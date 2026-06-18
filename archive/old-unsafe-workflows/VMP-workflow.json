@@ -1,0 +1,591 @@
+{
+  "name": "VMP",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "vmp-read",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ad34f38b-91fe-4041-ad25-ca1e2f7e9875",
+      "name": "Webhook",
+      "webhookId": "753b4f2e-6fd6-41df-80d4-eba0497c118e"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1FEl03KJYoBh2YwYOnBeEZkNGXPxYSVR6BPrZbhtgbEk/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "VMP",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1FEl03KJYoBh2YwYOnBeEZkNGXPxYSVR6BPrZbhtgbEk/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "a71a3a43-3748-40d3-b976-f2b2077c4b94",
+      "name": "Google Sheets (đọc)",
+      "credentials": {
+        "googleApi": {
+          "id": "uqbMxdAY6BDmg4Ez",
+          "name": "kết nối google"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// =============================================================================\n//  VMP MONITOR — Node \"Code in JavaScript\" cho n8n  (Mode: Run Once for All Items)\n//  -----------------------------------------------------------------------------\n//  ĐẶT NGAY SAU node Google Sheets → \"Get row(s) in sheet\".\n//  Sau node này nối tới node \"Respond to Webhook\" (Respond With: First Incoming Item).\n//\n//  Ưu điểm:\n//   • Khớp cột theo TÊN đã chuẩn hoá (bỏ dấu cách thừa, không phân biệt hoa/thường)\n//     → vẫn đúng dù header có khoảng trắng thừa (vd \"…hoàn thành đề cương \") hoặc lệch nhẹ.\n//   • Tự đưa mọi kiểu ngày (số serial Google / Date / chuỗi ISO / dd-mm-yyyy) về dd/mm/yyyy.\n//   • Bỏ qua dòng trống (không có Mã đối tượng).\n//   • Trả về đúng định dạng web cần: { ok, count, rows: [...] }.\n// =============================================================================\n\n// ---- 1) Bản đồ: TÊN CỘT (đã chuẩn hoá) -> khoá ngắn dùng trong web ----\nconst COLS = {\n  \"stt\":                                                      \"stt\",\n  \"phân loại đối tượng\":                                      \"phan_loai\",\n  \"loại thẩm định\":                                           \"loai_td\",\n  \"mã đối tượng\":                                             \"ma\",\n  \"tên đối tượng\":                                            \"ten\",\n  \"bộ phận quản lý\":                                          \"bo_phan\",\n  \"mã khu vực\":                                               \"khu_vuc\",\n  \"line\":                                                     \"line\",\n  \"tình trạng\":                                               \"tinh_trang\",\n  \"show\":                                                     \"show\",\n  \"thẩm định\":                                                \"td\",\n  \"tần suất thẩm định (tháng)\":                               \"tan_suat\",\n  \"năm\":                                                      \"nam\",\n  \"id thẩm định\":                                             \"id\",\n  \"số ngày công thẩm định thực tế\":                           \"so_ngay_cong\",\n  \"điểm trọng yếu\":                                           \"diem_trong_yeu\",\n  \"phân loại báo cáo\":                                        \"phan_loai_bc\",\n  \"qa phụ trách (qa nhập)\":                                   \"qa\",\n  \"email (qa nhập)\":                                          \"email_qa\",\n  \"nhân sự bộ phận khác (bộ phận khác nhập)\":                 \"ns_khac\",\n  \"email (bộ phận khác nhập)\":                                \"email_khac\",\n  \"deadline đề cương (t- 60 ngày)\":                           \"dl_de_cuong\",\n  \"thời gian thực tế hoàn thành đề cương\":                    \"ngay_de_cuong\",\n  \"trạng thái đề cương\":                                      \"tt_de_cuong\",\n  \"deadline thẩm định thực tế (t-5-bc)\":                      \"dl_tham_dinh\",\n  \"bộ phận quản lý xếp lịch thẩm định (dd/mm/yyyy hh:mm:ss)\": \"lich_td\",\n  \"thời gian thực tế hoàn thành thẩm định thực tế\":           \"ngay_tham_dinh\",\n  \"trạng thái thẩm định thực tế\":                             \"tt_tham_dinh\",\n  \"deadline báo cáo (t-5 ngày)\":                              \"dl_bao_cao\",\n  \"thời gian thực tế hoàn thành báo cáo\":                     \"ngay_bao_cao\",\n  \"trạng thái báo cáo\":                                       \"tt_bao_cao\",\n  \"deadline vmp (t)\":                                         \"dl_vmp\",\n  \"thời gian thực tế deadline vmp\":                           \"ngay_vmp\",\n  \"trạng thái vmp\":                                           \"tt_vmp\",\n};\n\n// Chuẩn hoá: bỏ dấu cách thừa + về chữ thường + gộp nhiều dấu cách thành 1.\nconst norm = (s) => String(s == null ? \"\" : s).trim().toLowerCase().replace(/\\s+/g, \" \");\nconst pad  = (n) => String(n).padStart(2, \"0\");\n\n// ---- 2) Đưa mọi kiểu ngày về \"dd/mm/yyyy\" ----\nfunction toDMY(v) {\n  if (v == null || v === \"\") return \"\";\n  if (v instanceof Date && !isNaN(v)) return `${pad(v.getDate())}/${pad(v.getMonth() + 1)}/${v.getFullYear()}`;\n  if (typeof v === \"number\" && isFinite(v)) {              // số serial của Google Sheets\n    const d = new Date(Math.round((v - 25569) * 86400000)); // 25569 ngày: 1899-12-30 → 1970-01-01\n    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;\n  }\n  const s = String(v).trim();\n  const iso = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);          // yyyy-mm-dd...\n  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;\n  const dmy = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);    // dd/mm/yyyy...\n  if (dmy) return `${pad(+dmy[1])}/${pad(+dmy[2])}/${dmy[3]}`;\n  return s;\n}\n\n// Các cột là NGÀY (ép về dd/mm/yyyy). Cột \"lich_td\" giữ nguyên vì có cả giờ.\nconst DATE_KEYS = new Set([\n  \"dl_de_cuong\", \"ngay_de_cuong\", \"dl_tham_dinh\", \"ngay_tham_dinh\",\n  \"dl_bao_cao\", \"ngay_bao_cao\", \"dl_vmp\", \"ngay_vmp\",\n]);\n\n// ---- 3) Lặp qua từng dòng Sheet, dựng object theo khoá ngắn ----\nconst rows = [];\nfor (const item of $input.all()) {\n  const src = item.json || {};\n\n  // map: tên-cột-đã-chuẩn-hoá -> giá trị (để khớp dù header lệch dấu cách/hoa thường)\n  const byNorm = {};\n  for (const key of Object.keys(src)) byNorm[norm(key)] = src[key];\n\n  const row = {};\n  for (const headerNorm in COLS) {\n    const shortKey = COLS[headerNorm];\n    let val = byNorm[headerNorm];\n    if (val == null) val = \"\";\n    if (DATE_KEYS.has(shortKey)) val = toDMY(val);\n    else if (typeof val === \"string\") val = val.trim();\n    row[shortKey] = val;\n  }\n\n  // --- Fallback MỀM cho 2 cột SỐ quan trọng: nếu khớp chính xác không ra,\n  //     dò theo từ khoá đặc trưng (\"ngày công\" / \"trọng yếu\") — an toàn vì\n  //     không cột nào khác chứa các từ này. Giúp vẫn đọc đúng dù tiêu đề lệch chữ.\n  if (String(row.so_ngay_cong).trim() === \"\") {\n    const k = Object.keys(byNorm).find((h) => h.includes(\"ngày công\") || h.includes(\"ngay cong\"));\n    if (k) { const v = byNorm[k]; row.so_ngay_cong = (typeof v === \"string\") ? v.trim() : v; }\n  }\n  if (String(row.diem_trong_yeu).trim() === \"\") {\n    const k = Object.keys(byNorm).find((h) => h.includes(\"trọng yếu\") || h.includes(\"trong yeu\"));\n    if (k) { const v = byNorm[k]; row.diem_trong_yeu = (typeof v === \"string\") ? v.trim() : v; }\n  }\n\n  // Bỏ dòng không có Mã đối tượng (dòng trống hoặc dòng chú thích).\n  if (String(row.ma).trim() !== \"\") rows.push(row);\n}\n\n// ---- 4) Trả về cho web (ĐÚNG định dạng adapter cần) ----\nreturn [{ json: { ok: true, count: rows.length, rows } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "7413633b-2d54-49b5-8752-4737b5fcd5d6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "d4884b1b-ac69-445f-a9a8-d7926b46d67a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vmp-write",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        224
+      ],
+      "id": "0d1d047b-b946-48aa-8c6e-5d07b3f0f82a",
+      "name": "Webhook1",
+      "webhookId": "3989b201-b384-4a6a-909b-c014b9acecd7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.body;\nconst p = typeof raw === 'string' ? JSON.parse(raw) : raw;\n\nif (p.action === 'ping') return [{ json: { ok: true, pong: true, ts: Date.now() } }];\nif (p.action !== 'updateRow' || !p.id) throw new Error('Thiếu action=updateRow hoặc id');\n\nconst pt = p.patch || {};\nreturn [{ json: {\n  id: p.id, user: p.user || '', ts: p.ts || '',\n  ngay_de_cuong:  pt.ngay_de_cuong  ?? '',\n  tt_de_cuong:    pt.tt_de_cuong    ?? '',\n  lich_td:        pt.lich_td        ?? '',\n  ngay_tham_dinh: pt.ngay_tham_dinh ?? '',\n  tt_tham_dinh:   pt.tt_tham_dinh   ?? '',\n  ngay_bao_cao:   pt.ngay_bao_cao   ?? '',\n  tt_bao_cao:     pt.tt_bao_cao     ?? '',\n  ngay_vmp:       pt.ngay_vmp       ?? '',\n  tt_vmp:         pt.tt_vmp         ?? '',\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        224
+      ],
+      "id": "b524917a-cd1a-4357-b2e5-0575c0be133d",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1FEl03KJYoBh2YwYOnBeEZkNGXPxYSVR6BPrZbhtgbEk/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "VMP",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1FEl03KJYoBh2YwYOnBeEZkNGXPxYSVR6BPrZbhtgbEk/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Thời gian thực tế hoàn thành đề cương\n": "={{ $json.ngay_de_cuong }}",
+            "Trạng thái đề cương": "={{ $json.tt_de_cuong }}",
+            "Bộ phận quản lý xếp lịch thẩm định\n(dd/mm/yyyy hh:mm:ss)": "={{ $json.lich_td }}",
+            "Thời gian thực tế hoàn thành Thẩm định thực tế": "={{ $json.ngay_tham_dinh }}",
+            "Trạng thái thẩm định thực tế": "={{ $json.tt_tham_dinh }}",
+            "Thời gian thực tế hoàn thành báo cáo": "={{ $json.ngay_bao_cao }}",
+            "Trạng thái báo cáo": "={{ $json.tt_bao_cao }}",
+            "Thời gian thực tế Deadline VMP": "={{ $json.ngay_vmp }}",
+            "Trạng thái VMP": "={{ $json.tt_vmp }}",
+            "ID thẩm định": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "ID thẩm định"
+          ],
+          "schema": [
+            {
+              "id": "STT",
+              "displayName": "STT",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phân loại đối tượng",
+              "displayName": "Phân loại đối tượng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Loại thẩm định",
+              "displayName": "Loại thẩm định",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Mã đối tượng",
+              "displayName": "Mã đối tượng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tên đối tượng",
+              "displayName": "Tên đối tượng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Bộ phận quản lý",
+              "displayName": "Bộ phận quản lý",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Mã khu vực",
+              "displayName": "Mã khu vực",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Line",
+              "displayName": "Line",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tình trạng",
+              "displayName": "Tình trạng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Show",
+              "displayName": "Show",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Thẩm định",
+              "displayName": "Thẩm định",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tần suất thẩm định (tháng)",
+              "displayName": "Tần suất thẩm định (tháng)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Năm",
+              "displayName": "Năm",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ID thẩm định",
+              "displayName": "ID thẩm định",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "QA phụ trách\n(QA nhập)",
+              "displayName": "QA phụ trách\n(QA nhập)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email\n(QA nhập)",
+              "displayName": "Email\n(QA nhập)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nhân sự bộ phận khác\n(Bộ phận khác nhập)",
+              "displayName": "Nhân sự bộ phận khác\n(Bộ phận khác nhập)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email\n(Bộ phận khác nhập)",
+              "displayName": "Email\n(Bộ phận khác nhập)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Deadline đề cương \n(T- 60 ngày)",
+              "displayName": "Deadline đề cương \n(T- 60 ngày)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Thời gian thực tế hoàn thành đề cương\n",
+              "displayName": "Thời gian thực tế hoàn thành đề cương\n",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Trạng thái đề cương",
+              "displayName": "Trạng thái đề cương",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Deadline thẩm định thực tế (T-5-BC)",
+              "displayName": "Deadline thẩm định thực tế (T-5-BC)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Bộ phận quản lý xếp lịch thẩm định\n(dd/mm/yyyy hh:mm:ss)",
+              "displayName": "Bộ phận quản lý xếp lịch thẩm định\n(dd/mm/yyyy hh:mm:ss)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Thời gian thực tế hoàn thành Thẩm định thực tế",
+              "displayName": "Thời gian thực tế hoàn thành Thẩm định thực tế",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Trạng thái thẩm định thực tế",
+              "displayName": "Trạng thái thẩm định thực tế",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phân loại báo cáo",
+              "displayName": "Phân loại báo cáo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Deadline báo cáo (T-5 ngày)",
+              "displayName": "Deadline báo cáo (T-5 ngày)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Thời gian thực tế hoàn thành báo cáo",
+              "displayName": "Thời gian thực tế hoàn thành báo cáo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Trạng thái báo cáo",
+              "displayName": "Trạng thái báo cáo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Deadline VMP (T)",
+              "displayName": "Deadline VMP (T)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Thời gian thực tế Deadline VMP",
+              "displayName": "Thời gian thực tế Deadline VMP",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Trạng thái VMP",
+              "displayName": "Trạng thái VMP",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hasNewRows",
+              "displayName": "hasNewRows",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "count",
+              "displayName": "count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "debug_sheetA",
+              "displayName": "debug_sheetA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "debug_sheetB",
+              "displayName": "debug_sheetB",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "=USER_ENTERED"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        224
+      ],
+      "id": "ff4567a0-4a14-4cca-87e1-b9415ec4b0ba",
+      "name": "Google Sheets (ghi)",
+      "credentials": {
+        "googleApi": {
+          "id": "uqbMxdAY6BDmg4Ez",
+          "name": "kết nối google"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{{ { \"ok\": true, \"id\": $('Code in JavaScript1').item.json.id } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        224
+      ],
+      "id": "da03aea3-8227-4ebb-9f41-1ec016461666",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets (đọc)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets (đọc)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets (ghi)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets (ghi)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "deefefbf-5dc4-4a67-a5ec-586b10734497",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9ea70412f6483404a24a396db9516cfc29e7c69a85518e948e0c2108ba561bd9"
+  },
+  "id": "h72rRPx5dHjZ01Bx",
+  "tags": []
+}
