@@ -1,0 +1,24 @@
+{
+  "name": "vmp-monitor",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "VMP Monitor — Theo dõi Kế hoạch Thẩm định Gốc (CPC1 HN). React + Vite, đồng bộ 2 chiều với Google Sheet qua n8n.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.1",
+    "lucide-react": "^0.408.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.2"
+  }
+}
