@@ -56,17 +56,41 @@ export async function fetchMissingItems(year) {
 // ============================================================
 // GHI: Cập nhật tiến độ qua RPC (có kiểm tra quyền + lý do)
 // ============================================================
-export async function updateProgressSupabase(validationCode, patch, reason) {
+export async function updateProgressSupabase(validationCode, patch, reason, sheetPatch) {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
 
   const { data, error } = await supabase.rpc("rpc_update_progress", {
     p_validation_code: validationCode,
     p_patch: patch,
     p_reason: reason || null,
+    p_sheet_patch: sheetPatch || null, // (MỚI) bản vá theo cột Sheet → RPC đưa vào hàng đợi đồng bộ (outbox)
   });
 
   if (error) throw new Error(error.message);
-  return data; // { ok, error?, msg?, reason_logged? }
+  return data; // { ok, error?, msg?, reason_logged?, outbox_id? }
+}
+
+// ============================================================
+// GHI: Đánh dấu 1 việc trong hàng đợi đồng bộ Sheet đã xong / lỗi
+// ------------------------------------------------------------
+//  Gọi SAU khi mirror tức thời (pushToSheet/WF-04) trả kết quả:
+//   - thành công → ok=true  → đánh dấu 'done' để WF-06 KHÔNG ghi Sheet lại lần nữa
+//   - thất bại   → KHÔNG cần gọi: để nguyên 'pending', WF-06 sẽ tự đẩy lại (~1 phút)
+//  Fire-and-forget: lỗi ở bước này không ảnh hưởng dữ liệu (đã nằm an toàn trong DB).
+// ============================================================
+export async function resolveOutbox(outboxId, ok, error) {
+  if (!supabase || !outboxId) return { ok: true, skipped: true };
+  try {
+    const { data, error: rpcErr } = await supabase.rpc("rpc_resolve_outbox", {
+      p_id: outboxId,
+      p_ok: !!ok,
+      p_error: error || null,
+    });
+    if (rpcErr) return { ok: false, error: rpcErr.message };
+    return data;
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 // ============================================================
