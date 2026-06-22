@@ -8,3 +8,41 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ===== Luxury login styles ===== */
+.vq-luxury-btn {
+  transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
+}
+.vq-luxury-btn:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.015);
+  filter: brightness(1.05);
+  box-shadow: 0 14px 36px rgba(111, 88, 201, .42), 0 4px 12px rgba(181, 71, 122, .28);
+}
+.vq-luxury-btn:active:not(:disabled) {
+  transform: translateY(0) scale(.99);
+}
+
+.vq-input-shell {
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.vq-input-shell:focus-within {
+  border-color: #B5477A;
+  box-shadow: 0 0 0 4px rgba(181, 71, 122, .10);
+  background: #fff;
+}
+
+.vq-crown-float {
+  animation: vqCrownFloat 6s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes vqCrownFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* Subtle responsive: stack the two panels on small screens */
+@media (max-width: 760px) {
+  .vq-login-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
