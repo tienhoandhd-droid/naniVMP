@@ -361,20 +361,106 @@ export function ROField({ label, value }) {
   );
 }
 
-// ======================== CROWN LOGO ========================
+// ======================== BRAND LOGO ========================
+// Brand mark CPC1 HN logo + V/Q team wordmark (cách điệu mạnh mẽ, dứt khoát).
+// Giữ tên export "CrownLogo" để không cần đổi import nơi khác.
+const VQ_NAVY = "#1E3A8A";
+const VQ_RED  = "#E63946";
+
+export function VQWordmark({ size = 22 }) {
+  // size = chiều cao chữ V/Q (px). "team" sẽ scale theo.
+  const teamSize = Math.round(size * 0.42);
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "baseline",
+        gap: 0,
+        fontFamily: TEXT,
+        userSelect: "none",
+        lineHeight: 1,
+      }}
+    >
+      <span
+        style={{
+          fontSize: size,
+          fontWeight: 900,
+          color: VQ_NAVY,
+          letterSpacing: "-0.04em",
+          textShadow: "0 1px 0 rgba(30,58,138,.08)",
+        }}
+      >
+        V
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          fontSize: size * 1.22,
+          fontWeight: 900,
+          color: VQ_RED,
+          display: "inline-block",
+          transform: "skewX(-18deg) translateY(2px)",
+          margin: `0 ${Math.round(size * 0.02)}px`,
+          textShadow: "0 2px 0 rgba(230,57,70,.18)",
+        }}
+      >
+        /
+      </span>
+      <span
+        style={{
+          fontSize: size,
+          fontWeight: 900,
+          color: VQ_NAVY,
+          letterSpacing: "-0.04em",
+          textShadow: "0 1px 0 rgba(30,58,138,.08)",
+        }}
+      >
+        Q
+      </span>
+      <span
+        style={{
+          fontSize: teamSize,
+          fontWeight: 700,
+          color: VQ_NAVY,
+          marginLeft: Math.round(size * 0.32),
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          opacity: 0.78,
+        }}
+      >
+        team
+      </span>
+    </div>
+  );
+}
+
 export function CrownLogo() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: 14, background: GRAD,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 20,
-      }}>
-        👑
+      <div
+        style={{
+          height: 40,
+          padding: "4px 8px",
+          borderRadius: 12,
+          background: "#fff",
+          border: `1px solid ${C.pinkSoft}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 2px 6px rgba(30,58,138,.08)",
+        }}
+      >
+        <img
+          src="./logo-cpc1hn.png"
+          alt="CPC1 HN"
+          style={{ height: 30, width: "auto", display: "block" }}
+        />
       </div>
       <div>
-        <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>VMP Monitor</div>
-        <div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 600 }}>CPC1 HN · QLCL</div>
+        <VQWordmark size={18} />
+        <div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+          CPC1 HN · QLCL
+        </div>
       </div>
     </div>
   );
