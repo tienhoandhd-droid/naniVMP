@@ -45,7 +45,7 @@ import { useDebounce, useScrollTop, useAuth, useVmpData } from "./hooks/index.js
 import {
   Sparkle, Mascot, Card, CardTitle, Tag, Modal, Donut, KpiCard, Sel,
   SkeletonPulse, SkeletonDashboard, SyncBanner, CrownLogo, VQWordmark,
-  GuardianSilhouette,
+  GuardianSilhouette, PrincessCommentary,
 } from "./components/ui/Primitives.jsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.jsx";
 
@@ -943,36 +943,55 @@ function Overview({ acts, setView }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Hero KPI */}
-      <Card variant="strong" style={{ display: "flex", alignItems: "center", gap: 24, padding: "28px 30px", flexWrap: "wrap" }}>
-        <div style={{ position: "relative" }}>
-          <Donut segments={[{ value: e.done, color: C.mint }, { value: e.over, color: C.rasp }, { value: e.todo, color: C.marigold }]} />
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ fontFamily: NUM, fontSize: 38, fontWeight: 800, color: C.plum, lineHeight: 1 }}>{e.rate}%</div>
-            <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>Thẩm định</div>
+      {/* Hero — 2 cột: Donut + Princess Commentary */}
+      <div
+        className="vmp-hero-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.15fr 1fr",
+          gap: 18,
+        }}
+      >
+        {/* Cột trái — Donut + stats */}
+        <Card variant="strong" style={{ display: "flex", alignItems: "center", gap: 24, padding: "26px 28px", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <Donut segments={[{ value: e.done, color: C.mint }, { value: e.over, color: C.rasp }, { value: e.todo, color: C.marigold }]} />
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ fontFamily: NUM, fontSize: 36, fontWeight: 800, color: C.plum, lineHeight: 1 }}>{e.rate}%</div>
+              <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>Thẩm định</div>
+            </div>
           </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800, color: C.plum, marginBottom: 8 }}>Tiến độ thẩm định {vmpToday().getFullYear()}</div>
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-            {[
-              { l: "Hoàn thành", v: e.done, c: C.mintText },
-              { l: "Quá hạn", v: e.over, c: C.raspText },
-              { l: "Chưa HT", v: e.todo, c: C.marigoldText },
-            ].map(s => (
-              <div key={s.l} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <span style={{ fontFamily: NUM, fontSize: 24, fontWeight: 800, color: s.c }}>{s.v}</span>
-                <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{s.l}</span>
-              </div>
-            ))}
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontFamily: TEXT, fontSize: 18, fontWeight: 800, color: C.plum, marginBottom: 10 }}>Tiến độ thẩm định {vmpToday().getFullYear()}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[
+                { l: "Hoàn thành", v: e.done, c: C.mintText },
+                { l: "Quá hạn", v: e.over, c: C.raspText },
+                { l: "Chưa HT", v: e.todo, c: C.marigoldText },
+              ].map(s => (
+                <div key={s.l} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: NUM, fontSize: 22, fontWeight: 800, color: s.c, minWidth: 28 }}>{s.v}</span>
+                  <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>{s.l}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
+              Hồ sơ: {d.rate}% ({d.done}/{d.total})
+              {gap > 0 && <div style={{ color: C.marigoldText, marginTop: 2 }}>Chênh {gap} hạng mục ({gapPts} điểm%)</div>}
+            </div>
           </div>
-          <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>
-            Hồ sơ: {d.rate}% ({d.done}/{d.total})
-            {gap > 0 && <span style={{ color: C.marigoldText }}> · Chênh {gap} hạng mục ({gapPts} điểm%)</span>}
-          </div>
-        </div>
-        <Mascot mood={e.rate >= 60 ? "happy" : "worried"} size={100} />
-      </Card>
+        </Card>
+
+        {/* Cột phải — Công chúa Vali commentary */}
+        <PrincessCommentary
+          stats={{
+            e, d,
+            overdue: overdue.length,
+            soon: soon.length,
+            mismatched: mismatched.length,
+          }}
+        />
+      </div>
 
       {/* Quick KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 16 }}>
