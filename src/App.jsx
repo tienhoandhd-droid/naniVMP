@@ -197,22 +197,22 @@ function LoginScreen({ onLogin }) {
             <GuardianSilhouette color="#F4E2BA" opacity={0.07} width={420} />
           </div>
 
-          {/* Top — CPC1HN as masthead (small, no card) */}
+          {/* Top — CPC1HN masthead (corporate presence, refined pill) */}
           <div style={{ position: "relative", zIndex: 1 }}>
             <div
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                padding: "5px 9px",
-                background: "rgba(255, 255, 255, 0.96)",
-                borderRadius: 5,
-                boxShadow: "0 1px 0 rgba(0,0,0,0.04)",
+                padding: "6px 10px",
+                background: "rgba(255, 255, 255, 0.97)",
+                borderRadius: 6,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
               }}
             >
               <img
                 src="./logo-cpc1hn.png"
                 alt="CPC1 HN"
-                style={{ height: 22, width: "auto", display: "block" }}
+                style={{ height: 40, width: "auto", display: "block" }}
               />
             </div>
           </div>
