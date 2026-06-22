@@ -366,17 +366,95 @@ export function ROField({ label, value }) {
 // Giữ tên export "CrownLogo" để không cần đổi import nơi khác.
 const VQ_NAVY = "#1E3A8A";
 const VQ_RED  = "#E63946";
+const VQ_GOLD = "#D4AF6A";
 
-export function VQWordmark({ size = 22 }) {
+// Vương miện line-art tối giản — sang trọng, "The Guardian Princess".
+// Không phải hoạt hình; chỉ là dấu hiệu thương hiệu nhẹ nhàng.
+export function CrownLineArt({ size = 56, color = "#fff", opacity = 0.92, strokeWidth = 1.4 }) {
+  return (
+    <svg
+      width={size}
+      height={size * 0.72}
+      viewBox="0 0 64 46"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ opacity, display: "block" }}
+      aria-hidden="true"
+    >
+      {/* Crown silhouette: 5 đỉnh đối xứng */}
+      <path d="M6 32 L12 10 L20 22 L26 6 L32 16 L38 6 L44 22 L52 10 L58 32 Z" />
+      {/* Base bar */}
+      <path d="M6 32 L58 32 L56 40 L8 40 Z" />
+      {/* 3 jewels ở các đỉnh chính */}
+      <circle cx="12" cy="10" r="1.6" fill={color} stroke="none" />
+      <circle cx="26" cy="6"  r="1.8" fill={color} stroke="none" />
+      <circle cx="38" cy="6"  r="1.8" fill={color} stroke="none" />
+      <circle cx="52" cy="10" r="1.6" fill={color} stroke="none" />
+      {/* Center jewel */}
+      <circle cx="32" cy="16" r="2.2" fill={color} stroke="none" opacity="0.85" />
+      {/* Decorative dots trên base */}
+      <circle cx="18" cy="36" r="1" fill={color} stroke="none" opacity="0.7" />
+      <circle cx="32" cy="36" r="1.2" fill={color} stroke="none" opacity="0.85" />
+      <circle cx="46" cy="36" r="1" fill={color} stroke="none" opacity="0.7" />
+    </svg>
+  );
+}
+
+// Watermark pattern dùng làm nền — vương miện + ngôi sao + lục giác.
+// Opacity rất thấp (0.04–0.06) để tạo chiều sâu, không phá layout.
+export function BrandWatermark({ color = "#fff", opacity = 0.05 }) {
+  return (
+    <svg
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        opacity,
+      }}
+      aria-hidden="true"
+    >
+      <defs>
+        <pattern id="vq-watermark" x="0" y="0" width="140" height="140" patternUnits="userSpaceOnUse">
+          {/* Crown */}
+          <g transform="translate(18, 24)" fill="none" stroke={color} strokeWidth="1.2" strokeLinejoin="round">
+            <path d="M0 18 L4 4 L10 12 L16 0 L22 12 L28 4 L32 18 Z" />
+            <path d="M0 18 L32 18 L30 24 L2 24 Z" />
+          </g>
+          {/* Star sparkle */}
+          <g transform="translate(96, 60)" fill={color}>
+            <path d="M0 -9 L2.2 -2.5 L9 0 L2.2 2.5 L0 9 L-2.2 2.5 L-9 0 L-2.2 -2.5 Z" />
+          </g>
+          {/* Hexagon */}
+          <g transform="translate(40, 96)" fill="none" stroke={color} strokeWidth="1.1">
+            <polygon points="11,0 19.5,5.5 19.5,16.5 11,22 2.5,16.5 2.5,5.5" />
+          </g>
+          {/* Small star */}
+          <g transform="translate(108, 110)" fill={color}>
+            <path d="M0 -5 L1.3 -1.5 L5 0 L1.3 1.5 L0 5 L-1.3 1.5 L-5 0 L-1.3 -1.5 Z" />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#vq-watermark)" />
+    </svg>
+  );
+}
+
+export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor }) {
   // size = chiều cao chữ V/Q (px). "team" sẽ scale theo.
   const teamSize = Math.round(size * 0.42);
+  const teamClr = teamColor || navy;
   return (
     <div
       style={{
         display: "inline-flex",
         alignItems: "baseline",
         gap: 0,
-        fontFamily: TEXT,
+        fontFamily: "'Poppins', system-ui, sans-serif",
         userSelect: "none",
         lineHeight: 1,
       }}
@@ -384,10 +462,9 @@ export function VQWordmark({ size = 22 }) {
       <span
         style={{
           fontSize: size,
-          fontWeight: 900,
-          color: VQ_NAVY,
+          fontWeight: 800,
+          color: navy,
           letterSpacing: "-0.04em",
-          textShadow: "0 1px 0 rgba(30,58,138,.08)",
         }}
       >
         V
@@ -396,12 +473,11 @@ export function VQWordmark({ size = 22 }) {
         aria-hidden="true"
         style={{
           fontSize: size * 1.22,
-          fontWeight: 900,
-          color: VQ_RED,
+          fontWeight: 800,
+          color: red,
           display: "inline-block",
           transform: "skewX(-18deg) translateY(2px)",
           margin: `0 ${Math.round(size * 0.02)}px`,
-          textShadow: "0 2px 0 rgba(230,57,70,.18)",
         }}
       >
         /
@@ -409,10 +485,9 @@ export function VQWordmark({ size = 22 }) {
       <span
         style={{
           fontSize: size,
-          fontWeight: 900,
-          color: VQ_NAVY,
+          fontWeight: 800,
+          color: navy,
           letterSpacing: "-0.04em",
-          textShadow: "0 1px 0 rgba(30,58,138,.08)",
         }}
       >
         Q
@@ -420,12 +495,12 @@ export function VQWordmark({ size = 22 }) {
       <span
         style={{
           fontSize: teamSize,
-          fontWeight: 700,
-          color: VQ_NAVY,
+          fontWeight: 600,
+          color: teamClr,
           marginLeft: Math.round(size * 0.32),
-          letterSpacing: "0.18em",
+          letterSpacing: "0.22em",
           textTransform: "uppercase",
-          opacity: 0.78,
+          opacity: 0.82,
         }}
       >
         team

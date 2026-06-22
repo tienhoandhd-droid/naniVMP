@@ -45,6 +45,7 @@ import { useDebounce, useScrollTop, useAuth, useVmpData } from "./hooks/index.js
 import {
   Sparkle, Mascot, Card, CardTitle, Tag, Modal, Donut, KpiCard, Sel,
   SkeletonPulse, SkeletonDashboard, SyncBanner, CrownLogo, VQWordmark,
+  CrownLineArt, BrandWatermark,
 } from "./components/ui/Primitives.jsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.jsx";
 
@@ -66,6 +67,36 @@ import { isSupabaseConfigured, signIn, signOut, changePassword, getAccessToken, 
 const sum = (arr) => arr.reduce((a, b) => a + b, 0);
 const NAV = NAV_ITEMS.filter(n => !n.adminOnly).slice(0, 7); // backward compat
 
+/* ===================== Daily greetings ===================== */
+// Lời chào theo khung giờ (cập nhật mỗi lần render trang đăng nhập)
+function getTimeOfDayGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 11) return "Chào buổi sáng! Chúc bạn một ngày mới tràn đầy năng lượng.";
+  if (h >= 11 && h < 13) return "Chúc bạn một buổi trưa thật nhẹ nhàng và ngon miệng.";
+  if (h >= 13 && h < 17) return "Chào buổi chiều! Chúc bạn tiếp tục một buổi chiều hiệu quả.";
+  if (h >= 17 && h < 22) return "Chào buổi tối! Cảm ơn vì sự nỗ lực của bạn hôm nay.";
+  return "Khuya rồi — nhớ chăm sóc sức khoẻ bạn nhé.";
+}
+
+// Câu chúc xoay vòng theo ngày — ổn định trong cả ngày, đổi khi sang ngày mới
+const DAILY_WISHES = [
+  "Một ngày mới — một cơ hội mới để làm điều tử tế.",
+  "Bạn đang góp phần bảo vệ chất lượng cuộc sống của rất nhiều người.",
+  "Mỗi nỗ lực hôm nay là nền móng cho một ngày mai vững chắc hơn.",
+  "Hãy tin vào những gì bạn đang làm — nó quan trọng hơn bạn nghĩ.",
+  "Hôm nay là một ngày tuyệt vời để học thêm một điều mới.",
+  "Chúc bạn một ngày làm việc trọn vẹn niềm vui và bình an.",
+  "Sự tử tế và chỉn chu của bạn hôm nay sẽ tạo nên sự khác biệt.",
+  "Việc bạn làm hôm nay quan trọng — vì sau mỗi quy trình là một con người.",
+  "Hãy bắt đầu nhẹ nhàng, kết thúc trọn vẹn. Chúc bạn một ngày tốt lành.",
+  "Cảm ơn bạn đã có mặt hôm nay — V/Q Team luôn cần bạn.",
+];
+function getDailyWish() {
+  const start = new Date(new Date().getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((Date.now() - start.getTime()) / 86400000);
+  return DAILY_WISHES[dayOfYear % DAILY_WISHES.length];
+}
+
 /* ===================== Login ===================== */
 function LoginScreen({ onLogin }) {
   const [u, setU] = useState(""); const [p, setP] = useState(""); const [err, setErr] = useState(""); const [show, setShow] = useState(false); const [loading, setLoading] = useState(false);
@@ -83,54 +114,325 @@ function LoginScreen({ onLogin }) {
     setLoading(false);
   };
   const field = (icon, props, right) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderRadius: 16, background: "#fff", border: `1.5px solid ${C.pinkSoft}` }}>
-      {icon}<input {...props} onKeyDown={(e) => e.key === "Enter" && submit()} style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14.5, color: C.plum, width: "100%", fontWeight: 600 }} />{right}
+    <div
+      className="vq-input-shell"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "14px 16px",
+        borderRadius: 12,
+        background: "#F8F9FB",
+        border: "1px solid #E5E7EB",
+      }}
+    >
+      {icon}
+      <input
+        {...props}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
+        style={{
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          fontFamily: "'Inter', system-ui, sans-serif",
+          fontSize: 14.5,
+          color: "#1F2937",
+          width: "100%",
+          fontWeight: 500,
+        }}
+      />
+      {right}
     </div>
   );
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: TEXT, padding: 20, background: `radial-gradient(720px 520px at 86% -5%, ${C.pinkMist}, transparent 60%), radial-gradient(640px 520px at -6% 104%, ${C.lavSoft}, transparent 55%), linear-gradient(160deg, ${C.bg1}, ${C.bg2})` }}>
-      {[{ t: "10%", l: "18%", s: 16, c: C.gold }, { t: "20%", l: "82%", s: 13, c: C.pink }, { t: "76%", l: "12%", s: 14, c: C.lav }, { t: "70%", l: "88%", s: 12, c: C.sky }].map((x, i) => <div key={i} className="tw" style={{ position: "fixed", top: x.t, left: x.l }}><Sparkle size={x.s} color={x.c} /></div>)}
-      <div style={{ width: "100%", maxWidth: 900, display: "grid", gridTemplateColumns: "1fr 1fr", borderRadius: 30, overflow: "hidden", boxShadow: "0 24px 60px rgba(238,123,169,.28)" }} className="login-grid">
-        <div style={{ background: GRAD, padding: "44px 40px", color: "#fff", position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", textAlign: "center" }}>
-          <div style={{ position: "absolute", top: 20, right: 26 }}><Sparkle size={20} color="#fff" style={{ opacity: .85 }} /></div>
-          <div style={{
-            padding: "10px 16px",
-            borderRadius: 18,
-            background: "rgba(255,255,255,.96)",
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'Inter', system-ui, sans-serif",
+        padding: 24,
+        background:
+          "radial-gradient(800px 600px at 88% -8%, #F4E7F0, transparent 60%), radial-gradient(700px 600px at -6% 108%, #E8E3F5, transparent 55%), linear-gradient(160deg, #FBF8FC, #F2EEF7)",
+      }}
+    >
+      <div
+        className="vq-login-grid"
+        style={{
+          width: "100%",
+          maxWidth: 980,
+          display: "grid",
+          gridTemplateColumns: "1.05fr 1fr",
+          borderRadius: 24,
+          overflow: "hidden",
+          boxShadow: "0 30px 80px rgba(94, 53, 132, .22), 0 8px 24px rgba(94, 53, 132, .10)",
+          background: "#fff",
+        }}
+      >
+        {/* ===== LEFT — Brand Panel ===== */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #A04D88 0%, #7B5CCB 100%)",
+            padding: "52px 44px",
+            color: "#fff",
+            position: "relative",
+            overflow: "hidden",
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 6px 16px rgba(0,0,0,.12)",
-          }}>
-            <img src="./logo-cpc1hn.png" alt="CPC1 HN" style={{ height: 44, width: "auto", display: "block" }} />
-          </div>
-          <Mascot mood="happy" size={170} />
-          <div>
-            <div style={{
-              display: "inline-block",
-              padding: "10px 18px",
-              borderRadius: 14,
-              background: "rgba(255,255,255,.96)",
-              boxShadow: "0 6px 18px rgba(0,0,0,.14)",
-            }}>
-              <VQWordmark size={30} />
+            flexDirection: "column",
+            justifyContent: "space-between",
+            minHeight: 540,
+          }}
+        >
+          {/* Watermark họa tiết */}
+          <BrandWatermark color="#fff" opacity={0.055} />
+
+          {/* Logo CPC1HN nhỏ ở góc trên-trái */}
+          <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "flex-start" }}>
+            <div
+              style={{
+                background: "#fff",
+                padding: "6px 12px",
+                borderRadius: 10,
+                display: "flex",
+                alignItems: "center",
+                boxShadow: "0 4px 12px rgba(0,0,0,.10)",
+              }}
+            >
+              <img src="./logo-cpc1hn.png" alt="CPC1 HN" style={{ height: 26, width: "auto", display: "block" }} />
             </div>
-            <div style={{ fontSize: 13.5, marginTop: 12, opacity: .95, lineHeight: 1.6 }}>Hệ Giám sát Thẩm định<br />CPC1 HN · QLCL</div>
+          </div>
+
+          {/* Middle: Crown + V/Q card */}
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 18,
+              marginTop: 8,
+            }}
+          >
+            {/* Vương miện line-art */}
+            <div className="vq-crown-float">
+              <CrownLineArt size={56} color="#F5D78B" opacity={0.95} strokeWidth={1.4} />
+            </div>
+
+            {/* Glass card chứa V/Q TEAM */}
+            <div
+              style={{
+                background: "rgba(255,255,255,0.97)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                padding: "22px 36px",
+                borderRadius: 18,
+                boxShadow: "0 16px 40px rgba(0,0,0,.22), 0 4px 12px rgba(0,0,0,.10)",
+                border: "1px solid rgba(255,255,255,.6)",
+              }}
+            >
+              <VQWordmark size={42} />
+            </div>
+
+            {/* Tagline tiếng Anh — Validation & Quality Excellence */}
+            <div style={{ textAlign: "center", marginTop: 4 }}>
+              <div
+                style={{
+                  fontFamily: "'Poppins', system-ui, sans-serif",
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  letterSpacing: "0.28em",
+                  textTransform: "uppercase",
+                  color: "#F5D78B",
+                  opacity: 0.95,
+                }}
+              >
+                Validation &nbsp;·&nbsp; Quality &nbsp;·&nbsp; Excellence
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom: mô tả hệ thống */}
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              textAlign: "center",
+              fontFamily: "'Inter', system-ui, sans-serif",
+              fontSize: 13,
+              lineHeight: 1.65,
+              opacity: 0.88,
+              letterSpacing: "0.02em",
+            }}
+          >
+            Hệ thống Quản lý Thẩm định
+            <br />
+            <span style={{ fontWeight: 600, letterSpacing: "0.06em" }}>CPC1 HÀ NỘI · QLCL</span>
           </div>
         </div>
-        <div style={{ background: C.pinkMist, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <div style={{ fontFamily: TEXT, fontSize: 24, fontWeight: 800, color: C.plum }}>Xin chào!</div>
-          <div style={{ fontSize: 13.5, color: C.plumSoft, marginTop: 5, marginBottom: 22, fontWeight: 700 }}>{useSupa ? "Đăng nhập bằng email Supabase" : "Đăng nhập để bắt đầu"}</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {field(<Boxes size={18} color={C.pink} />, { placeholder: useSupa ? "Email" : "Tài khoản", value: u, onChange: (e) => { setU(e.target.value); setErr(""); } })}
-            {field(<Lock size={18} color={C.pink} />, { placeholder: "Mật khẩu", type: show ? "text" : "password", value: p, onChange: (e) => { setP(e.target.value); setErr(""); } }, <button onClick={() => setShow(!show)} style={{ border: "none", background: "transparent", cursor: "pointer", display: "flex" }}>{show ? <EyeOff size={17} color={C.plumSoft} /> : <Eye size={17} color={C.plumSoft} />}</button>)}
-            {err && <div style={{ color: C.raspText, fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}><XCircle size={15} /> {err}</div>}
-            <button onClick={submit} disabled={loading} style={{ ...btnPrimary, marginTop: 4, padding: "14px", borderRadius: 16, fontSize: 15, boxShadow: "0 8px 20px rgba(190,69,116,.35)", opacity: loading ? .7 : 1 }}>{loading ? "Đang đăng nhập…" : "Đăng nhập"}</button>
+
+        {/* ===== RIGHT — Form Panel ===== */}
+        <div
+          style={{
+            background: "#FCFCFD",
+            padding: "56px 48px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Poppins', system-ui, sans-serif",
+              fontSize: 26,
+              fontWeight: 600,
+              color: "#1F2937",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Xin chào!
           </div>
+          <div
+            style={{
+              fontFamily: "'Inter', system-ui, sans-serif",
+              fontSize: 13.5,
+              color: "#6B7280",
+              marginTop: 8,
+              marginBottom: 28,
+              fontWeight: 500,
+              lineHeight: 1.55,
+            }}
+          >
+            {getTimeOfDayGreeting()}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {field(
+              <Boxes size={18} color="#A04D88" />,
+              {
+                placeholder: useSupa ? "Email" : "Tài khoản",
+                value: u,
+                onChange: (e) => {
+                  setU(e.target.value);
+                  setErr("");
+                },
+              }
+            )}
+            {field(
+              <Lock size={18} color="#A04D88" />,
+              {
+                placeholder: "Mật khẩu",
+                type: show ? "text" : "password",
+                value: p,
+                onChange: (e) => {
+                  setP(e.target.value);
+                  setErr("");
+                },
+              },
+              <button
+                onClick={() => setShow(!show)}
+                style={{ border: "none", background: "transparent", cursor: "pointer", display: "flex" }}
+                aria-label={show ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              >
+                {show ? <EyeOff size={17} color="#6B7280" /> : <Eye size={17} color="#6B7280" />}
+              </button>
+            )}
+
+            {err && (
+              <div
+                style={{
+                  color: "#B91C1C",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                }}
+              >
+                <XCircle size={15} /> {err}
+              </div>
+            )}
+
+            <button
+              className="vq-luxury-btn"
+              onClick={submit}
+              disabled={loading}
+              style={{
+                marginTop: 8,
+                height: 56,
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                color: "#fff",
+                fontFamily: "'Poppins', system-ui, sans-serif",
+                fontSize: 15,
+                fontWeight: 600,
+                letterSpacing: "0.02em",
+                borderRadius: 14,
+                background: "linear-gradient(135deg, #B5477A 0%, #6F58C9 100%)",
+                boxShadow: "0 8px 25px rgba(111, 88, 201, .32), 0 2px 8px rgba(181, 71, 122, .20)",
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? "Đang đăng nhập…" : "Đăng nhập"}
+            </button>
+          </div>
+
           {useSupa ? (
-            <div style={{ marginTop: 18, padding: "12px 15px", borderRadius: 14, background: C.mintSoft, fontSize: 12, color: C.mintText, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}><ShieldCheck size={15} /> Xác thực qua Supabase · Mật khẩu mã hoá · Audit log</div>
+            <div
+              style={{
+                marginTop: 26,
+                paddingTop: 20,
+                borderTop: "1px solid #F3F4F6",
+                textAlign: "center",
+              }}
+            >
+              <div
+                aria-hidden="true"
+                style={{
+                  fontFamily: "'Poppins', system-ui, sans-serif",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: "0.32em",
+                  textTransform: "uppercase",
+                  color: "#A04D88",
+                  opacity: 0.7,
+                  marginBottom: 8,
+                }}
+              >
+                ✦ &nbsp; Lời chúc hôm nay &nbsp; ✦
+              </div>
+              <div
+                style={{
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontSize: 13,
+                  fontStyle: "italic",
+                  color: "#6B5572",
+                  lineHeight: 1.65,
+                  fontWeight: 500,
+                  padding: "0 6px",
+                }}
+              >
+                “{getDailyWish()}”
+              </div>
+            </div>
           ) : (
-            <div style={{ marginTop: 18, padding: "12px 15px", borderRadius: 14, background: C.marigoldSoft, fontSize: 12, color: C.marigoldText, fontWeight: 700 }}>Chế độ tạm (chưa có Supabase). Xem hướng dẫn để nâng cấp.</div>
+            <div
+              style={{
+                marginTop: 22,
+                padding: "12px 15px",
+                borderRadius: 12,
+                background: "#FFFBEB",
+                border: "1px solid #FEF3C7",
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 12,
+                color: "#92400E",
+                fontWeight: 500,
+              }}
+            >
+              Chế độ tạm (chưa có Supabase). Xem hướng dẫn để nâng cấp.
+            </div>
           )}
         </div>
       </div>
