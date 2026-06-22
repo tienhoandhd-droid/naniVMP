@@ -31,15 +31,6 @@ body {
   background: #fff;
 }
 
-.vq-crown-float {
-  animation: vqCrownFloat 6s ease-in-out infinite;
-  transform-origin: center;
-}
-@keyframes vqCrownFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-4px); }
-}
-
 /* Subtle responsive: stack the two panels on small screens */
 @media (max-width: 760px) {
   .vq-login-grid {

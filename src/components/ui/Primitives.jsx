@@ -444,6 +444,67 @@ export function BrandWatermark({ color = "#fff", opacity = 0.05 }) {
   );
 }
 
+// Guardian silhouette — bóng người bảo hộ chất lượng có vương miện.
+// Dùng FILLED shape (không phải line-art) để vẫn đọc được ở 4-6% opacity.
+// Crop ở phần dưới — gợi ý là bức tranh lớn hơn khung nhìn.
+export function GuardianSilhouette({
+  color = "#FFFFFF",
+  opacity = 0.055,
+  width = 360,
+  style = {},
+}) {
+  return (
+    <svg
+      viewBox="0 0 300 380"
+      width={width}
+      height={width * (380 / 300)}
+      style={{
+        opacity,
+        pointerEvents: "none",
+        display: "block",
+        ...style,
+      }}
+      aria-hidden="true"
+    >
+      <g fill={color}>
+        {/* Crown — 5 peaks regal */}
+        <path d="M 108 58 L 124 22 L 138 60 L 150 8 L 162 60 L 176 22 L 192 58 L 196 76 L 104 76 Z" />
+        <rect x="104" y="76" width="92" height="10" rx="1" />
+        {/* Jewel orb on top center */}
+        <circle cx="150" cy="6" r="4" />
+        {/* Crown band detail */}
+        <rect x="104" y="90" width="92" height="3" opacity="0.7" />
+        {/* Head — oval */}
+        <ellipse cx="150" cy="135" rx="38" ry="48" />
+        {/* Neck */}
+        <rect x="140" y="180" width="20" height="16" />
+        {/* Royal collar / shoulders — wide regal silhouette */}
+        <path d="
+          M 60 240
+          Q 75 210, 110 200
+          Q 130 196, 140 196
+          L 160 196
+          Q 170 196, 190 200
+          Q 225 210, 240 240
+          L 244 280
+          Q 240 320, 232 360
+          L 68 360
+          Q 60 320, 56 280
+          Z
+        " />
+        {/* Cape extending below — softer */}
+        <path
+          d="M 56 280 Q 36 340, 24 380 L 276 380 Q 264 340, 244 280 Z"
+          opacity="0.6"
+        />
+        {/* Subtle medallion center */}
+        <circle cx="150" cy="240" r="3.5" opacity="0.5" />
+      </g>
+    </svg>
+  );
+}
+
+
 export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor }) {
   // size = chiều cao chữ V/Q (px). "team" sẽ scale theo.
   const teamSize = Math.round(size * 0.42);

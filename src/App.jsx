@@ -45,7 +45,7 @@ import { useDebounce, useScrollTop, useAuth, useVmpData } from "./hooks/index.js
 import {
   Sparkle, Mascot, Card, CardTitle, Tag, Modal, Donut, KpiCard, Sel,
   SkeletonPulse, SkeletonDashboard, SyncBanner, CrownLogo, VQWordmark,
-  CrownLineArt, BrandWatermark,
+  GuardianSilhouette,
 } from "./components/ui/Primitives.jsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.jsx";
 
@@ -170,105 +170,144 @@ function LoginScreen({ onLogin }) {
           background: "#fff",
         }}
       >
-        {/* ===== LEFT — Brand Panel ===== */}
+        {/* ===== LEFT — Brand Panel · Quiet Luxury ===== */}
         <div
           style={{
-            background: "linear-gradient(135deg, #A04D88 0%, #7B5CCB 100%)",
-            padding: "52px 44px",
-            color: "#fff",
+            background:
+              "radial-gradient(900px 700px at 105% 105%, #4A2353 0%, #3D1B45 55%, #371740 100%)",
+            padding: "56px 64px 48px 56px",
+            color: "#FFFFFF",
             position: "relative",
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between",
-            minHeight: 540,
+            minHeight: 580,
           }}
         >
-          {/* Watermark họa tiết */}
-          <BrandWatermark color="#fff" opacity={0.055} />
+          {/* Guardian silhouette — bottom-right, faint watermark */}
+          <div
+            style={{
+              position: "absolute",
+              right: -90,
+              bottom: -80,
+              zIndex: 0,
+              pointerEvents: "none",
+            }}
+          >
+            <GuardianSilhouette color="#F4E2BA" opacity={0.07} width={420} />
+          </div>
 
-          {/* Logo CPC1HN nhỏ ở góc trên-trái */}
-          <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "flex-start" }}>
+          {/* Top — CPC1HN as masthead (small, no card) */}
+          <div style={{ position: "relative", zIndex: 1 }}>
             <div
               style={{
-                background: "#fff",
-                padding: "6px 12px",
-                borderRadius: 10,
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                boxShadow: "0 4px 12px rgba(0,0,0,.10)",
+                padding: "5px 9px",
+                background: "rgba(255, 255, 255, 0.96)",
+                borderRadius: 5,
+                boxShadow: "0 1px 0 rgba(0,0,0,0.04)",
               }}
             >
-              <img src="./logo-cpc1hn.png" alt="CPC1 HN" style={{ height: 26, width: "auto", display: "block" }} />
+              <img
+                src="./logo-cpc1hn.png"
+                alt="CPC1 HN"
+                style={{ height: 22, width: "auto", display: "block" }}
+              />
             </div>
           </div>
 
-          {/* Middle: Crown + V/Q card */}
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 18,
-              marginTop: 8,
-            }}
-          >
-            {/* Vương miện line-art */}
-            <div className="vq-crown-float">
-              <CrownLineArt size={56} color="#F5D78B" opacity={0.95} strokeWidth={1.4} />
-            </div>
+          {/* Flexible upper spacer — pushes title block to lower 2/3 */}
+          <div style={{ flex: 1.2 }} />
 
-            {/* Glass card chứa V/Q TEAM */}
+          {/* Editorial title block */}
+          <div style={{ position: "relative", zIndex: 1 }}>
+            {/* Champagne gold hairline */}
             <div
               style={{
-                background: "rgba(255,255,255,0.97)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                padding: "22px 36px",
-                borderRadius: 18,
-                boxShadow: "0 16px 40px rgba(0,0,0,.22), 0 4px 12px rgba(0,0,0,.10)",
-                border: "1px solid rgba(255,255,255,.6)",
+                height: 1.5,
+                width: 36,
+                background: "#C9A961",
+                marginBottom: 28,
+                opacity: 0.95,
+              }}
+            />
+
+            {/* V/Q — line 1 */}
+            <div
+              style={{
+                fontFamily: "'Cormorant Garamond', 'Times New Roman', serif",
+                fontSize: 92,
+                fontWeight: 500,
+                lineHeight: 0.92,
+                letterSpacing: "-0.02em",
+                color: "#FFFFFF",
+                display: "flex",
+                alignItems: "baseline",
               }}
             >
-              <VQWordmark size={42} />
-            </div>
-
-            {/* Tagline tiếng Anh — Validation & Quality Excellence */}
-            <div style={{ textAlign: "center", marginTop: 4 }}>
-              <div
+              <span>V</span>
+              <span
                 style={{
-                  fontFamily: "'Poppins', system-ui, sans-serif",
-                  fontSize: 12.5,
-                  fontWeight: 500,
-                  letterSpacing: "0.28em",
-                  textTransform: "uppercase",
-                  color: "#F5D78B",
-                  opacity: 0.95,
+                  color: "#C9A961",
+                  fontWeight: 400,
+                  margin: "0 -0.04em",
                 }}
               >
-                Validation &nbsp;·&nbsp; Quality &nbsp;·&nbsp; Excellence
-              </div>
+                /
+              </span>
+              <span>Q</span>
+            </div>
+
+            {/* TEAM — line 2 */}
+            <div
+              style={{
+                fontFamily: "'Cormorant Garamond', 'Times New Roman', serif",
+                fontSize: 92,
+                fontWeight: 500,
+                lineHeight: 0.92,
+                letterSpacing: "0.01em",
+                color: "#FFFFFF",
+                marginTop: 4,
+                marginBottom: 30,
+              }}
+            >
+              TEAM
+            </div>
+
+            {/* Tagline — Validation & Qualification */}
+            <div
+              style={{
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 12.5,
+                fontWeight: 500,
+                letterSpacing: "0.32em",
+                textTransform: "uppercase",
+                color: "#C9A961",
+                opacity: 0.92,
+              }}
+            >
+              Validation &nbsp;&amp;&nbsp; Qualification
             </div>
           </div>
 
-          {/* Bottom: mô tả hệ thống */}
+          {/* Flexible lower spacer */}
+          <div style={{ flex: 0.5 }} />
+
+          {/* Bottom — Department signature */}
           <div
             style={{
               position: "relative",
               zIndex: 1,
-              textAlign: "center",
               fontFamily: "'Inter', system-ui, sans-serif",
-              fontSize: 13,
-              lineHeight: 1.65,
-              opacity: 0.88,
-              letterSpacing: "0.02em",
+              fontSize: 12,
+              fontWeight: 400,
+              color: "#FFFFFF",
+              opacity: 0.62,
+              letterSpacing: "0.08em",
             }}
           >
-            Hệ thống Quản lý Thẩm định
-            <br />
-            <span style={{ fontWeight: 600, letterSpacing: "0.06em" }}>CPC1 HÀ NỘI · QLCL</span>
+            Phòng Quản lý Chất lượng
           </div>
         </div>
 
