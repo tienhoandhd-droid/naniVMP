@@ -44,7 +44,7 @@ import { useDebounce, useScrollTop, useAuth, useVmpData } from "./hooks/index.js
 // ===== UI Primitives =====
 import {
   Sparkle, Mascot, Card, CardTitle, Tag, Modal, Donut, KpiCard, Sel,
-  SkeletonPulse, SkeletonDashboard, SyncBanner, CrownLogo,
+  SkeletonPulse, SkeletonDashboard, SyncBanner, CrownLogo, VQWordmark,
 } from "./components/ui/Primitives.jsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.jsx";
 
@@ -93,11 +93,29 @@ function LoginScreen({ onLogin }) {
       <div style={{ width: "100%", maxWidth: 900, display: "grid", gridTemplateColumns: "1fr 1fr", borderRadius: 30, overflow: "hidden", boxShadow: "0 24px 60px rgba(238,123,169,.28)" }} className="login-grid">
         <div style={{ background: GRAD, padding: "44px 40px", color: "#fff", position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", textAlign: "center" }}>
           <div style={{ position: "absolute", top: 20, right: 26 }}><Sparkle size={20} color="#fff" style={{ opacity: .85 }} /></div>
-          <div style={{ width: 56, height: 56, borderRadius: 18, background: "rgba(255,255,255,.24)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>👑</div>
+          <div style={{
+            padding: "10px 16px",
+            borderRadius: 18,
+            background: "rgba(255,255,255,.96)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 6px 16px rgba(0,0,0,.12)",
+          }}>
+            <img src="./logo-cpc1hn.png" alt="CPC1 HN" style={{ height: 44, width: "auto", display: "block" }} />
+          </div>
           <Mascot mood="happy" size={170} />
           <div>
-            <div style={{ fontFamily: TEXT, fontSize: 26, fontWeight: 800 }}>VMP Monitor</div>
-            <div style={{ fontSize: 13.5, marginTop: 6, opacity: .95, lineHeight: 1.6 }}>Hệ Giám sát Thẩm định<br />CPC1 HN · V/Q Team — QLCL</div>
+            <div style={{
+              display: "inline-block",
+              padding: "10px 18px",
+              borderRadius: 14,
+              background: "rgba(255,255,255,.96)",
+              boxShadow: "0 6px 18px rgba(0,0,0,.14)",
+            }}>
+              <VQWordmark size={30} />
+            </div>
+            <div style={{ fontSize: 13.5, marginTop: 12, opacity: .95, lineHeight: 1.6 }}>Hệ Giám sát Thẩm định<br />CPC1 HN · QLCL</div>
           </div>
         </div>
         <div style={{ background: C.pinkMist, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
