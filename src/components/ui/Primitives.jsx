@@ -2,6 +2,7 @@
  *  components/ui/Primitives.jsx — Shared UI Components
  *  Card, Tag, Modal, Donut, KpiCard, Sparkle, Skeleton, etc.
  * ===================================================================== */
+import { useId } from "react";
 import { C, TEXT, NUM, GRAD, cardDefault, cardStrong, cardSoft, glass, btnPrimary, FIELD, LBL, INP } from "../../constants/theme.js";
 import { STATUS } from "../../constants/vmp.js";
 import { XCircle } from "lucide-react";
@@ -15,44 +16,435 @@ export function Sparkle({ size = 18, color = C.gold, style }) {
   );
 }
 
-// ======================== MASCOT ========================
-export function Mascot({ mood, size = 130 }) {
+// ======================== MASCOT (refined) ========================
+// Công chúa Vali — phiên bản tinh tế hơn. Dùng gradient, manga eyes, crown có jewels.
+// Vẫn là SVG (không phải anime PNG), nhưng đẹp hơn cartoon cũ đáng kể.
+export function Mascot({ mood = "happy", size = 140 }) {
+  // Unique id cho gradient để tránh xung đột khi render nhiều mascot
+  const uid = useId().replace(/:/g, "");
+  // Palette tinh tế
+  const skin       = "#FFE2D0";
+  const skinShade  = "#F0C5AE";
+  const hairLight  = "#E0BFF0";   // lavender light
+  const hairMid    = "#B58FE0";   // mid purple
+  const hairDeep   = "#7E5BB8";   // deep purple
+  const blush      = "#FFB7C7";
+  const eyeDeep    = "#4A2D87";
+  const eyeMid     = "#6B45B8";
+  const crownLight = "#FFE9A8";
+  const crownGold  = "#E8C76A";
+  const crownDeep  = "#B89020";
+  const jewelRed   = "#E63946";
+  const jewelBlue  = "#5DB3E0";
+  const lips       = "#D8607A";
+
   const happy = mood === "happy";
-  const hair = "#E3A9D6", hairDark = "#C77FBE", skin = "#FFE0CD";
+  const worried = mood === "worried";
+
   return (
-    <svg width={size} height={size} viewBox="0 0 150 150" className="bob" style={{ overflow: "visible" }}>
-      <ellipse cx="75" cy="74" rx="46" ry="48" fill={hair} />
-      <ellipse cx="42" cy="92" rx="13" ry="22" fill={hairDark} opacity="0.8" />
-      <ellipse cx="108" cy="92" rx="13" ry="22" fill={hairDark} opacity="0.8" />
-      {!happy && (<g fill={hairDark}><path d="M52 30 L46 14 L58 28 Z" /><path d="M70 24 L70 8 L78 24 Z" /><path d="M92 30 L102 16 L96 31 Z" /><path d="M34 52 L18 46 L33 56 Z" /><path d="M116 52 L132 48 L117 58 Z" /></g>)}
-      <circle cx="75" cy="76" r="31" fill={skin} />
-      <path d="M44 74 C46 48 104 48 106 74 C96 60 54 60 44 74 Z" fill={hair} />
-      <ellipse cx="57" cy="84" rx="6.5" ry="4.5" fill="#F7A8C4" opacity="0.85" />
-      <ellipse cx="93" cy="84" rx="6.5" ry="4.5" fill="#F7A8C4" opacity="0.85" />
-      <g transform={happy ? "" : "rotate(-14 75 46)"}><path d="M60 48 L64 33 L72 44 L80 33 L84 48 Z" fill={C.gold} stroke="#E0A21F" strokeWidth="1" /><circle cx="72" cy="35" r="3" fill={C.pink} /></g>
+    <svg
+      width={size}
+      height={size * 1.08}
+      viewBox="0 0 200 216"
+      className="bob"
+      style={{ overflow: "visible", display: "block" }}
+      aria-label="Công chúa Vali"
+    >
+      <defs>
+        <linearGradient id={`hair-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={hairLight} />
+          <stop offset="0.55" stopColor={hairMid} />
+          <stop offset="1" stopColor={hairDeep} />
+        </linearGradient>
+        <radialGradient id={`face-${uid}`} cx="0.5" cy="0.42" r="0.55">
+          <stop offset="0" stopColor="#FFEFE2" />
+          <stop offset="0.82" stopColor={skin} />
+          <stop offset="1" stopColor={skinShade} />
+        </radialGradient>
+        <linearGradient id={`crown-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={crownLight} />
+          <stop offset="0.55" stopColor={crownGold} />
+          <stop offset="1" stopColor={crownDeep} />
+        </linearGradient>
+        <linearGradient id={`dress-${uid}`} x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor={hairMid} />
+          <stop offset="1" stopColor={hairDeep} />
+        </linearGradient>
+      </defs>
+
+      {/* Hair background — long flowing */}
+      <path
+        d="M 36 108
+           Q 28 82, 42 60
+           Q 42 28, 78 22
+           Q 100 6, 122 22
+           Q 158 28, 158 60
+           Q 172 82, 164 108
+           Q 172 140, 164 172
+           Q 158 195, 152 210
+           L 48 210
+           Q 42 195, 36 172
+           Q 28 140, 36 108 Z"
+        fill={`url(#hair-${uid})`}
+      />
+
+      {/* Hair side accent strands */}
+      <path d="M 38 96 Q 30 135, 44 185 L 52 210 L 56 210 Q 46 175, 50 130 Z" fill={hairDeep} opacity="0.4" />
+      <path d="M 162 96 Q 170 135, 156 185 L 148 210 L 144 210 Q 154 175, 150 130 Z" fill={hairDeep} opacity="0.4" />
+
+      {/* Face oval */}
+      <ellipse cx="100" cy="106" rx="46" ry="54" fill={`url(#face-${uid})`} />
+
+      {/* Bangs / forehead hair */}
+      <path
+        d="M 56 74
+           Q 60 52, 82 50
+           Q 92 42, 100 47
+           Q 108 42, 118 50
+           Q 140 52, 144 74
+           Q 134 80, 120 73
+           Q 110 67, 100 72
+           Q 90 67, 80 73
+           Q 66 80, 56 74 Z"
+        fill={`url(#hair-${uid})`}
+      />
+
+      {/* === Crown === */}
+      <g>
+        {/* 5-peak crown silhouette */}
+        <path
+          d="M 66 40
+             L 75 22
+             L 82 38
+             L 92 16
+             L 100 32
+             L 108 16
+             L 118 38
+             L 125 22
+             L 134 40
+             L 136 50
+             L 64 50 Z"
+          fill={`url(#crown-${uid})`}
+          stroke={crownDeep}
+          strokeWidth="0.8"
+        />
+        {/* Crown base band */}
+        <rect x="64" y="50" width="72" height="6.5" rx="1" fill={crownGold} stroke={crownDeep} strokeWidth="0.6" />
+        {/* Subtle band pattern */}
+        <circle cx="76"  cy="53" r="1.4" fill={crownDeep} opacity="0.7" />
+        <circle cx="100" cy="53" r="1.6" fill={crownDeep} opacity="0.7" />
+        <circle cx="124" cy="53" r="1.4" fill={crownDeep} opacity="0.7" />
+        {/* Jewels on peaks */}
+        <circle cx="75"  cy="22" r="2.6" fill={jewelRed} />
+        <circle cx="92"  cy="16" r="3"   fill={jewelRed} />
+        <circle cx="100" cy="32" r="3.6" fill={jewelBlue} />
+        <circle cx="108" cy="16" r="3"   fill={jewelRed} />
+        <circle cx="125" cy="22" r="2.6" fill={jewelRed} />
+        {/* Jewel highlights */}
+        <circle cx="74" cy="21" r="0.8" fill="#fff" opacity="0.8" />
+        <circle cx="91" cy="15" r="0.9" fill="#fff" opacity="0.8" />
+        <circle cx="99" cy="30" r="1.1" fill="#fff" opacity="0.8" />
+        <circle cx="107" cy="15" r="0.9" fill="#fff" opacity="0.8" />
+        <circle cx="124" cy="21" r="0.8" fill="#fff" opacity="0.8" />
+        {/* Crown gloss highlight */}
+        <ellipse cx="100" cy="42" rx="22" ry="2" fill="#FFF4D6" opacity="0.55" />
+      </g>
+
+      {/* === Eyebrows === */}
+      <path d="M 73 89 Q 82 86 91 89" fill="none" stroke={hairDeep} strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M 109 89 Q 118 86 127 89" fill="none" stroke={hairDeep} strokeWidth="1.4" strokeLinecap="round" />
+
+      {/* === Eyes — manga style with highlights === */}
       {happy ? (
         <>
-          <path d="M60 76 Q65 71 70 76" fill="none" stroke={C.plum} strokeWidth="2.6" strokeLinecap="round" />
-          <path d="M80 76 Q85 71 90 76" fill="none" stroke={C.plum} strokeWidth="2.6" strokeLinecap="round" />
-          <path d="M66 90 Q75 100 84 90 Q75 95 66 90 Z" fill="#D8607E" />
-          <path d="M118 40 C119 44 121 46 125 47 C121 48 119 50 118 54 C117 50 115 48 111 47 C115 46 117 44 118 40 Z" fill={C.gold} />
-          <path d="M30 60 C31 63 32 64 35 65 C32 66 31 67 30 70 C29 67 28 66 25 65 C28 64 29 63 30 60 Z" fill={C.pink} />
+          {/* Closed-happy eyes (smile arcs) */}
+          <path d="M 73 102 Q 82 96 91 102" fill="none" stroke={eyeDeep} strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M 109 102 Q 118 96 127 102" fill="none" stroke={eyeDeep} strokeWidth="2.8" strokeLinecap="round" />
+          {/* Sparkle dots */}
+          <circle cx="68" cy="98" r="1.3" fill={crownGold} opacity="0.85" />
+          <circle cx="132" cy="98" r="1.3" fill={crownGold} opacity="0.85" />
         </>
       ) : (
         <>
-          <path d="M56 67 L65 64" stroke={C.plum} strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M94 67 L85 64" stroke={C.plum} strokeWidth="2.2" strokeLinecap="round" />
-          <circle cx="64" cy="76" r="5" fill="#fff" stroke={C.plum} strokeWidth="1.4" /><circle cx="65" cy="77" r="2.4" fill={C.plum} />
-          <circle cx="86" cy="76" r="5" fill="#fff" stroke={C.plum} strokeWidth="1.4" /><circle cx="85" cy="77" r="2.4" fill={C.plum} />
-          <path d="M68 92 Q72 88 75 92 Q78 96 82 92" fill="none" stroke="#C0506E" strokeWidth="2.4" strokeLinecap="round" />
-          <path d="M104 64 C100 70 108 70 104 64 Z" fill="#8FC4EC" /><ellipse cx="103" cy="67" rx="1.2" ry="1.6" fill="#fff" opacity="0.7" />
+          {/* Open eyes - large oval with multi-tone irises */}
+          <g>
+            {/* Eye whites */}
+            <ellipse cx="82" cy="104" rx="6.5" ry="8" fill="#FCFAFF" />
+            <ellipse cx="118" cy="104" rx="6.5" ry="8" fill="#FCFAFF" />
+            {/* Outer iris (darker) */}
+            <ellipse cx="82" cy="105" rx="5.5" ry="7" fill={eyeDeep} />
+            <ellipse cx="118" cy="105" rx="5.5" ry="7" fill={eyeDeep} />
+            {/* Inner iris (lighter) */}
+            <ellipse cx="82" cy="106" rx="3.5" ry="5" fill={eyeMid} />
+            <ellipse cx="118" cy="106" rx="3.5" ry="5" fill={eyeMid} />
+            {/* Pupil */}
+            <ellipse cx="82" cy="106" rx="1.8" ry="3" fill="#1A0F3D" />
+            <ellipse cx="118" cy="106" rx="1.8" ry="3" fill="#1A0F3D" />
+            {/* Main highlight */}
+            <ellipse cx="83.5" cy="101" rx="1.8" ry="2.4" fill="#fff" />
+            <ellipse cx="119.5" cy="101" rx="1.8" ry="2.4" fill="#fff" />
+            {/* Small highlight */}
+            <circle cx="80" cy="108" r="0.9" fill="#fff" opacity="0.85" />
+            <circle cx="116" cy="108" r="0.9" fill="#fff" opacity="0.85" />
+          </g>
+          {/* Upper eyelash line */}
+          <path d="M 75 97 Q 82 94 89 98" fill="none" stroke={eyeDeep} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M 111 98 Q 118 94 125 97" fill="none" stroke={eyeDeep} strokeWidth="1.8" strokeLinecap="round" />
+          {/* Outer lash flick */}
+          <path d="M 89 98 L 93 96" stroke={eyeDeep} strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M 111 98 L 107 96" stroke={eyeDeep} strokeWidth="1.5" strokeLinecap="round" />
+        </>
+      )}
+
+      {/* === Cheek blush === */}
+      <ellipse cx="71" cy="121" rx="7" ry="4.2" fill={blush} opacity="0.55" />
+      <ellipse cx="129" cy="121" rx="7" ry="4.2" fill={blush} opacity="0.55" />
+
+      {/* === Nose — tiny dot === */}
+      <ellipse cx="100" cy="118" rx="1.2" ry="0.8" fill={skinShade} opacity="0.7" />
+
+      {/* === Lips === */}
+      {happy ? (
+        <>
+          <path d="M 92 132 Q 100 140 108 132 Q 100 135 92 132 Z" fill={lips} />
+          <path d="M 92 132 Q 100 136 108 132" fill="none" stroke={lips} strokeWidth="0.6" />
+        </>
+      ) : worried ? (
+        <path d="M 94 134 Q 100 131 106 134" fill="none" stroke={lips} strokeWidth="2.2" strokeLinecap="round" />
+      ) : (
+        <path d="M 95 133 Q 100 135 105 133" fill="none" stroke={lips} strokeWidth="2" strokeLinecap="round" />
+      )}
+
+      {/* === Neck === */}
+      <rect x="92" y="152" width="16" height="18" fill={skin} />
+      <path d="M 92 165 Q 100 168 108 165" fill="none" stroke={skinShade} strokeWidth="0.8" opacity="0.6" />
+
+      {/* === Royal dress collar === */}
+      <path
+        d="M 72 180
+           Q 86 168 100 172
+           Q 114 168 128 180
+           L 134 210
+           L 66 210 Z"
+        fill={`url(#dress-${uid})`}
+      />
+      {/* Gold trim on collar */}
+      <path
+        d="M 72 180 Q 86 168 100 172 Q 114 168 128 180"
+        fill="none"
+        stroke={crownGold}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      {/* Center medallion */}
+      <circle cx="100" cy="184" r="3.2" fill={jewelRed} />
+      <circle cx="100" cy="184" r="1.2" fill="#fff" opacity="0.7" />
+      {/* Side gold dots on dress */}
+      <circle cx="82" cy="194" r="1.5" fill={crownGold} />
+      <circle cx="118" cy="194" r="1.5" fill={crownGold} />
+
+      {/* Decorative sparkles around */}
+      {happy && (
+        <>
+          <path d="M 158 70 L 161 64 L 164 70 L 161 76 Z" fill={crownGold} opacity="0.85" />
+          <path d="M 36 76 L 39 70 L 42 76 L 39 82 Z" fill={blush} opacity="0.85" />
+          <circle cx="170" cy="135" r="1.5" fill={crownGold} opacity="0.7" />
+          <circle cx="30" cy="140" r="1.5" fill={hairLight} opacity="0.85" />
         </>
       )}
     </svg>
   );
 }
 
-// ======================== CARD ========================
+// ======================== PRINCESS COMMENTARY ========================
+// Card hiển thị công chúa Vali + nhận xét động dựa trên data thẩm định.
+// Props: stats = { e:{done,over,todo,rate}, d:{done,total,rate}, overdue, soon, mismatched }
+export function PrincessCommentary({ stats }) {
+  const { e, d, overdue, soon, mismatched } = stats || {};
+  const erate = e?.rate ?? 0;
+  const eOver = e?.over ?? 0;
+  const eTodo = e?.todo ?? 0;
+  const oCount = typeof overdue === "number" ? overdue : (overdue?.length ?? 0);
+  const sCount = typeof soon === "number" ? soon : (soon?.length ?? 0);
+  const mCount = typeof mismatched === "number" ? mismatched : (mismatched?.length ?? 0);
+
+  // Mood của công chúa
+  const mood =
+    oCount === 0 && erate >= 70 ? "happy"
+    : oCount >= 3 || erate < 30 ? "worried"
+    : "happy";
+
+  // Greeting theo giờ trong ngày
+  const h = new Date().getHours();
+  let greeting = "Xin chào!";
+  if (h >= 5 && h < 11) greeting = "Chào buổi sáng!";
+  else if (h >= 11 && h < 13) greeting = "Chúc bữa trưa ngon miệng!";
+  else if (h >= 13 && h < 17) greeting = "Chào buổi chiều!";
+  else if (h >= 17 && h < 22) greeting = "Chào buổi tối!";
+  else greeting = "Khuya rồi nhỉ?";
+
+  // Build danh sách nhận xét theo data
+  const remarks = [];
+  if (oCount === 0) {
+    remarks.push({ tone: "success", text: "Chưa có hồ sơ quá hạn — tuyệt vời!" });
+  } else {
+    remarks.push({
+      tone: "danger",
+      text: `Có ${oCount} hồ sơ quá hạn cần xử lý ngay.`,
+    });
+  }
+  if (sCount > 0) {
+    remarks.push({
+      tone: "warning",
+      text: `${sCount} hồ sơ tới hạn trong 30 ngày, hãy chú ý nhé.`,
+    });
+  }
+  if (erate >= 80) {
+    remarks.push({ tone: "success", text: `Tiến độ ${erate}% — xuất sắc, tiếp tục duy trì!` });
+  } else if (erate >= 50) {
+    remarks.push({ tone: "info", text: `Tiến độ ${erate}% — đang trên đà tốt, cố lên nhé.` });
+  } else if (eTodo > 0) {
+    remarks.push({
+      tone: "warning",
+      text: `Còn ${eTodo} hồ sơ chưa hoàn tất, cần đẩy nhanh tiến độ.`,
+    });
+  }
+  if (mCount > 0) {
+    remarks.push({
+      tone: "info",
+      text: `${mCount} hồ sơ lệch pha — cần kiểm tra đồng bộ.`,
+    });
+  }
+
+  // Closing nudge — tách riêng để có cảm giác kết
+  const closing =
+    erate >= 80 ? "Hãy giữ phong độ này nhé! ✨"
+    : oCount > 0 ? "Mình cùng giải quyết quá hạn trước nhé."
+    : "Hãy tiếp tục duy trì tiến độ nhé!";
+
+  // Token màu cho từng tone
+  const toneColor = {
+    success: { c: "#1B6A3F", bg: "#E5F6EC", icon: "✓" },
+    danger:  { c: "#9F1F2E", bg: "#FCE6E9", icon: "!" },
+    warning: { c: "#8A5A12", bg: "#FCEFD9", icon: "⏱" },
+    info:    { c: "#3D2870", bg: "#EDE6F8", icon: "i" },
+  };
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        background:
+          "radial-gradient(280px 220px at 100% 0%, #F9E8F0, transparent 60%), linear-gradient(135deg, #FCF5FA 0%, #F6EEFB 100%)",
+        borderRadius: 22,
+        padding: "22px 22px 22px 24px",
+        border: "1px solid #F0E5EE",
+        boxShadow: "0 4px 14px rgba(148, 89, 156, 0.07)",
+        overflow: "hidden",
+        display: "flex",
+        gap: 14,
+        alignItems: "stretch",
+        minHeight: 240,
+      }}
+    >
+      {/* LEFT — Speech bubble content */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div>
+          <div style={{
+            fontFamily: TEXT,
+            fontSize: 18,
+            fontWeight: 800,
+            color: "#5A2F6E",
+            letterSpacing: "-0.005em",
+          }}>
+            Công chúa Vali
+          </div>
+          <div style={{
+            fontSize: 12,
+            color: "#8B6FA0",
+            fontWeight: 600,
+            marginTop: 2,
+          }}>
+            Trợ lý V/Q · Báo cáo nhanh
+          </div>
+        </div>
+
+        {/* Greeting bubble */}
+        <div style={{
+          fontSize: 13.5,
+          color: "#3D2552",
+          fontWeight: 600,
+          lineHeight: 1.55,
+        }}>
+          {greeting} Mình đã xem tình hình thẩm định hôm nay rồi đó.
+        </div>
+
+        {/* Remarks list */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
+          {remarks.map((r, i) => {
+            const t = toneColor[r.tone] || toneColor.info;
+            return (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  gap: 9,
+                  alignItems: "flex-start",
+                  fontSize: 12.5,
+                  color: "#2E1B45",
+                  lineHeight: 1.5,
+                }}
+              >
+                <span
+                  style={{
+                    flexShrink: 0,
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    background: t.bg,
+                    color: t.c,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginTop: 1,
+                  }}
+                >
+                  {t.icon}
+                </span>
+                <span style={{ flex: 1 }}>{r.text}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Closing */}
+        <div style={{
+          marginTop: "auto",
+          fontSize: 12.5,
+          color: "#5A2F6E",
+          fontWeight: 700,
+          fontStyle: "italic",
+        }}>
+          {closing}
+        </div>
+      </div>
+
+      {/* RIGHT — Mascot */}
+      <div style={{
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+      }}>
+        <Mascot mood={mood} size={150} />
+      </div>
+    </div>
+  );
+}
+
+
 export function Card({ children, style, variant = "default", cls = "" }) {
   const base = variant === "strong" ? cardStrong : variant === "soft" ? cardSoft : cardDefault;
   return (

@@ -37,3 +37,10 @@ body {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Dashboard hero — stack the donut card and princess card on narrow */
+@media (max-width: 980px) {
+  .vmp-hero-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
