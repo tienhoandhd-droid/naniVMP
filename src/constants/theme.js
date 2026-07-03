@@ -24,11 +24,14 @@ export const GRAD_SOFT = "linear-gradient(135deg, #EE7BA9, #8E6FD0)";
 
 export const cardDefault = {
   background: "#fff", border: `1.5px solid ${C.pinkSoft}`,
-  borderRadius: 24, boxShadow: "0 10px 30px rgba(238,123,169,.10)",
+  borderRadius: 24,
+  // Shadow phân lớp: viền gần sắc nét + tỏa xa mềm → chiều sâu tinh tế hơn.
+  boxShadow: "0 1px 2px rgba(78,42,78,.04), 0 12px 32px rgba(238,123,169,.11)",
 };
 export const cardStrong = {
   background: "#fff", border: `1.5px solid ${C.pink}3a`,
-  borderRadius: 26, boxShadow: "0 14px 34px rgba(238,123,169,.16)",
+  borderRadius: 26,
+  boxShadow: "0 1px 2px rgba(78,42,78,.05), 0 16px 40px rgba(238,123,169,.17)",
 };
 export const cardSoft = {
   background: C.pinkMist, border: `1px solid ${C.pinkSoft}`,

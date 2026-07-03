@@ -1,13 +1,96 @@
+/* =====================================================================
+ *  index.css — Global stylesheet · VMP Monitor
+ *  Static CSS (áp dụng NGAY trước khi React mount → không "nháy trắng",
+ *  không FOUC, cache được). Trước đây phần lớn được inject bằng JS.
+ * ===================================================================== */
+
+:root {
+  /* Brand palette (đồng bộ với constants/theme.js) */
+  --pink: #EE7BA9;
+  --pink-deep: #D85F92;
+  --pink-text: #B43A6E;
+  --pink-soft: #FCE3EF;
+  --pink-mist: #FDEEF6;
+  --lav: #8E6FD0;
+  --lav-soft: #EDE7FC;
+  --plum: #4E2A4E;
+  --plum-soft: #6E4869;
+  --bg1: #FFF5FA;
+  --bg2: #FBEFFB;
+  --focus: #B5477A;
+  --shadow-card: 0 10px 30px rgba(238, 123, 169, .10);
+  --shadow-card-hover: 0 18px 44px rgba(238, 123, 169, .22);
+}
+
+* { box-sizing: border-box; }
+
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
 }
 
+html { scroll-behavior: smooth; }
+
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Nền brand ngay từ đầu → tránh chớp trắng trước khi React render */
+  background: linear-gradient(160deg, var(--bg1), var(--bg2));
+  color: var(--plum);
+  font-family: 'Quicksand', system-ui, -apple-system, sans-serif;
 }
+
+img { max-width: 100%; }
+
+/* Số liệu canh đều (đồng hồ, KPI, bảng) */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* ===== Accessibility: focus rõ ràng, chỉ khi dùng bàn phím ===== */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+
+/* ===== Custom scrollbar ===== */
+.vmp-scroll { scrollbar-width: thin; scrollbar-color: rgba(238,123,169,.45) transparent; }
+.vmp-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+.vmp-scroll::-webkit-scrollbar-thumb { background: rgba(238,123,169,.42); border-radius: 9px; }
+.vmp-scroll::-webkit-scrollbar-thumb:hover { background: rgba(216,95,146,.6); }
+.vmp-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ===== Cards / rows / nav interactions ===== */
+.card {
+  transition: transform .28s cubic-bezier(.22,1,.36,1), box-shadow .28s ease;
+  will-change: transform;
+}
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); }
+.vmp-nav { transition: background .18s ease, color .18s ease; }
+.vmp-nav:hover { background: var(--pink-mist) !important; color: var(--plum) !important; }
+.vmp-row { transition: background .18s ease; }
+.vmp-row:hover { background: var(--pink-mist); }
+
+/* ===== Keyframes & animation utilities ===== */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.fade { animation: fadeUp .5s ease both; }
+@keyframes twinkle { 0%,100% { opacity: .3; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+.tw { animation: twinkle 2.6s ease-in-out infinite, floaty 5s ease-in-out infinite; pointer-events: none; z-index: 0; }
+@keyframes bob { 0%,100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-7px) rotate(1.5deg); } }
+.bob { animation: bob 3.4s ease-in-out infinite; transform-origin: 50% 60%; }
+@keyframes pop { 0% { opacity: 0; transform: scale(.9) translateY(8px); } 100% { opacity: 1; transform: none; } }
+.pop { animation: pop .5s ease both; }
+@keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise .6s cubic-bezier(.22,1,.36,1) both; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .9s linear infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+input::placeholder { color: #B79BB2; }
+select { appearance: none; -webkit-appearance: none; }
 
 /* ===== Luxury login styles ===== */
 .vq-luxury-btn {
@@ -18,29 +101,30 @@ body {
   filter: brightness(1.05);
   box-shadow: 0 14px 36px rgba(111, 88, 201, .42), 0 4px 12px rgba(181, 71, 122, .28);
 }
-.vq-luxury-btn:active:not(:disabled) {
-  transform: translateY(0) scale(.99);
-}
+.vq-luxury-btn:active:not(:disabled) { transform: translateY(0) scale(.99); }
 
 .vq-input-shell {
   transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
 .vq-input-shell:focus-within {
-  border-color: #B5477A;
+  border-color: var(--focus);
   box-shadow: 0 0 0 4px rgba(181, 71, 122, .10);
   background: #fff;
 }
 
-/* Subtle responsive: stack the two panels on small screens */
+/* ===== Responsive ===== */
 @media (max-width: 760px) {
-  .vq-login-grid {
-    grid-template-columns: 1fr !important;
-  }
+  .vq-login-grid { grid-template-columns: 1fr !important; }
+  .vmp-sidebar { display: none !important; }
+}
+@media (max-width: 980px) {
+  .vmp-hero-grid { grid-template-columns: 1fr !important; }
 }
 
-/* Dashboard hero — stack the donut card and princess card on narrow */
-@media (max-width: 980px) {
-  .vmp-hero-grid {
-    grid-template-columns: 1fr !important;
-  }
+/* ===== Respect reduced-motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .tw, .bob, .fade, .pop, .rise { animation: none !important; }
+  .card { transition: none !important; }
+  .card:hover { transform: none !important; }
 }
