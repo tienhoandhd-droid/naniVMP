@@ -1157,44 +1157,9 @@ function ReportsView({ acts }) {
   );
 }
 
-/* ===================== GLOBAL CSS ===================== */
-const GlobalStyles = () => (
-  <style>{`
-    *{box-sizing:border-box;}
-    .vmp-scroll::-webkit-scrollbar{width:9px;height:9px;}
-    .vmp-scroll::-webkit-scrollbar-thumb{background:${C.pink}55;border-radius:9px;}
-    .vmp-scroll::-webkit-scrollbar-track{background:transparent;}
-    .card{transition:transform .25s ease, box-shadow .25s ease;}
-    .card:hover{transform:translateY(-3px);box-shadow:0 18px 42px rgba(238,123,169,.20);}
-    .vmp-nav:hover{background:${C.pinkMist}!important;color:${C.plum}!important;}
-    .vmp-row{transition:background .18s ease;}
-    .vmp-row:hover{background:${C.pinkMist};}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
-    .fade{animation:fadeUp .5s ease both;}
-    @keyframes twinkle{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
-    @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-    .tw{animation:twinkle 2.6s ease-in-out infinite, floaty 5s ease-in-out infinite;pointer-events:none;z-index:0;}
-    @keyframes bob{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-7px) rotate(1.5deg)}}
-    .bob{animation:bob 3.4s ease-in-out infinite;transform-origin:50% 60%;}
-    @keyframes pop{0%{opacity:0;transform:scale(.9) translateY(8px)}100%{opacity:1;transform:none}}
-    .pop{animation:pop .5s ease both;}
-    @keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
-    .rise{animation:rise .6s cubic-bezier(.22,1,.36,1) both;}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .spin{animation:spin .9s linear infinite;}
-    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-    input::placeholder{color:#B79BB2;}
-    select{appearance:none;}
-    @media (max-width:760px){.login-grid{grid-template-columns:1fr!important;} .vmp-sidebar{display:none!important;}}
-    @media (prefers-reduced-motion: reduce){
-      .tw,.bob,.fade,.pop,.rise{animation:none!important;}
-      .card{transition:none!important;}
-      .card:hover{transform:none!important;}
-    }
-  `}</style>
-);
-
-/* ===================== MAIN APP ===================== */
+/* ===================== MAIN APP =====================
+ * Global CSS & keyframes → src/index.css (tĩnh, áp dụng trước first paint).
+ * Fonts → index.html (nạp 1 request, không FOUC). */
 export default function App() {
   const { user, setUser, login, logout, isAdmin } = useAuth();
   const { objects, acts, conn, lastSync, saveStatus, reloadData, silentRefresh, updateActivity, saveObject, deleteObject, setConn } = useVmpData();
@@ -1219,22 +1184,9 @@ export default function App() {
     };
   }, [silentRefresh]);
 
-  // Load fonts
-  useEffect(() => {
-    const id = "pastel-fonts";
-    if (!document.getElementById(id)) {
-      const l = document.createElement("link"); l.id = id; l.rel = "stylesheet";
-      l.href = "https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap";
-      document.head.appendChild(l);
-    }
-  }, []);
-
   // Login screen
   if (!user) return (
-    <>
-      <GlobalStyles />
-      <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />
-    </>
+    <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />
   );
 
   const title = NAV_ITEMS.find((n) => n.id === view)?.label || "Tổng quan";
@@ -1247,7 +1199,6 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>
-      <GlobalStyles />
       {showPw && <ChangePwModal user={user} onClose={() => setShowPw(false)} />}
 
       <Sidebar

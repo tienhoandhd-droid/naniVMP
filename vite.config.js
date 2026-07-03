@@ -11,6 +11,19 @@ export default defineConfig({
   base: "./",
   build: {
     outDir: "dist",
+    target: "es2020",
+    cssMinify: true,
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // Tách vendor để trình duyệt cache riêng (đổi code app không phải
+        // tải lại react/supabase) + tải song song → nhanh hơn ở lần sau.
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-icons": ["lucide-react"],
+        },
+      },
+    },
   },
 });
