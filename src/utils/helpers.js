@@ -180,13 +180,15 @@ export function tally(acts) {
 export function docTally(acts) {
   // Loại Không áp dụng/Đã hủy khỏi đếm hồ sơ.
   const A = acts.filter((a) => (a.state || "active") === "active");
-  const isDcDone = (a) => {
+  // "Hồ sơ" trên dashboard tương ứng cột trạng thái báo cáo. Đề cương là
+  // một KPI riêng, vì vậy không buộc cả đề cương + báo cáo cùng hoàn thành.
+  const isDocDone = (a) => {
     const r = a._raw || {};
-    return wlIsDone(r.tt_de_cuong) && wlIsDone(r.tt_bao_cao);
+    return wlIsDone(r.tt_bao_cao);
   };
-  const done = A.filter(isDcDone).length;
+  const done = A.filter(isDocDone).length;
   const over = A.filter((a) => {
-    if (isDcDone(a)) return false;
+    if (isDocDone(a)) return false;
     const r = a._raw || {};
     const dlBc = parseD(r.dl_bao_cao || "") || parseD(r.dl_vmp || "");
     return dlBc && dlBc < vmpToday();

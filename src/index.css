@@ -119,6 +119,11 @@ select { appearance: none; -webkit-appearance: none; }
 }
 @media (max-width: 980px) {
   .vmp-hero-grid { grid-template-columns: 1fr !important; }
+  .completion-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 560px) {
+  .completion-metric-grid { grid-template-columns: 1fr !important; }
+  .completion-type-grid { grid-template-columns: 1fr !important; }
 }
 
 /* ===== Respect reduced-motion ===== */
