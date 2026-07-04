@@ -1,37 +1,54 @@
-# Kiến trúc dữ liệu VMP Monitor — cập nhật 2026-07
+# Kiến trúc dữ liệu VMP Monitor — cập nhật 2026-07-04
 
-## Quyết định: Supabase là nguồn sự thật duy nhất
+## Quyết định: Google Sheet là nguồn dữ liệu chuẩn
 
-Từ 2026-07-03, luồng dữ liệu chuyển sang **một chiều về mặt chỉnh sửa**:
+Luồng dữ liệu nghiệp vụ VMP là một chiều:
 
 ```
-Google Sheet (KHÓA, chỉ đọc)  ──một lần/thủ công──▶  Supabase (source of truth)  ◀──sửa──  Dashboard (GitHub Pages)
+Google Sheet 6.Timeline VMP ──webhook instant + snapshot 5 phút──▶ Supabase ──realtime/read-only──▶ Dashboard
 ```
 
-- **Google Sheet**: bị **khóa** — chỉ dùng để nạp dữ liệu ban đầu. **Không bao giờ ghi vào Sheet.**
-- **Supabase**: kho chính + phân quyền (RLS) + audit + realtime. Mọi chỉnh sửa đi qua RPC.
-- **Dashboard (GitHub Pages)**: **nơi chỉnh sửa duy nhất**; đọc/ghi trực tiếp Supabase.
+- **Google Sheet** là nơi lưu và chỉnh sửa dữ liệu nghiệp vụ chuẩn.
+- **Supabase** là bản chiếu chỉ đọc cho browser, phục vụ RLS, audit, realtime và các tác vụ phụ trợ.
+- Browser roles không có `INSERT`, `UPDATE`, `DELETE` trên `vmp_plan_items`/`vmp_objects` và không được gọi các RPC ghi nghiệp vụ.
+- Chỉ n8n/Postgres service được ghi snapshot canonical.
+- Workflow này không ghi ngược dữ liệu vào Google Sheet.
 
-## Thay đổi kèm theo
+## Đồng bộ canonical
 
-### n8n — workflow WF-04 (`Nhóm-VMP WF-04`)
-Đã **tắt** các node sau (để thực thi chính sách khóa Sheet + tránh ghi đè ngược):
-- `Schedule (4h)`, `Trigger: Sheet changed (instant)` — dừng sync Sheet → Supabase.
-- `Schedule (1 phút)`, `6. Update Sheet Row`, `3. Update Sheet Row` — dừng mọi thao tác ghi Sheet.
-- **Giữ lại**: nhánh cảnh báo email hằng ngày (7h) và đường đọc Supabase.
+Workflow live: `VMP WF-04: Google Sheet → Supabase canonical sync`
+(`LArr1nhj3jzFjJLs`).
 
-### GitHub Actions Variables
-- **Đã xóa** `VITE_N8N_WRITE_URL` → dashboard không còn mirror ghi sang Sheet
-  (`pushToSheet()` trả `skipped` khi biến trống). Chỉnh sửa chỉ ghi Supabase.
-- Lưu ý: biến đọc bị gõ sai tên `ITE_VMP_READ_URL` (thiếu chữ "V"); không ảnh
-  hưởng vì đã đọc thẳng Supabase. Đổi tên thành `VITE_VMP_READ_URL` nếu cần fallback.
+Nhánh canonical:
 
-## Sự cố đã sửa (2026-07-03)
-Một lần WF-04 đọc Sheet **thiếu** đã khiến `rpc_reconcile_orphan_objects` tắt nhầm
-236/243 đối tượng và gắn cờ `missing_from_sheet` cho 771/1217 hạng mục → dashboard
-chỉ hiển thị 7 đối tượng. Đã khôi phục: bật lại đối tượng có hạng mục sống, xóa cờ
-missing, và xóa 2 dòng lệch dòng (`PCTB504/2026.02-OQ` thuộc PCTB509,
-`PCTB504/2026.02-PQ` thuộc PCTB510). Sau sửa: **243 đối tượng / 1215 hạng mục.**
+1. `Trigger: Sheet changed (instant)` nhận webhook Apps Script có Header Auth; `Schedule (5 phút)` là fallback.
+2. `1. Download Canonical Sheet CSV` đọc tab `6.Timeline VMP`, gid `1252715724`.
+3. `2. Parse Canonical Sheet CSV` kiểm tra 37 cột, khóa bắt buộc và ngưỡng số dòng.
+4. `3. Apply Canonical Snapshot` so checksum; snapshot không đổi được bỏ qua.
+5. Snapshot thay đổi được backup và áp dụng nguyên tử qua
+   `rpc_sync_vmp_sheet_snapshot`. Nếu một bước lỗi, transaction tự rollback.
 
-> ⚠️ Không bật lại `rpc_reconcile_orphan_objects` nguyên trạng: nó tắt mọi mã vắng
-> khỏi danh sách truyền vào. Nếu cần nạp bổ sung từ Sheet, sửa để CHỈ THÊM, không TẮT.
+Snapshot đầu ngày 2026-07-04 đã thay thế dữ liệu cũ:
+
+- Raw Sheet: 479 dòng.
+- `vmp_plan_items`: 476 ID duy nhất.
+- `vmp_objects`: 214 mã đối tượng.
+- Ba ID trùng dùng dòng xuất hiện cuối; toàn bộ 479 dòng vẫn được lưu trong
+  `vmp_sheet_rows` để đối chiếu.
+
+Backup trước reset được gắn với sync run
+`5a5144f8-f076-4f8e-a1c0-21133bef60ea`, gồm 1.215 hạng mục, 243 đối tượng và
+30 data-quality issue. Có thể khôi phục nguyên tử bằng
+`rpc_rollback_vmp_sheet_sync(sync_run_id)` khi thật sự cần.
+
+## Hàng rào an toàn
+
+- Khóa advisory ngăn hai snapshot ghi đồng thời.
+- Từ chối snapshot sai 37 cột, thiếu ID/mã đối tượng hoặc giảm dưới ngưỡng an toàn.
+- Mỗi lần thay đổi đều lưu raw rows, checksum và backup trước khi ghi.
+- Hậu kiểm bắt buộc số `vmp_plan_items` và `vmp_objects` bằng số ID/mã duy nhất
+  của Sheet.
+- Data-quality issue chưa xử lý có khóa chống trùng.
+- Không dùng lại `rpc_reconcile_orphan_objects` cũ; exact-set sync đã thay thế nó.
+- Các HTTP RPC bootstrap/probe cũ đã bị gỡ; n8n gọi RPC service-only qua Postgres credential.
+- Frontend có lớp chặn ghi dự phòng và hiển thị rõ dữ liệu chỉ sửa tại Google Sheet.

@@ -115,7 +115,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
   );
 }
 
-export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload }) {
+export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true }) {
   const [q, setQ] = useState("");
   const [fst, setFst] = useState("all");
   const [period, setPeriod] = useState("all");
@@ -140,7 +140,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload }) 
     const s = (q || "").toLowerCase();
     return [a.code, a.name, a.owner, a.id, a.vtype].some((x) => String(x || "").toLowerCase().includes(s));
   }), [inWindow, stageByItem, stageF, fst, q]);
-  const linked = conn.status === "ok" && conn.writeUrl;
+  const linked = conn.status === "ok";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <Card>
@@ -148,11 +148,11 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload }) 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 14, background: C.mintSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={22} color={C.mintText} /></div>
             <div>
-              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 17, color: C.plum }}>Nhập tiến độ thực tế</div>
-              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Lưu trực tiếp vào Supabase · audit tự động</div>
+              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 17, color: C.plum }}>Theo dõi tiến độ thực tế</div>
+              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Chỉ đọc từ Supabase · chỉnh sửa tại Google Sheet</div>
             </div>
           </div>
-          <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Đã kết nối" : "○ Chưa kết nối"}</Tag>
+          <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Supabase chỉ đọc" : "○ Chưa kết nối"}</Tag>
         </div>
         <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
@@ -206,10 +206,10 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload }) 
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>{sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}</td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}><Pill s={a.st} small /></td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                    <button onClick={() => setEdit(a)}
-                      disabled={isFrozen && !isAdmin}
-                      title={isFrozen && !isAdmin ? `Hạng mục đang "${itemState === 'not_applicable' ? 'Không áp dụng' : 'Đã hủy'}" — admin có thể khôi phục` : "Cập nhật tiến độ"}
-                      style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 10, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, opacity: (isFrozen && !isAdmin) ? 0.5 : 1, cursor: (isFrozen && !isAdmin) ? "not-allowed" : "pointer" }}><Pencil size={13} /> {isFrozen ? "Xem/khôi phục" : "Cập nhật"}</button>
+                    <button onClick={() => { if (!readOnly) setEdit(a); }}
+                      disabled={readOnly || (isFrozen && !isAdmin)}
+                      title={readOnly ? "Google Sheet là nơi chỉnh sửa dữ liệu chuẩn" : "Cập nhật tiến độ"}
+                      style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 10, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
                   </td>
                 </tr>
               ); })}
@@ -219,9 +219,9 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload }) 
         </div>
       </Card>
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        Chỉ sửa được <b style={{ color: C.mintText }}>ngày & trạng thái thực tế</b>. Các <b style={{ color: C.lavText }}>Deadline tự tính</b> (T-60 / T-5) chỉ hiển thị tham chiếu. Sửa danh mục gốc {isAdmin ? "ở mục Danh mục." : "cần quyền admin."}
+        Google Sheet là <b style={{ color: C.mintText }}>nguồn dữ liệu chuẩn duy nhất</b>. Trang này chỉ đọc bản đồng bộ từ Supabase; hãy sửa ngày, trạng thái và danh mục trực tiếp trên Sheet.
       </div>
-      {edit && <ProgressEditModal
+      {edit && !readOnly && <ProgressEditModal
         act={edit}
         isAdmin={isAdmin}
         onClose={() => setEdit(null)}

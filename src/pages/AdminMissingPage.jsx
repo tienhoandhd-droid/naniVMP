@@ -13,7 +13,7 @@ import { C, TEXT, btnPrimary } from "../constants/theme.js";
 import { supabase } from "../lib/supabaseClient.js";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.jsx";
 
-export default function AdminMissingView({ isAdmin, onReload }) {
+export default function AdminMissingView({ isAdmin, onReload, readOnly = true }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -119,14 +119,16 @@ export default function AdminMissingView({ isAdmin, onReload }) {
                     {it.missing_since ? new Date(it.missing_since).toLocaleString("vi-VN") : "—"}
                   </td>
                   <td style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
-                    <button onClick={() => resolve(it.validation_code, "keep_active")}
-                      style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: "#fff", color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
-                      ✓ Giữ active
-                    </button>
-                    <button onClick={() => resolve(it.validation_code, "deactivate")}
-                      style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.rasp}`, background: "#fff", color: C.raspText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
-                      ⊘ Xác nhận hủy
-                    </button>
+                    {readOnly ? <Tag color={C.lavText} bg={C.lavSoft}>Xử lý trên Google Sheet</Tag> : <>
+                      <button onClick={() => resolve(it.validation_code, "keep_active")}
+                        style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: "#fff", color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        ✓ Giữ active
+                      </button>
+                      <button onClick={() => resolve(it.validation_code, "deactivate")}
+                        style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.rasp}`, background: "#fff", color: C.raspText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        ⊘ Xác nhận hủy
+                      </button>
+                    </>}
                   </td>
                 </tr>
               ))}
@@ -136,9 +138,7 @@ export default function AdminMissingView({ isAdmin, onReload }) {
       </Card>
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        💡 <b>Khi nào có mã ở đây?</b> Khi WF-01 phát hiện mã trong DB không còn trong Sheet.
-        Nguyên nhân thường gặp: (1) ai đó xoá dòng trên Sheet, (2) đổi "ID thẩm định" thành mã khác,
-        (3) Sheet bị filter ẩn dòng. Mọi quyết định ở đây đều được ghi vào <b>audit_logs</b> (ALCOA+).
+        💡 Google Sheet là nguồn chuẩn. Nếu mã xuất hiện ở đây, hãy sửa hoặc khôi phục trực tiếp trên Sheet; snapshot kế tiếp sẽ cập nhật Supabase.
       </div>
     </div>
   );

@@ -1,17 +1,14 @@
 /* =====================================================================
- *  hooks/index.js — Custom React Hooks (v2.1 — Supabase RPC first)
+ *  hooks/index.js — Custom React Hooks (Sheet-canonical read-only mode)
  *  =====================================================================
- *  Thay đổi:
- *  - updateActivity: ghi qua Supabase RPC (audit do trigger DB lo)
- *  - saveObject/deleteObject: gửi kèm JWT token
- *  - Bỏ writeAuditLog() từ frontend — DB trigger ghi tập trung
- *  - Fallback qua n8n webhook nếu chưa có Supabase
+ *  Google Sheet là nơi chỉnh sửa duy nhất. Dashboard chỉ đọc Supabase;
+ *  mọi lời gọi ghi từ UI đều bị chặn ở client trước khi chạm tới API.
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.js";
-import { fetchVmpData, postToN8n, deriveActivityFields, clearVmpCache } from "../lib/n8nAdapter.js";
-import { isSupabaseConfigured, signIn, signOut, getSession, getAccessToken, supabase } from "../lib/supabaseClient.js";
-import { fetchVmpDataFromSupabase, updateProgressSupabase, upsertObjectSupabase, pushToSheet, resolveOutbox } from "../lib/supabaseData.js";
+import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.js";
+import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.js";
+import { fetchVmpDataFromSupabase } from "../lib/supabaseData.js";
 import { enrich } from "../utils/helpers.js";
 
 // ======================== useDebounce ========================
@@ -67,39 +64,6 @@ export function useAuth() {
   }, []);
 
   return { user, setUser, login, logout, loading, isAdmin: user?.perm === "admin" };
-}
-
-// ======================== Helper: Map frontend fields → Supabase ========================
-function mapPatchToSupabase(patch) {
-  const map = {
-    tt_de_cuong: "status_protocol",
-    tt_tham_dinh: "status_validation",
-    tt_bao_cao: "status_report",
-    tt_vmp: "status_vmp",
-    ngay_de_cuong: "actual_protocol_date",
-    ngay_tham_dinh: "actual_validation_date",
-    ngay_bao_cao: "actual_report_date",
-    ngay_vmp: "actual_vmp_date",
-    lich_td: "scheduled_date",
-  };
-  const statusMap = (v) => {
-    const s = (v || "").toLowerCase().trim();
-    if (!s) return "not_started";
-    // PHỦ ĐỊNH TRƯỚC: "Chưa hoàn thành"/"không đạt"/not_started → KHÔNG phải completed.
-    const neg = /\b(chưa|chua|không|khong)\b/.test(s) || /^\s*(chưa|chua|không|khong)/.test(s) || /not[_\s-]?started/.test(s);
-    if (neg) return "not_started";
-    if (/hoàn thành|hoan thanh|done|đạt|dat|complete|completed|xong/.test(s)) return "completed";
-    if (/đang|dang|progress|in[_\s-]?progress|thực hiện|thuc hien|wip/.test(s)) return "in_progress";
-    return "not_started";
-  };
-  const out = {};
-  for (const [k, v] of Object.entries(patch)) {
-    const col = map[k];
-    if (!col) continue;
-    if (col.startsWith("status_")) out[col] = statusMap(v);
-    else out[col] = v || null;
-  }
-  return out;
 }
 
 // ======================== useVmpData ========================
@@ -236,175 +200,26 @@ export function useVmpData() {
     };
   }, []);
 
-  // ============================================================
-  // updateActivity: DUAL-WRITE — Supabase RPC (chính) + ghi Sheet (gương)
-  // Supabase: bản ghi chính thức + audit. Sheet: đồng bộ ngược để không bị
-  // WF-01 ghi đè ở lần sync sau. Nếu ghi Sheet lỗi → CẢNH BÁO rõ ràng.
-  // ============================================================
-  const updateActivity = useCallback(async (id, patch, userName, reason, expectedVersion) => {
-    setSaveStatus("saving");
+  const rejectWrite = useCallback((action) => {
+    const msg = `${action} đã bị khóa: Google Sheet là nguồn dữ liệu chuẩn. Vui lòng chỉnh sửa trên Sheet.`;
+    setSaveStatus("error");
+    setConn((c) => ({ ...c, msg }));
+    setTimeout(() => setSaveStatus(""), 5000);
+    return Promise.resolve({ ok: false, code: "sheet_canonical_read_only", error: msg });
+  }, []);
 
-    // Optimistic update UI
-    setActs((prev) => prev.map((a) => {
-      if (a.id !== id) return a;
-      const raw = { ...(a._raw || {}), ...patch };
-      return { ...a, _raw: raw, ...deriveActivityFields(raw) };
-    }));
-
-    if (!supabase) {
-      setSaveStatus("error");
-      setConn((c) => ({ ...c, msg: "Chưa cấu hình Supabase — không thể lưu an toàn." }));
-      setTimeout(() => setSaveStatus(""), 4000);
-      return { ok: false };
-    }
-
-    // BƯỚC 1 — GHI CHÍNH: Supabase RPC (kiểm tra quyền + lý do + audit qua trigger)
-    let outboxId = null;
-    try {
-      const supabasePatch = mapPatchToSupabase(patch);
-      // Truyền `patch` (theo cột Sheet) làm p_sheet_patch → RPC ghi vào hàng đợi đồng bộ (outbox).
-      const result = await updateProgressSupabase(id, supabasePatch, reason, patch, expectedVersion);
-      if (result && result.ok === false) {
-        // (MỚI) Xung đột phiên bản: người khác đã sửa hạng mục này → tải lại dữ liệu mới + báo.
-        if (result.code === "version_conflict") {
-          if (refreshRef.current) refreshRef.current();
-          setSaveStatus("error");
-          setConn((c) => ({ ...c, msg: result.error || "Hạng mục đã được người khác cập nhật — đã tải lại, vui lòng thử lại." }));
-          setTimeout(() => setSaveStatus(""), 6000);
-          return { ok: false, conflict: true, error: result.error };
-        }
-        setSaveStatus("error");
-        setConn((c) => ({ ...c, msg: result.error || "Ghi Supabase thất bại" }));
-        setTimeout(() => setSaveStatus(""), 5000);
-        return { ok: false, error: result.error };
-      }
-      outboxId = (result && result.outbox_id) || null;
-    } catch (e) {
-      setSaveStatus("error");
-      setConn((c) => ({ ...c, msg: "Lỗi ghi Supabase: " + (e?.message || "không rõ") }));
-      setTimeout(() => setSaveStatus(""), 5000);
-      return { ok: false, error: e.message };
-    }
-
-    // BƯỚC 2 — GHI GƯƠNG: đẩy về Google Sheet (await để biết kết quả)
-    if (conn.writeUrl) {
-      const sheetRes = await pushToSheet(conn.writeUrl, id, patch);
-      if (sheetRes.ok) {
-        // Mirror tức thời OK → đánh dấu việc trong hàng đợi là 'done' (WF-06 khỏi ghi lại).
-        resolveOutbox(outboxId, true);
-        setSaveStatus("saved");
-        setConn((c) => ({ ...c, msg: `Đã lưu '${id}' ✓ (Supabase + Google Sheet)` }));
-      } else if (sheetRes.skipped) {
-        resolveOutbox(outboxId, true);
-        setSaveStatus("saved");
-        setConn((c) => ({ ...c, msg: `Đã lưu '${id}' vào Supabase ✓` }));
-      } else {
-        // Supabase OK nhưng mirror Sheet lỗi → KHÔNG đáng lo: việc vẫn nằm trong hàng đợi
-        // (status 'pending'). WF-06 sẽ TỰ ĐẨY sang Google Sheet trong ~1 phút, có retry.
-        // → Dữ liệu KHÔNG lệch pha; người dùng không cần làm gì.
-        setSaveStatus("saved");
-        setConn((c) => ({
-          ...c,
-          msg: `Đã lưu '${id}' vào Supabase ✓ — đang tự đồng bộ Google Sheet ở chế độ nền (hoàn tất trong giây lát).`,
-        }));
-        setTimeout(() => setSaveStatus(""), 5000);
-        return { ok: true, sheetPending: true };
-      }
-    } else {
-      // Chưa cấu hình Sheet → chỉ Supabase (chấp nhận được nếu Supabase là nguồn)
-      setSaveStatus("saved");
-      setConn((c) => ({ ...c, msg: `Đã lưu '${id}' vào Supabase ✓ (chưa nối Sheet)` }));
-    }
-
-    setTimeout(() => setSaveStatus(""), 3000);
-    return { ok: true };
-  }, [conn.writeUrl]);
-
-  // ============================================================
-  // saveObject: Dùng RPC upsert có mapping cột (sửa lỗi cột cls/dept/crit)
-  // ============================================================
-  const saveObject = useCallback(async (obj, isNew) => {
-    setSaveStatus("saving");
-    setObjects((prev) => isNew ? [...prev, obj] : prev.map((o) => o.code === obj.code ? obj : o));
-
-    // GHI CHÍNH: Supabase RPC (mapping field frontend → cột DB)
-    if (supabase) {
-      try {
-        const result = await upsertObjectSupabase(obj);
-        if (result && result.ok === false) {
-          setSaveStatus("error");
-          setConn((c) => ({ ...c, msg: result.error || "Lưu thất bại" }));
-          setTimeout(() => setSaveStatus(""), 5000);
-          return;
-        }
-        setSaveStatus("saved");
-        setConn((c) => ({ ...c, msg: `Đã lưu '${obj.code}' vào Supabase ✓` }));
-        setTimeout(() => setSaveStatus(""), 3000);
-        return;
-      } catch (e) {
-        console.warn("Upsert RPC failed, trying n8n:", e.message);
-      }
-    }
-
-    // FALLBACK: n8n webhook (có JWT token)
-    if (conn.writeUrl) {
-      try {
-        const token = await getAccessToken();
-        const r = await postToN8n(conn.writeUrl, { action: "upsertObject", row: obj }, token);
-        const j = await r.json().catch(() => null);
-        const ok = r.ok && (!j || j.ok !== false);
-        setSaveStatus(ok ? "saved" : "error");
-        setConn((c) => ({
-          ...c, msg: ok ? `Đã lưu '${obj.code}' ✓` : (j?.error || `Lưu '${obj.code}' thất bại`),
-        }));
-      } catch (e) {
-        setSaveStatus("error");
-        setConn((c) => ({ ...c, msg: "Lỗi lưu: " + (e?.message || "không rõ") }));
-      }
-    }
-    setTimeout(() => setSaveStatus(""), 4000);
-  }, [conn.writeUrl]);
-
-  // ============================================================
-  // deleteObject: Soft delete + JWT token
-  // ============================================================
-  const deleteObject = useCallback(async (code) => {
-    // S2-4: ẩn đối tượng phải qua RPC có kiểm quyền + LÝ DO + audit (không ghi thẳng client).
-    const reason = (typeof window !== "undefined"
-      ? window.prompt(`Lý do ẩn đối tượng ${code} (bắt buộc — sẽ ghi audit GMP):`)
-      : "") || "";
-    if (!reason.trim()) { return; } // huỷ nếu không nhập lý do
-    setSaveStatus("saving");
-    setObjects((prev) => prev.filter((o) => o.code !== code));
-
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.rpc("rpc_deactivate_object", {
-          p_code: code, p_reason: reason.trim(),
-        });
-        if (error) throw error;
-        if (data && data.ok === false) throw new Error(data.error);
-        setSaveStatus("saved");
-        setConn((c) => ({ ...c, msg: `Đã ẩn '${code}' ✓ (soft delete)` }));
-        setTimeout(() => setSaveStatus(""), 3000);
-        return;
-      } catch (e) {
-        console.warn("Direct delete failed:", e.message);
-      }
-    }
-
-    if (conn.writeUrl) {
-      try {
-        const token = await getAccessToken();
-        await postToN8n(conn.writeUrl, { action: "deleteObject", code }, token);
-        setSaveStatus("saved");
-      } catch (e) {
-        setSaveStatus("error");
-        setConn((c) => ({ ...c, msg: "Lỗi xoá: " + (e?.message || "không rõ") }));
-      }
-    }
-    setTimeout(() => setSaveStatus(""), 4000);
-  }, [conn.writeUrl]);
+  const updateActivity = useCallback(
+    () => rejectWrite("Cập nhật tiến độ trên web"),
+    [rejectWrite],
+  );
+  const saveObject = useCallback(
+    () => rejectWrite("Thêm hoặc sửa đối tượng trên web"),
+    [rejectWrite],
+  );
+  const deleteObject = useCallback(
+    () => rejectWrite("Xóa đối tượng trên web"),
+    [rejectWrite],
+  );
 
   return {
     objects, acts: enriched, conn, lastSync, saveStatus,
