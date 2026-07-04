@@ -29,7 +29,7 @@ import {
 // ===== Internal modules (refactored) =====
 import { C, TEXT, NUM, GRAD, GRAD_SOFT, btnPrimary, INP, FIELD, LBL, glass } from "./constants/theme.js";
 import {
-  STATUS, MST, PROG, CLS, DEPTS, DEPT_DEEP, DEPT_COLOR, DEPT_CODE, DEP_DAYS, CRIT,
+  STATUS, MST, PROG, CLS, DEPTS, DEPT_CODE, DEP_DAYS, CRIT,
   SOON_DAYS, PERM_LABEL, NAV_ITEMS, NAV_SUBS, STAGES, TT_OPTS, PERIODS, PLABEL,
   vmpToday,
 } from "./constants/vmp.js";
@@ -57,6 +57,7 @@ import InventoryView from "./pages/InventoryPage.jsx";
 import UpdateView from "./pages/UpdatePage.jsx";
 import WorkloadView from "./pages/WorkloadPage.jsx";
 import AdminMissingView from "./pages/AdminMissingPage.jsx";
+import CompletionDashboard from "./components/dashboard/CompletionDashboard.jsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
 import { loadConn, saveConn, clearConn, loadUser, saveUser } from "./lib/config.js";
@@ -923,21 +924,14 @@ function IndividualLeaderboard({ acts }) {
 
 /* --- Overview --- */
 function Overview({ acts, setView }) {
-  const { e, d, overdue, soon, gap, gapPts, deptFull, mismatched } = useMemo(() => {
+  const { e, d, overdue, soon, gap, gapPts, mismatched } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
     const overdue = acts.filter((a) => a.alert && a.alert.kind === "over");
     const soon = acts.filter((a) => a.alert && a.alert.kind === "soon");
-    const deptFull = DEPTS.map((dp) => {
-      const da = acts.filter((a) => a.dept === dp.id && (a.state || "active") === "active");
-      const et = tally(da), dt = docTally(da);
-      const riskScore = da.length ? Math.round(((et.over + (da.length - et.done)) / da.length) * 100) : 0;
-      const risk = riskScore >= 60 ? { l: "Cần xử lý", c: C.raspText, bg: C.raspSoft } : riskScore >= 35 ? { l: "Cần chú ý", c: C.marigoldText, bg: C.marigoldSoft } : { l: "Tốt", c: C.mintText, bg: C.mintSoft };
-      return { ...dp, da, et, dt, risk, riskScore };
-    }).filter((r) => r.da.length > 0).sort((a, b) => b.riskScore - a.riskScore);
     return {
       e, d, overdue, soon,
       gap: e.done - d.done, gapPts: e.rate - d.rate,
-      deptFull, mismatched: acts.filter((a) => a.mismatch),
+      mismatched: acts.filter((a) => a.mismatch),
     };
   }, [acts]);
 
@@ -1002,35 +996,8 @@ function Overview({ acts, setView }) {
         <KpiCard emoji="📊" bg={C.skySoft} color={C.skyText} value={`${d.rate}%`} label="Tỷ lệ hồ sơ" sub={`${d.done}/${d.total} hoàn thiện`} />
       </div>
 
-      {/* Department overview */}
-      <Card variant="strong">
-        <CardTitle icon={BarChart3} sub="So sánh tỷ lệ hoàn thành giữa các bộ phận">
-          Tiến độ theo bộ phận
-        </CardTitle>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {deptFull.map(dp => (
-            <div key={dp.id} className="vmp-row" style={{
-              display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
-              borderRadius: 16, background: "#fff", border: `1px solid ${C.pinkSoft}`,
-            }}>
-              <div style={{ width: 46, height: 46, borderRadius: 14, background: `${DEPT_COLOR[dp.id]}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontWeight: 800, fontSize: 14, color: DEPT_DEEP[dp.id] }}>{dp.short}</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={{ fontWeight: 800, fontSize: 14, color: C.plum }}>{dp.name}</div>
-                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-                  {dp.et.done} HT · {dp.et.over} QH · {dp.da.length} tổng
-                </div>
-              </div>
-              <div style={{ width: 120, height: 10, borderRadius: 999, background: C.pinkSoft, overflow: "hidden" }}>
-                <div style={{ width: `${dp.et.rate}%`, height: "100%", borderRadius: 999, background: dp.et.rate >= 70 ? C.mint : dp.et.rate >= 40 ? C.marigold : C.rasp, transition: "width .6s ease" }} />
-              </div>
-              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: C.plum, minWidth: 44, textAlign: "right" }}>{dp.et.rate}%</span>
-              <Tag color={dp.risk.c} bg={dp.risk.bg}>{dp.risk.l}</Tag>
-            </div>
-          ))}
-        </div>
-      </Card>
+      {/* Completion analytics: stage, validation type, person and department */}
+      <CompletionDashboard acts={acts} />
 
       {/* Leaderboard */}
       <IndividualLeaderboard acts={acts} />
