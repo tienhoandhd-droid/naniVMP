@@ -56,7 +56,11 @@ export default function InventoryView({ objects, acts, canEdit, onSave, onDelete
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 15px", borderRadius: 12, border: `1.5px solid ${C.pinkSoft}`, flex: 1, minWidth: 220, background: "#fff" }}><Search size={16} color={C.pink} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo tên hoặc mã…" style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14, color: C.plum, width: "100%", fontWeight: 600 }} /></div>
-          <button disabled={!canEdit} onClick={() => setEdit({ obj: { code: "", name: "", cls: "tb", dept: "sx", area: "", grade: "—", gxp: "GxP", crit: "TB", freq: 12, need: true, reason: "" }, isNew: true })} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 12, border: "none", cursor: canEdit ? "pointer" : "not-allowed", background: canEdit ? GRAD : C.pinkSoft, color: canEdit ? "#fff" : C.plumSoft, fontFamily: TEXT, fontWeight: 800, fontSize: 13, opacity: canEdit ? 1 : .8 }}><Plus size={15} /> Thêm đối tượng</button>
+          {canEdit ? (
+            <button onClick={() => setEdit({ obj: { code: "", name: "", cls: "tb", dept: "sx", area: "", grade: "—", gxp: "GxP", crit: "TB", freq: 12, need: true, reason: "" }, isNew: true })} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 12, border: "none", cursor: "pointer", background: GRAD, color: "#fff", fontFamily: TEXT, fontWeight: 800, fontSize: 13 }}><Plus size={15} /> Thêm đối tượng</button>
+          ) : (
+            <Tag color={C.lavText} bg={C.lavSoft}>Chỉ đọc · chỉnh sửa trên Google Sheet</Tag>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Filter size={15} color={C.plumSoft} /><span style={{ fontSize: 12.5, fontWeight: 800, color: C.plumSoft }}>Bộ phận:</span>
@@ -65,7 +69,7 @@ export default function InventoryView({ objects, acts, canEdit, onSave, onDelete
         </div>
       </Card>
       <Card variant="strong">
-        <CardTitle icon={Boxes} sub={`${filtered.length} đối tượng — đồng bộ Google Sheet`}>Danh mục đối tượng thẩm định</CardTitle>
+        <CardTitle icon={Boxes} sub={`${filtered.length} đối tượng — nguồn chuẩn Google Sheet`}>Danh mục đối tượng thẩm định</CardTitle>
         <div style={{ overflowX: "auto" }} className="vmp-scroll">
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 880 }}>
             <thead><tr>{["Mã", "Tên / Lý do", "Nhóm", "Bộ phận", "Phụ trách", "Khu vực", "Mức ĐH", "Chu kỳ", "TĐ?", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 2 && i <= 9 ? "center" : "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, letterSpacing: 0.5, padding: "0 12px 13px", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
@@ -81,10 +85,12 @@ export default function InventoryView({ objects, acts, canEdit, onSave, onDelete
                 <td style={{ padding: "13px 12px", textAlign: "center", fontFamily: NUM, fontSize: 14, fontWeight: 800, color: C.plum }}>{o.freq > 0 ? o.freq + "th" : "—"}</td>
                 <td style={{ padding: "13px 12px", textAlign: "center" }}>{o.need ? <CheckCircle2 size={17} color={C.mintText} /> : <span style={{ color: "#C9B6C7", fontWeight: 700 }}>—</span>}</td>
                 <td style={{ padding: "13px 12px", textAlign: "center" }}><Pill s={st} small /></td>
-                <td style={{ padding: "13px 12px" }}><div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                  <button disabled={!canEdit} onClick={() => setEdit({ obj: o, isNew: false })} style={{ width: 32, height: 32, borderRadius: 9, border: "none", cursor: canEdit ? "pointer" : "not-allowed", background: C.lavSoft, display: "flex", alignItems: "center", justifyContent: "center", opacity: canEdit ? 1 : .5 }}><Pencil size={15} color={C.lavText} /></button>
-                  <button disabled={!canEdit} onClick={() => { if (window.confirm(`Xoá đối tượng ${o.code}?`)) onDelete(o.code); }} style={{ width: 32, height: 32, borderRadius: 9, border: "none", cursor: canEdit ? "pointer" : "not-allowed", background: C.raspSoft, display: "flex", alignItems: "center", justifyContent: "center", opacity: canEdit ? 1 : .5 }}><Trash2 size={15} color={C.raspText} /></button>
-                </div></td>
+                <td style={{ padding: "13px 12px" }}>
+                  {canEdit ? <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                    <button onClick={() => setEdit({ obj: o, isNew: false })} style={{ width: 32, height: 32, borderRadius: 9, border: "none", cursor: "pointer", background: C.lavSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={15} color={C.lavText} /></button>
+                    <button onClick={() => { if (window.confirm(`Xoá đối tượng ${o.code}?`)) onDelete(o.code); }} style={{ width: 32, height: 32, borderRadius: 9, border: "none", cursor: "pointer", background: C.raspSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Trash2 size={15} color={C.raspText} /></button>
+                  </div> : <span style={{ display: "block", textAlign: "right", color: C.plumSoft, fontSize: 11.5, fontWeight: 700 }}>Từ Sheet</span>}
+                </td>
               </tr>
             ); })}</tbody>
           </table>

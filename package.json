@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.1",
   "type": "module",
-  "description": "VMP Monitor — Theo dõi Kế hoạch Thẩm định Gốc (CPC1 HN). React + Vite, đồng bộ 2 chiều với Google Sheet qua n8n.",
+  "description": "VMP Monitor — Theo dõi Kế hoạch Thẩm định Gốc (CPC1 HN). React + Vite, nhận snapshot một chiều từ Google Sheet qua n8n.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

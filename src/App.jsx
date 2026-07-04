@@ -1294,15 +1294,15 @@ export default function App() {
             {/* Page router */}
             {view === "overview" && <Overview acts={acts} setView={setView} />}
             {view === "timeline" && <TimelineView acts={acts} />}
-            {view === "inventory" && <InventoryView objects={objects} acts={acts} canEdit={isAdmin} onSave={saveObject} onDelete={deleteObject} conn={conn} />}
-            {view === "update" && <UpdateView acts={acts} conn={conn} isAdmin={isAdmin} onUpdate={updateActivity} onReload={reloadData} />}
+            {view === "inventory" && <InventoryView objects={objects} acts={acts} canEdit={false} onSave={saveObject} onDelete={deleteObject} conn={conn} />}
+            {view === "update" && <UpdateView acts={acts} conn={conn} isAdmin={isAdmin} onUpdate={updateActivity} onReload={reloadData} readOnly />}
             {view === "alerts" && <AlertsView acts={acts} />}
             {view === "risk" && <QrmView acts={acts} />}
             {view === "workload" && <WorkloadView acts={acts} />}
             {view === "reports" && <ReportsView acts={acts} />}
             {view === "mismatch" && <MismatchView acts={acts} />}
             {view === "quality" && <DataQualityView acts={acts} />}
-            {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} />}
+            {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} readOnly />}
             {view === "audit" && <AuditLogView />}
             {view === "admin" && <AdminView conn={conn} user={user} />}
           </div>
