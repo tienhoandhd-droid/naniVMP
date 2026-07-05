@@ -121,3 +121,36 @@ Rui ro con lai:
 - Chua chup screenshot that cho README.
 - `src/index.css` va `src/pages/TimelinePage.jsx` da co thay doi dang do truoc
   phase nay; da duoc giu nguyen va chi bo sung them CSS namespace `visual-*`.
+
+## 2026-07-06 - Phase 5 - Timeline VMP map refinement
+
+Pham vi:
+
+- Nang cap rieng khu vuc `Ban do timeline VMP · Nam 2026`.
+- Tham khao cac pattern timeline/Gantt pho bien:
+  - axis/zoom/current marker tu vis-timeline.
+  - density grid va load rail tu gantt-schedule-timeline-calendar.
+  - layout mode ro rang tu React Chrono.
+  - Gantt/doc-friendly tu Mermaid.
+- Chuyen mac dinh timeline sang mode `So do + Gantt`.
+- Them insight strip gom khung quan sat, cao diem deadline, moc nong va nhip
+  hoan thanh.
+- Them range rail/mini-map theo thang hoac tuan, co marker `Hom nay`, load bar,
+  ty le hoan thanh va so luong can chu y.
+- Click band nam/quy se drill-down ve thang tuong ung.
+
+Thay doi Supabase/n8n/GitHub remote:
+
+- Khong co Supabase mutation.
+- Khong co n8n mutation.
+- Khong push, khong tao PR.
+
+Kiem tra:
+
+- `npm run build`: PASS.
+- `git diff --check`: PASS.
+
+Rui ro con lai:
+
+- Chua visual QA bang browser sau dang nhap vi can phien/credential de vao man
+  hinh timeline voi du lieu that.

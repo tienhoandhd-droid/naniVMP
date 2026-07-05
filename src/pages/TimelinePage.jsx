@@ -376,6 +376,126 @@ function TimelineMapSummary({ items }) {
   );
 }
 
+function bandItems(items, band) {
+  return items.filter((a) => inRange(parseD(a.target), band));
+}
+
+function bandSummary(items, range) {
+  return range.bands.map((band) => {
+    const rows = bandItems(items, band);
+    const done = rows.filter((a) => issueLevel(a) === "done").length;
+    const over = rows.filter((a) => issueLevel(a) === "over").length;
+    const prog = rows.filter((a) => issueLevel(a) === "prog").length;
+    return {
+      ...band,
+      rows,
+      count: rows.length,
+      done,
+      over,
+      prog,
+      rate: rows.length ? Math.round((done / rows.length) * 100) : 0,
+    };
+  });
+}
+
+function TimelineInsightStrip({ items, stats, range }) {
+  const bands = bandSummary(items, range);
+  const peak = [...bands].sort((a, b) => b.count - a.count || b.over - a.over)[0];
+  const stageLoads = MAP_STAGES.map((stage) => {
+    const states = items.map((a) => stageState(a, stage));
+    return {
+      stage,
+      urgent: states.filter((state) => !state.done && ["over", "urgent", "soon"].includes(state.heat)).length,
+      pending: states.filter((state) => !state.done).length,
+    };
+  }).sort((a, b) => b.urgent - a.urgent || b.pending - a.pending);
+  const hotStage = stageLoads[0];
+
+  return (
+    <div className="timeline-insight-strip">
+      <div className="timeline-insight-card timeline-insight-card--primary">
+        <span>Khung quan sát</span>
+        <strong>{range.title}</strong>
+        <small>{items.length} hạng mục đang nằm trong bản đồ</small>
+      </div>
+      <div className="timeline-insight-card timeline-insight-card--peak">
+        <span>Cao điểm deadline</span>
+        <strong>{peak?.label || "—"}</strong>
+        <small>{peak?.count || 0} đích VMP · {peak?.over || 0} cần chú ý</small>
+      </div>
+      <div className="timeline-insight-card timeline-insight-card--stage">
+        <span>Mốc nóng</span>
+        <strong>{hotStage?.stage.label || "—"}</strong>
+        <small>{hotStage?.urgent || 0} cần chú ý · {hotStage?.pending || 0} chưa xong</small>
+      </div>
+      <div className="timeline-insight-card timeline-insight-card--done">
+        <span>Nhịp hoàn thành</span>
+        <strong className="tnum">{stats.rate}%</strong>
+        <small>{stats.done} xong · {stats.owners} người liên quan</small>
+      </div>
+    </div>
+  );
+}
+
+function TimelineRangeRail({ items, range, view, onFocusBand }) {
+  const bands = bandSummary(items, range);
+  const maxCount = Math.max(1, ...bands.map((band) => band.count));
+  const today = vmpToday();
+  const todayVisible = inRange(today, range);
+  const modeLabel = view === "month" ? "tuần" : "tháng";
+
+  return (
+    <div className={`timeline-range-rail timeline-range-rail--${view}`}>
+      <div className="timeline-range-rail__head">
+        <div>
+          <strong>Nhịp phân bố trong {range.title}</strong>
+          <span>Deadline VMP theo {modeLabel}, có marker hôm nay và tỷ lệ hoàn thành từng cụm</span>
+        </div>
+        <div className="timeline-range-rail__legend">
+          <span><i className="timeline-range-rail__legend-done" />Hoàn thành</span>
+          <span><i className="timeline-range-rail__legend-over" />Cần chú ý</span>
+          <span><i className="timeline-range-rail__legend-work" />Đang chạy</span>
+        </div>
+      </div>
+
+      <div className="timeline-range-rail__track">
+        {todayVisible && (
+          <i className="timeline-range-rail__today" style={{ left: `${pctInRange(today, range)}%` }}>
+            <span>Hôm nay</span>
+          </i>
+        )}
+        {bands.map((band, index) => {
+          const canFocus = view !== "month";
+          const load = Math.max(4, Math.round((band.count / maxCount) * 100));
+          const doneW = band.count ? Math.round((band.done / band.count) * 100) : 0;
+          const overW = band.count ? Math.round((band.over / band.count) * 100) : 0;
+          const progW = band.count ? Math.round((band.prog / band.count) * 100) : 0;
+          return (
+            <button
+              type="button"
+              key={`${band.label}-${index}`}
+              className={`timeline-range-rail__band ${band.over ? "timeline-range-rail__band--over" : ""} ${band.count ? "" : "timeline-range-rail__band--empty"}`}
+              onClick={() => canFocus && onFocusBand(band)}
+              disabled={!canFocus}
+              title={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${band.over} cần chú ý`}
+              style={{ "--load": `${load}%`, "--done": `${doneW}%`, "--over": `${overW}%`, "--prog": `${progW}%` }}
+            >
+              <span>{band.label}</span>
+              <strong className="tnum">{band.count}</strong>
+              <small>{band.rate}% xong</small>
+              <em>
+                <b className="timeline-range-rail__done" />
+                <b className="timeline-range-rail__over" />
+                <b className="timeline-range-rail__prog" />
+              </em>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function TimelineMapStage({ a, stage }) {
   const state = stageState(a, stage);
   const date = state.done ? (state.actual || state.due) : state.due;
@@ -775,7 +895,7 @@ export default function TimelineView({ acts }) {
   const year = vmpToday().getFullYear();
   const [view, setView] = useState("year");
   const [scope, setScope] = useState("year");
-  const [chartMode, setChartMode] = useState("table");
+  const [chartMode, setChartMode] = useState("hybrid");
   const [density, setDensity] = useState("compact");
   const [focusMonth, setFocusMonth] = useState(vmpToday().getMonth());
   const [cls, setCls] = useState("all");
@@ -855,6 +975,11 @@ export default function TimelineView({ acts }) {
   };
 
   const setQuarter = (qIndex) => setFocusMonth(qIndex * 3);
+  const focusBand = (band) => {
+    setFocusMonth(band.start.getMonth());
+    setView("month");
+    setScope("period");
+  };
   const hasFilters = cls !== "all" || dept !== "all" || status !== "all" || q.trim();
 
   return (
@@ -866,9 +991,10 @@ export default function TimelineView({ acts }) {
               <GanttChartSquare size={21} />
             </span>
             <div>
+              <div className="timeline-title-kicker">Timeline intelligence</div>
               <div className="timeline-title">Bản đồ timeline VMP · {range.title}</div>
               <div className="timeline-subtitle">
-                Sort theo đích VMP · nguồn chuẩn là Google Sheet 6.Timeline VMP
+                Hybrid Gantt + stage map · marker hôm nay · dữ liệu đồng bộ từ Supabase
               </div>
             </div>
           </div>
@@ -969,6 +1095,9 @@ export default function TimelineView({ acts }) {
             ))}
           </div>
         </div>
+
+        <TimelineInsightStrip items={filtered} stats={stats} range={range} />
+        <TimelineRangeRail items={filtered} range={range} view={view} onFocusBand={focusBand} />
 
         <div className="timeline-filter-row timeline-filter-row--workbench">
           <div className="timeline-filter-label">
