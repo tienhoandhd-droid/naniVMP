@@ -448,8 +448,8 @@ function TimelineRangeRail({ items, range, view, onFocusBand }) {
     <div className={`timeline-range-rail timeline-range-rail--${view}`}>
       <div className="timeline-range-rail__head">
         <div>
-          <strong>Nhịp phân bố trong {range.title}</strong>
-          <span>Deadline VMP theo {modeLabel}, có marker hôm nay và tỷ lệ hoàn thành từng cụm</span>
+          <strong>Biểu đồ cột theo thời gian · {range.title}</strong>
+          <span>Chiều cao là tổng deadline theo {modeLabel}; màu cột thể hiện trạng thái xử lý</span>
         </div>
         <div className="timeline-range-rail__legend">
           <span><i className="timeline-range-rail__legend-done" />Hoàn thành</span>
@@ -478,16 +478,21 @@ function TimelineRangeRail({ items, range, view, onFocusBand }) {
               onClick={() => canFocus && onFocusBand(band)}
               disabled={!canFocus}
               title={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${band.over} cần chú ý`}
+              aria-label={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${band.over} cần chú ý`}
               style={{ "--load": `${load}%`, "--done": `${doneW}%`, "--over": `${overW}%`, "--prog": `${progW}%` }}
             >
-              <span>{band.label}</span>
-              <strong className="tnum">{band.count}</strong>
-              <small>{band.rate}% xong</small>
-              <em>
-                <b className="timeline-range-rail__done" />
-                <b className="timeline-range-rail__over" />
-                <b className="timeline-range-rail__prog" />
-              </em>
+              <span className="timeline-range-rail__plot" aria-hidden="true">
+                <strong className="timeline-range-rail__value tnum">{band.count}</strong>
+                <span className="timeline-range-rail__column">
+                  <i className="timeline-range-rail__over" />
+                  <i className="timeline-range-rail__prog" />
+                  <i className="timeline-range-rail__done" />
+                </span>
+              </span>
+              <span className="timeline-range-rail__caption">
+                <span>{band.label}</span>
+                <small>{band.rate}% xong</small>
+              </span>
             </button>
           );
         })}

@@ -154,3 +154,29 @@ Rui ro con lai:
 
 - Chua visual QA bang browser sau dang nhap vi can phien/credential de vao man
   hinh timeline voi du lieu that.
+
+## 2026-07-06 - Phase 6 - Time-column chart for Timeline VMP
+
+Pham vi:
+
+- Chuyen range rail thanh bieu do cot chay theo truc thoi gian.
+- Chieu cao moi cot the hien tong deadline trong tuan/thang tuong ung.
+- Moi cot duoc xep chong theo ba trang thai: hoan thanh, dang chay va can chu y.
+- Dat tong so tren dinh cot, ty le hoan thanh duoi nhan thoi gian.
+- Giu marker `Hom nay` va hanh vi click cot nam/quy de drill-down vao thang.
+- Bo sung duong tham chieu ngang va responsive cho man hinh hep.
+
+Thay doi Supabase/n8n/GitHub remote:
+
+- Khong co Supabase mutation.
+- Khong co n8n mutation.
+- Khong push, khong tao PR.
+
+Kiem tra:
+
+- `npm run build`: PASS.
+- `git diff --check`: PASS.
+- Browser QA desktop 1280x720: 12 cot thang, khong tran ngang toan trang.
+- Browser QA mobile 390x844: bieu do cuon ngang rieng, khong de chu.
+- Click cot `T1`: drill-down dung ve 5 cot tuan cua Thang 1/2026.
+- Console browser: khong co warning/error.
