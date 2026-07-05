@@ -57,6 +57,7 @@ import InventoryView from "./pages/InventoryPage.jsx";
 import UpdateView from "./pages/UpdatePage.jsx";
 import WorkloadView from "./pages/WorkloadPage.jsx";
 import AdminMissingView from "./pages/AdminMissingPage.jsx";
+import VisualExplorerPage from "./pages/VisualExplorerPage.jsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.jsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1265,6 +1266,7 @@ export default function App() {
             {view === "update" && <UpdateView acts={acts} conn={conn} isAdmin={isAdmin} onUpdate={updateActivity} onReload={reloadData} readOnly />}
             {view === "alerts" && <AlertsView acts={acts} />}
             {view === "risk" && <QrmView acts={acts} />}
+            {view === "visual" && <VisualExplorerPage objects={objects} acts={acts} />}
             {view === "workload" && <WorkloadView acts={acts} />}
             {view === "reports" && <ReportsView acts={acts} />}
             {view === "mismatch" && <MismatchView acts={acts} />}
