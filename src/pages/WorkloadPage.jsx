@@ -70,12 +70,15 @@ export default function WorkloadView({ acts }) {
   const tasksIn = (p, ci) => monthsOfCol(ci).flatMap((mi) => p.months[mi].tasks);
   const peakMonth = (p) => { let mx = 0, mi = -1; p.months.forEach((m, i) => { if (m.cong > mx) { mx = m.cong; mi = i; } }); return { eff: mx, mi }; };
 
+  // Thang tuần tự theo cường độ tải: xanh nhạt → xanh đậm → cam (sắp đầy) →
+  // đỏ (quá tải). Bỏ màu xanh dương ở giữa (không hợp thang magnitude) và
+  // đồng bộ với thẻ tải từng người (xanh=nhẹ · cam=bận · đỏ=quá tải).
   const heat = (val, capv) => {
     const ratio = capv > 0 ? val / capv : 0;
-    if (ratio > 1) return { bg: C.rasp + "55", text: C.raspText };
-    if (ratio >= 0.85) return { bg: C.marigold + "55", text: C.marigoldText };
-    if (ratio >= 0.5) return { bg: C.sky + "55", text: C.skyText };
-    return { bg: C.mint + "55", text: C.mintText };
+    if (ratio > 1) return { bg: C.rasp + "66", text: C.raspText };
+    if (ratio >= 0.85) return { bg: C.marigold + "66", text: C.marigoldText };
+    if (ratio >= 0.5) return { bg: C.mint + "80", text: C.mintText };
+    return { bg: C.mint + "38", text: C.mintText };
   };
 
   const totalCong = sum(pend.map(congConLai));
@@ -90,7 +93,7 @@ export default function WorkloadView({ acts }) {
   const bubble = overloaded.length > 0
     ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm! Bấm vào từng người xem chi tiết 💪`
     : `Cả đội đang cân đối! Cứ giữ nhịp này là về đích VMP êm ru ✨`;
-  const legend = [["Nhẹ", C.mint], ["Vừa", C.sky], ["Sắp đầy", C.marigold], ["Quá tải", C.rasp]];
+  const legend = [["Nhẹ", C.mint + "38"], ["Vừa", C.mint + "80"], ["Sắp đầy", C.marigold], ["Quá tải", C.rasp]];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
