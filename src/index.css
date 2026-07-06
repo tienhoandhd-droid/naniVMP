@@ -3000,6 +3000,14 @@ select { appearance: none; -webkit-appearance: none; }
 .timeline-day-stage--validation { --stage-color: #4FA3D9; }
 .timeline-day-stage--vmp { --stage-color: #2FA98A; }
 
+/* Chấm cột giữa cũng theo TRẠNG THÁI (đồng bộ với cột lịch + legend); danh tính
+ * mốc do chữ ĐC/TT/VMP mang. Đặt sau các luật theo mốc để ghi đè --stage-color. */
+.timeline-day-stage--steady { --stage-color: #7A6BB0; }
+.timeline-day-stage--soon   { --stage-color: #C6820F; }
+.timeline-day-stage--over,
+.timeline-day-stage--urgent { --stage-color: #C73D62; }
+.timeline-day-stage--done   { --stage-color: #2FA98A; }
+
 .timeline-day-stage > i {
   width: 6px;
   height: 6px;
@@ -3192,28 +3200,158 @@ select { appearance: none; -webkit-appearance: none; }
   color: var(--plum);
 }
 
-.timeline-day-flow__node--done {
-  background: rgba(242,253,249,.98);
-}
-
-.timeline-day-flow__node--done b {
-  background: #2FA98A;
-}
-
-.timeline-day-flow__node--soon b {
-  background: #D9891C;
-}
-
+/* Màu node = TRẠNG THÁI theo hạn, nhất quán mọi mốc (override --stage-color để
+ * border + chữ + badge cùng theo một màu). Danh tính mốc do chữ ĐC/TT/VMP mang,
+ * không dựa vào màu — tránh màu "làm hai việc". */
+.timeline-day-flow__node--steady { --stage-color: #7A6BB0; }                                    /* đúng nhịp — trung tính */
+.timeline-day-flow__node--soon   { --stage-color: #C6820F; }                                    /* sắp đến hạn — hổ phách */
 .timeline-day-flow__node--urgent,
-.timeline-day-flow__node--over {
-  border-color: #C73D62;
-  color: #B83255;
-  background: rgba(255,247,250,.98);
-}
+.timeline-day-flow__node--over   { --stage-color: #C73D62; background: rgba(255,247,250,.98); }  /* trễ / gấp — đỏ */
+.timeline-day-flow__node--done   { --stage-color: #2FA98A; background: rgba(242,253,249,.98); }   /* đã xong — lục */
 
-.timeline-day-flow__node--urgent b,
-.timeline-day-flow__node--over b {
-  background: #C73D62;
+/* Chú giải bảng dòng thời gian — nằm giữa tiêu đề và bảng, giải nghĩa 2 chiều. */
+.timeline-flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  padding: 10px 14px;
+  margin: 2px 0 10px;
+  border-radius: 14px;
+  background: rgba(248,245,252,.6);
+  border: 1px solid rgba(142,111,208,.14);
+}
+.timeline-flow-legend__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.timeline-flow-legend__group > b {
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--plum-soft);
+  margin-right: 2px;
+}
+.timeline-flow-legend__stage,
+.timeline-flow-legend__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--plum);
+  white-space: nowrap;
+}
+.timeline-flow-legend__stage > i {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1.5px solid #7A6BB0;
+  color: #7A6BB0;
+  background: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  font-style: normal;
+}
+.timeline-flow-legend__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  font-style: normal;
+}
+.timeline-flow-legend__dot--steady { background: #7A6BB0; }
+.timeline-flow-legend__dot--soon   { background: #C6820F; }
+.timeline-flow-legend__dot--over   { background: #C73D62; }
+.timeline-flow-legend__dot--done   { background: #2FA98A; }
+
+/* Panel "Tình hình thẩm định" — 3 thẻ mốc + 1 thẻ quý tới. Trả lời trực tiếp
+ * các câu hỏi vận hành; thay cho dải KPI chung chung. */
+.timeline-stage-progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 4px 0 8px;
+}
+.tsp-card {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid rgba(142,111,208,.12);
+  box-shadow: 0 6px 16px rgba(78,42,78,.05);
+  text-align: left;
+  font-family: inherit;
+}
+.tsp-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tsp-card__label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--plum-soft);
+}
+.tsp-card__count { font-size: 14px; font-weight: 800; color: var(--plum-soft); }
+.tsp-card__count b { font-size: 22px; color: #2FA98A; }
+.tsp-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(142,111,208,.14);
+  margin: 9px 0 9px;
+  overflow: hidden;
+}
+.tsp-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3BBE9A, #2FA98A);
+}
+.tsp-card__foot { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tsp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: inherit;
+}
+.tsp-chip::before { content: ""; width: 8px; height: 8px; border-radius: 999px; }
+.tsp-chip--over { background: rgba(199,61,98,.1); color: #B83255; cursor: pointer; }
+.tsp-chip--over::before { background: #C73D62; }
+.tsp-chip--over:hover { background: rgba(199,61,98,.18); }
+.tsp-chip--soon { background: rgba(198,130,15,.12); color: #9A6205; }
+.tsp-chip--soon::before { background: #C6820F; }
+.tsp-chip--ok { background: rgba(47,169,138,.1); color: #1F7A63; }
+.tsp-chip--ok::before { background: #2FA98A; }
+.tsp-card--next {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #F3EEFC, #FBF5FA);
+}
+.tsp-card--next:disabled { cursor: default; opacity: .7; }
+.tsp-card--next:hover:not(:disabled) { box-shadow: 0 8px 20px rgba(142,111,208,.18); }
+.tsp-next__value { font-size: 30px; font-weight: 900; color: var(--plum); line-height: 1; margin-top: 6px; }
+.tsp-next__sub { font-size: 11.5px; font-weight: 800; color: var(--plum-soft); margin-top: 4px; }
+@media (max-width: 720px) {
+  .timeline-stage-progress { grid-template-columns: repeat(2, 1fr); }
 }
 
 .timeline-day-flow--empty {
