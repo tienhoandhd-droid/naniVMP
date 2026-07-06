@@ -54,8 +54,8 @@ while (parsed.length && parsed[parsed.length - 1].every((value) => value === '')
 if (parsed.length < 2) throw new Error('VMP_SYNC_INVALID_CSV: no data rows');
 
 const headers = parsed[0];
-if (headers.length !== 37) {
-  throw new Error(`VMP_SYNC_INVALID_HEADERS: expected 37 columns, received ${headers.length}`);
+if (headers.length !== 38) {
+  throw new Error(`VMP_SYNC_INVALID_HEADERS: expected 38 columns, received ${headers.length}`);
 }
 
 const norm = (value) => String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -78,10 +78,10 @@ for (const [index, expected] of requiredHeaders) {
 }
 
 const rows = parsed.slice(1).map((values, index) => {
-  if (values.length > 37) {
+  if (values.length > 38) {
     throw new Error(`VMP_SYNC_ROW_WIDTH: Sheet row ${index + 2} has ${values.length} columns`);
   }
-  const padded = [...values, ...Array(37 - values.length).fill('')];
+  const padded = [...values, ...Array(38 - values.length).fill('')];
   return { row_number: index + 2, values: padded };
 });
 
