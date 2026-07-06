@@ -13,7 +13,7 @@
  *    - Webhook URL từ .env (build-time) hoặc localStorage
  *    - AI API gọi qua Anthropic proxy (không cần key phía frontend)
  * ===================================================================== */
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
 
 // ===== External libs =====
 import {
@@ -49,15 +49,16 @@ import {
 } from "./components/ui/Primitives.jsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.jsx";
 
-// ===== Page components (extracted from monolith) =====
-import TimelineView from "./pages/TimelinePage.jsx";
-import AlertsView from "./pages/AlertsPage.jsx";
-import QrmView from "./pages/QrmPage.jsx";
-import InventoryView from "./pages/InventoryPage.jsx";
-import UpdateView from "./pages/UpdatePage.jsx";
-import WorkloadView from "./pages/WorkloadPage.jsx";
-import AdminMissingView from "./pages/AdminMissingPage.jsx";
-import VisualExplorerPage from "./pages/VisualExplorerPage.jsx";
+// ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
+// ban đầu; chỉ đụng cấu trúc UI, KHÔNG thay đổi luồng dữ liệu Sheet→Supabase). =====
+const TimelineView = lazy(() => import("./pages/TimelinePage.jsx"));
+const AlertsView = lazy(() => import("./pages/AlertsPage.jsx"));
+const QrmView = lazy(() => import("./pages/QrmPage.jsx"));
+const InventoryView = lazy(() => import("./pages/InventoryPage.jsx"));
+const UpdateView = lazy(() => import("./pages/UpdatePage.jsx"));
+const WorkloadView = lazy(() => import("./pages/WorkloadPage.jsx"));
+const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.jsx"));
+const VisualExplorerPage = lazy(() => import("./pages/VisualExplorerPage.jsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.jsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1259,21 +1260,23 @@ export default function App() {
             {/* Sync warning banner */}
             {acts.length > 0 && <SyncBanner conn={conn} lastSync={lastSync} />}
 
-            {/* Page router */}
-            {view === "overview" && <Overview acts={acts} setView={setView} />}
-            {view === "timeline" && <TimelineView acts={acts} />}
-            {view === "inventory" && <InventoryView objects={objects} acts={acts} canEdit={false} onSave={saveObject} onDelete={deleteObject} conn={conn} />}
-            {view === "update" && <UpdateView acts={acts} conn={conn} isAdmin={isAdmin} onUpdate={updateActivity} onReload={reloadData} readOnly />}
-            {view === "alerts" && <AlertsView acts={acts} />}
-            {view === "risk" && <QrmView acts={acts} />}
-            {view === "visual" && <VisualExplorerPage objects={objects} acts={acts} />}
-            {view === "workload" && <WorkloadView acts={acts} />}
-            {view === "reports" && <ReportsView acts={acts} />}
-            {view === "mismatch" && <MismatchView acts={acts} />}
-            {view === "quality" && <DataQualityView acts={acts} />}
-            {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} readOnly />}
-            {view === "audit" && <AuditLogView />}
-            {view === "admin" && <AdminView conn={conn} user={user} />}
+            {/* Page router — Suspense bọc các màn lazy; fallback là skeleton nhẹ. */}
+            <Suspense fallback={<SkeletonDashboard />}>
+              {view === "overview" && <Overview acts={acts} setView={setView} />}
+              {view === "timeline" && <TimelineView acts={acts} />}
+              {view === "inventory" && <InventoryView objects={objects} acts={acts} canEdit={false} onSave={saveObject} onDelete={deleteObject} conn={conn} />}
+              {view === "update" && <UpdateView acts={acts} conn={conn} isAdmin={isAdmin} onUpdate={updateActivity} onReload={reloadData} readOnly />}
+              {view === "alerts" && <AlertsView acts={acts} />}
+              {view === "risk" && <QrmView acts={acts} />}
+              {view === "visual" && <VisualExplorerPage objects={objects} acts={acts} />}
+              {view === "workload" && <WorkloadView acts={acts} />}
+              {view === "reports" && <ReportsView acts={acts} />}
+              {view === "mismatch" && <MismatchView acts={acts} />}
+              {view === "quality" && <DataQualityView acts={acts} />}
+              {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} readOnly />}
+              {view === "audit" && <AuditLogView />}
+              {view === "admin" && <AdminView conn={conn} user={user} />}
+            </Suspense>
           </div>
         </div>
       </main>

@@ -318,3 +318,77 @@ Kiem tra:
   tran ngang toan trang.
 - Node De cuong sap toi nam trong vung quan sat khi bang tu dong can timeline.
 - Console browser: khong co warning/error.
+
+## 2026-07-06 - Phase 10 - Compact milestone tables
+
+Pham vi:
+
+- Giu mot khung bang Timeline va bo sung ba che do bang chuyen biet:
+  - De cuong.
+  - Tham dinh thuc te.
+  - Hoan thanh VMP.
+- Them segmented control `Tong hop / De cuong / Tham dinh thuc te / Hoan
+  thanh VMP`; khong render bon bang dai cung luc.
+- Moi bang chuyen biet chi hien mot moc tren truc ngay va sap xep theo thu tu
+  van hanh: moc chua xong sap toi, moc qua han, moc da xong, du lieu thieu ngay.
+- Thu gon hai cot co dinh tren desktop tu 510px xuong 380px:
+  - Cot hang muc: 240px.
+  - Cot moc: 140px.
+- Nen dong tong hop tu khoang 102px xuong 77px; dong bang mot moc con khoang
+  65px de quan sat duoc nhieu hang muc hon trong mot man hinh.
+- Rut ten moc trong cot thanh `DC / TT / VMP`, giu noi dung day du trong
+  tooltip va title cua bang.
+- Gom thong tin tiep theo va dich VMP vao mot dong chan ngan; bo cac khoang
+  padding/gradient trang tri khong can thiet.
+- Mobile dung cot hang muc 142px, cot moc 108px; rut tab thanh `Tong hop / De
+  cuong / Tham dinh / VMP` va an pill trang thai dai trong cot hep.
+
+Thay doi Supabase/n8n/GitHub remote:
+
+- Chi doc du lieu Supabase hien co qua app runtime.
+- Khong co Supabase mutation.
+- Khong co n8n mutation.
+- Khong push, khong tao PR trong phase nay.
+
+Kiem tra:
+
+- `git diff --check`: PASS.
+- `npm run build`: PASS.
+- Browser QA desktop 1280x720: body khong tran ngang; bang tong hop co 3 node
+  va 3 nhan moc moi dong; ba bang chuyen biet co 1 node va 1 nhan moc moi dong.
+- Desktop: cot hang muc 240px, cot moc 140px, dong tong hop 77px, dong chuyen
+  biet khoang 65px.
+- Browser QA mobile 390x844: `bodyScrollWidth = bodyClientWidth = 390`, cot
+  hang muc 142px, cot moc 108px, bang cuon ngang noi bo.
+- Mobile: bon tab nam trong khung 252px, khong con scroll ngang rieng cho tab;
+  pill trang thai dai khong con bi cat chu.
+- Console browser: khong co warning/error.
+
+## 2026-07-06 — Phase toc do: code-split theo page (React.lazy)
+
+Muc tieu: giam bundle critical-path bang cach tach 8 man thanh chunk tai theo
+yeu cau, KHONG doi luong du lieu Sheet -> Supabase -> app (read-only giu nguyen).
+
+Phan viec:
+
+- App.jsx: doi 8 import page tinh sang `lazy(() => import(...))` va boc block
+  router trong `<Suspense fallback={<SkeletonDashboard />}>`.
+- Khong dung `xlsx` (da lazy san), khong dung Supabase/n8n/RPC/RLS.
+
+Ket qua do (npm run build):
+
+- Chunk app `index`: 62.53 kB -> 34.60 kB gzip (-27.93 kB).
+- Critical-path JS luc mo app: 167.7 kB -> 139.7 kB gzip (~-17%).
+- 8 page thanh chunk rieng: Timeline 11.03, VisualExplorer 7.77, Update 4.70,
+  Workload 4.40, Inventory 3.19, AdminMissing 2.07, Alerts 1.87, Qrm 1.83 kB gzip.
+
+Thay doi Supabase/n8n/GitHub remote:
+
+- Chi doc du lieu Supabase hien co. Khong Supabase mutation. Khong n8n mutation.
+- Khong push, khong tao PR trong phase nay.
+
+Kiem tra:
+
+- `npm run build`: PASS (1588 modules, tach 8 page chunk).
+- 8 page deu co `export default` (dieu kien cho React.lazy): PASS.
+- `git diff --name-only` khong cham file data-flow (supabase/n8n/config): PASS.
