@@ -54,8 +54,7 @@ import { Sidebar, Topbar } from "./components/layout/Layout.jsx";
 const TimelineView = lazy(() => import("./pages/TimelinePage.jsx"));
 const AlertsView = lazy(() => import("./pages/AlertsPage.jsx"));
 const QrmView = lazy(() => import("./pages/QrmPage.jsx"));
-const InventoryView = lazy(() => import("./pages/InventoryPage.jsx"));
-const UpdateView = lazy(() => import("./pages/UpdatePage.jsx"));
+const CatalogView = lazy(() => import("./pages/CatalogPage.jsx"));
 const WorkloadView = lazy(() => import("./pages/WorkloadPage.jsx"));
 const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.jsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.jsx";
@@ -1263,8 +1262,7 @@ export default function App() {
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "overview" && <Overview acts={acts} setView={setView} />}
               {view === "timeline" && <TimelineView acts={acts} objects={objects} />}
-              {view === "inventory" && <InventoryView objects={objects} acts={acts} canEdit={false} onSave={saveObject} onDelete={deleteObject} conn={conn} />}
-              {view === "update" && <UpdateView acts={acts} conn={conn} isAdmin={isAdmin} onUpdate={updateActivity} onReload={reloadData} readOnly />}
+              {view === "inventory" && <CatalogView objects={objects} acts={acts} />}
               {view === "alerts" && <AlertsView acts={acts} />}
               {view === "risk" && <QrmView acts={acts} />}
               {view === "workload" && <WorkloadView acts={acts} />}
