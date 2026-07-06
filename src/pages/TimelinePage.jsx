@@ -427,6 +427,34 @@ function compareByStageMilestone(stageId) {
   };
 }
 
+/* Thứ tự hiển thị timeline theo yêu cầu vận hành:
+ *  0 Quá hạn (quá hạn nhiều/lâu nhất lên trước) → 1 Tới hạn (gần hạn trước)
+ *  → 2 Còn hạn/đang làm → 3 Đã hoàn thành (đẩy xuống cuối).
+ * Trong cùng nhóm: sắp theo NGÀY của mốc kế tiếp (hoặc đích VMP), cũ→mới. */
+function timelinePriority(a) {
+  const lvl = issueLevel(a);
+  if (lvl === "over") return 0;
+  if (lvl === "done") return 3;
+  const next = nextPendingMilestone(a);
+  const left = next ? daysUntil(next.state.due) : null;
+  if (left != null && left >= 0 && left <= SOON_DAYS) return 1;
+  return 2;
+}
+function timelineRefTime(a) {
+  const next = nextPendingMilestone(a);
+  const d = (next && next.state.due) || parseD(a.target) || new Date(2999, 0, 1);
+  return d.getTime();
+}
+function compareTimelineOrder(a, b) {
+  const pa = timelinePriority(a);
+  const pb = timelinePriority(b);
+  if (pa !== pb) return pa - pb;
+  const da = timelineRefTime(a);
+  const db = timelineRefTime(b);
+  if (da !== db) return da - db;
+  return String(a.code || a.id || "").localeCompare(String(b.code || b.id || ""), "vi");
+}
+
 function TimelineMapSummary({ items }) {
   const rows = MAP_STAGES.map((stage) => {
     const states = items.map((a) => stageState(a, stage));
@@ -863,7 +891,7 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
   const selectedStage = MAP_STAGES.find((stage) => stage.id === tableStage);
   const visibleStages = selectedStage ? [selectedStage] : MAP_STAGES;
   const tableItems = useMemo(
-    () => [...items].sort(tableStage === "all" ? compareByNextMilestone : compareByStageMilestone(tableStage)),
+    () => [...items].sort(tableStage === "all" ? compareTimelineOrder : compareByStageMilestone(tableStage)),
     [items, tableStage],
   );
   const nextUpcomingDate = tableItems
@@ -1284,9 +1312,7 @@ export default function TimelineView({ acts, objects = [] }) {
         }
         return true;
       })
-      .sort((x, y) => {
-        return compareByTarget(x, y);
-      });
+      .sort(compareTimelineOrder);
   }, [acts, cls, dept, dq, range, status]);
 
   // Tập dữ liệu cho các tab phân tích (Sơ đồ/Bố cục/Bảng): cùng bộ lọc nhưng
