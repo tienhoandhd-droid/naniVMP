@@ -53,10 +53,15 @@ while (parsed.length && parsed[parsed.length - 1].every((value) => value === '')
 
 if (parsed.length < 2) throw new Error('VMP_SYNC_INVALID_CSV: no data rows');
 
-const headers = parsed[0];
-if (headers.length !== 38) {
-  throw new Error(`VMP_SYNC_INVALID_HEADERS: expected 38 columns, received ${headers.length}`);
+// Supabase canonical dùng ĐÚNG 37 cột đầu. Sheet có thể có cột phụ ở cuối (vd
+// cột 38 "Không có thẩm định thực tế và hoàn thiện hồ sơ") — bỏ khi đồng bộ để
+// không phải đổi schema Supabase; các cột 0..36 (gồm 4 cột trạng thái) giữ nguyên.
+const CANON = 37;
+const rawHeaders = parsed[0];
+if (rawHeaders.length !== 37 && rawHeaders.length !== 38) {
+  throw new Error(`VMP_SYNC_INVALID_HEADERS: expected 37 or 38 columns, received ${rawHeaders.length}`);
 }
+const headers = rawHeaders.slice(0, CANON);
 
 const norm = (value) => String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 const requiredHeaders = new Map([
@@ -81,7 +86,8 @@ const rows = parsed.slice(1).map((values, index) => {
   if (values.length > 38) {
     throw new Error(`VMP_SYNC_ROW_WIDTH: Sheet row ${index + 2} has ${values.length} columns`);
   }
-  const padded = [...values, ...Array(38 - values.length).fill('')];
+  const trimmed = values.slice(0, CANON);
+  const padded = [...trimmed, ...Array(CANON - trimmed.length).fill('')];
   return { row_number: index + 2, values: padded };
 });
 

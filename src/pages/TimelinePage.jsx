@@ -432,13 +432,14 @@ function compareByStageMilestone(stageId) {
  *  → 2 Còn hạn/đang làm → 3 Đã hoàn thành (đẩy xuống cuối).
  * Trong cùng nhóm: sắp theo NGÀY của mốc kế tiếp (hoặc đích VMP), cũ→mới. */
 function timelinePriority(a) {
-  const lvl = issueLevel(a);
-  if (lvl === "over") return 0;
-  if (lvl === "done") return 3;
+  if (issueLevel(a) === "done") return 3;
   const next = nextPendingMilestone(a);
   const left = next ? daysUntil(next.state.due) : null;
-  if (left != null && left >= 0 && left <= SOON_DAYS) return 1;
-  return 2;
+  // Quá hạn (nhóm 0): trạng thái tổng 'over' HOẶC mốc kế tiếp đã trễ ngày
+  // (vd đề cương đã quá hạn) — luôn xếp trên các mục mới "sắp tới hạn".
+  if (issueLevel(a) === "over" || (left != null && left < 0)) return 0;
+  if (left != null && left <= SOON_DAYS) return 1; // tới hạn (0..SOON_DAYS ngày)
+  return 2; // còn hạn / đang làm
 }
 function timelineRefTime(a) {
   const next = nextPendingMilestone(a);
