@@ -738,6 +738,109 @@ function TimelineTableFlowCell({ a, range, stages = MAP_STAGES }) {
   );
 }
 
+/* Tổng hợp theo mốc cho 1 stage: xong / quá hạn / sắp tới hạn. */
+function stageAgg(items, stage) {
+  const states = items.map((a) => stageState(a, stage));
+  const done = states.filter((s) => s.done).length;
+  const over = states.filter((s) => !s.done && s.heat === "over").length;
+  const soon = states.filter((s) => !s.done && (s.heat === "urgent" || s.heat === "soon")).length;
+  return { done, over, soon, total: items.length };
+}
+
+/* Panel "Tình hình thẩm định" — trả lời trực tiếp các câu hỏi vận hành:
+ *  · Đề cương / Thẩm định tới đâu?  → thanh tiến độ done/total mỗi mốc
+ *  · Sắp thẩm định thực tế chưa?    → số "sắp hạn" của mốc Thẩm định
+ *  · Mục nào quá hạn / bị trôi?     → chip "quá hạn" (bấm để lọc)
+ *  · Kế hoạch quý tới?              → thẻ "quý tới" (bấm để nhảy tới quý sau) */
+function TimelineStageProgress({ items, year, onOverdue, onNextQuarter }) {
+  const cards = MAP_STAGES.map((stage) => ({ stage, ...stageAgg(items, stage) }));
+  const curQ = Math.floor(vmpToday().getMonth() / 3);
+  const nextInYear = curQ + 1 <= 3;
+  const nqIndex = nextInYear ? curQ + 1 : 0;
+  const nqYear = nextInYear ? year : year + 1;
+  const nextQCount = items.filter((a) => {
+    const t = parseD(a.target);
+    return t && t.getFullYear() === nqYear && Math.floor(t.getMonth() / 3) === nqIndex;
+  }).length;
+  const nqLabel = `Quý ${nqIndex + 1}/${nqYear}`;
+
+  return (
+    <div className="timeline-stage-progress" aria-label="Tình hình thẩm định theo mốc">
+      {cards.map(({ stage, done, over, soon, total }) => {
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        return (
+          <div key={stage.id} className={`tsp-card tsp-card--${stage.id}`}>
+            <div className="tsp-card__head">
+              <span className="tsp-card__label">{stage.label}</span>
+              <span className="tsp-card__count tnum"><b>{done}</b>/{total}</span>
+            </div>
+            <div className="tsp-bar"><i style={{ width: `${pct}%` }} /></div>
+            <div className="tsp-card__foot">
+              {over > 0 && (
+                <button type="button" className="tsp-chip tsp-chip--over" onClick={onOverdue} title="Lọc các mục quá hạn">
+                  {over} quá hạn
+                </button>
+              )}
+              {soon > 0 && <span className="tsp-chip tsp-chip--soon">{soon} sắp hạn</span>}
+              {over === 0 && soon === 0 && <span className="tsp-chip tsp-chip--ok">đúng nhịp</span>}
+            </div>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className="tsp-card tsp-card--next"
+        onClick={onNextQuarter}
+        disabled={!nextInYear}
+        title={nextInYear ? `Xem kế hoạch ${nqLabel}` : "Quý tới thuộc năm sau"}
+      >
+        <div className="tsp-card__head">
+          <span className="tsp-card__label">Kế hoạch quý tới</span>
+        </div>
+        <div className="tsp-next__value tnum">{nextQCount}</div>
+        <div className="tsp-next__sub">đích VMP · {nqLabel}{nextInYear ? " →" : ""}</div>
+      </button>
+    </div>
+  );
+}
+
+/* Chú giải bảng dòng thời gian — tách rõ 2 chiều:
+ *  · Chữ ĐC/TT/VMP = MỐC nào (danh tính, không dựa màu)
+ *  · Màu chấm = TRẠNG THÁI theo hạn (nhất quán mọi mốc, luôn kèm nhãn) */
+function TimelineFlowLegend() {
+  const stages = [
+    ["ĐC", "Đề cương"],
+    ["TT", "Thẩm định thực tế"],
+    ["VMP", "Hoàn thành VMP"],
+  ];
+  const states = [
+    ["done", "✓", "Đã xong"],
+    ["over", "●", "Trễ / gấp"],
+    ["soon", "●", "Sắp đến hạn"],
+    ["steady", "●", "Đúng nhịp"],
+  ];
+  return (
+    <div className="timeline-flow-legend" aria-label="Chú giải biểu đồ dòng thời gian">
+      <div className="timeline-flow-legend__group">
+        <b>Mốc</b>
+        {stages.map(([short, label]) => (
+          <span key={short} className="timeline-flow-legend__stage" title={label}>
+            <i>{short}</i>{label}
+          </span>
+        ))}
+      </div>
+      <div className="timeline-flow-legend__group">
+        <b>Trạng thái</b>
+        {states.map(([key, glyph, label]) => (
+          <span key={key} className="timeline-flow-legend__state">
+            <i className={`timeline-flow-legend__dot timeline-flow-legend__dot--${key}`}>{glyph}</i>{label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" }) {
   const boardRef = useRef(null);
   const calendarWidth = timelineCalendarWidth(range, density);
@@ -1171,22 +1274,6 @@ export default function TimelineView({ acts }) {
       });
   }, [acts, cls, dept, dq, range, status]);
 
-  const stats = useMemo(() => {
-    const statusMap = countBy(filtered, issueLevel);
-    const targets = filtered.filter((a) => inRange(parseD(a.target), range)).length;
-    const owners = new Set(filtered.map(ownerOf).filter((x) => x && x !== "—")).size;
-    const done = statusMap.get("done") || 0;
-    const rate = filtered.length ? Math.round(done / filtered.length * 100) : 0;
-    return {
-      total: filtered.length,
-      targets,
-      owners,
-      over: statusMap.get("over") || 0,
-      done,
-      rate,
-    };
-  }, [filtered, range]);
-
   const resetFilters = () => {
     setCls("all");
     setDept("all");
@@ -1201,6 +1288,13 @@ export default function TimelineView({ acts }) {
   };
 
   const setQuarter = (qIndex) => setFocusMonth(qIndex * 3);
+  const goNextQuarter = () => {
+    const nq = Math.floor(vmpToday().getMonth() / 3) + 1;
+    if (nq > 3) return;
+    setView("quarter");
+    setScope("period");
+    setFocusMonth(nq * 3);
+  };
   const focusBand = (band) => {
     setFocusMonth(band.start.getMonth());
     setView("month");
@@ -1220,7 +1314,7 @@ export default function TimelineView({ acts }) {
               <div className="timeline-title-kicker">Timeline intelligence</div>
               <div className="timeline-title">Bản đồ timeline VMP · {range.title}</div>
               <div className="timeline-subtitle">
-                Hybrid Gantt + stage map · marker hôm nay · dữ liệu đồng bộ từ Supabase
+                Theo dõi 3 mốc Đề cương · Thẩm định · Hoàn thành VMP trên dòng thời gian, có vạch ngày hôm nay
               </div>
             </div>
           </div>
@@ -1322,9 +1416,6 @@ export default function TimelineView({ acts }) {
           </div>
         </div>
 
-        <TimelineInsightStrip items={filtered} stats={stats} range={range} />
-        <TimelineRangeRail items={filtered} range={range} view={view} onFocusBand={focusBand} />
-
         <div className="timeline-filter-row timeline-filter-row--workbench">
           <div className="timeline-filter-label">
             <Filter size={15} />
@@ -1360,14 +1451,12 @@ export default function TimelineView({ acts }) {
           )}
         </div>
 
-        <div className="timeline-kpi-strip">
-          <RangeStat label="Đang hiển thị" value={stats.total} sub="hạng mục active" />
-          <RangeStat label="Đích trong kỳ" value={stats.targets} sub="deadline VMP" tone="work" />
-          <RangeStat label="Cần chú ý" value={stats.over} sub="quá hạn / lệch nhịp" tone="over" />
-          <RangeStat label="Hoàn thành" value={`${stats.rate}%`} sub={`${stats.done} hạng mục`} tone="done" />
-        </div>
-
-        <TimelineMapSummary items={filtered} />
+        <TimelineStageProgress
+          items={filtered}
+          year={year}
+          onOverdue={() => setStatus("over")}
+          onNextQuarter={goNextQuarter}
+        />
 
         <div className="timeline-map-surface">
           <div className="timeline-map-surface__head">
@@ -1411,6 +1500,8 @@ export default function TimelineView({ acts }) {
               </div>
             )}
           </div>
+
+          {chartMode === "table" && <TimelineFlowLegend />}
 
           {chartMode === "table" ? (
             <TimelineTableBoard
