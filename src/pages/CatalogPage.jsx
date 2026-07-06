@@ -41,6 +41,21 @@ function yearOf(a) {
   return d ? String(d.getFullYear()) : "—";
 }
 
+// Chia hạng mục của 1 đối tượng theo THỂ LOẠI THẨM ĐỊNH (OQ/PQ/IQ…); trong mỗi
+// loại, một NĂM chỉ nên có 1 lần — nếu trùng năm cùng loại thì đánh dấu cảnh báo.
+function groupByType(items) {
+  const m = new Map();
+  items.forEach((a) => { const t = a.vtype || "—"; if (!m.has(t)) m.set(t, []); m.get(t).push(a); });
+  return [...m.entries()]
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0]), "vi"))
+    .map(([vtype, its]) => {
+      const yrs = its.map(yearOf);
+      const dupYears = new Set(yrs.filter((y, i) => yrs.indexOf(y) !== i));
+      its.sort((x, y) => String(yearOf(x)).localeCompare(String(yearOf(y))));
+      return { vtype, items: its, dupYears };
+    });
+}
+
 /* ---------- Modal Cập nhật tiến độ (sinh payload, chưa ghi) ---------- */
 function UpdateModal({ act, onClose }) {
   const raw = act._raw || {};
@@ -176,9 +191,15 @@ export default function CatalogView({ objects = [], acts = [] }) {
   const [cls, setCls] = useState("all");
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
+  const [year, setYear] = useState("all");
   const [open, setOpen] = useState({});
   const [edit, setEdit] = useState(null);
   const [adding, setAdding] = useState(false);
+
+  const years = useMemo(
+    () => [...new Set(acts.map(yearOf))].filter((y) => y && y !== "—").sort(),
+    [acts],
+  );
 
   // Gom hạng mục theo mã đối tượng.
   const groups = useMemo(() => {
@@ -190,14 +211,19 @@ export default function CatalogView({ objects = [], acts = [] }) {
       byCode.get(a.code).items.push(a);
     });
     let list = [...byCode.values()];
-    // sắp mỗi nhóm: theo loại thẩm định rồi năm
-    list.forEach((g) => g.items.sort((x, y) => String(x.vtype).localeCompare(String(y.vtype), "vi") || String(yearOf(x)).localeCompare(String(yearOf(y)))));
-    // lọc
+    // lọc theo NĂM ngay trên hạng mục, rồi sắp theo loại thẩm định → năm
+    list.forEach((g) => {
+      g.items = g.items
+        .filter((a) => year === "all" || yearOf(a) === year)
+        .sort((x, y) => String(x.vtype).localeCompare(String(y.vtype), "vi") || String(yearOf(x)).localeCompare(String(yearOf(y))));
+    });
+    // lọc nhóm
     const needle = q.trim().toLowerCase();
     list = list.filter((g) => {
       const o = g.obj;
       if (cls !== "all" && o.cls !== cls) return false;
       if (dept !== "all" && o.dept !== dept) return false;
+      if (year !== "all" && g.items.length === 0) return false; // lọc năm → chỉ mã có hạng mục năm đó
       if (status !== "all" && !g.items.some((a) => a.st === status)) return false;
       if (needle) {
         const hay = [o.code, o.name, ...g.items.map((a) => a.vtype), ...g.items.map((a) => a.owner)].map((x) => String(x || "").toLowerCase());
@@ -208,7 +234,7 @@ export default function CatalogView({ objects = [], acts = [] }) {
     // sắp theo MÃ đối tượng
     list.sort((a, b) => String(a.obj.code).localeCompare(String(b.obj.code), "vi", { numeric: true }));
     return list;
-  }, [objects, acts, q, cls, dept, status]);
+  }, [objects, acts, q, cls, dept, status, year]);
 
   const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
   const toggle = (code) => setOpen((p) => ({ ...p, [code]: !p[code] }));
@@ -234,6 +260,7 @@ export default function CatalogView({ objects = [], acts = [] }) {
           <select value={cls} onChange={(e) => setCls(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả nhóm</option>{Object.keys(CLS).map((k) => <option key={k} value={k}>{CLS[k].label}</option>)}</select>
           <select value={dept} onChange={(e) => setDept(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả bộ phận</option>{DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
           <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 170 }}><option value="all">Tất cả tình trạng</option><option value="over">Quá hạn</option><option value="prog">Đang chạy</option><option value="todo">Kế hoạch</option><option value="done">Đã xong</option></select>
+          <select value={year} onChange={(e) => setYear(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 140 }} title="Lọc theo năm thẩm định"><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
         </div>
         <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>{groups.length} đối tượng · {totalItems} hạng mục thẩm định</div>
       </Card>
@@ -245,6 +272,7 @@ export default function CatalogView({ objects = [], acts = [] }) {
           const dp = DEPTS.find((d) => d.id === o.dept);
           const done = g.items.filter((a) => a.st === "done").length;
           const over = g.items.filter((a) => a.st === "over").length;
+          const nTypes = new Set(g.items.map((a) => a.vtype)).size;
           const isOpen = open[o.code];
           return (
             <Card key={o.code} style={{ padding: 0, overflow: "hidden" }}>
@@ -255,33 +283,47 @@ export default function CatalogView({ objects = [], acts = [] }) {
                   <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{txt(o.name)}</div>
                   <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{cl.label} · {dp?.name || o.dept || "—"} · {txt(o.area)}{o.freq > 0 ? ` · chu kỳ ${o.freq} tháng` : ""}</div>
                 </div>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 800, color: C.lavText, background: C.lavSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><Layers size={13} />{g.items.length} loại TĐ</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 800, color: C.lavText, background: C.lavSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><Layers size={13} />{nTypes} loại · {g.items.length} lần</span>
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: C.mintText, whiteSpace: "nowrap" }}>{done}/{g.items.length} xong</span>
                 {over > 0 && <span style={{ fontSize: 11.5, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>{over} quá hạn</span>}
               </button>
 
               {isOpen && (
-                <div className="vmp-scroll" style={{ overflowX: "auto", borderTop: `1px solid ${C.pinkSoft}` }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 640 }}>
-                    <thead><tr style={{ background: "rgba(252,227,239,.4)" }}>
-                      {["Loại TĐ", "Năm", "ID", "Deadline VMP", "QA", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 5 ? "center" : "left", padding: "9px 14px", fontSize: 11, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
-                    </tr></thead>
-                    <tbody>
-                      {g.items.map((a, i) => (
-                        <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? "rgba(255,255,255,.5)" : "transparent" }}>
-                          <td style={{ padding: "9px 14px" }}><Tag color={C.lavText} bg={C.lavSoft}>{txt(a.vtype)}</Tag></td>
-                          <td style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: C.plum, fontSize: 12.5 }}>{yearOf(a)}</td>
-                          <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</td>
-                          <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap" }}>{a.target ? fmtVN(parseD(a.target)) : "—"}</td>
-                          <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12.5, fontWeight: 600 }}>{txt(a.owner)}</td>
-                          <td style={{ padding: "9px 14px", textAlign: "center" }}><Pill s={a.st} small /></td>
-                          <td style={{ padding: "9px 14px", textAlign: "center" }}>
-                            <button onClick={() => setEdit(a)} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 9, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div style={{ borderTop: `1px solid ${C.pinkSoft}`, padding: "10px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {groupByType(g.items).map(({ vtype, items, dupYears }) => (
+                    <div key={vtype} style={{ borderRadius: 12, border: `1px solid ${C.pinkSoft}`, overflow: "hidden" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", background: "rgba(237,231,252,.45)" }}>
+                        <Tag color={C.lavText} bg={C.lavSoft}>{txt(vtype)}</Tag>
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: C.plum }}>{items.length} lần thẩm định</span>
+                        {dupYears.size > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 9px", borderRadius: 999 }} title="Cùng một loại thẩm định không nên lặp trong cùng một năm">
+                            ⚠ Trùng loại trong năm {[...dupYears].join(", ")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="vmp-scroll" style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 560 }}>
+                          <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
+                            {["Năm", "ID", "Deadline VMP", "QA", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 4 ? "center" : "left", padding: "8px 14px", fontSize: 11, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+                          </tr></thead>
+                          <tbody>
+                            {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
+                              <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: dup ? "rgba(252,226,233,.45)" : (i % 2 ? "rgba(255,255,255,.5)" : "transparent") }}>
+                                <td style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: dup ? C.raspText : C.plum, fontSize: 12.5, whiteSpace: "nowrap" }}>{yearOf(a)}{dup && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: C.raspText }}>⚠</span>}</td>
+                                <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</td>
+                                <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap" }}>{a.target ? fmtVN(parseD(a.target)) : "—"}</td>
+                                <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12.5, fontWeight: 600 }}>{txt(a.owner)}</td>
+                                <td style={{ padding: "9px 14px", textAlign: "center" }}><Pill s={a.st} small /></td>
+                                <td style={{ padding: "9px 14px", textAlign: "center" }}>
+                                  <button onClick={() => setEdit(a)} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 9, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
+                                </td>
+                              </tr>
+                            ); })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>
