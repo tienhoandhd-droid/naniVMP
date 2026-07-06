@@ -116,6 +116,15 @@ export const wlIsDone = (v) => {
   return !_neg(v) && RE_DONE.test(s);
 };
 
+// "Không tiến hành / Không thực hiện" = hạng mục BỎ, sẽ không làm → không tính
+// ngày công & hồ sơ. Phân biệt với "Chưa …" (chưa làm nhưng SẼ làm → vẫn tính).
+const RE_SKIP = /không\s*(tiến hành|thực hiện)|khong\s*(tien hanh|thuc hien)/;
+export const isSkipped = (a) => {
+  const r = (a && a._raw) || {};
+  return RE_SKIP.test(String(r.tt_tham_dinh ?? "").toLowerCase())
+    || RE_SKIP.test(String(r.tt_vmp ?? "").toLowerCase());
+};
+
 const _progTxt = (v) => {
   const s = String(v == null ? "" : v).toLowerCase();
   return !_neg(v) && RE_PROG.test(s);
@@ -379,9 +388,9 @@ export function wlPending(a) {
 }
 
 export function congConLai(a) {
-  if (a.st === "done") return 0;
+  if (a.st === "done" || isSkipped(a)) return 0; // xong hoặc không thực hiện → 0 ngày công
   const e = Number(a.effort);
   return (!isNaN(e) && e > 0) ? e : 0;
 }
 
-export const hoSoConLai = (a) => a.st !== "done" && !wlIsDone((a._raw || {}).tt_bao_cao);
+export const hoSoConLai = (a) => a.st !== "done" && !isSkipped(a) && !wlIsDone((a._raw || {}).tt_bao_cao);
