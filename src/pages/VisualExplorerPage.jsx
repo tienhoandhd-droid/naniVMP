@@ -290,7 +290,7 @@ function TimelinePanel({ events, onSelect, selectedId, density }) {
   );
 }
 
-function DiagramPanel({ nodes, edges, onSelectNode, selectedNodeId }) {
+export function DiagramPanel({ nodes, edges, onSelectNode, selectedNodeId }) {
   const [zoom, setZoom] = useState(1);
   if (!nodes.length) return <EmptyPanel />;
 
@@ -365,7 +365,7 @@ function DiagramPanel({ nodes, edges, onSelectNode, selectedNodeId }) {
   );
 }
 
-function DashboardPanel({ metrics, events, onSelectStatus }) {
+export function DashboardPanel({ metrics, events, onSelectStatus }) {
   if (!events.length) return <EmptyPanel />;
 
   const statusRows = STATUS_ORDER
@@ -439,7 +439,7 @@ function DashboardPanel({ metrics, events, onSelectStatus }) {
   );
 }
 
-function TablePanel({ events, onSelect, selectedId, density }) {
+export function TablePanel({ events, onSelect, selectedId, density }) {
   if (!events.length) return <EmptyPanel />;
 
   return (

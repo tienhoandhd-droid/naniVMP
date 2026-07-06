@@ -7,13 +7,27 @@ import {
   FileText,
   Filter,
   GanttChartSquare,
+  LayoutGrid,
+  Network,
   Search,
+  Table2,
 } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.js";
 import { CLS, DEPTS, CRIT, MONTHS, PHASE_COLOR, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.js";
 import { parseD, fmtVN, milestones, phaseStates, addDays, clamp, wlIsDone } from "../utils/helpers.js";
 import { useDebounce } from "../hooks/index.js";
 import { Card, Tag, Modal, Pill, phaseTag } from "../components/ui/Primitives.jsx";
+import { buildVisualModel } from "../lib/visualModel.js";
+import { DiagramPanel, DashboardPanel, TablePanel } from "./VisualExplorerPage.jsx";
+
+// Các "không gian làm việc" gộp chung dưới menu Timeline VMP: timeline sâu +
+// 3 góc nhìn phân tích (sơ đồ luồng, bố cục dashboard, bảng dữ liệu).
+const WORKSPACES = [
+  { id: "timeline", label: "Timeline", icon: GanttChartSquare },
+  { id: "diagram", label: "Sơ đồ", icon: Network },
+  { id: "dashboard", label: "Bố cục", icon: LayoutGrid },
+  { id: "table", label: "Bảng", icon: Table2 },
+];
 
 const DAY_MS = 86400000;
 const MONTH_NAMES = [
@@ -1219,8 +1233,9 @@ function ActivityDetailModal({ a, onClose }) {
   );
 }
 
-export default function TimelineView({ acts }) {
+export default function TimelineView({ acts, objects = [] }) {
   const year = vmpToday().getFullYear();
+  const [workspace, setWorkspace] = useState("timeline");
   const [view, setView] = useState("year");
   const [scope, setScope] = useState("year");
   const [chartMode, setChartMode] = useState("table");
@@ -1274,6 +1289,29 @@ export default function TimelineView({ acts }) {
       });
   }, [acts, cls, dept, dq, range, status]);
 
+  // Tập dữ liệu cho các tab phân tích (Sơ đồ/Bố cục/Bảng): cùng bộ lọc nhưng
+  // KHÔNG giới hạn theo khung tháng/quý — để nhìn toàn cảnh.
+  const explorerActs = useMemo(() => {
+    const needle = dq.trim().toLowerCase();
+    return acts.filter((a) => {
+      if ((a.state || "active") !== "active") return false;
+      if (cls !== "all" && a.cls !== cls) return false;
+      if (dept !== "all" && a.dept !== dept) return false;
+      if (status !== "all" && issueLevel(a) !== status) return false;
+      if (needle) {
+        const hay = [a.code, a.name, ownerOf(a), a.id, a.vtype, a.dep, a.crit].map((x) => String(x || "").toLowerCase());
+        if (!hay.some((x) => x.includes(needle))) return false;
+      }
+      return true;
+    });
+  }, [acts, cls, dept, dq, status]);
+
+  const visualModel = useMemo(
+    () => buildVisualModel({ objects, activities: explorerActs }),
+    [objects, explorerActs],
+  );
+  const isTimeline = workspace === "timeline";
+
   const resetFilters = () => {
     setCls("all");
     setDept("all");
@@ -1312,45 +1350,62 @@ export default function TimelineView({ acts }) {
             </span>
             <div>
               <div className="timeline-title-kicker">Timeline intelligence</div>
-              <div className="timeline-title">Bản đồ timeline VMP · {range.title}</div>
+              <div className="timeline-title">Timeline VMP{isTimeline ? ` · ${range.title}` : ""}</div>
               <div className="timeline-subtitle">
-                Theo dõi 3 mốc Đề cương · Thẩm định · Hoàn thành VMP trên dòng thời gian, có vạch ngày hôm nay
+                {isTimeline
+                  ? "Theo dõi 3 mốc Đề cương · Thẩm định · Hoàn thành VMP trên dòng thời gian, có vạch ngày hôm nay"
+                  : "Sơ đồ luồng, bố cục dashboard và bảng dữ liệu — cùng một bộ lọc, từ dữ liệu Supabase hiện có"}
               </div>
             </div>
           </div>
 
           <div className="timeline-board-tools">
-            <div className="timeline-mode-controls" aria-label="Kiểu bản đồ timeline">
-              {Object.entries(CHART_LABELS).map(([k, label]) => (
-                <ScopeButton
-                  key={k}
-                  active={chartMode === k}
-                  onClick={() => setChartMode(k)}
-                  title={k === "table"
-                    ? "Bảng timeline có hàng/cột rõ để quan sát sơ đồ"
-                    : k === "stage"
-                      ? "Sơ đồ gọn theo đích VMP và 3 mốc chính"
-                      : "Sơ đồ gọn kết hợp trục timeline cũ"}
-                >
-                  {label}
-                </ScopeButton>
-              ))}
+            <div className="timeline-mode-controls" aria-label="Không gian làm việc">
+              {WORKSPACES.map((w) => {
+                const Icon = w.icon;
+                return (
+                  <ScopeButton key={w.id} active={workspace === w.id} onClick={() => setWorkspace(w.id)}>
+                    <Icon size={14} style={{ marginRight: 5, verticalAlign: "-2px" }} />{w.label}
+                  </ScopeButton>
+                );
+              })}
             </div>
-            <div className="timeline-density-controls" aria-label="Mật độ dòng timeline">
-              {Object.entries(DENSITY_LABELS).map(([k, label]) => (
-                <ScopeButton
-                  key={k}
-                  active={density === k}
-                  onClick={() => setDensity(k)}
-                  title={k === "compact" ? "Hiển thị nhiều hạng mục hơn" : "Hiển thị hạng mục thoáng và dễ đọc hơn"}
-                >
-                  {label}
-                </ScopeButton>
-              ))}
-            </div>
+            {isTimeline && (
+              <div className="timeline-mode-controls" aria-label="Kiểu bản đồ timeline">
+                {Object.entries(CHART_LABELS).map(([k, label]) => (
+                  <ScopeButton
+                    key={k}
+                    active={chartMode === k}
+                    onClick={() => setChartMode(k)}
+                    title={k === "table"
+                      ? "Bảng timeline có hàng/cột rõ để quan sát sơ đồ"
+                      : k === "stage"
+                        ? "Sơ đồ gọn theo đích VMP và 3 mốc chính"
+                        : "Sơ đồ gọn kết hợp trục timeline cũ"}
+                  >
+                    {label}
+                  </ScopeButton>
+                ))}
+              </div>
+            )}
+            {(isTimeline || workspace === "table") && (
+              <div className="timeline-density-controls" aria-label="Mật độ hiển thị">
+                {Object.entries(DENSITY_LABELS).map(([k, label]) => (
+                  <ScopeButton
+                    key={k}
+                    active={density === k}
+                    onClick={() => setDensity(k)}
+                    title={k === "compact" ? "Hiển thị nhiều hạng mục hơn" : "Hiển thị thoáng và dễ đọc hơn"}
+                  >
+                    {label}
+                  </ScopeButton>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
+        {isTimeline && (
         <div className="timeline-command-bar">
           <div className="timeline-view-controls">
             {Object.entries(VIEW_LABELS).map(([k, label]) => (
@@ -1415,6 +1470,7 @@ export default function TimelineView({ acts }) {
             ))}
           </div>
         </div>
+        )}
 
         <div className="timeline-filter-row timeline-filter-row--workbench">
           <div className="timeline-filter-label">
@@ -1451,6 +1507,8 @@ export default function TimelineView({ acts }) {
           )}
         </div>
 
+        {isTimeline ? (
+        <>
         <TimelineStageProgress
           items={filtered}
           year={year}
@@ -1523,6 +1581,18 @@ export default function TimelineView({ acts }) {
             />
           )}
         </div>
+        </>
+        ) : workspace === "diagram" ? (
+          <DiagramPanel nodes={visualModel.diagramNodes} edges={visualModel.diagramEdges} onSelectNode={() => {}} selectedNodeId="" />
+        ) : workspace === "dashboard" ? (
+          <DashboardPanel
+            metrics={visualModel.dashboardMetrics}
+            events={visualModel.timelineEvents}
+            onSelectStatus={(s) => { setStatus(["over", "prog", "todo", "done"].includes(s) ? s : "all"); setWorkspace("timeline"); }}
+          />
+        ) : (
+          <TablePanel events={visualModel.timelineEvents} selectedId="" onSelect={(ev) => setDetail(ev.raw)} density={density} />
+        )}
       </Card>
 
       <ActivityDetailModal a={detail} onClose={() => setDetail(null)} />

@@ -76,7 +76,6 @@ export const NAV_ITEMS = [
   { id: "mismatch", label: "Lệch pha hồ sơ", icon: FileText, group: "monitor" },
   { id: "workload", label: "Tải công việc", icon: Activity, group: "monitor" },
   { id: "risk", label: "QRM – Rủi ro", icon: ShieldAlert, group: "analysis" },
-  { id: "visual", label: "Visual Explorer", icon: Network, group: "analysis" },
   { id: "reports", label: "Báo cáo & AI", icon: FileBarChart, group: "analysis" },
   { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin", adminOnly: true },
   { id: "quality", label: "Data quality", icon: Radar, group: "admin", adminOnly: true },
@@ -86,14 +85,13 @@ export const NAV_ITEMS = [
 
 export const NAV_SUBS = {
   overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
-  timeline: "Lịch tổng thể & các mốc: Đề cương → Thẩm định → Báo cáo → Đích VMP",
+  timeline: "Timeline · Sơ đồ · Bố cục · Bảng — các mốc Đề cương → Thẩm định → Báo cáo → Đích VMP",
   inventory: "Danh mục đối tượng theo 5 nhóm — đồng bộ Google Sheet",
   update: "Nhập kết quả thực tế — ghi thẳng vào Google Sheet qua n8n",
   alerts: "Cảnh báo tới hạn / quá hạn & dự báo tái thẩm định",
   mismatch: "Hạng mục thẩm định xong nhưng hồ sơ chưa hoàn thiện (hoặc ngược lại)",
   workload: "Ma trận tải công việc Người × Tháng",
   risk: "Quản lý rủi ro chất lượng (ICH Q9 / EU GMP Annex 15)",
-  visual: "Timeline, sơ đồ và bố cục dashboard từ dữ liệu Supabase hiện có",
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / DOCX / HTML",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
   quality: "Phát hiện lỗi dữ liệu: thiếu mã, trùng ID, sai ngày, mâu thuẫn trạng thái",

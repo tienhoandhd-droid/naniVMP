@@ -48,20 +48,19 @@ function percent(done, total) {
 }
 
 function statusLabel(status) {
-  return STATUS[status]?.label || status || "Chua ro";
+  return STATUS[status]?.label || status || "Chưa rõ";
 }
 
 function classLabel(cls) {
-  return CLS[cls]?.label || cls || "Chua phan loai";
+  return CLS[cls]?.label || cls || "Chưa phân loại";
 }
 
 function deptLabel(dept) {
-  return DEPTS.find((item) => item.id === dept)?.name || dept || "Chua xac dinh";
+  return DEPTS.find((item) => item.id === dept)?.name || dept || "Chưa xác định";
 }
 
 function criticalityLabel(value) {
   const v = clean(value);
-  if (v === "Thấp") return "Thap";
   return v || "TB";
 }
 
@@ -134,52 +133,52 @@ export function buildDashboardMetrics(activities = [], objects = []) {
   return [
     {
       key: "active_items",
-      label: "Hang muc active",
+      label: "Hạng mục đang theo dõi",
       value: total,
       tone: "neutral",
-      helper: "Tong hang muc dang duoc tinh trong dashboard",
+      helper: "Tổng hạng mục đang được tính trong dashboard",
     },
     {
       key: "completion_rate",
-      label: "Ty le hoan thanh",
+      label: "Tỷ lệ hoàn thành",
       value: `${percent(done, total)}%`,
       tone: done === total && total ? "good" : "neutral",
-      helper: `${done}/${total} hang muc da hoan thanh VMP`,
+      helper: `${done}/${total} hạng mục đã hoàn thành VMP`,
     },
     {
       key: "overdue_items",
-      label: "Can chu y",
+      label: "Cần chú ý",
       value: over,
       tone: over ? "bad" : "good",
-      helper: "Hang muc qua han hoac lech nhip theo trang thai hien tai",
+      helper: "Hạng mục quá hạn hoặc lệch nhịp theo trạng thái hiện tại",
     },
     {
       key: "in_progress",
-      label: "Dang thuc hien",
+      label: "Đang thực hiện",
       value: prog,
       tone: prog ? "warn" : "neutral",
-      helper: "Hang muc co it nhat mot giai doan dang chay",
+      helper: "Hạng mục có ít nhất một giai đoạn đang chạy",
     },
     {
       key: "planned_items",
-      label: "Ke hoach/chua lam",
+      label: "Kế hoạch / chưa làm",
       value: plan,
       tone: "neutral",
-      helper: "Hang muc chua bat dau hoac nam trong ke hoach",
+      helper: "Hạng mục chưa bắt đầu hoặc nằm trong kế hoạch",
     },
     {
       key: "objects",
-      label: "Doi tuong",
+      label: "Đối tượng",
       value: objectCodes.size || objects.length,
       tone: "neutral",
-      helper: "Ma doi tuong duy nhat tu Supabase read model",
+      helper: "Mã đối tượng duy nhất từ Supabase read model",
     },
     {
       key: "owners",
-      label: "Nguoi lien quan",
+      label: "Người liên quan",
       value: owners,
       tone: "neutral",
-      helper: "Nguoi/nhom phu trach doc tu du lieu hien co",
+      helper: "Người/nhóm phụ trách đọc từ dữ liệu hiện có",
     },
   ];
 }
