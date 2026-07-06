@@ -2989,6 +2989,154 @@ select { appearance: none; -webkit-appearance: none; }
   background: rgba(226,248,241,.24);
 }
 
+.timeline-day-flow {
+  position: relative;
+  height: 96px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.68), rgba(255,255,255,.16)),
+    radial-gradient(circle at 12px 50%, rgba(110,84,192,.08), transparent 28px);
+}
+
+.timeline-day-flow .timeline-band {
+  opacity: .62;
+}
+
+.timeline-day-flow .timeline-grid-line {
+  background: rgba(78,42,78,.085);
+}
+
+.timeline-day-flow__window {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  z-index: 2;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,242,216,.34), rgba(232,246,255,.38), rgba(226,248,241,.40));
+  box-shadow: inset 0 0 0 1px rgba(78,42,78,.05);
+  pointer-events: none;
+}
+
+.timeline-day-flow__path {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.timeline-day-flow__segment {
+  stroke: #8E6FD0;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: .72;
+  stroke-dasharray: 7 5;
+}
+
+.timeline-day-flow__segment--protocol {
+  stroke: #E69A2E;
+}
+
+.timeline-day-flow__segment--validation {
+  stroke: #4FA3D9;
+}
+
+.timeline-day-flow__segment--done {
+  stroke-dasharray: none;
+  opacity: .9;
+}
+
+.timeline-day-flow__node {
+  --stage-color: #8E6FD0;
+  position: absolute;
+  z-index: 8;
+  min-width: 64px;
+  height: 25px;
+  transform: translate(-50%, -50%);
+  display: inline-grid;
+  grid-template-columns: 18px auto auto;
+  align-items: center;
+  gap: 4px;
+  border: 1.5px solid var(--stage-color);
+  border-radius: 999px;
+  padding: 2px 6px 2px 3px;
+  background: rgba(255,255,255,.96);
+  color: var(--stage-color);
+  box-shadow: 0 5px 12px rgba(78,42,78,.13);
+  white-space: nowrap;
+}
+
+.timeline-day-flow__node--protocol { --stage-color: #E69A2E; }
+.timeline-day-flow__node--validation { --stage-color: #4FA3D9; }
+.timeline-day-flow__node--vmp { --stage-color: #2FA98A; }
+
+.timeline-day-flow__node--before {
+  transform: translate(0, -50%);
+}
+
+.timeline-day-flow__node--after {
+  transform: translate(-100%, -50%);
+}
+
+.timeline-day-flow__node b {
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--stage-color);
+  color: #fff;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.timeline-day-flow__node small,
+.timeline-day-flow__node em {
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 900;
+  font-style: normal;
+}
+
+.timeline-day-flow__node em {
+  color: var(--plum);
+}
+
+.timeline-day-flow__node--done {
+  background: rgba(242,253,249,.98);
+}
+
+.timeline-day-flow__node--done b {
+  background: #2FA98A;
+}
+
+.timeline-day-flow__node--soon b {
+  background: #D9891C;
+}
+
+.timeline-day-flow__node--urgent,
+.timeline-day-flow__node--over {
+  border-color: #C73D62;
+  color: #B83255;
+  background: rgba(255,247,250,.98);
+}
+
+.timeline-day-flow__node--urgent b,
+.timeline-day-flow__node--over b {
+  background: #C73D62;
+}
+
+.timeline-day-flow--empty {
+  display: grid;
+  place-items: center;
+  color: var(--plum-soft);
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .timeline-day-marker {
   position: absolute;
   top: 3px;
@@ -3049,6 +3197,32 @@ select { appearance: none; -webkit-appearance: none; }
 .timeline-day-board--compact .timeline-day-stages,
 .timeline-day-board--compact .timeline-day-lanes {
   grid-template-rows: repeat(3, 27px);
+}
+
+.timeline-day-board--compact .timeline-day-flow {
+  height: 87px;
+}
+
+.timeline-day-board--compact .timeline-day-flow__window {
+  top: 11px;
+  bottom: 11px;
+}
+
+.timeline-day-board--compact .timeline-day-flow__node {
+  min-width: 57px;
+  height: 22px;
+  gap: 3px;
+}
+
+.timeline-day-board--compact .timeline-day-flow__node b {
+  width: 15px;
+  height: 15px;
+  font-size: 7.5px;
+}
+
+.timeline-day-board--compact .timeline-day-flow__node small,
+.timeline-day-board--compact .timeline-day-flow__node em {
+  font-size: 8px;
 }
 
 .timeline-day-board--compact .timeline-day-marker {

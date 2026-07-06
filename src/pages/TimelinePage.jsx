@@ -626,24 +626,68 @@ function TimelineTableStageLabel({ a, stage }) {
   );
 }
 
-function TimelineTableDateLane({ a, stage, range }) {
-  const state = stageState(a, stage);
-  const point = timelineStagePoint(state, range);
-  const actualText = state.actual ? ` · Thực tế ${fmtVN(state.actual)}` : "";
-  const edgeText = point.edge === "before" ? " · Trước kỳ" : point.edge === "after" ? " · Sau kỳ" : "";
+const FLOW_Y = {
+  protocol: 24,
+  validation: 50,
+  vmp: 76,
+};
+
+function TimelineTableFlowCell({ a, range }) {
+  const entries = MAP_STAGES.map((stage) => {
+    const state = stageState(a, stage);
+    const point = timelineStagePoint(state, range);
+    return { stage, state, point, y: FLOW_Y[stage.id] || 50 };
+  }).filter((entry) => entry.point.date);
+  if (!entries.length) {
+    return (
+      <div className="timeline-day-flow timeline-day-flow--empty">
+        <ScaleBands range={range} />
+        <span>Chưa có ngày mốc</span>
+      </div>
+    );
+  }
+  const left = Math.min(...entries.map((entry) => entry.point.left));
+  const right = Math.max(...entries.map((entry) => entry.point.left));
 
   return (
-    <div className={`timeline-day-lane timeline-day-lane--${stage.id}`}>
-      {point.date && (
-        <span
-          className={`timeline-day-marker timeline-day-marker--${state.heat} timeline-day-marker--${point.edge}`}
-          style={{ left: `${point.left}%` }}
-          title={`${stage.label}: hạn ${fmtVN(state.due)}${actualText}${edgeText}`}
-        >
-          <b>{state.done ? "✓" : stage.short}</b>
-          <small className="tnum">{fmtVN(point.date).slice(0, 5)}</small>
-        </span>
-      )}
+    <div className="timeline-day-flow">
+      <ScaleBands range={range} />
+      <span
+        className="timeline-day-flow__window"
+        style={{ left: `${left}%`, width: `${Math.max(1, right - left)}%` }}
+      />
+      <svg className="timeline-day-flow__path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {entries.slice(1).map((entry, index) => {
+          const prev = entries[index];
+          return (
+            <line
+              key={`${prev.stage.id}-${entry.stage.id}`}
+              x1={prev.point.left}
+              y1={prev.y}
+              x2={entry.point.left}
+              y2={entry.y}
+              vectorEffect="non-scaling-stroke"
+              className={`timeline-day-flow__segment timeline-day-flow__segment--${prev.stage.id} ${prev.state.done ? "timeline-day-flow__segment--done" : ""}`}
+            />
+          );
+        })}
+      </svg>
+      {entries.map(({ stage, state, point, y }) => {
+        const actualText = state.actual ? ` · Thực tế ${fmtVN(state.actual)}` : "";
+        const edgeText = point.edge === "before" ? " · Trước kỳ" : point.edge === "after" ? " · Sau kỳ" : "";
+        return (
+          <span
+            key={stage.id}
+            className={`timeline-day-flow__node timeline-day-flow__node--${stage.id} timeline-day-flow__node--${state.heat} timeline-day-flow__node--${point.edge}`}
+            style={{ left: `${point.left}%`, top: `${y}%` }}
+            title={`${stage.label}: ${state.label} · hạn ${fmtVN(state.due)}${actualText}${edgeText}`}
+          >
+            <b>{state.done ? "✓" : stage.short}</b>
+            <small>{stage.short}</small>
+            <em className="tnum">{fmtVN(point.date).slice(0, 5)}</em>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -758,11 +802,7 @@ function TimelineTableBoard({ items, onOpen, density, range }) {
                 </td>
                 <td className="timeline-day-calendar-cell" style={{ width: `${calendarWidth}px` }}>
                   {todayVisible && <i className="timeline-day-calendar__today" style={{ left: `${pctInRange(today, range)}%` }} />}
-                  <div className="timeline-day-lanes">
-                    {MAP_STAGES.map((stage) => (
-                      <TimelineTableDateLane key={stage.id} a={a} stage={stage} range={range} />
-                    ))}
-                  </div>
+                  <TimelineTableFlowCell a={a} range={range} />
                 </td>
               </tr>
             );
@@ -1284,7 +1324,7 @@ export default function TimelineView({ acts }) {
             <div>
               <strong>
                 {chartMode === "table"
-                  ? "Bảng timeline quan sát"
+                  ? "Sơ đồ dòng thời gian tổng hợp"
                   : chartMode === "stage"
                     ? "Sơ đồ 3 mốc"
                     : "Sơ đồ 3 mốc + trục thời gian"}

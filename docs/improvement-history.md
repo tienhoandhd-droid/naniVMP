@@ -279,3 +279,42 @@ Rui ro con lai:
   de bundle nhe va tranh doi contract du lieu.
 - Viec dieu huong mobile cua shell tong the van phu thuoc layout hien co; Visual
   Explorer da duoc kiem khong tran ngang khi mo truc tiep trong viewport mobile.
+
+## 2026-07-06 - Phase 9 - Timeline day-flow redraw
+
+Pham vi:
+
+- Ve lai o lich cua `Bang ngay tong hop` theo ngon ngu so do dong thoi gian
+  dang dung trong mode `So do + Gantt`.
+- Moi hang muc co mot duong tien trinh lien tuc voi ba node rieng:
+  - De cuong.
+  - Tham dinh thuc te.
+  - Hoan thanh VMP.
+- Noi ba node bang hai doan co mau theo moc truoc do; node giu ngay hoan thanh
+  thuc te neu da xong va ngay han neu chua xong.
+- Bo sung dai thoi gian tu moc dau den dich VMP de nhin nhanh do dai chu ky.
+- Giu marker `Hom nay`, truc ngay/thang, sticky column, uu tien moc sap toi va
+  scroll ngang noi bo cua bang.
+- Doi tieu de bang thanh `So do dong thoi gian tong hop` de phan anh dung cach
+  hien thi moi.
+- Loai bo renderer lane cu sau khi flow cell moi thay the hoan toan.
+
+Thay doi Supabase/n8n/GitHub remote:
+
+- Chi doc du lieu Supabase hien co qua app runtime.
+- Khong co Supabase mutation.
+- Khong co n8n mutation.
+- Khong push, khong tao PR trong phase nay.
+
+Kiem tra:
+
+- `git diff --check`: PASS.
+- `npm run build`: PASS.
+- Browser QA desktop 1280x720: `bodyScrollWidth = bodyClientWidth = 1280`,
+  `mainScrollWidth = mainClientWidth = 1014`; bang cuon ngang noi bo.
+- 441 hang muc dang hien thi; moi hang co dung 3 node va 2 doan noi.
+- Browser QA mobile 390x844: `bodyScrollWidth = 390`,
+  `mainScrollWidth = 390`; bang rong 3795px cuon trong khung 268px, khong lam
+  tran ngang toan trang.
+- Node De cuong sap toi nam trong vung quan sat khi bang tu dong can timeline.
+- Console browser: khong co warning/error.
