@@ -38,9 +38,11 @@ const METRICS = [
     short: "Hồ sơ",
     field: "tt_bao_cao",
     icon: FileCheck2,
-    color: C.marigold,
-    text: C.marigoldText,
-    soft: C.marigoldSoft,
+    // Hồng = nhận-diện giai đoạn (không mang nghĩa status). Cam/đỏ được dành
+    // riêng cho trạng thái (đang/sắp · quá hạn) nhất quán toàn app.
+    color: C.pink,
+    text: C.pinkText,
+    soft: C.pinkSoft,
   },
   {
     id: "vmp",
