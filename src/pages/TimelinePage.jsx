@@ -1,5 +1,5 @@
 /* TimelinePage.jsx — Modern Gantt Timeline VMP */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarClock,
   ChevronLeft,
@@ -38,7 +38,7 @@ const DENSITY_LABELS = {
 };
 
 const CHART_LABELS = {
-  table: "Bảng timeline",
+  table: "Bảng ngày tổng hợp",
   stage: "Sơ đồ 3 mốc",
   hybrid: "Sơ đồ + Gantt",
 };
@@ -50,9 +50,9 @@ const PHASES = [
 ];
 
 const MAP_STAGES = [
-  { id: "report", label: "Hồ sơ", short: "HS", field: "tt_bao_cao", actual: "ngay_bao_cao", due: "report" },
-  { id: "validation", label: "Thực tế", short: "TT", field: "tt_tham_dinh", actual: "ngay_tham_dinh", due: "validation" },
-  { id: "vmp", label: "VMP", short: "VMP", field: "tt_vmp", actual: "ngay_vmp", due: "target" },
+  { id: "protocol", label: "Đề cương", short: "ĐC", field: "tt_de_cuong", actual: "ngay_de_cuong", due: "protocol" },
+  { id: "validation", label: "Thẩm định thực tế", short: "TT", field: "tt_tham_dinh", actual: "ngay_tham_dinh", due: "validation" },
+  { id: "vmp", label: "Hoàn thành VMP", short: "VMP", field: "tt_vmp", actual: "ngay_vmp", due: "target" },
 ];
 
 const MILESTONES = [
@@ -350,6 +350,29 @@ function activeMapStep(a) {
   return { stage: next.stage, label: `Đang ở: ${next.stage.label}` };
 }
 
+function nextPendingMilestone(a) {
+  for (const stage of MAP_STAGES) {
+    const state = stageState(a, stage);
+    if (!state.done) return { stage, state };
+  }
+  return null;
+}
+
+function compareByNextMilestone(a, b) {
+  const today = startOfDay(vmpToday()).getTime();
+  const aNext = nextPendingMilestone(a);
+  const bNext = nextPendingMilestone(b);
+  const aTime = aNext?.state.due?.getTime();
+  const bTime = bNext?.state.due?.getTime();
+  const bucket = (next, time) => !next || !Number.isFinite(time) ? 2 : time >= today ? 0 : 1;
+  const aBucket = bucket(aNext, aTime);
+  const bBucket = bucket(bNext, bTime);
+  if (aBucket !== bBucket) return aBucket - bBucket;
+  if (aBucket === 0 && aTime !== bTime) return aTime - bTime;
+  if (aBucket === 1 && aTime !== bTime) return bTime - aTime;
+  return compareByTarget(a, b);
+}
+
 function TimelineMapSummary({ items }) {
   const rows = MAP_STAGES.map((stage) => {
     const states = items.map((a) => stageState(a, stage));
@@ -551,25 +574,115 @@ function TimelineMapRowContent({ a }) {
   );
 }
 
-function TimelineTableStageCell({ a, stage }) {
+function timelineCalendarWidth(range, density) {
+  const pxPerDay = range.view === "month"
+    ? (density === "compact" ? 29 : 34)
+    : range.view === "quarter"
+      ? (density === "compact" ? 16 : 19)
+      : (density === "compact" ? 9 : 11);
+  return Math.max(920, Math.round(range.days * pxPerDay));
+}
+
+function timelineDateTicks(range) {
+  const step = range.view === "month" ? 1 : range.view === "quarter" ? 7 : 14;
+  const ticks = [];
+  for (let index = 0; index < range.days; index += 1) {
+    const date = addDays(range.start, index);
+    const major = date.getDate() === 1;
+    if (index === 0 || index === range.days - 1 || major || index % step === 0) {
+      ticks.push({
+        date,
+        major,
+        edge: index === 0 ? "start" : index === range.days - 1 ? "end" : "",
+        label: `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`,
+        left: pctInRange(date, range),
+      });
+    }
+  }
+  return ticks;
+}
+
+function timelineStagePoint(state, range) {
+  const date = state.done && state.actual ? state.actual : state.due;
+  const before = date && date < startOfDay(range.start);
+  const after = date && date > startOfDay(range.end);
+  return {
+    date,
+    edge: before ? "before" : after ? "after" : "inside",
+    left: before ? 1 : after ? 99 : pctInRange(date, range),
+  };
+}
+
+function TimelineTableStageLabel({ a, stage }) {
   const state = stageState(a, stage);
-  const actual = state.actual || null;
   return (
-    <td className={`timeline-table-stage timeline-table-stage--${stage.id} timeline-table-stage--${state.heat}`}>
-      <div className="timeline-table-stage__head">
-        <span>{stage.short}</span>
+    <div className={`timeline-day-stage timeline-day-stage--${stage.id} timeline-day-stage--${state.heat}`}>
+      <i />
+      <span>
         <strong>{stage.label}</strong>
-      </div>
-      <div className="timeline-table-stage__state">{state.label}</div>
-      <div className="timeline-table-stage__date">
-        <span>Hạn: <b className="tnum">{fmtVN(state.due)}</b></span>
-        {actual && <span>TT: <b className="tnum">{fmtVN(actual)}</b></span>}
-      </div>
-    </td>
+        <small>{state.label}</small>
+      </span>
+    </div>
   );
 }
 
-function TimelineTableBoard({ items, onOpen, density }) {
+function TimelineTableDateLane({ a, stage, range }) {
+  const state = stageState(a, stage);
+  const point = timelineStagePoint(state, range);
+  const actualText = state.actual ? ` · Thực tế ${fmtVN(state.actual)}` : "";
+  const edgeText = point.edge === "before" ? " · Trước kỳ" : point.edge === "after" ? " · Sau kỳ" : "";
+
+  return (
+    <div className={`timeline-day-lane timeline-day-lane--${stage.id}`}>
+      {point.date && (
+        <span
+          className={`timeline-day-marker timeline-day-marker--${state.heat} timeline-day-marker--${point.edge}`}
+          style={{ left: `${point.left}%` }}
+          title={`${stage.label}: hạn ${fmtVN(state.due)}${actualText}${edgeText}`}
+        >
+          <b>{state.done ? "✓" : stage.short}</b>
+          <small className="tnum">{fmtVN(point.date).slice(0, 5)}</small>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function TimelineTableBoard({ items, onOpen, density, range }) {
+  const boardRef = useRef(null);
+  const calendarWidth = timelineCalendarWidth(range, density);
+  const today = vmpToday();
+  const todayVisible = inRange(today, range);
+  const tableItems = useMemo(() => [...items].sort(compareByNextMilestone), [items]);
+  const nextUpcomingDate = tableItems
+    .map((item) => nextPendingMilestone(item)?.state.due)
+    .find((date) => date && date >= startOfDay(today) && inRange(date, range));
+  const nextUpcomingTime = nextUpcomingDate?.getTime() || null;
+
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board || !todayVisible) return;
+    const centerToday = () => {
+      const itemHead = board.querySelector(".timeline-day-head-item");
+      const stageHead = board.querySelector(".timeline-day-head-stages");
+      const calendarHead = board.querySelector(".timeline-day-head-calendar");
+      const itemWidth = itemHead?.offsetWidth || 0;
+      const stageIsHorizontallySticky = stageHead && getComputedStyle(stageHead).left !== "auto";
+      const stickyWidth = itemWidth + (stageIsHorizontallySticky ? stageHead.offsetWidth : 0);
+      const availableWidth = Math.max(0, board.clientWidth - stickyWidth);
+      const focusDate = availableWidth < 180 && nextUpcomingTime ? new Date(nextUpcomingTime) : today;
+      const focusX = (calendarHead?.offsetLeft || 0) + ((calendarHead?.offsetWidth || calendarWidth) * pctInRange(focusDate, range)) / 100;
+      const focusOffset = stickyWidth + Math.max(34, availableWidth * (availableWidth < 180 ? 0.62 : 0.45));
+      board.scrollLeft = Math.max(0, focusX - focusOffset);
+    };
+    const frame = requestAnimationFrame(centerToday);
+    window.addEventListener("resize", centerToday);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", centerToday);
+    };
+  }, [calendarWidth, nextUpcomingTime, range, todayVisible]);
+
   if (!items.length) {
     return (
       <div className="timeline-card-board-empty">
@@ -578,60 +691,78 @@ function TimelineTableBoard({ items, onOpen, density }) {
     );
   }
 
+  const ticks = timelineDateTicks(range);
+  const daySize = `${100 / range.days}%`;
+
   return (
-    <div className={`timeline-table-board timeline-table-board--${density} vmp-scroll`}>
-      <table className="timeline-table">
+    <div ref={boardRef} className={`timeline-day-board timeline-day-board--${density} vmp-scroll`}>
+      <table
+        className="timeline-day-table"
+        style={{ minWidth: `${510 + calendarWidth}px`, "--calendar-width": `${calendarWidth}px`, "--day-size": daySize }}
+      >
         <thead>
           <tr>
-            <th>Đích VMP</th>
-            <th>Hạng mục</th>
-            {MAP_STAGES.map((stage) => (
-              <th key={stage.id} className={`timeline-table__stage-head timeline-table__stage-head--${stage.id}`}>
-                {stage.label}
-              </th>
-            ))}
-            <th>Tình trạng</th>
+            <th className="timeline-day-head-item">Hạng mục · ưu tiên mốc sắp tới</th>
+            <th className="timeline-day-head-stages">3 mốc hoàn thành</th>
+            <th className="timeline-day-head-calendar">
+              <div className="timeline-day-axis" style={{ width: `${calendarWidth}px` }}>
+                {todayVisible && <i className="timeline-day-axis__today" style={{ left: `${pctInRange(today, range)}%` }}><span>Hôm nay</span></i>}
+                {ticks.map((tick) => (
+                  <span
+                    key={tick.date.getTime()}
+                    className={`timeline-day-axis__tick ${tick.major ? "timeline-day-axis__tick--major" : ""} ${tick.edge ? `timeline-day-axis__tick--${tick.edge}` : ""}`}
+                    style={{ left: `${tick.left}%` }}
+                  >
+                    {tick.label}
+                  </span>
+                ))}
+              </div>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((a) => {
+          {tableItems.map((a) => {
             const cls = CLS[a.cls] || CLS.tb;
             const dept = DEPTS.find((d) => d.id === a.dept);
             const level = issueLevel(a);
             const owner = ownerOf(a);
             const step = activeMapStep(a);
+            const stepState = stageState(a, step.stage);
             return (
               <tr
                 key={a.id}
-                className={`timeline-table-row timeline-table-row--${level}`}
+                className={`timeline-day-row timeline-day-row--${level}`}
                 onClick={() => onOpen && onOpen(a)}
                 title={`${a.code} · ${a.name}\nĐích VMP: ${fmtVN(parseD(a.target))}`}
               >
-                <td className="timeline-table-target">
-                  <span>Đích VMP</span>
-                  <strong className="tnum">{fmtVN(parseD(a.target))}</strong>
-                </td>
-                <td className="timeline-table-item">
+                <td className="timeline-day-item">
                   <div className="timeline-table-item__top">
                     <Tag color={cls.text} bg={cls.soft}>{a.vtype}</Tag>
                     <span className="timeline-card-code">{a.code}</span>
+                    <Pill s={a.st} small />
                   </div>
                   <div className="timeline-table-item__name">{a.name}</div>
                   <div className="timeline-table-item__meta">
+                    <span className="tnum">VMP {fmtVN(parseD(a.target))}</span>
                     <span>{owner}</span>
                     <span>{dept?.short || a.dept || "—"}</span>
-                    <span>{a.crit || "TB"}</span>
+                  </div>
+                  <div className={`timeline-day-item__next timeline-day-item__next--${stepState.heat}`}>
+                    {step.label} · {stepState.label}
                   </div>
                 </td>
-                {MAP_STAGES.map((stage) => (
-                  <TimelineTableStageCell key={stage.id} a={a} stage={stage} />
-                ))}
-                <td className="timeline-table-status">
-                  <Pill s={a.st} small />
-                  <span>{level === "over" ? "Cần chú ý" : level === "done" ? "Đã xong" : level === "prog" ? "Đang chạy" : "Kế hoạch"}</span>
-                  <small className={`timeline-table-status__step timeline-table-status__step--${step.stage.id}`}>
-                    {step.label}
-                  </small>
+                <td className="timeline-day-stages-cell">
+                  <div className="timeline-day-stages">
+                    {MAP_STAGES.map((stage) => <TimelineTableStageLabel key={stage.id} a={a} stage={stage} />)}
+                  </div>
+                </td>
+                <td className="timeline-day-calendar-cell" style={{ width: `${calendarWidth}px` }}>
+                  {todayVisible && <i className="timeline-day-calendar__today" style={{ left: `${pctInRange(today, range)}%` }} />}
+                  <div className="timeline-day-lanes">
+                    {MAP_STAGES.map((stage) => (
+                      <TimelineTableDateLane key={stage.id} a={a} stage={stage} range={range} />
+                    ))}
+                  </div>
                 </td>
               </tr>
             );
@@ -900,7 +1031,7 @@ export default function TimelineView({ acts }) {
   const year = vmpToday().getFullYear();
   const [view, setView] = useState("year");
   const [scope, setScope] = useState("year");
-  const [chartMode, setChartMode] = useState("hybrid");
+  const [chartMode, setChartMode] = useState("table");
   const [density, setDensity] = useState("compact");
   const [focusMonth, setFocusMonth] = useState(vmpToday().getMonth());
   const [cls, setCls] = useState("all");
@@ -1158,7 +1289,7 @@ export default function TimelineView({ acts }) {
                     ? "Sơ đồ 3 mốc"
                     : "Sơ đồ 3 mốc + trục thời gian"}
               </strong>
-              <span>{filtered.length} hạng mục · Hồ sơ / Thực tế / VMP · sort theo đích VMP</span>
+              <span>{filtered.length} hạng mục · Đề cương / Thẩm định thực tế / Hoàn thành VMP · ưu tiên mốc sắp tới</span>
             </div>
             <div className="timeline-map-legend">
               {MAP_STAGES.map((stage) => (
@@ -1170,7 +1301,7 @@ export default function TimelineView({ acts }) {
           </div>
 
           {chartMode === "table" ? (
-            <TimelineTableBoard items={filtered} onOpen={setDetail} density={density} />
+            <TimelineTableBoard items={filtered} onOpen={setDetail} density={density} range={range} />
           ) : chartMode === "stage" ? (
             <TimelineStageBoard items={filtered} onOpen={setDetail} density={density} />
           ) : (

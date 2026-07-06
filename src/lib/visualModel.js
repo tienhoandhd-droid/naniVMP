@@ -80,9 +80,21 @@ export function buildTimelineEvents(activities = []) {
     .filter(ACTIVE)
     .map((activity) => {
       const m = activity.m || milestones(activity);
+      const raw = activity._raw || {};
       const target = parseD(activity.target) || m.target || null;
       const start = m.protocol || target;
       const end = m.target || target;
+      const phaseDoneState = {
+        protocol: phaseDone(activity, "tt_de_cuong"),
+        validation: phaseDone(activity, "tt_tham_dinh"),
+        report: phaseDone(activity, "tt_bao_cao"),
+        vmp: phaseDone(activity, "tt_vmp"),
+      };
+      const phases = [
+        { id: "protocol", label: "De cuong", due: dateISO(m.protocol), actual: dateISO(parseD(raw.ngay_de_cuong)), done: phaseDoneState.protocol },
+        { id: "validation", label: "Tham dinh thuc te", due: dateISO(m.validation), actual: dateISO(parseD(raw.ngay_tham_dinh)), done: phaseDoneState.validation },
+        { id: "vmp", label: "Hoan thanh VMP", due: dateISO(m.target), actual: dateISO(parseD(raw.ngay_vmp)), done: phaseDoneState.vmp },
+      ];
       return {
         id: String(activity.id || `${activity.code}-${activity.vtype}`),
         code: activity.code || "",
@@ -99,12 +111,9 @@ export function buildTimelineEvents(activities = []) {
         owner: ownerOf(activity),
         criticality: criticalityLabel(activity.crit),
         source: "supabase",
-        phaseDone: {
-          protocol: phaseDone(activity, "tt_de_cuong"),
-          validation: phaseDone(activity, "tt_tham_dinh"),
-          report: phaseDone(activity, "tt_bao_cao"),
-          vmp: phaseDone(activity, "tt_vmp"),
-        },
+        phaseDone: phaseDoneState,
+        phases,
+        nextMilestone: phases.find((phase) => !phase.done) || null,
         raw: activity,
       };
     })
@@ -178,8 +187,8 @@ export function buildDashboardMetrics(activities = [], objects = []) {
 function aggregateNodes(prefix, counts, type, x, labelOf) {
   const rows = [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "vi"));
-  const gap = rows.length > 4 ? 78 : 94;
-  const top = 92 - ((rows.length - 1) * gap) / 2;
+  const gap = rows.length > 8 ? 58 : rows.length > 4 ? 70 : 82;
+  const top = 58;
   return rows.map(([key, count], index) => ({
     id: `${prefix}:${key || "unknown"}`,
     label: labelOf(key),
