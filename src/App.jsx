@@ -1269,7 +1269,6 @@ export default function App() {
               {view === "risk" && <QrmView acts={acts} />}
               {view === "workload" && <WorkloadView acts={acts} />}
               {view === "reports" && <ReportsView acts={acts} />}
-              {view === "mismatch" && <MismatchView acts={acts} />}
               {view === "quality" && <DataQualityView acts={acts} />}
               {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} readOnly />}
               {view === "audit" && <AuditLogView />}

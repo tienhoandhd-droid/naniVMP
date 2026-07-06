@@ -161,15 +161,15 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }) {
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
           <Sparkle size={14} color={C.pink} />
-          <span style={{ fontSize: 10.5, color: C.pinkText, fontWeight: 800, letterSpacing: 1.6 }}>
+          <span style={{ fontSize: 12, color: C.pinkText, fontWeight: 900, letterSpacing: 1.6 }}>
             VMP MONITOR · HỆ GIÁM SÁT THẨM ĐỊNH
           </span>
         </div>
-        <div style={{ fontFamily: TEXT, fontSize: 25, fontWeight: 800, color: C.plum }}>{title}</div>
-        <div style={{ fontSize: 13, color: C.plumSoft, marginTop: 3, fontWeight: 600 }}>
+        <div style={{ fontFamily: TEXT, fontSize: 31, fontWeight: 900, color: C.plum, letterSpacing: -0.2 }}>{title}</div>
+        <div style={{ fontSize: 14.5, color: C.plum, marginTop: 5, fontWeight: 700 }}>
           {sub || "CPC1 HN"}
           {lastSync && (
-            <span style={{ marginLeft: 12, fontSize: 11, opacity: 0.7 }}>
+            <span style={{ marginLeft: 12, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
               · Đồng bộ: {lastSync.toLocaleTimeString("vi-VN")}
             </span>
           )}
