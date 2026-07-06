@@ -82,7 +82,7 @@ export default function InventoryView({ objects, acts, canEdit, onSave, onDelete
                 <td style={{ padding: "13px 12px", textAlign: "center", fontSize: 12.5, fontWeight: 700, color: C.plum }}>{qaList || "—"}</td>
                 <td style={{ padding: "13px 12px", textAlign: "center", fontSize: 13, color: C.plumSoft, fontWeight: 700 }}>{o.area}</td>
                 <td style={{ padding: "13px 12px", textAlign: "center" }}><Tag color={ct.text} bg={ct.soft}>{o.crit}</Tag></td>
-                <td style={{ padding: "13px 12px", textAlign: "center", fontFamily: NUM, fontSize: 14, fontWeight: 800, color: C.plum }}>{o.freq > 0 ? o.freq + "th" : "—"}</td>
+                <td style={{ padding: "13px 12px", textAlign: "center", fontFamily: NUM, fontSize: 14, fontWeight: 800, color: C.plum }}>{o.freq > 0 ? o.freq + " tháng" : "—"}</td>
                 <td style={{ padding: "13px 12px", textAlign: "center" }}>{o.need ? <CheckCircle2 size={17} color={C.mintText} /> : <span style={{ color: "#C9B6C7", fontWeight: 700 }}>—</span>}</td>
                 <td style={{ padding: "13px 12px", textAlign: "center" }}><Pill s={st} small /></td>
                 <td style={{ padding: "13px 12px" }}>
