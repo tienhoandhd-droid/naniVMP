@@ -58,7 +58,6 @@ const InventoryView = lazy(() => import("./pages/InventoryPage.jsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.jsx"));
 const WorkloadView = lazy(() => import("./pages/WorkloadPage.jsx"));
 const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.jsx"));
-const VisualExplorerPage = lazy(() => import("./pages/VisualExplorerPage.jsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.jsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1263,12 +1262,11 @@ export default function App() {
             {/* Page router — Suspense bọc các màn lazy; fallback là skeleton nhẹ. */}
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "overview" && <Overview acts={acts} setView={setView} />}
-              {view === "timeline" && <TimelineView acts={acts} />}
+              {view === "timeline" && <TimelineView acts={acts} objects={objects} />}
               {view === "inventory" && <InventoryView objects={objects} acts={acts} canEdit={false} onSave={saveObject} onDelete={deleteObject} conn={conn} />}
               {view === "update" && <UpdateView acts={acts} conn={conn} isAdmin={isAdmin} onUpdate={updateActivity} onReload={reloadData} readOnly />}
               {view === "alerts" && <AlertsView acts={acts} />}
               {view === "risk" && <QrmView acts={acts} />}
-              {view === "visual" && <VisualExplorerPage objects={objects} acts={acts} />}
               {view === "workload" && <WorkloadView acts={acts} />}
               {view === "reports" && <ReportsView acts={acts} />}
               {view === "mismatch" && <MismatchView acts={acts} />}
