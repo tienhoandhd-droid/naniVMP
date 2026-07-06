@@ -456,6 +456,34 @@ function compareTimelineOrder(a, b) {
   return String(a.code || a.id || "").localeCompare(String(b.code || b.id || ""), "vi");
 }
 
+/* Cùng thứ tự ưu tiên nhưng theo MỘT mốc cụ thể (dùng cho tab Đề cương /
+ * Thẩm định thực tế / Hoàn thành VMP): quá hạn → tới hạn → còn hạn → xong (cuối). */
+function stagePriority(a, stage) {
+  const h = stageState(a, stage).heat;
+  if (h === "done") return 3;
+  if (h === "over") return 0;
+  if (h === "urgent" || h === "soon") return 1;
+  return 2; // steady / chưa có mốc
+}
+function stageRefTime(a, stage) {
+  const st = stageState(a, stage);
+  const d = (st.done && st.actual ? st.actual : st.due) || parseD(a.target) || new Date(2999, 0, 1);
+  return d.getTime();
+}
+function compareStageOrder(stageId) {
+  const stage = MAP_STAGES.find((entry) => entry.id === stageId);
+  if (!stage) return compareTimelineOrder;
+  return (a, b) => {
+    const pa = stagePriority(a, stage);
+    const pb = stagePriority(b, stage);
+    if (pa !== pb) return pa - pb;
+    const da = stageRefTime(a, stage);
+    const db = stageRefTime(b, stage);
+    if (da !== db) return da - db;
+    return String(a.code || a.id || "").localeCompare(String(b.code || b.id || ""), "vi");
+  };
+}
+
 function TimelineMapSummary({ items }) {
   const rows = MAP_STAGES.map((stage) => {
     const states = items.map((a) => stageState(a, stage));
@@ -892,7 +920,7 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
   const selectedStage = MAP_STAGES.find((stage) => stage.id === tableStage);
   const visibleStages = selectedStage ? [selectedStage] : MAP_STAGES;
   const tableItems = useMemo(
-    () => [...items].sort(tableStage === "all" ? compareTimelineOrder : compareByStageMilestone(tableStage)),
+    () => [...items].sort(tableStage === "all" ? compareTimelineOrder : compareStageOrder(tableStage)),
     [items, tableStage],
   );
   const nextUpcomingDate = tableItems
