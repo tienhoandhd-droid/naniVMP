@@ -1133,10 +1133,75 @@ const PERIOD_OPTS = [
   { v: "quy", l: "Quý này" },
   { v: "sixm", l: "Nửa năm tới" },
   { v: "nam", l: "Trong năm nay" },
+  { v: "custom", l: "Tùy chọn…" },
 ];
 
-function GlobalFilterBar({ area, setArea, period, setPeriod, areaOptions, shown, total }) {
-  const active = area !== "all" || period !== "all";
+const miniBtn = {
+  flex: 1, padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`,
+  background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11, fontWeight: 800, cursor: "pointer",
+};
+const dateInp = {
+  padding: "7px 9px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
+  background: "#fff", color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700, cursor: "pointer",
+};
+
+// Dropdown CHỌN NHIỀU (checkbox) — dùng cho Khu vực & Bộ phận. Rỗng = tất cả.
+function MultiSelect({ label, allLabel, options, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (ev) => { if (ref.current && !ref.current.contains(ev.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const toggle = (v) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+  const btn = selected.length === 0 ? allLabel : `${label}: ${selected.length}`;
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} style={{
+        display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
+        borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
+        background: selected.length ? C.pinkMist : "#fff",
+        color: selected.length ? C.pinkText : C.plum,
+        fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+      }}>
+        {btn} <span style={{ fontSize: 10 }}>▾</span>
+      </button>
+      {open && (
+        <div className="vmp-scroll" style={{
+          position: "absolute", zIndex: 60, top: "calc(100% + 6px)", left: 0,
+          minWidth: 210, maxHeight: 300, overflowY: "auto",
+          background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
+          boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
+        }}>
+          <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
+            <button type="button" onClick={() => onChange(options.map((o) => o.v))} style={miniBtn}>Chọn hết</button>
+            <button type="button" onClick={() => onChange([])} style={miniBtn}>Bỏ chọn</button>
+          </div>
+          {options.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có dữ liệu</div>}
+          {options.map((o) => (
+            <label key={o.v} style={{
+              display: "flex", alignItems: "center", gap: 9, padding: "7px 8px",
+              cursor: "pointer", borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: C.plum,
+            }}>
+              <input type="checkbox" checked={selected.includes(o.v)} onChange={() => toggle(o.v)}
+                style={{ width: 15, height: 15, accentColor: C.pink, cursor: "pointer" }} />
+              {o.l}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GlobalFilterBar({
+  areaSel, setAreaSel, deptSel, setDeptSel, period, setPeriod,
+  customFrom, setCustomFrom, customTo, setCustomTo,
+  areaOptions, deptOptions, shown, total,
+}) {
+  const active = areaSel.length > 0 || deptSel.length > 0 || period !== "all";
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
@@ -1148,20 +1213,36 @@ function GlobalFilterBar({ area, setArea, period, setPeriod, areaOptions, shown,
         <Filter size={15} />
         <span style={{ fontSize: 12, fontWeight: 800 }}>Lọc chung</span>
       </div>
+
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Khu vực</span>
-        <Sel val={area} set={setArea} opts={[{ v: "all", l: "Tất cả khu vực" }, ...areaOptions.map((a) => ({ v: a, l: a }))]} />
+        <MultiSelect label="Khu vực" allLabel="Tất cả khu vực" options={areaOptions} selected={areaSel} onChange={setAreaSel} />
       </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Bộ phận</span>
+        <MultiSelect label="Bộ phận" allLabel="Tất cả bộ phận" options={deptOptions} selected={deptSel} onChange={setDeptSel} />
+      </div>
+
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Thời gian</span>
         <Sel val={period} set={setPeriod} opts={PERIOD_OPTS} />
       </div>
+
+      {period === "custom" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={dateInp} aria-label="Từ ngày" />
+          <span style={{ color: C.plumSoft, fontWeight: 700 }}>→</span>
+          <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={dateInp} aria-label="Đến ngày" />
+        </div>
+      )}
+
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
           <b style={{ color: C.plum }}>{shown}</b>/{total} hạng mục
         </span>
         {active && (
-          <button type="button" onClick={() => { setArea("all"); setPeriod("all"); }} style={{
+          <button type="button" onClick={() => { setAreaSel([]); setDeptSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); }} style={{
             display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px",
             borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
             color: C.pinkText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer",
@@ -1184,24 +1265,39 @@ export default function App() {
   const [showPw, setShowPw] = useState(false);
   const mainRef = useScrollTop([view]);
 
-  // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + thời gian, áp cho MỌI trang.
-  const [areaFilter, setAreaFilter] = useState("all");
+  // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + bộ phận (chọn NHIỀU) + thời gian (có Tùy chọn).
+  const [areaSel, setAreaSel] = useState([]);   // rỗng = tất cả khu vực
+  const [deptSel, setDeptSel] = useState([]);   // rỗng = tất cả bộ phận
   const [periodFilter, setPeriodFilter] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");   // yyyy-mm-dd
+  const [customTo, setCustomTo] = useState("");       // yyyy-mm-dd
   const areaOptions = useMemo(() => {
     const set = new Set();
     for (const a of acts) {
       const ar = String(a.area || "").trim();
       if (ar && ar !== "—") set.add(ar);
     }
-    return [...set].sort((x, y) => x.localeCompare(y, "vi"));
+    return [...set].sort((x, y) => x.localeCompare(y, "vi")).map((a) => ({ v: a, l: a }));
   }, [acts]);
+  const deptOptions = useMemo(() => DEPTS.map((d) => ({ v: d.id, l: d.name })), []);
+  const matchTime = useCallback((a) => {
+    if (periodFilter === "custom") {
+      if (!a.target) return false;
+      if (customFrom && a.target < customFrom) return false;
+      if (customTo && a.target > customTo) return false;
+      return true;
+    }
+    return inPeriod(a, periodFilter);
+  }, [periodFilter, customFrom, customTo]);
   const filteredActs = useMemo(() => acts.filter((a) => (
-    (areaFilter === "all" || String(a.area || "").trim() === areaFilter) &&
-    inPeriod(a, periodFilter)
-  )), [acts, areaFilter, periodFilter]);
-  const filteredObjects = useMemo(() => (
-    areaFilter === "all" ? objects : objects.filter((o) => String(o.area || "").trim() === areaFilter)
-  ), [objects, areaFilter]);
+    (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) &&
+    (deptSel.length === 0 || deptSel.includes(a.dept)) &&
+    matchTime(a)
+  )), [acts, areaSel, deptSel, matchTime]);
+  const filteredObjects = useMemo(() => objects.filter((o) => (
+    (areaSel.length === 0 || areaSel.includes(String(o.area || "").trim())) &&
+    (deptSel.length === 0 || deptSel.includes(o.dept))
+  )), [objects, areaSel, deptSel]);
 
   // (MỚI) Giữ dữ liệu tươi: làm mới khi quay lại tab; RELOAD khi sang NGÀY MỚI
   // (VMP_TODAY và "hôm nay" tính lúc tải trang → tránh "quá hạn/ngày còn lại" bị cũ khi mở lâu).
@@ -1330,9 +1426,12 @@ export default function App() {
             {/* Bộ lọc TOÀN CỤC (khu vực + thời gian) — áp cho mọi trang có dữ liệu */}
             {acts.length > 0 && view !== "audit" && view !== "admin" && view !== "missing" && (
               <GlobalFilterBar
-                area={areaFilter} setArea={setAreaFilter}
+                areaSel={areaSel} setAreaSel={setAreaSel}
+                deptSel={deptSel} setDeptSel={setDeptSel}
                 period={periodFilter} setPeriod={setPeriodFilter}
-                areaOptions={areaOptions}
+                customFrom={customFrom} setCustomFrom={setCustomFrom}
+                customTo={customTo} setCustomTo={setCustomTo}
+                areaOptions={areaOptions} deptOptions={deptOptions}
                 shown={filteredActs.length} total={acts.length}
               />
             )}
