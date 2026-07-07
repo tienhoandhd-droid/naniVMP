@@ -43,13 +43,14 @@ export const DEPTS = [
   { id: "sx", name: "Xưởng sản xuất", short: "SX" },
   { id: "cd", name: "Cơ điện", short: "CĐ" },
   { id: "kho", name: "Kho", short: "Kho" },
-  { id: "qc", name: "RD / QC – Kiểm nghiệm", short: "RD/QC" },
+  { id: "qc", name: "QC – Kiểm nghiệm", short: "QC" },
+  { id: "rd", name: "RD – Nghiên cứu phát triển", short: "RD" },
   { id: "qa", name: "QA – QLCL", short: "QA" },
 ];
 
-export const DEPT_DEEP = { sx: C.pinkText, cd: C.skyText, kho: C.marigoldText, qc: C.mintText, qa: C.lavText };
-export const DEPT_COLOR = { sx: C.pink, cd: C.sky, kho: C.marigold, qc: C.mint, qa: C.lav };
-export const DEPT_CODE = { sx: "SX", cd: "CĐ", kho: "Kho", qc: "QC", qa: "QA" };
+export const DEPT_DEEP = { sx: C.pinkText, cd: C.skyText, kho: C.marigoldText, qc: C.mintText, rd: C.raspText, qa: C.lavText };
+export const DEPT_COLOR = { sx: C.pink, cd: C.sky, kho: C.marigold, qc: C.mint, rd: C.rasp, qa: C.lav };
+export const DEPT_CODE = { sx: "SX", cd: "CĐ", kho: "Kho", qc: "QC", rd: "RD", qa: "QA" };
 
 // ======================== DEADLINE RULES ========================
 // Số ngày QC cần cho từng loại báo cáo (dùng tính T-5-BC)
