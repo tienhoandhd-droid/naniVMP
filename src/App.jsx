@@ -1124,6 +1124,56 @@ function ReportsView({ acts }) {
   );
 }
 
+/* ===================== GLOBAL FILTER BAR =====================
+ * Lọc TOÀN CỤC theo Khu vực + Thời gian (tháng/quý/nửa năm/năm).
+ * Đặt dưới Topbar, hiển thị trên mọi trang. */
+const PERIOD_OPTS = [
+  { v: "all", l: "Toàn bộ thời gian" },
+  { v: "thang", l: "Tháng này" },
+  { v: "quy", l: "Quý này" },
+  { v: "sixm", l: "Nửa năm tới" },
+  { v: "nam", l: "Trong năm nay" },
+];
+
+function GlobalFilterBar({ area, setArea, period, setPeriod, areaOptions, shown, total }) {
+  const active = area !== "all" || period !== "all";
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+      marginBottom: 18, padding: "11px 16px", borderRadius: 16,
+      background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)",
+      border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, color: C.plumSoft }}>
+        <Filter size={15} />
+        <span style={{ fontSize: 12, fontWeight: 800 }}>Lọc chung</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Khu vực</span>
+        <Sel val={area} set={setArea} opts={[{ v: "all", l: "Tất cả khu vực" }, ...areaOptions.map((a) => ({ v: a, l: a }))]} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Thời gian</span>
+        <Sel val={period} set={setPeriod} opts={PERIOD_OPTS} />
+      </div>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+          <b style={{ color: C.plum }}>{shown}</b>/{total} hạng mục
+        </span>
+        {active && (
+          <button type="button" onClick={() => { setArea("all"); setPeriod("all"); }} style={{
+            display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px",
+            borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
+            color: C.pinkText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer",
+          }}>
+            <XCircle size={13} /> Đặt lại
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ===================== MAIN APP =====================
  * Global CSS & keyframes → src/index.css (tĩnh, áp dụng trước first paint).
  * Fonts → index.html (nạp 1 request, không FOUC). */
@@ -1133,6 +1183,25 @@ export default function App() {
   const [view, setView] = useState("overview");
   const [showPw, setShowPw] = useState(false);
   const mainRef = useScrollTop([view]);
+
+  // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + thời gian, áp cho MỌI trang.
+  const [areaFilter, setAreaFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
+  const areaOptions = useMemo(() => {
+    const set = new Set();
+    for (const a of acts) {
+      const ar = String(a.area || "").trim();
+      if (ar && ar !== "—") set.add(ar);
+    }
+    return [...set].sort((x, y) => x.localeCompare(y, "vi"));
+  }, [acts]);
+  const filteredActs = useMemo(() => acts.filter((a) => (
+    (areaFilter === "all" || String(a.area || "").trim() === areaFilter) &&
+    inPeriod(a, periodFilter)
+  )), [acts, areaFilter, periodFilter]);
+  const filteredObjects = useMemo(() => (
+    areaFilter === "all" ? objects : objects.filter((o) => String(o.area || "").trim() === areaFilter)
+  ), [objects, areaFilter]);
 
   // (MỚI) Giữ dữ liệu tươi: làm mới khi quay lại tab; RELOAD khi sang NGÀY MỚI
   // (VMP_TODAY và "hôm nay" tính lúc tải trang → tránh "quá hạn/ngày còn lại" bị cũ khi mở lâu).
@@ -1258,16 +1327,26 @@ export default function App() {
             {/* Sync warning banner */}
             {acts.length > 0 && <SyncBanner conn={conn} lastSync={lastSync} />}
 
+            {/* Bộ lọc TOÀN CỤC (khu vực + thời gian) — áp cho mọi trang có dữ liệu */}
+            {acts.length > 0 && view !== "audit" && view !== "admin" && view !== "missing" && (
+              <GlobalFilterBar
+                area={areaFilter} setArea={setAreaFilter}
+                period={periodFilter} setPeriod={setPeriodFilter}
+                areaOptions={areaOptions}
+                shown={filteredActs.length} total={acts.length}
+              />
+            )}
+
             {/* Page router — Suspense bọc các màn lazy; fallback là skeleton nhẹ. */}
             <Suspense fallback={<SkeletonDashboard />}>
-              {view === "overview" && <Overview acts={acts} setView={setView} />}
-              {view === "timeline" && <TimelineView acts={acts} objects={objects} />}
-              {view === "inventory" && <CatalogView objects={objects} acts={acts} />}
-              {view === "alerts" && <AlertsView acts={acts} />}
-              {view === "risk" && <QrmView acts={acts} />}
-              {view === "workload" && <WorkloadView acts={acts} />}
-              {view === "reports" && <ReportsView acts={acts} />}
-              {view === "quality" && <DataQualityView acts={acts} />}
+              {view === "overview" && <Overview acts={filteredActs} setView={setView} />}
+              {view === "timeline" && <TimelineView acts={filteredActs} objects={filteredObjects} />}
+              {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
+              {view === "alerts" && <AlertsView acts={filteredActs} />}
+              {view === "risk" && <QrmView acts={filteredActs} />}
+              {view === "workload" && <WorkloadView acts={filteredActs} />}
+              {view === "reports" && <ReportsView acts={filteredActs} />}
+              {view === "quality" && <DataQualityView acts={filteredActs} />}
               {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} readOnly />}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} />}
