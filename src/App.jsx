@@ -1205,6 +1205,9 @@ function GlobalFilterBar({
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+      // position + zIndex cao: đưa cả thanh lọc (và dropdown checkbox) lên TRÊN
+      // các card phía sau (vd "Tiến độ thẩm định 2026") để không bị đè.
+      position: "relative", zIndex: 40,
       marginBottom: 18, padding: "11px 16px", borderRadius: 16,
       background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)",
       border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)",
