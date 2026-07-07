@@ -90,6 +90,148 @@ function completionSummary(activities) {
   }));
 }
 
+/* ============================================================
+ * Trạng thái theo 4 giai đoạn — LẤY ĐÚNG CHỮ trong cột Sheet
+ * (không suy diễn theo deadline). Đếm theo ID thẩm định duy nhất.
+ * Ô trạng thái trống → nhóm "Chưa điền thông tin".
+ * ============================================================ */
+const EMPTY_LABEL = "Chưa điền thông tin";
+
+// field = chữ GỐC tiếng Việt từ Sheet (RPC trả *_goc); fallback = enum đã map.
+const STATUS_DIMS = [
+  { id: "vmp", label: "Trạng thái VMP", field: "tt_vmp_goc", fallback: "tt_vmp" },
+  { id: "dc", label: "Trạng thái đề cương", field: "tt_de_cuong_goc", fallback: "tt_de_cuong" },
+  { id: "td", label: "Thẩm định thực tế", field: "tt_tham_dinh_goc", fallback: "tt_tham_dinh" },
+  { id: "bc", label: "Trạng thái báo cáo", field: "tt_bao_cao_goc", fallback: "tt_bao_cao" },
+];
+
+// Supabase chuẩn hoá trạng thái Sheet thành enum; đổi về nhãn tiếng Việt để hiển thị.
+// Nếu ô đã là chữ gốc tiếng Việt (đường khác) thì giữ nguyên.
+const ENUM_LABEL = {
+  not_started: "Chưa thực hiện",
+  in_progress: "Đang thực hiện",
+  completed: "Hoàn thành",
+  overdue: "Quá hạn",
+};
+
+// Màu theo ngữ nghĩa chữ trạng thái (nhận diện tiếng Việt). Thứ tự có chủ đích:
+// xét phủ định ("chưa/không") TRƯỚC để "Chưa tiến hành" không bị bắt nhầm là "đang".
+function statusTone(label) {
+  if (label === EMPTY_LABEL) return C.plumSoft;
+  const x = label.toLowerCase();
+  if (/quá hạn|overdue/.test(x)) return C.raspText;
+  if (/không\s*(tiến hành|thực hiện)/.test(x)) return C.plumSoft;   // bỏ/không làm → xám
+  if (/chưa|chờ|pending/.test(x)) return C.skyText;                 // chưa/chờ xử lý
+  if (/hoàn thành|hoàn thiện|đạt|xong|done/.test(x) && !/đang/.test(x)) return C.mintText;
+  if (/tạm ngưng|tạm dừng|tạm hoãn|hoãn|ngưng/.test(x)) return C.lavText;
+  if (/đang|bổ sung|tiến hành|làm|progress/.test(x)) return C.marigoldText;
+  return C.pinkText;
+}
+
+// Phân bố trạng thái theo chữ trong cột, đếm theo ID thẩm định duy nhất.
+function statusDistribution(activities, field, fallback) {
+  const seen = new Set();
+  const counts = new Map();
+  let total = 0;
+  for (const activity of activities) {
+    const id = clean(activity.id);
+    if (!id || seen.has(id)) continue; // mã duy nhất = ID thẩm định
+    seen.add(id);
+    total += 1;
+    const raw = activity._raw || {};
+    let value = clean(raw[field]); // ưu tiên chữ gốc *_goc
+    if ((value === "" || value === "—") && fallback) value = clean(raw[fallback]); // fallback enum
+    if (value === "" || value === "—") value = EMPTY_LABEL; // chưa điền → nhóm riêng
+    else value = ENUM_LABEL[value] || value; // enum -> nhãn VN; chữ gốc giữ nguyên
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  const rows = [...counts.entries()]
+    .map(([label, count]) => ({ label, count, rate: total ? Math.round((count / total) * 100) : 0 }))
+    .sort((a, b) => {
+      if (a.label === EMPTY_LABEL) return 1; // "Chưa điền thông tin" xuống cuối
+      if (b.label === EMPTY_LABEL) return -1;
+      return b.count - a.count || a.label.localeCompare(b.label, "vi");
+    });
+  return { rows, total };
+}
+
+function StatusBreakdown({ acts }) {
+  const [dim, setDim] = useState("vmp");
+  const active = STATUS_DIMS.find((item) => item.id === dim) || STATUS_DIMS[0];
+  const { rows, total } = useMemo(
+    () => statusDistribution(acts, active.field, active.fallback),
+    [acts, active.field, active.fallback],
+  );
+
+  return (
+    <Card variant="strong">
+      <div style={{
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+        gap: 14, flexWrap: "wrap", marginBottom: 16,
+      }}>
+        <CardTitle icon={ClipboardCheck} sub={`Đếm theo ID thẩm định duy nhất · ${total} hạng mục · lấy đúng chữ trong cột, không suy diễn`}>
+          Trạng thái theo 4 giai đoạn
+        </CardTitle>
+        <div style={{
+          display: "inline-flex", gap: 4, padding: 4, borderRadius: 12,
+          background: C.pinkMist, border: `1px solid ${C.pinkSoft}`, flexWrap: "wrap",
+        }}>
+          {STATUS_DIMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setDim(item.id)}
+              aria-pressed={dim === item.id}
+              style={{
+                border: "none", borderRadius: 9, padding: "8px 12px", cursor: "pointer",
+                fontFamily: TEXT, fontSize: 12, fontWeight: 800,
+                color: dim === item.id ? "#fff" : C.plumSoft,
+                background: dim === item.id ? C.plum : "transparent",
+                boxShadow: dim === item.id ? "0 4px 12px rgba(78,42,78,.18)" : "none",
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {rows.length ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {rows.map((row) => {
+            const tone = statusTone(row.label);
+            return (
+              <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ minWidth: 190, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: tone, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: row.label === EMPTY_LABEL ? C.plumSoft : C.plum }}>
+                    {row.label}
+                  </span>
+                </div>
+                <div style={{ flex: 1, minWidth: 60 }}>
+                  <div style={{ height: 10, borderRadius: 999, background: C.pinkMist, overflow: "hidden" }}>
+                    <div style={{
+                      width: `${row.rate}%`, height: "100%", borderRadius: 999, background: tone,
+                      transition: "width .55s cubic-bezier(.22,1,.36,1)",
+                    }} />
+                  </div>
+                </div>
+                <div style={{ minWidth: 88, textAlign: "right", fontFamily: NUM, fontSize: 13, fontWeight: 800, color: tone }}>
+                  {row.count} <span style={{ color: C.plumSoft, fontWeight: 700 }}>· {row.rate}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 13, fontWeight: 700 }}>
+          Không có dữ liệu trạng thái.
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ProgressBar({ rate, color, height = 8 }) {
   return (
     <div style={{ height, borderRadius: 999, background: C.pinkSoft, overflow: "hidden" }}>
@@ -340,6 +482,8 @@ export default function CompletionDashboard({ acts }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <StatusBreakdown acts={acts} />
+
       <Card variant="strong">
         <div style={{
           display: "flex", alignItems: "flex-start", justifyContent: "space-between",
