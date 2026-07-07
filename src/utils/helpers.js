@@ -144,12 +144,29 @@ export function stageOf(a) {
   return "chua";
 }
 
+// Tách chuỗi "Bộ phận quản lý" GỐC thành TẬP bộ phận (1 hạng mục có thể thuộc
+// nhiều BP). QLCL = QA + QC; XSX = Xưởng SX. Vd "RD, QLCL, XSX" -> [rd,qa,qc,sx].
+export function parseDepts(raw) {
+  const x = String(raw == null ? "" : raw).toLowerCase();
+  const s = new Set();
+  if (/xsx|xưởng|xuong|sản xuất|san xuat|\bsx\b/.test(x)) s.add("sx");
+  if (/cơ điện|co dien|\bcd\b|cđ/.test(x)) s.add("cd");
+  if (/\bkho\b|warehouse/.test(x)) s.add("kho");
+  if (/\brd\b|r&d|nghiên cứu|nghien cuu|research/.test(x)) s.add("rd");
+  if (/\bqc\b|kiểm nghiệm|kiem nghiem/.test(x)) s.add("qc");
+  if (/qlcl/.test(x)) { s.add("qa"); s.add("qc"); } // QLCL bao gồm QA + QC
+  if (/\bqa\b|đảm bảo|dam bao/.test(x)) s.add("qa");
+  return [...s];
+}
+
 // ======================== ENRICHMENT ========================
 export function enrich(objects, acts) {
   const map = Object.fromEntries(objects.map((o) => [o.code, o]));
   return acts.map((a) => {
     const o = map[a.code] || {};
     const raw = a._raw || {};
+    const parsedDepts = parseDepts(raw.bo_phan_goc);
+    const depts = parsedDepts.length ? parsedDepts : [o.dept || "qa"];
     const valDone = a.st === "done" || wlIsDone(raw.tt_tham_dinh);
     const docPending = !a.docDone && !wlIsDone(raw.tt_bao_cao);
     const mismatch = valDone && docPending
@@ -161,6 +178,7 @@ export function enrich(objects, acts) {
       name: o.name || a.code,
       cls: o.cls || "tb",
       dept: o.dept || "qa",
+      depts,
       area: o.area || "—",
       crit: o.crit || "TB",
       freq: o.freq || 12,

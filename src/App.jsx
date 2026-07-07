@@ -1275,16 +1275,32 @@ export default function App() {
   const [customFrom, setCustomFrom] = useState("");   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState("");       // yyyy-mm-dd
   const deptOptions = useMemo(() => DEPTS.map((d) => ({ v: d.id, l: d.name })), []);
+  // 1 hạng mục có thể thuộc NHIỀU bộ phận (a.depts, vd "RD,QLCL,XSX"). Khớp nếu GIAO.
+  const inDept = useCallback(
+    (a) => deptSel.length === 0 || (a.depts || [a.dept]).some((d) => deptSel.includes(d)),
+    [deptSel],
+  );
   // Khu vực PHỤ THUỘC Bộ phận: chỉ hiện khu vực thuộc các bộ phận đã chọn.
   const areaOptions = useMemo(() => {
     const set = new Set();
     for (const a of acts) {
-      if (deptSel.length && !deptSel.includes(a.dept)) continue;
+      if (!inDept(a)) continue;
       const ar = String(a.area || "").trim();
       if (ar && ar !== "—") set.add(ar);
     }
     return [...set].sort((x, y) => x.localeCompare(y, "vi")).map((a) => ({ v: a, l: a }));
-  }, [acts, deptSel]);
+  }, [acts, inDept]);
+  // Bộ phận của mỗi đối tượng = hợp bộ phận của các hạng mục thuộc nó (để lọc danh mục).
+  const objectDepts = useMemo(() => {
+    const m = new Map();
+    for (const a of acts) {
+      if (!a.code) continue;
+      let set = m.get(a.code);
+      if (!set) { set = new Set(); m.set(a.code, set); }
+      (a.depts || []).forEach((d) => set.add(d));
+    }
+    return m;
+  }, [acts]);
   // Khi đổi Bộ phận, bỏ các Khu vực đã chọn không còn thuộc bộ phận đó.
   useEffect(() => {
     const valid = new Set(areaOptions.map((o) => o.v));
@@ -1304,13 +1320,17 @@ export default function App() {
   }, [periodFilter, customFrom, customTo]);
   const filteredActs = useMemo(() => acts.filter((a) => (
     (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) &&
-    (deptSel.length === 0 || deptSel.includes(a.dept)) &&
+    inDept(a) &&
     matchTime(a)
-  )), [acts, areaSel, deptSel, matchTime]);
-  const filteredObjects = useMemo(() => objects.filter((o) => (
-    (areaSel.length === 0 || areaSel.includes(String(o.area || "").trim())) &&
-    (deptSel.length === 0 || deptSel.includes(o.dept))
-  )), [objects, areaSel, deptSel]);
+  )), [acts, areaSel, inDept, matchTime]);
+  const filteredObjects = useMemo(() => objects.filter((o) => {
+    if (areaSel.length && !areaSel.includes(String(o.area || "").trim())) return false;
+    if (deptSel.length) {
+      const set = objectDepts.get(o.code);
+      if (!set || !deptSel.some((d) => set.has(d))) return false;
+    }
+    return true;
+  }), [objects, areaSel, deptSel, objectDepts]);
 
   // (MỚI) Giữ dữ liệu tươi: làm mới khi quay lại tab; RELOAD khi sang NGÀY MỚI
   // (VMP_TODAY và "hôm nay" tính lúc tải trang → tránh "quá hạn/ngày còn lại" bị cũ khi mở lâu).
