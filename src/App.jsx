@@ -1218,13 +1218,13 @@ function GlobalFilterBar({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Khu vực</span>
-        <MultiSelect label="Khu vực" allLabel="Tất cả khu vực" options={areaOptions} selected={areaSel} onChange={setAreaSel} />
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Bộ phận</span>
+        <MultiSelect label="Bộ phận" allLabel="Tất cả bộ phận" options={deptOptions} selected={deptSel} onChange={setDeptSel} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Bộ phận</span>
-        <MultiSelect label="Bộ phận" allLabel="Tất cả bộ phận" options={deptOptions} selected={deptSel} onChange={setDeptSel} />
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Khu vực</span>
+        <MultiSelect label="Khu vực" allLabel="Tất cả khu vực" options={areaOptions} selected={areaSel} onChange={setAreaSel} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1274,15 +1274,25 @@ export default function App() {
   const [periodFilter, setPeriodFilter] = useState("all");
   const [customFrom, setCustomFrom] = useState("");   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState("");       // yyyy-mm-dd
+  const deptOptions = useMemo(() => DEPTS.map((d) => ({ v: d.id, l: d.name })), []);
+  // Khu vực PHỤ THUỘC Bộ phận: chỉ hiện khu vực thuộc các bộ phận đã chọn.
   const areaOptions = useMemo(() => {
     const set = new Set();
     for (const a of acts) {
+      if (deptSel.length && !deptSel.includes(a.dept)) continue;
       const ar = String(a.area || "").trim();
       if (ar && ar !== "—") set.add(ar);
     }
     return [...set].sort((x, y) => x.localeCompare(y, "vi")).map((a) => ({ v: a, l: a }));
-  }, [acts]);
-  const deptOptions = useMemo(() => DEPTS.map((d) => ({ v: d.id, l: d.name })), []);
+  }, [acts, deptSel]);
+  // Khi đổi Bộ phận, bỏ các Khu vực đã chọn không còn thuộc bộ phận đó.
+  useEffect(() => {
+    const valid = new Set(areaOptions.map((o) => o.v));
+    setAreaSel((prev) => {
+      const next = prev.filter((a) => valid.has(a));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [areaOptions]);
   const matchTime = useCallback((a) => {
     if (periodFilter === "custom") {
       if (!a.target) return false;
