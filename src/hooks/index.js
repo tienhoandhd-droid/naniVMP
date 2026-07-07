@@ -190,8 +190,9 @@ export function useVmpData() {
       )
       .subscribe();
 
-    // Backup polling mỗi 2 phút — đảm bảo đồng bộ kể cả khi Realtime chưa bật
-    const poll = setInterval(() => refreshRef.current?.(), 120000);
+    // Backup polling mỗi 20s — đảm bảo web cập nhật nhanh kể cả khi Realtime lỡ.
+    // silentRefresh có kiểm tra chữ ký dữ liệu nên không re-render nếu không đổi.
+    const poll = setInterval(() => refreshRef.current?.(), 20000);
 
     return () => {
       clearTimeout(timer);
