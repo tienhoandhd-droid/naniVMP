@@ -1264,7 +1264,6 @@ function GlobalFilterBarLegacy({
  * Gọn theo hướng 2025–2026: preset thời gian + 1 nút "+ Lọc" + chip đang lọc
  * + faceted count. Giữ NGUYÊN props & logic lọc; chỉ đổi trình bày.
  * Bản cũ: GlobalFilterBarLegacy (ngay trên) — đổi ở call-site để revert. */
-const TSHORT = { all: "Toàn bộ", thang: "Tháng", quy: "Quý", sixm: "6 tháng", nam: "Năm", custom: "Tùy chọn" };
 const DEPT_CHIP = {
   xsx: { soft: C.pinkMist, text: C.pinkText, dot: C.pink },
   cd:  { soft: C.skySoft,  text: C.skyText,  dot: C.sky },
@@ -1300,8 +1299,11 @@ function GlobalFilterBar({
 
   const toggleDept = (v) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
   const toggleArea = (v) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
-  const active = deptSel.length > 0 || areaSel.length > 0 || period !== "all";
+  const active = deptSel.length > 0 || areaSel.length > 0 || !!customFrom || !!customTo;
   const resetAll = () => { setDeptSel([]); setAreaSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); };
+  // Thời gian CHỈ theo mốc ngày: có nhập ngày -> bật lọc "custom"; xoá hết -> "all".
+  const onFrom = (v) => { setCustomFrom(v); setPeriod((v || customTo) ? "custom" : "all"); };
+  const onTo = (v) => { setCustomTo(v); setPeriod((customFrom || v) ? "custom" : "all"); };
 
   const optRow = (o, on, toggle, dot) => (
     <button key={o.v} type="button" onClick={() => toggle(o.v)} aria-pressed={on}
@@ -1315,24 +1317,13 @@ function GlobalFilterBar({
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 16, background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
-      {/* preset thời gian (gồm Tùy chọn) */}
-      <div role="group" aria-label="Khoảng thời gian" style={{ display: "inline-flex", background: C.pinkSoft, borderRadius: 999, padding: 3, gap: 2, flexWrap: "wrap" }}>
-        {PERIOD_OPTS.map((p) => (
-          <button key={p.v} type="button" onClick={() => setPeriod(p.v)} aria-pressed={period === p.v}
-            style={{ border: "none", background: period === p.v ? "#fff" : "transparent", color: period === p.v ? C.pinkText : C.plumSoft, boxShadow: period === p.v ? "0 1px 3px rgba(78,42,78,.12)" : "none", fontFamily: TEXT, fontSize: 12, fontWeight: 800, padding: "6px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>
-            {TSHORT[p.v]}
-          </button>
-        ))}
+      {/* Thời gian: CHỈ theo mốc ngày (từ → đến). Để trống = mọi thời gian. */}
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 800, color: C.plumSoft }}><Filter size={14} /> Thời gian</span>
+        <input type="date" value={customFrom} onChange={(e) => onFrom(e.target.value)} style={dateInp} aria-label="Từ ngày" />
+        <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
+        <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} style={dateInp} aria-label="Đến ngày" />
       </div>
-
-      {/* mốc ngày khi chọn Tùy chọn */}
-      {period === "custom" && (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={dateInp} aria-label="Từ ngày" />
-          <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
-          <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={dateInp} aria-label="Đến ngày" />
-        </div>
-      )}
 
       {/* + Lọc (Bộ phận / Khu vực) */}
       <div ref={popRef} style={{ position: "relative" }}>
@@ -1360,8 +1351,8 @@ function GlobalFilterBar({
       {areaSel.map((v) => (
         <FilterChip key={"a" + v} label={"Khu vực: " + v} onRemove={() => toggleArea(v)} style={neutralChip} />
       ))}
-      {period === "custom" && (customFrom || customTo) && (
-        <FilterChip label={`Ngày: ${customFrom || "…"} → ${customTo || "…"}`} onRemove={() => { setCustomFrom(""); setCustomTo(""); }} style={neutralChip} />
+      {(customFrom || customTo) && (
+        <FilterChip label={`Ngày: ${customFrom || "…"} → ${customTo || "…"}`} onRemove={() => { setCustomFrom(""); setCustomTo(""); setPeriod("all"); }} style={neutralChip} />
       )}
 
       {/* phải: đếm kết quả + xóa */}
