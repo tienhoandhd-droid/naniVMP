@@ -56,13 +56,15 @@ declare
   x text := lower(coalesce(p_raw, ''));
   s text[] := '{}';
 begin
-  if x ~ '(\yxsx\y|xưởng|xuong|sản xuất|san xuat|\ysx\y)' then s := s || 'sx'; end if;
-  if x ~ '(cơ điện|co dien|\ycd\y|cđ)'                     then s := s || 'cd'; end if;
-  if x ~ '(\ykho\y|warehouse)'                             then s := s || 'kho'; end if;
-  if x ~ '(\yrd\y|r&d|nghiên cứu|nghien cuu|research)'     then s := s || 'rd'; end if;
-  if x ~ '(\yqc\y|kiểm nghiệm|kiem nghiem)'                then s := s || 'qc'; end if;
-  if x ~ 'qlcl'                    then s := s || 'qa'; s := s || 'qc'; end if; -- QLCL = QA + QC
-  if x ~ '(\yqa\y|đảm bảo|dam bao)'                        then s := s || 'qa'; end if;
+  -- LƯU Ý: phải dùng array_append (không dùng s || 'xx') — Postgres coi
+  -- text[] || unknown là nối MẢNG-với-MẢNG nên sẽ thử parse 'xx' như array literal.
+  if x ~ '(\yxsx\y|xưởng|xuong|sản xuất|san xuat|\ysx\y)' then s := array_append(s, 'sx'); end if;
+  if x ~ '(cơ điện|co dien|\ycd\y|cđ)'                     then s := array_append(s, 'cd'); end if;
+  if x ~ '(\ykho\y|warehouse)'                             then s := array_append(s, 'kho'); end if;
+  if x ~ '(\yrd\y|r&d|nghiên cứu|nghien cuu|research)'     then s := array_append(s, 'rd'); end if;
+  if x ~ '(\yqc\y|kiểm nghiệm|kiem nghiem)'                then s := array_append(s, 'qc'); end if;
+  if x ~ 'qlcl'  then s := array_append(s, 'qa'); s := array_append(s, 'qc'); end if; -- QLCL = QA + QC
+  if x ~ '(\yqa\y|đảm bảo|dam bao)'                        then s := array_append(s, 'qa'); end if;
   -- Loại trùng (thứ tự không quan trọng — chỉ dùng để so tập).
   return array(select distinct e from unnest(s) as e);
 end;
