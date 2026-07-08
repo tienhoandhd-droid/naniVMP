@@ -6,7 +6,7 @@ import {
 
 import { C, NUM, TEXT } from "../../constants/theme.js";
 import { DEPTS, DEPT_COLOR, DEPT_DEEP } from "../../constants/vmp.js";
-import { wlIsDone } from "../../utils/helpers.js";
+import { parseDepts, wlIsDone } from "../../utils/helpers.js";
 import { Card, CardTitle, Sel } from "../ui/Primitives.jsx";
 
 const ACTIVE = (activity) => (activity.state || "active") === "active";
@@ -69,6 +69,63 @@ function activityPeople(activity) {
   const raw = activity._raw || {};
   const values = [activity.owner, raw.qa, raw.ns_khac, raw.secondary_owner, raw.owner_name];
   return [...new Set(values.flatMap(splitPeople))];
+}
+
+function deptMeta(deptId) {
+  return DEPTS.find((item) => item.id === deptId);
+}
+
+function deptGroup(activity, rawField) {
+  const raw = activity._raw || {};
+  const parsed = parseDepts(raw[rawField]);
+  if (parsed.length) return parsed.map((deptId) => {
+    const dept = deptMeta(deptId);
+    return {
+      key: deptId,
+      label: dept?.name || raw[rawField] || "Chưa xác định",
+      short: dept?.short || "—",
+      deptId,
+    };
+  });
+  return [];
+}
+
+function valueGroup(value, emptyLabel) {
+  const label = clean(value);
+  return [{ key: label ? label.toLocaleLowerCase("vi") : "unknown", label: label || emptyLabel }];
+}
+
+const DIMENSION_OPTIONS = [
+  { id: "department", label: "Bộ phận quản lý", head: "Đơn vị" },
+  { id: "person", label: "Người phụ trách", head: "Người phụ trách", multiNote: true },
+  { id: "executionDepartment", label: "Bộ phận thực hiện", head: "Bộ phận thực hiện" },
+  { id: "area", label: "Mã khu vực", head: "Mã khu vực" },
+  { id: "line", label: "Line", head: "Line" },
+];
+
+function dimensionGroups(activity, dimension) {
+  const raw = activity._raw || {};
+  if (dimension === "department") {
+    const groups = deptGroup(activity, "bo_phan_goc");
+    if (groups.length) return groups;
+    const dept = deptMeta(activity.dept);
+    return [{
+      key: activity.dept || "unknown",
+      label: dept?.name || "Chưa xác định",
+      short: dept?.short || "—",
+      deptId: activity.dept,
+    }];
+  }
+  if (dimension === "executionDepartment") {
+    const groups = deptGroup(activity, "bo_phan_thuc_hien_goc");
+    return groups.length ? groups : [{ key: "unknown", label: "Chưa có dữ liệu", short: "—" }];
+  }
+  if (dimension === "area") return valueGroup(activity.area || raw.khu_vuc, "Chưa có khu vực");
+  if (dimension === "line") return valueGroup(activity.line || raw.line, "Chưa có line");
+
+  const people = activityPeople(activity);
+  if (!people.length) return [{ key: "unassigned", label: "Chưa phân công" }];
+  return people.map((person) => ({ key: person.toLocaleLowerCase("vi"), label: person }));
 }
 
 function isMetricDone(activity, metric) {
@@ -285,18 +342,9 @@ function groupRows(activities, dimension) {
   };
 
   activities.filter(ACTIVE).forEach((activity) => {
-    if (dimension === "department") {
-      const dept = DEPTS.find((item) => item.id === activity.dept);
-      add(activity.dept || "unknown", dept?.name || "Chưa xác định", activity, {
-        short: dept?.short || "—",
-        deptId: activity.dept,
-      });
-      return;
-    }
-
-    const people = activityPeople(activity);
-    if (!people.length) add("unassigned", "Chưa phân công", activity);
-    people.forEach((person) => add(person.toLocaleLowerCase("vi"), person, activity));
+    dimensionGroups(activity, dimension).forEach((group) => {
+      add(group.key, group.label, activity, group);
+    });
   });
 
   return [...groups.values()]
@@ -308,6 +356,7 @@ function groupRows(activities, dimension) {
 
 function DimensionTable({ activities, dimension, setDimension }) {
   const rows = useMemo(() => groupRows(activities, dimension), [activities, dimension]);
+  const activeDimension = DIMENSION_OPTIONS.find((item) => item.id === dimension) || DIMENSION_OPTIONS[0];
 
   return (
     <Card variant="strong">
@@ -315,24 +364,21 @@ function DimensionTable({ activities, dimension, setDimension }) {
         display: "flex", alignItems: "flex-start", justifyContent: "space-between",
         gap: 14, flexWrap: "wrap", marginBottom: 18,
       }}>
-        <CardTitle icon={Users} sub="So sánh bốn mốc hoàn thành trên cùng một mẫu số">
+        <CardTitle icon={Users} sub={`So sánh bốn mốc hoàn thành trên cùng một mẫu số · ${activeDimension.label.toLowerCase()}`}>
           Tiến độ theo đơn vị phụ trách
         </CardTitle>
         <div style={{
           display: "inline-flex", gap: 4, padding: 4, borderRadius: 12,
-          background: C.pinkMist, border: `1px solid ${C.pinkSoft}`,
+          background: C.pinkMist, border: `1px solid ${C.pinkSoft}`, flexWrap: "wrap",
         }}>
-          {[
-            { id: "department", label: "Theo bộ phận" },
-            { id: "person", label: "Theo người" },
-          ].map((option) => (
+          {DIMENSION_OPTIONS.map((option) => (
             <button
               key={option.id}
               type="button"
               onClick={() => setDimension(option.id)}
               aria-pressed={dimension === option.id}
               style={{
-                border: "none", borderRadius: 9, padding: "8px 12px", cursor: "pointer",
+                border: "none", borderRadius: 9, padding: "8px 10px", cursor: "pointer",
                 fontFamily: TEXT, fontSize: 12, fontWeight: 800,
                 color: dimension === option.id ? "#fff" : C.plumSoft,
                 background: dimension === option.id ? C.plum : "transparent",
@@ -350,7 +396,7 @@ function DimensionTable({ activities, dimension, setDimension }) {
           <table style={{ width: "100%", minWidth: 720, borderCollapse: "separate", borderSpacing: "0 8px" }}>
             <thead>
               <tr>
-                <th style={TH}>Đơn vị</th>
+                <th style={TH}>{activeDimension.head}</th>
                 <th style={TH}>Hạng mục</th>
                 {METRICS.map((metric) => <th key={metric.id} style={TH}>{metric.short}</th>)}
               </tr>
@@ -360,14 +406,14 @@ function DimensionTable({ activities, dimension, setDimension }) {
                 <tr key={row.key} className="vmp-row">
                   <td style={{ ...TD, borderRadius: "14px 0 0 14px", minWidth: 200 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      {dimension === "department" ? (
+                      {row.deptId ? (
                         <div style={{
                           width: 38, height: 38, borderRadius: 11, flexShrink: 0,
                           background: `${DEPT_COLOR[row.deptId] || C.lav}18`,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           color: DEPT_DEEP[row.deptId] || C.lavText, fontSize: 11, fontWeight: 800,
                         }}>
-                          {row.short}
+                          {row.short || "—"}
                         </div>
                       ) : (
                         <div style={{
@@ -376,7 +422,7 @@ function DimensionTable({ activities, dimension, setDimension }) {
                           display: "flex", alignItems: "center", justifyContent: "center",
                           fontFamily: NUM, fontSize: 17, fontWeight: 800,
                         }}>
-                          {row.label.charAt(0).toUpperCase() || "?"}
+                          {(row.label === "Chưa có dữ liệu" ? "?" : row.label.charAt(0).toUpperCase()) || "?"}
                         </div>
                       )}
                       <span style={{ color: C.plum, fontSize: 13, fontWeight: 800 }}>{row.label}</span>
@@ -417,9 +463,14 @@ function DimensionTable({ activities, dimension, setDimension }) {
         </div>
       )}
 
-      {dimension === "person" && (
+      {activeDimension.multiNote && (
         <div style={{ marginTop: 10, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
           Một hạng mục có nhiều người phụ trách được tính vào kết quả của từng người liên quan; vì vậy tổng số theo người có thể lớn hơn tổng hạng mục duy nhất.
+        </div>
+      )}
+      {dimension === "executionDepartment" && rows.length === 1 && rows[0].key === "unknown" && (
+        <div style={{ marginTop: 10, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
+          Cần chạy migration read model và sync snapshot mới để lấy cột Sheet “Bộ phận thực hiện thẩm định” vào dashboard.
         </div>
       )}
     </Card>

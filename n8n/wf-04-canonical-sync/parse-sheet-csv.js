@@ -53,17 +53,70 @@ while (parsed.length && parsed[parsed.length - 1].every((value) => value === '')
 
 if (parsed.length < 2) throw new Error('VMP_SYNC_INVALID_CSV: no data rows');
 
-// Supabase canonical dùng ĐÚNG 37 cột đầu. Sheet có thể có cột phụ ở cuối (vd
-// cột 38 "Không có thẩm định thực tế và hoàn thiện hồ sơ") — bỏ khi đồng bộ để
-// không phải đổi schema Supabase; các cột 0..36 (gồm 4 cột trạng thái) giữ nguyên.
+// Supabase canonical dùng ĐÚNG 37 cột theo schema ban đầu. Sheet vận hành có
+// thể thêm cột phụ ở cuối hoặc chen giữa (vd "Bộ phận thực hiện thẩm định").
+// Vì vậy không slice theo vị trí tuyệt đối của Sheet nữa; map theo tiêu đề để
+// giữ đúng 37 giá trị canonical trước khi gọi RPC.
 const CANON = 37;
 const rawHeaders = parsed[0];
-if (rawHeaders.length !== 37 && rawHeaders.length !== 38) {
-  throw new Error(`VMP_SYNC_INVALID_HEADERS: expected 37 or 38 columns, received ${rawHeaders.length}`);
-}
-const headers = rawHeaders.slice(0, CANON);
-
 const norm = (value) => String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+const CANON_HEADER_NORMS = [
+  'stt',
+  'phân loại đối tượng',
+  'loại thẩm định',
+  'mã đối tượng',
+  'tên đối tượng',
+  'bộ phận quản lý',
+  'mã khu vực',
+  'line',
+  'tình trạng',
+  'show',
+  'thẩm định',
+  'tần suất thẩm định (tháng)',
+  'năm nhập',
+  'phân loại báo cáo',
+  'số ngày công thẩm định thực tế',
+  'điểm trọng yếu',
+  'id thẩm định',
+  'qa phụ trách (qa nhập)',
+  'email (qa nhập)',
+  'nhân sự bộ phận khác (bộ phận khác nhập)',
+  'email (bộ phận khác nhập)',
+  'thời hạn hoàn thành đề cương',
+  'thời gian thực tế hoàn thành đề cương',
+  'trạng thái đề cương',
+  'thời hạn bắt đầu thẩm định thực tế',
+  'thời hạn kết thúc thẩm định thực tế (t-5-bc)',
+  'bộ phận quản lý xếp lịch thẩm định (dd/mm/yyyy hh:mm:ss)',
+  'thời gian thực tế hoàn thành thẩm định thực tế',
+  'trạng thái thẩm định thực tế',
+  'phân loại báo cáo',
+  'thời hạn báo cáo (t-5 ngày)',
+  'thời gian thực tế hoàn thành báo cáo',
+  'trạng thái báo cáo',
+  'thời hạn hoàn thành (t) [deadline vmp]',
+  'thời gian thực tế deadline vmp',
+  'trạng thái vmp',
+  'không có (x)/ không rõ',
+];
+
+const normalizedHeaders = rawHeaders.map(norm);
+const extraIndexes = {
+  execution_department: normalizedHeaders.findIndex((header) => header === 'bộ phận thực hiện thẩm định'),
+};
+const usedHeaderIndexes = new Set();
+const canonicalIndexes = CANON_HEADER_NORMS.map((expected, canonIndex) => {
+  const sheetIndex = normalizedHeaders.findIndex((header, index) => header === expected && !usedHeaderIndexes.has(index));
+  if (sheetIndex < 0) {
+    throw new Error(`VMP_SYNC_HEADER_DRIFT: missing canonical column ${canonIndex + 1} "${expected}"`);
+  }
+  usedHeaderIndexes.add(sheetIndex);
+  return sheetIndex;
+});
+
+const headers = canonicalIndexes.map((sheetIndex) => rawHeaders[sheetIndex]);
+
 const requiredHeaders = new Map([
   [3, 'mã đối tượng'],
   [16, 'id thẩm định'],
@@ -76,19 +129,21 @@ const requiredHeaders = new Map([
 
 for (const [index, expected] of requiredHeaders) {
   if (norm(headers[index]) !== expected) {
-    throw new Error(
-      `VMP_SYNC_HEADER_DRIFT: column ${index + 1} expected "${expected}", received "${headers[index]}"`,
-    );
+    throw new Error(`VMP_SYNC_HEADER_DRIFT: canonical column ${index + 1} expected "${expected}", received "${headers[index]}"`);
   }
 }
 
 const rows = parsed.slice(1).map((values, index) => {
-  if (values.length > 38) {
-    throw new Error(`VMP_SYNC_ROW_WIDTH: Sheet row ${index + 2} has ${values.length} columns`);
+  if (values.length > rawHeaders.length) {
+    throw new Error(`VMP_SYNC_ROW_WIDTH: Sheet row ${index + 2} has ${values.length} columns, headers have ${rawHeaders.length}`);
   }
-  const trimmed = values.slice(0, CANON);
-  const padded = [...trimmed, ...Array(CANON - trimmed.length).fill('')];
-  return { row_number: index + 2, values: padded };
+  return {
+    row_number: index + 2,
+    values: canonicalIndexes.map((sheetIndex) => values[sheetIndex] ?? ''),
+    extra: {
+      execution_department: extraIndexes.execution_department >= 0 ? (values[extraIndexes.execution_department] ?? '') : '',
+    },
+  };
 });
 
 const ids = rows.map((row) => String(row.values[16] ?? '').trim());
