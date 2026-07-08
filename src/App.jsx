@@ -1196,7 +1196,9 @@ function MultiSelect({ label, allLabel, options, selected, onChange }) {
   );
 }
 
-function GlobalFilterBar({
+// LEGACY (giữ lại để revert): thanh lọc cũ — 3 hộp checkbox luôn hiện.
+// Muốn quay lại: ở call-site đổi <GlobalFilterBar .../> thành <GlobalFilterBarLegacy .../>.
+function GlobalFilterBarLegacy({
   areaSel, setAreaSel, deptSel, setDeptSel, period, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
   areaOptions, deptOptions, shown, total,
@@ -1258,6 +1260,125 @@ function GlobalFilterBar({
   );
 }
 
+/* ===================== GLOBAL FILTER BAR (mới) =====================
+ * Gọn theo hướng 2025–2026: preset thời gian + 1 nút "+ Lọc" + chip đang lọc
+ * + faceted count. Giữ NGUYÊN props & logic lọc; chỉ đổi trình bày.
+ * Bản cũ: GlobalFilterBarLegacy (ngay trên) — đổi ở call-site để revert. */
+const TSHORT = { all: "Toàn bộ", thang: "Tháng", quy: "Quý", sixm: "6 tháng", nam: "Năm", custom: "Tùy chọn" };
+const DEPT_CHIP = {
+  xsx: { soft: C.pinkMist, text: C.pinkText, dot: C.pink },
+  cd:  { soft: C.skySoft,  text: C.skyText,  dot: C.sky },
+  kho: { soft: C.marigoldSoft, text: C.marigoldText, dot: C.marigold },
+  qc:  { soft: C.mintSoft, text: C.mintText, dot: C.mint },
+  rd:  { soft: C.raspSoft, text: C.raspText, dot: C.rasp },
+  qa:  { soft: C.lavSoft,  text: C.lavText,  dot: C.lav },
+};
+const neutralChip = { background: "rgba(78,42,78,.06)", color: C.plum };
+
+function FilterChip({ style, label, onRemove }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 6px 5px 11px", borderRadius: 999, fontFamily: TEXT, fontSize: 12, fontWeight: 800, ...style }}>
+      {label}
+      <button type="button" onClick={onRemove} aria-label={`Bỏ ${label}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, border: "none", cursor: "pointer", background: "rgba(0,0,0,.08)", color: "inherit", fontSize: 13, lineHeight: 1, fontWeight: 900 }}>×</button>
+    </span>
+  );
+}
+
+function GlobalFilterBar({
+  areaSel, setAreaSel, deptSel, setDeptSel, period, setPeriod,
+  customFrom, setCustomFrom, customTo, setCustomTo,
+  areaOptions, deptOptions, shown, total,
+}) {
+  const [open, setOpen] = useState(false);
+  const popRef = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (ev) => { if (popRef.current && !popRef.current.contains(ev.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const toggleDept = (v) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
+  const toggleArea = (v) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
+  const active = deptSel.length > 0 || areaSel.length > 0 || period !== "all";
+  const resetAll = () => { setDeptSel([]); setAreaSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); };
+
+  const optRow = (o, on, toggle, dot) => (
+    <button key={o.v} type="button" onClick={() => toggle(o.v)} aria-pressed={on}
+      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", border: "none", background: on ? C.pinkMist : "transparent", fontFamily: TEXT, fontSize: 13, fontWeight: 700, color: C.plum, padding: "8px 9px", borderRadius: 9, cursor: "pointer" }}>
+      <span style={{ width: 9, height: 9, borderRadius: 3, background: dot, flex: "none" }} />
+      <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.l}</span>
+      {on && <span style={{ color: C.pinkText, fontWeight: 900 }}>✓</span>}
+      <span style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "1px 8px", borderRadius: 999, fontFamily: NUM }}>{o.n}</span>
+    </button>
+  );
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 16, background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
+      {/* preset thời gian (gồm Tùy chọn) */}
+      <div role="group" aria-label="Khoảng thời gian" style={{ display: "inline-flex", background: C.pinkSoft, borderRadius: 999, padding: 3, gap: 2, flexWrap: "wrap" }}>
+        {PERIOD_OPTS.map((p) => (
+          <button key={p.v} type="button" onClick={() => setPeriod(p.v)} aria-pressed={period === p.v}
+            style={{ border: "none", background: period === p.v ? "#fff" : "transparent", color: period === p.v ? C.pinkText : C.plumSoft, boxShadow: period === p.v ? "0 1px 3px rgba(78,42,78,.12)" : "none", fontFamily: TEXT, fontSize: 12, fontWeight: 800, padding: "6px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {TSHORT[p.v]}
+          </button>
+        ))}
+      </div>
+
+      {/* mốc ngày khi chọn Tùy chọn */}
+      {period === "custom" && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={dateInp} aria-label="Từ ngày" />
+          <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
+          <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={dateInp} aria-label="Đến ngày" />
+        </div>
+      )}
+
+      {/* + Lọc (Bộ phận / Khu vực) */}
+      <div ref={popRef} style={{ position: "relative" }}>
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="true" aria-expanded={open}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, border: `1px dashed ${C.pink}`, background: open ? C.pinkMist : "transparent", color: C.pinkText, fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
+          <Plus size={14} /> Lọc
+        </button>
+        {open && (
+          <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 250, maxHeight: 340, overflowY: "auto", background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
+            <div style={{ margin: "6px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
+            {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, (DEPT_CHIP[o.v] || {}).dot || C.pink))}
+            <div style={{ margin: "8px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
+            {areaOptions.length === 0
+              ? <div style={{ padding: "8px 9px", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có khu vực</div>
+              : areaOptions.map((o) => optRow(o, areaSel.includes(o.v), toggleArea, C.marigold))}
+          </div>
+        )}
+      </div>
+
+      {/* chip đang lọc */}
+      {deptSel.map((v) => (
+        <FilterChip key={"d" + v} label={DEPT_CODE[v] || v.toUpperCase()} onRemove={() => toggleDept(v)}
+          style={DEPT_CHIP[v] ? { background: DEPT_CHIP[v].soft, color: DEPT_CHIP[v].text } : neutralChip} />
+      ))}
+      {areaSel.map((v) => (
+        <FilterChip key={"a" + v} label={"Khu vực: " + v} onRemove={() => toggleArea(v)} style={neutralChip} />
+      ))}
+      {period === "custom" && (customFrom || customTo) && (
+        <FilterChip label={`Ngày: ${customFrom || "…"} → ${customTo || "…"}`} onRemove={() => { setCustomFrom(""); setCustomTo(""); }} style={neutralChip} />
+      )}
+
+      {/* phải: đếm kết quả + xóa */}
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
+          <b style={{ color: shown < total ? C.pinkText : C.plum }}>{shown}</b>/{total} hạng mục
+        </span>
+        {active && (
+          <button type="button" onClick={resetAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
+            <XCircle size={13} /> Xóa lọc
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ===================== MAIN APP =====================
  * Global CSS & keyframes → src/index.css (tĩnh, áp dụng trước first paint).
  * Fonts → index.html (nạp 1 request, không FOUC). */
@@ -1274,7 +1395,11 @@ export default function App() {
   const [periodFilter, setPeriodFilter] = useState("all");
   const [customFrom, setCustomFrom] = useState("");   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState("");       // yyyy-mm-dd
-  const deptOptions = useMemo(() => DEPTS.map((d) => ({ v: d.id, l: d.name })), []);
+  // Faceted count: số hạng mục theo mỗi bộ phận (khớp a.depts) — hiện cạnh lựa chọn.
+  const deptOptions = useMemo(() => DEPTS.map((d) => ({
+    v: d.id, l: d.name,
+    n: acts.reduce((s, a) => s + ((a.depts || [a.dept]).includes(d.id) ? 1 : 0), 0),
+  })), [acts]);
   // 1 hạng mục có thể thuộc NHIỀU bộ phận (a.depts, vd "RD,QLCL,XSX"). Khớp nếu GIAO.
   const inDept = useCallback(
     (a) => deptSel.length === 0 || (a.depts || [a.dept]).some((d) => deptSel.includes(d)),
@@ -1282,13 +1407,13 @@ export default function App() {
   );
   // Khu vực PHỤ THUỘC Bộ phận: chỉ hiện khu vực thuộc các bộ phận đã chọn.
   const areaOptions = useMemo(() => {
-    const set = new Set();
+    const m = new Map();
     for (const a of acts) {
       if (!inDept(a)) continue;
       const ar = String(a.area || "").trim();
-      if (ar && ar !== "—") set.add(ar);
+      if (ar && ar !== "—") m.set(ar, (m.get(ar) || 0) + 1);
     }
-    return [...set].sort((x, y) => x.localeCompare(y, "vi")).map((a) => ({ v: a, l: a }));
+    return [...m.keys()].sort((x, y) => x.localeCompare(y, "vi")).map((a) => ({ v: a, l: a, n: m.get(a) }));
   }, [acts, inDept]);
   // Bộ phận của mỗi đối tượng = hợp bộ phận của các hạng mục thuộc nó (để lọc danh mục).
   const objectDepts = useMemo(() => {
