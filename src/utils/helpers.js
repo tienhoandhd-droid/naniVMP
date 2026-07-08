@@ -144,12 +144,12 @@ export function stageOf(a) {
   return "chua";
 }
 
-// Tách chuỗi "Bộ phận quản lý" GỐC thành TẬP bộ phận (1 hạng mục có thể thuộc
-// nhiều BP). QLCL = QA + QC; XSX = Xưởng SX. Vd "RD, QLCL, XSX" -> [rd,qa,qc,sx].
+// Tách chuỗi bộ phận GỐC thành TẬP bộ phận. Một hạng mục có thể thuộc nhiều BP;
+// QLCL = QA + QC; XSX = Xưởng sản xuất.
 export function parseDepts(raw) {
   const x = String(raw == null ? "" : raw).toLowerCase();
   const s = new Set();
-  if (/xsx|xưởng|xuong|sản xuất|san xuat|\bsx\b/.test(x)) s.add("sx");
+  if (/\bxsx\b|xưởng|xuong|sản xuất|san xuat|\bsx\b/.test(x)) s.add("sx");
   if (/cơ điện|co dien|\bcd\b|cđ/.test(x)) s.add("cd");
   if (/\bkho\b|warehouse/.test(x)) s.add("kho");
   if (/\brd\b|r&d|nghiên cứu|nghien cuu|research/.test(x)) s.add("rd");
