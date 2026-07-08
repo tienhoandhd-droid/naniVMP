@@ -42,7 +42,7 @@ select case
     'reason', 'unchanged_checksum',
     'checksum', f.checksum
   )
-  else public.rpc_sync_vmp_sheet_snapshot(
+  else public.rpc_sync_vmp_sheet_snapshot_with_extras(
     '1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8',
     '1252715724',
     '6.Timeline VMP',
