@@ -16,6 +16,8 @@
 const N8N_WEBHOOK_URL  = 'https://n8n.cpc1hn.com/webhook/vmp-sheet-changed';
 const AUTH_HEADER_NAME = 'x-vmp-sync-token';
 const VMP_SYNC_TOKEN   = 'tienhoan2025';
+const SHEET_ID         = '1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8'; // dùng cho setupTrigger (chạy được cả khi script độc lập)
+const TARGET_TAB       = '6.Timeline VMP'; // CHỈ sync khi sửa đúng tab nguồn này
 const DEBOUNCE_SECONDS = 5;      // fire SAU khi ngừng sửa ngần này giây
 const MIN_GAP_SECONDS  = 3;      // chặn spam: 2 lần sync thật cách nhau tối thiểu
 
@@ -39,6 +41,10 @@ function ping_(reason) {
  *    -> luôn chụp đúng trạng thái cuối cùng của Sheet.
  */
 function onEditVmp(e) {
+  // Chỉ sync khi sửa đúng tab "6.Timeline VMP". Nếu không đọc được tab (chạy tay)
+  // thì không chặn. Sửa các tab khác -> bỏ qua, không gọi sync thừa.
+  if (e && e.range && e.range.getSheet().getName() !== TARGET_TAB) return;
+
   const props = PropertiesService.getScriptProperties();
   const myMark = String(Date.now()) + '-' + Math.floor(Math.random() * 1e6);
   props.setProperty('last_edit_mark', myMark);
@@ -65,11 +71,9 @@ function setupTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'onEditVmp') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('onEditVmp')
-    .forSpreadsheet(SpreadsheetApp.getActive())
-    .onEdit()
-    .create();
-  console.log('Đã cài trigger onEdit -> onEditVmp (installable).');
+  var ss = SpreadsheetApp.openById(SHEET_ID); // openById: chạy được cả khi script độc lập
+  ScriptApp.newTrigger('onEditVmp').forSpreadsheet(ss).onEdit().create();
+  console.log('Đã cài trigger onEdit -> onEditVmp cho: ' + ss.getName());
 }
 
 /** Kiểm tra nhanh: liệt kê trigger đang có. */
