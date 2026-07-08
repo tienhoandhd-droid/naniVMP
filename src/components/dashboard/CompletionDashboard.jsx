@@ -492,6 +492,11 @@ function DimensionTable({ activities, dimension, setDimension }) {
           Một hạng mục có nhiều người phụ trách được tính vào kết quả của từng người liên quan; vì vậy tổng số theo người có thể lớn hơn tổng hạng mục duy nhất.
         </div>
       )}
+      {isExecutionDepartment && rows.some((row) => row.key !== "unknown") && (
+        <div style={{ marginTop: 10, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
+          Dòng có nhiều bộ phận thực hiện, ví dụ “RD, QA, QC, XSX”, được tách và tính vào từng bộ phận riêng.
+        </div>
+      )}
       {dimension === "executionDepartment" && rows.length === 1 && rows[0].key === "unknown" && (
         <div style={{ marginTop: 10, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
           Cần chạy migration read model và sync snapshot mới để lấy cột Sheet “Bộ phận thực hiện thẩm định” vào dashboard.
@@ -514,6 +519,7 @@ const TD = {
 
 export default function CompletionDashboard({ acts }) {
   const [department, setDepartment] = useState("all");
+  const [validationType, setValidationType] = useState("all");
   const [person, setPerson] = useState("all");
   const [dimension, setDimension] = useState("department");
 
@@ -522,12 +528,20 @@ export default function CompletionDashboard({ acts }) {
     () => department === "all" ? activeActs : activeActs.filter((activity) => activity.dept === department),
     [activeActs, department],
   );
-  const people = useMemo(() => [...new Set(departmentActs.flatMap(activityPeople))]
+  const validationTypes = useMemo(() => [...new Set(departmentActs
+    .map((activity) => clean(activity.vtype).toUpperCase())
+    .filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "vi")), [departmentActs]);
+  const selectedType = validationType === "all" || validationTypes.includes(validationType) ? validationType : "all";
+  const typeActs = useMemo(() => departmentActs.filter((activity) => (
+    selectedType === "all" || clean(activity.vtype).toUpperCase() === selectedType
+  )), [departmentActs, selectedType]);
+  const people = useMemo(() => [...new Set(typeActs.flatMap(activityPeople))]
+    .sort((a, b) => a.localeCompare(b, "vi")), [typeActs]);
   const selectedPerson = person === "all" || people.includes(person) ? person : "all";
-  const scopedActs = useMemo(() => departmentActs.filter((activity) => (
+  const scopedActs = useMemo(() => typeActs.filter((activity) => (
     selectedPerson === "all" || activityPeople(activity).includes(selectedPerson)
-  )), [departmentActs, selectedPerson]);
+  )), [typeActs, selectedPerson]);
   const summary = useMemo(() => completionSummary(scopedActs), [scopedActs]);
 
   const typeRows = useMemo(() => {
@@ -547,11 +561,13 @@ export default function CompletionDashboard({ acts }) {
 
   const scopeLabel = [
     department === "all" ? "Tất cả bộ phận" : DEPTS.find((item) => item.id === department)?.name,
+    selectedType === "all" ? "Tất cả loại thẩm định" : selectedType,
     selectedPerson === "all" ? "Tất cả người phụ trách" : selectedPerson,
   ].filter(Boolean).join(" · ");
 
   const resetFilters = () => {
     setDepartment("all");
+    setValidationType("all");
     setPerson("all");
   };
 
@@ -574,15 +590,20 @@ export default function CompletionDashboard({ acts }) {
             </div>
             <Sel
               val={department}
-              set={(value) => { setDepartment(value); setPerson("all"); }}
+              set={(value) => { setDepartment(value); setValidationType("all"); setPerson("all"); }}
               opts={[{ v: "all", l: "Tất cả bộ phận" }, ...DEPTS.map((item) => ({ v: item.id, l: item.name }))]}
+            />
+            <Sel
+              val={selectedType}
+              set={(value) => { setValidationType(value); setPerson("all"); }}
+              opts={[{ v: "all", l: "Tất cả loại thẩm định" }, ...validationTypes.map((type) => ({ v: type, l: type }))]}
             />
             <Sel
               val={selectedPerson}
               set={setPerson}
               opts={[{ v: "all", l: "Tất cả người phụ trách" }, ...people.map((name) => ({ v: name, l: name }))]}
             />
-            {(department !== "all" || selectedPerson !== "all") && (
+            {(department !== "all" || selectedType !== "all" || selectedPerson !== "all") && (
               <button type="button" onClick={resetFilters} style={{
                 display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 10px",
                 borderRadius: 11, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
