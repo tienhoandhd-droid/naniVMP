@@ -357,6 +357,11 @@ function groupRows(activities, dimension) {
 function DimensionTable({ activities, dimension, setDimension }) {
   const rows = useMemo(() => groupRows(activities, dimension), [activities, dimension]);
   const activeDimension = DIMENSION_OPTIONS.find((item) => item.id === dimension) || DIMENSION_OPTIONS[0];
+  const isExecutionDepartment = dimension === "executionDepartment";
+  const title = isExecutionDepartment ? "Tiến độ theo bộ phận thực hiện" : "Tiến độ theo đơn vị phụ trách";
+  const subtitle = isExecutionDepartment
+    ? "Theo dõi tiến độ từng bộ phận qua 4 chỉ tiêu: đề cương, thực tế, hồ sơ, VMP"
+    : `So sánh bốn mốc hoàn thành trên cùng một mẫu số · ${activeDimension.label.toLowerCase()}`;
 
   return (
     <Card variant="strong">
@@ -364,8 +369,8 @@ function DimensionTable({ activities, dimension, setDimension }) {
         display: "flex", alignItems: "flex-start", justifyContent: "space-between",
         gap: 14, flexWrap: "wrap", marginBottom: 18,
       }}>
-        <CardTitle icon={Users} sub={`So sánh bốn mốc hoàn thành trên cùng một mẫu số · ${activeDimension.label.toLowerCase()}`}>
-          Tiến độ theo đơn vị phụ trách
+        <CardTitle icon={Users} sub={subtitle}>
+          {title}
         </CardTitle>
         <div style={{
           display: "inline-flex", gap: 4, padding: 4, borderRadius: 12,
@@ -393,11 +398,16 @@ function DimensionTable({ activities, dimension, setDimension }) {
 
       {rows.length ? (
         <div className="completion-table-scroll" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 720, borderCollapse: "separate", borderSpacing: "0 8px" }}>
+          <table style={{
+            width: "100%",
+            minWidth: isExecutionDepartment ? 650 : 720,
+            borderCollapse: "separate",
+            borderSpacing: "0 8px",
+          }}>
             <thead>
               <tr>
                 <th style={TH}>{activeDimension.head}</th>
-                <th style={TH}>Hạng mục</th>
+                {!isExecutionDepartment && <th style={TH}>Hạng mục</th>}
                 {METRICS.map((metric) => <th key={metric.id} style={TH}>{metric.short}</th>)}
               </tr>
             </thead>
@@ -428,9 +438,11 @@ function DimensionTable({ activities, dimension, setDimension }) {
                       <span style={{ color: C.plum, fontSize: 13, fontWeight: 800 }}>{row.label}</span>
                     </div>
                   </td>
-                  <td style={{ ...TD, fontFamily: NUM, fontSize: 15, fontWeight: 800, color: C.plum }}>
-                    {row.activities.length}
-                  </td>
+                  {!isExecutionDepartment && (
+                    <td style={{ ...TD, fontFamily: NUM, fontSize: 15, fontWeight: 800, color: C.plum }}>
+                      {row.activities.length}
+                    </td>
+                  )}
                   {METRICS.map((metric, index) => {
                     const value = row.summary[metric.id];
                     return (
@@ -447,6 +459,18 @@ function DimensionTable({ activities, dimension, setDimension }) {
                           </span>
                           <div style={{ flex: 1, minWidth: 42 }}>
                             <ProgressBar rate={value.rate} color={metric.color} height={6} />
+                            {isExecutionDepartment && (
+                              <div style={{
+                                marginTop: 3,
+                                fontFamily: TEXT,
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: C.plumSoft,
+                                whiteSpace: "nowrap",
+                              }}>
+                                {value.done}/{value.total}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
