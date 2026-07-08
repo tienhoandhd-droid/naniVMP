@@ -75,9 +75,13 @@ function deptMeta(deptId) {
   return DEPTS.find((item) => item.id === deptId);
 }
 
-function deptGroup(activity, rawField) {
+// precomputed: mảng mã bộ phận đã chuẩn hoá ở server (activity.depts /
+// activity.exec_depts). Ưu tiên nó; chỉ regex raw khi RPC chưa trả (đường n8n).
+function deptGroup(activity, rawField, precomputed) {
   const raw = activity._raw || {};
-  const parsed = parseDepts(raw[rawField]);
+  const parsed = (Array.isArray(precomputed) && precomputed.length)
+    ? precomputed
+    : parseDepts(raw[rawField]);
   if (parsed.length) return parsed.map((deptId) => {
     const dept = deptMeta(deptId);
     return {
@@ -106,7 +110,7 @@ const DIMENSION_OPTIONS = [
 function dimensionGroups(activity, dimension) {
   const raw = activity._raw || {};
   if (dimension === "department") {
-    const groups = deptGroup(activity, "bo_phan_goc");
+    const groups = deptGroup(activity, "bo_phan_goc", activity.depts);
     if (groups.length) return groups;
     const dept = deptMeta(activity.dept);
     return [{
@@ -117,7 +121,7 @@ function dimensionGroups(activity, dimension) {
     }];
   }
   if (dimension === "executionDepartment") {
-    const groups = deptGroup(activity, "bo_phan_thuc_hien_goc");
+    const groups = deptGroup(activity, "bo_phan_thuc_hien_goc", activity.exec_depts);
     return groups.length ? groups : [{ key: "unknown", label: "Chưa có dữ liệu", short: "—" }];
   }
   if (dimension === "area") return valueGroup(activity.area || raw.khu_vuc, "Chưa có khu vực");

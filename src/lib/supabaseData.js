@@ -39,6 +39,20 @@ export async function fetchVmpDataFromSupabase(year, includeMissing = false) {
 }
 
 // ============================================================
+// ĐỌC: Watermark nhẹ để poll phát hiện thay đổi (không kéo cả payload)
+// ============================================================
+// Trả { year, plan_items, objects, updated_at }. Frontend so chuỗi watermark
+// trước khi refetch toàn bộ dashboard → poll 20s gần như miễn phí khi không đổi.
+export async function fetchVmpWatermark(year) {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("rpc_get_vmp_watermark", {
+    p_year: year || new Date().getFullYear(),
+  });
+  if (error) { console.warn("fetchVmpWatermark:", error.message); return null; }
+  return data || null;
+}
+
+// ============================================================
 // ĐỌC: Danh sách mã đã mất khỏi Sheet (cho admin review)
 // ============================================================
 export async function fetchMissingItems(year) {
