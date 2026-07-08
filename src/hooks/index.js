@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.js";
 import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.js";
 import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.js";
-import { fetchVmpDataFromSupabase } from "../lib/supabaseData.js";
+import { fetchVmpDataFromSupabase, fetchVmpWatermark } from "../lib/supabaseData.js";
 import { enrich } from "../utils/helpers.js";
 
 // ======================== useDebounce ========================
@@ -81,6 +81,10 @@ export function useVmpData() {
   // Chữ ký dữ liệu gần nhất — để bỏ qua setState khi poll/Realtime trả về dữ liệu
   // y hệt (tránh re-render toàn bộ bảng/biểu đồ mỗi 2 phút khi không có thay đổi).
   const dataSigRef = useRef("");
+  // Watermark gần nhất (count + max updated_at). Poll so cái này TRƯỚC — chỉ khi
+  // đổi mới kéo cả payload nặng về. Tránh JSON.stringify cả mảng mỗi 20s.
+  const wmSigRef = useRef("");
+  const wmSig = (wm) => wm ? `${wm.plan_items}|${wm.objects}|${wm.updated_at}` : "";
   const sigOf = (objs, activities) => {
     try { return JSON.stringify(activities) + "|" + (objs ? objs.length : 0); }
     catch { return String(Date.now()); }
@@ -144,9 +148,17 @@ export function useVmpData() {
   const silentRefresh = useCallback(async () => {
     if (!supabase) return;
     try {
+      // BƯỚC 1 (nhẹ): so watermark. Nếu không đổi → dừng, KHÔNG kéo payload.
+      const wm = await fetchVmpWatermark(new Date().getFullYear());
+      if (wm) {
+        const ws = wmSig(wm);
+        if (ws === wmSigRef.current) return; // không đổi → poll gần như miễn phí
+        wmSigRef.current = ws;
+      }
+      // BƯỚC 2 (nặng): watermark đổi (hoặc RPC watermark chưa có) → kéo full.
       const data = await fetchVmpDataFromSupabase(new Date().getFullYear());
       const sig = sigOf(data.objects, data.activities);
-      // Không có thay đổi thật → bỏ qua, tránh re-render tốn kém khi dữ liệu lớn.
+      // Chốt chặn 2: nếu payload y hệt thì bỏ qua setState (tránh re-render).
       if (sig === dataSigRef.current) return;
       dataSigRef.current = sig;
       if (Array.isArray(data.objects)) setObjects(data.objects);
@@ -191,7 +203,8 @@ export function useVmpData() {
       .subscribe();
 
     // Backup polling mỗi 20s — đảm bảo web cập nhật nhanh kể cả khi Realtime lỡ.
-    // silentRefresh có kiểm tra chữ ký dữ liệu nên không re-render nếu không đổi.
+    // silentRefresh giờ so WATERMARK trước (query vài byte) nên poll gần như miễn
+    // phí; chỉ kéo cả payload khi count/updated_at thật sự đổi.
     const poll = setInterval(() => refreshRef.current?.(), 20000);
 
     return () => {

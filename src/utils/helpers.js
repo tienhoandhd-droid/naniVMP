@@ -165,7 +165,12 @@ export function enrich(objects, acts) {
   return acts.map((a) => {
     const o = map[a.code] || {};
     const raw = a._raw || {};
-    const parsedDepts = parseDepts(raw.bo_phan_goc);
+    // Ưu tiên tập bộ phận đã chuẩn hoá ở server (RPC trả 'depts' — nguồn chân lý,
+    // xem migration dashboard_dept_normalization). Chỉ regex phía client khi đọc
+    // qua n8n hoặc DB chưa sync lại sau migration.
+    const parsedDepts = (Array.isArray(a.depts) && a.depts.length)
+      ? a.depts
+      : parseDepts(raw.bo_phan_goc);
     const depts = parsedDepts.length ? parsedDepts : [o.dept || "qa"];
     const valDone = a.st === "done" || wlIsDone(raw.tt_tham_dinh);
     const docPending = !a.docDone && !wlIsDone(raw.tt_bao_cao);
