@@ -149,7 +149,7 @@ export function stageOf(a) {
 export function parseDepts(raw) {
   const x = String(raw == null ? "" : raw).toLowerCase();
   const s = new Set();
-  if (/\bxsx\b|xưởng|xuong|sản xuất|san xuat|\bsx\b/.test(x)) s.add("sx");
+  if (/\bxsx\b|xưởng|xuong|sản xuất|san xuat|\bsx\b/.test(x)) s.add("xsx");
   if (/cơ điện|co dien|\bcd\b|cđ/.test(x)) s.add("cd");
   if (/\bkho\b|warehouse/.test(x)) s.add("kho");
   if (/\brd\b|r&d|nghiên cứu|nghien cuu|research/.test(x)) s.add("rd");

@@ -57,7 +57,7 @@ export default function InventoryView({ objects, acts, canEdit, onSave, onDelete
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 15px", borderRadius: 12, border: `1.5px solid ${C.pinkSoft}`, flex: 1, minWidth: 220, background: "#fff" }}><Search size={16} color={C.pink} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo tên hoặc mã…" style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14, color: C.plum, width: "100%", fontWeight: 600 }} /></div>
           {canEdit ? (
-            <button onClick={() => setEdit({ obj: { code: "", name: "", cls: "tb", dept: "sx", area: "", grade: "—", gxp: "GxP", crit: "TB", freq: 12, need: true, reason: "" }, isNew: true })} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 12, border: "none", cursor: "pointer", background: GRAD, color: "#fff", fontFamily: TEXT, fontWeight: 800, fontSize: 13 }}><Plus size={15} /> Thêm đối tượng</button>
+            <button onClick={() => setEdit({ obj: { code: "", name: "", cls: "tb", dept: "xsx", area: "", grade: "—", gxp: "GxP", crit: "TB", freq: 12, need: true, reason: "" }, isNew: true })} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 12, border: "none", cursor: "pointer", background: GRAD, color: "#fff", fontFamily: TEXT, fontWeight: 800, fontSize: 13 }}><Plus size={15} /> Thêm đối tượng</button>
           ) : (
             <Tag color={C.lavText} bg={C.lavSoft}>Chỉ đọc · chỉnh sửa trên Google Sheet</Tag>
           )}
