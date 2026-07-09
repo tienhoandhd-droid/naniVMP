@@ -1,7 +1,6 @@
 /* TimelinePage.jsx — Modern Gantt Timeline VMP */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
@@ -24,7 +23,6 @@ import { DiagramPanel, DashboardPanel, TablePanel } from "./VisualExplorerPage.j
 // Các "không gian làm việc" gộp chung dưới menu Timeline VMP: timeline sâu +
 // 3 góc nhìn phân tích (sơ đồ luồng, bố cục dashboard, bảng dữ liệu).
 const WORKSPACES = [
-  { id: "overview", label: "Tổng quan", icon: BarChart3 },
   { id: "timeline", label: "Timeline", icon: GanttChartSquare },
   { id: "diagram", label: "Sơ đồ", icon: Network },
   { id: "dashboard", label: "Bố cục", icon: LayoutGrid },
@@ -1292,140 +1290,9 @@ function ActivityDetailModal({ a, onClose }) {
   );
 }
 
-/* ===================== TỔNG QUAN (overview-first) =====================
- * Biểu đồ tải VMP theo tháng (chiều cao = khối lượng, màu = trạng thái) +
- * KPI + sức khoẻ theo bộ phận. Bấm cột/bộ phận -> drill xuống chi tiết.
- * Tính từ dữ liệu hiện có (a.st, a.target, a.dept) — không đổi luồng dữ liệu. */
-const OV_COLOR = { done: C.mint, over: C.rasp, prog: C.marigold, chua: C.sky };
-const OV_STATUS = [
-  { k: "done", label: "Hoàn thành" },
-  { k: "over", label: "Quá hạn" },
-  { k: "prog", label: "Đang thực hiện" },
-  { k: "chua", label: "Chưa / Kế hoạch" },
-];
-const ovBucket = (st) => (st === "done" || st === "over" || st === "prog") ? st : "chua";
-
-function OvKpi({ k, v, sub, color, small }) {
-  return (
-    <div style={{ background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 16, padding: "13px 16px" }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>{k}</div>
-      <div style={{ fontSize: small ? 21 : 27, fontWeight: 800, color, fontFamily: NUM, letterSpacing: "-.02em", marginTop: 2 }}>{v}</div>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>{sub}</div>
-    </div>
-  );
-}
-
-function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
-  const { months, noDeadline, deptRows, kpi } = useMemo(() => {
-    const months = Array.from({ length: 12 }, () => ({ done: 0, over: 0, prog: 0, chua: 0, total: 0 }));
-    const deptM = new Map();
-    let noDeadline = 0;
-    for (const a of acts) {
-      const b = ovBucket(a.st);
-      const d = a.dept || "qa";
-      const dm = deptM.get(d) || { total: 0, done: 0, over: 0 };
-      dm.total++; if (b === "done") dm.done++; else if (b === "over") dm.over++;
-      deptM.set(d, dm);
-      const t = a.target ? parseD(a.target) : null;
-      if (!t) { noDeadline++; continue; }
-      if (t.getFullYear() !== year) continue;
-      const m = months[t.getMonth()];
-      m.total++; m[b]++;
-    }
-    const deptRows = DEPTS
-      .map((d) => ({ id: d.id, code: d.short, name: d.name, ...(deptM.get(d.id) || { total: 0, done: 0, over: 0 }) }))
-      .filter((r) => r.total > 0)
-      .sort((x, y) => y.total - x.total);
-    const nowM = vmpToday().getMonth();
-    let peakI = 0;
-    months.forEach((m, i) => { if (m.total > months[peakI].total) peakI = i; });
-    const overAll = acts.filter((a) => a.st === "over").length;
-    const kpi = { totalAll: acts.length, overAll, thisMonth: months[nowM].total, nowM, peakI, peak: months[peakI].total };
-    return { months, noDeadline, deptRows, kpi };
-  }, [acts, year]);
-
-  const maxT = Math.max(1, ...months.map((m) => m.total));
-  const H = 210, nowM = vmpToday().getMonth();
-  const maxDeptTotal = deptRows.length ? deptRows[0].total : 1;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* KPI */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(148px,1fr))", gap: 12 }}>
-        <OvKpi k="Tổng hạng mục" v={kpi.totalAll} sub={noDeadline ? `${noDeadline} chưa có deadline` : "trong bộ lọc"} color={C.plum} />
-        <OvKpi k="Quá hạn" v={kpi.overAll} sub={kpi.totalAll ? `${Math.round(kpi.overAll / kpi.totalAll * 100)}% tổng` : "0%"} color={C.raspText} />
-        <OvKpi k="Đến hạn tháng này" v={kpi.thisMonth} sub={MONTHS[kpi.nowM]} color={C.marigoldText} />
-        <OvKpi k="Tháng cao điểm" v={`${MONTHS[kpi.peakI]} · ${kpi.peak}`} sub="khối lượng lớn nhất" color={C.pinkText} small />
-      </div>
-
-      {/* Biểu đồ tháng */}
-      <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
-          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>Tải VMP theo tháng · {year}</strong>
-          <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Bấm một cột để xem chi tiết tháng đó</span>
-        </div>
-        <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(44px,1fr))", gap: 10, alignItems: "end", height: H + 46, minWidth: 620, paddingTop: 20 }}>
-            {months.map((m, i) => {
-              const barH = m.total / maxT * H;
-              const isNow = i === nowM;
-              return (
-                <button key={i} type="button" onClick={() => onPickMonth(i)}
-                  title={`${MONTHS[i]}: ${m.total} hạng mục — Xong ${m.done} · Quá hạn ${m.over} · Đang ${m.prog} · Chưa ${m.chua}`}
-                  style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", position: "relative", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
-                  <span style={{ position: "absolute", top: -18, left: 0, right: 0, textAlign: "center", fontSize: 12, fontWeight: 800, color: C.plum, fontFamily: NUM }}>{m.total || ""}</span>
-                  <div style={{ display: "flex", flexDirection: "column-reverse", borderRadius: "8px 8px 3px 3px", overflow: "hidden", height: barH, minHeight: m.total ? 4 : 0, outline: isNow ? `2px solid ${C.pink}` : "none", outlineOffset: 2 }}>
-                    {OV_STATUS.map((s) => m[s.k] > 0
-                      ? <div key={s.k} style={{ height: m[s.k] / m.total * barH, background: OV_COLOR[s.k] }} />
-                      : null)}
-                  </div>
-                  <span style={{ marginTop: 8, textAlign: "center", fontSize: 12, fontWeight: 800, color: isNow ? C.pinkText : C.plumSoft }}>{MONTHS[i]}{isNow ? " ●" : ""}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 14 }}>
-          {OV_STATUS.map((s) => (
-            <span key={s.k} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
-              <span style={{ width: 12, height: 12, borderRadius: 4, background: OV_COLOR[s.k] }} />{s.label}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Sức khoẻ theo bộ phận */}
-      {deptRows.length > 0 && (
-        <div>
-          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>Sức khoẻ theo bộ phận quản lý</strong>
-          <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
-            {deptRows.map((r) => {
-              const rest = r.total - r.done - r.over;
-              const pc = (n) => (n / r.total * 100) + "%";
-              return (
-                <button key={r.id} type="button" onClick={() => onPickDept(r.id)}
-                  title={`${r.name}: ${r.total} — xong ${r.done}, quá hạn ${r.over}`}
-                  style={{ display: "grid", gridTemplateColumns: "58px 1fr 92px", alignItems: "center", gap: 12, border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{r.code}</span>
-                  <span style={{ height: 20, borderRadius: 7, background: C.pinkMist, overflow: "hidden", display: "flex", width: (r.total / maxDeptTotal * 100) + "%" }}>
-                    <span style={{ width: pc(r.done), background: C.mint }} />
-                    <span style={{ width: pc(r.over), background: C.rasp }} />
-                    <span style={{ width: pc(rest), background: C.sky }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, textAlign: "right", fontFamily: NUM }}>{r.total} · <b style={{ color: C.raspText }}>{r.over} QH</b></span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function TimelineView({ acts, objects = [] }) {
   const year = vmpToday().getFullYear();
-  const [workspace, setWorkspace] = useState("overview");
+  const [workspace, setWorkspace] = useState("timeline");
   const [view, setView] = useState("year");
   const [scope, setScope] = useState("year");
   const [chartMode, setChartMode] = useState("table");
@@ -1695,14 +1562,7 @@ export default function TimelineView({ acts, objects = [] }) {
           )}
         </div>
 
-        {workspace === "overview" ? (
-          <TimelineOverview
-            acts={explorerActs}
-            year={year}
-            onPickMonth={(m) => { setFocusMonth(m); setView("month"); setWorkspace("timeline"); }}
-            onPickDept={(d) => { setDept(d); setWorkspace("timeline"); }}
-          />
-        ) : isTimeline ? (
+        {isTimeline ? (
         <>
         <TimelineStageProgress
           items={filtered}
