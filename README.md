@@ -1,5 +1,8 @@
 # VMP Monitor
 
+> **Tiếp nhận dự án?** Đọc [docs/HANDOVER.md](docs/HANDOVER.md) — bàn giao 3 bước,
+> kèm `bash scripts/handover-check.sh` để tự kiểm tra kết nối (✅/❌ trong ~1 phút).
+
 VMP Monitor la dashboard theo doi Ke hoach Tham dinh Goc cua CPC1 HN. Ung dung
 doc du lieu tu Supabase read model, hien thi tien do, canh bao, workload, QRM va
 bao cao theo cac moc De cuong - Tham dinh thuc te - Bao cao - VMP.
