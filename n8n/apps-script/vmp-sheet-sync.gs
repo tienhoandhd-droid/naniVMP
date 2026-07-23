@@ -5,8 +5,11 @@
  *
  * CÁCH DÙNG (làm 1 lần):
  *   1. Dán file này vào Extensions -> Apps Script.
- *   2. Chọn hàm setupTrigger -> Run  (cấp quyền khi được hỏi).  <-- BẮT BUỘC
- *   3. Chọn hàm testPing -> Run, xem Log phải hiện "HTTP 200".
+ *   2. Đặt token: Project Settings (bánh răng) -> Script Properties ->
+ *      thêm khóa VMP_SYNC_TOKEN với giá trị token (phải khớp Header Auth trong n8n WF-04).
+ *      KHÔNG ghi token vào code — code này nằm công khai trên GitHub.
+ *   3. Chọn hàm setupTrigger -> Run  (cấp quyền khi được hỏi).  <-- BẮT BUỘC
+ *   4. Chọn hàm testPing -> Run, xem Log phải hiện "HTTP 200".
  *   Từ đó mỗi lần sửa ô, sau ~5s ngừng gõ sẽ tự sync.
  *
  * LƯU Ý: onEditVmp phải chạy bằng trigger CÀI ĐẶT (installable) do setupTrigger tạo —
@@ -15,17 +18,23 @@
 
 const N8N_WEBHOOK_URL  = 'https://n8n.cpc1hn.com/webhook/vmp-sheet-changed';
 const AUTH_HEADER_NAME = 'x-vmp-sync-token';
-const VMP_SYNC_TOKEN   = 'tienhoan2025';
 const SHEET_ID         = '1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8'; // dùng cho setupTrigger (chạy được cả khi script độc lập)
 const TARGET_TAB       = '6.Timeline VMP'; // CHỈ sync khi sửa đúng tab nguồn này
 const DEBOUNCE_SECONDS = 5;      // fire SAU khi ngừng sửa ngần này giây
 const MIN_GAP_SECONDS  = 3;      // chặn spam: 2 lần sync thật cách nhau tối thiểu
 
+/** Token đọc từ Script Properties (khóa VMP_SYNC_TOKEN) — không hard-code vào code. */
+function getToken_() {
+  const t = PropertiesService.getScriptProperties().getProperty('VMP_SYNC_TOKEN');
+  if (!t) throw new Error('Chưa đặt Script Property VMP_SYNC_TOKEN (Project Settings -> Script Properties).');
+  return t;
+}
+
 function ping_(reason) {
   const res = UrlFetchApp.fetch(N8N_WEBHOOK_URL, {
     method: 'post',
     contentType: 'application/json',
-    headers: { [AUTH_HEADER_NAME]: VMP_SYNC_TOKEN },
+    headers: { [AUTH_HEADER_NAME]: getToken_() },
     payload: JSON.stringify({ source: 'apps-script', reason: reason, ts: new Date().toISOString() }),
     muteHttpExceptions: true,
   });
