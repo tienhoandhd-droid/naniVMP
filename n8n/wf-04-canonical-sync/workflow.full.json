@@ -1,0 +1,1948 @@
+{
+  "id": "LArr1nhj3jzFjJLs",
+  "name": "VMP WF-04: Google Sheet → Supabase canonical sync",
+  "active": false,
+  "isArchived": false,
+  "versionId": "70d2a05d-2517-41ff-93eb-2cdb5e9b9c88",
+  "activeVersionId": null,
+  "triggerCount": 6,
+  "createdAt": "2026-06-18T15:29:42.659Z",
+  "updatedAt": "2026-07-12T09:46:32.773Z",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "CONFIG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Extract JWT": {
+      "main": [
+        [
+          {
+            "node": "2. Verify with Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Verify with Supabase": {
+      "main": [
+        [
+          {
+            "node": "2b. Lấy quyền",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Validate & Build Row": {
+      "main": [
+        [
+          {
+            "node": "4. OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. OK?": {
+      "main": [
+        [
+          {
+            "node": "5. Skip?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Skip?": {
+      "main": [
+        [
+          {
+            "node": "Respond Skip",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5b. Dòng sạch để ghi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Update Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIG": {
+      "main": [
+        [
+          {
+            "node": "1. Extract JWT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2b. Lấy quyền": {
+      "main": [
+        [
+          {
+            "node": "3. Validate & Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5b. Dòng sạch để ghi": {
+      "main": [
+        [
+          {
+            "node": "6. Update Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule (hằng ngày 7h)": {
+      "main": [
+        [
+          {
+            "node": "CONFIG1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger: chạy ngay (tùy chọn)": {
+      "main": [
+        [
+          {
+            "node": "CONFIG1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Đọc Sheet người nhận (raw)": {
+      "main": [
+        [
+          {
+            "node": "1b. Chuẩn hóa người nhận",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1b. Chuẩn hóa người nhận": {
+      "main": [
+        [
+          {
+            "node": "3. Ghép người nhận × hạng mục",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Lấy hạng mục đến hạn (rpc_due_alerts)": {
+      "main": [
+        [
+          {
+            "node": "2b. Bung danh sách đến hạn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2b. Bung danh sách đến hạn": {
+      "main": [
+        [
+          {
+            "node": "3. Ghép người nhận × hạng mục",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Ghép người nhận × hạng mục": {
+      "main": [
+        [
+          {
+            "node": "4. Đăng ký cảnh báo (chống trùng)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Đăng ký cảnh báo (chống trùng)": {
+      "main": [
+        [
+          {
+            "node": "4b. Giữ dữ liệu + cờ mới",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4b. Giữ dữ liệu + cờ mới": {
+      "main": [
+        [
+          {
+            "node": "5. Chỉ cảnh báo MỚI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Chỉ cảnh báo MỚI": {
+      "main": [
+        [
+          {
+            "node": "6. Lấy bối cảnh AI (bộ nhớ)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Lấy bối cảnh AI (bộ nhớ)": {
+      "main": [
+        [
+          {
+            "node": "7. Dựng prompt AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Dựng prompt AI": {
+      "main": [
+        [
+          {
+            "node": "8. Soạn cảnh báo (Claude AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Soạn cảnh báo (Claude AI)": {
+      "main": [
+        [
+          {
+            "node": "9. Dựng email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. Dựng email HTML": {
+      "main": [
+        [
+          {
+            "node": "10. Gửi Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10. Gửi Gmail": {
+      "main": [
+        [
+          {
+            "node": "11. Đánh dấu đã gửi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "12. Đánh dấu lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIG1": {
+      "main": [
+        [
+          {
+            "node": "1. Đọc Sheet người nhận (raw)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "2. Lấy hạng mục đến hạn (rpc_due_alerts)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule (1 phút)": {
+      "main": [
+        [
+          {
+            "node": "CONFIG2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger: drain ngay (tuỳ chọn)": {
+      "main": [
+        [
+          {
+            "node": "CONFIG2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Claim Due Rows": {
+      "main": [
+        [
+          {
+            "node": "2. Build Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Build Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "3. Update Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Update Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "4. Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5. Mark Error (+backoff)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "0b. Dọn outbox cũ": {
+      "main": [
+        [
+          {
+            "node": "1. Claim Due Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIG2": {
+      "main": [
+        [
+          {
+            "node": "0b. Dọn outbox cũ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Read Sheet (raw)": {
+      "main": [
+        [
+          {
+            "node": "1. Read Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Diff Engine": {
+      "main": [
+        [
+          {
+            "node": "5. Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Router": {
+      "main": [
+        [
+          {
+            "node": "6A. INSERT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6B. UPDATE",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6C. MARK MISSING",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6D. CONFLICT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "7. Log Run",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "9. Reconcile Objects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6A. INSERT": {
+      "main": [
+        [],
+        [
+          {
+            "node": "8. Log Write Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6B. UPDATE": {
+      "main": [
+        [],
+        [
+          {
+            "node": "8. Log Write Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6C. MARK MISSING": {
+      "main": [
+        [],
+        [
+          {
+            "node": "8. Log Write Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6D. CONFLICT": {
+      "main": [
+        [],
+        [
+          {
+            "node": "8. Log Write Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "0. Build Objects SQL": {
+      "main": [
+        [
+          {
+            "node": "0b. Upsert Objects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "0b. Upsert Objects": {
+      "main": [
+        [
+          {
+            "node": "4. Diff Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger: Sheet changed (instant)": {
+      "main": [
+        [
+          {
+            "node": "CONFIG3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Read Sheet": {
+      "main": [
+        [
+          {
+            "node": "3. Sync reads (Merge)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Sync reads (Merge)": {
+      "main": [
+        [
+          {
+            "node": "0. Build Objects SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "1. Ghi workflow_runs (failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Ghi workflow_runs (failed)": {
+      "main": [
+        [
+          {
+            "node": "2. Email admin (tuỳ chọn)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Download Canonical Sheet CSV": {
+      "main": [
+        [
+          {
+            "node": "2. Parse Canonical Sheet CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Parse Canonical Sheet CSV": {
+      "main": [
+        [
+          {
+            "node": "3. Apply Canonical Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIG3": {
+      "main": [
+        [
+          {
+            "node": "1. Download Canonical Sheet CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule (5 phút)": {
+      "main": [
+        [
+          {
+            "node": "CONFIG3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vmp-write",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -1984,
+        208
+      ],
+      "webhookId": "vmp-write",
+      "typeVersion": 2,
+      "id": "d3efe2fb-965a-4d69-9c7c-af4e70a2527d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lấy JWT token từ header Authorization\nconst headers = $input.first().json.headers || {};\nconst authHeader = headers.authorization || headers.Authorization || '';\nif (!authHeader.startsWith('Bearer ')) {\n  return [{ json: { _valid: false, _code: 401, error: 'Thiếu Authorization: Bearer <token>' } }];\n}\nconst token = authHeader.replace('Bearer ', '').trim();\nif (token.length < 50) {\n  return [{ json: { _valid: false, _code: 401, error: 'Token không hợp lệ' } }];\n}\ntry {\n  const parts = token.split('.');\n  if (parts.length !== 3) throw new Error('Token format sai');\n  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());\n  if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {\n    return [{ json: { _valid: false, _code: 401, error: 'Token đã hết hạn' } }];\n  }\n  return [{ json: { _valid: true, _token: token, _body: $input.first().json.body || $input.first().json } }];\n} catch (e) {\n  return [{ json: { _valid: false, _code: 401, error: 'Token decode lỗi: ' + e.message } }];\n}"
+      },
+      "name": "1. Extract JWT",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1536,
+        208
+      ],
+      "typeVersion": 2,
+      "id": "87464b99-5664-47cd-b6a7-23e7bada3cdc"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('CONFIG').first().json.SUPABASE_URL }}/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json._token }}"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $('CONFIG').first().json.SUPABASE_ANON_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "name": "2. Verify with Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1312,
+        208
+      ],
+      "typeVersion": 4.2,
+      "id": "fde20045-d6e7-4b08-80aa-730df40be816",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Kiểm tra quyền (S2-6) + dựng dòng ghi Sheet theo TIÊU ĐỀ TIẾNG VIỆT (S1-1).\n// S1-B FIX (2026-06-21): biến H_BASE chứa tiêu đề \"chuẩn\" của hệ thống. Nếu Sheet\n//   của bạn dùng VIẾT HOA/THƯỜNG khác H_BASE → Google Sheets sẽ tạo CỘT RÁC mới.\n//   Hãy kiểm tra tab \"6.Timeline VMP\" và đồng nhất tiêu đề với H_BASE bên dưới\n//   (case-sensitive). Đặc biệt: \"Thẩm\", \"Deadline VMP\" phải KHỚP CHỮ HOA.\nconst row0 = $input.first().json || {};\nconst uid = row0.uid, email = row0.email, role = row0.role;\nconst extract = $('1. Extract JWT').first().json;\nif (!uid || !email) return [{ json: { _ok:false, _code:401, error:'Token không hợp lệ hoặc hết hạn — Supabase từ chối' } }];\nif (role === 'viewer' || role === '') return [{ json: { _ok:false, _code:403, error:'Tài khoản không có quyền ghi (viewer hoặc chưa cấp quyền)' } }];\nconst body = extract._body;\nif (body.action !== 'updateRow') return [{ json: { _ok:true, _skip:true, ok:true, msg:'Bỏ qua (không phải updateRow)' } }];\nif (!body.id) return [{ json: { _ok:false, _code:400, error:'Thiếu mã thẩm định (id)' } }];\nif (!body.patch || typeof body.patch !== 'object') return [{ json: { _ok:false, _code:400, error:'Thiếu patch' } }];\n\nconst allowed = ['ngay_de_cuong','tt_de_cuong','lich_td','ngay_tham_dinh','tt_tham_dinh','ngay_bao_cao','tt_bao_cao','ngay_vmp','tt_vmp'];\nconst bad = Object.keys(body.patch).filter(k => !allowed.includes(k));\nif (bad.length) return [{ json: { _ok:false, _code:400, error:'Trường không được phép: ' + bad.join(', ') } }];\n\n// QUAN TRỌNG: H_BASE phải TRÙNG TUYỆT ĐỐI với tiêu đề trên Google Sheet (case-sensitive).\n// Nếu Sheet thực tế khác viết hoa/thường → Google Sheets sẽ TẠO CỘT RÁC.\nconst H_BASE = {\n  tt_de_cuong:    'Trạng thái đề cương',\n  ngay_de_cuong:  'Thời gian thực tế hoàn thành đề cương',\n  lich_td:        'Bộ phận quản lý xếp lịch thẩm định (dd/mm/yyyy hh:mm:ss)',\n  tt_tham_dinh:   'Trạng thái thẩm định thực tế',\n  ngay_tham_dinh: 'Thời gian thực tế hoàn thành Thẩm định thực tế',\n  tt_bao_cao:     'Trạng thái báo cáo',\n  ngay_bao_cao:   'Thời gian thực tế hoàn thành báo cáo',\n  tt_vmp:         'Trạng thái VMP',\n  ngay_vmp:       'Thời gian thực tế Deadline VMP',\n};\n\nconst row = { 'ID thẩm định': String(body.id) };\nfor (const k of allowed) if (k in body.patch) row[H_BASE[k]] = (body.patch[k] == null ? '' : String(body.patch[k]));\nreturn [{ json: { _ok:true, _user: email, _vc: String(body.id), _row: row } }];\n"
+      },
+      "name": "3. Validate & Build Row",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -864,
+        208
+      ],
+      "typeVersion": 2,
+      "id": "e293ec60-c379-4ee9-a150-c83d55623e7e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json._ok }}",
+              "operation": "equals",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "name": "4. OK?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -640,
+        208
+      ],
+      "typeVersion": 1,
+      "id": "78841f25-deb2-45ec-b29c-d93a091bd7aa"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json._skip === true }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "5. Skip?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -416,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "307cfc8a-fc38-4f15-858f-4ade84fdf736"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('CONFIG').first().json.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "6.Timeline VMP",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID thẩm định"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "6. Update Sheet Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        32,
+        224
+      ],
+      "typeVersion": 4.5,
+      "id": "4355f877-9e3e-4904-94ec-59fbe6b90490",
+      "disabled": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, id: $('3. Validate & Build Row').first().json._vc, msg: 'Đã ghi Google Sheet' }) }}",
+        "options": {}
+      },
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        256,
+        176
+      ],
+      "typeVersion": 1.1,
+      "id": "fa83ffa9-b57f-4d31-a97b-3580f2778125"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, skipped: true, msg: $json.msg }) }}",
+        "options": {}
+      },
+      "name": "Respond Skip",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        -192,
+        32
+      ],
+      "typeVersion": 1.1,
+      "id": "9e51fadf-eb26-4a75-9136-3fdd46f2f090"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error || 'Lỗi xác thực' }) }}",
+        "options": {
+          "responseCode": "={{ $json._code || 400 }}"
+        }
+      },
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        256,
+        400
+      ],
+      "typeVersion": 1.1,
+      "id": "29544070-1554-491c-994c-00fc58f9e935"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ====== SỬA 3 GIÁ TRỊ Ở ĐÂY (giữ nguyên ...$input để chuyển tiếp header/body) ======\nreturn [{ json: { ...$input.first().json,\n  GOOGLE_SHEET_ID: \"1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8\",\n  SUPABASE_URL: \"https://ivembmikfhtyzhtqebgh.supabase.co\",          // vd https://abcd.supabase.co  (KHÔNG có / ở cuối)\n  SUPABASE_ANON_KEY: \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2ZW1ibWlrZmh0eXpodHFlYmdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwODU0NzIsImV4cCI6MjA5NzY2MTQ3Mn0._IZwrZd9kaeP3HXhlE8Jl5VjNIP0O4C0k7GlnbDdfmg\",\n} }];"
+      },
+      "name": "CONFIG",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1760,
+        208
+      ],
+      "typeVersion": 2,
+      "id": "cf6c7b9f-4c80-4126-bf85-ebfd7dafa808"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE((SELECT role::text FROM profiles WHERE id = '{{ ($json.id || '').replace(/'/g, \"''\") }}'), '') AS role, '{{ ($json.id || '').replace(/'/g, \"''\") }}' AS uid, '{{ ($json.email || '').replace(/'/g, \"''\") }}' AS email",
+        "options": {}
+      },
+      "name": "2b. Lấy quyền",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1088,
+        208
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "ae078cca-6a3f-4f2c-8e40-368aaf937900"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json._row }];"
+      },
+      "name": "5b. Dòng sạch để ghi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        224
+      ],
+      "id": "fa5e56a2-585e-4a40-b5af-f35a7a9f4790"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "name": "Schedule (hằng ngày 7h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1984,
+        624
+      ],
+      "id": "596c54af-2345-49c2-8bb6-c3d8dfcaeaab"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vmp-alert-now",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "name": "Trigger: chạy ngay (tùy chọn)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1984,
+        816
+      ],
+      "webhookId": "vmp-alert-now",
+      "id": "d91490db-2d95-4ded-9d33-10e1f16bb6eb",
+      "notes": "Bảo vệ bằng Header Auth. Gọi để gửi cảnh báo ngay, không chờ tới 7h."
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('CONFIG1').first().json.ALERT_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('CONFIG1').first().json.ALERT_TAB }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "name": "1. Đọc Sheet người nhận (raw)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1536,
+        624
+      ],
+      "id": "7a19157c-ea75-466f-bf1b-81e4644e060c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Chuẩn hóa danh sách người nhận từ Sheet (tiêu đề tiếng Việt -> khóa ngắn).\n// Sheet \"CanhBao\" có các cột (xem mẫu trong hướng dẫn):\n//   Bật | Loại phạm vi | Phạm vi | Email nhận | Tên người nhận | Loại cảnh báo | Ngưỡng ngày\nfunction norm(h){ return String(h==null?'':h).replace(/\\s+/g,' ').trim().toLowerCase(); }\nconst MAP = {\n  'bật':'enabled', 'bat':'enabled',\n  'loại phạm vi':'scope_type', 'loai pham vi':'scope_type',\n  'phạm vi':'scope', 'pham vi':'scope',\n  'email nhận':'email', 'email nhan':'email', 'email':'email',\n  'tên người nhận':'name', 'ten nguoi nhan':'name',\n  'loại cảnh báo':'alert_kind', 'loai canh bao':'alert_kind',\n  'ngưỡng ngày':'threshold_days', 'nguong ngay':'threshold_days',\n};\nconst truthy = (v)=>{ const s=norm(v); return ['true','1','x','yes','co','có','bật','bat','on'].includes(s); };\nconst out=[];\nfor(const it of $input.all()){\n  const raw=it.json||{}; const m={};\n  for(const [k,v] of Object.entries(raw)){ const t=MAP[norm(k)]; if(t) m[t]=v; }\n  if(!truthy(m.enabled)) continue;                 // chỉ lấy dòng đang bật\n  const email=String(m.email||'').trim();\n  if(!email || !email.includes('@')) continue;     // bỏ dòng thiếu email\n  out.push({ json: {\n    scope_type: norm(m.scope_type),                // 'tất cả' | 'bộ phận' | 'đối tượng'\n    scope: String(m.scope||'').trim(),\n    email, name: String(m.name||'').trim(),\n    alert_kind: norm(m.alert_kind),                // 'quá hạn' | 'sắp đến hạn' | 'cả hai'\n    threshold_days: m.threshold_days!=null && String(m.threshold_days).trim()!=='' ? parseInt(m.threshold_days,10) : null,\n  }});\n}\nif(out.length===0) console.log('⚠ Không có dòng người nhận nào đang bật trong Sheet CanhBao.');\nreturn out;"
+      },
+      "name": "1b. Chuẩn hóa người nhận",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        624
+      ],
+      "id": "e03f365e-48f6-4faa-89da-7ef58447f49a"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT (rpc_due_alerts(EXTRACT(YEAR FROM NOW())::int, {{ $('CONFIG').first().json.SOON_DAYS }})) AS due",
+        "options": {}
+      },
+      "name": "2. Lấy hạng mục đến hạn (rpc_due_alerts)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1536,
+        816
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "e6f4c7ea-628d-4223-ba31-d926122925e8"
+    },
+    {
+      "parameters": {
+        "jsCode": "// rpc_due_alerts trả về 1 JSONB (mảng). Bung ra mỗi hạng mục = 1 item.\nconst row = $input.first().json;\nlet arr = row.due || row.rpc_due_alerts || [];\nif (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { arr = []; } }\nif (!Array.isArray(arr)) arr = [];\nreturn arr.map(d => ({ json: d }));"
+      },
+      "name": "2b. Bung danh sách đến hạn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        816
+      ],
+      "id": "4cee3a82-9401-4537-9ced-3c079e1e3ae4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ghép (người nhận x hạng mục đến hạn) -> danh sách email cần gửi.\n// Lấy dữ liệu qua tham chiếu node (đảm bảo cả 2 nhánh đã chạy).\nconst recips = $('1b. Chuẩn hóa người nhận').all().map(i=>i.json);\nconst dues   = $('2b. Bung danh sách đến hạn').all().map(i=>i.json);\nconst soonDefault = Number($('CONFIG1').first().json.SOON_DAYS) || 7;\nconst n = (s)=>String(s==null?'':s).toLowerCase();\nconst out=[];\nfor (const d of dues) {\n  for (const r of recips) {\n    // 1) khớp phạm vi\n    let scopeOK=false;\n    if (r.scope_type.includes('tất') || n(r.scope)==='all') scopeOK=true;\n    if (r.scope_type.includes('bộ'))  scopeOK = (n(r.scope)===n(d.department));\n    if (r.scope_type.includes('đối')) scopeOK = (n(r.scope)===n(d.object_code) || n(r.scope)===n(d.validation_code));\n    if (!scopeOK) continue;\n    // 2) khớp loại cảnh báo\n    const wantBoth = r.alert_kind.includes('cả') || r.alert_kind==='';\n    const wantOver = r.alert_kind.includes('quá');\n    const wantSoon = r.alert_kind.includes('sắp');\n    if (!(wantBoth || (wantOver && d.alert_type==='overdue') || (wantSoon && d.alert_type==='due_soon'))) continue;\n    // 3) ngưỡng ngày cho 'sắp đến hạn'\n    if (d.alert_type==='due_soon') {\n      const thr = (r.threshold_days!=null) ? r.threshold_days : soonDefault;\n      if (Number(d.days_left) > thr) continue;\n    }\n    const key = `alert:${d.alert_type}:${d.validation_code}:${d.stage}:${d.due_date}:${r.email}`;\n    out.push({ json: { ...d, _email: r.email, _name: r.name||'', _idem: key } });\n  }\n}\nif(out.length===0) console.log('Không có cảnh báo nào cần gửi hôm nay.');\nreturn out;"
+      },
+      "name": "3. Ghép người nhận × hạng mục",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        720
+      ],
+      "id": "236674c1-afc1-4195-a7ba-01fd71ef1e76"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT (rpc_register_alert('{{ $json._idem }}', '{{ $json.alert_type }}', '{{ $json.validation_code }}', '{{ $json._email }}', '{{ ($json._name || '').replace(/'/g, \"''\") }}', '{{ (($json.alert_type==='overdue'?'[QUÁ HẠN] ':'[SẮP ĐẾN HẠN] ') + $json.object_code + ' · ' + $json.stage).replace(/'/g, \"''\") }}', '{{ ($json.object_name || '').replace(/'/g, \"''\") }}')) AS r",
+        "options": {}
+      },
+      "name": "4. Đăng ký cảnh báo (chống trùng)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -864,
+        720
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "0df110e4-6e16-40ed-8f1e-41def9343618"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sau node Postgres, lấy lại dữ liệu hạng mục gốc của item hiện tại + cờ is_new.\nconst reg = $json.r || {};\nconst base = $('3. Ghép người nhận × hạng mục').item.json;\nreturn [{ json: { ...base, is_new: !!reg.is_new } }];"
+      },
+      "name": "4b. Giữ dữ liệu + cờ mới",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        720
+      ],
+      "id": "179ea3c7-c653-4957-b436-484ef045483b"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.is_new }}",
+              "rightValue": "={{ true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "5. Chỉ cảnh báo MỚI",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        720
+      ],
+      "id": "064856ad-60e2-43f0-85bd-49d0ad95f5ca"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT (rpc_alert_context('{{ $json.validation_code }}', 5)) AS ctx",
+        "options": {}
+      },
+      "name": "6. Lấy bối cảnh AI (bộ nhớ)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -192,
+        720
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "b0844b5e-1985-4739-bb2b-25a300795777"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dựng prompt cho Claude (có TRÍ NHỚ: lịch sử + cảnh báo cũ + xu hướng).\nconst ctx = $json.ctx || {};\nconst item = $('4b. Giữ dữ liệu + cờ mới').item.json;\nconst sys = \"Bạn là trợ lý QA dược phẩm (GMP). Viết 2-3 câu tiếng Việt, ngắn gọn, lịch sự, \"\n  + \"nhắc nhở phụ trách về hạng mục thẩm định sắp/đã đến hạn. Dựa vào LỊCH SỬ và XU HƯỚNG được cung cấp: \"\n  + \"nếu hạng mục đã từng bị dời deadline hoặc đã từng quá hạn, hãy nêu rõ để nhấn mạnh mức ưu tiên. \"\n  + \"Không bịa số liệu. Không thêm tiêu đề, chỉ trả về đoạn văn.\";\nconst user = \"DỮ LIỆU HẠNG MỤC:\n\" + JSON.stringify({\n  ma: item.validation_code, doi_tuong: item.object_name, loai: item.validation_type,\n  giai_doan: item.stage, han: item.due_date, con_lai_ngay: item.days_left,\n  loai_canh_bao: item.alert_type, phu_trach: item.owner_name\n}, null, 2) + \"\n\nBỐI CẢNH/BỘ NHỚ:\n\" + JSON.stringify({\n  trang_thai_hien_tai: ctx.now, lich_su: ctx.history, canh_bao_truoc: ctx.past_alerts, xu_huong: ctx.trend\n}, null, 2);\nreturn [{ json: { ...item, _ai_system: sys, _ai_user: user,\n  _ai_body: JSON.stringify({ model: \"claude-sonnet-4-6\", max_tokens: 400,\n    system: sys, messages: [{ role: \"user\", content: user }] }) } }];"
+      },
+      "name": "7. Dựng prompt AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        720
+      ],
+      "id": "cb1acf0e-e811-470e-a894-abc35f18bf0c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "raw",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "8. Soạn cảnh báo (Claude AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        720
+      ],
+      "id": "a7206ff6-19b5-49df-b8ff-81c0c98bf43b",
+      "onError": "continueRegularOutput",
+      "notes": "Credential Header Auth: Name = x-api-key, Value = <ANTHROPIC_API_KEY>. Nếu không dùng AI, xóa node này và nối thẳng 7 -> 9 (sẽ dùng nội dung mặc định)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dựng email HTML. Ưu tiên đoạn văn AI; nếu AI lỗi/tắt -> nội dung mặc định.\nconst item = $('7. Dựng prompt AI').item.json;\nlet aiText = '';\ntry {\n  const resp = $json;                 // output node Claude (nếu có)\n  if (resp && resp.content && Array.isArray(resp.content)) {\n    aiText = resp.content.filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();\n  }\n} catch(e) {}\nconst over = item.alert_type === 'overdue';\nconst tone = over ? '#b00020' : '#9a6a00';\nconst label = over ? 'QUÁ HẠN' : 'SẮP ĐẾN HẠN';\nconst fallback = `Hạng mục ${item.validation_code} (${item.object_name||''}) — giai đoạn ${item.stage} ${over?'đã quá hạn':'sắp đến hạn'} `\n  + `vào ${item.due_date}${over?'':` (còn ${item.days_left} ngày)`}. Đề nghị ${item.owner_name||'phụ trách'} kiểm tra và cập nhật tiến độ.`;\nconst body = aiText || fallback;\nconst subject = `[${label}] ${item.object_code} · ${item.stage} · ${item.due_date}`;\nconst html = `\n<div style=\"font-family:Arial,sans-serif;max-width:600px;border:1px solid #eee;border-radius:10px;overflow:hidden\">\n  <div style=\"background:${tone};color:#fff;padding:12px 16px;font-weight:bold\">VMP Monitor · Cảnh báo ${label}</div>\n  <div style=\"padding:16px;color:#222;line-height:1.6\">\n    <p>${body}</p>\n    <table style=\"border-collapse:collapse;font-size:13px;margin-top:8px\">\n      <tr><td style=\"padding:4px 10px;color:#666\">Mã thẩm định</td><td style=\"padding:4px 10px\"><b>${item.validation_code}</b></td></tr>\n      <tr><td style=\"padding:4px 10px;color:#666\">Đối tượng</td><td style=\"padding:4px 10px\">${item.object_name||''} (${item.object_code})</td></tr>\n      <tr><td style=\"padding:4px 10px;color:#666\">Loại</td><td style=\"padding:4px 10px\">${item.validation_type}</td></tr>\n      <tr><td style=\"padding:4px 10px;color:#666\">Giai đoạn</td><td style=\"padding:4px 10px\">${item.stage}</td></tr>\n      <tr><td style=\"padding:4px 10px;color:#666\">Deadline</td><td style=\"padding:4px 10px\"><b>${item.due_date}</b></td></tr>\n      <tr><td style=\"padding:4px 10px;color:#666\">Phụ trách</td><td style=\"padding:4px 10px\">${item.owner_name||'—'}</td></tr>\n    </table>\n    <p style=\"font-size:11px;color:#999;margin-top:14px\">Email tự động từ hệ thống VMP Monitor. Nội dung gợi ý do AI soạn — vui lòng kiểm tra trước khi hành động.</p>\n  </div>\n</div>`;\nreturn [{ json: { ...item, _subject: subject, _html: html } }];"
+      },
+      "name": "9. Dựng email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        720
+      ],
+      "id": "4c285e4c-8de8-4135-abba-ffd593ece1b0"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "sendTo": "={{ $json._email }}",
+        "subject": "={{ $json._subject }}",
+        "message": "={{ $json._html }}",
+        "options": {}
+      },
+      "name": "10. Gửi Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        704,
+        720
+      ],
+      "id": "17db655c-be2e-4c7e-81d2-698fd98de194",
+      "webhookId": "79211707-698a-4866-8248-0b5caaa625a3",
+      "onError": "continueErrorOutput",
+      "notes": "Có thể thay bằng node SMTP (Send Email) nếu dùng mail nội bộ. Lỗi -> nhánh phải đánh dấu failed."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rpc_mark_alert_sent('{{ $json._idem }}', true, NULL)",
+        "options": {}
+      },
+      "name": "11. Đánh dấu đã gửi",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        928,
+        624
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "61760813-f7c8-48ae-b1b8-d316e9dab236"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rpc_mark_alert_sent('{{ $json._idem }}', false, 'WF-07: gửi mail thất bại')",
+        "options": {}
+      },
+      "name": "12. Đánh dấu lỗi",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        928,
+        816
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "69b01c0e-3cd4-40f5-a632-89d51977f19c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ====== SỬA 2 GIÁ TRỊ Ở ĐÂY ======\n// 1) ID của GOOGLE SHEET chứa DANH SÁCH NGƯỜI NHẬN cảnh báo (sheet bạn tự xây).\n//    Lấy đoạn giữa /d/ và /edit trong URL.\n// 2) Tên TAB chứa danh sách (mặc định \"CanhBao\").\n// 3) SOON_DAYS: số ngày coi là \"sắp đến hạn\" mặc định (nếu dòng không ghi ngưỡng riêng).\nreturn [{ json: { ...($input.first()?.json || {}),\n  ALERT_SHEET_ID: \"1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8\",\n  ALERT_TAB: \"CanhBao\",\n  SOON_DAYS: 7,\n} }];"
+      },
+      "name": "CONFIG1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        720
+      ],
+      "id": "9ec879da-2258-4377-8f76-8fa667a1f448"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "2b50cb6b-dbbd-406d-8368-b550e206aa1b",
+      "name": "Schedule (1 phút)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1984,
+        -608
+      ],
+      "disabled": true,
+      "notes": "Lưới an toàn: mỗi phút rút hàng đợi outbox và đẩy sang Sheet. Đảm bảo Sheet luôn khớp Supabase."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vmp-drain-now",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "3d2561d3-58e8-4e85-adc7-3ae9360e85ca",
+      "name": "Trigger: drain ngay (tuỳ chọn)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1984,
+        -416
+      ],
+      "webhookId": "55cd8099-aee1-4e23-aea9-51c536e7f01b",
+      "notes": "Frontend ping webhook này khi mirror tức thời lỗi → đẩy lại Sheet trong ~1s thay vì chờ tới phút kế. Bảo vệ bằng Header Auth."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Giành (claim) tối đa 50 việc đến hạn, đánh dấu 'sending' để 2 lần drain song song không ghi trùng.\nUPDATE sheet_sync_outbox\nSET status = 'sending', updated_at = NOW()\nWHERE id IN (\n  SELECT id FROM sheet_sync_outbox\n  WHERE (status IN ('pending','error') AND next_attempt_at <= NOW())\n     OR (status = 'sending' AND updated_at < NOW() - INTERVAL '5 minutes')  -- gỡ kẹt nếu drain trước chết giữa chừng\n  ORDER BY id\n  LIMIT 50\n  FOR UPDATE SKIP LOCKED\n)\nRETURNING id AS _outbox_id, validation_code, sheet_patch, attempts;",
+        "options": {}
+      },
+      "id": "b6a29a55-b2d5-43ba-991a-61986498ae98",
+      "name": "1. Claim Due Rows",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1312,
+        -512
+      ],
+      "notes": "Dùng credential Postgres (Supabase). FOR UPDATE SKIP LOCKED chống ghi trùng khi 2 drain chạy song song."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dựng dòng ghi Google Sheet theo TIÊU ĐỀ TIẾNG VIỆT, khớp 'ID thẩm định' (S1-1).\n// S1-A FIX (2026-06-21): GIỮ pairedItem để node \"4. Mark Done\" / \"5. Mark Error\"\n//   sau Google Sheets node lấy đúng `_outbox_id` từ \"1. Claim Due Rows\" tương ứng\n//   với từng item (khi outbox đẩy >1 dòng cùng lúc).\nconst H = {\n  tt_de_cuong:    'Trạng thái đề cương',\n  ngay_de_cuong:  'Thời gian thực tế hoàn thành đề cương',\n  lich_td:        'Bộ phận quản lý xếp lịch thẩm định (dd/mm/yyyy hh:mm:ss)',\n  tt_tham_dinh:   'Trạng thái thẩm định thực tế',\n  ngay_tham_dinh: 'Thời gian thực tế hoàn thành Thẩm định thực tế',\n  tt_bao_cao:     'Trạng thái báo cáo',\n  ngay_bao_cao:   'Thời gian thực tế hoàn thành báo cáo',\n  tt_vmp:         'Trạng thái VMP',\n  ngay_vmp:       'Thời gian thực tế Deadline VMP',\n};\nconst ALLOWED = Object.keys(H);\nconst out = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const r = items[i].json;\n  let patch = r.sheet_patch;\n  if (typeof patch === 'string') { try { patch = JSON.parse(patch); } catch { patch = {}; } }\n  if (!patch || typeof patch !== 'object') patch = {};\n  const row = { 'ID thẩm định': String(r.validation_code) };\n  for (const k of ALLOWED) if (k in patch) row[H[k]] = (patch[k] == null ? '' : String(patch[k]));\n  // S1-A FIX: ĐẶT pairedItem RÕ RÀNG → Google Sheets node giữ được pairing\n  // → $('1. Claim Due Rows').item.json._outbox_id ở các node sau sẽ TRỎ ĐÚNG item.\n  out.push({ json: row, pairedItem: { item: i } });\n}\nreturn out;\n"
+      },
+      "id": "8ed0fac8-02cf-4bf8-9389-de3d8b0f0959",
+      "name": "2. Build Sheet Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('CONFIG2').first().json.GOOGLE_SHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "6.Timeline VMP",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID thẩm định"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "97815f97-6225-4da8-9aa0-391a408033b0",
+      "name": "3. Update Sheet Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -864,
+        -512
+      ],
+      "disabled": true,
+      "onError": "continueErrorOutput",
+      "notes": "Khớp theo cột 'id' (= mã thẩm định). Lỗi → nhánh phải để đánh dấu error + retry."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE sheet_sync_outbox\nSET status = 'done', last_error = NULL, updated_at = NOW()\nWHERE validation_code = '{{ ($json[\"ID thẩm định\"] || \"\").toString().replace(/'/g, \"''\") }}'\n  AND status = 'sending';",
+        "options": {}
+      },
+      "id": "a19f3f92-a8dc-45f6-b652-bb36e8c3c5cf",
+      "name": "4. Mark Done",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -640,
+        -672
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE sheet_sync_outbox\nSET status = 'error', attempts = attempts + 1,\n    last_error = 'WF-06: ghi Google Sheet thất bại (xem execution log)',\n    next_attempt_at = NOW() + (LEAST(power(2, attempts) * 30, 600) || ' seconds')::interval,\n    updated_at = NOW()\nWHERE validation_code = '{{ ($json[\"ID thẩm định\"] || \"\").toString().replace(/'/g, \"''\") }}'\n  AND status = 'sending';",
+        "options": {}
+      },
+      "id": "58f4490e-7002-4dba-b7ca-5960b4d6bf7f",
+      "name": "5. Mark Error (+backoff)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -640,
+        -416
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM sheet_sync_outbox WHERE status = 'done' AND updated_at < NOW() - INTERVAL '7 days';",
+        "options": {}
+      },
+      "name": "0b. Dọn outbox cũ",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1536,
+        -512
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "944abf3f-ba28-4713-b97b-6ac42702fce4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ====== SỬA 1 GIÁ TRỊ Ở ĐÂY ======\nreturn [{ json: { ...($input.first()?.json || {}),\n  GOOGLE_SHEET_ID: \"1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8\",\n} }];"
+      },
+      "id": "fce4eb53-35a6-4671-af2e-8619d107244b",
+      "name": "CONFIG2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "name": "Schedule (5 phút)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -1984,
+        1616
+      ],
+      "typeVersion": 1.2,
+      "id": "4666dc4b-699b-402e-a4f7-ee3d32b1d859"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('CONFIG3').first().json.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "6.Timeline VMP",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "name": "1. Read Sheet (raw)",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -1536,
+        1424
+      ],
+      "typeVersion": 4.5,
+      "id": "66322b7c-66e7-4348-9978-5f9fffc41dc1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- n8n Postgres node query.\n-- Configure queryReplacement to the n8n payload_b64 expression.\nwith payload as (\n  select convert_from(decode($1, 'base64'), 'UTF8')::jsonb as body\n),\nfingerprint as (\n  select\n    body,\n    encode(\n      extensions.digest(\n        convert_to((body -> 'headers')::text || (body -> 'rows')::text, 'UTF8'),\n        'sha256'\n      ),\n      'hex'\n    ) as checksum\n  from payload\n),\nlatest as (\n  select id, checksum, unique_validation_count, object_count, completed_at\n  from public.vmp_sheet_sync_runs\n  where status = 'completed'\n  order by created_at desc\n  limit 1\n)\nselect case\n  when l.checksum = f.checksum\n   and (select count(*) from public.vmp_plan_items) = l.unique_validation_count\n   and (select count(*) from public.vmp_objects) = l.object_count\n   and not exists (\n     select 1 from public.vmp_plan_items p\n     where p.source_sync_run_id is distinct from l.id\n        or p.updated_at > l.completed_at\n   )\n   and not exists (\n     select 1 from public.vmp_objects o\n     where o.source_sync_run_id is distinct from l.id\n        or o.updated_at > l.completed_at\n   )\n  then jsonb_build_object(\n    'ok', true,\n    'skipped', true,\n    'reason', 'unchanged_checksum',\n    'checksum', f.checksum\n  )\n  else public.rpc_sync_vmp_sheet_snapshot_with_extras(\n    '1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8',\n    '1252715724',\n    '6.Timeline VMP',\n    f.body -> 'headers',\n    f.body -> 'rows'\n  )\nend as sync_result\nfrom fingerprint f\nleft join latest l on true;",
+        "options": {
+          "queryBatching": "single",
+          "queryReplacement": "={{ $json.payload_b64 }}"
+        }
+      },
+      "name": "3. Apply Canonical Snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        -960,
+        1808
+      ],
+      "typeVersion": 2.5,
+      "retryOnFail": false,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "8d8631ff-fbe9-431e-b537-f1eac251428d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// DIFF ENGINE (S1-2 + S1-3) — so sánh Sheet vs Supabase theo validation_code\n// ============================================================\nconst sheetRows = $('1. Read Sheet').all().map(i => i.json);\nconst dbRows = $('2. Read Supabase').all().map(i => i.json);\nconst s  = (v) => (v == null ? '' : String(v)).trim();\nconst lc = (v) => s(v).toLowerCase();\nfunction toISO(v){ const t=s(v); if(!t) return null;\n  let m=t.match(/^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})/);\n  if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;\n  m=t.match(/^(\\d{1,2})[-/](\\d{1,2})[-/](\\d{4})/);\n  if(m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;\n  return null; }\nfunction mapStatus(v){ const x=lc(v); if(!x) return 'not_started';\n  const neg=/\\b(chưa|chua|không|khong)\\b/.test(x)||/not[_\\s-]?started/.test(x);\n  if(neg) return 'not_started';\n  if(/hoàn thành|hoan thanh|done|đạt|dat|complete|completed|xong|✓/.test(x)) return 'completed';\n  if(/đang|dang|progress|in[_\\s-]?progress|thực hiện|thuc hien|wip/.test(x)) return 'in_progress';\n  return 'not_started'; }\nconst numLoose=(v)=>{const n=parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(n)?n:null;};\nconst intLoose=(v)=>{const n=parseInt(String(v==null?'':v).replace(/[^\\d-]/g,''),10); return isFinite(n)?n:null;};\n\nconst sheetMap=new Map(); const sheetCodes=new Set(); const warnNonNum=[];\nfor(const r of sheetRows){\n  const code=s(r.ma); if(!code) continue;\n  if(/[a-zà-ỹ]/i.test(s(r.diem_trong_yeu))||/[a-zà-ỹ]/i.test(s(r.so_ngay_cong))) warnNonNum.push(s(r.id)||code); // S1-3: KHÔNG bỏ hàng\n  const vc=s(r.id)||`${code}/${s(r.loai_td)||'PQ'}`;\n  const rawSP=s(r.tt_de_cuong),rawSV=s(r.tt_tham_dinh),rawSR=s(r.tt_bao_cao),rawSVMP=s(r.tt_vmp);\n  sheetCodes.add(code);\n  sheetMap.set(vc,{validation_code:vc,object_code:code,\n    validation_type:(s(r.loai_td)||'PQ').toUpperCase(),\n    report_class:s(r.phan_loai_bc)||'Không phụ thuộc',\n    owner_name:s(r.qa)||s(r.ns_khac)||'—',\n    effort_days:numLoose(r.so_ngay_cong), criticality_score:intLoose(r.diem_trong_yeu),\n    deadline_vmp:toISO(r.dl_vmp),deadline_protocol:toISO(r.dl_de_cuong),deadline_report:toISO(r.dl_bao_cao),\n    actual_protocol_date:toISO(r.ngay_de_cuong),actual_validation_date:toISO(r.ngay_tham_dinh),\n    actual_report_date:toISO(r.ngay_bao_cao),actual_vmp_date:toISO(r.ngay_vmp),\n    scheduled_date:toISO(r.lich_td),\n    rawSP,rawSV,rawSR,rawSVMP,\n    sheet_sp:mapStatus(rawSP),sheet_sv:mapStatus(rawSV),sheet_sr:mapStatus(rawSR),sheet_svmp:mapStatus(rawSVMP)});\n}\nif(warnNonNum.length) console.log('⚠ Hàng có chữ trong cột số (VẪN đồng bộ):',warnNonNum);\n\nconst dbMap=new Map(); for(const r of dbRows) dbMap.set(r.validation_code||r.id,r);\nconst results=[]; let stats={insert:0,update:0,soft_delete:0,conflict:0,skip:0};\n\nfor(const [vc,sh] of sheetMap){\n  const db=dbMap.get(vc);\n  if(!db){\n    results.push({json:{_op:'insert',\n      id:vc,validation_code:vc,object_code:sh.object_code,\n      validation_type:sh.validation_type,report_class:sh.report_class,\n      owner_name:sh.owner_name,effort_days:sh.effort_days,criticality_score:sh.criticality_score,\n      deadline_vmp:sh.deadline_vmp,deadline_protocol:sh.deadline_protocol,deadline_report:sh.deadline_report,\n      actual_protocol_date:sh.actual_protocol_date,actual_validation_date:sh.actual_validation_date,\n      actual_report_date:sh.actual_report_date,actual_vmp_date:sh.actual_vmp_date,\n      scheduled_date:sh.scheduled_date,\n      status_protocol:sh.sheet_sp,status_validation:sh.sheet_sv,status_report:sh.sheet_sr,status_vmp:sh.sheet_svmp,\n      is_active:true,year:new Date().getFullYear()}});\n    stats.insert++;\n  } else {\n    const patch={}; let changed=false;\n    for(const f of ['object_code','validation_type','report_class','owner_name','effort_days','criticality_score','deadline_vmp','deadline_protocol','deadline_report']){\n      if(String(sh[f]??'')!==String(db[f]??'')){patch[f]=sh[f];changed=true;}\n    }\n    const sflds=[\n      {raw:'rawSP',s:'sheet_sp',d:'status_protocol',a:'actual_protocol_date'},\n      {raw:'rawSV',s:'sheet_sv',d:'status_validation',a:'actual_validation_date'},\n      {raw:'rawSR',s:'sheet_sr',d:'status_report',a:'actual_report_date'},\n      {raw:'rawSVMP',s:'sheet_svmp',d:'status_vmp',a:'actual_vmp_date'}];\n    for(const sf of sflds){\n      if(sh[sf.raw]==='') continue;                 // S1-2: ô trống -> không đụng trạng thái\n      if(sh[sf.s]!==db[sf.d]){\n        if(db[sf.a]&&db[sf.d]==='completed'&&sh[sf.s]!=='completed'){\n          results.push({json:{_op:'conflict',validation_code:vc,field:sf.d,db_val:db[sf.d],sheet_val:sh[sf.s]}}); stats.conflict++;\n        } else { patch[sf.d]=sh[sf.s]; changed=true; }\n      }\n    }\n    for(const af of ['actual_protocol_date','actual_validation_date','actual_report_date','actual_vmp_date','scheduled_date']){\n      if(sh[af]&&String(sh[af])!==String(db[af]??'')){patch[af]=sh[af];changed=true;}\n    }\n    if(db.missing_from_sheet){patch.missing_from_sheet=false;patch.missing_since=null;changed=true;}\n    if(changed){results.push({json:{_op:'update',validation_code:vc,...patch}});stats.update++;} else stats.skip++;\n  }\n}\nfor(const [vc,db] of dbMap){ if(!sheetMap.has(vc)&&db.is_active){results.push({json:{_op:'soft_delete',validation_code:vc}});stats.soft_delete++;} }\nif(results.length===0) results.push({json:{_op:'noop'}});\nresults.push({json:{_op:'log',stats,codes_in_sheet:[...sheetCodes]}}); // S2-2\nreturn results;"
+      },
+      "name": "4. Diff Engine",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -416,
+        1520
+      ],
+      "typeVersion": 2,
+      "id": "8b60c47c-1392-4c83-99ed-802cc0742e1d",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._op }}",
+                    "rightValue": "insert",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._op }}",
+                    "rightValue": "update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._op }}",
+                    "rightValue": "soft_delete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._op }}",
+                    "rightValue": "conflict",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._op }}",
+                    "rightValue": "log",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "5. Router",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -192,
+        1472
+      ],
+      "typeVersion": 3.2,
+      "id": "de477401-64d7-4a18-a80b-54dba561d7aa",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- S2-B FIX: SET app.audit_source để audit_logs ghi đúng nguồn\nSET LOCAL app.audit_source = 'wf01_sheet_sync';\nSET LOCAL app.audit_reason = 'Đồng bộ tự động từ Google Sheet (INSERT)';\n\nINSERT INTO vmp_plan_items (\n  id, validation_code, object_code, validation_type, report_class,\n  owner_name, effort_days, criticality_score,\n  deadline_vmp, deadline_protocol, deadline_report,\n  actual_protocol_date, actual_validation_date, actual_report_date, actual_vmp_date,\n  scheduled_date,\n  status_protocol, status_validation, status_report, status_vmp,\n  is_active, year\n) VALUES (\n  '{{ String($json.validation_code).replace(/'/g, \"''\") }}',\n  '{{ String($json.validation_code).replace(/'/g, \"''\") }}',\n  '{{ String($json.object_code || '').replace(/'/g, \"''\") }}',\n  '{{ String($json.validation_type || 'PQ').replace(/'/g, \"''\") }}',\n  '{{ String($json.report_class || 'Không phụ thuộc').replace(/'/g, \"''\") }}',\n  {{ $json.owner_name ? \"'\" + String($json.owner_name).replace(/'/g, \"''\") + \"'\" : \"NULL\" }},\n  {{ $json.effort_days != null && $json.effort_days !== '' ? Number($json.effort_days) : \"NULL\" }},\n  {{ $json.criticality_score != null && $json.criticality_score !== '' ? Number($json.criticality_score) : \"NULL\" }},\n  {{ $json.deadline_vmp ? \"'\" + $json.deadline_vmp + \"'::DATE\" : \"NULL\" }},\n  {{ $json.deadline_protocol ? \"'\" + $json.deadline_protocol + \"'::DATE\" : \"NULL\" }},\n  {{ $json.deadline_report ? \"'\" + $json.deadline_report + \"'::DATE\" : \"NULL\" }},\n  {{ $json.actual_protocol_date ? \"'\" + $json.actual_protocol_date + \"'::DATE\" : \"NULL\" }},\n  {{ $json.actual_validation_date ? \"'\" + $json.actual_validation_date + \"'::DATE\" : \"NULL\" }},\n  {{ $json.actual_report_date ? \"'\" + $json.actual_report_date + \"'::DATE\" : \"NULL\" }},\n  {{ $json.actual_vmp_date ? \"'\" + $json.actual_vmp_date + \"'::DATE\" : \"NULL\" }},\n  {{ $json.scheduled_date ? \"'\" + $json.scheduled_date + \"'::DATE\" : \"NULL\" }},\n  '{{ $json.status_protocol || 'not_started' }}'::phase_status,\n  '{{ $json.status_validation || 'not_started' }}'::phase_status,\n  '{{ $json.status_report || 'not_started' }}'::phase_status,\n  '{{ $json.status_vmp || 'not_started' }}'::phase_status,\n  true,\n  {{ Number($json.year) || new Date().getFullYear() }}\n)\nON CONFLICT (id) DO NOTHING;",
+        "options": {}
+      },
+      "name": "6A. INSERT",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        32,
+        1040
+      ],
+      "typeVersion": 2.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "9b1be992-3d8b-4f50-ad5a-b66fdd6569bd",
+      "disabled": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- S2-B FIX: SET audit_source\nSET LOCAL app.audit_source = 'wf01_sheet_sync';\nSET LOCAL app.audit_reason = 'Đồng bộ tự động từ Google Sheet (UPDATE)';\n\nUPDATE vmp_plan_items SET updated_at = NOW(){{ (() => { const e = Object.entries($json).filter(([k]) => !['_op','validation_code'].includes(k)).map(([k,v]) => v === null ? `${k} = NULL` : `${k} = '${String(v).replace(/'/g, \"''\")}'`); return e.length ? ', ' + e.join(', ') : ''; })() }} WHERE validation_code = '{{ $json.validation_code.replace(/'/g, \"''\") }}'",
+        "options": {}
+      },
+      "name": "6B. UPDATE",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        32,
+        1232
+      ],
+      "typeVersion": 2.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "553a977d-6df8-447d-93b5-dadbe8bb7006",
+      "disabled": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- S2-B FIX: SET audit_source\nSET LOCAL app.audit_source = 'wf01_sheet_sync';\nSET LOCAL app.audit_reason = 'Mã đã mất khỏi Google Sheet — đánh dấu missing';\n\nUPDATE vmp_plan_items SET missing_from_sheet = true, missing_since = COALESCE(missing_since, NOW()), updated_at = NOW() WHERE validation_code = '{{ $json.validation_code.replace(/'/g, \"''\") }}' AND missing_from_sheet = false",
+        "options": {}
+      },
+      "name": "6C. MARK MISSING",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        32,
+        1424
+      ],
+      "typeVersion": 2.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "7c5d644b-b2e1-4c8e-b065-1df4c3fa625b",
+      "disabled": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO data_quality_issues (plan_item_id, issue_type, severity, field_name, field_value, expected_value, message, detected_at) SELECT '{{ $json.validation_code.replace(/'/g, \"''\") }}', 'sync_conflict', 'warning', '{{ $json.field }}', '{{ String($json.sheet_val ?? '').replace(/'/g, \"''\") }}', '{{ String($json.db_val ?? '').replace(/'/g, \"''\") }}', '{{ ('Xung đột ' + $json.validation_code + ' · ' + $json.field + ': DB=' + $json.db_val + ' / Sheet=' + $json.sheet_val).replace(/'/g, \"''\") }}', NOW() WHERE NOT EXISTS (SELECT 1 FROM data_quality_issues d WHERE d.issue_type = 'sync_conflict' AND d.is_resolved = false AND d.plan_item_id = '{{ $json.validation_code.replace(/'/g, \"''\") }}' AND d.field_name = '{{ $json.field }}')",
+        "options": {}
+      },
+      "name": "6D. CONFLICT",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        32,
+        1616
+      ],
+      "typeVersion": 2.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "55580bab-a320-4662-a714-669dd72cd937",
+      "disabled": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (workflow_id, workflow_name, status, output_summary, triggered_by)\nVALUES ('WF-01', 'Full-Scan Diff Sync', 'success',\n        '{{ JSON.stringify($json.stats || {}).replace(/'/g, \"''\") }}'::jsonb, 'schedule')",
+        "options": {}
+      },
+      "name": "7. Log Run",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        32,
+        1808
+      ],
+      "typeVersion": 2.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "e0a2f370-cf24-4f4e-b47a-fedb56a86b36",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// BUILD OBJECTS UPSERT — sinh vmp_objects từ Google Sheet\n// (BẮT BUỘC chạy trước khi INSERT vmp_plan_items vì object_code\n//  có khoá ngoại REFERENCES vmp_objects(code))\n// ============================================================\nconst rows = $('1. Read Sheet').all().map(i => i.json);\nconst s  = (v) => (v == null ? '' : String(v)).trim();\nconst lc = (v) => s(v).toLowerCase();\nconst esc = (v) => (v == null || v === '') ? 'NULL' : `'${String(v).replace(/'/g, \"''\")}'`;\n\nfunction mapClass(x){ x = lc(x);\n  if (/thiết bị|thiet bi|equipment|máy|may/.test(x)) return 'tb';\n  if (/quy trình|quy trinh|process|sop|công đoạn|cong doan/.test(x)) return 'qt';\n  if (/kho|warehouse|storage|bảo quản|bao quan/.test(x)) return 'kho';\n  if (/hệ thống|he thong|phụ trợ|phu tro|hvac|utility|khí|khi|nước|nuoc|điều hòa|dieu hoa/.test(x)) return 'ht';\n  if (/vận chuyển|van chuyen|transport|logistics|cold chain|chuỗi lạnh|chuoi lanh/.test(x)) return 'vc';\n  return 'tb';\n}\nfunction mapDept(x){ x = lc(x);\n  if (/xsx|sản xuất|san xuat|xưởng|xuong|production|\\bsx\\b/.test(x)) return 'sx';\n  if (/cơ điện|co dien|mep|kỹ thuật|ky thuat|engineering|cđ|\\bcd\\b/.test(x)) return 'cd';\n  if (/\\bkho\\b|warehouse/.test(x)) return 'kho';\n  if (/\\brd\\b|r&d|nghiên cứu|nghien cuu|research|qc|kiểm nghiệm|kiem nghiem|lab/.test(x)) return 'qc';\n  if (/\\bqa\\b|qlcl|đảm bảo|dam bao|quality|chất lượng|chat luong/.test(x)) return 'qa';\n  return 'qa';\n}\nfunction critScore(v){ const n = parseInt(v, 10);\n  if (isNaN(n)) return 'medium';\n  if (n >= 7) return 'high';\n  if (n >= 4) return 'medium';\n  return 'low';\n}\n\nconst seen = new Map();\nfor (const r of rows) {\n  const code = s(r.ma); if (!code) continue;\n  // bỏ dòng chú thích lẫn trong vùng dữ liệu (cột số chứa chữ)\nif (!seen.has(code)) {\n    const score = parseInt(r.diem_trong_yeu, 10);\n    seen.set(code, {\n      code, name: s(r.ten) || code,\n      classification: mapClass(r.phan_loai),\n      department: mapDept(r.bo_phan),\n      area: s(r.khu_vuc) || '—', line: s(r.line) || '—',\n      criticality_score: isNaN(score) ? null : score,\n      criticality: critScore(r.diem_trong_yeu),\n      frequency_months: parseInt(r.tan_suat, 10) || 12,\n    });\n  } else {\n    // ô gộp: lấp dữ liệu thiếu từ dòng sau\n    const o = seen.get(code);\n    if ((!o.name || o.name === code) && s(r.ten)) o.name = s(r.ten);\n    if (o.classification === 'tb' && s(r.phan_loai)) o.classification = mapClass(r.phan_loai);\n    if (o.area === '—' && s(r.khu_vuc)) o.area = s(r.khu_vuc);\n  }\n}\n\nconst objs = [...seen.values()];\nif (objs.length === 0) return [{ json: { query: 'SELECT 1' } }];\n\nconst vals = objs.map(o =>\n  `(${esc(o.code)},${esc(o.name)},${esc(o.classification)},${esc(o.department)},${esc(o.area)},${esc(o.line)},` +\n  `${o.criticality_score == null ? 'NULL' : o.criticality_score},${esc(o.criticality)}::criticality,${o.frequency_months})`\n).join(',');\n\nconst query =\n  `INSERT INTO vmp_objects (code,name,classification,department,area,line,criticality_score,criticality,frequency_months) ` +\n  `VALUES ${vals} ` +\n  `ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, classification=EXCLUDED.classification, ` +\n  `department=EXCLUDED.department, area=EXCLUDED.area, line=EXCLUDED.line, ` +\n  `criticality_score=EXCLUDED.criticality_score, criticality=EXCLUDED.criticality, ` +\n  `frequency_months=EXCLUDED.frequency_months, updated_at=NOW();`;\n\nreturn [{ json: { query, _objects_count: objs.length } }];\n"
+      },
+      "name": "0. Build Objects SQL",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -864,
+        1520
+      ],
+      "typeVersion": 2,
+      "id": "d1ac8c10-8f47-4fcb-a480-45056680905b",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "name": "0b. Upsert Objects",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        -640,
+        1520
+      ],
+      "typeVersion": 2.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "953bcd97-e30f-4ea4-afe4-de7dd1499496",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vmp-sheet-changed",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "276ceeb8-290c-4f59-a7af-603da1d68ab9",
+      "name": "Trigger: Sheet changed (instant)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1984,
+        1424
+      ],
+      "webhookId": "46f7deb7-285b-4a83-9e79-0d3746f879ca",
+      "notes": "Apps Script gọi webhook này mỗi khi Google Sheet thay đổi → chạy diff ngay (đồng bộ Sheet→Web trong ~15s). Bảo vệ bằng Header Auth."
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================================\n//  WF-01 · Node Code MỚI: \"1. Read Sheet\"  (CHUẨN HÓA CỘT)\n//  ---------------------------------------------------------------------\n//  VẤN ĐỀ: Tab \"6.Timeline VMP\" có tiêu đề cột bằng TIẾNG VIỆT đầy đủ\n//          (\"Mã đối tượng\", \"ID thẩm định\", \"Trạng thái đề cương\"...),\n//          trong khi Diff Engine + Build Objects + frontend lại đọc theo\n//          KHÓA NGẮN (ma, id, loai_td, tt_de_cuong, dl_vmp...).\n//          → node Google Sheets trả về object có key tiếng Việt → r.ma,\n//            r.id... đều undefined → MỌI dòng bị bỏ qua → KHÔNG có dữ liệu.\n//\n//  CÁCH DÙNG (mẹo không phải sửa Diff Engine/Build Objects):\n//    1) Đổi tên node Google Sheets hiện tại \"1. Read Sheet\" → \"1. Read Sheet (raw)\"\n//       và sửa Sheet name của nó thành: 6.Timeline VMP\n//    2) Thêm node Code này, ĐẶT TÊN ĐÚNG: \"1. Read Sheet\"\n//       (giữ nguyên tên cũ → mọi $('1. Read Sheet') ở Diff Engine/Build Objects\n//        sẽ tự lấy dữ liệu ĐÃ chuẩn hóa, không cần sửa code các node đó).\n//    3) Nối:  CONFIG → \"1. Read Sheet (raw)\" → \"1. Read Sheet\" (node này) → \"0. Build Objects SQL\"\n//\n//  Bảng ánh xạ Tiếng Việt → khóa ngắn nằm ở MAP bên dưới. Sheet đổi tiêu đề\n//  thì chỉ sửa ở đây.\n// =====================================================================\n\n// Gộp xuống dòng/khoảng trắng thừa, bỏ phân biệt hoa thường → so khớp ổn định.\nfunction norm(h) {\n  return String(h == null ? '' : h).replace(/\\s+/g, ' ').trim().toLowerCase();\n}\n\n// normalized(header tiếng Việt)  →  khóa ngắn pipeline cần\nconst MAP = {\n  'stt': 'stt',\n  'phân loại đối tượng': 'phan_loai',\n  'loại thẩm định': 'loai_td',\n  'mã đối tượng': 'ma',\n  'tên đối tượng': 'ten',\n  'bộ phận quản lý': 'bo_phan',\n  'mã khu vực': 'khu_vuc',\n  'line': 'line',\n  'tình trạng': 'tinh_trang',\n  'show': 'show',\n  'thẩm định': 'td',\n  'tần suất thẩm định (tháng)': 'tan_suat',\n  'năm': 'nam',\n  'id thẩm định': 'id',                                   // ← KHÓA NGHIỆP VỤ (validation_code)\n  'qa phụ trách (qa nhập)': 'qa',\n  'email (qa nhập)': 'email_qa',\n  'nhân sự bộ phận khác (bộ phận khác nhập)': 'ns_khac',\n  'email (bộ phận khác nhập)': 'email_khac',\n  'deadline đề cương (t- 60 ngày)': 'dl_de_cuong',\n  'thời gian thực tế hoàn thành đề cương': 'ngay_de_cuong',\n  'trạng thái đề cương': 'tt_de_cuong',\n  'deadline thẩm định thực tế (t-5-bc)': 'dl_tham_dinh',\n  'bộ phận quản lý xếp lịch thẩm định (dd/mm/yyyy hh:mm:ss)': 'lich_td',\n  'thời gian thực tế hoàn thành thẩm định thực tế': 'ngay_tham_dinh',\n  'trạng thái thẩm định thực tế': 'tt_tham_dinh',\n  'phân loại báo cáo': 'phan_loai_bc',\n  'deadline báo cáo (t-5 ngày)': 'dl_bao_cao',\n  'thời gian thực tế hoàn thành báo cáo': 'ngay_bao_cao',\n  'trạng thái báo cáo': 'tt_bao_cao',\n  'deadline vmp (t)': 'dl_vmp',\n  'thời gian thực tế deadline vmp': 'ngay_vmp',\n  'trạng thái vmp': 'tt_vmp',\n  // --- 2 cột NÊN THÊM vào Sheet (xem khuyến nghị) — đã map sẵn ở đây ---\n  'điểm trọng yếu': 'diem_trong_yeu',   // 1–9 → criticality_score / criticality\n  'số ngày công': 'so_ngay_cong',       // → effort_days (ma trận khối lượng)\n};\n\n// Các cột rác do ghi ngược cũ tạo ra → BỎ, không đưa vào pipeline.\nconst IGNORE = new Set(['hasnewrows', 'count', 'debug_sheeta', 'debug_sheetb', 'id', '_attempts', '_outbox_id']);\n// Lưu ý: 'id' ở đây là cột tự sinh (col37) — ta KHÔNG dùng nó; khóa nghiệp vụ lấy từ 'ID thẩm định'.\n\n// Chuyển Date (nếu node trả về kiểu Date) → 'yyyy-mm-dd'.\nfunction val(v) {\n  if (v instanceof Date) {\n    const y = v.getFullYear(), m = String(v.getMonth() + 1).padStart(2, '0'), d = String(v.getDate()).padStart(2, '0');\n    return `${y}-${m}-${d}`;\n  }\n  return v;\n}\n\nconst out = [];\nconst unmatched = new Set();\nlet skipped = 0;\n\nfor (const item of $input.all()) {\n  const raw = item.json || {};\n  const mapped = {};\n\n  for (const [k, v] of Object.entries(raw)) {\n    const nk = norm(k);\n    if (IGNORE.has(nk)) continue;\n    const target = MAP[nk];\n    if (target) {\n      mapped[target] = val(v);\n    } else if (nk) {\n      unmatched.add(k);          // ghi log để dễ soi nếu Sheet đổi tiêu đề\n    }\n  }\n\n  // Đồng nhất khóa nghiệp vụ cho Diff Engine (đọc cả r.id lẫn r.validation_code).\n  if (mapped.id) mapped.validation_code = mapped.id;\n\n  // QUY TẮC: chỉ lấy dòng CÓ \"ID thẩm định\". Dòng để trống ID → BỎ QUA (không đồng bộ,\n  // không hiển thị trên web). Nhờ vậy mỗi hạng mục luôn có 1 khóa duy nhất, không trùng.\n  const idVal = mapped.id == null ? '' : String(mapped.id).trim();\n  if (!idVal) { skipped++; continue; }\n\n  out.push({ json: mapped });\n}\n\n// In cảnh báo (xem ở tab Output/Logs của node) nếu có tiêu đề chưa map.\nif (unmatched.size) console.log('⚠ Cột chưa ánh xạ (bỏ qua):', Array.from(unmatched));\nconsole.log(`✓ Chuẩn hóa ${out.length} dòng có ID thẩm định · bỏ ${skipped} dòng trống ID.`);\n\nreturn out;\n"
+      },
+      "id": "a5a32621-1708-4f22-83ee-9b4bc2e5315b",
+      "name": "1. Read Sheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        1424
+      ],
+      "disabled": true,
+      "notes": "Chuẩn hóa tiêu đề tiếng Việt -> khóa ngắn + lọc theo ID thẩm định. Giữ tên '1. Read Sheet' để Diff Engine/Build Objects dùng dữ liệu đã chuẩn hóa."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (workflow_id, workflow_name, status, error_message, triggered_by) VALUES ('WF-01','Full-Scan Diff Sync','failed', '{{ String(($json.error && $json.error.message) || \"ghi thất bại (xem execution)\").replace(/'/g, \"''\") }}', 'schedule')",
+        "options": {}
+      },
+      "name": "8. Log Write Errors",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        256,
+        1328
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "c7f0ae4d-14c4-4fad-8334-e27c71170d1b",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rpc_reconcile_orphan_objects( ARRAY[ {{ ($json.codes_in_sheet || []).map(c => \"'\" + String(c).replace(/'/g, \"''\") + \"'\").join(',') }} ]::text[] )",
+        "options": {}
+      },
+      "name": "9. Reconcile Objects",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        32,
+        2000
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "id": "96fc8ae5-802d-4c25-9796-843ec2785558",
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "id": "1f2dae2d-2edc-4b34-b703-610b96579f26",
+      "name": "3. Sync reads (Merge)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -1088,
+        1520
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ====== SỬA 1 GIÁ TRỊ DUY NHẤT Ở ĐÂY ======\n// Lấy ID giữa /d/ và /edit trong URL Google Sheet.\nreturn [{ json: {\n  GOOGLE_SHEET_ID: \"1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8\",\n} }];"
+      },
+      "name": "CONFIG3",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1760,
+        1520
+      ],
+      "typeVersion": 2,
+      "id": "7026c5a6-0fb2-49c9-a2a5-e716004bd6f5"
+    },
+    {
+      "parameters": {},
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        -192
+      ],
+      "id": "85d7d302-05d5-4780-aedb-579e2d0b2394"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (workflow_id, workflow_name, execution_id, status, error_message, error_details, triggered_by)\nVALUES (\n  '{{ ($json.workflow && $json.workflow.id) ? String($json.workflow.id).replace(/'/g, \"''\") : 'unknown' }}',\n  '{{ ($json.workflow && $json.workflow.name) ? String($json.workflow.name).replace(/'/g, \"''\") : 'unknown' }}',\n  '{{ ($json.execution && $json.execution.id) ? String($json.execution.id).replace(/'/g, \"''\") : '' }}',\n  'failed',\n  '{{ String(($json.execution && $json.execution.error && $json.execution.error.message) || 'Lỗi không xác định').replace(/'/g, \"''\") }}',\n  jsonb_build_object('lastNode', '{{ ($json.execution && $json.execution.lastNodeExecuted) ? String($json.execution.lastNodeExecuted).replace(/'/g, \"''\") : '' }}',\n                     'url', '{{ ($json.execution && $json.execution.url) ? String($json.execution.url).replace(/'/g, \"''\") : '' }}'),\n  'error-trigger'\n);",
+        "options": {}
+      },
+      "name": "1. Ghi workflow_runs (failed)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1760,
+        -192
+      ],
+      "id": "2758ee19-5feb-4121-baf5-ba19cbf1ba0c",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "sendTo": "Tienhoan.dhd@gmail.com",
+        "subject": "=[VMP Monitor] Workflow LỖI: {{ $('Error Trigger').item.json.workflow.name }}",
+        "emailType": "text",
+        "message": "=Workflow: {{ $('Error Trigger').item.json.workflow.name }}\nNode lỗi: {{ $('Error Trigger').item.json.execution.lastNodeExecuted }}\nLỗi: {{ $('Error Trigger').item.json.execution.error.message }}\nXem: {{ $('Error Trigger').item.json.execution.url }}",
+        "options": {}
+      },
+      "name": "2. Email admin (tuỳ chọn)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1536,
+        -192
+      ],
+      "id": "895bf3d2-6e77-48e0-919b-9e8e5410f7cd",
+      "webhookId": "9c72e2fd-2b36-4321-819e-bc3c42d0ec9e",
+      "onError": "continueRegularOutput",
+      "notes": "Sửa địa chỉ admin@cpc1hn.vn thành email nhận cảnh báo lỗi. Không cần email thì xóa node này."
+    },
+    {
+      "parameters": {
+        "url": "https://docs.google.com/spreadsheets/d/1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8/export?format=csv&gid=1252715724",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "bf96beac-0dd5-41e2-a2cf-69a766399360",
+      "name": "1. Download Canonical Sheet CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1536,
+        1808
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json || {};\nconst csvText = String(input.data ?? input.body ?? input.csv ?? '').replace(/^\\uFEFF/, '');\n\nif (!csvText) {\n  throw new Error('VMP_SYNC_EMPTY_CSV: Google Sheet CSV response is empty');\n}\n\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [];\n  let cell = '';\n  let quoted = false;\n\n  for (let i = 0; i < text.length; i += 1) {\n    const ch = text[i];\n    if (quoted) {\n      if (ch === '\"' && text[i + 1] === '\"') {\n        cell += '\"';\n        i += 1;\n      } else if (ch === '\"') {\n        quoted = false;\n      } else {\n        cell += ch;\n      }\n      continue;\n    }\n\n    if (ch === '\"') {\n      quoted = true;\n    } else if (ch === ',') {\n      row.push(cell);\n      cell = '';\n    } else if (ch === '\\n') {\n      row.push(cell);\n      rows.push(row);\n      row = [];\n      cell = '';\n    } else if (ch !== '\\r') {\n      cell += ch;\n    }\n  }\n\n  if (quoted) throw new Error('VMP_SYNC_INVALID_CSV: unclosed quoted cell');\n  if (cell !== '' || row.length) {\n    row.push(cell);\n    rows.push(row);\n  }\n  return rows;\n}\n\nconst parsed = parseCsv(csvText);\nwhile (parsed.length && parsed[parsed.length - 1].every((value) => value === '')) parsed.pop();\n\nif (parsed.length < 2) throw new Error('VMP_SYNC_INVALID_CSV: no data rows');\n\n// Supabase canonical dùng ĐÚNG 37 cột theo schema ban đầu. Sheet vận hành có\n// thể thêm cột phụ ở cuối hoặc chen giữa (vd \"Bộ phận thực hiện thẩm định\").\n// Vì vậy không slice theo vị trí tuyệt đối của Sheet nữa; map theo tiêu đề để\n// giữ đúng 37 giá trị canonical trước khi gọi RPC.\nconst CANON = 37;\nconst rawHeaders = parsed[0];\nconst norm = (value) => String(value ?? '').replace(/\\s+/g, ' ').trim().toLowerCase();\n\nconst CANON_HEADER_NORMS = [\n  'stt',\n  'phân loại đối tượng',\n  'loại thẩm định',\n  'mã đối tượng',\n  'tên đối tượng',\n  'bộ phận quản lý',\n  'mã khu vực',\n  'line',\n  'tình trạng',\n  'show',\n  'thẩm định',\n  'tần suất thẩm định (tháng)',\n  'năm nhập',\n  'phân loại báo cáo',\n  'số ngày công thẩm định thực tế',\n  'điểm trọng yếu',\n  'id thẩm định',\n  'qa phụ trách (qa nhập)',\n  'email (qa nhập)',\n  'nhân sự bộ phận khác (bộ phận khác nhập)',\n  'email (bộ phận khác nhập)',\n  'thời hạn hoàn thành đề cương',\n  'thời gian thực tế hoàn thành đề cương',\n  'trạng thái đề cương',\n  'thời hạn bắt đầu thẩm định thực tế',\n  'thời hạn kết thúc thẩm định thực tế (t-5-bc)',\n  'bộ phận quản lý xếp lịch thẩm định (dd/mm/yyyy hh:mm:ss)',\n  'thời gian thực tế hoàn thành thẩm định thực tế',\n  'trạng thái thẩm định thực tế',\n  'phân loại báo cáo',\n  'thời hạn báo cáo (t-5 ngày)',\n  'thời gian thực tế hoàn thành báo cáo',\n  'trạng thái báo cáo',\n  'thời hạn hoàn thành (t) [deadline vmp]',\n  'thời gian thực tế deadline vmp',\n  'trạng thái vmp',\n  'không có (x)/ không rõ',\n];\n\nconst normalizedHeaders = rawHeaders.map(norm);\nconst extraIndexes = {\n  execution_department: normalizedHeaders.findIndex((header) => header === 'bộ phận thực hiện thẩm định'),\n};\nconst usedHeaderIndexes = new Set();\nconst canonicalIndexes = CANON_HEADER_NORMS.map((expected, canonIndex) => {\n  const sheetIndex = normalizedHeaders.findIndex((header, index) => header === expected && !usedHeaderIndexes.has(index));\n  if (sheetIndex < 0) {\n    throw new Error(`VMP_SYNC_HEADER_DRIFT: missing canonical column ${canonIndex + 1} \"${expected}\"`);\n  }\n  usedHeaderIndexes.add(sheetIndex);\n  return sheetIndex;\n});\n\nconst headers = canonicalIndexes.map((sheetIndex) => rawHeaders[sheetIndex]);\n\nconst requiredHeaders = new Map([\n  [3, 'mã đối tượng'],\n  [16, 'id thẩm định'],\n  [21, 'thời hạn hoàn thành đề cương'],\n  [25, 'thời hạn kết thúc thẩm định thực tế (t-5-bc)'],\n  [30, 'thời hạn báo cáo (t-5 ngày)'],\n  [33, 'thời hạn hoàn thành (t) [deadline vmp]'],\n  [35, 'trạng thái vmp'],\n]);\n\nfor (const [index, expected] of requiredHeaders) {\n  if (norm(headers[index]) !== expected) {\n    throw new Error(`VMP_SYNC_HEADER_DRIFT: canonical column ${index + 1} expected \"${expected}\", received \"${headers[index]}\"`);\n  }\n}\n\nconst rows = parsed.slice(1).map((values, index) => {\n  if (values.length > rawHeaders.length) {\n    throw new Error(`VMP_SYNC_ROW_WIDTH: Sheet row ${index + 2} has ${values.length} columns, headers have ${rawHeaders.length}`);\n  }\n  return {\n    row_number: index + 2,\n    values: canonicalIndexes.map((sheetIndex) => values[sheetIndex] ?? ''),\n    extra: {\n      execution_department: extraIndexes.execution_department >= 0 ? (values[extraIndexes.execution_department] ?? '') : '',\n    },\n  };\n});\n\nconst ids = rows.map((row) => String(row.values[16] ?? '').trim());\nconst codes = rows.map((row) => String(row.values[3] ?? '').trim());\nif (ids.some((id) => !id) || codes.some((code) => !code)) {\n  throw new Error('VMP_SYNC_REQUIRED_KEY: every Sheet row must have object code and validation ID');\n}\n\nconst uniqueIds = new Set(ids);\nconst uniqueObjects = new Set(codes);\nif (rows.length < 450 || uniqueIds.size < 450 || uniqueObjects.size < 200) {\n  throw new Error(\n    `VMP_SYNC_CARDINALITY_GUARD: rows=${rows.length}, uniqueIds=${uniqueIds.size}, objects=${uniqueObjects.size}`,\n  );\n}\n\nconst payload = JSON.stringify({ headers, rows });\nreturn [{\n  json: {\n    payload_b64: Buffer.from(payload, 'utf8').toString('base64'),\n    source_rows: rows.length,\n    unique_validation_ids: uniqueIds.size,\n    objects_in_sheet: uniqueObjects.size,\n    duplicate_validation_ids: rows.length - uniqueIds.size,\n  },\n}];"
+      },
+      "id": "7865622f-c56c-490b-9e40-f41f50b91335",
+      "name": "2. Parse Canonical Sheet CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        1808
+      ]
+    }
+  ],
+  "activeVersion": null,
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "parentFolderId": null,
+  "description": "Google Sheet 6.Timeline VMP là nguồn chuẩn. Apps Script gọi webhook instant có Header Auth; lịch 5 phút là fallback. Supabase là read model và chỉ n8n/Postgres service được ghi snapshot.",
+  "scopes": [
+    "execution:reveal",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true
+}
