@@ -5893,3 +5893,77 @@ body { transition: background var(--mo-slow) var(--ease); }
   }
   .vmp-lift:hover { transform: none; }
 }
+
+
+/* =====================================================================
+ * LƯỚI BENTO — màn Tổng quan
+ *
+ * Không phải lưới đều nhau. Ô to nhỏ khác nhau CHÍNH LÀ thứ tự đọc: ô
+ * lớn nhất là câu trả lời cho câu hỏi quan trọng nhất ("dự án đang ở
+ * đâu"), các ô nhỏ là số cần liếc. Lưới đều nhau bắt mắt phải tự quyết
+ * định nhìn đâu trước.
+ *
+ * Ba mốc, không nhiều hơn: một cột (điện thoại) · hai cột (máy tính
+ * bảng) · bốn cột (màn rộng).
+ * ===================================================================== */
+.vmp-bento {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "hero"
+    "k1" "k2" "k3" "k4"
+    "risk"
+    "vali"
+    "wide";
+}
+
+@media (min-width: 720px) {
+  .vmp-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "hero hero"
+      "k1   k2"
+      "k3   k4"
+      "risk risk"
+      "vali vali"
+      "wide wide";
+  }
+}
+
+@media (min-width: 1180px) {
+  .vmp-bento {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+      "hero hero k1   k2"
+      "hero hero k3   k4"
+      "risk risk risk vali"
+      "wide wide wide wide";
+  }
+}
+
+.vmp-bento > .b-hero { grid-area: hero; }
+.vmp-bento > .b-k1   { grid-area: k1; }
+.vmp-bento > .b-k2   { grid-area: k2; }
+.vmp-bento > .b-k3   { grid-area: k3; }
+.vmp-bento > .b-k4   { grid-area: k4; }
+.vmp-bento > .b-risk { grid-area: risk; }
+.vmp-bento > .b-vali { grid-area: vali; }
+.vmp-bento > .b-wide { grid-area: wide; }
+
+/* Ô số liệu: dải màu mảnh bên trái thay cho viền màu cả ô. Đủ để phân
+   loại bằng mắt, không đủ để át con số. */
+.vmp-tile {
+  position: relative;
+  overflow: hidden;
+}
+.vmp-tile::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--tile-accent, transparent);
+}
+
+/* Ô bấm được thì con trỏ và độ nổi phải nói ra điều đó */
+.vmp-tile[role="button"] { cursor: pointer; }

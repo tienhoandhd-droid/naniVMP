@@ -39,6 +39,7 @@ import {
   Cloud,
   FileText,
   ShieldAlert,
+  Clock, ClipboardCheck, FileWarning,
 } from "lucide-react";
 // Lưu ý: recharts đã bị gỡ vì KHÔNG dùng (chỉ import thừa, nặng bundle).
 // xlsx được nạp động (dynamic import) ngay trong hàm xuất Excel để giảm bundle ban đầu.
@@ -73,14 +74,13 @@ import {
   CardTitle,
   Tag,
   Modal,
-  Donut,
+
   KpiCard,
   Sel,
   SkeletonDashboard,
   SyncBanner,
   GuardianSilhouette,
-  PrincessCommentary,
-} from "./components/ui/Primitives.tsx";
+  PrincessCommentary, StatTile, Ring} from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
 // ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
@@ -1069,84 +1069,124 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
   );
 }
 
-function Overview({ acts }: { acts: Activity[]; setView?: (v: string) => void }) {
-  const { e, d, overdue, soon, gap, gapPts, mismatched } = useMemo(() => {
+/* =====================================================================
+ * TỔNG QUAN — lưới bento
+ *
+ * Ô to nhỏ khác nhau chính là thứ tự đọc: ô lớn nhất trả lời câu hỏi
+ * quan trọng nhất ("dự án đang ở đâu"), các ô nhỏ là số cần liếc. Lưới
+ * đều nhau bắt mắt phải tự quyết định nhìn đâu trước — đó là lý do bản
+ * cũ (4 thẻ KPI y hệt nhau xếp hàng ngang) đọc mệt hơn cần thiết.
+ * =================================================================== */
+function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) => void }) {
+  const { e, d, overdue, soon, gap, gapPts, mismatched, theoThang } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
     const overdue = acts.filter((a) => a.alert && a.alert.kind === "over");
     const soon = acts.filter((a) => a.alert && a.alert.kind === "soon");
+
+    // Tỷ lệ hoàn thành theo tháng đích — dải cột nhỏ trong ô "Hoàn thành".
+    // Cho biết nhịp đang lên hay đang chùng, thứ con số tổng không nói được.
+    const thang = Array.from({ length: 12 }, () => ({ tong: 0, xong: 0 }));
+    for (const a of acts) {
+      const t = a.target ? new Date(a.target).getMonth() : -1;
+      if (t < 0 || t > 11) continue;
+      thang[t].tong++;
+      if (a.st === "done") thang[t].xong++;
+    }
     return {
       e, d, overdue, soon,
       gap: e.done - d.done, gapPts: e.rate - d.rate,
       mismatched: acts.filter((a) => a.mismatch),
+      theoThang: thang.map((m) => (m.tong ? m.xong / m.tong : 0)),
     };
   }, [acts]);
 
+  const di = (v: string) => (setView ? () => setView(v) : undefined);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Hero — 2 cột: Donut + Princess Commentary */}
-      <div
-        className="vmp-hero-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.15fr 1fr",
-          gap: 18,
-        }}
-      >
-        {/* Cột trái — Donut + stats */}
-        <Card variant="strong" style={{ display: "flex", alignItems: "center", gap: 24, padding: "26px 28px", flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <Donut segments={[{ value: e.done, color: C.mint }, { value: e.over, color: C.rasp }, { value: e.todo, color: C.marigold }]} />
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ fontFamily: NUM, fontSize: 36, fontWeight: 800, color: C.plum, lineHeight: 1 }}>{e.rate}%</div>
-              <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>Thẩm định</div>
-            </div>
+    <div className="vmp-bento vmp-stagger">
+      {/* Ô lớn — trạng thái chung của cả kế hoạch */}
+      <Card variant="strong" cls="b-hero"
+        style={{ padding: "26px 28px", display: "flex", alignItems: "center",
+                 gap: 26, flexWrap: "wrap" }}>
+        <Ring size={176} stroke={16} segments={[
+          { value: e.done, color: C.mint },
+          { value: e.over, color: C.rasp },
+          { value: e.todo, color: C.marigold },
+        ]}>
+          <div style={{ fontFamily: NUM, fontSize: 40, fontWeight: 800,
+                        color: C.plum, lineHeight: 1 }}>{e.rate}%</div>
+          <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 800,
+                        marginTop: 3, letterSpacing: .4 }}>THẨM ĐỊNH</div>
+        </Ring>
+
+        <div style={{ flex: 1, minWidth: 190 }}>
+          <div style={{ fontFamily: TEXT, fontSize: 19, fontWeight: 800,
+                        color: C.plum, marginBottom: 3 }}>
+            Tiến độ thẩm định {vmpToday().getFullYear()}
           </div>
-          <div style={{ flex: 1, minWidth: 160 }}>
-            <div style={{ fontFamily: TEXT, fontSize: 18, fontWeight: 800, color: C.plum, marginBottom: 10 }}>Tiến độ thẩm định {vmpToday().getFullYear()}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {[
-                { l: "Hoàn thành", v: e.done, c: C.mintText },
-                { l: "Quá hạn", v: e.over, c: C.raspText },
-                { l: "Chưa HT", v: e.todo, c: C.marigoldText },
-              ].map(s => (
-                <div key={s.l} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: NUM, fontSize: 22, fontWeight: 800, color: s.c, minWidth: 28 }}>{s.v}</span>
-                  <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>{s.l}</span>
+          <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
+            {e.total} hạng mục trong kế hoạch năm
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+            {[
+              { l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
+              { l: "Quá hạn", v: e.over, c: C.rasp, t: C.raspText },
+              { l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
+            ].map((x) => (
+              <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 999,
+                               background: x.c, flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700,
+                               flex: 1 }}>{x.l}</span>
+                <div style={{ width: 88, height: 6, borderRadius: 999,
+                              background: C.surfaceSunk, overflow: "hidden" }}>
+                  <div style={{ width: `${e.total ? (x.v / e.total) * 100 : 0}%`,
+                                height: "100%", background: x.c }} />
                 </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 12, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-              Hồ sơ: {d.rate}% ({d.done}/{d.total})
-              {gap > 0 && <div style={{ color: C.marigoldText, marginTop: 2 }}>Chênh {gap} hạng mục ({gapPts} điểm%)</div>}
-            </div>
+                <span style={{ fontFamily: NUM, fontSize: 19, fontWeight: 800,
+                               color: x.t, minWidth: 34, textAlign: "right" }}>{x.v}</span>
+              </div>
+            ))}
           </div>
-        </Card>
 
-        {/* Cột phải — Công chúa Vali commentary */}
-        <PrincessCommentary
-          stats={{
-            e, d,
-            overdue: overdue.length,
-            soon: soon.length,
-            mismatched: mismatched.length,
-          }}
-        />
+          <div style={{ marginTop: 15, paddingTop: 13, borderTop: `1px solid ${C.line}`,
+                        fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
+            Hồ sơ hoàn thiện: <b style={{ color: C.plum }}>{d.rate}%</b> ({d.done}/{d.total})
+            {gap > 0 && (
+              <span style={{ color: C.marigoldText }}>
+                {" · lệch "}{gap} hạng mục ({gapPts} điểm%)
+              </span>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <StatTile cls="b-k1" icon={AlertCircle} label="Quá hạn" value={overdue.length}
+        tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di("progress")}
+        sub={overdue.length ? "Bấm để mở danh sách cần xử lý" : "Không còn hạng mục nào trễ"} />
+
+      <StatTile cls="b-k2" icon={Clock} label="Tới hạn 30 ngày" value={soon.length}
+        tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di("alerts")}
+        sub={soon.length ? "Theo dõi để không rơi sang quá hạn" : "Tháng tới đang trống"} />
+
+      <StatTile cls="b-k3" icon={ClipboardCheck} label="Tỷ lệ hồ sơ" value={`${d.rate}%`}
+        tone={{ c: C.mintText, bg: C.mintSoft }} bars={theoThang}
+        sub={`${d.done}/${d.total} hoàn thiện · dải cột = tỷ lệ xong theo tháng đích`} />
+
+      <StatTile cls="b-k4" icon={FileWarning} label="Lệch pha hồ sơ" value={mismatched.length}
+        tone={{ c: C.lavText, bg: C.lavSoft }} onClick={di("health")}
+        sub={mismatched.length ? "Trạng thái các giai đoạn mâu thuẫn nhau" : "Các giai đoạn khớp nhau"} />
+
+      <div className="b-risk"><RiskProgress acts={acts} /></div>
+
+      <div className="b-vali">
+        <PrincessCommentary stats={{
+          e, d, overdue: overdue.length, soon: soon.length, mismatched: mismatched.length,
+        }} />
       </div>
 
-      {/* Quick KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 16 }}>
-        <KpiCard emoji="🚨" bg={C.raspSoft} color={C.raspText} value={overdue.length} label="Quá hạn" sub="Cần xử lý" />
-        <KpiCard emoji="⏰" bg={C.marigoldSoft} color={C.marigoldText} value={soon.length} label="Tới hạn 30 ngày" sub="Theo dõi" />
-        <KpiCard emoji="📋" bg={C.lavSoft} color={C.lavText} value={mismatched.length} label="Lệch pha hồ sơ"
-          sub={mismatched.length ? "Bấm để xem" : "Đồng bộ tốt"} />
-        <KpiCard emoji="📊" bg={C.skySoft} color={C.skyText} value={`${d.rate}%`} label="Tỷ lệ hồ sơ" sub={`${d.done}/${d.total} hoàn thiện`} />
-      </div>
-
-      {/* Tiến độ theo mức trọng yếu — câu hỏi ICH Q9 */}
-      <RiskProgress acts={acts} />
-
-      {/* Completion analytics: stage, validation type, person and department */}
-      <CompletionDashboard acts={acts} />
+      <div className="b-wide"><CompletionDashboard acts={acts} /></div>
     </div>
   );
 }
