@@ -78,3 +78,32 @@ select * from vmp_ai_chat_log where ty_le_bam < 100 -- câu có số không bám
   `rpc_ai_context_gon` (602 ký tự), không dùng bản đầy đủ (9.036).
 - Câu **giải thích luôn phải đi bậc sâu** dù ngắn — mô hình nhanh không
   gọi công cụ tra tài liệu mà tự bịa.
+
+## Ba tầng bộ nhớ (từ 29/07/2026)
+
+Theo kiến trúc chuẩn 2026 — episodic / semantic / procedural:
+
+| Tầng | Nội dung | Lấy ở đâu |
+|---|---|---|
+| **Lõi** | Tên, quyền, khối lượng việc, nhóm việc | Tính tại chỗ, luôn tươi |
+| **Gần** | Mấy lượt vừa rồi trong phiên (30 phút) | `vmp_ai_hoi_thoai` |
+| **Kho** | Chuyện cũ đã lắng lại (30 ngày) | `vmp_ai_bo_nho` |
+
+Tầng kho chia hai loại: `viec_da_xay_ra` (episodic — "từng nói đang quá
+tải") và `dieu_biet_ve` (semantic — "hay hỏi về thiết bị KNTB133").
+
+**Tự lắng đọng** bằng trigger trên `vmp_ai_hoi_thoai`, không gọi mô hình
+— chạy mỗi lượt thì quá tốn. Luật rút gọn: câu tâm sự luôn ghi nhớ; chủ
+đề hỏi ≥2 lần trong 30 ngày thì thành mối quan tâm.
+
+**Điểm nhớ mờ dần**: mỗi 30 ngày không nhắc tới thì trừ 1 điểm quan
+trọng, xuống 0 là thôi lôi ra. Nhớ mãi mọi thứ cũng tệ như quên sạch.
+
+### Giới hạn cố ý
+
+Đây là bộ nhớ về ĐỒNG NGHIỆP, không phải hồ sơ theo dõi:
+- Chỉ nhớ điều liên quan công việc và cách làm việc
+- KHÔNG suy diễn tâm lý, KHÔNG chấm điểm thái độ
+- RLS: người dùng chỉ đọc và **xoá được** bộ nhớ về chính mình
+- Nhắc lại phải tự nhiên ("lần trước ngươi than mệt, giờ đỡ chưa"),
+  không đọc vanh vách ngày giờ như đọc hồ sơ
