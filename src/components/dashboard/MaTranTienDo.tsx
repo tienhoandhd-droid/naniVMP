@@ -64,15 +64,37 @@ function chamGiaiDoan(a: Activity, gd: (typeof GIAI_DOAN)[number]): TrangThai {
    lời "khâu IQ/OQ/PQ nào đang chậm". */
 const TRUC = [
   { id: "bo_phan", ten: "Bộ phận" },
+  { id: "khu_vuc", ten: "Khu vực" },
+  { id: "nhom_viec", ten: "Nhóm công việc" },
   { id: "doi_tuong", ten: "Đối tượng" },
   { id: "nguoi", ten: "Người thực hiện" },
   { id: "loai", ten: "Loại thẩm định" },
 ] as const;
 type TrucId = (typeof TRUC)[number]["id"];
 
+/* Cột đổi được nữa: bốn giai đoạn trả lời "tắc ở khâu nào", mười hai
+   tháng trả lời "dồn việc vào lúc nào" — cùng một bảng, hai câu hỏi. */
+const COT = [
+  { id: "giai_doan", ten: "Bốn giai đoạn" },
+  { id: "thang", ten: "12 tháng" },
+] as const;
+type CotId = (typeof COT)[number]["id"];
+
+const THANG = Array.from({ length: 12 }, (_, i) => ({ id: "t" + (i + 1), ten: "T" + (i + 1), so: i + 1 }));
+
+/** Chấm một hạng mục theo MỐC ĐÍCH của nó (dùng cho cột tháng). */
+function chamHangMuc(a: Activity): TrangThai {
+  const raw = (a._raw || {}) as Record<string, unknown>;
+  if (a.st === "done") return parseD(raw.ngay_vmp) ? "xong" : "thieu";
+  const dich = parseD(a.target);
+  if (!dich) return "thieu";
+  return dich < vmpToday() ? "tre" : "chua";
+}
+
 export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
   const [oDangXem, setODangXem] = useState<{ ten: string; ds: Activity[] } | null>(null);
   const [truc, setTruc] = useState<TrucId>("bo_phan");
+  const [cot, setCot] = useState<CotId>("giai_doan");
   const [soHang, setSoHang] = useState(12);
 
   const { luoi, chatLuong, diemNong, tong } = useMemo(() => {
@@ -93,6 +115,12 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
           const bp = DEPTS.find((d) => d.id === id);
           them(String(id), bp?.short || String(id), bp?.name || "", a);
         });
+      } else if (truc === "khu_vuc") {
+        const kv = String((a._raw as Record<string, unknown> | undefined)?.khu_vuc || a.area || "").trim();
+        them(kv || "(chưa ghi khu vực)", kv || "(chưa ghi khu vực)", "", a);
+      } else if (truc === "nhom_viec") {
+        const ng = String(a.group || "").trim();
+        them(ng || "(chưa xếp nhóm)", ng || "(chưa xếp nhóm)", "", a);
       } else if (truc === "doi_tuong") {
         them(String(a.code || "—"), String(a.code || "—"), String(a.name || ""), a);
       } else if (truc === "nguoi") {
@@ -106,11 +134,20 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
     const luoi = [...nhom.entries()]
       .map(([khoa, v]) => {
-        const o = GIAI_DOAN.map((gd) => {
-          const dem: Record<TrangThai, Activity[]> = { xong: [], tre: [], chua: [], thieu: [] };
-          v.ds.forEach((a) => dem[chamGiaiDoan(a, gd)].push(a));
-          return { gd, dem };
-        });
+        const o = cot === "giai_doan"
+          ? GIAI_DOAN.map((gd) => {
+              const dem: Record<TrangThai, Activity[]> = { xong: [], tre: [], chua: [], thieu: [] };
+              v.ds.forEach((a) => dem[chamGiaiDoan(a, gd)].push(a));
+              return { id: gd.id, ten: gd.ten, dem };
+            })
+          : THANG.map((th) => {
+              const dem: Record<TrangThai, Activity[]> = { xong: [], tre: [], chua: [], thieu: [] };
+              v.ds.forEach((a) => {
+                const d = parseD(a.target);
+                if (d && d.getMonth() + 1 === th.so) dem[chamHangMuc(a)].push(a);
+              });
+              return { id: th.id, ten: th.ten, dem };
+            });
         const tre = o.reduce((n, x) => n + x.dem.tre.length, 0);
         const thieu = o.reduce((n, x) => n + x.dem.thieu.length, 0);
         return { khoa, ten: v.ten, phu: v.phu, tong: v.ds.length, o, tre, thieu };
@@ -152,7 +189,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
       .slice(0, 10);
 
     return { luoi, chatLuong, diemNong, tong: A.length };
-  }, [acts, truc]);
+  }, [acts, truc, cot]);
 
   const O = ({ dem, ten }: { dem: Record<TrangThai, Activity[]>; ten: string }) => {
     const tong = (Object.keys(dem) as TrangThai[]).reduce((n, k) => n + dem[k].length, 0);
@@ -204,10 +241,25 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
               </button>
             );
           })}
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginLeft: 10 }}>Cột</span>
+          {COT.map((c) => {
+            const on = cot === c.id;
+            return (
+              <button key={c.id} onClick={() => setCot(c.id)}
+                style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: on ? 800 : 600,
+                         color: on ? C.plum : C.plumSoft, borderRadius: 999, padding: "7px 14px",
+                         cursor: "pointer", border: `1.5px solid ${on ? C.lav : C.pinkSoft}`,
+                         background: on ? C.lavSoft : C.surface }}>
+                {c.ten}
+              </button>
+            );
+          })}
           <span style={{ marginLeft: "auto", fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>
-            {truc === "bo_phan"
-              ? "Một hạng mục thuộc nhiều bộ phận sẽ đếm ở cả hai hàng"
-              : "Hàng có nhiều hạng mục trễ / thiếu dữ liệu xếp lên trước"}
+            {cot === "thang"
+              ? "Cột tháng xếp theo MỐC ĐÍCH của hạng mục — ô trống là tháng đó không có việc"
+              : truc === "bo_phan"
+                ? "Một hạng mục thuộc nhiều bộ phận sẽ đếm ở cả hai hàng"
+                : "Hàng có nhiều hạng mục trễ / thiếu dữ liệu xếp lên trước"}
           </span>
         </div>
 
@@ -221,13 +273,13 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
         </div>
 
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 620 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: cot === "giai_doan" ? 620 : 1000 }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>
                   {TRUC.find((t) => t.id === truc)?.ten}
                 </th>
-                {GIAI_DOAN.map((g) => (
+                {(cot === "giai_doan" ? GIAI_DOAN.map((g) => ({ id: g.id, ten: g.ten })) : THANG).map((g) => (
                   <th key={g.id} style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>{g.ten}</th>
                 ))}
               </tr>
@@ -241,11 +293,11 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
                       {h.phu ? h.phu + " · " : ""}{h.tong} hạng mục
                     </div>
                   </td>
-                  {h.o.map((o) => <O key={o.gd.id} dem={o.dem} ten={`${h.ten} · ${o.gd.ten}`} />)}
+                  {h.o.map((o) => <O key={o.id} dem={o.dem} ten={`${h.ten} · ${o.ten}`} />)}
                 </tr>
               ))}
               {luoi.length > soHang && (
-                <tr><td colSpan={5} style={{ padding: "10px 8px" }}>
+                <tr><td colSpan={cot === "giai_doan" ? 5 : 13} style={{ padding: "10px 8px" }}>
                   <button onClick={() => setSoHang((n) => n + 20)}
                     style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum,
                              border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
@@ -255,7 +307,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
                 </td></tr>
               )}
               {!luoi.length && (
-                <tr><td colSpan={5} style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 600 }}>Không có hạng mục nào trong phạm vi đang lọc.</td></tr>
+                <tr><td colSpan={cot === "giai_doan" ? 5 : 13} style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 600 }}>Không có hạng mục nào trong phạm vi đang lọc.</td></tr>
               )}
             </tbody>
           </table>
