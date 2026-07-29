@@ -107,7 +107,6 @@ import {
   isSupabaseConfigured,
   signIn,
   changePassword,
-  getAccessToken,
   supabase,
 } from "./lib/supabaseClient.ts";
 
@@ -1487,33 +1486,26 @@ function ReportsView({ acts }: { acts: Activity[] }) {
 
   const generate = async () => {
     setLoading(true); setErr(""); setAi("");
-    const deptStr = deptRows.length ? "Theo bộ phận: " + deptRows.map((r) => `${r.name} (HT ${r.done}, QH ${r.over}, tỷ lệ ${r.rate}%)`).join("; ") : "";
-    const ovStr = overdueList.length ? "Quá hạn: " + overdueList.map((o) => `${o.id} (mốc ${o.stage}, trễ ${Math.abs(o.dleft)} ngày)`).join("; ") : "Không có hạng mục quá hạn.";
-
     // Gọi n8n webhook AI report (OpenAI key ở backend, KHÔNG ở frontend)
     const aiWebhookUrl = import.meta.env.VITE_N8N_AI_REPORT_URL || "";
     if (!aiWebhookUrl) {
-      setErr("Chưa cấu hình VITE_N8N_AI_REPORT_URL. Liên hệ IT.");
+      setErr("Chưa cấu hình đường gọi AI (VITE_N8N_AI_REPORT_URL). Nhận xét tự động phía trên vẫn dùng được bình thường.");
       setLoading(false);
       return;
     }
 
-    const reportData = {
-      action: "ai_report",
-      period: period,
-      period_label: pl?.t || "",
-      period_sub: pl?.p || "",
-      scope: scopeLabel,
-      validation: { done: e.done, over: e.over, todo: e.todo, total: e.total, rate: e.rate },
-      documentation: { done: d.done, over: d.over, todo: d.todo, total: d.total, rate: d.rate },
-      by_dept: deptStr,
-      overdue: ovStr,
-    };
+    // Workflow "Vani VMP 5" TỰ ĐỌC dữ liệu thô từ Supabase (toàn bộ hạng mục
+    // năm nay, danh sách quá hạn, lỗi hồ sơ, tải việc theo người) nên web chỉ
+    // cần nói ĐANG XEM KỲ NÀO, PHẠM VI NÀO. Trước đây web gửi lên vài con số
+    // tóm tắt, AI chỉ diễn giải lại đúng mấy con số đó.
+    const reportData = { ky: period, pham_vi: scope };
 
     try {
-      const token = await getAccessToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
+      // Cùng token với ô chat: nằm trong gói JS công khai nên chỉ để chặn quét
+      // bừa, không phải bí mật. Không dùng lại x-vmp-secret của đường ghi.
+      const chatToken = import.meta.env.VITE_N8N_CHAT_TOKEN as string | undefined;
+      if (chatToken) headers["x-vmp-chat"] = chatToken;
 
       const res = await fetch(aiWebhookUrl, { method: "POST", headers, body: JSON.stringify(reportData) });
       const json = await res.json();
