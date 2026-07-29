@@ -1,13 +1,17 @@
 import React from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
 // Lưới an toàn: nếu App lỗi khi render, hiện thông báo thay vì trang trắng.
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { err: null }; }
-  static getDerivedStateFromError(err) { return { err }; }
-  componentDidCatch(err, info) { console.error("VMP Monitor crash:", err, info); }
+interface BoundaryProps { children?: ReactNode }
+interface BoundaryState { err: Error | null }
+
+class ErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
+  constructor(props: BoundaryProps) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err: Error): BoundaryState { return { err }; }
+  componentDidCatch(err: Error, info: ErrorInfo) { console.error("VMP Monitor crash:", err, info); }
   render() {
     if (this.state.err) {
       return (
@@ -26,7 +30,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <App />

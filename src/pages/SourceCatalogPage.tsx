@@ -27,6 +27,7 @@ import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
   generateTimeline,
 } from "../lib/supabaseData.ts";
+import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
    `hint` giải thích ảnh hưởng tới luật sinh timeline — đây là phần người
@@ -56,23 +57,26 @@ const FIELDS = [
   { key: "note",             label: "Ghi chú",             w: 160 },
 ];
 
-export default function SourceCatalogView({ user, onReload }) {
+export default function SourceCatalogView({ user, onReload }: {
+  user?: AppUser | null; onReload?: () => void;
+}) {
   const canEdit = user?.perm === "admin";
-  const [kind, setKind] = useState(SOURCE_KINDS[0]);
-  const [rows, setRows] = useState([]);
+  const [kind, setKind] = useState<ObjectKind>(SOURCE_KINDS[0]);
+  const [rows, setRows] = useState<SourceObjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
-  const [editing, setEditing] = useState(null);   // null | {} (thêm mới) | row (sửa)
+  // null = đóng | {} = thêm mới | row = sửa
+  const [editing, setEditing] = useState<Partial<SourceObjectRow> | null>(null);
   const [saving, setSaving] = useState(false);
-  const [gen, setGen] = useState(null);           // hộp thoại sinh timeline
+  const [gen, setGen] = useState<GenState | null>(null);   // hộp thoại sinh timeline
 
   const load = async () => {
     setLoading(true); setErr("");
     try {
       setRows(await fetchSourceObjects({ kind }));
     } catch (e) {
-      setErr(e.message || "Lỗi tải danh mục");
+      setErr((e as Error).message || "Lỗi tải danh mục");
     }
     setLoading(false);
   };
@@ -83,7 +87,7 @@ export default function SourceCatalogView({ user, onReload }) {
     const s = q.trim().toLowerCase();
     if (!s) return rows;
     return rows.filter((r) =>
-      FIELDS.some((f) => String(r[f.key] ?? "").toLowerCase().includes(s)));
+      FIELDS.some((f) => String((r as Record<string, unknown>)[f.key] ?? "").toLowerCase().includes(s)));
   }, [rows, q]);
 
   // Đối tượng có thẩm định nhưng thiếu tháng đầu tiên => timeline sẽ hỏng mốc
@@ -91,34 +95,34 @@ export default function SourceCatalogView({ user, onReload }) {
     () => rows.filter((r) => r.validate_flag === "y" && r.first_month == null),
     [rows]);
 
-  const save = async (form) => {
+  const save = async (form: Record<string, unknown>) => {
     setSaving(true);
     try {
-      const patch = {};
+      const patch: Record<string, unknown> = {};
       for (const f of FIELDS) {
         if (f.key === "object_code") continue;
         const raw = form[f.key];
         if (raw === undefined || raw === "") continue;
         patch[f.key] = f.num ? Number(raw) : String(raw);
       }
-      await upsertSourceObject(kind, form.object_code, patch);
+      await upsertSourceObject(kind, String(form.object_code), patch);
       setEditing(null);
       await load();
       if (onReload) onReload();
     } catch (e) {
-      alert("Lỗi lưu: " + (e.message || "không rõ"));
+      alert("Lỗi lưu: " + ((e as Error).message || "không rõ"));
     }
     setSaving(false);
   };
 
-  const stop = async (row) => {
+  const stop = async (row: SourceObjectRow) => {
     const reason = window.prompt(`Lý do ngừng dùng "${row.object_code}":`);
     if (!reason || !reason.trim()) return;
     try {
       await deleteSourceObject(kind, row.object_code, reason.trim());
       await load();
     } catch (e) {
-      alert("Lỗi: " + (e.message || "không rõ"));
+      alert("Lỗi: " + ((e as Error).message || "không rõ"));
     }
   };
 
@@ -229,14 +233,14 @@ export default function SourceCatalogView({ user, onReload }) {
                 <tr key={r.id} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
                   {FIELDS.map((f) => (
                     <td key={f.key} style={{ padding: "8px", whiteSpace: "nowrap", color: C.plumSoft }}>
-                      {f.key === "validate_flag"
+                      {(() => { const rec = r as Record<string, unknown>; return f.key === "validate_flag"
                         ? <Tag color={r.validate_flag === "y" ? C.mintText : C.plumSoft}
                                bg={r.validate_flag === "y" ? C.mintSoft : C.pinkMist}>
                             {r.validate_flag || "—"}
                           </Tag>
                         : f.key === "first_month" && r.validate_flag === "y" && r.first_month == null
                           ? <span style={{ color: C.raspText, fontWeight: 700 }}>thiếu</span>
-                          : (r[f.key] ?? "—")}
+                          : (rec[f.key] as React.ReactNode ?? "—"); })()}
                     </td>
                   ))}
                   {canEdit && (
@@ -281,11 +285,18 @@ export default function SourceCatalogView({ user, onReload }) {
  * Hàm DB idempotent: mã đã tồn tại thì bỏ qua, và không bao giờ đè lên
  * các cột tiến độ người dùng đã nhập tay.
  * ---------------------------------------------------------------- */
-function GenerateModal({ state, setState, onClose, onDone }) {
+interface GenState { year: number | string; preview: GenerateTimelineResult | null }
+
+function GenerateModal({ state, setState, onClose, onDone }: {
+  state: GenState;
+  setState: React.Dispatch<React.SetStateAction<GenState | null>>;
+  onClose: () => void;
+  onDone?: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const r = state.preview;
 
-  const run = async (commit) => {
+  const run = async (commit: boolean) => {
     setBusy(true);
     try {
       const res = await generateTimeline(Number(state.year), commit);
@@ -294,10 +305,10 @@ function GenerateModal({ state, setState, onClose, onDone }) {
         onClose();
         if (onDone) onDone();
       } else {
-        setState((p) => ({ ...p, preview: res }));
+        setState((p) => (p ? { ...p, preview: res } : p));
       }
     } catch (e) {
-      alert("Lỗi: " + (e.message || "không rõ"));
+      alert("Lỗi: " + ((e as Error).message || "không rõ"));
     }
     setBusy(false);
   };
@@ -350,14 +361,21 @@ function GenerateModal({ state, setState, onClose, onDone }) {
 }
 
 /* ---------------------------------------------------------------- */
-function EditModal({ kind, row, saving, onClose, onSave }) {
+function EditModal({ kind, row, saving, onClose, onSave }: {
+  kind: ObjectKind;
+  row: Partial<SourceObjectRow>;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (form: Record<string, unknown>) => void;
+}) {
   const isNew = !row.id;
   const [form, setForm] = useState(() => {
-    const f = {};
-    for (const x of FIELDS) f[x.key] = row[x.key] ?? "";
+    const f: Record<string, unknown> = {};
+    const rec = row as Record<string, unknown>;
+    for (const x of FIELDS) f[x.key] = rec[x.key] ?? "";
     return f;
   });
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const submit = () => {
     if (!String(form.object_code || "").trim()) { alert("Phải nhập mã đối tượng."); return; }
@@ -374,7 +392,7 @@ function EditModal({ kind, row, saving, onClose, onSave }) {
               {f.label}{f.required ? " *" : ""}
             </span>
             <input
-              value={form[f.key] ?? ""}
+              value={String(form[f.key] ?? "")}
               onChange={(e) => set(f.key, e.target.value)}
               disabled={!isNew && f.lockOnEdit}
               inputMode={f.num ? "numeric" : undefined}
