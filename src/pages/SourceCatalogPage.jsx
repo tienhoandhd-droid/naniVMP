@@ -20,11 +20,12 @@
  *  chỉ ẩn nút cho gọn giao diện, không phải lớp bảo mật).
  * ===================================================================== */
 import { useState, useEffect, useMemo } from "react";
-import { Boxes, RefreshCw, Plus, Pencil, Ban, Search, AlertTriangle } from "lucide-react";
+import { Boxes, RefreshCw, Plus, Pencil, Ban, Search, AlertTriangle, CalendarPlus } from "lucide-react";
 import { C, TEXT, btnPrimary } from "../constants/theme.js";
 import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.jsx";
 import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
+  generateTimeline,
 } from "../lib/supabaseData.js";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
@@ -64,6 +65,7 @@ export default function SourceCatalogView({ user, onReload }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);   // null | {} (thêm mới) | row (sửa)
   const [saving, setSaving] = useState(false);
+  const [gen, setGen] = useState(null);           // hộp thoại sinh timeline
 
   const load = async () => {
     setLoading(true); setErr("");
@@ -160,6 +162,12 @@ export default function SourceCatalogView({ user, onReload }) {
           {canEdit && (
             <button onClick={() => setEditing({})} style={btnPrimary}>
               <Plus size={15} /> Thêm đối tượng
+            </button>
+          )}
+          {canEdit && (
+            <button onClick={() => setGen({ year: new Date().getFullYear(), preview: null })}
+              style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+              <CalendarPlus size={15} /> Sinh timeline
             </button>
           )}
         </div>
@@ -260,7 +268,84 @@ export default function SourceCatalogView({ user, onReload }) {
         <EditModal kind={kind} row={editing} saving={saving}
           onClose={() => setEditing(null)} onSave={save} />
       )}
+      {gen && (
+        <GenerateModal state={gen} setState={setGen}
+          onClose={() => setGen(null)} onDone={onReload} />
+      )}
     </div>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * Sinh timeline — luôn XEM TRƯỚC rồi mới ghi.
+ * Hàm DB idempotent: mã đã tồn tại thì bỏ qua, và không bao giờ đè lên
+ * các cột tiến độ người dùng đã nhập tay.
+ * ---------------------------------------------------------------- */
+function GenerateModal({ state, setState, onClose, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const r = state.preview;
+
+  const run = async (commit) => {
+    setBusy(true);
+    try {
+      const res = await generateTimeline(Number(state.year), commit);
+      if (commit) {
+        alert(res.msg || "Đã sinh timeline");
+        onClose();
+        if (onDone) onDone();
+      } else {
+        setState((p) => ({ ...p, preview: res }));
+      }
+    } catch (e) {
+      alert("Lỗi: " + (e.message || "không rõ"));
+    }
+    setBusy(false);
+  };
+
+  return (
+    <Modal onClose={onClose} icon={CalendarPlus} title="Sinh hạng mục timeline từ danh mục nguồn">
+      <div style={{ fontSize: 13, color: C.plumSoft, fontFamily: TEXT, lineHeight: 1.55 }}>
+        Sinh theo đúng luật VMP01: lọc đối tượng có <b>Thẩm định = y</b>, suy ra loại thẩm định
+        theo phân loại, rồi tính lùi các mốc từ hạn hoàn thành (T).
+        <br />
+        Mã đã tồn tại sẽ được <b>bỏ qua</b> — không tạo trùng, không đè dữ liệu đã nhập.
+      </div>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>Năm thẩm định</span>
+        <input value={state.year} inputMode="numeric"
+          onChange={(e) => setState((p) => ({ ...p, year: e.target.value, preview: null }))}
+          style={{ width: 110, padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13, border: `1.5px solid ${C.pinkSoft}` }} />
+      </label>
+
+      {r && (
+        <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: C.pinkMist, fontFamily: TEXT, fontSize: 13 }}>
+          <div><b>{r.so_tao_moi}</b> hạng mục sẽ được tạo mới</div>
+          <div style={{ color: C.plumSoft }}>{r.so_bo_qua} mã đã tồn tại → bỏ qua</div>
+          {r.so_thieu_moc > 0 && (
+            <div style={{ color: C.marigoldText, marginTop: 6 }}>
+              ⚠️ {r.so_thieu_moc} hạng mục thiếu dữ liệu nguồn nên không tính được đủ mốc thời gian
+              (sẽ tạo với ô ngày để trống).
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+        <button onClick={onClose}
+          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+          Đóng
+        </button>
+        <button onClick={() => run(false)} disabled={busy}
+          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}`, opacity: busy ? 0.6 : 1 }}>
+          Xem trước
+        </button>
+        <button onClick={() => run(true)} disabled={busy || !r || !r.so_tao_moi}
+          style={{ ...btnPrimary, opacity: (busy || !r || !r.so_tao_moi) ? 0.5 : 1 }}>
+          {busy ? "Đang chạy…" : `Ghi ${r ? r.so_tao_moi : ""} hạng mục`}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
