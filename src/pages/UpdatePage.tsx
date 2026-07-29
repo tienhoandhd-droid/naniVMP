@@ -150,6 +150,8 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   const [fst, setFst] = useState("all");
   const [period, setPeriod] = useState("all");
   const [stageF, setStageF] = useState("all");
+  /** Lọc nhanh theo lỗi dữ liệu — để không phải dò 461 dòng tìm chỗ thiếu. */
+  const [fix, setFix] = useState("all");
   const [edit, setEdit] = useState<PlanActivity | null>(null);
   const inWindow = useMemo(() => acts.filter((a) => inPeriod(a, period)), [acts, period]);
   // Tính giai đoạn 1 lần/hạng mục rồi tái dùng (trước đây stageOf chạy ~7 lần/hàng).
@@ -167,13 +169,45 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     });
     return c;
   }, [inWindow, stageByItem]);
+  // Bốn lỗi mà kiểm tra dữ liệu ở Supabase đang báo — cùng định nghĩa với
+  // rpc_check_data_quality để hai chỗ không nói khác nhau.
+  const FIXES = useMemo(() => ({
+    done_no_date: {
+      label: "Hoàn thành nhưng thiếu ngày",
+      hint: "Vi phạm ALCOA+ — đã ghi hoàn thành thì phải có ngày thực tế",
+      test: (a: PlanActivity) => a.st === "done" && !a._raw?.ngay_vmp,
+    },
+    no_deadline: {
+      label: "Thiếu deadline VMP",
+      hint: "Không có mốc đích thì mọi mốc khác không tính được",
+      test: (a: PlanActivity) => !a.target,
+    },
+    no_owner: {
+      label: "Chưa có QA phụ trách",
+      hint: "Không phân công thì không ai theo",
+      test: (a: PlanActivity) => !a.owner || a.owner === "—",
+    },
+    mismatch: {
+      label: "Lệch pha hồ sơ",
+      hint: "Trạng thái các giai đoạn mâu thuẫn nhau",
+      test: (a: PlanActivity) => !!a.mismatch,
+    },
+  }), []);
+
+  const fixCount = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const [k, v] of Object.entries(FIXES)) c[k] = inWindow.filter(v.test).length;
+    return c;
+  }, [inWindow, FIXES]);
+
   const list = useMemo(() => inWindow.filter((a) => {
+    if (fix !== "all" && !FIXES[fix as keyof typeof FIXES]?.test(a)) return false;
     if (stageF !== "all" && stageByItem.get(a.id) !== stageF) return false;
     if (fst !== "all" && a.st !== fst) return false;
     if (!q) return true;
     const s = (q || "").toLowerCase();
     return [a.code, a.name, a.owner, a.id, a.vtype].some((x) => String(x || "").toLowerCase().includes(s));
-  }), [inWindow, stageByItem, stageF, fst, q]);
+  }), [inWindow, stageByItem, stageF, fst, q, fix, FIXES]);
   const linked = conn?.status === "ok";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -183,10 +217,10 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
             <div style={{ width: 44, height: 44, borderRadius: 14, background: C.mintSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={22} color={C.mintText} /></div>
             <div>
               <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 17, color: C.plum }}>Theo dõi tiến độ thực tế</div>
-              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Chỉ đọc từ Supabase · chỉnh sửa tại Google Sheet</div>
+              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Nhập ngày và trạng thái thực tế ngay tại đây — Supabase là nơi lưu dữ liệu gốc</div>
             </div>
           </div>
-          <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Supabase chỉ đọc" : "○ Chưa kết nối"}</Tag>
+          <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Đã nối Supabase — ghi được" : "○ Chưa kết nối"}</Tag>
         </div>
         <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
@@ -197,6 +231,45 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
             <option value="all">Tất cả trạng thái</option>
             {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
+        </div>
+
+        {/* Cần bạn điền — đúng 4 lỗi mà kiểm tra dữ liệu ở Supabase đang báo.
+            Không có thanh này thì phải dò tay 461 dòng mới tìm ra chỗ thiếu. */}
+        <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${C.pinkMist}` }}>
+          <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 800, marginBottom: 8 }}>
+            CẦN BẠN ĐIỀN
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => setFix("all")}
+              style={{ padding: "8px 14px", borderRadius: 999, border: "none", cursor: "pointer",
+                       fontFamily: TEXT, fontSize: 12.5, fontWeight: 800,
+                       background: fix === "all" ? GRAD : C.pinkSoft,
+                       color: fix === "all" ? "#fff" : C.plumSoft }}>
+              Tất cả ({inWindow.length})
+            </button>
+            {Object.entries(FIXES).map(([k, v]) => {
+              const n = fixCount[k] || 0;
+              const on = fix === k;
+              const nang = k === "done_no_date" || k === "no_deadline";
+              return (
+                <button key={k} onClick={() => setFix(on ? "all" : k)} title={v.hint}
+                  disabled={n === 0}
+                  style={{ padding: "8px 14px", borderRadius: 999, cursor: n ? "pointer" : "default",
+                           fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, border: "none",
+                           opacity: n ? 1 : 0.45,
+                           background: on ? (nang ? C.raspText : C.marigoldText)
+                                          : (nang ? C.raspSoft : C.marigoldSoft),
+                           color: on ? "#fff" : (nang ? C.raspText : C.marigoldText) }}>
+                  {v.label} ({n})
+                </button>
+              );
+            })}
+          </div>
+          {fix !== "all" && (
+            <div style={{ marginTop: 9, fontSize: 12, color: C.plumSoft, lineHeight: 1.6 }}>
+              {FIXES[fix as keyof typeof FIXES].hint}. Bấm <b>Cập nhật</b> ở từng dòng để điền.
+            </div>
+          )}
         </div>
       </Card>
       <Card variant="strong">
@@ -253,7 +326,9 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
         </div>
       </Card>
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        Google Sheet là <b style={{ color: C.mintText }}>nguồn dữ liệu chuẩn duy nhất</b>. Trang này chỉ đọc bản đồng bộ từ Supabase; hãy sửa ngày, trạng thái và danh mục trực tiếp trên Sheet.
+        <b style={{ color: C.mintText }}>Supabase là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).
+        Sửa ngày, trạng thái và danh mục ngay trên web — Google Sheet nay chỉ là bản tham chiếu
+        chỉ đọc, sửa trên đó sẽ không vào hệ thống.
       </div>
       {edit && !readOnly && <ProgressEditModal
         act={edit}

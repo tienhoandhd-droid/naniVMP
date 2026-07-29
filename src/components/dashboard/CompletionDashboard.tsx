@@ -184,7 +184,10 @@ function completionSummary(activities: Activity[]) {
  * ============================================================ */
 const EMPTY_LABEL = "Chưa điền thông tin";
 
-// field = chữ GỐC tiếng Việt từ Sheet (RPC trả *_goc); fallback = enum đã map.
+// field = chữ trạng thái tiếng Việt ĐANG HIỆU LỰC trong DB (RPC vẫn trả dưới
+// tên *_goc để khỏi phải sửa frontend, nhưng từ 29/07/2026 nó đọc từ cột
+// status_*_text của vmp_plan_items, không còn là ảnh chụp Google Sheet).
+// fallback = enum đã map.
 const STATUS_DIMS = [
   { id: "vmp", label: "Trạng thái VMP", field: "tt_vmp_goc", fallback: "tt_vmp" },
   { id: "dc", label: "Trạng thái đề cương", field: "tt_de_cuong_goc", fallback: "tt_de_cuong" },
@@ -628,7 +631,7 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
           display: "flex", alignItems: "flex-start", justifyContent: "space-between",
           gap: 14, flexWrap: "wrap", marginBottom: 18,
         }}>
-          <CardTitle icon={BarChart3} sub="Tính trên các hạng mục đang hoạt động, cập nhật theo dữ liệu Sheet">
+          <CardTitle icon={BarChart3} sub="Tính trên các hạng mục đang hoạt động — đọc thẳng từ Supabase">
             Tỷ lệ hoàn thành theo giai đoạn
           </CardTitle>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
