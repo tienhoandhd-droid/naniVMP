@@ -101,6 +101,33 @@ không công cụ, nên đúng hôm cả Gemini lẫn Groq hết quota thì Vali
 "bổn cung lục mãi không ra" cho mọi câu — lưới an toàn có mà không đỡ được
 gì. Nay lớp 3 là agent, dùng chung hai công cụ Postgres với lớp 2.
 
+> ⚠ Node `Bậc nào?` từng **chia theo độ khó** chứ không phải theo lỗi:
+> câu "nhanh" đi thẳng xuống Groq, Gemini không được gọi lần nào. Nghĩa là
+> phần lớn câu hỏi chỉ có hai lớp thật, và hôm Groq hết token thì rơi
+> thẳng xuống OpenAI trả phí dù Gemini vẫn còn lượt. Nay cả hai nhánh đều
+> vào Gemini trước; `bac` chỉ còn dùng để chọn giọng.
+
+> ⚠ Đổi tên node trong n8n **không** cập nhật tham chiếu `$('Tên node')`
+> nằm trong `options` (ví dụ `queryReplacement` của node Postgres). Đổi
+> "Thử trả lời bằng SQL" thành "Dọn sẵn số liệu bằng SQL" làm gãy 5 node,
+> webhook trả rỗng ngay lập tức với lỗi *Referenced node doesn't exist*.
+> Đổi tên xong phải rà lại toàn bộ biểu thức.
+
+**Thời gian thật đo được** (lúc Gemini 429 và Groq hết token ngày, tức là
+đường xấu nhất — cả ba lớp đều chạy):
+
+| Chặng | Mất |
+|---|---|
+| Nhúng câu hỏi + tra nguồn + dọn số liệu SQL | ~1,0 s |
+| Lớp 1 phân tích câu hỏi | ~0,2 s |
+| Gemini báo lỗi 429 | 0,08 s |
+| Groq báo lỗi hết token | 0,19 s |
+| OpenAI lớp 3 (2 lượt gọi + 1 lần tra dữ liệu) | ~5,1 s |
+| **Tổng** | **~7,2 s** |
+
+Hai lớp hỏng chỉ tốn **0,3 giây** — người dùng gần như không cảm nhận
+được. Thời gian chờ nằm ở chỗ khác: mô hình sinh chữ và lần tra dữ liệu.
+
 ## 6. Trích dẫn nguồn: chip riêng, không chú giữa câu
 
 Đây là **khung chat**, không phải luận văn. Bắt Vali mở ngoặc chú nguồn
