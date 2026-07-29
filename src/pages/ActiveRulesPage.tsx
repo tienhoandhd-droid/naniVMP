@@ -126,11 +126,31 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
   };
 
   if (loading) return <Card><div style={{ padding: 20, color: C.plumSoft }}>Đang tải luật…</div></Card>;
-  if (err) return (
-    <Card><div style={{ padding: 16, borderRadius: 10, background: C.raspSoft,
-                        color: C.raspText, fontSize: 13 }}>{err}</div></Card>
+
+  // Lỗi kỹ thuật của Postgres ("permission denied for function …") không nói
+  // cho người dùng biết phải làm gì. Dịch ra việc cần làm, giữ nguyên câu gốc
+  // ở dòng nhỏ để người hỗ trợ còn tra.
+  if (err || !rules) return (
+    <Card>
+      <div style={{ padding: "18px 20px", borderRadius: 14, background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
+        <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 15, color: C.raspText }}>
+          Không đọc được luật đang áp dụng
+        </div>
+        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 6, lineHeight: 1.65 }}>
+          {/permission denied|401|JWT|not authorized/i.test(err)
+            ? "Phiên đăng nhập đã hết hạn hoặc tài khoản chưa đủ quyền. Đăng nhập lại rồi mở lại trang này."
+            : "Máy chủ không trả về dữ liệu luật. Thử lại sau ít phút; nếu vẫn vậy, gửi dòng chữ bên dưới cho người hỗ trợ."}
+        </div>
+        {err && (
+          <div style={{ fontSize: 11.5, color: C.plumSoft, marginTop: 8, fontFamily: NUM,
+                        background: C.surface, borderRadius: 9, padding: "8px 11px" }}>{err}</div>
+        )}
+        <button onClick={load} style={{ ...btnPrimary, marginTop: 13, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>
+          Thử lại
+        </button>
+      </div>
+    </Card>
   );
-  if (!rules) return null;
 
   const dtl = rules.diem_trong_yeu;
   const tl = rules.sinh_timeline;

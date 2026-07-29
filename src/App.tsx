@@ -925,6 +925,8 @@ function AuditLogView() {
   const [total, setTotal] = useState(0);
   /** true = con số tổng là ước lượng của Postgres (khi không lọc gì). */
   const [uocLuong, setUocLuong] = useState(false);
+  /** Lỗi tải nhật ký — phải hiện ra, không được để bảng rỗng nói thay. */
+  const [loadErr, setLoadErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState({ action: "", user: "", record: "" });
@@ -933,8 +935,9 @@ function AuditLogView() {
   const loadLogs = useCallback(async (pg = 0) => {
     if (!isSupabaseConfigured()) return;
     setLoading(true);
+    setLoadErr("");
     try {
-      if (!supabase) return;
+      if (!supabase) { setLoadErr("Chưa cấu hình kết nối Supabase."); return; }
 
       // Chỉ lấy cột BẢNG THẬT SỰ HIỆN. select("*") kéo về cả old_data lẫn
       // new_data của 50 dòng — hai cột JSONB nặng nhất bảng — trong khi giao
@@ -959,7 +962,12 @@ function AuditLogView() {
       setUocLuong(!coLoc);
       setPage(pg);
     } catch (e) {
+      // Trước đây chỉ console.error rồi để bảng rỗng — người dùng đọc thành
+      // "hệ thống chưa ghi nhật ký nào", trong khi thật ra là KHÔNG TẢI ĐƯỢC.
       console.error("Audit log error:", e);
+      setLogs([]);
+      setTotal(0);
+      setLoadErr((e as { message?: string })?.message || "Không rõ nguyên nhân");
     } finally { setLoading(false); }
   }, [filters]);
 
@@ -1002,7 +1010,7 @@ function AuditLogView() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
-        <CardTitle icon={ShieldCheck} sub={`${uocLuong ? "≈" : ""}${total} bản ghi · ALCOA+ audit trail · Không thể sửa/xoá`}>
+        <CardTitle icon={ShieldCheck} sub={loadErr ? "Không tải được nhật ký" : `${uocLuong ? "≈" : ""}${total} bản ghi · ALCOA+ audit trail · Không thể sửa/xoá`}>
           Nhật ký thao tác hệ thống
         </CardTitle>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
@@ -1025,9 +1033,29 @@ function AuditLogView() {
 
         {loading && <div style={{ textAlign: "center", padding: 30, color: C.plumSoft }}>Đang tải...</div>}
 
-        {!loading && logs.length === 0 && (
+        {/* Tải hỏng và "không có gì" là HAI chuyện khác nhau — nói đúng chuyện. */}
+        {!loading && loadErr && (
+          <div style={{ margin: "10px 0", padding: "16px 18px", borderRadius: 14,
+                        background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
+            <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>
+              Không tải được nhật ký thao tác
+            </div>
+            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
+              {loadErr}
+              <br />
+              Thường gặp: phiên đăng nhập hết hạn (đăng nhập lại), hoặc tài khoản không phải admin/QA —
+              nhật ký chỉ mở cho hai vai trò này.
+            </div>
+            <button onClick={() => loadLogs(0)}
+              style={{ ...btnPrimary, marginTop: 12, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {!loading && !loadErr && logs.length === 0 && (
           <div style={{ textAlign: "center", padding: 40, color: C.plumSoft, fontWeight: 600 }}>
-            Chưa có bản ghi audit log nào.
+            Chưa có bản ghi audit log nào khớp bộ lọc.
           </div>
         )}
 
