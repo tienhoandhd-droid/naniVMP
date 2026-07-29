@@ -237,15 +237,6 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     inWindow.forEach((a) => m.set(a.id, stageOf(a)));
     return m;
   }, [inWindow]);
-  const stageCount = useMemo(() => {
-    const c: Record<string, number> = {};
-    STAGES.forEach((st) => { c[st.id] = 0; });
-    inWindow.forEach((a) => {
-      const st = stageByItem.get(a.id);
-      if (st != null && c[st] != null) c[st]++;
-    });
-    return c;
-  }, [inWindow, stageByItem]);
   // Bốn lỗi mà kiểm tra dữ liệu ở Supabase đang báo — cùng định nghĩa với
   // rpc_check_data_quality để hai chỗ không nói khác nhau.
   const FIXES = useMemo(() => ({
@@ -271,20 +262,54 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     },
   }), []);
 
-  const fixCount = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const [k, v] of Object.entries(FIXES)) c[k] = inWindow.filter(v.test).length;
-    return c;
-  }, [inWindow, FIXES]);
-
-  const list = useMemo(() => inWindow.filter((a) => {
-    if (fix !== "all" && !FIXES[fix as keyof typeof FIXES]?.test(a)) return false;
-    if (stageF !== "all" && stageByItem.get(a.id) !== stageF) return false;
-    if (fst !== "all" && a.st !== fst) return false;
-    if (!q) return true;
-    const s = (q || "").toLowerCase();
+  /* Bốn bộ lọc chạy song song. Tách từng điều kiện ra để ĐẾM và LỌC dùng
+     chung một luật — trước đây số trên ô giai đoạn đếm trên toàn kỳ, còn
+     bảng thì lọc thêm cả "cần bạn điền" / trạng thái / ô tìm, nên bấm ô
+     ghi 85 mà bảng ra 0 dòng, nhìn như lọc hỏng. */
+  const okFix    = (a: PlanActivity) => fix === "all" || !!FIXES[fix as keyof typeof FIXES]?.test(a);
+  const okStage  = (a: PlanActivity) => stageF === "all" || stageByItem.get(a.id) === stageF;
+  const okStatus = (a: PlanActivity) => fst === "all" || a.st === fst;
+  const okSearch = (a: PlanActivity) => {
+    const s = q.trim().toLowerCase();
+    if (!s) return true;
     return [a.code, a.name, a.owner, a.id, a.vtype].some((x) => String(x || "").toLowerCase().includes(s));
-  }), [inWindow, stageByItem, stageF, fst, q, fix, FIXES]);
+  };
+
+  // Đếm kiểu "facet": mỗi ô đếm trên phần đã lọc bởi CÁC bộ lọc khác, trừ
+  // chính nó — bấm vào ô nào cũng ra đúng bằng số ghi trên ô đó.
+  const stageCount = useMemo(() => {
+    const c: Record<string, number> = { all: 0 };
+    STAGES.forEach((st) => { c[st.id] = 0; });
+    inWindow.forEach((a) => {
+      if (!okFix(a) || !okStatus(a) || !okSearch(a)) return;
+      c.all++;
+      const st = stageByItem.get(a.id);
+      if (st != null && c[st] != null) c[st]++;
+    });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inWindow, stageByItem, fix, fst, q, FIXES]);
+
+  const fixCount = useMemo(() => {
+    const c: Record<string, number> = { all: 0 };
+    for (const k of Object.keys(FIXES)) c[k] = 0;
+    inWindow.forEach((a) => {
+      if (!okStage(a) || !okStatus(a) || !okSearch(a)) return;
+      c.all++;
+      for (const [k, v] of Object.entries(FIXES)) if (v.test(a)) c[k]++;
+    });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inWindow, stageByItem, stageF, fst, q, FIXES]);
+
+  const list = useMemo(
+    () => inWindow.filter((a) => okFix(a) && okStage(a) && okStatus(a) && okSearch(a)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inWindow, stageByItem, stageF, fst, q, fix, FIXES],
+  );
+
+  const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all";
+  const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); setQ(""); setPeriod("all"); };
   const linked = conn?.status === "ok";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -322,7 +347,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                        fontFamily: TEXT, fontSize: 12.5, fontWeight: 800,
                        background: fix === "all" ? GRAD : C.pinkSoft,
                        color: fix === "all" ? "#fff" : C.plumSoft }}>
-              Tất cả ({inWindow.length})
+              Tất cả ({fixCount.all})
             </button>
             {Object.entries(FIXES).map(([k, v]) => {
               const n = fixCount[k] || 0;
@@ -351,22 +376,24 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
       </Card>
       <Card variant="strong">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-          <CardTitle icon={Activity} sub="Bấm 1 ô để lọc danh sách">Bản đồ giai đoạn ({inWindow.length})</CardTitle>
+          <CardTitle icon={Activity} sub="Bấm 1 ô để lọc danh sách — số trên ô đã tính cả các bộ lọc đang bật">Bản đồ giai đoạn ({stageCount.all})</CardTitle>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {PERIODS.map(([id, lb]) => <button key={id} onClick={() => setPeriod(id)} style={{ padding: "7px 13px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: period === id ? GRAD : C.pinkSoft, color: period === id ? "#fff" : C.plumSoft }}>{lb}</button>)}
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
           <button onClick={() => setStageF("all")} style={{ textAlign: "left", border: "none", cursor: "pointer", padding: "14px 16px", borderRadius: 16, background: C.surface, boxShadow: stageF === "all" ? `0 0 0 3px ${C.pink}` : `inset 0 0 0 1px ${C.pinkSoft}` }}>
-            <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.plum }}>{inWindow.length}</div>
+            <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.plum }}>{stageCount.all}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginTop: 2 }}>Tất cả</div>
           </button>
-          {STAGES.map((s) => (
-            <button key={s.id} onClick={() => setStageF(s.id)} style={{ textAlign: "left", border: "none", cursor: "pointer", padding: "14px 16px", borderRadius: 16, background: s.bg, boxShadow: stageF === s.id ? `0 0 0 3px ${s.color}` : "none", opacity: stageCount[s.id] === 0 ? 0.55 : 1 }}>
-              <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: s.color }}>{stageCount[s.id]}</div>
+          {STAGES.map((s) => { const n = stageCount[s.id] || 0; const on = stageF === s.id; return (
+            <button key={s.id} onClick={() => setStageF(on ? "all" : s.id)} disabled={n === 0 && !on}
+              title={n === 0 ? `Không có hạng mục nào đang ở "${s.label}" với bộ lọc hiện tại.` : `${n} hạng mục · bấm để lọc`}
+              style={{ textAlign: "left", border: "none", cursor: n === 0 && !on ? "default" : "pointer", padding: "14px 16px", borderRadius: 16, background: s.bg, boxShadow: on ? `0 0 0 3px ${s.color}` : "none", opacity: n === 0 ? 0.55 : 1 }}>
+              <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: s.color }}>{n}</div>
               <div style={{ fontSize: 11.5, fontWeight: 800, color: s.color, marginTop: 2, lineHeight: 1.3 }}>{s.label}</div>
             </button>
-          ))}
+          ); })}
         </div>
       </Card>
       <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -397,7 +424,25 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                   </td>
                 </tr>
               ); })}
-              {!list.length && <tr><td colSpan={8} style={{ padding: 30, textAlign: "center", color: C.plumSoft, fontWeight: 600 }}>Không có hạng mục phù hợp.</td></tr>}
+              {/* Rỗng thì nói RÕ vì sao rỗng và bộ lọc nào đang bật — không thì
+                  người dùng tưởng dữ liệu mất hoặc trang hỏng. */}
+              {!list.length && (
+                <tr><td colSpan={8} style={{ padding: 26, textAlign: "center", color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+                  {hasFilter ? (
+                    <>
+                      Không có hạng mục nào khớp bộ lọc đang bật:
+                      <div style={{ margin: "8px 0 12px", display: "flex", gap: 7, flexWrap: "wrap", justifyContent: "center" }}>
+                        {period !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Kỳ: {PERIODS.find(([id]) => id === period)?.[1]}</Tag>}
+                        {stageF !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Giai đoạn: {STAGES.find((s) => s.id === stageF)?.label}</Tag>}
+                        {fix !== "all" && <Tag color={C.marigoldText} bg={C.marigoldSoft}>Cần điền: {FIXES[fix as keyof typeof FIXES].label}</Tag>}
+                        {fst !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Trạng thái: {(STATUS as Record<string, { label: string }>)[fst]?.label ?? fst}</Tag>}
+                        {!!q.trim() && <Tag color={C.lavText} bg={C.lavSoft}>Tìm: “{q.trim()}”</Tag>}
+                      </div>
+                      <button onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 10, fontSize: 12.5 }}>Xoá hết bộ lọc</button>
+                    </>
+                  ) : "Chưa có hạng mục nào trong kế hoạch."}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>
