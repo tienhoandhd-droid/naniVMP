@@ -306,6 +306,282 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_ai_bo_kiem: {
+        Row: {
+          cau_hoi: string
+          ghi_chu: string | null
+          ma: string
+          mong_doi: Json
+        }
+        Insert: {
+          cau_hoi: string
+          ghi_chu?: string | null
+          ma: string
+          mong_doi: Json
+        }
+        Update: {
+          cau_hoi?: string
+          ghi_chu?: string | null
+          ma?: string
+          mong_doi?: Json
+        }
+        Relationships: []
+      }
+      vmp_ai_bo_nho: {
+        Row: {
+          id: number
+          loai: string
+          nguoi: string
+          nhac_cuoi: string | null
+          noi_dung: string
+          quan_trong: number
+          so_lan_nhac: number
+          tang: string
+          tao_luc: string
+          tu_khoa: string[]
+        }
+        Insert: {
+          id?: never
+          loai: string
+          nguoi: string
+          nhac_cuoi?: string | null
+          noi_dung: string
+          quan_trong?: number
+          so_lan_nhac?: number
+          tang: string
+          tao_luc?: string
+          tu_khoa?: string[]
+        }
+        Update: {
+          id?: never
+          loai?: string
+          nguoi?: string
+          nhac_cuoi?: string | null
+          noi_dung?: string
+          quan_trong?: number
+          so_lan_nhac?: number
+          tang?: string
+          tao_luc?: string
+          tu_khoa?: string[]
+        }
+        Relationships: []
+      }
+      vmp_ai_cache: {
+        Row: {
+          cau_hoi_goc: string
+          dau_van: string
+          dung_gan_nhat: string | null
+          het_han_luc: string
+          id: number
+          khoa_cau_hoi: string
+          nguon: string
+          so_lan_dung: number
+          tao_luc: string
+          tra_loi: string
+        }
+        Insert: {
+          cau_hoi_goc: string
+          dau_van: string
+          dung_gan_nhat?: string | null
+          het_han_luc?: string
+          id?: never
+          khoa_cau_hoi: string
+          nguon: string
+          so_lan_dung?: number
+          tao_luc?: string
+          tra_loi: string
+        }
+        Update: {
+          cau_hoi_goc?: string
+          dau_van?: string
+          dung_gan_nhat?: string | null
+          het_han_luc?: string
+          id?: never
+          khoa_cau_hoi?: string
+          nguon?: string
+          so_lan_dung?: number
+          tao_luc?: string
+          tra_loi?: string
+        }
+        Relationships: []
+      }
+      vmp_ai_chat_log: {
+        Row: {
+          answer: string | null
+          created_at: string
+          duong_tra_loi: string | null
+          error: string | null
+          id: number
+          latency_ms: number | null
+          model: string | null
+          question: string
+          so_lac: Json | null
+          sources: Json
+          ty_le_bam: number | null
+          user_email: string | null
+          user_id: string | null
+          y_dinh: string | null
+        }
+        Insert: {
+          answer?: string | null
+          created_at?: string
+          duong_tra_loi?: string | null
+          error?: string | null
+          id?: never
+          latency_ms?: number | null
+          model?: string | null
+          question: string
+          so_lac?: Json | null
+          sources?: Json
+          ty_le_bam?: number | null
+          user_email?: string | null
+          user_id?: string | null
+          y_dinh?: string | null
+        }
+        Update: {
+          answer?: string | null
+          created_at?: string
+          duong_tra_loi?: string | null
+          error?: string | null
+          id?: never
+          latency_ms?: number | null
+          model?: string | null
+          question?: string
+          so_lac?: Json | null
+          sources?: Json
+          ty_le_bam?: number | null
+          user_email?: string | null
+          user_id?: string | null
+          y_dinh?: string | null
+        }
+        Relationships: []
+      }
+      vmp_ai_dong_nghia: {
+        Row: {
+          bat: boolean
+          cach_goi: string
+          id: number
+          nhom: string | null
+          tu_chuan: string
+        }
+        Insert: {
+          bat?: boolean
+          cach_goi: string
+          id?: never
+          nhom?: string | null
+          tu_chuan: string
+        }
+        Update: {
+          bat?: boolean
+          cach_goi?: string
+          id?: never
+          nhom?: string | null
+          tu_chuan?: string
+        }
+        Relationships: []
+      }
+      vmp_ai_giong: {
+        Row: {
+          bat: boolean
+          cau: string
+          id: number
+          ngu_canh: string
+        }
+        Insert: {
+          bat?: boolean
+          cau: string
+          id?: never
+          ngu_canh: string
+        }
+        Update: {
+          bat?: boolean
+          cau?: string
+          id?: never
+          ngu_canh?: string
+        }
+        Relationships: []
+      }
+      vmp_ai_hoi_thoai: {
+        Row: {
+          cau_hoi: string
+          cho_lam_ro: boolean
+          id: number
+          phien: string
+          tao_luc: string
+          y_dinh: string | null
+        }
+        Insert: {
+          cau_hoi: string
+          cho_lam_ro?: boolean
+          id?: never
+          phien: string
+          tao_luc?: string
+          y_dinh?: string | null
+        }
+        Update: {
+          cau_hoi?: string
+          cho_lam_ro?: boolean
+          id?: never
+          phien?: string
+          tao_luc?: string
+          y_dinh?: string | null
+        }
+        Relationships: []
+      }
+      vmp_ai_mo_hinh: {
+        Row: {
+          bac: string
+          bat: boolean
+          ghi_chu: string | null
+          loi_gan_nhat: string | null
+          loi_lien_tiep: number
+          luc_loi: string | null
+          ma: string
+          mien_phi: boolean
+          nghi_den: string | null
+          nha_cung_cap: string
+          so_lan_goi: number
+          so_lan_loi: number
+          ten: string
+          thu_tu: number
+          tre_tb_ms: number | null
+        }
+        Insert: {
+          bac: string
+          bat?: boolean
+          ghi_chu?: string | null
+          loi_gan_nhat?: string | null
+          loi_lien_tiep?: number
+          luc_loi?: string | null
+          ma: string
+          mien_phi?: boolean
+          nghi_den?: string | null
+          nha_cung_cap: string
+          so_lan_goi?: number
+          so_lan_loi?: number
+          ten: string
+          thu_tu: number
+          tre_tb_ms?: number | null
+        }
+        Update: {
+          bac?: string
+          bat?: boolean
+          ghi_chu?: string | null
+          loi_gan_nhat?: string | null
+          loi_lien_tiep?: number
+          luc_loi?: string | null
+          ma?: string
+          mien_phi?: boolean
+          nghi_den?: string | null
+          nha_cung_cap?: string
+          so_lan_goi?: number
+          so_lan_loi?: number
+          ten?: string
+          thu_tu?: number
+          tre_tb_ms?: number | null
+        }
+        Relationships: []
+      }
       vmp_ai_report_cache: {
         Row: {
           ai_model: string | null
@@ -449,6 +725,54 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_assignment_rules: {
+        Row: {
+          category: string
+          created_at: string
+          expected_2026: number | null
+          id: number
+          is_active: boolean
+          match_areas: string[] | null
+          match_dept: string | null
+          match_kind: string | null
+          match_name_re: string | null
+          owner_name: string
+          priority: number
+          support_name: string | null
+          work_group: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          expected_2026?: number | null
+          id: number
+          is_active?: boolean
+          match_areas?: string[] | null
+          match_dept?: string | null
+          match_kind?: string | null
+          match_name_re?: string | null
+          owner_name: string
+          priority: number
+          support_name?: string | null
+          work_group: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          expected_2026?: number | null
+          id?: number
+          is_active?: boolean
+          match_areas?: string[] | null
+          match_dept?: string | null
+          match_kind?: string | null
+          match_name_re?: string | null
+          owner_name?: string
+          priority?: number
+          support_name?: string | null
+          work_group?: string
+        }
+        Relationships: []
+      }
       vmp_deadline_rules: {
         Row: {
           description: string | null
@@ -482,6 +806,57 @@ export type Database = {
           report_offset?: number
           updated_at?: string | null
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      vmp_kb_chunks: {
+        Row: {
+          content: string
+          embedding: string | null
+          heading: string | null
+          id: number
+          ord: number
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          embedding?: string | null
+          heading?: string | null
+          id?: never
+          ord?: number
+          source: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          embedding?: string | null
+          heading?: string | null
+          id?: never
+          ord?: number
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vmp_kb_documents: {
+        Row: {
+          content: string | null
+          embedding: string | null
+          id: number
+          metadata: Json | null
+        }
+        Insert: {
+          content?: string | null
+          embedding?: string | null
+          id?: never
+          metadata?: Json | null
+        }
+        Update: {
+          content?: string | null
+          embedding?: string | null
+          id?: never
+          metadata?: Json | null
         }
         Relationships: []
       }
@@ -641,6 +1016,45 @@ export type Database = {
           },
         ]
       }
+      vmp_performers: {
+        Row: {
+          created_at: string
+          department: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          note: string | null
+          performer_name: string
+          role_title: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          performer_name: string
+          role_title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          performer_name?: string
+          role_title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       vmp_plan_items: {
         Row: {
           actual_protocol_date: string | null
@@ -659,6 +1073,7 @@ export type Database = {
           delete_reason: string | null
           deleted_at: string | null
           deleted_from_sheet: boolean | null
+          department_text: string | null
           departments: string[] | null
           effort_days: number | null
           execution_departments: string[] | null
@@ -684,14 +1099,19 @@ export type Database = {
           source_sheet_row: number | null
           source_sync_run_id: string | null
           status_protocol: Database["public"]["Enums"]["phase_status"] | null
+          status_protocol_text: string | null
           status_report: Database["public"]["Enums"]["phase_status"] | null
+          status_report_text: string | null
           status_validation: Database["public"]["Enums"]["phase_status"] | null
+          status_validation_text: string | null
           status_vmp: Database["public"]["Enums"]["phase_status"] | null
+          status_vmp_text: string | null
           updated_at: string | null
           updated_by: string | null
           validation_code: string
           validation_type: string
           version: number
+          work_group: string | null
           year: number
         }
         Insert: {
@@ -711,6 +1131,7 @@ export type Database = {
           delete_reason?: string | null
           deleted_at?: string | null
           deleted_from_sheet?: boolean | null
+          department_text?: string | null
           departments?: string[] | null
           effort_days?: number | null
           execution_departments?: string[] | null
@@ -736,14 +1157,19 @@ export type Database = {
           source_sheet_row?: number | null
           source_sync_run_id?: string | null
           status_protocol?: Database["public"]["Enums"]["phase_status"] | null
+          status_protocol_text?: string | null
           status_report?: Database["public"]["Enums"]["phase_status"] | null
+          status_report_text?: string | null
           status_validation?: Database["public"]["Enums"]["phase_status"] | null
+          status_validation_text?: string | null
           status_vmp?: Database["public"]["Enums"]["phase_status"] | null
+          status_vmp_text?: string | null
           updated_at?: string | null
           updated_by?: string | null
           validation_code: string
           validation_type?: string
           version?: number
+          work_group?: string | null
           year?: number
         }
         Update: {
@@ -763,6 +1189,7 @@ export type Database = {
           delete_reason?: string | null
           deleted_at?: string | null
           deleted_from_sheet?: boolean | null
+          department_text?: string | null
           departments?: string[] | null
           effort_days?: number | null
           execution_departments?: string[] | null
@@ -788,14 +1215,19 @@ export type Database = {
           source_sheet_row?: number | null
           source_sync_run_id?: string | null
           status_protocol?: Database["public"]["Enums"]["phase_status"] | null
+          status_protocol_text?: string | null
           status_report?: Database["public"]["Enums"]["phase_status"] | null
+          status_report_text?: string | null
           status_validation?: Database["public"]["Enums"]["phase_status"] | null
+          status_validation_text?: string | null
           status_vmp?: Database["public"]["Enums"]["phase_status"] | null
+          status_vmp_text?: string | null
           updated_at?: string | null
           updated_by?: string | null
           validation_code?: string
           validation_type?: string
           version?: number
+          work_group?: string | null
           year?: number
         }
         Relationships: [
@@ -1177,16 +1609,19 @@ export type Database = {
           object_code: string
           object_kind: string
           object_name: string | null
+          owner_name: string | null
           quality_impact_score: number | null
           report_class: string | null
           show_flag: string | null
           source_row: number
           source_tab: string
           status: string | null
+          support_name: string | null
           updated_at: string
           updated_by: string | null
           validate_flag: string | null
           validate_reason: string | null
+          work_group: string | null
           workdays: number | null
           year_ref: number | null
         }
@@ -1209,16 +1644,19 @@ export type Database = {
           object_code: string
           object_kind: string
           object_name?: string | null
+          owner_name?: string | null
           quality_impact_score?: number | null
           report_class?: string | null
           show_flag?: string | null
           source_row: number
           source_tab: string
           status?: string | null
+          support_name?: string | null
           updated_at?: string
           updated_by?: string | null
           validate_flag?: string | null
           validate_reason?: string | null
+          work_group?: string | null
           workdays?: number | null
           year_ref?: number | null
         }
@@ -1241,16 +1679,19 @@ export type Database = {
           object_code?: string
           object_kind?: string
           object_name?: string | null
+          owner_name?: string | null
           quality_impact_score?: number | null
           report_class?: string | null
           show_flag?: string | null
           source_row?: number
           source_tab?: string
           status?: string | null
+          support_name?: string | null
           updated_at?: string
           updated_by?: string | null
           validate_flag?: string | null
           validate_reason?: string | null
+          work_group?: string | null
           workdays?: number | null
           year_ref?: number | null
         }
@@ -1386,6 +1827,14 @@ export type Database = {
       }
     }
     Views: {
+      vmp_ai_tu_dien: {
+        Row: {
+          gia_tri: string | null
+          khoa: string | null
+          loai: string | null
+        }
+        Relationships: []
+      }
       vmp_status_current: {
         Row: {
           classification: string | null
@@ -1458,11 +1907,131 @@ export type Database = {
         Returns: string
       }
       is_admin_or_qa: { Args: never; Returns: boolean }
+      match_vmp_kb: {
+        Args: { filter?: Json; match_count?: number; query_embedding: string }
+        Returns: {
+          content: string
+          id: number
+          metadata: Json
+          similarity: number
+        }[]
+      }
       rpc_active_rules: { Args: never; Returns: Json }
+      rpc_ai_cache_doc: { Args: { p_question: string }; Returns: Json }
+      rpc_ai_chay_bo_kiem: { Args: { p_nguoi?: Json }; Returns: Json }
+      rpc_ai_chon_mo_hinh: { Args: { p_question: string }; Returns: Json }
+      rpc_ai_context: {
+        Args: { p_question?: string; p_row_limit?: number; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_context_goc: {
+        Args: { p_question?: string; p_row_limit?: number; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_context_gon: {
+        Args: { p_question?: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_do_kho: { Args: { p_question: string }; Returns: Json }
+      rpc_ai_do_thuc_the: {
+        Args: { p_loai?: string; p_question: string }
+        Returns: Json
+      }
+      rpc_ai_doc_trang_thai: {
+        Args: { p_question: string; p_ten?: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_dung_cau_tra_loi: {
+        Args: { p_hieu: Json; p_question: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_dung_cau_tra_loi_goc: {
+        Args: { p_hieu: Json; p_question: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_ghep_ngu_canh: {
+        Args: { p_phien: string; p_question: string }
+        Returns: Json
+      }
+      rpc_ai_ghi_ket_qua: {
+        Args: { p_loi?: string; p_ma: string; p_ok: boolean; p_tre_ms?: number }
+        Returns: Json
+      }
+      rpc_ai_ghi_nho: {
+        Args: {
+          p_loai: string
+          p_nguoi: string
+          p_noi_dung: string
+          p_quan_trong?: number
+          p_tu_khoa?: string[]
+        }
+        Returns: Json
+      }
+      rpc_ai_goi_y_tiep: {
+        Args: { p_hieu: Json; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_hieu_cau_hoi: { Args: { p_question: string }; Returns: Json }
+      rpc_ai_ho_so_nguoi: {
+        Args: { p_ten: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_khong_hieu: { Args: { p_question: string }; Returns: string }
+      rpc_ai_kiem_chung: {
+        Args: { p_du_lieu: string; p_tra_loi: string }
+        Returns: Json
+      }
+      rpc_ai_kiem_mo_ho: { Args: { p_question: string }; Returns: Json }
+      rpc_ai_lay_giong: { Args: { p_tin_xau?: boolean }; Returns: Json }
+      rpc_ai_mo_rong_cau_hoi: { Args: { p_question: string }; Returns: Json }
+      rpc_ai_ngu_canh_nap_san: {
+        Args: { p_question: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_ngu_canh_phan_tich: {
+        Args: { p_phien?: string; p_question: string }
+        Returns: Json
+      }
+      rpc_ai_ngu_canh_tam_ly: {
+        Args: { p_question: string; p_ten?: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_nho_lai: {
+        Args: { p_cau_hoi?: string; p_nguoi: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_suc_khoe: { Args: never; Returns: Json }
+      rpc_ai_tam_su: {
+        Args: { p_nguoi?: Json; p_question: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_tim_nguoi_mo: {
+        Args: { p_question: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_tra_loi_nhanh: {
+        Args: {
+          p_nguoi?: Json
+          p_phien?: string
+          p_question: string
+          p_year?: number
+        }
+        Returns: Json
+      }
+      rpc_ai_trong_diem: { Args: { p_hieu: Json }; Returns: Json }
+      rpc_ai_ve_nguoi_hoi: {
+        Args: { p_nguoi: Json; p_question: string; p_year?: number }
+        Returns: Json
+      }
+      rpc_ai_xa_giao: {
+        Args: { p_nguoi?: Json; p_question: string }
+        Returns: Json
+      }
       rpc_alert_context: {
         Args: { p_limit?: number; p_validation_code: string }
         Returns: Json
       }
+      rpc_apply_assignments: { Args: { p_overwrite?: boolean }; Returns: Json }
       rpc_apply_sheet_sync: {
         Args: { p_op: string; p_patch: Json; p_validation_code: string }
         Returns: Json
@@ -1484,6 +2053,7 @@ export type Database = {
         Returns: Json
       }
       rpc_delete_alert_recipient: { Args: { p_id: string }; Returns: Json }
+      rpc_delete_performer: { Args: { p_id: string }; Returns: Json }
       rpc_delete_plan_item: {
         Args: { p_reason: string; p_validation_code: string }
         Returns: Json
@@ -1533,6 +2103,14 @@ export type Database = {
         Returns: Json
       }
       rpc_get_vmp_watermark: { Args: { p_year?: number }; Returns: Json }
+      rpc_kb_search: {
+        Args: { p_embedding: string; p_k?: number; p_min_score?: number }
+        Returns: Json
+      }
+      rpc_kb_search_text: {
+        Args: { p_k?: number; p_query: string }
+        Returns: Json
+      }
       rpc_list_source_tabs: { Args: never; Returns: Json }
       rpc_mark_alert_sent: {
         Args: { p_error?: string; p_idempotency_key: string; p_ok: boolean }
@@ -1570,6 +2148,10 @@ export type Database = {
       }
       rpc_rollback_vmp_sheet_sync: {
         Args: { p_sync_run_id: string }
+        Returns: Json
+      }
+      rpc_set_item_performer: {
+        Args: { p_performer_name: string; p_validation_code: string }
         Returns: Json
       }
       rpc_set_item_state: {
@@ -1634,6 +2216,10 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_upsert_performer: {
+        Args: { p_id: string; p_patch: Json }
+        Returns: Json
+      }
       rpc_upsert_product_gmp: {
         Args: { p_bfo_code: string; p_patch: Json }
         Returns: Json
@@ -1654,9 +2240,17 @@ export type Database = {
         Args: { item: Database["public"]["Tables"]["vmp_plan_items"]["Row"] }
         Returns: Json
       }
+      vmp_ai_dau_van: { Args: never; Returns: string }
+      vmp_ai_khoa_cau_hoi: { Args: { p_q: string }; Returns: string }
+      vmp_khong_dau: { Args: { t: string }; Returns: string }
+      vmp_ma_phan_loai: { Args: { p_kind: string }; Returns: string }
       vmp_parse_depts: { Args: { p_raw: string }; Returns: string[] }
+      vmp_phase_status_text: {
+        Args: { p: Database["public"]["Enums"]["phase_status"] }
+        Returns: string
+      }
       vmp_score_complexity: {
-        Args: { p_kind: string; p_name: string }
+        Args: { p_kind: string; p_name: string; p_report_class?: string }
         Returns: number
       }
       vmp_score_quality_impact: {

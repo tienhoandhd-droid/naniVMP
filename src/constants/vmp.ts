@@ -96,7 +96,7 @@ export const NAV_SUBS = {
   alerts: "Cảnh báo tới hạn / quá hạn & dự báo tái thẩm định",
   progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
   inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
-  source: "Danh mục nguồn · Người nhận cảnh báo · Danh bạ nhân sự · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
+  source: "Danh mục nguồn · Người nhận cảnh báo · Danh bạ nhân sự · Người thực hiện · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
   risk: "Quản lý rủi ro chất lượng (ICH Q9 / EU GMP Annex 15) — theo điểm trọng yếu 1…9",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / DOCX / HTML",
