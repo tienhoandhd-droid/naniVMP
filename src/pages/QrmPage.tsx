@@ -1,7 +1,7 @@
 /* QrmPage.jsx — Ma trận rủi ro thẩm định (QRM / ICH Q9) */
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { CLS, CRIT } from "../constants/vmp.ts";
-import { valStatus } from "../utils/helpers.ts";
+import { valStatus, qrmRpn, qrmLevel } from "../utils/helpers.ts";
 import { Card, CardTitle, Tag, Donut, Pill } from "../components/ui/Primitives.tsx";
 import { ShieldAlert, AlertCircle, Trophy } from "lucide-react";
 import type { Activity } from "../types/domain.ts";
@@ -24,13 +24,12 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
   const cellRisk = (crit: string, col: string) => { const base = CRITMAP[crit].w; const sc = col === "Quá hạn" ? 3 : col === "Chưa/Đang" ? 2 : 1; const r = base * sc; return r >= 7 ? C.rasp : r >= 4 ? C.marigold : C.mint; };
   const cellText = (col: string) => col === C.mint ? C.mintText : col === C.marigold ? C.marigoldText : C.raspText;
   const critCount = rowsC.map((r) => ({ k: r, n: acts.filter((a) => a.crit === r).length }));
-  const sevOf = (a: Activity): number => {
-    if (a.score != null) return Number(a.score);
-    const c = CRITMAP[String(a.crit ?? "")];
-    return c ? c.w * 3 : 5;
-  };
-  const occOf = (a: Activity): number => (a.st === "over" ? 3 : a.st === "done" ? 0 : a.st === "plan" ? 1 : 2);
-  const top = acts.filter((a) => a.st !== "done").map((a) => ({ a, score: sevOf(a) * occOf(a) })).sort((x, y) => y.score - x.score).slice(0, 8);
+  // Điểm rủi ro dùng CHUNG với danh sách cảnh báo (helpers.qrmRpn) — hai chỗ
+  // chấm khác nhau thì người dùng không biết tin bên nào.
+  const top = acts.filter((a) => a.st !== "done")
+    .map((a) => ({ a, score: qrmRpn(a) }))
+    .sort((x, y) => y.score - x.score)
+    .slice(0, 8);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
@@ -70,7 +69,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {top.map((x) => { const cls = (CLS as Record<string, typeof CLS.tb>)[String(x.a.cls ?? "tb")] ?? CLS.tb; return (
               <div key={x.a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
-                <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, color: "#fff", background: x.score >= 7 ? C.raspText : C.marigoldText }}>RPN {x.score}</span>
+                <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, color: "#fff", background: qrmLevel(x.score) === "cao" ? C.raspText : qrmLevel(x.score) === "tb" ? C.marigoldText : C.mintText }}>RPN {x.score}</span>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}><Tag color={cls.text} bg={cls.soft}>{x.a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plum }}>{x.a.name}</span></div><div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{x.a.id} · {x.a.dep}</div></div>
                 <Pill s={x.a.st} small />
               </div>

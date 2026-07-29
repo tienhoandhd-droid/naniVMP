@@ -4,7 +4,7 @@
  * ===================================================================== */
 import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
-  LayoutDashboard, GanttChartSquare, Pencil, ShieldAlert,
+  LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
   ShieldCheck, Radar, BarChart3, Scale,
 } from "lucide-react";
@@ -71,7 +71,7 @@ export const NAV_ITEMS = [
   // GIÁM SÁT — nhìn tình hình, không sửa gì
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard, group: "monitor" },
   { id: "timeline", label: "Timeline VMP", icon: GanttChartSquare, group: "monitor" },
-  { id: "alerts", label: "Cảnh báo", icon: AlertCircle, group: "monitor" },
+  { id: "alerts", label: "Cảnh báo & Rủi ro", icon: AlertCircle, group: "monitor" },
 
   // THỰC HIỆN — việc làm hằng ngày, có ghi dữ liệu
   { id: "progress", label: "Cập nhật tiến độ", icon: Pencil, group: "work" },
@@ -79,7 +79,8 @@ export const NAV_ITEMS = [
   { id: "source", label: "Danh mục & Nhập liệu", icon: Boxes, group: "work" },
 
   // PHÂN TÍCH — ra quyết định
-  { id: "risk", label: "QRM – Rủi ro", icon: ShieldAlert, group: "analysis" },
+  // QRM – Rủi ro đã gộp vào "Cảnh báo & Rủi ro": ma trận rủi ro nằm cùng chỗ
+  // với danh sách cảnh báo mà nó dùng để xếp thứ tự ưu tiên.
   { id: "workload", label: "Phân công & Tải việc", icon: Activity, group: "analysis" },
   { id: "reports", label: "Báo cáo & AI", icon: FileBarChart, group: "analysis" },
   { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
@@ -93,11 +94,10 @@ export const NAV_ITEMS = [
 export const NAV_SUBS = {
   overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
   timeline: "Timeline · Sơ đồ · Bố cục · Bảng — các mốc Đề cương → Thẩm định → Báo cáo → Đích VMP",
-  alerts: "Cảnh báo tới hạn / quá hạn & dự báo tái thẩm định",
+  alerts: "Cảnh báo tới hạn / quá hạn / tái thẩm định — xếp theo điểm rủi ro ICH Q9, kèm ma trận QRM",
   progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
   inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
   source: "Danh mục nguồn · Người nhận cảnh báo · Danh bạ nhân sự · Người thực hiện · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
-  risk: "Quản lý rủi ro chất lượng (ICH Q9 / EU GMP Annex 15) — theo điểm trọng yếu 1…9",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / DOCX / HTML",
   rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",

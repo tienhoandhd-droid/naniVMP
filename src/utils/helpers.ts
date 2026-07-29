@@ -412,6 +412,41 @@ export function valStatus(a: Activity) {
   return a.st === "over" ? "Quá hạn" : a.st === "done" ? "Đạt" : "Chưa/Đang";
 }
 
+/* Điểm rủi ro theo ICH Q9: RPN = mức nghiêm trọng × khả năng xảy ra.
+   Ba hàm này là NGUỒN CHUNG cho cả ma trận QRM lẫn thứ tự danh sách cảnh
+   báo — tách ra để hai chỗ không thể chấm điểm khác nhau. */
+
+/** Nghiêm trọng 1..9: lấy điểm trọng yếu của hạng mục; thiếu thì suy từ mức tới hạn. */
+export function qrmSeverity(a: Activity): number {
+  const score = Number(a.score);
+  if (Number.isFinite(score) && score > 0) return score;
+  const w = { "Cao": 3, "TB": 2, "Thấp": 1 }[String(a.crit ?? "")] ?? 2;
+  return w * 3;
+}
+
+/** Khả năng xảy ra 0..3: quá hạn 3 · đang làm 2 · mới lên kế hoạch 1 · đã xong 0. */
+export function qrmOccurrence(a: Activity): number {
+  if (a.st === "done" || isSkipped(a)) return 0;
+  if (a.st === "over") return 3;
+  if (a.st === "plan") return 1;
+  return 2;
+}
+
+/** RPN 0..27. Xong hoặc không thực hiện thì bằng 0 — hết rủi ro. */
+export function qrmRpn(a: Activity): number {
+  return qrmSeverity(a) * qrmOccurrence(a);
+}
+
+/** Nhóm rủi ro theo RPN. Ngưỡng đặt ở đây để đổi một chỗ là đổi khắp nơi. */
+export function qrmLevel(rpn: number): "cao" | "tb" | "thap" {
+  return rpn >= 15 ? "cao" : rpn >= 7 ? "tb" : "thap";
+}
+
+/** Thứ tự cảnh báo: rủi ro cao lên trước; cùng rủi ro thì trễ nhiều/gần hạn lên trước. */
+export function byRisk(x: { a: Activity; dleft: number }, y: { a: Activity; dleft: number }): number {
+  return qrmRpn(y.a) - qrmRpn(x.a) || x.dleft - y.dleft;
+}
+
 // ======================== WORKLOAD HELPERS ========================
 export const wlMonthOf = (a: Activity): number => {
   if (!a.target) return -1;
