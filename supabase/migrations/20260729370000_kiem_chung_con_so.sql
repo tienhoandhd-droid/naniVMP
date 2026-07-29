@@ -158,8 +158,19 @@ begin
     if (r.mong_doi->>'duong') = 'sql' and not (v_kq->>'khop')::boolean then
       v_ly := array_append(v_ly, 'đáng lẽ SQL trả lời được nhưng lại đẩy sang AI');
     end if;
-    if (r.mong_doi->>'duong') = 'ai' and (v_kq->>'khop')::boolean then
+    -- Câu đi đường AI mà lần này trúng ĐỆM thì vẫn đúng: đệm chỉ chứa câu
+    -- trả lời do AI soạn trước đó, dữ liệu chưa đổi nên dùng lại là hợp lệ.
+    -- Coi 'dem' là hỏng thì cứ chạy bộ kiểm lần thứ hai là báo động giả.
+    if (r.mong_doi->>'duong') = 'ai' and (v_kq->>'khop')::boolean
+       and coalesce(v_kq->>'nguon','') <> 'dem' then
       v_ly := array_append(v_ly, 'đáng lẽ phải nhờ AI nhưng SQL lại tự trả lời');
+    end if;
+    if (r.mong_doi->>'duong') = 'ai' and coalesce(v_kq->>'nguon','') = 'dem' then
+      v_ds := v_ds || jsonb_build_object(
+        'ma', r.ma, 'cau_hoi', r.cau_hoi, 'dat', true, 'duong', 'dem',
+        'ly_do', '[]'::jsonb,
+        'ghi_chu', 'Trúng đệm — câu trả lời do AI soạn trước đó, dữ liệu chưa đổi.');
+      continue;
     end if;
     if r.mong_doi ? 'y_dinh' and coalesce(v_kq->>'y_dinh','') <> (r.mong_doi->>'y_dinh') then
       v_ly := array_append(v_ly, 'ý định ra "' || coalesce(v_kq->>'y_dinh','(rỗng)')
