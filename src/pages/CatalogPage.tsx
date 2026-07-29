@@ -7,15 +7,19 @@
  *    (xem trước) để về sau nối đường ghi ngược Sheet — giữ read-only an toàn.
  * ===================================================================== */
 import { useMemo, useState } from "react";
-import { Boxes, Search, Filter, Pencil, Plus, ChevronRight, Save, Layers, FileSpreadsheet } from "lucide-react";
-import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
-import { CLS, DEPTS, CRIT, TT_OPTS } from "../constants/vmp.ts";
+import { Boxes, Search, Pencil, Plus, ChevronRight, Save, Layers, FileSpreadsheet } from "lucide-react";
+import { C, TEXT, NUM, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
+import { CLS, DEPTS, TT_OPTS } from "../constants/vmp.ts";
 import { parseD, fmtVN, txt } from "../utils/helpers.ts";
 import { toISO } from "../lib/n8nAdapter.ts";
-import { Card, CardTitle, Tag, Modal, Pill } from "../components/ui/Primitives.tsx";
+import { Card, Tag, Modal, Pill } from "../components/ui/Primitives.tsx";
+import type { Activity, VmpObject } from "../types/domain.ts";
 
 // Ánh xạ trường sửa → CỘT SHEET chuẩn (index 0-based khớp 37 cột canonical).
-const UPDATE_MAP = [
+/** [khoá, số cột trong Sheet (0-based), nhãn] */
+type UpdateDef = [key: string, col: number, label: string];
+
+const UPDATE_MAP: UpdateDef[] = [
   ["tt_de_cuong", 23, "Trạng thái đề cương"],
   ["ngay_de_cuong", 22, "TG thực tế hoàn thành đề cương"],
   ["lich_td", 26, "Bộ phận xếp lịch thẩm định"],
@@ -34,7 +38,7 @@ const STAGES4 = [
   ["4. Hoàn thành VMP", "ngay_vmp", "tt_vmp", "dl_vmp"],
 ];
 
-function yearOf(a) {
+function yearOf(a: Activity): string {
   const m = String(a.id || "").match(/\/(20\d{2})/);
   if (m) return m[1];
   const d = parseD(a.target);
@@ -43,40 +47,51 @@ function yearOf(a) {
 
 // Chia hạng mục của 1 đối tượng theo THỂ LOẠI THẨM ĐỊNH (OQ/PQ/IQ…); trong mỗi
 // loại, một NĂM chỉ nên có 1 lần — nếu trùng năm cùng loại thì đánh dấu cảnh báo.
-function groupByType(items) {
-  const m = new Map();
-  items.forEach((a) => { const t = a.vtype || "—"; if (!m.has(t)) m.set(t, []); m.get(t).push(a); });
+function groupByType(items: Activity[]) {
+  const m = new Map<string, Activity[]>();
+  items.forEach((a) => {
+    const t = a.vtype || "—";
+    if (!m.has(t)) m.set(t, []);
+    m.get(t)!.push(a);
+  });
   return [...m.entries()]
     .sort((a, b) => String(a[0]).localeCompare(String(b[0]), "vi"))
     .map(([vtype, its]) => {
       const yrs = its.map(yearOf);
-      const dupYears = new Set(yrs.filter((y, i) => yrs.indexOf(y) !== i));
-      its.sort((x, y) => String(yearOf(x)).localeCompare(String(yearOf(y))));
+      const dupYears = new Set(yrs.filter((y: string, i: number) => yrs.indexOf(y) !== i));
+      its.sort((x: Activity, y: Activity) => yearOf(x).localeCompare(yearOf(y)));
       return { vtype, items: its, dupYears };
     });
 }
 
 /* ---------- Modal Cập nhật tiến độ (sinh payload, chưa ghi) ---------- */
 function UpdateModal({ act, onClose }: { act: Activity; onClose: () => void }) {
-  const raw = act._raw || {};
-  const [f, setF] = useState(() => ({
-    ngay_de_cuong: toISO(raw.ngay_de_cuong), tt_de_cuong: raw.tt_de_cuong || "",
-    lich_td: toISO(raw.lich_td), ngay_tham_dinh: toISO(raw.ngay_tham_dinh), tt_tham_dinh: raw.tt_tham_dinh || "",
-    ngay_bao_cao: toISO(raw.ngay_bao_cao), tt_bao_cao: raw.tt_bao_cao || "",
-    ngay_vmp: toISO(raw.ngay_vmp), tt_vmp: raw.tt_vmp || "",
+  const raw = (act._raw || {}) as Record<string, unknown>;
+  const [f, setF] = useState<Record<string, string>>(() => ({
+    ngay_de_cuong: toISO(raw.ngay_de_cuong), tt_de_cuong: String(raw.tt_de_cuong || ""),
+    lich_td: toISO(raw.lich_td), ngay_tham_dinh: toISO(raw.ngay_tham_dinh),
+    tt_tham_dinh: String(raw.tt_tham_dinh || ""),
+    ngay_bao_cao: toISO(raw.ngay_bao_cao), tt_bao_cao: String(raw.tt_bao_cao || ""),
+    ngay_vmp: toISO(raw.ngay_vmp), tt_vmp: String(raw.tt_vmp || ""),
   }));
-  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
-  const sel = (k) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
-  const dt = (k) => <input type="date" value={f[k] || ""} onChange={set(k)} style={INP} />;
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setF((p) => ({ ...p, [k]: e.target.value }));
+  const sel = (k: string) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
+  const dt = (k: string) => <input type="date" value={f[k] || ""} onChange={set(k)} style={INP} />;
 
   // Chỉ lấy các ô THỰC SỰ đổi so với dữ liệu gốc → payload ghi Sheet.
   const patch = UPDATE_MAP
     .map(([key, col, label]) => {
-      const before = key.startsWith("ngay") || key === "lich_td" ? toISO(raw[key]) : (raw[key] || "");
-      const after = f[key] || "";
-      return before === after ? null : { key, col, label, before: before || "—", after: after || "—" };
+      const k = String(key);
+      const before = k.startsWith("ngay") || k === "lich_td"
+        ? toISO(raw[k])
+        : String(raw[k] || "");
+      const after = f[k] || "";
+      return before === after
+        ? null
+        : { key: k, col: Number(col), label: String(label), before: before || "—", after: after || "—" };
     })
-    .filter(Boolean);
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
   return (
     <Modal onClose={onClose} title="Cập nhật tiến độ" icon={Pencil} wide>
@@ -128,7 +143,10 @@ function UpdateModal({ act, onClose }: { act: Activity; onClose: () => void }) {
 }
 
 /* ---------- Modal Thêm đối tượng (sinh dòng Sheet, chưa ghi) ---------- */
-const NEW_FIELDS = [
+/** [khoá, số cột trong Sheet (0-based), nhãn, kiểu ô nhập] */
+type FieldDef = [key: string, col: number, label: string, kind: string];
+
+const NEW_FIELDS: FieldDef[] = [
   ["phan_loai", 1, "Phân loại đối tượng", "select-cls"],
   ["loai_td", 2, "Loại thẩm định", "text"],
   ["ma", 3, "Mã đối tượng", "text"],
@@ -145,8 +163,9 @@ const NEW_FIELDS = [
   ["dl_vmp", 33, "Hạn hoàn thành (Deadline VMP)", "date"],
 ];
 function AddObjectModal({ onClose }: { onClose: () => void }) {
-  const [f, setF] = useState({ tan_suat: "12" });
-  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const [f, setF] = useState<Record<string, string>>({ tan_suat: "12" });
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setF((p) => ({ ...p, [k]: e.target.value }));
   const filled = NEW_FIELDS.filter(([k]) => String(f[k] ?? "").trim() !== "");
   return (
     <Modal onClose={onClose} title="Thêm đối tượng thẩm định" icon={Plus} wide>
@@ -194,8 +213,8 @@ export default function CatalogView({ objects = [], acts = [] }: {
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
   const [year, setYear] = useState("all");
-  const [open, setOpen] = useState({});
-  const [edit, setEdit] = useState(null);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [edit, setEdit] = useState<Activity | null>(null);
   const [adding, setAdding] = useState(false);
 
   const years = useMemo(
@@ -205,19 +224,28 @@ export default function CatalogView({ objects = [], acts = [] }: {
 
   // Gom hạng mục theo mã đối tượng.
   const groups = useMemo(() => {
-    const byCode = new Map();
+  /** Một nhóm hiển thị: đối tượng + các hạng mục thẩm định của nó. */
+    const byCode = new Map<string, { obj: VmpObject; items: Activity[] }>();
     objects.forEach((o) => byCode.set(o.code, { obj: o, items: [] }));
     acts.forEach((a) => {
       if ((a.state || "active") !== "active") return;
-      if (!byCode.has(a.code)) byCode.set(a.code, { obj: { code: a.code, name: a.name, cls: a.cls, dept: a.dept, area: "—", crit: a.crit, freq: 0 }, items: [] });
-      byCode.get(a.code).items.push(a);
+      if (!byCode.has(a.code)) byCode.set(a.code, {
+        obj: {
+          code: a.code, name: a.name ?? a.code, cls: a.cls, dept: a.dept,
+          area: "—", crit: a.crit, freq: 0,
+        },
+        items: [],
+      });
+      byCode.get(a.code)!.items.push(a);
     });
     let list = [...byCode.values()];
     // lọc theo NĂM ngay trên hạng mục, rồi sắp theo loại thẩm định → năm
     list.forEach((g) => {
       g.items = g.items
-        .filter((a) => year === "all" || yearOf(a) === year)
-        .sort((x, y) => String(x.vtype).localeCompare(String(y.vtype), "vi") || String(yearOf(x)).localeCompare(String(yearOf(y))));
+        .filter((a: Activity) => year === "all" || yearOf(a) === year)
+        .sort((x: Activity, y: Activity) =>
+          String(x.vtype).localeCompare(String(y.vtype), "vi")
+          || yearOf(x).localeCompare(yearOf(y)));
     });
     // lọc nhóm
     const needle = q.trim().toLowerCase();
@@ -239,7 +267,7 @@ export default function CatalogView({ objects = [], acts = [] }: {
   }, [objects, acts, q, cls, dept, status, year]);
 
   const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
-  const toggle = (code) => setOpen((p) => ({ ...p, [code]: !p[code] }));
+  const toggle = (code: string) => setOpen((p) => ({ ...p, [code]: !p[code] }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -259,7 +287,7 @@ export default function CatalogView({ objects = [], acts = [] }: {
             <Search size={16} color={C.plumSoft} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại thẩm định, QA…" style={{ ...INP, paddingLeft: 36 }} />
           </div>
-          <select value={cls} onChange={(e) => setCls(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả nhóm</option>{Object.keys(CLS).map((k) => <option key={k} value={k}>{CLS[k].label}</option>)}</select>
+          <select value={cls} onChange={(e) => setCls(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả nhóm</option>{Object.keys(CLS).map((k) => <option key={k} value={k}>{(CLS as Record<string, { label: string }>)[k].label}</option>)}</select>
           <select value={dept} onChange={(e) => setDept(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả bộ phận</option>{DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
           <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 170 }}><option value="all">Tất cả tình trạng</option><option value="over">Quá hạn</option><option value="prog">Đang chạy</option><option value="todo">Kế hoạch</option><option value="done">Đã xong</option></select>
           <select value={year} onChange={(e) => setYear(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 140 }} title="Lọc theo năm thẩm định"><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
@@ -270,12 +298,12 @@ export default function CatalogView({ objects = [], acts = [] }: {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {groups.map((g) => {
           const o = g.obj;
-          const cl = CLS[o.cls] || CLS.tb;
+          const cl = (CLS as Record<string, typeof CLS.tb>)[String(o.cls ?? "tb")] || CLS.tb;
           const dp = DEPTS.find((d) => d.id === o.dept);
           const done = g.items.filter((a) => a.st === "done").length;
           const over = g.items.filter((a) => a.st === "over").length;
           const nTypes = new Set(g.items.map((a) => a.vtype)).size;
-          const isOpen = open[o.code];
+          const isOpen = open[String(o.code)];
           return (
             <Card key={o.code} style={{ padding: 0, overflow: "hidden" }}>
               <button onClick={() => toggle(o.code)} style={{ width: "100%", textAlign: "left", border: "none", background: isOpen ? C.pinkMist : "#fff", cursor: "pointer", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
@@ -283,7 +311,7 @@ export default function CatalogView({ objects = [], acts = [] }: {
                 <span style={{ fontFamily: NUM, fontWeight: 900, fontSize: 15, color: cl.text, background: cl.soft, padding: "3px 10px", borderRadius: 9, whiteSpace: "nowrap" }}>{o.code}</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{txt(o.name)}</div>
-                  <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{cl.label} · {dp?.name || o.dept || "—"} · {txt(o.area)}{o.freq > 0 ? ` · chu kỳ ${o.freq} tháng` : ""}</div>
+                  <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{cl.label} · {dp?.name || o.dept || "—"} · {txt(o.area)}{Number(o.freq) > 0 ? ` · chu kỳ ${o.freq} tháng` : ""}</div>
                 </div>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 800, color: C.lavText, background: C.lavSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><Layers size={13} />{nTypes} loại · {g.items.length} lần</span>
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: C.mintText, whiteSpace: "nowrap" }}>{done}/{g.items.length} xong</span>

@@ -1,19 +1,38 @@
 /* WorkloadPage.jsx — Ma trận tải công việc Người × Tháng */
 import { useState, useMemo } from "react";
-import { Activity, BarChart3, ShieldAlert, AlertCircle, Flag } from "lucide-react";
+import type { ReactNode } from "react";
+import { Activity, BarChart3, ShieldAlert, Flag } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
-import { CLS, CRIT, WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
-import { parseD, fmtVN, clamp, wlIsDone, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
+import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
+import { parseD, fmtVN, clamp, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
+// lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
+import type { Activity as PlanActivity } from "../types/domain.ts";
 import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill } from "../components/ui/Primitives.tsx";
 
-const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
+
+/** Một ô trong ma trận Người × Tháng. */
+interface WlCell { tasks: PlanActivity[]; cong: number; hoso: number }
+
+/** Tải công việc của một người trong cả năm, chia theo 12 tháng. */
+interface WlPerson {
+  name: string;
+  months: WlCell[];
+  congTotal: number;
+  hosoTotal: number;
+  count: number;
+  over: number;
+  critCao: number;
+}
 
 function WorkloadDetailModal({ detail, onClose }: {
-  detail: { title: string; acts: Activity[]; [k: string]: unknown };
+  detail: { title: string; tasks: PlanActivity[]; [k: string]: unknown };
   onClose: () => void;
 }) {
-  const tasks = [...detail.tasks].sort((a, b) => parseD(a.target) - parseD(b.target));
-  const PhaseChip = ({ label, done, cong }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
+  const tasks = [...detail.tasks].sort(
+    (a, b) => (parseD(a.target)?.getTime() ?? 0) - (parseD(b.target)?.getTime() ?? 0),
+  );
+  const PhaseChip = ({ label, done, cong }: { label: string; done: boolean; cong?: number | null }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
   return (
     <Modal onClose={onClose} title={detail.title} icon={Activity} wide>
       <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 14 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></div>
@@ -41,15 +60,15 @@ function WorkloadDetailModal({ detail, onClose }: {
   );
 }
 
-export default function WorkloadView({ acts }: { acts: Activity[] }) {
+export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const [scope, setScope] = useState("month");
   const [metric, setMetric] = useState("cong");
-  const [detail, setDetail] = useState(null);
+  const [detail, setDetail] = useState<{ title: string; tasks: PlanActivity[] } | null>(null);
 
   const pend = useMemo(() => acts.filter((a) => a.st !== "done" && wlMonthOf(a) >= 0), [acts]);
 
   const people = useMemo(() => {
-    const map = {};
+    const map: Record<string, WlPerson> = {};
     pend.forEach((a) => {
       const mi = wlMonthOf(a);
       const owner = a.owner || "—";
@@ -68,15 +87,19 @@ export default function WorkloadView({ acts }: { acts: Activity[] }) {
   const unitMonths = scope === "month" ? 1 : scope === "quarter" ? 3 : 12;
   const congCap = CAP_MONTH * unitMonths;
   const cap = metric === "cong" ? congCap : CAP_HOSO_MONTH * unitMonths;
-  const monthsOfCol = (ci) => scope === "month" ? [ci] : scope === "quarter" ? [ci * 3, ci * 3 + 1, ci * 3 + 2] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  const valIn = (p, ci) => sum(monthsOfCol(ci).map((mi) => metric === "cong" ? p.months[mi].cong : p.months[mi].hoso));
-  const tasksIn = (p, ci) => monthsOfCol(ci).flatMap((mi) => p.months[mi].tasks);
-  const peakMonth = (p) => { let mx = 0, mi = -1; p.months.forEach((m, i) => { if (m.cong > mx) { mx = m.cong; mi = i; } }); return { eff: mx, mi }; };
+  const monthsOfCol = (ci: number): number[] => scope === "month" ? [ci] : scope === "quarter" ? [ci * 3, ci * 3 + 1, ci * 3 + 2] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const valIn = (p: WlPerson, ci: number): number => sum(monthsOfCol(ci).map((mi) => metric === "cong" ? p.months[mi].cong : p.months[mi].hoso));
+  const tasksIn = (p: WlPerson, ci: number): PlanActivity[] => monthsOfCol(ci).flatMap((mi) => p.months[mi].tasks);
+  const peakMonth = (p: WlPerson) => {
+    let mx = 0, mi = -1;
+    p.months.forEach((m, i) => { if (m.cong > mx) { mx = m.cong; mi = i; } });
+    return { eff: mx, mi };
+  };
 
   // Thang tuần tự theo cường độ tải: xanh nhạt → xanh đậm → cam (sắp đầy) →
   // đỏ (quá tải). Bỏ màu xanh dương ở giữa (không hợp thang magnitude) và
   // đồng bộ với thẻ tải từng người (xanh=nhẹ · cam=bận · đỏ=quá tải).
-  const heat = (val, capv) => {
+  const heat = (val: number, capv: number) => {
     const ratio = capv > 0 ? val / capv : 0;
     if (ratio > 1) return { bg: C.rasp + "66", text: C.raspText };
     if (ratio >= 0.85) return { bg: C.marigold + "66", text: C.marigoldText };
@@ -87,11 +110,18 @@ export default function WorkloadView({ acts }: { acts: Activity[] }) {
   const totalCong = sum(pend.map(congConLai));
   const totalHoso = pend.filter(hoSoConLai).length;
   const overloaded = people.filter((p) => peakMonth(p).eff > CAP_MONTH);
-  const critCount = { Cao: 0, TB: 0, "Thấp": 0 }; pend.forEach((a) => { critCount[a.crit] = (critCount[a.crit] || 0) + 1; });
-  const focus = pend.filter((a) => a.crit === "Cao" || wlScore(a) >= 7).map((a) => ({ a, sc: wlScore(a) })).sort((x, y) => y.sc - x.sc || (parseD(x.a.target) - parseD(y.a.target))).slice(0, 8);
+  const critCount: Record<string, number> = { Cao: 0, TB: 0, "Thấp": 0 };
+  pend.forEach((a) => {
+    const k = String(a.crit ?? "");
+    critCount[k] = (critCount[k] || 0) + 1;
+  });
+  const focus = pend.filter((a) => a.crit === "Cao" || wlScore(a) >= 7).map((a) => ({ a, sc: wlScore(a) })).sort((x, y) => y.sc - x.sc
+      || ((parseD(x.a.target)?.getTime() ?? 0) - (parseD(y.a.target)?.getTime() ?? 0))).slice(0, 8);
 
-  const openDetail = (title, tasks) => { if (tasks.length) setDetail({ title, tasks }); };
-  const Btn = ({ on, onClick, children }) => <button onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
+  const openDetail = (title: string, tasks: PlanActivity[]) => {
+    if (tasks.length) setDetail({ title, tasks });
+  };
+  const Btn = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) => <button onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
   const mood = overloaded.length > 0 ? "stressed" : "happy";
   const bubble = overloaded.length > 0
     ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm! Bấm vào từng người xem chi tiết 💪`
