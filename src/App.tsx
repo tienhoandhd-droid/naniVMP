@@ -87,7 +87,6 @@ import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 // ban đầu; chỉ đụng cấu trúc UI, KHÔNG thay đổi luồng dữ liệu Sheet→Supabase). =====
 const TimelineView = lazy(() => import("./pages/TimelinePage.tsx"));
 const AlertsView = lazy(() => import("./pages/AlertsPage.tsx"));
-const QrmView = lazy(() => import("./pages/QrmPage.tsx"));
 const CatalogView = lazy(() => import("./pages/CatalogPage.tsx"));
 const WorkloadView = lazy(() => import("./pages/WorkloadPage.tsx"));
 const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
@@ -1853,8 +1852,9 @@ export default function App() {
                 <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
                   onUpdate={updateActivity} onReload={reloadData} readOnly={false} />
               )}
-              {view === "alerts" && <AlertsView acts={filteredActs} />}
-              {view === "risk" && <QrmView acts={filteredActs} />}
+              {/* "risk" là mục cũ đã gộp vào Cảnh báo — giữ nhánh này để đường
+                  dẫn/nút cũ không dẫn vào trang trắng. */}
+              {(view === "alerts" || view === "risk") && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
               {view === "audit" && <AuditLogView />}
