@@ -236,3 +236,36 @@ Thêm nút **Sinh timeline** ở tab Danh mục nguồn: xem trước rồi mớ
 1. **`vmp_alert_recipients` đang rỗng.** Vani VMP 1 dù bật cũng không gửi cho ai — nhập danh sách ở màn này trước khi nghiệm thu workflow.
 2. **Vani VMP 1 vẫn đọc người nhận TỪ SHEET** (node `1. Đọc Sheet người nhận`). Sau khi nhập xong trên web, đổi node đó sang đọc `vmp_alert_recipients` để cắt hẳn phụ thuộc Sheet.
 3. Các tab chỉ mang tính lịch sử (`Mail_Log`, `Mail_Log_Index`, `Giao việc`, `Rule VMP state`, `0.Rule timeline VMP`) đã nằm trong `vmp_source_rows` dạng thô, chưa dựng màn riêng vì chưa có nhu cầu sửa.
+
+## 11. Màn "Kiểm tra máy chủ" — đưa năng lực Supabase lên web
+
+Rà 2026-07-29: Supabase có **32 RPC** mà web chỉ gọi 21. Phần còn lại là các hàm server đã viết sẵn nhưng bỏ không dùng, trong khi web tự tính lại ở client — dẫn tới số trên dashboard có thể lệch số mà workflow và báo cáo dùng.
+
+Màn `Kiểm tra máy chủ` (nhóm PHÂN TÍCH) gọi thẳng các hàm đó:
+
+| RPC | Hiển thị | Vì sao đáng xem |
+|---|---|---|
+| `rpc_dashboard_kpi` | KPI hạng mục / hồ sơ / số lệch | Số **đối chiếu** — nếu lệch dashboard thì có vấn đề ở đường tính client |
+| `rpc_due_alerts` | Bảng cảnh báo, chỉnh ngưỡng 3/7/14/30 ngày | **Đúng danh sách** workflow `Vani VMP 1` dùng để gửi mail — xem trước trước khi bật workflow |
+| `rpc_check_data_quality` | Lỗi dữ liệu server phát hiện, lọc theo mức | Rà thẳng trên DB, không phụ thuộc dữ liệu đã tải về trình duyệt |
+| `rpc_refresh_computed_status` | Nút "Tính lại trạng thái" (chỉ admin) | `computed_status` tính lúc GHI nên hạng mục quá hạn *theo thời gian* không tự đổi |
+
+Số liệu thực tế lúc dựng: 461 hạng mục · 609 vấn đề chất lượng dữ liệu · 304 cảnh báo ở ngưỡng 7 ngày (339 ở ngưỡng 30).
+
+### 11a. ⚠️ Bảo mật: cách rà RPC ghi đã sai, đã sửa
+
+Migration `...070000` rà "hàm nào là hàm ghi" bằng **tiền tố tên hàm**. Cách đó **bỏ sót `rpc_refresh_computed_status`** — hàm này `UPDATE` cột `computed_status` của toàn bộ `vmp_plan_items` nhưng tên bắt đầu bằng `refresh`, không nằm trong danh sách tiền tố, nên vẫn mở cho `anon`.
+
+Migration `...090000` sửa tiêu chí: dùng **`provolatile = 'v'` (VOLATILE)** của Postgres — thông tin chính xác về việc hàm có thể ghi hay không — thay vì suy đoán theo tên.
+
+**Khi thêm RPC mới, kiểm bằng câu này:**
+
+```sql
+select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname like 'rpc\_%'
+  and p.provolatile = 'v'
+  and has_function_privilege('anon', p.oid, 'execute');
+-- Phải trả về 0 dòng.
+```
+
+Hiện trạng: **0 hàm VOLATILE mở cho anon**, 9 hàm chỉ-đọc vẫn mở để dashboard công khai chạy được.

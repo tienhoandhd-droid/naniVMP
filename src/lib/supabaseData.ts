@@ -242,6 +242,90 @@ export async function generateTimeline(
   return unwrap<GenerateTimelineResult>(data, error, "Sinh timeline thất bại");
 }
 
+/* ============================================================
+ * Các hàm tính SẴN Ở SERVER — trước đây web tự tính lại ở client
+ * hoặc bỏ không dùng. Dùng bản server để số liệu trên web khớp
+ * đúng số liệu mà n8n và báo cáo dùng.
+ * ============================================================ */
+
+/** KPI tổng hợp: hạng mục & hồ sơ theo done/over/todo + số lệch. */
+export interface ServerKpi {
+  updated_at: string;
+  validation: { done: number; over: number; todo: number; total: number };
+  documentation: { done: number; over: number; todo: number; total: number };
+  mismatch_count: number;
+}
+
+export async function fetchDashboardKpi(year?: number): Promise<ServerKpi> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_dashboard_kpi", { p_year: year ?? undefined });
+  if (error) throw new Error("Lỗi đọc KPI: " + error.message);
+  return asShape<ServerKpi>(data);
+}
+
+/** Một vấn đề chất lượng dữ liệu do server phát hiện. */
+export interface ServerQualityIssue {
+  id: string;
+  type: string;
+  severity: string;
+  msg: string;
+}
+
+export async function checkDataQuality(year?: number): Promise<ServerQualityIssue[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_check_data_quality", { p_year: year ?? undefined });
+  if (error) throw new Error("Lỗi kiểm tra chất lượng dữ liệu: " + error.message);
+  return asShape<ServerQualityIssue[]>(data) || [];
+}
+
+/** Một hạng mục đến hạn — ĐÚNG dữ liệu mà workflow cảnh báo dùng để gửi mail. */
+export interface DueAlert {
+  validation_code: string;
+  validation_type: string;
+  object_code: string;
+  object_name: string;
+  department: string;
+  owner_name: string;
+  stage: string;
+  due_date: string;
+  days_left: number;
+  alert_type: "overdue" | "due_soon";
+}
+
+export async function fetchDueAlerts(year?: number, soonDays = 7): Promise<DueAlert[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_due_alerts", {
+    p_year: year ?? undefined, p_soon_days: soonDays,
+  });
+  if (error) throw new Error("Lỗi đọc cảnh báo: " + error.message);
+  return asShape<DueAlert[]>(data) || [];
+}
+
+/** Tính lại computed_status cho toàn bộ hạng mục (theo ngày hôm nay). */
+export async function refreshComputedStatus(): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_refresh_computed_status");
+  return unwrap(data, error, "Tính lại trạng thái thất bại");
+}
+
+/** Nhật ký thao tác, lọc phía server thay vì kéo hết về client. */
+export async function fetchAuditLogs(opts: {
+  limit?: number; offset?: number; table?: string | null;
+  action?: string | null; userEmail?: string | null; recordId?: string | null;
+} = {}): Promise<unknown> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_get_audit_logs", {
+    p_limit: opts.limit ?? 100,
+    p_offset: opts.offset ?? 0,
+    p_table_name: opts.table ?? undefined,
+    p_action: opts.action ?? undefined,
+    p_user_email: opts.userEmail ?? undefined,
+    p_record_id: opts.recordId ?? undefined,
+  });
+  if (error) throw new Error("Lỗi đọc nhật ký: " + error.message);
+  return data;
+}
+
 /* ---- Tab thô (mọi tab của workbook) ---- */
 
 /** Một dòng thô trong vmp_source_rows. */
