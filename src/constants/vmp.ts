@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil, ShieldAlert,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3,
+  ShieldCheck, Radar, BarChart3, Scale,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -75,6 +75,7 @@ export const NAV_ITEMS = [
   { id: "source", label: "Dữ liệu & Nhập liệu", icon: Boxes, group: "monitor" },
   { id: "alerts", label: "Cảnh báo", icon: AlertCircle, group: "monitor" },
   { id: "workload", label: "Tải công việc", icon: Activity, group: "monitor" },
+  { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
   { id: "server", label: "Kiểm tra máy chủ", icon: Radar, group: "analysis" },
   { id: "risk", label: "QRM – Rủi ro", icon: ShieldAlert, group: "analysis" },
   { id: "reports", label: "Báo cáo & AI", icon: FileBarChart, group: "analysis" },
@@ -92,6 +93,7 @@ export const NAV_SUBS = {
   source: "Danh mục nguồn · Người nhận cảnh báo · Danh bạ nhân sự · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
   alerts: "Cảnh báo tới hạn / quá hạn & dự báo tái thẩm định",
   workload: "Ma trận tải công việc Người × Tháng",
+  rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
   server: "Số liệu và kiểm tra tính sẵn ở Supabase — dùng để đối chiếu với dashboard và xem trước cảnh báo sẽ gửi",
   risk: "Quản lý rủi ro chất lượng (ICH Q9 / EU GMP Annex 15)",
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / DOCX / HTML",

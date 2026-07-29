@@ -93,6 +93,7 @@ const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.tsx"));
 const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
 const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
+const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1733,6 +1734,7 @@ export default function App() {
               {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
               {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
               {view === "server" && <ServerChecksView user={user} />}
+              {view === "rules" && <ActiveRulesView user={user} />}
               {view === "progress" && (
                 <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
                   onUpdate={updateActivity} onReload={reloadData} readOnly={false} />

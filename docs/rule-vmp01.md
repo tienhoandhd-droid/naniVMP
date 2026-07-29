@@ -219,3 +219,90 @@ Bản cài đặt trên Supabase: `rpc_generate_timeline(p_year, p_commit)` — 
 Gọi từ web: màn **Dữ liệu & Nhập liệu** → tab **Danh mục nguồn** → nút **Sinh timeline**.
 
 Ba điểm 1–3 ở mục 10 **được cài y nguyên** trong RPC để kết quả khớp bản n8n. Sửa luật thì sửa ở RPC, và sửa cả `scripts/import-source-catalogs.py` nếu đụng tới ánh xạ cột.
+
+
+---
+
+## 12. Điểm trọng yếu — công thức, phân loại, và giới hạn của thang điểm
+
+### 12.1 Công thức (từ tab `0.Rule timeline VMP`)
+
+```
+Điểm trọng yếu = Điểm mức độ phức tạp × Điểm ảnh hưởng tới chất lượng sản phẩm
+
+  Mức độ phức tạp:              Cao 3 · Trung bình 2 · Thấp 1
+  Ảnh hưởng chất lượng SP:      Trực tiếp 3 · Gián tiếp 2 · Không 1
+```
+
+Thang 1…9, khớp đúng ràng buộc `vmp_plan_items_criticality_score_check (1..9)` vốn đã có trong DB.
+
+### 12.2 Bản chấm đầu tiên SAI có hệ thống — đã sửa
+
+Bản chấm tự động đầu tiên xếp **khí nén = 4 điểm**. Sai, và sai theo một kiểu nhất quán: tôi hiểu "ảnh hưởng trực tiếp" thành *"chỉ tính khi chạm sản phẩm"*.
+
+Căn cứ sửa:
+
+1. **Khí nén và khí công nghệ là _critical utility_** — tiếp xúc trực tiếp sản phẩm, linh kiện, bề mặt thiết bị và hệ vô trùng; đòi đủ chuỗi `URS → DQ → IQ → OQ → PQ`, không chấp nhận chỉ có chứng chỉ máy nén; chất lượng khí theo `ISO 8573-1`.
+2. **Định nghĩa của ISPE Baseline Guide 5**: *Direct Impact = tác động trực tiếp tới CQA của sản phẩm, **hoặc** tới chất lượng sản phẩm do một critical utility cung cấp.*
+
+Các nhóm bị xếp nhầm xuống "gián tiếp", nay đã nâng lên "trực tiếp":
+
+| Nhóm | Vì sao là trực tiếp |
+|---|---|
+| Khí nén, khí nitơ | Critical utility, chạm sản phẩm |
+| Nồi hấp / tủ hấp tiệt trùng dụng cụ | Đảm bảo **vô trùng** — là CQA |
+| Máy rửa dụng cụ, tủ sấy dụng cụ | **Tồn dư** sau làm sạch — là CQA |
+| Passbox, tủ truyền nguyên liệu | Kiểm soát nhiễm chéo giữa các cấp sạch |
+| Tủ hấp tiệt trùng quần áo | Kiểm soát nhiễm trong khu vực vô trùng |
+
+Vẫn giữ "gián tiếp" (có lý do rõ): **kho lưu mẫu QC** (mẫu lưu, không phải lô xuất bán) và **thẩm định vận chuyển** với xe thường — *nếu vận chuyển thuốc lạnh thì phải nâng lên 3, QA cần xác nhận điểm này.*
+
+### 12.3 Kết quả sau khi sửa
+
+| Điểm | Số đối tượng | % |
+|---|---|---|
+| **9** | 62 | 23,5% |
+| **6** | 154 | 58,3% |
+| **3** | 41 | 15,5% |
+| 2 | 5 | 1,9% |
+| 1 | 2 | 0,8% |
+
+### 12.4 ⚠️ Thang điểm CÓ chuẩn về hình thức, nhưng một trục đã mất tác dụng
+
+Đo sức phân biệt của từng trục:
+
+| Trục | Phân bố | Nhận xét |
+|---|---|---|
+| Mức độ phức tạp | 3 → 23,5% · 2 → 59,1% · 1 → 17,4% | Phân tán tốt |
+| **Ảnh hưởng chất lượng** | **3 → 97,3%** · 2 → 1,1% · 1 → 1,5% | ⚠️ **Gần như không phân biệt** |
+
+**Đây không phải lỗi phân loại — đó là bản chất của một nhà máy GMP: gần như mọi thiết bị GMP đều là _direct impact_.**
+
+Chính vì lý do này, **ISPE Baseline Guide 5 bản 2 đã BỎ mức "Indirect Impact"**, chỉ còn Direct / Not-Direct: mức ở giữa không mang thông tin.
+
+Hệ quả với công thức hiện tại: với 97% đối tượng, `điểm = phức tạp × 3`. Trục ảnh hưởng đóng góp gần như bằng không, và thang 1–9 thực chất co lại thành ba mức **3 · 6 · 9** do độ phức tạp quyết định.
+
+### 12.5 Đề xuất — giữ hay đổi thang điểm
+
+**Giữ công thức hiện tại.** Nó là luật đã ban hành, đang chạy, và vẫn xếp được thứ tự ưu tiên (23,5% ở mức 9 là nhóm cần làm trước).
+
+Nhưng nếu muốn tiệm cận `ICH Q9`, có hai hướng, chọn một:
+
+**Hướng A — thêm chiều thứ ba: khả năng phát hiện**
+FMEA chuẩn dùng `RPN = Mức nghiêm trọng × Khả năng xảy ra × Khả năng phát hiện`. Chiều "phát hiện" tạo khác biệt lớn nhất trong thực tế: HVAC có giám sát chênh áp **liên tục** rủi ro thấp hơn hẳn HVAC chỉ đo **định kỳ**, dù cùng phức tạp và cùng ảnh hưởng. Đây là chiều duy nhất hiện đang thiếu hoàn toàn.
+
+**Hướng B — thay trục "ảnh hưởng" bằng trục có sức phân biệt thật**
+Ví dụ *"hậu quả nếu lỗi"*: gây thu hồi lô (3) · gây sai lệch phải điều tra (2) · không ảnh hưởng lô (1). Trục này phân tán tốt hơn nhiều so với direct/indirect.
+
+Lưu ý về tên gọi: **"độ phức tạp" không phải yếu tố rủi ro chuẩn** — nó là đại lượng thay thế cho *khả năng xảy ra lỗi* và *công sức thẩm định*. Dùng được, nhưng nên gọi đúng tên khi giải trình với thanh tra.
+
+### 12.6 Điểm do máy chấm là ĐỀ XUẤT
+
+Chấm rủi ro là phán quyết chuyên môn GMP. Hệ phân loại theo từ khoá — minh bạch, đọc được, tái lập được — rồi đánh dấu `criticality_source = 'auto'`. Khi QA sửa tay, dòng đó chuyển sang `'manual'` và **lần chấm tự động sau không ghi đè**.
+
+Xem và sửa tại màn **Luật đang áp dụng** (nhóm PHÂN TÍCH) và **Danh mục nguồn**.
+
+### Nguồn
+
+- [Khí nén và khí trong dược: yêu cầu thử nghiệm và kỳ vọng GMP](https://www.pharmaceuticalmicrobiology.in/2026/02/compressed-air-gases-in-pharmaceuticals.html) · [GMP Grade Compressed Air — PQE Group](https://blog.pqegroup.com/commissioning-qualification-validation/gmp-grade-compressed-air-regulatory-essentials-testing) · [Nitơ trong sản xuất dược — ECA Academy](https://www.gmp-compliance.org/gmp-news/nitrogen-use-in-pharmaceutical-production)
+- [ISPE Baseline Guide 5 bản 2 — ECA Academy](https://www.gmp-compliance.org/gmp-news/ispe-publishes-revised-guideline-on-commissioning-and-qualification) · [Phân loại Direct/Indirect Impact](https://mikewilliamsonvalidation.wordpress.com/2019/07/03/ispes-commissioning-and-qualification-guide-second-edition/)

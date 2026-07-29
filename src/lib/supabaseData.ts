@@ -403,6 +403,56 @@ export async function fetchAuditLogs(opts: {
   return data;
 }
 
+/* ---- Luật đang áp dụng ---- */
+
+/** Luật hệ thống đang chạy, đọc THẲNG từ DB nên không thể lệch thực tế. */
+export interface ActiveRules {
+  cap_nhat: string;
+  diem_trong_yeu: {
+    cong_thuc: string;
+    thang: string;
+    phuc_tap: Array<{ muc: string; diem: number }>;
+    anh_huong: Array<{ muc: string; diem: number }>;
+    phan_bo: Array<{ diem: number; so_luong: number }>;
+    /** Phân bố từng trục — cho thấy trục nào thật sự phân biệt được. */
+    phan_bo_truc?: {
+      phuc_tap: Array<{ diem: number; so_luong: number }>;
+      anh_huong: Array<{ diem: number; so_luong: number }>;
+    };
+    da_duyet: number;
+    cho_duyet: number;
+  };
+  sinh_timeline: {
+    loc: string;
+    loai_tham_dinh: Array<{ phan_loai: string; loai: string }>;
+    lan_dau: string;
+    so_lan_trong_nam: string;
+    ma_id: string;
+    moc_thoi_gian: string[];
+    khoang_cach_bao_cao: Array<{ dieu_kien: string; ngay: number }>;
+  };
+  phan_quyen: Array<{ vai_tro: string; quyen: string }>;
+  toan_ven_du_lieu: string[];
+  so_lieu_hien_tai: {
+    doi_tuong_nguon: number; co_tham_dinh: number;
+    hang_muc: number; ban_ghi_audit: number;
+  };
+}
+
+export async function fetchActiveRules(): Promise<ActiveRules> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_active_rules");
+  if (error) throw new Error("Lỗi đọc luật: " + error.message);
+  return asShape<ActiveRules>(data);
+}
+
+/** Chấm lại điểm trọng yếu. Mặc định chỉ đụng dòng chưa được QA chốt tay. */
+export async function recalcCriticality(onlyAuto = true): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_recalc_criticality", { p_only_auto: onlyAuto });
+  return unwrap(data, error, "Chấm lại điểm trọng yếu thất bại");
+}
+
 /* ---- Tab thô (mọi tab của workbook) ---- */
 
 /** Một dòng thô trong vmp_source_rows. */
