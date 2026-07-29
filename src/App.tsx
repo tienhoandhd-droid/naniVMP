@@ -92,6 +92,7 @@ const WorkloadView = lazy(() => import("./pages/WorkloadPage.tsx"));
 const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.tsx"));
 const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
 const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
+const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1513,6 +1514,7 @@ export default function App() {
   const { user, setUser, logout, isAdmin } = useAuth();
   const {
     objects, acts, conn, lastSync, saveStatus, reloadData, silentRefresh,
+    updateActivity,
   } = useVmpData();
   const [view, setView] = useState("overview");
   const [showPw, setShowPw] = useState(false);
@@ -1731,6 +1733,10 @@ export default function App() {
               {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
               {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
               {view === "server" && <ServerChecksView user={user} />}
+              {view === "progress" && (
+                <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
+                  onUpdate={updateActivity} onReload={reloadData} readOnly={false} />
+              )}
               {view === "alerts" && <AlertsView acts={filteredActs} />}
               {view === "risk" && <QrmView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}

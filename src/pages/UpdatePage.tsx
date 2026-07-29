@@ -133,7 +133,8 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }: {
 
 export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true }: {
   acts: PlanActivity[];
-  conn?: { status?: string; msg?: string; [k: string]: unknown };
+  /** Không dùng index signature để nhận được cả ConnState (status là union). */
+  conn?: { status?: string; msg?: string };
   isAdmin?: boolean;
   onUpdate?: (
     id: string,
@@ -241,7 +242,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
                     <button onClick={() => { if (!readOnly) setEdit(a); }}
                       disabled={readOnly || (isFrozen && !isAdmin)}
-                      title={readOnly ? "Google Sheet là nơi chỉnh sửa dữ liệu chuẩn" : "Cập nhật tiến độ"}
+                      title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
                       style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 10, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
                   </td>
                 </tr>

@@ -172,6 +172,63 @@ export async function updateProgressSupabase(
   return unwrap(data, error, "Cập nhật thất bại");
 }
 
+/* ------------------------------------------------------------------
+ * Cập nhật tiến độ từ FORM giao diện
+ * ------------------------------------------------------------------
+ * Form dùng tên kiểu Sheet (ngay_de_cuong, tt_de_cuong…) và nhãn tiếng
+ * Việt, còn rpc_update_progress nhận tên cột DB và enum phase_status.
+ * Ánh xạ đặt ở đây để chỉ có MỘT chỗ phải sửa khi đổi form hay đổi cột.
+ * ------------------------------------------------------------------ */
+
+/** Tên trường trên form -> cột trong vmp_plan_items. */
+const FORM_TO_COLUMN: Record<string, string> = {
+  ngay_de_cuong:   "actual_protocol_date",
+  tt_de_cuong:     "status_protocol",
+  lich_td:         "scheduled_date",
+  ngay_tham_dinh:  "actual_validation_date",
+  tt_tham_dinh:    "status_validation",
+  ngay_bao_cao:    "actual_report_date",
+  tt_bao_cao:      "status_report",
+  ngay_vmp:        "actual_vmp_date",
+  tt_vmp:          "status_vmp",
+};
+
+/** Nhãn tiếng Việt trên dropdown -> enum phase_status của Postgres. */
+const LABEL_TO_STATUS: Record<string, string> = {
+  "Hoàn thành":      "completed",
+  "Đang thực hiện":  "in_progress",
+  "Chưa hoàn thành": "not_started",
+  "Kế hoạch":        "not_started",
+};
+
+/**
+ * Cập nhật tiến độ một hạng mục từ form.
+ * Trả về lỗi rõ ràng khi RPC từ chối — ví dụ thiếu LÝ DO lúc đánh dấu hoàn
+ * thành (yêu cầu GMP), hoặc version_conflict khi người khác vừa sửa.
+ */
+export async function updateItemProgress(
+  validationCode: string,
+  form: Record<string, unknown>,
+  reason?: string,
+  expectedVersion?: number,
+): Promise<RpcResult> {
+  const patch: Record<string, unknown> = {};
+  for (const [formKey, col] of Object.entries(FORM_TO_COLUMN)) {
+    const raw = form[formKey];
+    if (raw === undefined || raw === null || raw === "") continue;
+    if (col.startsWith("status_")) {
+      const mapped = LABEL_TO_STATUS[String(raw)];
+      if (mapped) patch[col] = mapped;      // nhãn lạ thì bỏ qua, không đoán
+    } else {
+      patch[col] = String(raw);             // ngày đã ở dạng yyyy-mm-dd
+    }
+  }
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Chưa có thay đổi nào để lưu" };
+  }
+  return updateProgressSupabase(validationCode, patch, reason, null, expectedVersion);
+}
+
 /** Thêm hạng mục timeline. Mã sinh theo quy ước VMP01: {mã}/{năm}.{lần}-{loại} */
 export async function createPlanItem(
   { objectCode, validationType, year, occurrence = 1, patch = {} }: {

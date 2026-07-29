@@ -22,7 +22,7 @@ import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
 import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.ts";
 import {
   fetchVmpDataFromSupabase, fetchVmpWatermark,
-  updateProgressSupabase, upsertObjectSupabase, deleteSourceObject,
+  updateItemProgress, upsertObjectSupabase, deleteSourceObject,
 } from "../lib/supabaseData.ts";
 import { enrich } from "../utils/helpers.ts";
 
@@ -258,10 +258,17 @@ export function useVmpData() {
     }
   }, []);
 
+  /** Chữ ký khớp UpdatePage: (mã, form, tênNgườiDùng, lýDo, versionKỳVọng).
+   *  Tham số userName không dùng — server tự lấy người ghi theo JWT. */
   const updateActivity = useCallback(
-    (validationCode: string, patch: Record<string, unknown>, reason?: string, expectedVersion?: number) =>
-      runWrite("Cập nhật tiến độ", () =>
-        updateProgressSupabase(validationCode, patch, reason, null, expectedVersion)),
+    (
+      validationCode: string,
+      form: Record<string, unknown>,
+      _userName?: string,
+      reason?: string,
+      expectedVersion?: number,
+    ) => runWrite("Cập nhật tiến độ", () =>
+      updateItemProgress(validationCode, form, reason, expectedVersion)),
     [runWrite],
   );
   const saveObject = useCallback(
