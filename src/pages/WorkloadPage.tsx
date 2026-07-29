@@ -71,7 +71,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
     const map: Record<string, WlPerson> = {};
     pend.forEach((a) => {
       const mi = wlMonthOf(a);
-      const owner = a.owner || "—";
+      // Hạng mục chưa ai phụ trách gom thành MỘT "người" tên rõ ràng — trước
+      // đây hiện là "—", trông như một nhân sự tên gạch ngang gánh 180 việc.
+      const owner = a.owner && a.owner !== "—" ? a.owner : "Chưa phân công";
       if (!map[owner]) map[owner] = { name: owner, months: Array.from({ length: 12 }, () => ({ tasks: [], cong: 0, hoso: 0 })), congTotal: 0, hosoTotal: 0, count: 0, over: 0, critCao: 0 };
       const o = map[owner], cell = o.months[mi];
       const c = congConLai(a), h = hoSoConLai(a) ? 1 : 0;
@@ -147,7 +149,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const board = useMemo(() => {
     const m = new Map<string, { name: string; total: number; done: number; over: number }>();
     for (const a of acts) {
-      const k = a.owner && a.owner !== "—" ? a.owner : "(chưa phân)";
+      const k = a.owner && a.owner !== "—" ? a.owner : "Chưa phân công";
       if (!m.has(k)) m.set(k, { name: k, total: 0, done: 0, over: 0 });
       const r = m.get(k)!;
       r.total++;
@@ -304,14 +306,14 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           {board.map((r, i) => (
             <button key={r.name} className="vmp-row vmp-lift"
               onClick={() => openDetail(`Hạng mục của ${r.name}`,
-                acts.filter((a) => (a.owner && a.owner !== "—" ? a.owner : "(chưa phân)") === r.name))}
+                acts.filter((a) => (a.owner && a.owner !== "—" ? a.owner : "Chưa phân công") === r.name))}
               style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px",
                        borderRadius: 13, background: C.surface, cursor: "pointer", textAlign: "left",
-                       border: `1px solid ${r.name === "(chưa phân)" ? C.marigoldSoft : C.pinkSoft}` }}>
+                       border: `1px solid ${r.name === "Chưa phân công" ? C.marigoldSoft : C.pinkSoft}` }}>
               <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 13, color: C.plumSoft,
                              width: 22, flexShrink: 0 }}>{i + 1}</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 800,
-                             color: r.name === "(chưa phân)" ? C.marigoldText : C.plum }}>
+                             color: r.name === "Chưa phân công" ? C.marigoldText : C.plum }}>
                 {r.name}
               </span>
               <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700, whiteSpace: "nowrap" }}>
