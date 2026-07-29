@@ -5,14 +5,29 @@
  *  mọi lời gọi ghi từ UI đều bị chặn ở client trước khi chạm tới API.
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import type { DependencyList } from "react";
+import type { Activity, VmpObject } from "../types/domain.ts";
+
+/** Trạng thái kết nối nguồn dữ liệu hiển thị trên banner. */
+interface ConnState {
+  readUrl: string;
+  writeUrl: string;
+  status: "idle" | "loading" | "ok" | "err";
+  msg: string;
+  /** Nguồn dữ liệu đang dùng: "supabase" hoặc "n8n". */
+  source?: string;
+}
 import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.ts";
 import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
 import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.ts";
-import { fetchVmpDataFromSupabase, fetchVmpWatermark } from "../lib/supabaseData.ts";
+import {
+  fetchVmpDataFromSupabase, fetchVmpWatermark,
+  updateProgressSupabase, upsertObjectSupabase, deleteSourceObject,
+} from "../lib/supabaseData.ts";
 import { enrich } from "../utils/helpers.ts";
 
 // ======================== useDebounce ========================
-export function useDebounce(value, delay = 300) {
+export function useDebounce<T>(value: T, delay = 300): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(value), delay);
@@ -22,8 +37,8 @@ export function useDebounce(value, delay = 300) {
 }
 
 // ======================== useScrollTop ========================
-export function useScrollTop(deps) {
-  const ref = useRef(null);
+export function useScrollTop(deps: DependencyList) {
+  const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (ref.current) ref.current.scrollTop = 0;
   }, deps); // eslint-disable-line
@@ -47,7 +62,7 @@ export function useAuth() {
 
   useEffect(() => { saveUser(user); }, [user]);
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured()) {
       throw new Error("Hệ thống chưa cấu hình Supabase Auth. Liên hệ IT để thiết lập.");
     }
@@ -68,15 +83,15 @@ export function useAuth() {
 
 // ======================== useVmpData ========================
 export function useVmpData() {
-  const [objects, setObjects] = useState([]);
-  const [acts, setActs] = useState([]);
-  const [conn, setConn] = useState(() => {
+  const [objects, setObjects] = useState<VmpObject[]>([]);
+  const [acts, setActs] = useState<Activity[]>([]);
+  const [conn, setConn] = useState<ConnState>(() => {
     const c = loadConn();
     return c
       ? { readUrl: c.readUrl || "", writeUrl: c.writeUrl || "", status: "idle", msg: "Đã nạp URL — đang chờ đồng bộ…" }
       : { readUrl: "", writeUrl: "", status: "idle", msg: "" };
   });
-  const [lastSync, setLastSync] = useState(null);
+  const [lastSync, setLastSync] = useState<number | null>(null);
   const [saveStatus, setSaveStatus] = useState(""); // "saving" | "saved" | "error" | ""
   // Chữ ký dữ liệu gần nhất — để bỏ qua setState khi poll/Realtime trả về dữ liệu
   // y hệt (tránh re-render toàn bộ bảng/biểu đồ mỗi 2 phút khi không có thay đổi).
@@ -84,15 +99,16 @@ export function useVmpData() {
   // Watermark gần nhất (count + max updated_at). Poll so cái này TRƯỚC — chỉ khi
   // đổi mới kéo cả payload nặng về. Tránh JSON.stringify cả mảng mỗi 20s.
   const wmSigRef = useRef("");
-  const wmSig = (wm) => wm ? `${wm.plan_items}|${wm.objects}|${wm.updated_at}` : "";
-  const sigOf = (objs, activities) => {
+  const wmSig = (wm: { plan_items?: number; objects?: number; updated_at?: string } | null): string =>
+    wm ? `${wm.plan_items}|${wm.objects}|${wm.updated_at}` : "";
+  const sigOf = (objs: VmpObject[] | null, activities: Activity[]): string => {
     try { return JSON.stringify(activities) + "|" + (objs ? objs.length : 0); }
     catch { return String(Date.now()); }
   };
 
   const enriched = useMemo(() => enrich(objects, acts), [objects, acts]);
 
-  const connectSheet = useCallback(async (readUrl, writeUrl, force = false) => {
+  const connectSheet = useCallback(async (readUrl: string, writeUrl: string, force = false) => {
     setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", msg: "Đang tải dữ liệu…" }));
 
     // ƯU TIÊN 1: Đọc trực tiếp từ Supabase (nhanh, dữ liệu đã đồng bộ)
@@ -103,14 +119,14 @@ export function useVmpData() {
         if (Array.isArray(data.objects)) setObjects(data.objects);
         if (Array.isArray(data.activities)) setActs(data.activities);
         if (readUrl || writeUrl) saveConn(readUrl, writeUrl);
-        setLastSync(new Date());
+        setLastSync(Date.now());
         setConn({
           readUrl, writeUrl, status: "ok", source: "supabase",
           msg: `Đã tải ${data.objects.length} đối tượng · ${data.activities.length} hạng mục từ Supabase ✓`,
         });
         return;
       } catch (e) {
-        console.warn("Supabase read failed, trying n8n:", e.message);
+        console.warn("Supabase read failed, trying n8n:", (e as Error).message);
         // Fallback sang n8n nếu Supabase lỗi
       }
     }
@@ -121,11 +137,13 @@ export function useVmpData() {
       return;
     }
     try {
-      const data = await fetchVmpData(readUrl, force);
+      const data = (await fetchVmpData(readUrl, force)) as {
+        objects?: VmpObject[]; activities?: Activity[]; source?: string;
+      };
       if (Array.isArray(data.objects) && data.objects.length) setObjects(data.objects);
       if (Array.isArray(data.activities) && data.activities.length) setActs(data.activities);
       saveConn(readUrl, writeUrl);
-      setLastSync(new Date());
+      setLastSync(Date.now());
       setConn({
         readUrl, writeUrl, status: "ok", source: data.source,
         msg: `Đã tải ${data.objects?.length || 0} đối tượng · ${data.activities?.length || 0} hạng mục từ n8n ✓`,
@@ -133,7 +151,7 @@ export function useVmpData() {
     } catch (e) {
       setConn({
         readUrl, writeUrl, status: "err",
-        msg: "Lỗi tải: " + (e?.message || "không rõ") + " — kiểm tra URL / CORS / workflow",
+        msg: "Lỗi tải: " + ((e as Error)?.message || "không rõ") + " — kiểm tra URL / CORS / workflow",
       });
     }
   }, []);
@@ -163,7 +181,7 @@ export function useVmpData() {
       dataSigRef.current = sig;
       if (Array.isArray(data.objects)) setObjects(data.objects);
       if (Array.isArray(data.activities)) setActs(data.activities);
-      setLastSync(new Date());
+      setLastSync(Date.now());
     } catch (e) { /* im lặng — lần sau thử lại */ }
   }, []);
 
@@ -181,7 +199,7 @@ export function useVmpData() {
 
   useEffect(() => {
     if (!supabase) return;
-    let timer = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const debounced = () => {
       clearTimeout(timer);
       timer = setTimeout(() => refreshRef.current?.(), 800);
@@ -210,29 +228,51 @@ export function useVmpData() {
     return () => {
       clearTimeout(timer);
       clearInterval(poll);
-      supabase.removeChannel(channel);
+      supabase?.removeChannel(channel);
     };
   }, []);
 
-  const rejectWrite = useCallback((action) => {
-    const msg = `${action} đã bị khóa: Google Sheet là nguồn dữ liệu chuẩn. Vui lòng chỉnh sửa trên Sheet.`;
-    setSaveStatus("error");
-    setConn((c) => ({ ...c, msg }));
-    setTimeout(() => setSaveStatus(""), 5000);
-    return Promise.resolve({ ok: false, code: "sheet_canonical_read_only", error: msg });
+  /* ---- GHI ----------------------------------------------------------
+   * Trước 2026-07-29 mọi thao tác ghi đều bị chặn vì Google Sheet là nguồn
+   * chuẩn. Nay Supabase là nơi lưu dữ liệu chính và web là nơi nhập liệu,
+   * nên các hàm này gọi thẳng RPC. Quyền do server kiểm (SECURITY DEFINER
+   * đọc role/bộ phận từ profiles) — client không tự quyết định được.
+   * ------------------------------------------------------------------- */
+  const runWrite = useCallback(async <T,>(
+    label: string,
+    fn: () => Promise<T>,
+  ): Promise<T | { ok: false; error: string }> => {
+    setSaveStatus("saving");
+    try {
+      const res = await fn();
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 2500);
+      refreshRef.current?.();          // kéo lại dữ liệu để giao diện khớp DB
+      return res;
+    } catch (e) {
+      const msg = `${label} thất bại: ${(e as Error).message || "không rõ"}`;
+      setSaveStatus("error");
+      setConn((c) => ({ ...c, msg }));
+      setTimeout(() => setSaveStatus(""), 5000);
+      return { ok: false, error: msg };
+    }
   }, []);
 
   const updateActivity = useCallback(
-    () => rejectWrite("Cập nhật tiến độ trên web"),
-    [rejectWrite],
+    (validationCode: string, patch: Record<string, unknown>, reason?: string, expectedVersion?: number) =>
+      runWrite("Cập nhật tiến độ", () =>
+        updateProgressSupabase(validationCode, patch, reason, null, expectedVersion)),
+    [runWrite],
   );
   const saveObject = useCallback(
-    () => rejectWrite("Thêm hoặc sửa đối tượng trên web"),
-    [rejectWrite],
+    (obj: Parameters<typeof upsertObjectSupabase>[0]) =>
+      runWrite("Lưu đối tượng", () => upsertObjectSupabase(obj)),
+    [runWrite],
   );
   const deleteObject = useCallback(
-    () => rejectWrite("Xóa đối tượng trên web"),
-    [rejectWrite],
+    (kind: Parameters<typeof deleteSourceObject>[0], code: string, reason: string) =>
+      runWrite("Ngừng dùng đối tượng", () => deleteSourceObject(kind, code, reason)),
+    [runWrite],
   );
 
   return {
