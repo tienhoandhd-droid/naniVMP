@@ -4,6 +4,10 @@
  *  Doc tu state Supabase da co trong app. Khong goi network, khong ghi data.
  * ===================================================================== */
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+// lucide-react cũng xuất icon tên Activity (dùng trong TONE_ICON).
+import type { Activity as PlanActivity, VmpObject } from "../types/domain.ts";
 import {
   Activity,
   AlertTriangle,
@@ -65,32 +69,77 @@ const TONE_ICON = {
   neutral: Boxes,
 };
 
-function active(item) {
+/** Sự kiện timeline do buildTimelineEvents() sinh ra. */
+export interface VisualEvent {
+  id: string;
+  code?: string;
+  title?: string;
+  status?: string;
+  statusLabel?: string;
+  group?: string;
+  groupLabel?: string;
+  department?: string;
+  departmentLabel?: string;
+  owner?: string;
+  criticality?: string;
+  start?: string;
+  end?: string;
+  target?: string;
+  phases?: Array<{ id: string; label: string; due: string; actual: string; done: boolean }>;
+  [k: string]: unknown;
+}
+
+/** Nút trong sơ đồ luồng. */
+export interface VisualNode {
+  id: string;
+  label?: string;
+  type?: string;
+  count?: number;
+  /** Toạ độ trên canvas sơ đồ. */
+  x: number;
+  y: number;
+  /** Khoá gốc (mã bộ phận / trạng thái…) để tra nhãn. */
+  key?: string;
+  meta?: { key?: string; [k: string]: unknown };
+  [k: string]: unknown;
+}
+
+/** Cạnh nối giữa hai nút sơ đồ. */
+export interface VisualEdge {
+  id: string;
+  source: string;
+  target: string;
+  relation?: string;
+  weight?: number;
+  status?: string;
+}
+
+function active(item: { state?: string } | null | undefined): boolean {
   return (item?.state || "active") === "active";
 }
 
-function clean(value) {
+function clean(value: unknown): string {
   return String(value == null ? "" : value).trim();
 }
 
-function labelOfStatus(status) {
-  return STATUS[status]?.label || status || "Chưa rõ";
+function labelOfStatus(status?: string): string {
+  return (STATUS as Record<string, { label: string }>)[status ?? ""]?.label || status || "Chưa rõ";
 }
 
-function labelOfClass(cls) {
-  return CLS[cls]?.label || cls || "Chưa phân loại";
+function labelOfClass(cls?: string): string {
+  return (CLS as Record<string, { label: string }>)[cls ?? ""]?.label || cls || "Chưa phân loại";
 }
 
-function labelOfDept(dept) {
+function labelOfDept(dept?: string): string {
   return DEPTS.find((item) => item.id === dept)?.name || dept || "Chưa xác định";
 }
 
-function eventDateValue(value) {
+function eventDateValue(value: unknown): number | null {
   const date = parseD(value);
   return date ? date.getTime() : null;
 }
 
-function inScope(activity, scope) {
+function inScope(activity: PlanActivity, scope: string): boolean {
   if (scope === "all") return true;
   const target = parseD(activity?.target);
   if (!target) return false;
@@ -99,7 +148,7 @@ function inScope(activity, scope) {
   return target >= today && target <= end;
 }
 
-function explorerStats(events) {
+function explorerStats(events: VisualEvent[]) {
   const total = events.length;
   const done = events.filter((event) => event.status === "done").length;
   const attention = events.filter((event) => event.status === "over").length;
@@ -107,14 +156,19 @@ function explorerStats(events) {
   const next30 = addDays(today, 30);
   const dueSoon = events.filter((event) => {
     if (event.status === "done") return false;
-    const date = parseD(event.nextMilestone?.due || event.target);
+    const nm = event.nextMilestone as { due?: string } | undefined;
+    const date = parseD(nm?.due || event.target);
     return date && date >= today && date <= next30;
   }).length;
   return { total, done, attention, dueSoon, rate: total ? Math.round((done / total) * 100) : 0 };
 }
 
-function countRows(events, getKey, getLabel) {
-  const map = new Map();
+function countRows(
+  events: VisualEvent[],
+  getKey: (e: VisualEvent) => string | undefined,
+  getLabel: (key: string) => string,
+) {
+  const map = new Map<string, { key: string; label: string; count: number }>();
   events.forEach((event) => {
     const key = getKey(event);
     if (!key) return;
@@ -125,7 +179,12 @@ function countRows(events, getKey, getLabel) {
   return [...map.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi"));
 }
 
-function FilterSelect({ value, onChange, children, label }) {
+function FilterSelect({ value, onChange, children, label }: {
+  value: string;
+  onChange: (value: string) => void;
+  children?: ReactNode;
+  label?: ReactNode;
+}) {
   return (
     <label className="visual-filter-field">
       <span>{label}</span>
@@ -136,7 +195,11 @@ function FilterSelect({ value, onChange, children, label }) {
   );
 }
 
-function TabButton({ tab, activeTab, onClick }) {
+function TabButton({ tab, activeTab, onClick }: {
+  tab: { id: string; label: string; icon: LucideIcon };
+  activeTab: string;
+  onClick: (id: string) => void;
+}) {
   const Icon = tab.icon;
   const isActive = activeTab === tab.id;
   return (
@@ -151,8 +214,10 @@ function TabButton({ tab, activeTab, onClick }) {
   );
 }
 
-function MetricTile({ metric }) {
-  const Icon = TONE_ICON[metric.tone] || TONE_ICON.neutral;
+function MetricTile({ metric }: {
+  metric: { label: string; value: ReactNode; helper?: ReactNode; tone?: string };
+}) {
+  const Icon = (TONE_ICON as Record<string, LucideIcon>)[metric.tone ?? "neutral"] || TONE_ICON.neutral;
   return (
     <div className={`visual-metric visual-metric--${metric.tone}`}>
       <div className="visual-metric__icon">
@@ -167,7 +232,15 @@ function MetricTile({ metric }) {
   );
 }
 
-function PulseMetric({ icon: Icon, label, value, helper, tone = "neutral", active: isActive, onClick }) {
+function PulseMetric({ icon: Icon, label, value, helper, tone = "neutral", active: isActive, onClick }: {
+  icon: LucideIcon;
+  label: ReactNode;
+  value: ReactNode;
+  helper?: ReactNode;
+  tone?: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
   const content = (
     <>
       <Icon size={16} />
@@ -187,11 +260,16 @@ function PulseMetric({ icon: Icon, label, value, helper, tone = "neutral", activ
   );
 }
 
-function EmptyPanel({ children = "Không có dữ liệu phù hợp với bộ lọc hiện tại." }) {
+function EmptyPanel({ children = "Không có dữ liệu phù hợp với bộ lọc hiện tại." }: { children?: ReactNode }) {
   return <div className="visual-empty">{children}</div>;
 }
 
-function TimelinePanel({ events, onSelect, selectedId, density }) {
+function TimelinePanel({ events, onSelect, selectedId, density }: {
+  events: VisualEvent[];
+  onSelect: (e: VisualEvent) => void;
+  selectedId?: string | null;
+  density?: string;
+}) {
   const validDates = events
     .flatMap((event) => [eventDateValue(event.start), eventDateValue(event.end), eventDateValue(event.target)])
     .filter((value) => value != null);
@@ -216,7 +294,7 @@ function TimelinePanel({ events, onSelect, selectedId, density }) {
   const today = vmpToday();
   const todayVisible = today >= min && today <= max;
 
-  const pct = (value) => {
+  const pct = (value: unknown): number => {
     const ts = value instanceof Date ? value.getTime() : eventDateValue(value);
     if (ts == null) return 0;
     return Math.max(0, Math.min(100, ((ts - min.getTime()) / range) * 100));
@@ -278,9 +356,11 @@ function TimelinePanel({ events, onSelect, selectedId, density }) {
                 <em style={{ left: `${pct(event.target)}%` }} />
               </div>
               <div className="visual-timeline-row__status">
-                <Pill s={event.status} small />
+                <Pill s={event.status ?? "plan"} small />
                 <span className="tnum">{fmtVN(parseD(event.target))}</span>
-                <small>{event.nextMilestone ? PHASE_LABELS[event.nextMilestone.id] : "Đã hoàn thành"}</small>
+                <small>{event.nextMilestone
+                  ? (PHASE_LABELS as Record<string, string>)[String((event.nextMilestone as { id?: string }).id ?? "")]
+                  : "Đã hoàn thành"}</small>
               </div>
             </button>
           );
@@ -290,12 +370,17 @@ function TimelinePanel({ events, onSelect, selectedId, density }) {
   );
 }
 
-export function DiagramPanel({ nodes, edges, onSelectNode, selectedNodeId }) {
+export function DiagramPanel({ nodes, edges, onSelectNode, selectedNodeId }: {
+  nodes: VisualNode[];
+  edges: VisualEdge[];
+  onSelectNode: (n: VisualNode) => void;
+  selectedNodeId?: string | null;
+}) {
   const [zoom, setZoom] = useState(1);
   if (!nodes.length) return <EmptyPanel />;
 
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-  const nodeWidth = (node) => (node.type === "source" ? 188 : 172);
+  const nodeWidth = (node: VisualNode): number => (node.type === "source" ? 188 : 172);
   const nodeHeight = 58;
   const height = Math.max(320, ...nodes.map((node) => node.y + nodeHeight + 38));
   const width = 980;
@@ -353,7 +438,7 @@ export function DiagramPanel({ nodes, edges, onSelectNode, selectedNodeId }) {
                 onClick={() => onSelectNode(node)}
                 title={`${node.label} · ${node.count || 0} hạng mục`}
               >
-                <span>{NODE_TYPE_LABELS[node.type] || node.type}</span>
+                <span>{(NODE_TYPE_LABELS as Record<string, string>)[node.type ?? ""] || node.type}</span>
                 <strong>{node.label}</strong>
                 <em className="tnum">{node.count || 0}</em>
               </button>
@@ -365,7 +450,11 @@ export function DiagramPanel({ nodes, edges, onSelectNode, selectedNodeId }) {
   );
 }
 
-export function DashboardPanel({ metrics, events, onSelectStatus }) {
+export function DashboardPanel({ metrics, events, onSelectStatus }: {
+  metrics: Array<{ key: string; label: string; value: ReactNode; helper?: ReactNode; tone?: string }>;
+  events: VisualEvent[];
+  onSelectStatus?: (s: string) => void;
+}) {
   if (!events.length) return <EmptyPanel />;
 
   const statusRows = STATUS_ORDER
@@ -374,12 +463,17 @@ export function DashboardPanel({ metrics, events, onSelectStatus }) {
   const classRows = countRows(events, (event) => event.group, labelOfClass);
   const deptRows = countRows(events, (event) => event.department, labelOfDept).slice(0, 8);
   const stageRows = ["protocol", "validation", "vmp"].map((key) => {
-    const count = events.filter((event) => event.phaseDone?.[key]).length;
-    return { key, label: PHASE_LABELS[key], count, rate: events.length ? Math.round((count / events.length) * 100) : 0 };
+    const count = events.filter((event) =>
+      (event.phaseDone as Record<string, boolean> | undefined)?.[key]).length;
+    return { key, label: (PHASE_LABELS as Record<string, string>)[key], count, rate: events.length ? Math.round((count / events.length) * 100) : 0 };
   });
   const maxCount = Math.max(1, ...[...statusRows, ...classRows, ...deptRows].map((row) => row.count));
 
-  const ProgressList = ({ title, rows, kind }) => (
+  const ProgressList = ({ title, rows, kind }: {
+    title: string;
+    rows: Array<{ key: string; label: string; count: number; rate?: number }>;
+    kind: string;
+  }) => (
     <div className="visual-layout-panel">
       <div className="visual-layout-panel__head">
         <strong>{title}</strong>
@@ -391,7 +485,7 @@ export function DashboardPanel({ metrics, events, onSelectStatus }) {
             type="button"
             key={row.key}
             className={`visual-progress-row visual-progress-row--${kind}-${row.key}`}
-            onClick={() => kind === "status" && onSelectStatus(row.key)}
+            onClick={() => { if (kind === "status") onSelectStatus?.(row.key); }}
           >
             <span>{row.label}</span>
             <i><b style={{ width: `${Math.max(4, (row.count / maxCount) * 100)}%` }} /></i>
@@ -439,7 +533,12 @@ export function DashboardPanel({ metrics, events, onSelectStatus }) {
   );
 }
 
-export function TablePanel({ events, onSelect, selectedId, density }) {
+export function TablePanel({ events, onSelect, selectedId, density }: {
+  events: VisualEvent[];
+  onSelect: (e: VisualEvent) => void;
+  selectedId?: string | null;
+  density?: string;
+}) {
   if (!events.length) return <EmptyPanel />;
 
   return (
@@ -475,7 +574,7 @@ export function TablePanel({ events, onSelect, selectedId, density }) {
                 <td>{event.groupLabel}</td>
                 <td>{event.departmentLabel}</td>
                 <td>{event.owner}</td>
-                <td><Pill s={event.status} small /></td>
+                <td><Pill s={event.status ?? "plan"} small /></td>
                 <td className="tnum">{fmtVN(parseD(event.target))}</td>
               </tr>
             ))}
@@ -486,7 +585,11 @@ export function TablePanel({ events, onSelect, selectedId, density }) {
   );
 }
 
-function DetailPanel({ event, node, onClose }) {
+function DetailPanel({ event, node, onClose }: {
+  event?: VisualEvent | null;
+  node?: VisualNode | null;
+  onClose: () => void;
+}) {
   if (!event && !node) {
     return (
       <aside className="visual-detail visual-detail--empty">
@@ -501,7 +604,7 @@ function DetailPanel({ event, node, onClose }) {
     return (
       <aside className="visual-detail">
         <button type="button" className="visual-detail__close" onClick={onClose}><X size={15} /></button>
-        <span className="visual-detail__eyebrow">{NODE_TYPE_LABELS[node.type] || node.type}</span>
+        <span className="visual-detail__eyebrow">{(NODE_TYPE_LABELS as Record<string, string>)[node.type ?? ""] || node.type}</span>
         <h3>{node.label}</h3>
         <div className="visual-detail__stat">
           <span>Hạng mục liên quan</span>
@@ -512,10 +615,13 @@ function DetailPanel({ event, node, onClose }) {
     );
   }
 
-  const phaseRows = event.phases || [
-    { id: "protocol", label: "Đề cương", done: event.phaseDone.protocol },
-    { id: "validation", label: "Thẩm định thực tế", done: event.phaseDone.validation },
-    { id: "vmp", label: "Hoàn thành VMP", done: event.phaseDone.vmp },
+  if (!event) return null;
+  const pd = (event.phaseDone || {}) as Record<string, boolean>;
+  type PhaseRow = { id: string; label: string; done?: boolean; due?: string; actual?: string };
+  const phaseRows: PhaseRow[] = event.phases || [
+    { id: "protocol", label: "Đề cương", done: pd.protocol },
+    { id: "validation", label: "Thẩm định thực tế", done: pd.validation },
+    { id: "vmp", label: "Hoàn thành VMP", done: pd.vmp },
   ];
 
   return (
@@ -525,7 +631,7 @@ function DetailPanel({ event, node, onClose }) {
       <h3>{event.title}</h3>
       <div className="visual-detail__chips">
         <Tag color={C.plum} bg={C.pinkMist}>{event.code || "—"}</Tag>
-        <Pill s={event.status} small />
+        <Pill s={event.status ?? "plan"} small />
       </div>
       <dl>
         <div><dt>Đích VMP</dt><dd className="tnum">{fmtVN(parseD(event.target))}</dd></div>
@@ -536,7 +642,7 @@ function DetailPanel({ event, node, onClose }) {
       <div className="visual-detail__phase">
         {phaseRows.map((phase) => (
           <span key={phase.id} className={phase.done ? "visual-detail__phase-done" : ""}>
-            <strong>{PHASE_LABELS[phase.id] || phase.label}</strong>
+            <strong>{(PHASE_LABELS as Record<string, string>)[phase.id] || phase.label}</strong>
             <small className="tnum">{phase.done && phase.actual ? fmtVN(parseD(phase.actual)) : fmtVN(parseD(phase.due))}</small>
           </span>
         ))}
@@ -545,7 +651,9 @@ function DetailPanel({ event, node, onClose }) {
   );
 }
 
-export default function VisualExplorerPage({ objects = [], acts = [] }) {
+export default function VisualExplorerPage({ objects = [], acts = [] }: {
+  objects?: VmpObject[]; acts?: PlanActivity[];
+}) {
   const [tab, setTab] = useState("timeline");
   const [scope, setScope] = useState("all");
   const [status, setStatus] = useState("all");
@@ -554,7 +662,7 @@ export default function VisualExplorerPage({ objects = [], acts = [] }) {
   const [density, setDensity] = useState("compact");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState("");
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [selectedNode, setSelectedNode] = useState<VisualNode | null>(null);
 
   const allModel = useMemo(() => buildVisualModel({ objects, activities: acts }), [objects, acts]);
 
@@ -567,7 +675,7 @@ export default function VisualExplorerPage({ objects = [], acts = [] }) {
       if (cls !== "all" && activity.cls !== cls) return false;
       if (dept !== "all" && activity.dept !== dept) return false;
       if (!needle) return true;
-      const raw = activity._raw || {};
+      const raw = (activity._raw || {}) as Record<string, unknown>;
       return [
         activity.id,
         activity.code,
@@ -609,17 +717,17 @@ export default function VisualExplorerPage({ objects = [], acts = [] }) {
     setQ("");
   };
 
-  const selectEvent = (event) => {
+  const selectEvent = (event: VisualEvent) => {
     setSelectedId(event.id);
     setSelectedNode(null);
   };
 
-  const selectNode = (node) => {
+  const selectNode = (node: VisualNode) => {
     setSelectedNode(node);
     setSelectedId("");
   };
 
-  const selectTab = (value) => {
+  const selectTab = (value: string) => {
     setTab(value);
     setSelectedId("");
     setSelectedNode(null);
