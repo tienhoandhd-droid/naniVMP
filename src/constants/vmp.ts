@@ -93,13 +93,13 @@ export const NAV_ITEMS = [
 
 export const NAV_SUBS = {
   overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
-  timeline: "Timeline · Sơ đồ · Bố cục · Bảng — các mốc Đề cương → Thẩm định → Báo cáo → Đích VMP",
+  timeline: "Tổng quan tải việc theo tháng · Timeline các mốc Đề cương → Thẩm định → Báo cáo → Đích VMP",
   alerts: "Cảnh báo tới hạn / quá hạn / tái thẩm định — xếp theo điểm rủi ro ICH Q9, kèm ma trận QRM",
   progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
   inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
   source: "Danh mục nguồn · Người nhận cảnh báo · Danh bạ nhân sự · Người thực hiện · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
-  reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / DOCX / HTML",
+  reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / Excel / HTML",
   rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
   health: "Sức khoẻ dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng ở Supabase",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",

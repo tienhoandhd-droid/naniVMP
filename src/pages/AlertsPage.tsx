@@ -15,7 +15,7 @@ import { AlertCircle, CalendarClock, Filter, ShieldAlert, Download, Search, List
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { CLS, CRIT, DEPTS, DEP_DAYS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
 import {
-  parseD, fmtVN, daysBetween, addMonths, txt, milestones,
+  parseD, fmtVN, daysBetween, addMonths, txt, nguoiPhuTrach, milestones,
   qrmRpn, qrmLevel, byRisk,
 } from "../utils/helpers.ts";
 import { Card, CardTitle, Tag, KpiCard, Modal, Pill } from "../components/ui/Primitives.tsx";
@@ -130,7 +130,7 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
         </div>
         <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
           {r.a.id} · Mốc <b style={{ color: late ? C.raspText : C.marigoldText }}>{r.stage}</b>
-          {r.date ? ` · hạn ${fmtVN(r.date)}` : ""} · {txt(r.a.owner)}
+          {r.date ? ` · hạn ${fmtVN(r.date)}` : ""} · {nguoiPhuTrach(r.a.owner)}
           {email ? <> (<a href={`mailto:${email}?subject=${encodeURIComponent(`[VMP] ${KIND_LABEL[r.kind]}: ${r.a.id} — ${r.a.name}`)}`}
             onClick={(e) => e.stopPropagation()}
             style={{ color: C.lavText, fontWeight: 700 }}>{email}</a>)</> : null}
@@ -195,7 +195,7 @@ export function AlertDetailModal({ r, email, onClose }: {
           <Pill s={a.st} small />
         </div>
         <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
-          {a.code} · {txt(a.dept)} · người thực hiện <b style={{ color: C.plum }}>{txt(a.owner)}</b>
+          {a.code} · {txt(a.dept)} · người thực hiện <b style={{ color: C.plum }}>{nguoiPhuTrach(a.owner)}</b>
           {email ? <> · <a href={`mailto:${email}`} style={{ color: C.lavText, fontWeight: 700 }}>{email}</a></> : ""}
           {a.freq ? ` · chu kỳ ${a.freq} tháng` : ""}
         </div>
@@ -378,7 +378,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     for (const r of shown) {
       const rpn = qrmRpn(r.a);
       lines.push([
-        KIND_LABEL[r.kind], r.a.id, r.a.name, r.a.vtype, r.a.dept, txt(r.a.owner),
+        KIND_LABEL[r.kind], r.a.id, r.a.name, r.a.vtype, r.a.dept, nguoiPhuTrach(r.a.owner),
         find(r.a.owner)?.email ?? "",
         r.stage, r.date ? fmtVN(r.date) : "", r.dleft, rpn, LEVEL_STYLE[qrmLevel(rpn)].label,
       ].map(esc).join(","));

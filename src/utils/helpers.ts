@@ -42,6 +42,12 @@ export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo,
 // Ô trống / null / "—"  →  "Không có thông tin" (CHỈ dùng cho HIỂN THỊ).
 // KHÔNG dùng cho dữ liệu tính toán (ngày, trạng thái, tỷ lệ) — sẽ phá logic.
 export const NO_INFO = "Không có thông tin";
+/** Người phụ trách chưa gán thì nói "Chưa phân công" — "Không có thông tin"
+ *  nghe như hệ thống mất dữ liệu, trong khi thật ra là chưa ai được giao. */
+export const nguoiPhuTrach = (v: unknown): string => {
+  const s = String(v == null ? "" : v).trim();
+  return (s === "" || s === "—") ? "Chưa phân công" : s;
+};
 export const txt = (v: unknown): string => {
   const s = String(v == null ? "" : v).trim();
   return (s === "" || s === "—") ? NO_INFO : String(v);
@@ -302,7 +308,7 @@ export function runDataQualityChecks(acts: Activity[]) {
 
     // 6. Thiếu email QA
     if (a.owner && a.owner !== "—" && !r.email_qa) {
-      issues.push({ type: "owner_no_email", severity: "info", id: a.id, msg: `QA "${a.owner}" chưa có email — không nhận được cảnh báo` });
+      issues.push({ type: "owner_no_email", severity: "info", id: a.id, msg: `QA "${a.owner}" chưa có email — không nhận được cảnh báo. Bổ sung ở Danh mục & Nhập liệu → tab Người thực hiện.` });
     }
 
     // 7. Thiếu loại thẩm định
