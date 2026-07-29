@@ -23,8 +23,8 @@ interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string; goiY?:
 
 /** Câu hỏi mồi — người mới không biết hỏi gì thì bấm thẳng. */
 const GOI_Y = [
+  "Ta là ai?",
   "Còn bao nhiêu hạng mục quá hạn?",
-  "Tỷ lệ hoàn thành theo người phụ trách",
   "Liệt kê hạng mục sắp đến hạn 30 ngày",
   "Vì sao LAF cân được 9 điểm trọng yếu?",
 ];
@@ -36,11 +36,11 @@ const GOI_Y = [
  * giây — im lặng chừng đó là người dùng tưởng hỏng và bấm lại. Lời chờ
  * đổi dần vừa cho biết hệ vẫn chạy, vừa nói ra nó đang làm gì. */
 const LOI_CHO: Array<{ tu: number; text: string }> = [
-  { tu: 0,     text: "Công chúa đang lật sổ tra giúp anh/chị…" },
+  { tu: 0,     text: "Công chúa đang lật sổ tra cho ngươi…" },
   { tu: 2500,  text: "Công chúa đang đăm chiêu, suy nghĩ để đưa ra câu trả lời…" },
-  { tu: 6000,  text: "Câu này hơi khó, công chúa đang tra thêm tài liệu luật…" },
-  { tu: 11000, text: "Công chúa vẫn đang cặm cụi, anh/chị chờ em thêm chút nữa nhé…" },
-  { tu: 18000, text: "Hôm nay hệ hơi đông, công chúa đang xếp hàng chờ tới lượt ạ…" },
+  { tu: 6000,  text: "Câu này hơi hóc, công chúa phải giở thêm tài liệu luật…" },
+  { tu: 11000, text: "Công chúa vẫn đang cặm cụi, ngươi nán thêm chút nữa…" },
+  { tu: 18000, text: "Hôm nay cung đông khách, công chúa đang chờ tới lượt…" },
 ];
 
 export default function ChatBox({ user }: { user?: AppUser | null }) {
@@ -124,10 +124,10 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
       const noiDung = String(data.tra_loi ?? "").trim();
       if (!noiDung) {
         setMsgs((m) => [...m, { ai: true, loi: true,
-          text: "Dạ em xin lỗi, mô hình vừa không trả về nội dung nào ạ. "
-              + "Anh/chị thử hỏi ngắn gọn hơn giúp em nhé — ví dụ "
-              + "\"bao nhiêu hạng mục quá hạn\" — những câu như vậy em tra "
-              + "thẳng từ database, không cần nhờ AI ạ." }]);
+          text: "Mô hình vừa không trả về nội dung nào. "
+              + "Ngươi thử hỏi ngắn gọn hơn — ví dụ "
+              + "\"bao nhiêu hạng mục quá hạn\" — những câu như vậy bổn cung tra "
+              + "thẳng từ database, không cần nhờ tới AI." }]);
         setDangHoi(false);
         return;
       }
@@ -186,7 +186,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
             Công chúa Vali
           </div>
           <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>
-            Số liệu đọc thẳng từ database · em không đoán đâu ạ
+            Số liệu đọc thẳng từ database · bổn cung không đoán
           </div>
         </div>
         <button onClick={() => setMo(false)} title="Đóng"
@@ -203,9 +203,9 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
         {msgs.length === 0 && (
           <>
             <div style={{ fontSize: 12.5, color: C.plumSoft, lineHeight: 1.65 }}>
-              Dạ em chào ạ 🌸 Em là Vali. Anh/chị cứ hỏi em bất cứ điều gì về
-              timeline VMP nhé — tiến độ, người phụ trách, điểm trọng yếu, hay
-              quy tắc tính hạn, em tra giúp ạ.
+              Bổn cung là Vali 🌸 Ngươi cứ hỏi thẳng chuyện trong kế hoạch
+              thẩm định — tiến độ, người phụ trách, điểm trọng yếu, hay quy
+              tắc tính hạn, bổn cung tra cho.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 3 }}>
               {GOI_Y.map((g) => (
@@ -239,13 +239,13 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
                             background: C.marigoldSoft, color: C.marigoldText,
                             fontSize: 11.5, lineHeight: 1.55, fontWeight: 600 }}>
                 <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
-                {m.canhBao} Anh/chị đối chiếu lại trên bảng giúp em nhé.
+                {m.canhBao} Ngươi đối chiếu lại trên bảng cho chắc.
               </div>
             )}
             {m.goiY && m.goiY.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
                 <div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700 }}>
-                  Anh/chị có muốn hỏi tiếp không ạ 🌸
+                  Ngươi muốn hỏi tiếp gì nữa 🌸
                 </div>
                 {m.goiY.map((g) => (
                   <button key={g} onClick={() => hoi(g)} className="vmp-lift"
@@ -261,7 +261,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
             {m.nguon === "dem" && (
               <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 4,
                             paddingLeft: 3, fontWeight: 700 }}>
-                💾 Em đã tra câu này rồi, dữ liệu chưa đổi nên dùng lại ạ
+                💾 Bổn cung đã tra câu này, dữ liệu chưa đổi nên dùng lại
               </div>
             )}
           </div>
@@ -299,7 +299,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
               // Enter gửi, Shift+Enter xuống dòng — quy ước quen thuộc
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); hoi(q); }
             }}
-            placeholder="Anh/chị muốn hỏi Vali điều gì ạ…"
+            placeholder="Ngươi muốn hỏi bổn cung điều gì…"
             style={{ flex: 1, resize: "none", maxHeight: 110, padding: "10px 12px",
                      borderRadius: R.md, border: `1px solid ${C.line}`,
                      background: C.surfaceSunk, color: C.plum, fontFamily: TEXT,
@@ -315,7 +315,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
         </div>
         <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 7, lineHeight: 1.5 }}>
           Câu hỏi và câu trả lời được ghi nhật ký theo yêu cầu ALCOA+.
-          Em vẫn có thể nhầm ạ — số liệu quan trọng anh/chị đối chiếu lại trên bảng giúp em nhé.
+          Bổn cung vẫn có thể nhầm — số liệu quan trọng thì đối chiếu lại trên bảng.
         </div>
       </div>
     </div>
