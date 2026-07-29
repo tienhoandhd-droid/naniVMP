@@ -8,29 +8,25 @@ import {
   FileText,
   Filter,
   GanttChartSquare,
-  LayoutGrid,
-  Network,
   Search,
-  Table2,
 } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
 import { CLS, DEPTS, CRIT, MONTHS, PHASE_COLOR, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
 import { parseD, fmtVN, milestones, phaseStates, addDays, clamp, wlIsDone } from "../utils/helpers.ts";
 import { useDebounce } from "../hooks/index.ts";
 import { Card, Tag, Modal, Pill, phaseTag } from "../components/ui/Primitives.tsx";
-import { buildVisualModel } from "../lib/visualModel.ts";
-import { DiagramPanel, DashboardPanel, TablePanel } from "./VisualExplorerPage.tsx";
 import type { ReactNode } from "react";
-import type { Activity, Milestones, VmpObject } from "../types/domain.ts";
+import type { Activity, Milestones } from "../types/domain.ts";
 
 // Các "không gian làm việc" gộp chung dưới menu Timeline VMP: timeline sâu +
-// 3 góc nhìn phân tích (sơ đồ luồng, bố cục dashboard, bảng dữ liệu).
+// Chỉ hai góc nhìn. Ba tab "Sơ đồ · Bố cục · Bảng" đã bỏ (29/07/2026):
+// cả ba vẽ lại cùng bộ dữ liệu mà tab Timeline đã hiện đầy đủ hơn — Sơ đồ
+// và Bố cục chỉ đổi cách bày, còn Bảng thì trùng hẳn với chế độ bảng có
+// sẵn trong Timeline. Năm tab cho hai nội dung chỉ làm người dùng phải
+// thử từng cái mới biết cái nào có thứ mình cần.
 const WORKSPACES = [
   { id: "overview", label: "Tổng quan", icon: BarChart3 },
   { id: "timeline", label: "Timeline", icon: GanttChartSquare },
-  { id: "diagram", label: "Sơ đồ", icon: Network },
-  { id: "dashboard", label: "Bố cục", icon: LayoutGrid },
-  { id: "table", label: "Bảng", icon: Table2 },
 ];
 
 const DAY_MS = 86400000;
@@ -1507,9 +1503,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
   );
 }
 
-export default function TimelineView({ acts, objects = [] }: {
-  acts: Activity[]; objects?: VmpObject[];
-}) {
+export default function TimelineView({ acts }: { acts: Activity[] }) {
   const year = vmpToday().getFullYear();
   const [workspace, setWorkspace] = useState("overview");
   const [view, setView] = useState("year");
@@ -1580,10 +1574,6 @@ export default function TimelineView({ acts, objects = [] }: {
     });
   }, [acts, cls, dept, dq, status]);
 
-  const visualModel = useMemo(
-    () => buildVisualModel({ objects, activities: explorerActs }),
-    [objects, explorerActs],
-  );
   const isTimeline = workspace === "timeline";
 
   const resetFilters = () => {
@@ -1868,18 +1858,7 @@ export default function TimelineView({ acts, objects = [] }: {
           )}
         </div>
         </>
-        ) : workspace === "diagram" ? (
-          <DiagramPanel nodes={visualModel.diagramNodes} edges={visualModel.diagramEdges} onSelectNode={() => {}} selectedNodeId="" />
-        ) : workspace === "dashboard" ? (
-          <DashboardPanel
-            metrics={visualModel.dashboardMetrics}
-            events={visualModel.timelineEvents}
-            onSelectStatus={(s) => { setStatus(["over", "prog", "todo", "done"].includes(s) ? s : "all"); setWorkspace("timeline"); }}
-          />
-        ) : (
-          <TablePanel events={visualModel.timelineEvents} selectedId=""
-            onSelect={(ev) => setDetail((ev.raw as Activity) ?? null)} density={density} />
-        )}
+        ) : null}
       </Card>
 
       <ActivityDetailModal a={detail} onClose={() => setDetail(null)} />
