@@ -95,6 +95,7 @@ const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
 const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
+const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1822,6 +1823,9 @@ export default function App() {
               {view === "admin" && <AdminView conn={conn} user={user} />}
             </Suspense>
             </div>
+
+            {/* Trợ lý hỏi đáp — nổi ở góc, không chiếm chỗ của bảng dữ liệu */}
+            <Suspense fallback={null}><ChatBox user={user} /></Suspense>
           </div>
         </div>
       </main>
