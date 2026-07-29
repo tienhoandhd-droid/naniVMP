@@ -9,7 +9,33 @@ import { DEPTS, DEPT_COLOR, DEPT_DEEP } from "../../constants/vmp.ts";
 import { parseDepts, wlIsDone } from "../../utils/helpers.ts";
 import { Card, CardTitle, Sel } from "../ui/Primitives.tsx";
 
-const ACTIVE = (activity) => (activity.state || "active") === "active";
+import type { CSSProperties } from "react";
+import type { Activity } from "../../types/domain.ts";
+
+/** Một nhóm trong bảng phân tích (theo bộ phận / người / loại...). */
+interface Group {
+  key: string;
+  label: string;
+  short?: string;
+  deptId?: string;
+}
+
+/** Một chỉ số hoàn thành (đề cương / thẩm định / báo cáo / VMP).
+ *  Suy thẳng từ mảng METRICS để không lệch khi thêm bớt chỉ số. */
+type Metric = (typeof METRICS)[number];
+
+/** Một dòng trong bảng phân tích: nhóm + các hạng mục + tỉ lệ hoàn thành. */
+interface GroupRow {
+  key: string;
+  label: string;
+  activities: Activity[];
+  summary: Record<string, { done: number; total: number; rate: number }>;
+  short?: string;
+  deptId?: string;
+  [k: string]: unknown;
+}
+
+const ACTIVE = (activity: Activity): boolean => (activity.state || "active") === "active";
 
 const METRICS = [
   {
@@ -56,37 +82,37 @@ const METRICS = [
   },
 ];
 
-const clean = (value) => String(value == null ? "" : value).trim();
+const clean = (value: unknown): string => String(value == null ? "" : value).trim();
 
-function splitPeople(value) {
+function splitPeople(value: unknown): string[] {
   return clean(value)
     .split(/\s*(?:,|;|\s+&\s+)\s*/)
     .map((name) => name.trim())
     .filter((name) => name && name !== "—");
 }
 
-function activityPeople(activity) {
+function activityPeople(activity: Activity): string[] {
   const raw = activity._raw || {};
   const values = [activity.owner, raw.qa, raw.ns_khac, raw.secondary_owner, raw.owner_name];
   return [...new Set(values.flatMap(splitPeople))];
 }
 
-function deptMeta(deptId) {
+function deptMeta(deptId?: string) {
   return DEPTS.find((item) => item.id === deptId);
 }
 
 // precomputed: mảng mã bộ phận đã chuẩn hoá ở server (activity.depts /
 // activity.exec_depts). Ưu tiên nó; chỉ regex raw khi RPC chưa trả (đường n8n).
-function deptGroup(activity, rawField, precomputed) {
-  const raw = activity._raw || {};
-  const parsed = (Array.isArray(precomputed) && precomputed.length)
-    ? precomputed
+function deptGroup(activity: Activity, rawField: string, precomputed?: unknown): Group[] {
+  const raw = (activity._raw || {}) as Record<string, unknown>;
+  const parsed: string[] = (Array.isArray(precomputed) && precomputed.length)
+    ? (precomputed as string[])
     : parseDepts(raw[rawField]);
   if (parsed.length) return parsed.map((deptId) => {
     const dept = deptMeta(deptId);
     return {
       key: deptId,
-      label: dept?.name || raw[rawField] || "Chưa xác định",
+      label: String(dept?.name || raw[rawField] || "Chưa xác định"),
       short: dept?.short || "—",
       deptId,
     };
@@ -94,7 +120,7 @@ function deptGroup(activity, rawField, precomputed) {
   return [];
 }
 
-function valueGroup(value, emptyLabel) {
+function valueGroup(value: unknown, emptyLabel: string): Group[] {
   const label = clean(value);
   return [{ key: label ? label.toLocaleLowerCase("vi") : "unknown", label: label || emptyLabel }];
 }
@@ -107,7 +133,7 @@ const DIMENSION_OPTIONS = [
   { id: "line", label: "Line", head: "Line" },
 ];
 
-function dimensionGroups(activity, dimension) {
+function dimensionGroups(activity: Activity, dimension: string): Group[] {
   const raw = activity._raw || {};
   if (dimension === "department") {
     const groups = deptGroup(activity, "bo_phan_goc", activity.depts);
@@ -132,13 +158,13 @@ function dimensionGroups(activity, dimension) {
   return people.map((person) => ({ key: person.toLocaleLowerCase("vi"), label: person }));
 }
 
-function isMetricDone(activity, metric) {
-  const raw = activity._raw || {};
+function isMetricDone(activity: Activity, metric: Metric): boolean {
+  const raw = (activity._raw || {}) as Record<string, unknown>;
   if (metric.id === "vmp" && activity.st === "done") return true;
   return wlIsDone(raw[metric.field]);
 }
 
-function completionSummary(activities) {
+function completionSummary(activities: Activity[]) {
   const active = activities.filter(ACTIVE);
   const total = active.length;
   return Object.fromEntries(METRICS.map((metric) => {
@@ -177,7 +203,7 @@ const ENUM_LABEL = {
 
 // Màu theo ngữ nghĩa chữ trạng thái (nhận diện tiếng Việt). Thứ tự có chủ đích:
 // xét phủ định ("chưa/không") TRƯỚC để "Chưa tiến hành" không bị bắt nhầm là "đang".
-function statusTone(label) {
+function statusTone(label: string) {
   if (label === EMPTY_LABEL) return C.plumSoft;
   const x = label.toLowerCase();
   if (/quá hạn|overdue/.test(x)) return C.raspText;
@@ -190,7 +216,7 @@ function statusTone(label) {
 }
 
 // Phân bố trạng thái theo chữ trong cột, đếm theo ID thẩm định duy nhất.
-function statusDistribution(activities, field, fallback) {
+function statusDistribution(activities: Activity[], field: string, fallback: string) {
   const seen = new Set();
   const counts = new Map();
   let total = 0;
@@ -199,11 +225,11 @@ function statusDistribution(activities, field, fallback) {
     if (!id || seen.has(id)) continue; // mã duy nhất = ID thẩm định
     seen.add(id);
     total += 1;
-    const raw = activity._raw || {};
+    const raw = (activity._raw || {}) as Record<string, unknown>;
     let value = clean(raw[field]); // ưu tiên chữ gốc *_goc
     if ((value === "" || value === "—") && fallback) value = clean(raw[fallback]); // fallback enum
     if (value === "" || value === "—") value = EMPTY_LABEL; // chưa điền → nhóm riêng
-    else value = ENUM_LABEL[value] || value; // enum -> nhãn VN; chữ gốc giữ nguyên
+    else value = (ENUM_LABEL as Record<string, string>)[value] || value; // enum -> nhãn VN; chữ gốc giữ nguyên
     counts.set(value, (counts.get(value) || 0) + 1);
   }
   const rows = [...counts.entries()]
@@ -216,7 +242,7 @@ function statusDistribution(activities, field, fallback) {
   return { rows, total };
 }
 
-function StatusBreakdown({ acts }) {
+function StatusBreakdown({ acts }: { acts: Activity[] }) {
   const [dim, setDim] = useState("vmp");
   const active = STATUS_DIMS.find((item) => item.id === dim) || STATUS_DIMS[0];
   const { rows, total } = useMemo(
@@ -293,7 +319,9 @@ function StatusBreakdown({ acts }) {
   );
 }
 
-function ProgressBar({ rate, color, height = 8 }) {
+function ProgressBar({ rate, color, height = 8 }: {
+  rate: number; color: string; height?: number;
+}) {
   return (
     <div style={{ height, borderRadius: 999, background: C.pinkSoft, overflow: "hidden" }}>
       <div style={{
@@ -304,7 +332,10 @@ function ProgressBar({ rate, color, height = 8 }) {
   );
 }
 
-function MetricCard({ metric, value }) {
+function MetricCard({ metric, value }: {
+  metric: Metric;
+  value: { done: number; total: number; rate: number };
+}) {
   const Icon = metric.icon;
   return (
     <div style={{
@@ -337,28 +368,40 @@ function MetricCard({ metric, value }) {
   );
 }
 
-function groupRows(activities, dimension) {
-  const groups = new Map();
-  const add = (key, label, activity, meta = {}) => {
+function groupRows(activities: Activity[], dimension: string): GroupRow[] {
+  const groups = new Map<string, {
+    key: string; label: string; activities: Activity[]; [k: string]: unknown;
+  }>();
+  const add = (
+    key: string,
+    label: string,
+    activity: Activity,
+    meta: Record<string, unknown> = {},
+  ): void => {
     if (!key) return;
     if (!groups.has(key)) groups.set(key, { key, label, activities: [], ...meta });
-    groups.get(key).activities.push(activity);
+    groups.get(key)!.activities.push(activity);
   };
 
   activities.filter(ACTIVE).forEach((activity) => {
     dimensionGroups(activity, dimension).forEach((group) => {
-      add(group.key, group.label, activity, group);
+      add(group.key, group.label, activity, { ...group });
     });
   });
 
   return [...groups.values()]
-    .map((group) => ({ ...group, summary: completionSummary(group.activities) }))
+    .map((group): GroupRow => ({
+      ...group,
+      summary: completionSummary(group.activities),
+    }))
     .sort((a, b) => b.summary.vmp.rate - a.summary.vmp.rate
       || b.summary.validation.rate - a.summary.validation.rate
       || a.label.localeCompare(b.label, "vi"));
 }
 
-function DimensionTable({ activities, dimension, setDimension }) {
+function DimensionTable({ activities, dimension, setDimension }: {
+  activities: Activity[]; dimension: string; setDimension: (d: string) => void;
+}) {
   const rows = useMemo(() => groupRows(activities, dimension), [activities, dimension]);
   const activeDimension = DIMENSION_OPTIONS.find((item) => item.id === dimension) || DIMENSION_OPTIONS[0];
   const isExecutionDepartment = dimension === "executionDepartment";
@@ -423,9 +466,10 @@ function DimensionTable({ activities, dimension, setDimension }) {
                       {row.deptId ? (
                         <div style={{
                           width: 38, height: 38, borderRadius: 11, flexShrink: 0,
-                          background: `${DEPT_COLOR[row.deptId] || C.lav}18`,
+                          background: `${(DEPT_COLOR as Record<string, string>)[row.deptId] || C.lav}18`,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          color: DEPT_DEEP[row.deptId] || C.lavText, fontSize: 11, fontWeight: 800,
+                          color: (DEPT_DEEP as Record<string, string>)[row.deptId] || C.lavText,
+                          fontSize: 11, fontWeight: 800,
                         }}>
                           {row.short || "—"}
                         </div>
@@ -510,18 +554,18 @@ function DimensionTable({ activities, dimension, setDimension }) {
   );
 }
 
-const TH = {
+const TH: CSSProperties = {
   padding: "0 14px 6px", textAlign: "left", color: C.plumSoft,
   fontFamily: TEXT, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase",
   letterSpacing: ".04em", whiteSpace: "nowrap",
 };
 
-const TD = {
+const TD: CSSProperties = {
   padding: "11px 14px", background: "#fff", borderTop: `1px solid ${C.pinkSoft}`,
   borderBottom: `1px solid ${C.pinkSoft}`, color: C.plumSoft, fontSize: 12,
 };
 
-export default function CompletionDashboard({ acts }) {
+export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
   const [department, setDepartment] = useState("all");
   const [validationType, setValidationType] = useState("all");
   const [person, setPerson] = useState("all");

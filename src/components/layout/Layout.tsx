@@ -5,12 +5,21 @@ import { useState, useEffect } from "react";
 import {
   Bell, KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X,
 } from "lucide-react";
-import { C, TEXT, NUM, GRAD, glass, btnPrimary } from "../../constants/theme.ts";
-import { NAV_ITEMS, NAV_SUBS, PERM_LABEL } from "../../constants/vmp.ts";
+import { C, TEXT, NUM, GRAD, glass } from "../../constants/theme.ts";
+import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
+import type { ReactNode } from "react";
 import { Sparkle, CrownLogo } from "../ui/Primitives.tsx";
+import type { AppUser } from "../../types/domain.ts";
 
 // ======================== SIDEBAR ========================
-export function Sidebar({ view, setView, user, onLogout, onChangePw, connected }) {
+export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
+  view: string;
+  setView: (v: string) => void;
+  user?: AppUser | null;
+  onLogout: () => void;
+  onChangePw: () => void;
+  connected?: boolean;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const isAdmin = user?.perm === "admin";
 
@@ -92,7 +101,7 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw, connected }
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 15,
           }}>
-            {user.name?.[0] || "U"}
+            {user?.name?.[0] || "U"}
           </div>
         ) : (
           <>
@@ -102,12 +111,12 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw, connected }
                 background: GRAD, display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 17,
               }}>
-                {user.name?.[0] || "U"}
+                {user?.name?.[0] || "U"}
               </div>
               <div style={{ lineHeight: 1.3, overflow: "hidden", flex: 1 }}>
-                <div style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{user.name}</div>
+                <div style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{user?.name}</div>
                 <div style={{ color: C.plumSoft, fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {user.role}
+                  {user?.role}
                 </div>
               </div>
             </div>
@@ -146,8 +155,16 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw, connected }
 }
 
 // ======================== TOPBAR ========================
-export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }) {
-  const [now, setNow] = useState(new Date());
+export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }: {
+  title?: ReactNode;
+  user?: AppUser | null;
+  sub?: ReactNode;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  lastSync?: number | string | null;
+}) {
+  // Đồng hồ chỉ để kích hoạt render lại mỗi phút; giá trị không dùng trực tiếp.
+  const [, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
@@ -170,7 +187,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }) {
           {sub || "CPC1 HN"}
           {lastSync && (
             <span style={{ marginLeft: 12, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
-              · Đồng bộ: {lastSync.toLocaleTimeString("vi-VN")}
+              · Đồng bộ: {new Date(lastSync).toLocaleTimeString("vi-VN")}
             </span>
           )}
         </div>
@@ -190,15 +207,15 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }) {
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           padding: "8px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 800,
-          color: user.perm === "view" ? C.skyText : C.pinkText,
-          background: user.perm === "view" ? C.skySoft : C.pinkSoft,
+          color: user?.perm === "view" ? C.skyText : C.pinkText,
+          background: user?.perm === "view" ? C.skySoft : C.pinkSoft,
         }}>
-          <ShieldCheck size={14} /> {PERM_LABEL[user.perm] || user.role}
+          <ShieldCheck size={14} /> {(user && PERM_LABEL[user.perm]) || user?.role}
         </span>
 
         <button style={{
-          position: "relative", width: 42, height: 42, borderRadius: 999,
-          border: "none", cursor: "pointer", ...glass,
+          position: "relative", width: 42, height: 42,
+          cursor: "pointer", ...glass,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <Bell size={18} color={C.pink} />
