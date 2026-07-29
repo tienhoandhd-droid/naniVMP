@@ -191,8 +191,11 @@ export function enrich(objects: VmpObject[], acts: Activity[]) {
     return {
       ...a,
       name: o.name || a.code,
-      cls: o.cls || "tb",
-      dept: o.dept || "qa",
+      // Ưu tiên cls do RPC trả thẳng theo hạng mục. Chỉ tra ngược qua bảng
+      // objects khi thiếu — bớt được một chỗ nối là bớt một kiểu hỏng
+      // im lặng (objects sai định dạng thì mọi bộ lọc chết mà không báo).
+      cls: a.cls || o.cls || "tb",
+      dept: a.dept || o.dept || "qa",
       depts,
       area: o.area || "—",
       crit: o.crit || "TB",
