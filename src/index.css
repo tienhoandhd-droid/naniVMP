@@ -5846,6 +5846,10 @@ body { transition: background var(--mo-slow) var(--ease); }
 
 /* Đổi trang: trượt lên rất nhẹ + hiện dần. Đủ để mắt biết nội dung vừa
    thay, không đủ để phải chờ. */
+/* CẢNH BÁO: khối này có transform (hoạt ảnh vào), nên MỌI phần tử
+   position:fixed nằm bên trong sẽ neo theo nó chứ không theo màn hình —
+   hộp thoại sẽ trôi xuống giữa chiều cao cả trang và người dùng chỉ thấy
+   lớp phủ. Bất cứ lớp nổi nào cũng phải bọc <Portal> (Primitives.tsx). */
 .vmp-view-enter { animation: vmpViewIn var(--mo-slow) var(--ease) both; }
 @keyframes vmpViewIn {
   from { opacity: 0; transform: translateY(8px); }

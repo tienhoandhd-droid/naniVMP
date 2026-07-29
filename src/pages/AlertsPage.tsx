@@ -94,7 +94,8 @@ function phaseLabel(enumVal: unknown, sheetVal: unknown): string {
   return e || "Chưa nhập";
 }
 
-function AlertDetailModal({ r, email, onClose }: {
+/** Xuất ra ngoài để test render được bằng react-dom/server. */
+export function AlertDetailModal({ r, email, onClose }: {
   r: AlertRow; email?: string | null; onClose: () => void;
 }) {
   const a = r.a;
@@ -205,7 +206,9 @@ function AlertDetailModal({ r, email, onClose }: {
                   <Line label="Hạn kế hoạch" value={m.plan ? fmtVN(m.plan) : <span style={{ color: C.plumSoft, fontWeight: 600 }}>không có trong kế hoạch</span>} />
                   <Line label="Hạn theo luật" value={m.rule ? <>{fmtVN(m.rule)} <span style={{ color: C.plumSoft, fontWeight: 600 }}>({m.ruleNote})</span></> : "—"} />
                   <Line label="Ngày thực tế" value={m.actual ? fmtVN(m.actual) : <span style={{ color: C.plumSoft, fontWeight: 600 }}>chưa có</span>} />
-                  {!m.actual && d && <Line label="Còn lại" value={
+                  {/* Mốc đã xong thì đếm ngược không còn nghĩa gì — trước đây
+                      vẫn hiện "trễ 255 ngày" cho mốc đã hoàn thành. */}
+                  {!m.done && !m.actual && d && <Line label="Còn lại" value={
                     <span style={{ color: (left ?? 0) < 0 ? C.raspText : (left ?? 0) <= SOON_DAYS ? C.marigoldText : C.mintText }}>
                       {(left ?? 0) < 0 ? `trễ ${Math.abs(left ?? 0)} ngày` : `${left} ngày`}
                     </span>} />}
