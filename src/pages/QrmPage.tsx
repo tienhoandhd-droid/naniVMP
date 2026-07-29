@@ -1,10 +1,97 @@
 /* QrmPage.jsx — Ma trận rủi ro thẩm định (QRM / ICH Q9) */
+import { useMemo } from "react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { CLS, CRIT } from "../constants/vmp.ts";
 import { valStatus, qrmRpn, qrmLevel } from "../utils/helpers.ts";
 import { Card, CardTitle, Tag, Donut, Pill } from "../components/ui/Primitives.tsx";
 import { ShieldAlert, AlertCircle, Trophy } from "lucide-react";
 import type { Activity } from "../types/domain.ts";
+
+/* ----------------------------------------------------------------
+ * Tiến độ theo mức trọng yếu (trước ở trang Tổng quan, chuyển về đây
+ * cho cùng chỗ với ma trận rủi ro).
+ *
+ * ICH Q9 và Annex 15 đều đòi xếp lịch theo rủi ro, nhưng trước giờ không
+ * màn nào trả lời được câu hỏi kiểm tra sẽ hỏi: "nhóm trọng yếu cao có
+ * được làm TRƯỚC không?". Biểu đồ này so tỷ lệ hoàn thành giữa các mức
+ * điểm — nhóm 9 điểm mà tụt sau nhóm 3 điểm là dấu hiệu xếp lịch đang
+ * chạy theo thứ tự danh sách chứ không theo rủi ro.
+ * -------------------------------------------------------------- */
+function RiskProgress({ acts }: { acts: Activity[] }) {
+  const bands = useMemo(() => {
+    const defs = [
+      { id: "9", label: "9 điểm", hint: "phức tạp cao × ảnh hưởng trực tiếp", c: C.rasp, t: C.raspText, test: (n: number) => n >= 7 },
+      { id: "6", label: "4–6 điểm", hint: "trung bình", c: C.marigold, t: C.marigoldText, test: (n: number) => n >= 4 && n < 7 },
+      { id: "3", label: "1–3 điểm", hint: "thấp", c: C.mint, t: C.mintText, test: (n: number) => n < 4 },
+    ];
+    return defs.map((d) => {
+      const items = acts.filter((a) => a.score != null && d.test(Number(a.score)));
+      const done = items.filter((a) => a.st === "done").length;
+      const over = items.filter((a) => a.st === "over").length;
+      return { ...d, total: items.length, done, over,
+               rate: items.length ? Math.round((done / items.length) * 100) : 0 };
+    });
+  }, [acts]);
+
+  const cao = bands[0], thap = bands[2];
+  const nguoc = cao.total > 0 && thap.total > 0 && cao.rate + 5 < thap.rate;
+  const chuaCham = acts.filter((a) => a.score == null).length;
+
+  return (
+    <Card variant="strong">
+      <CardTitle icon={ShieldAlert}
+        sub="Điểm trọng yếu = mức độ phức tạp × ảnh hưởng chất lượng sản phẩm (1…9)">
+        Tiến độ theo mức trọng yếu
+      </CardTitle>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {bands.map((b) => (
+          <div key={b.id}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 5,
+                          fontFamily: TEXT, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: b.t }}>{b.label}</span>
+              <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{b.hint}</span>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
+                {b.done}/{b.total} xong
+                {b.over > 0 && <span style={{ color: C.raspText }}> · {b.over} quá hạn</span>}
+              </span>
+              <span style={{ fontFamily: NUM, fontSize: 17, fontWeight: 800, color: b.t,
+                             width: 50, textAlign: "right" }}>{b.rate}%</span>
+            </div>
+            <div style={{ height: 13, borderRadius: 999, background: C.pinkMist, overflow: "hidden",
+                          display: "flex" }}>
+              <div style={{ width: `${b.rate}%`, background: b.c }} />
+              <div style={{ width: `${b.total ? (b.over / b.total) * 100 : 0}%`, background: C.raspText }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 15, padding: "11px 13px", borderRadius: 12, fontFamily: TEXT,
+                    fontSize: 12.5, lineHeight: 1.65,
+                    background: nguoc ? C.raspSoft : C.mintSoft,
+                    color: nguoc ? C.raspText : C.mintText }}>
+        {nguoc ? (
+          <>
+            <b>Đang làm ngược thứ tự rủi ro.</b> Nhóm trọng yếu cao mới xong {cao.rate}%
+            trong khi nhóm thấp đã {thap.rate}%. ICH Q9 và Annex 15 đòi làm nhóm rủi ro cao
+            trước — chênh này là thứ thanh tra hỏi đầu tiên.
+          </>
+        ) : (
+          <>
+            <b>Thứ tự ưu tiên hợp lý.</b> Nhóm trọng yếu cao đang ở {cao.rate}%,
+            không tụt sau nhóm thấp ({thap.rate}%).
+          </>
+        )}
+        {chuaCham > 0 && (
+          <div style={{ marginTop: 6, opacity: 0.9 }}>
+            Còn {chuaCham} hạng mục chưa có điểm trọng yếu — chưa tính vào biểu đồ này.
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 /** Ô ma trận: danh sách hạng mục theo (mức tới hạn × trạng thái). */
 type RiskGrid = Record<string, Record<string, Activity[]>>;
@@ -54,6 +141,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           {[[C.mint, "Rủi ro thấp"], [C.marigold, "Rủi ro TB"], [C.rasp, "Rủi ro cao — ưu tiên"]].map(([c, l]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: C.plum }}><span style={{ width: 14, height: 14, borderRadius: 5, background: c }} />{l}</span>)}
         </div>
       </Card>
+      <RiskProgress acts={acts} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 24 }}>
         <Card variant="soft">
           <CardTitle icon={Trophy}>Phân bố mức tới hạn</CardTitle>

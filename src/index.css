@@ -5913,7 +5913,6 @@ body { transition: background var(--mo-slow) var(--ease); }
   grid-template-areas:
     "hero"
     "k1" "k2" "k3" "k4"
-    "risk"
     "vali"
     "wide";
 }
@@ -5925,7 +5924,6 @@ body { transition: background var(--mo-slow) var(--ease); }
       "hero hero"
       "k1   k2"
       "k3   k4"
-      "risk risk"
       "vali vali"
       "wide wide";
   }
@@ -5937,7 +5935,7 @@ body { transition: background var(--mo-slow) var(--ease); }
     grid-template-areas:
       "hero hero k1   k2"
       "hero hero k3   k4"
-      "risk risk risk vali"
+      "vali vali vali vali"
       "wide wide wide wide";
   }
 }
@@ -5947,7 +5945,7 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-bento > .b-k2   { grid-area: k2; }
 .vmp-bento > .b-k3   { grid-area: k3; }
 .vmp-bento > .b-k4   { grid-area: k4; }
-.vmp-bento > .b-risk { grid-area: risk; }
+/* .b-risk đã rời Tổng quan sang tab QRM của trang Cảnh báo & Rủi ro. */
 .vmp-bento > .b-vali { grid-area: vali; }
 .vmp-bento > .b-wide { grid-area: wide; }
 
