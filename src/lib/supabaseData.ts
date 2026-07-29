@@ -89,7 +89,7 @@ export async function fetchMissingItems(year?: number): Promise<unknown[]> {
 // ĐỌC: 5 danh mục nguồn (thiết bị / quy trình / kho / hệ thống phụ trợ /
 //      vận chuyển) — đây là nơi nhập liệu chính thay cho Google Sheet
 // ============================================================
-export const SOURCE_KINDS = [
+export const SOURCE_KINDS: ObjectKind[] = [
   "Thiết bị", "Quy trình", "Kho", "Hệ thống phụ trợ", "Vận chuyển",
 ];
 

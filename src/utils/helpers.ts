@@ -4,7 +4,7 @@
 import { DEP_DAYS, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
 
 // ======================== DATE HELPERS ========================
-import type { Activity, Milestones, VmpObject } from "../types/domain.ts";
+import type { Activity, AlertInfo, Milestones, VmpObject } from "../types/domain.ts";
 export type { Milestones };
 
 /** Dòng thô từ Sheet/Supabase, khoá là tên cột đã chuẩn hoá. */
@@ -91,10 +91,11 @@ export function phaseStates(act: Activity) {
   return { p: "future", v: "future", r: "future", m };
 }
 
-export function nextAlert(act: Activity) {
+export function nextAlert(act: Activity): AlertInfo | null {
   if (act.st === "done" || !act.target) return null;
   const m = milestones(act);
-  let stage, date;
+  let stage: string;
+  let date: Date | null;
   if (act.st === "over" || act.st === "prog") {
     stage = "Thẩm định"; date = m.validation;
   } else {
@@ -102,7 +103,7 @@ export function nextAlert(act: Activity) {
   }
   if (!date) return null;
   const dleft = daysBetween(date, vmpToday());
-  let kind = null;
+  let kind: AlertInfo["kind"] = null;
   if (dleft < 0) kind = "over";
   else if (dleft <= SOON_DAYS) kind = "soon";
   return { stage, date, dleft, kind };

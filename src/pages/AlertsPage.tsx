@@ -6,6 +6,7 @@ import { C, TEXT, NUM } from "../constants/theme.ts";
 import { CLS, DEPTS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
 import { parseD, fmtVN, daysBetween, addMonths } from "../utils/helpers.ts";
 import { Card, CardTitle, Tag, KpiCard } from "../components/ui/Primitives.tsx";
+import type { Activity, AlertInfo } from "../types/domain.ts";
 
 const WINDOWS = [
   ["all", "Mọi thời điểm"],
@@ -14,30 +15,36 @@ const WINDOWS = [
   ["90", "≤ 90 ngày"],
 ];
 
-export default function AlertsView({ acts }) {
+export default function AlertsView({ acts }: { acts: Activity[] }) {
   const [f, setF] = useState("over");
   const [dept, setDept] = useState("all");
   const [win, setWin] = useState("all");
 
   // ----- Dữ liệu gốc -----
-  const withAlert = acts.map((a) => ({ a, al: a.alert })).filter((x) => x.al && x.al.kind);
+  const withAlert = acts
+    .map((a) => ({ a, al: a.alert }))
+    .filter((x): x is { a: Activity; al: AlertInfo } => !!x.al && !!x.al.kind);
   const overdueAll = withAlert.filter((x) => x.al.kind === "over").sort((a, b) => a.al.dleft - b.al.dleft);
   const soonAll = withAlert.filter((x) => x.al.kind === "soon").sort((a, b) => a.al.dleft - b.al.dleft);
   const requalAll = acts
-    .filter((a) => a.st === "done" && a.freq > 0)
-    .map((a) => { const next = addMonths(parseD(a.target), a.freq); return { a, next, dleft: daysBetween(next, vmpToday()) }; })
+    .filter((a) => a.st === "done" && Number(a.freq) > 0)
+    .map((a) => {
+      const base = parseD(a.target);
+      const next = base ? addMonths(base, Number(a.freq)) : null;
+      return { a, next, dleft: next ? daysBetween(next, vmpToday()) : 0 };
+    })
     .filter((x) => x.dleft >= -30)
     .sort((a, b) => a.dleft - b.dleft);
 
   // ----- Áp bộ lọc bộ phận + thời gian -----
-  const passDept = (a) => dept === "all" || a.dept === dept;
-  const passWin = (dleft) => win === "all" || Math.abs(dleft) <= Number(win);
+  const passDept = (a: Activity): boolean => dept === "all" || a.dept === dept;
+  const passWin = (dleft: number): boolean => win === "all" || Math.abs(dleft) <= Number(win);
   const overdue = overdueAll.filter((x) => passDept(x.a) && passWin(x.al.dleft));
   const soon = soonAll.filter((x) => passDept(x.a) && passWin(x.al.dleft));
   const requal = requalAll.filter((x) => passDept(x.a) && passWin(x.dleft));
 
-  const Row = ({ a, al }) => {
-    const cls = CLS[a.cls];
+  const Row = ({ a, al }: { a: Activity; al: AlertInfo }) => {
+    const cls = (CLS as Record<string, typeof CLS.tb>)[String(a.cls ?? "tb")] ?? CLS.tb;
     return (
       <div className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: "#fff", border: `1px solid ${al.kind === "over" ? C.raspSoft : C.marigoldSoft}` }}>
         <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: al.kind === "over" ? C.raspSoft : C.marigoldSoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 17, color: al.kind === "over" ? C.raspText : C.marigoldText, lineHeight: 1 }}>{Math.abs(al.dleft)}</span><span style={{ fontSize: 9, color: C.plumSoft, fontWeight: 700 }}>ngày {al.kind === "over" ? "trễ" : "nữa"}</span></div>
@@ -58,7 +65,7 @@ export default function AlertsView({ acts }) {
 
   const hasFilter = dept !== "all" || win !== "all";
   const selStyle = { fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: "#fff", borderRadius: 999, padding: "8px 13px", cursor: "pointer" };
-  const chip = (on) => ({ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, background: on ? C.lav : "#fff", color: on ? "#fff" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
+  const chip = (on: boolean) => ({ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, background: on ? C.lav : "#fff", color: on ? "#fff" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -100,7 +107,7 @@ export default function AlertsView({ acts }) {
         <Card variant="soft">
           <CardTitle icon={CalendarClock} sub="Dự báo từ ngày hoàn thành + tần suất">Lịch tái thẩm định ({requal.length})</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-            {requal.slice(0, 12).map((x) => { const cls = CLS[x.a.cls]; return (
+            {requal.slice(0, 12).map((x) => { const cls = (CLS as Record<string, typeof CLS.tb>)[String(x.a.cls ?? "tb")] ?? CLS.tb; return (
               <div key={x.a.id} className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 16, background: "#fff", border: `1px solid ${C.pinkSoft}` }}>
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: x.dleft <= 30 ? C.raspSoft : C.skySoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: x.dleft <= 30 ? C.raspText : C.skyText }}>{x.dleft < 0 ? "!" : x.dleft}</span><span style={{ fontSize: 9, color: C.plumSoft, fontWeight: 700 }}>ngày</span></div>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: "flex", alignItems: "center", gap: 7 }}><Tag color={cls.text} bg={cls.soft}>{x.a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: C.plum }}>{x.a.name}</span></div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>Tái thẩm định dự kiến {fmtVN(x.next)} · chu kỳ {x.a.freq} tháng</div></div>

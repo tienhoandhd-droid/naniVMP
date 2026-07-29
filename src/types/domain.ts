@@ -66,6 +66,15 @@ export interface Milestones {
   target: Date | null;
 }
 
+/** Mốc cảnh báo gần nhất của một hạng mục (do nextAlert tính). */
+export interface AlertInfo {
+  stage: string;
+  date: Date;
+  dleft: number;
+  /** null khi còn xa, chưa tới ngưỡng cảnh báo. */
+  kind: "over" | "soon" | null;
+}
+
 /* ---------- Hình dạng cho giao diện ---------- */
 /**
  * Một hạng mục sau khi qua adapter (n8nAdapter/supabaseData). Khác
@@ -77,12 +86,33 @@ export interface Activity {
   code: string;              // validation_code
   obj: string;               // object_code
   objName?: string;
+  /** Tên hiển thị của hạng mục (thường là tên đối tượng). */
+  name?: string;
   type: string;              // loại thẩm định
+  /** Loại thẩm định dạng chữ dùng để hiển thị: IQ / OQ / PQ / PV / GSP / GDP… */
+  vtype?: string;
+  /** Nhóm phân loại đối tượng: tb | qt | kho | ht | vc. */
+  cls?: string;
   dept?: string;
   depts?: string[];
   execDepts?: string[];
+  exec_depts?: string[];
   owner?: string;
+  owner_name?: string;
+  secondary_owner?: string;
   year?: number;
+  /** Trạng thái nghiệp vụ của bản ghi: active | not_applicable | cancelled. */
+  state?: string;
+  /** Mức tới hạn dạng chữ: Cao | TB | Thấp. */
+  crit?: string;
+  /** Điểm trọng yếu 1–9. */
+  score?: number | string;
+  /** Tần suất thẩm định (tháng). */
+  freq?: number;
+  /** Phân loại báo cáo rút gọn, dùng tra số ngày báo cáo. */
+  dep?: string;
+  /** Cờ lệch dữ liệu giữa các cột trạng thái. */
+  mismatch?: boolean;
   /** Trạng thái suy ra tại thời điểm đọc. */
   st: ActivityStatus;
   target?: string | null;    // mốc đích đang theo dõi
@@ -100,6 +130,8 @@ export interface Activity {
   version?: number;
   /** Mốc thời gian đã tính sẵn (enrich gắn vào để khỏi tính lại). */
   m?: Milestones;
+  /** Cảnh báo gần nhất (enrich gắn vào). */
+  alert?: AlertInfo | null;
   /** Bản ghi gốc từ DB, dùng để tính lại các trường suy diễn. */
   _raw?: Record<string, unknown>;
   [key: string]: unknown;

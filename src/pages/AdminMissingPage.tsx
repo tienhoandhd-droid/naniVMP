@@ -12,9 +12,23 @@ import { ShieldAlert, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { C, TEXT, btnPrimary } from "../constants/theme.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
+import type { RpcResult } from "../types/domain.ts";
 
-export default function AdminMissingView({ isAdmin, onReload, readOnly = true }) {
-  const [items, setItems] = useState([]);
+/** Một mã đã mất khỏi Sheet, do rpc_get_missing_items trả về. */
+interface MissingItem {
+  validation_code: string;
+  object_code?: string;
+  object_name?: string;
+  validation_type?: string;
+  owner_name?: string;
+  missing_since?: string;
+  [k: string]: unknown;
+}
+
+export default function AdminMissingView({ isAdmin, onReload, readOnly = true }: {
+  isAdmin?: boolean; onReload?: () => void; readOnly?: boolean;
+}) {
+  const [items, setItems] = useState<MissingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -26,16 +40,16 @@ export default function AdminMissingView({ isAdmin, onReload, readOnly = true })
         p_year: new Date().getFullYear(),
       });
       if (error) throw error;
-      setItems(Array.isArray(data) ? data : []);
+      setItems(Array.isArray(data) ? (data as unknown as MissingItem[]) : []);
     } catch (e) {
-      setErr("Lỗi tải: " + (e.message || "không rõ"));
+      setErr("Lỗi tải: " + ((e as Error).message || "không rõ"));
     }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const resolve = async (validationCode, decision) => {
+  const resolve = async (validationCode: string, decision: string) => {
     const reason = window.prompt(
       decision === "keep_active"
         ? `Lý do GIỮ active mã ${validationCode} (vd: tạm thời ẩn khỏi Sheet, sẽ thêm lại):`
@@ -43,17 +57,18 @@ export default function AdminMissingView({ isAdmin, onReload, readOnly = true })
     );
     if (!reason || !reason.trim()) return;
     try {
-      const { data, error } = await supabase.rpc("rpc_resolve_missing", {
+      const { data, error } = await supabase!.rpc("rpc_resolve_missing", {
         p_validation_code: validationCode,
         p_decision: decision,
         p_reason: reason.trim(),
       });
       if (error) throw error;
-      if (data && data.ok === false) throw new Error(data.error);
+      const r = data as unknown as RpcResult | null;
+      if (r && r.ok === false) throw new Error(r.error);
       await load();
       if (onReload) onReload();
     } catch (e) {
-      alert("Lỗi: " + (e.message || "không rõ"));
+      alert("Lỗi: " + ((e as Error).message || "không rõ"));
     }
   };
 
