@@ -165,7 +165,9 @@ Dữ liệu thật hiện có **5 đối tượng** rơi vào trường hợp th
 
 **STT** tiếp tục từ STT lớn nhất đang có trong tab 6, tăng dần.
 
-**`Điểm trọng yếu` luôn ghi rỗng `''`** — dù 5 tab nguồn đều có cột này. Kiểm chứng: nguồn 0 dòng có giá trị, timeline 0 dòng có điểm. Cột này thực tế **chưa bao giờ được dùng**.
+**`Điểm trọng yếu`: workflow sinh timeline luôn ghi rỗng `''`.** Đúng ở thời điểm mô tả luật VMP01 — nguồn 0 dòng có giá trị, timeline 0 dòng có điểm.
+
+> **Đã đổi từ 29/07/2026 — đọc kỹ chỗ này.** Cột điểm trọng yếu nay ĐÃ ĐƯỢC DÙNG. `rpc_recalc_criticality` chấm cho toàn bộ 264 đối tượng nguồn và đồng bộ sang 461 hạng mục timeline (phân bố: 9 điểm → 96 đối tượng, 6 → 133, 3 → 28). Chỉ riêng *workflow sinh timeline* là vẫn không tự ghi điểm — điểm do RPC chấm riêng, không do bước sinh dòng. Câu "chưa bao giờ được dùng" chỉ đúng cho tới 28/07/2026; đừng trích nó để nói về hiện tại.
 
 Node ghi dùng `appendOrUpdate` khớp theo `ID thẩm định`:
 
