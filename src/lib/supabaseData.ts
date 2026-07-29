@@ -15,7 +15,7 @@ import { supabase } from "./supabaseClient.ts";
 import { deriveActivityFields } from "./n8nAdapter.ts";
 import type {
   Activity, GenerateTimelineResult, ObjectKind, ProductGmpRow, RpcResult,
-  SourceObjectRow, VmpDataset, VmpObject,
+  SourceObjectRow, VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
 } from "../types/domain.ts";
 
 /** RPC trả jsonb nên type sinh tự động là Json — ép về hình dạng đã biết ngay
@@ -103,6 +103,20 @@ export async function fetchSourceObjects(
   if (!includeInactive) q = q.eq("is_active", true);
   const { data, error } = await q.order("object_kind").order("object_code");
   if (error) throw new Error("Lỗi đọc danh mục nguồn: " + error.message);
+  return data || [];
+}
+
+export async function fetchAlertRecipients(): Promise<AlertRecipientRow[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.from("vmp_alert_recipients").select("*").order("email");
+  if (error) throw new Error("Lỗi đọc danh sách nhận cảnh báo: " + error.message);
+  return data || [];
+}
+
+export async function fetchStaffEmails(): Promise<StaffEmailRow[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.from("vmp_staff_emails").select("*").order("staff_name");
+  if (error) throw new Error("Lỗi đọc danh bạ: " + error.message);
   return data || [];
 }
 
@@ -226,6 +240,63 @@ export async function generateTimeline(
     p_commit: commit,
   });
   return unwrap<GenerateTimelineResult>(data, error, "Sinh timeline thất bại");
+}
+
+/* ---- Người nhận cảnh báo ---- */
+export async function upsertAlertRecipient(
+  id: string | null, patch: Record<string, unknown>,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_upsert_alert_recipient", {
+    // RPC nhận NULL để nghĩa là 'tạo mới'; type sinh tự động khai uuid không
+    // nullable nên phải ép kiểu ở đây.
+    p_id: (id ?? null) as unknown as string,
+    p_patch: patch as never,
+  });
+  return unwrap(data, error, "Lưu người nhận thất bại");
+}
+
+export async function deleteAlertRecipient(id: string): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_delete_alert_recipient", { p_id: id });
+  return unwrap(data, error, "Xoá người nhận thất bại");
+}
+
+/* ---- Danh bạ nhân sự ---- */
+export async function upsertStaffEmail(
+  id: string | null, patch: Record<string, unknown>,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_upsert_staff_email", {
+    // RPC nhận NULL để nghĩa là 'tạo mới'; type sinh tự động khai uuid không
+    // nullable nên phải ép kiểu ở đây.
+    p_id: (id ?? null) as unknown as string,
+    p_patch: patch as never,
+  });
+  return unwrap(data, error, "Lưu nhân sự thất bại");
+}
+
+export async function deleteStaffEmail(id: string): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_delete_staff_email", { p_id: id });
+  return unwrap(data, error, "Xoá nhân sự thất bại");
+}
+
+/* ---- Sản phẩm GMP ---- */
+export async function upsertProductGmp(
+  bfoCode: string, patch: Record<string, unknown>,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_upsert_product_gmp", {
+    p_bfo_code: bfoCode, p_patch: patch as never,
+  });
+  return unwrap(data, error, "Lưu sản phẩm thất bại");
+}
+
+export async function deleteProductGmp(bfoCode: string): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_delete_product_gmp", { p_bfo_code: bfoCode });
+  return unwrap(data, error, "Xoá sản phẩm thất bại");
 }
 
 export async function upsertObjectSupabase(obj: {

@@ -21,6 +21,8 @@ export type SourceObjectRow = Tables["vmp_source_objects"]["Row"];
 export type ProductGmpRow   = Tables["vmp_products_gmp"]["Row"];
 export type ProfileRow      = Tables["profiles"]["Row"];
 export type DepartmentRow   = Tables["departments"]["Row"];
+export type AlertRecipientRow = Tables["vmp_alert_recipients"]["Row"];
+export type StaffEmailRow     = Tables["vmp_staff_emails"]["Row"];
 
 /* ---------- Vai trò & quyền ---------- */
 /** Vai trò lưu trong profiles.role (enum user_role của Postgres). */

@@ -171,6 +171,18 @@ Chỉ đổi phần thông báo lỗi — ngưỡng và logic giữ nguyên; ph�
 psql "$SUPABASE_DB_URL" --single-transaction -f supabase/migrations/20260729020000_row_guard_diagnostic_message.sql
 ```
 
+## 8b. ⚠️ Bảo mật đã sửa: RPC ghi từng mở cho `anon`
+
+Supabase đặt sẵn `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon`, nên **mọi function mới tạo đều tự động có `anon=X`**.
+
+Hệ quả: cách thường dùng `REVOKE EXECUTE ... FROM PUBLIC` — và cũng là cách các migration trước của dự án này dùng — **không gỡ được**, vì quyền cấp đích danh cho `anon` chứ không kế thừa qua `PUBLIC`. Rà ngày 2026-07-29 thấy **10 RPC ghi** đang mở cho `anon`, trong đó có `rpc_generate_timeline` mà migration trước tưởng đã đóng.
+
+Vì sao đáng lo: dashboard chạy trên GitHub Pages công khai và anon key là key công khai. Chưa khai thác được vì mọi RPC đều tự kiểm quyền bên trong (`auth.uid()` → `profiles`), nhưng đó là lớp phòng thủ cuối.
+
+Đã xử lý bằng `supabase/migrations/20260729070000_revoke_write_rpc_from_anon.sql`: gỡ cả hai đường (`FROM anon` và `FROM public`), đổi default privilege để không tái diễn, kèm hậu kiểm tự chặn migration nếu còn sót. Kết quả: **0 RPC ghi mở cho anon**, 15 RPC vẫn dùng được cho người đăng nhập, RPC đọc giữ nguyên.
+
+**Khi thêm RPC ghi mới:** luôn `revoke execute ... from anon, public` rồi `grant ... to authenticated, service_role`, và kiểm lại bằng `has_function_privilege('anon', ...)`.
+
 ## 9. Danh mục nguồn trên Supabase (2026-07-29)
 
 Trước đây chỉ tab `6.Timeline VMP` có mặt trên Supabase. Nay 5 tab danh mục nguồn + tab sản phẩm GMP đã được đưa lên, phục vụ việc chuyển Supabase thành nơi lưu dữ liệu gốc.
@@ -201,3 +213,24 @@ Nạp dữ liệu: `python3 scripts/import-source-catalogs.py` — chạy lại 
 | Vận chuyển | `S1` | Thẩm định phương tiện vận chuyển: xe ô tô | Tháng thẩm định đầu tiên |
 
 Điền cột này trong Sheet nguồn là 5 dòng đó tự tính được đầy đủ mốc thời gian.
+
+## 10. Nhập liệu trên web — màn "Dữ liệu & Nhập liệu"
+
+Từ 2026-07-29 toàn bộ việc nhập liệu làm trên dashboard, Google Sheet chỉ còn là bản sao lưu. Màn này gộp 4 bộ dữ liệu, mỗi bộ đều xem / thêm / sửa / xoá được:
+
+| Bộ | Bảng | Số dòng | Thay cho tab Sheet |
+|---|---|---|---|
+| Danh mục nguồn (5 loại) | `vmp_source_objects` | 264 | 1→5 |
+| Người nhận cảnh báo | `vmp_alert_recipients` | 0 | `CanhBao` |
+| Danh bạ nhân sự | `vmp_staff_emails` | 4 | `Danh_sach_Email` |
+| Sản phẩm GMP | `vmp_products_gmp` | 31 | `DM TDQTSX show GMP` |
+
+Thêm nút **Sinh timeline** ở tab Danh mục nguồn: xem trước rồi mới ghi, idempotent, không đè cột nhập tay.
+
+**Quyền:** chỉ `admin` / `qa_manager` ghi được. Kiểm tra nằm phía server trong RPC (`SECURITY DEFINER` đọc `profiles` theo `auth.uid()`), giao diện chỉ ẩn nút cho gọn — không phải lớp bảo mật.
+
+### 10a. Việc còn để ngỏ
+
+1. **`vmp_alert_recipients` đang rỗng.** Vani VMP 1 dù bật cũng không gửi cho ai — nhập danh sách ở màn này trước khi nghiệm thu workflow.
+2. **Vani VMP 1 vẫn đọc người nhận TỪ SHEET** (node `1. Đọc Sheet người nhận`). Sau khi nhập xong trên web, đổi node đó sang đọc `vmp_alert_recipients` để cắt hẳn phụ thuộc Sheet.
+3. Các tab chỉ mang tính lịch sử (`Mail_Log`, `Mail_Log_Index`, `Giao việc`, `Rule VMP state`, `0.Rule timeline VMP`) đã nằm trong `vmp_source_rows` dạng thô, chưa dựng màn riêng vì chưa có nhu cầu sửa.
