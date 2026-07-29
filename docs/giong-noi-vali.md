@@ -128,6 +128,37 @@ gì. Nay lớp 3 là agent, dùng chung hai công cụ Postgres với lớp 2.
 Hai lớp hỏng chỉ tốn **0,3 giây** — người dùng gần như không cảm nhận
 được. Thời gian chờ nằm ở chỗ khác: mô hình sinh chữ và lần tra dữ liệu.
 
+### Dự phòng cho hai lớp phụ
+
+Ngoài ba lớp trả lời, còn hai lớp phụ mà trước đây **không có dự phòng** —
+hỏng là mất luôn:
+
+- **Lớp phân tích câu hỏi** chỉ chạy Gemini. Gemini 429 là câu hỏi không
+  được viết lại, không nối được mạch hội thoại. Nay thêm nhánh `Lớp 1b —
+  Phân tích dự phòng` chạy gpt-4o-mini, kích hoạt qua một node IF kiểm
+  tra lớp chính có ra `cau_hoi_ro` hay không.
+- **Lớp trau chuốt** trước đây chỉ áp cho nhánh Gemini; hai nhánh kia trả
+  lời thô. Nay cả ba nhánh gộp về một đường trau chuốt chung, và lớp trau
+  chuốt cũng có dự phòng OpenAI. Cả hai lớp trau chuốt cùng hỏng thì vẫn
+  trả bản nháp ra chứ không im lặng.
+
+Đồng thời tách quota: lớp phân tích và lớp trau chuốt chạy
+`gemini-flash-lite-latest` — **hạn mức riêng**, khác với
+`gemini-2.5-flash` của lớp trả lời chính. Đã kiểm chứng: hôm
+`gemini-2.5-flash` bị 429 cả ngày, lớp phân tích chạy flash-lite vẫn
+thành công trong 1,5 giây.
+
+> ⚠ Bẫy đắt nhất gặp khi làm việc này: node **Code** gọi `$('Tên node')`
+> sang một nhánh KHÔNG chạy trong lượt đó thì treo **109 giây** rồi chết
+> vì tràn bộ nhớ, và webhook không bao giờ trả lời — nginx cắt ở giây 60
+> trả về 404. Trong biểu thức của node thường thì `$()` bọc try/catch vẫn
+> an toàn, nhưng trong node Code thì không.
+>
+> Cách chữa: **đừng gọi chéo nhánh**. Mỗi nhánh gắn một node Set nhỏ ghi
+> `{output, lop}`, rồi node `Lấy giọng` echo bản nháp ra lại bằng SQL
+> (`select … , $1::text as ban_nhap`). Từ đó về sau mọi thứ đọc từ
+> `$json`, không nhánh nào phải hỏi thăm nhánh nào.
+
 ## 6. Trích dẫn nguồn: chip riêng, không chú giữa câu
 
 Đây là **khung chat**, không phải luận văn. Bắt Vali mở ngoặc chú nguồn
