@@ -21,7 +21,7 @@
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Boxes, RefreshCw, Plus, Pencil, Ban, Trash2, Search, AlertTriangle,
-         CalendarPlus, Bell, Users, UserCheck, FlaskConical, Table2, Columns3, Download } from "lucide-react";
+         CalendarPlus, Bell, Users, UserCheck, FlaskConical, Columns3, Download } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag, Modal, Portal, TableScroll } from "../components/ui/Primitives.tsx";
 import {
@@ -31,10 +31,8 @@ import {
   fetchStaffEmails, upsertStaffEmail, deleteStaffEmail,
   fetchPerformers, upsertPerformer, deletePerformer,
   fetchProductsGmp, upsertProductGmp, deleteProductGmp,
-  listSourceTabs, fetchSourceRows, upsertSourceRow, deleteSourceRow,
 } from "../lib/supabaseData.ts";
 import { usePerformers } from "../hooks/index.ts";
-import type { SourceRow } from "../lib/supabaseData.ts";
 import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
 import type { SourceWarnings } from "../lib/supabaseData.ts";
 
@@ -1335,7 +1333,6 @@ export default function DataWorkspaceView({ user, onReload }: {
   const TABS = [
     { id: "catalog", label: "Danh mục nguồn", icon: Boxes },
     ...DATASETS.map((d) => ({ id: d.id, label: d.label, icon: d.icon })),
-    { id: "raw", label: "Tab thô (mọi tab)", icon: Table2 },
   ];
 
   return (
@@ -1359,7 +1356,6 @@ export default function DataWorkspaceView({ user, onReload }: {
       </div>
 
       {tab === "catalog" ? <SourceCatalogSection user={user} onReload={onReload} />
-        : tab === "raw"  ? <RawTabsView canEdit={canEdit} />
         : spec           ? <SimpleDatasetView spec={spec} canEdit={canEdit} />
         : null}
     </div>
@@ -1367,231 +1363,16 @@ export default function DataWorkspaceView({ user, onReload }: {
 }
 
 /* ================================================================
- * TAB THÔ — mọi tab của workbook, cột tự sinh từ payload
+ * (ĐÃ GỠ) TAB THÔ — bản sao nguyên trạng các tab của Google Sheet
  * ----------------------------------------------------------------
- * Các tab như Mail_Log (18 cột), Giao việc (6), Rule VMP state (4),
- * 0.Rule timeline VMP (1) có số cột chênh nhau rất xa nên không dựng
- * bảng riêng; giữ payload jsonb và render cột động.
+ * Gỡ 29/07/2026. Google Sheet đã ngắt khỏi hệ thống, nên sửa dữ liệu
+ * thô ở đây KHÔNG còn ảnh hưởng tới bất cứ thứ gì — người dùng sửa một
+ * bản sao chết mà tưởng đang sửa dữ liệu thật. Vô dụng thì ít, gây hiểu
+ * nhầm thì nhiều.
+ *
+ * Bảng vmp_source_rows vẫn còn trong database để tra lịch sử; cần xem
+ * thì truy vấn thẳng, không mở lối sửa trên giao diện nữa.
  * ================================================================ */
-function RawTabsView({ canEdit }: { canEdit: boolean }) {
-  const [tabs, setTabs] = useState<Array<{ source_tab: string; rows: number; columns: number }>>([]);
-  const [tab, setTab] = useState("");
-  const [rows, setRows] = useState<SourceRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-  const [q, setQ] = useState("");
-  const [editing, setEditing] = useState<SourceRow | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const list = await listSourceTabs();
-        setTabs(list);
-        if (list.length && !tab) setTab(list[0].source_tab);
-      } catch (e) { setErr((e as Error).message); }
-      setLoading(false);
-    })();
-    /* eslint-disable-next-line */
-  }, []);
-
-  const load = async () => {
-    if (!tab) return;
-    setLoading(true); setErr("");
-    try { setRows(await fetchSourceRows(tab)); }
-    catch (e) { setErr((e as Error).message || "Lỗi tải dữ liệu"); }
-    setLoading(false);
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab]);
-
-  // Cột lấy hợp của mọi khoá xuất hiện — tab có dòng thiếu cột vẫn hiện đủ.
-  const cols = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((r) => Object.keys(r.payload || {}).forEach((k) => set.add(k)));
-    return [...set];
-  }, [rows]);
-
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r) =>
-      Object.values(r.payload || {}).some((v) => String(v ?? "").toLowerCase().includes(s)));
-  }, [rows, q]);
-
-  const save = async (payload: Record<string, unknown>, rowNumber: number | null) => {
-    setSaving(true);
-    try {
-      await upsertSourceRow(tab, rowNumber, payload);
-      setEditing(null);
-      await load();
-    } catch (e) { alert("Lỗi lưu: " + ((e as Error).message || "không rõ")); }
-    setSaving(false);
-  };
-
-  const remove = async (r: SourceRow) => {
-    if (!window.confirm(`Xoá dòng ${r.row_number} của "${tab}"? Không hoàn tác được.`)) return;
-    try { await deleteSourceRow(tab, r.row_number); await load(); }
-    catch (e) { alert("Lỗi: " + ((e as Error).message || "không rõ")); }
-  };
-
-  const meta = tabs.find((t) => t.source_tab === tab);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <Card>
-        <CardTitle icon={Table2}
-          sub="Dữ liệu thô đúng như trong Google Sheet — cột tự sinh theo từng tab">
-          Tab thô của workbook
-        </CardTitle>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-          {tabs.map((t) => {
-            const on = t.source_tab === tab;
-            return (
-              <button key={t.source_tab} onClick={() => { setTab(t.source_tab); setQ(""); }}
-                title={`${t.rows} dòng · ${t.columns} cột`}
-                style={{ padding: "8px 13px", borderRadius: 12, cursor: "pointer",
-                         fontFamily: TEXT, fontSize: 12.5, fontWeight: on ? 800 : 600,
-                         border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
-                         background: on ? C.pinkSoft : C.surface,
-                         color: on ? C.plum : C.plumSoft }}>
-                {t.source_tab}
-                <span style={{ marginLeft: 7, fontSize: 11, opacity: 0.75 }}>{t.rows}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flex: "1 1 220px" }}>
-            <Search size={15} color={C.plumSoft}
-              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm trong tab này…"
-              style={{ width: "100%", padding: "9px 10px 9px 32px", borderRadius: 12,
-                       border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 13 }} />
-          </div>
-          <button onClick={load}
-            style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
-            <RefreshCw size={15} /> Tải lại
-          </button>
-          {canEdit && cols.length > 0 && (
-            <button onClick={() => setEditing({ id: 0, source_tab: tab, row_number: 0, payload: {} })}
-              style={btnPrimary}>
-              <Plus size={15} /> Thêm dòng
-            </button>
-          )}
-        </div>
-
-        <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontFamily: TEXT }}>
-          {loading ? "Đang tải…"
-            : `${filtered.length} / ${rows.length} dòng · ${cols.length} cột`}
-          {meta ? ` · tab "${meta.source_tab}"` : ""}
-        </div>
-
-        {err && (
-          <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: C.raspSoft,
-                        color: C.raspText, fontSize: 13 }}>{err}</div>
-        )}
-      </Card>
-
-      <Card>
-        <TableScroll>
-          <table style={{ fontFamily: TEXT, fontSize: 12.5 }}>
-            <thead>
-              <tr>
-                <th className="vmp-col-pin"
-                    style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                             color: C.plumSoft, fontWeight: 800 }}>#</th>
-                {cols.map((c) => (
-                  <th key={c} style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                                       color: C.plum, fontWeight: 800, minWidth: 130 }}>{c}</th>
-                ))}
-                {canEdit && <th style={{ padding: "9px 8px" }} />}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
-                  <td className="vmp-col-pin"
-                      style={{ padding: "8px", color: C.plumSoft, fontWeight: 700 }}>{r.row_number}</td>
-                  {cols.map((c) => (
-                    <td key={c} style={{ padding: "8px", color: C.plumSoft,
-                                         maxWidth: 320, overflow: "hidden",
-                                         textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                        title={String(r.payload?.[c] ?? "")}>
-                      {String(r.payload?.[c] ?? "") || "—"}
-                    </td>
-                  ))}
-                  {canEdit && (
-                    <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
-                      <button onClick={() => setEditing(r)} title="Sửa"
-                        style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4 }}>
-                        <Pencil size={15} color={C.plum} />
-                      </button>
-                      <button onClick={() => remove(r)} title="Xoá"
-                        style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4 }}>
-                        <Trash2 size={15} color={C.raspText} />
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {!loading && filtered.length === 0 && (
-                <tr><td colSpan={cols.length + 2}
-                  style={{ padding: 20, textAlign: "center", color: C.plumSoft }}>Không có dòng nào.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </TableScroll>
-      </Card>
-
-      {editing && (
-        <RawRowModal row={editing} cols={cols} saving={saving}
-          onClose={() => setEditing(null)}
-          onSave={(payload) => save(payload, editing.row_number || null)} />
-      )}
-    </div>
-  );
-}
-
-function RawRowModal({ row, cols, saving, onClose, onSave }: {
-  row: SourceRow;
-  cols: string[];
-  saving: boolean;
-  onClose: () => void;
-  onSave: (payload: Record<string, unknown>) => void;
-}) {
-  const isNew = !row.row_number;
-  const [form, setForm] = useState<Record<string, string>>(() => {
-    const f: Record<string, string> = {};
-    for (const c of cols) f[c] = String(row.payload?.[c] ?? "");
-    return f;
-  });
-
-  return (
-    <Modal onClose={onClose} wide icon={Table2}
-      title={`${isNew ? "Thêm dòng" : `Sửa dòng ${row.row_number}`} — ${row.source_tab}`}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                    gap: 12, maxHeight: "58vh", overflowY: "auto" }} className="vmp-scroll">
-        {cols.map((c) => (
-          <label key={c} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>{c}</span>
-            <input value={form[c] ?? ""}
-              onChange={(e) => setForm((p) => ({ ...p, [c]: e.target.value }))}
-              style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
-                       border: `1.5px solid ${C.pinkSoft}` }} />
-          </label>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-        <button onClick={onClose}
-          style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>Huỷ</button>
-        <button onClick={() => onSave(form)} disabled={saving}
-          style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>{saving ? "Đang lưu…" : "Lưu"}</button>
-      </div>
-    </Modal>
-  );
-}
 
 /* ----------------------------------------------------------------
  * Hộp cảnh báo. Phân biệt rõ hai loại để người đọc biết phải làm gì:
