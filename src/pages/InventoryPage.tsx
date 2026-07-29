@@ -46,7 +46,7 @@ export default function InventoryView({ objects, acts, canEdit, onSave, onDelete
   canEdit?: boolean;
   onSave?: (obj: Record<string, unknown>, isNew?: boolean) => void;
   onDelete?: (code: string) => void;
-  conn?: { status?: string; [k: string]: unknown };
+  conn?: { status?: string; msg?: string; [k: string]: unknown };
 }) {
   const [q, setQ] = useState("");
   const [cls, setCls] = useState("all");

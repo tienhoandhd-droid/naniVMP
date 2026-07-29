@@ -9,7 +9,7 @@ import type { DependencyList } from "react";
 import type { Activity, VmpObject } from "../types/domain.ts";
 
 /** Trạng thái kết nối nguồn dữ liệu hiển thị trên banner. */
-interface ConnState {
+export interface ConnState {
   readUrl: string;
   writeUrl: string;
   status: "idle" | "loading" | "ok" | "err";

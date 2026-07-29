@@ -17,35 +17,68 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } fro
 
 // ===== External libs =====
 import {
-  LayoutDashboard, Boxes, FlaskConical, Cpu, CalendarClock, FileBarChart,
-  ShieldAlert, BarChart3, Search, Bell, ChevronRight, Clock, AlertCircle, CheckCircle2,
-  TrendingUp, ShieldCheck, Sparkles as SparkIcon, Download, Activity, Filter, LogOut,
-  KeyRound, Lock, Eye, EyeOff, RefreshCw, XCircle, Plus, Printer, Trophy, Crown, Flag,
-  GanttChartSquare, Radar, Cloud, Link2, Pencil, Trash2, Save, Warehouse, Wind, Truck, FileText,
+  Boxes,
+  FileBarChart,
+  BarChart3,
+  AlertCircle,
+  CheckCircle2,
+  ShieldCheck,
+  Sparkles as SparkIcon,
+  Download,
+  Filter,
+  KeyRound,
+  Lock,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  XCircle,
+  Plus,
+  Printer,
+  Crown,
+  Radar,
+  Cloud,
+  FileText,
 } from "lucide-react";
 // Lưu ý: recharts đã bị gỡ vì KHÔNG dùng (chỉ import thừa, nặng bundle).
 // xlsx được nạp động (dynamic import) ngay trong hàm xuất Excel để giảm bundle ban đầu.
 
 // ===== Internal modules (refactored) =====
-import { C, TEXT, NUM, GRAD, GRAD_SOFT, btnPrimary, INP, FIELD, LBL, glass } from "./constants/theme.ts";
+import { C, TEXT, NUM, GRAD, btnPrimary, INP, glass } from "./constants/theme.ts";
 import {
-  STATUS, MST, PROG, CLS, DEPTS, DEPT_CODE, DEP_DAYS, CRIT,
-  SOON_DAYS, PERM_LABEL, NAV_ITEMS, NAV_SUBS, STAGES, TT_OPTS, PERIODS, PLABEL,
+  PROG,
+  DEPTS,
+  DEPT_CODE,
+  PERM_LABEL,
+  NAV_ITEMS,
+  NAV_SUBS,
+  PLABEL,
   vmpToday,
 } from "./constants/vmp.ts";
 import {
-  parseD, addDays, addMonths, fmtVN, daysBetween, clamp, pctYear,
-  milestones, phaseStates, nextAlert, wlIsDone, stageOf, enrich,
-  tally, docTally, inPeriod, runDataQualityChecks,
-  buildReportHTML, download,
+  tally,
+  docTally,
+  inPeriod,
+  runDataQualityChecks,
+  buildReportHTML,
+  download,
 } from "./utils/helpers.ts";
-import { useDebounce, useScrollTop, useAuth, useVmpData } from "./hooks/index.ts";
+import { useScrollTop, useAuth, useVmpData } from "./hooks/index.ts";
+import type { ConnState } from "./hooks/index.ts";
 
 // ===== UI Primitives =====
 import {
-  Sparkle, Mascot, Card, CardTitle, Tag, Modal, Donut, KpiCard, Sel,
-  SkeletonPulse, SkeletonDashboard, SyncBanner, CrownLogo, VQWordmark,
-  GuardianSilhouette, PrincessCommentary,
+  Sparkle,
+  Card,
+  CardTitle,
+  Tag,
+  Modal,
+  Donut,
+  KpiCard,
+  Sel,
+  SkeletonDashboard,
+  SyncBanner,
+  GuardianSilhouette,
+  PrincessCommentary,
 } from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
@@ -61,13 +94,17 @@ const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.jsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
-import { loadConn, saveConn, clearConn, loadUser, saveUser } from "./lib/config.ts";
-import { toISO, deriveActivityFields } from "./lib/n8nAdapter.ts";
-import { isSupabaseConfigured, signIn, signOut, changePassword, getAccessToken, supabase } from "./lib/supabaseClient.ts";
-
-/* ===================== Backward-compat shims ===================== */
-const sum = (arr) => arr.reduce((a, b) => a + b, 0);
-const NAV = NAV_ITEMS.filter(n => !n.adminOnly).slice(0, 7); // backward compat
+import { saveUser } from "./lib/config.ts";
+import type { ReactNode } from "react";
+import type { Activity, AppUser } from "./types/domain.ts";
+import type { Database } from "./types/database.ts";
+import {
+  isSupabaseConfigured,
+  signIn,
+  changePassword,
+  getAccessToken,
+  supabase,
+} from "./lib/supabaseClient.ts";
 
 /* ===================== Daily greetings ===================== */
 // Lời chào theo khung giờ (cập nhật mỗi lần render trang đăng nhập)
@@ -100,7 +137,7 @@ function getDailyWish() {
 }
 
 /* ===================== Login ===================== */
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
   const [u, setU] = useState(""); const [p, setP] = useState(""); const [err, setErr] = useState(""); const [show, setShow] = useState(false); const [loading, setLoading] = useState(false);
   const useSupa = isSupabaseConfigured();
   const submit = async () => {
@@ -112,10 +149,14 @@ function LoginScreen({ onLogin }) {
       } else {
         setErr("Hệ thống chưa cấu hình Supabase Auth. Liên hệ IT để thiết lập VITE_SUPABASE_URL và VITE_SUPABASE_ANON.");
       }
-    } catch (e) { setErr(e.message || "Đăng nhập thất bại."); }
+    } catch (e) { setErr((e as Error).message || "Đăng nhập thất bại."); }
     setLoading(false);
   };
-  const field = (icon, props, right) => (
+  const field = (
+    icon: ReactNode,
+    props: React.InputHTMLAttributes<HTMLInputElement>,
+    right?: ReactNode,
+  ) => (
     <div
       className="vq-input-shell"
       style={{
@@ -482,7 +523,7 @@ function LoginScreen({ onLogin }) {
 }
 
 /* ===================== Change Password ===================== */
-function ChangePwModal({ user, onClose }) {
+function ChangePwModal({ onClose }: { onClose: () => void }) {
   const [np, setNp] = useState(""); const [cf, setCf] = useState(""); const [msg, setMsg] = useState({ type: "", text: "" }); const [loading, setLoading] = useState(false);
   const submit = async () => {
     if (np.length < 6) return setMsg({ type: "err", text: "Mật khẩu mới tối thiểu 6 ký tự." });
@@ -490,7 +531,7 @@ function ChangePwModal({ user, onClose }) {
     if (isSupabaseConfigured()) {
       setLoading(true);
       try { await changePassword(np); setMsg({ type: "ok", text: "Đổi mật khẩu thành công!" }); setNp(""); setCf(""); }
-      catch (e) { setMsg({ type: "err", text: e.message }); }
+      catch (e) { setMsg({ type: "err", text: (e as Error).message }); }
       setLoading(false);
     } else { setMsg({ type: "err", text: "Cần Supabase để đổi mật khẩu." }); }
   };
@@ -513,9 +554,19 @@ function ChangePwModal({ user, onClose }) {
 }
 
 /* ===================== Data Quality Page (NEW) ===================== */
-function DataQualityView({ acts }) {
+function DataQualityView({ acts }: { acts: Activity[] }) {
   const issues = useMemo(() => runDataQualityChecks(acts), [acts]);
-  const [serverIssues, setServerIssues] = useState([]);
+  /** Một vấn đề chất lượng dữ liệu, từ bảng data_quality_issues hoặc kiểm tra tại client. */
+  interface QualityIssue {
+    issue_type: string;
+    severity: string;
+    field_name?: string | null;
+    message: string;
+    detected_at?: string | null;
+    plan_item_id?: string | null;
+    id?: string;
+  }
+  const [serverIssues, setServerIssues] = useState<QualityIssue[]>([]);
   useEffect(() => {
     if (!isSupabaseConfigured() || !supabase) return;
     supabase.from("data_quality_issues")
@@ -523,11 +574,11 @@ function DataQualityView({ acts }) {
       .eq("is_resolved", false)
       .order("detected_at", { ascending: false })
       .limit(100)
-      .then(({ data }) => setServerIssues(data || []))
-      .catch(() => {});
+      .then(({ data }) => setServerIssues((data || []) as QualityIssue[]),
+            () => { /* bỏ qua lỗi đọc phụ trợ */ });
   }, []);
-  const sevCount = { error: 0, warning: 0, info: 0 };
-  issues.forEach(i => sevCount[i.severity]++);
+  const sevCount: Record<string, number> = { error: 0, warning: 0, info: 0 };
+  issues.forEach((i) => { sevCount[i.severity] = (sevCount[i.severity] || 0) + 1; });
   const [filter, setFilter] = useState("all");
   const filtered = filter === "all" ? issues : issues.filter(i => i.severity === filter);
 
@@ -607,7 +658,8 @@ function DataQualityView({ acts }) {
 }
 
 /* ===================== Mismatch Page (NEW) ===================== */
-function MismatchView({ acts }) {
+/** Giữ lại bản cũ để đối chiếu — hiện chưa gắn vào router. */
+export function MismatchView({ acts }: { acts: Activity[] }) {
   const mismatched = acts.filter(a => a.mismatch);
   const valDoneDocPend = mismatched.filter(a => a.mismatch === "val_done_doc_pending");
   const docDoneValPend = mismatched.filter(a => a.mismatch === "doc_done_val_pending");
@@ -671,7 +723,9 @@ function MismatchView({ acts }) {
 
 /* ===================== Audit Log Page (NEW) ===================== */
 function AuditLogView() {
-  const [logs, setLogs] = useState([]);
+  /** Một dòng nhật ký thao tác từ bảng audit_logs. */
+  type AuditRow = Database["public"]["Tables"]["audit_logs"]["Row"];
+  const [logs, setLogs] = useState<AuditRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -690,7 +744,7 @@ function AuditLogView() {
         .order("created_at", { ascending: false })
         .range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1);
 
-      if (filters.action) query = query.eq("action", filters.action);
+      if (filters.action) query = query.eq("action", filters.action as AuditRow["action"]);
       if (filters.user) query = query.ilike("user_email", `%${filters.user}%`);
       if (filters.record) query = query.eq("record_id", filters.record);
 
@@ -717,7 +771,7 @@ function AuditLogView() {
     AI_GENERATE: { label: "Tạo AI report", color: C.pinkText, bg: C.pinkSoft },
   };
 
-  const fmtTime = (ts) => {
+  const fmtTime = (ts: string | number | null | undefined): string => {
     if (!ts) return "—";
     const d = new Date(ts);
     return d.toLocaleDateString("vi-VN") + " " + d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
@@ -784,7 +838,8 @@ function AuditLogView() {
               </thead>
               <tbody>
                 {logs.map((log, i) => {
-                  const al = actionLabels[log.action] || { label: log.action, color: C.plumSoft, bg: C.pinkSoft };
+                  const al = (actionLabels as Record<string, { label: string; color: string; bg: string }>)[log.action]
+                    || { label: log.action, color: C.plumSoft, bg: C.pinkSoft };
                   return (
                     <tr key={log.id} style={{ borderTop: `1px solid ${C.line}`, background: i % 2 ? "rgba(255,255,255,.4)" : "transparent" }}>
                       <td style={{ padding: "11px 14px", fontSize: 12.5, fontWeight: 600, color: C.plumSoft, whiteSpace: "nowrap" }}>{fmtTime(log.created_at)}</td>
@@ -833,7 +888,10 @@ function AuditLogView() {
 }
 
 /* ===================== Admin Page (NEW) ===================== */
-function AdminView({ conn, user }) {
+function AdminView({ conn, user }: {
+  conn: ConnState;
+  user?: AppUser | null;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
@@ -851,7 +909,7 @@ function AdminView({ conn, user }) {
                conn.status === "loading" ? "Đang tải…" :
                conn.status === "err" ? "Lỗi kết nối" : "Chưa kết nối"}
             </div>
-            {conn.msg && <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 4 }}>{conn.msg}</div>}
+            {conn.msg ? <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 4 }}>{String(conn.msg)}</div> : null}
           </div>
 
           <div style={{ padding: 18, borderRadius: 16, background: isSupabaseConfigured() ? C.mintSoft : C.raspSoft }}>
@@ -867,10 +925,10 @@ function AdminView({ conn, user }) {
         <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: C.lavSoft }}>
           <div style={{ fontWeight: 800, fontSize: 13, color: C.lavText, marginBottom: 8 }}>Thông tin phiên</div>
           <div style={{ fontSize: 13, color: C.plum, lineHeight: 2 }}>
-            <div>Người dùng: <b>{user.name}</b></div>
-            <div>Vai trò: <b>{user.role}</b></div>
-            <div>Quyền: <b>{PERM_LABEL[user.perm] || user.perm}</b></div>
-            {user.department && <div>Bộ phận: <b>{user.department}</b></div>}
+            <div>Người dùng: <b>{user?.name}</b></div>
+            <div>Vai trò: <b>{user?.role}</b></div>
+            <div>Quyền: <b>{(user && PERM_LABEL[user.perm]) || user?.perm}</b></div>
+            {user?.department ? <div>Bộ phận: <b>{user.department}</b></div> : null}
           </div>
         </div>
       </Card>
@@ -884,9 +942,21 @@ function AdminView({ conn, user }) {
  */
 
 /* --- Individual Leaderboard --- */
-function IndividualLeaderboard({ acts }) {
-  const map = {};
-  acts.forEach((a) => { if ((a.state || "active") !== "active") return; const o = map[a.owner] || (map[a.owner] = { name: a.owner, items: 0, psum: 0, done: 0, over: 0 }); o.items++; o.psum += PROG[a.st]; if (a.st === "done") o.done++; if (a.st === "over") o.over++; });
+function IndividualLeaderboard({ acts }: { acts: Activity[] }) {
+  /** Thống kê của một người phụ trách trên bảng xếp hạng. */
+  interface PersonStat {
+    name: string; items: number; psum: number; done: number; over: number;
+  }
+  const map: Record<string, PersonStat> = {};
+  acts.forEach((a) => {
+    if ((a.state || "active") !== "active") return;
+    const key = a.owner || "—";
+    const o = map[key] || (map[key] = { name: key, items: 0, psum: 0, done: 0, over: 0 });
+    o.items++;
+    o.psum += (PROG as Record<string, number>)[a.st] ?? 0;
+    if (a.st === "done") o.done++;
+    if (a.st === "over") o.over++;
+  });
   const people = Object.values(map).map((p) => ({ ...p, avg: Math.round(p.psum / p.items) })).sort((a, b) => b.avg - a.avg || b.done - a.done || b.items - a.items);
   const top3 = people.slice(0, 3), rest = people.slice(3);
   const podium = [{ p: top3[1], place: 2 }, { p: top3[0], place: 1 }, { p: top3[2], place: 3 }].filter((x) => x.p);
@@ -899,7 +969,7 @@ function IndividualLeaderboard({ acts }) {
     <Card variant="strong" style={{ background: `linear-gradient(150deg,#fff,${C.pinkMist})` }}>
       <CardTitle icon={Crown} sub="Xếp theo tiến độ trung bình">Bảng vinh danh cá nhân</CardTitle>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 14, padding: "10px 0 4px", flexWrap: "wrap" }}>
-        {podium.map(({ p, place }) => { const cf = PCFG[place]; return (
+        {podium.map(({ p, place }) => { const cf = (PCFG as unknown as Record<number, { h: number; av: number; ring: string; base: string; crown?: boolean }>)[place]; return (
           <div key={p.name} className="rise" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: 116 }}>
             <div style={{ position: "relative" }}>
               {cf.crown && <div style={{ position: "absolute", top: -20, left: "50%", transform: "translateX(-50%)", fontSize: 22 }}>👑</div>}
@@ -911,7 +981,7 @@ function IndividualLeaderboard({ acts }) {
         ); })}
       </div>
       {rest.length > 0 && <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-        {rest.map((p, i) => (
+        {rest.map((p) => (
           <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px 8px 8px", borderRadius: 999, background: "#fff", border: `1.5px solid ${C.pinkSoft}` }}>
             <div style={{ width: 30, height: 30, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 13 }}>{p.name[0]}</div>
             <span style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 13, color: C.plum }}>{p.name}</span>
@@ -924,7 +994,7 @@ function IndividualLeaderboard({ acts }) {
 }
 
 /* --- Overview --- */
-function Overview({ acts, setView }) {
+function Overview({ acts }: { acts: Activity[]; setView?: (v: string) => void }) {
   const { e, d, overdue, soon, gap, gapPts, mismatched } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
     const overdue = acts.filter((a) => a.alert && a.alert.kind === "over");
@@ -1007,7 +1077,7 @@ function Overview({ acts, setView }) {
 }
 
 /* --- ReportsView (with AI via Anthropic proxy) --- */
-function ReportsView({ acts }) {
+function ReportsView({ acts }: { acts: Activity[] }) {
   const [period, setPeriod] = useState("thang");
   const [scope, setScope] = useState("all");
   const [ai, setAi] = useState("");
@@ -1018,8 +1088,12 @@ function ReportsView({ acts }) {
   const scopeLabel = scope === "all" ? "Toàn nhà máy" : (DEPTS.find((d) => d.id === scope)?.name || scope);
   const e = tally(scoped), d = docTally(scoped);
   const deptRows = DEPTS.map((dp) => { const da = scoped.filter((a) => a.dept === dp.id); const t = tally(da); return { ...dp, ...t }; }).filter((r) => r.total > 0);
-  const overdueList = scoped.map((a) => a.alert && a.alert.kind === "over" ? { id: a.id, name: a.name, stage: a.alert.stage, dleft: a.alert.dleft } : null).filter(Boolean);
-  const pl = PLABEL[period];
+  const overdueList = scoped
+    .map((a) => a.alert && a.alert.kind === "over"
+      ? { id: a.id, name: a.name ?? a.code, stage: a.alert.stage, dleft: a.alert.dleft }
+      : null)
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+  const pl = (PLABEL as Record<string, { t: string; p: string }>)[period];
   const html = () => buildReportHTML(period, scopeLabel, e, d, deptRows, overdueList, ai);
 
   const generate = async () => {
@@ -1049,7 +1123,7 @@ function ReportsView({ acts }) {
 
     try {
       const token = await getAccessToken();
-      const headers = { "Content-Type": "application/json" };
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch(aiWebhookUrl, { method: "POST", headers, body: JSON.stringify(reportData) });
@@ -1062,16 +1136,19 @@ function ReportsView({ acts }) {
       } else {
         setErr("Không nhận được phản hồi AI từ n8n.");
       }
-    } catch (ex) { setErr("Lỗi kết nối n8n: " + (ex?.message || "không xác định")); }
+    } catch (ex) { setErr("Lỗi kết nối n8n: " + ((ex as Error)?.message || "không xác định")); }
     finally { setLoading(false); }
   };
 
   const printPDF = () => {
     const ifr = document.createElement("iframe");
     ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
-    document.body.appendChild(ifr); const dd = ifr.contentWindow.document;
+    document.body.appendChild(ifr);
+    const win = ifr.contentWindow;
+    if (!win) return;
+    const dd = win.document;
     dd.open(); dd.write(html()); dd.close();
-    setTimeout(() => { try { ifr.contentWindow.focus(); ifr.contentWindow.print(); } catch {} setTimeout(() => document.body.removeChild(ifr), 1500); }, 400);
+    setTimeout(() => { try { win.focus(); win.print(); } catch { /* trình duyệt chặn in */ } setTimeout(() => document.body.removeChild(ifr), 1500); }, 400);
   };
 
   const exportExcel = async () => {
@@ -1080,9 +1157,13 @@ function ReportsView({ acts }) {
     const ws = XLSX.utils.aoa_to_sheet(wsData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Báo cáo"); XLSX.writeFile(wb, `VMP_${period}_CPC1HN.xlsx`);
   };
 
-  const Seg = ({ id, label }) => <button onClick={() => { setPeriod(id); setAi(""); }} style={{ padding: "10px 17px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 13, fontWeight: 800, background: period === id ? GRAD : C.pinkSoft, color: period === id ? "#fff" : C.plumSoft }}>{label}</button>;
+  const Seg = ({ id, label }: { id: string; label: string }) => <button onClick={() => { setPeriod(id); setAi(""); }} style={{ padding: "10px 17px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 13, fontWeight: 800, background: period === id ? GRAD : C.pinkSoft, color: period === id ? "#fff" : C.plumSoft }}>{label}</button>;
 
-  const statRow = (lbl, x, dotc) => (
+  const statRow = (
+    lbl: string,
+    x: { done: number; total: number; rate: number; over?: number; todo?: number },
+    dotc: string,
+  ) => (
     <tr style={{ borderTop: `1px solid ${C.line}` }}>
       <td style={{ padding: 13, fontSize: 13.5, fontWeight: 800, color: C.plum }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 999, background: dotc, marginRight: 8 }} />{lbl}</td>
       <td style={{ padding: 13, textAlign: "center", color: C.mintText, fontWeight: 800 }}>{x.done}</td>
@@ -1147,16 +1228,24 @@ const dateInp = {
 };
 
 // Dropdown CHỌN NHIỀU (checkbox) — dùng cho Khu vực & Bộ phận. Rỗng = tất cả.
-function MultiSelect({ label, allLabel, options, selected, onChange }) {
+function MultiSelect({ label, allLabel, options, selected, onChange }: {
+  label: string;
+  allLabel: string;
+  options: Array<{ v: string; l: string }>;
+  selected: string[];
+  onChange: (v: string[]) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
-    const onDoc = (ev) => { if (ref.current && !ref.current.contains(ev.target)) setOpen(false); };
+    const onDoc = (ev: MouseEvent) => {
+      if (ref.current && !ref.current.contains(ev.target as Node)) setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
-  const toggle = (v) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
   const btn = selected.length === 0 ? allLabel : `${label}: ${selected.length}`;
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -1199,10 +1288,26 @@ function MultiSelect({ label, allLabel, options, selected, onChange }) {
 
 // LEGACY (giữ lại để revert): thanh lọc cũ — 3 hộp checkbox luôn hiện.
 // Muốn quay lại: ở call-site đổi <GlobalFilterBar .../> thành <GlobalFilterBarLegacy .../>.
-function GlobalFilterBarLegacy({
+/** Bản thanh lọc cũ, giữ để revert nếu cần — hiện dùng GlobalFilterBar. */
+export function GlobalFilterBarLegacy({
   areaSel, setAreaSel, deptSel, setDeptSel, period, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
   areaOptions, deptOptions, shown, total,
+}: {
+  areaSel: string[];
+  setAreaSel: (v: string[]) => void;
+  deptSel: string[];
+  setDeptSel: (v: string[]) => void;
+  period: string;
+  setPeriod: (v: string) => void;
+  customFrom: string;
+  setCustomFrom: (v: string) => void;
+  customTo: string;
+  setCustomTo: (v: string) => void;
+  areaOptions: Array<{ v: string; l: string }>;
+  deptOptions: Array<{ v: string; l: string }>;
+  shown: number;
+  total: number;
 }) {
   const active = areaSel.length > 0 || deptSel.length > 0 || period !== "all";
   return (
@@ -1275,7 +1380,9 @@ const DEPT_CHIP = {
 };
 const neutralChip = { background: "rgba(78,42,78,.06)", color: C.plum };
 
-function FilterChip({ style, label, onRemove }) {
+function FilterChip({ style, label, onRemove }: {
+  style?: React.CSSProperties; label: ReactNode; onRemove: () => void;
+}) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 6px 5px 11px", borderRadius: 999, fontFamily: TEXT, fontSize: 12, fontWeight: 800, ...style }}>
       {label}
@@ -1285,28 +1392,50 @@ function FilterChip({ style, label, onRemove }) {
 }
 
 function GlobalFilterBar({
-  areaSel, setAreaSel, deptSel, setDeptSel, period, setPeriod,
+  areaSel, setAreaSel, deptSel, setDeptSel, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
   areaOptions, deptOptions, shown, total,
+}: {
+  areaSel: string[];
+  setAreaSel: (v: string[]) => void;
+  deptSel: string[];
+  setDeptSel: (v: string[]) => void;
+  period: string;
+  setPeriod: (v: string) => void;
+  customFrom: string;
+  setCustomFrom: (v: string) => void;
+  customTo: string;
+  setCustomTo: (v: string) => void;
+  areaOptions: Array<{ v: string; l: string }>;
+  deptOptions: Array<{ v: string; l: string }>;
+  shown: number;
+  total: number;
 }) {
   const [open, setOpen] = useState(false);
-  const popRef = useRef(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
-    const onDoc = (ev) => { if (popRef.current && !popRef.current.contains(ev.target)) setOpen(false); };
+    const onDoc = (ev: MouseEvent) => {
+      if (popRef.current && !popRef.current.contains(ev.target as Node)) setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  const toggleDept = (v) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
-  const toggleArea = (v) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
+  const toggleDept = (v: string) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
+  const toggleArea = (v: string) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
   const active = deptSel.length > 0 || areaSel.length > 0 || !!customFrom || !!customTo;
   const resetAll = () => { setDeptSel([]); setAreaSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); };
   // Thời gian CHỈ theo mốc ngày: có nhập ngày -> bật lọc "custom"; xoá hết -> "all".
-  const onFrom = (v) => { setCustomFrom(v); setPeriod((v || customTo) ? "custom" : "all"); };
-  const onTo = (v) => { setCustomTo(v); setPeriod((customFrom || v) ? "custom" : "all"); };
+  const onFrom = (v: string) => { setCustomFrom(v); setPeriod((v || customTo) ? "custom" : "all"); };
+  const onTo = (v: string) => { setCustomTo(v); setPeriod((customFrom || v) ? "custom" : "all"); };
 
-  const optRow = (o, on, toggle, dot) => (
+  const optRow = (
+    o: { v: string; l: string; n?: number },
+    on: boolean,
+    toggle: (v: string) => void,
+    dot: string,
+  ) => (
     <button key={o.v} type="button" onClick={() => toggle(o.v)} aria-pressed={on}
       style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", border: "none", background: on ? C.pinkMist : "transparent", fontFamily: TEXT, fontSize: 13, fontWeight: 700, color: C.plum, padding: "8px 9px", borderRadius: 9, cursor: "pointer" }}>
       <span style={{ width: 9, height: 9, borderRadius: 3, background: dot, flex: "none" }} />
@@ -1335,7 +1464,7 @@ function GlobalFilterBar({
         {open && (
           <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 250, maxHeight: 340, overflowY: "auto", background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
             <div style={{ margin: "6px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
-            {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, (DEPT_CHIP[o.v] || {}).dot || C.pink))}
+            {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, ((DEPT_CHIP as Record<string, { dot?: string }>)[o.v] || {}).dot || C.pink))}
             <div style={{ margin: "8px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
             {areaOptions.length === 0
               ? <div style={{ padding: "8px 9px", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có khu vực</div>
@@ -1346,8 +1475,13 @@ function GlobalFilterBar({
 
       {/* chip đang lọc */}
       {deptSel.map((v) => (
-        <FilterChip key={"d" + v} label={DEPT_CODE[v] || v.toUpperCase()} onRemove={() => toggleDept(v)}
-          style={DEPT_CHIP[v] ? { background: DEPT_CHIP[v].soft, color: DEPT_CHIP[v].text } : neutralChip} />
+        <FilterChip key={"d" + v}
+          label={(DEPT_CODE as Record<string, string>)[v] || v.toUpperCase()}
+          onRemove={() => toggleDept(v)}
+          style={(() => {
+            const chip = (DEPT_CHIP as Record<string, { soft: string; text: string }>)[v];
+            return chip ? { background: chip.soft, color: chip.text } : neutralChip;
+          })()} />
       ))}
       {areaSel.map((v) => (
         <FilterChip key={"a" + v} label={"Khu vực: " + v} onRemove={() => toggleArea(v)} style={neutralChip} />
@@ -1375,15 +1509,17 @@ function GlobalFilterBar({
  * Global CSS & keyframes → src/index.css (tĩnh, áp dụng trước first paint).
  * Fonts → index.html (nạp 1 request, không FOUC). */
 export default function App() {
-  const { user, setUser, login, logout, isAdmin } = useAuth();
-  const { objects, acts, conn, lastSync, saveStatus, reloadData, silentRefresh, updateActivity, saveObject, deleteObject, setConn } = useVmpData();
+  const { user, setUser, logout, isAdmin } = useAuth();
+  const {
+    objects, acts, conn, lastSync, saveStatus, reloadData, silentRefresh,
+  } = useVmpData();
   const [view, setView] = useState("overview");
   const [showPw, setShowPw] = useState(false);
   const mainRef = useScrollTop([view]);
 
   // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + bộ phận (chọn NHIỀU) + thời gian (có Tùy chọn).
-  const [areaSel, setAreaSel] = useState([]);   // rỗng = tất cả khu vực
-  const [deptSel, setDeptSel] = useState([]);   // rỗng = tất cả bộ phận
+  const [areaSel, setAreaSel] = useState<string[]>([]);   // rỗng = tất cả khu vực
+  const [deptSel, setDeptSel] = useState<string[]>([]);   // rỗng = tất cả bộ phận
   const [periodFilter, setPeriodFilter] = useState("all");
   const [customFrom, setCustomFrom] = useState("");   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState("");       // yyyy-mm-dd
@@ -1394,12 +1530,13 @@ export default function App() {
   })), [acts]);
   // 1 hạng mục có thể thuộc NHIỀU bộ phận (a.depts, vd "RD,QLCL,XSX"). Khớp nếu GIAO.
   const inDept = useCallback(
-    (a) => deptSel.length === 0 || (a.depts || [a.dept]).some((d) => deptSel.includes(d)),
+    (a: Activity) => deptSel.length === 0
+      || (a.depts || [a.dept]).some((d) => d != null && deptSel.includes(d)),
     [deptSel],
   );
   // Khu vực PHỤ THUỘC Bộ phận: chỉ hiện khu vực thuộc các bộ phận đã chọn.
   const areaOptions = useMemo(() => {
-    const m = new Map();
+    const m = new Map<string, number>();
     for (const a of acts) {
       if (!inDept(a)) continue;
       const ar = String(a.area || "").trim();
@@ -1409,7 +1546,7 @@ export default function App() {
   }, [acts, inDept]);
   // Bộ phận của mỗi đối tượng = hợp bộ phận của các hạng mục thuộc nó (để lọc danh mục).
   const objectDepts = useMemo(() => {
-    const m = new Map();
+    const m = new Map<string, Set<string>>();
     for (const a of acts) {
       if (!a.code) continue;
       let set = m.get(a.code);
@@ -1426,7 +1563,7 @@ export default function App() {
       return next.length === prev.length ? prev : next;
     });
   }, [areaOptions]);
-  const matchTime = useCallback((a) => {
+  const matchTime = useCallback((a: Activity) => {
     if (periodFilter === "custom") {
       if (!a.target) return false;
       if (customFrom && a.target < customFrom) return false;
@@ -1481,7 +1618,7 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>
-      {showPw && <ChangePwModal user={user} onClose={() => setShowPw(false)} />}
+      {showPw && <ChangePwModal onClose={() => setShowPw(false)} />}
 
       <Sidebar
         view={view} setView={setView} user={user}
@@ -1505,7 +1642,7 @@ export default function App() {
 
         <div style={{ position: "relative", zIndex: 1 }}>
           <Topbar
-            title={title} user={user} sub={NAV_SUBS[view]}
+            title={title} user={user} sub={(NAV_SUBS as Record<string, string>)[view]}
             onRefresh={reloadData} refreshing={conn.status === "loading"}
             lastSync={lastSync}
           />
