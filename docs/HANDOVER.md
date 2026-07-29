@@ -65,14 +65,36 @@ WF-04 gộp 5 nhánh trong 1 workflow. Node bị `disabled` là **tắt có ch�
 4. Đường sync cũ dùng node Google Sheets + Diff Engine (Router → INSERT/UPDATE/MARK MISSING/CONFLICT) — đã thay bằng đường CSV.
 5. Chiều ghi ngược App → Sheet (`/webhook/vmp-write` + outbox drain 1 phút) — node ghi Sheet bị tắt; dữ liệu hiện chảy **một chiều** Sheet → Supabase.
 
-## 4. Trạng thái tại thời điểm bàn giao (2026-07-23)
+## 4. Trạng thái hệ thống (kiểm chứng 2026-07-29)
 
-- **WF-04 đang `active: false` (chưa publish)** → không có sync nào chạy.
-- Lần sync thành công cuối: **2026-07-08 22:21 UTC** (463 dòng). Dữ liệu Supabase đứng từ đó.
-- `vmp_plan_items`: 460 dòng; `vmp_objects`: 217; `vmp_sheet_sync_runs`: 203 lần chạy.
+> ⚠️ Mục này chép trạng thái nên **mục rữa theo thời gian**. Đừng tin số ở đây —
+> chạy `bash scripts/handover-check.sh` để lấy trạng thái thật trong ~1 phút.
+
+- **WF-04 `active: true`**, Schedule 5 phút đang chạy.
+- Lần sync thành công cuối: **2026-07-29 00:54 UTC** — 464 dòng nguồn → 461 ID duy nhất, 217 đối tượng, 3 ID trùng.
+- `vmp_plan_items`: 461; `vmp_objects`: 217; `vmp_sheet_sync_runs`: 204 lần chạy.
 - Các workflow BMS/EM/HEPA khác trên cùng n8n **không thuộc** hệ VMP này.
 
 **Khôi phục vận hành:** vào n8n publish WF-04 → sync 5 phút tự bắt kịp, hoặc POST `/webhook/vmp-sheet-changed` với header `x-vmp-sync-token` để sync ngay.
+
+### 4b. Sự cố 2026-07-08 → 2026-07-29: sync đứng 21 ngày trong im lặng
+
+Đáng đọc vì nó chỉ ra một điểm mù còn nguyên trong thiết kế cảnh báo.
+
+**Diễn biến.** Tab `6.Timeline VMP` bị dán trùng nội dung 21 lượt → 9.724 dòng nhưng chỉ 461 ID duy nhất. Guard `VMP_SYNC_ROW_GUARD` chặn snapshot, đúng như thiết kế, nên **Supabase không bị ghi đè** — hàng rào an toàn đã làm tròn việc. Sau khi Sheet được dọn về 464 dòng, sync tự bắt kịp ngay ở lần chạy kế tiếp, không cần can thiệp tay.
+
+**Điểm mù.** Suốt 21 ngày đó, Error Trigger vẫn nổ **mỗi 5 phút** và vẫn gửi mail đều đặn. Nhưng vì mọi mail giống hệt nhau nên không ai đọc, và dashboard vẫn hiển thị bình thường — **không có dấu hiệu nào cho người dùng biết dữ liệu đã cũ 21 ngày**.
+
+**Bài học.** Cảnh báo khi *có lỗi* là chưa đủ; phải cảnh báo khi *thiếu thành công*. Mục 3b của `scripts/handover-check.sh` nay làm việc này (dead-man's switch, ngưỡng mặc định 30 phút, chỉnh bằng `VMP_SYNC_MAX_LAG_MIN`). Câu truy vấn cốt lõi:
+
+```sql
+select now() - max(created_at) as do_tre
+from public.vmp_sheet_sync_runs where status = 'completed';
+```
+
+Nên gắn thêm vào dashboard một banner "dữ liệu cập nhật lúc …" để độ trễ luôn hiển thị trước mắt người dùng — hiện **chưa có**.
+
+**Việc còn để ngỏ:** ngưỡng guard `450..5000` giữ nguyên (đúng); migration `20260729020000_row_guard_diagnostic_message.sql` chỉ làm thông báo lỗi tự chẩn đoán hơn — xem mục 8.
 
 ## 5. Quyền truy cập cần bàn giao kèm
 
@@ -96,3 +118,55 @@ WF-04 gộp 5 nhánh trong 1 workflow. Node bị `disabled` là **tắt có ch�
 - Token webhook `x-vmp-sync-token` cũ (`tienhoan2025`) **đã lộ trong lịch sử git** — dù code hiện tại đã đọc token từ Script Properties (khóa `VMP_SYNC_TOKEN`), vẫn **bắt buộc đặt token MỚI** khi tiếp nhận: đổi trong n8n (Header Auth của WF-04) + đặt Script Property trong Apps Script. Không ghi token vào code nữa.
 - `.env.local` chứa chuỗi kết nối role postgres (bypass RLS) — tuyệt đối không commit, chuyển giao qua kênh riêng.
 - Anon key Supabase xuất hiện trong workflow JSON là key công khai (by design), không phải rò rỉ.
+- ⚠️ **Repo `tienhoandhd-droid/naniVMP` đang ở chế độ PUBLIC.** Cân nhắc chuyển sang private, hoặc ít nhất đừng ghi chuỗi token thật vào tài liệu — viết "token cũ đã lộ, tra bằng `git log --all -S`" là đủ.
+
+## 8. Migration chờ áp (chưa chạy trên production)
+
+| File | Nội dung | Trạng thái |
+|---|---|---|
+| `supabase/migrations/20260729020000_row_guard_diagnostic_message.sql` | `VMP_SYNC_ROW_GUARD` in thêm số ID duy nhất + tỉ lệ lặp + hướng xử lý | ✅ Đã kiểm thử trong transaction rollback; ❌ **chưa áp** |
+
+Thông báo cũ → mới:
+
+```
+cũ:  VMP_SYNC_ROW_GUARD: source row count 9724 is outside 450..5000
+mới: VMP_SYNC_ROW_GUARD: 9724 dong / 461 ID duy nhat (ti le lap 21.1x)
+     - ngoai khoang 450..5000. Sheet bi dan trung: DON SHEET, KHONG noi nguong guard.
+```
+
+Chỉ đổi phần thông báo lỗi — ngưỡng và logic giữ nguyên; phần chẩn đoán chỉ chạy khi sắp raise nên đường chạy bình thường không tốn thêm. Áp bằng:
+
+```bash
+psql "$SUPABASE_DB_URL" --single-transaction -f supabase/migrations/20260729020000_row_guard_diagnostic_message.sql
+```
+
+## 9. Danh mục nguồn trên Supabase (2026-07-29)
+
+Trước đây chỉ tab `6.Timeline VMP` có mặt trên Supabase. Nay 5 tab danh mục nguồn + tab sản phẩm GMP đã được đưa lên, phục vụ việc chuyển Supabase thành nơi lưu dữ liệu gốc.
+
+| Bảng | Số dòng | Nội dung |
+|---|---|---|
+| `vmp_source_objects` | 264 | Đối tượng thẩm định gộp từ 5 tab, đã khử trùng (dòng xuất hiện sau thắng — cùng quy tắc timeline dùng) |
+| `vmp_source_rows` | 310 | Bản thô mọi dòng mọi tab, giữ cả dòng thiếu mã để đối chiếu |
+| `vmp_products_gmp` | 31 | Danh mục sản phẩm/cỡ lô từ tab `DM TDQTSX show GMP` |
+
+Migration: `supabase/migrations/20260729030000_source_catalogs.sql` (đã áp).
+Nạp dữ liệu: `python3 scripts/import-source-catalogs.py` — chạy lại được, thay toàn bộ trong một transaction; `--dry-run` chỉ sinh SQL.
+
+**Nghiệm thu:** 217 đối tượng có `validate_flag='y'` — **khớp chính xác** 217 dòng của `vmp_objects` sinh từ timeline. Chuỗi Sheet → luật → timeline → Supabase nhất quán đầu-cuối.
+
+### 9b. Luật sinh timeline — nguồn chân lý
+
+**Tab `0.Rule timeline VMP` KHÔNG phải luật chuẩn.** Luật chuẩn là node `Code in JavaScript1` của workflow n8n `VMP01-Tạo timeline VMP` (id `Dr5zFBSIjAvVFTCq`). Đã kiểm chứng 2026-07-29 bằng cách dựng lại thuật toán và so với dữ liệu thật: **439/439 ID khớp, 0 thiếu**. 22 dòng chênh là `DQ`/`FAT-SAT`/`IQ` — loại một-lần mà cơ chế `daTungIQ()` cố ý không sinh lại; đúng thiết kế.
+
+**Dữ liệu nguồn còn thiếu (5 đối tượng, gây chuỗi `"Không xác định do thiếu…"` trong cột ngày của timeline):**
+
+| Loại | Mã | Tên | Thiếu |
+|---|---|---|---|
+| Quy trình | `TDSX-X5-R011` | Ketofen-Drop | Tháng thẩm định đầu tiên |
+| Quy trình | `TDSX-X5-024` | Cafein | Tháng thẩm định đầu tiên |
+| Quy trình | `TDSX-X5-R007` | Moxieye | Tháng thẩm định đầu tiên |
+| Quy trình | `TDSX-X5-123` | Sugam | Tháng thẩm định đầu tiên |
+| Vận chuyển | `S1` | Thẩm định phương tiện vận chuyển: xe ô tô | Tháng thẩm định đầu tiên |
+
+Điền cột này trong Sheet nguồn là 5 dòng đó tự tính được đầy đủ mốc thời gian.
