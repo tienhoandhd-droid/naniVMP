@@ -1053,7 +1053,7 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             {[
               { l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
-              { l: "Quá hạn", v: e.over, c: C.rasp, t: C.raspText },
+              { l: "Quá hạn (trạng thái)", v: e.over, c: C.rasp, t: C.raspText },
               { l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
             ].map((x) => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1084,9 +1084,14 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
         </div>
       </Card>
 
-      <StatTile cls="b-k1" icon={AlertCircle} label="Quá hạn" value={overdue.length}
+      {/* CẨN THẬN: hai con số này KHÁC NHAU và trước đây cùng mang nhãn "Quá hạn"
+          trên một màn hình — 162 vs 279 — nên không ai biết tin số nào.
+          · e.over  = trạng thái hạng mục đang là "quá hạn"
+          · overdue = hạng mục có MỐC gần nhất (đề cương/thẩm định/báo cáo) đã trôi qua,
+            kể cả khi trạng thái tổng chưa chuyển. Số này luôn ≥ số kia. */}
+      <StatTile cls="b-k1" icon={AlertCircle} label="Có mốc đã quá hạn" value={overdue.length}
         tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di("progress")}
-        sub={overdue.length ? "Bấm để mở danh sách cần xử lý" : "Không còn hạng mục nào trễ"} />
+        sub={overdue.length ? `Gồm cả hạng mục trạng thái chưa đổi · bấm để xử lý` : "Không còn hạng mục nào trễ"} />
 
       <StatTile cls="b-k2" icon={Clock} label="Tới hạn 30 ngày" value={soon.length}
         tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di("alerts")}

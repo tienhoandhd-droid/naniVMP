@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Pencil, Search, Save, Activity, UserCheck } from "lucide-react";
 import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
 import { STATUS, STAGES, PERIODS, TT_OPTS } from "../constants/vmp.ts";
-import { stageOf, inPeriod, txt } from "../utils/helpers.ts";
+import { stageOf, inPeriod, txt, nguoiPhuTrach } from "../utils/helpers.ts";
 import { toISO } from "../lib/n8nAdapter.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { setItemPerformer } from "../lib/supabaseData.ts";
@@ -123,7 +123,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onRel
     <Modal onClose={onClose} title="Cập nhật tiến độ" icon={Pencil} wide>
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16 }}>
         <div style={{ fontWeight: 800, color: C.plum, fontSize: 15 }}>{act.code} · {act.name}</div>
-        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {act.id} · QA: {txt(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
+        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {act.id} · QA: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
         <ROField label="Deadline VMP (T) · gốc" value={toISO(raw.dl_vmp) || act.target} />
@@ -158,7 +158,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onRel
             </span>
           </>
         ) : (
-          <ROField label="" value={`${txt(act.owner)}${find(act.owner)?.email ? ` · ${find(act.owner)?.email}` : ""}`} />
+          <ROField label="" value={`${nguoiPhuTrach(act.owner)}${find(act.owner)?.email ? ` · ${find(act.owner)?.email}` : ""}`} />
         )}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -417,7 +417,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                     {isFrozen && <div style={{ marginTop: 4 }}><StateBadge state={String(itemState)} small /></div>}
                   </td>
                   <td style={{ padding: "12px 16px" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag></td>
-                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 13, fontWeight: 600 }}>{txt(a.owner)}</td>
+                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 13, fontWeight: 600 }}>{nguoiPhuTrach(a.owner)}</td>
                   <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>{a.target ? a.target.split("-").reverse().join("/") : "—"}</td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>{sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}</td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}><Pill s={a.st} small /></td>
