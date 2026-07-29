@@ -87,7 +87,6 @@ export const NAV_ITEMS = [
   // QUẢN TRỊ
   { id: "health", label: "Sức khoẻ dữ liệu", icon: Radar, group: "admin", adminOnly: true },
   { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin", adminOnly: true },
-  { id: "missing", label: "Mã mất khỏi Sheet", icon: ShieldAlert, group: "admin", adminOnly: true },
   { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin", adminOnly: true },
 ];
 
@@ -104,7 +103,6 @@ export const NAV_SUBS = {
   rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
   health: "Sức khoẻ dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng ở Supabase",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
-  missing: "Hạng mục có trong DB nhưng KHÔNG còn trong Google Sheet — chờ admin/QA xác nhận",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",
 };
 

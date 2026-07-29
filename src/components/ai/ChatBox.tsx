@@ -19,7 +19,7 @@ import { MessageCircle, X, Send, Sparkles, AlertTriangle } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import type { AppUser } from "../../types/domain.ts";
 
-interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string }
+interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string; goiY?: string[] }
 
 /** Câu hỏi mồi — người mới không biết hỏi gì thì bấm thẳng. */
 const GOI_Y = [
@@ -83,8 +83,22 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
       if (!r.ok || !data?.ok) {
         throw new Error(data?.loi || `Máy chủ trả về ${r.status}`);
       }
-      setMsgs((m) => [...m, { ai: true, nguon: data.nguon,
-        text: String(data.tra_loi || "(không có nội dung)") }]);
+      // Trả lời rỗng là LỖI, không phải câu trả lời. Hiện "(không có nội
+      // dung)" chỉ làm người dùng tưởng hệ thống bí — nói thật là mô hình
+      // không trả về gì, và mời hỏi lại theo cách ngắn hơn (câu ngắn rơi
+      // vào đường SQL, không phụ thuộc mô hình).
+      const noiDung = String(data.tra_loi ?? "").trim();
+      if (!noiDung) {
+        setMsgs((m) => [...m, { ai: true, loi: true,
+          text: "Dạ em xin lỗi, mô hình vừa không trả về nội dung nào ạ. "
+              + "Anh/chị thử hỏi ngắn gọn hơn giúp em nhé — ví dụ "
+              + "\"bao nhiêu hạng mục quá hạn\" — những câu như vậy em tra "
+              + "thẳng từ database, không cần nhờ AI ạ." }]);
+        setDangHoi(false);
+        return;
+      }
+      setMsgs((m) => [...m, { ai: true, nguon: data.nguon, text: noiDung,
+        goiY: Array.isArray(data.goi_y) ? data.goi_y.slice(0, 3) : undefined }]);
     } catch (e) {
       setMsgs((m) => [...m, { ai: true, loi: true,
         text: "Không hỏi được: " + ((e as Error).message || "lỗi không rõ") }]);
@@ -185,13 +199,30 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
               {m.loi && <AlertTriangle size={14} style={{ verticalAlign: -2, marginRight: 6 }} />}
               {m.text}
             </div>
+            {m.goiY && m.goiY.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                <div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700 }}>
+                  Anh/chị có muốn hỏi tiếp không ạ 🌸
+                </div>
+                {m.goiY.map((g) => (
+                  <button key={g} onClick={() => hoi(g)} className="vmp-lift"
+                    style={{ textAlign: "left", padding: "7px 10px", borderRadius: R.sm,
+                             border: `1px solid ${C.line}`, background: C.surface,
+                             cursor: "pointer", fontFamily: TEXT, fontSize: 12,
+                             color: C.plum, fontWeight: 600, lineHeight: 1.45 }}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            )}
             {m.nguon && (
               <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 4, paddingLeft: 3,
                             fontWeight: 700 }}>
                 {m.nguon === "sql" ? "⚡ Em tra thẳng từ database — không tốn AI"
                   : m.nguon === "dem" ? "💾 Câu này em đã tra rồi, dữ liệu chưa đổi nên dùng lại"
-                  : m.nguon === "du_phong" ? "🔁 Gemini bận, em nhờ mô hình dự phòng ạ"
-                  : "✨ Gemini"}
+                  : m.nguon === "groq" ? "🚀 Llama 3.3 70B (Groq) — chọn vì câu ngắn, trả nhanh"
+                  : m.nguon === "du_phong" ? "🔁 Đã chuyển sang mô hình dự phòng"
+                  : "✨ Gemini 2.5 Flash — chọn vì câu nhiều ý hoặc cần tra luật"}
               </div>
             )}
           </div>
