@@ -242,6 +242,57 @@ export async function generateTimeline(
   return unwrap<GenerateTimelineResult>(data, error, "Sinh timeline thất bại");
 }
 
+/* ---- Tab thô (mọi tab của workbook) ---- */
+
+/** Một dòng thô trong vmp_source_rows. */
+export interface SourceRow {
+  id: number;
+  source_tab: string;
+  row_number: number;
+  payload: Record<string, unknown>;
+}
+
+export async function listSourceTabs(): Promise<
+  Array<{ source_tab: string; rows: number; columns: number }>
+> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_list_source_tabs");
+  if (error) throw new Error("Lỗi đọc danh sách tab: " + error.message);
+  return asShape(data);
+}
+
+export async function fetchSourceRows(tab: string): Promise<SourceRow[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase
+    .from("vmp_source_rows")
+    .select("id,source_tab,row_number,payload")
+    .eq("source_tab", tab)
+    .order("row_number");
+  if (error) throw new Error("Lỗi đọc dữ liệu tab: " + error.message);
+  return asShape(data || []);
+}
+
+export async function upsertSourceRow(
+  tab: string, rowNumber: number | null, payload: Record<string, unknown>,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_upsert_source_row", {
+    p_source_tab: tab,
+    // NULL = thêm mới, RPC tự lấy số dòng kế tiếp.
+    p_row_number: (rowNumber ?? null) as unknown as number,
+    p_payload: payload as never,
+  });
+  return unwrap(data, error, "Lưu dòng thất bại");
+}
+
+export async function deleteSourceRow(tab: string, rowNumber: number): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_delete_source_row", {
+    p_source_tab: tab, p_row_number: rowNumber,
+  });
+  return unwrap(data, error, "Xoá dòng thất bại");
+}
+
 /* ---- Người nhận cảnh báo ---- */
 export async function upsertAlertRecipient(
   id: string | null, patch: Record<string, unknown>,

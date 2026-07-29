@@ -1480,6 +1480,10 @@ export type Database = {
         Args: { p_object_code: string; p_object_kind: string; p_reason: string }
         Returns: Json
       }
+      rpc_delete_source_row: {
+        Args: { p_row_number: number; p_source_tab: string }
+        Returns: Json
+      }
       rpc_delete_staff_email: { Args: { p_id: string }; Returns: Json }
       rpc_due_alerts: {
         Args: { p_soon_days?: number; p_year?: number }
@@ -1516,6 +1520,7 @@ export type Database = {
         Returns: Json
       }
       rpc_get_vmp_watermark: { Args: { p_year?: number }; Returns: Json }
+      rpc_list_source_tabs: { Args: never; Returns: Json }
       rpc_mark_alert_sent: {
         Args: { p_error?: string; p_idempotency_key: string; p_ok: boolean }
         Returns: Json
@@ -1620,6 +1625,10 @@ export type Database = {
       }
       rpc_upsert_source_object: {
         Args: { p_object_code: string; p_object_kind: string; p_patch: Json }
+        Returns: Json
+      }
+      rpc_upsert_source_row: {
+        Args: { p_payload: Json; p_row_number: number; p_source_tab: string }
         Returns: Json
       }
       rpc_upsert_staff_email: {
