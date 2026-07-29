@@ -411,8 +411,8 @@ export interface ActiveRules {
   diem_trong_yeu: {
     cong_thuc: string;
     thang: string;
-    phuc_tap: Array<{ muc: string; diem: number }>;
-    anh_huong: Array<{ muc: string; diem: number }>;
+    phuc_tap: Array<{ muc: string; diem: number; mo_ta?: string; vi_du?: string }>;
+    anh_huong: Array<{ muc: string; diem: number; mo_ta?: string; vi_du?: string }>;
     phan_bo: Array<{ diem: number; so_luong: number }>;
     /** Phân bố từng trục — cho thấy trục nào thật sự phân biệt được. */
     phan_bo_truc?: {

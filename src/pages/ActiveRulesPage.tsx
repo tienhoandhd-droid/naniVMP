@@ -54,6 +54,49 @@ function Rows({ rows }: { rows: Array<[React.ReactNode, React.ReactNode]> }) {
   );
 }
 
+/** Một trục chấm điểm: từng mức kèm tiêu chí và ví dụ thiết bị.
+ *  Ví dụ là phần quan trọng nhất — không có nó thì "Cao / Trung bình /
+ *  Thấp" chỉ là ba chữ, QA không đối chiếu được thiết bị của mình. */
+function ScoreAxis({ title, muc }: {
+  title: string;
+  muc: Array<{ muc: string; diem: number; mo_ta?: string; vi_du?: string }>;
+}) {
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plum, marginBottom: 8 }}>
+        {title}
+      </div>
+      <div style={{ display: "grid", gap: 9 }}>
+        {muc.map((x) => {
+          const t = toneForScore(x.diem === 3 ? 9 : x.diem === 2 ? 6 : 3);
+          return (
+            <div key={x.muc} style={{ padding: "10px 12px", borderRadius: 12,
+                                      background: t.bg, fontFamily: TEXT }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
+                <span style={{ fontFamily: NUM, fontSize: 18, fontWeight: 800, color: t.c }}>
+                  {x.diem}
+                </span>
+                <span style={{ fontSize: 12.5, fontWeight: 800, color: t.c }}>{x.muc}</span>
+              </div>
+              {x.mo_ta && (
+                <div style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.6, marginTop: 5 }}>
+                  {x.mo_ta}
+                </div>
+              )}
+              {x.vi_du && (
+                <div style={{ fontSize: 11.5, color: C.plumSoft, lineHeight: 1.7, marginTop: 6,
+                              paddingTop: 6, borderTop: `1px solid ${C.pinkMist}` }}>
+                  <b style={{ color: t.c }}>Ví dụ: </b>{x.vi_du}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
   const canRun = user?.perm === "admin";
   const [rules, setRules] = useState<ActiveRules | null>(null);
@@ -142,18 +185,8 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
 
         <div style={{ display: "grid", gap: 14,
                       gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plum, marginBottom: 6 }}>
-              Điểm mức độ phức tạp
-            </div>
-            <Rows rows={dtl.phuc_tap.map((x) => [x.muc, <b key={x.muc}>{x.diem}</b>])} />
-          </div>
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plum, marginBottom: 6 }}>
-              Điểm ảnh hưởng tới chất lượng sản phẩm
-            </div>
-            <Rows rows={dtl.anh_huong.map((x) => [x.muc, <b key={x.muc}>{x.diem}</b>])} />
-          </div>
+          <ScoreAxis title="Điểm mức độ phức tạp" muc={dtl.phuc_tap} />
+          <ScoreAxis title="Điểm ảnh hưởng tới chất lượng sản phẩm" muc={dtl.anh_huong} />
         </div>
 
         <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plum, margin: "16px 0 8px" }}>
