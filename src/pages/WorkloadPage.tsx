@@ -8,7 +8,10 @@ import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill } from "../components/
 
 const sum = (arr) => arr.reduce((a, b) => a + b, 0);
 
-function WorkloadDetailModal({ detail, onClose }) {
+function WorkloadDetailModal({ detail, onClose }: {
+  detail: { title: string; acts: Activity[]; [k: string]: unknown };
+  onClose: () => void;
+}) {
   const tasks = [...detail.tasks].sort((a, b) => parseD(a.target) - parseD(b.target));
   const PhaseChip = ({ label, done, cong }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
   return (
@@ -38,7 +41,7 @@ function WorkloadDetailModal({ detail, onClose }) {
   );
 }
 
-export default function WorkloadView({ acts }) {
+export default function WorkloadView({ acts }: { acts: Activity[] }) {
   const [scope, setScope] = useState("month");
   const [metric, setMetric] = useState("cong");
   const [detail, setDetail] = useState(null);
