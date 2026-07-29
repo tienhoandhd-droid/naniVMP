@@ -46,22 +46,32 @@ else
   bad "Chưa có .env.local" "Sao chép .env.local.example thành .env.local, điền chuỗi kết nối nhận qua kênh an toàn"
 fi
 
-# 3b. Dead-man's switch — cảnh báo khi THIẾU sync thành công, không chỉ khi CÓ lỗi.
-#     Error Trigger chỉ nổ lúc workflow chạy hỏng; nếu nó nổ đều mà không ai đọc mail,
-#     dữ liệu có thể đứng yên nhiều tuần trong im lặng. Mục này bắt đúng ca đó.
-MAX_LAG_MIN="${VMP_SYNC_MAX_LAG_MIN:-30}"
+# 3b. Dữ liệu nghiệp vụ có mặt và nhất quán.
+#
+#     LƯU Ý ĐỔI KIẾN TRÚC (2026-07-29): Supabase nay là nơi lưu dữ liệu chính,
+#     Google Sheet chỉ còn là bản sao lưu. Nhánh sync Sheet→Supabase của WF-04
+#     đã TẮT CÓ CHỦ ĐÍCH, nên "sync đứng" không còn là lỗi — đo độ trễ sync ở
+#     đây sẽ báo động giả mãi mãi. Thay bằng kiểm tra dữ liệu thực có tồn tại
+#     và số liệu giữa danh mục nguồn với timeline vẫn khớp nhau.
 if [ "$DB_OK" = "1" ]; then
-  LAG=$(psql "$SUPABASE_DB_URL" -tA -c "
-    select coalesce(round(extract(epoch from (now() - max(created_at))) / 60)::text, 'NEVER')
-    from public.vmp_sheet_sync_runs where status = 'completed';" 2>/dev/null | tr -d '[:space:]')
-  if [ "$LAG" = "NEVER" ] || [ -z "$LAG" ]; then
-    bad "Chưa từng có lần sync nào thành công" "Publish WF-04 trên n8n, hoặc POST /webhook/vmp-sheet-changed với header x-vmp-sync-token"
-  elif [ "$LAG" -le "$MAX_LAG_MIN" ]; then
-    ok "Sync còn tươi — thành công gần nhất cách đây ${LAG} phút (ngưỡng ${MAX_LAG_MIN})"
+  READ=$(psql "$SUPABASE_DB_URL" -tA -F'|' -c "
+    select
+      (select count(*) from public.vmp_plan_items where is_active),
+      (select count(*) from public.vmp_objects),
+      (select count(*) from public.vmp_source_objects where validate_flag = 'y' and is_active);
+  " 2>/dev/null | tr -d '[:space:]')
+  ITEMS=$(echo "$READ" | cut -d'|' -f1)
+  OBJS=$(echo "$READ" | cut -d'|' -f2)
+  SRC=$(echo "$READ" | cut -d'|' -f3)
+
+  if [ -z "$ITEMS" ] || [ "$ITEMS" = "0" ]; then
+    bad "Chưa có hạng mục thẩm định nào trong vmp_plan_items" \
+        "Vào màn Danh mục nguồn → Sinh timeline, hoặc gọi rpc_generate_timeline(năm, true)"
+  elif [ "$OBJS" = "$SRC" ]; then
+    ok "Dữ liệu nhất quán: ${ITEMS} hạng mục · ${OBJS} đối tượng khớp ${SRC} danh mục có thẩm định"
   else
-    LAG_DAY=$((LAG / 1440))
-    bad "Sync ĐỨNG: thành công gần nhất cách đây ${LAG} phút (~${LAG_DAY} ngày), quá ngưỡng ${MAX_LAG_MIN}" \
-        "Xem execution lỗi của WF-04 trên n8n. Dashboard đang hiển thị dữ liệu cũ — người dùng KHÔNG tự biết điều này."
+    bad "Lệch số liệu: ${OBJS} đối tượng timeline nhưng ${SRC} danh mục nguồn có 'Thẩm định = y'" \
+        "Chạy lại Sinh timeline để bổ sung hạng mục cho các đối tượng mới thêm"
   fi
 fi
 
