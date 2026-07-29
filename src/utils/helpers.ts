@@ -4,56 +4,64 @@
 import { DEP_DAYS, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
 
 // ======================== DATE HELPERS ========================
-export const parseD = (s) => {
+import type { Activity, Milestones, VmpObject } from "../types/domain.ts";
+export type { Milestones };
+
+/** Dòng thô từ Sheet/Supabase, khoá là tên cột đã chuẩn hoá. */
+type RawRow = Record<string, unknown>;
+
+export const parseD = (s: unknown): Date | null => {
   if (!s) return null;
   const [y, m, d] = String(s).split("-").map(Number);
   if (!y) return null;
   return new Date(y, (m || 1) - 1, d || 1);
 };
 
-export const addDays = (date, n) => {
+export const addDays = (date: Date, n: number): Date => {
   const x = new Date(date);
   x.setDate(x.getDate() + n);
   return x;
 };
 
-export const addMonths = (date, n) => {
+export const addMonths = (date: Date, n: number): Date => {
   const x = new Date(date);
   x.setMonth(x.getMonth() + n);
   return x;
 };
 
-export const fmtVN = (date) => {
-  if (!date || isNaN(date)) return "—";
+export const fmtVN = (date: Date | null | undefined): string => {
+  if (!date || isNaN(date.getTime())) return "—";
   return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 };
 
-export const daysBetween = (a, b) => Math.round((a - b) / 86400000);
-export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+export const daysBetween = (a: Date, b: Date): number =>
+  Math.round((a.getTime() - b.getTime()) / 86400000);
+export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 // ======================== DISPLAY HELPER ========================
 // Ô trống / null / "—"  →  "Không có thông tin" (CHỈ dùng cho HIỂN THỊ).
 // KHÔNG dùng cho dữ liệu tính toán (ngày, trạng thái, tỷ lệ) — sẽ phá logic.
 export const NO_INFO = "Không có thông tin";
-export const txt = (v) => {
+export const txt = (v: unknown): string => {
   const s = String(v == null ? "" : v).trim();
-  return (s === "" || s === "—") ? NO_INFO : v;
+  return (s === "" || s === "—") ? NO_INFO : String(v);
 };
 
 // S1-C FIX: pctYear tính lại YS/YE mỗi lần gọi (không đông cứng theo năm load)
-export const pctYear = (date) => {
+export const pctYear = (date: Date): number => {
   const today = vmpToday();
   const yr = today.getFullYear();
   const YS = new Date(yr, 0, 1);
   const YE = new Date(yr, 11, 31);
-  return clamp(((date - YS) / (YE - YS)) * 100, 0, 100);
+  return clamp(((date.getTime() - YS.getTime()) / (YE.getTime() - YS.getTime())) * 100, 0, 100);
 };
 
 // ======================== MILESTONE CALCULATION ========================
-export function milestones(act) {
+export function milestones(act: Activity): Milestones {
   const T = parseD(act.target);
   if (!T) return { protocol: null, validation: null, report: null, target: null };
-  const dep = DEP_DAYS[act.dep] != null ? DEP_DAYS[act.dep] : 2;
+  const depKey = String(act.dep ?? "");
+  const dep = (DEP_DAYS as Record<string, number>)[depKey] ?? 2;
   return {
     protocol: addDays(T, -60),
     validation: addDays(T, -5 - dep),
@@ -62,9 +70,9 @@ export function milestones(act) {
   };
 }
 
-export function phaseStates(act) {
+export function phaseStates(act: Activity) {
   const m = milestones(act);
-  const past = (d) => d && d < vmpToday();
+  const past = (d: Date | null | undefined): boolean => !!d && d < vmpToday();
 
   if (act.st === "done") return { p: "done", v: "done", r: "done", m };
   if (act.st === "over") return {
@@ -76,13 +84,14 @@ export function phaseStates(act) {
     r: "future", m,
   };
   if (act.st === "todo") return {
-    p: past(m.protocol) ? "over" : (past(addDays(m.protocol, -SOON_DAYS)) ? "current" : "future"),
+    p: past(m.protocol) ? "over"
+       : (m.protocol && past(addDays(m.protocol, -SOON_DAYS)) ? "current" : "future"),
     v: "future", r: "future", m,
   };
   return { p: "future", v: "future", r: "future", m };
 }
 
-export function nextAlert(act) {
+export function nextAlert(act: Activity) {
   if (act.st === "done" || !act.target) return null;
   const m = milestones(act);
   let stage, date;
@@ -109,9 +118,9 @@ const RE_NEG  = /\b(chưa|chua|không|khong)\b|^\s*(chưa|chua|không|khong)|not
 const RE_DONE = /hoàn thành|hoan thanh|done|đạt|dat|complete|completed|✓|✔|100|xong/;
 const RE_PROG = /đang|dang|progress|in[_\s-]?progress|thực hiện|thuc hien|wip/;
 
-const _neg = (v) => RE_NEG.test(String(v == null ? "" : v).toLowerCase());
+const _neg = (v: unknown): boolean => RE_NEG.test(String(v == null ? "" : v).toLowerCase());
 
-export const wlIsDone = (v) => {
+export const wlIsDone = (v: unknown): boolean => {
   const s = String(v == null ? "" : v).toLowerCase();
   return !_neg(v) && RE_DONE.test(s);
 };
@@ -119,18 +128,18 @@ export const wlIsDone = (v) => {
 // "Không tiến hành / Không thực hiện" = hạng mục BỎ, sẽ không làm → không tính
 // ngày công & hồ sơ. Phân biệt với "Chưa …" (chưa làm nhưng SẼ làm → vẫn tính).
 const RE_SKIP = /không\s*(tiến hành|thực hiện)|khong\s*(tien hanh|thuc hien)/;
-export const isSkipped = (a) => {
+export const isSkipped = (a: Activity): boolean => {
   const r = (a && a._raw) || {};
   return RE_SKIP.test(String(r.tt_tham_dinh ?? "").toLowerCase())
     || RE_SKIP.test(String(r.tt_vmp ?? "").toLowerCase());
 };
 
-const _progTxt = (v) => {
+const _progTxt = (v: unknown): boolean => {
   const s = String(v == null ? "" : v).toLowerCase();
   return !_neg(v) && RE_PROG.test(s);
 };
 
-export function stageOf(a) {
+export function stageOf(a: Activity) {
   const r = a._raw || {};
   if (a.st === "done" || wlIsDone(r.tt_vmp)) return "done";
   const dc = wlIsDone(r.tt_de_cuong);
@@ -146,9 +155,9 @@ export function stageOf(a) {
 
 // Tách chuỗi bộ phận GỐC thành TẬP bộ phận. Một hạng mục có thể thuộc nhiều BP;
 // QLCL = QA + QC; XSX = Xưởng sản xuất.
-export function parseDepts(raw) {
+export function parseDepts(raw: unknown): string[] {
   const x = String(raw == null ? "" : raw).toLowerCase();
-  const s = new Set();
+  const s = new Set<string>();
   if (/\bxsx\b|xưởng|xuong|sản xuất|san xuat|\bsx\b/.test(x)) s.add("xsx");
   if (/cơ điện|co dien|\bcd\b|cđ/.test(x)) s.add("cd");
   if (/\bkho\b|warehouse/.test(x)) s.add("kho");
@@ -160,7 +169,7 @@ export function parseDepts(raw) {
 }
 
 // ======================== ENRICHMENT ========================
-export function enrich(objects, acts) {
+export function enrich(objects: VmpObject[], acts: Activity[]) {
   const map = Object.fromEntries(objects.map((o) => [o.code, o]));
   return acts.map((a) => {
     const o = map[a.code] || {};
@@ -196,7 +205,7 @@ export function enrich(objects, acts) {
 }
 
 // ======================== TALLY FUNCTIONS ========================
-export function tally(acts) {
+export function tally(acts: Activity[]) {
   // Loại hạng mục Không áp dụng/Đã hủy khỏi ĐẾM KPI (chỉ tính item_state='active').
   const A = acts.filter((a) => (a.state || "active") === "active");
   const done = A.filter((a) => a.st === "done").length;
@@ -209,13 +218,13 @@ export function tally(acts) {
   };
 }
 
-export function docTally(acts) {
+export function docTally(acts: Activity[]) {
   // Loại Không áp dụng/Đã hủy khỏi đếm hồ sơ.
   const A = acts.filter((a) => (a.state || "active") === "active");
   // "Hồ sơ" trên dashboard tương ứng cột trạng thái báo cáo. Đề cương là
   // một KPI riêng, vì vậy không buộc cả đề cương + báo cáo cùng hoàn thành.
-  const isDocDone = (a) => {
-    const r = a._raw || {};
+  const isDocDone = (a: Activity): boolean => {
+    const r = (a._raw || {}) as RawRow;
     return wlIsDone(r.tt_bao_cao);
   };
   const done = A.filter(isDocDone).length;
@@ -235,7 +244,7 @@ export function docTally(acts) {
 }
 
 // ======================== PERIOD FILTER ========================
-export function inPeriod(a, period) {
+export function inPeriod(a: Activity, period: string): boolean {
   if (period === "all") return true;
   if (!a.target) return false;
   const parts = String(a.target).split("-").map(Number);
@@ -250,7 +259,7 @@ export function inPeriod(a, period) {
 }
 
 // ======================== DATA QUALITY CHECKS ========================
-export function runDataQualityChecks(acts) {
+export function runDataQualityChecks(acts: Activity[]) {
   const issues = [];
   const seenIds = new Set();
 
@@ -298,7 +307,7 @@ export function runDataQualityChecks(acts) {
     }
 
     // 8. Điểm trọng yếu cao nhưng chưa có kế hoạch
-    if (a.score >= 7 && a.st === "plan") {
+    if (Number(a.score) >= 7 && a.st === "plan") {
       issues.push({ type: "high_crit_no_plan", severity: "warning", id: a.id, msg: `Điểm trọng yếu ${a.score}/9 (Cao) nhưng vẫn ở trạng thái "Kế hoạch"` });
     }
   }
@@ -307,7 +316,15 @@ export function runDataQualityChecks(acts) {
 }
 
 // ======================== REPORT HTML BUILDER ========================
-export function buildReportHTML(period, scopeLabel, e, d, deptRows, overdueList, ai) {
+export function buildReportHTML(
+  period: string,
+  scopeLabel: string,
+  e: Record<string, unknown>,
+  d: Record<string, unknown>,
+  deptRows: Array<{ name: string; done: number; over: number; todo: number; total: number; rate: number }>,
+  overdueList: Array<{ id: string; name: string; stage: string; dleft: number }>,
+  ai?: string,
+): string {
   const now = new Date();
   const disclaimer = "BẢN NHÁP AI — Cần QA xác nhận trước khi phát hành";
   return `<!DOCTYPE html>
@@ -366,7 +383,7 @@ ${overdueList.map(o => `<tr><td>${o.id}</td><td>${o.name}</td><td>${o.stage}</td
 }
 
 // ======================== DOWNLOAD HELPER ========================
-export function download(filename, content, mime = "text/html") {
+export function download(filename: string, content: BlobPart, mime = "text/html"): void {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -377,7 +394,7 @@ export function download(filename, content, mime = "text/html") {
 }
 
 // ======================== INVENTORY STATUS ========================
-export function objStatus(code, acts) {
+export function objStatus(code: string, acts: Activity[]) {
   const list = acts.filter((a) => a.code === code);
   if (!list.length) return "plan";
   if (list.some((a) => a.st === "over")) return "over";
@@ -387,33 +404,41 @@ export function objStatus(code, acts) {
 }
 
 // ======================== QRM HELPERS ========================
-export function valStatus(a) {
+export function valStatus(a: Activity) {
   return a.st === "over" ? "Quá hạn" : a.st === "done" ? "Đạt" : "Chưa/Đang";
 }
 
 // ======================== WORKLOAD HELPERS ========================
-export const wlMonthOf = (a) => {
+export const wlMonthOf = (a: Activity): number => {
   if (!a.target) return -1;
   const m = Number(String(a.target).split("-")[1]);
   return (m >= 1 && m <= 12) ? m - 1 : -1;
 };
 
-export const wlScore = (a) => {
-  const s = Number(a.score);
-  if (!isNaN(s) && s > 0) return s;
+export const wlScore = (a: Activity): number => {
+  const sc = Number(a.score);
+  if (!isNaN(sc) && sc > 0) return sc;
   return a.crit === "Cao" ? 8 : a.crit === "TB" ? 5 : 2;
 };
 
-export function wlPending(a) {
+/** Ba giai đoạn còn tồn đọng của một hạng mục: đề cương / thẩm định / báo cáo. */
+export interface PendingStages { p: boolean; v: boolean; r: boolean }
+
+export function wlPending(a: Activity): PendingStages {
   if (a.st === "done") return { p: false, v: false, r: false };
-  const raw = a._raw || {};
-  return { p: !wlIsDone(raw.tt_de_cuong), v: !wlIsDone(raw.tt_tham_dinh), r: !wlIsDone(raw.tt_bao_cao) };
+  const raw = (a._raw || {}) as RawRow;
+  return {
+    p: !wlIsDone(raw.tt_de_cuong),
+    v: !wlIsDone(raw.tt_tham_dinh),
+    r: !wlIsDone(raw.tt_bao_cao),
+  };
 }
 
-export function congConLai(a) {
+export function congConLai(a: Activity): number {
   if (a.st === "done" || isSkipped(a)) return 0; // xong hoặc không thực hiện → 0 ngày công
   const e = Number(a.effort);
   return (!isNaN(e) && e > 0) ? e : 0;
 }
 
-export const hoSoConLai = (a) => a.st !== "done" && !isSkipped(a) && !wlIsDone((a._raw || {}).tt_bao_cao);
+export const hoSoConLai = (a: Activity): boolean =>
+  a.st !== "done" && !isSkipped(a) && !wlIsDone(((a._raw || {}) as RawRow).tt_bao_cao);
