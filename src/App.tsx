@@ -84,13 +84,14 @@ import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
 // ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
 // ban đầu; chỉ đụng cấu trúc UI, KHÔNG thay đổi luồng dữ liệu Sheet→Supabase). =====
-const TimelineView = lazy(() => import("./pages/TimelinePage.jsx"));
-const AlertsView = lazy(() => import("./pages/AlertsPage.jsx"));
-const QrmView = lazy(() => import("./pages/QrmPage.jsx"));
-const CatalogView = lazy(() => import("./pages/CatalogPage.jsx"));
-const WorkloadView = lazy(() => import("./pages/WorkloadPage.jsx"));
-const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.jsx"));
-const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.jsx"));
+const TimelineView = lazy(() => import("./pages/TimelinePage.tsx"));
+const AlertsView = lazy(() => import("./pages/AlertsPage.tsx"));
+const QrmView = lazy(() => import("./pages/QrmPage.tsx"));
+const CatalogView = lazy(() => import("./pages/CatalogPage.tsx"));
+const WorkloadView = lazy(() => import("./pages/WorkloadPage.tsx"));
+const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.tsx"));
+const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
+const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1729,6 +1730,7 @@ export default function App() {
               {view === "timeline" && <TimelineView acts={filteredActs} objects={filteredObjects} />}
               {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
               {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
+              {view === "server" && <ServerChecksView user={user} />}
               {view === "alerts" && <AlertsView acts={filteredActs} />}
               {view === "risk" && <QrmView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
