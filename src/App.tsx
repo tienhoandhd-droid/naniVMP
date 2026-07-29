@@ -766,6 +766,8 @@ function AuditLogView() {
   type AuditRow = Database["public"]["Tables"]["audit_logs"]["Row"];
   const [logs, setLogs] = useState<AuditRow[]>([]);
   const [total, setTotal] = useState(0);
+  /** true = con số tổng là ước lượng của Postgres (khi không lọc gì). */
+  const [uocLuong, setUocLuong] = useState(false);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState({ action: "", user: "", record: "" });
@@ -777,9 +779,15 @@ function AuditLogView() {
     try {
       if (!supabase) return;
 
-      // Build query with filters
+      // Chỉ lấy cột BẢNG THẬT SỰ HIỆN. select("*") kéo về cả old_data lẫn
+      // new_data của 50 dòng — hai cột JSONB nặng nhất bảng — trong khi giao
+      // diện chỉ mở new_data khi người dùng bấm "Xem dữ liệu".
+      const COT = "id,created_at,user_email,action,table_name,record_id,source,new_data";
+      // Không lọc gì thì đếm ƯỚC LƯỢNG: count exact quét cả 100.400 dòng /
+      // 158MB chỉ để biết chia bao nhiêu trang (đo được 1,8 giây khi nguội).
+      const coLoc = !!(filters.action || filters.user || filters.record);
       let query = supabase.from("audit_logs")
-        .select("*", { count: "exact" })
+        .select(COT, { count: coLoc ? "exact" : "planned" })
         .order("created_at", { ascending: false })
         .range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1);
 
@@ -789,8 +797,9 @@ function AuditLogView() {
 
       const { data, error, count } = await query;
       if (error) throw error;
-      setLogs(data || []);
+      setLogs((data || []) as unknown as AuditRow[]);
       setTotal(count || 0);
+      setUocLuong(!coLoc);
       setPage(pg);
     } catch (e) {
       console.error("Audit log error:", e);
@@ -836,7 +845,7 @@ function AuditLogView() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
-        <CardTitle icon={ShieldCheck} sub={`${total} bản ghi · ALCOA+ audit trail · Không thể sửa/xoá`}>
+        <CardTitle icon={ShieldCheck} sub={`${uocLuong ? "≈" : ""}${total} bản ghi · ALCOA+ audit trail · Không thể sửa/xoá`}>
           Nhật ký thao tác hệ thống
         </CardTitle>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
