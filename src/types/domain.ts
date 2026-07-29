@@ -51,8 +51,20 @@ export type ObjectKind =
 export type ReportClass =
   | "Không phụ thuộc" | "Hóa lý" | "Nhiễm khuẩn" | "Vô khuẩn";
 
-/** Trạng thái suy ra khi đọc, luôn tính lại theo ngày hôm nay. */
-export type ActivityStatus = "plan" | "doing" | "done" | "over";
+/**
+ * Trạng thái suy ra khi đọc, luôn tính lại theo ngày hôm nay.
+ * Giá trị do deriveSt() trong n8nAdapter sinh ra — giữ đúng 5 giá trị này,
+ * đừng đổi tên nếu chưa sửa deriveSt và các bảng màu trong constants/vmp.
+ */
+export type ActivityStatus = "plan" | "todo" | "prog" | "done" | "over";
+
+/** Bốn mốc thời gian của một hạng mục. Null khi chưa có mốc đích (target). */
+export interface Milestones {
+  protocol: Date | null;
+  validation: Date | null;
+  report: Date | null;
+  target: Date | null;
+}
 
 /* ---------- Hình dạng cho giao diện ---------- */
 /**
@@ -86,6 +98,8 @@ export interface Activity {
   actReport?: string | null;
   actVmp?: string | null;
   version?: number;
+  /** Mốc thời gian đã tính sẵn (enrich gắn vào để khỏi tính lại). */
+  m?: Milestones;
   /** Bản ghi gốc từ DB, dùng để tính lại các trường suy diễn. */
   _raw?: Record<string, unknown>;
   [key: string]: unknown;

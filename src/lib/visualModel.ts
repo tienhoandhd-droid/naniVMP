@@ -6,12 +6,15 @@
  * ===================================================================== */
 import { CLS, DEPTS, STATUS } from "../constants/vmp.ts";
 import { milestones, parseD, wlIsDone } from "../utils/helpers.ts";
+import type { Activity, VmpObject } from "../types/domain.ts";
 
-const ACTIVE = (item) => (item?.state || "active") === "active";
+type RawRow = Record<string, unknown>;
 
-const clean = (value) => String(value == null ? "" : value).trim();
+const ACTIVE = (item: Activity): boolean => (item?.state || "active") === "active";
 
-function dateISO(date) {
+const clean = (value: unknown): string => String(value == null ? "" : value).trim();
+
+function dateISO(date: Date | null | undefined): string {
   if (!date || Number.isNaN(date.getTime())) return "";
   return [
     date.getFullYear(),
@@ -20,8 +23,8 @@ function dateISO(date) {
   ].join("-");
 }
 
-function ownerOf(activity) {
-  const raw = activity?._raw || {};
+function ownerOf(activity: Activity): string {
+  const raw = (activity?._raw || {}) as RawRow;
   return [
     activity?.owner,
     raw.qa,
@@ -33,8 +36,8 @@ function ownerOf(activity) {
   ].map(clean).find((value) => value && value !== "—") || "—";
 }
 
-function countBy(items, getKey) {
-  const map = new Map();
+function countBy<T>(items: T[], getKey: (item: T) => string | undefined): Map<string, number> {
+  const map = new Map<string, number>();
   items.forEach((item) => {
     const key = getKey(item);
     if (!key) return;
@@ -43,43 +46,43 @@ function countBy(items, getKey) {
   return map;
 }
 
-function percent(done, total) {
+function percent(done: number, total: number): number {
   return total ? Math.round((done / total) * 100) : 0;
 }
 
-function statusLabel(status) {
-  return STATUS[status]?.label || status || "Chưa rõ";
+function statusLabel(status: string): string {
+  return (STATUS as Record<string, { label: string }>)[status]?.label || status || "Chưa rõ";
 }
 
-function classLabel(cls) {
-  return CLS[cls]?.label || cls || "Chưa phân loại";
+function classLabel(cls: string): string {
+  return (CLS as Record<string, { label: string }>)[cls]?.label || cls || "Chưa phân loại";
 }
 
-function deptLabel(dept) {
+function deptLabel(dept: string): string {
   return DEPTS.find((item) => item.id === dept)?.name || dept || "Chưa xác định";
 }
 
-function criticalityLabel(value) {
+function criticalityLabel(value: unknown): string {
   const v = clean(value);
   return v || "TB";
 }
 
-function targetTime(activity) {
+function targetTime(activity: Activity): number {
   return (parseD(activity?.target) || new Date(2999, 0, 1)).getTime();
 }
 
-function phaseDone(activity, field) {
+function phaseDone(activity: Activity, field: string): boolean {
   const raw = activity?._raw || {};
   if (field === "tt_vmp") return activity?.st === "done" || wlIsDone(raw.tt_vmp);
   return wlIsDone(raw[field]);
 }
 
-export function buildTimelineEvents(activities = []) {
+export function buildTimelineEvents(activities: Activity[] = []) {
   return activities
     .filter(ACTIVE)
     .map((activity) => {
       const m = activity.m || milestones(activity);
-      const raw = activity._raw || {};
+      const raw = (activity._raw || {}) as RawRow;
       const target = parseD(activity.target) || m.target || null;
       const start = m.protocol || target;
       const end = m.target || target;
@@ -104,9 +107,9 @@ export function buildTimelineEvents(activities = []) {
         status: activity.st || "todo",
         statusLabel: statusLabel(activity.st),
         group: activity.cls || "tb",
-        groupLabel: classLabel(activity.cls),
+        groupLabel: classLabel(String(activity.cls ?? "tb")),
         department: activity.dept || "qa",
-        departmentLabel: deptLabel(activity.dept),
+        departmentLabel: deptLabel(activity.dept ?? "qa"),
         owner: ownerOf(activity),
         criticality: criticalityLabel(activity.crit),
         source: "supabase",
@@ -120,7 +123,7 @@ export function buildTimelineEvents(activities = []) {
       || String(a.code).localeCompare(String(b.code), "vi"));
 }
 
-export function buildDashboardMetrics(activities = [], objects = []) {
+export function buildDashboardMetrics(activities: Activity[] = [], objects: VmpObject[] = []) {
   const active = activities.filter(ACTIVE);
   const total = active.length;
   const done = active.filter((item) => item.st === "done").length;
@@ -183,7 +186,13 @@ export function buildDashboardMetrics(activities = [], objects = []) {
   ];
 }
 
-function aggregateNodes(prefix, counts, type, x, labelOf) {
+function aggregateNodes(
+  prefix: string,
+  counts: Map<string, number>,
+  type: string,
+  x: number,
+  labelOf: (key: string) => string,
+) {
   const rows = [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "vi"));
   const gap = rows.length > 8 ? 58 : rows.length > 4 ? 70 : 82;
@@ -199,11 +208,11 @@ function aggregateNodes(prefix, counts, type, x, labelOf) {
   }));
 }
 
-export function buildDiagramModel(activities = []) {
+export function buildDiagramModel(activities: Activity[] = []) {
   const active = activities.filter(ACTIVE);
-  const classCounts = countBy(active, (item) => item.cls || "tb");
-  const deptCounts = countBy(active, (item) => item.dept || "qa");
-  const statusCounts = countBy(active, (item) => item.st || "todo");
+  const classCounts = countBy(active, (item) => String(item.cls ?? "tb"));
+  const deptCounts = countBy(active, (item) => item.dept ?? "qa");
+  const statusCounts = countBy(active, (item) => item.st ?? "todo");
 
   const sourceNode = {
     id: "source:supabase",
@@ -219,7 +228,10 @@ export function buildDiagramModel(activities = []) {
   const deptNodes = aggregateNodes("department", deptCounts, "department", 520, deptLabel);
   const statusNodes = aggregateNodes("status", statusCounts, "status", 780, statusLabel);
 
-  const edges = [];
+  /** Cạnh nối giữa các nút trong sơ đồ luồng. */
+  const edges: Array<{
+    id: string; source: string; target: string; value: number; relation: string;
+  }> = [];
 
   classNodes.forEach((node) => {
     edges.push({
@@ -262,7 +274,9 @@ export function buildDiagramModel(activities = []) {
   };
 }
 
-export function buildVisualModel({ objects = [], activities = [] } = {}) {
+export function buildVisualModel(
+  { objects = [], activities = [] }: { objects?: VmpObject[]; activities?: Activity[] } = {},
+) {
   const timelineEvents = buildTimelineEvents(activities);
   const diagram = buildDiagramModel(activities);
   const metrics = buildDashboardMetrics(activities, objects);
