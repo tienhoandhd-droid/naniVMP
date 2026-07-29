@@ -6,7 +6,7 @@
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { DependencyList } from "react";
-import type { Activity, VmpObject } from "../types/domain.ts";
+import type { Activity, PerformerRow, VmpObject } from "../types/domain.ts";
 
 /** Trạng thái kết nối nguồn dữ liệu hiển thị trên banner. */
 export interface ConnState {
@@ -22,7 +22,7 @@ import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
 import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.ts";
 import {
   fetchVmpDataFromSupabase, fetchVmpWatermark,
-  updateItemProgress, upsertObjectSupabase, deleteSourceObject,
+  updateItemProgress, upsertObjectSupabase, deleteSourceObject, fetchPerformers,
 } from "../lib/supabaseData.ts";
 import { enrich } from "../utils/helpers.ts";
 
@@ -43,6 +43,35 @@ export function useScrollTop(deps: DependencyList) {
     if (ref.current) ref.current.scrollTop = 0;
   }, deps); // eslint-disable-line
   return ref;
+}
+
+// ======================== usePerformers ========================
+/** Danh sách người thực hiện (tab "Người thực hiện") để đổ gợi ý cho ô nhập tên.
+ *  Chỉ lấy người đang làm; tra cứu không phân biệt hoa thường vì tên gõ tay
+ *  trong Sheet có đủ kiểu ('My', 'my', 'My2'). */
+export function usePerformers(): {
+  performers: PerformerRow[];
+  names: string[];
+  find: (name?: string | null) => PerformerRow | undefined;
+} {
+  const [performers, setPerformers] = useState<PerformerRow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetchPerformers()
+      .then((rows) => { if (alive) setPerformers(rows.filter((r) => r.is_active)); })
+      .catch(() => { /* danh sách gợi ý hỏng thì ô nhập vẫn dùng được */ });
+    return () => { alive = false; };
+  }, []);
+  const byName = useMemo(() => {
+    const m = new Map<string, PerformerRow>();
+    performers.forEach((p) => m.set(String(p.performer_name || "").trim().toLowerCase(), p));
+    return m;
+  }, [performers]);
+  return {
+    performers,
+    names: useMemo(() => performers.map((p) => p.performer_name), [performers]),
+    find: (name) => byName.get(String(name || "").trim().toLowerCase()),
+  };
 }
 
 // ======================== useAuth ========================

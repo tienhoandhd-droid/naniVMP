@@ -16,6 +16,7 @@ import { deriveActivityFields } from "./n8nAdapter.ts";
 import type {
   Activity, GenerateTimelineResult, ObjectKind, ProductGmpRow, RpcResult,
   SourceObjectRow, VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
+  PerformerRow,
 } from "../types/domain.ts";
 
 /** RPC trả jsonb nên type sinh tự động là Json — ép về hình dạng đã biết ngay
@@ -117,6 +118,13 @@ export async function fetchStaffEmails(): Promise<StaffEmailRow[]> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await supabase.from("vmp_staff_emails").select("*").order("staff_name");
   if (error) throw new Error("Lỗi đọc danh bạ: " + error.message);
+  return data || [];
+}
+
+export async function fetchPerformers(): Promise<PerformerRow[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.from("vmp_performers").select("*").order("performer_name");
+  if (error) throw new Error("Lỗi đọc danh sách người thực hiện: " + error.message);
   return data || [];
 }
 
@@ -544,6 +552,40 @@ export async function deleteStaffEmail(id: string): Promise<RpcResult> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await supabase.rpc("rpc_delete_staff_email", { p_id: id });
   return unwrap(data, error, "Xoá nhân sự thất bại");
+}
+
+/* ---- Người thực hiện ---- */
+export async function upsertPerformer(
+  id: string | null, patch: Record<string, unknown>,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_upsert_performer", {
+    // NULL nghĩa là 'tạo mới'; type sinh tự động khai uuid không nullable.
+    p_id: (id ?? null) as unknown as string,
+    p_patch: patch as never,
+  });
+  return unwrap(data, error, "Lưu người thực hiện thất bại");
+}
+
+/** Gán người thực hiện cho một hạng mục.
+ *  Ghi vào ĐỐI TƯỢNG (vmp_source_objects) rồi đẩy xuống mọi hạng mục của nó —
+ *  owner_name trên hạng mục bị WF-04 ghi đè mỗi lần đồng bộ nên không giữ được.
+ *  Tên rỗng = bỏ gán. Tên không có trong danh sách thì RPC từ chối. */
+export async function setItemPerformer(
+  validationCode: string, performerName: string,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_set_item_performer", {
+    p_validation_code: validationCode,
+    p_performer_name: performerName,
+  });
+  return unwrap(data, error, "Gán người thực hiện thất bại");
+}
+
+export async function deletePerformer(id: string): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_delete_performer", { p_id: id });
+  return unwrap(data, error, "Xoá người thực hiện thất bại");
 }
 
 /* ---- Sản phẩm GMP ---- */

@@ -23,6 +23,7 @@ export type ProfileRow      = Tables["profiles"]["Row"];
 export type DepartmentRow   = Tables["departments"]["Row"];
 export type AlertRecipientRow = Tables["vmp_alert_recipients"]["Row"];
 export type StaffEmailRow     = Tables["vmp_staff_emails"]["Row"];
+export type PerformerRow      = Tables["vmp_performers"]["Row"];
 
 /* ---------- Vai trò & quyền ---------- */
 /** Vai trò lưu trong profiles.role (enum user_role của Postgres). */

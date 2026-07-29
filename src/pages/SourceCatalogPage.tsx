@@ -21,7 +21,7 @@
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Boxes, RefreshCw, Plus, Pencil, Ban, Trash2, Search, AlertTriangle,
-         CalendarPlus, Bell, Users, FlaskConical, Table2, Columns3, Download } from "lucide-react";
+         CalendarPlus, Bell, Users, UserCheck, FlaskConical, Table2, Columns3, Download } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag, Modal, TableScroll } from "../components/ui/Primitives.tsx";
 import {
@@ -29,9 +29,11 @@ import {
   generateTimeline, fetchSourceWarnings,
   fetchAlertRecipients, upsertAlertRecipient, deleteAlertRecipient,
   fetchStaffEmails, upsertStaffEmail, deleteStaffEmail,
+  fetchPerformers, upsertPerformer, deletePerformer,
   fetchProductsGmp, upsertProductGmp, deleteProductGmp,
   listSourceTabs, fetchSourceRows, upsertSourceRow, deleteSourceRow,
 } from "../lib/supabaseData.ts";
+import { usePerformers } from "../hooks/index.ts";
 import type { SourceRow } from "../lib/supabaseData.ts";
 import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
 import type { SourceWarnings } from "../lib/supabaseData.ts";
@@ -69,7 +71,7 @@ const FIELDS = [
   { key: "year_ref",         label: "Năm nhập / ban hành", w: 120, num: true,
     hint: "Bằng năm thẩm định và chưa từng có IQ ⇒ sinh đủ DQ, FAT/SAT, IQ, OQ, PQ (chỉ một lần)." },
   { key: "owner_name",       label: "QA phụ trách",        w: 150,
-    hint: "Gán tự động theo bảng phân công (vmp_assignment_rules). Sửa tay được." },
+    hint: "Gán tự động theo bảng phân công (vmp_assignment_rules). Sửa tay được — gõ vào sẽ gợi ý từ tab Người thực hiện." },
   { key: "support_name",     label: "Người hỗ trợ",        w: 140 },
   { key: "work_group",       label: "Nhóm công việc",      w: 190,
     hint: "Nhóm trong bảng phân công đã khớp — dùng để truy vì sao thuộc về người này." },
@@ -81,6 +83,10 @@ const FIELDS = [
     hint: "= Phức tạp × Ảnh hưởng (1..9). Sửa tay thì dòng chuyển sang 'đã duyệt', không bị chấm lại đè." },
   { key: "note",             label: "Ghi chú",             w: 160 },
 ];
+
+/** Ô nhập tên người — đổ gợi ý từ danh sách người thực hiện thay vì gõ tay,
+ *  vì gõ tay chính là chỗ đẻ ra 'My' / 'My2' / 'my' là ba người khác nhau. */
+const PERSON_FIELDS = new Set(["owner_name", "support_name"]);
 
 function SourceCatalogSection({ user, onReload }: {
   user?: AppUser | null; onReload?: () => void;
@@ -927,6 +933,7 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
   onSave: (form: Record<string, unknown>) => void;
 }) {
   const isNew = !row.id;
+  const { performers } = usePerformers();
   const [form, setForm] = useState(() => {
     const f: Record<string, unknown> = {};
     const rec = row as Record<string, unknown>;
@@ -953,6 +960,7 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
               value={String(form[f.key] ?? "")}
               onChange={(e) => set(f.key, e.target.value)}
               disabled={!isNew && f.lockOnEdit}
+              list={PERSON_FIELDS.has(f.key) ? "vmp-performer-list" : undefined}
               inputMode={f.num ? "numeric" : undefined}
               style={{
                 padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
@@ -964,6 +972,11 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
             )}
           </label>
         ))}
+        <datalist id="vmp-performer-list">
+          {performers.map((p) => (
+            <option key={p.id} value={p.performer_name}>{p.email || "chưa có email"}</option>
+          ))}
+        </datalist>
       </div>
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
@@ -1054,6 +1067,27 @@ const DATASETS: DatasetSpec[] = [
     load: () => fetchStaffEmails() as unknown as Promise<Record<string, unknown>[]>,
     save: (key, patch) => upsertStaffEmail(key, patch),
     remove: (key) => deleteStaffEmail(key),
+  },
+  {
+    id: "performers",
+    label: "Người thực hiện",
+    icon: UserCheck,
+    sub: "Người trực tiếp làm thẩm định — tên ghi trên hạng mục VMP, kèm email liên hệ",
+    keyField: "id",
+    emptyWarning: "Chưa có người thực hiện nào. Thêm tên + email để dùng khi phân công hạng mục.",
+    fields: [
+      { key: "is_active", label: "Đang làm", w: 90, bool: true },
+      { key: "performer_name", label: "Tên người thực hiện", w: 190,
+        hint: "Ghi đúng như tên dùng trong kế hoạch VMP để khớp được với hạng mục." },
+      { key: "email", label: "Email", w: 220,
+        hint: "Không bắt buộc, nhưng đã nhập thì phải đúng dạng ten@congty.com." },
+      { key: "department", label: "Bộ phận", w: 120 },
+      { key: "role_title", label: "Chức danh", w: 140 },
+      { key: "note", label: "Ghi chú", w: 170 },
+    ],
+    load: () => fetchPerformers() as unknown as Promise<Record<string, unknown>[]>,
+    save: (key, patch) => upsertPerformer(key, patch),
+    remove: (key) => deletePerformer(key),
   },
   {
     id: "products",
