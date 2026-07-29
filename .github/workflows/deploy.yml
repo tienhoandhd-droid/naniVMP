@@ -39,6 +39,8 @@ jobs:
           VITE_VMP_READ_URL: ${{ vars.VITE_VMP_READ_URL }}
           VITE_N8N_WRITE_URL: ${{ vars.VITE_N8N_WRITE_URL }}
           VITE_N8N_AI_REPORT_URL: ${{ vars.VITE_N8N_AI_REPORT_URL }}
+          VITE_N8N_CHAT_URL: ${{ vars.VITE_N8N_CHAT_URL }}
+          VITE_N8N_CHAT_TOKEN: ${{ vars.VITE_N8N_CHAT_TOKEN }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

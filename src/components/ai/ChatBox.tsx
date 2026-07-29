@@ -66,7 +66,11 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { "x-vmp-secret": token } : {}),
+          // Token RIÊNG cho ô chat. Nó nằm trong gói JS công khai nên ai cũng
+          // đọc được — việc của nó chỉ là chặn quét bừa, không phải giữ bí mật.
+          // Vì vậy tuyệt đối không dùng lại x-vmp-secret (token đó còn mở
+          // /vmp-write, /vmp-alert-now, /vmp-drain-now).
+          ...(token ? { "x-vmp-chat": token } : {}),
         },
         body: JSON.stringify({
           cau_hoi: cauHoi,
