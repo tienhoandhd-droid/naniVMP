@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+
+    "types": ["vite/client", "node"],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src", "vite.config.js"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    // Bản sao lưu màn Timeline cũ, giữ lại để đối chiếu/revert — không file nào
+    // import nó, nên không kiểm kiểu để khỏi nhiễu.
+    "src/pages/TimelinePage.legacy.tsx",
+    // Bản hooks cũ còn sót (hooks/index.ts mới là bản đang dùng). Không ai import.
+    "src/index.ts"
+  ]
+}

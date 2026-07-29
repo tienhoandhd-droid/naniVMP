@@ -5,9 +5,9 @@ import { useState, useEffect } from "react";
 import {
   Bell, KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X,
 } from "lucide-react";
-import { C, TEXT, NUM, GRAD, glass, btnPrimary } from "../../constants/theme.js";
-import { NAV_ITEMS, NAV_SUBS, PERM_LABEL } from "../../constants/vmp.js";
-import { Sparkle, CrownLogo } from "../ui/Primitives.jsx";
+import { C, TEXT, NUM, GRAD, glass, btnPrimary } from "../../constants/theme.ts";
+import { NAV_ITEMS, NAV_SUBS, PERM_LABEL } from "../../constants/vmp.ts";
+import { Sparkle, CrownLogo } from "../ui/Primitives.tsx";
 
 // ======================== SIDEBAR ========================
 export function Sidebar({ view, setView, user, onLogout, onChangePw, connected }) {

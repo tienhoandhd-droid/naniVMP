@@ -1,12 +1,12 @@
 /* UpdatePage.jsx — Cập nhật tiến độ thực tế */
 import { useState, useMemo } from "react";
 import { Pencil, Search, Save, Activity } from "lucide-react";
-import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.js";
-import { STATUS, CLS, DEPTS, STAGES, PERIODS, TT_OPTS } from "../constants/vmp.js";
-import { stageOf, inPeriod, txt } from "../utils/helpers.js";
-import { toISO } from "../lib/n8nAdapter.js";
-import { supabase } from "../lib/supabaseClient.js";
-import { Card, CardTitle, Tag, Modal, Pill, ROField, StateBadge } from "../components/ui/Primitives.jsx";
+import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
+import { STATUS, CLS, DEPTS, STAGES, PERIODS, TT_OPTS } from "../constants/vmp.ts";
+import { stageOf, inPeriod, txt } from "../utils/helpers.ts";
+import { toISO } from "../lib/n8nAdapter.ts";
+import { supabase } from "../lib/supabaseClient.ts";
+import { Card, CardTitle, Tag, Modal, Pill, ROField, StateBadge } from "../components/ui/Primitives.tsx";
 
 function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
   const raw = act._raw || {};

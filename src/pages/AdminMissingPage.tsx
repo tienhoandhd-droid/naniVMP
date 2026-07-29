@@ -9,9 +9,9 @@
  * ===================================================================== */
 import { useState, useEffect } from "react";
 import { ShieldAlert, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
-import { C, TEXT, btnPrimary } from "../constants/theme.js";
-import { supabase } from "../lib/supabaseClient.js";
-import { Card, CardTitle, Tag } from "../components/ui/Primitives.jsx";
+import { C, TEXT, btnPrimary } from "../constants/theme.ts";
+import { supabase } from "../lib/supabaseClient.ts";
+import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
 
 export default function AdminMissingView({ isAdmin, onReload, readOnly = true }) {
   const [items, setItems] = useState([]);

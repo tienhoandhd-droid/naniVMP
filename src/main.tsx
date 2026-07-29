@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
+import App from "./App.tsx";
 import "./index.css";
 
 // Lưới an toàn: nếu App lỗi khi render, hiện thông báo thay vì trang trắng.

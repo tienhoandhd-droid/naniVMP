@@ -8,11 +8,11 @@
  *  - Fallback qua n8n webhook nếu chưa có Supabase
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.js";
-import { fetchVmpData, postToN8n, deriveActivityFields, clearVmpCache } from "../lib/n8nAdapter.js";
-import { isSupabaseConfigured, signIn, signOut, getSession, getAccessToken, supabase } from "../lib/supabaseClient.js";
-import { fetchVmpDataFromSupabase, updateProgressSupabase, upsertObjectSupabase, pushToSheet, resolveOutbox } from "../lib/supabaseData.js";
-import { enrich } from "../utils/helpers.js";
+import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.ts";
+import { fetchVmpData, postToN8n, deriveActivityFields, clearVmpCache } from "../lib/n8nAdapter.ts";
+import { isSupabaseConfigured, signIn, signOut, getSession, getAccessToken, supabase } from "../lib/supabaseClient.ts";
+import { fetchVmpDataFromSupabase, updateProgressSupabase, upsertObjectSupabase, pushToSheet, resolveOutbox } from "../lib/supabaseData.ts";
+import { enrich } from "../utils/helpers.ts";
 
 // ======================== useDebounce ========================
 export function useDebounce(value, delay = 300) {

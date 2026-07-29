@@ -1,10 +1,10 @@
 /* WorkloadPage.jsx — Ma trận tải công việc Người × Tháng */
 import { useState, useMemo } from "react";
 import { Activity, BarChart3, ShieldAlert, AlertCircle, Flag } from "lucide-react";
-import { C, TEXT, NUM, GRAD } from "../constants/theme.js";
-import { CLS, CRIT, WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.js";
-import { parseD, fmtVN, clamp, wlIsDone, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.js";
-import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill } from "../components/ui/Primitives.jsx";
+import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
+import { CLS, CRIT, WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
+import { parseD, fmtVN, clamp, wlIsDone, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
+import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill } from "../components/ui/Primitives.tsx";
 
 const sum = (arr) => arr.reduce((a, b) => a + b, 0);
 

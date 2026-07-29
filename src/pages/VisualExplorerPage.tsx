@@ -24,11 +24,11 @@ import {
   X,
 } from "lucide-react";
 
-import { C } from "../constants/theme.js";
-import { CLS, DEPTS, STATUS, vmpToday } from "../constants/vmp.js";
-import { buildVisualModel } from "../lib/visualModel.js";
-import { addDays, fmtVN, parseD } from "../utils/helpers.js";
-import { Card, Pill, Tag } from "../components/ui/Primitives.jsx";
+import { C } from "../constants/theme.ts";
+import { CLS, DEPTS, STATUS, vmpToday } from "../constants/vmp.ts";
+import { buildVisualModel } from "../lib/visualModel.ts";
+import { addDays, fmtVN, parseD } from "../utils/helpers.ts";
+import { Card, Pill, Tag } from "../components/ui/Primitives.tsx";
 
 const TABS = [
   { id: "timeline", label: "Timeline", icon: CalendarClock },

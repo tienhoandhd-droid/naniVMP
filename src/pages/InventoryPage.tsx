@@ -1,10 +1,10 @@
 /* InventoryPage.jsx — Danh mục đối tượng thẩm định 5 nhóm */
 import { useState, useMemo } from "react";
 import { Boxes, Search, Plus, Pencil, Trash2, Save, Filter, CheckCircle2 } from "lucide-react";
-import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.js";
-import { CLS, DEPTS, CRIT } from "../constants/vmp.js";
-import { objStatus } from "../utils/helpers.js";
-import { Card, CardTitle, Tag, Modal, Pill } from "../components/ui/Primitives.jsx";
+import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
+import { CLS, DEPTS, CRIT } from "../constants/vmp.ts";
+import { objStatus } from "../utils/helpers.ts";
+import { Card, CardTitle, Tag, Modal, Pill } from "../components/ui/Primitives.tsx";
 
 function EditObjModal({ obj, isNew, onClose, onSave }) {
   const [f, setF] = useState(obj);

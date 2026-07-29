@@ -27,27 +27,27 @@ import {
 // xlsx được nạp động (dynamic import) ngay trong hàm xuất Excel để giảm bundle ban đầu.
 
 // ===== Internal modules (refactored) =====
-import { C, TEXT, NUM, GRAD, GRAD_SOFT, btnPrimary, INP, FIELD, LBL, glass } from "./constants/theme.js";
+import { C, TEXT, NUM, GRAD, GRAD_SOFT, btnPrimary, INP, FIELD, LBL, glass } from "./constants/theme.ts";
 import {
   STATUS, MST, PROG, CLS, DEPTS, DEPT_CODE, DEP_DAYS, CRIT,
   SOON_DAYS, PERM_LABEL, NAV_ITEMS, NAV_SUBS, STAGES, TT_OPTS, PERIODS, PLABEL,
   vmpToday,
-} from "./constants/vmp.js";
+} from "./constants/vmp.ts";
 import {
   parseD, addDays, addMonths, fmtVN, daysBetween, clamp, pctYear,
   milestones, phaseStates, nextAlert, wlIsDone, stageOf, enrich,
   tally, docTally, inPeriod, runDataQualityChecks,
   buildReportHTML, download,
-} from "./utils/helpers.js";
-import { useDebounce, useScrollTop, useAuth, useVmpData } from "./hooks/index.js";
+} from "./utils/helpers.ts";
+import { useDebounce, useScrollTop, useAuth, useVmpData } from "./hooks/index.ts";
 
 // ===== UI Primitives =====
 import {
   Sparkle, Mascot, Card, CardTitle, Tag, Modal, Donut, KpiCard, Sel,
   SkeletonPulse, SkeletonDashboard, SyncBanner, CrownLogo, VQWordmark,
   GuardianSilhouette, PrincessCommentary,
-} from "./components/ui/Primitives.jsx";
-import { Sidebar, Topbar } from "./components/layout/Layout.jsx";
+} from "./components/ui/Primitives.tsx";
+import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
 // ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
 // ban đầu; chỉ đụng cấu trúc UI, KHÔNG thay đổi luồng dữ liệu Sheet→Supabase). =====
@@ -58,12 +58,12 @@ const CatalogView = lazy(() => import("./pages/CatalogPage.jsx"));
 const WorkloadView = lazy(() => import("./pages/WorkloadPage.jsx"));
 const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.jsx"));
 const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.jsx"));
-import CompletionDashboard from "./components/dashboard/CompletionDashboard.jsx";
+import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
-import { loadConn, saveConn, clearConn, loadUser, saveUser } from "./lib/config.js";
-import { toISO, deriveActivityFields } from "./lib/n8nAdapter.js";
-import { isSupabaseConfigured, signIn, signOut, changePassword, getAccessToken, supabase } from "./lib/supabaseClient.js";
+import { loadConn, saveConn, clearConn, loadUser, saveUser } from "./lib/config.ts";
+import { toISO, deriveActivityFields } from "./lib/n8nAdapter.ts";
+import { isSupabaseConfigured, signIn, signOut, changePassword, getAccessToken, supabase } from "./lib/supabaseClient.ts";
 
 /* ===================== Backward-compat shims ===================== */
 const sum = (arr) => arr.reduce((a, b) => a + b, 0);

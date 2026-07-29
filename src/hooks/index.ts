@@ -5,11 +5,11 @@
  *  mọi lời gọi ghi từ UI đều bị chặn ở client trước khi chạm tới API.
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.js";
-import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.js";
-import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.js";
-import { fetchVmpDataFromSupabase, fetchVmpWatermark } from "../lib/supabaseData.js";
-import { enrich } from "../utils/helpers.js";
+import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.ts";
+import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
+import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.ts";
+import { fetchVmpDataFromSupabase, fetchVmpWatermark } from "../lib/supabaseData.ts";
+import { enrich } from "../utils/helpers.ts";
 
 // ======================== useDebounce ========================
 export function useDebounce(value, delay = 300) {
