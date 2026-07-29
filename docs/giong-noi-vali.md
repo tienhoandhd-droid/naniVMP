@@ -107,7 +107,7 @@ gì. Nay lớp 3 là agent, dùng chung hai công cụ Postgres với lớp 2.
 sau từng câu đọc rất thô. Nhưng hồ sơ GMP thì vẫn phải truy được nguồn.
 
 Cách dung hoà: node **Lấy nguồn trích dẫn** chạy `rpc_tim_tri_thuc` một
-lần ở đầu luồng, lọc `do_tin >= 0.2`, trả về mảng `trich_dan`; web hiện
+lần ở đầu luồng, lọc `do_tin >= 0.55` — tức CẢ HAI đường tìm kiếm cùng chỉ vào mảnh đó, trả về mảng `trich_dan`; web hiện
 thành chip nhỏ dưới câu trả lời. Vali chỉ nhắc nguồn nhiều nhất hai lần,
 lồng tự nhiên trong câu văn.
 
@@ -133,7 +133,25 @@ kết luận câu hỏi ở mức nào — `du_y` / `con_rong` / `truot` / `cut_
 — và dặn thẳng lớp sau phải làm gì: trả lời thẳng, hay trả lời phần chung
 rồi hỏi thu hẹp kèm 2–3 lựa chọn thật.
 
-## 8. Mọi câu đều qua AI
+## 8. Đưa số đúng, đừng cấm lấy số sai
+
+Mô hình nhỏ (gpt-4o-mini ở lớp 3) liên tục lấy con số toàn nhà máy rồi
+đọc thành con số của một nhóm: *"hệ thống tank có 461 hạng mục, quá hạn
+162"* — con số đúng, gán sai chỗ, nghe rất trôi chảy. Kiểu sai nguy hiểm
+nhất trong hồ sơ GMP.
+
+Dặn bằng lời trong mô tả công cụ **không ăn**, thử hai vòng đều hỏng. Lý
+do dễ hiểu: mô hình đang cần một con số cho nhóm, trong tay chỉ có số
+tổng, nên nó lấy số tổng. Muốn nó thôi thì phải **đưa cho nó số đúng**,
+không phải cấm nó.
+
+Nay node công cụ tự đếm trên đúng các dòng khớp từ khoá rồi trả về ô
+`thong_ke_RIENG_CAC_DONG_KHOP`, và đổi tên ô cũ thành
+`tong_quan_TOAN_NHA_MAY_khong_duoc_gan_cho_mot_nhom` — cảnh báo nằm ngay
+trong tên khoá thì mô hình đọc là thấy, không lướt qua được. Hỏi "tank
+thì đến đâu rồi" nay ra 8 hạng mục khớp thay vì 461.
+
+## 9. Mọi câu đều qua AI
 
 Đường tắt SQL (node `Đường tắt SQL (ĐANG TẮT — mọi câu qua AI)`) đã bị tắt
 có chủ ý. Trước đây nó tự trả lời các câu chào hỏi và tâm sự bằng câu mẫu,
@@ -144,7 +162,7 @@ Nay SQL vẫn chạy nhưng chỉ để **dọn sẵn số liệu** cho AI dùng
 Muốn bật lại đường tắt (ví dụ khi cần tiết kiệm token gấp): đổi điều kiện
 node IF từ `{{ false }}` về `{{ $json.kq.khop }}`.
 
-## 9. Nguồn tham khảo
+## 10. Nguồn tham khảo
 
 - [character-card-spec-v2](https://github.com/malfoyslastname/character-card-spec-v2) — cấu trúc thẻ nhân vật và `character_book`
 - [SillyTavern lorebook / World Info](https://sillycard-web.pages.dev/blog/st-fields-04-character-book) — cách mảnh kích hoạt theo từ khoá
