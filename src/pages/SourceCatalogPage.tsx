@@ -60,7 +60,17 @@ const FIELDS = [
     hint: "BẮT BUỘC. Thiếu cột này thì toàn bộ mốc thời gian của đối tượng không tính được." },
   { key: "year_ref",         label: "Năm nhập / ban hành", w: 120, num: true,
     hint: "Bằng năm thẩm định và chưa từng có IQ ⇒ sinh đủ DQ, FAT/SAT, IQ, OQ, PQ (chỉ một lần)." },
-  { key: "critical_point",   label: "Điểm trọng yếu",      w: 130 },
+  { key: "owner_name",       label: "QA phụ trách",        w: 150,
+    hint: "Gán tự động theo bảng phân công (vmp_assignment_rules). Sửa tay được." },
+  { key: "support_name",     label: "Người hỗ trợ",        w: 140 },
+  { key: "work_group",       label: "Nhóm công việc",      w: 190,
+    hint: "Nhóm trong bảng phân công đã khớp — dùng để truy vì sao thuộc về người này." },
+  { key: "complexity_score", label: "Phức tạp",            w: 90, num: true,
+    hint: "3 Cao · 2 Trung bình · 1 Thấp" },
+  { key: "quality_impact_score", label: "Ảnh hưởng CL",    w: 105, num: true,
+    hint: "3 Trực tiếp · 2 Gián tiếp · 1 Không ảnh hưởng" },
+  { key: "criticality_score", label: "Điểm trọng yếu",     w: 120, num: true,
+    hint: "= Phức tạp × Ảnh hưởng (1..9). Sửa tay thì dòng chuyển sang 'đã duyệt', không bị chấm lại đè." },
   { key: "note",             label: "Ghi chú",             w: 160 },
 ];
 
