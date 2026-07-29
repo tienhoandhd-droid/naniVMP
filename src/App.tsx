@@ -97,6 +97,7 @@ const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
 const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
+import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
 import { saveUser } from "./lib/config.ts";
@@ -1459,7 +1460,11 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
         }} />
       </div>
 
-      <div className="b-wide"><CompletionDashboard acts={acts} /></div>
+      {/* Ma trận giai đoạn + chất lượng dữ liệu + điểm nóng — học từ dashboard BMS */}
+      <div className="b-wide" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <MaTranTienDo acts={acts} />
+        <CompletionDashboard acts={acts} />
+      </div>
     </div>
   );
 }

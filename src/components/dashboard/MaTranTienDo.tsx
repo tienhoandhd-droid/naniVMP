@@ -1,0 +1,257 @@
+/* =====================================================================
+ *  MaTranTienDo.tsx — Ma trận trạng thái + chất lượng dữ liệu + điểm nóng
+ *  ---------------------------------------------------------------------
+ *  Học từ dashboard BMS (Hơi tinh khiết / Khí) của cùng nhà máy. Ba thứ
+ *  bên đó làm đúng mà VMP còn thiếu:
+ *
+ *  1. BA TRẠNG THÁI, KHÔNG PHẢI HAI. BMS tách "thiếu dữ liệu" thành
+ *     trạng thái riêng, không gộp vào "không đạt" — vì hai chuyện khác
+ *     hẳn nhau: một bên là làm mà không đạt, một bên là KHÔNG BIẾT.
+ *     VMP đang gộp hạng mục thiếu ngày/thiếu hạn vào "chưa hoàn thành",
+ *     nên nhìn số không ra được chỗ nào là lỗ hổng hồ sơ.
+ *
+ *  2. MA TRẬN TRẠNG THÁI. Bảng vị trí × chỉ tiêu, mỗi ô một màu, bấm ô
+ *     ra chi tiết. Với VMP: bộ phận × bốn giai đoạn (Đề cương → Thẩm
+ *     định → Báo cáo → Đích). Nhìn một cái thấy ngay bộ phận nào tắc ở
+ *     khâu nào — thứ mà danh sách phẳng không bao giờ cho thấy.
+ *
+ *  3. ĐIỂM CHẤT LƯỢNG DỮ LIỆU đặt ngay cạnh KPI chính, kèm ngưỡng rõ
+ *     ràng (>=95% tốt · >=80% cần chú ý · dưới nữa là kém) và câu giải
+ *     thích. Không có nó thì mọi tỷ lệ phần trăm khác đều đáng ngờ.
+ * ===================================================================== */
+import { useMemo, useState } from "react";
+import { LayoutGrid, ShieldAlert, Flame } from "lucide-react";
+import { C, TEXT, NUM } from "../../constants/theme.ts";
+import { DEPTS, vmpToday } from "../../constants/vmp.ts";
+import { parseD, fmtVN, wlIsDone, nguoiPhuTrach, qrmRpn } from "../../utils/helpers.ts";
+import { Card, CardTitle, Tag, Modal } from "../ui/Primitives.tsx";
+import type { Activity } from "../../types/domain.ts";
+
+/** Trạng thái một giai đoạn của một hạng mục — bốn khả năng, trong đó
+ *  "thieu" là chỗ dữ liệu không nói được gì chứ không phải chưa làm. */
+type TrangThai = "xong" | "tre" | "chua" | "thieu";
+
+const MAU: Record<TrangThai, { nhan: string; mau: string; nen: string }> = {
+  xong:  { nhan: "Đã xong", mau: C.mintText, nen: C.mintSoft },
+  tre:   { nhan: "Trễ hạn", mau: C.raspText, nen: C.raspSoft },
+  chua:  { nhan: "Chưa tới hạn", mau: C.skyText, nen: C.skySoft },
+  thieu: { nhan: "Thiếu dữ liệu", mau: C.marigoldText, nen: C.marigoldSoft },
+};
+
+const GIAI_DOAN = [
+  { id: "de_cuong",  ten: "Đề cương",   tt: "tt_de_cuong",   ngay: "ngay_de_cuong",   han: "dl_de_cuong" },
+  { id: "tham_dinh", ten: "Thẩm định",  tt: "tt_tham_dinh",  ngay: "ngay_tham_dinh",  han: "dl_tham_dinh" },
+  { id: "bao_cao",   ten: "Báo cáo",    tt: "tt_bao_cao",    ngay: "ngay_bao_cao",    han: "dl_bao_cao" },
+  { id: "vmp",       ten: "Đích VMP",   tt: "tt_vmp",        ngay: "ngay_vmp",        han: "dl_vmp" },
+] as const;
+
+/** Chấm trạng thái một giai đoạn. Thiếu hạn thì KHÔNG đoán bừa là chưa
+ *  làm — trả "thiếu dữ liệu" để nó hiện ra thành việc phải đi điền. */
+function chamGiaiDoan(a: Activity, gd: (typeof GIAI_DOAN)[number]): TrangThai {
+  const raw = (a._raw || {}) as Record<string, unknown>;
+  const tt = raw[gd.tt];
+  const ngay = parseD(raw[gd.ngay]);
+  const han = parseD(raw[gd.han]);
+
+  if (wlIsDone(tt)) return ngay ? "xong" : "thieu";   // xong mà không có ngày = hồ sơ hổng
+  if (!han) return "thieu";                            // không có mốc thì không chấm được
+  return han < vmpToday() ? "tre" : "chua";
+}
+
+export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
+  const [oDangXem, setODangXem] = useState<{ ten: string; ds: Activity[] } | null>(null);
+
+  const { luoi, chatLuong, diemNong, tong } = useMemo(() => {
+    const A = acts.filter((a) => (a.state || "active") === "active");
+
+    // Lưới bộ phận × giai đoạn
+    const luoi = DEPTS.map((bp) => {
+      const cua = A.filter((a) => (a.depts?.length ? a.depts.includes(bp.id) : a.dept === bp.id));
+      return {
+        bp,
+        tong: cua.length,
+        o: GIAI_DOAN.map((gd) => {
+          const dem: Record<TrangThai, Activity[]> = { xong: [], tre: [], chua: [], thieu: [] };
+          cua.forEach((a) => dem[chamGiaiDoan(a, gd)].push(a));
+          return { gd, dem };
+        }),
+      };
+    }).filter((h) => h.tong > 0);
+
+    // Điểm chất lượng dữ liệu: bao nhiêu phần trăm ô chấm được
+    let oTong = 0, oThieu = 0;
+    A.forEach((a) => GIAI_DOAN.forEach((gd) => {
+      oTong++;
+      if (chamGiaiDoan(a, gd) === "thieu") oThieu++;
+    }));
+    const diem = oTong ? Math.round(((oTong - oThieu) / oTong) * 100) : 0;
+    const chatLuong = {
+      diem, oTong, oThieu,
+      muc: diem >= 95 ? "Tốt" : diem >= 80 ? "Cần chú ý" : "Kém",
+      mau: diem >= 95 ? C.mintText : diem >= 80 ? C.marigoldText : C.raspText,
+      nen: diem >= 95 ? C.mintSoft : diem >= 80 ? C.marigoldSoft : C.raspSoft,
+    };
+
+    // Điểm nóng: đối tượng cần chú ý nhất (giống "Top 10 vị trí" của BMS)
+    const theoDoiTuong = new Map<string, { ten: string; ds: Activity[] }>();
+    A.forEach((a) => {
+      const k = String(a.code || a.obj || "—");
+      if (!theoDoiTuong.has(k)) theoDoiTuong.set(k, { ten: String(a.name || k), ds: [] });
+      theoDoiTuong.get(k)!.ds.push(a);
+    });
+    const diemNong = [...theoDoiTuong.entries()]
+      .map(([ma, v]) => {
+        const tre = v.ds.filter((a) => a.st === "over").length;
+        const thieu = v.ds.reduce((n, a) => n + GIAI_DOAN.filter((gd) => chamGiaiDoan(a, gd) === "thieu").length, 0);
+        const rpnMax = Math.max(0, ...v.ds.map(qrmRpn));
+        return { ma, ten: v.ten, ds: v.ds, tre, thieu, rpnMax, diem: tre * 3 + thieu + rpnMax / 3 };
+      })
+      .filter((x) => x.tre > 0 || x.thieu > 0)
+      .sort((x, y) => y.diem - x.diem)
+      .slice(0, 10);
+
+    return { luoi, chatLuong, diemNong, tong: A.length };
+  }, [acts]);
+
+  const O = ({ dem, ten }: { dem: Record<TrangThai, Activity[]>; ten: string }) => {
+    const tong = (Object.keys(dem) as TrangThai[]).reduce((n, k) => n + dem[k].length, 0);
+    if (!tong) return <td style={{ padding: 6 }}><div style={{ height: 44, borderRadius: 10, background: C.pinkMist }} /></td>;
+    const noiBat: TrangThai = dem.tre.length ? "tre" : dem.thieu.length ? "thieu" : dem.chua.length ? "chua" : "xong";
+    const m = MAU[noiBat];
+    return (
+      <td style={{ padding: 6 }}>
+        <button
+          onClick={() => setODangXem({ ten, ds: dem[noiBat] })}
+          title={`${ten} — ${(Object.keys(dem) as TrangThai[]).filter((k) => dem[k].length).map((k) => `${MAU[k].nhan} ${dem[k].length}`).join(" · ")}`}
+          style={{ width: "100%", border: `1.5px solid ${m.mau}22`, background: m.nen, borderRadius: 10,
+                   padding: "6px 8px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, color: m.mau, lineHeight: 1 }}>
+            {dem[noiBat].length}
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: C.plumSoft }}> / {tong}</span>
+          </span>
+          {/* Thanh ba màu: xong · trễ · thiếu — đúng kiểu stacked bar của BMS */}
+          <span style={{ display: "flex", height: 5, borderRadius: 999, overflow: "hidden", background: C.surface }}>
+            {(["xong", "tre", "thieu", "chua"] as TrangThai[]).map((k) => (
+              dem[k].length ? <span key={k} style={{ width: `${(dem[k].length / tong) * 100}%`, background: MAU[k].mau }} /> : null
+            ))}
+          </span>
+        </button>
+      </td>
+    );
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <Card variant="strong">
+        <CardTitle icon={LayoutGrid}
+          sub="Bộ phận × bốn giai đoạn · màu theo trạng thái nặng nhất trong ô · bấm ô để xem danh sách">
+          Ma trận tiến độ theo giai đoạn
+        </CardTitle>
+
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          {(Object.keys(MAU) as TrangThai[]).map((k) => (
+            <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
+              <span style={{ width: 12, height: 12, borderRadius: 4, background: MAU[k].mau }} />{MAU[k].nhan}
+            </span>
+          ))}
+          <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{tong} hạng mục</span>
+        </div>
+
+        <div className="vmp-scroll" style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 620 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>Bộ phận</th>
+                {GIAI_DOAN.map((g) => (
+                  <th key={g.id} style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>{g.ten}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {luoi.map((h) => (
+                <tr key={h.bp.id}>
+                  <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{h.bp.short}</div>
+                    <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>{h.tong} hạng mục</div>
+                  </td>
+                  {h.o.map((o) => <O key={o.gd.id} dem={o.dem} ten={`${h.bp.name} · ${o.gd.ten}`} />)}
+                </tr>
+              ))}
+              {!luoi.length && (
+                <tr><td colSpan={5} style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 600 }}>Không có hạng mục nào trong phạm vi đang lọc.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 18 }}>
+        <Card>
+          <CardTitle icon={ShieldAlert} sub="Bao nhiêu phần trăm ô trong ma trận chấm được từ dữ liệu thật">
+            Chất lượng dữ liệu
+          </CardTitle>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ padding: "14px 20px", borderRadius: 16, background: chatLuong.nen, minWidth: 120, textAlign: "center" }}>
+              <div style={{ fontFamily: NUM, fontSize: 34, fontWeight: 800, color: chatLuong.mau, lineHeight: 1 }}>{chatLuong.diem}%</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: chatLuong.mau, marginTop: 4 }}>{chatLuong.muc}</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 200, fontSize: 12.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+              <b style={{ color: C.plum }}>{chatLuong.oThieu.toLocaleString("vi-VN")}</b> trên {chatLuong.oTong.toLocaleString("vi-VN")} ô
+              không chấm được: thiếu mốc hạn, hoặc ghi hoàn thành mà không có ngày thực tế.
+              <div style={{ marginTop: 6 }}>
+                Ngưỡng: <b style={{ color: C.mintText }}>≥95% tốt</b> · <b style={{ color: C.marigoldText }}>≥80% cần chú ý</b> · dưới nữa là kém.
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card variant="soft">
+          <CardTitle icon={Flame} sub="Nhiều hạng mục trễ, nhiều ô thiếu dữ liệu, điểm rủi ro cao">
+            Đối tượng cần chú ý nhất
+          </CardTitle>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {diemNong.map((d) => (
+              <button key={d.ma} onClick={() => setODangXem({ ten: `${d.ma} · ${d.ten}`, ds: d.ds })}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12,
+                         background: C.surface, border: `1px solid ${C.pinkSoft}`, cursor: "pointer", textAlign: "left" }}>
+                <span style={{ fontFamily: NUM, fontSize: 12, fontWeight: 800, color: C.plum, background: C.pinkMist, borderRadius: 8, padding: "3px 8px" }}>{d.ma}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.ten}</span>
+                {d.tre > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{d.tre} trễ</Tag>}
+                {d.thieu > 0 && <Tag color={C.marigoldText} bg={C.marigoldSoft}>{d.thieu} thiếu</Tag>}
+              </button>
+            ))}
+            {!diemNong.length && (
+              <div style={{ textAlign: "center", padding: 22, color: C.mintText, fontWeight: 700 }}>
+                Không có đối tượng nào trễ hạn hay thiếu dữ liệu.
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {oDangXem && (
+        <Modal onClose={() => setODangXem(null)} wide icon={LayoutGrid} title={oDangXem.ten}>
+          <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 12 }}>
+            {oDangXem.ds.length} hạng mục
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {oDangXem.ds.slice(0, 40).map((a) => (
+              <div key={a.id} style={{ padding: "9px 12px", borderRadius: 12, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{a.name}</div>
+                <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+                  {a.id} · {nguoiPhuTrach(a.owner)} · đích {a.target ? fmtVN(parseD(a.target)) : "chưa có"}
+                  {a.score != null ? ` · trọng yếu ${a.score}/9` : ""}
+                </div>
+              </div>
+            ))}
+            {oDangXem.ds.length > 40 && (
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center", padding: 8 }}>
+                … và {oDangXem.ds.length - 40} hạng mục nữa
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
