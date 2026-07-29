@@ -141,10 +141,21 @@ export interface VmpObject {
   code: string;
   name: string;
   dept?: string;
+  /** Nhóm phân loại: tb | qt | kho | ht | vc. */
+  cls?: string;
   classification?: string;
   area?: string;
   line?: string;
   criticality?: string;
+  /** Mức tới hạn dạng chữ: Cao | TB | Thấp. */
+  crit?: string;
+  /** Điểm trọng yếu hiển thị (1–9 hoặc "—"). */
+  grade?: string;
+  /** Phạm vi GxP. */
+  gxp?: string;
+  /** Có nằm trong kế hoạch thẩm định không. */
+  need?: boolean | string;
+  reason?: string;
   freq?: number | null;
   [key: string]: unknown;
 }

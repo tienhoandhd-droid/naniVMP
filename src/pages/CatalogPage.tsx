@@ -57,7 +57,7 @@ function groupByType(items) {
 }
 
 /* ---------- Modal Cập nhật tiến độ (sinh payload, chưa ghi) ---------- */
-function UpdateModal({ act, onClose }) {
+function UpdateModal({ act, onClose }: { act: Activity; onClose: () => void }) {
   const raw = act._raw || {};
   const [f, setF] = useState(() => ({
     ngay_de_cuong: toISO(raw.ngay_de_cuong), tt_de_cuong: raw.tt_de_cuong || "",
@@ -144,7 +144,7 @@ const NEW_FIELDS = [
   ["dl_de_cuong", 21, "Hạn đề cương", "date"],
   ["dl_vmp", 33, "Hạn hoàn thành (Deadline VMP)", "date"],
 ];
-function AddObjectModal({ onClose }) {
+function AddObjectModal({ onClose }: { onClose: () => void }) {
   const [f, setF] = useState({ tan_suat: "12" });
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const filled = NEW_FIELDS.filter(([k]) => String(f[k] ?? "").trim() !== "");
@@ -186,7 +186,9 @@ function AddObjectModal({ onClose }) {
 }
 
 /* ---------- Trang chính ---------- */
-export default function CatalogView({ objects = [], acts = [] }) {
+export default function CatalogView({ objects = [], acts = [] }: {
+  objects?: VmpObject[]; acts?: Activity[];
+}) {
   const [q, setQ] = useState("");
   const [cls, setCls] = useState("all");
   const [dept, setDept] = useState("all");

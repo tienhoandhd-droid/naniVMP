@@ -2,18 +2,33 @@
 import { useState, useMemo } from "react";
 import { Pencil, Search, Save, Activity } from "lucide-react";
 import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
-import { STATUS, CLS, DEPTS, STAGES, PERIODS, TT_OPTS } from "../constants/vmp.ts";
+import { STATUS, STAGES, PERIODS, TT_OPTS } from "../constants/vmp.ts";
 import { stageOf, inPeriod, txt } from "../utils/helpers.ts";
 import { toISO } from "../lib/n8nAdapter.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { Card, CardTitle, Tag, Modal, Pill, ROField, StateBadge } from "../components/ui/Primitives.tsx";
+// Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
+import type { Activity as PlanActivity } from "../types/domain.ts";
 
-function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
+function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }: {
+  act: PlanActivity;
+  isAdmin?: boolean;
+  onClose: () => void;
+  /** (id, patch, userName, reason, expectedVersion) — khoá lạc quan chống ghi đè. */
+  onSave: (
+    id: string,
+    patch: Record<string, unknown>,
+    userName?: string,
+    reason?: string,
+    expectedVersion?: number,
+  ) => void;
+  onChangeState?: (id: string, newState: string, reason?: string) => void;
+}) {
   const raw = act._raw || {};
   const currentState = act.state || raw.state || "active";
   // Chuẩn hoá trạng thái đang lưu (có thể là enum Supabase: completed/in_progress/
   // not_started/overdue) về đúng nhãn trong dropdown để hiển thị đúng hiện trạng.
-  const ttOpt = (v) => {
+  const ttOpt = (v: unknown): string => {
     const s = String(v == null ? "" : v).toLowerCase().trim();
     if (!s) return "";
     if (/not[_\s-]?started/.test(s) || /\b(chưa|chua|không|khong)\b/.test(s) || /^\s*(chưa|chua)/.test(s) || /overdue/.test(s)) return "Chưa hoàn thành";
@@ -22,7 +37,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
     if (/kế hoạch|ke hoach|plan/.test(s)) return "Kế hoạch";
     return "";
   };
-  const init = {
+  const init: Record<string, string> = {
     ngay_de_cuong: toISO(raw.ngay_de_cuong), tt_de_cuong: ttOpt(raw.tt_de_cuong),
     lich_td: toISO(raw.lich_td) || "",
     ngay_tham_dinh: toISO(raw.ngay_tham_dinh), tt_tham_dinh: ttOpt(raw.tt_tham_dinh),
@@ -32,7 +47,8 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
   const [f, setF] = useState(init);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
-  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setF((p) => ({ ...p, [k]: e.target.value }));
   // S2-7: cần LÝ DO nếu đặt "Hoàn thành" ở bất kỳ giai đoạn nào HOẶC nhập bất kỳ ngày hoàn thành nào.
   const needsReason =
     ["tt_de_cuong", "tt_tham_dinh", "tt_bao_cao", "tt_vmp"].some((k) => f[k] === "Hoàn thành") ||
@@ -44,16 +60,16 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
     }
     // onSave = onUpdate(id, patch, userName, reason). userName để trống (server tự lấy theo JWT).
     // (MỚI) gửi version để KHÓA LẠC QUAN — chống ghi đè khi 2 người sửa cùng hạng mục.
-    onSave(act.id, f, undefined, reason.trim() || undefined, raw.version);
+    onSave(act.id, f, undefined, reason.trim() || undefined, Number(raw.version) || undefined);
     onClose();
   };
-  const sel = (k) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
-  const dt = (k) => <input type="date" value={f[k]} onChange={set(k)} style={INP} />;
-  const stage = (title, dl, dCol, tCol) => (
+  const sel = (k: string) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
+  const dt = (k: string) => <input type="date" value={f[k]} onChange={set(k)} style={INP} />;
+  const stage = (title: string, dl: unknown, dCol: string, tCol: string) => (
     <div style={{ background: "#fff", borderRadius: 14, padding: 14, border: `1.5px solid ${C.pinkSoft}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <span style={{ fontWeight: 800, color: C.plum, fontSize: 14 }}>{title}</span>
-        <Tag color={C.lavText} bg={C.lavSoft}>Deadline: {dl || "Không có thông tin"}</Tag>
+        <Tag color={C.lavText} bg={C.lavSoft}>Deadline: {String(dl || "Không có thông tin")}</Tag>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span>{dt(dCol)}</div>
@@ -97,7 +113,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Hiện tại:</span>
-            <StateBadge state={currentState} small />
+            <StateBadge state={String(currentState)} small />
             {currentState === "active" && <span style={{ fontSize: 11, color: C.plumSoft }}>(đang theo dõi bình thường)</span>}
             <div style={{ flex: 1 }} />
             {currentState === "active" ? (
@@ -115,12 +131,25 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }) {
   );
 }
 
-export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true }) {
+export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true }: {
+  acts: PlanActivity[];
+  conn?: { status?: string; [k: string]: unknown };
+  isAdmin?: boolean;
+  onUpdate?: (
+    id: string,
+    patch: Record<string, unknown>,
+    userName?: string,
+    reason?: string,
+    expectedVersion?: number,
+  ) => void;
+  onReload?: () => void;
+  readOnly?: boolean;
+}) {
   const [q, setQ] = useState("");
   const [fst, setFst] = useState("all");
   const [period, setPeriod] = useState("all");
   const [stageF, setStageF] = useState("all");
-  const [edit, setEdit] = useState(null);
+  const [edit, setEdit] = useState<PlanActivity | null>(null);
   const inWindow = useMemo(() => acts.filter((a) => inPeriod(a, period)), [acts, period]);
   // Tính giai đoạn 1 lần/hạng mục rồi tái dùng (trước đây stageOf chạy ~7 lần/hàng).
   const stageByItem = useMemo(() => {
@@ -129,8 +158,12 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     return m;
   }, [inWindow]);
   const stageCount = useMemo(() => {
-    const c = {}; STAGES.forEach((s) => { c[s.id] = 0; });
-    inWindow.forEach((a) => { const st = stageByItem.get(a.id); if (c[st] != null) c[st]++; });
+    const c: Record<string, number> = {};
+    STAGES.forEach((st) => { c[st.id] = 0; });
+    inWindow.forEach((a) => {
+      const st = stageByItem.get(a.id);
+      if (st != null && c[st] != null) c[st]++;
+    });
     return c;
   }, [inWindow, stageByItem]);
   const list = useMemo(() => inWindow.filter((a) => {
@@ -140,7 +173,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     const s = (q || "").toLowerCase();
     return [a.code, a.name, a.owner, a.id, a.vtype].some((x) => String(x || "").toLowerCase().includes(s));
   }), [inWindow, stageByItem, stageF, fst, q]);
-  const linked = conn.status === "ok";
+  const linked = conn?.status === "ok";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <Card>
@@ -198,7 +231,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                   <td style={{ padding: "12px 16px", color: C.plum, fontSize: 13 }}>
                     {a.name}
                     {/* S3-G: badge Không áp dụng / Đã hủy */}
-                    {isFrozen && <div style={{ marginTop: 4 }}><StateBadge state={itemState} small /></div>}
+                    {isFrozen && <div style={{ marginTop: 4 }}><StateBadge state={String(itemState)} small /></div>}
                   </td>
                   <td style={{ padding: "12px 16px" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag></td>
                   <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 13, fontWeight: 600 }}>{txt(a.owner)}</td>
@@ -225,7 +258,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
         act={edit}
         isAdmin={isAdmin}
         onClose={() => setEdit(null)}
-        onSave={onUpdate}
+        onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}
         onChangeState={async (id, newState) => {
           // S3-G: gọi RPC rpc_set_item_state (010) — bắt buộc nhập lý do
           if (!supabase) { alert("Supabase chưa cấu hình."); return; }
@@ -244,12 +277,13 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
               p_reason: reason.trim(),
             });
             if (error) throw error;
-            if (data && data.ok === false) throw new Error(data.error);
+            const r = data as unknown as { ok?: boolean; error?: string } | null;
+            if (r && r.ok === false) throw new Error(r.error);
             alert(`✓ Đã đổi trạng thái ${id} → ${newState}`);
             setEdit(null);
             if (onReload) onReload();   // (MỚI) tải lại ngay để badge + đếm KPI cập nhật tức thì
           } catch (e) {
-            alert("Lỗi đổi trạng thái: " + (e.message || "không rõ"));
+            alert("Lỗi đổi trạng thái: " + ((e as Error).message || "không rõ"));
           }
         }}
       />}
