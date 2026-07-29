@@ -97,7 +97,14 @@ begin
              'chưa có hạng mục nào ạ')
       from vmp_plan_items p join vmp_objects o on o.code = p.object_code
       where %3$s
-    $q$, coalesce(v_loc->>'ten_doi_tuong', v_loc->>'ma'), v_year, v_where) into v_tl;
+    $q$,
+      -- Hiện TÊN kèm mã. "Dạ, HT-01 đây ạ" bắt người đọc tự nhớ HT-01 là
+      -- cái gì; "HVAC-C1 (HT-01)" thì đọc phát hiểu ngay.
+      coalesce(v_loc->>'ten_doi_tuong',
+               (select o.name || ' (' || o.code || ')' from vmp_objects o
+                where o.code = v_loc->>'ma' limit 1),
+               v_loc->>'ma'),
+      v_year, v_where) into v_tl;
     return jsonb_build_object('khop', true, 'y_dinh', 'chi_tiet', 'nguon', 'sql', 'tra_loi', v_tl);
   end if;
 

@@ -19,7 +19,7 @@ import { MessageCircle, X, Send, Sparkles, AlertTriangle } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import type { AppUser } from "../../types/domain.ts";
 
-interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string; goiY?: string[] }
+interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string; goiY?: string[]; canhBao?: string }
 
 /** Câu hỏi mồi — người mới không biết hỏi gì thì bấm thẳng. */
 const GOI_Y = [
@@ -132,6 +132,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
         return;
       }
       setMsgs((m) => [...m, { ai: true, nguon: data.nguon, text: noiDung,
+        canhBao: data.canh_bao || undefined,
         goiY: Array.isArray(data.goi_y) ? data.goi_y.slice(0, 3) : undefined }]);
     } catch (e) {
       setMsgs((m) => [...m, { ai: true, loi: true,
@@ -233,6 +234,14 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
               {m.loi && <AlertTriangle size={14} style={{ verticalAlign: -2, marginRight: 6 }} />}
               {m.text}
             </div>
+            {m.canhBao && (
+              <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: R.sm,
+                            background: C.marigoldSoft, color: C.marigoldText,
+                            fontSize: 11.5, lineHeight: 1.55, fontWeight: 600 }}>
+                <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
+                {m.canhBao} Anh/chị đối chiếu lại trên bảng giúp em nhé.
+              </div>
+            )}
             {m.goiY && m.goiY.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
                 <div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700 }}>
