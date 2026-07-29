@@ -10,13 +10,18 @@
  * ===================================================================== */
 
 import { createClient } from "@supabase/supabase-js";
+import type { Database, Json } from "../types/database.ts";
+import type { AppUser, Perm, UserRole } from "../types/domain.ts";
+
+/** Giá trị hợp lệ của audit_logs.action — lấy thẳng từ enum trong DB. */
+export type AuditAction = Database["public"]["Enums"]["audit_action"];
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || "";
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON || "";
 
 // Tạo client (hoặc null nếu chưa cấu hình)
 export const supabase = (SUPABASE_URL && SUPABASE_ANON)
-  ? createClient(SUPABASE_URL, SUPABASE_ANON, {
+  ? createClient<Database>(SUPABASE_URL, SUPABASE_ANON, {
       auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
     })
   : null;
@@ -24,7 +29,7 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON)
 export const isSupabaseConfigured = () => !!supabase;
 
 /* ---- Đăng nhập ---- */
-export async function signIn(email, password) {
+export async function signIn(email: string, password: string): Promise<AppUser> {
   if (!supabase) throw new Error("Supabase chưa cấu hình. Xem hướng dẫn cài đặt.");
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message === "Invalid login credentials" ? "Email hoặc mật khẩu không đúng." : error.message);
@@ -40,7 +45,7 @@ export async function signOut() {
 }
 
 /* ---- Kiểm tra phiên hiện tại ---- */
-export async function getSession() {
+export async function getSession(): Promise<AppUser | null> {
   if (!supabase) return null;
   const { data } = await supabase.auth.getSession();
   if (!data.session) return null;
@@ -49,23 +54,37 @@ export async function getSession() {
 }
 
 /* ---- Lấy profile từ bảng profiles ---- */
-async function getProfile(uid) {
+async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token">> {
   if (!supabase) return { name: "User", role: "viewer", perm: "view" };
   const { data, error } = await supabase.from("profiles").select("*").eq("id", uid).single();
   if (error || !data) return { name: "User", role: "viewer", perm: "view" };
-  const permMap = { admin: "admin", qa_manager: "admin", department_user: "edit", viewer: "view" };
-  return { name: data.full_name || "User", role: data.role || "viewer", perm: permMap[data.role] || "view", department: data.department || "" };
+  const permMap: Record<UserRole, Perm> = {
+    admin: "admin", qa_manager: "admin", department_user: "edit", viewer: "view",
+  };
+  const role = (data.role || "viewer") as UserRole;
+  return {
+    name: data.full_name || "User",
+    role,
+    perm: permMap[role] || "view",
+    department: data.department || "",
+  };
 }
 
 /* ---- Đổi mật khẩu ---- */
-export async function changePassword(newPassword) {
+export async function changePassword(newPassword: string): Promise<void> {
   if (!supabase) throw new Error("Supabase chưa cấu hình.");
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) throw new Error(error.message);
 }
 
 /* ---- Ghi audit log ---- */
-export async function writeAuditLog(action, tableName, recordId, oldData, newData) {
+export async function writeAuditLog(
+  action: AuditAction,
+  tableName: string,
+  recordId: string,
+  oldData: Json,
+  newData: Json,
+): Promise<void> {
   if (!supabase) return;
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return;
@@ -81,7 +100,7 @@ export async function writeAuditLog(action, tableName, recordId, oldData, newDat
 }
 
 /* ---- Lấy JWT token hiện tại (cho n8n guard) ---- */
-export async function getAccessToken() {
+export async function getAccessToken(): Promise<string | null> {
   if (!supabase) return null;
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token || null;

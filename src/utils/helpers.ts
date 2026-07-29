@@ -1,7 +1,7 @@
 /* =====================================================================
  *  utils/helpers.js — Pure utility functions (no React dependency)
  * ===================================================================== */
-import { DEP_DAYS, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.js";
+import { DEP_DAYS, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
 
 // ======================== DATE HELPERS ========================
 export const parseD = (s) => {

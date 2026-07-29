@@ -21,12 +21,12 @@
  * ===================================================================== */
 import { useState, useEffect, useMemo } from "react";
 import { Boxes, RefreshCw, Plus, Pencil, Ban, Search, AlertTriangle, CalendarPlus } from "lucide-react";
-import { C, TEXT, btnPrimary } from "../constants/theme.js";
-import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.jsx";
+import { C, TEXT, btnPrimary } from "../constants/theme.ts";
+import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.tsx";
 import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
   generateTimeline,
-} from "../lib/supabaseData.js";
+} from "../lib/supabaseData.ts";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
    `hint` giải thích ảnh hưởng tới luật sinh timeline — đây là phần người

@@ -5,11 +5,10 @@
 import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil, ShieldAlert,
-  Activity, FileBarChart, AlertCircle, CalendarClock,
-  FileText, ShieldCheck, Radar, BarChart3,
-  Network,
+  Activity, FileBarChart, AlertCircle,
+  ShieldCheck, Radar, BarChart3,
 } from "lucide-react";
-import { C } from "./theme.js";
+import { C } from "./theme.ts";
 
 // ======================== STATUS ========================
 export const STATUS = {
@@ -121,7 +120,7 @@ export const PERIODS = [
 ];
 
 export const PLABEL = {
-  tuan: { t: "Báo cáo tuần", p: `Tuần ${Math.ceil((new Date() - new Date(new Date().getFullYear(), 0, 1)) / 604800000)}/${new Date().getFullYear()}` },
+  tuan: { t: "Báo cáo tuần", p: `Tuần ${Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / 604800000)}/${new Date().getFullYear()}` },
   thang: { t: "Báo cáo tháng", p: `Tháng ${new Date().getMonth() + 1}/${new Date().getFullYear()}` },
   quy: { t: "Báo cáo quý", p: `Quý ${Math.floor(new Date().getMonth() / 3) + 1}/${new Date().getFullYear()}` },
 };

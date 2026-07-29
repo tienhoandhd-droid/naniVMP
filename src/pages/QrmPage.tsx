@@ -1,8 +1,8 @@
 /* QrmPage.jsx — Ma trận rủi ro thẩm định (QRM / ICH Q9) */
-import { C, TEXT, NUM } from "../constants/theme.js";
-import { CLS, CRIT, PROG } from "../constants/vmp.js";
-import { valStatus } from "../utils/helpers.js";
-import { Card, CardTitle, Tag, Donut, Pill } from "../components/ui/Primitives.jsx";
+import { C, TEXT, NUM } from "../constants/theme.ts";
+import { CLS, CRIT, PROG } from "../constants/vmp.ts";
+import { valStatus } from "../utils/helpers.ts";
+import { Card, CardTitle, Tag, Donut, Pill } from "../components/ui/Primitives.tsx";
 import { ShieldAlert, AlertCircle, Trophy } from "lucide-react";
 
 export default function QrmView({ acts }) {

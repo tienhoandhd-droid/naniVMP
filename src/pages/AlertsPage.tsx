@@ -2,10 +2,10 @@
  * Có bộ lọc theo bộ phận và theo khoảng thời gian (số ngày trễ/còn lại). */
 import { useState } from "react";
 import { AlertCircle, CalendarClock, Filter } from "lucide-react";
-import { C, TEXT, NUM } from "../constants/theme.js";
-import { CLS, DEPTS, SOON_DAYS, vmpToday } from "../constants/vmp.js";
-import { parseD, fmtVN, daysBetween, addMonths } from "../utils/helpers.js";
-import { Card, CardTitle, Tag, KpiCard } from "../components/ui/Primitives.jsx";
+import { C, TEXT, NUM } from "../constants/theme.ts";
+import { CLS, DEPTS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
+import { parseD, fmtVN, daysBetween, addMonths } from "../utils/helpers.ts";
+import { Card, CardTitle, Tag, KpiCard } from "../components/ui/Primitives.tsx";
 
 const WINDOWS = [
   ["all", "Mọi thời điểm"],

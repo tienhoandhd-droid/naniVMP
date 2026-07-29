@@ -4,8 +4,8 @@
  *  Nguon vao: objects + acts da duoc nap tu Supabase va enrich trong app.
  *  Module nay KHONG goi network, KHONG ghi du lieu, KHONG phu thuoc React.
  * ===================================================================== */
-import { CLS, DEPTS, STATUS } from "../constants/vmp.js";
-import { milestones, parseD, wlIsDone } from "../utils/helpers.js";
+import { CLS, DEPTS, STATUS } from "../constants/vmp.ts";
+import { milestones, parseD, wlIsDone } from "../utils/helpers.ts";
 
 const ACTIVE = (item) => (item?.state || "active") === "active";
 

@@ -8,11 +8,11 @@
  * ===================================================================== */
 import { useMemo, useState } from "react";
 import { Boxes, Search, Filter, Pencil, Plus, ChevronRight, Save, Layers, FileSpreadsheet } from "lucide-react";
-import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.js";
-import { CLS, DEPTS, CRIT, TT_OPTS } from "../constants/vmp.js";
-import { parseD, fmtVN, txt } from "../utils/helpers.js";
-import { toISO } from "../lib/n8nAdapter.js";
-import { Card, CardTitle, Tag, Modal, Pill } from "../components/ui/Primitives.jsx";
+import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
+import { CLS, DEPTS, CRIT, TT_OPTS } from "../constants/vmp.ts";
+import { parseD, fmtVN, txt } from "../utils/helpers.ts";
+import { toISO } from "../lib/n8nAdapter.ts";
+import { Card, CardTitle, Tag, Modal, Pill } from "../components/ui/Primitives.tsx";
 
 // Ánh xạ trường sửa → CỘT SHEET chuẩn (index 0-based khớp 37 cột canonical).
 const UPDATE_MAP = [

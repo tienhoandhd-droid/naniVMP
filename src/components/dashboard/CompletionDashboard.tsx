@@ -4,10 +4,10 @@ import {
   RotateCcw, ShieldCheck, Users,
 } from "lucide-react";
 
-import { C, NUM, TEXT } from "../../constants/theme.js";
-import { DEPTS, DEPT_COLOR, DEPT_DEEP } from "../../constants/vmp.js";
-import { parseDepts, wlIsDone } from "../../utils/helpers.js";
-import { Card, CardTitle, Sel } from "../ui/Primitives.jsx";
+import { C, NUM, TEXT } from "../../constants/theme.ts";
+import { DEPTS, DEPT_COLOR, DEPT_DEEP } from "../../constants/vmp.ts";
+import { parseDepts, wlIsDone } from "../../utils/helpers.ts";
+import { Card, CardTitle, Sel } from "../ui/Primitives.tsx";
 
 const ACTIVE = (activity) => (activity.state || "active") === "active";
 

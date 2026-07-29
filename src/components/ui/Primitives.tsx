@@ -3,8 +3,8 @@
  *  Card, Tag, Modal, Donut, KpiCard, Sparkle, Skeleton, etc.
  * ===================================================================== */
 import { useId } from "react";
-import { C, TEXT, NUM, GRAD, cardDefault, cardStrong, cardSoft, glass, btnPrimary, FIELD, LBL, INP } from "../../constants/theme.js";
-import { STATUS } from "../../constants/vmp.js";
+import { C, TEXT, NUM, GRAD, cardDefault, cardStrong, cardSoft, glass, btnPrimary, FIELD, LBL, INP } from "../../constants/theme.ts";
+import { STATUS } from "../../constants/vmp.ts";
 import { XCircle } from "lucide-react";
 
 // ======================== SPARKLE ========================
