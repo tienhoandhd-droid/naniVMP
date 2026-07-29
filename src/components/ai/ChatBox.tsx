@@ -17,6 +17,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Sparkles, AlertTriangle } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
+import { supabase } from "../../lib/supabaseClient.ts";
 import type { AppUser } from "../../types/domain.ts";
 
 interface TrichDan { nguon: string; muc?: string }
@@ -92,12 +93,38 @@ const LOI_CHO: Array<{ tu: number; text: string }> = [
   { tu: 18000, text: "Hôm nay cung đông khách, công chúa đang chờ tới lượt…" },
 ];
 
+/* Mẩu tri thức hiện trong lúc chờ.
+ *
+ * Người dùng BUỘC phải nhìn màn hình suốt 10–30 giây đó — bỏ trống là
+ * phí. Kho `vmp_chat_loi_cho` có 54 mẩu chia ba loại: thơ về nghề thẩm
+ * định, nguyên tắc GMP gọn trong vài dòng, và mẹo dùng hệ VMP.
+ *
+ * Chống lặp bằng ba lớp: nội dung unique ở DB, `daHien` loại mẩu đã
+ * hiện trong phiên, và mỗi mốc thời gian rút một LOẠI khác nhau — nên
+ * chờ 20 giây thì đọc được thơ rồi tới nguyên tắc, không đọc lại. */
+interface MauCho { loai: string; noi_dung: string; nguon?: string | null }
+
+/* Mốc nào thì rút loại gì. Mở đầu bằng mẹo cho nhẹ, chờ lâu mới tới
+ * nguyên tắc — thứ đáng đọc nhất thì để lúc người ta đã yên vị. */
+const NHIP_CHO: Array<{ tu: number; loai: string }> = [
+  { tu: 4000,  loai: "meo" },
+  { tu: 9000,  loai: "tho" },
+  { tu: 15000, loai: "nguyen_tac" },
+  { tu: 24000, loai: "tho" },
+  { tu: 32000, loai: "nguyen_tac" },
+];
+
 export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?: string }) {
   const [mo, setMo] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
   const [dangHoi, setDangHoi] = useState(false);
   const [choMs, setChoMs] = useState(0);
+  const [khoCho, setKhoCho] = useState<MauCho[]>([]);
+  const [mauCho, setMauCho] = useState<MauCho | null>(null);
+  // Mẩu đã hiện trong phiên — để không đọc lại cái vừa đọc
+  const daHienRef = useRef<Set<string>>(new Set());
+  const mocDaRutRef = useRef<number>(-1);
   const cuoiRef = useRef<HTMLDivElement | null>(null);
   const oNhapRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -110,13 +137,51 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
 
   useEffect(() => { if (mo) oNhapRef.current?.focus(); }, [mo]);
 
+  /* Tải kho mẩu chờ MỘT LẦN lúc mở ô chat, không phải lúc đang chờ —
+   * lúc đang chờ mà mới gọi mạng thì mẩu hiện ra sau khi câu trả lời
+   * đã về, thành vô dụng. */
+  useEffect(() => {
+    if (!mo || khoCho.length > 0 || !supabase) return;
+    let huy = false;
+    // Bảng vmp_chat_loi_cho mới thêm, chưa có trong types sinh tự động của
+    // Supabase nên phải ép kiểu. Chỉ đọc, chỉ ba cột, hỏng thì im lặng bỏ
+    // qua — mẩu chờ là thứ có thì hay, không có cũng không sao.
+    (supabase.from("vmp_chat_loi_cho" as never) as unknown as {
+      select: (c: string) => { eq: (k: string, v: boolean) => PromiseLike<{ data: MauCho[] | null }> };
+    })
+      .select("loai,noi_dung,nguon").eq("bat", true)
+      .then(({ data }) => { if (!huy && data) setKhoCho(data); });
+    return () => { huy = true; };
+  }, [mo, khoCho.length]);
+
   // Đếm thời gian đã chờ, để đổi lời chờ cho đúng nhịp
   useEffect(() => {
-    if (!dangHoi) { setChoMs(0); return; }
+    if (!dangHoi) {
+      setChoMs(0); setMauCho(null); mocDaRutRef.current = -1;
+      return;
+    }
     const t0 = Date.now();
     const id = setInterval(() => setChoMs(Date.now() - t0), 500);
     return () => clearInterval(id);
   }, [dangHoi]);
+
+  /* Tới mốc nào thì rút một mẩu của LOẠI ứng với mốc đó. Ưu tiên mẩu
+   * chưa hiện trong phiên; hết mẩu mới thì mới cho lặp lại. */
+  useEffect(() => {
+    if (!dangHoi || khoCho.length === 0) return;
+    const moc = NHIP_CHO.reduce((acc, x, i) => (choMs >= x.tu ? i : acc), -1);
+    if (moc < 0 || moc === mocDaRutRef.current) return;
+    mocDaRutRef.current = moc;
+
+    const loai = NHIP_CHO[moc].loai;
+    const cungLoai = khoCho.filter((m) => m.loai === loai);
+    const chuaDoc = cungLoai.filter((m) => !daHienRef.current.has(m.noi_dung));
+    const nguon = chuaDoc.length > 0 ? chuaDoc : cungLoai;
+    if (nguon.length === 0) return;
+    const chon = nguon[Math.floor(Math.random() * nguon.length)];
+    daHienRef.current.add(chon.noi_dung);
+    setMauCho(chon);
+  }, [choMs, dangHoi, khoCho]);
 
   const loiCho = [...LOI_CHO].reverse().find((x) => choMs >= x.tu)?.text
     ?? LOI_CHO[0].text;
@@ -343,21 +408,49 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
 
         {dangHoi && (
           <div style={{ alignSelf: "flex-start", maxWidth: "88%",
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "11px 14px", borderRadius: R.md,
-                        background: C.surface, border: `1px solid ${C.line}` }}>
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-              {[0, 1, 2].map((i) => (
-                <span key={i} style={{
-                  width: 6, height: 6, borderRadius: R.pill, background: C.pink,
-                  animation: `vmpNhipCho 1100ms ${MO.ease} ${i * 180}ms infinite`,
-                }} />
-              ))}
+                        display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10,
+                          padding: "11px 14px", borderRadius: R.md,
+                          background: C.surface, border: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                {[0, 1, 2].map((i) => (
+                  <span key={i} style={{
+                    width: 6, height: 6, borderRadius: R.pill, background: C.pink,
+                    animation: `vmpNhipCho 1100ms ${MO.ease} ${i * 180}ms infinite`,
+                  }} />
+                ))}
+              </div>
+              <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600,
+                             lineHeight: 1.5, fontStyle: "italic" }}>
+                {loiCho}
+              </span>
             </div>
-            <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600,
-                           lineHeight: 1.5, fontStyle: "italic" }}>
-              {loiCho}
-            </span>
+
+            {/* Chờ thì đọc lấy một mẩu — thơ về nghề, nguyên tắc GMP, hay
+                mẹo dùng hệ. Đằng nào cũng phải nhìn màn hình chừng đó giây. */}
+            {mauCho && (
+              <div style={{ padding: "10px 13px", borderRadius: R.md,
+                            background: C.surfaceSunk, border: `1px dashed ${C.line}`,
+                            animation: `vmpHienNhe 400ms ${MO.ease}` }}>
+                <div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 800,
+                              letterSpacing: 0.4, marginBottom: 5, opacity: 0.75 }}>
+                  {mauCho.loai === "tho" ? "🌸 CÔNG CHÚA NGÂM THƠ"
+                    : mauCho.loai === "nguyen_tac" ? "📖 NHÂN TIỆN, MỘT NGUYÊN TẮC GMP"
+                    : "💡 MÁCH NHỎ"}
+                </div>
+                <div style={{ fontSize: 12.5, color: C.plum, lineHeight: 1.7,
+                              whiteSpace: "pre-wrap",
+                              fontStyle: mauCho.loai === "tho" ? "italic" : "normal" }}>
+                  {mauCho.noi_dung}
+                </div>
+                {mauCho.nguon && (
+                  <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 6,
+                                fontWeight: 700, opacity: 0.8 }}>
+                    — {mauCho.nguon}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         <div ref={cuoiRef} />
