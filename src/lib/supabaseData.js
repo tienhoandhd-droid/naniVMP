@@ -173,6 +173,18 @@ export async function deleteSourceObject(objectKind, objectCode, reason) {
   return unwrap(data, error, "Ngừng dùng đối tượng thất bại");
 }
 
+/** Sinh hạng mục timeline từ danh mục nguồn, theo đúng luật VMP01.
+ *  commit=false chỉ xem trước. Idempotent: mã đã có thì bỏ qua, và không
+ *  bao giờ đè lên cột tiến độ người dùng đã nhập. */
+export async function generateTimeline(year, commit = false) {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_generate_timeline", {
+    p_year: year ?? null,
+    p_commit: commit,
+  });
+  return unwrap(data, error, "Sinh timeline thất bại");
+}
+
 export async function upsertObjectSupabase(obj) {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await supabase.rpc("rpc_upsert_object", {
