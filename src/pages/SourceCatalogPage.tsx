@@ -20,12 +20,16 @@
  *  chỉ ẩn nút cho gọn giao diện, không phải lớp bảo mật).
  * ===================================================================== */
 import { useState, useEffect, useMemo } from "react";
-import { Boxes, RefreshCw, Plus, Pencil, Ban, Search, AlertTriangle, CalendarPlus } from "lucide-react";
+import { Boxes, RefreshCw, Plus, Pencil, Ban, Trash2, Search, AlertTriangle,
+         CalendarPlus, Bell, Users, FlaskConical } from "lucide-react";
 import { C, TEXT, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.tsx";
 import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
   generateTimeline,
+  fetchAlertRecipients, upsertAlertRecipient, deleteAlertRecipient,
+  fetchStaffEmails, upsertStaffEmail, deleteStaffEmail,
+  fetchProductsGmp, upsertProductGmp, deleteProductGmp,
 } from "../lib/supabaseData.ts";
 import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
 
@@ -57,7 +61,7 @@ const FIELDS = [
   { key: "note",             label: "Ghi chú",             w: 160 },
 ];
 
-export default function SourceCatalogView({ user, onReload }: {
+function SourceCatalogSection({ user, onReload }: {
   user?: AppUser | null; onReload?: () => void;
 }) {
   const canEdit = user?.perm === "admin";
@@ -418,5 +422,350 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
         </button>
       </div>
     </Modal>
+  );
+}
+
+/* ================================================================
+ * CÁC BỘ DỮ LIỆU ĐƠN GIẢN (một bảng phẳng, khoá là một cột)
+ * ----------------------------------------------------------------
+ * Ba bộ dưới đây trước chỉ nằm trong Google Sheet. Nay nhập/sửa/xoá
+ * trực tiếp tại đây; Sheet chỉ còn là bản sao lưu.
+ * ================================================================ */
+
+interface SimpleField {
+  key: string;
+  label: string;
+  w?: number;
+  num?: boolean;
+  bool?: boolean;
+  /** Không cho sửa khi bản ghi đã tồn tại (thường là khoá). */
+  lockOnEdit?: boolean;
+  hint?: string;
+}
+
+interface DatasetSpec {
+  id: string;
+  label: string;
+  icon: typeof Boxes;
+  sub: string;
+  /** Cột dùng làm khoá khi lưu/xoá. */
+  keyField: string;
+  fields: SimpleField[];
+  load: () => Promise<Record<string, unknown>[]>;
+  save: (key: string | null, patch: Record<string, unknown>) => Promise<unknown>;
+  remove: (key: string) => Promise<unknown>;
+  /** Cảnh báo hiển thị khi bảng rỗng. */
+  emptyWarning?: string;
+}
+
+const DATASETS: DatasetSpec[] = [
+  {
+    id: "alerts",
+    label: "Người nhận cảnh báo",
+    icon: Bell,
+    sub: "Ai nhận email khi hạng mục sắp/đã đến hạn — thay cho tab CanhBao trong Sheet",
+    keyField: "id",
+    emptyWarning: "Chưa có người nhận nào. Workflow cảnh báo dù bật cũng sẽ không gửi cho ai.",
+    fields: [
+      { key: "is_enabled", label: "Bật", w: 70, bool: true },
+      { key: "email", label: "Email nhận", w: 210 },
+      { key: "recipient_name", label: "Tên người nhận", w: 160 },
+      { key: "scope_type", label: "Loại phạm vi", w: 130,
+        hint: "tất cả · bộ phận · đối tượng — quyết định cách so khớp phạm vi." },
+      { key: "scope", label: "Phạm vi", w: 130,
+        hint: "Để trống nếu chọn 'tất cả'. Nếu 'bộ phận' thì ghi mã bộ phận; nếu 'đối tượng' thì ghi mã đối tượng." },
+      { key: "alert_kind", label: "Loại cảnh báo", w: 130,
+        hint: "quá hạn · sắp đến hạn · cả hai" },
+      { key: "threshold_days", label: "Ngưỡng ngày", w: 110, num: true,
+        hint: "Riêng cho 'sắp đến hạn'. Để trống = dùng mặc định 7 ngày." },
+      { key: "note", label: "Ghi chú", w: 160 },
+    ],
+    load: () => fetchAlertRecipients() as unknown as Promise<Record<string, unknown>[]>,
+    save: (key, patch) => upsertAlertRecipient(key, patch),
+    remove: (key) => deleteAlertRecipient(key),
+  },
+  {
+    id: "staff",
+    label: "Danh bạ nhân sự",
+    icon: Users,
+    sub: "Nhân viên và email — thay cho tab Danh_sach_Email trong Sheet",
+    keyField: "id",
+    fields: [
+      { key: "is_active", label: "Đang dùng", w: 90, bool: true },
+      { key: "staff_name", label: "Nhân viên", w: 180 },
+      { key: "email", label: "Email", w: 220 },
+      { key: "department", label: "Bộ phận", w: 130 },
+      { key: "note", label: "Ghi chú", w: 180 },
+    ],
+    load: () => fetchStaffEmails() as unknown as Promise<Record<string, unknown>[]>,
+    save: (key, patch) => upsertStaffEmail(key, patch),
+    remove: (key) => deleteStaffEmail(key),
+  },
+  {
+    id: "products",
+    label: "Sản phẩm GMP",
+    icon: FlaskConical,
+    sub: "Danh mục sản phẩm / cỡ lô — thay cho tab DM TDQTSX show GMP",
+    keyField: "bfo_code",
+    fields: [
+      { key: "bfo_code", label: "Mã BFO", w: 120, lockOnEdit: true },
+      { key: "product_name", label: "Tên sản phẩm", w: 200 },
+      { key: "ingredients", label: "Thành phần", w: 180 },
+      { key: "strength", label: "Hàm lượng", w: 120 },
+      { key: "production_line", label: "Line sản xuất", w: 120 },
+      { key: "dosage_form", label: "Dạng bào chế", w: 130 },
+      { key: "primary_pack", label: "Quy cách sơ cấp", w: 150 },
+      { key: "batch_size", label: "Cỡ lô chốt", w: 120 },
+      { key: "mixing_tank", label: "Tank pha chế", w: 120 },
+      { key: "final_batch_size", label: "Cỡ lô chốt cuối", w: 140 },
+      { key: "note", label: "Ghi chú", w: 160 },
+    ],
+    load: () => fetchProductsGmp() as unknown as Promise<Record<string, unknown>[]>,
+    save: (key, patch) => upsertProductGmp(String(patch.bfo_code ?? key ?? ""), patch),
+    remove: (key) => deleteProductGmp(key),
+  },
+];
+
+function SimpleDatasetView({ spec, canEdit }: { spec: DatasetSpec; canEdit: boolean }) {
+  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [q, setQ] = useState("");
+  const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    setLoading(true); setErr("");
+    try { setRows(await spec.load()); }
+    catch (e) { setErr((e as Error).message || "Lỗi tải dữ liệu"); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [spec.id]);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return rows;
+    return rows.filter((r) => spec.fields.some((f) => String(r[f.key] ?? "").toLowerCase().includes(s)));
+  }, [rows, q, spec]);
+
+  const save = async (form: Record<string, unknown>) => {
+    setSaving(true);
+    try {
+      const patch: Record<string, unknown> = {};
+      for (const f of spec.fields) {
+        const raw = form[f.key];
+        if (raw === undefined || raw === "") continue;
+        patch[f.key] = f.num ? Number(raw) : f.bool ? raw === true || raw === "true" : String(raw);
+      }
+      const existingKey = editing && editing[spec.keyField] ? String(editing[spec.keyField]) : null;
+      await spec.save(existingKey, patch);
+      setEditing(null);
+      await load();
+    } catch (e) {
+      alert("Lỗi lưu: " + ((e as Error).message || "không rõ"));
+    }
+    setSaving(false);
+  };
+
+  const remove = async (row: Record<string, unknown>) => {
+    const label = String(row[spec.fields[1]?.key ?? spec.keyField] ?? "");
+    if (!window.confirm(`Xoá "${label}"? Thao tác này không hoàn tác được.`)) return;
+    try { await spec.remove(String(row[spec.keyField])); await load(); }
+    catch (e) { alert("Lỗi: " + ((e as Error).message || "không rõ")); }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Card>
+        <CardTitle icon={spec.icon} sub={spec.sub}>{spec.label}</CardTitle>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flex: "1 1 220px" }}>
+            <Search size={15} color={C.plumSoft}
+              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm…"
+              style={{ width: "100%", padding: "9px 10px 9px 32px", borderRadius: 12,
+                       border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 13 }} />
+          </div>
+          <button onClick={load}
+            style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+            <RefreshCw size={15} /> Tải lại
+          </button>
+          {canEdit && (
+            <button onClick={() => setEditing({})} style={btnPrimary}>
+              <Plus size={15} /> Thêm dòng
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontFamily: TEXT }}>
+          {loading ? "Đang tải…" : `${filtered.length} / ${rows.length} dòng`}
+        </div>
+
+        {err && (
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: C.raspSoft,
+                        color: C.raspText, fontSize: 13 }}>{err}</div>
+        )}
+
+        {!loading && rows.length === 0 && spec.emptyWarning && (
+          <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, background: C.marigoldSoft,
+                        color: C.marigoldText, fontSize: 12.5, fontFamily: TEXT,
+                        display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>{spec.emptyWarning}</div>
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
+            <thead>
+              <tr>
+                {spec.fields.map((f) => (
+                  <th key={f.key} title={f.hint || undefined}
+                    style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
+                             borderBottom: `1.5px solid ${C.pinkSoft}`, color: C.plum,
+                             fontWeight: 800, minWidth: f.w, cursor: f.hint ? "help" : "default" }}>
+                    {f.label}{f.hint ? " ⓘ" : ""}
+                  </th>
+                ))}
+                {canEdit && <th style={{ padding: "9px 8px", borderBottom: `1.5px solid ${C.pinkSoft}` }} />}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r, i) => (
+                <tr key={String(r[spec.keyField] ?? i)} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
+                  {spec.fields.map((f) => (
+                    <td key={f.key} style={{ padding: "8px", whiteSpace: "nowrap", color: C.plumSoft }}>
+                      {f.bool
+                        ? <Tag color={r[f.key] ? C.mintText : C.plumSoft}
+                               bg={r[f.key] ? C.mintSoft : C.pinkMist}>{r[f.key] ? "có" : "không"}</Tag>
+                        : (r[f.key] as React.ReactNode ?? "—")}
+                    </td>
+                  ))}
+                  {canEdit && (
+                    <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
+                      <button onClick={() => setEditing(r)} title="Sửa"
+                        style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4 }}>
+                        <Pencil size={15} color={C.plum} />
+                      </button>
+                      <button onClick={() => remove(r)} title="Xoá"
+                        style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4 }}>
+                        <Trash2 size={15} color={C.raspText} />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+              {!loading && filtered.length === 0 && (
+                <tr><td colSpan={spec.fields.length + 1}
+                  style={{ padding: 20, textAlign: "center", color: C.plumSoft }}>Chưa có dòng nào.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {editing && (
+        <SimpleEditModal spec={spec} row={editing} saving={saving}
+          onClose={() => setEditing(null)} onSave={save} />
+      )}
+    </div>
+  );
+}
+
+function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
+  spec: DatasetSpec;
+  row: Record<string, unknown>;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (form: Record<string, unknown>) => void;
+}) {
+  const isNew = !row[spec.keyField];
+  const [form, setForm] = useState<Record<string, unknown>>(() => {
+    const f: Record<string, unknown> = {};
+    for (const x of spec.fields) f[x.key] = row[x.key] ?? (x.bool ? true : "");
+    return f;
+  });
+  const set = (k: string, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
+
+  return (
+    <Modal onClose={onClose} wide icon={spec.icon}
+      title={`${isNew ? "Thêm" : "Sửa"} — ${spec.label}`}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
+        {spec.fields.map((f) => (
+          <label key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>{f.label}</span>
+            {f.bool ? (
+              <select value={form[f.key] ? "true" : "false"}
+                onChange={(e) => set(f.key, e.target.value === "true")}
+                style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
+                         border: `1.5px solid ${C.pinkSoft}` }}>
+                <option value="true">Có</option>
+                <option value="false">Không</option>
+              </select>
+            ) : (
+              <input value={String(form[f.key] ?? "")}
+                onChange={(e) => set(f.key, e.target.value)}
+                disabled={!isNew && f.lockOnEdit}
+                inputMode={f.num ? "numeric" : undefined}
+                style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
+                         border: `1.5px solid ${C.pinkSoft}`,
+                         background: (!isNew && f.lockOnEdit) ? C.pinkMist : "#fff" }} />
+            )}
+            {f.hint && <span style={{ fontSize: 11, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>}
+          </label>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+        <button onClick={onClose}
+          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>Huỷ</button>
+        <button onClick={() => onSave(form)} disabled={saving}
+          style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>{saving ? "Đang lưu…" : "Lưu"}</button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ================================================================
+ * Màn hình gộp: chuyển giữa các bộ dữ liệu
+ * ================================================================ */
+export default function DataWorkspaceView({ user, onReload }: {
+  user?: AppUser | null; onReload?: () => void;
+}) {
+  const canEdit = user?.perm === "admin";
+  const [tab, setTab] = useState("catalog");
+  const spec = DATASETS.find((d) => d.id === tab);
+
+  const TABS = [
+    { id: "catalog", label: "Danh mục nguồn", icon: Boxes },
+    ...DATASETS.map((d) => ({ id: d.id, label: d.label, icon: d.icon })),
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {TABS.map((t) => {
+          const on = tab === t.id;
+          const Icon = t.icon;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{ display: "flex", alignItems: "center", gap: 7,
+                       padding: "9px 15px", borderRadius: 999, cursor: "pointer",
+                       fontFamily: TEXT, fontSize: 13, fontWeight: on ? 800 : 600,
+                       border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
+                       background: on ? C.pinkSoft : "#fff",
+                       color: on ? C.plum : C.plumSoft }}>
+              <Icon size={15} /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "catalog"
+        ? <SourceCatalogSection user={user} onReload={onReload} />
+        : spec ? <SimpleDatasetView spec={spec} canEdit={canEdit} /> : null}
+    </div>
   );
 }

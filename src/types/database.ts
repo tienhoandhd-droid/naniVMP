@@ -404,6 +404,51 @@ export type Database = {
           },
         ]
       }
+      vmp_alert_recipients: {
+        Row: {
+          alert_kind: string
+          created_at: string
+          email: string
+          id: string
+          is_enabled: boolean
+          note: string | null
+          recipient_name: string | null
+          scope: string | null
+          scope_type: string
+          threshold_days: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          alert_kind?: string
+          created_at?: string
+          email: string
+          id?: string
+          is_enabled?: boolean
+          note?: string | null
+          recipient_name?: string | null
+          scope?: string | null
+          scope_type?: string
+          threshold_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          alert_kind?: string
+          created_at?: string
+          email?: string
+          id?: string
+          is_enabled?: boolean
+          note?: string | null
+          recipient_name?: string | null
+          scope?: string | null
+          scope_type?: string
+          threshold_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       vmp_deadline_rules: {
         Row: {
           description: string | null
@@ -1223,6 +1268,42 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_staff_emails: {
+        Row: {
+          created_at: string
+          department: string | null
+          email: string
+          id: string
+          is_active: boolean
+          note: string | null
+          staff_name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          email: string
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          staff_name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          staff_name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       workflow_runs: {
         Row: {
           created_at: string | null
@@ -1389,14 +1470,17 @@ export type Database = {
         Args: { p_code: string; p_reason: string }
         Returns: Json
       }
+      rpc_delete_alert_recipient: { Args: { p_id: string }; Returns: Json }
       rpc_delete_plan_item: {
         Args: { p_reason: string; p_validation_code: string }
         Returns: Json
       }
+      rpc_delete_product_gmp: { Args: { p_bfo_code: string }; Returns: Json }
       rpc_delete_source_object: {
         Args: { p_object_code: string; p_object_kind: string; p_reason: string }
         Returns: Json
       }
+      rpc_delete_staff_email: { Args: { p_id: string }; Returns: Json }
       rpc_due_alerts: {
         Args: { p_soon_days?: number; p_year?: number }
         Returns: Json
@@ -1513,6 +1597,10 @@ export type Database = {
             }
             Returns: Json
           }
+      rpc_upsert_alert_recipient: {
+        Args: { p_id: string; p_patch: Json }
+        Returns: Json
+      }
       rpc_upsert_object: {
         Args: {
           p_area: string
@@ -1526,8 +1614,16 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_upsert_product_gmp: {
+        Args: { p_bfo_code: string; p_patch: Json }
+        Returns: Json
+      }
       rpc_upsert_source_object: {
         Args: { p_object_code: string; p_object_kind: string; p_patch: Json }
+        Returns: Json
+      }
+      rpc_upsert_staff_email: {
+        Args: { p_id: string; p_patch: Json }
         Returns: Json
       }
       validate_plan_item: {
