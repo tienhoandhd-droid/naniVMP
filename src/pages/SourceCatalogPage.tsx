@@ -106,6 +106,11 @@ function SourceCatalogSection({ user, onReload }: {
   /** Ô đang sửa tại chỗ: nhấn đúp để mở, Enter lưu, Esc huỷ, Tab sang phải. */
   const [cell, setCell] = useState<{ id: string; key: string; value: string } | null>(null);
   const [bulk, setBulk] = useState(false);
+  /** Lọc theo cột kiểu Excel: cột → danh sách giá trị được giữ lại.
+   *  Không có khoá trong đây nghĩa là cột đó không lọc gì. */
+  const [colFil, setColFil] = useState<Record<string, string[]>>({});
+  /** Bảng chọn giá trị đang mở: cột nào, neo ở toạ độ nào trên màn hình. */
+  const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   // Cột mã đối tượng luôn hiện — nó là cột ghim, ẩn đi thì mất mốc dò dòng.
   const shownFields = useMemo(
     () => FIELDS.filter((f) => f.key === "object_code" || visible.has(f.key)),
@@ -128,12 +133,41 @@ function SourceCatalogSection({ user, onReload }: {
     fetchSourceWarnings().then(setWarn).catch(() => setWarn(null));
   }, []);
 
-  const filtered = useMemo(() => {
+  /** Ô trống hiện là "(trống)" trong bảng chọn, nhưng lưu là chuỗi rỗng. */
+  const cellText = (r: SourceObjectRow, key: string) =>
+    String((r as Record<string, unknown>)[key] ?? "");
+
+  /** Bước 1: ô tìm kiếm chung. */
+  const searched = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return rows;
     return rows.filter((r) =>
-      FIELDS.some((f) => String((r as Record<string, unknown>)[f.key] ?? "").toLowerCase().includes(s)));
+      FIELDS.some((f) => cellText(r, f.key).toLowerCase().includes(s)));
   }, [rows, q]);
+
+  /** Bước 2: lọc theo cột. Bỏ qua một cột (skip) để tính danh sách giá trị
+   *  cho chính cột đó — giống Excel: mở lại vẫn thấy đủ lựa chọn của nó. */
+  const applyColFil = (list: SourceObjectRow[], skip?: string) => {
+    const keys = Object.keys(colFil).filter((k) => k !== skip && colFil[k]?.length);
+    if (!keys.length) return list;
+    return list.filter((r) => keys.every((k) => colFil[k].includes(cellText(r, k))));
+  };
+
+  const filtered = useMemo(() => applyColFil(searched),
+    /* eslint-disable-next-line */ [searched, colFil]);
+
+  /** Giá trị có thể chọn của một cột, kèm số dòng — sắp xếp tiếng Việt. */
+  const optionsOf = (key: string) => {
+    const count = new Map<string, number>();
+    for (const r of applyColFil(searched, key)) {
+      const v = cellText(r, key);
+      count.set(v, (count.get(v) ?? 0) + 1);
+    }
+    return [...count.entries()]
+      .sort((a, b) => a[0] === "" ? 1 : b[0] === "" ? -1
+        : a[0].localeCompare(b[0], "vi", { numeric: true }))
+      .map(([value, n]) => ({ value, n }));
+  };
 
   /** Sắp xếp: số so theo số, còn lại so chuỗi có dấu tiếng Việt. */
   const sorted = useMemo(() => {
@@ -341,6 +375,17 @@ function SourceCatalogSection({ user, onReload }: {
           {" · "}
           {rows.filter((r) => r.validate_flag === "y").length} có thẩm định
           {sort ? ` · sắp theo "${FIELDS.find((f) => f.key === sort.key)?.label}" ${sort.dir === "asc" ? "tăng" : "giảm"}` : ""}
+          {Object.keys(colFil).length > 0 && (
+            <>
+              {" · lọc theo "}
+              <b>{Object.keys(colFil)
+                .map((k) => FIELDS.find((f) => f.key === k)?.label ?? k).join(", ")}</b>
+              <button onClick={() => setColFil({})}
+                style={{ ...miniBtn, marginLeft: 7, padding: "2px 8px" }}>
+                Bỏ hết lọc
+              </button>
+            </>
+          )}
           {canEdit && <span> · <b>nhấn đúp vào ô để sửa tại chỗ</b></span>}
         </div>
 
@@ -414,20 +459,38 @@ function SourceCatalogSection({ user, onReload }: {
                 )}
                 {shownFields.map((f, i) => {
                   const on = sort?.key === f.key;
+                  const fil = colFil[f.key]?.length ? colFil[f.key].length : 0;
                   return (
-                    <th key={f.key} title={f.hint || "Bấm để sắp xếp"}
-                      onClick={() => toggleSort(f.key)}
+                    <th key={f.key}
                       className={i === 0 ? (canEdit ? "vmp-col-pin2" : "vmp-col-pin") : undefined}
                       style={{
                         textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                        color: on ? C.pinkText : C.plum, fontWeight: 800, minWidth: f.w,
-                        cursor: "pointer", userSelect: "none",
+                        color: on || fil ? C.pinkText : C.plum, fontWeight: 800, minWidth: f.w,
+                        userSelect: "none",
                       }}>
-                      {f.label}
-                      <span style={{ opacity: on ? 1 : 0.25, marginLeft: 4 }}>
-                        {on ? (sort!.dir === "asc" ? "▲" : "▼") : "↕"}
+                      <span onClick={() => toggleSort(f.key)}
+                        title={f.hint || "Bấm để sắp xếp"}
+                        style={{ cursor: "pointer" }}>
+                        {f.label}
+                        <span style={{ opacity: on ? 1 : 0.25, marginLeft: 4 }}>
+                          {on ? (sort!.dir === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                        {f.hint ? " ⓘ" : ""}
                       </span>
-                      {f.hint ? " ⓘ" : ""}
+                      <button title={fil ? `Đang lọc ${fil} giá trị` : "Chọn giá trị để lọc"}
+                        onClick={(e) => {
+                          const b = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setMenu((m) => m?.key === f.key ? null
+                            : { key: f.key, x: b.left, y: b.bottom + 4 });
+                        }}
+                        style={{ marginLeft: 6, padding: "1px 5px", borderRadius: 6,
+                                 cursor: "pointer", fontSize: 10.5, lineHeight: 1.5,
+                                 fontFamily: TEXT, verticalAlign: "middle",
+                                 border: `1px solid ${fil ? C.pinkText : C.pinkSoft}`,
+                                 background: fil ? C.pinkText : "#fff",
+                                 color: fil ? "#fff" : C.plumSoft }}>
+                        {fil ? `▾ ${fil}` : "▾"}
+                      </button>
                     </th>
                   );
                 })}
@@ -508,7 +571,9 @@ function SourceCatalogSection({ user, onReload }: {
               {!loading && filtered.length === 0 && (
                 <tr><td colSpan={shownFields.length + 2}
                   style={{ padding: 20, textAlign: "center", color: C.plumSoft }}>
-                  Không có đối tượng nào.
+                  {Object.keys(colFil).length || q.trim()
+                    ? "Không có dòng nào khớp bộ lọc đang đặt."
+                    : "Không có đối tượng nào."}
                 </td></tr>
               )}
             </tbody>
@@ -528,9 +593,155 @@ function SourceCatalogSection({ user, onReload }: {
         <BulkModal count={picked.size} saving={saving}
           onClose={() => setBulk(false)} onApply={applyBulk} />
       )}
+      {menu && (
+        <FilterMenu
+          label={FIELDS.find((f) => f.key === menu.key)?.label ?? menu.key}
+          x={menu.x} y={menu.y}
+          options={optionsOf(menu.key)}
+          chosen={colFil[menu.key] ?? null}
+          onClose={() => setMenu(null)}
+          onSort={(dir) => { setSort({ key: menu.key, dir }); setMenu(null); }}
+          onChange={(vals) => setColFil((p) => {
+            const n = { ...p };
+            if (vals === null) delete n[menu.key]; else n[menu.key] = vals;
+            return n;
+          })} />
+      )}
     </div>
   );
 }
+
+/* ----------------------------------------------------------------
+ * Bảng chọn giá trị của một cột — kiểu bộ lọc của Excel.
+ *
+ * Chốt hai điểm cho khớp thói quen dùng Excel:
+ *   · chosen = null nghĩa là "lấy hết", KHÁC với chọn đủ mọi giá trị —
+ *     vì dữ liệu đổi thì "lấy hết" vẫn đúng, còn danh sách chốt cứng
+ *     sẽ âm thầm bỏ sót giá trị mới.
+ *   · ô trống hiện là "(trống)" để chọn được, thay vì biến mất.
+ * -------------------------------------------------------------- */
+function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }: {
+  label: string;
+  x: number; y: number;
+  options: { value: string; n: number }[];
+  chosen: string[] | null;
+  onClose: () => void;
+  onSort: (dir: "asc" | "desc") => void;
+  onChange: (vals: string[] | null) => void;
+}) {
+  const [find, setFind] = useState("");
+
+  // Neo theo toạ độ lúc bấm, nên cuộn/đổi cỡ là toạ độ sai — đóng lại
+  // thay vì để bảng chọn trôi lơ lửng giữa màn hình.
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("resize", onClose);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("resize", onClose);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [onClose]);
+
+  const shown = options.filter((o) =>
+    !find.trim() || (o.value || "(trống)").toLowerCase().includes(find.trim().toLowerCase()));
+  const has = (v: string) => chosen === null || chosen.includes(v);
+  const allShown = shown.length > 0 && shown.every((o) => has(o.value));
+
+  const toggle = (v: string) => {
+    const base = chosen ?? options.map((o) => o.value);
+    const next = base.includes(v) ? base.filter((x) => x !== v) : [...base, v];
+    onChange(next.length === options.length ? null : next);
+  };
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70 }} />
+      <div style={{
+        position: "fixed", zIndex: 71,
+        left: Math.min(x, window.innerWidth - 286), top: y,
+        width: 274, maxHeight: "min(400px, 70vh)",
+        display: "flex", flexDirection: "column",
+        background: "#fff", borderRadius: 14, fontFamily: TEXT,
+        border: `1px solid ${C.pinkSoft}`, boxShadow: "0 12px 34px rgba(90,50,90,.20)",
+      }}>
+        <div style={{ padding: "10px 12px 8px", borderBottom: `1px solid ${C.pinkMist}` }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.plum, marginBottom: 7 }}>
+            {label}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            <button onClick={() => onSort("asc")} style={miniBtn}>▲ Tăng dần</button>
+            <button onClick={() => onSort("desc")} style={miniBtn}>▼ Giảm dần</button>
+          </div>
+          <input autoFocus value={find} onChange={(e) => setFind(e.target.value)}
+            placeholder="Tìm trong danh sách…"
+            style={{ width: "100%", padding: "6px 9px", borderRadius: 9, fontSize: 12,
+                     fontFamily: TEXT, border: `1px solid ${C.pinkSoft}`, outline: "none" }} />
+        </div>
+
+        <label style={{ ...rowStyle, fontWeight: 700, color: C.plum,
+                        borderBottom: `1px solid ${C.pinkMist}` }}>
+          <input type="checkbox" checked={allShown}
+            onChange={() => {
+              if (find.trim()) {
+                // Đang tìm: chỉ bật/tắt đúng những dòng đang hiện.
+                const base = chosen ?? options.map((o) => o.value);
+                const ids = shown.map((o) => o.value);
+                const next = allShown ? base.filter((v) => !ids.includes(v))
+                  : [...new Set([...base, ...ids])];
+                onChange(next.length === options.length ? null : next);
+              } else onChange(allShown ? [] : null);
+            }} />
+          {find.trim() ? "Chọn các dòng đang tìm" : "Chọn tất cả"}
+          <span style={{ marginLeft: "auto", opacity: .6 }}>{shown.length}</span>
+        </label>
+
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {shown.map((o) => (
+            <label key={o.value} style={rowStyle}>
+              <input type="checkbox" checked={has(o.value)} onChange={() => toggle(o.value)} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                             color: o.value ? C.plumSoft : C.plumSoft,
+                             fontStyle: o.value ? "normal" : "italic" }}>
+                {o.value || "(trống)"}
+              </span>
+              <span style={{ marginLeft: "auto", opacity: .55, fontSize: 11 }}>{o.n}</span>
+            </label>
+          ))}
+          {shown.length === 0 && (
+            <div style={{ padding: 14, fontSize: 12, color: C.plumSoft, textAlign: "center" }}>
+              Không có giá trị nào khớp.
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "8px 10px", borderTop: `1px solid ${C.pinkMist}`,
+                      display: "flex", gap: 7 }}>
+          <button onClick={() => { onChange(null); setFind(""); }} style={miniBtn}>
+            Bỏ lọc cột này
+          </button>
+          <button onClick={onClose}
+            style={{ ...miniBtn, marginLeft: "auto", background: C.plum,
+                     color: "#fff", border: "none", fontWeight: 700 }}>
+            Xong
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const miniBtn: React.CSSProperties = {
+  padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontSize: 11.5,
+  fontFamily: TEXT, border: `1px solid ${C.pinkSoft}`, background: "#fff", color: C.plum,
+};
+
+const rowStyle: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 8, padding: "6px 12px",
+  fontSize: 12, cursor: "pointer", color: C.plumSoft,
+};
 
 /* ----------------------------------------------------------------
  * Điền hàng loạt — gán một giá trị cho mọi dòng đang chọn.
