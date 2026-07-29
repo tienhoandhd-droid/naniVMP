@@ -69,7 +69,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           <CardTitle icon={AlertCircle} sub="GxP cao nhưng chưa hoàn thành">Rủi ro ưu tiên xử lý</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {top.map((x) => { const cls = (CLS as Record<string, typeof CLS.tb>)[String(x.a.cls ?? "tb")] ?? CLS.tb; return (
-              <div key={x.a.id} className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", borderRadius: 14, background: "#fff", border: `1px solid ${C.raspSoft}` }}>
+              <div key={x.a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
                 <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, color: "#fff", background: x.score >= 7 ? C.raspText : C.marigoldText }}>RPN {x.score}</span>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}><Tag color={cls.text} bg={cls.soft}>{x.a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plum }}>{x.a.name}</span></div><div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{x.a.id} · {x.a.dep}</div></div>
                 <Pill s={x.a.st} small />

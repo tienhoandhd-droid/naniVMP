@@ -136,11 +136,11 @@ export default function AdminMissingView({ isAdmin, onReload, readOnly = true }:
                   <td style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
                     {readOnly ? <Tag color={C.lavText} bg={C.lavSoft}>Chỉ admin xử lý được</Tag> : <>
                       <button onClick={() => resolve(it.validation_code, "keep_active")}
-                        style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: "#fff", color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: C.surface, color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
                         ✓ Giữ active
                       </button>
                       <button onClick={() => resolve(it.validation_code, "deactivate")}
-                        style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.rasp}`, background: "#fff", color: C.raspText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.rasp}`, background: C.surface, color: C.raspText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
                         ⊘ Xác nhận hủy
                       </button>
                     </>}

@@ -3,7 +3,7 @@
  * ===================================================================== */
 import { useState, useEffect } from "react";
 import {
-  Bell, KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X,
+  Bell, KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
 } from "lucide-react";
 import { C, TEXT, NUM, GRAD, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
@@ -94,7 +94,7 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
       {/* User card */}
       <div style={{
         marginTop: 14, padding: collapsed ? "10px" : "13px",
-        borderRadius: 18, background: "#fff", border: `1.5px solid ${C.pinkSoft}`,
+        borderRadius: 18, background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
       }}>
         {collapsed ? (
           <div style={{
@@ -156,6 +156,70 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
 }
 
 // ======================== TOPBAR ========================
+/* ---------------------------------------------------------------------
+ * Đổi chế độ sáng / tối / theo hệ thống.
+ *
+ * Ghi thẳng data-theme lên <html> nên mọi biến màu đổi cùng lúc, không
+ * component nào phải biết chuyện gì đang xảy ra. Lựa chọn lưu ở
+ * localStorage và được áp lại trong main.tsx TRƯỚC khi React mount.
+ * ------------------------------------------------------------------- */
+type ThemeMode = "light" | "dark" | "auto";
+
+function useThemeMode(): [ThemeMode, (m: ThemeMode) => void] {
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    try {
+      const v = localStorage.getItem("vmp-theme");
+      return v === "light" || v === "dark" ? v : "auto";
+    } catch { return "auto"; }
+  });
+
+  useEffect(() => {
+    const sysDark = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const eff = mode === "auto" ? (sysDark.matches ? "dark" : "light") : mode;
+      document.documentElement.setAttribute("data-theme", eff);
+    };
+    apply();
+    try {
+      if (mode === "auto") localStorage.removeItem("vmp-theme");
+      else localStorage.setItem("vmp-theme", mode);
+    } catch { /* bỏ qua khi localStorage bị chặn */ }
+    // Đang ở "auto" thì phải theo khi người dùng đổi cài đặt hệ điều hành
+    if (mode !== "auto") return;
+    sysDark.addEventListener("change", apply);
+    return () => sysDark.removeEventListener("change", apply);
+  }, [mode]);
+
+  return [mode, setMode];
+}
+
+function ThemeToggle() {
+  const [mode, setMode] = useThemeMode();
+  const opts: Array<{ id: ThemeMode; icon: typeof Sun; label: string }> = [
+    { id: "light", icon: Sun, label: "Sáng" },
+    { id: "auto", icon: Monitor, label: "Theo hệ thống" },
+    { id: "dark", icon: Moon, label: "Tối" },
+  ];
+  return (
+    <div style={{ ...glass, borderRadius: 999, padding: 3, display: "flex", gap: 2 }}>
+      {opts.map((o) => {
+        const on = mode === o.id;
+        return (
+          <button key={o.id} onClick={() => setMode(o.id)} title={o.label}
+            aria-pressed={on}
+            style={{ width: 34, height: 34, borderRadius: 999, border: "none",
+                     cursor: "pointer", display: "flex", alignItems: "center",
+                     justifyContent: "center",
+                     background: on ? C.pinkSoft : "transparent",
+                     transition: "background var(--mo-fast) var(--ease)" }}>
+            <o.icon size={15} color={on ? C.pinkText : C.plumSoft} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }: {
   title?: ReactNode;
   user?: AppUser | null;
@@ -195,7 +259,8 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }: {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={onRefresh} title="Làm mới dữ liệu" style={{
+        <ThemeToggle />
+        <button onClick={onRefresh} title="Làm mới dữ liệu" className="vmp-lift" style={{
           ...glass, borderRadius: 16, padding: "9px 15px",
           display: "flex", alignItems: "center", gap: 8,
           border: "none", cursor: "pointer",
@@ -223,7 +288,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }: {
           <span style={{
             position: "absolute", top: 9, right: 10,
             width: 8, height: 8, borderRadius: 999,
-            background: C.rasp, border: "2px solid #fff",
+            background: C.rasp, border: `2px solid ${C.surface}`,
           }} />
         </button>
       </div>

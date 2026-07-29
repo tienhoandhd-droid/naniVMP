@@ -101,7 +101,7 @@ function UpdateModal({ act, onClose }: { act: Activity; onClose: () => void }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {STAGES4.map(([title, dCol, tCol, dlKey]) => (
-          <div key={tCol} style={{ background: "#fff", borderRadius: 14, padding: 13, border: `1.5px solid ${C.pinkSoft}` }}>
+          <div key={tCol} style={{ background: C.surface, borderRadius: 14, padding: 13, border: `1.5px solid ${C.pinkSoft}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
               <span style={{ fontWeight: 800, color: C.plum, fontSize: 13.5 }}>{title}</span>
               <Tag color={C.lavText} bg={C.lavSoft}>Hạn: {toISO(raw[dlKey]) ? fmtVN(parseD(toISO(raw[dlKey]))) : "—"}</Tag>
@@ -135,7 +135,7 @@ function UpdateModal({ act, onClose }: { act: Activity; onClose: () => void }) {
       </div>
 
       <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
-        <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: "#fff", color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Đóng</button>
+        <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Đóng</button>
         <button disabled title="Đường ghi ngược Sheet sẽ nối về sau" style={{ ...btnPrimary, flex: 2, padding: 12, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: 0.55, cursor: "not-allowed" }}><Save size={16} /> Lưu (chưa kích hoạt ghi)</button>
       </div>
     </Modal>
@@ -190,14 +190,14 @@ function AddObjectModal({ onClose }: { onClose: () => void }) {
         {filled.length === 0
           ? <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Chưa nhập trường nào.</div>
           : <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{filled.map(([k, col, label]) => (
-              <span key={k} style={{ fontSize: 11.5, fontWeight: 700, color: C.plum, background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 999, padding: "3px 9px" }}>
+              <span key={k} style={{ fontSize: 11.5, fontWeight: 700, color: C.plum, background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 999, padding: "3px 9px" }}>
                 <span style={{ fontFamily: "monospace", color: C.plumSoft }}>C{col + 1}</span> {label}: <b>{f[k]}</b>
               </span>
             ))}</div>}
       </div>
 
       <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
-        <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: "#fff", color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Đóng</button>
+        <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Đóng</button>
         <button disabled title="Đường ghi ngược Sheet sẽ nối về sau" style={{ ...btnPrimary, flex: 2, padding: 12, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: 0.55, cursor: "not-allowed" }}><Save size={16} /> Thêm (chưa kích hoạt ghi)</button>
       </div>
     </Modal>
@@ -306,7 +306,7 @@ export default function CatalogView({ objects = [], acts = [] }: {
           const isOpen = open[String(o.code)];
           return (
             <Card key={o.code} style={{ padding: 0, overflow: "hidden" }}>
-              <button onClick={() => toggle(o.code)} style={{ width: "100%", textAlign: "left", border: "none", background: isOpen ? C.pinkMist : "#fff", cursor: "pointer", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={() => toggle(o.code)} style={{ width: "100%", textAlign: "left", border: "none", background: isOpen ? C.pinkMist : C.surface, cursor: "pointer", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                 <ChevronRight size={18} color={C.plumSoft} style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s", flexShrink: 0 }} />
                 <span style={{ fontFamily: NUM, fontWeight: 900, fontSize: 15, color: cl.text, background: cl.soft, padding: "3px 10px", borderRadius: 9, whiteSpace: "nowrap" }}>{o.code}</span>
                 <div style={{ minWidth: 0, flex: 1 }}>

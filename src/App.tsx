@@ -214,7 +214,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
           borderRadius: 24,
           overflow: "hidden",
           boxShadow: "0 30px 80px rgba(94, 53, 132, .22), 0 8px 24px rgba(94, 53, 132, .10)",
-          background: "#fff",
+          background: C.surface,
         }}
       >
         {/* ===== LEFT — Brand Panel · Quiet Luxury ===== */}
@@ -543,7 +543,7 @@ function ChangePwModal({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} title="Đổi mật khẩu" icon={KeyRound}>
       <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
         {["Mật khẩu mới", "Xác nhận"].map((ph, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 15px", borderRadius: 14, background: "#fff", border: `1.5px solid ${C.pinkSoft}` }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 15px", borderRadius: 14, background: C.surface, border: `1.5px solid ${C.pinkSoft}` }}>
             <KeyRound size={16} color={C.pink} />
             <input type="password" placeholder={ph} value={i === 0 ? np : cf}
               onChange={(e) => { (i === 0 ? setNp : setCf)(e.target.value); setMsg({ type: "", text: "" }); }}
@@ -581,7 +581,7 @@ function HealthView({ acts, user }: { acts: Activity[]; user?: AppUser | null })
             style={{ padding: "9px 16px", borderRadius: 12, cursor: "pointer",
                      fontFamily: TEXT, fontSize: 13, fontWeight: tab === t.id ? 800 : 600,
                      border: `1.5px solid ${tab === t.id ? C.pink : C.pinkSoft}`,
-                     background: tab === t.id ? C.pinkSoft : "#fff",
+                     background: tab === t.id ? C.pinkSoft : C.surface,
                      color: tab === t.id ? C.pinkText : C.plumSoft, textAlign: "left" }}>
             {t.label}
             <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, opacity: .75 }}>
@@ -648,9 +648,9 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filtered.map((issue, i) => (
-              <div key={i} className="vmp-row" style={{
+              <div key={i} className="vmp-row vmp-lift" style={{
                 display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 14px", borderRadius: 14, background: "#fff",
+                padding: "12px 14px", borderRadius: 14, background: C.surface,
                 border: `1px solid ${issue.severity === "error" ? C.raspSoft : issue.severity === "warning" ? C.marigoldSoft : C.skySoft}`,
               }}>
                 <span style={{ fontSize: 18, flexShrink: 0 }}>
@@ -678,7 +678,7 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
           </CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {serverIssues.map((it, i) => (
-              <div key={i} className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14, background: "#fff", border: `1px solid ${it.severity === "error" ? C.raspSoft : C.marigoldSoft}` }}>
+              <div key={i} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14, background: C.surface, border: `1px solid ${it.severity === "error" ? C.raspSoft : C.marigoldSoft}` }}>
                 <span style={{ fontSize: 18, flexShrink: 0 }}>{it.severity === "error" ? "🚫" : "⚠️"}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 13.5, color: C.plum }}>{it.message}</div>
@@ -726,9 +726,9 @@ export function MismatchView({ acts }: { acts: Activity[] }) {
           </CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {group.items.map(a => (
-              <div key={a.id} className="vmp-row" style={{
+              <div key={a.id} className="vmp-row vmp-lift" style={{
                 display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 14px", borderRadius: 14, background: "#fff",
+                padding: "12px 14px", borderRadius: 14, background: C.surface,
                 border: `1px solid ${C.marigoldSoft}`,
               }}>
                 <div style={{
@@ -911,14 +911,14 @@ function AuditLogView() {
         {total > PAGE_SIZE && (
           <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 16 }}>
             <button disabled={page === 0} onClick={() => loadLogs(page - 1)}
-              style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: "#fff", cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
+              style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.surface, cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
               ← Trước
             </button>
             <span style={{ display: "flex", alignItems: "center", fontSize: 13, fontWeight: 700, color: C.plum }}>
               Trang {page + 1} / {Math.ceil(total / PAGE_SIZE)}
             </span>
             <button disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => loadLogs(page + 1)}
-              style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: "#fff", cursor: (page + 1) * PAGE_SIZE >= total ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
+              style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.surface, cursor: (page + 1) * PAGE_SIZE >= total ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
               Sau →
             </button>
           </div>
@@ -1298,7 +1298,7 @@ const miniBtn = {
 };
 const dateInp = {
   padding: "7px 9px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
-  background: "#fff", color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700, cursor: "pointer",
+  background: C.surface, color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700, cursor: "pointer",
 };
 
 // Dropdown CHỌN NHIỀU (checkbox) — dùng cho Khu vực & Bộ phận. Rỗng = tất cả.
@@ -1326,7 +1326,7 @@ function MultiSelect({ label, allLabel, options, selected, onChange }: {
       <button type="button" onClick={() => setOpen((o) => !o)} style={{
         display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
         borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
-        background: selected.length ? C.pinkMist : "#fff",
+        background: selected.length ? C.pinkMist : C.surface,
         color: selected.length ? C.pinkText : C.plum,
         fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
       }}>
@@ -1336,7 +1336,7 @@ function MultiSelect({ label, allLabel, options, selected, onChange }: {
         <div className="vmp-scroll" style={{
           position: "absolute", zIndex: 60, top: "calc(100% + 6px)", left: 0,
           minWidth: 210, maxHeight: 300, overflowY: "auto",
-          background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
+          background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
           boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
         }}>
           <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
@@ -1536,7 +1536,7 @@ function GlobalFilterBar({
           <Plus size={14} /> Lọc
         </button>
         {open && (
-          <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 250, maxHeight: 340, overflowY: "auto", background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
+          <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 250, maxHeight: 340, overflowY: "auto", background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
             <div style={{ margin: "6px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
             {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, ((DEPT_CHIP as Record<string, { dot?: string }>)[o.v] || {}).dot || C.pink))}
             <div style={{ margin: "8px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
@@ -1729,7 +1729,7 @@ export default function App() {
               padding: "12px 18px", borderRadius: 14, fontFamily: TEXT, fontWeight: 700, fontSize: 13.5,
               display: "flex", alignItems: "center", gap: 10, maxWidth: 380,
               boxShadow: "0 8px 28px rgba(120,60,110,.22)",
-              background: saveStatus === "saving" ? "#fff"
+              background: saveStatus === "saving" ? C.surface
                 : saveStatus === "saved" ? C.mintSoft
                 : saveStatus === "warning" ? C.marigoldSoft : C.raspSoft,
               color: saveStatus === "saving" ? C.plum
@@ -1760,10 +1760,10 @@ export default function App() {
               <div style={{
                 marginBottom: 22, padding: "16px 18px", borderRadius: 16,
                 border: `1.5px solid ${conn.status === "err" ? C.raspSoft : C.pinkSoft}`,
-                background: conn.status === "err" ? C.raspSoft : "#fff",
+                background: conn.status === "err" ? C.raspSoft : C.surface,
                 display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
               }}>
-                <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: conn.status === "err" ? "#fff" : C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: conn.status === "err" ? C.surface : C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {conn.status === "err" ? <AlertCircle size={22} color={C.raspText} /> : <Cloud size={22} color={C.pink} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
@@ -1799,6 +1799,9 @@ export default function App() {
             )}
 
             {/* Page router — Suspense bọc các màn lazy; fallback là skeleton nhẹ. */}
+            {/* key={view} khiến React dựng lại nhánh này mỗi lần đổi màn, nhờ
+                đó hoạt ảnh vào chạy lại — mắt biết nội dung vừa thay. */}
+            <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "overview" && <Overview acts={filteredActs} setView={setView} />}
               {view === "timeline" && <TimelineView acts={filteredActs} objects={filteredObjects} />}
@@ -1818,6 +1821,7 @@ export default function App() {
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} />}
             </Suspense>
+            </div>
           </div>
         </div>
       </main>

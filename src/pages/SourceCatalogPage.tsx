@@ -286,7 +286,7 @@ function SourceCatalogSection({ user, onReload }: {
                 padding: "8px 14px", borderRadius: 12, cursor: "pointer",
                 fontFamily: TEXT, fontSize: 13, fontWeight: kind === k ? 800 : 600,
                 border: `1.5px solid ${kind === k ? C.pink : C.pinkSoft}`,
-                background: kind === k ? C.pinkSoft : "#fff",
+                background: kind === k ? C.pinkSoft : C.surface,
                 color: kind === k ? C.plum : C.plumSoft,
               }}>
               {k}
@@ -305,11 +305,11 @@ function SourceCatalogSection({ user, onReload }: {
                 border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 13,
               }} />
           </div>
-          <button onClick={load} style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+          <button onClick={load} style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
             <RefreshCw size={15} /> Tải lại
           </button>
           <button onClick={exportXlsx}
-            style={{ ...btnPrimary, background: "#fff", color: C.plum,
+            style={{ ...btnPrimary, background: C.surface, color: C.plum,
                      border: `1.5px solid ${C.pinkSoft}` }}>
             <Download size={15} /> Xuất Excel
           </button>
@@ -320,13 +320,13 @@ function SourceCatalogSection({ user, onReload }: {
           )}
           <div style={{ position: "relative" }}>
             <button onClick={() => setColPicker((v) => !v)}
-              style={{ ...btnPrimary, background: "#fff", color: C.plum,
+              style={{ ...btnPrimary, background: C.surface, color: C.plum,
                        border: `1.5px solid ${C.pinkSoft}` }}>
               <Columns3 size={15} /> Cột hiển thị ({shownFields.length}/{FIELDS.length})
             </button>
             {colPicker && (
               <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 20,
-                            background: "#fff", border: `1.5px solid ${C.pinkSoft}`,
+                            background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
                             borderRadius: 14, padding: 12, minWidth: 250,
                             maxHeight: 340, overflowY: "auto",
                             boxShadow: "0 12px 34px rgba(238,123,169,.22)" }}
@@ -334,11 +334,11 @@ function SourceCatalogSection({ user, onReload }: {
                 <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                   <button onClick={() => setVisible(new Set(FIELDS.map((f) => f.key)))}
                     style={{ ...btnPrimary, padding: "5px 10px", fontSize: 11.5,
-                             background: "#fff", color: C.plum,
+                             background: C.surface, color: C.plum,
                              border: `1.5px solid ${C.pinkSoft}` }}>Chọn tất cả</button>
                   <button onClick={() => setVisible(new Set(DEFAULT_COLS))}
                     style={{ ...btnPrimary, padding: "5px 10px", fontSize: 11.5,
-                             background: "#fff", color: C.plum,
+                             background: C.surface, color: C.plum,
                              border: `1.5px solid ${C.pinkSoft}` }}>Mặc định</button>
                 </div>
                 {FIELDS.map((f) => {
@@ -364,7 +364,7 @@ function SourceCatalogSection({ user, onReload }: {
           </div>
           {canEdit && (
             <button onClick={() => setGen({ year: new Date().getFullYear(), preview: null })}
-              style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+              style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
               <CalendarPlus size={15} /> Sinh timeline
             </button>
           )}
@@ -402,7 +402,7 @@ function SourceCatalogSection({ user, onReload }: {
             </button>
             <button onClick={() => setPicked(new Set())}
               style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12,
-                       background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+                       background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
               Bỏ chọn
             </button>
             <span style={{ opacity: 0.85 }}>
@@ -498,7 +498,7 @@ function SourceCatalogSection({ user, onReload }: {
                                  fontWeight: 700, lineHeight: 1, fontFamily: TEXT,
                                  verticalAlign: "middle",
                                  border: `1.5px solid ${fil ? C.pinkText : C.pinkSoft}`,
-                                 background: fil ? C.pinkText : "#fff",
+                                 background: fil ? C.pinkText : C.surface,
                                  color: fil ? "#fff" : C.plumSoft,
                                  boxShadow: fil ? "0 1px 5px rgba(194,73,122,.35)" : "none" }}>
                         {fil ? `▼ ${fil}` : "▼"}
@@ -683,7 +683,7 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
         left: Math.min(x, window.innerWidth - 310), top: y,
         width: 298, maxHeight: "min(460px, 74vh)",
         display: "flex", flexDirection: "column",
-        background: "#fff", borderRadius: 14, fontFamily: TEXT,
+        background: C.surface, borderRadius: 14, fontFamily: TEXT,
         border: `1px solid ${C.pinkSoft}`, boxShadow: "0 12px 34px rgba(90,50,90,.20)",
       }}>
         <div style={{ padding: "10px 12px 8px", borderBottom: `1px solid ${C.pinkMist}` }}>
@@ -755,7 +755,7 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
 
 const miniBtn: React.CSSProperties = {
   padding: "6px 11px", borderRadius: 8, cursor: "pointer", fontSize: 12,
-  fontFamily: TEXT, border: `1px solid ${C.pinkSoft}`, background: "#fff", color: C.plum,
+  fontFamily: TEXT, border: `1px solid ${C.pinkSoft}`, background: C.surface, color: C.plum,
 };
 
 /** Ô tick to hơn mặc định của trình duyệt — bấm bằng chuột đỡ trượt. */
@@ -785,7 +785,7 @@ function BulkModal({ count, saving, onClose, onApply }: {
       style={{ position: "fixed", inset: 0, background: "rgba(60,40,60,.32)",
                display: "grid", placeItems: "center", zIndex: 60, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 18, padding: 20, width: "min(460px,96vw)",
+        style={{ background: C.surface, borderRadius: 18, padding: 20, width: "min(460px,96vw)",
                  border: `1px solid ${C.pinkMist}`, fontFamily: TEXT }}>
         <div style={{ fontFamily: NUM, fontSize: 18, fontWeight: 800, color: C.plum, marginBottom: 4 }}>
           Điền hàng loạt
@@ -811,7 +811,7 @@ function BulkModal({ count, saving, onClose, onApply }: {
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={onClose} disabled={saving}
             style={{ padding: "8px 14px", borderRadius: 10, cursor: "pointer",
-                     border: `1px solid ${C.pink}`, background: "#fff",
+                     border: `1px solid ${C.pink}`, background: C.surface,
                      color: C.plum, fontFamily: TEXT, fontSize: 13 }}>
             Huỷ
           </button>
@@ -902,11 +902,11 @@ function GenerateModal({ state, setState, onClose, onDone }: {
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
         <button onClick={onClose}
-          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+          style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
           Đóng
         </button>
         <button onClick={() => run(false)} disabled={busy}
-          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}`, opacity: busy ? 0.6 : 1 }}>
+          style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, opacity: busy ? 0.6 : 1 }}>
           Xem trước
         </button>
         <button onClick={() => run(true)} disabled={busy || !r || !r.so_tao_moi}
@@ -957,7 +957,7 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
               style={{
                 padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
                 border: `1.5px solid ${C.pinkSoft}`,
-                background: (!isNew && f.lockOnEdit) ? C.pinkMist : "#fff",
+                background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface,
               }} />
             {f.hint && (
               <span style={{ fontSize: 11, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>
@@ -968,7 +968,7 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
         <button onClick={onClose}
-          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+          style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
           Huỷ
         </button>
         <button onClick={submit} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>
@@ -1142,7 +1142,7 @@ function SimpleDatasetView({ spec, canEdit }: { spec: DatasetSpec; canEdit: bool
                        border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 13 }} />
           </div>
           <button onClick={load}
-            style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+            style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
             <RefreshCw size={15} /> Tải lại
           </button>
           {canEdit && (
@@ -1268,7 +1268,7 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
                 inputMode={f.num ? "numeric" : undefined}
                 style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
                          border: `1.5px solid ${C.pinkSoft}`,
-                         background: (!isNew && f.lockOnEdit) ? C.pinkMist : "#fff" }} />
+                         background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface }} />
             )}
             {f.hint && <span style={{ fontSize: 11, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>}
           </label>
@@ -1276,7 +1276,7 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
       </div>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
         <button onClick={onClose}
-          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>Huỷ</button>
+          style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>Huỷ</button>
         <button onClick={() => onSave(form)} disabled={saving}
           style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>{saving ? "Đang lưu…" : "Lưu"}</button>
       </div>
@@ -1312,7 +1312,7 @@ export default function DataWorkspaceView({ user, onReload }: {
                        padding: "9px 15px", borderRadius: 999, cursor: "pointer",
                        fontFamily: TEXT, fontSize: 13, fontWeight: on ? 800 : 600,
                        border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
-                       background: on ? C.pinkSoft : "#fff",
+                       background: on ? C.pinkSoft : C.surface,
                        color: on ? C.plum : C.plumSoft }}>
               <Icon size={15} /> {t.label}
             </button>
@@ -1415,7 +1415,7 @@ function RawTabsView({ canEdit }: { canEdit: boolean }) {
                 style={{ padding: "8px 13px", borderRadius: 12, cursor: "pointer",
                          fontFamily: TEXT, fontSize: 12.5, fontWeight: on ? 800 : 600,
                          border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
-                         background: on ? C.pinkSoft : "#fff",
+                         background: on ? C.pinkSoft : C.surface,
                          color: on ? C.plum : C.plumSoft }}>
                 {t.source_tab}
                 <span style={{ marginLeft: 7, fontSize: 11, opacity: 0.75 }}>{t.rows}</span>
@@ -1433,7 +1433,7 @@ function RawTabsView({ canEdit }: { canEdit: boolean }) {
                        border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 13 }} />
           </div>
           <button onClick={load}
-            style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+            style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
             <RefreshCw size={15} /> Tải lại
           </button>
           {canEdit && cols.length > 0 && (
@@ -1547,7 +1547,7 @@ function RawRowModal({ row, cols, saving, onClose, onSave }: {
       </div>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
         <button onClick={onClose}
-          style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>Huỷ</button>
+          style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>Huỷ</button>
         <button onClick={() => onSave(form)} disabled={saving}
           style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>{saving ? "Đang lưu…" : "Lưu"}</button>
       </div>

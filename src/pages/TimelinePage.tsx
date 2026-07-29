@@ -1334,7 +1334,7 @@ function ActivityDetailModal({ a, onClose }: { a: Activity | null; onClose: () =
       </div>
       <div style={{ fontFamily: TEXT, fontSize: 18, fontWeight: 800, color: C.plum, marginBottom: 16 }}>{a.name}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 9, marginBottom: 14 }}>
-        {info.map(([k, v]) => <div key={k} style={{ background: "#fff", borderRadius: 11, padding: "8px 11px" }}><div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 800, textTransform: "uppercase", letterSpacing: .3 }}>{k}</div><div style={{ fontSize: 13.5, color: C.plum, fontWeight: 700, marginTop: 2 }}>{v}</div></div>)}
+        {info.map(([k, v]) => <div key={k} style={{ background: C.surface, borderRadius: 11, padding: "8px 11px" }}><div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 800, textTransform: "uppercase", letterSpacing: .3 }}>{k}</div><div style={{ fontSize: 13.5, color: C.plum, fontWeight: 700, marginTop: 2 }}>{v}</div></div>)}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
         <div style={{ flex: 1, minWidth: 190, background: C.pinkSoft, borderRadius: 12, padding: "10px 13px" }}><div style={{ fontSize: 10, color: C.pinkText, fontWeight: 800, textTransform: "uppercase" }}>QA phụ trách</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.qa)}</div>{has(r.email_qa) && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_qa ?? "")}</div>}</div>
@@ -1343,7 +1343,7 @@ function ActivityDetailModal({ a, onClose }: { a: Activity | null; onClose: () =
       <div style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><CalendarClock size={17} color={C.pink} /> Vòng đời thẩm định</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {phases.map((p, i) => (
-          <div key={i} style={{ background: "#fff", borderRadius: 14, padding: "11px 14px", borderLeft: `4px solid ${has(p.act) ? C.mint : C.pinkSoft}` }}>
+          <div key={i} style={{ background: C.surface, borderRadius: 14, padding: "11px 14px", borderLeft: `4px solid ${has(p.act) ? C.mint : C.pinkSoft}` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}><span style={{ fontSize: 18 }}>{p.ic}</span><div><div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{p.label}</div><div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 600 }}>{p.note}</div></div></div>
               {phaseTag(String(p.st ?? ""))}
@@ -1377,7 +1377,7 @@ function OvKpi({ k, v, sub, color, small }: {
   k: ReactNode; v: ReactNode; sub?: ReactNode; color?: string; small?: boolean;
 }) {
   return (
-    <div style={{ background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 16, padding: "13px 16px" }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 16, padding: "13px 16px" }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>{k}</div>
       <div style={{ fontSize: small ? 21 : 27, fontWeight: 800, color, fontFamily: NUM, letterSpacing: "-.02em", marginTop: 2 }}>{v}</div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>{sub}</div>

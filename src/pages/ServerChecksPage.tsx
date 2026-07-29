@@ -100,7 +100,7 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
           <button onClick={load} disabled={loading}
-            style={{ ...btnPrimary, background: "#fff", color: C.plum,
+            style={{ ...btnPrimary, background: C.surface, color: C.plum,
                      border: `1.5px solid ${C.pinkSoft}`, opacity: loading ? 0.6 : 1 }}>
             <RefreshCw size={15} /> {loading ? "Đang tải…" : "Tải lại"}
           </button>
@@ -155,7 +155,7 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
               style={{ padding: "6px 13px", borderRadius: 999, cursor: "pointer",
                        fontFamily: TEXT, fontSize: 12.5, fontWeight: soonDays === d ? 800 : 600,
                        border: `1.5px solid ${soonDays === d ? C.pink : C.pinkSoft}`,
-                       background: soonDays === d ? C.pinkSoft : "#fff",
+                       background: soonDays === d ? C.pinkSoft : C.surface,
                        color: soonDays === d ? C.plum : C.plumSoft }}>
               {d} ngày
             </button>
@@ -230,7 +230,7 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
               style={{ padding: "7px 13px", borderRadius: 999, cursor: "pointer",
                        fontFamily: TEXT, fontSize: 12.5, fontWeight: sevFilter === k ? 800 : 600,
                        border: `1.5px solid ${sevFilter === k ? C.pink : C.pinkSoft}`,
-                       background: sevFilter === k ? C.pinkSoft : "#fff",
+                       background: sevFilter === k ? C.pinkSoft : C.surface,
                        color: sevFilter === k ? C.plum : C.plumSoft }}>
               {lb}
             </button>

@@ -40,7 +40,7 @@ function WorkloadDetailModal({ detail, onClose }: {
         {tasks.map((a) => {
           const ph = wlPending(a);
           return (
-            <div key={a.id} style={{ background: "#fff", border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: 13 }}>
+            <div key={a.id} style={{ background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: 13 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 7 }}>
                 <Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag>
                 <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</span>
@@ -176,7 +176,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           <div style={{ flexShrink: 0 }}><Mascot mood={mood} size={96} /></div>
           <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="pop" key={mood} style={{ background: "#fff", border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: "12px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, lineHeight: 1.5 }}>{bubble}</div>
+            <div className="pop" key={mood} style={{ background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: "12px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, lineHeight: 1.5 }}>{bubble}</div>
             <div style={{ fontSize: 12.5, color: C.plumSoft, marginTop: 8, fontWeight: 700 }}>Còn lại: <b style={{ color: C.lavText }}>{totalCong} ngày công</b> · <b style={{ color: C.pinkText }}>{totalHoso} hồ sơ</b> · <b style={{ color: C.mintText }}>{people.length} người</b></div>
           </div>
         </div>
@@ -194,7 +194,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
             const pk = peakMonth(p); const ratio = CAP_MONTH > 0 ? pk.eff / CAP_MONTH : 0;
             const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, e: "😵" } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, e: "🔥" } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, e: "🌿" };
             return (
-              <button key={p.name} className="rise" onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))} style={{ textAlign: "left", cursor: "pointer", background: "#fff", border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: 15, fontFamily: TEXT }}>
+              <button key={p.name} className="vmp-lift" onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))} style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: 15, fontFamily: TEXT }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 17, flexShrink: 0 }}>{p.name[0]}</div>
                   <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 15, color: C.plum }}>{p.name}</div><div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 700 }}>{p.count} hạng mục</div></div>
@@ -223,14 +223,14 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         <div style={{ overflowX: "auto" }} className="vmp-scroll">
           <table style={{ borderCollapse: "separate", borderSpacing: 5, minWidth: scope === "month" ? 880 : 440 }}>
             <thead><tr>
-              <th style={{ textAlign: "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, padding: "0 8px 8px", position: "sticky", left: 0, background: "#fff" }}>NGƯỜI</th>
+              <th style={{ textAlign: "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, padding: "0 8px 8px", position: "sticky", left: 0, background: C.surface }}>NGƯỜI</th>
               {cols.map((c, ci) => { const isNow = scope === "month" && ci === vmpToday().getMonth(); return <th key={c} style={{ fontSize: 11, fontWeight: 800, color: isNow ? C.pinkText : C.plumSoft, padding: "0 4px 8px", minWidth: 54 }}>{c}{isNow ? " •" : ""}</th>; })}
               <th style={{ fontSize: 11, fontWeight: 800, color: C.plum, padding: "0 6px 8px" }}>TỔNG</th>
             </tr></thead>
             <tbody>
               {people.map((p) => (
                 <tr key={p.name}>
-                  <td style={{ padding: "4px 8px", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
+                  <td style={{ padding: "4px 8px", position: "sticky", left: 0, background: C.surface, zIndex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 26, height: 26, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 12, flexShrink: 0 }}>{p.name[0]}</div><span style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plum, whiteSpace: "nowrap" }}>{p.name}</span></div>
                   </td>
                   {cols.map((c, ci) => {
@@ -267,9 +267,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           {groups.map((g) => {
             const chua = g.name === "(chưa phân nhóm)";
             return (
-              <button key={g.name} className="rise"
+              <button key={g.name} className="vmp-lift"
                 onClick={() => openDetail(`Nhóm: ${g.name}`, g.acts)}
-                style={{ textAlign: "left", cursor: "pointer", background: "#fff",
+                style={{ textAlign: "left", cursor: "pointer", background: C.surface,
                          border: `1.5px solid ${chua ? C.marigold : C.pinkSoft}`,
                          borderRadius: 16, padding: 14, fontFamily: TEXT }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: chua ? C.marigoldText : C.plum,
@@ -302,11 +302,11 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         </CardTitle>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {board.map((r, i) => (
-            <button key={r.name} className="vmp-row"
+            <button key={r.name} className="vmp-row vmp-lift"
               onClick={() => openDetail(`Hạng mục của ${r.name}`,
                 acts.filter((a) => (a.owner && a.owner !== "—" ? a.owner : "(chưa phân)") === r.name))}
               style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px",
-                       borderRadius: 13, background: "#fff", cursor: "pointer", textAlign: "left",
+                       borderRadius: 13, background: C.surface, cursor: "pointer", textAlign: "left",
                        border: `1px solid ${r.name === "(chưa phân)" ? C.marigoldSoft : C.pinkSoft}` }}>
               <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 13, color: C.plumSoft,
                              width: 22, flexShrink: 0 }}>{i + 1}</span>
@@ -346,7 +346,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         <Card variant="strong">
           <CardTitle icon={Flag} sub="Trọng yếu cao / ≥ 7 — ưu tiên">Cần tập trung</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {focus.map(({ a, sc }) => <div key={a.id} className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 13, background: "#fff", border: `1px solid ${C.raspSoft}` }}>
+            {focus.map(({ a, sc }) => <div key={a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 13, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
               <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 13, color: "#fff", background: sc >= 7 ? C.raspText : C.marigoldText, width: 30, height: 30, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plum }}>{a.name}</span></div>
