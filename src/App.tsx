@@ -1956,7 +1956,10 @@ export default function App() {
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "overview" && <Overview acts={filteredActs} setView={setView} />}
               {view === "timeline" && <TimelineView acts={filteredActs} />}
-              {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
+              {view === "inventory" && (
+                <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}
+                  onUpdate={updateActivity} onReload={reloadData} readOnly={false} />
+              )}
               {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
               {view === "health" && <HealthView acts={filteredActs} user={user} />}
               {view === "rules" && <ActiveRulesView user={user} />}
