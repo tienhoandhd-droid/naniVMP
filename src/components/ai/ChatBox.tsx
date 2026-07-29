@@ -106,6 +106,25 @@ interface MauCho { loai: string; noi_dung: string; nguon?: string | null }
 
 /* Mốc nào thì rút loại gì. Mở đầu bằng mẹo cho nhẹ, chờ lâu mới tới
  * nguyên tắc — thứ đáng đọc nhất thì để lúc người ta đã yên vị. */
+/* Mẩu dự phòng nhúng sẵn. Kho thật nằm ở DB nhưng bảng đó chỉ mở cho
+ * vai `authenticated` — chưa đăng nhập, mạng chậm, hoặc RLS đổi là kho
+ * rỗng và khung chờ trống trơn. Vài mẩu nhúng sẵn để không bao giờ
+ * trống, còn kho DB là phần mở rộng. */
+const MAU_CHO_DU_PHONG: MauCho[] = [
+  { loai: "tho", nguon: "Annex 15",
+    noi_dung: "Đề cương ký trước một ngày,\nMẻ chạy hôm ấy mới thay được lời.\nKý sau thì hỏng cả rồi,\nGiấy còn số đẹp, người soi vẫn tường." },
+  { loai: "tho", nguon: "ALCOA+ — Contemporaneous",
+    noi_dung: "Sổ ghi đúng lúc đang làm,\nĐừng chờ tối mịt mới cầm bút biên.\nGhi sau ký ức đã phiền,\nSố kia thành thể ước nguyền, chẳng thân." },
+  { loai: "nguyen_tac", nguon: "Nguyên tắc nền",
+    noi_dung: "Thẩm định là chứng minh bằng văn bản rằng kết quả đạt MỘT CÁCH NHẤT QUÁN. Một mẻ đạt chỉ nói lần đó đạt — nó không chứng minh được gì cả." },
+  { loai: "nguyen_tac", nguon: "Annex 11",
+    noi_dung: "Audit trail phải KHÔNG SỬA ĐƯỢC và phải ĐƯỢC RÀ SOÁT định kỳ. Thanh tra hỏi \"ai rà, rà lúc nào\" chứ không hỏi \"có audit trail không\"." },
+  { loai: "meo", nguon: null,
+    noi_dung: "Hỏi bổn cung một tên riêng thôi cũng được — \"tank\", \"nồi hấp\", \"KNTB1\" — bổn cung tự dò ra cả nhóm rồi hỏi lại cho hẹp." },
+  { loai: "meo", nguon: null,
+    noi_dung: "Số bổn cung đưa ra đều đếm bằng SQL trên toàn bộ bảng, không phải ước lượng. Nghi ngờ thì cứ đối chiếu với trang Timeline." },
+];
+
 const NHIP_CHO: Array<{ tu: number; loai: string }> = [
   { tu: 4000,  loai: "meo" },
   { tu: 9000,  loai: "tho" },
@@ -120,7 +139,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
   const [q, setQ] = useState("");
   const [dangHoi, setDangHoi] = useState(false);
   const [choMs, setChoMs] = useState(0);
-  const [khoCho, setKhoCho] = useState<MauCho[]>([]);
+  const [khoCho, setKhoCho] = useState<MauCho[]>(MAU_CHO_DU_PHONG);
   const [mauCho, setMauCho] = useState<MauCho | null>(null);
   // Mẩu đã hiện trong phiên — để không đọc lại cái vừa đọc
   const daHienRef = useRef<Set<string>>(new Set());
@@ -141,7 +160,8 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
    * lúc đang chờ mà mới gọi mạng thì mẩu hiện ra sau khi câu trả lời
    * đã về, thành vô dụng. */
   useEffect(() => {
-    if (!mo || khoCho.length > 0 || !supabase) return;
+    // Chỉ tải khi vẫn đang dùng bộ dự phòng — tải xong thì thôi
+    if (!mo || khoCho !== MAU_CHO_DU_PHONG || !supabase) return;
     let huy = false;
     // Bảng vmp_chat_loi_cho mới thêm, chưa có trong types sinh tự động của
     // Supabase nên phải ép kiểu. Chỉ đọc, chỉ ba cột, hỏng thì im lặng bỏ
@@ -150,9 +170,9 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
       select: (c: string) => { eq: (k: string, v: boolean) => PromiseLike<{ data: MauCho[] | null }> };
     })
       .select("loai,noi_dung,nguon").eq("bat", true)
-      .then(({ data }) => { if (!huy && data) setKhoCho(data); });
+      .then(({ data }) => { if (!huy && data && data.length > 0) setKhoCho(data); });
     return () => { huy = true; };
-  }, [mo, khoCho.length]);
+  }, [mo, khoCho]);
 
   // Đếm thời gian đã chờ, để đổi lời chờ cho đúng nhịp
   useEffect(() => {
