@@ -472,8 +472,12 @@ export function Card({ children, style, variant = "default", cls = "" }: {
   );
 }
 
-export function CardTitle({ icon: Icon, children, sub }: {
-  icon?: LucideIcon; children?: ReactNode; sub?: ReactNode;
+export function CardTitle({ icon: Icon, children, sub, right }: {
+  icon?: LucideIcon;
+  children?: ReactNode;
+  sub?: ReactNode;
+  /** Nội dung phụ căn phải (chú giải màu, nút nhỏ…). */
+  right?: ReactNode;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
@@ -486,6 +490,7 @@ export function CardTitle({ icon: Icon, children, sub }: {
         <div style={{ fontFamily: TEXT, fontSize: 18, fontWeight: 800, color: C.plum }}>{children}</div>
         {sub && <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{sub}</div>}
       </div>
+      {right}
     </div>
   );
 }
