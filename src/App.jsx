@@ -57,6 +57,7 @@ const QrmView = lazy(() => import("./pages/QrmPage.jsx"));
 const CatalogView = lazy(() => import("./pages/CatalogPage.jsx"));
 const WorkloadView = lazy(() => import("./pages/WorkloadPage.jsx"));
 const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.jsx"));
+const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.jsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.jsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
@@ -1590,6 +1591,7 @@ export default function App() {
               {view === "overview" && <Overview acts={filteredActs} setView={setView} />}
               {view === "timeline" && <TimelineView acts={filteredActs} objects={filteredObjects} />}
               {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
+              {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
               {view === "alerts" && <AlertsView acts={filteredActs} />}
               {view === "risk" && <QrmView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
