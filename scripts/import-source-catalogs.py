@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Nạp 5 tab danh mục nguồn + tab sản phẩm GMP từ Google Sheet vào Supabase.
+Nạp TOÀN BỘ tab của Google Sheet vào Supabase.
+
+  · 5 tab danh mục  -> vmp_source_objects (canonical, đã khử trùng)
+  · DM TDQTSX       -> vmp_products_gmp
+  · mọi tab còn lại -> vmp_source_rows (thô, giữ nguyên vẹn)
 
     python3 scripts/import-source-catalogs.py            # nạp thật
     python3 scripts/import-source-catalogs.py --dry-run  # chỉ in SQL, không chạy
@@ -181,8 +185,29 @@ def build_sql(wb):
     parts.extend(seen.values())
     n_prod = len(seen)
 
+    # ---- MỌI TAB CÒN LẠI: đẩy thô để Supabase giữ đủ dữ liệu của workbook.
+    #      Gồm: Giao việc · 0.Rule timeline VMP · Rule VMP state · Danh_sach_Email
+    #           · CanhBao · Mail_Log_Index · Mail_Log · 6.Timeline VMP
+    #      6.Timeline VMP đã có bản canonical ở vmp_plan_items; đẩy thêm bản thô
+    #      để đối chiếu khi cần, không ảnh hưởng gì.
+    done = {t for t, *_ in SOURCES} | {PRODUCT_TAB}
+    n_other_tabs = 0
+    for ws in wb.worksheets:
+        if ws.title in done:
+            continue
+        _, rows = read_tab(wb, ws.title)
+        if not rows:
+            skipped.append(f"{ws.title}: tab rỗng, không có dòng nào")
+            continue
+        n_other_tabs += 1
+        for rn, rec in rows:
+            parts.append(
+                f"INSERT INTO public.vmp_source_rows (source_tab,row_number,payload) "
+                f"VALUES ({q(ws.title)},{rn},{qjson({k: nfc(v) for k, v in rec.items()})});")
+            n_raw += 1
+
     parts.append("COMMIT;")
-    return "\n".join(parts), n_raw, n_obj, n_prod, skipped
+    return "\n".join(parts), n_raw, n_obj, n_prod, skipped, n_other_tabs
 
 
 def main():
@@ -197,10 +222,11 @@ def main():
     urllib.request.urlretrieve(XLSX_URL, xlsx)
     wb = openpyxl.load_workbook(xlsx, data_only=True)
 
-    sql, n_raw, n_obj, n_prod, skipped = build_sql(wb)
+    sql, n_raw, n_obj, n_prod, skipped, n_other = build_sql(wb)
     print(f"  dòng thô          : {n_raw}")
     print(f"  đối tượng canonical: {n_obj}")
     print(f"  sản phẩm GMP      : {n_prod}")
+    print(f"  tab khác đẩy thô  : {n_other}")
     for s in skipped:
         print(f"  bỏ qua: {s}")
 
