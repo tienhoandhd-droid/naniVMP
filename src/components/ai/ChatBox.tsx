@@ -19,15 +19,64 @@ import { MessageCircle, X, Send, Sparkles, AlertTriangle } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import type { AppUser } from "../../types/domain.ts";
 
-interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string; goiY?: string[]; canhBao?: string }
+interface TrichDan { nguon: string; muc?: string }
+interface Msg {
+  ai: boolean; text: string; loi?: boolean; nguon?: string;
+  goiY?: string[]; canhBao?: string; trichDan?: TrichDan[]; lop?: number;
+}
 
-/** Câu hỏi mồi — người mới không biết hỏi gì thì bấm thẳng. */
+/** Câu hỏi mồi chung — dùng khi không biết người dùng đang ở màn nào. */
 const GOI_Y = [
   "Ta là ai?",
   "Còn bao nhiêu hạng mục quá hạn?",
   "Liệt kê hạng mục sắp đến hạn 30 ngày",
   "Vì sao LAF cân được 9 điểm trọng yếu?",
 ];
+
+/* Câu hỏi mồi THEO MÀN ĐANG XEM.
+ *
+ * Bốn câu chung ở trên đúng cho người mới, nhưng người đang đứng ở màn
+ * Cảnh báo thì đầu họ đang nghĩ về chuyện trễ hạn, không nghĩ về "ta là
+ * ai". Gợi ý bám theo màn khiến ô chat trở thành thứ nối tiếp việc đang
+ * làm, thay vì một cái hộp phải nghĩ từ đầu mới dùng được. */
+const GOI_Y_THEO_TRANG: Record<string, string[]> = {
+  overview:  ["Tháng này có gì đáng lo nhất?",
+              "Tỷ lệ hoàn thành đang là bao nhiêu?",
+              "Bộ phận nào đang đuối nhất?"],
+  timeline:  ["Khu vực nào đang chậm nhất?",
+              "Nhóm công việc nào còn nhiều việc chưa bắt đầu?",
+              "Quy tắc tính deadline đề cương là gì?"],
+  alerts:    ["Ba hạng mục quá hạn nặng nhất là gì?",
+              "Cái nào quá hạn mà điểm trọng yếu từ 7 trở lên?",
+              "Tuần này còn gì gấp không?"],
+  progress:  ["Hôm nay nên làm gì trước?",
+              "Hạng mục nào sắp đến hạn trong 30 ngày?",
+              "Sửa tiến độ ở đâu thì đúng quy trình?"],
+  inventory: ["Thiết bị này thuộc nhóm công việc nào?",
+              "Đối tượng nào còn nhiều hạng mục dở nhất?",
+              "IQ với OQ khác nhau ở chỗ nào?"],
+  source:    ["Mã thiết bị đặt theo quy tắc gì?",
+              "Dòng nào thì được sinh timeline?",
+              "Nhập thiếu deadline thì hệ xử lý ra sao?"],
+  workload:  ["Ai đang phụ trách nhiều hạng mục nhất?",
+              "Việc có đang dồn lệch vào vài người không?",
+              "Bộ phận nào cần chia lại việc?"],
+  reports:   ["Tóm tắt tình hình cho cuộc họp tuần",
+              "So với đầu năm thì đã đi được bao xa?",
+              "Chuẩn bị thanh tra thì cần soi những gì?"],
+  rules:     ["Quy tắc tính deadline đề cương là gì?",
+              "Điểm trọng yếu chấm thế nào?",
+              "Annex 15 yêu cầu gì về đề cương?"],
+  health:    ["Vì sao những hạng mục này bị coi là thiếu dữ liệu?",
+              "Thiếu deadline thì có tính là quá hạn không?",
+              "Nên bổ sung gì trước cho nhanh?"],
+  audit:     ["Audit trail đang ghi lại những gì?",
+              "Thanh tra hay bắt lỗi ở chỗ nào?",
+              "Sửa dữ liệu có phải ghi lý do không?"],
+  admin:     ["Hệ thống đang chạy có ổn không?",
+              "Dữ liệu cập nhật lần cuối lúc nào?",
+              "Có việc nền nào đang treo không?"],
+};
 
 /* Lời chờ đổi dần theo thời gian đợi.
  *
@@ -43,7 +92,7 @@ const LOI_CHO: Array<{ tu: number; text: string }> = [
   { tu: 18000, text: "Hôm nay cung đông khách, công chúa đang chờ tới lượt…" },
 ];
 
-export default function ChatBox({ user }: { user?: AppUser | null }) {
+export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?: string }) {
   const [mo, setMo] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
@@ -133,6 +182,13 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
       }
       setMsgs((m) => [...m, { ai: true, nguon: data.nguon, text: noiDung,
         canhBao: data.canh_bao || undefined,
+        lop: typeof data.lop === "number" ? data.lop : undefined,
+        // Tài liệu mà lớp tìm kiếm lai lấy về cho câu này. Hiện ra thành
+        // chip riêng thay vì bắt Vali chú nguồn giữa câu — chú giữa câu
+        // đọc rất thô, mà trong hồ sơ GMP thì vẫn phải truy được nguồn.
+        trichDan: Array.isArray(data.trich_dan)
+          ? (data.trich_dan as TrichDan[]).filter((t) => t?.nguon).slice(0, 4)
+          : undefined,
         goiY: Array.isArray(data.goi_y) ? data.goi_y.slice(0, 3) : undefined }]);
     } catch (e) {
       setMsgs((m) => [...m, { ai: true, loi: true,
@@ -208,7 +264,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
               tắc tính hạn, bổn cung tra cho.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 3 }}>
-              {GOI_Y.map((g) => (
+              {(GOI_Y_THEO_TRANG[trang || ""] ?? GOI_Y).map((g) => (
                 <button key={g} onClick={() => hoi(g)} className="vmp-lift"
                   style={{ textAlign: "left", padding: "10px 12px", borderRadius: R.md,
                            border: `1px solid ${C.line}`, background: C.surface,
@@ -240,6 +296,24 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
                             fontSize: 11.5, lineHeight: 1.55, fontWeight: 600 }}>
                 <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
                 {m.canhBao} Ngươi đối chiếu lại trên bảng cho chắc.
+              </div>
+            )}
+            {m.trichDan && m.trichDan.length > 0 && (
+              <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap",
+                            gap: 5, alignItems: "center" }}>
+                <span style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700 }}>
+                  Tài liệu bổn cung giở:
+                </span>
+                {m.trichDan.map((t, k) => (
+                  <span key={k} title={t.nguon + (t.muc ? " › " + t.muc : "")}
+                    style={{ fontSize: 10.5, padding: "3px 8px", borderRadius: R.pill,
+                             background: C.surfaceSunk, border: `1px solid ${C.line}`,
+                             color: C.plumSoft, fontWeight: 600, maxWidth: 190,
+                             overflow: "hidden", textOverflow: "ellipsis",
+                             whiteSpace: "nowrap" }}>
+                    {t.muc || t.nguon.replace(/^docs\//, "")}
+                  </span>
+                ))}
               </div>
             )}
             {m.goiY && m.goiY.length > 0 && (

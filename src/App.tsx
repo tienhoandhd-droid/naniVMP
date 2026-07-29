@@ -2167,7 +2167,10 @@ export default function App() {
             </div>
 
             {/* Trợ lý hỏi đáp — nổi ở góc, không chiếm chỗ của bảng dữ liệu */}
-            <Suspense fallback={null}><ChatBox user={user} /></Suspense>
+            {/* Truyền màn đang xem xuống để Vali gợi ý câu hỏi bám đúng chỗ
+                người dùng đang đứng — hỏi ở trang Cảnh báo khác hẳn hỏi ở
+                trang Tổng quan. */}
+            <Suspense fallback={null}><ChatBox user={user} trang={view} /></Suspense>
           </div>
         </div>
       </main>
