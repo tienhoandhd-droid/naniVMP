@@ -3,12 +3,16 @@
  *  Card, Tag, Modal, Donut, KpiCard, Sparkle, Skeleton, etc.
  * ===================================================================== */
 import { useId } from "react";
-import { C, TEXT, NUM, GRAD, cardDefault, cardStrong, cardSoft, glass, btnPrimary, FIELD, LBL, INP } from "../../constants/theme.ts";
+import type { CSSProperties, ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { C, TEXT, NUM, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
 import { XCircle } from "lucide-react";
 
 // ======================== SPARKLE ========================
-export function Sparkle({ size = 18, color = C.gold, style }) {
+export function Sparkle({ size = 18, color = C.gold, style }: {
+  size?: number; color?: string; style?: CSSProperties;
+}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={style}>
       <path d="M12 0 C13 7 17 11 24 12 C17 13 13 17 12 24 C11 17 7 13 0 12 C7 11 11 7 12 0 Z" fill={color} />
@@ -19,7 +23,7 @@ export function Sparkle({ size = 18, color = C.gold, style }) {
 // ======================== MASCOT (refined) ========================
 // Công chúa Vali — phiên bản tinh tế hơn. Dùng gradient, manga eyes, crown có jewels.
 // Vẫn là SVG (không phải anime PNG), nhưng đẹp hơn cartoon cũ đáng kể.
-export function Mascot({ mood = "happy", size = 140 }) {
+export function Mascot({ mood = "happy", size = 140 }: { mood?: string; size?: number }) {
   // Unique id cho gradient để tránh xung đột khi render nhiều mascot
   const uid = useId().replace(/:/g, "");
   // Palette tinh tế
@@ -259,10 +263,21 @@ export function Mascot({ mood = "happy", size = 140 }) {
 // ======================== PRINCESS COMMENTARY ========================
 // Card hiển thị công chúa Vali + nhận xét động dựa trên data thẩm định.
 // Props: stats = { e:{done,over,todo,rate}, d:{done,total,rate}, overdue, soon, mismatched }
-export function PrincessCommentary({ stats }) {
-  const { e, d, overdue, soon, mismatched } = stats || {};
+/** Số liệu tổng hợp mà PrincessCommentary cần để chọn lời nhận xét. */
+export interface CommentaryStats {
+  /** Hạng mục: done/over/todo/rate. */
+  e?: { done?: number; over?: number; todo?: number; rate?: number };
+  /** Hồ sơ: done/total/rate. */
+  d?: { done?: number; total?: number; rate?: number };
+  /** Nhận cả số đếm sẵn lẫn mảng — tuỳ nơi gọi. */
+  overdue?: number | unknown[];
+  soon?: number | unknown[];
+  mismatched?: number | unknown[];
+}
+
+export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
+  const { e, overdue, soon, mismatched } = stats || {};
   const erate = e?.rate ?? 0;
-  const eOver = e?.over ?? 0;
   const eTodo = e?.todo ?? 0;
   const oCount = typeof overdue === "number" ? overdue : (overdue?.length ?? 0);
   const sCount = typeof soon === "number" ? soon : (soon?.length ?? 0);
@@ -382,7 +397,8 @@ export function PrincessCommentary({ stats }) {
         {/* Remarks list */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
           {remarks.map((r, i) => {
-            const t = toneColor[r.tone] || toneColor.info;
+            const t = (toneColor as Record<string, { c: string; bg: string; icon: string }>)[r.tone]
+                      || toneColor.info;
             return (
               <div
                 key={i}
@@ -445,7 +461,9 @@ export function PrincessCommentary({ stats }) {
 }
 
 
-export function Card({ children, style, variant = "default", cls = "" }) {
+export function Card({ children, style, variant = "default", cls = "" }: {
+  children?: ReactNode; style?: CSSProperties; variant?: string; cls?: string;
+}) {
   const base = variant === "strong" ? cardStrong : variant === "soft" ? cardSoft : cardDefault;
   return (
     <div className={`card fade ${cls}`} style={{ ...base, padding: 24, ...style }}>
@@ -454,7 +472,9 @@ export function Card({ children, style, variant = "default", cls = "" }) {
   );
 }
 
-export function CardTitle({ icon: Icon, children, sub }) {
+export function CardTitle({ icon: Icon, children, sub }: {
+  icon?: LucideIcon; children?: ReactNode; sub?: ReactNode;
+}) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
       {Icon && (
@@ -471,7 +491,9 @@ export function CardTitle({ icon: Icon, children, sub }) {
 }
 
 // ======================== TAG ========================
-export function Tag({ color, bg, children, style: extra }) {
+export function Tag({ color, bg, children, style: extra }: {
+  color?: string; bg?: string; children?: ReactNode; style?: CSSProperties;
+}) {
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
@@ -485,7 +507,10 @@ export function Tag({ color, bg, children, style: extra }) {
 }
 
 // ======================== MODAL ========================
-export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }) {
+export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: {
+  onClose: () => void; title?: ReactNode; icon?: LucideIcon;
+  children?: ReactNode; wide?: boolean;
+}) {
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, zIndex: 999,
@@ -520,7 +545,10 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }) 
 }
 
 // ======================== DONUT ========================
-export function Donut({ segments, size = 152, stroke = 18 }) {
+export function Donut({ segments, size = 152, stroke = 18 }: {
+  segments: Array<{ value: number; color: string; label?: string }>;
+  size?: number; stroke?: number;
+}) {
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
   const r = (size - stroke) / 2, circ = 2 * Math.PI * r;
   let acc = 0;
@@ -549,7 +577,10 @@ export function Donut({ segments, size = 152, stroke = 18 }) {
 }
 
 // ======================== KPI CARD ========================
-export function KpiCard({ emoji, bg, color, value, label, sub, subColor }) {
+export function KpiCard({ emoji, bg, color, value, label, sub, subColor }: {
+  emoji?: ReactNode; bg?: string; color?: string; value?: ReactNode;
+  label?: ReactNode; sub?: ReactNode; subColor?: string;
+}) {
   return (
     <Card style={{ textAlign: "center", padding: "22px 18px" }}>
       <div style={{
@@ -569,7 +600,12 @@ export function KpiCard({ emoji, bg, color, value, label, sub, subColor }) {
 }
 
 // ======================== SELECT ========================
-export function Sel({ val, set, opts }) {
+export function Sel({ val, set, opts }: {
+  val: string;
+  set: (v: string) => void;
+  /** v = giá trị, l = nhãn hiển thị. */
+  opts: Array<{ v: string; l: string }>;
+}) {
   return (
     <select value={val} onChange={(e) => set(e.target.value)} style={{
       padding: "8px 13px", borderRadius: 12, border: `1.5px solid ${C.pinkSoft}`,
@@ -582,7 +618,9 @@ export function Sel({ val, set, opts }) {
 }
 
 // ======================== SKELETON ========================
-export function SkeletonPulse({ w = "100%", h = 16, r = 8 }) {
+export function SkeletonPulse({ w = "100%", h = 16, r = 8 }: {
+  w?: number | string; h?: number | string; r?: number;
+}) {
   return (
     <div style={{
       width: w, height: h, borderRadius: r,
@@ -619,7 +657,11 @@ export function SkeletonDashboard() {
 }
 
 // ======================== SYNC STATUS BANNER ========================
-export function SyncBanner({ conn, lastSync, dataUpdatedAt }) {
+export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
+  conn: { status?: string; [k: string]: unknown };
+  lastSync?: number | string | null;
+  dataUpdatedAt?: string | null;
+}) {
   // S2-5/S3-5: cảnh báo dữ liệu CŨ theo TUỔI DỮ LIỆU (updated_at), không phải giờ fetch.
   const ageMs = dataUpdatedAt ? (Date.now() - new Date(dataUpdatedAt).getTime()) : null;
   const stale = ageMs != null && ageMs > 6 * 3600 * 1000;
@@ -648,7 +690,7 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }) {
         </span>
       ) : lastSync && (
         <span style={{ marginLeft: "auto", fontWeight: 600, opacity: 0.8 }}>
-          Đồng bộ cuối: {lastSync.toLocaleTimeString("vi-VN")}
+          Đồng bộ cuối: {new Date(lastSync).toLocaleTimeString("vi-VN")}
         </span>
       )}
     </div>
@@ -656,8 +698,8 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }) {
 }
 
 // ======================== PILL (status badge) ========================
-export function Pill({ s, small }) {
-  const m = STATUS[s] || STATUS.plan;
+export function Pill({ s, small }: { s: string; small?: boolean }) {
+  const m = (STATUS as Record<string, typeof STATUS.plan>)[s] || STATUS.plan;
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 6,
@@ -674,7 +716,7 @@ export function Pill({ s, small }) {
 // ======================== STATE BADGE (item_state nghiệp vụ) ========================
 // S3-G FIX: hiển thị item_state (not_applicable / cancelled) rõ ràng để user
 // không nhập tiến độ cho mã đã hủy. Trả về null nếu state='active'.
-export function StateBadge({ state, small }) {
+export function StateBadge({ state, small }: { state?: string; small?: boolean }) {
   if (!state || state === "active") return null;
   const m = state === "not_applicable"
     ? { label: "Không áp dụng", text: "#6B4DB3", bg: "#EDE5FA" }
@@ -696,7 +738,11 @@ export function StateBadge({ state, small }) {
 }
 
 // ======================== CHART TOOLTIP ========================
-export function ChartTip({ active, payload, label }) {
+export function ChartTip({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number | string; color?: string }>;
+  label?: ReactNode;
+}) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
@@ -717,7 +763,7 @@ export function ChartTip({ active, payload, label }) {
 }
 
 // ======================== PHASE TAG ========================
-export function phaseTag(txt) {
+export function phaseTag(txt: string) {
   const s = String(txt == null ? "" : txt).trim();
   const lc = s.toLowerCase();
   const neg = /\b(chưa|chua|không|khong)\b/.test(lc) || /^\s*(chưa|chua|không|khong)/.test(lc) || /not[_\s-]?started/.test(lc);
@@ -734,7 +780,7 @@ export function phaseTag(txt) {
 }
 
 // ======================== RO FIELD (read-only) ========================
-export function ROField({ label, value }) {
+export function ROField({ label, value }: { label: ReactNode; value: ReactNode }) {
   const isEmpty = value === null || value === undefined
     || String(value).trim() === "" || String(value).trim() === "—";
   return (
@@ -758,11 +804,13 @@ export function ROField({ label, value }) {
 // Giữ tên export "CrownLogo" để không cần đổi import nơi khác.
 const VQ_NAVY = "#1E3A8A";
 const VQ_RED  = "#E63946";
-const VQ_GOLD = "#D4AF6A";
+// const VQ_GOLD = "#D4AF6A";
 
 // Vương miện line-art tối giản — sang trọng, "The Guardian Princess".
 // Không phải hoạt hình; chỉ là dấu hiệu thương hiệu nhẹ nhàng.
-export function CrownLineArt({ size = 56, color = "#fff", opacity = 0.92, strokeWidth = 1.4 }) {
+export function CrownLineArt({ size = 56, color = "#fff", opacity = 0.92, strokeWidth = 1.4 }: {
+  size?: number; color?: string; opacity?: number; strokeWidth?: number;
+}) {
   return (
     <svg
       width={size}
@@ -797,7 +845,9 @@ export function CrownLineArt({ size = 56, color = "#fff", opacity = 0.92, stroke
 
 // Watermark pattern dùng làm nền — vương miện + ngôi sao + lục giác.
 // Opacity rất thấp (0.04–0.06) để tạo chiều sâu, không phá layout.
-export function BrandWatermark({ color = "#fff", opacity = 0.05 }) {
+export function BrandWatermark({ color = "#fff", opacity = 0.05 }: {
+  color?: string; opacity?: number;
+}) {
   return (
     <svg
       style={{
@@ -897,7 +947,9 @@ export function GuardianSilhouette({
 }
 
 
-export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor }) {
+export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor }: {
+  size?: number; navy?: string; red?: string; teamColor?: string;
+}) {
   // size = chiều cao chữ V/Q (px). "team" sẽ scale theo.
   const teamSize = Math.round(size * 0.42);
   const teamClr = teamColor || navy;
