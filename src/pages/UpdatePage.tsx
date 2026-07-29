@@ -133,7 +133,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }: {
 
 export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true }: {
   acts: PlanActivity[];
-  conn?: { status?: string; [k: string]: unknown };
+  conn?: { status?: string; msg?: string; [k: string]: unknown };
   isAdmin?: boolean;
   onUpdate?: (
     id: string,

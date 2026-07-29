@@ -111,8 +111,8 @@ export interface Activity {
   freq?: number;
   /** Phân loại báo cáo rút gọn, dùng tra số ngày báo cáo. */
   dep?: string;
-  /** Cờ lệch dữ liệu giữa các cột trạng thái. */
-  mismatch?: boolean;
+/** Mã lệch dữ liệu giữa các cột trạng thái, vd "val_done_doc_pending". */
+  mismatch?: string | null;
   /** Trạng thái suy ra tại thời điểm đọc. */
   st: ActivityStatus;
   target?: string | null;    // mốc đích đang theo dõi

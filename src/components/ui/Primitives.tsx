@@ -663,7 +663,8 @@ export function SkeletonDashboard() {
 
 // ======================== SYNC STATUS BANNER ========================
 export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
-  conn: { status?: string; [k: string]: unknown };
+  /** Không dùng index signature để nhận được cả ConnState (status là union). */
+  conn: { status?: string; msg?: string };
   lastSync?: number | string | null;
   dataUpdatedAt?: string | null;
 }) {
