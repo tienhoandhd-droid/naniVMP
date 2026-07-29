@@ -1,27 +1,29 @@
 # Tài liệu bàn giao hệ thống VMP Monitor
 
-_Cập nhật: 2026-07-23. Dành cho người tiếp nhận nghiên cứu/vận hành tiếp._
+_Cập nhật: 2026-07-29. Dành cho người tiếp nhận nghiên cứu/vận hành tiếp._
 
 ## 0. Bàn giao gọn — 3 bước
 
 1. **Quyền:** người bàn giao mời người nhận vào 4 chỗ: GitHub repo này, Supabase project `ivembmikfhtyzhtqebgh`, n8n `n8n.cpc1hn.com`, Google Sheet `6.Timeline VMP` (Editor + xem Apps Script).
 2. **Bí mật:** chuyển đúng **1 gói** qua kênh an toàn (password manager / tin nhắn tự hủy): nội dung `.env` + `.env.local` (mẫu: `.env.example`, `.env.local.example`) và token webhook `x-vmp-sync-token` mới (đặt trong n8n Header Auth + Script Properties của Apps Script, khóa `VMP_SYNC_TOKEN`).
-3. **Người nhận tự nghiệm thu:** clone repo → điền 2 file env → chạy `bash scripts/handover-check.sh` (kiểm tra npm, env, kết nối Supabase, tải CSV Sheet, n8n sống — in ✅/❌ kèm cách sửa) → `npm install && npm run dev`. 5/5 ✅ là bàn giao xong phần kỹ thuật; còn lại đọc tài liệu này.
+3. **Người nhận tự nghiệm thu:** clone repo → điền 2 file env → chạy `bash scripts/handover-check.sh` (kiểm tra npm, env, kết nối Supabase, tải CSV Sheet, n8n sống — in ✅/❌ kèm cách sửa) → `npm install && npm run dev`. 7/7 ✅ là bàn giao xong phần kỹ thuật; còn lại đọc tài liệu này.
 
 Chi tiết từng phần ở các mục dưới.
 
 ## 1. Kiến trúc tổng thể
 
+**Từ 2026-07-29 chiều dữ liệu đã ĐẢO:** Supabase là nơi lưu dữ liệu chính, web là nơi nhập liệu, Google Sheet chỉ còn là bản tham chiếu/sao lưu.
+
 ```
-Google Sheet "6.Timeline VMP"
-        │  (Apps Script gọi webhook instant + Schedule 5 phút fallback)
-        ▼
-n8n WF-04 (n8n.cpc1hn.com) — tải CSV thô → parse → rpc_apply_sheet_sync
-        ▼
-Supabase (project ivembmikfhtyzhtqebgh) — read model, RPC dashboard
-        ▼
-Frontend React/Vite (repo này) — ưu tiên đọc Supabase, fallback webhook n8n
+Web (React/Vite, GitHub Pages)  ── nhập/sửa/xoá qua RPC ──▶  ┌──────────────┐
+                                                              │              │
+Google Sheet ──(nhập lại khi cần, Vani VMP 3 chạy tay)─────▶  │   SUPABASE   │
+                                                              │ dữ liệu chính│
+n8n Vani VMP 1 (cảnh báo) ◀── đọc rpc_due_alerts ──────────── │              │
+                                                              └──────────────┘
 ```
+
+Kiến trúc CŨ (Sheet là nguồn chuẩn, sync 5 phút Sheet → Supabase) đã ngừng: nhánh sync của `Vani VMP 3` tắt có chủ đích, vì snapshot-replace sẽ xoá đè dữ liệu nhập từ web.
 
 Chi tiết kiến trúc: `docs/architecture-2026-07.md`, hợp đồng dữ liệu: `docs/data-contract.md`.
 
