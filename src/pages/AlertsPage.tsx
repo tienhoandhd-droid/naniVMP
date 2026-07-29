@@ -11,14 +11,14 @@
  * ma trận và danh sách không thể chấm khác nhau.
  */
 import { useMemo, useState } from "react";
-import { AlertCircle, CalendarClock, Filter, ShieldAlert, Download, Search, ListFilter } from "lucide-react";
+import { AlertCircle, CalendarClock, Filter, ShieldAlert, Download, Search, ListFilter, ChevronRight } from "lucide-react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
-import { CLS, CRIT, DEPTS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
+import { CLS, CRIT, DEPTS, DEP_DAYS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
 import {
-  parseD, fmtVN, daysBetween, addMonths, txt,
+  parseD, fmtVN, daysBetween, addMonths, txt, milestones,
   qrmRpn, qrmLevel, byRisk,
 } from "../utils/helpers.ts";
-import { Card, CardTitle, Tag, KpiCard } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, KpiCard, Modal, Pill } from "../components/ui/Primitives.tsx";
 import { usePerformers } from "../hooks/index.ts";
 import QrmView from "./QrmPage.tsx";
 import type { Activity } from "../types/domain.ts";
@@ -64,6 +64,167 @@ const KIND_LABEL: Record<AlertRow["kind"], string> = {
   over: "Quá hạn", soon: "Tới hạn", requal: "Tái thẩm định", risk: "Rủi ro cao",
 };
 
+/* ================================================================
+ * CHI TIẾT MỘT CẢNH BÁO — timeline bốn mốc, chỉ rõ hạn sắp tới
+ * ----------------------------------------------------------------
+ * Danh sách chỉ nói được MỘT mốc gần nhất. Mở chi tiết ra mới thấy cả
+ * chuỗi Đề cương → Thẩm định → Báo cáo → Đích, mốc nào xong ngày nào,
+ * mốc nào đang trễ, và cái tiếp theo còn mấy ngày.
+ * ================================================================ */
+interface Mile {
+  label: string;
+  /** Hạn ghi trong kế hoạch (cột deadline_* của DB). */
+  plan: Date | null;
+  /** Hạn suy theo luật VMP từ mốc đích. */
+  rule: Date | null;
+  ruleNote: string;
+  actual: Date | null;
+  status: string;
+  done: boolean;
+}
+
+/** Nhãn trạng thái ưu tiên chữ gốc trong Sheet, không có thì dịch enum. */
+function phaseLabel(enumVal: unknown, sheetVal: unknown): string {
+  const s = String(sheetVal ?? "").trim();
+  if (s) return s;
+  const e = String(enumVal ?? "").trim();
+  if (e === "completed") return "Hoàn thành";
+  if (e === "in_progress") return "Đang thực hiện";
+  if (e === "not_started") return "Chưa thực hiện";
+  return e || "Chưa nhập";
+}
+
+function AlertDetailModal({ r, email, onClose }: {
+  r: AlertRow; email?: string | null; onClose: () => void;
+}) {
+  const a = r.a;
+  const raw = (a._raw || {}) as Record<string, unknown>;
+  const rule = milestones(a);
+  const dep = (DEP_DAYS as Record<string, number>)[String(a.dep ?? "")] ?? 2;
+  const isDone = (v: unknown) => String(v ?? "") === "completed";
+
+  const miles: Mile[] = [
+    { label: "1. Đề cương", plan: parseD(raw.dl_de_cuong), rule: rule.protocol, ruleNote: "T−60 ngày",
+      actual: parseD(raw.ngay_de_cuong), status: phaseLabel(raw.tt_de_cuong, raw.tt_de_cuong_goc), done: isDone(raw.tt_de_cuong) },
+    { label: "2. Thẩm định thực tế", plan: parseD(raw.dl_tham_dinh), rule: rule.validation, ruleNote: `T−${5 + dep} ngày`,
+      actual: parseD(raw.ngay_tham_dinh), status: phaseLabel(raw.tt_tham_dinh, raw.tt_tham_dinh_goc), done: isDone(raw.tt_tham_dinh) },
+    { label: "3. Báo cáo", plan: parseD(raw.dl_bao_cao), rule: rule.report, ruleNote: "T−5 ngày",
+      actual: parseD(raw.ngay_bao_cao), status: phaseLabel(raw.tt_bao_cao, raw.tt_bao_cao_goc), done: isDone(raw.tt_bao_cao) },
+    { label: "4. Đích VMP", plan: parseD(raw.dl_vmp) || parseD(a.target), rule: rule.target, ruleNote: "mốc đích T",
+      actual: parseD(raw.ngay_vmp), status: phaseLabel(raw.tt_vmp, raw.tt_vmp_goc), done: isDone(raw.tt_vmp) },
+  ];
+
+  // Hạn sắp tới = mốc đầu tiên chưa xong. Đó là cái người trực cần biết,
+  // không phải mốc gần nhất theo lịch (mốc đó có thể đã làm xong rồi).
+  const nextIdx = miles.findIndex((m) => !m.done && !m.actual);
+  const next = nextIdx >= 0 ? miles[nextIdx] : null;
+  const nextDate = next ? (next.plan || next.rule) : null;
+  const nextLeft = nextDate ? daysBetween(nextDate, vmpToday()) : null;
+
+  const rpn = qrmRpn(a);
+  const lv = LEVEL_STYLE[qrmLevel(rpn)];
+  const lich = parseD(raw.lich_td);
+
+  const Line = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div style={{ display: "flex", gap: 8, fontSize: 12, lineHeight: 1.6 }}>
+      <span style={{ color: C.plumSoft, fontWeight: 700, minWidth: 96 }}>{label}</span>
+      <span style={{ color: C.plum, fontWeight: 700 }}>{value}</span>
+    </div>
+  );
+
+  return (
+    <Modal onClose={onClose} wide icon={CalendarClock} title={`Chi tiết · ${a.id}`}>
+      {/* Đầu hộp: hạng mục là gì, ai làm, rủi ro bao nhiêu */}
+      <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 15px", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <Tag color={C.lavText} bg={C.surface}>{a.vtype}</Tag>
+          <span style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 15, color: C.plum }}>{a.name}</span>
+          <Pill s={a.st} small />
+        </div>
+        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
+          {a.code} · {txt(a.dept)} · người thực hiện <b style={{ color: C.plum }}>{txt(a.owner)}</b>
+          {email ? <> · <a href={`mailto:${email}`} style={{ color: C.lavText, fontWeight: 700 }}>{email}</a></> : ""}
+          {a.freq ? ` · chu kỳ ${a.freq} tháng` : ""}
+        </div>
+        <div style={{ display: "flex", gap: 7, marginTop: 8, flexWrap: "wrap" }}>
+          <Tag color={lv.text} bg={lv.soft}>RPN {rpn} · {lv.label}</Tag>
+          <Tag color={C.plumSoft} bg={C.surface}>{KIND_LABEL[r.kind]}</Tag>
+          {a.score != null && <Tag color={C.plumSoft} bg={C.surface}>Trọng yếu {String(a.score)}/9</Tag>}
+        </div>
+      </div>
+
+      {/* Hạn sắp tới — câu trả lời cho "phải làm gì tiếp" */}
+      <div style={{ borderRadius: 14, padding: "13px 15px", marginBottom: 16,
+                    background: nextLeft != null && nextLeft < 0 ? C.raspSoft : nextLeft != null && nextLeft <= SOON_DAYS ? C.marigoldSoft : C.mintSoft }}>
+        <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, marginBottom: 3 }}>HẠN SẮP TỚI</div>
+        {next && nextDate ? (
+          <div style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.plum }}>
+            {next.label.replace(/^\d+\.\s*/, "")} — {fmtVN(nextDate)}
+            <span style={{ marginLeft: 8, fontFamily: NUM, color: (nextLeft ?? 0) < 0 ? C.raspText : (nextLeft ?? 0) <= SOON_DAYS ? C.marigoldText : C.mintText }}>
+              {(nextLeft ?? 0) < 0 ? `trễ ${Math.abs(nextLeft ?? 0)} ngày` : `còn ${nextLeft} ngày`}
+            </span>
+          </div>
+        ) : (
+          <div style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.mintText }}>
+            Đã xong cả bốn mốc — không còn hạn nào chờ.
+          </div>
+        )}
+        {lich && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginTop: 4 }}>Lịch thẩm định bộ phận xếp: {fmtVN(lich)}</div>}
+        {/* Hạng mục đã xong thì mốc kế tiếp là LẦN SAU — dự báo theo tần suất */}
+        {r.kind === "requal" && r.date && (
+          <div style={{ fontSize: 12.5, color: C.plum, fontWeight: 700, marginTop: 4 }}>
+            Tái thẩm định dự kiến: <b>{fmtVN(r.date)}</b> ({r.dleft < 0 ? `quá ${Math.abs(r.dleft)} ngày` : `còn ${r.dleft} ngày`}) — chu kỳ {r.a.freq} tháng tính từ mốc đích lần này.
+          </div>
+        )}
+      </div>
+
+      {/* Timeline bốn mốc */}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {miles.map((m, i) => {
+          const d = m.plan || m.rule;
+          const left = d ? daysBetween(d, vmpToday()) : null;
+          const late = !m.done && !m.actual && left != null && left < 0;
+          const isNext = i === nextIdx;
+          const dot = m.done || m.actual ? C.mint : late ? C.rasp : isNext ? C.marigold : C.pinkSoft;
+          const dotText = m.done || m.actual ? C.mintText : late ? C.raspText : isNext ? C.marigoldText : C.plumSoft;
+          return (
+            <div key={m.label} style={{ display: "flex", gap: 12 }}>
+              {/* Cột chấm + đường nối */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 22 }}>
+                <div style={{ width: 15, height: 15, borderRadius: 999, background: dot, border: `2px solid ${C.surface}`, boxShadow: isNext ? `0 0 0 3px ${C.marigoldSoft}` : "none", marginTop: 4 }} />
+                {i < miles.length - 1 && <div style={{ flex: 1, width: 2, background: C.pinkSoft, minHeight: 26 }} />}
+              </div>
+              <div style={{ flex: 1, paddingBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: dotText }}>{m.label}</span>
+                  <Tag color={dotText} bg={C.surface}>{m.status}</Tag>
+                  {isNext && <Tag color={C.marigoldText} bg={C.marigoldSoft}>Kế tiếp</Tag>}
+                  {late && <Tag color={C.raspText} bg={C.raspSoft}>Trễ {Math.abs(left ?? 0)} ngày</Tag>}
+                </div>
+                <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 1 }}>
+                  <Line label="Hạn kế hoạch" value={m.plan ? fmtVN(m.plan) : <span style={{ color: C.plumSoft, fontWeight: 600 }}>không có trong kế hoạch</span>} />
+                  <Line label="Hạn theo luật" value={m.rule ? <>{fmtVN(m.rule)} <span style={{ color: C.plumSoft, fontWeight: 600 }}>({m.ruleNote})</span></> : "—"} />
+                  <Line label="Ngày thực tế" value={m.actual ? fmtVN(m.actual) : <span style={{ color: C.plumSoft, fontWeight: 600 }}>chưa có</span>} />
+                  {!m.actual && d && <Line label="Còn lại" value={
+                    <span style={{ color: (left ?? 0) < 0 ? C.raspText : (left ?? 0) <= SOON_DAYS ? C.marigoldText : C.mintText }}>
+                      {(left ?? 0) < 0 ? `trễ ${Math.abs(left ?? 0)} ngày` : `${left} ngày`}
+                    </span>} />}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.6, borderTop: `1px solid ${C.pinkSoft}`, paddingTop: 10 }}>
+        <b style={{ color: C.plum }}>Hạn theo luật</b> suy từ mốc đích VMP: đề cương T−60 · thẩm định T−(5+{dep}) ·
+        báo cáo T−5, trong đó {dep} ngày là theo phân loại báo cáo “{txt(a.dep)}”. Lệch giữa hạn kế hoạch và hạn
+        theo luật nghĩa là kế hoạch đang đặt khác quy tắc — kiểm lại trước khi lấy làm mốc.
+      </div>
+    </Modal>
+  );
+}
+
 export default function AlertsView({ acts }: { acts: Activity[] }) {
   const [tab, setTab] = useState<"list" | "matrix">("list");
   const [bucket, setBucket] = useState<AlertRow["kind"]>("over");
@@ -73,6 +234,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const [owner, setOwner] = useState("all");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("risk");
+  const [detail, setDetail] = useState<AlertRow | null>(null);
   // Email người thực hiện lấy từ tab "Người thực hiện" — thấy cảnh báo là
   // nhắc được ngay, khỏi mở danh bạ ở trang khác.
   const { find } = usePerformers();
@@ -177,7 +339,11 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     const edge = r.kind === "over" ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft
       : r.kind === "risk" ? C.raspSoft : C.pinkSoft;
     return (
-      <div className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: C.surface, border: `1px solid ${edge}` }}>
+      <div className="vmp-row vmp-lift" role="button" tabIndex={0}
+        onClick={() => setDetail(r)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(r); } }}
+        title="Bấm để xem timeline các mốc hạn"
+        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: C.surface, border: `1px solid ${edge}`, cursor: "pointer" }}>
         {/* Ô ngày — trễ thì đỏ, còn hạn thì cam/xanh theo nhóm */}
         <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: late ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft : C.skySoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 17, color: late ? C.raspText : r.kind === "soon" ? C.marigoldText : C.skyText, lineHeight: 1 }}>{Math.abs(r.dleft)}</span>
@@ -198,6 +364,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             {r.a.id} · Mốc <b style={{ color: late ? C.raspText : C.marigoldText }}>{r.stage}</b>
             {r.date ? ` · hạn ${fmtVN(r.date)}` : ""} · {txt(r.a.owner)}
             {email ? <> (<a href={`mailto:${email}?subject=${encodeURIComponent(`[VMP] ${KIND_LABEL[r.kind]}: ${r.a.id} — ${r.a.name}`)}`}
+              onClick={(e) => e.stopPropagation()}
               style={{ color: C.lavText, fontWeight: 700 }}>{email}</a>)</> : null}
             {r.a.dep ? ` · BC: ${r.a.dep}` : ""}
           </div>
@@ -206,6 +373,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
           <Tag color={lv.text} bg={lv.soft}>{lv.label}</Tag>
           <Tag color={C.plumSoft} bg={C.pinkMist}>{KIND_LABEL[r.kind]}</Tag>
         </div>
+        <ChevronRight size={18} color={C.plumSoft} style={{ flexShrink: 0 }} />
       </div>
     );
   };
@@ -319,6 +487,10 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             Mức: <b style={{ color: CRIT.Cao.text }}>cao ≥ 15</b> · <b style={{ color: CRIT.TB.text }}>trung bình 7–14</b> · <b style={{ color: CRIT["Thấp"].text }}>thấp ≤ 6</b>.
           </div>
         </>
+      )}
+
+      {detail && (
+        <AlertDetailModal r={detail} email={find(detail.a.owner)?.email} onClose={() => setDetail(null)} />
       )}
     </div>
   );
