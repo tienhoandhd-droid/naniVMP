@@ -19,7 +19,7 @@ import { MessageCircle, X, Send, Sparkles, AlertTriangle } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import type { AppUser } from "../../types/domain.ts";
 
-interface Msg { ai: boolean; text: string; loi?: boolean }
+interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string }
 
 /** Câu hỏi mồi — người mới không biết hỏi gì thì bấm thẳng. */
 const GOI_Y = [
@@ -79,7 +79,8 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
       if (!r.ok || !data?.ok) {
         throw new Error(data?.loi || `Máy chủ trả về ${r.status}`);
       }
-      setMsgs((m) => [...m, { ai: true, text: String(data.tra_loi || "(không có nội dung)") }]);
+      setMsgs((m) => [...m, { ai: true, nguon: data.nguon,
+        text: String(data.tra_loi || "(không có nội dung)") }]);
     } catch (e) {
       setMsgs((m) => [...m, { ai: true, loi: true,
         text: "Không hỏi được: " + ((e as Error).message || "lỗi không rõ") }]);
@@ -177,6 +178,14 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
               {m.loi && <AlertTriangle size={14} style={{ verticalAlign: -2, marginRight: 6 }} />}
               {m.text}
             </div>
+            {m.nguon && (
+              <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 4, paddingLeft: 3,
+                            fontWeight: 700 }}>
+                {m.nguon === "sql" ? "⚡ Trả lời thẳng từ database — không dùng AI"
+                  : m.nguon === "du_phong" ? "🔁 Gemini bận, đã chuyển sang mô hình dự phòng"
+                  : "✨ Gemini"}
+              </div>
+            )}
           </div>
         ))}
 
