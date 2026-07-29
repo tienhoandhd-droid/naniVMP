@@ -34,8 +34,8 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
     <aside className="vmp-sidebar" style={{
       width: collapsed ? 72 : 266, flexShrink: 0, height: "100%",
       display: "flex", flexDirection: "column",
-      background: `linear-gradient(180deg, #FFFFFF, ${C.pinkMist})`,
-      borderRight: `1.5px solid ${C.pinkSoft}`,
+      background: `linear-gradient(180deg, ${C.surface}, ${C.pinkMist})`,
+      borderRight: `1px solid ${C.line}`,
       padding: collapsed ? "26px 8px" : "26px 16px",
       position: "relative", overflow: "hidden",
       transition: "width .25s ease, padding .25s ease",

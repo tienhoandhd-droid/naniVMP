@@ -5,7 +5,7 @@
 import { useId, useRef, useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { C, TEXT, NUM, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
+import { C, TEXT, NUM, MO, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
 import { XCircle } from "lucide-react";
 
@@ -678,6 +678,122 @@ export function KpiCard({ emoji, bg, color, value, label, sub, subColor }: {
       <div style={{ fontSize: 13, fontWeight: 800, color: C.plum, marginTop: 6 }}>{label}</div>
       {sub && <div style={{ fontSize: 11, color: subColor || C.plumSoft, fontWeight: 700, marginTop: 3 }}>{sub}</div>}
     </Card>
+  );
+}
+
+
+/* =====================================================================
+ * Ô SỐ LIỆU BENTO
+ *
+ * Khác KpiCard cũ ở ba điểm, đều có lý do:
+ *   · con số căn trái chứ không căn giữa — mắt quét cột số nhanh hơn khi
+ *     chúng thẳng hàng bên trái
+ *   · dải màu mảnh bên trái thay cho khối tròn màu to — phân loại được
+ *     bằng mắt mà không át con số
+ *   · có chỗ cho một dải cột nhỏ, để ô vừa nói "bao nhiêu" vừa nói
+ *     "đang đi hướng nào"
+ * =================================================================== */
+export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, cls = "" }: {
+  icon?: LucideIcon;
+  value?: ReactNode;
+  label?: ReactNode;
+  sub?: ReactNode;
+  /** Màu nhấn — dùng cho dải bên trái, biểu tượng và con số. */
+  tone?: { c: string; bg: string };
+  /** Dải cột nhỏ 0..1, vd tỷ lệ hoàn thành từng tháng. */
+  bars?: number[];
+  onClick?: () => void;
+  cls?: string;
+}) {
+  const t = tone || { c: C.plum, bg: C.pinkSoft };
+  return (
+    <Card cls={`vmp-tile ${onClick ? "vmp-lift" : ""} ${cls}`}
+      style={{ padding: "17px 18px", display: "flex", flexDirection: "column",
+               justifyContent: "space-between", minHeight: 132,
+               ["--tile-accent" as string]: t.c }}>
+      <div onClick={onClick} role={onClick ? "button" : undefined}
+        style={{ display: "flex", flexDirection: "column", height: "100%",
+                 gap: 8, cursor: onClick ? "pointer" : "default" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {Icon && (
+            <span style={{ width: 26, height: 26, borderRadius: 9, background: t.bg,
+                           display: "flex", alignItems: "center", justifyContent: "center",
+                           flexShrink: 0 }}>
+              <Icon size={14} color={t.c} />
+            </span>
+          )}
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.plumSoft,
+                         fontFamily: TEXT }}>{label}</span>
+        </div>
+
+        <div style={{ fontFamily: NUM, fontSize: 34, fontWeight: 800, color: t.c,
+                      lineHeight: 1, letterSpacing: -0.5 }}>{value}</div>
+
+        {bars && bars.length > 0 && (
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 22,
+                        marginTop: "auto" }}>
+            {bars.map((b, i) => (
+              <div key={i} style={{
+                flex: 1, minWidth: 2, borderRadius: 2,
+                height: `${Math.max(8, Math.min(1, b) * 100)}%`,
+                background: t.c, opacity: 0.3 + Math.min(1, b) * 0.7,
+              }} />
+            ))}
+          </div>
+        )}
+
+        {sub && (
+          <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700,
+                        fontFamily: TEXT, marginTop: bars ? 0 : "auto" }}>{sub}</div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* =====================================================================
+ * VÒNG TIẾN ĐỘ
+ *
+ * Thay Donut cũ ở màn Tổng quan. Khác biệt thật: có chỗ đặt nội dung ở
+ * giữa (Donut cũ phải chồng absolute từ bên ngoài), đầu nét bo tròn, và
+ * vòng nền dùng màu bề mặt chìm nên chạy được cả chế độ tối.
+ * =================================================================== */
+export function Ring({ segments, size = 168, stroke = 15, children }: {
+  segments: Array<{ value: number; color: string }>;
+  size?: number; stroke?: number; children?: ReactNode;
+}) {
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  let acc = 0;
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ display: "block" }}>
+        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none"
+            stroke={C.surfaceSunk} strokeWidth={stroke} />
+          {segments.map((s, i) => {
+            const len = (s.value / total) * circ;
+            // Lát có giá trị > 0 luôn thấy được ~2px, không "biến mất"
+            const seg = s.value > 0 ? Math.max(len - 4, 2) : 0;
+            const el = (
+              <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none"
+                stroke={s.color} strokeWidth={stroke} strokeLinecap="round"
+                strokeDasharray={`${seg} ${circ - seg}`}
+                strokeDashoffset={-acc}
+                style={{ transition: `stroke-dasharray 900ms ${MO.ease}` }} />
+            );
+            acc += len;
+            return el;
+          })}
+        </g>
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex",
+                    flexDirection: "column", alignItems: "center",
+                    justifyContent: "center", textAlign: "center" }}>
+        {children}
+      </div>
+    </div>
   );
 }
 
