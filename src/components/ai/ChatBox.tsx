@@ -1,5 +1,5 @@
 /* =====================================================================
- *  ChatBox.tsx — Trợ lý hỏi đáp VMP (nổi ở góc phải dưới)
+ *  ChatBox.tsx — Trò chuyện cùng công chúa Vali (nổi ở góc phải dưới)
  *  ---------------------------------------------------------------------
  *  Gọi webhook n8n "Vani VMP 4". Bên đó là AI Agent chạy Gemini với hai
  *  công cụ Postgres:
@@ -23,10 +23,10 @@ interface Msg { ai: boolean; text: string; loi?: boolean; nguon?: string }
 
 /** Câu hỏi mồi — người mới không biết hỏi gì thì bấm thẳng. */
 const GOI_Y = [
-  "Còn bao nhiêu hạng mục quá hạn, nặng nhất là những cái nào?",
-  "Nhóm điểm trọng yếu 7–9 đang làm tới đâu rồi?",
-  "Ai đang gánh nhiều việc nhất và bao nhiêu hạng mục?",
-  "Deadline đề cương và báo cáo được tính theo quy tắc nào?",
+  "Còn bao nhiêu hạng mục quá hạn?",
+  "Tỷ lệ hoàn thành theo người phụ trách",
+  "Liệt kê hạng mục sắp đến hạn 30 ngày",
+  "Vì sao LAF cân được 9 điểm trọng yếu?",
 ];
 
 export default function ChatBox({ user }: { user?: AppUser | null }) {
@@ -91,7 +91,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
   /* -------------------------------------------------------------- */
   if (!mo) {
     return (
-      <button onClick={() => setMo(true)} title="Hỏi trợ lý VMP"
+      <button onClick={() => setMo(true)} title="Trò chuyện cùng công chúa Vali"
         style={{
           position: "fixed", right: 22, bottom: 22, zIndex: 90,
           width: 56, height: 56, borderRadius: R.pill, border: "none",
@@ -129,9 +129,11 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
           <Sparkles size={16} color="#fff" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum }}>Trợ lý VMP</div>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum }}>
+            Công chúa Vali
+          </div>
           <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>
-            Số liệu đọc thẳng từ database · không đoán
+            Số liệu đọc thẳng từ database · em không đoán đâu ạ
           </div>
         </div>
         <button onClick={() => setMo(false)} title="Đóng"
@@ -148,8 +150,9 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
         {msgs.length === 0 && (
           <>
             <div style={{ fontSize: 12.5, color: C.plumSoft, lineHeight: 1.65 }}>
-              Hỏi bất cứ điều gì về timeline VMP — tiến độ, người phụ trách,
-              điểm trọng yếu, hoặc quy tắc tính hạn.
+              Dạ em chào ạ 🌸 Em là Vali. Anh/chị cứ hỏi em bất cứ điều gì về
+              timeline VMP nhé — tiến độ, người phụ trách, điểm trọng yếu, hay
+              quy tắc tính hạn, em tra giúp ạ.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 3 }}>
               {GOI_Y.map((g) => (
@@ -181,8 +184,9 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
             {m.nguon && (
               <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 4, paddingLeft: 3,
                             fontWeight: 700 }}>
-                {m.nguon === "sql" ? "⚡ Trả lời thẳng từ database — không dùng AI"
-                  : m.nguon === "du_phong" ? "🔁 Gemini bận, đã chuyển sang mô hình dự phòng"
+                {m.nguon === "sql" ? "⚡ Em tra thẳng từ database — không tốn AI"
+                  : m.nguon === "dem" ? "💾 Câu này em đã tra rồi, dữ liệu chưa đổi nên dùng lại"
+                  : m.nguon === "du_phong" ? "🔁 Gemini bận, em nhờ mô hình dự phòng ạ"
                   : "✨ Gemini"}
               </div>
             )}
@@ -214,7 +218,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
               // Enter gửi, Shift+Enter xuống dòng — quy ước quen thuộc
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); hoi(q); }
             }}
-            placeholder="Hỏi về timeline VMP…"
+            placeholder="Anh/chị muốn hỏi Vali điều gì ạ…"
             style={{ flex: 1, resize: "none", maxHeight: 110, padding: "10px 12px",
                      borderRadius: R.md, border: `1px solid ${C.line}`,
                      background: C.surfaceSunk, color: C.plum, fontFamily: TEXT,
@@ -230,7 +234,7 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
         </div>
         <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 7, lineHeight: 1.5 }}>
           Câu hỏi và câu trả lời được ghi nhật ký theo yêu cầu ALCOA+.
-          Trợ lý có thể nhầm — số liệu quan trọng hãy đối chiếu lại trên bảng.
+          Em vẫn có thể nhầm ạ — số liệu quan trọng anh/chị đối chiếu lại trên bảng giúp em nhé.
         </div>
       </div>
     </div>
