@@ -363,7 +363,10 @@ export default function CatalogView({ objects = [], acts = [] }: {
       </div>
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        Google Sheet là <b style={{ color: C.mintText }}>nguồn dữ liệu chuẩn duy nhất</b>. Form Cập nhật / Thêm đối tượng đã <b>sinh sẵn payload đúng cột Sheet</b> — đường ghi ngược sẽ được nối về sau (hiện chưa kích hoạt ghi).
+        <b style={{ color: C.mintText }}>Supabase là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).
+        Màn này gộp theo mã đối tượng để xem tiến độ; muốn thêm / sửa / xoá đối tượng thì
+        vào <b>Danh mục &amp; Nhập liệu</b>, muốn sửa ngày và trạng thái thì vào
+        <b> Cập nhật tiến độ</b>. Google Sheet nay chỉ là bản tham chiếu chỉ đọc.
       </div>
 
       {edit && <UpdateModal act={edit} onClose={() => setEdit(null)} />}

@@ -87,7 +87,7 @@ export default function AdminMissingView({ isAdmin, onReload, readOnly = true }:
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <Card>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <CardTitle icon={ShieldAlert} sub="Các hạng mục có mã nhưng KHÔNG còn trong Google Sheet — cần QA xác nhận.">
+          <CardTitle icon={ShieldAlert} sub="Hạng mục do lần đồng bộ Sheet cuối đánh dấu là đã mất — cần QA xác nhận trước khi bỏ.">
             Mã đã mất khỏi Sheet
           </CardTitle>
           <button onClick={load} style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 10, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -134,7 +134,7 @@ export default function AdminMissingView({ isAdmin, onReload, readOnly = true }:
                     {it.missing_since ? new Date(it.missing_since).toLocaleString("vi-VN") : "—"}
                   </td>
                   <td style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
-                    {readOnly ? <Tag color={C.lavText} bg={C.lavSoft}>Xử lý trên Google Sheet</Tag> : <>
+                    {readOnly ? <Tag color={C.lavText} bg={C.lavSoft}>Chỉ admin xử lý được</Tag> : <>
                       <button onClick={() => resolve(it.validation_code, "keep_active")}
                         style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: "#fff", color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
                         ✓ Giữ active
@@ -153,7 +153,7 @@ export default function AdminMissingView({ isAdmin, onReload, readOnly = true }:
       </Card>
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        💡 Google Sheet là nguồn chuẩn. Nếu mã xuất hiện ở đây, hãy sửa hoặc khôi phục trực tiếp trên Sheet; snapshot kế tiếp sẽ cập nhật Supabase.
+        💡 Danh sách này là di sản của thời Sheet còn ghi đè Supabase (đã dừng 29/07/2026). Supabase nay là nơi lưu dữ liệu gốc nên không có mã nào bị mất thêm — xác nhận nốt các mã cũ ở đây rồi mục này sẽ trống.
       </div>
     </div>
   );
