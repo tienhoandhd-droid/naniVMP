@@ -19,7 +19,7 @@
  *  Quyền: chỉ admin / qa_manager sửa được (RPC tự chặn phía server; ở đây
  *  chỉ ẩn nút cho gọn giao diện, không phải lớp bảo mật).
  * ===================================================================== */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Boxes, RefreshCw, Plus, Pencil, Ban, Trash2, Search, AlertTriangle,
          CalendarPlus, Bell, Users, FlaskConical, Table2, Columns3, Download } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
@@ -483,13 +483,15 @@ function SourceCatalogSection({ user, onReload }: {
                           setMenu((m) => m?.key === f.key ? null
                             : { key: f.key, x: b.left, y: b.bottom + 4 });
                         }}
-                        style={{ marginLeft: 6, padding: "1px 5px", borderRadius: 6,
-                                 cursor: "pointer", fontSize: 10.5, lineHeight: 1.5,
-                                 fontFamily: TEXT, verticalAlign: "middle",
-                                 border: `1px solid ${fil ? C.pinkText : C.pinkSoft}`,
+                        style={{ marginLeft: 7, minWidth: 30, height: 26, padding: "0 8px",
+                                 borderRadius: 8, cursor: "pointer", fontSize: 13,
+                                 fontWeight: 700, lineHeight: 1, fontFamily: TEXT,
+                                 verticalAlign: "middle",
+                                 border: `1.5px solid ${fil ? C.pinkText : C.pinkSoft}`,
                                  background: fil ? C.pinkText : "#fff",
-                                 color: fil ? "#fff" : C.plumSoft }}>
-                        {fil ? `▾ ${fil}` : "▾"}
+                                 color: fil ? "#fff" : C.plumSoft,
+                                 boxShadow: fil ? "0 1px 5px rgba(194,73,122,.35)" : "none" }}>
+                        {fil ? `▼ ${fil}` : "▼"}
                       </button>
                     </th>
                   );
@@ -631,15 +633,22 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
 }) {
   const [find, setFind] = useState("");
 
-  // Neo theo toạ độ lúc bấm, nên cuộn/đổi cỡ là toạ độ sai — đóng lại
-  // thay vì để bảng chọn trôi lơ lửng giữa màn hình.
+  const box = useRef<HTMLDivElement | null>(null);
+
+  // Neo theo toạ độ lúc bấm, nên cuộn TRANG/BẢNG là toạ độ sai — đóng lại.
+  // Nhưng cuộn BÊN TRONG danh sách thì không được đóng, nếu không thì
+  // không lăn chuột xem hết giá trị được.
   useEffect(() => {
+    const onScroll = (e: Event) => {
+      if (box.current?.contains(e.target as Node)) return;
+      onClose();
+    };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onClose);
     window.addEventListener("keydown", esc);
     return () => {
-      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onClose);
       window.removeEventListener("keydown", esc);
     };
@@ -659,10 +668,10 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70 }} />
-      <div style={{
+      <div ref={box} onWheel={(e) => e.stopPropagation()} style={{
         position: "fixed", zIndex: 71,
-        left: Math.min(x, window.innerWidth - 286), top: y,
-        width: 274, maxHeight: "min(400px, 70vh)",
+        left: Math.min(x, window.innerWidth - 310), top: y,
+        width: 298, maxHeight: "min(460px, 74vh)",
         display: "flex", flexDirection: "column",
         background: "#fff", borderRadius: 14, fontFamily: TEXT,
         border: `1px solid ${C.pinkSoft}`, boxShadow: "0 12px 34px rgba(90,50,90,.20)",
@@ -683,7 +692,7 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
 
         <label style={{ ...rowStyle, fontWeight: 700, color: C.plum,
                         borderBottom: `1px solid ${C.pinkMist}` }}>
-          <input type="checkbox" checked={allShown}
+          <input type="checkbox" checked={allShown} style={tickStyle}
             onChange={() => {
               if (find.trim()) {
                 // Đang tìm: chỉ bật/tắt đúng những dòng đang hiện.
@@ -701,7 +710,8 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
         <div style={{ overflowY: "auto", flex: 1 }}>
           {shown.map((o) => (
             <label key={o.value} style={rowStyle}>
-              <input type="checkbox" checked={has(o.value)} onChange={() => toggle(o.value)} />
+              <input type="checkbox" checked={has(o.value)} style={tickStyle}
+                onChange={() => toggle(o.value)} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                              color: o.value ? C.plumSoft : C.plumSoft,
                              fontStyle: o.value ? "normal" : "italic" }}>
@@ -734,13 +744,16 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
 }
 
 const miniBtn: React.CSSProperties = {
-  padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontSize: 11.5,
+  padding: "6px 11px", borderRadius: 8, cursor: "pointer", fontSize: 12,
   fontFamily: TEXT, border: `1px solid ${C.pinkSoft}`, background: "#fff", color: C.plum,
 };
 
+/** Ô tick to hơn mặc định của trình duyệt — bấm bằng chuột đỡ trượt. */
+const tickStyle: React.CSSProperties = { width: 16, height: 16, flex: "0 0 auto", cursor: "pointer" };
+
 const rowStyle: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 8, padding: "6px 12px",
-  fontSize: 12, cursor: "pointer", color: C.plumSoft,
+  display: "flex", alignItems: "center", gap: 9, padding: "8px 12px",
+  fontSize: 12.5, cursor: "pointer", color: C.plumSoft,
 };
 
 /* ----------------------------------------------------------------
