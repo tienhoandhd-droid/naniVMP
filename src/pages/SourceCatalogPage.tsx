@@ -21,9 +21,9 @@
  * ===================================================================== */
 import { useState, useEffect, useMemo } from "react";
 import { Boxes, RefreshCw, Plus, Pencil, Ban, Trash2, Search, AlertTriangle,
-         CalendarPlus, Bell, Users, FlaskConical, Table2 } from "lucide-react";
-import { C, TEXT, btnPrimary } from "../constants/theme.ts";
-import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.tsx";
+         CalendarPlus, Bell, Users, FlaskConical, Table2, Columns3, Download } from "lucide-react";
+import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
+import { Card, CardTitle, Tag, Modal, TableScroll } from "../components/ui/Primitives.tsx";
 import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
   generateTimeline, fetchSourceWarnings,
@@ -39,6 +39,14 @@ import type { SourceWarnings } from "../lib/supabaseData.ts";
 /* Cột hiển thị + siêu dữ liệu cho form.
    `hint` giải thích ảnh hưởng tới luật sinh timeline — đây là phần người
    nhập liệu hay sai nhất, nên để ngay cạnh ô nhập. */
+/** Cột hiện mặc định — 19 cột cùng lúc là quá rộng để đọc trên màn hình.
+ *  Người dùng bật thêm cột nào cần qua nút "Cột hiển thị". */
+const DEFAULT_COLS = new Set([
+  "object_code", "object_name", "department", "area_code",
+  "validate_flag", "first_month", "frequency_months",
+  "owner_name", "criticality_score",
+]);
+
 const FIELDS = [
   { key: "object_code",      label: "Mã đối tượng",        w: 130, required: true, lockOnEdit: true },
   { key: "object_name",      label: "Tên đối tượng",       w: 240 },
@@ -88,6 +96,20 @@ function SourceCatalogSection({ user, onReload }: {
   const [saving, setSaving] = useState(false);
   const [gen, setGen] = useState<GenState | null>(null);   // hộp thoại sinh timeline
   const [warn, setWarn] = useState<SourceWarnings | null>(null);
+  const [visible, setVisible] = useState<Set<string>>(() => new Set(DEFAULT_COLS));
+  const [colPicker, setColPicker] = useState(false);
+  /** Sắp xếp: null = giữ thứ tự gốc. Bấm tiêu đề để đổi tăng → giảm → bỏ. */
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  /** Dòng đang chọn, để thao tác hàng loạt — đây là cách xử lý nhanh
+   *  hàng trăm đối tượng mà không phải mở từng hộp thoại. */
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  /** Ô đang sửa tại chỗ: nhấn đúp để mở, Enter lưu, Esc huỷ, Tab sang phải. */
+  const [cell, setCell] = useState<{ id: string; key: string; value: string } | null>(null);
+  const [bulk, setBulk] = useState(false);
+  // Cột mã đối tượng luôn hiện — nó là cột ghim, ẩn đi thì mất mốc dò dòng.
+  const shownFields = useMemo(
+    () => FIELDS.filter((f) => f.key === "object_code" || visible.has(f.key)),
+    [visible]);
 
   const load = async () => {
     setLoading(true); setErr("");
@@ -112,6 +134,72 @@ function SourceCatalogSection({ user, onReload }: {
     return rows.filter((r) =>
       FIELDS.some((f) => String((r as Record<string, unknown>)[f.key] ?? "").toLowerCase().includes(s)));
   }, [rows, q]);
+
+  /** Sắp xếp: số so theo số, còn lại so chuỗi có dấu tiếng Việt. */
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const f = FIELDS.find((x) => x.key === sort.key);
+    const sign = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const va = (a as Record<string, unknown>)[sort.key];
+      const vb = (b as Record<string, unknown>)[sort.key];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;            // ô trống luôn xuống cuối
+      if (vb == null) return -1;
+      if (f?.num) return sign * (Number(va) - Number(vb));
+      return sign * String(va).localeCompare(String(vb), "vi", { numeric: true });
+    });
+  }, [filtered, sort]);
+
+  const toggleSort = (key: string) => setSort((p) =>
+    !p || p.key !== key ? { key, dir: "asc" }
+      : p.dir === "asc" ? { key, dir: "desc" }
+      : null);
+
+  /** Lưu một ô sau khi sửa tại chỗ. */
+  const saveCell = async () => {
+    if (!cell) return;
+    const row = rows.find((r) => r.id === cell.id);
+    const f = FIELDS.find((x) => x.key === cell.key);
+    setCell(null);
+    if (!row || !f) return;
+    const before = String((row as Record<string, unknown>)[cell.key] ?? "");
+    if (before === cell.value) return;                 // không đổi thì không gọi server
+    try {
+      await upsertSourceObject(kind, row.object_code,
+        { [cell.key]: f.num ? Number(cell.value) : cell.value });
+      await load();
+    } catch (e) { alert("Lỗi lưu: " + ((e as Error).message || "không rõ")); }
+  };
+
+  /** Gán cùng một giá trị cho mọi dòng đang chọn. */
+  const applyBulk = async (key: string, value: string) => {
+    const f = FIELDS.find((x) => x.key === key);
+    const targets = sorted.filter((r) => picked.has(r.id));
+    if (!targets.length) return;
+    if (!window.confirm(`Đặt "${f?.label}" = "${value}" cho ${targets.length} đối tượng đang chọn?`)) return;
+    setSaving(true);
+    try {
+      for (const r of targets) {
+        await upsertSourceObject(kind, r.object_code,
+          { [key]: f?.num ? Number(value) : value });
+      }
+      setPicked(new Set());
+      setBulk(false);
+      await load();
+    } catch (e) { alert("Lỗi: " + ((e as Error).message || "không rõ")); }
+    setSaving(false);
+  };
+
+  /** Xuất đúng phần đang xem (đã lọc, đã sắp, đúng cột đang hiện). */
+  const exportXlsx = async () => {
+    const XLSX = await import("xlsx");
+    const data = sorted.map((r) => Object.fromEntries(
+      shownFields.map((f) => [f.label, (r as Record<string, unknown>)[f.key] ?? ""])));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), kind.slice(0, 28));
+    XLSX.writeFile(wb, `VMP_${kind}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
 
   // Đối tượng có thẩm định nhưng thiếu tháng đầu tiên => timeline sẽ hỏng mốc
   const broken = useMemo(
@@ -186,11 +274,60 @@ function SourceCatalogSection({ user, onReload }: {
           <button onClick={load} style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
             <RefreshCw size={15} /> Tải lại
           </button>
+          <button onClick={exportXlsx}
+            style={{ ...btnPrimary, background: "#fff", color: C.plum,
+                     border: `1.5px solid ${C.pinkSoft}` }}>
+            <Download size={15} /> Xuất Excel
+          </button>
           {canEdit && (
             <button onClick={() => setEditing({})} style={btnPrimary}>
               <Plus size={15} /> Thêm đối tượng
             </button>
           )}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setColPicker((v) => !v)}
+              style={{ ...btnPrimary, background: "#fff", color: C.plum,
+                       border: `1.5px solid ${C.pinkSoft}` }}>
+              <Columns3 size={15} /> Cột hiển thị ({shownFields.length}/{FIELDS.length})
+            </button>
+            {colPicker && (
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 20,
+                            background: "#fff", border: `1.5px solid ${C.pinkSoft}`,
+                            borderRadius: 14, padding: 12, minWidth: 250,
+                            maxHeight: 340, overflowY: "auto",
+                            boxShadow: "0 12px 34px rgba(238,123,169,.22)" }}
+                   className="vmp-scroll">
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <button onClick={() => setVisible(new Set(FIELDS.map((f) => f.key)))}
+                    style={{ ...btnPrimary, padding: "5px 10px", fontSize: 11.5,
+                             background: "#fff", color: C.plum,
+                             border: `1.5px solid ${C.pinkSoft}` }}>Chọn tất cả</button>
+                  <button onClick={() => setVisible(new Set(DEFAULT_COLS))}
+                    style={{ ...btnPrimary, padding: "5px 10px", fontSize: 11.5,
+                             background: "#fff", color: C.plum,
+                             border: `1.5px solid ${C.pinkSoft}` }}>Mặc định</button>
+                </div>
+                {FIELDS.map((f) => {
+                  const locked = f.key === "object_code";
+                  return (
+                    <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 8,
+                                                padding: "5px 2px", fontSize: 12.5,
+                                                fontFamily: TEXT, color: locked ? C.plumSoft : C.plum,
+                                                cursor: locked ? "not-allowed" : "pointer" }}>
+                      <input type="checkbox" disabled={locked}
+                        checked={locked || visible.has(f.key)}
+                        onChange={(e) => setVisible((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(f.key); else next.delete(f.key);
+                          return next;
+                        })} />
+                      {f.label}{locked ? " (luôn hiện)" : ""}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           {canEdit && (
             <button onClick={() => setGen({ year: new Date().getFullYear(), preview: null })}
               style={{ ...btnPrimary, background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
@@ -200,10 +337,34 @@ function SourceCatalogSection({ user, onReload }: {
         </div>
 
         <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontFamily: TEXT }}>
-          {loading ? "Đang tải…" : `${filtered.length} / ${rows.length} đối tượng`}
+          {loading ? "Đang tải…" : `${sorted.length} / ${rows.length} đối tượng`}
           {" · "}
-          {rows.filter((r) => r.validate_flag === "y").length} đối tượng có thẩm định
+          {rows.filter((r) => r.validate_flag === "y").length} có thẩm định
+          {sort ? ` · sắp theo "${FIELDS.find((f) => f.key === sort.key)?.label}" ${sort.dir === "asc" ? "tăng" : "giảm"}` : ""}
+          {canEdit && <span> · <b>nhấn đúp vào ô để sửa tại chỗ</b></span>}
         </div>
+
+        {/* Thanh thao tác hàng loạt — hiện khi có dòng được chọn */}
+        {canEdit && picked.size > 0 && (
+          <div style={{ marginTop: 10, padding: "10px 13px", borderRadius: 12,
+                        background: C.lavSoft, color: C.lavText, fontFamily: TEXT,
+                        fontSize: 12.5, display: "flex", gap: 10,
+                        alignItems: "center", flexWrap: "wrap" }}>
+            <b>{picked.size} đối tượng đang chọn</b>
+            <button onClick={() => setBulk(true)}
+              style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }}>
+              Đặt giá trị hàng loạt
+            </button>
+            <button onClick={() => setPicked(new Set())}
+              style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12,
+                       background: "#fff", color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
+              Bỏ chọn
+            </button>
+            <span style={{ opacity: 0.85 }}>
+              Dùng để gán nhanh QA phụ trách, tần suất, tháng đầu tiên… cho nhiều đối tượng một lúc.
+            </span>
+          </div>
+        )}
 
         {err && (
           <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: C.raspSoft, color: C.raspText, fontSize: 13 }}>
@@ -239,39 +400,97 @@ function SourceCatalogSection({ user, onReload }: {
 
       {/* Bảng */}
       <Card>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
+        <TableScroll>
+          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
             <thead>
               <tr>
-                {FIELDS.map((f) => (
-                  <th key={f.key} title={f.hint || undefined}
-                    style={{
-                      textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                      borderBottom: `1.5px solid ${C.pinkSoft}`, color: C.plum,
-                      fontWeight: 800, minWidth: f.w,
-                      cursor: f.hint ? "help" : "default",
-                    }}>
-                    {f.label}{f.hint ? " ⓘ" : ""}
+                {canEdit && (
+                  <th className="vmp-col-check" style={{ padding: "9px 6px" }}>
+                    <input type="checkbox"
+                      checked={sorted.length > 0 && picked.size === sorted.length}
+                      onChange={(e) => setPicked(e.target.checked
+                        ? new Set(sorted.map((r) => r.id)) : new Set())} />
                   </th>
-                ))}
-                {canEdit && <th style={{ padding: "9px 8px", borderBottom: `1.5px solid ${C.pinkSoft}` }} />}
+                )}
+                {shownFields.map((f, i) => {
+                  const on = sort?.key === f.key;
+                  return (
+                    <th key={f.key} title={f.hint || "Bấm để sắp xếp"}
+                      onClick={() => toggleSort(f.key)}
+                      className={i === 0 ? (canEdit ? "vmp-col-pin2" : "vmp-col-pin") : undefined}
+                      style={{
+                        textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
+                        color: on ? C.pinkText : C.plum, fontWeight: 800, minWidth: f.w,
+                        cursor: "pointer", userSelect: "none",
+                      }}>
+                      {f.label}
+                      <span style={{ opacity: on ? 1 : 0.25, marginLeft: 4 }}>
+                        {on ? (sort!.dir === "asc" ? "▲" : "▼") : "↕"}
+                      </span>
+                      {f.hint ? " ⓘ" : ""}
+                    </th>
+                  );
+                })}
+                {canEdit && <th style={{ padding: "9px 8px" }} />}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
-                  {FIELDS.map((f) => (
-                    <td key={f.key} style={{ padding: "8px", whiteSpace: "nowrap", color: C.plumSoft }}>
-                      {(() => { const rec = r as Record<string, unknown>; return f.key === "validate_flag"
-                        ? <Tag color={r.validate_flag === "y" ? C.mintText : C.plumSoft}
-                               bg={r.validate_flag === "y" ? C.mintSoft : C.pinkMist}>
-                            {r.validate_flag || "—"}
-                          </Tag>
-                        : f.key === "first_month" && r.validate_flag === "y" && r.first_month == null
-                          ? <span style={{ color: C.raspText, fontWeight: 700 }}>thiếu</span>
-                          : (rec[f.key] as React.ReactNode ?? "—"); })()}
+              {sorted.map((r) => (
+                <tr key={r.id} style={{ borderBottom: `1px solid ${C.pinkMist}`,
+                                        background: picked.has(r.id) ? C.lavSoft : undefined }}>
+                  {canEdit && (
+                    <td className="vmp-col-check"
+                      style={{ padding: "8px 6px", background: picked.has(r.id) ? C.lavSoft : undefined }}>
+                      <input type="checkbox" checked={picked.has(r.id)}
+                        onChange={(e) => setPicked((prev) => {
+                          const n = new Set(prev);
+                          if (e.target.checked) n.add(r.id); else n.delete(r.id);
+                          return n;
+                        })} />
                     </td>
-                  ))}
+                  )}
+                  {shownFields.map((f, i) => {
+                    const rec = r as Record<string, unknown>;
+                    const here = cell?.id === r.id && cell.key === f.key;
+                    const score = Number(rec.criticality_score);
+                    return (
+                    <td key={f.key} className={i === 0 ? (canEdit ? "vmp-col-pin2" : "vmp-col-pin") : undefined}
+                      onDoubleClick={() => {
+                        if (!canEdit || f.lockOnEdit) return;
+                        setCell({ id: r.id, key: f.key, value: String(rec[f.key] ?? "") });
+                      }}
+                      title={canEdit && !f.lockOnEdit ? "Nhấn đúp để sửa tại chỗ" : undefined}
+                      style={{ padding: here ? "2px 4px" : "8px", whiteSpace: "nowrap",
+                               color: i === 0 ? C.plum : C.plumSoft,
+                               fontWeight: i === 0 ? 700 : 400,
+                               background: i === 0 && picked.has(r.id) ? C.lavSoft : undefined }}>
+                      {here ? (
+                        <input autoFocus value={cell.value}
+                          onChange={(e) => setCell({ ...cell, value: e.target.value })}
+                          onBlur={saveCell}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); saveCell(); }
+                            if (e.key === "Escape") setCell(null);
+                          }}
+                          inputMode={f.num ? "numeric" : undefined}
+                          style={{ width: Math.max(80, (f.w ?? 120) - 12), padding: "5px 7px",
+                                   borderRadius: 8, fontFamily: TEXT, fontSize: 12.5,
+                                   border: `1.5px solid ${C.pink}`, outline: "none" }} />
+                      ) : f.key === "validate_flag" ? (
+                        <Tag color={r.validate_flag === "y" ? C.mintText : C.plumSoft}
+                             bg={r.validate_flag === "y" ? C.mintSoft : C.pinkMist}>
+                          {r.validate_flag || "—"}
+                        </Tag>
+                      ) : f.key === "criticality_score" && rec[f.key] != null ? (
+                        <Tag color={score >= 7 ? C.raspText : score >= 4 ? C.marigoldText : C.mintText}
+                             bg={score >= 7 ? C.raspSoft : score >= 4 ? C.marigoldSoft : C.mintSoft}>
+                          {String(rec[f.key])}
+                        </Tag>
+                      ) : f.key === "first_month" && r.validate_flag === "y" && r.first_month == null ? (
+                        <span style={{ color: C.raspText, fontWeight: 700 }}>thiếu</span>
+                      ) : (rec[f.key] as React.ReactNode ?? "—")}
+                    </td>
+                  );})}
                   {canEdit && (
                     <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
                       <button onClick={() => setEditing(r)} title="Sửa"
@@ -287,14 +506,14 @@ function SourceCatalogSection({ user, onReload }: {
                 </tr>
               ))}
               {!loading && filtered.length === 0 && (
-                <tr><td colSpan={FIELDS.length + 1}
+                <tr><td colSpan={shownFields.length + 2}
                   style={{ padding: 20, textAlign: "center", color: C.plumSoft }}>
                   Không có đối tượng nào.
                 </td></tr>
               )}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
 
       {editing && (
@@ -305,6 +524,71 @@ function SourceCatalogSection({ user, onReload }: {
         <GenerateModal state={gen} setState={setGen}
           onClose={() => setGen(null)} onDone={onReload} />
       )}
+      {bulk && (
+        <BulkModal count={picked.size} saving={saving}
+          onClose={() => setBulk(false)} onApply={applyBulk} />
+      )}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * Điền hàng loạt — gán một giá trị cho mọi dòng đang chọn.
+ * Chỉ cho chọn cột sửa được (bỏ mã đối tượng và các cột khoá).
+ * -------------------------------------------------------------- */
+function BulkModal({ count, saving, onClose, onApply }: {
+  count: number; saving: boolean;
+  onClose: () => void;
+  onApply: (key: string, value: string) => void | Promise<void>;
+}) {
+  const cols = FIELDS.filter((f) => !f.lockOnEdit);
+  const [key, setKey] = useState(cols[0]?.key ?? "");
+  const [value, setValue] = useState("");
+  const f = cols.find((x) => x.key === key);
+
+  return (
+    <div onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(60,40,60,.32)",
+               display: "grid", placeItems: "center", zIndex: 60, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 18, padding: 20, width: "min(460px,96vw)",
+                 border: `1px solid ${C.pinkMist}`, fontFamily: TEXT }}>
+        <div style={{ fontFamily: NUM, fontSize: 18, fontWeight: 800, color: C.plum, marginBottom: 4 }}>
+          Điền hàng loạt
+        </div>
+        <div style={{ fontSize: 12.5, color: C.plumSoft, marginBottom: 14 }}>
+          Áp dụng cho <b>{count}</b> đối tượng đang chọn.
+        </div>
+
+        <label style={{ fontSize: 12, color: C.plumSoft }}>Cột</label>
+        <select value={key} onChange={(e) => { setKey(e.target.value); setValue(""); }}
+          style={{ width: "100%", padding: "9px 10px", borderRadius: 10, marginBottom: 12,
+                   border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 13 }}>
+          {cols.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+        </select>
+
+        <label style={{ fontSize: 12, color: C.plumSoft }}>Giá trị</label>
+        <input value={value} onChange={(e) => setValue(e.target.value)}
+          inputMode={f?.num ? "numeric" : undefined}
+          placeholder={f?.num ? "số" : "để trống = xoá nội dung"}
+          style={{ width: "100%", padding: "9px 10px", borderRadius: 10, marginBottom: 18,
+                   border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 13 }} />
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button onClick={onClose} disabled={saving}
+            style={{ padding: "8px 14px", borderRadius: 10, cursor: "pointer",
+                     border: `1px solid ${C.pink}`, background: "#fff",
+                     color: C.plum, fontFamily: TEXT, fontSize: 13 }}>
+            Huỷ
+          </button>
+          <button onClick={() => onApply(key, value)} disabled={saving || !key}
+            style={{ padding: "8px 14px", borderRadius: 10, border: "none",
+                     cursor: saving ? "wait" : "pointer", background: C.plum,
+                     color: "#fff", fontFamily: TEXT, fontSize: 13, fontWeight: 600 }}>
+            {saving ? "Đang lưu…" : "Áp dụng"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -654,26 +938,28 @@ function SimpleDatasetView({ spec, canEdit }: { spec: DatasetSpec; canEdit: bool
       </Card>
 
       <Card>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
+        <TableScroll>
+          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
             <thead>
               <tr>
-                {spec.fields.map((f) => (
+                {spec.fields.map((f, i) => (
                   <th key={f.key} title={f.hint || undefined}
+                    className={i === 0 ? "vmp-col-pin" : undefined}
                     style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                             borderBottom: `1.5px solid ${C.pinkSoft}`, color: C.plum,
-                             fontWeight: 800, minWidth: f.w, cursor: f.hint ? "help" : "default" }}>
+                             color: C.plum, fontWeight: 800, minWidth: f.w,
+                             cursor: f.hint ? "help" : "default" }}>
                     {f.label}{f.hint ? " ⓘ" : ""}
                   </th>
                 ))}
-                {canEdit && <th style={{ padding: "9px 8px", borderBottom: `1.5px solid ${C.pinkSoft}` }} />}
+                {canEdit && <th style={{ padding: "9px 8px" }} />}
               </tr>
             </thead>
             <tbody>
               {filtered.map((r, i) => (
                 <tr key={String(r[spec.keyField] ?? i)} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
-                  {spec.fields.map((f) => (
-                    <td key={f.key} style={{ padding: "8px", whiteSpace: "nowrap", color: C.plumSoft }}>
+                  {spec.fields.map((f, ci) => (
+                    <td key={f.key} className={ci === 0 ? "vmp-col-pin" : undefined}
+                      style={{ padding: "8px", whiteSpace: "nowrap", color: C.plumSoft }}>
                       {f.bool
                         ? <Tag color={r[f.key] ? C.mintText : C.plumSoft}
                                bg={r[f.key] ? C.mintSoft : C.pinkMist}>{r[f.key] ? "có" : "không"}</Tag>
@@ -700,7 +986,7 @@ function SimpleDatasetView({ spec, canEdit }: { spec: DatasetSpec; canEdit: bool
               )}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
 
       {editing && (
@@ -937,26 +1223,25 @@ function RawTabsView({ canEdit }: { canEdit: boolean }) {
       </Card>
 
       <Card>
-        <div style={{ overflowX: "auto", maxHeight: "62vh" }} className="vmp-scroll">
-          <table style={{ borderCollapse: "collapse", fontFamily: TEXT, fontSize: 12.5 }}>
+        <TableScroll>
+          <table style={{ fontFamily: TEXT, fontSize: 12.5 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                             borderBottom: `1.5px solid ${C.pinkSoft}`, color: C.plumSoft,
-                             fontWeight: 800, position: "sticky", left: 0, background: "#fff" }}>#</th>
+                <th className="vmp-col-pin"
+                    style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
+                             color: C.plumSoft, fontWeight: 800 }}>#</th>
                 {cols.map((c) => (
                   <th key={c} style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                                       borderBottom: `1.5px solid ${C.pinkSoft}`, color: C.plum,
-                                       fontWeight: 800, minWidth: 130 }}>{c}</th>
+                                       color: C.plum, fontWeight: 800, minWidth: 130 }}>{c}</th>
                 ))}
-                {canEdit && <th style={{ padding: "9px 8px", borderBottom: `1.5px solid ${C.pinkSoft}` }} />}
+                {canEdit && <th style={{ padding: "9px 8px" }} />}
               </tr>
             </thead>
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.id} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
-                  <td style={{ padding: "8px", color: C.plumSoft, fontWeight: 700,
-                               position: "sticky", left: 0, background: "#fff" }}>{r.row_number}</td>
+                  <td className="vmp-col-pin"
+                      style={{ padding: "8px", color: C.plumSoft, fontWeight: 700 }}>{r.row_number}</td>
                   {cols.map((c) => (
                     <td key={c} style={{ padding: "8px", color: C.plumSoft,
                                          maxWidth: 320, overflow: "hidden",
@@ -985,7 +1270,7 @@ function RawTabsView({ canEdit }: { canEdit: boolean }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
 
       {editing && (
