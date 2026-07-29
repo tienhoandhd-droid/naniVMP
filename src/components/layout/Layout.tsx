@@ -25,6 +25,7 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
 
   const groups = [
     { id: "monitor", label: "GIÁM SÁT" },
+    { id: "work", label: "THỰC HIỆN" },
     { id: "analysis", label: "PHÂN TÍCH" },
     ...(isAdmin ? [{ id: "admin", label: "QUẢN TRỊ" }] : []),
   ];

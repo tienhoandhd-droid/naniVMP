@@ -34,7 +34,7 @@ import {
   XCircle,
   Plus,
   Printer,
-  Crown,
+
   Radar,
   Cloud,
   FileText,
@@ -45,7 +45,7 @@ import {
 // ===== Internal modules (refactored) =====
 import { C, TEXT, NUM, GRAD, btnPrimary, INP, glass } from "./constants/theme.ts";
 import {
-  PROG,
+
   DEPTS,
   DEPT_CODE,
   PERM_LABEL,
@@ -557,6 +557,43 @@ function ChangePwModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ===================== Data Quality Page (NEW) ===================== */
+/* ----------------------------------------------------------------
+ * Sức khoẻ dữ liệu — gộp hai màn trước đây tách rời:
+ *   · "Data quality" kiểm tra TRÊN BẢN ĐANG XEM ở trình duyệt
+ *   · "Kiểm tra máy chủ" chạy kiểm tra THẲNG Ở SUPABASE
+ * Hai màn cùng trả lời một câu hỏi ("dữ liệu có sạch không") nên tách ra
+ * chỉ khiến người dùng phải tự nhớ cái nào đang xem cái gì. Gộp lại,
+ * ghi rõ cái nào chạy ở đâu — chênh nhau giữa hai tab chính là tín hiệu
+ * bản trên máy đã cũ.
+ * -------------------------------------------------------------- */
+function HealthView({ acts, user }: { acts: Activity[]; user?: AppUser | null }) {
+  const [tab, setTab] = useState<"client" | "server">("client");
+  const tabs = [
+    { id: "client" as const, label: "Lỗi trên bản đang xem", sub: "chạy ở trình duyệt" },
+    { id: "server" as const, label: "Kiểm tra tại Supabase", sub: "chạy ở máy chủ" },
+  ];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+        {tabs.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            style={{ padding: "9px 16px", borderRadius: 12, cursor: "pointer",
+                     fontFamily: TEXT, fontSize: 13, fontWeight: tab === t.id ? 800 : 600,
+                     border: `1.5px solid ${tab === t.id ? C.pink : C.pinkSoft}`,
+                     background: tab === t.id ? C.pinkSoft : "#fff",
+                     color: tab === t.id ? C.pinkText : C.plumSoft, textAlign: "left" }}>
+            {t.label}
+            <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, opacity: .75 }}>
+              {t.sub}
+            </span>
+          </button>
+        ))}
+      </div>
+      {tab === "client" ? <DataQualityView acts={acts} /> : <ServerChecksView user={user} />}
+    </div>
+  );
+}
+
 function DataQualityView({ acts }: { acts: Activity[] }) {
   const issues = useMemo(() => runDataQualityChecks(acts), [acts]);
   /** Một vấn đề chất lượng dữ liệu, từ bảng data_quality_issues hoặc kiểm tra tại client. */
@@ -945,58 +982,6 @@ function AdminView({ conn, user }: {
  */
 
 /* --- Individual Leaderboard --- */
-function IndividualLeaderboard({ acts }: { acts: Activity[] }) {
-  /** Thống kê của một người phụ trách trên bảng xếp hạng. */
-  interface PersonStat {
-    name: string; items: number; psum: number; done: number; over: number;
-  }
-  const map: Record<string, PersonStat> = {};
-  acts.forEach((a) => {
-    if ((a.state || "active") !== "active") return;
-    const key = a.owner || "—";
-    const o = map[key] || (map[key] = { name: key, items: 0, psum: 0, done: 0, over: 0 });
-    o.items++;
-    o.psum += (PROG as Record<string, number>)[a.st] ?? 0;
-    if (a.st === "done") o.done++;
-    if (a.st === "over") o.over++;
-  });
-  const people = Object.values(map).map((p) => ({ ...p, avg: Math.round(p.psum / p.items) })).sort((a, b) => b.avg - a.avg || b.done - a.done || b.items - a.items);
-  const top3 = people.slice(0, 3), rest = people.slice(3);
-  const podium = [{ p: top3[1], place: 2 }, { p: top3[0], place: 1 }, { p: top3[2], place: 3 }].filter((x) => x.p);
-  const PCFG = {
-    1: { h: 102, av: 60, ring: C.gold, base: "linear-gradient(180deg,#FBD66A,#E3A41E)", crown: true },
-    2: { h: 76, av: 50, ring: C.silver, base: "linear-gradient(180deg,#D6DCE5,#A7B0BD)" },
-    3: { h: 58, av: 46, ring: C.bronze, base: "linear-gradient(180deg,#E2B184,#C2854F)" },
-  };
-  return (
-    <Card variant="strong" style={{ background: `linear-gradient(150deg,#fff,${C.pinkMist})` }}>
-      <CardTitle icon={Crown} sub="Xếp theo tiến độ trung bình">Bảng vinh danh cá nhân</CardTitle>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 14, padding: "10px 0 4px", flexWrap: "wrap" }}>
-        {podium.map(({ p, place }) => { const cf = (PCFG as unknown as Record<number, { h: number; av: number; ring: string; base: string; crown?: boolean }>)[place]; return (
-          <div key={p.name} className="rise" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: 116 }}>
-            <div style={{ position: "relative" }}>
-              {cf.crown && <div style={{ position: "absolute", top: -20, left: "50%", transform: "translateX(-50%)", fontSize: 22 }}>👑</div>}
-              <div style={{ width: cf.av, height: cf.av, borderRadius: 999, background: GRAD, border: `3px solid ${cf.ring}`, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: cf.av / 2.4, boxShadow: "0 6px 16px rgba(78,42,78,.2)" }}>{p.name[0]}</div>
-            </div>
-            <div style={{ textAlign: "center" }}><div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.plum }}>{p.name}</div><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 18, color: C.plum }}>{p.avg}%</div><div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>{p.items} hạng mục · {p.done} xong</div></div>
-            <div style={{ width: "100%", height: cf.h, borderRadius: "14px 14px 0 0", background: cf.base, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 8 }}><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 26, color: C.plum }}>{place}</span></div>
-          </div>
-        ); })}
-      </div>
-      {rest.length > 0 && <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-        {rest.map((p) => (
-          <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px 8px 8px", borderRadius: 999, background: "#fff", border: `1.5px solid ${C.pinkSoft}` }}>
-            <div style={{ width: 30, height: 30, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 13 }}>{p.name[0]}</div>
-            <span style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 13, color: C.plum }}>{p.name}</span>
-            <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: C.plumSoft }}>{p.avg}%</span>
-          </div>
-        ))}
-      </div>}
-    </Card>
-  );
-}
-
-/* --- Overview --- */
 function Overview({ acts }: { acts: Activity[]; setView?: (v: string) => void }) {
   const { e, d, overdue, soon, gap, gapPts, mismatched } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
@@ -1072,9 +1057,6 @@ function Overview({ acts }: { acts: Activity[]; setView?: (v: string) => void })
 
       {/* Completion analytics: stage, validation type, person and department */}
       <CompletionDashboard acts={acts} />
-
-      {/* Leaderboard */}
-      <IndividualLeaderboard acts={acts} />
     </div>
   );
 }
@@ -1733,7 +1715,7 @@ export default function App() {
               {view === "timeline" && <TimelineView acts={filteredActs} objects={filteredObjects} />}
               {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
               {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
-              {view === "server" && <ServerChecksView user={user} />}
+              {view === "health" && <HealthView acts={filteredActs} user={user} />}
               {view === "rules" && <ActiveRulesView user={user} />}
               {view === "progress" && (
                 <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
@@ -1743,7 +1725,6 @@ export default function App() {
               {view === "risk" && <QrmView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
-              {view === "quality" && <DataQualityView acts={filteredActs} />}
               {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} readOnly />}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} />}

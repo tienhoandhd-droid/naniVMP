@@ -1,7 +1,7 @@
 /* WorkloadPage.jsx — Ma trận tải công việc Người × Tháng */
 import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
-import { Activity, BarChart3, ShieldAlert, Flag } from "lucide-react";
+import { Activity, BarChart3, ShieldAlert, Flag, Users, Crown } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
 import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
 import { parseD, fmtVN, clamp, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
@@ -118,6 +118,47 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const focus = pend.filter((a) => a.crit === "Cao" || wlScore(a) >= 7).map((a) => ({ a, sc: wlScore(a) })).sort((x, y) => y.sc - x.sc
       || ((parseD(x.a.target)?.getTime() ?? 0) - (parseD(y.a.target)?.getTime() ?? 0))).slice(0, 8);
 
+  // Phân công theo NHÓM VIỆC — bảng phân công QA 2026 chia theo nhóm hệ
+  // thống chứ không theo từng thiết bị, nên đây mới là đơn vị người dùng
+  // thật sự quản lý. Đọc thẳng work_group đã đồng bộ vào vmp_plan_items.
+  const groups = useMemo(() => {
+    const m = new Map<string, { name: string; acts: PlanActivity[]; owners: Set<string> }>();
+    for (const a of acts) {
+      const g = String(a.group || "(chưa phân nhóm)");
+      if (!m.has(g)) m.set(g, { name: g, acts: [], owners: new Set() });
+      const rec = m.get(g)!;
+      rec.acts.push(a);
+      if (a.owner && a.owner !== "—") rec.owners.add(a.owner);
+      if (a.support) rec.owners.add(String(a.support));
+    }
+    return [...m.values()]
+      .map((g) => {
+        const done = g.acts.filter((a) => a.st === "done").length;
+        const over = g.acts.filter((a) => a.st === "over").length;
+        return { ...g, done, over, total: g.acts.length,
+                 rate: g.acts.length ? Math.round((done / g.acts.length) * 100) : 0 };
+      })
+      .sort((a, b) => (a.name === "(chưa phân nhóm)" ? 1 : b.name === "(chưa phân nhóm)" ? -1
+                       : b.total - a.total));
+  }, [acts]);
+
+  // Bảng vinh danh — trước nằm ở màn Tổng quan, tách khỏi ma trận tải nên
+  // phải nhớ hai chỗ mới biết ai đang làm gì. Gộp về đây.
+  const board = useMemo(() => {
+    const m = new Map<string, { name: string; total: number; done: number; over: number }>();
+    for (const a of acts) {
+      const k = a.owner && a.owner !== "—" ? a.owner : "(chưa phân)";
+      if (!m.has(k)) m.set(k, { name: k, total: 0, done: 0, over: 0 });
+      const r = m.get(k)!;
+      r.total++;
+      if (a.st === "done") r.done++;
+      if (a.st === "over") r.over++;
+    }
+    return [...m.values()]
+      .map((r) => ({ ...r, rate: r.total ? Math.round((r.done / r.total) * 100) : 0 }))
+      .sort((a, b) => b.rate - a.rate || b.total - a.total);
+  }, [acts]);
+
   const openDetail = (title: string, tasks: PlanActivity[]) => {
     if (tasks.length) setDetail({ title, tasks });
   };
@@ -212,6 +253,82 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
               ))}
             </tbody>
           </table>
+        </div>
+      </Card>
+
+      {/* Phân công theo nhóm việc */}
+      <Card variant="strong">
+        <CardTitle icon={Users}
+          sub="Theo bảng phân công QA 2026 — bấm vào nhóm để xem toàn bộ hạng mục">
+          Phân công theo nhóm việc
+        </CardTitle>
+        <div style={{ display: "grid", gap: 12,
+                      gridTemplateColumns: "repeat(auto-fill,minmax(268px,1fr))" }}>
+          {groups.map((g) => {
+            const chua = g.name === "(chưa phân nhóm)";
+            return (
+              <button key={g.name} className="rise"
+                onClick={() => openDetail(`Nhóm: ${g.name}`, g.acts)}
+                style={{ textAlign: "left", cursor: "pointer", background: "#fff",
+                         border: `1.5px solid ${chua ? C.marigold : C.pinkSoft}`,
+                         borderRadius: 16, padding: 14, fontFamily: TEXT }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: chua ? C.marigoldText : C.plum,
+                              lineHeight: 1.4, minHeight: 36 }}>
+                  {g.name}
+                </div>
+                <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700, margin: "4px 0 9px" }}>
+                  {g.owners.size ? [...g.owners].join(" · ") : "chưa có ai phụ trách"}
+                </div>
+                <div style={{ height: 7, borderRadius: 999, background: C.pinkMist, overflow: "hidden" }}>
+                  <div style={{ width: `${g.rate}%`, height: "100%",
+                                background: g.rate >= 80 ? C.mint : g.rate >= 40 ? C.marigold : C.rasp }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between",
+                              marginTop: 7, fontSize: 11.5, fontWeight: 700 }}>
+                  <span style={{ color: C.plumSoft }}>{g.total} hạng mục</span>
+                  <span style={{ color: C.mintText }}>{g.rate}% xong</span>
+                  {g.over > 0 && <span style={{ color: C.raspText }}>{g.over} quá hạn</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Bảng vinh danh cá nhân */}
+      <Card variant="soft">
+        <CardTitle icon={Crown} sub="Xếp theo tỷ lệ hoàn thành · bấm để xem việc còn lại">
+          Bảng vinh danh cá nhân
+        </CardTitle>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {board.map((r, i) => (
+            <button key={r.name} className="vmp-row"
+              onClick={() => openDetail(`Hạng mục của ${r.name}`,
+                acts.filter((a) => (a.owner && a.owner !== "—" ? a.owner : "(chưa phân)") === r.name))}
+              style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px",
+                       borderRadius: 13, background: "#fff", cursor: "pointer", textAlign: "left",
+                       border: `1px solid ${r.name === "(chưa phân)" ? C.marigoldSoft : C.pinkSoft}` }}>
+              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 13, color: C.plumSoft,
+                             width: 22, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 800,
+                             color: r.name === "(chưa phân)" ? C.marigoldText : C.plum }}>
+                {r.name}
+              </span>
+              <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700, whiteSpace: "nowrap" }}>
+                {r.done}/{r.total}
+              </span>
+              <div style={{ width: 110, height: 7, borderRadius: 999, background: C.pinkMist,
+                            overflow: "hidden", flexShrink: 0 }}>
+                <div style={{ width: `${r.rate}%`, height: "100%",
+                              background: r.rate >= 80 ? C.mint : r.rate >= 40 ? C.marigold : C.rasp }} />
+              </div>
+              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, width: 46,
+                             textAlign: "right", flexShrink: 0,
+                             color: r.rate >= 80 ? C.mintText : r.rate >= 40 ? C.marigoldText : C.raspText }}>
+                {r.rate}%
+              </span>
+            </button>
+          ))}
         </div>
       </Card>
 

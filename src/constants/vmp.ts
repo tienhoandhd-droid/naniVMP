@@ -68,19 +68,25 @@ export const PERM_LABEL = { admin: "Quản trị", edit: "Chỉnh sửa", view: 
 
 // ======================== NAVIGATION ========================
 export const NAV_ITEMS = [
+  // GIÁM SÁT — nhìn tình hình, không sửa gì
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard, group: "monitor" },
   { id: "timeline", label: "Timeline VMP", icon: GanttChartSquare, group: "monitor" },
-  { id: "inventory", label: "Danh mục & Tiến độ", icon: Boxes, group: "monitor" },
-  { id: "progress", label: "Cập nhật tiến độ", icon: Pencil, group: "monitor" },
-  { id: "source", label: "Dữ liệu & Nhập liệu", icon: Boxes, group: "monitor" },
   { id: "alerts", label: "Cảnh báo", icon: AlertCircle, group: "monitor" },
-  { id: "workload", label: "Tải công việc", icon: Activity, group: "monitor" },
-  { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
-  { id: "server", label: "Kiểm tra máy chủ", icon: Radar, group: "analysis" },
+
+  // THỰC HIỆN — việc làm hằng ngày, có ghi dữ liệu
+  { id: "progress", label: "Cập nhật tiến độ", icon: Pencil, group: "work" },
+  { id: "inventory", label: "Tiến độ theo đối tượng", icon: Boxes, group: "work" },
+  { id: "source", label: "Danh mục & Nhập liệu", icon: Boxes, group: "work" },
+
+  // PHÂN TÍCH — ra quyết định
   { id: "risk", label: "QRM – Rủi ro", icon: ShieldAlert, group: "analysis" },
+  { id: "workload", label: "Phân công & Tải việc", icon: Activity, group: "analysis" },
   { id: "reports", label: "Báo cáo & AI", icon: FileBarChart, group: "analysis" },
+  { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
+
+  // QUẢN TRỊ
+  { id: "health", label: "Sức khoẻ dữ liệu", icon: Radar, group: "admin", adminOnly: true },
   { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin", adminOnly: true },
-  { id: "quality", label: "Data quality", icon: Radar, group: "admin", adminOnly: true },
   { id: "missing", label: "Mã mất khỏi Sheet", icon: ShieldAlert, group: "admin", adminOnly: true },
   { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin", adminOnly: true },
 ];
@@ -88,17 +94,16 @@ export const NAV_ITEMS = [
 export const NAV_SUBS = {
   overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
   timeline: "Timeline · Sơ đồ · Bố cục · Bảng — các mốc Đề cương → Thẩm định → Báo cáo → Đích VMP",
-  inventory: "Gộp danh mục đối tượng & tiến độ — nhóm theo mã, nhiều loại thẩm định / lần trong năm",
-  progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
-  source: "Danh mục nguồn · Người nhận cảnh báo · Danh bạ nhân sự · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
   alerts: "Cảnh báo tới hạn / quá hạn & dự báo tái thẩm định",
-  workload: "Ma trận tải công việc Người × Tháng",
-  rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
-  server: "Số liệu và kiểm tra tính sẵn ở Supabase — dùng để đối chiếu với dashboard và xem trước cảnh báo sẽ gửi",
-  risk: "Quản lý rủi ro chất lượng (ICH Q9 / EU GMP Annex 15)",
+  progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
+  inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
+  source: "Danh mục nguồn · Người nhận cảnh báo · Danh bạ nhân sự · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
+  risk: "Quản lý rủi ro chất lượng (ICH Q9 / EU GMP Annex 15) — theo điểm trọng yếu 1…9",
+  workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / DOCX / HTML",
+  rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
+  health: "Sức khoẻ dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng ở Supabase",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
-  quality: "Phát hiện lỗi dữ liệu: thiếu mã, trùng ID, sai ngày, mâu thuẫn trạng thái",
   missing: "Hạng mục có trong DB nhưng KHÔNG còn trong Google Sheet — chờ admin/QA xác nhận",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",
 };
