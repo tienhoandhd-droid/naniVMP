@@ -5967,3 +5967,10 @@ body { transition: background var(--mo-slow) var(--ease); }
 
 /* Ô bấm được thì con trỏ và độ nổi phải nói ra điều đó */
 .vmp-tile[role="button"] { cursor: pointer; }
+
+/* Nhịp chấm khi công chúa Vali đang suy nghĩ — thở đều, không nhấp nháy
+   chói mắt. Ba chấm lệch pha nhau tạo cảm giác đang tiến triển. */
+@keyframes vmpNhipCho {
+  0%, 100% { opacity: .25; transform: translateY(0); }
+  50%      { opacity: 1;   transform: translateY(-3px); }
+}

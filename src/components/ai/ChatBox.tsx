@@ -29,11 +29,26 @@ const GOI_Y = [
   "Vì sao LAF cân được 9 điểm trọng yếu?",
 ];
 
+/* Lời chờ đổi dần theo thời gian đợi.
+ *
+ * Ba dấu chấm nhấp nháy chỉ nói "đang bận", không nói "còn lâu không".
+ * Câu dài phải gọi mô hình rồi tra hai nguồn dữ liệu, có khi mất 8–10
+ * giây — im lặng chừng đó là người dùng tưởng hỏng và bấm lại. Lời chờ
+ * đổi dần vừa cho biết hệ vẫn chạy, vừa nói ra nó đang làm gì. */
+const LOI_CHO: Array<{ tu: number; text: string }> = [
+  { tu: 0,     text: "Công chúa đang lật sổ tra giúp anh/chị…" },
+  { tu: 2500,  text: "Công chúa đang đăm chiêu, suy nghĩ để đưa ra câu trả lời…" },
+  { tu: 6000,  text: "Câu này hơi khó, công chúa đang tra thêm tài liệu luật…" },
+  { tu: 11000, text: "Công chúa vẫn đang cặm cụi, anh/chị chờ em thêm chút nữa nhé…" },
+  { tu: 18000, text: "Hôm nay hệ hơi đông, công chúa đang xếp hàng chờ tới lượt ạ…" },
+];
+
 export default function ChatBox({ user }: { user?: AppUser | null }) {
   const [mo, setMo] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
   const [dangHoi, setDangHoi] = useState(false);
+  const [choMs, setChoMs] = useState(0);
   const cuoiRef = useRef<HTMLDivElement | null>(null);
   const oNhapRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -45,6 +60,17 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
   }, [msgs, dangHoi]);
 
   useEffect(() => { if (mo) oNhapRef.current?.focus(); }, [mo]);
+
+  // Đếm thời gian đã chờ, để đổi lời chờ cho đúng nhịp
+  useEffect(() => {
+    if (!dangHoi) { setChoMs(0); return; }
+    const t0 = Date.now();
+    const id = setInterval(() => setChoMs(Date.now() - t0), 500);
+    return () => clearInterval(id);
+  }, [dangHoi]);
+
+  const loiCho = [...LOI_CHO].reverse().find((x) => choMs >= x.tu)?.text
+    ?? LOI_CHO[0].text;
 
   const hoi = async (text: string) => {
     const cauHoi = text.trim();
@@ -77,6 +103,14 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
           // Khoá phiên theo người dùng để trợ lý nhớ được mạch hội thoại
           phien: user?.email || "khach",
           email: user?.email || "",
+          // Vali cần biết đang nói chuyện với ai thì mới trả lời được
+          // "tôi là ai", "tôi có quyền gì" — hai câu người mới hỏi đầu tiên.
+          nguoi: {
+            ten: user?.name || "",
+            email: user?.email || "",
+            quyen: user?.perm || "",
+            bo_phan: user?.department || "",
+          },
         }),
       });
       const data = await r.json().catch(() => null);
@@ -215,29 +249,32 @@ export default function ChatBox({ user }: { user?: AppUser | null }) {
                 ))}
               </div>
             )}
-            {m.nguon && (
-              <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 4, paddingLeft: 3,
-                            fontWeight: 700 }}>
-                {m.nguon === "sql" ? "⚡ Em tra thẳng từ database — không tốn AI"
-                  : m.nguon === "dem" ? "💾 Câu này em đã tra rồi, dữ liệu chưa đổi nên dùng lại"
-                  : m.nguon === "groq" ? "🚀 Llama 3.3 70B (Groq) — chọn vì câu ngắn, trả nhanh"
-                  : m.nguon === "du_phong" ? "🔁 Đã chuyển sang mô hình dự phòng"
-                  : "✨ Gemini 2.5 Flash — chọn vì câu nhiều ý hoặc cần tra luật"}
+            {m.nguon === "dem" && (
+              <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 4,
+                            paddingLeft: 3, fontWeight: 700 }}>
+                💾 Em đã tra câu này rồi, dữ liệu chưa đổi nên dùng lại ạ
               </div>
             )}
           </div>
         ))}
 
         {dangHoi && (
-          <div style={{ alignSelf: "flex-start", display: "flex", gap: 5,
-                        padding: "12px 14px", borderRadius: R.md,
+          <div style={{ alignSelf: "flex-start", maxWidth: "88%",
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "11px 14px", borderRadius: R.md,
                         background: C.surface, border: `1px solid ${C.line}` }}>
-            {[0, 1, 2].map((i) => (
-              <span key={i} style={{
-                width: 7, height: 7, borderRadius: R.pill, background: C.pink,
-                animation: `vmpViewIn 700ms ${MO.ease} ${i * 140}ms infinite alternate`,
-              }} />
-            ))}
+            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+              {[0, 1, 2].map((i) => (
+                <span key={i} style={{
+                  width: 6, height: 6, borderRadius: R.pill, background: C.pink,
+                  animation: `vmpNhipCho 1100ms ${MO.ease} ${i * 180}ms infinite`,
+                }} />
+              ))}
+            </div>
+            <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600,
+                           lineHeight: 1.5, fontStyle: "italic" }}>
+              {loiCho}
+            </span>
           </div>
         )}
         <div ref={cuoiRef} />
