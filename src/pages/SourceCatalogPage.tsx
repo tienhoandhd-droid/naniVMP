@@ -23,7 +23,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Boxes, RefreshCw, Plus, Pencil, Ban, Trash2, Search, AlertTriangle,
          CalendarPlus, Bell, Users, UserCheck, FlaskConical, Table2, Columns3, Download } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
-import { Card, CardTitle, Tag, Modal, TableScroll } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Portal, TableScroll } from "../components/ui/Primitives.tsx";
 import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
   generateTimeline, fetchSourceWarnings,
@@ -682,7 +682,9 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
   };
 
   return (
-    <>
+    // Portal: khung trang có transform (.vmp-view-enter) nên position:fixed
+    // để nguyên chỗ sẽ neo theo trang chứ không theo màn hình.
+    <Portal>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70 }} />
       <div ref={box} onWheel={(e) => e.stopPropagation()} style={{
         position: "fixed", zIndex: 71,
@@ -755,7 +757,7 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
           </button>
         </div>
       </div>
-    </>
+    </Portal>
   );
 }
 
@@ -787,6 +789,7 @@ function BulkModal({ count, saving, onClose, onApply }: {
   const f = cols.find((x) => x.key === key);
 
   return (
+    <Portal>
     <div onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(60,40,60,.32)",
                display: "grid", placeItems: "center", zIndex: 60, padding: 16 }}>
@@ -830,6 +833,7 @@ function BulkModal({ count, saving, onClose, onApply }: {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
 

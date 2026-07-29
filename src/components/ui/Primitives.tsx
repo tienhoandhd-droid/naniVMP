@@ -3,6 +3,7 @@
  *  Card, Tag, Modal, Donut, KpiCard, Sparkle, Skeleton, etc.
  * ===================================================================== */
 import { useId, useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { C, TEXT, NUM, MO, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
@@ -589,11 +590,28 @@ export function Tag({ color, bg, children, style: extra }: {
 }
 
 // ======================== MODAL ========================
+/* ---------------------------------------------------------------------
+ * Portal — BẮT BUỘC cho mọi thứ position:fixed nằm trong nội dung trang.
+ *
+ * Khung nội dung có class .vmp-view-enter chạy hoạt ảnh vào bằng
+ * transform. Một phần tử tổ tiên có transform thì position:fixed KHÔNG
+ * còn neo theo màn hình nữa mà neo theo phần tử đó — hộp thoại bị đẩy
+ * xuống giữa CHIỀU CAO CẢ TRANG (đo được 12.385px trên trang cảnh báo),
+ * người dùng chỉ thấy lớp phủ mờ mà không thấy hộp.
+ *
+ * Đưa ra thẳng document.body là hết, vì body không có transform.
+ * ------------------------------------------------------------------- */
+export function Portal({ children }: { children?: ReactNode }) {
+  if (typeof document === "undefined") return <>{children}</>;   // render phía server
+  return createPortal(children, document.body);
+}
+
 export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: {
   onClose: () => void; title?: ReactNode; icon?: LucideIcon;
   children?: ReactNode; wide?: boolean;
 }) {
   return (
+    <Portal>
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, zIndex: 999,
       background: "rgba(78,42,78,.48)", backdropFilter: "blur(4px)",
@@ -623,6 +641,7 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: 
         {children}
       </div>
     </div>
+    </Portal>
   );
 }
 
