@@ -107,8 +107,12 @@ export interface Activity {
   state?: string;
   /** Mức tới hạn dạng chữ: Cao | TB | Thấp. */
   crit?: string;
-  /** Điểm trọng yếu 1–9. */
+  /** Điểm trọng yếu 1–9 = phức tạp × ảnh hưởng chất lượng. */
   score?: number | string;
+  /** Người hỗ trợ (QA thứ hai) — từ vmp_source_objects.support_name. */
+  support?: string | null;
+  /** Nhóm phân công QA, vd "Hệ thống nồi hấp/tủ hấp". */
+  group?: string | null;
   /** Tần suất thẩm định (tháng). */
   freq?: number;
   /** Phân loại báo cáo rút gọn, dùng tra số ngày báo cáo. */
