@@ -69,6 +69,105 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs_archive: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          change_reason: string | null
+          changed_fields: string[] | null
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string | null
+          source: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+          user_role: Database["public"]["Enums"]["user_role"] | null
+          validation_code: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          change_reason?: string | null
+          changed_fields?: string[] | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          source?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+          validation_code?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          change_reason?: string | null
+          changed_fields?: string[] | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          source?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+          validation_code?: string | null
+        }
+        Relationships: []
+      }
+      audit_logs_purge_log: {
+        Row: {
+          breakdown: Json | null
+          criteria: string
+          date_from: string | null
+          date_to: string | null
+          id: number
+          purged_at: string
+          purged_by: string | null
+          reason: string
+          row_count: number
+          table_name: string
+        }
+        Insert: {
+          breakdown?: Json | null
+          criteria: string
+          date_from?: string | null
+          date_to?: string | null
+          id?: number
+          purged_at?: string
+          purged_by?: string | null
+          reason: string
+          row_count: number
+          table_name: string
+        }
+        Update: {
+          breakdown?: Json | null
+          criteria?: string
+          date_from?: string | null
+          date_to?: string | null
+          id?: number
+          purged_at?: string
+          purged_by?: string | null
+          reason?: string
+          row_count?: number
+          table_name?: string
+        }
+        Relationships: []
+      }
       data_quality_issues: {
         Row: {
           detected_at: string | null
@@ -2179,6 +2278,7 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_trang_thai_he_thong: { Args: never; Returns: Json }
       rpc_update_progress:
         | {
             Args: {
@@ -2242,7 +2342,9 @@ export type Database = {
       }
       vmp_ai_dau_van: { Args: never; Returns: string }
       vmp_ai_khoa_cau_hoi: { Args: { p_q: string }; Returns: string }
+      vmp_don_dau_vet_dong_bo: { Args: { p_giu?: number }; Returns: Json }
       vmp_khong_dau: { Args: { t: string }; Returns: string }
+      vmp_luu_tru_nhat_ky: { Args: { p_thang?: number }; Returns: Json }
       vmp_ma_phan_loai: { Args: { p_kind: string }; Returns: string }
       vmp_parse_depts: { Args: { p_raw: string }; Returns: string[] }
       vmp_phase_status_text: {

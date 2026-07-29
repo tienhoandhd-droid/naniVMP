@@ -413,6 +413,27 @@ export async function fetchAuditLogs(opts: {
   return data;
 }
 
+/* ---- Trạng thái hệ thống (màn Quản trị) ---- */
+/** Người dùng, cấu hình, lịch chạy tự động, khối lượng dữ liệu, lỗi workflow.
+ *  Gom một lời gọi để màn Quản trị không phải bắn 6 truy vấn rời. */
+export interface SystemStatus {
+  ok?: boolean;
+  error?: string;
+  nguoi_dung?: Array<{ ten: string; email: string; vai_tro: string; bo_phan: string | null; dang_dung: boolean; dang_nhap_gan_nhat: string | null }>;
+  cau_hinh?: Array<{ khoa: string; gia_tri: unknown }>;
+  lich_tu_dong?: Array<{ ten: string; lich: string; dang_bat: boolean; lenh: string }>;
+  dong_bo_gan_nhat?: { luc: string; trang_thai: string; so_dong_nguon: number; so_ma_trung: number } | null;
+  du_lieu?: Record<string, string | number>;
+  workflow_loi_7_ngay?: Array<{ ten: string; luc: string; loi: string }>;
+}
+
+export async function fetchSystemStatus(): Promise<SystemStatus> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_trang_thai_he_thong");
+  if (error) throw new Error("Lỗi đọc trạng thái hệ thống: " + error.message);
+  return asShape<SystemStatus>(data);
+}
+
 /* ---- Luật đang áp dụng ---- */
 
 /** Luật hệ thống đang chạy, đọc THẲNG từ DB nên không thể lệch thực tế. */

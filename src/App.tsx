@@ -38,7 +38,7 @@ import {
   Radar,
   Cloud,
   FileText,
-  Clock, ClipboardCheck, FileWarning, ChevronRight, Search,
+  Clock, ClipboardCheck, FileWarning, ChevronRight, Search, Users, Scale,
 } from "lucide-react";
 // Lưu ý: recharts đã bị gỡ vì KHÔNG dùng (chỉ import thừa, nặng bundle).
 // xlsx được nạp động (dynamic import) ngay trong hàm xuất Excel để giảm bundle ban đầu.
@@ -60,10 +60,13 @@ import {
   docTally,
   inPeriod,
   runDataQualityChecks,
+  nhanXetTuDong,
   buildReportHTML,
   download,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
+import { fetchSystemStatus } from "./lib/supabaseData.ts";
+import type { SystemStatus } from "./lib/supabaseData.ts";
 import type { ConnState } from "./hooks/index.ts";
 
 // ===== UI Primitives =====
@@ -1121,50 +1124,211 @@ function AuditLogView() {
 }
 
 /* ===================== Admin Page (NEW) ===================== */
-function AdminView({ conn, user }: {
-  conn: ConnState;
-  user?: AppUser | null;
-}) {
+/* ----------------------------------------------------------------
+ * Quản trị — hứa "cấu hình hệ thống, người dùng, phân quyền" nhưng bản
+ * cũ chỉ hiện trạng thái kết nối, kiểu xác thực và phiên của chính người
+ * đang xem. Không có người dùng, không có cấu hình, không có gì để quản.
+ *
+ * Mọi thứ cần cho việc quản trị đều đã nằm trong DB, chỉ chưa ai lấy ra.
+ * Gom vào một lời gọi rpc_trang_thai_he_thong (chỉ admin/QA đọc được).
+ * -------------------------------------------------------------- */
+
+/** Dịch lịch cron sang câu người đọc được — "0 20 * * 6" không nói gì với
+ *  người vận hành, và giờ trong DB là UTC còn người dùng nghĩ theo giờ VN. */
+function docLichCron(lich: string): string {
+  const p = String(lich || "").trim().split(/\s+/);
+  if (p.length < 5) return lich;
+  const [phut, gio, ngay, , thu] = p;
+  const gioVN = (Number(gio) + 7) % 24;
+  const gioChu = `${String(gioVN).padStart(2, "0")}:${String(phut).padStart(2, "0")}`;
+  const TEN_THU = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+  const quaNgay = Number(gio) + 7 >= 24 ? " (ngày kế tiếp)" : "";
+  if (thu !== "*") return `${TEN_THU[Number(thu)] || "thứ " + thu} hằng tuần, ${gioChu} giờ VN${quaNgay}`;
+  if (ngay !== "*") return `ngày ${ngay} hằng tháng, ${gioChu} giờ VN${quaNgay}`;
+  return `hằng ngày, ${gioChu} giờ VN${quaNgay}`;
+}
+
+const VAI_TRO_NHAN: Record<string, { nhan: string; mau: string; nen: string }> = {
+  admin:           { nhan: "Quản trị", mau: C.raspText, nen: C.raspSoft },
+  qa_manager:      { nhan: "QA quản lý", mau: C.lavText, nen: C.lavSoft },
+  department_user: { nhan: "Người bộ phận", mau: C.skyText, nen: C.skySoft },
+  viewer:          { nhan: "Chỉ xem", mau: C.plumSoft, nen: C.pinkMist },
+};
+
+function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
+  const [tt, setTt] = useState<SystemStatus | null>(null);
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [moCauHinh, setMoCauHinh] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr("");
+    try {
+      const r = await fetchSystemStatus();
+      if (r?.ok === false) setErr(r.error || "Không đọc được trạng thái hệ thống");
+      else setTt(r);
+    } catch (e) { setErr((e as Error).message || "Không đọc được trạng thái hệ thống"); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const oSo = (nhan: string, giaTri: React.ReactNode, phu?: string) => (
+    <div style={{ padding: "13px 15px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: C.plumSoft, textTransform: "uppercase", letterSpacing: ".03em" }}>{nhan}</div>
+      <div style={{ fontFamily: NUM, fontSize: 21, fontWeight: 800, color: C.plum, marginTop: 3 }}>{giaTri}</div>
+      {phu && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{phu}</div>}
+    </div>
+  );
+
+  const d = tt?.du_lieu || {};
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <Card>
-        <CardTitle icon={BarChart3} sub="Cấu hình hệ thống, trạng thái kết nối, sức khoẻ hệ thống">
+        <CardTitle icon={BarChart3} sub="Người dùng · cấu hình · việc tự động · khối lượng dữ liệu"
+          right={<button onClick={load} disabled={loading}
+            style={{ ...btnPrimary, padding: "8px 15px", borderRadius: 11, fontSize: 12.5, opacity: loading ? 0.6 : 1 }}>
+            {loading ? "Đang tải…" : "Tải lại"}</button>}>
           Quản trị hệ thống
         </CardTitle>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div style={{ padding: 18, borderRadius: 16, background: conn.status === "ok" ? C.mintSoft : C.marigoldSoft }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: conn.status === "ok" ? C.mintText : C.marigoldText, marginBottom: 8 }}>
-              Trạng thái kết nối
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: C.plum }}>
-              {conn.status === "ok" ? "Đã kết nối nguồn dữ liệu" :
-               conn.status === "loading" ? "Đang tải…" :
-               conn.status === "err" ? "Lỗi kết nối" : "Chưa kết nối"}
-            </div>
-            {conn.msg ? <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 4 }}>{String(conn.msg)}</div> : null}
-          </div>
-
-          <div style={{ padding: 18, borderRadius: 16, background: isSupabaseConfigured() ? C.mintSoft : C.raspSoft }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: isSupabaseConfigured() ? C.mintText : C.raspText, marginBottom: 8 }}>
-              Xác thực
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: C.plum }}>
-              {isSupabaseConfigured() ? "Supabase Auth (bảo mật)" : "Chế độ tạm (env)"}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14 }}>
+          <div style={{ padding: "13px 15px", borderRadius: 14, background: conn.status === "ok" ? C.mintSoft : C.marigoldSoft }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: conn.status === "ok" ? C.mintText : C.marigoldText, textTransform: "uppercase" }}>Kết nối dữ liệu</div>
+            <div style={{ fontSize: 14.5, fontWeight: 800, color: C.plum, marginTop: 3 }}>
+              {conn.status === "ok" ? "Đang chạy · Supabase" : conn.status === "loading" ? "Đang tải…" : conn.status === "err" ? "Lỗi kết nối" : "Chưa kết nối"}
             </div>
           </div>
-        </div>
-
-        <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: C.lavSoft }}>
-          <div style={{ fontWeight: 800, fontSize: 13, color: C.lavText, marginBottom: 8 }}>Thông tin phiên</div>
-          <div style={{ fontSize: 13, color: C.plum, lineHeight: 2 }}>
-            <div>Người dùng: <b>{user?.name}</b></div>
-            <div>Vai trò: <b>{user?.role}</b></div>
-            <div>Quyền: <b>{(user && PERM_LABEL[user.perm]) || user?.perm}</b></div>
-            {user?.department ? <div>Bộ phận: <b>{user.department}</b></div> : null}
+          <div style={{ padding: "13px 15px", borderRadius: 14, background: isSupabaseConfigured() ? C.mintSoft : C.raspSoft }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: isSupabaseConfigured() ? C.mintText : C.raspText, textTransform: "uppercase" }}>Xác thực</div>
+            <div style={{ fontSize: 14.5, fontWeight: 800, color: C.plum, marginTop: 3 }}>{isSupabaseConfigured() ? "Supabase Auth" : "Chế độ tạm (env)"}</div>
           </div>
+          {oSo("Đang đăng nhập", user?.name || "—", `${user?.role || ""} · ${(user && PERM_LABEL[user.perm]) || ""}`)}
         </div>
       </Card>
+
+      {err && (
+        <Card>
+          <div style={{ padding: "16px 18px", borderRadius: 14, background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
+            <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>Không đọc được trạng thái hệ thống</div>
+            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 5 }}>{err}</div>
+            <button onClick={load} style={{ ...btnPrimary, marginTop: 12, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>Thử lại</button>
+          </div>
+        </Card>
+      )}
+
+      {tt && (
+        <>
+          <Card variant="strong">
+            <CardTitle icon={Radar} sub="Đọc thẳng từ database lúc mở trang">Khối lượng dữ liệu</CardTitle>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(165px,1fr))", gap: 12 }}>
+              {oSo("Hạng mục đang theo dõi", String(d.hang_muc_dang_theo_doi ?? "—"), "tính vào KPI")}
+              {oSo("Không áp dụng", String(d.hang_muc_khong_ap_dung ?? "—"), "ngoài KPI, vẫn tra được")}
+              {oSo("Đối tượng", String(d.doi_tuong ?? "—"))}
+              {oSo("Người thực hiện", String(d.nguoi_thuc_hien ?? "—"))}
+              {oSo("Dòng nhật ký", String(d.dong_nhat_ky ?? "—"), "ALCOA+ audit trail")}
+              {oSo("Dung lượng", String(d.dung_luong ?? "—"), "cả database")}
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle icon={Users} sub={`${tt.nguoi_dung?.length || 0} tài khoản · vai trò quyết định ai ghi được gì`}>
+              Người dùng &amp; phân quyền
+            </CardTitle>
+            <div className="vmp-scroll" style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, fontSize: 13 }}>
+                <thead><tr style={{ background: C.pinkMist }}>
+                  {["Họ tên", "Email", "Vai trò", "Bộ phận", "Tình trạng", "Đăng nhập gần nhất"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "11px 14px", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {(tt.nguoi_dung || []).map((u: NonNullable<SystemStatus["nguoi_dung"]>[number]) => {
+                    const v = VAI_TRO_NHAN[u.vai_tro] || VAI_TRO_NHAN.viewer;
+                    return (
+                      <tr key={u.email} style={{ borderTop: `1px solid ${C.pinkSoft}` }}>
+                        <td style={{ padding: "11px 14px", fontWeight: 800, color: C.plum }}>{u.ten}</td>
+                        <td style={{ padding: "11px 14px", color: C.plumSoft, fontWeight: 600 }}>{u.email}</td>
+                        <td style={{ padding: "11px 14px" }}><Tag color={v.mau} bg={v.nen}>{v.nhan}</Tag></td>
+                        <td style={{ padding: "11px 14px", color: C.plumSoft, fontWeight: 600 }}>{u.bo_phan || "—"}</td>
+                        <td style={{ padding: "11px 14px" }}>
+                          <Tag color={u.dang_dung ? C.mintText : C.raspText} bg={u.dang_dung ? C.mintSoft : C.raspSoft}>
+                            {u.dang_dung ? "Đang dùng" : "Đã khoá"}
+                          </Tag>
+                        </td>
+                        <td style={{ padding: "11px 14px", color: C.plumSoft, fontWeight: 600, whiteSpace: "nowrap" }}>
+                          {u.dang_nhap_gan_nhat ? new Date(u.dang_nhap_gan_nhat).toLocaleString("vi-VN") : "chưa ghi nhận"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 10, lineHeight: 1.6 }}>
+              Thêm tài khoản và đổi vai trò làm ở Supabase → Authentication. Web cố ý không mở đường
+              tự cấp quyền cho chính mình.
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle icon={Clock} sub="pg_cron chạy ngay trong database — không phụ thuộc máy nào bật">
+              Việc tự động đang hẹn giờ
+            </CardTitle>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(tt.lich_tu_dong || []).map((j: NonNullable<SystemStatus["lich_tu_dong"]>[number]) => (
+                <div key={j.ten} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderRadius: 13, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
+                  <Tag color={j.dang_bat ? C.mintText : C.plumSoft} bg={j.dang_bat ? C.mintSoft : C.pinkMist}>{j.dang_bat ? "Đang bật" : "Tắt"}</Tag>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum }}>{j.ten}</div>
+                    <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>
+                      {docLichCron(j.lich)} · <span style={{ fontFamily: NUM }}>{j.lich}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {!(tt.lich_tu_dong || []).length && <div style={{ padding: 14, color: C.plumSoft, fontWeight: 600 }}>Chưa hẹn giờ việc nào.</div>}
+            </div>
+          </Card>
+
+          {!!(tt.workflow_loi_7_ngay || []).length && (
+            <Card variant="strong">
+              <CardTitle icon={FileWarning} sub="Ghi từ bảng workflow_runs — n8n báo về khi một workflow chạy hỏng">
+                Workflow lỗi 7 ngày qua ({tt.workflow_loi_7_ngay!.length})
+              </CardTitle>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {tt.workflow_loi_7_ngay!.map((wf: NonNullable<SystemStatus["workflow_loi_7_ngay"]>[number], i: number) => (
+                  <div key={i} style={{ padding: "10px 13px", borderRadius: 12, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{wf.ten || "(không tên)"}</div>
+                    <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+                      {wf.luc ? new Date(wf.luc).toLocaleString("vi-VN") : ""} · {wf.loi || "không có mô tả lỗi"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <Card variant="soft">
+            <CardTitle icon={Scale} sub={`${tt.cau_hinh?.length || 0} khoá · khoá đánh dấu nhạy cảm không hiện ở đây`}
+              right={<button onClick={() => setMoCauHinh((v) => !v)}
+                style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "7px 13px", cursor: "pointer" }}>
+                {moCauHinh ? "Gập lại" : "Xem"}</button>}>
+              Cấu hình hệ thống
+            </CardTitle>
+            {moCauHinh && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {(tt.cau_hinh || []).map((c: NonNullable<SystemStatus["cau_hinh"]>[number]) => (
+                  <div key={c.khoa} style={{ display: "flex", gap: 12, fontSize: 12.5, padding: "6px 0", borderTop: `1px solid ${C.pinkMist}` }}>
+                    <span style={{ fontFamily: NUM, fontWeight: 800, color: C.plum, minWidth: 210 }}>{c.khoa}</span>
+                    <span style={{ color: C.plumSoft, fontWeight: 600, wordBreak: "break-word" }}>{JSON.stringify(c.gia_tri)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   );
 }
@@ -1406,7 +1570,12 @@ function ReportsView({ acts }: { acts: Activity[] }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-end" }}>
           <div><div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Kỳ</div><div style={{ display: "flex", gap: 8 }}><Seg id="tuan" label="Tuần" /><Seg id="thang" label="Tháng" /><Seg id="quy" label="Quý" /></div></div>
           <div><div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Phạm vi</div><select value={scope} onChange={(e2) => { setScope(e2.target.value); setAi(""); }} style={{ ...glass, borderRadius: 12, padding: "11px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, cursor: "pointer", outline: "none" }}><option value="all">Toàn nhà máy</option>{DEPTS.map((dp) => <option key={dp.id} value={dp.id}>{dp.name}</option>)}</select></div>
-          <button onClick={generate} disabled={loading} style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "13px 24px", borderRadius: 14, fontSize: 14.5 }}>{loading ? <RefreshCw size={17} className="spin" /> : <SparkIcon size={17} />} {loading ? "AI đang phân tích…" : "Tạo nhận xét AI"}</button>
+          {/* Nút gọi AI chỉ hiện khi thật sự có dịch vụ AI. Trước đây nút luôn
+              hiện và luôn báo "Chưa cấu hình VITE_N8N_AI_REPORT_URL. Liên hệ
+              IT" — biến đó chưa từng được đặt, nên nút chết từ đầu. */}
+          {!!import.meta.env.VITE_N8N_AI_REPORT_URL && (
+            <button onClick={generate} disabled={loading} style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "13px 24px", borderRadius: 14, fontSize: 14.5 }}>{loading ? <RefreshCw size={17} className="spin" /> : <SparkIcon size={17} />} {loading ? "AI đang phân tích…" : "Thêm nhận xét AI"}</button>
+          )}
         </div>
       </Card>
       <Card variant="strong">
@@ -1420,11 +1589,34 @@ function ReportsView({ acts }: { acts: Activity[] }) {
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT }}><thead><tr>{["Nhóm", "HT", "QH", "Chưa", "Tổng", "Tỷ lệ"].map((h, i) => <th key={i} style={{ textAlign: i ? "center" : "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, padding: "0 13px 13px" }}>{h}</th>)}</tr></thead><tbody>{statRow("Thẩm định thực tế", e, C.mint)}{statRow("Hoàn thiện hồ sơ", d, C.sky)}</tbody></table>
         <div style={{ marginTop: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12 }}><SparkIcon size={18} color={C.pink} /><span style={{ fontFamily: TEXT, fontSize: 17, fontWeight: 800, color: C.plum }}>Nhận xét AI</span><Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag></div>
-          {err && <div style={{ color: C.raspText, fontSize: 13.5, fontWeight: 800, padding: "13px 15px", borderRadius: 12, background: C.raspSoft }}><AlertCircle size={16} /> {err}</div>}
-          {loading && <div style={{ padding: 32, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}><RefreshCw size={22} className="spin" color={C.pink} /><div style={{ marginTop: 10 }}>AI đang phân tích…</div></div>}
-          {!loading && !err && ai && <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8, fontWeight: 500, background: C.pinkMist, borderLeft: `4px solid ${C.pink}`, borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{ai}</div>}
-          {!loading && !err && !ai && <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 14, fontWeight: 700, border: `2px dashed ${C.pinkSoft}`, borderRadius: 16 }}>Bấm <b style={{ color: C.pinkText }}>Tạo nhận xét AI</b> để phân tích báo cáo.</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap" }}>
+            <SparkIcon size={18} color={C.pink} />
+            <span style={{ fontFamily: TEXT, fontSize: 17, fontWeight: 800, color: C.plum }}>Nhận xét</span>
+            <Tag color={C.mintText} bg={C.mintSoft}>Tính từ số liệu</Tag>
+          </div>
+
+          {/* Nhận xét tự động: tính thẳng từ số đang hiện, không gọi dịch vụ nào.
+              Cùng một bộ số cho ra đúng một câu — hợp hồ sơ GMP hơn văn AI. */}
+          <div style={{ fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.85, fontWeight: 500,
+                        background: C.pinkMist, borderLeft: `4px solid ${C.pink}`, borderRadius: "0 14px 14px 0", padding: "16px 20px" }}>
+            <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 7 }}>
+              {nhanXetTuDong(scoped).map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+          </div>
+
+          {/* Phần AI chỉ xuất hiện khi có dịch vụ và người dùng bấm gọi. */}
+          {err && <div style={{ marginTop: 12, color: C.raspText, fontSize: 13.5, fontWeight: 800, padding: "13px 15px", borderRadius: 12, background: C.raspSoft }}><AlertCircle size={16} /> {err}</div>}
+          {loading && <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}><RefreshCw size={22} className="spin" color={C.pink} /><div style={{ marginTop: 10 }}>AI đang phân tích…</div></div>}
+          {!loading && !err && ai && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+                <SparkIcon size={16} color={C.lavText} />
+                <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.plum }}>Nhận xét AI</span>
+                <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
+              </div>
+              <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8, fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`, borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{ai}</div>
+            </div>
+          )}
         </div>
       </Card>
     </div>

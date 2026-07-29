@@ -325,6 +325,62 @@ export function runDataQualityChecks(acts: Activity[]) {
   return issues;
 }
 
+// ======================== NHẬN XÉT TỰ ĐỘNG ========================
+/* Nút "Tạo nhận xét AI" gọi một webhook n8n qua biến VITE_N8N_AI_REPORT_URL.
+   Biến đó chưa từng được cấu hình, nên bấm vào chỉ nhận được câu "Chưa cấu
+   hình… Liên hệ IT" — nút chết trong suốt thời gian qua.
+
+   Nhận xét dưới đây tính THẲNG từ số liệu đang hiển thị: luôn chạy được,
+   không phụ thuộc dịch vụ ngoài, và quan trọng hơn với hồ sơ GMP — cùng
+   một bộ số thì cho ra đúng một câu, không bịa, truy lại được. */
+export function nhanXetTuDong(acts: Activity[]): string[] {
+  const A = acts.filter((a) => (a.state || "active") === "active");
+  if (!A.length) return ["Chưa có hạng mục nào trong phạm vi đang chọn."];
+
+  const e = tally(A);
+  const d = docTally(A);
+  const y: string[] = [];
+
+  y.push(`Thẩm định thực tế đạt ${e.rate}% (${e.done}/${e.total} hạng mục); hồ sơ hoàn thiện ${d.rate}% (${d.done}/${d.total}).`);
+
+  if (e.over > 0) {
+    const nang = A.filter((a) => a.st === "over" && Number(a.score) >= 7).length;
+    y.push(`Đang có ${e.over} hạng mục quá hạn${nang ? `, trong đó ${nang} hạng mục thuộc nhóm trọng yếu cao (≥7 điểm) — nhóm này phải xử lý trước theo ICH Q9` : ""}.`);
+  } else {
+    y.push("Không có hạng mục nào quá hạn trong phạm vi này.");
+  }
+
+  // So thứ tự rủi ro: nhóm trọng yếu cao có được làm trước nhóm thấp không
+  const cao = A.filter((a) => Number(a.score) >= 7);
+  const thap = A.filter((a) => Number(a.score) > 0 && Number(a.score) < 4);
+  const tl = (x: Activity[]) => (x.length ? Math.round((x.filter((a) => a.st === "done").length / x.length) * 100) : 0);
+  if (cao.length && thap.length) {
+    const tlCao = tl(cao), tlThap = tl(thap);
+    y.push(tlCao + 5 < tlThap
+      ? `Đang làm ngược thứ tự rủi ro: nhóm trọng yếu cao mới xong ${tlCao}% trong khi nhóm thấp đã ${tlThap}%. ICH Q9 và Annex 15 đòi ưu tiên nhóm rủi ro cao — chênh lệch này là thứ thanh tra hỏi đầu tiên.`
+      : `Thứ tự ưu tiên hợp lý: nhóm trọng yếu cao đạt ${tlCao}%, không tụt sau nhóm thấp (${tlThap}%).`);
+  }
+
+  // Hạng mục chưa ai phụ trách
+  const khongChu = A.filter((a) => !a.owner || a.owner === "—").length;
+  if (khongChu) y.push(`${khongChu} hạng mục chưa có người thực hiện — không phân công thì không ai theo.`);
+
+  // Vi phạm ALCOA+: đánh dấu xong nhưng thiếu ngày
+  const thieuNgay = A.filter((a) => a.st === "done" && !a._raw?.ngay_vmp).length;
+  if (thieuNgay) y.push(`${thieuNgay} hạng mục ghi "hoàn thành" nhưng thiếu ngày thực tế — vi phạm ALCOA+, cần bổ sung trước khi có đợt thanh tra.`);
+
+  // Tải việc tháng tới
+  const today = vmpToday();
+  const thangSau = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const sapToi = A.filter((a) => {
+    const t = parseD(a.target);
+    return a.st !== "done" && t && t >= today && t < new Date(thangSau.getFullYear(), thangSau.getMonth() + 1, 1);
+  }).length;
+  if (sapToi) y.push(`Từ nay tới hết tháng ${thangSau.getMonth() + 1} có ${sapToi} hạng mục tới hạn — cần xếp lịch sớm.`);
+
+  return y;
+}
+
 // ======================== REPORT HTML BUILDER ========================
 export function buildReportHTML(
   period: string,
