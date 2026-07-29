@@ -1473,10 +1473,15 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
         </div>
       </div>
 
-      {/* Sức khoẻ theo bộ phận */}
+      {/* Tiến độ theo bộ phận quản lý */}
       {deptRows.length > 0 && (
         <div>
-          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>Sức khoẻ theo bộ phận quản lý</strong>
+          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>Tiến độ theo bộ phận quản lý</strong>
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
+            Chiều dài thanh = số hạng mục · <span style={{ color: C.mintText }}>xanh: đã xong</span>
+            {" · "}<span style={{ color: C.raspText }}>đỏ: quá hạn</span>
+            {" · "}<span style={{ color: C.skyText }}>lam: còn lại</span> — bấm để lọc theo bộ phận
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
             {deptRows.map((r) => {
               const rest = r.total - r.done - r.over;
