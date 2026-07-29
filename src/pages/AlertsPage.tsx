@@ -10,7 +10,7 @@
  * của một cái cân. Điểm rủi ro tính bằng hàm dùng chung trong helpers nên
  * ma trận và danh sách không thể chấm khác nhau.
  */
-import { useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CalendarClock, Filter, ShieldAlert, Download, Search, ListFilter, ChevronRight } from "lucide-react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { CLS, CRIT, DEPTS, DEP_DAYS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
@@ -19,7 +19,7 @@ import {
   qrmRpn, qrmLevel, byRisk,
 } from "../utils/helpers.ts";
 import { Card, CardTitle, Tag, KpiCard, Modal, Pill } from "../components/ui/Primitives.tsx";
-import { usePerformers } from "../hooks/index.ts";
+import { useDebounce, usePerformers } from "../hooks/index.ts";
 import QrmView from "./QrmPage.tsx";
 import type { Activity } from "../types/domain.ts";
 
@@ -93,6 +93,58 @@ function phaseLabel(enumVal: unknown, sheetVal: unknown): string {
   if (e === "not_started") return "Chưa thực hiện";
   return e || "Chưa nhập";
 }
+
+/* Dòng cảnh báo tách khỏi AlertsView và bọc memo: trước đây hàm Row được
+ tạo lại mỗi lần gõ một phím vào ô tìm, nên React coi là component MỚI và
+ dựng lại toàn bộ 279 dòng — đó là chỗ trễ khi gõ. */
+const Row = memo(function Row({ r, email, onOpen }: {
+r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
+}) {
+  const cls = (CLS as Record<string, typeof CLS.tb>)[String(r.a.cls ?? "tb")] ?? CLS.tb;
+  const rpn = qrmRpn(r.a);
+  const lv = LEVEL_STYLE[qrmLevel(rpn)];
+  const late = r.dleft < 0;
+  const edge = r.kind === "over" ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft
+    : r.kind === "risk" ? C.raspSoft : C.pinkSoft;
+  return (
+    <div className="vmp-row vmp-lift" role="button" tabIndex={0}
+      onClick={() => onOpen(r)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } }}
+      title="Bấm để xem timeline các mốc hạn"
+      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: C.surface, border: `1px solid ${edge}`, cursor: "pointer" }}>
+      {/* Ô ngày — trễ thì đỏ, còn hạn thì cam/xanh theo nhóm */}
+      <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: late ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft : C.skySoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 17, color: late ? C.raspText : r.kind === "soon" ? C.marigoldText : C.skyText, lineHeight: 1 }}>{Math.abs(r.dleft)}</span>
+        <span style={{ fontSize: 9, color: C.plumSoft, fontWeight: 700 }}>ngày {late ? "trễ" : "nữa"}</span>
+      </div>
+      {/* Điểm rủi ro — lý do dòng này nằm ở vị trí này trong danh sách */}
+      <div title={`RPN = trọng yếu × khả năng xảy ra (ICH Q9). Tối đa 27.`}
+        style={{ width: 54, flexShrink: 0, textAlign: "center", padding: "6px 0", borderRadius: 12, background: lv.soft }}>
+        <div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, color: lv.text, lineHeight: 1 }}>{rpn}</div>
+        <div style={{ fontSize: 9, fontWeight: 800, color: lv.text }}>RPN</div>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+          <Tag color={cls.text} bg={cls.soft}>{r.a.vtype}</Tag>
+          <span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: C.plum }}>{r.a.name}</span>
+        </div>
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+          {r.a.id} · Mốc <b style={{ color: late ? C.raspText : C.marigoldText }}>{r.stage}</b>
+          {r.date ? ` · hạn ${fmtVN(r.date)}` : ""} · {txt(r.a.owner)}
+          {email ? <> (<a href={`mailto:${email}?subject=${encodeURIComponent(`[VMP] ${KIND_LABEL[r.kind]}: ${r.a.id} — ${r.a.name}`)}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{ color: C.lavText, fontWeight: 700 }}>{email}</a>)</> : null}
+          {r.a.dep ? ` · BC: ${r.a.dep}` : ""}
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
+        <Tag color={lv.text} bg={lv.soft}>{lv.label}</Tag>
+        <Tag color={C.plumSoft} bg={C.pinkMist}>{KIND_LABEL[r.kind]}</Tag>
+      </div>
+      <ChevronRight size={18} color={C.plumSoft} style={{ flexShrink: 0 }} />
+    </div>
+  );
+});
 
 /** Xuất ra ngoài để test render được bằng react-dom/server. */
 export function AlertDetailModal({ r, email, onClose }: {
@@ -238,6 +290,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("risk");
   const [detail, setDetail] = useState<AlertRow | null>(null);
+  const [hien, setHien] = useState(40);          // số dòng đang dựng thật
   // Email người thực hiện lấy từ tab "Người thực hiện" — thấy cảnh báo là
   // nhắc được ngay, khỏi mở danh bạ ở trang khác.
   const { find } = usePerformers();
@@ -280,7 +333,8 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     return [...s].sort((x, y) => x.localeCompare(y, "vi"));
   }, [acts]);
 
-  const kw = q.trim().toLowerCase();
+  // Gõ phím không lọc ngay: chờ 250ms cho người dùng gõ xong.
+  const kw = useDebounce(q.trim().toLowerCase(), 250);
   const pass = (r: AlertRow): boolean => {
     if (dept !== "all" && r.a.dept !== dept) return false;
     if (win !== "all" && Math.abs(r.dleft) > Number(win)) return false;
@@ -298,6 +352,9 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     return out;
   };
 
+  // Đổi nhóm hoặc đổi bộ lọc thì cuộn lại từ 40 dòng đầu.
+  useEffect(() => { setHien(40); }, [bucket, dept, win, level, owner, kw, sort]);
+
   const byKind = useMemo(() => {
     const g: Record<AlertRow["kind"], AlertRow[]> = { over: [], soon: [], requal: [], risk: [] };
     all.filter(pass).forEach((r) => g[r.kind].push(r));
@@ -307,6 +364,9 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   }, [all, dept, win, level, owner, kw, sort]);
 
   const shown = byKind[bucket];
+  // Đổi nhóm hay đổi bộ lọc thì quay về 40 dòng đầu.
+  const shownCut = shown.slice(0, hien);
+  const moKho = useCallback((r: AlertRow) => setDetail(r), []);
   const hasFilter = dept !== "all" || win !== "all" || level !== "all" || owner !== "all" || !!kw;
 
   // ----- Xuất danh sách đang xem ra CSV để dán vào biên bản họp -----
@@ -331,54 +391,6 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     a.download = `canh-bao-${bucket}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const Row = ({ r }: { r: AlertRow }) => {
-    const cls = (CLS as Record<string, typeof CLS.tb>)[String(r.a.cls ?? "tb")] ?? CLS.tb;
-    const rpn = qrmRpn(r.a);
-    const lv = LEVEL_STYLE[qrmLevel(rpn)];
-    const late = r.dleft < 0;
-    const email = find(r.a.owner)?.email;
-    const edge = r.kind === "over" ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft
-      : r.kind === "risk" ? C.raspSoft : C.pinkSoft;
-    return (
-      <div className="vmp-row vmp-lift" role="button" tabIndex={0}
-        onClick={() => setDetail(r)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(r); } }}
-        title="Bấm để xem timeline các mốc hạn"
-        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: C.surface, border: `1px solid ${edge}`, cursor: "pointer" }}>
-        {/* Ô ngày — trễ thì đỏ, còn hạn thì cam/xanh theo nhóm */}
-        <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: late ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft : C.skySoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 17, color: late ? C.raspText : r.kind === "soon" ? C.marigoldText : C.skyText, lineHeight: 1 }}>{Math.abs(r.dleft)}</span>
-          <span style={{ fontSize: 9, color: C.plumSoft, fontWeight: 700 }}>ngày {late ? "trễ" : "nữa"}</span>
-        </div>
-        {/* Điểm rủi ro — lý do dòng này nằm ở vị trí này trong danh sách */}
-        <div title={`RPN = trọng yếu × khả năng xảy ra (ICH Q9). Tối đa 27.`}
-          style={{ width: 54, flexShrink: 0, textAlign: "center", padding: "6px 0", borderRadius: 12, background: lv.soft }}>
-          <div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, color: lv.text, lineHeight: 1 }}>{rpn}</div>
-          <div style={{ fontSize: 9, fontWeight: 800, color: lv.text }}>RPN</div>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-            <Tag color={cls.text} bg={cls.soft}>{r.a.vtype}</Tag>
-            <span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: C.plum }}>{r.a.name}</span>
-          </div>
-          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
-            {r.a.id} · Mốc <b style={{ color: late ? C.raspText : C.marigoldText }}>{r.stage}</b>
-            {r.date ? ` · hạn ${fmtVN(r.date)}` : ""} · {txt(r.a.owner)}
-            {email ? <> (<a href={`mailto:${email}?subject=${encodeURIComponent(`[VMP] ${KIND_LABEL[r.kind]}: ${r.a.id} — ${r.a.name}`)}`}
-              onClick={(e) => e.stopPropagation()}
-              style={{ color: C.lavText, fontWeight: 700 }}>{email}</a>)</> : null}
-            {r.a.dep ? ` · BC: ${r.a.dep}` : ""}
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
-          <Tag color={lv.text} bg={lv.soft}>{lv.label}</Tag>
-          <Tag color={C.plumSoft} bg={C.pinkMist}>{KIND_LABEL[r.kind]}</Tag>
-        </div>
-        <ChevronRight size={18} color={C.plumSoft} style={{ flexShrink: 0 }} />
-      </div>
-    );
   };
 
   const cards = [
@@ -459,7 +471,13 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 Lịch tái thẩm định ({shown.length})
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {shown.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} />)}
+                {shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
+                {shown.length > shownCut.length && (
+                  <button type="button" onClick={() => setHien((n) => n + 60)}
+                    style={{ ...selStyle, alignSelf: "center", marginTop: 4 }}>
+                    Hiện thêm — đang xem {shownCut.length}/{shown.length}
+                  </button>
+                )}
                 {!shown.length && <div style={{ textAlign: "center", padding: 20, color: C.plumSoft, fontWeight: 600 }}>{hasFilter ? "Không có lịch tái thẩm định khớp bộ lọc." : "Chưa có lịch tái thẩm định."}</div>}
               </div>
             </Card>
@@ -473,7 +491,13 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 {KIND_LABEL[bucket]} ({shown.length})
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {shown.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} />)}
+                {shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
+                {shown.length > shownCut.length && (
+                  <button type="button" onClick={() => setHien((n) => n + 60)}
+                    style={{ ...selStyle, alignSelf: "center", marginTop: 4 }}>
+                    Hiện thêm — đang xem {shownCut.length}/{shown.length}
+                  </button>
+                )}
                 {!shown.length && (
                   <div style={{ textAlign: "center", padding: 30, color: C.mintText, fontWeight: 700 }}>
                     {hasFilter ? `Không có hạng mục ${KIND_LABEL[bucket].toLowerCase()} khớp bộ lọc.` : `🎉 Không có hạng mục ${KIND_LABEL[bucket].toLowerCase()}!`}

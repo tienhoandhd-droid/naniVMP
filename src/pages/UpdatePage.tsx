@@ -1,5 +1,5 @@
 /* UpdatePage.jsx — Cập nhật tiến độ thực tế */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Pencil, Search, Save, Activity, UserCheck } from "lucide-react";
 import { C, TEXT, NUM, GRAD, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
 import { STATUS, STAGES, PERIODS, TT_OPTS } from "../constants/vmp.ts";
@@ -7,7 +7,7 @@ import { stageOf, inPeriod, txt } from "../utils/helpers.ts";
 import { toISO } from "../lib/n8nAdapter.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { setItemPerformer } from "../lib/supabaseData.ts";
-import { usePerformers } from "../hooks/index.ts";
+import { useDebounce, usePerformers } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, Modal, Pill, ROField, StateBadge } from "../components/ui/Primitives.tsx";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
@@ -230,6 +230,9 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   /** Lọc nhanh theo lỗi dữ liệu — để không phải dò 461 dòng tìm chỗ thiếu. */
   const [fix, setFix] = useState("all");
   const [edit, setEdit] = useState<PlanActivity | null>(null);
+  // Gõ phím không lọc ngay — 461 dòng dựng lại mỗi phím là chỗ giật nhất trang này.
+  const kw = useDebounce(q.trim().toLowerCase(), 250);
+  const [hien, setHien] = useState(60);        // số dòng dựng thật trong bảng
   const inWindow = useMemo(() => acts.filter((a) => inPeriod(a, period)), [acts, period]);
   // Tính giai đoạn 1 lần/hạng mục rồi tái dùng (trước đây stageOf chạy ~7 lần/hàng).
   const stageByItem = useMemo(() => {
@@ -270,7 +273,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   const okStage  = (a: PlanActivity) => stageF === "all" || stageByItem.get(a.id) === stageF;
   const okStatus = (a: PlanActivity) => fst === "all" || a.st === fst;
   const okSearch = (a: PlanActivity) => {
-    const s = q.trim().toLowerCase();
+    const s = kw;
     if (!s) return true;
     return [a.code, a.name, a.owner, a.id, a.vtype].some((x) => String(x || "").toLowerCase().includes(s));
   };
@@ -288,7 +291,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     });
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inWindow, stageByItem, fix, fst, q, FIXES]);
+  }, [inWindow, stageByItem, fix, fst, kw, FIXES]);
 
   const fixCount = useMemo(() => {
     const c: Record<string, number> = { all: 0 };
@@ -300,13 +303,15 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     });
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inWindow, stageByItem, stageF, fst, q, FIXES]);
+  }, [inWindow, stageByItem, stageF, fst, kw, FIXES]);
 
   const list = useMemo(
     () => inWindow.filter((a) => okFix(a) && okStage(a) && okStatus(a) && okSearch(a)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [inWindow, stageByItem, stageF, fst, q, fix, FIXES],
+    [inWindow, stageByItem, stageF, fst, kw, fix, FIXES],
   );
+
+  useEffect(() => { setHien(60); }, [stageF, fix, fst, kw, period]);
 
   const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all";
   const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); setQ(""); setPeriod("all"); };
@@ -403,7 +408,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
               {["Mã", "Tên", "Loại", "QA", "Deadline", "Giai đoạn", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i > 4 ? "center" : "left", padding: "13px 16px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {list.map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
+              {list.slice(0, hien).map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
                 <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? "rgba(255,255,255,.4)" : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
                   <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 13 }}>{a.code}</td>
                   <td style={{ padding: "12px 16px", color: C.plum, fontSize: 13 }}>
@@ -424,6 +429,14 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                   </td>
                 </tr>
               ); })}
+              {list.length > hien && (
+                <tr><td colSpan={8} style={{ padding: 14, textAlign: "center" }}>
+                  <button onClick={() => setHien((n) => n + 100)}
+                    style={{ ...btnPrimary, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>
+                    Hiện thêm — đang xem {hien}/{list.length} hạng mục
+                  </button>
+                </td></tr>
+              )}
               {/* Rỗng thì nói RÕ vì sao rỗng và bộ lọc nào đang bật — không thì
                   người dùng tưởng dữ liệu mất hoặc trang hỏng. */}
               {!list.length && (
