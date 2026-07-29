@@ -229,8 +229,14 @@ export function buildDiagramModel(activities: Activity[] = []) {
   const statusNodes = aggregateNodes("status", statusCounts, "status", 780, statusLabel);
 
   /** Cạnh nối giữa các nút trong sơ đồ luồng. */
+  /** Cạnh sơ đồ luồng. `status` chỉ có ở cạnh bộ phận → trạng thái. */
   const edges: Array<{
-    id: string; source: string; target: string; value: number; relation: string;
+    id: string;
+    source: string;
+    target: string;
+    relation: string;
+    weight: number;
+    status?: string;
   }> = [];
 
   classNodes.forEach((node) => {
@@ -243,7 +249,7 @@ export function buildDiagramModel(activities: Activity[] = []) {
     });
   });
 
-  const classDept = countBy(active, (item) => `${item.cls || "tb"}|${item.dept || "qa"}`);
+  const classDept = countBy(active, (item) => `${item.cls ?? "tb"}|${item.dept ?? "qa"}`);
   [...classDept.entries()].forEach(([key, weight]) => {
     const [cls, dept] = key.split("|");
     edges.push({
