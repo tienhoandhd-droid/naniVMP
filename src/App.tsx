@@ -1844,7 +1844,7 @@ export default function App() {
             <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "overview" && <Overview acts={filteredActs} setView={setView} />}
-              {view === "timeline" && <TimelineView acts={filteredActs} objects={filteredObjects} />}
+              {view === "timeline" && <TimelineView acts={filteredActs} />}
               {view === "inventory" && <CatalogView objects={filteredObjects} acts={filteredActs} />}
               {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
               {view === "health" && <HealthView acts={filteredActs} user={user} />}
