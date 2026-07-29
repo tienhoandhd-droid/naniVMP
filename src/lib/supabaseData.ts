@@ -288,6 +288,26 @@ export async function deleteSourceObject(
 /** Sinh hạng mục timeline từ danh mục nguồn, theo đúng luật VMP01.
  *  commit=false chỉ xem trước. Idempotent: mã đã có thì bỏ qua, và không
  *  bao giờ đè lên cột tiến độ người dùng đã nhập. */
+/** Một nhóm cảnh báo về dữ liệu nguồn — mỗi phần tử là một đối tượng cần rà. */
+export interface SourceWarnings {
+  nam: number;
+  /** Chắc chắn sai: không có tháng đầu tiên thì mọi mốc đều hỏng. */
+  thieu_thang_dau: Array<{ object_kind: string; object_code: string; object_name: string }>;
+  /** Cần người xem: có thể là thiết bị cũ (bình thường) hoặc bỏ lỡ một năm. */
+  chua_tung_iq: Array<{ object_kind: string; object_code: string; object_name: string; nam_nhap: number }>;
+  /** Cần người xem: có thẩm định nhưng cờ hiển thị tắt. */
+  show_tat: Array<{ object_kind: string; object_code: string; object_name: string; show_flag: string }>;
+  /** Cần người xem: "Chưa hoạt động" chính là thứ CẦN DQ/IQ nên không lọc tự động. */
+  chua_hoat_dong: Array<{ object_kind: string; object_code: string; object_name: string; tinh_trang: string }>;
+}
+
+export async function fetchSourceWarnings(year?: number): Promise<SourceWarnings> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_source_warnings", { p_year: year ?? undefined });
+  if (error) throw new Error("Lỗi rà dữ liệu nguồn: " + error.message);
+  return asShape<SourceWarnings>(data);
+}
+
 export async function generateTimeline(
   year?: number | null, commit = false,
 ): Promise<GenerateTimelineResult> {

@@ -179,6 +179,12 @@ export interface GenerateTimelineResult extends RpcResult {
   so_tao_moi: number;
   so_bo_qua: number;
   so_thieu_moc: number;
+  /** Đối tượng tần suất > 12 tháng chưa tới chu kỳ nên bị hoãn. */
+  so_chua_toi_chu_ky?: number;
+  chua_toi_chu_ky?: Array<{
+    object_code: string; object_name: string;
+    tan_suat_thang: number; moc_gan_nhat: number; ky_ke_tiep: number;
+  }>;
   danh_sach?: Array<{
     validation_code: string;
     object_code: string;

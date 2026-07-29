@@ -26,7 +26,7 @@ import { C, TEXT, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.tsx";
 import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
-  generateTimeline,
+  generateTimeline, fetchSourceWarnings,
   fetchAlertRecipients, upsertAlertRecipient, deleteAlertRecipient,
   fetchStaffEmails, upsertStaffEmail, deleteStaffEmail,
   fetchProductsGmp, upsertProductGmp, deleteProductGmp,
@@ -34,6 +34,7 @@ import {
 } from "../lib/supabaseData.ts";
 import type { SourceRow } from "../lib/supabaseData.ts";
 import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
+import type { SourceWarnings } from "../lib/supabaseData.ts";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
    `hint` giải thích ảnh hưởng tới luật sinh timeline — đây là phần người
@@ -76,6 +77,7 @@ function SourceCatalogSection({ user, onReload }: {
   const [editing, setEditing] = useState<Partial<SourceObjectRow> | null>(null);
   const [saving, setSaving] = useState(false);
   const [gen, setGen] = useState<GenState | null>(null);   // hộp thoại sinh timeline
+  const [warn, setWarn] = useState<SourceWarnings | null>(null);
 
   const load = async () => {
     setLoading(true); setErr("");
@@ -88,6 +90,11 @@ function SourceCatalogSection({ user, onReload }: {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [kind]);
+
+  // Cảnh báo rà trên TOÀN BỘ danh mục nên chỉ tải một lần, không theo tab.
+  useEffect(() => {
+    fetchSourceWarnings().then(setWarn).catch(() => setWarn(null));
+  }, []);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -196,21 +203,27 @@ function SourceCatalogSection({ user, onReload }: {
 
         {/* Cảnh báo dữ liệu thiếu — đúng thứ làm hỏng mốc thời gian timeline */}
         {broken.length > 0 && (
-          <div style={{
-            marginTop: 10, padding: "10px 12px", borderRadius: 12,
-            background: C.marigoldSoft, color: C.marigoldText, fontSize: 12.5,
-            fontFamily: TEXT, display: "flex", gap: 8, alignItems: "flex-start",
-          }}>
-            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <b>{broken.length} đối tượng có thẩm định nhưng thiếu “Tháng thẩm định đầu tiên”</b> —
-              toàn bộ mốc thời gian của chúng không tính được, timeline sẽ ghi
-              “Không xác định do thiếu…” thay vì ngày.
-              <div style={{ marginTop: 4 }}>
-                {broken.map((b) => b.object_code).join(" · ")}
-              </div>
-            </div>
-          </div>
+          <WarnBox tone="bad" title={`${broken.length} đối tượng thiếu "Tháng thẩm định đầu tiên"`}
+            body="Toàn bộ mốc thời gian của chúng không tính được — timeline sẽ để trống ô ngày."
+            items={broken.map((b) => b.object_code)} />
+        )}
+        {warn && warn.chua_tung_iq.length > 0 && (
+          <WarnBox tone="ask" title={`${warn.chua_tung_iq.length} thiết bị/hệ thống chưa từng có IQ`}
+            body={"Bình thường nếu là thiết bị cũ đã thẩm định trước khi có hệ thống. "
+                + "Bất thường nếu năm nhập của chúng bị bỏ lỡ không sinh timeline — khi đó cần tạo IQ thủ công."}
+            items={warn.chua_tung_iq.slice(0, 12).map((x) => `${x.object_code} (${x.nam_nhap})`)}
+            more={warn.chua_tung_iq.length - 12} />
+        )}
+        {warn && warn.show_tat.length > 0 && (
+          <WarnBox tone="ask" title={`${warn.show_tat.length} đối tượng có Thẩm định = y nhưng Show ≠ y`}
+            body="Luật KHÔNG lọc theo Show — chúng vẫn được sinh timeline. Rà xem nên bật Show hay tắt Thẩm định."
+            items={warn.show_tat.map((x) => x.object_code)} />
+        )}
+        {warn && warn.chua_hoat_dong.length > 0 && (
+          <WarnBox tone="ask" title={`${warn.chua_hoat_dong.length} đối tượng "Chưa hoạt động" vẫn có thẩm định`}
+            body={"Luật cố ý KHÔNG lọc theo Tình trạng: thiết bị chưa hoạt động chính là thứ cần DQ/IQ/OQ. "
+                + "Chỉ rà lại nếu đối tượng thật sự đã ngừng dùng."}
+            items={warn.chua_hoat_dong.map((x) => x.object_code)} />
         )}
       </Card>
 
@@ -343,6 +356,17 @@ function GenerateModal({ state, setState, onClose, onDone }: {
             <div style={{ color: C.marigoldText, marginTop: 6 }}>
               ⚠️ {r.so_thieu_moc} hạng mục thiếu dữ liệu nguồn nên không tính được đủ mốc thời gian
               (sẽ tạo với ô ngày để trống).
+            </div>
+          )}
+          {(r.so_chua_toi_chu_ky ?? 0) > 0 && (
+            <div style={{ color: C.skyText, marginTop: 6 }}>
+              ⏳ {r.so_chua_toi_chu_ky} đối tượng tần suất trên 12 tháng <b>chưa tới chu kỳ</b> nên
+              được hoãn — đúng ý nghĩa "n năm thẩm định 1 lần":
+              <div style={{ marginTop: 3, fontSize: 11.5, opacity: 0.9 }}>
+                {(r.chua_toi_chu_ky ?? []).map((x) =>
+                  `${x.object_code} (${x.tan_suat_thang} tháng · gần nhất ${x.moc_gan_nhat} → kỳ sau ${x.ky_ke_tiep})`
+                ).join(" · ")}
+              </div>
             </div>
           )}
         </div>
@@ -999,5 +1023,37 @@ function RawRowModal({ row, cols, saving, onClose, onSave }: {
           style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>{saving ? "Đang lưu…" : "Lưu"}</button>
       </div>
     </Modal>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * Hộp cảnh báo. Phân biệt rõ hai loại để người đọc biết phải làm gì:
+ *   tone="bad" — chắc chắn sai, phải sửa
+ *   tone="ask" — cần người xem, máy KHÔNG tự quyết vì có thể đúng
+ * ---------------------------------------------------------------- */
+function WarnBox({ tone, title, body, items, more = 0 }: {
+  tone: "bad" | "ask";
+  title: string;
+  body: string;
+  items: string[];
+  more?: number;
+}) {
+  const bad = tone === "bad";
+  return (
+    <div style={{
+      marginTop: 10, padding: "10px 12px", borderRadius: 12,
+      background: bad ? C.raspSoft : C.marigoldSoft,
+      color: bad ? C.raspText : C.marigoldText,
+      fontSize: 12.5, fontFamily: TEXT, display: "flex", gap: 8, alignItems: "flex-start",
+    }}>
+      <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+      <div style={{ minWidth: 0 }}>
+        <b>{title}</b>
+        <div style={{ marginTop: 2, fontWeight: 600, opacity: 0.92 }}>{body}</div>
+        <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.85, wordBreak: "break-word" }}>
+          {items.join(" · ")}{more > 0 ? ` … và ${more} đối tượng nữa` : ""}
+        </div>
+      </div>
+    </div>
   );
 }
