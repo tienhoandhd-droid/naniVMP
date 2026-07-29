@@ -20,6 +20,8 @@ import { useDebounce } from "../hooks/index.ts";
 import { Card, Tag, Modal, Pill, phaseTag } from "../components/ui/Primitives.tsx";
 import { buildVisualModel } from "../lib/visualModel.ts";
 import { DiagramPanel, DashboardPanel, TablePanel } from "./VisualExplorerPage.tsx";
+import type { ReactNode } from "react";
+import type { Activity, Milestones, VmpObject } from "../types/domain.ts";
 
 // Các "không gian làm việc" gộp chung dưới menu Timeline VMP: timeline sâu +
 // 3 góc nhìn phân tích (sơ đồ luồng, bố cục dashboard, bảng dữ liệu).
@@ -92,69 +94,88 @@ const MILESTONES = [
   { id: "target", label: "Đích VMP", short: "VMP", color: C.lav },
 ];
 
-function startOfDay(d) {
+/** Khoảng thời gian đang hiển thị trên trục timeline. */
+export interface TimeRange {
+  view: string;
+  year: number;
+  start: Date;
+  end: Date;
+  title: string;
+  kicker: string;
+  /** Số ngày (bao gồm cả hai đầu) của khoảng. */
+  days: number;
+  bands: Array<{ label: string; start: Date; end: Date; [k: string]: unknown }>;
+  [k: string]: unknown;
+}
+
+function startOfDay(d: Date | null | undefined): Date | null {
   if (!d) return null;
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
 }
 
-function maxDate(a, b) {
+function maxDate(a: Date | null, b: Date | null): Date | null {
   if (!a) return b;
   if (!b) return a;
   return a > b ? a : b;
 }
 
-function minDate(a, b) {
+function minDate(a: Date | null, b: Date | null): Date | null {
   if (!a) return b;
   if (!b) return a;
   return a < b ? a : b;
 }
 
-function safeDate(d, fallback) {
-  return d && !isNaN(d) ? d : fallback;
+function safeDate(d: Date | null | undefined, fallback: Date): Date {
+  return d && !isNaN(d.getTime()) ? d : fallback;
 }
 
-function daysInclusive(start, end) {
-  return Math.max(1, Math.round((startOfDay(end) - startOfDay(start)) / DAY_MS) + 1);
+function daysInclusive(start: Date, end: Date): number {
+  return Math.max(1, Math.round(
+    ((startOfDay(end)?.getTime() ?? 0) - (startOfDay(start)?.getTime() ?? 0)) / DAY_MS) + 1);
 }
 
-function pctInRange(date, range) {
+function pctInRange(date: Date | null | undefined, range: TimeRange): number {
   if (!date) return 0;
-  const d = startOfDay(date);
-  const start = startOfDay(range.start);
-  const endExclusive = addDays(startOfDay(range.end), 1);
+  const d = startOfDay(date)!.getTime();
+  const start = startOfDay(range.start)!.getTime();
+  const endExclusive = addDays(startOfDay(range.end)!, 1).getTime();
   return clamp(((d - start) / Math.max(DAY_MS, endExclusive - start)) * 100, 0, 100);
 }
 
-function inRange(date, range) {
+function inRange(date: Date | null | undefined, range: { start: Date; end: Date }): boolean {
   if (!date) return false;
-  const d = startOfDay(date);
-  return d >= startOfDay(range.start) && d <= startOfDay(range.end);
+  const d = startOfDay(date)!;
+  return d >= startOfDay(range.start)! && d <= startOfDay(range.end)!;
 }
 
-function intersectsRange(start, end, range) {
+function intersectsRange(
+  start: Date | null | undefined,
+  end: Date | null | undefined,
+  range: { start: Date; end: Date },
+): boolean {
   if (!start || !end) return false;
-  const s = startOfDay(start);
-  const e = startOfDay(end);
-  return e >= startOfDay(range.start) && s <= startOfDay(range.end);
+  const s = startOfDay(start)!;
+  const e = startOfDay(end)!;
+  return e >= startOfDay(range.start)! && s <= startOfDay(range.end)!;
 }
 
-function chartWidthFor(view, density) {
+function chartWidthFor(view: string, density: string): number {
   const compact = density === "compact";
   if (view === "month") return compact ? 900 : 1040;
   if (view === "quarter") return compact ? 980 : 1120;
   return compact ? 1120 : 1320;
 }
 
-function rangeFor(view, focusMonth, year) {
+function rangeFor(view: string, focusMonth: number | null, year: number): TimeRange {
   const todayMonth = vmpToday().getMonth();
-  const m = Number.isFinite(focusMonth) ? focusMonth : todayMonth;
-  let start;
-  let end;
-  let title;
-  let kicker;
-  let bands = [];
+  const m: number = Number.isFinite(focusMonth) ? (focusMonth as number) : todayMonth;
+  let start: Date;
+  let end: Date;
+  let title: string;
+  let kicker: string;
+  let bands: TimeRange["bands"] = [];
 
   if (view === "month") {
     start = new Date(year, m, 1);
@@ -165,7 +186,7 @@ function rangeFor(view, focusMonth, year) {
     let cursor = start;
     let week = 1;
     while (cursor <= end) {
-      const next = minDate(addDays(cursor, 7), addDays(end, 1));
+      const next = minDate(addDays(cursor, 7), addDays(end, 1))!;
       bands.push({
         start: cursor,
         end: addDays(next, -1),
@@ -208,24 +229,24 @@ function rangeFor(view, focusMonth, year) {
   return { view, year, start, end, title, kicker, bands, days: daysInclusive(start, end) };
 }
 
-function taskWindow(a) {
+function taskWindow(a: Activity) {
   const m = a.m || milestones(a);
-  const fallback = parseD(a.target);
+  const fallback = parseD(a.target) ?? vmpToday();
   const start = safeDate(m.protocol, fallback);
   const end = safeDate(m.target, fallback);
   return { m, start, end };
 }
 
-function phaseProgress(a) {
-  const r = a._raw || {};
+function phaseProgress(a: Activity): number {
+  const r = (a._raw || {}) as Record<string, unknown>;
   if (a.st === "done" || wlIsDone(r.tt_vmp)) return 100;
   if (wlIsDone(r.tt_bao_cao)) return 82;
   if (wlIsDone(r.tt_tham_dinh)) return 58;
   if (wlIsDone(r.tt_de_cuong)) return 34;
-  return PROG[a.st] || 8;
+  return (PROG as Record<string, number>)[a.st] || 8;
 }
 
-function issueLevel(a) {
+function issueLevel(a: Activity): string {
   const ps = phaseStates(a);
   const hasOverPhase = [ps.p, ps.v, ps.r].includes("over");
   if (a.st === "over" || hasOverPhase) return "over";
@@ -234,8 +255,8 @@ function issueLevel(a) {
   return "todo";
 }
 
-function ownerOf(a) {
-  const raw = a._raw || {};
+function ownerOf(a: Activity): string {
+  const raw = (a._raw || {}) as Record<string, unknown>;
   const values = [
     a.owner,
     raw.qa,
@@ -248,16 +269,11 @@ function ownerOf(a) {
   return values.map((v) => String(v == null ? "" : v).trim()).find((v) => v && v !== "—") || "—";
 }
 
-function countBy(list, fn) {
-  const m = new Map();
-  list.forEach((item) => {
-    const key = fn(item);
-    m.set(key, (m.get(key) || 0) + 1);
-  });
-  return m;
-}
 
-function ControlButton({ active, children, onClick, title }) {
+
+function ControlButton({ active, children, onClick, title }: {
+  active?: boolean; children?: ReactNode; onClick?: () => void; title?: string;
+}) {
   return (
     <button
       type="button"
@@ -281,7 +297,9 @@ function ControlButton({ active, children, onClick, title }) {
   );
 }
 
-function ScopeButton({ active, children, onClick, title }) {
+function ScopeButton({ active, children, onClick, title }: {
+  active?: boolean; children?: ReactNode; onClick?: () => void; title?: string;
+}) {
   return (
     <button
       type="button"
@@ -294,14 +312,16 @@ function ScopeButton({ active, children, onClick, title }) {
   );
 }
 
-function RangeStat({ label, value, tone = "plum", sub }) {
+export function RangeStat({ label, value, tone = "plum", sub }: {
+  label: ReactNode; value: ReactNode; tone?: string; sub?: ReactNode;
+}) {
   const map = {
     plum: [C.plum, C.pinkMist],
     over: [C.raspText, C.raspSoft],
     done: [C.mintText, C.mintSoft],
     work: [C.lavText, C.lavSoft],
   };
-  const [color, bg] = map[tone] || map.plum;
+  const [color, bg] = (map as Record<string, string[]>)[tone] || map.plum;
   return (
     <div style={{
       minWidth: 128,
@@ -318,12 +338,13 @@ function RangeStat({ label, value, tone = "plum", sub }) {
   );
 }
 
-function daysUntil(date) {
+function daysUntil(date: Date | null | undefined): number | null {
   if (!date) return null;
-  return Math.round((startOfDay(date) - startOfDay(vmpToday())) / DAY_MS);
+  return Math.round(
+    ((startOfDay(date)?.getTime() ?? 0) - (startOfDay(vmpToday())?.getTime() ?? 0)) / DAY_MS);
 }
 
-function heatForDue(date, done = false) {
+function heatForDue(date: Date | null | undefined, done = false) {
   if (done) return "done";
   const left = daysUntil(date);
   if (left == null) return "steady";
@@ -333,7 +354,9 @@ function heatForDue(date, done = false) {
   return "steady";
 }
 
-function heatText(step) {
+function heatText(step: {
+  heat?: string; daysLeft?: number | null; due?: Date | null;
+}): string {
   if (step.heat === "done") return "Đã hoàn tất";
   const left = step.daysLeft;
   if (left == null) return "Chưa có mốc hạn";
@@ -342,23 +365,23 @@ function heatText(step) {
   return `Còn ${left} ngày`;
 }
 
-function targetTime(a) {
+function targetTime(a: Activity): number {
   return (parseD(a.target) || new Date(2999, 0, 1)).getTime();
 }
 
-function compareByTarget(a, b) {
+function compareByTarget(a: Activity, b: Activity): number {
   const diff = targetTime(a) - targetTime(b);
   if (diff) return diff;
   return String(a.code || a.id || "").localeCompare(String(b.code || b.id || ""), "vi");
 }
 
-function stageState(a, stage) {
-  const raw = a._raw || {};
+function stageState(a: Activity, stage: (typeof MAP_STAGES)[number]) {
+  const raw = (a._raw || {}) as Record<string, unknown>;
   const m = a.m || milestones(a);
   const done = stage.id === "vmp"
     ? (a.st === "done" || wlIsDone(raw.tt_vmp))
     : wlIsDone(raw[stage.field]);
-  const due = m[stage.due] || parseD(a.target);
+  const due = (m as unknown as Record<string, Date | null>)[stage.due] || parseD(a.target);
   const actual = parseD(raw[stage.actual]);
   const heat = heatForDue(due, done);
   return {
@@ -371,8 +394,8 @@ function stageState(a, stage) {
   };
 }
 
-function activeMapStep(a) {
-  const states = MAP_STAGES.map((stage) => ({ stage, state: stageState(a, stage) }));
+function activeMapStep(a: Activity) {
+  const states = MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => ({ stage, state: stageState(a, stage) }));
   const next = states.find((entry) => !entry.state.done);
   if (!next) {
     return { stage: MAP_STAGES[2], label: "Hoàn tất VMP" };
@@ -380,7 +403,7 @@ function activeMapStep(a) {
   return { stage: next.stage, label: `Đang ở: ${next.stage.label}` };
 }
 
-function nextPendingMilestone(a) {
+function nextPendingMilestone(a: Activity) {
   for (const stage of MAP_STAGES) {
     const state = stageState(a, stage);
     if (!state.done) return { stage, state };
@@ -388,43 +411,44 @@ function nextPendingMilestone(a) {
   return null;
 }
 
-function compareByNextMilestone(a, b) {
-  const today = startOfDay(vmpToday()).getTime();
+function compareByNextMilestone(a: Activity, b: Activity): number {
+  const today = startOfDay(vmpToday())!.getTime();
   const aNext = nextPendingMilestone(a);
   const bNext = nextPendingMilestone(b);
   const aTime = aNext?.state.due?.getTime();
   const bTime = bNext?.state.due?.getTime();
-  const bucket = (next, time) => !next || !Number.isFinite(time) ? 2 : time >= today ? 0 : 1;
+  const bucket = (next: unknown, time?: number): number =>
+    !next || !Number.isFinite(time) ? 2 : (time as number) >= today ? 0 : 1;
   const aBucket = bucket(aNext, aTime);
   const bBucket = bucket(bNext, bTime);
   if (aBucket !== bBucket) return aBucket - bBucket;
-  if (aBucket === 0 && aTime !== bTime) return aTime - bTime;
-  if (aBucket === 1 && aTime !== bTime) return bTime - aTime;
+  if (aBucket === 0 && aTime !== bTime) return (aTime as number) - (bTime as number);
+  if (aBucket === 1 && aTime !== bTime) return (bTime as number) - (aTime as number);
   return compareByTarget(a, b);
 }
 
-function compareByStageMilestone(stageId) {
+export function compareByStageMilestone(stageId: string) {
   const stage = MAP_STAGES.find((entry) => entry.id === stageId);
   if (!stage) return compareByNextMilestone;
-  const today = startOfDay(vmpToday()).getTime();
-  return (a, b) => {
+  const today = startOfDay(vmpToday())!.getTime();
+  return (a: Activity, b: Activity): number => {
     const aState = stageState(a, stage);
     const bState = stageState(b, stage);
     const aDate = aState.done && aState.actual ? aState.actual : aState.due;
     const bDate = bState.done && bState.actual ? bState.actual : bState.due;
     const aTime = aDate?.getTime();
     const bTime = bDate?.getTime();
-    const bucket = (state, time) => {
+    const bucket = (state: { done: boolean }, time?: number): number => {
       if (!Number.isFinite(time)) return 3;
-      if (!state.done && time >= today) return 0;
+      if (!state.done && (time as number) >= today) return 0;
       if (!state.done) return 1;
       return 2;
     };
     const aBucket = bucket(aState, aTime);
     const bBucket = bucket(bState, bTime);
     if (aBucket !== bBucket) return aBucket - bBucket;
-    if (aBucket === 0 && aTime !== bTime) return aTime - bTime;
-    if (aTime !== bTime) return bTime - aTime;
+    if (aBucket === 0 && aTime !== bTime) return (aTime as number) - (bTime as number);
+    if (aTime !== bTime) return (bTime as number) - (aTime as number);
     return compareByTarget(a, b);
   };
 }
@@ -433,7 +457,7 @@ function compareByStageMilestone(stageId) {
  *  0 Quá hạn (quá hạn nhiều/lâu nhất lên trước) → 1 Tới hạn (gần hạn trước)
  *  → 2 Còn hạn/đang làm → 3 Đã hoàn thành (đẩy xuống cuối).
  * Trong cùng nhóm: sắp theo NGÀY của mốc kế tiếp (hoặc đích VMP), cũ→mới. */
-function timelinePriority(a) {
+function timelinePriority(a: Activity): number {
   if (issueLevel(a) === "done") return 3;
   const next = nextPendingMilestone(a);
   const left = next ? daysUntil(next.state.due) : null;
@@ -443,12 +467,12 @@ function timelinePriority(a) {
   if (left != null && left <= SOON_DAYS) return 1; // tới hạn (0..SOON_DAYS ngày)
   return 2; // còn hạn / đang làm
 }
-function timelineRefTime(a) {
+function timelineRefTime(a: Activity): number {
   const next = nextPendingMilestone(a);
   const d = (next && next.state.due) || parseD(a.target) || new Date(2999, 0, 1);
   return d.getTime();
 }
-function compareTimelineOrder(a, b) {
+function compareTimelineOrder(a: Activity, b: Activity): number {
   const pa = timelinePriority(a);
   const pb = timelinePriority(b);
   if (pa !== pb) return pa - pb;
@@ -460,22 +484,22 @@ function compareTimelineOrder(a, b) {
 
 /* Cùng thứ tự ưu tiên nhưng theo MỘT mốc cụ thể (dùng cho tab Đề cương /
  * Thẩm định thực tế / Hoàn thành VMP): quá hạn → tới hạn → còn hạn → xong (cuối). */
-function stagePriority(a, stage) {
+function stagePriority(a: Activity, stage: (typeof MAP_STAGES)[number]): number {
   const h = stageState(a, stage).heat;
   if (h === "done") return 3;
   if (h === "over") return 0;
   if (h === "urgent" || h === "soon") return 1;
   return 2; // steady / chưa có mốc
 }
-function stageRefTime(a, stage) {
+function stageRefTime(a: Activity, stage: (typeof MAP_STAGES)[number]): number {
   const st = stageState(a, stage);
   const d = (st.done && st.actual ? st.actual : st.due) || parseD(a.target) || new Date(2999, 0, 1);
   return d.getTime();
 }
-function compareStageOrder(stageId) {
+function compareStageOrder(stageId: string) {
   const stage = MAP_STAGES.find((entry) => entry.id === stageId);
   if (!stage) return compareTimelineOrder;
-  return (a, b) => {
+  return (a: Activity, b: Activity): number => {
     const pa = stagePriority(a, stage);
     const pb = stagePriority(b, stage);
     if (pa !== pb) return pa - pb;
@@ -486,9 +510,9 @@ function compareStageOrder(stageId) {
   };
 }
 
-function TimelineMapSummary({ items }) {
-  const rows = MAP_STAGES.map((stage) => {
-    const states = items.map((a) => stageState(a, stage));
+export function TimelineMapSummary({ items }: { items: Activity[] }) {
+  const rows = MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => {
+    const states = items.map((a: Activity) => stageState(a, stage));
     const done = states.filter((state) => state.done).length;
     const urgent = states.filter((state) => !state.done && ["over", "urgent", "soon"].includes(state.heat)).length;
     return {
@@ -512,16 +536,16 @@ function TimelineMapSummary({ items }) {
   );
 }
 
-function bandItems(items, band) {
-  return items.filter((a) => inRange(parseD(a.target), band));
+function bandItems(items: Activity[], band: { start: Date; end: Date }): Activity[] {
+  return items.filter((a: Activity) => inRange(parseD(a.target), band));
 }
 
-function bandSummary(items, range) {
-  return range.bands.map((band) => {
+function bandSummary(items: Activity[], range: TimeRange) {
+  return range.bands.map((band: TimeRange["bands"][number]) => {
     const rows = bandItems(items, band);
-    const done = rows.filter((a) => issueLevel(a) === "done").length;
-    const over = rows.filter((a) => issueLevel(a) === "over").length;
-    const prog = rows.filter((a) => issueLevel(a) === "prog").length;
+    const done = rows.filter((a: Activity) => issueLevel(a) === "done").length;
+    const over = rows.filter((a: Activity) => issueLevel(a) === "over").length;
+    const prog = rows.filter((a: Activity) => issueLevel(a) === "prog").length;
     return {
       ...band,
       rows,
@@ -534,11 +558,13 @@ function bandSummary(items, range) {
   });
 }
 
-function TimelineInsightStrip({ items, stats, range }) {
+export function TimelineInsightStrip({ items, stats, range }: {
+  items: Activity[]; stats: Record<string, number>; range: TimeRange;
+}) {
   const bands = bandSummary(items, range);
   const peak = [...bands].sort((a, b) => b.count - a.count || b.over - a.over)[0];
-  const stageLoads = MAP_STAGES.map((stage) => {
-    const states = items.map((a) => stageState(a, stage));
+  const stageLoads = MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => {
+    const states = items.map((a: Activity) => stageState(a, stage));
     return {
       stage,
       urgent: states.filter((state) => !state.done && ["over", "urgent", "soon"].includes(state.heat)).length,
@@ -573,7 +599,10 @@ function TimelineInsightStrip({ items, stats, range }) {
   );
 }
 
-function TimelineRangeRail({ items, range, view, onFocusBand }) {
+export function TimelineRangeRail({ items, range, view, onFocusBand }: {
+  items: Activity[]; range: TimeRange; view: string;
+  onFocusBand?: (band: { label: string; start: Date; end: Date; [k: string]: unknown }) => void;
+}) {
   const bands = bandSummary(items, range);
   const maxCount = Math.max(1, ...bands.map((band) => band.count));
   const today = vmpToday();
@@ -611,11 +640,14 @@ function TimelineRangeRail({ items, range, view, onFocusBand }) {
               type="button"
               key={`${band.label}-${index}`}
               className={`timeline-range-rail__band ${band.over ? "timeline-range-rail__band--over" : ""} ${band.count ? "" : "timeline-range-rail__band--empty"}`}
-              onClick={() => canFocus && onFocusBand(band)}
+              onClick={() => { if (canFocus) onFocusBand?.(band); }}
               disabled={!canFocus}
               title={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${band.over} cần chú ý`}
               aria-label={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${band.over} cần chú ý`}
-              style={{ "--load": `${load}%`, "--done": `${doneW}%`, "--over": `${overW}%`, "--prog": `${progW}%` }}
+              style={{
+                "--load": `${load}%`, "--done": `${doneW}%`,
+                "--over": `${overW}%`, "--prog": `${progW}%`,
+              } as React.CSSProperties}
             >
               <span className="timeline-range-rail__plot" aria-hidden="true">
                 <strong className="timeline-range-rail__value tnum">{band.count}</strong>
@@ -637,7 +669,7 @@ function TimelineRangeRail({ items, range, view, onFocusBand }) {
   );
 }
 
-function TimelineMapStage({ a, stage }) {
+function TimelineMapStage({ a, stage }: { a: Activity; stage: (typeof MAP_STAGES)[number] }) {
   const state = stageState(a, stage);
   const date = state.done ? (state.actual || state.due) : state.due;
   return (
@@ -652,8 +684,8 @@ function TimelineMapStage({ a, stage }) {
   );
 }
 
-function TimelineMapRowContent({ a }) {
-  const cls = CLS[a.cls] || CLS.tb;
+function TimelineMapRowContent({ a }: { a: Activity }) {
+  const cls = (CLS as Record<string, typeof CLS.tb>)[String(a.cls ?? "tb")] || CLS.tb;
   const dept = DEPTS.find((d) => d.id === a.dept);
   const target = parseD(a.target);
   const owner = ownerOf(a);
@@ -679,7 +711,7 @@ function TimelineMapRowContent({ a }) {
       </div>
 
       <div className="timeline-map-stages">
-        {MAP_STAGES.map((stage) => (
+        {MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => (
           <TimelineMapStage key={stage.id} a={a} stage={stage} />
         ))}
       </div>
@@ -687,7 +719,7 @@ function TimelineMapRowContent({ a }) {
   );
 }
 
-function timelineCalendarWidth(range, density) {
+function timelineCalendarWidth(range: TimeRange, density: string): number {
   const pxPerDay = range.view === "month"
     ? (density === "compact" ? 29 : 34)
     : range.view === "quarter"
@@ -696,9 +728,9 @@ function timelineCalendarWidth(range, density) {
   return Math.max(920, Math.round(range.days * pxPerDay));
 }
 
-function timelineDateTicks(range) {
+function timelineDateTicks(range: TimeRange) {
   const step = range.view === "month" ? 1 : range.view === "quarter" ? 7 : 14;
-  const ticks = [];
+  const ticks: Array<Record<string, unknown> & { date: Date }> = [];
   for (let index = 0; index < range.days; index += 1) {
     const date = addDays(range.start, index);
     const major = date.getDate() === 1;
@@ -715,10 +747,13 @@ function timelineDateTicks(range) {
   return ticks;
 }
 
-function timelineStagePoint(state, range) {
+function timelineStagePoint(
+  state: { done: boolean; actual: Date | null; due: Date | null; [k: string]: unknown },
+  range: TimeRange,
+) {
   const date = state.done && state.actual ? state.actual : state.due;
-  const before = date && date < startOfDay(range.start);
-  const after = date && date > startOfDay(range.end);
+  const before = !!date && date < startOfDay(range.start)!;
+  const after = !!date && date > startOfDay(range.end)!;
   return {
     date,
     edge: before ? "before" : after ? "after" : "inside",
@@ -726,7 +761,7 @@ function timelineStagePoint(state, range) {
   };
 }
 
-function TimelineTableStageLabel({ a, stage }) {
+function TimelineTableStageLabel({ a, stage }: { a: Activity; stage: (typeof MAP_STAGES)[number] }) {
   const state = stageState(a, stage);
   return (
     <div
@@ -748,12 +783,17 @@ const FLOW_Y = {
   vmp: 76,
 };
 
-function TimelineTableFlowCell({ a, range, stages = MAP_STAGES }) {
+function TimelineTableFlowCell({ a, range, stages = MAP_STAGES }: {
+  a: Activity; range: TimeRange; stages?: typeof MAP_STAGES;
+}) {
   const singleStage = stages.length === 1;
-  const entries = stages.map((stage) => {
+  const entries = stages.map((stage: (typeof MAP_STAGES)[number]) => {
     const state = stageState(a, stage);
     const point = timelineStagePoint(state, range);
-    return { stage, state, point, y: singleStage ? 50 : (FLOW_Y[stage.id] || 50) };
+    return {
+      stage, state, point,
+      y: singleStage ? 50 : ((FLOW_Y as Record<string, number>)[stage.id] || 50),
+    };
   }).filter((entry) => entry.point.date);
   if (!entries.length) {
     return (
@@ -812,8 +852,8 @@ function TimelineTableFlowCell({ a, range, stages = MAP_STAGES }) {
 }
 
 /* Tổng hợp theo mốc cho 1 stage: xong / quá hạn / sắp tới hạn. */
-function stageAgg(items, stage) {
-  const states = items.map((a) => stageState(a, stage));
+function stageAgg(items: Activity[], stage: (typeof MAP_STAGES)[number]) {
+  const states = items.map((a: Activity) => stageState(a, stage));
   const done = states.filter((s) => s.done).length;
   const over = states.filter((s) => !s.done && s.heat === "over").length;
   const soon = states.filter((s) => !s.done && (s.heat === "urgent" || s.heat === "soon")).length;
@@ -825,13 +865,15 @@ function stageAgg(items, stage) {
  *  · Sắp thẩm định thực tế chưa?    → số "sắp hạn" của mốc Thẩm định
  *  · Mục nào quá hạn / bị trôi?     → chip "quá hạn" (bấm để lọc)
  *  · Kế hoạch quý tới?              → thẻ "quý tới" (bấm để nhảy tới quý sau) */
-function TimelineStageProgress({ items, year, onOverdue, onNextQuarter }) {
-  const cards = MAP_STAGES.map((stage) => ({ stage, ...stageAgg(items, stage) }));
+function TimelineStageProgress({ items, year, onOverdue, onNextQuarter }: {
+  items: Activity[]; year: number; onOverdue?: () => void; onNextQuarter?: () => void;
+}) {
+  const cards = MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => ({ stage, ...stageAgg(items, stage) }));
   const curQ = Math.floor(vmpToday().getMonth() / 3);
   const nextInYear = curQ + 1 <= 3;
   const nqIndex = nextInYear ? curQ + 1 : 0;
   const nqYear = nextInYear ? year : year + 1;
-  const nextQCount = items.filter((a) => {
+  const nextQCount = items.filter((a: Activity) => {
     const t = parseD(a.target);
     return t && t.getFullYear() === nqYear && Math.floor(t.getMonth() / 3) === nqIndex;
   }).length;
@@ -914,8 +956,11 @@ function TimelineFlowLegend() {
   );
 }
 
-function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" }) {
-  const boardRef = useRef(null);
+function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" }: {
+  items: Activity[]; onOpen: (a: Activity) => void; density: string;
+  range: TimeRange; tableStage?: string;
+}) {
+  const boardRef = useRef<HTMLDivElement | null>(null);
   const calendarWidth = timelineCalendarWidth(range, density);
   const today = vmpToday();
   const todayVisible = inRange(today, range);
@@ -927,16 +972,16 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
   );
   const nextUpcomingDate = tableItems
     .map((item) => selectedStage ? stageState(item, selectedStage).due : nextPendingMilestone(item)?.state.due)
-    .find((date) => date && date >= startOfDay(today) && inRange(date, range));
+    .find((date) => date && date >= startOfDay(today)! && inRange(date, range));
   const nextUpcomingTime = nextUpcomingDate?.getTime() || null;
 
   useEffect(() => {
     const board = boardRef.current;
     if (!board || !todayVisible) return;
     const centerToday = () => {
-      const itemHead = board.querySelector(".timeline-day-head-item");
-      const stageHead = board.querySelector(".timeline-day-head-stages");
-      const calendarHead = board.querySelector(".timeline-day-head-calendar");
+      const itemHead = board.querySelector<HTMLElement>(".timeline-day-head-item");
+      const stageHead = board.querySelector<HTMLElement>(".timeline-day-head-stages");
+      const calendarHead = board.querySelector<HTMLElement>(".timeline-day-head-calendar");
       const itemWidth = itemHead?.offsetWidth || 0;
       const stageIsHorizontallySticky = stageHead && getComputedStyle(stageHead).left !== "auto";
       const stickyWidth = itemWidth + (stageIsHorizontallySticky ? stageHead.offsetWidth : 0);
@@ -969,7 +1014,9 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
     <div ref={boardRef} className={`timeline-day-board timeline-day-board--${density} ${selectedStage ? "timeline-day-board--single" : ""} vmp-scroll`}>
       <table
         className="timeline-day-table"
-        style={{ "--calendar-width": `${calendarWidth}px`, "--day-size": daySize }}
+        style={{
+          "--calendar-width": `${calendarWidth}px`, "--day-size": daySize,
+        } as React.CSSProperties}
       >
         <thead>
           <tr>
@@ -984,7 +1031,7 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
                     className={`timeline-day-axis__tick ${tick.major ? "timeline-day-axis__tick--major" : ""} ${tick.edge ? `timeline-day-axis__tick--${tick.edge}` : ""}`}
                     style={{ left: `${tick.left}%` }}
                   >
-                    {tick.label}
+                    {String(tick.label ?? "")}
                   </span>
                 ))}
               </div>
@@ -992,8 +1039,8 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
           </tr>
         </thead>
         <tbody>
-          {tableItems.map((a) => {
-            const cls = CLS[a.cls] || CLS.tb;
+          {tableItems.map((a: Activity) => {
+            const cls = (CLS as Record<string, typeof CLS.tb>)[String(a.cls ?? "tb")] || CLS.tb;
             const dept = DEPTS.find((d) => d.id === a.dept);
             const level = issueLevel(a);
             const owner = ownerOf(a);
@@ -1022,7 +1069,7 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
                 </td>
                 <td className="timeline-day-stages-cell">
                   <div className={`timeline-day-stages ${selectedStage ? "timeline-day-stages--single" : ""}`}>
-                    {visibleStages.map((stage) => <TimelineTableStageLabel key={stage.id} a={a} stage={stage} />)}
+                    {visibleStages.map((stage: (typeof MAP_STAGES)[number]) => <TimelineTableStageLabel key={stage.id} a={a} stage={stage} />)}
                   </div>
                 </td>
                 <td className="timeline-day-calendar-cell" style={{ width: `${calendarWidth}px` }}>
@@ -1038,7 +1085,9 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
   );
 }
 
-function TimelineStageBoard({ items, onOpen, density }) {
+function TimelineStageBoard({ items, onOpen, density }: {
+  items: Activity[]; onOpen: (a: Activity) => void; density: string;
+}) {
   if (!items.length) {
     return (
       <div className="timeline-card-board-empty">
@@ -1050,7 +1099,7 @@ function TimelineStageBoard({ items, onOpen, density }) {
   return (
     <div className={`timeline-map-board timeline-map-board--${density}`}>
       <div className="timeline-map-list vmp-scroll">
-        {items.map((a) => (
+        {items.map((a: Activity) => (
           <button
             type="button"
             key={a.id}
@@ -1066,7 +1115,7 @@ function TimelineStageBoard({ items, onOpen, density }) {
   );
 }
 
-function HybridChartCell({ a, range, width }) {
+function HybridChartCell({ a, range, width }: { a: Activity; range: TimeRange; width: number }) {
   const ps = phaseStates(a);
   const { m, start, end } = taskWindow(a);
 
@@ -1079,13 +1128,19 @@ function HybridChartCell({ a, range, width }) {
         width: `${Math.max(.8, pctInRange(end, range) - pctInRange(start, range))}%`,
       }} />
       {PHASES.map((seg) => <PhaseSegment key={seg.id} seg={seg} ps={ps} m={m} range={range} />)}
-      {MILESTONES.map((ms) => <MilestoneDot key={ms.id} milestone={ms} date={m[ms.id]} range={range} />)}
+      {MILESTONES.map((ms) => (
+        <MilestoneDot key={ms.id} milestone={ms}
+          date={(m as unknown as Record<string, Date | null>)[ms.id]} range={range} />
+      ))}
       <ProgressPin a={a} start={start} end={end} range={range} />
     </div>
   );
 }
 
-function TimelineHybridBoard({ range, items, width, onOpen, density }) {
+function TimelineHybridBoard({ range, items, width, onOpen, density }: {
+  range: TimeRange; items: Activity[]; width: number;
+  onOpen: (a: Activity) => void; density: string;
+}) {
   if (!items.length) {
     return (
       <div className="timeline-card-board-empty">
@@ -1106,7 +1161,7 @@ function TimelineHybridBoard({ range, items, width, onOpen, density }) {
           <div className="timeline-chart-cell timeline-chart-cell--header timeline-hybrid-chart" style={{ width, flexBasis: width }}>
             <ScaleBands range={range} />
             <TodayLine range={range} label />
-            {range.bands.map((band, i) => {
+            {range.bands.map((band: TimeRange["bands"][number], i: number) => {
               const left = pctInRange(band.start, range);
               const right = pctInRange(addDays(band.end, 1), range);
               return (
@@ -1116,14 +1171,14 @@ function TimelineHybridBoard({ range, items, width, onOpen, density }) {
                   style={{ left: `${left}%`, width: `${Math.max(.3, right - left)}%` }}
                 >
                   <strong>{band.label}</strong>
-                  <small>{band.sub}</small>
+                  <small>{String(band.sub ?? "")}</small>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {items.map((a) => (
+        {items.map((a: Activity) => (
           <button
             type="button"
             key={a.id}
@@ -1142,10 +1197,10 @@ function TimelineHybridBoard({ range, items, width, onOpen, density }) {
   );
 }
 
-function ScaleBands({ range }) {
+function ScaleBands({ range }: { range: TimeRange }) {
   return (
     <>
-      {range.bands.map((band, i) => {
+      {range.bands.map((band: TimeRange["bands"][number], i: number) => {
         const left = pctInRange(band.start, range);
         const right = pctInRange(addDays(band.end, 1), range);
         return (
@@ -1160,7 +1215,7 @@ function ScaleBands({ range }) {
           />
         );
       })}
-      {range.bands.map((band, i) => (
+      {range.bands.map((band: TimeRange["bands"][number], i: number) => (
         <div
           key={`line-${band.label}-${i}`}
           className="timeline-grid-line"
@@ -1172,7 +1227,7 @@ function ScaleBands({ range }) {
   );
 }
 
-function TodayLine({ range, label = false }) {
+function TodayLine({ range, label = false }: { range: TimeRange; label?: boolean }) {
   const today = vmpToday();
   if (!inRange(today, range)) return null;
   return (
@@ -1182,13 +1237,20 @@ function TodayLine({ range, label = false }) {
   );
 }
 
-function PhaseSegment({ seg, ps, m, range }) {
-  const from = m[seg.from];
-  const to = m[seg.to];
+function PhaseSegment({ seg, ps, m, range }: {
+  seg: { id: string; from: string; to: string; key?: string; [k: string]: unknown };
+  /** Kết quả phaseStates(): p/v/r là trạng thái, m là mốc thời gian. */
+  ps: { p: string; v: string; r: string; [k: string]: unknown };
+  m: Milestones;
+  range: TimeRange;
+}) {
+  const mm = m as unknown as Record<string, Date | null>;
+  const from = mm[seg.from];
+  const to = mm[seg.to];
   if (!from || !to || !intersectsRange(from, to, range)) return null;
   const left = pctInRange(maxDate(from, range.start), range);
   const right = pctInRange(minDate(to, addDays(range.end, 1)), range);
-  const status = ps[seg.key] || "future";
+  const status = String(ps[String(seg.key)] ?? "future");
   return (
     <div
       className={`timeline-phase timeline-phase--${status}`}
@@ -1196,13 +1258,17 @@ function PhaseSegment({ seg, ps, m, range }) {
       style={{
         left: `${left}%`,
         width: `${Math.max(.6, right - left)}%`,
-        background: PHASE_COLOR[status] || PHASE_COLOR.future,
+        background: (PHASE_COLOR as Record<string, string>)[status] || PHASE_COLOR.future,
       }}
     />
   );
 }
 
-function MilestoneDot({ milestone, date, range }) {
+function MilestoneDot({ milestone, date, range }: {
+  milestone: { id: string; label: string; color?: string; [k: string]: unknown };
+  date: Date | null;
+  range: TimeRange;
+}) {
   if (!inRange(date, range)) return null;
   return (
     <span
@@ -1218,7 +1284,9 @@ function MilestoneDot({ milestone, date, range }) {
   );
 }
 
-function ProgressPin({ a, start, end, range }) {
+function ProgressPin({ a, start, end, range }: {
+  a: Activity; start: Date; end: Date; range: TimeRange;
+}) {
   const pct = phaseProgress(a);
   const startPct = pctInRange(start, range);
   const endPct = pctInRange(end, range);
@@ -1236,15 +1304,15 @@ function ProgressPin({ a, start, end, range }) {
   );
 }
 
-function ActivityDetailModal({ a, onClose }) {
+function ActivityDetailModal({ a, onClose }: { a: Activity | null; onClose: () => void }) {
   if (!a) return null;
   const r = a._raw || {};
   const m = a.m || milestones(a);
-  const cls = CLS[a.cls] || CLS.tb;
+  const cls = (CLS as Record<string, typeof CLS.tb>)[String(a.cls ?? "tb")] || CLS.tb;
   const dp = DEPTS.find((d) => d.id === a.dept);
-  const ct = CRIT[a.crit] || CRIT.TB;
-  const dShow = (v) => { const t = String(v == null ? "" : v).trim(); return t || "—"; };
-  const has = (v) => String(v == null ? "" : v).trim() !== "";
+  const ct = (CRIT as Record<string, typeof CRIT.TB>)[String(a.crit ?? "TB")] || CRIT.TB;
+  const dShow = (v: unknown): string => { const t = String(v == null ? "" : v).trim(); return t || "—"; };
+  const has = (v: unknown): boolean => String(v == null ? "" : v).trim() !== "";
   const info = [
     ["Phân loại", cls.label], ["Bộ phận", dp ? dp.name : dShow(r.bo_phan)], ["Line", dShow(r.line)],
     ["Khu vực", dShow(r.khu_vuc)], ["Tình trạng", dShow(r.tinh_trang)], ["Tần suất", has(r.tan_suat) ? dShow(r.tan_suat) + " tháng" : "—"],
@@ -1269,8 +1337,8 @@ function ActivityDetailModal({ a, onClose }) {
         {info.map(([k, v]) => <div key={k} style={{ background: "#fff", borderRadius: 11, padding: "8px 11px" }}><div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 800, textTransform: "uppercase", letterSpacing: .3 }}>{k}</div><div style={{ fontSize: 13.5, color: C.plum, fontWeight: 700, marginTop: 2 }}>{v}</div></div>)}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
-        <div style={{ flex: 1, minWidth: 190, background: C.pinkSoft, borderRadius: 12, padding: "10px 13px" }}><div style={{ fontSize: 10, color: C.pinkText, fontWeight: 800, textTransform: "uppercase" }}>QA phụ trách</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.qa)}</div>{has(r.email_qa) && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{r.email_qa}</div>}</div>
-        <div style={{ flex: 1, minWidth: 190, background: C.lavSoft, borderRadius: 12, padding: "10px 13px" }}><div style={{ fontSize: 10, color: C.lavText, fontWeight: 800, textTransform: "uppercase" }}>NS bộ phận khác</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.ns_khac)}</div>{has(r.email_khac) && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{r.email_khac}</div>}</div>
+        <div style={{ flex: 1, minWidth: 190, background: C.pinkSoft, borderRadius: 12, padding: "10px 13px" }}><div style={{ fontSize: 10, color: C.pinkText, fontWeight: 800, textTransform: "uppercase" }}>QA phụ trách</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.qa)}</div>{has(r.email_qa) && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_qa ?? "")}</div>}</div>
+        <div style={{ flex: 1, minWidth: 190, background: C.lavSoft, borderRadius: 12, padding: "10px 13px" }}><div style={{ fontSize: 10, color: C.lavText, fontWeight: 800, textTransform: "uppercase" }}>NS bộ phận khác</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.ns_khac)}</div>{has(r.email_khac) && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_khac ?? "")}</div>}</div>
       </div>
       <div style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><CalendarClock size={17} color={C.pink} /> Vòng đời thẩm định</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -1278,7 +1346,7 @@ function ActivityDetailModal({ a, onClose }) {
           <div key={i} style={{ background: "#fff", borderRadius: 14, padding: "11px 14px", borderLeft: `4px solid ${has(p.act) ? C.mint : C.pinkSoft}` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}><span style={{ fontSize: 18 }}>{p.ic}</span><div><div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{p.label}</div><div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 600 }}>{p.note}</div></div></div>
-              {phaseTag(p.st)}
+              {phaseTag(String(p.st ?? ""))}
             </div>
             <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap", fontSize: 12.5 }}>
               <span style={{ color: C.plumSoft, fontWeight: 600 }}>Hạn: <b style={{ color: C.plum }}>{dShow(p.dl)}</b></span>
@@ -1303,9 +1371,11 @@ const OV_STATUS = [
   { k: "prog", label: "Đang thực hiện" },
   { k: "chua", label: "Chưa / Kế hoạch" },
 ];
-const ovBucket = (st) => (st === "done" || st === "over" || st === "prog") ? st : "chua";
+const ovBucket = (st: string): string => (st === "done" || st === "over" || st === "prog") ? st : "chua";
 
-function OvKpi({ k, v, sub, color, small }) {
+function OvKpi({ k, v, sub, color, small }: {
+  k: ReactNode; v: ReactNode; sub?: ReactNode; color?: string; small?: boolean;
+}) {
   return (
     <div style={{ background: "#fff", border: `1px solid ${C.pinkSoft}`, borderRadius: 16, padding: "13px 16px" }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>{k}</div>
@@ -1315,7 +1385,10 @@ function OvKpi({ k, v, sub, color, small }) {
   );
 }
 
-function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
+function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
+  acts: Activity[]; year: number;
+  onPickMonth?: (m: number) => void; onPickDept?: (d: string) => void;
+}) {
   const { months, noDeadline, deptRows, kpi } = useMemo(() => {
     const months = Array.from({ length: 12 }, () => ({ done: 0, over: 0, prog: 0, chua: 0, total: 0 }));
     const deptM = new Map();
@@ -1329,7 +1402,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
       const t = a.target ? parseD(a.target) : null;
       if (!t) { noDeadline++; continue; }
       if (t.getFullYear() !== year) continue;
-      const m = months[t.getMonth()];
+      const m = months[t.getMonth()] as unknown as Record<string, number>;
       m.total++; m[b]++;
     }
     const deptRows = DEPTS
@@ -1339,7 +1412,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
     const nowM = vmpToday().getMonth();
     let peakI = 0;
     months.forEach((m, i) => { if (m.total > months[peakI].total) peakI = i; });
-    const overAll = acts.filter((a) => a.st === "over").length;
+    const overAll = acts.filter((a: Activity) => a.st === "over").length;
     const kpi = { totalAll: acts.length, overAll, thisMonth: months[nowM].total, nowM, peakI, peak: months[peakI].total };
     return { months, noDeadline, deptRows, kpi };
   }, [acts, year]);
@@ -1370,14 +1443,20 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
               const barH = m.total / maxT * H;
               const isNow = i === nowM;
               return (
-                <button key={i} type="button" onClick={() => onPickMonth(i)}
+                <button key={i} type="button" onClick={() => onPickMonth?.(i)}
                   title={`${MONTHS[i]}: ${m.total} hạng mục — Xong ${m.done} · Quá hạn ${m.over} · Đang ${m.prog} · Chưa ${m.chua}`}
                   style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", position: "relative", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
                   <span style={{ position: "absolute", top: -18, left: 0, right: 0, textAlign: "center", fontSize: 12, fontWeight: 800, color: C.plum, fontFamily: NUM }}>{m.total || ""}</span>
                   <div style={{ display: "flex", flexDirection: "column-reverse", borderRadius: "8px 8px 3px 3px", overflow: "hidden", height: barH, minHeight: m.total ? 4 : 0, outline: isNow ? `2px solid ${C.pink}` : "none", outlineOffset: 2 }}>
-                    {OV_STATUS.map((s) => m[s.k] > 0
-                      ? <div key={s.k} style={{ height: m[s.k] / m.total * barH, background: OV_COLOR[s.k] }} />
-                      : null)}
+                    {OV_STATUS.map((s) => {
+                      const mm = m as unknown as Record<string, number>;
+                      return mm[s.k] > 0
+                        ? <div key={s.k} style={{
+                            height: mm[s.k] / mm.total * barH,
+                            background: (OV_COLOR as Record<string, string>)[s.k],
+                          }} />
+                        : null;
+                    })}
                   </div>
                   <span style={{ marginTop: 8, textAlign: "center", fontSize: 12, fontWeight: 800, color: isNow ? C.pinkText : C.plumSoft }}>{MONTHS[i]}{isNow ? " ●" : ""}</span>
                 </button>
@@ -1388,7 +1467,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 14 }}>
           {OV_STATUS.map((s) => (
             <span key={s.k} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
-              <span style={{ width: 12, height: 12, borderRadius: 4, background: OV_COLOR[s.k] }} />{s.label}
+              <span style={{ width: 12, height: 12, borderRadius: 4, background: (OV_COLOR as Record<string, string>)[s.k] }} />{s.label}
             </span>
           ))}
         </div>
@@ -1401,9 +1480,9 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
             {deptRows.map((r) => {
               const rest = r.total - r.done - r.over;
-              const pc = (n) => (n / r.total * 100) + "%";
+              const pc = (n: number): string => (n / r.total * 100) + "%";
               return (
-                <button key={r.id} type="button" onClick={() => onPickDept(r.id)}
+                <button key={r.id} type="button" onClick={() => onPickDept?.(r.id)}
                   title={`${r.name}: ${r.total} — xong ${r.done}, quá hạn ${r.over}`}
                   style={{ display: "grid", gridTemplateColumns: "58px 1fr 92px", alignItems: "center", gap: 12, border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
                   <span style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{r.code}</span>
@@ -1423,7 +1502,9 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }) {
   );
 }
 
-export default function TimelineView({ acts, objects = [] }) {
+export default function TimelineView({ acts, objects = [] }: {
+  acts: Activity[]; objects?: VmpObject[];
+}) {
   const year = vmpToday().getFullYear();
   const [workspace, setWorkspace] = useState("overview");
   const [view, setView] = useState("year");
@@ -1436,19 +1517,19 @@ export default function TimelineView({ acts, objects = [] }) {
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
   const [q, setQ] = useState("");
-  const [detail, setDetail] = useState(null);
+  const [detail, setDetail] = useState<Activity | null>(null);
   const dq = useDebounce(q, 300);
 
   const range = useMemo(() => rangeFor(view, focusMonth, year), [view, focusMonth, year]);
   const chartWidth = chartWidthFor(view, density);
 
-  const setViewMode = (mode) => {
+  const setViewMode = (mode: string) => {
     setView(mode);
     if (mode === "year") setScope("year");
     else setScope("period");
   };
 
-  const setScopeMode = (mode) => {
+  const setScopeMode = (mode: string) => {
     setScope(mode);
     if (mode === "year") setView("year");
     else if (view === "year") setView("month");
@@ -1457,7 +1538,7 @@ export default function TimelineView({ acts, objects = [] }) {
   const filtered = useMemo(() => {
     const needle = dq.trim().toLowerCase();
     return acts
-      .filter((a) => {
+      .filter((a: Activity) => {
         if (!a.target) return false;
         if ((a.state || "active") !== "active") return false;
         if (cls !== "all" && a.cls !== cls) return false;
@@ -1481,7 +1562,7 @@ export default function TimelineView({ acts, objects = [] }) {
   // KHÔNG giới hạn theo khung tháng/quý — để nhìn toàn cảnh.
   const explorerActs = useMemo(() => {
     const needle = dq.trim().toLowerCase();
-    return acts.filter((a) => {
+    return acts.filter((a: Activity) => {
       if ((a.state || "active") !== "active") return false;
       if (cls !== "all" && a.cls !== cls) return false;
       if (dept !== "all" && a.dept !== dept) return false;
@@ -1507,13 +1588,13 @@ export default function TimelineView({ acts, objects = [] }) {
     setQ("");
   };
 
-  const shiftRange = (delta) => {
+  const shiftRange = (delta: number) => {
     if (view === "year") return;
     const step = view === "quarter" ? 3 : 1;
     setFocusMonth((m) => clamp(m + delta * step, 0, 11));
   };
 
-  const setQuarter = (qIndex) => setFocusMonth(qIndex * 3);
+  const setQuarter = (qIndex: number) => setFocusMonth(qIndex * 3);
   const goNextQuarter = () => {
     const nq = Math.floor(vmpToday().getMonth() / 3) + 1;
     if (nq > 3) return;
@@ -1521,11 +1602,14 @@ export default function TimelineView({ acts, objects = [] }) {
     setScope("period");
     setFocusMonth(nq * 3);
   };
-  const focusBand = (band) => {
+  // Dựng sẵn cho TimelineRangeRail (bấm vào một dải thời gian để zoom vào
+  // tháng đó). Rail chưa được gắn vào bố cục hiện tại — giữ để nối sau.
+  const focusBand = (band: { start: Date; [k: string]: unknown }) => {
     setFocusMonth(band.start.getMonth());
     setView("month");
     setScope("period");
   };
+  void focusBand;
   const hasFilters = cls !== "all" || dept !== "all" || status !== "all" || q.trim();
 
   return (
@@ -1667,7 +1751,9 @@ export default function TimelineView({ acts, objects = [] }) {
           </div>
           <select value={cls} onChange={(e) => setCls(e.target.value)} className="timeline-select">
             <option value="all">Tất cả nhóm</option>
-            {Object.keys(CLS).map((k) => <option key={k} value={k}>{CLS[k].label}</option>)}
+            {Object.keys(CLS).map((k) => (
+              <option key={k} value={k}>{(CLS as Record<string, { label: string }>)[k].label}</option>
+            ))}
           </select>
           <select value={dept} onChange={(e) => setDept(e.target.value)} className="timeline-select">
             <option value="all">Tất cả bộ phận</option>
@@ -1718,14 +1804,14 @@ export default function TimelineView({ acts, objects = [] }) {
                 {chartMode === "table"
                   ? tableStage === "all"
                     ? "Sơ đồ dòng thời gian tổng hợp"
-                    : `Bảng ${TABLE_STAGE_LABELS[tableStage]}`
+                    : `Bảng ${(TABLE_STAGE_LABELS as Record<string, string>)[tableStage]}`
                   : chartMode === "stage"
                     ? "Sơ đồ 3 mốc"
                     : "Sơ đồ 3 mốc + trục thời gian"}
               </strong>
               <span>
                 {filtered.length} hạng mục · {chartMode === "table" && tableStage !== "all"
-                  ? `${TABLE_STAGE_LABELS[tableStage]} · sắp xếp theo thời gian, mốc sắp tới trước`
+                  ? `${(TABLE_STAGE_LABELS as Record<string, string>)[tableStage]} · sắp xếp theo thời gian, mốc sắp tới trước`
                   : "Đề cương / Thẩm định thực tế / Hoàn thành VMP · ưu tiên mốc sắp tới"}
               </span>
             </div>
@@ -1735,7 +1821,7 @@ export default function TimelineView({ acts, objects = [] }) {
                   <button
                     type="button"
                     key={key}
-                    data-short={TABLE_STAGE_SHORT_LABELS[key]}
+                    data-short={(TABLE_STAGE_SHORT_LABELS as Record<string, string>)[key]}
                     className={`timeline-table-tab timeline-table-tab--${key} ${tableStage === key ? "is-active" : ""}`}
                     onClick={() => setTableStage(key)}
                   >
@@ -1745,7 +1831,7 @@ export default function TimelineView({ acts, objects = [] }) {
               </div>
             ) : (
               <div className="timeline-map-legend">
-                {MAP_STAGES.map((stage) => (
+                {MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => (
                   <span key={stage.id} className={`timeline-map-legend__item timeline-map-legend__item--${stage.id}`}>
                     <i />{stage.label}
                   </span>
@@ -1786,7 +1872,8 @@ export default function TimelineView({ acts, objects = [] }) {
             onSelectStatus={(s) => { setStatus(["over", "prog", "todo", "done"].includes(s) ? s : "all"); setWorkspace("timeline"); }}
           />
         ) : (
-          <TablePanel events={visualModel.timelineEvents} selectedId="" onSelect={(ev) => setDetail(ev.raw)} density={density} />
+          <TablePanel events={visualModel.timelineEvents} selectedId=""
+            onSelect={(ev) => setDetail((ev.raw as Activity) ?? null)} density={density} />
         )}
       </Card>
 
