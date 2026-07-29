@@ -257,13 +257,45 @@ Các nhóm bị xếp nhầm xuống "gián tiếp", nay đã nâng lên "trực
 
 Vẫn giữ "gián tiếp" (có lý do rõ): **kho lưu mẫu QC** (mẫu lưu, không phải lô xuất bán) và **thẩm định vận chuyển** với xe thường — *nếu vận chuyển thuốc lạnh thì phải nâng lên 3, QA cần xác nhận điểm này.*
 
-### 12.3 Kết quả sau khi sửa
+### 12.3 Lần rà thứ hai — trục "mức độ phức tạp" cũng sai
 
-| Điểm | Số đối tượng | % |
+Người dùng chỉ tiếp: *"LAF cân sao điểm là 3. Nó không phải chỉ là cái cân, cân nguyên liệu trong đó."*
+
+Đúng. Luật cũ có `^laf → phức tạp 1`, tức là coi mọi thiết bị có chữ LAF như một cái cân bàn. Sai về bản chất thiết bị: **LAF cân là buồng cân / buồng lấy mẫu** (dispensing booth, downflow booth, RLAF) — một tủ xử lý không khí sạch để cân nguyên liệu hở, không phải cái cân.
+
+Nhóm xử lý không khí sạch đòi đủ `DQ → IQ → OQ → PQ` với phép đo chuyên biệt, tái thẩm định định kỳ:
+
+- toàn vẹn màng HEPA bằng khí dung DOP/PAO
+- vận tốc gió và độ đồng đều — dung sai ±20% quanh giá trị đích
+- đếm tiểu phân theo cấp sạch
+- hình ảnh khói (smoke pattern) — hướng dòng khí, không có vùng quẩn
+- thời gian phục hồi (recovery)
+
+Đây là mức phức tạp **ngang hệ HVAC**.
+
+Các nhóm đã sửa trong lần rà này:
+
+| Nhóm | Cũ | Mới | Vì sao |
+|---|---|---|---|
+| LAF, buồng cân, buồng lấy mẫu, tủ ATSH/BSC, isolator, tủ găng tay | 1–2 | **3** | Xử lý không khí sạch, chuỗi phép đo HEPA/gió/tiểu phân/khói/recovery |
+| Nồi hấp, tủ hấp tiệt trùng | 2 | **3** | Phân bố nhiệt, xuyên nhiệt tới điểm lạnh nhất, chỉ thị sinh học, F0, thẩm định theo từng kiểu xếp tải |
+| Passbox, tủ truyền nguyên liệu | 1 | **2** | Có HEPA và khoá liên động, nhưng không có chu trình để chạy PQ nhiều thông số |
+| Chiller | 1 | **2** | Hệ làm lạnh có vòng điều khiển nhiệt độ; trước bị khớp nhầm chuỗi `chile` |
+| Quy trình vô khuẩn | 2 | **3** | Mô phỏng vô trùng (media fill) lặp lại, giám sát môi trường, kiểm tra vô khuẩn |
+
+Quy trình nay chấm theo cột **"Phân loại báo cáo"** của sheet gốc (`Vô khuẩn → 3`) thay vì đoán theo tên sản phẩm.
+
+Hai kiểu khớp nhầm cũng đã chặn: **"bán tự động"** khớp chuỗi `tự động` nhưng thực tế ít tự động hơn; **"Tủ sấy 2 cánh cho lên men"** khớp `lên men` nhưng nó là tủ sấy.
+
+Giữ nguyên phức tạp 1: cân check trên dây chuyền, tủ lạnh/tủ mát bảo quản, giá kệ, xe đẩy, kho thường, xe vận chuyển.
+
+### 12.3b Kết quả sau hai lần sửa
+
+| Điểm trọng yếu | Số đối tượng | % |
 |---|---|---|
-| **9** | 62 | 23,5% |
-| **6** | 154 | 58,3% |
-| **3** | 41 | 15,5% |
+| **9** | 96 | 36,4% |
+| **6** | 133 | 50,4% |
+| **3** | 28 | 10,6% |
 | 2 | 5 | 1,9% |
 | 1 | 2 | 0,8% |
 
@@ -273,7 +305,7 @@ Vẫn giữ "gián tiếp" (có lý do rõ): **kho lưu mẫu QC** (mẫu lưu, 
 
 | Trục | Phân bố | Nhận xét |
 |---|---|---|
-| Mức độ phức tạp | 3 → 23,5% · 2 → 59,1% · 1 → 17,4% | Phân tán tốt |
+| Mức độ phức tạp | 3 → 36,4% · 2 → 51,1% · 1 → 12,5% | Phân tán tốt |
 | **Ảnh hưởng chất lượng** | **3 → 97,3%** · 2 → 1,1% · 1 → 1,5% | ⚠️ **Gần như không phân biệt** |
 
 **Đây không phải lỗi phân loại — đó là bản chất của một nhà máy GMP: gần như mọi thiết bị GMP đều là _direct impact_.**
@@ -281,6 +313,8 @@ Vẫn giữ "gián tiếp" (có lý do rõ): **kho lưu mẫu QC** (mẫu lưu, 
 Chính vì lý do này, **ISPE Baseline Guide 5 bản 2 đã BỎ mức "Indirect Impact"**, chỉ còn Direct / Not-Direct: mức ở giữa không mang thông tin.
 
 Hệ quả với công thức hiện tại: với 97% đối tượng, `điểm = phức tạp × 3`. Trục ảnh hưởng đóng góp gần như bằng không, và thang 1–9 thực chất co lại thành ba mức **3 · 6 · 9** do độ phức tạp quyết định.
+
+**Điều này làm trục "mức độ phức tạp" thành trục quyết định duy nhất — nên một lỗi phân loại ở trục đó (như LAF cân) là lỗi ảnh hưởng thẳng tới thứ tự ưu tiên, không có trục thứ hai nào bù lại được.** Vì vậy mô tả và ví dụ của từng mức nay hiện thẳng trên tab "Luật đang áp dụng" để QA đối chiếu, thay vì chỉ có ba chữ Cao / Trung bình / Thấp.
 
 ### 12.5 Đề xuất — giữ hay đổi thang điểm
 
