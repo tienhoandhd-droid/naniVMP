@@ -691,7 +691,7 @@ export function Sel({ val, set, opts }: {
   return (
     <select value={val} onChange={(e) => set(e.target.value)} style={{
       padding: "8px 13px", borderRadius: 12, border: `1.5px solid ${C.pinkSoft}`,
-      background: "#fff", fontFamily: TEXT, fontSize: 13, color: C.plum,
+      background: C.surface, fontFamily: TEXT, fontSize: 13, color: C.plum,
       fontWeight: 700, cursor: "pointer", outline: "none",
     }}>
       {opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
@@ -829,7 +829,7 @@ export function ChartTip({ active, payload, label }: {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
-      background: "#fff", padding: "10px 14px", borderRadius: 14,
+      background: C.surface, padding: "10px 14px", borderRadius: 14,
       border: `1.5px solid ${C.pinkSoft}`,
       boxShadow: "0 8px 24px rgba(238,123,169,.18)",
       fontFamily: TEXT, fontSize: 13,
@@ -1105,7 +1105,7 @@ export function CrownLogo() {
           height: 40,
           padding: "4px 8px",
           borderRadius: 12,
-          background: "#fff",
+          background: C.surface,
           border: `1px solid ${C.pinkSoft}`,
           display: "flex",
           alignItems: "center",

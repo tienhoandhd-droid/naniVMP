@@ -46,7 +46,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const Row = ({ a, al }: { a: Activity; al: AlertInfo }) => {
     const cls = (CLS as Record<string, typeof CLS.tb>)[String(a.cls ?? "tb")] ?? CLS.tb;
     return (
-      <div className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: "#fff", border: `1px solid ${al.kind === "over" ? C.raspSoft : C.marigoldSoft}` }}>
+      <div className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: C.surface, border: `1px solid ${al.kind === "over" ? C.raspSoft : C.marigoldSoft}` }}>
         <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: al.kind === "over" ? C.raspSoft : C.marigoldSoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 17, color: al.kind === "over" ? C.raspText : C.marigoldText, lineHeight: 1 }}>{Math.abs(al.dleft)}</span><span style={{ fontSize: 9, color: C.plumSoft, fontWeight: 700 }}>ngày {al.kind === "over" ? "trễ" : "nữa"}</span></div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}><Tag color={cls.text} bg={cls.soft}>{a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: C.plum }}>{a.name}</span></div>
@@ -64,8 +64,8 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   ];
 
   const hasFilter = dept !== "all" || win !== "all";
-  const selStyle = { fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: "#fff", borderRadius: 999, padding: "8px 13px", cursor: "pointer" };
-  const chip = (on: boolean) => ({ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, background: on ? C.lav : "#fff", color: on ? "#fff" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
+  const selStyle = { fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "8px 13px", cursor: "pointer" };
+  const chip = (on: boolean) => ({ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, background: on ? C.lav : C.surface, color: on ? "#fff" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -108,7 +108,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
           <CardTitle icon={CalendarClock} sub="Dự báo từ ngày hoàn thành + tần suất">Lịch tái thẩm định ({requal.length})</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             {requal.slice(0, 12).map((x) => { const cls = (CLS as Record<string, typeof CLS.tb>)[String(x.a.cls ?? "tb")] ?? CLS.tb; return (
-              <div key={x.a.id} className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 16, background: "#fff", border: `1px solid ${C.pinkSoft}` }}>
+              <div key={x.a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 16, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: x.dleft <= 30 ? C.raspSoft : C.skySoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: x.dleft <= 30 ? C.raspText : C.skyText }}>{x.dleft < 0 ? "!" : x.dleft}</span><span style={{ fontSize: 9, color: C.plumSoft, fontWeight: 700 }}>ngày</span></div>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: "flex", alignItems: "center", gap: 7 }}><Tag color={cls.text} bg={cls.soft}>{x.a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: C.plum }}>{x.a.name}</span></div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>Tái thẩm định dự kiến {fmtVN(x.next)} · chu kỳ {x.a.freq} tháng</div></div>
               </div>

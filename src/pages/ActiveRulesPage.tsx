@@ -245,7 +245,7 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
           <Tag color={C.mintText} bg={C.mintSoft}>{dtl.da_duyet} đã duyệt</Tag>
           {canRun && (
             <button onClick={recalc} disabled={busy}
-              style={{ ...btnPrimary, background: "#fff", color: C.plum,
+              style={{ ...btnPrimary, background: C.surface, color: C.plum,
                        border: `1.5px solid ${C.pinkSoft}`, opacity: busy ? 0.6 : 1 }}>
               <RefreshCw size={15} /> {busy ? "Đang chấm…" : "Chấm lại (không đụng dòng đã duyệt)"}
             </button>

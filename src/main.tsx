@@ -4,6 +4,17 @@ import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+/* Đặt chế độ sáng/tối TRƯỚC khi React mount — nếu để trong component thì
+   trang sẽ loé bảng màu sáng một nhịp rồi mới nhảy sang tối. */
+(function applyTheme() {
+  try {
+    const saved = localStorage.getItem("vmp-theme");           // "light" | "dark" | "auto"
+    const mode = saved === "light" || saved === "dark" ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", mode);
+  } catch { /* riêng tư chặn localStorage thì cứ để mặc định sáng */ }
+})();
+
 // Lưới an toàn: nếu App lỗi khi render, hiện thông báo thay vì trang trắng.
 interface BoundaryProps { children?: ReactNode }
 interface BoundaryState { err: Error | null }

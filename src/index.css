@@ -4,22 +4,117 @@
  *  không FOUC, cache được). Trước đây phần lớn được inject bằng JS.
  * ===================================================================== */
 
+/* =====================================================================
+ * BẢNG MÀU — nguồn duy nhất cho cả ứng dụng.
+ *
+ * constants/theme.ts trỏ mọi token màu vào các biến dưới đây, nên đổi
+ * bảng màu ở đây là đổi toàn bộ giao diện, kể cả ~990 style nội tuyến.
+ *
+ * Quy ước tên:
+ *   --c-<màu>         nét đậm, dùng cho khối màu và thanh biểu đồ
+ *   --c-<màu>-text    chữ trên nền -soft, luôn đủ tương phản
+ *   --c-<màu>-soft    nền nhạt của thẻ / nhãn
+ * ===================================================================== */
 :root {
-  /* Brand palette (đồng bộ với constants/theme.js) */
-  --pink: #EE7BA9;
-  --pink-deep: #D85F92;
-  --pink-text: #B43A6E;
-  --pink-soft: #FCE3EF;
-  --pink-mist: #FDEEF6;
-  --lav: #8E6FD0;
-  --lav-soft: #EDE7FC;
-  --plum: #4E2A4E;
-  --plum-soft: #6E4869;
-  --bg1: #FFF5FA;
-  --bg2: #FBEFFB;
+  color-scheme: light;
+
+  /* Nền trang — chuyển sắc rất nhẹ, không cướp sự chú ý của dữ liệu */
+  --c-bg1: #FDF7FB;
+  --c-bg2: #F6F1FA;
+
+  /* Ba bậc mặt phẳng: chìm · thường · nổi */
+  --c-surface-sunk:   #FBF6FA;
+  --c-surface:        #FFFFFF;
+  --c-surface-raised: #FFFFFF;
+
+  --c-ink:      #3A2440;
+  --c-ink-soft: #6E5A72;
+  --c-line:        rgba(58, 36, 64, .10);
+  --c-line-strong: rgba(190, 100, 150, .26);
+
+  --c-pink: #E4749F; --c-pink-deep: #C9558A; --c-pink-text: #A83364;
+  --c-pink-soft: #FBE4EF; --c-pink-mist: #FDF0F7;
+  --c-lav: #8168CE; --c-lav-text: #5F44AD; --c-lav-soft: #EDE8FB;
+  --c-mint: #2A9E82; --c-mint-text: #146851; --c-mint-soft: #DAF2E9;
+  --c-sky: #4497D2; --c-sky-text: #1F6796; --c-sky-soft: #E1F0FA;
+  --c-rasp: #D6486D; --c-rasp-text: #B62E52; --c-rasp-soft: #FBE1E8;
+  --c-marigold: #DE9128; --c-marigold-text: #8D550A; --c-marigold-soft: #FAEDD3;
+  --c-gold: #EDB033; --c-silver: #A6B0BE; --c-bronze: #C2854F;
+
+  --grad: linear-gradient(135deg, #C2497A, #6E54C0);
+  --grad-soft: linear-gradient(135deg, #E4749F, #8168CE);
+
+  --c-glass: rgba(255, 255, 255, .72);
+  --c-glass-line: rgba(255, 255, 255, .9);
+
+  /* Bóng hai lớp: lớp sát viền cho cạnh sắc, lớp toả xa cho chiều sâu */
+  --e-low:   0 1px 2px rgba(58,36,64,.05),  0 6px 18px rgba(180,90,140,.09);
+  --e-mid:   0 1px 3px rgba(58,36,64,.07),  0 14px 34px rgba(180,90,140,.14);
+  --e-high:  0 2px 6px rgba(58,36,64,.09),  0 22px 54px rgba(180,90,140,.20);
+  --e-modal: 0 4px 12px rgba(58,36,64,.13), 0 40px 90px rgba(58,36,64,.26);
+  --e-accent: 0 4px 14px rgba(190,69,116,.30);
+
   --focus: #B5477A;
-  --shadow-card: 0 10px 30px rgba(238, 123, 169, .10);
-  --shadow-card-hover: 0 18px 44px rgba(238, 123, 169, .22);
+  --shadow-card: var(--e-low);
+  --shadow-card-hover: var(--e-mid);
+
+  /* Tên cũ, giữ lại cho các quy tắc CSS viết trước đây */
+  --pink: var(--c-pink); --pink-deep: var(--c-pink-deep);
+  --pink-text: var(--c-pink-text); --pink-soft: var(--c-pink-soft);
+  --pink-mist: var(--c-pink-mist);
+  --lav: var(--c-lav); --lav-soft: var(--c-lav-soft);
+  --plum: var(--c-ink); --plum-soft: var(--c-ink-soft);
+  --bg1: var(--c-bg1); --bg2: var(--c-bg2);
+}
+
+/* ---------------------------------------------------------------------
+ * CHẾ ĐỘ TỐI
+ *
+ * Không phải bản sáng đảo ngược. Nền là than tím rất tối chứ không phải
+ * đen tuyệt đối — đen tuyệt đối trên màn OLED làm viền thẻ biến mất và
+ * mắt phải căng ra tìm ranh giới. Màu nhấn được kéo sáng và giảm bão
+ * hoà để không rực lên trên nền tối.
+ *
+ * Trong chế độ tối, bóng đổ gần như vô hình, nên phân cấp chuyển sang
+ * dựa vào ĐỘ SÁNG BỀ MẶT: chìm tối hơn nền, nổi sáng hơn nền.
+ * ------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-bg1: #131019;
+  --c-bg2: #191320;
+
+  --c-surface-sunk:   #191521;
+  --c-surface:        #221C2C;
+  --c-surface-raised: #2B2437;
+
+  --c-ink:      #F2EAF3;
+  --c-ink-soft: #B3A2BA;
+  --c-line:        rgba(255, 255, 255, .09);
+  --c-line-strong: rgba(240, 150, 190, .28);
+
+  --c-pink: #EE8FB4; --c-pink-deep: #E4749F; --c-pink-text: #F6B6CF;
+  --c-pink-soft: #3A2130; --c-pink-mist: #2B1D27;
+  --c-lav: #A991EA; --c-lav-text: #C4B2F4; --c-lav-soft: #2B2440;
+  --c-mint: #4FC7A5; --c-mint-text: #7BDCC0; --c-mint-soft: #16332C;
+  --c-sky: #6BB8EE; --c-sky-text: #9AD1F6; --c-sky-soft: #16293A;
+  --c-rasp: #F0708F; --c-rasp-text: #F79FB4; --c-rasp-soft: #3A1B26;
+  --c-marigold: #EDAE55; --c-marigold-text: #F4C888; --c-marigold-soft: #362713;
+  --c-gold: #F0BE55; --c-silver: #8E97A5; --c-bronze: #C79766;
+
+  --grad: linear-gradient(135deg, #D9628F, #8168CE);
+  --grad-soft: linear-gradient(135deg, #EE8FB4, #A991EA);
+
+  --c-glass: rgba(34, 28, 44, .74);
+  --c-glass-line: rgba(255, 255, 255, .10);
+
+  --e-low:   0 1px 2px rgba(0,0,0,.40), 0 6px 18px rgba(0,0,0,.30);
+  --e-mid:   0 1px 3px rgba(0,0,0,.46), 0 14px 34px rgba(0,0,0,.38);
+  --e-high:  0 2px 6px rgba(0,0,0,.50), 0 22px 54px rgba(0,0,0,.46);
+  --e-modal: 0 4px 12px rgba(0,0,0,.56), 0 40px 90px rgba(0,0,0,.60);
+  --e-accent: 0 4px 14px rgba(217,98,143,.34);
+
+  --focus: #F6B6CF;
 }
 
 * { box-sizing: border-box; }
@@ -5717,4 +5812,84 @@ button.visual-pulse__item {
   display: flex;
   gap: 6px;
   align-items: center;
+}
+
+
+/* =====================================================================
+ * CHUYỂN ĐỘNG CÓ MỤC ĐÍCH
+ *
+ * Ba việc chuyển động được phép làm: báo đổi trạng thái, dẫn mắt tới chỗ
+ * vừa đổi, và giải thích nhân–quả (bấm đây thì mở ra kia). Ngoài ba việc
+ * đó thì không animate.
+ * ===================================================================== */
+:root {
+  --mo-fast: 120ms;
+  --mo-base: 220ms;
+  --mo-slow: 380ms;
+  --ease: cubic-bezier(.22,.61,.36,1);
+  --spring: cubic-bezier(.34,1.4,.64,1);
+}
+
+/* Nền trang đổi mượt khi chuyển sáng/tối, không giật một nhịp */
+body { transition: background var(--mo-slow) var(--ease); }
+
+/* Thẻ bấm được: nhấc lên một bậc độ nổi. Chiều sâu ở đây là tín hiệu
+   "cái này bấm được", không phải trang trí. */
+.vmp-lift {
+  transition: transform var(--mo-base) var(--ease),
+              box-shadow var(--mo-base) var(--ease),
+              border-color var(--mo-fast) var(--ease);
+  will-change: transform;
+}
+.vmp-lift:hover { transform: translateY(-2px); box-shadow: var(--e-mid); }
+.vmp-lift:active { transform: translateY(0) scale(.995); transition-duration: var(--mo-fast); }
+
+/* Đổi trang: trượt lên rất nhẹ + hiện dần. Đủ để mắt biết nội dung vừa
+   thay, không đủ để phải chờ. */
+.vmp-view-enter { animation: vmpViewIn var(--mo-slow) var(--ease) both; }
+@keyframes vmpViewIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Vào theo bậc — dùng cho lưới thẻ, để mắt đi theo thứ tự đọc thay vì
+   bị cả lưới đập vào cùng lúc. Chỉ 6 bậc rồi thôi, dài hơn là chờ. */
+.vmp-stagger > * { animation: vmpViewIn var(--mo-base) var(--ease) both; }
+.vmp-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.vmp-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.vmp-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.vmp-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.vmp-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.vmp-stagger > *:nth-child(n+6) { animation-delay: 200ms; }
+
+/* Viền focus thấy rõ ở cả hai chế độ — bàn phím phải dùng được */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Khung xương lúc tải — nhịp thở chậm, không nhấp nháy chói mắt */
+.vmp-skeleton {
+  background: linear-gradient(90deg,
+    var(--c-surface-sunk) 25%, var(--c-pink-mist) 37%, var(--c-surface-sunk) 63%);
+  background-size: 400% 100%;
+  animation: vmpShimmer 1.6s ease-in-out infinite;
+  border-radius: 10px;
+}
+@keyframes vmpShimmer {
+  from { background-position: 100% 0; }
+  to   { background-position: 0 0; }
+}
+
+/* TÔN TRỌNG NGƯỜI DÙNG: ai bật "giảm chuyển động" trong hệ điều hành thì
+   tắt sạch. Đây là yêu cầu tiếp cận, không phải tuỳ chọn. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .vmp-lift:hover { transform: none; }
 }

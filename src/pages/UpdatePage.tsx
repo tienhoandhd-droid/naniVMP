@@ -66,7 +66,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }: {
   const sel = (k: string) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
   const dt = (k: string) => <input type="date" value={f[k]} onChange={set(k)} style={INP} />;
   const stage = (title: string, dl: unknown, dCol: string, tCol: string) => (
-    <div style={{ background: "#fff", borderRadius: 14, padding: 14, border: `1.5px solid ${C.pinkSoft}` }}>
+    <div style={{ background: C.surface, borderRadius: 14, padding: 14, border: `1.5px solid ${C.pinkSoft}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <span style={{ fontWeight: 800, color: C.plum, fontSize: 14 }}>{title}</span>
         <Tag color={C.lavText} bg={C.lavSoft}>Deadline: {String(dl || "Không có thông tin")}</Tag>
@@ -101,7 +101,7 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }: {
         {err && <span style={{ color: "#b00020", fontSize: 12.5, fontWeight: 700 }}>{err}</span>}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
-        <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: "#fff", color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
+        <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
         <button onClick={handleSave} style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Save size={17} /> Lưu tiến độ</button>
       </div>
 
@@ -118,11 +118,11 @@ function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState }: {
             <div style={{ flex: 1 }} />
             {currentState === "active" ? (
               <>
-                <button onClick={() => onChangeState && onChangeState(act.id, "not_applicable")} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.lav}`, background: "#fff", color: C.lavText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>⊘ Không áp dụng</button>
-                <button onClick={() => onChangeState && onChangeState(act.id, "cancelled")} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.marigold}`, background: "#fff", color: C.marigoldText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>⊘ Hủy hạng mục</button>
+                <button onClick={() => onChangeState && onChangeState(act.id, "not_applicable")} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.lav}`, background: C.surface, color: C.lavText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>⊘ Không áp dụng</button>
+                <button onClick={() => onChangeState && onChangeState(act.id, "cancelled")} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.marigold}`, background: C.surface, color: C.marigoldText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>⊘ Hủy hạng mục</button>
               </>
             ) : (
-              <button onClick={() => onChangeState && onChangeState(act.id, "active")} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: "#fff", color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>↻ Khôi phục Active</button>
+              <button onClick={() => onChangeState && onChangeState(act.id, "active")} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: C.surface, color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>↻ Khôi phục Active</button>
             )}
           </div>
         </div>
@@ -280,7 +280,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-          <button onClick={() => setStageF("all")} style={{ textAlign: "left", border: "none", cursor: "pointer", padding: "14px 16px", borderRadius: 16, background: "#fff", boxShadow: stageF === "all" ? `0 0 0 3px ${C.pink}` : `inset 0 0 0 1px ${C.pinkSoft}` }}>
+          <button onClick={() => setStageF("all")} style={{ textAlign: "left", border: "none", cursor: "pointer", padding: "14px 16px", borderRadius: 16, background: C.surface, boxShadow: stageF === "all" ? `0 0 0 3px ${C.pink}` : `inset 0 0 0 1px ${C.pinkSoft}` }}>
             <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.plum }}>{inWindow.length}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginTop: 2 }}>Tất cả</div>
           </button>

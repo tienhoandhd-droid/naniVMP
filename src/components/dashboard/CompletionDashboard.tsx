@@ -463,7 +463,7 @@ function DimensionTable({ activities, dimension, setDimension }: {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.key} className="vmp-row">
+                <tr key={row.key} className="vmp-row vmp-lift">
                   <td style={{ ...TD, borderRadius: "14px 0 0 14px", minWidth: 200 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {row.deptId ? (
@@ -564,7 +564,7 @@ const TH: CSSProperties = {
 };
 
 const TD: CSSProperties = {
-  padding: "11px 14px", background: "#fff", borderTop: `1px solid ${C.pinkSoft}`,
+  padding: "11px 14px", background: C.surface, borderTop: `1px solid ${C.pinkSoft}`,
   borderBottom: `1px solid ${C.pinkSoft}`, color: C.plumSoft, fontSize: 12,
 };
 
@@ -690,7 +690,7 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
           }}>
             {typeRows.map((row) => (
               <div key={row.type} style={{
-                padding: "15px 16px", borderRadius: 16, background: "#fff",
+                padding: "15px 16px", borderRadius: 16, background: C.surface,
                 border: `1px solid ${C.pinkSoft}`,
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
