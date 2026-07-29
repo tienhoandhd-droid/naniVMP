@@ -1160,8 +1160,11 @@ export type Database = {
       vmp_source_objects: {
         Row: {
           area_code: string | null
+          complexity_score: number | null
           created_at: string
           critical_point: string | null
+          criticality_score: number | null
+          criticality_source: string
           department: string | null
           edited_on_web: boolean
           extra: Json
@@ -1174,6 +1177,7 @@ export type Database = {
           object_code: string
           object_kind: string
           object_name: string | null
+          quality_impact_score: number | null
           report_class: string | null
           show_flag: string | null
           source_row: number
@@ -1188,8 +1192,11 @@ export type Database = {
         }
         Insert: {
           area_code?: string | null
+          complexity_score?: number | null
           created_at?: string
           critical_point?: string | null
+          criticality_score?: number | null
+          criticality_source?: string
           department?: string | null
           edited_on_web?: boolean
           extra?: Json
@@ -1202,6 +1209,7 @@ export type Database = {
           object_code: string
           object_kind: string
           object_name?: string | null
+          quality_impact_score?: number | null
           report_class?: string | null
           show_flag?: string | null
           source_row: number
@@ -1216,8 +1224,11 @@ export type Database = {
         }
         Update: {
           area_code?: string | null
+          complexity_score?: number | null
           created_at?: string
           critical_point?: string | null
+          criticality_score?: number | null
+          criticality_source?: string
           department?: string | null
           edited_on_web?: boolean
           extra?: Json
@@ -1230,6 +1241,7 @@ export type Database = {
           object_code?: string
           object_kind?: string
           object_name?: string | null
+          quality_impact_score?: number | null
           report_class?: string | null
           show_flag?: string | null
           source_row?: number
@@ -1446,6 +1458,7 @@ export type Database = {
         Returns: string
       }
       is_admin_or_qa: { Args: never; Returns: boolean }
+      rpc_active_rules: { Args: never; Returns: Json }
       rpc_alert_context: {
         Args: { p_limit?: number; p_validation_code: string }
         Returns: Json
@@ -1525,6 +1538,7 @@ export type Database = {
         Args: { p_error?: string; p_idempotency_key: string; p_ok: boolean }
         Returns: Json
       }
+      rpc_recalc_criticality: { Args: { p_only_auto?: boolean }; Returns: Json }
       rpc_reconcile_orphan_objects: {
         Args: { p_codes_in_sheet: string[] }
         Returns: Json
@@ -1641,6 +1655,14 @@ export type Database = {
         Returns: Json
       }
       vmp_parse_depts: { Args: { p_raw: string }; Returns: string[] }
+      vmp_score_complexity: {
+        Args: { p_kind: string; p_name: string }
+        Returns: number
+      }
+      vmp_score_quality_impact: {
+        Args: { p_department: string; p_kind: string; p_name: string }
+        Returns: number
+      }
       vmp_sheet_classification: { Args: { p_value: string }; Returns: string }
       vmp_sheet_criticality: {
         Args: { p_report_class: string; p_score: string }
