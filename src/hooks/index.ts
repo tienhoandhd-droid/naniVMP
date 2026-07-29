@@ -25,6 +25,7 @@ import {
   updateItemProgress, upsertObjectSupabase, deleteSourceObject, fetchPerformers,
 } from "../lib/supabaseData.ts";
 import { enrich } from "../utils/helpers.ts";
+import { loadSnapshot, saveSnapshot, clearSnapshot } from "../lib/snapshotCache.ts";
 
 // ======================== useDebounce ========================
 export function useDebounce<T>(value: T, delay = 300): T {
@@ -105,6 +106,7 @@ export function useAuth() {
     setUser(null);
     saveUser(null);
     clearVmpCache();
+    clearSnapshot();   // máy dùng chung: không để dữ liệu người trước nằm lại
   }, []);
 
   return { user, setUser, login, logout, loading, isAdmin: user?.perm === "admin" };
@@ -142,11 +144,24 @@ export function useVmpData() {
 
     // ƯU TIÊN 1: Đọc trực tiếp từ Supabase (nhanh, dữ liệu đã đồng bộ)
     if (supabase) {
+      const nam = new Date().getFullYear();
+      // Vẽ ngay bằng bản chụp lần trước trong lúc chờ mạng. Không dùng khi
+      // người dùng bấm "Làm mới" (force) — lúc đó họ đang chờ số MỚI.
+      if (!force) {
+        const cu = loadSnapshot(nam);
+        if (cu) {
+          setObjects(cu.objects);
+          setActs(cu.activities);
+          setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", source: "supabase",
+            msg: `Đang hiện bản lưu lúc ${new Date(cu.at).toLocaleTimeString("vi-VN")} — đang tải bản mới…` }));
+        }
+      }
       try {
-        const data = await fetchVmpDataFromSupabase(new Date().getFullYear());
+        const data = await fetchVmpDataFromSupabase(nam);
         dataSigRef.current = sigOf(data.objects, data.activities);
         if (Array.isArray(data.objects)) setObjects(data.objects);
         if (Array.isArray(data.activities)) setActs(data.activities);
+        saveSnapshot(nam, data.objects || [], data.activities || []);
         if (readUrl || writeUrl) saveConn(readUrl, writeUrl);
         setLastSync(Date.now());
         setConn({
@@ -210,6 +225,7 @@ export function useVmpData() {
       dataSigRef.current = sig;
       if (Array.isArray(data.objects)) setObjects(data.objects);
       if (Array.isArray(data.activities)) setActs(data.activities);
+      saveSnapshot(new Date().getFullYear(), data.objects || [], data.activities || []);
       setLastSync(Date.now());
     } catch (e) { /* im lặng — lần sau thử lại */ }
   }, []);
