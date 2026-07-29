@@ -202,7 +202,7 @@ Nạp dữ liệu: `python3 scripts/import-source-catalogs.py` — chạy lại 
 
 ### 9b. Luật sinh timeline — nguồn chân lý
 
-**Tab `0.Rule timeline VMP` KHÔNG phải luật chuẩn.** Luật chuẩn là node `Code in JavaScript1` của workflow n8n `VMP01-Tạo timeline VMP` (id `Dr5zFBSIjAvVFTCq`). Đã kiểm chứng 2026-07-29 bằng cách dựng lại thuật toán và so với dữ liệu thật: **439/439 ID khớp, 0 thiếu**. 22 dòng chênh là `DQ`/`FAT-SAT`/`IQ` — loại một-lần mà cơ chế `daTungIQ()` cố ý không sinh lại; đúng thiết kế.
+**Tab `0.Rule timeline VMP` KHÔNG phải luật chuẩn.** Bản rà đầy đủ: [`docs/rule-vmp01.md`](rule-vmp01.md). Luật chuẩn là node `Code in JavaScript1` của workflow n8n `VMP01-Tạo timeline VMP` (id `Dr5zFBSIjAvVFTCq`). Đã kiểm chứng 2026-07-29 bằng cách dựng lại thuật toán và so với dữ liệu thật: **439/439 ID khớp, 0 thiếu**. 22 dòng chênh là `DQ`/`FAT-SAT`/`IQ` — loại một-lần mà cơ chế `daTungIQ()` cố ý không sinh lại; đúng thiết kế.
 
 **Dữ liệu nguồn còn thiếu (5 đối tượng, gây chuỗi `"Không xác định do thiếu…"` trong cột ngày của timeline):**
 
