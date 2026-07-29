@@ -5976,3 +5976,10 @@ body { transition: background var(--mo-slow) var(--ease); }
   0%, 100% { opacity: .25; transform: translateY(0); }
   50%      { opacity: 1;   transform: translateY(-3px); }
 }
+
+/* Mẩu tri thức hiện ra trong lúc chờ Vali trả lời. Trồi lên nhẹ chứ
+   không bật ra — người đang chờ số liệu, không cần bị giật mình. */
+@keyframes vmpHienNhe {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

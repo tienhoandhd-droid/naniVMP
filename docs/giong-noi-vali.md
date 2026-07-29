@@ -225,3 +225,35 @@ node IF từ `{{ false }}` về `{{ $json.kq.khop }}`.
 - [character-card-spec-v2](https://github.com/malfoyslastname/character-card-spec-v2) — cấu trúc thẻ nhân vật và `character_book`
 - [SillyTavern lorebook / World Info](https://sillycard-web.pages.dev/blog/st-fields-04-character-book) — cách mảnh kích hoạt theo từ khoá
 - WHO GMP TRS 1019 Annex 3, EU GMP Annex 15 & 11, ICH Q9 — xem `docs/gmp-nguyen-tac-chung.md`
+
+## 11. Kho lời chờ — 10–30 giây chờ thành 10–30 giây học
+
+Ô chat trước đây chỉ có 5 câu chờ cố định. Ngồi chờ lần thứ ba trong
+ngày là đọc lại y hệt câu cũ — vô duyên, và phí một khoảng thời gian mà
+người dùng **buộc phải** nhìn màn hình.
+
+Bảng `vmp_chat_loi_cho` (54 mẩu, không mẩu nào trùng) chia ba loại:
+
+| Loại | Số mẩu | Nội dung |
+|---|---|---|
+| `tho` | 12 | Lục bát về nghề thẩm định — ký đề cương, ghi sổ đúng lúc, ba chặng nước, IQ/OQ/PQ |
+| `nguyen_tac` | 34 | Một nguyên tắc GMP gọn trong vài dòng, có ghi nguồn (Annex 1, Annex 15, ICH Q9(R1), CSA, GAMP 5) |
+| `meo` | 8 | Mẹo dùng hệ VMP thật |
+
+**Chống trùng ba lớp:**
+
+1. `noi_dung` là `unique` ở DB — không nạp nhầm hai mẩu giống nhau.
+2. `daHienRef` giữ mẩu đã hiện trong phiên; chỉ khi hết mẩu mới mới cho lặp.
+3. Mỗi mốc thời gian rút một **loại khác nhau** (`NHIP_CHO`): giây 4 ra
+   mẹo, giây 9 ra thơ, giây 15 ra nguyên tắc, giây 24 thơ, giây 32
+   nguyên tắc. Chờ 20 giây thì đọc được ba mẩu khác thể loại.
+
+Kho tải **một lần lúc mở ô chat**, không phải lúc đang chờ — gọi mạng
+lúc đang chờ thì mẩu hiện ra sau khi câu trả lời đã về, thành vô dụng.
+
+Thêm mẩu mới chỉ cần một dòng `INSERT`, không phải build lại web:
+
+```sql
+insert into vmp_chat_loi_cho (loai, noi_dung, nguon)
+values ('nguyen_tac', 'Nội dung…', 'Annex 15');
+```
