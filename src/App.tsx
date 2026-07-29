@@ -90,7 +90,6 @@ const AlertsView = lazy(() => import("./pages/AlertsPage.tsx"));
 const QrmView = lazy(() => import("./pages/QrmPage.tsx"));
 const CatalogView = lazy(() => import("./pages/CatalogPage.tsx"));
 const WorkloadView = lazy(() => import("./pages/WorkloadPage.tsx"));
-const AdminMissingView = lazy(() => import("./pages/AdminMissingPage.tsx"));
 const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
 const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
@@ -1858,7 +1857,6 @@ export default function App() {
               {view === "risk" && <QrmView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
-              {view === "missing" && <AdminMissingView isAdmin={isAdmin} onReload={reloadData} readOnly />}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} />}
             </Suspense>

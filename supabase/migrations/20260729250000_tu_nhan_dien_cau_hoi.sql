@@ -154,13 +154,24 @@ begin
                 else q ~ ('(^|[^a-z0-9])' || khoa || '($|[^a-z0-9])') end)
     order by length(khoa) desc
   loop
-    -- Bỏ qua nếu cụm này nằm trọn trong một cụm đã nhận (tránh trùng)
-    if not exists (select 1 from unnest(v_hieu) h where h like '%' || r.gia_tri || '%') then
-      v_loc  := v_loc || jsonb_build_object(r.loai, r.gia_tri);
-      v_hieu := v_hieu || (r.loai || ' = ' || r.gia_tri);
-      -- Xoá khỏi câu để không tính là từ lạ ở bước sau
-      q := replace(q, r.khoa, ' ');
-    end if;
+    -- PHẢI kiểm lại trên q HIỆN TẠI, không phải q lúc mở con trỏ.
+    -- Câu lệnh của FOR được chạy một lần rồi giữ nguyên kết quả, nên nếu
+    -- không kiểm lại thì "LAF cân nguyên liệu" khớp trước, sau đó "Laf
+    -- cân" vẫn nằm trong danh sách và GHI ĐÈ lên nó — hỏi về buồng cân
+    -- nguyên liệu lại ra buồng cân khác.
+    continue when not (case when length(r.khoa) >= 4
+                            then q like '%' || r.khoa || '%'
+                            else q ~ ('(^|[^a-z0-9])' || r.khoa || '($|[^a-z0-9])') end);
+
+    -- Mỗi loại chỉ giữ MỘT giá trị, và vì đang duyệt từ dài tới ngắn nên
+    -- giá trị giữ lại luôn là cụm cụ thể nhất.
+    continue when v_loc ? r.loai;
+
+    v_loc  := v_loc || jsonb_build_object(r.loai, r.gia_tri);
+    v_hieu := v_hieu || (r.loai || ' = ' || r.gia_tri);
+    -- Xoá khỏi câu: vừa chống khớp chồng, vừa để bước dò từ lạ không
+    -- tính lại chính những chữ này.
+    q := replace(q, r.khoa, ' ');
   end loop;
 
   -- ---- Còn từ nội dung nào chưa hiểu không? ----
