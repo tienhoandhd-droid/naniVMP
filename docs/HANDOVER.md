@@ -52,7 +52,38 @@ psql "$SUPABASE_DB_URL" --single-transaction -f supabase/bootstrap/02_seed_confi
 - Chạy ngoài Supabase (Neon/Postgres thường): tạo trước 3 role `anon`, `authenticated`, `service_role`; bảng `profiles` tham chiếu `auth.users` nên tài khoản phải tạo qua Supabase Auth (không seed được).
 - Dump từ DB thật ngày 2026-07-23 (`pg_dump --schema-only --no-owner`). Migrations vẫn là nguồn chân lý khi sửa schema tiếp; migration mới hơn 2026-07-23 áp bình thường sau khi bootstrap.
 
-## 3. WF-04 — hệ nào dùng, hệ nào không
+## 3. Các workflow n8n (đã tách 2026-07-29)
+
+WF-04 trước đây gộp 5 nhánh trong một workflow, rất khó đọc. Nay tách thành:
+
+| Workflow | id n8n | Nội dung | Trạng thái |
+|---|---|---|---|
+| **Vani VMP 1 — Cảnh báo đến hạn** | `udqyfoWTbpl4amKM` | Schedule + webhook `/vmp-alert-now` → `rpc_due_alerts` → ghép người nhận (Sheet `CanhBao`) → chống trùng → Claude soạn → Gmail | ⏸ inactive, **chờ nghiệm thu** |
+| **Vani VMP 2 — Xử lý lỗi tập trung** | `LbAmGv9gGGdQRiEb` | Error Trigger → ghi `workflow_runs` + email admin. Đặt làm Error Workflow cho 2 workflow kia | ⏸ inactive, **chờ nghiệm thu** |
+| **Vani VMP 3 — Nhập Sheet (dự phòng)** | `LArr1nhj3jzFjJLs` | Chính là WF-04 đổi tên. Giữ nguyên nhánh sync CSV (2 trigger đã tắt) | 🔵 active nhưng nhánh sync đã tắt |
+
+Mã nguồn SDK của 2 workflow mới: `n8n/vani-vmp-1-canh-bao/`, `n8n/vani-vmp-2-xu-ly-loi/`.
+
+### 3a. ⚠️ Việc phải làm trước khi bật 2 workflow mới
+
+**n8n không phơi credential qua API**, nên bước tách không mang theo được. Mở từng workflow, kiểm tra và gắn lại:
+
+| Node | Credential cần |
+|---|---|
+| Mọi node Postgres | `VMP Supabase Postgres` |
+| `1. Đọc Sheet người nhận`, `10. Gửi Gmail`, `2. Email admin` | `kết nối google` (Service Account) |
+| `Trigger: chạy ngay` | `x-vmp-secret` (Header Auth) |
+| `8. Soạn cảnh báo (Claude AI)` | **Header Auth riêng**: Name `x-api-key`, Value = Anthropic API key |
+
+Thứ tự an toàn: gắn credential → chạy thử tay → bật Vani VMP 1 + 2 → **rồi mới** gỡ nhánh cảnh báo/lỗi khỏi Vani VMP 3.
+
+### 3b. Ba sai lệch phát hiện khi tách
+
+1. **Đã sửa trong bản mới:** node `2. Lấy hạng mục đến hạn` tham chiếu `$('CONFIG')` — nhưng `CONFIG` là node của nhánh JWT khác và **không có `SOON_DAYS`**. Ngưỡng "sắp đến hạn" đã luôn là `undefined`. Bản mới dùng `$('CONFIG1')`.
+2. **Giữ nguyên, cần bạn quyết:** trigger tên "Schedule (hằng ngày 7h)" thực tế cấu hình `{field: "hours"}` = **chạy mỗi giờ**, không phải 7h sáng. Không tự đổi vì đó là thay đổi hành vi.
+3. Hai nhánh legacy (Diff Engine cũ, ghi ngược App → Sheet) **không mang sang** — đường ghi ngược đã bị vô hiệu hoá vĩnh viễn trong `rpc_update_progress`.
+
+## 3c. WF-04 cũ — hệ nào dùng, hệ nào không (lịch sử)
 
 WF-04 gộp 5 nhánh trong 1 workflow. Node bị `disabled` là **tắt có chủ đích**, khi import lại đừng bật:
 
