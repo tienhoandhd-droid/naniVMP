@@ -129,3 +129,29 @@ Và VMP **không có số đo vận hành** — không có áp suất, lưu lư�
 tiêu thụ khí nitơ. Hỏi "thừa khí nitơ không" thì Vali phải nói thật là
 chỗ đó nằm ở hệ giám sát môi trường/BMS, rồi đưa cái nó có: hệ đó đã
 thẩm định tới đâu, kỳ tái thẩm định bao lâu một lần.
+
+## 8. Cache ngữ nghĩa — nhanh nhưng không được sai
+
+Câu hỏi lặp ("bao nhiêu quá hạn", "tank đến đâu") đi qua đủ ba lớp AI mất
+10–30 giây. Học `semantic_cache` của dự án Du_bao_thoi_tiet: lưu câu trả
+lời theo vector câu hỏi, câu lặp trả trong ~1 giây (`vmp_ai_cache_ngu_nghia`).
+
+Đo thật: lần đầu 18,7s → lần lặp **1,05s**, web hiện nhãn "💾 dữ liệu chưa
+đổi nên dùng lại" cho người đọc biết đây là câu dùng lại.
+
+Bốn van an toàn — vì câu trả lời VMP **đổi theo thời gian**:
+
+1. **Dữ liệu đổi là cache chết ngay** — trigger mức lệnh trên
+   `vmp_plan_items` và `vmp_objects`. Đã kiểm chứng: một lệnh UPDATE
+   (kể cả 0 dòng) vô hiệu toàn bộ cache số liệu, câu hỏi sau đó tra mới.
+2. **Sống tối đa 6 giờ và không qua ngày** — "còn 9 ngày" sang mai là sai
+   dù không ai đụng dữ liệu.
+3. **Ngưỡng giống 0,93** — chỉ nhận câu gần trùng hẳn; "tiến độ hệ thống
+   tank thế nào" khác "hệ thống tank đến đâu rồi" thì vẫn tra mới.
+4. **Không cache câu cá nhân** — "việc của tôi", "ta là ai" mà trả cho
+   người khác là lộ chuyện riêng; hàm lưu tự chối.
+
+Xem cache đang sống: `select cau_hoi, hit_count, created_at from
+vmp_ai_cache_ngu_nghia where is_valid;` — nghi ngờ thì
+`update vmp_ai_cache_ngu_nghia set is_valid = false where is_valid;`
+là toàn bộ về đường tra mới, không cần sửa workflow.
