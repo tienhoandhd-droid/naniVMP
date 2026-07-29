@@ -2,7 +2,7 @@
  *  components/ui/Primitives.jsx — Shared UI Components
  *  Card, Tag, Modal, Donut, KpiCard, Sparkle, Skeleton, etc.
  * ===================================================================== */
-import { useId } from "react";
+import { useId, useRef, useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { C, TEXT, NUM, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
@@ -460,6 +460,83 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
   );
 }
 
+
+/**
+ * Khung bảng rộng: cuộn cả hai chiều trong vùng cao cố định, kéo-thả bằng
+ * chuột để không phải với tới thanh cuộn.
+ *
+ * Vì sao cần: bảng danh mục có ~19 cột và hàng trăm dòng. Nếu để trang tự
+ * cuộn thì thanh cuộn ngang nằm tận đáy trang — xem tới dòng ở giữa là
+ * không kéo ngang được nữa.
+ */
+export function TableScroll({ children, maxHeight = "68vh", hint = true }: {
+  children?: ReactNode;
+  maxHeight?: number | string;
+  /** Hiện dòng gợi ý cách cuộn ngang. Tắt khi bảng chắc chắn không tràn. */
+  hint?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [canPan, setCanPan] = useState(false);
+  const [panning, setPanning] = useState(false);
+  const drag = useRef({ x: 0, left: 0 });
+
+  // Chỉ bật kéo-thả khi nội dung thật sự tràn ngang
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setCanPan(el.scrollWidth > el.clientWidth + 4);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [children]);
+
+  const onDown = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el || !canPan) return;
+    // Bỏ qua khi bấm vào nút / ô nhập — để không cướp thao tác bấm
+    const tag = (e.target as HTMLElement).closest("button, input, select, a");
+    if (tag) return;
+    setPanning(true);
+    drag.current = { x: e.clientX, left: el.scrollLeft };
+  };
+  const onMove = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el || !panning) return;
+    el.scrollLeft = drag.current.left - (e.clientX - drag.current.x);
+  };
+  const stop = () => setPanning(false);
+
+  // Giữ Shift + lăn chuột = cuộn ngang (thói quen quen thuộc trên bảng rộng)
+  const onWheel = (e: React.WheelEvent) => {
+    const el = ref.current;
+    if (!el || !e.shiftKey) return;
+    el.scrollLeft += e.deltaY;
+  };
+
+  return (
+    <>
+      <div
+        ref={ref}
+        className={`vmp-table-wrap vmp-scroll ${canPan ? "can-pan" : ""} ${panning ? "is-panning" : ""}`}
+        style={{ maxHeight }}
+        onMouseDown={onDown}
+        onMouseMove={onMove}
+        onMouseUp={stop}
+        onMouseLeave={stop}
+        onWheel={onWheel}
+      >
+        {children}
+      </div>
+      {hint && canPan && (
+        <div className="vmp-table-hint">
+          ↔ Bảng rộng hơn màn hình — kéo thả bằng chuột, hoặc giữ <b>Shift</b> và lăn chuột để xem các cột bên phải.
+          Cột đầu và hàng tiêu đề luôn được ghim.
+        </div>
+      )}
+    </>
+  );
+}
 
 export function Card({ children, style, variant = "default", cls = "" }: {
   children?: ReactNode; style?: CSSProperties; variant?: string; cls?: string;

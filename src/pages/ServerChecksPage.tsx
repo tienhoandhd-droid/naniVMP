@@ -16,7 +16,7 @@ import {
   Radar, RefreshCw, AlertTriangle, CheckCircle2, Bell, Gauge, PlayCircle,
 } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
-import { Card, CardTitle, Tag, KpiCard } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, KpiCard, TableScroll } from "../components/ui/Primitives.tsx";
 import {
   fetchDashboardKpi, checkDataQuality, fetchDueAlerts, refreshComputedStatus,
 } from "../lib/supabaseData.ts";
@@ -164,15 +164,15 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
           <Tag color={C.marigoldText} bg={C.marigoldSoft}>{dueSoon.length} sắp đến hạn</Tag>
         </div>
 
-        <div style={{ overflowX: "auto", maxHeight: "40vh" }} className="vmp-scroll">
-          <table style={{ borderCollapse: "collapse", width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
+        <TableScroll maxHeight="46vh">
+          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
             <thead>
               <tr>
                 {["Loại", "Mã thẩm định", "Đối tượng", "Bộ phận", "Giai đoạn", "Hạn", "Còn/Trễ", "Phụ trách"]
-                  .map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                                         borderBottom: `1.5px solid ${C.pinkSoft}`,
-                                         color: C.plum, fontWeight: 800 }}>{h}</th>
+                  .map((h, i) => (
+                    <th key={h} className={i === 1 ? "vmp-col-pin" : undefined}
+                        style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
+                                 color: C.plum, fontWeight: 800 }}>{h}</th>
                   ))}
               </tr>
             </thead>
@@ -187,7 +187,8 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
                         {over ? "quá hạn" : "sắp tới"}
                       </Tag>
                     </td>
-                    <td style={{ padding: "8px", fontWeight: 700, color: C.plum, whiteSpace: "nowrap" }}>
+                    <td className="vmp-col-pin"
+                        style={{ padding: "8px", fontWeight: 700, color: C.plum, whiteSpace: "nowrap" }}>
                       {a.validation_code}
                     </td>
                     <td style={{ padding: "8px", color: C.plumSoft }}>{a.object_name || a.object_code}</td>
@@ -210,7 +211,7 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
 
       {/* ---------- Chất lượng dữ liệu ---------- */}

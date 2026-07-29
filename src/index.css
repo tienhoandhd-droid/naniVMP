@@ -5635,3 +5635,86 @@ button.visual-pulse__item {
   .card { transition: none !important; }
   .card:hover { transform: none !important; }
 }
+
+/* ===================== BẢNG DỮ LIỆU RỘNG =====================
+ * Vấn đề: bảng danh mục có ~19 cột và hàng trăm dòng. Nếu để trang tự
+ * cuộn thì thanh cuộn NGANG nằm tận đáy trang — xem tới dòng ở giữa là
+ * không với tới được, phải cuộn dọc hàng nghìn pixel mới kéo ngang được.
+ *
+ * Cách sửa: khung bảng tự cuộn cả hai chiều trong một vùng cao cố định,
+ * nên cả hai thanh cuộn luôn nằm trong tầm mắt. Kèm:
+ *   · hàng tiêu đề dính trên  → cuộn dọc vẫn biết đang xem cột nào
+ *   · cột đầu dính trái       → cuộn ngang vẫn biết đang xem dòng nào
+ *   · kéo-thả bằng chuột      → không cần với tới thanh cuộn
+ * ============================================================= */
+.vmp-table-wrap {
+  overflow: auto;
+  max-height: 68vh;
+  border-radius: 14px;
+  border: 1px solid var(--vmp-line, #FBD6E6);
+  /* Cuộn ngang mượt và không "nảy" khi kéo */
+  overscroll-behavior-x: contain;
+}
+
+/* Đang kéo bằng chuột: đổi con trỏ và chặn bôi đen chữ */
+.vmp-table-wrap.is-panning { cursor: grabbing; user-select: none; }
+.vmp-table-wrap.can-pan { cursor: grab; }
+
+.vmp-table-wrap table { border-collapse: separate; border-spacing: 0; }
+
+/* Tiêu đề dính trên. z-index 3 để nằm trên cả ô dính trái. */
+.vmp-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: inset 0 -1.5px 0 #FBD6E6;
+}
+
+/* Cột dính trái (đánh dấu bằng class trên từng ô) */
+.vmp-table-wrap .vmp-col-pin {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: inset -1px 0 0 #FBD6E6;
+}
+.vmp-table-wrap thead .vmp-col-pin { z-index: 4; }
+
+/* Ô chọn dòng: ghim sát mép trái, KHÔNG kẻ viền phải — viền thuộc về cột
+   mã đối tượng ghim ngay sau nó. */
+.vmp-table-wrap .vmp-col-check {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  width: 34px;
+}
+.vmp-table-wrap thead .vmp-col-check { z-index: 4; }
+.vmp-table-wrap tbody tr:hover .vmp-col-check { background: #FFF7FA; }
+
+/* Cột ghim thứ hai — mã đối tượng, dính bên trái khi kéo ngang qua cột giữa */
+.vmp-table-wrap .vmp-col-pin2 {
+  position: sticky;
+  left: 34px;
+  z-index: 2;
+  background: #fff;
+  box-shadow: inset -1px 0 0 #FBD6E6;
+}
+.vmp-table-wrap thead .vmp-col-pin2 { z-index: 4; }
+.vmp-table-wrap tbody tr:hover .vmp-col-pin2 { background: #FFF7FA; }
+
+/* Dòng đang trỏ chuột — dễ dò mắt trên bảng rộng */
+.vmp-table-wrap tbody tr:hover td { background: #FFF7FA; }
+.vmp-table-wrap tbody tr:hover .vmp-col-pin { background: #FFF7FA; }
+
+/* Gợi ý cuộn ngang: đổ bóng mờ ở mép phải khi còn nội dung bị khuất */
+.vmp-table-hint {
+  font-size: 11.5px;
+  color: #9B7B96;
+  font-weight: 600;
+  padding: 6px 2px 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
