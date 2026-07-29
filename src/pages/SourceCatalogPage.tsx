@@ -423,6 +423,16 @@ function SourceCatalogSection({ user, onReload }: {
             body="Toàn bộ mốc thời gian của chúng không tính được — timeline sẽ để trống ô ngày."
             items={broken.map((b) => b.object_code)} />
         )}
+        {warn && (warn.ma_tam?.length ?? 0) > 0 && (
+          <WarnBox tone="bad" title={`${warn.ma_tam!.length} đối tượng đang dùng MÃ TẠM`}
+            body={"Đây là dòng trong Sheet không vào được bản nhập — hoặc trùng mã với dòng khác "
+                + "nên bị đè, hoặc không có mã nên không khoá được. Đã cứu vào để không mất, "
+                + "nhưng phải gán mã thật rồi bật lại Thẩm định; để nguyên thì chúng không bao "
+                + "giờ có timeline. Mã đối tượng là khoá nên không sửa tại chỗ được: bấm "
+                + "\"Thêm đối tượng\" tạo lại với mã thật (chép các ô còn lại sang), rồi bấm "
+                + "Ngừng dùng ở dòng mã tạm."}
+            items={warn.ma_tam!.map((x) => `${x.object_code} — ${x.object_name}`)} />
+        )}
         {warn && warn.chua_tung_iq.length > 0 && (
           <WarnBox tone="ask" title={`${warn.chua_tung_iq.length} thiết bị/hệ thống chưa từng có IQ`}
             body={"Bình thường nếu là thiết bị cũ đã thẩm định trước khi có hệ thống. "

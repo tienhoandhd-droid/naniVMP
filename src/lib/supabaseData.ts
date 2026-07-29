@@ -299,6 +299,8 @@ export interface SourceWarnings {
   show_tat: Array<{ object_kind: string; object_code: string; object_name: string; show_flag: string }>;
   /** Cần người xem: "Chưa hoạt động" chính là thứ CẦN DQ/IQ nên không lọc tự động. */
   chua_hoat_dong: Array<{ object_kind: string; object_code: string; object_name: string; tinh_trang: string }>;
+  /** Chắc chắn cần xử lý: dòng Sheet trùng mã / không mã, đã cứu vào với mã TẠM. */
+  ma_tam?: Array<{ object_kind: string; object_code: string; object_name: string; note: string }>;
 }
 
 export async function fetchSourceWarnings(year?: number): Promise<SourceWarnings> {
