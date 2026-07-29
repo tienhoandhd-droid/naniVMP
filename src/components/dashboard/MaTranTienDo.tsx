@@ -58,25 +58,66 @@ function chamGiaiDoan(a: Activity, gd: (typeof GIAI_DOAN)[number]): TrangThai {
   return han < vmpToday() ? "tre" : "chua";
 }
 
+/* Trục hàng đổi được. Cùng một bộ dữ liệu, đổi trục là đổi câu hỏi:
+   theo bộ phận trả lời "ai đang tắc", theo đối tượng trả lời "máy nào
+   đang kẹt", theo người trả lời "ai đang gánh", theo loại thẩm định trả
+   lời "khâu IQ/OQ/PQ nào đang chậm". */
+const TRUC = [
+  { id: "bo_phan", ten: "Bộ phận" },
+  { id: "doi_tuong", ten: "Đối tượng" },
+  { id: "nguoi", ten: "Người thực hiện" },
+  { id: "loai", ten: "Loại thẩm định" },
+] as const;
+type TrucId = (typeof TRUC)[number]["id"];
+
 export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
   const [oDangXem, setODangXem] = useState<{ ten: string; ds: Activity[] } | null>(null);
+  const [truc, setTruc] = useState<TrucId>("bo_phan");
+  const [soHang, setSoHang] = useState(12);
 
   const { luoi, chatLuong, diemNong, tong } = useMemo(() => {
     const A = acts.filter((a) => (a.state || "active") === "active");
 
-    // Lưới bộ phận × giai đoạn
-    const luoi = DEPTS.map((bp) => {
-      const cua = A.filter((a) => (a.depts?.length ? a.depts.includes(bp.id) : a.dept === bp.id));
-      return {
-        bp,
-        tong: cua.length,
-        o: GIAI_DOAN.map((gd) => {
+    // Gom hạng mục theo trục hàng đang chọn
+    const nhom = new Map<string, { ten: string; phu: string; ds: Activity[] }>();
+    const them = (khoa: string, ten: string, phu: string, a: Activity) => {
+      if (!nhom.has(khoa)) nhom.set(khoa, { ten, phu, ds: [] });
+      nhom.get(khoa)!.ds.push(a);
+    };
+    A.forEach((a) => {
+      if (truc === "bo_phan") {
+        const bps = a.depts?.length ? a.depts : [a.dept || "qa"];
+        // Một hạng mục thuộc nhiều bộ phận thì đếm ở CẢ HAI — đúng như bộ lọc
+        // bộ phận vẫn làm, nên tổng các hàng có thể lớn hơn tổng hạng mục.
+        bps.forEach((id) => {
+          const bp = DEPTS.find((d) => d.id === id);
+          them(String(id), bp?.short || String(id), bp?.name || "", a);
+        });
+      } else if (truc === "doi_tuong") {
+        them(String(a.code || "—"), String(a.code || "—"), String(a.name || ""), a);
+      } else if (truc === "nguoi") {
+        const ng = nguoiPhuTrach(a.owner);
+        them(ng, ng, "", a);
+      } else {
+        const l = String(a.vtype || "—");
+        them(l, l, "", a);
+      }
+    });
+
+    const luoi = [...nhom.entries()]
+      .map(([khoa, v]) => {
+        const o = GIAI_DOAN.map((gd) => {
           const dem: Record<TrangThai, Activity[]> = { xong: [], tre: [], chua: [], thieu: [] };
-          cua.forEach((a) => dem[chamGiaiDoan(a, gd)].push(a));
+          v.ds.forEach((a) => dem[chamGiaiDoan(a, gd)].push(a));
           return { gd, dem };
-        }),
-      };
-    }).filter((h) => h.tong > 0);
+        });
+        const tre = o.reduce((n, x) => n + x.dem.tre.length, 0);
+        const thieu = o.reduce((n, x) => n + x.dem.thieu.length, 0);
+        return { khoa, ten: v.ten, phu: v.phu, tong: v.ds.length, o, tre, thieu };
+      })
+      // Hàng có vấn đề nặng nhất lên trước — trục nào cũng đọc từ trên xuống.
+      .sort((x, y) => (y.tre * 3 + y.thieu) - (x.tre * 3 + x.thieu) || y.tong - x.tong)
+      .filter((h) => h.tong > 0);
 
     // Điểm chất lượng dữ liệu: bao nhiêu phần trăm ô chấm được
     let oTong = 0, oThieu = 0;
@@ -111,7 +152,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
       .slice(0, 10);
 
     return { luoi, chatLuong, diemNong, tong: A.length };
-  }, [acts]);
+  }, [acts, truc]);
 
   const O = ({ dem, ten }: { dem: Record<TrangThai, Activity[]>; ten: string }) => {
     const tong = (Object.keys(dem) as TrangThai[]).reduce((n, k) => n + dem[k].length, 0);
@@ -144,9 +185,31 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <Card variant="strong">
         <CardTitle icon={LayoutGrid}
-          sub="Bộ phận × bốn giai đoạn · màu theo trạng thái nặng nhất trong ô · bấm ô để xem danh sách">
+          sub="Trục hàng đổi được · màu theo trạng thái nặng nhất trong ô · bấm ô để xem danh sách hạng mục">
           Ma trận tiến độ theo giai đoạn
         </CardTitle>
+
+        {/* Đổi trục là đổi câu hỏi — cùng một bộ dữ liệu, bốn cách nhìn */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>Xem theo</span>
+          {TRUC.map((t) => {
+            const on = truc === t.id;
+            return (
+              <button key={t.id} onClick={() => { setTruc(t.id); setSoHang(12); }}
+                style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: on ? 800 : 600,
+                         color: on ? C.plum : C.plumSoft, borderRadius: 999, padding: "7px 14px",
+                         cursor: "pointer", border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
+                         background: on ? C.pinkSoft : C.surface }}>
+                {t.ten}
+              </button>
+            );
+          })}
+          <span style={{ marginLeft: "auto", fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>
+            {truc === "bo_phan"
+              ? "Một hạng mục thuộc nhiều bộ phận sẽ đếm ở cả hai hàng"
+              : "Hàng có nhiều hạng mục trễ / thiếu dữ liệu xếp lên trước"}
+          </span>
+        </div>
 
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
           {(Object.keys(MAU) as TrangThai[]).map((k) => (
@@ -161,22 +224,36 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 620 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>Bộ phận</th>
+                <th style={{ textAlign: "left", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>
+                  {TRUC.find((t) => t.id === truc)?.ten}
+                </th>
                 {GIAI_DOAN.map((g) => (
                   <th key={g.id} style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>{g.ten}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {luoi.map((h) => (
-                <tr key={h.bp.id}>
-                  <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{h.bp.short}</div>
-                    <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>{h.tong} hạng mục</div>
+              {luoi.slice(0, soHang).map((h) => (
+                <tr key={h.khoa}>
+                  <td style={{ padding: "6px 8px", maxWidth: 210 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.ten}</div>
+                    <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {h.phu ? h.phu + " · " : ""}{h.tong} hạng mục
+                    </div>
                   </td>
-                  {h.o.map((o) => <O key={o.gd.id} dem={o.dem} ten={`${h.bp.name} · ${o.gd.ten}`} />)}
+                  {h.o.map((o) => <O key={o.gd.id} dem={o.dem} ten={`${h.ten} · ${o.gd.ten}`} />)}
                 </tr>
               ))}
+              {luoi.length > soHang && (
+                <tr><td colSpan={5} style={{ padding: "10px 8px" }}>
+                  <button onClick={() => setSoHang((n) => n + 20)}
+                    style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum,
+                             border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
+                             borderRadius: 999, padding: "7px 14px", cursor: "pointer" }}>
+                    Hiện thêm — đang xem {soHang}/{luoi.length} hàng
+                  </button>
+                </td></tr>
+              )}
               {!luoi.length && (
                 <tr><td colSpan={5} style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 600 }}>Không có hạng mục nào trong phạm vi đang lọc.</td></tr>
               )}
