@@ -1562,6 +1562,7 @@ export type Database = {
         Args: { p_reason: string; p_state: string; p_validation_code: string }
         Returns: Json
       }
+      rpc_source_warnings: { Args: { p_year?: number }; Returns: Json }
       rpc_sync_vmp_sheet_snapshot: {
         Args: {
           p_headers: Json

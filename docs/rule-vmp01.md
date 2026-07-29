@@ -174,16 +174,37 @@ Node ghi dùng `appendOrUpdate` khớp theo `ID thẩm định`:
 
 ---
 
-## 10. Bốn điểm cần bạn quyết
+## 10. Bốn điểm — đã xử lý 2026-07-29
 
-| # | Vấn đề | Ảnh hưởng hiện tại |
+| # | Vấn đề | Cách xử lý | Vì sao |
+|---|---|---|---|
+| 1 | `NĂM THẨM ĐỊNH = 2026` viết cứng | **Không cần sửa** — `rpc_generate_timeline(p_year, …)` đã tham số hoá từ đầu. VMP01 đổi tên thành `[NGỪNG DÙNG]` để hết hai nguồn luật | Vấn đề chỉ tồn tại ở bản n8n, mà bản đó nay mồ côi |
+| 2 | "Lần đầu" đòi `Năm nhập === năm` | **Giữ nguyên luật**, thêm cảnh báo | Dữ liệu chứng minh luật đúng: cả 7 thiết bị có `IQ` đều `Năm nhập = 2026`. Bỏ điều kiện sẽ sinh **528 hạng mục rác** cho 176 thiết bị cũ |
+| 3 | Tần suất 36 tháng vẫn sinh mỗi năm | **ĐÃ SỬA** | Sai lệch nghiệp vụ thật. Nay chỉ sinh khi `năm ≥ năm mốc gần nhất + tần suất÷12` |
+| 4 | Không lọc `Show` / `Tình trạng` | **Giữ nguyên luật**, thêm cảnh báo | Lọc theo "Chưa hoạt động" sẽ **sai ngược** — đó chính là thứ cần `DQ`/`IQ`. `Show` là cờ hiển thị, `Thẩm định` mới là cờ nghiệp vụ |
+
+### Kết quả sau khi sửa điểm 3
+
+Ba kho tần suất 36 tháng (`S7.01`, `S7.02`, `S9.01`, mốc gần nhất 2026):
+
+| Năm sinh | Hạng mục tạo mới | Kho bị hoãn |
 |---|---|---|
-| 1 | `NĂM THẨM ĐỊNH = 2026` **viết cứng** trong code | Sang 2027 phải sửa tay, nếu quên thì không sinh gì cho năm mới |
-| 2 | "Lần đầu" đòi `Năm nhập === 2026` | Thiết bị nhập năm 2027 sẽ **không** được `DQ`/`FAT-SAT`/`IQ` nếu hằng số vẫn là 2026 |
-| 3 | Tần suất **36 tháng vẫn sinh 1 lần/năm** | 3 đối tượng đang bị lên lịch dày gấp 3 lần dự định |
-| 4 | Không lọc `Show` / `Tình trạng` | 6 đối tượng `Show = N` và 3 đối tượng "Chưa hoạt động" vẫn có timeline |
+| 2027 | 436 | 3 |
+| 2028 | 436 | 3 |
+| **2029** | **439** | 0 |
 
-Bốn điểm này **tôi giữ nguyên**, không tự sửa, vì mỗi cái đều đổi kết quả nghiệp vụ.
+### Ba cảnh báo thay cho việc máy tự quyết
+
+`rpc_source_warnings(p_year)` trả 4 nhóm, hiện ngay trên màn **Danh mục nguồn**:
+
+| Nhóm | Số lượng | Ý nghĩa |
+|---|---|---|
+| `thieu_thang_dau` | 5 | 🔴 **Chắc chắn sai** — phải điền |
+| `chua_tung_iq` | 176 | 🟡 Cần người xem — bình thường nếu là thiết bị cũ |
+| `show_tat` | 6 | 🟡 Cần người xem — `Thẩm định = y` nhưng `Show ≠ y` |
+| `chua_hoat_dong` | 3 | 🟡 Cần người xem — chỉ rà nếu thật sự đã ngừng dùng |
+
+Giao diện phân biệt rõ **đỏ = chắc chắn sai** với **vàng = cần người xem**, để không ai nhầm cảnh báo bình thường thành lỗi.
 
 ---
 
