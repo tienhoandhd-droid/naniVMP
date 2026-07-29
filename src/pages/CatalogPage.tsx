@@ -6,37 +6,19 @@
  *  - GHI CHƯA kích hoạt: form Cập nhật/Thêm sinh sẵn "payload đúng cột Sheet"
  *    (xem trước) để về sau nối đường ghi ngược Sheet — giữ read-only an toàn.
  * ===================================================================== */
-import { useMemo, useState } from "react";
-import { Boxes, Search, Pencil, Plus, ChevronRight, Save, Layers, FileSpreadsheet } from "lucide-react";
-import { C, TEXT, NUM, btnPrimary, INP, FIELD, LBL } from "../constants/theme.ts";
-import { CLS, DEPTS, TT_OPTS } from "../constants/vmp.ts";
+import { useEffect, useMemo, useState } from "react";
+import { Boxes, Search, Pencil, ChevronRight, Layers } from "lucide-react";
+import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
+import { CLS, DEPTS } from "../constants/vmp.ts";
 import { parseD, fmtVN, txt } from "../utils/helpers.ts";
-import { toISO } from "../lib/n8nAdapter.ts";
-import { Card, Tag, Modal, Pill } from "../components/ui/Primitives.tsx";
+import { Card, Tag, Pill } from "../components/ui/Primitives.tsx";
+import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
+import { useDebounce } from "../hooks/index.ts";
 import type { Activity, VmpObject } from "../types/domain.ts";
 
-// Ánh xạ trường sửa → CỘT SHEET chuẩn (index 0-based khớp 37 cột canonical).
-/** [khoá, số cột trong Sheet (0-based), nhãn] */
-type UpdateDef = [key: string, col: number, label: string];
-
-const UPDATE_MAP: UpdateDef[] = [
-  ["tt_de_cuong", 23, "Trạng thái đề cương"],
-  ["ngay_de_cuong", 22, "TG thực tế hoàn thành đề cương"],
-  ["lich_td", 26, "Bộ phận xếp lịch thẩm định"],
-  ["tt_tham_dinh", 28, "Trạng thái thẩm định thực tế"],
-  ["ngay_tham_dinh", 27, "TG thực tế hoàn thành thẩm định"],
-  ["tt_bao_cao", 32, "Trạng thái báo cáo"],
-  ["ngay_bao_cao", 31, "TG thực tế hoàn thành báo cáo"],
-  ["tt_vmp", 35, "Trạng thái VMP"],
-  ["ngay_vmp", 34, "TG thực tế Deadline VMP"],
-];
-
-const STAGES4 = [
-  ["1. Đề cương", "ngay_de_cuong", "tt_de_cuong", "dl_de_cuong"],
-  ["2. Thẩm định thực tế", "ngay_tham_dinh", "tt_tham_dinh", "dl_tham_dinh"],
-  ["3. Báo cáo", "ngay_bao_cao", "tt_bao_cao", "dl_bao_cao"],
-  ["4. Hoàn thành VMP", "ngay_vmp", "tt_vmp", "dl_vmp"],
-];
+// (Đã bỏ bảng ánh xạ cột Sheet và danh sách 4 giai đoạn: chúng chỉ phục vụ
+// hộp "xem trước dòng Sheet" thời còn ghi ngược Google Sheet. Nay ghi thẳng
+// Supabase qua hộp dùng chung ProgressEditModal.)
 
 function yearOf(a: Activity): string {
   const m = String(a.id || "").match(/\/(20\d{2})/);
@@ -64,158 +46,26 @@ function groupByType(items: Activity[]) {
     });
 }
 
-/* ---------- Modal Cập nhật tiến độ (sinh payload, chưa ghi) ---------- */
-function UpdateModal({ act, onClose }: { act: Activity; onClose: () => void }) {
-  const raw = (act._raw || {}) as Record<string, unknown>;
-  const [f, setF] = useState<Record<string, string>>(() => ({
-    ngay_de_cuong: toISO(raw.ngay_de_cuong), tt_de_cuong: String(raw.tt_de_cuong || ""),
-    lich_td: toISO(raw.lich_td), ngay_tham_dinh: toISO(raw.ngay_tham_dinh),
-    tt_tham_dinh: String(raw.tt_tham_dinh || ""),
-    ngay_bao_cao: toISO(raw.ngay_bao_cao), tt_bao_cao: String(raw.tt_bao_cao || ""),
-    ngay_vmp: toISO(raw.ngay_vmp), tt_vmp: String(raw.tt_vmp || ""),
-  }));
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setF((p) => ({ ...p, [k]: e.target.value }));
-  const sel = (k: string) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
-  const dt = (k: string) => <input type="date" value={f[k] || ""} onChange={set(k)} style={INP} />;
-
-  // Chỉ lấy các ô THỰC SỰ đổi so với dữ liệu gốc → payload ghi Sheet.
-  const patch = UPDATE_MAP
-    .map(([key, col, label]) => {
-      const k = String(key);
-      const before = k.startsWith("ngay") || k === "lich_td"
-        ? toISO(raw[k])
-        : String(raw[k] || "");
-      const after = f[k] || "";
-      return before === after
-        ? null
-        : { key: k, col: Number(col), label: String(label), before: before || "—", after: after || "—" };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
-
-  return (
-    <Modal onClose={onClose} title="Cập nhật tiến độ" icon={Pencil} wide>
-      <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 14 }}>
-        <div style={{ fontWeight: 800, color: C.plum, fontSize: 15 }}>{act.code} · {txt(act.name)}</div>
-        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · Năm {yearOf(act)} · ID: {act.id} · QA: {txt(act.owner)}</div>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {STAGES4.map(([title, dCol, tCol, dlKey]) => (
-          <div key={tCol} style={{ background: C.surface, borderRadius: 14, padding: 13, border: `1.5px solid ${C.pinkSoft}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
-              <span style={{ fontWeight: 800, color: C.plum, fontSize: 13.5 }}>{title}</span>
-              <Tag color={C.lavText} bg={C.lavSoft}>Hạn: {toISO(raw[dlKey]) ? fmtVN(parseD(toISO(raw[dlKey]))) : "—"}</Tag>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span>{dt(dCol)}</div>
-              <div style={FIELD}><span style={LBL}>Trạng thái</span>{sel(tCol)}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Xem trước payload ghi Sheet — CHƯA kích hoạt */}
-      <div style={{ marginTop: 16, borderRadius: 14, padding: "12px 14px", background: "#FFF8FB", border: `1px dashed ${C.pink}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 800, color: C.pinkText, marginBottom: 8 }}>
-          <FileSpreadsheet size={15} /> Dữ liệu sẽ ghi vào Sheet chính (xem trước · chưa kích hoạt)
-        </div>
-        {patch.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Chưa có thay đổi nào.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {patch.map((p) => (
-              <div key={p.key} style={{ fontSize: 12, color: C.plum, fontWeight: 600, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: "monospace", color: C.plumSoft }}>Cột&nbsp;{p.col + 1}</span>
-                <b>{p.label}:</b>
-                <span style={{ color: C.plumSoft }}>{p.before}</span>→<b style={{ color: C.mintText }}>{p.after}</b>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
-        <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Đóng</button>
-        <button disabled title="Đường ghi ngược Sheet sẽ nối về sau" style={{ ...btnPrimary, flex: 2, padding: 12, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: 0.55, cursor: "not-allowed" }}><Save size={16} /> Lưu (chưa kích hoạt ghi)</button>
-      </div>
-    </Modal>
-  );
-}
-
-/* ---------- Modal Thêm đối tượng (sinh dòng Sheet, chưa ghi) ---------- */
-/** [khoá, số cột trong Sheet (0-based), nhãn, kiểu ô nhập] */
-type FieldDef = [key: string, col: number, label: string, kind: string];
-
-const NEW_FIELDS: FieldDef[] = [
-  ["phan_loai", 1, "Phân loại đối tượng", "select-cls"],
-  ["loai_td", 2, "Loại thẩm định", "text"],
-  ["ma", 3, "Mã đối tượng", "text"],
-  ["ten", 4, "Tên đối tượng", "text"],
-  ["bo_phan", 5, "Bộ phận quản lý", "text"],
-  ["khu_vuc", 6, "Mã khu vực", "text"],
-  ["line", 7, "Line", "text"],
-  ["tan_suat", 11, "Tần suất thẩm định (tháng)", "num"],
-  ["phan_loai_bc", 13, "Phân loại báo cáo", "text"],
-  ["so_ngay_cong", 14, "Số ngày công", "num"],
-  ["diem_trong_yeu", 15, "Điểm trọng yếu (1–9)", "num"],
-  ["id", 16, "ID thẩm định", "text"],
-  ["dl_de_cuong", 21, "Hạn đề cương", "date"],
-  ["dl_vmp", 33, "Hạn hoàn thành (Deadline VMP)", "date"],
-];
-function AddObjectModal({ onClose }: { onClose: () => void }) {
-  const [f, setF] = useState<Record<string, string>>({ tan_suat: "12" });
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setF((p) => ({ ...p, [k]: e.target.value }));
-  const filled = NEW_FIELDS.filter(([k]) => String(f[k] ?? "").trim() !== "");
-  return (
-    <Modal onClose={onClose} title="Thêm đối tượng thẩm định" icon={Plus} wide>
-      <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginBottom: 14 }}>
-        Nhập thông tin đối tượng mới. Dữ liệu được sinh sẵn thành <b style={{ color: C.plum }}>một dòng đúng 37 cột Sheet</b> để về sau ghi vào Sheet chính.
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
-        {NEW_FIELDS.map(([k, col, label, kind]) => (
-          <div key={k} style={FIELD}>
-            <span style={LBL}>{label}</span>
-            {kind === "select-cls"
-              ? <select value={f[k] || ""} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}><option value="">— Chọn —</option>{Object.values(CLS).map((c) => <option key={c.label} value={c.label}>{c.label}</option>)}</select>
-              : <input type={kind === "date" ? "date" : kind === "num" ? "number" : "text"} value={f[k] || ""} onChange={set(k)} style={INP} placeholder={`Cột ${col + 1}`} />}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 16, borderRadius: 14, padding: "12px 14px", background: "#FFF8FB", border: `1px dashed ${C.pink}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 800, color: C.pinkText, marginBottom: 8 }}>
-          <FileSpreadsheet size={15} /> Dòng Sheet sẽ tạo (xem trước · chưa kích hoạt)
-        </div>
-        {filled.length === 0
-          ? <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Chưa nhập trường nào.</div>
-          : <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{filled.map(([k, col, label]) => (
-              <span key={k} style={{ fontSize: 11.5, fontWeight: 700, color: C.plum, background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 999, padding: "3px 9px" }}>
-                <span style={{ fontFamily: "monospace", color: C.plumSoft }}>C{col + 1}</span> {label}: <b>{f[k]}</b>
-              </span>
-            ))}</div>}
-      </div>
-
-      <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
-        <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Đóng</button>
-        <button disabled title="Đường ghi ngược Sheet sẽ nối về sau" style={{ ...btnPrimary, flex: 2, padding: 12, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: 0.55, cursor: "not-allowed" }}><Save size={16} /> Thêm (chưa kích hoạt ghi)</button>
-      </div>
-    </Modal>
-  );
-}
-
-/* ---------- Trang chính ---------- */
-export default function CatalogView({ objects = [], acts = [] }: {
-  objects?: VmpObject[]; acts?: Activity[];
+export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate, onReload, readOnly = false }: {
+  objects?: VmpObject[];
+  acts?: Activity[];
+  isAdmin?: boolean;
+  /** Cùng chữ ký với màn Cập nhật tiến độ — hai màn ghi qua một đường. */
+  onUpdate?: (id: string, patch: Record<string, unknown>, userName?: string, reason?: string, expectedVersion?: number) => void;
+  onReload?: () => void;
+  readOnly?: boolean;
 }) {
   const [q, setQ] = useState("");
+  const kw = useDebounce(q.trim().toLowerCase(), 250);
   const [cls, setCls] = useState("all");
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
   const [year, setYear] = useState("all");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [edit, setEdit] = useState<Activity | null>(null);
-  const [adding, setAdding] = useState(false);
+  /** Số nhóm dựng thật — 272 đối tượng dựng một lúc là thừa, mắt chỉ đọc được
+   *  vài chục dòng đầu. */
+  const [hien, setHien] = useState(40);
 
   const years = useMemo(
     () => [...new Set(acts.map(yearOf))].filter((y) => y && y !== "—").sort(),
@@ -248,7 +98,7 @@ export default function CatalogView({ objects = [], acts = [] }: {
           || yearOf(x).localeCompare(yearOf(y)));
     });
     // lọc nhóm
-    const needle = q.trim().toLowerCase();
+    const needle = kw;
     list = list.filter((g) => {
       const o = g.obj;
       if (cls !== "all" && o.cls !== cls) return false;
@@ -264,9 +114,11 @@ export default function CatalogView({ objects = [], acts = [] }: {
     // sắp theo MÃ đối tượng
     list.sort((a, b) => String(a.obj.code).localeCompare(String(b.obj.code), "vi", { numeric: true }));
     return list;
-  }, [objects, acts, q, cls, dept, status, year]);
+  }, [objects, acts, kw, cls, dept, status, year]);
 
   const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
+  // Đổi bộ lọc thì quay lại 40 nhóm đầu.
+  useEffect(() => { setHien(40); }, [kw, cls, dept, status, year]);
   const toggle = (code: string) => setOpen((p) => ({ ...p, [code]: !p[code] }));
 
   return (
@@ -280,7 +132,12 @@ export default function CatalogView({ objects = [], acts = [] }: {
               <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Nhóm theo mã đối tượng · mỗi mã nhiều loại thẩm định / lần thẩm định trong năm</div>
             </div>
           </div>
-          <button onClick={() => setAdding(true)} style={{ ...btnPrimary, padding: "10px 16px", borderRadius: 12, display: "inline-flex", alignItems: "center", gap: 7 }}><Plus size={16} /> Thêm đối tượng</button>
+          {/* Nút "Thêm đối tượng" cũ mở một hộp chỉ XEM TRƯỚC dòng Sheet rồi
+              khoá nút Lưu — thêm không được. Chỗ thêm thật nằm ở Danh mục &
+              Nhập liệu, nên chỉ đường sang đó thay vì để nút giả. */}
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, maxWidth: 260, lineHeight: 1.5, textAlign: "right" }}>
+            Thêm đối tượng mới ở <b style={{ color: C.plum }}>Danh mục &amp; Nhập liệu</b> → Danh mục nguồn, rồi bấm <b style={{ color: C.plum }}>Sinh timeline</b>.
+          </div>
         </div>
         <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
@@ -296,7 +153,7 @@ export default function CatalogView({ objects = [], acts = [] }: {
       </Card>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {groups.map((g) => {
+        {groups.slice(0, hien).map((g) => {
           const o = g.obj;
           const cl = (CLS as Record<string, typeof CLS.tb>)[String(o.cls ?? "tb")] || CLS.tb;
           const dp = DEPTS.find((d) => d.id === o.dept);
@@ -371,18 +228,34 @@ export default function CatalogView({ objects = [], acts = [] }: {
             </Card>
           );
         })}
+        {groups.length > hien && (
+          <button onClick={() => setHien((n) => n + 60)}
+            style={{ ...btnPrimary, alignSelf: "center", padding: "10px 20px", borderRadius: 12, fontSize: 13 }}>
+            Hiện thêm — đang xem {hien}/{groups.length} đối tượng
+          </button>
+        )}
         {!groups.length && <Card><div style={{ textAlign: "center", padding: 30, color: C.plumSoft, fontWeight: 600 }}>Không có đối tượng phù hợp bộ lọc.</div></Card>}
       </div>
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
         <b style={{ color: C.mintText }}>Supabase là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).
-        Màn này gộp theo mã đối tượng để xem tiến độ; muốn thêm / sửa / xoá đối tượng thì
-        vào <b>Danh mục &amp; Nhập liệu</b>, muốn sửa ngày và trạng thái thì vào
-        <b> Cập nhật tiến độ</b>. Google Sheet nay chỉ là bản tham chiếu chỉ đọc.
+        Màn này gộp theo mã đối tượng; bấm <b>Cập nhật</b> ở từng hạng mục là sửa được
+        ngay tại đây — cùng một hộp và cùng luật với màn <b>Cập nhật tiến độ</b>.
+        Thêm / xoá đối tượng thì vào <b>Danh mục &amp; Nhập liệu</b>.
+        Google Sheet nay chỉ là bản tham chiếu chỉ đọc.
       </div>
 
-      {edit && <UpdateModal act={edit} onClose={() => setEdit(null)} />}
-      {adding && <AddObjectModal onClose={() => setAdding(false)} />}
+      {/* Cùng một hộp với màn Cập nhật tiến độ: ghi thật, có khoá lạc quan,
+          bắt buộc lý do theo ALCOA+, gán được người thực hiện. */}
+      {edit && !readOnly && (
+        <ProgressEditModal
+          act={edit}
+          isAdmin={isAdmin}
+          onClose={() => setEdit(null)}
+          onReload={onReload}
+          onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}
+        />
+      )}
     </div>
   );
 }
