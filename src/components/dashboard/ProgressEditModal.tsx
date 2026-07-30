@@ -165,9 +165,18 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     }
 
     // onSave = onUpdate(id, patch, userName, reason). userName để trống (server tự lấy theo JWT).
-    // (MỚI) gửi version để KHÓA LẠC QUAN — chống ghi đè khi 2 người sửa cùng hạng mục.
+    // Gửi version để KHÓA LẠC QUAN — chống ghi đè khi 2 người sửa cùng hạng mục.
+    //
+    // KHÔNG dùng `Number(raw.version) || undefined`: version của hạng mục CHƯA
+    // TỪNG sửa là 0, mà 0 là falsy nên biểu thức đó luôn ra undefined. RPC chỉ
+    // kiểm khi p_expected_version IS NOT NULL, nên khoá lạc quan chưa bao giờ
+    // chạy đúng ở lần sửa đầu tiên — đúng lúc cần nhất (2026-07-30: cả 461
+    // hạng mục đều đang ở version 0).
+    // Thiếu version thì gửi undefined (bỏ kiểm) — gửi bừa 0 sẽ tạo ra
+    // version_conflict giả. Number(null) ra 0 nên phải loại null trước.
     if (formChanged) {
-      onSave(act.id, f, undefined, reason.trim() || undefined, Number(raw.version) || undefined);
+      const v = raw.version == null ? NaN : Number(raw.version);
+      onSave(act.id, f, undefined, reason.trim() || undefined, Number.isFinite(v) ? v : undefined);
     }
     if (goNext && nextAct && onOpenNext) onOpenNext(nextAct);
     else onClose();
