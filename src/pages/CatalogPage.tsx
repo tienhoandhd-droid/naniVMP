@@ -249,6 +249,7 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
           bắt buộc lý do theo ALCOA+, gán được người thực hiện. */}
       {edit && !readOnly && (
         <ProgressEditModal
+          key={edit.id}
           act={edit}
           isAdmin={isAdmin}
           onClose={() => setEdit(null)}
