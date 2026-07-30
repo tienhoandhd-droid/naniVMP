@@ -12,22 +12,6 @@
 --   $4 thang_den   — tháng cuối kỳ (1..12)
 --   $5 nam_sau     — năm của KỲ SAU
 --   $6 thang_sau_tu, $7 thang_sau_den — dải tháng của KỲ SAU
---   $8 moc         — mốc CHIA THÁNG: tham_dinh | bao_cao | vmp
---                   (de_cuong cố ý không dùng — T−60 lệch 2 tháng so mốc đích,
---                    chia theo nó rồi đo bằng hoàn thành VMP thì ra 0% giả)
---
--- MỐC (sửa 2026-07-31 theo yêu cầu người dùng): mặc định THAM_DINH — hạn thẩm
--- định thực tế là mốc GMP mà bộ phận thật sự phải bố trí người và thiết bị;
--- mốc đích VMP chỉ sau đó vài ngày và phần lớn là thủ tục giấy tờ.
--- ⚠️ MỐC CHỈ QUYẾT ĐỊNH HẠNG MỤC RƠI VÀO THÁNG NÀO. `da_xong` LUÔN là
--- status_vmp='completed', không bao giờ đọc theo mốc — xong đề cương không phải
--- là xong việc, một hạng mục mới viết xong đề cương mà mốc đích còn ở tháng sau
--- thì không được tính là hoàn thành của tháng này.
---
--- Dữ kiện 2026-07-31: 442/442 hạng mục có hạn thẩm định và hạn đích VMP rơi
--- CÙNG MỘT THÁNG, nên chọn 'tham_dinh' hay 'vmp' gần như không đổi cách chia
--- tháng. Riêng 'de_cuong' lệch hẳn (T−60) — dùng để xem tháng nào phải viết đề
--- cương, đừng dùng để chấm mục tiêu.
 --
 -- HAI TẬP DỮ LIỆU, đừng nhầm — dùng sai tập là ra số vô nghĩa:
 --   items_nam — toàn bộ hạng mục của NĂM. Chỉ dùng cho `theo_thang` (biểu đồ
@@ -50,20 +34,14 @@ with pv as (
     coalesce(nullif($4, '')::int, 12)                   as thang_den,
     coalesce(nullif($5, '')::int, extract(year from current_date)::int) as nam_sau,
     coalesce(nullif($6, '')::int, 1)                    as thang_sau_tu,
-    coalesce(nullif($7, '')::int, 12)                   as thang_sau_den,
-    coalesce(nullif($8, ''), 'tham_dinh')               as moc
+    coalesce(nullif($7, '')::int, 12)                   as thang_sau_den
 ),
 items_nam as (
   select
     p.validation_code as ma, o.name as ten, p.validation_type as loai,
     coalesce(nullif(btrim(p.owner_name), ''), 'chưa phân công') as nguoi,
     coalesce(p.criticality_score, 0) as diem,
-    case (select moc from pv)
-      when 'de_cuong'  then p.deadline_protocol
-      when 'bao_cao'   then p.deadline_report
-      when 'vmp'       then p.deadline_vmp
-      else p.deadline_validation
-    end as han,
+    p.deadline_vmp as han,
     (p.status_vmp = 'completed') as da_xong,
     coalesce(p.status_protocol_text, p.status_protocol::text) as tt_de_cuong,
     coalesce(p.status_validation_text, p.status_validation::text) as tt_tham_dinh,
@@ -72,12 +50,7 @@ items_nam as (
     p.actual_vmp_date as ngay_xong, p.actual_validation_date as ngay_tham_dinh,
     coalesce(p.departments, array[]::text[]) as bo_phan,
     coalesce(o.area, '') as khu_vuc,
-    (current_date - case (select moc from pv)
-      when 'de_cuong'  then p.deadline_protocol
-      when 'bao_cao'   then p.deadline_report
-      when 'vmp'       then p.deadline_vmp
-      else p.deadline_validation
-    end) as tre_ngay,
+    (current_date - p.deadline_vmp) as tre_ngay,
     p.deadline_protocol as dl_de_cuong,
     p.deadline_validation as dl_tham_dinh,
     p.deadline_report as dl_bao_cao,
@@ -110,34 +83,18 @@ items_sau as (
     coalesce(nullif(btrim(p.owner_name), ''), 'chưa phân công') as nguoi,
     coalesce(p.criticality_score, 0) as diem,
     coalesce(p.departments, array[]::text[]) as bo_phan,
-    case (select moc from pv)
-      when 'de_cuong'  then p.deadline_protocol
-      when 'bao_cao'   then p.deadline_report
-      when 'vmp'       then p.deadline_vmp
-      else p.deadline_validation
-    end as han
+    p.deadline_vmp as han
   from public.vmp_plan_items p
   join public.vmp_objects o on o.code = p.object_code
   where p.is_active and coalesce(p.item_state, 'active') = 'active'
     and p.year = (select nam_sau from pv)
     and p.status_vmp <> 'completed'
     and ((select bp from pv) = 'all' or (select bp from pv) = any(coalesce(p.departments, array[]::text[])))
-    and case (select moc from pv)
-          when 'de_cuong'  then p.deadline_protocol
-          when 'bao_cao'   then p.deadline_report
-          when 'vmp'       then p.deadline_vmp
-          else p.deadline_validation
-        end is not null
-    and extract(month from case (select moc from pv)
-          when 'de_cuong'  then p.deadline_protocol
-          when 'bao_cao'   then p.deadline_report
-          when 'vmp'       then p.deadline_vmp
-          else p.deadline_validation
-        end)::int between (select thang_sau_tu from pv) and (select thang_sau_den from pv)
+    and p.deadline_vmp is not null
+    and extract(month from p.deadline_vmp)::int between (select thang_sau_tu from pv) and (select thang_sau_den from pv)
 )
 select jsonb_build_object(
   'pham_vi', (select bp from pv),
-  'moc', (select moc from pv),
   'nam', (select nam from pv),
   'thang_tu', (select thang_tu from pv),
   'thang_den', (select thang_den from pv),
@@ -172,7 +129,7 @@ select jsonb_build_object(
       union all select ma, nguoi, 'trọng yếu cao (>=7) nhưng chưa bắt đầu' from items where diem >= 7 and trang_thai = 'plan'
       limit 100) l),
   'chua_phan_cong', (select count(*) from items where nguoi = 'chưa phân công'),
-  'chua_co_han_moc', (select count(*) from items_nam where han is null),
+  'chua_co_moc_dich', (select count(*) from items_nam where han is null),
   -- Biểu đồ xu hướng: LUÔN 12 tháng của năm, đọc từ items_nam. Kỳ đang xem chỉ
   -- để tô đậm ở phía web, không được cắt bớt dữ liệu ở đây.
   'theo_thang', (

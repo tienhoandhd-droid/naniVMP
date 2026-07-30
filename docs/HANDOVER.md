@@ -77,42 +77,41 @@ Mã các node của VMP 5: `n8n/vani-vmp-5-nhan-xet-bao-cao/`.
 | `bao_cao` | Trang **Báo cáo & AI** → nút *Thêm nhận xét AI* | Nhận xét cho báo cáo quản lý: tiến độ, mục tiêu 50%/tháng, kế hoạch tháng tới |
 | `canh_bao` | Trang **Cảnh báo & Rủi ro** → nút *Phân tích cảnh báo* | Quá hạn nặng nhất, thứ tự xử lý theo ICH Q9, ai đang ôm nhiều việc trễ |
 
-**Kỳ báo cáo (2026-07-31).** Web gửi kèm `ky: { nam, thang_tu, thang_den, nhan, moc }`;
-truy vấn nhận 8 tham số (`$1` phạm vi, `$2` năm, `$3`/`$4` dải tháng của kỳ, `$5`–`$7`
-của kỳ sau, `$8` mốc chia tháng). Thiếu `ky` → cả năm hiện tại + mốc `tham_dinh`, nên trang Cảnh
+**Kỳ báo cáo (2026-07-31).** Web gửi kèm `ky: { nam, thang_tu, thang_den, nhan }`;
+truy vấn nhận 7 tham số (`$1` phạm vi, `$2` năm, `$3`/`$4` dải tháng của kỳ, `$5`–`$7`
+của kỳ sau). Thiếu `ky` → cả năm hiện tại, nên trang Cảnh
 báo và đường chạy theo lịch không phải đổi gì.
 
-**MỐC CHIA THÁNG — mặc định `tham_dinh`.** Mốc chỉ quyết định hạng mục **rơi vào tháng
-nào**. `da_xong` **LUÔN** là `status_vmp = 'completed'`, không bao giờ đọc theo mốc
-(người dùng chốt 2026-07-31): xong đề cương không phải là xong việc, một hạng mục mới
-viết xong đề cương mà mốc đích còn ở tháng sau thì không được tính là hoàn thành của
-tháng này.
+**CHỈ SỐ CHÍNH LÀ HOÀN THÀNH VMP** (chốt 2026-07-31). Hạng mục thuộc tháng nào là theo
+**mốc đích VMP**, và `da_xong` là `status_vmp = 'completed'`. **Không có bộ chọn mốc** —
+một báo cáo quản lý chỉ được có MỘT định nghĩa "xong", nếu không thì hai người đọc cùng
+một trang sẽ ra hai kết luận khác nhau.
 
-Bộ chọn có 3 mốc: `tham_dinh` (mặc định) · `bao_cao` · `vmp`. **`de_cuong` cố ý không
-có.** Đề cương là T−60, thường sớm hơn mốc đích 2 tháng — chia theo nó rồi đo bằng hoàn
-thành VMP thì tháng 6 ra **80 hạng mục / 0 hoàn thành / 0%**, đọc như trượt thảm hại
-trong khi thực ra mốc đích của chúng còn ở tháng 8.
+Mức hoàn thành **đề cương / thẩm định thực tế / hồ sơ** vẫn trả về đầy đủ (phễu 4 giai
+đoạn ở mục 1, `bat_cap_theo_bo_phan` ở mục 4, và các cột `de_cuong`/`tham_dinh`/`bao_cao`
+trong CSV) — nhưng là **dữ liệu bổ sung để xem tình hình**, không phải thước đo mục tiêu.
+Giao diện tách hẳn hai hàng: ô "★ Hoàn thành VMP — chỉ số chính" đứng riêng, ba mức giai
+đoạn xuống dưới nhãn "DỮ LIỆU BỔ SUNG".
 
-Ba mốc còn lại nằm trong khoảng T−5 → T nên rơi cùng tháng với mốc đích. Đo 2026-07-31:
-**442/442 hạng mục có hạn thẩm định cùng tháng với hạn đích VMP** (0 lệch), nên chọn
-`tham_dinh` hay `vmp` gần như cùng kết quả — tháng 6: 24/7 (29%) so với 25/7 (28%).
-
-Cột `trang_thai` trong CTE `items` là done/over/todo suy từ `da_xong` + `han`;
-`computed_status` giữ riêng ở `trang_thai_vmp` cho bản CSV.
+_Đã thử rồi bỏ (cùng ngày):_ bộ chọn mốc chia tháng. Chia theo hạn **đề cương** (T−60)
+thì tháng 6 ra **80 hạng mục / 0 hoàn thành / 0%** — mốc đích của chúng còn ở tháng 8,
+đọc như trượt thảm hại trong khi thực ra là chưa tới hạn. Chia theo hạn **thẩm định** thì
+gần như không khác mốc đích (**442/442 hạng mục có hai hạn này rơi cùng một tháng**), tức
+thêm một cái núm chỉ để đổi 28% thành 29%. Đừng dựng lại cái núm đó.
 
 Truy vấn có **hai tập dữ liệu, dùng sai là ra số vô nghĩa**:
 
 | Tập | Nội dung | Dùng cho |
 |---|---|---|
 | `items_nam` | toàn bộ hạng mục của năm | `theo_thang` (biểu đồ 12 tháng), `sap_toi_han_60_ngay` |
-| `items` | `items_nam` ∩ hạn **của mốc đang chọn** rơi vào kỳ | mọi thứ còn lại — tương ứng `scopedKy` bên web |
+| `items` | `items_nam` ∩ **mốc đích VMP** rơi vào kỳ | mọi thứ còn lại — tương ứng `scopedKy` bên web |
 | `items_sau` | kỳ SAU, đọc lại bảng gốc vì kỳ sau có thể sang năm khác | `thang_toi` |
 
-Ba tập đều đo hoàn thành bằng `status_vmp`, không theo mốc.
+Ba tập đều đo hoàn thành bằng `status_vmp`.
 
-⚠️ `items` đòi hạn của mốc `is not null`, nên tổng toàn năm là **442** (theo thẩm định)
-chứ không phải 448: hạng mục thiếu hạn ở mốc đó không thuộc kỳ nào và được đếm riêng ở
-`chua_co_han_moc`. Web hiển thị đúng con số đó cạnh bộ lọc.
+⚠️ `items` đòi `deadline_vmp is not null`, nên tổng toàn năm là **443 chứ không phải
+448**: 5 hạng mục chưa có mốc đích không thuộc kỳ nào và được đếm riêng ở
+`chua_co_moc_dich`. Web hiển thị đúng con số đó cạnh bộ lọc.
 
 **Mail gồm cả dữ liệu thô** (người dùng chốt 2026-07-31): thân mail có bảng 60 dòng
 đầu để đọc ngay, **toàn bộ** đính kèm dạng CSV (`;` + BOM UTF-8 để Excel tiếng Việt
