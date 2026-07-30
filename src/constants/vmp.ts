@@ -51,6 +51,37 @@ export const DEPT_DEEP = { xsx: C.pinkText, cd: C.skyText, kho: C.marigoldText, 
 export const DEPT_COLOR = { xsx: C.pink, cd: C.sky, kho: C.marigold, qc: C.mint, rd: C.rasp, qa: C.lav };
 export const DEPT_CODE = { xsx: "XSX", cd: "CĐ", kho: "Kho", qc: "QC", rd: "RD", qa: "QA" };
 
+// ======================== GIAI ĐOẠN (đề cương/thực tế/báo cáo/VMP) ========================
+// Bốn màu này là quy ước MÀU THEO GIAI ĐOẠN dùng xuyên suốt app (bảng phân
+// tích ở CompletionDashboard, biểu đồ báo cáo) — cố định thứ tự, đừng đổi.
+export const STAGE_COLOR = {
+  protocol:   { color: C.lav,  text: C.lavText,  soft: C.lavSoft,  label: "Đề cương" },
+  validation: { color: C.sky,  text: C.skyText,  soft: C.skySoft,  label: "Thẩm định thực tế" },
+  report:     { color: C.pink, text: C.pinkText, soft: C.pinkSoft, label: "Báo cáo" },
+  vmp:        { color: C.mint, text: C.mintText, soft: C.mintSoft, label: "VMP" },
+};
+
+// ======================== CHẤT LƯỢNG DỮ LIỆU ========================
+// Dùng chung cho DataQualityView (Sức khoẻ dữ liệu) và ReportsView (Báo cáo
+// & AI) — một nơi định nghĩa nhãn lỗi, đổi một nơi khớp cả hai màn.
+export const LOAI_LOI: Record<string, { ten: string; sua: string }> = {
+  missing_code:          { ten: "Thiếu mã đối tượng", sua: "Sửa ở Danh mục & Nhập liệu → Danh mục nguồn" },
+  duplicate_id:          { ten: "Trùng ID hạng mục", sua: "Hai dòng cùng mã thẩm định — xoá hoặc đổi mã một dòng" },
+  deadline_before_start: { ten: "Deadline VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
+  done_no_date:          { ten: "Đánh dấu hoàn thành nhưng thiếu ngày", sua: "Vi phạm ALCOA+ — nhập ngày thực tế ở Cập nhật tiến độ" },
+  date_no_done:          { ten: "Có ngày hoàn thành nhưng trạng thái chưa xong", sua: "Đặt trạng thái về Hoàn thành, hoặc xoá ngày nếu nhập nhầm" },
+  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Điền ở Danh mục & Nhập liệu → tab Người thực hiện" },
+  no_validation_type:    { ten: "Chưa xác định loại thẩm định", sua: "Đặt IQ/OQ/PQ/CV ở Danh mục nguồn rồi sinh lại timeline" },
+  high_crit_no_plan:     { ten: "Trọng yếu cao nhưng vẫn ở Kế hoạch", sua: "ICH Q9 đòi làm nhóm rủi ro cao trước — xếp lịch sớm" },
+};
+
+export const SEV = {
+  error:   { nhan: "Lỗi", mau: C.raspText, nen: C.raspSoft, emoji: "🚫", uu_tien: 0 },
+  warning: { nhan: "Cảnh báo", mau: C.marigoldText, nen: C.marigoldSoft, emoji: "⚠️", uu_tien: 1 },
+  info:    { nhan: "Thông tin", mau: C.skyText, nen: C.skySoft, emoji: "ℹ️", uu_tien: 2 },
+} as const;
+export const sevOf = (s: string) => SEV[(s as keyof typeof SEV)] ?? SEV.info;
+
 // ======================== DEADLINE RULES ========================
 // Số ngày QC cần cho từng loại báo cáo (dùng tính T-5-BC)
 export const DEP_DAYS = { "Độc lập": 2, "Hóa lý": 2, "Nhiễm khuẩn": 7, "Vô khuẩn": 16 };
