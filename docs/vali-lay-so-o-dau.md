@@ -155,3 +155,42 @@ Xem cache đang sống: `select cau_hoi, hit_count, created_at from
 vmp_ai_cache_ngu_nghia where is_valid;` — nghi ngờ thì
 `update vmp_ai_cache_ngu_nghia set is_valid = false where is_valid;`
 là toàn bộ về đường tra mới, không cần sửa workflow.
+
+## 9. Sửa workflow thì cache KHÔNG tự vô hiệu
+
+Bài học đắt nhất khi truy lỗi "nhóm hệ thống nước trả 461".
+
+Cache ngữ nghĩa có trigger vô hiệu trên `vmp_plan_items`, `vmp_objects`,
+`vmp_chat_giong`, `vmp_ai_bi_danh`, `vmp_kb_documents` — tức là mọi thứ
+nằm trong **database**. Nhưng sửa **workflow trong n8n** thì không có
+trigger nào nổ, nên cache vẫn giữ câu trả lời cũ.
+
+Suốt mấy vòng vá tôi tưởng bản sửa không ăn, thực ra đang đọc lại câu trả
+lời cũ. Vô hiệu cache thủ công xong mới thấy bản vá **có** tác dụng.
+
+**Từ nay sửa workflow xong, chạy luôn:**
+
+```sql
+update vmp_ai_cache_ngu_nghia set is_valid = false where is_valid;
+```
+
+Không có cách tự động hoá chuyện này, vì database không biết n8n vừa đổi
+gì. Coi nó như một bước bắt buộc của quy trình sửa workflow.
+
+## 10. Số toàn nhà máy: đừng để nó lảng vảng trong ngữ cảnh
+
+Câu "nhóm hệ thống nước đến đâu rồi" liên tục trả **461** — số toàn nhà
+máy — gán cho một nhóm chỉ có 24 hạng mục. Ba vòng sửa:
+
+1. **Dán nhãn** `TOÀN NHÀ MÁY (tuyệt đối không gán cho một nhóm)` vào
+   khối chốt → **không ăn**. Mô hình nhỏ vẫn dùng con số nó thấy.
+2. **Chỉ chèn** số toàn nhà máy khi không có ca "hỏi lại" → **vẫn 461**.
+   Chứng tỏ con số không đến từ ngữ cảnh mà từ công cụ agent tự gọi.
+3. **Bỏ hẳn** `ai_tool` tra số liệu chung khỏi lớp 3 → **461 hết**.
+
+Điều kiện để bỏ được công cụ đó: số toàn nhà máy phải có sẵn trong khối
+chốt, nếu không câu "bao nhiêu hạng mục quá hạn" sẽ hỏng. Làm nửa bước là
+mất câu toàn cục.
+
+**Luật rút ra:** với mô hình nhỏ, đừng cố dặn nó bỏ qua một con số — hãy
+đừng đưa con số đó vào tầm mắt nó. Lời dặn thua sự hiện diện của dữ liệu.
