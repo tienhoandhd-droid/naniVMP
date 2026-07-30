@@ -77,13 +77,24 @@ function legendRow(items: Array<{ color: string; label: string }>, x: number, y:
 
 /* ======================== 1. THÁNG × MỤC TIÊU (bar + đường mục tiêu) ======================== */
 
-export function svgMonthlyTargetChart(rows: MonthTargetRow[], pal: ChartPalette = SCREEN_PALETTE): string {
+/** @param highlight Các tháng thuộc kỳ đang xem — tô nền để mắt bám được
+ *  chỗ đang đọc trong dải 12 tháng. Rỗng = không tô (xem cả năm). */
+export function svgMonthlyTargetChart(
+  rows: MonthTargetRow[], pal: ChartPalette = SCREEN_PALETTE, highlight: number[] = [],
+): string {
   const W = 720, H = 240;
   const padL = 34, padR = 12, padT = 14, padB = 30;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const target = rows[0]?.target ?? 50;
   const bw = plotW / rows.length;
   const yOf = (pct: number) => padT + plotH - (pct / 100) * plotH;
+
+  // Vẽ nền TRƯỚC lưới và cột, nếu không nó phủ mất số.
+  const hl = highlight.length && highlight.length < rows.length
+    ? rows.map((r, i) => (highlight.includes(r.month)
+      ? `<rect x="${padL + i * bw}" y="${padT}" width="${bw}" height="${plotH}" fill="${pal.line}" opacity=".38" />`
+      : "")).join("")
+    : "";
 
   let bars = "";
   rows.forEach((r, i) => {
@@ -143,7 +154,7 @@ export function svgMonthlyTargetChart(rows: MonthTargetRow[], pal: ChartPalette 
     { color: pal.line, label: "Chưa tới kỳ" },
   ], padL, legendY);
 
-  return svgWrap(W, legendY + 12, `<g fill="${pal.ink}">${axisY}${targetLine}${bars}${axisLabels}</g><g fill="${pal.ink}">${legend}</g>`,
+  return svgWrap(W, legendY + 12, `<g fill="${pal.ink}">${hl}${axisY}${targetLine}${bars}${axisLabels}</g><g fill="${pal.ink}">${legend}</g>`,
     "Tỷ lệ hoàn thành VMP theo tháng so với mục tiêu");
 }
 

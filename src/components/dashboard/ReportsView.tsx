@@ -27,8 +27,10 @@ import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll } from "../ui/Primitives.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong } from "../../utils/helpers.ts";
 import {
-  ytdSummary, currentMonthSummary, stageBottleneck, nextMonthWork, buildRawRows,
+  ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
+  periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget,
 } from "../../lib/reportModel.ts";
+import type { Period, PeriodKind } from "../../lib/reportModel.ts";
 import {
   svgMonthlyTargetChart, svgDeptBottleneckChart, svgDeptWorkloadChart, deptColorMap, SCREEN_PALETTE,
 } from "../../lib/reportCharts.ts";
@@ -56,6 +58,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [deptScope, setDeptScope] = useState("all");
   const [areaSel, setAreaSel] = useState<string[]>([]);
   const [critSel, setCritSel] = useState<string[]>([]);
+  const [ky, setKy] = useState<Period>(() => periodNow());
   const [ai, setAi] = useState("");
   const [loadingAi, setLoadingAi] = useState(false);
   const [errAi, setErrAi] = useState("");
@@ -66,6 +69,19 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     [acts],
   );
   const critOptions = useMemo(() => Object.keys(CRIT).map((v) => ({ v, l: v })), []);
+
+  // Năm nào có mặt trong dữ liệu thì cho chọn năm đó, cộng thêm năm hiện tại
+  // và năm sau — để lập kế hoạch kỳ tới ngay cả khi chưa có hạng mục nào.
+  const namOptions = useMemo(() => {
+    const nam = new Set<number>();
+    for (const a of acts) {
+      const y = Number(String(a.target ?? "").slice(0, 4));
+      if (y >= 2000 && y <= 2100) nam.add(y);
+    }
+    const nay = new Date().getFullYear();
+    nam.add(nay); nam.add(nay + 1);
+    return [...nam].sort((x, y) => y - x).map((y) => ({ v: String(y), l: `Năm ${y}` }));
+  }, [acts]);
 
   // ===== Bộ lọc dữ liệu báo cáo quản lý — lấy số liệu theo bất kỳ lát cắt nào =====
   const scoped = useMemo(() => {
@@ -78,22 +94,41 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     return list;
   }, [acts, deptScope, areaSel, critSel]);
 
+  // Lát cắt theo kỳ: giữ MỐC ĐÍCH VMP rơi vào kỳ đang chọn. Đây là lớp lọc
+  // thứ hai, tách hẳn khỏi `scoped` vì có mục cần dữ liệu CẢ NĂM (biểu đồ xu
+  // hướng) và có mục nói về KỲ SAU — hai mục đó phải đọc `scoped`, không phải
+  // `scopedKy`, nếu không sẽ tự cắt mất chính dữ liệu chúng cần.
+  const scopedKy = useMemo(() => scoped.filter((a) => actInPeriod(a, ky)), [scoped, ky]);
+  const soChuaCoMoc = useMemo(() => countNoTarget(scoped), [scoped]);
+
+  const kyLabel = useMemo(() => periodLabel(ky), [ky]);
+  const kyPhase = useMemo(() => periodPhase(ky), [ky]);
+  const laKyHienTai = useMemo(() => {
+    const bg = periodNow();
+    return ky.kind === bg.kind && ky.year === bg.year
+      && (ky.kind === "nam" || (ky.kind === "quy" ? ky.quarter === bg.quarter : ky.month === bg.month));
+  }, [ky]);
+
   const scopeLabel = useMemo(() => {
     const parts = [deptScope === "all" ? "Toàn nhà máy" : (DEPTS.find((d) => d.id === deptScope)?.name || deptScope)];
     if (areaSel.length) parts.push(`Khu vực: ${areaSel.join(", ")}`);
     if (critSel.length) parts.push(`Trọng yếu: ${critSel.join(", ")}`);
+    parts.push(`Kỳ: ${kyLabel}`);
     return parts.join(" · ");
-  }, [deptScope, areaSel, critSel]);
+  }, [deptScope, areaSel, critSel, kyLabel]);
 
-  const ytd = useMemo(() => ytdSummary(scoped), [scoped]);
-  const monthly = useMemo(() => currentMonthSummary(scoped, TARGET_PCT), [scoped]);
-  const bottleneck = useMemo(() => stageBottleneck(scoped), [scoped]);
-  const nextMonth = useMemo(() => nextMonthWork(scoped), [scoped]);
-  const quality = useMemo(() => runDataQualityChecks(scoped), [scoped]);
-  const rawRows = useMemo(() => buildRawRows(scoped), [scoped]);
-  const autoComments = useMemo(() => nhanXetTuDong(scoped), [scoped]);
+  const ytd = useMemo(() => ytdSummary(scopedKy), [scopedKy]);
+  const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT), [scoped, ky]);
+  const bottleneck = useMemo(() => stageBottleneck(scopedKy), [scopedKy]);
+  const nextMonth = useMemo(() => periodWork(scoped, nextPeriod(ky)), [scoped, ky]);
+  const quality = useMemo(() => runDataQualityChecks(scopedKy), [scopedKy]);
+  const rawRows = useMemo(() => buildRawRows(scopedKy), [scopedKy]);
+  const autoComments = useMemo(() => nhanXetTuDong(scopedKy), [scopedKy]);
 
-  const monthlyChartHtml = useMemo(() => svgMonthlyTargetChart(monthly.table, SCREEN_PALETTE), [monthly]);
+  const monthlyChartHtml = useMemo(
+    () => svgMonthlyTargetChart(monthly.table, SCREEN_PALETTE, monthly.highlight),
+    [monthly],
+  );
   const bottleneckChartHtml = useMemo(
     () => (bottleneck.length ? svgDeptBottleneckChart(bottleneck, SCREEN_PALETTE) : ""),
     [bottleneck],
@@ -120,13 +155,23 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       parts.push("Chưa có tháng nào kết thúc trong năm để chấm so mục tiêu.");
     }
 
-    parts.push(monthly.cur.rate == null
-      ? `Tháng ${monthly.month}/${monthly.year} chưa có hạng mục nào đến hạn.`
-      : `Tháng ${monthly.month}/${monthly.year} đang ở ${monthly.cur.rate}% (${monthly.cur.done}/${monthly.cur.due}) — số giữa kỳ, chưa phải kết quả chốt.`);
+    // Câu về kỳ ĐANG XEM phải nói đúng kỳ đó ở đâu so với hôm nay: kỳ đã qua
+    // mới được chốt đạt/trượt, kỳ đang diễn ra chỉ là số giữa kỳ, kỳ chưa tới
+    // thì không có gì để chấm.
+    const c = monthly.cur;
+    parts.push(
+      kyPhase === "chua_toi"
+        ? `Kỳ ${kyLabel} chưa tới — ${c.due} hạng mục sẽ đến hạn, chưa chấm được.`
+        : c.rate == null
+          ? `Kỳ ${kyLabel} chưa có hạng mục nào đến hạn.`
+          : kyPhase === "dang_dien_ra"
+            ? `Kỳ ${kyLabel} đang ở ${c.rate}% (${c.done}/${c.due}) — số giữa kỳ, chưa phải kết quả chốt.`
+            : `Kỳ ${kyLabel} chốt ở ${c.rate}% (${c.done}/${c.due}) — ${c.meets ? "đạt" : "chưa đạt"} mục tiêu ${TARGET_PCT}%.`,
+    );
 
     if (futureDue) parts.push(`Còn ${futureDue} hạng mục đến hạn ở các tháng chưa tới kỳ — chưa chấm được, chỉ là khối lượng phải bố trí.`);
     return parts.join(" ");
-  }, [monthly]);
+  }, [monthly, kyPhase, kyLabel]);
 
   const bottleneckVerdict = useMemo(() => {
     const worst = bottleneck[0];
@@ -167,12 +212,28 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const generateAi = async () => {
     setLoadingAi(true); setErrAi(""); setAi("");
     try {
-      const r = await chayPhanTichAi({ loai: "bao_cao", pham_vi: deptScope });
+      const r = await chayPhanTichAi({ loai: "bao_cao", pham_vi: deptScope, ky: kyChoAi });
       if (r.ok && r.ai_text) setAi(r.ai_text);
       else setErrAi(r.error ? `Lỗi AI: ${r.error}` : "Không nhận được phản hồi AI từ n8n.");
     } catch (ex) { setErrAi((ex as Error)?.message || "Lỗi kết nối n8n."); }
     finally { setLoadingAi(false); }
   };
+
+  /** Phần tên tệp theo kỳ: 2026-08 · 2026-Q3 · 2026. Chỉ chữ số và gạch,
+   *  vì tên tệp tải về không được chứa dấu / của "tháng 8/2026". */
+  const tenTepKy = () =>
+    ky.kind === "nam" ? `${ky.year}`
+      : ky.kind === "quy" ? `${ky.year}-Q${ky.quarter}`
+        : `${ky.year}-${String(ky.month).padStart(2, "0")}`;
+
+  // Kỳ gửi sang n8n: AI phải đọc ĐÚNG lát cắt đang hiện trên màn hình, nếu
+  // không thì bản nhận xét nói một đằng bảng số nói một nẻo.
+  const kyChoAi = useMemo(() => {
+    const ms = ky.kind === "nam" ? [1, 12]
+      : ky.kind === "quy" ? [(ky.quarter - 1) * 3 + 1, (ky.quarter - 1) * 3 + 3]
+        : [ky.month, ky.month];
+    return { nam: ky.year, thang_tu: ms[0], thang_den: ms[1], nhan: kyLabel };
+  }, [ky, kyLabel]);
 
   const printPDF = () => {
     const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
@@ -188,7 +249,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
   const downloadHtml = () => {
     const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
-    download(`BaoCaoQuanLy_VMP_${monthly.year}-${String(monthly.month).padStart(2, "0")}.html`, html);
+    download(`BaoCaoQuanLy_VMP_${tenTepKy()}.html`, html);
   };
 
   const exportExcel = async () => {
@@ -198,14 +259,17 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     const tongQuan = [
       ["Chỉ số", "Giá trị"],
       ["Phạm vi", scopeLabel],
+      ["Kỳ báo cáo", kyLabel],
+      ["Tình trạng kỳ", kyPhase === "da_qua" ? "Đã qua" : kyPhase === "dang_dien_ra" ? "Đang diễn ra" : "Chưa tới"],
+      ["Cách hiểu số liệu", "Lát cắt theo mốc đích VMP — tính tới hôm nay, không phải ảnh chụp tại thời điểm kỳ đó"],
       ["Tổng hạng mục đang hoạt động", ytd.total],
       ["Đề cương hoàn thành (%)", ytd.protocol.rate], ["Đề cương — đã xong", ytd.protocol.done], ["Đề cương — quá hạn", ytd.protocol.over],
       ["Thẩm định thực tế (%)", ytd.validation.rate], ["Thẩm định — đã xong", ytd.validation.done], ["Thẩm định — quá hạn", ytd.validation.over],
       ["Hồ sơ hoàn thiện (%)", ytd.documentation.rate], ["Hồ sơ — đã xong", ytd.documentation.done], ["Hồ sơ — quá hạn", ytd.documentation.over],
       ["Hoàn thành VMP (%)", ytd.vmp.rate], ["VMP — đã xong", ytd.vmp.done], ["VMP — quá hạn", ytd.vmp.over],
-      [], ["Tháng hiện tại", `${monthly.month}/${monthly.year}`],
-      ["Cần hoàn thành tháng này", monthly.cur.due], ["Đã hoàn thành tháng này", monthly.cur.done],
-      ["Tỷ lệ tháng này (%)", monthly.cur.rate ?? "—"], ["Tỷ lệ tháng trước (%)", monthly.prev?.rate ?? "—"],
+      [], ["Kỳ đang xem", kyLabel],
+      ["Cần hoàn thành trong kỳ", monthly.cur.due], ["Đã hoàn thành trong kỳ", monthly.cur.done],
+      ["Tỷ lệ kỳ này (%)", monthly.cur.rate ?? "—"], ["Tỷ lệ kỳ trước (%)", monthly.prev?.rate ?? "—"],
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tongQuan), "Tổng quan");
 
@@ -233,7 +297,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       ["Mã", "Tên", "Bộ phận", "Người thực hiện", "Hạn", "Mức trọng yếu"],
       ...nextMonth.items.map((it) => [it.code, it.name, it.depts.join("+"), it.owner, it.target, it.crit]),
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(thangToi), `Tháng tới ${nextMonth.monthLabel}`);
+    // Tên sheet Excel KHÔNG được chứa / \\ ? * [ ] và tối đa 31 ký tự —
+    // periodLabel trả "tháng 8/2026" có dấu / nên phải làm sạch, không thì
+    // cả file xuất ra hỏng.
+    const tenSheetKySau = `Ky sau ${nextMonth.monthLabel}`.replace(/[/\\?*[\]:]/g, "-").slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(thangToi), tenSheetKySau);
 
     const duLieuTho = [
       ["Mã", "Tên", "Loại", "Bộ phận", "Khu vực", "Người thực hiện", "Trọng yếu",
@@ -247,7 +315,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(duLieuTho), "Dữ liệu thô");
 
-    XLSX.writeFile(wb, `BaoCaoQuanLy_VMP_${monthly.year}-${String(monthly.month).padStart(2, "0")}_CPC1HN.xlsx`);
+    XLSX.writeFile(wb, `BaoCaoQuanLy_VMP_${tenTepKy()}_CPC1HN.xlsx`);
   };
 
   return (
@@ -258,6 +326,31 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           Bộ lọc dữ liệu báo cáo quản lý
         </CardTitle>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-end" }}>
+          {/* ---- Kỳ báo cáo: tháng / quý / năm ---- */}
+          <div>
+            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Kỳ báo cáo</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))}
+                opts={[{ v: "thang", l: "Theo tháng" }, { v: "quy", l: "Theo quý" }, { v: "nam", l: "Cả năm" }]} />
+              {ky.kind === "thang" && (
+                <Sel val={String(ky.month)} set={(v) => setKy((k) => ({ ...k, month: Number(v), quarter: Math.ceil(Number(v) / 3) }))}
+                  opts={Array.from({ length: 12 }, (_, i) => ({ v: String(i + 1), l: `Tháng ${i + 1}` }))} />
+              )}
+              {ky.kind === "quy" && (
+                <Sel val={String(ky.quarter)} set={(v) => setKy((k) => ({ ...k, quarter: Number(v), month: (Number(v) - 1) * 3 + 1 }))}
+                  opts={[1, 2, 3, 4].map((q) => ({ v: String(q), l: `Quý ${q}` }))} />
+              )}
+              <Sel val={String(ky.year)} set={(v) => setKy((k) => ({ ...k, year: Number(v) }))} opts={namOptions} />
+              {!laKyHienTai && (
+                <button type="button" onClick={() => setKy(periodNow())}
+                  title="Quay lại kỳ hiện tại"
+                  style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: C.lavText, background: C.lavSoft,
+                    border: "none", borderRadius: 999, padding: "8px 14px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  ↺ Về kỳ này
+                </button>
+              )}
+            </div>
+          </div>
           <div>
             <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Phạm vi (bộ phận)</div>
             <Sel val={deptScope} set={setDeptScope} opts={[{ v: "all", l: "Toàn nhà máy" }, ...DEPTS.map((d) => ({ v: d.id, l: d.name }))]} />
@@ -276,15 +369,32 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <button onClick={downloadHtml} style={toolBtn(C.lavSoft, C.lavText)}><Download size={16} /> HTML</button>
           </div>
         </div>
-        <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
-          Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b> · {scoped.filter((a) => (a.state || "active") === "active").length} hạng mục đang hoạt động
+        <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
+          Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b> · <b style={{ color: C.plum }}>{scopedKy.filter((a) => (a.state || "active") === "active").length}</b> hạng mục
+          có mốc đích rơi vào kỳ này (trên tổng {scoped.filter((a) => (a.state || "active") === "active").length} hạng mục đang hoạt động).
+          {soChuaCoMoc > 0 && (
+            <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục chưa có mốc đích VMP nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
+          )}
         </div>
+
+        {/* Kỳ là LÁT CẮT THEO MỐC ĐÍCH, không phải ảnh chụp quá khứ. Nói thẳng
+            ngay cạnh bộ chọn, vì đây đúng là chỗ người đọc dễ hiểu nhầm nhất —
+            và hiểu nhầm thì mọi con số bên dưới bị đọc sai theo. */}
+        {!laKyHienTai && (
+          <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 700, color: C.lavText, background: C.lavSoft,
+            borderRadius: 12, padding: "11px 15px", lineHeight: 1.7 }}>
+            ℹ️ Đang xem kỳ <b>{kyLabel}</b> ({kyPhase === "da_qua" ? "đã qua" : kyPhase === "dang_dien_ra" ? "đang diễn ra" : "chưa tới"}).
+            Đây là <b>lát cắt theo mốc đích</b>: những hạng mục có mốc đích VMP rơi vào kỳ đó, và tính tới <b>hôm nay</b> đã xong bao nhiêu —
+            không phải ảnh chụp tại thời điểm đó. Một hạng mục hạn {kyLabel} mà nay mới xong vẫn tính là đã xong,
+            vì dữ liệu chưa ghi ngày hoàn thành thực tế.
+          </div>
+        )}
       </Card>
 
       {/* ===== 1. Tổng quan số liệu tới hiện tại ===== */}
       <Card variant="strong">
-        <CardTitle icon={Boxes} sub={`Toàn bộ hạng mục VMP năm ${monthly.year}, tính tới hôm nay`}>
-          1. Tổng quan số liệu năm {monthly.year}
+        <CardTitle icon={Boxes} sub={`Hạng mục có mốc đích VMP rơi vào ${kyLabel}, tình trạng tính tới hôm nay`}>
+          1. Tổng quan số liệu kỳ {kyLabel}
         </CardTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
           <StatTile icon={Boxes} label="Tổng hạng mục" value={ytd.total} tone={{ c: C.plum, bg: C.pinkSoft }} />
@@ -320,20 +430,20 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 2. Tổng quan tháng hiện tại ===== */}
       <Card>
-        <CardTitle icon={CalendarClock} sub="So với tháng trước, cùng phạm vi đang lọc">
-          2. Tổng quan tháng {monthly.month}/{monthly.year}
+        <CardTitle icon={CalendarClock} sub="So với kỳ liền trước, cùng phạm vi đang lọc">
+          2. Tổng quan kỳ {kyLabel}
         </CardTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-          <StatTile icon={CalendarClock} label="Cần hoàn thành tháng này" value={monthly.cur.due} tone={{ c: C.plum, bg: C.pinkSoft }} />
+          <StatTile icon={CalendarClock} label={`Cần hoàn thành ${kyLabel}`} value={monthly.cur.due} tone={{ c: C.plum, bg: C.pinkSoft }} />
           <StatTile icon={FileCheck2} label="Đã hoàn thành" value={monthly.cur.done}
-            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : `${monthly.cur.rate}% trong tháng`} tone={{ c: C.mintText, bg: C.mintSoft }} />
-          <StatTile icon={ShieldCheck} label="Tỷ lệ tháng trước" value={monthly.prev?.rate == null ? "—" : `${monthly.prev.rate}%`}
+            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : `${monthly.cur.rate}% trong kỳ`} tone={{ c: C.mintText, bg: C.mintSoft }} />
+          <StatTile icon={ShieldCheck} label="Tỷ lệ kỳ trước" value={monthly.prev?.rate == null ? "—" : `${monthly.prev.rate}%`}
             tone={{ c: C.skyText, bg: C.skySoft }} />
           {/* Tháng hiện tại chưa kết thúc → nói "tạm", khớp với biểu đồ và câu
               kết luận. Ghi thẳng "Chưa đạt" là chốt sổ một kỳ chưa xong. */}
           <StatTile icon={AlertCircle} label={`So mục tiêu ${TARGET_PCT}%`}
-            value={monthly.cur.rate == null ? "—" : (monthly.cur.meets ? "Tạm đạt" : "Tạm dưới")}
-            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : "Số giữa kỳ — tháng chưa kết thúc"}
+            value={monthly.cur.rate == null ? "—" : kyPhase === "dang_dien_ra" ? (monthly.cur.meets ? "Tạm đạt" : "Tạm dưới") : (monthly.cur.meets ? "Đạt" : "Chưa đạt")}
+            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : kyPhase === "dang_dien_ra" ? "Số giữa kỳ — kỳ chưa kết thúc" : kyPhase === "chua_toi" ? "Kỳ chưa tới — chưa chấm được" : "Kết quả đã chốt"}
             tone={monthly.cur.meets === false ? { c: C.marigoldText, bg: C.marigoldSoft } : { c: C.mintText, bg: C.mintSoft }} />
         </div>
       </Card>
@@ -390,8 +500,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 5. Công việc dự kiến tháng tới ===== */}
       <Card>
-        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục có mốc đích VMP rơi vào tháng ${nextMonth.monthLabel}, chưa hoàn thành`}>
-          5. Công việc dự kiến tháng {nextMonth.monthLabel}
+        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục có mốc đích VMP rơi vào ${nextMonth.monthLabel}, chưa hoàn thành`}>
+          5. Công việc dự kiến {nextMonth.monthLabel}
         </CardTitle>
         {workloadChartHtml && <div dangerouslySetInnerHTML={{ __html: workloadChartHtml }} />}
         <TableScroll maxHeight={340}>
@@ -408,7 +518,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                   <td style={{ ...td, fontFamily: NUM }}>{it.target}</td><td style={td}>{it.crit}</td>
                 </tr>
               ))}
-              {!nextMonth.items.length && <tr><td style={td} colSpan={6}>Không có hạng mục nào đến hạn tháng tới trong phạm vi đang chọn.</td></tr>}
+              {!nextMonth.items.length && <tr><td style={td} colSpan={6}>Không có hạng mục nào đến hạn {nextMonth.monthLabel} trong phạm vi đang chọn.</td></tr>}
             </tbody>
           </table>
         </TableScroll>
@@ -526,7 +636,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {moGuiMail && (
         <AiMailModal
-          loai="bao_cao" phamVi={deptScope} phamViLabel={scopeLabel}
+          loai="bao_cao" phamVi={deptScope} phamViLabel={scopeLabel} ky={kyChoAi}
           onClose={() => setMoGuiMail(false)}
           onDone={(r) => { if (r.ai_text) { setAi(r.ai_text); setErrAi(""); } }}
         />

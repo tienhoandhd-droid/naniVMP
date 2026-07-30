@@ -40,6 +40,34 @@ function esc(s) {
 
 function laEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s || '').trim()); }
 
+// Người dùng chốt 2026-07-31: mail phải có CẢ dữ liệu thô LẪN phần phân tích.
+// 448 dòng x 18 cột nhồi vào thân mail thì hộp thư nào cũng cắt, nên: bảng gọn
+// 60 dòng đầu trong thân để đọc ngay, còn TOÀN BỘ đính kèm dưới dạng CSV.
+var COT_THO = [
+  ['ma', 'Mã'], ['ten', 'Tên hạng mục'], ['loai', 'Loại'], ['bo_phan', 'Bộ phận'],
+  ['khu_vuc', 'Khu vực'], ['nguoi', 'Người thực hiện'], ['diem', 'Điểm trọng yếu'],
+  ['trang_thai', 'Trạng thái'], ['tre_ngay', 'Trễ (ngày)'], ['han', 'Hạn VMP'],
+  ['dl_de_cuong', 'Hạn đề cương'], ['dl_tham_dinh', 'Hạn thẩm định'], ['dl_bao_cao', 'Hạn báo cáo'],
+  ['ngay_xong', 'Ngày hoàn thành'], ['de_cuong', 'TT đề cương'], ['tham_dinh', 'TT thẩm định'],
+  ['bao_cao', 'TT báo cáo'], ['vmp', 'TT VMP'],
+];
+
+function oCsv(v) {
+  if (v == null) return '';
+  var s = Array.isArray(v) ? v.join('+') : String(v);
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function dungCsv(rows) {
+  var L = [COT_THO.map(function (c) { return oCsv(c[1]); }).join(';')];
+  rows.forEach(function (r) {
+    L.push(COT_THO.map(function (c) { return oCsv(r[c[0]]); }).join(';'));
+  });
+  // Dấu ; và BOM UTF-8: Excel bản tiếng Việt mở CSV phẩy ra một cột và làm
+  // hỏng dấu — đã gặp ở bản xuất trước.
+  return '\ufeff' + L.join('\r\n');
+}
+
 var ctxAll = $('Dựng prompt tổng hợp').all().map(function (i) { return i.json; });
 
 return $input.all().map(function (it, idx) {
@@ -106,9 +134,33 @@ return $input.all().map(function (it, idx) {
   // ---------- Bản HTML cho mail ----------
   var tieuDe = th.tieuDe || (laCanhBao ? 'Phân tích cảnh báo VMP' : 'Nhận xét AI cho báo cáo VMP');
   var phamViChu = ctx.pham_vi === 'all' ? 'Toàn nhà máy' : ('Bộ phận ' + ctx.pham_vi);
+  var kyChu = ctx.ky_nhan || ('năm ' + (d.nam || ''));
   var mau = laCanhBao ? '#b00020' : '#6b46a8';
   var subject = '[VMP] ' + (laCanhBao ? 'Phân tích cảnh báo' : 'Nhận xét báo cáo')
-    + ' · ' + phamViChu + ' · ' + (d.ngay_chay || '');
+    + ' · ' + phamViChu + ' · kỳ ' + kyChu;
+
+  var tho = d.chi_tiet_toan_bo || [];
+  var csv = dungCsv(tho);
+  var tenTep = 'DuLieuTho_VMP_' + String(kyChu).replace(/[^0-9A-Za-z]+/g, '-') + '.csv';
+
+  var hangTho = tho.slice(0, 60).map(function (r) {
+    return '<tr>' + COT_THO.map(function (c) {
+      var v = r[c[0]];
+      return '<td style="padding:5px 8px;border-top:1px solid #eee;font-size:11.5px;white-space:nowrap">'
+        + esc(Array.isArray(v) ? v.join('+') : (v == null ? '' : v)) + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+
+  var bangTho = tho.length
+    ? '<div style="margin-top:22px">'
+      + '<div style="font-size:12px;font-weight:bold;color:#2d1b45;letter-spacing:.6px">DỮ LIỆU THÔ — KỲ ' + esc(String(kyChu).toUpperCase()) + '</div>'
+      + '<div style="font-size:11px;color:#777;margin:3px 0 6px">'
+      + esc(tho.length) + ' hạng mục. Bảng dưới hiện ' + Math.min(60, tho.length) + ' dòng đầu; toàn bộ nằm trong tệp CSV đính kèm (' + esc(tenTep) + ').</div>'
+      + '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">'
+      + '<tr style="text-align:left;color:#777;font-size:10.5px">'
+      + COT_THO.map(function (c) { return '<th style="padding:4px 8px;white-space:nowrap">' + esc(c[1]) + '</th>'; }).join('')
+      + '</tr>' + hangTho + '</table></div></div>'
+    : '';
 
   function khoiHtml(ten, v) {
     var xs = veMang(v);
@@ -163,7 +215,7 @@ return $input.all().map(function (it, idx) {
   var html = '<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">'
     + '<div style="background:' + mau + ';color:#fff;padding:14px 18px">'
     + '<div style="font-size:16px;font-weight:bold">VMP Monitor · ' + esc(tieuDe) + '</div>'
-    + '<div style="font-size:12px;opacity:.9;margin-top:3px">' + esc(phamViChu) + ' · số liệu ngày ' + esc(d.ngay_chay || '') + '</div>'
+    + '<div style="font-size:12px;opacity:.9;margin-top:3px">' + esc(phamViChu) + ' · kỳ ' + esc(kyChu) + ' · số liệu đọc ngày ' + esc(d.ngay_chay || '') + '</div>'
     + '</div>'
     + '<div style="padding:18px">'
     + (th.tomTat ? '<div style="font-size:14px;line-height:1.7;color:#222">' + esc(th.tomTat) + '</div>' : '')
@@ -179,7 +231,9 @@ return $input.all().map(function (it, idx) {
     + khoiHtml('BẰNG CHỨNG CHÍNH', th.bangChungChinh)
     + khoiHtml('GIỚI HẠN DỮ LIỆU', th.luuYDuLieu)
     + bangQuaHan
+    + bangTho
     + '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #eee;font-size:11px;color:#999;line-height:1.6">'
+    + 'Kỳ là lát cắt theo mốc đích VMP, không phải ảnh chụp tại thời điểm đó.<br/>'
     + esc(th.gioiHanAI || 'AI chỉ hỗ trợ nhận định, không thay thế đánh giá của QA và không phải căn cứ phê duyệt GMP.')
     + (th.confidence != null ? ' · Độ tin cậy AI tự đánh giá: ' + esc(th.confidence) : '')
     + '<br/>Mail tự động từ VMP Monitor (workflow Vani VMP 5). Phần chữ do AI soạn — CẦN QA XÁC NHẬN trước khi dùng làm căn cứ.'
@@ -201,6 +255,10 @@ return $input.all().map(function (it, idx) {
     // đợi một cái mail không bao giờ tới.
     ghi_chu_mail: ctx.gui_mail && !thucSuGui ? 'Không có địa chỉ nhận nào hợp lệ nên không gửi mail.' : '',
     nguoi_nhan: dsNhan,
+    ky_nhan: kyChu,
+    csv_tho: csv,
+    ten_tep_csv: tenTep,
+    so_dong_tho: tho.length,
     goc_idx: idx,
     nguon: 'gpt-4o-mini',
     luc: new Date().toISOString(),

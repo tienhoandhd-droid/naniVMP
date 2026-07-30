@@ -120,6 +120,11 @@ return $input.all().map(function (it, idx) {
   var payload = {
     loai_phan_tich: laCanhBao ? 'phan_tich_canh_bao' : 'nhan_xet_bao_cao',
     pham_vi: ctx.pham_vi, ngay_chay: d.ngay_chay,
+    // Kỳ báo cáo: mọi con số dưới đây CHỈ nói về kỳ này, trừ mau_sap_toi_han
+    // (việc sắp tới hạn vốn không thuộc kỳ nào).
+    ky_bao_cao: ctx.ky_nhan,
+    ky_nam: d.nam, ky_thang_tu: d.thang_tu, ky_thang_den: d.thang_den,
+    giai_thich_ky: 'Kỳ là lát cắt theo MỐC ĐÍCH VMP: hạng mục có mốc đích rơi vào kỳ, tính tới ngay_chay đã xong bao nhiêu. KHÔNG phải ảnh chụp tại thời điểm kỳ đó — dữ liệu không có ngày hoàn thành thực tế.',
     dem_tong_hang_muc: d.tong_hang_muc,
     dem_theo_trang_thai: tt,
     dem_qua_han: soQuaHan,
@@ -148,6 +153,7 @@ return $input.all().map(function (it, idx) {
   };
 
   var prompt = CHUNG + (laCanhBao ? SCHEMA_CANH_BAO : SCHEMA_BAO_CAO)
+    + ' Toàn bộ nhận định chỉ nói về KỲ ' + (ctx.ky_nhan || '') + '; mở đầu tieuDe phải nêu rõ kỳ này.'
     + ' BẮT BUỘC tuân theo câu sau khi nói về tháng hiện tại: ' + cachNoiThang
     + '\nDữ liệu: ' + JSON.stringify(payload);
 
@@ -157,6 +163,7 @@ return $input.all().map(function (it, idx) {
     so_qua_han: soQuaHan,
     loai: ctx.loai,
     pham_vi: ctx.pham_vi,
+    ky_nhan: ctx.ky_nhan,
     gui_mail: ctx.gui_mail,
     dung_danh_sach: ctx.dung_danh_sach,
     email_nhan: ctx.email_nhan || [],

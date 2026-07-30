@@ -30,6 +30,96 @@ function ymOf(target?: string | null): [number, number] | null {
   return [y, m];
 }
 
+/* ======================== KỲ BÁO CÁO ========================
+ * ---------------------------------------------------------------------
+ * Trang báo cáo trước đây khoá cứng vào tháng hiện tại, không xem lại
+ * được kỳ đã qua hay kỳ sắp tới. Nay chọn được tháng / quý / cả năm.
+ *
+ * ⚠️ NGHĨA CỦA MỘT KỲ — chốt với người dùng 2026-07-31, đừng hiểu khác:
+ * Kỳ là một LÁT CẮT THEO MỐC ĐÍCH VMP, **không phải ảnh chụp quá khứ**.
+ * "Kỳ tháng 6" = những hạng mục có mốc đích rơi vào tháng 6, và tới HÔM
+ * NAY đã xong bao nhiêu. Một hạng mục hạn tháng 6 mà tháng 7 mới xong
+ * vẫn tính là đã xong.
+ *
+ * Vì sao không làm ảnh chụp thật: dữ liệu KHÔNG có ngày hoàn thành thực
+ * tế. Kiểm ngày 2026-07-31: 83/83 hạng mục "đã hoàn thành VMP" đều trống
+ * actual_vmp_date (đề cương 202, thẩm định 146, báo cáo 106 cũng vậy).
+ * Không có ngày xong thì không thể biết ngày 30/6 nhìn vào thấy gì.
+ * Muốn có lịch sử thật thì phải nhập bổ sung ngày thực tế, hoặc chốt sổ
+ * định kỳ vào bảng vmp_report_snapshots (bảng đã có sẵn, đang rỗng).
+ * ===================================================================== */
+
+export type PeriodKind = "thang" | "quy" | "nam";
+
+export interface Period {
+  kind: PeriodKind;
+  year: number;
+  /** 1..12 — chỉ dùng khi kind = "thang". */
+  month: number;
+  /** 1..4 — chỉ dùng khi kind = "quy". */
+  quarter: number;
+}
+
+export function periodNow(): Period {
+  const t = vmpToday();
+  const m = t.getMonth() + 1;
+  return { kind: "thang", year: t.getFullYear(), month: m, quarter: Math.ceil(m / 3) };
+}
+
+/** Các tháng thuộc kỳ. Một chỗ duy nhất quyết định, để lọc dữ liệu và
+ *  tô đậm biểu đồ không thể lệch nhau. */
+export function periodMonths(p: Period): number[] {
+  if (p.kind === "nam") return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  if (p.kind === "quy") { const s = (p.quarter - 1) * 3 + 1; return [s, s + 1, s + 2]; }
+  return [p.month];
+}
+
+export function periodLabel(p: Period): string {
+  if (p.kind === "nam") return `năm ${p.year}`;
+  if (p.kind === "quy") return `quý ${p.quarter}/${p.year}`;
+  return `tháng ${p.month}/${p.year}`;
+}
+
+/** Kỳ đã qua / đang diễn ra / chưa tới, so với hôm nay. Quyết định
+ *  có được phép chấm đạt-trượt hay không. */
+export function periodPhase(p: Period): MonthPhase {
+  const t = vmpToday();
+  const cy = t.getFullYear(), cm = t.getMonth() + 1;
+  const ms = periodMonths(p);
+  const dau = ms[0], cuoi = ms[ms.length - 1];
+  if (p.year < cy || (p.year === cy && cuoi < cm)) return "da_qua";
+  if (p.year > cy || (p.year === cy && dau > cm)) return "chua_toi";
+  return "dang_dien_ra";
+}
+
+function dichKy(p: Period, buoc: number): Period {
+  if (p.kind === "nam") return { ...p, year: p.year + buoc };
+  if (p.kind === "quy") {
+    const q0 = (p.year * 4 + (p.quarter - 1)) + buoc;
+    const y = Math.floor(q0 / 4), q = (q0 % 4) + 1;
+    return { ...p, year: y, quarter: q, month: (q - 1) * 3 + 1 };
+  }
+  const m0 = (p.year * 12 + (p.month - 1)) + buoc;
+  const y = Math.floor(m0 / 12), m = (m0 % 12) + 1;
+  return { ...p, year: y, month: m, quarter: Math.ceil(m / 3) };
+}
+
+export const prevPeriod = (p: Period): Period => dichKy(p, -1);
+export const nextPeriod = (p: Period): Period => dichKy(p, 1);
+
+/** Hạng mục có thuộc kỳ không — xét theo MỐC ĐÍCH VMP.
+ *  Hạng mục chưa có mốc đích thì không thuộc kỳ nào; đếm riêng và nói ra
+ *  ở giao diện, đừng để nó biến mất lặng lẽ khỏi mọi kỳ. */
+export function actInPeriod(a: Activity, p: Period): boolean {
+  const ym = ymOf(a.target);
+  if (!ym) return false;
+  return ym[0] === p.year && periodMonths(p).includes(ym[1]);
+}
+
+export function countNoTarget(acts: Activity[]): number {
+  return acts.filter((a) => isActive(a) && !ymOf(a.target)).length;
+}
+
 /* ======================== 1. TỔNG QUAN NĂM (YTD) ======================== */
 
 export interface StageCount { id: string; label: string; count: number }
@@ -144,21 +234,51 @@ export function monthlyTargetTable(acts: Activity[], year: number, targetPct = 5
 export interface CurrentMonthSummary {
   year: number;
   month: number;
+  /** Nhãn kỳ đang xem: "tháng 6/2026", "quý 2/2026", "năm 2026". */
+  label: string;
+  period: Period;
   cur: MonthTargetRow;
   prev: MonthTargetRow | null;
+  /** Luôn là 12 tháng của NĂM trong kỳ — biểu đồ xu hướng cần cả năm để
+   *  so được, kể cả khi kỳ đang xem chỉ là một tháng. */
   table: MonthTargetRow[];
+  /** Các tháng thuộc kỳ, để biểu đồ tô đậm đúng chỗ đang xem. */
+  highlight: number[];
 }
 
-export function currentMonthSummary(acts: Activity[], targetPct = 50): CurrentMonthSummary {
-  const today = vmpToday();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  const table = monthlyTargetTable(acts, year, targetPct);
+/** Gộp nhiều tháng thành một dòng tổng cho kỳ (quý/năm chỉ là tổng các
+ *  tháng thành phần — cùng một định nghĩa mục tiêu, không đổi luật). */
+function gopThang(rows: MonthTargetRow[], months: number[], phase: MonthPhase, targetPct: number): MonthTargetRow {
+  const phan = rows.filter((r) => months.includes(r.month));
+  const due = phan.reduce((s, r) => s + r.due, 0);
+  const done = phan.reduce((s, r) => s + r.done, 0);
+  const rate = (due && phase !== "chua_toi") ? Math.round((done / due) * 100) : null;
   return {
-    year, month,
-    cur: table[month - 1],
-    prev: month > 1 ? table[month - 2] : null,
-    table,
+    month: months[0], phase, due, done, rate, target: targetPct,
+    meets: rate == null ? null : rate >= targetPct,
+    gap: rate == null ? null : rate - targetPct,
+  };
+}
+
+/** Số liệu của MỘT KỲ bất kỳ (tháng/quý/năm) + kỳ liền trước để so. */
+export function periodSummary(acts: Activity[], p: Period, targetPct = 50): CurrentMonthSummary {
+  const table = monthlyTargetTable(acts, p.year, targetPct);
+  const months = periodMonths(p);
+  const cur = gopThang(table, months, periodPhase(p), targetPct);
+
+  // Kỳ trước có thể rơi sang năm khác (tháng 1, quý 1) nên phải tính lại
+  // bảng của năm đó, không được lấy bừa dòng bên cạnh trong bảng năm nay.
+  const tr = prevPeriod(p);
+  const tableTr = tr.year === p.year ? table : monthlyTargetTable(acts, tr.year, targetPct);
+  const prev = gopThang(tableTr, periodMonths(tr), periodPhase(tr), targetPct);
+
+  return {
+    year: p.year,
+    month: p.kind === "thang" ? p.month : months[0],
+    label: periodLabel(p),
+    period: p,
+    cur, prev, table,
+    highlight: months,
   };
 }
 
@@ -231,15 +351,11 @@ export interface NextMonthWork {
   byDept: NextMonthByDept[];
 }
 
-export function nextMonthWork(acts: Activity[]): NextMonthWork {
-  const today = vmpToday();
-  const first = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const firstAfter = new Date(today.getFullYear(), today.getMonth() + 2, 1);
+/** Việc chưa xong có mốc đích rơi vào MỘT KỲ bất kỳ. Dùng cho mục
+ *  "kỳ kế tiếp" — truyền nextPeriod(p) vào. */
+export function periodWork(acts: Activity[], p: Period): NextMonthWork {
   const A = acts.filter((a) => isActive(a) && a.st !== "done");
-  const items: NextMonthItem[] = A.filter((a) => {
-    const t = parseD(a.target);
-    return !!t && t >= first && t < firstAfter;
-  }).map((a) => ({
+  const items: NextMonthItem[] = A.filter((a) => actInPeriod(a, p)).map((a) => ({
     id: a.id, code: a.code, name: a.name || a.code,
     depts: (Array.isArray(a.depts) && a.depts.length) ? a.depts : [a.dept || "qa"],
     target: a.target || "", owner: a.owner || "Chưa phân công", crit: a.crit || "TB",
@@ -251,7 +367,7 @@ export function nextMonthWork(acts: Activity[]): NextMonthWork {
     .map(([dept, count]) => ({ dept, label: DEPT_LABEL[dept] || dept, count }))
     .sort((a, b) => b.count - a.count);
 
-  return { monthLabel: `${first.getMonth() + 1}/${first.getFullYear()}`, total: items.length, items, byDept };
+  return { monthLabel: periodLabel(p), total: items.length, items, byDept };
 }
 
 /* ======================== DỮ LIỆU THÔ (xuất Excel/CSV) ======================== */

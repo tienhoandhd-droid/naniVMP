@@ -77,6 +77,27 @@ Mã các node của VMP 5: `n8n/vani-vmp-5-nhan-xet-bao-cao/`.
 | `bao_cao` | Trang **Báo cáo & AI** → nút *Thêm nhận xét AI* | Nhận xét cho báo cáo quản lý: tiến độ, mục tiêu 50%/tháng, kế hoạch tháng tới |
 | `canh_bao` | Trang **Cảnh báo & Rủi ro** → nút *Phân tích cảnh báo* | Quá hạn nặng nhất, thứ tự xử lý theo ICH Q9, ai đang ôm nhiều việc trễ |
 
+**Kỳ báo cáo (2026-07-31).** Web gửi kèm `ky: { nam, thang_tu, thang_den, nhan }`;
+truy vấn nhận 7 tham số (`$1` phạm vi, `$2` năm, `$3`/`$4` dải tháng của kỳ, `$5`–`$7`
+của kỳ sau). Thiếu `ky` → cả năm hiện tại, đúng hành vi cũ, nên trang Cảnh báo và
+đường chạy theo lịch không phải đổi gì.
+
+Truy vấn có **hai tập dữ liệu, dùng sai là ra số vô nghĩa**:
+
+| Tập | Nội dung | Dùng cho |
+|---|---|---|
+| `items_nam` | toàn bộ hạng mục của năm | `theo_thang` (biểu đồ 12 tháng), `sap_toi_han_60_ngay` |
+| `items` | `items_nam` ∩ mốc đích rơi vào kỳ | mọi thứ còn lại — tương ứng `scopedKy` bên web |
+
+⚠️ Từ bản này `items` đòi `deadline_vmp is not null`, nên `tong_hang_muc` toàn năm
+là **443 chứ không phải 448**: 5 hạng mục chưa có mốc đích không thuộc kỳ nào và
+được đếm riêng ở `chua_co_moc_dich`. Web hiển thị đúng con số đó cạnh bộ lọc.
+
+**Mail gồm cả dữ liệu thô** (người dùng chốt 2026-07-31): thân mail có bảng 60 dòng
+đầu để đọc ngay, **toàn bộ** đính kèm dạng CSV (`;` + BOM UTF-8 để Excel tiếng Việt
+mở đúng). CSV gắn vào `binary.du_lieu_tho` ở node `Bung người nhận` — node Send Email
+chỉ đính kèm được từ binary property, không nhận chuỗi.
+
 **Hai đường vào:**
 
 1. `POST /webhook/vmp-ai-report`, header `x-vmp-chat`.

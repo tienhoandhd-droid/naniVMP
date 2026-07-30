@@ -17,10 +17,23 @@
 /** Loại phân tích — quyết định prompt bên n8n. */
 export type AiKind = "bao_cao" | "canh_bao";
 
+/** Kỳ báo cáo — AI phải đọc ĐÚNG lát cắt đang hiện trên màn hình.
+ *  Thiếu kỳ thì n8n lấy cả năm hiện tại (hành vi cũ). */
+export interface AiPeriod {
+  nam: number;
+  /** Tháng đầu và cuối của kỳ, 1..12. Kỳ luôn là dải tháng liền nhau nên
+   *  hai số là đủ — không cần truyền danh sách. */
+  thang_tu: number;
+  thang_den: number;
+  /** Nhãn để AI và mail gọi tên kỳ giống hệt trên web. */
+  nhan: string;
+}
+
 export interface AiRequest {
   loai: AiKind;
   /** Mã bộ phận, hoặc "all" cho toàn nhà máy. */
   pham_vi?: string;
+  ky?: AiPeriod;
   /** Có gửi mail không. Không gửi thì chỉ trả chữ về web. */
   gui_mail?: boolean;
   /** Email gõ tay / chọn trong hộp thoại. */
@@ -37,6 +50,7 @@ export interface AiResult {
   so_hang_muc?: number;
   so_qua_han?: number;
   pham_vi?: string;
+  ky_nhan?: string;
   loai?: AiKind;
   nguon?: string;
   luc?: string;
@@ -89,6 +103,7 @@ export async function chayPhanTichAi(req: AiRequest, signal?: AbortSignal): Prom
     body: JSON.stringify({
       loai: req.loai,
       pham_vi: req.pham_vi || "all",
+      ky: req.ky || null,
       gui_mail: !!req.gui_mail,
       email_nhan: (req.email_nhan || []).filter(emailHopLe),
       dung_danh_sach: !!req.dung_danh_sach,
