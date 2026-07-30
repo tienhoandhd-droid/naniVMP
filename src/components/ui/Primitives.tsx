@@ -2,7 +2,7 @@
  *  components/ui/Primitives.jsx — Shared UI Components
  *  Card, Tag, Modal, Donut, KpiCard, Sparkle, Skeleton, etc.
  * ===================================================================== */
-import { useId, useRef, useEffect, useState } from "react";
+import { useId, useRef, useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -1244,6 +1244,17 @@ const multiSelectMiniBtn: CSSProperties = {
   background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11, fontWeight: 800, cursor: "pointer",
 };
 
+/* Bảng chọn phải render qua Portal, KHÔNG được để absolute trong thẻ cha.
+ *
+ * `.card` trong index.css có `will-change: transform` (để cú nhấc 3px lúc hover
+ * chạy mượt). Thuộc tính đó tạo ra một stacking context cho MỖI thẻ, nên
+ * z-index của bảng chọn chỉ còn hiệu lực bên trong thẻ chứa nó. Thẻ đứng sau
+ * trong DOM luôn vẽ đè lên — mở bộ lọc ở mục Báo cáo thì danh sách bị thẻ
+ * "Tổng quan số liệu" bên dưới cắt mất. Nâng z-index cao tới đâu cũng vô ích.
+ *
+ * Đưa ra document.body rồi định vị bằng toạ độ thật của nút là cách duy nhất
+ * thoát khỏi stacking context đó. Đổi lại phải tự bám theo nút khi cuộn trang.
+ */
 export function MultiSelect({ label, allLabel, options, selected, onChange }: {
   label: string;
   allLabel: string;
@@ -1252,53 +1263,99 @@ export function MultiSelect({ label, allLabel, options, selected, onChange }: {
   onChange: (v: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
+  const [box, setBox] = useState<{ left: number; top: number; width: number; lenNguoc: boolean } | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const CAO_TOI_DA = 300;
+  const RONG_TOI_THIEU = 210;
+
+  const doViTri = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const rong = Math.max(RONG_TOI_THIEU, r.width);
+    // Không đủ chỗ bên dưới thì lật lên trên — bộ lọc hay nằm sát đáy màn hình.
+    const duoi = window.innerHeight - r.bottom;
+    const lenNguoc = duoi < CAO_TOI_DA + 16 && r.top > duoi;
+    setBox({
+      // Ghim trong khung nhìn để bảng chọn ở mép phải không bị tràn ra ngoài.
+      left: Math.max(8, Math.min(r.left, window.innerWidth - rong - 8)),
+      top: lenNguoc ? r.top - 6 : r.bottom + 6,
+      width: rong,
+      lenNguoc,
+    });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
+    doViTri();
     const onDoc = (ev: MouseEvent) => {
-      if (ref.current && !ref.current.contains(ev.target as Node)) setOpen(false);
+      const t = ev.target as Node;
+      // Bảng chọn nằm ngoài cây DOM của nút nên phải kiểm cả hai, nếu không
+      // vừa bấm vào ô tick là bảng tự đóng.
+      if (btnRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
+    const onEsc = (ev: KeyboardEvent) => { if (ev.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+    document.addEventListener("keydown", onEsc);
+    // capture: true để bắt cả cuộn bên trong khung con, không chỉ cuộn trang.
+    window.addEventListener("scroll", doViTri, true);
+    window.addEventListener("resize", doViTri);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
+      window.removeEventListener("scroll", doViTri, true);
+      window.removeEventListener("resize", doViTri);
+    };
+  }, [open, doViTri]);
+
   const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
   const btn = selected.length === 0 ? allLabel : `${label}: ${selected.length}`;
+
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} style={{
-        display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
-        borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
-        background: selected.length ? C.pinkMist : C.surface,
-        color: selected.length ? C.pinkText : C.plum,
-        fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-      }}>
+    <>
+      <button ref={btnRef} type="button" onClick={() => setOpen((o) => !o)}
+        aria-expanded={open} aria-haspopup="listbox"
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
+          borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
+          background: selected.length ? C.pinkMist : C.surface,
+          color: selected.length ? C.pinkText : C.plum,
+          fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+        }}>
         {btn} <span style={{ fontSize: 10 }}>▾</span>
       </button>
-      {open && (
-        <div className="vmp-scroll" style={{
-          position: "absolute", zIndex: 60, top: "calc(100% + 6px)", left: 0,
-          minWidth: 210, maxHeight: 300, overflowY: "auto",
-          background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
-          boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
-        }}>
-          <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
-            <button type="button" onClick={() => onChange(options.map((o) => o.v))} style={multiSelectMiniBtn}>Chọn hết</button>
-            <button type="button" onClick={() => onChange([])} style={multiSelectMiniBtn}>Bỏ chọn</button>
+      {open && box && (
+        <Portal>
+          <div ref={panelRef} className="vmp-scroll" role="listbox" style={{
+            position: "fixed", zIndex: 4000,
+            left: box.left, width: box.width,
+            ...(box.lenNguoc ? { bottom: window.innerHeight - box.top } : { top: box.top }),
+            maxHeight: CAO_TOI_DA, overflowY: "auto",
+            background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
+            boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
+          }}>
+            <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
+              <button type="button" onClick={() => onChange(options.map((o) => o.v))} style={multiSelectMiniBtn}>Chọn hết</button>
+              <button type="button" onClick={() => onChange([])} style={multiSelectMiniBtn}>Bỏ chọn</button>
+            </div>
+            {options.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có dữ liệu</div>}
+            {options.map((o) => (
+              <label key={o.v} style={{
+                display: "flex", alignItems: "center", gap: 9, padding: "7px 8px",
+                cursor: "pointer", borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: C.plum,
+              }}>
+                <input type="checkbox" checked={selected.includes(o.v)} onChange={() => toggle(o.v)}
+                  style={{ width: 15, height: 15, accentColor: C.pink, cursor: "pointer" }} />
+                {o.l}
+              </label>
+            ))}
           </div>
-          {options.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có dữ liệu</div>}
-          {options.map((o) => (
-            <label key={o.v} style={{
-              display: "flex", alignItems: "center", gap: 9, padding: "7px 8px",
-              cursor: "pointer", borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: C.plum,
-            }}>
-              <input type="checkbox" checked={selected.includes(o.v)} onChange={() => toggle(o.v)}
-                style={{ width: 15, height: 15, accentColor: C.pink, cursor: "pointer" }} />
-              {o.l}
-            </label>
-          ))}
-        </div>
+        </Portal>
       )}
-    </div>
+    </>
   );
 }
 
