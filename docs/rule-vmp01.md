@@ -110,6 +110,11 @@ Ví dụ: `KNTB172/2026.01-IQ`, `S9.01/2026.02-GSP`
 
 ## 7. Năm mốc thời gian — tính LÙI từ đích
 
+Nói bằng lời cho dễ tra: hạn VMP là ngày cuối tháng đích; báo cáo phải
+xong trước hạn VMP 5 ngày; thẩm định kết thúc trước hạn báo cáo 2–16
+ngày tuỳ loại; và **đề cương phải hoàn thành trước ngày bắt đầu thẩm
+định 60 ngày**.
+
 Chỉ có **một** mốc được tính trực tiếp; bốn mốc còn lại suy ngược từ nó.
 
 ```

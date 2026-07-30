@@ -29,7 +29,8 @@ const chuanHoa = node({
       assignments: {
         assignments: [
           { id: 'tk', name: 'tu_khoa', value: expr("{{ $json.body?.tu_khoa ?? $json.tu_khoa ?? '' }}"), type: 'string' },
-          { id: 'vt', name: 'vector', value: expr("{{ $json.body?.vector ?? $json.vector ?? '' }}"), type: 'string' }
+          { id: 'vt', name: 'vector', value: expr("{{ $json.body?.vector ?? $json.vector ?? '' }}"), type: 'string' },
+          { id: 'ph', name: 'phien', value: expr("{{ $json.body?.phien ?? $json.phien ?? '' }}"), type: 'string' }
         ]
       },
       options: {}
@@ -219,13 +220,39 @@ const giuNguyen = node({
   output: [{ ket_qua: { ok: true, so_manh: 3, cham_lai: 'khong_can', manh: [] } }]
 });
 
+const luuTrichDan = node({
+  type: 'n8n-nodes-base.postgres',
+  version: 2.6,
+  config: {
+    name: 'Lưu trích dẫn',
+    position: [1720, -100],
+    onError: 'continueRegularOutput',
+    alwaysOutputData: true,
+    parameters: {
+      operation: 'executeQuery',
+      query:
+        "with ins as (\n" +
+        "  insert into public.vmp_ai_trich_dan_tam (phien, trich)\n" +
+        "  select $1, coalesce(jsonb_agg(distinct jsonb_build_object('nguon', m->>'nguon', 'muc', m->>'muc')), '[]'::jsonb)\n" +
+        "  from jsonb_array_elements($2::jsonb) m\n" +
+        "  where coalesce((m->>'diem_lien_quan')::numeric, 10 * coalesce((m->>'do_tin')::numeric, 0)) >= 6\n" +
+        "  returning 1\n" +
+        ")\n" +
+        "select $3::jsonb as ket_qua from ins",
+      options: { queryReplacement: expr("{{ [$('Chuẩn hoá đầu vào').first().json.phien || '', JSON.stringify($json.ket_qua.manh || []), JSON.stringify($json.ket_qua)] }}") }
+    },
+    credentials: { postgres: { id: 'gUbJq0xGJ2sJMjXx', name: 'VMP Supabase Postgres' } }
+  },
+  output: [{ ket_qua: { ok: true, so_manh: 4, manh: [] } }]
+});
+
 const traKetQua = node({
   type: 'n8n-nodes-base.respondToWebhook',
   version: 1.5,
   config: {
     name: 'Trả kết quả',
     position: [1850, 0],
-    parameters: { respondWith: 'json', responseBody: expr('{{ JSON.stringify($json.ket_qua) }}'), options: {} }
+    parameters: { respondWith: 'json', responseBody: expr("{{ (() => { try { if ($json.ket_qua) return JSON.stringify($json.ket_qua) } catch (e) {} try { return JSON.stringify($('Xếp lại theo điểm').first().json.ket_qua) } catch (e) {} return JSON.stringify($('Giữ nguyên (ít mảnh)').first().json.ket_qua) })() }}"), options: {} }
   },
   output: [{}]
 });
@@ -236,6 +263,6 @@ export default workflow('vali-rerank-tai-lieu', 'Vali — Rerank tài liệu (RA
   .to(traManh)
   .to(canCham
     .onTrue(geminiCham.to(docDiem.to(chamDuoc
-      .onTrue(xepLai.to(traKetQua))
+      .onTrue(xepLai.to(luuTrichDan.to(traKetQua)))
       .onFalse(openaiCham.to(xepLai)))))
-    .onFalse(giuNguyen.to(traKetQua)));
+    .onFalse(giuNguyen.to(luuTrichDan)));
