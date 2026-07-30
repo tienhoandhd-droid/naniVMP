@@ -11,8 +11,11 @@
  * ma trận và danh sách không thể chấm khác nhau.
  */
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CalendarClock, Filter, ShieldAlert, Download, Search, ListFilter, ChevronRight } from "lucide-react";
-import { C, TEXT, NUM } from "../constants/theme.ts";
+import {
+  AlertCircle, CalendarClock, Filter, ShieldAlert, Download, Search, ListFilter, ChevronRight,
+  Sparkles as SparkIcon, Mail, RefreshCw,
+} from "lucide-react";
+import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { CLS, CRIT, DEPTS, DEP_DAYS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
 import {
   parseD, fmtVN, daysBetween, addMonths, txt, nguoiPhuTrach, milestones,
@@ -20,6 +23,8 @@ import {
 } from "../utils/helpers.ts";
 import { Card, CardTitle, Tag, KpiCard, Modal, Pill } from "../components/ui/Primitives.tsx";
 import { useDebounce, usePerformers } from "../hooks/index.ts";
+import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT } from "../lib/aiReport.ts";
+import AiMailModal from "../components/ai/AiMailModal.tsx";
 import QrmView from "./QrmPage.tsx";
 import type { Activity } from "../types/domain.ts";
 
@@ -291,6 +296,14 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const [sort, setSort] = useState("risk");
   const [detail, setDetail] = useState<AlertRow | null>(null);
   const [hien, setHien] = useState(40);          // số dòng đang dựng thật
+  // Phân tích AI cho đúng bộ phận đang lọc. Không dùng bộ lọc còn lại (mức
+  // rủi ro, người, từ khoá) vì n8n đọc lại số từ Supabase chứ không nhận
+  // danh sách từ trình duyệt — nói "đã lọc" mà số không khớp thì tệ hơn là
+  // nói thẳng phạm vi chỉ theo bộ phận.
+  const [aiText, setAiText] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiErr, setAiErr] = useState("");
+  const [moGuiMail, setMoGuiMail] = useState(false);
   // Email người thực hiện lấy từ tab "Người thực hiện" — thấy cảnh báo là
   // nhắc được ngay, khỏi mở danh bạ ở trang khác.
   const { find } = usePerformers();
@@ -391,6 +404,18 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     a.download = `canh-bao-${bucket}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const deptLabel = dept === "all" ? "Toàn nhà máy" : (DEPTS.find((d) => d.id === dept)?.name || dept);
+
+  const chayAi = async () => {
+    setAiLoading(true); setAiErr(""); setAiText("");
+    try {
+      const r = await chayPhanTichAi({ loai: "canh_bao", pham_vi: dept });
+      if (r.ok && r.ai_text) setAiText(r.ai_text);
+      else setAiErr(r.error ? `Lỗi AI: ${r.error}` : "Không nhận được phản hồi AI từ n8n.");
+    } catch (e) { setAiErr((e as Error)?.message || "Lỗi kết nối n8n."); }
+    finally { setAiLoading(false); }
   };
 
   const cards = [
@@ -507,6 +532,68 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             </Card>
           )}
 
+          {/* ===== Phân tích AI cho cảnh báo + gửi mail =====
+              Danh sách trả lời "cái nào trước"; phần này trả lời "vì sao đang
+              nghẽn và phải nhắc ai" — rồi gửi thẳng cho người cần biết mà
+              không phải chép tay sang Outlook. */}
+          <Card variant="strong">
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+                <SparkIcon size={18} color={C.pink} />
+                <span style={{ fontFamily: TEXT, fontSize: 17, fontWeight: 800, color: C.plum }}>Phân tích cảnh báo bằng AI</span>
+                <Tag color={C.plumSoft} bg={C.pinkMist}>Phạm vi: {deptLabel}</Tag>
+                <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button type="button" onClick={chayAi} disabled={aiLoading || !aiConfigured()}
+                  title={aiConfigured() ? undefined : AI_SETUP_HINT}
+                  style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 8, padding: "10px 18px",
+                    borderRadius: 12, fontSize: 13, opacity: aiLoading || !aiConfigured() ? 0.55 : 1,
+                    cursor: aiLoading || !aiConfigured() ? "not-allowed" : "pointer" }}>
+                  {aiLoading ? <RefreshCw size={15} className="spin" /> : <SparkIcon size={15} />}
+                  {aiLoading ? "AI đang phân tích…" : "Phân tích cảnh báo"}
+                </button>
+                <button type="button" onClick={() => setMoGuiMail(true)} disabled={!aiConfigured()}
+                  title={aiConfigured() ? "Chạy AI rồi gửi bản phân tích qua email" : AI_SETUP_HINT}
+                  style={{ ...selStyle, display: "inline-flex", alignItems: "center", gap: 7,
+                    background: C.lavSoft, color: C.lavText, borderColor: C.lavSoft, fontWeight: 800,
+                    padding: "10px 16px", borderRadius: 12,
+                    opacity: aiConfigured() ? 1 : 0.55, cursor: aiConfigured() ? "pointer" : "not-allowed" }}>
+                  <Mail size={15} /> Gửi mail phân tích
+                </button>
+              </div>
+            </div>
+
+            {!aiConfigured() && (
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.marigoldText, background: C.marigoldSoft,
+                borderRadius: 12, padding: "11px 15px", lineHeight: 1.6 }}>⚠️ {AI_SETUP_HINT}</div>
+            )}
+            {aiErr && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, fontWeight: 800,
+                color: C.raspText, background: C.raspSoft, borderRadius: 12, padding: "12px 15px" }}>
+                <AlertCircle size={16} /> {aiErr}
+              </div>
+            )}
+            {aiLoading && (
+              <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}>
+                <RefreshCw size={22} className="spin" color={C.pink} />
+                <div style={{ marginTop: 10 }}>AI đang đọc lại số từ Supabase và phân tích…</div>
+              </div>
+            )}
+            {!aiLoading && !aiErr && aiText && (
+              <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8,
+                fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`,
+                borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{aiText}</div>
+            )}
+            {!aiLoading && !aiErr && !aiText && aiConfigured() && (
+              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+                AI đọc lại số thẳng từ Supabase lúc bấm — không lấy từ bảng đang hiện, nên kết quả không
+                phụ thuộc bộ lọc rủi ro/người/từ khoá ở trên, chỉ theo bộ phận. AI chỉ nhận định, không
+                thay đánh giá của QA và không phải căn cứ phê duyệt GMP.
+              </div>
+            )}
+          </Card>
+
           {/* Nhắc luật chấm điểm ngay dưới danh sách — để không ai phải đoán vì sao dòng này lên trên */}
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.6, padding: "0 4px" }}>
             <b style={{ color: C.plum }}>Thứ tự ưu tiên</b> theo RPN = điểm trọng yếu (1–9) × khả năng xảy ra
@@ -518,6 +605,14 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
 
       {detail && (
         <AlertDetailModal r={detail} email={find(detail.a.owner)?.email} onClose={() => setDetail(null)} />
+      )}
+
+      {moGuiMail && (
+        <AiMailModal
+          loai="canh_bao" phamVi={dept} phamViLabel={deptLabel}
+          onClose={() => setMoGuiMail(false)}
+          onDone={(r) => { if (r.ai_text) { setAiText(r.ai_text); setAiErr(""); } }}
+        />
       )}
     </div>
   );

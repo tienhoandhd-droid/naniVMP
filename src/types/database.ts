@@ -781,6 +781,8 @@ export type Database = {
       }
       vmp_alert_recipients: {
         Row: {
+          ai_report_enabled: boolean
+          ai_report_schedule: string
           alert_kind: string
           created_at: string
           email: string
@@ -795,6 +797,8 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          ai_report_enabled?: boolean
+          ai_report_schedule?: string
           alert_kind?: string
           created_at?: string
           email: string
@@ -809,6 +813,8 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          ai_report_enabled?: boolean
+          ai_report_schedule?: string
           alert_kind?: string
           created_at?: string
           email?: string

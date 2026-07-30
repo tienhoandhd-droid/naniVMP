@@ -63,8 +63,56 @@ WF-04 trước đây gộp 5 nhánh trong một workflow, rất khó đọc. Nay
 | **Vani VMP 1 — Cảnh báo đến hạn** | `udqyfoWTbpl4amKM` | Schedule + webhook `/vmp-alert-now` → `rpc_due_alerts` → ghép người nhận (Sheet `CanhBao`) → chống trùng → Claude soạn → Gmail | ⏸ inactive, **chờ nghiệm thu** |
 | **Vani VMP 2 — Xử lý lỗi tập trung** | `LbAmGv9gGGdQRiEb` | Error Trigger → ghi `workflow_runs` + email admin. Đặt làm Error Workflow cho 2 workflow kia | ⏸ inactive, **chờ nghiệm thu** |
 | **Vani VMP 3 — Nhập Sheet (dự phòng)** | `LArr1nhj3jzFjJLs` | Chính là WF-04 đổi tên. Giữ nguyên nhánh sync CSV (2 trigger đã tắt) | 🔵 active nhưng nhánh sync đã tắt |
+| **Vani VMP 5 — Nhận xét AI cho báo cáo** | `RWwTaTtzjjfgE5np` | Webhook `/vmp-ai-report` (web bấm nút) + Schedule 7h (đang tắt) → đọc số từ Supabase → OpenAI `gpt-4o-mini` → trả chữ về web **và/hoặc** gửi mail HTML qua SMTP | 🟢 active |
 
 Mã nguồn SDK của 2 workflow mới: `n8n/vani-vmp-1-canh-bao/`, `n8n/vani-vmp-2-xu-ly-loi/`.
+Mã các node của VMP 5: `n8n/vani-vmp-5-nhan-xet-bao-cao/`.
+
+### 3d. Vani VMP 5 — nhận xét & phân tích AI, kèm gửi mail (2026-07-30)
+
+**Hai loại phân tích, cùng một workflow** (`loai` trong body):
+
+| `loai` | Gọi từ đâu | Nội dung |
+|---|---|---|
+| `bao_cao` | Trang **Báo cáo & AI** → nút *Thêm nhận xét AI* | Nhận xét cho báo cáo quản lý: tiến độ, mục tiêu 50%/tháng, kế hoạch tháng tới |
+| `canh_bao` | Trang **Cảnh báo & Rủi ro** → nút *Phân tích cảnh báo* | Quá hạn nặng nhất, thứ tự xử lý theo ICH Q9, ai đang ôm nhiều việc trễ |
+
+**Hai đường vào:**
+
+1. `POST /webhook/vmp-ai-report`, header `x-vmp-chat`.
+   Body: `{ loai, pham_vi, gui_mail, email_nhan[], dung_danh_sach }`.
+2. Schedule 7h sáng — **đang `disabled` có chủ đích**. Bật khi đã khai người nhận và
+   thử nút gửi tay. `rpc_ai_mail_targets(current_date, false)` lọc ai tới lượt theo cột
+   `ai_report_schedule` (*hằng tuần* = thứ Hai, *hằng tháng* = ngày 1), gom **một dòng
+   mỗi phạm vi** vì AI phải chạy riêng cho từng bộ phận.
+
+**Người nhận mail** khai ở web: *Danh mục & Nhập liệu → Người nhận mail*. Bảng
+`vmp_alert_recipients` phục vụ **hai** loại mail bằng hai cờ độc lập:
+`is_enabled` (nhắc từng hạng mục — Vani VMP 1) và `ai_report_enabled` (bản phân tích
+tổng hợp — Vani VMP 5).
+
+**Ba quyết định thiết kế, đừng vô tình phá:**
+
+- **Một lần chạy AI dùng cho cả web và mail.** Tách ra thì cùng một phạm vi có hai bản
+  chữ khác nhau, người đọc mail và người xem web sẽ cãi nhau về số.
+- **Số trong mail do n8n đọc lại từ Supabase**, không nhận từ trình duyệt. Mail là thứ
+  gửi ra ngoài, không được phụ thuộc tab đang mở đã cũ tới đâu.
+- **Node `Gửi mail phân tích` để `onError: continueRegularOutput`.** Một địa chỉ sai
+  không được chặn những địa chỉ còn lại, và web vẫn phải nhận câu trả lời thay vì treo
+  tới lúc timeout. `Gom kết quả gửi` đọc trường `error` để báo đúng địa chỉ nào hỏng.
+
+**Chống bịa số — cái gì tính được thì tính sẵn trong Code node, đừng để mô hình chọn.**
+Ngày 2026-07-30 `gpt-4o-mini` đã mắc hai lỗi thật với dữ liệu thật:
+
+- *"nhóm trọng yếu cao có 149 hạng mục, trong đó 159 quá hạn"* — 159 là tổng quá hạn
+  **toàn nhà máy**. Nguyên nhân: `theo_muc_trong_yeu` từ SQL chỉ có `tong`/`xong`, không
+  có `qua_han`, nên nó ghép bừa. Đã tính sẵn `qua_han` từng nhóm trong `Dựng prompt tổng hợp`.
+- *"qc nghẽn ở thẩm định thực tế với 64"* — 64 là `qua_han_vmp`, còn giai đoạn nghẽn thật
+  là *báo cáo* (71). Đã tính sẵn `giai_doan_nghen_nhat` + `so_cham_o_giai_doan_nghen`.
+
+Tương tự, câu nói về tháng hiện tại được **tính sẵn** thành `cach_noi_ve_thang_hien_tai`:
+rào chắn dạng "đừng nói tháng đang diễn ra là chưa đạt" viết chung chung thì mô hình vẫn
+vi phạm; đưa hẳn câu phải nói thì nó tuân.
 
 ### 3a. ⚠️ Việc phải làm trước khi bật 2 workflow mới
 

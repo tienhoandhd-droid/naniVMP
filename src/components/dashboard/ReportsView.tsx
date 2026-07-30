@@ -19,7 +19,7 @@
 import { useMemo, useState } from "react";
 import {
   FileBarChart, Printer, Download, RefreshCw, AlertCircle, Sparkles as SparkIcon,
-  Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2,
+  Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2, Mail,
 } from "lucide-react";
 
 import { C, TEXT, NUM, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
@@ -33,6 +33,8 @@ import {
   svgMonthlyTargetChart, svgDeptBottleneckChart, svgDeptWorkloadChart, deptColorMap, SCREEN_PALETTE,
 } from "../../lib/reportCharts.ts";
 import { buildManagementReportHTML } from "../../lib/reportHtml.ts";
+import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT } from "../../lib/aiReport.ts";
+import AiMailModal from "../ai/AiMailModal.tsx";
 
 import type { Activity } from "../../types/domain.ts";
 
@@ -57,6 +59,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [ai, setAi] = useState("");
   const [loadingAi, setLoadingAi] = useState(false);
   const [errAi, setErrAi] = useState("");
+  const [moGuiMail, setMoGuiMail] = useState(false);
 
   const areaOptions = useMemo(
     () => uniqSorted(acts.map((a) => String(a.area ?? ""))).map((v) => ({ v, l: v })),
@@ -159,20 +162,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     return m;
   }, [quality]);
 
+  // Chỉ chạy AI, không gửi mail. Nút gửi mail nằm riêng và mở hộp thoại chọn
+  // người nhận — gộp hai việc vào một nút thì không ai dám bấm thử.
   const generateAi = async () => {
     setLoadingAi(true); setErrAi(""); setAi("");
-    const url = import.meta.env.VITE_N8N_AI_REPORT_URL || "";
-    if (!url) { setErrAi("Chưa cấu hình đường gọi AI (VITE_N8N_AI_REPORT_URL)."); setLoadingAi(false); return; }
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      const chatToken = import.meta.env.VITE_N8N_CHAT_TOKEN as string | undefined;
-      if (chatToken) headers["x-vmp-chat"] = chatToken;
-      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ pham_vi: deptScope }) });
-      const json = await res.json();
-      if (json.ok && json.ai_text) setAi(json.ai_text);
-      else if (json.error) setErrAi(`Lỗi AI: ${json.error}`);
-      else setErrAi("Không nhận được phản hồi AI từ n8n.");
-    } catch (ex) { setErrAi("Lỗi kết nối n8n: " + ((ex as Error)?.message || "không xác định")); }
+      const r = await chayPhanTichAi({ loai: "bao_cao", pham_vi: deptScope });
+      if (r.ok && r.ai_text) setAi(r.ai_text);
+      else setErrAi(r.error ? `Lỗi AI: ${r.error}` : "Không nhận được phản hồi AI từ n8n.");
+    } catch (ex) { setErrAi((ex as Error)?.message || "Lỗi kết nối n8n."); }
     finally { setLoadingAi(false); }
   };
 
@@ -474,12 +472,32 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <span style={{ fontFamily: TEXT, fontSize: 17, fontWeight: 800, color: C.plum }}>Nhận xét</span>
             <Tag color={C.mintText} bg={C.mintSoft}>Tính từ số liệu</Tag>
           </div>
-          {!!import.meta.env.VITE_N8N_AI_REPORT_URL && (
-            <button onClick={generateAi} disabled={loadingAi} style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px", borderRadius: 12, fontSize: 13.5 }}>
+          {/* Nút KHÔNG bị ẩn khi thiếu cấu hình. Bản cũ giấu nút đi nên trên
+              bản deploy thiếu biến môi trường, người dùng tưởng chức năng
+              không tồn tại thay vì biết là chưa cấu hình. */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={generateAi} disabled={loadingAi || !aiConfigured()}
+              title={aiConfigured() ? undefined : AI_SETUP_HINT}
+              style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
+                borderRadius: 12, fontSize: 13.5, opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
+                cursor: loadingAi || !aiConfigured() ? "not-allowed" : "pointer" }}>
               {loadingAi ? <RefreshCw size={16} className="spin" /> : <SparkIcon size={16} />} {loadingAi ? "AI đang phân tích…" : "Thêm nhận xét AI"}
             </button>
-          )}
+            <button onClick={() => setMoGuiMail(true)} disabled={!aiConfigured()}
+              title={aiConfigured() ? "Chạy AI rồi gửi bản phân tích qua email" : AI_SETUP_HINT}
+              style={{ ...toolBtn(C.lavSoft, C.lavText), opacity: aiConfigured() ? 1 : 0.55,
+                cursor: aiConfigured() ? "pointer" : "not-allowed" }}>
+              <Mail size={16} /> Gửi mail phân tích
+            </button>
+          </div>
         </div>
+
+        {!aiConfigured() && (
+          <div style={{ marginBottom: 12, fontSize: 12.5, fontWeight: 700, color: C.marigoldText,
+            background: C.marigoldSoft, borderRadius: 12, padding: "11px 15px", lineHeight: 1.6 }}>
+            ⚠️ {AI_SETUP_HINT}
+          </div>
+        )}
 
         <div style={{ fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.85, fontWeight: 500,
           background: C.pinkMist, borderLeft: `4px solid ${C.pink}`, borderRadius: "0 14px 14px 0", padding: "16px 20px" }}>
@@ -505,6 +523,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       <div style={{ ...glass, padding: "10px 16px", fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center" }}>
         Toàn bộ số liệu trên đọc thẳng từ Supabase tại thời điểm mở trang — không có số nào do AI tạo ra ngoài mục &quot;Nhận xét AI&quot;, và mục đó luôn được đánh dấu cần QA xác nhận.
       </div>
+
+      {moGuiMail && (
+        <AiMailModal
+          loai="bao_cao" phamVi={deptScope} phamViLabel={scopeLabel}
+          onClose={() => setMoGuiMail(false)}
+          onDone={(r) => { if (r.ai_text) { setAi(r.ai_text); setErrAi(""); } }}
+        />
+      )}
     </div>
   );
 }

@@ -126,6 +126,25 @@ select jsonb_build_object(
       limit 100
     ) tt
   ),
+  -- MỚI 2026-07-30: người nhận mail phân tích AI khớp phạm vi đang chạy.
+  -- Đặt ngay trong truy vấn này thay vì thêm một node Postgres nữa: cùng một
+  -- $1, cùng một vòng đi về DB, và không sinh thêm chỗ để hai node lệch phạm
+  -- vi nhau. Chỉ dùng khi yêu cầu bật dung_danh_sach.
+  --   pv='all'      → mọi người đang bật nhận phân tích AI
+  --   pv='<bộ phận>' → người khai đúng bộ phận đó, cộng người khai 'tất cả'
+  'nguoi_nhan_danh_sach', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'email', r.email,
+      'ten', coalesce(nullif(btrim(r.recipient_name), ''), r.email)
+    ) order by r.email), '[]'::jsonb)
+    from public.vmp_alert_recipients r
+    where r.ai_report_enabled
+      and (
+        (select bp from pv) = 'all'
+        or r.scope_type = 'tất cả'
+        or (r.scope_type = 'bộ phận' and lower(btrim(coalesce(r.scope, ''))) = (select bp from pv))
+      )
+  ),
   'chi_tiet_toan_bo', (select coalesce(jsonb_agg(jsonb_build_object('ma', ma, 'ten', ten, 'loai', loai,
         'bo_phan', bo_phan, 'nguoi', nguoi, 'diem', diem, 'han', han, 'trang_thai', trang_thai,
         'de_cuong', tt_de_cuong, 'tham_dinh', tt_tham_dinh, 'bao_cao', tt_bao_cao, 'vmp', tt_vmp) order by ma), '[]'::jsonb)
