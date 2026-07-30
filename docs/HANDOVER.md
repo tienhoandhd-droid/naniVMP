@@ -77,21 +77,38 @@ Mã các node của VMP 5: `n8n/vani-vmp-5-nhan-xet-bao-cao/`.
 | `bao_cao` | Trang **Báo cáo & AI** → nút *Thêm nhận xét AI* | Nhận xét cho báo cáo quản lý: tiến độ, mục tiêu 50%/tháng, kế hoạch tháng tới |
 | `canh_bao` | Trang **Cảnh báo & Rủi ro** → nút *Phân tích cảnh báo* | Quá hạn nặng nhất, thứ tự xử lý theo ICH Q9, ai đang ôm nhiều việc trễ |
 
-**Kỳ báo cáo (2026-07-31).** Web gửi kèm `ky: { nam, thang_tu, thang_den, nhan }`;
-truy vấn nhận 7 tham số (`$1` phạm vi, `$2` năm, `$3`/`$4` dải tháng của kỳ, `$5`–`$7`
-của kỳ sau). Thiếu `ky` → cả năm hiện tại, đúng hành vi cũ, nên trang Cảnh báo và
-đường chạy theo lịch không phải đổi gì.
+**Kỳ báo cáo (2026-07-31).** Web gửi kèm `ky: { nam, thang_tu, thang_den, nhan, moc }`;
+truy vấn nhận 8 tham số (`$1` phạm vi, `$2` năm, `$3`/`$4` dải tháng của kỳ, `$5`–`$7`
+của kỳ sau, `$8` mốc). Thiếu `ky` → cả năm hiện tại + mốc `tham_dinh`, nên trang Cảnh
+báo và đường chạy theo lịch không phải đổi gì.
+
+**MỐC TÍNH KỲ — mặc định `tham_dinh`, không phải `vmp`.** Một hạng mục có bốn mốc
+(đề cương T−60 · thẩm định T−(5+n) · báo cáo T−5 · đích VMP T). Hạn **thẩm định thực
+tế** mới là mốc GMP mà bộ phận thật sự phải bố trí người và thiết bị; mốc đích VMP chỉ
+sau đó vài ngày và phần lớn là thủ tục giấy tờ. Chênh lệch không nhỏ:
+
+| Đo theo | Đã xong cả năm | Kỳ tháng 6 |
+|---|---|---|
+| Hạn thẩm định thực tế | 146 | 24 đến hạn · 20 xong · **83%** |
+| Hạn đích VMP | 83 | 25 đến hạn · 7 xong · **28%** |
+
+⚠️ Đổi mốc thì **đổi cả hai vế**: `han` lấy theo mốc nào thì `da_xong` cũng phải đọc
+đúng cột `status_*` của mốc đó. Lấy hạn thẩm định mà đo hoàn thành bằng trạng thái VMP
+là so hai thứ khác nhau. Cột `trang_thai` trong CTE `items` là trạng thái **của mốc**,
+không phải `computed_status` (vốn luôn là trạng thái VMP tổng) — `computed_status` vẫn
+giữ riêng ở `trang_thai_vmp` cho bản CSV.
 
 Truy vấn có **hai tập dữ liệu, dùng sai là ra số vô nghĩa**:
 
 | Tập | Nội dung | Dùng cho |
 |---|---|---|
 | `items_nam` | toàn bộ hạng mục của năm | `theo_thang` (biểu đồ 12 tháng), `sap_toi_han_60_ngay` |
-| `items` | `items_nam` ∩ mốc đích rơi vào kỳ | mọi thứ còn lại — tương ứng `scopedKy` bên web |
+| `items` | `items_nam` ∩ hạn **của mốc đang chọn** rơi vào kỳ | mọi thứ còn lại — tương ứng `scopedKy` bên web |
+| `items_sau` | kỳ SAU, đọc lại bảng gốc vì kỳ sau có thể sang năm khác | `thang_toi` |
 
-⚠️ Từ bản này `items` đòi `deadline_vmp is not null`, nên `tong_hang_muc` toàn năm
-là **443 chứ không phải 448**: 5 hạng mục chưa có mốc đích không thuộc kỳ nào và
-được đếm riêng ở `chua_co_moc_dich`. Web hiển thị đúng con số đó cạnh bộ lọc.
+⚠️ `items` đòi hạn của mốc `is not null`, nên tổng toàn năm là **442** (theo thẩm định)
+chứ không phải 448: hạng mục thiếu hạn ở mốc đó không thuộc kỳ nào và được đếm riêng ở
+`chua_co_han_moc`. Web hiển thị đúng con số đó cạnh bộ lọc.
 
 **Mail gồm cả dữ liệu thô** (người dùng chốt 2026-07-31): thân mail có bảng 60 dòng
 đầu để đọc ngay, **toàn bộ** đính kèm dạng CSV (`;` + BOM UTF-8 để Excel tiếng Việt
