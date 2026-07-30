@@ -257,3 +257,40 @@ Thêm mẩu mới chỉ cần một dòng `INSERT`, không phải build lại we
 insert into vmp_chat_loi_cho (loai, noi_dung, nguon)
 values ('nguyen_tac', 'Nội dung…', 'Annex 15');
 ```
+
+## 12. Đừng chép nguyên văn câu mà mình muốn cấm
+
+Lỗi mất hai vòng mới sửa xong, và đáng ghi lại vì rất dễ tái phát.
+
+**Hiện tượng.** Câu nhãn cảnh báo nguồn ngoài (câu nói với người đọc rằng
+đoạn dưới đây không phải số liệu nhà máy) bị dán vào cả những câu trả lời
+chỉ đọc số liệu nội bộ. Dán sai chỗ còn tệ hơn không dán: nó làm người
+đọc nghi ngờ chính con số đúng.
+
+**Vòng vá thứ nhất — thất bại.** Thêm hai mảnh sổ tay CẤM chuyện đó. Cả
+hai mảnh đều chép nguyên văn câu nhãn để làm ví dụ, và cả hai là mảnh NỀN
+nên ghép vào mọi lượt. Kết quả: mô hình đọc thấy một câu tiếng Việt hoàn
+chỉnh trong lời dặn rồi chép nó ra — đúng hiệu ứng "đừng nghĩ đến con
+voi". Sửa xong còn 1/3 câu vẫn dán sai.
+
+**Vòng vá thứ hai — tìm ra thủ phạm chính.** Prompt của **lớp trau chuốt**
+cũng chép nguyên văn, ở chỗ dặn "bỏ câu … nếu bản nháp có". Lớp này áp cho
+**cả ba** nhánh trả lời, nên một chỗ chép mẫu là cả ba lớp cùng dính. Cộng
+thêm prompt agent Gemini chép ở đoạn "khi dùng nguồn bên ngoài thì mở đầu
+bằng đúng câu …".
+
+**Cách sửa đúng.** Câu nhãn chỉ nằm ở **mô tả của công cụ tìm ngoài** —
+nơi nó vốn đã có sẵn, và chỉ được đọc khi thực sự gọi công cụ đó. Prompt
+chung thì **mô tả** cái nhãn thay vì chép nó:
+
+- lớp trau chuốt: *"bản nháp có thể chứa một câu nhãn cảnh báo — có thì
+  giữ nguyên, không có thì tuyệt đối đừng tự viết thêm"*
+- agent: *"công cụ tìm ngoài đã dặn sẵn một câu nhãn — làm theo lời dặn
+  của công cụ, không tự nghĩ ra câu khác"*
+
+Không còn câu mẫu hoàn chỉnh nào trong prompt thì không còn gì để chép.
+Kiểm chứng 6 câu phủ đủ ba lớp: **6/6 sạch**.
+
+**Luật rút ra cho lần sau:** muốn cấm mô hình viết một câu cụ thể thì
+đừng viết câu đó ra trong lời dặn. Mô tả nó — "câu nhãn cảnh báo",
+"tên trường dữ liệu", "chữ đặt chỗ" — chứ đừng dán mẫu.
