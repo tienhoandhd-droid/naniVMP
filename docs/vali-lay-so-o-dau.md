@@ -180,7 +180,9 @@ gì. Coi nó như một bước bắt buộc của quy trình sửa workflow.
 ## 10. Số toàn nhà máy: đừng để nó lảng vảng trong ngữ cảnh
 
 Câu "nhóm hệ thống nước đến đâu rồi" liên tục trả **461** — số toàn nhà
-máy — gán cho một nhóm chỉ có 24 hạng mục. Ba vòng sửa:
+máy — trong khi "hệ thống nước" thật ra chạm **hai** nhóm (Hệ thống nước
+tinh khiết, nước cất: 24 hạng mục; Hệ thống xử lý nước thải: 2), nên câu
+đúng là **hỏi lại** chứ không phải bất kỳ con số nào. Ba vòng sửa:
 
 1. **Dán nhãn** `TOÀN NHÀ MÁY (tuyệt đối không gán cho một nhóm)` vào
    khối chốt → **không ăn**. Mô hình nhỏ vẫn dùng con số nó thấy.
