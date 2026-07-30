@@ -1030,13 +1030,14 @@ interface DatasetSpec {
 const DATASETS: DatasetSpec[] = [
   {
     id: "alerts",
-    label: "Người nhận cảnh báo",
+    label: "Người nhận mail",
     icon: Bell,
-    sub: "Ai nhận email khi hạng mục sắp/đã đến hạn — thay cho tab CanhBao trong Sheet",
+    sub: "Hai loại mail dùng chung một danh sách: nhắc từng hạng mục đến hạn, và bản phân tích AI định kỳ",
     keyField: "id",
     emptyWarning: "Chưa có người nhận nào. Workflow cảnh báo dù bật cũng sẽ không gửi cho ai.",
     fields: [
-      { key: "is_enabled", label: "Bật", w: 70, bool: true },
+      { key: "is_enabled", label: "Mail cảnh báo", w: 110, bool: true,
+        hint: "Nhận mail nhắc TỪNG hạng mục sắp/đã đến hạn (Vani VMP 1)." },
       { key: "email", label: "Email nhận", w: 210 },
       { key: "recipient_name", label: "Tên người nhận", w: 160 },
       { key: "scope_type", label: "Loại phạm vi", w: 130,
@@ -1047,6 +1048,13 @@ const DATASETS: DatasetSpec[] = [
         hint: "quá hạn · sắp đến hạn · cả hai" },
       { key: "threshold_days", label: "Ngưỡng ngày", w: 110, num: true,
         hint: "Riêng cho 'sắp đến hạn'. Để trống = dùng mặc định 7 ngày." },
+      // Hai cột dưới dành cho mail PHÂN TÍCH AI (Vani VMP 5) — mail tổng hợp
+      // cả phạm vi, khác hẳn mail nhắc từng hạng mục ở trên. Tách cờ riêng vì
+      // có người chỉ muốn bản phân tích tháng, không muốn bị nhắc từng mã.
+      { key: "ai_report_enabled", label: "Mail phân tích AI", w: 130, bool: true,
+        hint: "Nhận bản phân tích AI tổng hợp (Vani VMP 5). Độc lập với cột 'Mail cảnh báo'." },
+      { key: "ai_report_schedule", label: "Lịch gửi AI", w: 130,
+        hint: "không · hằng tuần (sáng thứ Hai) · hằng tháng (sáng ngày 1). Đặt 'không' thì chỉ gửi khi bấm tay trên web." },
       { key: "note", label: "Ghi chú", w: 160 },
     ],
     load: () => fetchAlertRecipients() as unknown as Promise<Record<string, unknown>[]>,
