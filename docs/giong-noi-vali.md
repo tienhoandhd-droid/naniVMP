@@ -294,3 +294,58 @@ Kiểm chứng 6 câu phủ đủ ba lớp: **6/6 sạch**.
 **Luật rút ra cho lần sau:** muốn cấm mô hình viết một câu cụ thể thì
 đừng viết câu đó ra trong lời dặn. Mô tả nó — "câu nhãn cảnh báo",
 "tên trường dữ liệu", "chữ đặt chỗ" — chứ đừng dán mẫu.
+
+## 13. Làm mới ngữ cảnh — 20 mảnh nền xuống 5
+
+Sau nhiều vòng vá lỗi, ngữ cảnh gửi vào mô hình mỗi lượt phình lên:
+
+| Khối | Ký tự |
+|---|---|
+| Sổ tay giọng (ghép vào **mọi** lượt) | 10.210 |
+| System prompt agent | 4.746 |
+| Phân tích câu hỏi | 1.346 |
+| Từ điển giọng lớp trau chuốt | 1.148 |
+| Khối số liệu đã chốt | 509 |
+| **Tổng** | **~17.000 ký tự ≈ 5.600 token** |
+
+Sổ tay có **20 mảnh nền** — tôi đã phá vỡ chính nguyên tắc lorebook viết ở
+mục 2: mảnh nền phải ÍT, mảnh kích hoạt mới NHIỀU. Mỗi lần sửa một lỗi lại
+thêm một mảnh nền, dồn thành 20.
+
+**Đó là lý do "dặn mãi mà không ăn".** Bảy mảnh trong số đó nói cùng một
+chuyện — luật đọc số — chiếm 4.100 ký tự, lặp ý chồng chéo. Bảy lời dặn
+rải rác về cùng một việc thì không cái nào là luật rõ ràng, và mô hình đọc
+10.000 ký tự dặn dò thì không biết cái nào quan trọng nhất.
+
+**Cách chữa không phải thêm luật, mà là HỢP NHẤT.** Gộp hai vòng:
+
+| Mảnh gộp | Gộp từ | Ký tự |
+|---|---|---|
+| `LUẬT SỐ` | 7 mảnh về số liệu | 1.519 |
+| `RANH GIỚI` | nói dối bản chất, so bì người, ranh giới tâm lý, không ghi dữ liệu, hỏi lại gọn | ~1.600 |
+| `GIỌNG` | công chúa chiều, genz ở nhịp, tinh tế tiếng Việt, vui là vui thật, không sáo, dọn bước tiếp | ~2.200 |
+| `HÌNH THỨC` | không lộ khung mẫu, nhãn nguồn ngoài | ~900 |
+| `TIẾP SỨC` | giữ riêng — chủ đề độc lập | 439 |
+
+**Kết quả: 20 mảnh nền → 5. Sổ tay 10.210 → 6.946 ký tự (giảm 32%).**
+
+Nguyên tắc khi gộp: **giữ nguyên mọi luật**, chỉ bỏ phần giải thích lặp và
+ví dụ dài. Chỗ nào là bài học từ lỗi thật thì giữ ví dụ ngắn — không có ví
+dụ thì mô hình không hiểu luật muốn nói gì.
+
+Mảnh cũ **tắt (`bat = false`) chứ không xoá**, còn lần lại được nếu bản gộp
+tệ hơn:
+
+```sql
+select ten, length(noi_dung) from vmp_chat_giong
+where not bat and tu_khoa = '{}' order by 2 desc;
+```
+
+Kiểm chứng sau khi gộp: bộ chấm giữ **166/166**, và bốn hành vi khó nhất
+vẫn đúng — số theo nhóm (tank 72, xe hơi 1), nhận mình là AI, không xếp
+hạng con người.
+
+**Luật cho lần sau:** mỗi khi định thêm một mảnh NỀN, hãy tìm mảnh nền nào
+đã nói về chủ đề đó và viết thêm vào đấy. Chỉ mở mảnh nền mới khi thật sự
+là chủ đề chưa từng có. Mảnh kích hoạt theo từ khoá thì thêm bao nhiêu
+cũng được — chúng không tốn ngữ cảnh của lượt khác.
