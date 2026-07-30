@@ -1232,6 +1232,76 @@ export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor 
   );
 }
 
+/* =====================================================================
+ * MULTI SELECT — dropdown chọn nhiều (checkbox)
+ *
+ * Chuyển từ App.tsx (2026-07-30): dùng cho thanh Lọc chung (Khu vực/Bộ
+ * phận) và bộ lọc riêng của ReportsView — một nơi định nghĩa, đổi giao
+ * diện một chỗ khớp cả hai. Rỗng = tất cả.
+ * =================================================================== */
+const multiSelectMiniBtn: CSSProperties = {
+  flex: 1, padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`,
+  background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11, fontWeight: 800, cursor: "pointer",
+};
+
+export function MultiSelect({ label, allLabel, options, selected, onChange }: {
+  label: string;
+  allLabel: string;
+  options: Array<{ v: string; l: string }>;
+  selected: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (ev: MouseEvent) => {
+      if (ref.current && !ref.current.contains(ev.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+  const btn = selected.length === 0 ? allLabel : `${label}: ${selected.length}`;
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} style={{
+        display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
+        borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
+        background: selected.length ? C.pinkMist : C.surface,
+        color: selected.length ? C.pinkText : C.plum,
+        fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+      }}>
+        {btn} <span style={{ fontSize: 10 }}>▾</span>
+      </button>
+      {open && (
+        <div className="vmp-scroll" style={{
+          position: "absolute", zIndex: 60, top: "calc(100% + 6px)", left: 0,
+          minWidth: 210, maxHeight: 300, overflowY: "auto",
+          background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
+          boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
+        }}>
+          <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
+            <button type="button" onClick={() => onChange(options.map((o) => o.v))} style={multiSelectMiniBtn}>Chọn hết</button>
+            <button type="button" onClick={() => onChange([])} style={multiSelectMiniBtn}>Bỏ chọn</button>
+          </div>
+          {options.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có dữ liệu</div>}
+          {options.map((o) => (
+            <label key={o.v} style={{
+              display: "flex", alignItems: "center", gap: 9, padding: "7px 8px",
+              cursor: "pointer", borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: C.plum,
+            }}>
+              <input type="checkbox" checked={selected.includes(o.v)} onChange={() => toggle(o.v)}
+                style={{ width: 15, height: 15, accentColor: C.pink, cursor: "pointer" }} />
+              {o.l}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CrownLogo() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>

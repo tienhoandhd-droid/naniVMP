@@ -381,72 +381,10 @@ export function nhanXetTuDong(acts: Activity[]): string[] {
   return y;
 }
 
-// ======================== REPORT HTML BUILDER ========================
-export function buildReportHTML(
-  period: string,
-  scopeLabel: string,
-  e: Record<string, unknown>,
-  d: Record<string, unknown>,
-  deptRows: Array<{ name: string; done: number; over: number; todo: number; total: number; rate: number }>,
-  overdueList: Array<{ id: string; name: string; stage: string; dleft: number }>,
-  ai?: string,
-): string {
-  const now = new Date();
-  const disclaimer = "BẢN NHÁP AI — Cần QA xác nhận trước khi phát hành";
-  return `<!DOCTYPE html>
-<html lang="vi"><head><meta charset="UTF-8">
-<title>Báo cáo VMP — CPC1 HN</title>
-<style>
-  body{font-family:'Segoe UI',system-ui,sans-serif;max-width:900px;margin:auto;padding:40px 30px;color:#2d2d2d;line-height:1.7}
-  h1{color:#B43A6E;border-bottom:3px solid #EE7BA9;padding-bottom:12px}
-  h2{color:#6B4DB3;margin-top:32px;border-left:4px solid #8E6FD0;padding-left:12px}
-  table{width:100%;border-collapse:collapse;margin:16px 0}
-  th,td{border:1px solid #ddd;padding:10px 14px;text-align:center}
-  th{background:#FCE3EF;color:#B43A6E;font-weight:700}
-  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
-  .done{background:#DBF3EA;color:#1A7058} .over{background:#FCE2E9;color:#BE3357}
-  .footer{margin-top:40px;padding:16px;background:#FFF5FA;border-radius:12px;font-size:13px;color:#6E4869}
-  .ai-box{background:#FDEEF6;border-left:4px solid #EE7BA9;padding:18px 22px;border-radius:0 12px 12px 0;margin:16px 0;white-space:pre-wrap}
-  .stamp{background:#FCE2E9;color:#BE3357;padding:6px 14px;border-radius:8px;font-weight:800;font-size:13px;display:inline-block;margin-bottom:12px}
-</style></head><body>
-<h1>BÁO CÁO TIẾN ĐỘ THẨM ĐỊNH — CPC1 HÀ NỘI</h1>
-<p><b>Kỳ:</b> ${period} · <b>Phạm vi:</b> ${scopeLabel} · <b>Ngày chốt:</b> ${fmtVN(now)} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}</p>
-<p><b>Đơn vị:</b> V/Q Team — QLCL · <b>Nguồn:</b> Supabase (đồng bộ từ Google Sheet qua n8n)</p>
-
-<h2>1. Tổng quan KPI</h2>
-<table>
-<tr><th>Nhóm</th><th>Hoàn thành</th><th>Quá hạn</th><th>Chưa HT</th><th>Tổng</th><th>Tỷ lệ</th></tr>
-<tr><td><b>Thẩm định thực tế</b></td><td class="done">${e.done}</td><td class="over">${e.over}</td><td>${e.todo}</td><td>${e.total}</td><td><b>${e.rate}%</b></td></tr>
-<tr><td><b>Hoàn thiện hồ sơ</b></td><td class="done">${d.done}</td><td class="over">${d.over}</td><td>${d.todo}</td><td>${d.total}</td><td><b>${d.rate}%</b></td></tr>
-</table>
-
-<h2>2. Chi tiết theo Bộ phận</h2>
-<table>
-<tr><th>Bộ phận</th><th>HT</th><th>QH</th><th>Chưa</th><th>Tổng</th><th>Tỷ lệ</th></tr>
-${deptRows.map(r => `<tr><td>${r.name}</td><td>${r.done}</td><td>${r.over}</td><td>${r.todo}</td><td>${r.total}</td><td><b>${r.rate}%</b></td></tr>`).join("")}
-</table>
-
-<h2>3. Hạng mục Quá hạn (${overdueList.length})</h2>
-${overdueList.length ? `<table><tr><th>ID</th><th>Tên</th><th>Mốc</th><th>Trễ</th></tr>
-${overdueList.map(o => `<tr><td>${o.id}</td><td>${o.name}</td><td>${o.stage}</td><td class="over">${Math.abs(o.dleft)} ngày</td></tr>`).join("")}</table>` : "<p>Không có hạng mục quá hạn.</p>"}
-
-<h2>4. Nhận xét & Đánh giá (AI)</h2>
-<div class="stamp">${disclaimer}</div>
-<div class="ai-box">${ai || "(Chưa tạo nhận xét AI)"}</div>
-
-<h2>5. QA Review & Xác nhận</h2>
-<table>
-<tr><td style="width:50%"><b>Người lập:</b> ........................</td><td><b>Người xác nhận (QA):</b> ........................</td></tr>
-<tr><td><b>Ngày:</b> ....../....../20......</td><td><b>Ngày:</b> ....../....../20......</td></tr>
-<tr><td><b>Chữ ký:</b></td><td><b>Chữ ký:</b></td></tr>
-</table>
-
-<div class="footer">
-<b>Audit:</b> Snapshot tạo lúc ${now.toISOString()} · Template v2.0 · Hệ thống VMP Monitor CPC1 HN<br/>
-<b>Lưu ý:</b> Số liệu được chốt tại thời điểm tạo báo cáo. Mọi thay đổi sau thời điểm này không ảnh hưởng đến báo cáo đã phát hành.
-</div>
-</body></html>`;
-}
+// REPORT HTML BUILDER: chuyển sang lib/reportHtml.ts (buildManagementReportHTML,
+// 2026-07-30) — bản mới in đủ 5 mục báo cáo quản lý + biểu đồ, đặt ở lib/ để
+// tránh vòng import (nó cần kiểu từ reportModel.ts, mà reportModel.ts import
+// hàm thuần ở chính file helpers.ts này).
 
 // ======================== DOWNLOAD HELPER ========================
 export function download(filename: string, content: BlobPart, mime = "text/html"): void {

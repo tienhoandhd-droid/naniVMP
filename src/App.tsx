@@ -18,13 +18,10 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } fro
 // ===== External libs =====
 import {
   Boxes,
-  FileBarChart,
   BarChart3,
   AlertCircle,
   CheckCircle2,
   ShieldCheck,
-  Sparkles as SparkIcon,
-  Download,
   Filter,
   KeyRound,
   Lock,
@@ -33,7 +30,6 @@ import {
   RefreshCw,
   XCircle,
   Plus,
-  Printer,
 
   Radar,
   Cloud,
@@ -44,7 +40,7 @@ import {
 // xlsx được nạp động (dynamic import) ngay trong hàm xuất Excel để giảm bundle ban đầu.
 
 // ===== Internal modules (refactored) =====
-import { C, TEXT, NUM, GRAD, btnPrimary, INP, glass } from "./constants/theme.ts";
+import { C, TEXT, NUM, btnPrimary, INP } from "./constants/theme.ts";
 import {
 
   DEPTS,
@@ -52,17 +48,15 @@ import {
   PERM_LABEL,
   NAV_ITEMS,
   NAV_SUBS,
-  PLABEL,
   vmpToday,
+  LOAI_LOI,
+  sevOf,
 } from "./constants/vmp.ts";
 import {
   tally,
   docTally,
   inPeriod,
   runDataQualityChecks,
-  nhanXetTuDong,
-  buildReportHTML,
-  download,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
 import { fetchSystemStatus } from "./lib/supabaseData.ts";
@@ -82,7 +76,7 @@ import {
   SkeletonDashboard,
   SyncBanner,
   GuardianSilhouette,
-  PrincessCommentary, StatTile, Ring} from "./components/ui/Primitives.tsx";
+  PrincessCommentary, StatTile, Ring, MultiSelect} from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
 // ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
@@ -98,6 +92,7 @@ const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
 const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
+import ReportsView from "./components/dashboard/ReportsView.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
 import { saveUser } from "./lib/config.ts";
@@ -608,25 +603,8 @@ function HealthView({ acts, user }: { acts: Activity[]; user?: AppUser | null })
  * cũng chỉ dựng 20 dòng đầu — trang nhẹ hẳn.
  * -------------------------------------------------------------- */
 
-/** Nhãn tiếng Việt + chỗ sửa cho từng loại lỗi. Thiếu loại nào thì rơi
- *  về nhãn mặc định chứ không giấu lỗi đi. */
-const LOAI_LOI: Record<string, { ten: string; sua: string }> = {
-  missing_code:          { ten: "Thiếu mã đối tượng", sua: "Sửa ở Danh mục & Nhập liệu → Danh mục nguồn" },
-  duplicate_id:          { ten: "Trùng ID hạng mục", sua: "Hai dòng cùng mã thẩm định — xoá hoặc đổi mã một dòng" },
-  deadline_before_start: { ten: "Deadline VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
-  done_no_date:          { ten: "Đánh dấu hoàn thành nhưng thiếu ngày", sua: "Vi phạm ALCOA+ — nhập ngày thực tế ở Cập nhật tiến độ" },
-  date_no_done:          { ten: "Có ngày hoàn thành nhưng trạng thái chưa xong", sua: "Đặt trạng thái về Hoàn thành, hoặc xoá ngày nếu nhập nhầm" },
-  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Điền ở Danh mục & Nhập liệu → tab Người thực hiện" },
-  no_validation_type:    { ten: "Chưa xác định loại thẩm định", sua: "Đặt IQ/OQ/PQ/CV ở Danh mục nguồn rồi sinh lại timeline" },
-  high_crit_no_plan:     { ten: "Trọng yếu cao nhưng vẫn ở Kế hoạch", sua: "ICH Q9 đòi làm nhóm rủi ro cao trước — xếp lịch sớm" },
-};
-
-const SEV = {
-  error:   { nhan: "Lỗi", mau: C.raspText, nen: C.raspSoft, emoji: "🚫", uu_tien: 0 },
-  warning: { nhan: "Cảnh báo", mau: C.marigoldText, nen: C.marigoldSoft, emoji: "⚠️", uu_tien: 1 },
-  info:    { nhan: "Thông tin", mau: C.skyText, nen: C.skySoft, emoji: "ℹ️", uu_tien: 2 },
-} as const;
-const sevOf = (s: string) => SEV[(s as keyof typeof SEV)] ?? SEV.info;
+// LOAI_LOI, SEV, sevOf: chuyển sang constants/vmp.ts (2026-07-30) để ReportsView
+// dùng chung, không copy lại nhãn lỗi.
 
 function DataQualityView({ acts }: { acts: Activity[] }) {
   const issues = useMemo(() => runDataQualityChecks(acts), [acts]);
@@ -1469,157 +1447,6 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
   );
 }
 
-/* --- ReportsView (with AI via Anthropic proxy) --- */
-function ReportsView({ acts }: { acts: Activity[] }) {
-  const [period, setPeriod] = useState("thang");
-  const [scope, setScope] = useState("all");
-  const [ai, setAi] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-
-  const scoped = scope === "all" ? acts : acts.filter((a) => a.dept === scope);
-  const scopeLabel = scope === "all" ? "Toàn nhà máy" : (DEPTS.find((d) => d.id === scope)?.name || scope);
-  const e = tally(scoped), d = docTally(scoped);
-  const deptRows = DEPTS.map((dp) => { const da = scoped.filter((a) => a.dept === dp.id); const t = tally(da); return { ...dp, ...t }; }).filter((r) => r.total > 0);
-  const overdueList = scoped
-    .map((a) => a.alert && a.alert.kind === "over"
-      ? { id: a.id, name: a.name ?? a.code, stage: a.alert.stage, dleft: a.alert.dleft }
-      : null)
-    .filter((x): x is NonNullable<typeof x> => x !== null);
-  const pl = (PLABEL as Record<string, { t: string; p: string }>)[period];
-  const html = () => buildReportHTML(period, scopeLabel, e, d, deptRows, overdueList, ai);
-
-  const generate = async () => {
-    setLoading(true); setErr(""); setAi("");
-    // Gọi n8n webhook AI report (OpenAI key ở backend, KHÔNG ở frontend)
-    const aiWebhookUrl = import.meta.env.VITE_N8N_AI_REPORT_URL || "";
-    if (!aiWebhookUrl) {
-      setErr("Chưa cấu hình đường gọi AI (VITE_N8N_AI_REPORT_URL). Nhận xét tự động phía trên vẫn dùng được bình thường.");
-      setLoading(false);
-      return;
-    }
-
-    // Workflow "Vani VMP 5" TỰ ĐỌC dữ liệu thô từ Supabase (toàn bộ hạng mục
-    // năm nay, danh sách quá hạn, lỗi hồ sơ, tải việc theo người) nên web chỉ
-    // cần nói ĐANG XEM KỲ NÀO, PHẠM VI NÀO. Trước đây web gửi lên vài con số
-    // tóm tắt, AI chỉ diễn giải lại đúng mấy con số đó.
-    const reportData = { ky: period, pham_vi: scope };
-
-    try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      // Cùng token với ô chat: nằm trong gói JS công khai nên chỉ để chặn quét
-      // bừa, không phải bí mật. Không dùng lại x-vmp-secret của đường ghi.
-      const chatToken = import.meta.env.VITE_N8N_CHAT_TOKEN as string | undefined;
-      if (chatToken) headers["x-vmp-chat"] = chatToken;
-
-      const res = await fetch(aiWebhookUrl, { method: "POST", headers, body: JSON.stringify(reportData) });
-      const json = await res.json();
-
-      if (json.ok && json.ai_text) {
-        setAi(json.ai_text);
-      } else if (json.error) {
-        setErr(`Lỗi AI: ${json.error}`);
-      } else {
-        setErr("Không nhận được phản hồi AI từ n8n.");
-      }
-    } catch (ex) { setErr("Lỗi kết nối n8n: " + ((ex as Error)?.message || "không xác định")); }
-    finally { setLoading(false); }
-  };
-
-  const printPDF = () => {
-    const ifr = document.createElement("iframe");
-    ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
-    document.body.appendChild(ifr);
-    const win = ifr.contentWindow;
-    if (!win) return;
-    const dd = win.document;
-    dd.open(); dd.write(html()); dd.close();
-    setTimeout(() => { try { win.focus(); win.print(); } catch { /* trình duyệt chặn in */ } setTimeout(() => document.body.removeChild(ifr), 1500); }, 400);
-  };
-
-  const exportExcel = async () => {
-    const XLSX = await import("xlsx");
-    const wsData = [["Nhóm", "HT", "QH", "Chưa", "Tổng", "Tỷ lệ"], ["Thẩm định", e.done, e.over, e.todo, e.total, e.rate], ["Hồ sơ", d.done, d.over, d.todo, d.total, d.rate], [], ["Bộ phận", "HT", "QH", "Chưa", "Tổng", "Tỷ lệ"], ...deptRows.map((r) => [r.name, r.done, r.over, r.todo, r.total, r.rate])];
-    const ws = XLSX.utils.aoa_to_sheet(wsData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Báo cáo"); XLSX.writeFile(wb, `VMP_${period}_CPC1HN.xlsx`);
-  };
-
-  const Seg = ({ id, label }: { id: string; label: string }) => <button onClick={() => { setPeriod(id); setAi(""); }} style={{ padding: "10px 17px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 13, fontWeight: 800, background: period === id ? GRAD : C.pinkSoft, color: period === id ? "#fff" : C.plumSoft }}>{label}</button>;
-
-  const statRow = (
-    lbl: string,
-    x: { done: number; total: number; rate: number; over?: number; todo?: number },
-    dotc: string,
-  ) => (
-    <tr style={{ borderTop: `1px solid ${C.line}` }}>
-      <td style={{ padding: 13, fontSize: 13.5, fontWeight: 800, color: C.plum }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 999, background: dotc, marginRight: 8 }} />{lbl}</td>
-      <td style={{ padding: 13, textAlign: "center", color: C.mintText, fontWeight: 800 }}>{x.done}</td>
-      <td style={{ padding: 13, textAlign: "center", color: C.raspText, fontWeight: 800 }}>{x.over}</td>
-      <td style={{ padding: 13, textAlign: "center", color: C.marigoldText, fontWeight: 800 }}>{x.todo}</td>
-      <td style={{ padding: 13, textAlign: "center", fontWeight: 800, fontFamily: NUM }}>{x.total}</td>
-      <td style={{ padding: 13, textAlign: "center" }}><span style={{ fontFamily: NUM, fontWeight: 800, color: "#fff", background: C.mintText, padding: "4px 11px", borderRadius: 999, fontSize: 12.5 }}>{x.rate}%</span></td>
-    </tr>
-  );
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <Card>
-        <CardTitle icon={FileBarChart}>Thiết lập báo cáo</CardTitle>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-end" }}>
-          <div><div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Kỳ</div><div style={{ display: "flex", gap: 8 }}><Seg id="tuan" label="Tuần" /><Seg id="thang" label="Tháng" /><Seg id="quy" label="Quý" /></div></div>
-          <div><div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Phạm vi</div><select value={scope} onChange={(e2) => { setScope(e2.target.value); setAi(""); }} style={{ ...glass, borderRadius: 12, padding: "11px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, cursor: "pointer", outline: "none" }}><option value="all">Toàn nhà máy</option>{DEPTS.map((dp) => <option key={dp.id} value={dp.id}>{dp.name}</option>)}</select></div>
-          {/* Nút gọi AI chỉ hiện khi thật sự có dịch vụ AI. Trước đây nút luôn
-              hiện và luôn báo "Chưa cấu hình VITE_N8N_AI_REPORT_URL. Liên hệ
-              IT" — biến đó chưa từng được đặt, nên nút chết từ đầu. */}
-          {!!import.meta.env.VITE_N8N_AI_REPORT_URL && (
-            <button onClick={generate} disabled={loading} style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "13px 24px", borderRadius: 14, fontSize: 14.5 }}>{loading ? <RefreshCw size={17} className="spin" /> : <SparkIcon size={17} />} {loading ? "AI đang phân tích…" : "Thêm nhận xét AI"}</button>
-          )}
-        </div>
-      </Card>
-      <Card variant="strong">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}><span style={{ background: C.pinkText, color: "#fff", fontWeight: 800, borderRadius: 10, padding: "8px 12px", fontSize: 12.5 }}>CPC1 HN</span><div><div style={{ fontFamily: TEXT, fontSize: 19, fontWeight: 800, color: C.plum }}>{pl.t}</div><div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>{pl.p} · {scopeLabel}</div></div></div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={printPDF} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 12, border: "none", cursor: "pointer", background: GRAD, color: "#fff", fontFamily: TEXT, fontWeight: 800, fontSize: 13 }}><Printer size={16} /> PDF</button>
-            <button onClick={exportExcel} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 12, border: "none", cursor: "pointer", background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontWeight: 800, fontSize: 13 }}><Download size={16} /> Excel</button>
-            <button onClick={() => download(`BaoCao_${period}.html`, html())} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 12, border: "none", cursor: "pointer", background: C.lavSoft, color: C.lavText, fontFamily: TEXT, fontWeight: 800, fontSize: 13 }}><Download size={16} /> HTML</button>
-          </div>
-        </div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT }}><thead><tr>{["Nhóm", "HT", "QH", "Chưa", "Tổng", "Tỷ lệ"].map((h, i) => <th key={i} style={{ textAlign: i ? "center" : "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, padding: "0 13px 13px" }}>{h}</th>)}</tr></thead><tbody>{statRow("Thẩm định thực tế", e, C.mint)}{statRow("Hoàn thiện hồ sơ", d, C.sky)}</tbody></table>
-        <div style={{ marginTop: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap" }}>
-            <SparkIcon size={18} color={C.pink} />
-            <span style={{ fontFamily: TEXT, fontSize: 17, fontWeight: 800, color: C.plum }}>Nhận xét</span>
-            <Tag color={C.mintText} bg={C.mintSoft}>Tính từ số liệu</Tag>
-          </div>
-
-          {/* Nhận xét tự động: tính thẳng từ số đang hiện, không gọi dịch vụ nào.
-              Cùng một bộ số cho ra đúng một câu — hợp hồ sơ GMP hơn văn AI. */}
-          <div style={{ fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.85, fontWeight: 500,
-                        background: C.pinkMist, borderLeft: `4px solid ${C.pink}`, borderRadius: "0 14px 14px 0", padding: "16px 20px" }}>
-            <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 7 }}>
-              {nhanXetTuDong(scoped).map((c, i) => <li key={i}>{c}</li>)}
-            </ul>
-          </div>
-
-          {/* Phần AI chỉ xuất hiện khi có dịch vụ và người dùng bấm gọi. */}
-          {err && <div style={{ marginTop: 12, color: C.raspText, fontSize: 13.5, fontWeight: 800, padding: "13px 15px", borderRadius: 12, background: C.raspSoft }}><AlertCircle size={16} /> {err}</div>}
-          {loading && <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}><RefreshCw size={22} className="spin" color={C.pink} /><div style={{ marginTop: 10 }}>AI đang phân tích…</div></div>}
-          {!loading && !err && ai && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-                <SparkIcon size={16} color={C.lavText} />
-                <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.plum }}>Nhận xét AI</span>
-                <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
-              </div>
-              <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8, fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`, borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{ai}</div>
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
 /* ===================== GLOBAL FILTER BAR =====================
  * Lọc TOÀN CỤC theo Khu vực + Thời gian (tháng/quý/nửa năm/năm).
  * Đặt dưới Topbar, hiển thị trên mọi trang. */
@@ -1632,73 +1459,13 @@ const PERIOD_OPTS = [
   { v: "custom", l: "Tùy chọn…" },
 ];
 
-const miniBtn = {
-  flex: 1, padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`,
-  background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11, fontWeight: 800, cursor: "pointer",
-};
 const dateInp = {
   padding: "7px 9px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
   background: C.surface, color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700, cursor: "pointer",
 };
 
-// Dropdown CHỌN NHIỀU (checkbox) — dùng cho Khu vực & Bộ phận. Rỗng = tất cả.
-function MultiSelect({ label, allLabel, options, selected, onChange }: {
-  label: string;
-  allLabel: string;
-  options: Array<{ v: string; l: string }>;
-  selected: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (ev: MouseEvent) => {
-      if (ref.current && !ref.current.contains(ev.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
-  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
-  const btn = selected.length === 0 ? allLabel : `${label}: ${selected.length}`;
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} style={{
-        display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
-        borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
-        background: selected.length ? C.pinkMist : C.surface,
-        color: selected.length ? C.pinkText : C.plum,
-        fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-      }}>
-        {btn} <span style={{ fontSize: 10 }}>▾</span>
-      </button>
-      {open && (
-        <div className="vmp-scroll" style={{
-          position: "absolute", zIndex: 60, top: "calc(100% + 6px)", left: 0,
-          minWidth: 210, maxHeight: 300, overflowY: "auto",
-          background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
-          boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
-        }}>
-          <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
-            <button type="button" onClick={() => onChange(options.map((o) => o.v))} style={miniBtn}>Chọn hết</button>
-            <button type="button" onClick={() => onChange([])} style={miniBtn}>Bỏ chọn</button>
-          </div>
-          {options.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có dữ liệu</div>}
-          {options.map((o) => (
-            <label key={o.v} style={{
-              display: "flex", alignItems: "center", gap: 9, padding: "7px 8px",
-              cursor: "pointer", borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: C.plum,
-            }}>
-              <input type="checkbox" checked={selected.includes(o.v)} onChange={() => toggle(o.v)}
-                style={{ width: 15, height: 15, accentColor: C.pink, cursor: "pointer" }} />
-              {o.l}
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// MultiSelect: chuyển sang components/ui/Primitives.tsx (2026-07-30) để
+// ReportsView dùng chung cho bộ lọc riêng, không copy lại.
 
 // LEGACY (giữ lại để revert): thanh lọc cũ — 3 hộp checkbox luôn hiện.
 // Muốn quay lại: ở call-site đổi <GlobalFilterBar .../> thành <GlobalFilterBarLegacy .../>.
