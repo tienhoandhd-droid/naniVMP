@@ -33,6 +33,8 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   /** Lọc nhanh theo lỗi dữ liệu — để không phải dò 461 dòng tìm chỗ thiếu. */
   const [fix, setFix] = useState("all");
   const [edit, setEdit] = useState<PlanActivity | null>(null);
+  /** Mở hộp bằng đường tắt "✓ Xong bước" — hộp sẽ điền sẵn hôm nay + Hoàn thành. */
+  const [quick, setQuick] = useState(false);
   // Gõ phím không lọc ngay — 461 dòng dựng lại mỗi phím là chỗ giật nhất trang này.
   const kw = useDebounce(q.trim().toLowerCase(), 250);
   const [hien, setHien] = useState(60);        // số dòng dựng thật trong bảng
@@ -225,10 +227,21 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>{sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}</td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}><Pill s={a.st} small /></td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                    <button onClick={() => { if (!readOnly) setEdit(a); }}
-                      disabled={readOnly || (isFrozen && !isAdmin)}
-                      title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
-                      style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 10, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
+                    <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      {/* Đường tắt: mở hộp đã điền sẵn "hôm nay + Hoàn thành" cho bước
+                          hiện tại — vẫn phải chọn lý do và Lưu nên không đi tắt luật GMP. */}
+                      {!readOnly && !isFrozen && stageByItem.get(a.id) !== "done" && (
+                        <button onClick={() => { setEdit(a); setQuick(true); }}
+                          title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
+                          style={{ padding: "7px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                          ✓ Xong bước
+                        </button>
+                      )}
+                      <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
+                        disabled={readOnly || (isFrozen && !isAdmin)}
+                        title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
+                        style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 10, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
+                    </div>
                   </td>
                 </tr>
               ); })}
@@ -269,21 +282,25 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
         chỉ đọc, sửa trên đó sẽ không vào hệ thống.
       </div>
       {edit && !readOnly && <ProgressEditModal
+        key={edit.id}
         act={edit}
         isAdmin={isAdmin}
-        onClose={() => setEdit(null)}
+        quickDone={quick}
+        onClose={() => { setEdit(null); setQuick(false); }}
         onReload={onReload}
+        // Hạng mục kế tiếp TRONG danh sách đang lọc — nhập hàng loạt không phải
+        // đóng hộp rồi dò lại bảng. Bỏ qua hạng mục đóng băng nếu không phải admin.
+        nextAct={(() => {
+          const i = list.findIndex((a) => a.id === edit.id);
+          if (i < 0) return null;
+          return list.slice(i + 1).find((a) => isAdmin || (a.state || a._raw?.state || "active") === "active") || null;
+        })()}
+        onOpenNext={(a) => { setEdit(a); setQuick(false); }}
         onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}
-        onChangeState={async (id, newState) => {
-          // S3-G: gọi RPC rpc_set_item_state (010) — bắt buộc nhập lý do
+        onChangeState={async (id, newState, reason) => {
+          // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp
+          // (trước đây dùng window.prompt, dễ bấm nhầm Cancel là mất).
           if (!supabase) { alert("Supabase chưa cấu hình."); return; }
-          const reason = window.prompt(
-            newState === "active"
-              ? `Lý do KHÔI PHỤC mã ${id} về Active:`
-              : newState === "not_applicable"
-              ? `Lý do đánh dấu ${id} "Không áp dụng" (vd: thiết bị ngừng dùng):`
-              : `Lý do HỦY hạng mục ${id} (vd: theo phê duyệt CAPA #...):`
-          );
           if (!reason || !reason.trim()) return;
           try {
             const { data, error } = await supabase.rpc("rpc_set_item_state", {
@@ -295,7 +312,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
             const r = data as unknown as { ok?: boolean; error?: string } | null;
             if (r && r.ok === false) throw new Error(r.error);
             alert(`✓ Đã đổi trạng thái ${id} → ${newState}`);
-            setEdit(null);
+            setEdit(null); setQuick(false);
             if (onReload) onReload();   // (MỚI) tải lại ngay để badge + đếm KPI cập nhật tức thì
           } catch (e) {
             alert("Lỗi đổi trạng thái: " + ((e as Error).message || "không rõ"));
