@@ -79,24 +79,26 @@ Mã các node của VMP 5: `n8n/vani-vmp-5-nhan-xet-bao-cao/`.
 
 **Kỳ báo cáo (2026-07-31).** Web gửi kèm `ky: { nam, thang_tu, thang_den, nhan, moc }`;
 truy vấn nhận 8 tham số (`$1` phạm vi, `$2` năm, `$3`/`$4` dải tháng của kỳ, `$5`–`$7`
-của kỳ sau, `$8` mốc). Thiếu `ky` → cả năm hiện tại + mốc `tham_dinh`, nên trang Cảnh
+của kỳ sau, `$8` mốc chia tháng). Thiếu `ky` → cả năm hiện tại + mốc `tham_dinh`, nên trang Cảnh
 báo và đường chạy theo lịch không phải đổi gì.
 
-**MỐC TÍNH KỲ — mặc định `tham_dinh`, không phải `vmp`.** Một hạng mục có bốn mốc
-(đề cương T−60 · thẩm định T−(5+n) · báo cáo T−5 · đích VMP T). Hạn **thẩm định thực
-tế** mới là mốc GMP mà bộ phận thật sự phải bố trí người và thiết bị; mốc đích VMP chỉ
-sau đó vài ngày và phần lớn là thủ tục giấy tờ. Chênh lệch không nhỏ:
+**MỐC CHIA THÁNG — mặc định `tham_dinh`.** Mốc chỉ quyết định hạng mục **rơi vào tháng
+nào**. `da_xong` **LUÔN** là `status_vmp = 'completed'`, không bao giờ đọc theo mốc
+(người dùng chốt 2026-07-31): xong đề cương không phải là xong việc, một hạng mục mới
+viết xong đề cương mà mốc đích còn ở tháng sau thì không được tính là hoàn thành của
+tháng này.
 
-| Đo theo | Đã xong cả năm | Kỳ tháng 6 |
-|---|---|---|
-| Hạn thẩm định thực tế | 146 | 24 đến hạn · 20 xong · **83%** |
-| Hạn đích VMP | 83 | 25 đến hạn · 7 xong · **28%** |
+Bộ chọn có 3 mốc: `tham_dinh` (mặc định) · `bao_cao` · `vmp`. **`de_cuong` cố ý không
+có.** Đề cương là T−60, thường sớm hơn mốc đích 2 tháng — chia theo nó rồi đo bằng hoàn
+thành VMP thì tháng 6 ra **80 hạng mục / 0 hoàn thành / 0%**, đọc như trượt thảm hại
+trong khi thực ra mốc đích của chúng còn ở tháng 8.
 
-⚠️ Đổi mốc thì **đổi cả hai vế**: `han` lấy theo mốc nào thì `da_xong` cũng phải đọc
-đúng cột `status_*` của mốc đó. Lấy hạn thẩm định mà đo hoàn thành bằng trạng thái VMP
-là so hai thứ khác nhau. Cột `trang_thai` trong CTE `items` là trạng thái **của mốc**,
-không phải `computed_status` (vốn luôn là trạng thái VMP tổng) — `computed_status` vẫn
-giữ riêng ở `trang_thai_vmp` cho bản CSV.
+Ba mốc còn lại nằm trong khoảng T−5 → T nên rơi cùng tháng với mốc đích. Đo 2026-07-31:
+**442/442 hạng mục có hạn thẩm định cùng tháng với hạn đích VMP** (0 lệch), nên chọn
+`tham_dinh` hay `vmp` gần như cùng kết quả — tháng 6: 24/7 (29%) so với 25/7 (28%).
+
+Cột `trang_thai` trong CTE `items` là done/over/todo suy từ `da_xong` + `han`;
+`computed_status` giữ riêng ở `trang_thai_vmp` cho bản CSV.
 
 Truy vấn có **hai tập dữ liệu, dùng sai là ra số vô nghĩa**:
 
@@ -105,6 +107,8 @@ Truy vấn có **hai tập dữ liệu, dùng sai là ra số vô nghĩa**:
 | `items_nam` | toàn bộ hạng mục của năm | `theo_thang` (biểu đồ 12 tháng), `sap_toi_han_60_ngay` |
 | `items` | `items_nam` ∩ hạn **của mốc đang chọn** rơi vào kỳ | mọi thứ còn lại — tương ứng `scopedKy` bên web |
 | `items_sau` | kỳ SAU, đọc lại bảng gốc vì kỳ sau có thể sang năm khác | `thang_toi` |
+
+Ba tập đều đo hoàn thành bằng `status_vmp`, không theo mốc.
 
 ⚠️ `items` đòi hạn của mốc `is not null`, nên tổng toàn năm là **442** (theo thẩm định)
 chứ không phải 448: hạng mục thiếu hạn ở mốc đó không thuộc kỳ nào và được đếm riêng ở

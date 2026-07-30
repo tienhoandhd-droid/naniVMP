@@ -240,7 +240,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         : [ky.month, ky.month];
     // Nhãn kỳ mang luôn tên mốc: nhờ vậy prompt AI và tiêu đề mail tự nói đúng
     // mốc đang tính mà không cần sửa thêm node nào bên n8n.
-    return { nam: ky.year, thang_tu: ms[0], thang_den: ms[1], nhan: `${kyLabel} (theo ${mocChu})`, moc };
+    return { nam: ky.year, thang_tu: ms[0], thang_den: ms[1], nhan: `${kyLabel} (chia tháng theo ${mocChu}, đo hoàn thành bằng hoàn thành VMP)`, moc };
   }, [ky, kyLabel, moc, mocChu]);
 
   const printPDF = () => {
@@ -268,9 +268,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       ["Chỉ số", "Giá trị"],
       ["Phạm vi", scopeLabel],
       ["Kỳ báo cáo", kyLabel],
-      ["Tính theo mốc", mocLabel(moc)],
+      ["Chia tháng theo mốc", mocLabel(moc)],
+      ["Đo hoàn thành bằng", "Hoàn thành VMP (tt_vmp)"],
       ["Tình trạng kỳ", kyPhase === "da_qua" ? "Đã qua" : kyPhase === "dang_dien_ra" ? "Đang diễn ra" : "Chưa tới"],
-      ["Cách hiểu số liệu", `Lát cắt theo ${mocChu} — tính tới hôm nay, không phải ảnh chụp tại thời điểm kỳ đó`],
+      ["Cách hiểu số liệu", `Chia tháng theo ${mocChu}; "đã hoàn thành" luôn là hoàn thành VMP. Tính tới hôm nay, không phải ảnh chụp tại thời điểm kỳ đó`],
       ["Tổng hạng mục đang hoạt động", ytd.total],
       ["Đề cương hoàn thành (%)", ytd.protocol.rate], ["Đề cương — đã xong", ytd.protocol.done], ["Đề cương — quá hạn", ytd.protocol.over],
       ["Thẩm định thực tế (%)", ytd.validation.rate], ["Thẩm định — đã xong", ytd.validation.done], ["Thẩm định — quá hạn", ytd.validation.over],
@@ -338,7 +339,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           {/* ---- Kỳ báo cáo: tháng / quý / năm ---- */}
           <div>
             <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>
-              Kỳ báo cáo <span style={{ fontWeight: 600 }}>— và tính theo mốc nào</span>
+              Kỳ báo cáo <span style={{ fontWeight: 600 }}>— và xếp hạng mục vào tháng theo mốc nào</span>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))}
@@ -385,7 +386,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
           Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b> · <b style={{ color: C.plum }}>{scopedKy.filter((a) => (a.state || "active") === "active").length}</b> hạng mục
           có <b style={{ color: C.plum }}>{mocChu}</b> rơi vào kỳ này (trên tổng {scoped.filter((a) => (a.state || "active") === "active").length} hạng mục đang hoạt động).
-          {" "}Tỷ lệ hoàn thành cũng đo bằng đúng mốc đó.
+          {" "}Mốc chỉ quyết định hạng mục thuộc tháng nào; <b style={{ color: C.plum }}>&quot;đã hoàn thành&quot; luôn là hoàn thành VMP</b>.
           {soChuaCoMoc > 0 && (
             <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục thiếu {mocChu} nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
           )}
@@ -398,9 +399,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 700, color: C.lavText, background: C.lavSoft,
             borderRadius: 12, padding: "11px 15px", lineHeight: 1.7 }}>
             ℹ️ Đang xem kỳ <b>{kyLabel}</b> ({kyPhase === "da_qua" ? "đã qua" : kyPhase === "dang_dien_ra" ? "đang diễn ra" : "chưa tới"}).
-            Đây là <b>lát cắt theo {mocChu}</b>: những hạng mục có hạn đó rơi vào kỳ, và tính tới <b>hôm nay</b> đã xong bao nhiêu —
-            không phải ảnh chụp tại thời điểm đó. Một hạng mục hạn {kyLabel} mà nay mới xong vẫn tính là đã xong,
-            vì dữ liệu chưa ghi ngày hoàn thành thực tế.
+            Đây là <b>lát cắt theo {mocChu}</b>: những hạng mục có hạn đó rơi vào kỳ, và tính tới <b>hôm nay</b> đã
+            hoàn thành VMP bao nhiêu — không phải ảnh chụp tại thời điểm đó. Một hạng mục hạn {kyLabel} mà nay mới
+            xong vẫn tính là đã xong, vì dữ liệu chưa ghi ngày hoàn thành thực tế.
           </div>
         )}
       </Card>
@@ -464,7 +465,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 3. Mục tiêu 50%/tháng ===== */}
       <Card variant="strong">
-        <CardTitle icon={FileBarChart} sub={`Mục tiêu: 50% hạng mục có ${mocChu} rơi vào tháng đó phải hoàn thành trong tháng`}>
+        <CardTitle icon={FileBarChart} sub={`Mục tiêu: 50% hạng mục có ${mocChu} rơi vào tháng đó phải HOÀN THÀNH VMP`}>
           3. Đánh giá so với mục tiêu {TARGET_PCT}%/tháng
         </CardTitle>
         <div dangerouslySetInnerHTML={{ __html: monthlyChartHtml }} />
@@ -514,7 +515,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 5. Công việc dự kiến tháng tới ===== */}
       <Card>
-        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục có ${mocChu} rơi vào ${nextMonth.monthLabel}, chưa hoàn thành`}>
+        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục có ${mocChu} rơi vào ${nextMonth.monthLabel}, chưa hoàn thành VMP`}>
           5. Công việc dự kiến {nextMonth.monthLabel}
         </CardTitle>
         {workloadChartHtml && <div dangerouslySetInnerHTML={{ __html: workloadChartHtml }} />}

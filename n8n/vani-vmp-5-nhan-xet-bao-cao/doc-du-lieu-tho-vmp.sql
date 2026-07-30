@@ -12,15 +12,22 @@
 --   $4 thang_den   — tháng cuối kỳ (1..12)
 --   $5 nam_sau     — năm của KỲ SAU
 --   $6 thang_sau_tu, $7 thang_sau_den — dải tháng của KỲ SAU
---   $8 moc         — mốc tính kỳ: de_cuong | tham_dinh | bao_cao | vmp
+--   $8 moc         — mốc CHIA THÁNG: tham_dinh | bao_cao | vmp
+--                   (de_cuong cố ý không dùng — T−60 lệch 2 tháng so mốc đích,
+--                    chia theo nó rồi đo bằng hoàn thành VMP thì ra 0% giả)
 --
 -- MỐC (sửa 2026-07-31 theo yêu cầu người dùng): mặc định THAM_DINH — hạn thẩm
 -- định thực tế là mốc GMP mà bộ phận thật sự phải bố trí người và thiết bị;
 -- mốc đích VMP chỉ sau đó vài ngày và phần lớn là thủ tục giấy tờ.
--- Đổi mốc thì ĐỔI CẢ HAI VẾ: `han` lấy theo mốc nào thì `da_xong` cũng phải
--- đọc đúng cột status của mốc đó. Đo hạn thẩm định bằng trạng thái VMP là so
--- hai thứ khác nhau — chênh lệch không nhỏ: 146 xong theo thẩm định so với 83
--- theo đích VMP.
+-- ⚠️ MỐC CHỈ QUYẾT ĐỊNH HẠNG MỤC RƠI VÀO THÁNG NÀO. `da_xong` LUÔN là
+-- status_vmp='completed', không bao giờ đọc theo mốc — xong đề cương không phải
+-- là xong việc, một hạng mục mới viết xong đề cương mà mốc đích còn ở tháng sau
+-- thì không được tính là hoàn thành của tháng này.
+--
+-- Dữ kiện 2026-07-31: 442/442 hạng mục có hạn thẩm định và hạn đích VMP rơi
+-- CÙNG MỘT THÁNG, nên chọn 'tham_dinh' hay 'vmp' gần như không đổi cách chia
+-- tháng. Riêng 'de_cuong' lệch hẳn (T−60) — dùng để xem tháng nào phải viết đề
+-- cương, đừng dùng để chấm mục tiêu.
 --
 -- HAI TẬP DỮ LIỆU, đừng nhầm — dùng sai tập là ra số vô nghĩa:
 --   items_nam — toàn bộ hạng mục của NĂM. Chỉ dùng cho `theo_thang` (biểu đồ
@@ -57,12 +64,7 @@ items_nam as (
       when 'vmp'       then p.deadline_vmp
       else p.deadline_validation
     end as han,
-    case (select moc from pv)
-      when 'de_cuong'  then p.status_protocol = 'completed'
-      when 'bao_cao'   then p.status_report = 'completed'
-      when 'vmp'       then p.status_vmp = 'completed'
-      else p.status_validation = 'completed'
-    end as da_xong,
+    (p.status_vmp = 'completed') as da_xong,
     coalesce(p.status_protocol_text, p.status_protocol::text) as tt_de_cuong,
     coalesce(p.status_validation_text, p.status_validation::text) as tt_tham_dinh,
     coalesce(p.status_report_text, p.status_report::text) as tt_bao_cao,
@@ -118,11 +120,7 @@ items_sau as (
   join public.vmp_objects o on o.code = p.object_code
   where p.is_active and coalesce(p.item_state, 'active') = 'active'
     and p.year = (select nam_sau from pv)
-    and not (case (select moc from pv)
-          when 'de_cuong' then p.status_protocol = 'completed'
-          when 'bao_cao'  then p.status_report = 'completed'
-          when 'vmp'      then p.status_vmp = 'completed'
-          else p.status_validation = 'completed' end)
+    and p.status_vmp <> 'completed'
     and ((select bp from pv) = 'all' or (select bp from pv) = any(coalesce(p.departments, array[]::text[])))
     and case (select moc from pv)
           when 'de_cuong'  then p.deadline_protocol
