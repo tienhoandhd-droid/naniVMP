@@ -21,7 +21,7 @@ import { C, TEXT, btnPrimary } from "../../constants/theme.ts";
 import { Modal, Tag, TableScroll } from "../ui/Primitives.tsx";
 import { fetchAlertRecipients, fetchStaffEmails, fetchPerformers } from "../../lib/supabaseData.ts";
 import { chayPhanTichAi, emailHopLe, tachEmail } from "../../lib/aiReport.ts";
-import type { AiKind, AiResult } from "../../lib/aiReport.ts";
+import type { AiKind, AiPeriod, AiResult } from "../../lib/aiReport.ts";
 
 /** Một dòng chọn được trong danh bạ — gộp từ ba bảng khác nhau. */
 interface Ung {
@@ -61,10 +61,12 @@ function gopUngVien(
   });
 }
 
-export default function AiMailModal({ loai, phamVi, phamViLabel, onClose, onDone }: {
+export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, onDone }: {
   loai: AiKind;
   phamVi: string;
   phamViLabel: string;
+  /** Kỳ báo cáo đang xem. Bỏ trống = cả năm hiện tại. */
+  ky?: AiPeriod;
   onClose: () => void;
   /** Trả bản phân tích về trang cha để hiện luôn, khỏi chạy AI lần hai. */
   onDone?: (r: AiResult) => void;
@@ -126,7 +128,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, onClose, onDone
     try { localStorage.setItem(LS_LAST, goTay); } catch { /* riêng tư/hết chỗ — không chặn việc gửi */ }
     try {
       const r = await chayPhanTichAi({
-        loai, pham_vi: phamVi, gui_mail: true,
+        loai, pham_vi: phamVi, ky, gui_mail: true,
         email_nhan: [...chon, ...emailGoTay.filter(emailHopLe)],
         dung_danh_sach: dungDanhSach,
       });
@@ -153,8 +155,11 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, onClose, onDone
     <Modal onClose={onClose} wide icon={Mail}
       title={`Gửi bản phân tích AI · ${loai === "canh_bao" ? "cảnh báo" : "báo cáo quản lý"}`}>
       <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 14, lineHeight: 1.65 }}>
-        Phạm vi gửi: <b style={{ color: C.plum }}>{phamViLabel}</b>. Số liệu trong mail do n8n đọc lại
-        thẳng từ Supabase lúc gửi — không lấy từ trang đang mở, nên không phụ thuộc bản này đã cũ tới đâu.
+        Phạm vi gửi: <b style={{ color: C.plum }}>{phamViLabel}</b>
+        {ky ? <> · kỳ <b style={{ color: C.plum }}>{ky.nhan}</b></> : null}.
+        Mail gồm <b>phần phân tích AI</b> và <b>toàn bộ dữ liệu thô</b> của phạm vi này (đính kèm tệp CSV).
+        Số liệu do n8n đọc lại thẳng từ Supabase lúc gửi — không lấy từ trang đang mở, nên không phụ
+        thuộc bản này đã cũ tới đâu.
       </div>
 
       {/* 1. Danh sách định kỳ — cách dùng thật */}

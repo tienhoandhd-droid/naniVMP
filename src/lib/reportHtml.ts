@@ -37,7 +37,7 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
   const disclaimer = "BẢN NHÁP AI — Cần QA xác nhận trước khi phát hành";
   const dept = deptColorMap(EXPORT_PALETTE);
 
-  const monthlyChart = svgMonthlyTargetChart(d.monthly.table, EXPORT_PALETTE);
+  const monthlyChart = svgMonthlyTargetChart(d.monthly.table, EXPORT_PALETTE, d.monthly.highlight);
   const bottleneckChart = d.bottleneck.length ? svgDeptBottleneckChart(d.bottleneck, EXPORT_PALETTE) : "";
   const workloadChart = d.nextMonth.byDept.length ? svgDeptWorkloadChart(d.nextMonth.byDept, dept, EXPORT_PALETTE) : "";
 
@@ -112,7 +112,7 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
 <p><b>Phạm vi:</b> ${esc(d.scopeLabel)} · <b>Ngày chốt:</b> ${fmtVN(now)} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}</p>
 <p><b>Đơn vị:</b> V/Q Team — QLCL · <b>Nguồn:</b> Supabase (dữ liệu gốc, không qua Sheet) · <b>Mục tiêu:</b> ${d.monthly.cur.target}% hạng mục đến hạn mỗi tháng phải hoàn thành trong tháng đó</p>
 
-<h2>1. Tổng quan số liệu tới hiện tại (năm ${d.monthly.year})</h2>
+<h2>1. Tổng quan số liệu kỳ ${esc(d.monthly.label)}</h2>
 <div class="kpi">
   <div><div class="v">${d.ytd.total}</div><div class="l">Tổng hạng mục đang hoạt động</div></div>
   <div><div class="v">${d.ytd.protocol.rate}%</div><div class="l">Đề cương hoàn thành (${d.ytd.protocol.done}/${d.ytd.protocol.total})</div></div>
@@ -130,12 +130,12 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
 </table>
 <table><tr><th>Trạng thái hiện tại</th><th>Số hạng mục</th></tr>${stageRows}</table>
 
-<h2>2. Tổng quan tháng ${d.monthly.month}/${d.monthly.year}</h2>
+<h2>2. Tổng quan kỳ ${esc(d.monthly.label)}</h2>
 <div class="kpi">
-  <div><div class="v">${d.monthly.cur.due}</div><div class="l">Cần hoàn thành tháng này</div></div>
+  <div><div class="v">${d.monthly.cur.due}</div><div class="l">Cần hoàn thành trong kỳ</div></div>
   <div><div class="v">${d.monthly.cur.done}</div><div class="l">Đã hoàn thành</div></div>
-  <div><div class="v">${d.monthly.cur.rate == null ? "—" : d.monthly.cur.rate + "%"}</div><div class="l">Tỷ lệ tháng này</div></div>
-  <div><div class="v">${d.monthly.prev?.rate == null ? "—" : d.monthly.prev.rate + "%"}</div><div class="l">Tỷ lệ tháng trước</div></div>
+  <div><div class="v">${d.monthly.cur.rate == null ? "—" : d.monthly.cur.rate + "%"}</div><div class="l">Tỷ lệ kỳ này</div></div>
+  <div><div class="v">${d.monthly.prev?.rate == null ? "—" : d.monthly.prev.rate + "%"}</div><div class="l">Tỷ lệ kỳ trước</div></div>
 </div>
 
 <h2>3. Đánh giá so với mục tiêu ${d.monthly.cur.target}%/tháng</h2>
@@ -147,10 +147,10 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
 ${bottleneckChart ? `<div class="chart">${bottleneckChart}</div>` : "<p>Không có bộ phận nào đang chậm ở giai đoạn nào.</p>"}
 ${d.bottleneck.length ? `<table><tr><th>Bộ phận</th><th>Tổng</th><th>Chậm đề cương</th><th>Chậm thẩm định</th><th>Chậm báo cáo</th><th>Tỷ lệ đúng hạn</th></tr>${bottleneckRows}</table>` : ""}
 
-<h2>5. Công việc dự kiến tháng ${d.nextMonth.monthLabel}</h2>
+<h2>5. Công việc dự kiến ${esc(d.nextMonth.monthLabel)}</h2>
 <p><b>${d.nextMonth.total}</b> hạng mục đến hạn, chưa hoàn thành.</p>
 ${workloadChart ? `<div class="chart">${workloadChart}</div>` : ""}
-${d.nextMonth.items.length ? `<table><tr><th>Mã</th><th>Tên</th><th>Bộ phận</th><th>Người thực hiện</th><th>Hạn</th><th>Trọng yếu</th></tr>${nextMonthRows}</table>${nextMonthTruncated}` : "<p>Không có hạng mục nào đến hạn tháng tới trong phạm vi này.</p>"}
+${d.nextMonth.items.length ? `<table><tr><th>Mã</th><th>Tên</th><th>Bộ phận</th><th>Người thực hiện</th><th>Hạn</th><th>Trọng yếu</th></tr>${nextMonthRows}</table>${nextMonthTruncated}` : "<p>Không có hạng mục nào đến hạn ${esc(d.nextMonth.monthLabel)} trong phạm vi này.</p>"}
 
 <h2>6. Chất lượng dữ liệu</h2>
 <div class="kpi">
