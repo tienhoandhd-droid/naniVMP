@@ -383,24 +383,17 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
                 {m.canhBao} Ngươi đối chiếu lại trên bảng cho chắc.
               </div>
             )}
-            {m.trichDan && m.trichDan.length > 0 && (
-              <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap",
-                            gap: 5, alignItems: "center" }}>
-                <span style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700 }}>
-                  Tài liệu bổn cung giở:
-                </span>
-                {m.trichDan.map((t, k) => (
-                  <span key={k} title={t.nguon + (t.muc ? " › " + t.muc : "")}
-                    style={{ fontSize: 10.5, padding: "3px 8px", borderRadius: R.pill,
-                             background: C.surfaceSunk, border: `1px solid ${C.line}`,
-                             color: C.plumSoft, fontWeight: 600, maxWidth: 190,
-                             overflow: "hidden", textOverflow: "ellipsis",
-                             whiteSpace: "nowrap" }}>
-                    {t.muc || t.nguon.replace(/^docs\//, "")}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* Chip "Tài liệu bổn cung giở" đã BỎ.
+             *
+             * Lý do: nguồn hiện ra là top mảnh của tìm kiếm lai, không phải
+             * mảnh Vali thực sự dựa vào để viết câu trả lời. Nên nó hay
+             * hiện những mục chẳng liên quan gì tới câu hỏi — "1. Luồng
+             * chạy", "3. Tách WF-04" — làm người đọc hoang mang thay vì
+             * yên tâm. Một trích dẫn không đúng thì tệ hơn không trích dẫn.
+             *
+             * Máy chủ vẫn trả về trich_dan và Msg vẫn giữ trường đó, nên
+             * bật lại chỉ là chuyện thêm khối JSX — nhưng chỉ nên bật khi
+             * nào truy được ĐÚNG mảnh mà mô hình đã dùng. */}
             {m.goiY && m.goiY.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
                 <div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700 }}>
@@ -500,9 +493,11 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
             <Send size={16} />
           </button>
         </div>
+        {/* Một câu là đủ. Bản cũ nói cả chuyện ghi nhật ký ALCOA+ lẫn
+            chuyện đối chiếu lại trên bảng — dài, và người dùng đọc lướt
+            qua hết. Giữ đúng điều họ cần nhớ. */}
         <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 7, lineHeight: 1.5 }}>
-          Câu hỏi và câu trả lời được ghi nhật ký theo yêu cầu ALCOA+.
-          Bổn cung vẫn có thể nhầm — số liệu quan trọng thì đối chiếu lại trên bảng.
+          Bổn cung vẫn có thể nhầm.
         </div>
       </div>
     </div>
