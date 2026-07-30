@@ -27,6 +27,9 @@ export interface AiPeriod {
   thang_den: number;
   /** Nhãn để AI và mail gọi tên kỳ giống hệt trên web. */
   nhan: string;
+  /** Mốc dùng để xếp hạng mục vào kỳ và để đo hoàn thành:
+   *  de_cuong | tham_dinh | bao_cao | vmp. Mặc định bên n8n là tham_dinh. */
+  moc?: string;
 }
 
 export interface AiRequest {
