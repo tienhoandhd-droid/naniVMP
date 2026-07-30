@@ -29,9 +29,8 @@ import { download, runDataQualityChecks, nhanXetTuDong } from "../../utils/helpe
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
   periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget,
-  MILESTONES, MOC_MAC_DINH, mocLabel,
 } from "../../lib/reportModel.ts";
-import type { Period, PeriodKind, Milestone } from "../../lib/reportModel.ts";
+import type { Period, PeriodKind } from "../../lib/reportModel.ts";
 import {
   svgMonthlyTargetChart, svgDeptBottleneckChart, svgDeptWorkloadChart, deptColorMap, SCREEN_PALETTE,
 } from "../../lib/reportCharts.ts";
@@ -60,10 +59,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [areaSel, setAreaSel] = useState<string[]>([]);
   const [critSel, setCritSel] = useState<string[]>([]);
   const [ky, setKy] = useState<Period>(() => periodNow());
-  // Mốc quyết định "hạng mục này thuộc tháng nào". Mặc định HẠN THẨM ĐỊNH
-  // THỰC TẾ — đó mới là mốc GMP bộ phận phải bố trí người và thiết bị; mốc
-  // đích VMP chỉ sau đó vài ngày và phần lớn là thủ tục giấy tờ.
-  const [moc, setMoc] = useState<Milestone>(MOC_MAC_DINH);
   const [ai, setAi] = useState("");
   const [loadingAi, setLoadingAi] = useState(false);
   const [errAi, setErrAi] = useState("");
@@ -103,9 +98,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   // thứ hai, tách hẳn khỏi `scoped` vì có mục cần dữ liệu CẢ NĂM (biểu đồ xu
   // hướng) và có mục nói về KỲ SAU — hai mục đó phải đọc `scoped`, không phải
   // `scopedKy`, nếu không sẽ tự cắt mất chính dữ liệu chúng cần.
-  const scopedKy = useMemo(() => scoped.filter((a) => actInPeriod(a, ky, moc)), [scoped, ky, moc]);
-  const soChuaCoMoc = useMemo(() => countNoTarget(scoped, moc), [scoped, moc]);
-  const mocChu = useMemo(() => mocLabel(moc).toLowerCase(), [moc]);
+  const scopedKy = useMemo(() => scoped.filter((a) => actInPeriod(a, ky)), [scoped, ky]);
+  const soChuaCoMoc = useMemo(() => countNoTarget(scoped), [scoped]);
 
   const kyLabel = useMemo(() => periodLabel(ky), [ky]);
   const kyPhase = useMemo(() => periodPhase(ky), [ky]);
@@ -119,14 +113,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     const parts = [deptScope === "all" ? "Toàn nhà máy" : (DEPTS.find((d) => d.id === deptScope)?.name || deptScope)];
     if (areaSel.length) parts.push(`Khu vực: ${areaSel.join(", ")}`);
     if (critSel.length) parts.push(`Trọng yếu: ${critSel.join(", ")}`);
-    parts.push(`Kỳ: ${kyLabel} (theo ${mocChu})`);
+    parts.push(`Kỳ: ${kyLabel}`);
     return parts.join(" · ");
-  }, [deptScope, areaSel, critSel, kyLabel, mocChu]);
+  }, [deptScope, areaSel, critSel, kyLabel]);
 
   const ytd = useMemo(() => ytdSummary(scopedKy), [scopedKy]);
-  const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT, moc), [scoped, ky, moc]);
+  const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT), [scoped, ky]);
   const bottleneck = useMemo(() => stageBottleneck(scopedKy), [scopedKy]);
-  const nextMonth = useMemo(() => periodWork(scoped, nextPeriod(ky), moc), [scoped, ky, moc]);
+  const nextMonth = useMemo(() => periodWork(scoped, nextPeriod(ky)), [scoped, ky]);
   const quality = useMemo(() => runDataQualityChecks(scopedKy), [scopedKy]);
   const rawRows = useMemo(() => buildRawRows(scopedKy), [scopedKy]);
   const autoComments = useMemo(() => nhanXetTuDong(scopedKy), [scopedKy]);
@@ -240,8 +234,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         : [ky.month, ky.month];
     // Nhãn kỳ mang luôn tên mốc: nhờ vậy prompt AI và tiêu đề mail tự nói đúng
     // mốc đang tính mà không cần sửa thêm node nào bên n8n.
-    return { nam: ky.year, thang_tu: ms[0], thang_den: ms[1], nhan: `${kyLabel} (chia tháng theo ${mocChu}, đo hoàn thành bằng hoàn thành VMP)`, moc };
-  }, [ky, kyLabel, moc, mocChu]);
+    return { nam: ky.year, thang_tu: ms[0], thang_den: ms[1], nhan: kyLabel };
+  }, [ky, kyLabel]);
 
   const printPDF = () => {
     const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
@@ -268,10 +262,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       ["Chỉ số", "Giá trị"],
       ["Phạm vi", scopeLabel],
       ["Kỳ báo cáo", kyLabel],
-      ["Chia tháng theo mốc", mocLabel(moc)],
-      ["Đo hoàn thành bằng", "Hoàn thành VMP (tt_vmp)"],
+      ["Chỉ số chính", "Hoàn thành VMP — chia tháng theo mốc đích VMP"],
       ["Tình trạng kỳ", kyPhase === "da_qua" ? "Đã qua" : kyPhase === "dang_dien_ra" ? "Đang diễn ra" : "Chưa tới"],
-      ["Cách hiểu số liệu", `Chia tháng theo ${mocChu}; "đã hoàn thành" luôn là hoàn thành VMP. Tính tới hôm nay, không phải ảnh chụp tại thời điểm kỳ đó`],
+      ["Cách hiểu số liệu", "Lát cắt theo mốc đích VMP, tính tới hôm nay — không phải ảnh chụp tại thời điểm kỳ đó"],
       ["Tổng hạng mục đang hoạt động", ytd.total],
       ["Đề cương hoàn thành (%)", ytd.protocol.rate], ["Đề cương — đã xong", ytd.protocol.done], ["Đề cương — quá hạn", ytd.protocol.over],
       ["Thẩm định thực tế (%)", ytd.validation.rate], ["Thẩm định — đã xong", ytd.validation.done], ["Thẩm định — quá hạn", ytd.validation.over],
@@ -304,7 +297,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(batCap), "Bất cập theo bộ phận");
 
     const thangToi = [
-      ["Mã", "Tên", "Bộ phận", "Người thực hiện", mocLabel(moc), "Mức trọng yếu"],
+      ["Mã", "Tên", "Bộ phận", "Người thực hiện", "Hạn đích VMP", "Mức trọng yếu"],
       ...nextMonth.items.map((it) => [it.code, it.name, it.depts.join("+"), it.owner, it.target, it.crit]),
     ];
     // Tên sheet Excel KHÔNG được chứa / \\ ? * [ ] và tối đa 31 ký tự —
@@ -339,7 +332,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           {/* ---- Kỳ báo cáo: tháng / quý / năm ---- */}
           <div>
             <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>
-              Kỳ báo cáo <span style={{ fontWeight: 600 }}>— và xếp hạng mục vào tháng theo mốc nào</span>
+              Kỳ báo cáo
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))}
@@ -353,8 +346,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                   opts={[1, 2, 3, 4].map((q) => ({ v: String(q), l: `Quý ${q}` }))} />
               )}
               <Sel val={String(ky.year)} set={(v) => setKy((k) => ({ ...k, year: Number(v) }))} opts={namOptions} />
-              <Sel val={moc} set={(v) => setMoc(v as Milestone)}
-                opts={MILESTONES.map((m) => ({ v: m.id, l: m.label }))} />
               {!laKyHienTai && (
                 <button type="button" onClick={() => setKy(periodNow())}
                   title="Quay lại kỳ hiện tại"
@@ -385,10 +376,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         </div>
         <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
           Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b> · <b style={{ color: C.plum }}>{scopedKy.filter((a) => (a.state || "active") === "active").length}</b> hạng mục
-          có <b style={{ color: C.plum }}>{mocChu}</b> rơi vào kỳ này (trên tổng {scoped.filter((a) => (a.state || "active") === "active").length} hạng mục đang hoạt động).
-          {" "}Mốc chỉ quyết định hạng mục thuộc tháng nào; <b style={{ color: C.plum }}>&quot;đã hoàn thành&quot; luôn là hoàn thành VMP</b>.
+          có <b style={{ color: C.plum }}>mốc đích VMP</b> rơi vào kỳ này (trên tổng {scoped.filter((a) => (a.state || "active") === "active").length} hạng mục đang hoạt động).
+          {" "}Chỉ số chính của báo cáo là <b style={{ color: C.plum }}>hoàn thành VMP</b>; mức hoàn thành đề cương và
+          thẩm định thực tế là dữ liệu bổ sung, xem ở mục 1 và mục 4.
           {soChuaCoMoc > 0 && (
-            <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục thiếu {mocChu} nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
+            <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục chưa có mốc đích VMP nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
           )}
         </div>
 
@@ -399,8 +391,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 700, color: C.lavText, background: C.lavSoft,
             borderRadius: 12, padding: "11px 15px", lineHeight: 1.7 }}>
             ℹ️ Đang xem kỳ <b>{kyLabel}</b> ({kyPhase === "da_qua" ? "đã qua" : kyPhase === "dang_dien_ra" ? "đang diễn ra" : "chưa tới"}).
-            Đây là <b>lát cắt theo {mocChu}</b>: những hạng mục có hạn đó rơi vào kỳ, và tính tới <b>hôm nay</b> đã
-            hoàn thành VMP bao nhiêu — không phải ảnh chụp tại thời điểm đó. Một hạng mục hạn {kyLabel} mà nay mới
+            Đây là <b>lát cắt theo mốc đích VMP</b>: những hạng mục có mốc đích rơi vào kỳ, và tính tới <b>hôm nay</b>
+            đã hoàn thành VMP bao nhiêu — không phải ảnh chụp tại thời điểm đó. Một hạng mục hạn {kyLabel} mà nay mới
             xong vẫn tính là đã xong, vì dữ liệu chưa ghi ngày hoàn thành thực tế.
           </div>
         )}
@@ -408,19 +400,29 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 1. Tổng quan số liệu tới hiện tại ===== */}
       <Card variant="strong">
-        <CardTitle icon={Boxes} sub={`Hạng mục có ${mocChu} rơi vào ${kyLabel}, tình trạng tính tới hôm nay`}>
+        <CardTitle icon={Boxes} sub={`Hạng mục có mốc đích VMP rơi vào ${kyLabel} — hoàn thành VMP là chỉ số chính, ba mức còn lại là dữ liệu bổ sung`}>
           1. Tổng quan số liệu kỳ {kyLabel}
         </CardTitle>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-          <StatTile icon={Boxes} label="Tổng hạng mục" value={ytd.total} tone={{ c: C.plum, bg: C.pinkSoft }} />
+        {/* Hai hàng tách bạch: chỉ số CHÍNH của báo cáo đứng riêng, ba mức giai
+            đoạn xuống dưới dán nhãn "bổ sung". Xếp năm ô ngang hàng như bản cũ
+            khiến người đọc tưởng cả năm đều là thước đo mục tiêu — trong khi
+            chỉ có Hoàn thành VMP mới là. */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
+          <StatTile icon={Boxes} label="Tổng hạng mục trong kỳ" value={ytd.total} tone={{ c: C.plum, bg: C.pinkSoft }} />
+          <StatTile icon={CheckCircle2} label="★ Hoàn thành VMP — chỉ số chính" value={`${ytd.vmp.rate}%`}
+            sub={`${ytd.vmp.done}/${ytd.vmp.total} · quá hạn ${ytd.vmp.over}`} tone={{ c: C.mintText, bg: C.mintSoft }} />
+        </div>
+
+        <div style={{ marginTop: 18, marginBottom: 10, fontSize: 12, color: C.plumSoft, fontWeight: 800, letterSpacing: ".04em" }}>
+          DỮ LIỆU BỔ SUNG — ba giai đoạn trước đó, để xem tình hình chứ không phải thước đo mục tiêu
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
           <StatTile icon={ClipboardCheck} label="Đề cương hoàn thành" value={`${ytd.protocol.rate}%`}
             sub={`${ytd.protocol.done}/${ytd.protocol.total} · quá hạn ${ytd.protocol.over}`} tone={{ c: C.lavText, bg: C.lavSoft }} />
           <StatTile icon={ShieldCheck} label="Thẩm định thực tế" value={`${ytd.validation.rate}%`}
             sub={`${ytd.validation.done}/${ytd.validation.total} · quá hạn ${ytd.validation.over}`} tone={{ c: C.skyText, bg: C.skySoft }} />
           <StatTile icon={FileCheck2} label="Hồ sơ hoàn thiện" value={`${ytd.documentation.rate}%`}
             sub={`${ytd.documentation.done}/${ytd.documentation.total} · quá hạn ${ytd.documentation.over}`} tone={{ c: C.pinkText, bg: C.pinkSoft }} />
-          <StatTile icon={CheckCircle2} label="Hoàn thành VMP" value={`${ytd.vmp.rate}%`}
-            sub={`${ytd.vmp.done}/${ytd.vmp.total} · quá hạn ${ytd.vmp.over}`} tone={{ c: C.mintText, bg: C.mintSoft }} />
         </div>
         {/* Phễu 4 giai đoạn phải giảm dần. Nếu không, dữ liệu tự mâu thuẫn
             (xong báo cáo mà chưa thẩm định) — nói thẳng thay vì để người đọc
@@ -465,7 +467,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 3. Mục tiêu 50%/tháng ===== */}
       <Card variant="strong">
-        <CardTitle icon={FileBarChart} sub={`Mục tiêu: 50% hạng mục có ${mocChu} rơi vào tháng đó phải HOÀN THÀNH VMP`}>
+        <CardTitle icon={FileBarChart} sub="Mục tiêu: 50% hạng mục có mốc đích VMP rơi vào tháng đó phải hoàn thành VMP trong tháng">
           3. Đánh giá so với mục tiêu {TARGET_PCT}%/tháng
         </CardTitle>
         <div dangerouslySetInnerHTML={{ __html: monthlyChartHtml }} />
@@ -515,7 +517,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 5. Công việc dự kiến tháng tới ===== */}
       <Card>
-        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục có ${mocChu} rơi vào ${nextMonth.monthLabel}, chưa hoàn thành VMP`}>
+        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục có mốc đích VMP rơi vào ${nextMonth.monthLabel}, chưa hoàn thành VMP`}>
           5. Công việc dự kiến {nextMonth.monthLabel}
         </CardTitle>
         {workloadChartHtml && <div dangerouslySetInnerHTML={{ __html: workloadChartHtml }} />}
@@ -523,7 +525,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720, marginTop: 12 }}>
             <thead><tr>
               <th style={th}>Mã</th><th style={th}>Tên</th><th style={th}>Bộ phận</th>
-              <th style={th}>Người thực hiện</th><th style={th}>{mocLabel(moc)}</th><th style={th}>Trọng yếu</th>
+              <th style={th}>Người thực hiện</th><th style={th}>Hạn đích VMP</th><th style={th}>Trọng yếu</th>
             </tr></thead>
             <tbody>
               {nextMonth.items.slice(0, 200).map((it) => (

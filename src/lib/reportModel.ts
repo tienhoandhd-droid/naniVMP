@@ -6,11 +6,10 @@
  *  Cùng một Activity[] luôn ra đúng một kết quả — không có chỗ cho AI
  *  hay số liệu tự chế len vào lớp này.
  *
- *  ĐỊNH NGHĨA MỤC TIÊU 50%/THÁNG (chốt 2026-07-30, sửa 2026-07-31):
- *    tỷ lệ tháng M = (số hạng mục ĐÃ HOÀN THÀNH VMP, trong nhóm có hạn của
- *                     mốc đang chọn rơi vào tháng M) / (tổng nhóm đó)
+ *  ĐỊNH NGHĨA MỤC TIÊU 50%/THÁNG (chốt 2026-07-30):
+ *    tỷ lệ tháng M = (số hạng mục ĐÃ HOÀN THÀNH VMP có mốc đích VMP rơi vào
+ *                     tháng M) / (tổng số hạng mục có mốc đích rơi vào M)
  *    mục tiêu: tỷ lệ tháng ≥ 50%.
- *  Mốc chỉ chia tháng; TỬ SỐ luôn là hoàn thành VMP — xem khối "MỐC TÍNH KỲ".
  *  Tháng chưa có hạng mục nào đến hạn (due=0) → rate=null, KHÔNG phải 0%
  *  (0% đọc như "trễ hết", trong khi thực ra là "chưa tới lượt").
  * ===================================================================== */
@@ -36,10 +35,10 @@ function ymOf(target?: string | null): [number, number] | null {
  * được kỳ đã qua hay kỳ sắp tới. Nay chọn được tháng / quý / cả năm.
  *
  * ⚠️ NGHĨA CỦA MỘT KỲ — chốt với người dùng 2026-07-31, đừng hiểu khác:
- * Kỳ là một LÁT CẮT THEO HẠN CỦA MỐC ĐANG CHỌN, **không phải ảnh chụp quá
- * khứ**. "Kỳ tháng 6" = những hạng mục có hạn (mặc định: hạn thẩm định
- * thực tế) rơi vào tháng 6, và tới HÔM NAY đã xong bao nhiêu. Một hạng mục
- * hạn tháng 6 mà tháng 7 mới xong vẫn tính là đã xong.
+ * Kỳ là một LÁT CẮT THEO MỐC ĐÍCH VMP, **không phải ảnh chụp quá khứ**.
+ * "Kỳ tháng 6" = những hạng mục có mốc đích rơi vào tháng 6, và tới HÔM
+ * NAY đã hoàn thành VMP bao nhiêu. Một hạng mục hạn tháng 6 mà tháng 7 mới
+ * xong vẫn tính là đã xong.
  *
  * Vì sao không làm ảnh chụp thật: dữ liệu KHÔNG có ngày hoàn thành thực
  * tế. Kiểm ngày 2026-07-31: 83/83 hạng mục "đã hoàn thành VMP" đều trống
@@ -49,90 +48,40 @@ function ymOf(target?: string | null): [number, number] | null {
  * định kỳ vào bảng vmp_report_snapshots (bảng đã có sẵn, đang rỗng).
  * ===================================================================== */
 
-/* ---- MỐC CHIA THÁNG -------------------------------------------------
- * Mốc quyết định hạng mục rơi vào tháng nào:
+/* ---- MỐC CHUẨN CỦA BÁO CÁO -----------------------------------------
+ * CHỈ SỐ CHÍNH LÀ HOÀN THÀNH VMP. Một hạng mục thuộc tháng nào là theo
+ * MỐC ĐÍCH VMP, và "đã hoàn thành" là hoàn thành VMP (`tt_vmp`).
+ * Chốt với người dùng 2026-07-31, không có bộ chọn mốc nào cả — một báo
+ * cáo quản lý chỉ được có MỘT định nghĩa "xong", nếu không thì hai người
+ * đọc cùng một trang sẽ ra hai kết luận khác nhau.
  *
- *   Thẩm định T−(5+n) → THÁNG THỰC SỰ RA HIỆN TRƯỜNG LÀM  ← mặc định
- *   Báo cáo   T−5    → tháng phải ra báo cáo
- *   Đích VMP  T      → tháng chốt sổ hồ sơ
+ * Mức hoàn thành đề cương / thẩm định thực tế / hồ sơ vẫn hiện đầy đủ ở
+ * mục 1 (phễu 4 giai đoạn) và ở mục 4 (bộ phận nghẽn giai đoạn nào) —
+ * nhưng là DỮ LIỆU BỔ SUNG để xem tình hình, không phải thước đo mục tiêu.
  *
- * Mặc định là THẨM ĐỊNH THỰC TẾ (người dùng chốt 2026-07-31): đó là mốc
- * GMP mà bộ phận thật sự phải bố trí người và thiết bị. Mốc đích VMP chỉ
- * sau đó vài ngày và phần lớn là thủ tục giấy tờ.
- *
- * Chênh lệch không nhỏ: đo theo thẩm định có 146 hạng mục đã xong, đo theo
- * đích VMP chỉ 83. Riêng tháng 6: 20/24 (83%) so với 7/25 (28%).
- *
- * ⚠️ MỐC CHỈ QUYẾT ĐỊNH HẠNG MỤC RƠI VÀO THÁNG NÀO.
- * "Đã hoàn thành" LUÔN LUÔN là HOÀN THÀNH VMP (`tt_vmp`), không bao giờ đọc
- * theo mốc đang chọn (người dùng chốt 2026-07-31).
- *
- * Vì sao: xong đề cương không phải là xong việc. Một hạng mục mới viết xong
- * đề cương mà mốc đích còn ở tháng sau thì không thể tính là hoàn thành của
- * tháng này — đếm kiểu đó là tự khen mình bằng công việc chưa làm.
- *
- * Dữ kiện đo ngày 2026-07-31: 442/442 hạng mục có hạn thẩm định và hạn đích
- * VMP RƠI CÙNG MỘT THÁNG (0 hạng mục lệch tháng), vì thẩm định chỉ trước
- * đích 5+n ngày. Nên chọn "thẩm định" hay "đích VMP" gần như không đổi cách
- * chia tháng. Riêng "đề cương" lệch hẳn (T−60, thường sớm 2 tháng) nên đổi
- * cách chia rất nhiều — dùng nó để xem "tháng nào phải viết đề cương",
- * đừng dùng để chấm mục tiêu.
+ * Từng thử cho chọn mốc rồi bỏ (2026-07-31): chia tháng theo hạn đề cương
+ * (T−60) thì tháng 6 ra 80 hạng mục / 0 hoàn thành / 0%, vì mốc đích của
+ * chúng còn ở tháng 8 — đọc như trượt thảm hại trong khi thực ra là chưa
+ * tới hạn. Chia theo hạn thẩm định thì gần như không khác gì mốc đích
+ * (442/442 hạng mục có hai hạn này rơi cùng một tháng), tức thêm một cái
+ * núm chỉ để đổi 28% thành 29%.
  */
-export type Milestone = "tham_dinh" | "bao_cao" | "vmp";
 
-export interface MilestoneSpec {
-  id: Milestone;
-  label: string;
-  /** Cột hạn trong `_raw`. */
-  dlKey: string;
-  /** Cột trạng thái trong `_raw`. */
-  ttKey: string;
-}
-
-/** CỐ Ý KHÔNG CÓ "hạn đề cương" ở đây.
- *
- *  Đề cương là T−60, thường sớm hơn mốc đích 2 tháng. Chia tháng theo nó rồi
- *  đo bằng hoàn thành VMP thì tháng 6 ra 80 hạng mục / 0 hoàn thành / 0% —
- *  vì mốc đích của chúng còn ở tháng 8, chưa tới lượt xong. Con số 0% đó đọc
- *  như "trượt thảm hại" trong khi thực ra là "chưa tới hạn".
- *
- *  Ba mốc còn lại đều nằm trong khoảng T−5 tới T nên rơi cùng tháng với mốc
- *  đích (đo 2026-07-31: 442/442 hạng mục có hạn thẩm định cùng tháng với hạn
- *  đích) — chia theo mốc nào cũng ra gần như một kết quả, và đều đúng.
- *
- *  Muốn xem "tháng nào phải viết đề cương" thì dùng Timeline VMP, đó là chỗ
- *  trả lời câu hỏi đó mà không kèm phép chấm mục tiêu.
- */
-export const MILESTONES: MilestoneSpec[] = [
-  { id: "tham_dinh", label: "Hạn thẩm định thực tế", dlKey: "dl_tham_dinh", ttKey: "tt_tham_dinh" },
-  { id: "bao_cao", label: "Hạn báo cáo", dlKey: "dl_bao_cao", ttKey: "tt_bao_cao" },
-  { id: "vmp", label: "Hạn đích VMP", dlKey: "dl_vmp", ttKey: "tt_vmp" },
-];
-
-export const MOC_MAC_DINH: Milestone = "tham_dinh";
-
-const specOf = (ms: Milestone): MilestoneSpec =>
-  MILESTONES.find((m) => m.id === ms) || MILESTONES[0];
-
-/** Hạn của hạng mục theo mốc đang chọn, dạng chuỗi "yyyy-mm-dd". */
-export function mocDeadline(a: Activity, ms: Milestone): string | null {
+/** Hạn đích VMP dạng "yyyy-mm-dd". Lùi về `a.target` khi thiếu `dl_vmp`,
+ *  đúng cách phần còn lại của app vẫn đọc mốc đích. */
+export function hanVmp(a: Activity): string | null {
   const raw = (a._raw || {}) as Record<string, unknown>;
-  const v = raw[specOf(ms).dlKey];
-  // Mốc đích lùi về a.target khi thiếu dl_vmp — giữ đúng cách phần còn lại
-  // của app vẫn đọc mốc đích.
-  const s = v == null || v === "" ? (ms === "vmp" ? a.target : null) : String(v);
+  const v = raw.dl_vmp;
+  const s = v == null || v === "" ? a.target : String(v);
   return s || null;
 }
 
-/** ĐÃ HOÀN THÀNH — luôn là hoàn thành VMP, KHÔNG phụ thuộc mốc đang chọn.
- *  Đọc `tt_vmp` chứ không dùng `a.st`, để cùng một nguồn với stageTally và
- *  không lệ thuộc cách `enrich()` suy trạng thái tổng. */
+/** ĐÃ HOÀN THÀNH = hoàn thành VMP. Đọc `tt_vmp` để cùng một nguồn với
+ *  stageTally, không lệ thuộc cách `enrich()` suy trạng thái tổng. */
 export function hoanThanhVmp(a: Activity): boolean {
   const raw = (a._raw || {}) as Record<string, unknown>;
   return wlIsDone(raw.tt_vmp);
 }
-
-export const mocLabel = (ms: Milestone): string => specOf(ms).label;
 
 export type PeriodKind = "thang" | "quy" | "nam";
 
@@ -195,14 +144,14 @@ export const nextPeriod = (p: Period): Period => dichKy(p, 1);
 /** Hạng mục có thuộc kỳ không — xét theo hạn của MỐC đang chọn.
  *  Hạng mục thiếu hạn ở mốc đó thì không thuộc kỳ nào; đếm riêng và nói ra
  *  ở giao diện, đừng để nó biến mất lặng lẽ khỏi mọi kỳ. */
-export function actInPeriod(a: Activity, p: Period, ms: Milestone = MOC_MAC_DINH): boolean {
-  const ym = ymOf(mocDeadline(a, ms));
+export function actInPeriod(a: Activity, p: Period): boolean {
+  const ym = ymOf(hanVmp(a));
   if (!ym) return false;
   return ym[0] === p.year && periodMonths(p).includes(ym[1]);
 }
 
-export function countNoTarget(acts: Activity[], ms: Milestone = MOC_MAC_DINH): number {
-  return acts.filter((a) => isActive(a) && !ymOf(mocDeadline(a, ms))).length;
+export function countNoTarget(acts: Activity[]): number {
+  return acts.filter((a) => isActive(a) && !ymOf(hanVmp(a))).length;
 }
 
 /* ======================== 1. TỔNG QUAN NĂM (YTD) ======================== */
@@ -288,9 +237,7 @@ export interface MonthTargetRow {
   gap: number | null;     // rate - target
 }
 
-export function monthlyTargetTable(
-  acts: Activity[], year: number, targetPct = 50, ms: Milestone = MOC_MAC_DINH,
-): MonthTargetRow[] {
+export function monthlyTargetTable(acts: Activity[], year: number, targetPct = 50): MonthTargetRow[] {
   const A = acts.filter(isActive);
   const today = vmpToday();
   const curYear = today.getFullYear();
@@ -302,11 +249,9 @@ export function monthlyTargetTable(
         : year === curYear && m === curMonth ? "dang_dien_ra"
           : "chua_toi";
     const due = A.filter((a) => {
-      const ym = ymOf(mocDeadline(a, ms));
+      const ym = ymOf(hanVmp(a));
       return !!ym && ym[0] === year && ym[1] === m;
     });
-    // Mốc chỉ quyết định hạng mục thuộc tháng nào; "đã hoàn thành" luôn là
-    // hoàn thành VMP. Xong đề cương không phải là xong việc.
     const done = due.filter(hoanThanhVmp).length;
     const rate = (due.length && phase !== "chua_toi")
       ? Math.round((done / due.length) * 100)
@@ -350,17 +295,15 @@ function gopThang(rows: MonthTargetRow[], months: number[], phase: MonthPhase, t
 }
 
 /** Số liệu của MỘT KỲ bất kỳ (tháng/quý/năm) + kỳ liền trước để so. */
-export function periodSummary(
-  acts: Activity[], p: Period, targetPct = 50, ms: Milestone = MOC_MAC_DINH,
-): CurrentMonthSummary {
-  const table = monthlyTargetTable(acts, p.year, targetPct, ms);
+export function periodSummary(acts: Activity[], p: Period, targetPct = 50): CurrentMonthSummary {
+  const table = monthlyTargetTable(acts, p.year, targetPct);
   const months = periodMonths(p);
   const cur = gopThang(table, months, periodPhase(p), targetPct);
 
   // Kỳ trước có thể rơi sang năm khác (tháng 1, quý 1) nên phải tính lại
   // bảng của năm đó, không được lấy bừa dòng bên cạnh trong bảng năm nay.
   const tr = prevPeriod(p);
-  const tableTr = tr.year === p.year ? table : monthlyTargetTable(acts, tr.year, targetPct, ms);
+  const tableTr = tr.year === p.year ? table : monthlyTargetTable(acts, tr.year, targetPct);
   const prev = gopThang(tableTr, periodMonths(tr), periodPhase(tr), targetPct);
 
   return {
@@ -444,14 +387,12 @@ export interface NextMonthWork {
 
 /** Việc chưa xong có mốc đích rơi vào MỘT KỲ bất kỳ. Dùng cho mục
  *  "kỳ kế tiếp" — truyền nextPeriod(p) vào. */
-export function periodWork(acts: Activity[], p: Period, ms: Milestone = MOC_MAC_DINH): NextMonthWork {
+export function periodWork(acts: Activity[], p: Period): NextMonthWork {
   const A = acts.filter((a) => isActive(a) && !hoanThanhVmp(a));
-  const items: NextMonthItem[] = A.filter((a) => actInPeriod(a, p, ms)).map((a) => ({
+  const items: NextMonthItem[] = A.filter((a) => actInPeriod(a, p)).map((a) => ({
     id: a.id, code: a.code, name: a.name || a.code,
     depts: (Array.isArray(a.depts) && a.depts.length) ? a.depts : [a.dept || "qa"],
-    // `target` ở đây là HẠN CỦA MỐC đang chọn, không phải luôn là mốc đích —
-    // cột "Hạn" trên bảng phải khớp với mốc mà kỳ đang lọc theo.
-    target: mocDeadline(a, ms) || "", owner: a.owner || "Chưa phân công", crit: a.crit || "TB",
+    target: hanVmp(a) || "", owner: a.owner || "Chưa phân công", crit: a.crit || "TB",
   })).sort((x, y) => x.target.localeCompare(y.target));
 
   const countByDept = new Map<string, number>();
