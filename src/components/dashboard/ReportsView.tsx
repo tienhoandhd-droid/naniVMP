@@ -117,6 +117,23 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     return parts.join(" · ");
   }, [deptScope, areaSel, critSel, kyLabel]);
 
+  /* ===== BA MỤC MẶC ĐỊNH — luôn hiện, KHÔNG phụ thuộc bộ chọn kỳ =====
+     Người quản lý mở trang ra là phải thấy ngay ba câu trả lời, không phải
+     bấm gì trước: năm nay tới đâu, tháng này tới đâu (cả hai so mục tiêu
+     50%), và tháng sau phải hoàn thành những gì.
+     Chỉ chịu ảnh hưởng của bộ lọc bộ phận/khu vực/trọng yếu — kỳ báo cáo
+     bên dưới là để đào sâu, không được đổi ba con số nền này. */
+  const kyBgNam = useMemo<Period>(() => {
+    const n = periodNow();
+    return { kind: "nam", year: n.year, month: n.month, quarter: n.quarter };
+  }, []);
+  const kyBgThang = useMemo<Period>(() => periodNow(), []);
+  const kyBgThangSau = useMemo<Period>(() => nextPeriod(periodNow()), []);
+
+  const bgNam = useMemo(() => periodSummary(scoped, kyBgNam, TARGET_PCT), [scoped, kyBgNam]);
+  const bgThang = useMemo(() => periodSummary(scoped, kyBgThang, TARGET_PCT), [scoped, kyBgThang]);
+  const bgThangSau = useMemo(() => periodWork(scoped, kyBgThangSau), [scoped, kyBgThangSau]);
+
   const ytd = useMemo(() => ytdSummary(scopedKy), [scopedKy]);
   const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT), [scoped, ky]);
   const bottleneck = useMemo(() => stageBottleneck(scopedKy), [scopedKy]);
@@ -321,8 +338,86 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     XLSX.writeFile(wb, `BaoCaoQuanLy_VMP_${tenTepKy()}_CPC1HN.xlsx`);
   };
 
+  /** Câu kết cho một kỳ so mục tiêu. Kỳ ĐANG DIỄN RA chỉ được nói "tạm",
+   *  kỳ chưa có hạng mục đến hạn thì không có gì để chấm — chốt sổ một kỳ
+   *  chưa xong là bịa kết luận. */
+  const cauSoMucTieu = (r: { rate: number | null; meets: boolean | null; due: number; done: number }, dangDienRa: boolean) => {
+    if (r.due === 0) return { chu: "—", phu: "Chưa có hạng mục nào đến hạn", dat: null as boolean | null };
+    if (r.rate == null) return { chu: "—", phu: "Chưa chấm được", dat: null };
+    return {
+      chu: `${r.rate}%`,
+      phu: dangDienRa
+        ? `${r.done}/${r.due} · số giữa kỳ, ${r.meets ? "tạm đạt" : "tạm dưới"} mục tiêu ${TARGET_PCT}%`
+        : `${r.done}/${r.due} · ${r.meets ? "đạt" : "chưa đạt"} mục tiêu ${TARGET_PCT}%`,
+      dat: r.meets,
+    };
+  };
+
+  const oNam = cauSoMucTieu(bgNam.cur, true);
+  const oThang = cauSoMucTieu(bgThang.cur, true);
+  const toneTheoDat = (dat: boolean | null) =>
+    dat == null ? { c: C.plumSoft, bg: C.pinkMist }
+      : dat ? { c: C.mintText, bg: C.mintSoft } : { c: C.marigoldText, bg: C.marigoldSoft };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* ===== BA MỤC MẶC ĐỊNH — mở trang ra là thấy ngay, không phải chọn gì =====
+          Cố ý đặt TRÊN bộ lọc và cố ý KHÔNG đổi theo bộ chọn kỳ: đây là mặt
+          đồng hồ của báo cáo. Bộ lọc bên dưới là để đào sâu. */}
+      <Card variant="strong">
+        <CardTitle icon={FileBarChart}
+          sub={`${scopeLabel.split(" · Kỳ:")[0]} · không đổi theo bộ chọn kỳ bên dưới · chỉ số là HOÀN THÀNH VMP`}>
+          Tổng quan nhanh
+        </CardTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16 }}>
+          {/* 1. Năm hiện tại so mục tiêu 50% */}
+          <div style={{ borderRadius: 16, padding: "16px 18px", background: toneTheoDat(oNam.dat).bg }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, letterSpacing: ".06em" }}>
+              1 · NĂM {bgNam.year} — SO MỤC TIÊU {TARGET_PCT}%
+            </div>
+            <div style={{ fontFamily: NUM, fontSize: 38, fontWeight: 800, lineHeight: 1.15, marginTop: 6, color: toneTheoDat(oNam.dat).c }}>
+              {oNam.chu}
+            </div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plum, marginTop: 4, lineHeight: 1.6 }}>{oNam.phu}</div>
+            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 6 }}>
+              Hạng mục có mốc đích VMP trong năm và đã hoàn thành VMP.
+            </div>
+          </div>
+
+          {/* 2. Tháng hiện tại so mục tiêu 50% */}
+          <div style={{ borderRadius: 16, padding: "16px 18px", background: toneTheoDat(oThang.dat).bg }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, letterSpacing: ".06em" }}>
+              2 · THÁNG {bgThang.period.month}/{bgThang.year} — SO MỤC TIÊU {TARGET_PCT}%
+            </div>
+            <div style={{ fontFamily: NUM, fontSize: 38, fontWeight: 800, lineHeight: 1.15, marginTop: 6, color: toneTheoDat(oThang.dat).c }}>
+              {oThang.chu}
+            </div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plum, marginTop: 4, lineHeight: 1.6 }}>{oThang.phu}</div>
+            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 6 }}>
+              Tháng trước: {bgThang.prev?.rate == null ? "chưa có số" : `${bgThang.prev.rate}% (${bgThang.prev.done}/${bgThang.prev.due})`}
+            </div>
+          </div>
+
+          {/* 3. Tháng tiếp theo — kế hoạch phải hoàn thành VMP */}
+          <div style={{ borderRadius: 16, padding: "16px 18px", background: C.lavSoft }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, letterSpacing: ".06em" }}>
+              3 · {bgThangSau.monthLabel.toUpperCase()} — KẾ HOẠCH HOÀN THÀNH VMP
+            </div>
+            <div style={{ fontFamily: NUM, fontSize: 38, fontWeight: 800, lineHeight: 1.15, marginTop: 6, color: C.lavText }}>
+              {bgThangSau.total}
+            </div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plum, marginTop: 4, lineHeight: 1.6 }}>
+              hạng mục phải hoàn thành VMP, hiện chưa xong
+            </div>
+            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 6, lineHeight: 1.6 }}>
+              {bgThangSau.byDept.length
+                ? `Nặng nhất: ${bgThangSau.byDept.slice(0, 3).map((d) => `${d.label} ${d.count}`).join(" · ")}`
+                : "Chưa có hạng mục nào đến hạn."}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* ===== Bộ lọc dữ liệu báo cáo — lấy số liệu theo bất kỳ lát cắt nào ===== */}
       <Card>
         <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo bên dưới — kể cả dữ liệu thô và bản xuất">

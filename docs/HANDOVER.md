@@ -82,6 +82,19 @@ truy vấn nhận 7 tham số (`$1` phạm vi, `$2` năm, `$3`/`$4` dải tháng
 của kỳ sau). Thiếu `ky` → cả năm hiện tại, nên trang Cảnh
 báo và đường chạy theo lịch không phải đổi gì.
 
+**BA MỤC MẶC ĐỊNH ở đầu trang Báo cáo** (chốt 2026-07-31) — thẻ *Tổng quan nhanh*, đặt
+TRÊN bộ lọc và **cố ý không đổi theo bộ chọn kỳ**; chỉ chịu ảnh hưởng của bộ lọc bộ
+phận/khu vực/trọng yếu. Mở trang ra là thấy ngay, không phải bấm gì trước:
+
+| Ô | Nội dung | Số thật 2026-07-31 |
+|---|---|---|
+| 1 | Năm hiện tại — so mục tiêu 50% | 19% (83/443) |
+| 2 | Tháng hiện tại — so mục tiêu 50%, kèm tháng trước | 5% (3/60) · T6: 28% (7/25) |
+| 3 | Tháng tiếp theo — kế hoạch phải hoàn thành VMP | 80 hạng mục · xsx 64 · qc 10 · cd 4 |
+
+Cả ô 1 và 2 đều là kỳ ĐANG DIỄN RA nên chỉ được ghi "tạm đạt/tạm dưới · số giữa kỳ" —
+không bao giờ chốt "chưa đạt" cho một kỳ chưa kết thúc.
+
 **CHỈ SỐ CHÍNH LÀ HOÀN THÀNH VMP** (chốt 2026-07-31). Hạng mục thuộc tháng nào là theo
 **mốc đích VMP**, và `da_xong` là `status_vmp = 'completed'`. **Không có bộ chọn mốc** —
 một báo cáo quản lý chỉ được có MỘT định nghĩa "xong", nếu không thì hai người đọc cùng
