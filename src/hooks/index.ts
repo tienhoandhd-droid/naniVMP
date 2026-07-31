@@ -123,6 +123,12 @@ export function useVmpData() {
       : { readUrl: "", writeUrl: "", status: "idle", msg: "" };
   });
   const [lastSync, setLastSync] = useState<number | null>(null);
+  // TUỔI DỮ LIỆU, khác hẳn lastSync. lastSync là lúc TRÌNH DUYỆT kéo về — bấm
+  // Làm mới là nó mới tinh, kể cả khi đường Sheet→Supabase đã chết ba ngày.
+  // Cái người dùng cần biết là dữ liệu trong DB cũ tới đâu, và chỉ watermark
+  // trả lời được: rpc_get_vmp_dashboard trả 'updated_at', now() nên vô dụng cho
+  // việc này, còn rpc_get_vmp_watermark trả max(updated_at) thật.
+  const [dataUpdatedAt, setDataUpdatedAt] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState(""); // "saving" | "saved" | "error" | ""
   // Chữ ký dữ liệu gần nhất — để bỏ qua setState khi poll/Realtime trả về dữ liệu
   // y hệt (tránh re-render toàn bộ bảng/biểu đồ mỗi 2 phút khi không có thay đổi).
@@ -132,6 +138,16 @@ export function useVmpData() {
   const wmSigRef = useRef("");
   const wmSig = (wm: { plan_items?: number; objects?: number; updated_at?: string } | null): string =>
     wm ? `${wm.plan_items}|${wm.objects}|${wm.updated_at}` : "";
+  type Watermark = { plan_items?: number; objects?: number; updated_at?: string };
+  /** Đọc watermark và ghi lại tuổi dữ liệu. Hỏng thì trả null — độ tươi là
+   *  thông tin phụ, không được phép làm hỏng đường nạp dữ liệu chính. */
+  const docWatermark = useCallback(async (): Promise<Watermark | null> => {
+    try {
+      const wm = (await fetchVmpWatermark(new Date().getFullYear())) as Watermark | null;
+      if (wm?.updated_at) setDataUpdatedAt(wm.updated_at);
+      return wm;
+    } catch { return null; }
+  }, []);
   const sigOf = (objs: VmpObject[] | null, activities: Activity[]): string => {
     try { return JSON.stringify(activities) + "|" + (objs ? objs.length : 0); }
     catch { return String(Date.now()); }
@@ -164,6 +180,8 @@ export function useVmpData() {
         saveSnapshot(nam, data.objects || [], data.activities || []);
         if (readUrl || writeUrl) saveConn(readUrl, writeUrl);
         setLastSync(Date.now());
+        // Không await: vẽ xong đã, tuổi dữ liệu điền sau vài trăm ms.
+        void docWatermark();
         setConn({
           readUrl, writeUrl, status: "ok", source: "supabase",
           msg: `Đã tải ${data.objects.length} đối tượng · ${data.activities.length} hạng mục từ Supabase ✓`,
@@ -198,7 +216,7 @@ export function useVmpData() {
         msg: "Lỗi tải: " + ((e as Error)?.message || "không rõ") + " — kiểm tra URL / CORS / workflow",
       });
     }
-  }, []);
+  }, [docWatermark]);
 
   const reloadData = useCallback(() => {
     const c = loadConn() || {};
@@ -211,7 +229,9 @@ export function useVmpData() {
     if (!supabase) return;
     try {
       // BƯỚC 1 (nhẹ): so watermark. Nếu không đổi → dừng, KHÔNG kéo payload.
-      const wm = await fetchVmpWatermark(new Date().getFullYear());
+      // docWatermark ghi luôn tuổi dữ liệu, nên nhánh "không đổi" vẫn cập nhật
+      // được độ tươi — đây chính là nhánh chạy khi sync đứng, tức lúc cần nhất.
+      const wm = await docWatermark();
       if (wm) {
         const ws = wmSig(wm);
         if (ws === wmSigRef.current) return; // không đổi → poll gần như miễn phí
@@ -228,7 +248,7 @@ export function useVmpData() {
       saveSnapshot(new Date().getFullYear(), data.objects || [], data.activities || []);
       setLastSync(Date.now());
     } catch (e) { /* im lặng — lần sau thử lại */ }
-  }, []);
+  }, [docWatermark]);
 
   useEffect(() => {
     const c = loadConn();
@@ -328,7 +348,7 @@ export function useVmpData() {
   );
 
   return {
-    objects, acts: enriched, conn, lastSync, saveStatus,
+    objects, acts: enriched, conn, lastSync, dataUpdatedAt, saveStatus,
     connectSheet, reloadData, silentRefresh, updateActivity,
     saveObject, deleteObject, setConn,
   };
