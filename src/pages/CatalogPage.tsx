@@ -7,10 +7,10 @@
  *    (xem trước) để về sau nối đường ghi ngược Sheet — giữ read-only an toàn.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
-import { Boxes, Search, Pencil, ChevronRight, Layers } from "lucide-react";
+import { Boxes, Search, Pencil, ChevronRight, Layers, ExternalLink } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
 import { CLS, DEPTS } from "../constants/vmp.ts";
-import { parseD, fmtVN, txt } from "../utils/helpers.ts";
+import { parseD, fmtVN, txt, wlIsDone } from "../utils/helpers.ts";
 import { Card, Tag, Pill } from "../components/ui/Primitives.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import { useDebounce } from "../hooks/index.ts";
@@ -46,7 +46,41 @@ function groupByType(items: Activity[]) {
     });
 }
 
-export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate, onReload, readOnly = false }: {
+/** Mã nhóm trong dashboard (tb/qt/kho/ht/vc) sang tên nhóm của Danh mục nguồn.
+ *  Hai chỗ dùng hai cách gọi khác nhau; không dịch thì bấm sang trang kia sẽ
+ *  rơi vào nhóm sai và người dùng tưởng đối tượng không tồn tại. */
+const CLS_SANG_NHOM: Record<string, string> = {
+  tb: "Thiết bị", qt: "Quy trình", kho: "Kho", ht: "Hệ thống phụ trợ", vc: "Vận chuyển",
+};
+
+/** Một ô mốc thời gian: hạn, trạng thái, ngày thực tế — gói gọn trong một ô
+ *  bảng để nhìn cả timeline mà không phải mở từng hộp một. */
+function OMoc({ raw, dlKey, ngayKey, ttKey }: {
+  raw: Record<string, unknown>; dlKey: string; ngayKey: string; ttKey: string;
+}) {
+  const dl = parseD(raw[dlKey] as string);
+  const ngay = parseD(raw[ngayKey] as string);
+  const xong = wlIsDone(raw[ttKey]);
+  const tre = !xong && dl && dl < new Date(new Date().setHours(0, 0, 0, 0));
+  const mau = xong ? C.mintText : tre ? C.raspText : C.plumSoft;
+  const nen = xong ? C.mintSoft : tre ? C.raspSoft : C.pinkMist;
+  return (
+    <td style={{ padding: "7px 10px", whiteSpace: "nowrap", verticalAlign: "top" }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: nen,
+        borderRadius: 8, padding: "3px 8px" }}>
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: mau, flexShrink: 0 }} />
+        <span style={{ fontFamily: NUM, fontSize: 11.5, fontWeight: 800, color: mau }}>
+          {dl ? fmtVN(dl) : "—"}
+        </span>
+      </div>
+      <div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+        {xong ? (ngay ? `xong ${fmtVN(ngay)}` : "xong · thiếu ngày") : tre ? "trễ" : "chưa xong"}
+      </div>
+    </td>
+  );
+}
+
+export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate, onReload, readOnly = false, onMoDanhMuc }: {
   objects?: VmpObject[];
   acts?: Activity[];
   isAdmin?: boolean;
@@ -54,6 +88,8 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   onUpdate?: (id: string, patch: Record<string, unknown>, userName?: string, reason?: string, expectedVersion?: number) => void;
   onReload?: () => void;
   readOnly?: boolean;
+  /** Mở đúng đối tượng này bên "Danh mục & Nhập liệu". */
+  onMoDanhMuc?: (code: string, nhom?: string) => void;
 }) {
   const [q, setQ] = useState("");
   const kw = useDebounce(q.trim().toLowerCase(), 250);
@@ -187,6 +223,28 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                 {over > 0 && <span style={{ fontSize: 11.5, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>{over} quá hạn</span>}
               </button>
 
+              {/* Trang này CHỈ nhập timeline và đánh dấu xong/chưa. Mọi thứ thuộc
+                  về bản thân đối tượng — tên, khu vực, bộ phận, tần suất, điểm
+                  trọng yếu — nằm ở Danh mục & Nhập liệu. Không có lối nhảy thì
+                  người dùng phải tự nhớ mã rồi sang trang kia gõ lại tay. */}
+              {isOpen && onMoDanhMuc && (
+                <div style={{ padding: "8px 16px", borderTop: `1px solid ${C.pinkSoft}`,
+                  background: "rgba(237,231,252,.28)", display: "flex", alignItems: "center",
+                  gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700 }}>
+                    Sửa tên · khu vực · bộ phận · tần suất · điểm trọng yếu của đối tượng này:
+                  </span>
+                  <button type="button"
+                    onClick={() => onMoDanhMuc(String(o.code), CLS_SANG_NHOM[String(o.cls ?? "")])}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6,
+                      fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer",
+                      color: C.lavText, background: C.lavSoft, border: "none",
+                      borderRadius: 999, padding: "6px 13px" }}>
+                    <ExternalLink size={13} /> Mở trong Danh mục &amp; Nhập liệu
+                  </button>
+                </div>
+              )}
+
               {isOpen && (
                 <div style={{ borderTop: `1px solid ${C.pinkSoft}`, padding: "10px", display: "flex", flexDirection: "column", gap: 10 }}>
                   {groupByType(g.items).map(({ vtype, items, dupYears }) => (
@@ -201,19 +259,22 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                         )}
                       </div>
                       <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 560 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 980 }}>
                           <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
-                            {["Năm", "ID", "Deadline VMP", "QA", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 4 ? "center" : "left", padding: "8px 14px", fontSize: 11, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+                            {["Năm", "ID", "1. Đề cương", "2. Thẩm định", "3. Báo cáo", "4. Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 11, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
                           </tr></thead>
                           <tbody>
                             {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
                               <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: dup ? "rgba(252,226,233,.45)" : (i % 2 ? "rgba(255,255,255,.5)" : "transparent") }}>
                                 <td style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: dup ? C.raspText : C.plum, fontSize: 12.5, whiteSpace: "nowrap" }}>{yearOf(a)}{dup && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: C.raspText }}>⚠</span>}</td>
-                                <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</td>
-                                <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap" }}>{a.target ? fmtVN(parseD(a.target)) : "—"}</td>
-                                <td style={{ padding: "9px 14px", color: C.plumSoft, fontSize: 12.5, fontWeight: 600 }}>{txt(a.owner)}</td>
-                                <td style={{ padding: "9px 14px", textAlign: "center" }}><Pill s={a.st} small /></td>
-                                <td style={{ padding: "9px 14px", textAlign: "center" }}>
+                                <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</td>
+                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_de_cuong" ngayKey="ngay_de_cuong" ttKey="tt_de_cuong" />
+                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_tham_dinh" ngayKey="ngay_tham_dinh" ttKey="tt_tham_dinh" />
+                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_bao_cao" ngayKey="ngay_bao_cao" ttKey="tt_bao_cao" />
+                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_vmp" ngayKey="ngay_vmp" ttKey="tt_vmp" />
+                                <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>{txt(a.owner)}</td>
+                                <td style={{ padding: "9px 12px", textAlign: "center" }}><Pill s={a.st} small /></td>
+                                <td style={{ padding: "9px 12px", textAlign: "center" }}>
                                   <button onClick={() => setEdit(a)} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 9, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
                                 </td>
                               </tr>

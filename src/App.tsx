@@ -1696,6 +1696,10 @@ export default function App() {
     updateActivity,
   } = useVmpData();
   const [view, setView] = useState("overview");
+  // Đối tượng cần mở sẵn khi nhảy từ "Tiến độ theo đối tượng" sang "Danh mục &
+  // Nhập liệu". Dùng object mới mỗi lần bấm (không phải chuỗi) để bấm lại cùng
+  // một mã vẫn kích hoạt useEffect bên kia.
+  const [moDanhMuc, setMoDanhMuc] = useState<{ code: string; nhom?: string } | null>(null);
   const [showPw, setShowPw] = useState(false);
   const mainRef = useScrollTop([view]);
 
@@ -1914,9 +1918,10 @@ export default function App() {
               {view === "timeline" && <TimelineView acts={filteredActs} />}
               {view === "inventory" && (
                 <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}
-                  onUpdate={updateActivity} onReload={reloadData} readOnly={false} />
+                  onUpdate={updateActivity} onReload={reloadData} readOnly={false}
+                  onMoDanhMuc={(code, nhom) => { setMoDanhMuc({ code, nhom }); setView("source"); }} />
               )}
-              {view === "source" && <SourceCatalogView user={user} onReload={reloadData} />}
+              {view === "source" && <SourceCatalogView user={user} onReload={reloadData} focus={moDanhMuc} />}
               {view === "health" && <HealthView acts={filteredActs} user={user} />}
               {view === "rules" && <ActiveRulesView user={user} />}
               {view === "progress" && (

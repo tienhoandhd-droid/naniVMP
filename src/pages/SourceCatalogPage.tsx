@@ -86,8 +86,10 @@ const FIELDS = [
  *  vì gõ tay chính là chỗ đẻ ra 'My' / 'My2' / 'my' là ba người khác nhau. */
 const PERSON_FIELDS = new Set(["owner_name", "support_name"]);
 
-function SourceCatalogSection({ user, onReload }: {
+function SourceCatalogSection({ user, onReload, focus }: {
   user?: AppUser | null; onReload?: () => void;
+  /** Đối tượng cần mở sẵn, do trang "Tiến độ theo đối tượng" chuyển sang. */
+  focus?: { code: string; nhom?: string } | null;
 }) {
   const canEdit = user?.perm === "admin";
   const [kind, setKind] = useState<ObjectKind>(SOURCE_KINDS[0]);
@@ -131,6 +133,17 @@ function SourceCatalogSection({ user, onReload }: {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [kind]);
+
+  // Nhảy từ "Tiến độ theo đối tượng" sang: mở đúng nhóm rồi lọc sẵn theo mã.
+  // Phải đổi cả `kind`, không chỉ ô tìm — mỗi nhóm nạp một tập dòng riêng, để
+  // nguyên nhóm cũ thì tìm mãi không ra và người dùng tưởng mã không tồn tại.
+  useEffect(() => {
+    if (!focus || !focus.code) return;
+    if (focus.nhom && SOURCE_KINDS.indexOf(focus.nhom as ObjectKind) >= 0) {
+      setKind(focus.nhom as ObjectKind);
+    }
+    setQ(focus.code);
+  }, [focus]);
 
   // Cảnh báo rà trên TOÀN BỘ danh mục nên chỉ tải một lần, không theo tab.
   useEffect(() => {
@@ -1331,11 +1344,15 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
 /* ================================================================
  * Màn hình gộp: chuyển giữa các bộ dữ liệu
  * ================================================================ */
-export default function DataWorkspaceView({ user, onReload }: {
+export default function DataWorkspaceView({ user, onReload, focus }: {
   user?: AppUser | null; onReload?: () => void;
+  focus?: { code: string; nhom?: string } | null;
 }) {
   const canEdit = user?.perm === "admin";
   const [tab, setTab] = useState("catalog");
+  // Nhảy sang từ trang khác thì luôn về tab Danh mục nguồn — đó là chỗ chứa
+  // đối tượng, không phải tab người nhận mail hay sản phẩm GMP.
+  useEffect(() => { if (focus && focus.code) setTab("catalog"); }, [focus]);
   const spec = DATASETS.find((d) => d.id === tab);
 
   const TABS = [
@@ -1363,7 +1380,7 @@ export default function DataWorkspaceView({ user, onReload }: {
         })}
       </div>
 
-      {tab === "catalog" ? <SourceCatalogSection user={user} onReload={onReload} />
+      {tab === "catalog" ? <SourceCatalogSection user={user} onReload={onReload} focus={focus} />
         : spec           ? <SimpleDatasetView spec={spec} canEdit={canEdit} />
         : null}
     </div>
