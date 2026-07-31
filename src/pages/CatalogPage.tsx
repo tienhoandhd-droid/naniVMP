@@ -53,6 +53,17 @@ const CLS_SANG_NHOM: Record<string, string> = {
   tb: "Thiết bị", qt: "Quy trình", kho: "Kho", ht: "Hệ thống phụ trợ", vc: "Vận chuyển",
 };
 
+/** Đối tượng có nằm trong kế hoạch thẩm định không — cột "Thẩm định" của danh
+ *  mục nguồn, RPC trả về dưới tên `need`.
+ *  Mặc định TRUE khi thiếu: nhóm dựng từ chính hạng mục (mã có timeline mà
+ *  danh mục nguồn chưa có dòng) thì đương nhiên là có thẩm định — để mặc
+ *  định false sẽ giấu mất đúng những mã đang cần nhập. */
+function coThamDinh(o: { need?: boolean | string }): boolean {
+  const v = o.need;
+  if (v == null || v === "") return true;
+  return !(v === false || v === "n" || v === "false" || v === "N");
+}
+
 /** Một ô mốc thời gian: hạn, trạng thái, ngày thực tế — gói gọn trong một ô
  *  bảng để nhìn cả timeline mà không phải mở từng hộp một. */
 function OMoc({ raw, dlKey, ngayKey, ttKey }: {
@@ -97,6 +108,12 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
   const [year, setYear] = useState("all");
+  /** Lọc theo cột "Thẩm định" của danh mục nguồn. MẶC ĐỊNH `y`: RPC trả về
+   *  TOÀN BỘ `vmp_source_objects` đang hoạt động (272), trong đó 55 đối tượng
+   *  có `Thẩm định = n` — chúng không sinh hạng mục nào nên chỉ làm loãng
+   *  danh sách của trang tiến độ. Vẫn để chọn xem được, vì người dùng cần
+   *  kiểm tra "cái này sao không có timeline?". */
+  const [tdinh, setTdinh] = useState<"y" | "n" | "all">("y");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [edit, setEdit] = useState<Activity | null>(null);
   /** Mở hộp bằng đường tắt "✓ Xong bước" — hộp điền sẵn hôm nay + Hoàn thành,
@@ -145,6 +162,7 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
     const needle = kw;
     list = list.filter((g) => {
       const o = g.obj;
+      if (tdinh !== "all" && (coThamDinh(o) ? "y" : "n") !== tdinh) return false;
       if (cls !== "all" && o.cls !== cls) return false;
       if (dept !== "all" && o.dept !== dept) return false;
       if (year !== "all" && g.items.length === 0) return false; // lọc năm → chỉ mã có hạng mục năm đó
@@ -158,11 +176,11 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
     // sắp theo MÃ đối tượng
     list.sort((a, b) => String(a.obj.code).localeCompare(String(b.obj.code), "vi", { numeric: true }));
     return list;
-  }, [objects, acts, kw, cls, dept, status, year]);
+  }, [objects, acts, kw, cls, dept, status, year, tdinh]);
 
   const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
   // Đổi bộ lọc thì quay lại 40 nhóm đầu.
-  useEffect(() => { setHien(40); }, [kw, cls, dept, status, year]);
+  useEffect(() => { setHien(40); }, [kw, cls, dept, status, year, tdinh]);
   const danhSachPhang = useMemo(
     () => groups.slice(0, hien).flatMap((g) => groupByType(g.items).flatMap((t) => t.items)),
     [groups, hien],
@@ -197,6 +215,12 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
           <select value={dept} onChange={(e) => setDept(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả bộ phận</option>{DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
           <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 170 }}><option value="all">Tất cả tình trạng</option><option value="over">Quá hạn</option><option value="prog">Đang chạy</option><option value="todo">Kế hoạch</option><option value="done">Đã xong</option></select>
           <select value={year} onChange={(e) => setYear(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 140 }} title="Lọc theo năm thẩm định"><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
+          <select value={tdinh} onChange={(e) => setTdinh(e.target.value as "y" | "n" | "all")} style={{ ...INP, cursor: "pointer", maxWidth: 210 }}
+            title="Cột &quot;Thẩm định&quot; ở Danh mục nguồn. Đối tượng đánh dấu 'n' không sinh hạng mục nào nên mặc định được ẩn khỏi trang tiến độ.">
+            <option value="y">Chỉ đối tượng có thẩm định</option>
+            <option value="n">Chỉ đối tượng không thẩm định</option>
+            <option value="all">Cả hai</option>
+          </select>
         </div>
         <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>{groups.length} đối tượng · {totalItems} hạng mục thẩm định</div>
       </Card>
@@ -256,14 +280,23 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                     </div>
                   )}
                 </div>
-                {/* Đối tượng KHÔNG nằm trong kế hoạch thẩm định (cột "Thẩm định" ≠ y)
-                    trước đây hiện "0 loại · 0 lần · 0/0 xong" — nhìn y như dữ liệu
-                    bị thiếu. Nói thẳng ra là không phải thiếu, là không thẩm định. */}
+                {/* Nhóm rỗng có HAI nguyên nhân khác hẳn nhau, gộp chung một nhãn
+                    là nói sai: đối tượng ngoài kế hoạch (cột "Thẩm định" = n) thì
+                    đúng là không thẩm định; còn đối tượng CÓ thẩm định mà rỗng là
+                    do mọi hạng mục của nó bị đánh "Không áp dụng" — cái này cần
+                    người nhập ngó lại, không được ru ngủ bằng chữ "không thẩm định". */}
                 {g.items.length === 0 ? (
-                  <span style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
-                    title="Danh mục nguồn đánh dấu đối tượng này không thẩm định nên không sinh hạng mục nào.">
-                    Không thẩm định
-                  </span>
+                  !coThamDinh(o) ? (
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
+                      title="Danh mục nguồn đánh dấu đối tượng này không thẩm định nên không sinh hạng mục nào.">
+                      Không thẩm định
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: C.marigoldText, background: C.marigoldSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
+                      title="Đối tượng CÓ trong kế hoạch thẩm định nhưng không còn hạng mục nào đang hiệu lực — thường do các lần đã bị đánh dấu &quot;Không áp dụng&quot;. Mở Danh mục &amp; Nhập liệu để kiểm tra.">
+                      Có thẩm định · chưa có lần nào hiệu lực
+                    </span>
+                  )
                 ) : (
                   <>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 800, color: C.lavText, background: C.lavSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><Layers size={13} />{nTypes} loại · {g.items.length} lần</span>
