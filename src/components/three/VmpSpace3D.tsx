@@ -84,6 +84,9 @@ export function dungMaTran(acts: Activity[], nam: number): O3D[] {
 }
 
 const CAO = 2.0;        // đơn vị cảnh cho mốc 100%
+/** Sắc "ngưỡng" dùng chung: đường mục tiêu ở biểu đồ phẳng và đường giới
+ *  hạn ±3σ của biểu đồ kiểm soát đều dùng màu này. Một khái niệm, một màu. */
+const MAU_MUC_TIEU = "#B62E52";
 const BUOC_T = 0.46;    // khoảng cách giữa hai tháng (trục sâu)
 const BUOC_G = 0.72;    // khoảng cách giữa hai giai đoạn (trục ngang)
 
@@ -151,7 +154,9 @@ function Canh({ o3d, chon, onHover }: {
     })),
     // Tên trục bỏ khỏi cảnh — phụ đề thẻ đã nói, mà để trong cảnh thì nó
     // đẩy khung rộng ra và chen vào dãy nhãn giai đoạn.
-    { vt: [rongX / 2 + 0.55, CAO / 2, 0], chu: "mục tiêu 50%", cap: "phu" as const },
+    /* Nhãn nằm NGAY TRÊN mép gần của mặt phẳng, ở cấp đậm nhất: đây là mốc
+       để đọc cả khối, không phải một chú thích phụ. */
+    { vt: [rongX / 2 + 0.55, CAO / 2 + 0.03, sauZ / 2 + 0.2], chu: "Mục tiêu 50%", cap: "truc" as const },
   ];
 
   return (
@@ -182,14 +187,35 @@ function Canh({ o3d, chon, onHover }: {
         <meshBasicMaterial color="#F7F1F8" />
       </mesh>
 
-      {/* Mặt phẳng 50% cắt ngang cả khối. Ở 2D đây là một nét đứt dễ bỏ qua;
-          ở 3D nó là mặt nước — cột nào nhô lên khỏi mặt là thấy ngay, trên
-          toàn bộ 12 tháng cùng lúc. */}
-      <mesh position={[0, CAO / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[rongX + 0.35, sauZ + 0.3]} />
-        <meshBasicMaterial color="#8168CE" transparent opacity={0.1}
-          side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
+      {/* MẶT PHẲNG MỤC TIÊU 50% — cắt ngang cả khối.
+          Đây mới là thứ khiến khối 3D này đáng dựng: ở bản phẳng, mục tiêu
+          là một nét đứt dễ bỏ qua; ở đây nó là MẶT NƯỚC, và câu hỏi "tháng
+          nào đạt" trở thành câu hỏi "cột nào nhô lên khỏi mặt" — trả lời
+          được cho cả 48 ô cùng một lúc, không phải dò từng cột.
+
+          Bản trước để opacity 0.1 nên gần như vô hình, tức là mất luôn tác
+          dụng đó. Nay: mặt đậm hơn, CÓ VIỀN (mặt trong suốt mà không viền
+          thì chỗ nào không có cột xuyên qua sẽ biến mất hẳn), và có cột mốc
+          ở bốn góc để mắt bám được độ cao của mặt phẳng trong không gian.
+          Màu dùng sắc "ngưỡng" của app — cùng màu với đường mục tiêu trên
+          biểu đồ phẳng và đường giới hạn của biểu đồ kiểm soát. */}
+      <group position={[0, CAO / 2, 0]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
+          <planeGeometry args={[rongX + 0.42, sauZ + 0.36]} />
+          <meshBasicMaterial color={MAU_MUC_TIEU} transparent opacity={0.16}
+            side={THREE.DoubleSide} depthWrite={false} />
+          <Edges threshold={1} color={MAU_MUC_TIEU} />
+        </mesh>
+        {/* Bốn cột mốc rất mảnh nối mặt phẳng xuống sàn: không có chúng thì
+            mặt phẳng trông như trôi lơ lửng và mắt không định được nó cao
+            bao nhiêu so với chân cột. */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], i) => (
+          <mesh key={i} position={[sx * (rongX + 0.42) / 2, -CAO / 4, sz * (sauZ + 0.36) / 2]}>
+            <boxGeometry args={[0.012, CAO / 2, 0.012]} />
+            <meshBasicMaterial color={MAU_MUC_TIEU} transparent opacity={0.45} />
+          </mesh>
+        ))}
+      </group>
 
       <NhanTruc nhan={nhan} tam={[0, CAO / 2, 0]} />
 
@@ -281,7 +307,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
               <i style={{ background: g.mau }} />{g.ten}
             </span>
           ))}
-          <span className="vmp-space3d-muc"><i />Mặt phẳng mục tiêu 50%</span>
+          <span className="vmp-space3d-muc"><i />Mặt phẳng mục tiêu 50% — cột nhô lên khỏi mặt là tháng đạt</span>
         </div>
 
         <div className="vmp-space3d-tip" role="status" aria-live="polite">
