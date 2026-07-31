@@ -6388,3 +6388,52 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-ctrl-bang th { font-weight: 800; color: var(--c-ink-soft); }
 .vmp-ctrl-bang td { font-weight: 700; color: var(--c-ink); }
 .vmp-ctrl-bang tr.is-vuot td { color: var(--c-rasp-text); font-weight: 900; }
+
+/* =====================================================================
+   NÚT ĐỔI 3D ↔ 2D + BẢN ĐỒ NHIỆT
+   ---------------------------------------------------------------------
+   Khối 3D giữ nguyên làm mặc định; bản 2D là bản song sinh cho ba việc mà
+   WebGL không làm được: in ra giấy, đọc số chính xác, và chạy trên máy
+   không có WebGL.
+   ===================================================================== */
+.vmp-space3d-doi {
+  display: inline-flex; gap: 3px; padding: 3px; margin-bottom: 12px;
+  background: var(--c-surface-sunk); border-radius: 999px;
+}
+.vmp-space3d-doi button {
+  border: none; cursor: pointer; padding: 7px 15px; border-radius: 999px;
+  background: transparent; color: var(--c-ink-soft);
+  font-family: inherit; font-size: 12.5px; font-weight: 800;
+  transition: background 140ms ease, color 140ms ease;
+}
+.vmp-space3d-doi button.is-chon {
+  background: var(--c-surface); color: var(--c-ink); box-shadow: var(--e-low);
+}
+
+.vmp-nhiet { overflow-x: auto; }
+.vmp-nhiet-bang { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 720px; }
+.vmp-nhiet-bang th {
+  font-size: 11.5px; font-weight: 800; color: var(--c-ink-soft);
+  padding: 4px 6px; white-space: nowrap;
+}
+.vmp-nhiet-bang thead th { text-align: center; }
+.vmp-nhiet-bang tbody th[scope="row"],
+.vmp-nhiet-bang tfoot th[scope="row"] { text-align: left; color: var(--c-ink); }
+.vmp-nhiet-goc { text-align: left !important; opacity: .7; }
+.vmp-nhiet-o {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 42px; border-radius: 9px; padding: 4px 2px; line-height: 1.15;
+}
+.vmp-nhiet-o b { font-size: 14px; font-weight: 800; }
+.vmp-nhiet-o small { font-size: 9.5px; font-weight: 700; opacity: .85; }
+.vmp-nhiet-bang td { text-align: center; }
+.vmp-nhiet-tong {
+  font-size: 13px; font-weight: 800; color: var(--c-ink);
+  background: var(--c-surface-sunk); border-radius: 9px;
+}
+.vmp-nhiet-bang tfoot td { font-size: 12.5px; font-weight: 800; color: var(--c-ink-soft); }
+.vmp-nhiet-chu {
+  display: flex; align-items: center; gap: 6px; margin-top: 10px;
+  font-size: 11.5px; font-weight: 700; color: var(--c-ink-soft);
+}
+.vmp-nhiet-chu i { width: 22px; height: 11px; border-radius: 3px; display: block; }

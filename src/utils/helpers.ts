@@ -333,21 +333,28 @@ export function runDataQualityChecks(acts: Activity[]) {
    Nhận xét dưới đây tính THẲNG từ số liệu đang hiển thị: luôn chạy được,
    không phụ thuộc dịch vụ ngoài, và quan trọng hơn với hồ sơ GMP — cùng
    một bộ số thì cho ra đúng một câu, không bịa, truy lại được. */
-export function nhanXetTuDong(acts: Activity[]): string[] {
+export function nhanXetTuDong(acts: Activity[], phamVi = ""): string[] {
   const A = acts.filter((a) => (a.state || "active") === "active");
-  if (!A.length) return ["Chưa có hạng mục nào trong phạm vi đang chọn."];
+  // Mọi câu phải TỰ NÓI phạm vi của nó. Bản trước viết "trong phạm vi này"
+  // trong khi tập truyền vào là KỲ đang chọn (vd Tháng 8), còn mục 1 cùng
+  // trang lại tính cả năm — đọc liền nhau thành ra trang tự phủ định chính
+  // nó: mục 1 ghi "quá hạn 208", nhận xét ghi "không có hạng mục nào quá
+  // hạn". Với hồ sơ GMP thì đây là câu không giải thích được với thanh tra.
+  const trong = phamVi ? `${phamVi}: ` : "";
+  const hoa = (t: string) => (phamVi ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+  if (!A.length) return [`${trong}${hoa("Chưa có hạng mục nào trong phạm vi đang chọn.")}`];
 
   const e = tally(A);
   const d = docTally(A);
   const y: string[] = [];
 
-  y.push(`Thẩm định thực tế đạt ${e.rate}% (${e.done}/${e.total} hạng mục); hồ sơ hoàn thiện ${d.rate}% (${d.done}/${d.total}).`);
+  y.push(`${trong}${hoa(`Thẩm định thực tế đạt ${e.rate}% (${e.done}/${e.total} hạng mục); hồ sơ hoàn thiện ${d.rate}% (${d.done}/${d.total}).`)}`);
 
   if (e.over > 0) {
     const nang = A.filter((a) => a.st === "over" && Number(a.score) >= 7).length;
-    y.push(`Đang có ${e.over} hạng mục quá hạn${nang ? `, trong đó ${nang} hạng mục thuộc nhóm trọng yếu cao (≥7 điểm) — nhóm này phải xử lý trước theo ICH Q9` : ""}.`);
+    y.push(`${trong}${hoa(`đang có ${e.over} hạng mục quá hạn${nang ? `, trong đó ${nang} hạng mục thuộc nhóm trọng yếu cao (≥7 điểm) — nhóm này phải xử lý trước theo ICH Q9` : ""}.`)}`);
   } else {
-    y.push("Không có hạng mục nào quá hạn trong phạm vi này.");
+    y.push(`${trong}${hoa("Không có hạng mục nào quá hạn.")}${phamVi ? " Con số quá hạn ở mục 1 tính trên cả năm, không phải kỳ này." : ""}`);
   }
 
   // So thứ tự rủi ro: nhóm trọng yếu cao có được làm trước nhóm thấp không

@@ -1,7 +1,7 @@
 /* WorkloadPage.jsx — Ma trận tải công việc Người × Tháng */
 import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
-import { Activity, BarChart3, ShieldAlert, Flag, Users, Crown } from "lucide-react";
+import { Activity, BarChart3, ShieldAlert, Flag, Users, UserX } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
 import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
 import { parseD, fmtVN, clamp, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
@@ -111,7 +111,15 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
 
   const totalCong = sum(pend.map(congConLai));
   const totalHoso = pend.filter(hoSoConLai).length;
-  const overloaded = people.filter((p) => peakMonth(p).eff > CAP_MONTH);
+  /* "Chưa phân công" là một ĐỐNG VIỆC vô chủ, không phải nhân sự. Bản trước
+     gộp nó vào danh sách người: nó có avatar chữ "C", được xếp hạng trong
+     bảng cá nhân, và được đếm vào câu "7 bạn đang quá tải" — trong khi câu
+     kết luận ngay dưới đếm đúng 6. Hai con số cạnh nhau, lệch nhau, cùng
+     một trang. Tách hẳn ra: người là người, việc vô chủ là việc vô chủ. */
+  const LA_VO_CHU = "Chưa phân công";
+  const nguoiThat = people.filter((p) => p.name !== LA_VO_CHU);
+  const voChu = people.find((p) => p.name === LA_VO_CHU) || null;
+  const overloaded = nguoiThat.filter((p) => peakMonth(p).eff > CAP_MONTH);
   const critCount: Record<string, number> = { Cao: 0, TB: 0, "Thấp": 0 };
   pend.forEach((a) => {
     const k = String(a.crit ?? "");
@@ -149,7 +157,10 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const board = useMemo(() => {
     const m = new Map<string, { name: string; total: number; done: number; over: number }>();
     for (const a of acts) {
-      const k = a.owner && a.owner !== "—" ? a.owner : "Chưa phân công";
+      // Hạng mục chưa có người thì KHÔNG vào bảng tiến độ theo người — nó
+      // được nói riêng ở thẻ cảnh báo phía trên.
+      if (!(a.owner && a.owner !== "—")) continue;
+      const k = a.owner;
       if (!m.has(k)) m.set(k, { name: k, total: 0, done: 0, over: 0 });
       const r = m.get(k)!;
       r.total++;
@@ -247,7 +258,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
 
   const mood = overloaded.length > 0 ? "stressed" : "happy";
   const bubble = overloaded.length > 0
-    ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm! Bấm vào từng người xem chi tiết 💪`
+    ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng)! Bấm vào từng người xem chi tiết 💪`
     : `Cả đội đang cân đối! Cứ giữ nhịp này là về đích VMP êm ru ✨`;
   const legend = [["Nhẹ", C.mint + "38"], ["Vừa", C.mint + "80"], ["Sắp đầy", C.marigold], ["Quá tải", C.rasp]];
 
@@ -268,12 +279,45 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         </div>
       </Card>
 
+      {/* Việc vô chủ — thẻ RIÊNG, không trộn vào danh sách người. */}
+      {voChu && voChu.count > 0 && (
+        <Card variant="strong" style={{ borderColor: C.marigold }}>
+          <CardTitle icon={UserX}
+            sub="Chưa có ai đứng tên nên không nằm trong sức tải của bất kỳ ai — phải phân người trước khi nói tới giãn lịch">
+            {voChu.count} hạng mục chưa phân công
+          </CardTitle>
+          <button type="button" className="vmp-lift"
+            onClick={() => openDetail("Hạng mục chưa phân công", voChu.months.flatMap((m) => m.tasks))}
+            style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", cursor: "pointer",
+                     background: C.marigoldSoft, border: "none", borderRadius: 16, padding: "14px 18px",
+                     fontFamily: TEXT, textAlign: "left", width: "100%" }}>
+            <div>
+              <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.marigoldText, lineHeight: 1 }}>
+                {voChu.congTotal}
+              </div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>ngày công</div>
+            </div>
+            <div>
+              <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.marigoldText, lineHeight: 1 }}>
+                {voChu.hosoTotal}
+              </div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>hồ sơ</div>
+            </div>
+            {voChu.critCao > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{voChu.critCao} trọng yếu cao</Tag>}
+            {voChu.over > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{voChu.over} quá hạn</Tag>}
+            <span style={{ marginLeft: "auto", fontSize: 12, color: C.marigoldText, fontWeight: 800 }}>
+              Xem danh sách →
+            </span>
+          </button>
+        </Card>
+      )}
+
       {/* Capacity cards */}
       <Card variant="strong">
-        <CardTitle icon={Activity} sub="Thanh = tháng bận nhất so với ngưỡng · bấm vào thẻ để xem chi tiết">Sức tải từng người</CardTitle>
+        <CardTitle icon={Activity} sub={`Thanh = tháng bận nhất so với ngưỡng ${CAP_MONTH} ngày công/tháng · bấm vào thẻ để xem chi tiết`}>Sức tải từng người</CardTitle>
         {klSucTai && <CauKetLuan chinh={klSucTai.chinh} phu={klSucTai.phu} tone={klSucTai.tone} />}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(262px,1fr))", gap: 14 }}>
-          {people.map((p) => {
+          {nguoiThat.map((p) => {
             const pk = peakMonth(p); const ratio = CAP_MONTH > 0 ? pk.eff / CAP_MONTH : 0;
             const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, e: "😵" } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, e: "🔥" } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, e: "🌿" };
             return (
@@ -296,7 +340,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
               </button>
             );
           })}
-          {people.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 28, color: C.mintText, fontWeight: 700 }}>🎉 Không còn hạng mục nào chưa chốt VMP!</div>}
+          {nguoiThat.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 28, color: C.mintText, fontWeight: 700 }}>🎉 Không còn hạng mục nào chưa chốt VMP!</div>}
         </div>
       </Card>
 
@@ -381,19 +425,24 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
 
       {/* Bảng vinh danh cá nhân */}
       <Card variant="soft">
-        <CardTitle icon={Crown} sub="Xếp theo tỷ lệ hoàn thành · bấm để xem việc còn lại">
-          Bảng vinh danh cá nhân
+        {/* Đổi từ "Bảng vinh danh cá nhân" (có thứ hạng 1-2-3) sang bảng
+            tiến độ trung tính, bỏ số thứ hạng. Lý do không phải thẩm mỹ:
+            phần lớn chênh lệch ở đây đến từ PHÂN BỔ VIỆC chứ không phải năng
+            lực — người ôm 56 hạng mục dồn hết vào T7–T8 và người chỉ có 12
+            hạng mục toàn hạn cuối năm không so được với nhau bằng một con số
+            phần trăm. Xếp hạng công khai kiểu đó gây mâu thuẫn nội bộ mà
+            không đo đúng thứ nó tưởng đang đo. */}
+        <CardTitle icon={Users} sub="Sắp theo tỷ lệ hoàn thành · bấm để xem việc còn lại. Tỷ lệ phụ thuộc nhiều vào phân bổ việc và mốc hạn, không phải thước đo năng lực.">
+          Tiến độ theo người
         </CardTitle>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {board.map((r, i) => (
+          {board.map((r) => (
             <button key={r.name} className="vmp-row vmp-lift"
               onClick={() => openDetail(`Hạng mục của ${r.name}`,
                 acts.filter((a) => (a.owner && a.owner !== "—" ? a.owner : "Chưa phân công") === r.name))}
               style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px",
                        borderRadius: 13, background: C.surface, cursor: "pointer", textAlign: "left",
                        border: `1px solid ${r.name === "Chưa phân công" ? C.marigoldSoft : C.pinkSoft}` }}>
-              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 13, color: C.plumSoft,
-                             width: 22, flexShrink: 0 }}>{i + 1}</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 800,
                              color: r.name === "Chưa phân công" ? C.marigoldText : C.plum }}>
                 {r.name}

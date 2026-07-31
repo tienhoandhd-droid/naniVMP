@@ -159,7 +159,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const nextMonth = useMemo(() => periodWork(scoped, nextPeriod(ky)), [scoped, ky]);
   const quality = useMemo(() => runDataQualityChecks(scopedKy), [scopedKy]);
   const rawRows = useMemo(() => buildRawRows(scopedKy), [scopedKy]);
-  const autoComments = useMemo(() => nhanXetTuDong(scopedKy), [scopedKy]);
+  // Truyền nhãn kỳ vào để mọi câu tự nói phạm vi — xem nhanXetTuDong().
+  const autoComments = useMemo(() => nhanXetTuDong(scopedKy, kyLabel), [scopedKy, kyLabel]);
 
   const monthlyChartHtml = useMemo(
     () => svgMonthlyTargetChart(monthly.table, SCREEN_PALETTE, monthly.highlight),
@@ -593,7 +594,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               <th style={th}>Bộ phận</th><th style={{ ...th, textAlign: "center" }}>Tổng</th>
               <th style={{ ...th, textAlign: "center" }}>Chậm đề cương</th><th style={{ ...th, textAlign: "center" }}>Chậm thẩm định</th>
               <th style={{ ...th, textAlign: "center" }}>Chậm báo cáo</th><th style={{ ...th, textAlign: "center" }}>Quá hạn VMP</th>
-              <th style={{ ...th, textAlign: "center" }}>Tỷ lệ đúng hạn</th>
+              <th style={{ ...th, textAlign: "center" }}>Hoàn thành VMP</th>
             </tr></thead>
             <tbody>
               {bottleneck.map((r) => (
@@ -604,7 +605,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                   <td style={{ ...td, textAlign: "center" }}>{r.overValidation > 0 ? <Tag color={C.skyText} bg={C.skySoft}>{r.overValidation}</Tag> : "—"}</td>
                   <td style={{ ...td, textAlign: "center" }}>{r.overReport > 0 ? <Tag color={C.pinkText} bg={C.pinkSoft}>{r.overReport}</Tag> : "—"}</td>
                   <td style={{ ...td, textAlign: "center" }}>{r.overVmp > 0 ? <Tag color={C.raspText} bg={C.raspSoft}>{r.overVmp}</Tag> : "—"}</td>
-                  <td style={{ ...td, textAlign: "center", fontWeight: 800 }}>{r.onTimeRate}%</td>
+                  {/* Cột này đếm HOÀN THÀNH, không phải "đúng hạn" — tên cũ
+                      làm bộ phận không chậm mốc nào vẫn hiện 0% và đọc ra
+                      thành "không có gì đúng hạn". Đổi tên cho khớp phép
+                      đếm, và khi chưa hạng mục nào xong thì ghi "—" chứ
+                      không ghi 0%: chưa có gì để đo khác với đo ra số 0. */}
+                  <td style={{ ...td, textAlign: "center", fontWeight: 800 }}>
+                    {r.total === 0 ? "—" : r.onTimeRate === 0 ? "0% (chưa mục nào xong)" : `${r.onTimeRate}%`}
+                  </td>
                 </tr>
               ))}
               {!bottleneck.length && <tr><td style={td} colSpan={7}>Không có dữ liệu trong phạm vi đang chọn.</td></tr>}

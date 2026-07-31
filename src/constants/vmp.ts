@@ -186,5 +186,12 @@ export const PHASE_COLOR = { done: C.mint, current: C.marigold, over: C.rasp, fu
 // ======================== WORKLOAD MATRIX ========================
 export const WL_MONTHS = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
 export const WL_QUARTERS = ["Quý 1", "Quý 2", "Quý 3", "Quý 4"];
-export const CAP_MONTH = 10;       // ngưỡng "đầy tải" (ngày công/tháng)
+/* Ngưỡng "đầy tải" — ngày công một người gánh được trong một tháng.
+   Bản trước để 10, và đó là con số sai về mặt vật lý: một tháng chỉ có
+   khoảng 22 ngày làm việc. Hệ quả đo được: 7/7 người đều bị gắn nhãn "quá
+   tải", kể cả người cả năm chỉ có 36 ngày công, và người nặng nhất bị ghi
+   "gấp 12 lần ngưỡng" — một tỉ số không thể có thật. Khi mọi người đều đỏ
+   thì màu đỏ hết là tín hiệu.
+   20 ngày công/tháng: chừa 2 ngày cho họp, đào tạo, việc đột xuất. */
+export const CAP_MONTH = 20;       // ngưỡng "đầy tải" (ngày công/tháng)
 export const CAP_HOSO_MONTH = 3;   // ngưỡng "nhiều hồ sơ"/tháng

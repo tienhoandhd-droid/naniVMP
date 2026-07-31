@@ -23,6 +23,8 @@ import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
+import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
+import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
@@ -277,10 +279,36 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
      luôn cột nào đang trỏ. Nay số hiện ngay cạnh con trỏ; dòng dưới vẫn
      giữ vì đó là bản mà trình đọc màn hình đọc được. */
   const [chuot, setChuot] = useState<{ x: number; y: number } | null>(null);
+  /* Nút chuyển 3D ↔ 2D. Giữ 3D làm mặc định vì nó trả lời "chỗ nào nhô cao"
+     nhanh nhất, nhưng ai cần đọc số chính xác — hoặc cần IN RA GIẤY, thứ mà
+     WebGL không làm được — thì có bản đồ nhiệt tương đương. Cùng một bộ số,
+     không phải hai phép đếm khác nhau. */
+  const [kieu, setKieu] = useState<"3d" | "2d">("3d");
+  const oNhiet: ONhiet[] = useMemo(() => o3d.map((x) => ({
+    hang: x.bp, cot: x.thang - 1, gt: x.tong, phu: x.chuaXong,
+    ghiChu: `${DEPTS[x.bp]?.name || DEPTS[x.bp]?.id} · Tháng ${x.thang}: `
+      + `${x.tong} hạng mục đến hạn, ${x.chuaXong} chưa xong`,
+  })), [o3d]);
 
   return (
     <div className="vmp-space3d">
       {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
+      <div className="vmp-space3d-doi">
+        <button type="button" onClick={() => setKieu("3d")}
+          className={kieu === "3d" ? "is-chon" : ""}>Khối 3D</button>
+        <button type="button" onClick={() => setKieu("2d")}
+          className={kieu === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
+      </div>
+
+      {kieu === "2d" ? (
+        <BanDoNhiet
+          tenHang="Bộ phận" tenCot="Tháng"
+          o={oNhiet}
+          nhanHang={DEPTS.map((d) => d.short || d.id)}
+          nhanCot={Array.from({ length: 12 }, (_, i) => `T${i + 1}`)}
+          donVi="hạng mục" phuLabel="chưa xong"
+        />
+      ) : (
       <div className="vmp-space3d-than">
         <div className="vmp-space3d-khung"
           onPointerMove={(e) => {
@@ -336,6 +364,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
         </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
