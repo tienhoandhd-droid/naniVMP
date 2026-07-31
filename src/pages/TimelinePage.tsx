@@ -1,5 +1,5 @@
 /* TimelinePage.jsx — Modern Gantt Timeline VMP */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import {
   BarChart3,
   CalendarClock,
@@ -14,7 +14,9 @@ import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
 import { CLS, DEPTS, CRIT, MONTHS, PHASE_COLOR, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
 import { parseD, fmtVN, milestones, phaseStates, addDays, clamp, wlIsDone } from "../utils/helpers.ts";
 import { useDebounce } from "../hooks/index.ts";
-import { Card, Tag, Modal, Pill, phaseTag } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Pill, phaseTag } from "../components/ui/Primitives.tsx";
+// Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
+const WorkloadSpace3D = lazy(() => import("../components/three/WorkloadSpace3D.tsx"));
 import type { ReactNode } from "react";
 import type { Activity, Milestones } from "../types/domain.ts";
 
@@ -1505,6 +1507,11 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
 
 export default function TimelineView({ acts }: { acts: Activity[] }) {
   const year = vmpToday().getFullYear();
+  const giamChuyenDong = useMemo(
+    () => typeof window !== "undefined"
+      && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
   const [workspace, setWorkspace] = useState("overview");
   const [view, setView] = useState("year");
   const [scope, setScope] = useState("year");
@@ -1609,6 +1616,19 @@ export default function TimelineView({ acts }: { acts: Activity[] }) {
 
   return (
     <div className="timeline-page-shell">
+      {/* Địa hình tải việc. Bảng Gantt bên dưới trả lời "hạng mục X đang ở
+          đâu"; khối này trả lời câu người xếp lịch hỏi mỗi tháng mà Gantt
+          không nói được: "tháng nào bộ phận nào bị dồn việc". */}
+      <Card variant="strong">
+        <CardTitle icon={GanttChartSquare}
+          sub="Trục sâu là 12 tháng theo mốc đích VMP · trục ngang là bộ phận · chiều cao là số hạng mục đến hạn">
+          Địa hình tải việc {year}
+        </CardTitle>
+        <Suspense fallback={<div style={{ height: 420 }} />}>
+          <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong} />
+        </Suspense>
+      </Card>
+
       <Card variant="strong" cls="timeline-workbench">
         <div className="timeline-workbench-head">
           <div className="timeline-title-block">
