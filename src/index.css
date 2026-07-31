@@ -6681,3 +6681,59 @@ input[type="checkbox"] {
 /* Nhãn bọc ô đánh dấu chính là vùng bấm thật — cho nó chiều cao tối thiểu. */
 label:has(> input[type="checkbox"]) { min-height: 24px; display: inline-flex; align-items: center; }
 summary { min-height: 24px; display: flex; align-items: center; }
+
+/* =====================================================================
+   BẢN IN — @media print
+   ---------------------------------------------------------------------
+   Đây là hệ GMP: biên bản họp, hồ sơ thẩm định, tài liệu trình thanh tra
+   đều đi ra giấy. Không có kiểu dáng in thì trang in ra sẽ có nguyên
+   thanh menu, nút bấm, ô lọc và khung chat — tốn giấy và trông cẩu thả
+   trong một hồ sơ phải lưu.
+
+   Nguyên tắc: giấy chỉ nhận NỘI DUNG. Mọi thứ để thao tác đều bỏ.
+   ===================================================================== */
+@media print {
+  /* Ép nền sáng và mực đen bất kể đang xem ở chế độ nào — in chế độ tối
+     ra giấy là in một trang đen. */
+  :root, :root[data-theme="dark"] {
+    --c-bg1: #fff; --c-bg2: #fff;
+    --c-surface: #fff; --c-surface-sunk: #fff; --c-surface-raised: #fff;
+    --c-ink: #111; --c-ink-soft: #444;
+    --c-line: #d5d5d5; --c-line-strong: #bbb;
+    --e-low: none; --e-mid: none; --e-high: none; --e-modal: none; --e-accent: none;
+  }
+  body { background: #fff !important; }
+
+  /* Bỏ mọi thứ để thao tác, không phải để đọc. */
+  .vmp-sidebar,
+  .vmp-space3d-doi,
+  .vmp-doi-nhom,
+  .vmp-gt,
+  .vmp-mo-sau,
+  button, .hn-nut, .tl-focus-them, .vmp-ctrl-bangbtn,
+  input, select, textarea,
+  [class*="chat"], [class*="Chat"] { display: none !important; }
+
+  /* Bảng và thẻ: viền mảnh thay đổ bóng, và không cắt ngang giữa một thẻ. */
+  .card { box-shadow: none !important; border: 1px solid #d5d5d5 !important;
+          break-inside: avoid; page-break-inside: avoid; }
+  table { break-inside: auto; }
+  tr, .hn-dong, .tl-focus-ds li { break-inside: avoid; page-break-inside: avoid; }
+  thead { display: table-header-group; }
+
+  /* Câu kết luận là phần đáng in nhất — giữ nguyên viền trái để nó vẫn
+     đọc ra là một kết luận, không lẫn vào thân bài. */
+  .vmp-ketluan { border-left: 3px solid #666 !important; background: #f6f6f6 !important; }
+
+  /* Khối 3D không in được (WebGL không vào bản in). Nói rõ thay vì để một
+     ô trắng không hiểu vì sao. */
+  .vmp-space3d-khung { display: none !important; }
+  .vmp-space3d::after {
+    content: "Khối 3D không in được — mở bản “Bảng nhiệt 2D” trên màn hình rồi in lại.";
+    display: block; padding: 12px 14px; border: 1px dashed #bbb; border-radius: 8px;
+    font-size: 12px; color: #444;
+  }
+
+  main { overflow: visible !important; height: auto !important; }
+  a[href]::after { content: ""; }
+}
