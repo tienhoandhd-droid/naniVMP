@@ -170,13 +170,27 @@ export async function updateProgressSupabase(
 ): Promise<RpcResult> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   void sheetPatch;  // Sheet là chỉ đọc — tham số giữ lại cho tương thích chữ ký cũ
+  // PHẢI gửi ĐỦ 5 khoá, và dùng `null` chứ KHÔNG dùng `undefined`.
+  //
+  // Trên DB đang tồn tại HAI overload của rpc_update_progress: bản 4 tham số
+  // (cũ) và bản 5 tham số có p_expected_version (mới). JSON.stringify vứt bỏ
+  // mọi khoá mang giá trị undefined, nên khi thiếu version/lý do thì thân yêu
+  // cầu chỉ còn 2–3 khoá — và CẢ HAI overload đều khớp vì phần còn lại đều có
+  // DEFAULT. PostgREST không chọn được, trả về:
+  //     PGRST203 "Could not choose the best candidate function between…"
+  // Người dùng chỉ thấy "Cập nhật tiến độ thất bại" mà không biết vì sao.
+  //
+  // Đây chính là lý do 461/461 hạng mục còn ở version 0 và nhật ký kiểm toán
+  // không có lấy một dòng nguồn 'dashboard_rpc': đường ghi từ web chưa bao giờ
+  // chạy được. Có khoá p_expected_version trong thân là bản 4 tham số hết cửa
+  // khớp, nên chỉ cần luôn gửi nó — kể cả khi giá trị là null.
   const { data, error } = await supabase.rpc("rpc_update_progress", {
     p_validation_code: validationCode,
     p_patch: patch as never,
-    p_reason: reason ?? undefined,
-    p_sheet_patch: undefined,
-    p_expected_version: expectedVersion ?? undefined,
-  });
+    p_reason: reason ?? null,
+    p_sheet_patch: null,
+    p_expected_version: expectedVersion ?? null,
+  } as never);
   return unwrap(data, error, "Cập nhật thất bại");
 }
 
@@ -220,11 +234,25 @@ export async function updateItemProgress(
   reason?: string,
   expectedVersion?: number,
 ): Promise<RpcResult> {
+  // `form` là BẢN CHÊNH — hộp sửa chỉ đưa vào những ô người dùng thật sự đổi.
+  // Nhờ vậy phân biệt được ba việc khác hẳn nhau:
+  //    khoá vắng mặt      → không đụng tới ô đó
+  //    khoá = ""          → XOÁ TRẮNG (nhập nhầm ngày, sửa lại cho đúng)
+  //    khoá có giá trị    → ghi giá trị mới
+  // Bản cũ `if (raw === "") continue` gộp hai trường hợp đầu làm một, nên xoá
+  // một ngày nhập nhầm là bấm Lưu xong không có gì xảy ra. Nó cũng gửi lên
+  // TOÀN BỘ 9 cột mỗi lần lưu, khiến nhật ký kiểm toán ghi cả những ô không ai
+  // đụng vào — soi hồ sơ về sau không biết lần đó người ta sửa cái gì.
   const patch: Record<string, unknown> = {};
   for (const [formKey, col] of Object.entries(FORM_TO_COLUMN)) {
+    if (!Object.prototype.hasOwnProperty.call(form, formKey)) continue;
     const raw = form[formKey];
-    if (raw === undefined || raw === null || raw === "") continue;
-    if (col.startsWith("status_")) {
+    if (raw === undefined || raw === null || raw === "") {
+      // Ngày xoá được về trắng. Trạng thái thì KHÔNG để null: cột này nuôi
+      // stageOf / bản đồ giai đoạn / mọi phép đếm, null vào là các màn đó
+      // rơi vào nhánh "không rõ". "Chưa nhập" đúng nghĩa là not_started.
+      patch[col] = col.startsWith("status_") ? "not_started" : null;
+    } else if (col.startsWith("status_")) {
       const mapped = LABEL_TO_STATUS[String(raw)];
       if (mapped) patch[col] = mapped;      // nhãn lạ thì bỏ qua, không đoán
     } else {
