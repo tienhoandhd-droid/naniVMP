@@ -5,6 +5,7 @@
  * Không ghi gì lên Supabase.
  */
 import puppeteer from "puppeteer-core";
+import { choServer } from "./cho-server.mjs";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = process.env.E2E_URL || "http://localhost:4173";
