@@ -6122,3 +6122,30 @@ body { transition: background var(--mo-slow) var(--ease); }
   background: var(--c-surface-sunk); border-radius: 10px; padding: 8px 12px;
 }
 @media (max-width: 760px) { .vmp-space3d-khung { height: 320px; } }
+
+/* Nhãn trục trong khối 3D — thẻ DOM neo theo toạ độ cảnh (drei <Html>).
+   Nền mờ để chữ đọc được cả khi đè lên cột màu đậm. */
+.vmp-nhan-truc {
+  display: inline-block;
+  font-family: var(--font-num, ui-monospace, monospace);
+  font-size: 10.5px; font-weight: 800; line-height: 1;
+  color: var(--c-ink-soft);
+  background: color-mix(in srgb, var(--c-surface) 82%, transparent);
+  padding: 2px 5px; border-radius: 5px;
+  white-space: nowrap;
+}
+.vmp-nhan-truc-dam {
+  font-family: inherit;
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--c-ink); background: color-mix(in srgb, var(--c-surface) 90%, transparent);
+}
+
+/* Câu kết luận của khối 3D. Đặt TRÊN hình chứ không phải dưới: người đọc
+   nhìn thấy điều cần biết trước, rồi mới nhìn hình để kiểm chứng. */
+.vmp-space3d-ketluan {
+  margin: 0 0 10px; padding: 11px 15px;
+  font-size: 14px; font-weight: 700; line-height: 1.65; color: var(--c-ink);
+  background: var(--c-surface-sunk);
+  border-left: 4px solid var(--c-pink);
+  border-radius: 0 12px 12px 0;
+}

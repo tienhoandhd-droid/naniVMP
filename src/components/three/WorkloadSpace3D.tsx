@@ -18,9 +18,11 @@
  * ===================================================================== */
 import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
+import { OrthographicCamera, OrbitControls, Edges, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
+import { NhanTruc } from "./NhanTruc.tsx";
+import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
 
 export interface OTai {
@@ -102,18 +104,58 @@ function Cot({ o, caoNhat, chon, onHover }: {
   );
 }
 
-function Canh({ o3d, caoNhat, chon, onHover, giam }: {
+function Canh({ o3d, caoNhat, chon, onHover }: {
   o3d: OTai[]; caoNhat: number; chon: OTai | null;
-  onHover: (o: OTai | null) => void; giam: boolean;
+  onHover: (o: OTai | null) => void;
 }) {
   const rongX = DEPTS.length * BUOC_B;
   const sauZ = 12 * BUOC_T;
+
+  /* Nhãn trục. Tháng chạy dọc mép trái, bộ phận chạy dọc mép trước, và mỗi
+     trục có một nhãn tên đặt ở đầu — không có tên trục thì người xem vẫn
+     phải đoán "dãy số 1..12 này là tháng hay là tuần". */
+  const nhan: MotNhan[] = [
+    ...Array.from({ length: 12 }, (_, i) => ({
+      vt: [-rongX / 2 - 0.34, 0.02, (i + 1 - 6.5) * BUOC_T] as [number, number, number],
+      chu: `T${i + 1}`,
+    })),
+    ...DEPTS.map((d, i) => ({
+      vt: [(i - (DEPTS.length - 1) / 2) * BUOC_B, 0.02, sauZ / 2 + 0.3] as [number, number, number],
+      chu: (d.id || "").toUpperCase(),
+    })),
+    // Tên trục đặt HẲN ngoài vùng cột, không thì camera chếch làm chữ rơi
+    // vào giữa khối và trông như một cột bị dán nhãn sai.
+    // Tên trục đặt ở ĐẦU GẦN (cạnh T12), không phải đầu xa: đầu xa bị góc
+    // camera chiếu vào giữa rừng cột và trông như nhãn của một cột nào đó.
+    { vt: [-rongX / 2 - 1.05, 0.02, sauZ / 2 + 0.2], chu: "↖ Tháng", dam: true },
+    { vt: [rongX / 2 + 0.9, 0.02, sauZ / 2 + 0.62], chu: "Bộ phận →", dam: true },
+    { vt: [-rongX / 2 - 0.75, CAO_MAX + 0.3, -sauZ / 2 - 0.2], chu: `↑ cao nhất ${caoNhat}`, dam: true },
+  ];
+
+  /* Ghi số thẳng lên NĂM đỉnh cao nhất. Đây là chỗ mắt nhìn vào đầu tiên và
+     cũng là chỗ người xếp lịch cần con số; ghi số lên mọi cột thì thành bãi
+     chữ và che mất chính hình khối. */
+  const dinh = [...o3d].sort((a, b) => b.tong - a.tong).slice(0, 5);
+  for (const o of dinh) {
+    nhan.push({
+      vt: [
+        (o.bp - (DEPTS.length - 1) / 2) * BUOC_B,
+        (o.tong / Math.max(1, caoNhat)) * CAO_MAX + 0.15,
+        (o.thang - 6.5) * BUOC_T,
+      ],
+      chu: String(o.tong),
+    });
+  }
+
   return (
     <>
       <OrthographicCamera makeDefault position={[5, 4.2, 6] } zoom={98} />
+      {/* Không tự xoay. Khối quay liên tục thì nhãn trục chạy theo và người
+          xem phải đuổi theo chữ — chống lại đúng mục tiêu "nhìn là hiểu".
+          Ai cần xem mặt khuất thì tự kéo. */}
       <OrbitControls makeDefault enablePan={false} enableZoom={false}
         minPolarAngle={0.25} maxPolarAngle={Math.PI / 2.35}
-        autoRotate={!giam} autoRotateSpeed={0.3} target={[0, 0.6, 0]} />
+        autoRotate={false} target={[0, 0.6, 0]} />
 
       <ambientLight intensity={0.78} />
       <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow shadow-mapSize={[1024, 1024]} />
@@ -124,6 +166,12 @@ function Canh({ o3d, caoNhat, chon, onHover, giam }: {
         <meshBasicMaterial color="#F7F1F8" />
       </mesh>
       <gridHelper args={[Math.max(rongX, sauZ) + 0.5, 12, "#E7DAEB", "#F1E8F3"]} position={[0, 0.001, 0]} />
+      {/* Bóng tiếp xúc: chân cột dính xuống sàn. Thiếu nó thì cả rừng cột
+          trông như đang lơ lửng, và độ cao mất mốc so sánh. */}
+      <ContactShadows position={[0, 0.002, 0]} opacity={0.42}
+        scale={Math.max(rongX, sauZ) + 1} blur={1.6} far={1.2} resolution={1024} />
+
+      <NhanTruc nhan={nhan} />
 
       {o3d.map((o) => (
         <Cot key={`${o.thang}-${o.bp}`} o={o} caoNhat={caoNhat}
@@ -146,12 +194,48 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
     return t;
   }, [o3d]);
 
+  /* CÂU KẾT LUẬN. Đây mới là thứ người xem cần: biểu đồ phải tự nói ra điều
+     nó phát hiện, chứ không bày số ra rồi bắt người ta tự rút ra. Mọi con số
+     trong câu đều tính từ chính dữ liệu đang vẽ — không có chỗ nào ước lượng. */
+  const ketLuan = useMemo(() => {
+    if (!o3d.length || !dinh) return "";
+    const theoThang = new Map<number, number>();
+    for (const o of o3d) theoThang.set(o.thang, (theoThang.get(o.thang) || 0) + o.tong);
+    const tb = [...theoThang.values()].reduce((a, b) => a + b, 0) / Math.max(1, theoThang.size);
+    const thangDinh = theoThang.get(dinh.thang) || 0;
+    const lan = tb > 0 ? thangDinh / tb : 0;
+    const bp = DEPTS[dinh.bp]?.name || DEPTS[dinh.bp]?.id;
+    const tyChuaXong = dinh.tong ? Math.round((dinh.chuaXong / dinh.tong) * 100) : 0;
+
+    const cau = [`Nặng nhất là ${bp} tháng ${dinh.thang}: ${dinh.tong} hạng mục đến hạn, ${dinh.chuaXong} chưa xong (${tyChuaXong}%).`];
+    if (lan >= 1.3) {
+      cau.push(`Cả tháng ${dinh.thang} gánh ${thangDinh} hạng mục — gấp ${lan.toFixed(1)} lần mức trung bình tháng (${Math.round(tb)}).`);
+    }
+    const trong = [...theoThang.entries()].filter(([, n]) => n === 0).map(([t]) => t);
+    if (trong.length >= 2) cau.push(`Tháng ${trong.join(", ")} không có hạng mục nào — còn chỗ để giãn bớt.`);
+    return cau.join(" ");
+  }, [o3d, dinh]);
+
   return (
     <div className="vmp-space3d">
+      {ketLuan && <p className="vmp-space3d-ketluan">{ketLuan}</p>}
       <div className="vmp-space3d-khung">
-        <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
+        <Canvas
+          dpr={[1, 2]}
+          // Bóng mềm (PCFSoft) thay bóng cứng: mép bóng nhoè dần theo khoảng
+          // cách là tín hiệu chiều sâu mà mắt người đọc rất nhanh — cột nào
+          // đứng trước, cột nào đứng sau, không cần xoay mới biết.
+          shadows="soft"
+          gl={{
+            antialias: true, alpha: true,
+            // ACES filmic: giữ được chi tiết ở vùng sáng thay vì cháy trắng.
+            // Không có nó thì đỉnh cột màu đậm bệt thành một mảng.
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.05,
+            outputColorSpace: THREE.SRGBColorSpace,
+          }}
           frameloop={giamChuyenDong ? "demand" : "always"}>
-          <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} giam={giamChuyenDong} />
+          <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
         </Canvas>
       </div>
 
@@ -167,10 +251,9 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
             <b>Tháng {chon.thang} · {DEPTS[chon.bp]?.name || DEPTS[chon.bp]?.id}</b>
             {" — "}<b>{chon.tong}</b> hạng mục đến hạn, còn <b>{chon.chuaXong}</b> chưa xong
           </>
-        ) : dinh ? (
-          <>Kéo để xoay · trục sâu là 12 tháng, trục ngang là bộ phận, chiều cao là số hạng mục đến hạn.
-            {" "}Đỉnh cao nhất: <b>{DEPTS[dinh.bp]?.name} tháng {dinh.thang}</b> với {dinh.tong} hạng mục.</>
-        ) : "Không có hạng mục nào có mốc đích VMP trong năm đang chọn."}
+        ) : o3d.length
+          ? "Đưa chuột lên một cột để xem chi tiết · kéo để xoay nếu có cột bị khuất."
+          : "Không có hạng mục nào có mốc đích VMP trong năm đang chọn."}
       </div>
     </div>
   );

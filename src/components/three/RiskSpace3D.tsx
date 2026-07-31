@@ -23,6 +23,8 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import * as THREE from "three";
 import { qrmSeverity, qrmOccurrence, qrmLevel } from "../../utils/helpers.ts";
+import { NhanTruc } from "./NhanTruc.tsx";
+import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
 
 export interface ORui {
@@ -49,6 +51,8 @@ export function dungKhoiRuiRo(acts: Activity[]): ORui[] {
   }
   return [...o.values()];
 }
+
+const TEN_KN = ["Đã xong — hết rủi ro", "Mới lên kế hoạch", "Đang làm", "Quá hạn"];
 
 const BUOC_X = 0.5;
 const BUOC_Z = 0.72;
@@ -84,18 +88,36 @@ function Cot({ o, caoNhat, chon, onHover }: {
   );
 }
 
-function Canh({ o3d, caoNhat, chon, onHover, giam }: {
+function Canh({ o3d, caoNhat, chon, onHover }: {
   o3d: ORui[]; caoNhat: number; chon: ORui | null;
-  onHover: (o: ORui | null) => void; giam: boolean;
+  onHover: (o: ORui | null) => void;
 }) {
   const rongX = 9 * BUOC_X;
   const sauZ = 4 * BUOC_Z;
+
+  const nhan: MotNhan[] = [
+    ...Array.from({ length: 9 }, (_, i) => ({
+      vt: [(i + 1 - 5) * BUOC_X, 0.02, sauZ / 2 + 0.32] as [number, number, number],
+      chu: String(i + 1),
+    })),
+    ...TEN_KN.map((t, i) => ({
+      vt: [-rongX / 2 - 0.5, 0.02, (i - 1.5) * BUOC_Z] as [number, number, number],
+      chu: t.split(" —")[0],
+    })),
+    { vt: [rongX / 2 + 0.7, 0.02, sauZ / 2 + 0.32], chu: "Nghiêm trọng →", dam: true },
+    { vt: [-rongX / 2 - 0.9, 0.02, -sauZ / 2 - 0.45], chu: "Khả năng xảy ra ↘", dam: true },
+    { vt: [-rongX / 2 - 0.6, CAO_MAX + 0.25, -sauZ / 2 - 0.2], chu: "↑ số hạng mục", dam: true },
+  ];
+
   return (
     <>
       <OrthographicCamera makeDefault position={[5, 4, 6]} zoom={106} />
+      {/* Không tự xoay. Khối quay liên tục thì nhãn trục chạy theo và người
+          xem phải đuổi theo chữ — chống lại đúng mục tiêu "nhìn là hiểu".
+          Ai cần xem mặt khuất thì tự kéo. */}
       <OrbitControls makeDefault enablePan={false} enableZoom={false}
         minPolarAngle={0.25} maxPolarAngle={Math.PI / 2.35}
-        autoRotate={!giam} autoRotateSpeed={0.3} target={[0, 0.6, 0]} />
+        autoRotate={false} target={[0, 0.6, 0]} />
 
       <ambientLight intensity={0.78} />
       <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow shadow-mapSize={[1024, 1024]} />
@@ -107,6 +129,8 @@ function Canh({ o3d, caoNhat, chon, onHover, giam }: {
       </mesh>
       <gridHelper args={[Math.max(rongX, sauZ) + 0.6, 12, "#E7DAEB", "#F1E8F3"]} position={[0, 0.001, 0]} />
 
+      <NhanTruc nhan={nhan} />
+
       {o3d.map((o) => (
         <Cot key={`${o.ng}-${o.kn}`} o={o} caoNhat={caoNhat}
           chon={!!chon && chon.ng === o.ng && chon.kn === o.kn} onHover={onHover} />
@@ -114,8 +138,6 @@ function Canh({ o3d, caoNhat, chon, onHover, giam }: {
     </>
   );
 }
-
-const TEN_KN = ["Đã xong — hết rủi ro", "Mới lên kế hoạch", "Đang làm", "Quá hạn"];
 
 export default function RiskSpace3D({ acts, giamChuyenDong }: {
   acts: Activity[]; giamChuyenDong: boolean;
@@ -129,7 +151,7 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
       <div className="vmp-space3d-khung">
         <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
           frameloop={giamChuyenDong ? "demand" : "always"}>
-          <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} giam={giamChuyenDong} />
+          <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
         </Canvas>
       </div>
 
