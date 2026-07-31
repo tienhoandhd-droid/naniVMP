@@ -80,7 +80,7 @@ import {
   SkeletonDashboard,
   SyncBanner,
   GuardianSilhouette,
-  PrincessCommentary, StatTile, MultiSelect} from "./components/ui/Primitives.tsx";
+  PrincessCommentary, StatTile, MultiSelect, GiaiThich, MAU_SO} from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
 // ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
@@ -93,6 +93,7 @@ const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
 const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
+const TodayView = lazy(() => import("./pages/TodayPage.tsx"));
 const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
 import VongNam from "./components/dashboard/VongNam.tsx";
 import LoginCrown from "./components/three/LoginCrown.tsx";
@@ -1416,7 +1417,7 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               {[
                 { l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
-                { l: "Quá hạn (trạng thái)", v: e.over, c: C.rasp, t: C.raspText },
+                { l: "Quá hạn", v: e.over, c: C.rasp, t: C.raspText },
                 { l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
               ].map((x) => (
                 <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1453,9 +1454,15 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
           · e.over  = trạng thái hạng mục đang là "quá hạn"
           · overdue = hạng mục có MỐC gần nhất (đề cương/thẩm định/báo cáo) đã trôi qua,
             kể cả khi trạng thái tổng chưa chuyển. Số này luôn ≥ số kia. */}
-      <StatTile cls="b-k1" icon={AlertCircle} label="Có mốc đã quá hạn" value={overdue.length}
+      {/* MỘT chỉ số quá hạn, không phải hai. Bản trước để "Quá hạn (trạng
+          thái) 208" và "Có mốc đã quá hạn 268" cạnh nhau, người mới nhìn
+          tưởng web tính sai. Nay lấy con số RỘNG hơn (theo mốc) làm chỉ số
+          chính vì đó mới là thứ phải xử, và nói thẳng chênh lệch là gì. */}
+      <StatTile cls="b-k1" icon={AlertCircle} label="Quá hạn" value={overdue.length}
         tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di("progress")}
-        sub={overdue.length ? `Gồm cả hạng mục trạng thái chưa đổi · bấm để xử lý` : "Không còn hạng mục nào trễ"} />
+        sub={overdue.length
+          ? `${e.over} đã đổi trạng thái · ${Math.max(0, overdue.length - e.over)} mốc đã trôi mà trạng thái chưa đổi`
+          : "Không còn hạng mục nào trễ"} />
 
       <StatTile cls="b-k2" icon={Clock} label="Tới hạn 30 ngày" value={soon.length}
         tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di("alerts")}
@@ -1742,8 +1749,12 @@ function GlobalFilterBar({
 
       {/* phải: đếm kết quả + xóa */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
           <b style={{ color: shown < total ? C.pinkText : C.plum }}>{shown}</b>/{total} hạng mục
+          <GiaiThich tieuDe={`${total} = mẫu số của thanh lọc`}>
+            <span>{MAU_SO.tatCa}</span>
+            <span>Các trang khác dùng mẫu số HẸP HƠN và đều có dấu i riêng: trang Tổng quan đếm hạng mục có mốc đích; Báo cáo mục 1 chỉ đếm mốc đích rơi vào năm đang chọn. Ba con số khác nhau là do ba định nghĩa khác nhau, không phải do lệch dữ liệu.</span>
+          </GiaiThich>
         </span>
         {/* Cả màn hình đang xem nằm trong URL, nên chép link là chia sẻ được
             nguyên lát cắt — khỏi phải dặn nhau "vào Cảnh báo rồi chọn XSX". */}
@@ -1791,6 +1802,11 @@ export default function App() {
   // Nhập liệu". Dùng object mới mỗi lần bấm (không phải chuỗi) để bấm lại cùng
   // một mã vẫn kích hoạt useEffect bên kia.
   const [moDanhMuc, setMoDanhMuc] = useState<{ code: string; nhom?: string } | null>(null);
+  /* Mã hạng mục cần nhảy tới ở màn Cập nhật tiến độ. Màn "Hôm nay" đặt giá
+     trị này rồi chuyển màn — người dùng khỏi phải nhớ mã và tự dán vào ô tìm. */
+  const [moHangMuc, setMoHangMuc] = useState<string>("");
+  /** Cách nhóm ở màn nhập liệu: theo hạng mục hay theo đối tượng. */
+  const [nhomTheo, setNhomTheo] = useState<"hangmuc" | "doituong">("hangmuc");
   const [showPw, setShowPw] = useState(false);
   const mainRef = useScrollTop([view]);
 
@@ -2090,6 +2106,10 @@ export default function App() {
                 đó hoạt ảnh vào chạy lại — mắt biết nội dung vừa thay. */}
             <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
+              {view === "today" && (
+                <TodayView acts={filteredActs} myName={myName} setView={setView}
+                  onMo={(a) => { setMoHangMuc(String(a.id)); setView("progress"); }} />
+              )}
               {view === "overview" && <Overview acts={filteredActs} setView={setView} />}
               {view === "timeline" && <TimelineView acts={filteredActs} />}
               {view === "inventory" && (
@@ -2101,8 +2121,25 @@ export default function App() {
               {view === "health" && <HealthView acts={filteredActs} user={user} />}
               {view === "rules" && <ActiveRulesView user={user} />}
               {view === "progress" && (
-                <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
-                  onUpdate={updateActivity} onReload={reloadData} readOnly={false} />
+                <>
+                  {/* Nút đổi cách NHÓM, không phải đổi màn. Cùng dữ liệu, cùng
+                      hộp sửa, cùng bộ lọc — chỉ khác cách gom dòng. */}
+                  <div className="vmp-doi-nhom">
+                    <button type="button" onClick={() => setNhomTheo("hangmuc")}
+                      className={nhomTheo === "hangmuc" ? "is-chon" : ""}>Theo hạng mục</button>
+                    <button type="button" onClick={() => setNhomTheo("doituong")}
+                      className={nhomTheo === "doituong" ? "is-chon" : ""}>Theo đối tượng</button>
+                  </div>
+                  {nhomTheo === "doituong" ? (
+                    <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}
+                      onUpdate={updateActivity} onReload={reloadData} readOnly={false}
+                      onMoDanhMuc={(code, nhom) => { setMoDanhMuc({ code, nhom }); setView("source"); }} />
+                  ) : (
+                    <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
+                      onUpdate={updateActivity} onReload={reloadData} readOnly={false}
+                      focusId={moHangMuc} onFocusDone={() => setMoHangMuc("")} />
+                  )}
+                </>
               )}
               {/* "risk" là mục cũ đã gộp vào Cảnh báo — giữ nhánh này để đường
                   dẫn/nút cũ không dẫn vào trang trắng. */}

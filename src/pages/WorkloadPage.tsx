@@ -7,7 +7,7 @@ import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../
 import { parseD, fmtVN, clamp, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
-import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill, CauKetLuan } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill, CauKetLuan, laThanhTra } from "../components/ui/Primitives.tsx";
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 
@@ -257,9 +257,14 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   }, [critCount]);
 
   const mood = overloaded.length > 0 ? "stressed" : "happy";
-  const bubble = overloaded.length > 0
-    ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng)! Bấm vào từng người xem chi tiết 💪`
-    : `Cả đội đang cân đối! Cứ giữ nhịp này là về đích VMP êm ru ✨`;
+  const thanhTra = laThanhTra();
+  const bubble = thanhTra
+    ? (overloaded.length > 0
+      ? `${overloaded.length} người vượt ngưỡng ${CAP_MONTH} ngày công/tháng ở tháng cao điểm.`
+      : `Không có người nào vượt ngưỡng ${CAP_MONTH} ngày công/tháng.`)
+    : (overloaded.length > 0
+      ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng)! Bấm vào từng người xem chi tiết 💪`
+      : `Cả đội đang cân đối! Cứ giữ nhịp này là về đích VMP êm ru ✨`);
   const legend = [["Nhẹ", C.mint + "38"], ["Vừa", C.mint + "80"], ["Sắp đầy", C.marigold], ["Quá tải", C.rasp]];
 
   return (
@@ -267,7 +272,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       {detail && <WorkloadDetailModal detail={detail} onClose={() => setDetail(null)} />}
       <Card variant="strong" style={{ background: `linear-gradient(120deg,#fff,${C.pinkMist})` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-          <div style={{ flexShrink: 0 }}><Mascot mood={mood} size={96} /></div>
+          {!thanhTra && <div style={{ flexShrink: 0 }}><Mascot mood={mood} size={96} /></div>}
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="pop" key={mood} style={{ background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: "12px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, lineHeight: 1.5 }}>{bubble}</div>
             <div style={{ fontSize: 12.5, color: C.plumSoft, marginTop: 8, fontWeight: 700 }}>Còn lại: <b style={{ color: C.lavText }}>{totalCong} ngày công</b> · <b style={{ color: C.pinkText }}>{totalHoso} hồ sơ</b> · <b style={{ color: C.mintText }}>{people.length} người</b></div>
@@ -319,7 +324,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(262px,1fr))", gap: 14 }}>
           {nguoiThat.map((p) => {
             const pk = peakMonth(p); const ratio = CAP_MONTH > 0 ? pk.eff / CAP_MONTH : 0;
-            const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, e: "😵" } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, e: "🔥" } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, e: "🌿" };
+            const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, e: thanhTra ? "" : "😵" } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, e: thanhTra ? "" : "🔥" } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, e: thanhTra ? "" : "🌿" };
             return (
               <button key={p.name} className="vmp-lift" onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))} style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: 15, fontFamily: TEXT }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>

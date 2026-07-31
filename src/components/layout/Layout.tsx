@@ -8,7 +8,7 @@ import {
 import { C, TEXT, NUM, GRAD, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
 import type { ReactNode } from "react";
-import { Sparkle, CrownLogo, tuoiDuLieu } from "../ui/Primitives.tsx";
+import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 
 // ======================== SIDEBAR ========================
@@ -221,6 +221,28 @@ function ThemeToggle() {
   );
 }
 
+/* Công tắc chế độ thanh tra — xem dungThanhTra() trong Primitives.tsx. */
+function ThanhTraToggle() {
+  const [bat, setBat] = dungThanhTra();
+  return (
+    <button onClick={() => setBat(!bat)}
+      title={bat
+        ? "Chế độ thanh tra ĐANG BẬT — ẩn emoji, biệt danh và xếp hạng cá nhân. Bấm để tắt."
+        : "Bật chế độ thanh tra: ngôn ngữ trung tính, không emoji, không xếp hạng cá nhân"}
+      aria-pressed={bat}
+      style={{ ...glass, height: 40, padding: "0 14px", borderRadius: 999,
+               border: bat ? `1.5px solid ${C.plum}` : "none",
+               background: bat ? C.plum : undefined,
+               cursor: "pointer", display: "flex", alignItems: "center", gap: 7 }}>
+      <ShieldCheck size={15} color={bat ? "#fff" : C.plumSoft} />
+      <span style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800,
+                     color: bat ? "#fff" : C.plumSoft, whiteSpace: "nowrap" }}>
+        {bat ? "Chế độ thanh tra" : "Thanh tra"}
+      </span>
+    </button>
+  );
+}
+
 export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, dataUpdatedAt }: {
   title?: ReactNode;
   user?: AppUser | null;
@@ -288,6 +310,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <ThanhTraToggle />
         <ThemeToggle />
         <button onClick={onRefresh} title="Làm mới dữ liệu" className="vmp-lift" style={{
           ...glass, borderRadius: 16, padding: "9px 15px",
