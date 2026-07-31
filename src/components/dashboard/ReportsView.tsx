@@ -26,7 +26,7 @@ import { C, TEXT, NUM, GRAD, btnPrimary, glass } from "../../constants/theme.ts"
 // Khối 3D nạp theo yêu cầu: ai không mở trang Báo cáo thì không tải three.js.
 const VmpSpace3D = lazy(() => import("../three/VmpSpace3D.tsx"));
 import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
-import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll } from "../ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
@@ -562,6 +562,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         {/* Khối 3D cho MÀN HÌNH. Bản SVG phẳng bên dưới vẫn giữ và vẫn là
             bản duy nhất đi vào PDF/HTML xuất ra — WebGL không in được, nên
             đây không phải chuyện thích hay không thích. */}
+        {/* Kết luận đặt TRƯỚC hình. Bản cũ để dưới cùng, sau cả khối 3D và
+            phần "xem dạng phẳng" — người đọc phải xem hết hình rồi mới biết
+            hình đó nói gì, tức là tự suy luận trước rồi mới được xác nhận. */}
+        <CauKetLuan chinh={targetVerdict} tone={monthly.cur.meets === false ? "warn" : "ok"} />
         <Suspense fallback={<div style={{ height: 380 }} />}>
           <VmpSpace3D acts={scopedNamActive} nam={ky.year} giamChuyenDong={giamChuyenDong} />
         </Suspense>
@@ -571,10 +575,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </summary>
           <div style={{ marginTop: 10 }} dangerouslySetInnerHTML={{ __html: monthlyChartHtml }} />
         </details>
-        <div style={{ marginTop: 10, fontSize: 13.5, color: C.plum, fontWeight: 600, background: C.pinkMist,
-          borderLeft: `4px solid ${C.pink}`, borderRadius: "0 12px 12px 0", padding: "12px 16px" }}>
-          {targetVerdict}
-        </div>
       </Card>
 
       {/* ===== 4. Bất cập trong VMP ===== */}
@@ -582,13 +582,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <CardTitle icon={AlertCircle} sub="Chậm đề cương, chậm thẩm định thực tế hay chậm báo cáo — theo từng bộ phận">
           4. Bất cập trong VMP — bộ phận nào chậm
         </CardTitle>
+        <CauKetLuan chinh={bottleneckVerdict} tone={bottleneck.length ? "over" : "ok"} />
         {bottleneckChartHtml
           ? <div dangerouslySetInnerHTML={{ __html: bottleneckChartHtml }} />
           : <div style={{ fontSize: 13.5, color: C.plumSoft, fontWeight: 700, padding: 12 }}>Không có bộ phận nào đang chậm trong phạm vi đang chọn.</div>}
-        <div style={{ marginTop: 10, marginBottom: 14, fontSize: 13.5, color: C.plum, fontWeight: 600, background: C.raspSoft,
-          borderLeft: `4px solid ${C.rasp}`, borderRadius: "0 12px 12px 0", padding: "12px 16px" }}>
-          {bottleneckVerdict}
-        </div>
+        <div style={{ height: 14 }} />
         <TableScroll maxHeight={320}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720 }}>
             <thead><tr>

@@ -7,7 +7,7 @@ import {
 import { C, NUM, TEXT } from "../../constants/theme.ts";
 import { DEPTS, DEPT_COLOR, DEPT_DEEP } from "../../constants/vmp.ts";
 import { parseDepts, wlIsDone } from "../../utils/helpers.ts";
-import { Card, CardTitle, Sel } from "../ui/Primitives.tsx";
+import { Card, CardTitle, Sel, CauKetLuan } from "../ui/Primitives.tsx";
 
 import type { CSSProperties } from "react";
 import type { Activity } from "../../types/domain.ts";
@@ -253,6 +253,19 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
     [acts, active.field, active.fallback],
   );
 
+  const klTrangThai = useMemo(() => {
+    if (!rows.length || !total) return null;
+    const dau = rows[0];
+    const trong = rows.find((r) => r.label === EMPTY_LABEL);
+    return {
+      chinh: `${active.label}: nhóm đông nhất là "${dau.label}" với ${dau.count}/${total} hạng mục (${dau.rate}%).`,
+      phu: trong && trong.count > 0
+        ? `${trong.count} hạng mục chưa điền trạng thái ở cột này (${trong.rate}%) — số liệu bên dưới đọc trên phần đã điền.`
+        : "Mọi hạng mục đều đã có trạng thái ở cột này.",
+      tone: (trong && trong.rate >= 20 ? "warn" : "ok") as "warn" | "ok",
+    };
+  }, [rows, total, active.label]);
+
   return (
     <Card variant="strong">
       <div style={{
@@ -285,6 +298,11 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
           ))}
         </div>
       </div>
+
+      {/* Nhóm chiếm đa số quyết định cách đọc cả biểu đồ: "62% còn ở Chưa
+          thực hiện" là một câu chuyện khác hẳn "62% đã Đạt". Nói ra bằng
+          chữ thay vì để người xem so chiều dài từng thanh. */}
+      {klTrangThai && <CauKetLuan chinh={klTrangThai.chinh} phu={klTrangThai.phu} tone={klTrangThai.tone} />}
 
       {rows.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -610,6 +628,41 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
     })).sort((a, b) => b.total - a.total || a.type.localeCompare(b.type, "vi"));
   }, [scopedActs]);
 
+  /* Phễu bốn giai đoạn: khâu tụt sâu nhất so với khâu liền trước là chỗ
+     đang tắc. Bốn thẻ số cạnh nhau không tự nói ra điều đó — mắt phải trừ
+     nhẩm bốn lần. */
+  const klPheu = useMemo(() => {
+    const buoc = METRICS.map((m) => ({ m, v: summary[m.id] as { done: number; total: number; rate: number } }));
+    if (!buoc.length || !buoc[0].v?.total) return null;
+    let hut = 0;
+    for (let i = 1; i < buoc.length; i += 1) {
+      if (buoc[i - 1].v.rate - buoc[i].v.rate > buoc[hut].v.rate - buoc[hut + 1].v.rate) hut = i - 1;
+    }
+    const rong = buoc[hut].v.rate - buoc[hut + 1].v.rate;
+    const cuoi = buoc[buoc.length - 1].v;
+    return {
+      chinh: rong >= 8
+        ? `Tắc nhất ở khâu ${buoc[hut].m.short} → ${buoc[hut + 1].m.short}: ${buoc[hut].v.rate}% xuống ${buoc[hut + 1].v.rate}%, mất ${rong} điểm.`
+        : `Bốn giai đoạn đi đều nhau, chênh nhau nhiều nhất ${rong} điểm — không có khâu nào tắc riêng.`,
+      phu: `Đích cuối: ${cuoi.done}/${cuoi.total} hạng mục đã hoàn thành VMP (${cuoi.rate}%).`,
+      tone: (rong >= 25 ? "over" : rong >= 8 ? "warn" : "ok") as "over" | "warn" | "ok",
+    };
+  }, [summary]);
+
+  /* So loại thẩm định: chỉ nêu loại tụt nhất và loại dẫn đầu — người xem
+     cần biết đi hỏi ai, không cần đọc lại cả mười ô. */
+  const klLoai = useMemo(() => {
+    const co = typeRows.filter((r) => r.total >= 3);
+    if (co.length < 2) return null;
+    const xep = [...co].sort((a, b) => b.rate - a.rate);
+    const dau = xep[0], cuoi = xep[xep.length - 1];
+    return {
+      chinh: `${cuoi.type} tụt xa nhất: ${cuoi.rate}% trên ${cuoi.total} hạng mục, kém ${dau.type} (${dau.rate}%) ${dau.rate - cuoi.rate} điểm.`,
+      phu: "Chỉ so các loại có từ 3 hạng mục trở lên — dưới mức đó một hạng mục đã làm lệch tỉ lệ.",
+      tone: (dau.rate - cuoi.rate >= 30 ? "warn" : "ok") as "warn" | "ok",
+    };
+  }, [typeRows]);
+
   const scopeLabel = [
     department === "all" ? "Tất cả bộ phận" : DEPTS.find((item) => item.id === department)?.name,
     selectedType === "all" ? "Tất cả loại thẩm định" : selectedType,
@@ -673,6 +726,8 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
           {scopeLabel} · <b style={{ color: C.plum }}>{scopedActs.length}</b> hạng mục
         </div>
 
+        {klPheu && <CauKetLuan chinh={klPheu.chinh} phu={klPheu.phu} tone={klPheu.tone} />}
+
         <div className="completion-metric-grid" style={{
           display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12,
         }}>
@@ -684,6 +739,7 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
         <CardTitle icon={ClipboardCheck} sub="Hoàn thành được xác định theo trạng thái VMP của từng hạng mục">
           Tỷ lệ hoàn thành từng loại thẩm định
         </CardTitle>
+        {klLoai && <CauKetLuan chinh={klLoai.chinh} phu={klLoai.phu} tone={klLoai.tone} />}
         {typeRows.length ? (
           <div className="completion-type-grid" style={{
             display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12,

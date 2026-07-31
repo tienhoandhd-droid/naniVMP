@@ -58,6 +58,7 @@ import {
   docTally,
   inPeriod,
   runDataQualityChecks,
+  wlIsDone,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
@@ -1343,14 +1344,16 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
     const overdue = acts.filter((a) => a.alert && a.alert.kind === "over");
     const soon = acts.filter((a) => a.alert && a.alert.kind === "soon");
 
-    // Tỷ lệ hoàn thành theo tháng đích — dải cột nhỏ trong ô "Hoàn thành".
-    // Cho biết nhịp đang lên hay đang chùng, thứ con số tổng không nói được.
+    // Dải cột nhỏ trong ô "Tỷ lệ hồ sơ": tỷ lệ hồ sơ theo tháng đích.
+    // Phải đếm ĐÚNG thước đo mà con số lớn của ô đang dùng (trạng thái báo
+    // cáo) — bản trước vẽ tỷ lệ hoàn thành VMP cạnh con số tỷ lệ hồ sơ, hai
+    // thước đo khác nhau trong một ô, đọc ra kết luận sai về xu hướng.
     const thang = Array.from({ length: 12 }, () => ({ tong: 0, xong: 0 }));
     for (const a of acts) {
       const t = a.target ? new Date(a.target).getMonth() : -1;
       if (t < 0 || t > 11) continue;
       thang[t].tong++;
-      if (a.st === "done") thang[t].xong++;
+      if (wlIsDone((a._raw as Record<string, unknown> | undefined)?.tt_bao_cao)) thang[t].xong++;
     }
     return {
       e, d, overdue, soon,

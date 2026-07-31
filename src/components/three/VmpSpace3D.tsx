@@ -27,6 +27,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import * as THREE from "three";
 import { wlIsDone } from "../../utils/helpers.ts";
+import { CauKetLuan } from "../ui/Primitives.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
@@ -190,8 +191,45 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
   const o3d = useMemo(() => dungMaTran(acts, nam), [acts, nam]);
   const [chon, setChon] = useState<O3D | null>(null);
 
+  /* CÂU KẾT LUẬN. Hình khối cho thấy có một cái phễu, nhưng người xem vẫn
+     phải tự đo xem nó tụt mạnh nhất ở khâu nào. Đó chính là con số quyết
+     định phải đi gỡ chỗ nào — nên nói thẳng ra bằng chữ. */
+  const ketLuan = useMemo(() => {
+    const tbGiaiDoan = GIAI_DOAN.map((_, g) => {
+      const o = o3d.filter((x) => x.giaiDoan === g && x.tyLe != null);
+      const tongXong = o.reduce((s, x) => s + x.xong, 0);
+      const tong = o.reduce((s, x) => s + x.tong, 0);
+      return tong ? Math.round((tongXong / tong) * 100) : null;
+    });
+    if (tbGiaiDoan.some((v) => v == null)) return null;
+
+    // Khâu tụt sâu nhất = chênh lệch lớn nhất giữa hai giai đoạn liền nhau.
+    let hut = 0;
+    for (let g = 1; g < tbGiaiDoan.length; g += 1) {
+      if ((tbGiaiDoan[g - 1] as number) - (tbGiaiDoan[g] as number)
+        > (tbGiaiDoan[hut] as number) - (tbGiaiDoan[hut + 1] as number)) hut = g - 1;
+    }
+    const rong = (tbGiaiDoan[hut] as number) - (tbGiaiDoan[hut + 1] as number);
+
+    // Tháng nào tụt sâu nhất ở đích VMP — chỗ cần nhìn trước tiên.
+    const dichVmp = o3d.filter((x) => x.giaiDoan === 3 && x.tyLe != null && x.tong > 0);
+    const te = [...dichVmp].sort((a, b) => (a.tyLe as number) - (b.tyLe as number))[0];
+
+    return {
+      chinh: rong >= 8
+        ? `Phễu tụt sâu nhất ở khâu ${GIAI_DOAN[hut].ten} → ${GIAI_DOAN[hut + 1].ten}: `
+          + `${tbGiaiDoan[hut]}% xuống ${tbGiaiDoan[hut + 1]}%, mất ${rong} điểm.`
+        : `Bốn giai đoạn đi khá đều nhau (${tbGiaiDoan.join("% → ")}%) — không có khâu nào tắc riêng.`,
+      phu: te
+        ? `Tháng ${te.thang} yếu nhất ở đích VMP: ${te.tyLe}% (${te.xong}/${te.tong} hạng mục).`
+        : "",
+      tone: (rong >= 20 ? "over" : rong >= 8 ? "warn" : "ok") as "over" | "warn" | "ok",
+    };
+  }, [o3d]);
+
   return (
     <div className="vmp-space3d">
+      {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
       {/* Bọc hẳn một div có chiều cao rõ ràng. Bản trước tôi đặt chiều cao
           bằng bộ chọn `> div:first-child` và trượt: R3F tự sinh lớp bọc
           riêng, canvas co lại còn 150px nên cột bị cắt mất ngọn. */}

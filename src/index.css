@@ -6140,12 +6140,163 @@ body { transition: background var(--mo-slow) var(--ease); }
   color: var(--c-ink); background: color-mix(in srgb, var(--c-surface) 90%, transparent);
 }
 
-/* Câu kết luận của khối 3D. Đặt TRÊN hình chứ không phải dưới: người đọc
-   nhìn thấy điều cần biết trước, rồi mới nhìn hình để kiểm chứng. */
-.vmp-space3d-ketluan {
-  margin: 0 0 10px; padding: 11px 15px;
-  font-size: 14px; font-weight: 700; line-height: 1.65; color: var(--c-ink);
-  background: var(--c-surface-sunk);
-  border-left: 4px solid var(--c-pink);
+/* Câu kết luận của khối 3D đã chuyển sang khối chung `.vmp-ketluan` bên
+   dưới — ba khối 3D và mọi biểu đồ 2D nay dùng cùng một khối, cùng một
+   giọng, cùng một quy ước màu trạng thái. */
+
+/* =====================================================================
+   CÂU KẾT LUẬN — khối chuẩn của mọi biểu đồ thuyết minh
+   ---------------------------------------------------------------------
+   Một khối, một giọng, dùng ở mọi trang. Đặt TRÊN hình: đọc kết luận
+   trước, nhìn hình sau để kiểm chứng.
+
+   Màu viền trái là TRẠNG THÁI (cần làm gì), không phải nhận dạng chuỗi
+   dữ liệu — nên chỉ có ba mức và không bao giờ dùng lại cho series.
+   ===================================================================== */
+.vmp-ketluan {
+  margin: 0 0 12px; padding: 11px 15px;
+  border-left: 4px solid var(--c-line-strong);
   border-radius: 0 12px 12px 0;
+  background: var(--c-surface-sunk);
+  display: flex; flex-direction: column; gap: 4px;
 }
+.vmp-ketluan b {
+  font-size: 14.5px; font-weight: 800; line-height: 1.55; color: var(--c-ink);
+}
+.vmp-ketluan span {
+  font-size: 12.5px; font-weight: 600; line-height: 1.6; color: var(--c-ink-soft);
+}
+.vmp-ketluan--ok   { border-left-color: var(--c-mint); }
+.vmp-ketluan--warn { border-left-color: var(--c-marigold); }
+.vmp-ketluan--over { border-left-color: var(--c-rasp); }
+.vmp-ketluan--over b { color: var(--c-rasp-text); }
+
+/* =====================================================================
+   LỚP THUYẾT MINH TRÊN GANTT (trang Timeline)
+   ===================================================================== */
+.tl-focus { margin-bottom: 18px; }
+
+/* Làn đếm ngược: trục ngang là thời gian tính từ hôm nay. Trái = đã trễ
+   (có màu nhấn, đậm dần theo mức trễ), phải = sắp tới (xám). */
+.tl-focus-lan {
+  position: relative;
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+  padding: 10px 12px 8px; border-radius: 14px;
+  background: var(--c-surface-sunk);
+}
+.tl-focus-o {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  min-width: 0;
+}
+.tl-focus-o > b {
+  font-family: var(--font-num, inherit);
+  font-size: 17px; font-weight: 900; line-height: 1; min-height: 17px;
+  color: var(--c-ink-soft);
+}
+.tl-focus-o--tre > b { color: var(--c-rasp-text); }
+.tl-focus-o--rong { opacity: .45; }
+.tl-focus-cot {
+  width: 100%; height: 44px; display: flex; align-items: flex-end;
+  border-bottom: 1px solid var(--c-line);
+}
+.tl-focus-cot i {
+  display: block; width: 100%; border-radius: 4px 4px 0 0;
+  background: var(--c-ink-soft); opacity: .28;
+  transition: height .5s cubic-bezier(.22,.61,.36,1);
+}
+.tl-focus-o--tre .tl-focus-cot i { background: var(--c-rasp); }
+.tl-focus-o small {
+  font-size: 10.5px; font-weight: 700; line-height: 1.25; text-align: center;
+  color: var(--c-ink-soft);
+}
+/* Vạch "hôm nay" — mốc chia quá khứ với tương lai, đặt sau ô thứ tư. */
+.tl-focus-moc {
+  position: absolute; top: 6px; bottom: 24px; left: calc(66.666% + 1px);
+  border-left: 2px dashed var(--c-pink);
+  font-size: 9.5px; font-weight: 800; letter-spacing: .04em;
+  color: var(--c-pink-text); padding-left: 4px; text-transform: uppercase;
+  pointer-events: none;
+}
+
+.tl-focus-ds { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tl-focus-ds button {
+  width: 100%; display: grid; grid-template-columns: 74px minmax(0, 1fr) auto;
+  align-items: center; gap: 12px; text-align: left; cursor: pointer;
+  padding: 9px 12px; border-radius: 12px;
+  background: var(--c-surface); border: 1px solid var(--c-line);
+  font-family: inherit;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.tl-focus-ds button:hover { border-color: var(--c-pink); transform: translateX(2px); }
+.tl-focus-ngay {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 4px 6px; border-radius: 9px; line-height: 1.1;
+  font-family: var(--font-num, inherit); font-size: 13px; font-weight: 900;
+}
+.tl-focus-ngay small { font-size: 9px; font-weight: 700; opacity: .8; }
+.tl-focus-ngay.is-tre { background: var(--c-rasp-soft); color: var(--c-rasp-text); }
+.tl-focus-ngay.is-toi { background: var(--c-surface-sunk); color: var(--c-ink-soft); }
+.tl-focus-ten { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tl-focus-ten b { font-size: 12px; font-weight: 900; color: var(--c-ink); font-family: ui-monospace, monospace; }
+.tl-focus-ten span {
+  font-size: 13px; font-weight: 700; color: var(--c-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tl-focus-meta { font-size: 11px; font-weight: 700; color: var(--c-ink-soft); white-space: nowrap; }
+.tl-focus-chan {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--c-ink-soft);
+}
+.tl-focus-them {
+  border: none; cursor: pointer; padding: 7px 13px; border-radius: 999px;
+  background: var(--c-rasp-soft); color: var(--c-rasp-text);
+  font-family: inherit; font-size: 12px; font-weight: 800;
+}
+.tl-focus-them:hover { filter: brightness(.96); }
+
+@media (max-width: 720px) {
+  .tl-focus-lan { grid-template-columns: repeat(3, 1fr); row-gap: 12px; }
+  .tl-focus-moc { display: none; }
+  .tl-focus-ds button { grid-template-columns: 66px minmax(0, 1fr); }
+  .tl-focus-meta { grid-column: 2; }
+}
+
+/* =====================================================================
+   BIỂU ĐỒ KIỂM SOÁT (Shewhart p-chart)
+   ===================================================================== */
+.vmp-ctrl-khung { overflow-x: auto; }
+.vmp-ctrl-svg { width: 100%; min-width: 560px; height: auto; display: block; }
+.vmp-ctrl-chu {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--c-ink-soft);
+}
+.vmp-ctrl-chu span { display: inline-flex; align-items: center; gap: 7px; }
+.vmp-ctrl-chu i { width: 16px; height: 0; display: block; flex-shrink: 0; }
+.vmp-ctrl-chu__tam { border-top: 2px solid var(--c-ink); }
+.vmp-ctrl-chu__gh  { border-top: 2px dashed var(--c-rasp-text); }
+.vmp-ctrl-chu__vuot {
+  width: 11px !important; height: 11px !important; border-radius: 999px;
+  background: var(--c-rasp);
+}
+.vmp-ctrl-chu__nay {
+  width: 11px !important; height: 11px !important; border-radius: 999px;
+  background: var(--c-surface); border: 2px dashed var(--c-ink-soft);
+}
+.vmp-ctrl-bangbtn {
+  margin-left: auto; border: 1px solid var(--c-line); cursor: pointer;
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--c-surface); color: var(--c-ink-soft);
+  font-family: inherit; font-size: 11.5px; font-weight: 800;
+}
+.vmp-ctrl-bangbtn:hover { border-color: var(--c-pink); color: var(--c-pink-text); }
+.vmp-ctrl-bang { margin-top: 10px; overflow-x: auto; }
+.vmp-ctrl-bang table { width: 100%; min-width: 520px; border-collapse: collapse; }
+.vmp-ctrl-bang th, .vmp-ctrl-bang td {
+  padding: 7px 10px; text-align: right; font-size: 12.5px;
+  border-bottom: 1px solid var(--c-line);
+}
+.vmp-ctrl-bang th:first-child, .vmp-ctrl-bang td:first-child,
+.vmp-ctrl-bang th:last-child, .vmp-ctrl-bang td:last-child { text-align: left; }
+.vmp-ctrl-bang th { font-weight: 800; color: var(--c-ink-soft); }
+.vmp-ctrl-bang td { font-weight: 700; color: var(--c-ink); }
+.vmp-ctrl-bang tr.is-vuot td { color: var(--c-rasp-text); font-weight: 900; }
