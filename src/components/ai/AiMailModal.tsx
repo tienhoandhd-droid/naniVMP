@@ -20,7 +20,7 @@ import { Mail, Send, RefreshCw, AlertCircle, CheckCircle2, Users, Search } from 
 import { C, TEXT, btnPrimary } from "../../constants/theme.ts";
 import { Modal, Tag, TableScroll } from "../ui/Primitives.tsx";
 import { fetchAlertRecipients, fetchStaffEmails, fetchPerformers } from "../../lib/supabaseData.ts";
-import { chayPhanTichAi, emailHopLe, tachEmail } from "../../lib/aiReport.ts";
+import { chayPhanTichAi, emailHopLe, tachEmail, AI_NHAN } from "../../lib/aiReport.ts";
 import type { AiKind, AiPeriod, AiResult } from "../../lib/aiReport.ts";
 
 /** Một dòng chọn được trong danh bạ — gộp từ ba bảng khác nhau. */
@@ -153,7 +153,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
 
   return (
     <Modal onClose={onClose} wide icon={Mail}
-      title={`Gửi bản phân tích AI · ${loai === "canh_bao" ? "cảnh báo" : "báo cáo quản lý"}`}>
+      title={`Gửi bản phân tích AI · ${AI_NHAN[loai].toLowerCase()}`}>
       <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 14, lineHeight: 1.65 }}>
         Phạm vi gửi: <b style={{ color: C.plum }}>{phamViLabel}</b>
         {ky ? <> · kỳ <b style={{ color: C.plum }}>{ky.nhan}</b></> : null}.

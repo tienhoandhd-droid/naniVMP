@@ -19,7 +19,7 @@
 import { useMemo, useState } from "react";
 import {
   FileBarChart, Printer, Download, RefreshCw, AlertCircle, Sparkles as SparkIcon,
-  Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2, Mail,
+  Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2, Mail, Layers,
 } from "lucide-react";
 
 import { C, TEXT, NUM, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
@@ -35,7 +35,8 @@ import {
   svgMonthlyTargetChart, svgDeptBottleneckChart, svgDeptWorkloadChart, deptColorMap, SCREEN_PALETTE,
 } from "../../lib/reportCharts.ts";
 import { buildManagementReportHTML } from "../../lib/reportHtml.ts";
-import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT } from "../../lib/aiReport.ts";
+import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT, AI_NHAN } from "../../lib/aiReport.ts";
+import type { AiKind } from "../../lib/aiReport.ts";
 import AiMailModal from "../ai/AiMailModal.tsx";
 import ChiTietKyModal from "./ChiTietKyModal.tsx";
 import type { GiaiDoan } from "./ChiTietKyModal.tsx";
@@ -62,6 +63,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [critSel, setCritSel] = useState<string[]>([]);
   const [ky, setKy] = useState<Period>(() => periodNow());
   const [ai, setAi] = useState("");
+  // Loại phân tích của bản đang hiện — quyết định nhãn hiển thị và loại mail
+  // sẽ gửi, để không bao giờ gắn nhãn "phân tích sâu" lên một bản nhận xét
+  // thường (hoặc ngược lại).
+  const [loaiAi, setLoaiAi] = useState<AiKind>("bao_cao");
   const [loadingAi, setLoadingAi] = useState(false);
   const [errAi, setErrAi] = useState("");
   const [moGuiMail, setMoGuiMail] = useState(false);
@@ -230,10 +235,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
   // Chỉ chạy AI, không gửi mail. Nút gửi mail nằm riêng và mở hộp thoại chọn
   // người nhận — gộp hai việc vào một nút thì không ai dám bấm thử.
-  const generateAi = async () => {
-    setLoadingAi(true); setErrAi(""); setAi("");
+  const generateAi = async (loai: AiKind) => {
+    setLoadingAi(true); setErrAi(""); setAi(""); setLoaiAi(loai);
     try {
-      const r = await chayPhanTichAi({ loai: "bao_cao", pham_vi: deptScope, ky: kyChoAi });
+      const r = await chayPhanTichAi({ loai, pham_vi: deptScope, ky: kyChoAi });
       if (r.ok && r.ai_text) setAi(r.ai_text);
       else setErrAi(r.error ? `Lỗi AI: ${r.error}` : "Không nhận được phản hồi AI từ n8n.");
     } catch (ex) { setErrAi((ex as Error)?.message || "Lỗi kết nối n8n."); }
@@ -677,15 +682,29 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               bản deploy thiếu biến môi trường, người dùng tưởng chức năng
               không tồn tại thay vì biết là chưa cấu hình. */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={generateAi} disabled={loadingAi || !aiConfigured()}
-              title={aiConfigured() ? undefined : AI_SETUP_HINT}
+            <button onClick={() => generateAi("bao_cao")} disabled={loadingAi || !aiConfigured()}
+              title={aiConfigured() ? "Nhận xét trên số đã tổng hợp — nhanh, rẻ" : AI_SETUP_HINT}
               style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
                 borderRadius: 12, fontSize: 13.5, opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
                 cursor: loadingAi || !aiConfigured() ? "not-allowed" : "pointer" }}>
-              {loadingAi ? <RefreshCw size={16} className="spin" /> : <SparkIcon size={16} />} {loadingAi ? "AI đang phân tích…" : "Thêm nhận xét AI"}
+              {loadingAi && loaiAi === "bao_cao" ? <RefreshCw size={16} className="spin" /> : <SparkIcon size={16} />}
+              {loadingAi && loaiAi === "bao_cao" ? "AI đang phân tích…" : "Thêm nhận xét AI"}
+            </button>
+            {/* Nút thứ hai chạy nhánh khác hẳn: AI đọc TỪNG DÒNG dữ liệu thô để
+                tìm quy luật chéo hạng mục, không phải diễn giải số đã gộp.
+                Nặng token hơn nhiều nên tách nút riêng, và nói thẳng trong
+                tooltip là dùng theo tuần/tháng chứ không phải mỗi lần mở trang. */}
+            <button onClick={() => generateAi("phan_tich_sau")} disabled={loadingAi || !aiConfigured()}
+              title={aiConfigured()
+                ? "AI đọc từng dòng dữ liệu thô để tìm quy luật lặp (cùng khu vực, cùng loại thẩm định, chuỗi hạn dồn). Nặng hơn nhiều — nên chạy theo tuần hoặc tháng."
+                : AI_SETUP_HINT}
+              style={{ ...toolBtn(C.skySoft, C.skyText), opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
+                cursor: loadingAi || !aiConfigured() ? "not-allowed" : "pointer" }}>
+              {loadingAi && loaiAi === "phan_tich_sau" ? <RefreshCw size={16} className="spin" /> : <Layers size={16} />}
+              {loadingAi && loaiAi === "phan_tich_sau" ? "Đang đọc dữ liệu thô…" : "Phân tích sâu dữ liệu"}
             </button>
             <button onClick={() => setMoGuiMail(true)} disabled={!aiConfigured()}
-              title={aiConfigured() ? "Chạy AI rồi gửi bản phân tích qua email" : AI_SETUP_HINT}
+              title={aiConfigured() ? `Chạy lại AI (${AI_NHAN[loaiAi].toLowerCase()}) rồi gửi qua email` : AI_SETUP_HINT}
               style={{ ...toolBtn(C.lavSoft, C.lavText), opacity: aiConfigured() ? 1 : 0.55,
                 cursor: aiConfigured() ? "pointer" : "not-allowed" }}>
               <Mail size={16} /> Gửi mail phân tích
@@ -713,8 +732,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <div style={{ marginTop: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
               <SparkIcon size={16} color={C.lavText} />
-              <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.plum }}>Nhận xét AI</span>
+              <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.plum }}>{AI_NHAN[loaiAi]}</span>
               <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
+              {loaiAi === "phan_tich_sau" && (
+                <Tag color={C.skyText} bg={C.skySoft}>Đọc từng dòng dữ liệu thô · mọi nhận định phải dẫn mã</Tag>
+              )}
             </div>
             <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8, fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`, borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{ai}</div>
           </div>
@@ -732,7 +754,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {moGuiMail && (
         <AiMailModal
-          loai="bao_cao" phamVi={deptScope} phamViLabel={scopeLabel} ky={kyChoAi}
+          loai={loaiAi} phamVi={deptScope} phamViLabel={scopeLabel} ky={kyChoAi}
           onClose={() => setMoGuiMail(false)}
           onDone={(r) => { if (r.ai_text) { setAi(r.ai_text); setErrAi(""); } }}
         />

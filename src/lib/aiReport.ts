@@ -14,8 +14,19 @@
  *  đang mở đã cũ tới đâu.
  * ===================================================================== */
 
-/** Loại phân tích — quyết định prompt bên n8n. */
-export type AiKind = "bao_cao" | "canh_bao";
+/** Loại phân tích — quyết định prompt bên n8n.
+ *  - bao_cao      : nhận xét cho báo cáo quản lý (số đã gộp)
+ *  - canh_bao     : phân tích quá hạn / sắp tới hạn (số đã gộp)
+ *  - phan_tich_sau: đọc DANH SÁCH TỪNG DÒNG để tìm quy luật chéo hạng mục.
+ *    Nặng token hơn hẳn hai loại kia (~89KB prompt) nên dùng theo tuần/tháng,
+ *    đừng gắn vào lịch chạy hằng ngày. */
+export type AiKind = "bao_cao" | "canh_bao" | "phan_tich_sau";
+
+export const AI_NHAN: Record<AiKind, string> = {
+  bao_cao: "Nhận xét AI cho báo cáo",
+  canh_bao: "Phân tích cảnh báo",
+  phan_tich_sau: "Phân tích sâu dữ liệu",
+};
 
 /** Kỳ báo cáo — AI phải đọc ĐÚNG lát cắt đang hiện trên màn hình.
  *  Thiếu kỳ thì n8n lấy cả năm hiện tại (hành vi cũ). */
