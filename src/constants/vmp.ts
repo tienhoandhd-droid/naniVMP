@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3, Scale,
+  ShieldCheck, Radar, BarChart3, Scale, ClipboardList,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -99,14 +99,23 @@ export const PERM_LABEL = { admin: "Quản trị", edit: "Chỉnh sửa", view: 
 
 // ======================== NAVIGATION ========================
 export const NAV_ITEMS = [
+  /* HÔM NAY đứng đầu, và nằm ở nhóm THỰC HIỆN chứ không phải GIÁM SÁT.
+     App có bảy màn để đọc trên hai màn để làm, trong khi việc hằng ngày của
+     QA là làm chứ không phải đọc. Màn này là cửa vào của việc đó. */
+  { id: "today", label: "Hôm nay", icon: ClipboardList, group: "work" },
+
   // GIÁM SÁT — nhìn tình hình, không sửa gì
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard, group: "monitor" },
   { id: "timeline", label: "Timeline VMP", icon: GanttChartSquare, group: "monitor" },
   { id: "alerts", label: "Cảnh báo & Rủi ro", icon: AlertCircle, group: "monitor" },
 
   // THỰC HIỆN — việc làm hằng ngày, có ghi dữ liệu
+  /* MỘT mục nhập liệu, không phải hai. "Cập nhật tiến độ" và "Tiến độ theo
+     đối tượng" dùng cùng một hộp sửa và cùng một luật — chính app tự ghi như
+     vậy — chỉ khác cách NHÓM dòng. Hai mục nav cho một việc buộc người dùng
+     phải nhớ "cái nào có thứ mình cần". Nay gộp: vào một chỗ rồi chọn cách
+     nhóm. Màn `inventory` vẫn còn để URL cũ không chết. */
   { id: "progress", label: "Cập nhật tiến độ", icon: Pencil, group: "work" },
-  { id: "inventory", label: "Tiến độ theo đối tượng", icon: Boxes, group: "work" },
   { id: "source", label: "Danh mục & Nhập liệu", icon: Boxes, group: "work" },
 
   // PHÂN TÍCH — ra quyết định
@@ -123,6 +132,7 @@ export const NAV_ITEMS = [
 ];
 
 export const NAV_SUBS = {
+  today: "Việc của tôi hôm nay — đã trễ, tới hạn trong 7 ngày, và hồ sơ cần điền nốt",
   overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
   timeline: "Tổng quan tải việc theo tháng · Timeline các mốc Đề cương → Thẩm định → Báo cáo → Đích VMP",
   alerts: "Cảnh báo tới hạn / quá hạn / tái thẩm định — xếp theo điểm rủi ro ICH Q9, kèm ma trận QRM",

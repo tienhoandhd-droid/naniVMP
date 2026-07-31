@@ -6437,3 +6437,102 @@ body { transition: background var(--mo-slow) var(--ease); }
   font-size: 11.5px; font-weight: 700; color: var(--c-ink-soft);
 }
 .vmp-nhiet-chu i { width: 22px; height: 11px; border-radius: 3px; display: block; }
+
+/* Chú thích ⓘ cạnh con số — xem GiaiThich trong Primitives.tsx. */
+.vmp-gt { display: inline-block; position: relative; vertical-align: middle; }
+.vmp-gt > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  width: 15px; height: 15px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--c-surface-sunk); border: 1px solid var(--c-line);
+  color: var(--c-ink-soft);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10.5px; font-weight: 700; font-style: italic; line-height: 1;
+}
+.vmp-gt > summary::-webkit-details-marker { display: none; }
+.vmp-gt > summary:hover,
+.vmp-gt[open] > summary { background: var(--c-pink-soft); border-color: var(--c-pink); color: var(--c-pink-text); }
+.vmp-gt-noi {
+  position: absolute; z-index: 70; top: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%);
+  width: max-content; max-width: 300px;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 13px; border-radius: 12px;
+  background: var(--c-surface-raised); border: 1px solid var(--c-line-strong);
+  box-shadow: var(--e-high);
+  font-size: 12px; font-weight: 600; line-height: 1.55; color: var(--c-ink-soft);
+  white-space: normal; text-align: left; text-transform: none; letter-spacing: 0;
+}
+.vmp-gt-noi b { font-size: 12.5px; font-weight: 800; color: var(--c-ink); }
+
+/* =====================================================================
+   MÀN "HÔM NAY" — việc của tôi, xử ngay tại chỗ
+   ===================================================================== */
+.hn-ds { display: flex; flex-direction: column; gap: 7px; }
+.hn-dong {
+  display: grid; grid-template-columns: 76px minmax(0, 1fr) auto auto auto;
+  align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--c-surface); border: 1px solid var(--c-line);
+}
+.hn-dong:hover { border-color: var(--c-pink); }
+.hn-ngay {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 4px 6px; border-radius: 9px; line-height: 1.1;
+  font-family: var(--font-num, inherit); font-size: 13px; font-weight: 900;
+}
+.hn-ngay small { font-size: 9px; font-weight: 700; opacity: .8; }
+.hn-ngay.is-tre { background: var(--c-rasp-soft); color: var(--c-rasp-text); }
+.hn-ngay.is-toi { background: var(--c-marigold-soft); color: var(--c-marigold-text); }
+.hn-ten { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.hn-ten b { font-size: 12px; font-weight: 900; color: var(--c-ink); font-family: ui-monospace, monospace; }
+.hn-ten > span {
+  font-size: 13.5px; font-weight: 700; color: var(--c-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-meta { font-size: 11.5px; font-weight: 700; color: var(--c-ink-soft); white-space: nowrap; }
+.hn-nut {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 7px 13px; border-radius: 10px; cursor: pointer;
+  border: none; background: var(--grad); color: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 800;
+}
+.hn-nut:hover { filter: brightness(1.05); }
+.hn-them {
+  margin-top: 10px; align-self: flex-start;
+  padding: 8px 15px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--c-line); background: var(--c-surface); color: var(--c-ink-soft);
+  font-family: inherit; font-size: 12.5px; font-weight: 800;
+}
+.hn-them:hover { border-color: var(--c-pink); color: var(--c-pink-text); }
+
+@media (max-width: 860px) {
+  .hn-dong { grid-template-columns: 70px minmax(0, 1fr) auto; row-gap: 8px; }
+  .hn-meta { grid-column: 2 / -1; }
+}
+
+/* =====================================================================
+   CHẾ ĐỘ THANH TRA
+   ---------------------------------------------------------------------
+   Không bỏ phong cách đi — chỉ tắt phần dễ bị hiểu nhầm khi hệ thống được
+   trình cho thanh tra GMP: linh vật, biệt danh, lời chào thân mật, và xếp
+   hạng cá nhân. Số liệu không đổi một chữ nào.
+   ===================================================================== */
+:root[data-thanhtra="1"] .vmp-an-thanhtra { display: none !important; }
+:root[data-thanhtra="1"] .tw,
+:root[data-thanhtra="1"] .vq-login-crown { display: none !important; }
+
+/* Nút đổi cách nhóm ở màn nhập liệu (D17) — cùng kiểu với nút đổi 3D/2D. */
+.vmp-doi-nhom {
+  display: inline-flex; gap: 3px; padding: 3px; margin-bottom: 14px;
+  background: var(--c-surface-sunk); border-radius: 999px;
+}
+.vmp-doi-nhom button {
+  border: none; cursor: pointer; padding: 8px 17px; border-radius: 999px;
+  background: transparent; color: var(--c-ink-soft);
+  font-family: inherit; font-size: 13px; font-weight: 800;
+  transition: background 140ms ease, color 140ms ease;
+}
+.vmp-doi-nhom button.is-chon {
+  background: var(--c-surface); color: var(--c-ink); box-shadow: var(--e-low);
+}

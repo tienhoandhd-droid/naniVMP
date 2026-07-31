@@ -290,10 +290,13 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
     : oCount >= 3 || erate < 30 ? "worried"
     : "happy";
 
-  // Greeting theo giờ trong ngày
+  /* Lời chào theo giờ. Ở chế độ thanh tra thì thay bằng một câu nêu phạm vi
+     — vẫn có một dòng mở đầu, chỉ là không hỏi thăm giờ giấc của người đọc. */
+  const thanhTra = laThanhTra();
   const h = new Date().getHours();
   let greeting = "Xin chào!";
-  if (h >= 5 && h < 11) greeting = "Chào buổi sáng!";
+  if (thanhTra) greeting = "Tổng hợp tình hình thẩm định";
+  else if (h >= 5 && h < 11) greeting = "Chào buổi sáng!";
   else if (h >= 11 && h < 13) greeting = "Chúc bữa trưa ngon miệng!";
   else if (h >= 13 && h < 17) greeting = "Chào buổi chiều!";
   else if (h >= 17 && h < 22) greeting = "Chào buổi tối!";
@@ -373,7 +376,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
             color: "#5A2F6E",
             letterSpacing: "-0.005em",
           }}>
-            Công chúa Vali
+            {thanhTra ? "Trợ lý phân tích" : "Công chúa Vali"}
           </div>
           <div style={{
             fontSize: 12,
@@ -994,6 +997,82 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
     </div>
   );
 }
+
+/* ======================== CHẾ ĐỘ THANH TRA ========================
+ * Một công tắc, ghi ở localStorage, đọc được từ mọi nơi mà không cần
+ * context: `document.documentElement[data-thanhtra]`.
+ *
+ * Vì sao cần: hệ này có thể được cho thanh tra GMP xem. Giọng thân mật
+ * ("Khuya rồi nhỉ?"), emoji 😵💪, biệt danh "công chúa Vali" và bảng xếp
+ * hạng cá nhân đều là gu riêng của nơi dùng — nhưng trong một buổi thanh
+ * tra thì chúng làm người đọc nghi ngờ mức nghiêm túc của cả hệ thống, kể
+ * cả khi số liệu hoàn toàn đúng.
+ *
+ * Cách xử: KHÔNG bỏ phong cách đi. Giữ nguyên ở chế độ thường, và cho bật
+ * một chế độ trung tính khi cần. Bật/tắt không đụng tới dữ liệu, chỉ đổi
+ * cách trình bày — nên không có chuyện "hai bản số liệu khác nhau".
+ */
+export function dungThanhTra(): [boolean, (v: boolean) => void] {
+  const [bat, setBat] = useState(() => {
+    try { return localStorage.getItem("vmp-thanhtra") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute("data-thanhtra", bat ? "1" : "0");
+    try {
+      if (bat) localStorage.setItem("vmp-thanhtra", "1");
+      else localStorage.removeItem("vmp-thanhtra");
+    } catch { /* localStorage bị chặn thì vẫn chạy, chỉ không nhớ */ }
+  }, [bat]);
+  return [bat, setBat];
+}
+
+/** Đọc trạng thái chế độ thanh tra ở nơi không tiện dùng hook. */
+export const laThanhTra = (): boolean =>
+  typeof document !== "undefined"
+  && document.documentElement.getAttribute("data-thanhtra") === "1";
+
+/** Bỏ emoji khỏi một câu khi đang ở chế độ thanh tra. */
+export function chuTrungTinh(t: string): string {
+  if (!laThanhTra()) return t;
+  return t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s{2,}/g, " ").trim();
+}
+
+/* ======================== CHÚ THÍCH ⓘ ========================
+ * Một dấu ⓘ đặt NGAY CẠNH con số nó giải thích.
+ *
+ * Hai vấn đề mà nó xử:
+ *  1. Cùng một trang có 461 / 448 / 443 "tổng hạng mục". Mỗi con số có định
+ *     nghĩa riêng và đều đúng, nhưng người vận hành không đọc được định
+ *     nghĩa đó từ giao diện — nên kết luận duy nhất rút ra được là "web
+ *     hiển thị lung tung". Mất niềm tin vào số liệu là mất tất cả.
+ *  2. Các câu giải thích luật rất có giá trị nhưng nằm cuối trang, chữ nhỏ.
+ *     Người ta cần chúng lúc ĐANG phân vân, không phải sau khi cuộn hết.
+ *
+ * Dùng <details>/<summary> chứ không phải tooltip hover: bàn phím mở được,
+ * điện thoại chạm được, và trình đọc màn hình đọc được nội dung.
+ */
+export function GiaiThich({ tieuDe, children }: { tieuDe?: string; children: ReactNode }) {
+  return (
+    <details className="vmp-gt">
+      <summary aria-label={tieuDe || "Giải thích con số này"} title={tieuDe || "Giải thích con số này"}>
+        <span aria-hidden="true">i</span>
+      </summary>
+      <div className="vmp-gt-noi">
+        {tieuDe && <b>{tieuDe}</b>}
+        {children}
+      </div>
+    </details>
+  );
+}
+
+/** Định nghĩa các mẫu số hay bị nhầm với nhau — dùng chung mọi trang. */
+export const MAU_SO = {
+  tatCa: "Mọi hạng mục đang hoạt động, KỂ CẢ hạng mục chưa có mốc đích VMP.",
+  coMoc: "Chỉ hạng mục ĐÃ có mốc đích VMP (bất kỳ năm nào).",
+  trongNam: "Chỉ hạng mục có mốc đích VMP rơi vào năm đang chọn.",
+  quaHanTrangThai: "Đếm theo TRẠNG THÁI TỔNG của hạng mục đang là \"quá hạn\".",
+  quaHanMoc: "Đếm hạng mục có ÍT NHẤT MỘT MỐC (đề cương / thẩm định / báo cáo) đã trôi qua, kể cả khi trạng thái tổng chưa đổi. Số này luôn ≥ số đếm theo trạng thái.",
+};
 
 /* ======================== PHÂN TRANG ========================
  * Thay nút "Hiện thêm" đơn độc. Nút đó bắt bấm 6–7 lần mới thấy hết danh

@@ -11,7 +11,7 @@ import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
 
-export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true }: {
+export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true, focusId, onFocusDone }: {
   acts: PlanActivity[];
   /** Không dùng index signature để nhận được cả ConnState (status là union). */
   conn?: { status?: string; msg?: string };
@@ -25,6 +25,9 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   ) => void;
   onReload?: () => void;
   readOnly?: boolean;
+  /** Mã hạng mục cần nhảy tới — màn "Hôm nay" truyền vào khi bấm Cập nhật. */
+  focusId?: string;
+  onFocusDone?: () => void;
 }) {
   const [q, setQ] = useState("");
   const [fst, setFst] = useState("all");
@@ -40,7 +43,22 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   // Phân trang thật thay nút "Hiện thêm" (phải bấm 7 lần mới hết 461 dòng).
   const [trang, setTrang] = useState(0);
   const [coTrang, setCoTrang] = useState(100);
-  const inWindow = useMemo(() => acts.filter((a) => inPeriod(a, period)), [acts, period]);
+  /* D18 — hàng đã ngừng (Không áp dụng / Đã huỷ) ẨN mặc định.
+     Trước đây chúng nằm xen giữa danh sách làm việc với nhãn "⊘ Xem/khôi
+     phục", nên mỗi lần quét mắt xuống là một lần phải phân biệt "dòng này
+     có phải việc của mình không". Chúng vẫn tra được, chỉ là không chen vào
+     luồng làm việc hằng ngày nữa. */
+  const [hienNgung, setHienNgung] = useState(false);
+  const inWindow = useMemo(() => acts.filter((a) => {
+    if (!inPeriod(a, period)) return false;
+    if (hienNgung) return true;
+    const st = String(a.state || (a._raw && (a._raw as Record<string, unknown>).state) || "active");
+    return st === "active";
+  }), [acts, period, hienNgung]);
+  const soNgung = useMemo(() => acts.filter((a) => {
+    const st = String(a.state || (a._raw && (a._raw as Record<string, unknown>).state) || "active");
+    return st !== "active";
+  }).length, [acts]);
   // Tính giai đoạn 1 lần/hạng mục rồi tái dùng (trước đây stageOf chạy ~7 lần/hàng).
   const stageByItem = useMemo(() => {
     const m = new Map();
@@ -125,7 +143,19 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   );
   // Đổi bộ lọc thì về trang đầu — không thì đang ở trang 5 mà danh sách mới
   // chỉ có 2 trang, màn hình rỗng và trông như mất dữ liệu.
-  useEffect(() => { setTrang(0); }, [stageF, fix, fst, kw, period]);
+  useEffect(() => { setTrang(0); }, [stageF, fix, fst, kw, period, hienNgung]);
+
+  /* Nhảy tới đúng hạng mục mà màn "Hôm nay" vừa bấm: đổ mã vào ô tìm và bỏ
+     mọi bộ lọc đang chắn, vì hạng mục đó có thể không nằm trong lát cắt hiện
+     tại — bấm Cập nhật mà ra danh sách rỗng thì tệ hơn là không có nút. */
+  useEffect(() => {
+    if (!focusId) return;
+    setQ(focusId);
+    setFix("all"); setStageF("all"); setFst("all"); setPeriod("all");
+    setTrang(0);
+    onFocusDone?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all";
   const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); setQ(""); setPeriod("all"); };
@@ -148,6 +178,17 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
             <Search size={16} color={C.plumSoft} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo mã, tên, QA…" style={{ ...INP, paddingLeft: 36 }} />
           </div>
+          {soNgung > 0 && (
+            <label title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc"
+              style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer",
+                       padding: "0 12px", borderRadius: 10, border: `1px solid ${hienNgung ? C.marigold : C.pinkSoft}`,
+                       background: hienNgung ? C.marigoldSoft : C.surface,
+                       fontFamily: TEXT, fontSize: 12.5, fontWeight: 800,
+                       color: hienNgung ? C.marigoldText : C.plumSoft }}>
+              <input type="checkbox" checked={hienNgung} onChange={(e) => setHienNgung(e.target.checked)} />
+              Hiện cả mục đã ngừng ({soNgung})
+            </label>
+          )}
           <select value={fst} onChange={(e) => setFst(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 200 }}>
             <option value="all">Tất cả trạng thái</option>
             {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
