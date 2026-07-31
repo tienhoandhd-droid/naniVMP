@@ -66,9 +66,9 @@ items_nam as (
   where p.is_active and coalesce(p.item_state, 'active') = 'active'
     -- "Thuộc năm N" = MỐC ĐÍCH VMP rơi vào năm N, đúng như web (hanVmp trong
     -- reportModel.ts). Bản cũ lọc theo cột p.year — là năm trong mã hạng mục,
-    -- KHÔNG phải năm của hạn. Hai cái này hiện trùng nhau nên chưa lộ ra,
-    -- nhưng một hạng mục 2026 bị dời hạn sang tháng 1/2027 sẽ nằm ở 2027 trên
-    -- web và ở 2026 trong mail AI — hai con số khác nhau cho cùng một câu hỏi.
+    -- KHÔNG phải năm của hạn. Hai cái này hiện trùng nhau nên chưa lộ ra, nhưng
+    -- một hạng mục 2026 bị dời hạn sang tháng 1/2027 sẽ nằm ở 2027 trên web và
+    -- ở 2026 trong mail AI — hai con số khác nhau cho cùng một câu hỏi.
     and ( extract(year from p.deadline_vmp)::int = (select nam from pv)
           -- Hạng mục CHƯA có mốc đích không rơi vào năm nào theo hạn. Vẫn kéo
           -- vào theo năm kế hoạch để mục chất lượng dữ liệu bên dưới còn nêu
@@ -77,8 +77,6 @@ items_nam as (
     and ((select bp from pv) = 'all' or (select bp from pv) = any(coalesce(p.departments, array[]::text[])))
 ),
 items as (
-  -- trang_thai ở đây là trạng thái CỦA MỐC đang chọn, không phải computed_status
-  -- (vốn luôn là trạng thái VMP tổng). Mọi phép đếm done/over bên dưới dùng cột này.
   select *,
     case when da_xong then 'done'
          when han < current_date then 'over'
@@ -87,8 +85,6 @@ items as (
   where han is not null
     and extract(month from han)::int between (select thang_tu from pv) and (select thang_den from pv)
 ),
--- Kỳ SAU có thể rơi sang năm khác nên phải đọc lại bảng gốc, không lọc từ
--- items_nam (vốn chỉ chứa năm của kỳ đang xem).
 items_sau as (
   select
     p.validation_code as ma, o.name as ten,
@@ -112,11 +108,10 @@ select jsonb_build_object(
   'thang_den', (select thang_den from pv),
   'ngay_chay', current_date,
   'tong_hang_muc', (select count(*) from items),
-  -- Đếm CÓ MỐC ĐÍCH, để khớp ô "Tổng hạng mục năm N" trên web (443, không
-  -- phải 448). Web loại hạng mục thiếu mốc đích ra khỏi mọi phép tính năm và
-  -- kể riêng chúng ở mục chất lượng dữ liệu; ở đây cũng vậy — xem
-  -- 'chua_co_moc_dich' ngay bên dưới. Trước đây mail AI viết 448 trong khi
-  -- dashboard hiện 443, người đọc không biết tin con nào.
+  -- Đếm CÓ MỐC ĐÍCH, để khớp ô "Tổng hạng mục năm N" trên web (443, không phải
+  -- 448). Web loại hạng mục thiếu mốc đích ra khỏi mọi phép tính năm và kể
+  -- riêng chúng ở mục chất lượng dữ liệu; ở đây cũng vậy — xem
+  -- 'chua_co_moc_dich' bên dưới.
   'tong_hang_muc_ca_nam', (select count(*) from items_nam where han is not null),
   'theo_trang_thai', (select jsonb_object_agg(trang_thai, n) from (select trang_thai, count(*) n from items group by 1) x),
   'theo_bo_phan', (select jsonb_agg(jsonb_build_object('bo_phan', bp, 'tong', n, 'xong', xong, 'qua_han', qh) order by qh desc) from (
@@ -135,20 +130,16 @@ select jsonb_build_object(
   'qua_han', (select coalesce(jsonb_agg(jsonb_build_object('ma', ma, 'ten', ten, 'loai', loai, 'nguoi', nguoi,
         'diem', diem, 'han', han, 'tre_ngay', tre_ngay, 'bo_phan', bo_phan) order by diem desc, tre_ngay desc), '[]'::jsonb)
       from (select * from items where trang_thai = 'over' order by diem desc, tre_ngay desc limit 80) q),
-  -- Việc sắp tới hạn KHÔNG thuộc kỳ nào nên đọc từ items_nam: nếu cắt theo kỳ
-  -- đã qua thì mục này luôn rỗng, mà đó lại là phần hữu ích nhất của bản cảnh báo.
   'sap_toi_han_60_ngay', (select coalesce(jsonb_agg(jsonb_build_object('ma', ma, 'ten', ten, 'nguoi', nguoi,
         'diem', diem, 'han', han, 'con_ngay', -tre_ngay) order by han), '[]'::jsonb)
       from (select * from items_nam where not da_xong and han between current_date and current_date + 60 order by han limit 80) s),
   'loi_ho_so', (select coalesce(jsonb_agg(jsonb_build_object('ma', ma, 'nguoi', nguoi, 'loi', loi) order by ma), '[]'::jsonb) from (
       select ma, nguoi, 'ghi hoàn thành nhưng thiếu ngày thực tế' as loi from items where trang_thai='done' and ngay_xong is null
-      union all select ma, nguoi, 'thiếu deadline VMP' from items_nam where han is null
-      union all select ma, nguoi, 'trọng yếu cao (>=7) nhưng chưa bắt đầu' from items where diem >= 7 and trang_thai = 'plan'
+      union all select ma, nguoi, 'thiếu mốc đích VMP' from items_nam where han is null
+      union all select ma, nguoi, 'trọng yếu cao (>=7) nhưng chưa xong' from items where diem >= 7 and trang_thai <> 'done'
       limit 100) l),
   'chua_phan_cong', (select count(*) from items where nguoi = 'chưa phân công'),
   'chua_co_moc_dich', (select count(*) from items_nam where han is null),
-  -- Biểu đồ xu hướng: LUÔN 12 tháng của năm, đọc từ items_nam. Kỳ đang xem chỉ
-  -- để tô đậm ở phía web, không được cắt bớt dữ liệu ở đây.
   'theo_thang', (
     select jsonb_agg(jsonb_build_object(
       'thang', m, 'can_hoan_thanh', coalesce(x.due_n, 0), 'da_hoan_thanh', coalesce(x.done_n, 0),
@@ -185,19 +176,12 @@ select jsonb_build_object(
       group by bp
     ) bc
   ),
-  -- Việc của KỲ SAU (web tính nextPeriod rồi truyền xuống $5/$6/$7).
-  -- Việc của KỲ SAU (web tính nextPeriod rồi truyền xuống $5/$6/$7). Dùng CTE
-  -- items_sau cho gọn: lặp lại lateral chỉ để lấy `han` theo mốc là chỗ dễ sai.
   'thang_toi', (
     select coalesce(jsonb_agg(jsonb_build_object(
       'ma', ma, 'ten', ten, 'nguoi', nguoi, 'diem', diem, 'han', han, 'bo_phan', bo_phan
     ) order by han), '[]'::jsonb)
     from (select * from items_sau order by han limit 100) tt
   ),
-  -- Tổng quan CẢ NĂM cho mục 1 của dashboard trong mail — phải khớp mục 1 trên
-  -- web, tức phễu 4 giai đoạn + 7 nhóm giai đoạn, tính trên items_nam.
-  -- Luật xếp nhóm giai đoạn giống hệt stageOf() trong src/utils/helpers.ts;
-  -- sửa một bên phải sửa bên kia, nếu không mail và web đếm khác nhau.
   'tong_quan_nam', (
     select jsonb_build_object(
       'tong', count(*),
@@ -248,12 +232,10 @@ select jsonb_build_object(
         or (r.scope_type = 'bộ phận' and lower(btrim(coalesce(r.scope, ''))) = (select bp from pv))
       )
   ),
-  -- Dữ liệu thô đầy đủ của kỳ — vừa để AI dẫn chứng, vừa để xuất CSV đính kèm
-  -- mail (người dùng chốt 2026-07-31: mail phải có cả dữ liệu thô lẫn phân tích).
   'chi_tiet_toan_bo', (select coalesce(jsonb_agg(jsonb_build_object('ma', ma, 'ten', ten, 'loai', loai,
         'bo_phan', bo_phan, 'khu_vuc', khu_vuc, 'nguoi', nguoi, 'diem', diem, 'han', han, 'trang_thai', trang_thai,
         'tre_ngay', tre_ngay, 'dl_de_cuong', dl_de_cuong, 'dl_tham_dinh', dl_tham_dinh, 'dl_bao_cao', dl_bao_cao,
-        'ngay_xong', ngay_xong, 'da_xong', da_xong, 'trang_thai_vmp', trang_thai_vmp,
+        'ngay_xong', ngay_xong, 'trang_thai_vmp', trang_thai_vmp,
         'de_cuong', tt_de_cuong, 'tham_dinh', tt_tham_dinh, 'bao_cao', tt_bao_cao, 'vmp', tt_vmp) order by ma), '[]'::jsonb)
       from items)
 ) as du_lieu
