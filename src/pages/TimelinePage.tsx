@@ -286,7 +286,7 @@ function ControlButton({ active, children, onClick, title }: {
         padding: "9px 14px",
         cursor: "pointer",
         fontFamily: TEXT,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: 900,
         boxShadow: active ? "0 8px 18px rgba(142,111,208,.23)" : "none",
       }}
@@ -325,14 +325,14 @@ export function RangeStat({ label, value, tone = "plum", sub }: {
     <div style={{
       minWidth: 128,
       flex: "1 1 128px",
-      borderRadius: 18,
+      borderRadius: 14,
       padding: "13px 14px",
       background: bg,
       border: "1px solid rgba(255,255,255,.7)",
     }}>
-      <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: .35, textTransform: "uppercase", color }}>{label}</div>
-      <div className="tnum" style={{ fontFamily: NUM, fontSize: 27, lineHeight: 1.02, fontWeight: 900, color, marginTop: 3 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft, marginTop: 3 }}>{sub}</div>}
+      <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: .35, textTransform: "uppercase", color }}>{label}</div>
+      <div className="tnum" style={{ fontFamily: NUM, fontSize: 28, lineHeight: 1.02, fontWeight: 900, color, marginTop: 3 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
@@ -1503,28 +1503,28 @@ function ActivityDetailModal({ a, onClose }: { a: Activity | null; onClose: () =
   return (
     <Modal onClose={onClose} title="Chi tiết hạng mục" icon={FileText} wide>
       <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 6 }}>
-        <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: cls.text, background: cls.soft, padding: "4px 10px", borderRadius: 9 }}>{a.code}</span>
+        <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 800, color: cls.text, background: cls.soft, padding: "4px 10px", borderRadius: 8 }}>{a.code}</span>
         <Tag color={cls.text} bg={cls.soft}>{a.vtype}</Tag>
         <Tag color={ct.text} bg={ct.soft}>Rủi ro {a.crit}</Tag>
         <Pill s={a.st} small />
       </div>
-      <div style={{ fontFamily: TEXT, fontSize: 18, fontWeight: 800, color: C.plum, marginBottom: 16 }}>{a.name}</div>
+      <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum, marginBottom: 16 }}>{a.name}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 9, marginBottom: 14 }}>
-        {info.map(([k, v]) => <div key={k} style={{ background: C.surface, borderRadius: 11, padding: "8px 11px" }}><div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 800, textTransform: "uppercase", letterSpacing: .3 }}>{k}</div><div style={{ fontSize: 13.5, color: C.plum, fontWeight: 700, marginTop: 2 }}>{v}</div></div>)}
+        {info.map(([k, v]) => <div key={k} style={{ background: C.surface, borderRadius: 14, padding: "8px 11px" }}><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, textTransform: "uppercase", letterSpacing: .3 }}>{k}</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 700, marginTop: 2 }}>{v}</div></div>)}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
-        <div style={{ flex: 1, minWidth: 190, background: C.pinkSoft, borderRadius: 12, padding: "10px 13px" }}><div style={{ fontSize: 10, color: C.pinkText, fontWeight: 800, textTransform: "uppercase" }}>QA phụ trách</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.qa)}</div>{has(r.email_qa) && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_qa ?? "")}</div>}</div>
-        <div style={{ flex: 1, minWidth: 190, background: C.lavSoft, borderRadius: 12, padding: "10px 13px" }}><div style={{ fontSize: 10, color: C.lavText, fontWeight: 800, textTransform: "uppercase" }}>NS bộ phận khác</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.ns_khac)}</div>{has(r.email_khac) && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_khac ?? "")}</div>}</div>
+        <div style={{ flex: 1, minWidth: 190, background: C.pinkSoft, borderRadius: 14, padding: "10px 13px" }}><div style={{ fontSize: 12, color: C.pinkText, fontWeight: 800, textTransform: "uppercase" }}>QA phụ trách</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.qa)}</div>{has(r.email_qa) && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_qa ?? "")}</div>}</div>
+        <div style={{ flex: 1, minWidth: 190, background: C.lavSoft, borderRadius: 14, padding: "10px 13px" }}><div style={{ fontSize: 12, color: C.lavText, fontWeight: 800, textTransform: "uppercase" }}>NS bộ phận khác</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.ns_khac)}</div>{has(r.email_khac) && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_khac ?? "")}</div>}</div>
       </div>
       <div style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><CalendarClock size={17} color={C.pink} /> Vòng đời thẩm định</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {phases.map((p, i) => (
           <div key={i} style={{ background: C.surface, borderRadius: 14, padding: "11px 14px", borderLeft: `4px solid ${has(p.act) ? C.mint : C.pinkSoft}` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}><span style={{ fontSize: 18 }}>{p.ic}</span><div><div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{p.label}</div><div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 600 }}>{p.note}</div></div></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}><span style={{ fontSize: 16 }}>{p.ic}</span><div><div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{p.label}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{p.note}</div></div></div>
               {phaseTag(String(p.st ?? ""))}
             </div>
-            <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap", fontSize: 12.5 }}>
+            <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap", fontSize: 12 }}>
               <span style={{ color: C.plumSoft, fontWeight: 600 }}>Hạn: <b style={{ color: C.plum }}>{dShow(p.dl)}</b></span>
               <span style={{ color: C.plumSoft, fontWeight: 600 }}>Thực tế: <b style={{ color: has(p.act) ? C.mintText : "#C9B6C7" }}>{dShow(p.act)}</b></span>
               {p.sched != null && has(p.sched) && <span style={{ color: C.plumSoft, fontWeight: 600 }}>Lịch xếp: <b style={{ color: C.plum }}>{dShow(p.sched)}</b></span>}
@@ -1553,10 +1553,10 @@ function OvKpi({ k, v, sub, color, small }: {
   k: ReactNode; v: ReactNode; sub?: ReactNode; color?: string; small?: boolean;
 }) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 16, padding: "13px 16px" }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14, padding: "13px 16px" }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>{k}</div>
       <div style={{ fontSize: small ? 21 : 27, fontWeight: 800, color, fontFamily: NUM, letterSpacing: "-.02em", marginTop: 2 }}>{v}</div>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>{sub}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>{sub}</div>
     </div>
   );
 }
@@ -1660,7 +1660,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
       {/* Biểu đồ tháng */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
-          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>Tải VMP theo tháng · {year}</strong>
+          <strong style={{ fontFamily: TEXT, fontSize: 14, color: C.plum }}>Tải VMP theo tháng · {year}</strong>
         </div>
         <CauKetLuan chinh={klThang.chinh} phu={klThang.phu} tone={klThang.tone} />
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
@@ -1706,8 +1706,8 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 14 }}>
           {OV_STATUS.map((s) => (
-            <span key={s.k} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
-              <span style={{ width: 12, height: 12, borderRadius: 4, background: (OV_COLOR as Record<string, string>)[s.k] }} />{s.label}
+            <span key={s.k} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
+              <span style={{ width: 12, height: 12, borderRadius: 8, background: (OV_COLOR as Record<string, string>)[s.k] }} />{s.label}
             </span>
           ))}
         </div>
@@ -1719,7 +1719,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
           và người ta đi truy nguyên một tháng vốn chỉ đang dao động. */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
-          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>
+          <strong style={{ fontFamily: TEXT, fontSize: 14, color: C.plum }}>
             Biểu đồ kiểm soát · tỉ lệ hoàn thành theo tháng
           </strong>
           <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
@@ -1732,7 +1732,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
       {/* Tiến độ theo bộ phận quản lý */}
       {deptRows.length > 0 && (
         <div>
-          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>Tiến độ theo bộ phận quản lý</strong>
+          <strong style={{ fontFamily: TEXT, fontSize: 14, color: C.plum }}>Tiến độ theo bộ phận quản lý</strong>
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
             Chiều dài thanh = số hạng mục · <span style={{ color: C.mintText }}>xanh: đã xong</span>
             {" · "}<span style={{ color: C.raspText }}>đỏ: quá hạn</span>
@@ -1749,8 +1749,8 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
                 <button key={r.id} type="button" onClick={() => onPickDept?.(r.id)}
                   title={`${r.name}: ${r.total} — xong ${r.done}, quá hạn ${r.over}`}
                   style={{ display: "grid", gridTemplateColumns: "58px 1fr 92px", alignItems: "center", gap: 12, border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{r.code}</span>
-                  <span style={{ height: 20, borderRadius: 7, background: C.pinkMist, overflow: "hidden", display: "flex", width: (r.total / maxDeptTotal * 100) + "%" }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{r.code}</span>
+                  <span style={{ height: 20, borderRadius: 8, background: C.pinkMist, overflow: "hidden", display: "flex", width: (r.total / maxDeptTotal * 100) + "%" }}>
                     <span style={{ width: pc(r.done), background: C.mint }} />
                     <span style={{ width: pc(r.over), background: C.rasp }} />
                     <span style={{ width: pc(rest), background: C.sky }} />

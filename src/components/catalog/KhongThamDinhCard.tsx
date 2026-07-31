@@ -39,11 +39,11 @@ function canRaSoat(r: SourceObjectRow): boolean {
 }
 
 const th: React.CSSProperties = {
-  textAlign: "left", fontSize: 11, color: C.plumSoft, fontWeight: 800,
+  textAlign: "left", fontSize: 12, color: C.plumSoft, fontWeight: 800,
   padding: "0 11px 9px", whiteSpace: "nowrap",
 };
 const td: React.CSSProperties = {
-  padding: "9px 11px", fontSize: 12.5, color: C.plum, fontWeight: 600,
+  padding: "9px 11px", fontSize: 12, color: C.plum, fontWeight: 600,
   borderTop: `1px solid ${C.line}`, verticalAlign: "top",
 };
 
@@ -132,7 +132,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
       <button type="button" onClick={() => setMo((v) => !v)}
         style={{ width: "100%", textAlign: "left", border: "none", background: "transparent",
           cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 13, background: C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 14, background: C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <ShieldOff size={20} color={C.plumSoft} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -144,11 +144,11 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
           </div>
         </div>
         {rows && dem.soat > 0 && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>
             <AlertTriangle size={13} />{dem.soat} cần rà soát
           </span>
         )}
-        <span style={{ fontSize: 12.5, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>
           {mo ? "Thu gọn" : "Mở ra"}
         </span>
       </button>
@@ -156,7 +156,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
       {mo && (
         <div style={{ marginTop: 14 }}>
           {loi && <Tag color={C.raspText} bg={C.raspSoft}>Lỗi đọc danh mục: {loi}</Tag>}
-          {!rows && !loi && <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>Đang tải…</div>}
+          {!rows && !loi && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Đang tải…</div>}
 
           {rows && (
             <>
@@ -179,7 +179,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
                 </select>
                 <button type="button" onClick={xuatCsv} disabled={!hien.length}
                   style={{ display: "inline-flex", alignItems: "center", gap: 7, fontFamily: TEXT,
-                    fontSize: 12.5, fontWeight: 800, color: C.mintText, background: C.mintSoft,
+                    fontSize: 12, fontWeight: 800, color: C.mintText, background: C.mintSoft,
                     border: "none", borderRadius: 999, padding: "9px 15px",
                     cursor: hien.length ? "pointer" : "not-allowed", opacity: hien.length ? 1 : 0.5 }}>
                   <Download size={14} /> Xuất CSV ({hien.length})
@@ -218,7 +218,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
                           <td style={{ ...td, fontWeight: 600, lineHeight: 1.6 }}>
                             {txt(r.validate_reason)}
                             {soat && (
-                              <div style={{ marginTop: 5, fontSize: 11.5, fontWeight: 800, color: C.raspText }}>
+                              <div style={{ marginTop: 5, fontSize: 12, fontWeight: 800, color: C.raspText }}>
                                 ⚠ Lý do nói là cần thẩm định nhưng cột Thẩm định đang để &quot;n&quot; — QA cần chốt lại.
                               </div>
                             )}
@@ -227,7 +227,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
                             <td style={{ ...td, whiteSpace: "nowrap" }}>
                               <button type="button" onClick={() => onMoDanhMuc(String(r.object_code), String(r.object_kind || ""))}
                                 style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: TEXT,
-                                  fontSize: 11.5, fontWeight: 800, color: C.lavText, background: C.lavSoft,
+                                  fontSize: 12, fontWeight: 800, color: C.lavText, background: C.lavSoft,
                                   border: "none", borderRadius: 999, padding: "6px 11px", cursor: "pointer" }}>
                                 <ExternalLink size={12} /> Sửa
                               </button>
@@ -245,7 +245,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
                 </table>
               </TableScroll>
 
-              <div style={{ marginTop: 11, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.65 }}>
+              <div style={{ marginTop: 11, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.65 }}>
                 Danh mục này chỉ ĐỌC. Muốn đưa một đối tượng vào kế hoạch thẩm định thì sang
                 <b style={{ color: C.plum }}> Danh mục &amp; Nhập liệu</b>, đổi cột <b style={{ color: C.plum }}>Thẩm định</b> sang
                 &quot;y&quot;, điền <b style={{ color: C.plum }}>tháng thẩm định đầu tiên</b> rồi bấm <b style={{ color: C.plum }}>Sinh timeline</b>.

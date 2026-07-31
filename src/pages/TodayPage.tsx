@@ -109,7 +109,7 @@ function Khoi({ icon, tieuDe, phu, ds, tone, onMo, rong = "Không có mục nào
       </CardTitle>
       {ds.length === 0 ? (
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "14px 4px",
-                      color: C.mintText, fontWeight: 700, fontFamily: TEXT, fontSize: 13.5 }}>
+                      color: C.mintText, fontWeight: 700, fontFamily: TEXT, fontSize: 14 }}>
           <CheckCircle2 size={17} /> {rong}
         </div>
       ) : (
@@ -214,7 +214,7 @@ export default function TodayView({ acts, myName, onMo, setView }: {
             {moiNguoi ? "Việc hôm nay — cả đội" : `Việc hôm nay của ${myName || "bạn"}`}
           </CardTitle>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer",
-                          fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: C.plumSoft }}>
+                          fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: C.plumSoft }}>
             <input type="checkbox" checked={moiNguoi} onChange={(e) => setMoiNguoi(e.target.checked)} />
             Xem của mọi người
             <GiaiThich tieuDe="Phạm vi màn này">

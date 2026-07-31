@@ -193,7 +193,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
   const O = ({ dem, ten }: { dem: Record<TrangThai, Activity[]>; ten: string }) => {
     const tong = (Object.keys(dem) as TrangThai[]).reduce((n, k) => n + dem[k].length, 0);
-    if (!tong) return <td style={{ padding: 6 }}><div style={{ height: 44, borderRadius: 10, background: C.pinkMist }} /></td>;
+    if (!tong) return <td style={{ padding: 6 }}><div style={{ height: 44, borderRadius: 8, background: C.pinkMist }} /></td>;
     const noiBat: TrangThai = dem.tre.length ? "tre" : dem.thieu.length ? "thieu" : dem.chua.length ? "chua" : "xong";
     const m = MAU[noiBat];
     return (
@@ -201,11 +201,11 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
         <button
           onClick={() => setODangXem({ ten, ds: dem[noiBat] })}
           title={`${ten} — ${(Object.keys(dem) as TrangThai[]).filter((k) => dem[k].length).map((k) => `${MAU[k].nhan} ${dem[k].length}`).join(" · ")}`}
-          style={{ width: "100%", border: `1.5px solid ${m.mau}22`, background: m.nen, borderRadius: 10,
+          style={{ width: "100%", border: `1.5px solid ${m.mau}22`, background: m.nen, borderRadius: 8,
                    padding: "6px 8px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, color: m.mau, lineHeight: 1 }}>
+          <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: m.mau, lineHeight: 1 }}>
             {dem[noiBat].length}
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: C.plumSoft }}> / {tong}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}> / {tong}</span>
           </span>
           {/* Thanh ba màu: xong · trễ · thiếu — đúng kiểu stacked bar của BMS */}
           <span style={{ display: "flex", height: 5, borderRadius: 999, overflow: "hidden", background: C.surface }}>
@@ -233,7 +233,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
             const on = truc === t.id;
             return (
               <button key={t.id} onClick={() => { setTruc(t.id); setSoHang(12); }}
-                style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: on ? 800 : 600,
+                style={{ fontFamily: TEXT, fontSize: 12, fontWeight: on ? 800 : 600,
                          color: on ? C.plum : C.plumSoft, borderRadius: 999, padding: "7px 14px",
                          cursor: "pointer", border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
                          background: on ? C.pinkSoft : C.surface }}>
@@ -246,7 +246,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
             const on = cot === c.id;
             return (
               <button key={c.id} onClick={() => setCot(c.id)}
-                style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: on ? 800 : 600,
+                style={{ fontFamily: TEXT, fontSize: 12, fontWeight: on ? 800 : 600,
                          color: on ? C.plum : C.plumSoft, borderRadius: 999, padding: "7px 14px",
                          cursor: "pointer", border: `1.5px solid ${on ? C.lav : C.pinkSoft}`,
                          background: on ? C.lavSoft : C.surface }}>
@@ -254,7 +254,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
               </button>
             );
           })}
-          <span style={{ marginLeft: "auto", fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>
+          <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
             {cot === "thang"
               ? "Cột tháng xếp theo MỐC ĐÍCH của hạng mục — ô trống là tháng đó không có việc"
               : truc === "bo_phan"
@@ -266,7 +266,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
           {(Object.keys(MAU) as TrangThai[]).map((k) => (
             <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
-              <span style={{ width: 12, height: 12, borderRadius: 4, background: MAU[k].mau }} />{MAU[k].nhan}
+              <span style={{ width: 12, height: 12, borderRadius: 8, background: MAU[k].mau }} />{MAU[k].nhan}
             </span>
           ))}
           <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{tong} hạng mục</span>
@@ -276,11 +276,11 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: cot === "giai_doan" ? 620 : 1000 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>
+                <th style={{ textAlign: "left", fontSize: 12, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>
                   {TRUC.find((t) => t.id === truc)?.ten}
                 </th>
                 {(cot === "giai_doan" ? GIAI_DOAN.map((g) => ({ id: g.id, ten: g.ten })) : THANG).map((g) => (
-                  <th key={g.id} style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>{g.ten}</th>
+                  <th key={g.id} style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>{g.ten}</th>
                 ))}
               </tr>
             </thead>
@@ -288,8 +288,8 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
               {luoi.slice(0, soHang).map((h) => (
                 <tr key={h.khoa}>
                   <td style={{ padding: "6px 8px", maxWidth: 210 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.ten}</div>
-                    <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.ten}</div>
+                    <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {h.phu ? h.phu + " · " : ""}{h.tong} hạng mục
                     </div>
                   </td>
@@ -299,7 +299,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
               {luoi.length > soHang && (
                 <tr><td colSpan={cot === "giai_doan" ? 5 : 13} style={{ padding: "10px 8px" }}>
                   <button onClick={() => setSoHang((n) => n + 20)}
-                    style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum,
+                    style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum,
                              border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
                              borderRadius: 999, padding: "7px 14px", cursor: "pointer" }}>
                     Hiện thêm — đang xem {soHang}/{luoi.length} hàng
@@ -320,11 +320,11 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
             Chất lượng dữ liệu
           </CardTitle>
           <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-            <div style={{ padding: "14px 20px", borderRadius: 16, background: chatLuong.nen, minWidth: 120, textAlign: "center" }}>
-              <div style={{ fontFamily: NUM, fontSize: 34, fontWeight: 800, color: chatLuong.mau, lineHeight: 1 }}>{chatLuong.diem}%</div>
+            <div style={{ padding: "14px 20px", borderRadius: 14, background: chatLuong.nen, minWidth: 120, textAlign: "center" }}>
+              <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: chatLuong.mau, lineHeight: 1 }}>{chatLuong.diem}%</div>
               <div style={{ fontSize: 12, fontWeight: 800, color: chatLuong.mau, marginTop: 4 }}>{chatLuong.muc}</div>
             </div>
-            <div style={{ flex: 1, minWidth: 200, fontSize: 12.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+            <div style={{ flex: 1, minWidth: 200, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
               <b style={{ color: C.plum }}>{chatLuong.oThieu.toLocaleString("vi-VN")}</b> trên {chatLuong.oTong.toLocaleString("vi-VN")} ô
               không chấm được: thiếu mốc hạn, hoặc ghi hoàn thành mà không có ngày thực tế.
               <div style={{ marginTop: 6 }}>
@@ -341,10 +341,10 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {diemNong.map((d) => (
               <button key={d.ma} onClick={() => setODangXem({ ten: `${d.ma} · ${d.ten}`, ds: d.ds })}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12,
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14,
                          background: C.surface, border: `1px solid ${C.pinkSoft}`, cursor: "pointer", textAlign: "left" }}>
                 <span style={{ fontFamily: NUM, fontSize: 12, fontWeight: 800, color: C.plum, background: C.pinkMist, borderRadius: 8, padding: "3px 8px" }}>{d.ma}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.ten}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.ten}</span>
                 {d.tre > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{d.tre} trễ</Tag>}
                 {d.thieu > 0 && <Tag color={C.marigoldText} bg={C.marigoldSoft}>{d.thieu} thiếu</Tag>}
               </button>
@@ -360,14 +360,14 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
       {oDangXem && (
         <Modal onClose={() => setODangXem(null)} wide icon={LayoutGrid} title={oDangXem.ten}>
-          <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 12 }}>
             {oDangXem.ds.length} hạng mục
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {oDangXem.ds.slice(0, 40).map((a) => (
-              <div key={a.id} style={{ padding: "9px 12px", borderRadius: 12, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{a.name}</div>
-                <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+              <div key={a.id} style={{ padding: "9px 12px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</div>
+                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
                   {a.id} · {nguoiPhuTrach(a.owner)} · đích {a.target ? fmtVN(parseD(a.target)) : "chưa có"}
                   {a.score != null ? ` · trọng yếu ${a.score}/9` : ""}
                 </div>

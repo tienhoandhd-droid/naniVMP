@@ -167,8 +167,8 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 14, background: C.mintSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={22} color={C.mintText} /></div>
             <div>
-              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 17, color: C.plum }}>Theo dõi tiến độ thực tế</div>
-              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Nhập ngày và trạng thái thực tế ngay tại đây — Supabase là nơi lưu dữ liệu gốc</div>
+              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 16, color: C.plum }}>Theo dõi tiến độ thực tế</div>
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Nhập ngày và trạng thái thực tế ngay tại đây — Supabase là nơi lưu dữ liệu gốc</div>
             </div>
           </div>
           <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Đã nối Supabase — ghi được" : "○ Chưa kết nối"}</Tag>
@@ -181,9 +181,9 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           {soNgung > 0 && (
             <label title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc"
               style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer",
-                       padding: "0 12px", borderRadius: 10, border: `1px solid ${hienNgung ? C.marigold : C.pinkSoft}`,
+                       padding: "0 12px", borderRadius: 8, border: `1px solid ${hienNgung ? C.marigold : C.pinkSoft}`,
                        background: hienNgung ? C.marigoldSoft : C.surface,
-                       fontFamily: TEXT, fontSize: 12.5, fontWeight: 800,
+                       fontFamily: TEXT, fontSize: 12, fontWeight: 800,
                        color: hienNgung ? C.marigoldText : C.plumSoft }}>
               <input type="checkbox" checked={hienNgung} onChange={(e) => setHienNgung(e.target.checked)} />
               Hiện cả mục đã ngừng ({soNgung})
@@ -198,13 +198,13 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
         {/* Cần bạn điền — đúng 4 lỗi mà kiểm tra dữ liệu ở Supabase đang báo.
             Không có thanh này thì phải dò tay 461 dòng mới tìm ra chỗ thiếu. */}
         <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${C.pinkMist}` }}>
-          <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 800, marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 8 }}>
             CẦN BẠN ĐIỀN
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={() => setFix("all")}
               style={{ padding: "8px 14px", borderRadius: 999, border: "none", cursor: "pointer",
-                       fontFamily: TEXT, fontSize: 12.5, fontWeight: 800,
+                       fontFamily: TEXT, fontSize: 12, fontWeight: 800,
                        background: fix === "all" ? GRAD : C.pinkSoft,
                        color: fix === "all" ? "#fff" : C.plumSoft }}>
               Tất cả ({fixCount.all})
@@ -217,7 +217,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                 <button key={k} onClick={() => setFix(on ? "all" : k)} title={v.hint}
                   disabled={n === 0}
                   style={{ padding: "8px 14px", borderRadius: 999, cursor: n ? "pointer" : "default",
-                           fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, border: "none",
+                           fontFamily: TEXT, fontSize: 12, fontWeight: 800, border: "none",
                            opacity: n ? 1 : 0.45,
                            background: on ? (nang ? C.raspText : C.marigoldText)
                                           : (nang ? C.raspSoft : C.marigoldSoft),
@@ -242,16 +242,16 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-          <button onClick={() => setStageF("all")} style={{ textAlign: "left", border: "none", cursor: "pointer", padding: "14px 16px", borderRadius: 16, background: C.surface, boxShadow: stageF === "all" ? `0 0 0 3px ${C.pink}` : `inset 0 0 0 1px ${C.pinkSoft}` }}>
-            <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.plum }}>{stageCount.all}</div>
+          <button onClick={() => setStageF("all")} style={{ textAlign: "left", border: "none", cursor: "pointer", padding: "14px 16px", borderRadius: 14, background: C.surface, boxShadow: stageF === "all" ? `0 0 0 3px ${C.pink}` : `inset 0 0 0 1px ${C.pinkSoft}` }}>
+            <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: C.plum }}>{stageCount.all}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginTop: 2 }}>Tất cả</div>
           </button>
           {STAGES.map((s) => { const n = stageCount[s.id] || 0; const on = stageF === s.id; return (
             <button key={s.id} onClick={() => setStageF(on ? "all" : s.id)} disabled={n === 0 && !on}
               title={n === 0 ? `Không có hạng mục nào đang ở "${s.label}" với bộ lọc hiện tại.` : `${n} hạng mục · bấm để lọc`}
-              style={{ textAlign: "left", border: "none", cursor: n === 0 && !on ? "default" : "pointer", padding: "14px 16px", borderRadius: 16, background: s.bg, boxShadow: on ? `0 0 0 3px ${s.color}` : "none", opacity: n === 0 ? 0.55 : 1 }}>
-              <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: s.color }}>{n}</div>
-              <div style={{ fontSize: 11.5, fontWeight: 800, color: s.color, marginTop: 2, lineHeight: 1.3 }}>{s.label}</div>
+              style={{ textAlign: "left", border: "none", cursor: n === 0 && !on ? "default" : "pointer", padding: "14px 16px", borderRadius: 14, background: s.bg, boxShadow: on ? `0 0 0 3px ${s.color}` : "none", opacity: n === 0 ? 0.55 : 1 }}>
+              <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: s.color }}>{n}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: s.color, marginTop: 2, lineHeight: 1.3 }}>{s.label}</div>
             </button>
           ); })}
         </div>
@@ -265,15 +265,15 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
             <tbody>
               {lat.map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
                 <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? "rgba(255,255,255,.4)" : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
-                  <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 13 }}>{a.code}</td>
-                  <td style={{ padding: "12px 16px", color: C.plum, fontSize: 13 }}>
+                  <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 14 }}>{a.code}</td>
+                  <td style={{ padding: "12px 16px", color: C.plum, fontSize: 14 }}>
                     {a.name}
                     {/* S3-G: badge Không áp dụng / Đã hủy */}
                     {isFrozen && <div style={{ marginTop: 4 }}><StateBadge state={String(itemState)} small /></div>}
                   </td>
                   <td style={{ padding: "12px 16px" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag></td>
-                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 13, fontWeight: 600 }}>{nguoiPhuTrach(a.owner)}</td>
-                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>{a.target ? a.target.split("-").reverse().join("/") : "—"}</td>
+                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 14, fontWeight: 600 }}>{nguoiPhuTrach(a.owner)}</td>
+                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>{a.target ? a.target.split("-").reverse().join("/") : "—"}</td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>{sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}</td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}><Pill s={a.st} small /></td>
                   <td style={{ padding: "12px 16px", textAlign: "center" }}>
@@ -283,14 +283,14 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                       {!readOnly && !isFrozen && stageByItem.get(a.id) !== "done" && (
                         <button onClick={() => { setEdit(a); setQuick(true); }}
                           title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
-                          style={{ padding: "7px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                          style={{ padding: "7px 11px", borderRadius: 8, border: `1px solid ${C.mint}`, background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
                           ✓ Xong bước
                         </button>
                       )}
                       <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
                         disabled={readOnly || (isFrozen && !isAdmin)}
                         title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
-                        style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 10, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
+                        style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
                     </div>
                   </td>
                 </tr>
@@ -315,7 +315,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                         {fst !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Trạng thái: {(STATUS as Record<string, { label: string }>)[fst]?.label ?? fst}</Tag>}
                         {!!q.trim() && <Tag color={C.lavText} bg={C.lavSoft}>Tìm: “{q.trim()}”</Tag>}
                       </div>
-                      <button onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 10, fontSize: 12.5 }}>Xoá hết bộ lọc</button>
+                      <button onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá hết bộ lọc</button>
                     </>
                   ) : "Chưa có hạng mục nào trong kế hoạch."}
                 </td></tr>

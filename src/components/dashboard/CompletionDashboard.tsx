@@ -276,7 +276,7 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
           Trạng thái theo 4 giai đoạn
         </CardTitle>
         <div style={{
-          display: "inline-flex", gap: 4, padding: 4, borderRadius: 12,
+          display: "inline-flex", gap: 4, padding: 4, borderRadius: 14,
           background: C.pinkMist, border: `1px solid ${C.pinkSoft}`, flexWrap: "wrap",
         }}>
           {STATUS_DIMS.map((item) => (
@@ -286,7 +286,7 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
               onClick={() => setDim(item.id)}
               aria-pressed={dim === item.id}
               style={{
-                border: "none", borderRadius: 9, padding: "8px 12px", cursor: "pointer",
+                border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer",
                 fontFamily: TEXT, fontSize: 12, fontWeight: 800,
                 color: dim === item.id ? "#fff" : C.plumSoft,
                 background: dim === item.id ? C.plum : "transparent",
@@ -312,7 +312,7 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
               <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ minWidth: 190, display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ width: 10, height: 10, borderRadius: 999, background: tone, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: row.label === EMPTY_LABEL ? C.plumSoft : C.plum }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: row.label === EMPTY_LABEL ? C.plumSoft : C.plum }}>
                     {row.label}
                   </span>
                 </div>
@@ -324,7 +324,7 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
                     }} />
                   </div>
                 </div>
-                <div style={{ minWidth: 88, textAlign: "right", fontFamily: NUM, fontSize: 13, fontWeight: 800, color: tone }}>
+                <div style={{ minWidth: 88, textAlign: "right", fontFamily: NUM, fontSize: 14, fontWeight: 800, color: tone }}>
                   {row.count} <span style={{ color: C.plumSoft, fontWeight: 700 }}>· {row.rate}%</span>
                 </div>
               </div>
@@ -332,7 +332,7 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
           })}
         </div>
       ) : (
-        <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 13, fontWeight: 700 }}>
+        <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 14, fontWeight: 700 }}>
           Không có dữ liệu trạng thái.
         </div>
       )}
@@ -360,29 +360,29 @@ function MetricCard({ metric, value }: {
   const Icon = metric.icon;
   return (
     <div style={{
-      minWidth: 0, padding: "17px 18px", borderRadius: 18,
+      minWidth: 0, padding: "17px 18px", borderRadius: 14,
       background: `linear-gradient(145deg,#fff,${metric.soft})`,
       border: `1px solid ${metric.color}33`,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 13 }}>
         <div style={{
-          width: 38, height: 38, borderRadius: 12, background: metric.soft,
+          width: 38, height: 38, borderRadius: 14, background: metric.soft,
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>
           <Icon size={19} color={metric.text} />
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: C.plum, lineHeight: 1.25 }}>{metric.label}</div>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}>
             {value.done}/{value.total} hạng mục
           </div>
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-        <span style={{ fontFamily: NUM, fontSize: 31, fontWeight: 800, color: metric.text, lineHeight: 1 }}>
+        <span style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: metric.text, lineHeight: 1 }}>
           {value.rate}%
         </span>
-        <span style={{ fontSize: 10.5, fontWeight: 800, color: C.plumSoft }}>HOÀN THÀNH</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>HOÀN THÀNH</span>
       </div>
       <ProgressBar rate={value.rate} color={metric.color} />
     </div>
@@ -441,7 +441,7 @@ function DimensionTable({ activities, dimension, setDimension }: {
           {title}
         </CardTitle>
         <div style={{
-          display: "inline-flex", gap: 4, padding: 4, borderRadius: 12,
+          display: "inline-flex", gap: 4, padding: 4, borderRadius: 14,
           background: C.pinkMist, border: `1px solid ${C.pinkSoft}`, flexWrap: "wrap",
         }}>
           {DIMENSION_OPTIONS.map((option) => (
@@ -451,7 +451,7 @@ function DimensionTable({ activities, dimension, setDimension }: {
               onClick={() => setDimension(option.id)}
               aria-pressed={dimension === option.id}
               style={{
-                border: "none", borderRadius: 9, padding: "8px 10px", cursor: "pointer",
+                border: "none", borderRadius: 8, padding: "8px 10px", cursor: "pointer",
                 fontFamily: TEXT, fontSize: 12, fontWeight: 800,
                 color: dimension === option.id ? "#fff" : C.plumSoft,
                 background: dimension === option.id ? C.plum : "transparent",
@@ -486,11 +486,11 @@ function DimensionTable({ activities, dimension, setDimension }: {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {row.deptId ? (
                         <div style={{
-                          width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+                          width: 38, height: 38, borderRadius: 14, flexShrink: 0,
                           background: `${(DEPT_COLOR as Record<string, string>)[row.deptId] || C.lav}18`,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           color: (DEPT_DEEP as Record<string, string>)[row.deptId] || C.lavText,
-                          fontSize: 11, fontWeight: 800,
+                          fontSize: 12, fontWeight: 800,
                         }}>
                           {row.short || "—"}
                         </div>
@@ -499,16 +499,16 @@ function DimensionTable({ activities, dimension, setDimension }: {
                           width: 38, height: 38, borderRadius: 999, flexShrink: 0,
                           background: "linear-gradient(135deg,#C2497A,#6E54C0)", color: "#fff",
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontFamily: NUM, fontSize: 17, fontWeight: 800,
+                          fontFamily: NUM, fontSize: 16, fontWeight: 800,
                         }}>
                           {(row.label === "Chưa có dữ liệu" ? "?" : row.label.charAt(0).toUpperCase()) || "?"}
                         </div>
                       )}
-                      <span style={{ color: C.plum, fontSize: 13, fontWeight: 800 }}>{row.label}</span>
+                      <span style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{row.label}</span>
                     </div>
                   </td>
                   {!isExecutionDepartment && (
-                    <td style={{ ...TD, fontFamily: NUM, fontSize: 15, fontWeight: 800, color: C.plum }}>
+                    <td style={{ ...TD, fontFamily: NUM, fontSize: 14, fontWeight: 800, color: C.plum }}>
                       {row.activities.length}
                     </td>
                   )}
@@ -532,7 +532,7 @@ function DimensionTable({ activities, dimension, setDimension }: {
                               <div style={{
                                 marginTop: 3,
                                 fontFamily: TEXT,
-                                fontSize: 10,
+                                fontSize: 12,
                                 fontWeight: 800,
                                 color: C.plumSoft,
                                 whiteSpace: "nowrap",
@@ -551,23 +551,23 @@ function DimensionTable({ activities, dimension, setDimension }: {
           </table>
         </div>
       ) : (
-        <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 13, fontWeight: 700 }}>
+        <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 14, fontWeight: 700 }}>
           Không có hạng mục phù hợp với phạm vi đang chọn.
         </div>
       )}
 
       {activeDimension.multiNote && (
-        <div style={{ marginTop: 10, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
           Một hạng mục có nhiều người phụ trách được tính vào kết quả của từng người liên quan; vì vậy tổng số theo người có thể lớn hơn tổng hạng mục duy nhất.
         </div>
       )}
       {isExecutionDepartment && rows.some((row) => row.key !== "unknown") && (
-        <div style={{ marginTop: 10, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
           Dòng có nhiều bộ phận thực hiện, ví dụ “RD, QA, QC, XSX”, được tách và tính vào từng bộ phận riêng.
         </div>
       )}
       {dimension === "executionDepartment" && rows.length === 1 && rows[0].key === "unknown" && (
-        <div style={{ marginTop: 10, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
           Cần chạy migration read model và sync snapshot mới để lấy cột Sheet “Bộ phận thực hiện thẩm định” vào dashboard.
         </div>
       )}
@@ -577,7 +577,7 @@ function DimensionTable({ activities, dimension, setDimension }: {
 
 const TH: CSSProperties = {
   padding: "0 14px 6px", textAlign: "left", color: C.plumSoft,
-  fontFamily: TEXT, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase",
+  fontFamily: TEXT, fontSize: 12, fontWeight: 800, textTransform: "uppercase",
   letterSpacing: ".04em", whiteSpace: "nowrap",
 };
 
@@ -690,7 +690,7 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, color: C.plumSoft }}>
               <Filter size={15} />
-              <span style={{ fontSize: 11.5, fontWeight: 800 }}>Phạm vi</span>
+              <span style={{ fontSize: 12, fontWeight: 800 }}>Phạm vi</span>
             </div>
             <Sel
               val={department}
@@ -710,8 +710,8 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
             {(department !== "all" || selectedType !== "all" || selectedPerson !== "all") && (
               <button type="button" onClick={resetFilters} style={{
                 display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 10px",
-                borderRadius: 11, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
-                color: C.pinkText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer",
+                borderRadius: 14, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
+                color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
               }}>
                 <RotateCcw size={14} /> Đặt lại
               </button>
@@ -720,8 +720,8 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
         </div>
 
         <div style={{
-          marginBottom: 14, padding: "9px 12px", borderRadius: 12, background: C.pinkMist,
-          color: C.plumSoft, fontSize: 11.5, fontWeight: 700,
+          marginBottom: 14, padding: "9px 12px", borderRadius: 14, background: C.pinkMist,
+          color: C.plumSoft, fontSize: 12, fontWeight: 700,
         }}>
           {scopeLabel} · <b style={{ color: C.plum }}>{scopedActs.length}</b> hạng mục
         </div>
@@ -746,24 +746,24 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
           }}>
             {typeRows.map((row) => (
               <div key={row.type} style={{
-                padding: "15px 16px", borderRadius: 16, background: C.surface,
+                padding: "15px 16px", borderRadius: 14, background: C.surface,
                 border: `1px solid ${C.pinkSoft}`,
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{row.type}</div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}>
                       {row.done}/{row.total} hoàn thành VMP
                     </div>
                   </div>
-                  <div style={{ fontFamily: NUM, fontSize: 25, fontWeight: 800, color: C.mintText }}>{row.rate}%</div>
+                  <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: C.mintText }}>{row.rate}%</div>
                 </div>
                 <ProgressBar rate={row.rate} color={C.mint} height={8} />
               </div>
             ))}
           </div>
         ) : (
-          <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 13, fontWeight: 700 }}>
+          <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 14, fontWeight: 700 }}>
             Không có loại thẩm định trong phạm vi đang chọn.
           </div>
         )}

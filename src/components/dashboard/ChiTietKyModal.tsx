@@ -47,8 +47,8 @@ function hanCua(a: Activity, g: GdSpec): Date | null {
   return parseD(r[g.dl] as string) || (g.dlLui ? parseD(r[g.dlLui] as string) : null);
 }
 
-const th: React.CSSProperties = { textAlign: "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, padding: "0 11px 9px", whiteSpace: "nowrap" };
-const td: React.CSSProperties = { padding: "9px 11px", fontSize: 12.5, color: C.plum, fontWeight: 600, borderTop: `1px solid ${C.line}` };
+const th: React.CSSProperties = { textAlign: "left", fontSize: 12, color: C.plumSoft, fontWeight: 800, padding: "0 11px 9px", whiteSpace: "nowrap" };
+const td: React.CSSProperties = { padding: "9px 11px", fontSize: 12, color: C.plum, fontWeight: 600, borderTop: `1px solid ${C.line}` };
 
 export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: {
   title: string;
@@ -81,7 +81,7 @@ export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: 
   const chip = (id: Loc, nhan: string, n: number, mau: string, nen: string) => (
     <button key={id} type="button" onClick={() => setLoc(id)}
       style={{
-        fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer",
+        fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
         border: loc === id ? `2px solid ${mau}` : `1.5px solid ${C.pinkSoft}`,
         background: loc === id ? nen : C.surface, color: loc === id ? mau : C.plumSoft,
         borderRadius: 999, padding: "7px 14px",
@@ -112,7 +112,7 @@ export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: 
 
   return (
     <Modal onClose={onClose} wide icon={ListFilter} title={title}>
-      {sub && <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 12, lineHeight: 1.65 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 12, lineHeight: 1.65 }}>{sub}</div>}
 
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
         {phanLoai ? (
@@ -127,7 +127,7 @@ export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: 
         )}
         <button type="button" onClick={xuatCsv} disabled={!hienThi.length}
           style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7,
-            fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: C.mintText, background: C.mintSoft,
+            fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: C.mintText, background: C.mintSoft,
             border: "none", borderRadius: 999, padding: "8px 15px",
             cursor: hienThi.length ? "pointer" : "not-allowed", opacity: hienThi.length ? 1 : 0.5 }}>
           <Download size={14} /> Xuất CSV ({hienThi.length})
@@ -182,7 +182,7 @@ export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: 
         </table>
       </TableScroll>
 
-      <div style={{ marginTop: 12, fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.65 }}>
+      <div style={{ marginTop: 12, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.65 }}>
         Danh sách này lấy đúng tập hạng mục đã tạo ra con số bạn vừa bấm — cùng bộ lọc, cùng kỳ.
         &quot;Trễ&quot; tính theo hạn của chính giai đoạn đang xem, không phải hạn đích VMP.
       </div>

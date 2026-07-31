@@ -116,22 +116,22 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
       onClick={() => onOpen(r)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } }}
       title="Bấm để xem timeline các mốc hạn"
-      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16, background: C.surface, border: `1px solid ${edge}`, cursor: "pointer" }}>
+      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${edge}`, cursor: "pointer" }}>
       {/* Ô ngày — trễ thì đỏ, còn hạn thì cam/xanh theo nhóm */}
       <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: late ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft : C.skySoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 17, color: late ? C.raspText : r.kind === "soon" ? C.marigoldText : C.skyText, lineHeight: 1 }}>{Math.abs(r.dleft)}</span>
-        <span style={{ fontSize: 9, color: C.plumSoft, fontWeight: 700 }}>ngày {late ? "trễ" : "nữa"}</span>
+        <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: late ? C.raspText : r.kind === "soon" ? C.marigoldText : C.skyText, lineHeight: 1 }}>{Math.abs(r.dleft)}</span>
+        <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>ngày {late ? "trễ" : "nữa"}</span>
       </div>
       {/* Điểm rủi ro — lý do dòng này nằm ở vị trí này trong danh sách */}
       <div title={`RPN = trọng yếu × khả năng xảy ra (ICH Q9). Tối đa 27.`}
-        style={{ width: 54, flexShrink: 0, textAlign: "center", padding: "6px 0", borderRadius: 12, background: lv.soft }}>
-        <div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, color: lv.text, lineHeight: 1 }}>{rpn}</div>
-        <div style={{ fontSize: 9, fontWeight: 800, color: lv.text }}>RPN</div>
+        style={{ width: 54, flexShrink: 0, textAlign: "center", padding: "6px 0", borderRadius: 14, background: lv.soft }}>
+        <div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: lv.text, lineHeight: 1 }}>{rpn}</div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: lv.text }}>RPN</div>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
           <Tag color={cls.text} bg={cls.soft}>{r.a.vtype}</Tag>
-          <span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: C.plum }}>{r.a.name}</span>
+          <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{r.a.name}</span>
         </div>
         <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
           {r.a.id} · Mốc <b style={{ color: late ? C.raspText : C.marigoldText }}>{r.stage}</b>
@@ -196,10 +196,10 @@ export function AlertDetailModal({ r, email, onClose }: {
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 15px", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <Tag color={C.lavText} bg={C.surface}>{a.vtype}</Tag>
-          <span style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 15, color: C.plum }}>{a.name}</span>
+          <span style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.plum }}>{a.name}</span>
           <Pill s={a.st} small />
         </div>
-        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
           {a.code} · {txt(a.dept)} · người thực hiện <b style={{ color: C.plum }}>{nguoiPhuTrach(a.owner)}</b>
           {email ? <> · <a href={`mailto:${email}`} style={{ color: C.lavText, fontWeight: 700 }}>{email}</a></> : ""}
           {a.freq ? ` · chu kỳ ${a.freq} tháng` : ""}
@@ -214,23 +214,23 @@ export function AlertDetailModal({ r, email, onClose }: {
       {/* Hạn sắp tới — câu trả lời cho "phải làm gì tiếp" */}
       <div style={{ borderRadius: 14, padding: "13px 15px", marginBottom: 16,
                     background: nextLeft != null && nextLeft < 0 ? C.raspSoft : nextLeft != null && nextLeft <= SOON_DAYS ? C.marigoldSoft : C.mintSoft }}>
-        <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, marginBottom: 3 }}>HẠN SẮP TỚI</div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginBottom: 3 }}>HẠN SẮP TỚI</div>
         {next && nextDate ? (
-          <div style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.plum }}>
+          <div style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>
             {next.label.replace(/^\d+\.\s*/, "")} — {fmtVN(nextDate)}
             <span style={{ marginLeft: 8, fontFamily: NUM, color: (nextLeft ?? 0) < 0 ? C.raspText : (nextLeft ?? 0) <= SOON_DAYS ? C.marigoldText : C.mintText }}>
               {(nextLeft ?? 0) < 0 ? `trễ ${Math.abs(nextLeft ?? 0)} ngày` : `còn ${nextLeft} ngày`}
             </span>
           </div>
         ) : (
-          <div style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.mintText }}>
+          <div style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.mintText }}>
             Đã xong cả bốn mốc — không còn hạn nào chờ.
           </div>
         )}
         {lich && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginTop: 4 }}>Lịch thẩm định bộ phận xếp: {fmtVN(lich)}</div>}
         {/* Hạng mục đã xong thì mốc kế tiếp là LẦN SAU — dự báo theo tần suất */}
         {r.kind === "requal" && r.date && (
-          <div style={{ fontSize: 12.5, color: C.plum, fontWeight: 700, marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: C.plum, fontWeight: 700, marginTop: 4 }}>
             Tái thẩm định dự kiến: <b>{fmtVN(r.date)}</b> ({r.dleft < 0 ? `quá ${Math.abs(r.dleft)} ngày` : `còn ${r.dleft} ngày`}) — chu kỳ {r.a.freq} tháng tính từ mốc đích lần này.
           </div>
         )}
@@ -254,7 +254,7 @@ export function AlertDetailModal({ r, email, onClose }: {
               </div>
               <div style={{ flex: 1, paddingBottom: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: dotText }}>{m.label}</span>
+                  <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: dotText }}>{m.label}</span>
                   <Tag color={dotText} bg={C.surface}>{m.status}</Tag>
                   {isNext && <Tag color={C.marigoldText} bg={C.marigoldSoft}>Kế tiếp</Tag>}
                   {late && <Tag color={C.raspText} bg={C.raspSoft}>Trễ {Math.abs(left ?? 0)} ngày</Tag>}
@@ -276,7 +276,7 @@ export function AlertDetailModal({ r, email, onClose }: {
         })}
       </div>
 
-      <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.6, borderTop: `1px solid ${C.pinkSoft}`, paddingTop: 10 }}>
+      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.6, borderTop: `1px solid ${C.pinkSoft}`, paddingTop: 10 }}>
         <b style={{ color: C.plum }}>Hạn theo luật</b> suy từ mốc đích VMP: đề cương T−60 · thẩm định T−(5+{dep}) ·
         báo cáo T−5, trong đó {dep} ngày là theo phân loại báo cáo “{txt(a.dep)}”. Lệch giữa hạn kế hoạch và hạn
         theo luật nghĩa là kế hoạch đang đặt khác quy tắc — kiểm lại trước khi lấy làm mốc.
@@ -299,12 +299,12 @@ function CumRow({ c, email, onOpen }: {
         style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
                  padding: "12px 14px", border: "none", cursor: "pointer",
                  background: tre ? C.raspSoft : C.surface, fontFamily: TEXT }}>
-        <span style={{ fontFamily: NUM, fontSize: 15, fontWeight: 900,
+        <span style={{ fontFamily: NUM, fontSize: 14, fontWeight: 900,
                        color: tre ? C.raspText : C.plum, minWidth: 30 }}>{c.rows.length}</span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: C.plum,
                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.ten}</span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
             {c.rows.length} hạng mục
             {tre ? ` · trễ nhất ${Math.abs(c.treNhat)} ngày` : ` · sớm nhất còn ${c.treNhat} ngày`}
             {c.nguoi.length ? ` · ${c.nguoi.join(", ")}` : " · chưa có người"}
@@ -503,9 +503,9 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     { id: "requal", emoji: "🔁", bg: C.lavSoft,      color: C.lavText,      ring: C.lav,      label: "Tái thẩm định sắp tới",       sub: "Theo tần suất" },
   ] as const;
 
-  const selStyle = { fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "8px 13px", cursor: "pointer" };
-  const chip = (on: boolean) => ({ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, background: on ? C.lav : C.surface, color: on ? "#fff" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
-  const tabBtn = (on: boolean) => ({ display: "flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 999, cursor: "pointer", fontFamily: TEXT, fontSize: 13, fontWeight: on ? 800 : 600, border: `1.5px solid ${on ? C.pink : C.pinkSoft}`, background: on ? C.pinkSoft : C.surface, color: on ? C.plum : C.plumSoft });
+  const selStyle = { fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "8px 13px", cursor: "pointer" };
+  const chip = (on: boolean) => ({ fontFamily: TEXT, fontSize: 12, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, background: on ? C.lav : C.surface, color: on ? "#fff" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
+  const tabBtn = (on: boolean) => ({ display: "flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 999, cursor: "pointer", fontFamily: TEXT, fontSize: 14, fontWeight: on ? 800 : 600, border: `1.5px solid ${on ? C.pink : C.pinkSoft}`, background: on ? C.pinkSoft : C.surface, color: on ? C.plum : C.plumSoft });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -523,7 +523,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 24 }}>
             {cards.map((c) => (
-              <div key={c.id} onClick={() => setBucket(c.id)} style={{ cursor: "pointer", borderRadius: 24, boxShadow: bucket === c.id ? `0 0 0 3px ${c.ring}` : "none", transition: "box-shadow .2s" }}>
+              <div key={c.id} onClick={() => setBucket(c.id)} style={{ cursor: "pointer", borderRadius: 14, boxShadow: bucket === c.id ? `0 0 0 3px ${c.ring}` : "none", transition: "box-shadow .2s" }}>
                 <KpiCard emoji={c.emoji} bg={c.bg} color={c.color} value={byKind[c.id].length}
                   label={c.label} sub={bucket === c.id ? "● Đang xem" : c.sub} subColor={c.color} />
               </div>
@@ -541,8 +541,8 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
           />
 
           {/* Bộ lọc: bộ phận · thời gian · mức rủi ro · người thực hiện · tìm kiếm */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "12px 15px", borderRadius: 18, background: "rgba(248,245,252,.6)", border: `1px solid ${C.pinkSoft}` }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 800, color: C.plumSoft }}><Filter size={15} /> Lọc</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "12px 15px", borderRadius: 14, background: "rgba(248,245,252,.6)", border: `1px solid ${C.pinkSoft}` }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: C.plumSoft }}><Filter size={15} /> Lọc</span>
             <select value={dept} onChange={(e) => setDept(e.target.value)} style={selStyle} aria-label="Lọc theo bộ phận">
               <option value="all">Tất cả bộ phận</option>
               {DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -569,9 +569,9 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "6px 12px" }}>
               <Search size={14} color={C.plumSoft} />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, người…"
-                style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 12.5, fontWeight: 600, color: C.plum, width: 150 }} />
+                style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 12, fontWeight: 600, color: C.plum, width: 150 }} />
             </label>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 800, color: C.plumSoft, marginLeft: 4 }}><ListFilter size={15} /> Xếp</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: C.plumSoft, marginLeft: 4 }}><ListFilter size={15} /> Xếp</span>
             <select value={sort} onChange={(e) => setSort(e.target.value)} style={selStyle} aria-label="Sắp xếp">
               {SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
@@ -635,7 +635,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
                 <SparkIcon size={18} color={C.pink} />
-                <span style={{ fontFamily: TEXT, fontSize: 17, fontWeight: 800, color: C.plum }}>Phân tích cảnh báo bằng AI</span>
+                <span style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>Phân tích cảnh báo bằng AI</span>
                 <Tag color={C.plumSoft} bg={C.pinkMist}>Phạm vi: {deptLabel}</Tag>
                 <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
               </div>
@@ -643,7 +643,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 <button type="button" onClick={chayAi} disabled={aiLoading || !aiConfigured()}
                   title={aiConfigured() ? undefined : AI_SETUP_HINT}
                   style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 8, padding: "10px 18px",
-                    borderRadius: 12, fontSize: 13, opacity: aiLoading || !aiConfigured() ? 0.55 : 1,
+                    borderRadius: 14, fontSize: 14, opacity: aiLoading || !aiConfigured() ? 0.55 : 1,
                     cursor: aiLoading || !aiConfigured() ? "not-allowed" : "pointer" }}>
                   {aiLoading ? <RefreshCw size={15} className="spin" /> : <SparkIcon size={15} />}
                   {aiLoading ? "AI đang phân tích…" : "Phân tích cảnh báo"}
@@ -652,7 +652,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                   title={aiConfigured() ? "Chạy AI rồi gửi bản phân tích qua email" : AI_SETUP_HINT}
                   style={{ ...selStyle, display: "inline-flex", alignItems: "center", gap: 7,
                     background: C.lavSoft, color: C.lavText, borderColor: C.lavSoft, fontWeight: 800,
-                    padding: "10px 16px", borderRadius: 12,
+                    padding: "10px 16px", borderRadius: 14,
                     opacity: aiConfigured() ? 1 : 0.55, cursor: aiConfigured() ? "pointer" : "not-allowed" }}>
                   <Mail size={15} /> Gửi mail phân tích
                 </button>
@@ -660,12 +660,12 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             </div>
 
             {!aiConfigured() && (
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.marigoldText, background: C.marigoldSoft,
-                borderRadius: 12, padding: "11px 15px", lineHeight: 1.6 }}>⚠️ {AI_SETUP_HINT}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.marigoldText, background: C.marigoldSoft,
+                borderRadius: 14, padding: "11px 15px", lineHeight: 1.6 }}>⚠️ {AI_SETUP_HINT}</div>
             )}
             {aiErr && (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, fontWeight: 800,
-                color: C.raspText, background: C.raspSoft, borderRadius: 12, padding: "12px 15px" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, fontWeight: 800,
+                color: C.raspText, background: C.raspSoft, borderRadius: 14, padding: "12px 15px" }}>
                 <AlertCircle size={16} /> {aiErr}
               </div>
             )}
@@ -681,7 +681,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{aiText}</div>
             )}
             {!aiLoading && !aiErr && !aiText && aiConfigured() && (
-              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
                 AI đọc lại số thẳng từ Supabase lúc bấm — không lấy từ bảng đang hiện, nên kết quả không
                 phụ thuộc bộ lọc rủi ro/người/từ khoá ở trên, chỉ theo bộ phận. AI chỉ nhận định, không
                 thay đánh giá của QA và không phải căn cứ phê duyệt GMP.
