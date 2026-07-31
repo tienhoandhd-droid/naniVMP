@@ -94,6 +94,7 @@ const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
 const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
 import CrownHero from "./components/three/CrownHero.tsx";
+import LoginCrown from "./components/three/LoginCrown.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
 import ReportsView from "./components/dashboard/ReportsView.tsx";
@@ -231,7 +232,9 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
             minHeight: 580,
           }}
         >
-          {/* Guardian silhouette — bottom-right, faint watermark */}
+          {/* Guardian silhouette — bottom-right, faint watermark.
+              Giữ nguyên làm nền: vương miện 3D nằm đè lên phía trên, và khi
+              máy không có WebGL thì hình chìm này vẫn còn, panel không trống. */}
           <div
             style={{
               position: "absolute",
@@ -243,6 +246,10 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
           >
             <GuardianSilhouette color="#F4E2BA" opacity={0.07} width={420} />
           </div>
+
+          {/* Vương miện 3D — panel này không có con số nào phải đọc nên được
+              phép để đồ hoạ chiếm chỗ. */}
+          <LoginCrown />
 
           {/* Top — CPC1HN masthead (corporate presence, refined pill) */}
           <div style={{ position: "relative", zIndex: 1 }}>
