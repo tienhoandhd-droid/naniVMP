@@ -67,13 +67,23 @@ function ymOf(target?: string | null): [number, number] | null {
  * núm chỉ để đổi 28% thành 29%.
  */
 
-/** Hạn đích VMP dạng "yyyy-mm-dd". Lùi về `a.target` khi thiếu `dl_vmp`,
- *  đúng cách phần còn lại của app vẫn đọc mốc đích. */
+/** Hạn đích VMP dạng "yyyy-mm-dd" — ĐỌC DUY NHẤT cột `dl_vmp`
+ *  ("Thời hạn hoàn thành (T) [deadline VMP]" trong Sheet).
+ *
+ *  KHÔNG lùi về `a.target`. Trông thì `a.target` cũng là mốc đích, nhưng
+ *  `deriveActivityFields()` định nghĩa nó là `dl_vmp || dl_bao_cao` — tức
+ *  khi thiếu hạn VMP nó âm thầm lấy HẠN BÁO CÁO. Dùng nó để chia kỳ thì một
+ *  hạng mục không có mốc đích vẫn bị xếp vào tháng theo hạn báo cáo, trong
+ *  khi truy vấn n8n (`p.deadline_vmp`, không lùi) lại loại nó ra — web và
+ *  mail đếm khác nhau mà không ai biết vì sao.
+ *
+ *  Đo 2026-07-31: 5 hạng mục thiếu `deadline_vmp` cũng không có hạn báo cáo
+ *  nên hôm nay hai đường vẫn ra 443 giống nhau. Đây là bịt lỗ trước khi có
+ *  người điền hạn báo cáo cho chúng. */
 export function hanVmp(a: Activity): string | null {
   const raw = (a._raw || {}) as Record<string, unknown>;
   const v = raw.dl_vmp;
-  const s = v == null || v === "" ? a.target : String(v);
-  return s || null;
+  return v == null || v === "" ? null : String(v);
 }
 
 /** ĐÃ HOÀN THÀNH = hoàn thành VMP. Đọc `tt_vmp` để cùng một nguồn với

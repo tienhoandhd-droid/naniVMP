@@ -83,10 +83,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
   // Năm nào có mặt trong dữ liệu thì cho chọn năm đó, cộng thêm năm hiện tại
   // và năm sau — để lập kế hoạch kỳ tới ngay cả khi chưa có hạng mục nào.
+  // Đọc hanVmp() chứ KHÔNG đọc a.target: a.target lùi về hạn báo cáo khi thiếu
+  // hạn VMP, nên có thể mời chọn một năm mà mục 1/2 lại rỗng.
   const namOptions = useMemo(() => {
     const nam = new Set<number>();
     for (const a of acts) {
-      const y = Number(String(a.target ?? "").slice(0, 4));
+      const y = Number(String(hanVmp(a) ?? "").slice(0, 4));
       if (y >= 2000 && y <= 2100) nam.add(y);
     }
     const nay = new Date().getFullYear();
