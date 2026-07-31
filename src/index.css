@@ -6102,3 +6102,23 @@ body { transition: background var(--mo-slow) var(--ease); }
 @media (max-width: 900px) {
   .vq-login-crown { width: 250px; height: 220px; right: -70px; bottom: -60px; }
 }
+
+/* =====================================================================
+   KHÔNG GIAN VMP 3D — 12 tháng × 4 giai đoạn × % hoàn thành
+   ===================================================================== */
+.vmp-space3d { position: relative; }
+.vmp-space3d-khung { height: 420px; width: 100%; }
+.vmp-space3d-khung > div, .vmp-space3d canvas { width: 100% !important; height: 100% !important; display: block; }
+.vmp-space3d-chu {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--c-ink-soft);
+}
+.vmp-space3d-chu span { display: inline-flex; align-items: center; gap: 7px; }
+.vmp-space3d-chu i { width: 10px; height: 10px; border-radius: 3px; display: block; }
+.vmp-space3d-muc i { background: #8168CE; opacity: .3; }
+.vmp-space3d-tip {
+  margin-top: 8px; min-height: 34px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.6; color: var(--c-ink-soft);
+  background: var(--c-surface-sunk); border-radius: 10px; padding: 8px 12px;
+}
+@media (max-width: 760px) { .vmp-space3d-khung { height: 320px; } }

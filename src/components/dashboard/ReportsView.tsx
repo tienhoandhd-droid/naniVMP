@@ -16,13 +16,15 @@
  *  — không có chỗ nào tự bịa số. Biểu đồ dùng lib/reportCharts.ts (SVG tay,
  *  không thư viện ngoài — recharts đã bị gỡ khỏi app).
  * ===================================================================== */
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import {
   FileBarChart, Printer, Download, RefreshCw, AlertCircle, Sparkles as SparkIcon,
   Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2, Mail, Layers,
 } from "lucide-react";
 
 import { C, TEXT, NUM, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
+// Khối 3D nạp theo yêu cầu: ai không mở trang Báo cáo thì không tải three.js.
+const VmpSpace3D = lazy(() => import("../three/VmpSpace3D.tsx"));
 import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll } from "../ui/Primitives.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
@@ -62,6 +64,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [areaSel, setAreaSel] = useState<string[]>([]);
   const [critSel, setCritSel] = useState<string[]>([]);
   const [ky, setKy] = useState<Period>(() => periodNow());
+  // Người dùng bật "giảm chuyển động" thì khối 3D đứng yên, không tự xoay.
+  const giamChuyenDong = useMemo(
+    () => typeof window !== "undefined"
+      && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
   const [ai, setAi] = useState("");
   // Loại phân tích của bản đang hiện — quyết định nhãn hiển thị và loại mail
   // sẽ gửi, để không bao giờ gắn nhãn "phân tích sâu" lên một bản nhận xét
@@ -551,7 +559,18 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <CardTitle icon={FileBarChart} sub="Mục tiêu: 50% hạng mục có mốc đích VMP rơi vào tháng đó phải hoàn thành VMP trong tháng">
           3. Đánh giá so với mục tiêu {TARGET_PCT}%/tháng
         </CardTitle>
-        <div dangerouslySetInnerHTML={{ __html: monthlyChartHtml }} />
+        {/* Khối 3D cho MÀN HÌNH. Bản SVG phẳng bên dưới vẫn giữ và vẫn là
+            bản duy nhất đi vào PDF/HTML xuất ra — WebGL không in được, nên
+            đây không phải chuyện thích hay không thích. */}
+        <Suspense fallback={<div style={{ height: 380 }} />}>
+          <VmpSpace3D acts={scopedNamActive} nam={ky.year} giamChuyenDong={giamChuyenDong} />
+        </Suspense>
+        <details style={{ marginTop: 12 }}>
+          <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 800, color: C.plumSoft }}>
+            Xem dạng phẳng 12 tháng (bản dùng cho PDF)
+          </summary>
+          <div style={{ marginTop: 10 }} dangerouslySetInnerHTML={{ __html: monthlyChartHtml }} />
+        </details>
         <div style={{ marginTop: 10, fontSize: 13.5, color: C.plum, fontWeight: 600, background: C.pinkMist,
           borderLeft: `4px solid ${C.pink}`, borderRadius: "0 12px 12px 0", padding: "12px 16px" }}>
           {targetVerdict}
