@@ -3,8 +3,8 @@
  *  ---------------------------------------------------------------------
  *  Thay bản ReportsView cũ trong App.tsx (kỳ tuần/tháng/quý + 1 bảng KPI).
  *  Bản mới theo đúng yêu cầu quản lý:
- *    1. Tổng quan số liệu tới hiện tại (năm nay)
- *    2. Tổng quan tháng hiện tại
+ *    1. Tổng quan CẢ NĂM — đã làm được bao nhiêu (không đổi khi chọn tháng)
+ *    2. Tổng quan KỲ đang chọn, có bộ chọn tháng/quý ngay trong thẻ
  *    3. Đánh giá so với mục tiêu 50%/tháng (chốt định nghĩa với người dùng
  *       2026-07-30: % hạng mục ĐẾN HẠN trong tháng mà đã HOÀN THÀNH)
  *    4. Bất cập trong VMP — bộ phận nào chậm, chậm đề cương hay thực tế
@@ -28,7 +28,7 @@ import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll } from ".
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
-  periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget,
+  periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget, hanVmp,
 } from "../../lib/reportModel.ts";
 import type { Period, PeriodKind } from "../../lib/reportModel.ts";
 import {
@@ -123,26 +123,21 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     return parts.join(" · ");
   }, [deptScope, areaSel, critSel, kyLabel]);
 
-  /* ===== BA MỤC MẶC ĐỊNH — luôn hiện, KHÔNG phụ thuộc bộ chọn kỳ =====
-     Người quản lý mở trang ra là phải thấy ngay ba câu trả lời, không phải
-     bấm gì trước: năm nay tới đâu, tháng này tới đâu (cả hai so mục tiêu
-     50%), và tháng sau phải hoàn thành những gì.
-     Chỉ chịu ảnh hưởng của bộ lọc bộ phận/khu vực/trọng yếu — kỳ báo cáo
-     bên dưới là để đào sâu, không được đổi ba con số nền này. */
-  const kyBgNam = useMemo<Period>(() => {
-    const n = periodNow();
-    return { kind: "nam", year: n.year, month: n.month, quarter: n.quarter };
-  }, []);
-  const kyBgThang = useMemo<Period>(() => periodNow(), []);
-  const kyBgThangSau = useMemo<Period>(() => nextPeriod(periodNow()), []);
-
-  const bgNam = useMemo(() => periodSummary(scoped, kyBgNam, TARGET_PCT), [scoped, kyBgNam]);
-  const bgThang = useMemo(() => periodSummary(scoped, kyBgThang, TARGET_PCT), [scoped, kyBgThang]);
-  const bgThangSau = useMemo(() => periodWork(scoped, kyBgThangSau), [scoped, kyBgThangSau]);
+  // Mục 1 nói về CẢ NĂM, mục 2 trở đi nói về KỲ đang chọn. Trước đây cả hai
+  // cùng đọc `scopedKy` nên trang có hai mục cùng tên "Tổng quan tháng 7" —
+  // người đọc không biết cái nào là cái nào.
+  const scopedNam = useMemo(
+    () => scoped.filter((a) => Number(String(hanVmp(a) ?? "").slice(0, 4)) === ky.year),
+    [scoped, ky.year],
+  );
 
   // ytdSummary lọc bỏ hạng mục Không áp dụng/Đã hủy, nên danh sách chi tiết
   // phải lọc y hệt — bấm vào ô "60" mà ra 63 dòng là mất tin ngay.
-  const scopedKyActive = useMemo(() => scopedKy.filter((a) => (a.state || "active") === "active"), [scopedKy]);
+  const chiActive = (xs: Activity[]) => xs.filter((a) => (a.state || "active") === "active");
+  const scopedNamActive = useMemo(() => chiActive(scopedNam), [scopedNam]);
+  const scopedKyActive = useMemo(() => chiActive(scopedKy), [scopedKy]);
+
+  const ytdNam = useMemo(() => ytdSummary(scopedNam), [scopedNam]);
   const ytd = useMemo(() => ytdSummary(scopedKy), [scopedKy]);
   const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT), [scoped, ky]);
   const bottleneck = useMemo(() => stageBottleneck(scopedKy), [scopedKy]);
@@ -213,10 +208,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   // Phễu phải giảm dần: đề cương ≥ thẩm định ≥ hồ sơ ≥ VMP.
   const funnelWarning = useMemo(() => {
     const f = [
-      { l: "đề cương", n: ytd.protocol.done },
-      { l: "thẩm định thực tế", n: ytd.validation.done },
-      { l: "hồ sơ", n: ytd.documentation.done },
-      { l: "hoàn thành VMP", n: ytd.vmp.done },
+      { l: "đề cương", n: ytdNam.protocol.done },
+      { l: "thẩm định thực tế", n: ytdNam.validation.done },
+      { l: "hồ sơ", n: ytdNam.documentation.done },
+      { l: "hoàn thành VMP", n: ytdNam.vmp.done },
     ];
     const nguoc: string[] = [];
     for (let i = 1; i < f.length; i++) {
@@ -225,7 +220,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     return nguoc.length
       ? `Dữ liệu tự mâu thuẫn: ${nguoc.join("; ")}. Một giai đoạn sau không thể xong nhiều hơn giai đoạn trước — cần rà lại cột trạng thái ở Cập nhật tiến độ.`
       : "";
-  }, [ytd]);
+  }, [ytdNam]);
 
   const qualityBySeverity = useMemo(() => {
     const m: Record<string, number> = { error: 0, warning: 0, info: 0 };
@@ -347,27 +342,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     XLSX.writeFile(wb, `BaoCaoQuanLy_VMP_${tenTepKy()}_CPC1HN.xlsx`);
   };
 
-  /** Câu kết cho một kỳ so mục tiêu. Kỳ ĐANG DIỄN RA chỉ được nói "tạm",
-   *  kỳ chưa có hạng mục đến hạn thì không có gì để chấm — chốt sổ một kỳ
-   *  chưa xong là bịa kết luận. */
-  const cauSoMucTieu = (r: { rate: number | null; meets: boolean | null; due: number; done: number }, dangDienRa: boolean) => {
-    if (r.due === 0) return { chu: "—", phu: "Chưa có hạng mục nào đến hạn", dat: null as boolean | null };
-    if (r.rate == null) return { chu: "—", phu: "Chưa chấm được", dat: null };
-    return {
-      chu: `${r.rate}%`,
-      phu: dangDienRa
-        ? `${r.done}/${r.due} · số giữa kỳ, ${r.meets ? "tạm đạt" : "tạm dưới"} mục tiêu ${TARGET_PCT}%`
-        : `${r.done}/${r.due} · ${r.meets ? "đạt" : "chưa đạt"} mục tiêu ${TARGET_PCT}%`,
-      dat: r.meets,
-    };
-  };
-
-  const oNam = cauSoMucTieu(bgNam.cur, true);
-  const oThang = cauSoMucTieu(bgThang.cur, true);
-  const toneTheoDat = (dat: boolean | null) =>
-    dat == null ? { c: C.plumSoft, bg: C.pinkMist }
-      : dat ? { c: C.mintText, bg: C.mintSoft } : { c: C.marigoldText, bg: C.marigoldSoft };
-
   const moChiTiet = (title: string, rows: Activity[], giaiDoan?: GiaiDoan) =>
     setChiTiet({ title, sub: `${scopeLabel} · ${rows.length} hạng mục`, rows, giaiDoan });
 
@@ -375,106 +349,29 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   // những hạng mục gây mâu thuẫn để sửa được ngay, thay vì chỉ báo có lỗi.
   const hangMucMauThuan = useMemo(() => {
     const r = (a: Activity) => (a._raw || {}) as Record<string, unknown>;
-    return scopedKy.filter((a) => {
+    return scopedNamActive.filter((a) => {
       const dc = wlIsDone(r(a).tt_de_cuong);
       const td = wlIsDone(r(a).tt_tham_dinh);
       const bc = wlIsDone(r(a).tt_bao_cao);
       const vmp = wlIsDone(r(a).tt_vmp);
       return (td && !dc) || (bc && !td) || (vmp && !bc);
     });
-  }, [scopedKy]);
+  }, [scopedNamActive]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* ===== BA MỤC MẶC ĐỊNH — mở trang ra là thấy ngay, không phải chọn gì =====
-          Cố ý đặt TRÊN bộ lọc và cố ý KHÔNG đổi theo bộ chọn kỳ: đây là mặt
-          đồng hồ của báo cáo. Bộ lọc bên dưới là để đào sâu. */}
-      <Card variant="strong">
-        <CardTitle icon={FileBarChart}
-          sub={`${scopeLabel.split(" · Kỳ:")[0]} · không đổi theo bộ chọn kỳ bên dưới · chỉ số là HOÀN THÀNH VMP`}>
-          Tổng quan nhanh
-        </CardTitle>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16 }}>
-          {/* 1. Năm hiện tại so mục tiêu 50% */}
-          <div style={{ borderRadius: 16, padding: "16px 18px", background: toneTheoDat(oNam.dat).bg }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, letterSpacing: ".06em" }}>
-              1 · NĂM {bgNam.year} — SO MỤC TIÊU {TARGET_PCT}%
-            </div>
-            <div style={{ fontFamily: NUM, fontSize: 38, fontWeight: 800, lineHeight: 1.15, marginTop: 6, color: toneTheoDat(oNam.dat).c }}>
-              {oNam.chu}
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plum, marginTop: 4, lineHeight: 1.6 }}>{oNam.phu}</div>
-            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 6 }}>
-              Hạng mục có mốc đích VMP trong năm và đã hoàn thành VMP.
-            </div>
-          </div>
-
-          {/* 2. Tháng hiện tại so mục tiêu 50% */}
-          <div style={{ borderRadius: 16, padding: "16px 18px", background: toneTheoDat(oThang.dat).bg }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, letterSpacing: ".06em" }}>
-              2 · THÁNG {bgThang.period.month}/{bgThang.year} — SO MỤC TIÊU {TARGET_PCT}%
-            </div>
-            <div style={{ fontFamily: NUM, fontSize: 38, fontWeight: 800, lineHeight: 1.15, marginTop: 6, color: toneTheoDat(oThang.dat).c }}>
-              {oThang.chu}
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plum, marginTop: 4, lineHeight: 1.6 }}>{oThang.phu}</div>
-            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 6 }}>
-              Tháng trước: {bgThang.prev?.rate == null ? "chưa có số" : `${bgThang.prev.rate}% (${bgThang.prev.done}/${bgThang.prev.due})`}
-            </div>
-          </div>
-
-          {/* 3. Tháng tiếp theo — kế hoạch phải hoàn thành VMP */}
-          <div style={{ borderRadius: 16, padding: "16px 18px", background: C.lavSoft }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, letterSpacing: ".06em" }}>
-              3 · {bgThangSau.monthLabel.toUpperCase()} — KẾ HOẠCH HOÀN THÀNH VMP
-            </div>
-            <div style={{ fontFamily: NUM, fontSize: 38, fontWeight: 800, lineHeight: 1.15, marginTop: 6, color: C.lavText }}>
-              {bgThangSau.total}
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plum, marginTop: 4, lineHeight: 1.6 }}>
-              hạng mục phải hoàn thành VMP, hiện chưa xong
-            </div>
-            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 6, lineHeight: 1.6 }}>
-              {bgThangSau.byDept.length
-                ? `Nặng nhất: ${bgThangSau.byDept.slice(0, 3).map((d) => `${d.label} ${d.count}`).join(" · ")}`
-                : "Chưa có hạng mục nào đến hạn."}
-            </div>
-          </div>
-        </div>
-      </Card>
-
       {/* ===== Bộ lọc dữ liệu báo cáo — lấy số liệu theo bất kỳ lát cắt nào ===== */}
       <Card>
-        <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo bên dưới — kể cả dữ liệu thô và bản xuất">
+        <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo bên dưới — kể cả dữ liệu thô và bản xuất. Chọn tháng/quý ở mục 2.">
           Bộ lọc dữ liệu báo cáo quản lý
         </CardTitle>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-end" }}>
-          {/* ---- Kỳ báo cáo: tháng / quý / năm ---- */}
+          {/* Chỉ còn chọn NĂM ở đây — năm là thứ chi phối cả mục 1 (tổng quan
+              năm) lẫn biểu đồ 12 tháng. Chọn tháng/quý nằm trong chính mục 2,
+              cạnh con số mà nó đổi. */}
           <div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>
-              Kỳ báo cáo
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))}
-                opts={[{ v: "thang", l: "Theo tháng" }, { v: "quy", l: "Theo quý" }, { v: "nam", l: "Cả năm" }]} />
-              {ky.kind === "thang" && (
-                <Sel val={String(ky.month)} set={(v) => setKy((k) => ({ ...k, month: Number(v), quarter: Math.ceil(Number(v) / 3) }))}
-                  opts={Array.from({ length: 12 }, (_, i) => ({ v: String(i + 1), l: `Tháng ${i + 1}` }))} />
-              )}
-              {ky.kind === "quy" && (
-                <Sel val={String(ky.quarter)} set={(v) => setKy((k) => ({ ...k, quarter: Number(v), month: (Number(v) - 1) * 3 + 1 }))}
-                  opts={[1, 2, 3, 4].map((q) => ({ v: String(q), l: `Quý ${q}` }))} />
-              )}
-              <Sel val={String(ky.year)} set={(v) => setKy((k) => ({ ...k, year: Number(v) }))} opts={namOptions} />
-              {!laKyHienTai && (
-                <button type="button" onClick={() => setKy(periodNow())}
-                  title="Quay lại kỳ hiện tại"
-                  style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: C.lavText, background: C.lavSoft,
-                    border: "none", borderRadius: 999, padding: "8px 14px", cursor: "pointer", whiteSpace: "nowrap" }}>
-                  ↺ Về kỳ này
-                </button>
-              )}
-            </div>
+            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Năm báo cáo</div>
+            <Sel val={String(ky.year)} set={(v) => setKy((k) => ({ ...k, year: Number(v) }))} opts={namOptions} />
           </div>
           <div>
             <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Phạm vi (bộ phận)</div>
@@ -495,10 +392,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </div>
         </div>
         <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
-          Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b> · <b style={{ color: C.plum }}>{scopedKy.filter((a) => (a.state || "active") === "active").length}</b> hạng mục
-          có <b style={{ color: C.plum }}>mốc đích VMP</b> rơi vào kỳ này (trên tổng {scoped.filter((a) => (a.state || "active") === "active").length} hạng mục đang hoạt động).
-          {" "}Chỉ số chính của báo cáo là <b style={{ color: C.plum }}>hoàn thành VMP</b>; mức hoàn thành đề cương và
-          thẩm định thực tế là dữ liệu bổ sung, xem ở mục 1 và mục 4.
+          Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b>.
+          {" "}Mục 1 tính trên <b style={{ color: C.plum }}>{scopedNamActive.length}</b> hạng mục có mốc đích VMP trong năm {ky.year};
+          mục 2 trở xuống tính trên <b style={{ color: C.plum }}>{scopedKyActive.length}</b> hạng mục của <b style={{ color: C.plum }}>{kyLabel}</b>.
+          {" "}Chỉ số chính là <b style={{ color: C.plum }}>hoàn thành VMP</b>; mức hoàn thành đề cương và thẩm định
+          thực tế là dữ liệu bổ sung.
           {soChuaCoMoc > 0 && (
             <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục chưa có mốc đích VMP nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
           )}
@@ -520,35 +418,36 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 1. Tổng quan số liệu tới hiện tại ===== */}
       <Card variant="strong">
-        <CardTitle icon={Boxes} sub={`Hạng mục có mốc đích VMP rơi vào ${kyLabel} — hoàn thành VMP là chỉ số chính, ba mức còn lại là dữ liệu bổ sung`}>
-          1. Tổng quan số liệu kỳ {kyLabel}
+        <CardTitle icon={Boxes}
+          sub={`Toàn bộ hạng mục có mốc đích VMP trong năm ${ky.year} — không đổi khi bạn chọn tháng bên dưới`}>
+          1. Tổng quan năm {ky.year} — đã làm được bao nhiêu
         </CardTitle>
         {/* Hai hàng tách bạch: chỉ số CHÍNH của báo cáo đứng riêng, ba mức giai
             đoạn xuống dưới dán nhãn "bổ sung". Xếp năm ô ngang hàng như bản cũ
             khiến người đọc tưởng cả năm đều là thước đo mục tiêu — trong khi
             chỉ có Hoàn thành VMP mới là. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
-          <StatTile icon={Boxes} label="Tổng hạng mục trong kỳ" value={ytd.total} tone={{ c: C.plum, bg: C.pinkSoft }}
+          <StatTile icon={Boxes} label={`Tổng hạng mục năm ${ky.year}`} value={ytdNam.total} tone={{ c: C.plum, bg: C.pinkSoft }}
             sub="Bấm để xem danh sách"
-            onClick={() => moChiTiet(`Toàn bộ hạng mục · kỳ ${kyLabel}`, scopedKyActive)} />
-          <StatTile icon={CheckCircle2} label="★ Hoàn thành VMP — chỉ số chính" value={`${ytd.vmp.rate}%`}
-            sub={`${ytd.vmp.done}/${ytd.vmp.total} · quá hạn ${ytd.vmp.over} · bấm để xem`} tone={{ c: C.mintText, bg: C.mintSoft }}
-            onClick={() => moChiTiet(`Hoàn thành VMP · kỳ ${kyLabel}`, scopedKyActive, "vmp")} />
+            onClick={() => moChiTiet(`Toàn bộ hạng mục · năm ${ky.year}`, scopedNamActive)} />
+          <StatTile icon={CheckCircle2} label="★ Hoàn thành VMP — chỉ số chính" value={`${ytdNam.vmp.rate}%`}
+            sub={`${ytdNam.vmp.done}/${ytdNam.vmp.total} · quá hạn ${ytdNam.vmp.over} · bấm để xem`} tone={{ c: C.mintText, bg: C.mintSoft }}
+            onClick={() => moChiTiet(`Hoàn thành VMP · năm ${ky.year}`, scopedNamActive, "vmp")} />
         </div>
 
         <div style={{ marginTop: 18, marginBottom: 10, fontSize: 12, color: C.plumSoft, fontWeight: 800, letterSpacing: ".04em" }}>
           DỮ LIỆU BỔ SUNG — ba giai đoạn trước đó, để xem tình hình chứ không phải thước đo mục tiêu
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
-          <StatTile icon={ClipboardCheck} label="Đề cương hoàn thành" value={`${ytd.protocol.rate}%`}
-            sub={`${ytd.protocol.done}/${ytd.protocol.total} · quá hạn ${ytd.protocol.over} · bấm để xem`} tone={{ c: C.lavText, bg: C.lavSoft }}
-            onClick={() => moChiTiet(`Đề cương · kỳ ${kyLabel}`, scopedKyActive, "de_cuong")} />
-          <StatTile icon={ShieldCheck} label="Thẩm định thực tế" value={`${ytd.validation.rate}%`}
-            sub={`${ytd.validation.done}/${ytd.validation.total} · quá hạn ${ytd.validation.over} · bấm để xem`} tone={{ c: C.skyText, bg: C.skySoft }}
-            onClick={() => moChiTiet(`Thẩm định thực tế · kỳ ${kyLabel}`, scopedKyActive, "tham_dinh")} />
-          <StatTile icon={FileCheck2} label="Hồ sơ hoàn thiện" value={`${ytd.documentation.rate}%`}
-            sub={`${ytd.documentation.done}/${ytd.documentation.total} · quá hạn ${ytd.documentation.over} · bấm để xem`} tone={{ c: C.pinkText, bg: C.pinkSoft }}
-            onClick={() => moChiTiet(`Hồ sơ · kỳ ${kyLabel}`, scopedKyActive, "ho_so")} />
+          <StatTile icon={ClipboardCheck} label="Đề cương hoàn thành" value={`${ytdNam.protocol.rate}%`}
+            sub={`${ytdNam.protocol.done}/${ytdNam.protocol.total} · quá hạn ${ytdNam.protocol.over} · bấm để xem`} tone={{ c: C.lavText, bg: C.lavSoft }}
+            onClick={() => moChiTiet(`Đề cương · năm ${ky.year}`, scopedNamActive, "de_cuong")} />
+          <StatTile icon={ShieldCheck} label="Thẩm định thực tế" value={`${ytdNam.validation.rate}%`}
+            sub={`${ytdNam.validation.done}/${ytdNam.validation.total} · quá hạn ${ytdNam.validation.over} · bấm để xem`} tone={{ c: C.skyText, bg: C.skySoft }}
+            onClick={() => moChiTiet(`Thẩm định thực tế · năm ${ky.year}`, scopedNamActive, "tham_dinh")} />
+          <StatTile icon={FileCheck2} label="Hồ sơ hoàn thiện" value={`${ytdNam.documentation.rate}%`}
+            sub={`${ytdNam.documentation.done}/${ytdNam.documentation.total} · quá hạn ${ytdNam.documentation.over} · bấm để xem`} tone={{ c: C.pinkText, bg: C.pinkSoft }}
+            onClick={() => moChiTiet(`Hồ sơ · năm ${ky.year}`, scopedNamActive, "ho_so")} />
         </div>
         {/* Phễu 4 giai đoạn phải giảm dần. Nếu không, dữ liệu tự mâu thuẫn
             (xong báo cáo mà chưa thẩm định) — nói thẳng thay vì để người đọc
@@ -559,7 +458,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             ⚠️ {funnelWarning}
             {hangMucMauThuan.length > 0 && (
               <button type="button"
-                onClick={() => moChiTiet(`Hạng mục có trạng thái mâu thuẫn · kỳ ${kyLabel}`, hangMucMauThuan)}
+                onClick={() => moChiTiet(`Hạng mục có trạng thái mâu thuẫn · năm ${ky.year}`, hangMucMauThuan)}
                 style={{ marginLeft: 10, fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer",
                   color: C.marigoldText, background: C.surface, border: `1.5px solid ${C.marigoldText}`,
                   borderRadius: 999, padding: "5px 13px" }}>
@@ -572,10 +471,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, marginTop: 16 }}>
             <thead><tr><th style={th}>Giai đoạn</th><th style={{ ...th, textAlign: "center" }}>Số hạng mục</th></tr></thead>
             <tbody>
-              {ytd.byStage.map((s) => (
+              {ytdNam.byStage.map((s) => (
                 <tr key={s.id} className={s.count ? "vmp-row" : undefined}
                   role={s.count ? "button" : undefined}
-                  onClick={s.count ? () => moChiTiet(`${s.label} · kỳ ${kyLabel}`, scopedKyActive.filter((a) => stageOf(a) === s.id)) : undefined}
+                  onClick={s.count ? () => moChiTiet(`${s.label} · năm ${ky.year}`, scopedNamActive.filter((a) => stageOf(a) === s.id)) : undefined}
                   style={{ cursor: s.count ? "pointer" : "default" }}>
                   <td style={td}>{s.label}{s.count > 0 && <span style={{ color: C.plumSoft, fontWeight: 600 }}> · bấm để xem</span>}</td>
                   <td style={{ ...td, textAlign: "center", fontFamily: NUM }}>{s.count}</td>
@@ -586,19 +485,53 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         </TableScroll>
       </Card>
 
-      {/* ===== 2. Tổng quan tháng hiện tại ===== */}
-      <Card>
-        <CardTitle icon={CalendarClock} sub="So với kỳ liền trước, cùng phạm vi đang lọc">
-          2. Tổng quan kỳ {kyLabel}
+      {/* ===== 2. Tổng quan kỳ đang chọn — CÓ bộ chọn ngay tại đây =====
+          Bộ chọn đặt trong chính thẻ mà nó đổi tên, để không ai phải đoán
+          "chọn ở trên thì cái nào bên dưới chạy theo". Mục 1 ở trên là cả năm
+          và đứng yên; từ đây trở xuống chạy theo kỳ. */}
+      <Card variant="strong">
+        <CardTitle icon={CalendarClock} sub="So với kỳ liền trước, cùng phạm vi đang lọc — đổi kỳ thì mục 2, 4, 5 và dữ liệu thô chạy theo">
+          2. Tổng quan {kyLabel}
         </CardTitle>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-          <StatTile icon={CalendarClock} label={`Cần hoàn thành ${kyLabel}`} value={monthly.cur.due} tone={{ c: C.plum, bg: C.pinkSoft }} />
-          <StatTile icon={FileCheck2} label="Đã hoàn thành" value={monthly.cur.done}
-            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : `${monthly.cur.rate}% trong kỳ`} tone={{ c: C.mintText, bg: C.mintSoft }} />
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16,
+          background: C.pinkMist, borderRadius: 14, padding: "11px 14px" }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.plumSoft, marginRight: 2 }}>Xem kỳ</span>
+          <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))}
+            opts={[{ v: "thang", l: "Theo tháng" }, { v: "quy", l: "Theo quý" }, { v: "nam", l: "Cả năm" }]} />
+          {ky.kind === "thang" && (
+            <Sel val={String(ky.month)} set={(v) => setKy((k) => ({ ...k, month: Number(v), quarter: Math.ceil(Number(v) / 3) }))}
+              opts={Array.from({ length: 12 }, (_, i) => ({ v: String(i + 1), l: `Tháng ${i + 1}` }))} />
+          )}
+          {ky.kind === "quy" && (
+            <Sel val={String(ky.quarter)} set={(v) => setKy((k) => ({ ...k, quarter: Number(v), month: (Number(v) - 1) * 3 + 1 }))}
+              opts={[1, 2, 3, 4].map((q) => ({ v: String(q), l: `Quý ${q}` }))} />
+          )}
+          {!laKyHienTai && (
+            <button type="button" onClick={() => setKy(periodNow())} title="Quay lại kỳ hiện tại"
+              style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: C.lavText, background: C.lavSoft,
+                border: "none", borderRadius: 999, padding: "8px 14px", cursor: "pointer", whiteSpace: "nowrap" }}>
+              ↺ Về kỳ này
+            </button>
+          )}
+          <span style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+            Năm chọn ở bộ lọc phía trên
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
+          <StatTile icon={CalendarClock} label={`Cần hoàn thành ${kyLabel}`} value={monthly.cur.due}
+            sub="Bấm để xem danh sách" tone={{ c: C.plum, bg: C.pinkSoft }}
+            onClick={() => moChiTiet(`Hạng mục đến hạn · ${kyLabel}`, scopedKyActive)} />
+          <StatTile icon={FileCheck2} label="Đã hoàn thành VMP" value={monthly.cur.done}
+            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : `${monthly.cur.rate}% trong kỳ · bấm để xem`}
+            tone={{ c: C.mintText, bg: C.mintSoft }}
+            onClick={() => moChiTiet(`Hoàn thành VMP · ${kyLabel}`, scopedKyActive, "vmp")} />
           <StatTile icon={ShieldCheck} label="Tỷ lệ kỳ trước" value={monthly.prev?.rate == null ? "—" : `${monthly.prev.rate}%`}
+            sub={monthly.prev?.rate == null ? "Kỳ trước chưa có hạng mục đến hạn" : `${monthly.prev.done}/${monthly.prev.due} hạng mục`}
             tone={{ c: C.skyText, bg: C.skySoft }} />
-          {/* Tháng hiện tại chưa kết thúc → nói "tạm", khớp với biểu đồ và câu
-              kết luận. Ghi thẳng "Chưa đạt" là chốt sổ một kỳ chưa xong. */}
+          {/* Kỳ chưa kết thúc → nói "tạm", khớp với biểu đồ và câu kết luận.
+              Ghi thẳng "Chưa đạt" là chốt sổ một kỳ chưa xong. */}
           <StatTile icon={AlertCircle} label={`So mục tiêu ${TARGET_PCT}%`}
             value={monthly.cur.rate == null ? "—" : kyPhase === "dang_dien_ra" ? (monthly.cur.meets ? "Tạm đạt" : "Tạm dưới") : (monthly.cur.meets ? "Đạt" : "Chưa đạt")}
             sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : kyPhase === "dang_dien_ra" ? "Số giữa kỳ — kỳ chưa kết thúc" : kyPhase === "chua_toi" ? "Kỳ chưa tới — chưa chấm được" : "Kết quả đã chốt"}
