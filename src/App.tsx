@@ -94,7 +94,7 @@ const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
 const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
-import CrownHero from "./components/three/CrownHero.tsx";
+import VongNam from "./components/dashboard/VongNam.tsx";
 import LoginCrown from "./components/three/LoginCrown.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
@@ -1368,55 +1368,56 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
   return (
     <div className="vmp-bento vmp-stagger">
       {/* Ô lớn — trạng thái chung của cả kế hoạch */}
-      <Card variant="strong" cls="b-hero"
-        style={{ padding: "26px 28px", display: "flex", alignItems: "center",
-                 gap: 26, flexWrap: "wrap" }}>
-        {/* Vương miện thẩm định thay vòng tròn phẳng: vòng tròn cũ nói được
-            một con số, vương miện nói bốn — hụt ở khâu nào thì viên ngọc
-            khâu đó tối đi, thấy ngay mà không phải bấm sang trang khác. */}
-        <CrownHero acts={acts} rate={e.rate} total={e.total} />
+      <Card variant="strong" cls="b-hero" style={{ padding: "24px 26px" }}>
+        {/* Vòng năm thay vương miện 3D. Vương miện mã hoá bốn tỉ lệ vào ĐỘ
+            SÁNG viên ngọc — kênh mà mắt người đọc kém nhất; bằng chứng là
+            phần đọc được thật vẫn phải nằm ở bảng chú giải bên cạnh nó.
+            Vòng năm nói được thứ tổng quát hơn và đọc thẳng từ hình: cả 12
+            tháng khép kín, khối lượng từng tháng, phần đã xong, và kim chỉ
+            mình đang đứng ở đâu trong năm. */}
+        <VongNam acts={acts} rate={e.rate} total={e.total} ben={
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: TEXT, fontSize: 19, fontWeight: 800,
+                          color: C.plum, marginBottom: 3 }}>
+              Tiến độ thẩm định {vmpToday().getFullYear()}
+            </div>
+            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
+              {e.total} hạng mục trong kế hoạch năm
+            </div>
 
-        <div style={{ flex: 1, minWidth: 190 }}>
-          <div style={{ fontFamily: TEXT, fontSize: 19, fontWeight: 800,
-                        color: C.plum, marginBottom: 3 }}>
-            Tiến độ thẩm định {vmpToday().getFullYear()}
-          </div>
-          <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
-            {e.total} hạng mục trong kế hoạch năm
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-            {[
-              { l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
-              { l: "Quá hạn (trạng thái)", v: e.over, c: C.rasp, t: C.raspText },
-              { l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
-            ].map((x) => (
-              <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 999,
-                               background: x.c, flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700,
-                               flex: 1 }}>{x.l}</span>
-                <div style={{ width: 88, height: 6, borderRadius: 999,
-                              background: C.surfaceSunk, overflow: "hidden" }}>
-                  <div style={{ width: `${e.total ? (x.v / e.total) * 100 : 0}%`,
-                                height: "100%", background: x.c }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+              {[
+                { l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
+                { l: "Quá hạn (trạng thái)", v: e.over, c: C.rasp, t: C.raspText },
+                { l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
+              ].map((x) => (
+                <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 999,
+                                 background: x.c, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700,
+                                 flex: 1 }}>{x.l}</span>
+                  <div style={{ width: 88, height: 6, borderRadius: 999,
+                                background: C.surfaceSunk, overflow: "hidden" }}>
+                    <div style={{ width: `${e.total ? (x.v / e.total) * 100 : 0}%`,
+                                  height: "100%", background: x.c }} />
+                  </div>
+                  <span style={{ fontFamily: NUM, fontSize: 19, fontWeight: 800,
+                                 color: x.t, minWidth: 34, textAlign: "right" }}>{x.v}</span>
                 </div>
-                <span style={{ fontFamily: NUM, fontSize: 19, fontWeight: 800,
-                               color: x.t, minWidth: 34, textAlign: "right" }}>{x.v}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div style={{ marginTop: 15, paddingTop: 13, borderTop: `1px solid ${C.line}`,
-                        fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
-            Hồ sơ hoàn thiện: <b style={{ color: C.plum }}>{d.rate}%</b> ({d.done}/{d.total})
-            {gap > 0 && (
-              <span style={{ color: C.marigoldText }}>
-                {" · lệch "}{gap} hạng mục ({gapPts} điểm%)
-              </span>
-            )}
+            <div style={{ marginTop: 15, paddingTop: 13, borderTop: `1px solid ${C.line}`,
+                          fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
+              Hồ sơ hoàn thiện: <b style={{ color: C.plum }}>{d.rate}%</b> ({d.done}/{d.total})
+              {gap > 0 && (
+                <span style={{ color: C.marigoldText }}>
+                  {" · lệch "}{gap} hạng mục ({gapPts} điểm%)
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        } />
       </Card>
 
       {/* CẨN THẬN: hai con số này KHÁC NHAU và trước đây cùng mang nhãn "Quá hạn"

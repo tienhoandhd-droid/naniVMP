@@ -5913,7 +5913,12 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-bento { perspective: 1600px; perspective-origin: 50% 20%;
   display: grid;
   gap: 16px;
-  grid-template-columns: 1fr;
+  /* minmax(0, 1fr) chứ KHÔNG phải 1fr. `1fr` là `minmax(auto, 1fr)`, nghĩa
+     là track phình ra theo min-content của ô — một thẻ có nội dung rộng sẽ
+     kéo cả cột rộng hơn màn hình, và phần thò ra bị cắt mất chứ không cuộn
+     tới được. Hai mốc màn hình lớn bên dưới đã dùng minmax(0,1fr) đúng từ
+     đầu; chỗ này sót lại. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "hero"
     "k1" "k2" "k3" "k4"
@@ -5985,70 +5990,64 @@ body { transition: background var(--mo-slow) var(--ease); }
 }
 
 /* =====================================================================
-   VƯƠNG MIỆN THẨM ĐỊNH — hero 3D trang Tổng quan
+   VÒNG NĂM — hero trang Tổng quan
    ---------------------------------------------------------------------
-   Canvas nằm dưới, chữ nằm trên. Canvas KHÔNG nhận chuột (pointer-events
-   none ở component) nên không cướp thao tác bôi-chép của người đọc số.
+   Thay khối vương miện 3D trước đây ở chỗ này. SVG phẳng, không WebGL:
+   in ra giấy được, trình đọc màn hình đọc được, và không tốn một byte
+   three.js nào cho trang mở nhiều nhất trong app.
+
+   Số ở giữa vòng nằm ở lớp HTML chứ không vẽ vào SVG — bôi-chép được và
+   đổi cỡ chữ hệ thống thì nó đi theo.
    ===================================================================== */
-.vmp-crown-hero {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(220px, 300px) 1fr;
-  /* Số nằm ở HÀNG RIÊNG dưới vương miện, không chồng lớp. Bản trước tôi cho
-     đè lên và dù kê nền cỡ nào thì chữ số vẫn cắt ngang vành kim loại —
-     xấu, và quan trọng hơn là khó đọc. */
-  grid-template-areas: "san chu" "so chu" "ghichu ghichu";
-  gap: 4px 26px;
-  align-items: center;
+.vmp-vongnam {
   width: 100%;
+  /* Xếp cột theo BỀ RỘNG CỦA THẺ, không theo bề rộng cửa sổ. Thẻ hero nằm
+     trong lưới bento nên ở màn 1500px nó vẫn chỉ rộng ~575px — dùng
+     media query theo cửa sổ là đo nhầm đối tượng, và kết quả là cột chữ
+     bên phải bị bóp đến mức "Quá hạn (trạng thái)" vỡ làm ba dòng. */
+  container-type: inline-size;
 }
-.vmp-crown-stage {
-  grid-area: san;
-  position: relative;
-  height: 218px;
-  min-width: 0;
-  /* Quầng sáng sau vương miện — tách khối kim loại khỏi nền thẻ trắng. */
-  background: radial-gradient(58% 46% at 50% 38%,
-    color-mix(in srgb, var(--c-gold) 16%, transparent), transparent 72%);
-}
-.vmp-crown-figure {
-  grid-area: so;
-  justify-self: center;
-  text-align: center;
-}
-.vmp-crown-legend {
-  grid-area: chu;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  min-width: 0;
-}
-.vmp-crown-legend li {
-  display: flex;
+.vmp-vongnam-than {
+  display: grid;
+  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
+  gap: 10px 26px;
   align-items: center;
-  gap: 10px;
-  font-size: 12.5px;
-  font-weight: 700;
 }
-.vmp-crown-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; transform: rotate(45deg); }
-.vmp-crown-label { flex: 1; color: var(--c-ink-soft); white-space: nowrap; }
-.vmp-crown-bar {
-  width: 96px; height: 6px; border-radius: 999px; flex: none;
-  background: var(--c-surface-sunk); overflow: hidden;
+.vmp-vongnam-than > * { min-width: 0; }
+@container (max-width: 660px) {
+  .vmp-vongnam-than { grid-template-columns: 1fr; gap: 18px; }
+  .vmp-vongnam-vong { max-width: 300px; margin: 0 auto; }
 }
-.vmp-crown-bar > i { display: block; height: 100%; border-radius: 999px; }
-.vmp-crown-legend b { min-width: 40px; text-align: right; font-size: 15px; font-weight: 800; }
-.vmp-crown-note {
-  grid-area: ghichu;
-  font-size: 11.5px; font-weight: 600; color: var(--c-ink-soft); opacity: .85;
+.vmp-vongnam-vong {
+  position: relative;
+  min-width: 0;
+  /* Quầng sáng rất nhẹ sau vòng — tách khối khỏi nền thẻ trắng mà không
+     thêm một đường viền nữa. */
+  background: radial-gradient(52% 52% at 50% 50%,
+    color-mix(in srgb, var(--c-pink) 9%, transparent), transparent 70%);
 }
+.vmp-vongnam-svg { display: block; width: 100%; height: auto; }
+.vmp-vongnam-loi {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; pointer-events: none;
+}
+.vmp-vongnam-ben { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.vmp-vongnam-chu {
+  display: flex; flex-wrap: wrap; gap: 6px 16px;
+  font-size: 11.5px; font-weight: 700; color: var(--c-ink-soft);
+}
+.vmp-vongnam-chu span { display: inline-flex; align-items: center; gap: 6px; }
+.vmp-vongnam-chu i { width: 10px; height: 10px; border-radius: 3px; display: block; flex: none; }
+.vmp-vongnam-kim {
+  width: 2px !important; height: 13px !important; border-radius: 999px !important;
+  background: var(--c-pink-text);
+}
+.vmp-vongnam-nut { margin-left: 0 !important; align-self: flex-start; }
 
 @media (max-width: 760px) {
-  .vmp-crown-hero { grid-template-columns: 1fr; grid-template-areas: "san" "chu" "ghichu"; }
-  .vmp-crown-stage { height: 190px; }
+  .vmp-vongnam-than { grid-template-columns: 1fr; }
+  .vmp-vongnam-vong { max-width: 300px; margin: 0 auto; }
 }
 
 /* =====================================================================
