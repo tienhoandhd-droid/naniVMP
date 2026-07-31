@@ -300,8 +300,8 @@ function SourceCatalogSection({ user, onReload, focus }: {
           {SOURCE_KINDS.map((k) => (
             <button key={k} onClick={() => { setKind(k); setQ(""); }}
               style={{
-                padding: "8px 14px", borderRadius: 12, cursor: "pointer",
-                fontFamily: TEXT, fontSize: 13, fontWeight: kind === k ? 800 : 600,
+                padding: "8px 14px", borderRadius: 14, cursor: "pointer",
+                fontFamily: TEXT, fontSize: 14, fontWeight: kind === k ? 800 : 600,
                 border: `1.5px solid ${kind === k ? C.pink : C.pinkSoft}`,
                 background: kind === k ? C.pinkSoft : C.surface,
                 color: kind === k ? C.plum : C.plumSoft,
@@ -318,8 +318,8 @@ function SourceCatalogSection({ user, onReload, focus }: {
               style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo mã, tên, bộ phận…"
               style={{
-                width: "100%", padding: "9px 10px 9px 32px", borderRadius: 12,
-                border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 13,
+                width: "100%", padding: "9px 10px 9px 32px", borderRadius: 14,
+                border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 14,
               }} />
           </div>
           <button onClick={load} style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
@@ -350,11 +350,11 @@ function SourceCatalogSection({ user, onReload, focus }: {
                    className="vmp-scroll">
                 <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                   <button onClick={() => setVisible(new Set(FIELDS.map((f) => f.key)))}
-                    style={{ ...btnPrimary, padding: "5px 10px", fontSize: 11.5,
+                    style={{ ...btnPrimary, padding: "5px 10px", fontSize: 12,
                              background: C.surface, color: C.plum,
                              border: `1.5px solid ${C.pinkSoft}` }}>Chọn tất cả</button>
                   <button onClick={() => setVisible(new Set(DEFAULT_COLS))}
-                    style={{ ...btnPrimary, padding: "5px 10px", fontSize: 11.5,
+                    style={{ ...btnPrimary, padding: "5px 10px", fontSize: 12,
                              background: C.surface, color: C.plum,
                              border: `1.5px solid ${C.pinkSoft}` }}>Mặc định</button>
                 </div>
@@ -362,7 +362,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
                   const locked = f.key === "object_code";
                   return (
                     <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 8,
-                                                padding: "5px 2px", fontSize: 12.5,
+                                                padding: "5px 2px", fontSize: 12,
                                                 fontFamily: TEXT, color: locked ? C.plumSoft : C.plum,
                                                 cursor: locked ? "not-allowed" : "pointer" }}>
                       <input type="checkbox" disabled={locked}
@@ -387,7 +387,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
           )}
         </div>
 
-        <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontFamily: TEXT }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontFamily: TEXT }}>
           {loading ? "Đang tải…" : `${sorted.length} / ${rows.length} đối tượng`}
           {" · "}
           {rows.filter((r) => r.validate_flag === "y").length} có thẩm định
@@ -408,9 +408,9 @@ function SourceCatalogSection({ user, onReload, focus }: {
 
         {/* Thanh thao tác hàng loạt — hiện khi có dòng được chọn */}
         {canEdit && picked.size > 0 && (
-          <div style={{ marginTop: 10, padding: "10px 13px", borderRadius: 12,
+          <div style={{ marginTop: 10, padding: "10px 13px", borderRadius: 14,
                         background: C.lavSoft, color: C.lavText, fontFamily: TEXT,
-                        fontSize: 12.5, display: "flex", gap: 10,
+                        fontSize: 12, display: "flex", gap: 10,
                         alignItems: "center", flexWrap: "wrap" }}>
             <b>{picked.size} đối tượng đang chọn</b>
             <button onClick={() => setBulk(true)}
@@ -429,7 +429,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
         )}
 
         {err && (
-          <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: C.raspSoft, color: C.raspText, fontSize: 13 }}>
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: C.raspSoft, color: C.raspText, fontSize: 14 }}>
             {err}
           </div>
         )}
@@ -473,7 +473,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
       {/* Bảng */}
       <Card>
         <TableScroll>
-          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
+          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12 }}>
             <thead>
               <tr>
                 {canEdit && (
@@ -511,7 +511,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
                             : { key: f.key, x: b.left, y: b.bottom + 4 });
                         }}
                         style={{ marginLeft: 7, minWidth: 30, height: 26, padding: "0 8px",
-                                 borderRadius: 8, cursor: "pointer", fontSize: 13,
+                                 borderRadius: 8, cursor: "pointer", fontSize: 14,
                                  fontWeight: 700, lineHeight: 1, fontFamily: TEXT,
                                  verticalAlign: "middle",
                                  border: `1.5px solid ${fil ? C.pinkText : C.pinkSoft}`,
@@ -566,7 +566,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
                           }}
                           inputMode={f.num ? "numeric" : undefined}
                           style={{ width: Math.max(80, (f.w ?? 120) - 12), padding: "5px 7px",
-                                   borderRadius: 8, fontFamily: TEXT, fontSize: 12.5,
+                                   borderRadius: 8, fontFamily: TEXT, fontSize: 12,
                                    border: `1.5px solid ${C.pink}`, outline: "none" }} />
                       ) : f.key === "validate_flag" ? (
                         <Tag color={r.validate_flag === "y" ? C.mintText : C.plumSoft}
@@ -715,7 +715,7 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
           </div>
           <input autoFocus value={find} onChange={(e) => setFind(e.target.value)}
             placeholder="Tìm trong danh sách…"
-            style={{ width: "100%", padding: "6px 9px", borderRadius: 9, fontSize: 12,
+            style={{ width: "100%", padding: "6px 9px", borderRadius: 8, fontSize: 12,
                      fontFamily: TEXT, border: `1px solid ${C.pinkSoft}`, outline: "none" }} />
         </div>
 
@@ -746,7 +746,7 @@ function FilterMenu({ label, x, y, options, chosen, onClose, onSort, onChange }:
                              fontStyle: o.value ? "normal" : "italic" }}>
                 {o.value || "(trống)"}
               </span>
-              <span style={{ marginLeft: "auto", opacity: .55, fontSize: 11 }}>{o.n}</span>
+              <span style={{ marginLeft: "auto", opacity: .55, fontSize: 12 }}>{o.n}</span>
             </label>
           ))}
           {shown.length === 0 && (
@@ -782,7 +782,7 @@ const tickStyle: React.CSSProperties = { width: 16, height: 16, flex: "0 0 auto"
 
 const rowStyle: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 9, padding: "8px 12px",
-  fontSize: 12.5, cursor: "pointer", color: C.plumSoft,
+  fontSize: 12, cursor: "pointer", color: C.plumSoft,
 };
 
 /* ----------------------------------------------------------------
@@ -805,19 +805,19 @@ function BulkModal({ count, saving, onClose, onApply }: {
       style={{ position: "fixed", inset: 0, background: "rgba(60,40,60,.32)",
                display: "grid", placeItems: "center", zIndex: 60, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()}
-        style={{ background: C.surface, borderRadius: 18, padding: 20, width: "min(460px,96vw)",
+        style={{ background: C.surface, borderRadius: 14, padding: 20, width: "min(460px,96vw)",
                  border: `1px solid ${C.pinkMist}`, fontFamily: TEXT }}>
-        <div style={{ fontFamily: NUM, fontSize: 18, fontWeight: 800, color: C.plum, marginBottom: 4 }}>
+        <div style={{ fontFamily: NUM, fontSize: 16, fontWeight: 800, color: C.plum, marginBottom: 4 }}>
           Điền hàng loạt
         </div>
-        <div style={{ fontSize: 12.5, color: C.plumSoft, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: C.plumSoft, marginBottom: 14 }}>
           Áp dụng cho <b>{count}</b> đối tượng đang chọn.
         </div>
 
         <label style={{ fontSize: 12, color: C.plumSoft }}>Cột</label>
         <select value={key} onChange={(e) => { setKey(e.target.value); setValue(""); }}
-          style={{ width: "100%", padding: "9px 10px", borderRadius: 10, marginBottom: 12,
-                   border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 13 }}>
+          style={{ width: "100%", padding: "9px 10px", borderRadius: 8, marginBottom: 12,
+                   border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 14 }}>
           {cols.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
 
@@ -825,20 +825,20 @@ function BulkModal({ count, saving, onClose, onApply }: {
         <input value={value} onChange={(e) => setValue(e.target.value)}
           inputMode={f?.num ? "numeric" : undefined}
           placeholder={f?.num ? "số" : "để trống = xoá nội dung"}
-          style={{ width: "100%", padding: "9px 10px", borderRadius: 10, marginBottom: 18,
-                   border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 13 }} />
+          style={{ width: "100%", padding: "9px 10px", borderRadius: 8, marginBottom: 18,
+                   border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 14 }} />
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={onClose} disabled={saving}
-            style={{ padding: "8px 14px", borderRadius: 10, cursor: "pointer",
+            style={{ padding: "8px 14px", borderRadius: 8, cursor: "pointer",
                      border: `1px solid ${C.pink}`, background: C.surface,
-                     color: C.plum, fontFamily: TEXT, fontSize: 13 }}>
+                     color: C.plum, fontFamily: TEXT, fontSize: 14 }}>
             Huỷ
           </button>
           <button onClick={() => onApply(key, value)} disabled={saving || !key}
-            style={{ padding: "8px 14px", borderRadius: 10, border: "none",
+            style={{ padding: "8px 14px", borderRadius: 8, border: "none",
                      cursor: saving ? "wait" : "pointer", background: C.plum,
-                     color: "#fff", fontFamily: TEXT, fontSize: 13, fontWeight: 600 }}>
+                     color: "#fff", fontFamily: TEXT, fontSize: 14, fontWeight: 600 }}>
             {saving ? "Đang lưu…" : "Áp dụng"}
           </button>
         </div>
@@ -883,7 +883,7 @@ function GenerateModal({ state, setState, onClose, onDone }: {
 
   return (
     <Modal onClose={onClose} icon={CalendarPlus} title="Sinh hạng mục timeline từ danh mục nguồn">
-      <div style={{ fontSize: 13, color: C.plumSoft, fontFamily: TEXT, lineHeight: 1.55 }}>
+      <div style={{ fontSize: 14, color: C.plumSoft, fontFamily: TEXT, lineHeight: 1.55 }}>
         Sinh theo đúng luật VMP01: lọc đối tượng có <b>Thẩm định = y</b>, suy ra loại thẩm định
         theo phân loại, rồi tính lùi các mốc từ hạn hoàn thành (T).
         <br />
@@ -891,14 +891,14 @@ function GenerateModal({ state, setState, onClose, onDone }: {
       </div>
 
       <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>Năm thẩm định</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>Năm thẩm định</span>
         <input value={state.year} inputMode="numeric"
           onChange={(e) => setState((p) => ({ ...p, year: e.target.value, preview: null }))}
-          style={{ width: 110, padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13, border: `1.5px solid ${C.pinkSoft}` }} />
+          style={{ width: 110, padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14, border: `1.5px solid ${C.pinkSoft}` }} />
       </label>
 
       {r && (
-        <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: C.pinkMist, fontFamily: TEXT, fontSize: 13 }}>
+        <div style={{ marginTop: 14, padding: 12, borderRadius: 14, background: C.pinkMist, fontFamily: TEXT, fontSize: 14 }}>
           <div><b>{r.so_tao_moi}</b> hạng mục sẽ được tạo mới</div>
           <div style={{ color: C.plumSoft }}>{r.so_bo_qua} mã đã tồn tại → bỏ qua</div>
           {r.so_thieu_moc > 0 && (
@@ -911,7 +911,7 @@ function GenerateModal({ state, setState, onClose, onDone }: {
             <div style={{ color: C.skyText, marginTop: 6 }}>
               ⏳ {r.so_chua_toi_chu_ky} đối tượng tần suất trên 12 tháng <b>chưa tới chu kỳ</b> nên
               được hoãn — đúng ý nghĩa "n năm thẩm định 1 lần":
-              <div style={{ marginTop: 3, fontSize: 11.5, opacity: 0.9 }}>
+              <div style={{ marginTop: 3, fontSize: 12, opacity: 0.9 }}>
                 {(r.chua_toi_chu_ky ?? []).map((x) =>
                   `${x.object_code} (${x.tan_suat_thang} tháng · gần nhất ${x.moc_gan_nhat} → kỳ sau ${x.ky_ke_tiep})`
                 ).join(" · ")}
@@ -978,12 +978,12 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
               list={PERSON_FIELDS.has(f.key) ? "vmp-performer-list" : undefined}
               inputMode={f.num ? "numeric" : undefined}
               style={{
-                padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
+                padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
                 border: `1.5px solid ${C.pinkSoft}`,
                 background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface,
               }} />
             {f.hint && (
-              <span style={{ fontSize: 11, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>
+              <span style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>
             )}
           </label>
         ))}
@@ -1195,8 +1195,8 @@ function SimpleDatasetView({ spec, canEdit }: { spec: DatasetSpec; canEdit: bool
             <Search size={15} color={C.plumSoft}
               style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm…"
-              style={{ width: "100%", padding: "9px 10px 9px 32px", borderRadius: 12,
-                       border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 13 }} />
+              style={{ width: "100%", padding: "9px 10px 9px 32px", borderRadius: 14,
+                       border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, fontSize: 14 }} />
           </div>
           <button onClick={load}
             style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
@@ -1209,18 +1209,18 @@ function SimpleDatasetView({ spec, canEdit }: { spec: DatasetSpec; canEdit: bool
           )}
         </div>
 
-        <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontFamily: TEXT }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontFamily: TEXT }}>
           {loading ? "Đang tải…" : `${filtered.length} / ${rows.length} dòng`}
         </div>
 
         {err && (
-          <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: C.raspSoft,
-                        color: C.raspText, fontSize: 13 }}>{err}</div>
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: C.raspSoft,
+                        color: C.raspText, fontSize: 14 }}>{err}</div>
         )}
 
         {!loading && rows.length === 0 && spec.emptyWarning && (
-          <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, background: C.marigoldSoft,
-                        color: C.marigoldText, fontSize: 12.5, fontFamily: TEXT,
+          <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 14, background: C.marigoldSoft,
+                        color: C.marigoldText, fontSize: 12, fontFamily: TEXT,
                         display: "flex", gap: 8, alignItems: "flex-start" }}>
             <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
             <div>{spec.emptyWarning}</div>
@@ -1230,7 +1230,7 @@ function SimpleDatasetView({ spec, canEdit }: { spec: DatasetSpec; canEdit: bool
 
       <Card>
         <TableScroll>
-          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
+          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12 }}>
             <thead>
               <tr>
                 {spec.fields.map((f, i) => (
@@ -1313,7 +1313,7 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
             {f.bool ? (
               <select value={form[f.key] ? "true" : "false"}
                 onChange={(e) => set(f.key, e.target.value === "true")}
-                style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
+                style={{ padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
                          border: `1.5px solid ${C.pinkSoft}` }}>
                 <option value="true">Có</option>
                 <option value="false">Không</option>
@@ -1323,11 +1323,11 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
                 onChange={(e) => set(f.key, e.target.value)}
                 disabled={!isNew && f.lockOnEdit}
                 inputMode={f.num ? "numeric" : undefined}
-                style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 13,
+                style={{ padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
                          border: `1.5px solid ${C.pinkSoft}`,
                          background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface }} />
             )}
-            {f.hint && <span style={{ fontSize: 11, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>}
+            {f.hint && <span style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>}
           </label>
         ))}
       </div>
@@ -1370,7 +1370,7 @@ export default function DataWorkspaceView({ user, onReload, focus }: {
             <button key={t.id} onClick={() => setTab(t.id)}
               style={{ display: "flex", alignItems: "center", gap: 7,
                        padding: "9px 15px", borderRadius: 999, cursor: "pointer",
-                       fontFamily: TEXT, fontSize: 13, fontWeight: on ? 800 : 600,
+                       fontFamily: TEXT, fontSize: 14, fontWeight: on ? 800 : 600,
                        border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
                        background: on ? C.pinkSoft : C.surface,
                        color: on ? C.plum : C.plumSoft }}>
@@ -1414,16 +1414,16 @@ function WarnBox({ tone, title, body, items, more = 0 }: {
   const bad = tone === "bad";
   return (
     <div style={{
-      marginTop: 10, padding: "10px 12px", borderRadius: 12,
+      marginTop: 10, padding: "10px 12px", borderRadius: 14,
       background: bad ? C.raspSoft : C.marigoldSoft,
       color: bad ? C.raspText : C.marigoldText,
-      fontSize: 12.5, fontFamily: TEXT, display: "flex", gap: 8, alignItems: "flex-start",
+      fontSize: 12, fontFamily: TEXT, display: "flex", gap: 8, alignItems: "flex-start",
     }}>
       <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
       <div style={{ minWidth: 0 }}>
         <b>{title}</b>
         <div style={{ marginTop: 2, fontWeight: 600, opacity: 0.92 }}>{body}</div>
-        <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.85, wordBreak: "break-word" }}>
+        <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85, wordBreak: "break-word" }}>
           {items.join(" · ")}{more > 0 ? ` … và ${more} đối tượng nữa` : ""}
         </div>
       </div>

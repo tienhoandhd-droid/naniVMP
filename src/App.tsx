@@ -80,7 +80,7 @@ import {
   SkeletonDashboard,
   SyncBanner,
   GuardianSilhouette,
-  PrincessCommentary, StatTile, MultiSelect, GiaiThich, MAU_SO} from "./components/ui/Primitives.tsx";
+  PrincessCommentary, StatTile, MultiSelect, GiaiThich, MAU_SO, Pill} from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
 // ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
@@ -171,7 +171,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
         alignItems: "center",
         gap: 10,
         padding: "14px 16px",
-        borderRadius: 12,
+        borderRadius: 14,
         background: "#F8F9FB",
         border: "1px solid #E5E7EB",
       }}
@@ -185,7 +185,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
           outline: "none",
           background: "transparent",
           fontFamily: "'Inter', system-ui, sans-serif",
-          fontSize: 14.5,
+          fontSize: 14,
           color: "#1F2937",
           width: "100%",
           fontWeight: 500,
@@ -214,7 +214,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
           maxWidth: 980,
           display: "grid",
           gridTemplateColumns: "1.05fr 1fr",
-          borderRadius: 24,
+          borderRadius: 14,
           overflow: "hidden",
           boxShadow: "0 30px 80px rgba(94, 53, 132, .22), 0 8px 24px rgba(94, 53, 132, .10)",
           background: C.surface,
@@ -261,7 +261,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
                 alignItems: "center",
                 padding: "6px 10px",
                 background: "rgba(255, 255, 255, 0.97)",
-                borderRadius: 6,
+                borderRadius: 8,
                 boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
               }}
             >
@@ -293,7 +293,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
             <div
               style={{
                 fontFamily: "'Cormorant Garamond', 'Times New Roman', serif",
-                fontSize: 92,
+                fontSize: 40,
                 fontWeight: 500,
                 lineHeight: 0.92,
                 letterSpacing: "-0.02em",
@@ -319,7 +319,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
             <div
               style={{
                 fontFamily: "'Cormorant Garamond', 'Times New Roman', serif",
-                fontSize: 92,
+                fontSize: 40,
                 fontWeight: 500,
                 lineHeight: 0.92,
                 letterSpacing: "0.01em",
@@ -335,7 +335,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
             <div
               style={{
                 fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: 500,
                 letterSpacing: "0.32em",
                 textTransform: "uppercase",
@@ -380,7 +380,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
           <div
             style={{
               fontFamily: "'Poppins', system-ui, sans-serif",
-              fontSize: 26,
+              fontSize: 28,
               fontWeight: 600,
               color: "#1F2937",
               letterSpacing: "-0.01em",
@@ -391,7 +391,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
           <div
             style={{
               fontFamily: "'Inter', system-ui, sans-serif",
-              fontSize: 13.5,
+              fontSize: 14,
               color: "#6B7280",
               marginTop: 8,
               marginBottom: 28,
@@ -438,7 +438,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
               <div
                 style={{
                   color: "#B91C1C",
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: 600,
                   display: "flex",
                   alignItems: "center",
@@ -461,7 +461,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
                 cursor: loading ? "not-allowed" : "pointer",
                 color: "#fff",
                 fontFamily: "'Poppins', system-ui, sans-serif",
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: 600,
                 letterSpacing: "0.02em",
                 borderRadius: 14,
@@ -487,7 +487,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
                 aria-hidden="true"
                 style={{
                   fontFamily: "'Poppins', system-ui, sans-serif",
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: 600,
                   letterSpacing: "0.32em",
                   textTransform: "uppercase",
@@ -501,7 +501,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
               <div
                 style={{
                   fontFamily: "'Inter', system-ui, sans-serif",
-                  fontSize: 13,
+                  fontSize: 14,
                   fontStyle: "italic",
                   color: "#6B5572",
                   lineHeight: 1.65,
@@ -517,7 +517,7 @@ function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
               style={{
                 marginTop: 22,
                 padding: "12px 15px",
-                borderRadius: 12,
+                borderRadius: 14,
                 background: "#FFFBEB",
                 border: "1px solid #FEF3C7",
                 fontFamily: "'Inter', system-ui, sans-serif",
@@ -559,8 +559,8 @@ function ChangePwModal({ onClose }: { onClose: () => void }) {
               style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14, color: C.plum, width: "100%", fontWeight: 600 }} />
           </div>
         ))}
-        {msg.text && <div style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 6, color: msg.type === "ok" ? C.mintText : C.raspText }}>{msg.type === "ok" ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {msg.text}</div>}
-        <button onClick={submit} disabled={loading} style={{ ...btnPrimary, marginTop: 4, padding: "13px", borderRadius: 14, fontSize: 14.5 }}>{loading ? "Đang lưu…" : "Xác nhận"}</button>
+        {msg.text && <div style={{ fontSize: 14, fontWeight: 800, display: "flex", alignItems: "center", gap: 6, color: msg.type === "ok" ? C.mintText : C.raspText }}>{msg.type === "ok" ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {msg.text}</div>}
+        <button onClick={submit} disabled={loading} style={{ ...btnPrimary, marginTop: 4, padding: "13px", borderRadius: 14, fontSize: 14 }}>{loading ? "Đang lưu…" : "Xác nhận"}</button>
       </div>
     </Modal>
   );
@@ -587,13 +587,13 @@ function HealthView({ acts, user }: { acts: Activity[]; user?: AppUser | null })
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding: "9px 16px", borderRadius: 12, cursor: "pointer",
-                     fontFamily: TEXT, fontSize: 13, fontWeight: tab === t.id ? 800 : 600,
+            style={{ padding: "9px 16px", borderRadius: 14, cursor: "pointer",
+                     fontFamily: TEXT, fontSize: 14, fontWeight: tab === t.id ? 800 : 600,
                      border: `1.5px solid ${tab === t.id ? C.pink : C.pinkSoft}`,
                      background: tab === t.id ? C.pinkSoft : C.surface,
                      color: tab === t.id ? C.pinkText : C.plumSoft, textAlign: "left" }}>
             {t.label}
-            <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, opacity: .75 }}>
+            <span style={{ display: "block", fontSize: 12, fontWeight: 600, opacity: .75 }}>
               {t.sub}
             </span>
           </button>
@@ -680,7 +680,7 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
     return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [serverIssues]);
 
-  const nutNho = { fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum,
+  const nutNho = { fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum,
                    border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
                    borderRadius: 999, padding: "7px 13px", cursor: "pointer" };
 
@@ -709,7 +709,7 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
           <label style={{ display: "inline-flex", alignItems: "center", gap: 7, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "7px 13px" }}>
             <Search size={14} color={C.plumSoft} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã hạng mục hoặc nội dung lỗi…"
-              style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 12.5, fontWeight: 600, color: C.plum, width: 230 }} />
+              style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 12, fontWeight: 600, color: C.plum, width: 230 }} />
           </label>
           {nhom.length > 0 && (
             <>
@@ -737,15 +737,15 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
               const dangMo = !!mo[g.type];
               const soHien = hien[g.type] || 20;
               return (
-                <div key={g.type} style={{ border: `1px solid ${sv.nen}`, borderRadius: 16, overflow: "hidden", background: C.surface }}>
+                <div key={g.type} style={{ border: `1px solid ${sv.nen}`, borderRadius: 14, overflow: "hidden", background: C.surface }}>
                   <button onClick={() => setMo((p) => ({ ...p, [g.type]: !p[g.type] }))}
                     style={{ width: "100%", textAlign: "left", border: "none", background: dangMo ? sv.nen : C.surface,
                              cursor: "pointer", padding: "13px 15px", display: "flex", alignItems: "center", gap: 12 }}>
                     <ChevronRight size={17} color={sv.mau} style={{ transform: dangMo ? "rotate(90deg)" : "none", transition: "transform .15s", flexShrink: 0 }} />
-                    <span style={{ fontSize: 17 }}>{sv.emoji}</span>
+                    <span style={{ fontSize: 16 }}>{sv.emoji}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{meta.ten}</div>
-                      {meta.sua && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{meta.sua}</div>}
+                      {meta.sua && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{meta.sua}</div>}
                     </div>
                     <Tag color={sv.mau} bg={sv.nen}>{g.ds.length} hạng mục</Tag>
                   </button>
@@ -761,7 +761,7 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                             onClick={() => navigator.clipboard?.writeText(g.ds.map((x) => x.id).join("\n"))}>
                             Sao chép {g.ds.length} mã
                           </button>
-                          <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>
+                          <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
                             dán vào ô tìm ở Cập nhật tiến độ để xử lý từng mã
                           </span>
                         </div>
@@ -787,14 +787,14 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                             return (
                               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                 {dong.slice(0, soHien).map(([cau, ids], i) => (
-                                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12.5, padding: "6px 0", borderTop: i ? `1px solid ${C.pinkMist}` : "none", flexWrap: "wrap" }}>
+                                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12, padding: "6px 0", borderTop: i ? `1px solid ${C.pinkMist}` : "none", flexWrap: "wrap" }}>
                                     <span style={{ fontFamily: NUM, fontWeight: 800, color: sv.mau, minWidth: 165 }}>
                                       {ids.length > 1 ? `${ids.length} hạng mục` : ids[0]}
                                     </span>
                                     <span style={{ color: C.plumSoft, fontWeight: 600, flex: 1, minWidth: 200 }}>{cau}</span>
                                     {ids.length > 1 && (
                                       <span title={ids.join("\n")}
-                                        style={{ fontFamily: NUM, fontSize: 11, fontWeight: 700, color: C.plumSoft, opacity: .8 }}>
+                                        style={{ fontFamily: NUM, fontSize: 12, fontWeight: 700, color: C.plumSoft, opacity: .8 }}>
                                         {ids.slice(0, 3).join(", ")}{ids.length > 3 ? `… (+${ids.length - 3})` : ""}
                                       </span>
                                     )}
@@ -832,7 +832,7 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
           Lỗi / xung đột ghi nhận từ hệ thống (Supabase)
         </CardTitle>
         {serverErr ? (
-          <div style={{ padding: 16, color: C.raspText, fontWeight: 700, fontSize: 13 }}>
+          <div style={{ padding: 16, color: C.raspText, fontWeight: 700, fontSize: 14 }}>
             Không đọc được: {serverErr}
           </div>
         ) : nhomServer.length === 0 ? (
@@ -851,13 +851,13 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                     style={{ width: "100%", textAlign: "left", border: "none", background: "transparent", cursor: "pointer", padding: "11px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                     <ChevronRight size={16} color={C.plumSoft} style={{ transform: dangMo ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
                     <span style={{ fontSize: 16 }}>{nang ? "🚫" : "⚠️"}</span>
-                    <span style={{ flex: 1, fontFamily: TEXT, fontSize: 13.5, fontWeight: 800, color: C.plum }}>{loai}</span>
+                    <span style={{ flex: 1, fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{loai}</span>
                     <Tag color={nang ? C.raspText : C.marigoldText} bg={nang ? C.raspSoft : C.marigoldSoft}>{ds.length}</Tag>
                   </button>
                   {dangMo && (
                     <div style={{ padding: "0 14px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
                       {ds.slice(0, 30).map((it, i) => (
-                        <div key={i} style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, paddingTop: 6, borderTop: i ? `1px solid ${C.pinkMist}` : "none" }}>
+                        <div key={i} style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, paddingTop: 6, borderTop: i ? `1px solid ${C.pinkMist}` : "none" }}>
                           <b style={{ color: C.plum }}>{it.plan_item_id || "—"}</b> · {it.message}
                           {it.detected_at ? ` · ${new Date(it.detected_at).toLocaleDateString("vi-VN")}` : ""}
                         </div>
@@ -909,7 +909,7 @@ export function MismatchView({ acts }: { acts: Activity[] }) {
                 border: `1px solid ${C.marigoldSoft}`,
               }}>
                 <div style={{
-                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                  width: 44, height: 44, borderRadius: 14, flexShrink: 0,
                   background: C.marigoldSoft, display: "flex", alignItems: "center",
                   justifyContent: "center", fontSize: 20,
                 }}>
@@ -1018,9 +1018,9 @@ function AuditLogView() {
         <Card>
           <CardTitle icon={ShieldCheck} sub="Cần Supabase để xem audit trail">Audit Log</CardTitle>
           <div style={{ padding: "40px 20px", textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>🔐</div>
             <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>Cần cấu hình Supabase</div>
-            <div style={{ fontSize: 13, color: C.plumSoft, fontWeight: 600, marginTop: 8 }}>
+            <div style={{ fontSize: 14, color: C.plumSoft, fontWeight: 600, marginTop: 8 }}>
               Đặt VITE_SUPABASE_URL và VITE_SUPABASE_ANON để xem nhật ký thao tác.
             </div>
           </div>
@@ -1048,7 +1048,7 @@ function AuditLogView() {
             onChange={(e) => setFilters(f => ({ ...f, record: e.target.value }))}
             style={{ ...INP, maxWidth: 200 }} />
           <button onClick={() => loadLogs(0)} disabled={loading}
-            style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7 }}>
+            style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 14, display: "flex", alignItems: "center", gap: 7 }}>
             <RefreshCw size={15} className={loading ? "spin" : ""} /> Tải lại
           </button>
         </div>
@@ -1062,14 +1062,14 @@ function AuditLogView() {
             <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>
               Không tải được nhật ký thao tác
             </div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
               {loadErr}
               <br />
               Thường gặp: phiên đăng nhập hết hạn (đăng nhập lại), hoặc tài khoản không phải admin/QA —
               nhật ký chỉ mở cho hai vai trò này.
             </div>
             <button onClick={() => loadLogs(0)}
-              style={{ ...btnPrimary, marginTop: 12, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>
+              style={{ ...btnPrimary, marginTop: 12, padding: "9px 18px", borderRadius: 14, fontSize: 14 }}>
               Thử lại
             </button>
           </div>
@@ -1087,7 +1087,7 @@ function AuditLogView() {
               <thead>
                 <tr style={{ background: C.pinkMist }}>
                   {["Thời gian", "Người thực hiện", "Hành động", "Bảng", "ID bản ghi", "Nguồn", "Chi tiết"].map((h, i) => (
-                    <th key={i} style={{ textAlign: "left", padding: "12px 14px", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                    <th key={i} style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, fontWeight: 800, color: C.plumSoft, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1097,17 +1097,17 @@ function AuditLogView() {
                     || { label: log.action, color: C.plumSoft, bg: C.pinkSoft };
                   return (
                     <tr key={log.id} style={{ borderTop: `1px solid ${C.line}`, background: i % 2 ? "rgba(255,255,255,.4)" : "transparent" }}>
-                      <td style={{ padding: "11px 14px", fontSize: 12.5, fontWeight: 600, color: C.plumSoft, whiteSpace: "nowrap" }}>{fmtTime(log.created_at)}</td>
-                      <td style={{ padding: "11px 14px", fontSize: 13, fontWeight: 700, color: C.plum }}>{log.user_email || "—"}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft, whiteSpace: "nowrap" }}>{fmtTime(log.created_at)}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 14, fontWeight: 700, color: C.plum }}>{log.user_email || "—"}</td>
                       <td style={{ padding: "11px 14px" }}><Tag color={al.color} bg={al.bg}>{al.label}</Tag></td>
-                      <td style={{ padding: "11px 14px", fontSize: 12.5, fontWeight: 600, color: C.plumSoft }}>{log.table_name || "—"}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft }}>{log.table_name || "—"}</td>
                       <td style={{ padding: "11px 14px", fontSize: 12, fontFamily: "monospace", color: C.lavText }}>{log.record_id || "—"}</td>
                       <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft }}>{log.source || "—"}</td>
                       <td style={{ padding: "11px 14px" }}>
                         {log.new_data && (
-                          <details style={{ fontSize: 11.5 }}>
+                          <details style={{ fontSize: 12 }}>
                             <summary style={{ cursor: "pointer", color: C.lavText, fontWeight: 700 }}>Xem dữ liệu</summary>
-                            <pre style={{ fontSize: 10.5, color: C.plumSoft, whiteSpace: "pre-wrap", maxWidth: 300, marginTop: 4, background: C.pinkMist, padding: 8, borderRadius: 8 }}>
+                            <pre style={{ fontSize: 12, color: C.plumSoft, whiteSpace: "pre-wrap", maxWidth: 300, marginTop: 4, background: C.pinkMist, padding: 8, borderRadius: 8 }}>
                               {JSON.stringify(log.new_data, null, 2).substring(0, 500)}
                             </pre>
                           </details>
@@ -1125,14 +1125,14 @@ function AuditLogView() {
         {total > PAGE_SIZE && (
           <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 16 }}>
             <button disabled={page === 0} onClick={() => loadLogs(page - 1)}
-              style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.surface, cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
+              style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`, background: C.surface, cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
               ← Trước
             </button>
-            <span style={{ display: "flex", alignItems: "center", fontSize: 13, fontWeight: 700, color: C.plum }}>
+            <span style={{ display: "flex", alignItems: "center", fontSize: 14, fontWeight: 700, color: C.plum }}>
               Trang {page + 1} / {Math.ceil(total / PAGE_SIZE)}
             </span>
             <button disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => loadLogs(page + 1)}
-              style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.surface, cursor: (page + 1) * PAGE_SIZE >= total ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
+              style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`, background: C.surface, cursor: (page + 1) * PAGE_SIZE >= total ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, color: C.plumSoft }}>
               Sau →
             </button>
           </div>
@@ -1193,9 +1193,9 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
 
   const oSo = (nhan: string, giaTri: React.ReactNode, phu?: string) => (
     <div style={{ padding: "13px 15px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: C.plumSoft, textTransform: "uppercase", letterSpacing: ".03em" }}>{nhan}</div>
-      <div style={{ fontFamily: NUM, fontSize: 21, fontWeight: 800, color: C.plum, marginTop: 3 }}>{giaTri}</div>
-      {phu && <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{phu}</div>}
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, textTransform: "uppercase", letterSpacing: ".03em" }}>{nhan}</div>
+      <div style={{ fontFamily: NUM, fontSize: 20, fontWeight: 800, color: C.plum, marginTop: 3 }}>{giaTri}</div>
+      {phu && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{phu}</div>}
     </div>
   );
 
@@ -1206,21 +1206,21 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
       <Card>
         <CardTitle icon={BarChart3} sub="Người dùng · cấu hình · việc tự động · khối lượng dữ liệu"
           right={<button onClick={load} disabled={loading}
-            style={{ ...btnPrimary, padding: "8px 15px", borderRadius: 11, fontSize: 12.5, opacity: loading ? 0.6 : 1 }}>
+            style={{ ...btnPrimary, padding: "8px 15px", borderRadius: 14, fontSize: 12, opacity: loading ? 0.6 : 1 }}>
             {loading ? "Đang tải…" : "Tải lại"}</button>}>
           Quản trị hệ thống
         </CardTitle>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14 }}>
           <div style={{ padding: "13px 15px", borderRadius: 14, background: conn.status === "ok" ? C.mintSoft : C.marigoldSoft }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: conn.status === "ok" ? C.mintText : C.marigoldText, textTransform: "uppercase" }}>Kết nối dữ liệu</div>
-            <div style={{ fontSize: 14.5, fontWeight: 800, color: C.plum, marginTop: 3 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: conn.status === "ok" ? C.mintText : C.marigoldText, textTransform: "uppercase" }}>Kết nối dữ liệu</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 3 }}>
               {conn.status === "ok" ? "Đang chạy · Supabase" : conn.status === "loading" ? "Đang tải…" : conn.status === "err" ? "Lỗi kết nối" : "Chưa kết nối"}
             </div>
           </div>
           <div style={{ padding: "13px 15px", borderRadius: 14, background: isSupabaseConfigured() ? C.mintSoft : C.raspSoft }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: isSupabaseConfigured() ? C.mintText : C.raspText, textTransform: "uppercase" }}>Xác thực</div>
-            <div style={{ fontSize: 14.5, fontWeight: 800, color: C.plum, marginTop: 3 }}>{isSupabaseConfigured() ? "Supabase Auth" : "Chế độ tạm (env)"}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: isSupabaseConfigured() ? C.mintText : C.raspText, textTransform: "uppercase" }}>Xác thực</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 3 }}>{isSupabaseConfigured() ? "Supabase Auth" : "Chế độ tạm (env)"}</div>
           </div>
           {oSo("Đang đăng nhập", user?.name || "—", `${user?.role || ""} · ${(user && PERM_LABEL[user.perm]) || ""}`)}
         </div>
@@ -1230,8 +1230,8 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
         <Card>
           <div style={{ padding: "16px 18px", borderRadius: 14, background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
             <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>Không đọc được trạng thái hệ thống</div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 5 }}>{err}</div>
-            <button onClick={load} style={{ ...btnPrimary, marginTop: 12, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>Thử lại</button>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 5 }}>{err}</div>
+            <button onClick={load} style={{ ...btnPrimary, marginTop: 12, padding: "9px 18px", borderRadius: 14, fontSize: 14 }}>Thử lại</button>
           </div>
         </Card>
       )}
@@ -1255,10 +1255,10 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
               Người dùng &amp; phân quyền
             </CardTitle>
             <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, fontSize: 13 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, fontSize: 14 }}>
                 <thead><tr style={{ background: C.pinkMist }}>
                   {["Họ tên", "Email", "Vai trò", "Bộ phận", "Tình trạng", "Đăng nhập gần nhất"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "11px 14px", fontSize: 11.5, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>
+                    <th key={h} style={{ textAlign: "left", padding: "11px 14px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
@@ -1284,7 +1284,7 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
                 </tbody>
               </table>
             </div>
-            <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 10, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 10, lineHeight: 1.6 }}>
               Thêm tài khoản và đổi vai trò làm ở Supabase → Authentication. Web cố ý không mở đường
               tự cấp quyền cho chính mình.
             </div>
@@ -1296,11 +1296,11 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
             </CardTitle>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {(tt.lich_tu_dong || []).map((j: NonNullable<SystemStatus["lich_tu_dong"]>[number]) => (
-                <div key={j.ten} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderRadius: 13, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
+                <div key={j.ten} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
                   <Tag color={j.dang_bat ? C.mintText : C.plumSoft} bg={j.dang_bat ? C.mintSoft : C.pinkMist}>{j.dang_bat ? "Đang bật" : "Tắt"}</Tag>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum }}>{j.ten}</div>
-                    <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{j.ten}</div>
+                    <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>
                       {docLichCron(j.lich)} · <span style={{ fontFamily: NUM }}>{j.lich}</span>
                     </div>
                   </div>
@@ -1317,9 +1317,9 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 {tt.workflow_loi_7_ngay!.map((wf: NonNullable<SystemStatus["workflow_loi_7_ngay"]>[number], i: number) => (
-                  <div key={i} style={{ padding: "10px 13px", borderRadius: 12, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>{wf.ten || "(không tên)"}</div>
-                    <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+                  <div key={i} style={{ padding: "10px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{wf.ten || "(không tên)"}</div>
+                    <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
                       {wf.luc ? new Date(wf.luc).toLocaleString("vi-VN") : ""} · {wf.loi || "không có mô tả lỗi"}
                     </div>
                   </div>
@@ -1331,14 +1331,14 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
           <Card variant="soft">
             <CardTitle icon={Scale} sub={`${tt.cau_hinh?.length || 0} khoá · khoá đánh dấu nhạy cảm không hiện ở đây`}
               right={<button onClick={() => setMoCauHinh((v) => !v)}
-                style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "7px 13px", cursor: "pointer" }}>
+                style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "7px 13px", cursor: "pointer" }}>
                 {moCauHinh ? "Gập lại" : "Xem"}</button>}>
               Cấu hình hệ thống
             </CardTitle>
             {moCauHinh && (
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {(tt.cau_hinh || []).map((c: NonNullable<SystemStatus["cau_hinh"]>[number]) => (
-                  <div key={c.khoa} style={{ display: "flex", gap: 12, fontSize: 12.5, padding: "6px 0", borderTop: `1px solid ${C.pinkMist}` }}>
+                  <div key={c.khoa} style={{ display: "flex", gap: 12, fontSize: 12, padding: "6px 0", borderTop: `1px solid ${C.pinkMist}` }}>
                     <span style={{ fontFamily: NUM, fontWeight: 800, color: C.plum, minWidth: 210 }}>{c.khoa}</span>
                     <span style={{ color: C.plumSoft, fontWeight: 600, wordBreak: "break-word" }}>{JSON.stringify(c.gia_tri)}</span>
                   </div>
@@ -1393,6 +1393,20 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
   }, [acts]);
 
   const di = (v: string) => (setView ? () => setView(v) : undefined);
+  const [sau, setSau] = useState(false);
+  const soLoiDl = useMemo(() => runDataQualityChecks(acts).length, [acts]);
+
+  /* Năm việc gấp nhất của người đang đăng nhập — bản rút gọn của màn "Hôm
+     nay", đặt ngay trên trang đầu. Người ta mở app ra là để làm việc, nên
+     màn đầu phải có ít nhất một lối vào việc, không chỉ toàn số để ngắm. */
+  const vieCGap = useMemo(() => {
+    const homNay = vmpToday().getTime();
+    return acts
+      .filter((a) => (a.state || "active") === "active" && a.st !== "done" && a.alert?.date)
+      .map((a) => ({ a, con: Math.round((new Date(a.alert!.date).setHours(0, 0, 0, 0) - homNay) / 86400000) }))
+      .sort((x, y) => x.con - y.con)
+      .slice(0, 5);
+  }, [acts]);
 
   return (
     <div className="vmp-bento vmp-stagger">
@@ -1406,11 +1420,11 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
             mình đang đứng ở đâu trong năm. */}
         <VongNam acts={acts} rate={e.rate} total={e.total} ben={
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: TEXT, fontSize: 19, fontWeight: 800,
+            <div style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800,
                           color: C.plum, marginBottom: 3 }}>
               Tiến độ thẩm định {vmpToday().getFullYear()}
             </div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
               {e.total} hạng mục trong kế hoạch năm
             </div>
 
@@ -1423,14 +1437,14 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
                 <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 999,
                                  background: x.c, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700,
+                  <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700,
                                  flex: 1 }}>{x.l}</span>
                   <div style={{ width: 88, height: 6, borderRadius: 999,
                                 background: C.surfaceSunk, overflow: "hidden" }}>
                     <div style={{ width: `${e.total ? (x.v / e.total) * 100 : 0}%`,
                                   height: "100%", background: x.c }} />
                   </div>
-                  <span style={{ fontFamily: NUM, fontSize: 19, fontWeight: 800,
+                  <span style={{ fontFamily: NUM, fontSize: 20, fontWeight: 800,
                                  color: x.t, minWidth: 34, textAlign: "right" }}>{x.v}</span>
                 </div>
               ))}
@@ -1468,13 +1482,18 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
         tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di("alerts")}
         sub={soon.length ? "Theo dõi để không rơi sang quá hạn" : "Tháng tới đang trống"} />
 
-      <StatTile cls="b-k3" icon={ClipboardCheck} label="Tỷ lệ hồ sơ" value={`${d.rate}%`}
+      <StatTile cls="b-k3" icon={ClipboardCheck} label="Hoàn thành VMP" value={`${e.rate}%`}
         tone={{ c: C.mintText, bg: C.mintSoft }} bars={theoThang}
-        sub={`${d.done}/${d.total} hoàn thiện · dải cột = tỷ lệ xong theo tháng đích`} />
+        sub={`${e.done}/${e.total} hạng mục · dải cột = tỷ lệ hồ sơ theo tháng đích`} />
 
-      <StatTile cls="b-k4" icon={FileWarning} label="Lệch pha hồ sơ" value={mismatched.length}
-        tone={{ c: C.lavText, bg: C.lavSoft }} onClick={di("health")}
-        sub={mismatched.length ? "Trạng thái các giai đoạn mâu thuẫn nhau" : "Các giai đoạn khớp nhau"} />
+      {/* Ô thứ tư là CHẤT LƯỢNG DỮ LIỆU, không phải một chỉ số tiến độ nữa.
+          Lý do: mọi con số còn lại trên trang đều chỉ đáng tin bằng đúng chất
+          lượng của dữ liệu dưới nó. Đặt nó ngang hàng với ba chỉ số kia là
+          nói rằng nó quan trọng ngang chúng — và đúng là như vậy. */}
+      <StatTile cls="b-k4" icon={FileWarning} label="Vấn đề dữ liệu" value={soLoiDl}
+        tone={soLoiDl > 0 ? { c: C.marigoldText, bg: C.marigoldSoft } : { c: C.mintText, bg: C.mintSoft }}
+        onClick={di("health")}
+        sub={soLoiDl ? `${mismatched.length} lệch pha · bấm để xem và sửa` : "Không phát hiện vấn đề nào"} />
 
       <div className="b-vali">
         <PrincessCommentary stats={{
@@ -1482,10 +1501,59 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
         }} />
       </div>
 
-      {/* Ma trận giai đoạn + chất lượng dữ liệu + điểm nóng — học từ dashboard BMS */}
-      <div className="b-wide" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <MaTranTienDo acts={acts} />
-        <CompletionDashboard acts={acts} />
+      {/* Lối vào VIỆC, ngay trên màn đầu. */}
+      <Card cls="b-wide" variant="strong">
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between",
+                      gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <strong style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800, color: C.plum }}>
+            Việc gấp nhất
+          </strong>
+          <button type="button" className="vmp-mo-sau" style={{ width: "auto", padding: "8px 14px" }}
+            onClick={di("today")}>Mở màn Hôm nay →</button>
+        </div>
+        {vieCGap.length === 0 ? (
+          <div style={{ padding: 16, color: C.mintText, fontWeight: 700, fontSize: 14 }}>
+            Không có hạng mục nào đang tới hạn hoặc quá hạn.
+          </div>
+        ) : (
+          <div className="hn-ds">
+            {vieCGap.map(({ a, con }) => (
+              <div key={a.id} className="hn-dong">
+                <span className={`hn-ngay ${con < 0 ? "is-tre" : "is-toi"}`}>
+                  {con < 0 ? `trễ ${Math.abs(con)}` : con === 0 ? "hôm nay" : `còn ${con}`}
+                  {con !== 0 && <small>ngày</small>}
+                </span>
+                <span className="hn-ten">
+                  <b>{a.code}</b><span>{a.name}</span>
+                </span>
+                <span className="hn-meta">{a.alert?.stage} · {a.owner || "chưa có người"}</span>
+                <Pill s={a.st} small />
+                <button type="button" className="hn-nut" onClick={di("today")}>Xử lý</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* PHÂN TÍCH CHI TIẾT — gập lại, không nằm trên màn đầu.
+          Trang này trước dài 6,7 màn hình với 12 khối nội dung: đó là một
+          bản báo cáo, không phải một "tổng quan". Tổng quan phải trả lời
+          được trong một màn: có gì cháy, đang ở đâu, hôm nay làm gì.
+          Ma trận giai đoạn, phễu, tỷ lệ theo loại, bảng theo đơn vị vẫn
+          giá trị nguyên vẹn — chỉ là không thuộc màn đầu tiên. */}
+      <div className="b-wide">
+        <button type="button" className="vmp-mo-sau" onClick={() => setSau((v) => !v)}
+          aria-expanded={sau}>
+          <span>{sau ? "▾" : "▸"}</span>
+          Phân tích chi tiết
+          <small>ma trận giai đoạn · phễu bốn giai đoạn · tỷ lệ theo loại thẩm định · theo bộ phận</small>
+        </button>
+        {sau && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
+            <MaTranTienDo acts={acts} />
+            <CompletionDashboard acts={acts} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1504,7 +1572,7 @@ const PERIOD_OPTS = [
 ];
 
 const dateInp = {
-  padding: "7px 9px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
+  padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`,
   background: C.surface, color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700, cursor: "pointer",
 };
 
@@ -1541,7 +1609,7 @@ export function GlobalFilterBarLegacy({
       // position + zIndex cao: đưa cả thanh lọc (và dropdown checkbox) lên TRÊN
       // các card phía sau (vd "Tiến độ thẩm định 2026") để không bị đè.
       position: "relative", zIndex: 40,
-      marginBottom: 18, padding: "11px 16px", borderRadius: 16,
+      marginBottom: 18, padding: "11px 16px", borderRadius: 14,
       background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)",
       border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)",
     }}>
@@ -1551,17 +1619,17 @@ export function GlobalFilterBarLegacy({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Bộ phận</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>Bộ phận</span>
         <MultiSelect label="Bộ phận" allLabel="Tất cả bộ phận" options={deptOptions} selected={deptSel} onChange={setDeptSel} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Khu vực</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>Khu vực</span>
         <MultiSelect label="Khu vực" allLabel="Tất cả khu vực" options={areaOptions} selected={areaSel} onChange={setAreaSel} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Thời gian</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>Thời gian</span>
         <Sel val={period} set={setPeriod} opts={PERIOD_OPTS} />
       </div>
 
@@ -1574,14 +1642,14 @@ export function GlobalFilterBarLegacy({
       )}
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
           <b style={{ color: C.plum }}>{shown}</b>/{total} hạng mục
         </span>
         {active && (
           <button type="button" onClick={() => { setAreaSel([]); setDeptSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); }} style={{
             display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px",
-            borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
-            color: C.pinkText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer",
+            borderRadius: 8, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
+            color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
           }}>
             <XCircle size={13} /> Đặt lại
           </button>
@@ -1611,7 +1679,7 @@ function FilterChip({ style, label, onRemove }: {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 6px 5px 11px", borderRadius: 999, fontFamily: TEXT, fontSize: 12, fontWeight: 800, ...style }}>
       {label}
-      <button type="button" onClick={onRemove} aria-label={`Bỏ ${label}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, border: "none", cursor: "pointer", background: "rgba(0,0,0,.08)", color: "inherit", fontSize: 13, lineHeight: 1, fontWeight: 900 }}>×</button>
+      <button type="button" onClick={onRemove} aria-label={`Bỏ ${label}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, border: "none", cursor: "pointer", background: "rgba(0,0,0,.08)", color: "inherit", fontSize: 14, lineHeight: 1, fontWeight: 900 }}>×</button>
     </span>
   );
 }
@@ -1677,27 +1745,27 @@ function GlobalFilterBar({
     dot: string,
   ) => (
     <button key={o.v} type="button" onClick={() => toggle(o.v)} aria-pressed={on}
-      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", border: "none", background: on ? C.pinkMist : "transparent", fontFamily: TEXT, fontSize: 13, fontWeight: 700, color: C.plum, padding: "8px 9px", borderRadius: 9, cursor: "pointer" }}>
-      <span style={{ width: 9, height: 9, borderRadius: 3, background: dot, flex: "none" }} />
+      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", border: "none", background: on ? C.pinkMist : "transparent", fontFamily: TEXT, fontSize: 14, fontWeight: 700, color: C.plum, padding: "8px 9px", borderRadius: 8, cursor: "pointer" }}>
+      <span style={{ width: 9, height: 9, borderRadius: 8, background: dot, flex: "none" }} />
       <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.l}</span>
       {on && <span style={{ color: C.pinkText, fontWeight: 900 }}>✓</span>}
-      <span style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "1px 8px", borderRadius: 999, fontFamily: NUM }}>{o.n}</span>
+      <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "1px 8px", borderRadius: 999, fontFamily: NUM }}>{o.n}</span>
     </button>
   );
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 16, background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
       {/* Việc của tôi — lọc theo QA phụ trách khớp tên người đang đăng nhập.
           Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
           vào trong hộp thì coi như không có. */}
       {myName && (
         <button type="button" onClick={() => setOnlyMine(!onlyMine)} aria-pressed={onlyMine}
           title={`Chỉ hiện hạng mục có QA phụ trách hoặc người hỗ trợ là "${myName}"`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10,
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8,
             border: `1px solid ${onlyMine ? C.mintText : C.pinkSoft}`,
             background: onlyMine ? C.mintSoft : "transparent",
             color: onlyMine ? C.mintText : C.plumSoft,
-            fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
+            fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
           <Users size={14} /> Việc của tôi
         </button>
       )}
@@ -1709,20 +1777,20 @@ function GlobalFilterBar({
             phần đầu trang đã ngốn gần 1/3 chiều cao trước khi thấy nội dung.
             Số bộ lọc đang bật hiện ngay trên nút nên không giấu mất trạng thái. */}
         <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="true" aria-expanded={open}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, border: `1px dashed ${soLoc ? C.pinkText : C.pink}`, background: open || soLoc ? C.pinkMist : "transparent", color: C.pinkText, fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1px dashed ${soLoc ? C.pinkText : C.pink}`, background: open || soLoc ? C.pinkMist : "transparent", color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
           <Plus size={14} /> Bộ lọc{soLoc ? ` (${soLoc})` : ""}
         </button>
         {open && (
           <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 274, maxHeight: 380, overflowY: "auto", background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
-            <div style={{ margin: "6px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khoảng thời gian</div>
+            <div style={{ margin: "6px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khoảng thời gian</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 8px 8px" }}>
               <input type="date" value={customFrom} onChange={(e) => onFrom(e.target.value)} style={{ ...dateInp, flex: 1 }} aria-label="Từ ngày" />
               <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
               <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} style={{ ...dateInp, flex: 1 }} aria-label="Đến ngày" />
             </div>
-            <div style={{ margin: "6px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
+            <div style={{ margin: "6px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
             {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, ((DEPT_CHIP as Record<string, { dot?: string }>)[o.v] || {}).dot || C.pink))}
-            <div style={{ margin: "8px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
+            <div style={{ margin: "8px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
             {areaOptions.length === 0
               ? <div style={{ padding: "8px 9px", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có khu vực</div>
               : areaOptions.map((o) => optRow(o, areaSel.includes(o.v), toggleArea, C.marigold))}
@@ -1749,7 +1817,7 @@ function GlobalFilterBar({
 
       {/* phải: đếm kết quả + xóa */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
           <b style={{ color: shown < total ? C.pinkText : C.plum }}>{shown}</b>/{total} hạng mục
           <GiaiThich tieuDe={`${total} = mẫu số của thanh lọc`}>
             <span>{MAU_SO.tatCa}</span>
@@ -1759,13 +1827,13 @@ function GlobalFilterBar({
         {/* Cả màn hình đang xem nằm trong URL, nên chép link là chia sẻ được
             nguyên lát cắt — khỏi phải dặn nhau "vào Cảnh báo rồi chọn XSX". */}
         <button type="button" onClick={chepLien} title="Chép liên kết tới đúng màn hình và bộ lọc đang xem"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 10,
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8,
             border: `1px solid ${daChep ? C.mintText : C.pinkSoft}`, background: daChep ? C.mintSoft : "transparent",
-            color: daChep ? C.mintText : C.plumSoft, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
+            color: daChep ? C.mintText : C.plumSoft, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
           {daChep ? <CheckCircle2 size={13} /> : <FileText size={13} />} {daChep ? "Đã chép" : "Chép liên kết"}
         </button>
         {active && (
-          <button type="button" onClick={resetAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
+          <button type="button" onClick={resetAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
             <XCircle size={13} /> Xóa lọc
           </button>
         )}
@@ -2023,7 +2091,7 @@ export default function App() {
           {saveStatus && (
             <div style={{
               position: "fixed", top: 20, right: 20, zIndex: 9999,
-              padding: "12px 18px", borderRadius: 14, fontFamily: TEXT, fontWeight: 700, fontSize: 13.5,
+              padding: "12px 18px", borderRadius: 14, fontFamily: TEXT, fontWeight: 700, fontSize: 14,
               display: "flex", alignItems: "center", gap: 10, maxWidth: 380,
               boxShadow: "0 8px 28px rgba(120,60,110,.22)",
               background: saveStatus === "saving" ? C.surface
@@ -2036,7 +2104,7 @@ export default function App() {
                 : saveStatus === "saved" ? C.mint
                 : saveStatus === "warning" ? C.marigold : C.rasp}`,
             }}>
-              <span style={{ fontSize: 18 }}>
+              <span style={{ fontSize: 16 }}>
                 {saveStatus === "saving" ? "⏳" : saveStatus === "saved" ? "✓" : saveStatus === "warning" ? "⚠" : "✕"}
               </span>
               <span>
@@ -2055,24 +2123,24 @@ export default function App() {
             {/* Empty / Error state */}
             {objects.length === 0 && conn.status !== "loading" && (
               <div style={{
-                marginBottom: 22, padding: "16px 18px", borderRadius: 16,
+                marginBottom: 22, padding: "16px 18px", borderRadius: 14,
                 border: `1.5px solid ${conn.status === "err" ? C.raspSoft : C.pinkSoft}`,
                 background: conn.status === "err" ? C.raspSoft : C.surface,
                 display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
               }}>
-                <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: conn.status === "err" ? C.surface : C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 14, flexShrink: 0, background: conn.status === "err" ? C.surface : C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {conn.status === "err" ? <AlertCircle size={22} color={C.raspText} /> : <Cloud size={22} color={C.pink} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
-                  <div style={{ fontWeight: 800, fontSize: 15, color: conn.status === "err" ? C.raspText : C.plum }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: conn.status === "err" ? C.raspText : C.plum }}>
                     {conn.status === "err" ? "Chưa tải được dữ liệu" : conn.readUrl ? "Đang chờ đồng bộ…" : "Chưa cấu hình kết nối"}
                   </div>
-                  <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
+                  <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
                     {conn.msg || "Nhúng URL webhook trong .env hoặc bấm Làm mới."}
                   </div>
                 </div>
                 {conn.readUrl && (
-                  <button onClick={reloadData} style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                  <button onClick={reloadData} style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 14, display: "flex", alignItems: "center", gap: 8 }}>
                     <RefreshCw size={15} /> Thử lại
                   </button>
                 )}

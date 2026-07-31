@@ -29,7 +29,7 @@
  * ===================================================================== */
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { C, NUM, TEXT } from "../../constants/theme.ts";
+import { C, NUM_HERO, TEXT } from "../../constants/theme.ts";
 import { MONTHS, vmpToday } from "../../constants/vmp.ts";
 import { parseD } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
@@ -62,11 +62,14 @@ export function dungVongNam(acts: Activity[], nam: number): OThangNam[] {
   return o;
 }
 
-const S = 268;
+/* Khung rộng hơn vòng để chừa chỗ cho nhãn tháng. Bản trước S=268 với nhãn
+   đặt ở bán kính 131 — chữ "T10" neo giữa nên tràn ra ngoài mép trái và bị
+   cắt mất chữ T. */
+const S = 300;
 const CX = S / 2;
 const CY = S / 2;
-const R0 = 64;      // vòng gốc — mọi cột đo từ đây
-const RMAX = 118;
+const R0 = 76;      // vòng gốc — mọi cột đo từ đây (đủ rộng cho chữ giữa vòng)
+const RMAX = 120;
 const KHE = 1.5;    // khe hở giữa hai tháng, tính bằng độ
 
 const toaDo = (r: number, doc: number): [number, number] => {
@@ -195,11 +198,11 @@ export default function VongNam({ acts, rate, total, ben }: {
                 được ghi kèm số — hai chỗ mắt cần, không phải cả mười hai. */}
             {o.map((x) => {
               const giua = gocThang(x.thang) + 15;
-              const [tx, ty] = toaDo(RMAX + 13, giua);
+              const [tx, ty] = toaDo(RMAX + 16, giua);
               const nhan = x.thang === dinh.thang || x.dangChay;
               return (
                 <text key={`nhan-${x.thang}`} x={tx} y={ty + 3.4} textAnchor="middle"
-                  fontFamily={TEXT} fontSize={nhan ? 11 : 10}
+                  fontFamily={TEXT} fontSize={nhan ? 13 : 12}
                   fontWeight={nhan ? 900 : 700}
                   fill={x.thang === dinh.thang ? C.raspText : C.plumSoft}>
                   {MONTHS[x.thang]}{nhan ? ` ${x.tong}` : ""}
@@ -223,13 +226,13 @@ export default function VongNam({ acts, rate, total, ben }: {
           {/* Số nằm ở lớp HTML giữa vòng: bôi-chép được, trình đọc màn hình
               đọc được, và không nhoè như chữ vẽ trong canvas. */}
           <div className="vmp-vongnam-loi">
-            <div style={{ fontFamily: NUM, fontSize: 42, fontWeight: 800, color: C.plum, lineHeight: 1 }}>
+            <div style={{ fontFamily: NUM_HERO, fontSize: 42, fontWeight: 800, color: C.plum, lineHeight: 1 }}>
               {rate}%
             </div>
-            <div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 800, letterSpacing: ".13em", marginTop: 3 }}>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, letterSpacing: ".1em", marginTop: 3 }}>
               HOÀN THÀNH VMP
             </div>
-            <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 700 }}>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
               trên {total} hạng mục
             </div>
           </div>

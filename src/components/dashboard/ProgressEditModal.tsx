@@ -281,7 +281,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
             {!isDone && (
               <button onClick={markDone(dCol, tCol)} disabled={khoaBoiTruoc}
                 title={khoaBoiTruoc ? `Phải xong "${truoc!.ten}" trước đã — bốn bước đi theo thứ tự.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
-                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: khoaBoiTruoc ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: khoaBoiTruoc ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
                 ✓ Xong hôm nay
               </button>
             )}
@@ -297,7 +297,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           <div style={{ ...FIELD, marginTop: 12 }}>
             <span style={LBL}>Lịch thẩm định (bộ phận xếp)</span>
             <input type="date" value={f.lich_td} onChange={set("lich_td")} style={INP} />
-            <span style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>
+            <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
               Ngày bộ phận hẹn vào làm. Khác với ngày hoàn thành thực tế ở trên.
             </span>
           </div>
@@ -305,15 +305,15 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
         {/* Chữ gốc trong Sheet — nhiều ô ghi kiểu "Chờ thẩm định thực tế",
             "Chờ xử lý"; ô chọn 4 nhãn ở trên nuốt mất sắc thái đó. */}
         {ttGoc && (
-          <div style={{ marginTop: 8, fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>
+          <div style={{ marginTop: 8, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
             Dữ liệu gốc ghi: <b style={{ color: C.plum }}>{ttGoc}</b>
           </div>
         )}
         {f[tCol] === "Hoàn thành" && !f[dCol] && (
-          <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 700, color: "#b00020" }}>
+          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: "#b00020" }}>
             Đã ghi Hoàn thành nhưng thiếu ngày thực tế — sẽ bị báo lỗi ALCOA+.{" "}
             <button onClick={() => setF((p) => ({ ...p, [dCol]: todayISO() }))}
-              style={{ border: "none", background: "none", color: C.mintText, fontFamily: TEXT, fontWeight: 800, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+              style={{ border: "none", background: "none", color: C.mintText, fontFamily: TEXT, fontWeight: 800, fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
               Điền hôm nay
             </button>
           </div>
@@ -324,11 +324,11 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   return (
     <Modal onClose={onClose} title="Cập nhật tiến độ" icon={Pencil} wide>
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16 }}>
-        <div style={{ fontWeight: 800, color: C.plum, fontSize: 15 }}>{act.code} · {act.name}</div>
-        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {act.id} · QA: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
+        <div style={{ fontWeight: 800, color: C.plum, fontSize: 14 }}>{act.code} · {act.name}</div>
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {act.id} · QA: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
       </div>
       {quickDone && BLOCK_COLS[curBlock] && (
-        <div style={{ background: C.mintSoft, border: `1px solid ${C.mint}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, fontWeight: 700, color: C.mintText, lineHeight: 1.55 }}>
+        <div style={{ background: C.mintSoft, border: `1px solid ${C.mint}`, borderRadius: 14, padding: "10px 14px", marginBottom: 16, fontSize: 12, fontWeight: 700, color: C.mintText, lineHeight: 1.55 }}>
           ⚡ Đã điền sẵn <b>hôm nay + Hoàn thành</b> cho bước hiện tại — kiểm tra lại ngày,
           chọn lý do rồi bấm Lưu. Chưa ghi gì cho tới khi bạn Lưu.
         </div>
@@ -345,7 +345,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           return (
             <span key={s.n} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               {i > 0 && <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>}
-              <span style={{ background: nen, color: mau, borderRadius: 999, padding: "5px 11px", fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap" }}>
+              <span style={{ background: nen, color: mau, borderRadius: 999, padding: "5px 11px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>
                 {xong ? "✓" : tre ? "!" : "○"} {s.ten}
               </span>
             </span>
@@ -356,7 +356,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       {/* Mâu thuẫn có sẵn trong dữ liệu — không chặn Lưu (chặn thì không mở ra
           sửa được chính nó), nhưng phải nói ra chứ không im lặng. */}
       {nhac.length > 0 && (
-        <div style={{ background: C.marigoldSoft, border: `1px solid ${C.marigold}`, borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 12, fontWeight: 700, color: C.marigoldText, lineHeight: 1.6 }}>
+        <div style={{ background: C.marigoldSoft, border: `1px solid ${C.marigold}`, borderRadius: 14, padding: "10px 14px", marginBottom: 14, fontSize: 12, fontWeight: 700, color: C.marigoldText, lineHeight: 1.6 }}>
           ⚠ Hạng mục này đang có mâu thuẫn giữa các bước (có từ trước, không phải do bạn):
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             {nhac.map((v, i) => <li key={i}>{v.msg}</li>)}
@@ -393,7 +393,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
                 </option>
               ))}
             </datalist>
-            <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, lineHeight: 1.45 }}>
+            <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.45 }}>
               {who.trim() && !whoMatch
                 ? <b style={{ color: "#b00020" }}>Chưa có trong danh sách người thực hiện — thêm ở Danh mục &amp; Nhập liệu → tab Người thực hiện.</b>
                 : whoMatch
@@ -415,7 +415,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       {/* Báo NGAY lúc gõ, không đợi bấm Lưu mới nói — người nhập sửa được tại
           chỗ thay vì điền xong hết rồi mới biết cả cụm không hợp lệ. */}
       {chan.length > 0 && (
-        <div style={{ marginTop: 14, background: C.raspSoft, border: `1px solid ${C.raspText}`, borderRadius: 12, padding: "10px 14px", fontSize: 12, fontWeight: 700, color: C.raspText, lineHeight: 1.6 }}>
+        <div style={{ marginTop: 14, background: C.raspSoft, border: `1px solid ${C.raspText}`, borderRadius: 14, padding: "10px 14px", fontSize: 12, fontWeight: 700, color: C.raspText, lineHeight: 1.6 }}>
           ✕ Chưa lưu được — thay đổi vừa rồi làm lệch thứ tự bốn bước:
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             {chan.map((v, i) => <li key={i}>{v.msg}</li>)}
@@ -428,7 +428,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           {REASON_CHIPS.map((r) => (
             <button key={r} onClick={() => { setReason(r); if (err) setErr(""); }}
               style={{ padding: "5px 11px", borderRadius: 999, border: "none", cursor: "pointer",
-                       fontFamily: TEXT, fontSize: 11.5, fontWeight: 700,
+                       fontFamily: TEXT, fontSize: 12, fontWeight: 700,
                        background: reason === r ? C.plum : C.pinkSoft,
                        color: reason === r ? "#fff" : C.plumSoft }}>
               {r}
@@ -438,19 +438,19 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
         <textarea value={reason} onChange={(e) => { setReason(e.target.value); if (err) setErr(""); }}
           rows={2} placeholder="Bấm chip ở trên hoặc gõ lý do khác…"
           style={{ ...INP, resize: "vertical", minHeight: 54 }} />
-        {err && <span style={{ color: "#b00020", fontSize: 12.5, fontWeight: 700 }}>{err}</span>}
+        {err && <span style={{ color: "#b00020", fontSize: 12, fontWeight: 700 }}>{err}</span>}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
-        <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 13, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
+        <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
         <button onClick={() => handleSave(false)} disabled={savingWho || (!formChanged && !whoChanged)}
           title={!formChanged && !whoChanged ? "Chưa sửa ô nào nên chưa có gì để lưu" : undefined}
-          style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || (!formChanged && !whoChanged) ? 0.55 : 1, cursor: !formChanged && !whoChanged ? "not-allowed" : "pointer" }}>
+          style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || (!formChanged && !whoChanged) ? 0.55 : 1, cursor: !formChanged && !whoChanged ? "not-allowed" : "pointer" }}>
           <Save size={17} /> {savingWho ? "Đang lưu…" : nChanged + (whoChanged ? 1 : 0) > 0 ? `Lưu ${nChanged + (whoChanged ? 1 : 0)} thay đổi` : "Lưu tiến độ"}
         </button>
         {nextAct && onOpenNext && (
           <button onClick={() => handleSave(true)} disabled={savingWho}
             title={`Tiếp theo: ${nextAct.code} · ${nextAct.name}`}
-            style={{ flex: 1.4, padding: "12px", borderRadius: 13, border: `1.5px solid ${C.plum}`, background: C.surface, color: C.plum, fontFamily: TEXT, fontWeight: 800, cursor: "pointer", opacity: savingWho ? 0.6 : 1, whiteSpace: "nowrap" }}>
+            style={{ flex: 1.4, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.plum}`, background: C.surface, color: C.plum, fontFamily: TEXT, fontWeight: 800, cursor: "pointer", opacity: savingWho ? 0.6 : 1, whiteSpace: "nowrap" }}>
             {formChanged || whoChanged ? "Lưu & mở tiếp →" : "Mở tiếp →"}
           </button>
         )}
@@ -460,22 +460,22 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           Lý do nhập NGAY TẠI ĐÂY thay vì window.prompt: prompt hệ thống không
           có gợi ý, bấm nhầm Cancel là mất, và không đồng bộ giao diện. */}
       {isAdmin && onChangeState && (
-        <div style={{ marginTop: 18, padding: 14, borderRadius: 12, background: "#FFF5FA", border: `1px dashed ${C.pinkSoft}` }}>
-          <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plumSoft, marginBottom: 8 }}>
+        <div style={{ marginTop: 18, padding: 14, borderRadius: 14, background: "#FFF5FA", border: `1px dashed ${C.pinkSoft}` }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginBottom: 8 }}>
             ⚙️ Trạng thái nghiệp vụ (chỉ admin / QA manager)
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Hiện tại:</span>
             <StateBadge state={String(currentState)} small />
-            {currentState === "active" && <span style={{ fontSize: 11, color: C.plumSoft }}>(đang theo dõi bình thường)</span>}
+            {currentState === "active" && <span style={{ fontSize: 12, color: C.plumSoft }}>(đang theo dõi bình thường)</span>}
             <div style={{ flex: 1 }} />
             {currentState === "active" ? (
               <>
-                <button onClick={() => { setPendingState(pendingState === "not_applicable" ? null : "not_applicable"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.lav}`, background: pendingState === "not_applicable" ? C.lavSoft : C.surface, color: C.lavText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>⊘ Không áp dụng</button>
-                <button onClick={() => { setPendingState(pendingState === "cancelled" ? null : "cancelled"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.marigold}`, background: pendingState === "cancelled" ? C.marigoldSoft : C.surface, color: C.marigoldText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>⊘ Hủy hạng mục</button>
+                <button onClick={() => { setPendingState(pendingState === "not_applicable" ? null : "not_applicable"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 8, border: `1px solid ${C.lav}`, background: pendingState === "not_applicable" ? C.lavSoft : C.surface, color: C.lavText, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>⊘ Không áp dụng</button>
+                <button onClick={() => { setPendingState(pendingState === "cancelled" ? null : "cancelled"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 8, border: `1px solid ${C.marigold}`, background: pendingState === "cancelled" ? C.marigoldSoft : C.surface, color: C.marigoldText, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>⊘ Hủy hạng mục</button>
               </>
             ) : (
-              <button onClick={() => { setPendingState(pendingState === "active" ? null : "active"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 10, border: `1px solid ${C.mint}`, background: pendingState === "active" ? C.mintSoft : C.surface, color: C.mintText, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>↻ Khôi phục Active</button>
+              <button onClick={() => { setPendingState(pendingState === "active" ? null : "active"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 8, border: `1px solid ${C.mint}`, background: pendingState === "active" ? C.mintSoft : C.surface, color: C.mintText, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>↻ Khôi phục Active</button>
             )}
           </div>
           {pendingState && (
@@ -489,11 +489,11 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
                   style={{ ...INP, flex: 1, minWidth: 220 }} />
                 <button disabled={!stateReason.trim()}
                   onClick={() => onChangeState(act.id, pendingState, stateReason.trim())}
-                  style={{ ...btnPrimary, padding: "9px 16px", borderRadius: 10, fontSize: 12.5, opacity: stateReason.trim() ? 1 : 0.5, cursor: stateReason.trim() ? "pointer" : "not-allowed" }}>
+                  style={{ ...btnPrimary, padding: "9px 16px", borderRadius: 8, fontSize: 12, opacity: stateReason.trim() ? 1 : 0.5, cursor: stateReason.trim() ? "pointer" : "not-allowed" }}>
                   Xác nhận
                 </button>
                 <button onClick={() => { setPendingState(null); setStateReason(""); }}
-                  style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}>
+                  style={{ padding: "9px 14px", borderRadius: 8, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, fontSize: 12, cursor: "pointer" }}>
                   Thôi
                 </button>
               </div>

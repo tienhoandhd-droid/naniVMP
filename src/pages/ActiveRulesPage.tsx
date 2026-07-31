@@ -40,7 +40,7 @@ function Section({ icon: Icon, title, sub, children }: {
 /** Bảng hai cột đơn giản, dùng lại cho mọi mục luật. */
 function Rows({ rows }: { rows: Array<[React.ReactNode, React.ReactNode]> }) {
   return (
-    <table style={{ borderCollapse: "collapse", width: "100%", fontFamily: TEXT, fontSize: 13 }}>
+    <table style={{ borderCollapse: "collapse", width: "100%", fontFamily: TEXT, fontSize: 14 }}>
       <tbody>
         {rows.map(([a, b], i) => (
           <tr key={i} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
@@ -63,20 +63,20 @@ function ScoreAxis({ title, muc }: {
 }) {
   return (
     <div>
-      <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plum, marginBottom: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.plum, marginBottom: 8 }}>
         {title}
       </div>
       <div style={{ display: "grid", gap: 9 }}>
         {muc.map((x) => {
           const t = toneForScore(x.diem === 3 ? 9 : x.diem === 2 ? 6 : 3);
           return (
-            <div key={x.muc} style={{ padding: "10px 12px", borderRadius: 12,
+            <div key={x.muc} style={{ padding: "10px 12px", borderRadius: 14,
                                       background: t.bg, fontFamily: TEXT }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
-                <span style={{ fontFamily: NUM, fontSize: 18, fontWeight: 800, color: t.c }}>
+                <span style={{ fontFamily: NUM, fontSize: 16, fontWeight: 800, color: t.c }}>
                   {x.diem}
                 </span>
-                <span style={{ fontSize: 12.5, fontWeight: 800, color: t.c }}>{x.muc}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: t.c }}>{x.muc}</span>
               </div>
               {x.mo_ta && (
                 <div style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.6, marginTop: 5 }}>
@@ -84,7 +84,7 @@ function ScoreAxis({ title, muc }: {
                 </div>
               )}
               {x.vi_du && (
-                <div style={{ fontSize: 11.5, color: C.plumSoft, lineHeight: 1.7, marginTop: 6,
+                <div style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.7, marginTop: 6,
                               paddingTop: 6, borderTop: `1px solid ${C.pinkMist}` }}>
                   <b style={{ color: t.c }}>Ví dụ: </b>{x.vi_du}
                 </div>
@@ -133,19 +133,19 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
   if (err || !rules) return (
     <Card>
       <div style={{ padding: "18px 20px", borderRadius: 14, background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
-        <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 15, color: C.raspText }}>
+        <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>
           Không đọc được luật đang áp dụng
         </div>
-        <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 6, lineHeight: 1.65 }}>
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 6, lineHeight: 1.65 }}>
           {/permission denied|401|JWT|not authorized/i.test(err)
             ? "Phiên đăng nhập đã hết hạn hoặc tài khoản chưa đủ quyền. Đăng nhập lại rồi mở lại trang này."
             : "Máy chủ không trả về dữ liệu luật. Thử lại sau ít phút; nếu vẫn vậy, gửi dòng chữ bên dưới cho người hỗ trợ."}
         </div>
         {err && (
-          <div style={{ fontSize: 11.5, color: C.plumSoft, marginTop: 8, fontFamily: NUM,
-                        background: C.surface, borderRadius: 9, padding: "8px 11px" }}>{err}</div>
+          <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 8, fontFamily: NUM,
+                        background: C.surface, borderRadius: 8, padding: "8px 11px" }}>{err}</div>
         )}
-        <button onClick={load} style={{ ...btnPrimary, marginTop: 13, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>
+        <button onClick={load} style={{ ...btnPrimary, marginTop: 13, padding: "9px 18px", borderRadius: 14, fontSize: 14 }}>
           Thử lại
         </button>
       </div>
@@ -164,8 +164,8 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
           Luật hệ thống đang áp dụng
         </CardTitle>
         <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "11px 13px",
-                      borderRadius: 12, background: C.skySoft, color: C.skyText,
-                      fontSize: 12.5, fontFamily: TEXT, lineHeight: 1.6 }}>
+                      borderRadius: 14, background: C.skySoft, color: C.skyText,
+                      fontSize: 12, fontFamily: TEXT, lineHeight: 1.6 }}>
           <Info size={16} style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
             Nội dung trang này <b>không được gõ tay trong giao diện</b> — mọi con số và quy tắc
@@ -180,12 +180,12 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
             ["Có thẩm định", rules.so_lieu_hien_tai.co_tham_dinh],
             ["Hạng mục timeline", rules.so_lieu_hien_tai.hang_muc],
             ["Bản ghi audit", rules.so_lieu_hien_tai.ban_ghi_audit]].map(([l, v]) => (
-            <div key={String(l)} style={{ padding: "9px 15px", borderRadius: 12,
+            <div key={String(l)} style={{ padding: "9px 15px", borderRadius: 14,
                                           background: C.pinkMist, minWidth: 130 }}>
-              <div style={{ fontFamily: NUM, fontSize: 19, fontWeight: 800, color: C.plum }}>
+              <div style={{ fontFamily: NUM, fontSize: 20, fontWeight: 800, color: C.plum }}>
                 {Number(v).toLocaleString("vi-VN")}
               </div>
-              <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700 }}>{l}</div>
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{l}</div>
             </div>
           ))}
         </div>
@@ -194,7 +194,7 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
       {/* Điểm trọng yếu */}
       <Section icon={Calculator} title="Điểm trọng yếu"
         sub="Công thức lấy từ tab '0.Rule timeline VMP' trong Google Sheet">
-        <div style={{ padding: "12px 14px", borderRadius: 12, background: C.lavSoft,
+        <div style={{ padding: "12px 14px", borderRadius: 14, background: C.lavSoft,
                       color: C.lavText, fontFamily: TEXT, fontSize: 14, fontWeight: 800,
                       marginBottom: 14 }}>
           {dtl.cong_thuc}
@@ -209,19 +209,19 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
           <ScoreAxis title="Điểm ảnh hưởng tới chất lượng sản phẩm" muc={dtl.anh_huong} />
         </div>
 
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plum, margin: "16px 0 8px" }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: C.plum, margin: "16px 0 8px" }}>
           Phân bố điểm hiện tại
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {dtl.phan_bo.map((x) => {
             const t = toneForScore(x.diem);
             return (
-              <div key={x.diem} style={{ padding: "8px 14px", borderRadius: 12,
+              <div key={x.diem} style={{ padding: "8px 14px", borderRadius: 14,
                                          background: t.bg, color: t.c, fontFamily: TEXT }}>
                 {/* Có chữ "điểm" và dấu phân cách. Bản trước là hai con số
                     dính nhau, đọc ra thành "972 đối tượng" thay vì "9 điểm ·
                     72 đối tượng" — và trình đọc màn hình cũng đọc y như vậy. */}
-                <span style={{ fontFamily: NUM, fontSize: 17, fontWeight: 800 }}>{x.diem}</span>
+                <span style={{ fontFamily: NUM, fontSize: 16, fontWeight: 800 }}>{x.diem}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 5 }}>điểm</span>
                 <span style={{ fontSize: 12, fontWeight: 700, margin: "0 6px", opacity: .5 }}>·</span>
                 <span style={{ fontSize: 12, fontWeight: 700 }}>
@@ -233,9 +233,9 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
         </div>
 
         {dtl.phan_bo_truc && (
-          <div style={{ marginTop: 16, padding: "11px 13px", borderRadius: 12,
+          <div style={{ marginTop: 16, padding: "11px 13px", borderRadius: 14,
                         background: C.skySoft, color: C.skyText,
-                        fontSize: 12.5, fontFamily: TEXT, lineHeight: 1.65 }}>
+                        fontSize: 12, fontFamily: TEXT, lineHeight: 1.65 }}>
             <b>Sức phân biệt của từng trục</b>
             <div style={{ display: "grid", gap: 10, marginTop: 8,
                           gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
@@ -277,9 +277,9 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
           )}
         </div>
 
-        <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 12,
+        <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 14,
                       background: C.marigoldSoft, color: C.marigoldText,
-                      fontSize: 12.5, fontFamily: TEXT, lineHeight: 1.6 }}>
+                      fontSize: 12, fontFamily: TEXT, lineHeight: 1.6 }}>
           <b>Điểm do máy chấm là ĐỀ XUẤT, không phải quyết định.</b> Chấm rủi ro là phán quyết
           chuyên môn GMP. Máy phân loại theo từ khoá trong tên đối tượng — minh bạch và tái lập
           được — rồi đánh dấu "chờ QA duyệt". Khi QA sửa tay ở màn <b>Danh mục nguồn</b>, dòng đó
@@ -303,7 +303,7 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
           )],
           ["Điều kiện \"lần đầu\"", tl.lan_dau],
           ["Số lần trong năm", tl.so_lan_trong_nam],
-          ["Quy ước mã", <code style={{ fontSize: 12.5 }}>{tl.ma_id}</code>],
+          ["Quy ước mã", <code style={{ fontSize: 12 }}>{tl.ma_id}</code>],
           ["Mốc thời gian", (
             <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
               {tl.moc_thoi_gian.map((m, i) => <li key={i}>{m}</li>)}
@@ -325,14 +325,14 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
       <Section icon={Lock} title="Phân quyền"
         sub="Kiểm tra nằm phía server trong RPC — giao diện chỉ ẩn nút cho gọn, không phải lớp bảo mật">
         <Rows rows={rules.phan_quyen.map((x) => [
-          <code key={x.vai_tro} style={{ fontSize: 12.5 }}>{x.vai_tro}</code>, x.quyen,
+          <code key={x.vai_tro} style={{ fontSize: 12 }}>{x.vai_tro}</code>, x.quyen,
         ])} />
       </Section>
 
       {/* Toàn vẹn dữ liệu */}
       <Section icon={ShieldCheck} title="Luật toàn vẹn dữ liệu"
         sub="Các ràng buộc luôn được áp, không tắt được từ giao diện">
-        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 2, fontSize: 13,
+        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 2, fontSize: 14,
                      color: C.plumSoft, fontFamily: TEXT }}>
           {rules.toan_ven_du_lieu.map((x, i) => <li key={i}>{x}</li>)}
         </ul>

@@ -6,7 +6,7 @@ import { useId, useRef, useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { C, TEXT, NUM, MO, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
+import { C, TEXT, NUM, NUM_HERO, MO, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
 import { XCircle } from "lucide-react";
 
@@ -355,7 +355,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
         position: "relative",
         background:
           "radial-gradient(280px 220px at 100% 0%, #F9E8F0, transparent 60%), linear-gradient(135deg, #FCF5FA 0%, #F6EEFB 100%)",
-        borderRadius: 22,
+        borderRadius: 14,
         padding: "22px 22px 22px 24px",
         border: "1px solid #F0E5EE",
         boxShadow: "0 4px 14px rgba(148, 89, 156, 0.07)",
@@ -371,7 +371,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
         <div>
           <div style={{
             fontFamily: TEXT,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: 800,
             color: "#5A2F6E",
             letterSpacing: "-0.005em",
@@ -390,7 +390,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
 
         {/* Greeting bubble */}
         <div style={{
-          fontSize: 13.5,
+          fontSize: 14,
           color: "#3D2552",
           fontWeight: 600,
           lineHeight: 1.55,
@@ -410,7 +410,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
                   display: "flex",
                   gap: 9,
                   alignItems: "flex-start",
-                  fontSize: 12.5,
+                  fontSize: 12,
                   color: "#2E1B45",
                   lineHeight: 1.5,
                 }}
@@ -420,10 +420,10 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
                     flexShrink: 0,
                     width: 18,
                     height: 18,
-                    borderRadius: 9,
+                    borderRadius: 8,
                     background: t.bg,
                     color: t.c,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 800,
                     display: "flex",
                     alignItems: "center",
@@ -442,7 +442,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
         {/* Closing */}
         <div style={{
           marginTop: "auto",
-          fontSize: 12.5,
+          fontSize: 12,
           color: "#5A2F6E",
           fontWeight: 700,
           fontStyle: "italic",
@@ -600,8 +600,8 @@ export function CardTitle({ icon: Icon, children, sub, right }: {
         </div>
       )}
       <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: TEXT, fontSize: 18, fontWeight: 800, color: C.plum }}>{children}</div>
-        {sub && <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{sub}</div>}
+        <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>{children}</div>
+        {sub && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{sub}</div>}
       </div>
       {right}
     </div>
@@ -616,7 +616,7 @@ export function Tag({ color, bg, children, style: extra }: {
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
       padding: "4px 11px", borderRadius: 999,
-      fontFamily: TEXT, fontSize: 11.5, fontWeight: 800,
+      fontFamily: TEXT, fontSize: 12, fontWeight: 800,
       color, background: bg, whiteSpace: "nowrap", ...extra,
     }}>
       {children}
@@ -654,7 +654,7 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: 
       padding: 20,
     }}>
       <div onClick={(e) => e.stopPropagation()} className="vmp-scroll" style={{
-        background: C.pinkMist, borderRadius: 24, padding: 28,
+        background: C.pinkMist, borderRadius: 14, padding: 28,
         width: "100%", maxWidth: wide ? 620 : 440,
         maxHeight: "90vh", overflowY: "auto",
         boxShadow: "0 24px 54px rgba(78,42,78,.32)",
@@ -662,12 +662,12 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
-              width: 40, height: 40, borderRadius: 13, background: C.lavSoft,
+              width: 40, height: 40, borderRadius: 14, background: C.lavSoft,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <Icon size={20} color={C.lavText} />
             </div>
-            <span style={{ fontFamily: TEXT, fontSize: 19, fontWeight: 800, color: C.plum }}>{title}</span>
+            <span style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800, color: C.plum }}>{title}</span>
           </div>
           <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", display: "flex" }}>
             <XCircle size={22} color={C.plumSoft} />
@@ -720,17 +720,17 @@ export function KpiCard({ emoji, bg, color, value, label, sub, subColor }: {
   return (
     <Card style={{ textAlign: "center", padding: "22px 18px" }}>
       <div style={{
-        width: 52, height: 52, borderRadius: 16, margin: "0 auto 12px",
+        width: 52, height: 52, borderRadius: 14, margin: "0 auto 12px",
         background: bg, display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 24,
+        fontSize: 20,
       }}>
         {emoji}
       </div>
-      <div style={{ fontFamily: NUM, fontSize: 32, fontWeight: 800, color, lineHeight: 1 }}>
+      <div style={{ fontFamily: NUM_HERO, fontSize: 28, fontWeight: 800, color, lineHeight: 1 }}>
         {value}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 800, color: C.plum, marginTop: 6 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color: subColor || C.plumSoft, fontWeight: 700, marginTop: 3 }}>{sub}</div>}
+      <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 6 }}>{label}</div>
+      {sub && <div style={{ fontSize: 12, color: subColor || C.plumSoft, fontWeight: 700, marginTop: 3 }}>{sub}</div>}
     </Card>
   );
 }
@@ -770,17 +770,17 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
                  gap: 8, cursor: onClick ? "pointer" : "default" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && (
-            <span style={{ width: 26, height: 26, borderRadius: 9, background: t.bg,
+            <span style={{ width: 26, height: 26, borderRadius: 8, background: t.bg,
                            display: "flex", alignItems: "center", justifyContent: "center",
                            flexShrink: 0 }}>
               <Icon size={14} color={t.c} />
             </span>
           )}
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.plumSoft,
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft,
                          fontFamily: TEXT }}>{label}</span>
         </div>
 
-        <div style={{ fontFamily: NUM, fontSize: 34, fontWeight: 800, color: t.c,
+        <div style={{ fontFamily: NUM_HERO, fontSize: 28, fontWeight: 800, color: t.c,
                       lineHeight: 1, letterSpacing: -0.5 }}>{value}</div>
 
         {bars && bars.length > 0 && (
@@ -788,7 +788,7 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
                         marginTop: "auto" }}>
             {bars.map((b, i) => (
               <div key={i} style={{
-                flex: 1, minWidth: 2, borderRadius: 2,
+                flex: 1, minWidth: 2, borderRadius: 8,
                 height: `${Math.max(8, Math.min(1, b) * 100)}%`,
                 background: t.c, opacity: 0.3 + Math.min(1, b) * 0.7,
               }} />
@@ -797,7 +797,7 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
         )}
 
         {sub && (
-          <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700,
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700,
                         fontFamily: TEXT, marginTop: bars ? 0 : "auto" }}>{sub}</div>
         )}
       </div>
@@ -860,8 +860,8 @@ export function Sel({ val, set, opts }: {
 }) {
   return (
     <select value={val} onChange={(e) => set(e.target.value)} style={{
-      padding: "8px 13px", borderRadius: 12, border: `1.5px solid ${C.pinkSoft}`,
-      background: C.surface, fontFamily: TEXT, fontSize: 13, color: C.plum,
+      padding: "8px 13px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`,
+      background: C.surface, fontFamily: TEXT, fontSize: 14, color: C.plum,
       fontWeight: 700, cursor: "pointer", outline: "none",
     }}>
       {opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
@@ -959,7 +959,7 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
           display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 12,
           padding: "5px 12px", borderRadius: 999, cursor: "pointer",
           background: C.marigoldSoft, border: `1px solid ${C.marigold}`,
-          color: C.marigoldText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800,
+          color: C.marigoldText, fontFamily: TEXT, fontSize: 12, fontWeight: 800,
         }}>
         <span style={{ width: 8, height: 8, borderRadius: 999, background: C.marigold, flex: "none" }} />
         Dữ liệu cũ ~{Math.round((ageMs || 0) / 3600000)}h — bấm để xem
@@ -969,10 +969,10 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
 
   return (
     <div style={{
-      padding: "10px 14px", borderRadius: 12, marginBottom: 16,
+      padding: "10px 14px", borderRadius: 14, marginBottom: 16,
       background: isErr ? C.raspSoft : C.marigoldSoft,
       border: `1.5px solid ${isErr ? C.rasp : C.marigold}`,
-      fontSize: 12.5, fontWeight: 700,
+      fontSize: 12, fontWeight: 700,
       color: isErr ? C.raspText : C.marigoldText,
       display: "flex", alignItems: "center", gap: 8,
     }}>
@@ -990,7 +990,7 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
       {isStaleOnly && (
         <button type="button" onClick={() => setMo(false)} aria-label="Thu gọn"
           style={{ border: "none", background: "transparent", cursor: "pointer",
-                   color: C.marigoldText, fontWeight: 900, fontSize: 15, lineHeight: 1, padding: "0 2px" }}>
+                   color: C.marigoldText, fontWeight: 900, fontSize: 14, lineHeight: 1, padding: "0 2px" }}>
           ×
         </button>
       )}
@@ -1104,11 +1104,11 @@ export function PhanTrang({ tong, trang, setTrang, coTrang, setCoTrang, donVi = 
     <button key={`${nhan}`} type="button" onClick={() => setTrang(n)} disabled={bat}
       aria-current={n === trang ? "page" : undefined}
       style={{
-        minWidth: 32, height: 32, padding: "0 9px", borderRadius: 9, cursor: bat ? "default" : "pointer",
+        minWidth: 32, height: 32, padding: "0 9px", borderRadius: 8, cursor: bat ? "default" : "pointer",
         border: `1px solid ${n === trang ? C.pinkText : C.line}`,
         background: n === trang ? C.pinkMist : C.surface,
         color: bat ? C.plumSoft : n === trang ? C.pinkText : C.plum,
-        fontFamily: NUM, fontSize: 12.5, fontWeight: 800, opacity: bat ? 0.45 : 1,
+        fontFamily: NUM, fontSize: 12, fontWeight: 800, opacity: bat ? 0.45 : 1,
       }}>
       {nhan}
     </button>
@@ -1130,11 +1130,11 @@ export function PhanTrang({ tong, trang, setTrang, coTrang, setCoTrang, donVi = 
       </span>
 
       <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto" }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Mỗi trang</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>Mỗi trang</span>
         <select value={String(coTrang)} onChange={(e) => { setCoTrang(Number(e.target.value)); setTrang(0); }}
           aria-label="Số dòng mỗi trang"
-          style={{ padding: "6px 9px", borderRadius: 9, border: `1px solid ${C.line}`,
-                   background: C.surface, color: C.plum, fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+          style={{ padding: "6px 9px", borderRadius: 8, border: `1px solid ${C.line}`,
+                   background: C.surface, color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
           {CO_TRANG.map((n) => <option key={n} value={n}>{n}</option>)}
           <option value={0}>Tất cả</option>
         </select>
@@ -1205,7 +1205,7 @@ export function ChartTip({ active, payload, label }: {
       background: C.surface, padding: "10px 14px", borderRadius: 14,
       border: `1.5px solid ${C.pinkSoft}`,
       boxShadow: "0 8px 24px rgba(238,123,169,.18)",
-      fontFamily: TEXT, fontSize: 13,
+      fontFamily: TEXT, fontSize: 14,
     }}>
       {label && <div style={{ fontWeight: 700, color: C.plum, marginBottom: 5 }}>{label}</div>}
       {payload.map((p, i) => (
@@ -1232,7 +1232,7 @@ export function phaseTag(txt: string) {
     : isOverdue ? { l: "⚠ Quá hạn", col: C.raspText, bg: C.raspSoft }
     : isEmptyish ? { l: "Chưa có", col: C.plumSoft, bg: "rgba(122,74,110,.08)" }
     : { l: "○ " + (s.length > 16 ? s.slice(0, 16) + "…" : s), col: C.skyText, bg: C.skySoft };
-  return <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 800, color: c.col, background: c.bg, whiteSpace: "nowrap" }}>{c.l}</span>;
+  return <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 800, color: c.col, background: c.bg, whiteSpace: "nowrap" }}>{c.l}</span>;
 }
 
 // ======================== RO FIELD (read-only) ========================
@@ -1243,7 +1243,7 @@ export function ROField({ label, value }: { label: ReactNode; value: ReactNode }
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>{label}</span>
       <div style={{
-        padding: "11px 13px", borderRadius: 12,
+        padding: "11px 13px", borderRadius: 14,
         border: `1.5px solid ${C.lavSoft}`, background: C.lavSoft,
         fontFamily: TEXT, fontSize: 14, color: C.plumSoft, fontWeight: 600,
         display: "flex", alignItems: "center", minHeight: 20,
@@ -1479,7 +1479,7 @@ export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor 
  * =================================================================== */
 const multiSelectMiniBtn: CSSProperties = {
   flex: 1, padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`,
-  background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11, fontWeight: 800, cursor: "pointer",
+  background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
 };
 
 /* Bảng chọn phải render qua Portal, KHÔNG được để absolute trong thẻ cha.
@@ -1558,12 +1558,12 @@ export function MultiSelect({ label, allLabel, options, selected, onChange }: {
         aria-expanded={open} aria-haspopup="listbox"
         style={{
           display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
-          borderRadius: 10, border: `1px solid ${C.pinkSoft}`,
+          borderRadius: 8, border: `1px solid ${C.pinkSoft}`,
           background: selected.length ? C.pinkMist : C.surface,
           color: selected.length ? C.pinkText : C.plum,
           fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
         }}>
-        {btn} <span style={{ fontSize: 10 }}>▾</span>
+        {btn} <span style={{ fontSize: 12 }}>▾</span>
       </button>
       {open && box && (
         <Portal>
@@ -1572,7 +1572,7 @@ export function MultiSelect({ label, allLabel, options, selected, onChange }: {
             left: box.left, width: box.width,
             ...(box.lenNguoc ? { bottom: window.innerHeight - box.top } : { top: box.top }),
             maxHeight: CAO_TOI_DA, overflowY: "auto",
-            background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 12,
+            background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14,
             boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
           }}>
             <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
@@ -1583,7 +1583,7 @@ export function MultiSelect({ label, allLabel, options, selected, onChange }: {
             {options.map((o) => (
               <label key={o.v} style={{
                 display: "flex", alignItems: "center", gap: 9, padding: "7px 8px",
-                cursor: "pointer", borderRadius: 8, fontSize: 12.5, fontWeight: 700, color: C.plum,
+                cursor: "pointer", borderRadius: 8, fontSize: 12, fontWeight: 700, color: C.plum,
               }}>
                 <input type="checkbox" checked={selected.includes(o.v)} onChange={() => toggle(o.v)}
                   style={{ width: 15, height: 15, accentColor: C.pink, cursor: "pointer" }} />
@@ -1604,7 +1604,7 @@ export function CrownLogo() {
         style={{
           height: 40,
           padding: "4px 8px",
-          borderRadius: 12,
+          borderRadius: 14,
           background: C.surface,
           border: `1px solid ${C.pinkSoft}`,
           display: "flex",
@@ -1621,7 +1621,7 @@ export function CrownLogo() {
       </div>
       <div>
         <VQWordmark size={18} />
-        <div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
           CPC1 HN · QLCL
         </div>
       </div>

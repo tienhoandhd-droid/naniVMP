@@ -32,10 +32,10 @@ function WorkloadDetailModal({ detail, onClose }: {
   const tasks = [...detail.tasks].sort(
     (a, b) => (parseD(a.target)?.getTime() ?? 0) - (parseD(b.target)?.getTime() ?? 0),
   );
-  const PhaseChip = ({ label, done, cong }: { label: string; done: boolean; cong?: number | null }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
+  const PhaseChip = ({ label, done, cong }: { label: string; done: boolean; cong?: number | null }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
   return (
     <Modal onClose={onClose} title={detail.title} icon={Activity} wide>
-      <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 14 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></div>
+      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 14 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {tasks.map((a) => {
           const ph = wlPending(a);
@@ -46,7 +46,7 @@ function WorkloadDetailModal({ detail, onClose }: {
                 <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</span>
                 <Pill s={a.st} small />
               </div>
-              <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginBottom: 9 }}>{a.code} · {a.owner} · đích {a.target ? fmtVN(parseD(a.target)) : "—"} · còn <b style={{ color: C.lavText }}>{congConLai(a)} nc</b></div>
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 9 }}>{a.code} · {a.owner} · đích {a.target ? fmtVN(parseD(a.target)) : "—"} · còn <b style={{ color: C.lavText }}>{congConLai(a)} nc</b></div>
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                 <PhaseChip label="Đề cương" done={!ph.p} />
                 <PhaseChip label="Thẩm định" done={!ph.v} cong={Number(a.effort) > 0 ? Number(a.effort) : null} />
@@ -175,7 +175,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const openDetail = (title: string, tasks: PlanActivity[]) => {
     if (tasks.length) setDetail({ title, tasks });
   };
-  const Btn = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) => <button onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
+  const Btn = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) => <button onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
   /* ---------------- Câu kết luận của từng biểu đồ ----------------
    * Ba biểu đồ dưới đây trước giờ chỉ bày số. Người xem phải tự quét 20
    * thẻ người, 12 cột tháng rồi tự rút ra "ai quá tải, tháng nào" — đúng
@@ -274,13 +274,13 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           {!thanhTra && <div style={{ flexShrink: 0 }}><Mascot mood={mood} size={96} /></div>}
           <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="pop" key={mood} style={{ background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: "12px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, lineHeight: 1.5 }}>{bubble}</div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, marginTop: 8, fontWeight: 700 }}>Còn lại: <b style={{ color: C.lavText }}>{totalCong} ngày công</b> · <b style={{ color: C.pinkText }}>{totalHoso} hồ sơ</b> · <b style={{ color: C.mintText }}>{people.length} người</b></div>
+            <div className="pop" key={mood} style={{ background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "12px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, lineHeight: 1.5 }}>{bubble}</div>
+            <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 8, fontWeight: 700 }}>Còn lại: <b style={{ color: C.lavText }}>{totalCong} ngày công</b> · <b style={{ color: C.pinkText }}>{totalHoso} hồ sơ</b> · <b style={{ color: C.mintText }}>{people.length} người</b></div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 16 }}>
-          <div><div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>KHUNG THỜI GIAN</div><div style={{ display: "flex", gap: 7 }}><Btn on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
-          <div><div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>TÔ THEO</div><div style={{ display: "flex", gap: 7 }}><Btn on={metric === "cong"} onClick={() => setMetric("cong")}>Ngày công</Btn><Btn on={metric === "hoso"} onClick={() => setMetric("hoso")}>Hồ sơ</Btn></div></div>
+          <div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>KHUNG THỜI GIAN</div><div style={{ display: "flex", gap: 7 }}><Btn on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
+          <div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>TÔ THEO</div><div style={{ display: "flex", gap: 7 }}><Btn on={metric === "cong"} onClick={() => setMetric("cong")}>Ngày công</Btn><Btn on={metric === "hoso"} onClick={() => setMetric("hoso")}>Hồ sơ</Btn></div></div>
         </div>
       </Card>
 
@@ -294,19 +294,19 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           <button type="button" className="vmp-lift"
             onClick={() => openDetail("Hạng mục chưa phân công", voChu.months.flatMap((m) => m.tasks))}
             style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", cursor: "pointer",
-                     background: C.marigoldSoft, border: "none", borderRadius: 16, padding: "14px 18px",
+                     background: C.marigoldSoft, border: "none", borderRadius: 14, padding: "14px 18px",
                      fontFamily: TEXT, textAlign: "left", width: "100%" }}>
             <div>
-              <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.marigoldText, lineHeight: 1 }}>
+              <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: C.marigoldText, lineHeight: 1 }}>
                 {voChu.congTotal}
               </div>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>ngày công</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>ngày công</div>
             </div>
             <div>
-              <div style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: C.marigoldText, lineHeight: 1 }}>
+              <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: C.marigoldText, lineHeight: 1 }}>
                 {voChu.hosoTotal}
               </div>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>hồ sơ</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>hồ sơ</div>
             </div>
             {voChu.critCao > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{voChu.critCao} trọng yếu cao</Tag>}
             {voChu.over > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{voChu.over} quá hạn</Tag>}
@@ -326,21 +326,21 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
             const pk = peakMonth(p); const ratio = CAP_MONTH > 0 ? pk.eff / CAP_MONTH : 0;
             const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, e: thanhTra ? "" : "😵" } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, e: thanhTra ? "" : "🔥" } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, e: thanhTra ? "" : "🌿" };
             return (
-              <button key={p.name} className="vmp-lift" onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))} style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 18, padding: 15, fontFamily: TEXT }}>
+              <button key={p.name} className="vmp-lift" onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))} style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: 15, fontFamily: TEXT }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 17, flexShrink: 0 }}>{p.name[0]}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 15, color: C.plum }}>{p.name}</div><div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 700 }}>{p.count} hạng mục</div></div>
-                  <span style={{ fontSize: 11.5, fontWeight: 800, color: band.t, background: band.bg, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{band.e} {band.l}</span>
+                  <div style={{ width: 40, height: 40, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 16, flexShrink: 0 }}>{p.name[0]}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 14, color: C.plum }}>{p.name}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{p.count} hạng mục</div></div>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: band.t, background: band.bg, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{band.e} {band.l}</span>
                 </div>
                 <div style={{ display: "flex", gap: 9, marginBottom: 12 }}>
-                  <div style={{ flex: 1, background: C.lavSoft, borderRadius: 12, padding: "9px 11px" }}><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 21, color: C.lavText, lineHeight: 1 }}>{p.congTotal}</div><div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>ngày công</div></div>
-                  <div style={{ flex: 1, background: C.pinkSoft, borderRadius: 12, padding: "9px 11px" }}><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 21, color: C.pinkText, lineHeight: 1 }}>{p.hosoTotal}</div><div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>hồ sơ</div></div>
+                  <div style={{ flex: 1, background: C.lavSoft, borderRadius: 14, padding: "9px 11px" }}><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color: C.lavText, lineHeight: 1 }}>{p.congTotal}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>ngày công</div></div>
+                  <div style={{ flex: 1, background: C.pinkSoft, borderRadius: 14, padding: "9px 11px" }}><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color: C.pinkText, lineHeight: 1 }}>{p.hosoTotal}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>hồ sơ</div></div>
                 </div>
                 <div style={{ height: 8, borderRadius: 999, background: C.pinkSoft, overflow: "hidden" }}><div style={{ height: "100%", width: clamp(ratio, 0, 1) * 100 + "%", background: band.c, borderRadius: 999, transition: "width .9s ease" }} /></div>
                 <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
                   {p.critCao > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{p.critCao} trọng yếu cao</Tag>}
                   {p.over > 0 && <Tag color={C.marigoldText} bg={C.marigoldSoft}>{p.over} quá hạn</Tag>}
-                  <span style={{ marginLeft: "auto", fontSize: 11, color: C.pinkText, fontWeight: 800 }}>Xem →</span>
+                  <span style={{ marginLeft: "auto", fontSize: 12, color: C.pinkText, fontWeight: 800 }}>Xem →</span>
                 </div>
               </button>
             );
@@ -351,35 +351,35 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
 
       {/* Matrix */}
       <Card variant="strong">
-        <CardTitle icon={BarChart3} right={<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>{legend.map(([l, c]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: C.plum, fontWeight: 700 }}><span style={{ width: 12, height: 12, borderRadius: 4, background: c }} />{l}</span>)}</div>} sub={`Mỗi ô = ${metric === "cong" ? "ngày công" : "hồ sơ"} · bấm vào ô để xem`}>Ma trận · Người × {scope === "month" ? "Tháng" : scope === "quarter" ? "Quý" : "Năm"}</CardTitle>
+        <CardTitle icon={BarChart3} right={<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>{legend.map(([l, c]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.plum, fontWeight: 700 }}><span style={{ width: 12, height: 12, borderRadius: 8, background: c }} />{l}</span>)}</div>} sub={`Mỗi ô = ${metric === "cong" ? "ngày công" : "hồ sơ"} · bấm vào ô để xem`}>Ma trận · Người × {scope === "month" ? "Tháng" : scope === "quarter" ? "Quý" : "Năm"}</CardTitle>
         {klMaTran && <CauKetLuan chinh={klMaTran.chinh} phu={klMaTran.phu} tone={klMaTran.tone} />}
         <div style={{ overflowX: "auto" }} className="vmp-scroll">
           <table style={{ borderCollapse: "separate", borderSpacing: 5, minWidth: scope === "month" ? 880 : 440 }}>
             <thead><tr>
-              <th style={{ textAlign: "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, padding: "0 8px 8px", position: "sticky", left: 0, background: C.surface }}>NGƯỜI</th>
-              {cols.map((c, ci) => { const isNow = scope === "month" && ci === vmpToday().getMonth(); return <th key={c} style={{ fontSize: 11, fontWeight: 800, color: isNow ? C.pinkText : C.plumSoft, padding: "0 4px 8px", minWidth: 54 }}>{c}{isNow ? " •" : ""}</th>; })}
-              <th style={{ fontSize: 11, fontWeight: 800, color: C.plum, padding: "0 6px 8px" }}>TỔNG</th>
+              <th style={{ textAlign: "left", fontSize: 12, color: C.plumSoft, fontWeight: 800, padding: "0 8px 8px", position: "sticky", left: 0, background: C.surface }}>NGƯỜI</th>
+              {cols.map((c, ci) => { const isNow = scope === "month" && ci === vmpToday().getMonth(); return <th key={c} style={{ fontSize: 12, fontWeight: 800, color: isNow ? C.pinkText : C.plumSoft, padding: "0 4px 8px", minWidth: 54 }}>{c}{isNow ? " •" : ""}</th>; })}
+              <th style={{ fontSize: 12, fontWeight: 800, color: C.plum, padding: "0 6px 8px" }}>TỔNG</th>
             </tr></thead>
             <tbody>
               {people.map((p) => (
                 <tr key={p.name}>
                   <td style={{ padding: "4px 8px", position: "sticky", left: 0, background: C.surface, zIndex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 26, height: 26, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 12, flexShrink: 0 }}>{p.name[0]}</div><span style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plum, whiteSpace: "nowrap" }}>{p.name}</span></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 26, height: 26, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 12, flexShrink: 0 }}>{p.name[0]}</div><span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum, whiteSpace: "nowrap" }}>{p.name}</span></div>
                   </td>
                   {cols.map((c, ci) => {
                     const v = valIn(p, ci); const tasks = tasksIn(p, ci);
-                    if (v <= 0) return <td key={ci} style={{ textAlign: "center" }}><div style={{ height: 42, borderRadius: 10, background: C.pinkMist }} /></td>;
+                    if (v <= 0) return <td key={ci} style={{ textAlign: "center" }}><div style={{ height: 42, borderRadius: 8, background: C.pinkMist }} /></td>;
                     const st = heat(v, cap);
                     return <td key={ci} style={{ textAlign: "center" }}>
-                      <div onClick={() => openDetail(`${p.name} · ${c}`, tasks)} style={{ height: 42, borderRadius: 10, background: st.bg, border: `1px solid ${st.text}33`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                        <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, color: st.text, lineHeight: 1 }}>{v}</span>
-                        <span style={{ fontSize: 8.5, color: st.text, fontWeight: 700, opacity: .85 }}>{metric === "cong" ? "nc" : "hồ sơ"}</span>
+                      <div onClick={() => openDetail(`${p.name} · ${c}`, tasks)} style={{ height: 42, borderRadius: 8, background: st.bg, border: `1px solid ${st.text}33`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                        <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: st.text, lineHeight: 1 }}>{v}</span>
+                        <span style={{ fontSize: 12, color: st.text, fontWeight: 700, opacity: .85 }}>{metric === "cong" ? "nc" : "hồ sơ"}</span>
                       </div>
                     </td>;
                   })}
                   <td style={{ textAlign: "center" }}>
-                    <div style={{ height: 42, borderRadius: 10, background: peakMonth(p).eff > CAP_MONTH ? C.raspSoft : C.lavSoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, color: peakMonth(p).eff > CAP_MONTH ? C.raspText : C.lavText, lineHeight: 1 }}>{metric === "cong" ? p.congTotal : p.hosoTotal}</span>
+                    <div style={{ height: 42, borderRadius: 8, background: peakMonth(p).eff > CAP_MONTH ? C.raspSoft : C.lavSoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: peakMonth(p).eff > CAP_MONTH ? C.raspText : C.lavText, lineHeight: 1 }}>{metric === "cong" ? p.congTotal : p.hosoTotal}</span>
                     </div>
                   </td>
                 </tr>
@@ -404,12 +404,12 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
                 onClick={() => openDetail(`Nhóm: ${g.name}`, g.acts)}
                 style={{ textAlign: "left", cursor: "pointer", background: C.surface,
                          border: `1.5px solid ${chua ? C.marigold : C.pinkSoft}`,
-                         borderRadius: 16, padding: 14, fontFamily: TEXT }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: chua ? C.marigoldText : C.plum,
+                         borderRadius: 14, padding: 14, fontFamily: TEXT }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: chua ? C.marigoldText : C.plum,
                               lineHeight: 1.4, minHeight: 36 }}>
                   {g.name}
                 </div>
-                <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700, margin: "4px 0 9px" }}>
+                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, margin: "4px 0 9px" }}>
                   {g.owners.size ? [...g.owners].join(" · ") : "chưa có ai phụ trách"}
                 </div>
                 <div style={{ height: 7, borderRadius: 999, background: C.pinkMist, overflow: "hidden" }}>
@@ -417,7 +417,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
                                 background: g.rate >= 80 ? C.mint : g.rate >= 40 ? C.marigold : C.rasp }} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between",
-                              marginTop: 7, fontSize: 11.5, fontWeight: 700 }}>
+                              marginTop: 7, fontSize: 12, fontWeight: 700 }}>
                   <span style={{ color: C.plumSoft }}>{g.total} hạng mục</span>
                   <span style={{ color: C.mintText }}>{g.rate}% xong</span>
                   {g.over > 0 && <span style={{ color: C.raspText }}>{g.over} quá hạn</span>}
@@ -446,13 +446,13 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
               onClick={() => openDetail(`Hạng mục của ${r.name}`,
                 acts.filter((a) => (a.owner && a.owner !== "—" ? a.owner : "Chưa phân công") === r.name))}
               style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px",
-                       borderRadius: 13, background: C.surface, cursor: "pointer", textAlign: "left",
+                       borderRadius: 14, background: C.surface, cursor: "pointer", textAlign: "left",
                        border: `1px solid ${r.name === "Chưa phân công" ? C.marigoldSoft : C.pinkSoft}` }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 800,
+              <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800,
                              color: r.name === "Chưa phân công" ? C.marigoldText : C.plum }}>
                 {r.name}
               </span>
-              <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700, whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, whiteSpace: "nowrap" }}>
                 {r.done}/{r.total}
               </span>
               <div style={{ width: 110, height: 7, borderRadius: 999, background: C.pinkMist,
@@ -460,7 +460,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
                 <div style={{ width: `${r.rate}%`, height: "100%",
                               background: r.rate >= 80 ? C.mint : r.rate >= 40 ? C.marigold : C.rasp }} />
               </div>
-              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 15, width: 46,
+              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, width: 46,
                              textAlign: "right", flexShrink: 0,
                              color: r.rate >= 80 ? C.mintText : r.rate >= 40 ? C.marigoldText : C.raspText }}>
                 {r.rate}%
@@ -478,18 +478,18 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <Donut size={132} segments={[{ value: critCount.Cao, color: C.rasp }, { value: critCount.TB, color: C.marigold }, { value: critCount["Thấp"], color: C.mint }]} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-              {[["Cao", C.rasp, C.raspText], ["TB", C.marigold, C.marigoldText], ["Thấp", C.mint, C.mintText]].map(([k, c, t]) => <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: c }} />TY {k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: t }}>{critCount[k] || 0}</span></div>)}
+              {[["Cao", C.rasp, C.raspText], ["TB", C.marigold, C.marigoldText], ["Thấp", C.mint, C.mintText]].map(([k, c, t]) => <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: c }} />TY {k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: t }}>{critCount[k] || 0}</span></div>)}
             </div>
           </div>
         </Card>
         <Card variant="strong">
           <CardTitle icon={Flag} sub="Trọng yếu cao / ≥ 7 — ưu tiên">Cần tập trung</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {focus.map(({ a, sc }) => <div key={a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 13, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
-              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 13, color: "#fff", background: sc >= 7 ? C.raspText : C.marigoldText, width: 30, height: 30, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc}</span>
+            {focus.map(({ a, sc }) => <div key={a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
+              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: "#fff", background: sc >= 7 ? C.raspText : C.marigoldText, width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plum }}>{a.name}</span></div>
-                <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{a.owner} · đích {a.target ? fmtVN(parseD(a.target)) : "—"}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</span></div>
+                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{a.owner} · đích {a.target ? fmtVN(parseD(a.target)) : "—"}</div>
               </div>
               <Pill s={a.st} small />
             </div>)}

@@ -146,15 +146,15 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
   const thatBai = ketQua?.mail?.that_bai || [];
 
   const o: React.CSSProperties = {
-    fontFamily: TEXT, fontSize: 13, fontWeight: 600, color: C.plum,
+    fontFamily: TEXT, fontSize: 14, fontWeight: 600, color: C.plum,
     border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
-    borderRadius: 12, padding: "10px 13px", width: "100%", outline: "none",
+    borderRadius: 14, padding: "10px 13px", width: "100%", outline: "none",
   };
 
   return (
     <Modal onClose={onClose} wide icon={Mail}
       title={`Gửi bản phân tích AI · ${AI_NHAN[loai].toLowerCase()}`}>
-      <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 700, marginBottom: 14, lineHeight: 1.65 }}>
+      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 14, lineHeight: 1.65 }}>
         Phạm vi gửi: <b style={{ color: C.plum }}>{phamViLabel}</b>
         {ky ? <> · kỳ <b style={{ color: C.plum }}>{ky.nhan}</b></> : null}.
         Mail gồm <b>phần phân tích AI</b> và <b>toàn bộ dữ liệu thô</b> của phạm vi này (đính kèm tệp CSV).
@@ -170,9 +170,9 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
       }}>
         <input type="checkbox" checked={dungDanhSach} onChange={(e) => setDungDanhSach(e.target.checked)}
           style={{ width: 17, height: 17, marginTop: 2, accentColor: C.pink, cursor: "pointer" }} />
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.plum, lineHeight: 1.6 }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.plum, lineHeight: 1.6 }}>
           Gửi cho danh sách định kỳ ({soDinhKy} người đang bật &quot;Mail phân tích AI&quot;)
-          <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
             Đúng danh sách mà lịch tự động dùng. n8n lọc lại theo phạm vi từng người, nên bỏ tick
             nếu chỉ muốn thử gửi cho riêng mình.
           </div>
@@ -182,14 +182,14 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
       {/* 2. Chọn trong danh bạ */}
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 9, flexWrap: "wrap" }}>
         <Users size={16} color={C.plumSoft} />
-        <span style={{ fontSize: 13, fontWeight: 800, color: C.plum }}>Chọn thêm trong danh bạ</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>Chọn thêm trong danh bạ</span>
         {chon.size > 0 && <Tag color={C.lavText} bg={C.lavSoft}>Đã chọn {chon.size}</Tag>}
         <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6,
           border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "6px 12px" }}>
           <Search size={14} color={C.plumSoft} />
           <input value={tim} onChange={(e) => setTim(e.target.value)} placeholder="Tìm tên, email…"
             style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT,
-              fontSize: 12.5, fontWeight: 600, color: C.plum, width: 150 }} />
+              fontSize: 12, fontWeight: 600, color: C.plum, width: 150 }} />
         </label>
       </div>
 
@@ -198,20 +198,20 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
           <RefreshCw size={18} className="spin" color={C.pink} /> Đang tải danh bạ…
         </div>
       ) : loiTai ? (
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.marigoldText, background: C.marigoldSoft,
-          borderRadius: 12, padding: "11px 14px" }}>{loiTai}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.marigoldText, background: C.marigoldSoft,
+          borderRadius: 14, padding: "11px 14px" }}>{loiTai}</div>
       ) : (
         <TableScroll maxHeight={210} hint={false}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {hienThi.map((u) => (
               <label key={u.email} style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "8px 11px", borderRadius: 11,
+                display: "flex", alignItems: "center", gap: 10, padding: "8px 11px", borderRadius: 14,
                 cursor: "pointer", background: chon.has(u.email) ? C.lavSoft : "transparent",
               }}>
                 <input type="checkbox" checked={chon.has(u.email)} onChange={() => bat(u.email)}
                   style={{ width: 16, height: 16, accentColor: C.lav, cursor: "pointer" }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: C.plum }}>{u.ten}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.plum }}>{u.ten}</span>
                   <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}> · {u.email}</span>
                 </span>
                 {u.dinhKy && <Tag color={C.mintText} bg={C.mintSoft}>Định kỳ</Tag>}
@@ -219,7 +219,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
               </label>
             ))}
             {!hienThi.length && (
-              <div style={{ padding: 14, textAlign: "center", color: C.plumSoft, fontWeight: 600, fontSize: 12.5 }}>
+              <div style={{ padding: 14, textAlign: "center", color: C.plumSoft, fontWeight: 600, fontSize: 12 }}>
                 Không có ai khớp &quot;{tim}&quot;.
               </div>
             )}
@@ -229,7 +229,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
 
       {/* 3. Gõ tay */}
       <div style={{ marginTop: 16 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: C.plum, marginBottom: 7 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: C.plum, marginBottom: 7 }}>
           Hoặc gõ tay email (cách nhau bằng dấu phẩy hoặc xuống dòng)
         </div>
         <textarea value={goTay} onChange={(e) => setGoTay(e.target.value)} rows={2}
@@ -243,15 +243,15 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
 
       {/* Kết quả gửi — nói rõ ai nhận được, ai không, thay vì chỉ "đã gửi" */}
       {loiGui && (
-        <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center", fontSize: 13,
-          fontWeight: 800, color: C.raspText, background: C.raspSoft, borderRadius: 12, padding: "12px 15px" }}>
+        <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center", fontSize: 14,
+          fontWeight: 800, color: C.raspText, background: C.raspSoft, borderRadius: 14, padding: "12px 15px" }}>
           <AlertCircle size={16} /> {loiGui}
         </div>
       )}
       {ketQua?.ok && (
-        <div style={{ marginTop: 14, borderRadius: 12, padding: "13px 15px",
+        <div style={{ marginTop: 14, borderRadius: 14, padding: "13px 15px",
           background: thatBai.length ? C.marigoldSoft : C.mintSoft }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, fontWeight: 800,
+          <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, fontWeight: 800,
             color: thatBai.length ? C.marigoldText : C.mintText }}>
             <CheckCircle2 size={16} />
             {daGui.length
@@ -259,25 +259,25 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
               : "Bản phân tích đã chạy xong nhưng không có địa chỉ nào nhận được."}
           </div>
           {thatBai.length > 0 && (
-            <div style={{ marginTop: 7, fontSize: 12.5, fontWeight: 700, color: C.raspText }}>
+            <div style={{ marginTop: 7, fontSize: 12, fontWeight: 700, color: C.raspText }}>
               Gửi hỏng {thatBai.length}: {thatBai.map((t) => `${t.email} (${t.loi})`).join("; ")}
             </div>
           )}
-          <div style={{ marginTop: 6, fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
             Bản phân tích cũng đã hiện ở trang bên dưới — không phải chạy AI lần nữa.
           </div>
         </div>
       )}
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18, flexWrap: "wrap" }}>
-        <button onClick={onClose} style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plumSoft,
-          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 12, padding: "11px 18px", cursor: "pointer" }}>
+        <button onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
+          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
           {ketQua?.ok ? "Đóng" : "Huỷ"}
         </button>
         <button onClick={gui} disabled={dangGui || !guiDuoc}
           title={guiDuoc ? undefined : "Chưa chọn người nhận nào"}
           style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
-            borderRadius: 12, fontSize: 13.5, opacity: dangGui || !guiDuoc ? 0.55 : 1,
+            borderRadius: 14, fontSize: 14, opacity: dangGui || !guiDuoc ? 0.55 : 1,
             cursor: dangGui || !guiDuoc ? "not-allowed" : "pointer" }}>
           {dangGui ? <RefreshCw size={16} className="spin" /> : <Send size={16} />}
           {dangGui ? "AI đang phân tích rồi gửi…" : "Chạy AI và gửi mail"}

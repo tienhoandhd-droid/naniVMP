@@ -50,7 +50,7 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
       {/* Logo */}
       <div style={{ padding: "0 6px 16px" }}>
         {collapsed
-          ? <div style={{ width: 40, height: 40, borderRadius: 14, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, margin: "0 auto" }}>👑</div>
+          ? <div style={{ width: 40, height: 40, borderRadius: 14, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, margin: "0 auto" }}>👑</div>
           : <CrownLogo />
         }
       </div>
@@ -60,7 +60,7 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
         {groups.map((g) => (
           <div key={g.id}>
             {!collapsed && (
-              <div style={{ fontSize: 10.5, color: C.plumSoft, letterSpacing: 1.4, fontWeight: 800, padding: "10px 12px 6px" }}>
+              <div style={{ fontSize: 12, color: C.plumSoft, letterSpacing: 1.4, fontWeight: 800, padding: "10px 12px 6px" }}>
                 {g.label}
               </div>
             )}
@@ -74,7 +74,7 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
                     display: "flex", alignItems: "center", gap: 12,
                     padding: collapsed ? "12px" : "11px 13px", borderRadius: 14,
                     border: "none", cursor: "pointer", textAlign: "left",
-                    fontFamily: TEXT, fontSize: 13.5, width: "100%",
+                    fontFamily: TEXT, fontSize: 14, width: "100%",
                     fontWeight: active ? 800 : 600,
                     color: active ? C.plum : C.plumSoft,
                     background: active ? C.pinkSoft : "transparent",
@@ -94,13 +94,13 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
       {/* User card */}
       <div style={{
         marginTop: 14, padding: collapsed ? "10px" : "13px",
-        borderRadius: 18, background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
+        borderRadius: 14, background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
       }}>
         {collapsed ? (
           <div style={{
             width: 36, height: 36, borderRadius: 999, background: GRAD, margin: "0 auto",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 15,
+            color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 14,
           }}>
             {user?.name?.[0] || "U"}
           </div>
@@ -110,13 +110,13 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
               <div style={{
                 width: 40, height: 40, borderRadius: 999, flexShrink: 0,
                 background: GRAD, display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 17,
+                color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 16,
               }}>
                 {user?.name?.[0] || "U"}
               </div>
               <div style={{ lineHeight: 1.3, overflow: "hidden", flex: 1 }}>
                 <div style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{user?.name}</div>
-                <div style={{ color: C.plumSoft, fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {user?.role}
                 </div>
               </div>
@@ -124,14 +124,14 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
             <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
               <button onClick={onChangePw} style={{
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "9px", borderRadius: 11, border: "none", cursor: "pointer",
+                padding: "9px", borderRadius: 14, border: "none", cursor: "pointer",
                 background: C.lavSoft, color: C.lavText, fontFamily: TEXT, fontSize: 12, fontWeight: 800,
               }}>
                 <KeyRound size={14} /> Mật khẩu
               </button>
               <button onClick={onLogout} style={{
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "9px", borderRadius: 11, border: "none", cursor: "pointer",
+                padding: "9px", borderRadius: 14, border: "none", cursor: "pointer",
                 background: C.raspSoft, color: C.raspText, fontFamily: TEXT, fontSize: 12, fontWeight: 800,
               }}>
                 <LogOut size={14} /> Thoát
@@ -272,8 +272,8 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
             VMP MONITOR · HỆ GIÁM SÁT THẨM ĐỊNH
           </span>
         </div>
-        <div style={{ fontFamily: TEXT, fontSize: 31, fontWeight: 900, color: C.plum, letterSpacing: -0.2 }}>{title}</div>
-        <div style={{ fontSize: 14.5, color: C.plum, marginTop: 5, fontWeight: 700 }}>
+        <div className="vmp-title" style={{ fontSize: 28, fontWeight: 800, color: C.plum }}>{title}</div>
+        <div style={{ fontSize: 14, color: C.plum, marginTop: 5, fontWeight: 700 }}>
           {sub || "CPC1 HN"}
           {lastSync && (
             <span style={{ marginLeft: 12, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
@@ -313,10 +313,10 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
         <ThanhTraToggle />
         <ThemeToggle />
         <button onClick={onRefresh} title="Làm mới dữ liệu" className="vmp-lift" style={{
-          ...glass, borderRadius: 16, padding: "9px 15px",
+          ...glass, borderRadius: 14, padding: "9px 15px",
           display: "flex", alignItems: "center", gap: 8,
           border: "none", cursor: "pointer",
-          color: C.pinkText, fontFamily: TEXT, fontWeight: 800, fontSize: 12.5,
+          color: C.pinkText, fontFamily: TEXT, fontWeight: 800, fontSize: 12,
         }}>
           <RefreshCw size={15} color={C.pink} className={refreshing ? "spin" : ""} />
           {refreshing ? "Đang tải…" : "Làm mới"}
@@ -324,7 +324,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
 
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "8px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 800,
+          padding: "8px 14px", borderRadius: 999, fontSize: 12, fontWeight: 800,
           color: user?.perm === "view" ? C.skyText : C.pinkText,
           background: user?.perm === "view" ? C.skySoft : C.pinkSoft,
         }}>

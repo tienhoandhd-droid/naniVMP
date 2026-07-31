@@ -48,12 +48,12 @@ import type { Activity } from "../../types/domain.ts";
 const TARGET_PCT = 50;
 
 const toolBtn = (bg: string, color: string) => ({
-  display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 12,
-  border: "none", cursor: "pointer", background: bg, color, fontFamily: TEXT, fontWeight: 800, fontSize: 13,
+  display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 14,
+  border: "none", cursor: "pointer", background: bg, color, fontFamily: TEXT, fontWeight: 800, fontSize: 14,
 });
 
-const th: React.CSSProperties = { textAlign: "left", fontSize: 11, color: C.plumSoft, fontWeight: 800, padding: "0 13px 10px", whiteSpace: "nowrap" };
-const td: React.CSSProperties = { padding: "10px 13px", fontSize: 13, color: C.plum, fontWeight: 600, borderTop: `1px solid ${C.line}` };
+const th: React.CSSProperties = { textAlign: "left", fontSize: 12, color: C.plumSoft, fontWeight: 800, padding: "0 13px 10px", whiteSpace: "nowrap" };
+const td: React.CSSProperties = { padding: "10px 13px", fontSize: 14, color: C.plum, fontWeight: 600, borderTop: `1px solid ${C.line}` };
 
 function uniqSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
@@ -396,19 +396,19 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               năm) lẫn biểu đồ 12 tháng. Chọn tháng/quý nằm trong chính mục 2,
               cạnh con số mà nó đổi. */}
           <div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Năm báo cáo</div>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Năm báo cáo</div>
             <Sel val={String(ky.year)} set={(v) => setKy((k) => ({ ...k, year: Number(v) }))} opts={namOptions} />
           </div>
           <div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Phạm vi (bộ phận)</div>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Phạm vi (bộ phận)</div>
             <Sel val={deptScope} set={setDeptScope} opts={[{ v: "all", l: "Toàn nhà máy" }, ...DEPTS.map((d) => ({ v: d.id, l: d.name }))]} />
           </div>
           <div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Khu vực</div>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Khu vực</div>
             <MultiSelect label="Khu vực" allLabel="Tất cả khu vực" options={areaOptions} selected={areaSel} onChange={setAreaSel} />
           </div>
           <div>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Mức trọng yếu</div>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Mức trọng yếu</div>
             <MultiSelect label="Trọng yếu" allLabel="Tất cả mức" options={critOptions} selected={critSel} onChange={setCritSel} />
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -432,8 +432,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             ngay cạnh bộ chọn, vì đây đúng là chỗ người đọc dễ hiểu nhầm nhất —
             và hiểu nhầm thì mọi con số bên dưới bị đọc sai theo. */}
         {!laKyHienTai && (
-          <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 700, color: C.lavText, background: C.lavSoft,
-            borderRadius: 12, padding: "11px 15px", lineHeight: 1.7 }}>
+          <div style={{ marginTop: 12, fontSize: 12, fontWeight: 700, color: C.lavText, background: C.lavSoft,
+            borderRadius: 14, padding: "11px 15px", lineHeight: 1.7 }}>
             ℹ️ Đang xem kỳ <b>{kyLabel}</b> ({kyPhase === "da_qua" ? "đã qua" : kyPhase === "dang_dien_ra" ? "đang diễn ra" : "chưa tới"}).
             Đây là <b>lát cắt theo mốc đích VMP</b>: những hạng mục có mốc đích rơi vào kỳ, và tính tới <b>hôm nay</b>
             đã hoàn thành VMP bao nhiêu — không phải ảnh chụp tại thời điểm đó. Một hạng mục hạn {kyLabel} mà nay mới
@@ -479,13 +479,13 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             (xong báo cáo mà chưa thẩm định) — nói thẳng thay vì để người đọc
             tự phát hiện rồi mất tin vào cả bản báo cáo. */}
         {funnelWarning && (
-          <div style={{ marginTop: 12, fontSize: 13, fontWeight: 700, color: C.marigoldText,
-            background: C.marigoldSoft, borderRadius: 12, padding: "11px 15px" }}>
+          <div style={{ marginTop: 12, fontSize: 14, fontWeight: 700, color: C.marigoldText,
+            background: C.marigoldSoft, borderRadius: 14, padding: "11px 15px" }}>
             ⚠️ {funnelWarning}
             {hangMucMauThuan.length > 0 && (
               <button type="button"
                 onClick={() => moChiTiet(`Hạng mục có trạng thái mâu thuẫn · năm ${ky.year}`, hangMucMauThuan)}
-                style={{ marginLeft: 10, fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer",
+                style={{ marginLeft: 10, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
                   color: C.marigoldText, background: C.surface, border: `1.5px solid ${C.marigoldText}`,
                   borderRadius: 999, padding: "5px 13px" }}>
                 Xem {hangMucMauThuan.length} hạng mục
@@ -522,7 +522,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16,
           background: C.pinkMist, borderRadius: 14, padding: "11px 14px" }}>
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.plumSoft, marginRight: 2 }}>Xem kỳ</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginRight: 2 }}>Xem kỳ</span>
           <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))}
             opts={[{ v: "thang", l: "Theo tháng" }, { v: "quy", l: "Theo quý" }, { v: "nam", l: "Cả năm" }]} />
           {ky.kind === "thang" && (
@@ -535,12 +535,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           )}
           {!laKyHienTai && (
             <button type="button" onClick={() => setKy(periodNow())} title="Quay lại kỳ hiện tại"
-              style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: C.lavText, background: C.lavSoft,
+              style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: C.lavText, background: C.lavSoft,
                 border: "none", borderRadius: 999, padding: "8px 14px", cursor: "pointer", whiteSpace: "nowrap" }}>
               ↺ Về kỳ này
             </button>
           )}
-          <span style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+          <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
             Năm chọn ở bộ lọc phía trên
           </span>
         </div>
@@ -581,7 +581,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <VmpSpace3D acts={scopedNamActive} nam={ky.year} giamChuyenDong={giamChuyenDong} />
         </Suspense>
         <details style={{ marginTop: 12 }}>
-          <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 800, color: C.plumSoft }}>
+          <summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 800, color: C.plumSoft }}>
             Xem dạng phẳng 12 tháng (bản dùng cho PDF)
           </summary>
           <div style={{ marginTop: 10 }} dangerouslySetInnerHTML={{ __html: monthlyChartHtml }} />
@@ -596,7 +596,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <CauKetLuan chinh={bottleneckVerdict} tone={bottleneck.length ? "over" : "ok"} />
         {bottleneckChartHtml
           ? <div dangerouslySetInnerHTML={{ __html: bottleneckChartHtml }} />
-          : <div style={{ fontSize: 13.5, color: C.plumSoft, fontWeight: 700, padding: 12 }}>Không có bộ phận nào đang chậm trong phạm vi đang chọn.</div>}
+          : <div style={{ fontSize: 14, color: C.plumSoft, fontWeight: 700, padding: 12 }}>Không có bộ phận nào đang chậm trong phạm vi đang chọn.</div>}
         <div style={{ height: 14 }} />
         <TableScroll maxHeight={320}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720 }}>
@@ -669,7 +669,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <Tag color={sevOf("info").mau} bg={sevOf("info").nen}>{sevOf("info").emoji} Thông tin: {qualityBySeverity.info || 0}</Tag>
         </div>
         {quality.length > 0 && (
-          <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, fontSize: 13, color: C.plum, fontWeight: 600 }}>
+          <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, fontSize: 14, color: C.plum, fontWeight: 600 }}>
             {quality.slice(0, 8).map((q, i) => (
               <li key={i}>{sevOf(q.severity).emoji} <b>{LOAI_LOI[q.type]?.ten || q.type}</b> — {q.msg}</li>
             ))}
@@ -713,7 +713,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <SparkIcon size={18} color={C.pink} />
-            <span style={{ fontFamily: TEXT, fontSize: 17, fontWeight: 800, color: C.plum }}>Nhận xét</span>
+            <span style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>Nhận xét</span>
             <Tag color={C.mintText} bg={C.mintSoft}>Tính từ số liệu</Tag>
           </div>
           {/* Nút KHÔNG bị ẩn khi thiếu cấu hình. Bản cũ giấu nút đi nên trên
@@ -723,7 +723,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <button onClick={() => generateAi("bao_cao")} disabled={loadingAi || !aiConfigured()}
               title={aiConfigured() ? "Nhận xét trên số đã tổng hợp — nhanh, rẻ" : AI_SETUP_HINT}
               style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
-                borderRadius: 12, fontSize: 13.5, opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
+                borderRadius: 14, fontSize: 14, opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
                 cursor: loadingAi || !aiConfigured() ? "not-allowed" : "pointer" }}>
               {loadingAi && loaiAi === "bao_cao" ? <RefreshCw size={16} className="spin" /> : <SparkIcon size={16} />}
               {loadingAi && loaiAi === "bao_cao" ? "AI đang phân tích…" : "Thêm nhận xét AI"}
@@ -751,8 +751,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         </div>
 
         {!aiConfigured() && (
-          <div style={{ marginBottom: 12, fontSize: 12.5, fontWeight: 700, color: C.marigoldText,
-            background: C.marigoldSoft, borderRadius: 12, padding: "11px 15px", lineHeight: 1.6 }}>
+          <div style={{ marginBottom: 12, fontSize: 12, fontWeight: 700, color: C.marigoldText,
+            background: C.marigoldSoft, borderRadius: 14, padding: "11px 15px", lineHeight: 1.6 }}>
             ⚠️ {AI_SETUP_HINT}
           </div>
         )}
@@ -764,13 +764,13 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </ul>
         </div>
 
-        {errAi && <div style={{ marginTop: 12, color: C.raspText, fontSize: 13.5, fontWeight: 800, padding: "13px 15px", borderRadius: 12, background: C.raspSoft, display: "flex", gap: 8, alignItems: "center" }}><AlertCircle size={16} /> {errAi}</div>}
+        {errAi && <div style={{ marginTop: 12, color: C.raspText, fontSize: 14, fontWeight: 800, padding: "13px 15px", borderRadius: 14, background: C.raspSoft, display: "flex", gap: 8, alignItems: "center" }}><AlertCircle size={16} /> {errAi}</div>}
         {loadingAi && <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}><RefreshCw size={22} className="spin" color={C.pink} /><div style={{ marginTop: 10 }}>AI đang phân tích…</div></div>}
         {!loadingAi && !errAi && ai && (
           <div style={{ marginTop: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
               <SparkIcon size={16} color={C.lavText} />
-              <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 800, color: C.plum }}>{AI_NHAN[loaiAi]}</span>
+              <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{AI_NHAN[loaiAi]}</span>
               <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
               {loaiAi === "phan_tich_sau" && (
                 <Tag color={C.skyText} bg={C.skySoft}>Đọc từng dòng dữ liệu thô · mọi nhận định phải dẫn mã</Tag>

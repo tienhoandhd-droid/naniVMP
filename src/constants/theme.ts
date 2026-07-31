@@ -41,8 +41,27 @@ export const C = {
   white: "var(--c-surface)", line: "var(--c-line)",
 };
 
-export const TEXT = "'Quicksand', system-ui, -apple-system, sans-serif";
-export const NUM = "'Baloo 2', 'Quicksand', system-ui, sans-serif";
+/* ---------------------------------------------------------------------
+ * BỘ ĐÔI PHÔNG CHỮ — hiển thị + thân bài.
+ *
+ * TEXT dùng cho MỌI thứ đọc thật: bảng, nhãn, thân bài, chú thích.
+ * Be Vietnam Pro do người Việt thiết kế riêng cho tiếng Việt — dấu được
+ * vẽ và canh chuẩn ở cỡ nhỏ, chiều cao chữ thường lớn, và có chữ số đều
+ * bề rộng. Ba thứ đó đúng là ba thứ một dashboard số liệu cần.
+ *
+ * DISPLAY (Quicksand) chỉ còn dùng cho logo, tiêu đề và số KPI lớn — tức
+ * là "giọng nói thương hiệu". Bản trước dùng nó cho toàn bộ bảng số 10–13px
+ * kèm dấu tiếng Việt: font tròn hình học, x-height thấp, chữ 'a' một tầng,
+ * đặt ở cỡ đó thì dấu chồng lên nhau và mắt phải căng ra đọc.
+ *
+ * NUM dùng cho con số trong bảng và nhãn — cùng phông thân bài, nhưng bật
+ * chữ số đều bề rộng ở index.css nên cột số thẳng hàng dọc.
+ * ------------------------------------------------------------------- */
+export const TEXT = "'Be Vietnam Pro', system-ui, -apple-system, sans-serif";
+export const DISPLAY = "'Quicksand', 'Be Vietnam Pro', system-ui, sans-serif";
+export const NUM = "'Be Vietnam Pro', system-ui, -apple-system, sans-serif";
+/** Số KPI cỡ lớn — chỗ duy nhất còn dùng phông hiển thị cho chữ số. */
+export const NUM_HERO = "'Baloo 2', 'Quicksand', system-ui, sans-serif";
 export const GRAD = "var(--grad)";
 export const GRAD_SOFT = "var(--grad-soft)";
 
@@ -67,7 +86,11 @@ export const E = {
 };
 
 /** Bo góc — thang 4 bậc, dùng nhất quán thay vì tuỳ hứng mỗi chỗ một số. */
-export const R = { sm: 10, md: 14, lg: 20, xl: 26, pill: 999 };
+/* Bo góc — CHỈ BA giá trị. Bản trước có sáu (999/26/20/18/16/12) và khi mọi
+ * thứ đều là hộp bo tròn thì không hộp nào nổi hơn hộp nào; mắt không biết
+ * nhìn đâu trước. Tên bốn bậc giữ nguyên để code cũ không vỡ, nhưng lg/xl
+ * nay trỏ về cùng một giá trị thẻ. */
+export const R = { sm: 8, md: 14, lg: 14, xl: 14, pill: 999 };
 
 /* ---------------------------------------------------------------------
  * Chuyển động.
@@ -118,7 +141,7 @@ export const glass: CSSProperties = {
 };
 export const btnPrimary: CSSProperties = {
   background: GRAD, color: "#fff", border: "none", cursor: "pointer",
-  fontFamily: TEXT, fontWeight: 700, fontSize: 13.5,
+  fontFamily: TEXT, fontWeight: 700, fontSize: 14,
   borderRadius: R.sm,
   boxShadow: "var(--e-accent)",
   transition: `transform ${MO.fast} ${MO.spring}, box-shadow ${MO.base} ${MO.ease}`,
@@ -126,8 +149,8 @@ export const btnPrimary: CSSProperties = {
 export const INP: CSSProperties = {
   width: "100%", padding: "11px 14px", borderRadius: R.sm,
   border: `1px solid ${C.line}`, background: C.surfaceSunk,
-  fontFamily: TEXT, fontSize: 13.5, color: C.plum, fontWeight: 600, outline: "none",
+  fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 600, outline: "none",
   transition: `border-color ${MO.fast} ${MO.ease}, box-shadow ${MO.fast} ${MO.ease}`,
 };
 export const FIELD: CSSProperties = { display: "flex", flexDirection: "column", gap: 5 };
-export const LBL: CSSProperties = { fontSize: 11.5, fontWeight: 800, color: C.plumSoft };
+export const LBL: CSSProperties = { fontSize: 12, fontWeight: 800, color: C.plumSoft };

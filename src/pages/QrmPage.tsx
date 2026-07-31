@@ -63,13 +63,13 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
           <div key={b.id}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 5,
                           fontFamily: TEXT, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: b.t }}>{b.label}</span>
-              <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600 }}>{b.hint}</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: b.t }}>{b.label}</span>
+              <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{b.hint}</span>
               <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
                 {b.done}/{b.total} xong
                 {b.over > 0 && <span style={{ color: C.raspText }}> · {b.over} quá hạn</span>}
               </span>
-              <span style={{ fontFamily: NUM, fontSize: 17, fontWeight: 800, color: b.t,
+              <span style={{ fontFamily: NUM, fontSize: 16, fontWeight: 800, color: b.t,
                              width: 50, textAlign: "right" }}>{b.rate}%</span>
             </div>
             <div style={{ height: 13, borderRadius: 999, background: C.pinkMist, overflow: "hidden",
@@ -147,14 +147,14 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
         </Suspense>
         <div style={{ overflowX: "auto", marginTop: 8 }} className="vmp-scroll">
           <table style={{ borderCollapse: "separate", borderSpacing: 8, margin: "0 auto" }}>
-            <thead><tr><th></th>{cols.map((c) => <th key={c} style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: C.plumSoft, padding: "0 8px" }}>{c}</th>)}</tr></thead>
+            <thead><tr><th></th>{cols.map((c) => <th key={c} style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: C.plumSoft, padding: "0 8px" }}>{c}</th>)}</tr></thead>
             <tbody>{rowsC.map((rc) => (
               <tr key={rc}>
-                <td style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, color: CRITMAP[rc].text, paddingRight: 8, whiteSpace: "nowrap" }}>Ảnh hưởng {rc}</td>
+                <td style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: CRITMAP[rc].text, paddingRight: 8, whiteSpace: "nowrap" }}>Ảnh hưởng {rc}</td>
                 {cols.map((c) => { const items = grid[rc][c]; const col = cellRisk(rc, c); return (
-                  <td key={c}><div style={{ width: 100, height: 74, borderRadius: 16, background: col + "26", border: `2px solid ${col}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontFamily: NUM, fontSize: 26, fontWeight: 800, color: cellText(col) }}>{items.length}</span>
-                    <span style={{ fontSize: 10, color: C.plumSoft, fontWeight: 700 }}>hạng mục</span>
+                  <td key={c}><div style={{ width: 100, height: 74, borderRadius: 14, background: col + "26", border: `2px solid ${col}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: cellText(col) }}>{items.length}</span>
+                    <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>hạng mục</span>
                   </div></td>
                 ); })}
               </tr>
@@ -162,7 +162,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           </table>
         </div>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
-          {[[C.mint, "Rủi ro thấp"], [C.marigold, "Rủi ro TB"], [C.rasp, "Rủi ro cao — ưu tiên"]].map(([c, l]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: C.plum }}><span style={{ width: 14, height: 14, borderRadius: 5, background: c }} />{l}</span>)}
+          {[[C.mint, "Rủi ro thấp"], [C.marigold, "Rủi ro TB"], [C.rasp, "Rủi ro cao — ưu tiên"]].map(([c, l]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: C.plum }}><span style={{ width: 14, height: 14, borderRadius: 8, background: c }} />{l}</span>)}
         </div>
       </Card>
       <RiskProgress acts={acts} />
@@ -173,7 +173,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <Donut size={140} segments={critCount.map((x) => ({ value: x.n, color: CRITMAP[x.k].color }))} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-              {critCount.map((x) => <div key={x.k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: CRITMAP[x.k].color }} />Ảnh hưởng {x.k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: CRITMAP[x.k].text }}>{x.n}</span></div>)}
+              {critCount.map((x) => <div key={x.k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: CRITMAP[x.k].color }} />Ảnh hưởng {x.k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: CRITMAP[x.k].text }}>{x.n}</span></div>)}
             </div>
           </div>
         </Card>
@@ -182,8 +182,8 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {top.map((x) => { const cls = (CLS as Record<string, typeof CLS.tb>)[String(x.a.cls ?? "tb")] ?? CLS.tb; return (
               <div key={x.a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
-                <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, color: "#fff", background: qrmLevel(x.score) === "cao" ? C.raspText : qrmLevel(x.score) === "tb" ? C.marigoldText : C.mintText }}>RPN {x.score}</span>
-                <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}><Tag color={cls.text} bg={cls.soft}>{x.a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plum }}>{x.a.name}</span></div><div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{x.a.id} · {x.a.dep}</div></div>
+                <span style={{ fontSize: 12, fontWeight: 800, padding: "4px 10px", borderRadius: 999, color: "#fff", background: qrmLevel(x.score) === "cao" ? C.raspText : qrmLevel(x.score) === "tb" ? C.marigoldText : C.mintText }}>RPN {x.score}</span>
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}><Tag color={cls.text} bg={cls.soft}>{x.a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{x.a.name}</span></div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{x.a.id} · {x.a.dep}</div></div>
                 <Pill s={x.a.st} small />
               </div>
             ); })}

@@ -113,8 +113,8 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
         </div>
 
         {err && (
-          <div style={{ padding: 10, borderRadius: 10, background: C.raspSoft,
-                        color: C.raspText, fontSize: 13, marginBottom: 12 }}>{err}</div>
+          <div style={{ padding: 10, borderRadius: 8, background: C.raspSoft,
+                        color: C.raspText, fontSize: 14, marginBottom: 12 }}>{err}</div>
         )}
 
         {kpi && (
@@ -147,13 +147,13 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
         </CardTitle>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>
             Ngưỡng "sắp đến hạn"
           </span>
           {[3, 7, 14, 30].map((d) => (
             <button key={d} onClick={() => setSoonDays(d)}
               style={{ padding: "6px 13px", borderRadius: 999, cursor: "pointer",
-                       fontFamily: TEXT, fontSize: 12.5, fontWeight: soonDays === d ? 800 : 600,
+                       fontFamily: TEXT, fontSize: 12, fontWeight: soonDays === d ? 800 : 600,
                        border: `1.5px solid ${soonDays === d ? C.pink : C.pinkSoft}`,
                        background: soonDays === d ? C.pinkSoft : C.surface,
                        color: soonDays === d ? C.plum : C.plumSoft }}>
@@ -165,7 +165,7 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
         </div>
 
         <TableScroll maxHeight="46vh">
-          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12.5 }}>
+          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12 }}>
             <thead>
               <tr>
                 {["Loại", "Mã thẩm định", "Đối tượng", "Bộ phận", "Giai đoạn", "Hạn", "Còn/Trễ", "Phụ trách"]
@@ -228,7 +228,7 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
             ["info", `Thông tin (${sevCount.info})`]].map(([k, lb]) => (
             <button key={k} onClick={() => setSevFilter(k)}
               style={{ padding: "7px 13px", borderRadius: 999, cursor: "pointer",
-                       fontFamily: TEXT, fontSize: 12.5, fontWeight: sevFilter === k ? 800 : 600,
+                       fontFamily: TEXT, fontSize: 12, fontWeight: sevFilter === k ? 800 : 600,
                        border: `1.5px solid ${sevFilter === k ? C.pink : C.pinkSoft}`,
                        background: sevFilter === k ? C.pinkSoft : C.surface,
                        color: sevFilter === k ? C.plum : C.plumSoft }}>
@@ -244,12 +244,12 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
             return (
               <div key={`${i.id}-${i.type}-${idx}`}
                 style={{ display: "flex", gap: 10, alignItems: "flex-start",
-                         padding: "10px 12px", borderRadius: 12,
-                         background: tone.bg, color: tone.c, fontSize: 12.5, fontFamily: TEXT }}>
+                         padding: "10px 12px", borderRadius: 14,
+                         background: tone.bg, color: tone.c, fontSize: 12, fontFamily: TEXT }}>
                 <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{i.msg}</div>
-                  <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>
+                  <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>
                     {i.id} · {i.type}
                   </div>
                 </div>
@@ -257,7 +257,7 @@ export default function ServerChecksView({ user }: { user?: AppUser | null }) {
             );
           })}
           {!loading && shownIssues.length === 0 && (
-            <div style={{ padding: 20, textAlign: "center", color: C.mintText, fontSize: 13 }}>
+            <div style={{ padding: 20, textAlign: "center", color: C.mintText, fontSize: 14 }}>
               <CheckCircle2 size={16} style={{ verticalAlign: "-3px", marginRight: 6 }} />
               Không phát hiện vấn đề nào.
             </div>

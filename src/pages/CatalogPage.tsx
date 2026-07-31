@@ -81,11 +81,11 @@ function OMoc({ raw, dlKey, ngayKey, ttKey }: {
       <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: nen,
         borderRadius: 8, padding: "3px 8px" }}>
         <span style={{ width: 7, height: 7, borderRadius: 999, background: mau, flexShrink: 0 }} />
-        <span style={{ fontFamily: NUM, fontSize: 11.5, fontWeight: 800, color: mau }}>
+        <span style={{ fontFamily: NUM, fontSize: 12, fontWeight: 800, color: mau }}>
           {dl ? fmtVN(dl) : "—"}
         </span>
       </div>
-      <div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
         {xong ? (ngay ? `xong ${fmtVN(ngay)}` : "xong · thiếu ngày") : tre ? "trễ" : "chưa xong"}
       </div>
     </td>
@@ -203,8 +203,8 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 14, background: C.lavSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Boxes size={22} color={C.lavText} /></div>
             <div>
-              <div style={{ fontFamily: TEXT, fontWeight: 900, fontSize: 18, color: C.plum }}>Danh mục đối tượng & Tiến độ</div>
-              <div style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600 }}>Nhóm theo mã đối tượng · mỗi mã nhiều loại thẩm định / lần thẩm định trong năm</div>
+              <div style={{ fontFamily: TEXT, fontWeight: 900, fontSize: 16, color: C.plum }}>Danh mục đối tượng & Tiến độ</div>
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Nhóm theo mã đối tượng · mỗi mã nhiều loại thẩm định / lần thẩm định trong năm</div>
             </div>
           </div>
           {/* Nút "Thêm đối tượng" cũ mở một hộp chỉ XEM TRƯỚC dòng Sheet rồi
@@ -230,7 +230,7 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
             <option value="all">Cả hai</option>
           </select>
         </div>
-        <div style={{ marginTop: 10, fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>{groups.length} đối tượng · {totalItems} hạng mục thẩm định</div>
+        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{groups.length} đối tượng · {totalItems} hạng mục thẩm định</div>
       </Card>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -260,15 +260,15 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
             <Card key={o.code} style={{ padding: 0, overflow: "hidden" }}>
               <button onClick={() => toggle(o.code)} style={{ width: "100%", textAlign: "left", border: "none", background: isOpen ? C.pinkMist : C.surface, cursor: "pointer", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                 <ChevronRight size={18} color={C.plumSoft} style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s", flexShrink: 0 }} />
-                <span style={{ fontFamily: NUM, fontWeight: 900, fontSize: 15, color: cl.text, background: cl.soft, padding: "3px 10px", borderRadius: 9, whiteSpace: "nowrap" }}>{o.code}</span>
+                <span style={{ fontFamily: NUM, fontWeight: 900, fontSize: 14, color: cl.text, background: cl.soft, padding: "3px 10px", borderRadius: 8, whiteSpace: "nowrap" }}>{o.code}</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{txt(o.name)}</div>
-                  <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{cl.label} · {dp?.name || o.dept || "—"} · {txt(o.area)}{Number(o.freq) > 0 ? ` · chu kỳ ${o.freq} tháng` : ""}</div>
+                  <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{cl.label} · {dp?.name || o.dept || "—"} · {txt(o.area)}{Number(o.freq) > 0 ? ` · chu kỳ ${o.freq} tháng` : ""}</div>
                   {/* Điểm trọng yếu và phân loại báo cáo lấy từ chính hạng mục,
                       vì hai thứ này quyết định thứ tự ưu tiên (ICH Q9) và số
                       ngày lùi của hạn thẩm định — người nhập cần thấy ngay. */}
                   {thongTin && (
-                    <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600, marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {thongTin.diem != null && (
                         <span style={{ background: C.marigoldSoft, color: C.marigoldText, borderRadius: 999, padding: "2px 8px", fontWeight: 800 }}>
                           Trọng yếu {thongTin.diem}/9
@@ -295,23 +295,23 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                     người nhập ngó lại, không được ru ngủ bằng chữ "không thẩm định". */}
                 {g.items.length === 0 ? (
                   !coThamDinh(o) ? (
-                    <span style={{ fontSize: 11.5, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
                       title="Danh mục nguồn đánh dấu đối tượng này không thẩm định nên không sinh hạng mục nào.">
                       Không thẩm định
                     </span>
                   ) : (
-                    <span style={{ fontSize: 11.5, fontWeight: 800, color: C.marigoldText, background: C.marigoldSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.marigoldText, background: C.marigoldSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
                       title="Đối tượng CÓ trong kế hoạch thẩm định nhưng không còn hạng mục nào đang hiệu lực — thường do các lần đã bị đánh dấu &quot;Không áp dụng&quot;. Mở Danh mục &amp; Nhập liệu để kiểm tra.">
                       Có thẩm định · chưa có lần nào hiệu lực
                     </span>
                   )
                 ) : (
                   <>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 800, color: C.lavText, background: C.lavSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><Layers size={13} />{nTypes} loại · {g.items.length} lần</span>
-                    <span style={{ fontSize: 11.5, fontWeight: 800, color: C.mintText, whiteSpace: "nowrap" }}>{done}/{g.items.length} xong</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, color: C.lavText, background: C.lavSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><Layers size={13} />{nTypes} loại · {g.items.length} lần</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.mintText, whiteSpace: "nowrap" }}>{done}/{g.items.length} xong</span>
                   </>
                 )}
-                {over > 0 && <span style={{ fontSize: 11.5, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>{over} quá hạn</span>}
+                {over > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>{over} quá hạn</span>}
               </button>
 
               {/* Trang này CHỈ nhập timeline và đánh dấu xong/chưa. Mọi thứ thuộc
@@ -322,13 +322,13 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                 <div style={{ padding: "8px 16px", borderTop: `1px solid ${C.pinkSoft}`,
                   background: "rgba(237,231,252,.28)", display: "flex", alignItems: "center",
                   gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 700 }}>
+                  <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
                     Sửa tên · khu vực · bộ phận · tần suất · điểm trọng yếu của đối tượng này:
                   </span>
                   <button type="button"
                     onClick={() => onMoDanhMuc(String(o.code), CLS_SANG_NHOM[String(o.cls ?? "")])}
                     style={{ display: "inline-flex", alignItems: "center", gap: 6,
-                      fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer",
+                      fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
                       color: C.lavText, background: C.lavSoft, border: "none",
                       borderRadius: 999, padding: "6px 13px" }}>
                     <ExternalLink size={13} /> Mở trong Danh mục &amp; Nhập liệu
@@ -339,12 +339,12 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
               {isOpen && (
                 <div style={{ borderTop: `1px solid ${C.pinkSoft}`, padding: "10px", display: "flex", flexDirection: "column", gap: 10 }}>
                   {groupByType(g.items).map(({ vtype, items, dupYears }) => (
-                    <div key={vtype} style={{ borderRadius: 12, border: `1px solid ${C.pinkSoft}`, overflow: "hidden" }}>
+                    <div key={vtype} style={{ borderRadius: 14, border: `1px solid ${C.pinkSoft}`, overflow: "hidden" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", background: "rgba(237,231,252,.45)" }}>
                         <Tag color={C.lavText} bg={C.lavSoft}>{txt(vtype)}</Tag>
-                        <span style={{ fontSize: 12.5, fontWeight: 800, color: C.plum }}>{items.length} lần thẩm định</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: C.plum }}>{items.length} lần thẩm định</span>
                         {dupYears.size > 0 && (
-                          <span style={{ fontSize: 11, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 9px", borderRadius: 999 }} title="Cùng một loại thẩm định không nên lặp trong cùng một năm">
+                          <span style={{ fontSize: 12, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 9px", borderRadius: 999 }} title="Cùng một loại thẩm định không nên lặp trong cùng một năm">
                             ⚠ Trùng loại trong năm {[...dupYears].join(", ")}
                           </span>
                         )}
@@ -352,30 +352,30 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                       <div className="vmp-scroll" style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 980 }}>
                           <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
-                            {["Năm", "ID", "1. Đề cương", "2. Thẩm định", "3. Báo cáo", "4. Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 11, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+                            {["Năm", "ID", "1. Đề cương", "2. Thẩm định", "3. Báo cáo", "4. Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
                           </tr></thead>
                           <tbody>
                             {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
                               <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: dup ? "rgba(252,226,233,.45)" : (i % 2 ? "rgba(255,255,255,.5)" : "transparent") }}>
-                                <td style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: dup ? C.raspText : C.plum, fontSize: 12.5, whiteSpace: "nowrap" }}>{yearOf(a)}{dup && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: C.raspText }}>⚠</span>}</td>
+                                <td style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: dup ? C.raspText : C.plum, fontSize: 12, whiteSpace: "nowrap" }}>{yearOf(a)}{dup && <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, color: C.raspText }}>⚠</span>}</td>
                                 <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</td>
                                 <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_de_cuong" ngayKey="ngay_de_cuong" ttKey="tt_de_cuong" />
                                 <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_tham_dinh" ngayKey="ngay_tham_dinh" ttKey="tt_tham_dinh" />
                                 <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_bao_cao" ngayKey="ngay_bao_cao" ttKey="tt_bao_cao" />
                                 <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_vmp" ngayKey="ngay_vmp" ttKey="tt_vmp" />
-                                <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>{txt(a.owner)}</td>
+                                <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{txt(a.owner)}</td>
                                 <td style={{ padding: "9px 12px", textAlign: "center" }}><Pill s={a.st} small /></td>
                                 <td style={{ padding: "9px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                                   {!readOnly && a.st !== "done" && (
                                     <button onClick={() => { setEdit(a); setQuick(true); }}
                                       title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
-                                      style={{ padding: "6px 10px", borderRadius: 9, border: `1px solid ${C.mint}`,
+                                      style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.mint}`,
                                         background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12,
                                         fontWeight: 800, cursor: "pointer", marginRight: 6 }}>
                                       ✓ Xong bước
                                     </button>
                                   )}
-                                  <button onClick={() => { setEdit(a); setQuick(false); }} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 9, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
+                                  <button onClick={() => { setEdit(a); setQuick(false); }} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
                                 </td>
                               </tr>
                             ); })}

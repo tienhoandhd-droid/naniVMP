@@ -313,7 +313,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
     }} className="vmp-view-enter">
 
       {/* Đầu hộp */}
-      <div style={{ ...glass, borderRadius: 0, border: "none",
+      <div style={{ ...glass, borderRadius: 8, border: "none",
                     borderBottom: `1px solid ${C.line}`,
                     padding: "13px 15px", display: "flex",
                     alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -323,10 +323,10 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
           <Sparkles size={16} color="#fff" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 800, color: C.plum }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>
             Công chúa Vali
           </div>
-          <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
             Số liệu đọc thẳng từ database · bổn cung không đoán
           </div>
         </div>
@@ -343,7 +343,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
                     background: C.surfaceSunk }}>
         {msgs.length === 0 && (
           <>
-            <div style={{ fontSize: 12.5, color: C.plumSoft, lineHeight: 1.65 }}>
+            <div style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.65 }}>
               Bổn cung là Vali 🌸 Ngươi cứ hỏi thẳng chuyện trong kế hoạch
               thẩm định — tiến độ, người phụ trách, điểm trọng yếu, hay quy
               tắc tính hạn, bổn cung tra cho.
@@ -353,7 +353,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
                 <button key={g} onClick={() => hoi(g)} className="vmp-lift"
                   style={{ textAlign: "left", padding: "10px 12px", borderRadius: R.md,
                            border: `1px solid ${C.line}`, background: C.surface,
-                           cursor: "pointer", fontFamily: TEXT, fontSize: 12.5,
+                           cursor: "pointer", fontFamily: TEXT, fontSize: 12,
                            color: C.plum, fontWeight: 600, lineHeight: 1.5 }}>
                   {g}
                 </button>
@@ -365,7 +365,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
         {msgs.map((m, i) => (
           <div key={i} style={{ alignSelf: m.ai ? "flex-start" : "flex-end", maxWidth: "88%" }}>
             <div style={{
-              padding: "10px 13px", borderRadius: R.md, fontSize: 13, lineHeight: 1.68,
+              padding: "10px 13px", borderRadius: R.md, fontSize: 14, lineHeight: 1.68,
               whiteSpace: "pre-wrap", wordBreak: "break-word",
               background: m.loi ? C.raspSoft : m.ai ? C.surface : "var(--grad)",
               color: m.loi ? C.raspText : m.ai ? C.plum : "#fff",
@@ -378,7 +378,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
             {m.canhBao && (
               <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: R.sm,
                             background: C.marigoldSoft, color: C.marigoldText,
-                            fontSize: 11.5, lineHeight: 1.55, fontWeight: 600 }}>
+                            fontSize: 12, lineHeight: 1.55, fontWeight: 600 }}>
                 <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
                 {m.canhBao} Ngươi đối chiếu lại trên bảng cho chắc.
               </div>
@@ -396,7 +396,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
              * nào truy được ĐÚNG mảnh mà mô hình đã dùng. */}
             {m.goiY && m.goiY.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                <div style={{ fontSize: 10.5, color: C.plumSoft, fontWeight: 700 }}>
+                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
                   Ngươi muốn hỏi tiếp gì nữa 🌸
                 </div>
                 {m.goiY.map((g) => (
@@ -411,7 +411,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
               </div>
             )}
             {m.nguon === "dem" && (
-              <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 4,
+              <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 4,
                             paddingLeft: 3, fontWeight: 700 }}>
                 💾 Bổn cung đã tra câu này, dữ liệu chưa đổi nên dùng lại
               </div>
@@ -433,7 +433,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
                   }} />
                 ))}
               </div>
-              <span style={{ fontSize: 12.5, color: C.plumSoft, fontWeight: 600,
+              <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600,
                              lineHeight: 1.5, fontStyle: "italic" }}>
                 {loiCho}
               </span>
@@ -445,19 +445,19 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
               <div style={{ padding: "10px 13px", borderRadius: R.md,
                             background: C.surfaceSunk, border: `1px dashed ${C.line}`,
                             animation: `vmpHienNhe 400ms ${MO.ease}` }}>
-                <div style={{ fontSize: 10, color: C.plumSoft, fontWeight: 800,
+                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800,
                               letterSpacing: 0.4, marginBottom: 5, opacity: 0.75 }}>
                   {mauCho.loai === "tho" ? "🌸 CÔNG CHÚA NGÂM THƠ"
                     : mauCho.loai === "nguyen_tac" ? "📖 NHÂN TIỆN, MỘT NGUYÊN TẮC GMP"
                     : "💡 MÁCH NHỎ"}
                 </div>
-                <div style={{ fontSize: 12.5, color: C.plum, lineHeight: 1.7,
+                <div style={{ fontSize: 12, color: C.plum, lineHeight: 1.7,
                               whiteSpace: "pre-wrap",
                               fontStyle: mauCho.loai === "tho" ? "italic" : "normal" }}>
                   {mauCho.noi_dung}
                 </div>
                 {mauCho.nguon && (
-                  <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 6,
+                  <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 6,
                                 fontWeight: 700, opacity: 0.8 }}>
                     — {mauCho.nguon}
                   </div>
@@ -483,7 +483,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
             style={{ flex: 1, resize: "none", maxHeight: 110, padding: "10px 12px",
                      borderRadius: R.md, border: `1px solid ${C.line}`,
                      background: C.surfaceSunk, color: C.plum, fontFamily: TEXT,
-                     fontSize: 13, lineHeight: 1.5, outline: "none" }} />
+                     fontSize: 14, lineHeight: 1.5, outline: "none" }} />
           <button onClick={() => hoi(q)} disabled={!q.trim() || dangHoi} title="Gửi"
             style={{ width: 40, height: 40, flexShrink: 0, borderRadius: R.md,
                      border: "none", cursor: q.trim() && !dangHoi ? "pointer" : "default",
@@ -496,7 +496,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
         {/* Một câu là đủ. Bản cũ nói cả chuyện ghi nhật ký ALCOA+ lẫn
             chuyện đối chiếu lại trên bảng — dài, và người dùng đọc lướt
             qua hết. Giữ đúng điều họ cần nhớ. */}
-        <div style={{ fontSize: 10.5, color: C.plumSoft, marginTop: 7, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 7, lineHeight: 1.5 }}>
           Bổn cung vẫn có thể nhầm.
         </div>
       </div>
