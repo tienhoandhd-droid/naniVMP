@@ -59,6 +59,12 @@ function uniqSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
 }
 
+/* Mã bộ phận hiển thị THỐNG NHẤT một kiểu. Bảng đang in thẳng id trong DB
+   ("xsx", "qc", "cd") trong khi chỗ khác dùng "XSX", "QC – Kiểm nghiệm" —
+   cùng một bộ phận mà ba cách viết thì người đọc phải tự ghép. */
+const maBoPhan = (ds: string[]): string =>
+  ds.map((d) => DEPTS.find((x) => x.id === d)?.short || d.toUpperCase()).join(" + ");
+
 export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [deptScope, setDeptScope] = useState("all");
   const [areaSel, setAreaSel] = useState<string[]>([]);
@@ -101,7 +107,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     }
     const nay = new Date().getFullYear();
     nam.add(nay); nam.add(nay + 1);
-    return [...nam].sort((x, y) => y - x).map((y) => ({ v: String(y), l: `Năm ${y}` }));
+    /* Năm HIỆN TẠI đứng đầu, rồi mới tới các năm khác giảm dần. Sắp giảm dần
+       thuần tuý đẩy "Năm 2027" — một năm chưa xảy ra — lên trên "Năm 2026",
+       nên mục đầu danh sách lại là mục ít ai cần nhất. */
+    const con = [...nam].filter((y) => y !== nay).sort((x, y) => y - x);
+    return [nay, ...con].map((y) => ({ v: String(y), l: `Năm ${y}${y === nay ? " (năm nay)" : ""}` }));
   }, [acts]);
 
   // ===== Bộ lọc dữ liệu báo cáo quản lý — lấy số liệu theo bất kỳ lát cắt nào =====
@@ -334,8 +344,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(batCap), "Bất cập theo bộ phận");
 
     const thangToi = [
-      ["Mã", "Tên", "Bộ phận", "Người thực hiện", "Hạn đích VMP", "Mức trọng yếu"],
-      ...nextMonth.items.map((it) => [it.code, it.name, it.depts.join("+"), it.owner, it.target, it.crit]),
+      ["Mã", "Tên", "Loại thẩm định", "Bộ phận", "Người thực hiện", "Hạn đích VMP", "Mức trọng yếu"],
+      ...nextMonth.items.map((it) => [it.code, it.name, it.vtype, maBoPhan(it.depts), it.owner, it.target, it.crit]),
     ];
     // Tên sheet Excel KHÔNG được chứa / \\ ? * [ ] và tối đa 31 ký tự —
     // periodLabel trả "tháng 8/2026" có dấu / nên phải làm sạch, không thì
@@ -630,14 +640,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <TableScroll maxHeight={340}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720, marginTop: 12 }}>
             <thead><tr>
-              <th style={th}>Mã</th><th style={th}>Tên</th><th style={th}>Bộ phận</th>
+              <th style={th}>Mã</th><th style={th}>Tên</th><th style={th}>Loại thẩm định</th><th style={th}>Bộ phận</th>
               <th style={th}>Người thực hiện</th><th style={th}>Hạn đích VMP</th><th style={th}>Trọng yếu</th>
             </tr></thead>
             <tbody>
               {nextMonth.items.slice(0, 200).map((it) => (
                 <tr key={it.id}>
                   <td style={{ ...td, fontFamily: NUM }}>{it.code}</td><td style={td}>{it.name}</td>
-                  <td style={td}>{it.depts.join("+")}</td><td style={td}>{it.owner}</td>
+                  <td style={td}>{it.vtype}</td>
+                  <td style={td}>{maBoPhan(it.depts)}</td><td style={td}>{it.owner}</td>
                   <td style={{ ...td, fontFamily: NUM }}>{it.target}</td><td style={td}>{it.crit}</td>
                 </tr>
               ))}

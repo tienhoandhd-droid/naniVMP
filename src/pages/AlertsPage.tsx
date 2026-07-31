@@ -21,7 +21,7 @@ import {
   parseD, fmtVN, daysBetween, addMonths, txt, nguoiPhuTrach, milestones,
   qrmRpn, qrmLevel, byRisk,
 } from "../utils/helpers.ts";
-import { Card, CardTitle, Tag, KpiCard, Modal, Pill } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, KpiCard, Modal, Pill, PhanTrang, CauKetLuan } from "../components/ui/Primitives.tsx";
 import { useDebounce, usePerformers } from "../hooks/index.ts";
 import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT } from "../lib/aiReport.ts";
 import AiMailModal from "../components/ai/AiMailModal.tsx";
@@ -285,6 +285,43 @@ export function AlertDetailModal({ r, email, onClose }: {
   );
 }
 
+/** Một cụm cảnh báo — mở ra mới hiện từng hạng mục bên trong. */
+function CumRow({ c, email, onOpen }: {
+  c: { khoa: string; ten: string; rows: AlertRow[]; treNhat: number; nguoi: string[]; rpn: number };
+  email: (ten?: string) => string | undefined | null;
+  onOpen: (r: AlertRow) => void;
+}) {
+  const [mo, setMo] = useState(false);
+  const tre = c.treNhat < 0;
+  return (
+    <div style={{ border: `1px solid ${tre ? C.raspSoft : C.pinkSoft}`, borderRadius: 14, overflow: "hidden" }}>
+      <button type="button" onClick={() => setMo((v) => !v)}
+        style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+                 padding: "12px 14px", border: "none", cursor: "pointer",
+                 background: tre ? C.raspSoft : C.surface, fontFamily: TEXT }}>
+        <span style={{ fontFamily: NUM, fontSize: 15, fontWeight: 900,
+                       color: tre ? C.raspText : C.plum, minWidth: 30 }}>{c.rows.length}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: C.plum,
+                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.ten}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+            {c.rows.length} hạng mục
+            {tre ? ` · trễ nhất ${Math.abs(c.treNhat)} ngày` : ` · sớm nhất còn ${c.treNhat} ngày`}
+            {c.nguoi.length ? ` · ${c.nguoi.join(", ")}` : " · chưa có người"}
+          </span>
+        </span>
+        <Tag color={C.raspText} bg={C.raspSoft}>RPN {c.rpn}</Tag>
+        <span style={{ color: C.plumSoft, fontWeight: 900 }}>{mo ? "▾" : "▸"}</span>
+      </button>
+      {mo && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, background: C.surfaceSunk }}>
+          {c.rows.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={email(r.a.owner)} onOpen={onOpen} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AlertsView({ acts }: { acts: Activity[] }) {
   const [tab, setTab] = useState<"list" | "matrix">("list");
   const [bucket, setBucket] = useState<AlertRow["kind"]>("over");
@@ -295,7 +332,14 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("risk");
   const [detail, setDetail] = useState<AlertRow | null>(null);
-  const [hien, setHien] = useState(40);          // số dòng đang dựng thật
+  /* Phân trang thật thay nút "Hiện thêm" (268 dòng = bấm 6 lần). */
+  const [trang, setTrang] = useState(0);
+  const [coTrang, setCoTrang] = useState(50);
+  /* Gom nhóm. Danh sách phẳng ở đây gần như vô dụng: hàng chục dòng liên
+     tiếp cùng "RPN 27 · Rủi ro cao · Quá hạn" nên sắp theo RPN không tách
+     được gì. Người vận hành xử theo CỤM (một hệ thống, một người, một đợt),
+     không xử theo từng dòng. */
+  const [gom, setGom] = useState(true);
   // Phân tích AI cho đúng bộ phận đang lọc. Không dùng bộ lọc còn lại (mức
   // rủi ro, người, từ khoá) vì n8n đọc lại số từ Supabase chứ không nhận
   // danh sách từ trình duyệt — nói "đã lọc" mà số không khớp thì tệ hơn là
@@ -365,9 +409,6 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     return out;
   };
 
-  // Đổi nhóm hoặc đổi bộ lọc thì cuộn lại từ 40 dòng đầu.
-  useEffect(() => { setHien(40); }, [bucket, dept, win, level, owner, kw, sort]);
-
   const byKind = useMemo(() => {
     const g: Record<AlertRow["kind"], AlertRow[]> = { over: [], soon: [], requal: [], risk: [] };
     all.filter(pass).forEach((r) => g[r.kind].push(r));
@@ -376,9 +417,46 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all, dept, win, level, owner, kw, sort]);
 
+  /* Đếm hạng mục mà điểm trọng yếu chưa có dấu QA duyệt. Không có trường đó
+     trong bản đang tải thì để 0 và câu chữ tự chuyển sang cách nói không
+     khẳng định con số. */
+  const soChuaDuyet = useMemo(
+    () => acts.filter((a) => {
+      const r = (a._raw || {}) as Record<string, unknown>;
+      return "qa_approved_at" in r && !r.qa_approved_at;
+    }).length,
+    [acts],
+  );
+
   const shown = byKind[bucket];
-  // Đổi nhóm hay đổi bộ lọc thì quay về 40 dòng đầu.
-  const shownCut = shown.slice(0, hien);
+  const shownCut = useMemo(
+    () => (coTrang > 0 ? shown.slice(trang * coTrang, (trang + 1) * coTrang) : shown),
+    [shown, trang, coTrang],
+  );
+
+  /* Cụm = nhóm việc (work_group) nếu có, không thì lấy mã đối tượng. Cùng
+     một hệ thống nước thì ba hạng mục của nó phải nằm chung một dòng. */
+  const cum = useMemo(() => {
+    const m = new Map<string, { ten: string; rows: AlertRow[] }>();
+    for (const r of shown) {
+      const k = String(r.a.group || r.a.obj || r.a.code || "—");
+      if (!m.has(k)) m.set(k, { ten: String(r.a.group || r.a.objName || r.a.obj || k), rows: [] });
+      m.get(k)!.rows.push(r);
+    }
+    return [...m.entries()]
+      .map(([khoa, v]) => {
+        const treNhat = Math.min(...v.rows.map((r) => r.dleft));
+        const nguoi = [...new Set(v.rows.map((r) => String(r.a.owner || "")).filter((x) => x && x !== "—"))];
+        const rpn = Math.max(...v.rows.map((r) => qrmRpn(r.a)));
+        return { khoa, ten: v.ten, rows: v.rows, treNhat, nguoi, rpn };
+      })
+      .sort((x, y) => x.treNhat - y.treNhat || y.rows.length - x.rows.length);
+  }, [shown]);
+  const cumCat = useMemo(
+    () => (coTrang > 0 ? cum.slice(trang * coTrang, (trang + 1) * coTrang) : cum),
+    [cum, trang, coTrang],
+  );
+  useEffect(() => { setTrang(0); }, [bucket, dept, win, level, owner, kw, sort, gom]);
   const moKho = useCallback((r: AlertRow) => setDetail(r), []);
   const hasFilter = dept !== "all" || win !== "all" || level !== "all" || owner !== "all" || !!kw;
 
@@ -452,6 +530,16 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             ))}
           </div>
 
+          {/* Thứ tự ưu tiên trên màn này do RPN quyết định, mà RPN tính từ
+              điểm trọng yếu — vốn là ĐỀ XUẤT CỦA MÁY cho tới khi QA sửa tay.
+              Trang "Luật đang áp dụng" có ghi điều đó, nhưng người dùng màn
+              Cảnh báo không sang trang kia. Nói ngay tại chỗ đang dùng. */}
+          <CauKetLuan
+            tone="warn"
+            chinh={`Thứ tự ưu tiên dưới đây dựa trên điểm rủi ro do máy chấm${soChuaDuyet ? ` — ${soChuaDuyet} hạng mục chưa được QA duyệt điểm` : ", chưa qua QA duyệt"}.`}
+            phu="Điểm máy chấm là đề xuất, không thay đánh giá của QA. Xem cách chấm và duyệt lại ở màn Luật đang áp dụng."
+          />
+
           {/* Bộ lọc: bộ phận · thời gian · mức rủi ro · người thực hiện · tìm kiếm */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "12px 15px", borderRadius: 18, background: "rgba(248,245,252,.6)", border: `1px solid ${C.pinkSoft}` }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 800, color: C.plumSoft }}><Filter size={15} /> Lọc</span>
@@ -471,6 +559,13 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 <button key={k} type="button" onClick={() => setWin(k)} style={chip(win === k)}>{label}</button>
               ))}
             </div>
+            {/* Gom cụm mặc định BẬT: danh sách phẳng ở đây là hàng chục dòng
+                liên tiếp cùng "RPN 27 · Rủi ro cao · Quá hạn", sắp xếp không
+                tách được gì vì mọi dòng giống hệt nhau. */}
+            <button type="button" onClick={() => setGom((v) => !v)} style={chip(gom)}
+              title="Gom các hạng mục cùng một nhóm việc / một đối tượng thành một dòng">
+              {gom ? "Đang gom cụm" : "Danh sách phẳng"}
+            </button>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "6px 12px" }}>
               <Search size={14} color={C.plumSoft} />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, người…"
@@ -496,12 +591,12 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 Lịch tái thẩm định ({shown.length})
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
-                {shown.length > shownCut.length && (
-                  <button type="button" onClick={() => setHien((n) => n + 60)}
-                    style={{ ...selStyle, alignSelf: "center", marginTop: 4 }}>
-                    Hiện thêm — đang xem {shownCut.length}/{shown.length}
-                  </button>
+                {gom
+                  ? cumCat.map((c) => <CumRow key={c.khoa} c={c} email={(t) => find(t)?.email ?? undefined} onOpen={moKho} />)
+                  : shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
+                {shown.length > 0 && (
+                  <PhanTrang tong={gom ? cum.length : shown.length} trang={trang} setTrang={setTrang}
+                    coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "cụm" : "hạng mục"} />
                 )}
                 {!shown.length && <div style={{ textAlign: "center", padding: 20, color: C.plumSoft, fontWeight: 600 }}>{hasFilter ? "Không có lịch tái thẩm định khớp bộ lọc." : "Chưa có lịch tái thẩm định."}</div>}
               </div>
@@ -516,12 +611,12 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 {KIND_LABEL[bucket]} ({shown.length})
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
-                {shown.length > shownCut.length && (
-                  <button type="button" onClick={() => setHien((n) => n + 60)}
-                    style={{ ...selStyle, alignSelf: "center", marginTop: 4 }}>
-                    Hiện thêm — đang xem {shownCut.length}/{shown.length}
-                  </button>
+                {gom
+                  ? cumCat.map((c) => <CumRow key={c.khoa} c={c} email={(t) => find(t)?.email} onOpen={moKho} />)
+                  : shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
+                {shown.length > 0 && (
+                  <PhanTrang tong={gom ? cum.length : shown.length} trang={trang} setTrang={setTrang}
+                    coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "cụm" : "hạng mục"} />
                 )}
                 {!shown.length && (
                   <div style={{ textAlign: "center", padding: 30, color: C.mintText, fontWeight: 700 }}>

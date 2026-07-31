@@ -11,7 +11,7 @@ import { Boxes, Search, Pencil, ChevronRight, Layers, ExternalLink } from "lucid
 import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
 import { CLS, DEPTS } from "../constants/vmp.ts";
 import { parseD, fmtVN, txt, wlIsDone } from "../utils/helpers.ts";
-import { Card, Tag, Pill } from "../components/ui/Primitives.tsx";
+import { Card, Tag, Pill, PhanTrang } from "../components/ui/Primitives.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import KhongThamDinhCard from "../components/catalog/KhongThamDinhCard.tsx";
 import { useDebounce } from "../hooks/index.ts";
@@ -123,7 +123,9 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   const [quick, setQuick] = useState(false);
   /** Số nhóm dựng thật — 272 đối tượng dựng một lúc là thừa, mắt chỉ đọc được
    *  vài chục dòng đầu. */
-  const [hien, setHien] = useState(40);
+  // Phân trang thật thay nút "Hiện thêm" — xem PhanTrang trong Primitives.
+  const [trang, setTrang] = useState(0);
+  const [coTrang, setCoTrang] = useState(50);
 
   /** Danh sách phẳng đúng thứ tự đang hiện trên màn — hộp sửa dùng nó để nhảy
    *  sang hạng mục kế tiếp mà không phải đóng ra mở vào. Đây chính là cách
@@ -180,11 +182,16 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   }, [objects, acts, kw, cls, dept, status, year, tdinh]);
 
   const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
-  // Đổi bộ lọc thì quay lại 40 nhóm đầu.
-  useEffect(() => { setHien(40); }, [kw, cls, dept, status, year, tdinh]);
+  // Lát cắt đang dựng; coTrang = 0 là "Tất cả".
+  const lat = useMemo(
+    () => (coTrang > 0 ? groups.slice(trang * coTrang, (trang + 1) * coTrang) : groups),
+    [groups, trang, coTrang],
+  );
+  // Đổi bộ lọc thì về trang đầu.
+  useEffect(() => { setTrang(0); }, [kw, cls, dept, status, year, tdinh]);
   const danhSachPhang = useMemo(
-    () => groups.slice(0, hien).flatMap((g) => groupByType(g.items).flatMap((t) => t.items)),
-    [groups, hien],
+    () => lat.flatMap((g) => groupByType(g.items).flatMap((t) => t.items)),
+    [lat],
   );
 
   const toggle = (code: string) => setOpen((p) => ({ ...p, [code]: !p[code] }));
@@ -227,7 +234,7 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
       </Card>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {groups.slice(0, hien).map((g) => {
+        {lat.map((g) => {
           const o = g.obj;
           const cl = (CLS as Record<string, typeof CLS.tb>)[String(o.cls ?? "tb")] || CLS.tb;
           const dp = DEPTS.find((d) => d.id === o.dept);
@@ -382,11 +389,9 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
             </Card>
           );
         })}
-        {groups.length > hien && (
-          <button onClick={() => setHien((n) => n + 60)}
-            style={{ ...btnPrimary, alignSelf: "center", padding: "10px 20px", borderRadius: 12, fontSize: 13 }}>
-            Hiện thêm — đang xem {hien}/{groups.length} đối tượng
-          </button>
+        {groups.length > 0 && (
+          <PhanTrang tong={groups.length} trang={trang} setTrang={setTrang}
+            coTrang={coTrang} setCoTrang={setCoTrang} donVi="đối tượng" />
         )}
         {!groups.length && <Card><div style={{ textAlign: "center", padding: 30, color: C.plumSoft, fontWeight: 600 }}>Không có đối tượng phù hợp bộ lọc.</div></Card>}
       </div>

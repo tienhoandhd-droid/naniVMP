@@ -932,9 +932,38 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
   const tuoi = tuoiDuLieu(dataUpdatedAt);
   const ageMs = tuoi ? tuoi.ms : null;
   const stale = !!tuoi?.cu;
+  const [mo, setMo] = useState(false);
   if (conn.status === "ok" && lastSync && !stale) return null;
   const isErr = conn.status === "err";
   const isStaleOnly = conn.status === "ok" && stale;
+
+  const noiDung = conn.status === "loading" ? "Đang đồng bộ dữ liệu…"
+    : isErr ? `Lỗi kết nối: ${conn.msg}`
+      : isStaleOnly ? `Dữ liệu có thể đã CŨ — không có thay đổi nào trong ~${Math.round((ageMs || 0) / 3600000)} giờ. Kiểm tra đồng bộ Sheet→Supabase (WF-04).`
+        : "Dữ liệu chưa đồng bộ. Bấm Làm mới để tải.";
+
+  /* Dữ liệu CŨ thu thành một dải mảnh bấm được, không phải khối cảnh báo
+     chiếm nguyên một hàng trên MỌI màn hình. Lý do: tình trạng này kéo dài
+     nhiều ngày liền, mà một cảnh báo hiện liên tục nhiều ngày thì người ta
+     thôi không đọc nữa — vừa mất chỗ vừa mất tác dụng.
+     LỖI KẾT NỐI thì vẫn bung hết: đó là chuyện phải xử ngay. */
+  const thuGon = isStaleOnly && !mo;
+  if (thuGon) {
+    return (
+      <button type="button" onClick={() => setMo(true)}
+        title={noiDung}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 12,
+          padding: "5px 12px", borderRadius: 999, cursor: "pointer",
+          background: C.marigoldSoft, border: `1px solid ${C.marigold}`,
+          color: C.marigoldText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800,
+        }}>
+        <span style={{ width: 8, height: 8, borderRadius: 999, background: C.marigold, flex: "none" }} />
+        Dữ liệu cũ ~{Math.round((ageMs || 0) / 3600000)}h — bấm để xem
+      </button>
+    );
+  }
+
   return (
     <div style={{
       padding: "10px 14px", borderRadius: 12, marginBottom: 16,
@@ -945,12 +974,7 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
       display: "flex", alignItems: "center", gap: 8,
     }}>
       <span>{isErr ? "⚠️" : "⏳"}</span>
-      <span>
-        {conn.status === "loading" ? "Đang đồng bộ dữ liệu…" :
-         isErr ? `Lỗi kết nối: ${conn.msg}` :
-         isStaleOnly ? `Dữ liệu có thể đã CŨ — không có thay đổi nào trong ~${Math.round((ageMs || 0) / 3600000)} giờ. Kiểm tra đồng bộ Sheet→Supabase (WF-04).` :
-         "Dữ liệu chưa đồng bộ. Bấm Làm mới để tải."}
-      </span>
+      <span>{noiDung}</span>
       {dataUpdatedAt ? (
         <span style={{ marginLeft: "auto", fontWeight: 600, opacity: 0.8 }}>
           Cập nhật dữ liệu: {new Date(dataUpdatedAt).toLocaleString("vi-VN")}
@@ -959,6 +983,92 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
         <span style={{ marginLeft: "auto", fontWeight: 600, opacity: 0.8 }}>
           Đồng bộ cuối: {new Date(lastSync).toLocaleTimeString("vi-VN")}
         </span>
+      )}
+      {isStaleOnly && (
+        <button type="button" onClick={() => setMo(false)} aria-label="Thu gọn"
+          style={{ border: "none", background: "transparent", cursor: "pointer",
+                   color: C.marigoldText, fontWeight: 900, fontSize: 15, lineHeight: 1, padding: "0 2px" }}>
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ======================== PHÂN TRANG ========================
+ * Thay nút "Hiện thêm" đơn độc. Nút đó bắt bấm 6–7 lần mới thấy hết danh
+ * sách (Cảnh báo 40/268, Cập nhật tiến độ 60/461), không nhảy được tới cuối,
+ * không xem được tất cả, và mỗi lần bấm là một lần mất chỗ đang đọc.
+ *
+ * Ở đây: chọn số dòng mỗi trang (50/100/200/500/tất cả) + nhảy trang. Vẫn
+ * giữ cách dựng "cắt danh sách" cũ nên không đụng tới logic lọc/sắp xếp của
+ * từng trang — chỉ đổi cách chọn lát cắt.
+ */
+export const CO_TRANG = [50, 100, 200, 500];
+
+export function PhanTrang({ tong, trang, setTrang, coTrang, setCoTrang, donVi = "dòng" }: {
+  tong: number;
+  /** Trang hiện tại, đếm từ 0. */
+  trang: number;
+  setTrang: (n: number) => void;
+  /** Số dòng mỗi trang; 0 = hiện tất cả. */
+  coTrang: number;
+  setCoTrang: (n: number) => void;
+  donVi?: string;
+}) {
+  const soTrang = coTrang > 0 ? Math.max(1, Math.ceil(tong / coTrang)) : 1;
+  const tu = coTrang > 0 ? trang * coTrang + 1 : 1;
+  const den = coTrang > 0 ? Math.min(tong, (trang + 1) * coTrang) : tong;
+  if (!tong) return null;
+
+  const nut = (n: number, nhan: ReactNode, bat = false) => (
+    <button key={`${nhan}`} type="button" onClick={() => setTrang(n)} disabled={bat}
+      aria-current={n === trang ? "page" : undefined}
+      style={{
+        minWidth: 32, height: 32, padding: "0 9px", borderRadius: 9, cursor: bat ? "default" : "pointer",
+        border: `1px solid ${n === trang ? C.pinkText : C.line}`,
+        background: n === trang ? C.pinkMist : C.surface,
+        color: bat ? C.plumSoft : n === trang ? C.pinkText : C.plum,
+        fontFamily: NUM, fontSize: 12.5, fontWeight: 800, opacity: bat ? 0.45 : 1,
+      }}>
+      {nhan}
+    </button>
+  );
+
+  // Cửa sổ trang quanh trang hiện tại — 20 trang mà in hết thì lại thành một
+  // hàng số dài không ai đọc.
+  const cua: number[] = [];
+  const dau = Math.max(0, Math.min(trang - 2, soTrang - 5));
+  for (let i = dau; i < Math.min(soTrang, dau + 5); i += 1) cua.push(i);
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      padding: "12px 4px", fontFamily: TEXT,
+    }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
+        Đang xem <b style={{ color: C.plum, fontFamily: NUM }}>{tu}–{den}</b> / {tong} {donVi}
+      </span>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>Mỗi trang</span>
+        <select value={String(coTrang)} onChange={(e) => { setCoTrang(Number(e.target.value)); setTrang(0); }}
+          aria-label="Số dòng mỗi trang"
+          style={{ padding: "6px 9px", borderRadius: 9, border: `1px solid ${C.line}`,
+                   background: C.surface, color: C.plum, fontFamily: TEXT, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+          {CO_TRANG.map((n) => <option key={n} value={n}>{n}</option>)}
+          <option value={0}>Tất cả</option>
+        </select>
+      </div>
+
+      {coTrang > 0 && soTrang > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          {nut(0, "«", trang === 0)}
+          {nut(Math.max(0, trang - 1), "‹", trang === 0)}
+          {cua.map((i) => nut(i, i + 1))}
+          {nut(Math.min(soTrang - 1, trang + 1), "›", trang >= soTrang - 1)}
+          {nut(soTrang - 1, "»", trang >= soTrang - 1)}
+        </div>
       )}
     </div>
   );

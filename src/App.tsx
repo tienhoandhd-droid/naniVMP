@@ -772,16 +772,44 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                             ))}
                           </div>
                         ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {g.ds.slice(0, soHien).map((it, i) => (
-                              <div key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12.5, padding: "6px 0", borderTop: i ? `1px solid ${C.pinkMist}` : "none" }}>
-                                <span style={{ fontFamily: NUM, fontWeight: 800, color: sv.mau, minWidth: 165 }}>{it.id}</span>
-                                <span style={{ color: C.plumSoft, fontWeight: 600 }}>{it.msg}</span>
+                          /* Gộp các dòng CÙNG MỘT CÂU. Trước đây "Lương Minh
+                             Hằng chưa có email" lặp y nguyên 8 lần trong một
+                             danh sách 64 vấn đề — đọc 8 lần vẫn chỉ là một
+                             việc phải làm: điền một địa chỉ email. */
+                          (() => {
+                            const theoCau = new Map<string, string[]>();
+                            for (const it of g.ds) {
+                              if (!theoCau.has(it.msg)) theoCau.set(it.msg, []);
+                              theoCau.get(it.msg)!.push(String(it.id));
+                            }
+                            const dong = [...theoCau.entries()].sort((a, b) => b[1].length - a[1].length);
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {dong.slice(0, soHien).map(([cau, ids], i) => (
+                                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12.5, padding: "6px 0", borderTop: i ? `1px solid ${C.pinkMist}` : "none", flexWrap: "wrap" }}>
+                                    <span style={{ fontFamily: NUM, fontWeight: 800, color: sv.mau, minWidth: 165 }}>
+                                      {ids.length > 1 ? `${ids.length} hạng mục` : ids[0]}
+                                    </span>
+                                    <span style={{ color: C.plumSoft, fontWeight: 600, flex: 1, minWidth: 200 }}>{cau}</span>
+                                    {ids.length > 1 && (
+                                      <span title={ids.join("\n")}
+                                        style={{ fontFamily: NUM, fontSize: 11, fontWeight: 700, color: C.plumSoft, opacity: .8 }}>
+                                        {ids.slice(0, 3).join(", ")}{ids.length > 3 ? `… (+${ids.length - 3})` : ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                                {dong.length > soHien && (
+                                  <button onClick={() => setHien((p) => ({ ...p, [g.type]: soHien + 50 }))}
+                                    style={{ ...nutNho, marginTop: 6, alignSelf: "flex-start" }}>
+                                    Hiện thêm — đang xem {soHien}/{dong.length} loại
+                                  </button>
+                                )}
                               </div>
-                            ))}
-                          </div>
+                            );
+                          })()
                         )}
-                        {g.ds.length > soHien && (
+                        {giongNhau && g.ds.length > soHien && (
                           <button onClick={() => setHien((p) => ({ ...p, [g.type]: soHien + 50 }))}
                             style={{ ...nutNho, marginTop: 10 }}>
                             Hiện thêm — đang xem {soHien}/{g.ds.length}
@@ -1629,6 +1657,7 @@ function GlobalFilterBar({
   const toggleDept = (v: string) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
   const toggleArea = (v: string) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
   const active = deptSel.length > 0 || areaSel.length > 0 || !!customFrom || !!customTo || onlyMine;
+  const soLoc = deptSel.length + areaSel.length + (customFrom || customTo ? 1 : 0);
   const resetAll = () => { setDeptSel([]); setAreaSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); setOnlyMine(false); };
   // Thời gian CHỈ theo mốc ngày: có nhập ngày -> bật lọc "custom"; xoá hết -> "all".
   const onFrom = (v: string) => { setCustomFrom(v); setPeriod((v || customTo) ? "custom" : "all"); };
@@ -1651,14 +1680,6 @@ function GlobalFilterBar({
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 16, background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
-      {/* Thời gian: CHỈ theo mốc ngày (từ → đến). Để trống = mọi thời gian. */}
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 800, color: C.plumSoft }}><Filter size={14} /> Thời gian</span>
-        <input type="date" value={customFrom} onChange={(e) => onFrom(e.target.value)} style={dateInp} aria-label="Từ ngày" />
-        <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
-        <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} style={dateInp} aria-label="Đến ngày" />
-      </div>
-
       {/* Việc của tôi — lọc theo QA phụ trách khớp tên người đang đăng nhập.
           Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
           vào trong hộp thì coi như không có. */}
@@ -1676,12 +1697,22 @@ function GlobalFilterBar({
 
       {/* + Lọc (Bộ phận / Khu vực) */}
       <div ref={popRef} style={{ position: "relative" }}>
+        {/* Hai ô chọn ngày đã chuyển VÀO hộp này. Chúng chiếm cố định ~230px
+            trên mọi màn hình cho một thao tác thỉnh thoảng mới dùng, trong khi
+            phần đầu trang đã ngốn gần 1/3 chiều cao trước khi thấy nội dung.
+            Số bộ lọc đang bật hiện ngay trên nút nên không giấu mất trạng thái. */}
         <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="true" aria-expanded={open}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, border: `1px dashed ${C.pink}`, background: open ? C.pinkMist : "transparent", color: C.pinkText, fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
-          <Plus size={14} /> Lọc
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, border: `1px dashed ${soLoc ? C.pinkText : C.pink}`, background: open || soLoc ? C.pinkMist : "transparent", color: C.pinkText, fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
+          <Plus size={14} /> Bộ lọc{soLoc ? ` (${soLoc})` : ""}
         </button>
         {open && (
-          <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 250, maxHeight: 340, overflowY: "auto", background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
+          <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 274, maxHeight: 380, overflowY: "auto", background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
+            <div style={{ margin: "6px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khoảng thời gian</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 8px 8px" }}>
+              <input type="date" value={customFrom} onChange={(e) => onFrom(e.target.value)} style={{ ...dateInp, flex: 1 }} aria-label="Từ ngày" />
+              <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
+              <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} style={{ ...dateInp, flex: 1 }} aria-label="Đến ngày" />
+            </div>
             <div style={{ margin: "6px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
             {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, ((DEPT_CHIP as Record<string, { dot?: string }>)[o.v] || {}).dot || C.pink))}
             <div style={{ margin: "8px 8px 3px", fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
@@ -2036,7 +2067,12 @@ export default function App() {
             {acts.length > 0 && <SyncBanner conn={conn} lastSync={lastSync} dataUpdatedAt={dataUpdatedAt} />}
 
             {/* Bộ lọc TOÀN CỤC (khu vực + thời gian) — áp cho mọi trang có dữ liệu */}
-            {acts.length > 0 && view !== "audit" && view !== "admin" && view !== "missing" && (
+            {/* Trang "Luật đang áp dụng" đọc thẳng cấu hình từ database, không
+                hiển thị hạng mục nào — thanh lọc ở đó là một bộ điều khiển
+                không điều khiển gì, lại còn ghi "461/461 hạng mục" trên một
+                trang không có hạng mục. Ẩn đi. */}
+            {acts.length > 0 && view !== "audit" && view !== "admin" && view !== "missing"
+              && view !== "rules" && (
               <GlobalFilterBar
                 areaSel={areaSel} setAreaSel={setAreaSel}
                 deptSel={deptSel} setDeptSel={setDeptSel}

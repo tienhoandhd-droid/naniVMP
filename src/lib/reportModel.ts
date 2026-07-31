@@ -384,6 +384,10 @@ export function stageBottleneck(acts: Activity[]): DeptBottleneckRow[] {
 export interface NextMonthItem {
   id: string; code: string; name: string; depts: string[];
   target: string; owner: string; crit: string;
+  /** Loại thẩm định (OQ/PQ/IQ…). Thiếu cột này thì một đối tượng có hai
+   *  loại thẩm định hiện thành hai dòng y hệt nhau — trông như dữ liệu bị
+   *  nhân đôi, và người dùng báo lỗi đúng như vậy. */
+  vtype: string;
 }
 
 export interface NextMonthByDept { dept: string; label: string; count: number }
@@ -403,7 +407,8 @@ export function periodWork(acts: Activity[], p: Period): NextMonthWork {
     id: a.id, code: a.code, name: a.name || a.code,
     depts: (Array.isArray(a.depts) && a.depts.length) ? a.depts : [a.dept || "qa"],
     target: hanVmp(a) || "", owner: a.owner || "Chưa phân công", crit: a.crit || "TB",
-  })).sort((x, y) => x.target.localeCompare(y.target));
+    vtype: String(a.vtype || a.type || "—"),
+  })).sort((x, y) => x.target.localeCompare(y.target) || x.code.localeCompare(y.code));
 
   const countByDept = new Map<string, number>();
   for (const it of items) for (const d of it.depts) countByDept.set(d, (countByDept.get(d) || 0) + 1);
