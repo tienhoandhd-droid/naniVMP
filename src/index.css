@@ -6083,3 +6083,22 @@ body { transition: background var(--mo-slow) var(--ease); }
 @media (prefers-reduced-motion: reduce) {
   .vmp-lift-3d, .vmp-lift-3d:hover { transform: none; transition: none; }
 }
+
+/* Vương miện 3D ở panel tối màn đăng nhập. Đặt tuyệt đối, không nhận chuột,
+   nằm dưới lớp chữ (chữ có z-index 1) nên tiêu đề và slogan vẫn đọc rõ. */
+.vq-login-crown {
+  position: absolute;
+  /* Nằm gọn góc dưới–phải. Bản đầu tôi để giữa panel và vành vàng cắt ngang
+     chữ "V/Q TEAM" — khối kim loại nặng đi qua giữa dòng tiêu đề thì cả hai
+     cùng hỏng: chữ khó đọc, vương miện mất dáng. */
+  right: -66px;
+  bottom: -78px;
+  width: 340px;
+  height: 300px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .95;
+}
+@media (max-width: 900px) {
+  .vq-login-crown { width: 250px; height: 220px; right: -70px; bottom: -60px; }
+}
