@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "gen:types": "supabase gen types typescript --db-url \"$SUPABASE_DB_URL\" --schema public > src/types/database.ts",
-    "e2e": "node tests/e2e/luong-chinh.mjs && node tests/e2e/quet-tat-ca-man.mjs && node tests/e2e/giam-chuyen-dong.mjs"
+    "e2e": "node tests/e2e/luong-chinh.mjs && node tests/e2e/quet-tat-ca-man.mjs && node tests/e2e/giam-chuyen-dong.mjs",
+    "cham": "node tests/e2e/cham-giao-dien.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

@@ -69,8 +69,11 @@ function Nhan({ n, tam }: { n: MotNhan; tam: THREE.Vector3 }) {
     // Chuẩn hoá theo bán kính cảnh, và mờ TỐI ĐA 45%. Bản trước mờ tới 72%
     // nên nhãn ở nửa xa gần như biến mất — mờ là để lùi lớp, không phải để
     // xoá. Chỉ cần đủ để mắt biết nhãn nào thuộc mặt trước.
+    /* Mờ TỐI ĐA 30%, tức sàn 0.70. Đo bằng máy: ở mức mờ 0.55 thì tương
+       phản chữ tụt xuống 1.3:1–2:1, dưới xa ngưỡng WCAG 4.5:1 — nhãn lùi
+       lớp là đúng, nhưng lùi tới mức không đọc được thì thành lỗi. */
     const xa = THREE.MathUtils.clamp(sau / 3.2, 0, 1);
-    const mo = n.sang ? 1 : 1 - xa * 0.45;
+    const mo = n.sang ? 1 : 1 - xa * 0.3;
     el.style.opacity = String(mo);
     el.style.transform = `scale(${(n.sang ? 1.06 : 1) - xa * 0.1})`;
     // Nhãn ở xa lùi xuống dưới lớp nhãn gần, không tranh chỗ đọc.

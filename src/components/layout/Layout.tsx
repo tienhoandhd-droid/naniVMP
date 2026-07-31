@@ -142,7 +142,9 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
       </div>
 
       {/* Collapse toggle */}
-      <button onClick={() => setCollapsed(!collapsed)} style={{
+      <button
+        aria-label={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+        title={collapsed ? "Mở rộng menu" : "Thu gọn menu"} onClick={() => setCollapsed(!collapsed)} style={{
         position: "absolute", top: 26, right: collapsed ? "50%" : 12,
         transform: collapsed ? "translateX(50%)" : "none",
         width: 28, height: 28, borderRadius: 8, border: "none",
@@ -331,7 +333,9 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           <ShieldCheck size={14} /> {(user && PERM_LABEL[user.perm]) || user?.role}
         </span>
 
-        <button style={{
+        <button
+          aria-label="Thông báo"
+          title="Thông báo" style={{
           position: "relative", width: 42, height: 42,
           cursor: "pointer", ...glass,
           display: "flex", alignItems: "center", justifyContent: "center",

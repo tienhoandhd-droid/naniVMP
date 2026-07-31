@@ -42,7 +42,9 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   const kw = useDebounce(q.trim().toLowerCase(), 250);
   // Phân trang thật thay nút "Hiện thêm" (phải bấm 7 lần mới hết 461 dòng).
   const [trang, setTrang] = useState(0);
-  const [coTrang, setCoTrang] = useState(100);
+  // 50 dòng/trang: 100 dòng đẩy chiều cao trang lên ~9600px, tức gần 10 màn
+  // hình cuộn cho MỘT trang — phân trang mà vẫn phải cuộn dài thì chưa xong việc.
+  const [coTrang, setCoTrang] = useState(50);
   /* D18 — hàng đã ngừng (Không áp dụng / Đã huỷ) ẨN mặc định.
      Trước đây chúng nằm xen giữa danh sách làm việc với nhãn "⊘ Xem/khôi
      phục", nên mỗi lần quét mắt xuống là một lần phải phân biệt "dòng này
@@ -189,7 +191,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
               Hiện cả mục đã ngừng ({soNgung})
             </label>
           )}
-          <select value={fst} onChange={(e) => setFst(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 200 }}>
+          <select value={fst} onChange={(e) => setFst(e.target.value)} aria-label="Lọc theo trạng thái" style={{ ...INP, cursor: "pointer", maxWidth: 200 }}>
             <option value="all">Tất cả trạng thái</option>
             {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
