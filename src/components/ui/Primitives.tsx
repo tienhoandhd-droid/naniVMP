@@ -553,6 +553,35 @@ export function Card({ children, style, variant = "default", cls = "" }: {
   );
 }
 
+/* ======================== CÂU KẾT LUẬN CỦA BIỂU ĐỒ ========================
+ * Khác biệt giữa biểu đồ KHÁM PHÁ và biểu đồ THUYẾT MINH nằm ở đúng khối
+ * này: biểu đồ khám phá bày số ra để người xem tự mò; biểu đồ thuyết minh
+ * nói thẳng điều nó phát hiện, rồi mới đưa hình ra làm bằng chứng.
+ *
+ * Ba quy ước cố định, để mọi biểu đồ trong app nói cùng một giọng:
+ *  · Đặt TRÊN hình, không phải dưới — đọc kết luận trước, nhìn hình sau
+ *  · Câu chính là một MỆNH ĐỀ có số, không phải nhãn chủ đề
+ *    ("Xưởng sản xuất tháng 8 dồn gấp đôi" ≠ "Tải việc theo tháng")
+ *  · Câu phụ nói ĐIỀU NÊN LÀM hoặc vì sao con số đó đáng tin
+ *
+ * Sắc thái chỉ có ba: 'over' (cần hành động), 'warn' (đáng để ý),
+ * 'ok' (không phải làm gì). Màu ở đây là TRẠNG THÁI, không phải nhận dạng —
+ * không dùng để phân biệt chuỗi dữ liệu.
+ */
+export function CauKetLuan({ chinh, phu, tone = "ok" }: {
+  chinh: ReactNode;
+  phu?: ReactNode;
+  tone?: "ok" | "warn" | "over";
+}) {
+  if (!chinh) return null;
+  return (
+    <p className={`vmp-ketluan vmp-ketluan--${tone}`}>
+      <b>{chinh}</b>
+      {phu ? <span>{phu}</span> : null}
+    </p>
+  );
+}
+
 export function CardTitle({ icon: Icon, children, sub, right }: {
   icon?: LucideIcon;
   children?: ReactNode;

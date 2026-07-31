@@ -123,6 +123,10 @@ export function svgMonthlyTargetChart(
     // Tháng đang diễn ra dùng màu riêng: số là thật nhưng mới giữa kỳ, chưa
     // phải kết quả chốt — tô đỏ như tháng đã qua sẽ nặng hơn thực tế.
     const color = r.phase === "dang_dien_ra" ? pal.marigold : (r.meets ? pal.mint : pal.rasp);
+    // Nhãn số KHÔNG dùng màu cột. Màu cột là sắc giữa (mint #2A9E82 trên nền
+    // trắng chỉ đạt ~3.5:1) — đủ cho một khối tô lớn, không đủ cho chữ 10px.
+    // Dùng tông chữ đậm cùng họ: vẫn phân biệt được trạng thái, mà đọc được.
+    const inkColor = r.phase === "dang_dien_ra" ? pal.marigoldText : (r.meets ? pal.mintText : pal.raspText);
     const ket = r.phase === "dang_dien_ra"
       ? `đang diễn ra, tạm ${r.meets ? "đạt" : "dưới"} mục tiêu ${target}%`
       : `${r.meets ? "đạt" : "chưa đạt"} mục tiêu ${target}%`;
@@ -130,7 +134,7 @@ export function svgMonthlyTargetChart(
     bars += `<rect x="${cx - barW / 2}" y="${yOf(rate)}" width="${barW}" height="${h}" rx="4" fill="${color}">` +
       `<title>${esc(MONTH_LABEL[i])}: ${rate}% (${r.done}/${r.due} hạng mục) — ${ket}</title></rect>`;
     // Nhãn số — chỉ ở cột có dữ liệu, tránh rợp chữ.
-    bars += `<text x="${cx}" y="${yOf(rate) - 6}" font-size="10.5" font-weight="800" text-anchor="middle" fill="${color}">${rate}%</text>`;
+    bars += `<text x="${cx}" y="${yOf(rate) - 6}" font-size="10.5" font-weight="800" text-anchor="middle" fill="${inkColor}">${rate}%</text>`;
   });
 
   const axisLabels = rows.map((_r, i) =>
@@ -162,7 +166,13 @@ export function svgMonthlyTargetChart(
 
 export function svgDeptBottleneckChart(rows: DeptBottleneckRow[], pal: ChartPalette = SCREEN_PALETTE): string {
   const rowH = 30, gap = 8, padL = 96, padR = 46, padT = 10, padB = 34;
-  const chartRows = rows.slice(0, 8); // đủ 6 bộ phận thật + chừa chỗ nếu tách nhóm
+  // Bỏ bộ phận KHÔNG chậm ở cả ba giai đoạn. Vẽ ra thì chúng chiếm một
+  // dòng trống hoàn toàn — người đọc phải xác nhận "à, dòng này rỗng" cho
+  // từng dòng một. Bộ phận đó vẫn nằm đủ trong bảng ngay bên dưới.
+  const chartRows = rows
+    .filter((r) => r.overProtocol > 0 || r.overValidation > 0 || r.overReport > 0)
+    .slice(0, 8); // đủ 6 bộ phận thật + chừa chỗ nếu tách nhóm
+  if (!chartRows.length) return "";
   const W = 640;
   const H = padT + chartRows.length * (rowH + gap) + padB;
   const plotW = W - padL - padR;
@@ -173,17 +183,19 @@ export function svgDeptBottleneckChart(rows: DeptBottleneckRow[], pal: ChartPale
   chartRows.forEach((r, i) => {
     const y0 = padT + i * (rowH + gap);
     body += `<text x="${padL - 10}" y="${y0 + rowH / 2 + 4}" font-size="11.5" font-weight="800" text-anchor="end" fill="${pal.ink}">${esc(r.label)}</text>`;
-    const series: Array<[number, string, string]> = [
-      [r.overProtocol, pal.lav, "chậm đề cương"],
-      [r.overValidation, pal.sky, "chậm thẩm định thực tế"],
-      [r.overReport, pal.pink, "chậm báo cáo"],
+    // Cặp (màu khối, màu chữ): khối tô dùng sắc giữa, chữ dùng tông đậm —
+    // sky #4497D2 và pink #E4749F ở cỡ 10px là không đọc nổi trên nền trắng.
+    const series: Array<[number, string, string, string]> = [
+      [r.overProtocol, pal.lav, "chậm đề cương", pal.lavText],
+      [r.overValidation, pal.sky, "chậm thẩm định thực tế", pal.skyText],
+      [r.overReport, pal.pink, "chậm báo cáo", pal.pinkText],
     ];
-    series.forEach(([val, color, name], si) => {
+    series.forEach(([val, color, name, inkColor], si) => {
       const w = (val / maxVal) * plotW;
       const y = y0 + si * sub;
       body += `<rect x="${padL}" y="${y}" width="${Math.max(w, val > 0 ? 3 : 0)}" height="${sub - 2}" rx="3" fill="${color}">` +
         `<title>${esc(r.label)} — ${name}: ${val} hạng mục</title></rect>`;
-      if (val > 0) body += `<text x="${padL + Math.max(w, 3) + 6}" y="${y + sub / 2 + 3}" font-size="10" font-weight="700" fill="${color}">${val}</text>`;
+      if (val > 0) body += `<text x="${padL + Math.max(w, 3) + 6}" y="${y + sub / 2 + 3}" font-size="10" font-weight="700" fill="${inkColor}">${val}</text>`;
     });
   });
 
@@ -214,7 +226,9 @@ export function svgDeptWorkloadChart(
     const w = Math.max(4, (r.count / maxVal) * plotW);
     body += `<text x="${padL - 10}" y="${y + rowH / 2 + 4}" font-size="11.5" font-weight="800" text-anchor="end" fill="${pal.ink}">${esc(r.label)}</text>`;
     body += `<rect x="${padL}" y="${y}" width="${w}" height="${rowH}" rx="6" fill="${color}"><title>${esc(r.label)}: ${r.count} hạng mục đến hạn tháng tới</title></rect>`;
-    body += `<text x="${padL + w + 8}" y="${y + rowH / 2 + 4}" font-size="11" font-weight="800" fill="${color}">${r.count}</text>`;
+    // Số ghi cạnh thanh dùng mực chính: sáu màu bộ phận có màu đủ nhạt để
+    // chữ nhỏ mất tương phản, mà danh tính bộ phận đã có nhãn bên trái rồi.
+    body += `<text x="${padL + w + 8}" y="${y + rowH / 2 + 4}" font-size="11" font-weight="800" fill="${pal.ink}">${r.count}</text>`;
   });
 
   return svgWrap(W, H, body, "Việc dự kiến tháng tới theo bộ phận");

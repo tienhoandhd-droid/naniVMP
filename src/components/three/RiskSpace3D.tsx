@@ -23,6 +23,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import * as THREE from "three";
 import { qrmSeverity, qrmOccurrence, qrmLevel } from "../../utils/helpers.ts";
+import { CauKetLuan } from "../ui/Primitives.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
@@ -146,8 +147,31 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
   const caoNhat = useMemo(() => o3d.reduce((m, o) => Math.max(m, o.n), 1), [o3d]);
   const [chon, setChon] = useState<ORui | null>(null);
 
+  /* CÂU KẾT LUẬN. Ma trận rủi ro chỉ có giá trị khi nó chỉ ra được KHỐI
+     hạng mục đang đứng ở ô nguy hiểm nhất — chứ không phải bày ra một
+     rừng ô có màu rồi để người xem tự nhặt. */
+  const ketLuan = useMemo(() => {
+    if (!o3d.length) return null;
+    const tong = o3d.reduce((s, o) => s + o.n, 0);
+    const cao = o3d.filter((o) => qrmLevel(o.rpn) === "cao");
+    const nCao = cao.reduce((s, o) => s + o.n, 0);
+    const oNang = [...o3d].sort((a, b) => b.rpn - a.rpn || b.n - a.n)[0];
+
+    return {
+      chinh: nCao > 0
+        ? `${nCao} hạng mục (${Math.round((nCao / tong) * 100)}% tổng) đang nằm ở vùng RPN cao — `
+          + `dồn nhất là ô nghiêm trọng ${oNang.ng} × ${TEN_KN[oNang.kn].toLowerCase()}, ${oNang.n} hạng mục.`
+        : `Không hạng mục nào rơi vào vùng RPN cao; ô nặng nhất là RPN ${oNang.rpn} với ${oNang.n} hạng mục.`,
+      phu: nCao > 0
+        ? "Annex 15 đòi xử vùng này trước — chiều cao cột cho biết gỡ một ô là gỡ được bao nhiêu hạng mục."
+        : "Thứ tự xử hiện tại phù hợp với mức rủi ro; giữ nhịp.",
+      tone: (nCao >= tong * 0.15 ? "over" : nCao > 0 ? "warn" : "ok") as "over" | "warn" | "ok",
+    };
+  }, [o3d]);
+
   return (
     <div className="vmp-space3d">
+      {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
       <div className="vmp-space3d-khung">
         <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
           frameloop={giamChuyenDong ? "demand" : "always"}>

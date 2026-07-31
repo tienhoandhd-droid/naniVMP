@@ -7,7 +7,7 @@ import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../
 import { parseD, fmtVN, clamp, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
-import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill, CauKetLuan } from "../components/ui/Primitives.tsx";
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 
@@ -165,6 +165,86 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
     if (tasks.length) setDetail({ title, tasks });
   };
   const Btn = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) => <button onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
+  /* ---------------- Câu kết luận của từng biểu đồ ----------------
+   * Ba biểu đồ dưới đây trước giờ chỉ bày số. Người xem phải tự quét 20
+   * thẻ người, 12 cột tháng rồi tự rút ra "ai quá tải, tháng nào" — đúng
+   * công việc mà biểu đồ sinh ra để làm hộ. Mỗi câu dưới đây tính từ
+   * chính dữ liệu đang vẽ, không ước lượng. */
+  const klSucTai = useMemo(() => {
+    // "Chưa phân công" là một ĐỐNG VIỆC, không phải một nhân sự. Xếp nó vào
+    // bảng xếp hạng người bận nhất là nói sai: nó không quá tải, nó vô chủ.
+    // Tách riêng và nói riêng, vì cách xử lý cũng khác hẳn — một bên là giãn
+    // lịch, một bên là phải phân người.
+    const thuc = people.filter((p) => p.name !== "Chưa phân công");
+    const voChu = people.find((p) => p.name === "Chưa phân công");
+    const voChuCau = voChu
+      ? ` Ngoài ra còn ${voChu.congTotal} ngày công (${voChu.count} hạng mục) chưa có ai đứng tên — chưa nằm trong sức tải của bất kỳ ai.`
+      : "";
+    if (!thuc.length) {
+      return voChu
+        ? {
+          chinh: `Toàn bộ ${voChu.count} hạng mục còn lại chưa phân cho ai (${voChu.congTotal} ngày công).`,
+          phu: "Chưa phân người thì không tính được sức tải — đây là việc phải làm trước.",
+          tone: "over" as const,
+        }
+        : null;
+    }
+    const xep = thuc.map((p) => ({ p, pk: peakMonth(p) })).sort((a, b) => b.pk.eff - a.pk.eff);
+    const nang = xep[0];
+    const quaTai = thuc.filter((p) => peakMonth(p).eff > CAP_MONTH);
+    const tbCong = thuc.reduce((s, p) => s + p.congTotal, 0) / thuc.length;
+    if (!quaTai.length) {
+      return {
+        chinh: `Không ai quá tải: người bận nhất là ${nang.p.name}, cao điểm ${nang.pk.eff} ngày công `
+          + `ở ${WL_MONTHS[nang.pk.mi] || "—"} (ngưỡng ${CAP_MONTH}).`,
+        phu: `Trung bình mỗi người còn ${Math.round(tbCong)} ngày công trong năm.${voChuCau}`,
+        tone: (voChu ? "warn" : "ok") as "warn" | "ok",
+      };
+    }
+    return {
+      chinh: `${quaTai.length} người vượt ngưỡng ${CAP_MONTH} ngày công ở tháng cao điểm — `
+        + `nặng nhất là ${nang.p.name}: ${nang.pk.eff} ngày công dồn vào ${WL_MONTHS[nang.pk.mi] || "—"}.`,
+      phu: `Gấp ${(nang.pk.eff / CAP_MONTH).toFixed(1)} lần ngưỡng. Giãn bớt hạng mục của tháng đó sang tháng trống là cách rẻ nhất, `
+        + `trước khi tính tới chuyện thêm người.${voChuCau}`,
+      tone: (nang.pk.eff > CAP_MONTH * 1.5 ? "over" : "warn") as "over" | "warn",
+    };
+  }, [people]);
+
+  const klMaTran = useMemo(() => {
+    let nong: { ten: string; cot: string; v: number } | null = null;
+    people.forEach((p) => cols.forEach((c, ci) => {
+      const v = valIn(p, ci);
+      if (!nong || v > nong.v) nong = { ten: p.name, cot: c, v };
+    }));
+    const o = nong as { ten: string; cot: string; v: number } | null;
+    if (!o || o.v <= 0) return null;
+    const donVi = metric === "cong" ? "ngày công" : "hồ sơ";
+    const quaCap = o.v > cap;
+    const voChu = o.ten === "Chưa phân công";
+    return {
+      chinh: `Ô nóng nhất: ${o.ten} · ${o.cot} — ${o.v} ${donVi}${quaCap ? `, vượt ngưỡng ${cap}` : ""}.`,
+      phu: voChu
+        ? "Đây là việc chưa có người đứng tên, không phải một người đang quá tải — phải phân người trước khi nói tới giãn lịch."
+        : quaCap
+          ? "Bấm vào ô để xem đúng những hạng mục đang dồn ở đó."
+          : `Mọi ô đều nằm dưới ngưỡng ${cap} ${donVi}/${scope === "month" ? "tháng" : scope === "quarter" ? "quý" : "năm"}.`,
+      tone: (quaCap ? "warn" : "ok") as "warn" | "ok",
+    };
+  }, [people, cols, metric, cap, scope, valIn]);
+
+  const klTrongYeu = useMemo(() => {
+    const tong = (critCount.Cao || 0) + (critCount.TB || 0) + (critCount["Thấp"] || 0);
+    if (!tong) return null;
+    const tyCao = Math.round(((critCount.Cao || 0) / tong) * 100);
+    return {
+      chinh: `${critCount.Cao || 0} trong ${tong} hạng mục còn lại thuộc mức trọng yếu Cao (${tyCao}%).`,
+      phu: tyCao >= 40
+        ? "Phần việc còn tồn nghiêng hẳn về nhóm rủi ro cao — đây là nhóm Annex 15 đòi làm trước."
+        : "Phần lớn việc còn tồn thuộc nhóm rủi ro thấp và trung bình.",
+      tone: (tyCao >= 40 ? "warn" : "ok") as "warn" | "ok",
+    };
+  }, [critCount]);
+
   const mood = overloaded.length > 0 ? "stressed" : "happy";
   const bubble = overloaded.length > 0
     ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm! Bấm vào từng người xem chi tiết 💪`
@@ -191,6 +271,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       {/* Capacity cards */}
       <Card variant="strong">
         <CardTitle icon={Activity} sub="Thanh = tháng bận nhất so với ngưỡng · bấm vào thẻ để xem chi tiết">Sức tải từng người</CardTitle>
+        {klSucTai && <CauKetLuan chinh={klSucTai.chinh} phu={klSucTai.phu} tone={klSucTai.tone} />}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(262px,1fr))", gap: 14 }}>
           {people.map((p) => {
             const pk = peakMonth(p); const ratio = CAP_MONTH > 0 ? pk.eff / CAP_MONTH : 0;
@@ -222,6 +303,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       {/* Matrix */}
       <Card variant="strong">
         <CardTitle icon={BarChart3} right={<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>{legend.map(([l, c]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: C.plum, fontWeight: 700 }}><span style={{ width: 12, height: 12, borderRadius: 4, background: c }} />{l}</span>)}</div>} sub={`Mỗi ô = ${metric === "cong" ? "ngày công" : "hồ sơ"} · bấm vào ô để xem`}>Ma trận · Người × {scope === "month" ? "Tháng" : scope === "quarter" ? "Quý" : "Năm"}</CardTitle>
+        {klMaTran && <CauKetLuan chinh={klMaTran.chinh} phu={klMaTran.phu} tone={klMaTran.tone} />}
         <div style={{ overflowX: "auto" }} className="vmp-scroll">
           <table style={{ borderCollapse: "separate", borderSpacing: 5, minWidth: scope === "month" ? 880 : 440 }}>
             <thead><tr>
@@ -338,6 +420,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 24 }}>
         <Card variant="soft">
           <CardTitle icon={ShieldAlert} sub="Theo mức trọng yếu">Phân bố trọng yếu</CardTitle>
+          {klTrongYeu && <CauKetLuan chinh={klTrongYeu.chinh} phu={klTrongYeu.phu} tone={klTrongYeu.tone} />}
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <Donut size={132} segments={[{ value: critCount.Cao, color: C.rasp }, { value: critCount.TB, color: C.marigold }, { value: critCount["Thấp"], color: C.mint }]} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>

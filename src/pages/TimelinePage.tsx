@@ -14,7 +14,8 @@ import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
 import { CLS, DEPTS, CRIT, MONTHS, PHASE_COLOR, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
 import { parseD, fmtVN, milestones, phaseStates, addDays, clamp, wlIsDone } from "../utils/helpers.ts";
 import { useDebounce } from "../hooks/index.ts";
-import { Card, CardTitle, Tag, Modal, Pill, phaseTag } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Pill, phaseTag, CauKetLuan } from "../components/ui/Primitives.tsx";
+import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
 const WorkloadSpace3D = lazy(() => import("../components/three/WorkloadSpace3D.tsx"));
 import type { ReactNode } from "react";
@@ -849,6 +850,183 @@ function TimelineTableFlowCell({ a, range, stages = MAP_STAGES }: {
   );
 }
 
+/* ===================== LỚP THUYẾT MINH TRÊN GANTT =====================
+ * Gantt bên dưới là biểu đồ KHÁM PHÁ: 461 dòng, ai cần tra hạng mục nào
+ * thì tra. Nó làm tốt việc đó. Nhưng nó không trả lời được câu hỏi mà
+ * người xem mang tới khi vừa mở trang: "có gì đang cháy không, cháy tới
+ * mức nào, và tôi phải động vào cái gì trước".
+ *
+ * Muốn biết bằng Gantt thì phải rà 461 dòng bằng mắt — đúng thứ mà biểu
+ * đồ sinh ra để khỏi phải làm.
+ *
+ * Lớp này trả lời đúng câu đó, theo ba luật của explanatory visualization:
+ *  1. Tiêu đề nói KẾT LUẬN kèm số, không nói chủ đề
+ *  2. Màu để CHỈ TAY — chỉ nhóm quá hạn có màu nhấn, phần còn lại xám;
+ *     mức trễ mã hoá bằng ĐỘ ĐẬM của cùng một màu, không đổi sang màu khác
+ *  3. Chỉ hiện thứ cần hành động; phần đúng nhịp gộp thành một dòng chữ
+ *
+ * Không 3D hoá: dữ liệu ở đây chỉ có hai chiều (thời gian × số lượng).
+ * Thêm chiều thứ ba là thêm một lớp phải giải mã trước khi đọc được số,
+ * đúng thứ chống lại "rút ngắn thời gian tiếp nhận".
+ */
+const FOCUS_NHOM = [
+  { id: "tre30", label: "Trễ trên 30 ngày", ngan: "> 30 ng", dam: 1, test: (d: number) => d < -30 },
+  { id: "tre8", label: "Trễ 8–30 ngày", ngan: "8–30 ng", dam: 0.74, test: (d: number) => d >= -30 && d <= -8 },
+  { id: "tre1", label: "Trễ 1–7 ngày", ngan: "1–7 ng", dam: 0.5, test: (d: number) => d >= -7 && d <= -1 },
+  { id: "homnay", label: "Đến hạn hôm nay", ngan: "hôm nay", dam: 0.34, test: (d: number) => d === 0 },
+  { id: "toi7", label: "Còn 1–7 ngày", ngan: "1–7 ng", dam: 0, test: (d: number) => d >= 1 && d <= 7 },
+  { id: "toi30", label: "Còn 8–30 ngày", ngan: "8–30 ng", dam: 0, test: (d: number) => d >= 8 && d <= SOON_DAYS },
+];
+
+function focusItems(items: Activity[]) {
+  const canhBao: Array<{ a: Activity; con: number; stage: (typeof MAP_STAGES)[number] }> = [];
+  let dungNhip = 0;
+  let xong = 0;
+  for (const a of items) {
+    if (issueLevel(a) === "done") { xong += 1; continue; }
+    const next = nextPendingMilestone(a);
+    const con = next ? daysUntil(next.state.due) : null;
+    if (next && con != null && con <= SOON_DAYS) canhBao.push({ a, con, stage: next.stage });
+    else dungNhip += 1;
+  }
+  canhBao.sort((x, y) => x.con - y.con || compareByTarget(x.a, y.a));
+  return { canhBao, dungNhip, xong };
+}
+
+function TimelineFocusLayer({ items, onOpen, onLocQuaHan }: {
+  items: Activity[];
+  onOpen: (a: Activity) => void;
+  onLocQuaHan?: () => void;
+}) {
+  const { canhBao, dungNhip, xong } = useMemo(() => focusItems(items), [items]);
+
+  const nhom = useMemo(
+    () => FOCUS_NHOM.map((n) => ({ ...n, rows: canhBao.filter((c) => n.test(c.con)) })),
+    [canhBao],
+  );
+  const daTre = canhBao.filter((c) => c.con < 0);
+  const toiHan = canhBao.filter((c) => c.con >= 0);
+  const maxN = Math.max(1, ...nhom.map((n) => n.rows.length));
+
+  /* Nút thắt nằm ở mốc nào — câu này quyết định hành động khác hẳn nhau:
+     kẹt ở Đề cương là kẹt giấy tờ, kẹt ở Thẩm định thực tế là kẹt hiện trường. */
+  const nutThat = useMemo(() => {
+    const dem = new Map<string, number>();
+    for (const c of daTre) dem.set(c.stage.id, (dem.get(c.stage.id) || 0) + 1);
+    const top = [...dem.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (!top) return null;
+    const stage = MAP_STAGES.find((s) => s.id === top[0]);
+    return stage ? { label: stage.label, n: top[1] } : null;
+  }, [daTre]);
+
+  const ketLuan = useMemo(() => {
+    if (!items.length) {
+      return { chinh: "Không có hạng mục nào trong bộ lọc hiện tại.", phu: "", tone: "ok" as const };
+    }
+    if (!canhBao.length) {
+      return {
+        chinh: `Không có hạng mục nào trễ hạn hay tới hạn trong ${SOON_DAYS} ngày tới.`,
+        phu: `${dungNhip} hạng mục còn hạn xa và ${xong} đã xong — không có việc phải xử gấp.`,
+        tone: "ok" as const,
+      };
+    }
+    const nang = daTre[0];
+    if (daTre.length) {
+      return {
+        chinh: `${daTre.length} hạng mục đã trễ hạn — nặng nhất là ${nang.a.code} trễ ${Math.abs(nang.con)} ngày ở mốc ${nang.stage.label.toLowerCase()}.`
+          + (toiHan.length ? ` Thêm ${toiHan.length} hạng mục tới hạn trong ${SOON_DAYS} ngày.` : ""),
+        phu: nutThat && nutThat.n > 1
+          ? `Phần lớn chỗ tắc nằm ở mốc ${nutThat.label} (${nutThat.n}/${daTre.length}) — xử một mốc gỡ được nhiều hạng mục hơn là xử từng hạng mục.`
+          : "Danh sách dưới đây xếp theo mức trễ, trễ nhất lên trước.",
+        tone: "over" as const,
+      };
+    }
+    const gan = toiHan[0];
+    return {
+      chinh: `Chưa hạng mục nào trễ, nhưng ${toiHan.length} hạng mục tới hạn trong ${SOON_DAYS} ngày — sớm nhất là ${gan.a.code}, còn ${gan.con} ngày.`,
+      phu: `${dungNhip} hạng mục khác còn hạn xa, ${xong} đã xong.`,
+      tone: "warn" as const,
+    };
+  }, [items.length, canhBao.length, daTre, toiHan, dungNhip, xong, nutThat]);
+
+  const HIEN = 6;
+
+  return (
+    <section className="tl-focus" aria-label="Lớp thuyết minh — việc cần xử trước">
+      <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />
+
+      {canhBao.length > 0 && (
+        <>
+          {/* Làn đếm ngược. Trục ngang là thời gian tính từ hôm nay: bên
+              trái đã trễ, bên phải sắp tới. Chiều cao là số hạng mục.
+              Đọc một lần là biết "gánh nặng đang nằm ở quá khứ hay tương
+              lai" — điều mà danh sách 461 dòng không nói được. */}
+          <div className="tl-focus-lan" role="group" aria-label="Phân bố theo mức trễ và mức gấp">
+            {nhom.map((n) => {
+              const cao = Math.round((n.rows.length / maxN) * 100);
+              const treHan = n.dam > 0 || n.id === "homnay";
+              return (
+                <div key={n.id} className={`tl-focus-o ${treHan ? "tl-focus-o--tre" : ""} ${n.rows.length ? "" : "tl-focus-o--rong"}`}>
+                  <b className="tnum">{n.rows.length || ""}</b>
+                  <span className="tl-focus-cot">
+                    <i style={{
+                      height: `${Math.max(n.rows.length ? 5 : 0, cao)}%`,
+                      // Mức trễ mã hoá bằng ĐỘ ĐẬM của một màu, không đổi
+                      // sang màu khác — đây là thang cường độ, không phải
+                      // các loại khác nhau.
+                      opacity: treHan ? 0.42 + n.dam * 0.58 : 1,
+                    }} />
+                  </span>
+                  <small>{n.label}</small>
+                </div>
+              );
+            })}
+            <span className="tl-focus-moc" aria-hidden="true">hôm nay</span>
+          </div>
+
+          {/* Danh sách việc phải động vào trước. Sáu dòng, không phải bốn
+              trăm — quá số này thì thành bảng tra cứu, mà bảng tra cứu đã
+              nằm ngay bên dưới rồi. */}
+          <ol className="tl-focus-ds">
+            {canhBao.slice(0, HIEN).map(({ a, con, stage }) => {
+              const dept = DEPTS.find((d) => d.id === a.dept);
+              return (
+                <li key={a.id}>
+                  <button type="button" onClick={() => onOpen(a)}
+                    title={`${a.code} · ${a.name}\n${stage.label}: hạn ${fmtVN(nextPendingMilestone(a)?.state.due)}`}>
+                    <span className={`tl-focus-ngay ${con < 0 ? "is-tre" : "is-toi"}`}>
+                      {con < 0 ? `trễ ${Math.abs(con)}` : con === 0 ? "hôm nay" : `còn ${con}`}
+                      {con !== 0 && <small>ngày</small>}
+                    </span>
+                    <span className="tl-focus-ten">
+                      <b>{a.code}</b>
+                      <span>{a.name}</span>
+                    </span>
+                    <span className="tl-focus-meta">
+                      {stage.short} · {dept?.short || a.dept || "—"} · {ownerOf(a)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="tl-focus-chan">
+            {canhBao.length > HIEN && (
+              <button type="button" className="tl-focus-them" onClick={onLocQuaHan}>
+                Còn {canhBao.length - HIEN} hạng mục nữa cần chú ý — lọc để xem hết
+              </button>
+            )}
+            <span>
+              {dungNhip} hạng mục còn hạn xa · {xong} đã xong — tra chi tiết ở bảng bên dưới.
+            </span>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 /* Tổng hợp theo mốc cho 1 stage: xong / quá hạn / sắp tới hạn. */
 function stageAgg(items: Activity[], stage: (typeof MAP_STAGES)[number]) {
   const states = items.map((a: Activity) => stageState(a, stage));
@@ -1419,6 +1597,50 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
   const H = 210, nowM = vmpToday().getMonth();
   const maxDeptTotal = deptRows.length ? deptRows[0].total : 1;
 
+  /* Câu kết luận của biểu đồ tháng. So tháng cao điểm với mức trung bình
+     tháng — "80 hạng mục" tự nó không nói lên gì, "gấp đôi mức thường"
+     thì nói ngay là có phải giãn lịch hay không. */
+  const klThang = useMemo(() => {
+    const coMoc = months.filter((m) => m.total > 0);
+    if (!coMoc.length) {
+      return { chinh: "Chưa hạng mục nào có mốc đích VMP trong năm nay.", phu: "", tone: "warn" as const };
+    }
+    const tb = coMoc.reduce((s, m) => s + m.total, 0) / coMoc.length;
+    const lan = tb > 0 ? months[kpi.peakI].total / tb : 0;
+    const quaHanDinh = months[kpi.peakI].over;
+    const trong = months.map((m, i) => ({ m, i })).filter((x) => x.m.total === 0).map((x) => MONTHS[x.i]);
+    return {
+      chinh: lan >= 1.3
+        ? `${MONTH_NAMES[kpi.peakI]} dồn ${kpi.peak} hạng mục — gấp ${lan.toFixed(1)} lần mức trung bình tháng (${Math.round(tb)}).`
+        : `Khối lượng rải khá đều: tháng nặng nhất (${MONTH_NAMES[kpi.peakI]}, ${kpi.peak} hạng mục) chỉ hơn mức trung bình ${Math.round((lan - 1) * 100)}%.`,
+      phu: [
+        quaHanDinh > 0 ? `Riêng tháng đó đã có ${quaHanDinh} hạng mục quá hạn.` : "",
+        trong.length >= 2 ? `${trong.join(", ")} chưa có hạng mục nào — còn chỗ để giãn bớt.` : "",
+        "Bấm một cột để mở đúng tháng đó trên timeline.",
+      ].filter(Boolean).join(" "),
+      tone: lan >= 1.5 || quaHanDinh > 0 ? ("warn" as const) : ("ok" as const),
+    };
+  }, [months, kpi.peakI, kpi.peak]);
+
+  /* Câu kết luận của biểu đồ bộ phận: chênh lệch tỉ lệ hoàn thành giữa
+     bộ phận đứng đầu và đứng cuối — con số quyết định có phải điều phối
+     lại nguồn lực hay không. */
+  const klBoPhan = useMemo(() => {
+    const co = deptRows.filter((r) => r.total >= 5)
+      .map((r) => ({ ...r, rate: Math.round((r.done / r.total) * 100) }))
+      .sort((a, b) => b.rate - a.rate);
+    if (co.length < 2) return null;
+    const dau = co[0], cuoi = co[co.length - 1];
+    const nhieuQh = [...deptRows].sort((a, b) => b.over - a.over)[0];
+    return {
+      chinh: `${cuoi.name} đang chậm nhất: ${cuoi.rate}% xong trên ${cuoi.total} hạng mục, kém ${dau.code} (${dau.rate}%) ${dau.rate - cuoi.rate} điểm.`,
+      phu: nhieuQh && nhieuQh.over > 0
+        ? `${nhieuQh.name} giữ nhiều hạng mục quá hạn nhất (${nhieuQh.over}). Bấm một thanh để lọc theo bộ phận đó.`
+        : "Bấm một thanh để lọc theo bộ phận đó.",
+      tone: (dau.rate - cuoi.rate >= 25 ? "warn" : "ok") as "warn" | "ok",
+    };
+  }, [deptRows]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* KPI */}
@@ -1433,18 +1655,32 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
           <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>Tải VMP theo tháng · {year}</strong>
-          <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Bấm một cột để xem chi tiết tháng đó</span>
         </div>
+        <CauKetLuan chinh={klThang.chinh} phu={klThang.phu} tone={klThang.tone} />
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(44px,1fr))", gap: 10, alignItems: "end", height: H + 46, minWidth: 620, paddingTop: 20 }}>
             {months.map((m, i) => {
               const barH = m.total / maxT * H;
               const isNow = i === nowM;
+              // Nhấn CHỌN LỌC chứ không giấu số. Biểu đồ này không có trục
+              // giá trị và cũng không có bảng số kèm theo, nên bỏ nhãn đi là
+              // đẩy mọi con số vào tooltip — người dùng bàn phím và bản in
+              // mất hẳn đường đọc. Cách đúng: giữ đủ số, nhưng để số thường
+              // chìm xuống nền và chỉ cho tháng cao điểm / tháng hiện tại
+              // nổi lên. Mắt vẫn bắt được điểm cần nhìn ngay.
+              const nhan = i === kpi.peakI || isNow;
               return (
                 <button key={i} type="button" onClick={() => onPickMonth?.(i)}
                   title={`${MONTHS[i]}: ${m.total} hạng mục — Xong ${m.done} · Quá hạn ${m.over} · Đang ${m.prog} · Chưa ${m.chua}`}
                   style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", position: "relative", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
-                  <span style={{ position: "absolute", top: -18, left: 0, right: 0, textAlign: "center", fontSize: 12, fontWeight: 800, color: C.plum, fontFamily: NUM }}>{m.total || ""}</span>
+                  <span style={{
+                    position: "absolute", top: -18, left: 0, right: 0, textAlign: "center",
+                    fontFamily: NUM,
+                    fontSize: nhan ? 13 : 11,
+                    fontWeight: nhan ? 900 : 700,
+                    color: i === kpi.peakI ? C.raspText : C.plumSoft,
+                    opacity: nhan ? 1 : 0.72,
+                  }}>{m.total || ""}</span>
                   <div style={{ display: "flex", flexDirection: "column-reverse", borderRadius: "8px 8px 3px 3px", overflow: "hidden", height: barH, minHeight: m.total ? 4 : 0, outline: isNow ? `2px solid ${C.pink}` : "none", outlineOffset: 2 }}>
                     {OV_STATUS.map((s) => {
                       const mm = m as unknown as Record<string, number>;
@@ -1471,6 +1707,22 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
         </div>
       </div>
 
+      {/* Biểu đồ kiểm soát — trả lời câu mà biểu đồ cột ở trên KHÔNG trả
+          lời được: tháng tụt kia là dao động bình thường hay quy trình đã
+          hỏng ở tháng đó. Không có nó thì mắt luôn thấy "tháng thấp nhất"
+          và người ta đi truy nguyên một tháng vốn chỉ đang dao động. */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+          <strong style={{ fontFamily: TEXT, fontSize: 15, color: C.plum }}>
+            Biểu đồ kiểm soát · tỉ lệ hoàn thành theo tháng
+          </strong>
+          <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
+            Shewhart p-chart · giới hạn ±3σ
+          </span>
+        </div>
+        <BieuDoKiemSoat acts={acts} nam={year} />
+      </div>
+
       {/* Tiến độ theo bộ phận quản lý */}
       {deptRows.length > 0 && (
         <div>
@@ -1480,6 +1732,9 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
             {" · "}<span style={{ color: C.raspText }}>đỏ: quá hạn</span>
             {" · "}<span style={{ color: C.skyText }}>lam: còn lại</span> — bấm để lọc theo bộ phận
           </div>
+          {klBoPhan && <div style={{ marginTop: 10 }}>
+            <CauKetLuan chinh={klBoPhan.chinh} phu={klBoPhan.phu} tone={klBoPhan.tone} />
+          </div>}
           <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
             {deptRows.map((r) => {
               const rest = r.total - r.done - r.over;
@@ -1805,6 +2060,14 @@ export default function TimelineView({ acts }: { acts: Activity[] }) {
           />
         ) : isTimeline ? (
         <>
+        {/* Lớp thuyết minh đặt TRƯỚC mọi thứ khác của tab này: nó là câu
+            trả lời, phần còn lại là bằng chứng và chỗ tra cứu. */}
+        <TimelineFocusLayer
+          items={filtered}
+          onOpen={setDetail}
+          onLocQuaHan={() => setStatus("over")}
+        />
+
         <TimelineStageProgress
           items={filtered}
           year={year}

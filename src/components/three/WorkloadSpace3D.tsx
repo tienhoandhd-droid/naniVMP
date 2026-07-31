@@ -21,6 +21,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
+import { CauKetLuan } from "../ui/Primitives.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
@@ -198,7 +199,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
      nó phát hiện, chứ không bày số ra rồi bắt người ta tự rút ra. Mọi con số
      trong câu đều tính từ chính dữ liệu đang vẽ — không có chỗ nào ước lượng. */
   const ketLuan = useMemo(() => {
-    if (!o3d.length || !dinh) return "";
+    if (!o3d.length || !dinh) return null;
     const theoThang = new Map<number, number>();
     for (const o of o3d) theoThang.set(o.thang, (theoThang.get(o.thang) || 0) + o.tong);
     const tb = [...theoThang.values()].reduce((a, b) => a + b, 0) / Math.max(1, theoThang.size);
@@ -207,18 +208,23 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
     const bp = DEPTS[dinh.bp]?.name || DEPTS[dinh.bp]?.id;
     const tyChuaXong = dinh.tong ? Math.round((dinh.chuaXong / dinh.tong) * 100) : 0;
 
-    const cau = [`Nặng nhất là ${bp} tháng ${dinh.thang}: ${dinh.tong} hạng mục đến hạn, ${dinh.chuaXong} chưa xong (${tyChuaXong}%).`];
+    const phu: string[] = [];
     if (lan >= 1.3) {
-      cau.push(`Cả tháng ${dinh.thang} gánh ${thangDinh} hạng mục — gấp ${lan.toFixed(1)} lần mức trung bình tháng (${Math.round(tb)}).`);
+      phu.push(`Cả tháng ${dinh.thang} gánh ${thangDinh} hạng mục — gấp ${lan.toFixed(1)} lần mức trung bình tháng (${Math.round(tb)}).`);
     }
     const trong = [...theoThang.entries()].filter(([, n]) => n === 0).map(([t]) => t);
-    if (trong.length >= 2) cau.push(`Tháng ${trong.join(", ")} không có hạng mục nào — còn chỗ để giãn bớt.`);
-    return cau.join(" ");
+    if (trong.length >= 2) phu.push(`Tháng ${trong.join(", ")} không có hạng mục nào — còn chỗ để giãn bớt.`);
+
+    return {
+      chinh: `Nặng nhất là ${bp} tháng ${dinh.thang}: ${dinh.tong} hạng mục đến hạn, ${dinh.chuaXong} chưa xong (${tyChuaXong}%).`,
+      phu: phu.join(" "),
+      tone: (lan >= 1.5 || tyChuaXong >= 80 ? "over" : lan >= 1.3 ? "warn" : "ok") as "over" | "warn" | "ok",
+    };
   }, [o3d, dinh]);
 
   return (
     <div className="vmp-space3d">
-      {ketLuan && <p className="vmp-space3d-ketluan">{ketLuan}</p>}
+      {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
       <div className="vmp-space3d-khung">
         <Canvas
           dpr={[1, 2]}

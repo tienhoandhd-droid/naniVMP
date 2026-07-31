@@ -3,7 +3,7 @@ import { useMemo, lazy, Suspense } from "react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { CLS, CRIT } from "../constants/vmp.ts";
 import { valStatus, qrmRpn, qrmLevel } from "../utils/helpers.ts";
-import { Card, CardTitle, Tag, Donut, Pill } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Donut, Pill, CauKetLuan } from "../components/ui/Primitives.tsx";
 import { ShieldAlert, AlertCircle, Trophy } from "lucide-react";
 import type { Activity } from "../types/domain.ts";
 
@@ -44,6 +44,20 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
         Tiến độ theo mức trọng yếu
       </CardTitle>
 
+      {/* Kết luận đặt TRÊN hình, cùng một khối với mọi biểu đồ khác trong
+          app — trước đây khối này nằm dưới và mang kiểu riêng, nên mỗi
+          trang lại nói một giọng khác nhau. */}
+      <CauKetLuan
+        tone={nguoc ? "over" : "ok"}
+        chinh={nguoc
+          ? `Đang làm ngược thứ tự rủi ro: nhóm trọng yếu cao mới xong ${cao.rate}% trong khi nhóm thấp đã ${thap.rate}%.`
+          : `Thứ tự ưu tiên hợp lý: nhóm trọng yếu cao đang ở ${cao.rate}%, không tụt sau nhóm thấp (${thap.rate}%).`}
+        phu={[
+          nguoc ? "ICH Q9 và Annex 15 đòi làm nhóm rủi ro cao trước — chênh này là thứ thanh tra hỏi đầu tiên." : "",
+          chuaCham > 0 ? `Còn ${chuaCham} hạng mục chưa có điểm trọng yếu, chưa tính vào biểu đồ này.` : "",
+        ].filter(Boolean).join(" ")}
+      />
+
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {bands.map((b) => (
           <div key={b.id}>
@@ -67,28 +81,6 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
         ))}
       </div>
 
-      <div style={{ marginTop: 15, padding: "11px 13px", borderRadius: 12, fontFamily: TEXT,
-                    fontSize: 12.5, lineHeight: 1.65,
-                    background: nguoc ? C.raspSoft : C.mintSoft,
-                    color: nguoc ? C.raspText : C.mintText }}>
-        {nguoc ? (
-          <>
-            <b>Đang làm ngược thứ tự rủi ro.</b> Nhóm trọng yếu cao mới xong {cao.rate}%
-            trong khi nhóm thấp đã {thap.rate}%. ICH Q9 và Annex 15 đòi làm nhóm rủi ro cao
-            trước — chênh này là thứ thanh tra hỏi đầu tiên.
-          </>
-        ) : (
-          <>
-            <b>Thứ tự ưu tiên hợp lý.</b> Nhóm trọng yếu cao đang ở {cao.rate}%,
-            không tụt sau nhóm thấp ({thap.rate}%).
-          </>
-        )}
-        {chuaCham > 0 && (
-          <div style={{ marginTop: 6, opacity: 0.9 }}>
-            Còn {chuaCham} hạng mục chưa có điểm trọng yếu — chưa tính vào biểu đồ này.
-          </div>
-        )}
-      </div>
     </Card>
   );
 }
@@ -125,6 +117,24 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
     .map((a) => ({ a, score: qrmRpn(a) }))
     .sort((x, y) => y.score - x.score)
     .slice(0, 8);
+
+  /* Vòng tròn phân bố tự nó chỉ nói "có ba nhóm". Điều đáng nói là nhóm
+     ảnh hưởng Cao chiếm bao nhiêu và trong đó bao nhiêu còn chưa xong —
+     vì đó mới là phần quyết định thứ tự làm theo ICH Q9. */
+  const klPhanBo = useMemo(() => {
+    const tong = acts.length;
+    if (!tong) return null;
+    const cao = acts.filter((a) => a.crit === "Cao");
+    const caoChua = cao.filter((a) => a.st !== "done").length;
+    const ty = Math.round((cao.length / tong) * 100);
+    return {
+      chinh: `${cao.length}/${tong} hạng mục thuộc mức ảnh hưởng Cao (${ty}%), trong đó ${caoChua} chưa hoàn thành.`,
+      phu: caoChua > 0
+        ? "Đây là nhóm phải xong trước theo ICH Q9 — xem thứ tự thực tế ở biểu đồ tiến độ phía trên."
+        : "Toàn bộ nhóm ảnh hưởng Cao đã hoàn thành.",
+      tone: (caoChua > cao.length * 0.5 ? "warn" : "ok") as "warn" | "ok",
+    };
+  }, [acts]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
@@ -159,6 +169,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 24 }}>
         <Card variant="soft">
           <CardTitle icon={Trophy}>Phân bố mức tới hạn</CardTitle>
+          {klPhanBo && <CauKetLuan chinh={klPhanBo.chinh} phu={klPhanBo.phu} tone={klPhanBo.tone} />}
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <Donut size={140} segments={critCount.map((x) => ({ value: x.n, color: CRITMAP[x.k].color }))} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
