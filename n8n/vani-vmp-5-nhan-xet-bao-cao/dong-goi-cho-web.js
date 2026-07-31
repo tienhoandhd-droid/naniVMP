@@ -220,7 +220,13 @@ return $input.all().map(function (it, idx) {
   var d = ctx.du_lieu || {};
   var laCanhBao = ctx.loai === 'canh_bao';
 
-  var NHAN = laCanhBao
+  var laPhanTichSau = ctx.loai === 'phan_tich_sau';
+
+  var NHAN = laPhanTichSau
+    ? { quyLuat: 'QUY LUẬT PHÁT HIỆN', canhBaoChuoi: 'CẢNH BÁO CHUỖI LIÊN QUAN',
+        lechUuTien: 'LỆCH ƯU TIÊN THEO TRỌNG YẾU', canNguyen: 'GIẢ THUYẾT NGUYÊN NHÂN',
+        khuyenNghi: 'KHUYẾN NGHỊ HÀNH ĐỘNG' }
+    : laCanhBao
     ? { tienDo: 'QUÁ HẠN NẶNG NHẤT', ruiRo: 'THỨ TỰ XỬ LÝ THEO RỦI RO',
         mucTieu: 'SO VỚI MỤC TIÊU 50%/THÁNG', batCap: 'BỘ PHẬN ĐANG NGHẼN', thangToi: 'SẮP TỚI HẠN — CHUẨN BỊ NGAY',
         uuTien: 'VIỆC PHẢI LÀM TUẦN TỚI' }
@@ -237,9 +243,30 @@ return $input.all().map(function (it, idx) {
     xs.forEach(function (x) { L.push('· ' + x); });
   }
 
+  // Nhánh phân tích sâu trả MẢNG OBJECT {nhanDinh, maDanChung} chứ không phải
+  // mảng chuỗi — muc() cũ dựa trên veMang() chỉ hiểu chuỗi, đưa object vào sẽ
+  // in ra JSON thô. Cần bản song song.
+  function mucBangChung(ten, arr) {
+    if (!Array.isArray(arr) || !arr.length) return;
+    L.push('', ten);
+    arr.forEach(function (x) {
+      var nd = (x && x.nhanDinh) || (typeof x === 'string' ? x : '');
+      var ma = (x && Array.isArray(x.maDanChung)) ? x.maDanChung.join(', ') : '';
+      if (nd) L.push('· ' + nd + (ma ? ' [' + ma + ']' : ''));
+    });
+  }
+
   if (th.tieuDe) L.push(th.tieuDe);
   if (th.tomTat) L.push('', th.tomTat);
   if (th.mucRuiRoTongThe) L.push('', 'Mức rủi ro tổng thể: ' + th.mucRuiRoTongThe);
+  if (laPhanTichSau) {
+    mucBangChung(NHAN.quyLuat, th.quyLuatPhatHien);
+    mucBangChung(NHAN.canhBaoChuoi, th.canhBaoChuoi);
+    mucBangChung(NHAN.lechUuTien, th.lechUuTien);
+    mucBangChung(NHAN.canNguyen, th.canNguyenNhan);
+    mucBangChung(NHAN.khuyenNghi, th.khuyenNghi);
+    muc('GIỚI HẠN PHÂN TÍCH', th.gioiHanPhanTich);
+  } else {
   muc(NHAN.tienDo, th.tienDo);
   muc(NHAN.ruiRo, th.ruiRo);
   muc(NHAN.mucTieu, th.soSanhMucTieu);
@@ -252,6 +279,7 @@ return $input.all().map(function (it, idx) {
     uuTien.forEach(function (x, i) { L.push((i + 1) + '. ' + x); });
   }
   muc('GIỚI HẠN DỮ LIỆU', th.luuYDuLieu);
+  }
   L.push('', th.gioiHanAI || 'AI chỉ hỗ trợ nhận định, không thay thế đánh giá của QA và không phải căn cứ phê duyệt GMP.');
   if (th.confidence != null) L.push('Độ tin cậy tự đánh giá: ' + th.confidence);
   if (!th.tieuDe && !th.tomTat) L.push('Không đọc được kết quả AI — xem workflow_runs để tra.');
@@ -274,11 +302,12 @@ return $input.all().map(function (it, idx) {
   var thucSuGui = !!ctx.gui_mail && dsNhan.length > 0;
 
   // ---------- Bản HTML cho mail ----------
-  var tieuDe = th.tieuDe || (laCanhBao ? 'Phân tích cảnh báo VMP' : 'Nhận xét AI cho báo cáo VMP');
+  var tieuDe = th.tieuDe || (laPhanTichSau ? 'Phân tích sâu dữ liệu VMP'
+    : laCanhBao ? 'Phân tích cảnh báo VMP' : 'Nhận xét AI cho báo cáo VMP');
   var phamViChu = ctx.pham_vi === 'all' ? 'Toàn nhà máy' : ('Bộ phận ' + ctx.pham_vi);
   var kyChu = ctx.ky_nhan || ('năm ' + (d.nam || ''));
   var mau = laCanhBao ? '#b00020' : '#6b46a8';
-  var subject = '[VMP] ' + (laCanhBao ? 'Phân tích cảnh báo' : 'Nhận xét báo cáo')
+  var subject = '[VMP] ' + (laPhanTichSau ? 'Phân tích sâu' : laCanhBao ? 'Phân tích cảnh báo' : 'Nhận xét báo cáo')
     + ' · ' + phamViChu + ' · kỳ ' + kyChu;
 
   var thangTrongKy = [];
@@ -333,6 +362,42 @@ return $input.all().map(function (it, idx) {
       + xs.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('')
       + '</ul></div>';
   }
+
+  function khoiHtmlBangChung(ten, arr) {
+    if (!Array.isArray(arr) || !arr.length) return '';
+    var li = arr.map(function (x) {
+      var nd = (x && x.nhanDinh) || (typeof x === 'string' ? x : '');
+      var ma = (x && Array.isArray(x.maDanChung)) ? x.maDanChung : [];
+      if (!nd) return '';
+      return '<li style="margin-bottom:5px">' + esc(nd)
+        + (ma.length ? '<br/><span style="font-size:11.5px;color:#6b46a8;font-weight:bold">'
+            + esc(ma.join(' · ')) + '</span>' : '')
+        + '</li>';
+    }).join('');
+    if (!li) return '';
+    return '<div style="margin-top:16px">'
+      + '<div style="font-size:12px;font-weight:bold;color:' + mau + ';letter-spacing:.6px">' + esc(ten) + '</div>'
+      + '<ul style="margin:6px 0 0;padding-left:20px;color:#222;font-size:13.5px;line-height:1.65">'
+      + li + '</ul></div>';
+  }
+
+  // Dựng khối nhận định một lần rồi cắm vào HTML — tránh nhét ba nhánh if vào
+  // giữa chuỗi nối HTML dài.
+  var khoiNhanDinh = laPhanTichSau
+    ? (khoiHtmlBangChung(NHAN.quyLuat, th.quyLuatPhatHien)
+      + khoiHtmlBangChung(NHAN.canhBaoChuoi, th.canhBaoChuoi)
+      + khoiHtmlBangChung(NHAN.lechUuTien, th.lechUuTien)
+      + khoiHtmlBangChung(NHAN.canNguyen, th.canNguyenNhan)
+      + khoiHtmlBangChung(NHAN.khuyenNghi, th.khuyenNghi)
+      + khoiHtml('GIỚI HẠN PHÂN TÍCH', th.gioiHanPhanTich))
+    : (khoiHtml(NHAN.tienDo, th.tienDo)
+      + khoiHtml(NHAN.ruiRo, th.ruiRo)
+      + khoiHtml(NHAN.mucTieu, th.soSanhMucTieu)
+      + khoiHtml(NHAN.batCap, th.batCapBoPhan)
+      + khoiHtml(NHAN.thangToi, th.keHoachThangToi)
+      + khoiHtml(NHAN.uuTien, th.viecUuTien)
+      + khoiHtml('BẰNG CHỨNG CHÍNH', th.bangChungChinh)
+      + khoiHtml('GIỚI HẠN DỮ LIỆU', th.luuYDuLieu));
 
   var soQuaHan = ctx.so_qua_han || 0;
   var soSapToiHan = (d.sap_toi_han_60_ngay || []).length;
@@ -488,14 +553,7 @@ return $input.all().map(function (it, idx) {
     + '<table style="border-collapse:separate;border-spacing:0;margin-top:16px;width:100%"><tr>' + oSo + '</tr></table>'
     + mucNam
     + mucKy
-    + khoiHtml(NHAN.tienDo, th.tienDo)
-    + khoiHtml(NHAN.ruiRo, th.ruiRo)
-    + khoiHtml(NHAN.mucTieu, th.soSanhMucTieu)
-    + khoiHtml(NHAN.batCap, th.batCapBoPhan)
-    + khoiHtml(NHAN.thangToi, th.keHoachThangToi)
-    + khoiHtml(NHAN.uuTien, th.viecUuTien)
-    + khoiHtml('BẰNG CHỨNG CHÍNH', th.bangChungChinh)
-    + khoiHtml('GIỚI HẠN DỮ LIỆU', th.luuYDuLieu)
+    + khoiNhanDinh
     + bieuDoThang(d.theo_thang, thangTrongKy)
     + bieuDoBoPhan(d.bat_cap_theo_bo_phan)
     + bangBatCap

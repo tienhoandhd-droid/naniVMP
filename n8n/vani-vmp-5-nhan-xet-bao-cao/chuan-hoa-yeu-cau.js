@@ -72,7 +72,13 @@ if (Object.prototype.hasOwnProperty.call(dau, 'muc_tieu')) {
 // ---- Đường 1: bấm nút trên web ----
 return items.map(function (it) {
   var b = (it.json && it.json.body) || it.json || {};
-  var loai = String(b.loai || 'bao_cao').trim() === 'canh_bao' ? 'canh_bao' : 'bao_cao';
+  // Danh sách trắng, KHÔNG phải phép so hai nhánh: bản cũ viết
+  //   loai === 'canh_bao' ? 'canh_bao' : 'bao_cao'
+  // nên mọi giá trị mới (vd 'phan_tich_sau') bị nuốt về 'bao_cao' — thêm nhánh
+  // mà quên chỗ này thì nó chạy nhánh cũ mà không báo lỗi gì.
+  var LOAI_HOP_LE = ['bao_cao', 'canh_bao', 'phan_tich_sau'];
+  var loaiRaw = String(b.loai || 'bao_cao').trim();
+  var loai = LOAI_HOP_LE.indexOf(loaiRaw) >= 0 ? loaiRaw : 'bao_cao';
   var pv = String(b.pham_vi != null ? b.pham_vi : (b.scope != null ? b.scope : 'all')).trim() || 'all';
   var mails = Array.isArray(b.email_nhan)
     ? b.email_nhan.map(function (e) { return String(e || '').trim(); }).filter(laEmail)

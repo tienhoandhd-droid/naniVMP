@@ -58,6 +58,37 @@ var SCHEMA_CANH_BAO = 'Đúng schema: '
  + 'luuYDuLieu: giới hạn của dữ liệu (thiếu ngày thực tế, chưa chấm điểm trọng yếu, danh sách bị cắt). '
  + 'gioiHanAI phải nói rõ AI chỉ hỗ trợ nhận định, không thay thế QA và không phải căn cứ phê duyệt. Toàn bộ bằng tiếng Việt.';
 
+
+/* ---- NHÁNH 3: PHÂN TÍCH SÂU TỪ DỮ LIỆU THÔ -------------------------
+ * Hai nhánh bao_cao/canh_bao cố ý CHỈ đưa số đã gộp cho AI — để nó không
+ * đếm sai. Đổi lại, AI không bao giờ thấy được quy luật ở cấp từng dòng:
+ * bốn hạng mục cùng khu C3 cùng nghẽn thẩm định là MỘT nguyên nhân chung
+ * hay bốn việc rời rạc, số tổng không trả lời được.
+ *
+ * Nhánh này đưa danh sách từng dòng vào, nhưng giữ nguyên kỷ luật cũ bằng
+ * ba chốt: (1) mọi nhận định phải dẫn ≥2 mã có thật, (2) danh sách đã lọc
+ * nên cấm suy ra phần trăm từ độ dài mảng, (3) cấm chấm điểm cá nhân.
+ * ------------------------------------------------------------------- */
+var CHUNG_SAU = 'Bạn là chuyên gia QA thẩm định nhà máy dược GMP, đọc DANH SÁCH HẠNG MỤC THẬT (từng dòng, không phải số đã gộp) của Kế hoạch Thẩm định Gốc (VMP) để tìm QUY LUẬT mà số liệu tổng hợp không thấy được. '
+ + 'Bạn chỉ là lớp nhận định, không thay đổi số liệu, không phê duyệt GMP. '
+ + 'MỌI nhận định về một quy luật/nhóm PHẢI dẫn ít nhất 2 mã hạng mục CÓ THẬT trong danh sách được cung cấp — không nói "nhiều hạng mục" mà không nêu mã, không bịa mã, không bịa số. '
+ + 'Danh sách hang_muc_dang_chu_y đã LỌC SẴN (xem loc_theo) — KHÔNG phải toàn bộ dữ liệu kỳ này — nên KHÔNG suy ra % hay so với tổng toàn nhà máy từ độ dài mảng này; muốn nói tổng thì dùng đúng dem_* hoặc doi_chieu_tong_hop đã cho, không tự tính lại. '
+ + 'TUYỆT ĐỐI KHÔNG nhận định về hiệu suất hay tải việc của TỪNG CÁ NHÂN — chỉ nhắc người thực hiện khi đó là bằng chứng cho vướng mắc CƠ CẤU/QUY TRÌNH (vd một khu vực chưa có ai phụ trách), không phải chấm điểm người đó. '
+ + 'Không đủ dữ liệu để kết luận thì nói rõ "không đủ dữ liệu", không suy diễn thêm. '
+ + 'Chỉ trả về MỘT JSON object thuần, không markdown, không code fence. ';
+
+var SCHEMA_PHAN_TICH_SAU = 'Đúng schema: '
+ + 'tieuDe, tomTat, mucRuiRoTongThe, quyLuatPhatHien, canhBaoChuoi, lechUuTien, canNguyenNhan, khuyenNghi, gioiHanPhanTich, confidence. '
+ + 'mucRuiRoTongThe thuộc {cao, trung binh, thap}. confidence là số 0..1. tomTat tối đa 80 từ. '
+ + 'quyLuatPhatHien, canhBaoChuoi, lechUuTien, canNguyenNhan, khuyenNghi là MẢNG OBJECT {nhanDinh, maDanChung}: nhanDinh tối đa 40 từ, maDanChung là mảng 2-6 mã hạng mục LẤY NGUYÊN VĂN từ dữ liệu. Tối đa 5 object mỗi mảng. '
+ + 'quyLuatPhatHien: quy luật lặp xuyên nhiều hạng mục — cùng khu vực, cùng loại thẩm định (OQ/PQ/IQ/DQ/FAT-SAT), hoặc cùng chuỗi mã bị nghẽn cùng giai đoạn — gợi ý MỘT nguyên nhân chung thay vì nhiều vấn đề riêng lẻ. '
+ + 'canhBaoChuoi: hạng mục liên quan (cùng khu vực/cùng nhóm thiết bị) có nhiều mốc hạn dồn sát nhau — rủi ro chậm dây chuyền nếu một mốc trượt. '
+ + 'lechUuTien: hạng mục điểm trọng yếu cao (>=7) nhưng không được xử lý sớm hơn hạng mục điểm thấp hơn cùng đợt — so hạn và trạng thái thực tế, không so điểm với điểm. '
+ + 'canNguyenNhan: với mỗi mục ở quyLuatPhatHien, MỘT giả thuyết nguyên nhân khả dĩ — nói rõ đây là gợi ý để QA xác minh, không phải kết luận chắc chắn. '
+ + 'khuyenNghi: 2-4 hành động cụ thể, mỗi hành động gắn đúng mã ở trên, có động từ. '
+ + 'gioiHanPhanTich (mảng chuỗi thường): nói rõ danh sách đã lọc theo tiêu chí nào, và yếu tố ngoài dữ liệu (lịch sản xuất, nhân sự nghỉ, ưu tiên nội bộ...) mà phân tích này không thấy được. '
+ + 'Toàn bộ bằng tiếng Việt.';
+
 return $input.all().map(function (it, idx) {
   var d = (it.json || {}).du_lieu || {};
   var ctx = yc[idx] || yc[0] || {};
@@ -92,17 +123,6 @@ return $input.all().map(function (it, idx) {
     return r;
   }).filter(function (r) { return r.tong > 0; });
 
-  // Câu lệnh cứng cho tháng hiện tại. Rào chắn chung trong prompt đã có nhưng
-  // mô hình vẫn viết "tháng này 5%, chưa đạt" cho một tháng chưa kết thúc —
-  // chốt sổ một kỳ chưa xảy ra. Nói thẳng bằng một câu tính sẵn thì chắc hơn.
-  var cachNoiThang = !thangRow
-    ? 'Không có dữ liệu tháng hiện tại — không được nhận định gì về tháng này.'
-    : thangRow.ky === 'dang_dien_ra'
-      ? ('Tháng ' + thangHienTai + ' ĐANG DIỄN RA. ' + (thangRow.ty_le == null
-          ? 'Chưa có hạng mục nào đến hạn trong tháng — KHÔNG được nói 0% hay chưa đạt.'
-          : 'Con số ' + thangRow.ty_le + '% là SỐ GIỮA KỲ, chưa phải kết quả chốt. Phải nói rõ đó là số giữa kỳ; TUYỆT ĐỐI KHÔNG viết "chưa đạt", "trượt mục tiêu" hay "không đạt" cho tháng này.'))
-      : ('Tháng ' + thangHienTai + ' có ky=' + thangRow.ky + '.');
-
   // Mỗi bộ phận có 4 con số gần giống nhau (cham_de_cuong / cham_tham_dinh /
   // cham_bao_cao / qua_han_vmp) và mô hình chọn nhầm — 2026-07-30 nó viết "qc
   // nghẽn ở thẩm định thực tế với 64" trong khi 64 là qua_han_vmp còn giai
@@ -118,6 +138,66 @@ return $input.all().map(function (it, idx) {
       so_cham_o_giai_doan_nghen: gd.n,
     });
   });
+
+  // Lọc trước khi đưa vào prompt: cả năm là 300+ dòng, nhét hết vừa tốn token
+  // vừa loãng tín hiệu. Giữ lại thứ đáng nhìn — chưa xong, trọng yếu cao, hoặc
+  // đang có lỗi quy trình.
+  var choTatCa = d.chi_tiet_toan_bo || [];
+  var dangChuY = choTatCa.filter(function (r) {
+    return r.trang_thai !== 'done'
+      || (r.diem || 0) >= 7
+      || String(r.vmp || '').indexOf('Lỗi') >= 0;
+  });
+  var demDangChuY = dangChuY.length;   // số THẬT — mảng dưới đây đã bị cắt
+  // Cắt bớt cột: da_xong trùng với trang_thai, ngay_xong luôn rỗng (dữ liệu
+  // chưa từng ghi ngày thực tế), trang_thai_vmp trùng với vmp. Giữ nguyên cả
+  // 20 cột thì prompt lên 101KB — vừa tốn vừa loãng đúng thứ cần nhìn.
+  var COT_CHO_AI = ['ma', 'ten', 'loai', 'khu_vuc', 'bo_phan', 'nguoi', 'diem',
+    'trang_thai', 'tre_ngay', 'han', 'dl_de_cuong', 'dl_tham_dinh', 'dl_bao_cao',
+    'de_cuong', 'tham_dinh', 'bao_cao', 'vmp'];
+  var mauDangChuY = dangChuY
+    .sort(function (x, y) { return (y.diem - x.diem) || ((y.tre_ngay || 0) - (x.tre_ngay || 0)); })
+    .slice(0, 250)
+    .map(function (r) {
+      var o = {};
+      COT_CHO_AI.forEach(function (c) { if (r[c] != null && r[c] !== '') o[c] = r[c]; });
+      return o;
+    });
+
+  if (ctx.loai === 'phan_tich_sau') {
+    var payloadSau = {
+      loai_phan_tich: 'phan_tich_sau_du_lieu_tho',
+      pham_vi: ctx.pham_vi, ky_bao_cao: ctx.ky_nhan,
+      dem_tong_hang_muc_trong_ky: d.tong_hang_muc,
+      dem_hang_muc_dang_chu_y: demDangChuY,
+      loc_theo: 'hang_muc_dang_chu_y chỉ gồm: chưa xong, HOẶC điểm trọng yếu>=7, HOẶC có lỗi quy trình — KHÔNG phải toàn bộ ' + d.tong_hang_muc + ' hạng mục trong kỳ.',
+      hang_muc_dang_chu_y: mauDangChuY,
+      doi_chieu_tong_hop: {
+        theo_bo_phan: d.theo_bo_phan,
+        bat_cap_theo_bo_phan: batCap,
+        theo_muc_trong_yeu: theoMucTrongYeu
+      }
+    };
+    var promptSau = CHUNG_SAU + SCHEMA_PHAN_TICH_SAU
+      + ' Toàn bộ nhận định chỉ nói về KỲ ' + (ctx.ky_nhan || '') + '.'
+      + '\nDữ liệu: ' + JSON.stringify(payloadSau);
+    return { json: {
+      promptTongHop: promptSau, du_lieu: d, so_qua_han: soQuaHan, loai: ctx.loai,
+      pham_vi: ctx.pham_vi, ky_nhan: ctx.ky_nhan, gui_mail: ctx.gui_mail,
+      dung_danh_sach: ctx.dung_danh_sach, email_nhan: ctx.email_nhan || [], tu_web: ctx.tu_web
+    } };
+  }
+
+  // Câu lệnh cứng cho tháng hiện tại. Rào chắn chung trong prompt đã có nhưng
+  // mô hình vẫn viết "tháng này 5%, chưa đạt" cho một tháng chưa kết thúc —
+  // chốt sổ một kỳ chưa xảy ra. Nói thẳng bằng một câu tính sẵn thì chắc hơn.
+  var cachNoiThang = !thangRow
+    ? 'Không có dữ liệu tháng hiện tại — không được nhận định gì về tháng này.'
+    : thangRow.ky === 'dang_dien_ra'
+      ? ('Tháng ' + thangHienTai + ' ĐANG DIỄN RA. ' + (thangRow.ty_le == null
+          ? 'Chưa có hạng mục nào đến hạn trong tháng — KHÔNG được nói 0% hay chưa đạt.'
+          : 'Con số ' + thangRow.ty_le + '% là SỐ GIỮA KỲ, chưa phải kết quả chốt. Phải nói rõ đó là số giữa kỳ; TUYỆT ĐỐI KHÔNG viết "chưa đạt", "trượt mục tiêu" hay "không đạt" cho tháng này.'))
+      : ('Tháng ' + thangHienTai + ' có ky=' + thangRow.ky + '.');
 
   var payload = {
     loai_phan_tich: laCanhBao ? 'phan_tich_canh_bao' : 'nhan_xet_bao_cao',
