@@ -126,10 +126,26 @@ Ba tập đều đo hoàn thành bằng `status_vmp`.
 448**: 5 hạng mục chưa có mốc đích không thuộc kỳ nào và được đếm riêng ở
 `chua_co_moc_dich`. Web hiển thị đúng con số đó cạnh bộ lọc.
 
-**Mail gồm cả dữ liệu thô** (người dùng chốt 2026-07-31): thân mail có bảng 60 dòng
-đầu để đọc ngay, **toàn bộ** đính kèm dạng CSV (`;` + BOM UTF-8 để Excel tiếng Việt
-mở đúng). CSV gắn vào `binary.du_lieu_tho` ở node `Bung người nhận` — node Send Email
-chỉ đính kèm được từ binary property, không nhận chuỗi.
+**Mail = dashboard tĩnh + hai tệp đính kèm** (người dùng chốt 2026-07-31):
+
+| Phần | Nội dung |
+|---|---|
+| Thân mail | số chính · phân tích AI · **3 biểu đồ** · bảng quá hạn · 60 dòng dữ liệu thô đầu · link dashboard sống |
+| Đính kèm 1 | `DuLieuTho_VMP_<kỳ>.csv` — toàn bộ dòng, `;` + BOM UTF-8 để Excel tiếng Việt mở đúng |
+| Đính kèm 2 | `Dashboard_VMP_<kỳ>.html` — cùng dashboard nhưng **đủ dòng**, mở thẳng bằng trình duyệt |
+
+⚠️ **Biểu đồ trong mail phải dựng bằng bảng HTML lồng nhau + `width` phần trăm +
+`bgcolor`.** Hộp thư không chạy JavaScript, và Gmail còn cắt luôn thẻ `<svg>` — nên
+KHÔNG dùng lại `reportCharts.ts` (SVG) hay `<canvas>` cho mail, người nhận sẽ thấy ô
+trống. Ba biểu đồ hiện có: tỷ lệ 12 tháng so mục tiêu 50% · bộ phận nghẽn ở giai đoạn
+nào · khối lượng kỳ sau theo bộ phận.
+
+Phần "động" thật là **link tới dashboard** ở cuối mail (`TRANG_DASHBOARD` trong node
+`Đóng gói cho web`) — mail chỉ là ảnh chụp lúc gửi, và nói rõ điều đó với người đọc.
+
+Cả hai tệp gắn vào `binary` ở node `Bung người nhận` (`du_lieu_tho`, `dashboard_html`);
+node Send Email khai `options.fileAttachments = "du_lieu_tho,dashboard_html"` — nó chỉ
+đính kèm được từ binary property, không nhận chuỗi.
 
 **Hai đường vào:**
 

@@ -68,6 +68,101 @@ function dungCsv(rows) {
   return '\ufeff' + L.join('\r\n');
 }
 
+
+/* ===================== BIỂU ĐỒ CHO EMAIL =====================
+ * Hộp thư KHÔNG chạy JavaScript, và Gmail còn cắt luôn thẻ <svg>. Nên biểu
+ * đồ trong mail phải dựng bằng BẢNG HTML lồng nhau + width phần trăm +
+ * bgcolor — kỹ thuật cũ nhưng là thứ duy nhất hiện đúng ở cả Gmail, Outlook
+ * lẫn app điện thoại. Đừng thay bằng SVG hay <canvas>, người nhận sẽ thấy ô
+ * trống.
+ *
+ * Phần "động" thật nằm ở link dashboard cuối mail — mail chỉ là ảnh chụp.
+ * ============================================================= */
+
+var TRANG_DASHBOARD = 'https://tienhoandhd-droid.github.io/naniVMP/';
+
+function thanh(pct, mau, cao) {
+  var p = Math.max(0, Math.min(100, Math.round(pct || 0)));
+  return '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:fixed"><tr>'
+    + (p > 0 ? '<td width="' + p + '%" bgcolor="' + mau + '" style="height:' + (cao || 14) + 'px;font-size:1px;line-height:1px">&nbsp;</td>' : '')
+    + (p < 100 ? '<td bgcolor="#ece7f1" style="height:' + (cao || 14) + 'px;font-size:1px;line-height:1px">&nbsp;</td>' : '')
+    + '</tr></table>';
+}
+
+function dongBieuDo(nhan, noiDung, ghiChu) {
+  return '<tr>'
+    + '<td width="86" style="font-size:11.5px;color:#555;padding:4px 8px 4px 0;white-space:nowrap">' + esc(nhan) + '</td>'
+    + '<td style="padding:4px 0">' + noiDung + '</td>'
+    + '<td width="132" style="font-size:11.5px;color:#555;padding:4px 0 4px 8px;white-space:nowrap">' + esc(ghiChu) + '</td>'
+    + '</tr>';
+}
+
+function khungBieuDo(tieu, than, chuThich) {
+  if (!than) return '';
+  return '<div style="margin-top:22px">'
+    + '<div style="font-size:12px;font-weight:bold;color:#2d1b45;letter-spacing:.6px">' + esc(tieu) + '</div>'
+    + (chuThich ? '<div style="font-size:11px;color:#888;margin:3px 0 6px">' + chuThich + '</div>' : '<div style="height:6px"></div>')
+    + '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">' + than + '</table>'
+    + '</div>';
+}
+
+/** 12 tháng so mục tiêu 50%. Tháng chưa tới kỳ KHÔNG vẽ cột tỷ lệ — vẽ ra là
+ *  kết luận sai; chỉ ghi khối lượng sắp đến hạn. */
+function bieuDoThang(rows, thangTrongKy) {
+  var than = (rows || []).map(function (r) {
+    var trongKy = (thangTrongKy || []).indexOf(r.thang) >= 0;
+    var nhan = (trongKy ? '\u25B8 ' : '') + 'T' + r.thang;
+    if (r.can_hoan_thanh === 0) return dongBieuDo(nhan, thanh(0, '#ccc'), 'chưa có hạng mục');
+    if (r.ky === 'chua_toi') return dongBieuDo(nhan, thanh(0, '#ccc'), r.can_hoan_thanh + ' sẽ đến hạn');
+    var mau = r.ky === 'dang_dien_ra' ? '#e8a33d' : (r.ty_le >= r.muc_tieu ? '#2e9e6b' : '#c0405f');
+    var ghi = r.ty_le + '% (' + r.da_hoan_thanh + '/' + r.can_hoan_thanh + ')'
+      + (r.ky === 'dang_dien_ra' ? ' giữa kỳ' : '');
+    return dongBieuDo(nhan, thanh(r.ty_le, mau), ghi);
+  }).join('');
+  return khungBieuDo('TỶ LỆ HOÀN THÀNH VMP THEO THÁNG — MỤC TIÊU 50%', than,
+    'Xanh = đạt · Đỏ = chưa đạt · Cam = tháng đang diễn ra (số giữa kỳ) · Xám = chưa tới kỳ. Mũi thọn ▸ là tháng thuộc kỳ đang xem.');
+}
+
+/** Bộ phận nghẽn ở giai đoạn nào — ba thanh cạnh nhau, cùng một thang đo. */
+function bieuDoBoPhan(rows) {
+  var ds = (rows || []).filter(function (r) {
+    return (r.cham_de_cuong + r.cham_tham_dinh + r.cham_bao_cao) > 0;
+  }).slice(0, 8);
+  if (!ds.length) return '';
+  var max = 1;
+  ds.forEach(function (r) { max = Math.max(max, r.cham_de_cuong, r.cham_tham_dinh, r.cham_bao_cao); });
+  var than = ds.map(function (r) {
+    var ba = '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">'
+      + '<tr><td style="padding:1px 0">' + thanh(100 * r.cham_de_cuong / max, '#8b6fc7', 9) + '</td></tr>'
+      + '<tr><td style="padding:1px 0">' + thanh(100 * r.cham_tham_dinh / max, '#3f8fc4', 9) + '</td></tr>'
+      + '<tr><td style="padding:1px 0">' + thanh(100 * r.cham_bao_cao / max, '#d4699a', 9) + '</td></tr>'
+      + '</table>';
+    return dongBieuDo(r.bo_phan, ba,
+      'ĐC ' + r.cham_de_cuong + ' · TĐ ' + r.cham_tham_dinh + ' · BC ' + r.cham_bao_cao);
+  }).join('');
+  return khungBieuDo('BỘ PHẬN ĐANG NGHẼN Ở GIAI ĐOẠN NÀO', than,
+    '<span style="color:#8b6fc7">\u25A0</span> chậm đề cương &nbsp; '
+    + '<span style="color:#3f8fc4">\u25A0</span> chậm thẩm định thực tế &nbsp; '
+    + '<span style="color:#d4699a">\u25A0</span> chậm báo cáo');
+}
+
+/** Khối lượng kỳ sau theo bộ phận. */
+function bieuDoKySau(items, nhanKy) {
+  var dem = {};
+  (items || []).forEach(function (it) {
+    (it.bo_phan || []).forEach(function (bp) { dem[bp] = (dem[bp] || 0) + 1; });
+  });
+  var ds = Object.keys(dem).map(function (k) { return { bp: k, n: dem[k] }; })
+    .sort(function (a, b) { return b.n - a.n; }).slice(0, 8);
+  if (!ds.length) return '';
+  var max = ds[0].n || 1;
+  var than = ds.map(function (r) {
+    return dongBieuDo(r.bp, thanh(100 * r.n / max, '#6b46a8'), r.n + ' hạng mục');
+  }).join('');
+  return khungBieuDo('KHỐI LƯỢNG ' + String(nhanKy || 'kỳ sau').toUpperCase() + ' — CHƯA HOÀN THÀNH VMP', than,
+    'Hạng mục có mốc đích VMP rơi vào kỳ sau và hiện chưa xong.');
+}
+
 var ctxAll = $('Dựng prompt tổng hợp').all().map(function (i) { return i.json; });
 
 return $input.all().map(function (it, idx) {
@@ -139,28 +234,39 @@ return $input.all().map(function (it, idx) {
   var subject = '[VMP] ' + (laCanhBao ? 'Phân tích cảnh báo' : 'Nhận xét báo cáo')
     + ' · ' + phamViChu + ' · kỳ ' + kyChu;
 
+  var thangTrongKy = [];
+  for (var mm = (d.thang_tu || 1); mm <= (d.thang_den || 12); mm++) thangTrongKy.push(mm);
+
   var tho = d.chi_tiet_toan_bo || [];
   var csv = dungCsv(tho);
   var tenTep = 'DuLieuTho_VMP_' + String(kyChu).replace(/[^0-9A-Za-z]+/g, '-') + '.csv';
 
-  var hangTho = tho.slice(0, 60).map(function (r) {
-    return '<tr>' + COT_THO.map(function (c) {
-      var v = r[c[0]];
-      return '<td style="padding:5px 8px;border-top:1px solid #eee;font-size:11.5px;white-space:nowrap">'
-        + esc(Array.isArray(v) ? v.join('+') : (v == null ? '' : v)) + '</td>';
-    }).join('') + '</tr>';
-  }).join('');
-
-  var bangTho = tho.length
-    ? '<div style="margin-top:22px">'
+  // Thân mail chỉ 60 dòng đầu (hộp thư nào cũng cắt mail quá dài); bản HTML
+  // đính kèm có ĐỦ — đó mới là chỗ tra cứu thật.
+  function dungBangTho(gioiHan) {
+    if (!tho.length) return '';
+    var n = Math.min(gioiHan, tho.length);
+    var hang = tho.slice(0, n).map(function (r) {
+      return '<tr>' + COT_THO.map(function (c) {
+        var v = r[c[0]];
+        return '<td style="padding:5px 8px;border-top:1px solid #eee;font-size:11.5px;white-space:nowrap">'
+          + esc(Array.isArray(v) ? v.join('+') : (v == null ? '' : v)) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return '<div style="margin-top:22px">'
       + '<div style="font-size:12px;font-weight:bold;color:#2d1b45;letter-spacing:.6px">DỮ LIỆU THÔ — KỲ ' + esc(String(kyChu).toUpperCase()) + '</div>'
       + '<div style="font-size:11px;color:#777;margin:3px 0 6px">'
-      + esc(tho.length) + ' hạng mục. Bảng dưới hiện ' + Math.min(60, tho.length) + ' dòng đầu; toàn bộ nằm trong tệp CSV đính kèm (' + esc(tenTep) + ').</div>'
+      + esc(tho.length) + ' hạng mục'
+      + (n < tho.length
+          ? '. Bảng dưới hiện ' + n + ' dòng đầu; toàn bộ nằm trong tệp CSV và tệp HTML đính kèm.'
+          : ' — đầy đủ.')
+      + '</div>'
       + '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">'
       + '<tr style="text-align:left;color:#777;font-size:10.5px">'
       + COT_THO.map(function (c) { return '<th style="padding:4px 8px;white-space:nowrap">' + esc(c[1]) + '</th>'; }).join('')
-      + '</tr>' + hangTho + '</table></div></div>'
-    : '';
+      + '</tr>' + hang + '</table></div></div>';
+  }
+  var bangTho = dungBangTho(60);
 
   function khoiHtml(ten, v) {
     var xs = veMang(v);
@@ -212,7 +318,8 @@ return $input.all().map(function (it, idx) {
       + '</div>'
     : '';
 
-  var html = '<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">'
+  function dungHtml(bangThoBlock) {
+  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">'
     + '<div style="background:' + mau + ';color:#fff;padding:14px 18px">'
     + '<div style="font-size:16px;font-weight:bold">VMP Monitor · ' + esc(tieuDe) + '</div>'
     + '<div style="font-size:12px;opacity:.9;margin-top:3px">' + esc(phamViChu) + ' · kỳ ' + esc(kyChu) + ' · số liệu đọc ngày ' + esc(d.ngay_chay || '') + '</div>'
@@ -230,14 +337,32 @@ return $input.all().map(function (it, idx) {
     + khoiHtml(NHAN.uuTien, th.viecUuTien)
     + khoiHtml('BẰNG CHỨNG CHÍNH', th.bangChungChinh)
     + khoiHtml('GIỚI HẠN DỮ LIỆU', th.luuYDuLieu)
+    + bieuDoThang(d.theo_thang, thangTrongKy)
+    + bieuDoBoPhan(d.bat_cap_theo_bo_phan)
+    + bieuDoKySau(d.thang_toi, 'kỳ sau')
     + bangQuaHan
-    + bangTho
+    + bangThoBlock
+    + '<div style="margin-top:22px;padding:14px 16px;background:#f3eefa;border-radius:10px">'
+    + '<a href="' + TRANG_DASHBOARD + '" style="color:#6b46a8;font-weight:bold;font-size:13.5px;text-decoration:none">'
+    + '\u2192 Mở dashboard động (lọc, đổi kỳ, bấm vào số để xem chi tiết)</a>'
+    + '<div style="font-size:11px;color:#777;margin-top:4px">Mail này là ảnh chụp lúc gửi. Hộp thư không chạy được JavaScript nên bảng biểu ở đây là tĩnh; muốn xoay số thì mở dashboard.</div>'
+    + '</div>'
     + '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #eee;font-size:11px;color:#999;line-height:1.6">'
     + 'Kỳ là lát cắt theo mốc đích VMP, không phải ảnh chụp tại thời điểm đó.<br/>'
     + esc(th.gioiHanAI || 'AI chỉ hỗ trợ nhận định, không thay thế đánh giá của QA và không phải căn cứ phê duyệt GMP.')
     + (th.confidence != null ? ' · Độ tin cậy AI tự đánh giá: ' + esc(th.confidence) : '')
     + '<br/>Mail tự động từ VMP Monitor (workflow Vani VMP 5). Phần chữ do AI soạn — CẦN QA XÁC NHẬN trước khi dùng làm căn cứ.'
     + '</div></div></div>';
+  }
+
+  var html = dungHtml(bangTho);
+  // Tệp đính kèm: cùng một dashboard nhưng ĐỦ dòng dữ liệu thô, bọc trong
+  // khung HTML hoàn chỉnh để mở thẳng bằng trình duyệt.
+  var htmlDayDu = '<!doctype html><html lang="vi"><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>' + esc(subject) + '</title></head>'
+    + '<body style="margin:0;padding:18px;background:#faf7fb">' + dungHtml(dungBangTho(tho.length)) + '</body></html>';
+  var tenTepHtml = 'Dashboard_VMP_' + String(kyChu).replace(/[^0-9A-Za-z]+/g, '-') + '.html';
 
   return { json: {
     ok: true,
@@ -258,6 +383,8 @@ return $input.all().map(function (it, idx) {
     ky_nhan: kyChu,
     csv_tho: csv,
     ten_tep_csv: tenTep,
+    html_day_du: htmlDayDu,
+    ten_tep_html: tenTepHtml,
     so_dong_tho: tho.length,
     goc_idx: idx,
     nguon: 'gpt-4o-mini',

@@ -19,18 +19,31 @@ return $input.all().flatMap(function (it) {
         ky_nhan: j.ky_nhan,
         loai: j.loai,
         ten_tep_csv: j.ten_tep_csv,
+        ten_tep_html: j.ten_tep_html,
         so_dong_tho: j.so_dong_tho,
         goc_idx: j.goc_idx,
       },
     };
+    // HAI tệp đính kèm, hai việc khác nhau:
+    //   CSV  — mở bằng Excel để lọc, xoay, cộng trừ
+    //   HTML — dashboard đầy đủ (biểu đồ + toàn bộ dòng), mở bằng trình duyệt
+    // Thân mail chỉ là ảnh chụp rút gọn vì hộp thư cắt mail dài và không chạy
+    // được JavaScript.
+    item.binary = {};
     if (j.csv_tho) {
-      item.binary = {
-        du_lieu_tho: {
-          data: Buffer.from(j.csv_tho, 'utf8').toString('base64'),
-          mimeType: 'text/csv',
-          fileName: j.ten_tep_csv || 'du-lieu-tho.csv',
-          fileExtension: 'csv',
-        },
+      item.binary.du_lieu_tho = {
+        data: Buffer.from(j.csv_tho, 'utf8').toString('base64'),
+        mimeType: 'text/csv',
+        fileName: j.ten_tep_csv || 'du-lieu-tho.csv',
+        fileExtension: 'csv',
+      };
+    }
+    if (j.html_day_du) {
+      item.binary.dashboard_html = {
+        data: Buffer.from(j.html_day_du, 'utf8').toString('base64'),
+        mimeType: 'text/html',
+        fileName: j.ten_tep_html || 'dashboard-vmp.html',
+        fileExtension: 'html',
       };
     }
     return item;
