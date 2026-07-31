@@ -2,6 +2,7 @@
  * và pageerror. Đây là phép kiểm bắt được loại lỗi mà typecheck/build không
  * thấy — lỗi lúc chạy thật với dữ liệu thật. */
 import puppeteer from "puppeteer-core";
+import { choServer } from "./cho-server.mjs";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = "http://localhost:4173";
@@ -20,6 +21,8 @@ const MAN = [
   ["audit", "Audit log"],
   ["admin", "Quản trị"],
 ];
+
+await choServer(GOC);
 
 const b = await puppeteer.launch({
   executablePath: CHROME, headless: "new",

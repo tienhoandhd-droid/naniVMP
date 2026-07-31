@@ -1,4 +1,7 @@
 import puppeteer from "puppeteer-core";
+import { choServer } from "./cho-server.mjs";
+await choServer("http://localhost:4173");
+
 const b = await puppeteer.launch({ executablePath:"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless:"new", args:["--no-sandbox","--use-gl=angle","--use-angle=metal"] });
 const p = await b.newPage();
 await p.setViewport({width:1400,height:1000});
