@@ -99,10 +99,18 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   const [year, setYear] = useState("all");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [edit, setEdit] = useState<Activity | null>(null);
+  /** Mở hộp bằng đường tắt "✓ Xong bước" — hộp điền sẵn hôm nay + Hoàn thành,
+   *  người nhập chỉ còn chọn lý do rồi Lưu. Dùng lại đúng đường đã kiểm của
+   *  màn Cập nhật tiến độ, KHÔNG ghi thẳng — lý do là bắt buộc theo ALCOA+. */
+  const [quick, setQuick] = useState(false);
   /** Số nhóm dựng thật — 272 đối tượng dựng một lúc là thừa, mắt chỉ đọc được
    *  vài chục dòng đầu. */
   const [hien, setHien] = useState(40);
 
+  /** Danh sách phẳng đúng thứ tự đang hiện trên màn — hộp sửa dùng nó để nhảy
+   *  sang hạng mục kế tiếp mà không phải đóng ra mở vào. Đây chính là cách
+   *  "nhập hàng loạt" mà màn Cập nhật tiến độ đang dùng; làm giống hệt để hai
+   *  màn không có hai thói quen khác nhau. */
   const years = useMemo(
     () => [...new Set(acts.map(yearOf))].filter((y) => y && y !== "—").sort(),
     [acts],
@@ -155,6 +163,11 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
   // Đổi bộ lọc thì quay lại 40 nhóm đầu.
   useEffect(() => { setHien(40); }, [kw, cls, dept, status, year]);
+  const danhSachPhang = useMemo(
+    () => groups.slice(0, hien).flatMap((g) => groupByType(g.items).flatMap((t) => t.items)),
+    [groups, hien],
+  );
+
   const toggle = (code: string) => setOpen((p) => ({ ...p, [code]: !p[code] }));
 
   return (
@@ -197,6 +210,20 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
           const over = g.items.filter((a) => a.st === "over").length;
           const nTypes = new Set(g.items.map((a) => a.vtype)).size;
           const isOpen = open[String(o.code)];
+          // Điểm trọng yếu / phân loại báo cáo nằm ở hạng mục chứ không ở đối
+          // tượng. Lấy của lần đầu, và báo nếu các lần không giống nhau —
+          // hiện một con số cho cả nhóm mà bên trong khác nhau là nói dối.
+          const thongTin = (() => {
+            if (!g.items.length) return null;
+            const diems = new Set(g.items.map((a) => String(a.score ?? "")));
+            const deps = new Set(g.items.map((a) => String(a.dep ?? "")));
+            const d0 = g.items[0];
+            return {
+              diem: d0.score != null && String(d0.score) !== "" ? d0.score : null,
+              dep: d0.dep ? txt(d0.dep) : "",
+              lech: diems.size > 1 || deps.size > 1,
+            };
+          })();
           return (
             <Card key={o.code} style={{ padding: 0, overflow: "hidden" }}>
               <button onClick={() => toggle(o.code)} style={{ width: "100%", textAlign: "left", border: "none", background: isOpen ? C.pinkMist : C.surface, cursor: "pointer", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
@@ -205,6 +232,29 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{txt(o.name)}</div>
                   <div style={{ fontSize: 11.5, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{cl.label} · {dp?.name || o.dept || "—"} · {txt(o.area)}{Number(o.freq) > 0 ? ` · chu kỳ ${o.freq} tháng` : ""}</div>
+                  {/* Điểm trọng yếu và phân loại báo cáo lấy từ chính hạng mục,
+                      vì hai thứ này quyết định thứ tự ưu tiên (ICH Q9) và số
+                      ngày lùi của hạn thẩm định — người nhập cần thấy ngay. */}
+                  {thongTin && (
+                    <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600, marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {thongTin.diem != null && (
+                        <span style={{ background: C.marigoldSoft, color: C.marigoldText, borderRadius: 999, padding: "2px 8px", fontWeight: 800 }}>
+                          Trọng yếu {thongTin.diem}/9
+                        </span>
+                      )}
+                      {thongTin.dep && (
+                        <span style={{ background: C.skySoft, color: C.skyText, borderRadius: 999, padding: "2px 8px", fontWeight: 800 }}>
+                          Báo cáo: {thongTin.dep}
+                        </span>
+                      )}
+                      {thongTin.lech && (
+                        <span style={{ background: C.raspSoft, color: C.raspText, borderRadius: 999, padding: "2px 8px", fontWeight: 800 }}
+                          title="Các hạng mục của đối tượng này không cùng điểm trọng yếu / phân loại báo cáo — mở từng hạng mục để xem đúng của nó.">
+                          ⚠ các lần không giống nhau
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {/* Đối tượng KHÔNG nằm trong kế hoạch thẩm định (cột "Thẩm định" ≠ y)
                     trước đây hiện "0 loại · 0 lần · 0/0 xong" — nhìn y như dữ liệu
@@ -274,8 +324,17 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
                                 <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_vmp" ngayKey="ngay_vmp" ttKey="tt_vmp" />
                                 <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>{txt(a.owner)}</td>
                                 <td style={{ padding: "9px 12px", textAlign: "center" }}><Pill s={a.st} small /></td>
-                                <td style={{ padding: "9px 12px", textAlign: "center" }}>
-                                  <button onClick={() => setEdit(a)} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 9, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
+                                <td style={{ padding: "9px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                  {!readOnly && a.st !== "done" && (
+                                    <button onClick={() => { setEdit(a); setQuick(true); }}
+                                      title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
+                                      style={{ padding: "6px 10px", borderRadius: 9, border: `1px solid ${C.mint}`,
+                                        background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12,
+                                        fontWeight: 800, cursor: "pointer", marginRight: 6 }}>
+                                      ✓ Xong bước
+                                    </button>
+                                  )}
+                                  <button onClick={() => { setEdit(a); setQuick(false); }} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 9, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
                                 </td>
                               </tr>
                             ); })}
@@ -313,8 +372,14 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
           key={edit.id}
           act={edit}
           isAdmin={isAdmin}
-          onClose={() => setEdit(null)}
+          onClose={() => { setEdit(null); setQuick(false); }}
           onReload={onReload}
+          quickDone={quick}
+          nextAct={(() => {
+            const i = danhSachPhang.findIndex((x) => x.id === edit.id);
+            return i >= 0 ? danhSachPhang[i + 1] ?? null : null;
+          })()}
+          onOpenNext={(a) => { setEdit(a); setQuick(false); }}
           onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}
         />
       )}
