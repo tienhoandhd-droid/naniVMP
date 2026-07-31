@@ -218,8 +218,13 @@ export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
             return (
               <div key={x.diem} style={{ padding: "8px 14px", borderRadius: 12,
                                          background: t.bg, color: t.c, fontFamily: TEXT }}>
+                {/* Có chữ "điểm" và dấu phân cách. Bản trước là hai con số
+                    dính nhau, đọc ra thành "972 đối tượng" thay vì "9 điểm ·
+                    72 đối tượng" — và trình đọc màn hình cũng đọc y như vậy. */}
                 <span style={{ fontFamily: NUM, fontSize: 17, fontWeight: 800 }}>{x.diem}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 7 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 5 }}>điểm</span>
+                <span style={{ fontSize: 12, fontWeight: 700, margin: "0 6px", opacity: .5 }}>·</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>
                   {x.so_luong} đối tượng
                 </span>
               </div>

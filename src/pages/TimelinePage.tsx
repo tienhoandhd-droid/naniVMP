@@ -1571,10 +1571,16 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
     let noDeadline = 0;
     for (const a of acts) {
       const b = ovBucket(a.st);
-      const d = a.dept || "qa";
-      const dm = deptM.get(d) || { total: 0, done: 0, over: 0 };
-      dm.total++; if (b === "done") dm.done++; else if (b === "over") dm.over++;
-      deptM.set(d, dm);
+      // Một hạng mục thuộc NHIỀU bộ phận. Bản trước chỉ đọc a.dept (một giá
+      // trị), nên bộ phận nào không bao giờ đứng tên chính thì biến mất khỏi
+      // biểu đồ — RD có 21 hạng mục mà không hiện dòng nào. Mọi chỗ khác
+      // trong app đã đếm theo a.depts; chỗ này lệch luật.
+      const ds = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
+      for (const d of ds) {
+        const dm = deptM.get(d) || { total: 0, done: 0, over: 0 };
+        dm.total++; if (b === "done") dm.done++; else if (b === "over") dm.over++;
+        deptM.set(d, dm);
+      }
       const t = a.target ? parseD(a.target) : null;
       if (!t) { noDeadline++; continue; }
       if (t.getFullYear() !== year) continue;
