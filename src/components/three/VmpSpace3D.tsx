@@ -25,6 +25,7 @@
 import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
+import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { wlIsDone } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
@@ -39,6 +40,11 @@ export interface O3D {
   xong: number;
   tong: number;
 }
+
+/** Vị trí camera gốc — dùng chung cho khung nhìn và biên góc xoay. */
+/* Phương vị nghiêng về trục tháng để 12 tháng trải ngang khung —
+   xem lý do đầy đủ ở WorkloadSpace3D.tsx. */
+const VI_TRI: [number, number, number] = [7.4, 3.9, 3.4];
 
 const GIAI_DOAN = [
   { khoa: "tt_de_cuong", ten: "Đề cương", mau: "#8168CE" },
@@ -125,32 +131,44 @@ function Canh({ o3d, chon, onHover }: {
   const z0 = -sauZ / 2 + BUOC_T / 2;
   const x0 = -rongX / 2 + BUOC_G / 2;
 
+  /* Chỉ mốc quý đứng đậm; tháng còn lại nhỏ và mờ, sáng lên khi trỏ vào
+     cột của tháng đó. Tên trục bỏ mũi tên — khối xoay được nên mũi tên vẽ
+     cứng theo góc ban đầu sẽ chỉ sai sau khi xoay. */
   const nhan: MotNhan[] = [
     ...Array.from({ length: 12 }, (_, i) => ({
-      vt: [x0 - BUOC_G * 0.72, 0.02, z0 + i * BUOC_T] as [number, number, number],
+      // Mép GẦN camera — xem lý do ở WorkloadSpace3D.tsx.
+      // Lật trục thời gian để T1 nằm bên trái — xem WorkloadSpace3D.tsx.
+      vt: [rongX / 2 + 0.42, 0.02, -(z0 + i * BUOC_T)] as [number, number, number],
       chu: `T${i + 1}`,
+      cap: ((i + 1) % 3 === 1 ? "chinh" : "phu") as "chinh" | "phu",
+      sang: chon?.thang === i + 1,
     })),
     ...GIAI_DOAN.map((g, i) => ({
-      vt: [x0 + i * BUOC_G, 0.02, sauZ / 2 + 0.34] as [number, number, number],
+      vt: [x0 + i * BUOC_G, 0.02, sauZ / 2 + 0.36] as [number, number, number],
       chu: g.ten,
+      cap: "chinh" as const,
+      sang: chon?.giaiDoan === i,
     })),
-    { vt: [x0 - BUOC_G * 1.3, 0.02, -sauZ / 2 - 0.4], chu: "Tháng ↘", dam: true },
-    { vt: [rongX / 2 + 0.6, 0.02, sauZ / 2 + 0.34], chu: "Giai đoạn →", dam: true },
-    { vt: [x0 - BUOC_G * 1.0, CAO + 0.22, -sauZ / 2 - 0.2], chu: "↑ 100%", dam: true },
-    { vt: [rongX / 2 + 0.5, CAO / 2, -sauZ / 2 - 0.1], chu: "mục tiêu 50%" },
+    // Tên trục bỏ khỏi cảnh — phụ đề thẻ đã nói, mà để trong cảnh thì nó
+    // đẩy khung rộng ra và chen vào dãy nhãn giai đoạn.
+    { vt: [rongX / 2 + 0.55, CAO / 2, 0], chu: "mục tiêu 50%", cap: "phu" as const },
   ];
 
   return (
     <>
-      <OrthographicCamera makeDefault position={[5.2, 4.2, 6.2]} zoom={92} />
-      {/* Không tự xoay — xem chú thích ở WorkloadSpace3D.tsx. */}
+      <OrthographicCamera makeDefault position={VI_TRI} />
+      <KhungVua le={1.02}
+        hop={{ rong: rongX / 2 + 0.62, cao: CAO / 2 + 0.2, sau: sauZ / 2 + 0.4,
+               tam: [0, CAO / 2, 0] }} />
+      {/* Không tự xoay, và chặn góc quanh hướng gốc — xem WorkloadSpace3D.tsx. */}
       <OrbitControls
         makeDefault enablePan={false} enableZoom={false}
         // Chặn không cho lật xuống dưới sàn: nhìn từ dưới lên thì cột nào
         // cũng che nhau và không còn đọc được gì.
-        minPolarAngle={0.25} maxPolarAngle={Math.PI / 2.35}
+        minPolarAngle={0.34} maxPolarAngle={Math.PI / 2.5}
+        {...bienPhuongVi(VI_TRI, 0.55)}
         autoRotate={false}
-        target={[0, 0.55, 0]}
+        target={[0, CAO / 2, 0]}
       />
 
       <ambientLight intensity={0.75} />
@@ -173,11 +191,11 @@ function Canh({ o3d, chon, onHover }: {
           side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
-      <NhanTruc nhan={nhan} />
+      <NhanTruc nhan={nhan} tam={[0, CAO / 2, 0]} />
 
       {o3d.map((o) => (
         <Cot key={`${o.thang}-${o.giaiDoan}`} o={o}
-          x={x0 + o.giaiDoan * BUOC_G} z={z0 + (o.thang - 1) * BUOC_T}
+          x={x0 + o.giaiDoan * BUOC_G} z={-(z0 + (o.thang - 1) * BUOC_T)}
           chon={!!chon && chon.thang === o.thang && chon.giaiDoan === o.giaiDoan}
           onHover={onHover} />
       ))}
@@ -190,6 +208,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
 }) {
   const o3d = useMemo(() => dungMaTran(acts, nam), [acts, nam]);
   const [chon, setChon] = useState<O3D | null>(null);
+  const [chuot, setChuot] = useState<{ x: number; y: number } | null>(null);
 
   /* CÂU KẾT LUẬN. Hình khối cho thấy có một cái phễu, nhưng người xem vẫn
      phải tự đo xem nó tụt mạnh nhất ở khâu nào. Đó chính là con số quyết
@@ -233,29 +252,47 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
       {/* Bọc hẳn một div có chiều cao rõ ràng. Bản trước tôi đặt chiều cao
           bằng bộ chọn `> div:first-child` và trượt: R3F tự sinh lớp bọc
           riêng, canvas co lại còn 150px nên cột bị cắt mất ngọn. */}
-      <div className="vmp-space3d-khung">
-        <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
-          frameloop={giamChuyenDong ? "demand" : "always"}>
-          <Canh o3d={o3d} chon={chon} onHover={setChon} />
-        </Canvas>
-      </div>
+      <div className="vmp-space3d-than">
+        <div className="vmp-space3d-khung"
+          onPointerMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setChuot({ x: e.clientX - r.left, y: e.clientY - r.top });
+          }}
+          onPointerLeave={() => setChuot(null)}>
+          {chon && chuot && (
+            <div className="vmp-space3d-hover" style={{ left: chuot.x, top: chuot.y }} aria-hidden="true">
+              <b>{GIAI_DOAN[chon.giaiDoan].ten} · Tháng {chon.thang}</b>
+              <span>
+                <i style={{ background: GIAI_DOAN[chon.giaiDoan].mau }} />{chon.tyLe}% xong
+                <em>{chon.xong}/{chon.tong} hạng mục</em>
+              </span>
+            </div>
+          )}
+          <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
+            frameloop={giamChuyenDong ? "demand" : "always"}>
+            <Canh o3d={o3d} chon={chon} onHover={setChon} />
+          </Canvas>
+        </div>
 
-      <div className="vmp-space3d-chu">
-        {GIAI_DOAN.map((g) => (
-          <span key={g.ten}>
-            <i style={{ background: g.mau }} />{g.ten}
-          </span>
-        ))}
-        <span className="vmp-space3d-muc"><i />Mặt phẳng mục tiêu 50%</span>
-      </div>
+        <div className="vmp-space3d-canh">
+        <div className="vmp-space3d-chu">
+          {GIAI_DOAN.map((g) => (
+            <span key={g.ten}>
+              <i style={{ background: g.mau }} />{g.ten}
+            </span>
+          ))}
+          <span className="vmp-space3d-muc"><i />Mặt phẳng mục tiêu 50%</span>
+        </div>
 
-      <div className="vmp-space3d-tip" role="status" aria-live="polite">
-        {chon ? (
-          <>
-            <b>Tháng {chon.thang} · {GIAI_DOAN[chon.giaiDoan].ten}</b>
-            {" — "}{chon.tyLe}% ({chon.xong}/{chon.tong} hạng mục có mốc đích VMP tháng này)
-          </>
-        ) : "Kéo để xoay khối · đưa chuột lên một cột để xem số. Trục sâu là 12 tháng, trục ngang là bốn giai đoạn, chiều cao là % hoàn thành."}
+        <div className="vmp-space3d-tip" role="status" aria-live="polite">
+          {chon ? (
+            <>
+              <b>Tháng {chon.thang} · {GIAI_DOAN[chon.giaiDoan].ten}</b>
+              {" — "}{chon.tyLe}% ({chon.xong}/{chon.tong} hạng mục có mốc đích VMP tháng này)
+            </>
+          ) : "Kéo để xoay khối · đưa chuột lên một cột để xem số. Trục sâu là 12 tháng, trục ngang là bốn giai đoạn, chiều cao là % hoàn thành."}
+        </div>
+        </div>
       </div>
     </div>
   );

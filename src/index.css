@@ -6105,38 +6105,127 @@ body { transition: background var(--mo-slow) var(--ease); }
 /* =====================================================================
    KHÔNG GIAN VMP 3D — 12 tháng × 4 giai đoạn × % hoàn thành
    ===================================================================== */
-.vmp-space3d { position: relative; }
-.vmp-space3d-khung { height: 420px; width: 100%; }
-.vmp-space3d-khung > div, .vmp-space3d canvas { width: 100% !important; height: 100% !important; display: block; }
-.vmp-space3d-chu {
-  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
-  margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--c-ink-soft);
+.vmp-space3d { position: relative; container-type: inline-size; }
+
+/* Bố cục: khung vẽ bên trái, chú giải + chi tiết bên phải.
+   ---------------------------------------------------------------------
+   Bản trước xếp dọc — khung vẽ chiếm trọn 1116px bề ngang, còn chú giải
+   và dòng chi tiết nằm dưới thành hai dải mỏng. Hình chiếu của khối chỉ
+   có tỉ lệ ~1.5:1 nên trong khung 2.7:1 nó buộc phải co lại theo chiều
+   cao, bỏ trắng gần 40% bề ngang. Không phải lỗi thu phóng — là lỗi cho
+   khung một tỉ lệ mà hình không bao giờ lấp đầy được.
+   Cắt bớt bề ngang khung vẽ và dùng chỗ vừa lấy để đặt chú giải: hình
+   lấp đầy hơn, chú giải đọc theo cột dễ hơn theo hàng, và dòng chi tiết
+   không còn bị đẩy xa khỏi hình. */
+.vmp-space3d-than {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 224px;
+  gap: 18px;
+  align-items: stretch;
 }
-.vmp-space3d-chu span { display: inline-flex; align-items: center; gap: 7px; }
-.vmp-space3d-chu i { width: 10px; height: 10px; border-radius: 3px; display: block; }
+@container (max-width: 720px) {
+  .vmp-space3d-than { grid-template-columns: 1fr; gap: 12px; }
+}
+
+/* position:relative để tooltip bám con trỏ neo được vào đúng khung vẽ. */
+.vmp-space3d-khung { position: relative; height: 440px; width: 100%; min-width: 0; }
+.vmp-space3d-khung > div, .vmp-space3d canvas { width: 100% !important; height: 100% !important; display: block; }
+
+.vmp-space3d-canh {
+  display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  min-width: 0;
+}
+.vmp-space3d-chu {
+  display: flex; flex-direction: column; gap: 9px;
+  font-size: 12.5px; font-weight: 700; color: var(--c-ink-soft);
+}
+.vmp-space3d-chu span { display: inline-flex; align-items: center; gap: 8px; line-height: 1.35; }
+.vmp-space3d-chu i { width: 11px; height: 11px; border-radius: 3px; display: block; flex: none; }
 .vmp-space3d-muc i { background: #8168CE; opacity: .3; }
 .vmp-space3d-tip {
-  margin-top: 8px; min-height: 34px;
-  font-size: 12.5px; font-weight: 600; line-height: 1.6; color: var(--c-ink-soft);
-  background: var(--c-surface-sunk); border-radius: 10px; padding: 8px 12px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.55; color: var(--c-ink-soft);
+  background: var(--c-surface-sunk); border-radius: 12px; padding: 10px 12px;
 }
-@media (max-width: 760px) { .vmp-space3d-khung { height: 320px; } }
+.vmp-space3d-tip b { color: var(--c-ink); }
+@container (max-width: 720px) {
+  .vmp-space3d-khung { height: 320px; }
+  .vmp-space3d-chu { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; }
+}
 
 /* Nhãn trục trong khối 3D — thẻ DOM neo theo toạ độ cảnh (drei <Html>).
-   Nền mờ để chữ đọc được cả khi đè lên cột màu đậm. */
+   ---------------------------------------------------------------------
+   Cỡ chữ: bản trước dùng 10.5px, NHỎ HƠN cả bảng số liệu ngay bên dưới
+   cùng trang (13px) — tức là phần khó đọc nhất của trang lại được cho cỡ
+   chữ nhỏ nhất. Nay 12.5px cho vạch chia, 13px cho tên trục.
+
+   Nền chip đặc hơn (92%) và có viền mảnh: nhãn nằm đè lên nền nhiều màu
+   của rừng cột, nền 82% không đủ tách chữ khỏi cột đỏ đậm.
+
+   Độ mờ và zIndex do NhanTruc.tsx đặt theo từng frame (nhãn ở mặt xa lùi
+   lại), nên ở đây KHÔNG khai opacity — khai là đè mất. */
 .vmp-nhan-truc {
   display: inline-block;
   font-family: var(--font-num, ui-monospace, monospace);
-  font-size: 10.5px; font-weight: 800; line-height: 1;
-  color: var(--c-ink-soft);
-  background: color-mix(in srgb, var(--c-surface) 82%, transparent);
-  padding: 2px 5px; border-radius: 5px;
+  font-size: 12.5px; font-weight: 800; line-height: 1;
+  color: var(--c-ink);
+  background: color-mix(in srgb, var(--c-surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-ink) 8%, transparent);
+  padding: 3px 7px; border-radius: 7px;
   white-space: nowrap;
+  transition: opacity 140ms ease;
 }
+/* Vạch chia phụ — tháng không phải mốc quý. Nhỏ và chìm để mốc quý dẫn mắt. */
+.vmp-nhan-truc-phu {
+  font-size: 11px; font-weight: 700;
+  color: var(--c-ink-soft);
+  background: color-mix(in srgb, var(--c-surface) 80%, transparent);
+  border-color: transparent;
+  padding: 2px 5px;
+}
+/* Tên trục. */
 .vmp-nhan-truc-dam {
   font-family: inherit;
-  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--c-ink); background: color-mix(in srgb, var(--c-surface) 90%, transparent);
+  font-size: 13px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--c-ink);
+  background: color-mix(in srgb, var(--c-surface) 94%, transparent);
+  border-color: color-mix(in srgb, var(--c-ink) 12%, transparent);
+  padding: 4px 9px;
+}
+/* Số ghi trên đỉnh cột. */
+.vmp-nhan-truc-so {
+  font-size: 13px; font-weight: 900;
+  background: color-mix(in srgb, var(--c-surface) 94%, transparent);
+}
+/* Nhãn của cột đang trỏ tới — nổi hẳn lên khỏi phần còn lại. */
+.vmp-nhan-truc-sang {
+  color: #fff;
+  background: var(--c-pink-text);
+  border-color: var(--c-pink-text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+}
+
+/* Tooltip bám con trỏ trong khối 3D. Chi tiết cột phải hiện NGAY CẠNH
+   cột đang trỏ: bắt người ta liếc xuống dòng chữ dưới khung là bắt họ rời
+   mắt, mà rời mắt là mất luôn cột đang trỏ. */
+.vmp-space3d-hover {
+  position: absolute; z-index: 40;
+  transform: translate(14px, -50%);
+  pointer-events: none;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 9px 12px; border-radius: 12px;
+  background: var(--c-surface-raised);
+  border: 1px solid var(--c-line-strong);
+  box-shadow: var(--e-high);
+  max-width: 260px;
+}
+.vmp-space3d-hover b { font-size: 13px; font-weight: 800; color: var(--c-ink); white-space: nowrap; }
+.vmp-space3d-hover span {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 700; color: var(--c-ink); white-space: nowrap;
+}
+.vmp-space3d-hover i { width: 9px; height: 9px; border-radius: 3px; display: block; flex: none; }
+.vmp-space3d-hover em {
+  font-style: normal; font-weight: 700; color: var(--c-ink-soft); font-size: 11.5px;
 }
 
 /* Câu kết luận của khối 3D đã chuyển sang khối chung `.vmp-ketluan` bên
