@@ -13,6 +13,7 @@ import { CLS, DEPTS } from "../constants/vmp.ts";
 import { parseD, fmtVN, txt, wlIsDone } from "../utils/helpers.ts";
 import { Card, Tag, Pill } from "../components/ui/Primitives.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
+import KhongThamDinhCard from "../components/catalog/KhongThamDinhCard.tsx";
 import { useDebounce } from "../hooks/index.ts";
 import type { Activity, VmpObject } from "../types/domain.ts";
 
@@ -389,6 +390,10 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
         )}
         {!groups.length && <Card><div style={{ textAlign: "center", padding: 30, color: C.plumSoft, fontWeight: 600 }}>Không có đối tượng phù hợp bộ lọc.</div></Card>}
       </div>
+
+      {/* Ẩn khỏi danh sách trên mà không có chỗ tra thì thành GIẤU. Thẻ này là
+          chỗ tra: mở ra là thấy đủ 55 đối tượng ngoài kế hoạch kèm lý do. */}
+      <KhongThamDinhCard onMoDanhMuc={onMoDanhMuc} />
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
         <b style={{ color: C.mintText }}>Supabase là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).
