@@ -57,6 +57,9 @@ items_nam as (
     (p.status_protocol = 'completed') as de_cuong_done,
     (p.status_validation = 'completed') as tham_dinh_done,
     (p.status_report = 'completed') as bao_cao_done,
+    (p.status_protocol = 'in_progress') as de_cuong_dang,
+    (p.status_validation = 'in_progress') as tham_dinh_dang,
+    (p.status_report = 'in_progress') as bao_cao_dang,
     p.computed_status::text as trang_thai_vmp
   from public.vmp_plan_items p
   join public.vmp_objects o on o.code = p.object_code
@@ -176,6 +179,47 @@ select jsonb_build_object(
       'ma', ma, 'ten', ten, 'nguoi', nguoi, 'diem', diem, 'han', han, 'bo_phan', bo_phan
     ) order by han), '[]'::jsonb)
     from (select * from items_sau order by han limit 100) tt
+  ),
+  -- Tổng quan CẢ NĂM cho mục 1 của dashboard trong mail — phải khớp mục 1 trên
+  -- web, tức phễu 4 giai đoạn + 7 nhóm giai đoạn, tính trên items_nam.
+  -- Luật xếp nhóm giai đoạn giống hệt stageOf() trong src/utils/helpers.ts;
+  -- sửa một bên phải sửa bên kia, nếu không mail và web đếm khác nhau.
+  'tong_quan_nam', (
+    select jsonb_build_object(
+      'tong', count(*),
+      'de_cuong',  jsonb_build_object('xong', count(*) filter (where de_cuong_done),
+                                      'qua_han', count(*) filter (where not de_cuong_done and dl_de_cuong < current_date)),
+      'tham_dinh', jsonb_build_object('xong', count(*) filter (where tham_dinh_done),
+                                      'qua_han', count(*) filter (where not tham_dinh_done and dl_tham_dinh < current_date)),
+      'ho_so',     jsonb_build_object('xong', count(*) filter (where bao_cao_done),
+                                      'qua_han', count(*) filter (where not bao_cao_done and coalesce(dl_bao_cao, han) < current_date)),
+      'vmp',       jsonb_build_object('xong', count(*) filter (where da_xong),
+                                      'qua_han', count(*) filter (where not da_xong and han < current_date))
+    ) from items_nam where han is not null
+  ),
+  'giai_doan_nam', (
+    select coalesce(jsonb_agg(jsonb_build_object('id', gd, 'so', n) order by thu_tu), '[]'::jsonb)
+    from (
+      select gd, thu_tu, count(*) n from (
+        select case
+          when da_xong then 'done'
+          when bao_cao_done or bao_cao_dang then 'bc'
+          when tham_dinh_done then 'cho_bc'
+          when tham_dinh_dang then 'dang_td'
+          when de_cuong_done then 'cho_td'
+          when de_cuong_dang then 'dang_dc'
+          else 'chua' end as gd,
+        case
+          when da_xong then 7
+          when bao_cao_done or bao_cao_dang then 6
+          when tham_dinh_done then 5
+          when tham_dinh_dang then 4
+          when de_cuong_done then 3
+          when de_cuong_dang then 2
+          else 1 end as thu_tu
+        from items_nam where han is not null
+      ) x group by gd, thu_tu
+    ) y
   ),
   'nguoi_nhan_danh_sach', (
     select coalesce(jsonb_agg(jsonb_build_object(

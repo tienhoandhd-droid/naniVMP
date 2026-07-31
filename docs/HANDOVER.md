@@ -126,13 +126,28 @@ Ba tập đều đo hoàn thành bằng `status_vmp`.
 448**: 5 hạng mục chưa có mốc đích không thuộc kỳ nào và được đếm riêng ở
 `chua_co_moc_dich`. Web hiển thị đúng con số đó cạnh bộ lọc.
 
-**Mail = dashboard tĩnh + hai tệp đính kèm** (người dùng chốt 2026-07-31):
+**Mail = tóm tắt gọn + dashboard đầy đủ đính kèm** (người dùng chốt 2026-07-31):
 
-| Phần | Nội dung |
-|---|---|
-| Thân mail | số chính · phân tích AI · **3 biểu đồ** · bảng quá hạn · 60 dòng dữ liệu thô đầu · link dashboard sống |
-| Đính kèm 1 | `DuLieuTho_VMP_<kỳ>.csv` — toàn bộ dòng, `;` + BOM UTF-8 để Excel tiếng Việt mở đúng |
-| Đính kèm 2 | `Dashboard_VMP_<kỳ>.html` — cùng dashboard nhưng **đủ dòng**, mở thẳng bằng trình duyệt |
+| Phần | Nội dung | Cỡ đo thật (cả năm 2026) |
+|---|---|---|
+| Thân mail | đủ mục nhưng bảng cắt 15 dòng, **không** kèm dữ liệu thô | **40 KB** |
+| Đính kèm 1 | `DuLieuTho_VMP_<kỳ>.csv` — toàn bộ dòng, `;` + BOM UTF-8 | 75 KB |
+| Đính kèm 2 | `Dashboard_VMP_<kỳ>.html` — dashboard **đầy đủ**, mọi bảng không cắt | 870 KB |
+
+Cả hai đi qua **cùng một hàm `dungHtml(dayDu)`**, chỉ khác giới hạn số dòng — nên thân mail
+và tệp đính kèm không thể lệch nội dung.
+
+⚠️ **Vì sao thân mail phải cắt:** Gmail cắt mail quá ~100 KB và người nhận chỉ thấy
+`[Message clipped]`. Đo thật: để nguyên bảng dữ liệu thô thì thân mail 194 KB (vượt), bỏ ra
+còn 30–40 KB. 18 cột nhân N dòng với style nội tuyến lặp lại là phần nặng nhất — và đó đúng
+là thứ nên nằm ở tệp đính kèm.
+
+**Dashboard trong mail có đủ các mục như web:** tổng quan năm (phễu 4 giai đoạn + bảng 7
+nhóm giai đoạn) · tổng quan kỳ so mục tiêu 50% · biểu đồ 12 tháng · bộ phận nghẽn (biểu đồ
++ bảng) · công việc kỳ sau (biểu đồ + bảng) · quá hạn nặng nhất · chất lượng dữ liệu · dữ
+liệu thô. Số mục 1 lấy từ `tong_quan_nam` / `giai_doan_nam` trong truy vấn — **luật xếp
+nhóm giai đoạn phải giống `stageOf()` trong `src/utils/helpers.ts`**, sửa một bên phải sửa
+bên kia.
 
 ⚠️ **Biểu đồ trong mail phải dựng bằng bảng HTML lồng nhau + `width` phần trăm +
 `bgcolor`.** Hộp thư không chạy JavaScript, và Gmail còn cắt luôn thẻ `<svg>` — nên

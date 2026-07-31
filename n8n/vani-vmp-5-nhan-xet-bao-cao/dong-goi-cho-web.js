@@ -166,6 +166,51 @@ function bieuDoKySau(items, nhanKy) {
     'Hạng mục có mốc đích VMP rơi vào kỳ sau và hiện chưa xong.');
 }
 
+
+/* ============ BẢNG & Ô SỐ CHO DASHBOARD TRONG MAIL ============
+ * Mail nay là dashboard đầy đủ, không phải bản tóm tắt (người dùng chốt
+ * 2026-07-31: "chấp nhận nặng hơn vì nó là dashboard"). Nên nó lặp lại ĐỦ
+ * các mục của trang web: tổng quan năm, tổng quan kỳ, mục tiêu 50%, bất cập
+ * theo bộ phận, việc kỳ sau, chất lượng dữ liệu, dữ liệu thô.
+ * ============================================================= */
+
+function oSoLon(nhan, so, phu, mau, nen) {
+  return '<td style="padding:12px 14px;background:' + (nen || '#f7f4fb') + ';border-radius:10px;vertical-align:top">'
+    + '<div style="font-size:11px;color:#777;line-height:1.4">' + esc(nhan) + '</div>'
+    + '<div style="font-size:22px;font-weight:bold;color:' + (mau || '#2d1b45') + ';margin-top:2px">' + esc(so) + '</div>'
+    + (phu ? '<div style="font-size:10.5px;color:#888;margin-top:2px;line-height:1.4">' + esc(phu) + '</div>' : '')
+    + '</td>';
+}
+
+function hangO(os) {
+  return '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:6px 0;margin-top:10px"><tr>'
+    + os.join('') + '</tr></table>';
+}
+
+function bangHtml(tieu, cot, hang, ghiChu) {
+  if (!hang.length) return '';
+  return '<div style="margin-top:22px">'
+    + '<div style="font-size:12px;font-weight:bold;color:#2d1b45;letter-spacing:.6px">' + esc(tieu) + '</div>'
+    + (ghiChu ? '<div style="font-size:11px;color:#888;margin:3px 0 6px">' + esc(ghiChu) + '</div>' : '<div style="height:6px"></div>')
+    + '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">'
+    + '<tr style="text-align:left;color:#777;font-size:10.5px">'
+    + cot.map(function (c) { return '<th style="padding:4px 8px;white-space:nowrap">' + esc(c) + '</th>'; }).join('')
+    + '</tr>'
+    + hang.map(function (r) {
+        return '<tr>' + r.map(function (v) {
+          return '<td style="padding:5px 8px;border-top:1px solid #eee;font-size:11.5px;white-space:nowrap">'
+            + esc(v == null ? '' : v) + '</td>';
+        }).join('') + '</tr>';
+      }).join('')
+    + '</table></div></div>';
+}
+
+var TEN_GIAI_DOAN = {
+  chua: 'Chưa bắt đầu', dang_dc: 'Đang làm đề cương', cho_td: 'Xong đề cương · chờ thực tế',
+  dang_td: 'Đang thẩm định thực tế', cho_bc: 'Xong thực tế · chờ báo cáo',
+  bc: 'Đang/đã làm báo cáo', done: 'Hoàn thành VMP'
+};
+
 var ctxAll = $('Dựng prompt tổng hợp').all().map(function (i) { return i.json; });
 
 return $input.all().map(function (it, idx) {
@@ -242,6 +287,8 @@ return $input.all().map(function (it, idx) {
   var tho = d.chi_tiet_toan_bo || [];
   var csv = dungCsv(tho);
   var tenTep = 'DuLieuTho_VMP_' + String(kyChu).replace(/[^0-9A-Za-z]+/g, '-') + '.csv';
+  function tenTepCsv() { return tenTep; }
+  function tenTepHtmlChu() { return 'Dashboard_VMP_' + String(kyChu).replace(/[^0-9A-Za-z]+/g, '-') + '.html'; }
 
   // Thân mail chỉ 60 dòng đầu (hộp thư nào cũng cắt mail quá dài); bản HTML
   // đính kèm có ĐỦ — đó mới là chỗ tra cứu thật.
@@ -268,7 +315,14 @@ return $input.all().map(function (it, idx) {
       + COT_THO.map(function (c) { return '<th style="padding:4px 8px;white-space:nowrap">' + esc(c[1]) + '</th>'; }).join('')
       + '</tr>' + hang + '</table></div></div>';
   }
-  var bangTho = dungBangTho(60);
+
+  function dungLoiNhacTho() {
+    if (!tho.length) return '';
+    return '<div style="margin-top:22px;padding:13px 15px;background:#fff8e6;border-radius:10px;font-size:12px;color:#6a5326;line-height:1.6">'
+      + '<b>Dữ liệu thô ' + esc(tho.length) + ' hạng mục</b> nằm trong hai tệp đính kèm: '
+      + esc(tenTepCsv()) + ' (mở bằng Excel để lọc/xoay) và ' + esc(tenTepHtmlChu()) + ' (dashboard đầy đủ, mở bằng trình duyệt).'
+      + '</div>';
+  }
 
   function khoiHtml(ten, v) {
     var xs = veMang(v);
@@ -319,8 +373,111 @@ return $input.all().map(function (it, idx) {
       + '</div>'
     : '';
 
-  function dungHtml(bangThoBlock) {
-  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">'
+  // ---------- MỤC 1: TỔNG QUAN CẢ NĂM (khớp mục 1 trên web) ----------
+  var tqn = d.tong_quan_nam || null;
+  var pct = function (x, t) { return t ? Math.round(100 * x / t) + '%' : '—'; };
+  var mucNam = !tqn ? '' :
+    '<div style="margin-top:22px">'
+    + '<div style="font-size:12px;font-weight:bold;color:#2d1b45;letter-spacing:.6px">1. TỔNG QUAN NĂM ' + esc(d.nam) + ' — ĐÃ LÀM ĐƯỢC BAO NHIÊU</div>'
+    + '<div style="font-size:11px;color:#888;margin-top:3px">Toàn bộ hạng mục có mốc đích VMP trong năm. Hoàn thành VMP là chỉ số chính; ba mức còn lại là dữ liệu bổ sung.</div>'
+    + hangO([
+        oSoLon('Tổng hạng mục năm ' + d.nam, tqn.tong, '', '#2d1b45'),
+        oSoLon('\u2605 Hoàn thành VMP — chỉ số chính', pct(tqn.vmp.xong, tqn.tong),
+          tqn.vmp.xong + '/' + tqn.tong + ' · quá hạn ' + tqn.vmp.qua_han, '#2e9e6b', '#e8f6ef'),
+      ])
+    + '<div style="font-size:10.5px;color:#888;margin-top:12px;letter-spacing:.4px;font-weight:bold">DỮ LIỆU BỔ SUNG — ba giai đoạn trước đó</div>'
+    + hangO([
+        oSoLon('Đề cương hoàn thành', pct(tqn.de_cuong.xong, tqn.tong), tqn.de_cuong.xong + '/' + tqn.tong + ' · quá hạn ' + tqn.de_cuong.qua_han, '#8b6fc7'),
+        oSoLon('Thẩm định thực tế', pct(tqn.tham_dinh.xong, tqn.tong), tqn.tham_dinh.xong + '/' + tqn.tong + ' · quá hạn ' + tqn.tham_dinh.qua_han, '#3f8fc4'),
+        oSoLon('Hồ sơ hoàn thiện', pct(tqn.ho_so.xong, tqn.tong), tqn.ho_so.xong + '/' + tqn.tong + ' · quá hạn ' + tqn.ho_so.qua_han, '#d4699a'),
+      ])
+    + bangHtml('HẠNG MỤC ĐANG Ở GIAI ĐOẠN NÀO — NĂM ' + d.nam, ['Giai đoạn', 'Số hạng mục'],
+        (d.giai_doan_nam || []).map(function (g) { return [TEN_GIAI_DOAN[g.id] || g.id, g.so]; }))
+    + '</div>';
+
+  // ---------- MỤC 2: TỔNG QUAN KỲ ĐANG XEM ----------
+  var thangKy = (d.theo_thang || []).filter(function (r) {
+    return r.thang >= (d.thang_tu || 1) && r.thang <= (d.thang_den || 12);
+  });
+  var kyDue = thangKy.reduce(function (a2, r) { return a2 + (r.can_hoan_thanh || 0); }, 0);
+  var kyDone = thangKy.reduce(function (a2, r) { return a2 + (r.da_hoan_thanh || 0); }, 0);
+  // Kỳ CHƯA TỚI thì không có tỷ lệ — 0% ở kỳ chưa xảy ra không phải một tỷ lệ.
+  var kyChuaToi = thangKy.length > 0 && thangKy.every(function (r) { return r.ky === 'chua_toi'; });
+  var kyDangDienRa = thangKy.some(function (r) { return r.ky === 'dang_dien_ra'; });
+  var kyRate = (kyDue && !kyChuaToi) ? Math.round(100 * kyDone / kyDue) : null;
+
+  var dai = (d.thang_den || 12) - (d.thang_tu || 1) + 1;
+  var trTu = (d.thang_tu || 1) - dai, trDen = (d.thang_tu || 1) - 1;
+  var thangTruoc = trTu >= 1
+    ? (d.theo_thang || []).filter(function (r) { return r.thang >= trTu && r.thang <= trDen; })
+    : [];
+  var trDue = thangTruoc.reduce(function (a2, r) { return a2 + (r.can_hoan_thanh || 0); }, 0);
+  var trDone = thangTruoc.reduce(function (a2, r) { return a2 + (r.da_hoan_thanh || 0); }, 0);
+  var trRate = trDue ? Math.round(100 * trDone / trDue) : null;
+
+  var soSanh = kyRate == null ? '—'
+    : kyChuaToi ? 'Chưa chấm được'
+    : kyDangDienRa ? (kyRate >= 50 ? 'Tạm đạt' : 'Tạm dưới')
+    : (kyRate >= 50 ? 'Đạt' : 'Chưa đạt');
+  var soSanhPhu = kyRate == null ? 'Chưa có hạng mục đến hạn'
+    : kyChuaToi ? 'Kỳ chưa tới'
+    : kyDangDienRa ? 'Số giữa kỳ — kỳ chưa kết thúc' : 'Kết quả đã chốt';
+
+  var mucKy = '<div style="margin-top:24px">'
+    + '<div style="font-size:12px;font-weight:bold;color:#2d1b45;letter-spacing:.6px">2. TỔNG QUAN ' + esc(String(kyChu).toUpperCase()) + '</div>'
+    + hangO([
+        oSoLon('Cần hoàn thành ' + kyChu, kyDue, '', '#2d1b45'),
+        oSoLon('Đã hoàn thành VMP', kyDone, kyRate == null ? 'chưa có hạng mục đến hạn' : kyRate + '% trong kỳ', '#2e9e6b', '#e8f6ef'),
+        oSoLon('Tỷ lệ kỳ trước', trRate == null ? '—' : trRate + '%',
+          trRate == null ? (trTu < 1 ? 'kỳ trước ở năm khác' : 'kỳ trước chưa có hạng mục') : trDone + '/' + trDue + ' hạng mục', '#3f8fc4'),
+        oSoLon('So mục tiêu 50%', soSanh, soSanhPhu, (kyRate != null && kyRate >= 50) ? '#2e9e6b' : '#c0405f',
+          (kyRate != null && kyRate >= 50) ? '#e8f6ef' : '#fdeff2'),
+      ])
+    + '</div>';
+
+  // ---------- MỤC 4: BẢNG BẤT CẬP THEO BỘ PHẬN ----------
+  var xongTheoBp = {};
+  (d.theo_bo_phan || []).forEach(function (b2) { xongTheoBp[b2.bo_phan] = b2; });
+  var bangBatCap = bangHtml('4. BẤT CẬP THEO BỘ PHẬN — KỲ ' + String(kyChu).toUpperCase(),
+    ['Bộ phận', 'Tổng', 'Chậm đề cương', 'Chậm thẩm định', 'Chậm báo cáo', 'Quá hạn VMP', 'Tỷ lệ đúng hạn'],
+    (d.bat_cap_theo_bo_phan || []).map(function (r) {
+      var bp = xongTheoBp[r.bo_phan] || {};
+      var tyLe = bp.tong ? Math.round(100 * (bp.xong || 0) / bp.tong) + '%' : '—';
+      return [r.bo_phan, r.tong, r.cham_de_cuong, r.cham_tham_dinh, r.cham_bao_cao, r.qua_han_vmp, tyLe];
+    }),
+    'Chậm = quá hạn của chính giai đoạn đó mà chưa xong. Quá hạn VMP là con số khác — quá mốc đích.');
+
+  // ---------- MỤC 5: BẢNG VIỆC KỲ SAU ----------
+  function dungBangKySau(n) {
+    var ds = d.thang_toi || [];
+    return bangHtml('5. CÔNG VIỆC DỰ KIẾN KỲ SAU — CHƯA HOÀN THÀNH VMP',
+      ['Mã', 'Tên hạng mục', 'Bộ phận', 'Người thực hiện', 'Hạn đích VMP', 'Điểm trọng yếu'],
+      ds.slice(0, n).map(function (r) {
+        return [r.ma, r.ten, (r.bo_phan || []).join('+'), r.nguoi, r.han, r.diem];
+      }),
+      ds.length + ' hạng mục có mốc đích VMP rơi vào kỳ sau'
+        + (n < ds.length ? ' — bảng dưới hiện ' + n + ' dòng đầu, xem đủ trong tệp đính kèm.' : '.'));
+  }
+
+  // ---------- CHẤT LƯỢNG DỮ LIỆU ----------
+  var loi = d.loi_ho_so || [];
+  function dungBangChatLuong(n) {
+    return bangHtml('CHẤT LƯỢNG DỮ LIỆU — KỲ ' + String(kyChu).toUpperCase(),
+      ['Mã', 'Vấn đề'], loi.slice(0, n).map(function (r) { return [r.ma, r.loi]; }),
+      loi.length + ' vấn đề'
+        + ((d.chua_co_moc_dich || 0) > 0 ? ' · ' + d.chua_co_moc_dich + ' hạng mục chưa có mốc đích VMP nên không thuộc kỳ nào' : '')
+        + (n < loi.length ? ' · bảng dưới hiện ' + n + ' dòng đầu, xem đủ trong tệp đính kèm' : ''));
+  }
+
+  // Thân mail phải GỌN: Gmail cắt mail quá ~100KB và người nhận chỉ thấy
+  // "[Message clipped]". Bản ĐẦY ĐỦ nằm ở tệp HTML đính kèm — đó mới là
+  // dashboard. Cùng một hàm dựng, khác nhau ở giới hạn số dòng.
+  function dungHtml(dayDu) {
+    var gh = dayDu ? 100000 : 15;
+    // Thân mail KHÔNG kèm bảng dữ liệu thô — 18 cột nhân N dòng với style nội
+    // tuyến lặp lại là phần nặng nhất, mà đó đúng là thứ nên nằm ở tệp đính kèm.
+    var bangThoBlock = dayDu ? dungBangTho(tho.length) : dungLoiNhacTho();
+  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:900px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">'
     + '<div style="background:' + mau + ';color:#fff;padding:14px 18px">'
     + '<div style="font-size:16px;font-weight:bold">VMP Monitor · ' + esc(tieuDe) + '</div>'
     + '<div style="font-size:12px;opacity:.9;margin-top:3px">' + esc(phamViChu) + ' · kỳ ' + esc(kyChu) + ' · số liệu đọc ngày ' + esc(d.ngay_chay || '') + '</div>'
@@ -329,6 +486,8 @@ return $input.all().map(function (it, idx) {
     + (th.tomTat ? '<div style="font-size:14px;line-height:1.7;color:#222">' + esc(th.tomTat) + '</div>' : '')
     + (th.mucRuiRoTongThe ? '<div style="margin-top:10px;display:inline-block;padding:5px 12px;border-radius:999px;background:#f3eefa;color:' + mau + ';font-size:12px;font-weight:bold">Mức rủi ro tổng thể: ' + esc(th.mucRuiRoTongThe) + '</div>' : '')
     + '<table style="border-collapse:separate;border-spacing:0;margin-top:16px;width:100%"><tr>' + oSo + '</tr></table>'
+    + mucNam
+    + mucKy
     + khoiHtml(NHAN.tienDo, th.tienDo)
     + khoiHtml(NHAN.ruiRo, th.ruiRo)
     + khoiHtml(NHAN.mucTieu, th.soSanhMucTieu)
@@ -339,8 +498,11 @@ return $input.all().map(function (it, idx) {
     + khoiHtml('GIỚI HẠN DỮ LIỆU', th.luuYDuLieu)
     + bieuDoThang(d.theo_thang, thangTrongKy)
     + bieuDoBoPhan(d.bat_cap_theo_bo_phan)
+    + bangBatCap
     + bieuDoKySau(d.thang_toi, 'kỳ sau')
+    + dungBangKySau(gh)
     + bangQuaHan
+    + dungBangChatLuong(gh)
     + bangThoBlock
     + '<div style="margin-top:22px;padding:14px 16px;background:#f3eefa;border-radius:10px">'
     + '<a href="' + TRANG_DASHBOARD + '" style="color:#6b46a8;font-weight:bold;font-size:13.5px;text-decoration:none">'
@@ -355,13 +517,13 @@ return $input.all().map(function (it, idx) {
     + '</div></div></div>';
   }
 
-  var html = dungHtml(bangTho);
+  var html = dungHtml(false);
   // Tệp đính kèm: cùng một dashboard nhưng ĐỦ dòng dữ liệu thô, bọc trong
   // khung HTML hoàn chỉnh để mở thẳng bằng trình duyệt.
   var htmlDayDu = '<!doctype html><html lang="vi"><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
     + '<title>' + esc(subject) + '</title></head>'
-    + '<body style="margin:0;padding:18px;background:#faf7fb">' + dungHtml(dungBangTho(tho.length)) + '</body></html>';
+    + '<body style="margin:0;padding:18px;background:#faf7fb">' + dungHtml(true) + '</body></html>';
   var tenTepHtml = 'Dashboard_VMP_' + String(kyChu).replace(/[^0-9A-Za-z]+/g, '-') + '.html';
 
   return { json: {
