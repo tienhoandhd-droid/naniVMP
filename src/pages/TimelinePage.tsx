@@ -1750,7 +1750,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
                   title={`${r.name}: ${r.total} — xong ${r.done}, quá hạn ${r.over}`}
                   style={{ display: "grid", gridTemplateColumns: "58px 1fr 92px", alignItems: "center", gap: 12, border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
                   <span style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{r.code}</span>
-                  <span style={{ height: 20, borderRadius: 8, background: C.pinkMist, overflow: "hidden", display: "flex", width: (r.total / maxDeptTotal * 100) + "%" }}>
+                  <span style={{ height: 26, borderRadius: 8, background: C.pinkMist, overflow: "hidden", display: "flex", width: (r.total / maxDeptTotal * 100) + "%" }}>
                     <span style={{ width: pc(r.done), background: C.mint }} />
                     <span style={{ width: pc(r.over), background: C.rasp }} />
                     <span style={{ width: pc(rest), background: C.sky }} />

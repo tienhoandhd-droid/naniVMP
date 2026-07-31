@@ -852,14 +852,21 @@ export function Ring({ segments, size = 168, stroke = 15, children }: {
 }
 
 // ======================== SELECT ========================
-export function Sel({ val, set, opts }: {
+export function Sel({ val, set, opts, nhan }: {
   val: string;
   set: (v: string) => void;
   /** v = giá trị, l = nhãn hiển thị. */
   opts: Array<{ v: string; l: string }>;
+  /** Nhãn đọc được cho trình đọc màn hình. Không có thì lấy tạm nhãn của
+   *  lựa chọn đang chọn — vẫn hơn là một ô select không tên. */
+  nhan?: string;
 }) {
+  const tenHienTai = opts.find((o) => o.v === val)?.l;
   return (
-    <select value={val} onChange={(e) => set(e.target.value)} style={{
+    <select value={val} onChange={(e) => set(e.target.value)}
+      aria-label={nhan || tenHienTai || "Lựa chọn"}
+      title={nhan || tenHienTai}
+      style={{
       padding: "8px 13px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`,
       background: C.surface, fontFamily: TEXT, fontSize: 14, color: C.plum,
       fontWeight: 700, cursor: "pointer", outline: "none",

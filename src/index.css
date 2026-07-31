@@ -28,7 +28,9 @@
   --c-surface-raised: #FFFFFF;
 
   --c-ink:      #3A2440;
-  --c-ink-soft: #6E5A72;
+  /* Đậm hơn bản trước (#6E5A72): trên nền chìm --c-surface-sunk nó chỉ đạt
+     4.37:1, dưới ngưỡng WCAG AA 4.5:1 cho chữ nhỏ. */
+  --c-ink-soft: #5E4B64;
   --c-line:        rgba(58, 36, 64, .10);
   --c-line-strong: rgba(91, 58, 107, .22);
 
@@ -6654,3 +6656,28 @@ h1, h2, h3, .vmp-tieu-de-lon { line-height: var(--lh-tight); }
 .vmp-bento > .b-k2,
 .vmp-bento > .b-k3,
 .vmp-bento > .b-k4 { align-self: stretch; }
+
+/* =====================================================================
+   VÙNG BẤM TỐI THIỂU — mọi thứ bấm được phải đủ lớn để bấm trúng
+   ---------------------------------------------------------------------
+   Đo được trước khi sửa: 17/580 phần tử bấm được nhỏ hơn 24px, trong đó
+   dấu ⓘ chỉ 15×15px và ô đánh dấu 13×13px. Ngưỡng 24px là mức tối thiểu
+   của WCAG 2.2 (2.5.8 Target Size Minimum).
+   ===================================================================== */
+.vmp-gt > summary {
+  width: 24px; height: 24px;
+  /* Vùng bấm nới thêm ra ngoài mà không đẩy bố cục — chữ cạnh nó không
+     bị xô, nhưng ngón tay có 26px để bấm. */
+  outline-offset: 2px;
+  position: relative;
+}
+.vmp-gt > summary::after {
+  content: ""; position: absolute; inset: -4px;
+}
+input[type="checkbox"] {
+  width: 20px; height: 20px; cursor: pointer;
+  accent-color: var(--c-pink);
+}
+/* Nhãn bọc ô đánh dấu chính là vùng bấm thật — cho nó chiều cao tối thiểu. */
+label:has(> input[type="checkbox"]) { min-height: 24px; display: inline-flex; align-items: center; }
+summary { min-height: 24px; display: flex; align-items: center; }
