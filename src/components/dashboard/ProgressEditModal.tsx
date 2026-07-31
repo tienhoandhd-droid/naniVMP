@@ -47,6 +47,29 @@ const BLOCK_COLS: Record<number, [string, string]> = {
   4: ["ngay_vmp", "tt_vmp"],
 };
 
+/** Bốn bước là MỘT CHUỖI, không phải bốn ô rời nhau: đề cương xong mới thẩm
+ *  định được, thẩm định xong mới viết báo cáo, có báo cáo mới tổng kết VMP.
+ *  Bảng này là chỗ duy nhất khai thứ tự đó để mọi phép kiểm dưới đây dùng
+ *  chung — thêm bước mới chỉ phải sửa ở đây. */
+const CHUOI = [
+  { n: 1, ten: "Đề cương",          d: "ngay_de_cuong",  t: "tt_de_cuong",  dl: "dl_de_cuong",  goc: "tt_de_cuong_goc" },
+  { n: 2, ten: "Thẩm định thực tế", d: "ngay_tham_dinh", t: "tt_tham_dinh", dl: "dl_tham_dinh", goc: "tt_tham_dinh_goc" },
+  { n: 3, ten: "Báo cáo",           d: "ngay_bao_cao",   t: "tt_bao_cao",   dl: "dl_bao_cao",   goc: "tt_bao_cao_goc" },
+  { n: 4, ten: "Tổng kết VMP",      d: "ngay_vmp",       t: "tt_vmp",       dl: "dl_vmp",       goc: "tt_vmp_goc" },
+] as const;
+
+const ngayVN = (s: string) => (s ? s.split("-").reverse().join("/") : "—");
+
+/** Số ngày từ hôm nay tới hạn (âm = đã quá hạn). null khi không có hạn. */
+function conLai(hanISO: string): number | null {
+  if (!hanISO) return null;
+  const h = new Date(`${hanISO}T00:00:00`);
+  if (Number.isNaN(h.getTime())) return null;
+  const t = new Date();
+  const t0 = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  return Math.round((h.getTime() - t0.getTime()) / 86400000);
+}
+
 export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onReload, nextAct, onOpenNext, quickDone }: {
   act: PlanActivity;
   isAdmin?: boolean;
@@ -125,8 +148,43 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
 
   // Chỉ ghi tiến độ khi thực sự có ô nào đổi — đổi mỗi người thực hiện mà vẫn
   // gọi RPC tiến độ thì server trả "chưa có thay đổi" và người dùng tưởng hỏng.
-  const nChanged = Object.keys(init).filter((k) => (f[k] || "") !== (init[k] || "")).length;
+  const doiRoi = Object.keys(init).filter((k) => (f[k] || "") !== (init[k] || ""));
+  const nChanged = doiRoi.length;
   const formChanged = nChanged > 0;
+
+  /* ---- Liên kết giữa bốn bước ----
+   * Hai luật, cùng một gốc: bốn bước là một chuỗi.
+   *   · Ngày bước sau không được sớm hơn ngày bước trước.
+   *   · Không đánh dấu bước sau "Hoàn thành" khi bước trước chưa xong.
+   * Dữ liệu đang có 22 hạng mục "báo cáo xong mà thẩm định chưa xong" và 4
+   * hạng mục "thẩm định xong mà đề cương chưa xong" — chặn cứng thì người
+   * dùng không mở ra sửa được chính những dòng đó. Nên: mâu thuẫn dính tới ô
+   * VỪA SỬA thì CHẶN (đừng tạo thêm cái sai mới), mâu thuẫn có sẵn thì chỉ
+   * NHẮC để người dùng biết mà dọn.
+   */
+  const viPham = (() => {
+    const out: Array<{ msg: string; keys: string[] }> = [];
+    for (let i = 1; i < CHUOI.length; i++) {
+      const tr = CHUOI[i - 1], sau = CHUOI[i];
+      const dTr = f[tr.d] || "", dSau = f[sau.d] || "";
+      if (dTr && dSau && dSau < dTr) {
+        out.push({
+          msg: `Ngày ${sau.ten.toLowerCase()} (${ngayVN(dSau)}) sớm hơn ngày ${tr.ten.toLowerCase()} (${ngayVN(dTr)}).`,
+          keys: [tr.d, sau.d],
+        });
+      }
+      if (f[sau.t] === "Hoàn thành" && f[tr.t] !== "Hoàn thành") {
+        out.push({
+          msg: `Đánh dấu ${sau.ten.toLowerCase()} HOÀN THÀNH trong khi ${tr.ten.toLowerCase()} chưa hoàn thành.`,
+          keys: [tr.t, sau.t],
+        });
+      }
+    }
+    return out;
+  })();
+  const dinhToOSua = (v: { keys: string[] }) => v.keys.some((k) => doiRoi.includes(k));
+  const chan = viPham.filter(dinhToOSua);
+  const nhac = viPham.filter((v) => !dinhToOSua(v));
   // S2-7: cần LÝ DO nếu đặt "Hoàn thành" ở bất kỳ giai đoạn nào HOẶC nhập bất kỳ ngày hoàn thành nào.
   const needsReason = formChanged && (
     ["tt_de_cuong", "tt_tham_dinh", "tt_bao_cao", "tt_vmp"].some((k) => f[k] === "Hoàn thành") ||
@@ -136,6 +194,11 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     // "Mở tiếp" khi chưa sửa gì = chỉ chuyển hạng mục, không ghi.
     if (goNext && !formChanged && !whoChanged) {
       if (nextAct && onOpenNext) onOpenNext(nextAct);
+      return;
+    }
+    if (chan.length) {
+      setErr("Không lưu được vì mâu thuẫn giữa các bước: " + chan.map((v) => v.msg).join(" ")
+        + " Bốn bước phải theo đúng thứ tự đề cương → thẩm định → báo cáo → tổng kết VMP.");
       return;
     }
     if (needsReason && !reason.trim()) {
@@ -176,27 +239,49 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     // version_conflict giả. Number(null) ra 0 nên phải loại null trước.
     if (formChanged) {
       const v = raw.version == null ? NaN : Number(raw.version);
-      onSave(act.id, f, undefined, reason.trim() || undefined, Number.isFinite(v) ? v : undefined);
+      // Gửi BẢN CHÊNH, không gửi cả form. Gửi cả form thì nhật ký kiểm toán
+      // ghi luôn 9 cột mỗi lần lưu — soi hồ sơ về sau không biết lần đó người
+      // ta thật sự sửa cái gì. Và ô người dùng vừa xoá trắng phải đi kèm dưới
+      // dạng chuỗi rỗng, để lớp dưới dịch thành "xoá" chứ không phải "bỏ qua".
+      const patch: Record<string, string> = {};
+      doiRoi.forEach((k) => { patch[k] = f[k] || ""; });
+      onSave(act.id, patch, undefined, reason.trim() || undefined, Number.isFinite(v) ? v : undefined);
     }
     if (goNext && nextAct && onOpenNext) onOpenNext(nextAct);
     else onClose();
   };
   const sel = (k: string) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
-  const stage = (n: number, title: string, dl: unknown, dCol: string, tCol: string) => {
+  const stage = (s: (typeof CHUOI)[number], truoc: (typeof CHUOI)[number] | null) => {
+    const { n, d: dCol, t: tCol } = s;
+    const dl = toISO(raw[s.dl]);
     const isDone = f[tCol] === "Hoàn thành" && !!f[dCol];
     const isCur = curBlock === n && !isDone;
+    const con = conLai(dl);
+    // Bước trước chưa xong thì không mời bấm "Xong hôm nay" ở bước này — mời
+    // xong lại chặn lúc Lưu là đưa người dùng vào ngõ cụt.
+    const khoaBoiTruoc = !!truoc && f[truoc.t] !== "Hoàn thành";
+    const ttGoc = String(raw[s.goc] ?? "").trim();
     return (
-      <div style={{ background: C.surface, borderRadius: 14, padding: 14, border: `1.5px solid ${isCur ? C.marigold : C.pinkSoft}`, boxShadow: isCur ? `0 0 0 2px ${C.marigoldSoft}` : "none" }}>
+      <div key={n} style={{ background: C.surface, borderRadius: 14, padding: 14, border: `1.5px solid ${isCur ? C.marigold : C.pinkSoft}`, boxShadow: isCur ? `0 0 0 2px ${C.marigoldSoft}` : "none" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontWeight: 800, color: C.plum, fontSize: 14 }}>
-            {title}
+            {n}. {s.ten}
             {isCur && <Tag color={C.marigoldText} bg={C.marigoldSoft}>← đang ở bước này</Tag>}
+            {isDone && <Tag color={C.mintText} bg={C.mintSoft}>✓ xong</Tag>}
           </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Tag color={C.lavText} bg={C.lavSoft}>Deadline: {String(dl || "Không có thông tin")}</Tag>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Tag color={C.lavText} bg={C.lavSoft}>Hạn: {dl ? ngayVN(dl) : "chưa có"}</Tag>
+            {/* Còn mấy ngày / trễ mấy ngày — không có thì người nhập phải tự
+                trừ ngày trong đầu mỗi lần mở hộp. */}
+            {!isDone && con != null && (
+              con < 0
+                ? <Tag color={C.raspText} bg={C.raspSoft}>trễ {-con} ngày</Tag>
+                : <Tag color={con <= 7 ? C.marigoldText : C.plumSoft} bg={con <= 7 ? C.marigoldSoft : C.pinkMist}>còn {con} ngày</Tag>
+            )}
             {!isDone && (
-              <button onClick={markDone(dCol, tCol)} title="Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"
-                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${C.mint}`, background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button onClick={markDone(dCol, tCol)} disabled={khoaBoiTruoc}
+                title={khoaBoiTruoc ? `Phải xong "${truoc!.ten}" trước đã — bốn bước đi theo thứ tự.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
+                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: khoaBoiTruoc ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
                 ✓ Xong hôm nay
               </button>
             )}
@@ -206,6 +291,24 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" value={f[dCol]} onChange={setDate(dCol, tCol)} style={INP} /></div>
           <div style={FIELD}><span style={LBL}>Trạng thái</span>{sel(tCol)}</div>
         </div>
+        {/* Lịch thẩm định thuộc về CHÍNH bước thẩm định. Trước đây nó nằm tận
+            trên đầu hộp, tách rời khỏi ô ngày thẩm định thực tế mà nó ấn định. */}
+        {n === 2 && (
+          <div style={{ ...FIELD, marginTop: 12 }}>
+            <span style={LBL}>Lịch thẩm định (bộ phận xếp)</span>
+            <input type="date" value={f.lich_td} onChange={set("lich_td")} style={INP} />
+            <span style={{ fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>
+              Ngày bộ phận hẹn vào làm. Khác với ngày hoàn thành thực tế ở trên.
+            </span>
+          </div>
+        )}
+        {/* Chữ gốc trong Sheet — nhiều ô ghi kiểu "Chờ thẩm định thực tế",
+            "Chờ xử lý"; ô chọn 4 nhãn ở trên nuốt mất sắc thái đó. */}
+        {ttGoc && (
+          <div style={{ marginTop: 8, fontSize: 11, color: C.plumSoft, fontWeight: 600 }}>
+            Dữ liệu gốc ghi: <b style={{ color: C.plum }}>{ttGoc}</b>
+          </div>
+        )}
         {f[tCol] === "Hoàn thành" && !f[dCol] && (
           <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 700, color: "#b00020" }}>
             Đã ghi Hoàn thành nhưng thiếu ngày thực tế — sẽ bị báo lỗi ALCOA+.{" "}
@@ -230,9 +333,46 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           chọn lý do rồi bấm Lưu. Chưa ghi gì cho tới khi bạn Lưu.
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-        <ROField label="Deadline VMP (T) · gốc" value={toISO(raw.dl_vmp) || act.target} />
-        <div style={FIELD}><span style={LBL}>Lịch thẩm định (bộ phận xếp)</span><input type="date" value={f.lich_td} onChange={set("lich_td")} style={INP} /></div>
+      {/* Chuỗi bước: nhìn một dòng là biết đang tắc ở đâu và bước nào chờ bước
+          nào. Trước đây bốn khối nằm rời nhau, không có gì nói chúng nối tiếp. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+        {CHUOI.map((s, i) => {
+          const xong = f[s.t] === "Hoàn thành";
+          const dang = f[s.t] === "Đang thực hiện";
+          const tre = !xong && (conLai(toISO(raw[s.dl])) ?? 1) < 0;
+          const mau = xong ? C.mintText : tre ? C.raspText : dang ? C.marigoldText : C.plumSoft;
+          const nen = xong ? C.mintSoft : tre ? C.raspSoft : dang ? C.marigoldSoft : C.pinkMist;
+          return (
+            <span key={s.n} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {i > 0 && <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>}
+              <span style={{ background: nen, color: mau, borderRadius: 999, padding: "5px 11px", fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap" }}>
+                {xong ? "✓" : tre ? "!" : "○"} {s.ten}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Mâu thuẫn có sẵn trong dữ liệu — không chặn Lưu (chặn thì không mở ra
+          sửa được chính nó), nhưng phải nói ra chứ không im lặng. */}
+      {nhac.length > 0 && (
+        <div style={{ background: C.marigoldSoft, border: `1px solid ${C.marigold}`, borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 12, fontWeight: 700, color: C.marigoldText, lineHeight: 1.6 }}>
+          ⚠ Hạng mục này đang có mâu thuẫn giữa các bước (có từ trước, không phải do bạn):
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {nhac.map((v, i) => <li key={i}>{v.msg}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Thông tin nền của hạng mục. Thiếu chúng thì người nhập phải mở thêm
+          hai màn khác mới biết mình đang sửa cái gì, ở đâu, chu kỳ bao lâu. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 16 }}>
+        <ROField label="Hạn đích VMP (T)" value={ngayVN(toISO(raw.dl_vmp) || act.target || "")} />
+        <ROField label="Bộ phận" value={txt(raw.bo_phan_goc ?? act.dept)} />
+        <ROField label="Khu vực · dây chuyền" value={[raw.khu_vuc, raw.line].filter(Boolean).map(String).join(" · ") || "—"} />
+        <ROField label="Chu kỳ tái thẩm định" value={Number(raw.tan_suat) > 0 ? `${raw.tan_suat} tháng` : "—"} />
+        <ROField label="Phân loại báo cáo" value={txt(act.dep)} />
+        <ROField label="Nhóm việc" value={txt(raw.nhom_viec)} />
       </div>
 
       {/* Người thực hiện — gõ vào là hiện gợi ý từ tab "Người thực hiện" */}
@@ -267,11 +407,21 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
         )}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {stage(1, "1. Đề cương", toISO(raw.dl_de_cuong), "ngay_de_cuong", "tt_de_cuong")}
-        {stage(2, "2. Thẩm định thực tế", toISO(raw.dl_tham_dinh), "ngay_tham_dinh", "tt_tham_dinh")}
-        {stage(3, "3. Báo cáo", toISO(raw.dl_bao_cao), "ngay_bao_cao", "tt_bao_cao")}
-        {stage(4, "4. Tổng kết VMP", "", "ngay_vmp", "tt_vmp")}
+        {/* Bước 4 trước đây được truyền hạn = chuỗi rỗng nên luôn hiện
+            "Deadline: Không có thông tin", dù raw.dl_vmp vẫn có sẵn. Nay cả
+            bốn bước lấy hạn từ cùng một bảng CHUOI nên không lệch được nữa. */}
+        {CHUOI.map((s, i) => stage(s, i > 0 ? CHUOI[i - 1] : null))}
       </div>
+      {/* Báo NGAY lúc gõ, không đợi bấm Lưu mới nói — người nhập sửa được tại
+          chỗ thay vì điền xong hết rồi mới biết cả cụm không hợp lệ. */}
+      {chan.length > 0 && (
+        <div style={{ marginTop: 14, background: C.raspSoft, border: `1px solid ${C.raspText}`, borderRadius: 12, padding: "10px 14px", fontSize: 12, fontWeight: 700, color: C.raspText, lineHeight: 1.6 }}>
+          ✕ Chưa lưu được — thay đổi vừa rồi làm lệch thứ tự bốn bước:
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {chan.map((v, i) => <li key={i}>{v.msg}</li>)}
+          </ul>
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 14 }}>
         <span style={LBL}>Lý do {needsReason ? <b style={{ color: "#b00020" }}>(bắt buộc)</b> : "(tuỳ chọn)"}</span>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
