@@ -25,7 +25,7 @@ import {
 import { C, TEXT, NUM, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
 import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll } from "../ui/Primitives.tsx";
-import { download, runDataQualityChecks, nhanXetTuDong } from "../../utils/helpers.ts";
+import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
   periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget,
@@ -37,6 +37,8 @@ import {
 import { buildManagementReportHTML } from "../../lib/reportHtml.ts";
 import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT } from "../../lib/aiReport.ts";
 import AiMailModal from "../ai/AiMailModal.tsx";
+import ChiTietKyModal from "./ChiTietKyModal.tsx";
+import type { GiaiDoan } from "./ChiTietKyModal.tsx";
 
 import type { Activity } from "../../types/domain.ts";
 
@@ -63,6 +65,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [loadingAi, setLoadingAi] = useState(false);
   const [errAi, setErrAi] = useState("");
   const [moGuiMail, setMoGuiMail] = useState(false);
+  // Bấm vào bất kỳ con số nào ở mục 1 là ra danh sách hạng mục đứng sau nó.
+  const [chiTiet, setChiTiet] = useState<
+    { title: string; sub?: string; rows: Activity[]; giaiDoan?: GiaiDoan } | null
+  >(null);
 
   const areaOptions = useMemo(
     () => uniqSorted(acts.map((a) => String(a.area ?? ""))).map((v) => ({ v, l: v })),
@@ -134,6 +140,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const bgThang = useMemo(() => periodSummary(scoped, kyBgThang, TARGET_PCT), [scoped, kyBgThang]);
   const bgThangSau = useMemo(() => periodWork(scoped, kyBgThangSau), [scoped, kyBgThangSau]);
 
+  // ytdSummary lọc bỏ hạng mục Không áp dụng/Đã hủy, nên danh sách chi tiết
+  // phải lọc y hệt — bấm vào ô "60" mà ra 63 dòng là mất tin ngay.
+  const scopedKyActive = useMemo(() => scopedKy.filter((a) => (a.state || "active") === "active"), [scopedKy]);
   const ytd = useMemo(() => ytdSummary(scopedKy), [scopedKy]);
   const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT), [scoped, ky]);
   const bottleneck = useMemo(() => stageBottleneck(scopedKy), [scopedKy]);
@@ -359,6 +368,22 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     dat == null ? { c: C.plumSoft, bg: C.pinkMist }
       : dat ? { c: C.mintText, bg: C.mintSoft } : { c: C.marigoldText, bg: C.marigoldSoft };
 
+  const moChiTiet = (title: string, rows: Activity[], giaiDoan?: GiaiDoan) =>
+    setChiTiet({ title, sub: `${scopeLabel} · ${rows.length} hạng mục`, rows, giaiDoan });
+
+  // Phễu ngược: giai đoạn sau xong nhiều hơn giai đoạn trước. Liệt kê đúng
+  // những hạng mục gây mâu thuẫn để sửa được ngay, thay vì chỉ báo có lỗi.
+  const hangMucMauThuan = useMemo(() => {
+    const r = (a: Activity) => (a._raw || {}) as Record<string, unknown>;
+    return scopedKy.filter((a) => {
+      const dc = wlIsDone(r(a).tt_de_cuong);
+      const td = wlIsDone(r(a).tt_tham_dinh);
+      const bc = wlIsDone(r(a).tt_bao_cao);
+      const vmp = wlIsDone(r(a).tt_vmp);
+      return (td && !dc) || (bc && !td) || (vmp && !bc);
+    });
+  }, [scopedKy]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* ===== BA MỤC MẶC ĐỊNH — mở trang ra là thấy ngay, không phải chọn gì =====
@@ -503,9 +528,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             khiến người đọc tưởng cả năm đều là thước đo mục tiêu — trong khi
             chỉ có Hoàn thành VMP mới là. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
-          <StatTile icon={Boxes} label="Tổng hạng mục trong kỳ" value={ytd.total} tone={{ c: C.plum, bg: C.pinkSoft }} />
+          <StatTile icon={Boxes} label="Tổng hạng mục trong kỳ" value={ytd.total} tone={{ c: C.plum, bg: C.pinkSoft }}
+            sub="Bấm để xem danh sách"
+            onClick={() => moChiTiet(`Toàn bộ hạng mục · kỳ ${kyLabel}`, scopedKyActive)} />
           <StatTile icon={CheckCircle2} label="★ Hoàn thành VMP — chỉ số chính" value={`${ytd.vmp.rate}%`}
-            sub={`${ytd.vmp.done}/${ytd.vmp.total} · quá hạn ${ytd.vmp.over}`} tone={{ c: C.mintText, bg: C.mintSoft }} />
+            sub={`${ytd.vmp.done}/${ytd.vmp.total} · quá hạn ${ytd.vmp.over} · bấm để xem`} tone={{ c: C.mintText, bg: C.mintSoft }}
+            onClick={() => moChiTiet(`Hoàn thành VMP · kỳ ${kyLabel}`, scopedKyActive, "vmp")} />
         </div>
 
         <div style={{ marginTop: 18, marginBottom: 10, fontSize: 12, color: C.plumSoft, fontWeight: 800, letterSpacing: ".04em" }}>
@@ -513,11 +541,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
           <StatTile icon={ClipboardCheck} label="Đề cương hoàn thành" value={`${ytd.protocol.rate}%`}
-            sub={`${ytd.protocol.done}/${ytd.protocol.total} · quá hạn ${ytd.protocol.over}`} tone={{ c: C.lavText, bg: C.lavSoft }} />
+            sub={`${ytd.protocol.done}/${ytd.protocol.total} · quá hạn ${ytd.protocol.over} · bấm để xem`} tone={{ c: C.lavText, bg: C.lavSoft }}
+            onClick={() => moChiTiet(`Đề cương · kỳ ${kyLabel}`, scopedKyActive, "de_cuong")} />
           <StatTile icon={ShieldCheck} label="Thẩm định thực tế" value={`${ytd.validation.rate}%`}
-            sub={`${ytd.validation.done}/${ytd.validation.total} · quá hạn ${ytd.validation.over}`} tone={{ c: C.skyText, bg: C.skySoft }} />
+            sub={`${ytd.validation.done}/${ytd.validation.total} · quá hạn ${ytd.validation.over} · bấm để xem`} tone={{ c: C.skyText, bg: C.skySoft }}
+            onClick={() => moChiTiet(`Thẩm định thực tế · kỳ ${kyLabel}`, scopedKyActive, "tham_dinh")} />
           <StatTile icon={FileCheck2} label="Hồ sơ hoàn thiện" value={`${ytd.documentation.rate}%`}
-            sub={`${ytd.documentation.done}/${ytd.documentation.total} · quá hạn ${ytd.documentation.over}`} tone={{ c: C.pinkText, bg: C.pinkSoft }} />
+            sub={`${ytd.documentation.done}/${ytd.documentation.total} · quá hạn ${ytd.documentation.over} · bấm để xem`} tone={{ c: C.pinkText, bg: C.pinkSoft }}
+            onClick={() => moChiTiet(`Hồ sơ · kỳ ${kyLabel}`, scopedKyActive, "ho_so")} />
         </div>
         {/* Phễu 4 giai đoạn phải giảm dần. Nếu không, dữ liệu tự mâu thuẫn
             (xong báo cáo mà chưa thẩm định) — nói thẳng thay vì để người đọc
@@ -526,6 +557,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <div style={{ marginTop: 12, fontSize: 13, fontWeight: 700, color: C.marigoldText,
             background: C.marigoldSoft, borderRadius: 12, padding: "11px 15px" }}>
             ⚠️ {funnelWarning}
+            {hangMucMauThuan.length > 0 && (
+              <button type="button"
+                onClick={() => moChiTiet(`Hạng mục có trạng thái mâu thuẫn · kỳ ${kyLabel}`, hangMucMauThuan)}
+                style={{ marginLeft: 10, fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer",
+                  color: C.marigoldText, background: C.surface, border: `1.5px solid ${C.marigoldText}`,
+                  borderRadius: 999, padding: "5px 13px" }}>
+                Xem {hangMucMauThuan.length} hạng mục
+              </button>
+            )}
           </div>
         )}
         <TableScroll maxHeight={280} hint={false}>
@@ -533,7 +573,13 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <thead><tr><th style={th}>Giai đoạn</th><th style={{ ...th, textAlign: "center" }}>Số hạng mục</th></tr></thead>
             <tbody>
               {ytd.byStage.map((s) => (
-                <tr key={s.id}><td style={td}>{s.label}</td><td style={{ ...td, textAlign: "center", fontFamily: NUM }}>{s.count}</td></tr>
+                <tr key={s.id} className={s.count ? "vmp-row" : undefined}
+                  role={s.count ? "button" : undefined}
+                  onClick={s.count ? () => moChiTiet(`${s.label} · kỳ ${kyLabel}`, scopedKyActive.filter((a) => stageOf(a) === s.id)) : undefined}
+                  style={{ cursor: s.count ? "pointer" : "default" }}>
+                  <td style={td}>{s.label}{s.count > 0 && <span style={{ color: C.plumSoft, fontWeight: 600 }}> · bấm để xem</span>}</td>
+                  <td style={{ ...td, textAlign: "center", fontFamily: NUM }}>{s.count}</td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -745,6 +791,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       <div style={{ ...glass, padding: "10px 16px", fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center" }}>
         Toàn bộ số liệu trên đọc thẳng từ Supabase tại thời điểm mở trang — không có số nào do AI tạo ra ngoài mục &quot;Nhận xét AI&quot;, và mục đó luôn được đánh dấu cần QA xác nhận.
       </div>
+
+      {chiTiet && (
+        <ChiTietKyModal title={chiTiet.title} sub={chiTiet.sub} rows={chiTiet.rows}
+          giaiDoan={chiTiet.giaiDoan} onClose={() => setChiTiet(null)} />
+      )}
 
       {moGuiMail && (
         <AiMailModal
