@@ -13,6 +13,10 @@
 
 var yc = $('Chuẩn hoá yêu cầu').all().map(function (i) { return i.json; });
 
+// BỎ khỏi báo cáo 2026-07-31 (người dùng chốt): mảng `phanCong` và dữ liệu
+// theo_nguoi / dem_chua_phan_cong. Báo cáo quản lý nói về tiến độ thẩm định;
+// ai làm bao nhiêu là câu hỏi khác, có trang riêng. Không đưa dữ liệu vào
+// prompt nữa để mô hình không tự lôi chuyện phân công vào mảng khác.
 var CHUNG = 'Bạn là chuyên gia QA thẩm định nhà máy dược GMP, đọc số liệu thật của Kế hoạch Thẩm định Gốc (VMP). '
  + 'Bạn chỉ là lớp nhận định. Không thay đổi số liệu. Không phê duyệt GMP. Không bịa số, không bịa mã hạng mục. '
  + 'Mọi con số và mã nêu ra phải có trong dữ liệu. Các danh sách chi tiết đã bị cắt bớt để gọn, nên khi nói số tổng phải dùng các trường dem_* chứ không đếm độ dài danh sách. '
@@ -20,12 +24,11 @@ var CHUNG = 'Bạn là chuyên gia QA thẩm định nhà máy dược GMP, đ�
  + 'Chỉ trả về MỘT JSON object thuần, không markdown, không code fence. ';
 
 var SCHEMA_BAO_CAO = 'Đúng schema: '
- + 'mucRuiRoTongThe, tieuDe, tomTat, tienDo, ruiRo, phanCong, soSanhMucTieu, batCapBoPhan, keHoachThangToi, bangChungChinh, viecUuTien, luuYDuLieu, gioiHanAI, confidence. '
+ + 'mucRuiRoTongThe, tieuDe, tomTat, tienDo, ruiRo, soSanhMucTieu, batCapBoPhan, keHoachThangToi, bangChungChinh, viecUuTien, luuYDuLieu, gioiHanAI, confidence. '
  + 'mucRuiRoTongThe thuộc {cao, trung binh, thap}. confidence là số 0..1. tomTat tối đa 100 từ. '
- + 'tienDo, ruiRo, phanCong, soSanhMucTieu, batCapBoPhan, keHoachThangToi, bangChungChinh, viecUuTien, luuYDuLieu là mảng chuỗi, mỗi mảng tối đa 4 mục, mỗi mục tối đa 35 từ. '
+ + 'tienDo, ruiRo, soSanhMucTieu, batCapBoPhan, keHoachThangToi, bangChungChinh, viecUuTien, luuYDuLieu là mảng chuỗi, mỗi mảng tối đa 4 mục, mỗi mục tối đa 35 từ. '
  + 'tienDo: tiến độ và quá hạn theo bộ phận. '
  + 'ruiRo: nhóm trọng yếu cao 7-9 điểm có bị làm chậm hơn nhóm thấp không (ICH Q9, EU GMP Annex 15) và lỗi hồ sơ theo ALCOA+, có dẫn mã hạng mục. '
- + 'phanCong: tải việc theo người và hạng mục chưa phân công — số hạng mục chưa phân công phải lấy ĐÚNG dem_chua_phan_cong, không được lấy con số khác. '
  + 'soSanhMucTieu: so tỷ lệ hoàn thành với mục tiêu 50%/tháng, dùng đúng số ty_le đã cho, KHÔNG tự tính lại phần trăm. '
  + 'CHỈ được kết luận đạt/chưa đạt cho tháng có ky="da_qua". Tháng ky="dang_dien_ra" phải nói rõ là số giữa kỳ, chưa phải kết quả chốt. '
  + 'TUYỆT ĐỐI KHÔNG nói tháng ky="chua_toi" là chưa đạt hay 0% — kỳ đó chưa xảy ra, ty_le của nó là null, chỉ được nhắc tới như khối lượng sắp phải bố trí. '
@@ -40,13 +43,12 @@ var SCHEMA_BAO_CAO = 'Đúng schema: '
 // một schema duy nhất để node đóng gói không phải rẽ nhánh — chỗ rẽ nhánh
 // theo hình dạng AI trả về chính là chỗ bản cũ từng vỡ.
 var SCHEMA_CANH_BAO = 'Đúng schema: '
- + 'mucRuiRoTongThe, tieuDe, tomTat, tienDo, ruiRo, phanCong, soSanhMucTieu, batCapBoPhan, keHoachThangToi, bangChungChinh, viecUuTien, luuYDuLieu, gioiHanAI, confidence. '
+ + 'mucRuiRoTongThe, tieuDe, tomTat, tienDo, ruiRo, soSanhMucTieu, batCapBoPhan, keHoachThangToi, bangChungChinh, viecUuTien, luuYDuLieu, gioiHanAI, confidence. '
  + 'mucRuiRoTongThe thuộc {cao, trung binh, thap}. confidence là số 0..1. tomTat tối đa 100 từ, nói ngay tình trạng cảnh báo nặng nhất. '
  + 'Các trường mảng là mảng chuỗi, mỗi mảng tối đa 4 mục, mỗi mục tối đa 35 từ. '
  + 'Đây là BẢN PHÂN TÍCH CẢNH BÁO, không phải báo cáo tháng, nên hiểu từng mảng như sau: '
  + 'tienDo: hạng mục quá hạn nặng nhất, trễ bao nhiêu ngày, thuộc bộ phận nào — dẫn mã cụ thể. '
  + 'ruiRo: xếp thứ tự xử lý theo rủi ro ICH Q9 — quá hạn của nhóm trọng yếu cao 7-9 điểm phải đứng trước quá hạn lâu hơn của nhóm điểm thấp; nói rõ vì sao. '
- + 'phanCong: ai đang ôm nhiều hạng mục quá hạn nhất, và bao nhiêu hạng mục chưa có người — số chưa phân công phải lấy ĐÚNG dem_chua_phan_cong, không được lấy con số khác. '
  + 'soSanhMucTieu: tháng này đang ở đâu so với mục tiêu 50%, dùng đúng ty_le đã cho, KHÔNG tự tính lại. '
  + 'CHỈ kết luận đạt/chưa đạt cho tháng ky="da_qua"; tháng ky="dang_dien_ra" phải nói rõ là số giữa kỳ; TUYỆT ĐỐI KHÔNG nói tháng ky="chua_toi" là chưa đạt hay 0%. '
  + 'batCapBoPhan: bộ phận nào nghẽn ở giai đoạn nào — dùng ĐÚNG cặp giai_doan_nghen_nhat + so_cham_o_giai_doan_nghen của bộ phận đó, KHÔNG dùng qua_han_vmp thay. '
@@ -129,13 +131,11 @@ return $input.all().map(function (it, idx) {
     dem_theo_trang_thai: tt,
     dem_qua_han: soQuaHan,
     dem_da_xong: soXong,
-    dem_chua_phan_cong: d.chua_phan_cong,
     dem_loi_ho_so: (d.loi_ho_so || []).length,
     dem_sap_toi_han_60_ngay: (d.sap_toi_han_60_ngay || []).length,
     theo_muc_trong_yeu: theoMucTrongYeu,
     giai_thich_theo_muc_trong_yeu: 'Trong theo_muc_trong_yeu, "tong"/"xong"/"qua_han" là số hạng mục CỦA RIÊNG nhóm đó. Không được lấy dem_qua_han (số của TOÀN phạm vi) gán cho một nhóm.',
     theo_bo_phan: d.theo_bo_phan,
-    theo_nguoi: d.theo_nguoi,
     // Bản cảnh báo cần nhiều mẫu quá hạn hơn để xếp thứ tự cho đúng; bản báo
     // cáo cần nhiều số tổng hợp hơn. Cắt khác nhau để prompt không phình.
     mau_qua_han_nang_nhat: (d.qua_han || []).slice(0, laCanhBao ? 40 : 30),

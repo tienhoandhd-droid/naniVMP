@@ -361,22 +361,15 @@ export function nhanXetTuDong(acts: Activity[]): string[] {
       : `Thứ tự ưu tiên hợp lý: nhóm trọng yếu cao đạt ${tlCao}%, không tụt sau nhóm thấp (${tlThap}%).`);
   }
 
-  // Hạng mục chưa ai phụ trách
-  const khongChu = A.filter((a) => !a.owner || a.owner === "—").length;
-  if (khongChu) y.push(`${khongChu} hạng mục chưa có người thực hiện — không phân công thì không ai theo.`);
+  // BỎ khỏi báo cáo 2026-07-31 (người dùng chốt): hai nhận xét về PHÂN CÔNG
+  // ("N hạng mục chưa có người thực hiện") và TẢI VIỆC ("N hạng mục tới hạn,
+  // cần xếp lịch"). Báo cáo quản lý nói về tiến độ thẩm định; việc ai làm bao
+  // nhiêu là câu hỏi khác, đã có trang riêng "Phân công & Tải việc".
+  // Hạng mục thiếu người vẫn được nhắc ở mục Chất lượng dữ liệu.
 
   // Vi phạm ALCOA+: đánh dấu xong nhưng thiếu ngày
   const thieuNgay = A.filter((a) => a.st === "done" && !a._raw?.ngay_vmp).length;
   if (thieuNgay) y.push(`${thieuNgay} hạng mục ghi "hoàn thành" nhưng thiếu ngày thực tế — vi phạm ALCOA+, cần bổ sung trước khi có đợt thanh tra.`);
-
-  // Tải việc tháng tới
-  const today = vmpToday();
-  const thangSau = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const sapToi = A.filter((a) => {
-    const t = parseD(a.target);
-    return a.st !== "done" && t && t >= today && t < new Date(thangSau.getFullYear(), thangSau.getMonth() + 1, 1);
-  }).length;
-  if (sapToi) y.push(`Từ nay tới hết tháng ${thangSau.getMonth() + 1} có ${sapToi} hạng mục tới hạn — cần xếp lịch sớm.`);
 
   return y;
 }

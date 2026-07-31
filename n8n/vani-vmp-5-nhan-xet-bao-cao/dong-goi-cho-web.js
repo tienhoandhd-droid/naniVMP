@@ -41,6 +41,9 @@ function esc(s) {
 function laEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s || '').trim()); }
 
 // Người dùng chốt 2026-07-31: mail phải có CẢ dữ liệu thô LẪN phần phân tích.
+// Cùng ngày, BỎ mục "phân công & tải việc" khỏi báo cáo — cả khối chữ lẫn ô
+// "Chưa phân công". Cột "Người thực hiện" trong dữ liệu thô thì GIỮ: đó là để
+// nhận diện hạng mục, không phải phép đo tải việc.
 // 448 dòng x 18 cột nhồi vào thân mail thì hộp thư nào cũng cắt, nên: bảng gọn
 // 60 dòng đầu trong thân để đọc ngay, còn TOÀN BỘ đính kèm dưới dạng CSV.
 var COT_THO = [
@@ -173,10 +176,10 @@ return $input.all().map(function (it, idx) {
   var laCanhBao = ctx.loai === 'canh_bao';
 
   var NHAN = laCanhBao
-    ? { tienDo: 'QUÁ HẠN NẶNG NHẤT', ruiRo: 'THỨ TỰ XỬ LÝ THEO RỦI RO', phanCong: 'AI ĐANG ÔM NHIỀU VIỆC TRỄ',
+    ? { tienDo: 'QUÁ HẠN NẶNG NHẤT', ruiRo: 'THỨ TỰ XỬ LÝ THEO RỦI RO',
         mucTieu: 'SO VỚI MỤC TIÊU 50%/THÁNG', batCap: 'BỘ PHẬN ĐANG NGHẼN', thangToi: 'SẮP TỚI HẠN — CHUẨN BỊ NGAY',
         uuTien: 'VIỆC PHẢI LÀM TUẦN TỚI' }
-    : { tienDo: 'TIẾN ĐỘ & QUÁ HẠN', ruiRo: 'THỨ TỰ RỦI RO & HỒ SƠ', phanCong: 'PHÂN CÔNG & TẢI VIỆC',
+    : { tienDo: 'TIẾN ĐỘ & QUÁ HẠN', ruiRo: 'THỨ TỰ RỦI RO & HỒ SƠ',
         mucTieu: 'SO VỚI MỤC TIÊU 50%/THÁNG', batCap: 'BẤT CẬP THEO BỘ PHẬN', thangToi: 'KẾ HOẠCH THÁNG TỚI',
         uuTien: 'VIỆC ƯU TIÊN TUẦN TỚI' };
 
@@ -194,7 +197,6 @@ return $input.all().map(function (it, idx) {
   if (th.mucRuiRoTongThe) L.push('', 'Mức rủi ro tổng thể: ' + th.mucRuiRoTongThe);
   muc(NHAN.tienDo, th.tienDo);
   muc(NHAN.ruiRo, th.ruiRo);
-  muc(NHAN.phanCong, th.phanCong);
   muc(NHAN.mucTieu, th.soSanhMucTieu);
   muc(NHAN.batCap, th.batCapBoPhan);
   muc(NHAN.thangToi, th.keHoachThangToi);
@@ -284,7 +286,6 @@ return $input.all().map(function (it, idx) {
     ['Tổng hạng mục', d.tong_hang_muc || 0],
     ['Đang quá hạn', soQuaHan],
     ['Tới hạn ≤ 60 ngày', soSapToiHan],
-    ['Chưa phân công', d.chua_phan_cong || 0],
   ].map(function (p) {
     return '<td style="padding:10px 14px;background:#f7f4fb;border-radius:10px">'
       + '<div style="font-size:11px;color:#777">' + esc(p[0]) + '</div>'
@@ -330,7 +331,6 @@ return $input.all().map(function (it, idx) {
     + '<table style="border-collapse:separate;border-spacing:0;margin-top:16px;width:100%"><tr>' + oSo + '</tr></table>'
     + khoiHtml(NHAN.tienDo, th.tienDo)
     + khoiHtml(NHAN.ruiRo, th.ruiRo)
-    + khoiHtml(NHAN.phanCong, th.phanCong)
     + khoiHtml(NHAN.mucTieu, th.soSanhMucTieu)
     + khoiHtml(NHAN.batCap, th.batCapBoPhan)
     + khoiHtml(NHAN.thangToi, th.keHoachThangToi)
