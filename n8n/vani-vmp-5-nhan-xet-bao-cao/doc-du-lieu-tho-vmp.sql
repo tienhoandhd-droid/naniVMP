@@ -64,7 +64,16 @@ items_nam as (
   from public.vmp_plan_items p
   join public.vmp_objects o on o.code = p.object_code
   where p.is_active and coalesce(p.item_state, 'active') = 'active'
-    and p.year = (select nam from pv)
+    -- "Thuộc năm N" = MỐC ĐÍCH VMP rơi vào năm N, đúng như web (hanVmp trong
+    -- reportModel.ts). Bản cũ lọc theo cột p.year — là năm trong mã hạng mục,
+    -- KHÔNG phải năm của hạn. Hai cái này hiện trùng nhau nên chưa lộ ra,
+    -- nhưng một hạng mục 2026 bị dời hạn sang tháng 1/2027 sẽ nằm ở 2027 trên
+    -- web và ở 2026 trong mail AI — hai con số khác nhau cho cùng một câu hỏi.
+    and ( extract(year from p.deadline_vmp)::int = (select nam from pv)
+          -- Hạng mục CHƯA có mốc đích không rơi vào năm nào theo hạn. Vẫn kéo
+          -- vào theo năm kế hoạch để mục chất lượng dữ liệu bên dưới còn nêu
+          -- được tên chúng — đó là lý do duy nhất chúng có mặt ở đây.
+          or (p.deadline_vmp is null and p.year = (select nam from pv)) )
     and ((select bp from pv) = 'all' or (select bp from pv) = any(coalesce(p.departments, array[]::text[])))
 ),
 items as (
@@ -103,7 +112,12 @@ select jsonb_build_object(
   'thang_den', (select thang_den from pv),
   'ngay_chay', current_date,
   'tong_hang_muc', (select count(*) from items),
-  'tong_hang_muc_ca_nam', (select count(*) from items_nam),
+  -- Đếm CÓ MỐC ĐÍCH, để khớp ô "Tổng hạng mục năm N" trên web (443, không
+  -- phải 448). Web loại hạng mục thiếu mốc đích ra khỏi mọi phép tính năm và
+  -- kể riêng chúng ở mục chất lượng dữ liệu; ở đây cũng vậy — xem
+  -- 'chua_co_moc_dich' ngay bên dưới. Trước đây mail AI viết 448 trong khi
+  -- dashboard hiện 443, người đọc không biết tin con nào.
+  'tong_hang_muc_ca_nam', (select count(*) from items_nam where han is not null),
   'theo_trang_thai', (select jsonb_object_agg(trang_thai, n) from (select trang_thai, count(*) n from items group by 1) x),
   'theo_bo_phan', (select jsonb_agg(jsonb_build_object('bo_phan', bp, 'tong', n, 'xong', xong, 'qua_han', qh) order by qh desc) from (
       select bp, count(*) n, count(*) filter (where trang_thai='done') xong, count(*) filter (where trang_thai='over') qh
