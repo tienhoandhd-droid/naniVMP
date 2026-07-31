@@ -543,8 +543,11 @@ export function Card({ children, style, variant = "default", cls = "" }: {
   children?: ReactNode; style?: CSSProperties; variant?: string; cls?: string;
 }) {
   const base = variant === "strong" ? cardStrong : variant === "soft" ? cardSoft : cardDefault;
+  // vmp-lift-3d: nghiêng rất nhẹ theo con trỏ + bóng hai tầng. Chỉ áp cho THẺ,
+  // không áp cho ô số liệu — chữ số bị xô lệch là đọc sai, mà đây là màn để
+  // đọc hạn thẩm định. Lớp này tự tắt khi người dùng bật "giảm chuyển động".
   return (
-    <div className={`card fade ${cls}`} style={{ ...base, padding: 24, ...style }}>
+    <div className={`card fade vmp-lift-3d ${cls}`} style={{ ...base, padding: 24, ...style }}>
       {children}
     </div>
   );
@@ -874,6 +877,22 @@ export function SkeletonDashboard() {
 }
 
 // ======================== SYNC STATUS BANNER ========================
+/** Ngưỡng coi dữ liệu là CŨ. WF-04 đồng bộ 5 phút một lần và mỗi lần áp
+ *  snapshot đều chạm `updated_at` của toàn bộ hạng mục, nên quá 6 giờ không
+ *  nhúc nhích nghĩa là đường Sheet→Supabase đã đứng — không phải "hôm nay ít
+ *  việc nên không ai sửa gì". */
+export const NGUONG_DU_LIEU_CU_MS = 6 * 3600 * 1000;
+
+/** Tuổi dữ liệu theo `max(updated_at)` trong DB. Trả null khi chưa đọc được
+ *  watermark — lúc đó KHÔNG được đoán là dữ liệu tươi. */
+export function tuoiDuLieu(dataUpdatedAt?: string | null): { ms: number; gio: number; cu: boolean } | null {
+  if (!dataUpdatedAt) return null;
+  const moc = new Date(dataUpdatedAt).getTime();
+  if (Number.isNaN(moc)) return null;
+  const ms = Math.max(0, Date.now() - moc);
+  return { ms, gio: Math.round(ms / 3600000), cu: ms > NGUONG_DU_LIEU_CU_MS };
+}
+
 export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
   /** Không dùng index signature để nhận được cả ConnState (status là union). */
   conn: { status?: string; msg?: string };
@@ -881,8 +900,9 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
   dataUpdatedAt?: string | null;
 }) {
   // S2-5/S3-5: cảnh báo dữ liệu CŨ theo TUỔI DỮ LIỆU (updated_at), không phải giờ fetch.
-  const ageMs = dataUpdatedAt ? (Date.now() - new Date(dataUpdatedAt).getTime()) : null;
-  const stale = ageMs != null && ageMs > 6 * 3600 * 1000;
+  const tuoi = tuoiDuLieu(dataUpdatedAt);
+  const ageMs = tuoi ? tuoi.ms : null;
+  const stale = !!tuoi?.cu;
   if (conn.status === "ok" && lastSync && !stale) return null;
   const isErr = conn.status === "err";
   const isStaleOnly = conn.status === "ok" && stale;
@@ -899,7 +919,7 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
       <span>
         {conn.status === "loading" ? "Đang đồng bộ dữ liệu…" :
          isErr ? `Lỗi kết nối: ${conn.msg}` :
-         isStaleOnly ? `Dữ liệu có thể đã CŨ (cập nhật ~${Math.round(ageMs / 3600000)} giờ trước) — kiểm tra đồng bộ Sheet→DB (WF-01).` :
+         isStaleOnly ? `Dữ liệu có thể đã CŨ — không có thay đổi nào trong ~${Math.round((ageMs || 0) / 3600000)} giờ. Kiểm tra đồng bộ Sheet→Supabase (WF-04).` :
          "Dữ liệu chưa đồng bộ. Bấm Làm mới để tải."}
       </span>
       {dataUpdatedAt ? (

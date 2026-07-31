@@ -5910,7 +5910,7 @@ body { transition: background var(--mo-slow) var(--ease); }
  * Ba mốc, không nhiều hơn: một cột (điện thoại) · hai cột (máy tính
  * bảng) · bốn cột (màn rộng).
  * ===================================================================== */
-.vmp-bento {
+.vmp-bento { perspective: 1600px; perspective-origin: 50% 20%;
   display: grid;
   gap: 16px;
   grid-template-columns: 1fr;
@@ -5982,4 +5982,104 @@ body { transition: background var(--mo-slow) var(--ease); }
 @keyframes vmpHienNhe {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =====================================================================
+   VƯƠNG MIỆN THẨM ĐỊNH — hero 3D trang Tổng quan
+   ---------------------------------------------------------------------
+   Canvas nằm dưới, chữ nằm trên. Canvas KHÔNG nhận chuột (pointer-events
+   none ở component) nên không cướp thao tác bôi-chép của người đọc số.
+   ===================================================================== */
+.vmp-crown-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  /* Số nằm ở HÀNG RIÊNG dưới vương miện, không chồng lớp. Bản trước tôi cho
+     đè lên và dù kê nền cỡ nào thì chữ số vẫn cắt ngang vành kim loại —
+     xấu, và quan trọng hơn là khó đọc. */
+  grid-template-areas: "san chu" "so chu" "ghichu ghichu";
+  gap: 4px 26px;
+  align-items: center;
+  width: 100%;
+}
+.vmp-crown-stage {
+  grid-area: san;
+  position: relative;
+  height: 218px;
+  min-width: 0;
+  /* Quầng sáng sau vương miện — tách khối kim loại khỏi nền thẻ trắng. */
+  background: radial-gradient(58% 46% at 50% 38%,
+    color-mix(in srgb, var(--c-gold) 16%, transparent), transparent 72%);
+}
+.vmp-crown-figure {
+  grid-area: so;
+  justify-self: center;
+  text-align: center;
+}
+.vmp-crown-legend {
+  grid-area: chu;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-width: 0;
+}
+.vmp-crown-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.vmp-crown-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; transform: rotate(45deg); }
+.vmp-crown-label { flex: 1; color: var(--c-ink-soft); white-space: nowrap; }
+.vmp-crown-bar {
+  width: 96px; height: 6px; border-radius: 999px; flex: none;
+  background: var(--c-surface-sunk); overflow: hidden;
+}
+.vmp-crown-bar > i { display: block; height: 100%; border-radius: 999px; }
+.vmp-crown-legend b { min-width: 40px; text-align: right; font-size: 15px; font-weight: 800; }
+.vmp-crown-note {
+  grid-area: ghichu;
+  font-size: 11.5px; font-weight: 600; color: var(--c-ink-soft); opacity: .85;
+}
+
+@media (max-width: 760px) {
+  .vmp-crown-hero { grid-template-columns: 1fr; grid-template-areas: "san" "chu" "ghichu"; }
+  .vmp-crown-stage { height: 190px; }
+}
+
+/* =====================================================================
+   CHIỀU SÂU THẬT — lớp 3D nhẹ cho toàn app
+   ---------------------------------------------------------------------
+   Trước bản này cả file không có một dòng perspective nào: mọi thứ phẳng,
+   bóng đổ chỉ một tầng. Ở đây thêm đúng hai thứ và không hơn — nghiêng
+   theo con trỏ, và bóng hai tầng. Thẻ số liệu KHÔNG nghiêng: chữ số bị
+   xô lệch là đọc sai, mà đây là màn để đọc hạn thẩm định.
+   ===================================================================== */
+.vmp-3d-scene { perspective: 1400px; perspective-origin: 50% 30%; }
+
+.vmp-lift-3d {
+  transform-style: preserve-3d;
+  transition: transform .38s cubic-bezier(.2, .7, .3, 1), box-shadow .38s ease;
+  will-change: transform;
+}
+.vmp-lift-3d:hover {
+  transform: translateY(-3px) rotateX(1.6deg) rotateY(-1.6deg);
+  /* Bóng hai tầng: một tầng sát để dính mặt phẳng, một tầng xa và loãng
+     để ra khoảng cách. Một tầng duy nhất luôn trông như dán decal. */
+  box-shadow:
+    0 2px 6px rgba(90, 42, 84, .07),
+    0 18px 44px rgba(90, 42, 84, .14);
+}
+.vmp-lift-3d:focus-visible {
+  transform: translateY(-3px);
+  outline: 2px solid var(--c-pink);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmp-lift-3d, .vmp-lift-3d:hover { transform: none; transition: none; }
 }

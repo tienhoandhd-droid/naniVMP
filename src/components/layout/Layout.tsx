@@ -8,7 +8,7 @@ import {
 import { C, TEXT, NUM, GRAD, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
 import type { ReactNode } from "react";
-import { Sparkle, CrownLogo } from "../ui/Primitives.tsx";
+import { Sparkle, CrownLogo, tuoiDuLieu } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 
 // ======================== SIDEBAR ========================
@@ -220,13 +220,15 @@ function ThemeToggle() {
   );
 }
 
-export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }: {
+export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, dataUpdatedAt }: {
   title?: ReactNode;
   user?: AppUser | null;
   sub?: ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
   lastSync?: number | string | null;
+  /** max(updated_at) trong DB — TUỔI DỮ LIỆU, không phải giờ trình duyệt tải. */
+  dataUpdatedAt?: string | null;
 }) {
   // Đồng hồ chỉ để kích hoạt render lại mỗi phút; giá trị không dùng trực tiếp.
   const [, setNow] = useState(new Date());
@@ -255,6 +257,32 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync }: {
               · Đồng bộ: {new Date(lastSync).toLocaleTimeString("vi-VN")}
             </span>
           )}
+          {/* Mốc dữ liệu luôn hiện, không đợi tới lúc quá ngưỡng mới báo: sự cố
+              21 ngày lần trước không ai phát hiện chính vì màn hình im lặng khi
+              mọi thứ "trông vẫn bình thường". */}
+          {dataUpdatedAt && (() => {
+            const t = tuoiDuLieu(dataUpdatedAt);
+            if (!t) return null;
+            return (
+              <span
+                title={`Hạng mục được sửa gần nhất lúc ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`}
+                style={{
+                  marginLeft: 10, fontSize: 12, fontWeight: 800,
+                  padding: t.cu ? "2px 9px" : 0, borderRadius: 999,
+                  color: t.cu ? C.marigoldText : C.plumSoft,
+                  background: t.cu ? C.marigoldSoft : "transparent",
+                }}>
+                {/* Ghép tay chứ không dùng toLocaleString: với vi-VN nó trả
+                    "14:11 31-07" — giờ đứng trước ngày, đọc rất dễ nhầm. */}
+                {(() => {
+                  const d = new Date(dataUpdatedAt);
+                  const hai = (n: number) => String(n).padStart(2, "0");
+                  return `· Dữ liệu: ${hai(d.getDate())}/${hai(d.getMonth() + 1)} ${hai(d.getHours())}:${hai(d.getMinutes())}`;
+                })()}
+                {t.cu && ` (cũ ~${t.gio}h)`}
+              </span>
+            );
+          })()}
         </div>
       </div>
 

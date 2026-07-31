@@ -18,6 +18,7 @@ export const ENV_WRITE_URL = import.meta.env.VITE_N8N_WRITE_URL || ""; // chỉ 
 
 const LS_KEY = "vmp_monitor_conn_v1";
 const LS_USER = "vmp_monitor_user_v1";
+const LS_LOC = "vmp_monitor_loc_v1";
 
 /* ---- Kết nối (URL đọc/ghi) ---- */
 export function loadConn(): ConnConfig | null {
@@ -45,6 +46,29 @@ export function saveConn(readUrl?: string, writeUrl?: string): void {
 
 export function clearConn(): void {
   try { localStorage.removeItem(LS_KEY); } catch { /* ignore */ }
+}
+
+/* ---- Bộ lọc toàn cục đã chọn lần trước ----------------------------
+ * Lưu theo TỪNG NGƯỜI vì máy trong xưởng là máy dùng chung: QA của Xưởng
+ * sản xuất và QA của Kho ngồi cùng một máy thì không được thấy bộ lọc của
+ * nhau. Chỉ lưu bộ lọc, KHÔNG lưu đang xem trang nào — mở app ra mà nhảy
+ * thẳng vào màn hôm qua đang dở thì khó hiểu hơn là tiện.
+ * ------------------------------------------------------------------- */
+function khoaLoc(userKey?: string | null): string {
+  return `${LS_LOC}:${String(userKey || "chung").trim().toLowerCase()}`;
+}
+
+export function loadFilterPrefs(userKey?: string | null): Record<string, unknown> | null {
+  try {
+    const raw = localStorage.getItem(khoaLoc(userKey));
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    return o && typeof o === "object" ? o : null;
+  } catch { return null; }
+}
+
+export function saveFilterPrefs(userKey: string | null | undefined, prefs: Record<string, unknown>): void {
+  try { localStorage.setItem(khoaLoc(userKey), JSON.stringify(prefs)); } catch { /* ignore */ }
 }
 
 /* ---- Phiên đăng nhập (ghi nhớ user, KHÔNG lưu mật khẩu) ---- */

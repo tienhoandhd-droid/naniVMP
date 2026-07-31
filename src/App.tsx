@@ -48,6 +48,7 @@ import {
   PERM_LABEL,
   NAV_ITEMS,
   NAV_SUBS,
+  PERIODS,
   vmpToday,
   LOAI_LOI,
   sevOf,
@@ -59,6 +60,8 @@ import {
   runDataQualityChecks,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
+import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
+import type { UrlState } from "./lib/urlState.ts";
 import { fetchSystemStatus } from "./lib/supabaseData.ts";
 import type { SystemStatus } from "./lib/supabaseData.ts";
 import type { ConnState } from "./hooks/index.ts";
@@ -76,7 +79,7 @@ import {
   SkeletonDashboard,
   SyncBanner,
   GuardianSilhouette,
-  PrincessCommentary, StatTile, Ring, MultiSelect} from "./components/ui/Primitives.tsx";
+  PrincessCommentary, StatTile, MultiSelect} from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
 // ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
@@ -90,12 +93,13 @@ const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
 const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
+import CrownHero from "./components/three/CrownHero.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
 import ReportsView from "./components/dashboard/ReportsView.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
-import { saveUser } from "./lib/config.ts";
+import { saveUser, loadUser, loadFilterPrefs, saveFilterPrefs } from "./lib/config.ts";
 import type { ReactNode } from "react";
 import type { Activity, AppUser } from "./types/domain.ts";
 import type { Database } from "./types/database.ts";
@@ -1357,16 +1361,10 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
       <Card variant="strong" cls="b-hero"
         style={{ padding: "26px 28px", display: "flex", alignItems: "center",
                  gap: 26, flexWrap: "wrap" }}>
-        <Ring size={176} stroke={16} segments={[
-          { value: e.done, color: C.mint },
-          { value: e.over, color: C.rasp },
-          { value: e.todo, color: C.marigold },
-        ]}>
-          <div style={{ fontFamily: NUM, fontSize: 40, fontWeight: 800,
-                        color: C.plum, lineHeight: 1 }}>{e.rate}%</div>
-          <div style={{ fontSize: 11, color: C.plumSoft, fontWeight: 800,
-                        marginTop: 3, letterSpacing: .4 }}>THẨM ĐỊNH</div>
-        </Ring>
+        {/* Vương miện thẩm định thay vòng tròn phẳng: vòng tròn cũ nói được
+            một con số, vương miện nói bốn — hụt ở khâu nào thì viên ngọc
+            khâu đó tối đi, thấy ngay mà không phải bấm sang trang khác. */}
+        <CrownHero acts={acts} rate={e.rate} total={e.total} />
 
         <div style={{ flex: 1, minWidth: 190 }}>
           <div style={{ fontFamily: TEXT, fontSize: 19, fontWeight: 800,
@@ -1576,6 +1574,7 @@ function GlobalFilterBar({
   areaSel, setAreaSel, deptSel, setDeptSel, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
   areaOptions, deptOptions, shown, total,
+  onlyMine, setOnlyMine, myName,
 }: {
   areaSel: string[];
   setAreaSel: (v: string[]) => void;
@@ -1591,8 +1590,21 @@ function GlobalFilterBar({
   deptOptions: Array<{ v: string; l: string }>;
   shown: number;
   total: number;
+  onlyMine: boolean;
+  setOnlyMine: (v: boolean) => void;
+  /** Tên người đăng nhập, dùng để đối chiếu với QA phụ trách. Rỗng thì
+   *  không hiện nút — thà không có nút còn hơn có nút bấm ra 0 dòng. */
+  myName: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [daChep, setDaChep] = useState(false);
+  const chepLien = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setDaChep(true);
+      setTimeout(() => setDaChep(false), 2000);
+    } catch { /* trình duyệt chặn clipboard thì người dùng copy từ thanh địa chỉ */ }
+  };
   const popRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
@@ -1605,8 +1617,8 @@ function GlobalFilterBar({
 
   const toggleDept = (v: string) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
   const toggleArea = (v: string) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
-  const active = deptSel.length > 0 || areaSel.length > 0 || !!customFrom || !!customTo;
-  const resetAll = () => { setDeptSel([]); setAreaSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); };
+  const active = deptSel.length > 0 || areaSel.length > 0 || !!customFrom || !!customTo || onlyMine;
+  const resetAll = () => { setDeptSel([]); setAreaSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); setOnlyMine(false); };
   // Thời gian CHỈ theo mốc ngày: có nhập ngày -> bật lọc "custom"; xoá hết -> "all".
   const onFrom = (v: string) => { setCustomFrom(v); setPeriod((v || customTo) ? "custom" : "all"); };
   const onTo = (v: string) => { setCustomTo(v); setPeriod((customFrom || v) ? "custom" : "all"); };
@@ -1635,6 +1647,21 @@ function GlobalFilterBar({
         <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
         <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} style={dateInp} aria-label="Đến ngày" />
       </div>
+
+      {/* Việc của tôi — lọc theo QA phụ trách khớp tên người đang đăng nhập.
+          Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
+          vào trong hộp thì coi như không có. */}
+      {myName && (
+        <button type="button" onClick={() => setOnlyMine(!onlyMine)} aria-pressed={onlyMine}
+          title={`Chỉ hiện hạng mục có QA phụ trách hoặc người hỗ trợ là "${myName}"`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10,
+            border: `1px solid ${onlyMine ? C.mintText : C.pinkSoft}`,
+            background: onlyMine ? C.mintSoft : "transparent",
+            color: onlyMine ? C.mintText : C.plumSoft,
+            fontFamily: TEXT, fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
+          <Users size={14} /> Việc của tôi
+        </button>
+      )}
 
       {/* + Lọc (Bộ phận / Khu vực) */}
       <div ref={popRef} style={{ position: "relative" }}>
@@ -1676,6 +1703,14 @@ function GlobalFilterBar({
         <span style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
           <b style={{ color: shown < total ? C.pinkText : C.plum }}>{shown}</b>/{total} hạng mục
         </span>
+        {/* Cả màn hình đang xem nằm trong URL, nên chép link là chia sẻ được
+            nguyên lát cắt — khỏi phải dặn nhau "vào Cảnh báo rồi chọn XSX". */}
+        <button type="button" onClick={chepLien} title="Chép liên kết tới đúng màn hình và bộ lọc đang xem"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 10,
+            border: `1px solid ${daChep ? C.mintText : C.pinkSoft}`, background: daChep ? C.mintSoft : "transparent",
+            color: daChep ? C.mintText : C.plumSoft, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
+          {daChep ? <CheckCircle2 size={13} /> : <FileText size={13} />} {daChep ? "Đã chép" : "Chép liên kết"}
+        </button>
         {active && (
           <button type="button" onClick={resetAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 10, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
             <XCircle size={13} /> Xóa lọc
@@ -1692,10 +1727,24 @@ function GlobalFilterBar({
 export default function App() {
   const { user, setUser, logout, isAdmin } = useAuth();
   const {
-    objects, acts, conn, lastSync, saveStatus, reloadData, silentRefresh,
+    objects, acts, conn, lastSync, dataUpdatedAt, saveStatus, reloadData, silentRefresh,
     updateActivity,
   } = useVmpData();
-  const [view, setView] = useState("overview");
+  // Trạng thái ban đầu: URL thắng, rồi mới tới bộ lọc nhớ từ lần trước. Ai dán
+  // link cho nhau thì phải thấy ĐÚNG cái người gửi thấy, không bị bộ lọc cũ của
+  // máy mình đè lên — đó là cả lý do đưa trạng thái lên URL.
+  const khoiTao = useMemo<UrlState>(() => {
+    const tuUrl = docUrl(typeof window === "undefined" ? "" : window.location.hash, {
+      views: NAV_ITEMS.map((n) => n.id).concat(["risk", "missing"]),
+      depts: DEPTS.map((d) => d.id),
+      periods: PERIODS.map((p) => p[0]).concat(["custom"]),
+    });
+    if (vietUrl(tuUrl)) return tuUrl;            // URL có nội dung → dùng luôn
+    const nho = loadFilterPrefs(loadUser()?.email || loadUser()?.name);
+    return nho ? { ...tuUrl, ...docUrl(String(nho.hash || "")), view: tuUrl.view } : tuUrl;
+  }, []);
+
+  const [view, setView] = useState(khoiTao.view);
   // Đối tượng cần mở sẵn khi nhảy từ "Tiến độ theo đối tượng" sang "Danh mục &
   // Nhập liệu". Dùng object mới mỗi lần bấm (không phải chuỗi) để bấm lại cùng
   // một mã vẫn kích hoạt useEffect bên kia.
@@ -1704,11 +1753,12 @@ export default function App() {
   const mainRef = useScrollTop([view]);
 
   // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + bộ phận (chọn NHIỀU) + thời gian (có Tùy chọn).
-  const [areaSel, setAreaSel] = useState<string[]>([]);   // rỗng = tất cả khu vực
-  const [deptSel, setDeptSel] = useState<string[]>([]);   // rỗng = tất cả bộ phận
-  const [periodFilter, setPeriodFilter] = useState("all");
-  const [customFrom, setCustomFrom] = useState("");   // yyyy-mm-dd
-  const [customTo, setCustomTo] = useState("");       // yyyy-mm-dd
+  const [areaSel, setAreaSel] = useState<string[]>(khoiTao.areaSel);   // rỗng = tất cả khu vực
+  const [deptSel, setDeptSel] = useState<string[]>(khoiTao.deptSel);   // rỗng = tất cả bộ phận
+  const [periodFilter, setPeriodFilter] = useState(khoiTao.period);
+  const [customFrom, setCustomFrom] = useState(khoiTao.customFrom);   // yyyy-mm-dd
+  const [customTo, setCustomTo] = useState(khoiTao.customTo);         // yyyy-mm-dd
+  const [onlyMine, setOnlyMine] = useState(khoiTao.onlyMine);
   // Faceted count: số hạng mục theo mỗi bộ phận (khớp a.depts) — hiện cạnh lựa chọn.
   const deptOptions = useMemo(() => DEPTS.map((d) => ({
     v: d.id, l: d.name,
@@ -1758,11 +1808,30 @@ export default function App() {
     }
     return inPeriod(a, periodFilter);
   }, [periodFilter, customFrom, customTo]);
+  /* ---- "Việc của tôi" ------------------------------------------------
+   * Đối chiếu tên người đăng nhập với QA phụ trách / người hỗ trợ. Ô người
+   * phụ trách trong Sheet có khi gói nhiều tên ("A, B") nên phải tách ra rồi
+   * mới so, chứ so cả chuỗi thì người thứ hai không bao giờ khớp.
+   * ------------------------------------------------------------------- */
+  const myName = String(user?.name || "").trim();
+  const myKey = useMemo(
+    () => myName.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase(),
+    [myName],
+  );
+  const laViecCuaToi = useCallback((a: Activity) => {
+    if (!onlyMine || !myKey) return true;
+    return [a.owner, a.owner_name, a.support, a.secondary_owner].some((raw) =>
+      String(raw || "")
+        .split(/[,;/]+/)
+        .some((phan) => phan.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase() === myKey));
+  }, [onlyMine, myKey]);
+
   const filteredActs = useMemo(() => acts.filter((a) => (
     (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) &&
     inDept(a) &&
-    matchTime(a)
-  )), [acts, areaSel, inDept, matchTime]);
+    matchTime(a) &&
+    laViecCuaToi(a)
+  )), [acts, areaSel, inDept, matchTime, laViecCuaToi]);
   const filteredObjects = useMemo(() => objects.filter((o) => {
     if (areaSel.length && !areaSel.includes(String(o.area || "").trim())) return false;
     if (deptSel.length) {
@@ -1771,6 +1840,65 @@ export default function App() {
     }
     return true;
   }), [objects, areaSel, deptSel, objectDepts]);
+
+  /* ---- URL ↔ trạng thái ----------------------------------------------
+   * Ghi: đổi MÀN thì pushState (nút Back quay về màn trước — hành vi ai cũng
+   * mong đợi); chỉnh BỘ LỌC thì replaceState, vì gõ ngày tháng mà mỗi ký tự
+   * đẩy một mục vào lịch sử thì bấm Back mười lần mới thoát nổi.
+   * Đọc: nghe popstate (Back/Forward) và hashchange (người dùng tự sửa URL).
+   * ------------------------------------------------------------------- */
+  const trangThaiUrl = useMemo<UrlState>(() => ({
+    view, deptSel, areaSel, period: periodFilter, customFrom, customTo, onlyMine,
+  }), [view, deptSel, areaSel, periodFilter, customFrom, customTo, onlyMine]);
+
+  const viewTruoc = useRef(view);
+  useEffect(() => {
+    const hash = vietUrl(trangThaiUrl);
+    const moi = hash ? `#${hash}` : window.location.pathname + window.location.search;
+    // So với hash hiện tại: không có bước này thì chính popstate lại kích hoạt
+    // effect này ghi đè lịch sử, và nút Forward chết.
+    const dangCo = window.location.hash ? window.location.hash : "";
+    if (dangCo === (hash ? `#${hash}` : "")) { viewTruoc.current = view; return; }
+    const doiMan = viewTruoc.current !== view;
+    viewTruoc.current = view;
+    try {
+      if (doiMan) window.history.pushState(null, "", moi);
+      else window.history.replaceState(null, "", moi);
+    } catch { /* trình duyệt chặn history thì bỏ qua, app vẫn chạy */ }
+  }, [trangThaiUrl, view]);
+
+  // Nhớ bộ lọc cho lần mở sau. KHÔNG lưu `view` — mở app ra mà nhảy thẳng vào
+  // màn hôm qua đang dở thì khó hiểu hơn là tiện.
+  useEffect(() => {
+    if (!user) return;
+    saveFilterPrefs(user.email || user.name, {
+      hash: vietUrl({ ...trangThaiUrl, view: MAC_DINH.view }),
+    });
+  }, [trangThaiUrl, user]);
+
+  useEffect(() => {
+    const apDung = () => {
+      const s = docUrl(window.location.hash, {
+        views: NAV_ITEMS.map((n) => n.id).concat(["risk", "missing"]),
+        depts: DEPTS.map((d) => d.id),
+        periods: PERIODS.map((p) => p[0]).concat(["custom"]),
+      });
+      viewTruoc.current = s.view;
+      setView(s.view);
+      setDeptSel(s.deptSel);
+      setAreaSel(s.areaSel);
+      setPeriodFilter(s.period);
+      setCustomFrom(s.customFrom);
+      setCustomTo(s.customTo);
+      setOnlyMine(s.onlyMine);
+    };
+    window.addEventListener("popstate", apDung);
+    window.addEventListener("hashchange", apDung);
+    return () => {
+      window.removeEventListener("popstate", apDung);
+      window.removeEventListener("hashchange", apDung);
+    };
+  }, []);
 
   // (MỚI) Giữ dữ liệu tươi: làm mới khi quay lại tab; RELOAD khi sang NGÀY MỚI
   // (VMP_TODAY và "hôm nay" tính lúc tải trang → tránh "quá hạn/ngày còn lại" bị cũ khi mở lâu).
@@ -1830,7 +1958,7 @@ export default function App() {
           <Topbar
             title={title} user={user} sub={(NAV_SUBS as Record<string, string>)[view]}
             onRefresh={reloadData} refreshing={conn.status === "loading"}
-            lastSync={lastSync}
+            lastSync={lastSync} dataUpdatedAt={dataUpdatedAt}
           />
 
           {/* Toast trạng thái lưu nổi góc phải */}
@@ -1894,7 +2022,7 @@ export default function App() {
             )}
 
             {/* Sync warning banner */}
-            {acts.length > 0 && <SyncBanner conn={conn} lastSync={lastSync} />}
+            {acts.length > 0 && <SyncBanner conn={conn} lastSync={lastSync} dataUpdatedAt={dataUpdatedAt} />}
 
             {/* Bộ lọc TOÀN CỤC (khu vực + thời gian) — áp cho mọi trang có dữ liệu */}
             {acts.length > 0 && view !== "audit" && view !== "admin" && view !== "missing" && (
@@ -1906,6 +2034,7 @@ export default function App() {
                 customTo={customTo} setCustomTo={setCustomTo}
                 areaOptions={areaOptions} deptOptions={deptOptions}
                 shown={filteredActs.length} total={acts.length}
+                onlyMine={onlyMine} setOnlyMine={setOnlyMine} myName={myName}
               />
             )}
 
