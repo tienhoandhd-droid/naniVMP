@@ -27,6 +27,8 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import * as THREE from "three";
 import { wlIsDone } from "../../utils/helpers.ts";
+import { NhanTruc } from "./NhanTruc.tsx";
+import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
 
 export interface O3D {
@@ -115,23 +117,38 @@ function Cot({ o, x, z, chon, onHover }: {
   );
 }
 
-function Canh({ o3d, chon, onHover, giam }: {
-  o3d: O3D[]; chon: O3D | null; onHover: (o: O3D | null) => void; giam: boolean;
-}) {
+function Canh({ o3d, chon, onHover }: {
+  o3d: O3D[]; chon: O3D | null; onHover: (o: O3D | null) => void; }) {
   const sauZ = 12 * BUOC_T;
   const rongX = GIAI_DOAN.length * BUOC_G;
   const z0 = -sauZ / 2 + BUOC_T / 2;
   const x0 = -rongX / 2 + BUOC_G / 2;
 
+  const nhan: MotNhan[] = [
+    ...Array.from({ length: 12 }, (_, i) => ({
+      vt: [x0 - BUOC_G * 0.72, 0.02, z0 + i * BUOC_T] as [number, number, number],
+      chu: `T${i + 1}`,
+    })),
+    ...GIAI_DOAN.map((g, i) => ({
+      vt: [x0 + i * BUOC_G, 0.02, sauZ / 2 + 0.34] as [number, number, number],
+      chu: g.ten,
+    })),
+    { vt: [x0 - BUOC_G * 1.3, 0.02, -sauZ / 2 - 0.4], chu: "Tháng ↘", dam: true },
+    { vt: [rongX / 2 + 0.6, 0.02, sauZ / 2 + 0.34], chu: "Giai đoạn →", dam: true },
+    { vt: [x0 - BUOC_G * 1.0, CAO + 0.22, -sauZ / 2 - 0.2], chu: "↑ 100%", dam: true },
+    { vt: [rongX / 2 + 0.5, CAO / 2, -sauZ / 2 - 0.1], chu: "mục tiêu 50%" },
+  ];
+
   return (
     <>
       <OrthographicCamera makeDefault position={[5.2, 4.2, 6.2]} zoom={92} />
+      {/* Không tự xoay — xem chú thích ở WorkloadSpace3D.tsx. */}
       <OrbitControls
         makeDefault enablePan={false} enableZoom={false}
         // Chặn không cho lật xuống dưới sàn: nhìn từ dưới lên thì cột nào
         // cũng che nhau và không còn đọc được gì.
         minPolarAngle={0.25} maxPolarAngle={Math.PI / 2.35}
-        autoRotate={!giam} autoRotateSpeed={0.35}
+        autoRotate={false}
         target={[0, 0.55, 0]}
       />
 
@@ -154,6 +171,8 @@ function Canh({ o3d, chon, onHover, giam }: {
         <meshBasicMaterial color="#8168CE" transparent opacity={0.1}
           side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
+
+      <NhanTruc nhan={nhan} />
 
       {o3d.map((o) => (
         <Cot key={`${o.thang}-${o.giaiDoan}`} o={o}
@@ -179,7 +198,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
       <div className="vmp-space3d-khung">
         <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
           frameloop={giamChuyenDong ? "demand" : "always"}>
-          <Canh o3d={o3d} chon={chon} onHover={setChon} giam={giamChuyenDong} />
+          <Canh o3d={o3d} chon={chon} onHover={setChon} />
         </Canvas>
       </div>
 
