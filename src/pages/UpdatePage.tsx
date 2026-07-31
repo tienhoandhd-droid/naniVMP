@@ -6,7 +6,7 @@ import { STATUS, STAGES, PERIODS } from "../constants/vmp.ts";
 import { stageOf, inPeriod, nguoiPhuTrach } from "../utils/helpers.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { useDebounce } from "../hooks/index.ts";
-import { Card, CardTitle, Tag, Pill, StateBadge } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
@@ -37,7 +37,9 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   const [quick, setQuick] = useState(false);
   // Gõ phím không lọc ngay — 461 dòng dựng lại mỗi phím là chỗ giật nhất trang này.
   const kw = useDebounce(q.trim().toLowerCase(), 250);
-  const [hien, setHien] = useState(60);        // số dòng dựng thật trong bảng
+  // Phân trang thật thay nút "Hiện thêm" (phải bấm 7 lần mới hết 461 dòng).
+  const [trang, setTrang] = useState(0);
+  const [coTrang, setCoTrang] = useState(100);
   const inWindow = useMemo(() => acts.filter((a) => inPeriod(a, period)), [acts, period]);
   // Tính giai đoạn 1 lần/hạng mục rồi tái dùng (trước đây stageOf chạy ~7 lần/hàng).
   const stageByItem = useMemo(() => {
@@ -116,7 +118,14 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     [inWindow, stageByItem, stageF, fst, kw, fix, FIXES],
   );
 
-  useEffect(() => { setHien(60); }, [stageF, fix, fst, kw, period]);
+  // Lát cắt đang dựng. coTrang = 0 nghĩa là "Tất cả".
+  const lat = useMemo(
+    () => (coTrang > 0 ? list.slice(trang * coTrang, (trang + 1) * coTrang) : list),
+    [list, trang, coTrang],
+  );
+  // Đổi bộ lọc thì về trang đầu — không thì đang ở trang 5 mà danh sách mới
+  // chỉ có 2 trang, màn hình rỗng và trông như mất dữ liệu.
+  useEffect(() => { setTrang(0); }, [stageF, fix, fst, kw, period]);
 
   const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all";
   const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); setQ(""); setPeriod("all"); };
@@ -213,7 +222,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
               {["Mã", "Tên", "Loại", "QA", "Deadline", "Giai đoạn", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i > 4 ? "center" : "left", padding: "13px 16px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {list.slice(0, hien).map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
+              {lat.map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
                 <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? "rgba(255,255,255,.4)" : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
                   <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 13 }}>{a.code}</td>
                   <td style={{ padding: "12px 16px", color: C.plum, fontSize: 13 }}>
@@ -245,12 +254,10 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                   </td>
                 </tr>
               ); })}
-              {list.length > hien && (
-                <tr><td colSpan={8} style={{ padding: 14, textAlign: "center" }}>
-                  <button onClick={() => setHien((n) => n + 100)}
-                    style={{ ...btnPrimary, padding: "9px 18px", borderRadius: 11, fontSize: 13 }}>
-                    Hiện thêm — đang xem {hien}/{list.length} hạng mục
-                  </button>
+              {list.length > 0 && (
+                <tr><td colSpan={8} style={{ padding: "4px 8px" }}>
+                  <PhanTrang tong={list.length} trang={trang} setTrang={setTrang}
+                    coTrang={coTrang} setCoTrang={setCoTrang} donVi="hạng mục" />
                 </td></tr>
               )}
               {/* Rỗng thì nói RÕ vì sao rỗng và bộ lọc nào đang bật — không thì

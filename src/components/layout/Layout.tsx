@@ -193,6 +193,10 @@ function useThemeMode(): [ThemeMode, (m: ThemeMode) => void] {
   return [mode, setMode];
 }
 
+/* MỘT nút xoay vòng thay ba nút luôn hiện.
+   Ba nút chiếm chỗ cố định trên mọi màn hình để phục vụ một thao tác mà
+   người dùng làm vài lần trong đời. Một nút hiện trạng thái đang dùng, bấm
+   thì chuyển sang chế độ kế tiếp — vẫn tới được cả ba, mà chỉ tốn 1/3 chỗ. */
 function ThemeToggle() {
   const [mode, setMode] = useThemeMode();
   const opts: Array<{ id: ThemeMode; icon: typeof Sun; label: string }> = [
@@ -200,23 +204,20 @@ function ThemeToggle() {
     { id: "auto", icon: Monitor, label: "Theo hệ thống" },
     { id: "dark", icon: Moon, label: "Tối" },
   ];
+  const i = Math.max(0, opts.findIndex((o) => o.id === mode));
+  const cur = opts[i];
+  const next = opts[(i + 1) % opts.length];
+  const Icon = cur.icon;
   return (
-    <div style={{ ...glass, borderRadius: 999, padding: 3, display: "flex", gap: 2 }}>
-      {opts.map((o) => {
-        const on = mode === o.id;
-        return (
-          <button key={o.id} onClick={() => setMode(o.id)} title={o.label}
-            aria-pressed={on}
-            style={{ width: 34, height: 34, borderRadius: 999, border: "none",
-                     cursor: "pointer", display: "flex", alignItems: "center",
-                     justifyContent: "center",
-                     background: on ? C.pinkSoft : "transparent",
-                     transition: "background var(--mo-fast) var(--ease)" }}>
-            <o.icon size={15} color={on ? C.pinkText : C.plumSoft} />
-          </button>
-        );
-      })}
-    </div>
+    <button
+      onClick={() => setMode(next.id)}
+      title={`Giao diện: ${cur.label} — bấm để chuyển sang ${next.label}`}
+      aria-label={`Giao diện ${cur.label}. Bấm để chuyển sang ${next.label}`}
+      style={{ ...glass, width: 40, height: 40, borderRadius: 999, border: "none",
+               cursor: "pointer", display: "flex", alignItems: "center",
+               justifyContent: "center", padding: 0 }}>
+      <Icon size={16} color={C.pinkText} />
+    </button>
   );
 }
 
