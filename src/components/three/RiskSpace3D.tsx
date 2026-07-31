@@ -21,6 +21,7 @@
 import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
+import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { qrmSeverity, qrmOccurrence, qrmLevel } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
@@ -35,6 +36,11 @@ export interface ORui {
   rpn: number;
   ma: string[];    // vài mã đầu, để chú thích khi rê chuột
 }
+
+/** Vị trí camera gốc — dùng chung cho khung nhìn và biên góc xoay. */
+/* Ở khối này trục DÀI là X (mức nghiêm trọng 1..9), nên nghiêng ngược
+   với hai khối kia: nhìn gần dọc trục Z để 9 mức trải ngang khung. */
+const VI_TRI: [number, number, number] = [3.2, 4.2, 7.4];
 
 const MAU = { cao: "#D6486D", tb: "#EDB033", thap: "#2A9E82" };
 
@@ -96,29 +102,35 @@ function Canh({ o3d, caoNhat, chon, onHover }: {
   const rongX = 9 * BUOC_X;
   const sauZ = 4 * BUOC_Z;
 
+  /* Thang nghiêm trọng 1..9: chỉ các mốc lẻ đứng đậm cho đỡ rợp, mốc đang
+     trỏ tới sáng lên. Tên trục bỏ mũi tên vì khối xoay được. */
   const nhan: MotNhan[] = [
     ...Array.from({ length: 9 }, (_, i) => ({
-      vt: [(i + 1 - 5) * BUOC_X, 0.02, sauZ / 2 + 0.32] as [number, number, number],
+      vt: [(i + 1 - 5) * BUOC_X, 0.02, sauZ / 2 + 0.34] as [number, number, number],
       chu: String(i + 1),
+      cap: ((i + 1) % 2 === 1 ? "chinh" : "phu") as "chinh" | "phu",
+      sang: chon?.ng === i + 1,
     })),
     ...TEN_KN.map((t, i) => ({
-      vt: [-rongX / 2 - 0.5, 0.02, (i - 1.5) * BUOC_Z] as [number, number, number],
+      vt: [-rongX / 2 - 0.52, 0.02, (i - 1.5) * BUOC_Z] as [number, number, number],
       chu: t.split(" —")[0],
+      cap: "chinh" as const,
+      sang: chon?.kn === i,
     })),
-    { vt: [rongX / 2 + 0.7, 0.02, sauZ / 2 + 0.32], chu: "Nghiêm trọng →", dam: true },
-    { vt: [-rongX / 2 - 0.9, 0.02, -sauZ / 2 - 0.45], chu: "Khả năng xảy ra ↘", dam: true },
-    { vt: [-rongX / 2 - 0.6, CAO_MAX + 0.25, -sauZ / 2 - 0.2], chu: "↑ số hạng mục", dam: true },
+    // Tên trục bỏ khỏi cảnh — xem lý do ở WorkloadSpace3D.tsx.
   ];
 
   return (
     <>
-      <OrthographicCamera makeDefault position={[5, 4, 6]} zoom={106} />
-      {/* Không tự xoay. Khối quay liên tục thì nhãn trục chạy theo và người
-          xem phải đuổi theo chữ — chống lại đúng mục tiêu "nhìn là hiểu".
-          Ai cần xem mặt khuất thì tự kéo. */}
+      <OrthographicCamera makeDefault position={VI_TRI} />
+      <KhungVua le={1.02}
+        hop={{ rong: rongX / 2 + 0.4, cao: CAO_MAX / 2 + 0.24, sau: sauZ / 2 + 0.72,
+               tam: [0, CAO_MAX / 2, 0] }} />
+      {/* Không tự xoay, và chặn góc quanh hướng gốc — xem WorkloadSpace3D.tsx. */}
       <OrbitControls makeDefault enablePan={false} enableZoom={false}
-        minPolarAngle={0.25} maxPolarAngle={Math.PI / 2.35}
-        autoRotate={false} target={[0, 0.6, 0]} />
+        minPolarAngle={0.34} maxPolarAngle={Math.PI / 2.5}
+        {...bienPhuongVi(VI_TRI, 0.55)}
+        autoRotate={false} target={[0, CAO_MAX / 2, 0]} />
 
       <ambientLight intensity={0.78} />
       <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow shadow-mapSize={[1024, 1024]} />
@@ -130,7 +142,7 @@ function Canh({ o3d, caoNhat, chon, onHover }: {
       </mesh>
       <gridHelper args={[Math.max(rongX, sauZ) + 0.6, 12, "#E7DAEB", "#F1E8F3"]} position={[0, 0.001, 0]} />
 
-      <NhanTruc nhan={nhan} />
+      <NhanTruc nhan={nhan} tam={[0, CAO_MAX / 2, 0]} />
 
       {o3d.map((o) => (
         <Cot key={`${o.ng}-${o.kn}`} o={o} caoNhat={caoNhat}
@@ -146,6 +158,7 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
   const o3d = useMemo(() => dungKhoiRuiRo(acts), [acts]);
   const caoNhat = useMemo(() => o3d.reduce((m, o) => Math.max(m, o.n), 1), [o3d]);
   const [chon, setChon] = useState<ORui | null>(null);
+  const [chuot, setChuot] = useState<{ x: number; y: number } | null>(null);
 
   /* CÂU KẾT LUẬN. Ma trận rủi ro chỉ có giá trị khi nó chỉ ra được KHỐI
      hạng mục đang đứng ở ô nguy hiểm nhất — chứ không phải bày ra một
@@ -172,27 +185,46 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
   return (
     <div className="vmp-space3d">
       {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
-      <div className="vmp-space3d-khung">
-        <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
-          frameloop={giamChuyenDong ? "demand" : "always"}>
-          <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
-        </Canvas>
-      </div>
+      <div className="vmp-space3d-than">
+        <div className="vmp-space3d-khung"
+          onPointerMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setChuot({ x: e.clientX - r.left, y: e.clientY - r.top });
+          }}
+          onPointerLeave={() => setChuot(null)}>
+          {chon && chuot && (
+            <div className="vmp-space3d-hover" style={{ left: chuot.x, top: chuot.y }} aria-hidden="true">
+              <b>Nghiêm trọng {chon.ng} · {TEN_KN[chon.kn]}</b>
+              <span>
+                <i style={{ background: MAU[qrmLevel(chon.rpn) as keyof typeof MAU] || MAU.thap }} />
+                {chon.n} hạng mục
+                <em>RPN {chon.rpn}</em>
+              </span>
+            </div>
+          )}
+          <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
+            frameloop={giamChuyenDong ? "demand" : "always"}>
+            <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
+          </Canvas>
+        </div>
 
-      <div className="vmp-space3d-chu">
-        <span><i style={{ background: MAU.cao }} />RPN ≥ 15 — cao</span>
-        <span><i style={{ background: MAU.tb }} />RPN 7–14 — trung bình</span>
-        <span><i style={{ background: MAU.thap }} />RPN &lt; 7 — thấp</span>
-      </div>
+        <div className="vmp-space3d-canh">
+        <div className="vmp-space3d-chu">
+          <span><i style={{ background: MAU.cao }} />RPN ≥ 15 — cao</span>
+          <span><i style={{ background: MAU.tb }} />RPN 7–14 — trung bình</span>
+          <span><i style={{ background: MAU.thap }} />RPN &lt; 7 — thấp</span>
+        </div>
 
-      <div className="vmp-space3d-tip" role="status" aria-live="polite">
-        {chon ? (
-          <>
-            <b>Nghiêm trọng {chon.ng} · {TEN_KN[chon.kn]}</b>
-            {" — "}RPN {chon.rpn} · <b>{chon.n}</b> hạng mục
-            {chon.ma.length ? ` (${chon.ma.join(", ")}${chon.n > chon.ma.length ? "…" : ""})` : ""}
-          </>
-        ) : "Kéo để xoay · trục ngang là mức nghiêm trọng 1–9, trục sâu là khả năng xảy ra, chiều cao là SỐ HẠNG MỤC ở ô đó. Dữ liệu chưa có trường khả năng phát hiện nên không dựng trục thứ ba của ICH Q9."}
+        <div className="vmp-space3d-tip" role="status" aria-live="polite">
+          {chon ? (
+            <>
+              <b>Nghiêm trọng {chon.ng} · {TEN_KN[chon.kn]}</b>
+              {" — "}RPN {chon.rpn} · <b>{chon.n}</b> hạng mục
+              {chon.ma.length ? ` (${chon.ma.join(", ")}${chon.n > chon.ma.length ? "…" : ""})` : ""}
+            </>
+          ) : "Kéo để xoay · trục ngang là mức nghiêm trọng 1–9, trục sâu là khả năng xảy ra, chiều cao là SỐ HẠNG MỤC ở ô đó. Dữ liệu chưa có trường khả năng phát hiện nên không dựng trục thứ ba của ICH Q9."}
+        </div>
+        </div>
       </div>
     </div>
   );

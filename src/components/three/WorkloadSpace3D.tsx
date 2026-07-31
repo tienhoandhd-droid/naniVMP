@@ -19,6 +19,7 @@
 import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges, ContactShadows } from "@react-three/drei";
+import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
@@ -59,6 +60,15 @@ export function dungTaiViec(acts: Activity[], nam: number): OTai[] {
   return [...o.values()];
 }
 
+/** Vị trí camera gốc — dùng chung cho khung nhìn và biên góc xoay. */
+/* Hướng nhìn chếch HẲN về phía trục tháng. Bản trước đặt [5, 4.2, 6] —
+   phương vị ~40°, tức nhìn chéo góc: cả 12 tháng lẫn 6 bộ phận đều chiếu
+   xuống một dải chéo hẹp, nên 12 nhãn tháng chen nhau trong ~150px và
+   hình thì gầy so với khung rộng 1116px (bỏ trắng hai bên ~40%).
+   Kéo phương vị lên ~64°: trục 12 tháng trải NGANG gần hết bề rộng khung —
+   hình lấp đầy khung, và khoảng cách giữa hai nhãn tháng tăng hơn gấp đôi. */
+const VI_TRI: [number, number, number] = [7.6, 3.9, 3.3];
+
 const BUOC_T = 0.44;
 const BUOC_B = 0.62;
 const CAO_MAX = 2.1;
@@ -93,7 +103,10 @@ function Cot({ o, caoNhat, chon, onHover }: {
 
   return (
     <mesh ref={m}
-      position={[(o.bp - (DEPTS.length - 1) / 2) * BUOC_B, 0, (o.thang - 6.5) * BUOC_T]}
+      // (6.5 - thang) chứ không phải (thang - 6.5): với hướng camera hiện
+      // tại, +Z chiếu về phía TRÁI màn hình. Để nguyên thì T12 nằm trái và
+      // T1 nằm phải — thời gian chạy ngược, thứ mà mắt luôn đọc sai.
+      position={[(o.bp - (DEPTS.length - 1) / 2) * BUOC_B, 0, (6.5 - o.thang) * BUOC_T]}
       onPointerOver={(e) => { e.stopPropagation(); onHover(o); }}
       onPointerOut={() => onHover(null)}
       castShadow receiveShadow>
@@ -112,25 +125,41 @@ function Canh({ o3d, caoNhat, chon, onHover }: {
   const rongX = DEPTS.length * BUOC_B;
   const sauZ = 12 * BUOC_T;
 
-  /* Nhãn trục. Tháng chạy dọc mép trái, bộ phận chạy dọc mép trước, và mỗi
-     trục có một nhãn tên đặt ở đầu — không có tên trục thì người xem vẫn
-     phải đoán "dãy số 1..12 này là tháng hay là tuần". */
+  /* Nhãn trục. Tháng chạy dọc mép trái, bộ phận chạy dọc mép trước.
+     Không nhồi cả 12 tháng cùng một mức: chỉ MỐC QUÝ (T1·T4·T7·T10) đứng
+     đậm làm mốc định vị, các tháng còn lại nhỏ và mờ. Trỏ vào cột nào thì
+     tháng và bộ phận của cột đó sáng lên — cần chính xác thì hỏi, không
+     phải lúc nào cũng bày ra hết. */
   const nhan: MotNhan[] = [
-    ...Array.from({ length: 12 }, (_, i) => ({
-      vt: [-rongX / 2 - 0.34, 0.02, (i + 1 - 6.5) * BUOC_T] as [number, number, number],
-      chu: `T${i + 1}`,
-    })),
+    ...Array.from({ length: 12 }, (_, i) => {
+      const thang = i + 1;
+      const quy = thang % 3 === 1;              // T1 · T4 · T7 · T10
+      const sang = chon?.thang === thang;
+      return {
+        // Mép GẦN camera. Bản trước đặt ở mép -X, mà camera đứng phía +X —
+        // nhãn rơi vào nửa xa, bị làm mờ theo độ sâu tới mức gần như biến
+        // mất. Nhãn trục phải nằm ở phía người xem đang đứng.
+        vt: [rongX / 2 + 0.4, 0.02, (6.5 - thang) * BUOC_T] as [number, number, number],
+        chu: `T${thang}`,
+        cap: (quy ? "chinh" : "phu") as "chinh" | "phu",
+        sang,
+      };
+    }),
     ...DEPTS.map((d, i) => ({
-      vt: [(i - (DEPTS.length - 1) / 2) * BUOC_B, 0.02, sauZ / 2 + 0.3] as [number, number, number],
-      chu: (d.id || "").toUpperCase(),
+      // Giãn 1.18 lần và đẩy xa mép thêm chút. Hướng camera mới trải trục
+      // tháng ra rộng nhưng bù lại NÉN trục bộ phận, hai nhãn liền nhau chỉ
+      // còn cách 29px. Giãn ra ngoài rìa cột là cách rẻ nhất để lấy lại
+      // khoảng thở mà không phải đổi hướng nhìn.
+      vt: [(i - (DEPTS.length - 1) / 2) * BUOC_B * 1.18, 0.02, sauZ / 2 + 0.5] as [number, number, number],
+      chu: d.short || (d.id || "").toUpperCase(),
+      cap: "chinh" as const,
+      sang: chon?.bp === i,
     })),
-    // Tên trục đặt HẲN ngoài vùng cột, không thì camera chếch làm chữ rơi
-    // vào giữa khối và trông như một cột bị dán nhãn sai.
-    // Tên trục đặt ở ĐẦU GẦN (cạnh T12), không phải đầu xa: đầu xa bị góc
-    // camera chiếu vào giữa rừng cột và trông như nhãn của một cột nào đó.
-    { vt: [-rongX / 2 - 1.05, 0.02, sauZ / 2 + 0.2], chu: "↖ Tháng", dam: true },
-    { vt: [rongX / 2 + 0.9, 0.02, sauZ / 2 + 0.62], chu: "Bộ phận →", dam: true },
-    { vt: [-rongX / 2 - 0.75, CAO_MAX + 0.3, -sauZ / 2 - 0.2], chu: `↑ cao nhất ${caoNhat}`, dam: true },
+    /* KHÔNG đặt tên trục trong cảnh nữa. Ba lý do, phát hiện khi chụp lại:
+       tên trục nằm ngoài rìa nên đẩy khung nhìn rộng ra, làm chính hình bị
+       thu nhỏ; nó chen vào dãy nhãn bộ phận ("BỘ PHẬN" đè lên "Kho"); và
+       phụ đề của thẻ đã nói đủ ba trục rồi. Nhãn trong cảnh chỉ giữ thứ
+       KHÔNG nói được bằng chữ ngoài hình: giá trị của từng vạch. */
   ];
 
   /* Ghi số thẳng lên NĂM đỉnh cao nhất. Đây là chỗ mắt nhìn vào đầu tiên và
@@ -141,22 +170,43 @@ function Canh({ o3d, caoNhat, chon, onHover }: {
     nhan.push({
       vt: [
         (o.bp - (DEPTS.length - 1) / 2) * BUOC_B,
-        (o.tong / Math.max(1, caoNhat)) * CAO_MAX + 0.15,
-        (o.thang - 6.5) * BUOC_T,
+        (o.tong / Math.max(1, caoNhat)) * CAO_MAX + 0.17,
+        (6.5 - o.thang) * BUOC_T,
       ],
       chu: String(o.tong),
+      cap: "so",
+      sang: chon?.thang === o.thang && chon?.bp === o.bp,
+    });
+  }
+  // Cột đang trỏ tới luôn được ghi số, kể cả khi không nằm trong tốp năm.
+  if (chon && !dinh.some((d) => d.thang === chon.thang && d.bp === chon.bp)) {
+    nhan.push({
+      vt: [
+        (chon.bp - (DEPTS.length - 1) / 2) * BUOC_B,
+        (chon.tong / Math.max(1, caoNhat)) * CAO_MAX + 0.17,
+        (6.5 - chon.thang) * BUOC_T,
+      ],
+      chu: String(chon.tong),
+      cap: "so",
+      sang: true,
     });
   }
 
   return (
     <>
-      <OrthographicCamera makeDefault position={[5, 4.2, 6] } zoom={98} />
-      {/* Không tự xoay. Khối quay liên tục thì nhãn trục chạy theo và người
-          xem phải đuổi theo chữ — chống lại đúng mục tiêu "nhìn là hiểu".
-          Ai cần xem mặt khuất thì tự kéo. */}
+      <OrthographicCamera makeDefault position={VI_TRI} />
+      {/* Khung nhìn tính theo cỡ khung thật, không đặt zoom cứng — xem lý do
+          ở KhungVua.tsx. */}
+      <KhungVua le={1.02}
+        hop={{ rong: rongX / 2 + 0.5, cao: CAO_MAX / 2 + 0.24, sau: sauZ / 2 + 0.42,
+               tam: [0, CAO_MAX / 2, 0] }} />
+      {/* Không tự xoay, và CHẶN góc xoay quanh hướng gốc. Xoay là để liếc
+          mặt bị cột khác che, không phải để lạc mất biểu đồ: thả tự do 360°
+          thì chỉ một cú kéo là nửa hình ra khỏi khung và trục lộn ngược. */}
       <OrbitControls makeDefault enablePan={false} enableZoom={false}
-        minPolarAngle={0.25} maxPolarAngle={Math.PI / 2.35}
-        autoRotate={false} target={[0, 0.6, 0]} />
+        minPolarAngle={0.34} maxPolarAngle={Math.PI / 2.5}
+        {...bienPhuongVi(VI_TRI, 0.55)}
+        autoRotate={false} target={[0, CAO_MAX / 2, 0]} />
 
       <ambientLight intensity={0.78} />
       <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow shadow-mapSize={[1024, 1024]} />
@@ -172,7 +222,7 @@ function Canh({ o3d, caoNhat, chon, onHover }: {
       <ContactShadows position={[0, 0.002, 0]} opacity={0.42}
         scale={Math.max(rongX, sauZ) + 1} blur={1.6} far={1.2} resolution={1024} />
 
-      <NhanTruc nhan={nhan} />
+      <NhanTruc nhan={nhan} tam={[0, CAO_MAX / 2, 0]} />
 
       {o3d.map((o) => (
         <Cot key={`${o.thang}-${o.bp}`} o={o} caoNhat={caoNhat}
@@ -222,44 +272,69 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
     };
   }, [o3d, dinh]);
 
+  /* Tooltip bám con trỏ. Trước đây chi tiết cột chỉ hiện ở dòng chữ DƯỚI
+     khung — muốn đọc phải rời mắt khỏi cột đang trỏ, mà rời mắt là mất
+     luôn cột nào đang trỏ. Nay số hiện ngay cạnh con trỏ; dòng dưới vẫn
+     giữ vì đó là bản mà trình đọc màn hình đọc được. */
+  const [chuot, setChuot] = useState<{ x: number; y: number } | null>(null);
+
   return (
     <div className="vmp-space3d">
       {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
-      <div className="vmp-space3d-khung">
-        <Canvas
-          dpr={[1, 2]}
-          // Bóng mềm (PCFSoft) thay bóng cứng: mép bóng nhoè dần theo khoảng
-          // cách là tín hiệu chiều sâu mà mắt người đọc rất nhanh — cột nào
-          // đứng trước, cột nào đứng sau, không cần xoay mới biết.
-          shadows="soft"
-          gl={{
-            antialias: true, alpha: true,
-            // ACES filmic: giữ được chi tiết ở vùng sáng thay vì cháy trắng.
-            // Không có nó thì đỉnh cột màu đậm bệt thành một mảng.
-            toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.05,
-            outputColorSpace: THREE.SRGBColorSpace,
+      <div className="vmp-space3d-than">
+        <div className="vmp-space3d-khung"
+          onPointerMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setChuot({ x: e.clientX - r.left, y: e.clientY - r.top });
           }}
-          frameloop={giamChuyenDong ? "demand" : "always"}>
-          <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
-        </Canvas>
-      </div>
+          onPointerLeave={() => setChuot(null)}>
+          {chon && chuot && (
+            <div className="vmp-space3d-hover"
+              style={{ left: chuot.x, top: chuot.y }} aria-hidden="true">
+              <b>{DEPTS[chon.bp]?.name || DEPTS[chon.bp]?.id} · Tháng {chon.thang}</b>
+              <span>
+                <i style={{ background: "#D6486D" }} />{chon.chuaXong} chưa xong
+                <em>/ {chon.tong} đến hạn</em>
+              </span>
+            </div>
+          )}
+          <Canvas
+            dpr={[1, 2]}
+            // Bóng mềm (PCFSoft) thay bóng cứng: mép bóng nhoè dần theo khoảng
+            // cách là tín hiệu chiều sâu mà mắt người đọc rất nhanh — cột nào
+            // đứng trước, cột nào đứng sau, không cần xoay mới biết.
+            shadows="soft"
+            gl={{
+              antialias: true, alpha: true,
+              // ACES filmic: giữ được chi tiết ở vùng sáng thay vì cháy trắng.
+              // Không có nó thì đỉnh cột màu đậm bệt thành một mảng.
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: 1.05,
+              outputColorSpace: THREE.SRGBColorSpace,
+            }}
+            frameloop={giamChuyenDong ? "demand" : "always"}>
+            <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
+          </Canvas>
+        </div>
 
-      <div className="vmp-space3d-chu">
-        <span><i style={{ background: "#2A9E82" }} />Gần xong hết</span>
-        <span><i style={{ background: "#8B7B96" }} />Đang làm dở</span>
-        <span><i style={{ background: "#D6486D" }} />Còn nguyên — dồn việc</span>
-      </div>
+        <div className="vmp-space3d-canh">
+        <div className="vmp-space3d-chu">
+          <span><i style={{ background: "#2A9E82" }} />Gần xong hết</span>
+          <span><i style={{ background: "#8B7B96" }} />Đang làm dở</span>
+          <span><i style={{ background: "#D6486D" }} />Còn nguyên — dồn việc</span>
+        </div>
 
-      <div className="vmp-space3d-tip" role="status" aria-live="polite">
-        {chon ? (
-          <>
-            <b>Tháng {chon.thang} · {DEPTS[chon.bp]?.name || DEPTS[chon.bp]?.id}</b>
-            {" — "}<b>{chon.tong}</b> hạng mục đến hạn, còn <b>{chon.chuaXong}</b> chưa xong
-          </>
-        ) : o3d.length
-          ? "Đưa chuột lên một cột để xem chi tiết · kéo để xoay nếu có cột bị khuất."
-          : "Không có hạng mục nào có mốc đích VMP trong năm đang chọn."}
+        <div className="vmp-space3d-tip" role="status" aria-live="polite">
+          {chon ? (
+            <>
+              <b>Tháng {chon.thang} · {DEPTS[chon.bp]?.name || DEPTS[chon.bp]?.id}</b>
+              {" — "}<b>{chon.tong}</b> hạng mục đến hạn, còn <b>{chon.chuaXong}</b> chưa xong
+            </>
+          ) : o3d.length
+            ? "Đưa chuột lên một cột để xem chi tiết · kéo để xoay nếu có cột bị khuất."
+            : "Không có hạng mục nào có mốc đích VMP trong năm đang chọn."}
+        </div>
+        </div>
       </div>
     </div>
   );
