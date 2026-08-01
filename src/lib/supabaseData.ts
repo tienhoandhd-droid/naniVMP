@@ -659,7 +659,7 @@ export async function setEmailChoPhep(
 export interface RolePermRow {
   hanh_dong: string;
   vai_tro: string;
-  muc: "co" | "bo_phan" | "khong";
+  muc: "co" | "bo_phan" | "phan_cong" | "khong";
 }
 
 export async function fetchRolePermissions(): Promise<RolePermRow[]> {
@@ -673,7 +673,7 @@ export async function fetchRolePermissions(): Promise<RolePermRow[]> {
 }
 
 export async function setRolePermission(
-  hanhDong: string, vaiTro: string, muc: "co" | "bo_phan" | "khong",
+  hanhDong: string, vaiTro: string, muc: "co" | "bo_phan" | "phan_cong" | "khong",
 ): Promise<RpcResult> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await (supabase.rpc as unknown as (

@@ -60,7 +60,7 @@ import type { Activity, AppUser, PerformerRow } from "../types/domain.ts";
 /* ---------------------------------------------------------------------
  * A · LUẬT ĐANG CHẠY
  * ------------------------------------------------------------------- */
-type Muc = "co" | "bo_phan" | "khong";
+type Muc = "co" | "bo_phan" | "phan_cong" | "khong";
 
 const VAI = [
   { id: "admin", ten: "admin", mo: "Quản trị hệ thống" },
@@ -93,8 +93,8 @@ const HANH_DONG: HanhDong[] = [
   {
     id: "update_progress",
     ten: "Cập nhật tiến độ",
-    giaiThich: "rpc_update_progress. Đây là hành động DUY NHẤT có vế so bộ phận trong luật (so vmp_objects.department với profiles.department), nên cũng là hành động duy nhất đặt được mức 'Chỉ bộ phận mình'.",
-    mucChoPhep: ["co", "bo_phan", "khong"],
+    giaiThich: "rpc_update_progress → ly_do_khong_sua_duoc. Đây là hành động DUY NHẤT có vế so bộ phận và phân công trong luật, nên cũng là hành động duy nhất đặt được hai mức hạn chế.\n\n• 'Bộ phận mình' so với CẢ HAI chiều: bộ phận QUẢN LÝ đối tượng và bộ phận THỰC HIỆN thẩm định. Hai chiều này lệch nhau ở 150/448 hạng mục — người XSX đi thẩm định thiết bị do QA quản lý là chuyện thường — nên chỉ so một chiều là chặn đúng người đang đi làm.\n\n• 'Theo phân công' mịn hơn một bậc: chỉ sửa được hạng mục mà ma trận D có tích đúng tên mình, đúng loại thẩm định, đúng line. Tích ở 'Mọi line' thì được cả bộ phận.",
+    mucChoPhep: ["co", "bo_phan", "phan_cong", "khong"],
   },
   {
     id: "set_item_state",
@@ -122,9 +122,12 @@ const HANH_DONG: HanhDong[] = [
   },
 ];
 
+/* Bốn mức, bốn ký hiệu phân biệt được cả khi in đen trắng: ô càng đầy thì
+   quyền càng rộng. ✓ đầy → ◑ nửa → ◔ một phần tư → ✕ không. */
 const O_QUYEN: Record<Muc, { chu: string; ky: string; mau: string; nen: string }> = {
-  co: { chu: "Được", ky: "✓", mau: C.mintText, nen: C.mintSoft },
-  bo_phan: { chu: "Chỉ bộ phận mình", ky: "◑", mau: C.marigoldText, nen: C.marigoldSoft },
+  co: { chu: "Được — mọi hạng mục", ky: "✓", mau: C.mintText, nen: C.mintSoft },
+  bo_phan: { chu: "Chỉ bộ phận mình (quản lý hoặc thực hiện)", ky: "◑", mau: C.marigoldText, nen: C.marigoldSoft },
+  phan_cong: { chu: "Chỉ hạng mục được phân công (loại × line)", ky: "◔", mau: C.skyText, nen: C.skySoft },
   khong: { chu: "Không", ky: "✕", mau: C.plumSoft, nen: C.surfaceSunk },
 };
 
@@ -522,7 +525,14 @@ export default function PhanQuyenView(
     for (const a of song) {
       const tho = String(a.owner || "").trim();
       const ten = laTenThat(tho) ? tho : "(chưa phân công)";
-      const ds = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
+      /* Đếm theo CẢ HAI chiều bộ phận, đúng như luật mới so: bộ phận QUẢN
+         LÝ đối tượng và bộ phận THỰC HIỆN thẩm định. Hai chiều lệch nhau ở
+         150/448 hạng mục. Chỉ đếm chiều quản lý thì bảng sẽ nói người XSX
+         không dính gì tới 107 hạng mục mà chính họ đang đi làm. Hệ quả:
+         một hạng mục có thể đếm ở hai cột — dòng tổng nói rõ điều đó. */
+      const quanLy = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
+      const thucHien = ((a.execDepts || a.exec_depts || []) as string[]).filter(Boolean);
+      const ds = [...new Set([...quanLy, ...thucHien])];
       if (!dem.has(ten)) dem.set(ten, new Map());
       for (const d of ds) {
         dem.get(ten)!.set(d, (dem.get(ten)!.get(d) || 0) + 1);
@@ -1100,10 +1110,11 @@ export default function PhanQuyenView(
 
         <div style={{ display: "flex", gap: "8px 18px", flexWrap: "wrap", marginTop: 12,
                       fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
-          <span><b style={{ color: C.mintText }}>✓</b> Được</span>
-          <span><b style={{ color: C.marigoldText }}>◑</b> Chỉ bộ phận mình</span>
+          <span><b style={{ color: C.mintText }}>✓</b> Được — mọi hạng mục</span>
+          <span><b style={{ color: C.marigoldText }}>◑</b> Bộ phận mình — quản lý <i>hoặc</i> thực hiện</span>
+          <span><b style={{ color: C.skyText }}>◔</b> Theo phân công — đúng loại, đúng line ở bảng D</span>
           <span><b>✕</b> Không</span>
-          <span>Bấm một ô để đổi mức. “Chỉ bộ phận mình” chỉ có ở hàng <b>Cập nhật tiến độ</b> —
+          <span>Bấm một ô để đổi mức. Hai mức hạn chế chỉ có ở hàng <b>Cập nhật tiến độ</b> —
             các hàm khác chưa có vế so bộ phận trong luật.</span>
         </div>
 
@@ -1213,7 +1224,13 @@ export default function PhanQuyenView(
                       const suaDuoc = voChu ? null
                         : m === "co" ? true
                           : m === "bo_phan" ? bpHienTai(h) === d.id
-                            : false;
+                            /* Mức "theo phân công" không trả lời được ở cấp
+                               ô này: nó phụ thuộc từng hạng mục (loại thẩm
+                               định × line), không phụ thuộc bộ phận. Trả về
+                               null để ô hiện màu trung tính thay vì nói bừa
+                               một trong hai đáp án. */
+                            : m === "phan_cong" ? null
+                              : false;
                       return (
                         <td key={d.id} style={{ ...td, textAlign: "center" }}>
                           {n > 0 ? (
@@ -1236,7 +1253,13 @@ export default function PhanQuyenView(
                 );
               })}
               <tr>
-                <td style={{ ...td, fontWeight: 800 }} colSpan={4}>Tổng theo bộ phận</td>
+                <td style={{ ...td, fontWeight: 800 }} colSpan={4}>
+                  Tổng theo bộ phận
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+                    Đếm cả hai chiều — một hạng mục do XSX quản lý mà QA thực hiện được tính ở cả hai cột,
+                    nên tổng ở đây lớn hơn tổng số hạng mục.
+                  </div>
+                </td>
                 {DEPTS.map((d) => (
                   <td key={d.id} style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800, color: C.plumSoft }}>
                     {tongTheoBp.get(d.id) || 0}
@@ -1252,7 +1275,10 @@ export default function PhanQuyenView(
                       fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
           <span><i style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: C.mint, marginRight: 6 }} />Đứng tên và sửa được</span>
           <span><i style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: C.rasp, marginRight: 6 }} />Đứng tên nhưng KHÔNG sửa được</span>
-          <span>Cột bộ phận đổi màu ngay theo mức bạn vừa tích ở bảng A — thấy hệ quả trước khi lưu.</span>
+          <span>Cột bộ phận đổi màu ngay theo mức bạn vừa tích ở bảng A — thấy hệ quả trước khi lưu.
+            Riêng mức <b>◔ theo phân công</b> thì ô hiện màu trung tính: quyền lúc đó phụ thuộc từng
+            hạng mục (loại thẩm định × line), không phụ thuộc bộ phận, nên một ô cấp bộ phận không
+            trả lời được.</span>
         </div>
 
         <ThanhLuu soThayDoi={demNhap("Bv|", "Bd|", "Be|")} dangLuu={dangLuu === "B"}
