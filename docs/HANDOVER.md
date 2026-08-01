@@ -573,3 +573,50 @@ tiếp. Khi đó chỉ người đã đăng nhập mới dùng được trợ l�
 
 **Tôi không tự sửa** vì đây là workflow đang phục vụ người dùng thật, sửa
 hỏng thì trợ lý chết mà không ai biết. Cần làm khi có người trực.
+
+### 13e. n8n — ĐÃ SIẾT: webhook nay đòi phiên đăng nhập thật (2026-08-01)
+
+Mục 13d ở trên ghi "chưa sửa". Nay đã sửa xong và nghiệm thu đủ hai chiều.
+
+**Thứ tự bắt buộc, làm ngược là trợ lý chết ngay:**
+1. Client gửi vé phiên trước (`Authorization: Bearer <access_token>` từ
+   `vePhien()` trong `supabaseClient.ts`) — commit `14b6ece`.
+2. Đợi bản đó LÊN WEB (GitHub Pages deploy xong).
+3. Mới thêm cổng chặn vào workflow.
+
+**Cổng chặn** — node `Xác thực phiên Supabase` (HTTP Request) đặt ngay sau
+webhook, gọi `/auth/v1/user` của Supabase với vé của người gọi. Node đặt
+`onError: continueErrorOutput`, nhánh lỗi đi vào node trả 401. Áp cho cả hai
+workflow web gọi: `Vani VMP 4` (ô chat) và `Vani VMP 5` (phân tích AI).
+
+> **BẪY ĐÃ SẬP MỘT LẦN:** sửa workflow qua API chỉ tạo BẢN NHÁP. Lần thử đầu
+> cả hai lượt curl vẫn trả lời bình thường vì bản đang chạy là bản cũ. Phải
+> gọi `publish_workflow` thì cổng mới có tác dụng. **Sửa xong luôn phải thử
+> lại bằng curl** — không thử thì tưởng đã siết mà thực ra chưa.
+
+**Nghiệm thu — bốn phép, cả hai chiều:**
+
+| phép thử | kết quả |
+|---|---|
+| chat · không vé | **401** |
+| chat · vé rác | **401** |
+| chat · vé phiên thật | **200**, trả lời bình thường |
+| phân tích AI · không vé | **401** |
+| phân tích AI · vé phiên thật | **200**, sinh nhận xét bình thường |
+
+Chiều CHO PHÉP quan trọng hơn chiều chặn: chặn sai thì trợ lý chết mà không
+ai báo. Để thử được, đã tạo một tài khoản kiểm thử
+(`kiemthu.baomat@local.test`), đăng nhập lấy vé thật, thử xong **xoá tài
+khoản** — nghiệm thu còn 0 dòng, tổng tài khoản về đúng 3.
+KHÔNG dùng refresh token của người thật: đổi nó là làm hỏng phiên đang dùng
+của họ.
+
+> Tạo tài khoản bằng SQL thì GoTrue báo `Database error querying schema` nếu
+> để các cột token là NULL (`confirmation_token`, `recovery_token`,
+> `email_change*`, `phone_change*`, `reauthentication_token`). Phải đặt
+> chuỗi rỗng.
+
+**Còn lại, cố ý chấp nhận:** khoá `apikey` trong node xác thực để thẳng
+trong workflow. Đó là khoá *publishable*, vốn đã nằm trong gói JS công khai
+— giấu nó vào credential không thêm được lớp bảo vệ nào, chỉ thêm một chỗ
+phải nhớ. Khoá bí mật thì tuyệt đối không được làm vậy.
