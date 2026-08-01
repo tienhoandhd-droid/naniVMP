@@ -2236,7 +2236,7 @@ export default function App() {
               {(view === "alerts" || view === "risk") && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
-              {view === "phanquyen" && <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} />}
+              {view === "phanquyen" && <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} user={user} />}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} />}
             </Suspense>

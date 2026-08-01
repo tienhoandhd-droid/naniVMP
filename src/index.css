@@ -6747,3 +6747,28 @@ summary { min-height: 24px; display: flex; align-items: center; }
 .pq-o:hover:not(:disabled) { border-color: var(--c-pink); }
 .pq-o:focus-visible { outline: 2px solid var(--c-pink); outline-offset: 1px; }
 .pq-o:disabled { opacity: .55; cursor: progress; }
+
+/* Ô tích của ma trận phân công. Vuông 34px — trên ngưỡng chạm 24px của
+   WCAG 2.2 và đủ rộng để tích nhanh hàng chục ô mà không trượt tay. Ký
+   hiệu ● ○ ＋ mang nghĩa song song với màu, nên người mù màu vẫn đọc
+   được ba trạng thái. */
+.pq-tich {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--ff-text);
+  font-size: 15px; font-weight: 800; line-height: 1;
+  color: var(--c-ink-soft);
+  background: var(--c-surface-sunk);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: transform .08s ease, border-color .12s ease;
+}
+.pq-tich:hover:not(:disabled) { border-color: var(--c-pink); transform: scale(1.06); }
+.pq-tich:active:not(:disabled) { transform: scale(.94); }
+.pq-tich:focus-visible { outline: 2px solid var(--c-pink); outline-offset: 2px; }
+.pq-tich:disabled { cursor: default; opacity: .8; }
+@media (prefers-reduced-motion: reduce) {
+  .pq-tich { transition: none; }
+  .pq-tich:hover:not(:disabled), .pq-tich:active:not(:disabled) { transform: none; }
+}

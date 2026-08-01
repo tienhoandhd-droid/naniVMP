@@ -18,10 +18,21 @@ const GOC = "http://localhost:4173";
 
 await choServer(GOC);
 
+const PHAN_CONG_GIA = [
+  { staff_name: "Tào Tiến Hoàn", department: "qa", validation_type: "PQ", line: "*", vai_tro: "thuc_hien" },
+  { staff_name: "Lê Xuân Đức", department: "qa", validation_type: "OQ", line: "*", vai_tro: "ho_tro" },
+];
+
 const HO_SO_GIA = [
   { id: "11111111-1111-1111-1111-111111111111", full_name: "Người Quản Trị", email: "qt@vd.local", role: "admin", department: null, is_active: true },
   { id: "22222222-2222-2222-2222-222222222222", full_name: "Người Bộ Phận", email: "bp@vd.local", role: "department_user", department: "xsx", is_active: true },
   { id: "33333333-3333-3333-3333-333333333333", full_name: "Người Chỉ Xem", email: "", role: "viewer", department: null, is_active: true },
+];
+
+const NHAN_SU_GIA = [
+  { id: "aaaa1111-0000-4000-8000-000000000001", staff_name: "Tào Tiến Hoàn", email: "tth@vd.local", department: "qa", is_active: true },
+  { id: "aaaa1111-0000-4000-8000-000000000002", staff_name: "Lê Xuân Đức", email: "lxd@vd.local", department: "qa", is_active: true },
+  { id: "aaaa1111-0000-4000-8000-000000000003", staff_name: "Thợ Xưởng Một", email: "tx1@vd.local", department: "xsx", is_active: true },
 ];
 
 const b = await puppeteer.launch({
@@ -45,7 +56,16 @@ const CORS = {
   "access-control-allow-methods": "GET,POST,OPTIONS",
   "access-control-expose-headers": "content-range",
 };
+const traLoi = (r, body, ma = 200) => (r.method() === "OPTIONS"
+  ? r.respond({ status: 204, headers: CORS, body: "" })
+  : r.respond({ status: ma, contentType: "application/json", headers: CORS, body: JSON.stringify(body) }));
+
 p.on("request", (r) => {
+  if (/\/rest\/v1\/vmp_assignment_matrix/.test(r.url())) return traLoi(r, PHAN_CONG_GIA);
+  if (/\/rest\/v1\/vmp_staff_emails/.test(r.url())) return traLoi(r, NHAN_SU_GIA);
+  if (/\/rest\/v1\/rpc\/rpc_set_assignment/.test(r.url())) {
+    return traLoi(r, { ok: true, msg: "Đã lưu phân công", vai_tro: "thuc_hien" });
+  }
   if (/\/rest\/v1\/profiles/.test(r.url())) {
     if (r.method() === "OPTIONS") return r.respond({ status: 204, headers: CORS, body: "" });
     return r.respond({
@@ -75,10 +95,23 @@ const vao = async (perm) => {
      phiên phải tải cả bó JS lười + dữ liệu, lâu hơn hẳn các lần sau; đặt
      một con số giây cố định thì lúc chạy cả bộ sẽ hỏng ngẫu nhiên còn chạy
      riêng lại đạt — đúng kiểu hỏng khiến người ta mất niềm tin vào bộ kiểm. */
-  await p.waitForFunction(
-    () => document.body.innerText.includes("Ai chịu trách nhiệm phần nào"),
-    { timeout: 45000 },
-  );
+  /* Thử lại một lần nếu lần đầu không dựng xong. Chạy ngay sau `npm run
+     build`, lần tải đầu tiên có lúc vớ phải chunk đang được ghi dở — tải
+     lại là xong. Không thử lại thì bộ kiểm hỏng ngẫu nhiên, mà bộ kiểm
+     hỏng ngẫu nhiên thì người ta bỏ qua cả những lần hỏng thật. */
+  for (let lan = 0; ; lan++) {
+    try {
+      await p.waitForFunction(
+        () => document.body.innerText.includes("Ai chịu trách nhiệm phần nào"),
+        { timeout: 30000 },
+      );
+      break;
+    } catch (e) {
+      if (lan >= 1) throw e;
+      console.log("  … màn chưa dựng xong, tải lại lần 2");
+      await p.reload({ waitUntil: "networkidle2" });
+    }
+  }
   await new Promise((r) => setTimeout(r, 1200));
 };
 
@@ -87,7 +120,10 @@ console.log("\n── 1. Vai admin — ô sửa hiện trên bảng ──");
 await vao("admin");
 
 const o = await p.evaluate(() => {
-  const chon = [...document.querySelectorAll("select.pq-o")];
+  /* .pq-loc là hai ô LỌC của khối D (chọn bộ phận / chọn line) — chúng
+     không sửa dữ liệu nên vẫn hiện với người chỉ được xem. Đếm lẫn vào
+     thì phép kiểm "không hiện ô sửa nào" sẽ báo sai. */
+  const chon = [...document.querySelectorAll("select.pq-o:not(.pq-loc)")];
   const nhap = [...document.querySelectorAll("input.pq-o")];
   return {
     soChon: chon.length,
@@ -122,7 +158,7 @@ kiem("C · khu vực / line, ghi rõ CHƯA có hiệu lực",
 console.log("\n── 3. Vai không phải admin — khoá sửa ──");
 await vao("edit");
 const k = await p.evaluate(() => ({
-  soChon: document.querySelectorAll("select.pq-o").length,
+  soChon: document.querySelectorAll("select.pq-o:not(.pq-loc)").length,
   soNhap: document.querySelectorAll("input.pq-o").length,
   noiRo: document.body.innerText.includes("Bảng chỉ để xem"),
   vanDocDuoc: document.body.innerText.includes("Ai chịu trách nhiệm phần nào"),
@@ -131,8 +167,68 @@ kiem("Không hiện ô sửa nào", k.soChon === 0 && k.soNhap === 0, `${k.soCho
 kiem("Nói rõ vì sao không sửa được", k.noiRo);
 kiem("Vẫn đọc được toàn bộ ma trận", k.vanDocDuoc);
 
-/* ── 4. Sạch lỗi ── */
-console.log("\n── 4. Không có lỗi console ──");
+/* ── 4. Ma trận D · phân công theo loại thẩm định và line ── */
+console.log("\n── 4. Ma trận D — tích chọn loại thẩm định theo line ──");
+await vao("admin");
+
+const chonBp = async (bp) => {
+  await p.evaluate((v) => {
+    const s = [...document.querySelectorAll("select.pq-loc")]
+      .find((x) => [...x.options].some((o) => o.value === "xsx") && [...x.options].some((o) => o.value === "qa"));
+    const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set;
+    set.call(s, v);
+    s.dispatchEvent(new Event("change", { bubbles: true }));
+  }, bp);
+  await new Promise((r) => setTimeout(r, 700));
+};
+
+await chonBp("qa");
+const d = await p.evaluate(() => {
+  const chu = document.body.innerText;
+  const o = [...document.querySelectorAll(".pq-tich")];
+  return {
+    soO: o.length,
+    daTich: o.filter((x) => x.textContent.trim() !== "＋").map((x) => x.getAttribute("aria-label")),
+    coBangD: chu.includes("D · Ai làm loại thẩm định nào"),
+    coDuLoai: ["DQ", "FAT/SAT", "IQ", "OQ", "PQ", "PV", "GSP", "GDP"].every((t) => chu.includes(t)),
+    coChuThich: chu.includes("Thực hiện — người trực tiếp làm") && chu.includes("Hỗ trợ — phối hợp"),
+    caoNhoNhat: Math.min(...o.map((x) => x.getBoundingClientRect().height)),
+  };
+});
+kiem("Bảng D hiện với đủ 8 loại thẩm định", d.coBangD && d.coDuLoai);
+kiem("Có ô tích cho từng người × từng loại", d.soO >= 16, `${d.soO} ô`);
+kiem("Ô đã phân công đọc đúng từ database",
+  d.daTich.some((t) => /Tào Tiến Hoàn · PQ: Thực hiện/.test(t))
+  && d.daTich.some((t) => /Lê Xuân Đức · OQ: Hỗ trợ/.test(t)),
+  d.daTich.join(" | ").slice(0, 120));
+kiem("Ngưỡng chạm ô tích ≥ 24px", d.caoNhoNhat >= 24, `${Math.round(d.caoNhoNhat)}px`);
+kiem("Có chú thích ba trạng thái", d.coChuThich);
+
+/* Bấm một ô trống: phải đi lên bậc 'Thực hiện' và ghi lại ngay trên màn. */
+const truoc = await p.evaluate(() => {
+  const o = [...document.querySelectorAll(".pq-tich")].find((x) => x.textContent.trim() === "＋");
+  o.dataset.moc = "1";
+  return o.getAttribute("aria-label");
+});
+await p.evaluate(() => document.querySelector('.pq-tich[data-moc="1"]').click());
+await new Promise((r) => setTimeout(r, 900));
+const sau = await p.evaluate(() => {
+  const o = document.querySelector('.pq-tich[data-moc="1"]');
+  return { nhan: o.getAttribute("aria-label"), ky: o.textContent.trim() };
+});
+kiem("Bấm ô trống → chuyển sang 'Thực hiện' ngay trên màn",
+  sau.ky === "●" && /Thực hiện/.test(sau.nhan), `${truoc} → ${sau.nhan}`);
+
+/* Đổi bộ phận thì danh sách người phải đổi theo danh bạ, không giữ nguyên. */
+await chonBp("xsx");
+const xsx = await p.evaluate(() => document.body.innerText);
+kiem("Đổi bộ phận thì thành viên lấy theo danh bạ của bộ phận đó",
+  xsx.includes("Thợ Xưởng Một") && !xsx.includes("Tào Tiến Hoàn · PQ"));
+kiem("Bộ phận có chia line thì hiện danh sách line thật",
+  /Nang mềm|BFS|Khí dung/.test(xsx));
+
+/* ── 5. Sạch lỗi ── */
+console.log("\n── 5. Không có lỗi console ──");
 const that = loi.filter((t) => !/401|403|Unauthorized|JWT|row-level security|Failed to load resource/i.test(t));
 kiem("Không có lỗi JS", that.length === 0, that.slice(0, 3).join(" | "));
 
