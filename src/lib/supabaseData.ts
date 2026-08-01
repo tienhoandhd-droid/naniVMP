@@ -625,6 +625,35 @@ export async function setUserRole(
   return unwrap(data, error, "Đổi phân quyền thất bại");
 }
 
+/* ---- Ma trận A: luật vai trò × hành động (bảng vmp_role_permissions) ---- */
+export interface RolePermRow {
+  hanh_dong: string;
+  vai_tro: string;
+  muc: "co" | "bo_phan" | "khong";
+}
+
+export async function fetchRolePermissions(): Promise<RolePermRow[]> {
+  if (!supabase) return [];
+  // Bảng sinh ở migration 20260801070000 — chưa có trong types sinh tự động.
+  const { data, error } = await supabase
+    .from("vmp_role_permissions" as never)
+    .select("hanh_dong,vai_tro,muc");
+  if (error) throw new Error(error.message);
+  return (data || []) as unknown as RolePermRow[];
+}
+
+export async function setRolePermission(
+  hanhDong: string, vaiTro: string, muc: "co" | "bo_phan" | "khong",
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_role_permission", {
+    p_hanh_dong: hanhDong, p_vai_tro: vaiTro, p_muc: muc,
+  });
+  return unwrap(data, error, "Lưu luật phân quyền thất bại");
+}
+
 /* ---- Ma trận phân công: nhân viên × loại thẩm định × line ---- */
 export interface AssignmentRow {
   staff_name: string;
