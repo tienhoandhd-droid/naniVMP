@@ -22,7 +22,12 @@ function kiem(ten, dat, chiTiet = "") {
 const doi = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Chờ tới khi hàm trả về giá trị thật (không null/false) hoặc hết giờ. */
-async function cho(page, fn, { hanMs = 25000, nhip = 250, ten = "điều kiện" } = {}) {
+/* Hạn chờ 45s chứ không phải 25s. Lần đầu tải trang phải: lấy phông từ
+   Google Fonts, tải chunk React + Supabase, rồi mới gọi RPC lấy 461 hạng
+   mục. Khi máy đang chạy song song bộ kiểm khác thì 25s vừa đủ để trượt —
+   và một bộ kiểm thỉnh thoảng đỏ mà không phải do lỗi thật còn tệ hơn
+   không có bộ kiểm: người ta sẽ quen với màu đỏ và thôi đọc nó. */
+async function cho(page, fn, { hanMs = 45000, nhip = 250, ten = "điều kiện" } = {}) {
   const het = Date.now() + hanMs;
   for (;;) {
     const v = await page.evaluate(fn);

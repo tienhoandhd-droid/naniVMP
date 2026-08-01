@@ -280,7 +280,7 @@ function ControlButton({ active, children, onClick, title }: {
       onClick={onClick}
       style={{
         border: active ? "none" : `1.5px solid ${C.pinkSoft}`,
-        background: active ? GRAD : "rgba(255,255,255,.88)",
+        background: active ? GRAD : C.surface,
         color: active ? "#fff" : C.plum,
         borderRadius: 999,
         padding: "9px 14px",

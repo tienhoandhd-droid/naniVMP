@@ -90,7 +90,19 @@ export function useAuth() {
     }
   }, []); // eslint-disable-line
 
-  useEffect(() => { saveUser(user); }, [user]);
+  /* Chỉ ghi khi user THẬT SỰ đổi, KHÔNG ghi ở lần chạy đầu.
+     Bản trước ghi cả lần đầu, nên mỗi lần app mount trong trạng thái chưa
+     đăng nhập là một lần saveUser(null) — tức là XOÁ hồ sơ đang có trong
+     localStorage. Bình thường vô hại vì đằng nào cũng chưa đăng nhập, nhưng
+     nó tạo ra một khoảng đua: ai ghi hồ sơ vào localStorage đúng lúc app
+     đang mount thì bị xoá mất ngay sau đó.
+     Đó chính là thứ làm bộ kiểm e2e thỉnh thoảng đỏ ở bước đầu tiên — và
+     nếu người dùng mở hai tab thì tab đang mount cũng xoá phiên của tab kia. */
+  const daChay = useRef(false);
+  useEffect(() => {
+    if (!daChay.current) { daChay.current = true; return; }
+    saveUser(user);
+  }, [user]);
 
   const login = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured()) {
