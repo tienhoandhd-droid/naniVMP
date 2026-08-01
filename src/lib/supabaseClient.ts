@@ -28,13 +28,21 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON)
 
 export const isSupabaseConfigured = () => !!supabase;
 
-/* Gắn client ra window để BỘ KIỂM đối chiếu số trên màn với dữ liệu gốc.
- * Chỉ đọc — client này dùng khoá anon công khai (đã có sẵn trong bundle
- * và trong mã nguồn công khai), và mọi RPC ghi đã bị thu quyền khỏi anon
- * (xem mục 8b/11a HANDOVER). Không mở thêm bề mặt tấn công nào; chỉ tránh
- * cho bộ kiểm phải dựng client thứ hai rồi đối chiếu nhầm phiên. */
+/* Gắn client ra window CHỈ KHI chạy trên máy nội bộ, để bộ kiểm đối chiếu
+ * số trên màn với dữ liệu gốc.
+ *
+ * Vì sao phải chặn theo tên miền chứ không để mở: dù khoá anon vốn công
+ * khai và mọi RPC ghi đã bị thu quyền khỏi anon (mục 8b/11a), một client
+ * gắn sẵn trên window vẫn là một mồi ngon — bất kỳ đoạn mã lạ nào lọt vào
+ * trang (tiện ích trình duyệt, thư viện bị chèn) đều gọi được ngay mà
+ * không phải tự dựng client. Trang production không cần nó, nên không mở.
+ * Đây là nguyên tắc bề mặt tối thiểu: cái gì không cần ở đó thì không để
+ * ở đó, kể cả khi "chưa khai thác được". */
 if (typeof window !== "undefined" && supabase) {
-  (window as unknown as Record<string, unknown>).__vmpSb = supabase;
+  const may = window.location.hostname;
+  if (may === "localhost" || may === "127.0.0.1" || may === "[::1]") {
+    (window as unknown as Record<string, unknown>).__vmpSb = supabase;
+  }
 }
 
 /* ---- Đăng nhập ---- */

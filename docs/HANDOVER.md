@@ -468,3 +468,108 @@ thanh tra đều ra giấy: bản in ép nền sáng mực đen (in chế độ 
 in một trang đen), bỏ mọi thứ để thao tác, không cắt thẻ ngang trang, lặp
 hàng tiêu đề bảng ở trang sau. Khối 3D không in được nên **nói rõ** và chỉ
 sang bản "Bảng nhiệt 2D", thay vì để một ô trắng không hiểu vì sao.
+
+## 13. Kiểm liên kết dữ liệu bằng ghi thật + đợt siết bảo mật (2026-08-01)
+
+### 13a. Đã ghi thật vào Supabase rồi hoàn nguyên
+
+Câu hỏi cần trả lời: sửa một ô thì mọi phép tính, biểu đồ, hiển thị liên quan
+có tự cập nhật không. Trả lời bằng một lần ghi thật, có người cho phép.
+
+Cách làm — **sửa một hạng mục có sẵn rồi trả lại nguyên trạng**, không tạo
+dòng mới. Dòng mới sẽ lọt vào báo cáo trong lúc kiểm, và xoá đi thì để lại lỗ
+trong chuỗi mã.
+
+1. Chụp toàn bộ 40 cột của `HT-16/2026.01-OQ` ra file.
+2. Ghi số "trước" trên ba màn.
+3. Gọi `rpc_update_progress` — đúng đường app dùng, có mạo danh phiên admin
+   thật bằng `set local request.jwt.claims` nên RPC vẫn chạy qua đủ lớp kiểm
+   quyền, không bỏ qua lớp nào.
+4. Đo lại, hoàn nguyên bằng chính RPC đó, đo lần ba.
+
+| chỉ số | trước | sau khi ghi | sau hoàn nguyên |
+|---|---|---|---|
+| Tổng quan · Quá hạn | 208 | **207** | 208 |
+| Tổng quan · Hoàn thành | 95 | **96** | 95 |
+| Vòng năm · "mới xong" | 91 | **92** | 91 |
+| Hôm nay · Đã trễ | 9 | **8** | 9 |
+| DB · `computed_status` | over | **done** | over |
+
+So từng cột với bản chụp: **khớp hoàn toàn**. Chỉ `version` (0→2) và
+`updated_by` đổi — cố ý giữ làm dấu vết kiểm thử, không xoá.
+
+`audit_logs` ghi đủ hai lần với `old_data`, `new_data`, `changed_fields` và
+lý do bằng tiếng Việt. **Không xoá bản ghi audit nào** — với ALCOA+ thì xoá
+dấu vết còn nặng hơn lỗi ban đầu.
+
+Cơ chế đằng sau: RPC ghi → `refreshRef()` kéo lại toàn bộ → `enrich()` tính
+lại trạng thái/cảnh báo/mốc → mọi màn đọc từ **cùng một mảng**. Đo được: đổi
+màn gọi lại RPC **0 lần**, tức không màn nào giữ bản sao riêng.
+
+### 13b. Lỗ hổng nghiêm trọng đã bịt: `anon` TRUNCATE được `audit_logs`
+
+**RLS không áp dụng cho TRUNCATE.** Đây là điều PostgreSQL nói rõ trong tài
+liệu và là chỗ rất dễ bỏ sót — bật RLS xong thì tưởng đã kín.
+
+Supabase đặt sẵn `ALTER DEFAULT PRIVILEGES` cấp `arwdDxtm` cho `anon` và
+`authenticated` trên **mọi bảng tạo mới**; chữ `D` là TRUNCATE. 36 bảng đang
+ở tình trạng đó, gồm `audit_logs`, `profiles`, `system_config`.
+
+Đã chứng minh: `set role anon; truncate audit_logs;` — **lệnh chạy thành
+công** (cuộn lại ngay, 11 381 dòng nguyên vẹn). Nghĩa là ai cầm khoá anon
+cũng xoá sạch được nhật ký ALCOA+ — mà khoá anon nằm trong gói JavaScript
+của một repo GitHub **để công khai**.
+
+Đã sửa bằng `20260801030000_siet_quyen_anon_authenticated.sql`: thu
+TRUNCATE/REFERENCES/TRIGGER khỏi cả hai vai, thu INSERT/UPDATE/DELETE khỏi
+anon, đổi quyền mặc định, và hậu kiểm tự chặn migration nếu còn sót.
+Nghiệm thu: **0 quyền nguy hiểm còn lại**, đòn tấn công cũ nay bị chặn, app
+vẫn chạy (E2E 18/18, đối chiếu dữ liệu 10/10).
+
+> **Giới hạn còn lại:** Supabase còn một bộ quyền mặc định thuộc vai
+> `supabase_admin` mà vai `postgres` không đổi được. Bảng tạo qua **bảng
+> điều khiển Supabase** sẽ nhận lại TRUNCATE cho anon. Tạo bảng bằng
+> migration thì không dính. **Chạy lại migration này sau mỗi lần thêm bảng
+> bằng bảng điều khiển.**
+
+### 13c. GitHub
+
+| Mục | Trước | Sau |
+|---|---|---|
+| Quét bí mật | tắt | **bật** |
+| Chặn đẩy bí mật | tắt | **bật** |
+| Cảnh báo lỗ hổng phụ thuộc | tắt | **bật** |
+| Tự vá phụ thuộc | tắt | **bật** |
+| Ép-đẩy vào `main` | cho phép | **chặn** |
+| Xoá nhánh `main` | cho phép | **chặn** |
+| Lịch sử thẳng | không bắt buộc | **bắt buộc** |
+
+Quét lịch sử git: có một JWT lọt vào, nhưng payload là `"role":"anon"` —
+khoá công khai theo thiết kế, **không phải `service_role`**. Không có rò rỉ
+nghiêm trọng. Quyền `GITHUB_TOKEN` trong workflow vốn đã tối thiểu
+(`contents: read`), không dùng secret nào.
+
+Chưa làm, cần bạn quyết: **repo vẫn PUBLIC**. Chuyển sang private làm
+GitHub Pages ngừng hoạt động trên gói miễn phí — đây là đánh đổi thuộc về
+chủ dự án, không phải quyết định kỹ thuật.
+
+### 13d. n8n — điểm yếu còn lại, CHƯA sửa
+
+Cả hai webhook mà web gọi (`/vmp-hoi-dap`, `/vmp-ai-report`) đều đã bật
+`headerAuth`. Không có webhook nào để trần.
+
+**Nhưng token nằm trong gói JS công khai.** Mọi biến `VITE_*` đều được Vite
+nướng thẳng vào bundle — đó là thiết kế của Vite, không phải lỗi cấu hình.
+Đã kiểm: token có mặt trong `dist/assets/ChatBox-*.js`. Nghĩa là bất kỳ ai
+mở web cũng lấy được và gọi thẳng webhook: **tốn tiền gọi AI**, và hỏi được
+dữ liệu VMP mà không cần đăng nhập.
+
+Đổi token không giải quyết được — token mới cũng công khai y hệt.
+
+Cách sửa đúng: **bỏ token tĩnh, dùng phiên đăng nhập Supabase**. Client gửi
+`Authorization: Bearer <access_token>` của người đang đăng nhập; workflow
+thêm một node gọi `/auth/v1/user` của Supabase để xác thực trước khi chạy
+tiếp. Khi đó chỉ người đã đăng nhập mới dùng được trợ lý.
+
+**Tôi không tự sửa** vì đây là workflow đang phục vụ người dùng thật, sửa
+hỏng thì trợ lý chết mà không ai biết. Cần làm khi có người trực.
