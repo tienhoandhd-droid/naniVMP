@@ -3,6 +3,7 @@
  * thấy — lỗi lúc chạy thật với dữ liệu thật. */
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
+import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = "http://localhost:4173";
@@ -36,10 +37,10 @@ let loi = [];
 p.on("console", (m) => { if (m.type() === "error") loi.push(m.text()); });
 p.on("pageerror", (e) => loi.push("pageerror: " + e.message));
 
-await p.goto(GOC, { waitUntil: "domcontentloaded" });
-await p.evaluate(() => localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-  name: "Tào Tiến Hoàn", email: "e2e@test.local", role: "admin", perm: "admin",
-})));
+/* Đăng nhập THẬT: từ 2026-08-01 vai anon không gọi được rpc_* nào, nhét
+   hồ sơ giả vào localStorage là không đủ nữa — sẽ không có số liệu. */
+await vaoHeThong(p, GOC);
+await doiVaiTrenMan(p, "admin", "Tào Tiến Hoàn");
 
 /* Bốn màn này gọi RPC bắt buộc phiên đăng nhập thật (rpc_active_rules,
    rpc_list_source_tabs, đọc bảng audit_logs…). Bộ kiểm chỉ nhét hồ sơ giả

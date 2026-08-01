@@ -43,7 +43,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ShieldCheck, Users, KeyRound, AlertTriangle, MapPin, Grid3x3,
-  Save, Undo2, Check, Contact, Plus,
+  Save, Undo2, Check, Contact, Plus, Mail, Trash2,
 } from "lucide-react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { DEPTS } from "../constants/vmp.ts";
@@ -51,8 +51,9 @@ import { supabase } from "../lib/supabaseClient.ts";
 import {
   setUserRole, upsertPerformer, fetchStaffEmails, fetchAssignments, setAssignment,
   fetchRolePermissions, setRolePermission, fetchPerformers,
+  fetchEmailChoPhep, setEmailChoPhep,
 } from "../lib/supabaseData.ts";
-import type { AssignmentRow, RolePermRow } from "../lib/supabaseData.ts";
+import type { AssignmentRow, RolePermRow, EmailChoPhepRow } from "../lib/supabaseData.ts";
 import { Card, CardTitle, Tag, CauKetLuan, GiaiThich } from "../components/ui/Primitives.tsx";
 import type { Activity, AppUser, PerformerRow } from "../types/domain.ts";
 
@@ -293,6 +294,8 @@ export default function PhanQuyenView(
   const [lineChon, setLineChon] = useState("*");
   const [loiD, setLoiD] = useState("");
   const [nguoiMoi, setNguoiMoi] = useState({ ten: "", email: "", bp: "" });
+  const [dsEmail, setDsEmail] = useState<EmailChoPhepRow[]>([]);
+  const [emailMoi, setEmailMoi] = useState({ email: "", ghiChu: "" });
 
   /* Bản nháp: KHOÁ Ô → giá trị mới. Các bảng dùng chung một map, phân
      biệt bằng tiền tố khoá. Một map thì "có thay đổi nào chưa lưu không"
@@ -365,7 +368,27 @@ export default function PhanQuyenView(
         .filter((r) => laTenThat(r.ten))))
       .catch((e) => setLoiD((e as Error).message));
     fetchAssignments().then(setPhanCong).catch((e) => setLoiD((e as Error).message));
+    taiDsEmail();
   }, []);
+
+  /* ================= DANH SÁCH EMAIL ĐƯỢC PHÉP ================= */
+  const taiDsEmail = async () => {
+    try { setDsEmail(await fetchEmailChoPhep()); } catch { /* không có quyền thì thôi */ }
+  };
+
+  const doiEmail = async (email: string, choPhep: boolean, ghiChu?: string) => {
+    setDangLuu("E");
+    try {
+      const r = await setEmailChoPhep(email, choPhep, ghiChu);
+      setKetQua((c) => ({
+        ...c, E: { xong: r.ok ? 1 : 0, tong: 1, loi: r.ok ? [] : [`${email}: ${r.error}`] },
+      }));
+      if (r.ok) { setEmailMoi({ email: "", ghiChu: "" }); await taiDsEmail(); }
+    } catch (e) {
+      setKetQua((c) => ({ ...c, E: { xong: 0, tong: 1, loi: [`${email}: ${(e as Error).message}`] } }));
+    }
+    setDangLuu("");
+  };
 
   /* ================= 0 · DANH BẠ NGƯỜI THỰC HIỆN ================= */
   const bpNguoi = (p: PerformerRow) => nhap[`Nb|${p.id}`] ?? (chuanBoPhan(p.department) || "");
@@ -810,6 +833,113 @@ export default function PhanQuyenView(
           Danh bạ · phân quyền · phân công trách nhiệm
         </CardTitle>
         <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />
+      </Card>
+
+      {/* ============ DANH SÁCH EMAIL ĐƯỢC PHÉP CÓ TÀI KHOẢN ============ */}
+      <Card variant="strong">
+        <CardTitle icon={Mail}
+          sub="Cửa vào duy nhất: không có email ở đây thì Supabase từ chối tạo tài khoản, kể cả tạo tay trong Dashboard.">
+          Ai được phép có tài khoản
+        </CardTitle>
+
+        <CauKetLuan tone="ok"
+          chinh={`${dsEmail.filter((e) => e.is_active).length} email được phép tạo tài khoản.`}
+          phu="Trước 01/08/2026 bất kỳ ai trên internet cũng tự đăng ký được bằng khoá công khai nằm trong mã nguồn trang. Nay trigger ở database chặn mọi email không có trong danh sách này — chặn ở database chứ không chỉ tắt ô tick trên Dashboard, vì ô tick thì không ai nhìn lại còn trigger thì đi theo mã nguồn."
+        />
+
+        {quyenSuaA && (
+          <div className="pq-them" style={{ marginTop: 14 }}>
+            <input className="pq-o" style={{ maxWidth: 260 }} type="email" placeholder="email@congty.com"
+              aria-label="Email được phép tạo tài khoản" value={emailMoi.email}
+              onChange={(e) => setEmailMoi((c) => ({ ...c, email: e.target.value }))} />
+            <input className="pq-o" style={{ maxWidth: 260 }} placeholder="Ghi chú — ai, bộ phận nào"
+              aria-label="Ghi chú cho email này" value={emailMoi.ghiChu}
+              onChange={(e) => setEmailMoi((c) => ({ ...c, ghiChu: e.target.value }))} />
+            <button type="button" className="pq-nut la-chinh"
+              disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailMoi.email.trim()) || dangLuu === "E"}
+              onClick={() => doiEmail(emailMoi.email.trim(), true, emailMoi.ghiChu.trim())}>
+              <Plus size={15} /> Cho phép email này
+            </button>
+          </div>
+        )}
+
+        <div className="vmp-scroll" style={{ overflowX: "auto", marginTop: 12 }}>
+          <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Email</th>
+                <th style={th}>Ghi chú</th>
+                <th style={th}>Tình trạng</th>
+                <th style={th}>Đã có tài khoản</th>
+                {quyenSuaA && <th style={th} />}
+              </tr>
+            </thead>
+            <tbody>
+              {dsEmail.map((e) => {
+                const coTk = hoSo.some((h) => (h.email || "").toLowerCase() === e.email);
+                return (
+                  <tr key={e.email}>
+                    <td style={{ ...td, fontWeight: 800 }}>{e.email}</td>
+                    <td style={{ ...td, fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>
+                      {e.ghi_chu || "—"}
+                    </td>
+                    <td style={td}>
+                      {e.is_active
+                        ? <Tag color={C.mintText} bg={C.mintSoft}>được phép</Tag>
+                        : <Tag color={C.plumSoft} bg={C.surfaceSunk}>đã bỏ</Tag>}
+                    </td>
+                    <td style={td}>
+                      {coTk
+                        ? <Tag color={C.mintText} bg={C.mintSoft}>rồi</Tag>
+                        : <span style={{ color: C.marigoldText, fontWeight: 700, fontSize: 12.5 }}>
+                            chưa — người này còn phải được tạo tài khoản ở Supabase
+                          </span>}
+                    </td>
+                    {quyenSuaA && (
+                      <td style={td}>
+                        {e.is_active ? (
+                          <button type="button" className="pq-nut" disabled={dangLuu === "E"}
+                            onClick={() => doiEmail(e.email, false)}
+                            title="Bỏ email khỏi danh sách. Không bỏ được nếu đang gắn với tài khoản còn hoạt động.">
+                            <Trash2 size={14} /> Bỏ
+                          </button>
+                        ) : (
+                          <button type="button" className="pq-nut" disabled={dangLuu === "E"}
+                            onClick={() => doiEmail(e.email, true)}>
+                            <Plus size={14} /> Cho phép lại
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+              {!dsEmail.length && (
+                <tr><td style={td} colSpan={5}>
+                  Chưa đọc được danh sách — cần đăng nhập bằng tài khoản admin.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {ketQua.E && (
+          <div className={`pq-canhbao ${ketQua.E.loi.length ? "la-do" : ""}`}
+            style={{ marginTop: 12, background: ketQua.E.loi.length ? undefined : C.mintSoft,
+                     color: ketQua.E.loi.length ? undefined : C.mintText }} role="status">
+            {ketQua.E.loi.length
+              ? <><AlertTriangle size={16} /> <span>{ketQua.E.loi[0]}</span></>
+              : <><Check size={16} /> <span>Đã lưu danh sách email.</span></>}
+          </div>
+        )}
+
+        <div style={{ marginTop: 14, padding: "11px 14px", borderRadius: 14, background: C.surfaceSunk,
+                      fontSize: 13, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+          <b style={{ color: C.plum }}>Thêm một người mới, đủ ba bước:</b> ① thêm email vào danh sách này →
+          ② vào <b>Supabase Dashboard → Authentication → Users → Add user</b>, tạo tài khoản với đúng email
+          đó → ③ quay lại <b>ma trận B</b> bên dưới, tích vai trò và bộ phận. Bỏ bước ① thì Supabase từ chối
+          tạo; bỏ bước ③ thì họ đăng nhập được nhưng chỉ xem được, không sửa gì.
+        </div>
       </Card>
 
       {/* ============ 0 · DANH BẠ NGƯỜI THỰC HIỆN ============ */}

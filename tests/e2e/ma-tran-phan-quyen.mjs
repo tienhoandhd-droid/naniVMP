@@ -12,6 +12,7 @@
  * ===================================================================== */
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
+import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = "http://localhost:4173";
@@ -30,6 +31,12 @@ const LUAT_GIA = [
   ["admin_users", "admin", "co"], ["admin_users", "qa_manager", "khong"],
   ["admin_users", "department_user", "khong"], ["admin_users", "viewer", "khong"],
 ].map(([hanh_dong, vai_tro, muc]) => ({ hanh_dong, vai_tro, muc }));
+
+const EMAIL_GIA = [
+  { email: "qt@vd.local", ghi_chu: "Quản trị", is_active: true },
+  { email: "chua-tao-tk@vd.local", ghi_chu: "Đã duyệt, chưa tạo tài khoản", is_active: true },
+  { email: "da-bo@vd.local", ghi_chu: "Đã nghỉ", is_active: false },
+];
 
 const NGUOI_TH_GIA = [
   { id: "bbbb2222-0000-4000-8000-000000000001", performer_name: "Tào Tiến Hoàn", email: "tth@vd.local", department: "qa", is_active: true },
@@ -83,6 +90,10 @@ const traLoi = (r, body, ma = 200) => (r.method() === "OPTIONS"
 p.on("request", (r) => {
   if (/\/rest\/v1\/vmp_assignment_matrix/.test(r.url())) return traLoi(r, PHAN_CONG_GIA);
   if (/\/rest\/v1\/vmp_role_permissions/.test(r.url())) return traLoi(r, LUAT_GIA);
+  if (/\/rest\/v1\/vmp_email_cho_phep/.test(r.url())) return traLoi(r, EMAIL_GIA);
+  if (/\/rest\/v1\/rpc\/rpc_set_email_cho_phep/.test(r.url())) {
+    return traLoi(r, { ok: true, msg: "Đã cho phép email này tạo tài khoản" });
+  }
   if (/\/rest\/v1\/vmp_performers/.test(r.url())) return traLoi(r, NGUOI_TH_GIA);
   if (/\/rest\/v1\/rpc\/rpc_set_role_permission/.test(r.url())) {
     // Ô (Sinh timeline × viewer) cố tình hỏng để kiểm đường báo lỗi.
@@ -130,11 +141,10 @@ const kiem = (ten, ok, chiTiet = "") => {
   else { hong++; console.log(`  ❌ ${ten}${chiTiet ? " — " + chiTiet : ""}`); }
 };
 
+let daVao = false;
 const vao = async (perm) => {
-  await p.goto(GOC, { waitUntil: "domcontentloaded" });
-  await p.evaluate((q) => localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-    name: "Tào Tiến Hoàn", email: "e2e@test.local", role: q === "admin" ? "admin" : "qa", perm: q,
-  })), perm);
+  if (!daVao) { await vaoHeThong(p, GOC); daVao = true; }
+  await doiVaiTrenMan(p, perm, "Tào Tiến Hoàn");
   await p.goto(`${GOC}#v=phanquyen`, { waitUntil: "networkidle2" });
   await p.reload({ waitUntil: "networkidle2" });
   /* Chờ theo NỘI DUNG chứ không theo đồng hồ. Lần chạy đầu tiên trong
@@ -261,6 +271,24 @@ const oLoi = await p.evaluate((ten) => {
 kiem("Hiện hộp lỗi nêu đích danh ô nào hỏng", oLoi.coHop && /Sinh timeline/.test(oLoi.chu), oLoi.chu.split("\n")[0]);
 kiem("Nêu lý do máy chủ trả về", /Ô này bị khoá/.test(oLoi.chu));
 kiem("Ô hỏng giữ viền đỏ, thay đổi không bị nuốt mất", oLoi.oHong >= 1, `${oLoi.oHong} ô`);
+
+/* ── Danh sách email được phép có tài khoản ── */
+console.log("\n── 3a. Ai được phép có tài khoản ──");
+const dse = await p.evaluate(() => {
+  const t = document.body.innerText;
+  return {
+    coKhoi: t.includes("Ai được phép có tài khoản"),
+    demDung: /2 email được phép tạo tài khoản/.test(t),
+    baoChuaCoTk: t.includes("chưa — người này còn phải được tạo tài khoản"),
+    coBaBuoc: t.includes("Thêm một người mới, đủ ba bước"),
+    coNutBo: [...document.querySelectorAll("button")].some((b) => /^Bỏ$/.test(b.innerText.trim())),
+  };
+});
+kiem("Có khối danh sách email được phép", dse.coKhoi);
+kiem("Đếm đúng số email đang được phép (không tính email đã bỏ)", dse.demDung);
+kiem("Chỉ rõ email đã duyệt mà chưa tạo tài khoản", dse.baoChuaCoTk);
+kiem("Ghi rõ ba bước thêm người mới", dse.coBaBuoc);
+kiem("Admin có nút bỏ email khỏi danh sách", dse.coNutBo);
 
 /* ── Danh bạ người thực hiện chia theo bộ phận ── */
 console.log("\n── 3b. Danh bạ người thực hiện theo bộ phận ──");

@@ -22,6 +22,7 @@
  * ===================================================================== */
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
+import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = "http://localhost:4173";
@@ -34,9 +35,8 @@ const b = await puppeteer.launch({
 });
 const p = await b.newPage();
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
-const dangNhap = () => p.evaluate(() => localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-  name: "Nguyễn Thị Hương", email: "e2e@test.local", role: "admin", perm: "admin",
-})));
+/* Đăng nhập thật một lần, các lượt sau chỉ đổi vai ở vế client. */
+const dangNhap = () => doiVaiTrenMan(p, "admin", "Tào Tiến Hoàn");
 
 const ket = [];
 const kiem = (nhom, ten, dat, ghi = "") => {
@@ -52,7 +52,7 @@ const moMan = async (v) => {
 };
 
 await p.setViewport({ width: 1500, height: 1000 });
-await p.goto(GOC, { waitUntil: "domcontentloaded" });
+await vaoHeThong(p, GOC);
 await dangNhap();
 await moMan("overview");
 

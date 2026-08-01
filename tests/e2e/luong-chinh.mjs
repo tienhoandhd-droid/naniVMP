@@ -6,6 +6,7 @@
  */
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
+import { dangNhap as vaoHeThong } from "./dang-nhap.mjs";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = process.env.E2E_URL || "http://localhost:4173";
@@ -59,11 +60,16 @@ try {
   page.on("console", (m) => { if (m.type() === "error") loiConsole.push(m.text()); });
   page.on("pageerror", (e) => loiConsole.push("pageerror: " + e.message));
 
-  // ---- Nạp hồ sơ giả để qua màn đăng nhập (chỉ ảnh hưởng localStorage) ----
-  await page.goto(GOC, { waitUntil: "domcontentloaded" });
+  /* Đăng nhập THẬT. Trước 2026-08-01 chỉ cần nhét hồ sơ giả vào
+     localStorage vì vai anon đọc được mọi thứ; nay anon không gọi được
+     rpc_* nào nên phải qua cửa thật — và nhờ vậy bộ kiểm mới thật sự
+     kiểm cả đường đăng nhập. Sau đó vẫn đè tên "E2E Tester" lên vế client
+     để giữ nguyên phép kiểm "tên lạ thì lọc ra 0 hạng mục". */
+  await vaoHeThong(page, GOC);
   await page.evaluate(() => {
+    const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
     localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-      name: "E2E Tester", email: "e2e@test.local", role: "admin", perm: "admin",
+      ...cu, name: "E2E Tester", email: "e2e@test.local", role: "admin", perm: "admin",
     }));
     localStorage.removeItem("vmp_monitor_loc_v1:e2e@test.local");
   });
@@ -175,8 +181,9 @@ try {
   if (QA) {
     console.log("\n── 8b. Việc của tôi với QA có thật ──");
     await page.evaluate((ten) => {
+      const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
       localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-        name: ten, email: "e2e@test.local", role: "admin", perm: "admin",
+        ...cu, name: ten, email: "e2e@test.local", role: "admin", perm: "admin",
       }));
     }, QA);
     // goto sang URL chỉ khác mỗi hash là điều hướng trong cùng tài liệu —
