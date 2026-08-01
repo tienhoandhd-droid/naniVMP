@@ -620,3 +620,38 @@ của họ.
 trong workflow. Đó là khoá *publishable*, vốn đã nằm trong gói JS công khai
 — giấu nó vào credential không thêm được lớp bảo vệ nào, chỉ thêm một chỗ
 phải nhớ. Khoá bí mật thì tuyệt đối không được làm vậy.
+
+### 13f. "Cập nhật tiến độ không lưu được" — không phải lỗi ghi (2026-08-01)
+
+Người dùng báo bấm Lưu không có gì xảy ra. Tái hiện bằng **phiên đăng nhập
+thật** (tài khoản kiểm thử, đăng nhập qua đúng form của web, lái chuột như
+người dùng) thì ra kết quả khác hẳn với giả thuyết ban đầu:
+
+**Đường ghi hoạt động tốt.** Điền ngày + lý do rồi bấm Lưu thì RPC chạy,
+`vmp_plan_items` đổi, `audit_logs` ghi đủ `old_data`/`new_data`, mốc dữ liệu
+nhảy sang giờ mới.
+
+**Vấn đề là ở chỗ khác:** lý do là **bắt buộc** theo GMP khi đánh dấu hoàn
+thành hoặc nhập ngày hoàn thành — nhưng nút Lưu vẫn sáng bình thường. Bấm
+xong mới hiện dòng chữ đỏ, mà dòng đó nằm giữa một hộp dài nên rất dễ trôi
+khỏi tầm mắt. Người dùng đọc ra thành **"bấm Lưu không có gì xảy ra"**.
+
+Đã sửa: gom điều kiện thành một biến `thieuGi`, dùng cho CẢ nút lẫn dải
+cảnh báo — nút **tự tắt** khi còn thiếu và ghi thẳng thiếu cái gì, ngay
+cạnh nút, **trước** khi bấm. Tính một chỗ chứ không lặp điều kiện ở hai
+nơi: lệch nhau một lần là nút sáng mà bấm không ăn.
+
+Nghiệm thu bằng máy: trước khi nhập lý do → `nút tắt: true`, có dải "Chưa
+lưu được: cần nhập LÝ DO"; sau khi nhập → nút bật, bấm là ghi.
+
+> **Bài học cho lần sau:** "không lưu được" gần như luôn có hai khả năng —
+> đường ghi hỏng, hoặc người dùng bị chặn bởi một điều kiện không nhìn thấy.
+> Kiểm khả năng thứ hai TRƯỚC, vì nó rẻ hơn nhiều và hay đúng hơn.
+
+**Dọn dẹp:** hai hạng mục dùng để thử (`CMTB101/2026.01-OQ` và `-PQ`) đã
+hoàn nguyên đúng giá trị gốc. Tài khoản kiểm thử **KHÔNG xoá được** vì
+`audit_logs.user_id` trỏ tới — và đó là ràng buộc đúng: xoá tài khoản là xoá
+mất dấu vết ai đã làm gì. Thay vào đó đã **khoá vĩnh viễn** (`banned_until =
+infinity`), đổi mật khẩu thành chuỗi ngẫu nhiên, đổi email sang
+`…DA-KHOA@local.invalid`, và **xoá hồ sơ trong `profiles`** nên không vào
+được app. Đã kiểm: đăng nhập trả `invalid_credentials`.

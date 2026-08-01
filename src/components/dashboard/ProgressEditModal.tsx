@@ -190,6 +190,17 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     ["tt_de_cuong", "tt_tham_dinh", "tt_bao_cao", "tt_vmp"].some((k) => f[k] === "Hoàn thành") ||
     ["ngay_de_cuong", "ngay_tham_dinh", "ngay_bao_cao", "ngay_vmp"].some((k) => !!f[k]));
 
+  /* Còn thiếu gì để lưu được — MỘT câu, dùng cho cả nút và dải cảnh báo.
+     Trả về chuỗi rỗng nghĩa là lưu được. Tính ở đây chứ không lặp lại điều
+     kiện ở hai chỗ: lệch nhau một lần là nút sáng mà bấm không ăn. */
+  const thieuGi = (!formChanged && !whoChanged)
+    ? "chưa sửa ô nào"
+    : chan.length
+      ? "còn mâu thuẫn giữa các bước — " + chan.map((v) => v.msg).join(" ")
+      : (needsReason && !reason.trim())
+        ? "cần nhập LÝ DO (yêu cầu GMP khi đánh dấu hoàn thành hoặc nhập ngày hoàn thành)"
+        : "";
+
   const handleSave = async (goNext = false) => {
     // "Mở tiếp" khi chưa sửa gì = chỉ chuyển hạng mục, không ghi.
     if (goNext && !formChanged && !whoChanged) {
@@ -440,11 +451,27 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           style={{ ...INP, resize: "vertical", minHeight: 54 }} />
         {err && <span style={{ color: "#b00020", fontSize: 12, fontWeight: 700 }}>{err}</span>}
       </div>
+      {/* CÒN THIẾU GÌ — nói NGAY CẠNH NÚT, trước khi bấm.
+          Đo được (2026-08-01): đường ghi từ web hoạt động tốt, nhưng người
+          dùng báo "không cập nhật được". Tái hiện bằng phiên thật thì ra lý
+          do: lý do là BẮT BUỘC theo GMP, mà nút Lưu vẫn sáng bình thường —
+          bấm xong mới hiện dòng chữ đỏ, và dòng đó nằm giữa một hộp dài nên
+          rất dễ trôi khỏi tầm mắt. Người dùng đọc ra thành "bấm Lưu không có
+          gì xảy ra".
+          Nay nút TỰ TẮT khi còn thiếu, và ghi thẳng thiếu cái gì. */}
+      {thieuGi && (
+        <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 14,
+                      background: C.marigoldSoft, border: `1px solid ${C.marigold}`,
+                      color: C.marigoldText, fontFamily: TEXT, fontSize: 14, fontWeight: 700 }}>
+          Chưa lưu được: {thieuGi}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
         <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
-        <button onClick={() => handleSave(false)} disabled={savingWho || (!formChanged && !whoChanged)}
-          title={!formChanged && !whoChanged ? "Chưa sửa ô nào nên chưa có gì để lưu" : undefined}
-          style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || (!formChanged && !whoChanged) ? 0.55 : 1, cursor: !formChanged && !whoChanged ? "not-allowed" : "pointer" }}>
+        <button onClick={() => handleSave(false)} disabled={savingWho || !!thieuGi}
+          title={thieuGi || undefined}
+          style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || thieuGi ? 0.55 : 1, cursor: thieuGi ? "not-allowed" : "pointer" }}>
           <Save size={17} /> {savingWho ? "Đang lưu…" : nChanged + (whoChanged ? 1 : 0) > 0 ? `Lưu ${nChanged + (whoChanged ? 1 : 0)} thay đổi` : "Lưu tiến độ"}
         </button>
         {nextAct && onOpenNext && (
