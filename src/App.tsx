@@ -1096,7 +1096,7 @@ function AuditLogView() {
                   const al = (actionLabels as Record<string, { label: string; color: string; bg: string }>)[log.action]
                     || { label: log.action, color: C.plumSoft, bg: C.pinkSoft };
                   return (
-                    <tr key={log.id} style={{ borderTop: `1px solid ${C.line}`, background: i % 2 ? "rgba(255,255,255,.4)" : "transparent" }}>
+                    <tr key={log.id} style={{ borderTop: `1px solid ${C.line}`, background: i % 2 ? C.surfaceSunk : "transparent" }}>
                       <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft, whiteSpace: "nowrap" }}>{fmtTime(log.created_at)}</td>
                       <td style={{ padding: "11px 14px", fontSize: 14, fontWeight: 700, color: C.plum }}>{log.user_email || "—"}</td>
                       <td style={{ padding: "11px 14px" }}><Tag color={al.color} bg={al.bg}>{al.label}</Tag></td>
@@ -1610,7 +1610,7 @@ export function GlobalFilterBarLegacy({
       // các card phía sau (vd "Tiến độ thẩm định 2026") để không bị đè.
       position: "relative", zIndex: 40,
       marginBottom: 18, padding: "11px 16px", borderRadius: 14,
-      background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)",
+      background: C.glass, backdropFilter: "blur(6px)",
       border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 7, color: C.plumSoft }}>
@@ -1754,7 +1754,7 @@ function GlobalFilterBar({
   );
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: "rgba(255,255,255,.72)", backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
       {/* Việc của tôi — lọc theo QA phụ trách khớp tên người đang đăng nhập.
           Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
           vào trong hộp thì coi như không có. */}

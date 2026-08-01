@@ -266,7 +266,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
             </tr></thead>
             <tbody>
               {lat.map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
-                <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? "rgba(255,255,255,.4)" : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
+                <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? C.surfaceSunk : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
                   <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 14 }}>{a.code}</td>
                   <td style={{ padding: "12px 16px", color: C.plum, fontSize: 14 }}>
                     {a.name}
