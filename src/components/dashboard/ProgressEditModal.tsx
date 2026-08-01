@@ -180,6 +180,38 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
         });
       }
     }
+
+    /* HAI LUẬT CÒN THIẾU, thêm 2026-08-01.
+     *
+     * 1. "Hoàn thành" mà KHÔNG CÓ NGÀY. Đây chính là lỗ đã tạo ra 97 hạng
+     *    mục ghi hoàn thành nhưng không có ngày thực tế nào — bằng đúng
+     *    tổng số hạng mục hoàn thành lúc rà. ALCOA+ đòi ghi nhận ĐỒNG THỜI:
+     *    "xong" mà không nói xong lúc nào thì không kiểm chứng được, và đó
+     *    là thứ thanh tra hỏi đầu tiên.
+     *
+     * 2. Có NGÀY mà trạng thái không phải "Hoàn thành". Hai ô nói ngược
+     *    nhau: một bên bảo đã làm xong ngày đó, một bên bảo chưa xong. Ô
+     *    ngày tự đặt trạng thái khi gõ, nhưng đổi ngược trạng thái lại thì
+     *    lọt.
+     *
+     * Giữ đúng triết lý sẵn có của hộp này: CHẶN cái mới tạo ra, chỉ NHẮC
+     * cái đã có sẵn trong dữ liệu — chặn cứng thì người dùng không mở ra
+     * sửa được chính những dòng hỏng đó.
+     */
+    for (const b of CHUOI) {
+      if (f[b.t] === "Hoàn thành" && !f[b.d]) {
+        out.push({
+          msg: `${b.ten} ghi HOÀN THÀNH nhưng chưa có ngày thực tế — ALCOA+ đòi ghi rõ xong lúc nào.`,
+          keys: [b.t, b.d],
+        });
+      }
+      if (f[b.d] && f[b.t] !== "Hoàn thành") {
+        out.push({
+          msg: `${b.ten} đã có ngày thực tế (${ngayVN(f[b.d])}) nhưng trạng thái vẫn là "${f[b.t] || "chưa nhập"}".`,
+          keys: [b.d, b.t],
+        });
+      }
+    }
     return out;
   })();
   const dinhToOSua = (v: { keys: string[] }) => v.keys.some((k) => doiRoi.includes(k));
@@ -190,11 +222,21 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     ["tt_de_cuong", "tt_tham_dinh", "tt_bao_cao", "tt_vmp"].some((k) => f[k] === "Hoàn thành") ||
     ["ngay_de_cuong", "ngay_tham_dinh", "ngay_bao_cao", "ngay_vmp"].some((k) => !!f[k]));
 
+  /* Ngày THỰC TẾ nằm ở tương lai — chặn cứng.
+     Thuộc tính max của ô nhập chỉ chặn khi bấm chọn trên lịch; gõ tay hoặc
+     dán vào thì vẫn lọt. Kiểm lại ở đây, và server còn kiểm lần nữa. */
+  const ngayTuongLai = CHUOI
+    .filter((s) => f[s.d] && f[s.d] > todayISO())
+    .map((s) => `${s.ten} (${ngayVN(f[s.d])})`);
+
   /* Còn thiếu gì để lưu được — MỘT câu, dùng cho cả nút và dải cảnh báo.
      Trả về chuỗi rỗng nghĩa là lưu được. Tính ở đây chứ không lặp lại điều
      kiện ở hai chỗ: lệch nhau một lần là nút sáng mà bấm không ăn. */
   const thieuGi = (!formChanged && !whoChanged)
     ? "chưa sửa ô nào"
+    : ngayTuongLai.length
+      ? `ngày hoàn thành thực tế không thể ở tương lai — ${ngayTuongLai.join(", ")}. `
+        + `Hôm nay là ${ngayVN(todayISO())}.`
     : chan.length
       ? "còn mâu thuẫn giữa các bước — " + chan.map((v) => v.msg).join(" ")
       : (needsReason && !reason.trim())
@@ -299,7 +341,12 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" value={f[dCol]} onChange={setDate(dCol, tCol)} style={INP} /></div>
+          {/* max = hôm nay. NGÀY THỰC TẾ không thể nằm ở tương lai — ALCOA+
+              đòi ghi nhận ĐỒNG THỜI với việc làm, mà việc chưa làm thì không
+              có ngày làm. Trước đây ô này để trống max nên chọn được 2027.
+              Lịch thẩm định bên dưới thì NGƯỢC LẠI: nó là ngày hẹn, tương
+              lai mới đúng — nên không chặn. */}
+          <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" max={todayISO()} value={f[dCol]} onChange={setDate(dCol, tCol)} style={INP} /></div>
           <div style={FIELD}><span style={LBL}>Trạng thái</span>{sel(tCol)}</div>
         </div>
         {/* Lịch thẩm định thuộc về CHÍNH bước thẩm định. Trước đây nó nằm tận

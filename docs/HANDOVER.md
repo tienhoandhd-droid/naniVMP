@@ -655,3 +655,37 @@ mất dấu vết ai đã làm gì. Thay vào đó đã **khoá vĩnh viễn** (
 infinity`), đổi mật khẩu thành chuỗi ngẫu nhiên, đổi email sang
 `…DA-KHOA@local.invalid`, và **xoá hồ sơ trong `profiles`** nên không vào
 được app. Đã kiểm: đăng nhập trả `invalid_credentials`.
+
+### 13g. Luật nhập liệu: chặn ngày tương lai + hai lỗ logic (2026-08-01)
+
+**Ngày THỰC TẾ nằm ở tương lai.** ALCOA+ chữ C — Contemporaneous: ghi nhận
+phải xảy ra đồng thời với việc làm. "Hoàn thành ngày 15/09/2026" ghi vào hôm
+01/08/2026 là ghi trước một việc chưa xảy ra. Trước đây **không lớp nào
+chặn**: ô nhập để trống `max` nên chọn được 2027, và RPC nhận mọi ngày.
+
+Nay chặn ở **ba lớp**:
+1. `max={todayISO()}` trên ô ngày thực tế (không áp cho lịch thẩm định — đó
+   là ngày HẸN, tương lai mới đúng).
+2. Kiểm trước khi bấm Lưu — `max` chỉ chặn khi bấm chọn trên lịch, gõ tay
+   hoặc dán vào thì vẫn lọt.
+3. **RPC** (`20260801040000`) — client thì luôn có thể bị bỏ qua, gọi thẳng
+   bằng curl là xong, nên luật chỉ THẬT khi nằm ở server.
+
+Nghiệm thu bốn hướng: tương lai → chặn kèm mã `ngay_tuong_lai`; hôm nay →
+qua; quá khứ → qua; `scheduled_date` tương lai → **vẫn qua**.
+
+**Hai lỗ logic trong bộ luật nhập liệu**, phát hiện khi rà lại:
+
+| lỗ | hậu quả |
+|---|---|
+| "Hoàn thành" mà KHÔNG có ngày | chính là lỗ đã tạo ra **97 hạng mục** ghi hoàn thành nhưng thiếu ngày thực tế — bằng đúng tổng số hạng mục hoàn thành lúc rà |
+| Có NGÀY mà trạng thái không phải "Hoàn thành" | hai ô nói ngược nhau; ô ngày tự đặt trạng thái khi gõ, nhưng đổi ngược trạng thái lại thì lọt |
+
+Cả hai thêm vào `viPham` và **giữ đúng triết lý sẵn có của hộp sửa**: CHẶN
+cái người dùng vừa tạo ra, chỉ NHẮC cái đã có sẵn trong dữ liệu. Chặn cứng
+cả cái cũ thì người dùng không mở ra sửa được chính những dòng hỏng đó —
+đúng thứ cần sửa nhất.
+
+> 97 dòng cũ vẫn còn nguyên; luật mới chỉ ngăn phát sinh thêm. Dọn 97 dòng
+> đó là một chiến dịch dữ liệu riêng, cần QA điền ngày thật chứ không phải
+> đoán.
