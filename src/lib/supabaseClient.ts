@@ -28,6 +28,15 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON)
 
 export const isSupabaseConfigured = () => !!supabase;
 
+/* Gắn client ra window để BỘ KIỂM đối chiếu số trên màn với dữ liệu gốc.
+ * Chỉ đọc — client này dùng khoá anon công khai (đã có sẵn trong bundle
+ * và trong mã nguồn công khai), và mọi RPC ghi đã bị thu quyền khỏi anon
+ * (xem mục 8b/11a HANDOVER). Không mở thêm bề mặt tấn công nào; chỉ tránh
+ * cho bộ kiểm phải dựng client thứ hai rồi đối chiếu nhầm phiên. */
+if (typeof window !== "undefined" && supabase) {
+  (window as unknown as Record<string, unknown>).__vmpSb = supabase;
+}
+
 /* ---- Đăng nhập ---- */
 export async function signIn(email: string, password: string): Promise<AppUser> {
   if (!supabase) throw new Error("Supabase chưa cấu hình. Xem hướng dẫn cài đặt.");

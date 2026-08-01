@@ -1687,7 +1687,7 @@ function FilterChip({ style, label, onRemove }: {
 function GlobalFilterBar({
   areaSel, setAreaSel, deptSel, setDeptSel, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
-  areaOptions, deptOptions, shown, total,
+  areaOptions, deptOptions, shown, total, soNgung = 0,
   onlyMine, setOnlyMine, myName,
 }: {
   areaSel: string[];
@@ -1704,6 +1704,8 @@ function GlobalFilterBar({
   deptOptions: Array<{ v: string; l: string }>;
   shown: number;
   total: number;
+  /** Số hạng mục Không áp dụng / Đã huỷ — KHÔNG tính vào mẫu số. */
+  soNgung?: number;
   onlyMine: boolean;
   setOnlyMine: (v: boolean) => void;
   /** Tên người đăng nhập, dùng để đối chiếu với QA phụ trách. Rỗng thì
@@ -1821,7 +1823,14 @@ function GlobalFilterBar({
           <b style={{ color: shown < total ? C.pinkText : C.plum }}>{shown}</b>/{total} hạng mục
           <GiaiThich tieuDe={`${total} = mẫu số của thanh lọc`}>
             <span>{MAU_SO.tatCa}</span>
-            <span>Các trang khác dùng mẫu số HẸP HƠN và đều có dấu i riêng: trang Tổng quan đếm hạng mục có mốc đích; Báo cáo mục 1 chỉ đếm mốc đích rơi vào năm đang chọn. Ba con số khác nhau là do ba định nghĩa khác nhau, không phải do lệch dữ liệu.</span>
+            {soNgung > 0 && (
+              <span>
+                Đã trừ {soNgung} hạng mục "Không áp dụng / Đã huỷ" — chúng không hiện ở màn nào,
+                nên tính vào đây sẽ ra một mẫu số không trang nào dùng. Xem chúng ở màn Cập nhật
+                tiến độ bằng ô "Hiện cả mục đã ngừng".
+              </span>
+            )}
+            <span>Báo cáo mục 1 dùng mẫu số HẸP HƠN: chỉ hạng mục có mốc đích VMP rơi vào năm đang chọn. Số khác nhau là do định nghĩa khác nhau, không phải do lệch dữ liệu.</span>
           </GiaiThich>
         </span>
         {/* Cả màn hình đang xem nằm trong URL, nên chép link là chia sẻ được
@@ -1958,6 +1967,18 @@ export default function App() {
     matchTime(a) &&
     laViecCuaToi(a)
   )), [acts, areaSel, inDept, matchTime, laViecCuaToi]);
+  /* Mẫu số của thanh lọc phải đếm HẠNG MỤC ĐANG HOẠT ĐỘNG.
+     Đo được: RPC trả 461 dòng = 448 đang hoạt động + 13 "Không áp dụng".
+     Thanh lọc ghi 461 nhưng mọi màn bên dưới đều lọc bỏ 13 dòng kia, nên
+     con số 461 là một mẫu số KHÔNG MÀN NÀO dùng — người đọc đối chiếu với
+     bất kỳ trang nào cũng thấy lệch, và không có cách nào biết vì sao.
+     Dữ liệu vẫn giữ nguyên cả 461 dòng (màn Cập nhật tiến độ có ô "Hiện cả
+     mục đã ngừng" cần chúng); chỉ CON SỐ ĐẾM là đổi. */
+  const laSong = (a: Activity) => (a.state || "active") === "active";
+  const soSong = useMemo(() => acts.filter(laSong).length, [acts]);
+  const soSongHien = useMemo(() => filteredActs.filter(laSong).length, [filteredActs]);
+  const soNgung = acts.length - soSong;
+
   const filteredObjects = useMemo(() => objects.filter((o) => {
     if (areaSel.length && !areaSel.includes(String(o.area || "").trim())) return false;
     if (deptSel.length) {
@@ -2164,7 +2185,7 @@ export default function App() {
                 customFrom={customFrom} setCustomFrom={setCustomFrom}
                 customTo={customTo} setCustomTo={setCustomTo}
                 areaOptions={areaOptions} deptOptions={deptOptions}
-                shown={filteredActs.length} total={acts.length}
+                shown={soSongHien} total={soSong} soNgung={soNgung}
                 onlyMine={onlyMine} setOnlyMine={setOnlyMine} myName={myName}
               />
             )}
