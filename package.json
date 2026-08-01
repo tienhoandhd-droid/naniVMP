@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "gen:types": "supabase gen types typescript --db-url \"$SUPABASE_DB_URL\" --schema public > src/types/database.ts",
-    "e2e": "node tests/e2e/luong-chinh.mjs && node tests/e2e/quet-tat-ca-man.mjs && node tests/e2e/giam-chuyen-dong.mjs",
+    "e2e": "node tests/e2e/luong-chinh.mjs && node tests/e2e/quet-tat-ca-man.mjs && node tests/e2e/giam-chuyen-dong.mjs && node tests/e2e/ma-tran-phan-quyen.mjs",
     "cham": "node tests/e2e/cham-giao-dien.mjs",
     "viec": "node tests/e2e/viec-nguoi-dung.mjs",
     "doichieu": "node tests/e2e/doi-chieu-du-lieu.mjs"

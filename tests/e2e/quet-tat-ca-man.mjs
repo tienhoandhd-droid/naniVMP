@@ -18,6 +18,7 @@ const MAN = [
   ["reports", "Báo cáo & AI"],
   ["rules", "Luật đang áp dụng"],
   ["health", "Sức khoẻ dữ liệu"],
+  ["phanquyen", "Phân quyền & trách nhiệm"],
   ["audit", "Audit log"],
   ["admin", "Quản trị"],
 ];
@@ -45,7 +46,7 @@ await p.evaluate(() => localStorage.setItem("vmp_monitor_user_v1", JSON.stringif
    vào localStorage nên bị RLS chặn — đó là bảo mật chạy ĐÚNG, không phải
    lỗi. Kiểm chứng ngoài app bằng curl, xem README. Vẫn quét chúng để bắt
    lỗi JS khác, chỉ không tính 401 là hỏng. */
-const CAN_PHIEN_THAT = new Set(["source", "rules", "audit", "admin"]);
+const CAN_PHIEN_THAT = new Set(["source", "rules", "audit", "admin", "phanquyen"]);
 const laLoiQuyen = (t) => /401|403|Unauthorized|JWT|permission denied|row-level security/i.test(t);
 
 let hong = 0;

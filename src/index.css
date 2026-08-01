@@ -6725,3 +6725,25 @@ summary { min-height: 24px; display: flex; align-items: center; }
   main { overflow: visible !important; height: auto !important; }
   a[href]::after { content: ""; }
 }
+
+/* ── Ma trận phân quyền: ô sửa thẳng trên bảng ─────────────────────────
+   Ô nhập nằm TRONG bảng nên phải trông như ô nhập ngay cả khi chưa chạm
+   vào — viền mờ đủ để thấy "chỗ này bấm được", không đậm tới mức bảng
+   biến thành cái biểu mẫu. Chiều cao 32px giữ đúng ngưỡng chạm 24px của
+   WCAG 2.2 mà không làm hàng bảng cao vống lên. */
+.pq-o {
+  font-family: var(--ff-text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--c-ink);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  padding: 5px 9px;
+  min-height: 32px;
+  max-width: 220px;
+  width: 100%;
+}
+.pq-o:hover:not(:disabled) { border-color: var(--c-pink); }
+.pq-o:focus-visible { outline: 2px solid var(--c-pink); outline-offset: 1px; }
+.pq-o:disabled { opacity: .55; cursor: progress; }

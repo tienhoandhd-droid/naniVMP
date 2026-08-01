@@ -603,6 +603,28 @@ export async function deleteStaffEmail(id: string): Promise<RpcResult> {
   return unwrap(data, error, "Xoá nhân sự thất bại");
 }
 
+/* ---- Phân quyền người dùng ----
+ * Ba chốt an toàn nằm ở RPC chứ không ở đây: chỉ admin gọi được, không tự
+ * hạ vai mình, và luôn còn ít nhất một admin hoạt động. Đặt ở server vì
+ * client luôn có thể bị bỏ qua. */
+export async function setUserRole(
+  userId: string, role: string, department: string | null, reason?: string,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  // Kiểu RPC sinh tự động từ schema (src/types/database.ts) chưa có hàm này
+  // vì file đó sinh trước migration 20260801050000. Chạy `npm run gen:types`
+  // là hết cần ép kiểu — ép ở đây để không phải sinh lại cả file ngay lúc này.
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_user_role", {
+    p_user_id: userId,
+    p_role: role,
+    p_department: department,
+    p_reason: reason ?? null,
+  });
+  return unwrap(data, error, "Đổi phân quyền thất bại");
+}
+
 /* ---- Người thực hiện ---- */
 export async function upsertPerformer(
   id: string | null, patch: Record<string, unknown>,

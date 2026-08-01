@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3, Scale, ClipboardList,
+  ShieldCheck, Radar, BarChart3, Scale, ClipboardList, KeyRound,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -126,6 +126,7 @@ export const NAV_ITEMS = [
   { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
 
   // QUẢN TRỊ
+  { id: "phanquyen", label: "Phân quyền & trách nhiệm", icon: KeyRound, group: "admin", adminOnly: true },
   { id: "health", label: "Sức khoẻ dữ liệu", icon: Radar, group: "admin", adminOnly: true },
   { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin", adminOnly: true },
   { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin", adminOnly: true },
@@ -142,6 +143,7 @@ export const NAV_SUBS = {
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / Excel / HTML",
   rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
+  phanquyen: "Ma trận vai trò × hành động · người × bộ phận · khu vực/line — sửa vai trò, bộ phận và email thẳng trên bảng",
   health: "Sức khoẻ dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng ở Supabase",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",
