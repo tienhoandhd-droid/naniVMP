@@ -25,14 +25,17 @@
  *  trò, và không ai biết nó đã lệch.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Users, KeyRound, AlertTriangle, MapPin, Pencil } from "lucide-react";
+import { ShieldCheck, Users, KeyRound, AlertTriangle, MapPin, Pencil, Grid3x3 } from "lucide-react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { DEPTS } from "../constants/vmp.ts";
 import { supabase } from "../lib/supabaseClient.ts";
-import { setUserRole, upsertPerformer } from "../lib/supabaseData.ts";
+import {
+  setUserRole, upsertPerformer, fetchStaffEmails, fetchAssignments, setAssignment,
+} from "../lib/supabaseData.ts";
+import type { AssignmentRow } from "../lib/supabaseData.ts";
 import { usePerformers } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, CauKetLuan, GiaiThich } from "../components/ui/Primitives.tsx";
-import type { Activity } from "../types/domain.ts";
+import type { Activity, AppUser } from "../types/domain.ts";
 
 /* ---------------------------------------------------------------------
  * A · LUẬT ĐANG CHẠY — chép đúng từ thân rpc_update_progress /
@@ -89,10 +92,47 @@ const O_QUYEN: Record<Muc, { chu: string; mau: string; nen: string }> = {
   khong: { chu: "Không", mau: C.plumSoft, nen: C.surfaceSunk },
 };
 
+/* ---------------------------------------------------------------------
+ * D · MA TRẬN PHÂN CÔNG — nhân viên × loại thẩm định × line
+ * ------------------------------------------------------------------- */
+
+/* Tám loại đúng như luật VMP01 sinh ra, xếp theo trình tự vòng đời thiết
+   bị (DQ → FAT/SAT → IQ → OQ → PQ) rồi tới các loại độc lập. Xếp theo
+   trình tự chứ không theo bảng chữ cái: người ở xưởng đọc bảng này theo
+   thứ tự việc xảy ra, không theo thứ tự từ điển. */
+const LOAI_TD = ["DQ", "FAT/SAT", "IQ", "OQ", "PQ", "PV", "GSP", "GDP"] as const;
+
+const VAI_O = {
+  thuc_hien: { chu: "Thực hiện", ky: "●", mau: C.mintText, nen: C.mintSoft },
+  ho_tro: { chu: "Hỗ trợ", ky: "○", mau: C.skyText, nen: C.skySoft },
+} as const;
+
+/* Danh bạ ghi bộ phận bằng đủ kiểu — "QA", "qa", "Xưởng sản xuất", "XSX".
+   Không chuẩn hoá thì cùng một người sẽ rơi vào hai bộ phận khác nhau tuỳ
+   nguồn, và bảng sẽ thiếu người mà không báo gì. */
+function chuanBoPhan(v: unknown): string | null {
+  const t = String(v ?? "").trim().toLowerCase();
+  if (!t) return null;
+  const d = DEPTS.find((x) => x.id === t
+    || x.short.toLowerCase() === t
+    || x.name.toLowerCase() === t
+    || x.name.toLowerCase().startsWith(t));
+  if (d) return d.id;
+  if (/xưởng|xsx|sản xuất/.test(t)) return "xsx";
+  if (/cơ điện|co dien|\bcd\b/.test(t)) return "cd";
+  if (/kho|gsp/.test(t)) return "kho";
+  if (/kiểm nghiệm|\bqc\b/.test(t)) return "qc";
+  if (/nghiên cứu|\brd\b|r&d/.test(t)) return "rd";
+  if (/\bqa\b|chất lượng/.test(t)) return "qa";
+  return null;
+}
+
+interface NhanSu { ten: string; email: string | null; boPhan: string | null; nguon: string }
+
 interface HoSo { id: string; full_name: string | null; email: string | null; role: string; department: string | null; is_active: boolean | null }
 
 export default function PhanQuyenView(
-  { acts, isAdmin = false }: { acts: Activity[]; isAdmin?: boolean },
+  { acts, isAdmin = false, user }: { acts: Activity[]; isAdmin?: boolean; user?: AppUser | null },
 ) {
   const { performers } = usePerformers();
   const [hoSo, setHoSo] = useState<HoSo[]>([]);
@@ -112,6 +152,35 @@ export default function PhanQuyenView(
   };
 
   const suaQuyenDuoc = isAdmin && !!supabase;
+  /* Ma trận D mở hơn ma trận B một bậc: rpc_set_assignment nhận cả
+     qa_manager, vì phân công việc là việc của QA chứ không riêng quản trị
+     hệ thống. Đổi vai trò tài khoản thì vẫn chỉ admin. */
+  const suaPhanCongDuoc = (isAdmin || user?.role === "qa_manager") && !!supabase;
+
+  /* ── D · dữ liệu ma trận phân công ── */
+  const [danhBa, setDanhBa] = useState<NhanSu[]>([]);
+  const [phanCong, setPhanCong] = useState<AssignmentRow[]>([]);
+  const [bpChon, setBpChon] = useState("xsx");
+  const [lineChon, setLineChon] = useState("*");
+  const [loiD, setLoiD] = useState("");
+
+  useEffect(() => {
+    if (!supabase) return;
+    fetchStaffEmails()
+      .then((rows) => setDanhBa(rows
+        .filter((r) => r.is_active !== false)
+        .map((r) => ({
+          ten: String(r.staff_name || "").trim(),
+          email: r.email || null,
+          boPhan: chuanBoPhan(r.department),
+          nguon: "danh bạ",
+        }))
+        .filter((r) => r.ten)))
+      .catch((e) => setLoiD((e as Error).message));
+    fetchAssignments()
+      .then(setPhanCong)
+      .catch((e) => setLoiD((e as Error).message));
+  }, []);
 
   const doiQuyen = async (id: string, ten: string, vai: string, bp: string | null) => {
     setDangLuu(id); setKetQua(null);
@@ -153,7 +222,11 @@ export default function PhanQuyenView(
     const dem = new Map<string, Map<string, number>>();
     const tongTheoBp = new Map<string, number>();
     for (const a of song) {
-      const ten = String(a.owner || "").trim() || "(chưa phân công)";
+      /* Sheet lấp ô trống bằng "—". Không quy về "(chưa phân công)" thì ma
+         trận có thêm một dòng tên "—" đứng tên hàng chục hạng mục, trông
+         như một người thật chưa khai email. */
+      const thoTen = String(a.owner || "").trim();
+      const ten = (!thoTen || /^[-–—.·\s]+$/.test(thoTen)) ? "(chưa phân công)" : thoTen;
       const ds = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
       if (!dem.has(ten)) dem.set(ten, new Map());
       for (const d of ds) {
@@ -250,6 +323,131 @@ export default function PhanQuyenView(
     }
     return m;
   }, [acts]);
+
+  /* ── D · thành viên của bộ phận đang chọn ──
+     Gộp bốn nguồn (danh bạ · người thực hiện · tài khoản · người đang đứng
+     tên hạng mục) vì không nguồn nào đủ. Danh bạ là nguồn CHÍNH — đó là
+     chỗ người ta khai nhân sự — nhưng nếu chỉ lấy danh bạ thì người đang
+     làm thật mà chưa được khai sẽ biến mất khỏi ma trận, và không ai biết
+     họ đã biến mất. */
+  const thanhVien = useMemo(() => {
+    const m = new Map<string, { ten: string; email: string | null; nguon: Set<string> }>();
+    const them = (ten: string, email: string | null, nguon: string) => {
+      const t = ten.trim();
+      /* "—" và "-" là ký tự lấp chỗ trống của Sheet, không phải tên người.
+         Để lọt vào đây thì ma trận có một dòng ma mà ai cũng tưởng là một
+         nhân viên chưa được điền email. */
+      if (!t || t === "(chưa phân công)" || /^[-–—.·\s]+$/.test(t)) return;
+      const k = t.toLowerCase();
+      if (!m.has(k)) m.set(k, { ten: t, email, nguon: new Set() });
+      const o = m.get(k)!;
+      if (!o.email && email) o.email = email;
+      o.nguon.add(nguon);
+    };
+    danhBa.forEach((n) => { if (n.boPhan === bpChon) them(n.ten, n.email, "danh bạ"); });
+    performers.forEach((p) => {
+      if (chuanBoPhan(p.department) === bpChon) {
+        them(String(p.performer_name || ""), (p.email as string) || null, "người thực hiện");
+      }
+    });
+    hoSo.forEach((h) => {
+      if (chuanBoPhan(h.department) === bpChon) them(h.full_name || "", h.email, "tài khoản");
+    });
+    hang.forEach((h) => {
+      if ((h.theoBp.get(bpChon) || 0) > 0) them(h.ten, h.email, "đang đứng tên");
+    });
+    return [...m.values()].sort((a, b) => a.ten.localeCompare(b.ten, "vi"));
+  }, [danhBa, performers, hoSo, hang, bpChon]);
+
+  /* Line có thật trong dữ liệu của bộ phận đang chọn. Chỉ XSX chia line —
+     các bộ phận khác chỉ có ô '*' và bảng nói rõ điều đó thay vì hiện một
+     ô chọn rỗng làm người dùng tưởng dữ liệu bị mất. */
+  const dsLine = useMemo(() => {
+    const o = phamVi.get(bpChon);
+    if (!o) return [] as Array<[string, number]>;
+    return [...o.line.entries()]
+      .filter(([k]) => k !== "(chưa khai)")
+      .sort((a, b) => b[1] - a[1]);
+  }, [phamVi, bpChon]);
+
+  useEffect(() => { setLineChon("*"); }, [bpChon]);
+
+  const oPhanCong = useMemo(() => {
+    const m = new Map<string, AssignmentRow["vai_tro"]>();
+    for (const r of phanCong) m.set(`${r.staff_name.trim().toLowerCase()}|${r.validation_type}|${r.line}`, r.vai_tro);
+    return m;
+  }, [phanCong]);
+
+  const doiPhanCong = async (ten: string, loai: string) => {
+    const k = `${ten.trim().toLowerCase()}|${loai}|${lineChon}`;
+    const dang = oPhanCong.get(k);
+    /* Bấm một lần đi một bậc: trống → Thực hiện → Hỗ trợ → trống. Ba trạng
+       thái nhưng vẫn một cú bấm, không phải mở menu — ma trận này người ta
+       tích hàng chục ô một lượt. */
+    const moi: "" | "thuc_hien" | "ho_tro" =
+      dang === "thuc_hien" ? "ho_tro" : dang === "ho_tro" ? "" : "thuc_hien";
+    setDangLuu(k); setKetQua(null);
+    try {
+      const r = await setAssignment(ten, bpChon, loai, lineChon, moi);
+      if (r.ok) {
+        setPhanCong((cu) => {
+          const con = cu.filter((x) => !(x.staff_name.trim().toLowerCase() === ten.trim().toLowerCase()
+            && x.validation_type === loai && x.line === lineChon));
+          return moi ? [...con, { staff_name: ten, department: bpChon, validation_type: loai, line: lineChon, vai_tro: moi }] : con;
+        });
+        setKetQua({ ten, ok: true, msg: moi ? `${loai}: ${VAI_O[moi].chu}` : `${loai}: bỏ phân công` });
+      } else {
+        setKetQua({ ten, ok: false, msg: r.error || "Không lưu được" });
+      }
+    } catch (e) {
+      setKetQua({ ten, ok: false, msg: (e as Error).message });
+    }
+    setDangLuu("");
+  };
+
+  /* Câu kết luận của ma trận D: loại thẩm định nào của bộ phận này CÓ THẬT
+     trong kế hoạch mà chưa ai nhận. Đếm trên hạng mục thật, không đếm trên
+     tám cột cố định — bộ phận không làm PV thì thiếu PV không phải lỗi. */
+  const ketLuanD = useMemo(() => {
+    const coThat = new Set<string>();
+    for (const a of acts) {
+      if ((a.state || "active") !== "active") continue;
+      const ds = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
+      if (!ds.includes(bpChon)) continue;
+      const lt = String(a.vtype || a.type || "").trim();
+      if (lt) coThat.add(lt);
+    }
+    const chuaAi = [...coThat].filter((lt) =>
+      !thanhVien.some((v) => oPhanCong.get(`${v.ten.trim().toLowerCase()}|${lt}|${lineChon}`) === "thuc_hien"));
+    const tenBp = DEPTS.find((d) => d.id === bpChon)?.name || bpChon;
+    const tenLine = lineChon === "*" ? "mọi line" : `line ${lineChon}`;
+    if (!thanhVien.length) {
+      return {
+        chinh: `${tenBp} chưa có ai trong danh bạ — chưa tích được ô nào.`,
+        phu: "Thêm người ở Danh mục & Nhập liệu → Danh bạ nhân sự, chọn đúng bộ phận, rồi quay lại đây.",
+        tone: "warn" as const,
+      };
+    }
+    if (!coThat.size) {
+      return {
+        chinh: `${tenBp} không có hạng mục thẩm định nào trong kế hoạch năm nay.`,
+        phu: "Vẫn tích được để chuẩn bị cho năm sau; bảng chỉ không có gì để đối chiếu.",
+        tone: "ok" as const,
+      };
+    }
+    if (chuaAi.length) {
+      return {
+        chinh: `${tenBp} · ${tenLine}: ${chuaAi.length}/${coThat.size} loại thẩm định CHƯA có người thực hiện — ${chuaAi.join(", ")}.`,
+        phu: "Kế hoạch có hạng mục thuộc các loại này nhưng ma trận chưa chỉ ra ai làm. Tích ô 'Thực hiện' cho người phụ trách.",
+        tone: "over" as const,
+      };
+    }
+    return {
+      chinh: `${tenBp} · ${tenLine}: cả ${coThat.size} loại thẩm định trong kế hoạch đều đã có người thực hiện.`,
+      phu: `Đã tích: ${[...coThat].sort().join(", ")}.`,
+      tone: "ok" as const,
+    };
+  }, [acts, bpChon, lineChon, thanhVien, oPhanCong]);
 
   const th: React.CSSProperties = {
     textAlign: "left", padding: "10px 12px", fontSize: 12, fontWeight: 800,
@@ -540,6 +738,145 @@ export default function PhanQuyenView(
               </div>
             );
           })}
+        </div>
+      </Card>
+
+      {/* ============ D · MA TRẬN PHÂN CÔNG ============ */}
+      <Card variant="strong">
+        <CardTitle icon={Grid3x3}
+          sub="Thành viên lấy động từ Danh bạ nhân sự của bộ phận — tích ô để khai ai làm loại thẩm định nào, ở line nào">
+          D · Ai làm loại thẩm định nào, ở line nào
+        </CardTitle>
+
+        <CauKetLuan chinh={ketLuanD.chinh} phu={ketLuanD.phu} tone={ketLuanD.tone} />
+
+        <div style={{ display: "flex", gap: "10px 18px", flexWrap: "wrap", alignItems: "flex-end",
+                      margin: "14px 0 12px" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>Bộ phận</span>
+            <select className="pq-o pq-loc" style={{ maxWidth: 260 }} value={bpChon}
+              onChange={(e) => setBpChon(e.target.value)}>
+              {DEPTS.map((d) => (
+                <option key={d.id} value={d.id}>{d.short} · {d.name}</option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>Line / khu vực</span>
+            <select className="pq-o pq-loc" style={{ maxWidth: 280 }} value={lineChon}
+              disabled={!dsLine.length}
+              onChange={(e) => setLineChon(e.target.value)}>
+              <option value="*">Mọi line của bộ phận</option>
+              {dsLine.map(([k, n]) => <option key={k} value={k}>{k} ({n} hạng mục)</option>)}
+            </select>
+          </label>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plumSoft, paddingBottom: 8 }}>
+            {dsLine.length
+              ? <>Tích ở <b>“Mọi line”</b> là phân công chung; chọn một line cụ thể để khai riêng cho line đó.</>
+              : <>Bộ phận này không chia line trong dữ liệu — chỉ có một cột phân công chung.</>}
+          </div>
+        </div>
+
+        {loiD && (
+          <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "10px 14px",
+                        borderRadius: 14, background: C.raspSoft, color: C.raspText,
+                        fontFamily: TEXT, fontSize: 13.5, fontWeight: 700, marginBottom: 12 }}>
+            <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
+            <span>Chưa đọc được ma trận phân công: {loiD}
+              {/permission denied|row-level|JWT/i.test(loiD)
+                && " — cần đăng nhập bằng tài khoản thật mới đọc được bảng này."}</span>
+          </div>
+        )}
+
+        {!thanhVien.length ? (
+          <div style={{ padding: "18px 16px", borderRadius: 14, background: C.surfaceSunk,
+                        fontSize: 13.5, fontWeight: 700, color: C.plumSoft, lineHeight: 1.7 }}>
+            Chưa có ai thuộc bộ phận này. Vào <b>Danh mục &amp; Nhập liệu → Danh bạ nhân sự</b>,
+            thêm nhân viên và chọn đúng bộ phận — bảng dưới sẽ tự có dòng cho họ.
+          </div>
+        ) : (
+          <div className="vmp-scroll" style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", minWidth: 820, borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={th}>Nhân viên</th>
+                  <th style={th}>Nguồn tên</th>
+                  {LOAI_TD.map((lt) => (
+                    <th key={lt} style={{ ...th, textAlign: "center" }}>{lt}</th>
+                  ))}
+                  <th style={{ ...th, textAlign: "center" }}>Số loại</th>
+                </tr>
+              </thead>
+              <tbody>
+                {thanhVien.map((v) => {
+                  const dem = LOAI_TD.filter((lt) =>
+                    oPhanCong.get(`${v.ten.trim().toLowerCase()}|${lt}|${lineChon}`)).length;
+                  return (
+                    <tr key={v.ten}>
+                      <td style={{ ...td, fontWeight: 800 }}>
+                        {v.ten}
+                        {!v.email && (
+                          <div style={{ fontSize: 11.5, fontWeight: 700, color: C.marigoldText }}>chưa có email</div>
+                        )}
+                      </td>
+                      <td style={{ ...td, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
+                        {[...v.nguon].join(" · ")}
+                      </td>
+                      {LOAI_TD.map((lt) => {
+                        const k = `${v.ten.trim().toLowerCase()}|${lt}|${lineChon}`;
+                        const dang = oPhanCong.get(k);
+                        const o = dang ? VAI_O[dang] : null;
+                        return (
+                          <td key={lt} style={{ ...td, textAlign: "center", padding: "6px 4px" }}>
+                            <button type="button" className="pq-tich"
+                              disabled={!suaPhanCongDuoc || dangLuu === k}
+                              onClick={() => doiPhanCong(v.ten, lt)}
+                              aria-label={`${v.ten} · ${lt}: ${o ? o.chu : "chưa phân công"}`}
+                              title={suaPhanCongDuoc
+                                ? `${v.ten} · ${lt} · ${lineChon === "*" ? "mọi line" : lineChon}\nĐang: ${o ? o.chu : "chưa phân công"}\nBấm để chuyển sang: ${dang === "thuc_hien" ? "Hỗ trợ" : dang === "ho_tro" ? "bỏ phân công" : "Thực hiện"}`
+                                : `${v.ten} · ${lt}: ${o ? o.chu : "chưa phân công"}`}
+                              style={o
+                                ? { background: o.nen, color: o.mau, borderColor: "transparent" }
+                                : undefined}>
+                              {o ? o.ky : "＋"}
+                            </button>
+                          </td>
+                        );
+                      })}
+                      <td style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800,
+                                   color: dem ? C.plum : C.plumSoft }}>
+                        {dem || "·"}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td style={{ ...td, fontWeight: 800 }} colSpan={2}>Số người mỗi loại</td>
+                  {LOAI_TD.map((lt) => {
+                    const n = thanhVien.filter((v) =>
+                      oPhanCong.get(`${v.ten.trim().toLowerCase()}|${lt}|${lineChon}`) === "thuc_hien").length;
+                    return (
+                      <td key={lt} style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800,
+                                            color: n ? C.mintText : C.raspText }}>
+                        {n || "0"}
+                      </td>
+                    );
+                  })}
+                  <td style={td} />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "8px 18px", flexWrap: "wrap", marginTop: 14,
+                      fontSize: 12.5, fontWeight: 700, color: C.plumSoft, alignItems: "center" }}>
+          <span><b style={{ color: C.mintText }}>●</b> Thực hiện — người trực tiếp làm</span>
+          <span><b style={{ color: C.skyText }}>○</b> Hỗ trợ — phối hợp</span>
+          <span><b>＋</b> chưa phân công</span>
+          {suaPhanCongDuoc
+            ? <span>Bấm một ô đi một bậc: ＋ → ● → ○ → ＋, lưu ngay sau mỗi lần bấm.</span>
+            : <span>Chỉ admin hoặc QA được tích ô.</span>}
         </div>
       </Card>
 

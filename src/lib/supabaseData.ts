@@ -625,6 +625,47 @@ export async function setUserRole(
   return unwrap(data, error, "Đổi phân quyền thất bại");
 }
 
+/* ---- Ma trận phân công: nhân viên × loại thẩm định × line ---- */
+export interface AssignmentRow {
+  staff_name: string;
+  department: string;
+  validation_type: string;
+  /** '*' nghĩa là mọi line của bộ phận. */
+  line: string;
+  vai_tro: "thuc_hien" | "ho_tro";
+}
+
+export async function fetchAssignments(): Promise<AssignmentRow[]> {
+  if (!supabase) return [];
+  // Bảng sinh ở migration 20260801060000, sau lần sinh types gần nhất, nên
+  // src/types/database.ts chưa biết nó. `npm run gen:types` (cần Docker
+  // chạy) là hết cần ép kiểu ở đây.
+  const { data, error } = await supabase
+    .from("vmp_assignment_matrix" as never)
+    .select("staff_name,department,validation_type,line,vai_tro")
+    .eq("is_active", true);
+  if (error) throw new Error(error.message);
+  return (data || []) as unknown as AssignmentRow[];
+}
+
+/** vaiTro rỗng = bỏ tích ô đó. */
+export async function setAssignment(
+  staffName: string, department: string, validationType: string,
+  line: string, vaiTro: "" | "thuc_hien" | "ho_tro",
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_assignment", {
+    p_staff_name: staffName,
+    p_department: department,
+    p_validation_type: validationType,
+    p_line: line,
+    p_vai_tro: vaiTro,
+  });
+  return unwrap(data, error, "Lưu phân công thất bại");
+}
+
 /* ---- Người thực hiện ---- */
 export async function upsertPerformer(
   id: string | null, patch: Record<string, unknown>,

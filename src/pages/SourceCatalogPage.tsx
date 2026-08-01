@@ -23,6 +23,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Boxes, RefreshCw, Plus, Pencil, Ban, Trash2, Search, AlertTriangle,
          CalendarPlus, Bell, Users, UserCheck, FlaskConical, Columns3, Download } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
+import { DEPTS } from "../constants/vmp.ts";
 import { Card, CardTitle, Tag, Modal, Portal, TableScroll } from "../components/ui/Primitives.tsx";
 import {
   SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
@@ -1023,7 +1024,16 @@ interface SimpleField {
   /** Không cho sửa khi bản ghi đã tồn tại (thường là khoá). */
   lockOnEdit?: boolean;
   hint?: string;
+  /** Danh sách chọn cố định. Có thì ô nhập thành ô chọn — bộ phận gõ tay
+   *  sinh ra "QA", "qa", "Q.A", "Phòng QA" là bốn giá trị khác nhau đối với
+   *  máy, và mọi bảng gộp theo bộ phận sau đó đều sai mà không báo gì. */
+  chon?: Array<{ value: string; label: string }>;
 }
+
+/* Sáu nhóm dùng chung với DEPTS — lưu bằng ID viết thường để mọi màn gom
+   được cùng một khoá. Nhãn hiện đủ chữ để người nhập không phải đoán "cd"
+   là gì. */
+const CHON_BO_PHAN = DEPTS.map((d) => ({ value: d.id, label: `${d.short} · ${d.name}` }));
 
 interface DatasetSpec {
   id: string;
@@ -1078,13 +1088,14 @@ const DATASETS: DatasetSpec[] = [
     id: "staff",
     label: "Danh bạ nhân sự",
     icon: Users,
-    sub: "Nhân viên và email — thay cho tab Danh_sach_Email trong Sheet",
+    sub: "Nhân viên và email theo nhóm QA · XSX · QC · RD · Cơ điện · Kho — thay cho tab Danh_sach_Email trong Sheet. Ma trận phân công lấy thành viên từ đây.",
     keyField: "id",
     fields: [
       { key: "is_active", label: "Đang dùng", w: 90, bool: true },
       { key: "staff_name", label: "Nhân viên", w: 180 },
       { key: "email", label: "Email", w: 220 },
-      { key: "department", label: "Bộ phận", w: 130 },
+      { key: "department", label: "Bộ phận", w: 150, chon: CHON_BO_PHAN,
+        hint: "Chọn từ danh sách, đừng gõ tay: ma trận phân công gom thành viên theo đúng giá trị này. Gõ 'QA' và 'qa' là hai bộ phận khác nhau đối với máy." },
       { key: "note", label: "Ghi chú", w: 180 },
     ],
     load: () => fetchStaffEmails() as unknown as Promise<Record<string, unknown>[]>,
@@ -1104,7 +1115,8 @@ const DATASETS: DatasetSpec[] = [
         hint: "Ghi đúng như tên dùng trong kế hoạch VMP để khớp được với hạng mục." },
       { key: "email", label: "Email", w: 220,
         hint: "Không bắt buộc, nhưng đã nhập thì phải đúng dạng ten@congty.com." },
-      { key: "department", label: "Bộ phận", w: 120 },
+      { key: "department", label: "Bộ phận", w: 150, chon: CHON_BO_PHAN,
+        hint: "Chọn từ danh sách để ma trận phân công gom đúng người vào đúng bộ phận." },
       { key: "role_title", label: "Chức danh", w: 140 },
       { key: "note", label: "Ghi chú", w: 170 },
     ],
@@ -1317,6 +1329,21 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
                          border: `1.5px solid ${C.pinkSoft}` }}>
                 <option value="true">Có</option>
                 <option value="false">Không</option>
+              </select>
+            ) : f.chon ? (
+              <select value={String(form[f.key] ?? "")}
+                onChange={(e) => set(f.key, e.target.value)}
+                disabled={!isNew && f.lockOnEdit}
+                style={{ padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
+                         border: `1.5px solid ${C.pinkSoft}` }}>
+                <option value="">— chưa chọn —</option>
+                {f.chon.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {/* Giá trị cũ không có trong danh sách vẫn phải hiện ra. Nếu
+                    ẩn đi, ô sẽ trông như "chưa chọn" và người dùng bấm Lưu
+                    một phát là xoá mất dữ liệu đang có mà không hay biết. */}
+                {String(form[f.key] ?? "") !== ""
+                  && !f.chon.some((o) => o.value === String(form[f.key]))
+                  && <option value={String(form[f.key])}>{String(form[f.key])} (giá trị cũ)</option>}
               </select>
             ) : (
               <input value={String(form[f.key] ?? "")}
