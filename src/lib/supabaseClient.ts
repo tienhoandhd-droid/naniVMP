@@ -28,6 +28,24 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON)
 
 export const isSupabaseConfigured = () => !!supabase;
 
+/* Vé của phiên đang đăng nhập, để gửi kèm khi gọi webhook n8n.
+ *
+ * Vì sao cần: token `x-vmp-chat` nằm trong gói JavaScript công khai — mọi
+ * biến VITE_* đều bị Vite nướng thẳng vào bundle, đó là thiết kế của Vite
+ * chứ không phải lỗi cấu hình. Ai mở web cũng đọc được và gọi thẳng webhook:
+ * tốn tiền gọi AI, và hỏi được dữ liệu VMP mà không cần đăng nhập.
+ * Đổi token không cứu được — token mới cũng công khai y hệt.
+ *
+ * Vé phiên thì khác: nó của riêng một người, có hạn, và n8n xác thực được
+ * với Supabase. Token tĩnh vẫn gửi kèm để chặn quét bừa ở lớp ngoài. */
+export async function vePhien(): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch { return null; }
+}
+
 /* Gắn client ra window CHỈ KHI chạy trên máy nội bộ, để bộ kiểm đối chiếu
  * số trên màn với dữ liệu gốc.
  *

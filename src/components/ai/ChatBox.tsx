@@ -17,7 +17,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Sparkles, AlertTriangle } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
-import { supabase } from "../../lib/supabaseClient.ts";
+import { supabase, vePhien } from "../../lib/supabaseClient.ts";
 import type { AppUser } from "../../types/domain.ts";
 
 interface TrichDan { nguon: string; muc?: string }
@@ -222,10 +222,14 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
     }
 
     try {
+      /* Vé phiên đăng nhập — thứ n8n xác thực được với Supabase. Token tĩnh
+         bên dưới chỉ còn là lớp chặn quét bừa. */
+      const ve = await vePhien();
       const r = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(ve ? { Authorization: `Bearer ${ve}` } : {}),
           // Token RIÊNG cho ô chat. Nó nằm trong gói JS công khai nên ai cũng
           // đọc được — việc của nó chỉ là chặn quét bừa, không phải giữ bí mật.
           // Vì vậy tuyệt đối không dùng lại x-vmp-secret (token đó còn mở
