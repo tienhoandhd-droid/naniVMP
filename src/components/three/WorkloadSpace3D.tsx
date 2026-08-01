@@ -278,7 +278,6 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
      khung — muốn đọc phải rời mắt khỏi cột đang trỏ, mà rời mắt là mất
      luôn cột nào đang trỏ. Nay số hiện ngay cạnh con trỏ; dòng dưới vẫn
      giữ vì đó là bản mà trình đọc màn hình đọc được. */
-  const [chuot, setChuot] = useState<{ x: number; y: number } | null>(null);
   /* Nút chuyển 3D ↔ 2D. Giữ 3D làm mặc định vì nó trả lời "chỗ nào nhô cao"
      nhanh nhất, nhưng ai cần đọc số chính xác — hoặc cần IN RA GIẤY, thứ mà
      WebGL không làm được — thì có bản đồ nhiệt tương đương. Cùng một bộ số,
@@ -310,23 +309,13 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
         />
       ) : (
       <div className="vmp-space3d-than">
-        <div className="vmp-space3d-khung"
-          onPointerMove={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            setChuot({ x: e.clientX - r.left, y: e.clientY - r.top });
-          }}
-          onPointerLeave={() => setChuot(null)}>
-          {chon && chuot && (
-            <div className="vmp-space3d-hover"
-              style={{ left: chuot.x, top: chuot.y }} aria-hidden="true">
-              <b>{DEPTS[chon.bp]?.name || DEPTS[chon.bp]?.id} · Tháng {chon.thang}</b>
-              <span>
-                <i style={{ background: "#D6486D" }} />{chon.chuaXong} chưa xong
-                <em>/ {chon.tong} đến hạn</em>
-              </span>
-            </div>
-          )}
-          <Canvas
+        {/* KHÔNG có tooltip nổi bám con trỏ nữa. Nó che đúng thứ người ta
+            đang trỏ vào: cột bị chính chú thích của nó phủ lên, muốn nhìn
+            lại cột thì phải bỏ chuột ra, mà bỏ chuột ra thì mất chú thích.
+            Chi tiết nay hiện ở dải bên phải — ngang tầm mắt với khung vẽ,
+            không cách xa như hồi nó còn nằm dưới khung. */}
+        <div className="vmp-space3d-khung">
+            <Canvas
             dpr={[1, 2]}
             // Bóng mềm (PCFSoft) thay bóng cứng: mép bóng nhoè dần theo khoảng
             // cách là tín hiệu chiều sâu mà mắt người đọc rất nhanh — cột nào
@@ -352,7 +341,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
           <span><i style={{ background: "#D6486D" }} />Còn nguyên — dồn việc</span>
         </div>
 
-        <div className="vmp-space3d-tip" role="status" aria-live="polite">
+        <div className={`vmp-space3d-tip ${chon ? "is-tro" : ""}`} role="status" aria-live="polite">
           {chon ? (
             <>
               <b>Tháng {chon.thang} · {DEPTS[chon.bp]?.name || DEPTS[chon.bp]?.id}</b>

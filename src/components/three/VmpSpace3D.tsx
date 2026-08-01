@@ -29,6 +29,8 @@ import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { wlIsDone } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
+import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
+import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
@@ -234,7 +236,16 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
 }) {
   const o3d = useMemo(() => dungMaTran(acts, nam), [acts, nam]);
   const [chon, setChon] = useState<O3D | null>(null);
-  const [chuot, setChuot] = useState<{ x: number; y: number } | null>(null);
+  /* Đổi 3D ↔ 2D. Giữ 3D làm mặc định vì mặt phẳng mục tiêu cắt ngang khối
+     là thứ bản phẳng không làm được; nhưng ai cần đọc số chính xác — hoặc
+     cần IN RA GIẤY — thì có bảng tương đương, cùng một bộ số. */
+  const [kieu, setKieu] = useState<"3d" | "2d">("3d");
+  const oNhiet: ONhiet[] = useMemo(() => o3d
+    .filter((x) => x.tyLe != null)
+    .map((x) => ({
+      hang: x.giaiDoan, cot: x.thang - 1, gt: x.tyLe as number, phu: x.xong,
+      ghiChu: `${GIAI_DOAN[x.giaiDoan].ten} · Tháng ${x.thang}: ${x.tyLe}% (${x.xong}/${x.tong} hạng mục)`,
+    })), [o3d]);
 
   /* CÂU KẾT LUẬN. Hình khối cho thấy có một cái phễu, nhưng người xem vẫn
      phải tự đo xem nó tụt mạnh nhất ở khâu nào. Đó chính là con số quyết
@@ -278,23 +289,31 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
       {/* Bọc hẳn một div có chiều cao rõ ràng. Bản trước tôi đặt chiều cao
           bằng bộ chọn `> div:first-child` và trượt: R3F tự sinh lớp bọc
           riêng, canvas co lại còn 150px nên cột bị cắt mất ngọn. */}
+      <div className="vmp-space3d-doi">
+        <button type="button" onClick={() => setKieu("3d")}
+          className={kieu === "3d" ? "is-chon" : ""}>Khối 3D</button>
+        <button type="button" onClick={() => setKieu("2d")}
+          className={kieu === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
+      </div>
+
+      {kieu === "2d" ? (
+        <BanDoNhiet
+          tenHang="Giai đoạn" tenCot="Tháng"
+          o={oNhiet}
+          nhanHang={GIAI_DOAN.map((g) => g.ten)}
+          nhanCot={Array.from({ length: 12 }, (_, i) => `T${i + 1}`)}
+          donVi="%" phuLabel="xong" hauTo="%" congTong={false}
+          sacDo="#2A9E82"
+        />
+      ) : (
       <div className="vmp-space3d-than">
-        <div className="vmp-space3d-khung"
-          onPointerMove={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            setChuot({ x: e.clientX - r.left, y: e.clientY - r.top });
-          }}
-          onPointerLeave={() => setChuot(null)}>
-          {chon && chuot && (
-            <div className="vmp-space3d-hover" style={{ left: chuot.x, top: chuot.y }} aria-hidden="true">
-              <b>{GIAI_DOAN[chon.giaiDoan].ten} · Tháng {chon.thang}</b>
-              <span>
-                <i style={{ background: GIAI_DOAN[chon.giaiDoan].mau }} />{chon.tyLe}% xong
-                <em>{chon.xong}/{chon.tong} hạng mục</em>
-              </span>
-            </div>
-          )}
-          <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
+        {/* KHÔNG có tooltip nổi bám con trỏ nữa. Nó che đúng thứ người ta
+            đang trỏ vào: cột bị chính chú thích của nó phủ lên, muốn nhìn
+            lại cột thì phải bỏ chuột ra, mà bỏ chuột ra thì mất chú thích.
+            Chi tiết nay hiện ở dải bên phải — ngang tầm mắt với khung vẽ,
+            không cách xa như hồi nó còn nằm dưới khung. */}
+        <div className="vmp-space3d-khung">
+            <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
             frameloop={giamChuyenDong ? "demand" : "always"}>
             <Canh o3d={o3d} chon={chon} onHover={setChon} />
           </Canvas>
@@ -310,7 +329,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
           <span className="vmp-space3d-muc"><i />Mặt phẳng mục tiêu 50% — cột nhô lên khỏi mặt là tháng đạt</span>
         </div>
 
-        <div className="vmp-space3d-tip" role="status" aria-live="polite">
+        <div className={`vmp-space3d-tip ${chon ? "is-tro" : ""}`} role="status" aria-live="polite">
           {chon ? (
             <>
               <b>Tháng {chon.thang} · {GIAI_DOAN[chon.giaiDoan].ten}</b>
@@ -320,6 +339,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
         </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

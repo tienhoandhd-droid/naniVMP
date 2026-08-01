@@ -33,6 +33,7 @@ export interface ONhiet {
 
 export default function BanDoNhiet({
   tenHang, tenCot, o, nhanHang, nhanCot, donVi = "", phuLabel, sacDo = C.rasp,
+  hauTo = "", congTong = true,
 }: {
   /** Tên trục dọc, vd "Bộ phận". */
   tenHang: string;
@@ -45,6 +46,11 @@ export default function BanDoNhiet({
   /** Nhãn của giá trị phụ, vd "chưa xong". */
   phuLabel?: string;
   sacDo?: string;
+  /** Hậu tố của giá trị chính, vd "%" — bảng nào đo tỉ lệ thì cần. */
+  hauTo?: string;
+  /** Có cộng tổng theo hàng/cột không. Tỉ lệ thì KHÔNG cộng được: cộng
+   *  bốn cái 50% ra 200% là con số vô nghĩa. */
+  congTong?: boolean;
 }) {
   const bang = new Map<string, ONhiet>();
   for (const x of o) bang.set(`${x.hang}|${x.cot}`, x);
@@ -67,7 +73,7 @@ export default function BanDoNhiet({
           <tr>
             <th className="vmp-nhiet-goc">{tenHang} \\ {tenCot}</th>
             {nhanCot.map((c) => <th key={c}>{c}</th>)}
-            <th className="vmp-nhiet-tong">Tổng</th>
+            {congTong && <th className="vmp-nhiet-tong">Tổng</th>}
           </tr>
         </thead>
         <tbody>
@@ -86,7 +92,7 @@ export default function BanDoNhiet({
                         background: v > 0 ? `color-mix(in srgb, ${sacDo} ${Math.round(d * 100)}%, transparent)` : "transparent",
                         color: v > 0 ? chuTren(d) : C.plumSoft,
                       }}>
-                        <b className="tnum" style={{ fontFamily: NUM }}>{v || "·"}</b>
+                        <b className="tnum" style={{ fontFamily: NUM }}>{v ? `${v}${hauTo}` : "·"}</b>
                         {x?.phu != null && x.phu > 0 && (
                           <small>{x.phu} {phuLabel}</small>
                         )}
@@ -94,11 +100,12 @@ export default function BanDoNhiet({
                     </td>
                   );
                 })}
-                <td className="vmp-nhiet-tong tnum" style={{ fontFamily: NUM }}>{tong}</td>
+                {congTong && <td className="vmp-nhiet-tong tnum" style={{ fontFamily: NUM }}>{tong}</td>}
               </tr>
             );
           })}
         </tbody>
+        {congTong && (
         <tfoot>
           <tr>
             <th scope="row">Tổng</th>
@@ -111,6 +118,7 @@ export default function BanDoNhiet({
             </td>
           </tr>
         </tfoot>
+        )}
       </table>
       <div className="vmp-nhiet-chu" style={{ fontFamily: TEXT }}>
         <span>Nhạt</span>

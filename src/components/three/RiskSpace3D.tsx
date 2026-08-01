@@ -25,6 +25,8 @@ import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { qrmSeverity, qrmOccurrence, qrmLevel } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
+import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
+import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
 import type { Activity } from "../../types/domain.ts";
@@ -158,7 +160,14 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
   const o3d = useMemo(() => dungKhoiRuiRo(acts), [acts]);
   const caoNhat = useMemo(() => o3d.reduce((m, o) => Math.max(m, o.n), 1), [o3d]);
   const [chon, setChon] = useState<ORui | null>(null);
-  const [chuot, setChuot] = useState<{ x: number; y: number } | null>(null);
+  /* Đổi 3D ↔ 2D — xem lý do ở WorkloadSpace3D.tsx. Ở khối này bản 2D còn
+     có một lợi thế riêng: ma trận rủi ro là thứ hay phải dán vào hồ sơ
+     thẩm định, mà WebGL thì không in được. */
+  const [kieu, setKieu] = useState<"3d" | "2d">("3d");
+  const oNhiet: ONhiet[] = useMemo(() => o3d.map((x) => ({
+    hang: x.kn, cot: x.ng - 1, gt: x.n,
+    ghiChu: `Nghiêm trọng ${x.ng} · ${TEN_KN[x.kn]}: ${x.n} hạng mục · RPN ${x.rpn}`,
+  })), [o3d]);
 
   /* CÂU KẾT LUẬN. Ma trận rủi ro chỉ có giá trị khi nó chỉ ra được KHỐI
      hạng mục đang đứng ở ô nguy hiểm nhất — chứ không phải bày ra một
@@ -185,24 +194,30 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
   return (
     <div className="vmp-space3d">
       {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
+      <div className="vmp-space3d-doi">
+        <button type="button" onClick={() => setKieu("3d")}
+          className={kieu === "3d" ? "is-chon" : ""}>Khối 3D</button>
+        <button type="button" onClick={() => setKieu("2d")}
+          className={kieu === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
+      </div>
+
+      {kieu === "2d" ? (
+        <BanDoNhiet
+          tenHang="Khả năng xảy ra" tenCot="Mức nghiêm trọng"
+          o={oNhiet}
+          nhanHang={TEN_KN}
+          nhanCot={Array.from({ length: 9 }, (_, i) => String(i + 1))}
+          donVi="hạng mục"
+        />
+      ) : (
       <div className="vmp-space3d-than">
-        <div className="vmp-space3d-khung"
-          onPointerMove={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            setChuot({ x: e.clientX - r.left, y: e.clientY - r.top });
-          }}
-          onPointerLeave={() => setChuot(null)}>
-          {chon && chuot && (
-            <div className="vmp-space3d-hover" style={{ left: chuot.x, top: chuot.y }} aria-hidden="true">
-              <b>Nghiêm trọng {chon.ng} · {TEN_KN[chon.kn]}</b>
-              <span>
-                <i style={{ background: MAU[qrmLevel(chon.rpn) as keyof typeof MAU] || MAU.thap }} />
-                {chon.n} hạng mục
-                <em>RPN {chon.rpn}</em>
-              </span>
-            </div>
-          )}
-          <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
+        {/* KHÔNG có tooltip nổi bám con trỏ nữa. Nó che đúng thứ người ta
+            đang trỏ vào: cột bị chính chú thích của nó phủ lên, muốn nhìn
+            lại cột thì phải bỏ chuột ra, mà bỏ chuột ra thì mất chú thích.
+            Chi tiết nay hiện ở dải bên phải — ngang tầm mắt với khung vẽ,
+            không cách xa như hồi nó còn nằm dưới khung. */}
+        <div className="vmp-space3d-khung">
+            <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
             frameloop={giamChuyenDong ? "demand" : "always"}>
             <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
           </Canvas>
@@ -215,7 +230,7 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
           <span><i style={{ background: MAU.thap }} />RPN &lt; 7 — thấp</span>
         </div>
 
-        <div className="vmp-space3d-tip" role="status" aria-live="polite">
+        <div className={`vmp-space3d-tip ${chon ? "is-tro" : ""}`} role="status" aria-live="polite">
           {chon ? (
             <>
               <b>Nghiêm trọng {chon.ng} · {TEN_KN[chon.kn]}</b>
@@ -226,6 +241,7 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
         </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
