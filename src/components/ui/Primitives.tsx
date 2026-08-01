@@ -1074,7 +1074,7 @@ export function GiaiThich({ tieuDe, children }: { tieuDe?: string; children: Rea
 
 /** Định nghĩa các mẫu số hay bị nhầm với nhau — dùng chung mọi trang. */
 export const MAU_SO = {
-  tatCa: "Mọi hạng mục đang hoạt động, KỂ CẢ hạng mục chưa có mốc đích VMP.",
+  tatCa: "Hạng mục ĐANG HOẠT ĐỘNG, kể cả hạng mục chưa có mốc đích VMP.",
   coMoc: "Chỉ hạng mục ĐÃ có mốc đích VMP (bất kỳ năm nào).",
   trongNam: "Chỉ hạng mục có mốc đích VMP rơi vào năm đang chọn.",
   quaHanTrangThai: "Đếm theo TRẠNG THÁI TỔNG của hạng mục đang là \"quá hạn\".",
