@@ -1,64 +1,94 @@
 /* =====================================================================
- *  PhanQuyenPage.tsx — Danh bạ · phân quyền · phân công trách nhiệm
+ *  PhanQuyenPage.tsx — Ma trận phân quyền & trách nhiệm
  *  ---------------------------------------------------------------------
- *  Một màn, năm khối, mỗi khối trả lời một câu khác nhau. Không gộp làm
- *  một vì gộp lại thì không câu nào trả lời rõ.
+ *  Màn này trả lời đúng ba câu, theo thứ tự người ta thật sự hỏi:
  *
- *   0 · DANH BẠ NGƯỜI THỰC HIỆN — "bộ phận nào có những ai"
- *       Chia theo bộ phận. Đây là nguồn nhân sự cho ma trận D: không có
- *       tên ở đây thì không tích được ô phân công nào.
+ *   1 · AI VÀO ĐƯỢC     — email nào được phép có tài khoản
+ *   2 · VAI NÀO LÀM GÌ  — ma trận vai × quyền, hai nửa XEM và SỬA
+ *   3 · TỪNG NGƯỜI      — một dòng một người, và trên dòng đó có ĐỦ hai vế:
+ *                          được phép làm gì | đang nhận làm gì
  *
- *   A · VAI TRÒ × HÀNH ĐỘNG — "vai này được làm gì"
- *       Đọc và GHI thẳng vào bảng vmp_role_permissions, chính là bảng mà
- *       23 hàm RPC tra khi quyết định cho hay không cho. Trước migration
- *       20260801070000, luật này là hằng số cứng nằm rải trong thân hàm:
- *       màn hình chỉ chép lại được, sửa thì không.
+ *  ---------------------------------------------------------------------
+ *  VÌ SAO SÁU KHỐI CÒN BA
  *
- *   B · NGƯỜI × BỘ PHẬN — "ai chịu trách nhiệm phần nào, và có quyền
- *       tương ứng chưa". Một ô nói cả hai điều: người này đang đứng tên
- *       bao nhiêu hạng mục ở bộ phận đó, VÀ luật hiện hành có cho họ sửa.
+ *  · "Danh bạ người thực hiện" và "Người × bộ phận" đều là bảng NGƯỜI, mỗi
+ *    bảng sửa một nửa cùng một người — bảng này sửa tên/email/bộ phận
+ *    trong vmp_performers, bảng kia sửa vai/bộ phận trong profiles. Hai ô
+ *    "bộ phận" cho một người là hai chỗ để lệch nhau, và đã lệch thật:
+ *    Tôn Nữ Thiện My có bộ phận QA ở bảng người, trống ở bảng tài khoản.
+ *    Nay MỘT dòng, MỘT ô bộ phận, lưu xuống cả hai chỗ.
  *
- *   C · PHẠM VI CHI TIẾT — khu vực / line trong mỗi bộ phận.
- *       CHƯA dùng để phân quyền: luật hiện tại chỉ phân tới cấp BỘ PHẬN.
+ *  · Khối "Phạm vi chi tiết theo khu vực / line" chỉ liệt kê line có thật
+ *    rồi tự nói mình chưa có hiệu lực. Một khối cả màn hình để nói "chưa
+ *    dùng" là một khối phải cuộn qua mỗi lần. Danh sách line nay chỉ còn
+ *    là nguồn cho ô chọn line — đúng chỗ nó có ích.
  *
- *   D · PHÂN CÔNG — nhân viên × loại thẩm định × line.
+ *  · Bảng QUYỀN của người và bảng PHÂN CÔNG của người tách làm hai, cách
+ *    nhau một màn cuộn. Nhưng câu đáng hỏi nhất của một ma trận trách
+ *    nhiệm là câu bắc qua cả hai: NGƯỜI NHẬN LÀM VIỆC ĐÓ CÓ QUYỀN LÀM
+ *    VIỆC ĐÓ KHÔNG. Muốn trả lời thì phải tự ghép trong đầu — và người ta
+ *    không ghép. Nay hai vế nằm trên cùng một dòng, đọc ngang là ra.
+ *
+ *    Việc gộp còn bỏ được một thứ vốn không có thật: ô chọn BỘ PHẬN của
+ *    bảng phân công. Khoá duy nhất của vmp_assignment_matrix là
+ *    (staff_name, validation_type, line) — bộ phận KHÔNG nằm trong khoá,
+ *    nó chỉ là thuộc tính ghi kèm và bị ghi đè mỗi lần upsert. Nghĩa là ô
+ *    chọn đó chưa bao giờ là một chiều của ma trận, nó chỉ lọc người xem;
+ *    mà vẽ một ô lọc trông như một chiều thì người dùng sẽ tin rằng "cùng
+ *    tên, cùng loại, khác bộ phận" là hai ô khác nhau — không phải.
+ *    Bộ phận nay lấy thẳng từ dòng của người đó, và người xếp thành dải
+ *    theo bộ phận để vẫn thấy "bộ phận nào có những ai".
+ *
+ *  ---------------------------------------------------------------------
+ *  HAI NỬA CỦA MA TRẬN QUYỀN, VÀ VÌ SAO CHÚNG KHÁC NHAU
+ *
+ *  Nửa SỬA đọc bảng vmp_role_permissions — chính bảng mà 23 hàm RPC tra
+ *  khi quyết định cho hay không cho. Sửa ở đây là đổi quyền thật.
+ *
+ *  Nửa XEM đọc policy RLS của Postgres qua rpc_luat_xem. Quyền đọc do
+ *  Postgres chặn ở tầng dưới cùng, không có hàm RPC nào can thiệp, nên
+ *  KHÔNG sửa được từ màn hình — đổi nó là việc của migration. Bảng vẫn
+ *  phải hiện, vì "ai xem được gì" là nửa câu hỏi mà người quản trị hỏi
+ *  đầu tiên, và trước đây màn này không trả lời được.
+ *
+ *  Cả hai nửa đều ĐỌC LUẬT ĐANG CHẠY chứ không chép lại. Một bảng phân
+ *  quyền chép tay thì hôm nay đúng, ngày ai đó sửa luật vẫn hiện y nguyên
+ *  và vẫn trông rất chắc chắn — chỉ là sai, và sai theo kiểu khiến người
+ *  ta thôi kiểm tra.
  *
  *  ---------------------------------------------------------------------
  *  CÁCH SỬA: tích chọn, rồi bấm LƯU.
  *
- *  Ô nào cũng là ô TÍCH CHỌN, không phải ô gõ chữ — trừ tên người và
- *  email, hai thứ không có danh sách để chọn. Tích chọn thì không sai
- *  chính tả, không có "QA" với "qa" là hai giá trị khác nhau, và bấm
- *  nhanh hơn hẳn khi phải đi qua vài chục ô một lượt.
- *
- *  Sửa xong KHÔNG tự lưu. Thay đổi nằm ở bản nháp, viền vàng, đếm ở thanh
- *  dưới mỗi bảng, và chỉ đi xuống database khi bấm Lưu. Lý do: đây là
- *  bảng phân quyền — người ta hay tích thử vài ô để xem hình dung ra sao
- *  rồi mới quyết. Tự lưu từng cú bấm nghĩa là mỗi lần tích thử là một lần
- *  đổi quyền thật, và nhật ký đầy những thay đổi không ai định làm.
+ *  Ô nào cũng là ô tích chọn, trừ tên người và email — hai thứ không có
+ *  danh sách để chọn. Sửa xong KHÔNG tự lưu: thay đổi nằm ở bản nháp, viền
+ *  vàng, đếm ở thanh dưới mỗi bảng. Đây là bảng phân quyền, người ta hay
+ *  tích thử vài ô để xem hình dung ra sao rồi mới quyết; tự lưu từng cú
+ *  bấm nghĩa là mỗi lần tích thử là một lần đổi quyền thật.
  *
  *  Lưu xong luôn báo rõ: lưu được mấy ô, ô nào không lưu được và VÌ SAO.
  *  Ô hỏng giữ nguyên trong bản nháp kèm viền đỏ để sửa lại, không bị mất.
  * ===================================================================== */
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
-  ShieldCheck, Users, KeyRound, AlertTriangle, MapPin, Grid3x3,
-  Save, Undo2, Check, Contact, Plus, Mail, Trash2,
+  ShieldCheck, Users, KeyRound, AlertTriangle, Grid3x3,
+  Save, Undo2, Check, Plus, Mail, Trash2, Eye, Pencil,
 } from "lucide-react";
-import { C, TEXT, NUM } from "../constants/theme.ts";
+import { C, NUM } from "../constants/theme.ts";
 import { DEPTS } from "../constants/vmp.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import {
-  setUserRole, upsertPerformer, fetchStaffEmails, fetchAssignments, setAssignment,
-  fetchRolePermissions, setRolePermission, fetchPerformers,
-  fetchEmailChoPhep, setEmailChoPhep,
+  setUserRole, upsertPerformer, fetchAssignments, setAssignment,
+  fetchRolePermissions, setRolePermission,
+  fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, lienKetTaiKhoan, fetchLuatXem,
 } from "../lib/supabaseData.ts";
-import type { AssignmentRow, RolePermRow, EmailChoPhepRow } from "../lib/supabaseData.ts";
+import type {
+  AssignmentRow, RolePermRow, EmailChoPhepRow, NguoiQuyenRow, LuatXemRow, MucXem,
+} from "../lib/supabaseData.ts";
 import { Card, CardTitle, Tag, CauKetLuan, GiaiThich } from "../components/ui/Primitives.tsx";
-import type { Activity, AppUser, PerformerRow } from "../types/domain.ts";
+import type { Activity, AppUser } from "../types/domain.ts";
 
 /* ---------------------------------------------------------------------
- * A · LUẬT ĐANG CHẠY
+ * Vai trò và các mức quyền SỬA
  * ------------------------------------------------------------------- */
 type Muc = "co" | "bo_phan" | "phan_cong" | "khong";
 
@@ -70,8 +100,8 @@ const VAI = [
 ] as const;
 
 interface HanhDong {
-  /** Khoá trong vmp_role_permissions. null = không nằm trong bảng luật. */
-  id: string | null;
+  /** Khoá trong vmp_role_permissions. */
+  id: string;
   ten: string;
   giaiThich: string;
   /** Các mức đặt được cho hành động này. */
@@ -85,15 +115,9 @@ interface HanhDong {
    chặn ở phía server; đây chỉ là vế giao diện của cùng một luật. */
 const HANH_DONG: HanhDong[] = [
   {
-    id: null,
-    ten: "Xem số liệu",
-    giaiThich: "Mọi vai đã đăng nhập đều xem được toàn bộ số liệu. Quyền ĐỌC do Row Level Security của Postgres quyết định, không nằm trong bảng luật này — nên ô ở hàng này không sửa được ở đây. Muốn giới hạn ai xem được gì thì phải sửa policy RLS.",
-    mucChoPhep: [],
-  },
-  {
     id: "update_progress",
     ten: "Cập nhật tiến độ",
-    giaiThich: "rpc_update_progress → ly_do_khong_sua_duoc. Đây là hành động DUY NHẤT có vế so bộ phận và phân công trong luật, nên cũng là hành động duy nhất đặt được hai mức hạn chế.\n\n• 'Bộ phận mình' so với CẢ HAI chiều: bộ phận QUẢN LÝ đối tượng và bộ phận THỰC HIỆN thẩm định. Hai chiều này lệch nhau ở 150/448 hạng mục — người XSX đi thẩm định thiết bị do QA quản lý là chuyện thường — nên chỉ so một chiều là chặn đúng người đang đi làm.\n\n• 'Theo phân công' mịn hơn một bậc: chỉ sửa được hạng mục mà ma trận D có tích đúng tên mình, đúng loại thẩm định, đúng line. Tích ở 'Mọi line' thì được cả bộ phận.",
+    giaiThich: "rpc_update_progress → ly_do_khong_sua_duoc. Đây là hành động DUY NHẤT có vế so bộ phận và phân công trong luật, nên cũng là hành động duy nhất đặt được hai mức hạn chế.\n\n• 'Bộ phận mình' so với CẢ HAI chiều: bộ phận QUẢN LÝ đối tượng và bộ phận THỰC HIỆN thẩm định. Hai chiều này lệch nhau ở 150/448 hạng mục — người XSX đi thẩm định thiết bị do QA quản lý là chuyện thường — nên chỉ so một chiều là chặn đúng người đang đi làm.\n\n• 'Theo phân công' mịn hơn một bậc: chỉ sửa được hạng mục mà ma trận phân công có tích đúng tên mình, đúng loại thẩm định, đúng line. Tích ở 'Mọi line' thì được cả bộ phận.",
     mucChoPhep: ["co", "bo_phan", "phan_cong", "khong"],
   },
   {
@@ -111,7 +135,7 @@ const HANH_DONG: HanhDong[] = [
   {
     id: "edit_catalog",
     ten: "Sửa danh mục nguồn · người thực hiện · phân công",
-    giaiThich: "Cả họ rpc_upsert_* / rpc_delete_* (danh mục nguồn, danh bạ, người thực hiện, sản phẩm GMP, người nhận mail) và rpc_set_assignment của ma trận D — 20 hàm cùng đọc một dòng luật này.",
+    giaiThich: "Cả họ rpc_upsert_* / rpc_delete_* (danh mục nguồn, danh bạ, người thực hiện, sản phẩm GMP, người nhận mail) và rpc_set_assignment của ma trận phân công — 20 hàm cùng đọc một dòng luật này.",
     mucChoPhep: ["co", "khong"],
   },
   {
@@ -131,6 +155,16 @@ const O_QUYEN: Record<Muc, { chu: string; ky: string; mau: string; nen: string }
   khong: { chu: "Không", ky: "✕", mau: C.plumSoft, nen: C.surfaceSunk },
 };
 
+/* Mức XEM dùng CÙNG bộ ký hiệu với mức sửa, cùng thứ tự đầy → rỗng, để
+   đọc hai nửa bảng không phải đổi hệ quy chiếu giữa chừng. */
+const O_XEM: Record<MucXem, { chu: string; ky: string; mau: string; nen: string }> = {
+  tat_ca: { chu: "Xem được toàn bộ", ky: "✓", mau: C.mintText, nen: C.mintSoft },
+  mot_phan: { chu: "Xem được phần không nhạy cảm", ky: "◑", mau: C.marigoldText, nen: C.marigoldSoft },
+  cua_minh: { chu: "Chỉ xem được của chính mình", ky: "◔", mau: C.skyText, nen: C.skySoft },
+  khong: { chu: "Không xem được", ky: "✕", mau: C.plumSoft, nen: C.surfaceSunk },
+  khong_ro: { chu: "Chưa phân loại được policy này — xem nguyên văn ở chú giải", ky: "?", mau: C.raspText, nen: C.raspSoft },
+};
+
 /* Tám loại thẩm định đúng như luật VMP01 sinh ra, xếp theo trình tự vòng
    đời thiết bị rồi tới các loại độc lập — người ở xưởng đọc bảng này theo
    thứ tự việc xảy ra, không theo thứ tự từ điển. */
@@ -141,7 +175,7 @@ const VAI_O = {
   ho_tro: { chu: "Hỗ trợ", ky: "○", mau: C.skyText, nen: C.skySoft },
 } as const;
 
-/* Danh bạ ghi bộ phận bằng đủ kiểu — "QA", "qa", "Xưởng sản xuất", "XSX".
+/* Bộ phận được ghi bằng đủ kiểu — "QA", "qa", "Xưởng sản xuất", "XSX".
    Không chuẩn hoá thì cùng một người rơi vào hai bộ phận khác nhau tuỳ
    nguồn, và bảng thiếu người mà không báo gì. */
 function chuanBoPhan(v: unknown): string | null {
@@ -164,18 +198,12 @@ function chuanBoPhan(v: unknown): string | null {
 /** "—", "-", "·" là ký tự lấp ô trống của Sheet, không phải tên người. */
 const laTenThat = (t: string) => !!t && t !== "(chưa phân công)" && !/^[-–—.·\s]+$/.test(t);
 
-interface NhanSu { ten: string; email: string | null; boPhan: string | null }
-interface HoSo {
-  id: string; full_name: string | null; email: string | null;
-  role: string; department: string | null; is_active: boolean | null;
-}
-
 /* ---------------------------------------------------------------------
- * Ô TÍCH — dùng chung cho mọi bảng sửa được
+ * Ô TÍCH — dùng chung cho mọi bảng
  * ------------------------------------------------------------------- */
 function OTich({ ky, chu, mau, nen, khoa, nhap, hong, onClick, nhan }: {
   ky: string; chu: string; mau: string; nen: string;
-  /** Không sửa được (thiếu quyền, hoặc ô bị đóng băng). */
+  /** Không sửa được (thiếu quyền, ô đóng băng, hoặc luật không nằm ở đây). */
   khoa?: boolean;
   /** Đang có thay đổi chưa lưu. */
   nhap?: boolean;
@@ -286,19 +314,24 @@ type KetQuaLuu = { xong: number; tong: number; loi: string[] } | null;
 export default function PhanQuyenView(
   { acts, isAdmin = false, user }: { acts: Activity[]; isAdmin?: boolean; user?: AppUser | null },
 ) {
-  const [performers, setPerformers] = useState<PerformerRow[]>([]);
-  const [hoSo, setHoSo] = useState<HoSo[]>([]);
-  const [loi, setLoi] = useState("");
-  const [moPhamVi, setMoPhamVi] = useState<string>("");
-  const [danhBa, setDanhBa] = useState<NhanSu[]>([]);
-  const [phanCong, setPhanCong] = useState<AssignmentRow[]>([]);
+  /* Một dòng một người, do rpc_nguoi_va_quyen gộp bằng email + user_id ở
+     database (migration 20260801110000). Client không gộp lại lần nữa. */
+  const [nguoi, setNguoi] = useState<NguoiQuyenRow[]>([]);
+  const [tongHangMuc, setTongHangMuc] = useState(0);
+  const [luatXem, setLuatXem] = useState<LuatXemRow[]>([]);
   const [quyenA, setQuyenA] = useState<RolePermRow[]>([]);
-  const [bpChon, setBpChon] = useState("xsx");
-  const [lineChon, setLineChon] = useState("*");
-  const [loiD, setLoiD] = useState("");
-  const [nguoiMoi, setNguoiMoi] = useState({ ten: "", email: "", bp: "" });
+  const [phanCong, setPhanCong] = useState<AssignmentRow[]>([]);
   const [dsEmail, setDsEmail] = useState<EmailChoPhepRow[]>([]);
+  const [loi, setLoi] = useState("");
+  const [loiD, setLoiD] = useState("");
+  /* Không còn ô chọn bộ phận: bảng hiện mọi người, xếp thành dải theo bộ
+     phận. Line thì vẫn là một chiều thật của ma trận phân công (nó nằm
+     trong khoá duy nhất), nên vẫn còn ô chọn. */
+  const [lineChon, setLineChon] = useState("*");
+  const [nguoiMoi, setNguoiMoi] = useState({ ten: "", email: "", bp: "" });
   const [emailMoi, setEmailMoi] = useState({ email: "", ghiChu: "" });
+  /** performer đang chờ nối tay với tài khoản → user_id đã chọn. */
+  const [dangNoi, setDangNoi] = useState<Record<string, string>>({});
 
   /* Bản nháp: KHOÁ Ô → giá trị mới. Các bảng dùng chung một map, phân
      biệt bằng tiền tố khoá. Một map thì "có thay đổi nào chưa lưu không"
@@ -333,52 +366,34 @@ export default function PhanQuyenView(
   };
 
   const quyenSuaA = (isAdmin || user?.role === "admin") && !!supabase;
-  const suaQuyenDuoc = quyenSuaA;
-  /* Danh bạ và ma trận D mở hơn một bậc: rpc_upsert_performer và
+  /* Danh bạ và ma trận phân công mở hơn một bậc: rpc_upsert_performer và
      rpc_set_assignment nhận cả qa_manager, vì phân công việc là việc của
      QA chứ không riêng quản trị hệ thống. */
   const suaPhanCongDuoc = (isAdmin || user?.role === "qa_manager") && !!supabase;
 
   /* ---------------- nạp dữ liệu ---------------- */
-  const taiHoSo = async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from("profiles")
-      .select("id,full_name,email,role,department,is_active");
-    setHoSo((data || []) as HoSo[]);
+  const taiNguoiVaQuyen = async () => {
+    try {
+      const r = await fetchNguoiVaQuyen();
+      setNguoi(r.nguoi);
+      setTongHangMuc(r.tongHangMuc);
+      setLoi("");
+    } catch (e) { setLoi((e as Error).message); }
   };
-  const taiNguoiThucHien = async () => {
-    try { setPerformers((await fetchPerformers()).filter((r) => r.is_active)); }
-    catch (e) { setLoiD((e as Error).message); }
-  };
-
-  useEffect(() => {
-    if (!supabase) { setLoi("Chưa nối Supabase nên chưa đọc được danh sách người dùng."); return; }
-    supabase.from("profiles").select("id,full_name,email,role,department,is_active")
-      .then(({ data, error }) => {
-        if (error) setLoi(error.message);
-        else setHoSo((data || []) as HoSo[]);
-      });
-    fetchRolePermissions().then(setQuyenA).catch((e) => setLoi((e as Error).message));
-    taiNguoiThucHien();
-    fetchStaffEmails()
-      .then((rows) => setDanhBa(rows
-        .filter((r) => r.is_active !== false)
-        .map((r) => ({
-          ten: String(r.staff_name || "").trim(),
-          email: r.email || null,
-          boPhan: chuanBoPhan(r.department),
-        }))
-        .filter((r) => laTenThat(r.ten))))
-      .catch((e) => setLoiD((e as Error).message));
-    fetchAssignments().then(setPhanCong).catch((e) => setLoiD((e as Error).message));
-    taiDsEmail();
-  }, []);
-
-  /* ================= DANH SÁCH EMAIL ĐƯỢC PHÉP ================= */
   const taiDsEmail = async () => {
     try { setDsEmail(await fetchEmailChoPhep()); } catch { /* không có quyền thì thôi */ }
   };
 
+  useEffect(() => {
+    if (!supabase) { setLoi("Chưa nối Supabase nên chưa đọc được danh sách người dùng."); return; }
+    taiNguoiVaQuyen();
+    fetchLuatXem().then(setLuatXem).catch(() => { /* không phải admin/QA thì nửa XEM để trống */ });
+    fetchRolePermissions().then(setQuyenA).catch((e) => setLoi((e as Error).message));
+    fetchAssignments().then(setPhanCong).catch((e) => setLoiD((e as Error).message));
+    taiDsEmail();
+  }, []);
+
+  /* ================= 1 · DANH SÁCH EMAIL ĐƯỢC PHÉP ================= */
   const doiEmail = async (email: string, choPhep: boolean, ghiChu?: string) => {
     setDangLuu("E");
     try {
@@ -393,92 +408,7 @@ export default function PhanQuyenView(
     setDangLuu("");
   };
 
-  /* ================= 0 · DANH BẠ NGƯỜI THỰC HIỆN ================= */
-  const bpNguoi = (p: PerformerRow) => nhap[`Nb|${p.id}`] ?? (chuanBoPhan(p.department) || "");
-  const emailNguoi = (p: PerformerRow) => nhap[`Ne|${p.id}`] ?? (p.email || "");
-
-  const bamBpNguoi = (p: PerformerRow, bp: string) => {
-    const k = `Nb|${p.id}`;
-    if (bp === (chuanBoPhan(p.department) || "")) xoaNhap(k); else dat(k, bp);
-    xoaHong(k);
-  };
-
-  const theoBoPhan = useMemo(() => {
-    const m = new Map<string, PerformerRow[]>();
-    DEPTS.forEach((d) => m.set(d.id, []));
-    m.set("", []);
-    for (const p of performers) {
-      const bp = bpNguoi(p);
-      if (!m.has(bp)) m.set(bp, []);
-      m.get(bp)!.push(p);
-    }
-    m.forEach((ds) => ds.sort((a, b) =>
-      String(a.performer_name).localeCompare(String(b.performer_name), "vi")));
-    return m;
-  }, [performers, nhap]);
-
-  const themNguoi = async () => {
-    const ten = nguoiMoi.ten.trim();
-    if (!laTenThat(ten)) return;
-    setDangLuu("N");
-    try {
-      const r = await upsertPerformer(null, {
-        performer_name: ten,
-        email: nguoiMoi.email.trim() || null,
-        department: nguoiMoi.bp || null,
-      });
-      if (r.ok) {
-        setNguoiMoi({ ten: "", email: "", bp: "" });
-        await taiNguoiThucHien();
-        setKetQua((c) => ({ ...c, N: { xong: 1, tong: 1, loi: [] } }));
-      } else {
-        setKetQua((c) => ({ ...c, N: { xong: 0, tong: 1, loi: [`Thêm ${ten}: ${r.error}`] } }));
-      }
-    } catch (e) {
-      setKetQua((c) => ({ ...c, N: { xong: 0, tong: 1, loi: [`Thêm ${ten}: ${(e as Error).message}`] } }));
-    }
-    setDangLuu("");
-  };
-
-  const luuDanhBa = async () => {
-    const ids = new Set<string>();
-    Object.keys(nhap).forEach((k) => {
-      if (k.startsWith("Nb|") || k.startsWith("Ne|")) ids.add(k.slice(3));
-    });
-    setDangLuu("N");
-    let xong = 0; const loiDs: string[] = [];
-    const hong: Record<string, string> = {}; const giu: Record<string, string> = {};
-    for (const id of ids) {
-      const p = performers.find((x) => String(x.id) === id);
-      if (!p) continue;
-      try {
-        const r = await upsertPerformer(id, {
-          performer_name: p.performer_name,
-          department: bpNguoi(p) || null,
-          email: emailNguoi(p).trim() || null,
-        });
-        if (r.ok) xong++;
-        else {
-          loiDs.push(`${p.performer_name}: ${r.error}`);
-          for (const t of ["Nb", "Ne"]) {
-            const k = `${t}|${id}`;
-            if (nhap[k] != null) { hong[k] = r.error || "lỗi"; giu[k] = nhap[k]; }
-          }
-        }
-      } catch (e) {
-        loiDs.push(`${p.performer_name}: ${(e as Error).message}`);
-        for (const t of ["Nb", "Ne"]) {
-          const k = `${t}|${id}`;
-          if (nhap[k] != null) { hong[k] = (e as Error).message; giu[k] = nhap[k]; }
-        }
-      }
-    }
-    chotLuot("N", ["Nb|", "Ne|"], ids.size, xong, loiDs, giu, hong);
-    await taiNguoiThucHien();
-    setDangLuu("");
-  };
-
-  /* ================= A ================= */
+  /* ================= 2 · MA TRẬN VAI × QUYỀN ================= */
   const mucGoc = (hd: string, vai: string): Muc =>
     (quyenA.find((q) => q.hanh_dong === hd && q.vai_tro === vai)?.muc as Muc) || "khong";
   const khoaA = (hd: string, vai: string) => `A|${hd}|${vai}`;
@@ -486,7 +416,6 @@ export default function PhanQuyenView(
     (nhap[khoaA(hd, vai)] as Muc) ?? mucGoc(hd, vai);
 
   const bamA = (h: HanhDong, vai: string) => {
-    if (!h.id || !h.mucChoPhep.length) return;
     const vong = h.mucChoPhep;
     const nay = mucHienTai(h.id, vai);
     const sau = vong[(Math.max(0, vong.indexOf(nay)) + 1) % vong.length];
@@ -514,22 +443,37 @@ export default function PhanQuyenView(
     }
     chotLuot("A|", ["A|"], ds.length, xong, loiDs, giu, hong);
     try { setQuyenA(await fetchRolePermissions()); } catch { /* giữ bản cũ */ }
+    /* Đổi luật vai là đổi số hạng mục sửa được của mọi người mang vai đó. */
+    await taiNguoiVaQuyen();
     setDangLuu("");
   };
 
-  /* ================= B ================= */
-  const { hang, tongTheoBp } = useMemo(() => {
+  /** Vai này xem được mấy phần trong số các loại dữ liệu hệ thống giữ. */
+  const dongXem = (vai: string | null) => {
+    if (!vai || !luatXem.length) return null;
+    const het = luatXem.filter((x) => x.muc[vai] === "tat_ca");
+    const thieu = luatXem.filter((x) => x.muc[vai] !== "tat_ca");
+    return { het: het.length, tong: luatXem.length, thieu };
+  };
+
+  /* ================= 3 · TRÁCH NHIỆM & QUYỀN — phần dữ liệu ================= */
+  /* Đếm hạng mục theo TÊN người × bộ phận. Đây là phần duy nhất còn khớp
+     theo tên, và khớp được là vì owner_name trên hạng mục vốn LÀ một chuỗi
+     tên — không có khoá nào tốt hơn để nối. Việc gộp NGƯỜI thì đã chuyển
+     hẳn xuống database, nối bằng email + user_id. */
+  const { demTheoTen, tongTheoBp, soVoChu } = useMemo(() => {
     const song = acts.filter((a) => (a.state || "active") === "active");
     const dem = new Map<string, Map<string, number>>();
     const tongBp = new Map<string, number>();
+    let voChu = 0;
     for (const a of song) {
       const tho = String(a.owner || "").trim();
-      const ten = laTenThat(tho) ? tho : "(chưa phân công)";
-      /* Đếm theo CẢ HAI chiều bộ phận, đúng như luật mới so: bộ phận QUẢN
-         LÝ đối tượng và bộ phận THỰC HIỆN thẩm định. Hai chiều lệch nhau ở
-         150/448 hạng mục. Chỉ đếm chiều quản lý thì bảng sẽ nói người XSX
-         không dính gì tới 107 hạng mục mà chính họ đang đi làm. Hệ quả:
-         một hạng mục có thể đếm ở hai cột — dòng tổng nói rõ điều đó. */
+      const ten = (laTenThat(tho) ? tho : "(chưa phân công)").toLowerCase();
+      if (!laTenThat(tho)) voChu++;
+      /* Đếm theo CẢ HAI chiều bộ phận, đúng như luật hiện hành so: bộ phận
+         QUẢN LÝ đối tượng và bộ phận THỰC HIỆN thẩm định. Hai chiều lệch
+         nhau ở 150/448 hạng mục. Chỉ đếm chiều quản lý thì bảng sẽ nói
+         người XSX không dính gì tới 107 hạng mục mà chính họ đang đi làm. */
       const quanLy = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
       const thucHien = ((a.execDepts || a.exec_depts || []) as string[]).filter(Boolean);
       const ds = [...new Set([...quanLy, ...thucHien])];
@@ -539,139 +483,87 @@ export default function PhanQuyenView(
         tongBp.set(d, (tongBp.get(d) || 0) + 1);
       }
     }
+    return { demTheoTen: dem, tongTheoBp: tongBp, soVoChu: voChu };
+  }, [acts]);
 
-    /* Gộp BA nguồn tên người, vì mỗi nguồn thiếu một mảnh:
-       · profiles       — ai đăng nhập được (có người chưa từng đứng tên)
-       · vmp_performers — ai được khai là người thực hiện
-       · owner_name     — ai đang THẬT SỰ đứng tên hạng mục
-       Chỉ nhìn một nguồn thì không thấy khoảng hở giữa chúng, mà khoảng
-       hở đó mới là thứ đáng lo. */
-    const ten = new Set<string>();
-    hoSo.forEach((h) => { const t = (h.full_name || "").trim(); if (laTenThat(t)) ten.add(t); });
-    performers.forEach((p) => { const t = String(p.performer_name || "").trim(); if (laTenThat(t)) ten.add(t); });
-    dem.forEach((_v, k) => { if (k !== "(chưa phân công)") ten.add(k); });
-
-    const chuan = (s: string) => s.trim().toLowerCase();
-    const hangs = [...ten].map((t) => {
-      const h = hoSo.find((x) => chuan(x.full_name || "") === chuan(t));
-      const p = performers.find((x) => chuan(String(x.performer_name || "")) === chuan(t));
-      const theoBp = dem.get(t) || new Map<string, number>();
-      const tong = [...theoBp.values()].reduce((s, n) => s + n, 0);
+  const hang = useMemo(() => {
+    const hangs = nguoi.map((n) => {
+      const ten = String(n.ten || "").trim() || "(chưa đặt tên)";
+      const theoBp = demTheoTen.get(ten.toLowerCase()) || new Map<string, number>();
+      /* Khoá dòng: pid nếu có, không thì user_id. Ổn định qua mọi lần nạp,
+         và không đụng nhau kể cả khi hai người trùng tên. */
       return {
-        ten: t,
-        tkId: (h?.id as string | undefined) || null,
-        pid: (p?.id as string | undefined) || null,
-        vai: h?.role || null,
-        boPhanTaiKhoan: h?.department || null,
-        coTaiKhoan: !!h,
-        /* Hai email KHÁC NHAU, không được lẫn: emailTK là email đăng nhập
-           (ở auth, đổi ở đây vô nghĩa), emailTH là email nhận cảnh báo
-           trong vmp_performers — đó mới là cái sửa được. */
-        emailTK: h?.email || null,
-        emailTH: (p?.email as string | undefined) || null,
-        theoBp, tong,
+        khoa: (n.pid || n.user_id || ten) as string,
+        ten,
+        tkId: n.user_id,
+        pid: n.pid,
+        vai: n.vai,
+        /* Hai bộ phận từ hai bảng. Ô trên màn chỉ có MỘT — xem gocBoPhan. */
+        bpTaiKhoan: chuanBoPhan(n.bo_phan_tai_khoan),
+        bpNguoi: chuanBoPhan(n.bo_phan_nguoi),
+        coTaiKhoan: n.co_tai_khoan,
+        tkHoatDong: n.tk_hoat_dong,
+        email: n.email,
+        phamViRieng: n.pham_vi_rieng,
+        muc: n.muc,
+        soSuaDuoc: n.so_sua_duoc,
+        soDungTen: n.so_dung_ten,
+        soPhanCong: n.so_phan_cong,
+        theoBp,
       };
-    }).sort((a, b) => b.tong - a.tong || a.ten.localeCompare(b.ten, "vi"));
-
-    const voChu = dem.get("(chưa phân công)");
-    if (voChu) {
-      hangs.push({
-        ten: "(chưa phân công)", tkId: null, pid: null, vai: null, boPhanTaiKhoan: null,
-        coTaiKhoan: false, emailTK: null, emailTH: null,
-        theoBp: voChu, tong: [...voChu.values()].reduce((s, n) => s + n, 0),
-      });
-    }
-    return { hang: hangs, tongTheoBp: tongBp };
-  }, [acts, hoSo, performers]);
+    }).sort((a, b) => b.soDungTen - a.soDungTen || a.ten.localeCompare(b.ten, "vi"));
+    return hangs;
+  }, [nguoi, demTheoTen]);
 
   type HangB = typeof hang[number];
-  const vaiHienTai = (r: HangB) => nhap[`Bv|${r.tkId}`] ?? r.vai ?? "";
-  const bpHienTai = (r: HangB) => nhap[`Bd|${r.tkId}`] ?? r.boPhanTaiKhoan ?? "";
-  const emailHienTai = (r: HangB) => nhap[`Be|${r.ten}`] ?? r.emailTH ?? "";
 
-  const bamB = (r: HangB, loai: "v" | "d", gt: string) => {
-    if (!r.tkId) return;
-    const k = `B${loai}|${r.tkId}`;
-    const goc = loai === "v" ? (r.vai || "") : (r.boPhanTaiKhoan || "");
+  /** Dòng tổng cho hạng mục chưa ai đứng tên. Không phải một NGƯỜI nên
+   *  không nằm trong danh sách người — để lẫn vào đó thì mọi phép đếm
+   *  "bao nhiêu người" đều lệch một. */
+  const voChuHang = useMemo(() => {
+    const theoBp = demTheoTen.get("(chưa phân công)");
+    if (!theoBp || !soVoChu) return null;
+    return { theoBp, soDungTen: soVoChu };
+  }, [demTheoTen, soVoChu]);
+
+  /* MỘT ô bộ phận cho một người, dù dưới database là hai cột ở hai bảng.
+     Giá trị gốc lấy bộ phận của TÀI KHOẢN trước, vì đó là cột mà luật
+     'chỉ bộ phận mình' đem ra so; bộ phận ở bảng người chỉ là nguồn cho
+     ma trận phân công. Lưu thì ghi cả hai, nên chúng hết đường lệch. */
+  const gocBoPhan = (r: HangB) => r.bpTaiKhoan || r.bpNguoi || "";
+  const lechBoPhan = (r: HangB) =>
+    !!r.bpTaiKhoan && !!r.bpNguoi && r.bpTaiKhoan !== r.bpNguoi;
+
+  const vaiHienTai = (r: HangB) => nhap[`Bv|${r.khoa}`] ?? r.vai ?? "";
+  const bpHienTai = (r: HangB) => nhap[`Bd|${r.khoa}`] ?? gocBoPhan(r);
+  const emailHienTai = (r: HangB) => nhap[`Be|${r.khoa}`] ?? r.email ?? "";
+  /** "" = theo mức chung của vai (NULL ở database). */
+  const phamViHienTai = (r: HangB) => nhap[`Bp|${r.khoa}`] ?? r.phamViRieng ?? "";
+
+  /** Mức SỬA hiệu lực, dựng lại từ bản nháp: phạm vi riêng thắng mức của
+   *  vai — đúng thứ tự mà ly_do_khong_sua_duoc dùng ở server. */
+  const mucCuaNguoi = (r: HangB): Muc | null => {
+    const rieng = phamViHienTai(r);
+    if (rieng) return rieng as Muc;
+    const vai = vaiHienTai(r);
+    return vai ? mucHienTai("update_progress", vai) : null;
+  };
+
+  const bamB = (r: HangB, loai: "v" | "d" | "p", gt: string) => {
+    const k = `B${loai}|${r.khoa}`;
+    const goc = loai === "v" ? (r.vai || "")
+      : loai === "d" ? gocBoPhan(r)
+        : (r.phamViRieng || "");
     /* Bấm lại đúng giá trị đang lưu = bỏ thay đổi, không phải lưu lại y
        nguyên. Nếu không, số "thay đổi chưa lưu" sẽ nói dối. */
     if (gt === goc) xoaNhap(k); else dat(k, gt);
     xoaHong(k);
   };
 
-  const luuB = async () => {
-    setDangLuu("B");
-    const ids = new Set<string>();
-    Object.keys(nhap).forEach((k) => {
-      if (k.startsWith("Bv|") || k.startsWith("Bd|")) ids.add(k.slice(3));
-    });
-    const emails = Object.entries(nhap).filter(([k]) => k.startsWith("Be|"));
-    const tong = ids.size + emails.length;
-    let xong = 0; const loiDs: string[] = [];
-    const hong: Record<string, string> = {}; const giu: Record<string, string> = {};
-
-    for (const id of ids) {
-      const r = hang.find((x) => x.tkId === id);
-      if (!r) continue;
-      const ghiHong = (msg: string) => {
-        loiDs.push(`${r.ten}: ${msg}`);
-        for (const t of ["Bv", "Bd"]) {
-          const k = `${t}|${id}`;
-          if (nhap[k] != null) { hong[k] = msg; giu[k] = nhap[k]; }
-        }
-      };
-      try {
-        const kq = await setUserRole(id, vaiHienTai(r) || "viewer", bpHienTai(r) || null,
-          `Đổi phân quyền cho ${r.ten} từ màn Phân quyền`);
-        if (kq.ok) xong++; else ghiHong(kq.error || "lỗi");
-      } catch (e) { ghiHong((e as Error).message); }
-    }
-
-    for (const [k, v] of emails) {
-      const ten = k.slice(3);
-      const r = hang.find((x) => x.ten === ten);
-      try {
-        const kq = await upsertPerformer(r?.pid || null,
-          { performer_name: ten, email: v.trim() || null });
-        if (kq.ok) xong++;
-        else { loiDs.push(`Email ${ten}: ${kq.error}`); hong[k] = kq.error || "lỗi"; giu[k] = v; }
-      } catch (e) {
-        loiDs.push(`Email ${ten}: ${(e as Error).message}`);
-        hong[k] = (e as Error).message; giu[k] = v;
-      }
-    }
-
-    chotLuot("B", ["Bv|", "Bd|", "Be|"], tong, xong, loiDs, giu, hong);
-    await taiHoSo();
-    await taiNguoiThucHien();
-    setDangLuu("");
-  };
-
-  /* Khoảng hở đáng lo nhất: đứng tên hạng mục mà không có tài khoản. */
-  const thieuTaiKhoan = hang.filter((h) => h.ten !== "(chưa phân công)" && h.tong > 0 && !h.coTaiKhoan);
-  const thieuEmail = hang.filter((h) => h.ten !== "(chưa phân công)" && h.tong > 0 && !h.emailTK && !h.emailTH);
-  const adminKhongBoPhan = hoSo.filter((h) => h.role === "department_user" && !h.department);
-
-  const ketLuan = useMemo(() => {
-    if (loi) return { chinh: "Chưa đọc được danh sách người dùng.", phu: loi, tone: "warn" as const };
-    if (!hoSo.length) return { chinh: "Đang đọc danh sách người dùng…", phu: "", tone: "ok" as const };
-    const soHm = thieuTaiKhoan.reduce((s, h) => s + h.tong, 0);
-    if (thieuTaiKhoan.length) {
-      return {
-        chinh: `${thieuTaiKhoan.length} người đang đứng tên ${soHm} hạng mục nhưng CHƯA CÓ TÀI KHOẢN — họ không tự cập nhật được việc của mình.`,
-        phu: `${thieuTaiKhoan.map((h) => `${h.ten} (${h.tong})`).join(" · ")}. `
-          + `Đây là lý do phần lớn hạng mục phải nhờ người khác nhập hộ, và nhập hộ thì cột "người sửa" trong nhật ký không còn đúng người làm.`,
-        tone: "over" as const,
-      };
-    }
-    return {
-      chinh: `${hoSo.length} tài khoản, ${hang.filter((h) => h.tong > 0).length} người đang đứng tên hạng mục — ai cũng có tài khoản.`,
-      phu: "Kiểm tiếp cột vai trò: department_user mà thiếu bộ phận thì không sửa được hạng mục nào.",
-      tone: "ok" as const,
-    };
-  }, [loi, hoSo, hang, thieuTaiKhoan]);
-
-  /* ================= C ================= */
+  /* ================= 4 · PHÂN CÔNG — phần dữ liệu ================= */
+  /* Khu vực và line CÓ THẬT trong dữ liệu, theo bộ phận. Trước đây đây là
+     một khối riêng tự nhận "chưa có hiệu lực"; nay chỉ còn là nguồn cho ô
+     chọn line của ma trận — chỗ duy nhất nó có tác dụng. */
   const phamVi = useMemo(() => {
     const m = new Map<string, { khuVuc: Map<string, number>; line: Map<string, number> }>();
     for (const a of acts) {
@@ -689,38 +581,46 @@ export default function PhanQuyenView(
     return m;
   }, [acts]);
 
-  /* ================= D ================= */
-  const thanhVien = useMemo(() => {
-    const m = new Map<string, { ten: string; email: string | null; nguon: Set<string> }>();
-    const them = (ten: string, email: string | null, nguon: string) => {
-      const t = ten.trim();
-      if (!laTenThat(t)) return;
-      const k = t.toLowerCase();
-      if (!m.has(k)) m.set(k, { ten: t, email, nguon: new Set() });
-      const o = m.get(k)!;
-      if (!o.email && email) o.email = email;
-      o.nguon.add(nguon);
-    };
-    danhBa.forEach((n) => { if (n.boPhan === bpChon) them(n.ten, n.email, "danh bạ"); });
-    performers.forEach((p) => {
-      if (bpNguoi(p) === bpChon) them(String(p.performer_name || ""), (p.email as string) || null, "người thực hiện");
-    });
-    hoSo.forEach((h) => {
-      if (chuanBoPhan(h.department) === bpChon) them(h.full_name || "", h.email, "tài khoản");
-    });
-    hang.forEach((h) => {
-      if ((h.theoBp.get(bpChon) || 0) > 0) them(h.ten, h.emailTH || h.emailTK, "đang đứng tên");
-    });
-    return [...m.values()].sort((a, b) => a.ten.localeCompare(b.ten, "vi"));
-  }, [danhBa, performers, hoSo, hang, bpChon, nhap]);
+  /* Người xếp theo bộ phận — thay cho ô chọn bộ phận cũ. Nhóm rỗng vẫn
+     hiện: "XSX chưa có ai" là một câu trả lời, không phải một dòng trống
+     nên giấu đi. */
+  const nhomTheoBp = useMemo(() => {
+    const m = new Map<string, HangB[]>();
+    DEPTS.forEach((d) => m.set(d.id, []));
+    m.set("", []);
+    for (const h of hang) {
+      const bp = bpHienTai(h);
+      if (!m.has(bp)) m.set(bp, []);
+      m.get(bp)!.push(h);
+    }
+    m.forEach((ds) => ds.sort((a, b) => b.soDungTen - a.soDungTen
+      || a.ten.localeCompare(b.ten, "vi")));
+    return m;
+  }, [hang, nhap]);
 
+  /** Line có thật của một bộ phận. Dùng để khoá ô phân công của người mà
+   *  bộ phận họ không có line đang chọn. */
+  const lineCuaBp = (bp: string) => {
+    const o = phamVi.get(bp);
+    if (!o) return new Set<string>();
+    return new Set([...o.line.keys()].filter((k) => k !== "(chưa khai)"));
+  };
+
+  /* Line của MỌI bộ phận, kèm tên bộ phận — vì bảng nay hiện tất cả mọi
+     người cùng lúc chứ không lọc theo một bộ phận nữa. */
   const dsLine = useMemo(() => {
-    const o = phamVi.get(bpChon);
-    if (!o) return [] as Array<[string, number]>;
-    return [...o.line.entries()].filter(([k]) => k !== "(chưa khai)").sort((a, b) => b[1] - a[1]);
-  }, [phamVi, bpChon]);
-
-  useEffect(() => { setLineChon("*"); }, [bpChon]);
+    const m = new Map<string, { so: number; bp: Set<string> }>();
+    for (const [bp, o] of phamVi) {
+      for (const [ln, n] of o.line) {
+        if (ln === "(chưa khai)") continue;
+        if (!m.has(ln)) m.set(ln, { so: 0, bp: new Set() });
+        const x = m.get(ln)!;
+        x.so += n;
+        x.bp.add(bp);
+      }
+    }
+    return [...m.entries()].sort((a, b) => b[1].so - a[1].so);
+  }, [phamVi]);
 
   const gocPhanCong = useMemo(() => {
     const m = new Map<string, AssignmentRow["vai_tro"]>();
@@ -748,83 +648,232 @@ export default function PhanQuyenView(
     xoaHong(k);
   };
 
-  const luuD = async () => {
-    const ds = Object.entries(nhap).filter(([k]) => k.startsWith("D|"));
-    setDangLuu("D");
+  /* Loại thẩm định CÓ THẬT trong kế hoạch của từng bộ phận. Đếm trên hạng
+     mục thật, không đếm trên tám cột cố định — bộ phận không làm PV thì
+     thiếu PV không phải lỗi. */
+  const loaiTheoBp = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const a of acts) {
+      if ((a.state || "active") !== "active") continue;
+      const ds = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
+      const lt = String(a.vtype || a.type || "").trim();
+      if (!lt) continue;
+      for (const d of ds) {
+        if (!m.has(d)) m.set(d, new Set());
+        m.get(d)!.add(lt);
+      }
+    }
+    return m;
+  }, [acts]);
+
+  /** Loại thẩm định của bộ phận này mà chưa ai nhận "Thực hiện". */
+  const chuaAiNhan = (bp: string) => {
+    const coThat = loaiTheoBp.get(bp);
+    if (!coThat) return [] as string[];
+    const nguoiBp = nhomTheoBp.get(bp) || [];
+    return [...coThat].filter((lt) => !nguoiBp.some((h) => pcHienTai(h.ten, lt) === "thuc_hien"));
+  };
+
+  /* ================= LƯU ================= */
+  /* MỘT nút Lưu cho cả bảng: quyền của người và ô phân công của người nằm
+     trên cùng một dòng, nên tách làm hai nút thì sửa một dòng lại phải bấm
+     hai chỗ, và quên một chỗ là mất nửa thay đổi. */
+  const luuTrachNhiem = async () => {
+    setDangLuu("B");
+    const khoaSua = new Set<string>();
+    Object.keys(nhap).forEach((k) => { if (/^B[vdpe]\|/.test(k)) khoaSua.add(k.slice(3)); });
+    const tong = demNhap("Bv|", "Bd|", "Bp|", "Be|", "D|");
     let xong = 0; const loiDs: string[] = [];
     const hong: Record<string, string> = {}; const giu: Record<string, string> = {};
-    const moi = [...phanCong];
-    for (const [k, v] of ds) {
-      const [, tenThuong, loai, line] = k.split("|");
-      const ten = thanhVien.find((x) => x.ten.trim().toLowerCase() === tenThuong)?.ten || tenThuong;
+
+    for (const kh of khoaSua) {
+      const r = hang.find((x) => x.khoa === kh);
+      const oCua = ["Bv", "Bd", "Bp", "Be"].map((t) => `${t}|${kh}`).filter((k) => nhap[k] != null);
+      if (!r) continue;
+      const ghiHong = (msg: string) => {
+        loiDs.push(`${r.ten}: ${msg}`);
+        for (const k of oCua) { hong[k] = msg; giu[k] = nhap[k]; }
+      };
+      const doiBp = nhap[`Bd|${kh}`] != null;
+      const doiEm = nhap[`Be|${kh}`] != null;
+      const doiTk = nhap[`Bv|${kh}`] != null || nhap[`Bp|${kh}`] != null || doiBp;
       try {
-        const r = await setAssignment(ten, bpChon, loai, line, v as "" | "thuc_hien" | "ho_tro");
-        if (r.ok) {
+        /* Bản ghi NGƯỜI trước: tên, email, bộ phận. Có cả hai bản ghi thì
+           một ô bộ phận đi xuống cả hai chỗ. */
+        if (r.pid && (doiBp || doiEm)) {
+          const kq = await upsertPerformer(r.pid, {
+            performer_name: r.ten,
+            department: bpHienTai(r) || null,
+            email: emailHienTai(r).trim() || null,
+          });
+          if (!kq.ok) { ghiHong(kq.error || "lỗi"); continue; }
+        }
+        if (r.tkId && doiTk) {
+          const kq = await setUserRole(r.tkId, vaiHienTai(r) || "viewer", bpHienTai(r) || null,
+            `Đổi phân quyền cho ${r.ten} từ màn Phân quyền`, phamViHienTai(r) || null);
+          if (!kq.ok) { ghiHong(kq.error || "lỗi"); continue; }
+        }
+        /* Sửa email hay bộ phận cho người CHƯA có bản ghi nào để ghi vào
+           thì nói thẳng, thay vì im lặng bỏ qua rồi báo "đã lưu". */
+        if (!r.pid && !r.tkId && (doiBp || doiEm)) {
+          ghiHong("Người này chưa có bản ghi trong danh bạ — chưa lưu được email hay bộ phận.");
+          continue;
+        }
+        xong += oCua.length;
+      } catch (e) { ghiHong((e as Error).message); }
+    }
+
+    /* Ô phân công. Bộ phận lấy từ chính dòng của người đó — không còn ô
+       chọn bộ phận nào để lấy nữa, và cũng không cần: khoá duy nhất của
+       vmp_assignment_matrix là (tên, loại, line), bộ phận chỉ là thuộc
+       tính đi kèm. */
+    const moiPc = [...phanCong];
+    for (const [k, v] of Object.entries(nhap).filter(([k2]) => k2.startsWith("D|"))) {
+      const [, tenThuong, loai, line] = k.split("|");
+      const r = hang.find((x) => x.ten.trim().toLowerCase() === tenThuong);
+      const ten = r?.ten || tenThuong;
+      const bp = r ? bpHienTai(r) : "";
+      if (!bp) {
+        loiDs.push(`${ten} × ${loai}: chưa gán bộ phận nên chưa phân công được`);
+        hong[k] = "chưa gán bộ phận"; giu[k] = v;
+        continue;
+      }
+      try {
+        const kq = await setAssignment(ten, bp, loai, line, v as "" | "thuc_hien" | "ho_tro");
+        if (kq.ok) {
           xong++;
-          const i = moi.findIndex((x) => x.staff_name.trim().toLowerCase() === tenThuong
+          const i = moiPc.findIndex((x) => x.staff_name.trim().toLowerCase() === tenThuong
             && x.validation_type === loai && x.line === line);
-          if (i >= 0) moi.splice(i, 1);
+          if (i >= 0) moiPc.splice(i, 1);
           if (v) {
-            moi.push({
-              staff_name: ten, department: bpChon, validation_type: loai,
+            moiPc.push({
+              staff_name: ten, department: bp, validation_type: loai,
               line, vai_tro: v as AssignmentRow["vai_tro"],
             });
           }
-        } else { loiDs.push(`${ten} × ${loai}: ${r.error}`); hong[k] = r.error || "lỗi"; giu[k] = v; }
+        } else { loiDs.push(`${ten} × ${loai}: ${kq.error}`); hong[k] = kq.error || "lỗi"; giu[k] = v; }
       } catch (e) {
         loiDs.push(`${ten} × ${loai}: ${(e as Error).message}`);
         hong[k] = (e as Error).message; giu[k] = v;
       }
     }
-    setPhanCong(moi);
-    chotLuot("D|", ["D|"], ds.length, xong, loiDs, giu, hong);
+    setPhanCong(moiPc);
+
+    chotLuot("B", ["Bv|", "Bd|", "Bp|", "Be|", "D|"], tong, xong, loiDs, giu, hong);
+    /* Đổi bộ phận, phạm vi hay ô phân công đều làm số hạng mục sửa được
+       của người đó khác đi — đọc lại để cột Sửa được không nói con số cũ. */
+    await taiNguoiVaQuyen();
     setDangLuu("");
   };
 
-  /* Câu kết luận của D: loại thẩm định nào CÓ THẬT trong kế hoạch của bộ
-     phận này mà chưa ai nhận. Đếm trên hạng mục thật, không đếm trên tám
-     cột cố định — bộ phận không làm PV thì thiếu PV không phải lỗi. */
-  const ketLuanD = useMemo(() => {
-    const coThat = new Set<string>();
-    for (const a of acts) {
-      if ((a.state || "active") !== "active") continue;
-      const ds = (a.depts && a.depts.length ? a.depts : [a.dept || "qa"]).filter(Boolean) as string[];
-      if (!ds.includes(bpChon)) continue;
-      const lt = String(a.vtype || a.type || "").trim();
-      if (lt) coThat.add(lt);
+  const themNguoi = async () => {
+    const ten = nguoiMoi.ten.trim();
+    if (!laTenThat(ten)) return;
+    setDangLuu("B");
+    try {
+      const r = await upsertPerformer(null, {
+        performer_name: ten,
+        email: nguoiMoi.email.trim() || null,
+        department: nguoiMoi.bp || null,
+      });
+      if (r.ok) {
+        setNguoiMoi({ ten: "", email: "", bp: "" });
+        await taiNguoiVaQuyen();
+        setKetQua((c) => ({ ...c, B: { xong: 1, tong: 1, loi: [] } }));
+      } else {
+        setKetQua((c) => ({ ...c, B: { xong: 0, tong: 1, loi: [`Thêm ${ten}: ${r.error}`] } }));
+      }
+    } catch (e) {
+      setKetQua((c) => ({ ...c, B: { xong: 0, tong: 1, loi: [`Thêm ${ten}: ${(e as Error).message}`] } }));
     }
-    const chuaAi = [...coThat].filter((lt) =>
-      !thanhVien.some((v) => pcHienTai(v.ten, lt) === "thuc_hien"));
-    const tenBp = DEPTS.find((d) => d.id === bpChon)?.name || bpChon;
-    const tenLine = lineChon === "*" ? "mọi line" : `line ${lineChon}`;
-    if (!thanhVien.length) {
-      return {
-        chinh: `${tenBp} chưa có ai trong danh bạ — chưa tích được ô nào.`,
-        phu: "Thêm người ở khối Danh bạ người thực hiện ngay đầu màn này, chọn đúng bộ phận, rồi quay lại đây.",
-        tone: "warn" as const,
-      };
+    setDangLuu("");
+  };
+
+  /** Nối tay người thực hiện với tài khoản. Không đi qua bản nháp: đây là
+   *  thao tác một lần, một dòng, và kết quả đổi cả bảng — giữ nó ở nháp thì
+   *  bảng nói một đằng còn database một nẻo cho tới lúc bấm Lưu. */
+  const noiTaiKhoan = async (pid: string, userId: string | null, ten: string) => {
+    setDangLuu("B");
+    try {
+      const r = await lienKetTaiKhoan(pid, userId);
+      setKetQua((c) => ({
+        ...c, B: { xong: r.ok ? 1 : 0, tong: 1, loi: r.ok ? [] : [`${ten}: ${r.error}`] },
+      }));
+      if (r.ok) {
+        setDangNoi((c) => { const n = { ...c }; delete n[pid]; return n; });
+        await taiNguoiVaQuyen();
+      }
+    } catch (e) {
+      setKetQua((c) => ({ ...c, B: { xong: 0, tong: 1, loi: [`${ten}: ${(e as Error).message}`] } }));
     }
-    if (!coThat.size) {
+    setDangLuu("");
+  };
+
+  /* ================= KẾT LUẬN ================= */
+  /* Tài khoản chưa nối được với người nào — nguồn cho ô "nối tay". Đây
+     chính là những dòng mà khớp-theo-tên ngày trước làm hỏng. */
+  const tkChuaNoi = useMemo(() => nguoi.filter((n) => n.co_tai_khoan && !n.pid), [nguoi]);
+
+  /* Bốn khoảng hở, xếp theo mức đáng lo giảm dần. */
+  const thieuTaiKhoan = hang.filter((h) => h.soDungTen > 0 && !h.coTaiKhoan);
+  const thieuEmail = hang.filter((h) => h.soDungTen > 0 && !h.email);
+  /* Có tài khoản, vai cho phép sửa, nhưng luật cho sửa 0 hạng mục. Kiểu
+     hỏng im lặng: người đó đăng nhập được, nhìn thấy hết, bấm sửa thì bị
+     từ chối, và không có gì trên màn nói vì sao — trừ dòng này. */
+  const quyenRong = hang.filter((h) => h.coTaiKhoan && h.soSuaDuoc === 0 && h.muc !== "khong");
+  const lechBp = hang.filter(lechBoPhan);
+
+  const ketLuan = useMemo(() => {
+    if (loi) return { chinh: "Chưa đọc được danh sách người dùng.", phu: loi, tone: "warn" as const };
+    if (!nguoi.length) return { chinh: "Đang đọc danh sách người dùng…", phu: "", tone: "ok" as const };
+    const soHm = thieuTaiKhoan.reduce((s, h) => s + h.soDungTen, 0);
+    if (thieuTaiKhoan.length) {
       return {
-        chinh: `${tenBp} không có hạng mục thẩm định nào trong kế hoạch năm nay.`,
-        phu: "Vẫn tích được để chuẩn bị cho năm sau; bảng chỉ không có gì để đối chiếu.",
-        tone: "ok" as const,
-      };
-    }
-    if (chuaAi.length) {
-      return {
-        chinh: `${tenBp} · ${tenLine}: ${chuaAi.length}/${coThat.size} loại thẩm định CHƯA có người thực hiện — ${chuaAi.join(", ")}.`,
-        phu: "Kế hoạch có hạng mục thuộc các loại này nhưng ma trận chưa chỉ ra ai làm. Tích ô 'Thực hiện' cho người phụ trách rồi bấm Lưu.",
+        chinh: `${thieuTaiKhoan.length} người đang đứng tên ${soHm} hạng mục nhưng CHƯA CÓ TÀI KHOẢN — họ không tự cập nhật được việc của mình.`,
+        phu: `${thieuTaiKhoan.map((h) => `${h.ten} (${h.soDungTen})`).join(" · ")}. `
+          + `Đây là lý do phần lớn hạng mục phải nhờ người khác nhập hộ, và nhập hộ thì cột "người sửa" trong nhật ký không còn đúng người làm.`,
         tone: "over" as const,
       };
     }
     return {
-      chinh: `${tenBp} · ${tenLine}: cả ${coThat.size} loại thẩm định trong kế hoạch đều đã có người thực hiện.`,
-      phu: `Đã tích: ${[...coThat].sort().join(", ")}.`,
+      chinh: `${nguoi.length} người, ${nguoi.filter((n) => n.co_tai_khoan).length} tài khoản `
+        + `— ai đang đứng tên hạng mục cũng có tài khoản.`,
+      phu: "Kiểm tiếp cột Sửa được: có tài khoản mà sửa được 0 hạng mục thì đăng nhập cũng không làm được gì.",
       tone: "ok" as const,
     };
-  }, [acts, bpChon, lineChon, thanhVien, gocPhanCong, nhap]);
+  }, [loi, nguoi, thieuTaiKhoan]);
 
+  /* Kết luận của nửa trách nhiệm, bao cả bộ phận chứ không phải từng bộ
+     phận một. Ô chọn bộ phận cũ bắt người dùng đi qua sáu lần mới biết chỗ
+     nào hổng; một câu là đủ. */
+  const ketLuanD = useMemo(() => {
+    const tenLine = lineChon === "*" ? "Mọi line" : `Line ${lineChon}`;
+    const hong = DEPTS.map((d) => ({ d, thieu: chuaAiNhan(d.id) })).filter((x) => x.thieu.length);
+    const coKeHoach = DEPTS.filter((d) => (loaiTheoBp.get(d.id)?.size || 0) > 0);
+    if (!coKeHoach.length) {
+      return {
+        chinh: "Chưa có hạng mục thẩm định nào trong kế hoạch để đối chiếu phân công.",
+        phu: "Vẫn tích được để chuẩn bị; bảng chỉ chưa có gì để so.",
+        tone: "ok" as const,
+      };
+    }
+    if (hong.length) {
+      return {
+        chinh: `${tenLine}: ${hong.length}/${coKeHoach.length} bộ phận có loại thẩm định CHƯA ai nhận thực hiện.`,
+        phu: hong.map((x) => `${x.d.short}: ${x.thieu.join(", ")}`).join(" · ")
+          + ". Kế hoạch có hạng mục thuộc các loại này nhưng ma trận chưa chỉ ra ai làm — "
+          + "và người để phạm vi “theo phân công” ở bộ phận đó thì không sửa được gì.",
+        tone: "over" as const,
+      };
+    }
+    return {
+      chinh: `${tenLine}: mọi loại thẩm định có trong kế hoạch đều đã có người thực hiện.`,
+      phu: coKeHoach.map((d) => `${d.short} ${[...(loaiTheoBp.get(d.id) || [])].sort().join("/")}`).join(" · "),
+      tone: "ok" as const,
+    };
+  }, [loaiTheoBp, nhomTheoBp, lineChon, gocPhanCong, nhap]);
+
+  /* ---------------- kiểu dùng chung ---------------- */
   const th: React.CSSProperties = {
     textAlign: "left", padding: "10px 12px", fontSize: 12, fontWeight: 800,
     color: C.plumSoft, borderBottom: `1px solid ${C.line}`, whiteSpace: "nowrap",
@@ -832,24 +881,252 @@ export default function PhanQuyenView(
   const td: React.CSSProperties = {
     padding: "10px 12px", fontSize: 14, color: C.plum, borderBottom: `1px solid ${C.line}`,
   };
+  const dai: React.CSSProperties = {
+    padding: "9px 12px", fontSize: 12, fontWeight: 900, letterSpacing: .3,
+    borderBottom: `1px solid ${C.line}`, background: C.surfaceSunk, color: C.plum,
+  };
   const CHIP_BP = [{ id: "", nhan: "chưa gán", mo: "Không thuộc bộ phận nào" },
     ...DEPTS.map((d) => ({ id: d.id, nhan: d.short, mo: d.name }))];
+  /* "theo vai" đứng đầu vì đó là mặc định đúng cho hầu hết mọi người: đặt
+     phạm vi riêng là tách người đó ra khỏi bảng luật chung, và một ngoại lệ
+     ai cũng quên mất là một ngoại lệ sẽ gây bất ngờ về sau. */
+  const CHIP_PHAM_VI = [
+    { id: "", nhan: "theo vai", mo: "Đi theo mức chung của vai ở ma trận quyền" },
+    ...(["co", "bo_phan", "phan_cong", "khong"] as Muc[]).map((m) => ({
+      id: m,
+      nhan: `${O_QUYEN[m].ky} ${m === "co" ? "mọi hạng mục" : m === "bo_phan" ? "bộ phận mình"
+        : m === "phan_cong" ? "theo phân công" : "không"}`,
+      mo: O_QUYEN[m].chu,
+    })),
+  ];
+
+  /* Một dòng của ma trận trách nhiệm & quyền. Tách thành hàm vì nó được
+     gọi từ trong vòng lặp nhóm bộ phận — nhét thẳng vào JSX thì thân vòng
+     lặp dài tới mức không đọc được cấu trúc nhóm nữa. */
+  const veDongNguoi = (h: HangB) => {
+    const suaVai = quyenSuaA && !!h.tkId;
+    const suaNguoi = suaPhanCongDuoc;
+    const xem = dongXem(vaiHienTai(h) || null);
+    const spread = [...h.theoBp.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    const bp = bpHienTai(h);
+    const lines = lineCuaBp(bp);
+    /* Ba lý do khoá ô phân công, và ô phải nói ra lý do nào — "bấm không
+       ăn" mà không giải thích là cách nhanh nhất để người dùng kết luận
+       màn hình hỏng. */
+    const lyDoKhoa = !suaPhanCongDuoc ? "bạn không có quyền sửa phân công"
+      : !bp ? "chưa gán bộ phận nên chưa phân công được"
+        : (lineChon !== "*" && !lines.has(lineChon))
+          ? `bộ phận ${(DEPTS.find((d) => d.id === bp)?.short || bp)} không có line ${lineChon}`
+          : "";
+    /* Người này còn ô phân công ở line khác line đang xem. Không nói ra thì
+       bảng trông như họ chưa nhận gì, trong khi cột Sửa được lại nói khác. */
+    const oLineKhac = phanCong.filter((x) =>
+      x.staff_name.trim().toLowerCase() === h.ten.trim().toLowerCase() && x.line !== lineChon).length;
+
+    return (
+      <tr key={h.khoa}>
+        <td style={{ ...td, fontWeight: 800, minWidth: 250 }}>
+          {h.ten}
+          <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 3,
+                        display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+            {h.coTaiKhoan
+              ? <Tag color={C.mintText} bg={C.mintSoft}>có tài khoản</Tag>
+              : <Tag color={C.raspText} bg={C.raspSoft}>chưa có tài khoản</Tag>}
+            {h.coTaiKhoan && !h.tkHoatDong && (
+              <Tag color={C.raspText} bg={C.raspSoft}>đã khoá</Tag>
+            )}
+          </div>
+
+          {/* Email là KHOÁ NỐI người ↔ tài khoản, không còn là ô ghi chú.
+              Sửa nó là sửa cái mà database dùng để nhận ra "hai dòng này
+              là một người". */}
+          <div style={{ marginTop: 5 }}>
+            {suaNguoi && h.pid ? (
+              <input className={`pq-o${nhap[`Be|${h.khoa}`] != null ? " la-nhap" : ""}${oHong[`Be|${h.khoa}`] ? " la-hong" : ""}`}
+                type="email" inputMode="email" style={{ maxWidth: 230, fontSize: 12.5 }}
+                aria-label={`Email của ${h.ten}`} placeholder="chưa có email"
+                value={emailHienTai(h)}
+                onChange={(e) => {
+                  const k = `Be|${h.khoa}`;
+                  if (e.target.value === (h.email || "")) xoaNhap(k);
+                  else dat(k, e.target.value);
+                }} />
+            ) : (
+              <span style={{ fontSize: 12.5, fontWeight: 700,
+                             color: h.email ? C.plumSoft : C.marigoldText }}>
+                {h.email || "chưa có email"}
+              </span>
+            )}
+          </div>
+
+          {/* Nối tay: chỉ hiện cho người chưa có tài khoản mà hệ thống ĐANG
+              CÓ tài khoản chưa nhận chủ. Nối bằng email đã tự chạy lúc
+              migration; ô này là đường cho trường hợp email hai bên khác
+              nhau. */}
+          {quyenSuaA && h.pid && !h.tkId && tkChuaNoi.length > 0 && (
+            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              <select className="pq-o pq-loc" style={{ maxWidth: 210, fontSize: 12 }}
+                aria-label={`Nối ${h.ten} với tài khoản`}
+                value={dangNoi[h.pid] || ""}
+                onChange={(e) => setDangNoi((c) => ({ ...c, [h.pid!]: e.target.value }))}>
+                <option value="">— nối với tài khoản —</option>
+                {tkChuaNoi.map((t) => (
+                  <option key={t.user_id!} value={t.user_id!}>
+                    {t.ten || "(chưa đặt tên)"} · {t.email || "không email"}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="pq-nut"
+                disabled={!dangNoi[h.pid] || dangLuu === "B"}
+                onClick={() => noiTaiKhoan(h.pid!, dangNoi[h.pid!], h.ten)}>
+                Nối
+              </button>
+            </div>
+          )}
+          {quyenSuaA && h.pid && h.tkId && (
+            <button type="button" className="pq-nut"
+              style={{ marginTop: 6, fontSize: 12 }} disabled={dangLuu === "B"}
+              title="Gỡ nối người này khỏi tài khoản — dùng khi nối nhầm hai người thành một."
+              onClick={() => noiTaiKhoan(h.pid!, null, h.ten)}>
+              Gỡ nối tài khoản
+            </button>
+          )}
+        </td>
+
+        <td style={td}>
+          <NhomChip ds={CHIP_BP} dangChon={bp}
+            khoa={!suaNguoi || (!h.pid && !h.tkId)}
+            nhap={nhap[`Bd|${h.khoa}`] != null} hong={oHong[`Bd|${h.khoa}`]}
+            onChon={(x) => bamB(h, "d", x)} nhan={`Bộ phận của ${h.ten}`} />
+        </td>
+
+        <td style={td}>
+          {h.tkId ? (
+            <NhomChip ds={VAI.map((v) => ({ id: v.id, nhan: v.ten, mo: v.mo }))}
+              dangChon={vaiHienTai(h)} khoa={!suaVai}
+              nhap={nhap[`Bv|${h.khoa}`] != null} hong={oHong[`Bv|${h.khoa}`]}
+              onChon={(x) => bamB(h, "v", x)} nhan={`Vai trò của ${h.ten}`} />
+          ) : <span style={{ color: C.plumSoft }}>chưa có tài khoản</span>}
+        </td>
+
+        <td style={td}>
+          {h.tkId ? (
+            <NhomChip ds={CHIP_PHAM_VI} dangChon={phamViHienTai(h)} khoa={!suaVai}
+              nhap={nhap[`Bp|${h.khoa}`] != null} hong={oHong[`Bp|${h.khoa}`]}
+              onChon={(x) => bamB(h, "p", x)} nhan={`Phạm vi riêng của ${h.ten}`} />
+          ) : <span style={{ color: C.plumSoft }}>—</span>}
+        </td>
+
+        <td style={{ ...td, textAlign: "center" }}>
+          {!h.coTaiKhoan ? (
+            <span title="Không có tài khoản thì không vào được, không xem được gì"
+              style={{ color: C.raspText, fontWeight: 700, fontSize: 12.5 }}>
+              chưa vào được
+            </span>
+          ) : xem ? (
+            <span title={xem.thieu.length
+              ? `Xem đầy đủ ${xem.het}/${xem.tong} loại dữ liệu. Bị hạn chế: `
+                + xem.thieu.map((x) => `${x.nhan} (${O_XEM[x.muc[vaiHienTai(h)] || "khong_ro"].chu.toLowerCase()})`).join("; ")
+              : "Xem được toàn bộ dữ liệu hệ thống giữ"}
+              style={{
+                display: "inline-block", minWidth: 44, padding: "4px 9px", borderRadius: 8,
+                fontFamily: NUM, fontSize: 13, fontWeight: 800,
+                background: xem.thieu.length ? C.skySoft : C.mintSoft,
+                color: xem.thieu.length ? C.skyText : C.mintText,
+              }}>
+              {xem.het}<span style={{ opacity: .6 }}>/{xem.tong}</span>
+            </span>
+          ) : <span style={{ color: C.plumSoft, opacity: .6 }}>·</span>}
+        </td>
+
+        <td style={{ ...td, textAlign: "center" }}>
+          {h.coTaiKhoan ? (() => {
+            /* Con số là của lần nạp gần nhất. Nếu bản nháp vừa đổi mức hiệu
+               lực thì nó đã cũ — nói ra thay vì để người dùng tin một con
+               số không còn đúng. */
+            const mucMoi = mucCuaNguoi(h);
+            const daCu = !!mucMoi && mucMoi !== h.muc;
+            return (
+              <>
+                <span title={daCu
+                  ? `Bạn vừa đổi mức thành “${O_QUYEN[mucMoi].chu}”. Con số ${h.soSuaDuoc}/${tongHangMuc} còn là của mức cũ — bấm Lưu để database đếm lại.`
+                  : `${h.ten} sửa được ${h.soSuaDuoc}/${tongHangMuc} hạng mục theo luật đang chạy`}
+                  style={{
+                    display: "inline-block", minWidth: 62, padding: "4px 9px", borderRadius: 8,
+                    fontFamily: NUM, fontSize: 13, fontWeight: 800,
+                    opacity: daCu ? .45 : 1,
+                    background: h.soSuaDuoc === 0 ? C.raspSoft
+                      : h.soSuaDuoc === tongHangMuc ? C.mintSoft : C.skySoft,
+                    color: h.soSuaDuoc === 0 ? C.raspText
+                      : h.soSuaDuoc === tongHangMuc ? C.mintText : C.skyText,
+                  }}>
+                  {h.soSuaDuoc}<span style={{ opacity: .6 }}>/{tongHangMuc}</span>
+                </span>
+                {daCu && (
+                  <div style={{ fontSize: 11, fontWeight: 800, marginTop: 3, color: C.marigoldText }}>
+                    → {O_QUYEN[mucMoi].ky} chưa lưu
+                  </div>
+                )}
+              </>
+            );
+          })() : <span style={{ color: C.plumSoft, opacity: .6 }}>·</span>}
+        </td>
+
+        <td style={{ ...td, textAlign: "center", background: C.pinkMist }}>
+          <div style={{ fontFamily: NUM, fontSize: 14, fontWeight: 800,
+                        color: h.soDungTen ? C.plum : C.plumSoft }}>
+            {h.soDungTen || "·"}
+          </div>
+          {spread.length > 0 && (
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}
+              title="Đếm cả hai chiều: bộ phận quản lý đối tượng và bộ phận thực hiện thẩm định — một hạng mục có thể nằm ở hai bộ phận">
+              {spread.map(([d, n]) => `${DEPTS.find((x) => x.id === d)?.short || d} ${n}`).join(" · ")}
+            </div>
+          )}
+        </td>
+
+        {LOAI_TD.map((lt, i) => {
+          const k = khoaD(h.ten, lt);
+          const dang = pcHienTai(h.ten, lt);
+          const o = dang ? VAI_O[dang] : null;
+          return (
+            <td key={lt} style={{ ...td, textAlign: "center", padding: "6px 4px",
+                                  background: C.pinkMist }}>
+              <OTich ky={o ? o.ky : "＋"}
+                chu={lyDoKhoa || (o ? o.chu : "chưa phân công")}
+                mau={o ? o.mau : C.plumSoft} nen={o ? o.nen : C.surfaceSunk}
+                khoa={!!lyDoKhoa}
+                nhap={nhap[k] != null} hong={oHong[k]}
+                onClick={() => bamD(h.ten, lt)}
+                nhan={`${h.ten} · ${lt} · ${lineChon === "*" ? "mọi line" : lineChon}`} />
+              {i === LOAI_TD.length - 1 && oLineKhac > 0 && (
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: C.skyText, marginTop: 2 }}
+                  title="Người này còn ô phân công ở line khác — đổi ô chọn line ở trên để thấy">
+                  +{oLineKhac} line khác
+                </div>
+              )}
+            </td>
+          );
+        })}
+      </tr>
+    );
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <Card variant="strong">
         <CardTitle icon={ShieldCheck}
-          sub="Mọi ô đều tích chọn; sửa xong bấm Lưu, màn hình báo rõ lưu được mấy ô và ô nào hỏng vì sao.">
-          Danh bạ · phân quyền · phân công trách nhiệm
+          sub="Ba khối, theo thứ tự người ta thật sự hỏi: ai vào được · vai nào làm gì · từng người ra sao">
+          Ma trận phân quyền &amp; trách nhiệm
         </CardTitle>
         <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />
       </Card>
 
-      {/* ============ DANH SÁCH EMAIL ĐƯỢC PHÉP CÓ TÀI KHOẢN ============ */}
+      {/* ============ 1 · AI ĐƯỢC PHÉP CÓ TÀI KHOẢN ============ */}
       <Card variant="strong">
         <CardTitle icon={Mail}
           sub="Cửa vào duy nhất: không có email ở đây thì Supabase từ chối tạo tài khoản, kể cả tạo tay trong Dashboard.">
-          Ai được phép có tài khoản
+          1 · Ai được phép có tài khoản
         </CardTitle>
 
         <CauKetLuan tone="ok"
@@ -886,7 +1163,8 @@ export default function PhanQuyenView(
             </thead>
             <tbody>
               {dsEmail.map((e) => {
-                const coTk = hoSo.some((h) => (h.email || "").toLowerCase() === e.email);
+                const coTk = nguoi.some((n) => n.co_tai_khoan
+                  && (n.email || "").toLowerCase() === e.email);
                 return (
                   <tr key={e.email}>
                     <td style={{ ...td, fontWeight: 800 }}>{e.email}</td>
@@ -947,118 +1225,23 @@ export default function PhanQuyenView(
                       fontSize: 13, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
           <b style={{ color: C.plum }}>Thêm một người mới, đủ ba bước:</b> ① thêm email vào danh sách này →
           ② vào <b>Supabase Dashboard → Authentication → Users → Add user</b>, tạo tài khoản với đúng email
-          đó → ③ quay lại <b>ma trận B</b> bên dưới, tích vai trò và bộ phận. Bỏ bước ① thì Supabase từ chối
+          đó → ③ xuống <b>ma trận 3</b> bên dưới, tích vai trò và bộ phận. Bỏ bước ① thì Supabase từ chối
           tạo; bỏ bước ③ thì họ đăng nhập được nhưng chỉ xem được, không sửa gì.
         </div>
       </Card>
 
-      {/* ============ 0 · DANH BẠ NGƯỜI THỰC HIỆN ============ */}
-      <Card variant="strong">
-        <CardTitle icon={Contact}
-          sub="Chia theo bộ phận. Đây là nguồn nhân sự của ma trận phân công — không có tên ở đây thì không tích được ô nào ở bảng D.">
-          Danh bạ người thực hiện theo bộ phận
-        </CardTitle>
-
-        {suaPhanCongDuoc && (
-          <div className="pq-them">
-            <input className="pq-o" style={{ maxWidth: 240 }} placeholder="Họ tên người thực hiện"
-              aria-label="Họ tên người thực hiện mới" value={nguoiMoi.ten}
-              onChange={(e) => setNguoiMoi((c) => ({ ...c, ten: e.target.value }))} />
-            <input className="pq-o" style={{ maxWidth: 230 }} type="email" placeholder="Email (không bắt buộc)"
-              aria-label="Email người thực hiện mới" value={nguoiMoi.email}
-              onChange={(e) => setNguoiMoi((c) => ({ ...c, email: e.target.value }))} />
-            <NhomChip ds={CHIP_BP} dangChon={nguoiMoi.bp} nhan="Bộ phận của người mới"
-              onChon={(id) => setNguoiMoi((c) => ({ ...c, bp: id }))} />
-            <button type="button" className="pq-nut la-chinh" onClick={themNguoi}
-              disabled={!laTenThat(nguoiMoi.ten.trim()) || dangLuu === "N"}>
-              <Plus size={15} /> Thêm vào danh bạ
-            </button>
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 14 }}>
-          {[...DEPTS.map((d) => d.id), ""].map((bp) => {
-            const ds = theoBoPhan.get(bp) || [];
-            const meta = DEPTS.find((d) => d.id === bp);
-            if (!ds.length && bp === "") return null;
-            return (
-              <div key={bp || "trong"} style={{ border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
-                              background: bp ? C.pinkMist : C.marigoldSoft }}>
-                  <b style={{ fontSize: 14, color: bp ? C.plum : C.marigoldText, fontFamily: TEXT }}>
-                    {meta ? `${meta.short} · ${meta.name}` : "Chưa gán bộ phận"}
-                  </b>
-                  <span className="tnum" style={{ fontFamily: NUM, fontSize: 12.5, fontWeight: 800, color: C.plumSoft }}>
-                    {ds.length} người
-                  </span>
-                  {!bp && ds.length > 0 && (
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: C.marigoldText }}>
-                      — chưa vào được ma trận phân công của bộ phận nào
-                    </span>
-                  )}
-                </div>
-                {ds.length === 0 ? (
-                  <div style={{ padding: "12px 14px", fontSize: 13, fontWeight: 700, color: C.plumSoft }}>
-                    Chưa có ai. Thêm ở ô trên rồi chọn bộ phận này.
-                  </div>
-                ) : (
-                  <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", minWidth: 700, borderCollapse: "collapse" }}>
-                      <tbody>
-                        {ds.map((p) => {
-                          const id = String(p.id);
-                          return (
-                            <tr key={id}>
-                              <td style={{ ...td, fontWeight: 800, width: 210 }}>{p.performer_name}</td>
-                              <td style={{ ...td, width: 260 }}>
-                                <input className={`pq-o${nhap[`Ne|${id}`] != null ? " la-nhap" : ""}${oHong[`Ne|${id}`] ? " la-hong" : ""}`}
-                                  type="email" inputMode="email" placeholder="chưa có email"
-                                  aria-label={`Email của ${p.performer_name}`}
-                                  disabled={!suaPhanCongDuoc}
-                                  value={emailNguoi(p)}
-                                  onChange={(e) => {
-                                    const k = `Ne|${id}`;
-                                    if (e.target.value === (p.email || "")) xoaNhap(k);
-                                    else dat(k, e.target.value);
-                                  }} />
-                              </td>
-                              <td style={td}>
-                                <NhomChip ds={CHIP_BP} dangChon={bpNguoi(p)}
-                                  khoa={!suaPhanCongDuoc}
-                                  nhap={nhap[`Nb|${id}`] != null} hong={oHong[`Nb|${id}`]}
-                                  onChon={(x) => bamBpNguoi(p, x)}
-                                  nhan={`Bộ phận của ${p.performer_name}`} />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <ThanhLuu soThayDoi={demNhap("Nb|", "Ne|")} dangLuu={dangLuu === "N"}
-          ketQua={ketQua.N || null} onLuu={luuDanhBa}
-          onHoanTac={() => boNhap("N", "Nb|", "Ne|")} khoa={!suaPhanCongDuoc}
-          ghiChu="Tích bộ phận cho từng người, điền email nếu có, xong bấm Lưu." />
-      </Card>
-
-      {/* ============ A · VAI TRÒ × HÀNH ĐỘNG ============ */}
+      {/* ============ 2 · MA TRẬN VAI × QUYỀN ============ */}
       <Card variant="strong">
         <CardTitle icon={KeyRound}
-          sub="Bảng luật THẬT: 23 hàm RPC tra đúng bảng này để quyết định cho hay không cho. Sửa ở đây là đổi quyền thật.">
-          A · Vai trò được làm gì
+          sub="Hai nửa, hai nguồn luật khác nhau: nửa XEM đọc policy RLS của Postgres, nửa SỬA đọc bảng vmp_role_permissions mà 23 hàm RPC tra khi quyết định cho hay không cho">
+          2 · Vai nào xem được gì, sửa được gì
         </CardTitle>
 
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", minWidth: 820, borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={th}>Hành động</th>
+                <th style={th}>Nội dung / Hành động</th>
                 {VAI.map((v) => (
                   <th key={v.id} style={{ ...th, textAlign: "center" }}>
                     <div style={{ fontFamily: "ui-monospace, monospace", color: C.plum }}>{v.ten}</div>
@@ -1068,8 +1251,57 @@ export default function PhanQuyenView(
               </tr>
             </thead>
             <tbody>
+              {/* ---- nửa XEM ---- */}
+              <tr>
+                <td style={dai} colSpan={5}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <Eye size={15} /> XEM ĐƯỢC GÌ — do Row Level Security của Postgres quyết, KHÔNG sửa ở đây
+                    <GiaiThich tieuDe="Vì sao nửa này không sửa được">
+                      {"Quyền đọc do Postgres chặn ở tầng dưới cùng, trước cả khi hàm RPC nào chạy. Không có bảng luật nào để tích — muốn đổi thì phải sửa policy RLS bằng migration.\n\n"
+                        + "Bảng này KHÔNG chép tay lại luật: rpc_luat_xem đi đọc chính những policy đang chạy trong pg_policy rồi phân loại ra mức. Nên nó không thể lệch với thực tế — ngày ai đó sửa policy, bảng đổi theo.\n\n"
+                        + "Ô hiện dấu '?' nghĩa là hàm gặp một dạng biểu thức nó chưa nhận diện được. Lúc đó nó KHÔNG đoán: rê chuột vào ô để đọc nguyên văn biểu thức RLS."}
+                    </GiaiThich>
+                  </span>
+                </td>
+              </tr>
+              {luatXem.map((x) => (
+                <tr key={x.bang}>
+                  <td style={{ ...td, fontWeight: 700 }}>
+                    {x.nhan}
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft,
+                                  fontFamily: "ui-monospace, monospace" }}>
+                      {x.bang}
+                    </div>
+                  </td>
+                  {VAI.map((v) => {
+                    const m = x.muc[v.id] || "khong_ro";
+                    const o = O_XEM[m];
+                    return (
+                      <td key={v.id} style={{ ...td, textAlign: "center" }}>
+                        <OTich ky={o.ky} mau={o.mau} nen={o.nen} khoa
+                          chu={`${o.chu}${x.bieu_thuc ? `\nPolicy: ${x.bieu_thuc}` : "\nBảng không có policy đọc nào"}`}
+                          nhan={`${x.nhan} × ${v.ten}`} />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              {!luatXem.length && (
+                <tr><td style={{ ...td, color: C.plumSoft }} colSpan={5}>
+                  Chưa đọc được luật xem — cần đăng nhập bằng tài khoản admin hoặc phụ trách QA.
+                </td></tr>
+              )}
+
+              {/* ---- nửa SỬA ---- */}
+              <tr>
+                <td style={dai} colSpan={5}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <Pencil size={15} /> SỬA ĐƯỢC GÌ — bảng vmp_role_permissions, tích ở đây là đổi quyền thật
+                  </span>
+                </td>
+              </tr>
               {HANH_DONG.map((h) => (
-                <tr key={h.ten}>
+                <tr key={h.id}>
                   <td style={{ ...td, fontWeight: 700 }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       {h.ten.split("\n").map((d, i) => <span key={i}>{i ? <><br />{d}</> : d}</span>)}
@@ -1077,17 +1309,6 @@ export default function PhanQuyenView(
                     </span>
                   </td>
                   {VAI.map((v) => {
-                    /* Hàng "Xem số liệu": quyền đọc do RLS quyết, không nằm
-                       trong bảng luật. Vẽ ô sửa được ở đây là hứa một thứ hệ
-                       thống không làm. */
-                    if (!h.id) {
-                      return (
-                        <td key={v.id} style={{ ...td, textAlign: "center" }}>
-                          <OTich ky="✓" chu="Được — do RLS, không sửa ở đây" khoa
-                            mau={C.mintText} nen={C.mintSoft} nhan={`Xem số liệu × ${v.ten}`} />
-                        </td>
-                      );
-                    }
                     const k = khoaA(h.id, v.id);
                     const o = O_QUYEN[mucHienTai(h.id, v.id)];
                     const dongBang = h.id === "admin_users" && v.id === "admin";
@@ -1110,274 +1331,115 @@ export default function PhanQuyenView(
 
         <div style={{ display: "flex", gap: "8px 18px", flexWrap: "wrap", marginTop: 12,
                       fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
-          <span><b style={{ color: C.mintText }}>✓</b> Được — mọi hạng mục</span>
-          <span><b style={{ color: C.marigoldText }}>◑</b> Bộ phận mình — quản lý <i>hoặc</i> thực hiện</span>
-          <span><b style={{ color: C.skyText }}>◔</b> Theo phân công — đúng loại, đúng line ở bảng D</span>
+          <span><b style={{ color: C.mintText }}>✓</b> Được — mọi hạng mục · xem toàn bộ</span>
+          <span><b style={{ color: C.marigoldText }}>◑</b> Bộ phận mình — quản lý <i>hoặc</i> thực hiện · phần không nhạy cảm</span>
+          <span><b style={{ color: C.skyText }}>◔</b> Theo phân công · chỉ của chính mình</span>
           <span><b>✕</b> Không</span>
-          <span>Bấm một ô để đổi mức. Hai mức hạn chế chỉ có ở hàng <b>Cập nhật tiến độ</b> —
-            các hàm khác chưa có vế so bộ phận trong luật.</span>
+          <span><b style={{ color: C.raspText }}>?</b> Chưa phân loại được policy — rê chuột đọc nguyên văn</span>
+          <span>Hai mức hạn chế ở nửa SỬA chỉ có ở hàng <b>Cập nhật tiến độ</b> — các hàm khác chưa có
+            vế so bộ phận trong luật.</span>
         </div>
 
         <ThanhLuu soThayDoi={demNhap("A|")} dangLuu={dangLuu === "A"}
           ketQua={ketQua["A|"] || null} onLuu={luuA} onHoanTac={() => boNhap("A|", "A|")}
           khoa={!quyenSuaA}
-          ghiChu="Tích chọn để đổi mức quyền, xong bấm Lưu. Đây là luật thật, không phải bản mô tả." />
+          ghiChu="Tích chọn ở nửa SỬA để đổi mức quyền, xong bấm Lưu. Nửa XEM chỉ để đọc." />
       </Card>
 
-      {/* ============ B · NGƯỜI × BỘ PHẬN ============ */}
+      {/* ============ 3 · MA TRẬN TRÁCH NHIỆM & QUYỀN ============ */}
+      {/* Một dòng một người, và trên dòng đó có ĐỦ cả hai vế: người này
+          được phép làm gì, và đang nhận làm gì. Trước đây hai vế nằm ở hai
+          bảng cách nhau một màn cuộn, nên câu hỏi thật sự đáng hỏi — "người
+          nhận làm PQ có quyền sửa PQ không" — phải tự ghép trong đầu. */}
       <Card variant="strong">
         <CardTitle icon={Users}
-          sub="Mỗi ô nói hai điều: người này đang đứng tên bao nhiêu hạng mục ở bộ phận đó, và luật hiện hành có cho họ sửa không">
-          B · Ai chịu trách nhiệm phần nào
+          sub="Một dòng một người: bên trái là quyền (vai, phạm vi, xem gì, sửa được bao nhiêu), bên phải là trách nhiệm (đứng tên bao nhiêu, nhận làm loại thẩm định nào)">
+          3 · Ma trận trách nhiệm &amp; quyền
         </CardTitle>
 
-        {(thieuTaiKhoan.length > 0 || thieuEmail.length > 0 || adminKhongBoPhan.length > 0) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+        <CauKetLuan chinh={ketLuanD.chinh} phu={ketLuanD.phu} tone={ketLuanD.tone} />
+
+        {(thieuTaiKhoan.length > 0 || thieuEmail.length > 0 || quyenRong.length > 0
+          || lechBp.length > 0) && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "14px 0" }}>
+            {quyenRong.length > 0 && (
+              <div className="pq-canhbao la-do">
+                <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>Đăng nhập được nhưng sửa được <b>0 hạng mục</b>:{" "}
+                  <b>{quyenRong.map((h) => h.ten).join(", ")}</b> — vai của họ cho phép sửa, nhưng
+                  bộ phận hoặc ô phân công thì chưa có gì để so, nên hàm chặn hết. Họ sẽ thấy toàn
+                  bộ số liệu, bấm sửa, và bị từ chối mà không hiểu vì sao.</span>
+              </div>
+            )}
             {thieuTaiKhoan.length > 0 && (
               <div className="pq-canhbao la-do">
                 <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
                 <span>Chưa có tài khoản: <b>{thieuTaiKhoan.map((h) => h.ten).join(", ")}</b> — không đăng nhập được nên không tự cập nhật tiến độ của mình.</span>
               </div>
             )}
+            {lechBp.length > 0 && (
+              <div className="pq-canhbao la-vang">
+                <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>Bộ phận ghi khác nhau ở hai bảng: <b>{lechBp.map((h) => h.ten).join(", ")}</b> —
+                  ô bộ phận dưới đây đang hiện bộ phận của TÀI KHOẢN (cột mà luật đem ra so).
+                  Bấm Lưu một lần là hai bên khớp lại.</span>
+              </div>
+            )}
             {thieuEmail.length > 0 && (
               <div className="pq-canhbao la-vang">
                 <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
-                <span>Chưa có email: <b>{thieuEmail.map((h) => h.ten).join(", ")}</b> — không nhận được cảnh báo đến hạn.</span>
-              </div>
-            )}
-            {adminKhongBoPhan.length > 0 && (
-              <div className="pq-canhbao la-vang">
-                <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
-                <span><b>{adminKhongBoPhan.map((h) => h.full_name || h.email).join(", ")}</b> mang vai <code>department_user</code> nhưng chưa gán bộ phận — luật so bộ phận của hạng mục với bộ phận của người, thiếu vế sau thì không sửa được hạng mục nào.</span>
+                <span>Chưa có email: <b>{thieuEmail.map((h) => h.ten).join(", ")}</b> — không nhận được cảnh báo đến hạn, và không nối được với tài khoản.</span>
               </div>
             )}
           </div>
         )}
 
-        <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 1120, borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={th}>Người</th>
-                <th style={th}>Vai trò <span style={{ fontWeight: 600 }}>(tích một)</span></th>
-                <th style={th}>Bộ phận của tài khoản <span style={{ fontWeight: 600 }}>(tích một)</span></th>
-                <th style={th}>Email nhận cảnh báo</th>
-                {DEPTS.map((d) => <th key={d.id} style={{ ...th, textAlign: "center" }}>{d.short}</th>)}
-                <th style={{ ...th, textAlign: "center" }}>Tổng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hang.map((h) => {
-                const voChu = h.ten === "(chưa phân công)";
-                const suaDong = suaQuyenDuoc && !!h.tkId;
-                return (
-                  <tr key={h.ten}>
-                    <td style={{ ...td, fontWeight: 800 }}>
-                      {h.ten}
-                      <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 3 }}>
-                        {voChu ? <span style={{ color: C.marigoldText }}>chưa ai đứng tên</span>
-                          : h.coTaiKhoan
-                            ? <Tag color={C.mintText} bg={C.mintSoft}>có tài khoản</Tag>
-                            : <Tag color={C.raspText} bg={C.raspSoft}>chưa có tài khoản</Tag>}
-                      </div>
-                    </td>
-
-                    <td style={td}>
-                      {h.tkId ? (
-                        <NhomChip ds={VAI.map((v) => ({ id: v.id, nhan: v.ten, mo: v.mo }))}
-                          dangChon={vaiHienTai(h)} khoa={!suaDong}
-                          nhap={nhap[`Bv|${h.tkId}`] != null} hong={oHong[`Bv|${h.tkId}`]}
-                          onChon={(x) => bamB(h, "v", x)} nhan={`Vai trò của ${h.ten}`} />
-                      ) : <span style={{ color: C.plumSoft }}>—</span>}
-                    </td>
-
-                    <td style={td}>
-                      {h.tkId ? (
-                        <NhomChip ds={CHIP_BP} dangChon={bpHienTai(h)} khoa={!suaDong}
-                          nhap={nhap[`Bd|${h.tkId}`] != null} hong={oHong[`Bd|${h.tkId}`]}
-                          onChon={(x) => bamB(h, "d", x)} nhan={`Bộ phận của ${h.ten}`} />
-                      ) : <span style={{ color: C.plumSoft }}>—</span>}
-                    </td>
-
-                    <td style={td}>
-                      {voChu ? "—" : suaQuyenDuoc ? (
-                        <input className={`pq-o${nhap[`Be|${h.ten}`] != null ? " la-nhap" : ""}${oHong[`Be|${h.ten}`] ? " la-hong" : ""}`}
-                          type="email" inputMode="email"
-                          aria-label={`Email nhận cảnh báo của ${h.ten}`}
-                          placeholder={h.emailTK ? `đăng nhập: ${h.emailTK}` : "chưa có"}
-                          value={emailHienTai(h)}
-                          onChange={(e) => {
-                            const k = `Be|${h.ten}`;
-                            if (e.target.value === (h.emailTH || "")) xoaNhap(k);
-                            else dat(k, e.target.value);
-                          }} />
-                      ) : (h.emailTH || h.emailTK
-                        || <span style={{ color: C.marigoldText, fontWeight: 700 }}>chưa có</span>)}
-                    </td>
-
-                    {DEPTS.map((d) => {
-                      const n = h.theoBp.get(d.id) || 0;
-                      /* Quyền HIỆU LỰC ở ô này, theo đúng luật của bảng A —
-                         kể cả mức vừa tích chưa lưu, để thấy ngay hệ quả. */
-                      const vai = vaiHienTai(h);
-                      const m = vai ? mucHienTai("update_progress", vai) : "khong";
-                      const suaDuoc = voChu ? null
-                        : m === "co" ? true
-                          : m === "bo_phan" ? bpHienTai(h) === d.id
-                            /* Mức "theo phân công" không trả lời được ở cấp
-                               ô này: nó phụ thuộc từng hạng mục (loại thẩm
-                               định × line), không phụ thuộc bộ phận. Trả về
-                               null để ô hiện màu trung tính thay vì nói bừa
-                               một trong hai đáp án. */
-                            : m === "phan_cong" ? null
-                              : false;
-                      return (
-                        <td key={d.id} style={{ ...td, textAlign: "center" }}>
-                          {n > 0 ? (
-                            <span title={suaDuoc === null ? "Chưa có người đứng tên"
-                              : suaDuoc ? "Đứng tên và sửa được" : "Đứng tên nhưng KHÔNG sửa được theo luật hiện hành"}
-                              style={{
-                                display: "inline-block", minWidth: 34, padding: "4px 9px", borderRadius: 8,
-                                fontFamily: NUM, fontSize: 13, fontWeight: 800,
-                                background: suaDuoc === false ? C.raspSoft : suaDuoc ? C.mintSoft : C.surfaceSunk,
-                                color: suaDuoc === false ? C.raspText : suaDuoc ? C.mintText : C.plumSoft,
-                              }}>
-                              {n}{suaDuoc === false ? " ⚠" : ""}
-                            </span>
-                          ) : <span style={{ color: C.plumSoft, opacity: .5 }}>·</span>}
-                        </td>
-                      );
-                    })}
-                    <td style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800 }}>{h.tong}</td>
-                  </tr>
-                );
-              })}
-              <tr>
-                <td style={{ ...td, fontWeight: 800 }} colSpan={4}>
-                  Tổng theo bộ phận
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
-                    Đếm cả hai chiều — một hạng mục do XSX quản lý mà QA thực hiện được tính ở cả hai cột,
-                    nên tổng ở đây lớn hơn tổng số hạng mục.
-                  </div>
-                </td>
-                {DEPTS.map((d) => (
-                  <td key={d.id} style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800, color: C.plumSoft }}>
-                    {tongTheoBp.get(d.id) || 0}
-                  </td>
-                ))}
-                <td style={td} />
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ display: "flex", gap: "8px 18px", flexWrap: "wrap", marginTop: 14,
-                      fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
-          <span><i style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: C.mint, marginRight: 6 }} />Đứng tên và sửa được</span>
-          <span><i style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: C.rasp, marginRight: 6 }} />Đứng tên nhưng KHÔNG sửa được</span>
-          <span>Cột bộ phận đổi màu ngay theo mức bạn vừa tích ở bảng A — thấy hệ quả trước khi lưu.
-            Riêng mức <b>◔ theo phân công</b> thì ô hiện màu trung tính: quyền lúc đó phụ thuộc từng
-            hạng mục (loại thẩm định × line), không phụ thuộc bộ phận, nên một ô cấp bộ phận không
-            trả lời được.</span>
-        </div>
-
-        <ThanhLuu soThayDoi={demNhap("Bv|", "Bd|", "Be|")} dangLuu={dangLuu === "B"}
-          ketQua={ketQua.B || null} onLuu={luuB}
-          onHoanTac={() => boNhap("B", "Bv|", "Bd|", "Be|")} khoa={!suaQuyenDuoc}
-          ghiChu="Tích vai trò và bộ phận, điền email nếu cần, xong bấm Lưu." />
-      </Card>
-
-      {/* ============ C · KHU VỰC / LINE ============ */}
-      <Card>
-        <CardTitle icon={MapPin}
-          sub="Chuẩn bị cho việc phân quyền chi tiết hơn — CHƯA có hiệu lực">
-          C · Phạm vi chi tiết theo khu vực / line
-        </CardTitle>
-        <CauKetLuan
-          tone="warn"
-          chinh="Luật hiện hành chỉ phân quyền tới cấp BỘ PHẬN, chưa tới khu vực hay line."
-          phu="Bảng dưới đây liệt kê phạm vi có thật trong dữ liệu để chuẩn bị. Nó CHƯA quyết định ai sửa được gì — vẽ một ma trận trông như đang có hiệu lực trong khi chưa có là cách nhanh nhất khiến người ta tin nhầm rằng đã phân quyền xong."
-        />
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {DEPTS.map((d) => {
-            const o = phamVi.get(d.id);
-            if (!o) return null;
-            const mo = moPhamVi === d.id;
-            const kv = [...o.khuVuc.entries()].sort((a, b) => b[1] - a[1]);
-            const ln = [...o.line.entries()].sort((a, b) => b[1] - a[1]);
-            return (
-              <div key={d.id} style={{ border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
-                <button type="button" onClick={() => setMoPhamVi(mo ? "" : d.id)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
-                           padding: "12px 14px", border: "none", cursor: "pointer",
-                           background: mo ? C.pinkMist : C.surface, fontFamily: TEXT }}>
-                  <span style={{ color: C.plumSoft, fontWeight: 900 }}>{mo ? "▾" : "▸"}</span>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: C.plum }}>{d.name}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
-                    {kv.length} khu vực · {ln.length} line · {tongTheoBp.get(d.id) || 0} hạng mục
-                  </span>
-                </button>
-                {mo && (
-                  <div style={{ padding: "12px 16px", background: C.surfaceSunk,
-                                display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 16 }}>
-                    {[["Khu vực", kv], ["Line", ln]].map(([ten, ds]) => (
-                      <div key={ten as string}>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginBottom: 6 }}>{ten as string}</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {(ds as Array<[string, number]>).slice(0, 14).map(([k, n]) => (
-                            <span key={k} style={{ fontSize: 12, fontWeight: 700, color: C.plum,
-                                                   background: C.surface, border: `1px solid ${C.line}`,
-                                                   borderRadius: 8, padding: "4px 9px" }}>
-                              {k} <b style={{ fontFamily: NUM, color: C.plumSoft }}>{n}</b>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* ============ D · MA TRẬN PHÂN CÔNG ============ */}
-      <Card variant="strong">
-        <CardTitle icon={Grid3x3}
-          sub="Thành viên lấy động từ danh bạ của bộ phận — tích ô để khai ai làm loại thẩm định nào, ở line nào">
-          D · Ai làm loại thẩm định nào, ở line nào
-        </CardTitle>
-
-        <CauKetLuan chinh={ketLuanD.chinh} phu={ketLuanD.phu} tone={ketLuanD.tone} />
-
         <div style={{ display: "flex", gap: "10px 18px", flexWrap: "wrap", alignItems: "flex-end",
                       margin: "14px 0 12px" }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>Bộ phận</span>
-            <select className="pq-o pq-loc" style={{ maxWidth: 260 }} value={bpChon}
-              onChange={(e) => setBpChon(e.target.value)}>
-              {DEPTS.map((d) => <option key={d.id} value={d.id}>{d.short} · {d.name}</option>)}
-            </select>
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>Line / khu vực</span>
-            <select className="pq-o pq-loc" style={{ maxWidth: 280 }} value={lineChon}
+            <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>
+              Ô phân công đang khai cho
+            </span>
+            <select className="pq-o pq-loc" style={{ maxWidth: 320 }} value={lineChon}
               disabled={!dsLine.length}
               onChange={(e) => setLineChon(e.target.value)}>
-              <option value="*">Mọi line của bộ phận</option>
-              {dsLine.map(([k, n]) => <option key={k} value={k}>{k} ({n} hạng mục)</option>)}
+              <option value="*">Mọi line — phân công chung</option>
+              {dsLine.map(([k, x]) => (
+                <option key={k} value={k}>
+                  {k} ({[...x.bp].map((b) => DEPTS.find((d) => d.id === b)?.short || b).join("/")}
+                  , {x.so} hạng mục)
+                </option>
+              ))}
             </select>
           </label>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plumSoft, paddingBottom: 8 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.plumSoft, paddingBottom: 8,
+                        maxWidth: 560, lineHeight: 1.6 }}>
             {dsLine.length
-              ? <>Tích ở <b>“Mọi line”</b> là phân công chung; chọn một line cụ thể để khai riêng cho line đó.</>
-              : <>Bộ phận này không chia line trong dữ liệu — chỉ có một cột phân công chung.</>}
+              ? <>Tám cột bên phải là phân công ở <b>{lineChon === "*" ? "mọi line" : `line ${lineChon}`}</b>.
+                  Tích ở “Mọi line” là phân công chung cho cả bộ phận; chọn một line cụ thể để khai riêng.</>
+              : <>Dữ liệu chưa chia line — chỉ có một cột phân công chung.</>}
           </div>
         </div>
 
+        {suaPhanCongDuoc && (
+          <div className="pq-them">
+            <input className="pq-o" style={{ maxWidth: 240 }} placeholder="Họ tên người mới"
+              aria-label="Họ tên người mới" value={nguoiMoi.ten}
+              onChange={(e) => setNguoiMoi((c) => ({ ...c, ten: e.target.value }))} />
+            <input className="pq-o" style={{ maxWidth: 230 }} type="email" placeholder="Email (không bắt buộc)"
+              aria-label="Email người mới" value={nguoiMoi.email}
+              onChange={(e) => setNguoiMoi((c) => ({ ...c, email: e.target.value }))} />
+            <NhomChip ds={CHIP_BP} dangChon={nguoiMoi.bp} nhan="Bộ phận của người mới"
+              onChon={(id) => setNguoiMoi((c) => ({ ...c, bp: id }))} />
+            <button type="button" className="pq-nut la-chinh" onClick={themNguoi}
+              disabled={!laTenThat(nguoiMoi.ten.trim()) || dangLuu === "B"}>
+              <Plus size={15} /> Thêm người
+            </button>
+          </div>
+        )}
+
         {loiD && (
-          <div className="pq-canhbao la-do" style={{ marginBottom: 12 }}>
+          <div className="pq-canhbao la-do" style={{ margin: "12px 0" }}>
             <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
             <span>Chưa đọc được ma trận phân công: {loiD}
               {/permission denied|row-level|JWT/i.test(loiD)
@@ -1385,89 +1447,140 @@ export default function PhanQuyenView(
           </div>
         )}
 
-        {!thanhVien.length ? (
-          <div style={{ padding: "18px 16px", borderRadius: 14, background: C.surfaceSunk,
-                        fontSize: 13.5, fontWeight: 700, color: C.plumSoft, lineHeight: 1.7 }}>
-            Chưa có ai thuộc bộ phận này. Thêm người ở khối <b>Danh bạ người thực hiện</b> ngay đầu
-            màn này và chọn đúng bộ phận — bảng dưới sẽ tự có dòng cho họ.
-          </div>
-        ) : (
-          <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", minWidth: 820, borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={th}>Nhân viên</th>
-                  <th style={th}>Nguồn tên</th>
-                  {LOAI_TD.map((lt) => <th key={lt} style={{ ...th, textAlign: "center" }}>{lt}</th>)}
-                  <th style={{ ...th, textAlign: "center" }}>Số loại</th>
-                </tr>
-              </thead>
-              <tbody>
-                {thanhVien.map((v) => {
-                  const dem = LOAI_TD.filter((lt) => pcHienTai(v.ten, lt)).length;
-                  return (
-                    <tr key={v.ten}>
-                      <td style={{ ...td, fontWeight: 800 }}>
-                        {v.ten}
-                        {!v.email && (
-                          <div style={{ fontSize: 11.5, fontWeight: 700, color: C.marigoldText }}>chưa có email</div>
-                        )}
-                      </td>
-                      <td style={{ ...td, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
-                        {[...v.nguon].join(" · ")}
-                      </td>
-                      {LOAI_TD.map((lt) => {
-                        const k = khoaD(v.ten, lt);
-                        const dang = pcHienTai(v.ten, lt);
-                        const o = dang ? VAI_O[dang] : null;
-                        return (
-                          <td key={lt} style={{ ...td, textAlign: "center", padding: "6px 4px" }}>
-                            <OTich ky={o ? o.ky : "＋"} chu={o ? o.chu : "chưa phân công"}
-                              mau={o ? o.mau : C.plumSoft} nen={o ? o.nen : C.surfaceSunk}
-                              khoa={!suaPhanCongDuoc}
-                              nhap={nhap[k] != null} hong={oHong[k]}
-                              onClick={() => bamD(v.ten, lt)}
-                              nhan={`${v.ten} · ${lt} · ${lineChon === "*" ? "mọi line" : lineChon}`} />
-                          </td>
-                        );
-                      })}
-                      <td style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800,
-                                   color: dem ? C.plum : C.plumSoft }}>
-                        {dem || "·"}
+        <div className="vmp-scroll" style={{ overflowX: "auto", marginTop: 12 }}>
+          <table style={{ width: "100%", minWidth: 1560, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, background: C.surface }} colSpan={6}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                    <KeyRound size={14} /> ĐƯỢC PHÉP LÀM GÌ
+                  </span>
+                </th>
+                <th style={{ ...th, background: C.pinkMist }} colSpan={9}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                    <Grid3x3 size={14} /> ĐANG NHẬN LÀM GÌ
+                    <GiaiThich tieuDe="Vì sao hai vế nằm chung một dòng">
+                      {"Câu hỏi đáng hỏi nhất của một ma trận trách nhiệm là: người nhận làm việc đó CÓ QUYỀN làm việc đó không.\n\n"
+                        + "Trước đây hai vế nằm ở hai bảng cách nhau một màn cuộn, nên phải tự ghép trong đầu — và người ta không ghép. Kết quả là những dòng như 'nhận làm PQ, phạm vi theo phân công, sửa được 0 hạng mục' tồn tại rất lâu mà không ai thấy.\n\n"
+                        + "Tám cột phân công KHÔNG chia theo bộ phận, vì khoá duy nhất của vmp_assignment_matrix là (tên người, loại thẩm định, line) — bộ phận chỉ là thuộc tính đi kèm. Ô chọn bộ phận ở bản trước chỉ lọc người, nó không phải một chiều thật của ma trận."}
+                    </GiaiThich>
+                  </span>
+                </th>
+              </tr>
+              <tr>
+                <th style={th}>Người</th>
+                <th style={th}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    Bộ phận
+                    <GiaiThich tieuDe="Một ô bộ phận, hai chỗ lưu">
+                      {"Dưới database bộ phận nằm ở HAI cột: vmp_performers.department và profiles.department (cột mà luật 'chỉ bộ phận mình' đem ra so).\n\n"
+                        + "Trước đây màn này có hai ô riêng cho hai cột đó, ở hai khối khác nhau — và chúng đã lệch thật. Nay một ô, bấm Lưu ghi xuống cả hai."}
+                    </GiaiThich>
+                  </span>
+                </th>
+                <th style={th}>Vai trò</th>
+                <th style={th}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    Phạm vi riêng
+                    <GiaiThich tieuDe="Phạm vi riêng của một người">
+                      {"Mức quyền đặt cho RIÊNG người này, thắng mức chung của vai ở ma trận 2.\n\n"
+                        + "Vì sao cần: hai người cùng vai department_user, cùng bộ phận XSX — một người phụ trách cả bộ phận, một người chỉ phụ trách line mình. Bắt cả vai dùng chung một mức thì hoặc mở quá tay cho người sau, hoặc khoá nhầm người trước.\n\n"
+                        + "Để 'theo vai' (mặc định) thì người này đi theo ma trận 2; đổi ma trận 2 là đổi cho họ luôn. Đặt riêng thì ma trận 2 không còn ảnh hưởng tới họ nữa — nên chỉ đặt khi thật sự có ngoại lệ."}
+                    </GiaiThich>
+                  </span>
+                </th>
+                <th style={{ ...th, textAlign: "center" }}>Xem</th>
+                <th style={{ ...th, textAlign: "center" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    Sửa được
+                    <GiaiThich tieuDe="Sửa được bao nhiêu hạng mục">
+                      {"Số hạng mục người này THẬT SỰ sửa được, do database đếm bằng đúng hàm đang chặn (ly_do_khong_sua_duoc), không phải bản mô tả luật viết lại ở giao diện.\n\n"
+                        + "Giải thích một mức quyền bằng chữ thì ai đọc cũng gật mà không ai chắc mình hiểu đúng. Thấy '223/448' thì hết chỗ hiểu nhầm.\n\n"
+                        + "Con số này của lần nạp gần nhất — tích chọn chưa lưu chưa làm nó đổi. Bấm Lưu xong nó tự tính lại."}
+                    </GiaiThich>
+                  </span>
+                </th>
+                <th style={{ ...th, textAlign: "center", background: C.pinkMist }}>Đứng tên</th>
+                {LOAI_TD.map((lt) => (
+                  <th key={lt} style={{ ...th, textAlign: "center", background: C.pinkMist }}>{lt}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...DEPTS.map((d) => d.id), ""].map((bp) => {
+                const ds = nhomTheoBp.get(bp) || [];
+                const meta = DEPTS.find((d) => d.id === bp);
+                if (!ds.length && !bp) return null;
+                const thieu = bp ? chuaAiNhan(bp) : [];
+                return (
+                  <Fragment key={bp || "trong"}>
+                    <tr>
+                      <td style={{ ...dai, background: bp ? C.pinkMist : C.marigoldSoft }} colSpan={15}>
+                        <span style={{ display: "inline-flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+                          <b style={{ color: bp ? C.plum : C.marigoldText }}>
+                            {meta ? `${meta.short} · ${meta.name}` : "Chưa gán bộ phận"}
+                          </b>
+                          <span style={{ fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
+                            {ds.length} người · {tongTheoBp.get(bp) || 0} hạng mục
+                          </span>
+                          {!bp && ds.length > 0 && (
+                            <span style={{ fontWeight: 700, color: C.marigoldText }}>
+                              — chưa phân công được ô nào cho tới khi có bộ phận
+                            </span>
+                          )}
+                          {thieu.length > 0 && (
+                            <span style={{ fontWeight: 700, color: C.raspText }}>
+                              chưa ai nhận: {thieu.join(", ")}
+                            </span>
+                          )}
+                        </span>
                       </td>
                     </tr>
-                  );
-                })}
+                    {!ds.length && bp && (
+                      <tr>
+                        <td style={{ ...td, color: C.plumSoft, fontWeight: 700 }} colSpan={15}>
+                          Chưa có ai. Thêm người ở ô trên rồi chọn bộ phận này.
+                        </td>
+                      </tr>
+                    )}
+                    {ds.map((h) => veDongNguoi(h))}
+                  </Fragment>
+                );
+              })}
+              {voChuHang && (
                 <tr>
-                  <td style={{ ...td, fontWeight: 800 }} colSpan={2}>Số người mỗi loại</td>
-                  {LOAI_TD.map((lt) => {
-                    const n = thanhVien.filter((v) => pcHienTai(v.ten, lt) === "thuc_hien").length;
-                    return (
-                      <td key={lt} style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800,
-                                            color: n ? C.mintText : C.raspText }}>
-                        {n || "0"}
-                      </td>
-                    );
-                  })}
-                  <td style={td} />
+                  <td style={{ ...td, fontWeight: 800, color: C.marigoldText }} colSpan={6}>
+                    Chưa ai đứng tên
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+                      {[...voChuHang.theoBp.entries()].sort((a, b) => b[1] - a[1])
+                        .map(([d, n]) => `${DEPTS.find((x) => x.id === d)?.short || d} ${n}`).join(" · ")}
+                    </div>
+                  </td>
+                  <td style={{ ...td, textAlign: "center", fontFamily: NUM, fontWeight: 800,
+                               color: C.marigoldText, background: C.pinkMist }}>
+                    {voChuHang.soDungTen}
+                  </td>
+                  <td style={{ ...td, background: C.pinkMist }} colSpan={8} />
                 </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <div style={{ display: "flex", gap: "8px 18px", flexWrap: "wrap", marginTop: 14,
                       fontSize: 12.5, fontWeight: 700, color: C.plumSoft, alignItems: "center" }}>
           <span><b style={{ color: C.mintText }}>●</b> Thực hiện — người trực tiếp làm</span>
           <span><b style={{ color: C.skyText }}>○</b> Hỗ trợ — phối hợp</span>
-          <span><b>＋</b> chưa phân công</span>
-          <span>Bấm một ô đi một bậc: ＋ → ● → ○ → ＋.</span>
+          <span><b>＋</b> chưa phân công · bấm một ô đi một bậc ＋ → ● → ○ → ＋</span>
+          <span>Cột <b>Sửa được</b> và các ô <b>phân công</b> đọc chéo nhau: người để phạm vi
+            <b> ◔ theo phân công</b> mà không có ô nào tích thì sửa được 0 hạng mục.</span>
         </div>
 
-        <ThanhLuu soThayDoi={demNhap("D|")} dangLuu={dangLuu === "D"}
-          ketQua={ketQua["D|"] || null} onLuu={luuD} onHoanTac={() => boNhap("D|", "D|")}
-          khoa={!suaPhanCongDuoc}
-          ghiChu="Tích ô cho từng người × từng loại thẩm định, xong bấm Lưu." />
+        <ThanhLuu soThayDoi={demNhap("Bv|", "Bd|", "Bp|", "Be|", "D|")} dangLuu={dangLuu === "B"}
+          ketQua={ketQua.B || null} onLuu={luuTrachNhiem}
+          onHoanTac={() => boNhap("B", "Bv|", "Bd|", "Bp|", "Be|", "D|")}
+          khoa={!quyenSuaA && !suaPhanCongDuoc}
+          ghiChu="Tích quyền bên trái, phân công bên phải — một nút Lưu cho cả dòng." />
       </Card>
 
       {/* ============ CÁCH DÙNG ============ */}
@@ -1476,16 +1589,16 @@ export default function PhanQuyenView(
           Từ ma trận này làm gì tiếp
         </CardTitle>
         <ol style={{ margin: 0, paddingLeft: 22, fontSize: 14, lineHeight: 1.8, color: C.plum }}>
-          <li><b>Điền danh bạ cho các bộ phận ngoài QA.</b> Ma trận phân công lấy người từ danh bạ; bộ phận nào chưa có ai thì bảng D của bộ phận đó trống.</li>
+          <li><b>Xử lý các dòng “sửa được 0/{tongHangMuc}”.</b> Người có tài khoản mà sửa được 0 hạng mục là người sẽ bấm sửa rồi bị từ chối mà không hiểu vì sao — hoặc gán bộ phận, hoặc tích ô phân công, hoặc đổi phạm vi riêng.</li>
           <li><b>Tạo tài khoản cho người đang đứng tên hạng mục.</b> Người không đăng nhập được thì phải nhờ nhập hộ, mà nhập hộ làm cột "người sửa" trong nhật ký không còn đúng người làm — đó là điểm yếu về ALCOA+ chữ A (Attributable).</li>
-          <li><b>Gán bộ phận cho tài khoản mang vai <code>department_user</code>.</b> Luật so bộ phận của hạng mục với bộ phận của người; thiếu vế sau thì họ không sửa được hạng mục nào, dù nhìn thấy hết.</li>
+          <li><b>Tích phân công cho các bộ phận chưa ai nhận.</b> Dải màu của mỗi bộ phận nói thẳng loại thẩm định nào trong kế hoạch chưa có người thực hiện — và người để phạm vi "theo phân công" ở bộ phận đó thì đang bị khoá sạch.</li>
         </ol>
         <div style={{ marginTop: 14, padding: "11px 14px", borderRadius: 14, background: C.surfaceSunk,
                       fontSize: 13, color: C.plumSoft, fontWeight: 600, lineHeight: 1.65 }}>
-          <b style={{ color: C.plum }}>Muốn phân quyền tới khu vực / line</b> thì phải sửa luật trong
-          <code> rpc_update_progress</code>: thêm bảng gán "người × khu vực" và so thêm một vế nữa.
-          Làm ở giao diện thôi thì không có tác dụng — client luôn có thể bị bỏ qua bằng cách gọi
-          thẳng RPC, nên quyền chỉ là quyền thật khi nó nằm ở server.
+          <b style={{ color: C.plum }}>Muốn phân quyền XEM theo bộ phận</b> — chẳng hạn XSX chỉ thấy hạng
+          mục của XSX — thì phải sửa policy RLS của <code>vmp_plan_items</code> bằng migration, không sửa
+          được ở màn này. Nửa XEM của ma trận 2 sẽ đổi theo ngay khi policy đổi, vì nó đọc thẳng
+          <code> pg_policy</code> chứ không chép lại.
         </div>
       </Card>
     </div>
