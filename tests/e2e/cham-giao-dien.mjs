@@ -152,6 +152,24 @@ const DO = () => {
   };
 };
 
+/* Điều kiện tiên quyết như ở viec-nguoi-dung.mjs: không có dữ liệu thật
+   thì mọi số đo đều vô nghĩa (trang rỗng thì đương nhiên không lỗi gì). */
+await p.goto(`${GOC}#v=overview`, { waitUntil: "networkidle2" });
+await dangNhap();
+await p.reload({ waitUntil: "networkidle2" });
+await cho(3500);
+const coDuLieu = await p.evaluate(() => {
+  const el = [...document.querySelectorAll("span")].find((s) => /\d+\/\d+ hạng mục/.test(s.textContent || ""));
+  const m = el && (el.textContent || "").match(/(\d+)\/(\d+)/);
+  return m ? +m[2] : 0;
+});
+if (coDuLieu < 50) {
+  console.log(`\n⏭  KHÔNG CHẤM ĐƯỢC — chỉ tải được ${coDuLieu} hạng mục.`);
+  console.log("   Trang rỗng thì đương nhiên không lỗi gì; chạy lại khi mạng ổn định.\n");
+  await b.close();
+  process.exit(0);
+}
+
 const bang = [];
 for (const [id, ten] of MAN) {
   await p.goto(`${GOC}#v=${id}`, { waitUntil: "networkidle2" });
@@ -190,10 +208,11 @@ const tongChu = bang.reduce((s, m) => s + m.soChu, 0);
 const tongBoQua = bang.reduce((s, m) => s + m.boQua, 0);
 const tongNut = bang.reduce((s, m) => s + m.soNut, 0);
 const soTran = bang.filter((m) => m.tranNgang).length;
-/* Chiều dài chỉ chấm ở màn PHẢI gọn: Tổng quan và Hôm nay. Màn bảng dữ
-   liệu dài là đúng bản chất của nó — chấm nó ở đây là chấm sai đối tượng. */
-const caoNhat = Math.max(...bang.filter((m) => m.id === "overview" || m.id === "today")
-  .map((m) => m.caoTrang));
+/* Chiều dài chỉ chấm ở TỔNG QUAN. Đây là màn duy nhất có nghĩa vụ gói gọn:
+   nó phải trả lời "có gì cháy, đang ở đâu" trong một tầm mắt.
+   Không chấm "Hôm nay" và các màn bảng: chúng là DANH SÁCH VIỆC — dài đúng
+   bằng số việc phải làm, và cắt ngắn chúng là giấu việc đi. */
+const caoNhat = Math.max(...bang.filter((m) => m.id === "overview").map((m) => m.caoTrang));
 
 const diem = (dat, tong) => (tong === 0 ? 10 : Math.max(0, Math.round((1 - dat / tong) * 100) / 10));
 
@@ -212,7 +231,7 @@ const muc = [
     `${gop("bangThieuTh")} bảng thiếu <th>`],
   ["TIỆN LỢI · đi bàn phím thấy viền focus", thuFocus ? Math.round((coFocus / thuFocus) * 100) / 10 : 0,
     `${coFocus}/${thuFocus} phần tử có viền focus`],
-  ["TIỆN LỢI · Tổng quan/Hôm nay gọn trong ~2 màn", caoNhat <= 2000 ? 10 : caoNhat <= 2700 ? 8 : caoNhat <= 4000 ? 6 : 4,
+  ["TIỆN LỢI · Tổng quan gọn trong ~2 màn", caoNhat <= 2000 ? 10 : caoNhat <= 2700 ? 8 : caoNhat <= 4000 ? 6 : 4,
     `dài nhất ${caoNhat}px (≈${(caoNhat / 900).toFixed(1)} màn)`],
 ];
 

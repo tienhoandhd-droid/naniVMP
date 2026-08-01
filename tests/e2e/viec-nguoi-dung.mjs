@@ -28,9 +28,17 @@ const b = await puppeteer.launch({
 });
 const p = await b.newPage();
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
+/* Tách LỖI MÃ NGUỒN khỏi SỰ CỐ MẠNG. Máy chạy kiểm thỉnh thoảng mất phân
+   giải tên miền Supabase (ERR_NAME_NOT_RESOLVED); lúc đó không có dữ liệu
+   nào tải về nên mọi mục đều đỏ — nhưng đỏ vì mất mạng chứ không phải vì
+   app hỏng. Gộp hai loại đó làm một là cách chắc chắn nhất để người ta
+   quen với màu đỏ rồi thôi đọc nó. */
+const LOI_MANG = /ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|Failed to fetch|WebSocket connection|net::ERR_/i;
 const loiJs = [];
-p.on("pageerror", (e) => loiJs.push(e.message));
-p.on("console", (m) => { if (m.type() === "error") loiJs.push(m.text()); });
+const loiMang = [];
+const ghiLoi = (t) => (LOI_MANG.test(t) ? loiMang : loiJs).push(t);
+p.on("pageerror", (e) => ghiLoi(e.message));
+p.on("console", (m) => { if (m.type() === "error") ghiLoi(m.text()); });
 
 const dangNhap = (ten = QA) => p.evaluate((t) => localStorage.setItem("vmp_monitor_user_v1",
   JSON.stringify({ name: t, email: "e2e@test.local", role: "admin", perm: "admin" })), ten);
@@ -61,6 +69,27 @@ const kiem = (vai, viec, dat, ghi = "", buoc = null) => {
 await p.setViewport({ width: 1440, height: 900 });
 await p.goto(GOC, { waitUntil: "domcontentloaded" });
 await dangNhap();
+
+/* ---- Điều kiện tiên quyết: dữ liệu thật đã tải về chưa ----
+   Không có dữ liệu thì mọi phép kiểm bên dưới đều vô nghĩa. Dừng sớm và
+   nói rõ lý do, thay vì in ra một bảng toàn dấu đỏ. */
+await p.goto(`${GOC}#v=overview`, { waitUntil: "networkidle2" });
+await dangNhap();
+await p.reload({ waitUntil: "networkidle2" });
+await cho(3500);
+const coDuLieu = await p.evaluate(() => {
+  const el = [...document.querySelectorAll("span")].find((s) => /\d+\/\d+ hạng mục/.test(s.textContent || ""));
+  const m = el && (el.textContent || "").match(/(\d+)\/(\d+)/);
+  return m ? +m[2] : 0;
+});
+if (coDuLieu < 50) {
+  console.log("\n⏭  KHÔNG KIỂM ĐƯỢC — chưa tải được dữ liệu thật từ Supabase");
+  console.log(`   chỉ thấy ${coDuLieu} hạng mục.`);
+  if (loiMang.length) console.log(`   sự cố mạng: ${loiMang[0].slice(0, 120)}`);
+  console.log("   Bộ kiểm này cần dữ liệu thật; chạy lại khi mạng ổn định.\n");
+  await b.close();
+  process.exit(0);
+}
 
 /* ==================== VAI 1 · QA PHỤ TRÁCH ==================== */
 console.log("\n── VAI 1 · QA phụ trách (mở máy buổi sáng) ──");
@@ -258,6 +287,9 @@ kiem("In", "Có kiểu dáng riêng cho bản in", coIn, coIn ? "" : "chưa có 
 console.log("\n── CHUNG ──");
 kiem("Chung", "Không có lỗi JS trong suốt phiên", loiJs.length === 0,
   loiJs.slice(0, 2).join(" | "));
+if (loiMang.length) {
+  console.log(`  ⏭  ${loiMang.length} sự cố mạng (không tính là lỗi app): ${loiMang[0].slice(0, 90)}`);
+}
 
 await b.close();
 
