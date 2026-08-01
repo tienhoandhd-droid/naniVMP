@@ -50,6 +50,93 @@ const PHAN_CONG_GIA = [
   { staff_name: "Lê Xuân Đức", department: "qa", validation_type: "OQ", line: "*", vai_tro: "ho_tro" },
 ];
 
+/* Nửa XEM của ma trận quyền — đúng hình dạng rpc_luat_xem trả về, lấy từ
+   policy RLS thật đang chạy (migration 20260801130000). Bốn dạng mức đều
+   có mặt vì mỗi dạng vẽ ra một ký hiệu khác nhau, và một dạng 'khong_ro'
+   để chắc rằng giao diện chịu hiện dấu hỏi thay vì đoán bừa. */
+const LUAT_XEM_GIA = {
+  ok: true,
+  noi_dung: [
+    {
+      bang: "vmp_plan_items", nhan: "Số liệu thẩm định — hạng mục, tiến độ, ngày tháng",
+      bieu_thuc: "true",
+      muc: { admin: "tat_ca", qa_manager: "tat_ca", department_user: "tat_ca", viewer: "tat_ca" },
+    },
+    {
+      bang: "profiles", nhan: "Danh sách người dùng — họ tên, email, vai trò",
+      bieu_thuc: "((id = auth.uid()) OR is_admin_or_qa())",
+      muc: { admin: "tat_ca", qa_manager: "tat_ca", department_user: "cua_minh", viewer: "cua_minh" },
+    },
+    {
+      bang: "audit_logs", nhan: "Nhật ký thay đổi — ai sửa gì, lúc nào, vì sao",
+      bieu_thuc: "is_admin_or_qa()",
+      muc: { admin: "tat_ca", qa_manager: "tat_ca", department_user: "khong", viewer: "khong" },
+    },
+    {
+      bang: "system_config", nhan: "Cấu hình hệ thống",
+      bieu_thuc: "((NOT is_sensitive) OR (auth_user_role() = 'admin'::user_role))",
+      muc: { admin: "tat_ca", qa_manager: "mot_phan", department_user: "mot_phan", viewer: "mot_phan" },
+    },
+    {
+      bang: "vmp_bang_la", nhan: "Bảng có policy dạng lạ",
+      bieu_thuc: "(cot_nao_do = current_setting('vmp.gi_do'))",
+      muc: { admin: "khong_ro", qa_manager: "khong_ro", department_user: "khong_ro", viewer: "khong_ro" },
+    },
+  ],
+};
+
+/* Một dòng một người — đúng hình dạng rpc_nguoi_va_quyen trả về
+   (migration 20260801110000). Bốn tình huống cần có mặt vì mỗi cái làm hỏng
+   một kiểu khác nhau:
+     · Tào Tiến Hoàn  — người ĐÃ nối với tài khoản. Trước migration đây là
+       HAI dòng vì tên ở hai bảng khác nhau.
+     · Thợ Xưởng Một  — có tài khoản, vai cho phép sửa, mà sửa được 0 hạng
+       mục: kiểu hỏng im lặng mà bảng phải gọi tên ra.
+     · Lê Xuân Đức    — đứng tên hạng mục nhưng chưa có tài khoản.
+     · Người Chỉ Xem  — tài khoản chưa nối với người nào, là nguồn cho ô
+       "nối với tài khoản". */
+const NGUOI_QUYEN_GIA = {
+  ok: true,
+  tong_hang_muc: 448,
+  nguoi: [
+    {
+      pid: "bbbb2222-0000-4000-8000-000000000001", user_id: "11111111-1111-1111-1111-111111111111",
+      ten: "Tào Tiến Hoàn", email: "tth@vd.local", bo_phan: "qa",
+      bo_phan_nguoi: "qa", bo_phan_tai_khoan: null, vai: "admin",
+      pham_vi_rieng: null, muc: "co", co_tai_khoan: true, tk_hoat_dong: true,
+      so_sua_duoc: 448, so_dung_ten: 62, so_phan_cong: 1,
+    },
+    {
+      pid: "bbbb2222-0000-4000-8000-000000000002", user_id: null,
+      ten: "Lê Xuân Đức", email: "lxd@vd.local", bo_phan: "qa",
+      bo_phan_nguoi: "qa", bo_phan_tai_khoan: null, vai: null,
+      pham_vi_rieng: null, muc: null, co_tai_khoan: false, tk_hoat_dong: true,
+      so_sua_duoc: 0, so_dung_ten: 8, so_phan_cong: 1,
+    },
+    {
+      pid: "bbbb2222-0000-4000-8000-000000000003", user_id: "22222222-2222-2222-2222-222222222222",
+      ten: "Thợ Xưởng Một", email: "tx1@vd.local", bo_phan: "xsx",
+      bo_phan_nguoi: "xsx", bo_phan_tai_khoan: "xsx", vai: "department_user",
+      pham_vi_rieng: "phan_cong", muc: "phan_cong", co_tai_khoan: true, tk_hoat_dong: true,
+      so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 0,
+    },
+    {
+      pid: "bbbb2222-0000-4000-8000-000000000004", user_id: null,
+      ten: "Chưa Gán Ai", email: null, bo_phan: null,
+      bo_phan_nguoi: null, bo_phan_tai_khoan: null, vai: null,
+      pham_vi_rieng: null, muc: null, co_tai_khoan: false, tk_hoat_dong: true,
+      so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 0,
+    },
+    {
+      pid: null, user_id: "33333333-3333-3333-3333-333333333333",
+      ten: "Người Chỉ Xem", email: "", bo_phan: null,
+      bo_phan_nguoi: null, bo_phan_tai_khoan: null, vai: "viewer",
+      pham_vi_rieng: null, muc: "khong", co_tai_khoan: true, tk_hoat_dong: true,
+      so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 0,
+    },
+  ],
+};
+
 const HO_SO_GIA = [
   { id: "11111111-1111-1111-1111-111111111111", full_name: "Người Quản Trị", email: "qt@vd.local", role: "admin", department: null, is_active: true },
   { id: "22222222-2222-2222-2222-222222222222", full_name: "Người Bộ Phận", email: "bp@vd.local", role: "department_user", department: "xsx", is_active: true },
@@ -95,6 +182,14 @@ p.on("request", (r) => {
     return traLoi(r, { ok: true, msg: "Đã cho phép email này tạo tài khoản" });
   }
   if (/\/rest\/v1\/vmp_performers/.test(r.url())) return traLoi(r, NGUOI_TH_GIA);
+  if (/\/rest\/v1\/rpc\/rpc_nguoi_va_quyen/.test(r.url())) return traLoi(r, NGUOI_QUYEN_GIA);
+  if (/\/rest\/v1\/rpc\/rpc_luat_xem/.test(r.url())) return traLoi(r, LUAT_XEM_GIA);
+  if (/\/rest\/v1\/rpc\/rpc_lien_ket_tai_khoan/.test(r.url())) {
+    return traLoi(r, { ok: true, msg: "Đã nối với tài khoản" });
+  }
+  if (/\/rest\/v1\/rpc\/rpc_set_user_role/.test(r.url())) {
+    return traLoi(r, { ok: true, msg: "Đã cập nhật phân quyền" });
+  }
   if (/\/rest\/v1\/rpc\/rpc_set_role_permission/.test(r.url())) {
     // Ô (Sinh timeline × viewer) cố tình hỏng để kiểm đường báo lỗi.
     const than = r.postData() || "";
@@ -129,10 +224,11 @@ p.on("request", (r) => { if (/\/rest\/v1\/rpc\//.test(r.url())) goiRpc.push(r.ur
    ĐẦU TIÊN (khối Danh bạ) rồi báo sai về khối đang kiểm — nên mọi phép
    kiểm dưới đây đều đi qua hàm này để khoanh đúng thẻ cần xét. */
 const KHOI = {
-  danhba: "Danh bạ người thực hiện theo bộ phận",
-  A: "A · Vai trò được làm gì",
-  B: "B · Ai chịu trách nhiệm phần nào",
-  D: "D · Ai làm loại thẩm định nào",
+  email: "1 · Ai được phép có tài khoản",
+  A: "2 · Vai nào xem được gì, sửa được gì",
+  /* Ma trận trách nhiệm & quyền — nuốt cả khối phân công cũ. Không còn
+     khối "4 · ..." nào để khoanh riêng. */
+  B: "3 · Ma trận trách nhiệm",
 };
 
 let dat = 0; let hong = 0;
@@ -158,7 +254,7 @@ const vao = async (perm) => {
   for (let lan = 0; ; lan++) {
     try {
       await p.waitForFunction(
-        () => document.body.innerText.includes("Ai chịu trách nhiệm phần nào"),
+        () => document.body.innerText.includes("Ma trận trách nhiệm"),
         { timeout: 30000 },
       );
       break;
@@ -200,13 +296,16 @@ const o = await p.evaluate((K) => {
   };
 }, KHOI);
 
-kiem("Ma trận A dùng ô tích, không dùng ô sổ xuống", o.soSoXuong === 0, `${o.soSoXuong} ô sổ xuống`);
-kiem("Có ô tích cho ma trận A và D", o.soTich >= 24, `${o.soTich} ô tích`);
-kiem("Vai trò và bộ phận là chip chọn-một", o.soChip >= 20, `${o.soChip} chip`);
+kiem("Ma trận quyền dùng ô tích, không dùng ô sổ xuống", o.soSoXuong === 0, `${o.soSoXuong} ô sổ xuống`);
+kiem("Có ô tích cho ma trận quyền và ma trận phân công", o.soTich >= 24, `${o.soTich} ô tích`);
+kiem("Vai trò, bộ phận, phạm vi là chip chọn-một", o.soChip >= 20, `${o.soChip} chip`);
 kiem("Chỉ còn ô gõ chữ ở nơi không có danh sách (tên, email)", o.soNhap >= 3, `${o.soNhap} ô nhập`);
 kiem("Mọi ô sửa đều có nhãn cho trình đọc màn hình", o.coNhan);
 kiem("Ngưỡng chạm ≥ 24px (WCAG 2.2)", o.caoNhoNhat >= 24, `${Math.round(o.caoNhoNhat)}px`);
-kiem("Mỗi bảng sửa được có một thanh Lưu", o.soThanhLuu >= 4, `${o.soThanhLuu} thanh`);
+/* Gộp sáu khối còn ba: hai khối sửa được (ma trận quyền · ma trận trách
+   nhiệm) nên đúng HAI thanh Lưu. Nhiều hơn nghĩa là còn khối trùng chưa
+   gộp — đây là phép kiểm chống việc màn hình phình lại. */
+kiem("Hai khối sửa được, mỗi khối một thanh Lưu", o.soThanhLuu === 2, `${o.soThanhLuu} thanh`);
 kiem("Chưa sửa gì thì nút Lưu tắt", o.nutLuuTat);
 
 /* ── 2. Sửa ma trận A: tích → đếm → Lưu → xác nhận ── */
@@ -229,21 +328,21 @@ const sauTich = await p.evaluate((ten) => {
   return {
     soNhap: k.querySelectorAll(".pq-tich.la-nhap").length,
     chu: k.querySelector(".pq-thanhluu-chu")?.innerText || "",
-    nutBat: !k.querySelector(".pq-nut.la-chinh")?.disabled,
+    nutBat: !k.querySelector(".pq-thanhluu .pq-nut.la-chinh")?.disabled,
   };
 }, KHOI.A);
 kiem("Tích xong ô hiện viền 'chưa lưu'", sauTich.soNhap >= 2, `${sauTich.soNhap} ô`);
 kiem("Thanh dưới đếm đúng số thay đổi chưa lưu", /2\s*thay đổi chưa lưu/.test(sauTich.chu), sauTich.chu.trim());
 kiem("Có thay đổi thì nút Lưu bật lên", sauTich.nutBat, nhan0);
 
-await p.evaluate((ten) => window.__khoi(ten).querySelector(".pq-nut.la-chinh").click(), KHOI.A);
+await p.evaluate((ten) => window.__khoi(ten).querySelector(".pq-thanhluu .pq-nut.la-chinh").click(), KHOI.A);
 await new Promise((r) => setTimeout(r, 1500));
 const sauLuu = await p.evaluate((ten) => {
   const k = window.__khoi(ten);
   return {
     chu: k.querySelector(".pq-thanhluu-chu")?.innerText || "",
     conNhap: k.querySelectorAll(".pq-tich.la-nhap").length,
-    nutTat: k.querySelector(".pq-nut.la-chinh")?.disabled,
+    nutTat: k.querySelector(".pq-thanhluu .pq-nut.la-chinh")?.disabled,
   };
 }, KHOI.A);
 kiem("Lưu xong báo rõ đã lưu mấy thay đổi", /Đã lưu \d+\/\d+/.test(sauLuu.chu), sauLuu.chu.trim());
@@ -258,7 +357,7 @@ await p.evaluate((ten) => {
     .click();
 }, KHOI.A);
 await new Promise((r) => setTimeout(r, 300));
-await p.evaluate((ten) => window.__khoi(ten).querySelector(".pq-nut.la-chinh").click(), KHOI.A);
+await p.evaluate((ten) => window.__khoi(ten).querySelector(".pq-thanhluu .pq-nut.la-chinh").click(), KHOI.A);
 await new Promise((r) => setTimeout(r, 1500));
 const oLoi = await p.evaluate((ten) => {
   const k = window.__khoi(ten);
@@ -329,22 +428,115 @@ kiem("Chỉ rõ email đã duyệt mà chưa tạo tài khoản", dse.baoChuaCoT
 kiem("Ghi rõ ba bước thêm người mới", dse.coBaBuoc);
 kiem("Admin có nút bỏ email khỏi danh sách", dse.coNutBo);
 
-/* ── Danh bạ người thực hiện chia theo bộ phận ── */
-console.log("\n── 3b. Danh bạ người thực hiện theo bộ phận ──");
-const db = await p.evaluate(() => {
-  const t = document.body.innerText;
+/* ── Nửa XEM của ma trận quyền ──
+   Trước khi gộp, màn này không trả lời được câu "ai xem được gì" — nửa đó
+   nằm ở policy RLS, không ở bảng luật nào mà giao diện đọc. */
+console.log("\n── 3b. Ma trận quyền — nửa XEM đọc từ RLS ──");
+const xem = await p.evaluate((ten) => {
+  const k = window.__khoi(ten);
+  const nhan = (r) => [...k.querySelectorAll(".pq-tich")]
+    .map((x) => ({ nhan: x.getAttribute("aria-label") || "", chu: x.title || "", khoa: x.disabled }))
+    .filter((x) => x.nhan.startsWith(r));
   return {
-    coKhoi: t.includes("Danh bạ người thực hiện theo bộ phận"),
-    coQA: /QA · QA – QLCL\s*\n?\s*2 người/.test(t) || /QA – QLCL[\s\S]{0,40}người/.test(t),
-    coXSX: t.includes("Thợ Xưởng Một"),
-    coChuaGan: t.includes("Chưa gán bộ phận") && t.includes("Chưa Gán Ai"),
-    coThem: t.includes("Thêm vào danh bạ"),
+    chu: k.innerText,
+    nhatKy: nhan("Nhật ký thay đổi"),
+    hoSo: nhan("Danh sách người dùng"),
+    la: nhan("Bảng có policy dạng lạ"),
   };
-});
-kiem("Có khối danh bạ chia theo bộ phận", db.coKhoi);
-kiem("Người XSX nằm ở nhóm XSX", db.coXSX);
-kiem("Người chưa gán bộ phận được tách riêng và cảnh báo", db.coChuaGan);
-kiem("Có chỗ thêm người mới vào danh bạ", db.coThem);
+}, KHOI.A);
+kiem("Có nửa XEM và nửa SỬA trong cùng một ma trận",
+  /XEM ĐƯỢC GÌ/.test(xem.chu) && /SỬA ĐƯỢC GÌ/.test(xem.chu));
+kiem("Nói rõ nửa XEM do RLS quyết, không sửa ở đây",
+  /Row Level Security/.test(xem.chu) && xem.nhatKy.every((x) => x.khoa));
+kiem("Nhật ký: admin và QA xem được, hai vai còn lại không",
+  /Xem được toàn bộ/.test(xem.nhatKy[0]?.nhan) && /Xem được toàn bộ/.test(xem.nhatKy[1]?.nhan)
+  && /Không xem được/.test(xem.nhatKy[2]?.nhan) && /Không xem được/.test(xem.nhatKy[3]?.nhan),
+  xem.nhatKy.map((x) => x.nhan.split(": ")[1]).join(" · "));
+kiem("Danh sách người dùng: vai thường chỉ xem được của chính mình",
+  /chính mình/.test(xem.hoSo[2]?.nhan || ""), xem.hoSo[2]?.nhan);
+kiem("Policy dạng lạ thì hiện dấu hỏi và nguyên văn, không đoán bừa",
+  /Chưa phân loại được/.test(xem.la[0]?.nhan || "")
+  && /current_setting/.test(xem.la[0]?.chu || ""), xem.la[0]?.nhan);
+
+/* ── Bảng Người đã nuốt khối danh bạ cũ ── */
+console.log("\n── 3b2. Bảng Người gộp cả danh bạ ──");
+const db = await p.evaluate((ten) => {
+  const k = window.__khoi(ten);
+  const t = k.innerText;
+  return {
+    khongConKhoiCu: !document.body.innerText.includes("Danh bạ người thực hiện theo bộ phận"),
+    coXSX: t.includes("Thợ Xưởng Một"),
+    coChuaGan: t.includes("Chưa Gán Ai"),
+    coThem: t.includes("Thêm người"),
+    /* Một ô bộ phận cho mỗi người, không phải hai ô ở hai khối như trước
+       khi gộp. Đếm theo TÊN: trùng tên trong danh sách này nghĩa là màn
+       hình lại đang cho sửa cùng một người ở hai chỗ. */
+    oBoPhan: [...k.querySelectorAll('[role="group"]')]
+      .map((g) => g.getAttribute("aria-label") || "")
+      .filter((t) => /^Bộ phận của /.test(t) && !/người mới$/.test(t)),
+  };
+}, KHOI.B);
+kiem("Khối danh bạ riêng đã biến mất khỏi màn", db.khongConKhoiCu);
+kiem("Người của mọi bộ phận nằm chung một bảng", db.coXSX && db.coChuaGan);
+kiem("Vẫn thêm được người mới ngay tại bảng", db.coThem);
+kiem("Mỗi người đúng MỘT ô bộ phận, không phải hai bảng hai ô",
+  db.oBoPhan.length > 0 && new Set(db.oBoPhan).size === db.oBoPhan.length,
+  `${db.oBoPhan.length} ô, ${new Set(db.oBoPhan).size} tên khác nhau`);
+
+/* ── Bảng B: một dòng một người, gộp ở database ──
+   Phép kiểm quan trọng nhất ở đây là ĐẾM DÒNG. Trước migration 20260801110000
+   màn này gộp bằng chuỗi tên, nên một người có tên khác nhau ở hai bảng sẽ ra
+   hai dòng — và hai dòng đó nói ngược nhau về cùng một người. */
+console.log("\n── 3bb. Bảng B — một dòng một người ──");
+const bb = await p.evaluate((ten) => {
+  const k = window.__khoi(ten);
+  const dong = [...k.querySelectorAll("tbody tr")];
+  const cotNguoi = dong.map((r) => (r.querySelector("td")?.innerText || "").split("\n")[0].trim());
+  return {
+    chu: k.innerText,
+    demHoan: cotNguoi.filter((t) => t === "Tào Tiến Hoàn").length,
+    demThoXuong: cotNguoi.filter((t) => t === "Thợ Xưởng Một").length,
+    coCotSuaDuoc: /Sửa được/.test(k.innerText),
+    /* 448/448 cho admin, 0/448 cho hai người bị chặn. */
+    coSoThat: /448\/448/.test(k.innerText) && /0\/448/.test(k.innerText),
+    chipPhamVi: [...k.querySelectorAll(".pq-chip")]
+      .filter((x) => /^Phạm vi riêng của/.test(x.getAttribute("aria-label") || "")).length,
+    phamViDangChon: [...k.querySelectorAll(".pq-chip.la-chon")]
+      .filter((x) => /^Phạm vi riêng của/.test(x.getAttribute("aria-label") || ""))
+      .map((x) => x.getAttribute("aria-label")),
+    coONoi: [...k.querySelectorAll("select")]
+      .some((s) => /nối .* với tài khoản/i.test(s.getAttribute("aria-label") || "")),
+  };
+}, KHOI.B);
+kiem("Mỗi người đúng MỘT dòng, không tách theo tên",
+  bb.demHoan === 1 && bb.demThoXuong === 1, `Tào Tiến Hoàn ×${bb.demHoan}`);
+kiem("Có cột 'Sửa được' đọc số thật từ database", bb.coCotSuaDuoc && bb.coSoThat);
+kiem("Có chip phạm vi riêng cho từng tài khoản", bb.chipPhamVi >= 15, `${bb.chipPhamVi} chip`);
+kiem("Phạm vi riêng đọc đúng giá trị đang lưu",
+  bb.phamViDangChon.some((t) => /Thợ Xưởng Một.*theo phân công/.test(t)),
+  bb.phamViDangChon.join(" | "));
+kiem("Gọi tên người có tài khoản mà sửa được 0 hạng mục",
+  /sửa được 0 hạng mục/i.test(bb.chu.replace(/\s+/g, " ")) && /Thợ Xưởng Một/.test(bb.chu));
+kiem("Người chưa có tài khoản có ô nối tay với tài khoản chưa nhận chủ", bb.coONoi);
+
+/* Đổi phạm vi riêng: phải vào bản nháp, đếm ở thanh Lưu, chưa gọi RPC. */
+goiRpc.length = 0;
+await p.evaluate((ten) => {
+  [...window.__khoi(ten).querySelectorAll(".pq-chip")]
+    .find((x) => /^Phạm vi riêng của Tào Tiến Hoàn: ◑/.test(x.getAttribute("aria-label") || ""))
+    .click();
+}, KHOI.B);
+await new Promise((r) => setTimeout(r, 400));
+const bbNhap = await p.evaluate((ten) => ({
+  chu: window.__khoi(ten).querySelector(".pq-thanhluu-chu")?.innerText || "",
+}), KHOI.B);
+kiem("Đổi phạm vi riêng vào bản nháp, chưa gọi RPC",
+  /1\s*thay đổi chưa lưu/.test(bbNhap.chu) && goiRpc.length === 0,
+  `${bbNhap.chu.trim()} · ${goiRpc.join(", ")}`);
+await p.evaluate((ten) => window.__khoi(ten).querySelector(".pq-thanhluu .pq-nut.la-chinh").click(), KHOI.B);
+await new Promise((r) => setTimeout(r, 1500));
+kiem("Bấm Lưu mới gọi rpc_set_user_role",
+  goiRpc.some((u) => /rpc_set_user_role/.test(u)), goiRpc.join(", "));
 
 /* ── Vai không phải admin thì bảng chỉ để xem ── */
 console.log("\n── 3c. Vai không phải admin — khoá sửa ──");
@@ -354,7 +546,7 @@ const k = await p.evaluate(() => ({
   chipBat: [...document.querySelectorAll(".pq-chip")].filter((x) => !x.disabled).length,
   coNutLuu: document.querySelectorAll(".pq-nut.la-chinh").length,
   noiRo: document.body.innerText.includes("Bảng chỉ để xem"),
-  vanDocDuoc: document.body.innerText.includes("Ai chịu trách nhiệm phần nào"),
+  vanDocDuoc: document.body.innerText.includes("Ma trận trách nhiệm"),
 }));
 kiem("Không ô tích nào bấm được", k.tichBat === 0, `${k.tichBat} ô`);
 kiem("Không chip nào bấm được", k.chipBat === 0, `${k.chipBat} chip`);
@@ -362,37 +554,54 @@ kiem("Không hiện nút Lưu", k.coNutLuu === 0);
 kiem("Nói rõ vì sao không sửa được", k.noiRo);
 kiem("Vẫn đọc được toàn bộ ma trận", k.vanDocDuoc);
 
-/* ── 4. Ma trận D · phân công theo loại thẩm định và line ── */
-console.log("\n── 4. Ma trận D — tích chọn loại thẩm định theo line ──");
+/* ── 4. Nửa TRÁCH NHIỆM của ma trận đã gộp ──
+   Bảng phân công cũ đứng riêng và có ô chọn BỘ PHẬN. Ô đó là ảo: khoá duy
+   nhất của vmp_assignment_matrix là (staff_name, validation_type, line) —
+   bộ phận không nằm trong khoá. Nay ô phân công nằm ngay trên dòng của
+   người, bộ phận lấy từ chính dòng đó. */
+console.log("\n── 4. Ma trận trách nhiệm — phân công nằm cùng dòng với quyền ──");
 await vao("admin");
 
 goiRpc.length = 0;
-const chonBp = async (bp) => {
-  await p.evaluate((v) => {
+const chonLine = async (v) => {
+  await p.evaluate((x) => {
     const s = [...document.querySelectorAll("select.pq-loc")]
-      .find((x) => [...x.options].some((o) => o.value === "xsx") && [...x.options].some((o) => o.value === "qa"));
+      .find((e) => [...e.options].some((o) => o.value === "*"));
     const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set;
-    set.call(s, v);
+    set.call(s, x);
     s.dispatchEvent(new Event("change", { bubbles: true }));
-  }, bp);
+  }, v);
   await new Promise((r) => setTimeout(r, 700));
 };
 
-await chonBp("qa");
 const d = await p.evaluate((ten) => {
-  const chu = document.body.innerText;
-  const o = [...window.__khoi(ten).querySelectorAll(".pq-tich")];
+  const k = window.__khoi(ten);
+  const chu = k.innerText;
+  const o = [...k.querySelectorAll(".pq-tich")];
+  /* Dải bộ phận: gộp xong vẫn phải thấy "bộ phận nào có những ai", đó là
+     việc mà khối danh bạ cũ làm và không được mất khi bỏ khối đó. */
+  const dai = [...k.querySelectorAll("tbody tr")]
+    .map((r) => r.querySelector("td[colspan]")?.innerText || "")
+    .filter((t) => /\d+ người/.test(t));
   return {
+    khongConOChonBoPhan: ![...document.querySelectorAll("select.pq-loc")]
+      .some((e) => [...e.options].some((x) => x.value === "xsx")),
+    coHaiVe: /ĐƯỢC PHÉP LÀM GÌ/.test(chu) && /ĐANG NHẬN LÀM GÌ/.test(chu),
     soO: o.length,
-    daTich: o.filter((x) => x.textContent.trim() !== "＋").map((x) => x.getAttribute("aria-label")),
-    coBangD: chu.includes("D · Ai làm loại thẩm định nào"),
+    daTich: o.filter((x) => !/^[＋]$/.test(x.textContent.trim()))
+      .map((x) => x.getAttribute("aria-label")),
     coDuLoai: ["DQ", "FAT/SAT", "IQ", "OQ", "PQ", "PV", "GSP", "GDP"].every((t) => chu.includes(t)),
     coChuThich: chu.includes("Thực hiện — người trực tiếp làm") && chu.includes("Hỗ trợ — phối hợp"),
     caoNhoNhat: Math.min(...o.map((x) => x.getBoundingClientRect().height)),
+    dai,
   };
-}, KHOI.D);
-kiem("Bảng D hiện với đủ 8 loại thẩm định", d.coBangD && d.coDuLoai);
-kiem("Có ô tích cho từng người × từng loại", d.soO >= 16, `${d.soO} ô`);
+}, KHOI.B);
+kiem("Hai vế quyền và trách nhiệm nằm trong cùng một bảng", d.coHaiVe);
+kiem("Ô chọn bộ phận — chiều không có thật — đã bỏ", d.khongConOChonBoPhan);
+kiem("Đủ 8 loại thẩm định làm cột", d.coDuLoai);
+kiem("Có ô tích cho từng người × từng loại", d.soO >= 24, `${d.soO} ô`);
+kiem("Vẫn thấy bộ phận nào có những ai (dải nhóm)",
+  d.dai.length >= 2, d.dai.map((t) => t.split("\n")[0]).join(" | ").slice(0, 110));
 kiem("Ô đã phân công đọc đúng từ database",
   d.daTich.some((t) => /Tào Tiến Hoàn · PQ .*: Thực hiện/.test(t))
   && d.daTich.some((t) => /Lê Xuân Đức · OQ .*: Hỗ trợ/.test(t)),
@@ -400,13 +609,25 @@ kiem("Ô đã phân công đọc đúng từ database",
 kiem("Ngưỡng chạm ô tích ≥ 24px", d.caoNhoNhat >= 24, `${Math.round(d.caoNhoNhat)}px`);
 kiem("Có chú thích ba trạng thái", d.coChuThich);
 
+/* Người chưa gán bộ phận thì KHÔNG phân công được — và ô phải nói ra lý
+   do, vì "bấm không ăn" mà im lặng là cách nhanh nhất để người dùng kết
+   luận màn hình hỏng. */
+const khoaBp = await p.evaluate((ten) => {
+  const o = [...window.__khoi(ten).querySelectorAll(".pq-tich")]
+    .filter((x) => /^Chưa Gán Ai · /.test(x.getAttribute("aria-label") || ""));
+  return { so: o.length, khoaHet: o.length > 0 && o.every((x) => x.disabled),
+           nhan: o[0]?.getAttribute("aria-label") || "" };
+}, KHOI.B);
+kiem("Người chưa gán bộ phận thì ô phân công khoá và nói rõ vì sao",
+  khoaBp.khoaHet && /chưa gán bộ phận/.test(khoaBp.nhan), khoaBp.nhan);
+
 /* Bấm một ô trống: phải đi lên bậc 'Thực hiện' và ghi lại ngay trên màn. */
 const truoc = await p.evaluate((ten) => {
   const o = [...window.__khoi(ten).querySelectorAll(".pq-tich")]
-    .find((x) => x.textContent.trim() === "＋");
+    .find((x) => !x.disabled && x.textContent.trim() === "＋");
   o.dataset.moc = "1";
   return o.getAttribute("aria-label");
-}, KHOI.D);
+}, KHOI.B);
 await p.evaluate(() => document.querySelector('.pq-tich[data-moc="1"]').click());
 await new Promise((r) => setTimeout(r, 900));
 const sau = await p.evaluate(() => {
@@ -418,19 +639,52 @@ kiem("Bấm ô trống → chuyển sang 'Thực hiện' ngay trên màn",
 
 /* Chưa bấm Lưu thì KHÔNG được gọi RPC — đó là cả điểm của bản nháp. */
 kiem("Chưa bấm Lưu thì chưa gọi RPC nào", goiRpc.length === 0, goiRpc.join(", "));
-await p.evaluate((ten) => window.__khoi(ten).querySelector(".pq-nut.la-chinh").click(), KHOI.D);
-await new Promise((r) => setTimeout(r, 1200));
-kiem("Bấm Lưu mới gọi rpc_set_assignment",
-  goiRpc.some((u) => /rpc_set_assignment/.test(u)), goiRpc.join(", "));
 
-/* Đổi bộ phận thì danh sách người phải đổi theo danh bạ, không giữ nguyên. */
-await chonBp("xsx");
-const xsx = await p.evaluate(() => document.body.innerText);
-kiem("Đổi bộ phận thì thành viên lấy theo danh bạ của bộ phận đó",
-  xsx.includes("Thợ Xưởng Một") && !xsx.includes("Tào Tiến Hoàn · PQ"));
-kiem("Bộ phận có chia line thì hiện danh sách line thật",
-  /Nang mềm|BFS|Khí dung/.test(xsx));
+/* MỘT nút Lưu cho cả dòng: tích thêm một ô quyền rồi Lưu một lần phải đẩy
+   được cả hai loại thay đổi xuống. Tách hai nút thì sửa một dòng lại phải
+   bấm hai chỗ, và quên một chỗ là mất nửa thay đổi. */
+await p.evaluate((ten) => {
+  [...window.__khoi(ten).querySelectorAll(".pq-chip")]
+    .find((x) => /^Phạm vi riêng của Tào Tiến Hoàn: ◑/.test(x.getAttribute("aria-label") || ""))
+    .click();
+}, KHOI.B);
+await new Promise((r) => setTimeout(r, 300));
+const demTruocLuu = await p.evaluate((ten) => window.__khoi(ten)
+  .querySelector(".pq-thanhluu-chu")?.innerText || "", KHOI.B);
+kiem("Một thanh Lưu đếm chung cả ô quyền lẫn ô phân công",
+  /2\s*thay đổi chưa lưu/.test(demTruocLuu), demTruocLuu.trim());
 
+await p.evaluate((ten) => window.__khoi(ten)
+  .querySelector(".pq-thanhluu .pq-nut.la-chinh").click(), KHOI.B);
+await new Promise((r) => setTimeout(r, 1800));
+kiem("Bấm Lưu một lần đẩy cả hai loại thay đổi xuống",
+  goiRpc.some((u) => /rpc_set_assignment/.test(u))
+  && goiRpc.some((u) => /rpc_set_user_role/.test(u)),
+  [...new Set(goiRpc)].join(", "));
+
+/* Đổi line: ô phân công phải khai cho line vừa chọn, và người thuộc bộ
+   phận không có line đó thì bị khoá kèm lý do. */
+if (await p.evaluate(() => [...document.querySelectorAll("select.pq-loc option")].length > 1)) {
+  const line = await p.evaluate(() => {
+    const s = [...document.querySelectorAll("select.pq-loc")]
+      .find((e) => [...e.options].some((o) => o.value === "*"));
+    return s.options.length > 1 ? s.options[1].value : "";
+  });
+  if (line) {
+    await chonLine(line);
+    const theoLine = await p.evaluate((ten) => {
+      const o = [...window.__khoi(ten).querySelectorAll(".pq-tich")];
+      return {
+        nhan: o.map((x) => x.getAttribute("aria-label") || ""),
+        coKhoaViLine: o.some((x) => x.disabled && /không có line/.test(x.title || "")),
+      };
+    }, KHOI.B);
+    kiem("Đổi line thì ô phân công khai cho đúng line đó",
+      theoLine.nhan.some((t) => t.includes(line)), line);
+    kiem("Người thuộc bộ phận không có line đó thì ô khoá kèm lý do",
+      theoLine.coKhoaViLine);
+  }
+}
 /* ── 5. Sạch lỗi ── */
 console.log("\n── 5. Không có lỗi console ──");
 const that = loi.filter((t) => !/401|403|Unauthorized|JWT|row-level security|Failed to load resource/i.test(t));

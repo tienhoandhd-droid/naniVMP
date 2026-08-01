@@ -609,6 +609,7 @@ export async function deleteStaffEmail(id: string): Promise<RpcResult> {
  * client luôn có thể bị bỏ qua. */
 export async function setUserRole(
   userId: string, role: string, department: string | null, reason?: string,
+  phamVi?: string | null,
 ): Promise<RpcResult> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   // Kiểu RPC sinh tự động từ schema (src/types/database.ts) chưa có hàm này
@@ -621,8 +622,100 @@ export async function setUserRole(
     p_role: role,
     p_department: department,
     p_reason: reason ?? null,
+    // Rỗng = "theo mức chung của vai", đúng nghĩa NULL ở cột profiles.pham_vi.
+    p_pham_vi: phamVi || null,
   });
   return unwrap(data, error, "Đổi phân quyền thất bại");
+}
+
+/* ---- Một người, một dòng (migration 20260801110000) ----
+ * Trước đây màn Phân quyền đọc bốn nguồn — profiles, vmp_performers,
+ * vmp_staff_emails, owner_name — rồi tự gộp bằng JavaScript, gộp theo CHUỖI
+ * TÊN. Gộp theo tên thì "Tào Tiến Hoàn" ở bảng người thực hiện và "Admin
+ * chính" ở bảng tài khoản là hai người khác nhau, dù cùng một email. Nay
+ * database gộp một lần bằng email + user_id và trả về một dòng một người.
+ *
+ * `so_sua_duoc` là số hạng mục người đó THẬT SỰ sửa được, đếm bằng đúng luật
+ * đang chạy — không phải bản mô tả luật viết lại ở client rồi lệch dần. */
+export interface NguoiQuyenRow {
+  /** id trong vmp_performers. null = tài khoản chưa nối với người nào. */
+  pid: string | null;
+  /** id tài khoản đăng nhập. null = người này chưa có tài khoản. */
+  user_id: string | null;
+  ten: string | null;
+  email: string | null;
+  bo_phan: string | null;
+  bo_phan_nguoi: string | null;
+  bo_phan_tai_khoan: string | null;
+  vai: string | null;
+  /** Phạm vi riêng đặt cho người này. null = theo mức chung của vai. */
+  pham_vi_rieng: "co" | "bo_phan" | "phan_cong" | "khong" | null;
+  /** Mức hiệu lực = phạm vi riêng nếu có, không thì mức của vai. */
+  muc: "co" | "bo_phan" | "phan_cong" | "khong" | null;
+  co_tai_khoan: boolean;
+  tk_hoat_dong: boolean;
+  so_sua_duoc: number;
+  so_dung_ten: number;
+  so_phan_cong: number;
+}
+
+export interface NguoiVaQuyen {
+  tongHangMuc: number;
+  nguoi: NguoiQuyenRow[];
+}
+
+export async function fetchNguoiVaQuyen(): Promise<NguoiVaQuyen> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_nguoi_va_quyen");
+  if (error) throw new Error(error.message);
+  const o = (data || {}) as { ok?: boolean; error?: string; tong_hang_muc?: number; nguoi?: NguoiQuyenRow[] };
+  if (o.ok === false) throw new Error(o.error || "Không đọc được danh sách người");
+  return { tongHangMuc: o.tong_hang_muc || 0, nguoi: o.nguoi || [] };
+}
+
+/* ---- Nửa "XEM" của ma trận quyền (migration 20260801130000) ----
+ * Quyền ĐỌC không nằm trong vmp_role_permissions mà nằm ở policy RLS của
+ * Postgres. rpc_luat_xem đi đọc đúng những policy đang chạy rồi phân loại
+ * ra mức cho từng vai — nên bảng trên màn hình không thể lệch với luật
+ * thật. Mức 'khong_ro' nghĩa là hàm gặp một dạng biểu thức nó chưa nhận
+ * diện được; lúc đó giao diện hiện nguyên văn biểu thức thay vì đoán. */
+export type MucXem = "tat_ca" | "mot_phan" | "cua_minh" | "khong" | "khong_ro";
+
+export interface LuatXemRow {
+  bang: string;
+  nhan: string;
+  /** Nguyên văn biểu thức RLS đang chạy. null = bảng không có policy đọc nào. */
+  bieu_thuc: string | null;
+  muc: Record<string, MucXem>;
+}
+
+export async function fetchLuatXem(): Promise<LuatXemRow[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_luat_xem");
+  if (error) throw new Error(error.message);
+  const o = (data || {}) as { ok?: boolean; error?: string; noi_dung?: LuatXemRow[] };
+  if (o.ok === false) throw new Error(o.error || "Không đọc được luật xem");
+  return o.noi_dung || [];
+}
+
+/** Nối tay một người thực hiện với một tài khoản, cho trường hợp email hai
+ *  bên khác nhau nên bước nối tự động ở migration không bắt được.
+ *  userId = null là gỡ nối. */
+export async function lienKetTaiKhoan(
+  performerId: string, userId: string | null,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_lien_ket_tai_khoan", {
+    p_performer_id: performerId,
+    p_user_id: userId,
+  });
+  return unwrap(data, error, "Nối tài khoản thất bại");
 }
 
 /* ---- Danh sách email được phép có tài khoản ---- */
