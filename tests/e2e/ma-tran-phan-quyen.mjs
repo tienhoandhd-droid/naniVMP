@@ -272,6 +272,45 @@ kiem("Hiện hộp lỗi nêu đích danh ô nào hỏng", oLoi.coHop && /Sinh t
 kiem("Nêu lý do máy chủ trả về", /Ô này bị khoá/.test(oLoi.chu));
 kiem("Ô hỏng giữ viền đỏ, thay đổi không bị nuốt mất", oLoi.oHong >= 1, `${oLoi.oHong} ô`);
 
+/* ── Bốn mức quyền của hàng "Cập nhật tiến độ" ── */
+console.log("\n── 3z. Bốn mức quyền, chỉ hàng Cập nhật tiến độ có mức mịn ──");
+const mucA = await p.evaluate((ten) => {
+  const k = window.__khoi(ten);
+  const nhan = (r) => [...k.querySelectorAll(".pq-tich")]
+    .map((x) => x.getAttribute("aria-label") || "")
+    .filter((t) => t.startsWith(r));
+  return {
+    chu: k.innerText,
+    capNhat: nhan("Cập nhật tiến độ ×"),
+    sinhTl: nhan("Sinh timeline từ danh mục nguồn ×"),
+  };
+}, KHOI.A);
+kiem("Chú thích nêu đủ bốn mức",
+  /Được — mọi hạng mục/.test(mucA.chu) && /quản lý .*hoặc.* thực hiện/.test(mucA.chu)
+  && /Theo phân công/.test(mucA.chu) && /◔/.test(mucA.chu));
+kiem("Nói rõ 'bộ phận mình' tính cả bộ phận thực hiện",
+  /quản lý .*hoặc.* thực hiện/.test(mucA.chu));
+
+/* Bấm ô update_progress × department_user cho đi hết một vòng bốn mức. */
+const vong = [];
+for (let i = 0; i < 4; i++) {
+  vong.push(await p.evaluate((ten) => {
+    const o = [...window.__khoi(ten).querySelectorAll(".pq-tich")]
+      .find((x) => /^Cập nhật tiến độ × department_user/.test(x.getAttribute("aria-label") || ""));
+    o.click();
+    return o.getAttribute("aria-label");
+  }, KHOI.A));
+  await new Promise((r) => setTimeout(r, 150));
+}
+kiem("Ô 'Cập nhật tiến độ' đi qua đủ bốn mức rồi quay lại",
+  new Set(vong.map((t) => t.split(":")[1]?.trim().split(" (")[0])).size === 4,
+  vong.map((t) => t.split(":")[1]?.trim().split(" (")[0]).join(" → "));
+await p.evaluate((ten) => {
+  const b = window.__khoi(ten).querySelector(".pq-nut:not(.la-chinh)");
+  if (b && !b.disabled) b.click();
+}, KHOI.A);
+await new Promise((r) => setTimeout(r, 300));
+
 /* ── Danh sách email được phép có tài khoản ── */
 console.log("\n── 3a. Ai được phép có tài khoản ──");
 const dse = await p.evaluate(() => {
