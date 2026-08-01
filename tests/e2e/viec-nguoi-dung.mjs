@@ -15,6 +15,7 @@
  * ===================================================================== */
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
+import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = "http://localhost:4173";
@@ -40,8 +41,12 @@ const ghiLoi = (t) => (LOI_MANG.test(t) ? loiMang : loiJs).push(t);
 p.on("pageerror", (e) => ghiLoi(e.message));
 p.on("console", (m) => { if (m.type() === "error") ghiLoi(m.text()); });
 
-const dangNhap = (ten = QA) => p.evaluate((t) => localStorage.setItem("vmp_monitor_user_v1",
-  JSON.stringify({ name: t, email: "e2e@test.local", role: "admin", perm: "admin" })), ten);
+const dangNhap = (ten = QA) => p.evaluate((t) => {
+  const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
+  localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
+    ...cu, name: t, email: "e2e@test.local", role: "admin", perm: "admin",
+  }));
+}, ten);
 
 const moMan = async (v) => {
   await p.goto(`${GOC}#v=${v}`, { waitUntil: "networkidle2" });
@@ -67,7 +72,7 @@ const kiem = (vai, viec, dat, ghi = "", buoc = null) => {
 };
 
 await p.setViewport({ width: 1440, height: 900 });
-await p.goto(GOC, { waitUntil: "domcontentloaded" });
+await vaoHeThong(p, GOC);
 await dangNhap();
 
 /* ---- Điều kiện tiên quyết: dữ liệu thật đã tải về chưa ----

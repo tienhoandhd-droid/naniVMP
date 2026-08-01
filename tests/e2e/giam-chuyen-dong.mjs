@@ -1,5 +1,6 @@
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
+import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
 await choServer("http://localhost:4173");
 
 const b = await puppeteer.launch({ executablePath:"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless:"new", args:["--no-sandbox","--use-gl=angle","--use-angle=metal"] });
@@ -7,8 +8,8 @@ const p = await b.newPage();
 await p.setViewport({width:1400,height:1000});
 await p.emulateMediaFeatures([{name:"prefers-reduced-motion",value:"reduce"}]);
 const loi=[]; p.on("pageerror",e=>loi.push(e.message));
-await p.goto("http://localhost:4173",{waitUntil:"domcontentloaded"});
-await p.evaluate(()=>localStorage.setItem("vmp_monitor_user_v1",JSON.stringify({name:"T",email:"e@t.l",role:"admin",perm:"admin"})));
+await vaoHeThong(p, "http://localhost:4173");
+await doiVaiTrenMan(p, "admin");
 await p.goto("http://localhost:4173#v=overview",{waitUntil:"networkidle2"});
 await p.reload({waitUntil:"networkidle2"});
 await new Promise(r=>setTimeout(r,5000));

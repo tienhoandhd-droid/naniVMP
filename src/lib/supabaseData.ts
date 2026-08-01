@@ -625,6 +625,36 @@ export async function setUserRole(
   return unwrap(data, error, "Đổi phân quyền thất bại");
 }
 
+/* ---- Danh sách email được phép có tài khoản ---- */
+export interface EmailChoPhepRow {
+  email: string;
+  ghi_chu: string | null;
+  is_active: boolean;
+}
+
+export async function fetchEmailChoPhep(): Promise<EmailChoPhepRow[]> {
+  if (!supabase) return [];
+  // Bảng sinh ở migration 20260801090000 — chưa có trong types sinh tự động.
+  const { data, error } = await supabase
+    .from("vmp_email_cho_phep" as never)
+    .select("email,ghi_chu,is_active");
+  if (error) throw new Error(error.message);
+  return ((data || []) as unknown as EmailChoPhepRow[])
+    .sort((a, b) => a.email.localeCompare(b.email));
+}
+
+export async function setEmailChoPhep(
+  email: string, choPhep: boolean, ghiChu?: string,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_email_cho_phep", {
+    p_email: email, p_cho_phep: choPhep, p_ghi_chu: ghiChu ?? null,
+  });
+  return unwrap(data, error, "Lưu danh sách email thất bại");
+}
+
 /* ---- Ma trận A: luật vai trò × hành động (bảng vmp_role_permissions) ---- */
 export interface RolePermRow {
   hanh_dong: string;

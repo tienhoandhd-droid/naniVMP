@@ -262,9 +262,30 @@ export function useVmpData() {
     } catch (e) { /* im lặng — lần sau thử lại */ }
   }, [docWatermark]);
 
+  /* Chỉ nạp dữ liệu khi ĐÃ CÓ PHIÊN. Từ migration 20260801090000, vai
+     `anon` không gọi được hàm rpc_* nào, nên gọi lúc chưa đăng nhập chỉ
+     tạo ra một lỗi 401 trong console — vô hại nhưng gây nhiễu, mà console
+     nhiễu thì lỗi thật sau này chìm trong đó. Chờ có phiên rồi mới gọi. */
   useEffect(() => {
-    const c = loadConn();
-    if (c?.readUrl || supabase) connectSheet(c?.readUrl || "", c?.writeUrl || "");
+    let con = true;
+    const thu = async () => {
+      const c = loadConn();
+      if (c?.readUrl && !supabase) { connectSheet(c.readUrl, c?.writeUrl || ""); return; }
+      if (!supabase) return;
+      const { data } = await supabase.auth.getSession();
+      if (con && data.session) connectSheet(c?.readUrl || "", c?.writeUrl || "");
+    };
+    thu();
+    /* Đăng nhập xong thì nạp ngay, không bắt người dùng bấm "Làm mới". */
+    const { data: sub } = supabase
+      ? supabase.auth.onAuthStateChange((sk) => {
+        if (con && sk === "SIGNED_IN") {
+          const c = loadConn();
+          connectSheet(c?.readUrl || "", c?.writeUrl || "");
+        }
+      })
+      : { data: { subscription: null } };
+    return () => { con = false; sub?.subscription?.unsubscribe(); };
   }, [connectSheet]);
 
   // ============================================================
