@@ -402,3 +402,69 @@ where n.nspname = 'public' and p.proname like 'rpc\_%'
 ```
 
 Hiện trạng: **0 hàm VOLATILE mở cho anon**, 9 hàm chỉ-đọc vẫn mở để dashboard công khai chạy được.
+
+## 12. Hệ thiết kế và ba bộ kiểm giao diện (2026-08-01)
+
+### 12a. Hai phông, sáu cỡ chữ, ba bo góc — và vì sao
+
+**Phông.** `Be Vietnam Pro` cho mọi thứ đọc thật (bảng, nhãn, thân bài);
+`Quicksand` chỉ còn logo, tiêu đề trang và số KPI lớn. Quicksand là font
+hiển thị — tròn hình học, x-height thấp, chữ 'a' một tầng — đặt nguyên một
+bảng số liệu 10–13px kèm dấu tiếng Việt bằng nó thì khó đọc. Be Vietnam Pro
+do người Việt thiết kế riêng cho tiếng Việt: dấu vẽ và canh chuẩn ở cỡ nhỏ,
+có sẵn chữ số đều bề rộng.
+
+**Thang bậc.** Trang từng dùng 22 cỡ chữ (riêng 10–16px đã có 12 cỡ). Nay
+chỉ 6: `12 / 14 / 16 / 20 / 28 / 40`, và 3 bo góc: `8 / 14 / 999`. Token nằm
+ở `:root` trong `src/index.css` (`--fs-*`, `--r-*`, `--lh-*`, `--s*`).
+
+> **Nếu thấy "cần" một cỡ mới thì đó là thiết kế sai, không phải thang bậc
+> thiếu.** Đừng gõ `fontSize: 13.5` — nó sẽ bị đợt rà sau ép về 14 và mất ý
+> đồ ban đầu.
+
+**Ba luật chữ** áp ở cuối `index.css`, cố ý đặt cuối để thắng mọi khai báo
+rải rác: sàn 12px · chiều cao dòng tối thiểu 1.4 (dấu tiếng Việt chồng tầng,
+line-height 1.0 làm dấu chạm dòng trên) · `tabular-nums` toàn app.
+
+### 12b. Màu thương hiệu KHÁC màu cảnh báo
+
+Trước đây thương hiệu là hồng `#E4749F/#A83364`, gần trùng sắc với cảnh báo
+`#D6486D/#B62E52`. Hệ quả: nút Làm mới, nút Quản trị, viền menu đang chọn
+đều cùng sắc với badge "Quá hạn" — mắt không tách được khung giao diện với
+tín hiệu nguy hiểm nên toàn trang lúc nào cũng như đang báo động.
+
+Nay thương hiệu là tím mận `#5B3A6B` (biến vẫn tên `--c-pink*` để không phải
+sửa ~990 style nội tuyến). **Đỏ chỉ mang nghĩa quá hạn/lỗi.**
+
+> Khi thêm màu mới: hỏi "màu này mang NGHĨA gì". Không mang nghĩa trạng thái
+> thì dùng trung tính, đừng mượn sắc cảnh báo để trang trí.
+
+### 12c. Ba bộ kiểm, ba câu hỏi khác nhau
+
+| Lệnh | Hỏi gì | Ngưỡng đạt |
+|---|---|---|
+| `npm run e2e` | App có chạy đúng không (URL, bộ lọc, 12 màn, lỗi JS) | 18/18 · 8/12 màn sạch |
+| `npm run cham` | Giao diện có đạt chuẩn đo được không | 10/10 (8 mục) |
+| `npm run viec` | Người dùng có làm xong việc không, mất mấy bước | 29/29 (7 vai) |
+
+`npm run cham` chấm 8 mục trên 4 trục — tương phản WCAG AA, tràn ngang, vùng
+bấm ≥24px, tên đọc được, nhãn ô nhập, hàng tiêu đề bảng, viền focus, độ dài
+trang Tổng quan. **Chỉ chấm thứ đo được**: cảm nhận thì tranh luận được, còn
+"nút này 15px, dưới ngưỡng 24px" thì không.
+
+`npm run viec` chạy theo VAI TRÒ (QA · bộ phận · người nhập liệu · khổ hẹp ·
+trạng thái rỗng · chế độ tối · bản in) và ghi rõ SỐ BƯỚC mỗi việc. Việc hằng
+ngày mà quá ba bước là hỏng.
+
+**Cả hai bộ đều dừng sớm khi chưa tải được dữ liệu thật** và nói rõ lý do,
+thay vì in ra một bảng toàn dấu đỏ. Lỗi mạng (`ERR_NAME_NOT_RESOLVED`) được
+tách riêng, không tính là lỗi app — trộn hai loại đỏ làm một là cách chắc
+chắn nhất để người ta quen với màu đỏ rồi thôi đọc nó.
+
+### 12d. Bản in
+
+Có `@media print` ở cuối `index.css`. Hệ GMP thì biên bản họp và hồ sơ trình
+thanh tra đều ra giấy: bản in ép nền sáng mực đen (in chế độ tối ra giấy là
+in một trang đen), bỏ mọi thứ để thao tác, không cắt thẻ ngang trang, lặp
+hàng tiêu đề bảng ở trang sau. Khối 3D không in được nên **nói rõ** và chỉ
+sang bản "Bảng nhiệt 2D", thay vì để một ô trắng không hiểu vì sao.
