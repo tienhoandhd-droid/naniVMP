@@ -94,6 +94,7 @@ const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
 const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
 const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
 const TodayView = lazy(() => import("./pages/TodayPage.tsx"));
+const PhanQuyenView = lazy(() => import("./pages/PhanQuyenPage.tsx"));
 const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
 import VongNam from "./components/dashboard/VongNam.tsx";
 import LoginCrown from "./components/three/LoginCrown.tsx";
@@ -2235,6 +2236,7 @@ export default function App() {
               {(view === "alerts" || view === "risk") && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
+              {view === "phanquyen" && <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} />}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} />}
             </Suspense>
