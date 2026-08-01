@@ -13,6 +13,7 @@
  *  duyệt: mail là bằng chứng gửi ra ngoài, không được phụ thuộc vào cái tab
  *  đang mở đã cũ tới đâu.
  * ===================================================================== */
+import { vePhien } from "./supabaseClient.ts";
 
 /** Loại phân tích — quyết định prompt bên n8n.
  *  - bao_cao      : nhận xét cho báo cáo quản lý (số đã gộp)
@@ -109,6 +110,11 @@ export async function chayPhanTichAi(req: AiRequest, signal?: AbortSignal): Prom
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (AI_TOKEN) headers["x-vmp-chat"] = AI_TOKEN;
+  /* Vé phiên đăng nhập — xem chú thích ở vePhien(). Token tĩnh ở trên nằm
+     trong gói JS công khai nên không giữ được bí mật; vé phiên mới là thứ
+     n8n xác thực được là "người này có thật và đã đăng nhập". */
+  const ve = await vePhien();
+  if (ve) headers.Authorization = `Bearer ${ve}`;
 
   const res = await fetch(AI_URL, {
     method: "POST",
