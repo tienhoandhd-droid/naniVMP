@@ -2025,17 +2025,17 @@ export default function TimelineView({ acts }: { acts: Activity[] }) {
             <Filter size={15} />
             <span>Lọc</span>
           </div>
-          <select value={cls} onChange={(e) => setCls(e.target.value)} className="timeline-select">
+          <select value={cls} onChange={(e) => setCls(e.target.value)} className="timeline-select" aria-label="Lọc theo nhóm đối tượng">
             <option value="all">Tất cả nhóm</option>
             {Object.keys(CLS).map((k) => (
               <option key={k} value={k}>{(CLS as Record<string, { label: string }>)[k].label}</option>
             ))}
           </select>
-          <select value={dept} onChange={(e) => setDept(e.target.value)} className="timeline-select">
+          <select value={dept} onChange={(e) => setDept(e.target.value)} className="timeline-select" aria-label="Lọc theo bộ phận">
             <option value="all">Tất cả bộ phận</option>
             {DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="timeline-select">
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="timeline-select" aria-label="Lọc theo tình trạng">
             <option value="all">Tất cả tình trạng</option>
             <option value="over">Cần chú ý</option>
             <option value="prog">Đang chạy</option>
