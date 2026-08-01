@@ -6204,6 +6204,15 @@ body { transition: background var(--mo-slow) var(--ease); }
   background: var(--c-surface-sunk); border-radius: 14px; padding: 10px 12px;
 }
 .vmp-space3d-tip b { color: var(--c-ink); }
+/* Đang trỏ vào một cột: dải chi tiết nổi hẳn lên. Bỏ tooltip bám con trỏ
+   (nó che mất chính cột đang trỏ) thì phải bù lại bằng một tín hiệu đủ
+   mạnh ở đây, không thì người ta không nhận ra chữ vừa đổi. */
+.vmp-space3d-tip.is-tro {
+  background: var(--c-surface);
+  border: 1px solid var(--c-pink);
+  box-shadow: var(--e-mid);
+  color: var(--c-ink);
+}
 @container (max-width: 720px) {
   .vmp-space3d-khung { height: 320px; }
   .vmp-space3d-chu { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; }
@@ -6261,29 +6270,8 @@ body { transition: background var(--mo-slow) var(--ease); }
   box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
 }
 
-/* Tooltip bám con trỏ trong khối 3D. Chi tiết cột phải hiện NGAY CẠNH
-   cột đang trỏ: bắt người ta liếc xuống dòng chữ dưới khung là bắt họ rời
-   mắt, mà rời mắt là mất luôn cột đang trỏ. */
-.vmp-space3d-hover {
-  position: absolute; z-index: 40;
-  transform: translate(14px, -50%);
-  pointer-events: none;
-  display: flex; flex-direction: column; gap: 3px;
-  padding: 9px 12px; border-radius: 14px;
-  background: var(--c-surface-raised);
-  border: 1px solid var(--c-line-strong);
-  box-shadow: var(--e-high);
-  max-width: 260px;
-}
-.vmp-space3d-hover b { font-size: 14px; font-weight: 800; color: var(--c-ink); white-space: nowrap; }
-.vmp-space3d-hover span {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 700; color: var(--c-ink); white-space: nowrap;
-}
-.vmp-space3d-hover i { width: 9px; height: 9px; border-radius: 8px; display: block; flex: none; }
-.vmp-space3d-hover em {
-  font-style: normal; font-weight: 700; color: var(--c-ink-soft); font-size: 12px;
-}
+/* Tooltip bám con trỏ ĐÃ BỎ (2026-08-01): nó che đúng cột đang trỏ vào.
+   Chi tiết chuyển sang dải bên phải khung vẽ — xem .vmp-space3d-tip.is-tro. */
 
 /* Câu kết luận của khối 3D đã chuyển sang khối chung `.vmp-ketluan` bên
    dưới — ba khối 3D và mọi biểu đồ 2D nay dùng cùng một khối, cùng một

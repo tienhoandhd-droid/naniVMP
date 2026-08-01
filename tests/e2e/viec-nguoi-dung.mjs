@@ -187,6 +187,37 @@ kiem("Nhập liệu", "Đổi được cách nhóm mà không phải sang màn k
   await p.evaluate(() => [...document.querySelectorAll("button")]
     .some((x) => /Theo đối tượng/.test(x.textContent || ""))), "", 1);
 
+/* ---- Cả ba khối 3D: có nút 2D, và KHÔNG có chú thích đè lên hình ---- */
+console.log("\n── Khối 3D · bản 2D thay thế và chú thích không che hình ──");
+for (const [v, ten, truoc] of [
+  ["timeline", "Địa hình tải việc", null],
+  ["reports", "VMP bốn giai đoạn", "3. Đánh giá so với mục tiêu"],
+  ["alerts", "Ma trận rủi ro QRM", null],
+]) {
+  await moMan(v);
+  if (v === "alerts") {
+    await p.evaluate(() => {
+      const x = [...document.querySelectorAll("button")].find((e) => /QRM|Ma trận/.test(e.textContent || ""));
+      x?.click();
+    });
+    await cho(3500);
+  }
+  if (truoc) {
+    await p.evaluate((t) => {
+      const el = [...document.querySelectorAll("*")].find((x) => (x.textContent || "").trim().startsWith(t));
+      el?.scrollIntoView({ block: "start" });
+    }, truoc);
+    await cho(4000);
+  }
+  const r = await p.evaluate(() => ({
+    nut2d: [...document.querySelectorAll("button")].some((x) => /Bảng nhiệt 2D/.test(x.textContent || "")),
+    deLen: !!document.querySelector(".vmp-space3d-hover"),
+    coKhoi: !!document.querySelector(".vmp-space3d"),
+  }));
+  kiem("Khối 3D", `${ten} · có nút chuyển sang bảng 2D`, r.coKhoi && r.nut2d, "", 1);
+  kiem("Khối 3D", `${ten} · không có chú thích đè lên hình`, !r.deLen, "");
+}
+
 /* ==================== VAI 4 · DÙNG TRÊN MÁY TÍNH BẢNG / ĐIỆN THOẠI ====
    Người ở xưởng và kho hiếm khi ngồi trước máy để bàn. Màn hình hẹp là
    điều kiện làm việc thật của họ, không phải trường hợp hiếm. */
