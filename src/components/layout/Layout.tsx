@@ -284,7 +284,9 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           )}
           {/* Mốc dữ liệu luôn hiện, không đợi tới lúc quá ngưỡng mới báo: sự cố
               21 ngày lần trước không ai phát hiện chính vì màn hình im lặng khi
-              mọi thứ "trông vẫn bình thường". */}
+              mọi thứ "trông vẫn bình thường".
+              Nhưng chỉ hiện, KHÔNG tô màu báo động: Supabase là dữ liệu gốc nên
+              "lâu không đổi" chỉ nghĩa là chưa ai nhập liệu. */}
           {dataUpdatedAt && (() => {
             const t = tuoiDuLieu(dataUpdatedAt);
             if (!t) return null;
@@ -293,18 +295,15 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
                 title={`Hạng mục được sửa gần nhất lúc ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`}
                 style={{
                   marginLeft: 10, fontSize: 12, fontWeight: 800,
-                  padding: t.cu ? "2px 9px" : 0, borderRadius: 999,
-                  color: t.cu ? C.marigoldText : C.plumSoft,
-                  background: t.cu ? C.marigoldSoft : "transparent",
+                  color: C.plumSoft,
                 }}>
                 {/* Ghép tay chứ không dùng toLocaleString: với vi-VN nó trả
                     "14:11 31-07" — giờ đứng trước ngày, đọc rất dễ nhầm. */}
                 {(() => {
                   const d = new Date(dataUpdatedAt);
                   const hai = (n: number) => String(n).padStart(2, "0");
-                  return `· Dữ liệu: ${hai(d.getDate())}/${hai(d.getMonth() + 1)} ${hai(d.getHours())}:${hai(d.getMinutes())}`;
+                  return `· Sửa lần cuối: ${hai(d.getDate())}/${hai(d.getMonth() + 1)} ${hai(d.getHours())}:${hai(d.getMinutes())}`;
                 })()}
-                {t.cu && ` (cũ ~${t.gio}h)`}
               </span>
             );
           })()}

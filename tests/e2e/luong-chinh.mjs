@@ -80,15 +80,27 @@ try {
   kiem("App dựng được, thanh lọc toàn cục hiện ra", !!tong, `${tong.hien}/${tong.tong} hạng mục`);
   kiem("Đọc được dữ liệu thật từ Supabase", tong.tong > 400, `tổng = ${tong.tong}`);
 
-  console.log("\n── 2. Chỉ báo độ tươi dữ liệu ──");
+  console.log("\n── 2. Chỉ báo mốc dữ liệu ──");
+  /* Nhãn đổi từ "· Dữ liệu:" sang "· Sửa lần cuối:" ngày 2026-08-03. Lý do:
+     Supabase là dữ liệu gốc nên max(updated_at) nghĩa là "lần cuối CÓ NGƯỜI
+     sửa", không phải "độ tươi của đường đồng bộ". Cùng lúc đó bỏ hẳn phần tô
+     cam "(cũ ~Nh)" — với kiến trúc mới nó kêu sau mỗi buổi tối và mỗi cuối
+     tuần, tức là một cảnh báo lúc nào cũng sáng. */
   const tuoi = await cho(page, () => {
     const el = [...document.querySelectorAll("span")]
-      .find((s) => (s.textContent || "").includes("· Dữ liệu:"));
+      .find((s) => (s.textContent || "").includes("· Sửa lần cuối:"));
     return el ? { chu: el.textContent.trim(), title: el.getAttribute("title") || "" } : null;
   }, { ten: "mốc dữ liệu trên Topbar" });
-  kiem("Topbar hiện mốc dữ liệu (không phải giờ trình duyệt tải)",
-    /· Dữ liệu: \d{2}\/\d{2} \d{2}:\d{2}/.test(tuoi.chu), tuoi.chu);
+  kiem("Topbar hiện mốc sửa gần nhất (không phải giờ trình duyệt tải)",
+    /· Sửa lần cuối: \d{2}\/\d{2} \d{2}:\d{2}/.test(tuoi.chu), tuoi.chu);
   kiem("Có tooltip nêu rõ mốc sửa gần nhất", /sửa gần nhất lúc/.test(tuoi.title), tuoi.title.slice(0, 60));
+  kiem("Không tô báo động 'dữ liệu cũ' — Supabase là gốc, lâu không sửa là bình thường",
+    !/cũ\s*~/.test(tuoi.chu), tuoi.chu);
+
+  const daiCanhBao = await page.evaluate(() =>
+    [...document.querySelectorAll("button, div")]
+      .some((e) => /Dữ liệu cũ ~\d+h/.test(e.textContent || "")));
+  kiem("Không còn dải cam 'Dữ liệu cũ ~Nh — bấm để xem'", !daiCanhBao);
 
   console.log("\n── 3. URL lái được màn hình + bộ lọc ──");
   await page.goto(`${GOC}#v=alerts&dept=xsx`, { waitUntil: "networkidle2" });
