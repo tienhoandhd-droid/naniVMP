@@ -61,6 +61,7 @@ import {
   wlIsDone,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
+import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
 import type { UrlState } from "./lib/urlState.ts";
 import { fetchSystemStatus } from "./lib/supabaseData.ts";
@@ -83,19 +84,23 @@ import {
   PrincessCommentary, StatTile, MultiSelect, GiaiThich, MAU_SO, Pill} from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 
-// ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm bundle
-// ban đầu; chỉ đụng cấu trúc UI, KHÔNG thay đổi luồng dữ liệu Sheet→Supabase). =====
-const TimelineView = lazy(() => import("./pages/TimelinePage.tsx"));
-const AlertsView = lazy(() => import("./pages/AlertsPage.tsx"));
-const CatalogView = lazy(() => import("./pages/CatalogPage.tsx"));
-const WorkloadView = lazy(() => import("./pages/WorkloadPage.tsx"));
-const SourceCatalogView = lazy(() => import("./pages/SourceCatalogPage.tsx"));
-const ServerChecksView = lazy(() => import("./pages/ServerChecksPage.tsx"));
-const UpdateView = lazy(() => import("./pages/UpdatePage.tsx"));
-const ActiveRulesView = lazy(() => import("./pages/ActiveRulesPage.tsx"));
-const TodayView = lazy(() => import("./pages/TodayPage.tsx"));
-const PhanQuyenView = lazy(() => import("./pages/PhanQuyenPage.tsx"));
-const ChatBox = lazy(() => import("./components/ai/ChatBox.tsx"));
+/* ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm
+   bundle ban đầu).
+   Bọc qua nhapCoThuLai(): chunk có mã băm theo nội dung nên bản deploy mới
+   xoá mất chunk cũ, ai đang mở web lúc đó bấm sang màn khác là ăn 404. Xem
+   src/lib/tailMan.ts để biết vì sao đây chính là "thỉnh thoảng lỗi tải lại
+   trang". ===== */
+const TimelineView = lazy(nhapCoThuLai(() => import("./pages/TimelinePage.tsx")));
+const AlertsView = lazy(nhapCoThuLai(() => import("./pages/AlertsPage.tsx")));
+const CatalogView = lazy(nhapCoThuLai(() => import("./pages/CatalogPage.tsx")));
+const WorkloadView = lazy(nhapCoThuLai(() => import("./pages/WorkloadPage.tsx")));
+const SourceCatalogView = lazy(nhapCoThuLai(() => import("./pages/SourceCatalogPage.tsx")));
+const ServerChecksView = lazy(nhapCoThuLai(() => import("./pages/ServerChecksPage.tsx")));
+const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
+const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
+const TodayView = lazy(nhapCoThuLai(() => import("./pages/TodayPage.tsx")));
+const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
+const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
 import VongNam from "./components/dashboard/VongNam.tsx";
 import LoginCrown from "./components/three/LoginCrown.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";

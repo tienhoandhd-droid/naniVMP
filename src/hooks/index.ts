@@ -27,7 +27,7 @@ export interface ConnState {
 }
 import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.ts";
 import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
-import { isSupabaseConfigured, signIn, signOut, getSession, supabase } from "../lib/supabaseClient.ts";
+import { isSupabaseConfigured, signIn, signOut, layPhien, supabase } from "../lib/supabaseClient.ts";
 import {
   fetchVmpDataFromSupabase, fetchVmpWatermark,
   updateItemProgress, upsertObjectSupabase, deleteSourceObject, fetchPerformers,
@@ -106,13 +106,18 @@ export function useAuth() {
     if (!isSupabaseConfigured()) { setLoading(false); return; }
     let con = true;
 
-    getSession()
-      .then((s) => {
+    layPhien()
+      .then(({ tinhTrang, user: phien }) => {
         if (!con) return;
-        if (s) { if (!user) { setUser(s); saveUser(s); } }
-        else { setUser(null); saveUser(null); }
+        /* CHỈ đăng xuất khi CHẮC CHẮN không có phiên. 'khong_ro' nghĩa là
+           mạng chập lúc gia hạn vé, hoặc chưa đọc nổi bảng profiles — lúc đó
+           đá người dùng ra màn đăng nhập là sai, và sai theo kiểu tệ nhất:
+           thỉnh thoảng mới xảy ra, ngay lúc tải lại trang. Giữ nguyên hồ sơ
+           đang có, để lần tải sau tự khỏi. */
+        if (tinhTrang === "khong") { setUser(null); saveUser(null); return; }
+        if (tinhTrang === "co" && phien && !user) { setUser(phien); saveUser(phien); }
       })
-      .catch(() => { /* mạng hỏng — giữ nguyên, lần sau thử lại */ })
+      .catch(() => { /* không kết luận được — giữ nguyên, lần sau thử lại */ })
       .finally(() => { if (con) setLoading(false); });
 
     /* Phiên chết GIỮA CHỪNG lúc tab đang mở: autoRefreshToken thử gia hạn,

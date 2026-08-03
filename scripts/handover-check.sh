@@ -75,6 +75,36 @@ if [ "$DB_OK" = "1" ]; then
   fi
 fi
 
+# 3c. Không hàm rpc_* nào được có hai bản trùng tên.
+#
+#     Overload + tham số có DEFAULT = một yêu cầu thiếu tham số khớp CẢ HAI
+#     bản, PostgREST trả PGRST203 và đường gọi từ web chết câm — trên màn chỉ
+#     hiện một câu báo lỗi chung chung. Đã xảy ra HAI lần: rpc_update_progress
+#     (31/07, làm đường ghi tiến độ chưa từng chạy được) và rpc_set_user_role
+#     (03/08, làm nút Lưu màn Phân quyền chết). Migration 20260803050000 dựng
+#     event trigger chặn ở tầng DB; đây là lưới thứ hai, để nếu chốt kia bị gỡ
+#     thì vẫn có chỗ nhìn thấy.
+if [ "$DB_OK" = "1" ]; then
+  DUP=$(psql "$SUPABASE_DB_URL" -tA -c "
+    select coalesce(string_agg(proname || ' (' || n || ' bản)', ', '), '') from (
+      select p.proname, count(*) as n
+      from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+      where ns.nspname = 'public' and p.proname like 'rpc\\_%'
+      group by p.proname having count(*) > 1) t;" 2>/dev/null | tr -d '\n')
+  GUARD=$(psql "$SUPABASE_DB_URL" -tA -c "
+    select count(*) from pg_event_trigger where evtname = 'chan_overload_rpc_tg';" 2>/dev/null | tr -d '[:space:]')
+
+  if [ -n "$DUP" ]; then
+    bad "Hàm rpc_* bị overload: $DUP" \
+        "PostgREST sẽ trả PGRST203, web gọi vào là chết câm. DROP bản cũ (xem migration 20260803050000)"
+  elif [ "$GUARD" != "1" ]; then
+    bad "Không còn event trigger chan_overload_rpc_tg" \
+        "Chốt chặn overload đã bị gỡ. Áp lại migration 20260803050000"
+  else
+    ok "Không hàm rpc_* nào bị overload · chốt chặn chan_overload_rpc_tg đang bật"
+  fi
+fi
+
 # 4. Google Sheet CSV công khai tải được (đường sync WF-04 dùng chính URL dạng này)
 SHEET_CSV="https://docs.google.com/spreadsheets/d/1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8/export?format=csv&gid=1252715724"
 CSV_TMP=$(mktemp -t vmp-sheet.XXXXXX)
