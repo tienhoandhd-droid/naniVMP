@@ -916,20 +916,33 @@ export function SkeletonDashboard() {
 }
 
 // ======================== SYNC STATUS BANNER ========================
-/** Ngưỡng coi dữ liệu là CŨ. WF-04 đồng bộ 5 phút một lần và mỗi lần áp
- *  snapshot đều chạm `updated_at` của toàn bộ hạng mục, nên quá 6 giờ không
- *  nhúc nhích nghĩa là đường Sheet→Supabase đã đứng — không phải "hôm nay ít
- *  việc nên không ai sửa gì". */
-export const NGUONG_DU_LIEU_CU_MS = 6 * 3600 * 1000;
+/* KHÔNG CÒN NGƯỠNG "DỮ LIỆU CŨ" — và đây là chủ ý, không phải bỏ sót.
+ *
+ * Ngưỡng 6 giờ trước kia đúng với kiến trúc cũ: WF-04 đồng bộ 5 phút một lần
+ * và mỗi lần áp snapshot đều chạm `updated_at` của toàn bộ hạng mục, nên quá
+ * 6 giờ không nhúc nhích thật sự nghĩa là đường Sheet→Supabase đã chết.
+ *
+ * Từ 2026-07-29 Supabase là dữ liệu gốc: `updated_at` chỉ đổi khi CÓ NGƯỜI sửa.
+ * Cùng một ngưỡng ấy nay kêu sau mỗi buổi tối, mỗi cuối tuần, mỗi đợt không ai
+ * nhập liệu — tức gần như liên tục. Tệ hơn, nó còn bảo người dùng đi "kiểm tra
+ * đồng bộ Sheet→Supabase (WF-04)", một đường đã tắt có chủ đích, nên ai làm
+ * theo cũng chỉ mất công.
+ *
+ * Một cảnh báo lúc nào cũng sáng thì không còn là cảnh báo. Nguy hiểm hơn cả
+ * việc thừa chỗ: nó dạy người ta bỏ qua màu cam, để rồi cảnh báo thật sau này
+ * cũng chìm luôn. Nên mốc dữ liệu vẫn hiện — dạng thông tin trung tính — còn
+ * phần báo động thì bỏ. Sự cố tải dữ liệu nay do `conn.status` báo, và nó dựa
+ * trên việc gọi RPC có thành công hay không, tức đúng thứ cần đo.
+ */
 
-/** Tuổi dữ liệu theo `max(updated_at)` trong DB. Trả null khi chưa đọc được
- *  watermark — lúc đó KHÔNG được đoán là dữ liệu tươi. */
-export function tuoiDuLieu(dataUpdatedAt?: string | null): { ms: number; gio: number; cu: boolean } | null {
+/** Tuổi dữ liệu theo `max(updated_at)` trong DB — tức "lần cuối có người sửa".
+ *  Là thông tin, KHÔNG phải tín hiệu hỏng. Trả null khi chưa đọc được watermark. */
+export function tuoiDuLieu(dataUpdatedAt?: string | null): { ms: number; gio: number } | null {
   if (!dataUpdatedAt) return null;
   const moc = new Date(dataUpdatedAt).getTime();
   if (Number.isNaN(moc)) return null;
   const ms = Math.max(0, Date.now() - moc);
-  return { ms, gio: Math.round(ms / 3600000), cu: ms > NGUONG_DU_LIEU_CU_MS };
+  return { ms, gio: Math.round(ms / 3600000) };
 }
 
 export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
@@ -938,41 +951,14 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
   lastSync?: number | string | null;
   dataUpdatedAt?: string | null;
 }) {
-  // S2-5/S3-5: cảnh báo dữ liệu CŨ theo TUỔI DỮ LIỆU (updated_at), không phải giờ fetch.
-  const tuoi = tuoiDuLieu(dataUpdatedAt);
-  const ageMs = tuoi ? tuoi.ms : null;
-  const stale = !!tuoi?.cu;
-  const [mo, setMo] = useState(false);
-  if (conn.status === "ok" && lastSync && !stale) return null;
+  /* Chỉ còn báo khi ĐƯỜNG TẢI thật sự có vấn đề. Dữ liệu lâu không ai sửa
+     không phải sự cố — xem khối chú thích ở trên. */
+  if (conn.status === "ok" && lastSync) return null;
   const isErr = conn.status === "err";
-  const isStaleOnly = conn.status === "ok" && stale;
 
-  const noiDung = conn.status === "loading" ? "Đang đồng bộ dữ liệu…"
+  const noiDung = conn.status === "loading" ? "Đang tải dữ liệu…"
     : isErr ? `Lỗi kết nối: ${conn.msg}`
-      : isStaleOnly ? `Dữ liệu có thể đã CŨ — không có thay đổi nào trong ~${Math.round((ageMs || 0) / 3600000)} giờ. Kiểm tra đồng bộ Sheet→Supabase (WF-04).`
-        : "Dữ liệu chưa đồng bộ. Bấm Làm mới để tải.";
-
-  /* Dữ liệu CŨ thu thành một dải mảnh bấm được, không phải khối cảnh báo
-     chiếm nguyên một hàng trên MỌI màn hình. Lý do: tình trạng này kéo dài
-     nhiều ngày liền, mà một cảnh báo hiện liên tục nhiều ngày thì người ta
-     thôi không đọc nữa — vừa mất chỗ vừa mất tác dụng.
-     LỖI KẾT NỐI thì vẫn bung hết: đó là chuyện phải xử ngay. */
-  const thuGon = isStaleOnly && !mo;
-  if (thuGon) {
-    return (
-      <button type="button" onClick={() => setMo(true)}
-        title={noiDung}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 12,
-          padding: "5px 12px", borderRadius: 999, cursor: "pointer",
-          background: C.marigoldSoft, border: `1px solid ${C.marigold}`,
-          color: C.marigoldText, fontFamily: TEXT, fontSize: 12, fontWeight: 800,
-        }}>
-        <span style={{ width: 8, height: 8, borderRadius: 999, background: C.marigold, flex: "none" }} />
-        Dữ liệu cũ ~{Math.round((ageMs || 0) / 3600000)}h — bấm để xem
-      </button>
-    );
-  }
+      : "Dữ liệu chưa tải. Bấm Làm mới để tải.";
 
   return (
     <div style={{
@@ -994,13 +980,8 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
           Đồng bộ cuối: {new Date(lastSync).toLocaleTimeString("vi-VN")}
         </span>
       )}
-      {isStaleOnly && (
-        <button type="button" onClick={() => setMo(false)} aria-label="Thu gọn"
-          style={{ border: "none", background: "transparent", cursor: "pointer",
-                   color: C.marigoldText, fontWeight: 900, fontSize: 14, lineHeight: 1, padding: "0 2px" }}>
-          ×
-        </button>
-      )}
+      {/* Không còn nút thu gọn: dải này giờ chỉ hiện khi đường tải thật sự
+          có vấn đề, mà chuyện đó thì không nên tắt đi cho khuất mắt. */}
     </div>
   );
 }
