@@ -1,8 +1,16 @@
 /* =====================================================================
- *  hooks/index.js — Custom React Hooks (Sheet-canonical read-only mode)
+ *  hooks/index.js — Custom React Hooks
  *  =====================================================================
- *  Google Sheet là nơi chỉnh sửa duy nhất. Dashboard chỉ đọc Supabase;
- *  mọi lời gọi ghi từ UI đều bị chặn ở client trước khi chạm tới API.
+ *  SUPABASE LÀ DỮ LIỆU GỐC (từ 2026-07-29, người dùng xác nhận 2026-08-03).
+ *  Dữ liệu nghiệp vụ đã được đẩy hẳn lên Supabase; nhập liệu và sửa đổi
+ *  diễn ra trên dashboard, đi qua RPC có kiểm quyền phía server.
+ *
+ *  Google Sheet nay chỉ là bản tham chiếu/lưu trữ cũ — KHÔNG ghi vào nó,
+ *  và cũng không còn kéo dữ liệu từ nó về (nhánh sync 5 phút của WF-04 đã
+ *  tắt có chủ đích). Đầu file này trước ghi ngược lại — "Sheet-canonical
+ *  read-only mode" — và câu đó đã sống sót qua nhiều lần sửa sau khi hết
+ *  đúng, đủ lâu để làm lạc hướng chẩn đoán. Sai lệch giữa comment và thực
+ *  tế tốn kém hơn không có comment.
  * ===================================================================== */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { DependencyList } from "react";

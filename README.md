@@ -15,21 +15,26 @@ bao cao theo cac moc De cuong - Tham dinh thuc te - Bao cao - VMP.
 | --- | --- |
 | Frontend | React 18 + Vite |
 | Du lieu runtime | Supabase RPC `rpc_get_vmp_dashboard` |
-| Dong bo upstream | Google Sheet canonical qua n8n WF-04 |
-| Che do browser | Read-only voi du lieu nghiep vu |
+| Nguon du lieu goc | Supabase (tu 2026-07-29). Google Sheet chi con la ban tham chieu cu |
+| Che do browser | Doc va ghi qua RPC co kiem quyen phia server |
 | Kiem thu local | `npm run build` |
 
 ## Luong du lieu
 
 ```mermaid
 flowchart LR
-  Sheet["Google Sheet 6.Timeline VMP"] -->|"Webhook instant va schedule fallback"| N8N["n8n WF-04 canonical sync"]
-  N8N -->|"RPC service-only"| Supabase["Supabase read model"]
-  Supabase -->|"rpc_get_vmp_dashboard"| App["VMP Monitor React app"]
+  App["VMP Monitor React app"] -->|"RPC ghi, kiem quyen server-side"| Supabase["Supabase — DU LIEU GOC"]
+  Supabase -->|"rpc_get_vmp_dashboard"| App
   App --> Timeline["Timeline"]
   App --> Diagram["Visual Explorer"]
   App --> Reports["Reports va QRM"]
+  Sheet["Google Sheet 6.Timeline VMP<br/>(ban tham chieu cu — khong ghi, khong con keo ve)"] -.->|"nhanh sync WF-04 DA TAT"| Supabase
 ```
+
+Truoc 2026-07-29 luong di nguoc lai: Sheet la canonical, n8n WF-04 day snapshot
+mot chieu xuong Supabase, browser khong duoc ghi. Nhanh sync do da tat co chu
+dich. Neu doc tai lieu cu thay mo ta chieu Sheet -> Supabase thi do la kien truc
+cu, khong phai kien truc dang chay.
 
 ## Man hinh chinh
 
@@ -78,12 +83,16 @@ npm run build
 
 ## Chinh sach an toan
 
-- Browser khong duoc ghi truc tiep du lieu nghiep vu VMP.
+- Browser khong duoc ghi THANG vao bang. Moi thao tac ghi di qua RPC
+  SECURITY DEFINER doc role/bo phan tu `profiles` — khong the lach bang
+  `supabase.from(...).update()`.
 - Supabase trong frontend chi dung anon key va RPC/doc bang duoc RLS bao ve.
-- Cac hanh dong ghi schema/du lieu Supabase, sua/publish workflow n8n, `git push`
+  Tu migration 20260801090000, vai `anon` khong goi duoc ham `rpc_*` nao:
+  chua dang nhap thi khong co so lieu.
+- Cac hanh dong doi schema/du lieu Supabase, sua/publish workflow n8n, `git push`
   va tao PR can duoc xac nhan rieng.
-- Google Sheet van la nguon nghiep vu canonical neu quy trinh WF-04 dang hoat
-  dong. Supabase la read model phuc vu dashboard.
+- Supabase la NGUON DU LIEU GOC. Google Sheet chi la ban tham chieu cu:
+  khong ghi vao no, va cung khong con keo du lieu tu no ve.
 
 ## Tai lieu tham khao ky thuat
 
