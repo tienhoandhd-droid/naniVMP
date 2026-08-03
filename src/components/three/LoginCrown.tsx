@@ -15,7 +15,8 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { GemStat } from "./CrownScene.tsx";
 
-const CrownScene = lazy(() => import("./CrownScene.tsx"));
+import { nhapCoThuLai } from "../../lib/tailMan.ts";
+const CrownScene = lazy(nhapCoThuLai(() => import("./CrownScene.tsx")));
 
 /** Bốn giai đoạn ở trạng thái hoàn tất — hình mẫu, không phải số liệu thật.
  *  Cố ý không đọc DB: màn đăng nhập chưa có phiên, kéo dữ liệu ở đây vừa

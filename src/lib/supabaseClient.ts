@@ -68,8 +68,15 @@ export async function signIn(email: string, password: string): Promise<AppUser> 
   if (!supabase) throw new Error("Supabase chưa cấu hình. Xem hướng dẫn cài đặt.");
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message === "Invalid login credentials" ? "Email hoặc mật khẩu không đúng." : error.message);
-  // Lấy profile (role, tên...)
+  // Lấy profile (role, tên...). Đọc không được thì báo thẳng chứ không cho
+  // vào với vai viewer mặc định — vào được mà thiếu quyền còn khó hiểu hơn
+  // là không vào được kèm lý do.
   const profile = await getProfile(data.user.id);
+  if (!profile) {
+    throw new Error(
+      "Đăng nhập được nhưng chưa đọc được hồ sơ người dùng. Thử lại; nếu vẫn vậy, liên hệ quản trị.",
+    );
+  }
   return { ...profile, uid: data.user.id, email: data.user.email, token: data.session.access_token };
 }
 
@@ -79,20 +86,59 @@ export async function signOut() {
   await supabase.auth.signOut();
 }
 
-/* ---- Kiểm tra phiên hiện tại ---- */
-export async function getSession(): Promise<AppUser | null> {
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) return null;
-  const profile = await getProfile(data.session.user.id);
-  return { ...profile, uid: data.session.user.id, email: data.session.user.email, token: data.session.access_token };
+/* ---- Kiểm tra phiên hiện tại ----
+ *
+ * BA kết quả, không phải hai. "Không có phiên" và "chưa hỏi được" là hai
+ * chuyện khác hẳn nhau, mà `AppUser | null` gộp chúng làm một.
+ *
+ * Vì sao quan trọng: getSession() của supabase-js đọc vé trong localStorage,
+ * và nếu vé hết hạn thì nó gọi mạng để gia hạn. Mạng chập lúc đó → trả về
+ * session null KÈM error. Bên gọi nếu hiểu null là "chưa đăng nhập" sẽ đá
+ * người dùng ra màn đăng nhập chỉ vì một cái chớp mạng lúc tải lại trang —
+ * đúng kiểu lỗi "thỉnh thoảng mới bị", loại khó tin nhất khi nghe báo.
+ *
+ * Nên: 'khong' = chắc chắn không có phiên → đăng xuất là đúng.
+ *      'khong_ro' = chưa kết luận được → GIỮ NGUYÊN trạng thái đang có.
+ */
+export type TinhTrangPhien = "co" | "khong" | "khong_ro";
+
+export async function layPhien(): Promise<{ tinhTrang: TinhTrangPhien; user: AppUser | null }> {
+  if (!supabase) return { tinhTrang: "khong", user: null };
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { tinhTrang: "khong_ro", user: null };
+    if (!data.session) return { tinhTrang: "khong", user: null };
+    const profile = await getProfile(data.session.user.id);
+    // Đọc được vé nhưng không đọc nổi hồ sơ → chưa kết luận được. Xem
+    // getProfile() bên dưới để biết vì sao không được đoán bừa ở đây.
+    if (!profile) return { tinhTrang: "khong_ro", user: null };
+    return {
+      tinhTrang: "co",
+      user: {
+        ...profile,
+        uid: data.session.user.id,
+        email: data.session.user.email,
+        token: data.session.access_token,
+      },
+    };
+  } catch {
+    return { tinhTrang: "khong_ro", user: null };
+  }
 }
 
-/* ---- Lấy profile từ bảng profiles ---- */
-async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token">> {
-  if (!supabase) return { name: "User", role: "viewer", perm: "view" };
+/* ---- Lấy profile từ bảng profiles ----
+ *
+ * Trả null khi KHÔNG đọc được, chứ không trả vai 'viewer' mặc định.
+ *
+ * Bản trước nuốt lỗi rồi trả {name:'User', role:'viewer'}. Nghĩa là chỉ cần
+ * một lần đọc bảng profiles trục trặc — mạng chập, RLS chớp — là admin bị
+ * hạ thành "User · viewer" ngay sau khi tải lại trang, im lặng, không một
+ * dòng lỗi. Người dùng thấy các nút biến mất và tưởng web hỏng. Hạ quyền
+ * âm thầm còn tệ hơn báo lỗi thẳng: không ai biết để mà sửa. */
+async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> | null> {
+  if (!supabase) return null;
   const { data, error } = await supabase.from("profiles").select("*").eq("id", uid).single();
-  if (error || !data) return { name: "User", role: "viewer", perm: "view" };
+  if (error || !data) return null;
   const permMap: Record<UserRole, Perm> = {
     admin: "admin", qa_manager: "admin", department_user: "edit", viewer: "view",
   };

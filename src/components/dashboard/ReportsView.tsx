@@ -24,7 +24,8 @@ import {
 
 import { C, TEXT, NUM, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
 // Khối 3D nạp theo yêu cầu: ai không mở trang Báo cáo thì không tải three.js.
-const VmpSpace3D = lazy(() => import("../three/VmpSpace3D.tsx"));
+import { nhapCoThuLai } from "../../lib/tailMan.ts";
+const VmpSpace3D = lazy(nhapCoThuLai(() => import("../three/VmpSpace3D.tsx")));
 import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";

@@ -17,7 +17,8 @@ import { useDebounce } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, Modal, Pill, phaseTag, CauKetLuan } from "../components/ui/Primitives.tsx";
 import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
-const WorkloadSpace3D = lazy(() => import("../components/three/WorkloadSpace3D.tsx"));
+import { nhapCoThuLai } from "../lib/tailMan.ts";
+const WorkloadSpace3D = lazy(nhapCoThuLai(() => import("../components/three/WorkloadSpace3D.tsx")));
 import type { ReactNode } from "react";
 import type { Activity, Milestones } from "../types/domain.ts";
 

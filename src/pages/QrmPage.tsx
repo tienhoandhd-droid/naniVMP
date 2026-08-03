@@ -89,7 +89,8 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
 type RiskGrid = Record<string, Record<string, Activity[]>>;
 
 // Khối rủi ro 3D nạp theo yêu cầu — không ai mở trang này thì không tải three.js.
-const RiskSpace3D = lazy(() => import("../components/three/RiskSpace3D.tsx"));
+import { nhapCoThuLai } from "../lib/tailMan.ts";
+const RiskSpace3D = lazy(nhapCoThuLai(() => import("../components/three/RiskSpace3D.tsx")));
 
 export default function QrmView({ acts }: { acts: Activity[] }) {
   const giamChuyenDong = useMemo(
