@@ -80,14 +80,41 @@ export function useAuth() {
   const [user, setUser] = useState(() => loadUser());
   const [loading, setLoading] = useState(true);
 
+  /* HỒ SƠ TRONG localStorage KHÔNG PHẢI BẰNG CHỨNG CÒN PHIÊN.
+     Bản trước chỉ hỏi getSession() khi localStorage rỗng. Nên khi phiên
+     Supabase chết mà hồ sơ còn (vé hết hạn, refresh token bị thu hồi, đổi
+     mật khẩu ở máy khác), app vẫn dựng đủ dashboard như đã đăng nhập —
+     trong khi useVmpData thấy không có phiên nên KHÔNG gọi gì cả. Kết quả:
+     màn hình đầy đủ, "0/0 hạng mục", đứng ở "Đang chờ đồng bộ…" vĩnh viễn,
+     không một dòng lỗi, và tải lại trang cũng không cứu được vì vòng lặp
+     lặp lại y hệt. Người dùng chỉ thấy "web không tải được dữ liệu".
+     Nay phiên thật là nguồn chân lý: không có phiên thì rơi về màn đăng nhập.
+
+     Vẫn vẽ ngay bằng hồ sơ trong localStorage rồi mới đi hỏi, để không phải
+     nhìn màn trắng mỗi lần mở app. Chỉ khi hỏi xong mà KHÔNG có phiên mới
+     xoá — và không đụng tới hồ sơ đang có khi phiên còn sống, để bộ kiểm
+     đổi vai trên màn vẫn dùng được (quyền thật do server giữ, không do đây). */
   useEffect(() => {
-    if (isSupabaseConfigured() && !user) {
-      getSession()
-        .then((s) => { if (s) { setUser(s); saveUser(s); } })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    if (!isSupabaseConfigured()) { setLoading(false); return; }
+    let con = true;
+
+    getSession()
+      .then((s) => {
+        if (!con) return;
+        if (s) { if (!user) { setUser(s); saveUser(s); } }
+        else { setUser(null); saveUser(null); }
+      })
+      .catch(() => { /* mạng hỏng — giữ nguyên, lần sau thử lại */ })
+      .finally(() => { if (con) setLoading(false); });
+
+    /* Phiên chết GIỮA CHỪNG lúc tab đang mở: autoRefreshToken thử gia hạn,
+       thất bại thì supabase-js phát SIGNED_OUT. Không nghe thì app lại rơi
+       đúng vào trạng thái trên, chỉ khác là không cần tải lại trang. */
+    const { data: sub } = supabase!.auth.onAuthStateChange((sk, phien) => {
+      if (con && sk === "SIGNED_OUT" && !phien) { setUser(null); saveUser(null); }
+    });
+
+    return () => { con = false; sub?.subscription?.unsubscribe(); };
   }, []); // eslint-disable-line
 
   /* Chỉ ghi khi user THẬT SỰ đổi, KHÔNG ghi ở lần chạy đầu.
@@ -200,7 +227,20 @@ export function useVmpData() {
         });
         return;
       } catch (e) {
-        console.warn("Supabase read failed, trying n8n:", (e as Error).message);
+        const loi = (e as Error)?.message || "";
+        /* Hết phiên thì n8n cũng không cứu được, mà thông báo của nhánh
+           fallback ("chưa cấu hình URL đọc n8n") lại chỉ sai hướng hoàn toàn —
+           người dùng đi sửa cấu hình trong khi việc cần làm là đăng nhập lại.
+           42501 = permission denied for function: chính là vai anon gọi rpc_*
+           sau migration 20260801090000. */
+        if (/42501|permission denied|JWT|401/i.test(loi)) {
+          setConn((c) => ({
+            ...c, readUrl, writeUrl, status: "err",
+            msg: "Phiên đăng nhập đã hết hạn — đăng nhập lại để tải dữ liệu.",
+          }));
+          return;
+        }
+        console.warn("Supabase read failed, trying n8n:", loi);
         // Fallback sang n8n nếu Supabase lỗi
       }
     }
@@ -273,7 +313,17 @@ export function useVmpData() {
       if (c?.readUrl && !supabase) { connectSheet(c.readUrl, c?.writeUrl || ""); return; }
       if (!supabase) return;
       const { data } = await supabase.auth.getSession();
-      if (con && data.session) connectSheet(c?.readUrl || "", c?.writeUrl || "");
+      if (!con) return;
+      if (data.session) { connectSheet(c?.readUrl || "", c?.writeUrl || ""); return; }
+      /* Không có phiên → không gọi RPC (đúng), nhưng PHẢI nói ra. Bản trước
+         lặng lẽ không làm gì, để banner đứng ở "Đang chờ đồng bộ…" — một câu
+         hàm ý "chờ tí nữa là có", trong khi sự thật là sẽ không bao giờ có.
+         useAuth ở trên sẽ đưa về màn đăng nhập; dòng này lo trường hợp còn
+         kịp nhìn thấy banner, để lý do hiện ra thay vì phải đoán. */
+      setConn((cu) => ({
+        ...cu, status: "err",
+        msg: "Phiên đăng nhập đã hết hạn — đăng nhập lại để tải dữ liệu.",
+      }));
     };
     thu();
     /* Đăng nhập xong thì nạp ngay, không bắt người dùng bấm "Làm mới". */
