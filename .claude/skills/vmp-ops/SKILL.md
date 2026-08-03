@@ -1,20 +1,22 @@
 ---
 name: vmp-ops
-description: Chẩn đoán và vận hành pipeline VMP (Google Sheet → n8n WF-04 → Supabase → dashboard React). Dùng khi được hỏi về sync đứng/lỗi, dữ liệu cũ, guard chặn snapshot, trạng thái hệ VMP, hoặc trước khi sửa schema/workflow của dự án này.
+description: Chẩn đoán và vận hành hệ VMP (Supabase là dữ liệu gốc → dashboard React; n8n lo AI/cảnh báo). Dùng khi được hỏi về dữ liệu cũ/không tải được, guard chặn snapshot, trạng thái hệ VMP, hoặc trước khi sửa schema/workflow của dự án này.
 ---
 
 # Vận hành hệ VMP
 
 ## Luật bất di bất dịch
 
-1. **KHÔNG BAO GIỜ ghi vào Google Sheet.** Đây là dữ liệu gốc của người dùng, và
-   `6.Timeline VMP` là bản họ hoàn thiện nhất — **nhiều cột nhập tay** không tái tạo được
-   từ luật. Chỉ được `curl` tải CSV/XLSX về đọc. Nhánh ghi ngược App → Sheet trong WF-04
-   bị `disabled` **có chủ đích** — đừng bật lại.
-2. **Luồng dữ liệu hiện tại một chiều:** Sheet → Supabase. Supabase là read model, chỉ
-   n8n/Postgres service được ghi snapshot (migration `enforce_sheet_canonical_read_only`).
-   ⚠️ **Đang trong quá trình chuyển** sang lấy Supabase làm nơi lưu dữ liệu gốc, cho phép
-   sửa từ dashboard. Xem "Chuyển đổi kiến trúc" bên dưới trước khi động vào phần ghi.
+1. **SUPABASE LÀ DỮ LIỆU GỐC.** Chuyển đổi đã XONG, không còn "đang chuyển":
+   người dùng đã đẩy dữ liệu lên Supabase và xác nhận ngày 2026-08-03. Nhập liệu
+   và sửa đổi diễn ra trên dashboard, đi qua RPC có kiểm quyền phía server.
+   Nhánh sync 5 phút Sheet → Supabase của WF-04 đã **tắt có chủ đích**.
+2. **KHÔNG BAO GIỜ ghi vào Google Sheet**, và cũng đừng kéo dữ liệu từ nó về nữa.
+   Sheet `6.Timeline VMP` nay là **bản tham chiếu/lưu trữ cũ**: vẫn là công sức
+   nhập tay của người dùng nên không được đụng vào, nhưng nó **không còn là chân lý** —
+   Sheet lệch với Supabase thì Supabase đúng. Chỉ được `curl` tải CSV/XLSX về đọc.
+   ⚠️ Tài liệu và comment cũ trong repo có thể vẫn mô tả chiều Sheet → Supabase.
+   Đó là kiến trúc CŨ. Gặp thì sửa, đừng tin theo.
 3. **Đổi schema chỉ qua migration mới** trong `supabase/migrations/`, áp bằng
    `psql --single-transaction -f`. Không sửa trực tiếp trên DB.
 4. **Hỏi trước khi áp migration lên production** hoặc sửa/publish workflow trên n8n.
@@ -29,25 +31,39 @@ bash scripts/handover-check.sh
 7 mục, ~1 phút, chỉ đọc. Bao gồm dead-man's switch (độ trễ sync) và kiểm tra tỉ lệ
 dòng/ID duy nhất của Sheet. Đa số sự cố lộ ra ngay ở đây.
 
-## Cây quyết định khi "dashboard hiển thị dữ liệu cũ"
+## Cây quyết định khi "web không tải được dữ liệu"
+
+**Đừng đi tìm sync trước.** Supabase là dữ liệu gốc, không còn đường sync nào phải
+chạy — `vmp_sheet_sync_runs` đứng yên nhiều ngày là **bình thường**, không phải sự cố.
+Tiền lệ 2026-08-03: bảng sync đứng 3 ngày trông rất giống nguyên nhân, nhưng lỗi thật
+nằm ở phiên đăng nhập.
 
 ```
-1. Sync thành công gần nhất cách đây bao lâu?
-   psql "$SUPABASE_DB_URL" -c "select now()-max(created_at) from public.vmp_sheet_sync_runs where status='completed';"
-   → < 30 phút: dữ liệu vẫn tươi, vấn đề nằm ở frontend/cache.
-   → lâu hơn: đi tiếp bước 2.
+1. DB còn dữ liệu không?  bash scripts/handover-check.sh
+   → 7/7 đạt → dữ liệu lành, lỗi nằm ở frontend/phiên. Đi bước 2.
+   → hỏng → xem mục guard bên dưới.
 
-2. WF-04 có đang chạy không? (n8n MCP: search_workflows / search_executions)
-   → active:false  → cần publish WF-04.
-   → active:true nhưng executions toàn 'error' → bước 3.
-   ⚠️ Execution status 'success' với mode 'error' KHÔNG phải sync thành công —
-      đó là Error Trigger đang chạy để báo lỗi. Đọc nhầm chỗ này rất dễ.
+2. Mở web bằng tài khoản thật rồi nhìn cho kỹ (tests/e2e/_repro có sẵn mẫu):
+   → Rơi về màn đăng nhập  → đúng, chỉ cần đăng nhập lại.
+   → Dựng đủ dashboard mà "0/0 hạng mục" + "Đang chờ đồng bộ…" + console SẠCH
+     → phiên chết mà hồ sơ localStorage còn. Đã sửa 2026-08-03, có phép kiểm
+       tests/e2e/phien-het-han.mjs canh. Tái phát thì xem lại useAuth.
 
-3. Lấy thông báo lỗi thật:
-   get_execution(includeData=true, nodeNames=[...]) — payload rất lớn, MCP sẽ ghi ra file;
-   dùng jq trích: .data.resultData.error.message  và  .data.resultData.lastNodeExecuted
+3. Console có 401 / 42501 "permission denied for function rpc_*"?
+   → chưa đăng nhập, hoặc vai `anon` bị siết đúng như thiết kế (migration
+     20260801090000). Kiểm nhanh ngoài app:
+     curl -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/rpc_get_vmp_dashboard" \
+       -H "apikey: $VITE_SUPABASE_ANON" -H "Authorization: Bearer $VITE_SUPABASE_ANON" \
+       -H "Content-Type: application/json" -d '{"p_year":2026}'
+     401 ở đây là ĐÚNG, không phải lỗi.
 
-4. Nếu là VMP_SYNC_ROW_GUARD → bước 5. Nếu HEADER_DRIFT → cột Sheet bị đổi tên.
+4. Email có trong danh sách cho phép không?
+   psql "$SUPABASE_DB_URL" -c "select email,is_active from public.vmp_email_cho_phep;"
+   Và có hồ sơ trong public.profiles chưa? (thiếu hồ sơ → tụt về vai viewer im lặng)
+
+5. Banner "Dữ liệu cũ ~Nh" KHÔNG phải lỗi tải. Nó là watermark = max(updated_at)
+   của vmp_plan_items, tức "lần cuối có người sửa dữ liệu". Không ai sửa mấy hôm
+   thì nó kêu, dù mọi thứ khoẻ mạnh.
 ```
 
 ## Guard chặn snapshot — chẩn đoán đúng nguyên nhân
