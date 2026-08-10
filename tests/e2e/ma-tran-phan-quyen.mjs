@@ -241,8 +241,10 @@ let daVao = false;
 const vao = async (perm) => {
   if (!daVao) { await vaoHeThong(p, GOC); daVao = true; }
   await doiVaiTrenMan(p, perm, "Tào Tiến Hoàn");
-  await p.goto(`${GOC}#v=phanquyen`, { waitUntil: "networkidle2" });
-  await p.reload({ waitUntil: "networkidle2" });
+  // Realtime/polling giữ request nền nên networkidle2 có thể không bao giờ
+  // tới khi chạy sau các E2E khác. Chờ DOM rồi dùng nội dung thật bên dưới.
+  await p.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
+  await p.reload({ waitUntil: "domcontentloaded" });
   /* Chờ theo NỘI DUNG chứ không theo đồng hồ. Lần chạy đầu tiên trong
      phiên phải tải cả bó JS lười + dữ liệu, lâu hơn hẳn các lần sau; đặt
      một con số giây cố định thì lúc chạy cả bộ sẽ hỏng ngẫu nhiên còn chạy
@@ -261,7 +263,7 @@ const vao = async (perm) => {
     } catch (e) {
       if (lan >= 1) throw e;
       console.log("  … màn chưa dựng xong, tải lại lần 2");
-      await p.reload({ waitUntil: "networkidle2" });
+      await p.reload({ waitUntil: "domcontentloaded" });
     }
   }
   await new Promise((r) => setTimeout(r, 1200));
@@ -543,8 +545,8 @@ kiem("Bấm Lưu mới gọi rpc_set_user_role",
 /* ── Vai không phải admin thì bảng chỉ để xem ── */
 console.log("\n── 3c. Vai không thuộc allowlist — chặn truy cập ──");
 await doiVaiTrenMan(p, "view", "Tào Tiến Hoàn");
-await p.goto(`${GOC}#v=phanquyen`, { waitUntil: "networkidle2" });
-await p.reload({ waitUntil: "networkidle2" });
+await p.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
+await p.reload({ waitUntil: "domcontentloaded" });
 await p.waitForFunction(
   () => document.body.innerText.includes("Không có quyền truy cập"),
   { timeout: 30000 },
