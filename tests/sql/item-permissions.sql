@@ -1611,5 +1611,47 @@ begin
   ) then
     raise exception 'Preflight chưa chặn mapping resolve stale: %', v_result;
   end if;
+
+  v_values := jsonb_set(v_values, '{19}', to_jsonb(''::text));
+  update public.vmp_plan_items
+  set source_sheet_data = jsonb_set(source_sheet_data, '{values}', v_values, true)
+  where validation_code = v_code;
+  perform public.rpc_refresh_source_item_assignments();
+  if exists (
+    select 1 from public.vmp_item_assignments
+    where validation_code = v_code and source = 'sheet_other_staff'
+      and public.vmp_normalize_person_name(source_text) =
+          public.vmp_normalize_person_name('E2E Resolve Tên Trùng')
+  ) then
+    raise exception 'Fixture source đã xóa nhưng assignment cũ vẫn còn';
+  end if;
+  v_result := public.rpc_item_permission_preflight();
+  if exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'STALE_SOURCE_RESOLUTION'
+      and error->>'record_id' like v_code || '×sheet_other_staff×%'
+  ) then
+    raise exception 'Mapping orphan của source đã hết không được khóa preflight: %', v_result;
+  end if;
+
+  v_result := public.rpc_cleanup_orphan_source_assignment_resolutions(
+    'Dọn mapping của source không còn tồn tại'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (v_result->>'cleaned')::integer < 1
+      or exists (
+        select 1 from public.vmp_source_assignment_resolutions
+        where validation_code = v_code and source = 'sheet_other_staff'
+      ) then
+    raise exception 'Cleanup phải xóa mapping orphan an toàn: %', v_result;
+  end if;
+  if not exists (
+    select 1 from public.audit_logs
+    where table_name = 'vmp_source_assignment_resolutions'
+      and source = 'source_resolution_cleanup'
+      and change_reason = 'Dọn mapping của source không còn tồn tại'
+  ) then
+    raise exception 'Cleanup mapping orphan phải ghi audit';
+  end if;
 end
 $test$;
