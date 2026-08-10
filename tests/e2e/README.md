@@ -18,7 +18,17 @@ Hoặc chạy từng bộ:
 node tests/e2e/luong-chinh.mjs          # 19 phép kiểm: URL, bộ lọc, Việc của tôi, độ tươi
 node tests/e2e/quet-tat-ca-man.mjs      # mở lần lượt 12 màn, bắt lỗi console
 node tests/e2e/giam-chuyen-dong.mjs     # prefers-reduced-motion có thật sự dừng 3D không
+node tests/e2e/danh-ba-phan-quyen.mjs   # autocomplete, tự điền và phân công bằng person_id
+node tests/e2e/quyen-cot-timeline.mjs   # preview/enforced theo từng cột timeline
+node tests/e2e/thu-hoi-cache-phan-quyen.mjs # thu hồi cache và fail-closed khi bật enforced
+node tests/e2e/ma-tran-phan-quyen.mjs   # chống hồi quy ma trận quyền hiện hành
 ```
+
+Khi nghiệm thu phân quyền theo từng hạng mục, chạy `npm run test:permissions`
+sau khi đã dựng `npm run build` và mở preview ở cổng 4173. Bộ kiểm dùng ba
+persona QA, bộ phận quản lý thiết bị và chỉ-xem; chế độ `preview` phải giữ
+hành vi cũ, còn `enforced` chỉ được mô phỏng/mocked cho tới khi Admin chủ
+động bật sau tiền kiểm.
 
 Biến môi trường tuỳ chọn:
 
@@ -26,6 +36,7 @@ Biến môi trường tuỳ chọn:
 |---|---|
 | `E2E_URL` | Địa chỉ web cần kiểm (mặc định `http://localhost:4173`) |
 | `E2E_QA_NAME` | Tên một QA **có thật** trong dữ liệu, để kiểm "Việc của tôi" ra đúng việc |
+| `CHROME_PATH` | Đường dẫn Chrome/Chromium nếu không nằm ở vị trí chuẩn của macOS/Linux |
 
 ## Hai điều dễ vấp khi sửa bộ kiểm
 
