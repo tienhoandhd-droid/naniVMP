@@ -342,6 +342,35 @@ function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
   );
 }
 
+function CurrentPermissionWorkspace({ acts, isAdmin = false }: {
+  acts: Activity[];
+  isAdmin?: boolean;
+}) {
+  const [person, setPerson] = useState<DirectoryPerson | null>(null);
+  const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
+    const raw = (activity._raw || {}) as Record<string, unknown>;
+    return [activity.area, raw.area, raw.line]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+  }))].sort((a, b) => a.localeCompare(b, "vi")), [acts]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <Card variant="strong">
+        <CardTitle icon={Users}
+          sub="Chọn nhân sự từ danh bạ chuẩn, khai phạm vi và xem đúng quyền đang có hiệu lực.">
+          Danh bạ nhân sự &amp; quyền
+        </CardTitle>
+        <div className="ip-workspace">
+          <StaffDirectoryPanel canEdit={isAdmin} validAreas={validAreas} onSelect={setPerson} />
+          <AssignmentPanel person={person} canEdit={isAdmin} />
+          <EffectiveRightsPanel person={person} />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 export default function PhanQuyenView(props: PhanQuyenViewProps) {
   const allowed = props.user?.role === "admin"
     || props.user?.role === "qa_manager"
@@ -358,7 +387,7 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
   if (props.user?.accessClass === "equipment_manager" && props.user.role !== "admin") {
     return <EquipmentAssignmentWorkspace acts={props.acts} />;
   }
-  return <FullPermissionWorkspace {...props} />;
+  return <CurrentPermissionWorkspace acts={props.acts} isAdmin={props.isAdmin} />;
 }
 
 function FullPermissionWorkspace(
