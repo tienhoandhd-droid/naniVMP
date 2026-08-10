@@ -1,335 +1,379 @@
-# Thiết kế phân quyền tới từng hạng mục VMP
+# Thiết kế phân quyền VMP theo nhân viên, phạm vi, khu vực và cột timeline
 
-Ngày duyệt: 2026-08-10  
-Trạng thái: Đã duyệt để lập kế hoạch triển khai  
-Phạm vi bản đầu: Đưa bảng phân quyền dự thảo lên web online; chưa thay đổi quyền đang chạy cho tới khi Admin chủ động bật áp dụng.
+Ngày sửa đổi: 2026-08-10
+Trạng thái: Đã duyệt nguyên tắc nghiệp vụ; chờ duyệt bản đặc tả sửa đổi
+Nguồn yêu cầu: `Phân quyền truy cập web VMP.xlsx` và phản hồi trực tiếp của người quản trị hệ thống.
 
-## 1. Mục tiêu
+## 1. Kết luận ngắn
 
-Hệ thống hiện kiểm quyền chủ yếu theo vai trò, bộ phận và ma trận phân công loại thẩm định × line. Bản nâng cấp bổ sung một lớp ngoại lệ tới từng hạng mục VMP và từng tài khoản, tách riêng quyền Xem và Sửa.
+Phân quyền VMP có hai chiều độc lập:
 
-Bản online đầu tiên phục vụ họp và thống nhất giữa các bộ phận. Người có thẩm quyền được lưu cấu hình dự thảo, xem quyền dự kiến và lịch sử thay đổi, nhưng cấu hình mới chưa tác động RLS hoặc RPC nghiệp vụ. Sau khi dữ liệu được rà đủ, Admin mới bật chế độ áp dụng chính thức.
+1. **Chiều dọc — được thấy hạng mục nào:** theo nhân viên được phân công, phạm vi bộ phận và khu vực/line.
+2. **Chiều ngang — được sửa cột nào:** theo phân loại nhân viên; QA cập nhật bốn mốc hoàn thành, bộ phận quản lý thiết bị chỉ xếp lịch thẩm định.
 
-## 2. Nguyên tắc đã chốt
+Không còn quyền chung “Cập nhật tiến độ VMP”. Server phải kiểm từng trường trong bản cập nhật.
 
-1. Quyền Xem và Sửa là hai quyền độc lập.
-2. Mỗi quyền có ba trạng thái: Kế thừa, Cho phép và Từ chối.
-3. Ngoại lệ theo hạng mục ghi đè luật mặc định khi còn hiệu lực.
-4. Được Sửa luôn kéo theo được Xem. Từ chối Xem đồng thời từ chối Sửa.
-5. Chỉ người thực hiện và tài khoản thuộc bộ phận thực hiện của hạng mục mới đủ điều kiện nhận ngoại lệ. Admin và QA có quyền xem giám sát riêng nhưng không vì thế mà tự đủ điều kiện sửa.
-6. Mọi thay đổi phải có lý do và được ghi nhật ký. Ngày hết hạn là tùy chọn.
-7. Người chưa có tài khoản hoặc chưa liên kết `user_id` chỉ được hiển thị là người thực hiện; họ chưa nhận quyền hệ thống.
-8. Quyền được nối bằng `user_id`, không khớp bằng tên người.
-9. Quyền Sửa theo hạng mục áp dụng cho mọi thao tác làm thay đổi hạng mục. Thao tác nhạy cảm như Huỷ, Không áp dụng và Khôi phục còn phải vượt qua quyền hành động theo vai hiện có.
-10. Database là chốt chặn. Giao diện chỉ trình bày và gửi yêu cầu, không tự quyết định quyền cuối cùng.
+Bản đầu được triển khai ở chế độ `preview`: nhập danh sách, phân công và xem quyền dự kiến nhưng chưa thay đổi quyền đang chạy. Chỉ Admin được bật `enforced` sau khi dữ liệu nhân viên và phân công đạt kiểm tra tiền điều kiện.
 
-## 3. Người dùng và quyền mặc định
+## 2. Kết quả đọc file Excel
 
-### 3.1 Admin
+Workbook có một sheet `Trang tính1`, 1.000 dòng mẫu và chín cột:
 
-- Xem toàn bộ hạng mục và toàn bộ nhật ký phân quyền.
-- Quản trị cấu hình quyền trên toàn hệ thống.
-- Bật hoặc tắt chế độ áp dụng chính thức.
-- Quyền sửa nội dung hạng mục vẫn tuân theo phân công, bộ phận thực hiện và ngoại lệ như các tài khoản khác.
-- Không thể dùng ngoại lệ để chặn quyền xem quản trị của Admin.
+| Cột | Ý nghĩa |
+|---|---|
+| STT | Số thứ tự |
+| Bộ phận | Bộ phận của nhân viên |
+| Mã nhân viên | Mã nhân sự nội bộ |
+| Họ và tên | Tên nhân viên thực hiện |
+| Phân loại | Nhóm quyền theo chức năng |
+| Phạm vi | Phạm vi bộ phận/khối |
+| Khu vực phân quyền | Khu vực, phòng hoặc line |
+| Email nhận tài khoản | Email dùng liên kết Auth |
+| Xác nhận gửi email | Trạng thái gửi thông tin tài khoản |
 
-### 3.2 Phụ trách QA (`qa_manager`)
+File hiện chỉ có một dòng nhân viên RD. Danh sách cũ của `Phân loại` chỉ có `View` và `Cập nhật tiến độ VMP`; danh sách này không đủ để chặn theo từng cột timeline và sẽ được thay bằng năm phân loại ở mục 5.
 
-- Xem toàn bộ hạng mục để giám sát chất lượng.
-- Xem người đang có quyền, quyền dự kiến, lý do, ngày hết hạn và nhật ký.
-- Chỉ sửa nội dung khi QA là bộ phận thực hiện hoặc bản thân được phân công trực tiếp, và không có ngoại lệ từ chối còn hiệu lực.
-- Chỉ quản lý ngoại lệ khi QA là bộ phận thực hiện và hồ sơ tài khoản có cờ Quản lý bộ phận.
-- Không thể dùng ngoại lệ để chặn quyền xem giám sát của `qa_manager`.
+Danh sách phạm vi hiện có: Toàn nhà máy, Xưởng sản xuất, Cơ điện, Kho, RD, QA, QC. Danh sách khu vực hiện có các mã A1…S10, Hóa lý 1/2 và Vi sinh. Bản nhập mới phải cho phép nhiều khu vực hoặc “Toàn bộ khu vực trong phạm vi”.
 
-### 3.3 Nhân viên QA thông thường
+## 3. Danh tính nhân viên
 
-- Không mặc nhiên xem toàn hệ thống.
-- Xem hạng mục khi QA là bộ phận thực hiện hoặc bản thân là người thực hiện.
-- Chỉ sửa khi là người thực hiện trực tiếp hoặc có ngoại lệ Cho phép Sửa.
-- Không quản lý quyền nếu không có cờ Quản lý bộ phận.
+- Giai đoạn đầu khớp phân công bằng `Họ và tên` vì Mã nhân viên chưa được nhập đủ.
+- Tên được chuẩn hóa bằng cách bỏ khoảng trắng thừa và không phân biệt chữ hoa–thường. Không tự bỏ dấu, đoán tên gần giống hoặc mở rộng tên viết tắt.
+- Nếu một tên chỉ khớp đúng một người trong danh bạ thì hệ thống nối phân công nguồn với người đó.
+- Nếu có hai người trùng tên, hoặc tên nguồn không khớp duy nhất, hệ thống không tự cấp quyền và yêu cầu quản lý nối tay đúng tài khoản.
+- `Mã nhân viên` là trường tùy chọn trong bản đầu. Khi được bổ sung, mã phải duy nhất và sẽ trở thành khoá nghiệp vụ ưu tiên cho những lần nhập sau.
+- Email dùng nối tài khoản Auth. Sau khi nối, `user_id` là khoá kỹ thuật cho mọi phép kiểm quyền; việc đổi cách nhận dạng sau này không làm đổi quyền đã nối.
+- Nhân viên chưa có tài khoản hoặc chưa liên kết `user_id` vẫn được hiển thị trong danh sách phân công nhưng chưa nhận quyền thật.
 
-### 3.4 Người thực hiện trực tiếp
+### 3.1 Tìm và nối người tự động
 
-- Mặc định được Xem và Sửa đúng hạng mục mình được phân công.
-- Không tự động được sửa hạng mục khác.
-- Nếu thuộc bộ phận thực hiện nhưng không được phân công, mặc định chỉ được Xem.
-- Ngoại lệ Từ chối có thể thu hồi quyền. Giao diện phải cảnh báo khi người vẫn mang trách nhiệm nhưng bị thu hồi quyền thao tác.
-- Không được tự cấp, chuyển hoặc thu hồi quyền của người khác nếu không đồng thời là quản lý bộ phận hợp lệ.
+- Ô Họ tên/Tài khoản trên web là ô tìm kiếm có gợi ý từ danh bạ người thực hiện, hồ sơ người dùng và tài khoản Auth mà người quản trị được phép xem.
+- Gõ một phần tên sẽ trả các ứng viên kèm bộ phận và email. Người trùng tên phải được phân biệt bằng bộ phận/email trước khi chọn.
+- Khi chọn một ứng viên, web tự điền họ tên, bộ phận, email, trạng thái tài khoản và `user_id`; người dùng không phải nhập lại.
+- Nếu tên chưa có tài khoản, web giữ người đó ở trạng thái “chưa có tài khoản” và hướng dẫn mời/nối tài khoản; không tạo `user_id` giả.
+- Bảng kiểm soát quyền chỉ nhận liên kết tới bản ghi người đã chọn từ danh bạ. Không cho lưu một chuỗi tên rời không có bản ghi nguồn.
 
-### 3.5 Quản lý bộ phận thực hiện
+## 4. Chiều dọc — nhân viên được thấy hạng mục nào
 
-- Hồ sơ có `is_department_manager = true` và đúng bộ phận của tài khoản.
-- Mặc định được Xem và Sửa các hạng mục có bộ phận mình trong `execution_departments`.
-- Được quản lý ngoại lệ của các hạng mục thuộc phạm vi trên.
-- Không quản lý quyền của hạng mục ngoài bộ phận.
+### 4.1 Nhân viên thường
 
-### 3.6 Thành viên bộ phận thực hiện
+Một nhân viên chỉ thấy hạng mục khi đồng thời thỏa cả ba điều kiện:
 
-- Mặc định được Xem hạng mục có bộ phận mình trong `execution_departments`.
-- Không mặc định được Sửa nếu không phải người thực hiện hoặc quản lý bộ phận.
-- Có thể nhận ngoại lệ Cho phép Sửa hoặc Từ chối Xem/Sửa.
+1. Có phân công đang hoạt động tới hạng mục.
+2. Hạng mục nằm trong `Phạm vi` được cấp.
+3. Đối tượng nằm trong một `Khu vực phân quyền` được cấp.
 
-## 4. Mô hình dữ liệu
+Thiếu một trong ba điều kiện là không được xem.
 
-### 4.1 Hồ sơ quản lý bộ phận
+### 4.2 Nguồn phân công
 
-Thêm vào `profiles`:
+Phân công tới hạng mục có thể đến từ:
 
-- `is_department_manager boolean not null default false`.
+- `QA phụ trách (QA nhập)` trong dữ liệu VMP nguồn.
+- `Nhân sự bộ phận khác (Bộ phận khác nhập)` trong dữ liệu VMP nguồn.
+- Quản lý QA phân công QA trên web.
+- Quản lý bộ phận quản lý thiết bị phân công nhân viên bộ phận mình trên web.
 
-Cờ này luôn đi cùng `profiles.department`. Một tài khoản chỉ quản lý đúng bộ phận ghi trên hồ sơ. Admin là ngoại lệ toàn hệ thống và không phụ thuộc cờ này.
+Phân công nguồn bằng tên phải được đối chiếu duy nhất với `Họ và tên` đã chuẩn hóa và chuyển thành `user_id`. Tên chưa nối được hoặc trùng nhiều người tạo cảnh báo, không tự cấp quyền.
 
-### 4.2 Bảng ngoại lệ `vmp_item_permissions`
+Phân công thủ công trên web được lưu riêng, không ghi đè chuỗi nguồn và không bị lần đồng bộ nguồn sau xoá mất. Giao diện phải chỉ rõ nguồn của từng phân công.
 
-Mỗi dòng đại diện cho một cặp hạng mục × tài khoản:
+### 4.3 Quản lý
 
-- `id uuid primary key`.
-- `validation_code text` tham chiếu mã duy nhất của `vmp_plan_items`.
-- `user_id uuid` tham chiếu tài khoản.
-- `view_override boolean null`: `NULL` = Kế thừa, `true` = Cho phép, `false` = Từ chối.
-- `edit_override boolean null`: cùng quy ước.
-- `expires_at timestamptz null`.
-- `change_reason text not null`.
-- `created_by`, `created_at`, `updated_by`, `updated_at`.
-- Ràng buộc duy nhất `(validation_code, user_id)`.
-- Ràng buộc không cho `view_override = false` đồng thời `edit_override = true`.
-- Dòng có cả hai override là `NULL` không được lưu; thao tác đưa cả hai về Kế thừa sẽ xoá ngoại lệ.
+- Quản lý QA được xem toàn bộ hạng mục trong phạm vi/khu vực của mình để giám sát và phân công QA.
+- Quản lý bộ phận quản lý thiết bị được xem các hạng mục có `vmp_objects.department` bằng bộ phận mình, đồng thời nằm trong phạm vi/khu vực được cấp.
+- Admin xem toàn bộ để quản trị hệ thống.
+- Quyền xem rộng của quản lý không tự mở quyền sửa ngoài các cột ở mục 6.
 
-Chỉ ngoại lệ chưa hết hạn tham gia tính quyền. So sánh hết hạn dùng thời gian của database, không dùng đồng hồ trình duyệt.
+## 5. Phân loại nhân viên
 
-### 4.3 Chế độ vận hành
+Thay danh sách `View,Cập nhật tiến độ VMP` bằng:
 
-Thêm cấu hình hệ thống `item_permissions_mode` với hai giá trị:
+| Mã nội bộ | Nhãn hiển thị | Quyền chính |
+|---|---|---|
+| `view_only` | Chỉ xem | Xem hạng mục được phân; không sửa timeline |
+| `qa_progress_editor` | QA – Cập nhật 4 mốc hoàn thành | Xem hạng mục được phân và sửa tám trường QA ở mục 6.1 |
+| `qa_manager` | Quản lý QA | Xem phạm vi QA quản lý, phân công QA và sửa tám trường QA |
+| `equipment_scheduler` | Bộ phận quản lý thiết bị – Xếp lịch thẩm định | Xem hạng mục được phân và chỉ sửa lịch thẩm định |
+| `equipment_manager` | Quản lý bộ phận quản lý thiết bị | Xem hạng mục bộ phận quản lý, phân công nhân viên bộ phận và sửa lịch thẩm định |
 
-- `preview`: lưu và tính quyền dự kiến nhưng không thay đổi RLS/RPC đang chạy.
-- `enforced`: RLS và RPC nghiệp vụ dùng quyền hiệu lực theo hạng mục.
+Admin là vai hệ thống hiện có, không khai bằng `Phân loại` trong file nhân viên.
 
-Giá trị ban đầu sau migration là `preview`. Chỉ Admin được đổi chế độ qua RPC chuyên dụng; trình duyệt không cập nhật trực tiếp bảng cấu hình.
+Phân loại phải phù hợp với bộ phận. Ví dụ tài khoản không thuộc QA không được nhận `qa_progress_editor` hoặc `qa_manager`; `equipment_manager` chỉ quản lý đúng `profiles.department` của mình.
 
-### 4.4 Nhật ký
+## 6. Chiều ngang — quyền sửa từng cột timeline
 
-Tái sử dụng `audit_logs` hiện có:
+### 6.1 QA cập nhật bốn mốc hoàn thành
 
-- `table_name = 'vmp_item_permissions'`.
-- `validation_code` và `record_id` xác định hạng mục/tài khoản.
-- `old_data` và `new_data` chứa trạng thái Xem, Sửa và ngày hết hạn.
-- `change_reason` là lý do người quản trị nhập.
-- `changed_fields` ghi đúng các trường thay đổi.
-- `source = 'dashboard_rpc'`.
+`qa_progress_editor` và `qa_manager` chỉ được sửa tám trường sau:
 
-Việc bật/tắt chế độ áp dụng cũng phải có một bản ghi `CONFIG_CHANGE` riêng.
+| Mốc | Ngày thực tế | Trạng thái |
+|---|---|---|
+| Đề cương | `actual_protocol_date` | `status_protocol` |
+| Thẩm định thực tế | `actual_validation_date` | `status_validation` |
+| Báo cáo | `actual_report_date` | `status_report` |
+| Hoàn thành VMP | `actual_vmp_date` | `status_vmp` |
 
-## 5. Tính quyền hiệu lực
+QA chỉ sửa hạng mục họ được phép thấy theo mục 4. Quản lý QA có thể sửa trong phạm vi quản lý; nhân viên QA thường phải có phân công.
 
-Database cung cấp một lõi kiểm quyền duy nhất. Các RPC đọc cho giao diện, policy RLS và RPC ghi nghiệp vụ phải dùng cùng lõi, không chép lại luật thành nhiều phiên bản.
+### 6.2 Bộ phận quản lý thiết bị xếp lịch
 
-### 5.1 Quyền Xem
+`equipment_scheduler` và `equipment_manager` chỉ được sửa:
 
-Thứ tự quyết định:
+- `scheduled_at`: thời điểm “Bộ phận quản lý xếp lịch thẩm định (dd/mm/yyyy hh:mm:ss)”.
 
-1. Tài khoản không tồn tại hoặc không hoạt động: Từ chối.
-2. Admin: Cho phép.
-3. `qa_manager`: Cho phép.
-4. Ngoại lệ Xem còn hiệu lực: dùng giá trị ngoại lệ.
-5. Người thực hiện trực tiếp: Cho phép.
-6. Tài khoản thuộc một bộ phận trong `execution_departments`: Cho phép.
-7. Các trường hợp còn lại: Từ chối.
+“Bộ phận quản lý thiết bị” lấy từ `vmp_objects.department`. Nó có thể là XSX, Cơ điện, Kho, QC, RD hoặc bộ phận khác; không mặc định là xưởng.
 
-### 5.2 Quyền Sửa
+Nhân viên xếp lịch phải thuộc đúng bộ phận quản lý đối tượng. Nhân viên thường chỉ xếp lịch hạng mục được phân; quản lý bộ phận xếp lịch cho các hạng mục bộ phận mình quản lý trong phạm vi/khu vực.
 
-Thứ tự quyết định:
+### 6.3 Chặn theo trường ở server
 
-1. Tài khoản không tồn tại hoặc không hoạt động: Từ chối.
-2. Nếu quyền Xem hiệu lực là Từ chối: Từ chối.
-3. Ngoại lệ Sửa còn hiệu lực: dùng giá trị ngoại lệ.
-4. Người thực hiện trực tiếp: Cho phép.
-5. Quản lý của một bộ phận trong `execution_departments`: Cho phép.
-6. Các trường hợp còn lại: Từ chối.
+- RPC nhận bản chênh `patch` và kiểm từng khoá.
+- Chỉ cần có một khoá ngoài allowlist của người gọi thì toàn bộ transaction bị từ chối.
+- Không bỏ qua khoá trái phép và ghi phần còn lại, vì như vậy người dùng tưởng đã lưu toàn bộ.
+- Giao diện khoá các ô không được phép, nhưng đó chỉ là lớp trình bày; gọi thẳng RPC vẫn bị server chặn.
+- Mọi cập nhật bắt buộc có lý do và ghi `audit_logs` đúng các trường đã đổi.
 
-Admin và `qa_manager` không có đường tắt ở quyền Sửa. Họ chỉ được sửa khi đi qua các điều kiện trên.
+## 7. Phạm vi và khu vực
 
-### 5.3 Người thực hiện trực tiếp
+### 7.1 Phạm vi
 
-Ưu tiên nhận dạng bằng khoá tài khoản đã liên kết:
+Phạm vi là tập bộ phận/khối mà tài khoản được tiếp cận:
 
-- `vmp_plan_items.owner_id = auth.uid()` khi có dữ liệu.
-- Liên kết `vmp_performers.user_id` với người đứng tên hạng mục khi dữ liệu lịch sử chưa có `owner_id`.
-- Ma trận phân công hiện tại chỉ là đường kế thừa để xác định trách nhiệm theo loại × line; ngoại lệ mới luôn lưu theo `user_id`.
+- Một hoặc nhiều bộ phận cụ thể; hoặc
+- `*` = Toàn nhà máy.
 
-Không cấp quyền thực tế cho một tên chưa liên kết tài khoản. Giao diện phải hiển thị cảnh báo thay vì đoán một tài khoản từ chuỗi tên.
+Không dùng một chuỗi mô tả tự do để kiểm quyền. Khi nhập Excel, các nhãn tiếng Việt được chuẩn hóa thành mã bộ phận hệ thống.
 
-### 5.4 Ngoại lệ hợp lệ
+### 7.2 Khu vực phân quyền
 
-RPC lưu ngoại lệ từ chối mọi yêu cầu Cho phép nếu người nhận không phải:
+Khu vực là tập mã lấy từ `vmp_objects.area` và/hoặc `vmp_objects.line` theo dữ liệu có thật:
 
-- Người thực hiện của hạng mục; hoặc
-- Tài khoản có `profiles.department` nằm trong `execution_departments` của hạng mục.
+- Một hoặc nhiều mã; hoặc
+- `*` = Toàn bộ khu vực trong phạm vi.
 
-Ngoại lệ Từ chối chỉ áp dụng cho người đang có quyền mặc định hoặc ngoại lệ trước đó. Admin và `qa_manager` không thể bị từ chối Xem, nhưng có thể bị từ chối Sửa khi họ thuộc phạm vi sửa.
+Giao diện dùng chọn nhiều. File Excel sửa đổi cho phép danh sách mã cách nhau bằng dấu chấm phẩy và có lựa chọn “Toàn bộ khu vực trong phạm vi”. Importer chuẩn hóa, loại trùng và từ chối mã không tồn tại.
 
-## 6. Quyền quản trị ngoại lệ
+### 7.3 Thứ tự lọc
 
-- Admin quản trị mọi hạng mục.
-- Tài khoản có `is_department_manager = true` chỉ quản trị hạng mục có bộ phận mình trong `execution_departments`.
-- `qa_manager` không tự có quyền quản trị ngoại lệ. Họ phải đồng thời là quản lý bộ phận QA và QA phải là bộ phận thực hiện.
-- Người quản trị không được cấp quyền cho người ngoài phạm vi hợp lệ.
-- Người dùng không được sửa trực tiếp bảng; tất cả thay đổi đi qua RPC `SECURITY DEFINER` có kiểm `auth.uid()` và phạm vi.
-- `anon` không có quyền đọc danh sách quyền hoặc gọi RPC quản trị.
+1. Kiểm tài khoản hoạt động và liên kết nhân viên.
+2. Xác định quyền quản lý hoặc phân công.
+3. Kiểm phạm vi bộ phận.
+4. Kiểm khu vực/line.
+5. Trả hạng mục cùng lý do quyền hiệu lực.
 
-## 7. Giao diện
+## 8. Lưu thời điểm xếp lịch
 
-Mở rộng khối “Từng người” của trang Phân quyền thành “Người & hạng mục”, tránh tạo thêm các khối trùng ý nghĩa. Khối có bốn chế độ.
+Database hiện dùng `scheduled_date date`, làm mất giờ/phút/giây trong cột nguồn. Thiết kế mới dùng `scheduled_at timestamp` theo giờ nhà máy `Asia/Bangkok`.
 
-### 7.1 Theo hạng mục
+- Migration backfill ngày cũ vào `scheduled_at` mà không làm mất `scheduled_date` trong giai đoạn tương thích.
+- Parser nguồn đọc đúng `dd/mm/yyyy hh:mm:ss`.
+- Form dùng `datetime-local`, không dùng `date`.
+- Ngày hẹn được phép ở tương lai; không áp luật “ngày thực tế không vượt hôm nay”.
+- Các báo cáo chỉ cần ngày dùng phần ngày của `scheduled_at`.
+- Sau khi mọi đường đọc chuyển xong, `scheduled_date` trở thành trường tương thích và không còn là nguồn chính.
 
-Đây là chế độ mặc định:
+## 9. Mô hình dữ liệu
 
-- Tìm theo mã hoặc tên hạng mục.
-- Lọc theo bộ phận, loại thẩm định và line.
-- Hiển thị bộ phận thực hiện, người thực hiện và cảnh báo liên kết tài khoản.
-- Hiển thị tóm tắt luật của Admin, QA, quản lý và người thực hiện.
-- Danh sách chỉ gồm người đủ điều kiện, cộng với người đang có ngoại lệ cần xử lý.
-- Mỗi dòng hiển thị quyền mặc định, ngoại lệ Xem/Sửa, ngày hết hạn và quyền hiệu lực dự kiến.
-- Mỗi kết quả quyền có lời giải thích ngắn, ví dụ “Xem vì thuộc XSX”, “Sửa vì là quản lý XSX”, hoặc “Từ chối bởi ngoại lệ đến 30/09/2026”.
+### 9.1 Hồ sơ truy cập nhân viên
 
-### 7.2 Theo người
+Tạo bảng/hồ sơ chuẩn chứa:
 
-- Chọn một tài khoản để xem các hạng mục họ được Xem/Sửa.
-- Phân biệt quyền mặc định, ngoại lệ và quyền dự kiến.
-- Dùng cho điều chuyển nhân sự và phát hiện người có quá nhiều hoặc không có hạng mục.
+- `employee_code` tùy chọn trong bản đầu; duy nhất khi có giá trị.
+- `full_name`.
+- `normalized_full_name` để khớp chính xác sau khi chuẩn hóa khoảng trắng/chữ hoa–thường.
+- `user_id` duy nhất khi đã nối Auth.
+- `department`.
+- `access_class` thuộc năm giá trị mục 5.
+- `scope_departments text[]`.
+- `access_areas text[]`.
+- `email`.
+- `is_active`.
+- Người/thời điểm tạo và cập nhật.
 
-### 7.3 Sắp hết hạn
+Bảng này là nguồn dữ liệu người chuẩn cho màn kiểm soát quyền. Các bảng phân công/quyền chỉ lưu khoá liên kết tới hồ sơ này và `user_id`, không sao chép họ tên thành một danh bạ thứ hai.
 
-- Lọc quyền hết hạn trong 7 ngày, 30 ngày và đã hết hạn.
-- Hiển thị người, hạng mục, quyền, bộ phận, ngày hết hạn và người cấp.
+### 9.2 Phân công hạng mục
 
-### 7.4 Nhật ký
+Mỗi dòng phân công chứa:
 
-- Lọc theo hạng mục, người nhận quyền, người thay đổi và khoảng thời gian.
-- Hiển thị quyền cũ/mới và lý do.
+- `validation_code`.
+- `staff_name`, `normalized_staff_name`, `employee_code` nếu đã có và `user_id` khi đã nối.
+- `assignment_kind`: `qa` hoặc `equipment_department`.
+- `source`: `sheet_qa`, `sheet_other_staff`, `qa_manager`, `equipment_manager`.
+- `source_text` để truy vết chuỗi nguồn.
+- `expires_at` tùy chọn.
+- `is_active`.
+- Người/thời điểm tạo, cập nhật và lý do.
 
-### 7.5 Chỉnh sửa
+Khoá nghiệp vụ ngăn trùng cùng hạng mục × `user_id` × loại phân công × nguồn sau khi đã nối. Dòng chưa nối dùng tên chuẩn hóa để phát hiện trùng tạm thời nhưng chưa có quyền thật. Phân công nguồn và phân công tay cùng tồn tại; quyền hiệu lực chỉ cần một phân công hợp lệ.
 
-- Xem và Sửa đều dùng ba trạng thái Kế thừa, Cho phép, Từ chối.
-- Giao diện không cho tạo tổ hợp Từ chối Xem + Cho phép Sửa.
-- Thay đổi nằm trong bản nháp cục bộ cho đến khi bấm Lưu.
-- Bắt buộc nhập một lý do chung cho lần lưu; có thể đặt ngày hết hạn trên từng ngoại lệ.
-- Có nút Hoàn tác và hộp xác nhận trước khi ghi.
-- Một lần Lưu là một giao dịch nguyên tử: một thay đổi sai làm toàn bộ lần lưu không được ghi. RPC trả về đúng dòng và lý do để giao diện giữ bản nháp, đánh dấu lỗi và cho sửa lại.
-- Tài khoản chỉ có quyền xem thấy toàn bộ lời giải thích nhưng điều khiển bị khoá.
+### 9.3 Chế độ vận hành
 
-### 7.6 Dấu hiệu chế độ dự thảo
+`item_permissions_mode` có hai giá trị:
 
-Khi `item_permissions_mode = 'preview'`, trang luôn có banner nổi bật:
+- `preview`: tính quyền dự kiến, cho lưu hồ sơ/phân công nhưng chưa đổi RLS/RPC nghiệp vụ hiện tại.
+- `enforced`: áp dụng quyền đọc và allowlist cột ghi.
 
-> DỰ THẢO — CHƯA ÁP DỤNG PHÂN QUYỀN TỪNG HẠNG MỤC
+Mặc định sau migration là `preview`.
 
-Banner hiển thị người sửa gần nhất, thời điểm, số ngoại lệ, số quyền sắp hết hạn và số cấu hình mâu thuẫn/cần chú ý. Không dùng màu sắc đơn lẻ để truyền đạt trạng thái; phải có chữ rõ ràng.
+## 10. Quyền phân công
 
-## 8. Luồng dữ liệu và RPC
+- Admin quản trị danh bạ và phân công toàn hệ thống.
+- `qa_manager` chỉ thêm/bỏ phân công loại `qa` trong phạm vi/khu vực của mình.
+- `equipment_manager` chỉ thêm/bỏ phân công loại `equipment_department` cho nhân viên cùng bộ phận và hạng mục do bộ phận đó quản lý.
+- Quản lý không được thay đổi mã nhân viên, bộ phận hay phân loại của người ngoài quyền quản trị nhân sự.
+- Nhân viên thường không tự nhận việc hoặc chuyển việc cho người khác.
+- Thay đổi phân công bắt buộc có lý do và nhật ký.
 
-Các tên hàm dưới đây là giao diện logic; kế hoạch triển khai có thể điều chỉnh tên theo quy ước hiện có nhưng không được tách luật kiểm quyền thành nhiều bản:
+## 11. RLS, RPC đọc và chống lộ dữ liệu
 
-- Hàm lõi tính quyền một `user_id × validation_code`, trả Xem/Sửa và lý do.
-- RPC đọc danh sách hạng mục cùng số liệu quyền dự kiến.
-- RPC đọc chi tiết quyền và người đủ điều kiện của một hạng mục.
-- RPC đọc quyền theo một người.
-- RPC lưu một lô ngoại lệ trong một transaction.
-- RPC đọc quyền sắp hết hạn và nhật ký.
-- RPC kiểm tra điều kiện trước khi bật áp dụng.
-- RPC Admin bật/tắt `preview`/`enforced` với lý do bắt buộc.
+Khi ở `enforced`:
 
-RPC đọc phải phân trang hoặc lọc phía server; không tải ma trận 448 hạng mục × toàn bộ người dùng về trình duyệt trong một lần.
+- RLS trên `vmp_plan_items` dùng hàm quyền xem hiệu lực.
+- Mọi RPC/dashboard trả danh sách hoặc số tổng hợp phải áp cùng phạm vi. Không được để RPC `SECURITY DEFINER` trả số liệu ngoài phạm vi dù bảng trực tiếp đã có RLS.
+- Các trang Timeline, Hôm nay, Cảnh báo, Khối lượng, Báo cáo, Danh mục và trợ lý AI phải dùng tập dữ liệu đã lọc phù hợp người gọi.
+- Admin và service role có đường quản trị/hệ thống riêng được kiểm rõ ràng.
+- n8n/service role tiếp tục đọc toàn bộ để vận hành báo cáo và đồng bộ.
+- `anon` không đọc danh bạ, phân công hoặc gọi RPC quản trị.
 
-## 9. Chế độ dự thảo và áp dụng chính thức
+## 12. Giao diện Phân quyền
 
-### 9.1 Dự thảo
+### 12.1 Danh bạ từ file Excel
 
-- Là chế độ mặc định khi migration được áp.
-- Cho phép lưu, sửa, hết hạn và kiểm toán ngoại lệ.
-- Giao diện tính và hiển thị quyền dự kiến.
-- RLS và RPC nghiệp vụ tiếp tục hành vi hiện tại.
-- Không được mô tả quyền dự kiến như quyền đang có hiệu lực.
+Hiển thị đúng chín trường nguồn, nhưng `Phân loại`, `Phạm vi` và `Khu vực` dùng lựa chọn chuẩn hóa. Mỗi dòng hiển thị trạng thái nối tài khoản và lỗi dữ liệu.
 
-### 9.2 Kiểm tra trước khi bật
+- Ô Họ tên/Tài khoản có autocomplete.
+- Chọn người có sẵn tự điền bộ phận, email và trạng thái tài khoản.
+- Dòng nhập từ Excel được đối chiếu với danh bạ và đề xuất liên kết; quản lý xác nhận trước khi lưu.
+- Bảng kiểm soát quyền lấy trực tiếp danh sách người từ danh bạ này.
 
-Database chặn chuyển sang `enforced` nếu còn lỗi bắt buộc:
+### 12.2 Theo nhân viên
 
-- Hạng mục hoạt động chưa có bộ phận thực hiện.
-- Ngoại lệ Cho phép vi phạm phạm vi người/bộ phận hợp lệ.
-- Tổ hợp Xem/Sửa mâu thuẫn.
-- Bản ghi tham chiếu tài khoản không hoạt động hoặc không tồn tại.
+- Mã nhân viên, họ tên, bộ phận và phân loại.
+- Phạm vi và nhiều khu vực.
+- Hạng mục được thấy, nguồn phân công và quyền sửa từng cột.
+- Cảnh báo mã/tên/email không nối được.
 
-Các trường hợp người thực hiện chưa liên kết tài khoản được báo thành danh sách cảnh báo phải xác nhận, không bị im lặng bỏ qua. Admin phải xem báo cáo tiền kiểm và nhập lý do trước khi bật.
+### 12.3 Theo hạng mục
 
-### 9.3 Áp dụng
+- Bộ phận quản lý thiết bị, khu vực, line.
+- QA phụ trách và nhân sự bộ phận khác từ nguồn.
+- Phân công tay của quản lý.
+- Ma trận cột: Xem; QA cập nhật 4 mốc; Bộ phận quản lý xếp lịch.
+- Lời giải thích vì sao mỗi người được/không được quyền.
 
-- RLS đọc hạng mục dùng quyền Xem hiệu lực.
-- Mọi RPC thay đổi một hạng mục dùng quyền Sửa hiệu lực trước khi xử lý.
-- Thao tác nhạy cảm tiếp tục kiểm thêm quyền hành động theo vai.
-- Các đường chạy `service_role` của n8n và tác vụ hệ thống không bị chặn.
-- Admin có thể đưa hệ thống về `preview` khi phát hiện cấu hình sai; dữ liệu và nhật ký ngoại lệ được giữ nguyên.
+### 12.4 Nhật ký và cảnh báo
 
-## 10. Xử lý lỗi và an toàn
+- Nhân viên chưa có tài khoản.
+- Tên nguồn chưa khớp duy nhất với một người hoặc đang trùng tên.
+- Hạng mục chưa có QA hoặc chưa có người xếp lịch.
+- Người có phân công nhưng ngoài phạm vi/khu vực.
+- Phân công sắp hết hạn hoặc đã hết hạn.
+- Lịch sử thay đổi hồ sơ, phân loại, phạm vi, khu vực và phân công.
 
-- Không có quyền: trả thông báo nêu quyền nào thiếu và vì sao.
-- Người nhận không hợp lệ: không ghi và nêu bộ phận/người thực hiện hợp lệ.
-- Phiên hết hạn: trả về luồng đăng nhập lại hiện có, không biến thành lỗi dữ liệu.
-- Xung đột cập nhật: dùng thời điểm hoặc phiên bản để từ chối ghi đè bản mới hơn; giao diện tải lại và giữ nội dung người dùng vừa nhập khi có thể.
-- Ngoại lệ đã hết hạn: bỏ qua khi tính quyền nhưng vẫn giữ trong nhật ký và màn Sắp hết hạn.
-- Mọi RPC `SECURITY DEFINER` đặt `search_path`, thu quyền `public`/`anon` và chỉ cấp đúng vai cần thiết.
-- Index phục vụ tra cứu theo `(validation_code, user_id)`, `user_id`, `expires_at` và các bộ lọc nhật ký.
+Banner `DỰ THẢO — CHƯA ÁP DỤNG QUYỀN THẬT` luôn hiện trong chế độ `preview`.
 
-## 11. Kiểm thử
+## 13. File Excel sửa đổi
 
-### 11.1 SQL và bảo mật
+- Giữ nguyên chín cột để người dùng không phải nhập lại biểu mẫu.
+- Thay dropdown `Phân loại` bằng năm nhãn mục 5.
+- Giữ danh sách bộ phận nhưng chuẩn hóa tên khi import.
+- `Phạm vi` cho phép một hoặc nhiều phạm vi; `Toàn nhà máy` ánh xạ `*`.
+- `Khu vực phân quyền` cho phép nhiều mã cách nhau bằng dấu chấm phẩy hoặc “Toàn bộ khu vực trong phạm vi”.
+- Thêm sheet `Hướng dẫn` giải thích từng phân loại, phạm vi, khu vực và ví dụ.
+- Không dùng macro; file phải mở được trong Excel/LibreOffice và importer server phải kiểm lại mọi giá trị.
 
-- Admin và `qa_manager` xem toàn bộ nhưng không tự động sửa toàn bộ.
-- Người thực hiện xem/sửa đúng hạng mục.
-- Thành viên bộ phận thực hiện xem nhưng không mặc định sửa.
-- Quản lý bộ phận xem/sửa và quản trị đúng phạm vi.
-- Người ngoài phạm vi không nhận được ngoại lệ Cho phép.
-- Từ chối Xem kéo theo Từ chối Sửa.
-- Ngoại lệ hết hạn không còn hiệu lực.
-- `anon` và người thường không gọi được RPC quản trị trực tiếp.
-- Chế độ `preview` không thay đổi kết quả RLS/RPC nghiệp vụ hiện tại.
-- Chế độ `enforced` chặn đúng cả truy cập trực tiếp lẫn RPC.
-- `service_role` tiếp tục chạy các tác vụ hệ thống.
+## 14. Lỗi và an toàn
 
-### 11.2 Giao diện
+- Hai người trùng tên hoặc tên nguồn khớp nhiều người: không kích hoạt quyền, yêu cầu nối tay.
+- Mã nhân viên trùng khi đã được bổ sung: không kích hoạt dòng, báo chính xác hai dòng xung đột.
+- Email đã nối người khác: không ghi đè.
+- Tên trong nguồn chưa nối: giữ cảnh báo, không đoán.
+- Cấp phân loại sai bộ phận: từ chối.
+- Phân công ngoài phạm vi quản lý: từ chối.
+- Patch chứa trường trái phép: từ chối toàn bộ transaction và liệt kê trường.
+- Xung đột phiên bản: không ghi đè thay đổi mới hơn.
+- Phiên hết hạn: đưa về đăng nhập lại.
+- RPC `SECURITY DEFINER` đặt `search_path`, thu quyền `public`/`anon` và chỉ cấp đúng vai.
 
-- Tìm, lọc và chọn hạng mục với dữ liệu thật.
-- Hiển thị đúng bộ phận, người thực hiện, quyền mặc định, ngoại lệ và lời giải thích quyền dự kiến.
-- Lưu/Hoàn tác Xem và Sửa độc lập.
-- Bắt buộc lý do; ngày hết hạn hoạt động đúng.
-- Lỗi transaction giữ bản nháp và đánh dấu đúng dòng.
-- Các chế độ Theo người, Sắp hết hạn và Nhật ký trả đúng dữ liệu.
-- Banner Dự thảo luôn hiện khi chưa áp dụng.
-- Tài khoản chỉ xem không thể thao tác bằng giao diện hoặc gọi thẳng RPC.
+## 15. Kiểm tra trước khi bật áp dụng
 
-### 11.3 Hồi quy và triển khai
+Database không cho chuyển sang `enforced` nếu còn lỗi bắt buộc:
 
-- TypeScript và build Vite đạt.
-- Bộ e2e phân quyền hiện có tiếp tục đạt sau khi cập nhật kỳ vọng có chủ đích.
-- Thêm e2e cho quyền hạng mục và chế độ dự thảo.
-- Kiểm tra với dữ liệu Supabase thật mà không làm thay đổi quyền đang chạy.
-- Sau khi push `main`, xác minh URL online tải đúng bản mới, không lỗi console và hiển thị banner Dự thảo.
+- Nhân viên hoạt động thiếu họ tên, bộ phận, phân loại, phạm vi hoặc khu vực. Mã nhân viên được phép trống trong bản đầu.
+- Tên trùng chưa nối tay, mã nhân viên trùng khi có giá trị hoặc liên kết `user_id` trùng.
+- Phân loại không phù hợp bộ phận.
+- Phân công tay vi phạm quyền quản lý.
+- Hạng mục hoạt động thiếu bộ phận quản lý hoặc khu vực cần thiết để lọc.
+- Còn patch/RPC ghi timeline chưa đi qua allowlist cột.
+- Còn RPC đọc/tổng hợp có thể trả dữ liệu ngoài phạm vi.
 
-## 12. Tiêu chí hoàn tất bản online đầu tiên
+File hiện chỉ có một nhân viên nên chắc chắn chưa đạt điều kiện bật; hệ thống phải ở `preview` cho tới khi danh sách đủ.
 
-1. Migration dữ liệu và RPC dự thảo được áp thành công, mặc định ở `preview`.
-2. Web cho chọn từng hạng mục và hiển thị đúng quyền của Admin, QA, quản lý, người thực hiện và thành viên bộ phận.
-3. Người có thẩm quyền lưu được cấu hình dự thảo có lý do, ngày hết hạn và nhật ký.
-4. Không thể cấp quyền cho người ngoài phạm vi hợp lệ hoặc tạo quyền Xem/Sửa mâu thuẫn.
-5. Không có thay đổi nào tới quyền thực tế khi vẫn ở `preview`.
-6. Build, kiểm tra kiểu, SQL security checks và e2e liên quan đều đạt.
-7. Code được push lên `main`; trang online được kiểm tra trực tiếp và sẵn sàng cho buổi trao đổi với các bộ phận.
+## 16. Kiểm thử
 
-## 13. Ngoài phạm vi bản đầu
+### 16.1 Danh tính và nhập Excel
 
-- Không tự động bật chế độ `enforced`.
-- Không gửi email khi quyền được cấp hoặc sắp hết hạn.
-- Không cấp quyền theo nhóm tùy biến ngoài người, bộ phận và vai trò hiện có.
-- Không hỗ trợ một tài khoản quản lý nhiều bộ phận.
-- Không thay đổi quyền của n8n/service role.
-- Không xây dựng quy trình phê duyệt nhiều cấp; lý do và audit log là mức kiểm soát của bản đầu.
+- Tên chuẩn hóa khớp duy nhất thì nối được phân công.
+- Tên trùng hoặc tên nguồn khớp nhiều người bị chặn và yêu cầu nối tay.
+- Mã nhân viên để trống vẫn nhập được; mã trùng khi đã có bị chặn.
+- Autocomplete trả đúng người theo từ khóa, kèm bộ phận/email để phân biệt tên trùng.
+- Chọn người tự điền tài khoản; bảng kiểm soát quyền lưu đúng liên kết thay vì chuỗi tên.
+- Nhiều phạm vi/khu vực được chuẩn hóa đúng.
+- Mã khu vực không tồn tại bị báo.
+- Năm phân loại nhập đúng; giá trị cũ được cảnh báo/chuyển đổi có chủ đích.
+
+### 16.2 Quyền xem
+
+- Nhân viên được phân nhưng ngoài phạm vi hoặc khu vực không thấy hạng mục.
+- Nhân viên đúng cả ba điều kiện thấy đúng hạng mục.
+- QA manager thấy phạm vi quản lý để phân công.
+- Equipment manager chỉ thấy hạng mục bộ phận mình quản lý trong khu vực.
+- RPC tổng hợp không làm lộ số lượng ngoài phạm vi.
+
+### 16.3 Quyền sửa từng cột
+
+- QA sửa được đúng tám trường hoàn thành và không sửa được `scheduled_at`.
+- Equipment scheduler/manager sửa được `scheduled_at` và không sửa được tám trường QA.
+- `view_only` không sửa được trường nào.
+- Patch trộn một trường hợp lệ và một trường trái phép bị từ chối toàn bộ.
+- Gọi RPC trực tiếp cho kết quả giống giao diện.
+- Ngày thực tế tương lai bị chặn; lịch hẹn tương lai được phép.
+
+### 16.4 Phân công quản lý
+
+- QA manager chỉ phân công QA trong phạm vi.
+- Equipment manager chỉ phân công người cùng bộ phận cho thiết bị bộ phận quản lý.
+- Phân công nguồn và thủ công không xoá lẫn nhau.
+- Thu hồi một nguồn nhưng còn nguồn hợp lệ khác vẫn giữ quyền.
+
+### 16.5 Hồi quy và deploy
+
+- Chế độ `preview` không thay đổi quyền đang chạy.
+- TypeScript, Vite build, SQL security checks và toàn bộ e2e phân quyền đạt.
+- n8n/service role tiếp tục hoạt động.
+- URL online tải đúng bản mới và không lỗi console.
+
+## 17. Tiêu chí hoàn tất
+
+1. File Excel sửa đổi có đúng năm phân loại, nhiều phạm vi/khu vực và sheet hướng dẫn.
+2. Danh bạ bản đầu khớp duy nhất bằng Họ tên; Mã nhân viên là tùy chọn để bổ sung dần; quyền thật luôn neo bằng `user_id` sau khi nối.
+3. Ô tên/tài khoản tự gợi ý và điền dữ liệu; bảng kiểm soát quyền liên kết trực tiếp từ danh bạ chuẩn.
+4. Phân công đọc được hai cột nguồn và cho phép hai loại quản lý phân công trên web.
+5. Nhân viên chỉ thấy hạng mục thỏa phân công + phạm vi + khu vực.
+6. QA chỉ sửa tám trường hoàn thành; bộ phận quản lý thiết bị chỉ sửa lịch thẩm định.
+7. Lịch thẩm định giữ đủ ngày giờ.
+8. Mọi UI/RLS/RPC và báo cáo tổng hợp dùng cùng luật quyền.
+9. Bản đầu online ở `preview`, lưu được dữ liệu dự thảo và audit nhưng chưa ảnh hưởng quyền thật.
+10. Kiểm thử đạt và production được xác minh trực tiếp sau deploy.
+
+## 18. Ngoài phạm vi bản đầu
+
+- Không tự động bật `enforced`.
+- Không gửi email tự động khi quyền/phân công thay đổi.
+- Không dùng macro Excel.
+- Không cho một người quản lý nhiều bộ phận; nếu phát sinh sẽ thiết kế riêng.
+- Không thay đổi quyền của service role/n8n.
+- Không cho bộ phận quản lý thiết bị cập nhật các mốc hoàn thành QA.
+- Bản đầu mỗi tài khoản có một phân loại chính; chưa hỗ trợ một người đồng thời mang cả phân loại QA và phân loại bộ phận quản lý thiết bị.
