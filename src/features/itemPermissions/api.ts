@@ -34,10 +34,26 @@ function nullableString(row: JsonObject, key: string): string | null {
   return value;
 }
 
+function optionalNullableString(row: JsonObject, key: string): string | null {
+  const value = row[key];
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") throw new Error(`Dữ liệu danh bạ sai ${key}`);
+  return value;
+}
+
 function stringArray(row: JsonObject, key: string): string[] {
   const value = row[key];
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     throw new Error(`Dữ liệu danh bạ thiếu hoặc sai ${key}`);
+  }
+  return [...value];
+}
+
+function optionalStringArray(row: JsonObject, key: string): string[] {
+  const value = row[key];
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`Dữ liệu danh bạ sai ${key}`);
   }
   return [...value];
 }
@@ -70,10 +86,8 @@ export function decodeDirectoryPerson(value: unknown): DirectoryPerson {
   const row = objectValue(value, "Dòng danh bạ");
   const accessValue = row.access_class;
   let accessClass: AccessClass | null = null;
-  if (accessValue !== null) {
+  if (accessValue !== null && accessValue !== undefined) {
     accessClass = enumValue(row, "access_class", ACCESS_CLASSES.map((item) => item.id));
-  } else if (!("access_class" in row)) {
-    throw new Error("Dữ liệu danh bạ thiếu hoặc sai access_class");
   }
 
   return {
@@ -81,12 +95,12 @@ export function decodeDirectoryPerson(value: unknown): DirectoryPerson {
     user_id: nullableString(row, "user_id"),
     employee_code: nullableString(row, "employee_code"),
     full_name: requiredString(row, "full_name"),
-    department: requiredString(row, "department"),
+    department: optionalNullableString(row, "department"),
     email: nullableString(row, "email"),
     account_status: enumValue<AccountStatus>(row, "account_status", ["linked", "unlinked", "inactive"]),
     access_class: accessClass,
-    scope_departments: stringArray(row, "scope_departments"),
-    access_areas: stringArray(row, "access_areas"),
+    scope_departments: optionalStringArray(row, "scope_departments"),
+    access_areas: optionalStringArray(row, "access_areas"),
     email_sent_confirmed: booleanValue(row, "email_sent_confirmed"),
     is_active: booleanValue(row, "is_active"),
     match_status: enumValue<MatchStatus>(row, "match_status", ["unique", "ambiguous"]),

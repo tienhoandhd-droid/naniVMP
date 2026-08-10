@@ -33,7 +33,7 @@ export interface DirectoryPerson {
   user_id: string | null;
   employee_code: string | null;
   full_name: string;
-  department: string;
+  department: string | null;
   email: string | null;
   account_status: AccountStatus;
   access_class: AccessClass | null;
@@ -102,5 +102,21 @@ export interface PermissionPreflight {
 
 export function normalizePersonName(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
+}
+
+export function isDirectoryPersonComplete(person: DirectoryPerson): boolean {
+  return Boolean(
+    person.department?.trim()
+    && person.access_class
+    && person.scope_departments.length
+    && person.access_areas.length,
+  );
+}
+
+export function findDirectoryPersonById<T extends Pick<DirectoryPerson, "person_id">>(
+  people: readonly T[],
+  personId: string,
+): T | null {
+  return people.find((person) => person.person_id === personId) ?? null;
 }
 import type { ItemPermissionMode } from "../../types/domain.ts";
