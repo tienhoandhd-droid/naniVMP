@@ -452,7 +452,7 @@ Modal sửa và điền hàng loạt dùng `PerformerSelect`. Sửa tại chỗ 
 
 - [ ] **Step 5: Giữ tab Người thực hiện là nơi tạo tên**
 
-`SimpleEditModal` của dataset `performers` vẫn có input tên và nút Lưu; server chặn trùng tên chuẩn hóa. Mọi dataset khác không được tạo tên mới.
+`SimpleEditModal` của dataset `performers` vẫn có input tên và nút Lưu; server cảnh báo tên chuẩn hóa trùng nhưng giữ hai hồ sơ riêng nếu mã nhân viên/email/bộ phận xác định đây là hai người thật. Mọi dataset khác không được tạo tên mới.
 
 ```ts
 const isAuthoritativePerformerName = spec.id === "performers" && f.key === "performer_name";

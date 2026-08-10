@@ -68,7 +68,7 @@ Họ tên, mã nhân viên và email vẫn là dữ liệu hồ sơ. Bộ phận
 
 ### 4.1 Nguồn chính của tên người thực hiện
 
-Tab **Người thực hiện/Danh bạ** là nơi duy nhất cho phép tạo mới hoặc sửa tên người. Form này có nút **Lưu**, kiểm tra tên rỗng, tên chuẩn hóa bị trùng, email đã nối người khác và xung đột phiên bản trước khi ghi.
+Tab **Người thực hiện/Danh bạ** là nơi duy nhất cho phép tạo mới hoặc sửa tên người. Form này có nút **Lưu**, kiểm tra tên rỗng, cảnh báo tên chuẩn hóa bị trùng, email đã nối người khác và xung đột phiên bản trước khi ghi. Hai người trùng tên hợp lệ vẫn được giữ thành hai hồ sơ khác nhau và phân biệt bằng `person_id`, mã nhân viên, email, bộ phận.
 
 Các nơi dùng người thực hiện không được kiêm chức năng tạo tên mới:
 
@@ -168,7 +168,7 @@ Máy chủ phải từ chối:
 - Người gọi không có quyền sửa hồ sơ hoặc phạm vi tương ứng.
 - Patch chứa trường ngoài allowlist.
 - `person_id` không tồn tại, đã ngừng hoạt động hoặc không thuộc phạm vi người gọi được quản lý.
-- Tên người chuẩn hóa trùng với một hồ sơ đang hoạt động khi tạo/sửa danh bạ.
+- Gán người bằng chuỗi tên hoặc `person_id` không tồn tại/không hoạt động. Tên trùng hợp lệ không bị cấm vì khóa liên kết là `person_id`.
 
 RPC ghi phải dùng transaction, `search_path` cố định, quyền thực thi tối thiểu và trả lỗi có mã để giao diện chỉ đúng trường cần sửa.
 
@@ -226,7 +226,7 @@ Sau khi lưu hồ sơ hoặc phạm vi, bảng tự tải lại. Nếu đang ở
 - Lưu được nhiều giá trị hợp lệ ở cả bốn tầng.
 - Từ chối từng trường hợp quan hệ sai và rollback toàn bộ transaction.
 - Từ chối mã không tồn tại, patch trái phép, người gọi thiếu quyền và phiên bản cũ.
-- Từ chối gán `person_id` không tồn tại/không hoạt động và từ chối tạo tên chuẩn hóa bị trùng.
+- Từ chối gán `person_id` không tồn tại/không hoạt động; cảnh báo nhưng không gộp hoặc cấm hai người trùng tên hợp lệ.
 - Đổi tên một người giữ nguyên mọi liên kết nghiệp vụ vì khóa là `person_id`.
 - Nhật ký chứa đầy đủ trước/sau, người sửa, thời gian và lý do.
 - RPC quyền hiệu lực phản ánh đúng các tập phạm vi mới ở cả `preview` và `enforced`.
