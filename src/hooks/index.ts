@@ -33,7 +33,31 @@ import {
   updateItemProgress, upsertObjectSupabase, deleteSourceObject, fetchPerformers,
 } from "../lib/supabaseData.ts";
 import { enrich } from "../utils/helpers.ts";
-import { loadSnapshot, saveSnapshot, clearSnapshot } from "../lib/snapshotCache.ts";
+import {
+  loadSnapshot,
+  saveSnapshot,
+  clearSnapshot,
+  permissionDataPolicy,
+  type SnapshotPermissionMode,
+} from "../lib/snapshotCache.ts";
+
+async function readItemPermissionContext(): Promise<{
+  userId: string;
+  mode: SnapshotPermissionMode;
+}> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw new Error("Không đọc được phiên đăng nhập: " + sessionError.message);
+  const userId = sessionData.session?.user.id;
+  if (!userId) throw new Error("Phiên đăng nhập đã hết hạn");
+
+  const { data, error } = await supabase.rpc("item_permissions_mode" as never);
+  if (error) throw new Error("Không đọc được chế độ phân quyền: " + error.message);
+  if (data !== "preview" && data !== "enforced") {
+    throw new Error("Chế độ phân quyền không hợp lệ");
+  }
+  return { userId, mode: data };
+}
 
 // ======================== useDebounce ========================
 export function useDebounce<T>(value: T, delay = 300): T {
@@ -114,7 +138,12 @@ export function useAuth() {
            đá người dùng ra màn đăng nhập là sai, và sai theo kiểu tệ nhất:
            thỉnh thoảng mới xảy ra, ngay lúc tải lại trang. Giữ nguyên hồ sơ
            đang có, để lần tải sau tự khỏi. */
-        if (tinhTrang === "khong") { setUser(null); saveUser(null); return; }
+        if (tinhTrang === "khong") {
+          clearSnapshot();
+          setUser(null);
+          saveUser(null);
+          return;
+        }
         if (tinhTrang === "co" && phien && !user) { setUser(phien); saveUser(phien); }
       })
       .catch(() => { /* không kết luận được — giữ nguyên, lần sau thử lại */ })
@@ -124,7 +153,11 @@ export function useAuth() {
        thất bại thì supabase-js phát SIGNED_OUT. Không nghe thì app lại rơi
        đúng vào trạng thái trên, chỉ khác là không cần tải lại trang. */
     const { data: sub } = supabase!.auth.onAuthStateChange((sk, phien) => {
-      if (con && sk === "SIGNED_OUT" && !phien) { setUser(null); saveUser(null); }
+      if (con && sk === "SIGNED_OUT" && !phien) {
+        clearSnapshot();
+        setUser(null);
+        saveUser(null);
+      }
     });
 
     return () => { con = false; sub?.subscription?.unsubscribe(); };
@@ -188,6 +221,9 @@ export function useVmpData() {
   // Watermark gần nhất (count + max updated_at). Poll so cái này TRƯỚC — chỉ khi
   // đổi mới kéo cả payload nặng về. Tránh JSON.stringify cả mảng mỗi 20s.
   const wmSigRef = useRef("");
+  const permissionModeRef = useRef<SnapshotPermissionMode | null>(null);
+  const permissionUserRef = useRef("");
+  const dataRequestRef = useRef(0);
   const wmSig = (wm: { plan_items?: number; objects?: number; updated_at?: string } | null): string =>
     wm ? `${wm.plan_items}|${wm.objects}|${wm.updated_at}` : "";
   type Watermark = { plan_items?: number; objects?: number; updated_at?: string };
@@ -207,16 +243,61 @@ export function useVmpData() {
 
   const enriched = useMemo(() => enrich(objects, acts), [objects, acts]);
 
+  const clearProtectedData = useCallback((invalidateRequests = false) => {
+    if (invalidateRequests) dataRequestRef.current += 1;
+    dataSigRef.current = "";
+    wmSigRef.current = "";
+    setObjects([]);
+    setActs([]);
+    clearSnapshot();
+  }, []);
+
   const connectSheet = useCallback(async (readUrl: string, writeUrl: string, force = false) => {
     setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", msg: "Đang tải dữ liệu…" }));
+    let legacyRequestId: number | null = null;
+    let legacyFallbackAllowed = !supabase;
 
     // ƯU TIÊN 1: Đọc trực tiếp từ Supabase (nhanh, dữ liệu đã đồng bộ)
     if (supabase) {
+      const requestId = ++dataRequestRef.current;
+      legacyRequestId = requestId;
       const nam = new Date().getFullYear();
+      let permissionContext: Awaited<ReturnType<typeof readItemPermissionContext>>;
+      try {
+        permissionContext = await readItemPermissionContext();
+      } catch (error) {
+        if (requestId !== dataRequestRef.current) return;
+        permissionModeRef.current = null;
+        permissionUserRef.current = "";
+        clearProtectedData();
+        setConn((c) => ({
+          ...c,
+          readUrl,
+          writeUrl,
+          status: "err",
+          source: "supabase",
+          msg: `Không xác minh được quyền — đã thu hồi dữ liệu trên màn hình: ${(error as Error).message}`,
+        }));
+        return;
+      }
+      if (requestId !== dataRequestRef.current) return;
+
+      const previousMode = permissionModeRef.current;
+      const identityChanged = permissionUserRef.current !== ""
+        && permissionUserRef.current !== permissionContext.userId;
+      const modeChanged = previousMode !== null && previousMode !== permissionContext.mode;
+      const policy = permissionDataPolicy(permissionContext.mode, previousMode);
+      legacyFallbackAllowed = policy.allowLegacyFallback;
+      permissionModeRef.current = permissionContext.mode;
+      permissionUserRef.current = permissionContext.userId;
+      if (identityChanged || modeChanged || policy.revokeBeforeFetch) {
+        clearProtectedData();
+      }
+
       // Vẽ ngay bằng bản chụp lần trước trong lúc chờ mạng. Không dùng khi
       // người dùng bấm "Làm mới" (force) — lúc đó họ đang chờ số MỚI.
-      if (!force) {
-        const cu = loadSnapshot(nam);
+      if (!force && policy.allowSnapshot) {
+        const cu = loadSnapshot(nam, permissionContext.userId, permissionContext.mode);
         if (cu) {
           setObjects(cu.objects);
           setActs(cu.activities);
@@ -226,10 +307,21 @@ export function useVmpData() {
       }
       try {
         const data = await fetchVmpDataFromSupabase(nam);
+        if (requestId !== dataRequestRef.current) return;
         dataSigRef.current = sigOf(data.objects, data.activities);
         if (Array.isArray(data.objects)) setObjects(data.objects);
         if (Array.isArray(data.activities)) setActs(data.activities);
-        saveSnapshot(nam, data.objects || [], data.activities || []);
+        if (policy.allowSnapshot) {
+          saveSnapshot(
+            nam,
+            permissionContext.userId,
+            permissionContext.mode,
+            data.objects || [],
+            data.activities || [],
+          );
+        } else {
+          clearSnapshot();
+        }
         if (readUrl || writeUrl) saveConn(readUrl, writeUrl);
         setLastSync(Date.now());
         // Không await: vẽ xong đã, tuổi dữ liệu điền sau vài trăm ms.
@@ -240,6 +332,7 @@ export function useVmpData() {
         });
         return;
       } catch (e) {
+        if (requestId !== dataRequestRef.current) return;
         const loi = (e as Error)?.message || "";
         /* Hết phiên thì n8n cũng không cứu được, mà thông báo của nhánh
            fallback ("chưa cấu hình URL đọc n8n") lại chỉ sai hướng hoàn toàn —
@@ -247,9 +340,22 @@ export function useVmpData() {
            42501 = permission denied for function: chính là vai anon gọi rpc_*
            sau migration 20260801090000. */
         if (/42501|permission denied|JWT|401/i.test(loi)) {
+          clearProtectedData();
           setConn((c) => ({
             ...c, readUrl, writeUrl, status: "err",
             msg: "Phiên đăng nhập đã hết hạn — đăng nhập lại để tải dữ liệu.",
+          }));
+          return;
+        }
+        if (!policy.allowLegacyFallback) {
+          clearProtectedData();
+          setConn((c) => ({
+            ...c,
+            readUrl,
+            writeUrl,
+            status: "err",
+            source: "supabase",
+            msg: "Không tải được dữ liệu đã lọc quyền — hệ thống đã thu hồi dữ liệu cũ và không dùng nguồn dự phòng chưa lọc.",
           }));
           return;
         }
@@ -259,6 +365,11 @@ export function useVmpData() {
     }
 
     // ƯU TIÊN 2: Đọc qua n8n webhook (fallback)
+    if (supabase && (
+      !legacyFallbackAllowed
+      || legacyRequestId !== dataRequestRef.current
+      || permissionModeRef.current !== "preview"
+    )) return;
     if (!readUrl) {
       setConn((c) => ({ ...c, writeUrl, status: "err", msg: "Chưa cấu hình Supabase và chưa có URL đọc n8n." }));
       return;
@@ -267,6 +378,12 @@ export function useVmpData() {
       const data = (await fetchVmpData(readUrl, force)) as {
         objects?: VmpObject[]; activities?: Activity[]; source?: string;
       };
+      // Request được mở lúc preview có thể về sau khi Admin vừa bật enforced.
+      // Kiểm lại cả generation lẫn mode ngay trước khi đụng state.
+      if (supabase && (
+        legacyRequestId !== dataRequestRef.current
+        || permissionModeRef.current !== "preview"
+      )) return;
       if (Array.isArray(data.objects) && data.objects.length) setObjects(data.objects);
       if (Array.isArray(data.activities) && data.activities.length) setActs(data.activities);
       saveConn(readUrl, writeUrl);
@@ -281,7 +398,7 @@ export function useVmpData() {
         msg: "Lỗi tải: " + ((e as Error)?.message || "không rõ") + " — kiểm tra URL / CORS / workflow",
       });
     }
-  }, [docWatermark]);
+  }, [clearProtectedData, docWatermark]);
 
   const reloadData = useCallback(() => {
     const c = loadConn() || {};
@@ -292,28 +409,67 @@ export function useVmpData() {
   // Dùng cho Realtime + polling để tránh nhấp nháy UI
   const silentRefresh = useCallback(async () => {
     if (!supabase) return;
+    const requestId = ++dataRequestRef.current;
+    let permissionContext: Awaited<ReturnType<typeof readItemPermissionContext>>;
     try {
-      // BƯỚC 1 (nhẹ): so watermark. Nếu không đổi → dừng, KHÔNG kéo payload.
-      // docWatermark ghi luôn tuổi dữ liệu, nên nhánh "không đổi" vẫn cập nhật
-      // được độ tươi — đây chính là nhánh chạy khi sync đứng, tức lúc cần nhất.
-      const wm = await docWatermark();
-      if (wm) {
-        const ws = wmSig(wm);
-        if (ws === wmSigRef.current) return; // không đổi → poll gần như miễn phí
-        wmSigRef.current = ws;
+      // Mode là một phần của quyền đọc, nên phải kiểm ở MỌI lượt poll. Chỉ
+      // nhìn watermark hạng mục sẽ bỏ sót lúc Admin đổi preview → enforced.
+      permissionContext = await readItemPermissionContext();
+      if (requestId !== dataRequestRef.current) return;
+      const previousMode = permissionModeRef.current;
+      const identityChanged = permissionUserRef.current !== ""
+        && permissionUserRef.current !== permissionContext.userId;
+      const modeChanged = previousMode !== null && previousMode !== permissionContext.mode;
+      const policy = permissionDataPolicy(permissionContext.mode, previousMode);
+      permissionModeRef.current = permissionContext.mode;
+      permissionUserRef.current = permissionContext.userId;
+
+      if (identityChanged || modeChanged || policy.revokeBeforeFetch) {
+        clearProtectedData();
       }
-      // BƯỚC 2 (nặng): watermark đổi (hoặc RPC watermark chưa có) → kéo full.
+
+      if (!policy.bypassWatermark && !identityChanged && !modeChanged) {
+        // Preview giữ tối ưu cũ: dữ liệu không đổi thì không kéo payload nặng.
+        const wm = await docWatermark();
+        if (requestId !== dataRequestRef.current) return;
+        if (wm) {
+          const ws = wmSig(wm);
+          if (ws === wmSigRef.current) return;
+          wmSigRef.current = ws;
+        }
+      }
+
+      // Enforced luôn đi qua RPC đã lọc quyền: thu hồi phân công phải phản ánh
+      // dù updated_at/count của dữ liệu nghiệp vụ không đổi.
       const data = await fetchVmpDataFromSupabase(new Date().getFullYear());
+      if (requestId !== dataRequestRef.current) return;
       const sig = sigOf(data.objects, data.activities);
       // Chốt chặn 2: nếu payload y hệt thì bỏ qua setState (tránh re-render).
       if (sig === dataSigRef.current) return;
       dataSigRef.current = sig;
       if (Array.isArray(data.objects)) setObjects(data.objects);
       if (Array.isArray(data.activities)) setActs(data.activities);
-      saveSnapshot(new Date().getFullYear(), data.objects || [], data.activities || []);
+      if (policy.allowSnapshot) {
+        saveSnapshot(
+          new Date().getFullYear(),
+          permissionContext.userId,
+          permissionContext.mode,
+          data.objects || [],
+          data.activities || [],
+        );
+      } else {
+        clearSnapshot();
+      }
       setLastSync(Date.now());
-    } catch (e) { /* im lặng — lần sau thử lại */ }
-  }, [docWatermark]);
+    } catch {
+      if (requestId !== dataRequestRef.current) return;
+      // Không đọc được mode cũng không được phép đoán là preview. Thu hồi dữ
+      // liệu cũ để lỗi mạng/quyền không biến thành đường fail-open.
+      permissionModeRef.current = null;
+      permissionUserRef.current = "";
+      clearProtectedData();
+    }
+  }, [clearProtectedData, docWatermark]);
 
   /* Chỉ nạp dữ liệu khi ĐÃ CÓ PHIÊN. Từ migration 20260801090000, vai
      `anon` không gọi được hàm rpc_* nào, nên gọi lúc chưa đăng nhập chỉ
@@ -345,11 +501,15 @@ export function useVmpData() {
         if (con && sk === "SIGNED_IN") {
           const c = loadConn();
           connectSheet(c?.readUrl || "", c?.writeUrl || "");
+        } else if (con && sk === "SIGNED_OUT") {
+          permissionModeRef.current = null;
+          permissionUserRef.current = "";
+          clearProtectedData(true);
         }
       })
       : { data: { subscription: null } };
     return () => { con = false; sub?.subscription?.unsubscribe(); };
-  }, [connectSheet]);
+  }, [clearProtectedData, connectSheet]);
 
   // ============================================================
   // REALTIME: tự cập nhật khi bảng vmp_plan_items đổi ở Supabase
@@ -377,6 +537,10 @@ export function useVmpData() {
       )
       .on("postgres_changes",
         { event: "*", schema: "public", table: "vmp_objects" },
+        debounced
+      )
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "system_config", filter: "key=eq.item_permissions_mode" },
         debounced
       )
       .subscribe();

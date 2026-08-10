@@ -9,9 +9,11 @@
  *  rồi thay vào. Người dùng thấy nội dung tức thì; con số vẫn đúng vì bản
  *  mới về sau vài trăm mili giây và đè lên.
  *
- *  Ba chốt an toàn để bản cũ không thành "dữ liệu ma":
+ *  Các chốt an toàn để bản cũ không thành "dữ liệu ma" hoặc vượt quyền:
  *    · quá 24 giờ thì bỏ, thà chờ còn hơn hiện số của hôm kia
  *    · khác NĂM kế hoạch thì bỏ (đổi năm là đổi hẳn tập dữ liệu)
+ *    · khác NGƯỜI đăng nhập thì bỏ
+ *    · chỉ lưu/nạp ở PREVIEW; ENFORCED luôn đọc mới từ RPC đã lọc quyền
  *    · khác PHIÊN BẢN cấu trúc thì bỏ (đổi hình dạng dữ liệu sau khi
  *      nâng cấp mà vẫn đọc bản cũ là nguồn của lỗi khó hiểu)
  *
@@ -20,22 +22,58 @@
  * ===================================================================== */
 import type { Activity, VmpObject } from "../types/domain.ts";
 
-const KEY = "vmp_snapshot_v1";
+const KEY = "vmp_snapshot_v2";
+const LEGACY_KEY = "vmp_snapshot_v1";
 /** Tăng số này mỗi khi hình dạng Activity/VmpObject đổi. */
-const VERSION = 1;
+const VERSION = 2;
 const TTL_MS = 24 * 60 * 60 * 1000;
+
+export type SnapshotPermissionMode = "preview" | "enforced";
+
+export function permissionDataPolicy(
+  mode: SnapshotPermissionMode,
+  previousMode: SnapshotPermissionMode | null,
+): {
+  allowSnapshot: boolean;
+  allowLegacyFallback: boolean;
+  bypassWatermark: boolean;
+  revokeBeforeFetch: boolean;
+} {
+  const enforced = mode === "enforced";
+  return {
+    allowSnapshot: !enforced,
+    allowLegacyFallback: !enforced,
+    bypassWatermark: enforced,
+    revokeBeforeFetch: enforced && previousMode !== "enforced",
+  };
+}
 
 interface Snapshot {
   v: number;
   year: number;
+  userId: string;
+  mode: SnapshotPermissionMode;
   at: number;
   objects: VmpObject[];
   activities: Activity[];
 }
 
-export function saveSnapshot(year: number, objects: VmpObject[], activities: Activity[]): void {
+export function saveSnapshot(
+  year: number,
+  userId: string,
+  mode: SnapshotPermissionMode,
+  objects: VmpObject[],
+  activities: Activity[],
+): void {
   try {
-    const s: Snapshot = { v: VERSION, year, at: Date.now(), objects, activities };
+    localStorage.removeItem(LEGACY_KEY);
+    if (mode === "enforced") {
+      localStorage.removeItem(KEY);
+      return;
+    }
+    const s: Snapshot = {
+      v: VERSION, year, userId, mode, at: Date.now(), objects, activities,
+    };
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
     // Hết dung lượng hoặc trình duyệt chặn — bỏ qua, chỉ mất phần vẽ sớm.
@@ -43,12 +81,24 @@ export function saveSnapshot(year: number, objects: VmpObject[], activities: Act
   }
 }
 
-export function loadSnapshot(year: number): { objects: VmpObject[]; activities: Activity[]; at: number } | null {
+export function loadSnapshot(
+  year: number,
+  userId: string,
+  mode: SnapshotPermissionMode,
+): { objects: VmpObject[]; activities: Activity[]; at: number } | null {
   try {
+    localStorage.removeItem(LEGACY_KEY);
+    if (mode === "enforced") {
+      localStorage.removeItem(KEY);
+      return null;
+    }
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as Snapshot;
-    if (s.v !== VERSION || s.year !== year) return null;
+    if (s.v !== VERSION || s.year !== year || s.userId !== userId || s.mode !== mode) {
+      localStorage.removeItem(KEY);
+      return null;
+    }
     if (!Array.isArray(s.activities) || !s.activities.length) return null;
     if (Date.now() - s.at > TTL_MS) return null;
     return { objects: s.objects || [], activities: s.activities, at: s.at };
@@ -56,5 +106,8 @@ export function loadSnapshot(year: number): { objects: VmpObject[]; activities: 
 }
 
 export function clearSnapshot(): void {
-  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(LEGACY_KEY);
+  } catch { /* ignore */ }
 }
