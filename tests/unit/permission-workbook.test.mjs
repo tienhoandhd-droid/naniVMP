@@ -63,3 +63,51 @@ test("parser chấp nhận mã nhân viên trống và chặn phân loại/khu v
   ]);
   assert.deepEqual(blankTemplateRows, { rows: [], errors: [] });
 });
+
+test("parser từ chối file quá 5 MiB trước khi đọc nội dung", async () => {
+  const { parsePermissionWorkbook } = await import(
+    "../../src/features/itemPermissions/permissionWorkbook.ts"
+  );
+  let arrayBufferCalled = false;
+  const result = await parsePermissionWorkbook({
+    size: 5 * 1024 * 1024 + 1,
+    async arrayBuffer() {
+      arrayBufferCalled = true;
+      throw new Error("không được đọc file quá lớn");
+    },
+  });
+
+  assert.equal(arrayBufferCalled, false);
+  assert.equal(result.rows.length, 0);
+  assert.match(result.errors[0].message, /5 MiB/);
+});
+
+test("parser từ chối workbook quá 1.000 dòng hoặc 20.000 ô trước khi tạo matrix", async () => {
+  const { parsePermissionWorkbook } = await import(
+    "../../src/features/itemPermissions/permissionWorkbook.ts"
+  );
+  const ExcelJS = (await import("exceljs")).default;
+  const parseWorkbook = async (workbook) => {
+    const bytes = await workbook.xlsx.writeBuffer();
+    return parsePermissionWorkbook({
+      size: bytes.byteLength,
+      async arrayBuffer() { return bytes; },
+    });
+  };
+
+  const tooManyRows = new ExcelJS.Workbook();
+  tooManyRows.addWorksheet("Trang tính1").getCell("A1001").value = "dư dòng";
+  const rowResult = await parseWorkbook(tooManyRows);
+  assert.equal(rowResult.rows.length, 0);
+  assert.match(rowResult.errors[0].message, /tối đa 1\.000 dòng/);
+
+  const tooManyCells = new ExcelJS.Workbook();
+  const cellSheet = tooManyCells.addWorksheet("Trang tính1");
+  for (let row = 1; row <= 1000; row += 1) {
+    cellSheet.getRow(row).values = Array.from({ length: 20 }, () => "x");
+  }
+  cellSheet.getCell("U1").value = "ô thứ 20.001";
+  const cellResult = await parseWorkbook(tooManyCells);
+  assert.equal(cellResult.rows.length, 0);
+  assert.match(cellResult.errors[0].message, /tối đa 20\.000 ô/);
+});

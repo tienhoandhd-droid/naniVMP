@@ -15,7 +15,7 @@ const completePerson = {
   department: "rd",
   email: "hong.ngoc@vmp.local",
   account_status: "linked",
-  access_class: "view_only",
+  access_class: "qa_progress_editor",
   scope_departments: ["rd", "qa"],
   access_areas: ["A1", "A2"],
   email_sent_confirmed: true,
@@ -51,6 +51,25 @@ const duplicateSaved = {
   match_status: "ambiguous",
 };
 
+const assignmentFor = (person, validationCode) => ({
+  assignment_id: `cccccccc-3333-4333-8333-${validationCode === "A-LATE" ? "000000000001" : "000000000002"}`,
+  validation_code: validationCode,
+  person_id: person.person_id,
+  user_id: person.user_id,
+  staff_name: person.full_name,
+  employee_code: person.employee_code,
+  assignment_kind: "equipment_department",
+  source: "manual",
+  source_text: null,
+  unresolved_reason: null,
+  expires_at: null,
+  is_active: true,
+  grants_access: true,
+  object_department: "rd",
+  area: "A1",
+  line: null,
+});
+
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: "new",
@@ -61,6 +80,7 @@ await page.setViewport({ width: 1500, height: 1100 });
 await page.setRequestInterception(true);
 
 const assignmentBodies = [];
+const assignmentFetchPersonIds = [];
 const performerProfileSelects = [];
 const cors = {
   "access-control-allow-origin": "*",
@@ -91,7 +111,17 @@ page.on("request", (request) => {
     return answer(request, { ok: true, mode: "preview", blocking_errors: [], warnings: [] });
   }
   if (/\/rpc\/rpc_item_assignments/.test(url)) {
-    return answer(request, { ok: true, assignments: [] });
+    if (request.method() === "OPTIONS") return answer(request, {});
+    const body = JSON.parse(request.postData() || "{}");
+    assignmentFetchPersonIds.push(body.p_person_id);
+    const isFirstPerson = body.p_person_id === completePerson.person_id;
+    const assignment = isFirstPerson
+      ? assignmentFor(completePerson, "A-LATE")
+      : assignmentFor(duplicateFirst, "B-CURRENT");
+    return setTimeout(
+      () => answer(request, { ok: true, assignments: [assignment] }),
+      isFirstPerson ? 3000 : 40,
+    );
   }
   if (/\/rpc\/rpc_preview_item_rights/.test(url)) {
     return answer(request, { ok: true, mode: "preview", rights: [] });
@@ -142,6 +172,12 @@ try {
     "equipment manager không được thấy ma trận quyền toàn cục");
   assert.equal(await documentContains("Lưu hồ sơ"), false,
     "equipment manager không được sửa StaffDirectory");
+  assert.equal(
+    await page.evaluate(() => [...document.querySelectorAll("label")]
+      .some((label) => label.textContent?.includes("Vai trò phân công"))),
+    false,
+    "equipment manager không được chọn nhầm vai QA",
+  );
 
   const equipmentSearch = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
   assert.ok(equipmentSearch, "equipment manager cần tìm người chuẩn trước khi phân công");
@@ -149,12 +185,26 @@ try {
   await page.waitForFunction(() => document.body.innerText.includes("Đặng Thị Hồng Ngọc · RD"));
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
+  for (let attempt = 0; attempt < 50 && !assignmentFetchPersonIds.includes(completePerson.person_id); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(assignmentFetchPersonIds.includes(completePerson.person_id), true,
+    "test race phải khởi động request A trước khi chọn B");
+  await equipmentSearch.click({ clickCount: 3 });
+  await equipmentSearch.type("Nguyễn Văn Trùng");
+  await page.waitForFunction(() => document.body.innerText.includes("first@vmp.local"));
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.includes("first@vmp.local"))?.click());
+  await page.waitForFunction(() => document.body.innerText.includes("B-CURRENT"));
+  await new Promise((resolve) => setTimeout(resolve, 3200));
+  assert.equal(await documentContains("A-LATE"), false,
+    "response A về trễ không được ghi đè danh sách của người B");
   await page.type('[aria-label="Mã hạng mục cần phân công"]', "VMP-EQUIPMENT-01");
   await page.type('[aria-label="Lý do phân công"]', "Quản lý thiết bị xếp lịch");
   await page.click('button[aria-label="Phân công người đã chọn"]');
   await page.waitForFunction(() => document.body.innerText.includes("Đã phân công hạng mục VMP-EQUIPMENT-01"));
   assert.equal(assignmentBodies.length, 1);
-  assert.equal(assignmentBodies[0].p_person_id, completePerson.person_id);
+  assert.equal(assignmentBodies[0].p_person_id, duplicateFirst.person_id);
   assert.equal(assignmentBodies[0].p_assignment_kind, "equipment_department");
   assignmentBodies.length = 0;
 
@@ -227,6 +277,22 @@ try {
   assert.equal(assignmentBodies[0].p_person_id, duplicateSaved.person_id);
   assert.equal("staff_name" in assignmentBodies[0], false);
   assert.equal("full_name" in assignmentBodies[0], false);
+
+  await page.evaluate(() => {
+    const key = "vmp_monitor_user_v1";
+    const current = JSON.parse(localStorage.getItem(key) || "{}");
+    localStorage.setItem(key, JSON.stringify({
+      ...current,
+      role: "viewer",
+      perm: "view",
+      accessClass: null,
+    }));
+  });
+  await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.body.innerText.includes("không có quyền truy cập"));
+  assert.equal(await documentContains("Danh bạ nhân sự & quyền"), false,
+    "persona ngoài allowlist không được dựng workspace phân quyền");
   console.log("✅ Dòng legacy sửa được, khóa phân công và chọn đúng person_id khi trùng tên");
 } finally {
   await browser.close();

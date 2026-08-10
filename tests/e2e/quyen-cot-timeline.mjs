@@ -42,6 +42,13 @@ const ACTIVITY = {
     lich_td: "2026-08-12",
   },
 };
+const NEXT_ACTIVITY = {
+  ...ACTIVITY,
+  id: "VMP-E2E-02",
+  code: "TB-E2E-02",
+  name: "Thiết bị kế tiếp",
+  _raw: { ...ACTIVITY._raw },
+};
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -55,7 +62,9 @@ await page.setRequestInterception(true);
 
 let mode = "enforced";
 let editableFields = QA_FIELDS;
+let updateShouldFail = false;
 const updateBodies = [];
+const permissionBodies = [];
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -69,14 +78,15 @@ page.on("request", (request) => {
   const url = request.url();
   if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
     return answer(request, {
-      activities: [ACTIVITY], objects: [], updated_at: "2026-08-10T00:00:00Z",
+      activities: [ACTIVITY, NEXT_ACTIVITY], objects: [], updated_at: "2026-08-10T00:00:00Z",
     });
   }
   if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
     return answer(request, { year: 2026, plan_items: 1, objects: 1, updated_at: "2026-08-10T00:00:00Z" });
   }
   if (/\/rpc\/item_permissions_mode/.test(url)) return answer(request, mode);
-  if (/\/rpc\/vmp_item_rights/.test(url)) {
+  if (/\/rpc\/vmp_my_item_rights/.test(url)) {
+    if (request.method() !== "OPTIONS") permissionBodies.push(JSON.parse(request.postData() || "{}"));
     return answer(request, [{
       can_view: true,
       editable_fields: editableFields,
@@ -88,6 +98,14 @@ page.on("request", (request) => {
   }
   if (/\/rpc\/rpc_update_progress/.test(url)) {
     if (request.method() !== "OPTIONS") updateBodies.push(JSON.parse(request.postData() || "{}"));
+    if (request.method() !== "OPTIONS" && updateShouldFail) {
+      return request.respond({
+        status: 400,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({ code: "E2E_SAVE_FAILED", message: "Lưu E2E thất bại" }),
+      });
+    }
     return answer(request, { ok: true });
   }
   if (/\/vmp_performers/.test(url)) return answer(request, []);
@@ -152,11 +170,28 @@ try {
   await page.waitForFunction(() => document.body.innerText.includes("TB-E2E-01"));
 
   await openPersona("enforced", QA_FIELDS);
+  assert.deepEqual(permissionBodies[0], { p_validation_code: ACTIVITY.id },
+    "frontend chỉ gửi mã hạng mục vào wrapper quyền của chính auth.uid");
   const qa = await controlState();
   assert.equal(qa.qaCount, 8, "QA phải có đúng tám control ngày/trạng thái");
   assert.equal(qa.qaEnabled, 8, "QA phải sửa được đủ tám trường QA");
   assert.equal(qa.scheduleEnabled, false, "QA không được sửa scheduled_at");
   assert.equal(qa.scheduleValue, "2026-08-12T14:35", "giờ Bangkok phải hiển thị không lệch theo timezone trình duyệt");
+  await page.evaluate(() => {
+    const title = [...document.querySelectorAll("span")]
+      .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
+    const select = title?.closest(".vmp-scroll")?.querySelector("select:not([disabled])");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    setter.call(select, "Hoàn thành");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForFunction(() => document.body.innerText.includes("Chưa lưu được:"));
+  assert.equal(
+    await page.evaluate(() => [...document.querySelectorAll("button")]
+      .find((button) => button.textContent?.includes("Lưu & mở tiếp"))?.disabled),
+    true,
+    "Lưu & mở tiếp phải dùng cùng điều kiện thieuGi với nút Lưu",
+  );
 
   // Đường tắt đã điền sẵn hai trường QA trước khi quyền về, tạo một bản nháp
   // hỗn hợp. Enforced vẫn chỉ được gửi scheduled_at xuống RPC.
@@ -173,13 +208,24 @@ try {
   });
   await page.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  updateShouldFail = true;
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
+  await page.waitForFunction(() => document.body.innerText.includes("Lưu E2E thất bại"));
+  assert.equal(
+    await page.evaluate(() => [...document.querySelectorAll("span")]
+      .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")),
+    true,
+    "RPC lỗi thì modal phải giữ nguyên để người dùng thử lại",
+  );
+  updateShouldFail = false;
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
   await page.waitForFunction(() => ![...document.querySelectorAll("span")]
     .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
-  assert.equal(updateBodies.length, 1, "enforced chỉ gửi một request cập nhật hợp lệ");
-  assert.deepEqual(Object.keys(updateBodies[0].p_patch), ["scheduled_at"]);
-  assert.equal(updateBodies[0].p_patch.scheduled_at, "2026-08-12T08:45:00.000Z",
+  assert.equal(updateBodies.length, 2, "sau lỗi người dùng có thể thử lưu lại cùng bản nháp");
+  assert.deepEqual(Object.keys(updateBodies[1].p_patch), ["scheduled_at"]);
+  assert.equal(updateBodies[1].p_patch.scheduled_at, "2026-08-12T08:45:00.000Z",
     "15:45 Bangkok phải được gửi thành đúng thời điểm UTC");
 
   await openPersona("enforced", []);

@@ -129,7 +129,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     userName?: string,
     reason?: string,
     expectedVersion?: number,
-  ) => void;
+  ) => unknown | Promise<unknown>;
   onChangeState?: (id: string, newState: string, reason?: string) => void;
 }) {
   const raw = act._raw || {};
@@ -219,6 +219,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   const ownerNow = act.owner && act.owner !== "—" ? String(act.owner) : "";
   const [who, setWho] = useState(ownerNow);
   const [savingWho, setSavingWho] = useState(false);
+  const [savingProgress, setSavingProgress] = useState(false);
   const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
   const whoChanged = !same(who, ownerNow);
   const whoMatch = find(who);
@@ -376,7 +377,29 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       // dạng chuỗi rỗng, để lớp dưới dịch thành "xoá" chứ không phải "bỏ qua".
       const patch: Record<string, string> = {};
       doiRoi.forEach((k) => { patch[k] = f[k] || ""; });
-      onSave(act.id, patch, undefined, reason.trim() || undefined, Number.isFinite(v) ? v : undefined);
+      setSavingProgress(true);
+      try {
+        const result = await onSave(
+          act.id,
+          patch,
+          undefined,
+          reason.trim() || undefined,
+          Number.isFinite(v) ? v : undefined,
+        );
+        if (result && typeof result === "object" && "ok" in result
+            && (result as { ok?: unknown }).ok === false) {
+          const message = "error" in result && typeof (result as { error?: unknown }).error === "string"
+            ? (result as { error: string }).error
+            : "Cập nhật tiến độ thất bại";
+          setErr(message);
+          return;
+        }
+      } catch (error) {
+        setErr((error as Error).message || "Cập nhật tiến độ thất bại");
+        return;
+      } finally {
+        setSavingProgress(false);
+      }
     }
     if (goNext && nextAct && onOpenNext) onOpenNext(nextAct);
     else onClose();
@@ -615,16 +638,17 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
         <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
         {!permissionLoading && !timelineViewOnly && (
-          <button onClick={() => handleSave(false)} disabled={savingWho || !!thieuGi}
+          <button onClick={() => handleSave(false)} disabled={savingWho || savingProgress || !!thieuGi}
             title={thieuGi || undefined}
-            style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || thieuGi ? 0.55 : 1, cursor: thieuGi ? "not-allowed" : "pointer" }}>
-            <Save size={17} /> {savingWho ? "Đang lưu…" : nChanged + (whoChanged ? 1 : 0) > 0 ? `Lưu ${nChanged + (whoChanged ? 1 : 0)} thay đổi` : "Lưu tiến độ"}
+            style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || savingProgress || thieuGi ? 0.55 : 1, cursor: thieuGi ? "not-allowed" : "pointer" }}>
+            <Save size={17} /> {savingWho || savingProgress ? "Đang lưu…" : nChanged + (whoChanged ? 1 : 0) > 0 ? `Lưu ${nChanged + (whoChanged ? 1 : 0)} thay đổi` : "Lưu tiến độ"}
           </button>
         )}
         {!permissionLoading && !timelineViewOnly && nextAct && onOpenNext && (
-          <button onClick={() => handleSave(true)} disabled={savingWho}
+          <button onClick={() => handleSave(true)}
+            disabled={savingWho || savingProgress || ((formChanged || whoChanged) && !!thieuGi)}
             title={`Tiếp theo: ${nextAct.code} · ${nextAct.name}`}
-            style={{ flex: 1.4, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.plum}`, background: C.surface, color: C.plum, fontFamily: TEXT, fontWeight: 800, cursor: "pointer", opacity: savingWho ? 0.6 : 1, whiteSpace: "nowrap" }}>
+            style={{ flex: 1.4, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.plum}`, background: C.surface, color: C.plum, fontFamily: TEXT, fontWeight: 800, cursor: "pointer", opacity: savingWho || savingProgress || ((formChanged || whoChanged) && !!thieuGi) ? 0.6 : 1, whiteSpace: "nowrap" }}>
             {formChanged || whoChanged ? "Lưu & mở tiếp →" : "Mở tiếp →"}
           </button>
         )}
