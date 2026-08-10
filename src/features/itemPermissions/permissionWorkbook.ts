@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import { DEPTS } from "../../constants/vmp.ts";
 import type { AccessClass, PermissionPersonPatch } from "./types.ts";
 
@@ -109,9 +108,22 @@ export async function parsePermissionWorkbook(
   file: File,
   options: { validAreas?: readonly string[] } = {},
 ): Promise<PermissionWorkbookResult> {
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-  const firstSheet = workbook.Sheets["Trang tính1"] || workbook.Sheets[workbook.SheetNames[0]];
+  // Không dùng SheetJS/xlsx cho file người dùng tải lên: phiên bản npm hiện
+  // có advisory prototype-pollution/ReDoS. ExcelJS cũng là thư viện dùng để
+  // sinh chính file mẫu, nên đường đọc/ghi cùng một hợp đồng workbook.
+  const ExcelJS = (await import("exceljs")).default;
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await file.arrayBuffer());
+  const firstSheet = workbook.getWorksheet("Trang tính1") || workbook.worksheets[0];
   if (!firstSheet) return { rows: [], errors: [{ rowNumber: 1, message: "File không có trang dữ liệu" }] };
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(firstSheet, { header: 1, defval: "", raw: false });
+  const matrix: unknown[][] = [];
+  firstSheet.eachRow({ includeEmpty: true }, (row) => {
+    const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+    matrix.push(values.map((value) => {
+      if (value && typeof value === "object" && "text" in value) return value.text;
+      if (value && typeof value === "object" && "result" in value) return value.result;
+      return value ?? "";
+    }));
+  });
   return parsePermissionRows(matrix, options);
 }
