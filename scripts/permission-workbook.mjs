@@ -9,8 +9,10 @@ export const PERMISSION_HEADERS = [
   "Mã nhân viên",
   "Họ và tên",
   "Phân loại",
-  "Phạm vi",
-  "Khu vực phân quyền",
+  "Phạm vi bộ phận",
+  "Phạm vi xưởng",
+  "Phạm vi khu vực",
+  "Phạm vi line",
   "Email nhận tài khoản",
   "Xác nhận gửi email",
 ];
@@ -42,8 +44,10 @@ export async function createPermissionWorkbook(outputPath) {
     { key: "employeeCode", width: 18 },
     { key: "fullName", width: 30 },
     { key: "accessClass", width: 52 },
-    { key: "scope", width: 24 },
-    { key: "areas", width: 28 },
+    { key: "scopeDepartments", width: 24 },
+    { key: "scopeFactories", width: 24 },
+    { key: "scopeAreas", width: 24 },
+    { key: "scopeLines", width: 24 },
     { key: "email", width: 32 },
     { key: "emailSent", width: 24 },
   ];
@@ -61,7 +65,7 @@ export async function createPermissionWorkbook(outputPath) {
       right: { style: "thin", color: { argb: "FFE3CADB" } },
     };
   });
-  sheet.autoFilter = { from: "A1", to: "I501" };
+  sheet.autoFilter = { from: "A1", to: "K501" };
 
   const classFormula = `"${ACCESS_CLASS_LABELS.join(",")}"`;
   const departmentFormula = `"${DEPARTMENT_LABELS.join(",")}"`;
@@ -77,7 +81,7 @@ export async function createPermissionWorkbook(outputPath) {
       showErrorMessage: true, errorTitle: "Phân loại không hợp lệ",
       error: "Chọn một trong năm phân loại quyền chuẩn.",
     };
-    sheet.getCell(`I${row}`).dataValidation = {
+    sheet.getCell(`K${row}`).dataValidation = {
       type: "list", allowBlank: true, formulae: ['"Có,Không"'],
     };
     const fill = row % 2 === 0 ? "FFFFF9FC" : "FFFFFFFF";
@@ -94,10 +98,10 @@ export async function createPermissionWorkbook(outputPath) {
   guide.getColumn(1).width = 110;
   const guideRows = [
     "HƯỚNG DẪN NHẬP DANH BẠ NHÂN SỰ & QUYỀN VMP",
-    "Mỗi người một dòng. Không đổi tên, thứ tự hoặc thêm bớt chín cột ở Trang tính1.",
+    "Mỗi người một dòng. Không đổi tên, thứ tự hoặc thêm bớt 11 cột ở Trang tính1.",
     "Mã nhân viên hiện không bắt buộc; có thể để trống và bổ sung sau. Hệ thống tạm khớp bằng Họ và tên có dấu, không phân biệt hoa thường và khoảng trắng.",
-    "Phạm vi: nhập mã bộ phận được xem/làm, nhiều giá trị cách nhau bằng dấu chấm phẩy; ví dụ QA;QC. Dùng * chỉ khi cần toàn bộ.",
-    "Khu vực phân quyền: nhập mã khu vực hoặc line, nhiều giá trị cách nhau bằng dấu chấm phẩy; ví dụ A1;A2. Dùng * chỉ khi cần toàn bộ.",
+    "Bốn cột phạm vi nhập mã danh mục chuẩn, nhiều giá trị cách nhau bằng dấu chấm phẩy. Mỗi xưởng phải thuộc một bộ phận đã chọn, mỗi khu vực thuộc một xưởng đã chọn và mỗi line thuộc một khu vực đã chọn.",
+    "Muốn cấp toàn bộ ở một tầng, nhập mã lựa chọn Toàn bộ đã được cấu hình trong danh mục; ô trống không có nghĩa là toàn bộ.",
     "Email nhận tài khoản: nếu trùng email của tài khoản hệ thống, danh bạ tự nối đúng user_id. Không dùng chung một email cho hai người.",
     "Xác nhận gửi email: chọn Có sau khi đã gửi thông tin tài khoản; không có chức năng tự động gửi email trong file này.",
     "Năm phân loại quyền:",

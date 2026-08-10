@@ -34,6 +34,15 @@ import {
   fetchProductsGmp, upsertProductGmp, deleteProductGmp,
 } from "../lib/supabaseData.ts";
 import { usePerformers } from "../hooks/index.ts";
+import PerformerSelect from "../features/itemPermissions/PerformerSelect.tsx";
+import {
+  buildActivePerformerChoices,
+  buildSourcePerformerPatch,
+  resolvePerformerChoice,
+  resolveUniquePerformerIdByName,
+  type PerformerChoice,
+  type SourcePerformerField,
+} from "../features/itemPermissions/performerSelection.ts";
 import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
 import type { SourceWarnings } from "../lib/supabaseData.ts";
 
@@ -70,7 +79,7 @@ const FIELDS = [
   { key: "year_ref",         label: "Năm nhập / ban hành", w: 120, num: true,
     hint: "Bằng năm thẩm định và chưa từng có IQ ⇒ sinh đủ DQ, FAT/SAT, IQ, OQ, PQ (chỉ một lần)." },
   { key: "owner_name",       label: "QA phụ trách",        w: 150,
-    hint: "Gán tự động theo bảng phân công (vmp_assignment_rules). Sửa tay được — gõ vào sẽ gợi ý từ tab Người thực hiện." },
+    hint: "Gán tự động theo bảng phân công (vmp_assignment_rules). Chỉ chọn người đang hoạt động từ tab Người thực hiện." },
   { key: "support_name",     label: "Người hỗ trợ",        w: 140 },
   { key: "work_group",       label: "Nhóm công việc",      w: 190,
     hint: "Nhóm trong bảng phân công đã khớp — dùng để truy vì sao thuộc về người này." },
@@ -83,9 +92,20 @@ const FIELDS = [
   { key: "note",             label: "Ghi chú",             w: 160 },
 ];
 
-/** Ô nhập tên người — đổ gợi ý từ danh sách người thực hiện thay vì gõ tay,
- *  vì gõ tay chính là chỗ đẻ ra 'My' / 'My2' / 'my' là ba người khác nhau. */
+/** Hai cột liên kết người bằng ID; tên chỉ là bản sao legacy để hiển thị. */
 const PERSON_FIELDS = new Set(["owner_name", "support_name"]);
+
+const personIdField = (field: SourcePerformerField) =>
+  field === "owner_name" ? "owner_person_id" : "support_person_id";
+
+function sourcePersonId(
+  record: Record<string, unknown>,
+  field: SourcePerformerField,
+  choices: readonly PerformerChoice[],
+): string | null {
+  const stored = record[personIdField(field)];
+  return stored ? String(stored) : resolveUniquePerformerIdByName(String(record[field] ?? ""), choices);
+}
 
 function SourceCatalogSection({ user, onReload, focus }: {
   user?: AppUser | null; onReload?: () => void;
@@ -93,6 +113,8 @@ function SourceCatalogSection({ user, onReload, focus }: {
   focus?: { code: string; nhom?: string } | null;
 }) {
   const canEdit = user?.perm === "admin";
+  const { performers } = usePerformers();
+  const performerChoices = buildActivePerformerChoices(performers);
   const [kind, setKind] = useState<ObjectKind>(SOURCE_KINDS[0]);
   const [rows, setRows] = useState<SourceObjectRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +133,9 @@ function SourceCatalogSection({ user, onReload, focus }: {
    *  hàng trăm đối tượng mà không phải mở từng hộp thoại. */
   const [picked, setPicked] = useState<Set<string>>(new Set());
   /** Ô đang sửa tại chỗ: nhấn đúp để mở, Enter lưu, Esc huỷ, Tab sang phải. */
-  const [cell, setCell] = useState<{ id: string; key: string; value: string } | null>(null);
+  const [cell, setCell] = useState<{
+    id: string; key: string; value: string; personId?: string | null;
+  } | null>(null);
   const [bulk, setBulk] = useState(false);
   /** Lọc theo cột kiểu Excel: cột → danh sách giá trị được giữ lại.
    *  Không có khoá trong đây nghĩa là cột đó không lọc gì. */
@@ -211,6 +235,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
   /** Lưu một ô sau khi sửa tại chỗ. */
   const saveCell = async () => {
     if (!cell) return;
+    if (PERSON_FIELDS.has(cell.key)) return;
     const row = rows.find((r) => r.id === cell.id);
     const f = FIELDS.find((x) => x.key === cell.key);
     setCell(null);
@@ -224,17 +249,39 @@ function SourceCatalogSection({ user, onReload, focus }: {
     } catch (e) { alert("Lỗi lưu: " + ((e as Error).message || "không rõ")); }
   };
 
+  /** Person cells stay as drafts until their own explicit Lưu button. */
+  const savePersonCell = async () => {
+    if (!cell || !PERSON_FIELDS.has(cell.key)) return;
+    const row = rows.find((item) => item.id === cell.id);
+    if (!row) return;
+    const field = cell.key as SourcePerformerField;
+    const personId = cell.personId ?? null;
+    const beforeId = sourcePersonId(row as unknown as Record<string, unknown>, field, performerChoices);
+    if (beforeId === personId) { setCell(null); return; }
+    try {
+      const patch = buildSourcePerformerPatch(field, personId, performerChoices);
+      await upsertSourceObject(kind, row.object_code, patch);
+      setCell(null);
+      await load();
+    } catch (e) { alert("Lỗi lưu: " + ((e as Error).message || "không rõ")); }
+  };
+
   /** Gán cùng một giá trị cho mọi dòng đang chọn. */
-  const applyBulk = async (key: string, value: string) => {
+  const applyBulk = async (key: string, value: string | null) => {
     const f = FIELDS.find((x) => x.key === key);
     const targets = sorted.filter((r) => picked.has(r.id));
     if (!targets.length) return;
-    if (!window.confirm(`Đặt "${f?.label}" = "${value}" cho ${targets.length} đối tượng đang chọn?`)) return;
+    const shownValue = PERSON_FIELDS.has(key)
+      ? resolvePerformerChoice(value, performerChoices)?.fullName || "chưa phân công"
+      : value ?? "";
+    if (!window.confirm(`Đặt "${f?.label}" = "${shownValue}" cho ${targets.length} đối tượng đang chọn?`)) return;
     setSaving(true);
     try {
       for (const r of targets) {
-        await upsertSourceObject(kind, r.object_code,
-          { [key]: f?.num ? Number(value) : value });
+        const patch = PERSON_FIELDS.has(key)
+          ? buildSourcePerformerPatch(key as SourcePerformerField, value, performerChoices)
+          : { [key]: f?.num ? Number(value) : value };
+        await upsertSourceObject(kind, r.object_code, patch);
       }
       setPicked(new Set());
       setBulk(false);
@@ -264,6 +311,14 @@ function SourceCatalogSection({ user, onReload, focus }: {
       const patch: Record<string, unknown> = {};
       for (const f of FIELDS) {
         if (f.key === "object_code") continue;
+        if (PERSON_FIELDS.has(f.key)) {
+          Object.assign(patch, buildSourcePerformerPatch(
+            f.key as SourcePerformerField,
+            (form[personIdField(f.key as SourcePerformerField)] as string | null) ?? null,
+            performerChoices,
+          ));
+          continue;
+        }
         const raw = form[f.key];
         if (raw === undefined || raw === "") continue;
         patch[f.key] = f.num ? Number(raw) : String(raw);
@@ -550,7 +605,14 @@ function SourceCatalogSection({ user, onReload, focus }: {
                     <td key={f.key} className={i === 0 ? (canEdit ? "vmp-col-pin2" : "vmp-col-pin") : undefined}
                       onDoubleClick={() => {
                         if (!canEdit || f.lockOnEdit) return;
-                        setCell({ id: r.id, key: f.key, value: String(rec[f.key] ?? "") });
+                        setCell({
+                          id: r.id,
+                          key: f.key,
+                          value: String(rec[f.key] ?? ""),
+                          personId: PERSON_FIELDS.has(f.key)
+                            ? sourcePersonId(rec, f.key as SourcePerformerField, performerChoices)
+                            : undefined,
+                        });
                       }}
                       title={canEdit && !f.lockOnEdit ? "Nhấn đúp để sửa tại chỗ" : undefined}
                       style={{ padding: here ? "2px 4px" : "8px", whiteSpace: "nowrap",
@@ -558,7 +620,19 @@ function SourceCatalogSection({ user, onReload, focus }: {
                                fontWeight: i === 0 ? 700 : 400,
                                background: i === 0 && picked.has(r.id) ? C.lavSoft : undefined }}>
                       {here ? (
-                        <input autoFocus value={cell.value}
+                        PERSON_FIELDS.has(f.key) ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 430 }}>
+                            <PerformerSelect
+                              value={cell.personId ?? null}
+                              options={performerChoices}
+                              ariaLabel={f.label}
+                              onChange={(personId) => setCell({ ...cell, personId })}
+                              style={{ padding: "5px 7px", fontSize: 12 }}
+                            />
+                            <button type="button" onClick={savePersonCell} style={miniBtn}>Lưu</button>
+                            <button type="button" onClick={() => setCell(null)} style={miniBtn}>Không lưu</button>
+                          </div>
+                        ) : <input autoFocus value={cell.value}
                           onChange={(e) => setCell({ ...cell, value: e.target.value })}
                           onBlur={saveCell}
                           onKeyDown={(e) => {
@@ -793,11 +867,14 @@ const rowStyle: React.CSSProperties = {
 function BulkModal({ count, saving, onClose, onApply }: {
   count: number; saving: boolean;
   onClose: () => void;
-  onApply: (key: string, value: string) => void | Promise<void>;
+  onApply: (key: string, value: string | null) => void | Promise<void>;
 }) {
+  const { performers } = usePerformers();
+  const performerChoices = buildActivePerformerChoices(performers);
   const cols = FIELDS.filter((f) => !f.lockOnEdit);
   const [key, setKey] = useState(cols[0]?.key ?? "");
   const [value, setValue] = useState("");
+  const [personId, setPersonId] = useState<string | null>(null);
   const f = cols.find((x) => x.key === key);
 
   return (
@@ -816,18 +893,24 @@ function BulkModal({ count, saving, onClose, onApply }: {
         </div>
 
         <label style={{ fontSize: 12, color: C.plumSoft }}>Cột</label>
-        <select value={key} onChange={(e) => { setKey(e.target.value); setValue(""); }}
+        <select value={key} onChange={(e) => { setKey(e.target.value); setValue(""); setPersonId(null); }}
           style={{ width: "100%", padding: "9px 10px", borderRadius: 8, marginBottom: 12,
                    border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 14 }}>
           {cols.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
 
         <label style={{ fontSize: 12, color: C.plumSoft }}>Giá trị</label>
-        <input value={value} onChange={(e) => setValue(e.target.value)}
-          inputMode={f?.num ? "numeric" : undefined}
-          placeholder={f?.num ? "số" : "để trống = xoá nội dung"}
-          style={{ width: "100%", padding: "9px 10px", borderRadius: 8, marginBottom: 18,
-                   border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 14 }} />
+        {f && PERSON_FIELDS.has(f.key) ? (
+          <PerformerSelect value={personId} options={performerChoices}
+            ariaLabel={f.label} onChange={setPersonId}
+            style={{ marginBottom: 18, borderColor: C.pink }} />
+        ) : (
+          <input value={value} onChange={(e) => setValue(e.target.value)}
+            inputMode={f?.num ? "numeric" : undefined}
+            placeholder={f?.num ? "số" : "để trống = xoá nội dung"}
+            style={{ width: "100%", padding: "9px 10px", borderRadius: 8, marginBottom: 18,
+                     border: `1px solid ${C.pink}`, fontFamily: TEXT, fontSize: 14 }} />
+        )}
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={onClose} disabled={saving}
@@ -836,7 +919,7 @@ function BulkModal({ count, saving, onClose, onApply }: {
                      color: C.plum, fontFamily: TEXT, fontSize: 14 }}>
             Huỷ
           </button>
-          <button onClick={() => onApply(key, value)} disabled={saving || !key}
+          <button onClick={() => onApply(key, PERSON_FIELDS.has(key) ? personId : value)} disabled={saving || !key}
             style={{ padding: "8px 14px", borderRadius: 8, border: "none",
                      cursor: saving ? "wait" : "pointer", background: C.plum,
                      color: "#fff", fontFamily: TEXT, fontSize: 14, fontWeight: 600 }}>
@@ -950,17 +1033,30 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
 }) {
   const isNew = !row.id;
   const { performers } = usePerformers();
+  const performerChoices = buildActivePerformerChoices(performers);
   const [form, setForm] = useState(() => {
     const f: Record<string, unknown> = {};
     const rec = row as Record<string, unknown>;
     for (const x of FIELDS) f[x.key] = rec[x.key] ?? "";
     return f;
   });
+  const [personDraft, setPersonDraft] = useState<Record<SourcePerformerField, string | null | undefined>>({
+    owner_name: undefined,
+    support_name: undefined,
+  });
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  const selectedPersonId = (field: SourcePerformerField) =>
+    personDraft[field] !== undefined
+      ? personDraft[field] ?? null
+      : sourcePersonId(row as Record<string, unknown>, field, performerChoices);
 
   const submit = () => {
     if (!String(form.object_code || "").trim()) { alert("Phải nhập mã đối tượng."); return; }
-    onSave(form);
+    onSave({
+      ...form,
+      owner_person_id: selectedPersonId("owner_name"),
+      support_person_id: selectedPersonId("support_name"),
+    });
   };
 
   return (
@@ -972,27 +1068,33 @@ function EditModal({ kind, row, saving, onClose, onSave }: {
             <span style={{ fontSize: 12, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>
               {f.label}{f.required ? " *" : ""}
             </span>
-            <input
-              value={String(form[f.key] ?? "")}
-              onChange={(e) => set(f.key, e.target.value)}
-              disabled={!isNew && f.lockOnEdit}
-              list={PERSON_FIELDS.has(f.key) ? "vmp-performer-list" : undefined}
-              inputMode={f.num ? "numeric" : undefined}
-              style={{
-                padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
-                border: `1.5px solid ${C.pinkSoft}`,
-                background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface,
-              }} />
+            {PERSON_FIELDS.has(f.key) ? (
+              <PerformerSelect
+                value={selectedPersonId(f.key as SourcePerformerField)}
+                options={performerChoices}
+                ariaLabel={f.label}
+                onChange={(personId) => setPersonDraft((current) => ({
+                  ...current,
+                  [f.key]: personId,
+                }))}
+              />
+            ) : (
+              <input
+                value={String(form[f.key] ?? "")}
+                onChange={(e) => set(f.key, e.target.value)}
+                disabled={!isNew && f.lockOnEdit}
+                inputMode={f.num ? "numeric" : undefined}
+                style={{
+                  padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
+                  border: `1.5px solid ${C.pinkSoft}`,
+                  background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface,
+                }} />
+            )}
             {f.hint && (
               <span style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>
             )}
           </label>
         ))}
-        <datalist id="vmp-performer-list">
-          {performers.map((p) => (
-            <option key={p.id} value={p.performer_name}>{p.email || "chưa có email"}</option>
-          ))}
-        </datalist>
       </div>
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>

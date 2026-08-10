@@ -65,6 +65,11 @@ export default function EffectiveRightsPanel({ person }: { person: DirectoryPers
             <div><Pencil size={14} /> {right.editable_fields.length
               ? right.editable_fields.map((field) => fieldLabels[field] || field).join(" · ")
               : "Chỉ xem, không sửa cột timeline nào"}</div>
+            <div>Phạm vi: Bộ phận {right.scope_match ? "khớp" : "không khớp"}
+              {right.factory_match !== undefined && ` · Xưởng ${right.factory_match ? "khớp" : "không khớp"}`}
+              {` · Khu vực ${right.area_match ? "khớp" : "không khớp"}`}
+              {right.line_match !== undefined && ` · Line ${right.line_match ? "khớp" : "không khớp"}`}
+            </div>
           </article>
         ))}
         {!rows.length && <div className="ip-empty">Chưa có dòng quyền để hiển thị.</div>}

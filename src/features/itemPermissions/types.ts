@@ -38,6 +38,11 @@ export interface DirectoryPerson {
   account_status: AccountStatus;
   access_class: AccessClass | null;
   scope_departments: string[];
+  scope_factory_ids: string[];
+  scope_area_ids: string[];
+  scope_line_ids: string[];
+  version: number;
+  /** Trường đọc tương thích trước khi dữ liệu area/line được chuẩn hóa. */
   access_areas: string[];
   email_sent_confirmed: boolean;
   is_active: boolean;
@@ -51,7 +56,9 @@ export interface PermissionPersonPatch {
   email?: string | null;
   access_class: AccessClass;
   scope_departments: string[];
-  access_areas: string[];
+  scope_factory_ids: string[];
+  scope_area_ids: string[];
+  scope_line_ids: string[];
   email_sent_confirmed?: boolean;
   is_active?: boolean;
 }
@@ -86,6 +93,8 @@ export interface EffectiveItemRight {
   assignment_sources: string[];
   scope_match: boolean;
   area_match: boolean;
+  factory_match?: boolean;
+  line_match?: boolean;
 }
 
 export interface PermissionIssue {
@@ -109,7 +118,9 @@ export function isDirectoryPersonComplete(person: DirectoryPerson): boolean {
     person.department?.trim()
     && person.access_class
     && person.scope_departments.length
-    && person.access_areas.length,
+    && person.scope_factory_ids.length
+    && person.scope_area_ids.length
+    && person.scope_line_ids.length,
   );
 }
 

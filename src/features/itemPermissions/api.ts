@@ -10,6 +10,7 @@ import {
   type PermissionPersonPatch,
   type PermissionPreflight,
 } from "./types.ts";
+import type { RootScopeOption, ScopeCatalog, ScopeOption } from "./scopeHierarchy.ts";
 
 type JsonObject = Record<string, unknown>;
 
@@ -70,6 +71,21 @@ function nullableBoolean(row: JsonObject, key: string): boolean | null {
   return value;
 }
 
+function optionalBoolean(row: JsonObject, key: string): boolean | undefined {
+  const value = row[key];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "boolean") throw new Error(`Dữ liệu sai ${key}`);
+  return value;
+}
+
+function integerValue(row: JsonObject, key: string): number {
+  const value = row[key];
+  if (!Number.isInteger(value) || (value as number) < 1) {
+    throw new Error(`Dữ liệu danh bạ thiếu hoặc sai ${key}`);
+  }
+  return value as number;
+}
+
 function enumValue<T extends string>(
   row: JsonObject,
   key: string,
@@ -100,10 +116,47 @@ export function decodeDirectoryPerson(value: unknown): DirectoryPerson {
     account_status: enumValue<AccountStatus>(row, "account_status", ["linked", "unlinked", "inactive"]),
     access_class: accessClass,
     scope_departments: optionalStringArray(row, "scope_departments"),
+    scope_factory_ids: optionalStringArray(row, "scope_factory_ids"),
+    scope_area_ids: optionalStringArray(row, "scope_area_ids"),
+    scope_line_ids: optionalStringArray(row, "scope_line_ids"),
     access_areas: optionalStringArray(row, "access_areas"),
+    version: integerValue(row, "version"),
     email_sent_confirmed: booleanValue(row, "email_sent_confirmed"),
     is_active: booleanValue(row, "is_active"),
     match_status: enumValue<MatchStatus>(row, "match_status", ["unique", "ambiguous"]),
+  };
+}
+
+function scopeRows(payload: JsonObject, key: string): unknown[] {
+  const rows = payload[key];
+  if (!Array.isArray(rows)) throw new Error(`Danh mục phạm vi thiếu hoặc sai ${key}`);
+  return rows;
+}
+
+function decodeRootScopeOption(value: unknown, context: string): RootScopeOption {
+  const row = objectValue(value, context);
+  return {
+    id: requiredString(row, "id"),
+    code: requiredString(row, "code"),
+    label: requiredString(row, "label"),
+  };
+}
+
+function decodeScopeOption(value: unknown, context: string, parentKey: string): ScopeOption {
+  const row = objectValue(value, context);
+  return {
+    ...decodeRootScopeOption(row, context),
+    parentId: requiredString(row, parentKey),
+  };
+}
+
+export function decodeScopeCatalog(value: unknown): ScopeCatalog {
+  const payload = objectValue(value, "Danh mục phạm vi");
+  return {
+    departments: scopeRows(payload, "departments").map((row) => decodeRootScopeOption(row, "Bộ phận")),
+    factories: scopeRows(payload, "factories").map((row) => decodeScopeOption(row, "Xưởng", "department_id")),
+    areas: scopeRows(payload, "areas").map((row) => decodeScopeOption(row, "Khu vực", "factory_id")),
+    lines: scopeRows(payload, "lines").map((row) => decodeScopeOption(row, "Line", "area_id")),
   };
 }
 
@@ -152,6 +205,8 @@ function decodeEffectiveRight(value: unknown): EffectiveItemRight {
     assignment_sources: stringArray(row, "assignment_sources"),
     scope_match: booleanValue(row, "scope_match"),
     area_match: booleanValue(row, "area_match"),
+    factory_match: optionalBoolean(row, "factory_match"),
+    line_match: optionalBoolean(row, "line_match"),
   };
 }
 
@@ -182,16 +237,38 @@ export async function searchPermissionDirectory(query = ""): Promise<DirectoryPe
   return payload.people.map(decodeDirectoryPerson);
 }
 
+export async function searchActivePerformers(query = ""): Promise<DirectoryPerson[]> {
+  return (await searchPermissionDirectory(query)).filter((person) => person.is_active);
+}
+
+export async function fetchScopeCatalog(): Promise<ScopeCatalog> {
+  return decodeScopeCatalog(await callRpc("rpc_item_permission_scope_catalog", {}));
+}
+
+export function createSavePermissionPersonArgs(
+  personId: string | null,
+  patch: PermissionPersonPatch,
+  reason: string,
+  expectedVersion: number | null,
+): JsonObject {
+  return {
+    p_person_id: personId,
+    p_patch: patch,
+    p_reason: reason,
+    p_expected_version: personId === null ? 0 : expectedVersion,
+  };
+}
+
 export async function savePermissionPerson(
   personId: string | null,
   patch: PermissionPersonPatch,
   reason: string,
+  expectedVersion: number | null,
 ): Promise<{ person_id: string; user_id: string | null; account_status: AccountStatus }> {
-  const payload = await callRpc("rpc_upsert_item_permission_staff", {
-    p_person_id: personId,
-    p_patch: patch,
-    p_reason: reason,
-  });
+  const payload = await callRpc(
+    "rpc_upsert_item_permission_staff",
+    createSavePermissionPersonArgs(personId, patch, reason, expectedVersion),
+  );
   return {
     person_id: requiredString(payload, "person_id"),
     user_id: nullableString(payload, "user_id"),

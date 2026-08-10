@@ -13,6 +13,7 @@
  * ===================================================================== */
 import { supabase } from "./supabaseClient.ts";
 import { deriveActivityFields } from "./n8nAdapter.ts";
+import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/performerSelection.ts";
 import type {
   Activity, GenerateTimelineResult, ObjectKind, ProductGmpRow, RpcResult,
   SourceObjectRow, VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
@@ -901,6 +902,20 @@ export async function setItemPerformer(
     p_validation_code: validationCode,
     p_performer_name: performerName,
   });
+  return unwrap(data, error, "Gán người thực hiện thất bại");
+}
+
+/** Gán bằng khóa danh bạ ổn định; tên chỉ còn là dữ liệu hiển thị legacy. */
+export async function setItemPerformerById(
+  validationCode: string,
+  personId: string | null,
+  reason: string,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc(
+    "rpc_set_item_performer_by_id" as never,
+    buildSetItemPerformerByIdArgs(validationCode, personId, reason) as never,
+  );
   return unwrap(data, error, "Gán người thực hiện thất bại");
 }
 
