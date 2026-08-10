@@ -135,6 +135,56 @@ export async function fetchProductsGmp(): Promise<ProductGmpRow[]> {
   return data || [];
 }
 
+export type TimelinePermissionMode = "preview" | "enforced";
+
+export interface TimelineFieldPermission {
+  mode: TimelinePermissionMode;
+  canView: boolean;
+  editableFields: readonly string[];
+  reason: string;
+}
+
+/** Quyền hiệu lực của chính người đang đăng nhập trên một hạng mục.
+ *  Dùng function lõi thay vì RPC màn quản trị: function lõi trả đúng một
+ *  persona (auth.uid), còn rpc_preview_item_rights có thể trả nhiều nhân sự. */
+export async function fetchTimelineFieldPermission(
+  validationCode: string,
+): Promise<TimelineFieldPermission> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw new Error("Không đọc được phiên đăng nhập: " + sessionError.message);
+  const uid = sessionData.session?.user.id;
+  if (!uid) throw new Error("Phiên đăng nhập đã hết hạn");
+
+  const [modeResult, rightsResult] = await Promise.all([
+    supabase.rpc("item_permissions_mode" as never),
+    supabase.rpc("vmp_item_rights" as never, {
+      p_uid: uid,
+      p_validation_code: validationCode,
+    } as never),
+  ]);
+  if (modeResult.error) throw new Error("Không đọc được chế độ phân quyền: " + modeResult.error.message);
+  if (rightsResult.error) throw new Error("Không đọc được quyền hạng mục: " + rightsResult.error.message);
+
+  const mode = modeResult.data;
+  if (mode !== "preview" && mode !== "enforced") {
+    throw new Error("Chế độ phân quyền không hợp lệ");
+  }
+  const rows = Array.isArray(rightsResult.data) ? rightsResult.data : [rightsResult.data];
+  const row = (rows[0] || {}) as Record<string, unknown>;
+  const editableFields = Array.isArray(row.editable_fields)
+    ? row.editable_fields.filter((field): field is string => typeof field === "string")
+    : [];
+  return {
+    mode,
+    canView: row.can_view === true,
+    editableFields,
+    reason: typeof row.view_reason === "string" && row.view_reason.trim()
+      ? row.view_reason
+      : editableFields.length ? "Theo quyền hiệu lực" : "Chỉ xem",
+  };
+}
+
 // ============================================================
 // GHI: qua RPC — server tự kiểm tra quyền, client không ghi thẳng bảng
 // ============================================================
@@ -223,6 +273,18 @@ const LABEL_TO_STATUS: Record<string, string> = {
   "Kế hoạch":        "not_started",
 };
 
+/** datetime-local không mang timezone. Dữ liệu nghiệp vụ luôn được hiểu theo
+ * Asia/Bangkok (+07, không DST), rồi đổi sang ISO trước khi gửi timestamptz. */
+function bangkokLocalToIso(value: string): string {
+  const local = value.trim();
+  if (!local) return local;
+  const match = local.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2}))?$/);
+  if (match) return new Date(`${match[1]}T${match[2]}:${match[3] || "00"}+07:00`).toISOString();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(local)) return new Date(`${local}T00:00:00+07:00`).toISOString();
+  const parsed = new Date(local);
+  return Number.isNaN(parsed.getTime()) ? local : parsed.toISOString();
+}
+
 /**
  * Cập nhật tiến độ một hạng mục từ form.
  * Trả về lỗi rõ ràng khi RPC từ chối — ví dụ thiếu LÝ DO lúc đánh dấu hoàn
@@ -256,7 +318,9 @@ export async function updateItemProgress(
       const mapped = LABEL_TO_STATUS[String(raw)];
       if (mapped) patch[col] = mapped;      // nhãn lạ thì bỏ qua, không đoán
     } else {
-      patch[col] = String(raw);             // ngày đã ở dạng yyyy-mm-dd
+      patch[col] = col === "scheduled_at"
+        ? bangkokLocalToIso(String(raw))
+        : String(raw);                      // ngày đã ở dạng yyyy-mm-dd
     }
   }
   if (Object.keys(patch).length === 0) {
