@@ -21,13 +21,17 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
   connected?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const isAdmin = user?.perm === "admin";
+  const isAdmin = user?.role === "admin";
+  const canOpenPermissions = isAdmin
+    || user?.role === "qa_manager"
+    || user?.accessClass === "qa_manager"
+    || user?.accessClass === "equipment_manager";
 
   const groups = [
     { id: "monitor", label: "GIÁM SÁT" },
     { id: "work", label: "THỰC HIỆN" },
     { id: "analysis", label: "PHÂN TÍCH" },
-    ...(isAdmin ? [{ id: "admin", label: "QUẢN TRỊ" }] : []),
+    ...(canOpenPermissions ? [{ id: "admin", label: "QUẢN TRỊ" }] : []),
   ];
 
   return (
@@ -64,7 +68,9 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
                 {g.label}
               </div>
             )}
-            {NAV_ITEMS.filter((n) => n.group === g.id && (!n.adminOnly || isAdmin)).map((n) => {
+            {NAV_ITEMS.filter((n) => n.group === g.id && (
+              n.id === "phanquyen" ? canOpenPermissions : !n.adminOnly || isAdmin
+            )).map((n) => {
               const active = view === n.id;
               const Icon = n.icon;
               return (

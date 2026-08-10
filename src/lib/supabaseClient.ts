@@ -143,11 +143,30 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
     admin: "admin", qa_manager: "admin", department_user: "edit", viewer: "view",
   };
   const role = (data.role || "viewer") as UserRole;
+  let accessClass: string | null = null;
+  try {
+    // database.ts có thể chưa được sinh lại ngay sau migration danh bạ, nên
+    // cast tên cột ở biên query. Lỗi/RLS/schema cũ chỉ làm mất accessClass,
+    // không được biến một lần đọc phụ thành lỗi đăng nhập.
+    const { data: performer, error: performerError } = await supabase
+      .from("vmp_performers")
+      .select("access_class" as never)
+      .eq("user_id" as never, uid)
+      .eq("is_active", true)
+      .maybeSingle();
+    const performerRow = performer as unknown as Record<string, unknown> | null;
+    if (!performerError && performerRow && typeof performerRow.access_class === "string") {
+      accessClass = performerRow.access_class;
+    }
+  } catch {
+    // Degrade về null: profiles vẫn là nguồn bắt buộc để xác thực và vào app.
+  }
   return {
     name: data.full_name || "User",
     role,
     perm: permMap[role] || "view",
     department: data.department || "",
+    accessClass,
   };
 }
 
