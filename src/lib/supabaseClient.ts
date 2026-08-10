@@ -150,7 +150,7 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
     // không được biến một lần đọc phụ thành lỗi đăng nhập.
     const { data: performer, error: performerError } = await supabase
       .from("vmp_performers")
-      .select("access_class" as never)
+      .select("*")
       .eq("user_id" as never, uid)
       .eq("is_active", true)
       .maybeSingle();

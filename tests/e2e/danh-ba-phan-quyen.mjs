@@ -61,6 +61,7 @@ await page.setViewport({ width: 1500, height: 1100 });
 await page.setRequestInterception(true);
 
 const assignmentBodies = [];
+const performerProfileSelects = [];
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -72,7 +73,10 @@ const answer = (request, body) => request.method() === "OPTIONS"
 
 page.on("request", (request) => {
   const url = request.url();
-  if (/\/rest\/v1\/vmp_performers\?/.test(url) && /access_class/.test(url) && /user_id=eq\./.test(url)) {
+  if (/\/rest\/v1\/vmp_performers\?/.test(url) && /user_id=eq\./.test(url)) {
+    if (request.method() !== "OPTIONS") {
+      performerProfileSelects.push(new URL(url).searchParams.get("select"));
+    }
     return answer(request, { access_class: "equipment_manager" });
   }
   if (/\/rpc\/rpc_item_permission_directory/.test(url)) {
@@ -109,6 +113,12 @@ page.on("request", (request) => {
 
 try {
   await dangNhap(page, GOC);
+
+  assert.deepEqual(
+    [...new Set(performerProfileSelects)],
+    ["*"],
+    "getProfile phải dùng select=* để tương thích schema chưa có access_class",
+  );
 
   assert.equal(
     await page.evaluate(() => [...document.querySelectorAll("button")]
