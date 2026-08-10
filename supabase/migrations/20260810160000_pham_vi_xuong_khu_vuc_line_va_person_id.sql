@@ -645,6 +645,26 @@ exception when others then
 end
 $fn$;
 
+/* Đường gán bằng tên cũ bị vô hiệu hóa; mọi caller phải gửi person_id. */
+create or replace function public.rpc_set_item_performer(
+  p_validation_code text, p_performer_name text
+) returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $fn$
+  select jsonb_build_object(
+    'ok', false,
+    'error_code', 'PERSON_ID_REQUIRED',
+    'error', 'Đường gán theo tên đã ngừng hỗ trợ; phải chọn người bằng person_id'
+  )
+$fn$;
+alter function public.rpc_set_item_performer(text, text)
+  security invoker;
+revoke all on function public.rpc_set_item_performer(text, text)
+  from public, anon, authenticated, service_role;
+
 /* Cho Source Catalog gửi person_id; hai cột tên chỉ là mirror tương thích. */
 alter function public.rpc_upsert_source_object(text, text, jsonb)
   rename to vmp_upsert_source_object_before_person_id;

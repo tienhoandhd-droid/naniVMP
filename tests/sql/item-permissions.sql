@@ -81,6 +81,13 @@ begin
   if has_table_privilege('anon', 'public.vmp_performers', 'SELECT') then
     raise exception 'anon không được đọc danh bạ performer có metadata quyền';
   end if;
+  if has_function_privilege(
+      'authenticated', 'public.rpc_set_item_performer(text,text)', 'EXECUTE'
+    ) or has_function_privilege(
+      'service_role', 'public.rpc_set_item_performer(text,text)', 'EXECUTE'
+    ) then
+    raise exception 'RPC gán theo tên legacy phải bị vô hiệu hóa hoàn toàn';
+  end if;
 
   perform public.vmp_harden_dashboard_object_scope();
   perform public.vmp_harden_dashboard_object_scope();
