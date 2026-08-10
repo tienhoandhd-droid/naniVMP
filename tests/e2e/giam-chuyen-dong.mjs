@@ -1,9 +1,10 @@
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
+import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
 await choServer("http://localhost:4173");
 
-const b = await puppeteer.launch({ executablePath:"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless:"new", args:["--no-sandbox","--use-gl=angle","--use-angle=metal"] });
+const b = await puppeteer.launch({ executablePath:CHROME, headless:"new", args:["--no-sandbox", ...CHROME_GL_ARGS] });
 const p = await b.newPage();
 await p.setViewport({width:1400,height:1000});
 await p.emulateMediaFeatures([{name:"prefers-reduced-motion",value:"reduce"}]);

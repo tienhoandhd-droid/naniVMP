@@ -7,8 +7,8 @@
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap as vaoHeThong } from "./dang-nhap.mjs";
+import { CHROME } from "./chrome-path.mjs";
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = process.env.E2E_URL || "http://localhost:4173";
 const QA = process.env.E2E_QA_NAME || "";
 
