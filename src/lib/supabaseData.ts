@@ -206,7 +206,7 @@ export async function updateProgressSupabase(
 const FORM_TO_COLUMN: Record<string, string> = {
   ngay_de_cuong:   "actual_protocol_date",
   tt_de_cuong:     "status_protocol",
-  lich_td:         "scheduled_date",
+  lich_td:         "scheduled_at",
   ngay_tham_dinh:  "actual_validation_date",
   tt_tham_dinh:    "status_validation",
   ngay_bao_cao:    "actual_report_date",

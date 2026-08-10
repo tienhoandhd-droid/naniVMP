@@ -142,6 +142,8 @@ const rows = parsed.slice(1).map((values, index) => {
     values: canonicalIndexes.map((sheetIndex) => values[sheetIndex] ?? ''),
     extra: {
       execution_department: extraIndexes.execution_department >= 0 ? (values[extraIndexes.execution_department] ?? '') : '',
+      // Giữ nguyên chuỗi ngày giờ cột 27 để bước SQL đọc theo múi giờ Bangkok.
+      scheduled_at_source: values[canonicalIndexes[26]] ?? '',
     },
   };
 });

@@ -27,6 +27,161 @@ begin
   ) then
     raise exception 'Phân công chưa nối user_id không được cấp quyền';
   end if;
+
+  if public.vmp_parse_scheduled_at('12/08/2026 14:35:20')
+      is distinct from '2026-08-12 14:35:20 Asia/Bangkok'::timestamptz then
+    raise exception 'Parser lịch phải giữ đủ giờ theo múi giờ Bangkok';
+  end if;
+  if public.vmp_parse_scheduled_at('12/08/2026')
+      is distinct from '2026-08-12 00:00:00 Asia/Bangkok'::timestamptz then
+    raise exception 'Lịch chỉ có ngày phải mặc định 00:00:00';
+  end if;
+end
+$test$;
+
+do $test$
+declare
+  v_admin uuid;
+  v_user uuid;
+  v_person uuid;
+  v_code text;
+  v_area text;
+  v_before vmp_plan_items%rowtype;
+  v_after vmp_plan_items%rowtype;
+  v_result jsonb;
+  v_future timestamptz := (current_date + 7 + time '14:35:20') at time zone 'Asia/Bangkok';
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select id into v_user
+  from public.profiles
+  where role::text = 'viewer' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select item.validation_code, object.area
+  into v_code, v_area
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.is_active and coalesce(item.item_state, 'active') = 'active'
+    and object.department = 'xsx'
+    and nullif(btrim(coalesce(object.area, '')), '') is not null
+  order by item.validation_code limit 1;
+
+  if v_admin is null or v_user is null or v_code is null then
+    raise exception 'Thiếu fixture để kiểm khóa từng cột timeline';
+  end if;
+
+  delete from public.vmp_item_assignments where user_id = v_user;
+  delete from public.vmp_performers where user_id = v_user;
+  update public.profiles
+  set role = 'department_user', department = 'xsx', pham_vi = 'co', is_active = true
+  where id = v_user;
+  insert into public.vmp_performers (
+    performer_name, email, department, user_id, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  )
+  select 'E2E Người Sửa Timeline', email, 'qa', id, 'qa_progress_editor',
+         array['xsx'], array[v_area], true, v_admin
+  from public.profiles where id = v_user
+  returning id into v_person;
+  insert into public.vmp_item_assignments (
+    validation_code, performer_id, user_id, staff_name,
+    assignment_kind, source, source_text, is_active, change_reason
+  ) values (
+    v_code, v_person, v_user, 'E2E Người Sửa Timeline',
+    'qa', 'qa_manager', 'E2E Người Sửa Timeline', true, 'Fixture khóa cột'
+  );
+
+  update public.system_config
+  set value = '"enforced"'::jsonb
+  where key = 'item_permissions_mode';
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  select * into v_before from public.vmp_plan_items where validation_code = v_code;
+  v_result := public.rpc_update_progress(
+    v_code,
+    jsonb_build_object(
+      'actual_protocol_date', current_date::text,
+      'status_protocol', 'in_progress'
+    ),
+    'QA cập nhật đề cương', null, v_before.version
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'QA phải sửa được cột hoàn thành đề cương: %', v_result;
+  end if;
+
+  select * into v_before from public.vmp_plan_items where validation_code = v_code;
+  v_result := public.rpc_update_progress(
+    v_code, jsonb_build_object('scheduled_at', v_future::text),
+    'QA thử sửa lịch', null, v_before.version
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'QA không được sửa scheduled_at: %', v_result;
+  end if;
+
+  update public.vmp_performers
+  set department = 'xsx', access_class = 'equipment_scheduler'
+  where id = v_person;
+  update public.vmp_item_assignments
+  set assignment_kind = 'equipment_department'
+  where performer_id = v_person and validation_code = v_code;
+
+  select * into v_before from public.vmp_plan_items where validation_code = v_code;
+  v_result := public.rpc_update_progress(
+    v_code, jsonb_build_object('scheduled_at', v_future::text),
+    'Bộ phận quản lý thiết bị xếp lịch', null, v_before.version
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Bộ phận thiết bị phải sửa được scheduled_at: %', v_result;
+  end if;
+  select * into v_after from public.vmp_plan_items where validation_code = v_code;
+  if v_after.scheduled_at is distinct from v_future
+      or v_after.scheduled_date is distinct from (v_future at time zone 'Asia/Bangkok')::date then
+    raise exception 'scheduled_at phải giữ giờ và tương thích scheduled_date';
+  end if;
+
+  select * into v_before from public.vmp_plan_items where validation_code = v_code;
+  v_result := public.rpc_update_progress(
+    v_code,
+    jsonb_build_object(
+      'scheduled_at', (v_future + interval '1 hour')::text,
+      'status_protocol', 'completed'
+    ),
+    'Thử gói trộn cột', null, v_before.version
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'Gói trộn cột thiết bị + QA phải bị từ chối: %', v_result;
+  end if;
+  select * into v_after from public.vmp_plan_items where validation_code = v_code;
+  if v_after.scheduled_at is distinct from v_before.scheduled_at
+      or v_after.status_protocol is distinct from v_before.status_protocol
+      or v_after.version is distinct from v_before.version then
+    raise exception 'Gói trộn bị từ chối nhưng đã cập nhật một phần';
+  end if;
+
+  update public.vmp_performers set access_class = 'view_only' where id = v_person;
+  select * into v_before from public.vmp_plan_items where validation_code = v_code;
+  v_result := public.rpc_update_progress(
+    v_code, jsonb_build_object('scheduled_at', v_future::text),
+    'Người chỉ xem thử sửa', null, v_before.version
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'view_only không được sửa timeline: %', v_result;
+  end if;
+
+  update public.system_config
+  set value = '"preview"'::jsonb
+  where key = 'item_permissions_mode';
+  delete from public.vmp_item_assignments where performer_id = v_person;
+  delete from public.vmp_performers where id = v_person;
+  update public.profiles
+  set role = 'viewer', department = null, pham_vi = null
+  where id = v_user;
 end
 $test$;
 
