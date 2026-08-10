@@ -7,7 +7,13 @@ import {
   savePermissionPerson,
   searchPermissionDirectory,
 } from "./api.ts";
-import { ACCESS_CLASSES, type AccessClass, type DirectoryPerson } from "./types.ts";
+import {
+  ACCESS_CLASSES,
+  findDirectoryPersonById,
+  isDirectoryPersonComplete,
+  type AccessClass,
+  type DirectoryPerson,
+} from "./types.ts";
 import {
   parsePermissionWorkbook,
   type ParsedPermissionRow,
@@ -35,7 +41,8 @@ function splitList(value: string): string[] {
   return [...new Set(value.split(/[;,]/).map((item) => item.trim()).filter(Boolean))];
 }
 
-function departmentLabel(id: string): string {
+function departmentLabel(id: string | null): string {
+  if (!id) return "chưa có bộ phận";
   return DEPTS.find((department) => department.id === id)?.short || id.toUpperCase();
 }
 
@@ -98,7 +105,7 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
     setForm({
       employeeCode: person.employee_code || "",
       fullName: person.full_name,
-      department: person.department,
+      department: person.department || "",
       email: person.email || "",
       accessClass: person.access_class || "view_only",
       scope: person.scope_departments.join(";"),
@@ -114,7 +121,7 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
     setSaving(true);
     setMessage("");
     try {
-      await savePermissionPerson(selected?.person_id || null, {
+      const savedResult = await savePermissionPerson(selected?.person_id || null, {
         employee_code: form.employeeCode.trim() || null,
         full_name: form.fullName.trim(),
         department: form.department,
@@ -125,10 +132,15 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
         email_sent_confirmed: form.emailSent,
         is_active: true,
       }, `Cập nhật danh bạ nhân sự & quyền cho ${form.fullName.trim()}`);
-      setMessage("Đã lưu hồ sơ danh bạ");
       const refreshed = await searchPermissionDirectory(form.fullName.trim());
-      const saved = refreshed.find((person) => person.person_id === selected?.person_id) || refreshed[0];
-      if (saved) choose(saved);
+      const saved = findDirectoryPersonById(refreshed, savedResult.person_id);
+      if (!saved) {
+        setSelected(null);
+        onSelect(null);
+        throw new Error(`Đã lưu nhưng chưa tải lại được hồ sơ ${savedResult.person_id}`);
+      }
+      choose(saved);
+      setMessage("Đã lưu hồ sơ danh bạ");
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -228,6 +240,9 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
               : selected.account_status === "inactive" ? "Tài khoản đã khóa" : "Chưa có tài khoản"}
           </span>
           {selected.match_status === "ambiguous" && <span className="ip-badge is-warning">Trùng tên — cần nối tay</span>}
+          {!isDirectoryPersonComplete(selected) && (
+            <span className="ip-badge is-warning">Hồ sơ chưa đủ — cần bổ sung bộ phận, phân loại, phạm vi và khu vực</span>
+          )}
           <span className="ip-badge">Khóa người: {selected.person_id}</span>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link2 } from "lucide-react";
 import { fetchItemAssignments, setItemAssignment } from "./api.ts";
-import type { DirectoryPerson, ItemAssignment } from "./types.ts";
+import { isDirectoryPersonComplete, type DirectoryPerson, type ItemAssignment } from "./types.ts";
 
 export default function AssignmentPanel({ person, canEdit }: {
   person: DirectoryPerson | null;
@@ -13,6 +13,7 @@ export default function AssignmentPanel({ person, canEdit }: {
   const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const personComplete = person ? isDirectoryPersonComplete(person) : false;
 
   useEffect(() => {
     if (!person) { setAssignments([]); return; }
@@ -23,7 +24,7 @@ export default function AssignmentPanel({ person, canEdit }: {
   }, [person]);
 
   const assign = async () => {
-    if (!person) return;
+    if (!person || !isDirectoryPersonComplete(person)) return;
     setSaving(true);
     setMessage("");
     try {
@@ -51,7 +52,10 @@ export default function AssignmentPanel({ person, canEdit }: {
       <p className="ip-help">Chỉ chọn người từ danh bạ chuẩn; không có ô nhập tên tự do.</p>
       {person ? (
         <>
-          <div className="ip-selected"><Link2 size={16} /> <b>{person.full_name}</b><span>{person.department.toUpperCase()} · {person.person_id}</span></div>
+          <div className="ip-selected"><Link2 size={16} /> <b>{person.full_name}</b><span>{person.department?.toUpperCase() || "chưa có bộ phận"} · {person.person_id}</span></div>
+          {!personComplete && (
+            <div className="ip-message" role="status">Hồ sơ chưa đủ. Bổ sung bộ phận, phân loại, phạm vi và khu vực trước khi phân công.</div>
+          )}
           <div className="ip-form is-compact">
             <label>Mã hạng mục<input className="pq-o" aria-label="Mã hạng mục cần phân công" value={validationCode} onChange={(event) => setValidationCode(event.target.value)} placeholder="Ví dụ: CCTB01/2026.01-OQ" /></label>
             <label>Vai trò phân công
@@ -64,7 +68,7 @@ export default function AssignmentPanel({ person, canEdit }: {
           </div>
           {canEdit && (
             <button type="button" className="pq-nut la-chinh" aria-label="Phân công người đã chọn"
-              disabled={saving || !validationCode.trim() || !reason.trim()} onClick={assign}>
+              disabled={!personComplete || saving || !validationCode.trim() || !reason.trim()} onClick={assign}>
               <Link2 size={15} /> {saving ? "Đang phân công…" : "Phân công"}
             </button>
           )}

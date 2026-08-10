@@ -7,7 +7,7 @@ import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
 const GOC = "http://localhost:4173";
 await choServer(GOC);
 
-const person = {
+const completePerson = {
   person_id: "aaaaaaaa-1111-4111-8111-111111111111",
   user_id: "bbbbbbbb-2222-4222-8222-222222222222",
   employee_code: null,
@@ -21,6 +21,34 @@ const person = {
   email_sent_confirmed: true,
   is_active: true,
   match_status: "unique",
+};
+
+const legacyPerson = {
+  ...completePerson,
+  person_id: "aaaaaaaa-1111-4111-8111-000000000001",
+  user_id: null,
+  full_name: "Nhân Sự Legacy",
+  email: "legacy@vmp.local",
+  account_status: "unlinked",
+  access_class: null,
+  scope_departments: null,
+  access_areas: null,
+};
+delete legacyPerson.department;
+
+const duplicateFirst = {
+  ...completePerson,
+  person_id: "aaaaaaaa-1111-4111-8111-000000000002",
+  full_name: "Nguyễn Văn Trùng",
+  email: "first@vmp.local",
+  match_status: "ambiguous",
+};
+const duplicateSaved = {
+  ...completePerson,
+  person_id: "aaaaaaaa-1111-4111-8111-000000000003",
+  full_name: "Nguyễn Văn Trùng",
+  email: "saved@vmp.local",
+  match_status: "ambiguous",
 };
 
 const browser = await puppeteer.launch({
@@ -45,7 +73,11 @@ const answer = (request, body) => request.method() === "OPTIONS"
 page.on("request", (request) => {
   const url = request.url();
   if (/\/rpc\/rpc_item_permission_directory/.test(url)) {
-    return answer(request, { ok: true, people: [person] });
+    const body = JSON.parse(request.postData() || "{}");
+    const people = String(body.p_query || "").includes("Legacy")
+      ? [legacyPerson]
+      : [duplicateFirst, duplicateSaved];
+    return answer(request, { ok: true, people });
   }
   if (/\/rpc\/rpc_item_permission_preflight/.test(url)) {
     return answer(request, { ok: true, mode: "preview", blocking_errors: [], warnings: [] });
@@ -61,7 +93,12 @@ page.on("request", (request) => {
     return answer(request, { ok: true, action: "assign" });
   }
   if (/\/rpc\/rpc_upsert_item_permission_staff/.test(url)) {
-    return answer(request, { ok: true, person_id: person.person_id, user_id: person.user_id, account_status: "linked" });
+    return answer(request, {
+      ok: true,
+      person_id: duplicateSaved.person_id,
+      user_id: duplicateSaved.user_id,
+      account_status: "linked",
+    });
   }
   request.continue();
 });
@@ -78,14 +115,14 @@ try {
 
   const search = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
   assert.ok(search, "phải có ô autocomplete danh bạ");
-  await search.type("Hồng");
+  await search.type("Legacy");
   await page.waitForFunction(
-    () => document.body.innerText.includes("Đặng Thị Hồng Ngọc · RD"),
+    () => document.body.innerText.includes("Nhân Sự Legacy · chưa có bộ phận"),
     { timeout: 5000 },
   );
   await page.evaluate(() => {
     [...document.querySelectorAll("button")]
-      .find((button) => button.textContent?.includes("Đặng Thị Hồng Ngọc · RD"))?.click();
+      .find((button) => button.textContent?.includes("legacy@vmp.local"))?.click();
   });
 
   const form = await page.evaluate(() => ({
@@ -96,23 +133,48 @@ try {
     areas: document.querySelector('[aria-label="Khu vực phân quyền"]')?.value,
   }));
   assert.deepEqual(form, {
-    department: "rd",
-    email: "hong.ngoc@vmp.local",
+    department: "",
+    email: "legacy@vmp.local",
     accessClass: "view_only",
-    scope: "rd;qa",
-    areas: "A1;A2",
+    scope: "",
+    areas: "",
   });
+  assert.match(await page.$eval('[aria-label="Trạng thái tài khoản"]', (node) => node.textContent || ""), /Hồ sơ chưa đủ/);
 
   await page.type('[aria-label="Mã hạng mục cần phân công"]', "VMP-E2E-01");
   await page.type('[aria-label="Lý do phân công"]', "Chuẩn bị thảo luận quyền");
+  assert.equal(
+    await page.$eval('button[aria-label="Phân công người đã chọn"]', (button) => button.disabled),
+    true,
+    "hồ sơ legacy chưa đủ phải bị khóa phân công",
+  );
+  assert.equal(assignmentBodies.length, 0);
+
+  await search.click({ clickCount: 3 });
+  await search.type("Nguyễn Văn Trùng");
+  await page.select('[aria-label="Bộ phận trong danh bạ"]', "rd");
+  await page.type('[aria-label="Phạm vi phân quyền"]', "rd");
+  await page.type('[aria-label="Khu vực phân quyền"]', "A1");
+  await page.click(".ip-form + button.la-chinh");
+  await page.waitForFunction(
+    (personId) => document.body.innerText.includes(`Khóa người: ${personId}`),
+    {},
+    duplicateSaved.person_id,
+  );
+
+  assert.equal(
+    await page.$eval('[aria-label="Email trong danh bạ"]', (input) => input.value),
+    duplicateSaved.email,
+    "hai dòng trùng tên phải chọn đúng hồ sơ có person_id do RPC trả về",
+  );
+
   await page.click('button[aria-label="Phân công người đã chọn"]');
   await page.waitForFunction(() => document.body.innerText.includes("Đã phân công hạng mục"));
-
   assert.equal(assignmentBodies.length, 1);
-  assert.equal(assignmentBodies[0].p_person_id, person.person_id);
+  assert.equal(assignmentBodies[0].p_person_id, duplicateSaved.person_id);
   assert.equal("staff_name" in assignmentBodies[0], false);
   assert.equal("full_name" in assignmentBodies[0], false);
-  console.log("✅ Danh bạ autocomplete tự điền và phân công bằng person_id");
+  console.log("✅ Dòng legacy sửa được, khóa phân công và chọn đúng person_id khi trùng tên");
 } finally {
   await browser.close();
 }
