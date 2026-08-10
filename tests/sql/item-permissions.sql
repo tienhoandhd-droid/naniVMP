@@ -28,6 +28,35 @@ begin
     raise exception 'Phân công chưa nối user_id không được cấp quyền';
   end if;
 
+  if has_table_privilege('authenticated', 'public.vmp_item_assignments', 'SELECT')
+      or has_table_privilege('anon', 'public.vmp_item_assignments', 'SELECT')
+      or has_table_privilege('authenticated', 'public.vmp_active_item_assignments', 'SELECT')
+      or has_table_privilege('anon', 'public.vmp_active_item_assignments', 'SELECT') then
+    raise exception 'Browser role không được SELECT trực tiếp bảng/view phân công';
+  end if;
+  if not has_table_privilege('service_role', 'public.vmp_item_assignments', 'SELECT')
+      or not has_table_privilege('service_role', 'public.vmp_active_item_assignments', 'SELECT') then
+    raise exception 'service_role phải giữ quyền đọc bảng/view phân công';
+  end if;
+
+  if has_function_privilege(
+      'authenticated', 'public.vmp_item_rights(uuid,text)', 'EXECUTE'
+    ) or has_function_privilege(
+      'authenticated', 'public.vmp_can_view_item(uuid,text)', 'EXECUTE'
+    ) or has_function_privilege(
+      'authenticated', 'public.vmp_allowed_timeline_fields(uuid,text)', 'EXECUTE'
+    ) then
+    raise exception 'Browser role không được gọi core quyền với p_uid tùy ý';
+  end if;
+  if not has_function_privilege(
+      'authenticated', 'public.vmp_my_item_rights(text)', 'EXECUTE'
+    ) then
+    raise exception 'Browser role phải gọi được wrapper quyền của chính auth.uid()';
+  end if;
+  if has_table_privilege('anon', 'public.vmp_performers', 'SELECT') then
+    raise exception 'anon không được đọc danh bạ performer có metadata quyền';
+  end if;
+
   if public.vmp_parse_scheduled_at('12/08/2026 14:35:20')
       is distinct from '2026-08-12 14:35:20 Asia/Bangkok'::timestamptz then
     raise exception 'Parser lịch phải giữ đủ giờ theo múi giờ Bangkok';
@@ -35,6 +64,303 @@ begin
   if public.vmp_parse_scheduled_at('12/08/2026')
       is distinct from '2026-08-12 00:00:00 Asia/Bangkok'::timestamptz then
     raise exception 'Lịch chỉ có ngày phải mặc định 00:00:00';
+  end if;
+end
+$test$;
+
+/* Reader của từng loại quản lý không được nhìn người/phân công/hạng mục ngoài scope. */
+do $test$
+declare
+  v_admin uuid;
+  v_manager_user uuid;
+  v_manager_person uuid;
+  v_qa_person uuid;
+  v_xsx_person uuid;
+  v_qc_person uuid;
+  v_xsx_code text;
+  v_qc_code text;
+  v_xsx_area text;
+  v_result jsonb;
+  v_rights record;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select id into v_manager_user
+  from public.profiles
+  where id <> v_admin and coalesce(is_active, true)
+  order by case when role::text = 'viewer' then 0 else 1 end, created_at
+  limit 1;
+  select item.validation_code, object.area
+  into v_xsx_code, v_xsx_area
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.is_active and object.department = 'xsx'
+    and nullif(btrim(coalesce(object.area, '')), '') is not null
+  order by item.validation_code limit 1;
+  select item.validation_code into v_qc_code
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.is_active and object.department = 'qc'
+  order by item.validation_code limit 1;
+  if v_admin is null or v_manager_user is null
+      or v_xsx_code is null or v_qc_code is null then
+    raise exception 'Thiếu fixture để kiểm reader quản lý';
+  end if;
+
+  delete from public.vmp_item_assignments where user_id = v_manager_user;
+  delete from public.vmp_item_assignments
+  where performer_id in (
+    select id from public.vmp_performers where user_id = v_manager_user
+  );
+  delete from public.vmp_performers where user_id = v_manager_user;
+  update public.profiles
+  set role = 'qa_manager', department = 'qa', is_active = true
+  where id = v_manager_user;
+
+  insert into public.vmp_performers (
+    performer_name, department, user_id, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values (
+    'E2E Reader Quản Lý', 'qa', v_manager_user, 'qa_manager',
+    array['*'], array['*'], true, v_admin
+  ) returning id into v_manager_person;
+  insert into public.vmp_performers (
+    performer_name, department, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values
+    ('E2E Reader Người QA', 'qa', 'qa_progress_editor',
+     array['*'], array['*'], true, v_admin)
+  returning id into v_qa_person;
+  insert into public.vmp_performers (
+    performer_name, department, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values
+    ('E2E Reader Người XSX', 'xsx', 'equipment_scheduler',
+     array['xsx'], array[v_xsx_area], true, v_admin)
+  returning id into v_xsx_person;
+  insert into public.vmp_performers (
+    performer_name, department, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values
+    ('E2E Reader Người QC', 'qc', 'equipment_scheduler',
+     array['qc'], array['*'], true, v_admin)
+  returning id into v_qc_person;
+
+  insert into public.vmp_item_assignments (
+    validation_code, performer_id, staff_name, assignment_kind, source,
+    source_text, unresolved_reason, is_active, change_reason
+  ) values
+    (v_xsx_code, v_qa_person, 'E2E Reader Người QA', 'qa', 'qa_manager',
+     'E2E Reader Người QA', 'account_unlinked', true, 'Fixture reader'),
+    (v_xsx_code, v_xsx_person, 'E2E Reader Người XSX',
+     'equipment_department', 'equipment_manager',
+     'E2E Reader Người XSX', 'account_unlinked', true, 'Fixture reader'),
+    (v_qc_code, v_qa_person, 'E2E Reader Người QA', 'qa', 'qa_manager',
+     'E2E Reader Người QA', 'account_unlinked', true, 'Fixture reader'),
+    (v_qc_code, v_qc_person, 'E2E Reader Người QC',
+     'equipment_department', 'equipment_manager',
+     'E2E Reader Người QC', 'account_unlinked', true, 'Fixture reader');
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_manager_user::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_item_permission_directory(null);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or exists (
+        select 1 from jsonb_array_elements(v_result->'people') person
+        where person->>'department' <> 'qa'
+      ) then
+    raise exception 'QA manager chỉ được xem danh bạ QA: %', v_result;
+  end if;
+  v_result := public.rpc_item_assignments(null, null);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or exists (
+        select 1 from jsonb_array_elements(v_result->'assignments') assignment
+        where assignment->>'assignment_kind' <> 'qa'
+      ) then
+    raise exception 'QA manager chỉ được xem phân công QA: %', v_result;
+  end if;
+  v_result := public.rpc_preview_item_rights(null, v_xsx_code);
+  if exists (
+    select 1 from jsonb_array_elements(v_result->'rights') preview
+    where (preview->>'person_id')::uuid in (v_xsx_person, v_qc_person)
+  ) then
+    raise exception 'Preview QA manager cross-join người ngoài QA: %', v_result;
+  end if;
+
+  update public.vmp_performers
+  set department = 'xsx', access_class = 'equipment_manager',
+      scope_departments = array['xsx'], access_areas = array[v_xsx_area]
+  where id = v_manager_person;
+  v_result := public.rpc_item_permission_directory(null);
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'role qa_manager + class equipment_manager không được thành principal lai: %',
+      v_result;
+  end if;
+  select * into v_rights
+  from public.vmp_item_rights(v_manager_user, v_xsx_code);
+  if v_rights.can_view then
+    raise exception 'Principal lai không được nhận quyền lõi: %', row_to_json(v_rights);
+  end if;
+
+  update public.profiles
+  set role = 'department_user', department = 'xsx'
+  where id = v_manager_user;
+  v_result := public.rpc_item_permission_directory(null);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or exists (
+        select 1 from jsonb_array_elements(v_result->'people') person
+        where person->>'department' <> 'xsx'
+      ) then
+    raise exception 'Equipment manager chỉ được xem người cùng profiles.department: %',
+      v_result;
+  end if;
+  v_result := public.rpc_item_assignments(null, null);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or jsonb_array_length(v_result->'assignments') = 0
+      or exists (
+        select 1 from jsonb_array_elements(v_result->'assignments') assignment
+        where assignment->>'object_department' <> 'xsx'
+          or (assignment->>'person_id')::uuid <> v_xsx_person
+          or not (
+            assignment->>'area' = v_xsx_area
+            or assignment->>'line' = v_xsx_area
+          )
+      ) then
+    raise exception 'Reader equipment_manager lọt người/item ngoài scope: %', v_result;
+  end if;
+  v_result := public.rpc_preview_item_rights(v_qa_person, v_xsx_code);
+  if jsonb_array_length(v_result->'rights') <> 0 then
+    raise exception 'Preview equipment_manager không được cross-join người QA: %', v_result;
+  end if;
+  v_result := public.rpc_preview_item_rights(v_xsx_person, v_qc_code);
+  if jsonb_array_length(v_result->'rights') <> 0 then
+    raise exception 'Preview equipment_manager không được cross-join item QC: %', v_result;
+  end if;
+end
+$test$;
+
+/* Scope nhập từ dashboard/Excel phải tham chiếu danh mục thật. */
+do $test$
+declare
+  v_admin uuid;
+  v_user uuid;
+  v_user_email text;
+  v_area text;
+  v_result jsonb;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select id, email into v_user, v_user_email
+  from public.profiles
+  where id <> v_admin and coalesce(is_active, true)
+  order by case when role::text = 'viewer' then 0 else 1 end, created_at
+  limit 1;
+  select area into v_area
+  from public.vmp_objects
+  where nullif(btrim(coalesce(area, '')), '') is not null
+  order by code limit 1;
+  if v_admin is null or v_user is null or v_area is null then
+    raise exception 'Thiếu fixture để kiểm danh mục scope';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
+    'full_name', 'E2E Scope Sai Bộ Phận',
+    'department', 'xsx',
+    'access_class', 'view_only',
+    'scope_departments', jsonb_build_array('xssx'),
+    'access_areas', jsonb_build_array(v_area)
+  ), 'Kiểm typo bộ phận');
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'scope_departments typo phải bị RPC từ chối: %', v_result;
+  end if;
+
+  v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
+    'full_name', 'E2E Scope Sai Khu Vực',
+    'department', 'xsx',
+    'access_class', 'view_only',
+    'scope_departments', jsonb_build_array('xsx'),
+    'access_areas', jsonb_build_array('KHU-VUC-KHONG-TON-TAI')
+  ), 'Kiểm typo khu vực');
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'access_areas typo phải bị RPC từ chối: %', v_result;
+  end if;
+
+  v_result := public.rpc_import_item_permission_staff(
+    jsonb_build_array(jsonb_build_object(
+      'row_number', 404,
+      'full_name', 'E2E Import Scope Sai',
+      'department', 'xsx',
+      'access_class', 'view_only',
+      'scope_departments', jsonb_build_array('xsx-typo'),
+      'access_areas', jsonb_build_array(v_area)
+    )),
+    'Kiểm import typo'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or (v_result->>'imported')::integer <> 0
+      or jsonb_array_length(v_result->'errors') <> 1 then
+    raise exception 'Importer phải báo đúng dòng scope sai: %', v_result;
+  end if;
+
+  v_result := public.rpc_import_item_permission_staff(
+    jsonb_build_array(
+      jsonb_build_object(
+        'row_number', 501,
+        'full_name', 'E2E Import Atomic Dòng Hợp Lệ',
+        'department', 'xsx',
+        'access_class', 'view_only',
+        'scope_departments', jsonb_build_array('xsx'),
+        'access_areas', jsonb_build_array(v_area)
+      ),
+      jsonb_build_object(
+        'row_number', 502,
+        'full_name', 'E2E Import Atomic Dòng Lỗi',
+        'department', 'xsx',
+        'access_class', 'view_only',
+        'scope_departments', jsonb_build_array('xsx-typo'),
+        'access_areas', jsonb_build_array(v_area)
+      )
+    ),
+    'Kiểm batch atomic'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or (v_result->>'imported')::integer <> 0
+      or exists (
+        select 1 from public.vmp_performers
+        where normalized_full_name = public.vmp_normalize_person_name(
+          'E2E Import Atomic Dòng Hợp Lệ'
+        )
+      ) then
+    raise exception 'Batch có dòng lỗi phải rollback cả dòng hợp lệ: %', v_result;
+  end if;
+
+  update public.profiles
+  set role = 'viewer', department = 'qc', is_active = true
+  where id = v_user;
+  v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
+    'full_name', 'E2E Principal Thiết Bị Sai',
+    'email', v_user_email,
+    'department', 'xsx',
+    'access_class', 'equipment_manager',
+    'scope_departments', jsonb_build_array('xsx'),
+    'access_areas', jsonb_build_array(v_area)
+  ), 'Kiểm principal thiết bị');
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'equipment_manager lệch role/department profile phải bị từ chối: %',
+      v_result;
   end if;
 end
 $test$;
@@ -47,6 +373,7 @@ declare
   v_person uuid;
   v_visible_code text;
   v_hidden_code text;
+  v_hidden_object text;
   v_department text;
   v_area text;
   v_year integer;
@@ -63,17 +390,19 @@ begin
   order by case when role::text = 'viewer' then 0 else 1 end, created_at
   limit 1;
 
-  select visible.validation_code, hidden.validation_code,
+  select visible.validation_code, hidden.validation_code, hidden.object_code,
          object.department, object.area, visible.year
-  into v_visible_code, v_hidden_code, v_department, v_area, v_year
+  into v_visible_code, v_hidden_code, v_hidden_object,
+       v_department, v_area, v_year
   from public.vmp_plan_items visible
   join public.vmp_objects object on object.code = visible.object_code
   join lateral (
-    select candidate.validation_code
+    select candidate.validation_code, candidate.object_code
     from public.vmp_plan_items candidate
     join public.vmp_objects candidate_object on candidate_object.code = candidate.object_code
     where candidate.is_active and candidate.year = visible.year
       and candidate.validation_code <> visible.validation_code
+      and candidate.object_code <> visible.object_code
       and coalesce(candidate_object.area, candidate_object.line, '')
           <> coalesce(object.area, object.line, '')
     order by candidate.validation_code
@@ -135,6 +464,7 @@ begin
   );
   perform set_config('app.test_visible_code', v_visible_code, true);
   perform set_config('app.test_hidden_code', v_hidden_code, true);
+  perform set_config('app.test_hidden_object', v_hidden_object, true);
   perform set_config('app.test_item_year', v_year::text, true);
   perform set_config('app.test_item_user', v_user::text, true);
   perform set_config('app.test_item_person', v_person::text, true);
@@ -149,6 +479,7 @@ do $test$
 declare
   v_visible_code text := current_setting('app.test_visible_code');
   v_hidden_code text := current_setting('app.test_hidden_code');
+  v_hidden_object text := current_setting('app.test_hidden_object');
   v_year integer := current_setting('app.test_item_year')::integer;
   v_hidden_assignment uuid := current_setting('app.test_hidden_assignment')::uuid;
   v_dashboard jsonb;
@@ -161,6 +492,19 @@ begin
       ) then
     raise exception 'RLS enforced phải chỉ trả đúng hạng mục được cấp';
   end if;
+  if not coalesce((
+    select rights.can_view
+    from public.vmp_my_item_rights(v_visible_code) rights
+  ), false) then
+    raise exception 'Wrapper self phải trả quyền hạng mục của chính auth.uid()';
+  end if;
+  if not exists (
+      select 1 from public.vmp_performers where user_id = auth.uid()
+    ) or exists (
+      select 1 from public.vmp_performers where user_id is distinct from auth.uid()
+    ) then
+    raise exception 'Người thường chỉ được SELECT performer của chính mình';
+  end if;
 
   v_dashboard := public.rpc_get_vmp_dashboard(v_year, false, false);
   if v_dashboard::text like '%' || v_hidden_code || '%' then
@@ -171,23 +515,17 @@ begin
     raise exception 'Dashboard phải giữ hạng mục người dùng được xem: %',
       v_visible_code;
   end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(v_dashboard->'objects') object
+    where object->>'code' = v_hidden_object
+  ) then
+    raise exception 'Dashboard objects làm lộ object của hạng mục ẩn: %',
+      v_hidden_object;
+  end if;
   if not (v_dashboard->'activities'->0->'_raw' ? 'scheduled_at') then
     raise exception 'Dashboard phải trả scheduled_at đầy đủ trong _raw';
   end if;
-  if exists (
-    select 1 from public.vmp_item_assignments
-    where id = v_hidden_assignment
-  ) then
-    raise exception 'RLS enforced làm lộ phân công của hạng mục ngoài khu vực';
-  end if;
-  if not exists (
-    select 1 from public.vmp_item_assignments
-    where validation_code = v_visible_code
-      and user_id = auth.uid()
-  ) then
-    raise exception 'RLS phải giữ phân công thuộc hạng mục được xem';
-  end if;
-
   v_result := public.rpc_dashboard_kpi(v_year);
   if (v_result #>> '{validation,total}')::integer <> 1
       or (v_result #>> '{documentation,total}')::integer <> 1 then
@@ -816,6 +1154,7 @@ declare
   v_admin uuid;
   v_result jsonb;
   v_directory jsonb;
+  v_valid_area text;
 begin
   select id into v_admin
   from public.profiles
@@ -826,6 +1165,10 @@ begin
   if v_admin is null then
     raise exception 'Cần một admin hoạt động để kiểm RPC danh bạ';
   end if;
+  select area into v_valid_area
+  from public.vmp_objects
+  where nullif(btrim(coalesce(area, '')), '') is not null
+  order by code limit 1;
 
   perform set_config(
     'request.jwt.claims',
@@ -838,9 +1181,9 @@ begin
     jsonb_build_object(
       'employee_code', 'E2E-PQ-20260810-A',
       'full_name', 'E2E Phân Quyền Tên Duy Nhất',
-      'department', 'rd',
+      'department', 'qc',
       'access_class', 'view_only',
-      'scope_departments', jsonb_build_array('rd'),
+      'scope_departments', jsonb_build_array('qc'),
       'access_areas', jsonb_build_array('*'),
       'email', 'e2e-pq-unique@example.test'
     ),
@@ -900,9 +1243,9 @@ begin
     jsonb_build_object(
       'employee_code', 'E2E-PQ-20260810-A',
       'full_name', 'E2E Mã Nhân Viên Bị Trùng',
-      'department', 'rd',
+      'department', 'qc',
       'access_class', 'view_only',
-      'scope_departments', jsonb_build_array('rd'),
+      'scope_departments', jsonb_build_array('qc'),
       'access_areas', jsonb_build_array('*')
     ),
     'Kiểm mã nhân viên trùng'
@@ -919,13 +1262,209 @@ begin
       'department', 'qc',
       'access_class', 'view_only',
       'scope_departments', jsonb_build_array('qc'),
-      'access_areas', jsonb_build_array('Hóa lý 1')
+      'access_areas', jsonb_build_array(v_valid_area)
     )),
     'Nhập thử file Excel'
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
       or (v_result->>'imported')::int <> 1 then
     raise exception 'Importer phải nhập được một dòng hợp lệ: %', v_result;
+  end if;
+end
+$test$;
+
+/* Resolve tên trùng phải bền qua refresh; denormalized link và preflight phải khớp. */
+do $test$
+declare
+  v_admin uuid;
+  v_linked_user uuid;
+  v_manager_user uuid;
+  v_manager_person uuid;
+  v_person_1 uuid;
+  v_person_2 uuid;
+  v_legacy_person uuid;
+  v_code text;
+  v_area text;
+  v_values jsonb;
+  v_assignment uuid;
+  v_result jsonb;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select profile.id into v_manager_user
+  from public.profiles profile
+  join public.vmp_performers person on person.user_id = profile.id
+  where profile.id <> v_admin and person.access_class = 'equipment_manager'
+  order by profile.created_at limit 1;
+  select profile.id into v_linked_user
+  from public.profiles profile
+  where profile.id not in (v_admin, v_manager_user)
+    and coalesce(profile.is_active, true)
+  order by profile.created_at limit 1;
+  select item.validation_code, object.area
+  into v_code, v_area
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.is_active and object.department = 'xsx'
+    and nullif(btrim(coalesce(object.area, '')), '') is not null
+  order by item.validation_code limit 1;
+  if v_admin is null or v_linked_user is null or v_manager_user is null
+      or v_code is null then
+    raise exception 'Thiếu fixture để kiểm resolve/preflight';
+  end if;
+
+  delete from public.vmp_item_assignments
+  where performer_id in (
+    select id from public.vmp_performers where user_id = v_linked_user
+  );
+  delete from public.vmp_performers where user_id = v_linked_user;
+
+  select id into v_manager_person
+  from public.vmp_performers where user_id = v_manager_user;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  insert into public.vmp_performers (
+    performer_name, employee_code, department, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values (
+    'E2E Resolve Tên Trùng', 'E2E-RESOLVE-1', 'xsx', 'view_only',
+    array['xsx'], array[v_area], true, v_admin
+  ) returning id into v_person_1;
+  insert into public.vmp_performers (
+    performer_name, employee_code, department, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values (
+    ' E2E  Resolve Tên Trùng ', 'E2E-RESOLVE-2', 'xsx', 'view_only',
+    array['xsx'], array[v_area], true, v_admin
+  ) returning id into v_person_2;
+
+  select source_sheet_data->'values' into v_values
+  from public.vmp_plan_items where validation_code = v_code;
+  if jsonb_typeof(v_values) <> 'array' then
+    v_values := to_jsonb(array_fill(''::text, array[37]));
+  end if;
+  v_values := jsonb_set(v_values, '{19}', to_jsonb('E2E Resolve Tên Trùng'::text));
+  update public.vmp_plan_items
+  set source_sheet_data = jsonb_set(source_sheet_data, '{values}', v_values, true)
+  where validation_code = v_code;
+
+  perform public.rpc_refresh_source_item_assignments();
+  select id into v_assignment
+  from public.vmp_item_assignments
+  where validation_code = v_code and source = 'sheet_other_staff'
+    and normalized_staff_name = public.vmp_normalize_person_name('E2E Resolve Tên Trùng');
+  if v_assignment is null then
+    raise exception 'Refresh phải tạo assignment tên trùng để resolve';
+  end if;
+  v_result := public.rpc_resolve_source_item_assignment(
+    v_assignment, v_person_1, 'Chọn đúng nhân viên khi tên trùng'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Không lưu được quyết định resolve tay: %', v_result;
+  end if;
+  if not exists (
+    select 1 from public.vmp_source_assignment_resolutions
+    where validation_code = v_code and performer_id = v_person_1
+  ) then
+    raise exception 'Resolve tay phải tạo mapping bền';
+  end if;
+
+  perform public.rpc_refresh_source_item_assignments();
+  select id into v_assignment
+  from public.vmp_item_assignments
+  where validation_code = v_code and source = 'sheet_other_staff'
+    and performer_id = v_person_1 and unresolved_reason = 'account_unlinked';
+  if v_assignment is null then
+    raise exception 'Refresh phải ưu tiên mapping đã resolve dù tên vẫn trùng';
+  end if;
+
+  update public.vmp_performers
+  set performer_name = 'E2E Resolve Đã Đổi Tên',
+      employee_code = 'E2E-RESOLVE-1-NEW',
+      user_id = v_linked_user
+  where id = v_person_1;
+  if not exists (
+    select 1 from public.vmp_item_assignments
+    where id = v_assignment and user_id = v_linked_user
+      and staff_name = 'E2E Resolve Đã Đổi Tên'
+      and employee_code = 'E2E-RESOLVE-1-NEW'
+      and unresolved_reason is null
+  ) then
+    raise exception 'Assignment không đồng bộ user/mã/tên/reason khi performer đổi';
+  end if;
+  update public.vmp_performers set user_id = null where id = v_person_1;
+  if not exists (
+    select 1 from public.vmp_item_assignments
+    where id = v_assignment and user_id is null
+      and unresolved_reason = 'account_unlinked'
+  ) then
+    raise exception 'Gỡ tài khoản performer phải đồng bộ account_unlinked';
+  end if;
+  update public.vmp_performers set user_id = v_linked_user where id = v_person_1;
+
+  /* Tạo dữ liệu legacy sai để chứng minh preflight bắt đúng từng lớp. */
+  update public.vmp_item_assignments
+  set user_id = v_admin
+  where id = v_assignment;
+  insert into public.vmp_performers (
+    performer_name, department, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values (
+    'E2E Legacy Scope Typo', 'xsx', 'view_only',
+    array['xsx'], array[v_area], true, v_admin
+  ) returning id into v_legacy_person;
+  update public.vmp_performers
+  set scope_departments = array['xssx'],
+      access_areas = array['KHU-VUC-KHONG-TON-TAI']
+  where id = v_legacy_person;
+  update public.profiles
+  set role = 'qa_manager', department = 'qa'
+  where id = v_manager_user;
+
+  v_result := public.rpc_item_permission_preflight();
+  if not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'ASSIGNMENT_USER_MISMATCH'
+      and (error->>'record_id')::uuid = v_assignment
+  ) then
+    raise exception 'Preflight chưa bắt assignment.user_id lệch performer.user_id: %', v_result;
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'INVALID_SCOPE_DEPARTMENT'
+      and (error->>'record_id')::uuid = v_legacy_person
+  ) or not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'INVALID_ACCESS_AREA'
+      and (error->>'record_id')::uuid = v_legacy_person
+  ) then
+    raise exception 'Preflight chưa bắt scope/area legacy typo: %', v_result;
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'INVALID_MANAGER_PRINCIPAL'
+      and (error->>'record_id')::uuid = v_manager_person
+  ) then
+    raise exception 'Preflight chưa bắt principal quản lý bất nhất: %', v_result;
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'DUPLICATE_NORMALIZED_NAME'
+  ) then
+    raise exception 'Preflight không được block mọi tên trùng toàn cục: %', v_result;
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'UNRESOLVED_ASSIGNMENT'
+      and (error->>'record_id')::uuid = v_assignment
+  ) then
+    raise exception 'Assignment tên trùng đã resolve không được coi là unresolved: %', v_result;
   end if;
 end
 $test$;
