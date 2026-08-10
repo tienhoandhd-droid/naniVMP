@@ -11,13 +11,18 @@
  *
  *  Nay chỉ còn một hộp, hai màn dùng chung, nên không thể lệch nhau nữa.
  * ===================================================================== */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Save, UserCheck } from "lucide-react";
 import { C, TEXT, btnPrimary, INP, FIELD, LBL } from "../../constants/theme.ts";
 import { TT_OPTS } from "../../constants/vmp.ts";
 import { txt, nguoiPhuTrach, stageOf } from "../../utils/helpers.ts";
 import { toISO } from "../../lib/n8nAdapter.ts";
-import { setItemPerformer } from "../../lib/supabaseData.ts";
+import {
+  fetchTimelineFieldPermission,
+  setItemPerformer,
+  type TimelineFieldPermission,
+  type TimelinePermissionMode,
+} from "../../lib/supabaseData.ts";
 import { usePerformers } from "../../hooks/index.ts";
 import { Tag, Modal, ROField, StateBadge } from "../ui/Primitives.tsx";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
@@ -47,6 +52,19 @@ const BLOCK_COLS: Record<number, [string, string]> = {
   4: ["ngay_vmp", "tt_vmp"],
 };
 
+/** Tên control trên form → tên cột DB mà allowlist quyền trả về. */
+const FORM_TO_DB_COLUMN: Record<string, string> = {
+  ngay_de_cuong: "actual_protocol_date",
+  tt_de_cuong: "status_protocol",
+  ngay_tham_dinh: "actual_validation_date",
+  tt_tham_dinh: "status_validation",
+  ngay_bao_cao: "actual_report_date",
+  tt_bao_cao: "status_report",
+  ngay_vmp: "actual_vmp_date",
+  tt_vmp: "status_vmp",
+  lich_td: "scheduled_at",
+};
+
 /** Bốn bước là MỘT CHUỖI, không phải bốn ô rời nhau: đề cương xong mới thẩm
  *  định được, thẩm định xong mới viết báo cáo, có báo cáo mới tổng kết VMP.
  *  Bảng này là chỗ duy nhất khai thứ tự đó để mọi phép kiểm dưới đây dùng
@@ -60,6 +78,25 @@ const CHUOI = [
 
 const ngayVN = (s: string) => (s ? s.split("-").reverse().join("/") : "—");
 
+/** timestamptz → giá trị datetime-local tại Asia/Bangkok. Không dùng timezone
+ * của máy người mở web, vì lịch vận hành thuộc nhà máy tại Việt Nam. */
+function toBangkokDateTimeLocal(value: unknown): string {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return `${text}T00:00`;
+  const local = text.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::\d{2})?$/);
+  if (local) return `${local[1]}T${local[2]}`;
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+}
+
 /** Số ngày từ hôm nay tới hạn (âm = đã quá hạn). null khi không có hạn. */
 function conLai(hanISO: string): number | null {
   if (!hanISO) return null;
@@ -70,7 +107,7 @@ function conLai(hanISO: string): number | null {
   return Math.round((h.getTime() - t0.getTime()) / 86400000);
 }
 
-export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onReload, nextAct, onOpenNext, quickDone }: {
+export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onReload, nextAct, onOpenNext, quickDone, editableFields, permissionMode }: {
   act: PlanActivity;
   isAdmin?: boolean;
   onClose: () => void;
@@ -82,6 +119,9 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   onOpenNext?: (a: PlanActivity) => void;
   /** Mở hộp với bước hiện tại đã điền sẵn "hôm nay + Hoàn thành" — chỉ còn chọn lý do và Lưu. */
   quickDone?: boolean;
+  /** Cho phép caller đã có quyền truyền thẳng; nếu thiếu modal tự đọc quyền hiệu lực. */
+  editableFields?: readonly string[];
+  permissionMode?: TimelinePermissionMode;
   /** (id, patch, userName, reason, expectedVersion) — khoá lạc quan chống ghi đè. */
   onSave: (
     id: string,
@@ -109,7 +149,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   const curBlock = STAGE_BLOCK[stageOf(act)] ?? 0;
   const init: Record<string, string> = {
     ngay_de_cuong: toISO(raw.ngay_de_cuong), tt_de_cuong: ttOpt(raw.tt_de_cuong),
-    lich_td: toISO(raw.lich_td) || "",
+    lich_td: toBangkokDateTimeLocal(raw.scheduled_at ?? raw.lich_td),
     ngay_tham_dinh: toISO(raw.ngay_tham_dinh), tt_tham_dinh: ttOpt(raw.tt_tham_dinh),
     ngay_bao_cao: toISO(raw.ngay_bao_cao), tt_bao_cao: ttOpt(raw.tt_bao_cao),
     ngay_vmp: toISO(raw.ngay_vmp), tt_vmp: ttOpt(raw.tt_vmp),
@@ -125,6 +165,43 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   const [f, setF] = useState(start);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
+  const [fieldPermission, setFieldPermission] = useState<TimelineFieldPermission | null>(() =>
+    permissionMode
+      ? { mode: permissionMode, canView: true, editableFields: editableFields || [], reason: editableFields?.length ? "Theo quyền hiệu lực" : "Chỉ xem" }
+      : null
+  );
+  const [permissionError, setPermissionError] = useState("");
+  useEffect(() => {
+    if (permissionMode) {
+      setFieldPermission({
+        mode: permissionMode,
+        canView: true,
+        editableFields: editableFields || [],
+        reason: editableFields?.length ? "Theo quyền hiệu lực" : "Chỉ xem",
+      });
+      setPermissionError("");
+      return;
+    }
+    let active = true;
+    setFieldPermission(null);
+    setPermissionError("");
+    fetchTimelineFieldPermission(act.id).then((permission) => {
+      if (active) setFieldPermission(permission);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setPermissionError((error as Error).message || "Không tải được quyền hạng mục");
+      // Không biết server đang ở mode nào thì khóa để tránh gửi nhầm cột.
+      setFieldPermission({ mode: "enforced", canView: true, editableFields: [], reason: "Chỉ xem" });
+    });
+    return () => { active = false; };
+  }, [act.id, editableFields, permissionMode]);
+  const isEnforced = fieldPermission?.mode === "enforced";
+  const permissionLoading = fieldPermission == null;
+  const canEdit = (dbColumn: string) => !permissionLoading
+    && (!isEnforced || fieldPermission.editableFields.includes(dbColumn));
+  const canEditForm = (formKey: string) => canEdit(FORM_TO_DB_COLUMN[formKey]);
+  const timelineViewOnly = fieldPermission?.mode === "enforced"
+    && fieldPermission.editableFields.length === 0;
   /* ---- Đổi trạng thái nghiệp vụ: chọn trạng thái → nhập lý do tại chỗ → xác nhận ---- */
   const [pendingState, setPendingState] = useState<string | null>(null);
   const [stateReason, setStateReason] = useState("");
@@ -148,7 +225,8 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
 
   // Chỉ ghi tiến độ khi thực sự có ô nào đổi — đổi mỗi người thực hiện mà vẫn
   // gọi RPC tiến độ thì server trả "chưa có thay đổi" và người dùng tưởng hỏng.
-  const doiRoi = Object.keys(init).filter((k) => (f[k] || "") !== (init[k] || ""));
+  const doiRoi = Object.keys(init).filter((k) =>
+    (f[k] || "") !== (init[k] || "") && canEditForm(k));
   const nChanged = doiRoi.length;
   const formChanged = nChanged > 0;
 
@@ -218,9 +296,9 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   const chan = viPham.filter(dinhToOSua);
   const nhac = viPham.filter((v) => !dinhToOSua(v));
   // S2-7: cần LÝ DO nếu đặt "Hoàn thành" ở bất kỳ giai đoạn nào HOẶC nhập bất kỳ ngày hoàn thành nào.
-  const needsReason = formChanged && (
-    ["tt_de_cuong", "tt_tham_dinh", "tt_bao_cao", "tt_vmp"].some((k) => f[k] === "Hoàn thành") ||
-    ["ngay_de_cuong", "ngay_tham_dinh", "ngay_bao_cao", "ngay_vmp"].some((k) => !!f[k]));
+  const needsReason = (
+    ["tt_de_cuong", "tt_tham_dinh", "tt_bao_cao", "tt_vmp"].some((k) => doiRoi.includes(k) && f[k] === "Hoàn thành") ||
+    ["ngay_de_cuong", "ngay_tham_dinh", "ngay_bao_cao", "ngay_vmp"].some((k) => doiRoi.includes(k)));
 
   /* Ngày THỰC TẾ nằm ở tương lai — chặn cứng.
      Thuộc tính max của ô nhập chỉ chặn khi bấm chọn trên lịch; gõ tay hoặc
@@ -303,7 +381,10 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     if (goNext && nextAct && onOpenNext) onOpenNext(nextAct);
     else onClose();
   };
-  const sel = (k: string) => <select value={f[k]} onChange={set(k)} style={{ ...INP, cursor: "pointer" }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
+  const sel = (k: string) => {
+    const enabled = canEditForm(k);
+    return <select value={f[k]} onChange={set(k)} disabled={!enabled} style={{ ...INP, cursor: enabled ? "pointer" : "not-allowed", opacity: enabled ? 1 : 0.62 }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
+  };
   const stage = (s: (typeof CHUOI)[number], truoc: (typeof CHUOI)[number] | null) => {
     const { n, d: dCol, t: tCol } = s;
     const dl = toISO(raw[s.dl]);
@@ -313,6 +394,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     // Bước trước chưa xong thì không mời bấm "Xong hôm nay" ở bước này — mời
     // xong lại chặn lúc Lưu là đưa người dùng vào ngõ cụt.
     const khoaBoiTruoc = !!truoc && f[truoc.t] !== "Hoàn thành";
+    const canMarkDone = canEditForm(dCol) && canEditForm(tCol);
     const ttGoc = String(raw[s.goc] ?? "").trim();
     return (
       <div key={n} style={{ background: C.surface, borderRadius: 14, padding: 14, border: `1.5px solid ${isCur ? C.marigold : C.pinkSoft}`, boxShadow: isCur ? `0 0 0 2px ${C.marigoldSoft}` : "none" }}>
@@ -332,9 +414,9 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
                 : <Tag color={con <= 7 ? C.marigoldText : C.plumSoft} bg={con <= 7 ? C.marigoldSoft : C.pinkMist}>còn {con} ngày</Tag>
             )}
             {!isDone && (
-              <button onClick={markDone(dCol, tCol)} disabled={khoaBoiTruoc}
-                title={khoaBoiTruoc ? `Phải xong "${truoc!.ten}" trước đã — bốn bước đi theo thứ tự.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
-                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: khoaBoiTruoc ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+              <button onClick={markDone(dCol, tCol)} disabled={khoaBoiTruoc || !canMarkDone}
+                title={!canMarkDone ? "Bạn không có quyền sửa hai cột của bước này." : khoaBoiTruoc ? `Phải xong "${truoc!.ten}" trước đã — bốn bước đi theo thứ tự.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
+                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc || !canMarkDone ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc || !canMarkDone ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc || !canMarkDone ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: khoaBoiTruoc || !canMarkDone ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
                 ✓ Xong hôm nay
               </button>
             )}
@@ -346,7 +428,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
               có ngày làm. Trước đây ô này để trống max nên chọn được 2027.
               Lịch thẩm định bên dưới thì NGƯỢC LẠI: nó là ngày hẹn, tương
               lai mới đúng — nên không chặn. */}
-          <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" max={todayISO()} value={f[dCol]} onChange={setDate(dCol, tCol)} style={INP} /></div>
+          <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" max={todayISO()} value={f[dCol]} onChange={setDate(dCol, tCol)} disabled={!canEditForm(dCol)} style={{ ...INP, opacity: canEditForm(dCol) ? 1 : 0.62, cursor: canEditForm(dCol) ? "auto" : "not-allowed" }} /></div>
           <div style={FIELD}><span style={LBL}>Trạng thái</span>{sel(tCol)}</div>
         </div>
         {/* Lịch thẩm định thuộc về CHÍNH bước thẩm định. Trước đây nó nằm tận
@@ -354,7 +436,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
         {n === 2 && (
           <div style={{ ...FIELD, marginTop: 12 }}>
             <span style={LBL}>Lịch thẩm định (bộ phận xếp)</span>
-            <input type="date" value={f.lich_td} onChange={set("lich_td")} style={INP} />
+            <input type="datetime-local" value={f.lich_td} onChange={set("lich_td")} disabled={!canEdit("scheduled_at")} style={{ ...INP, opacity: canEdit("scheduled_at") ? 1 : 0.62, cursor: canEdit("scheduled_at") ? "auto" : "not-allowed" }} />
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
               Ngày bộ phận hẹn vào làm. Khác với ngày hoàn thành thực tế ở trên.
             </span>
@@ -370,7 +452,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
         {f[tCol] === "Hoàn thành" && !f[dCol] && (
           <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: "#b00020" }}>
             Đã ghi Hoàn thành nhưng thiếu ngày thực tế — sẽ bị báo lỗi ALCOA+.{" "}
-            <button onClick={() => setF((p) => ({ ...p, [dCol]: todayISO() }))}
+            <button onClick={() => setF((p) => ({ ...p, [dCol]: todayISO() }))} disabled={!canEditForm(dCol)}
               style={{ border: "none", background: "none", color: C.mintText, fontFamily: TEXT, fontWeight: 800, fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
               Điền hôm nay
             </button>
@@ -384,6 +466,22 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16 }}>
         <div style={{ fontWeight: 800, color: C.plum, fontSize: 14 }}>{act.code} · {act.name}</div>
         <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {act.id} · QA: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
+      </div>
+      <div style={{
+        background: permissionLoading ? C.marigoldSoft : isEnforced ? C.lavSoft : C.mintSoft,
+        border: `1px solid ${permissionLoading ? C.marigold : isEnforced ? C.lav : C.mint}`,
+        borderRadius: 14, padding: "10px 14px", marginBottom: 16,
+        color: permissionLoading ? C.marigoldText : isEnforced ? C.lavText : C.mintText,
+        fontSize: 12, fontWeight: 700, lineHeight: 1.55,
+      }}>
+        {permissionLoading
+          ? "Đang kiểm tra quyền từng cột…"
+          : isEnforced
+            ? <>🔒 <b>Quyền theo từng cột đang áp dụng.</b>{timelineViewOnly
+              ? ` Chỉ xem — ${fieldPermission?.reason || "không được sửa cột timeline nào"}.`
+              : ` Bạn được sửa ${fieldPermission?.editableFields.length || 0} cột timeline.`}</>
+            : <>ℹ️ <b>Quyền dự kiến chưa áp dụng.</b> Modal vẫn giữ hành vi và luật đang chạy hiện tại.</>}
+        {permissionError && <> Không tải được quyền: {permissionError} — tạm khóa để an toàn.</>}
       </div>
       {quickDone && BLOCK_COLS[curBlock] && (
         <div style={{ background: C.mintSoft, border: `1px solid ${C.mint}`, borderRadius: 14, padding: "10px 14px", marginBottom: 16, fontSize: 12, fontWeight: 700, color: C.mintText, lineHeight: 1.55 }}>
@@ -516,12 +614,14 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
 
       <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
         <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
-        <button onClick={() => handleSave(false)} disabled={savingWho || !!thieuGi}
-          title={thieuGi || undefined}
-          style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || thieuGi ? 0.55 : 1, cursor: thieuGi ? "not-allowed" : "pointer" }}>
-          <Save size={17} /> {savingWho ? "Đang lưu…" : nChanged + (whoChanged ? 1 : 0) > 0 ? `Lưu ${nChanged + (whoChanged ? 1 : 0)} thay đổi` : "Lưu tiến độ"}
-        </button>
-        {nextAct && onOpenNext && (
+        {!permissionLoading && !timelineViewOnly && (
+          <button onClick={() => handleSave(false)} disabled={savingWho || !!thieuGi}
+            title={thieuGi || undefined}
+            style={{ ...btnPrimary, flex: 2, padding: "12px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: savingWho || thieuGi ? 0.55 : 1, cursor: thieuGi ? "not-allowed" : "pointer" }}>
+            <Save size={17} /> {savingWho ? "Đang lưu…" : nChanged + (whoChanged ? 1 : 0) > 0 ? `Lưu ${nChanged + (whoChanged ? 1 : 0)} thay đổi` : "Lưu tiến độ"}
+          </button>
+        )}
+        {!permissionLoading && !timelineViewOnly && nextAct && onOpenNext && (
           <button onClick={() => handleSave(true)} disabled={savingWho}
             title={`Tiếp theo: ${nextAct.code} · ${nextAct.name}`}
             style={{ flex: 1.4, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.plum}`, background: C.surface, color: C.plum, fontFamily: TEXT, fontWeight: 800, cursor: "pointer", opacity: savingWho ? 0.6 : 1, whiteSpace: "nowrap" }}>
