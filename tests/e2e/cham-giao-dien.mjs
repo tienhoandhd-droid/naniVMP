@@ -12,8 +12,8 @@
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
+import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GOC = "http://localhost:4173";
 
 const MAN = [
@@ -30,7 +30,7 @@ await choServer(GOC);
 
 const b = await puppeteer.launch({
   executablePath: CHROME, headless: "new",
-  args: ["--no-sandbox", "--use-gl=angle", "--use-angle=metal"],
+  args: ["--no-sandbox", ...CHROME_GL_ARGS],
 });
 const p = await b.newPage();
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));

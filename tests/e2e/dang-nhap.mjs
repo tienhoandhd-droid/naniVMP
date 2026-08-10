@@ -55,7 +55,10 @@ export async function dangNhap(p, GOC) {
     );
   }
 
-  await p.goto(GOC, { waitUntil: "networkidle2" });
+  // Supabase/Google Fonts có request sống lâu nên `networkidle2` không phải
+  // tín hiệu trang đăng nhập đã sẵn sàng. Chờ DOM rồi chờ đúng ô mật khẩu
+  // bên dưới: đây là điều kiện người dùng thật sự cần để tiếp tục.
+  await p.goto(GOC, { waitUntil: "domcontentloaded" });
   await p.waitForSelector("input[type=password]", { timeout: 30000 });
 
   const oNhap = await p.$$("input");
