@@ -1,15 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Search, Save } from "lucide-react";
+import { AlertTriangle, Check, Download, Search, Save, Upload } from "lucide-react";
 import { DEPTS } from "../../constants/vmp.ts";
 import {
   fetchPermissionPreflight,
+  importPermissionRows,
   savePermissionPerson,
   searchPermissionDirectory,
 } from "./api.ts";
 import { ACCESS_CLASSES, type AccessClass, type DirectoryPerson } from "./types.ts";
+import {
+  parsePermissionWorkbook,
+  type ParsedPermissionRow,
+  type PermissionWorkbookError,
+} from "./permissionWorkbook.ts";
 
 interface StaffDirectoryPanelProps {
   canEdit: boolean;
+  validAreas?: readonly string[];
   onSelect: (person: DirectoryPerson | null) => void;
 }
 
@@ -32,7 +39,7 @@ function departmentLabel(id: string): string {
   return DEPTS.find((department) => department.id === id)?.short || id.toUpperCase();
 }
 
-export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirectoryPanelProps) {
+export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect }: StaffDirectoryPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DirectoryPerson[]>([]);
   const [selected, setSelected] = useState<DirectoryPerson | null>(null);
@@ -43,6 +50,10 @@ export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirector
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [importRows, setImportRows] = useState<ParsedPermissionRow[]>([]);
+  const [importErrors, setImportErrors] = useState<PermissionWorkbookError[]>([]);
+  const [importReason, setImportReason] = useState("");
+  const [importing, setImporting] = useState(false);
   const requestSequence = useRef(0);
 
   useEffect(() => {
@@ -134,6 +145,38 @@ export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirector
       : event.target.value,
   }));
 
+  const readWorkbook = async (file: File | undefined) => {
+    setImportRows([]);
+    setImportErrors([]);
+    if (!file) return;
+    try {
+      const parsed = await parsePermissionWorkbook(file, { validAreas });
+      setImportRows(parsed.rows);
+      setImportErrors(parsed.errors);
+      setMessage(parsed.errors.length
+        ? `File có ${parsed.errors.length} lỗi; chưa gửi dòng nào lên hệ thống.`
+        : `Đã kiểm tra ${parsed.rows.length} dòng hợp lệ. Chưa nhập vào hệ thống.`);
+    } catch (error) {
+      setMessage(`Không đọc được file: ${(error as Error).message}`);
+    }
+  };
+
+  const importPreview = async () => {
+    if (!importRows.length || importErrors.length || !importReason.trim()) return;
+    setImporting(true);
+    try {
+      await importPermissionRows(importRows, importReason.trim());
+      setMessage(`Đã nhập ${importRows.length} dòng danh bạ. Quyền vẫn ở chế độ preview.`);
+      setImportRows([]);
+      setImportErrors([]);
+      setImportReason("");
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <section className="ip-panel" aria-labelledby="ip-directory-title">
       <div className={`ip-mode ${mode === "preview" ? "is-preview" : "is-enforced"}`} role="status">
@@ -216,6 +259,43 @@ export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirector
         </button>
       )}
       {message && <div className="ip-message" role="status">{message}</div>}
+
+      <div className="ip-import">
+        <div>
+          <h4>Nhập danh bạ bằng Excel</h4>
+          <p className="ip-help">Tải file 9 cột, điền rồi chọn lại tại đây. Web kiểm toàn bộ file trước; có một dòng lỗi thì không gọi RPC nhập.</p>
+        </div>
+        <div className="ip-import-actions">
+          <a className="pq-nut" href={`${import.meta.env.BASE_URL}templates/phan-quyen-vmp.xlsx`} download>
+            <Download size={15} /> Tải file Excel mẫu
+          </a>
+          {canEdit && (
+            <label className="pq-nut">
+              <Upload size={15} /> Chọn file đã điền
+              <input type="file" accept=".xlsx" hidden onChange={(event) => void readWorkbook(event.target.files?.[0])} />
+            </label>
+          )}
+        </div>
+        {importErrors.length > 0 && (
+          <div className="ip-import-errors" role="alert">
+            <b>{importErrors.length} lỗi cần sửa:</b>
+            <ul>{importErrors.slice(0, 12).map((error, index) => <li key={`${error.rowNumber}-${index}`}>Dòng {error.rowNumber}: {error.message}</li>)}</ul>
+            {importErrors.length > 12 && <span>… và {importErrors.length - 12} lỗi khác.</span>}
+          </div>
+        )}
+        {importRows.length > 0 && !importErrors.length && (
+          <div className="ip-import-preview">
+            <b>Xem trước {importRows.length} dòng hợp lệ — chưa nhập</b>
+            {importRows.slice(0, 5).map((row) => (
+              <span key={row.row_number}>Dòng {row.row_number}: {row.full_name} · {row.department.toUpperCase()} · {row.access_class}</span>
+            ))}
+            <input className="pq-o" aria-label="Lý do nhập danh bạ" placeholder="Lý do nhập file (bắt buộc)" value={importReason} onChange={(event) => setImportReason(event.target.value)} />
+            <button type="button" className="pq-nut la-chinh" disabled={importing || !importReason.trim()} onClick={importPreview}>
+              <Upload size={15} /> {importing ? "Đang nhập…" : `Nhập ${importRows.length} dòng ở chế độ preview`}
+            </button>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

@@ -337,6 +337,10 @@ export default function PhanQuyenView(
   /** performer đang chờ nối tay với tài khoản → user_id đã chọn. */
   const [dangNoi, setDangNoi] = useState<Record<string, string>>({});
   const [permissionPerson, setPermissionPerson] = useState<DirectoryPerson | null>(null);
+  const permissionAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
+    const raw = (activity._raw || {}) as Record<string, unknown>;
+    return [activity.area, raw.area, raw.line].map((value) => String(value || "").trim()).filter(Boolean);
+  }))].sort((a, b) => a.localeCompare(b, "vi")), [acts]);
 
   /* Bản nháp: KHOÁ Ô → giá trị mới. Các bảng dùng chung một map, phân
      biệt bằng tiền tố khoá. Một map thì "có thay đổi nào chưa lưu không"
@@ -1136,7 +1140,7 @@ export default function PhanQuyenView(
           Danh bạ nhân sự &amp; quyền
         </CardTitle>
         <div className="ip-workspace">
-          <StaffDirectoryPanel canEdit={quyenSuaA} onSelect={setPermissionPerson} />
+          <StaffDirectoryPanel canEdit={quyenSuaA} validAreas={permissionAreas} onSelect={setPermissionPerson} />
           <AssignmentPanel person={permissionPerson} canEdit={quyenSuaA || suaPhanCongDuoc} />
           <EffectiveRightsPanel person={permissionPerson} />
         </div>
