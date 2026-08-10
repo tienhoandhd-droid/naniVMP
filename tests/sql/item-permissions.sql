@@ -39,6 +39,291 @@ begin
 end
 $test$;
 
+/* Task 11: preview giữ nguyên; enforced chỉ đọc hạng mục được cấp. */
+do $test$
+declare
+  v_admin uuid;
+  v_user uuid;
+  v_person uuid;
+  v_visible_code text;
+  v_hidden_code text;
+  v_department text;
+  v_area text;
+  v_year integer;
+  v_all_count bigint;
+  v_hidden_assignment uuid;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select id into v_user
+  from public.profiles
+  where id <> v_admin and coalesce(is_active, true)
+  order by case when role::text = 'viewer' then 0 else 1 end, created_at
+  limit 1;
+
+  select visible.validation_code, hidden.validation_code,
+         object.department, object.area, visible.year
+  into v_visible_code, v_hidden_code, v_department, v_area, v_year
+  from public.vmp_plan_items visible
+  join public.vmp_objects object on object.code = visible.object_code
+  join lateral (
+    select candidate.validation_code
+    from public.vmp_plan_items candidate
+    join public.vmp_objects candidate_object on candidate_object.code = candidate.object_code
+    where candidate.is_active and candidate.year = visible.year
+      and candidate.validation_code <> visible.validation_code
+      and coalesce(candidate_object.area, candidate_object.line, '')
+          <> coalesce(object.area, object.line, '')
+    order by candidate.validation_code
+    limit 1
+  ) hidden on true
+  where visible.is_active
+    and nullif(btrim(coalesce(object.department, '')), '') is not null
+    and nullif(btrim(coalesce(object.area, object.line, '')), '') is not null
+  order by visible.validation_code
+  limit 1;
+
+  if v_admin is null or v_user is null or v_hidden_code is null then
+    raise exception 'Thiếu fixture hai khu vực để kiểm RLS đọc theo hạng mục';
+  end if;
+
+  delete from public.vmp_item_assignments where user_id = v_user;
+  delete from public.vmp_performers where user_id = v_user;
+  update public.profiles
+  set role = 'department_user', department = v_department,
+      pham_vi = 'phan_cong', is_active = true
+  where id = v_user;
+  insert into public.vmp_performers (
+    performer_name, email, department, user_id, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  )
+  select 'E2E Người Kiểm RLS Hạng Mục', email, v_department, id, 'view_only',
+         array[v_department], array[coalesce(v_area, '*')], true, v_admin
+  from public.profiles where id = v_user
+  returning id into v_person;
+  insert into public.vmp_item_assignments (
+    validation_code, performer_id, user_id, staff_name,
+    assignment_kind, source, source_text, is_active, change_reason
+  ) values (
+    v_visible_code, v_person, v_user, 'E2E Người Kiểm RLS Hạng Mục',
+    'equipment_department', 'equipment_manager',
+    'E2E Người Kiểm RLS Hạng Mục', true,
+    'Fixture chống lộ dữ liệu đọc'
+  );
+  insert into public.vmp_item_assignments (
+    validation_code, staff_name, assignment_kind, source, source_text,
+    unresolved_reason, is_active, change_reason
+  ) values (
+    v_hidden_code, 'E2E Phân Công Hạng Mục Ẩn', 'qa', 'sheet_qa',
+    'E2E Phân Công Hạng Mục Ẩn', 'not_found', true,
+    'Fixture chống lộ bảng phân công'
+  ) returning id into v_hidden_assignment;
+
+  select count(*) into v_all_count from public.vmp_plan_items;
+  if (select count(*) from public.vmp_visible_plan_items()) <> v_all_count then
+    raise exception 'Preview phải giữ nguyên toàn bộ tập hạng mục đang đọc';
+  end if;
+
+  update public.system_config set value = '"enforced"'::jsonb
+  where key = 'item_permissions_mode';
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user::text, 'role', 'authenticated')::text,
+    true
+  );
+  perform set_config('app.test_visible_code', v_visible_code, true);
+  perform set_config('app.test_hidden_code', v_hidden_code, true);
+  perform set_config('app.test_item_year', v_year::text, true);
+  perform set_config('app.test_item_user', v_user::text, true);
+  perform set_config('app.test_item_person', v_person::text, true);
+  perform set_config('app.test_hidden_assignment', v_hidden_assignment::text, true);
+  perform set_config('app.test_all_item_count', v_all_count::text, true);
+end
+$test$;
+
+set local role authenticated;
+
+do $test$
+declare
+  v_visible_code text := current_setting('app.test_visible_code');
+  v_hidden_code text := current_setting('app.test_hidden_code');
+  v_year integer := current_setting('app.test_item_year')::integer;
+  v_hidden_assignment uuid := current_setting('app.test_hidden_assignment')::uuid;
+  v_dashboard jsonb;
+  v_result jsonb;
+begin
+  if (select count(*) from public.vmp_plan_items) <> 1
+      or not exists (
+        select 1 from public.vmp_plan_items
+        where validation_code = v_visible_code
+      ) then
+    raise exception 'RLS enforced phải chỉ trả đúng hạng mục được cấp';
+  end if;
+
+  v_dashboard := public.rpc_get_vmp_dashboard(v_year, false, false);
+  if v_dashboard::text like '%' || v_hidden_code || '%' then
+    raise exception 'Dashboard SECURITY DEFINER làm lộ mã hạng mục ngoài khu vực: %',
+      v_hidden_code;
+  end if;
+  if not (v_dashboard::text like '%' || v_visible_code || '%') then
+    raise exception 'Dashboard phải giữ hạng mục người dùng được xem: %',
+      v_visible_code;
+  end if;
+  if not (v_dashboard->'activities'->0->'_raw' ? 'scheduled_at') then
+    raise exception 'Dashboard phải trả scheduled_at đầy đủ trong _raw';
+  end if;
+  if exists (
+    select 1 from public.vmp_item_assignments
+    where id = v_hidden_assignment
+  ) then
+    raise exception 'RLS enforced làm lộ phân công của hạng mục ngoài khu vực';
+  end if;
+  if not exists (
+    select 1 from public.vmp_item_assignments
+    where validation_code = v_visible_code
+      and user_id = auth.uid()
+  ) then
+    raise exception 'RLS phải giữ phân công thuộc hạng mục được xem';
+  end if;
+
+  v_result := public.rpc_dashboard_kpi(v_year);
+  if (v_result #>> '{validation,total}')::integer <> 1
+      or (v_result #>> '{documentation,total}')::integer <> 1 then
+    raise exception 'KPI SECURITY DEFINER phải đếm đúng tập hạng mục được xem: %',
+      v_result;
+  end if;
+  v_result := public.rpc_due_alerts(v_year, 3650);
+  if v_result::text like '%' || v_hidden_code || '%' then
+    raise exception 'RPC cảnh báo hạn làm lộ mã hạng mục ngoài khu vực';
+  end if;
+  v_result := public.rpc_alert_context(v_hidden_code, 3650);
+  if v_result::text like '%' || v_hidden_code || '%' then
+    raise exception 'RPC ngữ cảnh cảnh báo làm lộ mã hạng mục ngoài khu vực';
+  end if;
+  v_result := public.rpc_get_missing_items(v_year);
+  if v_result::text like '%' || v_hidden_code || '%' then
+    raise exception 'RPC hạng mục thiếu làm lộ mã hạng mục ngoài khu vực';
+  end if;
+  v_result := public.rpc_source_warnings(v_year);
+  if v_result::text like '%' || v_hidden_code || '%' then
+    raise exception 'RPC cảnh báo nguồn làm lộ mã hạng mục ngoài khu vực';
+  end if;
+  v_result := public.rpc_active_rules();
+  if (v_result #>> '{so_lieu_hien_tai,hang_muc}')::integer <> 1 then
+    raise exception 'RPC luật đang chạy phải đếm đúng tập hạng mục được xem: %',
+      v_result;
+  end if;
+  v_result := public.rpc_trang_thai_he_thong();
+  if coalesce((v_result->>'ok')::boolean, false) then
+    raise exception 'Người dùng thường không được xem trạng thái hệ thống: %',
+      v_result;
+  end if;
+  v_result := public.rpc_ai_context_goc(null, v_year, 60);
+  if (v_result #>> '{tong_quan,tong_hang_muc}')::integer <> 1
+      or v_result::text like '%' || v_hidden_code || '%' then
+    raise exception 'RPC AI context phải chỉ dùng tập hạng mục được xem: %',
+      v_result;
+  end if;
+  v_result := public.rpc_ai_muc_luc();
+  if (v_result->>'tong')::integer <> 1 then
+    raise exception 'Họ RPC AI phải tổng hợp đúng tập hạng mục được xem: %',
+      v_result;
+  end if;
+end
+$test$;
+
+reset role;
+
+do $test$
+declare
+  v_admin uuid;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+end
+$test$;
+
+set local role authenticated;
+
+do $test$
+begin
+  if not public.is_admin()
+      or (select count(*) from public.vmp_plan_items)
+         <> current_setting('app.test_all_item_count')::bigint then
+    raise exception 'Admin phải đọc được toàn bộ hạng mục khi enforced';
+  end if;
+end
+$test$;
+
+reset role;
+
+/* Preflight phải dùng đúng audit runtime, không chỉ kiểm một danh sách đóng. */
+create function public.rpc_e2e_unfiltered_item_reader()
+returns bigint
+language sql
+stable
+security definer
+set search_path = public
+as $test_function$
+  select count(*) from public.vmp_plan_items
+$test_function$;
+
+do $test$
+declare
+  v_admin uuid;
+  v_result jsonb;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  v_result := public.rpc_item_permission_preflight();
+  if not exists (
+    select 1
+    from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'UNFILTERED_SECURITY_DEFINER_RPC'
+      and error->>'record_id' = 'rpc_e2e_unfiltered_item_reader()'
+  ) then
+    raise exception 'Preflight chưa chặn SECURITY DEFINER RPC không lọc: %', v_result;
+  end if;
+end
+$test$;
+
+drop function public.rpc_e2e_unfiltered_item_reader();
+
+do $test$
+declare
+  v_user uuid := current_setting('app.test_item_user')::uuid;
+  v_person uuid := current_setting('app.test_item_person')::uuid;
+begin
+  if exists (select 1 from public.vmp_unfiltered_security_definer_item_readers()) then
+    raise exception 'Audit vẫn còn đường đọc SECURITY DEFINER không lọc';
+  end if;
+  update public.system_config set value = '"preview"'::jsonb
+  where key = 'item_permissions_mode';
+  delete from public.vmp_item_assignments where performer_id = v_person;
+  delete from public.vmp_performers where id = v_person;
+  update public.profiles
+  set role = 'viewer', department = null, pham_vi = null
+  where id = v_user;
+end
+$test$;
+
 do $test$
 declare
   v_admin uuid;
