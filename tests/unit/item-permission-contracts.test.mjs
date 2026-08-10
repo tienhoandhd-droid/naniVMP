@@ -236,6 +236,8 @@ test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn cá
   assert.match(sql, /'error_code', 'VERSION_REQUIRED'/);
   assert.match(sql, /'error_code', 'PERSON_ID_REQUIRED'/);
   assert.match(sql, /raise exception 'IMPORT_ROW_FAILED:/);
+  assert.match(sql, /alter function public\.rpc_set_item_performer\(text, text\)\s+security invoker/);
+  assert.match(sql, /revoke all on function public\.rpc_set_item_performer\(text, text\)/);
 });
 
 test("chọn kết quả lưu theo person_id dù hai dòng trùng tên", async () => {
