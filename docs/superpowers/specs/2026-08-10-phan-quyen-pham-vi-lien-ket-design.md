@@ -1,7 +1,7 @@
 # Thiết kế tinh gọn Phân quyền & tài khoản và chọn phạm vi liên kết
 
 Ngày: 2026-08-10  
-Trạng thái: Đã duyệt thiết kế hội thoại, chờ duyệt bản đặc tả viết
+Trạng thái: Đã duyệt, sẵn sàng triển khai
 
 ## 1. Mục tiêu
 
@@ -23,6 +23,7 @@ Mỗi tầng phạm vi cho phép chọn nhiều giá trị. Danh sách ở tần
 - Cho phép chọn nhiều bộ phận, xưởng, khu vực và line trong phạm vi quyền.
 - Bổ sung danh mục chuẩn xưởng và quan hệ xưởng–khu vực–line.
 - Tự điền hồ sơ và phạm vi đã lưu khi chọn nhân sự có sẵn.
+- Dùng danh bạ làm nguồn tên người thực hiện duy nhất; các bảng nghiệp vụ chỉ chọn người có sẵn.
 - Lưu bản nháp bằng một lần xác nhận, kiểm tra nguyên khối tại máy chủ và ghi nhật ký.
 - Tải lại bảng quyền hiệu lực sau khi lưu thành công.
 
@@ -64,6 +65,21 @@ Người quản trị tìm theo họ tên, email hoặc mã nhân viên. Khi ch�
 - Trạng thái xác nhận gửi email tài khoản.
 
 Họ tên, mã nhân viên và email vẫn là dữ liệu hồ sơ. Bộ phận, xưởng, khu vực và line chỉ được chọn từ danh mục; không có ô nhập chuỗi phân cách bằng dấu chấm phẩy.
+
+### 4.1 Nguồn chính của tên người thực hiện
+
+Tab **Người thực hiện/Danh bạ** là nơi duy nhất cho phép tạo mới hoặc sửa tên người. Form này có nút **Lưu**, kiểm tra tên rỗng, tên chuẩn hóa bị trùng, email đã nối người khác và xung đột phiên bản trước khi ghi.
+
+Các nơi dùng người thực hiện không được kiêm chức năng tạo tên mới:
+
+- Ô Người thực hiện trong cửa sổ cập nhật tiến độ.
+- Cột QA phụ trách và Người hỗ trợ của Danh mục nguồn.
+- Thao tác điền hàng loạt cho hai cột người.
+- Phân công theo hạng mục trên trang Phân quyền.
+
+Các ô này chỉ tìm/chọn người đang hoạt động từ danh bạ. Sau khi chọn, giao diện giữ `person_id` trong bản nháp và hiển thị họ tên, email, bộ phận để người dùng đối chiếu. Thay đổi chỉ được ghi khi bấm nút **Lưu** hoặc **Áp dụng** có xác nhận; mất tiêu điểm, bấm Enter hay chọn một mục không tự gọi RPC ghi.
+
+Tên hiển thị không phải khóa liên kết. Khi đổi tên trong danh bạ, các màn nghiệp vụ đọc lại tên mới theo `person_id`; không tạo một người thứ hai và không cần sửa chuỗi tên ở từng hạng mục.
 
 ## 5. Mô hình phạm vi
 
@@ -151,6 +167,8 @@ Máy chủ phải từ chối:
 - Hai phiên cùng sửa một hồ sơ và phiên cũ cố ghi đè phiên mới.
 - Người gọi không có quyền sửa hồ sơ hoặc phạm vi tương ứng.
 - Patch chứa trường ngoài allowlist.
+- `person_id` không tồn tại, đã ngừng hoạt động hoặc không thuộc phạm vi người gọi được quản lý.
+- Tên người chuẩn hóa trùng với một hồ sơ đang hoạt động khi tạo/sửa danh bạ.
 
 RPC ghi phải dùng transaction, `search_path` cố định, quyền thực thi tối thiểu và trả lỗi có mã để giao diện chỉ đúng trường cần sửa.
 
@@ -198,6 +216,9 @@ Sau khi lưu hồ sơ hoặc phạm vi, bảng tự tải lại. Nếu đang ở
 - Thay đổi không gọi RPC ghi trước khi bấm **Lưu hồ sơ**.
 - Lưu lỗi giữ bản nháp; lưu thành công tải lại dữ liệu và bảng quyền.
 - Không còn ô nhập chuỗi tự do cho phạm vi.
+- Tab Người thực hiện/Danh bạ vẫn cho tạo hoặc sửa hồ sơ bằng form có nút **Lưu**.
+- Mọi ô gán QA phụ trách, người hỗ trợ và người thực hiện chỉ cho chọn từ danh bạ; chọn hoặc mất tiêu điểm không tự lưu.
+- Danh sách chọn người hiển thị đủ tên, email và bộ phận để phân biệt người trùng tên.
 - Không còn ba khối legacy và hướng dẫn dài bên dưới.
 
 ### Máy chủ
@@ -205,6 +226,8 @@ Sau khi lưu hồ sơ hoặc phạm vi, bảng tự tải lại. Nếu đang ở
 - Lưu được nhiều giá trị hợp lệ ở cả bốn tầng.
 - Từ chối từng trường hợp quan hệ sai và rollback toàn bộ transaction.
 - Từ chối mã không tồn tại, patch trái phép, người gọi thiếu quyền và phiên bản cũ.
+- Từ chối gán `person_id` không tồn tại/không hoạt động và từ chối tạo tên chuẩn hóa bị trùng.
+- Đổi tên một người giữ nguyên mọi liên kết nghiệp vụ vì khóa là `person_id`.
 - Nhật ký chứa đầy đủ trước/sau, người sửa, thời gian và lý do.
 - RPC quyền hiệu lực phản ánh đúng các tập phạm vi mới ở cả `preview` và `enforced`.
 - RLS/RPC đọc không làm lộ hạng mục ngoài phạm vi khi chuyển sang `enforced`.
