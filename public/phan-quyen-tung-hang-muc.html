@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Tài liệu lấy ý kiến về thiết kế phân quyền tới từng hạng mục VMP" />
+  <title>Dự thảo phân quyền từng hạng mục VMP</title>
+  <style>
+    :root {
+      --ink: #292633;
+      --muted: #696574;
+      --line: #e4e0e8;
+      --plum: #54375f;
+      --plum-2: #76527d;
+      --plum-soft: #f5eff7;
+      --green: #256b45;
+      --green-soft: #e9f6ee;
+      --amber: #7a5908;
+      --amber-soft: #fff4d3;
+      --red: #92364d;
+      --red-soft: #fbecef;
+      --blue: #315f8b;
+      --blue-soft: #edf5fc;
+      --surface: #ffffff;
+      --page: #f6f4f7;
+      --shadow: 0 12px 34px rgba(43, 31, 51, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--page);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.62;
+    }
+    a { color: var(--plum-2); }
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #f0edf2;
+      color: #4a3651;
+      font-size: 0.9em;
+    }
+    .hero {
+      color: white;
+      background:
+        radial-gradient(circle at 90% 10%, rgba(255,255,255,.18), transparent 34%),
+        linear-gradient(135deg, #3f2949, #76527d 65%, #96709a);
+      padding: 52px max(24px, calc((100vw - 1220px) / 2));
+    }
+    .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .82; }
+    .hero h1 { max-width: 900px; margin: 10px 0 12px; font-size: clamp(30px, 4.5vw, 52px); line-height: 1.08; }
+    .hero p { max-width: 900px; margin: 0; font-size: 16px; opacity: .9; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; }
+    .pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,.13); font-size: 12px; font-weight: 750; }
+    .pill.draft { color: #573d00; background: #ffe9a3; }
+    .shell { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 28px; max-width: 1280px; margin: 0 auto; padding: 30px; }
+    .toc { position: sticky; top: 18px; align-self: start; max-height: calc(100vh - 36px); overflow: auto; padding: 17px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); box-shadow: var(--shadow); }
+    .toc b { display: block; margin: 0 0 10px; color: var(--plum); }
+    .toc a { display: block; padding: 6px 8px; border-radius: 7px; color: var(--muted); text-decoration: none; font-size: 12px; }
+    .toc a:hover { color: var(--plum); background: var(--plum-soft); }
+    main { min-width: 0; }
+    .section { margin-bottom: 20px; padding: 26px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); box-shadow: var(--shadow); scroll-margin-top: 18px; }
+    .section h2 { margin: 0 0 8px; color: var(--plum); font-size: 23px; line-height: 1.25; }
+    .section h3 { margin: 23px 0 8px; color: #493450; font-size: 16px; }
+    .section p:first-of-type { margin-top: 4px; }
+    .lead { color: var(--muted); font-size: 14px; }
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 11px; margin-top: 18px; }
+    .card { padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: #fbfafc; }
+    .card strong { display: block; margin-bottom: 4px; color: var(--plum); font-size: 18px; }
+    .card span { color: var(--muted); font-size: 12px; }
+    .callout { margin: 14px 0; padding: 13px 15px; border-radius: 10px; font-size: 13px; }
+    .callout.warn { color: var(--amber); background: var(--amber-soft); border-left: 4px solid #d9a82c; }
+    .callout.good { color: var(--green); background: var(--green-soft); border-left: 4px solid #57a978; }
+    .callout.info { color: var(--blue); background: var(--blue-soft); border-left: 4px solid #6b9dca; }
+    .callout.bad { color: var(--red); background: var(--red-soft); border-left: 4px solid #cd7184; }
+    table { width: 100%; border-collapse: collapse; margin: 13px 0; font-size: 13px; }
+    th, td { padding: 10px 11px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #4b3652; background: #f7f3f8; }
+    tbody tr:nth-child(even) { background: #fcfbfd; }
+    .yes { color: var(--green); font-weight: 800; }
+    .conditional { color: var(--amber); font-weight: 800; }
+    .no { color: var(--red); font-weight: 800; }
+    .steps { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px; margin: 15px 0; }
+    .step { position: relative; min-height: 94px; padding: 13px; border-radius: 10px; background: var(--plum-soft); color: #4e3855; font-size: 12px; }
+    .step b { display: block; margin-bottom: 5px; }
+    .step:not(:last-child)::after { content: "→"; position: absolute; right: -8px; top: 34px; z-index: 2; color: #8b7390; font-size: 16px; }
+    .states { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; }
+    .state { padding: 13px; border-radius: 10px; text-align: center; font-size: 13px; font-weight: 800; }
+    .state.inherit { color: #5f5c67; background: #efedf1; }
+    .state.allow { color: var(--green); background: var(--green-soft); }
+    .state.deny { color: var(--red); background: var(--red-soft); }
+    .checklist { padding: 0; list-style: none; }
+    .checklist li { position: relative; margin: 8px 0; padding-left: 28px; }
+    .checklist li::before { content: "□"; position: absolute; left: 3px; top: -1px; color: var(--plum-2); font-size: 18px; }
+    .questions { border: 2px solid #cfbdd4; background: #fbf7fc; }
+    .questions h2 { color: #4b3155; }
+    .question { margin: 10px 0; padding: 13px; border-radius: 10px; background: white; border: 1px solid var(--line); }
+    .question b { color: var(--plum); }
+    .footer { max-width: 1280px; margin: 0 auto; padding: 0 30px 46px; color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; padding: 18px; }
+      .toc { position: static; max-height: none; }
+      .cards { grid-template-columns: repeat(2,1fr); }
+      .steps { grid-template-columns: 1fr; }
+      .step:not(:last-child)::after { content: "↓"; right: auto; left: 50%; top: auto; bottom: -13px; }
+    }
+    @media (max-width: 620px) {
+      .hero { padding: 35px 20px; }
+      .cards, .states { grid-template-columns: 1fr; }
+      .section { padding: 19px; overflow-x: auto; }
+      th, td { min-width: 125px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="eyebrow">VMP Monitor · Tài liệu lấy ý kiến liên bộ phận</div>
+    <h1>Phân quyền tới từng hạng mục VMP</h1>
+    <p>Tài liệu trình bày đầy đủ đối tượng được xem/sửa, thứ tự tính quyền, dữ liệu lưu, giao diện dự kiến, cơ chế dự thảo, an toàn bảo mật và tiêu chí nghiệm thu.</p>
+    <div class="hero-meta">
+      <span class="pill draft">● Dự thảo — chưa áp dụng quyền thật</span>
+      <span class="pill">Ngày duyệt thiết kế: 10/08/2026</span>
+      <span class="pill">Mục đích: lấy ý kiến các bộ phận</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="toc" aria-label="Mục lục">
+      <b>Mục lục</b>
+      <a href="#tom-tat">0. Tóm tắt quyết định</a>
+      <a href="#muc-tieu">1. Mục tiêu và phạm vi</a>
+      <a href="#nguyen-tac">2. Nguyên tắc chung</a>
+      <a href="#vai-tro">3. Ai được quyền gì?</a>
+      <a href="#du-lieu">4. Dữ liệu được lưu</a>
+      <a href="#tinh-quyen">5. Cách tính quyền</a>
+      <a href="#quan-tri">6. Ai được quản trị?</a>
+      <a href="#giao-dien">7. Bảng hiển thị trên web</a>
+      <a href="#luong-du-lieu">8. Luồng dữ liệu và lưu</a>
+      <a href="#du-thao">9. Dự thảo và áp dụng</a>
+      <a href="#an-toan">10. Lỗi và bảo mật</a>
+      <a href="#kiem-thu">11. Kiểm thử</a>
+      <a href="#hoan-tat">12. Tiêu chí hoàn tất</a>
+      <a href="#ngoai-pham-vi">13. Ngoài phạm vi</a>
+      <a href="#nhan-xet">Các điểm cần nhận xét</a>
+    </nav>
+
+    <main>
+      <section class="section" id="tom-tat">
+        <h2>0. Tóm tắt quyết định</h2>
+        <p class="lead">Nếu chỉ có ít thời gian, hãy đọc phần này, ma trận quyền ở mục 3 và các câu hỏi nhận xét cuối trang.</p>
+        <div class="cards">
+          <div class="card"><strong>2 quyền</strong><span>Xem và Sửa được quản lý độc lập.</span></div>
+          <div class="card"><strong>3 trạng thái</strong><span>Kế thừa · Cho phép · Từ chối.</span></div>
+          <div class="card"><strong>1 luật database</strong><span>Web, RLS và RPC không tự chép luật riêng.</span></div>
+          <div class="card"><strong>2 chế độ</strong><span>Dự thảo trước; Admin bật áp dụng sau.</span></div>
+        </div>
+        <div class="callout warn"><b>Điểm quan trọng:</b> Bản online đầu tiên chỉ để nhập và lưu dự thảo phục vụ trao đổi. Nó không làm thay đổi quyền truy cập hiện tại.</div>
+        <ul>
+          <li>Chỉ người thực hiện và người thuộc bộ phận thực hiện mới đủ điều kiện nhận quyền theo hạng mục.</li>
+          <li>Admin và phụ trách QA xem toàn bộ để quản trị/giám sát, nhưng không tự động được sửa toàn bộ.</li>
+          <li>Người thực hiện và quản lý bộ phận thực hiện mặc định được Xem + Sửa.</li>
+          <li>Thành viên khác của bộ phận thực hiện mặc định chỉ được Xem.</li>
+          <li>Mọi ngoại lệ có lý do, ngày hết hạn tùy chọn và nhật ký đầy đủ.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="muc-tieu">
+        <h2>1. Mục tiêu và phạm vi</h2>
+        <p>Hệ thống hiện kiểm quyền chủ yếu theo vai trò, bộ phận và ma trận phân công loại thẩm định × line. Thiết kế mới bổ sung một lớp ngoại lệ đến từng hạng mục VMP và từng tài khoản.</p>
+        <p>Bản đầu tiên được đưa lên online để các bộ phận nhìn cùng một bảng, thảo luận và lưu lại cấu hình dự thảo. Sau khi dữ liệu và quy tắc được thống nhất, Admin mới chủ động bật chế độ áp dụng để RLS chặn quyền Xem và RPC chặn quyền Sửa.</p>
+        <div class="callout info"><b>Không thay thế luật hiện có:</b> Quyền hạng mục là lớp ngoại lệ ghi đè khi cần; quyền theo vai, bộ phận và phân công vẫn là nền mặc định.</div>
+      </section>
+
+      <section class="section" id="nguyen-tac">
+        <h2>2. Nguyên tắc chung</h2>
+        <ol>
+          <li>Quyền <b>Xem</b> và <b>Sửa</b> là hai quyền độc lập.</li>
+          <li>Mỗi quyền có ba trạng thái: Kế thừa, Cho phép và Từ chối.</li>
+          <li>Ngoại lệ còn hiệu lực ghi đè quyền mặc định.</li>
+          <li>Được Sửa luôn kéo theo được Xem; Từ chối Xem đồng thời Từ chối Sửa.</li>
+          <li>Chỉ người thực hiện và người thuộc bộ phận thực hiện mới đủ điều kiện nhận ngoại lệ.</li>
+          <li>Mọi thay đổi bắt buộc có lý do; ngày hết hạn là tùy chọn.</li>
+          <li>Người chưa có tài khoản hoặc chưa liên kết tài khoản chưa nhận quyền hệ thống.</li>
+          <li>Liên kết quyền bằng <code>user_id</code>, không khớp bằng tên người.</li>
+          <li>Quyền Sửa hạng mục không tự mở thao tác nhạy cảm; Huỷ/Không áp dụng/Khôi phục còn phải qua quyền theo vai.</li>
+          <li>Database là chốt chặn; giao diện không tự quyết định quyền cuối cùng.</li>
+        </ol>
+        <div class="states" aria-label="Ba trạng thái quyền">
+          <div class="state inherit">Kế thừa<br><small>Dùng luật mặc định</small></div>
+          <div class="state allow">Cho phép<br><small>Mở quyền có chủ đích</small></div>
+          <div class="state deny">Từ chối<br><small>Thu hồi quyền có chủ đích</small></div>
+        </div>
+      </section>
+
+      <section class="section" id="vai-tro">
+        <h2>3. Ai được quyền gì?</h2>
+        <p class="lead">Ma trận dưới đây là phần cốt lõi để các bộ phận xác nhận trách nhiệm và quyền thao tác.</p>
+        <table>
+          <thead><tr><th>Nhóm người dùng</th><th>Xem mặc định</th><th>Sửa mặc định</th><th>Quản trị quyền</th><th>Giới hạn quan trọng</th></tr></thead>
+          <tbody>
+            <tr><td><b>Admin</b></td><td class="yes">Toàn bộ</td><td class="conditional">Theo trách nhiệm/ngoại lệ</td><td class="yes">Toàn hệ thống</td><td>Không được sửa mọi hạng mục chỉ vì là Admin.</td></tr>
+            <tr><td><b>Phụ trách QA</b><br><code>qa_manager</code></td><td class="yes">Toàn bộ để giám sát</td><td class="conditional">Khi QA thực hiện hoặc được phân công</td><td class="conditional">Khi đồng thời là quản lý QA và QA thực hiện</td><td>Quyền xem giám sát không bị ngoại lệ chặn.</td></tr>
+            <tr><td><b>Nhân viên QA thường</b></td><td class="conditional">Khi QA thực hiện hoặc bản thân thực hiện</td><td class="conditional">Khi trực tiếp thực hiện hoặc được cho phép</td><td class="no">Không</td><td>Không mặc nhiên xem toàn hệ thống.</td></tr>
+            <tr><td><b>Người thực hiện trực tiếp</b></td><td class="yes">Đúng hạng mục phụ trách</td><td class="yes">Đúng hạng mục phụ trách</td><td class="no">Không, trừ khi là quản lý hợp lệ</td><td>Nếu bị từ chối, web cảnh báo trách nhiệm và quyền mâu thuẫn.</td></tr>
+            <tr><td><b>Quản lý bộ phận thực hiện</b></td><td class="yes">Hạng mục của bộ phận</td><td class="yes">Hạng mục của bộ phận</td><td class="yes">Trong đúng bộ phận</td><td>Tài khoản phải có cờ Quản lý bộ phận.</td></tr>
+            <tr><td><b>Thành viên bộ phận thực hiện</b></td><td class="yes">Hạng mục của bộ phận</td><td class="conditional">Chỉ khi được phân công/cho phép</td><td class="no">Không</td><td>Mặc định chỉ xem.</td></tr>
+            <tr><td><b>Người ngoài phạm vi</b></td><td class="no">Không</td><td class="no">Không</td><td class="no">Không</td><td>Database từ chối cấp ngoại lệ Cho phép.</td></tr>
+          </tbody>
+        </table>
+        <h3>Người thực hiện trực tiếp</h3>
+        <ul>
+          <li>Mặc định Xem + Sửa đúng hạng mục mình phụ trách.</li>
+          <li>Không tự động sửa hạng mục khác, kể cả cùng bộ phận.</li>
+          <li>Không tự cấp, chuyển hoặc thu hồi quyền của người khác.</li>
+          <li>Nếu bị ngoại lệ Từ chối, hạng mục vẫn hiển thị cảnh báo rằng trách nhiệm chưa được thay đổi.</li>
+        </ul>
+        <h3>Admin và QA</h3>
+        <ul>
+          <li>Admin xem toàn bộ và quản trị toàn bộ nhưng quyền sửa nội dung vẫn theo phạm vi.</li>
+          <li>Phụ trách QA xem toàn bộ để giám sát chất lượng; quyền này không thể bị ngoại lệ chặn.</li>
+          <li>QA chỉ sửa khi QA là bộ phận thực hiện hoặc cá nhân được phân công.</li>
+          <li>QA chỉ thay đổi ngoại lệ khi đồng thời có cờ Quản lý bộ phận và QA là bộ phận thực hiện.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="du-lieu">
+        <h2>4. Dữ liệu được lưu</h2>
+        <h3>Hồ sơ quản lý bộ phận</h3>
+        <p>Thêm cờ <code>profiles.is_department_manager</code>. Cờ này luôn đi với đúng một <code>profiles.department</code>. Admin là ngoại lệ toàn hệ thống.</p>
+        <h3>Ngoại lệ hạng mục × tài khoản</h3>
+        <table>
+          <thead><tr><th>Trường</th><th>Ý nghĩa</th><th>Ràng buộc</th></tr></thead>
+          <tbody>
+            <tr><td><code>validation_code</code></td><td>Mã hạng mục duy nhất</td><td>Tham chiếu hạng mục thật</td></tr>
+            <tr><td><code>user_id</code></td><td>Tài khoản nhận quyền</td><td>Không dùng tên làm khoá</td></tr>
+            <tr><td><code>view_override</code></td><td>Ngoại lệ Xem</td><td>NULL/true/false = Kế thừa/Cho phép/Từ chối</td></tr>
+            <tr><td><code>edit_override</code></td><td>Ngoại lệ Sửa</td><td>Không thể true khi Xem là false</td></tr>
+            <tr><td><code>expires_at</code></td><td>Ngày giờ hết hạn</td><td>Tùy chọn; tính theo giờ database</td></tr>
+            <tr><td><code>change_reason</code></td><td>Lý do thay đổi</td><td>Bắt buộc</td></tr>
+            <tr><td>Người/thời điểm tạo và sửa</td><td>Truy vết cấu hình</td><td>Database tự ghi</td></tr>
+          </tbody>
+        </table>
+        <p>Mỗi cặp hạng mục × tài khoản chỉ có một dòng. Khi cả hai quyền trở về Kế thừa, dòng ngoại lệ được xoá; lịch sử vẫn còn trong <code>audit_logs</code>.</p>
+        <h3>Nhật ký</h3>
+        <p>Nhật ký lưu quyền cũ/mới, mã hạng mục, tài khoản nhận quyền, người thay đổi, lý do, trường đã đổi, nguồn thao tác và thời điểm. Việc bật/tắt chế độ áp dụng có bản ghi riêng.</p>
+      </section>
+
+      <section class="section" id="tinh-quyen">
+        <h2>5. Cách tính quyền hiệu lực</h2>
+        <p>Web, policy RLS và RPC nghiệp vụ cùng dùng một lõi tính quyền trong database. Không chép luật thành ba phiên bản.</p>
+        <h3>Quyền Xem</h3>
+        <div class="steps">
+          <div class="step"><b>1. Tài khoản</b>Không tồn tại hoặc không hoạt động → Từ chối.</div>
+          <div class="step"><b>2. Giám sát</b>Admin/qa_manager → Cho phép Xem.</div>
+          <div class="step"><b>3. Ngoại lệ</b>Ngoại lệ Xem còn hạn → dùng ngoại lệ.</div>
+          <div class="step"><b>4. Mặc định</b>Người thực hiện hoặc thuộc bộ phận thực hiện → Cho phép.</div>
+          <div class="step"><b>5. Còn lại</b>Không đủ điều kiện → Từ chối.</div>
+        </div>
+        <h3>Quyền Sửa</h3>
+        <div class="steps">
+          <div class="step"><b>1. Tài khoản</b>Không hoạt động → Từ chối.</div>
+          <div class="step"><b>2. Phải được Xem</b>Nếu Xem bị từ chối → Từ chối Sửa.</div>
+          <div class="step"><b>3. Ngoại lệ</b>Ngoại lệ Sửa còn hạn → dùng ngoại lệ.</div>
+          <div class="step"><b>4. Mặc định</b>Người thực hiện hoặc quản lý bộ phận → Cho phép.</div>
+          <div class="step"><b>5. Còn lại</b>Thành viên thường/người ngoài → Từ chối.</div>
+        </div>
+        <div class="callout warn"><b>Admin và qa_manager không có đường tắt ở quyền Sửa.</b> Họ phải là người thực hiện, quản lý bộ phận thực hiện hoặc có ngoại lệ Cho phép hợp lệ.</div>
+        <h3>Xác định người thực hiện</h3>
+        <ol>
+          <li>Ưu tiên <code>vmp_plan_items.owner_id</code>.</li>
+          <li>Nếu dữ liệu lịch sử chưa có <code>owner_id</code>, nối qua <code>vmp_performers.user_id</code>.</li>
+          <li>Ma trận phân công loại × line là lớp kế thừa về trách nhiệm; ngoại lệ mới luôn lưu bằng <code>user_id</code>.</li>
+        </ol>
+        <div class="callout bad">Tên người chưa liên kết tài khoản không nhận quyền thật. Web phải cảnh báo, không được đoán tài khoản từ chuỗi tên.</div>
+      </section>
+
+      <section class="section" id="quan-tri">
+        <h2>6. Ai được quản trị ngoại lệ?</h2>
+        <ul>
+          <li><b>Admin:</b> quản trị mọi hạng mục.</li>
+          <li><b>Quản lý bộ phận:</b> chỉ quản trị hạng mục có bộ phận mình trong danh sách bộ phận thực hiện.</li>
+          <li><b>Phụ trách QA:</b> không tự có quyền quản trị; phải đồng thời là quản lý QA và QA phải thực hiện hạng mục.</li>
+          <li><b>Người dùng thường:</b> không được quản trị ngoại lệ.</li>
+        </ul>
+        <p>Người quản trị cũng không thể cấp Cho phép cho người ngoài danh sách người thực hiện/bộ phận thực hiện. Mọi thay đổi đi qua RPC kiểm tra <code>auth.uid()</code>; trình duyệt không ghi thẳng bảng.</p>
+      </section>
+
+      <section class="section" id="giao-dien">
+        <h2>7. Bảng hiển thị trên web</h2>
+        <p>Mở rộng khối “Từng người” của trang Phân quyền thành “Người & hạng mục”, gồm bốn chế độ. Không tạo thêm nhiều bảng nói trùng một vấn đề.</p>
+        <h3>7.1 Theo hạng mục — màn mặc định</h3>
+        <ul>
+          <li>Tìm theo mã hoặc tên; lọc bộ phận, loại thẩm định và line.</li>
+          <li>Hiển thị người thực hiện, bộ phận thực hiện và cảnh báo liên kết tài khoản.</li>
+          <li>Hiển thị tóm tắt luật của Admin, QA, quản lý và người thực hiện.</li>
+          <li>Danh sách gồm người đủ điều kiện và người có ngoại lệ cần xử lý.</li>
+          <li>Mỗi dòng có quyền mặc định, ngoại lệ Xem/Sửa, ngày hết hạn và quyền dự kiến cuối cùng.</li>
+          <li>Mỗi kết quả có lời giải thích: “Xem vì thuộc XSX”, “Sửa vì là quản lý XSX”, “Từ chối đến 30/09/2026”…</li>
+        </ul>
+        <h3>7.2 Theo người</h3>
+        <p>Chọn một tài khoản để xem toàn bộ hạng mục họ được Xem/Sửa, phân biệt quyền mặc định và ngoại lệ. Dùng khi điều chuyển nhân sự hoặc kiểm tra quyền quá rộng/quá hẹp.</p>
+        <h3>7.3 Sắp hết hạn</h3>
+        <p>Lọc quyền hết hạn trong 7 ngày, 30 ngày và đã hết hạn; hiển thị người, hạng mục, quyền, bộ phận, ngày hết hạn và người cấp.</p>
+        <h3>7.4 Nhật ký</h3>
+        <p>Lọc theo hạng mục, người nhận quyền, người thay đổi và khoảng thời gian; hiển thị quyền cũ/mới cùng lý do.</p>
+        <h3>7.5 Chỉnh sửa</h3>
+        <ul>
+          <li>Xem và Sửa đều chọn Kế thừa/Cho phép/Từ chối.</li>
+          <li>Không cho tạo tổ hợp Từ chối Xem + Cho phép Sửa.</li>
+          <li>Thay đổi nằm ở bản nháp cục bộ, có Hoàn tác và xác nhận trước khi lưu.</li>
+          <li>Một lý do chung là bắt buộc; ngày hết hạn đặt theo từng ngoại lệ.</li>
+          <li>Tài khoản chỉ xem thấy giải thích nhưng điều khiển bị khoá.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="luong-du-lieu">
+        <h2>8. Luồng dữ liệu và cách lưu</h2>
+        <div class="steps">
+          <div class="step"><b>1. Chọn hạng mục</b>Web gửi mã và bộ lọc.</div>
+          <div class="step"><b>2. Database đọc</b>Trả người đủ điều kiện và quyền dự kiến.</div>
+          <div class="step"><b>3. Người dùng sửa</b>Web giữ thay đổi cục bộ.</div>
+          <div class="step"><b>4. RPC kiểm tra</b>Phạm vi, mâu thuẫn, phiên bản, lý do.</div>
+          <div class="step"><b>5. Ghi nguyên tử</b>Lưu tất cả + audit, hoặc không lưu gì.</div>
+        </div>
+        <p>Một lần bấm Lưu là một transaction. Nếu một dòng sai, không dòng nào được ghi; RPC trả đúng dòng và lý do để web giữ bản nháp và đánh dấu lỗi.</p>
+        <p>Các RPC đọc phải phân trang/lọc phía server. Không tải toàn bộ ma trận khoảng 448 hạng mục × mọi tài khoản trong một lần.</p>
+        <h3>Các khả năng server cần cung cấp</h3>
+        <ul>
+          <li>Tính quyền một tài khoản × một hạng mục, kèm lý do.</li>
+          <li>Đọc danh sách/chi tiết hạng mục và người đủ điều kiện.</li>
+          <li>Đọc quyền theo người, quyền sắp hết hạn và nhật ký.</li>
+          <li>Lưu một lô ngoại lệ trong một transaction.</li>
+          <li>Kiểm tra tiền điều kiện trước khi áp dụng.</li>
+          <li>Bật/tắt chế độ dự thảo/áp dụng bằng quyền Admin và lý do bắt buộc.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="du-thao">
+        <h2>9. Dự thảo và áp dụng chính thức</h2>
+        <table>
+          <thead><tr><th>Nội dung</th><th>Dự thảo (<code>preview</code>)</th><th>Áp dụng (<code>enforced</code>)</th></tr></thead>
+          <tbody>
+            <tr><td>Lưu ngoại lệ</td><td class="yes">Có</td><td class="yes">Có</td></tr>
+            <tr><td>Xem quyền dự kiến</td><td class="yes">Có</td><td class="yes">Có</td></tr>
+            <tr><td>Ghi nhật ký</td><td class="yes">Có</td><td class="yes">Có</td></tr>
+            <tr><td>RLS chặn quyền Xem</td><td class="no">Chưa</td><td class="yes">Có</td></tr>
+            <tr><td>RPC chặn quyền Sửa</td><td class="no">Chưa</td><td class="yes">Có</td></tr>
+            <tr><td>Ai được chuyển chế độ?</td><td colspan="2">Chỉ Admin, có lý do và nhật ký</td></tr>
+          </tbody>
+        </table>
+        <h3>Kiểm tra trước khi bật áp dụng</h3>
+        <ul>
+          <li>Hạng mục hoạt động phải có bộ phận thực hiện.</li>
+          <li>Không có ngoại lệ Cho phép cho người ngoài phạm vi.</li>
+          <li>Không có tổ hợp Xem/Sửa mâu thuẫn.</li>
+          <li>Tài khoản tham chiếu phải tồn tại và hoạt động.</li>
+          <li>Người thực hiện chưa liên kết tài khoản phải được liệt kê thành cảnh báo để Admin xác nhận.</li>
+        </ul>
+        <div class="callout good">Admin có thể đưa hệ thống về Dự thảo khi phát hiện cấu hình sai. Dữ liệu ngoại lệ và nhật ký vẫn được giữ nguyên. n8n/service role tiếp tục hoạt động ở cả hai chế độ.</div>
+      </section>
+
+      <section class="section" id="an-toan">
+        <h2>10. Xử lý lỗi và bảo mật</h2>
+        <table>
+          <thead><tr><th>Tình huống</th><th>Cách xử lý bắt buộc</th></tr></thead>
+          <tbody>
+            <tr><td>Thiếu quyền</td><td>Nêu rõ thiếu quyền Xem/Sửa nào và vì sao.</td></tr>
+            <tr><td>Người nhận ngoài phạm vi</td><td>Không ghi; nêu các bộ phận/người thực hiện hợp lệ.</td></tr>
+            <tr><td>Phiên hết hạn</td><td>Đưa về luồng đăng nhập lại, không báo thành lỗi dữ liệu.</td></tr>
+            <tr><td>Hai người sửa cùng lúc</td><td>Từ chối ghi đè bản mới hơn; tải lại và giữ nội dung vừa nhập khi có thể.</td></tr>
+            <tr><td>Quyền hết hạn</td><td>Không dùng để tính quyền; vẫn giữ trong nhật ký và danh sách hết hạn.</td></tr>
+            <tr><td>Gọi RPC trực tiếp</td><td>Server kiểm lại <code>auth.uid()</code>, vai và phạm vi; không tin giao diện.</td></tr>
+          </tbody>
+        </table>
+        <ul>
+          <li>Mọi RPC <code>SECURITY DEFINER</code> đặt <code>search_path</code> an toàn.</li>
+          <li>Thu quyền của <code>public</code> và <code>anon</code>; chỉ cấp đúng vai cần thiết.</li>
+          <li>Trình duyệt không được ghi thẳng bảng ngoại lệ hoặc cấu hình hệ thống.</li>
+          <li>Dùng index cho hạng mục × người, người dùng, hết hạn và nhật ký.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="kiem-thu">
+        <h2>11. Kiểm thử bắt buộc</h2>
+        <h3>Database và bảo mật</h3>
+        <ul class="checklist">
+          <li>Admin và phụ trách QA xem toàn bộ nhưng không tự sửa toàn bộ.</li>
+          <li>Người thực hiện xem/sửa đúng hạng mục.</li>
+          <li>Thành viên bộ phận thực hiện xem nhưng không mặc định sửa.</li>
+          <li>Quản lý bộ phận xem/sửa và quản trị đúng phạm vi.</li>
+          <li>Người ngoài phạm vi không nhận được ngoại lệ Cho phép.</li>
+          <li>Từ chối Xem kéo theo Từ chối Sửa.</li>
+          <li>Ngoại lệ hết hạn không còn hiệu lực.</li>
+          <li><code>anon</code> và người thường không gọi được RPC quản trị.</li>
+          <li>Dự thảo không thay đổi RLS/RPC nghiệp vụ hiện tại.</li>
+          <li>Áp dụng chặn đúng cả truy cập trực tiếp và RPC.</li>
+          <li><code>service_role</code> tiếp tục chạy tác vụ hệ thống.</li>
+        </ul>
+        <h3>Giao diện</h3>
+        <ul class="checklist">
+          <li>Tìm, lọc và chọn hạng mục bằng dữ liệu thật.</li>
+          <li>Hiển thị đúng quyền mặc định, ngoại lệ và lời giải thích.</li>
+          <li>Lưu/Hoàn tác Xem và Sửa độc lập.</li>
+          <li>Bắt buộc lý do; ngày hết hạn hoạt động đúng.</li>
+          <li>Lỗi transaction giữ bản nháp và đánh dấu đúng dòng.</li>
+          <li>Theo người, Sắp hết hạn và Nhật ký trả đúng dữ liệu.</li>
+          <li>Banner Dự thảo luôn hiện khi chưa áp dụng.</li>
+          <li>Tài khoản chỉ xem không thể thao tác bằng UI hoặc RPC trực tiếp.</li>
+        </ul>
+        <h3>Hồi quy và triển khai</h3>
+        <ul class="checklist">
+          <li>TypeScript, Vite build và e2e phân quyền đều đạt.</li>
+          <li>Thêm e2e cho quyền từng hạng mục và chế độ dự thảo.</li>
+          <li>Kiểm tra với Supabase thật mà không đổi quyền đang chạy.</li>
+          <li>Sau khi push, URL online tải đúng bản mới, không lỗi console.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="hoan-tat">
+        <h2>12. Tiêu chí hoàn tất bản online đầu tiên</h2>
+        <ol>
+          <li>Migration và RPC dự thảo được áp thành công, mặc định ở <code>preview</code>.</li>
+          <li>Web chọn được từng hạng mục và hiển thị đúng quyền của Admin, QA, quản lý, người thực hiện và thành viên bộ phận.</li>
+          <li>Người có thẩm quyền lưu được cấu hình dự thảo có lý do, ngày hết hạn và nhật ký.</li>
+          <li>Không thể cấp quyền ngoài phạm vi hoặc tạo quyền Xem/Sửa mâu thuẫn.</li>
+          <li>Không thay đổi quyền thật khi hệ thống vẫn ở Dự thảo.</li>
+          <li>Build, kiểm tra kiểu, SQL security checks và e2e đều đạt.</li>
+          <li>Code được push lên <code>main</code>; trang online sẵn sàng cho buổi trao đổi liên bộ phận.</li>
+        </ol>
+      </section>
+
+      <section class="section" id="ngoai-pham-vi">
+        <h2>13. Ngoài phạm vi bản đầu</h2>
+        <ul>
+          <li>Không tự động bật chế độ áp dụng.</li>
+          <li>Không gửi email khi cấp quyền hoặc sắp hết hạn.</li>
+          <li>Không tạo nhóm tùy biến ngoài người, bộ phận và vai trò hiện có.</li>
+          <li>Không hỗ trợ một tài khoản quản lý nhiều bộ phận.</li>
+          <li>Không thay đổi quyền của n8n/service role.</li>
+          <li>Không xây dựng phê duyệt nhiều cấp; bản đầu dùng lý do bắt buộc và audit log.</li>
+        </ul>
+      </section>
+
+      <section class="section questions" id="nhan-xet">
+        <h2>Các điểm đề nghị từng bộ phận nhận xét</h2>
+        <p class="lead">Khi gửi tài liệu, đề nghị mỗi bộ phận trả lời trực tiếp các câu dưới đây. Đây là nơi quy tắc có khả năng cần sửa nhiều nhất.</p>
+        <div class="question"><b>1. Người thực hiện:</b> Danh sách người thực hiện trực tiếp của từng hạng mục đã đúng và đã có tài khoản chưa?</div>
+        <div class="question"><b>2. Bộ phận thực hiện:</b> Hạng mục nào đang thiếu hoặc ghi thừa bộ phận thực hiện?</div>
+        <div class="question"><b>3. Quản lý:</b> Ai là quản lý được phép sửa và cấp/thu hồi ngoại lệ trong bộ phận?</div>
+        <div class="question"><b>4. Quyền xem:</b> Thành viên bộ phận thực hiện mặc định được xem toàn bộ hạng mục của bộ phận có phù hợp không?</div>
+        <div class="question"><b>5. Quyền sửa:</b> Có trường hợp nào thành viên không trực tiếp thực hiện vẫn cần quyền sửa mặc định không?</div>
+        <div class="question"><b>6. QA:</b> QA cần xem toàn bộ để giám sát; các trường hợp QA cần sửa ngoài phạm vi thực hiện là những trường hợp nào?</div>
+        <div class="question"><b>7. Ngoại lệ:</b> Quyền tạm thời thường cần thời hạn bao lâu và ai chịu trách nhiệm thu hồi?</div>
+        <div class="question"><b>8. Áp dụng:</b> Bộ phận cần báo cáo/kiểm tra gì trước khi Admin bật quyền thật?</div>
+        <div class="callout info"><b>Cách phản hồi:</b> Ghi rõ mã hạng mục, tên bộ phận, tài khoản liên quan, quyền đề nghị và lý do. Không gửi mật khẩu hoặc thông tin đăng nhập.</div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">VMP Monitor · Tài liệu dự thảo phục vụ lấy ý kiến · Không chứa mật khẩu hoặc dữ liệu bí mật</footer>
+</body>
+</html>
