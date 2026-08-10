@@ -86,6 +86,10 @@ import type {
 } from "../lib/supabaseData.ts";
 import { Card, CardTitle, Tag, CauKetLuan, GiaiThich } from "../components/ui/Primitives.tsx";
 import type { Activity, AppUser } from "../types/domain.ts";
+import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
+import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
+import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
+import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
 
 /* ---------------------------------------------------------------------
  * Vai trò và các mức quyền SỬA
@@ -332,6 +336,7 @@ export default function PhanQuyenView(
   const [emailMoi, setEmailMoi] = useState({ email: "", ghiChu: "" });
   /** performer đang chờ nối tay với tài khoản → user_id đã chọn. */
   const [dangNoi, setDangNoi] = useState<Record<string, string>>({});
+  const [permissionPerson, setPermissionPerson] = useState<DirectoryPerson | null>(null);
 
   /* Bản nháp: KHOÁ Ô → giá trị mới. Các bảng dùng chung một map, phân
      biệt bằng tiền tố khoá. Một map thì "có thay đổi nào chưa lưu không"
@@ -1120,6 +1125,21 @@ export default function PhanQuyenView(
           Ma trận phân quyền &amp; trách nhiệm
         </CardTitle>
         <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />
+      </Card>
+
+      {/* Nguồn chuẩn mới: mọi chọn người ở lớp quyền theo hạng mục đều đi
+          qua person_id. Khối cũ bên dưới vẫn được giữ trong giai đoạn
+          preview để các bộ phận đối chiếu trước khi chuyển đổi hoàn toàn. */}
+      <Card variant="strong">
+        <CardTitle icon={Users}
+          sub="Một danh bạ chuẩn nối tên · tài khoản · bộ phận · phân loại · phạm vi · khu vực; quyền theo hạng mục đang ở lớp dự thảo cho tới khi Admin chủ động bật">
+          Danh bạ nhân sự &amp; quyền
+        </CardTitle>
+        <div className="ip-workspace">
+          <StaffDirectoryPanel canEdit={quyenSuaA} onSelect={setPermissionPerson} />
+          <AssignmentPanel person={permissionPerson} canEdit={quyenSuaA || suaPhanCongDuoc} />
+          <EffectiveRightsPanel person={permissionPerson} />
+        </div>
       </Card>
 
       {/* ============ 1 · AI ĐƯỢC PHÉP CÓ TÀI KHOẢN ============ */}
