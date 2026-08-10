@@ -15,12 +15,14 @@ const choices = [
     fullName: "Nguyễn Văn Trùng",
     email: "first@example.com",
     department: "qa",
+    employeeCode: null,
   },
   {
     personId: "person-second",
     fullName: "Nguyễn Văn Trùng",
     email: "second@example.com",
     department: "rd",
+    employeeCode: null,
   },
 ];
 
@@ -36,9 +38,9 @@ test("chỉ chấp nhận person_id có trong danh sách và giữ được ngư
 test("danh sách gán chỉ gồm người đang hoạt động và không gộp người trùng tên", async () => {
   const { buildActivePerformerChoices } = await loadSelection();
   const result = buildActivePerformerChoices([
-    { id: "person-first", performer_name: "Nguyễn Văn Trùng", email: "first@example.com", department: "qa", is_active: true },
-    { id: "person-second", performer_name: "Nguyễn Văn Trùng", email: "second@example.com", department: "rd", is_active: true },
-    { id: "person-inactive", performer_name: "Người đã nghỉ", email: null, department: null, is_active: false },
+    { id: "person-first", performer_name: "Nguyễn Văn Trùng", email: "first@example.com", department: "qa", employee_code: null, is_active: true },
+    { id: "person-second", performer_name: "Nguyễn Văn Trùng", email: "second@example.com", department: "rd", employee_code: null, is_active: true },
+    { id: "person-inactive", performer_name: "Người đã nghỉ", email: null, department: null, employee_code: null, is_active: false },
   ]);
 
   assert.deepEqual(result, choices);
@@ -88,10 +90,30 @@ test("chỉ suy ra ID từ tên legacy khi khớp duy nhất", async () => {
   assert.equal(
     resolveUniquePerformerIdByName("  Trần   Thị An ", [
       ...choices,
-      { personId: "person-an", fullName: "Trần Thị An", email: null, department: "qa" },
+      { personId: "person-an", fullName: "Trần Thị An", email: null, department: "qa", employeeCode: null },
     ]),
     "person-an",
   );
   assert.equal(resolveUniquePerformerIdByName("Nguyễn Văn Trùng", choices), null);
   assert.equal(resolveUniquePerformerIdByName("Người không có", choices), null);
+});
+
+test("nhãn lựa chọn luôn có hậu tố ID và thêm mã nhân viên khi có", async () => {
+  const { formatPerformerOptionLabel } = await loadSelection();
+  const common = {
+    fullName: "Nguyễn Văn Trùng",
+    email: "same@example.com",
+    department: "qa",
+  };
+
+  assert.equal(formatPerformerOptionLabel({
+    ...common,
+    personId: "11111111-1111-1111-1111-1111aaaa0001",
+    employeeCode: "NV-001",
+  }), "Nguyễn Văn Trùng · same@example.com · qa · Mã NV NV-001 · ID …aaaa0001");
+  assert.equal(formatPerformerOptionLabel({
+    ...common,
+    personId: "11111111-1111-1111-1111-1111bbbb0002",
+    employeeCode: null,
+  }), "Nguyễn Văn Trùng · same@example.com · qa · ID …bbbb0002");
 });

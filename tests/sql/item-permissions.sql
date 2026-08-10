@@ -104,6 +104,155 @@ begin
 end
 $test$;
 
+/* Import lỗi một dòng phải rollback cả các dòng đã tạo trước đó. */
+do $test$
+declare
+  v_admin uuid;
+  v_failed boolean := false;
+  v_factory constant uuid := '70000000-0000-0000-0000-000000000001';
+  v_area constant uuid := '80000000-0000-0000-0000-000000000001';
+  v_line constant uuid := '90000000-0000-0000-0000-000000000001';
+begin
+  select id into v_admin from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
+  insert into public.vmp_scope_factories(id, code, name, department_id)
+  values (v_factory, 'IMPORT-F', 'Import factory', 'xsx');
+  insert into public.vmp_scope_areas(id, code, name, factory_id)
+  values (v_area, 'IMPORT-A', 'Import area', v_factory);
+  insert into public.vmp_scope_lines(id, code, name, area_id)
+  values (v_line, 'IMPORT-L', 'Import line', v_area);
+  begin
+    perform public.rpc_import_item_permission_staff(
+      jsonb_build_array(
+        jsonb_build_object(
+          'row_number', 1, 'employee_code', 'E2E-IMPORT-ATOMIC-OK',
+          'full_name', 'E2E Import Atomic Hợp Lệ', 'department', 'xsx',
+          'access_class', 'view_only',
+          'scope_departments', jsonb_build_array('xsx'),
+          'scope_factory_ids', jsonb_build_array(v_factory),
+          'scope_area_ids', jsonb_build_array(v_area),
+          'scope_line_ids', jsonb_build_array(v_line)
+        ),
+        jsonb_build_object(
+          'row_number', 2, 'employee_code', 'E2E-IMPORT-ATOMIC-BAD',
+          'department', 'xsx', 'access_class', 'view_only',
+          'scope_departments', jsonb_build_array('xsx'),
+          'scope_factory_ids', jsonb_build_array(v_factory),
+          'scope_area_ids', jsonb_build_array(v_area),
+          'scope_line_ids', jsonb_build_array(v_line)
+        )
+      ),
+      'Kiểm import rollback toàn bộ'
+    );
+  exception when sqlstate 'VMP01' then
+    v_failed := sqlerrm like 'IMPORT_ROW_FAILED:%';
+  end;
+  if not v_failed or exists (
+    select 1 from public.vmp_performers
+    where employee_code in ('E2E-IMPORT-ATOMIC-OK', 'E2E-IMPORT-ATOMIC-BAD')
+  ) then
+    raise exception 'Import phải raise IMPORT_ROW_FAILED và rollback mọi dòng';
+  end if;
+  delete from public.vmp_scope_lines where id = v_line;
+  delete from public.vmp_scope_areas where id = v_area;
+  delete from public.vmp_scope_factories where id = v_factory;
+end
+$test$;
+
+/* Mã area/line trùng trong hai factory cùng department phải fail closed. */
+do $test$
+declare
+  v_admin uuid;
+  v_person uuid;
+  v_code text;
+  v_department text;
+  v_area_code text;
+  v_line_code text;
+  v_match record;
+  v_preview jsonb;
+  v_preflight jsonb;
+  v_factory_1 constant uuid := '40000000-0000-0000-0000-000000000001';
+  v_factory_2 constant uuid := '40000000-0000-0000-0000-000000000002';
+  v_area_1 constant uuid := '50000000-0000-0000-0000-000000000001';
+  v_area_2 constant uuid := '50000000-0000-0000-0000-000000000002';
+  v_line_1 constant uuid := '60000000-0000-0000-0000-000000000001';
+  v_line_2 constant uuid := '60000000-0000-0000-0000-000000000002';
+begin
+  select id into v_admin from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
+  select item.validation_code, object.department,
+         nullif(btrim(object.area), ''), nullif(btrim(object.line), '')
+  into v_code, v_department, v_area_code, v_line_code
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.is_active and nullif(btrim(object.area), '') is not null
+  order by (nullif(btrim(object.line), '') is not null) desc, item.validation_code
+  limit 1;
+  if v_code is null then raise exception 'Thiếu item có area để kiểm hierarchy'; end if;
+
+  update public.vmp_scope_factories set is_active = false;
+  insert into public.vmp_scope_factories(id, code, name, department_id)
+  values (v_factory_1, 'PATH-1', 'Path 1', v_department),
+         (v_factory_2, 'PATH-2', 'Path 2', v_department);
+  insert into public.vmp_scope_areas(id, code, name, factory_id)
+  values (v_area_1, v_area_code, 'Area path 1', v_factory_1),
+         (v_area_2, v_area_code, 'Area path 2', v_factory_2);
+  if v_line_code is not null then
+    insert into public.vmp_scope_lines(id, code, name, area_id)
+    values (v_line_1, v_line_code, 'Line path 1', v_area_1),
+           (v_line_2, v_line_code, 'Line path 2', v_area_2);
+  end if;
+  update public.vmp_scope_factories set is_active = false where id = v_factory_2;
+
+  insert into public.vmp_performers(
+    performer_name, department, access_class, scope_departments,
+    access_areas, scope_factory_ids, scope_area_ids, scope_line_ids,
+    is_active, updated_by
+  ) values (
+    'E2E Scope Path Person', v_department, 'view_only', array[v_department],
+    array[v_area_code], array[v_factory_1], array[v_area_1],
+    case when v_line_code is null then '{}'::uuid[] else array[v_line_1] end,
+    true, v_admin
+  ) returning id into v_person;
+
+  select * into v_match from public.vmp_item_scope_matches(v_person, v_code);
+  if not v_match.scope_match or not v_match.factory_match
+      or not v_match.area_match or not v_match.line_match then
+    raise exception 'Một canonical path duy nhất phải match đủ bốn tầng';
+  end if;
+  update public.vmp_scope_factories set is_active = true where id = v_factory_2;
+  select * into v_match from public.vmp_item_scope_matches(v_person, v_code);
+  if v_match.scope_match or v_match.factory_match
+      or v_match.area_match or v_match.line_match then
+    raise exception 'Hai path trùng code phải fail closed toàn bộ';
+  end if;
+
+  v_preview := public.rpc_preview_item_rights(v_person, v_code);
+  if not (v_preview->'rights'->0 ? 'factory_match')
+      or not (v_preview->'rights'->0 ? 'line_match') then
+    raise exception 'Preview phải trả factory_match và line_match: %', v_preview;
+  end if;
+  v_preflight := public.rpc_item_permission_preflight();
+  if not exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' = 'ITEM_SCOPE_HIERARCHY_AMBIGUOUS'
+      and error->>'record_id' = v_code
+  ) then
+    raise exception 'Preflight phải chặn item có hierarchy mơ hồ: %', v_preflight;
+  end if;
+  delete from public.vmp_performers where id = v_person;
+  delete from public.vmp_scope_lines where id in (v_line_1, v_line_2);
+  delete from public.vmp_scope_areas where id in (v_area_1, v_area_2);
+  delete from public.vmp_scope_factories where id in (v_factory_1, v_factory_2);
+end
+$test$;
+
 /* Danh mục chuẩn khởi tạo rỗng; chỉ quan hệ được nhập rõ ràng mới hợp lệ. */
 do $test$
 declare
@@ -111,10 +260,15 @@ declare
   v_catalog jsonb;
   v_factory_1 constant uuid := '10000000-0000-0000-0000-000000000001';
   v_factory_2 constant uuid := '10000000-0000-0000-0000-000000000002';
+  v_factory_3 constant uuid := '10000000-0000-0000-0000-000000000003';
   v_area_1 constant uuid := '20000000-0000-0000-0000-000000000001';
   v_area_2 constant uuid := '20000000-0000-0000-0000-000000000002';
+  v_area_3 constant uuid := '20000000-0000-0000-0000-000000000003';
+  v_area_4 constant uuid := '20000000-0000-0000-0000-000000000004';
   v_line_1 constant uuid := '30000000-0000-0000-0000-000000000001';
   v_line_2 constant uuid := '30000000-0000-0000-0000-000000000002';
+  v_line_3 constant uuid := '30000000-0000-0000-0000-000000000003';
+  v_line_4 constant uuid := '30000000-0000-0000-0000-000000000004';
 begin
   if exists (select 1 from public.vmp_scope_factories)
       or exists (select 1 from public.vmp_scope_areas)
@@ -125,15 +279,20 @@ begin
   insert into public.vmp_scope_factories(id, code, name, department_id)
   values
     (v_factory_1, 'X1', 'Xưởng 1', 'xsx'),
-    (v_factory_2, 'X2', 'Xưởng 2', 'qa');
+    (v_factory_2, 'X2', 'Xưởng 2', 'qa'),
+    (v_factory_3, 'X3', 'Xưởng 3', 'qc');
   insert into public.vmp_scope_areas(id, code, name, factory_id)
   values
     (v_area_1, 'C1', 'Khu vực C1', v_factory_1),
-    (v_area_2, 'C2', 'Khu vực C2', v_factory_2);
+    (v_area_2, 'C2', 'Khu vực C2', v_factory_2),
+    (v_area_3, 'QC-A', 'Khu vực QC', v_factory_3),
+    (v_area_4, 'A1', 'Khu vực A1', v_factory_1);
   insert into public.vmp_scope_lines(id, code, name, area_id)
   values
     (v_line_1, 'BFS', 'BFS', v_area_1),
-    (v_line_2, 'LQA', 'Line QA', v_area_2);
+    (v_line_2, 'LQA', 'Line QA', v_area_2),
+    (v_line_3, 'LQC', 'Line QC', v_area_3),
+    (v_line_4, 'LA1', 'Line A1', v_area_4);
 
   if not public.vmp_valid_permission_scope(
     array['xsx'], array[v_factory_1], array[v_area_1], array[v_line_1]
@@ -203,6 +362,7 @@ declare
   v_person_1 uuid;
   v_person_2 uuid;
   v_legacy_person uuid;
+  v_object_kind text;
   v_result jsonb;
   v_directory jsonb;
   v_preflight jsonb;
@@ -246,6 +406,20 @@ begin
     raise exception 'Không tạo được hồ sơ phạm vi liên kết: %', v_result;
   end if;
   v_person_1 := (v_result->>'person_id')::uuid;
+  if (select count(*) from public.audit_logs
+      where table_name = 'vmp_performers'
+        and record_id = v_person_1::text
+        and change_reason = 'Tạo hồ sơ phạm vi liên kết') <> 1
+      or not exists (
+        select 1 from public.audit_logs
+        where table_name = 'vmp_performers' and record_id = v_person_1::text
+          and change_reason = 'Tạo hồ sơ phạm vi liên kết'
+          and action::text = 'INSERT'
+          and (new_data->>'version')::integer = 1
+          and new_data->'access_areas' <> jsonb_build_array('*')
+      ) then
+    raise exception 'Upsert mới phải ghi đúng một audit trạng thái cuối, không wildcard';
+  end if;
 
   v_directory := public.rpc_item_permission_directory('E2E Person ID Trùng Tên');
   if not exists (
@@ -359,17 +533,46 @@ begin
   end if;
   v_legacy_person := (v_result->>'person_id')::uuid;
 
-  select item.validation_code, item.object_code, item.year
-  into v_code, v_object_code, v_year
+  select item.validation_code, item.object_code, item.year, source.object_kind
+  into v_code, v_object_code, v_year, v_object_kind
   from public.vmp_plan_items item
+  join public.vmp_source_objects source on source.object_code = item.object_code
   where item.is_active
-    and exists (
-      select 1 from public.vmp_source_objects source
-      where source.object_code = item.object_code
-    )
   order by item.validation_code limit 1;
   if v_code is null then
     raise exception 'Thiếu hạng mục có source object để kiểm person_id';
+  end if;
+
+  v_result := public.rpc_upsert_source_object(
+    v_object_kind, v_object_code,
+    jsonb_build_object('owner_name', 'Tên nhập tay bị cấm')
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'PERSON_ID_REQUIRED' then
+    raise exception 'Source upsert phải từ chối tên người không có ID: %', v_result;
+  end if;
+  v_result := public.rpc_upsert_source_object(
+    v_object_kind, v_object_code,
+    jsonb_build_object(
+      'owner_person_id', v_person_2,
+      'support_person_id', v_person_2
+    )
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or exists (
+        select 1 from public.vmp_plan_items
+        where object_code = v_object_code and is_active and (
+          owner_person_id is distinct from v_person_2
+          or support_person_id is distinct from v_person_2
+          or owner_name is distinct from (
+            select performer_name from public.vmp_performers where id = v_person_2
+          )
+          or secondary_owner is distinct from (
+            select performer_name from public.vmp_performers where id = v_person_2
+          )
+        )
+      ) then
+    raise exception 'Source person_id phải lan xuống mọi plan item active: %', v_result;
   end if;
 
   v_result := public.rpc_set_item_performer_by_id(
@@ -417,13 +620,13 @@ begin
     raise exception 'person_id inactive phải bị từ chối và không đổi phân công: %', v_result;
   end if;
 
-  v_preflight := public.rpc_item_permission_preflight();
-  if not exists (
-    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
-    where error->>'code' = 'INCOMPLETE_SCOPE_HIERARCHY'
-      and (error->>'record_id')::uuid = v_legacy_person
-  ) then
-    raise exception 'Preflight phải chặn hồ sơ legacy thiếu hierarchy: %', v_preflight;
+  v_result := public.rpc_upsert_item_permission_staff(
+    v_legacy_person, jsonb_build_object('full_name', 'Không được ghi thiếu version'),
+    'Legacy update thiếu version'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'VERSION_REQUIRED' then
+    raise exception 'RPC ba tham số chỉ được create, update phải yêu cầu version: %', v_result;
   end if;
 
   update public.vmp_performers
@@ -698,71 +901,6 @@ begin
       v_result;
   end if;
 
-  v_result := public.rpc_import_item_permission_staff(
-    jsonb_build_array(jsonb_build_object(
-      'row_number', 405,
-      'full_name', 'E2E Import Department Sai',
-      'department', 'khong-ton-tai',
-      'access_class', 'view_only',
-      'scope_departments', jsonb_build_array('*'),
-      'access_areas', jsonb_build_array('*')
-    )),
-    'Kiểm import department typo'
-  );
-  if coalesce((v_result->>'ok')::boolean, true) is not false
-      or (v_result->>'imported')::integer <> 0
-      or jsonb_array_length(v_result->'errors') <> 1 then
-    raise exception 'Importer phải từ chối department ngoài catalog: %', v_result;
-  end if;
-
-  v_result := public.rpc_import_item_permission_staff(
-    jsonb_build_array(jsonb_build_object(
-      'row_number', 404,
-      'full_name', 'E2E Import Scope Sai',
-      'department', 'xsx',
-      'access_class', 'view_only',
-      'scope_departments', jsonb_build_array('xsx-typo'),
-      'access_areas', jsonb_build_array(v_area)
-    )),
-    'Kiểm import typo'
-  );
-  if coalesce((v_result->>'ok')::boolean, true) is not false
-      or (v_result->>'imported')::integer <> 0
-      or jsonb_array_length(v_result->'errors') <> 1 then
-    raise exception 'Importer phải báo đúng dòng scope sai: %', v_result;
-  end if;
-
-  v_result := public.rpc_import_item_permission_staff(
-    jsonb_build_array(
-      jsonb_build_object(
-        'row_number', 501,
-        'full_name', 'E2E Import Atomic Dòng Hợp Lệ',
-        'department', 'xsx',
-        'access_class', 'view_only',
-        'scope_departments', jsonb_build_array('xsx'),
-        'access_areas', jsonb_build_array(v_area)
-      ),
-      jsonb_build_object(
-        'row_number', 502,
-        'full_name', 'E2E Import Atomic Dòng Lỗi',
-        'department', 'xsx',
-        'access_class', 'view_only',
-        'scope_departments', jsonb_build_array('xsx-typo'),
-        'access_areas', jsonb_build_array(v_area)
-      )
-    ),
-    'Kiểm batch atomic'
-  );
-  if coalesce((v_result->>'ok')::boolean, true) is not false
-      or (v_result->>'imported')::integer <> 0
-      or exists (
-        select 1 from public.vmp_performers
-        where normalized_full_name = public.vmp_normalize_person_name(
-          'E2E Import Atomic Dòng Hợp Lệ'
-        )
-      ) then
-    raise exception 'Batch có dòng lỗi phải rollback cả dòng hợp lệ: %', v_result;
-  end if;
 
   update public.profiles
   set role = 'viewer', department = 'qc', is_active = true
@@ -1582,6 +1720,9 @@ declare
   v_result jsonb;
   v_directory jsonb;
   v_valid_area text;
+  v_import_factory constant uuid := '71000000-0000-0000-0000-000000000001';
+  v_import_area constant uuid := '81000000-0000-0000-0000-000000000001';
+  v_import_line constant uuid := '91000000-0000-0000-0000-000000000001';
 begin
   select id into v_admin
   from public.profiles
@@ -1682,6 +1823,13 @@ begin
     raise exception 'Mã nhân viên trùng phải bị từ chối rõ ràng: %', v_result;
   end if;
 
+  insert into public.vmp_scope_factories(id, code, name, department_id)
+  values (v_import_factory, 'IMPORT-QC-F', 'Import QC factory', 'qc');
+  insert into public.vmp_scope_areas(id, code, name, factory_id)
+  values (v_import_area, v_valid_area, 'Import QC area', v_import_factory);
+  insert into public.vmp_scope_lines(id, code, name, area_id)
+  values (v_import_line, 'IMPORT-QC-L', 'Import QC line', v_import_area);
+
   v_result := public.rpc_import_item_permission_staff(
     jsonb_build_array(jsonb_build_object(
       'row_number', 8,
@@ -1689,7 +1837,9 @@ begin
       'department', 'qc',
       'access_class', 'view_only',
       'scope_departments', jsonb_build_array('qc'),
-      'access_areas', jsonb_build_array(v_valid_area)
+      'scope_factory_ids', jsonb_build_array(v_import_factory),
+      'scope_area_ids', jsonb_build_array(v_import_area),
+      'scope_line_ids', jsonb_build_array(v_import_line)
     )),
     'Nhập thử file Excel'
   );

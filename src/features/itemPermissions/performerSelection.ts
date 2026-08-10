@@ -3,6 +3,7 @@ export interface PerformerChoice {
   fullName: string;
   email: string | null;
   department: string | null;
+  employeeCode: string | null;
 }
 
 export interface PerformerSourceRow {
@@ -10,6 +11,7 @@ export interface PerformerSourceRow {
   performer_name: string;
   email: string | null;
   department: string | null;
+  employee_code?: string | null;
   is_active: boolean;
 }
 
@@ -38,7 +40,20 @@ export function buildActivePerformerChoices(
       fullName: person.performer_name,
       email: person.email,
       department: person.department,
+      employeeCode: person.employee_code ?? null,
     }));
+}
+
+/** Human-readable identity that stays distinct even when profile fields match. */
+export function formatPerformerOptionLabel(person: PerformerChoice): string {
+  const parts = [
+    person.fullName,
+    person.email || "chưa có email",
+    person.department || "chưa có bộ phận",
+  ];
+  if (person.employeeCode?.trim()) parts.push(`Mã NV ${person.employeeCode.trim()}`);
+  parts.push(`ID …${person.personId.slice(-8)}`);
+  return parts.join(" · ");
 }
 
 /** Resolve only by stable ID. Names are deliberately never accepted as keys. */

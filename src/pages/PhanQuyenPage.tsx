@@ -348,6 +348,7 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false }: {
   isAdmin?: boolean;
 }) {
   const [person, setPerson] = useState<DirectoryPerson | null>(null);
+  const [rightsRevision, setRightsRevision] = useState(0);
   const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
     const raw = (activity._raw || {}) as Record<string, unknown>;
     return [activity.area, raw.area, raw.line]
@@ -364,8 +365,9 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false }: {
         </CardTitle>
         <div className="ip-workspace">
           <StaffDirectoryPanel canEdit={isAdmin} validAreas={validAreas} onSelect={setPerson} />
-          <AssignmentPanel person={person} canEdit={isAdmin} />
-          <EffectiveRightsPanel person={person} />
+          <AssignmentPanel person={person} canEdit={isAdmin}
+            onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
+          <EffectiveRightsPanel person={person} revision={rightsRevision} />
         </div>
       </Card>
     </div>
