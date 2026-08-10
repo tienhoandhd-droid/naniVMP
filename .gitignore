@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
+.worktrees/
 
 # Local env files (chứa cấu hình kết nối — KHÔNG commit)
 .env
