@@ -1,9 +1,11 @@
 import { DEPTS } from "../../constants/vmp.ts";
+import { resolveScopeCodes, type ScopeCatalog } from "./scopeHierarchy.ts";
 import type { AccessClass, PermissionPersonPatch } from "./types.ts";
 
 export const PERMISSION_HEADERS = [
   "STT", "Bộ phận", "Mã nhân viên", "Họ và tên", "Phân loại",
-  "Phạm vi", "Khu vực phân quyền", "Email nhận tài khoản", "Xác nhận gửi email",
+  "Phạm vi bộ phận", "Phạm vi xưởng", "Phạm vi khu vực", "Phạm vi line",
+  "Email nhận tài khoản", "Xác nhận gửi email",
 ] as const;
 
 const MAX_PERMISSION_FILE_BYTES = 5 * 1024 * 1024;
@@ -50,19 +52,22 @@ export interface PermissionWorkbookResult {
   errors: PermissionWorkbookError[];
 }
 
+export interface PermissionWorkbookOptions {
+  scopeCatalog: ScopeCatalog;
+}
+
 export function parsePermissionRows(
   matrix: unknown[][],
-  options: { validAreas?: readonly string[] } = {},
+  options: PermissionWorkbookOptions,
 ): PermissionWorkbookResult {
   const errors: PermissionWorkbookError[] = [];
   const rows: ParsedPermissionRow[] = [];
   const headers = (matrix[0] || []).map(normalize);
   if (headers.length !== PERMISSION_HEADERS.length
       || PERMISSION_HEADERS.some((header, index) => headers[index] !== header)) {
-    return { rows: [], errors: [{ rowNumber: 1, message: "File phải giữ đúng chín tiêu đề và đúng thứ tự của mẫu chuẩn" }] };
+    return { rows: [], errors: [{ rowNumber: 1, message: "File phải giữ đúng 11 tiêu đề và đúng thứ tự của mẫu chuẩn" }] };
   }
 
-  const validAreas = new Set((options.validAreas || []).map(key));
   for (let index = 1; index < matrix.length; index += 1) {
     const source = matrix[index] || [];
     // File mẫu điền sẵn STT cho 500 dòng; STT một mình vẫn là dòng trống.
@@ -70,20 +75,28 @@ export function parsePermissionRows(
     const rowNumber = index + 1;
     const department = DEPARTMENT_BY_LABEL.get(key(source[1]));
     const accessClass = ACCESS_CLASS_BY_LABEL[key(source[4])];
-    const scope = split(source[5]).map((item) => item === "*" ? "*" : DEPARTMENT_BY_LABEL.get(key(item)) || "");
-    const areas = split(source[6]);
+    const scopeCodes = {
+      departments: split(source[5]),
+      factories: split(source[6]),
+      areas: split(source[7]),
+      lines: split(source[8]),
+    };
     const rowErrors: string[] = [];
 
     if (!department) rowErrors.push(`Bộ phận không hợp lệ: ${normalize(source[1]) || "(trống)"}`);
     if (!normalize(source[3])) rowErrors.push("Họ và tên không được để trống");
     if (!accessClass) rowErrors.push(`Phân loại không hợp lệ: ${normalize(source[4]) || "(trống)"}`);
-    if (!scope.length || scope.some((item) => !item)) rowErrors.push("Phạm vi không hợp lệ; dùng mã bộ phận và dấu chấm phẩy");
-    if (!areas.length) rowErrors.push("Khu vực phân quyền không được để trống");
-    const unknownAreas = areas.filter((area) => area !== "*" && validAreas.size > 0 && !validAreas.has(key(area)));
-    if (unknownAreas.length) rowErrors.push(`Khu vực không hợp lệ: ${unknownAreas.join(", ")}`);
-    const email = normalize(source[7]).toLowerCase();
+    for (const [scopeKey, label] of [
+      ["departments", "bộ phận"], ["factories", "xưởng"],
+      ["areas", "khu vực"], ["lines", "line"],
+    ] as const) {
+      if (!scopeCodes[scopeKey].length) rowErrors.push(`Phạm vi ${label} không được để trống`);
+    }
+    const resolved = resolveScopeCodes(options.scopeCatalog, scopeCodes);
+    if (!resolved.ok) rowErrors.push(resolved.error);
+    const email = normalize(source[9]).toLowerCase();
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) rowErrors.push(`Email không hợp lệ: ${email}`);
-    const confirmation = key(source[8]);
+    const confirmation = key(source[10]);
     if (confirmation && !["có", "co", "không", "khong"].includes(confirmation)) {
       rowErrors.push("Xác nhận gửi email chỉ nhận Có hoặc Không");
     }
@@ -98,8 +111,10 @@ export function parsePermissionRows(
       full_name: normalize(source[3]),
       department: department!,
       access_class: accessClass!,
-      scope_departments: scope,
-      access_areas: areas,
+      scope_departments: resolved.ok ? resolved.selection.departments : [],
+      scope_factory_ids: resolved.ok ? resolved.selection.factories : [],
+      scope_area_ids: resolved.ok ? resolved.selection.areas : [],
+      scope_line_ids: resolved.ok ? resolved.selection.lines : [],
       email: email || null,
       email_sent_confirmed: ["có", "co"].includes(confirmation),
       is_active: true,
@@ -110,7 +125,7 @@ export function parsePermissionRows(
 
 export async function parsePermissionWorkbook(
   file: File,
-  options: { validAreas?: readonly string[] } = {},
+  options: PermissionWorkbookOptions,
 ): Promise<PermissionWorkbookResult> {
   if (file.size > MAX_PERMISSION_FILE_BYTES) {
     return { rows: [], errors: [{ rowNumber: 1, message: "File Excel không được lớn hơn 5 MiB" }] };

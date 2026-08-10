@@ -17,7 +17,11 @@ const completePerson = {
   account_status: "linked",
   access_class: "qa_progress_editor",
   scope_departments: ["rd", "qa"],
+  scope_factory_ids: ["10000000-0000-0000-0000-000000000001"],
+  scope_area_ids: ["20000000-0000-0000-0000-000000000001"],
+  scope_line_ids: ["30000000-0000-0000-0000-000000000001"],
   access_areas: ["A1", "A2"],
+  version: 1,
   email_sent_confirmed: true,
   is_active: true,
   match_status: "unique",
@@ -32,6 +36,9 @@ const legacyPerson = {
   account_status: "unlinked",
   access_class: null,
   scope_departments: null,
+  scope_factory_ids: null,
+  scope_area_ids: null,
+  scope_line_ids: null,
   access_areas: null,
 };
 delete legacyPerson.department;
@@ -87,6 +94,22 @@ const cors = {
   "access-control-allow-headers": "*",
   "access-control-allow-methods": "GET,POST,OPTIONS",
 };
+const scopeCatalog = {
+  ok: true,
+  departments: [
+    { id: "rd", code: "RD", label: "Nghiên cứu phát triển" },
+    { id: "qa", code: "QA", label: "Đảm bảo chất lượng" },
+  ],
+  factories: [
+    { id: "10000000-0000-0000-0000-000000000001", code: "XRD", label: "Xưởng RD", department_id: "rd" },
+  ],
+  areas: [
+    { id: "20000000-0000-0000-0000-000000000001", code: "A1", label: "Khu vực A1", factory_id: "10000000-0000-0000-0000-000000000001" },
+  ],
+  lines: [
+    { id: "30000000-0000-0000-0000-000000000001", code: "L1", label: "Line 1", area_id: "20000000-0000-0000-0000-000000000001" },
+  ],
+};
 const answer = (request, body) => request.method() === "OPTIONS"
   ? request.respond({ status: 204, headers: cors, body: "" })
   : request.respond({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(body) });
@@ -98,6 +121,9 @@ page.on("request", (request) => {
       performerProfileSelects.push(new URL(url).searchParams.get("select"));
     }
     return answer(request, { access_class: "equipment_manager" });
+  }
+  if (/\/rpc\/rpc_item_permission_scope_catalog/.test(url)) {
+    return answer(request, scopeCatalog);
   }
   if (/\/rpc\/rpc_item_permission_directory/.test(url)) {
     const body = JSON.parse(request.postData() || "{}");
@@ -242,15 +268,15 @@ try {
     department: document.querySelector('[aria-label="Bộ phận trong danh bạ"]')?.value,
     email: document.querySelector('[aria-label="Email trong danh bạ"]')?.value,
     accessClass: document.querySelector('[aria-label="Phân loại quyền"]')?.value,
-    scope: document.querySelector('[aria-label="Phạm vi phân quyền"]')?.value,
-    areas: document.querySelector('[aria-label="Khu vực phân quyền"]')?.value,
+    departments: document.querySelector('[aria-label="Phạm vi bộ phận"]')?.textContent?.trim(),
+    factoriesDisabled: document.querySelector('[aria-label="Phạm vi xưởng"]')?.disabled,
   }));
   assert.deepEqual(form, {
     department: "",
     email: "legacy@vmp.local",
     accessClass: "view_only",
-    scope: "",
-    areas: "",
+    departments: "— chọn —",
+    factoriesDisabled: true,
   });
   assert.match(await page.$eval('[aria-label="Trạng thái tài khoản"]', (node) => node.textContent || ""), /Hồ sơ chưa đủ/);
 
@@ -266,9 +292,23 @@ try {
   await search.click({ clickCount: 3 });
   await search.type("Nguyễn Văn Trùng");
   await page.select('[aria-label="Bộ phận trong danh bạ"]', "rd");
-  await page.type('[aria-label="Phạm vi phân quyền"]', "rd");
-  await page.type('[aria-label="Khu vực phân quyền"]', "A1");
-  await page.click(".ip-form + button.la-chinh");
+  await page.$eval('[aria-label="Phạm vi bộ phận"]', (button) => button.click());
+  await page.waitForSelector('[role="option"][data-value="rd"]');
+  await page.$eval('[role="option"][data-value="rd"]', (button) => button.click());
+  await page.waitForFunction(() => !document.querySelector('[aria-label="Phạm vi xưởng"]')?.disabled);
+  await page.$eval('[aria-label="Phạm vi xưởng"]', (button) => button.click());
+  await page.waitForSelector('[role="option"][data-value="10000000-0000-0000-0000-000000000001"]');
+  await page.$eval('[role="option"][data-value="10000000-0000-0000-0000-000000000001"]', (button) => button.click());
+  await page.waitForFunction(() => !document.querySelector('[aria-label="Phạm vi khu vực"]')?.disabled);
+  await page.$eval('[aria-label="Phạm vi khu vực"]', (button) => button.click());
+  await page.waitForSelector('[role="option"][data-value="20000000-0000-0000-0000-000000000001"]');
+  await page.$eval('[role="option"][data-value="20000000-0000-0000-0000-000000000001"]', (button) => button.click());
+  await page.waitForFunction(() => !document.querySelector('[aria-label="Phạm vi line"]')?.disabled);
+  await page.$eval('[aria-label="Phạm vi line"]', (button) => button.click());
+  await page.waitForSelector('[role="option"][data-value="30000000-0000-0000-0000-000000000001"]');
+  await page.$eval('[role="option"][data-value="30000000-0000-0000-0000-000000000001"]', (button) => button.click());
+  await page.waitForFunction(() => !document.querySelector('[data-testid="save-permission-person"]')?.disabled);
+  await page.$eval('[data-testid="save-permission-person"]', (button) => button.click());
   await page.waitForFunction(
     (personId) => document.body.innerText.includes(`Khóa người: ${personId}`),
     {},

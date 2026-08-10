@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Download, Search, Save, Upload } from "lucide-rea
 import { DEPTS } from "../../constants/vmp.ts";
 import {
   fetchPermissionPreflight,
+  fetchScopeCatalog,
   importPermissionRows,
   savePermissionPerson,
   searchPermissionDirectory,
@@ -19,6 +20,13 @@ import {
   type ParsedPermissionRow,
   type PermissionWorkbookError,
 } from "./permissionWorkbook.ts";
+import LinkedMultiSelect from "./LinkedMultiSelect.tsx";
+import {
+  filterScopeCatalog,
+  pruneInvalidScope,
+  type ScopeCatalog,
+  type ScopeSelection,
+} from "./scopeHierarchy.ts";
 
 interface StaffDirectoryPanelProps {
   canEdit: boolean;
@@ -32,25 +40,27 @@ const emptyForm = {
   department: "",
   email: "",
   accessClass: "view_only" as AccessClass,
-  scope: "",
-  areas: "",
+  scope: { departments: [], factories: [], areas: [], lines: [] } as ScopeSelection,
   emailSent: false,
 };
 
-function splitList(value: string): string[] {
-  return [...new Set(value.split(/[;,]/).map((item) => item.trim()).filter(Boolean))];
-}
+const emptyCatalog: ScopeCatalog = { departments: [], factories: [], areas: [], lines: [] };
 
 function departmentLabel(id: string | null): string {
   if (!id) return "chưa có bộ phận";
   return DEPTS.find((department) => department.id === id)?.short || id.toUpperCase();
 }
 
-export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect }: StaffDirectoryPanelProps) {
+export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirectoryPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DirectoryPerson[]>([]);
   const [selected, setSelected] = useState<DirectoryPerson | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [savedForm, setSavedForm] = useState(emptyForm);
+  const [catalog, setCatalog] = useState<ScopeCatalog>(emptyCatalog);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogReload, setCatalogReload] = useState(0);
   const [mode, setMode] = useState<"preview" | "enforced">("preview");
   const [blocking, setBlocking] = useState(0);
   const [warnings, setWarnings] = useState(0);
@@ -62,6 +72,21 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
   const [importReason, setImportReason] = useState("");
   const [importing, setImporting] = useState(false);
   const requestSequence = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    setCatalogLoading(true);
+    fetchScopeCatalog().then((nextCatalog) => {
+      if (!active) return;
+      setCatalog(nextCatalog);
+      setCatalogError("");
+    }).catch((error) => {
+      if (active) setCatalogError((error as Error).message);
+    }).finally(() => {
+      if (active) setCatalogLoading(false);
+    });
+    return () => { active = false; };
+  }, [catalogReload]);
 
   useEffect(() => {
     fetchPermissionPreflight().then((preflight) => {
@@ -102,16 +127,22 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
     setSelected(person);
     setQuery(person.full_name);
     setResults([]);
-    setForm({
+    const nextForm = {
       employeeCode: person.employee_code || "",
       fullName: person.full_name,
       department: person.department || "",
       email: person.email || "",
       accessClass: person.access_class || "view_only",
-      scope: person.scope_departments.join(";"),
-      areas: person.access_areas.join(";"),
+      scope: {
+        departments: person.scope_departments,
+        factories: person.scope_factory_ids,
+        areas: person.scope_area_ids,
+        lines: person.scope_line_ids,
+      },
       emailSent: person.email_sent_confirmed,
-    });
+    };
+    setForm(nextForm);
+    setSavedForm(nextForm);
     setMessage("");
     onSelect(person);
   };
@@ -127,17 +158,24 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
         department: form.department,
         email: form.email.trim() || null,
         access_class: form.accessClass,
-        scope_departments: splitList(form.scope),
-        access_areas: splitList(form.areas),
+        scope_departments: form.scope.departments,
+        scope_factory_ids: form.scope.factories,
+        scope_area_ids: form.scope.areas,
+        scope_line_ids: form.scope.lines,
         email_sent_confirmed: form.emailSent,
         is_active: true,
-      }, `Cập nhật danh bạ nhân sự & quyền cho ${form.fullName.trim()}`);
-      const refreshed = await searchPermissionDirectory(form.fullName.trim());
+      }, `Cập nhật danh bạ nhân sự & quyền cho ${form.fullName.trim()}`, selected?.version ?? null);
+      let refreshed: DirectoryPerson[];
+      try {
+        refreshed = await searchPermissionDirectory(form.fullName.trim());
+      } catch (error) {
+        setMessage(`Đã lưu hồ sơ nhưng chưa tải lại được: ${(error as Error).message}`);
+        return;
+      }
       const saved = findDirectoryPersonById(refreshed, savedResult.person_id);
       if (!saved) {
-        setSelected(null);
-        onSelect(null);
-        throw new Error(`Đã lưu nhưng chưa tải lại được hồ sơ ${savedResult.person_id}`);
+        setMessage(`Đã lưu hồ sơ nhưng chưa tìm thấy bản mới ${savedResult.person_id}. Hãy tải lại danh bạ.`);
+        return;
       }
       choose(saved);
       setMessage("Đã lưu hồ sơ danh bạ");
@@ -157,12 +195,41 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
       : event.target.value,
   }));
 
+  const changeScope = (scopeKey: keyof ScopeSelection, values: string[]) => {
+    const candidate = { ...form.scope, [scopeKey]: values };
+    const pruned = pruneInvalidScope(catalog, candidate);
+    const removed: string[] = [];
+    for (const [key, options] of [
+      ["departments", catalog.departments], ["factories", catalog.factories],
+      ["areas", catalog.areas], ["lines", catalog.lines],
+    ] as const) {
+      for (const id of candidate[key]) {
+        if (!pruned[key].includes(id)) {
+          const option = options.find((item) => item.id === id);
+          removed.push(option ? `${option.code} · ${option.label}` : id);
+        }
+      }
+    }
+    if (removed.length && !window.confirm(
+      `Thay đổi này sẽ bỏ ${removed.length} lựa chọn con không còn hợp lệ:\n${removed.join("\n")}`,
+    )) return;
+    setForm((current) => ({ ...current, scope: pruned }));
+  };
+
+  const filteredCatalog = filterScopeCatalog(catalog, form.scope);
+  const catalogReason = catalogLoading ? "Đang tải danh mục phạm vi…"
+    : catalogError ? "Không tải được danh mục phạm vi. Hãy thử lại."
+      : "";
+  const editReason = canEdit ? "" : "Bạn không có quyền sửa hồ sơ này.";
+  const scopeIsValid = JSON.stringify(pruneInvalidScope(catalog, form.scope)) === JSON.stringify(form.scope);
+  const dirty = JSON.stringify(form) !== JSON.stringify(savedForm);
+
   const readWorkbook = async (file: File | undefined) => {
     setImportRows([]);
     setImportErrors([]);
     if (!file) return;
     try {
-      const parsed = await parsePermissionWorkbook(file, { validAreas });
+      const parsed = await parsePermissionWorkbook(file, { scopeCatalog: catalog });
       setImportRows(parsed.rows);
       setImportErrors(parsed.errors);
       setMessage(parsed.errors.length
@@ -215,7 +282,9 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
           onChange={(event) => {
             setQuery(event.target.value);
             setSelected(null);
-            setForm({ ...emptyForm, fullName: event.target.value });
+            const nextForm = { ...emptyForm, scope: { ...emptyForm.scope }, fullName: event.target.value };
+            setForm(nextForm);
+            setSavedForm(emptyForm);
             onSelect(null);
           }}
         />
@@ -262,15 +331,55 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
             {ACCESS_CLASSES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
         </label>
-        <label>Phạm vi bộ phận<input className="pq-o" aria-label="Phạm vi phân quyền" value={form.scope} onChange={setField("scope")} disabled={!canEdit} placeholder="QA;QC hoặc *" /></label>
-        <label>Khu vực / line<input className="pq-o" aria-label="Khu vực phân quyền" value={form.areas} onChange={setField("areas")} disabled={!canEdit} placeholder="A1;A2 hoặc *" /></label>
+        <LinkedMultiSelect
+          label="Phạm vi bộ phận"
+          options={catalog.departments}
+          selected={form.scope.departments}
+          disabledReason={editReason || catalogReason || (!catalog.departments.length ? "Chưa có dữ liệu bộ phận trong danh mục." : "")}
+          onChange={(values) => changeScope("departments", values)}
+        />
+        <LinkedMultiSelect
+          label="Phạm vi xưởng"
+          options={filteredCatalog.factories}
+          selected={form.scope.factories}
+          disabledReason={editReason || catalogReason
+            || (!catalog.factories.length ? "Chưa có dữ liệu xưởng trong danh mục; vui lòng bổ sung danh mục xưởng trước."
+              : !form.scope.departments.length ? "Chọn ít nhất một bộ phận trước."
+                : !filteredCatalog.factories.length ? "Chưa có dữ liệu xưởng cho bộ phận đã chọn." : "")}
+          onChange={(values) => changeScope("factories", values)}
+        />
+        <LinkedMultiSelect
+          label="Phạm vi khu vực"
+          options={filteredCatalog.areas}
+          selected={form.scope.areas}
+          disabledReason={editReason || catalogReason
+            || (!form.scope.factories.length ? "Chọn ít nhất một xưởng trước."
+              : !filteredCatalog.areas.length ? "Chưa có dữ liệu khu vực cho xưởng đã chọn." : "")}
+          onChange={(values) => changeScope("areas", values)}
+        />
+        <LinkedMultiSelect
+          label="Phạm vi line"
+          options={filteredCatalog.lines}
+          selected={form.scope.lines}
+          disabledReason={editReason || catalogReason
+            || (!form.scope.areas.length ? "Chọn ít nhất một khu vực trước."
+              : !filteredCatalog.lines.length ? "Chưa có dữ liệu line cho khu vực đã chọn." : "")}
+          onChange={(values) => changeScope("lines", values)}
+        />
         <label className="ip-check"><input type="checkbox" checked={form.emailSent} onChange={setField("emailSent")} disabled={!canEdit} /> Đã xác nhận gửi email tài khoản</label>
       </div>
 
       {canEdit && (
-        <button type="button" className="pq-nut la-chinh" onClick={save}
-          disabled={saving || !form.fullName.trim() || !form.department || !form.scope || !form.areas}>
-          <Save size={15} /> {saving ? "Đang lưu…" : selected ? "Lưu hồ sơ" : "Thêm vào danh bạ"}
+        <button type="button" className="pq-nut la-chinh" data-testid="save-permission-person" onClick={save}
+          disabled={saving || !dirty || !form.fullName.trim() || !form.department || !form.accessClass
+            || !form.scope.departments.length || !form.scope.factories.length
+            || !form.scope.areas.length || !form.scope.lines.length || !scopeIsValid}>
+          <Save size={15} /> {saving ? "Đang lưu…" : selected ? `Lưu hồ sơ${dirty ? " · chưa lưu" : ""}` : "Thêm vào danh bạ"}
+        </button>
+      )}
+      {catalogError && (
+        <button type="button" className="pq-nut" onClick={() => setCatalogReload((value) => value + 1)}>
+          Thử tải lại danh mục phạm vi
         </button>
       )}
       {message && <div className="ip-message" role="status">{message}</div>}
@@ -278,7 +387,7 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
       <div className="ip-import">
         <div>
           <h4>Nhập danh bạ bằng Excel</h4>
-          <p className="ip-help">Tải file 9 cột, điền rồi chọn lại tại đây. Web kiểm toàn bộ file trước; có một dòng lỗi thì không gọi RPC nhập.</p>
+          <p className="ip-help">Tải file 11 cột, điền mã cho đủ bốn tầng phạm vi rồi chọn lại tại đây. Web kiểm toàn bộ file trước; có một dòng lỗi thì không gọi RPC nhập.</p>
         </div>
         <div className="ip-import-actions">
           <a className="pq-nut" href={`${import.meta.env.BASE_URL}templates/phan-quyen-vmp.xlsx`} download>
@@ -287,7 +396,7 @@ export default function StaffDirectoryPanel({ canEdit, validAreas = [], onSelect
           {canEdit && (
             <label className="pq-nut">
               <Upload size={15} /> Chọn file đã điền
-              <input type="file" accept=".xlsx" hidden onChange={(event) => void readWorkbook(event.target.files?.[0])} />
+              <input type="file" accept=".xlsx" hidden disabled={catalogLoading || Boolean(catalogError)} onChange={(event) => void readWorkbook(event.target.files?.[0])} />
             </label>
           )}
         </div>

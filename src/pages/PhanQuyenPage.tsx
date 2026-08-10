@@ -316,6 +316,7 @@ function ThanhLuu({ soThayDoi, dangLuu, ketQua, onLuu, onHoanTac, khoa, ghiChu }
 type KetQuaLuu = { xong: number; tong: number; loi: string[] } | null;
 
 type PhanQuyenViewProps = { acts: Activity[]; isAdmin?: boolean; user?: AppUser | null };
+const SHOW_LEGACY_PERMISSION_WORKSPACE = false;
 
 function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
   const [person, setPerson] = useState<DirectoryPerson | null>(null);
@@ -387,6 +388,7 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
   if (props.user?.accessClass === "equipment_manager" && props.user.role !== "admin") {
     return <EquipmentAssignmentWorkspace acts={props.acts} />;
   }
+  if (SHOW_LEGACY_PERMISSION_WORKSPACE) return <FullPermissionWorkspace {...props} />;
   return <CurrentPermissionWorkspace acts={props.acts} isAdmin={props.isAdmin} />;
 }
 

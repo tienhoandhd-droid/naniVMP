@@ -19,11 +19,17 @@ import { txt, nguoiPhuTrach, stageOf } from "../../utils/helpers.ts";
 import { toISO } from "../../lib/n8nAdapter.ts";
 import {
   fetchTimelineFieldPermission,
-  setItemPerformer,
+  setItemPerformerById,
   type TimelineFieldPermission,
   type TimelinePermissionMode,
 } from "../../lib/supabaseData.ts";
 import { usePerformers } from "../../hooks/index.ts";
+import PerformerSelect from "../../features/itemPermissions/PerformerSelect.tsx";
+import {
+  buildActivePerformerChoices,
+  resolvePerformerChoice,
+  resolveUniquePerformerIdByName,
+} from "../../features/itemPermissions/performerSelection.ts";
 import { Tag, Modal, ROField, StateBadge } from "../ui/Primitives.tsx";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
 
@@ -214,15 +220,19 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   const markDone = (dCol: string, tCol: string) => () =>
     setF((p) => ({ ...p, [dCol]: p[dCol] || todayISO(), [tCol]: "Hoàn thành" }));
 
-  /* ---- Người thực hiện: gợi ý từ tab "Người thực hiện" ---- */
-  const { performers, find } = usePerformers();
-  const ownerNow = act.owner && act.owner !== "—" ? String(act.owner) : "";
-  const [who, setWho] = useState(ownerNow);
+  /* ---- Người thực hiện: chỉ giữ person_id trong bản nháp tới lúc bấm Lưu ---- */
+  const { performers } = usePerformers();
+  const performerChoices = buildActivePerformerChoices(performers);
+  const rawOwnerPersonId = raw.owner_person_id ? String(raw.owner_person_id) : null;
+  const ownerPersonIdNow = rawOwnerPersonId
+    ?? resolveUniquePerformerIdByName(String(act.owner ?? ""), performerChoices);
+  const [performerDraftId, setPerformerDraftId] = useState<string | null>(rawOwnerPersonId);
+  const [performerTouched, setPerformerTouched] = useState(false);
+  const performerPersonId = performerTouched ? performerDraftId : ownerPersonIdNow;
   const [savingWho, setSavingWho] = useState(false);
   const [savingProgress, setSavingProgress] = useState(false);
-  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-  const whoChanged = !same(who, ownerNow);
-  const whoMatch = find(who);
+  const whoChanged = performerPersonId !== ownerPersonIdNow;
+  const selectedPerformer = resolvePerformerChoice(performerPersonId, performerChoices);
 
   // Chỉ ghi tiến độ khi thực sự có ô nào đổi — đổi mỗi người thực hiện mà vẫn
   // gọi RPC tiến độ thì server trả "chưa có thay đổi" và người dùng tưởng hỏng.
@@ -297,7 +307,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   const chan = viPham.filter(dinhToOSua);
   const nhac = viPham.filter((v) => !dinhToOSua(v));
   // S2-7: cần LÝ DO nếu đặt "Hoàn thành" ở bất kỳ giai đoạn nào HOẶC nhập bất kỳ ngày hoàn thành nào.
-  const needsReason = (
+  const needsReason = whoChanged || (
     ["tt_de_cuong", "tt_tham_dinh", "tt_bao_cao", "tt_vmp"].some((k) => doiRoi.includes(k) && f[k] === "Hoàn thành") ||
     ["ngay_de_cuong", "ngay_tham_dinh", "ngay_bao_cao", "ngay_vmp"].some((k) => doiRoi.includes(k)));
 
@@ -342,13 +352,13 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
     // Người thực hiện lưu riêng: nó nằm ở ĐỐI TƯỢNG chứ không ở hạng mục
     // (owner_name của hạng mục bị đồng bộ Sheet ghi đè mỗi lần chạy).
     if (whoChanged) {
-      if (who.trim() && !whoMatch) {
-        setErr(`Chưa có "${who.trim()}" trong danh sách người thực hiện. Thêm ở Danh mục & Nhập liệu → tab Người thực hiện.`);
+      if (performerPersonId && !selectedPerformer) {
+        setErr("Người được chọn không còn hoạt động hoặc không tồn tại. Hãy chọn lại từ danh bạ.");
         return;
       }
       setSavingWho(true);
       try {
-        const r = await setItemPerformer(act.id, who.trim());
+        const r = await setItemPerformerById(act.id, performerPersonId, reason.trim());
         if (!r.ok) { setErr(r.error || "Gán người thực hiện thất bại"); setSavingWho(false); return; }
       } catch (e) {
         setErr((e as Error).message || "Gán người thực hiện thất bại");
@@ -554,35 +564,34 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
         <ROField label="Nhóm việc" value={txt(raw.nhom_viec)} />
       </div>
 
-      {/* Người thực hiện — gõ vào là hiện gợi ý từ tab "Người thực hiện" */}
+      {/* Chọn chỉ đổi bản nháp; nút Lưu chung phía dưới mới gọi RPC. */}
       <div style={{ ...FIELD, marginBottom: 16 }}>
         <span style={LBL}><UserCheck size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Người thực hiện</span>
         {isAdmin ? (
           <>
-            <input
-              list="vmp-performer-list"
-              value={who}
-              onChange={(e) => { setWho(e.target.value); if (err) setErr(""); }}
-              placeholder="Gõ tên hoặc chọn trong danh sách — để trống là bỏ gán"
-              style={INP} />
-            <datalist id="vmp-performer-list">
-              {performers.map((p) => (
-                <option key={p.id} value={p.performer_name}>
-                  {p.email || "chưa có email"}
-                </option>
-              ))}
-            </datalist>
+            <PerformerSelect
+              value={performerPersonId}
+              options={performerChoices}
+              ariaLabel="Người thực hiện"
+              onChange={(personId) => {
+                setPerformerDraftId(personId);
+                setPerformerTouched(true);
+                if (err) setErr("");
+              }}
+            />
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.45 }}>
-              {who.trim() && !whoMatch
-                ? <b style={{ color: "#b00020" }}>Chưa có trong danh sách người thực hiện — thêm ở Danh mục &amp; Nhập liệu → tab Người thực hiện.</b>
-                : whoMatch
-                  ? <>Email: <b style={{ color: C.plum }}>{whoMatch.email || "chưa có — bổ sung ở tab Người thực hiện"}</b>{whoMatch.department ? ` · ${whoMatch.department}` : ""}</>
-                  : "Để trống = bỏ gán người thực hiện."}
+              {selectedPerformer
+                ? <>Email: <b style={{ color: C.plum }}>{selectedPerformer.email || "chưa có — bổ sung ở tab Người thực hiện"}</b>{selectedPerformer.department ? ` · ${selectedPerformer.department}` : " · chưa có bộ phận"}</>
+                : ownerPersonIdNow && performerPersonId === ownerPersonIdNow
+                  ? <b style={{ color: C.raspText }}>Liên kết hiện tại không còn trong danh sách người đang hoạt động — hãy chọn lại.</b>
+                  : "Chưa phân công. Tên mới chỉ được tạo ở Danh mục & Nhập liệu → tab Người thực hiện."}
               {whoChanged && <> · Áp dụng cho <b>mọi hạng mục của đối tượng {act.code}</b> (phân công lưu ở đối tượng nên không bị đồng bộ Sheet xoá).</>}
             </span>
           </>
         ) : (
-          <ROField label="" value={`${nguoiPhuTrach(act.owner)}${find(act.owner)?.email ? ` · ${find(act.owner)?.email}` : ""}`} />
+          <ROField label="" value={selectedPerformer
+            ? `${selectedPerformer.fullName} · ${selectedPerformer.email || "chưa có email"} · ${selectedPerformer.department || "chưa có bộ phận"}`
+            : nguoiPhuTrach(act.owner)} />
         )}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

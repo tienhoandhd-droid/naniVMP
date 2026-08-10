@@ -1,3 +1,8 @@
+/*
+ * Chạy file này sau toàn bộ migration 2026081008..2026081016.
+ * scripts/test-item-permissions-sql.sh áp các migration trong cùng transaction
+ * rồi rollback, nên fixture bên dưới không ghi vào database thật.
+ */
 select set_config(
   'request.jwt.claims',
   json_build_object(
@@ -95,6 +100,358 @@ begin
   if public.vmp_parse_scheduled_at('12/08/2026')
       is distinct from '2026-08-12 00:00:00 Asia/Bangkok'::timestamptz then
     raise exception 'Lịch chỉ có ngày phải mặc định 00:00:00';
+  end if;
+end
+$test$;
+
+/* Danh mục chuẩn khởi tạo rỗng; chỉ quan hệ được nhập rõ ràng mới hợp lệ. */
+do $test$
+declare
+  v_admin uuid;
+  v_catalog jsonb;
+  v_factory_1 constant uuid := '10000000-0000-0000-0000-000000000001';
+  v_factory_2 constant uuid := '10000000-0000-0000-0000-000000000002';
+  v_area_1 constant uuid := '20000000-0000-0000-0000-000000000001';
+  v_area_2 constant uuid := '20000000-0000-0000-0000-000000000002';
+  v_line_1 constant uuid := '30000000-0000-0000-0000-000000000001';
+  v_line_2 constant uuid := '30000000-0000-0000-0000-000000000002';
+begin
+  if exists (select 1 from public.vmp_scope_factories)
+      or exists (select 1 from public.vmp_scope_areas)
+      or exists (select 1 from public.vmp_scope_lines) then
+    raise exception 'Migration không được đoán hoặc tự sinh xưởng/khu vực/line';
+  end if;
+
+  insert into public.vmp_scope_factories(id, code, name, department_id)
+  values
+    (v_factory_1, 'X1', 'Xưởng 1', 'xsx'),
+    (v_factory_2, 'X2', 'Xưởng 2', 'qa');
+  insert into public.vmp_scope_areas(id, code, name, factory_id)
+  values
+    (v_area_1, 'C1', 'Khu vực C1', v_factory_1),
+    (v_area_2, 'C2', 'Khu vực C2', v_factory_2);
+  insert into public.vmp_scope_lines(id, code, name, area_id)
+  values
+    (v_line_1, 'BFS', 'BFS', v_area_1),
+    (v_line_2, 'LQA', 'Line QA', v_area_2);
+
+  if not public.vmp_valid_permission_scope(
+    array['xsx'], array[v_factory_1], array[v_area_1], array[v_line_1]
+  ) then
+    raise exception 'Đường department→factory→area→line đúng phải hợp lệ';
+  end if;
+  if public.vmp_valid_permission_scope(
+    array['qa'], array[v_factory_1], array[v_area_1], array[v_line_1]
+  ) then
+    raise exception 'Xưởng ngoài bộ phận đã chọn phải bị từ chối';
+  end if;
+  if public.vmp_valid_permission_scope(
+    array['xsx'], array[v_factory_1], array[v_area_2], array[v_line_2]
+  ) then
+    raise exception 'Khu vực/line ngoài xưởng đã chọn phải bị từ chối';
+  end if;
+  if public.vmp_valid_permission_scope(
+    array['khong-ton-tai'], array[v_factory_1], array[v_area_1], array[v_line_1]
+  ) then
+    raise exception 'Mã bộ phận không tồn tại phải bị từ chối';
+  end if;
+
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_catalog := public.rpc_item_permission_scope_catalog();
+  if coalesce((v_catalog->>'ok')::boolean, false) is not true
+      or not exists (
+        select 1 from jsonb_array_elements(v_catalog->'factories') value
+        where (value->>'id')::uuid = v_factory_1
+          and value->>'department_id' = 'xsx'
+      )
+      or not exists (
+        select 1 from jsonb_array_elements(v_catalog->'areas') value
+        where (value->>'id')::uuid = v_area_1
+          and (value->>'factory_id')::uuid = v_factory_1
+      )
+      or not exists (
+        select 1 from jsonb_array_elements(v_catalog->'lines') value
+        where (value->>'id')::uuid = v_line_1
+          and (value->>'area_id')::uuid = v_area_1
+      ) then
+    raise exception 'RPC catalog không trả đúng quan hệ chuẩn: %', v_catalog;
+  end if;
+
+  if has_table_privilege('authenticated', 'public.vmp_scope_factories', 'SELECT')
+      or has_table_privilege('authenticated', 'public.vmp_scope_areas', 'SELECT')
+      or has_table_privilege('authenticated', 'public.vmp_scope_lines', 'SELECT')
+      or has_function_privilege(
+        'anon', 'public.rpc_item_permission_scope_catalog()', 'EXECUTE'
+      ) then
+    raise exception 'Browser không được bỏ qua RPC catalog hoặc anon gọi catalog';
+  end if;
+end
+$test$;
+
+/* RPC bốn tham số lưu nguyên khối, khóa phiên bản và vẫn giữ RPC ba tham số. */
+do $test$
+declare
+  v_admin uuid;
+  v_person_1 uuid;
+  v_person_2 uuid;
+  v_legacy_person uuid;
+  v_result jsonb;
+  v_directory jsonb;
+  v_preflight jsonb;
+  v_dashboard jsonb;
+  v_code text;
+  v_object_code text;
+  v_year integer;
+  v_factory_1 constant uuid := '10000000-0000-0000-0000-000000000001';
+  v_area_1 constant uuid := '20000000-0000-0000-0000-000000000001';
+  v_area_2 constant uuid := '20000000-0000-0000-0000-000000000002';
+  v_line_1 constant uuid := '30000000-0000-0000-0000-000000000001';
+  v_line_2 constant uuid := '30000000-0000-0000-0000-000000000002';
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  v_result := public.rpc_upsert_item_permission_staff(
+    null,
+    jsonb_build_object(
+      'employee_code', 'E2E-SCOPE-PERSON-1',
+      'full_name', 'E2E Person ID Trùng Tên',
+      'department', 'xsx',
+      'access_class', 'view_only',
+      'scope_departments', jsonb_build_array('xsx'),
+      'scope_factory_ids', jsonb_build_array(v_factory_1),
+      'scope_area_ids', jsonb_build_array(v_area_1),
+      'scope_line_ids', jsonb_build_array(v_line_1)
+    ),
+    'Tạo hồ sơ phạm vi liên kết',
+    0
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (v_result->>'version')::integer <> 1 then
+    raise exception 'Không tạo được hồ sơ phạm vi liên kết: %', v_result;
+  end if;
+  v_person_1 := (v_result->>'person_id')::uuid;
+
+  v_directory := public.rpc_item_permission_directory('E2E Person ID Trùng Tên');
+  if not exists (
+    select 1 from jsonb_array_elements(v_directory->'people') person
+    where (person->>'person_id')::uuid = v_person_1
+      and (person->>'version')::integer = 1
+      and person->'scope_factory_ids' = jsonb_build_array(v_factory_1)
+      and person->'scope_area_ids' = jsonb_build_array(v_area_1)
+      and person->'scope_line_ids' = jsonb_build_array(v_line_1)
+  ) then
+    raise exception 'Directory thiếu scope UUID/version mới: %', v_directory;
+  end if;
+
+  v_result := public.rpc_upsert_item_permission_staff(
+    v_person_1,
+    jsonb_build_object(
+      'full_name', 'E2E Person ID Sau Khi Đổi Tên',
+      'scope_departments', jsonb_build_array('xsx'),
+      'scope_factory_ids', jsonb_build_array(v_factory_1),
+      'scope_area_ids', jsonb_build_array(v_area_1),
+      'scope_line_ids', jsonb_build_array(v_line_1)
+    ),
+    'Đổi tên đúng phiên bản',
+    1
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (v_result->>'version')::integer <> 2 then
+    raise exception 'Cập nhật đúng phiên bản phải tăng version đúng một lần: %', v_result;
+  end if;
+
+  v_result := public.rpc_upsert_item_permission_staff(
+    v_person_1,
+    jsonb_build_object(
+      'full_name', 'E2E Tên Không Được Ghi',
+      'scope_departments', jsonb_build_array('xsx'),
+      'scope_factory_ids', jsonb_build_array(v_factory_1),
+      'scope_area_ids', jsonb_build_array(v_area_1),
+      'scope_line_ids', jsonb_build_array(v_line_1)
+    ),
+    'Thử ghi bằng phiên bản cũ',
+    1
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'VERSION_CONFLICT'
+      or exists (
+        select 1 from public.vmp_performers
+        where id = v_person_1 and performer_name = 'E2E Tên Không Được Ghi'
+      ) then
+    raise exception 'Phiên bản cũ phải bị từ chối trước mọi thay đổi: %', v_result;
+  end if;
+
+  v_result := public.rpc_upsert_item_permission_staff(
+    v_person_1,
+    jsonb_build_object(
+      'full_name', 'E2E Quan Hệ Sai Không Được Ghi',
+      'scope_departments', jsonb_build_array('xsx'),
+      'scope_factory_ids', jsonb_build_array(v_factory_1),
+      'scope_area_ids', jsonb_build_array(v_area_2),
+      'scope_line_ids', jsonb_build_array(v_line_2)
+    ),
+    'Thử ghi quan hệ sai',
+    2
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'INVALID_SCOPE_HIERARCHY'
+      or exists (
+        select 1 from public.vmp_performers
+        where id = v_person_1
+          and performer_name = 'E2E Quan Hệ Sai Không Được Ghi'
+      )
+      or (select version from public.vmp_performers where id = v_person_1) <> 2 then
+    raise exception 'Quan hệ sai phải rollback toàn bộ hồ sơ/version: %', v_result;
+  end if;
+
+  /* Tên chuẩn hóa trùng là hợp lệ; person_id mới là khóa phân biệt. */
+  v_result := public.rpc_upsert_item_permission_staff(
+    null,
+    jsonb_build_object(
+      'employee_code', 'E2E-SCOPE-PERSON-2',
+      'full_name', '  E2E   Person ID Sau Khi Đổi Tên ',
+      'department', 'xsx',
+      'access_class', 'view_only',
+      'scope_departments', jsonb_build_array('xsx'),
+      'scope_factory_ids', jsonb_build_array(v_factory_1),
+      'scope_area_ids', jsonb_build_array(v_area_1),
+      'scope_line_ids', jsonb_build_array(v_line_1)
+    ),
+    'Tạo người trùng tên hợp lệ',
+    0
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Không được cấm hai person_id có tên giống nhau: %', v_result;
+  end if;
+  v_person_2 := (v_result->>'person_id')::uuid;
+
+  /* Hợp đồng ba tham số cũ vẫn chạy; preflight sẽ chặn scope mới còn thiếu. */
+  v_result := public.rpc_upsert_item_permission_staff(
+    null,
+    jsonb_build_object(
+      'employee_code', 'E2E-SCOPE-LEGACY',
+      'full_name', 'E2E Scope Legacy Ba Tham Số',
+      'department', 'xsx',
+      'access_class', 'view_only',
+      'scope_departments', jsonb_build_array('xsx'),
+      'access_areas', jsonb_build_array('*')
+    ),
+    'Kiểm tương thích RPC cũ'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'RPC ba tham số cũ phải tiếp tục hoạt động: %', v_result;
+  end if;
+  v_legacy_person := (v_result->>'person_id')::uuid;
+
+  select item.validation_code, item.object_code, item.year
+  into v_code, v_object_code, v_year
+  from public.vmp_plan_items item
+  where item.is_active
+    and exists (
+      select 1 from public.vmp_source_objects source
+      where source.object_code = item.object_code
+    )
+  order by item.validation_code limit 1;
+  if v_code is null then
+    raise exception 'Thiếu hạng mục có source object để kiểm person_id';
+  end if;
+
+  v_result := public.rpc_set_item_performer_by_id(
+    v_code, v_person_2, 'Chọn đúng person_id trong hai người trùng tên'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (v_result->>'person_id')::uuid <> v_person_2
+      or not exists (
+        select 1 from public.vmp_source_objects
+        where object_code = v_object_code
+          and owner_person_id = v_person_2
+          and owner_name = (
+            select performer_name from public.vmp_performers where id = v_person_2
+          )
+      )
+      or exists (
+        select 1 from public.vmp_plan_items
+        where object_code = v_object_code and is_active
+          and (
+            owner_person_id is distinct from v_person_2
+            or owner_name is distinct from (
+              select performer_name from public.vmp_performers where id = v_person_2
+            )
+          )
+      ) then
+    raise exception 'Gán theo ID phải giữ ID chuẩn và tên mirror legacy: %', v_result;
+  end if;
+
+  v_dashboard := public.rpc_get_vmp_dashboard(v_year, true, true);
+  if not exists (
+    select 1 from jsonb_array_elements(v_dashboard->'activities') activity
+    where activity->>'validation_code' = v_code
+      and activity->'_raw'->>'owner_person_id' = v_person_2::text
+  ) then
+    raise exception 'Dashboard raw phải đưa owner_person_id tới ProgressEditModal';
+  end if;
+
+  update public.vmp_performers set is_active = false where id = v_person_1;
+  v_result := public.rpc_set_item_performer_by_id(
+    v_code, v_person_1, 'Không được gán người đã ngừng hoạt động'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or (select owner_person_id from public.vmp_source_objects
+          where object_code = v_object_code limit 1) <> v_person_2 then
+    raise exception 'person_id inactive phải bị từ chối và không đổi phân công: %', v_result;
+  end if;
+
+  v_preflight := public.rpc_item_permission_preflight();
+  if not exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' = 'INCOMPLETE_SCOPE_HIERARCHY'
+      and (error->>'record_id')::uuid = v_legacy_person
+  ) then
+    raise exception 'Preflight phải chặn hồ sơ legacy thiếu hierarchy: %', v_preflight;
+  end if;
+
+  update public.vmp_performers
+  set scope_factory_ids = array['10000000-0000-0000-0000-000000000001']::uuid[],
+      scope_area_ids = array['20000000-0000-0000-0000-000000000002']::uuid[],
+      scope_line_ids = array['30000000-0000-0000-0000-000000000002']::uuid[]
+  where id = v_legacy_person;
+  v_preflight := public.rpc_item_permission_preflight();
+  if not exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' = 'INVALID_SCOPE_HIERARCHY'
+      and (error->>'record_id')::uuid = v_legacy_person
+  ) then
+    raise exception 'Preflight phải chặn hierarchy không nối đủ cha: %', v_preflight;
+  end if;
+
+  if has_function_privilege(
+      'anon',
+      'public.rpc_upsert_item_permission_staff(uuid,jsonb,text,integer)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'anon', 'public.rpc_set_item_performer_by_id(text,uuid,text)', 'EXECUTE'
+    ) or not has_function_privilege(
+      'authenticated',
+      'public.rpc_upsert_item_permission_staff(uuid,jsonb,text,integer)',
+      'EXECUTE'
+    ) then
+    raise exception 'Quyền EXECUTE của RPC scope/person_id không tối thiểu';
   end if;
 end
 $test$;
