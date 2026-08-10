@@ -55,4 +55,11 @@ test("parser chấp nhận mã nhân viên trống và chặn phân loại/khu v
   ], { validAreas: ["A1", "A2"] });
   assert.equal(invalid.rows.length, 0);
   assert.match(invalid.errors.map((error) => error.message).join(" "), /Phân loại.*không hợp lệ|Khu vực.*không hợp lệ/);
+
+  const blankTemplateRows = parsePermissionRows([
+    PERMISSION_HEADERS,
+    [1, "", "", "", "", "", "", "", ""],
+    [2, "", "", "", "", "", "", "", ""],
+  ]);
+  assert.deepEqual(blankTemplateRows, { rows: [], errors: [] });
 });

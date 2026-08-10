@@ -62,7 +62,8 @@ export function parsePermissionRows(
   const validAreas = new Set((options.validAreas || []).map(key));
   for (let index = 1; index < matrix.length; index += 1) {
     const source = matrix[index] || [];
-    if (source.every((value) => normalize(value) === "")) continue;
+    // File mẫu điền sẵn STT cho 500 dòng; STT một mình vẫn là dòng trống.
+    if (source.slice(1, PERMISSION_HEADERS.length).every((value) => normalize(value) === "")) continue;
     const rowNumber = index + 1;
     const department = DEPARTMENT_BY_LABEL.get(key(source[1]));
     const accessClass = ACCESS_CLASS_BY_LABEL[key(source[4])];
