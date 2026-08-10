@@ -3,10 +3,11 @@ import { Link2 } from "lucide-react";
 import { fetchItemAssignments, setItemAssignment } from "./api.ts";
 import { isDirectoryPersonComplete, type DirectoryPerson, type ItemAssignment } from "./types.ts";
 
-export default function AssignmentPanel({ person, canEdit, fixedKind }: {
+export default function AssignmentPanel({ person, canEdit, fixedKind, onAssignmentsChanged }: {
   person: DirectoryPerson | null;
   canEdit: boolean;
   fixedKind?: "qa" | "equipment_department";
+  onAssignmentsChanged?: () => void;
 }) {
   const [validationCode, setValidationCode] = useState("");
   const [kind, setKind] = useState<"qa" | "equipment_department">("qa");
@@ -45,6 +46,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind }: {
         reason: reason.trim(),
       });
       if (selectionSequence !== requestSequence.current) return;
+      onAssignmentsChanged?.();
       setMessage(`Đã phân công hạng mục ${validationCode.trim()} cho ${selectedPerson.full_name}`);
       const sequence = ++requestSequence.current;
       const nextAssignments = await fetchItemAssignments({ personId: selectedPerson.person_id });

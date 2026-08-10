@@ -62,16 +62,30 @@ export type ScopeResolution =
   | { ok: true; selection: ScopeSelection }
   | { ok: false; error: string };
 
-function idsForCodes(
-  options: Array<Pick<RootScopeOption, "id" | "code">>,
+function idsForCodes<T extends Pick<RootScopeOption, "id" | "code"> & { parentId?: string }>(
+  options: T[],
   codes: string[],
+  allowedParentIds?: Set<string>,
 ): string[] {
   const result: string[] = [];
   for (const code of codes) {
     const normalized = code.trim().toLocaleLowerCase("vi");
-    const match = options.find((item) => item.code.trim().toLocaleLowerCase("vi") === normalized);
-    const id = match?.id ?? "";
-    if (!result.includes(id)) result.push(id);
+    const codeMatches = options.filter(
+      (item) => item.code.trim().toLocaleLowerCase("vi") === normalized,
+    );
+    const pathMatches = allowedParentIds
+      ? codeMatches.filter((item) => item.parentId !== undefined && allowedParentIds.has(item.parentId))
+      : codeMatches;
+    // Giữ phân biệt giữa mã lạ và mã có thật nhưng nằm sai nhánh để thông
+    // báo quan hệ không hợp lệ ở bước prune bên dưới.
+    const matches = pathMatches.length ? pathMatches : codeMatches.slice(0, 1);
+    if (!matches.length) {
+      if (!result.includes("")) result.push("");
+      continue;
+    }
+    for (const match of matches) {
+      if (!result.includes(match.id)) result.push(match.id);
+    }
   }
   return result;
 }
@@ -81,9 +95,9 @@ export function resolveScopeCodes(
   codes: ScopeSelection,
 ): ScopeResolution {
   const departments = idsForCodes(catalog.departments, codes.departments);
-  const factories = idsForCodes(catalog.factories, codes.factories);
-  const areas = idsForCodes(catalog.areas, codes.areas);
-  const lines = idsForCodes(catalog.lines, codes.lines);
+  const factories = idsForCodes(catalog.factories, codes.factories, new Set(departments));
+  const areas = idsForCodes(catalog.areas, codes.areas, new Set(factories));
+  const lines = idsForCodes(catalog.lines, codes.lines, new Set(areas));
   const selection = { departments, factories, areas, lines };
   if (Object.values(selection).some((values) => values.includes(""))) {
     return { ok: false, error: "Mã phạm vi không tồn tại" };

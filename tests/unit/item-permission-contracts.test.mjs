@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 async function loadContracts() {
   try {
@@ -221,6 +222,20 @@ test("hồ sơ legacy chưa đủ bị khóa phân công cho tới khi bổ sung
   assert.equal(isDirectoryPersonComplete({ ...complete, scope_factory_ids: [] }), false);
   assert.equal(isDirectoryPersonComplete({ ...complete, scope_area_ids: [] }), false);
   assert.equal(isDirectoryPersonComplete({ ...complete, scope_line_ids: [] }), false);
+});
+
+test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
+  const sql = await readFile(new URL(
+    "../../supabase/migrations/20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql",
+    import.meta.url,
+  ), "utf8");
+
+  assert.match(sql, /create or replace function public\.vmp_item_scope_matches/);
+  assert.match(sql, /'factory_match', scope\.factory_match/);
+  assert.match(sql, /'line_match', scope\.line_match/);
+  assert.match(sql, /'error_code', 'VERSION_REQUIRED'/);
+  assert.match(sql, /'error_code', 'PERSON_ID_REQUIRED'/);
+  assert.match(sql, /raise exception 'IMPORT_ROW_FAILED:/);
 });
 
 test("chọn kết quả lưu theo person_id dù hai dòng trùng tên", async () => {

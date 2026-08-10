@@ -68,6 +68,34 @@ test("đổi mã danh mục thành ID ổn định không phân biệt hoa thư�
   });
 });
 
+test("mã con trùng nhau được giải theo đúng đường cha đã chọn", async () => {
+  const { resolveScopeCodes } = await import("../../src/features/itemPermissions/scopeHierarchy.ts");
+  const duplicateCodes = {
+    ...catalog,
+    factories: [
+      { id: "f-qa", code: "X1", label: "Xưởng 1 QA", parentId: "qa" },
+      { id: "f-xsx", code: "X1", label: "Xưởng 1 sản xuất", parentId: "xsx" },
+    ],
+    areas: [
+      { id: "a-qa", code: "KV1", label: "Khu vực 1 QA", parentId: "f-qa" },
+      { id: "a-xsx", code: "KV1", label: "Khu vực 1 sản xuất", parentId: "f-xsx" },
+    ],
+    lines: [
+      { id: "l-qa", code: "L1", label: "Line 1 QA", parentId: "a-qa" },
+      { id: "l-xsx", code: "L1", label: "Line 1 sản xuất", parentId: "a-xsx" },
+    ],
+  };
+
+  assert.deepEqual(resolveScopeCodes(duplicateCodes, {
+    departments: ["xsx"], factories: ["x1"], areas: ["kv1"], lines: ["l1"],
+  }), {
+    ok: true,
+    selection: {
+      departments: ["xsx"], factories: ["f-xsx"], areas: ["a-xsx"], lines: ["l-xsx"],
+    },
+  });
+});
+
 test("từ chối mã phạm vi không tồn tại", async () => {
   const { resolveScopeCodes } = await import("../../src/features/itemPermissions/scopeHierarchy.ts");
 

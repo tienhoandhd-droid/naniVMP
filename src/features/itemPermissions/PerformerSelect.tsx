@@ -1,6 +1,9 @@
 import type { CSSProperties } from "react";
 import { C, TEXT } from "../../constants/theme.ts";
-import type { PerformerChoice } from "./performerSelection.ts";
+import {
+  formatPerformerOptionLabel,
+  type PerformerChoice,
+} from "./performerSelection.ts";
 
 interface PerformerSelectProps {
   value: string | null;
@@ -45,7 +48,7 @@ export default function PerformerSelect({
       {!allowClear && !value && <option value="">— chọn người —</option>}
       {options.map((person) => (
         <option key={person.personId} value={person.personId}>
-          {person.fullName} · {person.email || "chưa có email"} · {person.department || "chưa có bộ phận"}
+          {formatPerformerOptionLabel(person)}
         </option>
       ))}
     </select>

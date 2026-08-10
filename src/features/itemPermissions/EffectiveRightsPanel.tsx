@@ -15,7 +15,10 @@ const fieldLabels: Record<string, string> = {
   scheduled_at: "Bộ phận quản lý thiết bị xếp lịch",
 };
 
-export default function EffectiveRightsPanel({ person }: { person: DirectoryPerson | null }) {
+export default function EffectiveRightsPanel({ person, revision = 0 }: {
+  person: DirectoryPerson | null;
+  revision?: number;
+}) {
   const [view, setView] = useState<"person" | "item">("person");
   const [validationCode, setValidationCode] = useState("");
   const [rows, setRows] = useState<EffectiveItemRight[]>([]);
@@ -39,7 +42,7 @@ export default function EffectiveRightsPanel({ person }: { person: DirectoryPers
 
   useEffect(() => {
     if (view === "person" && person) void load();
-  }, [person, view]);
+  }, [person, revision, view]);
 
   return (
     <section className="ip-panel" aria-labelledby="ip-rights-title">
