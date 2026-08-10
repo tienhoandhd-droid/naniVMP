@@ -215,6 +215,16 @@ try {
     () => document.body.innerText.includes("Danh bạ nhân sự & quyền"),
     { timeout: 15000 },
   );
+  assert.equal(await documentContains("1 · Ai được phép có tài khoản"), false,
+    "admin không còn thấy khối tài khoản legacy bên dưới workspace hiện hành");
+  assert.equal(await documentContains("2 · Vai nào xem được gì, sửa được gì"), false,
+    "admin không còn thấy ma trận vai trò legacy");
+  assert.equal(await documentContains("3 · Ma trận trách nhiệm & quyền"), false,
+    "admin không còn thấy ma trận trách nhiệm legacy");
+  assert.equal(await documentContains("Từ ma trận này làm gì tiếp"), false,
+    "admin không còn thấy hướng dẫn legacy dài bên dưới");
+  assert.equal(await documentContains("Quyền hiệu lực theo từng đầu mục"), true,
+    "bảng quyền hiệu lực hiện tại phải được giữ lại");
 
   const search = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
   assert.ok(search, "phải có ô autocomplete danh bạ");
