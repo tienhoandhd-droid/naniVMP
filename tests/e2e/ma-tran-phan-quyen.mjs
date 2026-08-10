@@ -286,8 +286,10 @@ const o = await p.evaluate((K) => {
     soTich: tich.length,
     soChip: chip.length,
     soNhap: nhap.length,
-    // Ô sổ xuống chỉ được còn ở hai ô LỌC của bảng D
-    soSoXuong: document.querySelectorAll("select.pq-o:not(.pq-loc)").length,
+    // Ma trận vai trò cũ không dùng select; danh bạ chuẩn mới có select
+    // bộ phận/phân loại đúng nghiệp vụ và được kiểm ở bài E2E riêng.
+    soSoXuong: [...document.querySelectorAll("select.pq-o:not(.pq-loc)")]
+      .filter((element) => !element.closest(".ip-workspace")).length,
     coNhan: oSua.every((e) => (e.getAttribute("aria-label") || "").trim().length > 3),
     caoNhoNhat: Math.min(...oSua.map((e) => e.getBoundingClientRect().height)),
     soThanhLuu: document.querySelectorAll(".pq-thanhluu").length,
