@@ -33,6 +33,157 @@ $test$;
 do $test$
 declare
   v_admin uuid;
+  v_user uuid;
+  v_person uuid;
+  v_xsx_code text;
+  v_qc_code text;
+  v_area text;
+  v_line text;
+  v_rights record;
+  v_result jsonb;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select id into v_user
+  from public.profiles
+  where id <> v_admin and coalesce(is_active, true)
+  order by case when role::text = 'viewer' then 0 else 1 end, created_at
+  limit 1;
+
+  select item.validation_code, object.area, object.line
+  into v_xsx_code, v_area, v_line
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.is_active and object.department = 'xsx'
+    and nullif(btrim(coalesce(object.area, '')), '') is not null
+  order by item.validation_code limit 1;
+  select item.validation_code into v_qc_code
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.is_active and object.department = 'qc'
+  order by item.validation_code limit 1;
+
+  if v_admin is null or v_user is null or v_xsx_code is null or v_qc_code is null then
+    raise exception 'Thiếu fixture production để kiểm lõi quyền';
+  end if;
+
+  delete from public.vmp_item_assignments where user_id = v_user;
+  delete from public.vmp_performers where user_id = v_user;
+  update public.profiles
+  set role = 'department_user', department = 'xsx', is_active = true
+  where id = v_user;
+
+  insert into public.vmp_performers (
+    performer_name, email, department, user_id, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  )
+  select
+    'E2E Người Kiểm Lõi Quyền', email, 'xsx', id, 'view_only',
+    array['xsx'], array[v_area], true, v_admin
+  from public.profiles where id = v_user
+  returning id into v_person;
+
+  insert into public.vmp_item_assignments (
+    validation_code, performer_id, user_id, staff_name,
+    assignment_kind, source, source_text, is_active, change_reason
+  ) values (
+    v_xsx_code, v_person, v_user, 'E2E Người Kiểm Lõi Quyền',
+    'equipment_department', 'equipment_manager',
+    'E2E Người Kiểm Lõi Quyền', true, 'Fixture lõi quyền'
+  );
+
+  select * into v_rights from public.vmp_item_rights(v_user, v_xsx_code);
+  if not v_rights.can_view or cardinality(v_rights.editable_fields) <> 0
+      or not v_rights.scope_match or not v_rights.area_match then
+    raise exception 'view_only đúng phân công/phạm vi/khu vực phải chỉ xem: %', row_to_json(v_rights);
+  end if;
+
+  update public.vmp_performers
+  set department = 'qa', access_class = 'qa_progress_editor',
+      scope_departments = array['xsx'], access_areas = array[v_area]
+  where id = v_person;
+  update public.vmp_item_assignments set assignment_kind = 'qa'
+  where performer_id = v_person and validation_code = v_xsx_code;
+  select * into v_rights from public.vmp_item_rights(v_user, v_xsx_code);
+  if not v_rights.can_view or v_rights.editable_fields <> array[
+    'actual_protocol_date', 'status_protocol',
+    'actual_validation_date', 'status_validation',
+    'actual_report_date', 'status_report',
+    'actual_vmp_date', 'status_vmp'
+  ]::text[] then
+    raise exception 'QA phải nhận đúng tám trường hoàn thành: %', row_to_json(v_rights);
+  end if;
+
+  update public.vmp_performers
+  set department = 'xsx', access_class = 'equipment_scheduler',
+      scope_departments = array['xsx'], access_areas = array[v_area]
+  where id = v_person;
+  update public.vmp_item_assignments set assignment_kind = 'equipment_department'
+  where performer_id = v_person and validation_code = v_xsx_code;
+  select * into v_rights from public.vmp_item_rights(v_user, v_xsx_code);
+  if not v_rights.can_view or v_rights.editable_fields <> array['scheduled_at']::text[] then
+    raise exception 'Người xếp lịch phải chỉ nhận scheduled_at: %', row_to_json(v_rights);
+  end if;
+
+  update public.vmp_performers set access_areas = array['KHU-VUC-KHAC']
+  where id = v_person;
+  select * into v_rights from public.vmp_item_rights(v_user, v_xsx_code);
+  if v_rights.can_view or v_rights.area_match then
+    raise exception 'Đúng phân công nhưng sai khu vực phải bị chặn: %', row_to_json(v_rights);
+  end if;
+
+  update public.vmp_performers
+  set access_class = 'equipment_manager', access_areas = array['*']
+  where id = v_person;
+  select * into v_rights from public.vmp_item_rights(v_user, v_xsx_code);
+  if not v_rights.can_view then
+    raise exception 'Equipment manager phải thấy hạng mục bộ phận mình';
+  end if;
+  select * into v_rights from public.vmp_item_rights(v_user, v_qc_code);
+  if v_rights.can_view then
+    raise exception 'Equipment manager XSX không được thấy hạng mục QC';
+  end if;
+
+  select * into v_rights from public.vmp_item_rights(v_admin, v_qc_code);
+  if not v_rights.can_view then
+    raise exception 'Admin phải xem được mọi hạng mục';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_item_permission_preflight();
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or jsonb_array_length(v_result->'blocking_errors') = 0 then
+    raise exception 'Preflight phải trả lỗi chặn với danh bạ production chưa đủ: %', v_result;
+  end if;
+
+  v_result := public.rpc_set_item_permissions_mode(
+    'enforced', 'Thử bật khi dữ liệu chưa đạt'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'Không được bật enforced khi preflight còn lỗi: %', v_result;
+  end if;
+  if public.item_permissions_mode() <> 'preview' then
+    raise exception 'Mode phải giữ preview sau lần bật bị từ chối';
+  end if;
+
+  -- Hoàn nguyên fixture dùng chung để các khối kiểm thử sau không phụ thuộc thứ tự.
+  delete from public.vmp_item_assignments where performer_id = v_person;
+  delete from public.vmp_performers where id = v_person;
+  update public.profiles
+  set role = 'viewer', department = null
+  where id = v_user;
+end
+$test$;
+
+do $test$
+declare
+  v_admin uuid;
   v_manager_user uuid;
   v_manager_person uuid;
   v_qa_person uuid;
