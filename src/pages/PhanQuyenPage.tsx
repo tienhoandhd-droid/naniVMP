@@ -315,7 +315,41 @@ function ThanhLuu({ soThayDoi, dangLuu, ketQua, onLuu, onHoanTac, khoa, ghiChu }
 
 type KetQuaLuu = { xong: number; tong: number; loi: string[] } | null;
 
-export default function PhanQuyenView(
+type PhanQuyenViewProps = { acts: Activity[]; isAdmin?: boolean; user?: AppUser | null };
+
+function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
+  const [person, setPerson] = useState<DirectoryPerson | null>(null);
+  const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
+    const raw = (activity._raw || {}) as Record<string, unknown>;
+    return [activity.area, raw.area, raw.line]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+  }))].sort((a, b) => a.localeCompare(b, "vi")), [acts]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <Card variant="strong">
+        <CardTitle icon={Users}
+          sub="Chọn người từ danh bạ chuẩn và phân công hạng mục thuộc bộ phận quản lý thiết bị. Hồ sơ nhân sự và ma trận quản trị chỉ Admin được sửa.">
+          Phân công theo hạng mục
+        </CardTitle>
+        <div className="ip-workspace">
+          <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson} />
+          <AssignmentPanel person={person} canEdit />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export default function PhanQuyenView(props: PhanQuyenViewProps) {
+  if (props.user?.accessClass === "equipment_manager" && props.user.role !== "admin") {
+    return <EquipmentAssignmentWorkspace acts={props.acts} />;
+  }
+  return <FullPermissionWorkspace {...props} />;
+}
+
+function FullPermissionWorkspace(
   { acts, isAdmin = false, user }: { acts: Activity[]; isAdmin?: boolean; user?: AppUser | null },
 ) {
   /* Một dòng một người, do rpc_nguoi_va_quyen gộp bằng email + user_id ở

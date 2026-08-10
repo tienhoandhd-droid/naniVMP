@@ -38,6 +38,9 @@ export interface AppUser {
   role: UserRole | "viewer";
   perm: Perm;
   department?: string;
+  /** Phân loại quyền theo hạng mục của danh bạ vmp_performers. Null/thiếu khi
+   * schema cũ chưa có cột hoặc tài khoản chưa nối với nhân sự. */
+  accessClass?: string | null;
   token?: string;
 }
 

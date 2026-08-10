@@ -72,11 +72,15 @@ const answer = (request, body) => request.method() === "OPTIONS"
 
 page.on("request", (request) => {
   const url = request.url();
+  if (/\/rest\/v1\/vmp_performers\?/.test(url) && /access_class/.test(url) && /user_id=eq\./.test(url)) {
+    return answer(request, { access_class: "equipment_manager" });
+  }
   if (/\/rpc\/rpc_item_permission_directory/.test(url)) {
     const body = JSON.parse(request.postData() || "{}");
-    const people = String(body.p_query || "").includes("Legacy")
+    const query = String(body.p_query || "");
+    const people = query.includes("Legacy")
       ? [legacyPerson]
-      : [duplicateFirst, duplicateSaved];
+      : query.includes("Hồng") ? [completePerson] : [duplicateFirst, duplicateSaved];
     return answer(request, { ok: true, people });
   }
   if (/\/rpc\/rpc_item_permission_preflight/.test(url)) {
@@ -105,6 +109,45 @@ page.on("request", (request) => {
 
 try {
   await dangNhap(page, GOC);
+
+  assert.equal(
+    await page.evaluate(() => [...document.querySelectorAll("button")]
+      .some((button) => button.textContent?.includes("Phân quyền & trách nhiệm"))),
+    true,
+    "equipment manager phải thấy menu Phân quyền & trách nhiệm",
+  );
+  assert.equal(
+    await page.evaluate(() => [...document.querySelectorAll("button")]
+      .some((button) => button.textContent?.includes("Sức khoẻ dữ liệu"))),
+    false,
+    "equipment manager không được thấy nav admin khác",
+  );
+
+  await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.body.innerText.includes("Phân công theo hạng mục"));
+  assert.equal(await documentContains("1 · Ai được phép có tài khoản"), false,
+    "equipment manager không được thấy workspace admin legacy");
+  assert.equal(await documentContains("2 · Vai nào xem được gì, sửa được gì"), false,
+    "equipment manager không được thấy ma trận quyền toàn cục");
+  assert.equal(await documentContains("Lưu hồ sơ"), false,
+    "equipment manager không được sửa StaffDirectory");
+
+  const equipmentSearch = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
+  assert.ok(equipmentSearch, "equipment manager cần tìm người chuẩn trước khi phân công");
+  await equipmentSearch.type("Hồng");
+  await page.waitForFunction(() => document.body.innerText.includes("Đặng Thị Hồng Ngọc · RD"));
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
+  await page.type('[aria-label="Mã hạng mục cần phân công"]', "VMP-EQUIPMENT-01");
+  await page.type('[aria-label="Lý do phân công"]', "Quản lý thiết bị xếp lịch");
+  await page.click('button[aria-label="Phân công người đã chọn"]');
+  await page.waitForFunction(() => document.body.innerText.includes("Đã phân công hạng mục VMP-EQUIPMENT-01"));
+  assert.equal(assignmentBodies.length, 1);
+  assert.equal(assignmentBodies[0].p_person_id, completePerson.person_id);
+  assert.equal(assignmentBodies[0].p_assignment_kind, "equipment_department");
+  assignmentBodies.length = 0;
+
   await doiVaiTrenMan(page, "admin", "Người Quản Trị");
   await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -177,4 +220,8 @@ try {
   console.log("✅ Dòng legacy sửa được, khóa phân công và chọn đúng person_id khi trùng tên");
 } finally {
   await browser.close();
+}
+
+function documentContains(text) {
+  return page.evaluate((expected) => document.body.innerText.includes(expected), text);
 }
