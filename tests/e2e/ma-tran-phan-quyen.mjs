@@ -541,20 +541,26 @@ kiem("Bấm Lưu mới gọi rpc_set_user_role",
   goiRpc.some((u) => /rpc_set_user_role/.test(u)), goiRpc.join(", "));
 
 /* ── Vai không phải admin thì bảng chỉ để xem ── */
-console.log("\n── 3c. Vai không phải admin — khoá sửa ──");
-await vao("view");
+console.log("\n── 3c. Vai không thuộc allowlist — chặn truy cập ──");
+await doiVaiTrenMan(p, "view", "Tào Tiến Hoàn");
+await p.goto(`${GOC}#v=phanquyen`, { waitUntil: "networkidle2" });
+await p.reload({ waitUntil: "networkidle2" });
+await p.waitForFunction(
+  () => document.body.innerText.includes("Không có quyền truy cập"),
+  { timeout: 30000 },
+);
 const k = await p.evaluate(() => ({
   tichBat: [...document.querySelectorAll(".pq-tich")].filter((x) => !x.disabled).length,
   chipBat: [...document.querySelectorAll(".pq-chip")].filter((x) => !x.disabled).length,
   coNutLuu: document.querySelectorAll(".pq-nut.la-chinh").length,
-  noiRo: document.body.innerText.includes("Bảng chỉ để xem"),
+  noiRo: /không có quyền truy cập màn Phân quyền/i.test(document.body.innerText),
   vanDocDuoc: document.body.innerText.includes("Ma trận trách nhiệm"),
 }));
 kiem("Không ô tích nào bấm được", k.tichBat === 0, `${k.tichBat} ô`);
 kiem("Không chip nào bấm được", k.chipBat === 0, `${k.chipBat} chip`);
 kiem("Không hiện nút Lưu", k.coNutLuu === 0);
-kiem("Nói rõ vì sao không sửa được", k.noiRo);
-kiem("Vẫn đọc được toàn bộ ma trận", k.vanDocDuoc);
+kiem("Nói rõ vì sao không được vào", k.noiRo);
+kiem("Không lộ ma trận qua URL gõ tay", !k.vanDocDuoc);
 
 /* ── 4. Nửa TRÁCH NHIỆM của ma trận đã gộp ──
    Bảng phân công cũ đứng riêng và có ô chọn BỘ PHẬN. Ô đó là ảo: khoá duy
