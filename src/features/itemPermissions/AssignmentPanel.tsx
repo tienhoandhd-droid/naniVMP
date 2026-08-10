@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link2 } from "lucide-react";
 import { fetchItemAssignments, setItemAssignment } from "./api.ts";
 import { isDirectoryPersonComplete, type DirectoryPerson, type ItemAssignment } from "./types.ts";
 
-export default function AssignmentPanel({ person, canEdit }: {
+export default function AssignmentPanel({ person, canEdit, fixedKind }: {
   person: DirectoryPerson | null;
   canEdit: boolean;
+  fixedKind?: "qa" | "equipment_department";
 }) {
   const [validationCode, setValidationCode] = useState("");
   const [kind, setKind] = useState<"qa" | "equipment_department">("qa");
@@ -13,30 +14,41 @@ export default function AssignmentPanel({ person, canEdit }: {
   const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const requestSequence = useRef(0);
   const personComplete = person ? isDirectoryPersonComplete(person) : false;
 
   useEffect(() => {
+    const sequence = ++requestSequence.current;
     if (!person) { setAssignments([]); return; }
-    setKind(person.access_class?.startsWith("qa_") ? "qa" : "equipment_department");
+    if (!fixedKind) setKind(person.access_class?.startsWith("qa_") ? "qa" : "equipment_department");
     fetchItemAssignments({ personId: person.person_id })
-      .then(setAssignments)
-      .catch((error) => setMessage((error as Error).message));
-  }, [person]);
+      .then((nextAssignments) => {
+        if (sequence === requestSequence.current) setAssignments(nextAssignments);
+      })
+      .catch((error) => {
+        if (sequence === requestSequence.current) setMessage((error as Error).message);
+      });
+  }, [fixedKind, person]);
 
   const assign = async () => {
     if (!person || !isDirectoryPersonComplete(person)) return;
+    const selectedPerson = person;
+    const selectionSequence = requestSequence.current;
     setSaving(true);
     setMessage("");
     try {
       await setItemAssignment({
-        personId: person.person_id,
+        personId: selectedPerson.person_id,
         validationCode: validationCode.trim(),
-        assignmentKind: kind,
+        assignmentKind: fixedKind || kind,
         action: "assign",
         reason: reason.trim(),
       });
-      setMessage(`Đã phân công hạng mục ${validationCode.trim()} cho ${person.full_name}`);
-      setAssignments(await fetchItemAssignments({ personId: person.person_id }));
+      if (selectionSequence !== requestSequence.current) return;
+      setMessage(`Đã phân công hạng mục ${validationCode.trim()} cho ${selectedPerson.full_name}`);
+      const sequence = ++requestSequence.current;
+      const nextAssignments = await fetchItemAssignments({ personId: selectedPerson.person_id });
+      if (sequence === requestSequence.current) setAssignments(nextAssignments);
       setValidationCode("");
       setReason("");
     } catch (error) {
@@ -58,12 +70,14 @@ export default function AssignmentPanel({ person, canEdit }: {
           )}
           <div className="ip-form is-compact">
             <label>Mã hạng mục<input className="pq-o" aria-label="Mã hạng mục cần phân công" value={validationCode} onChange={(event) => setValidationCode(event.target.value)} placeholder="Ví dụ: CCTB01/2026.01-OQ" /></label>
-            <label>Vai trò phân công
-              <select className="pq-o" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
-                <option value="qa">QA thực hiện các mốc hoàn thành</option>
-                <option value="equipment_department">Bộ phận quản lý thiết bị xếp lịch</option>
-              </select>
-            </label>
+            {!fixedKind && (
+              <label>Vai trò phân công
+                <select className="pq-o" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
+                  <option value="qa">QA thực hiện các mốc hoàn thành</option>
+                  <option value="equipment_department">Bộ phận quản lý thiết bị xếp lịch</option>
+                </select>
+              </label>
+            )}
             <label>Lý do<input className="pq-o" aria-label="Lý do phân công" value={reason} onChange={(event) => setReason(event.target.value)} /></label>
           </div>
           {canEdit && (

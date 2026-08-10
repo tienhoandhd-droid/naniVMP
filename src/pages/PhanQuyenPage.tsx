@@ -335,7 +335,7 @@ function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
         </CardTitle>
         <div className="ip-workspace">
           <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson} />
-          <AssignmentPanel person={person} canEdit />
+          <AssignmentPanel person={person} canEdit fixedKind="equipment_department" />
         </div>
       </Card>
     </div>
@@ -343,6 +343,18 @@ function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
 }
 
 export default function PhanQuyenView(props: PhanQuyenViewProps) {
+  const allowed = props.user?.role === "admin"
+    || props.user?.role === "qa_manager"
+    || props.user?.accessClass === "equipment_manager"
+    || props.user?.accessClass === "qa_manager";
+  if (!allowed) {
+    return (
+      <Card variant="strong">
+        <CardTitle icon={ShieldCheck}>Không có quyền truy cập</CardTitle>
+        <p>Bạn không có quyền truy cập màn Phân quyền &amp; trách nhiệm.</p>
+      </Card>
+    );
+  }
   if (props.user?.accessClass === "equipment_manager" && props.user.role !== "admin") {
     return <EquipmentAssignmentWorkspace acts={props.acts} />;
   }

@@ -145,21 +145,15 @@ export interface TimelineFieldPermission {
 }
 
 /** Quyền hiệu lực của chính người đang đăng nhập trên một hạng mục.
- *  Dùng function lõi thay vì RPC màn quản trị: function lõi trả đúng một
- *  persona (auth.uid), còn rpc_preview_item_rights có thể trả nhiều nhân sự. */
+ *  Wrapper tự lấy auth.uid ở database; client tuyệt đối không truyền uid. */
 export async function fetchTimelineFieldPermission(
   validationCode: string,
 ): Promise<TimelineFieldPermission> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) throw new Error("Không đọc được phiên đăng nhập: " + sessionError.message);
-  const uid = sessionData.session?.user.id;
-  if (!uid) throw new Error("Phiên đăng nhập đã hết hạn");
 
   const [modeResult, rightsResult] = await Promise.all([
     supabase.rpc("item_permissions_mode" as never),
-    supabase.rpc("vmp_item_rights" as never, {
-      p_uid: uid,
+    supabase.rpc("vmp_my_item_rights" as never, {
       p_validation_code: validationCode,
     } as never),
   ]);

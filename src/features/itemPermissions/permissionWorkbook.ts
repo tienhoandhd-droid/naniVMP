@@ -6,6 +6,10 @@ export const PERMISSION_HEADERS = [
   "Phạm vi", "Khu vực phân quyền", "Email nhận tài khoản", "Xác nhận gửi email",
 ] as const;
 
+const MAX_PERMISSION_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_PERMISSION_WORKBOOK_ROWS = 1000;
+const MAX_PERMISSION_WORKBOOK_CELLS = 20_000;
+
 const ACCESS_CLASS_BY_LABEL: Record<string, AccessClass> = {
   "chỉ xem": "view_only",
   view_only: "view_only",
@@ -108,12 +112,26 @@ export async function parsePermissionWorkbook(
   file: File,
   options: { validAreas?: readonly string[] } = {},
 ): Promise<PermissionWorkbookResult> {
+  if (file.size > MAX_PERMISSION_FILE_BYTES) {
+    return { rows: [], errors: [{ rowNumber: 1, message: "File Excel không được lớn hơn 5 MiB" }] };
+  }
   // Không dùng SheetJS/xlsx cho file người dùng tải lên: phiên bản npm hiện
   // có advisory prototype-pollution/ReDoS. ExcelJS cũng là thư viện dùng để
   // sinh chính file mẫu, nên đường đọc/ghi cùng một hợp đồng workbook.
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await file.arrayBuffer());
+  const workbookRows = workbook.worksheets.reduce((total, sheet) => total + sheet.rowCount, 0);
+  if (workbookRows > MAX_PERMISSION_WORKBOOK_ROWS) {
+    return { rows: [], errors: [{ rowNumber: 1, message: "Workbook chỉ được có tối đa 1.000 dòng" }] };
+  }
+  let workbookCells = 0;
+  for (const sheet of workbook.worksheets) {
+    sheet.eachRow({ includeEmpty: true }, (row) => { workbookCells += row.cellCount; });
+  }
+  if (workbookCells > MAX_PERMISSION_WORKBOOK_CELLS) {
+    return { rows: [], errors: [{ rowNumber: 1, message: "Workbook chỉ được có tối đa 20.000 ô" }] };
+  }
   const firstSheet = workbook.getWorksheet("Trang tính1") || workbook.worksheets[0];
   if (!firstSheet) return { rows: [], errors: [{ rowNumber: 1, message: "File không có trang dữ liệu" }] };
   const matrix: unknown[][] = [];
