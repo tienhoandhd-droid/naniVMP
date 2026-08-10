@@ -6946,6 +6946,14 @@ summary { min-height: 24px; display: flex; align-items: center; }
 .ip-rights-list article > div { display: flex; gap: 6px; align-items: flex-start; color: var(--c-ink-soft); }
 .ip-rights-list .is-allowed { color: var(--c-mint-text); }
 .ip-rights-list .is-denied { color: var(--c-rasp-text); }
+.ip-import { margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--c-line); }
+.ip-import h4 { margin: 0 0 4px; color: var(--c-ink); }
+.ip-import-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ip-import-actions a { text-decoration: none; }
+.ip-import-errors { margin-top: 10px; padding: 10px 12px; border-radius: var(--r-md); background: var(--c-rasp-soft); color: var(--c-rasp-text); font-size: 12px; line-height: 1.5; }
+.ip-import-errors ul { margin: 5px 0; padding-left: 18px; }
+.ip-import-preview { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 10px; padding: 10px 12px; border-radius: var(--r-md); background: var(--c-mint-soft); color: var(--c-mint-text); font-size: 12px; }
+.ip-import-preview .pq-o { max-width: 420px; }
 @media (max-width: 1000px) {
   .ip-workspace { grid-template-columns: 1fr; }
   .ip-panel:first-child { grid-row: auto; }
