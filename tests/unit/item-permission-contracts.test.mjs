@@ -40,3 +40,37 @@ test("khớp tên giữ nguyên dấu và chỉ chuẩn hóa khoảng trắng, h
     normalizePersonName("Dang Thi Hong Ngoc"),
   );
 });
+
+test("decoder danh bạ từ chối dòng thiếu trường bắt buộc", async () => {
+  const { decodeDirectoryPerson } = await import(
+    "../../src/features/itemPermissions/api.ts"
+  );
+  const valid = {
+    person_id: "11111111-1111-1111-1111-111111111111",
+    user_id: null,
+    employee_code: null,
+    full_name: "Đặng Thị Hồng Ngọc",
+    department: "rd",
+    email: null,
+    account_status: "unlinked",
+    access_class: "view_only",
+    scope_departments: ["rd"],
+    access_areas: ["A1"],
+    email_sent_confirmed: false,
+    is_active: true,
+    match_status: "unique",
+  };
+
+  assert.deepEqual(decodeDirectoryPerson(valid), valid);
+  for (const key of [
+    "person_id",
+    "full_name",
+    "access_class",
+    "scope_departments",
+    "access_areas",
+  ]) {
+    const invalid = { ...valid };
+    delete invalid[key];
+    assert.throws(() => decodeDirectoryPerson(invalid), new RegExp(key));
+  }
+});

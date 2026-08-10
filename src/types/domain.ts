@@ -219,3 +219,6 @@ export interface ConnConfig {
   writeUrl?: string;
   [key: string]: unknown;
 }
+
+/** Chế độ quyền ngoại lệ theo từng hạng mục VMP. */
+export type ItemPermissionMode = "preview" | "enforced";

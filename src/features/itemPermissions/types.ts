@@ -25,6 +25,82 @@ export type EditableTimelineField =
   | (typeof QA_TIMELINE_FIELDS)[number]
   | (typeof EQUIPMENT_TIMELINE_FIELDS)[number];
 
+export type AccountStatus = "linked" | "unlinked" | "inactive";
+export type MatchStatus = "unique" | "ambiguous";
+
+export interface DirectoryPerson {
+  person_id: string;
+  user_id: string | null;
+  employee_code: string | null;
+  full_name: string;
+  department: string;
+  email: string | null;
+  account_status: AccountStatus;
+  access_class: AccessClass | null;
+  scope_departments: string[];
+  access_areas: string[];
+  email_sent_confirmed: boolean;
+  is_active: boolean;
+  match_status: MatchStatus;
+}
+
+export interface PermissionPersonPatch {
+  employee_code?: string | null;
+  full_name: string;
+  department: string;
+  email?: string | null;
+  access_class: AccessClass;
+  scope_departments: string[];
+  access_areas: string[];
+  email_sent_confirmed?: boolean;
+  is_active?: boolean;
+}
+
+export interface ItemAssignment {
+  assignment_id: string;
+  validation_code: string;
+  person_id: string | null;
+  user_id: string | null;
+  staff_name: string;
+  employee_code: string | null;
+  assignment_kind: "qa" | "equipment_department";
+  source: string;
+  source_text: string | null;
+  unresolved_reason: string | null;
+  expires_at: string | null;
+  is_active: boolean;
+  grants_access: boolean;
+  object_department: string;
+  area: string | null;
+  line: string | null;
+}
+
+export interface EffectiveItemRight {
+  person_id: string;
+  user_id: string | null;
+  full_name: string;
+  validation_code: string;
+  can_view: boolean;
+  editable_fields: EditableTimelineField[];
+  view_reason: string;
+  assignment_sources: string[];
+  scope_match: boolean;
+  area_match: boolean;
+}
+
+export interface PermissionIssue {
+  code: string;
+  record_id: string;
+  message: string;
+}
+
+export interface PermissionPreflight {
+  mode: ItemPermissionMode;
+  blocking_errors: PermissionIssue[];
+  warnings: PermissionIssue[];
+}
+
 export function normalizePersonName(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
 }
+import type { ItemPermissionMode } from "../../types/domain.ts";
