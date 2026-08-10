@@ -38,6 +38,26 @@ begin
       or not has_table_privilege('service_role', 'public.vmp_active_item_assignments', 'SELECT') then
     raise exception 'service_role phải giữ quyền đọc bảng/view phân công';
   end if;
+  if has_table_privilege('authenticated', 'public.vmp_item_assignments', 'INSERT')
+      or has_table_privilege('authenticated', 'public.vmp_item_assignments', 'UPDATE')
+      or has_table_privilege('authenticated', 'public.vmp_item_assignments', 'DELETE')
+      or has_table_privilege('anon', 'public.vmp_item_assignments', 'INSERT')
+      or has_table_privilege('anon', 'public.vmp_item_assignments', 'UPDATE')
+      or has_table_privilege('anon', 'public.vmp_item_assignments', 'DELETE') then
+    raise exception 'Browser role không được có quyền mutation bảng phân công';
+  end if;
+  if not has_table_privilege('service_role', 'public.vmp_item_assignments', 'INSERT')
+      or not has_table_privilege('service_role', 'public.vmp_item_assignments', 'UPDATE')
+      or not has_table_privilege('service_role', 'public.vmp_item_assignments', 'DELETE') then
+    raise exception 'service_role phải giữ quyền mutation bảng phân công';
+  end if;
+  if has_function_privilege(
+    'service_role',
+    'public.rpc_set_item_assignment(uuid,text,text,text,text)',
+    'EXECUTE'
+  ) then
+    raise exception 'Không được grant service_role vào RPC phụ thuộc auth.uid manager';
+  end if;
 
   if has_function_privilege(
       'authenticated', 'public.vmp_item_rights(uuid,text)', 'EXECUTE'
@@ -55,6 +75,17 @@ begin
   end if;
   if has_table_privilege('anon', 'public.vmp_performers', 'SELECT') then
     raise exception 'anon không được đọc danh bạ performer có metadata quyền';
+  end if;
+
+  perform public.vmp_harden_dashboard_object_scope();
+  perform public.vmp_harden_dashboard_object_scope();
+  if regexp_count(
+    pg_get_functiondef(
+      'public.rpc_get_vmp_dashboard(integer,boolean,boolean)'::regprocedure
+    ),
+    'visible_object_item'
+  ) <> 6 then
+    raise exception 'Hardening dashboard objects không idempotent';
   end if;
 
   if public.vmp_parse_scheduled_at('12/08/2026 14:35:20')
@@ -298,6 +329,35 @@ begin
     raise exception 'access_areas typo phải bị RPC từ chối: %', v_result;
   end if;
 
+  v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
+    'full_name', 'E2E Department Sai Danh Mục',
+    'department', 'khong-ton-tai',
+    'access_class', 'view_only',
+    'scope_departments', jsonb_build_array('*'),
+    'access_areas', jsonb_build_array('*')
+  ), 'Kiểm department typo');
+  if coalesce((v_result->>'ok')::boolean, true) is not false then
+    raise exception 'department ngoài catalog phải bị RPC từ chối dù scope=*: %',
+      v_result;
+  end if;
+
+  v_result := public.rpc_import_item_permission_staff(
+    jsonb_build_array(jsonb_build_object(
+      'row_number', 405,
+      'full_name', 'E2E Import Department Sai',
+      'department', 'khong-ton-tai',
+      'access_class', 'view_only',
+      'scope_departments', jsonb_build_array('*'),
+      'access_areas', jsonb_build_array('*')
+    )),
+    'Kiểm import department typo'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or (v_result->>'imported')::integer <> 0
+      or jsonb_array_length(v_result->'errors') <> 1 then
+    raise exception 'Importer phải từ chối department ngoài catalog: %', v_result;
+  end if;
+
   v_result := public.rpc_import_item_permission_staff(
     jsonb_build_array(jsonb_build_object(
       'row_number', 404,
@@ -484,6 +544,8 @@ declare
   v_hidden_assignment uuid := current_setting('app.test_hidden_assignment')::uuid;
   v_dashboard jsonb;
   v_result jsonb;
+  v_hidden_rights jsonb;
+  v_missing_rights jsonb;
 begin
   if (select count(*) from public.vmp_plan_items) <> 1
       or not exists (
@@ -522,6 +584,14 @@ begin
   ) then
     raise exception 'Dashboard objects làm lộ object của hạng mục ẩn: %',
       v_hidden_object;
+  end if;
+  select to_jsonb(rights) into v_hidden_rights
+  from public.vmp_my_item_rights(v_hidden_code) rights;
+  select to_jsonb(rights) into v_missing_rights
+  from public.vmp_my_item_rights('E2E-KHONG-TON-TAI') rights;
+  if v_hidden_rights is distinct from v_missing_rights then
+    raise exception 'Wrapper self làm lộ hidden vs nonexistent: hidden=%, missing=%',
+      v_hidden_rights, v_missing_rights;
   end if;
   if not (v_dashboard->'activities'->0->'_raw' ? 'scheduled_at') then
     raise exception 'Dashboard phải trả scheduled_at đầy đủ trong _raw';
@@ -1410,7 +1480,10 @@ begin
 
   /* Tạo dữ liệu legacy sai để chứng minh preflight bắt đúng từng lớp. */
   update public.vmp_item_assignments
-  set user_id = v_admin
+  set user_id = v_admin,
+      employee_code = 'E2E-DENORMAL-SAI',
+      staff_name = 'E2E Denormal Sai',
+      unresolved_reason = null
   where id = v_assignment;
   insert into public.vmp_performers (
     performer_name, department, access_class,
@@ -1420,7 +1493,8 @@ begin
     array['xsx'], array[v_area], true, v_admin
   ) returning id into v_legacy_person;
   update public.vmp_performers
-  set scope_departments = array['xssx'],
+  set department = 'khong-ton-tai',
+      scope_departments = array['xssx'],
       access_areas = array['KHU-VUC-KHONG-TON-TAI']
   where id = v_legacy_person;
   update public.profiles
@@ -1437,6 +1511,13 @@ begin
   end if;
   if not exists (
     select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'ASSIGNMENT_DENORMALIZED_MISMATCH'
+      and (error->>'record_id')::uuid = v_assignment
+  ) then
+    raise exception 'Preflight chưa bắt mã/tên/reason denormalized bị stale: %', v_result;
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
     where error->>'code' = 'INVALID_SCOPE_DEPARTMENT'
       and (error->>'record_id')::uuid = v_legacy_person
   ) or not exists (
@@ -1445,6 +1526,13 @@ begin
       and (error->>'record_id')::uuid = v_legacy_person
   ) then
     raise exception 'Preflight chưa bắt scope/area legacy typo: %', v_result;
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'INVALID_PERSON_DEPARTMENT'
+      and (error->>'record_id')::uuid = v_legacy_person
+  ) then
+    raise exception 'Preflight chưa bắt performer.department ngoài catalog: %', v_result;
   end if;
   if not exists (
     select 1 from jsonb_array_elements(v_result->'blocking_errors') error
@@ -1465,6 +1553,63 @@ begin
       and (error->>'record_id')::uuid = v_assignment
   ) then
     raise exception 'Assignment tên trùng đã resolve không được coi là unresolved: %', v_result;
+  end if;
+
+  update public.vmp_item_assignments assignment
+  set user_id = person.user_id,
+      employee_code = person.employee_code,
+      staff_name = person.performer_name,
+      unresolved_reason = 'not_found'
+  from public.vmp_performers person
+  where assignment.id = v_assignment and person.id = assignment.performer_id;
+  v_result := public.rpc_item_permission_preflight();
+  if not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'ASSIGNMENT_DENORMALIZED_MISMATCH'
+      and (error->>'record_id')::uuid = v_assignment
+  ) then
+    raise exception 'Preflight chưa bắt unresolved_reason stale: %', v_result;
+  end if;
+
+  update public.vmp_performers set is_active = false where id = v_person_1;
+  perform public.rpc_refresh_source_item_assignments();
+  select id into v_assignment
+  from public.vmp_item_assignments
+  where validation_code = v_code and source = 'sheet_other_staff'
+    and public.vmp_normalize_person_name(source_text) =
+        public.vmp_normalize_person_name('E2E Resolve Tên Trùng');
+  if v_assignment is null or not exists (
+    select 1 from public.vmp_item_assignments
+    where id = v_assignment and performer_id is null and user_id is null
+      and unresolved_reason = 'stale_resolution'
+  ) then
+    raise exception 'Mapping tới performer inactive phải giữ stale, không remap người trùng khác';
+  end if;
+  if not exists (
+    select 1 from public.vmp_source_assignment_resolutions
+    where validation_code = v_code and performer_id = v_person_1
+  ) then
+    raise exception 'Mapping inactive phải được giữ để quản lý xử lý rõ ràng';
+  end if;
+
+  delete from public.vmp_performers where id = v_person_1;
+  perform public.rpc_refresh_source_item_assignments();
+  if not exists (
+    select 1 from public.vmp_source_assignment_resolutions
+    where validation_code = v_code and performer_id is null
+  ) or not exists (
+    select 1 from public.vmp_item_assignments
+    where validation_code = v_code and source = 'sheet_other_staff'
+      and performer_id is null and unresolved_reason = 'stale_resolution'
+  ) then
+    raise exception 'Xóa performer phải giữ mapping stale, không cascade/remap';
+  end if;
+  v_result := public.rpc_item_permission_preflight();
+  if not exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'STALE_SOURCE_RESOLUTION'
+  ) then
+    raise exception 'Preflight chưa chặn mapping resolve stale: %', v_result;
   end if;
 end
 $test$;
