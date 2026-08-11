@@ -1,6 +1,6 @@
 # Kiểm thử end-to-end VMP
 
-Ba bộ kiểm chạy trên **Chrome thật đã cài trên máy** (không tải trình duyệt
+Các bộ kiểm chạy trên **Chrome thật đã cài trên máy** (không tải trình duyệt
 riêng), đọc **dữ liệu Supabase thật** bằng khoá anon. Không có bộ nào ghi lên
 Supabase.
 
@@ -21,6 +21,7 @@ node tests/e2e/giam-chuyen-dong.mjs     # prefers-reduced-motion có thật sự
 node tests/e2e/danh-ba-phan-quyen.mjs   # autocomplete, tự điền và phân công bằng person_id
 node tests/e2e/quyen-cot-timeline.mjs   # preview/enforced theo từng cột timeline
 node tests/e2e/thu-hoi-cache-phan-quyen.mjs # thu hồi cache và fail-closed khi bật enforced
+node tests/e2e/danh-muc-nguoi-thuc-hien.mjs # danh mục cũ không còn mutation và dẫn tới danh bạ chuẩn
 ```
 
 Khi nghiệm thu phân quyền theo từng hạng mục, chạy `npm run test:permissions`
