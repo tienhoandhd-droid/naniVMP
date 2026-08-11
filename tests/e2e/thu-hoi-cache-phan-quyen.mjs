@@ -27,7 +27,9 @@ let modeReads = 0;
 let legacyReads = 0;
 let holdLegacy = false;
 let heldLegacyRequest = null;
-let collaboratorAssigned = true;
+// Phase preview → enforced bắt đầu bằng thu hồi phân công; scenario modal
+// collaborator phía dưới tự bật lại trạng thái này một cách tường minh.
+let collaboratorAssigned = false;
 let holdNextRights = false;
 let heldRightsRequest = null;
 let rightsReads = 0;
@@ -139,6 +141,7 @@ try {
 
   mode = "enforced";
   failDashboard = false;
+  collaboratorAssigned = false;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await page.waitForFunction(() => !document.body.innerText.includes("TB-BI-MAT"));
   await answer(heldLegacyRequest, { activities: [secret], objects: [] });
@@ -175,12 +178,12 @@ try {
   // quyền, khóa tám control, dashboard mất hạng mục. Response quyền cũ bắt
   // đầu trước lúc revoke cũng không được phép cấp lại quyền.
   failDashboard = false;
+  // Đây là phase độc lập: QA phối hợp còn được phân để mở modal trước revoke.
   collaboratorAssigned = true;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await page.waitForFunction(() => document.body.innerText.includes("TB-BI-MAT"));
   await openProgressModal();
-  await page.waitForFunction(() => [...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.includes("Quyền theo từng cột đang áp dụng")));
+  await page.waitForFunction(() => document.body.innerText.includes("Quyền theo từng cột đang áp dụng"));
   assert.equal(await enabledQaControls(), 8, "QA phối hợp ban đầu sửa đúng tám control");
 
   holdNextRights = true;
