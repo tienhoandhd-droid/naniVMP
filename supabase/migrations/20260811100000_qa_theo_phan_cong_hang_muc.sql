@@ -1,5 +1,11 @@
 /* Nối tài khoản vào hồ sơ bằng xác nhận Admin; QA nhận quyền từ phân công. */
 
+/* Chữ ký ba tham số đã được thay bằng optimistic version ở migration 1600.
+ * Phải drop trước CREATE OR REPLACE để event-trigger không thấy overload RPC. */
+revoke all on function public.rpc_upsert_item_permission_staff(uuid, jsonb, text)
+  from public, anon, authenticated, service_role;
+drop function public.rpc_upsert_item_permission_staff(uuid, jsonb, text);
+
 create or replace function public.rpc_upsert_item_permission_staff(
   p_person_id uuid, p_patch jsonb, p_reason text, p_expected_version integer
 ) returns jsonb
@@ -108,6 +114,14 @@ begin
   ) then
     return jsonb_build_object('ok', false, 'error_code', 'ACCOUNT_RELINK_REQUIRED',
       'error', 'Phải gỡ tài khoản trước khi đổi bộ phận hoặc phân loại quyền');
+  end if;
+  if p_person_id is not null
+      and v_old.user_id is not null
+      and v_old.is_active
+      and not v_is_active then
+    return jsonb_build_object('ok', false,
+      'error_code', 'ACCOUNT_UNLINK_REQUIRED',
+      'error', 'Phải gỡ tài khoản trước khi ngừng hoạt động hồ sơ');
   end if;
   if v_full_name is null then
     return jsonb_build_object('ok', false, 'error_code', 'FULL_NAME_REQUIRED',
@@ -354,6 +368,12 @@ begin
       'current_version', v_person.version
     );
   end if;
+  if p_user_id is not null and not v_person.is_active then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'PERSON_INACTIVE',
+      'error', 'Không được nối tài khoản vào hồ sơ đã ngừng hoạt động'
+    );
+  end if;
 
   /* Performer được khóa trước, sau đó profile được khóa theo UUID ổn định. */
   perform profile.id
@@ -494,6 +514,184 @@ exception
   when others then
     return jsonb_build_object(
       'ok', false, 'error_code', 'ACCOUNT_LINK_FAILED', 'error', sqlerrm
+    );
+end
+$fn$;
+
+/* Các writer danh bạ đời cũ thiếu reason/version và làm lệch profile.
+ * Giữ chữ ký để caller cũ nhận lỗi có nghĩa, nhưng tuyệt đối không mutate. */
+create or replace function public.rpc_upsert_performer(
+  p_id uuid, p_patch jsonb
+) returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $fn$
+  select jsonb_build_object(
+    'ok', false,
+    'error_code', 'LEGACY_RPC_DISABLED',
+    'error', 'Đường lưu người thực hiện cũ đã ngừng; dùng danh bạ phân quyền có reason và version'
+  )
+$fn$;
+
+create or replace function public.rpc_delete_performer(p_id uuid)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $fn$
+  select jsonb_build_object(
+    'ok', false,
+    'error_code', 'LEGACY_RPC_DISABLED',
+    'error', 'Đường xóa người thực hiện cũ đã ngừng; hãy ngừng hoạt động hồ sơ qua danh bạ phân quyền'
+  )
+$fn$;
+
+/* Giữ RPC quản trị user, nhưng profile đã linked phải unlink trước khi đổi
+ * role/department để coarse role không lệch access_class của performer. */
+create or replace function public.rpc_set_user_role(
+  p_user_id uuid,
+  p_role text,
+  p_department text,
+  p_reason text default null,
+  p_pham_vi text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_me uuid := auth.uid();
+  v_my_role text;
+  v_old public.profiles%rowtype;
+  v_linked public.vmp_performers%rowtype;
+  v_so_admin integer;
+  v_pv text := nullif(btrim(coalesce(p_pham_vi, '')), '');
+  v_department text := nullif(btrim(coalesce(p_department, '')), '');
+begin
+  select role::text into v_my_role
+  from public.profiles
+  where id = v_me and coalesce(is_active, true);
+  if v_my_role is null then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'FORBIDDEN',
+      'error', 'Không xác định được người dùng'
+    );
+  end if;
+  if not public.duoc_phep('admin_users', v_my_role) then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'FORBIDDEN',
+      'error', 'Chỉ admin được đổi phân quyền'
+    );
+  end if;
+
+  /* Cùng thứ tự lock với RPC link: performer trước, profile sau. */
+  select * into v_linked
+  from public.vmp_performers
+  where user_id = p_user_id
+  for update;
+  select * into v_old
+  from public.profiles
+  where id = p_user_id
+  for update;
+  if not found then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'ACCOUNT_NOT_FOUND',
+      'error', 'Không tìm thấy tài khoản'
+    );
+  end if;
+  if p_role not in ('admin', 'qa_manager', 'department_user', 'viewer') then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'INVALID_ROLE',
+      'error', 'Vai trò không hợp lệ'
+    );
+  end if;
+  if v_pv is not null and v_pv not in ('co', 'bo_phan', 'phan_cong', 'khong') then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'INVALID_SCOPE',
+      'error', 'Phạm vi không hợp lệ'
+    );
+  end if;
+  if v_linked.id is not null and (
+    p_role is distinct from v_old.role::text
+    or v_department is distinct from v_old.department
+  ) then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'ACCOUNT_RELINK_REQUIRED',
+      'error', 'Phải gỡ tài khoản khỏi hồ sơ trước khi đổi role hoặc department'
+    );
+  end if;
+  if p_user_id = v_me and p_role <> 'admin' then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'SELF_DEMOTION_FORBIDDEN',
+      'error', 'Không tự hạ vai của chính mình — hạ xong sẽ không vào lại được để sửa.'
+    );
+  end if;
+  if v_old.role::text = 'admin' and p_role <> 'admin' then
+    select count(*) into v_so_admin
+    from public.profiles
+    where role::text = 'admin' and coalesce(is_active, true) and id <> p_user_id;
+    if v_so_admin = 0 then
+      return jsonb_build_object(
+        'ok', false, 'error_code', 'LAST_ADMIN_PROTECTED',
+        'error', 'Đây là admin đang hoạt động cuối cùng — không thể hạ vai.'
+      );
+    end if;
+  end if;
+  if p_role = 'department_user' and v_department is null then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'DEPARTMENT_REQUIRED',
+      'error', 'Vai department_user bắt buộc có bộ phận.'
+    );
+  end if;
+  if v_pv = 'phan_cong' and not exists (
+    select 1
+    from public.vmp_assignment_matrix assignment
+    left join public.vmp_performers person on person.user_id = p_user_id
+    where assignment.is_active
+      and lower(btrim(assignment.staff_name)) = lower(btrim(coalesce(
+        person.performer_name, v_old.full_name, ''
+      )))
+  ) then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'ASSIGNMENT_REQUIRED',
+      'error', 'Người này chưa được tích ô phân công nào; hãy phân công trước.'
+    );
+  end if;
+
+  update public.profiles
+  set role = p_role::public.user_role,
+      department = v_department,
+      pham_vi = v_pv,
+      updated_at = now()
+  where id = p_user_id;
+
+  insert into public.audit_logs (
+    user_id, action, table_name, record_id, old_data, new_data,
+    change_reason, source, changed_fields
+  ) values (
+    v_me, 'UPDATE', 'profiles', p_user_id::text,
+    jsonb_build_object(
+      'role', v_old.role, 'department', v_old.department, 'pham_vi', v_old.pham_vi
+    ),
+    jsonb_build_object(
+      'role', p_role, 'department', v_department, 'pham_vi', v_pv
+    ),
+    coalesce(nullif(btrim(coalesce(p_reason, '')), ''),
+      'Đổi phân quyền từ màn Phân quyền'),
+    'dashboard_rpc', array['role', 'department', 'pham_vi']
+  );
+
+  return jsonb_build_object(
+    'ok', true, 'msg', 'Đã cập nhật phân quyền',
+    'role', p_role, 'department', v_department, 'pham_vi', v_pv
+  );
+exception
+  when others then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'ROLE_UPDATE_FAILED', 'error', sqlerrm
     );
 end
 $fn$;
@@ -921,6 +1119,12 @@ revoke execute on function public.rpc_item_permission_preflight()
   from public, anon;
 revoke all on function public.rpc_lien_ket_tai_khoan(uuid, uuid)
   from public, anon, authenticated, service_role;
+revoke all on function public.rpc_upsert_performer(uuid, jsonb)
+  from public, anon;
+revoke all on function public.rpc_delete_performer(uuid)
+  from public, anon;
+revoke all on function public.rpc_set_user_role(uuid, text, text, text, text)
+  from public, anon;
 
 grant execute on function public.rpc_upsert_item_permission_staff(
   uuid, jsonb, text, integer
@@ -936,6 +1140,12 @@ grant execute on function public.rpc_item_permission_directory(text)
   to authenticated, service_role;
 grant execute on function public.rpc_item_permission_preflight()
   to authenticated, service_role;
+grant execute on function public.rpc_upsert_performer(uuid, jsonb)
+  to authenticated, service_role;
+grant execute on function public.rpc_delete_performer(uuid)
+  to authenticated, service_role;
+grant execute on function public.rpc_set_user_role(uuid, text, text, text, text)
+  to authenticated;
 
 do $verify$
 begin
@@ -966,6 +1176,24 @@ begin
       'service_role', 'public.rpc_lien_ket_tai_khoan(uuid,uuid)', 'EXECUTE'
     ) then
     raise exception 'Quyền RPC nối account QA chưa tối thiểu hoặc còn đường legacy';
+  end if;
+  if to_regprocedure(
+      'public.rpc_upsert_item_permission_staff(uuid,jsonb,text)'
+    ) is not null
+      or (
+        select count(*)
+        from pg_proc procedure
+        join pg_namespace namespace on namespace.oid = procedure.pronamespace
+        where namespace.nspname = 'public'
+          and procedure.proname = 'rpc_upsert_item_permission_staff'
+      ) <> 1 then
+    raise exception 'RPC upsert danh bạ vẫn bị overload';
+  end if;
+  if not exists (
+    select 1 from pg_event_trigger
+    where evtname = 'chan_overload_rpc_tg' and evtenabled = 'O'
+  ) then
+    raise exception 'Event trigger chống overload RPC không còn bật';
   end if;
 end
 $verify$;

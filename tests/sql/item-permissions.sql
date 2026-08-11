@@ -200,6 +200,22 @@ begin
     ) then
     raise exception 'Quyền EXECUTE RPC nối tài khoản không tối thiểu hoặc còn đường legacy';
   end if;
+  if to_regprocedure(
+      'public.rpc_upsert_item_permission_staff(uuid,jsonb,text)'
+    ) is not null
+      or (
+        select count(*)
+        from pg_proc procedure
+        join pg_namespace namespace on namespace.oid = procedure.pronamespace
+        where namespace.nspname = 'public'
+          and procedure.proname = 'rpc_upsert_item_permission_staff'
+      ) <> 1
+      or not exists (
+        select 1 from pg_event_trigger
+        where evtname = 'chan_overload_rpc_tg' and evtenabled = 'O'
+      ) then
+    raise exception 'Forward migration phải giữ trigger bật và chỉ một chữ ký upsert';
+  end if;
 
   perform set_config(
     'request.jwt.claims',
@@ -333,6 +349,38 @@ begin
   end if;
   update public.profiles set department = 'qa' where id = v_user_1;
 
+  update public.vmp_performers set is_active = false where id = v_person_2;
+  v_result := public.rpc_link_item_permission_account(
+    v_person_2, v_user_2, 'Thử nối performer inactive', 1
+  );
+  if v_result->>'error_code' <> 'PERSON_INACTIVE'
+      or exists (
+        select 1 from public.vmp_performers
+        where id = v_person_2 and (user_id is not null or version <> 1)
+      ) then
+    raise exception 'Không được nối account vào performer inactive: %', v_result;
+  end if;
+  /* Dữ liệu linked+inactive có sẵn vẫn phải gỡ được để thu hồi coarse role. */
+  update public.vmp_performers set user_id = v_user_2 where id = v_person_2;
+  update public.profiles
+  set role = 'qa_manager', department = 'qa'
+  where id = v_user_2;
+  v_result := public.rpc_link_item_permission_account(
+    v_person_2, null, 'Thu hồi account của performer inactive', 1
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (v_result->>'version')::integer <> 2
+      or exists (
+        select 1 from public.vmp_performers
+        where id = v_person_2 and user_id is not null
+      ) or not exists (
+        select 1 from public.profiles
+        where id = v_user_2 and role::text = 'viewer'
+      ) then
+    raise exception 'Performer inactive đã linked phải gỡ và hạ role được: %', v_result;
+  end if;
+  update public.vmp_performers set is_active = true where id = v_person_2;
+
   v_result := public.rpc_link_item_permission_account(
     v_person_1, v_user_1, 'Admin xác nhận nối QA', v_version
   );
@@ -353,11 +401,49 @@ begin
     raise exception 'Nối account phải đồng bộ assignment và coarse role QA manager';
   end if;
 
+  v_result := public.rpc_upsert_item_permission_staff(
+    v_person_1, jsonb_build_object('is_active', false),
+    'Thử deactivate khi account còn nối', v_version
+  );
+  if v_result->>'error_code' <> 'ACCOUNT_UNLINK_REQUIRED'
+      or not exists (
+        select 1 from public.vmp_performers
+        where id = v_person_1 and is_active and user_id = v_user_1
+          and version = v_version
+      ) or not exists (
+        select 1 from public.profiles
+        where id = v_user_1 and role::text = 'qa_manager' and department = 'qa'
+      ) then
+    raise exception 'Linked performer phải unlink trước khi deactivate: %', v_result;
+  end if;
+
   perform set_config(
     'request.jwt.claims',
     json_build_object('sub', v_user_1::text, 'role', 'authenticated')::text,
     true
   );
+  v_result := public.rpc_upsert_performer(
+    v_person_1,
+    jsonb_build_object(
+      'performer_name', 'E2E Legacy QA Manager Bypass',
+      'is_active', false
+    )
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED' then
+    raise exception 'QA manager không được mutate qua rpc_upsert_performer legacy: %',
+      v_result;
+  end if;
+  v_result := public.rpc_delete_performer(v_person_1);
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED'
+      or not exists (
+        select 1 from public.vmp_performers
+        where id = v_person_1 and performer_name = 'E2E QA Không Phạm Vi'
+          and is_active and user_id = v_user_1 and version = v_version
+      ) then
+    raise exception 'QA manager không được delete qua RPC performer legacy: %', v_result;
+  end if;
   v_directory := public.rpc_item_permission_directory(null);
   if coalesce((v_directory->>'ok')::boolean, false) is not true then
     raise exception 'QA manager đã nối phải có principal quản lý hợp lệ: %', v_directory;
@@ -367,9 +453,42 @@ begin
     json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
     true
   );
+  v_result := public.rpc_upsert_performer(
+    v_person_1,
+    jsonb_build_object(
+      'performer_name', 'E2E Legacy Admin Bypass',
+      'is_active', false
+    )
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED' then
+    raise exception 'Admin không được mutate qua rpc_upsert_performer legacy: %', v_result;
+  end if;
+  v_result := public.rpc_delete_performer(v_person_1);
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED'
+      or not exists (
+        select 1 from public.vmp_performers
+        where id = v_person_1 and performer_name = 'E2E QA Không Phạm Vi'
+          and is_active and user_id = v_user_1 and version = v_version
+      ) then
+    raise exception 'Admin không được delete qua RPC performer legacy: %', v_result;
+  end if;
+  v_result := public.rpc_set_user_role(
+    v_user_1, 'viewer', 'xsx',
+    'Thử làm lệch profile đang linked', null
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' <> 'ACCOUNT_RELINK_REQUIRED'
+      or not exists (
+        select 1 from public.profiles
+        where id = v_user_1 and role::text = 'qa_manager' and department = 'qa'
+      ) then
+    raise exception 'rpc_set_user_role không được làm lệch profile linked: %', v_result;
+  end if;
 
   v_result := public.rpc_link_item_permission_account(
-    v_person_2, v_user_1, 'Thử dùng account đã nối', 1
+    v_person_2, v_user_1, 'Thử dùng account đã nối', 2
   );
   if v_result->>'error_code' <> 'ACCOUNT_ALREADY_LINKED' then
     raise exception 'Một account không được nối hai performer: %', v_result;
@@ -814,13 +933,13 @@ begin
 end
 $test$;
 
-/* RPC bốn tham số lưu nguyên khối, khóa phiên bản và vẫn giữ RPC ba tham số. */
+/* RPC bốn tham số lưu nguyên khối, khóa phiên bản; overload cũ bị loại bỏ. */
 do $test$
 declare
   v_admin uuid;
   v_person_1 uuid;
   v_person_2 uuid;
-  v_legacy_person uuid;
+  v_canonical_person uuid;
   v_object_kind text;
   v_result jsonb;
   v_directory jsonb;
@@ -974,7 +1093,7 @@ begin
   end if;
   v_person_2 := (v_result->>'person_id')::uuid;
 
-  /* Hợp đồng ba tham số cũ vẫn chạy; preflight sẽ chặn scope mới còn thiếu. */
+  /* Mọi create đều đi qua hợp đồng canonical có expected_version. */
   v_result := public.rpc_upsert_item_permission_staff(
     null,
     jsonb_build_object(
@@ -983,14 +1102,17 @@ begin
       'department', 'xsx',
       'access_class', 'view_only',
       'scope_departments', jsonb_build_array('xsx'),
-      'access_areas', jsonb_build_array('*')
+      'scope_factory_ids', jsonb_build_array(v_factory_1),
+      'scope_area_ids', jsonb_build_array(v_area_1),
+      'scope_line_ids', jsonb_build_array(v_line_1)
     ),
-    'Kiểm tương thích RPC cũ'
+    'Kiểm hợp đồng canonical',
+    0
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true then
-    raise exception 'RPC ba tham số cũ phải tiếp tục hoạt động: %', v_result;
+    raise exception 'RPC canonical phải tạo được hồ sơ: %', v_result;
   end if;
-  v_legacy_person := (v_result->>'person_id')::uuid;
+  v_canonical_person := (v_result->>'person_id')::uuid;
 
   select item.validation_code, item.object_code, item.year, source.object_kind
   into v_code, v_object_code, v_year, v_object_kind
@@ -1079,25 +1201,22 @@ begin
     raise exception 'person_id inactive phải bị từ chối và không đổi phân công: %', v_result;
   end if;
 
-  v_result := public.rpc_upsert_item_permission_staff(
-    v_legacy_person, jsonb_build_object('full_name', 'Không được ghi thiếu version'),
-    'Legacy update thiếu version'
-  );
-  if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'VERSION_REQUIRED' then
-    raise exception 'RPC ba tham số chỉ được create, update phải yêu cầu version: %', v_result;
+  if to_regprocedure(
+    'public.rpc_upsert_item_permission_staff(uuid,jsonb,text)'
+  ) is not null then
+    raise exception 'Overload ba tham số phải bị loại bỏ để không bypass version/audit';
   end if;
 
   update public.vmp_performers
   set scope_factory_ids = array['10000000-0000-0000-0000-000000000001']::uuid[],
       scope_area_ids = array['20000000-0000-0000-0000-000000000002']::uuid[],
       scope_line_ids = array['30000000-0000-0000-0000-000000000002']::uuid[]
-  where id = v_legacy_person;
+  where id = v_canonical_person;
   v_preflight := public.rpc_item_permission_preflight();
   if not exists (
     select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
     where error->>'code' = 'INVALID_SCOPE_HIERARCHY'
-      and (error->>'record_id')::uuid = v_legacy_person
+      and (error->>'record_id')::uuid = v_canonical_person
   ) then
     raise exception 'Preflight phải chặn hierarchy không nối đủ cha: %', v_preflight;
   end if;
@@ -1298,25 +1417,17 @@ $test$;
 do $test$
 declare
   v_admin uuid;
-  v_user uuid;
-  v_user_email text;
-  v_area text;
+  v_person uuid;
   v_result jsonb;
+  v_factory constant uuid := '10000000-0000-0000-0000-000000000001';
+  v_area constant uuid := '20000000-0000-0000-0000-000000000001';
+  v_line constant uuid := '30000000-0000-0000-0000-000000000001';
 begin
   select id into v_admin
   from public.profiles
   where role::text = 'admin' and coalesce(is_active, true)
   order by created_at limit 1;
-  select id, email into v_user, v_user_email
-  from public.profiles
-  where id <> v_admin and coalesce(is_active, true)
-  order by case when role::text = 'viewer' then 0 else 1 end, created_at
-  limit 1;
-  select area into v_area
-  from public.vmp_objects
-  where nullif(btrim(coalesce(area, '')), '') is not null
-  order by code limit 1;
-  if v_admin is null or v_user is null or v_area is null then
+  if v_admin is null then
     raise exception 'Thiếu fixture để kiểm danh mục scope';
   end if;
 
@@ -1331,8 +1442,10 @@ begin
     'department', 'xsx',
     'access_class', 'view_only',
     'scope_departments', jsonb_build_array('xssx'),
-    'access_areas', jsonb_build_array(v_area)
-  ), 'Kiểm typo bộ phận');
+    'scope_factory_ids', jsonb_build_array(v_factory),
+    'scope_area_ids', jsonb_build_array(v_area),
+    'scope_line_ids', jsonb_build_array(v_line)
+  ), 'Kiểm typo bộ phận', 0);
   if coalesce((v_result->>'ok')::boolean, true) is not false then
     raise exception 'scope_departments typo phải bị RPC từ chối: %', v_result;
   end if;
@@ -1342,39 +1455,43 @@ begin
     'department', 'xsx',
     'access_class', 'view_only',
     'scope_departments', jsonb_build_array('xsx'),
-    'access_areas', jsonb_build_array('KHU-VUC-KHONG-TON-TAI')
-  ), 'Kiểm typo khu vực');
+    'scope_factory_ids', jsonb_build_array(v_factory),
+    'scope_area_ids', jsonb_build_array('ffffffff-ffff-ffff-ffff-ffffffffffff'),
+    'scope_line_ids', jsonb_build_array(v_line)
+  ), 'Kiểm typo khu vực', 0);
   if coalesce((v_result->>'ok')::boolean, true) is not false then
-    raise exception 'access_areas typo phải bị RPC từ chối: %', v_result;
+    raise exception 'scope_area_ids ngoài catalog phải bị RPC từ chối: %', v_result;
   end if;
 
   v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
     'full_name', 'E2E Department Sai Danh Mục',
     'department', 'khong-ton-tai',
     'access_class', 'view_only',
-    'scope_departments', jsonb_build_array('*'),
-    'access_areas', jsonb_build_array('*')
-  ), 'Kiểm department typo');
+    'scope_departments', jsonb_build_array('xsx'),
+    'scope_factory_ids', jsonb_build_array(v_factory),
+    'scope_area_ids', jsonb_build_array(v_area),
+    'scope_line_ids', jsonb_build_array(v_line)
+  ), 'Kiểm department typo', 0);
   if coalesce((v_result->>'ok')::boolean, true) is not false then
     raise exception 'department ngoài catalog phải bị RPC từ chối dù scope=*: %',
       v_result;
   end if;
 
 
-  update public.profiles
-  set role = 'viewer', department = 'qc', is_active = true
-  where id = v_user;
   v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
-    'full_name', 'E2E Principal Thiết Bị Sai',
-    'email', v_user_email,
+    'full_name', 'E2E Email Chỉ Là Metadata',
+    'email', 'e2e-email-khong-tu-noi@example.test',
     'department', 'xsx',
     'access_class', 'equipment_manager',
     'scope_departments', jsonb_build_array('xsx'),
-    'access_areas', jsonb_build_array(v_area)
-  ), 'Kiểm principal thiết bị');
-  if coalesce((v_result->>'ok')::boolean, true) is not false then
-    raise exception 'equipment_manager lệch role/department profile phải bị từ chối: %',
-      v_result;
+    'scope_factory_ids', jsonb_build_array(v_factory),
+    'scope_area_ids', jsonb_build_array(v_area),
+    'scope_line_ids', jsonb_build_array(v_line)
+  ), 'Kiểm email không tự nối account', 0);
+  v_person := (v_result->>'person_id')::uuid;
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (select user_id from public.vmp_performers where id = v_person) is not null then
+    raise exception 'Email metadata không được tự suy luận hoặc nối account: %', v_result;
   end if;
 end
 $test$;
@@ -1996,6 +2113,9 @@ declare
   v_qc_code text;
   v_result jsonb;
   v_values jsonb;
+  v_factory constant uuid := '10000000-0000-0000-0000-000000000001';
+  v_area constant uuid := '20000000-0000-0000-0000-000000000001';
+  v_line constant uuid := '30000000-0000-0000-0000-000000000001';
 begin
   select id into v_admin
   from public.profiles
@@ -2036,10 +2156,8 @@ begin
   v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
     'full_name', 'E2E QA Được Phân Công',
     'department', 'qa',
-    'access_class', 'qa_progress_editor',
-    'scope_departments', jsonb_build_array('*'),
-    'access_areas', jsonb_build_array('*')
-  ), 'Tạo fixture QA');
+    'access_class', 'qa_progress_editor'
+  ), 'Tạo fixture QA', 0);
   v_qa_person := (v_result->>'person_id')::uuid;
 
   v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
@@ -2047,8 +2165,10 @@ begin
     'department', 'xsx',
     'access_class', 'equipment_scheduler',
     'scope_departments', jsonb_build_array('xsx'),
-    'access_areas', jsonb_build_array('*')
-  ), 'Tạo fixture XSX');
+    'scope_factory_ids', jsonb_build_array(v_factory),
+    'scope_area_ids', jsonb_build_array(v_area),
+    'scope_line_ids', jsonb_build_array(v_line)
+  ), 'Tạo fixture XSX', 0);
   v_xsx_person := (v_result->>'person_id')::uuid;
 
   v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
@@ -2056,18 +2176,22 @@ begin
     'department', 'xsx',
     'access_class', 'view_only',
     'scope_departments', jsonb_build_array('xsx'),
-    'access_areas', jsonb_build_array('*'),
+    'scope_factory_ids', jsonb_build_array(v_factory),
+    'scope_area_ids', jsonb_build_array(v_area),
+    'scope_line_ids', jsonb_build_array(v_line),
     'email', 'e2e-source-duplicate-1@example.test'
-  ), 'Tạo fixture tên trùng');
+  ), 'Tạo fixture tên trùng', 0);
   v_duplicate_1 := (v_result->>'person_id')::uuid;
   v_result := public.rpc_upsert_item_permission_staff(null, jsonb_build_object(
     'full_name', ' E2E  Tên Nguồn Bị Trùng ',
     'department', 'xsx',
     'access_class', 'view_only',
     'scope_departments', jsonb_build_array('xsx'),
-    'access_areas', jsonb_build_array('*'),
+    'scope_factory_ids', jsonb_build_array(v_factory),
+    'scope_area_ids', jsonb_build_array(v_area),
+    'scope_line_ids', jsonb_build_array(v_line),
     'email', 'e2e-source-duplicate-2@example.test'
-  ), 'Tạo fixture tên trùng');
+  ), 'Tạo fixture tên trùng', 0);
   v_duplicate_2 := (v_result->>'person_id')::uuid;
   if v_duplicate_1 is null or v_duplicate_2 is null then
     raise exception 'Không tạo được fixture tên trùng';
@@ -2182,6 +2306,12 @@ declare
   v_import_factory constant uuid := '71000000-0000-0000-0000-000000000001';
   v_import_area constant uuid := '81000000-0000-0000-0000-000000000001';
   v_import_line constant uuid := '91000000-0000-0000-0000-000000000001';
+  v_qc_factory constant uuid := '10000000-0000-0000-0000-000000000003';
+  v_qc_area constant uuid := '20000000-0000-0000-0000-000000000003';
+  v_qc_line constant uuid := '30000000-0000-0000-0000-000000000003';
+  v_xsx_factory constant uuid := '10000000-0000-0000-0000-000000000001';
+  v_xsx_area constant uuid := '20000000-0000-0000-0000-000000000004';
+  v_xsx_line constant uuid := '30000000-0000-0000-0000-000000000004';
 begin
   select id into v_admin
   from public.profiles
@@ -2211,10 +2341,13 @@ begin
       'department', 'qc',
       'access_class', 'view_only',
       'scope_departments', jsonb_build_array('qc'),
-      'access_areas', jsonb_build_array('*'),
+      'scope_factory_ids', jsonb_build_array(v_qc_factory),
+      'scope_area_ids', jsonb_build_array(v_qc_area),
+      'scope_line_ids', jsonb_build_array(v_qc_line),
       'email', 'e2e-pq-unique@example.test'
     ),
-    'Kiểm danh bạ tự động'
+    'Kiểm danh bạ tự động',
+    0
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true then
     raise exception 'Không tạo được người thử: %', v_result;
@@ -2234,11 +2367,10 @@ begin
       'full_name', 'E2E Phân Quyền Tên Trùng',
       'department', 'qa',
       'access_class', 'qa_progress_editor',
-      'scope_departments', jsonb_build_array('qa'),
-      'access_areas', jsonb_build_array('*'),
       'email', 'e2e-pq-duplicate-1@example.test'
     ),
-    'Kiểm cảnh báo trùng tên'
+    'Kiểm cảnh báo trùng tên',
+    0
   );
   perform public.rpc_upsert_item_permission_staff(
     null,
@@ -2247,10 +2379,13 @@ begin
       'department', 'xsx',
       'access_class', 'view_only',
       'scope_departments', jsonb_build_array('xsx'),
-      'access_areas', jsonb_build_array('A1'),
+      'scope_factory_ids', jsonb_build_array(v_xsx_factory),
+      'scope_area_ids', jsonb_build_array(v_xsx_area),
+      'scope_line_ids', jsonb_build_array(v_xsx_line),
       'email', 'e2e-pq-duplicate-2@example.test'
     ),
-    'Kiểm cảnh báo trùng tên'
+    'Kiểm cảnh báo trùng tên',
+    0
   );
 
   v_directory := public.rpc_item_permission_directory('E2E Phân Quyền Tên Trùng');
@@ -2273,9 +2408,12 @@ begin
       'department', 'qc',
       'access_class', 'view_only',
       'scope_departments', jsonb_build_array('qc'),
-      'access_areas', jsonb_build_array('*')
+      'scope_factory_ids', jsonb_build_array(v_qc_factory),
+      'scope_area_ids', jsonb_build_array(v_qc_area),
+      'scope_line_ids', jsonb_build_array(v_qc_line)
     ),
-    'Kiểm mã nhân viên trùng'
+    'Kiểm mã nhân viên trùng',
+    0
   );
   if coalesce((v_result->>'ok')::boolean, true) is not false
       or v_result->>'error' not ilike '%mã nhân viên%' then
