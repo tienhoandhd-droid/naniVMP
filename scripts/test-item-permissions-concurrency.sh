@@ -9,7 +9,37 @@ if [[ -z "$task3_admin_url" ]]; then
 fi
 task3_required_admin_db='vmp_concurrency_admin'
 task3_required_marker='VMP_CONCURRENCY_TEST_ONLY_ALLOW_DATABASE_CREATE_DROP'
-task3_admin_facts=$(psql "$task3_admin_url" -X -AtF '|' -v ON_ERROR_STOP=1 -c \
+task3_timeout_seconds=${TASK3_CONCURRENCY_TIMEOUT_SECONDS:-30}
+if [[ ! "$task3_timeout_seconds" =~ ^[0-9]+$
+    || "$task3_timeout_seconds" -lt 5
+    || "$task3_timeout_seconds" -gt 300 ]]; then
+  echo "TASK3_CONCURRENCY_TIMEOUT_SECONDS phải trong khoảng 5..300" >&2
+  exit 1
+fi
+task3_kill_after_seconds=5
+task3_connect_timeout_seconds=5
+task3_statement_timeout_ms=$((task3_timeout_seconds * 1000))
+task3_idle_timeout_ms=$(((task3_timeout_seconds + task3_kill_after_seconds) * 1000))
+task3_pg_options="-c statement_timeout=$task3_statement_timeout_ms -c lock_timeout=$task3_statement_timeout_ms -c idle_in_transaction_session_timeout=$task3_idle_timeout_ms"
+
+run_pg_command() {
+  local application_name=$1
+  shift
+  timeout --kill-after="${task3_kill_after_seconds}s" \
+    "${task3_timeout_seconds}s" \
+    env PGCONNECT_TIMEOUT="$task3_connect_timeout_seconds" \
+      PGAPPNAME="$application_name" PGOPTIONS="$task3_pg_options" \
+      "$@"
+}
+
+run_psql() {
+  local application_name=$1
+  shift
+  run_pg_command "$application_name" psql "$@"
+}
+
+task3_admin_facts=$(run_psql vmp-task3-guard "$task3_admin_url" \
+  -X -AtF '|' -v ON_ERROR_STOP=1 -c \
   "select current_database(),
           coalesce(shobj_description(oid, 'pg_database'), ''),
           (select rolcreatedb from pg_roles where rolname = current_user)
@@ -21,14 +51,6 @@ if [[ "$task3_admin_db" != "$task3_required_admin_db"
     || "$task3_can_create_db" != t ]]; then
   echo "Từ chối create/drop DB: admin database thiếu tên/marker/CREATEDB chuyên dụng" >&2
   exit 2
-fi
-
-task3_timeout_seconds=${TASK3_CONCURRENCY_TIMEOUT_SECONDS:-30}
-if [[ ! "$task3_timeout_seconds" =~ ^[0-9]+$
-    || "$task3_timeout_seconds" -lt 5
-    || "$task3_timeout_seconds" -gt 300 ]]; then
-  echo "TASK3_CONCURRENCY_TIMEOUT_SECONDS phải trong khoảng 5..300" >&2
-  exit 1
 fi
 
 task3_temp_db="vmp_task3_concurrency_${RANDOM}_$$"
@@ -58,33 +80,77 @@ task3_link_pid=''
 task3_role_pid=''
 task3_db_created=false
 
+process_group_is_running() {
+  local process_group=$1
+  local observed_group
+  local process_state
+  while read -r observed_group process_state; do
+    observed_group=${observed_group//[[:space:]]/}
+    process_state=${process_state//[[:space:]]/}
+    if [[ "$observed_group" == "$process_group"
+        && -n "$process_state" && "$process_state" != Z* ]]; then
+      return 0
+    fi
+  done < <(ps -e -o pgid= -o stat= 2>/dev/null || true)
+  return 1
+}
+
 stop_process_group() {
   local process_pid=$1
   local stop_deadline
+  local wait_status=0
   if [[ -z "$process_pid" ]]; then
     return
   fi
-  if kill -0 "$process_pid" >/dev/null 2>&1; then
+  if process_group_is_running "$process_pid"; then
     kill -TERM -- "-$process_pid" >/dev/null 2>&1 || true
   fi
-  stop_deadline=$((SECONDS + 5))
-  while kill -0 "$process_pid" >/dev/null 2>&1 \
+  stop_deadline=$((SECONDS + task3_kill_after_seconds))
+  while process_group_is_running "$process_pid" \
       && [[ $SECONDS -lt $stop_deadline ]]; do
     sleep 0.1
   done
-  if kill -0 "$process_pid" >/dev/null 2>&1; then
+  if process_group_is_running "$process_pid"; then
     kill -KILL -- "-$process_pid" >/dev/null 2>&1 || true
   fi
-  wait "$process_pid" >/dev/null 2>&1 || true
+  stop_deadline=$((SECONDS + task3_kill_after_seconds))
+  while process_group_is_running "$process_pid" \
+      && [[ $SECONDS -lt $stop_deadline ]]; do
+    sleep 0.1
+  done
+  if process_group_is_running "$process_pid"; then
+    return 1
+  fi
+  # Chỉ reap sau khi ps xác nhận process đã dừng/zombie; wait lúc này không chặn.
+  wait "$process_pid" >/dev/null 2>&1 || wait_status=$?
+  return "$wait_status"
+}
+
+wait_process_group() {
+  local process_pid=$1
+  local wait_deadline=$((SECONDS + task3_timeout_seconds + task3_kill_after_seconds))
+  local wait_status=0
+  while process_group_is_running "$process_pid" \
+      && [[ $SECONDS -lt $wait_deadline ]]; do
+    sleep 0.1
+  done
+  if process_group_is_running "$process_pid"; then
+    stop_process_group "$process_pid" || true
+    return 124
+  fi
+  # Process đã dừng/zombie nên reap là tức thời, không có wait mở vô hạn.
+  wait "$process_pid" || wait_status=$?
+  return "$wait_status"
 }
 
 cleanup() {
   local exit_code=$?
   trap - EXIT INT TERM
-  stop_process_group "$task3_link_pid"
-  stop_process_group "$task3_role_pid"
+  stop_process_group "$task3_link_pid" || true
+  stop_process_group "$task3_role_pid" || true
   if [[ "$task3_db_created" == true ]]; then
-    dropdb --maintenance-db="$task3_admin_url" --if-exists --force \
+    run_pg_command vmp-task3-cleanup dropdb \
+      --maintenance-db="$task3_admin_url" --if-exists --force \
       "$task3_temp_db" >/dev/null 2>&1 || true
   fi
   rm -f "$task3_ready_marker" "$task3_release_marker" \
@@ -94,12 +160,14 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-createdb --maintenance-db="$task3_admin_url" "$task3_temp_db"
 task3_db_created=true
+run_pg_command vmp-task3-create createdb \
+  --maintenance-db="$task3_admin_url" "$task3_temp_db"
 
 # Database này hoàn toàn rỗng và bị drop ở trap. Chỉ dựng các prerequisite
 # tối thiểu để áp nguyên migration Task 3 và chạy đúng hai RPC cần kiểm race.
-psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+run_psql vmp-task3-setup "$task3_temp_url" \
+  -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 create schema auth;
 
 create type public.user_role as enum (
@@ -224,14 +292,17 @@ insert into public.vmp_performers(
 );
 SQL
 
-psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 \
+run_psql vmp-task3-migration "$task3_temp_url" -X -v ON_ERROR_STOP=1 \
   -c 'begin' \
   -c 'set local check_function_bodies = off' \
   -f "$task3_migration_file" \
   -c 'commit' >/dev/null
 
-setsid timeout "${task3_timeout_seconds}s" stdbuf -oL \
-  psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+setsid timeout --kill-after="${task3_kill_after_seconds}s" \
+  "${task3_timeout_seconds}s" env \
+  PGCONNECT_TIMEOUT="$task3_connect_timeout_seconds" \
+  PGAPPNAME=vmp-task3-link-holder PGOPTIONS="$task3_pg_options" \
+  stdbuf -oL psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
   >"$task3_link_log" 2>&1 <<SQL &
 begin;
 select pg_backend_pid();
@@ -255,7 +326,7 @@ begin
 end
 \$test\$;
 \! : > '$task3_ready_marker'
-\! timeout '${task3_timeout_seconds}s' sh -c 'while [ ! -f "\$1" ]; do sleep 0.1; done' sh '$task3_release_marker'
+\! timeout --kill-after='${task3_kill_after_seconds}s' '${task3_timeout_seconds}s' sh -c 'while [ ! -f "\$1" ]; do sleep 0.1; done' sh '$task3_release_marker'
 \if :SHELL_ERROR
   \quit 4
 \endif
@@ -277,8 +348,11 @@ if [[ ! "$task3_link_backend" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-setsid timeout "${task3_timeout_seconds}s" stdbuf -oL \
-  psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+setsid timeout --kill-after="${task3_kill_after_seconds}s" \
+  "${task3_timeout_seconds}s" env \
+  PGCONNECT_TIMEOUT="$task3_connect_timeout_seconds" \
+  PGAPPNAME=vmp-task3-set-role-waiter PGOPTIONS="$task3_pg_options" \
+  stdbuf -oL psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
   >"$task3_role_log" 2>&1 <<'SQL' &
 begin;
 select pg_backend_pid();
@@ -295,7 +369,7 @@ begin
     'b0000000-0000-0000-0000-000000000001',
     'department_user', 'xsx', 'Concurrency set-role phải chờ link', 'co'
   );
-  if coalesce((v_result->>'ok')::boolean, false) is distinct from false
+  if (v_result->>'ok')::boolean is distinct from false
       or v_result->>'error_code' is distinct from 'ACCOUNT_RELINK_REQUIRED' then
     raise exception 'Set-role không fail closed sau link concurrent: %', v_result;
   end if;
@@ -322,7 +396,7 @@ fi
 task3_wait_seen=false
 task3_deadline=$((SECONDS + task3_timeout_seconds))
 while [[ $SECONDS -lt $task3_deadline ]]; do
-  task3_wait_event=$(psql "$task3_temp_url" -X -Atc \
+  task3_wait_event=$(run_psql vmp-task3-controller "$task3_temp_url" -X -Atc \
     "select coalesce(wait_event_type, '') || ':' || coalesce(wait_event, '')
      from pg_stat_activity where pid = $task3_role_backend")
   if [[ "$task3_wait_event" == "Lock:advisory" ]]; then
@@ -337,7 +411,7 @@ if [[ "$task3_wait_seen" != true ]]; then
 fi
 
 IFS='|' read -r task3_lock_classid task3_lock_objid <<EOF
-$(psql "$task3_temp_url" -X -AtF '|' -c \
+$(run_psql vmp-task3-controller "$task3_temp_url" -X -AtF '|' -c \
   "with account_lock as (
      select pg_catalog.hashtextextended(
        'vmp:item-permission-account:b0000000-0000-0000-0000-000000000001', 0
@@ -347,7 +421,7 @@ $(psql "$task3_temp_url" -X -AtF '|' -c \
           (key & 4294967295)::oid
    from account_lock")
 EOF
-task3_lock_state=$(psql "$task3_temp_url" -X -Atc \
+task3_lock_state=$(run_psql vmp-task3-controller "$task3_temp_url" -X -Atc \
   "select
      exists (
        select 1 from pg_locks
@@ -382,7 +456,8 @@ if [[ "$task3_lock_state" != t ]]; then
 fi
 
 # Khi request 2 đang chờ, snapshot committed không được có mutation nào.
-psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+run_psql vmp-task3-controller "$task3_temp_url" \
+  -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 do $test$
 begin
   if not exists (
@@ -403,12 +478,19 @@ $test$;
 SQL
 
 : >"$task3_release_marker"
-wait "$task3_link_pid"
+if ! wait_process_group "$task3_link_pid"; then
+  echo "Link session lỗi hoặc vượt deadline" >&2
+  exit 1
+fi
 task3_link_pid=''
-wait "$task3_role_pid"
+if ! wait_process_group "$task3_role_pid"; then
+  echo "Set-role session lỗi hoặc vượt deadline" >&2
+  exit 1
+fi
 task3_role_pid=''
 
-psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+run_psql vmp-task3-final-check "$task3_temp_url" \
+  -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 do $test$
 begin
   if not exists (
@@ -431,9 +513,10 @@ end
 $test$;
 SQL
 
-dropdb --maintenance-db="$task3_admin_url" --if-exists --force "$task3_temp_db"
+run_pg_command vmp-task3-drop dropdb \
+  --maintenance-db="$task3_admin_url" --if-exists --force "$task3_temp_db"
 task3_db_created=false
-task3_leftovers=$(psql "$task3_admin_url" -X -Atc \
+task3_leftovers=$(run_psql vmp-task3-leftover-check "$task3_admin_url" -X -Atc \
   "select count(*) from pg_database where datname = '$task3_temp_db'")
 if [[ "$task3_leftovers" != 0 ]]; then
   echo "Database concurrency tạm chưa được xóa" >&2
