@@ -14,6 +14,30 @@ function assignmentLabel(assignment: ItemAssignment): string {
   return assignment.assignment_role === "primary" ? "QA phụ trách chính" : "QA phối hợp";
 }
 
+export async function dispatchAssignmentWhenCurrent({
+  loadAssignments,
+  confirmReplacement,
+  isCurrent,
+  dispatch,
+}: {
+  loadAssignments: () => Promise<Array<Pick<ItemAssignment, "assignment_kind" | "assignment_role" | "is_active" | "staff_name">>>;
+  confirmReplacement: (existingPrimary: Pick<ItemAssignment, "staff_name">) => boolean;
+  isCurrent: () => boolean;
+  dispatch: (action: "assign" | "replace_primary") => Promise<unknown>;
+}): Promise<boolean> {
+  const itemAssignments = await loadAssignments();
+  const existingPrimary = itemAssignments.find((assignment) => assignment.assignment_kind === "qa"
+    && assignment.assignment_role === "primary" && assignment.is_active);
+  let action: "assign" | "replace_primary" = "assign";
+  if (existingPrimary) {
+    if (!confirmReplacement(existingPrimary)) return false;
+    action = "replace_primary";
+  }
+  if (!isCurrent()) return false;
+  await dispatch(action);
+  return true;
+}
+
 export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = false, onAssignmentsChanged }: {
   person: DirectoryPerson | null;
   canEdit: boolean;
@@ -29,11 +53,14 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const requestSequence = useRef(0);
+  const currentSelectedPersonId = useRef<string | null>(person?.person_id ?? null);
+  currentSelectedPersonId.current = person?.person_id ?? null;
   const personComplete = person ? isDirectoryPersonComplete(person) : false;
   const personIsQa = person ? isQaAccessClass(person.access_class) : false;
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
+    setSaving(false);
     if (!person) { setAssignments([]); return; }
     if (!fixedKind) setKind(personIsQa ? "qa" : "equipment_department");
     fetchItemAssignments({ personId: person.person_id })
@@ -57,31 +84,40 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
     const selectionSequence = requestSequence.current;
     const assignmentKind = fixedKind || (personIsQa ? "qa" : kind);
     const assignmentRole = assignmentKind === "qa" ? qaRole : null;
+    const isCurrentSelection = () => selectionSequence === requestSequence.current
+      && currentSelectedPersonId.current === selectedPerson.person_id;
     setSaving(true);
     setMessage("");
     try {
-      let action: "assign" | "replace_primary" = "assign";
       if (assignmentKind === "qa" && assignmentRole === "primary") {
-        const itemAssignments = await fetchItemAssignments({ validationCode: validationCode.trim() });
-        const existingPrimary = itemAssignments.find((assignment) => assignment.assignment_kind === "qa"
-          && assignment.assignment_role === "primary" && assignment.is_active);
-        if (existingPrimary) {
-          const confirmed = window.confirm(
+        const dispatched = await dispatchAssignmentWhenCurrent({
+          loadAssignments: () => fetchItemAssignments({ validationCode: validationCode.trim() }),
+          confirmReplacement: (existingPrimary) => window.confirm(
             `Hạng mục này đang có QA phụ trách chính là ${existingPrimary.staff_name}. Đổi sang ${selectedPerson.full_name}?`,
-          );
-          if (!confirmed) return;
-          action = "replace_primary";
-        }
+          ),
+          isCurrent: isCurrentSelection,
+          dispatch: (action) => setItemAssignment({
+            personId: selectedPerson.person_id,
+            validationCode: validationCode.trim(),
+            assignmentKind,
+            assignmentRole,
+            action,
+            reason: reason.trim(),
+          }),
+        });
+        if (!dispatched) return;
+      } else {
+        if (!isCurrentSelection()) return;
+        await setItemAssignment({
+          personId: selectedPerson.person_id,
+          validationCode: validationCode.trim(),
+          assignmentKind,
+          assignmentRole,
+          action: "assign",
+          reason: reason.trim(),
+        });
       }
-      await setItemAssignment({
-        personId: selectedPerson.person_id,
-        validationCode: validationCode.trim(),
-        assignmentKind,
-        assignmentRole,
-        action,
-        reason: reason.trim(),
-      });
-      if (selectionSequence !== requestSequence.current) return;
+      if (!isCurrentSelection()) return;
       onAssignmentsChanged?.();
       setMessage(`Đã phân công hạng mục ${validationCode.trim()} cho ${selectedPerson.full_name}`);
       await refreshAssignments(selectedPerson);
@@ -90,7 +126,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
-      if (selectedPerson.person_id === person?.person_id) setSaving(false);
+      if (isCurrentSelection()) setSaving(false);
     }
   };
 
@@ -132,7 +168,11 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
             {personIsQa ? (
               <label>Vai trò QA trong hạng mục
                 <select className="pq-o" aria-label="Vai trò QA trong hạng mục" value={qaRole}
-                  onChange={(event) => setQaRole(event.target.value as QaAssignmentRole)}>
+                  onChange={(event) => {
+                    requestSequence.current += 1;
+                    setSaving(false);
+                    setQaRole(event.target.value as QaAssignmentRole);
+                  }}>
                   <option value="primary">QA phụ trách chính</option>
                   <option value="collaborator">QA phối hợp</option>
                 </select>

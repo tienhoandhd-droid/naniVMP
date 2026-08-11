@@ -168,10 +168,10 @@ page.on("request", (request) => {
   if (/\/rpc\/rpc_item_permission_directory/.test(url)) {
     const body = JSON.parse(request.postData() || "{}");
     const query = String(body.p_query || "");
-    const people = query.includes("Legacy")
-      ? [{ ...legacyPerson, user_id: legacyLinked ? "dddddddd-4444-4444-8444-444444444444" : null,
-        account_status: legacyLinked ? "linked" : "unlinked", version: legacyLinked ? 2 : 1 }]
-      : query.includes("QA Legacy") ? [qaLegacy]
+    const people = query.includes("QA Legacy") ? [qaLegacy]
+      : query.includes("Legacy")
+        ? [{ ...legacyPerson, user_id: legacyLinked ? "dddddddd-4444-4444-8444-444444444444" : null,
+          account_status: legacyLinked ? "linked" : "unlinked", version: legacyLinked ? 2 : 1 }]
         : query.includes("QA") ? [qaPerson]
         : query.includes("Hồng") ? [completePerson] : [duplicateFirst, duplicateSaved];
     return answer(request, { ok: true, people });
