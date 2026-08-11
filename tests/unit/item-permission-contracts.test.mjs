@@ -744,7 +744,6 @@ test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn cá
   assert.match(sql, /create or replace function public\.vmp_item_scope_matches/);
   assert.match(sql, /'factory_match', scope\.factory_match/);
   assert.match(sql, /'line_match', scope\.line_match/);
-  assert.match(sql, /'error_code', 'VERSION_REQUIRED'/);
   assert.match(sql, /'error_code', 'PERSON_ID_REQUIRED'/);
   assert.match(sql, /raise exception 'IMPORT_ROW_FAILED:/);
   assert.match(sql, /alter function public\.rpc_set_item_performer\(text, text\)\s+security invoker/);

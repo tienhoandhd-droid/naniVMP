@@ -12,6 +12,10 @@ select set_config(
   true
 );
 
+/* Chỉ tồn tại trong transaction rollback của harness; dùng để phân biệt
+ * FOR UPDATE thật với khóa For Key Share phát sinh muộn từ foreign key. */
+create extension if not exists pgrowlocks;
+
 do $test$
 begin
   if public.vmp_normalize_person_name('  Đặng   Thị Hồng Ngọc ')
@@ -876,10 +880,10 @@ begin
       and (error->>'record_id')::uuid = v_assignment
   ) or not exists (
     select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
-    where error->>'code' = 'ASSIGNMENT_ACCOUNT_MISMATCH'
+    where error->>'code' = 'ASSIGNMENT_USER_MISMATCH'
       and (error->>'record_id')::uuid = v_assignment
   ) then
-    raise exception 'Preflight phải chặn assignment inactive/account mismatch: %', v_preflight;
+    raise exception 'Preflight phải chặn assignment inactive/user mismatch: %', v_preflight;
   end if;
 
   delete from public.vmp_item_assignments
@@ -2044,12 +2048,14 @@ declare
   v_qa_1 uuid;
   v_qa_2 uuid;
   v_qa_3 uuid;
+  v_refresh_probe uuid := gen_random_uuid();
   v_code text;
   v_result jsonb;
   v_rights record;
   v_constraint text;
   v_check_caught boolean;
   v_unique_caught boolean;
+  v_performer_lock_modes text[];
   v_values jsonb;
   v_qa_fields constant text[] := array[
     'actual_protocol_date', 'status_protocol',
@@ -2136,6 +2142,16 @@ begin
       and mode = 'RowShareLock' and granted
   ) then
     raise exception 'Mutation phân công phải giữ row lock trên hạng mục đến cuối transaction';
+  end if;
+  select locks.modes into v_performer_lock_modes
+  from public.pgrowlocks('public.vmp_performers') locks
+  where locks.locked_row = (
+    select person.ctid from public.vmp_performers person where person.id = v_qa_1
+  );
+  if coalesce('For Update' = any(v_performer_lock_modes), false) is not true then
+    raise exception
+      'Mutation phân công phải giữ For Update trên performer trước khi ghi assignment: %',
+      v_performer_lock_modes;
   end if;
   v_result := public.rpc_set_item_assignment(
     v_qa_2, v_code, 'qa', 'collaborator', 'assign', 'Gán QA phối hợp'
@@ -2484,7 +2500,25 @@ begin
     coalesce(source_sheet_data, '{}'::jsonb), '{values}', v_values, true
   )
   where validation_code = v_code;
+  insert into public.vmp_performers (
+    id, performer_name, department, access_class, scope_departments,
+    access_areas, is_active, updated_by
+  ) values (
+    v_refresh_probe, 'E2E Refresh Lock ' || v_refresh_probe::text,
+    'qa', 'qa_progress_editor', '{}'::text[], '{}'::text[], true, v_admin
+  );
   v_result := public.rpc_refresh_source_item_assignments();
+  select locks.modes into v_performer_lock_modes
+  from public.pgrowlocks('public.vmp_performers') locks
+  where locks.locked_row = (
+    select person.ctid
+    from public.vmp_performers person where person.id = v_refresh_probe
+  );
+  if coalesce('For Update' = any(v_performer_lock_modes), false) is not true then
+    raise exception
+      'Refresh nguồn phải khóa performer trước item/assignment để tránh deadlock account: %',
+      v_performer_lock_modes;
+  end if;
   if coalesce((v_result->>'ok')::boolean, false) is not true
       or (select count(*) from public.vmp_item_assignments
           where validation_code = v_code and performer_id = v_qa_2
@@ -2507,7 +2541,8 @@ begin
 
   delete from public.vmp_item_assignments
   where performer_id in (v_qa_1, v_qa_2, v_qa_3);
-  delete from public.vmp_performers where id in (v_qa_1, v_qa_2, v_qa_3);
+  delete from public.vmp_performers
+  where id in (v_qa_1, v_qa_2, v_qa_3, v_refresh_probe);
   delete from public.audit_logs where user_id in (v_user_1, v_user_2, v_user_3);
   delete from auth.users where id in (v_user_1, v_user_2, v_user_3);
   delete from public.vmp_email_cho_phep where email in (v_email_1, v_email_2, v_email_3);
@@ -3321,12 +3356,23 @@ begin
   where id = v_manager_user;
 
   v_result := public.rpc_item_permission_preflight();
-  if not exists (
+  if (
+    select count(*)
+    from jsonb_array_elements(v_result->'blocking_errors') error
+    where (error->>'record_id')::uuid = v_assignment
+      and error->>'code' in (
+        'ASSIGNMENT_USER_MISMATCH', 'ASSIGNMENT_ACCOUNT_MISMATCH'
+      )
+  ) <> 1 or not exists (
     select 1 from jsonb_array_elements(v_result->'blocking_errors') error
     where error->>'code' = 'ASSIGNMENT_USER_MISMATCH'
       and (error->>'record_id')::uuid = v_assignment
+  ) or exists (
+    select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+    where error->>'code' = 'ASSIGNMENT_ACCOUNT_MISMATCH'
+      and (error->>'record_id')::uuid = v_assignment
   ) then
-    raise exception 'Preflight chưa bắt assignment.user_id lệch performer.user_id: %', v_result;
+    raise exception 'Một user mismatch phải sinh đúng một blocker canonical: %', v_result;
   end if;
   if not exists (
     select 1 from jsonb_array_elements(v_result->'blocking_errors') error

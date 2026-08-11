@@ -142,26 +142,33 @@ as $fn$
     and cardinality(coalesce(p_areas, '{}'::uuid[])) > 0
     and cardinality(coalesce(p_lines, '{}'::uuid[])) > 0
     and not exists (
-      select 1 from unnest(coalesce(p_departments, '{}'::text[])) id
+      select 1
+      from unnest(coalesce(p_departments, '{}'::text[])) scope_department(id)
       left join public.departments department
-        on department.id = id and coalesce(department.is_active, true)
+        on department.id = scope_department.id
+       and coalesce(department.is_active, true)
       where department.id is null
     )
     and not exists (
-      select 1 from unnest(coalesce(p_factories, '{}'::uuid[])) id
+      select 1
+      from unnest(coalesce(p_factories, '{}'::uuid[])) scope_factory(id)
       left join public.vmp_scope_factories factory
-        on factory.id = id and factory.is_active
+        on factory.id = scope_factory.id and factory.is_active
       where factory.id is null
         or not (factory.department_id = any(p_departments))
     )
     and not exists (
-      select 1 from unnest(coalesce(p_areas, '{}'::uuid[])) id
-      left join public.vmp_scope_areas area on area.id = id and area.is_active
+      select 1
+      from unnest(coalesce(p_areas, '{}'::uuid[])) scope_area(id)
+      left join public.vmp_scope_areas area
+        on area.id = scope_area.id and area.is_active
       where area.id is null or not (area.factory_id = any(p_factories))
     )
     and not exists (
-      select 1 from unnest(coalesce(p_lines, '{}'::uuid[])) id
-      left join public.vmp_scope_lines line on line.id = id and line.is_active
+      select 1
+      from unnest(coalesce(p_lines, '{}'::uuid[])) scope_line(id)
+      left join public.vmp_scope_lines line
+        on line.id = scope_line.id and line.is_active
       where line.id is null or not (line.area_id = any(p_areas))
     )
 $fn$;
@@ -211,6 +218,10 @@ begin
   );
 end
 $fn$;
+
+/* Chữ ký ba tham số cũ phải biến mất trước khi tạo chữ ký canonical;
+ * event trigger public.chan_overload_rpc cấm mọi overload rpc_*. */
+drop function if exists public.rpc_upsert_item_permission_staff(uuid, jsonb, text);
 
 /* Ghi hồ sơ trực tiếp đúng một lần và audit đúng trạng thái cuối. */
 create or replace function public.rpc_upsert_item_permission_staff(
@@ -424,63 +435,6 @@ exception
       'error', 'Giá trị patch không đúng định dạng');
   when others then
     return jsonb_build_object('ok', false, 'error_code', 'SAVE_FAILED', 'error', sqlerrm);
-end
-$fn$;
-
-create or replace function public.rpc_upsert_item_permission_staff(
-  p_person_id uuid, p_patch jsonb, p_reason text
-) returns jsonb
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $fn$
-declare
-  v_patch jsonb := coalesce(p_patch, '{}'::jsonb);
-  v_departments text[];
-  v_access text[];
-  v_factories uuid[];
-  v_areas uuid[];
-  v_lines uuid[];
-begin
-  if p_person_id is not null then
-    return jsonb_build_object('ok', false, 'error_code', 'VERSION_REQUIRED',
-      'error', 'Cập nhật hồ sơ phải gửi expected_version');
-  end if;
-  v_departments := public.vmp_jsonb_text_array(v_patch, 'scope_departments');
-  v_access := public.vmp_jsonb_text_array(v_patch, 'access_areas');
-  if '*' = any(v_departments) then
-    select array_agg(id order by id) into v_departments
-    from public.departments where coalesce(is_active, true);
-    v_patch := v_patch || jsonb_build_object(
-      'scope_departments', to_jsonb(coalesce(v_departments, '{}'::text[]))
-    );
-  end if;
-
-  select array_agg(id order by id) into v_areas
-  from public.vmp_scope_areas area
-  join public.vmp_scope_factories factory on factory.id = area.factory_id
-  where area.is_active and factory.is_active
-    and factory.department_id = any(v_departments)
-    and ('*' = any(v_access) or area.code = any(v_access)
-      or exists (select 1 from public.vmp_scope_lines line
-        where line.area_id = area.id and line.is_active and line.code = any(v_access)));
-  select array_agg(id order by id) into v_factories
-  from public.vmp_scope_factories factory
-  where factory.is_active and factory.department_id = any(v_departments)
-    and factory.id in (select area.factory_id from public.vmp_scope_areas area
-      where area.id = any(coalesce(v_areas, '{}'::uuid[])));
-  select array_agg(line.id order by line.id) into v_lines
-  from public.vmp_scope_lines line
-  join public.vmp_scope_areas area on area.id = line.area_id
-  where line.is_active and area.id = any(coalesce(v_areas, '{}'::uuid[]))
-    and ('*' = any(v_access) or area.code = any(v_access) or line.code = any(v_access));
-
-  v_patch := v_patch - 'access_areas' || jsonb_build_object(
-    'scope_factory_ids', to_jsonb(coalesce(v_factories, '{}'::uuid[])),
-    'scope_area_ids', to_jsonb(coalesce(v_areas, '{}'::uuid[])),
-    'scope_line_ids', to_jsonb(coalesce(v_lines, '{}'::uuid[]))
-  );
-  return public.rpc_upsert_item_permission_staff(null, v_patch, p_reason, 0);
 end
 $fn$;
 

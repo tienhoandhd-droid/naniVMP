@@ -68,9 +68,7 @@ comment on column public.vmp_item_assignments.assignment_role is
 
 /* Chữ ký ba tham số đã được thay bằng optimistic version ở migration 1600.
  * Phải drop trước CREATE OR REPLACE để event-trigger không thấy overload RPC. */
-revoke all on function public.rpc_upsert_item_permission_staff(uuid, jsonb, text)
-  from public, anon, authenticated, service_role;
-drop function public.rpc_upsert_item_permission_staff(uuid, jsonb, text);
+drop function if exists public.rpc_upsert_item_permission_staff(uuid, jsonb, text);
 
 create or replace function public.rpc_upsert_item_permission_staff(
   p_person_id uuid, p_patch jsonb, p_reason text, p_expected_version integer
@@ -928,16 +926,6 @@ begin
 
     union all
     select jsonb_build_object(
-      'code', 'ASSIGNMENT_ACCOUNT_MISMATCH', 'record_id', assignment.id,
-      'message', 'Tài khoản trên phân công không khớp tài khoản đã xác nhận của nhân viên'
-    )
-    from public.vmp_item_assignments assignment
-    join public.vmp_performers person on person.id = assignment.performer_id
-    where assignment.is_active
-      and assignment.user_id is distinct from person.user_id
-
-    union all
-    select jsonb_build_object(
       'code', 'ASSIGNMENT_PERSON_INACTIVE', 'record_id', assignment.id,
       'message', 'Phân công đang trỏ tới nhân viên đã ngừng hoạt động'
     )
@@ -1211,7 +1199,7 @@ end
 $fn$;
 
 /* Refresh nguồn phải sinh assignment_role hợp lệ và ưu tiên sheet_qa làm
- * primary. Khóa item theo thứ tự để serialize với mutation dashboard. */
+ * primary. Mọi đường ghi assignment dùng cùng thứ tự performer → item. */
 create or replace function public.rpc_refresh_source_item_assignments()
 returns jsonb
 language plpgsql
@@ -1234,6 +1222,11 @@ begin
       'error', 'Chỉ Admin hoặc service đồng bộ được phân công nguồn'
     );
   end if;
+
+  perform person.id
+  from public.vmp_performers person
+  order by person.id
+  for update;
 
   perform item.validation_code
   from public.vmp_plan_items item
@@ -1491,7 +1484,8 @@ begin
 
   select * into v_target
   from public.vmp_performers
-  where id = p_person_id and is_active;
+  where id = p_person_id and is_active
+  for update;
   if not found then
     return jsonb_build_object(
       'ok', false, 'error_code', 'PERSON_NOT_FOUND',

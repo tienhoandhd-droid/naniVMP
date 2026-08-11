@@ -76,8 +76,14 @@ task3_ready_marker="$task3_tmp_dir/link-ready"
 task3_release_marker="$task3_tmp_dir/link-release"
 task3_link_log="$task3_tmp_dir/link.log"
 task3_role_log="$task3_tmp_dir/set-role.log"
+task3_unlink_ready_marker="$task3_tmp_dir/unlink-ready"
+task3_unlink_release_marker="$task3_tmp_dir/unlink-release"
+task3_unlink_log="$task3_tmp_dir/unlink.log"
+task3_assignment_log="$task3_tmp_dir/assignment.log"
 task3_link_pid=''
 task3_role_pid=''
+task3_unlink_pid=''
+task3_assignment_pid=''
 task3_db_created=false
 
 process_group_is_running() {
@@ -148,13 +154,17 @@ cleanup() {
   trap - EXIT INT TERM
   stop_process_group "$task3_link_pid" || true
   stop_process_group "$task3_role_pid" || true
+  stop_process_group "$task3_unlink_pid" || true
+  stop_process_group "$task3_assignment_pid" || true
   if [[ "$task3_db_created" == true ]]; then
     run_pg_command vmp-task3-cleanup dropdb \
       --maintenance-db="$task3_admin_url" --if-exists --force \
       "$task3_temp_db" >/dev/null 2>&1 || true
   fi
   rm -f "$task3_ready_marker" "$task3_release_marker" \
-    "$task3_link_log" "$task3_role_log"
+    "$task3_link_log" "$task3_role_log" \
+    "$task3_unlink_ready_marker" "$task3_unlink_release_marker" \
+    "$task3_unlink_log" "$task3_assignment_log"
   rmdir "$task3_tmp_dir" >/dev/null 2>&1 || true
   exit "$exit_code"
 }
@@ -211,13 +221,21 @@ create unique index task3_one_performer_per_user
   on public.vmp_performers(user_id) where user_id is not null;
 
 create table public.vmp_item_assignments (
-  id uuid primary key,
+  id uuid primary key default gen_random_uuid(),
+  validation_code text not null,
   performer_id uuid,
   user_id uuid,
   employee_code text,
   staff_name text,
+  assignment_kind text not null,
+  source text not null,
+  source_text text,
   unresolved_reason text,
-  updated_by uuid
+  is_active boolean not null default true,
+  change_reason text,
+  created_by uuid,
+  updated_by uuid,
+  created_at timestamptz not null default now()
 );
 create table public.vmp_assignment_matrix (
   id uuid primary key,
@@ -235,7 +253,19 @@ create table public.audit_logs (
   change_reason text,
   source text,
   changed_fields text[],
+  validation_code text,
   created_at timestamptz not null default now()
+);
+create table public.vmp_objects (
+  code text primary key,
+  department text,
+  area text,
+  line text
+);
+create table public.vmp_plan_items (
+  validation_code text primary key,
+  object_code text not null references public.vmp_objects(code),
+  is_active boolean not null default true
 );
 
 create function auth.uid() returns uuid
@@ -256,6 +286,21 @@ as $$ select p_role = 'admin' $$;
 create function public.item_permissions_mode()
 returns text language sql stable
 as $$ select 'preview'::text $$;
+create function public.vmp_manager_principal(p_user_id uuid)
+returns table (
+  principal_kind text,
+  profile_role text,
+  profile_department text,
+  person_id uuid,
+  access_class text,
+  scope_departments text[],
+  access_areas text[]
+) language sql stable
+as $$
+  select 'admin'::text, 'admin'::text, null::text, null::uuid, null::text,
+         '{}'::text[], '{}'::text[]
+  where p_user_id = 'a0000000-0000-0000-0000-000000000001'::uuid
+$$;
 
 create function public.rpc_upsert_item_permission_staff(uuid, jsonb, text)
 returns jsonb language sql as $$ select jsonb_build_object('ok', false) $$;
@@ -290,6 +335,10 @@ insert into public.vmp_performers(
   'qa', 'qa_manager', 1, true, '{}'::text[], '{}'::uuid[], '{}'::uuid[],
   '{}'::uuid[], 'a0000000-0000-0000-0000-000000000001'
 );
+insert into public.vmp_objects(code, department, area, line)
+values ('TASK3-OBJECT', 'xsx', 'TASK3-AREA', null);
+insert into public.vmp_plan_items(validation_code, object_code)
+values ('TASK3-ITEM', 'TASK3-OBJECT');
 SQL
 
 run_psql vmp-task3-migration "$task3_temp_url" -X -v ON_ERROR_STOP=1 \
@@ -513,6 +562,176 @@ end
 $test$;
 SQL
 
+# Unlink giữ performer row sau khi đã đồng bộ các assignment hiện có. Mutation
+# phân công concurrent phải chờ row này, rồi đọc snapshot account đã commit.
+setsid timeout --kill-after="${task3_kill_after_seconds}s" \
+  "${task3_timeout_seconds}s" env \
+  PGCONNECT_TIMEOUT="$task3_connect_timeout_seconds" \
+  PGAPPNAME=vmp-task3-unlink-holder PGOPTIONS="$task3_pg_options" \
+  stdbuf -oL psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+  >"$task3_unlink_log" 2>&1 <<SQL &
+begin;
+select pg_backend_pid();
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+do \$test\$
+declare
+  v_result jsonb;
+begin
+  v_result := public.rpc_link_item_permission_account(
+    'c0000000-0000-0000-0000-000000000001', null,
+    'Concurrency unlink giữ performer', 2
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Unlink session thất bại: %', v_result;
+  end if;
+end
+\$test\$;
+\! : > '$task3_unlink_ready_marker'
+\! timeout --kill-after='${task3_kill_after_seconds}s' '${task3_timeout_seconds}s' sh -c 'while [ ! -f "\$1" ]; do sleep 0.1; done' sh '$task3_unlink_release_marker'
+\if :SHELL_ERROR
+  \quit 4
+\endif
+commit;
+SQL
+task3_unlink_pid=$!
+
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ ! -f "$task3_unlink_ready_marker" && $SECONDS -lt $task3_deadline ]]; do
+  sleep 0.1
+done
+if [[ ! -f "$task3_unlink_ready_marker" ]]; then
+  echo "Unlink session không tới barrier" >&2
+  exit 1
+fi
+task3_unlink_backend=$(sed -n '1p' "$task3_unlink_log" 2>/dev/null || true)
+if [[ ! "$task3_unlink_backend" =~ ^[0-9]+$ ]]; then
+  echo "Không lấy được backend PID của unlink" >&2
+  exit 1
+fi
+
+setsid timeout --kill-after="${task3_kill_after_seconds}s" \
+  "${task3_timeout_seconds}s" env \
+  PGCONNECT_TIMEOUT="$task3_connect_timeout_seconds" \
+  PGAPPNAME=vmp-task3-assignment-waiter PGOPTIONS="$task3_pg_options" \
+  stdbuf -oL psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+  >"$task3_assignment_log" 2>&1 <<'SQL' &
+begin;
+select pg_backend_pid();
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+do $test$
+declare
+  v_result jsonb;
+begin
+  v_result := public.rpc_set_item_assignment(
+    'c0000000-0000-0000-0000-000000000001', 'TASK3-ITEM',
+    'equipment_department', null, 'assign',
+    'Concurrency assignment phải refresh performer'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Assignment session thất bại: %', v_result;
+  end if;
+end
+$test$;
+commit;
+SQL
+task3_assignment_pid=$!
+
+task3_assignment_backend=''
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ $SECONDS -lt $task3_deadline ]]; do
+  task3_assignment_backend=$(sed -n '1p' "$task3_assignment_log" 2>/dev/null || true)
+  if [[ "$task3_assignment_backend" =~ ^[0-9]+$ ]]; then
+    break
+  fi
+  sleep 0.1
+done
+if [[ ! "$task3_assignment_backend" =~ ^[0-9]+$ ]]; then
+  echo "Không lấy được backend PID của assignment" >&2
+  exit 1
+fi
+
+task3_assignment_wait_seen=false
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ $SECONDS -lt $task3_deadline ]]; do
+  task3_assignment_blockers=$(run_psql vmp-task3-controller "$task3_temp_url" \
+    -X -Atc "select pg_catalog.pg_blocking_pids($task3_assignment_backend)
+             @> array[$task3_unlink_backend]::integer[]")
+  if [[ "$task3_assignment_blockers" == t ]]; then
+    task3_assignment_wait_seen=true
+    break
+  fi
+  if ! process_group_is_running "$task3_assignment_pid"; then
+    break
+  fi
+  sleep 0.1
+done
+if [[ "$task3_assignment_wait_seen" != true ]]; then
+  echo "Assignment không chờ performer row của unlink; có thể ghi snapshot user_id cũ" >&2
+  exit 1
+fi
+
+task3_assignment_lock_order=$(run_psql vmp-task3-controller "$task3_temp_url" \
+  -X -Atc "select
+    exists (
+      select 1 from pg_locks
+      where pid = $task3_assignment_backend and granted
+        and relation = 'public.vmp_performers'::regclass
+        and mode = 'RowShareLock'
+    ) and not exists (
+      select 1 from pg_locks
+      where pid = $task3_assignment_backend and granted
+        and relation in (
+          'public.vmp_plan_items'::regclass,
+          'public.vmp_item_assignments'::regclass
+        )
+        and mode in ('RowShareLock', 'RowExclusiveLock')
+    )")
+if [[ "$task3_assignment_lock_order" != t ]]; then
+  echo "Assignment không giữ thứ tự performer trước item/assignment" >&2
+  exit 1
+fi
+
+: >"$task3_unlink_release_marker"
+if ! wait_process_group "$task3_unlink_pid"; then
+  echo "Unlink session lỗi hoặc vượt deadline" >&2
+  exit 1
+fi
+task3_unlink_pid=''
+if ! wait_process_group "$task3_assignment_pid"; then
+  echo "Assignment session lỗi hoặc vượt deadline" >&2
+  exit 1
+fi
+task3_assignment_pid=''
+
+run_psql vmp-task3-assignment-final-check "$task3_temp_url" \
+  -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+do $test$
+begin
+  if not exists (
+      select 1 from public.vmp_performers
+      where id = 'c0000000-0000-0000-0000-000000000001'
+        and user_id is null and version = 3
+    ) or not exists (
+      select 1 from public.vmp_item_assignments
+      where validation_code = 'TASK3-ITEM'
+        and performer_id = 'c0000000-0000-0000-0000-000000000001'
+        and user_id is null and unresolved_reason = 'account_unlinked'
+        and is_active
+    ) then
+    raise exception 'Assignment còn snapshot user_id/unresolved_reason stale sau unlink';
+  end if;
+end
+$test$;
+SQL
+
 run_pg_command vmp-task3-drop dropdb \
   --maintenance-db="$task3_admin_url" --if-exists --force "$task3_temp_db"
 task3_db_created=false
@@ -522,4 +741,4 @@ if [[ "$task3_leftovers" != 0 ]]; then
   echo "Database concurrency tạm chưa được xóa" >&2
   exit 1
 fi
-echo "CONCURRENCY PASS: set-role waited on same-account advisory lock; isolated database dropped"
+echo "CONCURRENCY PASS: set-role chờ account advisory; assignment chờ performer unlink; isolated database dropped"
