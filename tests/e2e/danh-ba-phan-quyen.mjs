@@ -202,11 +202,12 @@ page.on("request", (request) => {
   }
   if (/\/rpc\/rpc_preview_item_rights/.test(url)) {
     const body = JSON.parse(request.postData() || "{}");
-    const rights = body.p_person_id === qaPerson.person_id ? [{
+    const qaRight = {
       person_id: qaPerson.person_id,
       user_id: qaPerson.user_id,
       full_name: qaPerson.full_name,
       validation_code: "VMP-QA-01",
+      rights_basis: "qa_assignment",
       can_view: true,
       editable_fields: ["actual_protocol_date"],
       view_reason: "QA được phân công",
@@ -215,11 +216,36 @@ page.on("request", (request) => {
       area_match: false,
       factory_match: false,
       line_match: false,
-    }] : [];
+    };
+    const rights = body.p_validation_code === "VMP-MIXED-01" ? [
+      { ...qaRight, validation_code: "VMP-MIXED-01" },
+      {
+        ...qaRight,
+        person_id: completePerson.person_id,
+        user_id: completePerson.user_id,
+        full_name: completePerson.full_name,
+        validation_code: "VMP-MIXED-01",
+        rights_basis: "hierarchy_scope",
+        editable_fields: ["scheduled_at"],
+        assignment_sources: [],
+        scope_match: true,
+        factory_match: true,
+        area_match: true,
+        line_match: true,
+      },
+    ] : body.p_person_id === qaPerson.person_id ? [qaRight] : [];
     return answer(request, { ok: true, mode: "preview", rights });
   }
   if (/\/rpc\/rpc_set_item_assignment/.test(url)) {
-    if (request.method() !== "OPTIONS") assignmentBodies.push(JSON.parse(request.postData() || "{}"));
+    const body = JSON.parse(request.postData() || "{}");
+    if (request.method() !== "OPTIONS") assignmentBodies.push(body);
+    if (body.p_reason === "Mô phỏng xung đột QA chính") {
+      return answer(request, {
+        ok: false,
+        error_code: "PRIMARY_CONFLICT",
+        error: "QA phụ trách chính vừa thay đổi; hãy kiểm tra danh sách mới rồi thử lại",
+      });
+    }
     return answer(request, { ok: true, action: "assign" });
   }
   if (/\/rpc\/rpc_item_permission_account_candidates/.test(url)) {
@@ -319,6 +345,7 @@ try {
   assert.equal(assignmentBodies.length, 1);
   assert.equal(assignmentBodies[0].p_person_id, duplicateFirst.person_id);
   assert.equal(assignmentBodies[0].p_assignment_kind, "equipment_department");
+  assert.equal(assignmentBodies[0].p_expected_primary_assignment_id, null);
   assignmentBodies.length = 0;
 
   scopeCatalogCalls = 0;
@@ -348,6 +375,16 @@ try {
     .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
   await page.waitForFunction(() => document.body.innerText.includes("Quyền phát sinh từ phân công hạng mục"));
   await page.waitForFunction(() => document.body.innerText.includes("Phân công: QA phụ trách chính"));
+  await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')]
+    .find((button) => button.textContent?.includes("Theo hạng mục"))?.click());
+  await page.type('[aria-label="Mã hạng mục xem quyền"]', "VMP-MIXED-01");
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent === "Xem quyền")?.click());
+  await page.waitForFunction(() => document.body.innerText.includes("Phạm vi: Bộ phận khớp"));
+  assert.equal(await documentContains("Phân công: QA phụ trách chính"), true,
+    "dòng QA phải render basis phân công của chính dòng");
+  assert.equal(await documentContains("Phạm vi: Bộ phận khớp"), true,
+    "dòng thiết bị phải render basis hierarchy dù cùng item với QA");
   await page.waitForFunction(() => document.body.innerText.includes("QA phụ trách chính"));
   assert.equal(await documentContains("Phạm vi xưởng"), false);
   assert.equal(await documentContains("Không tải được danh mục phạm vi"), false);
@@ -368,10 +405,32 @@ try {
   assert.equal(assignmentBodies.at(-1).p_assignment_role, "primary");
   assert.equal(assignmentBodies.at(-1).p_action, "replace_primary");
   assert.equal(assignmentBodies.at(-1).p_reason, "Đổi QA phụ trách chính");
+  assert.equal(
+    assignmentBodies.at(-1).p_expected_primary_assignment_id,
+    assignmentFor(qaPrimary, "VMP-QA-01", "qa", "primary").assignment_id,
+  );
   await page.waitForFunction(() => {
     const input = document.querySelector('[aria-label="Lý do phân công"]');
     return input && !input.disabled && input.value === "";
   });
+  const fetchesBeforeConflict = assignmentFetchPersonIds.length;
+  await page.type('[aria-label="Mã hạng mục cần phân công"]', "VMP-QA-01");
+  await page.type('[aria-label="Lý do phân công"]', "Mô phỏng xung đột QA chính");
+  await page.click('button[aria-label="Phân công người đã chọn"]');
+  await page.waitForFunction(() => document.body.innerText.includes(
+    "QA phụ trách chính vừa thay đổi; hãy kiểm tra danh sách mới rồi thử lại",
+  ));
+  for (let attempt = 0; attempt < 50 && assignmentFetchPersonIds.length <= fetchesBeforeConflict; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(assignmentFetchPersonIds.length > fetchesBeforeConflict, true,
+    "PRIMARY_CONFLICT phải refresh danh sách phân công");
+  assert.equal(await documentContains("Đã phân công hạng mục VMP-QA-01"), false,
+    "PRIMARY_CONFLICT không được báo thành công");
+  await page.click('[aria-label="Mã hạng mục cần phân công"]', { clickCount: 3 });
+  await page.keyboard.press("Backspace");
+  await page.click('[aria-label="Lý do phân công"]', { clickCount: 3 });
+  await page.keyboard.press("Backspace");
   await page.type('[aria-label="Lý do phân công"]', "Thu hồi QA phối hợp");
   await page.waitForFunction(() => {
     const input = document.querySelector('[aria-label="Lý do phân công"]');
@@ -387,6 +446,7 @@ try {
     p_assignment_role: "collaborator",
     p_action: "revoke",
     p_reason: "Thu hồi QA phối hợp",
+    p_expected_primary_assignment_id: null,
   });
 
   await qaSearch.click({ clickCount: 3 });

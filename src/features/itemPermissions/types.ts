@@ -28,6 +28,7 @@ export type EditableTimelineField =
 export type AccountStatus = "linked" | "unlinked" | "inactive";
 export type MatchStatus = "unique" | "ambiguous";
 export type QaAssignmentRole = "primary" | "collaborator";
+export type RightsBasis = "qa_assignment" | "qa_management" | "hierarchy_scope";
 
 export interface AccountCandidate {
   user_id: string;
@@ -99,6 +100,7 @@ export interface EffectiveItemRight {
   user_id: string | null;
   full_name: string;
   validation_code: string;
+  rights_basis: RightsBasis;
   can_view: boolean;
   editable_fields: EditableTimelineField[];
   view_reason: string;

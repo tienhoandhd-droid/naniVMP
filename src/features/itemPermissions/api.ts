@@ -11,6 +11,7 @@ import {
   type PermissionPersonPatch,
   type PermissionPreflight,
   type QaAssignmentRole,
+  type RightsBasis,
 } from "./types.ts";
 import type { RootScopeOption, ScopeCatalog, ScopeOption } from "./scopeHierarchy.ts";
 
@@ -203,7 +204,7 @@ export function decodeAssignment(value: unknown): ItemAssignment {
   };
 }
 
-function decodeEffectiveRight(value: unknown): EffectiveItemRight {
+export function decodeEffectiveRight(value: unknown): EffectiveItemRight {
   const row = objectValue(value, "Quyền dự kiến");
   const editable = stringArray(row, "editable_fields");
   const knownFields = new Set([
@@ -220,6 +221,9 @@ function decodeEffectiveRight(value: unknown): EffectiveItemRight {
     user_id: nullableString(row, "user_id"),
     full_name: requiredString(row, "full_name"),
     validation_code: requiredString(row, "validation_code"),
+    rights_basis: enumValue<RightsBasis>(row, "rights_basis", [
+      "qa_assignment", "qa_management", "hierarchy_scope",
+    ]),
     can_view: booleanValue(row, "can_view"),
     editable_fields: editable as EffectiveItemRight["editable_fields"],
     view_reason: requiredString(row, "view_reason"),
@@ -240,6 +244,16 @@ function decodeIssue(value: unknown): PermissionPreflight["warnings"][number] {
   };
 }
 
+export class ItemPermissionRpcError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "ItemPermissionRpcError";
+    this.code = code;
+  }
+}
+
 async function callRpc(name: string, args: JsonObject): Promise<JsonObject> {
   const { supabase } = await import("../../lib/supabaseClient.ts");
   if (!supabase) throw new Error("Supabase chưa cấu hình");
@@ -247,7 +261,10 @@ async function callRpc(name: string, args: JsonObject): Promise<JsonObject> {
   if (error) throw new Error(error.message);
   const payload = objectValue(data, `Kết quả ${name}`);
   if (payload.ok === false) {
-    throw new Error(typeof payload.error === "string" ? payload.error : `${name} thất bại`);
+    throw new ItemPermissionRpcError(
+      typeof payload.error_code === "string" ? payload.error_code : "RPC_FAILED",
+      typeof payload.error === "string" ? payload.error : `${name} thất bại`,
+    );
   }
   return payload;
 }
@@ -355,6 +372,7 @@ export async function setItemAssignment(input: {
   assignmentRole: QaAssignmentRole | null;
   action: "assign" | "revoke" | "replace_primary";
   reason: string;
+  expectedPrimaryAssignmentId: string | null;
 }): Promise<JsonObject> {
   return callRpc("rpc_set_item_assignment", createSetItemAssignmentArgs(input));
 }
@@ -366,6 +384,7 @@ export function createSetItemAssignmentArgs(input: {
   assignmentRole: QaAssignmentRole | null;
   action: "assign" | "revoke" | "replace_primary";
   reason: string;
+  expectedPrimaryAssignmentId: string | null;
 }): JsonObject {
   return {
     p_person_id: input.personId,
@@ -374,6 +393,7 @@ export function createSetItemAssignmentArgs(input: {
     p_assignment_role: input.assignmentRole,
     p_action: input.action,
     p_reason: input.reason,
+    p_expected_primary_assignment_id: input.expectedPrimaryAssignmentId,
   };
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link2 } from "lucide-react";
-import { fetchItemAssignments, setItemAssignment } from "./api.ts";
+import { fetchItemAssignments, ItemPermissionRpcError, setItemAssignment } from "./api.ts";
 import {
   isDirectoryPersonComplete,
   isQaAccessClass,
@@ -20,22 +20,23 @@ export async function dispatchAssignmentWhenCurrent({
   isCurrent,
   dispatch,
 }: {
-  loadAssignments: () => Promise<Array<Pick<ItemAssignment, "assignment_kind" | "assignment_role" | "is_active" | "staff_name">>>;
+  loadAssignments: () => Promise<Array<Pick<ItemAssignment, "assignment_id" | "assignment_kind" | "assignment_role" | "is_active" | "staff_name">>>;
   confirmReplacement: (existingPrimary: Pick<ItemAssignment, "staff_name">) => boolean;
   isCurrent: () => boolean;
-  dispatch: (action: "assign" | "replace_primary") => Promise<unknown>;
+  dispatch: (action: "assign" | "replace_primary", expectedPrimaryAssignmentId: string | null) => Promise<unknown>;
 }): Promise<boolean> {
   const itemAssignments = await loadAssignments();
   if (!isCurrent()) return false;
   const existingPrimary = itemAssignments.find((assignment) => assignment.assignment_kind === "qa"
     && assignment.assignment_role === "primary" && assignment.is_active);
+  const expectedPrimaryAssignmentId = existingPrimary?.assignment_id ?? null;
   let action: "assign" | "replace_primary" = "assign";
   if (existingPrimary) {
     if (!confirmReplacement(existingPrimary)) return false;
     action = "replace_primary";
   }
   if (!isCurrent()) return false;
-  await dispatch(action);
+  await dispatch(action, expectedPrimaryAssignmentId);
   return true;
 }
 
@@ -45,12 +46,14 @@ export async function settleAssignmentOperationWhenCurrent({
   onSuccess,
   onError,
   refresh,
+  refreshOnError = () => false,
 }: {
   mutate: () => Promise<unknown>;
   isCurrent: () => boolean;
   onSuccess: () => void;
   onError: (error: unknown) => void;
   refresh: () => Promise<void>;
+  refreshOnError?: (error: unknown) => boolean;
 }): Promise<"success" | "error" | "stale"> {
   try {
     const result = await mutate();
@@ -61,6 +64,14 @@ export async function settleAssignmentOperationWhenCurrent({
     return isCurrent() ? "success" : "stale";
   } catch (error) {
     if (!isCurrent()) return "stale";
+    if (refreshOnError(error)) {
+      try {
+        await refresh();
+      } catch {
+        // Giữ lỗi mutation gốc; refresh chỉ là best-effort để đồng bộ conflict.
+      }
+      if (!isCurrent()) return "stale";
+    }
     onError(error);
     return "error";
   }
@@ -175,13 +186,14 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
             `Hạng mục này đang có QA phụ trách chính là ${existingPrimary.staff_name}. Đổi sang ${intent.fullName}?`,
           ),
           isCurrent: isCurrentSelection,
-          dispatch: (action) => setItemAssignment({
+          dispatch: (action, expectedPrimaryAssignmentId) => setItemAssignment({
             personId: intent.personId,
             validationCode: intent.validationCode,
             assignmentKind: intent.assignmentKind,
             assignmentRole: intent.assignmentRole,
             action,
             reason: intent.reason,
+            expectedPrimaryAssignmentId,
           }),
           })
           : setItemAssignment({
@@ -191,6 +203,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
             assignmentRole: intent.assignmentRole,
             action: "assign",
             reason: intent.reason,
+            expectedPrimaryAssignmentId: null,
           }),
         isCurrent: isCurrentSelection,
         onSuccess: () => {
@@ -199,6 +212,8 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
         },
         onError: (error) => setMessage((error as Error).message),
         refresh: () => refreshAssignments(selectedPerson, isCurrentSelection),
+        refreshOnError: (error) => error instanceof ItemPermissionRpcError
+          && error.code === "PRIMARY_CONFLICT",
       });
       if (outcome !== "success" || !isCurrentSelection()) return;
       setValidationCode("");
@@ -236,6 +251,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
           assignmentRole: intent.assignmentRole,
           action: "revoke",
           reason: intent.reason,
+          expectedPrimaryAssignmentId: null,
         }),
         isCurrent: isCurrentSelection,
         onSuccess: () => {

@@ -545,7 +545,7 @@ test("decoder phân công nhận vai trò QA hợp lệ và từ chối vai trò
   );
 });
 
-test("args phân công gửi assignment role cho RPC sáu tham số", async () => {
+test("args phân công gửi snapshot QA chính cho RPC bảy tham số", async () => {
   const { createSetItemAssignmentArgs } = await import(
     "../../src/features/itemPermissions/api.ts"
   );
@@ -557,6 +557,7 @@ test("args phân công gửi assignment role cho RPC sáu tham số", async () =
     assignmentRole: "collaborator",
     action: "replace_primary",
     reason: "Đổi QA phụ trách chính",
+    expectedPrimaryAssignmentId: "assignment-primary-a",
   }), {
     p_person_id: "person-qa-2",
     p_validation_code: "VMP-QA-01",
@@ -564,7 +565,46 @@ test("args phân công gửi assignment role cho RPC sáu tham số", async () =
     p_assignment_role: "collaborator",
     p_action: "replace_primary",
     p_reason: "Đổi QA phụ trách chính",
+    p_expected_primary_assignment_id: "assignment-primary-a",
   });
+});
+
+test("decoder quyền bắt buộc rights_basis canonical", async () => {
+  const { decodeEffectiveRight } = await import(
+    "../../src/features/itemPermissions/api.ts"
+  );
+  const row = {
+    person_id: "person-1", user_id: null, full_name: "QA A",
+    validation_code: "VAL-001", can_view: true, editable_fields: [],
+    view_reason: "Được xem", assignment_sources: [], scope_match: true,
+    area_match: true, rights_basis: "qa_assignment",
+  };
+
+  assert.equal(decodeEffectiveRight(row).rights_basis, "qa_assignment");
+  assert.throws(() => decodeEffectiveRight({ ...row, rights_basis: undefined }), /rights_basis/);
+  assert.throws(() => decodeEffectiveRight({ ...row, rights_basis: "selected_person" }), /rights_basis/);
+});
+
+test("mỗi dòng quyền render cơ sở của chính dòng đó", async () => {
+  const { EffectiveRightBasisSummary } = await import(
+    "../../src/features/itemPermissions/EffectiveRightsPanel.tsx"
+  );
+  const qa = {
+    rights_basis: "qa_assignment", assignment_sources: ["QA phụ trách chính"],
+    scope_match: false, area_match: false,
+  };
+  const hierarchy = {
+    rights_basis: "hierarchy_scope", assignment_sources: [],
+    scope_match: true, factory_match: true, area_match: false, line_match: false,
+  };
+  const html = renderToStaticMarkup(React.createElement(React.Fragment, null,
+    React.createElement(EffectiveRightBasisSummary, { right: qa }),
+    React.createElement(EffectiveRightBasisSummary, { right: hierarchy }),
+  ));
+
+  assert.match(html, /Phân công: QA phụ trách chính/);
+  assert.match(html, /Phạm vi: Bộ phận khớp/);
+  assert.doesNotMatch(html, /Phân công: chưa có phân công.*Phân công: chưa có phân công/);
 });
 
 test("đổi lựa chọn khi đang tìm QA chính không được gửi replace_primary cũ", async () => {
@@ -581,14 +621,14 @@ test("đổi lựa chọn khi đang tìm QA chính không được gửi replace
     loadAssignments: () => assignments,
     confirmReplacement: () => { confirms += 1; return true; },
     isCurrent: () => currentPersonId === "person-a",
-    dispatch: async (action) => { dispatched.push(action); },
+    dispatch: async (action, expectedId) => { dispatched.push([action, expectedId]); },
   });
   currentPersonId = "person-b";
   resolveAssignments([{
     assignment_kind: "qa",
     assignment_role: "primary",
     is_active: true,
-    staff_name: "QA A",
+    staff_name: "QA A", assignment_id: "assignment-a",
   }]);
 
   assert.equal(await pending, false);
@@ -610,19 +650,63 @@ test("đổi mã hoặc lý do khi preflight chờ không dispatch intent cũ", 
     loadAssignments: () => assignments,
     confirmReplacement: () => { confirms += 1; return true; },
     isCurrent: () => intent === "VMP-A|Lý do A",
-    dispatch: async (action) => { dispatched.push(action); },
+    dispatch: async (action, expectedId) => { dispatched.push([action, expectedId]); },
   });
   intent = "VMP-B|Lý do B";
   resolveAssignments([{
     assignment_kind: "qa",
     assignment_role: "primary",
     is_active: true,
-    staff_name: "QA A",
+    staff_name: "QA A", assignment_id: "assignment-a",
   }]);
 
   assert.equal(await pending, false);
   assert.equal(confirms, 0);
   assert.deepEqual(dispatched, []);
+});
+
+test("confirm bất đồng bộ không thể đổi snapshot QA chính đã tiền kiểm", async () => {
+  const { dispatchAssignmentWhenCurrent } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  const primary = {
+    assignment_id: "assignment-primary-a", assignment_kind: "qa",
+    assignment_role: "primary", is_active: true, staff_name: "QA A",
+  };
+  const dispatched = [];
+  await dispatchAssignmentWhenCurrent({
+    loadAssignments: async () => [primary],
+    confirmReplacement: () => {
+      primary.assignment_id = "assignment-primary-b";
+      return true;
+    },
+    isCurrent: () => true,
+    dispatch: async (action, expectedId) => dispatched.push([action, expectedId]),
+  });
+
+  assert.deepEqual(dispatched, [["replace_primary", "assignment-primary-a"]]);
+});
+
+test("PRIMARY_CONFLICT refresh trạng thái và không báo thành công", async () => {
+  const { ItemPermissionRpcError } = await import(
+    "../../src/features/itemPermissions/api.ts"
+  );
+  const { settleAssignmentOperationWhenCurrent } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  const events = [];
+  const outcome = await settleAssignmentOperationWhenCurrent({
+    mutate: async () => { throw new ItemPermissionRpcError("PRIMARY_CONFLICT", "QA chính đã đổi"); },
+    isCurrent: () => true,
+    onSuccess: () => events.push("success"),
+    onError: () => events.push("error"),
+    refresh: async () => events.push("refresh"),
+    refreshOnError: (error) => error instanceof ItemPermissionRpcError
+      && error.code === "PRIMARY_CONFLICT",
+  });
+
+  assert.equal(outcome, "error");
+  assert.deepEqual(events, ["refresh", "error"]);
 });
 
 test("mutation đến muộn không ghi status hoặc refresh của lựa chọn cũ", async () => {
