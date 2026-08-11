@@ -80,7 +80,7 @@ export default function EffectiveRightsPanel({ person, revision = 0 }: {
     setRows([]);
     setMessage("");
     if (view === "person" && person) void load();
-  }, [person?.person_id, revision, view]);
+  }, [person, revision, view]);
 
   return (
     <section className="ip-panel" aria-labelledby="ip-rights-title">
