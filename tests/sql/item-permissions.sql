@@ -3,6 +3,8 @@
  * scripts/test-item-permissions-sql.sh áp các migration trong cùng transaction
  * rồi rollback, nên fixture bên dưới không ghi vào database thật.
  */
+select 'ITEM_PERMISSION_SQL_PHASE_SCHEMA_CONTRACTS';
+
 select set_config(
   'request.jwt.claims',
   json_build_object(
@@ -914,6 +916,8 @@ begin
 end
 $test$;
 
+select 'ITEM_PERMISSION_SQL_PHASE_CANONICAL_SCOPE';
+
 /* Import lỗi một dòng phải rollback cả các dòng đã tạo trước đó. */
 do $test$
 declare
@@ -1728,6 +1732,8 @@ begin
 end
 $test$;
 
+select 'ITEM_PERMISSION_SQL_PHASE_ENFORCED_RLS';
+
 /* Task 11: preview giữ nguyên; enforced chỉ đọc hạng mục được cấp. */
 do $test$
 declare
@@ -1739,9 +1745,17 @@ declare
   v_hidden_object text;
   v_department text;
   v_area text;
+  v_line text;
+  v_hidden_area text;
+  v_hidden_line text;
   v_year integer;
   v_all_count bigint;
   v_hidden_assignment uuid;
+  v_factory constant uuid := 'a1100000-0000-0000-0000-000000000001';
+  v_visible_area constant uuid := 'a1200000-0000-0000-0000-000000000001';
+  v_hidden_area_id constant uuid := 'a1200000-0000-0000-0000-000000000002';
+  v_visible_line constant uuid := 'a1300000-0000-0000-0000-000000000001';
+  v_hidden_line_id constant uuid := 'a1300000-0000-0000-0000-000000000002';
 begin
   select id into v_admin
   from public.profiles
@@ -1753,27 +1767,38 @@ begin
   order by case when role::text = 'viewer' then 0 else 1 end, created_at
   limit 1;
 
+  /* Historical RED chọn đúng hai item này nhưng không tạo hierarchy, nên cả
+   * hai path-count đều bằng 0 và enforced RLS trả 0 dòng. Chọn rõ trạng thái
+   * pre-fixture đó rồi dựng đúng một path cho mỗi item bên dưới. */
   select visible.validation_code, hidden.validation_code, hidden.object_code,
-         object.department, object.area, visible.year
+         object.department, btrim(object.area), btrim(object.line),
+         hidden.area, hidden.line, visible.year
   into v_visible_code, v_hidden_code, v_hidden_object,
-       v_department, v_area, v_year
+       v_department, v_area, v_line, v_hidden_area, v_hidden_line, v_year
   from public.vmp_plan_items visible
   join public.vmp_objects object on object.code = visible.object_code
   join lateral (
-    select candidate.validation_code, candidate.object_code
+    select candidate.validation_code, candidate.object_code,
+           btrim(candidate_object.area) as area,
+           btrim(candidate_object.line) as line
     from public.vmp_plan_items candidate
     join public.vmp_objects candidate_object on candidate_object.code = candidate.object_code
     where candidate.is_active and candidate.year = visible.year
       and candidate.validation_code <> visible.validation_code
       and candidate.object_code <> visible.object_code
-      and coalesce(candidate_object.area, candidate_object.line, '')
-          <> coalesce(object.area, object.line, '')
+      and candidate_object.department = object.department
+      and nullif(btrim(coalesce(candidate_object.area, '')), '') is not null
+      and nullif(btrim(coalesce(candidate_object.line, '')), '') is not null
+      and btrim(candidate_object.area) <> btrim(object.area)
+      and public.vmp_item_scope_path_count(candidate.validation_code) = 0
     order by candidate.validation_code
     limit 1
   ) hidden on true
   where visible.is_active
     and nullif(btrim(coalesce(object.department, '')), '') is not null
-    and nullif(btrim(coalesce(object.area, object.line, '')), '') is not null
+    and nullif(btrim(coalesce(object.area, '')), '') is not null
+    and nullif(btrim(coalesce(object.line, '')), '') is not null
+    and public.vmp_item_scope_path_count(visible.validation_code) = 0
   order by visible.validation_code
   limit 1;
 
@@ -1787,12 +1812,24 @@ begin
   set role = 'department_user', department = v_department,
       pham_vi = 'phan_cong', is_active = true
   where id = v_user;
+  insert into public.vmp_scope_factories(id, code, name, department_id)
+  values (v_factory, 'E2E-RLS-F', 'E2E RLS factory', v_department);
+  insert into public.vmp_scope_areas(id, code, name, factory_id)
+  values
+    (v_visible_area, v_area, 'E2E RLS visible area', v_factory),
+    (v_hidden_area_id, v_hidden_area, 'E2E RLS hidden area', v_factory);
+  insert into public.vmp_scope_lines(id, code, name, area_id)
+  values
+    (v_visible_line, v_line, 'E2E RLS visible line', v_visible_area),
+    (v_hidden_line_id, v_hidden_line, 'E2E RLS hidden line', v_hidden_area_id);
   insert into public.vmp_performers (
     performer_name, email, department, user_id, access_class,
-    scope_departments, access_areas, is_active, updated_by
+    scope_departments, access_areas, scope_factory_ids, scope_area_ids,
+    scope_line_ids, is_active, updated_by
   )
   select 'E2E Người Kiểm RLS Hạng Mục', email, v_department, id, 'view_only',
-         array[v_department], array[coalesce(v_area, '*')], true, v_admin
+         array[v_department], array[v_area], array[v_factory], array[v_visible_area],
+         array[v_visible_line], true, v_admin
   from public.profiles where id = v_user
   returning id into v_person;
   insert into public.vmp_item_assignments (
@@ -1816,6 +1853,12 @@ begin
   select count(*) into v_all_count from public.vmp_plan_items;
   if (select count(*) from public.vmp_visible_plan_items()) <> v_all_count then
     raise exception 'Preview phải giữ nguyên toàn bộ tập hạng mục đang đọc';
+  end if;
+  if public.vmp_item_scope_path_count(v_visible_code) <> 1
+      or public.vmp_item_scope_path_count(v_hidden_code) <> 1 then
+    raise exception 'Fixture RLS phải tạo đúng một canonical path cho mỗi item: visible=%, hidden=%',
+      public.vmp_item_scope_path_count(v_visible_code),
+      public.vmp_item_scope_path_count(v_hidden_code);
   end if;
 
   update public.system_config set value = '"enforced"'::jsonb
@@ -2021,19 +2064,31 @@ do $test$
 declare
   v_user uuid := current_setting('app.test_item_user')::uuid;
   v_person uuid := current_setting('app.test_item_person')::uuid;
+  v_hidden_assignment uuid := current_setting('app.test_hidden_assignment')::uuid;
+  v_factory constant uuid := 'a1100000-0000-0000-0000-000000000001';
+  v_visible_area constant uuid := 'a1200000-0000-0000-0000-000000000001';
+  v_hidden_area constant uuid := 'a1200000-0000-0000-0000-000000000002';
+  v_visible_line constant uuid := 'a1300000-0000-0000-0000-000000000001';
+  v_hidden_line constant uuid := 'a1300000-0000-0000-0000-000000000002';
 begin
   if exists (select 1 from public.vmp_unfiltered_security_definer_item_readers()) then
     raise exception 'Audit vẫn còn đường đọc SECURITY DEFINER không lọc';
   end if;
   update public.system_config set value = '"preview"'::jsonb
   where key = 'item_permissions_mode';
-  delete from public.vmp_item_assignments where performer_id = v_person;
+  delete from public.vmp_item_assignments
+  where performer_id = v_person or id = v_hidden_assignment;
   delete from public.vmp_performers where id = v_person;
+  delete from public.vmp_scope_lines where id in (v_visible_line, v_hidden_line);
+  delete from public.vmp_scope_areas where id in (v_visible_area, v_hidden_area);
+  delete from public.vmp_scope_factories where id = v_factory;
   update public.profiles
   set role = 'viewer', department = null, pham_vi = null
   where id = v_user;
 end
 $test$;
+
+select 'ITEM_PERMISSION_SQL_PHASE_QA_ASSIGNMENTS';
 
 /* QA chỉ nhận quyền qua performer đã nối và phân công active của hạng mục. */
 do $test$
@@ -2556,6 +2611,9 @@ declare
   v_person uuid;
   v_code text;
   v_area text;
+  v_factory uuid;
+  v_area_id uuid;
+  v_line_id uuid;
   v_before vmp_plan_items%rowtype;
   v_after vmp_plan_items%rowtype;
   v_result jsonb;
@@ -2569,13 +2627,21 @@ begin
   from public.profiles
   where role::text = 'viewer' and coalesce(is_active, true)
   order by created_at limit 1;
-  select item.validation_code, object.area
-  into v_code, v_area
+  select item.validation_code, area.code, factory.id, area.id, line.id
+  into v_code, v_area, v_factory, v_area_id, v_line_id
   from public.vmp_plan_items item
   join public.vmp_objects object on object.code = item.object_code
+  join public.vmp_scope_factories factory
+    on factory.department_id = object.department and factory.is_active
+  join public.vmp_scope_areas area
+    on area.factory_id = factory.id and area.is_active
+   and area.code = btrim(object.area)
+  join public.vmp_scope_lines line
+    on line.area_id = area.id and line.is_active
+   and line.code = btrim(object.line)
   where item.is_active and coalesce(item.item_state, 'active') = 'active'
     and object.department = 'xsx'
-    and nullif(btrim(coalesce(object.area, '')), '') is not null
+    and public.vmp_item_scope_path_count(item.validation_code) = 1
   order by item.validation_code limit 1;
 
   if v_admin is null or v_user is null or v_code is null then
@@ -2589,10 +2655,12 @@ begin
   where id = v_user;
   insert into public.vmp_performers (
     performer_name, email, department, user_id, access_class,
-    scope_departments, access_areas, is_active, updated_by
+    scope_departments, access_areas, scope_factory_ids, scope_area_ids,
+    scope_line_ids, is_active, updated_by
   )
   select 'E2E Người Sửa Timeline', email, 'qa', id, 'qa_progress_editor',
-         array['xsx'], array[v_area], true, v_admin
+         array['xsx'], array[v_area], array[v_factory], array[v_area_id],
+         array[v_line_id], true, v_admin
   from public.profiles where id = v_user
   returning id into v_person;
   insert into public.vmp_item_assignments (
@@ -3197,6 +3265,8 @@ begin
 end
 $test$;
 
+select 'ITEM_PERMISSION_SQL_PHASE_SOURCE_RESOLUTION';
+
 /* Resolve tên trùng phải bền qua refresh; denormalized link và preflight phải khớp. */
 do $test$
 declare
@@ -3520,3 +3590,5 @@ begin
   end if;
 end
 $test$;
+
+select 'ITEM_PERMISSION_SQL_TESTS_COMPLETE';
