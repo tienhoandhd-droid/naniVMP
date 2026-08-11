@@ -29,6 +29,16 @@ export type AccountStatus = "linked" | "unlinked" | "inactive";
 export type MatchStatus = "unique" | "ambiguous";
 export type QaAssignmentRole = "primary" | "collaborator";
 
+export interface AccountCandidate {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: "admin" | "qa_manager" | "department_user" | "viewer";
+  department: string | null;
+  is_active: boolean;
+  linked_person_id: string | null;
+}
+
 export interface DirectoryPerson {
   person_id: string;
   user_id: string | null;

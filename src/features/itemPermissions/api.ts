@@ -2,6 +2,7 @@ import type { ItemPermissionMode } from "../../types/domain.ts";
 import {
   ACCESS_CLASSES,
   type AccessClass,
+  type AccountCandidate,
   type AccountStatus,
   type DirectoryPerson,
   type EffectiveItemRight,
@@ -128,6 +129,19 @@ export function decodeDirectoryPerson(value: unknown): DirectoryPerson {
   };
 }
 
+export function decodeAccountCandidate(value: unknown): AccountCandidate {
+  const row = objectValue(value, "Tài khoản ứng viên");
+  return {
+    user_id: requiredString(row, "user_id"),
+    email: requiredString(row, "email"),
+    full_name: requiredString(row, "full_name"),
+    role: enumValue(row, "role", ["admin", "qa_manager", "department_user", "viewer"]),
+    department: nullableString(row, "department"),
+    is_active: booleanValue(row, "is_active"),
+    linked_person_id: nullableString(row, "linked_person_id"),
+  };
+}
+
 function scopeRows(payload: JsonObject, key: string): unknown[] {
   const rows = payload[key];
   if (!Array.isArray(rows)) throw new Error(`Danh mục phạm vi thiếu hoặc sai ${key}`);
@@ -246,6 +260,38 @@ export async function searchPermissionDirectory(query = ""): Promise<DirectoryPe
 
 export async function searchActivePerformers(query = ""): Promise<DirectoryPerson[]> {
   return (await searchPermissionDirectory(query)).filter((person) => person.is_active);
+}
+
+export async function searchAccountCandidates(query = ""): Promise<AccountCandidate[]> {
+  const payload = await callRpc("rpc_item_permission_account_candidates", { p_query: query });
+  if (!Array.isArray(payload.accounts)) throw new Error("Kết quả tài khoản thiếu accounts");
+  return payload.accounts.map(decodeAccountCandidate);
+}
+
+export function createLinkPermissionAccountArgs(
+  personId: string,
+  userId: string | null,
+  reason: string,
+  expectedVersion: number,
+): JsonObject {
+  return {
+    p_person_id: personId,
+    p_user_id: userId,
+    p_reason: reason,
+    p_expected_version: expectedVersion,
+  };
+}
+
+export async function linkPermissionAccount(
+  personId: string,
+  userId: string | null,
+  reason: string,
+  expectedVersion: number,
+): Promise<void> {
+  await callRpc(
+    "rpc_link_item_permission_account",
+    createLinkPermissionAccountArgs(personId, userId, reason, expectedVersion),
+  );
 }
 
 export async function fetchScopeCatalog(): Promise<ScopeCatalog> {
