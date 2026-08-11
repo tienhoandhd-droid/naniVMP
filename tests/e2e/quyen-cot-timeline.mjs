@@ -61,7 +61,39 @@ await page.setViewport({ width: 1500, height: 1100 });
 await page.setRequestInterception(true);
 
 let mode = "enforced";
-let editableFields = QA_FIELDS;
+const primaryQa = {
+  can_view: true,
+  editable_fields: QA_FIELDS,
+  view_reason: "QA phụ trách chính theo phân công hạng mục",
+  assignment_sources: ["qa_primary"],
+  scope_match: true,
+  area_match: true,
+};
+const collaboratorQa = {
+  can_view: true,
+  editable_fields: QA_FIELDS,
+  view_reason: "QA phối hợp theo phân công hạng mục",
+  assignment_sources: ["qa_collaborator"],
+  scope_match: true,
+  area_match: true,
+};
+const unassignedQa = {
+  can_view: false,
+  editable_fields: [],
+  view_reason: "Chưa có phân công QA đang hoạt động",
+  assignment_sources: [],
+  scope_match: false,
+  area_match: false,
+};
+const equipmentScheduler = {
+  can_view: true,
+  editable_fields: ["scheduled_at"],
+  view_reason: "Bộ phận thiết bị được xếp lịch",
+  assignment_sources: ["equipment_department"],
+  scope_match: true,
+  area_match: true,
+};
+let right = primaryQa;
 let updateShouldFail = false;
 const updateBodies = [];
 const permissionBodies = [];
@@ -87,14 +119,7 @@ page.on("request", (request) => {
   if (/\/rpc\/item_permissions_mode/.test(url)) return answer(request, mode);
   if (/\/rpc\/vmp_my_item_rights/.test(url)) {
     if (request.method() !== "OPTIONS") permissionBodies.push(JSON.parse(request.postData() || "{}"));
-    return answer(request, [{
-      can_view: true,
-      editable_fields: editableFields,
-      view_reason: editableFields.length ? "Theo phân công E2E" : "Chỉ xem",
-      assignment_sources: [],
-      scope_match: true,
-      area_match: true,
-    }]);
+    return answer(request, [right]);
   }
   if (/\/rpc\/rpc_update_progress/.test(url)) {
     if (request.method() !== "OPTIONS") updateBodies.push(JSON.parse(request.postData() || "{}"));
@@ -124,10 +149,10 @@ async function closeModal() {
     .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
 }
 
-async function openPersona(nextMode, fields, { quick = false } = {}) {
+async function openPersona(nextMode, nextRight, { quick = false } = {}) {
   await closeModal();
   mode = nextMode;
-  editableFields = fields;
+  right = nextRight;
   await page.evaluate((useQuick) => {
     [...document.querySelectorAll("button")]
       .find((button) => button.textContent?.trim() === (useQuick ? "✓ Xong bước" : "Cập nhật"))?.click();
@@ -169,7 +194,11 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.body.innerText.includes("TB-E2E-01"));
 
-  await openPersona("enforced", QA_FIELDS);
+  await openPersona("enforced", primaryQa);
+  assert.deepEqual(primaryQa.editable_fields, QA_FIELDS,
+    "QA phụ trách chính chỉ nhận đúng tám trường QA");
+  assert.equal(primaryQa.editable_fields.includes("scheduled_at"), false,
+    "QA phụ trách chính không được nhận scheduled_at");
   assert.deepEqual(permissionBodies[0], { p_validation_code: ACTIVITY.id },
     "frontend chỉ gửi mã hạng mục vào wrapper quyền của chính auth.uid");
   const qa = await controlState();
@@ -195,7 +224,7 @@ try {
 
   // Đường tắt đã điền sẵn hai trường QA trước khi quyền về, tạo một bản nháp
   // hỗn hợp. Enforced vẫn chỉ được gửi scheduled_at xuống RPC.
-  await openPersona("enforced", ["scheduled_at"], { quick: true });
+  await openPersona("enforced", equipmentScheduler, { quick: true });
   const equipment = await controlState();
   assert.equal(equipment.qaEnabled, 0, "bộ phận thiết bị không được sửa tám trường QA");
   assert.equal(equipment.scheduleEnabled, true, "bộ phận thiết bị chỉ được xếp lịch");
@@ -228,14 +257,25 @@ try {
   assert.equal(updateBodies[1].p_patch.scheduled_at, "2026-08-12T08:45:00.000Z",
     "15:45 Bangkok phải được gửi thành đúng thời điểm UTC");
 
-  await openPersona("enforced", []);
+  await openPersona("enforced", collaboratorQa);
+  assert.deepEqual(collaboratorQa.editable_fields, QA_FIELDS,
+    "QA phối hợp phải có đúng cùng tám trường của QA phụ trách chính");
+  assert.equal(collaboratorQa.editable_fields.includes("scheduled_at"), false,
+    "QA phối hợp không được nhận scheduled_at");
+  const collaborator = await controlState();
+  assert.equal(collaborator.qaEnabled, 8, "QA phối hợp sửa được đủ tám trường QA");
+  assert.equal(collaborator.scheduleEnabled, false, "QA phối hợp không được xếp lịch");
+
+  await openPersona("enforced", unassignedQa);
+  assert.equal(unassignedQa.can_view, false, "QA chưa phân công không được xem hạng mục");
+  assert.deepEqual(unassignedQa.editable_fields, [], "QA chưa phân công không có trường được sửa");
   const viewer = await controlState();
   assert.equal(viewer.qaEnabled, 0);
   assert.equal(viewer.scheduleEnabled, false);
   assert.equal(viewer.hasSave, false, "view-only không có nút lưu tiến độ");
   assert.match(viewer.text, /Chỉ xem/);
 
-  await openPersona("preview", []);
+  await openPersona("preview", unassignedQa);
   const preview = await controlState();
   assert.equal(preview.qaEnabled, 8, "preview giữ nguyên tám control QA đang chạy");
   assert.equal(preview.scheduleEnabled, true, "preview không áp allowlist dự kiến lên lịch");
