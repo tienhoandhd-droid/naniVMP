@@ -135,6 +135,8 @@ declare
   v_result jsonb;
   v_directory jsonb;
   v_preflight jsonb;
+  v_account_lock_key bigint;
+  v_link_lock_key bigint;
 begin
   select id into v_admin
   from public.profiles
@@ -332,6 +334,18 @@ begin
       or (v_result->>'current_version')::integer <> v_version then
     raise exception 'Nối tài khoản phải kiểm optimistic version: %', v_result;
   end if;
+  v_link_lock_key := pg_catalog.hashtextextended(
+    'vmp:item-permission-account:' || v_user_1::text, 0
+  );
+  if not exists (
+    select 1 from pg_catalog.pg_locks
+    where locktype = 'advisory' and pid = pg_catalog.pg_backend_pid()
+      and classid = ((v_link_lock_key >> 32) & 4294967295)::oid
+      and objid = (v_link_lock_key & 4294967295)::oid
+      and objsubid = 1 and mode = 'ExclusiveLock' and granted
+  ) then
+    raise exception 'rpc_link phải giữ cùng advisory xact lock theo account';
+  end if;
 
   update public.profiles set is_active = false where id = v_user_1;
   v_result := public.rpc_link_item_permission_account(
@@ -348,6 +362,65 @@ begin
     raise exception 'Không được nối người QA vào profile bộ phận khác: %', v_result;
   end if;
   update public.profiles set department = 'qa' where id = v_user_1;
+
+  /* Cả set-role và link phải serialize trên cùng advisory key của account. */
+  v_account_lock_key := pg_catalog.hashtextextended(
+    'vmp:item-permission-account:' || v_user_2::text, 0
+  );
+  if exists (
+    select 1 from pg_catalog.pg_locks
+    where locktype = 'advisory' and pid = pg_catalog.pg_backend_pid()
+      and classid = ((v_account_lock_key >> 32) & 4294967295)::oid
+      and objid = (v_account_lock_key & 4294967295)::oid
+      and objsubid = 1 and mode = 'ExclusiveLock' and granted
+  ) then
+    raise exception 'Fixture account lock phải bắt đầu ở trạng thái chưa khóa';
+  end if;
+  v_result := public.rpc_set_user_role(
+    v_user_2, 'viewer', 'qa', '  Kiểm khóa account set-role  ',
+    v_old_user_2_profile.pham_vi
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or not exists (
+        select 1 from pg_catalog.pg_locks
+        where locktype = 'advisory' and pid = pg_catalog.pg_backend_pid()
+          and classid = ((v_account_lock_key >> 32) & 4294967295)::oid
+          and objid = (v_account_lock_key & 4294967295)::oid
+          and objsubid = 1 and mode = 'ExclusiveLock' and granted
+      ) then
+    raise exception 'rpc_set_user_role phải giữ advisory xact lock của account: %',
+      v_result;
+  end if;
+  if not exists (
+    select 1 from public.audit_logs
+    where table_name = 'profiles' and record_id = v_user_2::text
+      and change_reason = 'Kiểm khóa account set-role'
+  ) then
+    raise exception 'Audit set-role phải lưu reason đã btrim';
+  end if;
+
+  v_result := public.rpc_set_user_role(
+    v_user_2, 'department_user', 'xsx', null, 'co'
+  );
+  if v_result->>'error_code' <> 'REASON_REQUIRED'
+      or not exists (
+        select 1 from public.profiles
+        where id = v_user_2 and role::text = 'viewer' and department = 'qa'
+          and pham_vi is not distinct from v_old_user_2_profile.pham_vi
+      ) then
+    raise exception 'set-role reason null phải bị từ chối trước mọi ghi: %', v_result;
+  end if;
+  v_result := public.rpc_set_user_role(
+    v_user_2, 'department_user', 'xsx', '   ', 'co'
+  );
+  if v_result->>'error_code' <> 'REASON_REQUIRED'
+      or not exists (
+        select 1 from public.profiles
+        where id = v_user_2 and role::text = 'viewer' and department = 'qa'
+          and pham_vi is not distinct from v_old_user_2_profile.pham_vi
+      ) then
+    raise exception 'set-role reason blank phải bị từ chối trước mọi ghi: %', v_result;
+  end if;
 
   update public.vmp_performers set is_active = false where id = v_person_2;
   v_result := public.rpc_link_item_permission_account(

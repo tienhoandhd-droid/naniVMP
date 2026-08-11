@@ -333,6 +333,7 @@ declare
   v_profile public.profiles%rowtype;
   v_new_profile public.profiles%rowtype;
   v_version integer;
+  v_lock_user_id uuid;
 begin
   select role::text into v_actor_role
   from public.profiles
@@ -351,6 +352,23 @@ begin
     );
   end if;
 
+  /* Serialize mọi mutation của cùng account trước khi lấy row lock.
+   * Unlink lấy account hiện tại bằng snapshot; optimistic version bên dưới
+   * từ chối nếu một link vừa thay snapshot trong lúc chờ performer. */
+  v_lock_user_id := p_user_id;
+  if v_lock_user_id is null then
+    select user_id into v_lock_user_id
+    from public.vmp_performers
+    where id = p_person_id;
+  end if;
+  if v_lock_user_id is not null then
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(
+        'vmp:item-permission-account:' || v_lock_user_id::text, 0
+      )
+    );
+  end if;
+
   select * into v_person
   from public.vmp_performers
   where id = p_person_id
@@ -365,6 +383,14 @@ begin
     return jsonb_build_object(
       'ok', false, 'error_code', 'VERSION_CONFLICT',
       'error', 'Hồ sơ đã được cập nhật ở phiên khác',
+      'current_version', v_person.version
+    );
+  end if;
+  if p_user_id is null
+      and v_lock_user_id is distinct from v_person.user_id then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'VERSION_CONFLICT',
+      'error', 'Liên kết tài khoản đã đổi trong lúc chờ khóa hồ sơ',
       'current_version', v_person.version
     );
   end if;
@@ -570,6 +596,7 @@ declare
   v_so_admin integer;
   v_pv text := nullif(btrim(coalesce(p_pham_vi, '')), '');
   v_department text := nullif(btrim(coalesce(p_department, '')), '');
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
 begin
   select role::text into v_my_role
   from public.profiles
@@ -586,8 +613,23 @@ begin
       'error', 'Chỉ admin được đổi phân quyền'
     );
   end if;
+  if v_reason is null then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'REASON_REQUIRED',
+      'error', 'Bắt buộc nhập lý do đổi phân quyền'
+    );
+  end if;
 
-  /* Cùng thứ tự lock với RPC link: performer trước, profile sau. */
+  /* Cùng advisory key và thứ tự lock với RPC link:
+   * account advisory → performer → profile. */
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'vmp:item-permission-account:' || p_user_id::text, 0
+    )
+  );
+
+  /* Refresh linked performer sau khi đã serialize account; không dùng snapshot
+   * đọc trước lúc một RPC link concurrent commit. */
   select * into v_linked
   from public.vmp_performers
   where user_id = p_user_id
@@ -679,8 +721,7 @@ begin
     jsonb_build_object(
       'role', p_role, 'department', v_department, 'pham_vi', v_pv
     ),
-    coalesce(nullif(btrim(coalesce(p_reason, '')), ''),
-      'Đổi phân quyền từ màn Phân quyền'),
+    v_reason,
     'dashboard_rpc', array['role', 'department', 'pham_vi']
   );
 
