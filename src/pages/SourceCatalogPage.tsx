@@ -30,7 +30,6 @@ import {
   generateTimeline, fetchSourceWarnings,
   fetchAlertRecipients, upsertAlertRecipient, deleteAlertRecipient,
   fetchStaffEmails, upsertStaffEmail, deleteStaffEmail,
-  fetchPerformers, upsertPerformer, deletePerformer,
   fetchProductsGmp, upsertProductGmp, deleteProductGmp,
 } from "../lib/supabaseData.ts";
 import { usePerformers } from "../hooks/index.ts";
@@ -79,7 +78,7 @@ const FIELDS = [
   { key: "year_ref",         label: "Năm nhập / ban hành", w: 120, num: true,
     hint: "Bằng năm thẩm định và chưa từng có IQ ⇒ sinh đủ DQ, FAT/SAT, IQ, OQ, PQ (chỉ một lần)." },
   { key: "owner_name",       label: "QA phụ trách",        w: 150,
-    hint: "Gán tự động theo bảng phân công (vmp_assignment_rules). Chỉ chọn người đang hoạt động từ tab Người thực hiện." },
+    hint: "Gán tự động theo bảng phân công (vmp_assignment_rules). Chỉ chọn người đang hoạt động từ Phân quyền & trách nhiệm → Danh bạ người thực hiện." },
   { key: "support_name",     label: "Người hỗ trợ",        w: 140 },
   { key: "work_group",       label: "Nhóm công việc",      w: 190,
     hint: "Nhóm trong bảng phân công đã khớp — dùng để truy vì sao thuộc về người này." },
@@ -1205,28 +1204,6 @@ const DATASETS: DatasetSpec[] = [
     remove: (key) => deleteStaffEmail(key),
   },
   {
-    id: "performers",
-    label: "Người thực hiện",
-    icon: UserCheck,
-    sub: "Người trực tiếp làm thẩm định — tên ghi trên hạng mục VMP, kèm email liên hệ",
-    keyField: "id",
-    emptyWarning: "Chưa có người thực hiện nào. Thêm tên + email để dùng khi phân công hạng mục.",
-    fields: [
-      { key: "is_active", label: "Đang làm", w: 90, bool: true },
-      { key: "performer_name", label: "Tên người thực hiện", w: 190,
-        hint: "Ghi đúng như tên dùng trong kế hoạch VMP để khớp được với hạng mục." },
-      { key: "email", label: "Email", w: 220,
-        hint: "Không bắt buộc, nhưng đã nhập thì phải đúng dạng ten@congty.com." },
-      { key: "department", label: "Bộ phận", w: 150, chon: CHON_BO_PHAN,
-        hint: "Chọn từ danh sách để ma trận phân công gom đúng người vào đúng bộ phận." },
-      { key: "role_title", label: "Chức danh", w: 140 },
-      { key: "note", label: "Ghi chú", w: 170 },
-    ],
-    load: () => fetchPerformers() as unknown as Promise<Record<string, unknown>[]>,
-    save: (key, patch) => upsertPerformer(key, patch),
-    remove: (key) => deletePerformer(key),
-  },
-  {
     id: "products",
     label: "Sản phẩm GMP",
     icon: FlaskConical,
@@ -1470,6 +1447,32 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
   );
 }
 
+/** Danh bạ chuẩn đã chuyển sang màn Phân quyền: RPC CRUD cũ ở màn nguồn
+ * bị migration vô hiệu hoá, nên không để lại nút bấm chắc chắn thất bại. */
+function PerformerDirectoryRedirect({ canEdit }: { canEdit: boolean }) {
+  return (
+    <Card>
+      <CardTitle icon={UserCheck} sub="Một danh bạ chuẩn dùng chung cho phân công hạng mục và quyền hiệu lực.">
+        Người thực hiện
+      </CardTitle>
+      <div style={{ marginTop: 12, maxWidth: 680, color: C.plumSoft, fontSize: 14, lineHeight: 1.6 }}>
+        Danh bạ người thực hiện được quản lý tại Phân quyền & trách nhiệm. Tạo, sửa hoặc ngừng dùng người ở đó để
+        danh bạ, vai trò và phân công luôn dùng cùng một nguồn dữ liệu.
+      </div>
+      {canEdit ? (
+        <button onClick={() => { window.location.hash = "#v=phanquyen"; }}
+          style={{ ...btnPrimary, marginTop: 14 }}>
+          <UserCheck size={15} /> Đến Phân quyền & trách nhiệm
+        </button>
+      ) : (
+        <div style={{ marginTop: 12, color: C.marigoldText, fontSize: 12, fontWeight: 700 }}>
+          Chỉ quản trị viên mới có thể thay đổi danh bạ người thực hiện.
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /* ================================================================
  * Màn hình gộp: chuyển giữa các bộ dữ liệu
  * ================================================================ */
@@ -1483,9 +1486,11 @@ export default function DataWorkspaceView({ user, onReload, focus }: {
   // đối tượng, không phải tab người nhận mail hay sản phẩm GMP.
   useEffect(() => { if (focus && focus.code) setTab("catalog"); }, [focus]);
   const spec = DATASETS.find((d) => d.id === tab);
+  const isPerformerDirectory = tab === "performers";
 
   const TABS = [
     { id: "catalog", label: "Danh mục nguồn", icon: Boxes },
+    { id: "performers", label: "Người thực hiện", icon: UserCheck },
     ...DATASETS.map((d) => ({ id: d.id, label: d.label, icon: d.icon })),
   ];
 
@@ -1510,6 +1515,7 @@ export default function DataWorkspaceView({ user, onReload, focus }: {
       </div>
 
       {tab === "catalog" ? <SourceCatalogSection user={user} onReload={onReload} focus={focus} />
+        : isPerformerDirectory ? <PerformerDirectoryRedirect canEdit={canEdit} />
         : spec           ? <SimpleDatasetView spec={spec} canEdit={canEdit} />
         : null}
     </div>

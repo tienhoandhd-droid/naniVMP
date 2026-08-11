@@ -35,6 +35,7 @@ let heldRightsRequest = null;
 let rightsReads = 0;
 let staleRightsRequest = null;
 let markStaleRightsFinished = null;
+let failNextRights = false;
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -73,6 +74,10 @@ page.on("request", (request) => {
   if (/\/rpc\/vmp_my_item_rights/.test(url)) {
     if (request.method() === "OPTIONS") return answer(request, []);
     rightsReads += 1;
+    if (failNextRights) {
+      failNextRights = false;
+      return answer(request, { message: "forced rights failure" }, 500);
+    }
     if (holdNextRights) {
       holdNextRights = false;
       heldRightsRequest = request;
@@ -201,11 +206,14 @@ try {
   await page.waitForFunction(async () => {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
-    return title && [...title.closest(".vmp-scroll").querySelectorAll('input[type="date"], select')]
-      .every((control) => control.disabled);
+    const dialog = title?.closest(".vmp-scroll");
+    return dialog
+      && dialog.innerText.includes("Quyền xem hạng mục đã bị thu hồi")
+      && !dialog.innerText.includes("TB-BI-MAT")
+      && dialog.querySelectorAll('input, select').length === 0;
   });
   assert.ok(rightsReads > rightsBeforeRevoke, "thu hồi phải đọc quyền mới, không dùng quyền collaborator đã cache");
-  assert.equal(await enabledQaControls(), 0, "thu hồi khóa cả tám control QA trong modal đang mở");
+  assert.equal(await enabledQaControls(), 0, "thu hồi không để lại control để sửa hạng mục đã mất quyền xem");
 
   staleRightsRequest = heldRightsRequest;
   const staleRightsFinished = new Promise((resolve) => { markStaleRightsFinished = resolve; });
@@ -220,9 +228,28 @@ try {
   heldRightsRequest = null;
   await staleRightsFinished;
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  assert.equal(await enabledQaControls(), 0,
-    "response quyền collaborator cũ về trễ không được khôi phục quyền sau revoke");
-  console.log("✅ Đổi enforced thu hồi cache; modal fail-closed và response quyền cũ không khôi phục quyền");
+  assert.equal(await page.evaluate(() => document.body.innerText.includes("TB-BI-MAT")), false,
+    "response quyền collaborator cũ về trễ không được tiết lộ lại nội dung hạng mục sau revoke");
+
+  // Không tải được quyền cũng không được giả định can_view=true. Khi lỗi xảy
+  // ra lúc modal đang mở, phần thân hạng mục và các control phải biến mất.
+  collaboratorAssigned = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForFunction(() => document.body.innerText.includes("TB-BI-MAT"));
+  await openProgressModal();
+  await page.waitForFunction(() => document.body.innerText.includes("Quyền theo từng cột đang áp dụng"));
+  failNextRights = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForFunction(() => {
+    const title = [...document.querySelectorAll("span")]
+      .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
+    const dialog = title?.closest(".vmp-scroll");
+    return dialog
+      && dialog.innerText.includes("Không thể xác nhận quyền xem hạng mục")
+      && !dialog.innerText.includes("TB-BI-MAT")
+      && dialog.querySelectorAll('input, select').length === 0;
+  });
+  console.log("✅ Đổi enforced thu hồi cache; modal không lộ nội dung khi mất hoặc không tải được quyền");
 } finally {
   await browser.close();
 }

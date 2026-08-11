@@ -31,6 +31,7 @@ import {
   resolveUniquePerformerIdByName,
 } from "../../features/itemPermissions/performerSelection.ts";
 import { Tag, Modal, ROField, StateBadge } from "../ui/Primitives.tsx";
+import { progressModalContentState } from "./progressModalAccess.ts";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
 
 /** Ngày hôm nay theo giờ máy (không dùng toISOString — lệch múi giờ VN trước 7h sáng). */
@@ -201,8 +202,8 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       }).catch((error: unknown) => {
         if (!active || currentRequest !== requestVersion) return;
         setPermissionError((error as Error).message || "Không tải được quyền hạng mục");
-        // Không biết quyền mới thì khóa để lỗi mạng không thành fail-open.
-        setFieldPermission({ mode: "enforced", canView: true, editableFields: [], reason: "Chỉ xem" });
+        // Không biết quyền mới thì không được suy đoán người dùng còn xem được.
+        setFieldPermission({ mode: "enforced", canView: false, editableFields: [], reason: "Không thể xác nhận quyền xem" });
       });
     };
     const reloadWhenVisible = () => {
@@ -225,6 +226,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   const canEditForm = (formKey: string) => canEdit(FORM_TO_DB_COLUMN[formKey]);
   const timelineViewOnly = fieldPermission?.mode === "enforced"
     && fieldPermission.editableFields.length === 0;
+  const contentState = progressModalContentState(fieldPermission, permissionError);
   /* ---- Đổi trạng thái nghiệp vụ: chọn trạng thái → nhập lý do tại chỗ → xác nhận ---- */
   const [pendingState, setPendingState] = useState<string | null>(null);
   const [stateReason, setStateReason] = useState("");
@@ -511,6 +513,34 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       </div>
     );
   };
+  if (contentState !== "content") {
+    const isError = contentState === "error";
+    return (
+      <Modal onClose={onClose} title="Cập nhật tiến độ" icon={Pencil} wide>
+        <div style={{ background: isError ? C.raspSoft : C.marigoldSoft,
+          border: `1px solid ${isError ? C.rasp : C.marigold}`,
+          borderRadius: 14, padding: "14px 16px", color: isError ? C.raspText : C.marigoldText,
+          fontSize: 13, fontWeight: 700, lineHeight: 1.55 }}>
+          <div style={{ fontWeight: 800, marginBottom: 4 }}>
+            {contentState === "checking"
+              ? "Đang xác nhận quyền xem hạng mục…"
+              : isError
+                ? "Không thể xác nhận quyền xem hạng mục"
+                : "Quyền xem hạng mục đã bị thu hồi"}
+          </div>
+          {contentState === "checking"
+            ? "Nội dung hạng mục sẽ chỉ hiện sau khi kiểm tra quyền hoàn tất."
+            : isError
+              ? `${permissionError || "Không tải được quyền hạng mục"}. Nội dung được ẩn để bảo vệ dữ liệu.`
+              : `${fieldPermission?.reason || "Bạn không còn được phân quyền xem hạng mục này"}. Nội dung đã được ẩn.`}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+          <button onClick={onClose} style={{ ...btnPrimary, background: C.surface, color: C.plum,
+            border: `1.5px solid ${C.pinkSoft}` }}>Đóng</button>
+        </div>
+      </Modal>
+    );
+  }
   return (
     <Modal onClose={onClose} title="Cập nhật tiến độ" icon={Pencil} wide>
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16 }}>
