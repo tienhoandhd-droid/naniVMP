@@ -26,6 +26,7 @@ export async function dispatchAssignmentWhenCurrent({
   dispatch: (action: "assign" | "replace_primary") => Promise<unknown>;
 }): Promise<boolean> {
   const itemAssignments = await loadAssignments();
+  if (!isCurrent()) return false;
   const existingPrimary = itemAssignments.find((assignment) => assignment.assignment_kind === "qa"
     && assignment.assignment_role === "primary" && assignment.is_active);
   let action: "assign" | "replace_primary" = "assign";
@@ -67,11 +68,15 @@ export async function settleAssignmentOperationWhenCurrent({
 
 export class AssignmentOperationState {
   #activeToken: number | null = null;
+  #nextToken = 0;
   #saving = false;
 
-  begin(token: number) {
-    this.#activeToken = token;
+  begin(token?: number): number {
+    const operationId = token ?? this.#nextToken + 1;
+    this.#nextToken = Math.max(this.#nextToken, operationId);
+    this.#activeToken = operationId;
     this.#saving = true;
+    return operationId;
   }
 
   finish(token: number): boolean {
@@ -82,6 +87,10 @@ export class AssignmentOperationState {
 
   get saving(): boolean {
     return this.#saving;
+  }
+
+  isActive(token: number): boolean {
+    return this.#activeToken === token;
   }
 }
 
@@ -101,6 +110,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
   const [saving, setSaving] = useState(false);
   const requestSequence = useRef(0);
   const selectionSequence = useRef(0);
+  const intentSequence = useRef(0);
   const operationState = useRef(new AssignmentOperationState());
   const currentSelectedPersonId = useRef<string | null>(person?.person_id ?? null);
   currentSelectedPersonId.current = person?.person_id ?? null;
@@ -110,6 +120,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
   useEffect(() => {
     const sequence = ++requestSequence.current;
     selectionSequence.current += 1;
+    intentSequence.current += 1;
     setSaving(false);
     if (!person) { setAssignments([]); return; }
     if (!fixedKind) setKind(personIsQa ? "qa" : "equipment_department");
@@ -132,44 +143,55 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
   const assign = async () => {
     if (!person || !isDirectoryPersonComplete(person)) return;
     const selectedPerson = person;
-    const operationSequence = selectionSequence.current;
+    const selectionAtStart = selectionSequence.current;
+    const intentAtStart = intentSequence.current;
     const assignmentKind = fixedKind || (personIsQa ? "qa" : kind);
     const assignmentRole = assignmentKind === "qa" ? qaRole : null;
-    const isCurrentSelection = () => operationSequence === selectionSequence.current
-      && currentSelectedPersonId.current === selectedPerson.person_id;
-    operationState.current.begin(operationSequence);
+    const intent = {
+      personId: selectedPerson.person_id,
+      fullName: selectedPerson.full_name,
+      validationCode: validationCode.trim(),
+      assignmentKind,
+      assignmentRole,
+      reason: reason.trim(),
+    };
+    const operationId = operationState.current.begin();
+    const isCurrentSelection = () => operationState.current.isActive(operationId)
+      && selectionAtStart === selectionSequence.current
+      && intentAtStart === intentSequence.current
+      && currentSelectedPersonId.current === intent.personId;
     setSaving(true);
     setMessage("");
     try {
       const outcome = await settleAssignmentOperationWhenCurrent({
-        mutate: () => assignmentKind === "qa" && assignmentRole === "primary"
+        mutate: () => intent.assignmentKind === "qa" && intent.assignmentRole === "primary"
           ? dispatchAssignmentWhenCurrent({
-          loadAssignments: () => fetchItemAssignments({ validationCode: validationCode.trim() }),
+          loadAssignments: () => fetchItemAssignments({ validationCode: intent.validationCode }),
           confirmReplacement: (existingPrimary) => window.confirm(
-            `Hạng mục này đang có QA phụ trách chính là ${existingPrimary.staff_name}. Đổi sang ${selectedPerson.full_name}?`,
+            `Hạng mục này đang có QA phụ trách chính là ${existingPrimary.staff_name}. Đổi sang ${intent.fullName}?`,
           ),
           isCurrent: isCurrentSelection,
           dispatch: (action) => setItemAssignment({
-            personId: selectedPerson.person_id,
-            validationCode: validationCode.trim(),
-            assignmentKind,
-            assignmentRole,
+            personId: intent.personId,
+            validationCode: intent.validationCode,
+            assignmentKind: intent.assignmentKind,
+            assignmentRole: intent.assignmentRole,
             action,
-            reason: reason.trim(),
+            reason: intent.reason,
           }),
           })
           : setItemAssignment({
-            personId: selectedPerson.person_id,
-            validationCode: validationCode.trim(),
-            assignmentKind,
-            assignmentRole,
+            personId: intent.personId,
+            validationCode: intent.validationCode,
+            assignmentKind: intent.assignmentKind,
+            assignmentRole: intent.assignmentRole,
             action: "assign",
-            reason: reason.trim(),
+            reason: intent.reason,
           }),
         isCurrent: isCurrentSelection,
         onSuccess: () => {
           onAssignmentsChanged?.();
-          setMessage(`Đã phân công hạng mục ${validationCode.trim()} cho ${selectedPerson.full_name}`);
+          setMessage(`Đã phân công hạng mục ${intent.validationCode} cho ${intent.fullName}`);
         },
         onError: (error) => setMessage((error as Error).message),
         refresh: () => refreshAssignments(selectedPerson, isCurrentSelection),
@@ -178,40 +200,49 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
       setValidationCode("");
       setReason("");
     } finally {
-      if (operationState.current.finish(operationSequence)) setSaving(false);
+      if (operationState.current.finish(operationId)) setSaving(false);
     }
   };
 
   const revoke = async (assignment: ItemAssignment) => {
     if (!assignment.person_id || !reason.trim()) return;
     const selectedPerson = person;
-    const operationSequence = selectionSequence.current;
-    const selectionRole = qaRole;
-    const isCurrentSelection = () => operationSequence === selectionSequence.current
-      && currentSelectedPersonId.current === selectedPerson?.person_id && qaRole === selectionRole;
-    operationState.current.begin(operationSequence);
+    const selectionAtStart = selectionSequence.current;
+    const intentAtStart = intentSequence.current;
+    const intent = {
+      personId: assignment.person_id,
+      validationCode: assignment.validation_code,
+      assignmentKind: assignment.assignment_kind,
+      assignmentRole: assignment.assignment_role,
+      reason: reason.trim(),
+    };
+    const operationId = operationState.current.begin();
+    const isCurrentSelection = () => operationState.current.isActive(operationId)
+      && selectionAtStart === selectionSequence.current
+      && intentAtStart === intentSequence.current
+      && currentSelectedPersonId.current === selectedPerson?.person_id;
     setSaving(true);
     setMessage("");
     try {
       await settleAssignmentOperationWhenCurrent({
         mutate: () => setItemAssignment({
-          personId: assignment.person_id!,
-          validationCode: assignment.validation_code,
-          assignmentKind: assignment.assignment_kind,
-          assignmentRole: assignment.assignment_role,
+          personId: intent.personId,
+          validationCode: intent.validationCode,
+          assignmentKind: intent.assignmentKind,
+          assignmentRole: intent.assignmentRole,
           action: "revoke",
-          reason: reason.trim(),
+          reason: intent.reason,
         }),
         isCurrent: isCurrentSelection,
         onSuccess: () => {
           onAssignmentsChanged?.();
-          setMessage(`Đã thu hồi phân công ${assignment.validation_code}`);
+          setMessage(`Đã thu hồi phân công ${intent.validationCode}`);
         },
         onError: (error) => setMessage((error as Error).message),
         refresh: () => selectedPerson ? refreshAssignments(selectedPerson, isCurrentSelection) : Promise.resolve(),
       });
     } finally {
-      if (operationState.current.finish(operationSequence)) setSaving(false);
+      if (operationState.current.finish(operationId)) setSaving(false);
     }
   };
 
@@ -226,12 +257,17 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
             <div className="ip-message" role="status">Hồ sơ chưa đủ. Bổ sung bộ phận, phân loại, phạm vi và khu vực trước khi phân công.</div>
           )}
           <div className="ip-form is-compact">
-            <label>Mã hạng mục<input className="pq-o" aria-label="Mã hạng mục cần phân công" value={validationCode} onChange={(event) => setValidationCode(event.target.value)} placeholder="Ví dụ: CCTB01/2026.01-OQ" /></label>
+            <label>Mã hạng mục<input className="pq-o" aria-label="Mã hạng mục cần phân công" value={validationCode}
+              disabled={saving} onChange={(event) => {
+                intentSequence.current += 1;
+                setValidationCode(event.target.value);
+              }} placeholder="Ví dụ: CCTB01/2026.01-OQ" /></label>
             {personIsQa ? (
               <label>Vai trò QA trong hạng mục
                 <select className="pq-o" aria-label="Vai trò QA trong hạng mục" value={qaRole}
                   onChange={(event) => {
                     selectionSequence.current += 1;
+                    intentSequence.current += 1;
                     setSaving(false);
                     setQaRole(event.target.value as QaAssignmentRole);
                   }}>
@@ -241,13 +277,20 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
               </label>
             ) : !fixedKind && !qaOnly && (
               <label>Vai trò phân công
-                <select className="pq-o" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
+                <select className="pq-o" value={kind} disabled={saving} onChange={(event) => {
+                  intentSequence.current += 1;
+                  setKind(event.target.value as typeof kind);
+                }}>
                   <option value="qa">QA thực hiện các mốc hoàn thành</option>
                   <option value="equipment_department">Bộ phận quản lý thiết bị xếp lịch</option>
                 </select>
               </label>
             )}
-            <label>Lý do<input className="pq-o" aria-label="Lý do phân công" value={reason} onChange={(event) => setReason(event.target.value)} /></label>
+            <label>Lý do<input className="pq-o" aria-label="Lý do phân công" value={reason} disabled={saving}
+              onChange={(event) => {
+                intentSequence.current += 1;
+                setReason(event.target.value);
+              }} /></label>
           </div>
           {canEdit && (!qaOnly || personIsQa) && (
             <button type="button" className="pq-nut la-chinh" aria-label="Phân công người đã chọn"

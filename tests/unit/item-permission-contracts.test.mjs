@@ -501,10 +501,11 @@ test("đổi lựa chọn khi đang tìm QA chính không được gửi replace
   const assignments = new Promise((resolve) => { resolveAssignments = resolve; });
   let currentPersonId = "person-a";
   const dispatched = [];
+  let confirms = 0;
 
   const pending = dispatchAssignmentWhenCurrent({
     loadAssignments: () => assignments,
-    confirmReplacement: () => true,
+    confirmReplacement: () => { confirms += 1; return true; },
     isCurrent: () => currentPersonId === "person-a",
     dispatch: async (action) => { dispatched.push(action); },
   });
@@ -517,6 +518,36 @@ test("đổi lựa chọn khi đang tìm QA chính không được gửi replace
   }]);
 
   assert.equal(await pending, false);
+  assert.equal(confirms, 0, "selection cũ không được hiện confirm thay QA chính");
+  assert.deepEqual(dispatched, []);
+});
+
+test("đổi mã hoặc lý do khi preflight chờ không dispatch intent cũ", async () => {
+  const { dispatchAssignmentWhenCurrent } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  let resolveAssignments;
+  const assignments = new Promise((resolve) => { resolveAssignments = resolve; });
+  let intent = "VMP-A|Lý do A";
+  const dispatched = [];
+  let confirms = 0;
+
+  const pending = dispatchAssignmentWhenCurrent({
+    loadAssignments: () => assignments,
+    confirmReplacement: () => { confirms += 1; return true; },
+    isCurrent: () => intent === "VMP-A|Lý do A",
+    dispatch: async (action) => { dispatched.push(action); },
+  });
+  intent = "VMP-B|Lý do B";
+  resolveAssignments([{
+    assignment_kind: "qa",
+    assignment_role: "primary",
+    is_active: true,
+    staff_name: "QA A",
+  }]);
+
+  assert.equal(await pending, false);
+  assert.equal(confirms, 0);
   assert.deepEqual(dispatched, []);
 });
 
@@ -599,6 +630,21 @@ test("reject assign cũ không báo lỗi và không hạ loading của thao tá
   assert.equal(operations.finish(1), false);
   assert.equal(operations.saving, true, "finally cũ không được hạ loading của B");
   assert.equal(operations.finish(2), true);
+  assert.equal(operations.saving, false);
+});
+
+test("hai thao tác cùng lựa chọn chỉ thao tác mới giữ loading", async () => {
+  const { AssignmentOperationState } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  const operations = new AssignmentOperationState();
+  const first = operations.begin();
+  const second = operations.begin();
+
+  assert.notEqual(first, second, "mỗi thao tác phải có operation id riêng");
+  assert.equal(operations.finish(first), false);
+  assert.equal(operations.saving, true);
+  assert.equal(operations.finish(second), true);
   assert.equal(operations.saving, false);
 });
 
