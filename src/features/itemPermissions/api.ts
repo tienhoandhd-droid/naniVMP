@@ -352,16 +352,29 @@ export async function setItemAssignment(input: {
   personId: string;
   validationCode: string;
   assignmentKind: "qa" | "equipment_department";
-  action: "assign" | "revoke";
+  assignmentRole: QaAssignmentRole | null;
+  action: "assign" | "revoke" | "replace_primary";
   reason: string;
 }): Promise<JsonObject> {
-  return callRpc("rpc_set_item_assignment", {
+  return callRpc("rpc_set_item_assignment", createSetItemAssignmentArgs(input));
+}
+
+export function createSetItemAssignmentArgs(input: {
+  personId: string;
+  validationCode: string;
+  assignmentKind: "qa" | "equipment_department";
+  assignmentRole: QaAssignmentRole | null;
+  action: "assign" | "revoke" | "replace_primary";
+  reason: string;
+}): JsonObject {
+  return {
     p_person_id: input.personId,
     p_validation_code: input.validationCode,
     p_assignment_kind: input.assignmentKind,
+    p_assignment_role: input.assignmentRole,
     p_action: input.action,
     p_reason: input.reason,
-  });
+  };
 }
 
 export async function fetchEffectiveRights(filters: {

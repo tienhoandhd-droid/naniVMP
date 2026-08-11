@@ -471,6 +471,28 @@ test("decoder phân công nhận vai trò QA hợp lệ và từ chối vai trò
   );
 });
 
+test("args phân công gửi assignment role cho RPC sáu tham số", async () => {
+  const { createSetItemAssignmentArgs } = await import(
+    "../../src/features/itemPermissions/api.ts"
+  );
+
+  assert.deepEqual(createSetItemAssignmentArgs({
+    personId: "person-qa-2",
+    validationCode: "VMP-QA-01",
+    assignmentKind: "qa",
+    assignmentRole: "collaborator",
+    action: "replace_primary",
+    reason: "Đổi QA phụ trách chính",
+  }), {
+    p_person_id: "person-qa-2",
+    p_validation_code: "VMP-QA-01",
+    p_assignment_kind: "qa",
+    p_assignment_role: "collaborator",
+    p_action: "replace_primary",
+    p_reason: "Đổi QA phụ trách chính",
+  });
+});
+
 test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
   const sql = await readFile(new URL(
     "../../supabase/migrations/20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql",

@@ -12,6 +12,8 @@ import {
   ACCESS_CLASSES,
   findDirectoryPersonById,
   isDirectoryPersonComplete,
+  isQaAccessClass,
+  requiresHierarchyScope,
   type AccessClass,
   type DirectoryPerson,
 } from "./types.ts";
@@ -41,7 +43,7 @@ const emptyForm = {
   fullName: "",
   department: "",
   email: "",
-  accessClass: "view_only" as AccessClass,
+  accessClass: null as AccessClass | null,
   scope: { departments: [], factories: [], areas: [], lines: [] } as ScopeSelection,
   emailSent: false,
 };
@@ -93,7 +95,7 @@ export default function StaffDirectoryPanel({
   const [form, setForm] = useState(emptyForm);
   const [savedForm, setSavedForm] = useState(emptyForm);
   const [catalog, setCatalog] = useState<ScopeCatalog>(emptyCatalog);
-  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState("");
   const [catalogReload, setCatalogReload] = useState(0);
   const [mode, setMode] = useState<"preview" | "enforced">("preview");
@@ -110,22 +112,36 @@ export default function StaffDirectoryPanel({
   const lastDirectoryRevision = useRef(revision);
   const knownPeople = useRef(new Map<string, DirectoryPerson>());
   const currentSelectedPersonId = useRef<string | null>(null);
+  const catalogRef = useRef<ScopeCatalog>(emptyCatalog);
+  const catalogLoaded = useRef(false);
+  const catalogRequest = useRef<Promise<ScopeCatalog> | null>(null);
   currentSelectedPersonId.current = selected?.person_id ?? null;
 
-  useEffect(() => {
-    let active = true;
+  const loadScopeCatalog = async (): Promise<ScopeCatalog> => {
+    if (catalogLoaded.current) return catalogRef.current;
+    if (catalogRequest.current) return catalogRequest.current;
     setCatalogLoading(true);
-    fetchScopeCatalog().then((nextCatalog) => {
-      if (!active) return;
+    const request = fetchScopeCatalog().then((nextCatalog) => {
+      catalogRef.current = nextCatalog;
+      catalogLoaded.current = true;
       setCatalog(nextCatalog);
       setCatalogError("");
+      return nextCatalog;
     }).catch((error) => {
-      if (active) setCatalogError((error as Error).message);
+      setCatalogError((error as Error).message);
+      throw error;
     }).finally(() => {
-      if (active) setCatalogLoading(false);
+      catalogRequest.current = null;
+      setCatalogLoading(false);
     });
-    return () => { active = false; };
-  }, [catalogReload]);
+    catalogRequest.current = request;
+    return request;
+  };
+
+  useEffect(() => {
+    if (!requiresHierarchyScope(form.accessClass)) return;
+    void loadScopeCatalog().catch(() => undefined);
+  }, [catalogReload, form.accessClass]);
 
   useEffect(() => {
     fetchPermissionPreflight().then((preflight) => {
@@ -172,13 +188,15 @@ export default function StaffDirectoryPanel({
       fullName: person.full_name,
       department: person.department || "",
       email: person.email || "",
-      accessClass: person.access_class || "view_only",
-      scope: {
-        departments: person.scope_departments,
-        factories: person.scope_factory_ids,
-        areas: person.scope_area_ids,
-        lines: person.scope_line_ids,
-      },
+      accessClass: person.access_class,
+      scope: isQaAccessClass(person.access_class)
+        ? { departments: [], factories: [], areas: [], lines: [] }
+        : {
+          departments: person.scope_departments,
+          factories: person.scope_factory_ids,
+          areas: person.scope_area_ids,
+          lines: person.scope_line_ids,
+        },
       emailSent: person.email_sent_confirmed,
     };
     setForm(nextForm);
@@ -214,7 +232,7 @@ export default function StaffDirectoryPanel({
   }, [revision, refreshPersonId]);
 
   const save = async () => {
-    if (!canEdit) return;
+    if (!canEdit || !form.accessClass) return;
     setSaving(true);
     setMessage("");
     try {
@@ -261,6 +279,23 @@ export default function StaffDirectoryPanel({
       : event.target.value,
   }));
 
+  const changeAccessClass = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const accessClass = event.target.value ? event.target.value as AccessClass : null;
+    setForm((current) => {
+      const hasScope = Object.values(current.scope).some((values) => values.length > 0);
+      if (isQaAccessClass(accessClass) && hasScope && !window.confirm(
+        "Đổi sang phân loại QA sẽ xóa bốn tầng phạm vi hiện có. Tiếp tục?",
+      )) return current;
+      return {
+        ...current,
+        accessClass,
+        scope: isQaAccessClass(accessClass)
+          ? { departments: [], factories: [], areas: [], lines: [] }
+          : current.scope,
+      };
+    });
+  };
+
   const changeScope = (scopeKey: keyof ScopeSelection, values: string[]) => {
     const candidate = { ...form.scope, [scopeKey]: values };
     const pruned = pruneInvalidScope(catalog, candidate);
@@ -283,11 +318,16 @@ export default function StaffDirectoryPanel({
   };
 
   const filteredCatalog = filterScopeCatalog(catalog, form.scope);
-  const catalogReason = catalogLoading ? "Đang tải danh mục phạm vi…"
+  const isQa = isQaAccessClass(form.accessClass);
+  const needsScope = requiresHierarchyScope(form.accessClass);
+  const catalogReason = !needsScope ? "" : catalogLoading ? "Đang tải danh mục phạm vi…"
     : catalogError ? "Không tải được danh mục phạm vi. Hãy thử lại."
       : "";
   const editReason = canEdit ? "" : "Bạn không có quyền sửa hồ sơ này.";
-  const scopeIsValid = JSON.stringify(pruneInvalidScope(catalog, form.scope)) === JSON.stringify(form.scope);
+  const scopeIsValid = !needsScope
+    || JSON.stringify(pruneInvalidScope(catalog, form.scope)) === JSON.stringify(form.scope);
+  const allScopeLevelsSelected = form.scope.departments.length > 0 && form.scope.factories.length > 0
+    && form.scope.areas.length > 0 && form.scope.lines.length > 0;
   const dirty = JSON.stringify(form) !== JSON.stringify(savedForm);
 
   const readWorkbook = async (file: File | undefined) => {
@@ -295,7 +335,12 @@ export default function StaffDirectoryPanel({
     setImportErrors([]);
     if (!file) return;
     try {
-      const parsed = await parsePermissionWorkbook(file, { scopeCatalog: catalog });
+      let parsed = await parsePermissionWorkbook(file, { scopeCatalog: catalogRef.current });
+      const hasUnresolvedScope = parsed.errors.some((error) => error.message === "Mã phạm vi không tồn tại"
+        || error.message === "Quan hệ phạm vi không hợp lệ");
+      if (!catalogLoaded.current && hasUnresolvedScope) {
+        parsed = await parsePermissionWorkbook(file, { scopeCatalog: await loadScopeCatalog() });
+      }
       setImportRows(parsed.rows);
       setImportErrors(parsed.errors);
       setMessage(parsed.errors.length
@@ -375,6 +420,11 @@ export default function StaffDirectoryPanel({
               : selected.account_status === "inactive" ? "Tài khoản đã khóa" : "Chưa có tài khoản"}
           </span>
           {selected.match_status === "ambiguous" && <span className="ip-badge is-warning">Trùng tên — cần nối tay</span>}
+          {isQaAccessClass(selected.access_class) && (
+            <span className="ip-badge is-warning">{selected.user_id
+              ? "Quyền phát sinh từ phân công hạng mục"
+              : "Chưa nối tài khoản — có thể chuẩn bị phân công nhưng chưa cấp quyền"}</span>
+          )}
           {!isDirectoryPersonComplete(selected) && (
             <span className="ip-badge is-warning">Hồ sơ chưa đủ — cần bổ sung bộ phận, phân loại, phạm vi và khu vực</span>
           )}
@@ -393,10 +443,12 @@ export default function StaffDirectoryPanel({
         </label>
         <label>Email tài khoản<input className="pq-o" type="email" aria-label="Email trong danh bạ" value={form.email} onChange={setField("email")} disabled={!canEdit} /></label>
         <label>Phân loại
-          <select className="pq-o" aria-label="Phân loại quyền" value={form.accessClass} onChange={setField("accessClass")} disabled={!canEdit}>
+          <select className="pq-o" aria-label="Phân loại quyền" value={form.accessClass || ""} onChange={changeAccessClass} disabled={!canEdit}>
+            <option value="">— chọn phân loại —</option>
             {ACCESS_CLASSES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
         </label>
+        {needsScope && <>
         <LinkedMultiSelect
           label="Phạm vi bộ phận"
           options={catalog.departments}
@@ -432,18 +484,19 @@ export default function StaffDirectoryPanel({
               : !filteredCatalog.lines.length ? "Chưa có dữ liệu line cho khu vực đã chọn." : "")}
           onChange={(values) => changeScope("lines", values)}
         />
+        </>}
         <label className="ip-check"><input type="checkbox" checked={form.emailSent} onChange={setField("emailSent")} disabled={!canEdit} /> Đã xác nhận gửi email tài khoản</label>
       </div>
 
       {canEdit && (
         <button type="button" className="pq-nut la-chinh" data-testid="save-permission-person" onClick={save}
           disabled={saving || !dirty || !form.fullName.trim() || !form.department || !form.accessClass
-            || !form.scope.departments.length || !form.scope.factories.length
-            || !form.scope.areas.length || !form.scope.lines.length || !scopeIsValid}>
+            || (isQa && form.department !== "qa")
+            || (needsScope && (!allScopeLevelsSelected || !scopeIsValid))}>
           <Save size={15} /> {saving ? "Đang lưu…" : selected ? `Lưu hồ sơ${dirty ? " · chưa lưu" : ""}` : "Thêm vào danh bạ"}
         </button>
       )}
-      {catalogError && (
+      {needsScope && catalogError && (
         <button type="button" className="pq-nut" onClick={() => setCatalogReload((value) => value + 1)}>
           Thử tải lại danh mục phạm vi
         </button>
@@ -462,7 +515,7 @@ export default function StaffDirectoryPanel({
           {canEdit && (
             <label className="pq-nut">
               <Upload size={15} /> Chọn file đã điền
-              <input type="file" accept=".xlsx" hidden disabled={catalogLoading || Boolean(catalogError)} onChange={(event) => void readWorkbook(event.target.files?.[0])} />
+              <input type="file" accept=".xlsx" hidden onChange={(event) => void readWorkbook(event.target.files?.[0])} />
             </label>
           )}
         </div>
