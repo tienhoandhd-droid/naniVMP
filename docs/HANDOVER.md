@@ -126,8 +126,8 @@ Chi tiết từng phần ở các mục dưới.
 ```
 Web (React/Vite, GitHub Pages)  ── nhập/sửa/xoá qua RPC ──▶  ┌──────────────┐
                                                               │              │
-Google Sheet ──(nhập lại khi cần, Vani VMP 3 chạy tay)─────▶  │   SUPABASE   │
-                                                              │ dữ liệu chính│
+Google Sheet ── tham chiếu/đối chiếu có phê duyệt ──────────  │   SUPABASE   │
+            (không chạy canonical snapshot mù)                │ dữ liệu chính│
 n8n Vani VMP 1 (cảnh báo) ◀── đọc rpc_due_alerts ──────────── │              │
                                                               └──────────────┘
 ```
@@ -146,11 +146,12 @@ Chi tiết kiến trúc: `docs/architecture-2026-07.md`, hợp đồng dữ li�
 | Apps Script gắn với Sheet | `n8n/apps-script/vmp-sheet-sync.gs` |
 | Migration Supabase (forward-only, nguồn chân lý) | `supabase/migrations/*.sql` |
 | **Bộ SQL dựng DB từ đầu** (schema + RLS/grant + seed cấu hình) | `supabase/bootstrap/` — cách dùng ở mục 2b ngay dưới |
-| Google Sheet nguồn | id `1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8`, tab `6.Timeline VMP` (gid 1252715724) |
+| Google Sheet tham chiếu/sao lưu | id `1MPG6YbR6m-YrENqb8u7uS3O8RUYk7GCYuzQRbShtqP8`, tab `6.Timeline VMP` (gid 1252715724) |
 
-### 2b. Dựng lại database từ đầu (`supabase/bootstrap/`)
+### 2b. Dựng môi trường trống và khôi phục dữ liệu (`supabase/bootstrap/`)
 
-Dựng toàn bộ DB VMP trên project Supabase mới (hoặc Postgres 17+ bất kỳ), không cần chạy lần lượt migration lịch sử:
+Hai file bootstrap dưới đây chỉ dựng **schema snapshot và seed cấu hình lịch
+sử**, không phải bản backup đầy đủ của trạng thái hiện hành:
 
 ```bash
 # 1. Schema: 19 bảng, 46 hàm (đủ bộ rpc_*), view, index, trigger, RLS policy + GRANT
@@ -159,9 +160,26 @@ psql "$SUPABASE_DB_URL" --single-transaction -f supabase/bootstrap/01_schema_ful
 psql "$SUPABASE_DB_URL" --single-transaction -f supabase/bootstrap/02_seed_config.sql
 ```
 
-- **Dữ liệu nghiệp vụ KHÔNG cần restore** — publish WF-04 (hoặc POST `/webhook/vmp-sheet-changed`) để sync từ Sheet, vì Sheet là nguồn chuẩn.
+- Với current project/state, phải khôi phục dữ liệu nghiệp vụ từ Supabase custom
+  backup đã kiểm tra. Backup pre-live hiện có tại
+  `/home/admin1/VMP/.backups/qa-111200-prelive-20260811-MaXSPc/full-database.custom`,
+  SHA-256
+  `982037b19feb6f1ad8679928e348a8a1d99516a62070766571d9a863c0c6d737`.
+  Trước khi restore phải kiểm manifest/checksum, thử `pg_restore --list`, dựng
+  vào target cô lập rồi hậu kiểm schema, function, RLS/grant và count/digest dữ
+  liệu; không restore đè live chưa xác minh.
+- Google Sheet chỉ là nguồn tham chiếu/sao lưu để **đối chiếu có kiểm soát**.
+  Không publish WF-04, không POST `/webhook/vmp-sheet-changed` và không chạy
+  canonical snapshot chỉ để “nạp lại” database: snapshot-replace có thể xoá đè
+  dữ liệu đã nhập từ web.
+- Nếu môi trường mới không có backup Supabase hợp lệ, phải lập kế hoạch data
+  migration/reconciliation cụ thể (mapping, kiểm đếm, dry-run, rollback và tiêu
+  chí chấp nhận) rồi được người chịu trách nhiệm phê duyệt. Không tự động lấy
+  Sheet làm source of truth hoặc bật WF-04 thay cho kế hoạch này.
 - Chạy ngoài Supabase (Neon/Postgres thường): tạo trước 3 role `anon`, `authenticated`, `service_role`; bảng `profiles` tham chiếu `auth.users` nên tài khoản phải tạo qua Supabase Auth (không seed được).
-- Dump từ DB thật ngày 2026-07-23 (`pg_dump --schema-only --no-owner`). Migrations vẫn là nguồn chân lý khi sửa schema tiếp; migration mới hơn 2026-07-23 áp bình thường sau khi bootstrap.
+- Bootstrap lấy từ schema-only dump ngày 2026-07-23 nên không chứng minh schema
+  hiện hành. Không nối tiếp bằng cách chạy hàng loạt migration lịch sử; phải theo
+  quy trình baseline riêng ở phần cảnh báo ledger phía trên.
 
 ## 3. Các workflow n8n (đã tách 2026-07-29)
 
@@ -331,7 +349,7 @@ Thứ tự an toàn: gắn credential → chạy thử tay → bật Vani VMP 1 
 
 WF-04 gộp 5 nhánh trong 1 workflow. Node bị `disabled` là **tắt có chủ đích**, khi import lại đừng bật:
 
-**Đang dùng (khi workflow được publish):**
+**Các luồng có trong export lịch sử (không dùng làm quy trình recovery hiện tại):**
 1. **Sync Sheet → Supabase đường CSV**: webhook `/webhook/vmp-sheet-changed` (Apps Script gọi) + Schedule 5 phút → Download CSV → Parse CSV → `rpc_apply_sheet_sync`. Toàn bộ logic upsert nằm trong SQL.
 2. **Email cảnh báo đến hạn**: Schedule 7h sáng + `/webhook/vmp-alert-now` → `rpc_due_alerts` → Claude AI soạn → Gmail.
 3. **Error Trigger**: ghi `workflow_runs` + email admin khi lỗi.
@@ -350,13 +368,20 @@ WF-04 gộp 5 nhánh trong 1 workflow. Node bị `disabled` là **tắt có ch�
 - `vmp_plan_items`: 461; `vmp_objects`: 217; `vmp_sheet_sync_runs`: 204 lần chạy.
 - Các workflow BMS/EM/HEPA khác trên cùng n8n **không thuộc** hệ VMP này.
 
-**Khôi phục vận hành:** vào n8n publish WF-04 → sync 5 phút tự bắt kịp, hoặc POST `/webhook/vmp-sheet-changed` với header `x-vmp-sync-token` để sync ngay.
+**Khôi phục vận hành hiện tại:** restore từ Supabase custom backup đã validate
+theo mục 2b. Chỉ dùng Sheet để reconciliation theo kế hoạch được phê duyệt;
+không publish WF-04 hoặc POST `/webhook/vmp-sheet-changed` để chạy snapshot mù.
 
 ### 4b. Sự cố 2026-07-08 → 2026-07-29: sync đứng 21 ngày trong im lặng
 
 Đáng đọc vì nó chỉ ra một điểm mù còn nguyên trong thiết kế cảnh báo.
 
-**Diễn biến.** Tab `6.Timeline VMP` bị dán trùng nội dung 21 lượt → 9.724 dòng nhưng chỉ 461 ID duy nhất. Guard `VMP_SYNC_ROW_GUARD` chặn snapshot, đúng như thiết kế, nên **Supabase không bị ghi đè** — hàng rào an toàn đã làm tròn việc. Sau khi Sheet được dọn về 464 dòng, sync tự bắt kịp ngay ở lần chạy kế tiếp, không cần can thiệp tay.
+**Diễn biến lịch sử.** Tab `6.Timeline VMP` bị dán trùng nội dung 21 lượt →
+9.724 dòng nhưng chỉ 461 ID duy nhất. Guard `VMP_SYNC_ROW_GUARD` chặn snapshot,
+đúng như thiết kế, nên **Supabase không bị ghi đè** — hàng rào an toàn đã làm
+tròn việc. Sau khi Sheet được dọn về 464 dòng, luồng sync khi đó đã chạy lại ở
+lần kế tiếp. Đây là ghi nhận sự cố cũ, không phải hướng dẫn bật lại snapshot để
+recovery hiện tại.
 
 **Điểm mù.** Suốt 21 ngày đó, Error Trigger vẫn nổ **mỗi 5 phút** và vẫn gửi mail đều đặn. Nhưng vì mọi mail giống hệt nhau nên không ai đọc, và dashboard vẫn hiển thị bình thường — **không có dấu hiệu nào cho người dùng biết dữ liệu đã cũ 21 ngày**.
 
@@ -385,8 +410,13 @@ Nên gắn thêm vào dashboard một banner "dữ liệu cập nhật lúc …"
 
 1. **Luật tách bộ phận có 2 bản phải đồng bộ**: `parseDepts()` trong `src/utils/helpers.js` (JS) và `public.vmp_parse_depts(text)` (SQL trong migration). Sửa một nơi phải sửa nơi kia. Mã bộ phận Xưởng sản xuất là `xsx` (không phải `sx`).
 2. **Sheet rộng hơn 37 cột canonical** — 2 chiều bộ phận khác nhau: `bo_phan_goc` (cột 5 trong 37, → `depts`) và `bo_phan_thuc_hien_goc` (cột phụ ngoài 37, lưu `source_sheet_data`, → `exec_depts`). `values_json` luôn đúng 37 phần tử (có guard).
-3. **Supabase là read model**: chỉ n8n/Postgres service được ghi snapshot (migration `enforce_sheet_canonical_read_only`). Đổi schema chỉ qua migration mới trong `supabase/migrations/`, áp bằng `psql --single-transaction -f`.
-4. **Parse CSV thô, không dùng node Google Sheets** trong n8n cho đường sync — node Sheets làm sai kiểu dữ liệu ngày/số.
+3. **Supabase là nơi lưu dữ liệu chính**: web ghi qua RPC đã kiểm quyền; service
+   chỉ được ghi qua đường đã review. Sheet là tham chiếu/reconciliation, không
+   phải nguồn để blind snapshot. Đổi schema bằng migration forward mới theo
+   quy trình explicit transaction ở phần cảnh báo ledger, không chạy glob.
+4. Nếu có kế hoạch reconciliation từ Sheet đã được phê duyệt, phải parse CSV
+   thô, tạo diff/dry-run và kiểm đếm trước; node Google Sheets làm sai kiểu dữ
+   liệu ngày/số. Bước này không cho phép tự động chạy canonical snapshot.
 
 ## 7. ⚠️ Bảo mật — việc cần làm ngay khi tiếp nhận
 
