@@ -90,6 +90,7 @@ import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
 import AccountLinkPanel from "../features/itemPermissions/AccountLinkPanel.tsx";
 import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
+import { resolveDirectoryWorkspaceCapabilities } from "../features/itemPermissions/workspaceCapabilities.ts";
 import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
 
 /* ---------------------------------------------------------------------
@@ -351,11 +352,9 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
 }) {
   const [person, setPerson] = useState<DirectoryPerson | null>(null);
   const [directoryRevision, setDirectoryRevision] = useState(0);
+  const [directoryRefreshPersonId, setDirectoryRefreshPersonId] = useState<string | null>(null);
   const [rightsRevision, setRightsRevision] = useState(0);
-  const canManageDirectory = isAdmin || user?.role === "admin";
-  const canManageQaAssignments = canManageDirectory
-    || user?.role === "qa_manager"
-    || user?.accessClass === "qa_manager";
+  const { canManageDirectory, canManageQaAssignments } = resolveDirectoryWorkspaceCapabilities(isAdmin, user);
   const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
     const raw = (activity._raw || {}) as Record<string, unknown>;
     return [activity.area, raw.area, raw.line]
@@ -372,10 +371,11 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
         </CardTitle>
         <div className="ip-workspace">
           <StaffDirectoryPanel canEdit={canManageDirectory} validAreas={validAreas} onSelect={setPerson}
-            revision={directoryRevision} />
+            revision={directoryRevision} refreshPersonId={directoryRefreshPersonId} />
           {canManageDirectory && (
             <AccountLinkPanel person={person} canManageAccounts={canManageDirectory}
-              onLinked={() => {
+              onLinked={(personId) => {
+                setDirectoryRefreshPersonId(personId);
                 setDirectoryRevision((value) => value + 1);
                 setRightsRevision((value) => value + 1);
               }} />

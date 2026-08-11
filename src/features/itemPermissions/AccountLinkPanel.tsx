@@ -16,6 +16,38 @@ function candidateLabel(candidate: AccountCandidate): string {
   return `${candidate.full_name} · ${candidate.email} · ${candidate.role} · ${department}`;
 }
 
+function candidateStatus(candidate: AccountCandidate): string {
+  const status: string[] = [];
+  if (!candidate.is_active) status.push("tài khoản không hoạt động");
+  if (candidate.linked_person_id !== null) status.push("đã nối người khác");
+  return status.join(" · ") || "đang hoạt động";
+}
+
+export function AccountCandidateOption({ candidate }: { candidate: AccountCandidate }) {
+  return (
+    <option value={candidate.user_id}
+      disabled={!candidate.is_active || candidate.linked_person_id !== null}>
+      {candidateLabel(candidate)} · {candidateStatus(candidate)}
+    </option>
+  );
+}
+
+export async function completeAccountLinkMutation({
+  targetPersonId,
+  mutate,
+  getCurrentPersonId,
+  onLinked,
+}: {
+  targetPersonId: string;
+  mutate: () => Promise<unknown>;
+  getCurrentPersonId: () => string | null;
+  onLinked: (personId: string) => void;
+}): Promise<{ showResult: boolean }> {
+  await mutate();
+  onLinked(targetPersonId);
+  return { showResult: getCurrentPersonId() === targetPersonId };
+}
+
 export default function AccountLinkPanel({
   person,
   canManageAccounts,
@@ -34,15 +66,28 @@ export default function AccountLinkPanel({
   const [message, setMessage] = useState("");
   const [refreshNonce, setRefreshNonce] = useState(0);
   const requestSequence = useRef(0);
+  const currentPersonId = useRef<string | null>(person?.person_id ?? null);
+  currentPersonId.current = person?.person_id ?? null;
 
   useEffect(() => {
+    requestSequence.current += 1;
+    setQuery("");
+    setCandidates([]);
+    setSelectedUserId("");
+    setReason("");
+    setLoading(false);
+    setSaving(false);
+    setMessage("");
+  }, [person?.person_id]);
+
+  useEffect(() => {
+    const sequence = ++requestSequence.current;
     if (!person || person.user_id || query.trim().length < 2) {
       setCandidates([]);
       setSelectedUserId("");
       setLoading(false);
       return;
     }
-    const sequence = ++requestSequence.current;
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
@@ -65,20 +110,29 @@ export default function AccountLinkPanel({
 
   const link = async (userId: string | null) => {
     if (!reason.trim()) return;
+    const targetPerson = person;
     setSaving(true);
     setMessage("");
     try {
-      await linkPermissionAccount(person.person_id, userId, reason.trim(), person.version);
-      setReason("");
-      setQuery("");
-      setCandidates([]);
-      setSelectedUserId("");
-      setMessage(userId ? "Đã nối tài khoản. Đang tải lại hồ sơ…" : "Đã gỡ nối tài khoản. Đang tải lại hồ sơ…");
-      onLinked(person.person_id);
+      const completion = await completeAccountLinkMutation({
+        targetPersonId: targetPerson.person_id,
+        mutate: () => linkPermissionAccount(
+          targetPerson.person_id, userId, reason.trim(), targetPerson.version,
+        ),
+        getCurrentPersonId: () => currentPersonId.current,
+        onLinked,
+      });
+      if (completion.showResult) {
+        setReason("");
+        setQuery("");
+        setCandidates([]);
+        setSelectedUserId("");
+        setMessage(userId ? "Đã nối tài khoản. Đang tải lại hồ sơ…" : "Đã gỡ nối tài khoản. Đang tải lại hồ sơ…");
+      }
     } catch (error) {
-      setMessage((error as Error).message);
+      if (currentPersonId.current === targetPerson.person_id) setMessage((error as Error).message);
     } finally {
-      setSaving(false);
+      if (currentPersonId.current === targetPerson.person_id) setSaving(false);
     }
   };
 
@@ -115,10 +169,7 @@ export default function AccountLinkPanel({
               onChange={(event) => setSelectedUserId(event.target.value)}>
               <option value="">{query.trim().length < 2 ? "Nhập ít nhất 2 ký tự để tìm" : "Chọn tài khoản"}</option>
               {candidates.map((candidate) => (
-                <option key={candidate.user_id} value={candidate.user_id}
-                  disabled={candidate.linked_person_id !== null}>
-                  {candidateLabel(candidate)}{candidate.linked_person_id ? " · đã nối người khác" : ""}
-                </option>
+                <AccountCandidateOption key={candidate.user_id} candidate={candidate} />
               ))}
             </select>
           </label>
