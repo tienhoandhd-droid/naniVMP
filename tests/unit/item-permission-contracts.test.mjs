@@ -493,6 +493,33 @@ test("args phân công gửi assignment role cho RPC sáu tham số", async () =
   });
 });
 
+test("đổi lựa chọn khi đang tìm QA chính không được gửi replace_primary cũ", async () => {
+  const { dispatchAssignmentWhenCurrent } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  let resolveAssignments;
+  const assignments = new Promise((resolve) => { resolveAssignments = resolve; });
+  let currentPersonId = "person-a";
+  const dispatched = [];
+
+  const pending = dispatchAssignmentWhenCurrent({
+    loadAssignments: () => assignments,
+    confirmReplacement: () => true,
+    isCurrent: () => currentPersonId === "person-a",
+    dispatch: async (action) => { dispatched.push(action); },
+  });
+  currentPersonId = "person-b";
+  resolveAssignments([{
+    assignment_kind: "qa",
+    assignment_role: "primary",
+    is_active: true,
+    staff_name: "QA A",
+  }]);
+
+  assert.equal(await pending, false);
+  assert.deepEqual(dispatched, []);
+});
+
 test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
   const sql = await readFile(new URL(
     "../../supabase/migrations/20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql",
