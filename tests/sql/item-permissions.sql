@@ -1,7 +1,9 @@
 /*
- * Chạy file này sau toàn bộ migration 2026081008..2026081110.
- * scripts/test-item-permissions-sql.sh áp các migration trong cùng transaction
- * rồi rollback, nên fixture bên dưới không ghi vào database thật.
+ * Harness chỉ chạy file đầy đủ ở một trong hai trạng thái explicit:
+ * --final-state khi schema đã có 20260811120000 (không replay migration), hoặc
+ * --forward-test từ repaired pre-111200 với đúng migration 111200 được chỉ định.
+ * Mọi SQL test/fixture chạy trong cùng transaction rồi rollback, nên không ghi
+ * vào database thật; harness không tự chọn migration bằng glob.
  */
 select 'ITEM_PERMISSION_SQL_PHASE_SCHEMA_CONTRACTS';
 

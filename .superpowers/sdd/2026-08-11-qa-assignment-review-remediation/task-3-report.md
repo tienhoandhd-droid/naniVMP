@@ -172,3 +172,35 @@ env -u SUPABASE_DB_URL \
 Sau khi `111200` được apply hợp lệ ở Task 5, chạy `--final-state` bằng explicit
 `SUPABASE_DB_URL`. Không dùng kết quả manual current-DB ở trên để tuyên bố đã có
 dedicated-clone safety.
+
+## Pre-live Minor cleanup
+
+Review trước live chỉ ra hai Minor hợp lệ và đã được xử lý trong commit tiếp
+theo Task 3:
+
+1. Database URL được truyền bằng `psql --dbname="$db_url"`, nên giá trị bắt đầu
+   bằng `-` không thể bị `psql` diễn giải thành option.
+2. Header của full SQL mô tả đúng hai mode hiện tại: final-state không replay,
+   hoặc repaired pre-111200 với exact forward migration `111200`; không còn mô
+   tả glob migration cũ.
+
+TDD option-parsing evidence:
+
+- RED trước fix với `SUPABASE_DB_URL=--version`: output chạy
+  `psql (PostgreSQL) 16.14`, chứng minh URL bị parse thành option.
+- GREEN sau fix với cùng input: exit `2` ở bước kết nối database name, không in
+  version/help và không đi vào DB test.
+
+Fresh verification sau cleanup:
+
+- `bash -n`: exit `0`.
+- Missing mode, ambiguous URL và generic live forward gates: exit `64` đúng
+  contract.
+- Full manual current-repaired-DB outer rollback với migration `111200` hiện tại:
+  exit `0`, có `ITEM_PERMISSION_SQL_TESTS_COMPLETE` và
+  `ITEM_PERMISSION_SQL_ROLLBACK_CONFIRMED`.
+- Whole-row counts/digests trước/sau vẫn đúng bốn giá trị đã ghi ở bảng trên:
+  assignments `0:d41d8cd98f00b204e9800998ecf8427e`, performers
+  `7:ed7fb3f12ffeaef9c321df8629e0acd7`, plan items
+  `461:990abf39e2a2e576cea1d84c50f77b16`, source objects
+  `272:dee67ba61bbec4b6abe3df9dc2e548ec`.

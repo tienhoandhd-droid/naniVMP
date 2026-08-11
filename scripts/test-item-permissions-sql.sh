@@ -251,7 +251,7 @@ psql_args+=(
 set +e
 PGCONNECT_TIMEOUT=10 \
 PGOPTIONS='-c statement_timeout=180000 -c lock_timeout=10000' \
-  psql "$db_url" "${psql_args[@]}" 2>&1 | tee "$output_file"
+  psql --dbname="$db_url" "${psql_args[@]}" 2>&1 | tee "$output_file"
 psql_status=${PIPESTATUS[0]}
 set -e
 if (( psql_status != 0 )); then
