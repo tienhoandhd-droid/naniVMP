@@ -234,10 +234,37 @@ select format(
 )
 from item_permission_postflight_checksum
 order by relation_name;
-select 'ITEM_PERMISSION_SQL_ROLLBACK_CONFIRMED';
-drop table pg_temp.item_permission_postflight_checksum;
-drop table pg_temp.item_permission_preflight_checksum;
 SQL
+
+if [[ "$run_mode" == '--final-state' ]]; then
+  read -r -d '' rollback_state_sql <<'SQL' || true
+do $rollback_state$
+begin
+  if to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'
+    ) is null or to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+    ) is not null then
+    raise exception 'Rollback test làm đổi assignment signature post-111300';
+  end if;
+end
+$rollback_state$;
+SQL
+else
+  read -r -d '' rollback_state_sql <<'SQL' || true
+do $rollback_state$
+begin
+  if to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+    ) is null or to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'
+    ) is not null then
+    raise exception 'Rollback forward-test không khôi phục signature pre-111300';
+  end if;
+end
+$rollback_state$;
+SQL
+fi
 
 output_file=$(mktemp "${TMPDIR:-/tmp}/item-permission-sql.XXXXXX")
 trap 'rm -f -- "$output_file"' EXIT
@@ -247,9 +274,10 @@ psql_args=(
   -v ON_ERROR_STOP=1
   -Atq
   -P pager=off
+  -c "begin; set local statement_timeout = '180s'; set local lock_timeout = '10s'; set local idle_in_transaction_session_timeout = '240s'; select format('ITEM_PERMISSION_SQL_BACKEND|%s', pg_backend_pid());"
   -c "$state_sql"
   -c "$snapshot_sql"
-  -c "begin; set local statement_timeout = '180s'; set local lock_timeout = '10s'; set local idle_in_transaction_session_timeout = '240s';"
+  -c 'savepoint item_permission_test'
 )
 if [[ -n "$forward_file" ]]; then
   psql_args+=(-c "select 'ITEM_PERMISSION_SQL_PHASE_FORWARD_111300';" -f "$forward_file")
@@ -258,8 +286,12 @@ psql_args+=(
   -c "select 'ITEM_PERMISSION_SQL_PHASE_SOURCE_WRITER_AUTH';"
   -f "$source_writer_test"
   -f "$full_test"
-  -c 'rollback'
+  -c 'rollback to savepoint item_permission_test'
+  -c "$rollback_state_sql"
   -c "$postflight_sql"
+  -c "select format('ITEM_PERMISSION_SQL_BACKEND|%s', pg_backend_pid());"
+  -c 'rollback'
+  -c "select 'ITEM_PERMISSION_SQL_ROLLBACK_CONFIRMED';"
 )
 
 set +e
@@ -294,5 +326,13 @@ done
   || die 'thiếu checksum preflight của bốn bảng nghiệp vụ'
 [[ $(grep -Fc 'ITEM_PERMISSION_SQL_CHECKSUM_AFTER|' "$output_file") -eq 4 ]] \
   || die 'thiếu checksum postflight của bốn bảng nghiệp vụ'
+
+mapfile -t backend_markers < <(
+  grep -E '^ITEM_PERMISSION_SQL_BACKEND\|[0-9]+$' "$output_file" || true
+)
+[[ ${#backend_markers[@]} -eq 2 ]] \
+  || die 'thiếu backend marker trước/sau savepoint rollback'
+[[ "${backend_markers[0]}" == "${backend_markers[1]}" ]] \
+  || die 'transaction pooler đổi backend bên trong outer transaction'
 
 printf 'ITEM_PERMISSION_SQL_HARNESS_COMPLETE|%s\n' "$run_mode"
