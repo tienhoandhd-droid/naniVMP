@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, Pencil } from "lucide-react";
 import { fetchEffectiveRights } from "./api.ts";
 import { isQaAccessClass, type DirectoryPerson, type EffectiveItemRight } from "./types.ts";
@@ -15,6 +15,29 @@ const fieldLabels: Record<string, string> = {
   scheduled_at: "Bộ phận quản lý thiết bị xếp lịch",
 };
 
+export async function loadEffectiveRightsWhenCurrent<T>({
+  request,
+  isCurrent,
+  onSuccess,
+  onError,
+}: {
+  request: () => Promise<T>;
+  isCurrent: () => boolean;
+  onSuccess: (result: T) => void;
+  onError: (error: unknown) => void;
+}): Promise<"success" | "error" | "stale"> {
+  try {
+    const result = await request();
+    if (!isCurrent()) return "stale";
+    onSuccess(result);
+    return "success";
+  } catch (error) {
+    if (!isCurrent()) return "stale";
+    onError(error);
+    return "error";
+  }
+}
+
 export default function EffectiveRightsPanel({ person, revision = 0 }: {
   person: DirectoryPerson | null;
   revision?: number;
@@ -24,25 +47,40 @@ export default function EffectiveRightsPanel({ person, revision = 0 }: {
   const [rows, setRows] = useState<EffectiveItemRight[]>([]);
   const [mode, setMode] = useState<"preview" | "enforced">("preview");
   const [message, setMessage] = useState("");
+  const requestSequence = useRef(0);
+  const targetKey = view === "person"
+    ? `person:${person?.person_id || ""}:${revision}`
+    : `item:${validationCode.trim()}:${revision}`;
+  const currentTargetKey = useRef(targetKey);
+  currentTargetKey.current = targetKey;
 
   const load = async () => {
     if (view === "person" && !person) return;
     if (view === "item" && !validationCode.trim()) return;
-    try {
-      const result = await fetchEffectiveRights(view === "person"
-        ? { personId: person!.person_id }
-        : { validationCode: validationCode.trim() });
-      setRows(result.rights);
-      setMode(result.mode);
-      setMessage("");
-    } catch (error) {
-      setMessage((error as Error).message);
-    }
+    const requestKey = targetKey;
+    const sequence = ++requestSequence.current;
+    const requestArgs = view === "person"
+      ? { personId: person!.person_id }
+      : { validationCode: validationCode.trim() };
+    setRows([]);
+    setMessage("");
+    await loadEffectiveRightsWhenCurrent({
+      request: () => fetchEffectiveRights(requestArgs),
+      isCurrent: () => sequence === requestSequence.current && requestKey === currentTargetKey.current,
+      onSuccess: (result) => {
+        setRows(result.rights);
+        setMode(result.mode);
+      },
+      onError: (error) => setMessage((error as Error).message),
+    });
   };
 
   useEffect(() => {
+    requestSequence.current += 1;
+    setRows([]);
+    setMessage("");
     if (view === "person" && person) void load();
-  }, [person, revision, view]);
+  }, [person?.person_id, revision, view]);
 
   return (
     <section className="ip-panel" aria-labelledby="ip-rights-title">

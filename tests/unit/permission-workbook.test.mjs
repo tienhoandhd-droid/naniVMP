@@ -73,6 +73,21 @@ test("parser cho QA để trống bốn cột phạm vi", async () => {
   assert.deepEqual(qaWithoutScope.rows[0].scope_line_ids, []);
 });
 
+test("parser từ chối phân loại QA nằm ngoài bộ phận QA", async () => {
+  const { parsePermissionRows, PERMISSION_HEADERS } = await import(
+    "../../src/features/itemPermissions/permissionWorkbook.ts"
+  );
+  const wrongDepartment = parsePermissionRows([
+    PERMISSION_HEADERS,
+    [1, "RD", "NV02", "Nguyễn Văn B", "QA – Cập nhật 4 mốc hoàn thành", "", "", "", "", "b@vmp.local", "Có"],
+  ], { scopeCatalog });
+
+  assert.deepEqual(wrongDepartment.rows, []);
+  assert.deepEqual(wrongDepartment.errors.map((error) => error.message), [
+    "Phân loại QA chỉ được dùng cho bộ phận QA",
+  ]);
+});
+
 test("parser đổi bốn tầng mã sang ID và chấp nhận mã nhân viên trống cho non-QA", async () => {
   const { parsePermissionRows, PERMISSION_HEADERS } = await import(
     "../../src/features/itemPermissions/permissionWorkbook.ts"

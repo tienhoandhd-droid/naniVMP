@@ -87,6 +87,9 @@ export function parsePermissionRows(
     if (!normalize(source[3])) rowErrors.push("Họ và tên không được để trống");
     if (!accessClass) rowErrors.push(`Phân loại không hợp lệ: ${normalize(source[4]) || "(trống)"}`);
     const qaWithoutHierarchy = accessClass ? isQaAccessClass(accessClass) : false;
+    if (qaWithoutHierarchy && department && department !== "qa") {
+      rowErrors.push("Phân loại QA chỉ được dùng cho bộ phận QA");
+    }
     let resolved: ScopeResolution = {
       ok: true,
       selection: { departments: [], factories: [], areas: [], lines: [] },

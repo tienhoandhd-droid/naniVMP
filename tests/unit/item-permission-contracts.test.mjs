@@ -194,6 +194,80 @@ test("refresh mutation target A giữ nguyên lựa chọn B hiện tại", asyn
   assert.equal(result.shouldSelect, false);
 });
 
+test("lưu A về muộn chỉ cập nhật cache A và không thay lựa chọn B", async () => {
+  const { completeDirectorySaveWhenCurrent } = await import(
+    "../../src/features/itemPermissions/StaffDirectoryPanel.tsx"
+  );
+  const a = { person_id: "person-a", full_name: "QA A" };
+  const b = { person_id: "person-b", full_name: "QA B" };
+  const knownPeople = new Map([[a.person_id, a], [b.person_id, b]]);
+  let currentPersonId = a.person_id;
+  let resolveSearch;
+  const searchResult = new Promise((resolve) => { resolveSearch = resolve; });
+  const selected = [];
+
+  const completion = completeDirectorySaveWhenCurrent({
+    targetPersonId: a.person_id,
+    savedPersonId: a.person_id,
+    submittedFullName: a.full_name,
+    getCurrentSelectedPersonId: () => currentPersonId,
+    knownPeople,
+    search: () => searchResult,
+    onSelect: (person) => selected.push(person.person_id),
+  });
+  currentPersonId = b.person_id;
+  const refreshedA = { ...a, full_name: "QA A đã lưu" };
+  resolveSearch([refreshedA]);
+
+  assert.deepEqual(await completion, { outcome: "stale", person: refreshedA });
+  assert.equal(knownPeople.get(a.person_id), refreshedA);
+  assert.deepEqual(selected, []);
+});
+
+test("quyền A về muộn không ghi đè quyền của B", async () => {
+  const { loadEffectiveRightsWhenCurrent } = await import(
+    "../../src/features/itemPermissions/EffectiveRightsPanel.tsx"
+  );
+  let currentTarget = "person-a";
+  let resolveRights;
+  const rights = new Promise((resolve) => { resolveRights = resolve; });
+  const events = [];
+
+  const completion = loadEffectiveRightsWhenCurrent({
+    request: () => rights,
+    isCurrent: () => currentTarget === "person-a",
+    onSuccess: () => events.push("success-a"),
+    onError: () => events.push("error-a"),
+  });
+  currentTarget = "person-b";
+  resolveRights({ mode: "preview", rights: [{ validation_code: "A" }] });
+
+  assert.equal(await completion, "stale");
+  assert.deepEqual(events, []);
+});
+
+test("lỗi quyền A về muộn không hiện trong ngữ cảnh B", async () => {
+  const { loadEffectiveRightsWhenCurrent } = await import(
+    "../../src/features/itemPermissions/EffectiveRightsPanel.tsx"
+  );
+  let currentTarget = "person-a";
+  let rejectRights;
+  const rights = new Promise((_, reject) => { rejectRights = reject; });
+  const events = [];
+
+  const completion = loadEffectiveRightsWhenCurrent({
+    request: () => rights,
+    isCurrent: () => currentTarget === "person-a",
+    onSuccess: () => events.push("success-a"),
+    onError: () => events.push("error-a"),
+  });
+  currentTarget = "person-b";
+  rejectRights(new Error("A lỗi muộn"));
+
+  assert.equal(await completion, "stale");
+  assert.deepEqual(events, []);
+});
+
 test("QA manager được phân công nhưng không được sửa danh bạ hoặc nối tài khoản", async () => {
   const { resolveDirectoryWorkspaceCapabilities } = await import(
     "../../src/features/itemPermissions/workspaceCapabilities.ts"
