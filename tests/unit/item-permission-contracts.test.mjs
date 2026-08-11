@@ -520,6 +520,58 @@ test("đổi lựa chọn khi đang tìm QA chính không được gửi replace
   assert.deepEqual(dispatched, []);
 });
 
+test("mutation đến muộn không ghi status hoặc refresh của lựa chọn cũ", async () => {
+  const { settleAssignmentOperationWhenCurrent } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  let resolveAssign;
+  const assign = new Promise((resolve) => { resolveAssign = resolve; });
+  let selection = "person-a-primary";
+  const events = [];
+
+  const staleAssign = settleAssignmentOperationWhenCurrent({
+    mutate: () => assign,
+    isCurrent: () => selection === "person-a-primary",
+    onSuccess: () => events.push("assign-success"),
+    onError: () => events.push("assign-error"),
+    refresh: async () => events.push("assign-refresh"),
+  });
+  selection = "person-b-primary";
+  resolveAssign();
+  assert.equal(await staleAssign, "stale");
+  assert.deepEqual(events, []);
+
+  let resolveRevoke;
+  const revoke = new Promise((resolve) => { resolveRevoke = resolve; });
+  selection = "person-a-collaborator";
+  const staleRevokeSuccess = settleAssignmentOperationWhenCurrent({
+    mutate: () => revoke,
+    isCurrent: () => selection === "person-a-collaborator",
+    onSuccess: () => events.push("revoke-success"),
+    onError: () => events.push("revoke-error"),
+    refresh: async () => events.push("revoke-refresh"),
+  });
+  selection = "person-a-primary";
+  resolveRevoke();
+  assert.equal(await staleRevokeSuccess, "stale");
+  assert.deepEqual(events, []);
+
+  let rejectRevoke;
+  const failedRevoke = new Promise((_, reject) => { rejectRevoke = reject; });
+  selection = "person-a-collaborator";
+  const staleRevokeFailure = settleAssignmentOperationWhenCurrent({
+    mutate: () => failedRevoke,
+    isCurrent: () => selection === "person-a-collaborator",
+    onSuccess: () => events.push("revoke-success"),
+    onError: () => events.push("revoke-error"),
+    refresh: async () => events.push("revoke-refresh"),
+  });
+  selection = "person-b-collaborator";
+  rejectRevoke(new Error("RPC revoke bị từ chối"));
+  assert.equal(await staleRevokeFailure, "stale");
+  assert.deepEqual(events, []);
+});
+
 test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
   const sql = await readFile(new URL(
     "../../supabase/migrations/20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql",
