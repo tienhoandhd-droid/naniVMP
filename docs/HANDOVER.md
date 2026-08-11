@@ -14,6 +14,16 @@ Schema của phần QA theo phân công hạng mục đã được sửa trực 
   `f8ae9a61ff75ab16262ebf27519d4bf65e20a8a1e963debc76c6484c56fa8eae`.
   File được áp trong một transaction duy nhất; live xác nhận `COMMIT` lúc
   `2026-08-11 09:35:12.635101+00`.
+- `20260811130000_fix_assignment_conflict_and_rights_basis.sql` (`111300`) thêm
+  optimistic conflict cho thay QA chính và `rights_basis` theo từng dòng. SHA-256
+  của đúng file đã áp là
+  `23cdcdea80a17a3e069878c8929230aea1f358b593b37f1a5def70819dc6ac3b`.
+  File được áp trong một transaction duy nhất; exact checker phát
+  `ITEM_PERMISSION_DEPLOY_STATE_OK` trước khi live xác nhận `COMMIT` lúc
+  `2026-08-11 11:24:21.78097+00`. Hậu kiểm read-only bằng connection mới lúc
+  `2026-08-11 11:24:44.59893+00` xác nhận `preview`, signature bảy tham số duy
+  nhất, hash/ACL/`rights_basis` exact, fixture bằng 0 và dữ liệu nghiệp vụ không
+  đổi.
 
 Đây **không phải** xác nhận rằng phân quyền đã được bật trên production. Chế độ
 live vẫn là **`preview`**: chỉ hiển thị quyền dự kiến để nghiệm thu và giữ hành
@@ -40,9 +50,9 @@ sau deploy không đổi:
 ### Cảnh báo migration ledger live chưa được baseline
 
 `supabase_migrations.schema_migrations` trên live chỉ có **7 dòng**, cao nhất là
-`20260704110201`, trong khi repo có **166 migration local về sau**. `111100` và
-`111200` đã được áp thủ công nhưng không được chèn giả vào ledger. Hai nguồn
-trạng thái này **chưa được reconcile**.
+`20260704110201`, trong khi repo có **168 migration local về sau**. `111100`,
+`111200` và `111300` đã được áp thủ công nhưng không được chèn giả vào ledger.
+Hai nguồn trạng thái này **chưa được reconcile**.
 
 Vì vậy, trên live hiện tại tuyệt đối không chạy:
 
@@ -69,8 +79,8 @@ psql --dbname="$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
 ```
 
 Nếu migration hoặc assertion lỗi, `ON_ERROR_STOP` dừng trước lệnh `COMMIT`; mở
-connection mới để xác nhận rollback và trạng thái cuối. Không chạy lại `111100`
-hoặc `111200` trên live đã có trạng thái hậu kiểm này.
+connection mới để xác nhận rollback và trạng thái cuối. Không chạy lại `111100`,
+`111200` hoặc `111300` trên live đã có trạng thái hậu kiểm này.
 
 ### Nghiệm thu trạng thái và E2E
 
@@ -78,8 +88,8 @@ SQL harness không đọc `.env.local`, không tự đoán database clone và b�
 chọn đúng một mode:
 
 ```bash
-# Chỉ sau khi 111300 đã apply và postflight thành công: không chạy lại migration;
-# toàn bộ mutation test nằm trong rollback.
+# Live post-111300 đã hậu kiểm: không chạy lại migration; toàn bộ mutation test
+# nằm trong rollback.
 SUPABASE_DB_URL='postgresql://<redacted>' \
   scripts/test-item-permissions-sql.sh --final-state
 
@@ -90,29 +100,30 @@ env -u SUPABASE_DB_URL \
   supabase/migrations/20260811130000_fix_assignment_conflict_and_rights_basis.sql
 ```
 
-Live hiện vẫn là pre-111300 nên `--final-state` phải từ chối; chỉ được dùng mode
-này sau transaction deploy 111300 và postflight thành công. Không dùng
-`--forward-test` với live. Nghiệm thu ứng dụng chạy `npm run
+`--final-state` hiện hợp lệ trên live vì transaction deploy 111300 và postflight
+đã thành công; harness vẫn tự từ chối nếu definition không đúng final state.
+Không dùng `--forward-test` với live. Nghiệm thu ứng dụng chạy `npm run
 typecheck`, `npm run build`, dựng Vite preview, rồi chạy `npm run
 test:permissions` và `npm run e2e`. Cả hai suite đã đăng ký lại legacy E2E
 `tests/e2e/danh-muc-nguoi-thuc-hien.mjs`; không được bỏ test này khi chỉnh scripts.
 
 ### Backup, bằng chứng và công việc baseline riêng
 
-Backup pre-live nằm tại
-`/home/admin1/VMP/.backups/qa-111200-prelive-20260811-MaXSPc`. SHA-256 của full
-custom dump là
-`982037b19feb6f1ad8679928e348a8a1d99516a62070766571d9a863c0c6d737`.
-Thư mục này chứa dump, manifest checksum và log preflight/rehearsal/live;
-`.superpowers/sdd/2026-08-11-qa-assignment-review-remediation/task-5-report.md`
-ghi tóm tắt bằng chứng. Không có credential nào được ghi trong tài liệu này;
-chuỗi kết nối vẫn chỉ được chuyển qua kênh bí mật.
+Backup pre-live gần nhất nằm tại
+`/home/admin1/VMP/.backups/qa-111300-prelive-20260811-GmiHzf`. SHA-256 của full
+custom dump PostgreSQL 17 là
+`5249ff9436fa14e032004bd45bfc525625e583426365f33dcaa785d85420adc3`.
+Thư mục này chứa dump, manifest checksum, restore list, snapshot preflight và
+hai file migration/checker exact đã review;
+`.superpowers/sdd/2026-08-11-qa-assignment-review-remediation/final-fix-report.md`
+ghi tóm tắt bằng chứng deploy. Không có credential nào được ghi trong tài liệu
+này; chuỗi kết nối vẫn chỉ được chuyển qua kênh bí mật.
 
 Baseline migration ledger toàn repo là **project/branch riêng**, không phải phần
 còn lại của deploy tính năng này. Chỉ thực hiện sau khi chứng minh được cả hai
 đường: fresh-build (dựng mới từ đầu) và apply trên disposable clone, rồi so sánh
 schema, function, RLS, grant và dữ liệu. Không bulk-mark các version tháng
-7/tháng 8 từ bằng chứng deploy `111100`/`111200`.
+7/tháng 8 từ bằng chứng deploy `111100`/`111200`/`111300`.
 
 ## 0. Bàn giao gọn — 3 bước
 
@@ -165,9 +176,9 @@ psql "$SUPABASE_DB_URL" --single-transaction -f supabase/bootstrap/02_seed_confi
 
 - Với current project/state, phải khôi phục dữ liệu nghiệp vụ từ Supabase custom
   backup đã kiểm tra. Backup pre-live hiện có tại
-  `/home/admin1/VMP/.backups/qa-111200-prelive-20260811-MaXSPc/full-database.custom`,
+  `/home/admin1/VMP/.backups/qa-111300-prelive-20260811-GmiHzf/full-database.custom`,
   SHA-256
-  `982037b19feb6f1ad8679928e348a8a1d99516a62070766571d9a863c0c6d737`.
+  `5249ff9436fa14e032004bd45bfc525625e583426365f33dcaa785d85420adc3`.
   Trước khi restore phải kiểm manifest/checksum, thử `pg_restore --list`, dựng
   vào target cô lập rồi hậu kiểm schema, function, RLS/grant và count/digest dữ
   liệu; không restore đè live chưa xác minh.
