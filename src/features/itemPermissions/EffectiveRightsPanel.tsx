@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Eye, Pencil } from "lucide-react";
 import { fetchEffectiveRights } from "./api.ts";
-import type { DirectoryPerson, EffectiveItemRight } from "./types.ts";
+import { isQaAccessClass, type DirectoryPerson, type EffectiveItemRight } from "./types.ts";
 
 const fieldLabels: Record<string, string> = {
   actual_protocol_date: "Ngày hoàn thành đề cương",
@@ -68,11 +68,17 @@ export default function EffectiveRightsPanel({ person, revision = 0 }: {
             <div><Pencil size={14} /> {right.editable_fields.length
               ? right.editable_fields.map((field) => fieldLabels[field] || field).join(" · ")
               : "Chỉ xem, không sửa cột timeline nào"}</div>
-            <div>Phạm vi: Bộ phận {right.scope_match ? "khớp" : "không khớp"}
-              {right.factory_match !== undefined && ` · Xưởng ${right.factory_match ? "khớp" : "không khớp"}`}
-              {` · Khu vực ${right.area_match ? "khớp" : "không khớp"}`}
-              {right.line_match !== undefined && ` · Line ${right.line_match ? "khớp" : "không khớp"}`}
-            </div>
+            {isQaAccessClass(person?.access_class ?? null) ? (
+              <div>Phân công: {right.assignment_sources.length
+                ? right.assignment_sources.join(" · ")
+                : "chưa có phân công đang hoạt động"}</div>
+            ) : (
+              <div>Phạm vi: Bộ phận {right.scope_match ? "khớp" : "không khớp"}
+                {right.factory_match !== undefined && ` · Xưởng ${right.factory_match ? "khớp" : "không khớp"}`}
+                {` · Khu vực ${right.area_match ? "khớp" : "không khớp"}`}
+                {right.line_match !== undefined && ` · Line ${right.line_match ? "khớp" : "không khớp"}`}
+              </div>
+            )}
           </article>
         ))}
         {!rows.length && <div className="ip-empty">Chưa có dòng quyền để hiển thị.</div>}

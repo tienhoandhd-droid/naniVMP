@@ -381,6 +381,7 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
               }} />
           )}
           <AssignmentPanel person={person} canEdit={canManageQaAssignments}
+            qaOnly={!canManageDirectory}
             onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
           <EffectiveRightsPanel person={person} revision={rightsRevision} />
         </div>
