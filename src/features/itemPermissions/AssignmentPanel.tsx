@@ -65,6 +65,26 @@ export async function settleAssignmentOperationWhenCurrent({
   }
 }
 
+export class AssignmentOperationState {
+  #activeToken: number | null = null;
+  #saving = false;
+
+  begin(token: number) {
+    this.#activeToken = token;
+    this.#saving = true;
+  }
+
+  finish(token: number): boolean {
+    if (this.#activeToken !== token) return false;
+    this.#saving = false;
+    return true;
+  }
+
+  get saving(): boolean {
+    return this.#saving;
+  }
+}
+
 export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = false, onAssignmentsChanged }: {
   person: DirectoryPerson | null;
   canEdit: boolean;
@@ -81,6 +101,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
   const [saving, setSaving] = useState(false);
   const requestSequence = useRef(0);
   const selectionSequence = useRef(0);
+  const operationState = useRef(new AssignmentOperationState());
   const currentSelectedPersonId = useRef<string | null>(person?.person_id ?? null);
   currentSelectedPersonId.current = person?.person_id ?? null;
   const personComplete = person ? isDirectoryPersonComplete(person) : false;
@@ -116,6 +137,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
     const assignmentRole = assignmentKind === "qa" ? qaRole : null;
     const isCurrentSelection = () => operationSequence === selectionSequence.current
       && currentSelectedPersonId.current === selectedPerson.person_id;
+    operationState.current.begin(operationSequence);
     setSaving(true);
     setMessage("");
     try {
@@ -156,7 +178,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
       setValidationCode("");
       setReason("");
     } finally {
-      if (isCurrentSelection()) setSaving(false);
+      if (operationState.current.finish(operationSequence)) setSaving(false);
     }
   };
 
@@ -167,6 +189,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
     const selectionRole = qaRole;
     const isCurrentSelection = () => operationSequence === selectionSequence.current
       && currentSelectedPersonId.current === selectedPerson?.person_id && qaRole === selectionRole;
+    operationState.current.begin(operationSequence);
     setSaving(true);
     setMessage("");
     try {
@@ -188,7 +211,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
         refresh: () => selectedPerson ? refreshAssignments(selectedPerson, isCurrentSelection) : Promise.resolve(),
       });
     } finally {
-      if (isCurrentSelection()) setSaving(false);
+      if (operationState.current.finish(operationSequence)) setSaving(false);
     }
   };
 

@@ -521,7 +521,7 @@ test("đổi lựa chọn khi đang tìm QA chính không được gửi replace
 });
 
 test("mutation đến muộn không ghi status hoặc refresh của lựa chọn cũ", async () => {
-  const { settleAssignmentOperationWhenCurrent } = await import(
+  const { AssignmentOperationState, settleAssignmentOperationWhenCurrent } = await import(
     "../../src/features/itemPermissions/AssignmentPanel.tsx"
   );
   let resolveAssign;
@@ -570,6 +570,36 @@ test("mutation đến muộn không ghi status hoặc refresh của lựa chọn
   rejectRevoke(new Error("RPC revoke bị từ chối"));
   assert.equal(await staleRevokeFailure, "stale");
   assert.deepEqual(events, []);
+});
+
+test("reject assign cũ không báo lỗi và không hạ loading của thao tác mới", async () => {
+  const { AssignmentOperationState, settleAssignmentOperationWhenCurrent } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  const operations = new AssignmentOperationState();
+  let rejectAssign;
+  const assign = new Promise((_, reject) => { rejectAssign = reject; });
+  let selection = "person-a-primary";
+  const events = [];
+
+  operations.begin(1);
+  const staleAssign = settleAssignmentOperationWhenCurrent({
+    mutate: () => assign,
+    isCurrent: () => selection === "person-a-primary",
+    onSuccess: () => events.push("success"),
+    onError: () => events.push("error"),
+    refresh: async () => events.push("refresh"),
+  });
+  selection = "person-b-collaborator";
+  operations.begin(2);
+  rejectAssign(new Error("RPC assign bị từ chối"));
+
+  assert.equal(await staleAssign, "stale");
+  assert.deepEqual(events, []);
+  assert.equal(operations.finish(1), false);
+  assert.equal(operations.saving, true, "finally cũ không được hạ loading của B");
+  assert.equal(operations.finish(2), true);
+  assert.equal(operations.saving, false);
 });
 
 test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
