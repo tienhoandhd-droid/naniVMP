@@ -31,6 +31,8 @@ let collaboratorAssigned = true;
 let holdNextRights = false;
 let heldRightsRequest = null;
 let rightsReads = 0;
+let staleRightsRequest = null;
+let markStaleRightsFinished = null;
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -95,6 +97,9 @@ page.on("request", (request) => {
     return answer(request, { activities: [secret], objects: [] });
   }
   request.continue();
+});
+page.on("requestfinished", (request) => {
+  if (request === staleRightsRequest) markStaleRightsFinished?.();
 });
 
 async function openProgressModal() {
@@ -198,7 +203,9 @@ try {
   assert.ok(rightsReads > rightsBeforeRevoke, "thu hồi phải đọc quyền mới, không dùng quyền collaborator đã cache");
   assert.equal(await enabledQaControls(), 0, "thu hồi khóa cả tám control QA trong modal đang mở");
 
-  await answer(heldRightsRequest, [{
+  staleRightsRequest = heldRightsRequest;
+  const staleRightsFinished = new Promise((resolve) => { markStaleRightsFinished = resolve; });
+  await answer(staleRightsRequest, [{
     can_view: true,
     editable_fields: QA_FIELDS,
     view_reason: "QA phối hợp theo phân công hạng mục",
@@ -207,7 +214,8 @@ try {
     area_match: true,
   }]);
   heldRightsRequest = null;
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await staleRightsFinished;
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   assert.equal(await enabledQaControls(), 0,
     "response quyền collaborator cũ về trễ không được khôi phục quyền sau revoke");
   console.log("✅ Đổi enforced thu hồi cache; modal fail-closed và response quyền cũ không khôi phục quyền");

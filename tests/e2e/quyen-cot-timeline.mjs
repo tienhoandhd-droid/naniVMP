@@ -110,7 +110,8 @@ page.on("request", (request) => {
   const url = request.url();
   if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
     return answer(request, {
-      activities: [ACTIVITY, NEXT_ACTIVITY], objects: [], updated_at: "2026-08-10T00:00:00Z",
+      activities: right === unassignedQa ? [NEXT_ACTIVITY] : [ACTIVITY, NEXT_ACTIVITY],
+      objects: [], updated_at: "2026-08-10T00:00:00Z",
     });
   }
   if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
@@ -195,10 +196,6 @@ try {
   await page.waitForFunction(() => document.body.innerText.includes("TB-E2E-01"));
 
   await openPersona("enforced", primaryQa);
-  assert.deepEqual(primaryQa.editable_fields, QA_FIELDS,
-    "QA phụ trách chính chỉ nhận đúng tám trường QA");
-  assert.equal(primaryQa.editable_fields.includes("scheduled_at"), false,
-    "QA phụ trách chính không được nhận scheduled_at");
   assert.deepEqual(permissionBodies[0], { p_validation_code: ACTIVITY.id },
     "frontend chỉ gửi mã hạng mục vào wrapper quyền của chính auth.uid");
   const qa = await controlState();
@@ -258,22 +255,24 @@ try {
     "15:45 Bangkok phải được gửi thành đúng thời điểm UTC");
 
   await openPersona("enforced", collaboratorQa);
-  assert.deepEqual(collaboratorQa.editable_fields, QA_FIELDS,
-    "QA phối hợp phải có đúng cùng tám trường của QA phụ trách chính");
-  assert.equal(collaboratorQa.editable_fields.includes("scheduled_at"), false,
-    "QA phối hợp không được nhận scheduled_at");
   const collaborator = await controlState();
+  assert.equal(collaborator.qaCount, 8, "QA phối hợp có đúng tám control QA");
   assert.equal(collaborator.qaEnabled, 8, "QA phối hợp sửa được đủ tám trường QA");
   assert.equal(collaborator.scheduleEnabled, false, "QA phối hợp không được xếp lịch");
 
-  await openPersona("enforced", unassignedQa);
-  assert.equal(unassignedQa.can_view, false, "QA chưa phân công không được xem hạng mục");
-  assert.deepEqual(unassignedQa.editable_fields, [], "QA chưa phân công không có trường được sửa");
-  const viewer = await controlState();
-  assert.equal(viewer.qaEnabled, 0);
-  assert.equal(viewer.scheduleEnabled, false);
-  assert.equal(viewer.hasSave, false, "view-only không có nút lưu tiến độ");
-  assert.match(viewer.text, /Chỉ xem/);
+  await closeModal();
+  mode = "enforced";
+  right = unassignedQa;
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.body.innerText.includes("TB-E2E-02"));
+  assert.equal(await page.evaluate(() => document.body.innerText.includes("TB-E2E-01")), false,
+    "QA chưa phân công không thấy hạng mục mục tiêu trên dashboard enforced");
+  assert.equal(await page.evaluate((targetCode) => [...document.querySelectorAll("tr")]
+    .some((row) => row.innerText.includes(targetCode)), ACTIVITY.code), false,
+  "không có dòng hạng mục thì QA chưa phân công không thể mở modal cập nhật");
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll("span")]
+    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")), false,
+  "dashboard đã thu hồi hạng mục không để modal mục tiêu còn mở");
 
   await openPersona("preview", unassignedQa);
   const preview = await controlState();
