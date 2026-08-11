@@ -56,12 +56,70 @@ begin
       or not has_table_privilege('service_role', 'public.vmp_item_assignments', 'DELETE') then
     raise exception 'service_role phải giữ quyền mutation bảng phân công';
   end if;
+  if to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+    ) is null then
+    raise exception 'Thiếu RPC phân công có assignment_role';
+  end if;
+  if to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text)'
+    ) is not null then
+    raise exception 'RPC phân công năm tham số phải được thay thế, không tạo overload';
+  end if;
   if has_function_privilege(
-    'service_role',
-    'public.rpc_set_item_assignment(uuid,text,text,text,text)',
-    'EXECUTE'
+      'service_role',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'anon',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'EXECUTE'
+    ) or not has_function_privilege(
+      'authenticated',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'EXECUTE'
+    ) then
+    raise exception 'Quyền RPC phân công sáu tham số chưa tối thiểu';
+  end if;
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'vmp_item_assignments'
+      and column_name = 'assignment_role'
+      and data_type = 'text'
+      and is_nullable = 'YES'
   ) then
-    raise exception 'Không được grant service_role vào RPC phụ thuộc auth.uid manager';
+    raise exception 'Thiếu cột nullable assignment_role trên phân công';
+  end if;
+  if exists (
+      select 1 from public.vmp_item_assignments
+      where (assignment_kind = 'qa'
+          and (assignment_role is null
+            or assignment_role not in ('primary', 'collaborator')))
+        or (assignment_kind = 'equipment_department'
+          and assignment_role is not null)
+    ) or exists (
+      select 1
+      from public.vmp_item_assignments
+      where assignment_kind = 'qa' and assignment_role = 'primary' and is_active
+      group by validation_code
+      having count(*) > 1
+    ) or exists (
+      select 1
+      from public.vmp_item_assignments
+      where performer_id is not null and assignment_kind = 'qa' and is_active
+      group by validation_code, performer_id, assignment_kind
+      having count(*) > 1
+    ) then
+    raise exception 'Backfill assignment_role không thỏa constraint/uniqueness';
+  end if;
+  if exists (
+    select 1 from public.vmp_item_assignments
+    where assignment_kind = 'qa' and source = 'sheet_qa' and is_active
+      and assignment_role <> 'primary'
+  ) then
+    raise exception 'Backfill phải ưu tiên sheet_qa làm QA chính';
   end if;
 
   if has_function_privilege(
@@ -85,8 +143,16 @@ begin
       'authenticated', 'public.rpc_set_item_performer(text,text)', 'EXECUTE'
     ) or has_function_privilege(
       'service_role', 'public.rpc_set_item_performer(text,text)', 'EXECUTE'
+    ) or has_function_privilege(
+      'authenticated',
+      'public.vmp_set_item_assignment_unhardened(uuid,text,text,text,text)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'service_role',
+      'public.vmp_set_item_assignment_unhardened(uuid,text,text,text,text)',
+      'EXECUTE'
     ) then
-    raise exception 'RPC gán theo tên legacy phải bị vô hiệu hóa hoàn toàn';
+    raise exception 'Writer phân công legacy phải bị vô hiệu hóa hoàn toàn';
   end if;
 
   perform public.vmp_harden_dashboard_object_scope();
@@ -110,6 +176,44 @@ begin
   end if;
 end
 $test$;
+
+set local role authenticated;
+do $test$
+declare
+  v_denied boolean := false;
+begin
+  begin
+    perform public.rpc_set_item_performer(
+      '__E2E_TASK4_DENIED__', 'E2E writer legacy bị khóa'
+    );
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then
+    raise exception 'authenticated vẫn gọi trực tiếp được writer assignment legacy';
+  end if;
+end
+$test$;
+reset role;
+
+set local role service_role;
+do $test$
+declare
+  v_denied boolean := false;
+begin
+  begin
+    perform public.rpc_set_item_performer(
+      '__E2E_TASK4_DENIED__', 'E2E writer legacy bị khóa'
+    );
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then
+    raise exception 'service_role vẫn gọi trực tiếp được writer assignment legacy';
+  end if;
+end
+$test$;
+reset role;
 
 /* Tài khoản chỉ được nối rõ ràng bởi Admin/service; QA không cần scope hierarchy. */
 do $test$
@@ -279,10 +383,10 @@ begin
   end if;
 
   insert into public.vmp_item_assignments (
-    validation_code, performer_id, staff_name, assignment_kind, source,
+    validation_code, performer_id, staff_name, assignment_kind, assignment_role, source,
     source_text, unresolved_reason, is_active, change_reason
   ) values (
-    v_code, v_person_1, 'E2E QA Không Phạm Vi', 'qa', 'qa_manager',
+    v_code, v_person_1, 'E2E QA Không Phạm Vi', 'qa', 'collaborator', 'qa_manager',
     'E2E QA Không Phạm Vi', 'account_unlinked', true,
     'Fixture nối tài khoản rõ ràng'
   ) returning id into v_assignment;
@@ -737,10 +841,10 @@ begin
   ) returning id into v_non_qa_person;
   update public.vmp_performers set is_active = false where id = v_person_2;
   insert into public.vmp_item_assignments (
-    validation_code, performer_id, staff_name, assignment_kind, source,
+    validation_code, performer_id, staff_name, assignment_kind, assignment_role, source,
     source_text, unresolved_reason, is_active, change_reason
   ) values (
-    v_code, v_person_2, 'E2E QA Import Không Phạm Vi', 'qa', 'qa_manager',
+    v_code, v_person_2, 'E2E QA Import Không Phạm Vi', 'qa', 'collaborator', 'qa_manager',
     'E2E QA Import Không Phạm Vi', 'account_unlinked', true,
     'Fixture performer inactive'
   ) returning id into v_assignment;
@@ -1442,18 +1546,18 @@ begin
   returning id into v_qc_person;
 
   insert into public.vmp_item_assignments (
-    validation_code, performer_id, staff_name, assignment_kind, source,
+    validation_code, performer_id, staff_name, assignment_kind, assignment_role, source,
     source_text, unresolved_reason, is_active, change_reason
   ) values
-    (v_xsx_code, v_qa_person, 'E2E Reader Người QA', 'qa', 'qa_manager',
+    (v_xsx_code, v_qa_person, 'E2E Reader Người QA', 'qa', 'collaborator', 'qa_manager',
      'E2E Reader Người QA', 'account_unlinked', true, 'Fixture reader'),
     (v_xsx_code, v_xsx_person, 'E2E Reader Người XSX',
-     'equipment_department', 'equipment_manager',
+     'equipment_department', null, 'equipment_manager',
      'E2E Reader Người XSX', 'account_unlinked', true, 'Fixture reader'),
-    (v_qc_code, v_qa_person, 'E2E Reader Người QA', 'qa', 'qa_manager',
+    (v_qc_code, v_qa_person, 'E2E Reader Người QA', 'qa', 'collaborator', 'qa_manager',
      'E2E Reader Người QA', 'account_unlinked', true, 'Fixture reader'),
     (v_qc_code, v_qc_person, 'E2E Reader Người QC',
-     'equipment_department', 'equipment_manager',
+     'equipment_department', null, 'equipment_manager',
      'E2E Reader Người QC', 'account_unlinked', true, 'Fixture reader');
 
   perform set_config(
@@ -1697,10 +1801,10 @@ begin
     'Fixture chống lộ dữ liệu đọc'
   );
   insert into public.vmp_item_assignments (
-    validation_code, staff_name, assignment_kind, source, source_text,
+    validation_code, staff_name, assignment_kind, assignment_role, source, source_text,
     unresolved_reason, is_active, change_reason
   ) values (
-    v_hidden_code, 'E2E Phân Công Hạng Mục Ẩn', 'qa', 'sheet_qa',
+    v_hidden_code, 'E2E Phân Công Hạng Mục Ẩn', 'qa', 'collaborator', 'sheet_qa',
     'E2E Phân Công Hạng Mục Ẩn', 'not_found', true,
     'Fixture chống lộ bảng phân công'
   ) returning id into v_hidden_assignment;
@@ -1927,6 +2031,427 @@ begin
 end
 $test$;
 
+/* QA chỉ nhận quyền qua performer đã nối và phân công active của hạng mục. */
+do $test$
+declare
+  v_admin uuid;
+  v_user_1 uuid := gen_random_uuid();
+  v_user_2 uuid := gen_random_uuid();
+  v_user_3 uuid := gen_random_uuid();
+  v_email_1 text;
+  v_email_2 text;
+  v_email_3 text;
+  v_qa_1 uuid;
+  v_qa_2 uuid;
+  v_qa_3 uuid;
+  v_code text;
+  v_result jsonb;
+  v_rights record;
+  v_constraint text;
+  v_unique_caught boolean;
+  v_values jsonb;
+  v_qa_fields constant text[] := array[
+    'actual_protocol_date', 'status_protocol',
+    'actual_validation_date', 'status_validation',
+    'actual_report_date', 'status_report',
+    'actual_vmp_date', 'status_vmp'
+  ]::text[];
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at
+  limit 1;
+  select item.validation_code into v_code
+  from public.vmp_plan_items item
+  where item.is_active
+    and not exists (
+      select 1
+      from public.vmp_item_assignments assignment
+      where assignment.validation_code = item.validation_code
+        and assignment.assignment_kind = 'qa'
+        and assignment.is_active
+    )
+  order by item.validation_code
+  limit 1;
+  if v_admin is null or v_code is null then
+    raise exception 'Thiếu admin hoặc hạng mục trống để kiểm nhiều QA';
+  end if;
+
+  v_email_1 := 'e2e-task4-' || replace(v_user_1::text, '-', '') || '@example.test';
+  v_email_2 := 'e2e-task4-' || replace(v_user_2::text, '-', '') || '@example.test';
+  v_email_3 := 'e2e-task4-' || replace(v_user_3::text, '-', '') || '@example.test';
+  insert into public.vmp_email_cho_phep(email, ghi_chu)
+  values
+    (v_email_1, 'Fixture rollback Task 4'),
+    (v_email_2, 'Fixture rollback Task 4'),
+    (v_email_3, 'Fixture rollback Task 4');
+  insert into auth.users (
+    id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+  ) values
+    (v_user_1, 'authenticated', 'authenticated', v_email_1, '', now(),
+     '{"provider":"email","providers":["email"]}'::jsonb,
+     '{"full_name":"E2E Task 4 QA 1"}'::jsonb, now(), now()),
+    (v_user_2, 'authenticated', 'authenticated', v_email_2, '', now(),
+     '{"provider":"email","providers":["email"]}'::jsonb,
+     '{"full_name":"E2E Task 4 QA 2"}'::jsonb, now(), now()),
+    (v_user_3, 'authenticated', 'authenticated', v_email_3, '', now(),
+     '{"provider":"email","providers":["email"]}'::jsonb,
+     '{"full_name":"E2E Task 4 QA 3"}'::jsonb, now(), now());
+
+  update public.profiles
+  set role = 'viewer', department = 'qa', is_active = true
+  where id in (v_user_1, v_user_2, v_user_3);
+  insert into public.vmp_performers (
+    performer_name, email, department, user_id, access_class,
+    scope_departments, access_areas, is_active, updated_by
+  ) values
+    ('E2E Task 4 QA 1', v_email_1, 'qa', v_user_1, 'qa_progress_editor',
+     '{}'::text[], '{}'::text[], true, v_admin),
+    ('E2E Task 4 QA 2', v_email_2, 'qa', v_user_2, 'qa_progress_editor',
+     '{}'::text[], '{}'::text[], true, v_admin),
+    ('E2E Task 4 QA 3', v_email_3, 'qa', v_user_3, 'qa_progress_editor',
+     '{}'::text[], '{}'::text[], true, v_admin);
+  select id into v_qa_1 from public.vmp_performers where user_id = v_user_1;
+  select id into v_qa_2 from public.vmp_performers where user_id = v_user_2;
+  select id into v_qa_3 from public.vmp_performers where user_id = v_user_3;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'qa', 'primary', 'assign', 'Gán QA chính'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Không gán được QA chính: %', v_result;
+  end if;
+  if not exists (
+    select 1 from pg_catalog.pg_locks
+    where pid = pg_catalog.pg_backend_pid()
+      and relation = 'public.vmp_plan_items'::regclass
+      and mode = 'RowShareLock' and granted
+  ) then
+    raise exception 'Mutation phân công phải giữ row lock trên hạng mục đến cuối transaction';
+  end if;
+  v_result := public.rpc_set_item_assignment(
+    v_qa_2, v_code, 'qa', 'collaborator', 'assign', 'Gán QA phối hợp'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Không gán được QA phối hợp: %', v_result;
+  end if;
+
+  select * into v_rights from public.vmp_item_rights(v_user_1, v_code);
+  if not v_rights.can_view
+      or v_rights.editable_fields is distinct from v_qa_fields
+      or not v_rights.scope_match or not v_rights.area_match then
+    raise exception 'QA chính không nhận đúng quyền assignment-only: %', row_to_json(v_rights);
+  end if;
+  select * into v_rights from public.vmp_item_rights(v_user_2, v_code);
+  if not v_rights.can_view
+      or v_rights.editable_fields is distinct from v_qa_fields
+      or not v_rights.scope_match or not v_rights.area_match then
+    raise exception 'QA phối hợp không nhận đúng quyền assignment-only: %', row_to_json(v_rights);
+  end if;
+  select * into v_rights from public.vmp_item_rights(v_user_3, v_code);
+  if v_rights.can_view or cardinality(v_rights.editable_fields) <> 0
+      or v_rights.scope_match or v_rights.area_match then
+    raise exception 'QA chưa phân công phải fail closed: %', row_to_json(v_rights);
+  end if;
+  if not public.vmp_can_view_item(v_user_1, v_code)
+      or public.vmp_allowed_timeline_fields(v_user_1, v_code)
+        is distinct from v_qa_fields then
+    raise exception 'Consumer lõi quyền chưa dùng nhánh assignment-only mới';
+  end if;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user_1::text, 'role', 'authenticated')::text,
+    true
+  );
+  select * into v_rights from public.vmp_my_item_rights(v_code);
+  if not v_rights.can_view
+      or v_rights.editable_fields is distinct from v_qa_fields then
+    raise exception 'Wrapper browser phải trả đúng quyền QA của auth.uid(): %',
+      row_to_json(v_rights);
+  end if;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  v_result := public.rpc_item_assignments(v_code, null);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or not exists (
+        select 1 from jsonb_array_elements(v_result->'assignments') assignment
+        where (assignment->>'person_id')::uuid = v_qa_1
+          and assignment->>'assignment_role' = 'primary'
+      )
+      or not exists (
+        select 1 from jsonb_array_elements(v_result->'assignments') assignment
+        where (assignment->>'person_id')::uuid = v_qa_2
+          and assignment->>'assignment_role' = 'collaborator'
+  ) then
+    raise exception 'RPC đọc phân công chưa trả assignment_role: %', v_result;
+  end if;
+  v_result := public.rpc_preview_item_rights(v_qa_1, v_code);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or not exists (
+        select 1 from jsonb_array_elements(v_result->'rights') preview
+        where (preview->>'person_id')::uuid = v_qa_1
+          and preview->>'assignment_role' = 'primary'
+          and (preview->>'can_view')::boolean
+          and (preview->>'scope_match')::boolean
+          and (preview->>'factory_match')::boolean
+          and (preview->>'area_match')::boolean
+          and (preview->>'line_match')::boolean
+      ) then
+    raise exception 'Preview QA phải trả role và hiểu scope flags theo assignment: %',
+      v_result;
+  end if;
+
+  v_result := public.rpc_set_item_assignment(
+    v_qa_2, v_code, 'qa', 'primary', 'assign', 'Thử thêm QA chính'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' is distinct from 'PRIMARY_ALREADY_EXISTS' then
+    raise exception 'assign QA chính thứ hai phải bị từ chối rõ ràng: %', v_result;
+  end if;
+  v_result := public.rpc_set_item_assignment(
+    v_qa_2, v_code, 'qa', 'primary', 'replace_primary', 'Đổi QA chính'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (select count(*) from public.vmp_item_assignments
+          where validation_code = v_code and assignment_kind = 'qa'
+            and assignment_role = 'primary' and is_active) <> 1
+      or not exists (
+        select 1 from public.vmp_item_assignments
+        where validation_code = v_code and performer_id = v_qa_1
+          and assignment_role = 'collaborator' and is_active
+      )
+      or not exists (
+        select 1 from public.vmp_item_assignments
+        where validation_code = v_code and performer_id = v_qa_2
+          and assignment_role = 'primary' and is_active
+      ) then
+    raise exception 'replace_primary phải demote/promote nguyên tử: %', v_result;
+  end if;
+
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'qa', 'collaborator', 'revoke', 'Thu hồi QA phối hợp'
+  );
+  select * into v_rights from public.vmp_item_rights(v_user_1, v_code);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or v_rights.can_view or cardinality(v_rights.editable_fields) <> 0 then
+    raise exception 'Thu hồi QA phối hợp phải mất quyền ngay: %, %',
+      v_result, row_to_json(v_rights);
+  end if;
+
+  update public.vmp_performers set user_id = null where id = v_qa_2;
+  select * into v_rights from public.vmp_item_rights(v_user_2, v_code);
+  if v_rights.can_view then
+    raise exception 'QA bị gỡ liên kết tài khoản phải fail closed: %', row_to_json(v_rights);
+  end if;
+  update public.vmp_performers set user_id = v_user_2 where id = v_qa_2;
+
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'qa', null, 'assign', 'Thiếu vai trò QA'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' is distinct from 'INVALID_ASSIGNMENT_ROLE' then
+    raise exception 'QA thiếu assignment_role phải bị từ chối: %', v_result;
+  end if;
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'equipment_department', 'collaborator', 'assign',
+    'Thiết bị nhận sai vai trò QA'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' is distinct from 'INVALID_ASSIGNMENT_ROLE' then
+    raise exception 'Phân công thiết bị không được nhận assignment_role: %', v_result;
+  end if;
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'qa', 'collaborator', 'assign', '  '
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' is distinct from 'REASON_REQUIRED' then
+    raise exception 'Mutation phân công phải bắt buộc lý do: %', v_result;
+  end if;
+
+  update public.vmp_performers set access_class = 'qa_manager' where id = v_qa_3;
+  v_result := public.rpc_set_item_assignment(
+    v_qa_3, v_code, 'qa', 'collaborator', 'assign', 'Thử gán quản lý QA'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' is distinct from 'QA_TARGET_NOT_ASSIGNABLE' then
+    raise exception 'qa_manager không được làm target QA thường: %', v_result;
+  end if;
+  if not exists (
+    select 1 from public.vmp_item_assignments
+    where validation_code = v_code and performer_id = v_qa_2
+      and assignment_role = 'primary' and is_active
+  ) then
+    raise exception 'Target replace không hợp lệ không được làm mất QA chính hiện tại';
+  end if;
+
+  update public.profiles set role = 'qa_manager', department = 'qa'
+  where id = v_user_3;
+  select * into v_rights from public.vmp_item_rights(v_user_3, v_code);
+  if not v_rights.can_view
+      or v_rights.editable_fields is distinct from v_qa_fields
+      or not v_rights.scope_match or not v_rights.area_match then
+    raise exception 'Principal QA manager hợp lệ phải thấy mọi hạng mục, không cần scope: %',
+      row_to_json(v_rights);
+  end if;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user_3::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'qa', 'collaborator', 'assign',
+    'Quản lý QA gán không phụ thuộc scope'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'QA manager hợp lệ phải phân công không cần scope: %', v_result;
+  end if;
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'qa', 'collaborator', 'revoke',
+    'Quản lý QA thu hồi phân công'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'QA manager hợp lệ phải thu hồi được phân công: %', v_result;
+  end if;
+  update public.profiles set role = 'viewer' where id = v_user_3;
+  select * into v_rights from public.vmp_item_rights(v_user_3, v_code);
+  if v_rights.can_view then
+    raise exception 'access_class qa_manager thiếu role qa_manager phải fail closed: %',
+      row_to_json(v_rights);
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_unique_caught := false;
+  begin
+    insert into public.vmp_item_assignments (
+      validation_code, performer_id, user_id, staff_name, assignment_kind,
+      assignment_role, source, source_text, is_active, change_reason
+    ) values (
+      v_code, v_qa_3, v_user_3, 'E2E Task 4 QA 3', 'qa', 'primary',
+      'sheet_qa', 'E2E Task 4 QA 3', true, 'Thử trùng QA chính'
+    );
+  exception when unique_violation then
+    get stacked diagnostics v_constraint = constraint_name;
+    v_unique_caught := v_constraint = 'vmp_item_assignments_one_active_qa_primary';
+  end;
+  if not v_unique_caught then
+    raise exception 'Unique index một QA chính không bắt đúng predicate';
+  end if;
+
+  v_unique_caught := false;
+  begin
+    insert into public.vmp_item_assignments (
+      validation_code, performer_id, user_id, staff_name, assignment_kind,
+      assignment_role, source, source_text, is_active, change_reason
+    ) values (
+      v_code, v_qa_2, v_user_2, 'E2E Task 4 QA 2', 'qa', 'collaborator',
+      'sheet_qa', 'E2E Task 4 QA 2', true, 'Thử trùng người QA'
+    );
+  exception when unique_violation then
+    get stacked diagnostics v_constraint = constraint_name;
+    v_unique_caught := v_constraint = 'vmp_item_assignments_one_active_qa_person';
+  end;
+  if not v_unique_caught then
+    raise exception 'Unique index một dòng active mỗi người QA không bắt đúng predicate';
+  end if;
+
+  /* DDL và dữ liệu probe được rollback ở subtransaction có chủ đích. */
+  begin
+    execute 'drop index public.vmp_item_assignments_one_active_qa_primary';
+    execute 'drop index public.vmp_item_assignments_one_active_qa_person';
+    insert into public.vmp_item_assignments (
+      validation_code, performer_id, user_id, staff_name, assignment_kind,
+      assignment_role, source, source_text, is_active, change_reason
+    ) values
+      (v_code, v_qa_3, v_user_3, 'E2E Task 4 QA 3', 'qa', 'primary',
+       'sheet_qa', 'E2E Task 4 QA 3', true, 'Probe preflight trùng primary'),
+      (v_code, v_qa_2, v_user_2, 'E2E Task 4 QA 2', 'qa', 'collaborator',
+       'sheet_qa', 'E2E Task 4 QA 2', true, 'Probe preflight trùng person');
+    v_result := public.rpc_item_permission_preflight();
+    if not exists (
+      select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+      where error->>'code' = 'DUPLICATE_ACTIVE_QA_PRIMARY'
+        and error->>'record_id' = v_code
+    ) or not exists (
+      select 1 from jsonb_array_elements(v_result->'blocking_errors') error
+      where error->>'code' = 'DUPLICATE_ACTIVE_QA_PERSON'
+        and error->>'record_id' = v_code || '×' || v_qa_2::text
+    ) then
+      raise exception 'Preflight chưa bắt hai dạng trùng QA: %', v_result;
+    end if;
+    raise exception using errcode = 'PT401', message = 'rollback preflight probe';
+  exception when sqlstate 'PT401' then
+    null;
+  end;
+
+  if not exists (
+    select 1 from public.audit_logs
+    where validation_code = v_code
+      and table_name = 'vmp_item_assignments'
+      and source = 'dashboard_rpc'
+      and change_reason = 'Đổi QA chính'
+      and new_data @> jsonb_build_object('assignment_role', 'primary')
+  ) or not exists (
+    select 1 from public.audit_logs
+    where validation_code = v_code
+      and table_name = 'vmp_item_assignments'
+      and source = 'dashboard_rpc'
+      and change_reason = 'Thu hồi QA phối hợp'
+  ) then
+    raise exception 'Mutation QA phải ghi audit đủ lý do và vai trò';
+  end if;
+
+  v_values := to_jsonb(array_fill(''::text, array[37]));
+  v_values := jsonb_set(v_values, '{17}', to_jsonb('E2E Task 4 QA 2'::text));
+  update public.vmp_plan_items
+  set source_sheet_data = jsonb_set(
+    coalesce(source_sheet_data, '{}'::jsonb), '{values}', v_values, true
+  )
+  where validation_code = v_code;
+  v_result := public.rpc_refresh_source_item_assignments();
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (select count(*) from public.vmp_item_assignments
+          where validation_code = v_code and performer_id = v_qa_2
+            and assignment_kind = 'qa' and is_active) <> 1
+      or not exists (
+        select 1 from public.vmp_item_assignments
+        where validation_code = v_code and performer_id = v_qa_2
+          and assignment_kind = 'qa' and source = 'sheet_qa'
+          and assignment_role = 'primary' and is_active
+      )
+      or not exists (
+        select 1 from public.vmp_item_assignments
+        where validation_code = v_code and performer_id = v_qa_2
+          and assignment_kind = 'qa' and source = 'qa_manager'
+          and assignment_role = 'collaborator' and not is_active
+          and change_reason = 'Gộp nguồn phân công khi chuyển person_id'
+      ) then
+    raise exception 'Refresh phải ưu tiên sheet_qa và dedupe person_id ổn định: %', v_result;
+  end if;
+
+  delete from public.vmp_item_assignments
+  where performer_id in (v_qa_1, v_qa_2, v_qa_3);
+  delete from public.vmp_performers where id in (v_qa_1, v_qa_2, v_qa_3);
+  delete from public.audit_logs where user_id in (v_user_1, v_user_2, v_user_3);
+  delete from auth.users where id in (v_user_1, v_user_2, v_user_3);
+  delete from public.vmp_email_cho_phep where email in (v_email_1, v_email_2, v_email_3);
+end
+$test$;
+
 do $test$
 declare
   v_admin uuid;
@@ -1975,10 +2500,11 @@ begin
   returning id into v_person;
   insert into public.vmp_item_assignments (
     validation_code, performer_id, user_id, staff_name,
-    assignment_kind, source, source_text, is_active, change_reason
+    assignment_kind, assignment_role, source, source_text, is_active, change_reason
   ) values (
     v_code, v_person, v_user, 'E2E Người Sửa Timeline',
-    'qa', 'qa_manager', 'E2E Người Sửa Timeline', true, 'Fixture khóa cột'
+    'qa', 'collaborator', 'qa_manager', 'E2E Người Sửa Timeline', true,
+    'Fixture khóa cột'
   );
 
   update public.system_config
@@ -2016,7 +2542,7 @@ begin
   set department = 'xsx', access_class = 'equipment_scheduler'
   where id = v_person;
   update public.vmp_item_assignments
-  set assignment_kind = 'equipment_department'
+  set assignment_kind = 'equipment_department', assignment_role = null
   where performer_id = v_person and validation_code = v_code;
 
   select * into v_before from public.vmp_plan_items where validation_code = v_code;
@@ -2147,7 +2673,8 @@ begin
   set department = 'qa', access_class = 'qa_progress_editor',
       scope_departments = array['xsx'], access_areas = array[v_area]
   where id = v_person;
-  update public.vmp_item_assignments set assignment_kind = 'qa'
+  update public.vmp_item_assignments
+  set assignment_kind = 'qa', assignment_role = 'collaborator'
   where performer_id = v_person and validation_code = v_xsx_code;
   select * into v_rights from public.vmp_item_rights(v_user, v_xsx_code);
   if not v_rights.can_view or v_rights.editable_fields <> array[
@@ -2163,7 +2690,8 @@ begin
   set department = 'xsx', access_class = 'equipment_scheduler',
       scope_departments = array['xsx'], access_areas = array[v_area]
   where id = v_person;
-  update public.vmp_item_assignments set assignment_kind = 'equipment_department'
+  update public.vmp_item_assignments
+  set assignment_kind = 'equipment_department', assignment_role = null
   where performer_id = v_person and validation_code = v_xsx_code;
   select * into v_rights from public.vmp_item_rights(v_user, v_xsx_code);
   if not v_rights.can_view or v_rights.editable_fields <> array['scheduled_at']::text[] then
@@ -2344,6 +2872,7 @@ begin
     where validation_code = v_xsx_code
       and source = 'sheet_qa'
       and performer_id = v_qa_person
+      and assignment_role = 'primary'
       and unresolved_reason = 'account_unlinked'
   ) then
     raise exception 'Tên QA duy nhất phải nối đúng performer và báo chưa có tài khoản';
@@ -2379,13 +2908,13 @@ begin
     true
   );
   v_result := public.rpc_set_item_assignment(
-    v_xsx_person, v_xsx_code, 'equipment_department', 'assign', 'Xếp người XSX'
+    v_xsx_person, v_xsx_code, 'equipment_department', null, 'assign', 'Xếp người XSX'
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true then
     raise exception 'Equipment manager phải phân công được hạng mục XSX: %', v_result;
   end if;
   v_result := public.rpc_set_item_assignment(
-    v_xsx_person, v_qc_code, 'equipment_department', 'assign', 'Thử vượt bộ phận'
+    v_xsx_person, v_qc_code, 'equipment_department', null, 'assign', 'Thử vượt bộ phận'
   );
   if coalesce((v_result->>'ok')::boolean, true) is not false then
     raise exception 'Equipment manager XSX không được phân công hạng mục QC: %', v_result;
@@ -2398,7 +2927,7 @@ begin
       scope_departments = array['*'], access_areas = array['*']
   where id = v_manager_person;
   v_result := public.rpc_set_item_assignment(
-    v_qa_person, v_xsx_code, 'qa', 'assign', 'QA phân công phụ trách'
+    v_qa_person, v_xsx_code, 'qa', 'primary', 'assign', 'QA phân công phụ trách'
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true then
     raise exception 'QA manager phải phân công QA được: %', v_result;

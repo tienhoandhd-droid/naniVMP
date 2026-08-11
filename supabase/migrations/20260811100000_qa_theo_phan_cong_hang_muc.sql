@@ -1,5 +1,69 @@
 /* Nối tài khoản vào hồ sơ bằng xác nhận Admin; QA nhận quyền từ phân công. */
 
+alter table public.vmp_item_assignments
+  add column assignment_role text;
+
+/* Một người có thể còn hai nguồn QA legacy trên cùng hạng mục. Giữ dòng
+ * ưu tiên Sheet, rồi theo thời điểm/UUID ổn định; dòng dư chỉ ngừng active. */
+with ranked as (
+  select assignment.id,
+         row_number() over (
+           partition by assignment.validation_code, assignment.performer_id
+           order by (assignment.source = 'sheet_qa') desc,
+                    assignment.created_at,
+                    assignment.id
+         ) as position
+  from public.vmp_item_assignments assignment
+  where assignment.assignment_kind = 'qa'
+    and assignment.performer_id is not null
+    and assignment.is_active
+)
+update public.vmp_item_assignments assignment
+set is_active = false,
+    change_reason = 'Gộp nguồn phân công khi chuyển person_id'
+from ranked
+where assignment.id = ranked.id and ranked.position > 1;
+
+update public.vmp_item_assignments
+set assignment_role = 'collaborator'
+where assignment_kind = 'qa';
+
+with ranked as (
+  select assignment.id,
+         row_number() over (
+           partition by assignment.validation_code
+           order by (assignment.source = 'sheet_qa') desc,
+                    assignment.created_at,
+                    assignment.id
+         ) as position
+  from public.vmp_item_assignments assignment
+  where assignment.assignment_kind = 'qa' and assignment.is_active
+)
+update public.vmp_item_assignments assignment
+set assignment_role = 'primary'
+from ranked
+where assignment.id = ranked.id and ranked.position = 1;
+
+alter table public.vmp_item_assignments
+  add constraint vmp_item_assignments_role_check
+  check (
+    (assignment_kind = 'qa' and assignment_role in ('primary', 'collaborator'))
+    or (assignment_kind = 'equipment_department' and assignment_role is null)
+  ) not valid;
+alter table public.vmp_item_assignments
+  validate constraint vmp_item_assignments_role_check;
+
+create unique index vmp_item_assignments_one_active_qa_primary
+on public.vmp_item_assignments(validation_code)
+where assignment_kind = 'qa' and assignment_role = 'primary' and is_active;
+
+create unique index vmp_item_assignments_one_active_qa_person
+on public.vmp_item_assignments(validation_code, performer_id, assignment_kind)
+where performer_id is not null and assignment_kind = 'qa' and is_active;
+
+comment on column public.vmp_item_assignments.assignment_role is
+  'Vai trò QA theo hạng mục: primary hoặc collaborator; phân công thiết bị để null.';
+
 /* Chữ ký ba tham số đã được thay bằng optimistic version ở migration 1600.
  * Phải drop trước CREATE OR REPLACE để event-trigger không thấy overload RPC. */
 revoke all on function public.rpc_upsert_item_permission_staff(uuid, jsonb, text)
@@ -1144,6 +1208,845 @@ begin
 end
 $fn$;
 
+/* Refresh nguồn phải sinh assignment_role hợp lệ và ưu tiên sheet_qa làm
+ * primary. Khóa item theo thứ tự để serialize với mutation dashboard. */
+create or replace function public.rpc_refresh_source_item_assignments()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_actor uuid := auth.uid();
+  v_actor_role text;
+  v_inserted integer := 0;
+  v_unresolved integer := 0;
+begin
+  select role::text into v_actor_role
+  from public.profiles
+  where id = v_actor and coalesce(is_active, true);
+  if coalesce(auth.role(), '') <> 'service_role'
+      and v_actor_role is distinct from 'admin' then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'Chỉ Admin hoặc service đồng bộ được phân công nguồn'
+    );
+  end if;
+
+  perform item.validation_code
+  from public.vmp_plan_items item
+  where item.is_active
+  order by item.validation_code
+  for update;
+
+  delete from public.vmp_item_assignments
+  where source in ('sheet_qa', 'sheet_other_staff');
+
+  with source_names as (
+    select item.validation_code,
+           'qa'::text as assignment_kind,
+           'sheet_qa'::text as source,
+           coalesce(
+             nullif(btrim(item.source_sheet_data->'values'->>17), ''),
+             nullif(btrim(item.owner_name), '')
+           ) as source_name
+    from public.vmp_plan_items item
+    where item.is_active
+
+    union all
+
+    select item.validation_code,
+           'equipment_department'::text,
+           'sheet_other_staff'::text,
+           nullif(btrim(item.source_sheet_data->'values'->>19), '')
+    from public.vmp_plan_items item
+    where item.is_active
+  ), valid_sources as (
+    select source.*,
+           public.vmp_normalize_person_name(source.source_name)
+             as normalized_source_name
+    from source_names source
+    where source.source_name is not null
+      and source.source_name !~ '^[-–—.·[:space:]]+$'
+      and lower(source.source_name) <> '(chưa phân công)'
+  ), matched as (
+    select source.*,
+           resolution.validation_code is not null as has_resolution,
+           resolution.performer_id as mapped_performer_id,
+           resolved.id as active_resolved_performer_id,
+           automatic.match_count,
+           automatic.performer_id as automatic_performer_id
+    from valid_sources source
+    left join public.vmp_source_assignment_resolutions resolution
+      on resolution.validation_code = source.validation_code
+     and resolution.assignment_kind = source.assignment_kind
+     and resolution.source = source.source
+     and resolution.normalized_source_name = source.normalized_source_name
+    left join public.vmp_performers resolved
+      on resolved.id = resolution.performer_id and resolved.is_active
+    left join lateral (
+      select count(*)::integer as match_count,
+             case when count(*) = 1
+               then (array_agg(person.id order by person.id))[1]
+             end as performer_id
+      from public.vmp_performers person
+      where person.is_active
+        and person.normalized_full_name = source.normalized_source_name
+    ) automatic on true
+  ), selected as (
+    select matched.*,
+           case when has_resolution
+             then active_resolved_performer_id
+             else automatic_performer_id
+           end as performer_id
+    from matched
+  )
+  insert into public.vmp_item_assignments (
+    validation_code, performer_id, user_id, staff_name, employee_code,
+    assignment_kind, assignment_role, source, source_text, unresolved_reason,
+    is_active, change_reason, created_by, updated_by
+  )
+  select selected.validation_code,
+         selected.performer_id,
+         person.user_id,
+         coalesce(person.performer_name, selected.source_name),
+         person.employee_code,
+         selected.assignment_kind,
+         case when selected.assignment_kind = 'qa'
+           then 'collaborator' else null end,
+         selected.source,
+         selected.source_name,
+         case
+           when selected.has_resolution
+             and selected.active_resolved_performer_id is null
+             then 'stale_resolution'
+           when selected.performer_id is null and selected.match_count = 0
+             then 'not_found'
+           when selected.performer_id is null and selected.match_count > 1
+             then 'duplicate_name'
+           when person.user_id is null then 'account_unlinked'
+           else null
+         end,
+         selected.assignment_kind <> 'qa',
+         'Đồng bộ phân công từ dữ liệu Sheet',
+         v_actor,
+         v_actor
+  from selected
+  left join public.vmp_performers person on person.id = selected.performer_id;
+  get diagnostics v_inserted = row_count;
+
+  update public.vmp_item_assignments duplicate
+  set is_active = false,
+      assignment_role = 'collaborator',
+      change_reason = 'Gộp nguồn phân công khi chuyển person_id',
+      updated_by = v_actor
+  where duplicate.assignment_kind = 'qa'
+    and duplicate.source <> 'sheet_qa'
+    and duplicate.performer_id is not null
+    and duplicate.is_active
+    and exists (
+      select 1
+      from public.vmp_item_assignments sheet
+      where sheet.validation_code = duplicate.validation_code
+        and sheet.performer_id = duplicate.performer_id
+        and sheet.assignment_kind = 'qa'
+        and sheet.source = 'sheet_qa'
+    );
+
+  update public.vmp_item_assignments
+  set is_active = true
+  where assignment_kind = 'qa' and source = 'sheet_qa';
+
+  update public.vmp_item_assignments
+  set assignment_role = 'collaborator'
+  where assignment_kind = 'qa'
+    and assignment_role is distinct from 'collaborator';
+
+  with ranked as (
+    select assignment.id,
+           row_number() over (
+             partition by assignment.validation_code
+             order by (assignment.source = 'sheet_qa') desc,
+                      assignment.created_at,
+                      assignment.id
+           ) as position
+    from public.vmp_item_assignments assignment
+    where assignment.assignment_kind = 'qa' and assignment.is_active
+  )
+  update public.vmp_item_assignments assignment
+  set assignment_role = 'primary'
+  from ranked
+  where assignment.id = ranked.id and ranked.position = 1;
+
+  select count(*) into v_unresolved
+  from public.vmp_item_assignments
+  where source in ('sheet_qa', 'sheet_other_staff')
+    and unresolved_reason is not null;
+
+  insert into public.audit_logs (
+    user_id, action, table_name, record_id, new_data,
+    change_reason, source, changed_fields
+  ) values (
+    v_actor, 'CONFIG_CHANGE', 'vmp_item_assignments', 'source_refresh',
+    jsonb_build_object('inserted', v_inserted, 'unresolved', v_unresolved),
+    'Đối chiếu lại hai cột phân công từ Sheet',
+    'sheet_assignment_refresh',
+    array['sheet_qa', 'sheet_other_staff', 'assignment_role']
+  );
+
+  return jsonb_build_object(
+    'ok', true, 'inserted', v_inserted, 'unresolved', v_unresolved
+  );
+exception
+  when others then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'SOURCE_REFRESH_FAILED', 'error', sqlerrm
+    );
+end
+$fn$;
+
+revoke all on function public.rpc_set_item_assignment(uuid, text, text, text, text)
+  from public, anon, authenticated, service_role;
+drop function public.rpc_set_item_assignment(uuid, text, text, text, text);
+
+create function public.rpc_set_item_assignment(
+  p_person_id uuid,
+  p_validation_code text,
+  p_assignment_kind text,
+  p_assignment_role text,
+  p_action text,
+  p_reason text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_actor uuid := auth.uid();
+  v_principal record;
+  v_target public.vmp_performers%rowtype;
+  v_object_department text;
+  v_object_area text;
+  v_object_line text;
+  v_source text;
+  v_scope_match boolean;
+  v_area_match boolean;
+  v_assignment_id uuid;
+  v_existing_primary_id uuid;
+  v_old_assignments jsonb;
+  v_new_assignments jsonb;
+begin
+  if nullif(btrim(coalesce(p_reason, '')), '') is null then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'REASON_REQUIRED',
+      'error', 'Bắt buộc nhập lý do phân công'
+    );
+  end if;
+  if p_assignment_kind is null
+      or p_assignment_kind not in ('qa', 'equipment_department') then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'INVALID_ASSIGNMENT_KIND',
+      'error', 'Loại phân công không hợp lệ'
+    );
+  end if;
+  if p_assignment_kind = 'qa'
+      and (p_assignment_role is null
+        or p_assignment_role not in ('primary', 'collaborator')) then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'INVALID_ASSIGNMENT_ROLE',
+      'error', 'Phân công QA phải là phụ trách chính hoặc phối hợp'
+    );
+  end if;
+  if p_assignment_kind = 'equipment_department'
+      and p_assignment_role is not null then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'INVALID_ASSIGNMENT_ROLE',
+      'error', 'Phân công thiết bị không nhận vai trò QA'
+    );
+  end if;
+  if p_action is null
+      or p_action not in ('assign', 'revoke', 'replace_primary') then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'INVALID_ASSIGNMENT_ACTION',
+      'error', 'Hành động chỉ nhận assign, revoke hoặc replace_primary'
+    );
+  end if;
+  if p_action = 'replace_primary'
+      and (p_assignment_kind <> 'qa' or p_assignment_role <> 'primary') then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'INVALID_ASSIGNMENT_ACTION',
+      'error', 'replace_primary chỉ dùng để thay QA phụ trách chính'
+    );
+  end if;
+
+  select * into v_principal from public.vmp_manager_principal(v_actor);
+  if v_principal.principal_kind is null then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'FORBIDDEN',
+      'error', 'Principal quản lý không hợp lệ hoặc không nhất quán'
+    );
+  end if;
+
+  select * into v_target
+  from public.vmp_performers
+  where id = p_person_id and is_active;
+  if not found then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'PERSON_NOT_FOUND',
+      'error', 'Không tìm thấy nhân viên hoạt động'
+    );
+  end if;
+  if p_assignment_kind = 'qa' and (
+      v_target.department is distinct from 'qa'
+      or v_target.access_class is distinct from 'qa_progress_editor'
+    ) then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'QA_TARGET_NOT_ASSIGNABLE',
+      'error', 'Chỉ phân công được nhân viên QA xử lý tiến độ'
+    );
+  end if;
+
+  select object.department, object.area, object.line
+  into v_object_department, v_object_area, v_object_line
+  from public.vmp_plan_items item
+  join public.vmp_objects object on object.code = item.object_code
+  where item.validation_code = p_validation_code and item.is_active
+  for update of item;
+  if not found then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'ITEM_NOT_FOUND',
+      'error', 'Không tìm thấy hạng mục thẩm định'
+    );
+  end if;
+
+  if v_principal.principal_kind = 'qa_manager' then
+    if p_assignment_kind <> 'qa' then
+      return jsonb_build_object(
+        'ok', false, 'error_code', 'FORBIDDEN_ASSIGNMENT_KIND',
+        'error', 'Quản lý QA chỉ phân công loại QA'
+      );
+    end if;
+  elsif v_principal.principal_kind = 'equipment_manager' then
+    if p_assignment_kind <> 'equipment_department' then
+      return jsonb_build_object(
+        'ok', false, 'error_code', 'FORBIDDEN_ASSIGNMENT_KIND',
+        'error', 'Quản lý bộ phận thiết bị chỉ phân công nhân sự bộ phận'
+      );
+    end if;
+    if v_principal.profile_department is null
+        or v_target.department is distinct from v_principal.profile_department
+        or v_object_department is distinct from v_principal.profile_department then
+      return jsonb_build_object(
+        'ok', false, 'error_code', 'OUTSIDE_MANAGER_DEPARTMENT',
+        'error', 'Chỉ phân công người cùng bộ phận cho hạng mục do bộ phận mình quản lý'
+      );
+    end if;
+    v_scope_match := coalesce(
+      '*' = any(v_principal.scope_departments)
+      or v_object_department = any(v_principal.scope_departments),
+      false
+    );
+    v_area_match := coalesce(
+      '*' = any(v_principal.access_areas)
+      or v_object_area = any(v_principal.access_areas)
+      or v_object_line = any(v_principal.access_areas),
+      false
+    );
+    if not v_scope_match or not v_area_match then
+      return jsonb_build_object(
+        'ok', false, 'error_code', 'OUTSIDE_MANAGER_SCOPE',
+        'error', 'Hạng mục ngoài phạm vi/khu vực quản lý'
+      );
+    end if;
+  elsif v_principal.principal_kind <> 'admin' then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'FORBIDDEN',
+      'error', 'Bạn không có quyền phân công hạng mục'
+    );
+  end if;
+
+  perform assignment.id
+  from public.vmp_item_assignments assignment
+  where assignment.validation_code = p_validation_code
+    and assignment.assignment_kind = p_assignment_kind
+  order by assignment.id
+  for update;
+
+  select coalesce(
+    jsonb_agg(to_jsonb(assignment) order by assignment.id), '[]'::jsonb
+  ) into v_old_assignments
+  from public.vmp_item_assignments assignment
+  where assignment.validation_code = p_validation_code
+    and assignment.assignment_kind = p_assignment_kind;
+
+  v_source := case when p_assignment_kind = 'qa'
+    then 'qa_manager' else 'equipment_manager' end;
+
+  if p_action = 'revoke' then
+    update public.vmp_item_assignments
+    set is_active = false,
+        change_reason = btrim(p_reason),
+        updated_by = v_actor
+    where validation_code = p_validation_code
+      and performer_id = p_person_id
+      and assignment_kind = p_assignment_kind
+      and is_active;
+  else
+    if p_assignment_kind = 'qa' and p_assignment_role = 'primary'
+        and p_action = 'assign' then
+      select assignment.id into v_existing_primary_id
+      from public.vmp_item_assignments assignment
+      where assignment.validation_code = p_validation_code
+        and assignment.assignment_kind = 'qa'
+        and assignment.assignment_role = 'primary'
+        and assignment.is_active
+        and assignment.performer_id is distinct from p_person_id
+      order by assignment.id
+      limit 1;
+      if v_existing_primary_id is not null then
+        return jsonb_build_object(
+          'ok', false, 'error_code', 'PRIMARY_ALREADY_EXISTS',
+          'error', 'Hạng mục đã có QA phụ trách chính'
+        );
+      end if;
+    end if;
+
+    if p_action = 'replace_primary' then
+      update public.vmp_item_assignments
+      set assignment_role = 'collaborator',
+          change_reason = btrim(p_reason),
+          updated_by = v_actor
+      where validation_code = p_validation_code
+        and assignment_kind = 'qa'
+        and assignment_role = 'primary'
+        and is_active;
+    end if;
+
+    select assignment.id into v_assignment_id
+    from public.vmp_item_assignments assignment
+    where assignment.validation_code = p_validation_code
+      and assignment.performer_id = p_person_id
+      and assignment.assignment_kind = p_assignment_kind
+    order by assignment.is_active desc,
+             (assignment.source = v_source) desc,
+             assignment.created_at,
+             assignment.id
+    limit 1;
+
+    if v_assignment_id is null then
+      insert into public.vmp_item_assignments (
+        validation_code, performer_id, user_id, staff_name, employee_code,
+        assignment_kind, assignment_role, source, source_text,
+        unresolved_reason, is_active, change_reason, created_by, updated_by
+      ) values (
+        p_validation_code, v_target.id, v_target.user_id,
+        v_target.performer_name, v_target.employee_code,
+        p_assignment_kind, p_assignment_role, v_source,
+        v_target.performer_name,
+        case when v_target.user_id is null then 'account_unlinked' else null end,
+        true, btrim(p_reason), v_actor, v_actor
+      ) returning id into v_assignment_id;
+    else
+      update public.vmp_item_assignments
+      set user_id = v_target.user_id,
+          staff_name = v_target.performer_name,
+          employee_code = v_target.employee_code,
+          assignment_role = p_assignment_role,
+          source_text = v_target.performer_name,
+          unresolved_reason = case when v_target.user_id is null
+            then 'account_unlinked' else null end,
+          is_active = true,
+          change_reason = btrim(p_reason),
+          updated_by = v_actor
+      where id = v_assignment_id;
+    end if;
+  end if;
+
+  select coalesce(
+    jsonb_agg(to_jsonb(assignment) order by assignment.id), '[]'::jsonb
+  ) into v_new_assignments
+  from public.vmp_item_assignments assignment
+  where assignment.validation_code = p_validation_code
+    and assignment.assignment_kind = p_assignment_kind;
+
+  insert into public.audit_logs (
+    user_id, action, table_name, record_id, old_data, new_data,
+    change_reason, source, changed_fields, validation_code
+  ) values (
+    v_actor,
+    case when p_action = 'revoke'
+      then 'DELETE'::public.audit_action else 'UPDATE'::public.audit_action end,
+    'vmp_item_assignments',
+    p_validation_code || '×' || p_person_id::text,
+    jsonb_build_object('assignments', v_old_assignments),
+    jsonb_build_object(
+      'person_id', p_person_id,
+      'assignment_kind', p_assignment_kind,
+      'assignment_role', p_assignment_role,
+      'action', p_action,
+      'assignments', v_new_assignments
+    ),
+    btrim(p_reason), 'dashboard_rpc',
+    array['assignment_role', 'is_active'], p_validation_code
+  );
+
+  return jsonb_build_object(
+    'ok', true,
+    'action', p_action,
+    'source', v_source,
+    'assignment_role', p_assignment_role,
+    'account_status', case when v_target.user_id is null
+      then 'unlinked' else 'linked' end
+  );
+exception
+  when unique_violation then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'ASSIGNMENT_CONFLICT',
+      'error', 'Phân công vừa được thay đổi ở phiên khác'
+    );
+  when others then
+    return jsonb_build_object(
+      'ok', false, 'error_code', 'ASSIGNMENT_MUTATION_FAILED', 'error', sqlerrm
+    );
+end
+$fn$;
+
+create or replace function public.rpc_item_assignments(
+  p_validation_code text default null,
+  p_person_id uuid default null
+) returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_principal record;
+  v_assignments jsonb;
+begin
+  select * into v_principal from public.vmp_manager_principal(auth.uid());
+  if v_principal.principal_kind is null then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'Principal quản lý không hợp lệ hoặc không nhất quán'
+    );
+  end if;
+
+  select jsonb_agg(jsonb_build_object(
+    'assignment_id', assignment.id,
+    'validation_code', assignment.validation_code,
+    'person_id', assignment.performer_id,
+    'user_id', assignment.user_id,
+    'staff_name', assignment.staff_name,
+    'employee_code', assignment.employee_code,
+    'assignment_kind', assignment.assignment_kind,
+    'assignment_role', assignment.assignment_role,
+    'source', assignment.source,
+    'source_text', assignment.source_text,
+    'unresolved_reason', assignment.unresolved_reason,
+    'expires_at', assignment.expires_at,
+    'is_active', assignment.is_active,
+    'grants_access', active.grants_access,
+    'object_department', object.department,
+    'area', object.area,
+    'line', object.line
+  ) order by assignment.validation_code, assignment.assignment_kind,
+             assignment.assignment_role, assignment.staff_name)
+  into v_assignments
+  from public.vmp_item_assignments assignment
+  join public.vmp_plan_items item on item.validation_code = assignment.validation_code
+  join public.vmp_objects object on object.code = item.object_code
+  join public.vmp_active_item_assignments active on active.id = assignment.id
+  left join public.vmp_performers target on target.id = assignment.performer_id
+  where (p_validation_code is null or assignment.validation_code = p_validation_code)
+    and (p_person_id is null or assignment.performer_id = p_person_id)
+    and (
+      v_principal.principal_kind = 'admin'
+      or (
+        v_principal.principal_kind = 'qa_manager'
+        and assignment.assignment_kind = 'qa'
+      )
+      or (
+        v_principal.principal_kind = 'equipment_manager'
+        and target.department = v_principal.profile_department
+        and object.department = v_principal.profile_department
+        and (
+          '*' = any(v_principal.scope_departments)
+          or object.department = any(v_principal.scope_departments)
+        )
+        and (
+          '*' = any(v_principal.access_areas)
+          or object.area = any(v_principal.access_areas)
+          or object.line = any(v_principal.access_areas)
+        )
+      )
+    );
+
+  return jsonb_build_object(
+    'ok', true,
+    'assignments', coalesce(v_assignments, '[]'::jsonb)
+  );
+end
+$fn$;
+
+alter function public.vmp_item_rights(uuid, text)
+  rename to vmp_item_rights_before_assignment_only_qa;
+alter function public.vmp_item_rights_before_assignment_only_qa(uuid, text)
+  security invoker;
+revoke all on function public.vmp_item_rights_before_assignment_only_qa(uuid, text)
+  from public, anon, authenticated, service_role;
+
+/* QA chạy trước hierarchy: performer đang hoạt động và liên kết account là
+ * canonical principal; assignment dùng performer_id, không dùng scope. */
+create function public.vmp_item_rights(p_uid uuid, p_validation_code text)
+returns table (
+  can_view boolean,
+  editable_fields text[],
+  view_reason text,
+  assignment_sources text[],
+  scope_match boolean,
+  area_match boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_role text;
+  v_person public.vmp_performers%rowtype;
+  v_has_qa_assignment boolean := false;
+  v_sources text[] := '{}'::text[];
+  v_old record;
+  v_qa_fields constant text[] := array[
+    'actual_protocol_date', 'status_protocol',
+    'actual_validation_date', 'status_validation',
+    'actual_report_date', 'status_report',
+    'actual_vmp_date', 'status_vmp'
+  ]::text[];
+begin
+  select profile.role::text into v_role
+  from public.profiles profile
+  where profile.id = p_uid and coalesce(profile.is_active, true);
+
+  if v_role is null then
+    return query select *
+    from public.vmp_item_rights_before_assignment_only_qa(p_uid, p_validation_code);
+    return;
+  end if;
+
+  if v_role = 'admin' then
+    return query select *
+    from public.vmp_item_rights_before_assignment_only_qa(p_uid, p_validation_code);
+    return;
+  end if;
+
+  select * into v_person
+  from public.vmp_performers person
+  where person.user_id = p_uid and person.is_active;
+
+  if v_role = 'qa_manager' or v_person.access_class = 'qa_manager' then
+    if v_role = 'qa_manager'
+        and v_person.access_class = 'qa_manager'
+        and v_person.department = 'qa'
+        and exists (
+          select 1
+          from public.vmp_plan_items item
+          where item.validation_code = p_validation_code and item.is_active
+        ) then
+      return query select true, v_qa_fields,
+        'Quản lý QA xem toàn bộ hạng mục hoạt động',
+        '{}'::text[], true, true;
+      return;
+    end if;
+    return query select *
+    from public.vmp_item_rights_before_assignment_only_qa(p_uid, p_validation_code);
+    return;
+  end if;
+
+  if v_person.access_class = 'qa_progress_editor' then
+    if not exists (
+      select 1
+      from public.vmp_plan_items item
+      where item.validation_code = p_validation_code and item.is_active
+    ) then
+      return query select false, '{}'::text[],
+        'Không tìm thấy hạng mục hoạt động', '{}'::text[], false, false;
+      return;
+    end if;
+
+    select coalesce(bool_or(assignment.is_active), false),
+           coalesce(
+             array_agg(distinct assignment.source order by assignment.source),
+             '{}'::text[]
+           )
+    into v_has_qa_assignment, v_sources
+    from public.vmp_item_assignments assignment
+    where assignment.validation_code = p_validation_code
+      and assignment.performer_id = v_person.id
+      and assignment.assignment_kind = 'qa'
+      and assignment.is_active
+      and (assignment.expires_at is null or assignment.expires_at > now());
+
+    return query select
+      v_has_qa_assignment,
+      case when v_has_qa_assignment then v_qa_fields else '{}'::text[] end,
+      case when v_has_qa_assignment then 'Có phân công QA đang hoạt động'
+           else 'Chưa có phân công QA đang hoạt động' end,
+      v_sources,
+      v_has_qa_assignment,
+      v_has_qa_assignment;
+    return;
+  end if;
+
+  select * into v_old
+  from public.vmp_item_rights_before_assignment_only_qa(p_uid, p_validation_code);
+  return query select v_old.can_view, v_old.editable_fields, v_old.view_reason,
+    v_old.assignment_sources, v_old.scope_match, v_old.area_match;
+end
+$fn$;
+
+create or replace function public.rpc_preview_item_rights(
+  p_person_id uuid default null,
+  p_validation_code text default null
+) returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_principal record;
+  v_rows jsonb;
+begin
+  select * into v_principal from public.vmp_manager_principal(auth.uid());
+  if v_principal.principal_kind is null then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'Principal quản lý không hợp lệ hoặc không nhất quán'
+    );
+  end if;
+  if p_person_id is null and p_validation_code is null then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'Chọn một nhân viên hoặc một hạng mục để xem quyền dự kiến'
+    );
+  end if;
+
+  select jsonb_agg(jsonb_build_object(
+    'person_id', person.id,
+    'user_id', person.user_id,
+    'full_name', person.performer_name,
+    'validation_code', item.validation_code,
+    'assignment_role', active_assignment.assignment_role,
+    'can_view', rights.can_view,
+    'editable_fields', rights.editable_fields,
+    'view_reason', rights.view_reason,
+    'assignment_sources', rights.assignment_sources,
+    'scope_match', case when person.access_class in (
+        'qa_progress_editor', 'qa_manager'
+      ) then rights.scope_match else scope.scope_match end,
+    'factory_match', case when person.access_class in (
+        'qa_progress_editor', 'qa_manager'
+      ) then rights.scope_match else scope.factory_match end,
+    'area_match', case when person.access_class in (
+        'qa_progress_editor', 'qa_manager'
+      ) then rights.area_match else scope.area_match end,
+    'line_match', case when person.access_class in (
+        'qa_progress_editor', 'qa_manager'
+      ) then rights.area_match else scope.line_match end
+  ) order by person.performer_name, item.validation_code)
+  into v_rows
+  from public.vmp_performers person
+  cross join public.vmp_visible_plan_items() item
+  join public.vmp_objects object on object.code = item.object_code
+  cross join lateral public.vmp_item_rights(person.user_id, item.validation_code) rights
+  cross join lateral public.vmp_item_scope_matches(person.id, item.validation_code) scope
+  left join lateral (
+    select assignment.assignment_role
+    from public.vmp_item_assignments assignment
+    where assignment.validation_code = item.validation_code
+      and assignment.performer_id = person.id
+      and assignment.is_active
+      and (assignment.expires_at is null or assignment.expires_at > now())
+    order by (assignment.assignment_kind = 'qa') desc,
+             (assignment.assignment_role = 'primary') desc,
+             assignment.created_at,
+             assignment.id
+    limit 1
+  ) active_assignment on true
+  where person.is_active and item.is_active
+    and (p_person_id is null or person.id = p_person_id)
+    and (p_validation_code is null or item.validation_code = p_validation_code)
+    and (
+      v_principal.principal_kind = 'admin'
+      or (
+        v_principal.principal_kind = 'qa_manager'
+        and person.department = 'qa'
+      )
+      or (
+        v_principal.principal_kind = 'equipment_manager'
+        and person.department = v_principal.profile_department
+        and object.department = v_principal.profile_department
+      )
+    );
+
+  return jsonb_build_object(
+    'ok', true,
+    'mode', public.item_permissions_mode(),
+    'rights', coalesce(v_rows, '[]'::jsonb)
+  );
+end
+$fn$;
+
+do $patch_qa_assignment_preflight$
+declare
+  v_signature regprocedure := 'public.rpc_item_permission_preflight()'::regprocedure;
+  v_definition text;
+  v_marker text := E'  )\n  select jsonb_agg(error) into v_blocking from errors;';
+  v_extra text := $sql$
+
+    union all
+    select jsonb_build_object(
+      'code', 'DUPLICATE_ACTIVE_QA_PRIMARY',
+      'record_id', duplicate.validation_code,
+      'message', 'Hạng mục có nhiều hơn một QA phụ trách chính đang hoạt động'
+    )
+    from (
+      select assignment.validation_code
+      from public.vmp_item_assignments assignment
+      where assignment.assignment_kind = 'qa'
+        and assignment.assignment_role = 'primary'
+        and assignment.is_active
+      group by assignment.validation_code
+      having count(*) > 1
+    ) duplicate
+
+    union all
+    select jsonb_build_object(
+      'code', 'DUPLICATE_ACTIVE_QA_PERSON',
+      'record_id', duplicate.validation_code || '×' || duplicate.performer_id::text,
+      'message', 'Một nhân viên có nhiều nguồn phân công QA active trên cùng hạng mục'
+    )
+    from (
+      select assignment.validation_code, assignment.performer_id
+      from public.vmp_item_assignments assignment
+      where assignment.performer_id is not null
+        and assignment.assignment_kind = 'qa'
+        and assignment.is_active
+      group by assignment.validation_code, assignment.performer_id,
+               assignment.assignment_kind
+      having count(*) > 1
+    ) duplicate$sql$;
+begin
+  select pg_get_functiondef(v_signature) into v_definition;
+  if position(v_marker in v_definition) = 0 then
+    raise exception 'Không tìm thấy điểm nối QA duplicate trong preflight';
+  end if;
+  execute replace(v_definition, v_marker, v_extra || E'\n' || v_marker);
+end
+$patch_qa_assignment_preflight$;
+
 revoke execute on function public.rpc_upsert_item_permission_staff(
   uuid, jsonb, text, integer
 ) from public, anon;
@@ -1158,6 +2061,20 @@ revoke execute on function public.rpc_item_permission_directory(text)
   from public, anon;
 revoke execute on function public.rpc_item_permission_preflight()
   from public, anon;
+revoke all on function public.rpc_set_item_assignment(
+  uuid, text, text, text, text, text
+) from public, anon, service_role;
+revoke execute on function public.rpc_item_assignments(text, uuid)
+  from public, anon;
+revoke all on function public.vmp_item_rights(uuid, text)
+  from public, anon, authenticated, service_role;
+revoke execute on function public.rpc_preview_item_rights(uuid, text)
+  from public, anon;
+revoke all on function public.rpc_set_item_performer(text, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.vmp_set_item_assignment_unhardened(
+  uuid, text, text, text, text
+) from public, anon, authenticated, service_role;
 revoke all on function public.rpc_lien_ket_tai_khoan(uuid, uuid)
   from public, anon, authenticated, service_role;
 revoke all on function public.rpc_upsert_performer(uuid, jsonb)
@@ -1180,6 +2097,15 @@ grant execute on function public.rpc_link_item_permission_account(
 grant execute on function public.rpc_item_permission_directory(text)
   to authenticated, service_role;
 grant execute on function public.rpc_item_permission_preflight()
+  to authenticated, service_role;
+grant execute on function public.rpc_set_item_assignment(
+  uuid, text, text, text, text, text
+) to authenticated;
+grant execute on function public.rpc_item_assignments(text, uuid)
+  to authenticated, service_role;
+grant execute on function public.vmp_item_rights(uuid, text)
+  to service_role;
+grant execute on function public.rpc_preview_item_rights(uuid, text)
   to authenticated, service_role;
 grant execute on function public.rpc_upsert_performer(uuid, jsonb)
   to authenticated, service_role;
@@ -1235,6 +2161,55 @@ begin
     where evtname = 'chan_overload_rpc_tg' and evtenabled = 'O'
   ) then
     raise exception 'Event trigger chống overload RPC không còn bật';
+  end if;
+  if to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+    ) is null
+      or to_regprocedure(
+        'public.rpc_set_item_assignment(uuid,text,text,text,text)'
+      ) is not null
+      or (
+        select count(*)
+        from pg_proc procedure
+        join pg_namespace namespace on namespace.oid = procedure.pronamespace
+        where namespace.nspname = 'public'
+          and procedure.proname = 'rpc_set_item_assignment'
+      ) <> 1 then
+    raise exception 'RPC phân công chưa thay đúng chữ ký sáu tham số';
+  end if;
+  if has_function_privilege(
+      'service_role',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'anon',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'EXECUTE'
+    ) or not has_function_privilege(
+      'authenticated',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'EXECUTE'
+    ) then
+    raise exception 'Quyền RPC phân công QA chưa tối thiểu';
+  end if;
+  if not exists (
+      select 1
+      from pg_constraint constraint_row
+      where constraint_row.conrelid = 'public.vmp_item_assignments'::regclass
+        and constraint_row.conname = 'vmp_item_assignments_role_check'
+        and constraint_row.convalidated
+    ) or not exists (
+      select 1 from pg_index index_row
+      where index_row.indexrelid =
+        'public.vmp_item_assignments_one_active_qa_primary'::regclass
+        and index_row.indisunique and index_row.indisvalid
+    ) or not exists (
+      select 1 from pg_index index_row
+      where index_row.indexrelid =
+        'public.vmp_item_assignments_one_active_qa_person'::regclass
+        and index_row.indisunique and index_row.indisvalid
+    ) then
+    raise exception 'Constraint/index assignment_role chưa được validate';
   end if;
 end
 $verify$;
