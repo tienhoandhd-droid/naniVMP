@@ -47,7 +47,9 @@ where assignment.id = ranked.id and ranked.position = 1;
 alter table public.vmp_item_assignments
   add constraint vmp_item_assignments_role_check
   check (
-    (assignment_kind = 'qa' and assignment_role in ('primary', 'collaborator'))
+    (assignment_kind = 'qa'
+      and assignment_role is not null
+      and assignment_role in ('primary', 'collaborator'))
     or (assignment_kind = 'equipment_department' and assignment_role is null)
   ) not valid;
 alter table public.vmp_item_assignments
@@ -1815,6 +1817,7 @@ as $fn$
 declare
   v_role text;
   v_person public.vmp_performers%rowtype;
+  v_principal record;
   v_has_qa_assignment boolean := false;
   v_sources text[] := '{}'::text[];
   v_old record;
@@ -1844,11 +1847,11 @@ begin
   select * into v_person
   from public.vmp_performers person
   where person.user_id = p_uid and person.is_active;
+  select * into v_principal
+  from public.vmp_manager_principal(p_uid);
 
   if v_role = 'qa_manager' or v_person.access_class = 'qa_manager' then
-    if v_role = 'qa_manager'
-        and v_person.access_class = 'qa_manager'
-        and v_person.department = 'qa'
+    if v_principal.principal_kind = 'qa_manager'
         and exists (
           select 1
           from public.vmp_plan_items item

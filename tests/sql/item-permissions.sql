@@ -2048,6 +2048,7 @@ declare
   v_result jsonb;
   v_rights record;
   v_constraint text;
+  v_check_caught boolean;
   v_unique_caught boolean;
   v_values jsonb;
   v_qa_fields constant text[] := array[
@@ -2263,6 +2264,43 @@ begin
       or v_result->>'error_code' is distinct from 'INVALID_ASSIGNMENT_ROLE' then
     raise exception 'QA thiếu assignment_role phải bị từ chối: %', v_result;
   end if;
+
+  /* Mutation bắt lỗi: CHECK dùng `IN (...)` đơn thuần sẽ cho NULL đi qua
+   * vì biểu thức UNKNOWN. Invariant phải áp dụng cả dòng active và inactive. */
+  v_check_caught := false;
+  begin
+    insert into public.vmp_item_assignments (
+      validation_code, performer_id, user_id, staff_name, assignment_kind,
+      assignment_role, source, source_text, is_active, change_reason
+    ) values (
+      v_code, v_qa_3, v_user_3, 'E2E Task 4 QA 3', 'qa', null,
+      'qa_manager', 'E2E Task 4 QA 3', true, 'Probe QA active thiếu role'
+    );
+  exception when check_violation then
+    get stacked diagnostics v_constraint = constraint_name;
+    v_check_caught := v_constraint = 'vmp_item_assignments_role_check';
+  end;
+  if not v_check_caught then
+    raise exception 'Constraint phải chặn QA active có assignment_role NULL';
+  end if;
+
+  v_check_caught := false;
+  begin
+    insert into public.vmp_item_assignments (
+      validation_code, performer_id, user_id, staff_name, assignment_kind,
+      assignment_role, source, source_text, is_active, change_reason
+    ) values (
+      v_code, v_qa_3, v_user_3, 'E2E Task 4 QA 3', 'qa', null,
+      'qa_manager', 'E2E Task 4 QA 3', false, 'Probe QA inactive thiếu role'
+    );
+  exception when check_violation then
+    get stacked diagnostics v_constraint = constraint_name;
+    v_check_caught := v_constraint = 'vmp_item_assignments_role_check';
+  end;
+  if not v_check_caught then
+    raise exception 'Constraint phải chặn QA inactive có assignment_role NULL';
+  end if;
+
   v_result := public.rpc_set_item_assignment(
     v_qa_1, v_code, 'equipment_department', 'collaborator', 'assign',
     'Thiết bị nhận sai vai trò QA'
@@ -2295,8 +2333,32 @@ begin
     raise exception 'Target replace không hợp lệ không được làm mất QA chính hiện tại';
   end if;
 
-  update public.profiles set role = 'qa_manager', department = 'qa'
+  /* Mutation bắt lỗi: bỏ điều kiện profiles.department = 'qa' trong rights
+   * không được biến role/class khớp một phần thành QA manager toàn cục. */
+  update public.profiles set role = 'qa_manager', department = 'xsx'
   where id = v_user_3;
+  select * into v_rights from public.vmp_item_rights(v_user_3, v_code);
+  if v_rights.can_view or cardinality(v_rights.editable_fields) <> 0
+      or v_rights.scope_match or v_rights.area_match then
+    raise exception 'QA manager có profiles.department ngoài QA phải fail closed: %',
+      row_to_json(v_rights);
+  end if;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user_3::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_set_item_assignment(
+    v_qa_1, v_code, 'qa', 'collaborator', 'assign',
+    'Principal sai department không được phân công'
+  );
+  if coalesce((v_result->>'ok')::boolean, true) is not false
+      or v_result->>'error_code' is distinct from 'FORBIDDEN' then
+    raise exception 'Mutation và rights phải cùng từ chối QA manager sai department: %',
+      v_result;
+  end if;
+
+  update public.profiles set department = 'qa' where id = v_user_3;
   select * into v_rights from public.vmp_item_rights(v_user_3, v_code);
   if not v_rights.can_view
       or v_rights.editable_fields is distinct from v_qa_fields
