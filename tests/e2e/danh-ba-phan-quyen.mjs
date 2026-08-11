@@ -43,6 +43,12 @@ const qaPrimary = {
   full_name: "QA Phụ Trách Cũ",
 };
 
+const qaReplacement = {
+  ...qaPerson,
+  person_id: "aaaaaaaa-1111-4111-8111-000000000013",
+  full_name: "QA Phụ Trách B Hiện Tại",
+};
+
 const qaLegacy = {
   ...qaPerson,
   person_id: "aaaaaaaa-1111-4111-8111-000000000012",
@@ -123,11 +129,12 @@ await page.setRequestInterception(true);
 
 const assignmentBodies = [];
 const saveBodies = [];
-const assignmentFetchPersonIds = [];
+const assignmentFetches = [];
 const performerProfileSelects = [];
 const accountLinkBodies = [];
 let scopeCatalogCalls = 0;
 let legacyLinked = false;
+let currentQaPrimary = qaPrimary;
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -182,10 +189,18 @@ page.on("request", (request) => {
   if (/\/rpc\/rpc_item_assignments/.test(url)) {
     if (request.method() === "OPTIONS") return answer(request, {});
     const body = JSON.parse(request.postData() || "{}");
-    assignmentFetchPersonIds.push(body.p_person_id);
+    assignmentFetches.push({
+      p_person_id: body.p_person_id ?? null,
+      p_validation_code: body.p_validation_code ?? null,
+    });
     const isFirstPerson = body.p_person_id === completePerson.person_id;
     const qaAssignments = [
-      assignmentFor(qaPrimary, "VMP-QA-01", "qa", "primary"),
+      {
+        ...assignmentFor(currentQaPrimary, "VMP-QA-01", "qa", "primary"),
+        assignment_id: currentQaPrimary === qaReplacement
+          ? "cccccccc-3333-4333-8333-000000000003"
+          : "cccccccc-3333-4333-8333-000000000002",
+      },
       assignmentFor(qaCollaborator, "VMP-QA-01", "qa", "collaborator"),
       { ...assignmentFor(qaCollaborator, "VMP-QA-02", "qa", "collaborator"), grants_access: false,
         unresolved_reason: "chưa có quyền truy cập" },
@@ -240,6 +255,7 @@ page.on("request", (request) => {
     const body = JSON.parse(request.postData() || "{}");
     if (request.method() !== "OPTIONS") assignmentBodies.push(body);
     if (body.p_reason === "Mô phỏng xung đột QA chính") {
+      currentQaPrimary = qaReplacement;
       return answer(request, {
         ok: false,
         error_code: "PRIMARY_CONFLICT",
@@ -324,10 +340,14 @@ try {
   await page.waitForFunction(() => document.body.innerText.includes("Đặng Thị Hồng Ngọc · RD"));
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
-  for (let attempt = 0; attempt < 50 && !assignmentFetchPersonIds.includes(completePerson.person_id); attempt += 1) {
+  for (let attempt = 0; attempt < 50 && !assignmentFetches.some(
+    (fetch) => fetch.p_person_id === completePerson.person_id,
+  ); attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  assert.equal(assignmentFetchPersonIds.includes(completePerson.person_id), true,
+  assert.equal(assignmentFetches.some(
+    (fetch) => fetch.p_person_id === completePerson.person_id,
+  ), true,
     "test race phải khởi động request A trước khi chọn B");
   await equipmentSearch.click({ clickCount: 3 });
   await equipmentSearch.type("Nguyễn Văn Trùng");
@@ -413,31 +433,54 @@ try {
     const input = document.querySelector('[aria-label="Lý do phân công"]');
     return input && !input.disabled && input.value === "";
   });
-  const fetchesBeforeConflict = assignmentFetchPersonIds.length;
+  const itemFetchesBeforeConflict = assignmentFetches.filter(
+    (fetch) => fetch.p_validation_code === "VMP-QA-01" && fetch.p_person_id === null,
+  ).length;
   await page.type('[aria-label="Mã hạng mục cần phân công"]', "VMP-QA-01");
   await page.type('[aria-label="Lý do phân công"]', "Mô phỏng xung đột QA chính");
   await page.click('button[aria-label="Phân công người đã chọn"]');
   await page.waitForFunction(() => document.body.innerText.includes(
     "QA phụ trách chính vừa thay đổi; hãy kiểm tra danh sách mới rồi thử lại",
   ));
-  for (let attempt = 0; attempt < 50 && assignmentFetchPersonIds.length <= fetchesBeforeConflict; attempt += 1) {
+  for (let attempt = 0; attempt < 50 && assignmentFetches.filter(
+    (fetch) => fetch.p_validation_code === "VMP-QA-01" && fetch.p_person_id === null,
+  ).length < itemFetchesBeforeConflict + 2; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  assert.equal(assignmentFetchPersonIds.length > fetchesBeforeConflict, true,
-    "PRIMARY_CONFLICT phải refresh danh sách phân công");
+  const itemFetchesAfterConflict = assignmentFetches.filter(
+    (fetch) => fetch.p_validation_code === "VMP-QA-01" && fetch.p_person_id === null,
+  );
+  assert.equal(itemFetchesAfterConflict.length, itemFetchesBeforeConflict + 2,
+    "PRIMARY_CONFLICT phải có preflight và một refresh item-scope riêng");
+  assert.deepEqual(itemFetchesAfterConflict.at(-1), {
+    p_person_id: null,
+    p_validation_code: "VMP-QA-01",
+  });
+  await page.waitForFunction(() => document.body.innerText.includes("QA Phụ Trách B Hiện Tại"));
   assert.equal(await documentContains("Đã phân công hạng mục VMP-QA-01"), false,
     "PRIMARY_CONFLICT không được báo thành công");
-  await page.click('[aria-label="Mã hạng mục cần phân công"]', { clickCount: 3 });
-  await page.keyboard.press("Backspace");
-  await page.click('[aria-label="Lý do phân công"]', { clickCount: 3 });
-  await page.keyboard.press("Backspace");
-  await page.type('[aria-label="Lý do phân công"]', "Thu hồi QA phối hợp");
   await page.waitForFunction(() => {
     const input = document.querySelector('[aria-label="Lý do phân công"]');
-    const button = document.querySelector('[aria-label="Thu hồi VMP-QA-01 QA phối hợp"]');
-    return input?.value === "Thu hồi QA phối hợp" && button && !button.disabled;
+    return input && !input.disabled;
   });
-  await page.click('[aria-label="Thu hồi VMP-QA-01 QA phối hợp"]');
+  await page.click('[aria-label="Mã hạng mục cần phân công"]', { clickCount: 3 });
+  await page.keyboard.press("Backspace");
+  await page.focus('[aria-label="Lý do phân công"]');
+  await page.keyboard.down("Control");
+  await page.keyboard.press("A");
+  await page.keyboard.up("Control");
+  await page.keyboard.press("Backspace");
+  await page.type('[aria-label="Lý do phân công"]', "Thu hồi QA phối hợp");
+  await page.waitForFunction(() => document.querySelector('[aria-label="Lý do phân công"]')?.value
+    === "Thu hồi QA phối hợp");
+  const revokeButtons = await page.$$eval('button[aria-label^="Thu hồi"]', (buttons) => buttons.map((button) => ({
+    ariaLabel: button.getAttribute("aria-label"),
+    disabled: button.disabled,
+  })));
+  assert.equal(revokeButtons.some((button) => button.ariaLabel === "Thu hồi VMP-QA-01 QA phối hợp"
+    && !button.disabled), true, JSON.stringify(revokeButtons));
+  await page.evaluate(() => [...document.querySelectorAll('button[aria-label="Thu hồi VMP-QA-01 QA phối hợp"]')]
+    .find((button) => !button.disabled)?.click());
   await page.waitForFunction(() => document.body.innerText.includes("Đã thu hồi phân công"));
   assert.deepEqual(assignmentBodies.at(-1), {
     p_person_id: qaCollaborator.person_id,

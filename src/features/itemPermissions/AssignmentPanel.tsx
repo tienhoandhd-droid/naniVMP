@@ -47,6 +47,7 @@ export async function settleAssignmentOperationWhenCurrent({
   onError,
   refresh,
   refreshOnError = () => false,
+  refreshAfterError,
 }: {
   mutate: () => Promise<unknown>;
   isCurrent: () => boolean;
@@ -54,6 +55,7 @@ export async function settleAssignmentOperationWhenCurrent({
   onError: (error: unknown) => void;
   refresh: () => Promise<void>;
   refreshOnError?: (error: unknown) => boolean;
+  refreshAfterError?: (error: unknown) => Promise<void>;
 }): Promise<"success" | "error" | "stale"> {
   try {
     const result = await mutate();
@@ -66,7 +68,7 @@ export async function settleAssignmentOperationWhenCurrent({
     if (!isCurrent()) return "stale";
     if (refreshOnError(error)) {
       try {
-        await refresh();
+        await (refreshAfterError ? refreshAfterError(error) : refresh());
       } catch {
         // Giữ lỗi mutation gốc; refresh chỉ là best-effort để đồng bộ conflict.
       }
@@ -155,6 +157,13 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
     if (isCurrent() && sequence === requestSequence.current) setAssignments(nextAssignments);
   };
 
+  const refreshItemAssignments = async (itemCode: string, isCurrent = () => true) => {
+    if (!isCurrent()) return;
+    const sequence = ++requestSequence.current;
+    const nextAssignments = await fetchItemAssignments({ validationCode: itemCode });
+    if (isCurrent() && sequence === requestSequence.current) setAssignments(nextAssignments);
+  };
+
   const assign = async () => {
     if (!person || !isDirectoryPersonComplete(person)) return;
     const selectedPerson = person;
@@ -214,6 +223,9 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
         refresh: () => refreshAssignments(selectedPerson, isCurrentSelection),
         refreshOnError: (error) => error instanceof ItemPermissionRpcError
           && error.code === "PRIMARY_CONFLICT",
+        refreshAfterError: () => refreshItemAssignments(
+          intent.validationCode, isCurrentSelection,
+        ),
       });
       if (outcome !== "success" || !isCurrentSelection()) return;
       setValidationCode("");
@@ -323,6 +335,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
               <div key={assignment.assignment_id}>
                 <b>{assignment.validation_code}</b>
                 <span>{assignmentLabel(assignment)}</span>
+                <span>{assignment.staff_name}</span>
                 <span>{assignment.person_id ? `Khóa người: ${assignment.person_id}` : "Chưa xác định hồ sơ"}</span>
                 <em>{assignment.grants_access ? "cấp quyền" : assignment.unresolved_reason || "chưa có quyền truy cập"}</em>
                 {canEdit && (!qaOnly || assignment.assignment_kind === "qa") && (
