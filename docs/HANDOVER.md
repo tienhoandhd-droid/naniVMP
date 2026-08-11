@@ -4,10 +4,28 @@ _Cập nhật: 2026-08-11. Dành cho người tiếp nhận nghiên cứu/vận 
 
 ## Cập nhật 2026-08-11 — QA theo phân công từng hạng mục
 
-Phần QA theo phân công hạng mục đang ở trạng thái **chưa triển khai production**.
-Sau khi áp migration và hậu kiểm database thật mới được cập nhật trạng thái này.
-Chế độ vận hành phải giữ **`preview`**: chỉ hiển thị quyền dự kiến để nghiệm thu,
-không tự chuyển sang `enforced`.
+Schema của phần QA theo phân công hạng mục đã được sửa trực tiếp trên live theo
+đường forward-only có kiểm soát:
+
+- `20260811110000_repair_partial_qa_assignment_deploy.sql` (`111100`) sửa trạng
+  thái live bị áp dở trước đó.
+- `20260811120000_harden_canonical_source_writers.sql` (`111200`) harden các
+  writer còn lại. SHA-256 của đúng file đã áp là
+  `f8ae9a61ff75ab16262ebf27519d4bf65e20a8a1e963debc76c6484c56fa8eae`.
+  File được áp trong một transaction duy nhất; live xác nhận `COMMIT` lúc
+  `2026-08-11 09:35:12.635101+00`.
+
+Đây **không phải** xác nhận rằng phân quyền đã được bật trên production. Chế độ
+live vẫn là **`preview`**: chỉ hiển thị quyền dự kiến để nghiệm thu và giữ hành
+vi cũ; chưa chuyển sang `enforced`. Bốn bảng nghiệp vụ có count/digest trước và
+sau deploy không đổi:
+
+| Bảng | Số dòng | Digest |
+|---|---:|---|
+| `vmp_item_assignments` | 0 | `d41d8cd98f00b204e9800998ecf8427e` |
+| `vmp_performers` | 7 | `ed7fb3f12ffeaef9c321df8629e0acd7` |
+| `vmp_plan_items` | 461 | `990abf39e2a2e576cea1d84c50f77b16` |
+| `vmp_source_objects` | 272 | `dee67ba61bbec4b6abe3df9dc2e548ec` |
 
 - QA **không cấu hình phạm vi**. Admin nối tài khoản đăng nhập với hồ sơ QA;
   Quản lý QA phân công QA theo từng hạng mục.
@@ -19,25 +37,79 @@ không tự chuyển sang `enforced`.
 - QA không còn phân công thì không được xem hạng mục; giao diện phải thu hồi dữ
   liệu/cached rights theo hướng fail-closed, kể cả khi response cũ trả về muộn.
 
-Khi triển khai, migration phải chạy forward-only và theo đúng thứ tự hiện có,
-trong đó migration mới chạy **sau `20260810160000`**:
+### Cảnh báo migration ledger live chưa được baseline
 
-1. `20260810080000_danh_ba_phan_quyen_preview.sql`
-2. `20260810090000_rpc_danh_ba_va_phan_cong.sql`
-3. `20260810100000_tinh_quyen_hieu_luc.sql`
-4. `20260810110000_quyen_tung_cot_timeline.sql`
-5. `20260810115000_siet_quyen_quan_ly_va_lien_ket.sql`
-6. `20260810120000_rls_doc_theo_hang_muc.sql`
-7. `20260810130000_chot_tien_kiem_quyen_quan_ly.sql`
-8. `20260810140000_giu_lien_ket_ten_va_kiem_bo_phan.sql`
-9. `20260810150000_bo_chan_lien_ket_nguon_da_het.sql`
-10. `20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql`
-11. `20260811100000_qa_theo_phan_cong_hang_muc.sql`
+`supabase_migrations.schema_migrations` trên live chỉ có **7 dòng**, cao nhất là
+`20260704110201`, trong khi repo có **166 migration local về sau**. `111100` và
+`111200` đã được áp thủ công nhưng không được chèn giả vào ledger. Hai nguồn
+trạng thái này **chưa được reconcile**.
 
-Nghiệm thu trước triển khai chạy: `bash scripts/test-item-permissions-sql.sh`,
-`npm run test:permissions`, `npm run typecheck`, `npm run build`. Chỉ ghi “đã
-triển khai” sau khi các lệnh này và hậu kiểm database production đạt; hiện tại
-trạng thái vẫn là **chưa triển khai production**.
+Vì vậy, trên live hiện tại tuyệt đối không chạy:
+
+- `supabase db push`;
+- `supabase migration up`;
+- bất kỳ lệnh nào có `--include-all`;
+- bất kỳ shell glob nào như `supabase/migrations/*.sql`.
+
+Các lệnh trên có thể replay hàng loạt migration đã có hiệu lực nhưng không có
+trong ledger. Mọi thay đổi schema tiếp theo phải là migration forward mới đã
+review, chỉ rõ đúng một file, chạy bằng `psql` trong đúng một transaction với
+timeout và assertion trước `COMMIT`. Mẫu vận hành bắt buộc (thay hai placeholder
+bằng **đường dẫn file cụ thể đã review**, không dùng glob):
+
+```bash
+PGCONNECT_TIMEOUT=10 \
+PGOPTIONS='-c statement_timeout=60000 -c lock_timeout=5000' \
+psql --dbname="$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
+  -c 'BEGIN' \
+  -c "SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s'" \
+  -f 'supabase/migrations/<EXACT_REVIEWED_FORWARD_FILE>.sql' \
+  -f 'scripts/<EXACT_REVIEWED_PRECOMMIT_CHECK>.sql' \
+  -c 'COMMIT'
+```
+
+Nếu migration hoặc assertion lỗi, `ON_ERROR_STOP` dừng trước lệnh `COMMIT`; mở
+connection mới để xác nhận rollback và trạng thái cuối. Không chạy lại `111100`
+hoặc `111200` trên live đã có trạng thái hậu kiểm này.
+
+### Nghiệm thu trạng thái và E2E
+
+SQL harness không đọc `.env.local`, không tự đoán database clone và bắt buộc
+chọn đúng một mode:
+
+```bash
+# Live đã harden: không chạy migration, toàn bộ mutation test nằm trong rollback.
+SUPABASE_DB_URL='postgresql://<redacted>' \
+  scripts/test-item-permissions-sql.sh --final-state
+
+# Chỉ database test chuyên dụng ở trạng thái đã repair nhưng chưa có 111200.
+env -u SUPABASE_DB_URL \
+  ITEM_PERMISSION_SQL_DEDICATED_DB_URL='postgresql://<redacted>' \
+  scripts/test-item-permissions-sql.sh --forward-test \
+  supabase/migrations/20260811120000_harden_canonical_source_writers.sql
+```
+
+Không dùng `--forward-test` với live. Nghiệm thu ứng dụng chạy `npm run
+typecheck`, `npm run build`, dựng Vite preview, rồi chạy `npm run
+test:permissions` và `npm run e2e`. Cả hai suite đã đăng ký lại legacy E2E
+`tests/e2e/danh-muc-nguoi-thuc-hien.mjs`; không được bỏ test này khi chỉnh scripts.
+
+### Backup, bằng chứng và công việc baseline riêng
+
+Backup pre-live nằm tại
+`/home/admin1/VMP/.backups/qa-111200-prelive-20260811-MaXSPc`. SHA-256 của full
+custom dump là
+`982037b19feb6f1ad8679928e348a8a1d99516a62070766571d9a863c0c6d737`.
+Thư mục này chứa dump, manifest checksum và log preflight/rehearsal/live;
+`.superpowers/sdd/2026-08-11-qa-assignment-review-remediation/task-5-report.md`
+ghi tóm tắt bằng chứng. Không có credential nào được ghi trong tài liệu này;
+chuỗi kết nối vẫn chỉ được chuyển qua kênh bí mật.
+
+Baseline migration ledger toàn repo là **project/branch riêng**, không phải phần
+còn lại của deploy tính năng này. Chỉ thực hiện sau khi chứng minh được cả hai
+đường: fresh-build (dựng mới từ đầu) và apply trên disposable clone, rồi so sánh
+schema, function, RLS, grant và dữ liệu. Không bulk-mark các version tháng
+7/tháng 8 từ bằng chứng deploy `111100`/`111200`.
 
 ## 0. Bàn giao gọn — 3 bước
 
