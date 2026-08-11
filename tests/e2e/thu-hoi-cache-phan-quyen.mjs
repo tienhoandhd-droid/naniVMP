@@ -7,6 +7,12 @@ import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
 const GOC = "http://localhost:4173";
 await choServer(GOC);
 
+const QA_FIELDS = [
+  "actual_protocol_date", "status_protocol",
+  "actual_validation_date", "status_validation",
+  "actual_report_date", "status_report",
+  "actual_vmp_date", "status_vmp",
+];
 const makeActivity = (id, code, name) => ({
   id, code, name, vtype: "PQ", dep: "Không phụ thuộc", owner: "QA E2E",
   dept: "qa", target: "2026-12-31", st: "todo", state: "active",
@@ -21,6 +27,10 @@ let modeReads = 0;
 let legacyReads = 0;
 let holdLegacy = false;
 let heldLegacyRequest = null;
+let collaboratorAssigned = true;
+let holdNextRights = false;
+let heldRightsRequest = null;
+let rightsReads = 0;
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -46,7 +56,7 @@ page.on("request", (request) => {
   }
   if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
     if (failDashboard) return answer(request, { message: "forced dashboard failure" }, 500);
-    const activities = mode === "preview" ? [secret, allowed] : [allowed];
+    const activities = mode === "preview" || collaboratorAssigned ? [secret, allowed] : [allowed];
     return answer(request, {
       activities,
       objects: activities.map((activity) => ({ code: activity.code, name: activity.name })),
@@ -55,6 +65,25 @@ page.on("request", (request) => {
   }
   if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
     return answer(request, { year: 2026, plan_items: 2, objects: 2, updated_at: "2026-08-10T00:00:00Z" });
+  }
+  if (/\/rpc\/vmp_my_item_rights/.test(url)) {
+    if (request.method() === "OPTIONS") return answer(request, []);
+    rightsReads += 1;
+    if (holdNextRights) {
+      holdNextRights = false;
+      heldRightsRequest = request;
+      return;
+    }
+    return answer(request, [{
+      can_view: collaboratorAssigned,
+      editable_fields: collaboratorAssigned ? QA_FIELDS : [],
+      view_reason: collaboratorAssigned
+        ? "QA phối hợp theo phân công hạng mục"
+        : "Chưa có phân công QA đang hoạt động",
+      assignment_sources: collaboratorAssigned ? ["qa_collaborator"] : [],
+      scope_match: collaboratorAssigned,
+      area_match: collaboratorAssigned,
+    }]);
   }
   if (/\/rest\/v1\/vmp_performers/.test(url)) return answer(request, []);
   if (/legacy-vmp\.invalid\/read/.test(url)) {
@@ -66,6 +95,21 @@ page.on("request", (request) => {
     return answer(request, { activities: [secret], objects: [] });
   }
   request.continue();
+});
+
+async function openProgressModal() {
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Cập nhật")?.click());
+  await page.waitForFunction(() => [...document.querySelectorAll("span")]
+    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+}
+
+const enabledQaControls = () => page.evaluate(() => {
+  const title = [...document.querySelectorAll("span")]
+    .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
+  const dialog = title?.closest(".vmp-scroll");
+  return [...dialog.querySelectorAll('input[type="date"], select')]
+    .filter((control) => !control.disabled).length;
 });
 
 try {
@@ -121,7 +165,52 @@ try {
   assert.equal(await page.evaluate(() => document.body.innerText.includes("TB-BI-MAT")), false);
   assert.equal(await page.evaluate(() => localStorage.getItem("vmp_snapshot_v2")), null);
   assert.equal(legacyReads, 0, "enforced không được fail-open sang n8n legacy");
-  console.log("✅ Đổi enforced thu hồi cache, poll bỏ watermark và lỗi Supabase không fallback n8n");
+
+  // Khi QA phối hợp bị thu hồi lúc modal đang mở, modal phải tự đọc lại
+  // quyền, khóa tám control, dashboard mất hạng mục. Response quyền cũ bắt
+  // đầu trước lúc revoke cũng không được phép cấp lại quyền.
+  failDashboard = false;
+  collaboratorAssigned = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForFunction(() => document.body.innerText.includes("TB-BI-MAT"));
+  await openProgressModal();
+  await page.waitForFunction(() => [...document.querySelectorAll("span")]
+    .some((node) => node.textContent?.includes("Quyền theo từng cột đang áp dụng")));
+  assert.equal(await enabledQaControls(), 8, "QA phối hợp ban đầu sửa đúng tám control");
+
+  holdNextRights = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  for (let i = 0; i < 100 && !heldRightsRequest; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(heldRightsRequest, "modal đang mở phải tải lại quyền khi trang được focus");
+
+  collaboratorAssigned = false;
+  const rightsBeforeRevoke = rightsReads;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForFunction(() => !document.body.innerText.includes("TB-BI-MAT"));
+  await page.waitForFunction(async () => {
+    const title = [...document.querySelectorAll("span")]
+      .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
+    return title && [...title.closest(".vmp-scroll").querySelectorAll('input[type="date"], select')]
+      .every((control) => control.disabled);
+  });
+  assert.ok(rightsReads > rightsBeforeRevoke, "thu hồi phải đọc quyền mới, không dùng quyền collaborator đã cache");
+  assert.equal(await enabledQaControls(), 0, "thu hồi khóa cả tám control QA trong modal đang mở");
+
+  await answer(heldRightsRequest, [{
+    can_view: true,
+    editable_fields: QA_FIELDS,
+    view_reason: "QA phối hợp theo phân công hạng mục",
+    assignment_sources: ["qa_collaborator"],
+    scope_match: true,
+    area_match: true,
+  }]);
+  heldRightsRequest = null;
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(await enabledQaControls(), 0,
+    "response quyền collaborator cũ về trễ không được khôi phục quyền sau revoke");
+  console.log("✅ Đổi enforced thu hồi cache; modal fail-closed và response quyền cũ không khôi phục quyền");
 } finally {
   await browser.close();
 }

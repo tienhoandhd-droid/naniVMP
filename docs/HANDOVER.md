@@ -1,29 +1,26 @@
 # Tài liệu bàn giao hệ thống VMP Monitor
 
-_Cập nhật: 2026-08-10. Dành cho người tiếp nhận nghiên cứu/vận hành tiếp._
+_Cập nhật: 2026-08-11. Dành cho người tiếp nhận nghiên cứu/vận hành tiếp._
 
-## Cập nhật 2026-08-10 — danh bạ và quyền theo từng hạng mục
+## Cập nhật 2026-08-11 — QA theo phân công từng hạng mục
 
-Bản code `a063685` đã được kiểm thử và phần database đã triển khai lên Supabase
-ở chế độ **`preview`**. Chế độ này chỉ đưa danh bạ, bảng phân công, phạm vi và
-quyền dự kiến lên web để các bộ phận góp ý; luật mới **chưa cưỡng chế quyền thật**.
-Chỉ Admin được bật `enforced`, và RPC tiền kiểm sẽ từ chối nếu dữ liệu còn lỗi.
+Phần QA theo phân công hạng mục đang ở trạng thái **chưa triển khai production**.
+Sau khi áp migration và hậu kiểm database thật mới được cập nhật trạng thái này.
+Chế độ vận hành phải giữ **`preview`**: chỉ hiển thị quyền dự kiến để nghiệm thu,
+không tự chuyển sang `enforced`.
 
-- Danh bạ khớp người bằng họ tên chuẩn và `person_id`; mã nhân viên được phép bổ
-  sung sau. Tên trùng phải được quản lý chốt đúng người, hệ thống không tự đổi
-  sang người khác khi hồ sơ cũ ngừng hoạt động.
-- QA được cập nhật 8 trường đề cương, thẩm định thực tế, báo cáo và hoàn thành
-  VMP trên hạng mục được phân. Bộ phận quản lý thiết bị chỉ cập nhật
-  `Bộ phận quản lý xếp lịch thẩm định` (`scheduled_at`). Người được phân khác
-  chỉ xem hạng mục của mình.
-- Phạm vi được giới hạn đồng thời theo bộ phận và khu vực/line. Quản lý thiết bị
-  chỉ phân công trong bộ phận, phạm vi và khu vực của chính mình; QA manager và
-  Admin có workspace quản lý tương ứng.
-- File nhập mẫu: [phan-quyen-vmp.xlsx](https://tienhoandhd-droid.github.io/naniVMP/templates/phan-quyen-vmp.xlsx).
-  Web giới hạn 5 MiB, 1.000 dòng và 20.000 ô; nhập nhiều dòng là nguyên tử, có
-  một dòng lỗi thì không dòng nào được ghi.
+- QA **không cấu hình phạm vi**. Admin nối tài khoản đăng nhập với hồ sơ QA;
+  Quản lý QA phân công QA theo từng hạng mục.
+- Mỗi hạng mục có một QA phụ trách chính và có thể có nhiều QA phối hợp. Cả hai
+  vai trò có đúng cùng tám trường: `actual_protocol_date`, `status_protocol`,
+  `actual_validation_date`, `status_validation`, `actual_report_date`,
+  `status_report`, `actual_vmp_date`, `status_vmp`. Không vai trò QA nào được
+  sửa `scheduled_at`.
+- QA không còn phân công thì không được xem hạng mục; giao diện phải thu hồi dữ
+  liệu/cached rights theo hướng fail-closed, kể cả khi response cũ trả về muộn.
 
-Đã áp theo một transaction, đúng thứ tự:
+Khi triển khai, migration phải chạy forward-only và theo đúng thứ tự hiện có,
+trong đó migration mới chạy **sau `20260810160000`**:
 
 1. `20260810080000_danh_ba_phan_quyen_preview.sql`
 2. `20260810090000_rpc_danh_ba_va_phan_cong.sql`
@@ -34,16 +31,13 @@ Chỉ Admin được bật `enforced`, và RPC tiền kiểm sẽ từ chối n�
 7. `20260810130000_chot_tien_kiem_quyen_quan_ly.sql`
 8. `20260810140000_giu_lien_ket_ten_va_kiem_bo_phan.sql`
 9. `20260810150000_bo_chan_lien_ket_nguon_da_het.sql`
+10. `20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql`
+11. `20260811100000_qa_theo_phan_cong_hang_muc.sql`
 
-Hậu kiểm ngay sau migration: mode `preview`; 0 phân công tự phát sinh; audit RPC
-đọc không lọc = 0. Tiền kiểm trả 7 lỗi `INCOMPLETE_ACTIVE_PERSON` và 7 cảnh báo
-`EMPLOYEE_CODE_MISSING` từ 7 hồ sơ cũ. Đây là chốt an toàn có chủ đích: phải bổ
-sung phân loại, phạm vi và khu vực cho các hồ sơ này trước; mã nhân viên có thể
-bổ sung sau, rồi Admin mới cân nhắc bật quyền thật.
-
-Nghiệm thu trước triển khai: SQL harness rollback đạt; 14/14 unit; E2E danh bạ,
-quyền từng cột, thu hồi cache/fail-closed đạt; ma trận 60/60; TypeScript và build
-production đạt. Trang thảo luận: <https://tienhoandhd-droid.github.io/naniVMP/>.
+Nghiệm thu trước triển khai chạy: `bash scripts/test-item-permissions-sql.sh`,
+`npm run test:permissions`, `npm run typecheck`, `npm run build`. Chỉ ghi “đã
+triển khai” sau khi các lệnh này và hậu kiểm database production đạt; hiện tại
+trạng thái vẫn là **chưa triển khai production**.
 
 ## 0. Bàn giao gọn — 3 bước
 
