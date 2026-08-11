@@ -15,7 +15,7 @@ const completePerson = {
   department: "rd",
   email: "hong.ngoc@vmp.local",
   account_status: "linked",
-  access_class: "qa_progress_editor",
+  access_class: "equipment_scheduler",
   scope_departments: ["rd", "qa"],
   scope_factory_ids: ["10000000-0000-0000-0000-000000000001"],
   scope_area_ids: ["20000000-0000-0000-0000-000000000001"],
@@ -356,6 +356,7 @@ try {
   assert.equal(await page.$eval('[data-testid="save-permission-person"]', (button) => button.disabled), false);
   assert.equal(await documentContains("QA phụ trách chính"), true);
   assert.equal(await documentContains("QA phối hợp"), true);
+  await page.waitForFunction(() => document.body.innerText.includes("chưa có quyền truy cập"));
   assert.equal(await documentContains("chưa có quyền truy cập"), true);
 
   await page.type('[aria-label="Mã hạng mục cần phân công"]', "VMP-QA-01");
@@ -367,7 +368,16 @@ try {
   assert.equal(assignmentBodies.at(-1).p_assignment_role, "primary");
   assert.equal(assignmentBodies.at(-1).p_action, "replace_primary");
   assert.equal(assignmentBodies.at(-1).p_reason, "Đổi QA phụ trách chính");
+  await page.waitForFunction(() => {
+    const input = document.querySelector('[aria-label="Lý do phân công"]');
+    return input && !input.disabled && input.value === "";
+  });
   await page.type('[aria-label="Lý do phân công"]', "Thu hồi QA phối hợp");
+  await page.waitForFunction(() => {
+    const input = document.querySelector('[aria-label="Lý do phân công"]');
+    const button = document.querySelector('[aria-label="Thu hồi VMP-QA-01 QA phối hợp"]');
+    return input?.value === "Thu hồi QA phối hợp" && button && !button.disabled;
+  });
   await page.click('[aria-label="Thu hồi VMP-QA-01 QA phối hợp"]');
   await page.waitForFunction(() => document.body.innerText.includes("Đã thu hồi phân công"));
   assert.deepEqual(assignmentBodies.at(-1), {
@@ -396,6 +406,7 @@ try {
 
   const search = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
   assert.ok(search, "phải có ô autocomplete danh bạ");
+  await search.click({ clickCount: 3 });
   await search.type("Legacy");
   await page.waitForFunction(
     () => document.body.innerText.includes("Nhân Sự Legacy · chưa có bộ phận"),
@@ -410,16 +421,14 @@ try {
     department: document.querySelector('[aria-label="Bộ phận trong danh bạ"]')?.value,
     email: document.querySelector('[aria-label="Email trong danh bạ"]')?.value,
     accessClass: document.querySelector('[aria-label="Phân loại quyền"]')?.value,
-    departments: document.querySelector('[aria-label="Phạm vi bộ phận"]')?.textContent?.trim(),
-    factoriesDisabled: document.querySelector('[aria-label="Phạm vi xưởng"]')?.disabled,
   }));
   assert.deepEqual(form, {
     department: "",
     email: "legacy@vmp.local",
     accessClass: "",
-    departments: undefined,
-    factoriesDisabled: undefined,
   });
+  assert.equal(await page.$('[aria-label="Phạm vi bộ phận"]'), null);
+  assert.equal(await page.$('[aria-label="Phạm vi xưởng"]'), null);
   assert.match(await page.$eval('[aria-label="Trạng thái tài khoản"]', (node) => node.textContent || ""), /Hồ sơ chưa đủ/);
 
   await page.type('[aria-label="Tìm tài khoản để nối"]', "Legacy");
@@ -438,6 +447,7 @@ try {
   assert.equal(await documentContains(`Khóa người: ${legacyPerson.person_id}`), true,
     "tải lại sau nối giữ đúng person_id dù tên có thể trùng");
 
+  const assignmentCountBeforeLegacy = assignmentBodies.length;
   await page.type('[aria-label="Mã hạng mục cần phân công"]', "VMP-E2E-01");
   await page.type('[aria-label="Lý do phân công"]', "Chuẩn bị thảo luận quyền");
   assert.equal(
@@ -445,13 +455,14 @@ try {
     true,
     "hồ sơ legacy chưa đủ phải bị khóa phân công",
   );
-  assert.equal(assignmentBodies.length, 0);
+  assert.equal(assignmentBodies.length, assignmentCountBeforeLegacy,
+    "hồ sơ legacy bị khóa không được phát sinh RPC phân công mới");
 
   await search.click({ clickCount: 3 });
   await search.type("Nguyễn Văn Trùng");
   await page.select('[aria-label="Bộ phận trong danh bạ"]', "rd");
   await page.select('[aria-label="Phân loại quyền"]', "view_only");
-  await page.waitForSelector('[aria-label="Phạm vi bộ phận"]');
+  await page.waitForFunction(() => !document.querySelector('[aria-label="Phạm vi bộ phận"]')?.disabled);
   await page.$eval('[aria-label="Phạm vi bộ phận"]', (button) => button.click());
   await page.waitForSelector('[role="option"][data-value="rd"]');
   await page.$eval('[role="option"][data-value="rd"]', (button) => button.click());
@@ -481,12 +492,13 @@ try {
     "hai dòng trùng tên phải chọn đúng hồ sơ có person_id do RPC trả về",
   );
 
+  const assignmentCountBeforeSaved = assignmentBodies.length;
   await page.click('button[aria-label="Phân công người đã chọn"]');
   await page.waitForFunction(() => document.body.innerText.includes("Đã phân công hạng mục"));
-  assert.equal(assignmentBodies.length, 1);
-  assert.equal(assignmentBodies[0].p_person_id, duplicateSaved.person_id);
-  assert.equal("staff_name" in assignmentBodies[0], false);
-  assert.equal("full_name" in assignmentBodies[0], false);
+  assert.equal(assignmentBodies.length, assignmentCountBeforeSaved + 1);
+  assert.equal(assignmentBodies.at(-1).p_person_id, duplicateSaved.person_id);
+  assert.equal("staff_name" in assignmentBodies.at(-1), false);
+  assert.equal("full_name" in assignmentBodies.at(-1), false);
 
   await doiVaiTrenMan(page, "qa_manager", "Quản lý QA");
   await page.evaluate(() => {
