@@ -2,15 +2,33 @@
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
-  if [[ -f "$repo_dir/.env.local" ]]; then
-    set -a
-    source "$repo_dir/.env.local"
-    set +a
-  else
-    echo "Cần export SUPABASE_DB_URL để chạy concurrency test" >&2
-    exit 1
-  fi
+task3_admin_url=${VMP_CONCURRENCY_TEST_ADMIN_URL:-}
+if [[ -z "$task3_admin_url" ]]; then
+  echo "SKIP an toàn: cần VMP_CONCURRENCY_TEST_ADMIN_URL của cluster test chuyên dụng" >&2
+  exit 2
+fi
+task3_required_admin_db='vmp_concurrency_admin'
+task3_required_marker='VMP_CONCURRENCY_TEST_ONLY_ALLOW_DATABASE_CREATE_DROP'
+task3_admin_facts=$(psql "$task3_admin_url" -X -AtF '|' -v ON_ERROR_STOP=1 -c \
+  "select current_database(),
+          coalesce(shobj_description(oid, 'pg_database'), ''),
+          (select rolcreatedb from pg_roles where rolname = current_user)
+   from pg_database where datname = current_database()")
+IFS='|' read -r task3_admin_db task3_cluster_marker task3_can_create_db \
+  <<<"$task3_admin_facts"
+if [[ "$task3_admin_db" != "$task3_required_admin_db"
+    || "$task3_cluster_marker" != "$task3_required_marker"
+    || "$task3_can_create_db" != t ]]; then
+  echo "Từ chối create/drop DB: admin database thiếu tên/marker/CREATEDB chuyên dụng" >&2
+  exit 2
+fi
+
+task3_timeout_seconds=${TASK3_CONCURRENCY_TIMEOUT_SECONDS:-30}
+if [[ ! "$task3_timeout_seconds" =~ ^[0-9]+$
+    || "$task3_timeout_seconds" -lt 5
+    || "$task3_timeout_seconds" -gt 300 ]]; then
+  echo "TASK3_CONCURRENCY_TIMEOUT_SECONDS phải trong khoảng 5..300" >&2
+  exit 1
 fi
 
 task3_temp_db="vmp_task3_concurrency_${RANDOM}_$$"
@@ -19,10 +37,10 @@ if [[ ! "$task3_temp_db" =~ ^vmp_task3_concurrency_[0-9]+_[0-9]+$ ]]; then
   exit 1
 fi
 
-task3_url_base=${SUPABASE_DB_URL%%\?*}
+task3_url_base=${task3_admin_url%%\?*}
 task3_url_query=''
-if [[ "$SUPABASE_DB_URL" == *\?* ]]; then
-  task3_url_query="?${SUPABASE_DB_URL#*\?}"
+if [[ "$task3_admin_url" == *\?* ]]; then
+  task3_url_query="?${task3_admin_url#*\?}"
 fi
 task3_temp_url="${task3_url_base%/*}/${task3_temp_db}${task3_url_query}"
 task3_default_migration="$repo_dir/supabase/migrations/20260811100000_qa_theo_phan_cong_hang_muc.sql"
@@ -32,37 +50,52 @@ if [[ ! -f "$task3_migration_file" ]]; then
   exit 1
 fi
 task3_tmp_dir=$(mktemp -d)
-task3_ready_fifo="$task3_tmp_dir/link-ready"
-task3_release_fifo="$task3_tmp_dir/link-release"
+task3_ready_marker="$task3_tmp_dir/link-ready"
+task3_release_marker="$task3_tmp_dir/link-release"
 task3_link_log="$task3_tmp_dir/link.log"
 task3_role_log="$task3_tmp_dir/set-role.log"
 task3_link_pid=''
 task3_role_pid=''
 task3_db_created=false
 
+stop_process_group() {
+  local process_pid=$1
+  local stop_deadline
+  if [[ -z "$process_pid" ]]; then
+    return
+  fi
+  if kill -0 "$process_pid" >/dev/null 2>&1; then
+    kill -TERM -- "-$process_pid" >/dev/null 2>&1 || true
+  fi
+  stop_deadline=$((SECONDS + 5))
+  while kill -0 "$process_pid" >/dev/null 2>&1 \
+      && [[ $SECONDS -lt $stop_deadline ]]; do
+    sleep 0.1
+  done
+  if kill -0 "$process_pid" >/dev/null 2>&1; then
+    kill -KILL -- "-$process_pid" >/dev/null 2>&1 || true
+  fi
+  wait "$process_pid" >/dev/null 2>&1 || true
+}
+
 cleanup() {
   local exit_code=$?
   trap - EXIT INT TERM
-  if [[ -n "$task3_link_pid" ]]; then
-    kill "$task3_link_pid" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "$task3_role_pid" ]]; then
-    kill "$task3_role_pid" >/dev/null 2>&1 || true
-  fi
+  stop_process_group "$task3_link_pid"
+  stop_process_group "$task3_role_pid"
   if [[ "$task3_db_created" == true ]]; then
-    dropdb --maintenance-db="$SUPABASE_DB_URL" --if-exists --force \
+    dropdb --maintenance-db="$task3_admin_url" --if-exists --force \
       "$task3_temp_db" >/dev/null 2>&1 || true
   fi
-  rm -f "$task3_ready_fifo" "$task3_release_fifo" \
+  rm -f "$task3_ready_marker" "$task3_release_marker" \
     "$task3_link_log" "$task3_role_log"
   rmdir "$task3_tmp_dir" >/dev/null 2>&1 || true
   exit "$exit_code"
 }
 trap cleanup EXIT INT TERM
 
-createdb --maintenance-db="$SUPABASE_DB_URL" "$task3_temp_db"
+createdb --maintenance-db="$task3_admin_url" "$task3_temp_db"
 task3_db_created=true
-mkfifo "$task3_ready_fifo" "$task3_release_fifo"
 
 # Database này hoàn toàn rỗng và bị drop ở trap. Chỉ dựng các prerequisite
 # tối thiểu để áp nguyên migration Task 3 và chạy đúng hai RPC cần kiểm race.
@@ -197,10 +230,11 @@ psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 \
   -f "$task3_migration_file" \
   -c 'commit' >/dev/null
 
-(
-  timeout 20s psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 >/dev/null \
-    2>"$task3_link_log" <<SQL
+setsid timeout "${task3_timeout_seconds}s" stdbuf -oL \
+  psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+  >"$task3_link_log" 2>&1 <<SQL &
 begin;
+select pg_backend_pid();
 select set_config(
   'request.jwt.claims',
   '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}',
@@ -220,21 +254,32 @@ begin
   end if;
 end
 \$test\$;
-\! printf 'ready\\n' > '$task3_ready_fifo'
-\! read -r _ < '$task3_release_fifo'
+\! : > '$task3_ready_marker'
+\! timeout '${task3_timeout_seconds}s' sh -c 'while [ ! -f "\$1" ]; do sleep 0.1; done' sh '$task3_release_marker'
+\if :SHELL_ERROR
+  \quit 4
+\endif
 commit;
 SQL
-) &
 task3_link_pid=$!
 
-if ! read -r task3_ready <"$task3_ready_fifo" || [[ "$task3_ready" != ready ]]; then
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ ! -f "$task3_ready_marker" && $SECONDS -lt $task3_deadline ]]; do
+  sleep 0.1
+done
+if [[ ! -f "$task3_ready_marker" ]]; then
   echo "Link session không tới barrier" >&2
   exit 1
 fi
+task3_link_backend=$(sed -n '1p' "$task3_link_log" 2>/dev/null || true)
+if [[ ! "$task3_link_backend" =~ ^[0-9]+$ ]]; then
+  echo "Không lấy được backend PID của link" >&2
+  exit 1
+fi
 
-(
-  timeout 20s stdbuf -oL psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
-    >"$task3_role_log" 2>&1 <<'SQL'
+setsid timeout "${task3_timeout_seconds}s" stdbuf -oL \
+  psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+  >"$task3_role_log" 2>&1 <<'SQL' &
 begin;
 select pg_backend_pid();
 select set_config(
@@ -250,23 +295,24 @@ begin
     'b0000000-0000-0000-0000-000000000001',
     'department_user', 'xsx', 'Concurrency set-role phải chờ link', 'co'
   );
-  if v_result->>'error_code' <> 'ACCOUNT_RELINK_REQUIRED' then
+  if coalesce((v_result->>'ok')::boolean, false) is distinct from false
+      or v_result->>'error_code' is distinct from 'ACCOUNT_RELINK_REQUIRED' then
     raise exception 'Set-role không fail closed sau link concurrent: %', v_result;
   end if;
 end
 $test$;
 commit;
 SQL
-) &
 task3_role_pid=$!
 
 task3_role_backend=''
-for _ in {1..20}; do
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ $SECONDS -lt $task3_deadline ]]; do
   task3_role_backend=$(sed -n '1p' "$task3_role_log" 2>/dev/null || true)
   if [[ "$task3_role_backend" =~ ^[0-9]+$ ]]; then
     break
   fi
-  sleep 0.05
+  sleep 0.1
 done
 if [[ ! "$task3_role_backend" =~ ^[0-9]+$ ]]; then
   echo "Không lấy được backend PID của set-role" >&2
@@ -274,7 +320,8 @@ if [[ ! "$task3_role_backend" =~ ^[0-9]+$ ]]; then
 fi
 
 task3_wait_seen=false
-for _ in {1..20}; do
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ $SECONDS -lt $task3_deadline ]]; do
   task3_wait_event=$(psql "$task3_temp_url" -X -Atc \
     "select coalesce(wait_event_type, '') || ':' || coalesce(wait_event, '')
      from pg_stat_activity where pid = $task3_role_backend")
@@ -282,10 +329,55 @@ for _ in {1..20}; do
     task3_wait_seen=true
     break
   fi
-  sleep 0.05
+  sleep 0.1
 done
 if [[ "$task3_wait_seen" != true ]]; then
   echo "Set-role không chờ advisory serialization: ${task3_wait_event:-missing}" >&2
+  exit 1
+fi
+
+IFS='|' read -r task3_lock_classid task3_lock_objid <<EOF
+$(psql "$task3_temp_url" -X -AtF '|' -c \
+  "with account_lock as (
+     select pg_catalog.hashtextextended(
+       'vmp:item-permission-account:b0000000-0000-0000-0000-000000000001', 0
+     ) as key
+   )
+   select ((key >> 32) & 4294967295)::oid,
+          (key & 4294967295)::oid
+   from account_lock")
+EOF
+task3_lock_state=$(psql "$task3_temp_url" -X -Atc \
+  "select
+     exists (
+       select 1 from pg_locks
+       where pid = $task3_link_backend and locktype = 'advisory'
+         and classid = '$task3_lock_classid'::oid
+         and objid = '$task3_lock_objid'::oid and objsubid = 1
+         and mode = 'ExclusiveLock' and granted
+     )
+     and exists (
+       select 1 from pg_locks
+       where pid = $task3_role_backend and locktype = 'advisory'
+         and classid = '$task3_lock_classid'::oid
+         and objid = '$task3_lock_objid'::oid and objsubid = 1
+         and mode = 'ExclusiveLock' and not granted
+     )
+     and coalesce((
+       select backend_xid is null from pg_stat_activity
+       where pid = $task3_role_backend
+     ), false)
+     and not exists (
+       select 1 from pg_locks
+       where pid = $task3_role_backend and granted
+         and locktype in ('relation', 'tuple', 'transactionid')
+         and mode in (
+           'RowExclusiveLock', 'ShareRowExclusiveLock',
+           'ExclusiveLock', 'AccessExclusiveLock'
+         )
+     )")
+if [[ "$task3_lock_state" != t ]]; then
+  echo "Holder/waiter advisory key hoặc pre-release write-lock state không đúng" >&2
   exit 1
 fi
 
@@ -310,7 +402,7 @@ end
 $test$;
 SQL
 
-printf 'release\n' >"$task3_release_fifo"
+: >"$task3_release_marker"
 wait "$task3_link_pid"
 task3_link_pid=''
 wait "$task3_role_pid"
@@ -339,6 +431,12 @@ end
 $test$;
 SQL
 
-dropdb --maintenance-db="$SUPABASE_DB_URL" --if-exists --force "$task3_temp_db"
+dropdb --maintenance-db="$task3_admin_url" --if-exists --force "$task3_temp_db"
 task3_db_created=false
+task3_leftovers=$(psql "$task3_admin_url" -X -Atc \
+  "select count(*) from pg_database where datname = '$task3_temp_db'")
+if [[ "$task3_leftovers" != 0 ]]; then
+  echo "Database concurrency tạm chưa được xóa" >&2
+  exit 1
+fi
 echo "CONCURRENCY PASS: set-role waited on same-account advisory lock; isolated database dropped"

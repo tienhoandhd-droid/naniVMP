@@ -267,7 +267,7 @@ begin
     'Nhập QA chưa nối tài khoản'
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
-      or (v_result->>'imported')::integer <> 1 then
+      or (v_result->>'imported')::integer is distinct from 1 then
     raise exception 'Importer phải dùng cùng luật QA scope rỗng: %', v_result;
   end if;
   select id into v_person_2
@@ -292,13 +292,15 @@ begin
     true
   );
   v_result := public.rpc_item_permission_account_candidates(null);
-  if v_result->>'error_code' <> 'FORBIDDEN' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'FORBIDDEN' then
     raise exception 'Người không phải Admin không được xem account candidates: %', v_result;
   end if;
   v_result := public.rpc_link_item_permission_account(
     v_person_1, v_user_1, 'Thử nối không phải Admin', v_version
   );
-  if v_result->>'error_code' <> 'FORBIDDEN' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'FORBIDDEN' then
     raise exception 'Người không phải Admin không được nối tài khoản: %', v_result;
   end if;
 
@@ -334,8 +336,9 @@ begin
   v_result := public.rpc_link_item_permission_account(
     v_person_1, v_user_1, 'Thử nối với version cũ', v_version - 1
   );
-  if v_result->>'error_code' <> 'VERSION_CONFLICT'
-      or (v_result->>'current_version')::integer <> v_version then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'VERSION_CONFLICT'
+      or (v_result->>'current_version')::integer is distinct from v_version then
     raise exception 'Nối tài khoản phải kiểm optimistic version: %', v_result;
   end if;
   v_link_lock_key := pg_catalog.hashtextextended(
@@ -355,14 +358,16 @@ begin
   v_result := public.rpc_link_item_permission_account(
     v_person_1, v_user_1, 'Thử nối profile inactive', v_version
   );
-  if v_result->>'error_code' <> 'ACCOUNT_INACTIVE' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'ACCOUNT_INACTIVE' then
     raise exception 'Không được nối profile inactive: %', v_result;
   end if;
   update public.profiles set is_active = true, department = 'xsx' where id = v_user_1;
   v_result := public.rpc_link_item_permission_account(
     v_person_1, v_user_1, 'Thử nối profile ngoài QA', v_version
   );
-  if v_result->>'error_code' <> 'INVALID_QA_PRINCIPAL' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'INVALID_QA_PRINCIPAL' then
     raise exception 'Không được nối người QA vào profile bộ phận khác: %', v_result;
   end if;
   update public.profiles set department = 'qa' where id = v_user_1;
@@ -394,7 +399,8 @@ begin
   select count(*) into v_reason_audit_after
   from public.audit_logs
   where table_name = 'profiles' and record_id = v_user_2::text;
-  if v_result->>'error_code' <> 'REASON_REQUIRED'
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'REASON_REQUIRED'
       or to_jsonb(v_reason_profile_after) is distinct from
          to_jsonb(v_reason_profile_before)
       or v_reason_profile_after.updated_at is distinct from
@@ -418,7 +424,8 @@ begin
   select count(*) into v_reason_audit_after
   from public.audit_logs
   where table_name = 'profiles' and record_id = v_user_2::text;
-  if v_result->>'error_code' <> 'REASON_REQUIRED'
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'REASON_REQUIRED'
       or to_jsonb(v_reason_profile_after) is distinct from
          to_jsonb(v_reason_profile_before)
       or v_reason_profile_after.updated_at is distinct from
@@ -461,7 +468,8 @@ begin
   v_result := public.rpc_link_item_permission_account(
     v_person_2, v_user_2, 'Thử nối performer inactive', 1
   );
-  if v_result->>'error_code' <> 'PERSON_INACTIVE'
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'PERSON_INACTIVE'
       or exists (
         select 1 from public.vmp_performers
         where id = v_person_2 and (user_id is not null or version <> 1)
@@ -477,7 +485,7 @@ begin
     v_person_2, null, 'Thu hồi account của performer inactive', 1
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
-      or (v_result->>'version')::integer <> 2
+      or (v_result->>'version')::integer is distinct from 2
       or exists (
         select 1 from public.vmp_performers
         where id = v_person_2 and user_id is not null
@@ -493,9 +501,9 @@ begin
     v_person_1, v_user_1, 'Admin xác nhận nối QA', v_version
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
-      or (v_result->>'user_id')::uuid <> v_user_1
-      or v_result->>'account_status' <> 'linked'
-      or (v_result->>'version')::integer <> v_version + 1 then
+      or (v_result->>'user_id')::uuid is distinct from v_user_1
+      or v_result->>'account_status' is distinct from 'linked'
+      or (v_result->>'version')::integer is distinct from v_version + 1 then
     raise exception 'Admin phải nối được profile QA hợp lệ: %', v_result;
   end if;
   v_version := (v_result->>'version')::integer;
@@ -513,7 +521,8 @@ begin
     v_person_1, jsonb_build_object('is_active', false),
     'Thử deactivate khi account còn nối', v_version
   );
-  if v_result->>'error_code' <> 'ACCOUNT_UNLINK_REQUIRED'
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'ACCOUNT_UNLINK_REQUIRED'
       or not exists (
         select 1 from public.vmp_performers
         where id = v_person_1 and is_active and user_id = v_user_1
@@ -538,13 +547,13 @@ begin
     )
   );
   if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED' then
+      or v_result->>'error_code' is distinct from 'LEGACY_RPC_DISABLED' then
     raise exception 'QA manager không được mutate qua rpc_upsert_performer legacy: %',
       v_result;
   end if;
   v_result := public.rpc_delete_performer(v_person_1);
   if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED'
+      or v_result->>'error_code' is distinct from 'LEGACY_RPC_DISABLED'
       or not exists (
         select 1 from public.vmp_performers
         where id = v_person_1 and performer_name = 'E2E QA Không Phạm Vi'
@@ -569,12 +578,12 @@ begin
     )
   );
   if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED' then
+      or v_result->>'error_code' is distinct from 'LEGACY_RPC_DISABLED' then
     raise exception 'Admin không được mutate qua rpc_upsert_performer legacy: %', v_result;
   end if;
   v_result := public.rpc_delete_performer(v_person_1);
   if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'LEGACY_RPC_DISABLED'
+      or v_result->>'error_code' is distinct from 'LEGACY_RPC_DISABLED'
       or not exists (
         select 1 from public.vmp_performers
         where id = v_person_1 and performer_name = 'E2E QA Không Phạm Vi'
@@ -586,8 +595,8 @@ begin
     v_user_1, 'viewer', 'xsx',
     'Thử làm lệch profile đang linked', null
   );
-  if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'ACCOUNT_RELINK_REQUIRED'
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'ACCOUNT_RELINK_REQUIRED'
       or not exists (
         select 1 from public.profiles
         where id = v_user_1 and role::text = 'qa_manager' and department = 'qa'
@@ -598,7 +607,8 @@ begin
   v_result := public.rpc_link_item_permission_account(
     v_person_2, v_user_1, 'Thử dùng account đã nối', 2
   );
-  if v_result->>'error_code' <> 'ACCOUNT_ALREADY_LINKED' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'ACCOUNT_ALREADY_LINKED' then
     raise exception 'Một account không được nối hai performer: %', v_result;
   end if;
 
@@ -606,14 +616,16 @@ begin
     v_person_1, jsonb_build_object('department', 'xsx'),
     'Thử đổi bộ phận khi còn account', v_version
   );
-  if v_result->>'error_code' <> 'ACCOUNT_RELINK_REQUIRED' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'ACCOUNT_RELINK_REQUIRED' then
     raise exception 'Hồ sơ linked không được đổi department trước khi unlink: %', v_result;
   end if;
   v_result := public.rpc_upsert_item_permission_staff(
     v_person_1, jsonb_build_object('access_class', 'qa_progress_editor'),
     'Thử đổi phân loại khi còn account', v_version
   );
-  if v_result->>'error_code' <> 'ACCOUNT_RELINK_REQUIRED' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'ACCOUNT_RELINK_REQUIRED' then
     raise exception 'Hồ sơ linked không được đổi access_class trước khi unlink: %', v_result;
   end if;
 
@@ -643,8 +655,8 @@ begin
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
       or v_result->>'user_id' is not null
-      or v_result->>'account_status' <> 'unlinked'
-      or (v_result->>'version')::integer <> v_version + 1 then
+      or v_result->>'account_status' is distinct from 'unlinked'
+      or (v_result->>'version')::integer is distinct from v_version + 1 then
     raise exception 'Admin phải gỡ được account với optimistic version: %', v_result;
   end if;
   if not exists (
@@ -664,7 +676,8 @@ begin
     true
   );
   v_result := public.rpc_item_permission_account_candidates(null);
-  if v_result->>'error_code' <> 'FORBIDDEN' then
+  if coalesce((v_result->>'ok')::boolean, false) is not false
+      or v_result->>'error_code' is distinct from 'FORBIDDEN' then
     raise exception 'Account đã gỡ manager không được giữ đường quản trị: %', v_result;
   end if;
   v_directory := public.rpc_item_permission_directory(null);
@@ -1088,7 +1101,7 @@ begin
     0
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
-      or (v_result->>'version')::integer <> 1 then
+      or (v_result->>'version')::integer is distinct from 1 then
     raise exception 'Không tạo được hồ sơ phạm vi liên kết: %', v_result;
   end if;
   v_person_1 := (v_result->>'person_id')::uuid;
@@ -1132,7 +1145,7 @@ begin
     1
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
-      or (v_result->>'version')::integer <> 2 then
+      or (v_result->>'version')::integer is distinct from 2 then
     raise exception 'Cập nhật đúng phiên bản phải tăng version đúng một lần: %', v_result;
   end if;
 
@@ -1149,7 +1162,7 @@ begin
     1
   );
   if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'VERSION_CONFLICT'
+      or v_result->>'error_code' is distinct from 'VERSION_CONFLICT'
       or exists (
         select 1 from public.vmp_performers
         where id = v_person_1 and performer_name = 'E2E Tên Không Được Ghi'
@@ -1170,7 +1183,7 @@ begin
     2
   );
   if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'INVALID_SCOPE_HIERARCHY'
+      or v_result->>'error_code' is distinct from 'INVALID_SCOPE_HIERARCHY'
       or exists (
         select 1 from public.vmp_performers
         where id = v_person_1
@@ -1237,7 +1250,7 @@ begin
     jsonb_build_object('owner_name', 'Tên nhập tay bị cấm')
   );
   if coalesce((v_result->>'ok')::boolean, true) is not false
-      or v_result->>'error_code' <> 'PERSON_ID_REQUIRED' then
+      or v_result->>'error_code' is distinct from 'PERSON_ID_REQUIRED' then
     raise exception 'Source upsert phải từ chối tên người không có ID: %', v_result;
   end if;
   v_result := public.rpc_upsert_source_object(
@@ -1268,7 +1281,7 @@ begin
     v_code, v_person_2, 'Chọn đúng person_id trong hai người trùng tên'
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
-      or (v_result->>'person_id')::uuid <> v_person_2
+      or (v_result->>'person_id')::uuid is distinct from v_person_2
       or not exists (
         select 1 from public.vmp_source_objects
         where object_code = v_object_code
