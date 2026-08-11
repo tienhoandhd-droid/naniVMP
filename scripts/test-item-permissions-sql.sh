@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-forward_migration="$repo_dir/supabase/migrations/20260811120000_harden_canonical_source_writers.sql"
+forward_migration="$repo_dir/supabase/migrations/20260811130000_fix_assignment_conflict_and_rights_basis.sql"
 source_writer_test="$repo_dir/tests/sql/item-permission-source-writer-auth.sql"
 full_test="$repo_dir/tests/sql/item-permissions.sql"
 
@@ -12,10 +12,10 @@ Usage:
   SUPABASE_DB_URL=... scripts/test-item-permissions-sql.sh --final-state
   ITEM_PERMISSION_SQL_DEDICATED_DB_URL=... \
     scripts/test-item-permissions-sql.sh --forward-test \
-    supabase/migrations/20260811120000_harden_canonical_source_writers.sql
+    supabase/migrations/20260811130000_fix_assignment_conflict_and_rights_basis.sql
 
---final-state runs no migration and requires the hardened final definitions.
---forward-test accepts exactly the explicit 111200 migration and requires the
+--final-state runs no migration and requires the post-111300 final definitions.
+--forward-test accepts exactly the explicit 111300 migration and requires the
 separate dedicated-test URL variable. The script never infers clone safety and
 never falls back to .env.local.
 USAGE
@@ -48,7 +48,7 @@ case "$run_mode" in
     provided_file=$(realpath -e -- "$2") \
       || die 'migration input không tồn tại'
     [[ "$provided_file" == "$forward_migration" ]] \
-      || die '--forward-test chỉ chấp nhận migration 20260811120000 explicit'
+      || die '--forward-test chỉ chấp nhận migration 20260811130000 explicit'
     forward_file=$provided_file
     db_url=$ITEM_PERMISSION_SQL_DEDICATED_DB_URL
     ;;
@@ -89,6 +89,13 @@ begin
   if not v_set_hardened or not v_source_hardened then
     raise exception '--final-state nhận schema pre-111200; từ chối success mơ hồ';
   end if;
+  if to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'
+    ) is null or to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+    ) is not null then
+    raise exception '--final-state chưa có assignment signature post-111300';
+  end if;
 end
 $state$;
 SQL
@@ -117,8 +124,15 @@ begin
       'public.rpc_upsert_source_object(text,text,jsonb)'::regprocedure
     ))
   ) > 0 into v_source_hardened;
-  if v_set_hardened or v_source_hardened then
-    raise exception '--forward-test nhận schema đã/đang apply 111200; từ chối replay mơ hồ';
+  if not v_set_hardened or not v_source_hardened then
+    raise exception '--forward-test yêu cầu schema post-111200 đã harden writers';
+  end if;
+  if to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+    ) is null or to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'
+    ) is not null then
+    raise exception '--forward-test yêu cầu đúng assignment signature pre-111300';
   end if;
 end
 $state$;
@@ -238,7 +252,7 @@ psql_args=(
   -c "begin; set local statement_timeout = '180s'; set local lock_timeout = '10s'; set local idle_in_transaction_session_timeout = '240s';"
 )
 if [[ -n "$forward_file" ]]; then
-  psql_args+=(-c "select 'ITEM_PERMISSION_SQL_PHASE_FORWARD_111200';" -f "$forward_file")
+  psql_args+=(-c "select 'ITEM_PERMISSION_SQL_PHASE_FORWARD_111300';" -f "$forward_file")
 fi
 psql_args+=(
   -c "select 'ITEM_PERMISSION_SQL_PHASE_SOURCE_WRITER_AUTH';"
@@ -269,7 +283,7 @@ required_markers=(
   ITEM_PERMISSION_SQL_ROLLBACK_CONFIRMED
 )
 if [[ "$run_mode" == '--forward-test' ]]; then
-  required_markers+=(ITEM_PERMISSION_SQL_PHASE_FORWARD_111200)
+  required_markers+=(ITEM_PERMISSION_SQL_PHASE_FORWARD_111300)
 fi
 for marker in "${required_markers[@]}"; do
   [[ $(grep -Fxc "$marker" "$output_file") -eq 1 ]] \

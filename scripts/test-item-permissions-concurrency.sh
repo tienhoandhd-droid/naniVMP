@@ -65,12 +65,14 @@ if [[ "$task3_admin_url" == *\?* ]]; then
   task3_url_query="?${task3_admin_url#*\?}"
 fi
 task3_temp_url="${task3_url_base%/*}/${task3_temp_db}${task3_url_query}"
-task3_default_migration="$repo_dir/supabase/migrations/20260811100000_qa_theo_phan_cong_hang_muc.sql"
-task3_migration_file=${TASK3_MIGRATION_FILE:-"$task3_default_migration"}
-if [[ ! -f "$task3_migration_file" ]]; then
-  echo "Không tìm thấy migration Task 3: $task3_migration_file" >&2
-  exit 1
-fi
+task3_assignment_migration="$repo_dir/supabase/migrations/20260811100000_qa_theo_phan_cong_hang_muc.sql"
+task3_conflict_migration="$repo_dir/supabase/migrations/20260811130000_fix_assignment_conflict_and_rights_basis.sql"
+for task3_migration_file in "$task3_assignment_migration" "$task3_conflict_migration"; do
+  if [[ ! -f "$task3_migration_file" ]]; then
+    echo "Không tìm thấy migration concurrency: $task3_migration_file" >&2
+    exit 1
+  fi
+done
 task3_tmp_dir=$(mktemp -d)
 task3_ready_marker="$task3_tmp_dir/link-ready"
 task3_release_marker="$task3_tmp_dir/link-release"
@@ -80,11 +82,32 @@ task3_unlink_ready_marker="$task3_tmp_dir/unlink-ready"
 task3_unlink_release_marker="$task3_tmp_dir/unlink-release"
 task3_unlink_log="$task3_tmp_dir/unlink.log"
 task3_assignment_log="$task3_tmp_dir/assignment.log"
+task3_primary_ready_marker="$task3_tmp_dir/primary-ready"
+task3_primary_release_marker="$task3_tmp_dir/primary-release"
+task3_primary_holder_log="$task3_tmp_dir/primary-holder.log"
+task3_primary_waiter_log="$task3_tmp_dir/primary-waiter.log"
 task3_link_pid=''
 task3_role_pid=''
 task3_unlink_pid=''
 task3_assignment_pid=''
+task3_primary_holder_pid=''
+task3_primary_waiter_pid=''
 task3_db_created=false
+task3_created_roles=()
+
+cleanup_created_roles() {
+  local role_name
+  for role_name in "${task3_created_roles[@]}"; do
+    case "$role_name" in
+      anon|authenticated|service_role) ;;
+      *) return 1 ;;
+    esac
+    run_psql vmp-task3-role-cleanup "$task3_admin_url" \
+      -X -v ON_ERROR_STOP=1 -c "drop role if exists $role_name" >/dev/null \
+      || return 1
+  done
+  task3_created_roles=()
+}
 
 process_group_is_running() {
   local process_group=$1
@@ -156,19 +179,40 @@ cleanup() {
   stop_process_group "$task3_role_pid" || true
   stop_process_group "$task3_unlink_pid" || true
   stop_process_group "$task3_assignment_pid" || true
+  stop_process_group "$task3_primary_holder_pid" || true
+  stop_process_group "$task3_primary_waiter_pid" || true
   if [[ "$task3_db_created" == true ]]; then
     run_pg_command vmp-task3-cleanup dropdb \
       --maintenance-db="$task3_admin_url" --if-exists --force \
       "$task3_temp_db" >/dev/null 2>&1 || true
   fi
+  cleanup_created_roles || true
   rm -f "$task3_ready_marker" "$task3_release_marker" \
     "$task3_link_log" "$task3_role_log" \
     "$task3_unlink_ready_marker" "$task3_unlink_release_marker" \
     "$task3_unlink_log" "$task3_assignment_log"
+  rm -f "$task3_primary_ready_marker" "$task3_primary_release_marker" \
+    "$task3_primary_holder_log" "$task3_primary_waiter_log"
   rmdir "$task3_tmp_dir" >/dev/null 2>&1 || true
   exit "$exit_code"
 }
 trap cleanup EXIT INT TERM
+
+for task3_required_role in anon authenticated service_role; do
+  task3_role_exists=$(run_psql vmp-task3-role-guard "$task3_admin_url" \
+    -X -At -v ON_ERROR_STOP=1 -c \
+    "select exists(select 1 from pg_roles where rolname='$task3_required_role')")
+  if [[ "$task3_role_exists" != t ]]; then
+    task3_can_create_role=$(run_psql vmp-task3-role-guard "$task3_admin_url" \
+      -X -At -v ON_ERROR_STOP=1 -c \
+      "select rolsuper or rolcreaterole from pg_roles where rolname=current_user")
+    if [[ "$task3_can_create_role" != t ]]; then
+      echo "Cluster test thiếu role $task3_required_role và admin không có CREATEROLE" >&2
+      exit 2
+    fi
+    task3_created_roles+=("$task3_required_role")
+  fi
+done
 
 task3_db_created=true
 run_pg_command vmp-task3-create createdb \
@@ -179,6 +223,20 @@ run_pg_command vmp-task3-create createdb \
 run_psql vmp-task3-setup "$task3_temp_url" \
   -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 create schema auth;
+
+do $roles$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'anon') then
+    create role anon nologin;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+    create role authenticated nologin;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then
+    create role service_role nologin;
+  end if;
+end
+$roles$;
 
 create type public.user_role as enum (
   'admin', 'qa_manager', 'department_user', 'viewer'
@@ -235,7 +293,9 @@ create table public.vmp_item_assignments (
   change_reason text,
   created_by uuid,
   updated_by uuid,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz
 );
 create table public.vmp_assignment_matrix (
   id uuid primary key,
@@ -265,8 +325,29 @@ create table public.vmp_objects (
 create table public.vmp_plan_items (
   validation_code text primary key,
   object_code text not null references public.vmp_objects(code),
+  owner_name text,
+  secondary_owner text,
+  owner_person_id uuid references public.vmp_performers(id),
+  support_person_id uuid references public.vmp_performers(id),
+  source_sheet_data jsonb,
   is_active boolean not null default true
 );
+create table public.vmp_source_objects (
+  id uuid primary key default gen_random_uuid(),
+  validation_code text not null,
+  source text not null,
+  source_name text,
+  normalized_source_name text,
+  assignment_kind text,
+  owner_name text,
+  support_name text,
+  owner_person_id uuid references public.vmp_performers(id),
+  support_person_id uuid references public.vmp_performers(id),
+  is_active boolean not null default true
+);
+create view public.vmp_active_item_assignments as
+select assignment.*, assignment.is_active as grants_access
+from public.vmp_item_assignments assignment;
 
 create function auth.uid() returns uuid
 language sql stable
@@ -302,6 +383,43 @@ as $$
   where p_user_id = 'a0000000-0000-0000-0000-000000000001'::uuid
 $$;
 
+create function public.vmp_normalize_person_name(text)
+returns text language sql immutable as $$ select lower(btrim($1)) $$;
+alter table public.vmp_performers add column normalized_full_name text
+  generated always as (public.vmp_normalize_person_name(performer_name)) stored;
+create function public.vmp_jsonb_uuid_array(jsonb, text)
+returns uuid[] language sql immutable as $$ select '{}'::uuid[] $$;
+create function public.vmp_valid_permission_scope(text[],uuid[],uuid[],uuid[])
+returns boolean language sql stable as $$ select true $$;
+create function public.vmp_valid_access_areas(text[])
+returns boolean language sql stable as $$ select true $$;
+create function public.vmp_item_scope_path_count(text)
+returns bigint language sql stable as $$ select 1::bigint $$;
+create function public.vmp_item_scope_matches(uuid,text)
+returns table(scope_match boolean,factory_match boolean,area_match boolean,line_match boolean)
+language sql stable as $$ select true,true,true,true $$;
+create function public.vmp_visible_plan_items()
+returns setof public.vmp_plan_items language sql stable
+as $$ select * from public.vmp_plan_items where is_active $$;
+create function public.vmp_unfiltered_security_definer_item_readers()
+returns table(signature text, reason text) language sql stable
+as $$
+  select allowlist.signature, allowlist.reason
+  from (values
+    ('rpc_set_item_assignment(uuid,text,text,text,text,text)',
+     'RPC ghi phân công canonical')
+  ) allowlist(signature, reason)
+  where false
+$$;
+create function public.vmp_item_rights(uuid,text)
+returns table(can_view boolean,editable_fields text[],view_reason text,
+  assignment_sources text[],scope_match boolean,area_match boolean)
+language sql stable security definer set search_path=public,pg_temp
+as $$ select true,'{}'::text[],'legacy','{}'::text[],true,true $$;
+create function public.rpc_set_item_assignment(uuid,text,text,text,text)
+returns jsonb language sql security definer set search_path=public,pg_temp
+as $$ select jsonb_build_object('ok',false) $$;
+
 create function public.rpc_upsert_item_permission_staff(uuid, jsonb, text)
 returns jsonb language sql as $$ select jsonb_build_object('ok', false) $$;
 create function public.rpc_upsert_performer(uuid, jsonb)
@@ -313,12 +431,33 @@ create function public.rpc_set_user_role(
 ) returns jsonb language sql as $$ select jsonb_build_object('ok', false) $$;
 create function public.rpc_lien_ket_tai_khoan(uuid, uuid)
 returns jsonb language sql as $$ select jsonb_build_object('ok', false) $$;
+create function public.rpc_set_item_performer(text, text)
+returns jsonb language sql as $$ select jsonb_build_object('ok', false) $$;
+create function public.vmp_set_item_assignment_unhardened(uuid,text,text,text,text)
+returns jsonb language sql as $$ select jsonb_build_object('ok', false) $$;
 
-create function public.task3_noop_event_trigger()
-returns event_trigger language plpgsql
-as $$ begin null; end $$;
+create function public.chan_overload_rpc()
+returns event_trigger language plpgsql as $$
+declare r record; v_name text; v_count integer;
+begin
+  for r in select * from pg_event_trigger_ddl_commands()
+    where command_tag in ('CREATE FUNCTION','ALTER FUNCTION') loop
+    select procedure.proname into v_name
+    from pg_proc procedure join pg_namespace namespace
+      on namespace.oid=procedure.pronamespace
+    where procedure.oid=r.objid and namespace.nspname='public'
+      and procedure.proname like 'rpc\_%';
+    continue when v_name is null;
+    select count(*) into v_count from pg_proc procedure
+    where procedure.pronamespace='public'::regnamespace
+      and procedure.proname=v_name;
+    if v_count > 1 then
+      raise exception 'Concurrency bootstrap phát hiện RPC overload: %', v_name;
+    end if;
+  end loop;
+end $$;
 create event trigger chan_overload_rpc_tg
-  on ddl_command_end execute function public.task3_noop_event_trigger();
+  on ddl_command_end execute function public.chan_overload_rpc();
 
 insert into public.profiles(id, email, full_name, role, department)
 values
@@ -343,8 +482,8 @@ SQL
 
 run_psql vmp-task3-migration "$task3_temp_url" -X -v ON_ERROR_STOP=1 \
   -c 'begin' \
-  -c 'set local check_function_bodies = off' \
-  -f "$task3_migration_file" \
+  -f "$task3_assignment_migration" \
+  -f "$task3_conflict_migration" \
   -c 'commit' >/dev/null
 
 setsid timeout --kill-after="${task3_kill_after_seconds}s" \
@@ -732,13 +871,207 @@ end
 $test$;
 SQL
 
+# Hai phiên cùng snapshot QA chính A. Holder thay A→B nhưng giữ transaction;
+# waiter đã mang immutable A phải chờ lock rồi fail PRIMARY_CONFLICT, không audit.
+task3_primary_a='d0000000-0000-0000-0000-000000000001'
+task3_primary_b='d0000000-0000-0000-0000-000000000002'
+task3_primary_c='d0000000-0000-0000-0000-000000000003'
+run_psql vmp-task3-primary-setup "$task3_temp_url" \
+  -X -At -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into public.vmp_performers(
+  id, performer_name, department, access_class, is_active, updated_by
+) values
+  ('$task3_primary_a', 'Task 3 QA A', 'qa', 'qa_progress_editor', true,
+   'a0000000-0000-0000-0000-000000000001'),
+  ('$task3_primary_b', 'Task 3 QA B', 'qa', 'qa_progress_editor', true,
+   'a0000000-0000-0000-0000-000000000001'),
+  ('$task3_primary_c', 'Task 3 QA C', 'qa', 'qa_progress_editor', true,
+   'a0000000-0000-0000-0000-000000000001');
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  false
+);
+do \$test\$
+declare v_result jsonb;
+begin
+  v_result := public.rpc_set_item_assignment(
+    '$task3_primary_a', 'TASK3-ITEM', 'qa', 'primary', 'assign',
+    'Concurrency primary baseline', null
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Không dựng được QA primary A: %', v_result;
+  end if;
+end
+\$test\$;
+SQL
+task3_expected_primary=$(run_psql vmp-task3-primary-snapshot "$task3_temp_url" \
+  -X -At -v ON_ERROR_STOP=1 -c \
+  "select id from public.vmp_item_assignments
+   where validation_code='TASK3-ITEM' and assignment_kind='qa'
+     and assignment_role='primary' and is_active")
+if [[ ! "$task3_expected_primary" =~ ^[0-9a-f-]{36}$ ]]; then
+  echo "Không snapshot được assignment ID của QA A" >&2
+  exit 1
+fi
+
+setsid timeout --kill-after="${task3_kill_after_seconds}s" \
+  "${task3_timeout_seconds}s" env \
+  PGCONNECT_TIMEOUT="$task3_connect_timeout_seconds" \
+  PGAPPNAME=vmp-task3-primary-holder PGOPTIONS="$task3_pg_options" \
+  stdbuf -oL psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+  >"$task3_primary_holder_log" 2>&1 <<SQL &
+begin;
+select pg_backend_pid();
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+do \$test\$
+declare v_result jsonb;
+begin
+  v_result := public.rpc_set_item_assignment(
+    '$task3_primary_b', 'TASK3-ITEM', 'qa', 'primary', 'replace_primary',
+    'Concurrency primary A sang B', '$task3_expected_primary'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Holder A→B thất bại: %', v_result;
+  end if;
+end
+\$test\$;
+\! : > '$task3_primary_ready_marker'
+\! timeout --kill-after='${task3_kill_after_seconds}s' '${task3_timeout_seconds}s' sh -c 'while [ ! -f "\$1" ]; do sleep 0.1; done' sh '$task3_primary_release_marker'
+\if :SHELL_ERROR
+  \quit 4
+\endif
+commit;
+SQL
+task3_primary_holder_pid=$!
+
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ ! -f "$task3_primary_ready_marker" && $SECONDS -lt $task3_deadline ]]; do
+  sleep 0.1
+done
+if [[ ! -f "$task3_primary_ready_marker" ]]; then
+  echo "Primary holder không tới barrier" >&2
+  exit 1
+fi
+task3_primary_holder_backend=$(sed -n '1p' "$task3_primary_holder_log" 2>/dev/null || true)
+if [[ ! "$task3_primary_holder_backend" =~ ^[0-9]+$ ]]; then
+  echo "Không lấy được backend PID primary holder" >&2
+  exit 1
+fi
+
+setsid timeout --kill-after="${task3_kill_after_seconds}s" \
+  "${task3_timeout_seconds}s" env \
+  PGCONNECT_TIMEOUT="$task3_connect_timeout_seconds" \
+  PGAPPNAME=vmp-task3-primary-waiter PGOPTIONS="$task3_pg_options" \
+  stdbuf -oL psql "$task3_temp_url" -X -v ON_ERROR_STOP=1 -qAt \
+  >"$task3_primary_waiter_log" 2>&1 <<SQL &
+begin;
+select pg_backend_pid();
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+do \$test\$
+declare v_result jsonb;
+begin
+  v_result := public.rpc_set_item_assignment(
+    '$task3_primary_c', 'TASK3-ITEM', 'qa', 'primary', 'replace_primary',
+    'Concurrency stale primary A sang C', '$task3_expected_primary'
+  );
+  if v_result->>'error_code' is distinct from 'PRIMARY_CONFLICT'
+      or (v_result->>'expected_primary_assignment_id')::uuid
+        is distinct from '$task3_expected_primary'::uuid then
+    raise exception 'Waiter stale không PRIMARY_CONFLICT: %', v_result;
+  end if;
+end
+\$test\$;
+commit;
+SQL
+task3_primary_waiter_pid=$!
+
+task3_primary_waiter_backend=''
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ $SECONDS -lt $task3_deadline ]]; do
+  task3_primary_waiter_backend=$(sed -n '1p' "$task3_primary_waiter_log" 2>/dev/null || true)
+  if [[ "$task3_primary_waiter_backend" =~ ^[0-9]+$ ]]; then break; fi
+  sleep 0.1
+done
+if [[ ! "$task3_primary_waiter_backend" =~ ^[0-9]+$ ]]; then
+  echo "Không lấy được backend PID primary waiter" >&2
+  exit 1
+fi
+task3_primary_wait_seen=false
+task3_deadline=$((SECONDS + task3_timeout_seconds))
+while [[ $SECONDS -lt $task3_deadline ]]; do
+  task3_primary_blocked=$(run_psql vmp-task3-controller "$task3_temp_url" -X -Atc \
+    "select pg_blocking_pids($task3_primary_waiter_backend)
+       @> array[$task3_primary_holder_backend]::integer[]")
+  if [[ "$task3_primary_blocked" == t ]]; then
+    task3_primary_wait_seen=true
+    break
+  fi
+  sleep 0.1
+done
+if [[ "$task3_primary_wait_seen" != true ]]; then
+  echo "Primary waiter không chờ holder theo lock order" >&2
+  exit 1
+fi
+
+: >"$task3_primary_release_marker"
+if ! wait_process_group "$task3_primary_holder_pid"; then
+  echo "Primary holder lỗi hoặc vượt deadline" >&2
+  exit 1
+fi
+task3_primary_holder_pid=''
+if ! wait_process_group "$task3_primary_waiter_pid"; then
+  echo "Primary waiter lỗi hoặc vượt deadline" >&2
+  exit 1
+fi
+task3_primary_waiter_pid=''
+
+run_psql vmp-task3-primary-final "$task3_temp_url" \
+  -X -v ON_ERROR_STOP=1 >/dev/null <<SQL
+do \$test\$
+begin
+  if (select count(*) from public.vmp_item_assignments
+      where validation_code='TASK3-ITEM' and assignment_kind='qa'
+        and assignment_role='primary' and is_active) <> 1
+      or not exists (select 1 from public.vmp_item_assignments
+        where validation_code='TASK3-ITEM' and performer_id='$task3_primary_b'
+          and assignment_role='primary' and is_active)
+      or exists (select 1 from public.vmp_item_assignments
+        where validation_code='TASK3-ITEM' and performer_id='$task3_primary_c'
+          and assignment_role='primary' and is_active)
+      or (select count(*) from public.audit_logs
+          where table_name='vmp_item_assignments'
+            and validation_code='TASK3-ITEM'
+            and change_reason in (
+              'Concurrency primary baseline',
+              'Concurrency primary A sang B',
+              'Concurrency stale primary A sang C'
+            )) <> 2 then
+    raise exception 'Primary race sai final state hoặc waiter đã audit';
+  end if;
+end
+\$test\$;
+SQL
+
 run_pg_command vmp-task3-drop dropdb \
   --maintenance-db="$task3_admin_url" --if-exists --force "$task3_temp_db"
 task3_db_created=false
+if ! cleanup_created_roles; then
+  echo "Không dọn được role bootstrap concurrency" >&2
+  exit 1
+fi
 task3_leftovers=$(run_psql vmp-task3-leftover-check "$task3_admin_url" -X -Atc \
   "select count(*) from pg_database where datname = '$task3_temp_db'")
 if [[ "$task3_leftovers" != 0 ]]; then
   echo "Database concurrency tạm chưa được xóa" >&2
   exit 1
 fi
-echo "CONCURRENCY PASS: set-role chờ account advisory; assignment chờ performer unlink; isolated database dropped"
+echo "CONCURRENCY PASS: account/link races; stale primary A→C conflicted after A→B; isolated database dropped"

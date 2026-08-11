@@ -16,6 +16,13 @@ begin
       or to_regprocedure(
         'public.vmp_upsert_source_object_before_person_id(text,text,jsonb)'
       ) is null
+      or to_regprocedure(
+        'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'
+      ) is null
+      or to_regprocedure(
+        'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+      ) is not null
+      or to_regprocedure('public.rpc_preview_item_rights(uuid,text)') is null
       or to_regclass('public.vmp_performers') is null
       or to_regclass('public.vmp_source_objects') is null
       or to_regclass('public.vmp_plan_items') is null
@@ -123,10 +130,11 @@ select format(
 );
 
 select format(
-  'ITEM_PERMISSION_DEPLOY_LEDGER|%s|%s|111200=%s',
+  'ITEM_PERMISSION_DEPLOY_LEDGER|%s|%s|111200=%s|111300=%s',
   count(*),
   coalesce(max(version), 'none'),
-  count(*) filter (where version = '20260811120000')
+  count(*) filter (where version = '20260811120000'),
+  count(*) filter (where version = '20260811130000')
 )
 from supabase_migrations.schema_migrations;
 
@@ -140,6 +148,8 @@ where procedure.oid in (
   'public.rpc_set_item_performer_by_id(text,uuid,text)'::regprocedure::oid,
   'public.rpc_upsert_source_object(text,text,jsonb)'::regprocedure::oid,
   'public.vmp_upsert_source_object_before_person_id(text,text,jsonb)'::regprocedure::oid
+  , 'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'::regprocedure::oid
+  , 'public.rpc_preview_item_rights(uuid,text)'::regprocedure::oid
 )
 order by procedure.oid::regprocedure::text;
 
@@ -153,10 +163,15 @@ declare
     'public.vmp_upsert_source_object_before_person_id(text,text,jsonb)'::regprocedure;
   v_principal_helper regprocedure :=
     'public.vmp_manager_principal(uuid)'::regprocedure;
+  v_assignment_writer regprocedure :=
+    'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'::regprocedure;
+  v_preview_reader regprocedure :=
+    'public.rpc_preview_item_rights(uuid,text)'::regprocedure;
   v_fixture_count bigint;
   v_ledger_count bigint;
   v_ledger_max text;
   v_ledger_111200 bigint;
+  v_ledger_111300 bigint;
 begin
   if public.item_permissions_mode() is distinct from 'preview' then
     raise exception 'ITEM_PERMISSION_DEPLOY_STATE_INVALID: mode phải là preview';
@@ -236,12 +251,14 @@ begin
   select
     count(*),
     max(version),
-    count(*) filter (where version = '20260811120000')
-  into v_ledger_count, v_ledger_max, v_ledger_111200
+    count(*) filter (where version = '20260811120000'),
+    count(*) filter (where version = '20260811130000')
+  into v_ledger_count, v_ledger_max, v_ledger_111200, v_ledger_111300
   from supabase_migrations.schema_migrations;
   if v_ledger_count <> 7
       or v_ledger_max is distinct from '20260704110201'
-      or v_ledger_111200 <> 0 then
+      or v_ledger_111200 <> 0
+      or v_ledger_111300 <> 0 then
     raise exception
       'ITEM_PERMISSION_DEPLOY_STATE_INVALID: ledger legacy baseline lệch';
   end if;
@@ -261,6 +278,17 @@ begin
       'ITEM_PERMISSION_DEPLOY_STATE_INVALID: writer thiếu hoặc còn overload';
   end if;
 
+  if (
+      select count(*) from pg_proc procedure
+      where procedure.pronamespace = 'public'::regnamespace
+        and procedure.proname = 'rpc_set_item_assignment'
+    ) <> 1 or to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+    ) is not null then
+    raise exception
+      'ITEM_PERMISSION_DEPLOY_STATE_INVALID: assignment signature chưa là 111300';
+  end if;
+
   if exists (
     select 1
     from pg_proc procedure
@@ -274,6 +302,54 @@ begin
   ) then
     raise exception
       'ITEM_PERMISSION_DEPLOY_STATE_INVALID: SECURITY DEFINER/search_path sai';
+  end if;
+
+  if exists (
+    select 1 from pg_proc procedure
+    where procedure.oid in (v_assignment_writer::oid, v_preview_reader::oid)
+      and (
+        not procedure.prosecdef
+        or not coalesce(procedure.proconfig, '{}'::text[])
+          @> array['search_path=public, pg_temp']
+        or has_function_privilege(
+          procedure.proowner, v_principal_helper::oid, 'EXECUTE'
+        ) is distinct from true
+      )
+  ) then
+    raise exception
+      'ITEM_PERMISSION_DEPLOY_STATE_INVALID: assignment/preview owner hoặc config sai';
+  end if;
+
+  if exists (
+    with actual(procedure_oid, grantee, privilege_type, is_grantable) as (
+      select procedure.oid, privilege.grantee, privilege.privilege_type,
+             privilege.is_grantable
+      from pg_proc procedure
+      cross join lateral aclexplode(
+        coalesce(procedure.proacl, acldefault('f', procedure.proowner))
+      ) privilege
+      where procedure.oid in (v_assignment_writer::oid, v_preview_reader::oid)
+    ), expected(procedure_oid, grantee, privilege_type, is_grantable) as (
+      select v_assignment_writer::oid, procedure.proowner, 'EXECUTE'::text, false
+      from pg_proc procedure where procedure.oid = v_assignment_writer::oid
+      union all
+      select v_assignment_writer::oid, 'authenticated'::regrole::oid, 'EXECUTE', false
+      union all
+      select v_preview_reader::oid, procedure.proowner, 'EXECUTE', false
+      from pg_proc procedure where procedure.oid = v_preview_reader::oid
+      union all
+      select v_preview_reader::oid, 'authenticated'::regrole::oid, 'EXECUTE', false
+      union all
+      select v_preview_reader::oid, 'service_role'::regrole::oid, 'EXECUTE', false
+    )
+    select 1 from (
+      (select * from actual except select * from expected)
+      union all
+      (select * from expected except select * from actual)
+    ) acl_delta
+  ) then
+    raise exception
+      'ITEM_PERMISSION_DEPLOY_STATE_INVALID: assignment/preview raw ACL không exact';
   end if;
 
   if exists (
@@ -383,7 +459,11 @@ begin
       or md5(pg_get_functiondef(v_source_writer))
       <> '0baecd0a45f59f92b3ebe9afdc25b7bd'
       or md5(pg_get_functiondef(v_predecessor))
-      <> '10d7c5237b3c7451a09eed95f6d50643' then
+      <> '10d7c5237b3c7451a09eed95f6d50643'
+      or md5(pg_get_functiondef(v_assignment_writer))
+      <> '0a482bb8e1ccd4f70a326eb65d054160'
+      or md5(pg_get_functiondef(v_preview_reader))
+      <> 'a5dc61243202f581093b7db6dc36ae39' then
     raise exception
       'ITEM_PERMISSION_DEPLOY_STATE_INVALID: function definition hash lệch';
   end if;

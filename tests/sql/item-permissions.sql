@@ -1,7 +1,7 @@
 /*
  * Harness chỉ chạy file đầy đủ ở một trong hai trạng thái explicit:
- * --final-state khi schema đã có 20260811120000 (không replay migration), hoặc
- * --forward-test từ repaired pre-111200 với đúng migration 111200 được chỉ định.
+ * --final-state khi schema đã có 20260811130000 (không replay migration), hoặc
+ * --forward-test từ post-111200 với đúng migration 111300 được chỉ định.
  * Mọi SQL test/fixture chạy trong cùng transaction rồi rollback, nên không ghi
  * vào database thật; harness không tự chọn migration bằng glob.
  */
@@ -65,29 +65,31 @@ begin
     raise exception 'service_role phải giữ quyền mutation bảng phân công';
   end if;
   if to_regprocedure(
-      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)'
     ) is null then
-    raise exception 'Thiếu RPC phân công có assignment_role';
+    raise exception 'Thiếu RPC phân công có expected primary';
   end if;
   if to_regprocedure(
       'public.rpc_set_item_assignment(uuid,text,text,text,text)'
+    ) is not null or to_regprocedure(
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)'
     ) is not null then
-    raise exception 'RPC phân công năm tham số phải được thay thế, không tạo overload';
+    raise exception 'RPC phân công cũ phải được thay thế, không tạo overload';
   end if;
   if has_function_privilege(
       'service_role',
-      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)',
       'EXECUTE'
     ) or has_function_privilege(
       'anon',
-      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)',
       'EXECUTE'
     ) or not has_function_privilege(
       'authenticated',
-      'public.rpc_set_item_assignment(uuid,text,text,text,text,text)',
+      'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)',
       'EXECUTE'
     ) then
-    raise exception 'Quyền RPC phân công sáu tham số chưa tối thiểu';
+    raise exception 'Quyền RPC phân công bảy tham số chưa tối thiểu';
   end if;
   if not exists (
     select 1
@@ -1595,6 +1597,14 @@ begin
   if exists (
     select 1 from jsonb_array_elements(v_result->'rights') preview
     where (preview->>'person_id')::uuid in (v_xsx_person, v_qc_person)
+  ) or not exists (
+    select 1 from jsonb_array_elements(v_result->'rights') preview
+    where (preview->>'person_id')::uuid = v_qa_person
+      and preview->>'rights_basis' = 'qa_assignment'
+  ) or not exists (
+    select 1 from jsonb_array_elements(v_result->'rights') preview
+    where (preview->>'person_id')::uuid = v_manager_person
+      and preview->>'rights_basis' = 'qa_management'
   ) then
     raise exception 'Preview QA manager cross-join người ngoài QA: %', v_result;
   end if;
@@ -1643,6 +1653,11 @@ begin
   v_result := public.rpc_preview_item_rights(v_qa_person, v_xsx_code);
   if jsonb_array_length(v_result->'rights') <> 0 then
     raise exception 'Preview equipment_manager không được cross-join người QA: %', v_result;
+  end if;
+  v_result := public.rpc_preview_item_rights(v_xsx_person, v_xsx_code);
+  if jsonb_array_length(v_result->'rights') <> 1
+      or v_result->'rights'->0->>'rights_basis' is distinct from 'hierarchy_scope' then
+    raise exception 'Preview equipment phải ghi basis hierarchy theo từng dòng: %', v_result;
   end if;
   v_result := public.rpc_preview_item_rights(v_xsx_person, v_qc_code);
   if jsonb_array_length(v_result->'rights') <> 0 then
@@ -2114,6 +2129,9 @@ declare
   v_unique_caught boolean;
   v_performer_lock_modes text[];
   v_values jsonb;
+  v_primary_id uuid;
+  v_assignment_snapshot jsonb;
+  v_audit_count bigint;
   v_qa_fields constant text[] := array[
     'actual_protocol_date', 'status_protocol',
     'actual_validation_date', 'status_validation',
@@ -2275,6 +2293,7 @@ begin
       or not exists (
         select 1 from jsonb_array_elements(v_result->'rights') preview
         where (preview->>'person_id')::uuid = v_qa_1
+          and preview->>'rights_basis' = 'qa_assignment'
           and preview->>'assignment_role' = 'primary'
           and (preview->>'can_view')::boolean
           and (preview->>'scope_match')::boolean
@@ -2293,8 +2312,50 @@ begin
       or v_result->>'error_code' is distinct from 'PRIMARY_ALREADY_EXISTS' then
     raise exception 'assign QA chính thứ hai phải bị từ chối rõ ràng: %', v_result;
   end if;
+  select id into strict v_primary_id
+  from public.vmp_item_assignments
+  where validation_code = v_code and assignment_kind = 'qa'
+    and assignment_role = 'primary' and is_active;
+  select coalesce(jsonb_agg(to_jsonb(assignment) order by assignment.id), '[]')
+  into v_assignment_snapshot
+  from public.vmp_item_assignments assignment
+  where assignment.validation_code = v_code and assignment.assignment_kind = 'qa';
+  select count(*) into v_audit_count from public.audit_logs
+  where table_name = 'vmp_item_assignments' and validation_code = v_code;
+
   v_result := public.rpc_set_item_assignment(
-    v_qa_2, v_code, 'qa', 'primary', 'replace_primary', 'Đổi QA chính'
+    v_qa_2, v_code, 'qa', 'primary', 'replace_primary', 'Thiếu snapshot QA chính'
+  );
+  if v_result->>'error_code' is distinct from 'PRIMARY_EXPECTATION_REQUIRED'
+      or (select coalesce(jsonb_agg(to_jsonb(assignment) order by assignment.id), '[]')
+          from public.vmp_item_assignments assignment
+          where assignment.validation_code = v_code
+            and assignment.assignment_kind = 'qa') is distinct from v_assignment_snapshot
+      or (select count(*) from public.audit_logs
+          where table_name = 'vmp_item_assignments' and validation_code = v_code)
+        <> v_audit_count then
+    raise exception 'replace thiếu expectation phải fail không side effect: %', v_result;
+  end if;
+
+  v_result := public.rpc_set_item_assignment(
+    v_qa_2, v_code, 'qa', 'primary', 'replace_primary', 'Snapshot QA chính stale',
+    gen_random_uuid()
+  );
+  if v_result->>'error_code' is distinct from 'PRIMARY_CONFLICT'
+      or (v_result->>'current_primary_assignment_id')::uuid is distinct from v_primary_id
+      or (select coalesce(jsonb_agg(to_jsonb(assignment) order by assignment.id), '[]')
+          from public.vmp_item_assignments assignment
+          where assignment.validation_code = v_code
+            and assignment.assignment_kind = 'qa') is distinct from v_assignment_snapshot
+      or (select count(*) from public.audit_logs
+          where table_name = 'vmp_item_assignments' and validation_code = v_code)
+        <> v_audit_count then
+    raise exception 'replace stale phải PRIMARY_CONFLICT không side effect: %', v_result;
+  end if;
+
+  v_result := public.rpc_set_item_assignment(
+    v_qa_2, v_code, 'qa', 'primary', 'replace_primary', 'Đổi QA chính',
+    v_primary_id
   );
   if coalesce((v_result->>'ok')::boolean, false) is not true
       or (select count(*) from public.vmp_item_assignments

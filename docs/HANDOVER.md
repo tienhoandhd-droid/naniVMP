@@ -394,7 +394,9 @@ from public.vmp_sheet_sync_runs where status = 'completed';
 
 Nên gắn thêm vào dashboard một banner "dữ liệu cập nhật lúc …" để độ trễ luôn hiển thị trước mắt người dùng — hiện **chưa có**.
 
-**Việc còn để ngỏ:** ngưỡng guard `450..5000` giữ nguyên (đúng); migration `20260729020000_row_guard_diagnostic_message.sql` chỉ làm thông báo lỗi tự chẩn đoán hơn — xem mục 8.
+**Ghi chú lịch sử:** ngưỡng guard `450..5000` giữ nguyên. Migration
+`20260729020000_row_guard_diagnostic_message.sql` thuộc lịch sử chưa có ledger
+đáng tin cậy; không áp trực tiếp file này — xem mục 8.
 
 ## 5. Quyền truy cập cần bàn giao kèm
 
@@ -425,11 +427,11 @@ Nên gắn thêm vào dashboard một banner "dữ liệu cập nhật lúc …"
 - Anon key Supabase xuất hiện trong workflow JSON là key công khai (by design), không phải rò rỉ.
 - ⚠️ **Repo `tienhoandhd-droid/naniVMP` đang ở chế độ PUBLIC.** Cân nhắc chuyển sang private, hoặc ít nhất đừng ghi chuỗi token thật vào tài liệu — viết "token cũ đã lộ, tra bằng `git log --all -S`" là đủ.
 
-## 8. Migration chờ áp (chưa chạy trên production)
+## 8. Ghi nhận migration lịch sử — không phải runbook
 
 | File | Nội dung | Trạng thái |
 |---|---|---|
-| `supabase/migrations/20260729020000_row_guard_diagnostic_message.sql` | `VMP_SYNC_ROW_GUARD` in thêm số ID duy nhất + tỉ lệ lặp + hướng xử lý | ✅ Đã kiểm thử trong transaction rollback; ❌ **chưa áp** |
+| `supabase/migrations/20260729020000_row_guard_diagnostic_message.sql` | `VMP_SYNC_ROW_GUARD` in thêm số ID duy nhất + tỉ lệ lặp + hướng xử lý | Lịch sử chưa được ledger xác nhận; **không chạy trực tiếp** |
 
 Thông báo cũ → mới:
 
@@ -439,11 +441,11 @@ mới: VMP_SYNC_ROW_GUARD: 9724 dong / 461 ID duy nhat (ti le lap 21.1x)
      - ngoai khoang 450..5000. Sheet bi dan trung: DON SHEET, KHONG noi nguong guard.
 ```
 
-Chỉ đổi phần thông báo lỗi — ngưỡng và logic giữ nguyên; phần chẩn đoán chỉ chạy khi sắp raise nên đường chạy bình thường không tốn thêm. Áp bằng:
-
-```bash
-psql "$SUPABASE_DB_URL" --single-transaction -f supabase/migrations/20260729020000_row_guard_diagnostic_message.sql
-```
+Chỉ đổi phần thông báo lỗi — ngưỡng và logic giữ nguyên; phần chẩn đoán chỉ chạy
+khi sắp raise nên đường chạy bình thường không tốn thêm. Lệnh áp trực tiếp cũ
+đã bị loại khỏi tài liệu. Nếu thay đổi này còn cần thiết, phải đưa nội dung vào
+một migration forward mới, review checksum/backup/checker và áp bằng transaction
+explicit theo runbook hiện hành; không replay file lịch sử.
 
 ## 8b. ⚠️ Bảo mật đã sửa: RPC ghi từng mở cho `anon`
 
