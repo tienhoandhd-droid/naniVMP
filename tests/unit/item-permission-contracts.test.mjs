@@ -224,6 +224,80 @@ test("hồ sơ legacy chưa đủ bị khóa phân công cho tới khi bổ sung
   assert.equal(isDirectoryPersonComplete({ ...complete, scope_line_ids: [] }), false);
 });
 
+test("QA không cần phạm vi phân cấp còn nhóm thiết bị thì cần đủ phạm vi", async () => {
+  const {
+    isQaAccessClass,
+    requiresHierarchyScope,
+    isDirectoryPersonComplete,
+  } = await loadContracts();
+  const complete = {
+    person_id: "11111111-1111-1111-1111-111111111111",
+    user_id: null,
+    employee_code: null,
+    full_name: "Đặng Thị Hồng Ngọc",
+    department: "rd",
+    email: null,
+    account_status: "unlinked",
+    access_class: "view_only",
+    scope_departments: ["rd"],
+    scope_factory_ids: ["factory-1"],
+    scope_area_ids: ["area-1"],
+    scope_line_ids: ["line-1"],
+    access_areas: ["A1"],
+    version: 1,
+    email_sent_confirmed: false,
+    is_active: true,
+    match_status: "unique",
+  };
+  const qa = {
+    ...complete,
+    department: "qa",
+    access_class: "qa_progress_editor",
+    scope_departments: [],
+    scope_factory_ids: [],
+    scope_area_ids: [],
+    scope_line_ids: [],
+  };
+
+  assert.equal(isQaAccessClass(qa.access_class), true);
+  assert.equal(requiresHierarchyScope(qa.access_class), false);
+  assert.equal(isDirectoryPersonComplete(qa), true);
+  assert.equal(isDirectoryPersonComplete({ ...qa, department: "rd" }), false);
+
+  const equipment = { ...complete, access_class: "equipment_scheduler" };
+  assert.equal(requiresHierarchyScope(equipment.access_class), true);
+  assert.equal(isDirectoryPersonComplete({ ...equipment, scope_line_ids: [] }), false);
+});
+
+test("decoder phân công nhận vai trò QA hợp lệ và từ chối vai trò ngoài hợp đồng", async () => {
+  const { decodeAssignment } = await import("../../src/features/itemPermissions/api.ts");
+  const valid = {
+    assignment_id: "assignment-1",
+    validation_code: "VAL-001",
+    person_id: "person-1",
+    user_id: null,
+    staff_name: "Đặng Thị Hồng Ngọc",
+    employee_code: null,
+    assignment_kind: "qa",
+    assignment_role: "primary",
+    source: "manual",
+    source_text: null,
+    unresolved_reason: null,
+    expires_at: null,
+    is_active: true,
+    grants_access: true,
+    object_department: "qa",
+    area: null,
+    line: null,
+  };
+
+  assert.deepEqual(decodeAssignment(valid), valid);
+  assert.throws(
+    () => decodeAssignment({ ...valid, assignment_role: "owner" }),
+    /assignment_role/,
+  );
+});
+
 test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
   const sql = await readFile(new URL(
     "../../supabase/migrations/20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql",
