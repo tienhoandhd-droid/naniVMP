@@ -1,6 +1,6 @@
 import { DEPTS } from "../../constants/vmp.ts";
-import { resolveScopeCodes, type ScopeCatalog } from "./scopeHierarchy.ts";
-import type { AccessClass, PermissionPersonPatch } from "./types.ts";
+import { resolveScopeCodes, type ScopeCatalog, type ScopeResolution } from "./scopeHierarchy.ts";
+import { isQaAccessClass, type AccessClass, type PermissionPersonPatch } from "./types.ts";
 
 export const PERMISSION_HEADERS = [
   "STT", "Bộ phận", "Mã nhân viên", "Họ và tên", "Phân loại",
@@ -86,14 +86,21 @@ export function parsePermissionRows(
     if (!department) rowErrors.push(`Bộ phận không hợp lệ: ${normalize(source[1]) || "(trống)"}`);
     if (!normalize(source[3])) rowErrors.push("Họ và tên không được để trống");
     if (!accessClass) rowErrors.push(`Phân loại không hợp lệ: ${normalize(source[4]) || "(trống)"}`);
-    for (const [scopeKey, label] of [
-      ["departments", "bộ phận"], ["factories", "xưởng"],
-      ["areas", "khu vực"], ["lines", "line"],
-    ] as const) {
-      if (!scopeCodes[scopeKey].length) rowErrors.push(`Phạm vi ${label} không được để trống`);
+    const qaWithoutHierarchy = accessClass ? isQaAccessClass(accessClass) : false;
+    let resolved: ScopeResolution = {
+      ok: true,
+      selection: { departments: [], factories: [], areas: [], lines: [] },
+    };
+    if (!qaWithoutHierarchy) {
+      for (const [scopeKey, label] of [
+        ["departments", "bộ phận"], ["factories", "xưởng"],
+        ["areas", "khu vực"], ["lines", "line"],
+      ] as const) {
+        if (!scopeCodes[scopeKey].length) rowErrors.push(`Phạm vi ${label} không được để trống`);
+      }
+      resolved = resolveScopeCodes(options.scopeCatalog, scopeCodes);
+      if (!resolved.ok) rowErrors.push(resolved.error);
     }
-    const resolved = resolveScopeCodes(options.scopeCatalog, scopeCodes);
-    if (!resolved.ok) rowErrors.push(resolved.error);
     const email = normalize(source[9]).toLowerCase();
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) rowErrors.push(`Email không hợp lệ: ${email}`);
     const confirmation = key(source[10]);
