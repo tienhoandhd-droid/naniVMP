@@ -648,6 +648,19 @@ test("hai thao tác cùng lựa chọn chỉ thao tác mới giữ loading", asy
   assert.equal(operations.saving, false);
 });
 
+test("đổi intent không được hạ loading của RPC đang chạy", async () => {
+  const { AssignmentOperationState } = await import(
+    "../../src/features/itemPermissions/AssignmentPanel.tsx"
+  );
+  const operations = new AssignmentOperationState();
+  const operation = operations.begin();
+
+  assert.equal(operations.invalidateIntent(), true);
+  assert.equal(operations.saving, true);
+  assert.equal(operations.finish(operation), true);
+  assert.equal(operations.saving, false);
+});
+
 test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
   const sql = await readFile(new URL(
     "../../supabase/migrations/20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql",
