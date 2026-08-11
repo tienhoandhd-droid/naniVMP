@@ -21,7 +21,6 @@ node tests/e2e/giam-chuyen-dong.mjs     # prefers-reduced-motion có thật sự
 node tests/e2e/danh-ba-phan-quyen.mjs   # autocomplete, tự điền và phân công bằng person_id
 node tests/e2e/quyen-cot-timeline.mjs   # preview/enforced theo từng cột timeline
 node tests/e2e/thu-hoi-cache-phan-quyen.mjs # thu hồi cache và fail-closed khi bật enforced
-node tests/e2e/ma-tran-phan-quyen.mjs   # chống hồi quy ma trận quyền hiện hành
 ```
 
 Khi nghiệm thu phân quyền theo từng hạng mục, chạy `npm run test:permissions`
