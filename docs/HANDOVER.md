@@ -78,18 +78,21 @@ SQL harness không đọc `.env.local`, không tự đoán database clone và b�
 chọn đúng một mode:
 
 ```bash
-# Live đã harden: không chạy migration, toàn bộ mutation test nằm trong rollback.
+# Chỉ sau khi 111300 đã apply và postflight thành công: không chạy lại migration;
+# toàn bộ mutation test nằm trong rollback.
 SUPABASE_DB_URL='postgresql://<redacted>' \
   scripts/test-item-permissions-sql.sh --final-state
 
-# Chỉ database test chuyên dụng ở trạng thái đã repair nhưng chưa có 111200.
+# Chỉ database test chuyên dụng ở trạng thái post-111200 nhưng pre-111300.
 env -u SUPABASE_DB_URL \
   ITEM_PERMISSION_SQL_DEDICATED_DB_URL='postgresql://<redacted>' \
   scripts/test-item-permissions-sql.sh --forward-test \
-  supabase/migrations/20260811120000_harden_canonical_source_writers.sql
+  supabase/migrations/20260811130000_fix_assignment_conflict_and_rights_basis.sql
 ```
 
-Không dùng `--forward-test` với live. Nghiệm thu ứng dụng chạy `npm run
+Live hiện vẫn là pre-111300 nên `--final-state` phải từ chối; chỉ được dùng mode
+này sau transaction deploy 111300 và postflight thành công. Không dùng
+`--forward-test` với live. Nghiệm thu ứng dụng chạy `npm run
 typecheck`, `npm run build`, dựng Vite preview, rồi chạy `npm run
 test:permissions` và `npm run e2e`. Cả hai suite đã đăng ký lại legacy E2E
 `tests/e2e/danh-muc-nguoi-thuc-hien.mjs`; không được bỏ test này khi chỉnh scripts.

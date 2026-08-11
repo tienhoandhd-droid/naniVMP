@@ -700,13 +700,14 @@ test("PRIMARY_CONFLICT refresh trạng thái và không báo thành công", asyn
     isCurrent: () => true,
     onSuccess: () => events.push("success"),
     onError: () => events.push("error"),
-    refresh: async () => events.push("refresh"),
+    refresh: async () => events.push("person-refresh"),
     refreshOnError: (error) => error instanceof ItemPermissionRpcError
       && error.code === "PRIMARY_CONFLICT",
+    refreshAfterError: async () => events.push("item-refresh"),
   });
 
   assert.equal(outcome, "error");
-  assert.deepEqual(events, ["refresh", "error"]);
+  assert.deepEqual(events, ["item-refresh", "error"]);
 });
 
 test("mutation đến muộn không ghi status hoặc refresh của lựa chọn cũ", async () => {
