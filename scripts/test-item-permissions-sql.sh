@@ -9,7 +9,12 @@ if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
 fi
 
 shopt -s nullglob
-migrations=("$repo_dir"/supabase/migrations/20260810*.sql)
+migrations=(
+  "$repo_dir"/supabase/migrations/20260810*.sql
+  "$repo_dir"/supabase/migrations/20260811*.sql
+)
+IFS=$'\n' migrations=($(printf '%s\n' "${migrations[@]}" | sort))
+unset IFS
 args=(-X -v ON_ERROR_STOP=1 -c 'begin')
 for file in "${migrations[@]}"; do
   args+=(-f "$file")

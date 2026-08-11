@@ -1,5 +1,5 @@
 /*
- * Chạy file này sau toàn bộ migration 2026081008..2026081016.
+ * Chạy file này sau toàn bộ migration 2026081008..2026081110.
  * scripts/test-item-permissions-sql.sh áp các migration trong cùng transaction
  * rồi rollback, nên fixture bên dưới không ghi vào database thật.
  */
@@ -108,6 +108,458 @@ begin
       is distinct from '2026-08-12 00:00:00 Asia/Bangkok'::timestamptz then
     raise exception 'Lịch chỉ có ngày phải mặc định 00:00:00';
   end if;
+end
+$test$;
+
+/* Tài khoản chỉ được nối rõ ràng bởi Admin/service; QA không cần scope hierarchy. */
+do $test$
+declare
+  v_admin uuid;
+  v_user_1 uuid;
+  v_user_2 uuid;
+  v_user_1_email text;
+  v_user_2_email text;
+  v_person_1 uuid;
+  v_person_2 uuid;
+  v_admin_link_person uuid;
+  v_non_qa_person uuid;
+  v_old_admin_person uuid;
+  v_old_user_1_person uuid;
+  v_old_user_2_person uuid;
+  v_old_admin_profile public.profiles%rowtype;
+  v_old_user_1_profile public.profiles%rowtype;
+  v_old_user_2_profile public.profiles%rowtype;
+  v_assignment uuid;
+  v_code text;
+  v_version integer;
+  v_result jsonb;
+  v_directory jsonb;
+  v_preflight jsonb;
+begin
+  select id into v_admin
+  from public.profiles
+  where role::text = 'admin' and coalesce(is_active, true)
+  order by created_at limit 1;
+  select id, email into v_user_1, v_user_1_email
+  from public.profiles
+  where id <> v_admin and coalesce(is_active, true)
+  order by case when role::text = 'viewer' then 0 else 1 end, created_at
+  limit 1;
+  select id, email into v_user_2, v_user_2_email
+  from public.profiles
+  where id not in (v_admin, v_user_1) and coalesce(is_active, true)
+  order by case when role::text = 'viewer' then 0 else 1 end, created_at
+  limit 1;
+  select validation_code into v_code
+  from public.vmp_plan_items
+  where is_active
+  order by validation_code limit 1;
+  if v_admin is null or v_user_1 is null or v_user_2 is null
+      or v_user_1_email is null or v_user_2_email is null or v_code is null then
+    raise exception 'Thiếu fixture account để kiểm nối tài khoản Admin';
+  end if;
+
+  select * into v_old_admin_profile from public.profiles where id = v_admin;
+  select * into v_old_user_1_profile from public.profiles where id = v_user_1;
+  select * into v_old_user_2_profile from public.profiles where id = v_user_2;
+  select id into v_old_admin_person
+  from public.vmp_performers where user_id = v_admin;
+  select id into v_old_user_1_person
+  from public.vmp_performers where user_id = v_user_1;
+  select id into v_old_user_2_person
+  from public.vmp_performers where user_id = v_user_2;
+  update public.vmp_performers set user_id = null
+  where user_id in (v_admin, v_user_1, v_user_2);
+  update public.profiles
+  set role = 'viewer', department = 'qa', is_active = true
+  where id in (v_user_1, v_user_2);
+  update public.profiles set department = null where id = v_admin;
+
+  if has_function_privilege(
+      'anon', 'public.rpc_item_permission_account_candidates(text)', 'EXECUTE'
+    ) or has_function_privilege(
+      'anon',
+      'public.rpc_link_item_permission_account(uuid,uuid,text,integer)',
+      'EXECUTE'
+    ) or not has_function_privilege(
+      'authenticated', 'public.rpc_item_permission_account_candidates(text)', 'EXECUTE'
+    ) or not has_function_privilege(
+      'authenticated',
+      'public.rpc_link_item_permission_account(uuid,uuid,text,integer)',
+      'EXECUTE'
+    ) or not has_function_privilege(
+      'service_role', 'public.rpc_item_permission_account_candidates(text)', 'EXECUTE'
+    ) or not has_function_privilege(
+      'service_role',
+      'public.rpc_link_item_permission_account(uuid,uuid,text,integer)',
+      'EXECUTE'
+    ) or has_function_privilege(
+      'authenticated', 'public.rpc_lien_ket_tai_khoan(uuid,uuid)', 'EXECUTE'
+    ) or has_function_privilege(
+      'service_role', 'public.rpc_lien_ket_tai_khoan(uuid,uuid)', 'EXECUTE'
+    ) then
+    raise exception 'Quyền EXECUTE RPC nối tài khoản không tối thiểu hoặc còn đường legacy';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_upsert_item_permission_staff(
+    null,
+    jsonb_build_object(
+      'full_name', 'E2E QA Không Phạm Vi',
+      'department', 'qa',
+      'access_class', 'qa_manager',
+      'email', v_user_1_email,
+      'scope_departments', '[]'::jsonb,
+      'scope_factory_ids', '[]'::jsonb,
+      'scope_area_ids', '[]'::jsonb,
+      'scope_line_ids', '[]'::jsonb,
+      'is_active', true
+    ),
+    'Tạo QA chưa nối tài khoản',
+    0
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or v_result->>'user_id' is not null then
+    raise exception 'Lưu QA phải chấp nhận scope rỗng và không tự nối email: %', v_result;
+  end if;
+  v_person_1 := (v_result->>'person_id')::uuid;
+  v_version := (v_result->>'version')::integer;
+
+  v_result := public.rpc_import_item_permission_staff(
+    jsonb_build_array(jsonb_build_object(
+      'row_number', 1,
+      'full_name', 'E2E QA Import Không Phạm Vi',
+      'department', 'qa',
+      'access_class', 'qa_progress_editor',
+      'email', v_user_2_email,
+      'scope_departments', '[]'::jsonb,
+      'scope_factory_ids', '[]'::jsonb,
+      'scope_area_ids', '[]'::jsonb,
+      'scope_line_ids', '[]'::jsonb,
+      'is_active', true
+    )),
+    'Nhập QA chưa nối tài khoản'
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (v_result->>'imported')::integer <> 1 then
+    raise exception 'Importer phải dùng cùng luật QA scope rỗng: %', v_result;
+  end if;
+  select id into v_person_2
+  from public.vmp_performers
+  where performer_name = 'E2E QA Import Không Phạm Vi' and user_id is null;
+  if v_person_2 is null then
+    raise exception 'Importer không được tự nối profile chỉ vì trùng email';
+  end if;
+
+  insert into public.vmp_item_assignments (
+    validation_code, performer_id, staff_name, assignment_kind, source,
+    source_text, unresolved_reason, is_active, change_reason
+  ) values (
+    v_code, v_person_1, 'E2E QA Không Phạm Vi', 'qa', 'qa_manager',
+    'E2E QA Không Phạm Vi', 'account_unlinked', true,
+    'Fixture nối tài khoản rõ ràng'
+  ) returning id into v_assignment;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user_2::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_item_permission_account_candidates(null);
+  if v_result->>'error_code' <> 'FORBIDDEN' then
+    raise exception 'Người không phải Admin không được xem account candidates: %', v_result;
+  end if;
+  v_result := public.rpc_link_item_permission_account(
+    v_person_1, v_user_1, 'Thử nối không phải Admin', v_version
+  );
+  if v_result->>'error_code' <> 'FORBIDDEN' then
+    raise exception 'Người không phải Admin không được nối tài khoản: %', v_result;
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('role', 'service_role')::text,
+    true
+  );
+  v_result := public.rpc_item_permission_account_candidates(v_user_1_email);
+  if coalesce((v_result->>'ok')::boolean, false) is not true then
+    raise exception 'Service role hợp lệ phải xem được account candidates: %', v_result;
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_item_permission_account_candidates(v_user_1_email);
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or not exists (
+        select 1 from jsonb_array_elements(v_result->'accounts') account
+        where (account->>'user_id')::uuid = v_user_1
+          and account->>'email' = v_user_1_email
+          and account->>'role' = 'viewer'
+          and account->>'department' = 'qa'
+          and (account->>'is_active')::boolean
+          and account->>'linked_person_id' is null
+      ) then
+    raise exception 'Admin phải thấy profile QA chưa có chủ trong candidates: %', v_result;
+  end if;
+
+  v_result := public.rpc_link_item_permission_account(
+    v_person_1, v_user_1, 'Thử nối với version cũ', v_version - 1
+  );
+  if v_result->>'error_code' <> 'VERSION_CONFLICT'
+      or (v_result->>'current_version')::integer <> v_version then
+    raise exception 'Nối tài khoản phải kiểm optimistic version: %', v_result;
+  end if;
+
+  update public.profiles set is_active = false where id = v_user_1;
+  v_result := public.rpc_link_item_permission_account(
+    v_person_1, v_user_1, 'Thử nối profile inactive', v_version
+  );
+  if v_result->>'error_code' <> 'ACCOUNT_INACTIVE' then
+    raise exception 'Không được nối profile inactive: %', v_result;
+  end if;
+  update public.profiles set is_active = true, department = 'xsx' where id = v_user_1;
+  v_result := public.rpc_link_item_permission_account(
+    v_person_1, v_user_1, 'Thử nối profile ngoài QA', v_version
+  );
+  if v_result->>'error_code' <> 'INVALID_QA_PRINCIPAL' then
+    raise exception 'Không được nối người QA vào profile bộ phận khác: %', v_result;
+  end if;
+  update public.profiles set department = 'qa' where id = v_user_1;
+
+  v_result := public.rpc_link_item_permission_account(
+    v_person_1, v_user_1, 'Admin xác nhận nối QA', v_version
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or (v_result->>'user_id')::uuid <> v_user_1
+      or v_result->>'account_status' <> 'linked'
+      or (v_result->>'version')::integer <> v_version + 1 then
+    raise exception 'Admin phải nối được profile QA hợp lệ: %', v_result;
+  end if;
+  v_version := (v_result->>'version')::integer;
+  if not exists (
+      select 1 from public.vmp_item_assignments
+      where id = v_assignment and user_id = v_user_1 and unresolved_reason is null
+    ) or not exists (
+      select 1 from public.profiles
+      where id = v_user_1 and role::text = 'qa_manager' and department = 'qa'
+  ) then
+    raise exception 'Nối account phải đồng bộ assignment và coarse role QA manager';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user_1::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_directory := public.rpc_item_permission_directory(null);
+  if coalesce((v_directory->>'ok')::boolean, false) is not true then
+    raise exception 'QA manager đã nối phải có principal quản lý hợp lệ: %', v_directory;
+  end if;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  v_result := public.rpc_link_item_permission_account(
+    v_person_2, v_user_1, 'Thử dùng account đã nối', 1
+  );
+  if v_result->>'error_code' <> 'ACCOUNT_ALREADY_LINKED' then
+    raise exception 'Một account không được nối hai performer: %', v_result;
+  end if;
+
+  v_result := public.rpc_upsert_item_permission_staff(
+    v_person_1, jsonb_build_object('department', 'xsx'),
+    'Thử đổi bộ phận khi còn account', v_version
+  );
+  if v_result->>'error_code' <> 'ACCOUNT_RELINK_REQUIRED' then
+    raise exception 'Hồ sơ linked không được đổi department trước khi unlink: %', v_result;
+  end if;
+  v_result := public.rpc_upsert_item_permission_staff(
+    v_person_1, jsonb_build_object('access_class', 'qa_progress_editor'),
+    'Thử đổi phân loại khi còn account', v_version
+  );
+  if v_result->>'error_code' <> 'ACCOUNT_RELINK_REQUIRED' then
+    raise exception 'Hồ sơ linked không được đổi access_class trước khi unlink: %', v_result;
+  end if;
+
+  v_directory := public.rpc_item_permission_directory('E2E QA Không Phạm Vi');
+  if not exists (
+    select 1 from jsonb_array_elements(v_directory->'people') person
+    where (person->>'person_id')::uuid = v_person_1
+      and (person->>'version')::integer = v_version
+      and person->>'account_status' = 'linked'
+  ) then
+    raise exception 'Directory phải giữ version/account_status sau nối: %', v_directory;
+  end if;
+  if not exists (
+    select 1 from public.audit_logs
+    where table_name = 'vmp_performers' and record_id = v_person_1::text
+      and change_reason = 'Admin xác nhận nối QA'
+      and old_data ? 'performer' and old_data ? 'profile'
+      and new_data ? 'performer' and new_data ? 'profile'
+      and old_data #>> '{profile,role}' = 'viewer'
+      and new_data #>> '{profile,role}' = 'qa_manager'
+  ) then
+    raise exception 'Nối account phải audit old/new profile + performer và lý do';
+  end if;
+
+  v_result := public.rpc_link_item_permission_account(
+    v_person_1, null, 'Admin xác nhận gỡ QA manager', v_version
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or v_result->>'user_id' is not null
+      or v_result->>'account_status' <> 'unlinked'
+      or (v_result->>'version')::integer <> v_version + 1 then
+    raise exception 'Admin phải gỡ được account với optimistic version: %', v_result;
+  end if;
+  if not exists (
+      select 1 from public.vmp_item_assignments
+      where id = v_assignment and user_id is null
+        and unresolved_reason = 'account_unlinked'
+    ) or not exists (
+      select 1 from public.profiles
+      where id = v_user_1 and role::text = 'viewer' and department = 'qa'
+    ) then
+    raise exception 'Gỡ account phải đồng bộ assignment và hạ qa_manager về viewer';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_user_1::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_item_permission_account_candidates(null);
+  if v_result->>'error_code' <> 'FORBIDDEN' then
+    raise exception 'Account đã gỡ manager không được giữ đường quản trị: %', v_result;
+  end if;
+  v_directory := public.rpc_item_permission_directory(null);
+  if coalesce((v_directory->>'ok')::boolean, true) is not false then
+    raise exception 'Account đã gỡ manager không được gọi RPC quản lý: %', v_directory;
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+  v_result := public.rpc_upsert_item_permission_staff(
+    null,
+    jsonb_build_object(
+      'full_name', 'E2E QA Account Admin', 'department', 'qa',
+      'access_class', 'qa_manager',
+      'scope_departments', '[]'::jsonb,
+      'scope_factory_ids', '[]'::jsonb,
+      'scope_area_ids', '[]'::jsonb,
+      'scope_line_ids', '[]'::jsonb,
+      'is_active', true
+    ),
+    'Tạo QA để kiểm bảo vệ Admin', 0
+  );
+  v_admin_link_person := (v_result->>'person_id')::uuid;
+  v_result := public.rpc_link_item_permission_account(
+    v_admin_link_person, v_admin, 'Nối profile Admin', 1
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or not exists (
+        select 1 from public.profiles where id = v_admin and role::text = 'admin'
+      ) then
+    raise exception 'Nối QA không được hạ coarse role Admin: %', v_result;
+  end if;
+  v_result := public.rpc_link_item_permission_account(
+    v_admin_link_person, null, 'Gỡ profile Admin', 2
+  );
+  if coalesce((v_result->>'ok')::boolean, false) is not true
+      or not exists (
+        select 1 from public.profiles where id = v_admin and role::text = 'admin'
+      ) then
+    raise exception 'Gỡ QA không được hạ coarse role Admin: %', v_result;
+  end if;
+
+  /* QA scope rỗng hợp lệ; người ngoài QA vẫn fail closed đủ hierarchy. */
+  insert into public.vmp_performers (
+    performer_name, department, access_class, scope_departments,
+    access_areas, scope_factory_ids, scope_area_ids, scope_line_ids,
+    is_active, updated_by
+  ) values (
+    'E2E Non QA Scope Rỗng', 'xsx', 'view_only', '{}'::text[],
+    '{}'::text[], '{}'::uuid[], '{}'::uuid[], '{}'::uuid[], true, v_admin
+  ) returning id into v_non_qa_person;
+  update public.vmp_performers set is_active = false where id = v_person_2;
+  insert into public.vmp_item_assignments (
+    validation_code, performer_id, staff_name, assignment_kind, source,
+    source_text, unresolved_reason, is_active, change_reason
+  ) values (
+    v_code, v_person_2, 'E2E QA Import Không Phạm Vi', 'qa', 'qa_manager',
+    'E2E QA Import Không Phạm Vi', 'account_unlinked', true,
+    'Fixture performer inactive'
+  ) returning id into v_assignment;
+  update public.vmp_item_assignments set user_id = v_user_2
+  where id = v_assignment;
+
+  v_preflight := public.rpc_item_permission_preflight();
+  if exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' in ('INCOMPLETE_ACTIVE_PERSON', 'INCOMPLETE_SCOPE_HIERARCHY')
+      and (error->>'record_id')::uuid in (v_person_1, v_person_2)
+  ) then
+    raise exception 'Preflight không được block QA chỉ vì scope rỗng: %', v_preflight;
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' = 'INCOMPLETE_ACTIVE_PERSON'
+      and (error->>'record_id')::uuid = v_non_qa_person
+  ) or not exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' = 'INCOMPLETE_SCOPE_HIERARCHY'
+      and (error->>'record_id')::uuid = v_non_qa_person
+  ) then
+    raise exception 'Preflight phải giữ fail-closed hierarchy cho non-QA: %', v_preflight;
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' = 'ASSIGNMENT_PERSON_INACTIVE'
+      and (error->>'record_id')::uuid = v_assignment
+  ) or not exists (
+    select 1 from jsonb_array_elements(v_preflight->'blocking_errors') error
+    where error->>'code' = 'ASSIGNMENT_ACCOUNT_MISMATCH'
+      and (error->>'record_id')::uuid = v_assignment
+  ) then
+    raise exception 'Preflight phải chặn assignment inactive/account mismatch: %', v_preflight;
+  end if;
+
+  delete from public.vmp_item_assignments
+  where performer_id in (v_person_1, v_person_2, v_admin_link_person, v_non_qa_person);
+  delete from public.vmp_performers
+  where id in (v_person_1, v_person_2, v_admin_link_person, v_non_qa_person);
+  update public.profiles
+  set role = v_old_admin_profile.role,
+      department = v_old_admin_profile.department,
+      is_active = v_old_admin_profile.is_active
+  where id = v_admin;
+  update public.profiles
+  set role = v_old_user_1_profile.role,
+      department = v_old_user_1_profile.department,
+      is_active = v_old_user_1_profile.is_active
+  where id = v_user_1;
+  update public.profiles
+  set role = v_old_user_2_profile.role,
+      department = v_old_user_2_profile.department,
+      is_active = v_old_user_2_profile.is_active
+  where id = v_user_2;
+  update public.vmp_performers set user_id = v_admin
+  where id = v_old_admin_person;
+  update public.vmp_performers set user_id = v_user_1
+  where id = v_old_user_1_person;
+  update public.vmp_performers set user_id = v_user_2
+  where id = v_old_user_2_person;
 end
 $test$;
 
