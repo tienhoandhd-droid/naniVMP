@@ -92,6 +92,10 @@ export class AssignmentOperationState {
   isActive(token: number): boolean {
     return this.#activeToken === token;
   }
+
+  invalidateIntent(): boolean {
+    return this.#saving;
+  }
 }
 
 export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = false, onAssignmentsChanged }: {
@@ -264,11 +268,11 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
               }} placeholder="Ví dụ: CCTB01/2026.01-OQ" /></label>
             {personIsQa ? (
               <label>Vai trò QA trong hạng mục
-                <select className="pq-o" aria-label="Vai trò QA trong hạng mục" value={qaRole}
+                <select className="pq-o" aria-label="Vai trò QA trong hạng mục" value={qaRole} disabled={saving}
                   onChange={(event) => {
                     selectionSequence.current += 1;
                     intentSequence.current += 1;
-                    setSaving(false);
+                    operationState.current.invalidateIntent();
                     setQaRole(event.target.value as QaAssignmentRole);
                   }}>
                   <option value="primary">QA phụ trách chính</option>
