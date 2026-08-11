@@ -50,8 +50,19 @@ begin
       'authenticated',
       'public.rpc_upsert_source_object(text,text,jsonb)',
       'EXECUTE'
-    ) then
+  ) then
     raise exception 'SOURCE_WRITER_AUTH_FIXTURE: authenticated thiếu EXECUTE writer';
+  end if;
+  if has_function_privilege(
+      'service_role',
+      'public.rpc_set_item_performer_by_id(text,uuid,text)',
+      'EXECUTE'
+    ) is distinct from true or has_function_privilege(
+      'service_role',
+      'public.rpc_upsert_source_object(text,text,jsonb)',
+      'EXECUTE'
+    ) is distinct from true then
+    raise exception 'SOURCE_WRITER_AUTH_FIXTURE: service_role thiếu EXECUTE writer';
   end if;
 
   select profile.id into v_admin
@@ -156,7 +167,23 @@ begin
   into v_plan_before
   from public.vmp_plan_items item
   where item.object_code = v_object_code;
-  select count(*) into v_audit_before from public.audit_logs;
+  /* Shared DB: audit snapshots only cover records these writer calls can touch. */
+  select count(*) into v_audit_before
+  from public.audit_logs audit
+  where (
+    audit.table_name = 'vmp_source_objects'
+    and audit.record_id = v_object_code
+    and audit.validation_code = v_validation_code
+  ) or (
+    audit.table_name = 'vmp_plan_items'
+    and exists (
+      select 1
+      from public.vmp_plan_items item
+      where item.object_code = v_object_code
+        and item.validation_code = audit.validation_code
+        and item.id::text = audit.record_id
+    )
+  );
 
   /* Canonical QA manager remains allowed for QA targets. Each probe is rolled
    * back locally so later cases see the identical source/plan snapshot. */
@@ -231,7 +258,22 @@ begin
     into v_plan_after
     from public.vmp_plan_items item
     where item.object_code = v_object_code;
-    select count(*) into v_audit_after from public.audit_logs;
+    select count(*) into v_audit_after
+    from public.audit_logs audit
+    where (
+      audit.table_name = 'vmp_source_objects'
+      and audit.record_id = v_object_code
+      and audit.validation_code = v_validation_code
+    ) or (
+      audit.table_name = 'vmp_plan_items'
+      and exists (
+        select 1
+        from public.vmp_plan_items item
+        where item.object_code = v_object_code
+          and item.validation_code = audit.validation_code
+          and item.id::text = audit.record_id
+      )
+    );
     v_hybrid_set_mutated := v_source_after is distinct from v_source_before
       or v_plan_after is distinct from v_plan_before
       or v_audit_after is distinct from v_audit_before;
@@ -251,7 +293,22 @@ begin
     into v_plan_after
     from public.vmp_plan_items item
     where item.object_code = v_object_code;
-    select count(*) into v_audit_after from public.audit_logs;
+    select count(*) into v_audit_after
+    from public.audit_logs audit
+    where (
+      audit.table_name = 'vmp_source_objects'
+      and audit.record_id = v_object_code
+      and audit.validation_code = v_validation_code
+    ) or (
+      audit.table_name = 'vmp_plan_items'
+      and exists (
+        select 1
+        from public.vmp_plan_items item
+        where item.object_code = v_object_code
+          and item.validation_code = audit.validation_code
+          and item.id::text = audit.record_id
+      )
+    );
     v_hybrid_upsert_mutated := v_source_after is distinct from v_source_before
       or v_plan_after is distinct from v_plan_before
       or v_audit_after is distinct from v_audit_before;
@@ -348,7 +405,22 @@ begin
   into v_plan_after
   from public.vmp_plan_items item
   where item.object_code = v_object_code;
-  select count(*) into v_audit_after from public.audit_logs;
+  select count(*) into v_audit_after
+  from public.audit_logs audit
+  where (
+    audit.table_name = 'vmp_source_objects'
+    and audit.record_id = v_object_code
+    and audit.validation_code = v_validation_code
+  ) or (
+    audit.table_name = 'vmp_plan_items'
+    and exists (
+      select 1
+      from public.vmp_plan_items item
+      where item.object_code = v_object_code
+        and item.validation_code = audit.validation_code
+        and item.id::text = audit.record_id
+    )
+  );
   if v_source_after is distinct from v_source_before
       or v_plan_after is distinct from v_plan_before
       or v_audit_after is distinct from v_audit_before then
