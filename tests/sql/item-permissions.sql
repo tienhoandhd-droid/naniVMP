@@ -129,6 +129,8 @@ declare
   v_old_admin_profile public.profiles%rowtype;
   v_old_user_1_profile public.profiles%rowtype;
   v_old_user_2_profile public.profiles%rowtype;
+  v_reason_profile_before public.profiles%rowtype;
+  v_reason_profile_after public.profiles%rowtype;
   v_assignment uuid;
   v_code text;
   v_version integer;
@@ -137,6 +139,8 @@ declare
   v_preflight jsonb;
   v_account_lock_key bigint;
   v_link_lock_key bigint;
+  v_reason_audit_before bigint;
+  v_reason_audit_after bigint;
 begin
   select id into v_admin
   from public.profiles
@@ -376,6 +380,60 @@ begin
   ) then
     raise exception 'Fixture account lock phải bắt đầu ở trạng thái chưa khóa';
   end if;
+  select * into v_reason_profile_before
+  from public.profiles where id = v_user_2;
+  select count(*) into v_reason_audit_before
+  from public.audit_logs
+  where table_name = 'profiles' and record_id = v_user_2::text;
+
+  v_result := public.rpc_set_user_role(
+    v_user_2, 'department_user', 'xsx', null, 'co'
+  );
+  select * into v_reason_profile_after
+  from public.profiles where id = v_user_2;
+  select count(*) into v_reason_audit_after
+  from public.audit_logs
+  where table_name = 'profiles' and record_id = v_user_2::text;
+  if v_result->>'error_code' <> 'REASON_REQUIRED'
+      or to_jsonb(v_reason_profile_after) is distinct from
+         to_jsonb(v_reason_profile_before)
+      or v_reason_profile_after.updated_at is distinct from
+         v_reason_profile_before.updated_at
+      or v_reason_audit_after <> v_reason_audit_before
+      or exists (
+        select 1 from pg_catalog.pg_locks
+        where locktype = 'advisory' and pid = pg_catalog.pg_backend_pid()
+          and classid = ((v_account_lock_key >> 32) & 4294967295)::oid
+          and objid = (v_account_lock_key & 4294967295)::oid
+          and objsubid = 1 and mode = 'ExclusiveLock' and granted
+      ) then
+    raise exception 'set-role reason null phải không lock/update/audit: %', v_result;
+  end if;
+
+  v_result := public.rpc_set_user_role(
+    v_user_2, 'department_user', 'xsx', '   ', 'co'
+  );
+  select * into v_reason_profile_after
+  from public.profiles where id = v_user_2;
+  select count(*) into v_reason_audit_after
+  from public.audit_logs
+  where table_name = 'profiles' and record_id = v_user_2::text;
+  if v_result->>'error_code' <> 'REASON_REQUIRED'
+      or to_jsonb(v_reason_profile_after) is distinct from
+         to_jsonb(v_reason_profile_before)
+      or v_reason_profile_after.updated_at is distinct from
+         v_reason_profile_before.updated_at
+      or v_reason_audit_after <> v_reason_audit_before
+      or exists (
+        select 1 from pg_catalog.pg_locks
+        where locktype = 'advisory' and pid = pg_catalog.pg_backend_pid()
+          and classid = ((v_account_lock_key >> 32) & 4294967295)::oid
+          and objid = (v_account_lock_key & 4294967295)::oid
+          and objsubid = 1 and mode = 'ExclusiveLock' and granted
+      ) then
+    raise exception 'set-role reason blank phải không lock/update/audit: %', v_result;
+  end if;
+
   v_result := public.rpc_set_user_role(
     v_user_2, 'viewer', 'qa', '  Kiểm khóa account set-role  ',
     v_old_user_2_profile.pham_vi
@@ -397,29 +455,6 @@ begin
       and change_reason = 'Kiểm khóa account set-role'
   ) then
     raise exception 'Audit set-role phải lưu reason đã btrim';
-  end if;
-
-  v_result := public.rpc_set_user_role(
-    v_user_2, 'department_user', 'xsx', null, 'co'
-  );
-  if v_result->>'error_code' <> 'REASON_REQUIRED'
-      or not exists (
-        select 1 from public.profiles
-        where id = v_user_2 and role::text = 'viewer' and department = 'qa'
-          and pham_vi is not distinct from v_old_user_2_profile.pham_vi
-      ) then
-    raise exception 'set-role reason null phải bị từ chối trước mọi ghi: %', v_result;
-  end if;
-  v_result := public.rpc_set_user_role(
-    v_user_2, 'department_user', 'xsx', '   ', 'co'
-  );
-  if v_result->>'error_code' <> 'REASON_REQUIRED'
-      or not exists (
-        select 1 from public.profiles
-        where id = v_user_2 and role::text = 'viewer' and department = 'qa'
-          and pham_vi is not distinct from v_old_user_2_profile.pham_vi
-      ) then
-    raise exception 'set-role reason blank phải bị từ chối trước mọi ghi: %', v_result;
   end if;
 
   update public.vmp_performers set is_active = false where id = v_person_2;
