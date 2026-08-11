@@ -27,6 +27,7 @@ export type EditableTimelineField =
 
 export type AccountStatus = "linked" | "unlinked" | "inactive";
 export type MatchStatus = "unique" | "ambiguous";
+export type QaAssignmentRole = "primary" | "collaborator";
 
 export interface DirectoryPerson {
   person_id: string;
@@ -71,6 +72,7 @@ export interface ItemAssignment {
   staff_name: string;
   employee_code: string | null;
   assignment_kind: "qa" | "equipment_department";
+  assignment_role: QaAssignmentRole | null;
   source: string;
   source_text: string | null;
   unresolved_reason: string | null;
@@ -113,11 +115,21 @@ export function normalizePersonName(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
 }
 
+export function isQaAccessClass(value: AccessClass | null): boolean {
+  return value === "qa_progress_editor" || value === "qa_manager";
+}
+
+export function requiresHierarchyScope(value: AccessClass | null): boolean {
+  return value !== null && !isQaAccessClass(value);
+}
+
 export function isDirectoryPersonComplete(person: DirectoryPerson): boolean {
+  if (!person.department?.trim() || !person.access_class) return false;
+  if (isQaAccessClass(person.access_class)) {
+    return person.department === "qa";
+  }
   return Boolean(
-    person.department?.trim()
-    && person.access_class
-    && person.scope_departments.length
+    person.scope_departments.length
     && person.scope_factory_ids.length
     && person.scope_area_ids.length
     && person.scope_line_ids.length,

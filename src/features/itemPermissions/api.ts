@@ -9,6 +9,7 @@ import {
   type MatchStatus,
   type PermissionPersonPatch,
   type PermissionPreflight,
+  type QaAssignmentRole,
 } from "./types.ts";
 import type { RootScopeOption, ScopeCatalog, ScopeOption } from "./scopeHierarchy.ts";
 
@@ -160,8 +161,13 @@ export function decodeScopeCatalog(value: unknown): ScopeCatalog {
   };
 }
 
-function decodeAssignment(value: unknown): ItemAssignment {
+export function decodeAssignment(value: unknown): ItemAssignment {
   const row = objectValue(value, "Phân công");
+  const assignmentRoleValue = row.assignment_role;
+  let assignmentRole: QaAssignmentRole | null = null;
+  if (assignmentRoleValue !== null && assignmentRoleValue !== undefined) {
+    assignmentRole = enumValue<QaAssignmentRole>(row, "assignment_role", ["primary", "collaborator"]);
+  }
   return {
     assignment_id: requiredString(row, "assignment_id"),
     validation_code: requiredString(row, "validation_code"),
@@ -170,6 +176,7 @@ function decodeAssignment(value: unknown): ItemAssignment {
     staff_name: requiredString(row, "staff_name"),
     employee_code: nullableString(row, "employee_code"),
     assignment_kind: enumValue(row, "assignment_kind", ["qa", "equipment_department"]),
+    assignment_role: assignmentRole,
     source: requiredString(row, "source"),
     source_text: nullableString(row, "source_text"),
     unresolved_reason: nullableString(row, "unresolved_reason"),
