@@ -33,6 +33,7 @@ interface StaffDirectoryPanelProps {
   validAreas?: readonly string[];
   onSelect: (person: DirectoryPerson | null) => void;
   revision?: number;
+  refreshPersonId?: string | null;
 }
 
 const emptyForm = {
@@ -60,7 +61,32 @@ export async function reloadSelectedDirectoryPerson<T extends Pick<DirectoryPers
   return findDirectoryPersonById(people, selected.person_id);
 }
 
-export default function StaffDirectoryPanel({ canEdit, onSelect, revision = 0 }: StaffDirectoryPanelProps) {
+export async function reloadDirectoryMutationTarget<T extends Pick<DirectoryPerson, "person_id" | "full_name">>({
+  targetPersonId,
+  getCurrentSelectedPersonId,
+  knownPeople,
+  search,
+}: {
+  targetPersonId: string;
+  getCurrentSelectedPersonId: () => string | null;
+  knownPeople: ReadonlyMap<string, T>;
+  search: (query: string) => Promise<T[]>;
+}): Promise<{ person: T | null; shouldSelect: boolean }> {
+  const target = knownPeople.get(targetPersonId);
+  if (!target) return { person: null, shouldSelect: false };
+  const person = await reloadSelectedDirectoryPerson(target, search);
+  return {
+    person,
+    shouldSelect: person !== null && getCurrentSelectedPersonId() === targetPersonId,
+  };
+}
+
+export default function StaffDirectoryPanel({
+  canEdit,
+  onSelect,
+  revision = 0,
+  refreshPersonId = null,
+}: StaffDirectoryPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DirectoryPerson[]>([]);
   const [selected, setSelected] = useState<DirectoryPerson | null>(null);
@@ -82,6 +108,9 @@ export default function StaffDirectoryPanel({ canEdit, onSelect, revision = 0 }:
   const [importing, setImporting] = useState(false);
   const requestSequence = useRef(0);
   const lastDirectoryRevision = useRef(revision);
+  const knownPeople = useRef(new Map<string, DirectoryPerson>());
+  const currentSelectedPersonId = useRef<string | null>(null);
+  currentSelectedPersonId.current = selected?.person_id ?? null;
 
   useEffect(() => {
     let active = true;
@@ -134,6 +163,7 @@ export default function StaffDirectoryPanel({ canEdit, onSelect, revision = 0 }:
   }, [query, selected]);
 
   const choose = (person: DirectoryPerson) => {
+    knownPeople.current.set(person.person_id, person);
     setSelected(person);
     setQuery(person.full_name);
     setResults([]);
@@ -160,20 +190,28 @@ export default function StaffDirectoryPanel({ canEdit, onSelect, revision = 0 }:
   useEffect(() => {
     if (revision === lastDirectoryRevision.current) return;
     lastDirectoryRevision.current = revision;
-    if (!selected) return;
+    if (!refreshPersonId) return;
     let active = true;
-    reloadSelectedDirectoryPerson(selected, searchPermissionDirectory).then((refreshed) => {
+    reloadDirectoryMutationTarget({
+      targetPersonId: refreshPersonId,
+      getCurrentSelectedPersonId: () => currentSelectedPersonId.current,
+      knownPeople: knownPeople.current,
+      search: searchPermissionDirectory,
+    }).then(({ person, shouldSelect }) => {
       if (!active) return;
-      if (refreshed) {
-        choose(refreshed);
-      } else {
-        setMessage(`Đã thay đổi liên kết nhưng chưa tìm thấy lại hồ sơ ${selected.person_id}. Hãy tải lại danh bạ.`);
+      if (person) {
+        knownPeople.current.set(person.person_id, person);
+        if (shouldSelect) choose(person);
+      } else if (currentSelectedPersonId.current === refreshPersonId) {
+        setMessage(`Đã thay đổi liên kết nhưng chưa tìm thấy lại hồ sơ ${refreshPersonId}. Hãy tải lại danh bạ.`);
       }
     }).catch((error) => {
-      if (active) setMessage(`Đã thay đổi liên kết nhưng chưa tải lại được: ${(error as Error).message}`);
+      if (active && currentSelectedPersonId.current === refreshPersonId) {
+        setMessage(`Đã thay đổi liên kết nhưng chưa tải lại được: ${(error as Error).message}`);
+      }
     });
     return () => { active = false; };
-  }, [revision, selected]);
+  }, [revision, refreshPersonId]);
 
   const save = async () => {
     if (!canEdit) return;

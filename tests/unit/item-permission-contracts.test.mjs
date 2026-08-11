@@ -110,6 +110,50 @@ test("chỉ Admin nhìn thấy thao tác nối tài khoản", async () => {
   assert.match(admin, /Lý do nối tài khoản/);
 });
 
+test("ứng viên tài khoản không hoạt động bị khóa và có nhãn trạng thái", async () => {
+  const { AccountCandidateOption } = await import(
+    "../../src/features/itemPermissions/AccountLinkPanel.tsx"
+  );
+  const markup = renderToStaticMarkup(React.createElement("select", null,
+    React.createElement(AccountCandidateOption, {
+      candidate: {
+        user_id: "user-inactive",
+        email: "inactive@vmp.local",
+        full_name: "QA Không hoạt động",
+        role: "viewer",
+        department: "qa",
+        is_active: false,
+        linked_person_id: null,
+      },
+    }),
+  ));
+
+  assert.match(markup, /disabled=""/);
+  assert.match(markup, /tài khoản không hoạt động/);
+});
+
+test("hoàn tất nối muộn vẫn báo target A sau khi người dùng chọn B", async () => {
+  const { completeAccountLinkMutation } = await import(
+    "../../src/features/itemPermissions/AccountLinkPanel.tsx"
+  );
+  let currentPersonId = "person-a";
+  let resolveMutation;
+  const mutation = new Promise((resolve) => { resolveMutation = resolve; });
+  const linked = [];
+
+  const completion = completeAccountLinkMutation({
+    targetPersonId: "person-a",
+    mutate: () => mutation,
+    getCurrentPersonId: () => currentPersonId,
+    onLinked: (personId) => linked.push(personId),
+  });
+  currentPersonId = "person-b";
+  resolveMutation();
+
+  assert.deepEqual(await completion, { showResult: false });
+  assert.deepEqual(linked, ["person-a"]);
+});
+
 test("tải lại danh bạ sau nối chọn lại đúng person_id khi trùng tên", async () => {
   const { reloadSelectedDirectoryPerson } = await import(
     "../../src/features/itemPermissions/StaffDirectoryPanel.tsx"
@@ -127,13 +171,48 @@ test("tải lại danh bạ sau nối chọn lại đúng person_id khi trùng t
   assert.equal(refreshed, selected);
 });
 
-test("QA manager được phân công nhưng không được sửa danh bạ hoặc nối tài khoản", async () => {
-  const source = await readFile("src/pages/PhanQuyenPage.tsx", "utf8");
+test("refresh mutation target A giữ nguyên lựa chọn B hiện tại", async () => {
+  const { reloadDirectoryMutationTarget } = await import(
+    "../../src/features/itemPermissions/StaffDirectoryPanel.tsx"
+  );
+  const a = { person_id: "person-a", full_name: "QA A" };
+  const b = { person_id: "person-b", full_name: "QA B" };
+  let searched = "";
 
-  assert.match(source, /const canManageDirectory = isAdmin \|\| user\?\.role === "admin"/);
-  assert.match(source, /const canManageQaAssignments = canManageDirectory\s*\|\| user\?\.role === "qa_manager"\s*\|\| user\?\.accessClass === "qa_manager"/);
-  assert.match(source, /<AssignmentPanel person=\{person\} canEdit=\{canManageQaAssignments\}/);
-  assert.doesNotMatch(source, /lienKetTaiKhoan/);
+  const result = await reloadDirectoryMutationTarget({
+    targetPersonId: a.person_id,
+    getCurrentSelectedPersonId: () => b.person_id,
+    knownPeople: new Map([[a.person_id, a], [b.person_id, b]]),
+    search: async (query) => {
+      searched = query;
+      return [a];
+    },
+  });
+
+  assert.equal(searched, "QA A");
+  assert.equal(result.person, a);
+  assert.equal(result.shouldSelect, false);
+});
+
+test("QA manager được phân công nhưng không được sửa danh bạ hoặc nối tài khoản", async () => {
+  const { resolveDirectoryWorkspaceCapabilities } = await import(
+    "../../src/features/itemPermissions/workspaceCapabilities.ts"
+  );
+
+  assert.deepEqual(resolveDirectoryWorkspaceCapabilities(false, { role: "qa_manager" }), {
+    canManageDirectory: false,
+    canManageQaAssignments: true,
+  });
+  assert.deepEqual(resolveDirectoryWorkspaceCapabilities(false, {
+    role: "viewer", accessClass: "qa_manager",
+  }), {
+    canManageDirectory: false,
+    canManageQaAssignments: true,
+  });
+  assert.deepEqual(resolveDirectoryWorkspaceCapabilities(true, { role: "viewer" }), {
+    canManageDirectory: true,
+    canManageQaAssignments: true,
+  });
 });
 
 test("decoder danh bạ giữ dòng legacy thiếu cấu hình để có thể sửa", async () => {
