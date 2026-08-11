@@ -189,17 +189,34 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       return;
     }
     let active = true;
-    setFieldPermission(null);
-    setPermissionError("");
-    fetchTimelineFieldPermission(act.id).then((permission) => {
-      if (active) setFieldPermission(permission);
-    }).catch((error: unknown) => {
-      if (!active) return;
-      setPermissionError((error as Error).message || "Không tải được quyền hạng mục");
-      // Không biết server đang ở mode nào thì khóa để tránh gửi nhầm cột.
-      setFieldPermission({ mode: "enforced", canView: true, editableFields: [], reason: "Chỉ xem" });
-    });
-    return () => { active = false; };
+    let requestVersion = 0;
+    const reloadPermission = () => {
+      const currentRequest = ++requestVersion;
+      // Mỗi lần kiểm lại phải khóa ngay: dữ liệu quyền cũ không được dùng
+      // trong lúc tab vừa quay lại hoặc request mới còn đang bay.
+      setFieldPermission(null);
+      setPermissionError("");
+      fetchTimelineFieldPermission(act.id).then((permission) => {
+        if (active && currentRequest === requestVersion) setFieldPermission(permission);
+      }).catch((error: unknown) => {
+        if (!active || currentRequest !== requestVersion) return;
+        setPermissionError((error as Error).message || "Không tải được quyền hạng mục");
+        // Không biết quyền mới thì khóa để lỗi mạng không thành fail-open.
+        setFieldPermission({ mode: "enforced", canView: true, editableFields: [], reason: "Chỉ xem" });
+      });
+    };
+    const reloadWhenVisible = () => {
+      if (document.visibilityState !== "hidden") reloadPermission();
+    };
+    reloadPermission();
+    window.addEventListener("focus", reloadWhenVisible);
+    document.addEventListener("visibilitychange", reloadWhenVisible);
+    return () => {
+      active = false;
+      requestVersion += 1;
+      window.removeEventListener("focus", reloadWhenVisible);
+      document.removeEventListener("visibilitychange", reloadWhenVisible);
+    };
   }, [act.id, editableFields, permissionMode]);
   const isEnforced = fieldPermission?.mode === "enforced";
   const permissionLoading = fieldPermission == null;

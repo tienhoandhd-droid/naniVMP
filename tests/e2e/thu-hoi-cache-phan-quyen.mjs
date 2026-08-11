@@ -196,7 +196,8 @@ try {
   collaboratorAssigned = false;
   const rightsBeforeRevoke = rightsReads;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await page.waitForFunction(() => !document.body.innerText.includes("TB-BI-MAT"));
+  await page.waitForFunction((secretCode) => ![...document.querySelectorAll("tr")]
+    .some((row) => row.innerText.includes(secretCode)), {}, secret.code);
   await page.waitForFunction(async () => {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
