@@ -83,6 +83,32 @@ export async function reloadDirectoryMutationTarget<T extends Pick<DirectoryPers
   };
 }
 
+export async function completeDirectorySaveWhenCurrent<T extends Pick<DirectoryPerson, "person_id" | "full_name">>({
+  targetPersonId,
+  savedPersonId,
+  submittedFullName,
+  getCurrentSelectedPersonId,
+  knownPeople,
+  search,
+  onSelect,
+}: {
+  targetPersonId: string | null;
+  savedPersonId: string;
+  submittedFullName: string;
+  getCurrentSelectedPersonId: () => string | null;
+  knownPeople: Map<string, T>;
+  search: (query: string) => Promise<T[]>;
+  onSelect: (person: T) => void;
+}): Promise<{ outcome: "selected" | "stale" | "missing"; person: T | null }> {
+  const people = await search(submittedFullName);
+  const person = findDirectoryPersonById(people, savedPersonId);
+  if (!person) return { outcome: "missing", person: null };
+  knownPeople.set(person.person_id, person);
+  if (getCurrentSelectedPersonId() !== targetPersonId) return { outcome: "stale", person };
+  onSelect(person);
+  return { outcome: "selected", person };
+}
+
 export default function StaffDirectoryPanel({
   canEdit,
   onSelect,
@@ -233,10 +259,12 @@ export default function StaffDirectoryPanel({
 
   const save = async () => {
     if (!canEdit || !form.accessClass) return;
+    const targetPersonId = selected?.person_id ?? null;
+    const submittedFullName = form.fullName.trim();
     setSaving(true);
     setMessage("");
     try {
-      const savedResult = await savePermissionPerson(selected?.person_id || null, {
+      const savedResult = await savePermissionPerson(targetPersonId, {
         employee_code: form.employeeCode.trim() || null,
         full_name: form.fullName.trim(),
         department: form.department,
@@ -248,23 +276,31 @@ export default function StaffDirectoryPanel({
         scope_line_ids: form.scope.lines,
         email_sent_confirmed: form.emailSent,
         is_active: true,
-      }, `Cập nhật danh bạ nhân sự & quyền cho ${form.fullName.trim()}`, selected?.version ?? null);
-      let refreshed: DirectoryPerson[];
+      }, `Cập nhật danh bạ nhân sự & quyền cho ${submittedFullName}`, selected?.version ?? null);
+      let completion: { outcome: "selected" | "stale" | "missing"; person: DirectoryPerson | null };
       try {
-        refreshed = await searchPermissionDirectory(form.fullName.trim());
+        completion = await completeDirectorySaveWhenCurrent({
+          targetPersonId,
+          savedPersonId: savedResult.person_id,
+          submittedFullName,
+          getCurrentSelectedPersonId: () => currentSelectedPersonId.current,
+          knownPeople: knownPeople.current,
+          search: searchPermissionDirectory,
+          onSelect: choose,
+        });
       } catch (error) {
-        setMessage(`Đã lưu hồ sơ nhưng chưa tải lại được: ${(error as Error).message}`);
+        if (currentSelectedPersonId.current === targetPersonId) {
+          setMessage(`Đã lưu hồ sơ nhưng chưa tải lại được: ${(error as Error).message}`);
+        }
         return;
       }
-      const saved = findDirectoryPersonById(refreshed, savedResult.person_id);
-      if (!saved) {
+      if (completion.outcome === "missing" && currentSelectedPersonId.current === targetPersonId) {
         setMessage(`Đã lưu hồ sơ nhưng chưa tìm thấy bản mới ${savedResult.person_id}. Hãy tải lại danh bạ.`);
         return;
       }
-      choose(saved);
-      setMessage("Đã lưu hồ sơ danh bạ");
+      if (completion.outcome === "selected") setMessage("Đã lưu hồ sơ danh bạ");
     } catch (error) {
-      setMessage((error as Error).message);
+      if (currentSelectedPersonId.current === targetPersonId) setMessage((error as Error).message);
     } finally {
       setSaving(false);
     }
