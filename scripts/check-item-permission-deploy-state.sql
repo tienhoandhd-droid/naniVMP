@@ -130,6 +130,19 @@ select format(
 )
 from supabase_migrations.schema_migrations;
 
+select format(
+  'ITEM_PERMISSION_DEPLOY_FUNCTION|%s|%s',
+  procedure.oid::regprocedure::text,
+  md5(pg_get_functiondef(procedure.oid))
+)
+from pg_proc procedure
+where procedure.oid in (
+  'public.rpc_set_item_performer_by_id(text,uuid,text)'::regprocedure::oid,
+  'public.rpc_upsert_source_object(text,text,jsonb)'::regprocedure::oid,
+  'public.vmp_upsert_source_object_before_person_id(text,text,jsonb)'::regprocedure::oid
+)
+order by procedure.oid::regprocedure::text;
+
 do $assert_final_state$
 declare
   v_set_writer regprocedure :=
@@ -140,13 +153,97 @@ declare
     'public.vmp_upsert_source_object_before_person_id(text,text,jsonb)'::regprocedure;
   v_principal_helper regprocedure :=
     'public.vmp_manager_principal(uuid)'::regprocedure;
-  v_set_definition text;
-  v_source_definition text;
-  v_predecessor_definition text;
   v_fixture_count bigint;
+  v_ledger_count bigint;
+  v_ledger_max text;
+  v_ledger_111200 bigint;
 begin
   if public.item_permissions_mode() is distinct from 'preview' then
     raise exception 'ITEM_PERMISSION_DEPLOY_STATE_INVALID: mode phải là preview';
+  end if;
+
+  if exists (
+    with actual(relation_name, row_count, digest) as (
+      select
+        'vmp_item_assignments'::text,
+        count(*),
+        md5(coalesce(string_agg(
+          md5(to_jsonb(row_data)::text),
+          '' order by md5(to_jsonb(row_data)::text)
+        ), ''))
+      from public.vmp_item_assignments row_data
+      union all
+      select
+        'vmp_performers',
+        count(*),
+        md5(coalesce(string_agg(
+          md5(to_jsonb(row_data)::text),
+          '' order by md5(to_jsonb(row_data)::text)
+        ), ''))
+      from public.vmp_performers row_data
+      union all
+      select
+        'vmp_plan_items',
+        count(*),
+        md5(coalesce(string_agg(
+          md5(to_jsonb(row_data)::text),
+          '' order by md5(to_jsonb(row_data)::text)
+        ), ''))
+      from public.vmp_plan_items row_data
+      union all
+      select
+        'vmp_source_objects',
+        count(*),
+        md5(coalesce(string_agg(
+          md5(to_jsonb(row_data)::text),
+          '' order by md5(to_jsonb(row_data)::text)
+        ), ''))
+      from public.vmp_source_objects row_data
+    ), expected(relation_name, row_count, digest) as (
+      values
+        (
+          'vmp_item_assignments'::text,
+          0::bigint,
+          'd41d8cd98f00b204e9800998ecf8427e'::text
+        ),
+        (
+          'vmp_performers',
+          7::bigint,
+          'ed7fb3f12ffeaef9c321df8629e0acd7'
+        ),
+        (
+          'vmp_plan_items',
+          461::bigint,
+          '990abf39e2a2e576cea1d84c50f77b16'
+        ),
+        (
+          'vmp_source_objects',
+          272::bigint,
+          'dee67ba61bbec4b6abe3df9dc2e548ec'
+        )
+    )
+    select 1
+    from (
+      (select * from actual except select * from expected)
+      union all
+      (select * from expected except select * from actual)
+    ) drift
+  ) then
+    raise exception
+      'ITEM_PERMISSION_DEPLOY_STATE_INVALID: business baseline count/digest lệch';
+  end if;
+
+  select
+    count(*),
+    max(version),
+    count(*) filter (where version = '20260811120000')
+  into v_ledger_count, v_ledger_max, v_ledger_111200
+  from supabase_migrations.schema_migrations;
+  if v_ledger_count <> 7
+      or v_ledger_max is distinct from '20260704110201'
+      or v_ledger_111200 <> 0 then
+    raise exception
+      'ITEM_PERMISSION_DEPLOY_STATE_INVALID: ledger legacy baseline lệch';
   end if;
 
   if (
@@ -215,29 +312,57 @@ begin
   end if;
 
   if exists (
-    select 1
-    from pg_proc procedure
-    cross join lateral aclexplode(
-      coalesce(procedure.proacl, acldefault('f', procedure.proowner))
-    ) privilege
-    where procedure.oid in (v_set_writer::oid, v_source_writer::oid)
-      and privilege.privilege_type = 'EXECUTE'
-      and privilege.grantee not in (
-        procedure.proowner,
-        'authenticated'::regrole::oid,
-        'service_role'::regrole::oid
+    with actual(procedure_oid, grantee, privilege_type, is_grantable) as (
+      select
+        procedure.oid,
+        privilege.grantee,
+        privilege.privilege_type,
+        privilege.is_grantable
+      from pg_proc procedure
+      cross join lateral aclexplode(
+        coalesce(procedure.proacl, acldefault('f', procedure.proowner))
+      ) privilege
+      where procedure.oid in (
+        v_set_writer::oid, v_source_writer::oid, v_predecessor::oid
       )
-  ) or exists (
+    ), expected(procedure_oid, grantee, privilege_type, is_grantable) as (
+      select
+        v_set_writer::oid,
+        procedure.proowner,
+        'EXECUTE'::text,
+        false
+      from pg_proc procedure where procedure.oid = v_set_writer::oid
+      union all
+      select v_set_writer::oid, 'authenticated'::regrole::oid, 'EXECUTE', false
+      union all
+      select v_set_writer::oid, 'service_role'::regrole::oid, 'EXECUTE', false
+      union all
+      select
+        v_source_writer::oid,
+        procedure.proowner,
+        'EXECUTE',
+        false
+      from pg_proc procedure where procedure.oid = v_source_writer::oid
+      union all
+      select v_source_writer::oid, 'authenticated'::regrole::oid, 'EXECUTE', false
+      union all
+      select v_source_writer::oid, 'service_role'::regrole::oid, 'EXECUTE', false
+      union all
+      select
+        v_predecessor::oid,
+        procedure.proowner,
+        'EXECUTE',
+        false
+      from pg_proc procedure where procedure.oid = v_predecessor::oid
+    )
     select 1
-    from pg_proc procedure
-    cross join lateral aclexplode(
-      coalesce(procedure.proacl, acldefault('f', procedure.proowner))
-    ) privilege
-    where procedure.oid = v_predecessor::oid
-      and privilege.privilege_type = 'EXECUTE'
-      and privilege.grantee <> procedure.proowner
+    from (
+      (select * from actual except select * from expected)
+      union all
+      (select * from expected except select * from actual)
+    ) acl_delta
   ) then
-    raise exception 'ITEM_PERMISSION_DEPLOY_STATE_INVALID: raw ACL ngoài allowlist';
+    raise exception 'ITEM_PERMISSION_DEPLOY_STATE_INVALID: raw ACL không exact';
   end if;
 
   if (
@@ -253,27 +378,14 @@ begin
       'ITEM_PERMISSION_DEPLOY_STATE_INVALID: source wrapper/predecessor khác owner';
   end if;
 
-  select pg_get_functiondef(v_set_writer) into v_set_definition;
-  select pg_get_functiondef(v_source_writer) into v_source_definition;
-  select pg_get_functiondef(v_predecessor) into v_predecessor_definition;
-  if position(
-      'vmp_manager_principal(auth.uid())' in v_set_definition
-    ) = 0 or position(
-      'vmp_manager_principal(auth.uid())' in v_source_definition
-    ) = 0 or position(
-      'vmp_manager_principal(auth.uid())' in v_predecessor_definition
-    ) = 0
-      or position('auth.role()' in v_set_definition) = 0
-      or position('service_role' in v_set_definition) = 0
-      or position('auth.role()' in v_source_definition) = 0
-      or position('service_role' in v_source_definition) = 0
-      or position('auth.role()' in v_predecessor_definition) = 0
-      or position('service_role' in v_predecessor_definition) = 0
-      or position('from public.profiles' in lower(v_set_definition)) > 0
-      or position('from public.profiles' in lower(v_source_definition)) > 0
-      or position('from public.profiles' in lower(v_predecessor_definition)) > 0 then
+  if md5(pg_get_functiondef(v_set_writer))
+      <> '42791e7ff398d5503c201db8cbd2edea'
+      or md5(pg_get_functiondef(v_source_writer))
+      <> '0baecd0a45f59f92b3ebe9afdc25b7bd'
+      or md5(pg_get_functiondef(v_predecessor))
+      <> '10d7c5237b3c7451a09eed95f6d50643' then
     raise exception
-      'ITEM_PERMISSION_DEPLOY_STATE_INVALID: definition chưa canonical/service';
+      'ITEM_PERMISSION_DEPLOY_STATE_INVALID: function definition hash lệch';
   end if;
 
   select (
