@@ -458,6 +458,8 @@ declare
     'public.rpc_upsert_source_object(text,text,jsonb)'::regprocedure;
   v_predecessor regprocedure :=
     'public.vmp_upsert_source_object_before_person_id(text,text,jsonb)'::regprocedure;
+  v_principal_helper regprocedure :=
+    'public.vmp_manager_principal(uuid)'::regprocedure;
   v_set_definition text;
   v_source_definition text;
   v_predecessor_definition text;
@@ -493,6 +495,18 @@ begin
     )
   ) then
     raise exception 'Canonical source writer thiếu SECURITY DEFINER/search_path';
+  end if;
+  if exists (
+    select 1
+    from pg_proc procedure
+    where procedure.oid in (
+      v_set_writer::oid, v_source_writer::oid, v_predecessor::oid
+    )
+      and has_function_privilege(
+        procedure.proowner, v_principal_helper::oid, 'EXECUTE'
+      ) is distinct from true
+  ) then
+    raise exception 'Source writer owner không thể EXECUTE canonical principal';
   end if;
 
   if has_function_privilege(
