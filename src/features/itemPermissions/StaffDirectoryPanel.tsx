@@ -32,6 +32,7 @@ interface StaffDirectoryPanelProps {
   canEdit: boolean;
   validAreas?: readonly string[];
   onSelect: (person: DirectoryPerson | null) => void;
+  revision?: number;
 }
 
 const emptyForm = {
@@ -51,7 +52,15 @@ function departmentLabel(id: string | null): string {
   return DEPTS.find((department) => department.id === id)?.short || id.toUpperCase();
 }
 
-export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirectoryPanelProps) {
+export async function reloadSelectedDirectoryPerson<T extends Pick<DirectoryPerson, "person_id" | "full_name">>(
+  selected: T,
+  search: (query: string) => Promise<T[]>,
+): Promise<T | null> {
+  const people = await search(selected.full_name);
+  return findDirectoryPersonById(people, selected.person_id);
+}
+
+export default function StaffDirectoryPanel({ canEdit, onSelect, revision = 0 }: StaffDirectoryPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DirectoryPerson[]>([]);
   const [selected, setSelected] = useState<DirectoryPerson | null>(null);
@@ -72,6 +81,7 @@ export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirector
   const [importReason, setImportReason] = useState("");
   const [importing, setImporting] = useState(false);
   const requestSequence = useRef(0);
+  const lastDirectoryRevision = useRef(revision);
 
   useEffect(() => {
     let active = true;
@@ -146,6 +156,24 @@ export default function StaffDirectoryPanel({ canEdit, onSelect }: StaffDirector
     setMessage("");
     onSelect(person);
   };
+
+  useEffect(() => {
+    if (revision === lastDirectoryRevision.current) return;
+    lastDirectoryRevision.current = revision;
+    if (!selected) return;
+    let active = true;
+    reloadSelectedDirectoryPerson(selected, searchPermissionDirectory).then((refreshed) => {
+      if (!active) return;
+      if (refreshed) {
+        choose(refreshed);
+      } else {
+        setMessage(`Đã thay đổi liên kết nhưng chưa tìm thấy lại hồ sơ ${selected.person_id}. Hãy tải lại danh bạ.`);
+      }
+    }).catch((error) => {
+      if (active) setMessage(`Đã thay đổi liên kết nhưng chưa tải lại được: ${(error as Error).message}`);
+    });
+    return () => { active = false; };
+  }, [revision, selected]);
 
   const save = async () => {
     if (!canEdit) return;

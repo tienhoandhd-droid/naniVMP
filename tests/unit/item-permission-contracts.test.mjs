@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 async function loadContracts() {
   try {
@@ -40,6 +42,98 @@ test("khớp tên giữ nguyên dấu và chỉ chuẩn hóa khoảng trắng, h
     normalizePersonName("Đặng Thị Hồng Ngọc"),
     normalizePersonName("Dang Thi Hong Ngoc"),
   );
+});
+
+test("decoder tài khoản ứng viên và args nối tài khoản giữ hợp đồng RPC chuẩn", async () => {
+  const { decodeAccountCandidate, createLinkPermissionAccountArgs } = await import(
+    "../../src/features/itemPermissions/api.ts"
+  );
+  const candidate = {
+    user_id: "user-1",
+    email: "qa@vmp.local",
+    full_name: "QA A",
+    role: "viewer",
+    department: "qa",
+    is_active: true,
+    linked_person_id: null,
+  };
+
+  assert.deepEqual(decodeAccountCandidate(candidate), candidate);
+  assert.deepEqual(
+    createLinkPermissionAccountArgs("person-1", "user-1", "Nối tài khoản", 3),
+    {
+      p_person_id: "person-1",
+      p_user_id: "user-1",
+      p_reason: "Nối tài khoản",
+      p_expected_version: 3,
+    },
+  );
+});
+
+test("chỉ Admin nhìn thấy thao tác nối tài khoản", async () => {
+  const { default: AccountLinkPanel } = await import(
+    "../../src/features/itemPermissions/AccountLinkPanel.tsx"
+  );
+  const person = {
+    person_id: "person-1",
+    user_id: null,
+    employee_code: null,
+    full_name: "QA A",
+    department: "qa",
+    email: null,
+    account_status: "unlinked",
+    access_class: "qa_manager",
+    scope_departments: [],
+    scope_factory_ids: [],
+    scope_area_ids: [],
+    scope_line_ids: [],
+    access_areas: [],
+    version: 3,
+    email_sent_confirmed: false,
+    is_active: true,
+    match_status: "unique",
+  };
+
+  const denied = renderToStaticMarkup(React.createElement(AccountLinkPanel, {
+    person,
+    canManageAccounts: false,
+    onLinked: () => {},
+  }));
+  const admin = renderToStaticMarkup(React.createElement(AccountLinkPanel, {
+    person,
+    canManageAccounts: true,
+    onLinked: () => {},
+  }));
+
+  assert.equal(denied, "");
+  assert.match(admin, /Tìm tài khoản để nối/);
+  assert.match(admin, /Lý do nối tài khoản/);
+});
+
+test("tải lại danh bạ sau nối chọn lại đúng person_id khi trùng tên", async () => {
+  const { reloadSelectedDirectoryPerson } = await import(
+    "../../src/features/itemPermissions/StaffDirectoryPanel.tsx"
+  );
+  const selected = { person_id: "person-2", full_name: "QA Trùng Tên" };
+  const other = { person_id: "person-1", full_name: "QA Trùng Tên" };
+  let searched = "";
+
+  const refreshed = await reloadSelectedDirectoryPerson(selected, async (query) => {
+    searched = query;
+    return [other, selected];
+  });
+
+  assert.equal(searched, "QA Trùng Tên");
+  assert.equal(refreshed, selected);
+});
+
+test("QA manager được phân công nhưng không được sửa danh bạ hoặc nối tài khoản", async () => {
+  const source = await readFile("src/pages/PhanQuyenPage.tsx", "utf8");
+
+  assert.match(source, /const canManageDirectory = isAdmin \|\| user\?\.role === "admin"/);
+  assert.match(source, /const canManageQaAssignments = canManageDirectory\s*\|\| user\?\.role === "qa_manager"\s*\|\| user\?\.accessClass === "qa_manager"/);
+  assert.match(source, /<AssignmentPanel person=\{person\} canEdit=\{canManageQaAssignments\}/);
+  assert.doesNotMatch(source, /lienKetTaiKhoan/);
 });
 
 test("decoder danh bạ giữ dòng legacy thiếu cấu hình để có thể sửa", async () => {

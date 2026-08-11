@@ -79,7 +79,7 @@ import { supabase } from "../lib/supabaseClient.ts";
 import {
   setUserRole, upsertPerformer, fetchAssignments, setAssignment,
   fetchRolePermissions, setRolePermission,
-  fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, lienKetTaiKhoan, fetchLuatXem,
+  fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, fetchLuatXem,
 } from "../lib/supabaseData.ts";
 import type {
   AssignmentRow, RolePermRow, EmailChoPhepRow, NguoiQuyenRow, LuatXemRow, MucXem,
@@ -88,6 +88,7 @@ import { Card, CardTitle, Tag, CauKetLuan, GiaiThich } from "../components/ui/Pr
 import type { Activity, AppUser } from "../types/domain.ts";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
+import AccountLinkPanel from "../features/itemPermissions/AccountLinkPanel.tsx";
 import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
 import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
 
@@ -343,12 +344,18 @@ function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
   );
 }
 
-function CurrentPermissionWorkspace({ acts, isAdmin = false }: {
+function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
   acts: Activity[];
   isAdmin?: boolean;
+  user?: AppUser | null;
 }) {
   const [person, setPerson] = useState<DirectoryPerson | null>(null);
+  const [directoryRevision, setDirectoryRevision] = useState(0);
   const [rightsRevision, setRightsRevision] = useState(0);
+  const canManageDirectory = isAdmin || user?.role === "admin";
+  const canManageQaAssignments = canManageDirectory
+    || user?.role === "qa_manager"
+    || user?.accessClass === "qa_manager";
   const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
     const raw = (activity._raw || {}) as Record<string, unknown>;
     return [activity.area, raw.area, raw.line]
@@ -364,8 +371,16 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false }: {
           Danh bạ nhân sự &amp; quyền
         </CardTitle>
         <div className="ip-workspace">
-          <StaffDirectoryPanel canEdit={isAdmin} validAreas={validAreas} onSelect={setPerson} />
-          <AssignmentPanel person={person} canEdit={isAdmin}
+          <StaffDirectoryPanel canEdit={canManageDirectory} validAreas={validAreas} onSelect={setPerson}
+            revision={directoryRevision} />
+          {canManageDirectory && (
+            <AccountLinkPanel person={person} canManageAccounts={canManageDirectory}
+              onLinked={() => {
+                setDirectoryRevision((value) => value + 1);
+                setRightsRevision((value) => value + 1);
+              }} />
+          )}
+          <AssignmentPanel person={person} canEdit={canManageQaAssignments}
             onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
           <EffectiveRightsPanel person={person} revision={rightsRevision} />
         </div>
@@ -391,7 +406,7 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
     return <EquipmentAssignmentWorkspace acts={props.acts} />;
   }
   if (SHOW_LEGACY_PERMISSION_WORKSPACE) return <FullPermissionWorkspace {...props} />;
-  return <CurrentPermissionWorkspace acts={props.acts} isAdmin={props.isAdmin} />;
+  return <CurrentPermissionWorkspace acts={props.acts} isAdmin={props.isAdmin} user={props.user} />;
 }
 
 function FullPermissionWorkspace(
@@ -877,24 +892,13 @@ function FullPermissionWorkspace(
     setDangLuu("");
   };
 
-  /** Nối tay người thực hiện với tài khoản. Không đi qua bản nháp: đây là
-   *  thao tác một lần, một dòng, và kết quả đổi cả bảng — giữ nó ở nháp thì
-   *  bảng nói một đằng còn database một nẻo cho tới lúc bấm Lưu. */
-  const noiTaiKhoan = async (pid: string, userId: string | null, ten: string) => {
-    setDangLuu("B");
-    try {
-      const r = await lienKetTaiKhoan(pid, userId);
-      setKetQua((c) => ({
-        ...c, B: { xong: r.ok ? 1 : 0, tong: 1, loi: r.ok ? [] : [`${ten}: ${r.error}`] },
-      }));
-      if (r.ok) {
-        setDangNoi((c) => { const n = { ...c }; delete n[pid]; return n; });
-        await taiNguoiVaQuyen();
-      }
-    } catch (e) {
-      setKetQua((c) => ({ ...c, B: { xong: 0, tong: 1, loi: [`${ten}: ${(e as Error).message}`] } }));
-    }
-    setDangLuu("");
+  /** Workspace cũ không còn có đủ reason/version cho RPC chuẩn; thao tác
+   * nối được chuyển sang AccountLinkPanel của danh bạ chuẩn. */
+  const noiTaiKhoan = (_pid: string, _userId: string | null, ten: string) => {
+    setKetQua((c) => ({
+      ...c,
+      B: { xong: 0, tong: 1, loi: [`${ten}: hãy dùng Danh bạ nhân sự & quyền để nối tài khoản.`] },
+    }));
   };
 
   /* ================= KẾT LUẬN ================= */
