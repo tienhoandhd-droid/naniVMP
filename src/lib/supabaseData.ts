@@ -992,6 +992,51 @@ export async function pushToSheet(
 }
 
 // ============================================================
+// GHI: Danh mục nguồn qua RPC có kiểm version
+// ============================================================
+/** Kết quả `rpc_save_catalog_object`. `pending_timeline` là thứ giao diện
+ *  dùng để hiện thẻ "Danh mục đã đổi, timeline chưa cập nhật" — không được
+ *  hiển thị timeline như thể đã đồng bộ khi cờ này bật. */
+export interface KetQuaLuuDanhMuc {
+  ok: boolean;
+  object_code?: string;
+  version?: number;
+  timeline_revision?: number;
+  timeline_applied_revision?: number;
+  pending_timeline?: boolean;
+  error?: string;
+  error_code?: string;
+  current_version?: number;
+}
+
+export async function saveCatalogObject(
+  objectKind: ObjectKind,
+  objectCode: string,
+  patch: Record<string, unknown>,
+  reason: string | null,
+  expectedVersion: number | null,
+): Promise<KetQuaLuuDanhMuc> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+
+  /* Chưa có trong database.ts vì types sinh từ schema trước migration
+     20260812120000. Ép kiểu tại đúng một chỗ, và PHẢI bind — supabase.rpc
+     dùng `this` bên trong. */
+  const goi = supabase.rpc.bind(supabase) as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+
+  const { data, error } = await goi("rpc_save_catalog_object", {
+    p_object_kind: objectKind,
+    p_object_code: objectCode,
+    p_patch: patch,
+    p_reason: reason,
+    p_expected_version: expectedVersion,
+  });
+  if (error) throw new Error("Lưu danh mục thất bại: " + error.message);
+  return asShape<KetQuaLuuDanhMuc>(data);
+}
+
+// ============================================================
 // ĐỌC: Quyền MÀN HÌNH của phiên hiện tại
 // ============================================================
 /* Ba kết quả, không phải hai — cùng lý do như layPhien() ở supabaseClient:

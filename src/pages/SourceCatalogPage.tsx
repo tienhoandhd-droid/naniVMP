@@ -26,7 +26,7 @@ import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { DEPTS } from "../constants/vmp.ts";
 import { Card, CardTitle, Tag, Modal, Portal, TableScroll } from "../components/ui/Primitives.tsx";
 import {
-  SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject,
+  SOURCE_KINDS, fetchSourceObjects, upsertSourceObject, deleteSourceObject, saveCatalogObject,
   generateTimeline, fetchSourceWarnings,
   fetchAlertRecipients, upsertAlertRecipient, deleteAlertRecipient,
   fetchStaffEmails, upsertStaffEmail, deleteStaffEmail,
@@ -44,6 +44,7 @@ import {
 } from "../features/itemPermissions/performerSelection.ts";
 import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
 import type { SourceWarnings } from "../lib/supabaseData.ts";
+import CatalogObjectForm from "../components/catalog/CatalogObjectForm.tsx";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
    `hint` giải thích ảnh hưởng tới luật sinh timeline — đây là phần người
@@ -132,6 +133,10 @@ function SourceCatalogSection({ user, onReload, focus }: {
    *  hàng trăm đối tượng mà không phải mở từng hộp thoại. */
   const [picked, setPicked] = useState<Set<string>>(new Set());
   /** Ô đang sửa tại chỗ: nhấn đúp để mở, Enter lưu, Esc huỷ, Tab sang phải. */
+  /* Đối tượng đang mở trong form. `null` là đóng. Form thay cho lối sửa
+     bằng nhấn đúp: bảng không có chỗ nói trường nào bắt buộc, không kiểm
+     được liên hệ giữa các trường, và không có nơi nhập lý do thay đổi. */
+  const [dangSua, setDangSua] = useState<Record<string, unknown> | null>(null);
   const [cell, setCell] = useState<{
     id: string; key: string; value: string; personId?: string | null;
   } | null>(null);
@@ -458,7 +463,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
               </button>
             </>
           )}
-          {canEdit && <span> · <b>nhấn đúp vào ô để sửa tại chỗ</b></span>}
+          {canEdit && <span> · <b>nhấn đúp vào dòng để mở form sửa</b></span>}
         </div>
 
         {/* Thanh thao tác hàng loạt — hiện khi có dòng được chọn */}
@@ -602,18 +607,11 @@ function SourceCatalogSection({ user, onReload, focus }: {
                     const score = Number(rec.criticality_score);
                     return (
                     <td key={f.key} className={i === 0 ? (canEdit ? "vmp-col-pin2" : "vmp-col-pin") : undefined}
-                      onDoubleClick={() => {
-                        if (!canEdit || f.lockOnEdit) return;
-                        setCell({
-                          id: r.id,
-                          key: f.key,
-                          value: String(rec[f.key] ?? ""),
-                          personId: PERSON_FIELDS.has(f.key)
-                            ? sourcePersonId(rec, f.key as SourcePerformerField, performerChoices)
-                            : undefined,
-                        });
-                      }}
-                      title={canEdit && !f.lockOnEdit ? "Nhấn đúp để sửa tại chỗ" : undefined}
+                      /* ĐÃ BỎ sửa bằng nhấn đúp — xem CatalogObjectForm.
+                         Sửa từng ô rời rạc thì không kiểm được ràng buộc
+                         giữa các trường và không có chỗ nhập lý do. */
+                      onDoubleClick={canEdit ? () => setDangSua(rec) : undefined}
+                      title={canEdit ? "Nhấn đúp để mở form sửa" : undefined}
                       style={{ padding: here ? "2px 4px" : "8px", whiteSpace: "nowrap",
                                color: i === 0 ? C.plum : C.plumSoft,
                                fontWeight: i === 0 ? 700 : 400,
@@ -709,6 +707,31 @@ function SourceCatalogSection({ user, onReload, focus }: {
             if (vals === null) delete n[menu.key]; else n[menu.key] = vals;
             return n;
           })} />
+      )}
+
+      {dangSua && (
+        <CatalogObjectForm
+          row={dangSua}
+          objectKind={kind}
+          performers={performerChoices}
+          dangTaoMoi={false}
+          onClose={() => setDangSua(null)}
+          onSaved={async (patch, lyDo, version) => {
+            /* Không đổi gì thì đóng luôn — gọi RPC để ghi một patch rỗng
+               chỉ tạo thêm một dòng nhật ký vô nghĩa. */
+            if (!Object.keys(patch).length) { setDangSua(null); return; }
+
+            const kq = await saveCatalogObject(
+              kind, String(dangSua.object_code ?? ""), patch, lyDo, version);
+            if (!kq.ok) {
+              throw new Error(kq.error_code === "VERSION_CONFLICT"
+                ? `${kq.error ?? "Bản ghi đã bị người khác sửa"} (bản trên máy chủ: v${kq.current_version ?? "?"})`
+                : (kq.error ?? "Lưu danh mục thất bại"));
+            }
+            setDangSua(null);
+            await load();
+            onReload?.();
+          }} />
       )}
     </div>
   );
