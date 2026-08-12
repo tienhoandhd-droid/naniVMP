@@ -11,7 +11,7 @@
  *  bên Supabase mới là biên chặn thật.
  * ===================================================================== */
 import { useCallback, useEffect, useState } from "react";
-import { legacyAccessContext, parseAccessContext } from "../lib/access.ts";
+import { hopNhatPreview, legacyAccessContext, parseAccessContext } from "../lib/access.ts";
 import type { AccessContext } from "../lib/access.ts";
 import { fetchUiAccess } from "../lib/supabaseData.ts";
 import type { AppUser } from "../types/domain.ts";
@@ -59,7 +59,12 @@ export function useAccess(user: AppUser | null): AccessState {
       .then((kq) => {
         if (!con) return;
         if (kq.trangThai === "co") {
-          setAccess(parseAccessContext(kq.payload));
+          const tuServer = parseAccessContext(kq.payload);
+          // Preview nghĩa là KHÔNG đổi gì: hiển thị vẫn theo quyền cũ, chỉ
+          // lấy kết quả resolver về để đối chiếu. Xem hopNhatPreview.
+          setAccess(
+            tuServer.mode === "preview" ? hopNhatPreview(quyenCu, tuServer) : tuServer,
+          );
           return;
         }
         if (kq.trangThai === "chua_co_rpc") {

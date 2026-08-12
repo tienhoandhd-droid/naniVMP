@@ -199,3 +199,30 @@ test("danh sách màn phủ cả ba route ngoài menu", () => {
   assert.equal(SCREEN_IDS.length, 17);
   assert.equal(new Set(SCREEN_IDS).size, 17);
 });
+
+/* Preview phải nghĩa là KHÔNG đổi gì. Server ở preview cũng cố dựng lại luật
+   cũ, nhưng nó chỉ biết dữ liệu trong database, còn luật cũ đọc accessClass
+   của phiên đang đăng nhập — hai nguồn đang lệch nhau trên live. */
+test("preview giữ menu theo quyền cũ, chỉ lấy kết quả resolver để đối chiếu", async () => {
+  const { hopNhatPreview } = await import("../../src/lib/access.ts");
+
+  const quyenCu = legacyAccessContext({
+    name: "Quản lý xưởng", role: "department_user", perm: "edit",
+    accessClass: "equipment_manager",
+  });
+  // Server chưa thấy access_class nào nên nó giấu màn Phân quyền.
+  const tuServer = parseAccessContext({
+    ok: true, mode: "preview", business_role: null,
+    unresolved_reason: "missing_access_class",
+    screens: { phanquyen: { can_view: false, data_scope: "none", actions: [] } },
+  });
+
+  const ketQua = hopNhatPreview(quyenCu, tuServer);
+
+  assert.equal(ketQua.mode, "preview");
+  // Menu vẫn theo quyền cũ: người này đang thấy màn Phân quyền thì phải giữ.
+  assert.equal(ketQua.canView("phanquyen"), true);
+  // Nhưng kết quả đối chiếu của server vẫn giữ nguyên để admin xem trước.
+  assert.equal(ketQua.businessRole, null);
+  assert.equal(ketQua.unresolvedReason, "missing_access_class");
+});

@@ -281,6 +281,31 @@ export function legacyAccessContext(user: AppUser | null | undefined): AccessCon
   return dungContext("preview", null, "legacy_fallback", screens);
 }
 
+/**
+ * Ở chế độ `preview`: hiển thị theo quyền CŨ, nhưng giữ kết quả resolver
+ * của server để đối chiếu.
+ *
+ * Vì sao không dùng thẳng `screens` server trả về, dù server ở preview cũng
+ * cố dựng lại luật cũ: server chỉ biết những gì có trong database, còn luật
+ * cũ đọc `user.accessClass` của phiên đang đăng nhập. Hai nguồn đó lệch
+ * nhau ngay lúc này — bảy hồ sơ trên live có `access_class` NULL — nên tin
+ * server ở preview là âm thầm đổi menu của người đang dùng.
+ *
+ * Preview phải nghĩa là KHÔNG đổi gì. `businessRole` và `unresolvedReason`
+ * vẫn lấy từ server, vì đó chính là thứ cần đối chiếu trước khi bật enforce.
+ */
+export function hopNhatPreview(
+  quyenCu: AccessContext,
+  tuServer: AccessContext,
+): AccessContext {
+  return {
+    ...quyenCu,
+    mode: "preview",
+    businessRole: tuServer.businessRole,
+    unresolvedReason: tuServer.unresolvedReason,
+  };
+}
+
 /* ---------- Chuyển hướng an toàn ---------- */
 
 /**
