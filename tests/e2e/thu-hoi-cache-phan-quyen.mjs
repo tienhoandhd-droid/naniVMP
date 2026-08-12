@@ -3,6 +3,7 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
+import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
 
 const GOC = "http://localhost:4173";
 await choServer(GOC);
@@ -55,6 +56,9 @@ await page.setViewport({ width: 1500, height: 1000 });
 await page.setRequestInterception(true);
 page.on("request", (request) => {
   const url = request.url();
+  /* Xem chú thích ở quyen-cot-timeline: mở được màn là điều kiện cần trước
+     khi soi được lớp quyền theo hạng mục. */
+  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessAdmin);
   if (/\/rpc\/item_permissions_mode/.test(url)) {
     modeReads += request.method() === "OPTIONS" ? 0 : 1;
     return answer(request, mode);

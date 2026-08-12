@@ -3,6 +3,7 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
+import { LA_UI_ACCESS, uiAccessQuanLyXuong } from "./ui-access.mjs";
 
 const GOC = "http://localhost:4173";
 await choServer(GOC);
@@ -160,42 +161,14 @@ const answer = (request, body) => request.method() === "OPTIONS"
   ? request.respond({ status: 204, headers: cors, body: "" })
   : request.respond({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(body) });
 
-/* Bộ kiểm này giả lập một Quản lý xưởng bằng cách trả access_class từ
-   vmp_performers. Cách đó đủ khi menu còn đọc user.accessClass ở phía
-   trình duyệt, nhưng từ 2026-08-12 menu đọc rpc_my_ui_access — và server
-   tra quyền theo auth.uid() thật, không theo thứ trình duyệt tự khai.
-
-   Đó chính là điều đợt phân quyền màn hình muốn đạt: client không tự nâng
-   quyền được nữa. Nên bộ kiểm phải giả lập ở đúng chỗ mới — chính RPC đó.
-
-   Ma trận thật cho Quản lý xưởng: 9 màn phạm vi xưởng, cộng `phanquyen` là
-   cửa vào chức năng phân công (data_scope 'none', xem migration
-   20260812100000). */
-const manXuong = (actions) => ({ can_view: true, data_scope: "workshop", actions });
-const uiAccessQuanLyXuong = {
-  ok: true,
-  mode: "enforced",
-  business_role: "workshop_manager",
-  unresolved_reason: null,
-  screens: {
-    today: manXuong(["view"]),
-    overview: manXuong(["view"]),
-    timeline: manXuong(["view"]),
-    alerts: manXuong(["view"]),
-    risk: manXuong(["view"]),
-    reports: manXuong(["view"]),
-    source: manXuong(["view"]),
-    progress: manXuong(["assign_workshop_staff", "record_actual_validation_date"]),
-    inventory: manXuong(["assign_workshop_staff", "record_actual_validation_date"]),
-    phanquyen: { can_view: true, data_scope: "none", actions: ["assign_workshop_staff"] },
-  },
-};
-
+/* Bộ kiểm này giả lập một Quản lý xưởng. Trước đây nó khai access_class
+   qua vmp_performers — cách đó chỉ hiệu lực khi menu còn đọc
+   user.accessClass ở trình duyệt. Nay server tra quyền theo auth.uid()
+   thật, nên phải giả lập ở đúng chỗ: chính rpc_my_ui_access. Payload dùng
+   chung ở ./ui-access.mjs. */
 page.on("request", (request) => {
   const url = request.url();
-  if (/\/rpc\/rpc_my_ui_access/.test(url)) {
-    return answer(request, uiAccessQuanLyXuong);
-  }
+  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessQuanLyXuong);
   if (/\/rest\/v1\/vmp_performers\?/.test(url) && /user_id=eq\./.test(url)) {
     if (request.method() !== "OPTIONS") {
       performerProfileSelects.push(new URL(url).searchParams.get("select"));

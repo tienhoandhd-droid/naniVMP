@@ -3,6 +3,7 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
+import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
 
 const GOC = "http://localhost:4173";
 await choServer(GOC);
@@ -108,6 +109,10 @@ const answer = (request, body) => request.method() === "OPTIONS"
 
 page.on("request", (request) => {
   const url = request.url();
+  /* Bộ kiểm này soi lớp quyền THEO HẠNG MỤC. Nó vẫn phải vào được màn Cập
+     nhật tiến độ trước đã, mà quyền mở màn nay do server quyết — tài khoản
+     E2E là viewer nên sẽ bị chặn nếu không giả lập ở đây. */
+  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessAdmin);
   if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
     return answer(request, {
       activities: right === unassignedQa ? [NEXT_ACTIVITY] : [ACTIVITY, NEXT_ACTIVITY],
