@@ -126,10 +126,18 @@ export const NAV_ITEMS = [
   { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
 
   // QUẢN TRỊ
-  { id: "phanquyen", label: "Phân quyền & trách nhiệm", icon: KeyRound, group: "admin", adminOnly: true },
-  { id: "health", label: "Sức khoẻ dữ liệu", icon: Radar, group: "admin", adminOnly: true },
-  { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin", adminOnly: true },
-  { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin", adminOnly: true },
+  /* `adminOnly` đã bị bỏ. Quyền xem từng màn nay đọc bằng `access.canView(id)`
+     — xem src/lib/access.ts. Để một cờ tĩnh trong file hằng số quyết định
+     quyền thì quyền nằm luôn trong gói JavaScript công khai, và nó cũng
+     không diễn tả nổi sáu vai trò nghiệp vụ với phạm vi dữ liệu khác nhau.
+
+     `id` của mỗi mục CHÍNH LÀ screenId dùng để tra quyền, và cũng là hash
+     `#v=<id>`. Ba hash `inventory`, `risk`, `phanquyen` mà App.tsx render
+     ngoài menu được khai trong SCREEN_IDS, không khai ở đây. */
+  { id: "phanquyen", label: "Phân quyền & trách nhiệm", icon: KeyRound, group: "admin" },
+  { id: "health", label: "Sức khoẻ dữ liệu", icon: Radar, group: "admin" },
+  { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin" },
+  { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin" },
 ];
 
 export const NAV_SUBS = {

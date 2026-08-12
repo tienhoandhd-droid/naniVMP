@@ -61,6 +61,8 @@ import {
   wlIsDone,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
+import { useAccess } from "./hooks/useAccess.ts";
+import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
 import type { UrlState } from "./lib/urlState.ts";
@@ -1862,6 +1864,10 @@ function GlobalFilterBar({
  * Fonts → index.html (nạp 1 request, không FOUC). */
 export default function App() {
   const { user, setUser, logout, isAdmin } = useAuth();
+  /* Quyền xem từng màn do Supabase quyết, không suy từ `role`/`accessClass`.
+     Trong lúc chờ — và khi server chưa có `rpc_my_ui_access` — hook trả về
+     quyền theo luật cũ ở chế độ `preview`, nên ứng dụng chạy y như trước. */
+  const { access } = useAccess(user);
   const {
     objects, acts, conn, lastSync, dataUpdatedAt, saveStatus, reloadData, silentRefresh,
     updateActivity,
@@ -1871,7 +1877,11 @@ export default function App() {
   // máy mình đè lên — đó là cả lý do đưa trạng thái lên URL.
   const khoiTao = useMemo<UrlState>(() => {
     const tuUrl = docUrl(typeof window === "undefined" ? "" : window.location.hash, {
-      views: NAV_ITEMS.map((n) => n.id).concat(["risk", "missing"]),
+      // `inventory` và `risk` không có mục menu nhưng App vẫn render chúng.
+      // Thiếu `inventory` ở đây thì đường dẫn cũ người dùng đã lưu bị docUrl
+      // loại và rơi về màn mặc định — đúng cái mà chú thích ở NAV_ITEMS nói
+      // là phải tránh.
+      views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing"]),
       depts: DEPTS.map((d) => d.id),
       periods: PERIODS.map((p) => p[0]).concat(["custom"]),
     });
@@ -2020,6 +2030,18 @@ export default function App() {
     } catch { /* trình duyệt chặn history thì bỏ qua, app vẫn chạy */ }
   }, [trangThaiUrl, view]);
 
+  /* Chuyển màn do GUARD ép, không do người dùng bấm — nên THAY THẾ mục lịch
+     sử thay vì đẩy thêm. Đặt `viewTruoc` trước setView để effect ngay trên
+     coi đây không phải "đổi màn" và dùng replaceState.
+
+     Không có bước này thì bấm Back sẽ quay đúng về màn vừa bị cấm, guard lại
+     đá đi, và mỗi lần như vậy lại nhét thêm một mục vào lịch sử — người dùng
+     bấm Back mãi không thoát nổi. */
+  const chuyenManAnToan = useCallback((manMoi: string) => {
+    viewTruoc.current = manMoi;
+    setView(manMoi);
+  }, []);
+
   // Nhớ bộ lọc cho lần mở sau. KHÔNG lưu `view` — mở app ra mà nhảy thẳng vào
   // màn hôm qua đang dở thì khó hiểu hơn là tiện.
   useEffect(() => {
@@ -2032,7 +2054,11 @@ export default function App() {
   useEffect(() => {
     const apDung = () => {
       const s = docUrl(window.location.hash, {
-        views: NAV_ITEMS.map((n) => n.id).concat(["risk", "missing"]),
+        // `inventory` và `risk` không có mục menu nhưng App vẫn render chúng.
+        // Thiếu `inventory` ở đây thì đường dẫn cũ người dùng đã lưu bị
+        // docUrl loại và rơi về màn mặc định — đúng cái mà chú thích ở
+        // NAV_ITEMS nói là phải tránh.
+        views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing"]),
         depts: DEPTS.map((d) => d.id),
         periods: PERIODS.map((p) => p[0]).concat(["custom"]),
       });
@@ -2088,7 +2114,7 @@ export default function App() {
       {showPw && <ChangePwModal onClose={() => setShowPw(false)} />}
 
       <Sidebar
-        view={view} setView={setView} user={user}
+        view={view} setView={setView} user={user} access={access}
         connected={conn.status === "ok"}
         onLogout={logout}
         onChangePw={() => setShowPw(true)}
@@ -2199,6 +2225,9 @@ export default function App() {
             {/* Page router — Suspense bọc các màn lazy; fallback là skeleton nhẹ. */}
             {/* key={view} khiến React dựng lại nhánh này mỗi lần đổi màn, nhờ
                 đó hoạt ảnh vào chạy lại — mắt biết nội dung vừa thay. */}
+            {/* Chặn màn không được phép, kể cả khi gõ thẳng `#v=...`. Ở chế
+                độ `preview` guard không chặn gì — nó chỉ ghi lại chỗ lệch. */}
+            <ScreenGuard screenId={view} access={access} onRedirect={chuyenManAnToan}>
             <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "today" && (
@@ -2246,6 +2275,7 @@ export default function App() {
               {view === "admin" && <AdminView conn={conn} user={user} />}
             </Suspense>
             </div>
+            </ScreenGuard>
 
             {/* Trợ lý hỏi đáp — nổi ở góc, không chiếm chỗ của bảng dữ liệu */}
             {/* Truyền màn đang xem xuống để Vali gợi ý câu hỏi bám đúng chỗ

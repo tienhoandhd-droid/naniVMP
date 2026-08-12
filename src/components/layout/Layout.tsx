@@ -10,29 +10,32 @@ import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
 import type { ReactNode } from "react";
 import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
+import type { AccessContext } from "../../lib/access.ts";
 
 // ======================== SIDEBAR ========================
-export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
+export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
   view: string;
   setView: (v: string) => void;
   user?: AppUser | null;
+  /** Quyền màn hình do Supabase trả về. Menu vẽ theo đây, không theo
+   *  `user.role`/`user.accessClass`. */
+  access: AccessContext;
   onLogout: () => void;
   onChangePw: () => void;
   connected?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const isAdmin = user?.role === "admin";
-  const canOpenPermissions = isAdmin
-    || user?.role === "qa_manager"
-    || user?.accessClass === "qa_manager"
-    || user?.accessClass === "equipment_manager";
 
+  /* Nhóm nào không còn mục nào xem được thì không hiện tiêu đề nhóm. Trước
+     đây nhóm QUẢN TRỊ hiện/ẩn theo một biểu thức riêng gộp `role` với
+     `accessClass`; nay nó tự biến mất khi mọi mục bên trong đều bị từ chối,
+     nên thêm một màn quản trị mới không phải sửa lại điều kiện ở đây. */
   const groups = [
     { id: "monitor", label: "GIÁM SÁT" },
     { id: "work", label: "THỰC HIỆN" },
     { id: "analysis", label: "PHÂN TÍCH" },
-    ...(canOpenPermissions ? [{ id: "admin", label: "QUẢN TRỊ" }] : []),
-  ];
+    { id: "admin", label: "QUẢN TRỊ" },
+  ].filter((g) => NAV_ITEMS.some((n) => n.group === g.id && access.canView(n.id)));
 
   return (
     <aside className="vmp-sidebar" style={{
@@ -68,9 +71,7 @@ export function Sidebar({ view, setView, user, onLogout, onChangePw }: {
                 {g.label}
               </div>
             )}
-            {NAV_ITEMS.filter((n) => n.group === g.id && (
-              n.id === "phanquyen" ? canOpenPermissions : !n.adminOnly || isAdmin
-            )).map((n) => {
+            {NAV_ITEMS.filter((n) => n.group === g.id && access.canView(n.id)).map((n) => {
               const active = view === n.id;
               const Icon = n.icon;
               return (

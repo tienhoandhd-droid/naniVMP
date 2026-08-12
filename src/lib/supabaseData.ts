@@ -990,3 +990,43 @@ export async function pushToSheet(
   void n8nWriteUrl; void validationCode; void patch;
   throw sheetIsReadOnly();
 }
+
+// ============================================================
+// ĐỌC: Quyền MÀN HÌNH của phiên hiện tại
+// ============================================================
+/* Ba kết quả, không phải hai — cùng lý do như layPhien() ở supabaseClient:
+   "server chưa có RPC này" và "gọi được nhưng lỗi" là hai chuyện khác hẳn,
+   bên gọi phải xử lý khác nhau.
+
+   `chua_co_rpc` là trạng thái BÌNH THƯỜNG trong giai đoạn chuyển tiếp:
+   migration phân quyền màn hình đi sau bản web này. Lúc đó phải rơi về
+   quyền cũ (legacyAccessContext), chứ coi là "không có quyền gì" thì mọi
+   người mất sạch menu chỉ vì thứ tự triển khai. */
+export type UiAccessKetQua =
+  | { trangThai: "co"; payload: unknown }
+  | { trangThai: "chua_co_rpc" }
+  | { trangThai: "loi"; thongDiep: string };
+
+/** Mã lỗi PostgREST/Postgres khi hàm chưa tồn tại trong schema. */
+const MA_LOI_THIEU_HAM = new Set(["PGRST202", "42883"]);
+
+export async function fetchUiAccess(): Promise<UiAccessKetQua> {
+  if (!supabase) return { trangThai: "loi", thongDiep: "Supabase chưa cấu hình" };
+
+  /* `rpc_my_ui_access` chưa có trong src/types/database.ts vì file đó sinh từ
+     schema live, mà migration tạo hàm này chưa chạy. Ép kiểu tại đúng một
+     chỗ, có chú thích, thay vì tắt kiểm kiểu cả file. Sinh lại types sau khi
+     migration chạy thì xoá được đoạn ép này. */
+  const goi = supabase.rpc as unknown as (
+    fn: string,
+  ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+
+  const { data, error } = await goi("rpc_my_ui_access");
+
+  if (error) {
+    if (error.code && MA_LOI_THIEU_HAM.has(error.code)) return { trangThai: "chua_co_rpc" };
+    return { trangThai: "loi", thongDiep: error.message };
+  }
+  if (data == null) return { trangThai: "chua_co_rpc" };
+  return { trangThai: "co", payload: data };
+}
