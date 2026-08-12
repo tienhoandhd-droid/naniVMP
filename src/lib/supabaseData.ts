@@ -1016,8 +1016,13 @@ export async function fetchUiAccess(): Promise<UiAccessKetQua> {
   /* `rpc_my_ui_access` chưa có trong src/types/database.ts vì file đó sinh từ
      schema live, mà migration tạo hàm này chưa chạy. Ép kiểu tại đúng một
      chỗ, có chú thích, thay vì tắt kiểm kiểu cả file. Sinh lại types sau khi
-     migration chạy thì xoá được đoạn ép này. */
-  const goi = supabase.rpc as unknown as (
+     migration chạy thì xoá được đoạn ép này.
+
+     PHẢI `bind`: `supabase.rpc` là method dùng `this` bên trong (this.rest).
+     Gán nó ra biến rồi gọi trần làm mất receiver, và lỗi hiện ra ở tận
+     runtime dưới dạng "Cannot read properties of undefined (reading 'rest')"
+     — typecheck không bắt được. Bộ kiểm E2E bắt được. */
+  const goi = supabase.rpc.bind(supabase) as unknown as (
     fn: string,
   ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
 
