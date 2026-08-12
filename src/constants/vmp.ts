@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3, Scale, ClipboardList, KeyRound,
+  ShieldCheck, Radar, BarChart3, Scale, ClipboardList, KeyRound, Users,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -134,7 +134,14 @@ export const NAV_ITEMS = [
      `id` của mỗi mục CHÍNH LÀ screenId dùng để tra quyền, và cũng là hash
      `#v=<id>`. Ba hash `inventory`, `risk`, `phanquyen` mà App.tsx render
      ngoài menu được khai trong SCREEN_IDS, không khai ở đây. */
-  { id: "phanquyen", label: "Phân quyền & trách nhiệm", icon: KeyRound, group: "admin" },
+  /* Hai màn tách ra từ "Phân quyền & trách nhiệm": dữ liệu nhân sự và
+     vòng đời tài khoản là hai việc khác nhau, do hai nhóm người khác nhau
+     nắm. Mục `phanquyen` ở lại làm cửa vào cũ — vai Quản lý xưởng vẫn dùng
+     nó để phân công hạng mục thiết bị cho tới khi việc đó chuyển sang màn
+     Cập nhật tiến độ. */
+  { id: "people", label: "Nhân sự & phân công", icon: Users, group: "admin" },
+  { id: "accounts", label: "Tài khoản & quyền truy cập", icon: KeyRound, group: "admin" },
+  { id: "phanquyen", label: "Phân quyền & trách nhiệm", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Sức khoẻ dữ liệu", icon: Radar, group: "admin" },
   { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin" },
   { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin" },

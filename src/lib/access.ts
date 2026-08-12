@@ -239,8 +239,11 @@ export function parseAccessContext(payload: unknown): AccessContext {
  *  nằm đây vì nó có luật riêng rộng hơn. */
 const MAN_CHI_ADMIN: readonly ScreenId[] = ["health", "audit", "admin"];
 
-/** Hai màn của kế hoạch tách Phân quyền. Chưa có route nên chưa mở cho ai. */
-const MAN_CHUA_TON_TAI: readonly ScreenId[] = ["people", "accounts"];
+/** `accounts` là vòng đời tài khoản — chỉ Admin, giống ba màn quản trị kia.
+ *  `people` theo đúng luật cũ của màn Phân quyền: Admin, Quản lý QA, hoặc
+ *  người mang access_class qa_manager. Không mở cho equipment_manager vì
+ *  phần phân công của họ nằm ở `phanquyen`. */
+const MAN_NHAN_SU: ScreenId = "people";
 
 const HANH_DONG_ADMIN = [
   "edit_catalog",
@@ -262,10 +265,15 @@ export function legacyAccessContext(user: AppUser | null | undefined): AccessCon
     || user?.accessClass === "qa_manager"
     || user?.accessClass === "equipment_manager";
 
+  const moDuocNhanSu = laAdmin
+    || user?.role === "qa_manager"
+    || user?.accessClass === "qa_manager";
+
   const screens: Record<string, ScreenPermission> = {};
   for (const id of SCREEN_IDS) {
     let thay: boolean;
-    if (MAN_CHUA_TON_TAI.includes(id)) thay = false;
+    if (id === "accounts") thay = laAdmin;
+    else if (id === MAN_NHAN_SU) thay = moDuocNhanSu;
     else if (id === "phanquyen") thay = moDuocPhanQuyen;
     else if (MAN_CHI_ADMIN.includes(id)) thay = laAdmin;
     else thay = !!user;

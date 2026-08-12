@@ -166,12 +166,6 @@ test("đường lùi giữ nguyên luật mở màn Phân quyền hiện hành",
   assert.equal(nhanVien.canView("inventory"), true);
 });
 
-test("đường lùi không mở hai màn chưa có route", () => {
-  const admin = legacyAccessContext({ name: "A", role: "admin", perm: "admin" });
-  assert.equal(admin.canView("people"), false);
-  assert.equal(admin.canView("accounts"), false);
-});
-
 test("đường lùi không bao giờ ở chế độ enforced", () => {
   for (const role of ["admin", "qa_manager", "department_user", "viewer"]) {
     assert.equal(legacyAccessContext({ name: "X", role, perm: "view" }).mode, "preview");
@@ -225,4 +219,44 @@ test("preview giữ menu theo quyền cũ, chỉ lấy kết quả resolver đ�
   // Nhưng kết quả đối chiếu của server vẫn giữ nguyên để admin xem trước.
   assert.equal(ketQua.businessRole, null);
   assert.equal(ketQua.unresolvedReason, "missing_access_class");
+});
+
+/* Hai màn tách ra từ Phân quyền. Đường lùi phải khớp luật đang chạy, nếu
+   không việc tách màn sẽ âm thầm đổi ai vào được chỗ nào. */
+test("đường lùi mở đúng người cho hai màn mới", () => {
+  const admin = legacyAccessContext({ name: "A", role: "admin", perm: "admin" });
+  assert.equal(admin.canView("people"), true);
+  assert.equal(admin.canView("accounts"), true);
+
+  // Quản lý QA: sửa dữ liệu nhân sự được, nhưng không đụng vòng đời tài khoản.
+  for (const u of [
+    { name: "B", role: "qa_manager", perm: "admin" },
+    { name: "C", role: "department_user", perm: "edit", accessClass: "qa_manager" },
+  ]) {
+    const ctx = legacyAccessContext(u);
+    assert.equal(ctx.canView("people"), true, `${u.name} phải xem được Nhân sự`);
+    assert.equal(ctx.canView("accounts"), false, `${u.name} không được vào Tài khoản`);
+  }
+
+  // Quản lý xưởng dùng cửa cũ `phanquyen` để phân công thiết bị, không phải
+  // màn Nhân sự.
+  const xuong = legacyAccessContext({
+    name: "D", role: "department_user", perm: "edit", accessClass: "equipment_manager",
+  });
+  assert.equal(xuong.canView("phanquyen"), true);
+  assert.equal(xuong.canView("people"), false);
+  assert.equal(xuong.canView("accounts"), false);
+});
+
+test("ở enforced, quyền hai màn mới lấy từ server chứ không đoán", () => {
+  const qaManager = parseAccessContext({
+    ok: true, mode: "enforced", business_role: "qa_manager", unresolved_reason: null,
+    screens: {
+      people: { can_view: true, data_scope: "all", actions: ["edit_operational_people"] },
+      accounts: { can_view: false, data_scope: "none", actions: [] },
+    },
+  });
+  assert.equal(qaManager.can("people", "edit_operational_people"), true);
+  assert.equal(qaManager.can("accounts", "manage_accounts"), false);
+  assert.equal(qaManager.canView("accounts"), false);
 });

@@ -100,6 +100,8 @@ const SourceCatalogView = lazy(nhapCoThuLai(() => import("./pages/SourceCatalogP
 const ServerChecksView = lazy(nhapCoThuLai(() => import("./pages/ServerChecksPage.tsx")));
 const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
+const OperationalPeopleView = lazy(nhapCoThuLai(() => import("./pages/OperationalPeoplePage.tsx")));
+const AccountAccessView = lazy(nhapCoThuLai(() => import("./pages/AccountAccessPage.tsx")));
 const TodayView = lazy(nhapCoThuLai(() => import("./pages/TodayPage.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
@@ -2270,6 +2272,8 @@ export default function App() {
               {(view === "alerts" || view === "risk") && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
+              {view === "people" && <OperationalPeopleView acts={filteredActs} access={access} />}
+              {view === "accounts" && <AccountAccessView access={access} />}
               {view === "phanquyen" && <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} user={user} />}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} />}
