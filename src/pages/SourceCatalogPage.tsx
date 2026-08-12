@@ -45,6 +45,7 @@ import {
 import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../types/domain.ts";
 import type { SourceWarnings } from "../lib/supabaseData.ts";
 import CatalogObjectForm from "../components/catalog/CatalogObjectForm.tsx";
+import CatalogImpactPreview from "../components/catalog/CatalogImpactPreview.tsx";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
    `hint` giải thích ảnh hưởng tới luật sinh timeline — đây là phần người
@@ -137,6 +138,9 @@ function SourceCatalogSection({ user, onReload, focus }: {
      bằng nhấn đúp: bảng không có chỗ nói trường nào bắt buộc, không kiểm
      được liên hệ giữa các trường, và không có nơi nhập lý do thay đổi. */
   const [dangSua, setDangSua] = useState<Record<string, unknown> | null>(null);
+  /* Thay đổi vừa lưu, đang chờ áp vào timeline. Mở màn xem trước ngay sau
+     khi lưu — người dùng thấy ảnh hưởng lúc còn nhớ mình vừa sửa gì. */
+  const [changeId, setChangeId] = useState<string | null>(null);
   const [cell, setCell] = useState<{
     id: string; key: string; value: string; personId?: string | null;
   } | null>(null);
@@ -729,6 +733,19 @@ function SourceCatalogSection({ user, onReload, focus }: {
                 : (kq.error ?? "Lưu danh mục thất bại"));
             }
             setDangSua(null);
+            await load();
+            onReload?.();
+            // Chỉ mở xem trước khi thay đổi thật sự chạm tới timeline.
+            if (kq.change_id) setChangeId(kq.change_id);
+          }} />
+      )}
+
+      {changeId && (
+        <CatalogImpactPreview
+          changeId={changeId}
+          onClose={() => setChangeId(null)}
+          onApplied={async () => {
+            setChangeId(null);
             await load();
             onReload?.();
           }} />

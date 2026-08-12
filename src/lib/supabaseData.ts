@@ -1000,6 +1000,8 @@ export async function pushToSheet(
 export interface KetQuaLuuDanhMuc {
   ok: boolean;
   object_code?: string;
+  /** Chỉ có khi thay đổi chạm tới timeline — dùng để mở màn xem trước. */
+  change_id?: string;
   version?: number;
   timeline_revision?: number;
   timeline_applied_revision?: number;
@@ -1034,6 +1036,60 @@ export async function saveCatalogObject(
   });
   if (error) throw new Error("Lưu danh mục thất bại: " + error.message);
   return asShape<KetQuaLuuDanhMuc>(data);
+}
+
+// ============================================================
+// Xem trước và áp thay đổi danh mục vào timeline
+// ============================================================
+export interface AnhHuongTimeline {
+  ok: boolean;
+  change_id?: string;
+  object_code?: string;
+  timeline_revision?: number;
+  tao?: { validation_code: string; validation_type: string; deadline_vmp: string | null; thieu: string[] }[];
+  sua?: { validation_code: string; deadline_vmp_cu: string | null; deadline_vmp_moi: string | null }[];
+  dung?: { validation_code: string; ly_do: string }[];
+  giu_nguyen?: { validation_code: string; ly_do: string }[];
+  canh_bao?: string[];
+  error?: string;
+  error_code?: string;
+}
+
+export interface KetQuaApDung {
+  ok: boolean;
+  so_tao?: number;
+  so_sua?: number;
+  so_dung?: number;
+  so_giu_nguyen?: number;
+  error?: string;
+  error_code?: string;
+}
+
+/** Ép kiểu tại một chỗ: types sinh từ schema trước migration 20260812130000.
+ *  PHẢI bind — supabase.rpc dùng `this` bên trong. */
+function goiRpc() {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  return supabase.rpc.bind(supabase) as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+}
+
+export async function previewCatalogChange(changeId: string): Promise<AnhHuongTimeline> {
+  const { data, error } = await goiRpc()("rpc_preview_catalog_change", { p_change_id: changeId });
+  if (error) throw new Error("Không xem trước được ảnh hưởng: " + error.message);
+  return asShape<AnhHuongTimeline>(data);
+}
+
+export async function applyCatalogChange(
+  changeId: string, reason: string, expectedTimelineRevision: number | null,
+): Promise<KetQuaApDung> {
+  const { data, error } = await goiRpc()("rpc_apply_catalog_change", {
+    p_change_id: changeId,
+    p_reason: reason,
+    p_expected_timeline_revision: expectedTimelineRevision,
+  });
+  if (error) throw new Error("Áp vào timeline thất bại: " + error.message);
+  return asShape<KetQuaApDung>(data);
 }
 
 // ============================================================
