@@ -134,18 +134,24 @@ try {
   // Back phải chạy trên thao tác đổi màn.
   await page.goto(`${GOC}#v=overview&dept=xsx`, { waitUntil: "networkidle2" });
   await cho(page, docChip, { ten: "chip ở màn Tổng quan" });
+  /* Đổi sang "Timeline VMP", không phải "Phân công & Tải việc".
+     Bộ kiểm này đăng nhập bằng tài khoản CHỈ-XEM, và từ 2026-08-12 vai
+     Người xem không mở được màn Phân công & Tải việc — thiết kế §3.4 ghi
+     "Ẩn" cho vai đó. Trước đây họ vào được, nên phép kiểm cũ mượn màn ấy.
+     Phép kiểm này soi điều hướng và nút Back, không soi màn nào cụ thể, nên
+     dùng một màn mà Người xem thật sự được phép mới đo đúng thứ cần đo. */
   await page.evaluate(() => {
     const b = [...document.querySelectorAll("button")]
-      .find((x) => /Phân công & Tải việc/.test(x.textContent || ""));
+      .find((x) => /Timeline VMP/.test(x.textContent || ""));
     if (b) b.click();
   });
   await doi(900);
   const sauDoiMan = await page.evaluate(() => location.hash);
-  kiem("Đổi màn ghi màn mới vào URL", /v=workload/.test(sauDoiMan), sauDoiMan || "(rỗng)");
+  kiem("Đổi màn ghi màn mới vào URL", /v=timeline/.test(sauDoiMan), sauDoiMan || "(rỗng)");
   await page.goBack({ waitUntil: "domcontentloaded" });
   await doi(900);
   const sauBack = await page.evaluate(() => location.hash);
-  kiem("Back quay về màn trước, giữ nguyên bộ lọc", /dept=xsx/.test(sauBack) && !/v=workload/.test(sauBack),
+  kiem("Back quay về màn trước, giữ nguyên bộ lọc", /dept=xsx/.test(sauBack) && !/v=timeline/.test(sauBack),
     sauBack || "(rỗng)");
   const chipSauBack = await cho(page, docChip, { ten: "chip sau khi Back" });
   kiem("Back áp lại đúng bộ lọc lên dữ liệu", chipSauBack.hien === sauUrl.hien,
