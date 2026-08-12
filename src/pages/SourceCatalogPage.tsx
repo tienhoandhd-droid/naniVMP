@@ -46,6 +46,7 @@ import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } fro
 import type { SourceWarnings } from "../lib/supabaseData.ts";
 import CatalogObjectForm from "../components/catalog/CatalogObjectForm.tsx";
 import CatalogImpactPreview from "../components/catalog/CatalogImpactPreview.tsx";
+import { daDoiDataset, laTruongNangCao, validateDatasetForm } from "../lib/datasetForm.ts";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
    `hint` giải thích ảnh hưởng tới luật sinh timeline — đây là phần người
@@ -1427,18 +1428,48 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
   onSave: (form: Record<string, unknown>) => void;
 }) {
   const isNew = !row[spec.keyField];
-  const [form, setForm] = useState<Record<string, unknown>>(() => {
+  const banDau = () => {
     const f: Record<string, unknown> = {};
     for (const x of spec.fields) f[x.key] = row[x.key] ?? (x.bool ? true : "");
     return f;
-  });
-  const set = (k: string, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
+  };
+  const [form, setForm] = useState<Record<string, unknown>>(banDau);
+  const [loi, setLoi] = useState<Record<string, string>>({});
+  const [moNangCao, setMoNangCao] = useState(false);
+  const banGoc = useMemo(banDau, [row, spec]);
 
-  return (
-    <Modal onClose={onClose} wide icon={spec.icon}
-      title={`${isNew ? "Thêm" : "Sửa"} — ${spec.label}`}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
-        {spec.fields.map((f) => (
+  const set = (k: string, v: unknown) => {
+    setForm((p) => ({ ...p, [k]: v }));
+    // Xoá lỗi của đúng ô vừa sửa: giữ lại thì người dùng đã sửa đúng mà vẫn
+    // thấy chữ đỏ, và không biết mình còn sai chỗ nào nữa.
+    setLoi((p) => {
+      if (!p[k]) return p;
+      const n = { ...p };
+      delete n[k];
+      return n;
+    });
+  };
+
+  const dong = () => {
+    const keys = spec.fields.map((f) => f.key);
+    if (daDoiDataset(form, banGoc, keys)
+        && !window.confirm("Còn thay đổi chưa lưu. Đóng và bỏ các thay đổi?")) return;
+    onClose();
+  };
+
+  const luu = () => {
+    const loiMoi = validateDatasetForm(spec.id, form);
+    setLoi(loiMoi);
+    if (Object.keys(loiMoi).length) return;
+    onSave(form);
+  };
+
+  /* Nhóm nâng cao thu gọn sẵn. Mở form ra mà thấy mười một ô cùng lúc thì
+     không ai biết bắt đầu từ đâu — xem TRUONG_NANG_CAO ở lib/datasetForm. */
+  const truongChinh = spec.fields.filter((f) => !laTruongNangCao(spec.id, f.key));
+  const truongNangCao = spec.fields.filter((f) => laTruongNangCao(spec.id, f.key));
+
+  const veO = (f: SimpleField) => (
           <label key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>{f.label}</span>
             {f.bool ? (
@@ -1470,17 +1501,43 @@ function SimpleEditModal({ spec, row, saving, onClose, onSave }: {
                 disabled={!isNew && f.lockOnEdit}
                 inputMode={f.num ? "numeric" : undefined}
                 style={{ padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
-                         border: `1.5px solid ${C.pinkSoft}`,
+                         border: `1.5px solid ${loi[f.key] ? C.rasp : C.pinkSoft}`,
                          background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface }} />
             )}
-            {f.hint && <span style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>}
+            {/* Lỗi đặt ngay dưới ô sai, không gom vào một hộp ở đáy modal —
+                người dùng phải thấy sai ở đâu mà không phải dò. */}
+            {loi[f.key]
+              ? <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{loi[f.key]}</span>
+              : f.hint && <span style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>}
           </label>
-        ))}
-      </div>
+  );
+
+  const luoi = (ds: SimpleField[]) => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
+      {ds.map(veO)}
+    </div>
+  );
+
+  return (
+    <Modal onClose={dong} wide icon={spec.icon}
+      title={`${isNew ? "Thêm" : "Sửa"} — ${spec.label}`}>
+      {luoi(truongChinh)}
+
+      {truongNangCao.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <button type="button" onClick={() => setMoNangCao((v) => !v)}
+            style={{ border: "none", background: "transparent", cursor: "pointer",
+                     fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plumSoft, padding: 0 }}>
+            {moNangCao ? "▾" : "▸"} Nâng cao ({truongNangCao.length} mục)
+          </button>
+          {moNangCao && <div style={{ marginTop: 10 }}>{luoi(truongNangCao)}</div>}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-        <button onClick={onClose}
+        <button onClick={dong}
           style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>Huỷ</button>
-        <button onClick={() => onSave(form)} disabled={saving}
+        <button onClick={luu} disabled={saving}
           style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>{saving ? "Đang lưu…" : "Lưu"}</button>
       </div>
     </Modal>
