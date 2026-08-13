@@ -1734,9 +1734,162 @@ select { appearance: none; -webkit-appearance: none; }
 }
 
 /* ===== Luxury login styles ===== */
+.vq-login-page {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 42px;
+  background:
+    radial-gradient(800px 600px at 88% -8%, #f4e7f0, transparent 60%),
+    radial-gradient(700px 600px at -6% 108%, #e8e3f5, transparent 55%),
+    linear-gradient(160deg, #fbf8fc, #f2eef7);
+}
+
+.vq-login-grid {
+  width: min(100%, 1100px);
+  display: grid;
+  grid-template-columns: minmax(360px, .92fr) minmax(420px, 1.08fr);
+  overflow: hidden;
+  border: 1px solid rgba(81, 32, 82, .12);
+  border-radius: 18px;
+  background: #fffdfc;
+  box-shadow: 0 30px 80px rgba(69, 28, 76, .20), 0 8px 24px rgba(94, 53, 132, .10);
+}
+
+.vq-brand-panel {
+  position: relative;
+  min-height: 580px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 48px 54px 42px;
+  color: #fffdfc;
+  background: linear-gradient(155deg, #35153f, #512052 58%, #6a315d);
+}
+
+.vq-brand-panel::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: radial-gradient(circle at 88% 8%, rgba(230, 180, 166, .18), transparent 25%);
+}
+
+.vq-brand-logo-wrap,
+.vq-brand-content,
+.vq-brand-department { position: relative; z-index: 1; }
+
+.vq-brand-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 253, 252, .97);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .10);
+}
+
+.vq-brand-logo { display: block; width: auto; height: 40px; }
+
+.vq-crown-mark {
+  position: absolute;
+  z-index: 0;
+  right: -25px;
+  bottom: 64px;
+  width: 250px;
+  fill: none;
+  stroke: #d7b768;
+  stroke-width: 2;
+  opacity: .24;
+}
+
+.vq-brand-content { margin-top: auto; }
+.vq-brand-hairline { width: 38px; height: 2px; margin-bottom: 24px; background: #d7b768; }
+.vq-brand-wordmark {
+  display: flex;
+  flex-direction: column;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 44px;
+  font-weight: 500;
+  line-height: .86;
+  letter-spacing: -.02em;
+}
+.vq-brand-wordmark span { color: #fffdfc; }
+.vq-brand-wordmark strong { margin-top: 7px; color: #f2d896; font-weight: 500; }
+.vq-brand-caption {
+  margin-top: 30px;
+  color: #e8c979;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .27em;
+}
+.vq-brand-department {
+  margin-top: 34px;
+  color: rgba(255, 253, 252, .70);
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+
+.vq-login-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 52px 50px;
+  background: #fffdfc;
+}
+.vq-login-intro { margin-bottom: 28px; }
+.vq-login-kicker {
+  margin: 0 0 10px;
+  color: #8c396d;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+.vq-login-intro h1 {
+  margin: 0;
+  color: #35153f;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 35px;
+  font-weight: 600;
+  line-height: 1.04;
+}
+.vq-login-intro > p:last-child {
+  margin: 10px 0 0;
+  color: #674d63;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.vq-login-form { display: flex; flex-direction: column; gap: 16px; }
+.vq-login-field { display: flex; flex-direction: column; gap: 7px; }
+.vq-login-field > label {
+  color: #4c2a49;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
 .vq-luxury-btn {
+  width: 100%;
+  min-height: 54px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #b5477a, #68468f);
+  box-shadow: 0 8px 25px rgba(111, 88, 201, .25), 0 2px 8px rgba(181, 71, 122, .18);
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .02em;
   transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
 }
+.vq-luxury-btn:disabled { cursor: not-allowed; opacity: .7; }
 .vq-luxury-btn:hover:not(:disabled) {
   transform: translateY(-1px) scale(1.015);
   filter: brightness(1.05);
@@ -1745,17 +1898,92 @@ select { appearance: none; -webkit-appearance: none; }
 .vq-luxury-btn:active:not(:disabled) { transform: translateY(0) scale(.99); }
 
 .vq-input-shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid #e5dce5;
+  border-radius: 10px;
+  background: #fbf9fb;
+  color: #9d4d7d;
   transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.vq-input-shell input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #35153f;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
 }
 .vq-input-shell:focus-within {
   border-color: var(--focus);
   box-shadow: 0 0 0 4px rgba(181, 71, 122, .10);
   background: #fff;
 }
+.vq-password-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #6b5572;
+  background: transparent;
+}
+.vq-login-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #ad264c;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+.vq-login-error--server { padding: 10px 12px; border-radius: 8px; background: #fff0f3; }
+.vq-daily-wish {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid #f0e8ee;
+  text-align: center;
+}
+.vq-daily-wish span {
+  color: #9d4d7d;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .18em;
+}
+.vq-daily-wish p {
+  margin: 9px 0 0;
+  color: #674d63;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.6;
+}
 
 /* ===== Responsive ===== */
 @media (max-width: 760px) {
+  .vq-login-page { align-items: flex-start !important; padding: 14px !important; }
   .vq-login-grid { grid-template-columns: 1fr !important; }
+  .vq-brand-panel { min-height: 164px; padding: 22px 26px; }
+  .vq-brand-logo { height: 34px; }
+  .vq-crown-mark { right: 8px; bottom: -20px; width: 132px; }
+  .vq-brand-content { margin-top: auto; }
+  .vq-brand-hairline { width: 28px; margin-bottom: 11px; }
+  .vq-brand-wordmark { font-size: 29px; }
+  .vq-brand-wordmark strong { margin-top: 3px; }
+  .vq-brand-caption, .vq-brand-department, .vq-daily-wish { display: none; }
+  .vq-login-panel { padding: 26px 24px 28px; }
+  .vq-login-intro { margin-bottom: 20px; }
+  .vq-login-intro h1 { font-size: 31px; }
+  .vq-login-intro > p:last-child { margin-top: 7px; }
   .vmp-sidebar { display: none !important; }
 }
 @media (max-width: 980px) {

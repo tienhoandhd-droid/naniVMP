@@ -13,7 +13,7 @@
     "test:permissions": "npm run test:unit && node tests/e2e/danh-ba-phan-quyen.mjs && node tests/e2e/quyen-cot-timeline.mjs && node tests/e2e/thu-hoi-cache-phan-quyen.mjs && node tests/e2e/danh-muc-nguoi-thuc-hien.mjs",
     "gen:permission-workbook": "node scripts/permission-workbook.mjs public/templates/phan-quyen-vmp.xlsx",
     "gen:types": "supabase gen types typescript --db-url \"$SUPABASE_DB_URL\" --schema public > src/types/database.ts",
-    "e2e": "node tests/e2e/luong-chinh.mjs && node tests/e2e/quet-tat-ca-man.mjs && node tests/e2e/giam-chuyen-dong.mjs && node tests/e2e/phien-het-han.mjs && node tests/e2e/tai-lai-nhieu-lan.mjs && node tests/e2e/danh-muc-nguoi-thuc-hien.mjs",
+    "e2e": "node tests/e2e/luong-chinh.mjs && node tests/e2e/quet-tat-ca-man.mjs && node tests/e2e/giam-chuyen-dong.mjs && node tests/e2e/phien-het-han.mjs && node tests/e2e/tai-lai-nhieu-lan.mjs && node tests/e2e/danh-muc-nguoi-thuc-hien.mjs && node tests/e2e/ux-refinement.mjs",
     "cham": "node tests/e2e/cham-giao-dien.mjs",
     "viec": "node tests/e2e/viec-nguoi-dung.mjs",
     "doichieu": "node tests/e2e/doi-chieu-du-lieu.mjs"
