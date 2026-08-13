@@ -29,5 +29,26 @@ test("màu tiến độ kẹp tỷ lệ nằm ngoài khoảng hoàn thành", () 
 });
 
 test("màu tiến độ nội suy hex xác định tại điểm giữa", () => {
-  assert.equal(workloadCellColor(0.5), "#807378");
+  assert.equal(workloadCellColor(0.25), "#BD6673");
+  assert.equal(workloadCellColor(0.5), "#9F7D78");
+  assert.equal(workloadCellColor(0.75), "#778F7D");
+});
+
+test("model chỉ đếm một lần mỗi bộ phận khi activity chứa mã trùng", () => {
+  const cells = buildWorkloadMap([
+    { id: "duplicate-department", state: "active", st: "todo", dept: "qa", depts: ["qa", "qa", "xsx"], _raw: { dl_vmp: "2026-08-20" } },
+  ], 2026);
+  const qa = cells.find((cell) => cell.departmentId === "qa");
+  const xsx = cells.find((cell) => cell.departmentId === "xsx");
+  assert.equal(qa.total, 1);
+  assert.equal(xsx.total, 1);
+});
+
+test("model nhận diện riêng quá hạn từ alert và từ trạng thái", () => {
+  const cells = buildWorkloadMap([
+    { id: "alert-only", state: "active", st: "prog", dept: "qa", depts: ["qa"], alert: { kind: "over" }, _raw: { dl_vmp: "2026-08-20" } },
+    { id: "status-only", state: "active", st: "over", dept: "xsx", depts: ["xsx"], _raw: { dl_vmp: "2026-08-20" } },
+  ], 2026);
+  assert.equal(cells.find((cell) => cell.departmentId === "qa").overdue, 1);
+  assert.equal(cells.find((cell) => cell.departmentId === "xsx").overdue, 1);
 });

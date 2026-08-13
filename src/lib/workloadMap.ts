@@ -15,6 +15,23 @@ function clampRate(rate: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(rate) ? rate : 0));
 }
 
+function srgbToLinear(channel: number): number {
+  return channel < 0.04045
+    ? channel * 0.0773993808
+    : Math.pow(channel * 0.9478672986 + 0.0521327014, 2.4);
+}
+
+function linearToSrgb(channel: number): number {
+  return channel < 0.0031308
+    ? channel * 12.92
+    : 1.055 * Math.pow(channel, 0.41666) - 0.055;
+}
+
+function interpolateLegacyColor(start: number, end: number, rate: number): number {
+  const linear = srgbToLinear(start / 255) + (srgbToLinear(end / 255) - srgbToLinear(start / 255)) * rate;
+  return Math.round(Math.max(0, Math.min(1, linearToSrgb(linear))) * 255);
+}
+
 export function buildWorkloadMap(activities: Activity[], year: number): WorkloadCell[] {
   const cells = new Map<string, WorkloadCell>();
 
@@ -26,8 +43,8 @@ export function buildWorkloadMap(activities: Activity[], year: number): Workload
     const month = Number(deadline.slice(5, 7));
     if (!(month >= 1 && month <= 12)) continue;
 
-    const departmentIds = (activity.depts && activity.depts.length ? activity.depts : [activity.dept])
-      .filter(Boolean) as string[];
+    const departmentIds = [...new Set((activity.depts && activity.depts.length ? activity.depts : [activity.dept])
+      .filter(Boolean) as string[])];
     for (const departmentId of departmentIds) {
       const departmentIndex = DEPTS.findIndex((department) => department.id === departmentId);
       if (departmentIndex < 0) continue;
@@ -53,8 +70,8 @@ export function buildWorkloadMap(activities: Activity[], year: number): Workload
 
 export function workloadCellColor(completionRate: number): string {
   const rate = clampRate(completionRate);
-  const red = Math.round(214 + (42 - 214) * rate);
-  const green = Math.round(72 + (158 - 72) * rate);
-  const blue = Math.round(109 + (130 - 109) * rate);
+  const red = interpolateLegacyColor(214, 42, rate);
+  const green = interpolateLegacyColor(72, 158, rate);
+  const blue = interpolateLegacyColor(109, 130, rate);
   return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }
