@@ -760,47 +760,59 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
   cls?: string;
 }) {
   const t = tone || { c: C.plum, bg: C.pinkSoft };
+  const content = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {Icon && (
+          <span style={{ width: 26, height: 26, borderRadius: 8, background: t.bg,
+                         display: "flex", alignItems: "center", justifyContent: "center",
+                         flexShrink: 0 }}>
+            <Icon size={14} color={t.c} />
+          </span>
+        )}
+        <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft,
+                       fontFamily: TEXT }}>{label}</span>
+      </div>
+
+      <div style={{ fontFamily: NUM_HERO, fontSize: 28, fontWeight: 800, color: t.c,
+                    lineHeight: 1, letterSpacing: -0.5 }}>{value}</div>
+
+      {bars && bars.length > 0 && (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 22,
+                      marginTop: "auto" }}>
+          {bars.map((b, i) => (
+            <div key={i} style={{
+              flex: 1, minWidth: 2, borderRadius: 8,
+              height: `${Math.max(8, Math.min(1, b) * 100)}%`,
+              background: t.c, opacity: 0.3 + Math.min(1, b) * 0.7,
+            }} />
+          ))}
+        </div>
+      )}
+
+      {sub && (
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700,
+                      fontFamily: TEXT, marginTop: bars ? 0 : "auto" }}>{sub}</div>
+      )}
+    </>
+  );
   return (
     <Card cls={`vmp-tile ${onClick ? "vmp-lift" : ""} ${cls}`}
       style={{ padding: "17px 18px", display: "flex", flexDirection: "column",
                justifyContent: "space-between", minHeight: 132,
                ["--tile-accent" as string]: t.c }}>
-      <div onClick={onClick} role={onClick ? "button" : undefined}
-        style={{ display: "flex", flexDirection: "column", height: "100%",
-                 gap: 8, cursor: onClick ? "pointer" : "default" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {Icon && (
-            <span style={{ width: 26, height: 26, borderRadius: 8, background: t.bg,
-                           display: "flex", alignItems: "center", justifyContent: "center",
-                           flexShrink: 0 }}>
-              <Icon size={14} color={t.c} />
-            </span>
-          )}
-          <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft,
-                         fontFamily: TEXT }}>{label}</span>
+      {onClick ? (
+        <button type="button" className="vmp-tile-action" onClick={onClick}
+          style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", gap: 8,
+                   padding: 0, border: "none", background: "transparent", color: "inherit", textAlign: "left",
+                   font: "inherit", cursor: "pointer" }}>
+          {content}
+        </button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
+          {content}
         </div>
-
-        <div style={{ fontFamily: NUM_HERO, fontSize: 28, fontWeight: 800, color: t.c,
-                      lineHeight: 1, letterSpacing: -0.5 }}>{value}</div>
-
-        {bars && bars.length > 0 && (
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 22,
-                        marginTop: "auto" }}>
-            {bars.map((b, i) => (
-              <div key={i} style={{
-                flex: 1, minWidth: 2, borderRadius: 8,
-                height: `${Math.max(8, Math.min(1, b) * 100)}%`,
-                background: t.c, opacity: 0.3 + Math.min(1, b) * 0.7,
-              }} />
-            ))}
-          </div>
-        )}
-
-        {sub && (
-          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700,
-                        fontFamily: TEXT, marginTop: bars ? 0 : "auto" }}>{sub}</div>
-        )}
-      </div>
+      )}
     </Card>
   );
 }

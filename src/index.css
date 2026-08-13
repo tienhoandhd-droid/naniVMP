@@ -6360,8 +6360,12 @@ body { transition: background var(--mo-slow) var(--ease); }
   background: var(--tile-accent, transparent);
 }
 
-/* Ô bấm được thì con trỏ và độ nổi phải nói ra điều đó */
-.vmp-tile[role="button"] { cursor: pointer; }
+/* Ô bấm được dùng nút thật để đọc bàn phím và focus chuẩn. */
+.vmp-tile-action:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 5px;
+  border-radius: 8px;
+}
 
 /* Nhịp chấm khi công chúa Vali đang suy nghĩ — thở đều, không nhấp nháy
    chói mắt. Ba chấm lệch pha nhau tạo cảm giác đang tiến triển. */

@@ -138,7 +138,7 @@ function ChangePwModal({ onClose }: { onClose: () => void }) {
         {["Mật khẩu mới", "Xác nhận"].map((ph, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 15px", borderRadius: 14, background: C.surface, border: `1.5px solid ${C.pinkSoft}` }}>
             <KeyRound size={16} color={C.pink} />
-            <input type="password" placeholder={ph} value={i === 0 ? np : cf}
+            <input type="password" placeholder={ph} value={i === 0 ? np : cf} autoFocus={i === 0}
               onChange={(e) => { (i === 0 ? setNp : setCf)(e.target.value); setMsg({ type: "", text: "" }); }}
               style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14, color: C.plum, width: "100%", fontWeight: 600 }} />
           </div>

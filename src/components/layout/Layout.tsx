@@ -1,7 +1,8 @@
 /* =====================================================================
  *  components/layout/Layout.jsx — Sidebar, Topbar, AppShell
  * ===================================================================== */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
 } from "lucide-react";
@@ -167,38 +168,100 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
   );
 }
 
-function MobileDrawer({ open, view, setView, user, access, onClose, onLogout, onChangePw }: {
+function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionClose, onLogout, onChangePw }: {
   open: boolean;
   view: string;
   setView: (v: string) => void;
   user?: AppUser | null;
   access: AccessContext;
-  onClose: () => void;
+  /** Thoát drawer mà vẫn ở cùng ngữ cảnh → trả focus về nút mở. */
+  onDismiss: () => void;
+  /** Sang ngữ cảnh mới (màn, modal, logout, resize) → không trả focus cũ. */
+  onActionClose: () => void;
   onLogout: () => void;
   onChangePw: () => void;
 }) {
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    const root = document.querySelector("#root");
+    const main = document.querySelector("main") as HTMLElement | null;
+    const rootWasInert = root?.hasAttribute("inert") ?? false;
+    const bodyOverflow = document.body.style.overflow;
+    const mainOverflow = main?.style.overflow ?? "";
+    const mainOverflowY = main?.style.overflowY ?? "";
+    const desktop = window.matchMedia("(min-width: 761px)");
+
+    if (desktop.matches) {
+      onActionClose();
+      return;
+    }
+
+    // Drawer được portal ra ngoài #root, nên inert không vô hiệu hoá chính nó.
+    // Khoá cả body và vùng <main> cuộn riêng để touch/keyboard không làm nền
+    // chạy phía sau dialog.
+    root?.setAttribute("inert", "");
+    document.body.style.overflow = "hidden";
+    if (main) {
+      main.style.overflow = "hidden";
+      main.style.overflowY = "hidden";
+    }
+
+    const focusFrame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const focusables = () => Array.from(drawerRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? []).filter((element) => element.getClientRects().length > 0);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onDismiss();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = focusables();
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey && (active === first || !drawerRef.current?.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !drawerRef.current?.contains(active))) {
+        event.preventDefault();
+        first.focus();
       }
     };
+    const onViewportChange = (event: MediaQueryListEvent) => {
+      if (event.matches) onActionClose();
+    };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+    desktop.addEventListener("change", onViewportChange);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKeyDown);
+      desktop.removeEventListener("change", onViewportChange);
+      if (!rootWasInert) root?.removeAttribute("inert");
+      document.body.style.overflow = bodyOverflow;
+      if (main) {
+        main.style.overflow = mainOverflow;
+        main.style.overflowY = mainOverflowY;
+      }
+    };
+  }, [open, onDismiss, onActionClose]);
 
   if (!open) return null;
 
   const allowedItems = NAV_ITEMS.filter((item) => access.canView(item.id));
-  return (
-    <div className="vmp-mobile-drawer-backdrop" onClick={onClose}>
-      <aside id="vmp-mobile-drawer" className="vmp-mobile-drawer" role="dialog" aria-modal="true"
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="vmp-mobile-drawer-backdrop" onClick={onDismiss}>
+      <aside ref={drawerRef} id="vmp-mobile-drawer" className="vmp-mobile-drawer" role="dialog" aria-modal="true"
         aria-label="Menu điều hướng" onClick={(event) => event.stopPropagation()}>
         <div className="vmp-mobile-drawer-head">
           <CrownLogo />
-          <button type="button" aria-label="Đóng menu" onClick={onClose} className="vmp-mobile-drawer-close">
+          <button ref={closeButtonRef} type="button" aria-label="Đóng menu" onClick={onDismiss} className="vmp-mobile-drawer-close">
             <X size={18} color={C.pinkText} />
           </button>
         </div>
@@ -209,7 +272,7 @@ function MobileDrawer({ open, view, setView, user, access, onClose, onLogout, on
             const active = view === item.id;
             return (
               <button key={item.id} type="button" data-view={item.id} className="vmp-nav"
-                onClick={() => { setView(item.id); onClose(); }}
+                onClick={() => { setView(item.id); onActionClose(); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14,
                   border: "none", cursor: "pointer", textAlign: "left", fontFamily: TEXT, fontSize: 14,
@@ -230,15 +293,16 @@ function MobileDrawer({ open, view, setView, user, access, onClose, onLogout, on
             <ThemeToggle />
             <ThanhTraToggle />
           </div>
-          <button type="button" onClick={() => { onChangePw(); onClose(); }} className="vmp-mobile-drawer-account-action">
+          <button type="button" onClick={() => { onChangePw(); onActionClose(); }} className="vmp-mobile-drawer-account-action">
             <KeyRound size={15} /> Mật khẩu
           </button>
-          <button type="button" onClick={() => { onClose(); onLogout(); }} className="vmp-mobile-drawer-account-action is-logout">
+          <button type="button" onClick={() => { onActionClose(); onLogout(); }} className="vmp-mobile-drawer-account-action is-logout">
             <LogOut size={15} /> Thoát
           </button>
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -348,10 +412,11 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
-  const closeMobileMenu = () => {
+  const dismissMobileMenu = useCallback(() => {
     setMobileMenuOpen(false);
     requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
-  };
+  }, []);
+  const closeMobileMenuForAction = useCallback(() => setMobileMenuOpen(false), []);
   // Đồng hồ chỉ để kích hoạt render lại mỗi phút; giá trị không dùng trực tiếp.
   const [, setNow] = useState(new Date());
   useEffect(() => {
@@ -435,7 +500,8 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
 
       </div>
       <MobileDrawer open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
-        onClose={closeMobileMenu} onLogout={onLogout} onChangePw={onChangePw} />
+        onDismiss={dismissMobileMenu} onActionClose={closeMobileMenuForAction}
+        onLogout={onLogout} onChangePw={onChangePw} />
     </div>
   );
 }
