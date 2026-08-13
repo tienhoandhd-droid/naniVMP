@@ -60,6 +60,7 @@ import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts
 import { useAccess } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { overviewTarget } from "./lib/navigationTargets.ts";
+import { applyWorkloadCellNavigation } from "./lib/workloadNavigation.ts";
 import type { AccessContext, ScreenId } from "./lib/access.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
@@ -1518,14 +1519,10 @@ export default function App() {
   // khi có một màn hợp lệ, vì vậy nó không thể tạo CTA dẫn tới màn bị chặn.
   const workloadListTarget = overviewTarget(access, "soon");
   const onOpenWorkloadCell = useMemo(() => workloadListTarget ? (cell: WorkloadCell) => {
-    const first = new Date(vmpToday().getFullYear(), cell.month - 1, 1);
-    const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
-    const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-    setDeptSel([cell.departmentId]);
-    setPeriodFilter("custom");
-    setCustomFrom(localDate(first));
-    setCustomTo(localDate(last));
-    setView(workloadListTarget);
+    applyWorkloadCellNavigation({
+      cell, year: vmpToday().getFullYear(), target: workloadListTarget,
+      setDeptSel, setPeriodFilter, setCustomFrom, setCustomTo, setView,
+    });
   } : undefined, [workloadListTarget]);
   // Faceted count: số hạng mục theo mỗi bộ phận (khớp a.depts) — hiện cạnh lựa chọn.
   const deptOptions = useMemo(() => DEPTS.map((d) => ({

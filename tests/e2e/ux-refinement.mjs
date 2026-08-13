@@ -181,12 +181,30 @@ try {
 
     await page.click('button[data-map-mode="3d"]');
     await page.waitForSelector('[data-testid="workload-map-3d"] canvas');
-    await page.waitForFunction(() => !!document.querySelector('[data-testid="workload-map-3d"]')?.getAttribute("data-workload-fit"));
-    const workloadFit = await page.$eval('[data-testid="workload-map-3d"]', (el) => JSON.parse(el.getAttribute("data-workload-fit") || "{}"));
-    if (!(workloadFit.fillHeight >= .78 && workloadFit.fillWidth >= .45 && Math.abs(workloadFit.elevationDegrees - 35) <= 1)) {
-      throw new Error(`workload fit: ${JSON.stringify(workloadFit)}`);
+    await page.waitForFunction(() => !!document.querySelector('[data-testid="workload-map-3d"]')?.getAttribute("data-workload-projection"));
+    const baselineProjection = await page.$eval('[data-testid="workload-map-3d"]', (el) => JSON.parse(el.getAttribute("data-workload-projection") || "{}"));
+    if (!(baselineProjection.fillHeight >= .68 && baselineProjection.fillWidth >= .4 && Math.abs(baselineProjection.elevationDegrees - 35) <= 1)) {
+      throw new Error(`runtime workload projection: ${JSON.stringify(baselineProjection)}`);
     }
+    const canvasBox = await page.$eval('[data-testid="workload-map-3d"] canvas', (el) => {
+      const rect = el.getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.move(canvasBox.x, canvasBox.y);
+    await page.mouse.wheel({ deltaY: -180 });
+    await page.waitForFunction((baseline) => {
+      const current = JSON.parse(document.querySelector('[data-testid="workload-map-3d"]')?.getAttribute("data-workload-projection") || "{}");
+      return Math.abs((current.zoom || 0) - baseline.zoom) > .001;
+    }, {}, baselineProjection);
+    const changedProjection = await page.$eval('[data-testid="workload-map-3d"]', (el) => JSON.parse(el.getAttribute("data-workload-projection") || "{}"));
     await page.click('button[aria-label="Về góc chuẩn"]');
+    await page.waitForFunction((baseline) => {
+      const current = JSON.parse(document.querySelector('[data-testid="workload-map-3d"]')?.getAttribute("data-workload-projection") || "{}");
+      const close = (a, b) => Math.abs(a - b) < .002;
+      return close(current.zoom, baseline.zoom)
+        && current.position.every((value, index) => close(value, baseline.position[index]))
+        && current.target.every((value, index) => close(value, baseline.target[index]));
+    }, {}, baselineProjection);
+    if (Math.abs(changedProjection.zoom - baselineProjection.zoom) < .001) throw new Error("OrbitControls zoom did not change");
     const legend = await page.$eval('[data-testid="workload-map-legend"]', (el) => el.textContent || "");
     if (!legend.includes("Hoàn thành") || !legend.includes("Quá hạn")) throw new Error(legend);
     await page.click('button[data-map-mode="2d"]');

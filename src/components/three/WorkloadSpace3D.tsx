@@ -54,6 +54,16 @@ export function workloadActiveCell(selected: WorkloadCell | null, hover: Workloa
   return hover || selected;
 }
 
+function workloadBounds(width: number, depth: number): THREE.Vector3[] {
+  const points: THREE.Vector3[] = [];
+  for (const x of [-width / 2, width / 2]) {
+    for (const y of [0, CAO_MAX + .28]) {
+      for (const z of [-depth / 2, depth / 2]) points.push(new THREE.Vector3(x, y, z));
+    }
+  }
+  return points;
+}
+
 function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onHover, onSelect }: {
   cell: WorkloadCell;
   maxTotal: number;
@@ -125,13 +135,15 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
   onSelect: (cell: WorkloadCell) => void;
   onResetReady: (reset: () => void) => void;
 }) {
-  const { gl, size } = useThree();
+  const { size } = useThree();
   const camera = useRef<THREE.OrthographicCamera>(null);
   const controls = useRef<any>(null);
+  const previousProjection = useRef("");
   const fit = useMemo(() => workloadCameraFit(size.width, size.height), [size.height, size.width]);
   const active = workloadActiveCell(selected, hover);
   const width = 12 * MONTH_STEP;
   const depth = DEPTS.length * DEPARTMENT_STEP;
+  const bounds = useMemo(() => workloadBounds(width, depth), [depth, width]);
 
   const labels = useMemo(() => {
     const labels: MotNhan[] = [
@@ -180,12 +192,27 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
     return () => onResetReady(() => {});
   }, [fit, onResetReady]);
 
-  useEffect(() => {
-    const host = document.getElementById("workload-map-3d");
-    host?.setAttribute("data-workload-fit", JSON.stringify({
-      fillWidth: fit.fillWidth, fillHeight: fit.fillHeight, elevationDegrees: fit.elevationDegrees,
-    }));
-  }, [fit, gl]);
+  useFrame(() => {
+    if (!camera.current || !controls.current) return;
+    camera.current.updateProjectionMatrix();
+    camera.current.updateMatrixWorld();
+    const projected = bounds.map((corner) => corner.clone().project(camera.current!));
+    const xs = projected.map((point) => point.x);
+    const ys = projected.map((point) => point.y);
+    const target = controls.current.target as THREE.Vector3;
+    const offset = camera.current.position.clone().sub(target);
+    const elevationDegrees = THREE.MathUtils.radToDeg(Math.atan2(offset.y, Math.hypot(offset.x, offset.z)));
+    const snapshot = JSON.stringify({
+      fillWidth: (Math.max(...xs) - Math.min(...xs)) / 2,
+      fillHeight: (Math.max(...ys) - Math.min(...ys)) / 2,
+      elevationDegrees,
+      position: camera.current.position.toArray(), target: target.toArray(), zoom: camera.current.zoom,
+    });
+    if (snapshot !== previousProjection.current) {
+      previousProjection.current = snapshot;
+      document.getElementById("workload-map-3d")?.setAttribute("data-workload-projection", snapshot);
+    }
+  });
 
   return <>
     <OrthographicCamera ref={camera} makeDefault position={fit.position}
