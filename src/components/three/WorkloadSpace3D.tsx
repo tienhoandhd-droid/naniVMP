@@ -1,321 +1,240 @@
-/* =====================================================================
- *  components/three/WorkloadSpace3D.tsx — Địa hình tải việc theo thời gian
- *  ---------------------------------------------------------------------
- *      trục sâu   Z : thời gian — 12 tháng theo mốc đích VMP
- *      trục ngang X : bộ phận
- *      chiều cao  Y : số hạng mục đến hạn của bộ phận đó trong tháng đó
- *      màu          : phần CHƯA XONG so với tổng — cột càng đỏ càng dồn việc
- *
- *  Vì sao trang Timeline cần thêm khối này: bảng Gantt liệt kê 461 dòng,
- *  mỗi dòng một hạng mục. Nó trả lời rất tốt câu "hạng mục X đang ở đâu",
- *  nhưng KHÔNG trả lời được câu mà người xếp lịch hỏi mỗi tháng: "tháng nào
- *  bộ phận nào bị dồn việc". Muốn biết thì phải tự đếm 461 dòng bằng mắt.
- *
- *  Khối này là bản đồ địa hình của đúng câu đó: chỗ nào nhô cao là chỗ dồn,
- *  nhô cao mà đỏ là dồn và chưa làm.
- *
- *  Trực giao + xoay được, cùng lý do đã ghi ở VmpSpace3D.tsx.
- * ===================================================================== */
-import { useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrthographicCamera, OrbitControls, Edges, ContactShadows } from "@react-three/drei";
-import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
+import { ContactShadows, Edges, OrthographicCamera, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
-import { CauKetLuan } from "../ui/Primitives.tsx";
+import type { Activity } from "../../types/domain.ts";
+import { buildWorkloadMap, workloadCellColor } from "../../lib/workloadMap.ts";
+import type { WorkloadCell } from "../../lib/workloadMap.ts";
 import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
 import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
-import type { Activity } from "../../types/domain.ts";
-import { buildWorkloadMap, workloadCellColor } from "../../lib/workloadMap.ts";
-import type { WorkloadCell } from "../../lib/workloadMap.ts";
+import { ThreeFallbackBoundary } from "./ThreeFallbackBoundary.tsx";
+import { CauKetLuan } from "../ui/Primitives.tsx";
 
-/** Vị trí camera gốc — dùng chung cho khung nhìn và biên góc xoay. */
-/* Hướng nhìn chếch HẲN về phía trục tháng. Bản trước đặt [5, 4.2, 6] —
-   phương vị ~40°, tức nhìn chéo góc: cả 12 tháng lẫn 6 bộ phận đều chiếu
-   xuống một dải chéo hẹp, nên 12 nhãn tháng chen nhau trong ~150px và
-   hình thì gầy so với khung rộng 1116px (bỏ trắng hai bên ~40%).
-   Kéo phương vị lên ~64°: trục 12 tháng trải NGANG gần hết bề rộng khung —
-   hình lấp đầy khung, và khoảng cách giữa hai nhãn tháng tăng hơn gấp đôi. */
-const VI_TRI: [number, number, number] = [7.6, 3.9, 3.3];
-
-const BUOC_T = 0.44;
-const BUOC_B = 0.62;
+const DEFAULT_CAMERA_POSITION = new THREE.Vector3(7.8, 5.5, 7.8);
+const DEFAULT_TARGET: [number, number, number] = [0, 0.9, 0];
+const MONTH_STEP = 0.54;
+const DEPARTMENT_STEP = 0.72;
 const CAO_MAX = 2.1;
+const RASPBERRY = "#C72D62";
 
-function Cot({ o, caoNhat, chon, onHover }: {
-  o: WorkloadCell; caoNhat: number; chon: boolean; onHover: (o: WorkloadCell | null) => void;
+const cellKey = (cell: WorkloadCell) => `${cell.month}-${cell.departmentId}`;
+const deptName = (cell: WorkloadCell) => DEPTS[cell.departmentIndex]?.name || cell.departmentId;
+
+function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onHover, onSelect }: {
+  cell: WorkloadCell;
+  maxTotal: number;
+  selected: boolean;
+  selectionActive: boolean;
+  giamChuyenDong: boolean;
+  onHover: (cell: WorkloadCell | null) => void;
+  onSelect: (cell: WorkloadCell) => void;
 }) {
-  const m = useRef<THREE.Mesh>(null);
-  const dich = (o.total / Math.max(1, caoNhat)) * CAO_MAX;
-  const hien = useRef(0);
+  const body = useRef<THREE.Mesh>(null);
+  const cap = useRef<THREE.Mesh>(null);
+  const targetHeight = cell.total / Math.max(1, maxTotal) * CAO_MAX;
+  const capHeight = cell.total > 0
+    ? cell.overdue / cell.total * Math.min(targetHeight * .34, .28)
+    : 0;
+  const shownHeight = useRef(giamChuyenDong ? targetHeight : 0.004);
+  const shownCap = useRef(giamChuyenDong ? capHeight : 0.004);
+  const opacity = selectionActive && !selected ? .3 : 1;
 
-  useFrame((_, dt) => {
-    if (!m.current) return;
-    hien.current += (dich - hien.current) * Math.min(1, dt * 4.5);
-    const h = Math.max(0.004, hien.current);
-    m.current.scale.y = h;
-    m.current.position.y = h / 2;
+  useFrame((_, delta) => {
+    if (!body.current || giamChuyenDong) return;
+    shownHeight.current += (targetHeight - shownHeight.current) * Math.min(1, delta * 4.5);
+    shownCap.current += (capHeight - shownCap.current) * Math.min(1, delta * 4.5);
+    const height = Math.max(.004, shownHeight.current);
+    const capScale = Math.max(.004, shownCap.current);
+    body.current.scale.y = height;
+    body.current.position.y = height / 2;
+    if (cap.current) {
+      cap.current.scale.y = capScale;
+      cap.current.position.y = height + capScale / 2;
+    }
   });
 
-  const mau = useMemo(
-    () => new THREE.Color(workloadCellColor(o.completionRate)),
-    [o.completionRate],
-  );
-
+  const position: [number, number, number] = [(cell.month - 6.5) * MONTH_STEP, 0, (cell.departmentIndex - (DEPTS.length - 1) / 2) * DEPARTMENT_STEP];
   return (
-    <mesh ref={m}
-      // (6.5 - thang) chứ không phải (thang - 6.5): với hướng camera hiện
-      // tại, +Z chiếu về phía TRÁI màn hình. Để nguyên thì T12 nằm trái và
-      // T1 nằm phải — thời gian chạy ngược, thứ mà mắt luôn đọc sai.
-      position={[(o.departmentIndex - (DEPTS.length - 1) / 2) * BUOC_B, 0, (6.5 - o.month) * BUOC_T]}
-      onPointerOver={(e) => { e.stopPropagation(); onHover(o); }}
-      onPointerOut={() => onHover(null)}
-      castShadow receiveShadow>
-      <boxGeometry args={[0.4, 1, 0.3]} />
-      <meshPhysicalMaterial color={mau} roughness={0.34} metalness={0.04}
-        emissive={mau} emissiveIntensity={chon ? 0.5 : 0} />
-      <Edges threshold={15} color="#ffffff" />
-    </mesh>
-  );
-}
-
-function Canh({ o3d, caoNhat, chon, onHover }: {
-  o3d: WorkloadCell[]; caoNhat: number; chon: WorkloadCell | null;
-  onHover: (o: WorkloadCell | null) => void;
-}) {
-  const rongX = DEPTS.length * BUOC_B;
-  const sauZ = 12 * BUOC_T;
-
-  /* Nhãn trục. Tháng chạy dọc mép trái, bộ phận chạy dọc mép trước.
-     Không nhồi cả 12 tháng cùng một mức: chỉ MỐC QUÝ (T1·T4·T7·T10) đứng
-     đậm làm mốc định vị, các tháng còn lại nhỏ và mờ. Trỏ vào cột nào thì
-     tháng và bộ phận của cột đó sáng lên — cần chính xác thì hỏi, không
-     phải lúc nào cũng bày ra hết. */
-  const nhan: MotNhan[] = [
-    ...Array.from({ length: 12 }, (_, i) => {
-      const thang = i + 1;
-      const quy = thang % 3 === 1;              // T1 · T4 · T7 · T10
-      const sang = chon?.month === thang;
-      return {
-        // Mép GẦN camera. Bản trước đặt ở mép -X, mà camera đứng phía +X —
-        // nhãn rơi vào nửa xa, bị làm mờ theo độ sâu tới mức gần như biến
-        // mất. Nhãn trục phải nằm ở phía người xem đang đứng.
-        vt: [rongX / 2 + 0.4, 0.02, (6.5 - thang) * BUOC_T] as [number, number, number],
-        chu: `T${thang}`,
-        cap: (quy ? "chinh" : "phu") as "chinh" | "phu",
-        sang,
-      };
-    }),
-    ...DEPTS.map((d, i) => ({
-      // Giãn 1.18 lần và đẩy xa mép thêm chút. Hướng camera mới trải trục
-      // tháng ra rộng nhưng bù lại NÉN trục bộ phận, hai nhãn liền nhau chỉ
-      // còn cách 29px. Giãn ra ngoài rìa cột là cách rẻ nhất để lấy lại
-      // khoảng thở mà không phải đổi hướng nhìn.
-      vt: [(i - (DEPTS.length - 1) / 2) * BUOC_B * 1.18, 0.02, sauZ / 2 + 0.5] as [number, number, number],
-      chu: d.short || (d.id || "").toUpperCase(),
-      cap: "chinh" as const,
-      sang: chon?.departmentIndex === i,
-    })),
-    /* KHÔNG đặt tên trục trong cảnh nữa. Ba lý do, phát hiện khi chụp lại:
-       tên trục nằm ngoài rìa nên đẩy khung nhìn rộng ra, làm chính hình bị
-       thu nhỏ; nó chen vào dãy nhãn bộ phận ("BỘ PHẬN" đè lên "Kho"); và
-       phụ đề của thẻ đã nói đủ ba trục rồi. Nhãn trong cảnh chỉ giữ thứ
-       KHÔNG nói được bằng chữ ngoài hình: giá trị của từng vạch. */
-  ];
-
-  /* Ghi số thẳng lên NĂM đỉnh cao nhất. Đây là chỗ mắt nhìn vào đầu tiên và
-     cũng là chỗ người xếp lịch cần con số; ghi số lên mọi cột thì thành bãi
-     chữ và che mất chính hình khối. */
-  const dinh = [...o3d].sort((a, b) => b.total - a.total).slice(0, 5);
-  for (const o of dinh) {
-    nhan.push({
-      vt: [
-        (o.departmentIndex - (DEPTS.length - 1) / 2) * BUOC_B,
-        (o.total / Math.max(1, caoNhat)) * CAO_MAX + 0.17,
-        (6.5 - o.month) * BUOC_T,
-      ],
-      chu: String(o.total),
-      cap: "so",
-      sang: chon?.month === o.month && chon?.departmentIndex === o.departmentIndex,
-    });
-  }
-  // Cột đang trỏ tới luôn được ghi số, kể cả khi không nằm trong tốp năm.
-  if (chon && !dinh.some((d) => d.month === chon.month && d.departmentIndex === chon.departmentIndex)) {
-    nhan.push({
-      vt: [
-        (chon.departmentIndex - (DEPTS.length - 1) / 2) * BUOC_B,
-        (chon.total / Math.max(1, caoNhat)) * CAO_MAX + 0.17,
-        (6.5 - chon.month) * BUOC_T,
-      ],
-      chu: String(chon.total),
-      cap: "so",
-      sang: true,
-    });
-  }
-
-  return (
-    <>
-      <OrthographicCamera makeDefault position={VI_TRI} />
-      {/* Khung nhìn tính theo cỡ khung thật, không đặt zoom cứng — xem lý do
-          ở KhungVua.tsx. */}
-      <KhungVua le={1.02}
-        hop={{ rong: rongX / 2 + 0.5, cao: CAO_MAX / 2 + 0.24, sau: sauZ / 2 + 0.42,
-               tam: [0, CAO_MAX / 2, 0] }} />
-      {/* Không tự xoay, và CHẶN góc xoay quanh hướng gốc. Xoay là để liếc
-          mặt bị cột khác che, không phải để lạc mất biểu đồ: thả tự do 360°
-          thì chỉ một cú kéo là nửa hình ra khỏi khung và trục lộn ngược. */}
-      <OrbitControls makeDefault enablePan={false} enableZoom={false}
-        minPolarAngle={0.34} maxPolarAngle={Math.PI / 2.5}
-        {...bienPhuongVi(VI_TRI, 0.55)}
-        autoRotate={false} target={[0, CAO_MAX / 2, 0]} />
-
-      <ambientLight intensity={0.78} />
-      <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[-6, 4, -5]} intensity={0.4} color="#ffe4f1" />
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]} receiveShadow>
-        <planeGeometry args={[rongX + 0.5, sauZ + 0.5]} />
-        <meshBasicMaterial color="#F7F1F8" />
+    <group position={position}>
+      <mesh ref={body}
+        scale={[1, giamChuyenDong ? Math.max(.004, targetHeight) : .004, 1]}
+        position={[0, giamChuyenDong ? targetHeight / 2 : .002, 0]}
+        onPointerOver={(event) => { event.stopPropagation(); onHover(cell); }}
+        onPointerOut={() => onHover(null)}
+        onClick={(event) => { event.stopPropagation(); onSelect(cell); }}
+        castShadow receiveShadow>
+        <boxGeometry args={[.46, 1, .5]} />
+        <meshPhysicalMaterial color={workloadCellColor(cell.completionRate)} transparent opacity={opacity}
+          roughness={.34} metalness={.04} emissive={workloadCellColor(cell.completionRate)} emissiveIntensity={selected ? .45 : 0} />
+        <Edges threshold={15} color="#ffffff" />
       </mesh>
-      <gridHelper args={[Math.max(rongX, sauZ) + 0.5, 12, "#E7DAEB", "#F1E8F3"]} position={[0, 0.001, 0]} />
-      {/* Bóng tiếp xúc: chân cột dính xuống sàn. Thiếu nó thì cả rừng cột
-          trông như đang lơ lửng, và độ cao mất mốc so sánh. */}
-      <ContactShadows position={[0, 0.002, 0]} opacity={0.42}
-        scale={Math.max(rongX, sauZ) + 1} blur={1.6} far={1.2} resolution={1024} />
-
-      <NhanTruc nhan={nhan} tam={[0, CAO_MAX / 2, 0]} />
-
-      {o3d.map((o) => (
-        <Cot key={`${o.month}-${o.departmentIndex}`} o={o} caoNhat={caoNhat}
-          chon={!!chon && chon.month === o.month && chon.departmentIndex === o.departmentIndex} onHover={onHover} />
-      ))}
-    </>
+      {cell.overdue > 0 && <mesh ref={cap}
+        scale={[1, giamChuyenDong ? Math.max(.004, capHeight) : .004, 1]}
+        position={[0, targetHeight + (giamChuyenDong ? capHeight : .004) / 2, 0]}
+        onPointerOver={(event) => { event.stopPropagation(); onHover(cell); }}
+        onPointerOut={() => onHover(null)}
+        onClick={(event) => { event.stopPropagation(); onSelect(cell); }}>
+        <boxGeometry args={[.5, 1, .54]} />
+        <meshStandardMaterial color={RASPBERRY} transparent opacity={opacity} roughness={.3} />
+      </mesh>}
+    </group>
   );
 }
 
-export default function WorkloadSpace3D({ acts, nam, giamChuyenDong }: {
-  acts: Activity[]; nam: number; giamChuyenDong: boolean;
+function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSelect, onResetReady }: {
+  cells: WorkloadCell[];
+  maxTotal: number;
+  selected: WorkloadCell | null;
+  hover: WorkloadCell | null;
+  giamChuyenDong: boolean;
+  onHover: (cell: WorkloadCell | null) => void;
+  onSelect: (cell: WorkloadCell) => void;
+  onResetReady: (reset: () => void) => void;
 }) {
-  const o3d = useMemo(() => buildWorkloadMap(acts, nam), [acts, nam]);
-  const caoNhat = useMemo(() => o3d.reduce((m, o) => Math.max(m, o.total), 1), [o3d]);
-  const [chon, setChon] = useState<WorkloadCell | null>(null);
+  const camera = useRef<THREE.OrthographicCamera>(null);
+  const controls = useRef<any>(null);
+  const active = hover || selected;
+  const width = 12 * MONTH_STEP;
+  const depth = DEPTS.length * DEPARTMENT_STEP;
 
-  const dinh = useMemo(() => {
-    let t: WorkloadCell | null = null;
-    for (const o of o3d) if (!t || o.total > t.total) t = o;
-    return t;
-  }, [o3d]);
-
-  /* CÂU KẾT LUẬN. Đây mới là thứ người xem cần: biểu đồ phải tự nói ra điều
-     nó phát hiện, chứ không bày số ra rồi bắt người ta tự rút ra. Mọi con số
-     trong câu đều tính từ chính dữ liệu đang vẽ — không có chỗ nào ước lượng. */
-  const ketLuan = useMemo(() => {
-    if (!o3d.length || !dinh) return null;
-    const theoThang = new Map<number, number>();
-    for (const o of o3d) theoThang.set(o.month, (theoThang.get(o.month) || 0) + o.total);
-    const tb = [...theoThang.values()].reduce((a, b) => a + b, 0) / Math.max(1, theoThang.size);
-    const thangDinh = theoThang.get(dinh.month) || 0;
-    const lan = tb > 0 ? thangDinh / tb : 0;
-    const bp = DEPTS[dinh.departmentIndex]?.name || DEPTS[dinh.departmentIndex]?.id;
-    const chuaXong = dinh.total - dinh.completed;
-    const tyChuaXong = dinh.total ? Math.round((chuaXong / dinh.total) * 100) : 0;
-
-    const phu: string[] = [];
-    if (lan >= 1.3) {
-      phu.push(`Cả tháng ${dinh.month} gánh ${thangDinh} hạng mục — gấp ${lan.toFixed(1)} lần mức trung bình tháng (${Math.round(tb)}).`);
+  const labels = useMemo(() => {
+    const labels: MotNhan[] = [
+      ...Array.from({ length: 12 }, (_, index) => ({
+        vt: [(index + 1 - 6.5) * MONTH_STEP, .02, depth / 2 + .42] as [number, number, number],
+        chu: `T${index + 1}`,
+        cap: (index % 3 === 0 ? "chinh" : "phu") as "chinh" | "phu",
+        sang: active?.month === index + 1,
+      })),
+      ...DEPTS.map((department, index) => ({
+        vt: [-width / 2 - .48, .02, (index - (DEPTS.length - 1) / 2) * DEPARTMENT_STEP] as [number, number, number],
+        chu: department.short || department.id.toUpperCase(),
+        cap: "chinh" as const,
+        sang: active?.departmentIndex === index,
+      })),
+    ];
+    const meaningful = [
+      ...[...cells].sort((a, b) => b.total - a.total).slice(0, 5),
+      ...(selected ? [selected] : []),
+      ...cells.filter((cell) => cell.total > 0 && cell.overdue / cell.total >= .5),
+    ];
+    const labelled = new Set<string>();
+    for (const cell of meaningful) {
+      if (labelled.has(cellKey(cell))) continue;
+      labelled.add(cellKey(cell));
+      labels.push({
+        vt: [(cell.month - 6.5) * MONTH_STEP, cell.total / Math.max(1, maxTotal) * CAO_MAX + .18,
+          (cell.departmentIndex - (DEPTS.length - 1) / 2) * DEPARTMENT_STEP] as [number, number, number],
+        chu: String(cell.total), cap: "so", sang: !!active && cellKey(active) === cellKey(cell),
+      });
     }
-    const trong = [...theoThang.entries()].filter(([, n]) => n === 0).map(([t]) => t);
-    if (trong.length >= 2) phu.push(`Tháng ${trong.join(", ")} không có hạng mục nào — còn chỗ để giãn bớt.`);
+    return labels;
+  }, [active, cells, depth, maxTotal, selected, width]);
 
-    return {
-      chinh: `Nặng nhất là ${bp} tháng ${dinh.month}: ${dinh.total} hạng mục đến hạn, ${chuaXong} chưa xong (${tyChuaXong}%).`,
-      phu: phu.join(" "),
-      tone: (lan >= 1.5 || tyChuaXong >= 80 ? "over" : lan >= 1.3 ? "warn" : "ok") as "over" | "warn" | "ok",
+  useEffect(() => {
+    const reset = () => {
+      camera.current?.position.copy(DEFAULT_CAMERA_POSITION);
+      controls.current?.target.set(...DEFAULT_TARGET);
+      controls.current?.update();
     };
-  }, [o3d, dinh]);
+    onResetReady(reset);
+    return () => onResetReady(() => {});
+  }, [onResetReady]);
 
-  /* Tooltip bám con trỏ. Trước đây chi tiết cột chỉ hiện ở dòng chữ DƯỚI
-     khung — muốn đọc phải rời mắt khỏi cột đang trỏ, mà rời mắt là mất
-     luôn cột nào đang trỏ. Nay số hiện ngay cạnh con trỏ; dòng dưới vẫn
-     giữ vì đó là bản mà trình đọc màn hình đọc được. */
-  /* Nút chuyển 3D ↔ 2D. Giữ 3D làm mặc định vì nó trả lời "chỗ nào nhô cao"
-     nhanh nhất, nhưng ai cần đọc số chính xác — hoặc cần IN RA GIẤY, thứ mà
-     WebGL không làm được — thì có bản đồ nhiệt tương đương. Cùng một bộ số,
-     không phải hai phép đếm khác nhau. */
-  const [kieu, setKieu] = useState<"3d" | "2d">("3d");
-  const oNhiet: ONhiet[] = useMemo(() => o3d.map((x) => ({
-    hang: x.departmentIndex, cot: x.month - 1, gt: x.total, phu: x.total - x.completed,
-    ghiChu: `${DEPTS[x.departmentIndex]?.name || DEPTS[x.departmentIndex]?.id} · Tháng ${x.month}: `
-      + `${x.total} hạng mục đến hạn, ${x.total - x.completed} chưa xong`,
-  })), [o3d]);
+  return <>
+    <OrthographicCamera ref={camera} makeDefault position={DEFAULT_CAMERA_POSITION} />
+    <OrbitControls ref={controls} enablePan={false} enableZoom minZoom={.8} maxZoom={1.7}
+      minPolarAngle={.55} maxPolarAngle={1.25}
+      minAzimuthAngle={.35} maxAzimuthAngle={1.25} target={DEFAULT_TARGET} />
+    <ambientLight intensity={.8} />
+    <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow />
+    <directionalLight position={[-6, 4, -5]} intensity={.35} color="#ffe4f1" />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.004, 0]} receiveShadow>
+      <planeGeometry args={[width + 1.4, depth + 1.4]} /><meshBasicMaterial color="#F7F1F8" />
+    </mesh>
+    <gridHelper args={[Math.max(width, depth) + 1, 12, "#E7DAEB", "#F1E8F3"]} position={[0, .001, 0]} />
+    <ContactShadows position={[0, .002, 0]} opacity={.42} scale={Math.max(width, depth) + 1} blur={1.6} far={1.2} resolution={1024} />
+    <NhanTruc nhan={labels} tam={[0, CAO_MAX / 2, 0]} />
+    {cells.map((cell) => <Column key={cellKey(cell)} cell={cell} maxTotal={maxTotal}
+      selected={!!selected && cellKey(selected) === cellKey(cell)} selectionActive={!!selected}
+      giamChuyenDong={giamChuyenDong} onHover={onHover} onSelect={onSelect} />)}
+  </>;
+}
 
-  return (
-    <div className="vmp-space3d">
-      {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
-      <div className="vmp-space3d-doi">
-        <button type="button" onClick={() => setKieu("3d")}
-          className={kieu === "3d" ? "is-chon" : ""}>Khối 3D</button>
-        <button type="button" onClick={() => setKieu("2d")}
-          className={kieu === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
-      </div>
+function Detail({ cell, onOpenCell }: { cell: WorkloadCell | null; onOpenCell?: (cell: WorkloadCell) => void }) {
+  if (!cell) return <div className="vmp-space3d-tip" role="status">Chọn hoặc đưa chuột lên một cột để xem chi tiết.</div>;
+  return <div className="vmp-space3d-tip is-tro" role="status" aria-live="polite">
+    <b>Tháng {cell.month} · {deptName(cell)}</b>
+    <span> · Tổng {cell.total} · Hoàn thành {cell.completed} · Quá hạn {cell.overdue} · {Math.round(cell.completionRate * 100)}% hoàn thành</span>
+    {onOpenCell && <button type="button" className="workload-map-open-list" onClick={() => onOpenCell(cell)}>Xem danh sách</button>}
+  </div>;
+}
 
-      {kieu === "2d" ? (
-        <BanDoNhiet
-          tenHang="Bộ phận" tenCot="Tháng"
-          o={oNhiet}
-          nhanHang={DEPTS.map((d) => d.short || d.id)}
-          nhanCot={Array.from({ length: 12 }, (_, i) => `T${i + 1}`)}
-          donVi="hạng mục" phuLabel="chưa xong"
-        />
-      ) : (
-      <div className="vmp-space3d-than">
-        {/* KHÔNG có tooltip nổi bám con trỏ nữa. Nó che đúng thứ người ta
-            đang trỏ vào: cột bị chính chú thích của nó phủ lên, muốn nhìn
-            lại cột thì phải bỏ chuột ra, mà bỏ chuột ra thì mất chú thích.
-            Chi tiết nay hiện ở dải bên phải — ngang tầm mắt với khung vẽ,
-            không cách xa như hồi nó còn nằm dưới khung. */}
-        <div className="vmp-space3d-khung">
-            <Canvas
-            dpr={[1, 2]}
-            // Bóng mềm (PCFSoft) thay bóng cứng: mép bóng nhoè dần theo khoảng
-            // cách là tín hiệu chiều sâu mà mắt người đọc rất nhanh — cột nào
-            // đứng trước, cột nào đứng sau, không cần xoay mới biết.
-            shadows="soft"
-            gl={{
-              antialias: true, alpha: true,
-              // ACES filmic: giữ được chi tiết ở vùng sáng thay vì cháy trắng.
-              // Không có nó thì đỉnh cột màu đậm bệt thành một mảng.
-              toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.05,
-              outputColorSpace: THREE.SRGBColorSpace,
-            }}
-            frameloop={giamChuyenDong ? "demand" : "always"}>
-            <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
-          </Canvas>
-        </div>
+export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell }: {
+  acts: Activity[];
+  nam: number;
+  giamChuyenDong: boolean;
+  onOpenCell?: (cell: WorkloadCell) => void;
+}) {
+  const cells = useMemo(() => buildWorkloadMap(acts, nam), [acts, nam]);
+  const maxTotal = useMemo(() => cells.reduce((max, cell) => Math.max(max, cell.total), 1), [cells]);
+  const [hover, setHover] = useState<WorkloadCell | null>(null);
+  const [selected, setSelected] = useState<WorkloadCell | null>(null);
+  const [mode, setMode] = useState<"3d" | "2d">(() => (
+    typeof window !== "undefined" && window.matchMedia?.("(max-width: 760px)").matches ? "2d" : "3d"
+  ));
+  const resetRef = useRef<() => void>(() => {});
+  const onResetReady = useCallback((reset: () => void) => { resetRef.current = reset; }, []);
+  const detail = hover || selected;
+  const heatCells: ONhiet[] = useMemo(() => cells.map((cell) => ({
+    hang: cell.departmentIndex, cot: cell.month - 1, gt: cell.total, phu: cell.overdue,
+    ghiChu: `${deptName(cell)} · Tháng ${cell.month}: ${cell.total} hạng mục, ${cell.completed} hoàn thành, ${cell.overdue} quá hạn`,
+  })), [cells]);
+  const conclusion = useMemo(() => {
+    const peak = [...cells].sort((a, b) => b.total - a.total)[0];
+    if (!peak) return null;
+    const byMonth = new Map<number, number>();
+    for (const cell of cells) byMonth.set(cell.month, (byMonth.get(cell.month) || 0) + cell.total);
+    const average = [...byMonth.values()].reduce((sum, total) => sum + total, 0) / Math.max(1, byMonth.size);
+    const monthTotal = byMonth.get(peak.month) || 0;
+    const loadRatio = average ? monthTotal / average : 0;
+    return {
+      chinh: `Nặng nhất là ${deptName(peak)} tháng ${peak.month}: ${peak.total} hạng mục đến hạn, ${peak.total - peak.completed} chưa xong (${Math.round((1 - peak.completionRate) * 100)}%).`,
+      phu: loadRatio >= 1.3 ? `Cả tháng ${peak.month} gánh ${monthTotal} hạng mục — gấp ${loadRatio.toFixed(1)} lần mức trung bình tháng.` : "",
+      tone: (loadRatio >= 1.5 || peak.completionRate <= .2 ? "over" : loadRatio >= 1.3 ? "warn" : "ok") as "over" | "warn" | "ok",
+    };
+  }, [cells]);
 
-        <div className="vmp-space3d-canh">
-        <div className="vmp-space3d-chu">
-          <span><i style={{ background: "#2A9E82" }} />Gần xong hết</span>
-          <span><i style={{ background: "#8B7B96" }} />Đang làm dở</span>
-          <span><i style={{ background: "#D6486D" }} />Còn nguyên — dồn việc</span>
-        </div>
-
-        <div className={`vmp-space3d-tip ${chon ? "is-tro" : ""}`} role="status" aria-live="polite">
-          {chon ? (
-            <>
-              <b>Tháng {chon.month} · {DEPTS[chon.departmentIndex]?.name || DEPTS[chon.departmentIndex]?.id}</b>
-              {" — "}<b>{chon.total}</b> hạng mục đến hạn, còn <b>{chon.total - chon.completed}</b> chưa xong
-            </>
-          ) : o3d.length
-            ? "Đưa chuột lên một cột để xem chi tiết · kéo để xoay nếu có cột bị khuất."
-            : "Không có hạng mục nào có mốc đích VMP trong năm đang chọn."}
-        </div>
-        </div>
-      </div>
-      )}
+  return <div className="vmp-space3d">
+    {conclusion && <CauKetLuan chinh={conclusion.chinh} phu={conclusion.phu} tone={conclusion.tone} />}
+    <div className="vmp-space3d-doi" aria-label="Chế độ bản đồ tải việc">
+      <button type="button" data-map-mode="3d" onClick={() => setMode("3d")} className={mode === "3d" ? "is-chon" : ""}>Bản đồ 3D</button>
+      <button type="button" data-map-mode="2d" onClick={() => setMode("2d")} className={mode === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
     </div>
-  );
+    {mode === "3d" ? <div className="vmp-space3d-than">
+      <div className="vmp-space3d-khung" data-testid="workload-map-3d">
+        <ThreeFallbackBoundary onUse2D={() => setMode("2d")}>
+          <Canvas dpr={[1, 2]} shadows="soft" frameloop={giamChuyenDong ? "demand" : "always"}
+            gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05, outputColorSpace: THREE.SRGBColorSpace }}>
+            <Scene cells={cells} maxTotal={maxTotal} selected={selected} hover={hover} giamChuyenDong={giamChuyenDong}
+              onHover={setHover} onSelect={setSelected} onResetReady={onResetReady} />
+          </Canvas>
+        </ThreeFallbackBoundary>
+      </div>
+      <div className="vmp-space3d-canh">
+        <button type="button" className="workload-map-reset" aria-label="Về góc chuẩn" onClick={() => resetRef.current()}>Về góc chuẩn</button>
+        <div className="vmp-space3d-chu" data-testid="workload-map-legend">
+          <span><i style={{ background: "#2A9E82" }} />Hoàn thành</span>
+          <span><i style={{ background: RASPBERRY }} />Quá hạn</span>
+        </div>
+      </div>
+    </div> : <BanDoNhiet tenHang="Bộ phận" tenCot="Tháng" o={heatCells}
+      nhanHang={DEPTS.map((department) => department.short || department.id)}
+      nhanCot={Array.from({ length: 12 }, (_, index) => `T${index + 1}`)} donVi="hạng mục" phuLabel="quá hạn"
+      selected={selected ? { hang: selected.departmentIndex, cot: selected.month - 1 } : undefined}
+      onSelect={(cell) => setSelected(cells.find((item) => item.departmentIndex === cell.hang && item.month === cell.cot + 1) || null)} />}
+    <Detail cell={detail} onOpenCell={onOpenCell} />
+  </div>;
 }

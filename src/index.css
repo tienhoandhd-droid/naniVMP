@@ -6792,6 +6792,19 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-space3d-doi button.is-chon {
   background: var(--c-surface); color: var(--c-ink); box-shadow: var(--e-low);
 }
+.workload-map-reset, .workload-map-open-list, .workload-map-fallback button {
+  border: 1px solid var(--c-line-strong); border-radius: 10px; background: var(--c-surface);
+  color: var(--c-ink); cursor: pointer; font: inherit; font-size: 12px; font-weight: 800;
+  padding: 8px 10px;
+}
+.workload-map-reset:hover, .workload-map-open-list:hover, .workload-map-fallback button:hover {
+  border-color: var(--c-pink); color: var(--c-pink-text);
+}
+.workload-map-open-list { display: block; margin-top: 9px; }
+.workload-map-fallback {
+  min-height: 220px; display: grid; place-content: center; gap: 12px; text-align: center;
+  padding: 20px; border: 1px dashed var(--c-line-strong); border-radius: 14px; color: var(--c-ink-soft);
+}
 
 .vmp-nhiet { overflow-x: auto; }
 .vmp-nhiet-bang { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 720px; }

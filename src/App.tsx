@@ -112,6 +112,7 @@ import ReportsView from "./components/dashboard/ReportsView.tsx";
 import { saveUser, loadUser, loadFilterPrefs, saveFilterPrefs } from "./lib/config.ts";
 import type { ReactNode } from "react";
 import type { Activity, AppUser } from "./types/domain.ts";
+import type { WorkloadCell } from "./lib/workloadMap.ts";
 import type { Database } from "./types/database.ts";
 import {
   isSupabaseConfigured,
@@ -1513,6 +1514,19 @@ export default function App() {
   const [customFrom, setCustomFrom] = useState(khoiTao.customFrom);   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState(khoiTao.customTo);         // yyyy-mm-dd
   const [onlyMine, setOnlyMine] = useState(khoiTao.onlyMine);
+  // App là nơi duy nhất quyết định đích theo quyền. Bản đồ chỉ nhận callback
+  // khi có một màn hợp lệ, vì vậy nó không thể tạo CTA dẫn tới màn bị chặn.
+  const workloadListTarget = overviewTarget(access, "soon");
+  const onOpenWorkloadCell = useMemo(() => workloadListTarget ? (cell: WorkloadCell) => {
+    const first = new Date(vmpToday().getFullYear(), cell.month - 1, 1);
+    const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+    const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    setDeptSel([cell.departmentId]);
+    setPeriodFilter("custom");
+    setCustomFrom(localDate(first));
+    setCustomTo(localDate(last));
+    setView(workloadListTarget);
+  } : undefined, [workloadListTarget]);
   // Faceted count: số hạng mục theo mỗi bộ phận (khớp a.depts) — hiện cạnh lựa chọn.
   const deptOptions = useMemo(() => DEPTS.map((d) => ({
     v: d.id, l: d.name,
@@ -1840,7 +1854,7 @@ export default function App() {
                   onMo={(a) => { setMoHangMuc(String(a.id)); setView("progress"); }} />
               )}
               {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
-              {view === "timeline" && <TimelineView acts={filteredActs} />}
+              {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} />}
               {view === "inventory" && (
                 <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}
                   onUpdate={updateActivity} onReload={reloadData} readOnly={false}

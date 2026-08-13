@@ -21,6 +21,7 @@ import { nhapCoThuLai } from "../lib/tailMan.ts";
 const WorkloadSpace3D = lazy(nhapCoThuLai(() => import("../components/three/WorkloadSpace3D.tsx")));
 import type { ReactNode } from "react";
 import type { Activity, Milestones } from "../types/domain.ts";
+import type { WorkloadCell } from "../lib/workloadMap.ts";
 
 // Các "không gian làm việc" gộp chung dưới menu Timeline VMP: timeline sâu +
 // Chỉ hai góc nhìn. Ba tab "Sơ đồ · Bố cục · Bảng" đã bỏ (29/07/2026):
@@ -1767,7 +1768,10 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
   );
 }
 
-export default function TimelineView({ acts }: { acts: Activity[] }) {
+export default function TimelineView({ acts, onOpenWorkloadCell }: {
+  acts: Activity[];
+  onOpenWorkloadCell?: (cell: WorkloadCell) => void;
+}) {
   const year = vmpToday().getFullYear();
   const giamChuyenDong = useMemo(
     () => typeof window !== "undefined"
@@ -1887,7 +1891,8 @@ export default function TimelineView({ acts }: { acts: Activity[] }) {
           Địa hình tải việc {year}
         </CardTitle>
         <Suspense fallback={<div style={{ height: 420 }} />}>
-          <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong} />
+          <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong}
+            onOpenCell={onOpenWorkloadCell} />
         </Suspense>
       </Card>
 

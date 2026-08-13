@@ -178,6 +178,15 @@ try {
     if (beforeScrollNavigation <= 0) throw new Error(`scroll trước điều hướng: ${beforeScrollNavigation}`);
     await page.click('[data-view="timeline"]');
     await page.waitForFunction(() => document.querySelector("main").scrollTop === 0);
+
+    await page.click('button[data-map-mode="3d"]');
+    await page.waitForSelector('[data-testid="workload-map-3d"] canvas');
+    await page.click('button[aria-label="Về góc chuẩn"]');
+    const legend = await page.$eval('[data-testid="workload-map-legend"]', (el) => el.textContent || "");
+    if (!legend.includes("Hoàn thành") || !legend.includes("Quá hạn")) throw new Error(legend);
+    await page.setViewport({ width: 390, height: 844 });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector('button[data-map-mode="2d"].is-chon');
   }
 } finally {
   await browser.close();

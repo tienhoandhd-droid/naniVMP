@@ -34,6 +34,7 @@ export interface ONhiet {
 export default function BanDoNhiet({
   tenHang, tenCot, o, nhanHang, nhanCot, donVi = "", phuLabel, sacDo = C.rasp,
   hauTo = "", congTong = true,
+  selected, onSelect,
 }: {
   /** Tên trục dọc, vd "Bộ phận". */
   tenHang: string;
@@ -51,6 +52,9 @@ export default function BanDoNhiet({
   /** Có cộng tổng theo hàng/cột không. Tỉ lệ thì KHÔNG cộng được: cộng
    *  bốn cái 50% ra 200% là con số vô nghĩa. */
   congTong?: boolean;
+  /** Cho phép một bản đồ chủ quản lưu lựa chọn mà không buộc các nơi dùng khác phải tương tác. */
+  selected?: Pick<ONhiet, "hang" | "cot">;
+  onSelect?: (cell: ONhiet) => void;
 }) {
   const bang = new Map<string, ONhiet>();
   for (const x of o) bang.set(`${x.hang}|${x.cot}`, x);
@@ -86,11 +90,20 @@ export default function BanDoNhiet({
                 {cua.map((x, j) => {
                   const v = x?.gt || 0;
                   const d = doDam(v);
+                  const isSelected = !!x && selected?.hang === i && selected?.cot === j;
                   return (
-                    <td key={j} title={x?.ghiChu || `${h} · ${nhanCot[j]}: ${v} ${donVi}`}>
+                    <td key={j} title={x?.ghiChu || `${h} · ${nhanCot[j]}: ${v} ${donVi}`}
+                      onClick={x && onSelect ? () => onSelect(x) : undefined}
+                      role={x && onSelect ? "button" : undefined}
+                      tabIndex={x && onSelect ? 0 : undefined}
+                      onKeyDown={x && onSelect ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(x); }
+                      } : undefined}>
                       <div className="vmp-nhiet-o" style={{
                         background: v > 0 ? `color-mix(in srgb, ${sacDo} ${Math.round(d * 100)}%, transparent)` : "transparent",
                         color: v > 0 ? chuTren(d) : C.plumSoft,
+                        outline: isSelected ? `2px solid ${C.pink}` : undefined,
+                        outlineOffset: isSelected ? 2 : undefined,
                       }}>
                         <b className="tnum" style={{ fontFamily: NUM }}>{v ? `${v}${hauTo}` : "·"}</b>
                         {x?.phu != null && x.phu > 0 && (
