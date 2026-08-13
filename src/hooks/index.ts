@@ -73,7 +73,8 @@ export function useDebounce<T>(value: T, delay = 300): T {
 export function useScrollTop(deps: DependencyList) {
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (ref.current) ref.current.scrollTop = 0;
+    const frame = requestAnimationFrame(() => ref.current?.scrollTo({ top: 0, left: 0 }));
+    return () => cancelAnimationFrame(frame);
   }, deps); // eslint-disable-line
   return ref;
 }

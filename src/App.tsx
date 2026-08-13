@@ -59,6 +59,8 @@ import {
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
 import { useAccess } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
+import { overviewTarget } from "./lib/navigationTargets.ts";
+import type { AccessContext, ScreenId } from "./lib/access.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
 import type { UrlState } from "./lib/urlState.ts";
@@ -949,7 +951,11 @@ function AdminView({ conn, user }: { conn: ConnState; user?: AppUser | null }) {
  * đều nhau bắt mắt phải tự quyết định nhìn đâu trước — đó là lý do bản
  * cũ (4 thẻ KPI y hệt nhau xếp hàng ngang) đọc mệt hơn cần thiết.
  * =================================================================== */
-function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) => void }) {
+function Overview({ acts, setView, access }: {
+  acts: Activity[];
+  setView?: (v: string) => void;
+  access: Pick<AccessContext, "canView">;
+}) {
   const { e, d, overdue, soon, gap, gapPts, mismatched, theoThang } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
     const overdue = acts.filter((a) => a.alert && a.alert.kind === "over");
@@ -974,7 +980,21 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
     };
   }, [acts]);
 
-  const di = (v: string) => (setView ? () => setView(v) : undefined);
+  const destinations = useMemo(() => ({
+    overdue: overviewTarget(access, "overdue"),
+    soon: overviewTarget(access, "soon"),
+    dataQuality: overviewTarget(access, "data-quality"),
+    today: overviewTarget(access, "today"),
+  }), [access]);
+  const di = (v: ScreenId | null) => (v && setView ? () => setView(v) : undefined);
+  const nhanCta = (v: ScreenId | null) => {
+    if (v === "progress") return "Cập nhật";
+    if (v === "alerts") return "Xem cảnh báo";
+    if (v === "today") return "Mở việc hôm nay";
+    if (v === "health") return "Xem kiểm tra";
+    if (v === "source") return "Xem danh mục";
+    return "Mở chi tiết";
+  };
   const [sau, setSau] = useState(false);
   const soLoiDl = useMemo(() => runDataQualityChecks(acts).length, [acts]);
 
@@ -1055,13 +1075,13 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
           tưởng web tính sai. Nay lấy con số RỘNG hơn (theo mốc) làm chỉ số
           chính vì đó mới là thứ phải xử, và nói thẳng chênh lệch là gì. */}
       <StatTile cls="b-k1" icon={AlertCircle} label="Quá hạn" value={overdue.length}
-        tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di("progress")}
+        tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di(destinations.overdue)}
         sub={overdue.length
           ? `${e.over} đã đổi trạng thái · ${Math.max(0, overdue.length - e.over)} mốc đã trôi mà trạng thái chưa đổi`
           : "Không còn hạng mục nào trễ"} />
 
       <StatTile cls="b-k2" icon={Clock} label="Tới hạn 30 ngày" value={soon.length}
-        tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di("alerts")}
+        tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di(destinations.soon)}
         sub={soon.length ? "Theo dõi để không rơi sang quá hạn" : "Tháng tới đang trống"} />
 
       <StatTile cls="b-k3" icon={ClipboardCheck} label="Hoàn thành VMP" value={`${e.rate}%`}
@@ -1074,8 +1094,10 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
           nói rằng nó quan trọng ngang chúng — và đúng là như vậy. */}
       <StatTile cls="b-k4" icon={FileWarning} label="Vấn đề dữ liệu" value={soLoiDl}
         tone={soLoiDl > 0 ? { c: C.marigoldText, bg: C.marigoldSoft } : { c: C.mintText, bg: C.mintSoft }}
-        onClick={di("health")}
-        sub={soLoiDl ? `${mismatched.length} lệch pha · bấm để xem và sửa` : "Không phát hiện vấn đề nào"} />
+        onClick={di(destinations.dataQuality)}
+        sub={soLoiDl
+          ? `${mismatched.length} lệch pha${destinations.dataQuality ? ` · ${nhanCta(destinations.dataQuality).toLowerCase()}` : ""}`
+          : "Không phát hiện vấn đề nào"} />
 
       <div className="b-vali">
         <PrincessCommentary stats={{
@@ -1090,8 +1112,10 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
           <strong style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800, color: C.plum }}>
             Việc gấp nhất
           </strong>
-          <button type="button" className="vmp-mo-sau" style={{ width: "auto", padding: "8px 14px" }}
-            onClick={di("today")}>Mở màn Hôm nay →</button>
+          {destinations.today && (
+            <button type="button" className="vmp-mo-sau" style={{ width: "auto", padding: "8px 14px" }}
+              onClick={di(destinations.today)}>{nhanCta(destinations.today)} →</button>
+          )}
         </div>
         {vieCGap.length === 0 ? (
           <div style={{ padding: 16, color: C.mintText, fontWeight: 700, fontSize: 14 }}>
@@ -1110,7 +1134,11 @@ function Overview({ acts, setView }: { acts: Activity[]; setView?: (v: string) =
                 </span>
                 <span className="hn-meta">{a.alert?.stage} · {a.owner || "chưa có người"}</span>
                 <Pill s={a.st} small />
-                <button type="button" className="hn-nut" onClick={di("today")}>Xử lý</button>
+                {destinations.overdue && (
+                  <button type="button" className="hn-nut" onClick={di(destinations.overdue)}>
+                    {nhanCta(destinations.overdue)}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -1338,7 +1366,8 @@ function GlobalFilterBar({
   );
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
+    <div aria-label="Phạm vi toàn hệ thống" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
+      <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>
       {/* Việc của tôi — lọc theo QA phụ trách khớp tên người đang đăng nhập.
           Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
           vào trong hộp thì coi như không có. */}
@@ -1712,6 +1741,8 @@ export default function App() {
             title={title} user={user} sub={(NAV_SUBS as Record<string, string>)[view]}
             onRefresh={reloadData} refreshing={conn.status === "loading"}
             lastSync={lastSync} dataUpdatedAt={dataUpdatedAt}
+            view={view} setView={setView} access={access}
+            onLogout={logout} onChangePw={() => setShowPw(true)}
           />
 
           {/* Toast trạng thái lưu nổi góc phải */}
@@ -1808,7 +1839,7 @@ export default function App() {
                 <TodayView acts={filteredActs} myName={myName} setView={setView}
                   onMo={(a) => { setMoHangMuc(String(a.id)); setView("progress"); }} />
               )}
-              {view === "overview" && <Overview acts={filteredActs} setView={setView} />}
+              {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
               {view === "timeline" && <TimelineView acts={filteredActs} />}
               {view === "inventory" && (
                 <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}

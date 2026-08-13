@@ -1,9 +1,9 @@
 /* =====================================================================
  *  components/layout/Layout.jsx — Sidebar, Topbar, AppShell
  * ===================================================================== */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
-  Bell, KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
+  KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
 } from "lucide-react";
 import { C, TEXT, NUM, GRAD, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
@@ -75,7 +75,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               const active = view === n.id;
               const Icon = n.icon;
               return (
-                <button key={n.id} onClick={() => setView(n.id)} className="vmp-nav"
+                <button key={n.id} onClick={() => setView(n.id)} className="vmp-nav" data-view={n.id}
                   title={collapsed ? n.label : undefined}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
@@ -128,6 +128,9 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 </div>
               </div>
             </div>
+            <div style={{ marginTop: 11 }}>
+              <ThanhTraToggle />
+            </div>
             <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
               <button onClick={onChangePw} style={{
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -161,6 +164,81 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
         {collapsed ? <Menu size={14} color={C.pinkText} /> : <X size={14} color={C.pinkText} />}
       </button>
     </aside>
+  );
+}
+
+function MobileDrawer({ open, view, setView, user, access, onClose, onLogout, onChangePw }: {
+  open: boolean;
+  view: string;
+  setView: (v: string) => void;
+  user?: AppUser | null;
+  access: AccessContext;
+  onClose: () => void;
+  onLogout: () => void;
+  onChangePw: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const allowedItems = NAV_ITEMS.filter((item) => access.canView(item.id));
+  return (
+    <div className="vmp-mobile-drawer-backdrop" onClick={onClose}>
+      <aside id="vmp-mobile-drawer" className="vmp-mobile-drawer" role="dialog" aria-modal="true"
+        aria-label="Menu điều hướng" onClick={(event) => event.stopPropagation()}>
+        <div className="vmp-mobile-drawer-head">
+          <CrownLogo />
+          <button type="button" aria-label="Đóng menu" onClick={onClose} className="vmp-mobile-drawer-close">
+            <X size={18} color={C.pinkText} />
+          </button>
+        </div>
+
+        <nav aria-label="Điều hướng chính" className="vmp-mobile-drawer-nav">
+          {allowedItems.map((item) => {
+            const Icon = item.icon;
+            const active = view === item.id;
+            return (
+              <button key={item.id} type="button" data-view={item.id} className="vmp-nav"
+                onClick={() => { setView(item.id); onClose(); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14,
+                  border: "none", cursor: "pointer", textAlign: "left", fontFamily: TEXT, fontSize: 14,
+                  width: "100%", fontWeight: active ? 800 : 600, color: active ? C.plum : C.plumSoft,
+                  background: active ? C.pinkSoft : "transparent", boxShadow: active ? `inset 3px 0 0 ${C.pink}` : "none",
+                }}>
+                <Icon size={19} color={active ? C.pink : C.plumSoft} strokeWidth={2.2} />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="vmp-mobile-drawer-account">
+          <div style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{user?.name || "Tài khoản"}</div>
+          <div style={{ color: C.plumSoft, fontSize: 12, fontWeight: 700, marginTop: 2 }}>{user?.role}</div>
+          <div className="vmp-mobile-drawer-preferences">
+            <ThemeToggle />
+            <ThanhTraToggle />
+          </div>
+          <button type="button" onClick={() => { onChangePw(); onClose(); }} className="vmp-mobile-drawer-account-action">
+            <KeyRound size={15} /> Mật khẩu
+          </button>
+          <button type="button" onClick={() => { onClose(); onLogout(); }} className="vmp-mobile-drawer-account-action is-logout">
+            <LogOut size={15} /> Thoát
+          </button>
+        </div>
+      </aside>
+    </div>
   );
 }
 
@@ -252,7 +330,8 @@ function ThanhTraToggle() {
   );
 }
 
-export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, dataUpdatedAt }: {
+export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, dataUpdatedAt,
+  view, setView, access, onLogout, onChangePw }: {
   title?: ReactNode;
   user?: AppUser | null;
   sub?: ReactNode;
@@ -261,7 +340,18 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
   lastSync?: number | string | null;
   /** max(updated_at) trong DB — TUỔI DỮ LIỆU, không phải giờ trình duyệt tải. */
   dataUpdatedAt?: string | null;
+  view: string;
+  setView: (v: string) => void;
+  access: AccessContext;
+  onLogout: () => void;
+  onChangePw: () => void;
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+    requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
+  };
   // Đồng hồ chỉ để kích hoạt render lại mỗi phút; giá trị không dùng trực tiếp.
   const [, setNow] = useState(new Date());
   useEffect(() => {
@@ -270,7 +360,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
   }, []);
 
   return (
-    <div style={{
+    <div className="vmp-topbar" style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "22px 34px", gap: 20, flexWrap: "wrap",
     }}>
@@ -317,8 +407,12 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <ThanhTraToggle />
+      <div className="vmp-topbar-actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button ref={mobileMenuButtonRef} type="button" className="vmp-mobile-menu-button"
+          aria-label="Mở menu" aria-expanded={mobileMenuOpen} aria-controls="vmp-mobile-drawer"
+          onClick={() => setMobileMenuOpen(true)}>
+          <Menu size={19} color={C.pinkText} />
+        </button>
         <ThemeToggle />
         <button onClick={onRefresh} title="Làm mới dữ liệu" className="vmp-lift" style={{
           ...glass, borderRadius: 14, padding: "9px 15px",
@@ -330,7 +424,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           {refreshing ? "Đang tải…" : "Làm mới"}
         </button>
 
-        <span style={{
+        <span className="vmp-perm-badge" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           padding: "8px 14px", borderRadius: 999, fontSize: 12, fontWeight: 800,
           color: user?.perm === "view" ? C.skyText : C.pinkText,
@@ -339,21 +433,9 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           <ShieldCheck size={14} /> {(user && PERM_LABEL[user.perm]) || user?.role}
         </span>
 
-        <button
-          aria-label="Thông báo"
-          title="Thông báo" style={{
-          position: "relative", width: 42, height: 42,
-          cursor: "pointer", ...glass,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <Bell size={18} color={C.pink} />
-          <span style={{
-            position: "absolute", top: 9, right: 10,
-            width: 8, height: 8, borderRadius: 999,
-            background: C.rasp, border: `2px solid ${C.surface}`,
-          }} />
-        </button>
       </div>
+      <MobileDrawer open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
+        onClose={closeMobileMenu} onLogout={onLogout} onChangePw={onChangePw} />
     </div>
   );
 }

@@ -79,6 +79,14 @@ export function ScreenGuard({ screenId, access, onRedirect, children }: {
 
   if (!dangThucThi || duocXem) return <>{children}</>;
   // Đang chuyển hướng: không vẽ nội dung màn bị cấm, dù chỉ một khung hình.
-  if (manThayThe) return null;
+  if (manThayThe) return (
+    <div role="status" style={{
+      maxWidth: 560, margin: "64px auto", padding: 28, borderRadius: 18,
+      background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
+      fontFamily: TEXT, color: C.plum, lineHeight: 1.6,
+    }}>
+      Đang mở màn bạn được phép xem…
+    </div>
+  );
   return <KhongVaoDuoc access={access} />;
 }

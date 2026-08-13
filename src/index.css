@@ -216,6 +216,91 @@ button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 .vmp-row { transition: background .18s ease; }
 .vmp-row:hover { background: var(--pink-mist); }
 
+/* Thanh điều hướng điện thoại chỉ xuất hiện ở khổ hẹp. Sidebar desktop vẫn
+   là điều hướng chính; drawer gom các thao tác ít dùng vào gần tài khoản. */
+.vmp-mobile-menu-button {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: var(--c-glass);
+  cursor: pointer;
+}
+.vmp-mobile-drawer-backdrop {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  background: rgba(45, 22, 45, .42);
+}
+.vmp-mobile-drawer {
+  width: min(88vw, 360px);
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-line);
+  box-shadow: 18px 0 42px rgba(61, 31, 63, .23);
+}
+.vmp-mobile-drawer-head,
+.vmp-mobile-drawer-preferences,
+.vmp-mobile-drawer-account-action {
+  display: flex;
+  align-items: center;
+}
+.vmp-mobile-drawer-head { justify-content: space-between; gap: 12px; }
+.vmp-mobile-drawer-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: var(--pink-soft);
+  cursor: pointer;
+}
+.vmp-mobile-drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 20px 0;
+}
+.vmp-mobile-drawer-account {
+  margin-top: auto;
+  padding: 15px;
+  border: 1.5px solid var(--pink-soft);
+  border-radius: 14px;
+  background: var(--c-surface);
+}
+.vmp-mobile-drawer-preferences { gap: 8px; margin: 14px 0 10px; }
+.vmp-mobile-drawer-account-action {
+  width: 100%;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--lav-soft);
+  color: var(--c-lav-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+.vmp-mobile-drawer-account-action.is-logout { background: var(--c-rasp-soft); color: var(--c-rasp-text); }
+.vmp-global-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--plum-soft);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 /* ===== Keyframes & animation utilities ===== */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .fade { animation: fadeUp .5s ease both; }
@@ -1999,6 +2084,12 @@ select { appearance: none; -webkit-appearance: none; }
   .vq-login-intro h1 { font-size: 31px; }
   .vq-login-intro > p:last-child { margin-top: 7px; }
   .vmp-sidebar { display: none !important; }
+  .vmp-topbar { padding: 15px 18px !important; gap: 12px !important; }
+  .vmp-topbar > div:first-child { min-width: 0; }
+  .vmp-topbar .vmp-title { font-size: 23px !important; }
+  .vmp-topbar-actions { gap: 8px !important; max-width: 100%; }
+  .vmp-mobile-menu-button { display: inline-flex; flex: none; }
+  .vmp-global-filter-label { width: 100%; }
 }
 @media (max-width: 980px) {
   .vmp-hero-grid { grid-template-columns: 1fr !important; }
