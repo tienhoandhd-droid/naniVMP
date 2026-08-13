@@ -1,6 +1,7 @@
 import type { ItemPermissionMode } from "../../types/domain.ts";
 import {
   ACCESS_CLASSES,
+  LEGACY_ACCESS_CLASSES,
   type AccessClass,
   type AccountCandidate,
   type AccountStatus,
@@ -106,7 +107,10 @@ export function decodeDirectoryPerson(value: unknown): DirectoryPerson {
   const accessValue = row.access_class;
   let accessClass: AccessClass | null = null;
   if (accessValue !== null && accessValue !== undefined) {
-    accessClass = enumValue(row, "access_class", ACCESS_CLASSES.map((item) => item.id));
+    accessClass = enumValue(row, "access_class", [
+      ...ACCESS_CLASSES.map((item) => item.id),
+      ...LEGACY_ACCESS_CLASSES,
+    ]);
   }
 
   return {

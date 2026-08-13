@@ -314,6 +314,10 @@ test("decoder danh bạ giữ dòng legacy thiếu cấu hình để có thể s
   };
 
   assert.deepEqual(decodeDirectoryPerson(valid), valid);
+  assert.equal(decodeDirectoryPerson({
+    ...valid,
+    access_class: "equipment_scheduler",
+  }).access_class, "equipment_scheduler");
   assert.deepEqual(decodeDirectoryPerson({
     ...valid,
     department: null,

@@ -6,7 +6,11 @@ export const ACCESS_CLASSES = [
   { id: "equipment_manager", label: "Quản lý bộ phận quản lý thiết bị" },
 ] as const;
 
-export type AccessClass = (typeof ACCESS_CLASSES)[number]["id"];
+export const LEGACY_ACCESS_CLASSES = ["equipment_scheduler"] as const;
+
+export type AccessClass =
+  | (typeof ACCESS_CLASSES)[number]["id"]
+  | (typeof LEGACY_ACCESS_CLASSES)[number];
 
 export const QA_TIMELINE_FIELDS = [
   "actual_protocol_date",
