@@ -23,14 +23,14 @@ test("phân loại tạo đúng quyền sửa ở từng nhóm timeline", async 
     "view_only",
     "qa_progress_editor",
     "qa_manager",
-    "equipment_scheduler",
+    "workshop_staff",
     "equipment_manager",
   ]);
   assert.equal(QA_TIMELINE_FIELDS.length, 8);
-  assert.deepEqual(EQUIPMENT_TIMELINE_FIELDS, ["scheduled_at"]);
+  assert.deepEqual(EQUIPMENT_TIMELINE_FIELDS, ["actual_validation_date"]);
   assert.deepEqual(
     QA_TIMELINE_FIELDS.filter((field) => EQUIPMENT_TIMELINE_FIELDS.includes(field)),
-    [],
+    ["actual_validation_date"],
   );
 });
 

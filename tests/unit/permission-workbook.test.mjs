@@ -94,23 +94,24 @@ test("parser đổi bốn tầng mã sang ID và chấp nhận mã nhân viên t
   );
   const valid = parsePermissionRows([
     PERMISSION_HEADERS,
-    [1, "QA", "", "Nguyễn Văn A", "Bộ phận quản lý thiết bị – Xếp lịch thẩm định", "QA", "X1", "KV1", "L1", "a@vmp.local", "Có"],
+    [1, "QA", "", "Nguyễn Văn A", "Nhân viên xưởng – Ghi ngày thẩm định thực tế", "QA", "X1", "KV1", "L1", "a@vmp.local", "Có"],
   ], { scopeCatalog });
   assert.equal(valid.errors.length, 0);
   assert.equal(valid.rows[0].employee_code, null);
+  assert.equal(valid.rows[0].access_class, "workshop_staff");
   assert.deepEqual(valid.rows[0].scope_departments, ["qa"]);
   assert.deepEqual(valid.rows[0].scope_factory_ids, ["factory-1"]);
   assert.deepEqual(valid.rows[0].scope_area_ids, ["area-1"]);
   assert.deepEqual(valid.rows[0].scope_line_ids, ["line-1"]);
 });
 
-test("parser bắt equipment_scheduler nhập đủ bốn tầng phạm vi", async () => {
+test("parser bắt workshop_staff nhập đủ bốn tầng phạm vi", async () => {
   const { parsePermissionRows, PERMISSION_HEADERS } = await import(
     "../../src/features/itemPermissions/permissionWorkbook.ts"
   );
   const missingScope = parsePermissionRows([
     PERMISSION_HEADERS,
-    [1, "QA", "NV01", "Nguyễn Văn A", "Bộ phận quản lý thiết bị – Xếp lịch thẩm định", "", "", "", "", "", "Không"],
+    [1, "QA", "NV01", "Nguyễn Văn A", "Nhân viên xưởng – Ghi ngày thẩm định thực tế", "", "", "", "", "", "Không"],
   ], { scopeCatalog });
   assert.deepEqual(missingScope.rows, []);
   assert.deepEqual(missingScope.errors.map((error) => error.message), [
@@ -128,7 +129,7 @@ test("parser báo đúng dòng khi mã lạ hoặc quan hệ cha con sai", async
 
   const invalidCode = parsePermissionRows([
     PERMISSION_HEADERS,
-    [2, "QA", "NV02", "Nguyễn Văn B", "Bộ phận quản lý thiết bị – Xếp lịch thẩm định", "QA", "X-KHONG-CO", "KV1", "L1", "", "Không"],
+    [2, "QA", "NV02", "Nguyễn Văn B", "Nhân viên xưởng – Ghi ngày thẩm định thực tế", "QA", "X-KHONG-CO", "KV1", "L1", "", "Không"],
   ], { scopeCatalog });
   assert.equal(invalidCode.rows.length, 0);
   assert.equal(invalidCode.errors[0].rowNumber, 2);
@@ -136,7 +137,7 @@ test("parser báo đúng dòng khi mã lạ hoặc quan hệ cha con sai", async
 
   const invalidRelationship = parsePermissionRows([
     PERMISSION_HEADERS,
-    [3, "QA", "NV03", "Nguyễn Văn C", "Bộ phận quản lý thiết bị – Xếp lịch thẩm định", "QA", "X1", "KV1", "L2", "", "Không"],
+    [3, "QA", "NV03", "Nguyễn Văn C", "Nhân viên xưởng – Ghi ngày thẩm định thực tế", "QA", "X1", "KV1", "L2", "", "Không"],
   ], { scopeCatalog });
   assert.equal(invalidRelationship.rows.length, 0);
   assert.equal(invalidRelationship.errors[0].rowNumber, 2);

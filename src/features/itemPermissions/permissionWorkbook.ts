@@ -20,9 +20,9 @@ const ACCESS_CLASS_BY_LABEL: Record<string, AccessClass> = {
   qa_progress_editor: "qa_progress_editor",
   "quản lý qa": "qa_manager",
   qa_manager: "qa_manager",
-  "bộ phận quản lý thiết bị – xếp lịch thẩm định": "equipment_scheduler",
-  "bộ phận quản lý thiết bị - xếp lịch thẩm định": "equipment_scheduler",
-  equipment_scheduler: "equipment_scheduler",
+  "nhân viên xưởng – ghi ngày thẩm định thực tế": "workshop_staff",
+  "nhân viên xưởng - ghi ngày thẩm định thực tế": "workshop_staff",
+  workshop_staff: "workshop_staff",
   "quản lý bộ phận quản lý thiết bị": "equipment_manager",
   equipment_manager: "equipment_manager",
 };

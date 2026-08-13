@@ -21,7 +21,7 @@ export const ACCESS_CLASS_LABELS = [
   "Chỉ xem",
   "QA – Cập nhật 4 mốc hoàn thành",
   "Quản lý QA",
-  "Bộ phận quản lý thiết bị – Xếp lịch thẩm định",
+  "Nhân viên xưởng – Ghi ngày thẩm định thực tế",
   "Quản lý bộ phận quản lý thiết bị",
 ];
 
@@ -108,7 +108,7 @@ export async function createPermissionWorkbook(outputPath) {
     "Năm phân loại quyền:",
     ...ACCESS_CLASS_LABELS.map((label, index) => `${index + 1}. ${label}`),
     "QA chỉ cập nhật bốn mốc hoàn thành: đề cương, thẩm định thực tế, báo cáo và VMP (ngày + trạng thái).",
-    "Bộ phận quản lý thiết bị chỉ cập nhật cột xếp lịch thẩm định có đủ ngày giờ; bộ phận này không mặc định là Xưởng.",
+    "Nhân viên xưởng chỉ cập nhật ngày hoàn thành thẩm định thực tế cho hạng mục được giao.",
     "File này không có macro. Dữ liệu được kiểm tra và xem trước trên web trước khi Admin nhập; chế độ quyền thật vẫn chưa bật.",
   ];
   guideRows.forEach((text) => guide.addRow([text]));
