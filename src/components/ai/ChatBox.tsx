@@ -289,7 +289,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
   /* -------------------------------------------------------------- */
   if (!mo) {
     return (
-      <button onClick={() => setMo(true)} title="Trò chuyện cùng công chúa Vali"
+      <button className="vmp-chat-fab" onClick={() => setMo(true)} title="Trò chuyện cùng công chúa Vali"
         style={{
           position: "fixed", right: 22, bottom: 22, zIndex: 90,
           width: 56, height: 56, borderRadius: R.pill, border: "none",
@@ -314,7 +314,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
       borderRadius: R.xl, overflow: "hidden",
       background: C.surface, border: `1px solid ${C.line}`,
       boxShadow: E.modal, fontFamily: TEXT,
-    }} className="vmp-view-enter">
+    }} className="vmp-chat-panel vmp-view-enter">
 
       {/* Đầu hộp */}
       <div style={{ ...glass, borderRadius: 8, border: "none",
@@ -501,7 +501,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
             chuyện đối chiếu lại trên bảng — dài, và người dùng đọc lướt
             qua hết. Giữ đúng điều họ cần nhớ. */}
         <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 7, lineHeight: 1.5 }}>
-          Bổn cung vẫn có thể nhầm.
+          Bổn cung vẫn có thể nhầm. <span style={{ color: C.plumSoft, fontWeight: 700 }}>Shift + Enter để xuống dòng.</span>
         </div>
       </div>
     </div>

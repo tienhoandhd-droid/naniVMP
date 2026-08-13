@@ -46,6 +46,7 @@ import type { AppUser, GenerateTimelineResult, ObjectKind, SourceObjectRow } fro
 import type { SourceWarnings } from "../lib/supabaseData.ts";
 import CatalogObjectForm from "../components/catalog/CatalogObjectForm.tsx";
 import CatalogImpactPreview from "../components/catalog/CatalogImpactPreview.tsx";
+import CatalogWarningsSummary, { type CatalogWarning } from "../components/catalog/CatalogWarningsSummary.tsx";
 import { daDoiDataset, laTruongNangCao, validateDatasetForm } from "../lib/datasetForm.ts";
 
 /* Cột hiển thị + siêu dữ liệu cho form.
@@ -313,6 +314,40 @@ function SourceCatalogSection({ user, onReload, focus }: {
   const broken = useMemo(
     () => rows.filter((r) => r.validate_flag === "y" && r.first_month == null),
     [rows]);
+  const warningGroups = useMemo<CatalogWarning[]>(() => {
+    const groups: CatalogWarning[] = [];
+    if (broken.length > 0) groups.push({
+      id: "missing-first-month", tone: "bad", blocking: true,
+      title: `${broken.length} đối tượng thiếu "Tháng thẩm định đầu tiên"`,
+      body: "Toàn bộ mốc thời gian của chúng không tính được — timeline sẽ để trống ô ngày.",
+      items: broken.map((item) => item.object_code),
+    });
+    if ((warn?.ma_tam?.length ?? 0) > 0) groups.push({
+      id: "temporary-code", tone: "bad", blocking: true,
+      title: `${warn!.ma_tam!.length} đối tượng đang dùng MÃ TẠM`,
+      body: "Đây là dòng trong Sheet không vào được bản nhập — hoặc trùng mã với dòng khác nên bị đè, hoặc không có mã nên không khoá được. Đã cứu vào để không mất, nhưng phải gán mã thật rồi bật lại Thẩm định; để nguyên thì chúng không bao giờ có timeline. Mã đối tượng là khoá nên không sửa tại chỗ được: bấm \"Thêm đối tượng\" tạo lại với mã thật (chép các ô còn lại sang), rồi bấm Ngừng dùng ở dòng mã tạm.",
+      items: warn!.ma_tam!.map((item) => `${item.object_code} — ${item.object_name}`),
+    });
+    if (warn && warn.chua_tung_iq.length > 0) groups.push({
+      id: "never-iq", tone: "ask", blocking: false,
+      title: `${warn.chua_tung_iq.length} thiết bị/hệ thống chưa từng có IQ`,
+      body: "Bình thường nếu là thiết bị cũ đã thẩm định trước khi có hệ thống. Bất thường nếu năm nhập của chúng bị bỏ lỡ không sinh timeline — khi đó cần tạo IQ thủ công.",
+      items: warn.chua_tung_iq.map((item) => `${item.object_code} (${item.nam_nhap})`),
+    });
+    if (warn && warn.show_tat.length > 0) groups.push({
+      id: "show-off", tone: "ask", blocking: false,
+      title: `${warn.show_tat.length} đối tượng có Thẩm định = y nhưng Show ≠ y`,
+      body: "Luật KHÔNG lọc theo Show — chúng vẫn được sinh timeline. Rà xem nên bật Show hay tắt Thẩm định.",
+      items: warn.show_tat.map((item) => item.object_code),
+    });
+    if (warn && warn.chua_hoat_dong.length > 0) groups.push({
+      id: "not-active", tone: "ask", blocking: false,
+      title: `${warn.chua_hoat_dong.length} đối tượng \"Chưa hoạt động\" vẫn có thẩm định`,
+      body: "Luật cố ý KHÔNG lọc theo Tình trạng: thiết bị chưa hoạt động chính là thứ cần DQ/IQ/OQ. Chỉ rà lại nếu đối tượng thật sự đã ngừng dùng.",
+      items: warn.chua_hoat_dong.map((item) => item.object_code),
+    });
+    return groups;
+  }, [broken, warn]);
 
   const save = async (form: Record<string, unknown>) => {
     setSaving(true);
@@ -499,40 +534,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
           </div>
         )}
 
-        {/* Cảnh báo dữ liệu thiếu — đúng thứ làm hỏng mốc thời gian timeline */}
-        {broken.length > 0 && (
-          <WarnBox tone="bad" title={`${broken.length} đối tượng thiếu "Tháng thẩm định đầu tiên"`}
-            body="Toàn bộ mốc thời gian của chúng không tính được — timeline sẽ để trống ô ngày."
-            items={broken.map((b) => b.object_code)} />
-        )}
-        {warn && (warn.ma_tam?.length ?? 0) > 0 && (
-          <WarnBox tone="bad" title={`${warn.ma_tam!.length} đối tượng đang dùng MÃ TẠM`}
-            body={"Đây là dòng trong Sheet không vào được bản nhập — hoặc trùng mã với dòng khác "
-                + "nên bị đè, hoặc không có mã nên không khoá được. Đã cứu vào để không mất, "
-                + "nhưng phải gán mã thật rồi bật lại Thẩm định; để nguyên thì chúng không bao "
-                + "giờ có timeline. Mã đối tượng là khoá nên không sửa tại chỗ được: bấm "
-                + "\"Thêm đối tượng\" tạo lại với mã thật (chép các ô còn lại sang), rồi bấm "
-                + "Ngừng dùng ở dòng mã tạm."}
-            items={warn.ma_tam!.map((x) => `${x.object_code} — ${x.object_name}`)} />
-        )}
-        {warn && warn.chua_tung_iq.length > 0 && (
-          <WarnBox tone="ask" title={`${warn.chua_tung_iq.length} thiết bị/hệ thống chưa từng có IQ`}
-            body={"Bình thường nếu là thiết bị cũ đã thẩm định trước khi có hệ thống. "
-                + "Bất thường nếu năm nhập của chúng bị bỏ lỡ không sinh timeline — khi đó cần tạo IQ thủ công."}
-            items={warn.chua_tung_iq.slice(0, 12).map((x) => `${x.object_code} (${x.nam_nhap})`)}
-            more={warn.chua_tung_iq.length - 12} />
-        )}
-        {warn && warn.show_tat.length > 0 && (
-          <WarnBox tone="ask" title={`${warn.show_tat.length} đối tượng có Thẩm định = y nhưng Show ≠ y`}
-            body="Luật KHÔNG lọc theo Show — chúng vẫn được sinh timeline. Rà xem nên bật Show hay tắt Thẩm định."
-            items={warn.show_tat.map((x) => x.object_code)} />
-        )}
-        {warn && warn.chua_hoat_dong.length > 0 && (
-          <WarnBox tone="ask" title={`${warn.chua_hoat_dong.length} đối tượng "Chưa hoạt động" vẫn có thẩm định`}
-            body={"Luật cố ý KHÔNG lọc theo Tình trạng: thiết bị chưa hoạt động chính là thứ cần DQ/IQ/OQ. "
-                + "Chỉ rà lại nếu đối tượng thật sự đã ngừng dùng."}
-            items={warn.chua_hoat_dong.map((x) => x.object_code)} />
-        )}
+        <CatalogWarningsSummary warnings={warningGroups} />
       </Card>
 
       {/* Bảng */}
@@ -1630,35 +1632,3 @@ export default function DataWorkspaceView({ user, onReload, focus }: {
  * Bảng vmp_source_rows vẫn còn trong database để tra lịch sử; cần xem
  * thì truy vấn thẳng, không mở lối sửa trên giao diện nữa.
  * ================================================================ */
-
-/* ----------------------------------------------------------------
- * Hộp cảnh báo. Phân biệt rõ hai loại để người đọc biết phải làm gì:
- *   tone="bad" — chắc chắn sai, phải sửa
- *   tone="ask" — cần người xem, máy KHÔNG tự quyết vì có thể đúng
- * ---------------------------------------------------------------- */
-function WarnBox({ tone, title, body, items, more = 0 }: {
-  tone: "bad" | "ask";
-  title: string;
-  body: string;
-  items: string[];
-  more?: number;
-}) {
-  const bad = tone === "bad";
-  return (
-    <div style={{
-      marginTop: 10, padding: "10px 12px", borderRadius: 14,
-      background: bad ? C.raspSoft : C.marigoldSoft,
-      color: bad ? C.raspText : C.marigoldText,
-      fontSize: 12, fontFamily: TEXT, display: "flex", gap: 8, alignItems: "flex-start",
-    }}>
-      <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-      <div style={{ minWidth: 0 }}>
-        <b>{title}</b>
-        <div style={{ marginTop: 2, fontWeight: 600, opacity: 0.92 }}>{body}</div>
-        <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85, wordBreak: "break-word" }}>
-          {items.join(" · ")}{more > 0 ? ` … và ${more} đối tượng nữa` : ""}
-        </div>
-      </div>
-    </div>
-  );
-}

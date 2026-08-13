@@ -392,7 +392,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo bên dưới — kể cả dữ liệu thô và bản xuất. Chọn tháng/quý ở mục 2.">
           Bộ lọc dữ liệu báo cáo quản lý
         </CardTitle>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-end" }}>
+        <div className="vmp-report-command-bar">
           {/* Chỉ còn chọn NĂM ở đây — năm là thứ chi phối cả mục 1 (tổng quan
               năm) lẫn biểu đồ 12 tháng. Chọn tháng/quý nằm trong chính mục 2,
               cạnh con số mà nó đổi. */}
@@ -412,7 +412,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Mức trọng yếu</div>
             <MultiSelect label="Trọng yếu" allLabel="Tất cả mức" options={critOptions} selected={critSel} onChange={setCritSel} />
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div className="vmp-report-export-actions" role="group" aria-label="Xuất báo cáo">
             <button onClick={printPDF} style={toolBtn(GRAD, "#fff")}><Printer size={16} /> PDF</button>
             <button onClick={exportExcel} style={toolBtn(C.mintSoft, C.mintText)}><Download size={16} /> Excel (đủ 5 sheet)</button>
             <button onClick={downloadHtml} style={toolBtn(C.lavSoft, C.lavText)}><Download size={16} /> HTML</button>
@@ -720,7 +720,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           {/* Nút KHÔNG bị ẩn khi thiếu cấu hình. Bản cũ giấu nút đi nên trên
               bản deploy thiếu biến môi trường, người dùng tưởng chức năng
               không tồn tại thay vì biết là chưa cấu hình. */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div className="vmp-report-ai-actions" role="group" aria-label="Thao tác nhận xét AI">
             <button onClick={() => generateAi("bao_cao")} disabled={loadingAi || !aiConfigured()}
               title={aiConfigured() ? "Nhận xét trên số đã tổng hợp — nhanh, rẻ" : AI_SETUP_HINT}
               style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",

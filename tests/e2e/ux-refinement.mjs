@@ -93,6 +93,40 @@ try {
     const focusAfterNavigation = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
     if (focusAfterNavigation === "Mở menu") throw new Error("đổi màn không được trả focus về opener");
 
+    await page.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".vmp-report-export-actions");
+    await page.waitForSelector(".vmp-chat-fab");
+    const mobileCommands = await page.evaluate(() => {
+      const exports = document.querySelector(".vmp-report-export-actions");
+      const fab = document.querySelector(".vmp-chat-fab");
+      const exportRect = exports.getBoundingClientRect();
+      const fabRect = fab.getBoundingClientRect();
+      return {
+        exportRight: exportRect.right,
+        fabPosition: getComputedStyle(fab).position,
+        fabRight: fabRect.right,
+      };
+    });
+    if (mobileCommands.fabPosition !== "static" || mobileCommands.exportRight > 390
+      || mobileCommands.fabRight > 390) throw new Error(JSON.stringify(mobileCommands));
+
+    await page.click(".vmp-chat-fab");
+    await page.waitForSelector(".vmp-chat-panel");
+    const mobileChat = await page.evaluate(() => {
+      const exports = document.querySelector(".vmp-report-export-actions");
+      const panel = document.querySelector(".vmp-chat-panel");
+      const exportRect = exports.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      return {
+        panelPosition: getComputedStyle(panel).position,
+        panelTop: panelRect.top,
+        exportBottom: exportRect.bottom,
+        panelRight: panelRect.right,
+      };
+    });
+    if (mobileChat.panelPosition !== "static" || mobileChat.panelTop < mobileChat.exportBottom
+      || mobileChat.panelRight > 390) throw new Error(JSON.stringify(mobileChat));
+
     await page.setViewport({ width: 390, height: 844 });
     await page.click('[aria-label="Mở menu"]');
     await page.setViewport({ width: 1440, height: 900 });

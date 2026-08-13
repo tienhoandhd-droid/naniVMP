@@ -7007,6 +7007,73 @@ input[type="checkbox"] {
 label:has(> input[type="checkbox"]) { min-height: 24px; display: inline-flex; align-items: center; }
 summary { min-height: 24px; display: flex; align-items: center; }
 
+/* Cảnh báo danh mục: người nhập cần thấy ngay nhóm làm hỏng timeline,
+   còn các nhóm chỉ cần rà soát thì mở khi cần để bảng vẫn là trọng tâm. */
+.vmp-catalog-warnings { margin-top: 14px; font-family: var(--ff-text); }
+.vmp-catalog-warnings__summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
+  padding: 9px 12px; border: 1px solid var(--c-line); border-radius: 14px;
+  background: color-mix(in srgb, var(--c-pink-mist) 72%, var(--c-surface));
+  color: var(--c-ink); font-size: 12px; font-weight: 750;
+}
+.vmp-catalog-warnings__summary svg { color: var(--c-pink-deep); flex: none; }
+.vmp-catalog-warnings__summary b {
+  margin-left: auto; padding: 3px 8px; border-radius: 999px;
+  color: var(--c-rasp-text); background: var(--c-rasp-soft); font-size: 11px;
+}
+.vmp-catalog-warnings__groups { display: grid; gap: 8px; margin-top: 8px; }
+.vmp-catalog-warning {
+  border: 1px solid var(--c-line); border-radius: 14px; overflow: hidden;
+  background: var(--c-surface);
+}
+.vmp-catalog-warning--bad { border-color: color-mix(in srgb, var(--c-rasp) 25%, var(--c-line)); }
+.vmp-catalog-warning--ask { border-color: color-mix(in srgb, var(--c-marigold) 28%, var(--c-line)); }
+.vmp-catalog-warning summary {
+  list-style: none; cursor: pointer; gap: 8px; padding: 10px 12px;
+  font-size: 12px; font-weight: 800; line-height: 1.45;
+}
+.vmp-catalog-warning summary::-webkit-details-marker { display: none; }
+.vmp-catalog-warning--bad summary { color: var(--c-rasp-text); background: var(--c-rasp-soft); }
+.vmp-catalog-warning--ask summary { color: var(--c-marigold-text); background: var(--c-marigold-soft); }
+.vmp-catalog-warning summary > span { min-width: 0; }
+.vmp-catalog-warning__blocker {
+  margin-left: auto; padding: 2px 7px; border: 1px solid currentColor; border-radius: 999px;
+  font-size: 10px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap;
+}
+.vmp-catalog-warning__chevron { margin-left: auto; flex: none; transition: transform var(--mo-fast) var(--ease); }
+.vmp-catalog-warning__blocker + .vmp-catalog-warning__chevron { margin-left: 0; }
+.vmp-catalog-warning[open] .vmp-catalog-warning__chevron { transform: rotate(180deg); }
+.vmp-catalog-warning__body { padding: 10px 12px 11px 36px; font-size: 12px; font-weight: 650; line-height: 1.55; }
+.vmp-catalog-warning__items { margin-top: 5px; opacity: .9; overflow-wrap: anywhere; }
+
+/* Báo cáo tách rõ phần chọn phạm vi, xuất tệp và trợ lý AI để thao tác
+   chính luôn nằm trước nội dung, kể cả khi màn hình hẹp. */
+.vmp-report-command-bar { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+.vmp-report-export-actions,
+.vmp-report-ai-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.vmp-report-export-actions { margin-left: auto; }
+
+/* Nút chat cố định chỉ cần chừa chỗ trên desktop. Trên điện thoại cả nút và
+   khung hội thoại trở về luồng trang, nên không thể che CTA hoặc bảng. */
+@media (min-width: 761px) {
+  main:has(.vmp-chat-fab) { padding-bottom: 96px; }
+}
+@media (max-width: 760px) {
+  .vmp-chat-fab {
+    position: static !important; right: auto !important; bottom: auto !important;
+    z-index: auto !important; margin: 16px 0 4px auto;
+  }
+  .vmp-chat-panel {
+    position: static !important; right: auto !important; bottom: auto !important;
+    z-index: auto !important; width: 100% !important;
+    height: min(520px, 70svh) !important; margin-top: 12px;
+  }
+  .vmp-report-command-bar { align-items: stretch; gap: 14px; }
+  .vmp-report-export-actions,
+  .vmp-report-ai-actions { width: 100%; }
+  .vmp-report-export-actions { margin-left: 0; }
+}
+
 /* =====================================================================
    BẢN IN — @media print
    ---------------------------------------------------------------------
