@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Boxes, Eye, EyeOff, Lock, XCircle } from "lucide-react";
 import type { AppUser } from "../../types/domain.ts";
 import { loginErrorMessage, validateLogin, type LoginErrors } from "../../lib/loginForm.ts";
-import { isSupabaseConfigured, signIn } from "../../lib/supabaseClient.ts";
+import { isSupabaseConfigured } from "../../lib/supabaseConfig.ts";
 import LuxuryBrandPanel from "./LuxuryBrandPanel.tsx";
 
 const DAILY_WISHES = [
@@ -60,6 +60,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
 
     setLoading(true);
     try {
+      const { signIn } = await import("../../lib/supabaseClient.ts");
       const profile = await signIn(email.trim(), password);
       onLogin(profile);
     } catch (error) {

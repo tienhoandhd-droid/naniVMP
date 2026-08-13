@@ -12,25 +12,19 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../types/database.ts";
 import type { AppUser, Perm, UserRole } from "../types/domain.ts";
+import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "./supabaseConfig.ts";
+
+export { isSupabaseConfigured } from "./supabaseConfig.ts";
 
 /** Giá trị hợp lệ của audit_logs.action — lấy thẳng từ enum trong DB. */
 export type AuditAction = Database["public"]["Enums"]["audit_action"];
 
-/* `import.meta.env` do Vite cung cấp trong browser/build. Giữ fallback này để
- * render tĩnh component (unit test) vẫn có thể phản ánh đúng trạng thái chưa
- * cấu hình thay vì vỡ trước khi tới UI. */
-const env = import.meta.env ?? ({} as ImportMetaEnv);
-const SUPABASE_URL  = env.VITE_SUPABASE_URL  || "";
-const SUPABASE_ANON = env.VITE_SUPABASE_ANON || "";
-
 // Tạo client (hoặc null nếu chưa cấu hình)
-export const supabase = (SUPABASE_URL && SUPABASE_ANON)
-  ? createClient<Database>(SUPABASE_URL, SUPABASE_ANON, {
+export const supabase = isSupabaseConfigured()
+  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
     })
   : null;
-
-export const isSupabaseConfigured = () => !!supabase;
 
 /* Vé của phiên đang đăng nhập, để gửi kèm khi gọi webhook n8n.
  *
