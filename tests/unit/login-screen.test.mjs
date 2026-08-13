@@ -19,3 +19,10 @@ test("brand panel dùng motif 2D và không dựng canvas", () => {
   assert.match(html, /data-testid="luxury-crown-mark"/);
   assert.doesNotMatch(html, /<canvas/);
 });
+
+test("Supabase chưa cấu hình thì hiện hướng dẫn thay vì lời chúc đăng nhập", () => {
+  const html = renderToStaticMarkup(React.createElement(LoginScreen, { onLogin: () => {} }));
+  assert.match(html, /Chế độ tạm \(chưa có Supabase\)/);
+  assert.match(html, /Liên hệ IT để thiết lập/);
+  assert.doesNotMatch(html, /LỜI CHÚC HÔM NAY/);
+});

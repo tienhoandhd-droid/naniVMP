@@ -11,6 +11,7 @@ try {
   await page.setViewport({ width: 390, height: 844 });
   await page.goto(GOC, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#vmp-login-email");
+  await page.waitForFunction(() => document.body.innerText.includes("Chế độ tạm (chưa có Supabase)"));
   const geometry = await page.evaluate(() => {
     const button = document.querySelector('button[type="submit"]');
     const rect = button.getBoundingClientRect();
@@ -20,6 +21,11 @@ try {
 
   await page.click('button[type="submit"]');
   await page.waitForFunction(() => document.body.innerText.includes("Vui lòng nhập email"));
+
+  await page.locator("#vmp-login-email").fill("qa@example.com");
+  await page.locator("#vmp-login-password").fill("password");
+  await page.click('button[type="submit"]');
+  await page.waitForFunction(() => document.body.innerText.includes("Liên hệ IT để thiết lập"));
 } finally {
   await browser.close();
 }

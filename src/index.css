@@ -1967,6 +1967,20 @@ select { appearance: none; -webkit-appearance: none; }
   font-style: italic;
   line-height: 1.6;
 }
+.vq-login-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  border: 1px solid #f0d9b6;
+  border-radius: 10px;
+  background: #fffbf1;
+  color: #765323;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 /* ===== Responsive ===== */
 @media (max-width: 760px) {

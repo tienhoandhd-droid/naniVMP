@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Boxes, Eye, EyeOff, Lock, XCircle } from "lucide-react";
 import type { AppUser } from "../../types/domain.ts";
 import { loginErrorMessage, validateLogin, type LoginErrors } from "../../lib/loginForm.ts";
+import { isSupabaseConfigured, signIn } from "../../lib/supabaseClient.ts";
 import LuxuryBrandPanel from "./LuxuryBrandPanel.tsx";
 
 const DAILY_WISHES = [
@@ -33,6 +34,7 @@ function getDailyWish() {
 }
 
 export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) => void }) {
+  const useSupa = isSupabaseConfigured();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<LoginErrors>({});
@@ -51,10 +53,13 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
     setErrors(nextErrors);
     setServerError("");
     if (Object.keys(nextErrors).length > 0) return;
+    if (!useSupa) {
+      setServerError("Hệ thống chưa cấu hình Supabase Auth. Liên hệ IT để thiết lập VITE_SUPABASE_URL và VITE_SUPABASE_ANON.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const { signIn } = await import("../../lib/supabaseClient.ts");
       const profile = await signIn(email.trim(), password);
       onLogin(profile);
     } catch (error) {
@@ -123,10 +128,17 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
             </button>
           </form>
 
-          <aside className="vq-daily-wish" aria-label="Lời chúc hôm nay">
-            <span>✦ &nbsp; LỜI CHÚC HÔM NAY &nbsp; ✦</span>
-            <p>“{getDailyWish()}”</p>
-          </aside>
+          {useSupa ? (
+            <aside className="vq-daily-wish" aria-label="Lời chúc hôm nay">
+              <span>✦ &nbsp; LỜI CHÚC HÔM NAY &nbsp; ✦</span>
+              <p>“{getDailyWish()}”</p>
+            </aside>
+          ) : (
+            <aside className="vq-login-notice" role="status">
+              <strong>Chế độ tạm (chưa có Supabase)</strong>
+              <span>Liên hệ IT để thiết lập xác thực trước khi đăng nhập.</span>
+            </aside>
+          )}
         </section>
       </div>
     </main>
