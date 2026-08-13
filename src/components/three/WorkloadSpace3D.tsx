@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, Edges, OrthographicCamera, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
@@ -13,15 +13,46 @@ import type { MotNhan } from "./NhanTruc.tsx";
 import { ThreeFallbackBoundary } from "./ThreeFallbackBoundary.tsx";
 import { CauKetLuan } from "../ui/Primitives.tsx";
 
-const DEFAULT_CAMERA_POSITION = new THREE.Vector3(7.8, 5.5, 7.8);
 const DEFAULT_TARGET: [number, number, number] = [0, 0.9, 0];
 const MONTH_STEP = 0.54;
 const DEPARTMENT_STEP = 0.72;
 const CAO_MAX = 2.1;
 const RASPBERRY = "#C72D62";
+const DEFAULT_ELEVATION_DEGREES = 35;
+const CAMERA_AZIMUTH = Math.PI / 4;
+const CAMERA_PADDING = .84;
 
 const cellKey = (cell: WorkloadCell) => `${cell.month}-${cell.departmentId}`;
 const deptName = (cell: WorkloadCell) => DEPTS[cell.departmentIndex]?.name || cell.departmentId;
+
+/** Projected extents are shared by the camera and browser contract: the fitted
+ * frustum must reserve room for 12 month columns, labels, caps and axis labels. */
+export function workloadCameraFit(viewportWidth: number, viewportHeight: number) {
+  const aspect = Math.max(1, viewportWidth) / Math.max(1, viewportHeight);
+  const sceneWidth = 12 * MONTH_STEP + 1.35;
+  const sceneDepth = DEPTS.length * DEPARTMENT_STEP + 1.25;
+  const sceneHeight = CAO_MAX + .52;
+  const elevation = THREE.MathUtils.degToRad(DEFAULT_ELEVATION_DEGREES);
+  const projectedWidth = (sceneWidth + sceneDepth) * Math.sin(CAMERA_AZIMUTH);
+  const projectedHeight = (sceneWidth + sceneDepth) * Math.sin(elevation) * Math.cos(CAMERA_AZIMUTH)
+    + sceneHeight * Math.cos(elevation);
+  const halfHeight = Math.max(projectedHeight / (2 * CAMERA_PADDING), projectedWidth / (2 * aspect * CAMERA_PADDING));
+  const horizontalDistance = 8 * Math.SQRT2;
+  const verticalDistance = horizontalDistance * Math.tan(elevation);
+  const position: [number, number, number] = [8, DEFAULT_TARGET[1] + verticalDistance, 8];
+  return {
+    aspect, halfHeight, projectedWidth, projectedHeight,
+    fillWidth: projectedWidth / (halfHeight * 2 * aspect),
+    fillHeight: projectedHeight / (halfHeight * 2),
+    elevationDegrees: DEFAULT_ELEVATION_DEGREES,
+    defaultZoom: 1, minZoom: .78, maxZoom: 1.55,
+    position,
+  };
+}
+
+export function workloadActiveCell(selected: WorkloadCell | null, hover: WorkloadCell | null) {
+  return hover || selected;
+}
 
 function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onHover, onSelect }: {
   cell: WorkloadCell;
@@ -94,9 +125,11 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
   onSelect: (cell: WorkloadCell) => void;
   onResetReady: (reset: () => void) => void;
 }) {
+  const { gl, size } = useThree();
   const camera = useRef<THREE.OrthographicCamera>(null);
   const controls = useRef<any>(null);
-  const active = hover || selected;
+  const fit = useMemo(() => workloadCameraFit(size.width, size.height), [size.height, size.width]);
+  const active = workloadActiveCell(selected, hover);
   const width = 12 * MONTH_STEP;
   const depth = DEPTS.length * DEPARTMENT_STEP;
 
@@ -135,17 +168,30 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
 
   useEffect(() => {
     const reset = () => {
-      camera.current?.position.copy(DEFAULT_CAMERA_POSITION);
+      camera.current?.position.set(...fit.position);
+      if (camera.current) {
+        camera.current.zoom = fit.defaultZoom;
+        camera.current.updateProjectionMatrix();
+      }
       controls.current?.target.set(...DEFAULT_TARGET);
       controls.current?.update();
     };
     onResetReady(reset);
     return () => onResetReady(() => {});
-  }, [onResetReady]);
+  }, [fit, onResetReady]);
+
+  useEffect(() => {
+    const host = document.getElementById("workload-map-3d");
+    host?.setAttribute("data-workload-fit", JSON.stringify({
+      fillWidth: fit.fillWidth, fillHeight: fit.fillHeight, elevationDegrees: fit.elevationDegrees,
+    }));
+  }, [fit, gl]);
 
   return <>
-    <OrthographicCamera ref={camera} makeDefault position={DEFAULT_CAMERA_POSITION} />
-    <OrbitControls ref={controls} enablePan={false} enableZoom minZoom={.8} maxZoom={1.7}
+    <OrthographicCamera ref={camera} makeDefault position={fit.position}
+      left={-fit.halfHeight * fit.aspect} right={fit.halfHeight * fit.aspect}
+      top={fit.halfHeight} bottom={-fit.halfHeight} zoom={fit.defaultZoom} />
+    <OrbitControls ref={controls} enablePan={false} enableZoom minZoom={fit.minZoom} maxZoom={fit.maxZoom}
       minPolarAngle={.55} maxPolarAngle={1.25}
       minAzimuthAngle={.35} maxAzimuthAngle={1.25} target={DEFAULT_TARGET} />
     <ambientLight intensity={.8} />
@@ -163,7 +209,7 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
   </>;
 }
 
-function Detail({ cell, onOpenCell }: { cell: WorkloadCell | null; onOpenCell?: (cell: WorkloadCell) => void }) {
+export function WorkloadCellDetail({ cell, onOpenCell }: { cell: WorkloadCell | null; onOpenCell?: (cell: WorkloadCell) => void }) {
   if (!cell) return <div className="vmp-space3d-tip" role="status">Chọn hoặc đưa chuột lên một cột để xem chi tiết.</div>;
   return <div className="vmp-space3d-tip is-tro" role="status" aria-live="polite">
     <b>Tháng {cell.month} · {deptName(cell)}</b>
@@ -187,7 +233,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell 
   ));
   const resetRef = useRef<() => void>(() => {});
   const onResetReady = useCallback((reset: () => void) => { resetRef.current = reset; }, []);
-  const detail = hover || selected;
+  const detail = workloadActiveCell(selected, hover);
   const heatCells: ONhiet[] = useMemo(() => cells.map((cell) => ({
     hang: cell.departmentIndex, cot: cell.month - 1, gt: cell.total, phu: cell.overdue,
     ghiChu: `${deptName(cell)} · Tháng ${cell.month}: ${cell.total} hạng mục, ${cell.completed} hoàn thành, ${cell.overdue} quá hạn`,
@@ -214,7 +260,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell 
       <button type="button" data-map-mode="2d" onClick={() => setMode("2d")} className={mode === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
     </div>
     {mode === "3d" ? <div className="vmp-space3d-than">
-      <div className="vmp-space3d-khung" data-testid="workload-map-3d">
+      <div id="workload-map-3d" className="vmp-space3d-khung" data-testid="workload-map-3d">
         <ThreeFallbackBoundary onUse2D={() => setMode("2d")}>
           <Canvas dpr={[1, 2]} shadows="soft" frameloop={giamChuyenDong ? "demand" : "always"}
             gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05, outputColorSpace: THREE.SRGBColorSpace }}>
@@ -235,6 +281,6 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell 
       nhanCot={Array.from({ length: 12 }, (_, index) => `T${index + 1}`)} donVi="hạng mục" phuLabel="quá hạn"
       selected={selected ? { hang: selected.departmentIndex, cot: selected.month - 1 } : undefined}
       onSelect={(cell) => setSelected(cells.find((item) => item.departmentIndex === cell.hang && item.month === cell.cot + 1) || null)} />}
-    <Detail cell={detail} onOpenCell={onOpenCell} />
+    <WorkloadCellDetail cell={detail} onOpenCell={onOpenCell} />
   </div>;
 }

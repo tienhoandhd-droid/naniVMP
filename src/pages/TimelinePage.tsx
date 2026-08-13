@@ -1887,7 +1887,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
           không nói được: "tháng nào bộ phận nào bị dồn việc". */}
       <Card variant="strong">
         <CardTitle icon={GanttChartSquare}
-          sub="Trục sâu là 12 tháng theo mốc đích VMP · trục ngang là bộ phận · chiều cao là số hạng mục đến hạn">
+          sub="Trục ngang X là 12 tháng theo mốc đích VMP · trục sâu Z là bộ phận · chiều cao là số hạng mục đến hạn">
           Địa hình tải việc {year}
         </CardTitle>
         <Suspense fallback={<div style={{ height: 420 }} />}>

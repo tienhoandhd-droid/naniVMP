@@ -6820,6 +6820,8 @@ body { transition: background var(--mo-slow) var(--ease); }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-height: 42px; border-radius: 8px; padding: 4px 2px; line-height: 1.15;
 }
+.vmp-nhiet-chon { width: 100%; border: 0; cursor: pointer; font: inherit; }
+.vmp-nhiet-chon:focus-visible { outline: 2px solid var(--c-pink) !important; outline-offset: 2px; }
 .vmp-nhiet-o b { font-size: 14px; font-weight: 800; }
 .vmp-nhiet-o small { font-size: 12px; font-weight: 700; opacity: .85; }
 .vmp-nhiet-bang td { text-align: center; }

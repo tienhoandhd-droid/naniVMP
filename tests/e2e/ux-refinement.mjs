@@ -181,9 +181,23 @@ try {
 
     await page.click('button[data-map-mode="3d"]');
     await page.waitForSelector('[data-testid="workload-map-3d"] canvas');
+    await page.waitForFunction(() => !!document.querySelector('[data-testid="workload-map-3d"]')?.getAttribute("data-workload-fit"));
+    const workloadFit = await page.$eval('[data-testid="workload-map-3d"]', (el) => JSON.parse(el.getAttribute("data-workload-fit") || "{}"));
+    if (!(workloadFit.fillHeight >= .78 && workloadFit.fillWidth >= .45 && Math.abs(workloadFit.elevationDegrees - 35) <= 1)) {
+      throw new Error(`workload fit: ${JSON.stringify(workloadFit)}`);
+    }
     await page.click('button[aria-label="Về góc chuẩn"]');
     const legend = await page.$eval('[data-testid="workload-map-legend"]', (el) => el.textContent || "");
     if (!legend.includes("Hoàn thành") || !legend.includes("Quá hạn")) throw new Error(legend);
+    await page.click('button[data-map-mode="2d"]');
+    await page.waitForSelector('button[data-workload-cell]');
+    await page.click('button[data-workload-cell]');
+    await page.waitForSelector('.vmp-space3d-tip.is-tro');
+    const selectedCell = await page.$eval('button[data-workload-cell][aria-pressed="true"]', (el) => el.getAttribute("data-workload-cell"));
+    await page.click('button[data-map-mode="3d"]');
+    await page.waitForSelector('[data-testid="workload-map-3d"] canvas');
+    await page.click('button[data-map-mode="2d"]');
+    await page.waitForSelector(`button[data-workload-cell="${selectedCell}"][aria-pressed="true"]`);
     await page.setViewport({ width: 390, height: 844 });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector('button[data-map-mode="2d"].is-chon');

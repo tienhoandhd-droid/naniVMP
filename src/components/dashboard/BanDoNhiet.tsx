@@ -92,24 +92,25 @@ export default function BanDoNhiet({
                   const d = doDam(v);
                   const isSelected = !!x && selected?.hang === i && selected?.cot === j;
                   return (
-                    <td key={j} title={x?.ghiChu || `${h} · ${nhanCot[j]}: ${v} ${donVi}`}
-                      onClick={x && onSelect ? () => onSelect(x) : undefined}
-                      role={x && onSelect ? "button" : undefined}
-                      tabIndex={x && onSelect ? 0 : undefined}
-                      onKeyDown={x && onSelect ? (event) => {
-                        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(x); }
-                      } : undefined}>
-                      <div className="vmp-nhiet-o" style={{
+                    <td key={j} title={x?.ghiChu || `${h} · ${nhanCot[j]}: ${v} ${donVi}`}>
+                      {x && onSelect ? <button type="button" className="vmp-nhiet-o vmp-nhiet-chon"
+                        data-workload-cell={`${i}-${j}`} aria-pressed={isSelected} onClick={() => onSelect(x)} style={{
                         background: v > 0 ? `color-mix(in srgb, ${sacDo} ${Math.round(d * 100)}%, transparent)` : "transparent",
                         color: v > 0 ? chuTren(d) : C.plumSoft,
                         outline: isSelected ? `2px solid ${C.pink}` : undefined,
                         outlineOffset: isSelected ? 2 : undefined,
                       }}>
                         <b className="tnum" style={{ fontFamily: NUM }}>{v ? `${v}${hauTo}` : "·"}</b>
+                        {x.phu != null && x.phu > 0 && <small>{x.phu} {phuLabel}</small>}
+                      </button> : <div className="vmp-nhiet-o" style={{
+                        background: v > 0 ? `color-mix(in srgb, ${sacDo} ${Math.round(d * 100)}%, transparent)` : "transparent",
+                        color: v > 0 ? chuTren(d) : C.plumSoft,
+                      }}>
+                        <b className="tnum" style={{ fontFamily: NUM }}>{v ? `${v}${hauTo}` : "·"}</b>
                         {x?.phu != null && x.phu > 0 && (
                           <small>{x.phu} {phuLabel}</small>
                         )}
-                      </div>
+                      </div>}
                     </td>
                   );
                 })}
