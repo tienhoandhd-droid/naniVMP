@@ -96,6 +96,27 @@ try {
     await page.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".vmp-report-export-actions");
     await page.waitForSelector(".vmp-chat-fab");
+    await page.waitForSelector(".vmp-table-hint b");
+    const tableHintContrast = await page.$eval(".vmp-table-hint b", (el) => {
+      const parts = (value) => value.match(/\d+(?:\.\d+)?/g).map(Number);
+      const rgb = (value) => parts(value).slice(0, 3);
+      const luminance = ([r, g, b]) => [r, g, b].map((channel) => {
+        const v = channel / 255;
+        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+      const foreground = rgb(getComputedStyle(el).color);
+      let node = el.parentElement;
+      let background = [255, 255, 255];
+      while (node) {
+        const style = getComputedStyle(node);
+        const color = parts(style.backgroundColor);
+        if (color.length === 3 || color[3] > 0.99) { background = color.slice(0, 3); break; }
+        node = node.parentElement;
+      }
+      const a = luminance(foreground); const b = luminance(background);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+    if (tableHintContrast < 4.5) throw new Error(`tương phản Shift table hint: ${tableHintContrast.toFixed(2)}:1`);
     const mobileCommands = await page.evaluate(() => {
       const exports = document.querySelector(".vmp-report-export-actions");
       const fab = document.querySelector(".vmp-chat-fab");

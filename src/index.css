@@ -6194,6 +6194,7 @@ button.visual-pulse__item {
   gap: 6px;
   align-items: center;
 }
+.vmp-table-hint b { color: var(--c-ink); }
 
 
 /* =====================================================================
