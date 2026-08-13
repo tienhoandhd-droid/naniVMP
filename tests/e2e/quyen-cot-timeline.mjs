@@ -8,6 +8,18 @@ import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
 const GOC = "http://localhost:4173";
 await choServer(GOC);
 
+const bangkokToday = () => {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
+const WORKSHOP_DATE = bangkokToday();
+
 const QA_FIELDS = [
   "actual_protocol_date", "status_protocol",
   "actual_validation_date", "status_validation",
@@ -86,10 +98,10 @@ const unassignedQa = {
   scope_match: false,
   area_match: false,
 };
-const equipmentScheduler = {
+const workshopStaff = {
   can_view: true,
-  editable_fields: ["scheduled_at"],
-  view_reason: "Bộ phận thiết bị được xếp lịch",
+  editable_fields: ["actual_validation_date"],
+  view_reason: "Nhân viên xưởng được ghi ngày thẩm định thực tế",
   assignment_sources: ["equipment_department"],
   scope_match: true,
   area_match: true,
@@ -225,18 +237,24 @@ try {
   );
 
   // Đường tắt đã điền sẵn hai trường QA trước khi quyền về, tạo một bản nháp
-  // hỗn hợp. Enforced vẫn chỉ được gửi scheduled_at xuống RPC.
-  await openPersona("enforced", equipmentScheduler, { quick: true });
-  const equipment = await controlState();
-  assert.equal(equipment.qaEnabled, 0, "bộ phận thiết bị không được sửa tám trường QA");
-  assert.equal(equipment.scheduleEnabled, true, "bộ phận thiết bị chỉ được xếp lịch");
+  // hỗn hợp. Enforced vẫn chỉ được gửi ngày thẩm định thực tế mà xưởng được cấp.
+  await openPersona("enforced", workshopStaff, { quick: true });
+  const workshop = await controlState();
+  assert.equal(workshop.qaEnabled, 1,
+    "nhân viên xưởng chỉ được sửa ngày thẩm định thực tế trong tám trường QA");
+  assert.equal(workshop.scheduleEnabled, false, "nhân viên xưởng không được sửa lịch thẩm định");
 
-  await page.$eval('input[type="datetime-local"]', (input) => {
+  await page.evaluate((workshopDate) => {
+    const title = [...document.querySelectorAll("span")]
+      .find((node) => node.textContent?.trim() === "2. Thẩm định thực tế");
+    const block = title?.closest("div[style*='border']");
+    const input = block?.querySelector('input[type="date"]');
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    setter.call(input, "2026-08-12T15:45");
+    setter.call(input, workshopDate);
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  }, WORKSHOP_DATE);
+  await page.type("textarea", "Xưởng ghi nhận ngày thẩm định thực tế");
   await page.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
   updateShouldFail = true;
@@ -255,9 +273,9 @@ try {
   await page.waitForFunction(() => ![...document.querySelectorAll("span")]
     .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
   assert.equal(updateBodies.length, 2, "sau lỗi người dùng có thể thử lưu lại cùng bản nháp");
-  assert.deepEqual(Object.keys(updateBodies[1].p_patch), ["scheduled_at"]);
-  assert.equal(updateBodies[1].p_patch.scheduled_at, "2026-08-12T08:45:00.000Z",
-    "15:45 Bangkok phải được gửi thành đúng thời điểm UTC");
+  assert.deepEqual(Object.keys(updateBodies[1].p_patch), ["actual_validation_date"]);
+  assert.equal(updateBodies[1].p_patch.actual_validation_date, WORKSHOP_DATE,
+    "nhân viên xưởng chỉ được gửi ngày thẩm định thực tế xuống RPC");
 
   await openPersona("enforced", collaboratorQa);
   const collaborator = await controlState();
@@ -285,7 +303,7 @@ try {
   assert.equal(preview.scheduleEnabled, true, "preview không áp allowlist dự kiến lên lịch");
   assert.equal(preview.hasSave, true, "preview giữ hành vi lưu hiện tại");
 
-  console.log("✅ Timeline khóa đúng từng cột, preview không cưỡng chế và giờ Bangkok không lệch");
+  console.log("✅ Timeline khóa đúng QA/xưởng, preview không cưỡng chế và giờ Bangkok không lệch");
 } finally {
   await browser.close();
 }
