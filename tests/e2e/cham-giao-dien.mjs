@@ -43,6 +43,10 @@ const rect = (r) => ({ left: Math.round(r.left), top: Math.round(r.top), right: 
    qua phiên chỉ-xem thật. Nhờ vậy có thể bắt đường redirect enforced một
    cách lặp lại, thay vì phụ thuộc cấu hình quyền live của tài khoản E2E. */
 let uiAccess = uiAccessAdmin;
+const uiAccessOverviewOnly = {
+  ...uiAccessAdmin,
+  screens: { overview: uiAccessAdmin.screens.overview },
+};
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -131,15 +135,26 @@ const assertMobileShell = async () => {
     const opener = document.querySelector(selector);
     const chat = document.querySelector(".vmp-chat-fab");
     const openerRect = opener?.getBoundingClientRect();
+    const openerStyle = opener ? getComputedStyle(opener) : null;
+    const hit = openerRect && opener
+      ? document.elementFromPoint(openerRect.left + openerRect.width / 2, openerRect.top + openerRect.height / 2)
+      : null;
     return {
-      opener: openerRect ? { left: openerRect.left, top: openerRect.top, right: openerRect.right, bottom: openerRect.bottom } : null,
-      openerDisplay: opener ? getComputedStyle(opener).display : null,
+      opener: openerRect ? { left: openerRect.left, top: openerRect.top, right: openerRect.right, bottom: openerRect.bottom, width: openerRect.width, height: openerRect.height } : null,
+      openerStyle: openerStyle ? { display: openerStyle.display, visibility: openerStyle.visibility, opacity: openerStyle.opacity } : null,
+      hitOpener: !!(opener && hit && opener.contains(hit)),
       chatPosition: chat ? getComputedStyle(chat).position : null,
     };
   });
-  if (!geometry.opener || geometry.openerDisplay === "none") throw new Error(`auth 390x844: missing visible [aria-label="Mở menu"]`);
-  if (geometry.opener.right > viewport.width || geometry.opener.bottom > viewport.height) {
-    throw new Error(`auth 390x844: [aria-label="Mở menu"] ${JSON.stringify(rect(geometry.opener))} outside viewport 390x844`);
+  if (!geometry.opener || !geometry.openerStyle) throw new Error('auth 390x844: missing [aria-label="Mở menu"]');
+  if (geometry.openerStyle.display === "none" || geometry.openerStyle.visibility !== "visible" || parseFloat(geometry.openerStyle.opacity) <= 0 || geometry.opener.width <= 0 || geometry.opener.height <= 0) {
+    throw new Error(`auth 390x844: [aria-label="Mở menu"] unusable display=${geometry.openerStyle.display} visibility=${geometry.openerStyle.visibility} opacity=${geometry.openerStyle.opacity} rect=${JSON.stringify(rect(geometry.opener))}`);
+  }
+  if (geometry.opener.left < 0 || geometry.opener.top < 0 || geometry.opener.right > viewport.width || geometry.opener.bottom > viewport.height) {
+    throw new Error(`auth 390x844: [aria-label="Mở menu"] ${JSON.stringify(rect(geometry.opener))} outside all viewport edges 0,0–390,844`);
+  }
+  if (!geometry.hitOpener) {
+    throw new Error(`auth 390x844: [aria-label="Mở menu"] center hit-test missed opener rect=${JSON.stringify(rect(geometry.opener))}`);
   }
   if (geometry.chatPosition === "fixed") throw new Error("auth 390x844: .vmp-chat-fab remains fixed and can cover primary actions");
   await assertNoOverflow(viewport, "auth overview");
@@ -152,25 +167,26 @@ const assertNoDeadNotification = async (viewport) => {
 };
 
 const assertEnforcedRedirectHasMain = async () => {
-  uiAccess = {
-    ...uiAccessAdmin,
-    screens: {
-      ...uiAccessAdmin.screens,
-      progress: { ...uiAccessAdmin.screens.progress, can_view: false },
-    },
-  };
-  await p.setViewport({ width: 1366, height: 768 });
-  await p.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded" });
-  await p.reload({ waitUntil: "domcontentloaded" });
-  await p.waitForFunction(() => {
-    const main = document.querySelector("main");
-    return !!main && main.innerText.trim().length > 160
-      && !main.innerText.includes("Đang mở màn bạn được phép xem…");
-  });
-  const main = await p.$eval("main", (element) => ({ textLength: element.innerText.trim().length, text: element.innerText.slice(0, 100) }));
-  if (main.textLength <= 160) throw new Error(`enforced redirect #v=progress: main is blank (textLength=${main.textLength}, text=${JSON.stringify(main.text)})`);
-  console.log(`✅ enforced redirect #v=progress · main textLength=${main.textLength}`);
-  uiAccess = uiAccessAdmin;
+  uiAccess = uiAccessOverviewOnly;
+  try {
+    await p.setViewport({ width: 1366, height: 768 });
+    await p.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded" });
+    await p.reload({ waitUntil: "domcontentloaded" });
+    await p.waitForFunction(() => location.hash === "" && !!document.querySelector("main .vmp-bento"));
+    const fallback = await p.$eval("main", (element) => ({
+      hash: location.hash,
+      hasOverviewBento: !!element.querySelector(".vmp-bento"),
+      textLength: element.innerText.trim().length,
+      text: element.innerText.slice(0, 100),
+    }));
+    if (fallback.hash !== "") throw new Error(`enforced redirect #v=progress: expected canonical overview hash="", got ${JSON.stringify(fallback.hash)}`);
+    if (!fallback.hasOverviewBento || fallback.textLength <= 160) {
+      throw new Error(`enforced redirect #v=progress: overview fallback blank hasOverviewBento=${fallback.hasOverviewBento} textLength=${fallback.textLength} text=${JSON.stringify(fallback.text)}`);
+    }
+    console.log(`✅ enforced redirect #v=progress → overview canonical hash="" · main textLength=${fallback.textLength}`);
+  } finally {
+    uiAccess = uiAccessAdmin;
+  }
 };
 
 await assertMobileLogin();
@@ -267,8 +283,11 @@ const DO = () => {
         loi.nutNho.push({ the: el.tagName, chu: (el.textContent || "").trim().slice(0, 24),
                           w: Math.round(r.width), h: Math.round(r.height) });
       }
+      const label = el.closest("label")?.innerText.trim()
+        || (el.id && [...document.querySelectorAll("label")].find((candidate) => candidate.htmlFor === el.id)?.innerText.trim())
+        || "";
       const ten = (el.textContent || "").trim() || el.getAttribute("aria-label")
-        || el.getAttribute("title") || el.getAttribute("alt") || "";
+        || el.getAttribute("title") || el.getAttribute("alt") || label;
       if (!ten) loi.khongTen.push({ the: el.tagName, lop: String(el.className).slice(0, 30) });
     }
 
@@ -412,3 +431,14 @@ for (const m of bang) {
   for (const x of nn) console.log(`   nút ${x.w}×${x.h}px · "${x.chu}"`);
 }
 console.log("");
+
+const zeroDefects = {
+  horizontalOverflow: soTran,
+  lowContrast: gop("tuongPhan"),
+  unnamedControls: gop("khongTen"),
+  missingInputLabels: gop("oNhapKhongNhan"),
+};
+const failedGates = Object.entries(zeroDefects).filter(([, count]) => count !== 0);
+if (failedGates.length) {
+  throw new Error(`Audit zero-defect gate failed: ${failedGates.map(([name, count]) => `${name}=${count}`).join(", ")}`);
+}
