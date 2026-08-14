@@ -41,6 +41,8 @@ export interface MotNhan {
   cap?: CapNhan;
   /** Đang được trỏ tới — kéo lên mức đậm nhất bất kể cấp. */
   sang?: boolean;
+  /** Ưu tiên giữ nhãn số khi hình chiếu lên màn hình bị va chạm. */
+  priority?: number;
 }
 
 const LOP: Record<CapNhan, string> = {
@@ -84,20 +86,65 @@ function Nhan({ n, tam }: { n: MotNhan; tam: THREE.Vector3 }) {
   return (
     <Html position={n.vt} center occlude={false} zIndexRange={[30, 0]}
       style={{ pointerEvents: "none", userSelect: "none" }}>
-      <span ref={o} className={`${LOP[cap]}${n.sang ? " vmp-nhan-truc-sang" : ""}`}>
+      <span ref={o} className={`${LOP[cap]}${n.sang ? " vmp-nhan-truc-sang" : ""}`}
+        data-label-priority={cap === "so" ? n.priority || 0 : undefined}>
         {n.chu}
       </span>
     </Html>
   );
 }
 
-export function NhanTruc({ nhan, tam = [0, 0, 0] }: {
+export function NhanTruc({ nhan, tam = [0, 0, 0], declutterSo = false }: {
   nhan: MotNhan[];
   /** Tâm cảnh — mốc để phân biệt nhãn mặt gần với nhãn mặt xa. */
   tam?: [number, number, number];
+  /** Ẩn nhãn số ưu tiên thấp hơn khi hình chữ nhật DOM chồng nhau. */
+  declutterSo?: boolean;
 }) {
   const t = useRef(new THREE.Vector3(...tam));
+  const collisionState = useRef({ pending: "", applied: "" });
   t.current.set(...tam);
+  const numericLabels = nhan.filter((label) => label.cap === "so");
+  const numericSignature = numericLabels
+    .map((label) => `${label.chu}:${label.priority || 0}:${label.vt.join(",")}`)
+    .join("|");
+  useFrame(({ camera, size, invalidate }) => {
+    if (!declutterSo) return;
+    const matrixSignature = [...camera.projectionMatrix.elements, ...camera.matrixWorld.elements]
+      .map((value) => value.toFixed(5)).join(",");
+    const snapshot = `${size.width}x${size.height}|${numericSignature}|${matrixSignature}`;
+    if (collisionState.current.applied === snapshot) return;
+    // Wait one rendered frame after a camera/label change so drei <Html> has
+    // committed its new screen transform before any layout geometry is read.
+    if (collisionState.current.pending !== snapshot) {
+      collisionState.current.pending = snapshot;
+      invalidate();
+      return;
+    }
+    const labels = [...document.querySelectorAll<HTMLElement>("#workload-map-3d .vmp-nhan-truc-so")]
+      .map((element, order) => ({
+        element,
+        order,
+        priority: Number(element.dataset.labelPriority || 0),
+        rect: element.getBoundingClientRect(),
+      }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0);
+    if (labels.length !== numericLabels.length) {
+      invalidate();
+      return;
+    }
+    labels.sort((a, b) => b.priority - a.priority || a.order - b.order);
+    const kept: DOMRect[] = [];
+    for (const label of labels) {
+      const collides = kept.some((rect) => !(label.rect.right + 2 <= rect.left
+        || rect.right + 2 <= label.rect.left
+        || label.rect.bottom + 2 <= rect.top
+        || rect.bottom + 2 <= label.rect.top));
+      label.element.style.visibility = collides ? "hidden" : "visible";
+      if (!collides) kept.push(label.rect);
+    }
+    collisionState.current.applied = snapshot;
+  });
   return (
     <>
       {nhan.map((n, i) => <Nhan key={`${n.chu}-${i}`} n={n} tam={t.current} />)}

@@ -189,6 +189,36 @@ try {
     if (!(baselineProjection.fillHeight >= .68 && baselineProjection.fillWidth >= .4 && Math.abs(baselineProjection.elevationDegrees - 35) <= 1)) {
       throw new Error(`runtime workload projection: ${JSON.stringify(baselineProjection)}`);
     }
+    await page.waitForFunction(() => {
+      const labels = [...document.querySelectorAll(".vmp-nhan-truc-so")];
+      return labels.length > 1 && labels.every((label) => label.getBoundingClientRect().width > 0);
+    });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const numericLabelCollisions = await page.$$eval(".vmp-nhan-truc-so", (labels) => {
+      const visible = labels.map((label) => ({
+        text: label.textContent?.trim() || "",
+        style: getComputedStyle(label),
+        rect: label.getBoundingClientRect(),
+      })).filter(({ style, rect }) => style.display !== "none" && style.visibility !== "hidden"
+        && Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0);
+      const collisions = [];
+      for (let i = 0; i < visible.length; i += 1) {
+        for (let j = i + 1; j < visible.length; j += 1) {
+          const horizontal = Math.min(visible[i].rect.right, visible[j].rect.right)
+            - Math.max(visible[i].rect.left, visible[j].rect.left);
+          const vertical = Math.min(visible[i].rect.bottom, visible[j].rect.bottom)
+            - Math.max(visible[i].rect.top, visible[j].rect.top);
+          if (horizontal > 2 && vertical > 2) collisions.push({
+            labels: [visible[i].text, visible[j].text],
+            overlap: [Math.round(horizontal), Math.round(vertical)],
+          });
+        }
+      }
+      return collisions;
+    });
+    if (numericLabelCollisions.length) {
+      throw new Error(`workload numeric label collisions at 1440x900: ${JSON.stringify(numericLabelCollisions)}`);
+    }
     const canvasBox = await page.$eval('[data-testid="workload-map-3d"] canvas', (el) => {
       const rect = el.getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     });

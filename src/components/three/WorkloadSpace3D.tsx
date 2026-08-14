@@ -54,6 +54,11 @@ export function workloadActiveCell(selected: WorkloadCell | null, hover: Workloa
   return hover || selected;
 }
 
+export function reconcileWorkloadSelection(selected: WorkloadCell | null, cells: WorkloadCell[]) {
+  if (!selected) return null;
+  return cells.find((cell) => cellKey(cell) === cellKey(selected)) || null;
+}
+
 function workloadBounds(width: number, depth: number): THREE.Vector3[] {
   const points: THREE.Vector3[] = [];
   for (const x of [-width / 2, width / 2]) {
@@ -160,19 +165,20 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
         sang: active?.departmentIndex === index,
       })),
     ];
-    const meaningful = [
-      ...[...cells].sort((a, b) => b.total - a.total).slice(0, 5),
-      ...(selected ? [selected] : []),
-      ...cells.filter((cell) => cell.total > 0 && cell.overdue / cell.total >= .5),
-    ];
-    const labelled = new Set<string>();
-    for (const cell of meaningful) {
-      if (labelled.has(cellKey(cell))) continue;
-      labelled.add(cellKey(cell));
+    const meaningful = new Map<string, { cell: WorkloadCell; priority: number }>();
+    const offer = (cell: WorkloadCell, priority: number) => {
+      const key = cellKey(cell);
+      if ((meaningful.get(key)?.priority || 0) < priority) meaningful.set(key, { cell, priority });
+    };
+    for (const cell of [...cells].sort((a, b) => b.total - a.total).slice(0, 5)) offer(cell, 1);
+    for (const cell of cells.filter((item) => item.total > 0 && item.overdue / item.total >= .5)
+      .sort((a, b) => b.total - a.total)) offer(cell, 2);
+    if (selected) offer(selected, 3);
+    for (const { cell, priority } of [...meaningful.values()].sort((a, b) => b.priority - a.priority)) {
       labels.push({
         vt: [(cell.month - 6.5) * MONTH_STEP, cell.total / Math.max(1, maxTotal) * CAO_MAX + .18,
           (cell.departmentIndex - (DEPTS.length - 1) / 2) * DEPARTMENT_STEP] as [number, number, number],
-        chu: String(cell.total), cap: "so", sang: !!active && cellKey(active) === cellKey(cell),
+        chu: String(cell.total), cap: "so", sang: !!active && cellKey(active) === cellKey(cell), priority,
       });
     }
     return labels;
@@ -229,7 +235,7 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
     </mesh>
     <gridHelper args={[Math.max(width, depth) + 1, 12, "#E7DAEB", "#F1E8F3"]} position={[0, .001, 0]} />
     <ContactShadows position={[0, .002, 0]} opacity={.42} scale={Math.max(width, depth) + 1} blur={1.6} far={1.2} resolution={1024} />
-    <NhanTruc nhan={labels} tam={[0, CAO_MAX / 2, 0]} />
+    <NhanTruc nhan={labels} tam={[0, CAO_MAX / 2, 0]} declutterSo />
     {cells.map((cell) => <Column key={cellKey(cell)} cell={cell} maxTotal={maxTotal}
       selected={!!selected && cellKey(selected) === cellKey(cell)} selectionActive={!!selected}
       giamChuyenDong={giamChuyenDong} onHover={onHover} onSelect={onSelect} />)}
@@ -258,6 +264,10 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell 
   const [mode, setMode] = useState<"3d" | "2d">(() => (
     typeof window !== "undefined" && window.matchMedia?.("(max-width: 760px)").matches ? "2d" : "3d"
   ));
+  useEffect(() => {
+    setHover(null);
+    setSelected((current) => reconcileWorkloadSelection(current, cells));
+  }, [cells]);
   const resetRef = useRef<() => void>(() => {});
   const onResetReady = useCallback((reset: () => void) => { resetRef.current = reset; }, []);
   const detail = workloadActiveCell(selected, hover);

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildWorkloadMap, workloadCellColor } from "../../src/lib/workloadMap.ts";
+import * as workload3d from "../../src/components/three/WorkloadSpace3D.tsx";
 
 const acts = [
   { id: "a", state: "active", st: "done", dept: "qa", depts: ["qa"], _raw: { dl_vmp: "2026-08-10" } },
@@ -28,10 +29,28 @@ test("màu tiến độ kẹp tỷ lệ nằm ngoài khoảng hoàn thành", () 
   assert.equal(workloadCellColor(-1), "#D6486D");
 });
 
-test("màu tiến độ nội suy hex xác định tại điểm giữa", () => {
-  assert.equal(workloadCellColor(0.25), "#BD6673");
-  assert.equal(workloadCellColor(0.5), "#9F7D78");
-  assert.equal(workloadCellColor(0.75), "#778F7D");
+test("màu tiến độ đi qua mốc tím xám thay vì nâu ở điểm giữa", () => {
+  assert.equal(workloadCellColor(0.25), "#B15282");
+  assert.equal(workloadCellColor(0.5), "#7C5A93");
+  assert.equal(workloadCellColor(0.75), "#5E828B");
+});
+
+test("model chỉ nhận deadline YYYY-MM-DD hoặc YYYY/MM/DD", () => {
+  const cells = buildWorkloadMap([
+    { id: "dash", state: "active", st: "todo", dept: "qa", depts: ["qa"], _raw: { dl_vmp: "2026-08-10" } },
+    { id: "slash", state: "active", st: "todo", dept: "qa", depts: ["qa"], _raw: { dl_vmp: "2026/09/10" } },
+    { id: "letter", state: "active", st: "todo", dept: "qa", depts: ["qa"], _raw: { dl_vmp: "2026x08x10" } },
+    { id: "mixed", state: "active", st: "todo", dept: "qa", depts: ["qa"], _raw: { dl_vmp: "2026-10/10" } },
+  ], 2026);
+  assert.deepEqual(cells.map((cell) => [cell.month, cell.total]), [[8, 1], [9, 1]]);
+});
+
+test("lựa chọn được thay bằng cell mới cùng khóa và xóa khi không còn", () => {
+  assert.equal(typeof workload3d.reconcileWorkloadSelection, "function");
+  const oldCell = { month: 8, departmentId: "qa", departmentIndex: 0, total: 2, completed: 1, overdue: 1, completionRate: .5 };
+  const refreshedCell = { ...oldCell, total: 3, completed: 2, completionRate: 2 / 3 };
+  assert.equal(workload3d.reconcileWorkloadSelection(oldCell, [refreshedCell]), refreshedCell);
+  assert.equal(workload3d.reconcileWorkloadSelection(oldCell, []), null);
 });
 
 test("model chỉ đếm một lần mỗi bộ phận khi activity chứa mã trùng", () => {

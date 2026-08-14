@@ -349,7 +349,7 @@ for (const viewport of desktopViewports) {
       bang.push({ id, ten, ...r });
     }
   }
-  console.log(`✅ auth ${viewport.width}×${viewport.height} · ${MAN.length} màn không tràn · chat/notification sạch`);
+  console.log(`✅ auth ${viewport.width}×${viewport.height} · ${MAN.length} màn không tràn · chat ở Tổng quan + Thông báo ở Báo cáo đã kiểm`);
 }
 
 await assertMobileShell();

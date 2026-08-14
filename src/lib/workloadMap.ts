@@ -27,10 +27,16 @@ function linearToSrgb(channel: number): number {
     : 1.055 * Math.pow(channel, 0.41666) - 0.055;
 }
 
-function interpolateLegacyColor(start: number, end: number, rate: number): number {
+function interpolateLinearLight(start: number, end: number, rate: number): number {
   const linear = srgbToLinear(start / 255) + (srgbToLinear(end / 255) - srgbToLinear(start / 255)) * rate;
   return Math.round(Math.max(0, Math.min(1, linearToSrgb(linear))) * 255);
 }
+
+const RASPBERRY: [number, number, number] = [0xD6, 0x48, 0x6D];
+// Brand plum-grey is an intentional semantic midpoint; mixing the endpoints
+// directly produces a taupe that falls outside the approved purple palette.
+const PLUM_GREY: [number, number, number] = [0x7C, 0x5A, 0x93];
+const MINT: [number, number, number] = [0x2A, 0x9E, 0x82];
 
 export function buildWorkloadMap(activities: Activity[], year: number): WorkloadCell[] {
   const cells = new Map<string, WorkloadCell>();
@@ -38,10 +44,9 @@ export function buildWorkloadMap(activities: Activity[], year: number): Workload
   for (const activity of activities) {
     if ((activity.state || "active") !== "active") continue;
     const deadline = String((activity._raw as Record<string, unknown> | undefined)?.dl_vmp || "");
-    if (deadline.slice(0, 4) !== String(year)) continue;
-
-    const month = Number(deadline.slice(5, 7));
-    if (!(month >= 1 && month <= 12)) continue;
+    const deadlineParts = deadline.match(/^(\d{4})([-/])(0[1-9]|1[0-2])\2(0[1-9]|[12]\d|3[01])$/);
+    if (!deadlineParts || Number(deadlineParts[1]) !== year) continue;
+    const month = Number(deadlineParts[3]);
 
     const departmentIds = [...new Set((activity.depts && activity.depts.length ? activity.depts : [activity.dept])
       .filter(Boolean) as string[])];
@@ -70,8 +75,9 @@ export function buildWorkloadMap(activities: Activity[], year: number): Workload
 
 export function workloadCellColor(completionRate: number): string {
   const rate = clampRate(completionRate);
-  const red = interpolateLegacyColor(214, 42, rate);
-  const green = interpolateLegacyColor(72, 158, rate);
-  const blue = interpolateLegacyColor(109, 130, rate);
-  return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+  const [start, end, segmentRate] = rate <= .5
+    ? [RASPBERRY, PLUM_GREY, rate * 2]
+    : [PLUM_GREY, MINT, (rate - .5) * 2];
+  const channels = start.map((channel, index) => interpolateLinearLight(channel, end[index], segmentRate));
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }
