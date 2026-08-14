@@ -148,6 +148,9 @@ try {
     if (mobileChat.panelPosition !== "static" || mobileChat.panelTop < mobileChat.exportBottom
       || mobileChat.panelRight > 390) throw new Error(JSON.stringify(mobileChat));
 
+    await page.click('.vmp-chat-panel button[title="Đóng"]');
+    await page.waitForFunction(() => !document.querySelector(".vmp-chat-panel"));
+
     await page.setViewport({ width: 390, height: 844 });
     await page.click('[aria-label="Mở menu"]');
     await page.setViewport({ width: 1440, height: 900 });
@@ -202,7 +205,10 @@ try {
       const close = (a, b) => Math.abs(a - b) < .002;
       return close(current.zoom, baseline.zoom)
         && current.position.every((value, index) => close(value, baseline.position[index]))
-        && current.target.every((value, index) => close(value, baseline.target[index]));
+        && current.target.every((value, index) => close(value, baseline.target[index]))
+        && close(current.fillWidth, baseline.fillWidth)
+        && close(current.fillHeight, baseline.fillHeight)
+        && close(current.elevationDegrees, baseline.elevationDegrees);
     }, {}, baselineProjection);
     if (Math.abs(changedProjection.zoom - baselineProjection.zoom) < .001) throw new Error("OrbitControls zoom did not change");
     const legend = await page.$eval('[data-testid="workload-map-legend"]', (el) => el.textContent || "");
