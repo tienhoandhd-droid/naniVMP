@@ -50,11 +50,27 @@ Biến môi trường tuỳ chọn:
 
 ## Hai điều dễ vấp khi sửa bộ kiểm
 
-**1. Điều hướng chỉ đổi hash thì trang KHÔNG tải lại.**
+**1. Đổi persona và hash phải là một giao dịch trước khi tải lại.**
 `page.goto(url + "#v=reports")` từ cùng một URL là điều hướng trong cùng tài
-liệu — React không dựng lại, nên hồ sơ vừa ghi vào `localStorage` sẽ không
-được đọc và app vẫn nằm ở màn đăng nhập. Luôn `page.reload()` sau khi đặt
-`localStorage`. Lỗi này đã làm hỏng kết quả hai lần.
+liệu. Puppeteer có thể trả về trước khi React xử lý `hashchange`; effect ghi
+state ra URL khi đó có thể khôi phục hash cũ trước lệnh reload. Hãy ghi persona,
+`history.replaceState` tới URL đích và gọi `location.reload()` đồng bộ trong cùng
+một `page.evaluate`; đồng thời arm navigation wait trước bằng `Promise.all`:
+
+```js
+await Promise.all([
+  page.waitForNavigation({ waitUntil: "networkidle2" }),
+  page.evaluate(([url, persona]) => {
+    localStorage.setItem("vmp_monitor_user_v1", JSON.stringify(persona));
+    history.replaceState(null, "", url);
+    location.reload();
+  }, [targetUrl, persona]),
+]);
+```
+
+`replaceState` không phát `hashchange`; lần mount sau reload vì thế đọc persona và URL
+đích cùng nhau. Chỉ assert hash sau navigation: Tổng quan canonical có hash rỗng,
+các màn khác có `#v=<id>`.
 
 **2. Bốn màn trả 401 là ĐÚNG, không phải hỏng.**
 Danh mục & Nhập liệu · Luật đang áp dụng · Audit log · Quản trị gọi các RPC

@@ -3,6 +3,7 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
+import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
 
 const GOC = "http://localhost:4173";
 await choServer(GOC);
@@ -26,6 +27,9 @@ await page.setViewport({ width: 1500, height: 1000 });
 await page.setRequestInterception(true);
 page.on("request", (request) => {
   const url = request.url();
+  // Vai trò localStorage chỉ phục vụ fixture; ScreenGuard vẫn đọc RPC server.
+  // Mock đúng boundary này để test không phụ thuộc quyền live của tài khoản E2E.
+  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessAdmin);
   if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
     return answer(request, { activities: [], objects: [], updated_at: "2026-08-10T00:00:00Z" });
   }

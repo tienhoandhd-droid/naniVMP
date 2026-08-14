@@ -17,6 +17,7 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
+import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
 
 const GOC = "http://localhost:4173";
 const QA = "Nguyễn Thị Hương";
@@ -29,6 +30,21 @@ const b = await puppeteer.launch({
 });
 const p = await b.newPage();
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
+const cors = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers": "*",
+  "access-control-allow-methods": "GET,POST,OPTIONS",
+};
+const answer = (request, body) => request.method() === "OPTIONS"
+  ? request.respond({ status: 204, headers: cors, body: "" })
+  : request.respond({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(body) });
+await p.setRequestInterception(true);
+p.on("request", (request) => {
+  // Các persona trong fixture chỉ đổi localStorage; giữ ScreenGuard enforced
+  // bằng payload quyền màn hình cố định, còn dashboard vẫn là dữ liệu thật.
+  if (LA_UI_ACCESS.test(request.url())) return answer(request, uiAccessAdmin);
+  return request.continue();
+});
 /* Tách LỖI MÃ NGUỒN khỏi SỰ CỐ MẠNG. Máy chạy kiểm thỉnh thoảng mất phân
    giải tên miền Supabase (ERR_NAME_NOT_RESOLVED); lúc đó không có dữ liệu
    nào tải về nên mọi mục đều đỏ — nhưng đỏ vì mất mạng chứ không phải vì
@@ -48,11 +64,29 @@ const dangNhap = (ten = QA) => p.evaluate((t) => {
   }));
 }, ten);
 
-const moMan = async (v) => {
-  await p.goto(`${GOC}#v=${v}`, { waitUntil: "networkidle2" });
-  await dangNhap();
-  await p.reload({ waitUntil: "networkidle2" });
+const moMan = async (v, ten = QA) => {
+  const dich = v === "overview" ? GOC : `${GOC}#v=${v}`;
+  await Promise.all([
+    p.waitForNavigation({ waitUntil: "networkidle2" }),
+    p.evaluate(([url, t]) => {
+      const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
+      localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
+        ...cu, name: t, email: "e2e@test.local", role: "admin", perm: "admin",
+      }));
+      history.replaceState(null, "", url);
+      location.reload();
+    }, [dich, ten]),
+  ]);
   await cho(3000);
+  const state = await p.evaluate(() => ({
+    href: location.href,
+    hash: location.hash,
+    main: document.querySelector("main")?.innerText.slice(0, 240) || "",
+  }));
+  const expectedHash = v === "overview" ? "" : `#v=${v}`;
+  if (state.hash !== expectedHash) {
+    throw new Error(`moMan target=${v}, expected hash=${JSON.stringify(expectedHash)}: ${JSON.stringify(state)}`);
+  }
 };
 const chu = () => p.evaluate(() => document.querySelector("main")?.innerText || "");
 const bam = (re) => p.evaluate((r) => {
@@ -250,16 +284,23 @@ await p.setViewport({ width: 1440, height: 900 });
 
 /* ==================== VAI 5 · TRẠNG THÁI RỖNG & NGƯỜI LẠ ==================== */
 console.log("\n── VAI 5 · Trạng thái rỗng và người chưa được gán việc ──");
-await p.goto(GOC, { waitUntil: "domcontentloaded" });
-await dangNhap("Người Chưa Có Việc");
-await moMan("today");
+await moMan("today", "Người Chưa Có Việc");
 t = await chu();
 kiem("Rỗng", "Người chưa được gán việc được nói RÕ lý do, không im lặng hiện 0",
   /Chưa nhận ra tên bạn|Xem của mọi người/.test(t), "");
-await p.goto(GOC, { waitUntil: "domcontentloaded" });
-await dangNhap();
 
 await moMan("progress");
+try {
+  await p.waitForFunction(() => [...document.querySelectorAll("input")]
+    .some((x) => /Tìm theo mã/.test(x.placeholder || "")));
+} catch {
+  const state = await p.evaluate(() => ({
+    hash: location.hash,
+    main: document.querySelector("main")?.innerText.slice(0, 500) || "",
+    inputs: [...document.querySelectorAll("input")].map((x) => x.placeholder || x.type),
+  }));
+  throw new Error(`Vai 5 phải về progress có input “Tìm theo mã”: ${JSON.stringify(state)}`);
+}
 await p.evaluate(() => {
   const o = [...document.querySelectorAll("input")].find((x) => /Tìm theo mã/.test(x.placeholder || ""));
   const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
