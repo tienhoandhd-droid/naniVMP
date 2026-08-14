@@ -13,8 +13,9 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap as vaoHeThong, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
+import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
 
-const GOC = "http://localhost:4173";
+const GOC = process.env.E2E_URL || "http://localhost:4173";
 
 const MAN = [
   ["today", "Hôm nay"],
@@ -34,6 +35,145 @@ const b = await puppeteer.launch({
 });
 const p = await b.newPage();
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
+const overlap = (a, b) => !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+const rect = (r) => ({ left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom) });
+
+/* Audit chỉ mô phỏng response quyền màn hình trong chính trình duyệt. Nó
+   không đổi quyền ở server, không gửi mutation và vẫn lấy dữ liệu dashboard
+   qua phiên chỉ-xem thật. Nhờ vậy có thể bắt đường redirect enforced một
+   cách lặp lại, thay vì phụ thuộc cấu hình quyền live của tài khoản E2E. */
+let uiAccess = uiAccessAdmin;
+const cors = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers": "*",
+  "access-control-allow-methods": "GET,POST,OPTIONS",
+};
+await p.setRequestInterception(true);
+p.on("request", (request) => {
+  if (!LA_UI_ACCESS.test(request.url())) return request.continue();
+  return request.respond(request.method() === "OPTIONS"
+    ? { status: 204, headers: cors, body: "" }
+    : { status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(uiAccess) });
+});
+
+const assertNoOverflow = async (viewport, context) => {
+  const geometry = await p.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  if (geometry.scrollWidth > geometry.viewportWidth + 2) {
+    throw new Error(`${context}: document.documentElement.scrollWidth=${geometry.scrollWidth} > clientWidth=${geometry.viewportWidth} at ${viewport.width}x${viewport.height}`);
+  }
+};
+
+const assertMobileLogin = async () => {
+  await p.setViewport({ width: 390, height: 844 });
+  await p.goto(GOC, { waitUntil: "domcontentloaded" });
+  await p.waitForSelector("#vmp-login-email");
+  const geometry = await p.evaluate(() => {
+    const selector = 'button.vq-luxury-btn[type="submit"]';
+    const submit = document.querySelector(selector);
+    const r = submit?.getBoundingClientRect();
+    return {
+      selector,
+      submit: r ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null,
+      viewportHeight: innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  if (!geometry.submit) throw new Error(`unauth 390x844: missing ${geometry.selector}`);
+  if (geometry.submit.bottom > geometry.viewportHeight) {
+    throw new Error(`unauth 390x844: ${geometry.selector} bottom=${Math.round(geometry.submit.bottom)} > viewportHeight=${geometry.viewportHeight}`);
+  }
+  if (geometry.scrollWidth > geometry.viewportWidth + 2) {
+    throw new Error(`unauth 390x844: document.documentElement.scrollWidth=${geometry.scrollWidth} > clientWidth=${geometry.viewportWidth}`);
+  }
+  await p.click(geometry.selector);
+  await p.waitForFunction(() => document.body.innerText.includes("Vui lòng nhập email"));
+  console.log(`✅ unauth 390×844 · ${geometry.selector} bottom=${Math.round(geometry.submit.bottom)}/${geometry.viewportHeight} · no overflow`);
+};
+
+const assertNoChatOverlap = async (viewport) => {
+  await p.waitForSelector(".vmp-chat-fab");
+  await p.waitForSelector(".vmp-mo-sau");
+  await p.$eval(".vmp-mo-sau", (button) => button.scrollIntoView({ block: "end" }));
+  const geometry = await p.evaluate(() => {
+    const selector = ".vmp-chat-fab";
+    const chat = document.querySelector(selector);
+    const chatRect = chat?.getBoundingClientRect();
+    const primary = [...document.querySelectorAll(".vmp-mo-sau, .hn-nut")]
+      .map((button) => ({ button, rect: button.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight)
+      .map(({ button, rect }) => ({ selector: button.matches(".vmp-mo-sau") ? ".vmp-mo-sau" : ".hn-nut", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } }));
+    return {
+      position: chat ? getComputedStyle(chat).position : null,
+      chat: chatRect ? { left: chatRect.left, top: chatRect.top, right: chatRect.right, bottom: chatRect.bottom } : null,
+      primary,
+    };
+  });
+  if (!geometry.chat) throw new Error(`auth ${viewport.width}x${viewport.height}: missing .vmp-chat-fab`);
+  if (geometry.position !== "fixed") throw new Error(`auth ${viewport.width}x${viewport.height}: .vmp-chat-fab position=${geometry.position}, expected fixed`);
+  if (!geometry.primary.length) throw new Error(`auth ${viewport.width}x${viewport.height}: no visible primary selector (.vmp-mo-sau, .hn-nut) after scroll`);
+  const hit = geometry.primary.find((button) => overlap(geometry.chat, button.rect));
+  if (hit) throw new Error(`auth ${viewport.width}x${viewport.height}: fixed .vmp-chat-fab ${JSON.stringify(rect(geometry.chat))} overlaps visible primary ${hit.selector} ${JSON.stringify(rect(hit.rect))}`);
+};
+
+const assertMobileShell = async () => {
+  const viewport = { width: 390, height: 844 };
+  await p.setViewport(viewport);
+  await p.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded" });
+  await p.reload({ waitUntil: "domcontentloaded" });
+  await p.waitForSelector('[aria-label="Mở menu"]');
+  await p.waitForSelector(".vmp-chat-fab");
+  const geometry = await p.evaluate(() => {
+    const selector = '[aria-label="Mở menu"]';
+    const opener = document.querySelector(selector);
+    const chat = document.querySelector(".vmp-chat-fab");
+    const openerRect = opener?.getBoundingClientRect();
+    return {
+      opener: openerRect ? { left: openerRect.left, top: openerRect.top, right: openerRect.right, bottom: openerRect.bottom } : null,
+      openerDisplay: opener ? getComputedStyle(opener).display : null,
+      chatPosition: chat ? getComputedStyle(chat).position : null,
+    };
+  });
+  if (!geometry.opener || geometry.openerDisplay === "none") throw new Error(`auth 390x844: missing visible [aria-label="Mở menu"]`);
+  if (geometry.opener.right > viewport.width || geometry.opener.bottom > viewport.height) {
+    throw new Error(`auth 390x844: [aria-label="Mở menu"] ${JSON.stringify(rect(geometry.opener))} outside viewport 390x844`);
+  }
+  if (geometry.chatPosition === "fixed") throw new Error("auth 390x844: .vmp-chat-fab remains fixed and can cover primary actions");
+  await assertNoOverflow(viewport, "auth overview");
+  console.log("✅ auth 390×844 · mobile menu opener visible · chat static · no overflow");
+};
+
+const assertNoDeadNotification = async (viewport) => {
+  const dead = await p.$$('button[title="Thông báo"]');
+  if (dead.length) throw new Error(`auth ${viewport.width}x${viewport.height}: dead notification selector button[title="Thông báo"] count=${dead.length}`);
+};
+
+const assertEnforcedRedirectHasMain = async () => {
+  uiAccess = {
+    ...uiAccessAdmin,
+    screens: {
+      ...uiAccessAdmin.screens,
+      progress: { ...uiAccessAdmin.screens.progress, can_view: false },
+    },
+  };
+  await p.setViewport({ width: 1366, height: 768 });
+  await p.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded" });
+  await p.reload({ waitUntil: "domcontentloaded" });
+  await p.waitForFunction(() => {
+    const main = document.querySelector("main");
+    return !!main && main.innerText.trim().length > 160
+      && !main.innerText.includes("Đang mở màn bạn được phép xem…");
+  });
+  const main = await p.$eval("main", (element) => ({ textLength: element.innerText.trim().length, text: element.innerText.slice(0, 100) }));
+  if (main.textLength <= 160) throw new Error(`enforced redirect #v=progress: main is blank (textLength=${main.textLength}, text=${JSON.stringify(main.text)})`);
+  console.log(`✅ enforced redirect #v=progress · main textLength=${main.textLength}`);
+  uiAccess = uiAccessAdmin;
+};
+
+await assertMobileLogin();
 /* Đăng nhập thật một lần, các lượt sau chỉ đổi vai ở vế client. */
 const dangNhap = () => doiVaiTrenMan(p, "admin", "Tào Tiến Hoàn");
 
@@ -164,21 +304,37 @@ const coDuLieu = await p.evaluate(() => {
   return m ? +m[2] : 0;
 });
 if (coDuLieu < 50) {
-  console.log(`\n⏭  KHÔNG CHẤM ĐƯỢC — chỉ tải được ${coDuLieu} hạng mục.`);
-  console.log("   Trang rỗng thì đương nhiên không lỗi gì; chạy lại khi mạng ổn định.\n");
   await b.close();
-  process.exit(0);
+  throw new Error(`Audit dừng: overview span khớp /(\\d+)\\/(\\d+) hạng mục/ chỉ cho ${coDuLieu} hạng mục; không được coi trang thiếu dữ liệu là PASS.`);
 }
 
 const bang = [];
-for (const [id, ten] of MAN) {
-  await p.goto(`${GOC}#v=${id}`, { waitUntil: "networkidle2" });
-  await dangNhap();
-  await p.reload({ waitUntil: "networkidle2" });
-  await cho(3200);
-  const r = await p.evaluate(DO);
-  bang.push({ id, ten, ...r });
+const desktopViewports = [
+  { width: 1366, height: 768 },
+  { width: 1440, height: 900 },
+];
+for (const viewport of desktopViewports) {
+  await p.setViewport(viewport);
+  for (const [id, ten] of MAN) {
+    await p.goto(`${GOC}#v=${id}`, { waitUntil: "networkidle2" });
+    await dangNhap();
+    await p.reload({ waitUntil: "networkidle2" });
+    await cho(3200);
+    await assertNoOverflow(viewport, `auth ${ten}`);
+    if (id === "overview") await assertNoChatOverlap(viewport);
+    if (id === "reports") await assertNoDeadNotification(viewport);
+    // Bảng điểm giữ mốc desktop chuẩn 1440×900 như trước; 1366×768 là
+    // regression geometry riêng nên không làm thay đổi điểm lịch sử.
+    if (viewport.width === 1440) {
+      const r = await p.evaluate(DO);
+      bang.push({ id, ten, ...r });
+    }
+  }
+  console.log(`✅ auth ${viewport.width}×${viewport.height} · ${MAN.length} màn không tràn · chat/notification sạch`);
 }
+
+await assertMobileShell();
+await assertEnforcedRedirectHasMain();
 
 /* ---- Có nhìn thấy viền focus khi đi bằng bàn phím không ---- */
 await p.goto(`${GOC}#v=today`, { waitUntil: "networkidle2" });

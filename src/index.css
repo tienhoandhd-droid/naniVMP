@@ -7072,7 +7072,12 @@ summary { min-height: 24px; display: flex; align-items: center; }
 /* Nút chat cố định chỉ cần chừa chỗ trên desktop. Trên điện thoại cả nút và
    khung hội thoại trở về luồng trang, nên không thể che CTA hoặc bảng. */
 @media (min-width: 761px) {
-  main:has(.vmp-chat-fab) { padding-bottom: 96px; }
+  main:has(.vmp-chat-fab) {
+    padding-bottom: 96px;
+    padding-inline-end: 96px;
+    scroll-padding-bottom: 96px;
+    scroll-padding-inline-end: 96px;
+  }
 }
 @media (max-width: 760px) {
   .vmp-chat-fab {

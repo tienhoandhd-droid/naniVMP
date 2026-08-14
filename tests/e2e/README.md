@@ -22,7 +22,17 @@ node tests/e2e/danh-ba-phan-quyen.mjs   # autocomplete, tự điền và phân c
 node tests/e2e/quyen-cot-timeline.mjs   # preview/enforced theo từng cột timeline
 node tests/e2e/thu-hoi-cache-phan-quyen.mjs # thu hồi cache và fail-closed khi bật enforced
 node tests/e2e/danh-muc-nguoi-thuc-hien.mjs # danh mục cũ không còn mutation và dẫn tới danh bạ chuẩn
+node tests/e2e/ux-refinement.mjs         # login 390px, drawer mobile, chat, CTA quyền và bản đồ tải việc
+node tests/e2e/cham-giao-dien.mjs        # audit viewport 1366/1440/390, tràn, chat và redirect enforced
 ```
+
+`npm run cham` mở trang đăng nhập ở 390×844, rồi kiểm toàn bộ bảy màn có
+dữ liệu ở 1366×768 và 1440×900, cùng shell ứng dụng ở 390×844. Audit dừng
+với selector và hình học cụ thể nếu form login bị đẩy dưới viewport, tài liệu
+tràn ngang, FAB chat fixed che nút chính, opener menu mobile mất, nút Thông
+báo không hành động quay lại, hoặc redirect `enforced` để `main` rỗng. Response
+`rpc_my_ui_access` chỉ được mô phỏng trong Chrome để tái lập redirect; audit
+đăng nhập bằng tài khoản chỉ-xem và không gửi Supabase mutation.
 
 Khi nghiệm thu phân quyền theo từng hạng mục, chạy `npm run test:permissions`
 sau khi đã dựng `npm run build` và mở preview ở cổng 4173. Bộ kiểm dùng ba
