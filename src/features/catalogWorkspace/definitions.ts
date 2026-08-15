@@ -141,3 +141,61 @@ export const CATALOG_DATASET_ORDER: CatalogDatasetId[] = ["objects", "products",
 export function layDataset(id: CatalogDatasetId): CatalogDatasetDefinition {
   return CATALOG_DATASETS[id];
 }
+
+/* --------------------------------------------------------------------- *
+ *  Cột của mẫu Excel chính thức (Đợt B Task 8)
+ *  ---------------------------------------------------------------------
+ *  LITERAL và CÓ THỨ TỰ — đây là hợp đồng với file người dùng đã tải về.
+ *  Đổi tên, đổi chỗ hay thêm bớt cột là ĐỔI PHIÊN BẢN MẪU (nâng version
+ *  trong catalogWorkbook.ts), không phải sửa tại chỗ: file mẫu cũ ngoài
+ *  kia sẽ bị từ chối một cách rõ ràng thay vì bị đọc sai cột.
+ *
+ *  `key` phải thuộc whitelist trường của dataset tương ứng ở trên
+ *  (riêng `object_kind` là cột định tuyến bảng, không phải trường ghi).
+ * --------------------------------------------------------------------- */
+
+export interface CatalogTemplateColumn {
+  header: string;
+  key: string;
+}
+
+export const SOURCE_OBJECT_TEMPLATE_COLUMNS: readonly CatalogTemplateColumn[] = [
+  { header: "Loại đối tượng", key: "object_kind" },
+  { header: "Mã đối tượng", key: "object_code" },
+  { header: "Tên đối tượng", key: "object_name" },
+  { header: "Bộ phận quản lý", key: "department" },
+  { header: "Mã khu vực", key: "area_code" },
+  { header: "Dây chuyền", key: "line" },
+  { header: "Có thẩm định (y/n)", key: "validate_flag" },
+  { header: "Tần suất (tháng)", key: "frequency_months" },
+  { header: "Tháng đầu tiên", key: "first_month" },
+  { header: "Năm tham chiếu", key: "year_ref" },
+  { header: "Nhóm báo cáo", key: "report_class" },
+  { header: "Nhóm công việc", key: "work_group" },
+  { header: "Số ngày công", key: "workdays" },
+  { header: "Điểm phức tạp", key: "complexity_score" },
+  { header: "Điểm ảnh hưởng chất lượng", key: "quality_impact_score" },
+  { header: "Ghi chú", key: "note" },
+  { header: "Đang dùng (y/n)", key: "is_active" },
+];
+
+export const PRODUCT_GMP_TEMPLATE_COLUMNS: readonly CatalogTemplateColumn[] = [
+  { header: "Mã BFO", key: "bfo_code" },
+  { header: "Tên sản phẩm", key: "product_name" },
+  { header: "Hoạt chất", key: "ingredients" },
+  { header: "Hàm lượng", key: "strength" },
+  { header: "Dạng bào chế", key: "dosage_form" },
+  { header: "Dây chuyền", key: "production_line" },
+  { header: "Bao bì sơ cấp", key: "primary_pack" },
+  { header: "Cỡ lô", key: "batch_size" },
+  { header: "Bồn pha", key: "mixing_tank" },
+  { header: "Cỡ lô thành phẩm", key: "final_batch_size" },
+  { header: "Ghi chú", key: "note" },
+  { header: "Đang dùng (y/n)", key: "is_active" },
+];
+
+export const SOURCE_OBJECT_HEADERS: readonly string[] =
+  SOURCE_OBJECT_TEMPLATE_COLUMNS.map((c) => c.header);
+
+export const PRODUCT_GMP_HEADERS: readonly string[] =
+  PRODUCT_GMP_TEMPLATE_COLUMNS.map((c) => c.header);
