@@ -30,6 +30,23 @@ Thành công thì trả **nguyên mã thoát của lệnh bên trong**.
 
 Đặt `WITH_PREVIEW_TIMEOUT` (giây, mặc định 20) nếu máy chậm.
 
+## Kiểm thẩm mỹ toàn app
+
+```bash
+bash scripts/with-preview.sh -- npm run thammy
+```
+
+Áp 16 luật đo được ở `docs/design/luat-tham-my.md` lên **cả 17 màn**, ở hai
+chế độ sáng/tối, bốn khổ màn, và hai kịch bản dữ liệu (có dữ liệu · rỗng) —
+83 lượt đo. Thoát khác 0 nếu còn vi phạm **nặng**.
+
+Bộ này KHÔNG chạm production: `tests/e2e/gia-lap-supabase.mjs` chặn mọi
+request ra ngoài ở tầng trình duyệt và trả lời thay Supabase bằng dữ liệu
+dựng sẵn. Đổi lại nó không kiểm nghiệp vụ — chỉ chứng minh giao diện dựng
+đúng với một dữ liệu cho trước.
+
+Đặt `THAMMY_CHI_TIET=40` để in nhiều kiểu vi phạm hơn khi đang sửa.
+
 Cách cũ chỉ còn để tham khảo — nó không kiểm được `dist/` có tươi hay không:
 
 ```bash
