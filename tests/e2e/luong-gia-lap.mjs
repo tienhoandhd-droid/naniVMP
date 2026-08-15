@@ -245,7 +245,7 @@ for (const [id, ten] of MAN) {
     const pane = document.querySelector(".hn-pane");
     return {
       coPane: !!pane && getComputedStyle(pane).display !== "none",
-      coVali: !!pane?.querySelector("svg"),
+      coVali: !!pane?.querySelector("[data-lp-vali]"),
     };
   });
   kiem(banDau.coPane, "≥1600 có supporting pane");
@@ -276,7 +276,7 @@ for (const [id, ten] of MAN) {
   });
   await new Promise((r) => setTimeout(r, 400));
   const boChon = await trang.evaluate(() =>
-    !!document.querySelector(".hn-pane svg"));
+    !!document.querySelector(".hn-pane [data-lp-vali]"));
   kiem(boChon, "bỏ chọn thì pane quay về Vali hướng dẫn");
 
   /* Dưới 1600 pane ẩn — không ép hai cột vào màn hẹp. */

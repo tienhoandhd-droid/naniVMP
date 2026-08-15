@@ -34,6 +34,9 @@ export default defineConfig({
     deviceScaleFactor: 1,
     // Máy dev dùng Chrome hệ thống (không tải browser); CI cài chromium.
     channel: process.env.CI ? undefined : "chrome",
+    // Ép sRGB khi chụp: headless trên macOS mặc định chụp theo profile màn
+    // hình (Display-P3) làm ảnh bạc màu — đã dính khi thay art Vali.
+    launchOptions: { args: ["--force-color-profile=srgb"] },
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
 });
