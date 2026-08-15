@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 520" fill="none">
+  <!-- Cành sen góc đông-bắc. Vẽ để bị CROP: tâm bố cục lệch về góc trên
+       phải, phần đuôi thưa dần về phía vùng đọc. Chỉ dùng làm mask
+       (mask-image), màu lấy từ background-color của lớp art. -->
+  <g stroke="#000" stroke-linecap="round" fill="none">
+    <!-- whiplash chính đi từ ngoài mép vào -->
+    <path d="M520 40C420 52 340 96 302 176C270 244 282 330 244 392" stroke-width="3.4"/>
+    <path d="M520 118C446 122 384 150 348 210C318 262 322 330 292 380" stroke-width="2.2" opacity=".7"/>
+    <!-- bông sen hé - chỉ thấy một phần -->
+    <g stroke-width="3">
+      <path d="M420 26C400 66 402 108 428 140C456 108 460 64 444 22"/>
+      <path d="M372 44C366 88 380 126 418 146C424 110 414 70 392 38" opacity=".85"/>
+      <path d="M488 30C462 62 452 104 466 140C496 116 510 76 508 34" opacity=".85"/>
+    </g>
+    <!-- gân lá -->
+    <path d="M330 250C368 240 400 250 420 278" stroke-width="2" opacity=".6"/>
+    <path d="M318 300C356 296 386 310 402 340" stroke-width="2" opacity=".45"/>
+    <!-- nụ nhỏ cuối cành, mảnh nhất -->
+    <path d="M244 392C236 418 240 444 258 462" stroke-width="1.6" opacity=".4"/>
+    <ellipse cx="266" cy="470" rx="10" ry="16" stroke-width="1.6" opacity=".4" transform="rotate(24 266 470)"/>
+  </g>
+</svg>

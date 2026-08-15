@@ -18,36 +18,47 @@
 :root[data-visual="lotus-pearl"] {
   color-scheme: light;
 
-  /* --- Nền và chữ, spec §6.1 --------------------------------------- */
-  --lp-canvas:    #FFF9F7;
+  /* --- Nền và chữ — Atelier v2 -------------------------------------- *
+   * Canvas ngả hồng sâu hơn bản đầu (#FFF9F7 → #F7F0F3) để card trắng
+   * NỔI hẳn lên nền: đó là cách sơn mài tạo chiều sâu bằng lớp bề mặt,
+   * thay vì tăng bóng đổ. Nghiên cứu Atelier 15/08 §Palette. */
+  --lp-canvas:    #F7F0F3;
   --lp-surface:   #FFFDFC;
-  --lp-surface-2: #F8F1F3;
-  --lp-ink:       #332534;
-  /* Đậm hơn #756775 của bản đầu: trên nền blush (#F3E5EA) màu cũ chỉ đạt
-     4.34:1, tức trượt ngưỡng AA 4.5:1 ở đúng những chỗ hay dùng nó nhất —
-     chú thích trong thẻ hồng nhạt. Màu này đạt 5.1:1 trên blush và 5.6:1
-     trên nền chìm, mà vẫn nhạt hơn --lp-ink rõ rệt nên phân cấp còn nguyên. */
-  --lp-ink-muted: #6B5C6B;
+  --lp-surface-2: #F2E8ED;
+  /* Bề mặt nổi trên surface — popover, modal. */
+  --lp-raised:    #FFFFFF;
+  --lp-ink:       #2F2430;
+  /* ~6.4:1 trên surface, vẫn nhạt hơn --lp-ink rõ rệt nên phân cấp còn
+     nguyên. Không được nhạt hơn nữa: ngưỡng AA là 4.5:1. */
+  --lp-ink-muted: #685A66;
 
-  /* --- Thương hiệu -------------------------------------------------- */
-  --lp-plum:      #5E365D;
-  --lp-plum-2:    #7A496A;
-  --lp-rose:      #A96C87;
-  --lp-rose-soft: #F3E5EA;
+  /* --- Thương hiệu — thang plum ba bậc ------------------------------ *
+   * 900 neo đậm cho hero/panel sơn mài, 700 cho CTA và trạng thái chọn,
+   * 600 cho hover/accent. Tên cũ --lp-plum/--lp-plum-2 giữ làm bí danh
+   * vì components cũ đang dùng. */
+  --lp-plum-900:  #3E213E;
+  --lp-plum:      #5A3158;
+  --lp-plum-700:  var(--lp-plum);
+  --lp-plum-2:    #70446A;
+  --lp-plum-600:  var(--lp-plum-2);
+  --lp-rose:      #A74F72;
+  --lp-rose-600:  var(--lp-rose);
+  --lp-rose-soft: #F4E4EA;
 
   /* --- Ngữ nghĩa ---------------------------------------------------- */
-  --lp-success:      #467866;
-  --lp-success-soft: #E2EFE9;
-  --lp-danger:       #B64A63;
-  --lp-danger-soft:  #F8E3E8;
-  --lp-warning:      #9B692E;
-  --lp-warning-bg:   #FBF1E2;
+  --lp-success:      #386958;
+  --lp-success-soft: #E1EFE8;
+  --lp-danger:       #A93F5A;
+  --lp-danger-soft:  #F7E2E7;
+  --lp-warning:      #8B5D24;
+  --lp-warning-bg:   #FBF0DF;
   --lp-warning-line: #E3C48F;
-  --lp-info:         #4A6C8C;
-  --lp-info-soft:    #E4EDF4;
+  --lp-info:         #416B8C;
+  --lp-info-soft:    #E4EEF5;
 
-  /* Vàng — trang trí thuần tuý. Xem chú thích đầu file. */
-  --lp-gold: #C9A15B;
+  /* Vàng — trang trí thuần tuý (~2.4:1, cấm làm chữ nhỏ hay trạng thái).
+     Xem chú thích đầu file. */
+  --lp-gold: #C7A15B;
 
   /* Màu sứ dùng cho chữ đặt TRÊN nền sơn mài đậm (panel thương hiệu ở
      màn đăng nhập). Không đảo theo chế độ sáng/tối vì nền dưới nó cũng
@@ -67,20 +78,31 @@
   --lp-on-ink:     var(--lp-canvas);
 
   /* --- Đường nét, tiêu điểm, trạng thái vô hiệu --------------------- */
-  --lp-line:             rgb(51 37 52 / 0.10);
-  --lp-line-strong:      rgb(51 37 52 / 0.20);
-  --lp-focus:            rgb(94 54 93 / 0.38);
+  --lp-line:             rgb(47 36 48 / 0.10);
+  --lp-line-strong:      rgb(47 36 48 / 0.20);
+  --lp-focus:            rgb(90 49 88 / 0.38);
   --lp-disabled-ink:     #A79BA6;
   --lp-disabled-surface: #F1EAEC;
+
+  /* --- Bán kính — CHỈ ba bậc cho component mới ---------------------- *
+   * control 10 · card 16 · hero/panel 24 (pill 999 cho chip). Component
+   * cũ dùng 18px được chuyển dần khi chạm tới màn đó, không sửa hàng loạt. */
+  --lp-r-control: 10px;
+  --lp-r-card:    16px;
+  --lp-r-panel:   24px;
+  --lp-r-pill:    999px;
+
+  /* --- Độ mờ của artwork chìm (PageArtLayer) ------------------------ */
+  --lp-art-opacity: 0.045;
 
   /* --- §6.7a · Ánh ngọc trai --------------------------------------- *
    * Chênh sáng giữa hai đầu dưới 4% nên chữ đặt lên vẫn giữ tương phản.
    * Chỉ dùng ở shell, panel hero, thẻ đăng nhập, empty state — tuyệt đối
    * không đặt sau bảng dữ liệu (spec §5.4). */
-  --lp-sheen: linear-gradient(135deg, #FFFDFC 0%, #F8F1F3 46%, #F3E5EA 100%);
+  --lp-sheen: linear-gradient(135deg, #FFFDFC 0%, #F2E8ED 46%, #F4E4EA 100%);
 
   /* --- §6.7b · Chỉ vàng mảnh --------------------------------------- */
-  --lp-gold-hairline: rgb(201 161 91 / 0.38);
+  --lp-gold-hairline: rgb(199 161 91 / 0.38);
 
   /* --- §6.7c · Cỡ chữ hiển thị ------------------------------------- */
   --lp-fs-brand: 44px;
@@ -100,10 +122,13 @@
   /* --- Kính mờ và độ nổi ------------------------------------------- */
   --lp-glass:      rgb(255 253 252 / 0.74);
   --lp-glass-line: rgb(255 255 255 / 0.86);
-  --lp-e-low:   0 1px 2px rgb(51 37 52 / .05), 0 6px 18px rgb(94 54 93 / .07);
-  --lp-e-mid:   0 1px 3px rgb(51 37 52 / .07), 0 14px 34px rgb(94 54 93 / .11);
-  --lp-e-high:  0 2px 6px rgb(51 37 52 / .09), 0 22px 54px rgb(94 54 93 / .16);
-  --lp-e-modal: 0 4px 12px rgb(51 37 52 / .13), 0 40px 90px rgb(51 37 52 / .24);
+  /* Bóng lấy sắc từ ink (#2F2430) và plum-900 (#3E213E) — bóng xám thuần
+     trên nền hồng trông như bụi. Bảng = flat, hero = low, popover = mid,
+     modal = modal: KHÔNG cho mọi card cùng bay. */
+  --lp-e-low:   0 1px 2px rgb(47 36 48 / .04), 0 8px 24px rgb(62 33 62 / .07);
+  --lp-e-mid:   0 2px 5px rgb(47 36 48 / .07), 0 18px 42px rgb(62 33 62 / .12);
+  --lp-e-high:  0 2px 6px rgb(47 36 48 / .09), 0 22px 54px rgb(62 33 62 / .16);
+  --lp-e-modal: 0 8px 24px rgb(47 36 48 / .16), 0 40px 90px rgb(47 36 48 / .24);
 
   /* ==================================================================
    * CẦU TƯƠNG THÍCH — token cũ trỏ sang token mới.
@@ -179,15 +204,21 @@
   --lp-canvas:    #171218;
   --lp-surface:   #241C26;
   --lp-surface-2: #2C222E;
+  --lp-raised:    #302632;
   --lp-ink:       #F6EBEF;
   --lp-ink-muted: #BCAEB8;
 
   /* Trên nền tối, tím mận đặc trở nên không đọc được, nên vai trò thương
-     hiệu đảo sang sắc phấn sáng hơn. */
+     hiệu đảo sang sắc phấn sáng hơn. Bí danh 700/600/rose-600 tự đi theo
+     vì chúng là var() trỏ về hai tên này. */
+  --lp-plum-900:  #E2BDCD;
   --lp-plum:      #D0A5B7;
   --lp-plum-2:    #C495AA;
-  --lp-rose:      #BD839D;
+  --lp-rose:      #D998B4;
   --lp-rose-soft: #38293A;
+
+  /* Nền tối nuốt bớt chi tiết mờ nên artwork cần đậm hơn một chút. */
+  --lp-art-opacity: 0.075;
 
   --lp-success:      #84B6A0;
   --lp-success-soft: #24352E;

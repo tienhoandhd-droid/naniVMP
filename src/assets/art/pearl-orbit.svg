@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" fill="none">
+  <!-- Quỹ đạo ngọc trai cho khoảng trống quanh hero. Dùng làm mask.
+       KHÔNG được đặt chạy qua con số — chỉ sau khoảng trống. -->
+  <g stroke="#000" fill="none">
+    <ellipse cx="240" cy="240" rx="228" ry="150" stroke-width="1.6" opacity=".5" transform="rotate(-18 240 240)"/>
+    <ellipse cx="240" cy="240" rx="170" ry="106" stroke-width="1.4" opacity=".4" transform="rotate(-18 240 240)"/>
+    <ellipse cx="240" cy="240" rx="112" ry="66" stroke-width="1.2" opacity=".3" transform="rotate(-18 240 240)"/>
+    <!-- ngọc trai trên quỹ đạo -->
+    <circle cx="70" cy="160" r="9" stroke-width="2" opacity=".7"/>
+    <circle cx="404" cy="330" r="6.5" stroke-width="1.8" opacity=".6"/>
+    <circle cx="330" cy="112" r="4.5" stroke-width="1.5" opacity=".5"/>
+    <circle cx="150" cy="368" r="4" stroke-width="1.5" opacity=".4"/>
+  </g>
+</svg>

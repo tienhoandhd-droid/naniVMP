@@ -1882,28 +1882,22 @@ select { appearance: none; -webkit-appearance: none; }
      màu nhận diện, không phải bề mặt đọc dữ liệu, nên nó không đảo theo
      sáng/tối. Chữ trên nó luôn là màu sứ. */
   color: var(--lp-porcelain, #FFFDFC);
-  background: linear-gradient(155deg, #2A0F33, #4A2A4C 56%, #6A3E60);
+  /* Neo vào plum-900 (#3E213E) của palette Atelier thay vì ba mã tự chế. */
+  background: linear-gradient(155deg, #241026, #3E213E 52%, #5A3158);
 }
 
 /* Hoa sen line-art, mờ 6% — spec §6.6 và §5.4: hoạ tiết chỉ được xuất
    hiện ở shell/login/hero, và phải nhẹ tới mức gần như chỉ còn cảm giác. */
-.vq-brand-panel::before {
+/* Motif sen nhỏ cũ đã nhường chỗ cho lotus sweep của lớp art (Atelier):
+   một trang chỉ có MỘT artwork lớn + MỘT accent — thêm cái thứ ba là bỏ.
+   Sweep nằm trong .vq-brand-art (LuxuryBrandPanel.tsx), bị mép panel crop
+   bớt ~30% đúng chủ ý "tranh đi xuyên qua bố cục". */
+/* Hai class để thắng `position: relative` của .lp-art-layer (nạp sau). */
+.vq-brand-panel .vq-brand-art {
   position: absolute;
+  inset: 0;
   z-index: 0;
-  left: -40px;
-  bottom: -30px;
-  width: 260px;
-  height: 208px;
   pointer-events: none;
-  content: "";
-  opacity: .06;
-  background: currentColor;
-  mask-image: url("../assets/patterns/lotus-line.svg");
-  mask-repeat: no-repeat;
-  mask-size: contain;
-  -webkit-mask-image: url("../assets/patterns/lotus-line.svg");
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
 }
 
 .vq-brand-panel::after {

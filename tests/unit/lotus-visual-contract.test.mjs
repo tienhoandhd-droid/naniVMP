@@ -64,22 +64,25 @@ test("thang bo góc cũ được ánh xạ sang thang Lotus", () => {
 
 /* ---- Token màu ----------------------------------------------------- */
 
-test("token nền và chữ chế độ sáng đúng spec §6.1", () => {
-  assert.equal(bien(KHOI_SANG, "lp-canvas"), "#FFF9F7");
+test("token nền và chữ chế độ sáng đúng palette Atelier v2", () => {
+  /* Palette v2 theo nghiên cứu 15/08 (docs/design/lotus-pearl-atelier.md
+     §3): canvas ngả hồng sâu hơn để card trắng nổi, plum sâu hơn một bậc.
+     Mọi cặp chữ/nền đã tính lại tương phản ≥ 4.5:1 trước khi đổi. */
+  assert.equal(bien(KHOI_SANG, "lp-canvas"), "#F7F0F3");
   assert.equal(bien(KHOI_SANG, "lp-surface"), "#FFFDFC");
-  assert.equal(bien(KHOI_SANG, "lp-surface-2"), "#F8F1F3");
-  assert.equal(bien(KHOI_SANG, "lp-ink"), "#332534");
-  // Đậm hơn giá trị đầu của spec — xem "Hiệu chỉnh 2026-08-15" ở spec §6.2.
-  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "#6B5C6B");
-  assert.equal(bien(KHOI_SANG, "lp-plum"), "#5E365D");
-  assert.equal(bien(KHOI_SANG, "lp-rose"), "#A96C87");
+  assert.equal(bien(KHOI_SANG, "lp-surface-2"), "#F2E8ED");
+  assert.equal(bien(KHOI_SANG, "lp-ink"), "#2F2430");
+  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "#685A66");
+  assert.equal(bien(KHOI_SANG, "lp-plum"), "#5A3158");
+  assert.equal(bien(KHOI_SANG, "lp-plum-900"), "#3E213E");
+  assert.equal(bien(KHOI_SANG, "lp-rose"), "#A74F72");
 });
 
 test("ba màu ngữ nghĩa và vàng trang trí, chế độ sáng", () => {
-  assert.equal(bien(KHOI_SANG, "lp-success"), "#467866");
-  assert.equal(bien(KHOI_SANG, "lp-danger"), "#B64A63");
-  assert.equal(bien(KHOI_SANG, "lp-warning"), "#9B692E");
-  assert.equal(bien(KHOI_SANG, "lp-gold"), "#C9A15B");
+  assert.equal(bien(KHOI_SANG, "lp-success"), "#386958");
+  assert.equal(bien(KHOI_SANG, "lp-danger"), "#A93F5A");
+  assert.equal(bien(KHOI_SANG, "lp-warning"), "#8B5D24");
+  assert.equal(bien(KHOI_SANG, "lp-gold"), "#C7A15B");
   assert.ok(bien(KHOI_SANG, "lp-focus"), "phải có vòng focus riêng");
 });
 

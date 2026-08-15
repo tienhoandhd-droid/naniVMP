@@ -35,7 +35,7 @@ export default function PerformerSelect({
       style={{
         width: "100%",
         padding: "8px 10px",
-        borderRadius: 8,
+        borderRadius: 10,   /* thang radius Atelier: control = 10px */
         border: `1.5px solid ${C.pinkSoft}`,
         background: disabled ? C.pinkMist : C.surface,
         color: C.plum,

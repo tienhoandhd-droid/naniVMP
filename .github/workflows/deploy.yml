@@ -1,8 +1,20 @@
-name: Deploy VMP Monitor to GitHub Pages
+# =====================================================================
+#  Quality gate + Deploy (Lotus Pearl Atelier §GitHub Actions)
+#  ---------------------------------------------------------------------
+#  Trước đây workflow chỉ build rồi deploy — typecheck, unit, E2E giả lập,
+#  shell và kiểm thẩm mỹ có sẵn trong repo nhưng KHÔNG chặn deploy.
+#  Nghiên cứu 15/08 gọi đây là khoảng trống kỹ thuật quan trọng nhất.
+#
+#  Điểm sống còn: production-build KHÔNG được chạy nếu kiểm fail.
+#  Chrome: runner ubuntu-latest có sẵn /usr/bin/google-chrome —
+#  tests/e2e/chrome-path.mjs tự tìm thấy, không phải cài gì thêm.
+# =====================================================================
+name: Quality and Deploy
 
 on:
   push:
     branches: ["main"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -15,21 +27,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  static-quality:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: ./package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run drift
+
+  e2e-mock:
+    needs: static-quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+
+      - run: npm ci
+
+      # .env.local chỉ cần URL hợp lệ về mặt hình thức: E2E giả lập chặn
+      # toàn bộ mạng ra ngoài và tự trả lời thay Supabase.
+      - name: Tạo .env.local cho E2E giả lập
+        run: |
+          echo "VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL || 'https://gialap.supabase.co' }}" > .env.local
+          echo "VITE_SUPABASE_ANON=${{ vars.VITE_SUPABASE_ANON || 'gialap-anon-key' }}" >> .env.local
+
+      - name: E2E giả lập + shell + thẩm mỹ + atelier
+        run: |
+          bash scripts/with-preview.sh -- bash -c '
+            npm run e2e:gialap &&
+            npm run shell &&
+            npm run thammy &&
+            npm run atelier
+          '
+
+  production-build:
+    if: github.event_name != 'pull_request'
+    needs:
+      - static-quality
+      - e2e-mock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+
+      - run: npm ci
 
       - name: Build
         run: npm run build
@@ -42,16 +101,14 @@ jobs:
           VITE_N8N_CHAT_URL: ${{ vars.VITE_N8N_CHAT_URL }}
           VITE_N8N_CHAT_TOKEN: ${{ vars.VITE_N8N_CHAT_TOKEN }}
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v5
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
   deploy:
-    needs: build
+    needs: production-build
     runs-on: ubuntu-latest
     environment:
       name: github-pages

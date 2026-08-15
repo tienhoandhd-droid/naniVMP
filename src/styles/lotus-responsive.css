@@ -18,10 +18,43 @@
   --lp-sidebar-thu: 72px;
 }
 
-@media (max-width: 1199px) {
+/* 1366×768 là laptop hẹp phổ biến nhất của người dùng VMP — bảng grid
+   Atelier cho khổ này padding 24/gutter 20, nên mốc nâng lên 1399. */
+@media (max-width: 1399px) {
   :root[data-visual="lotus-pearl"] {
     --lp-shell-pad: 24px;
     --lp-grid-gutter: 20px;
+  }
+}
+
+/* --- Desktop mở rộng (Atelier §Grid): khoảng trống được giải quyết bằng
+ * padding lớn hơn và supporting pane, KHÔNG bằng cách kéo card ra 1500px. */
+@media (min-width: 1600px) {
+  :root[data-visual="lotus-pearl"] {
+    --lp-shell-pad: 36px;
+  }
+}
+
+@media (min-width: 1900px) {
+  :root[data-visual="lotus-pearl"] {
+    --lp-shell-pad: 48px;
+    --lp-grid-gutter: 28px;
+  }
+}
+
+/* Bố cục 8/4 kiểu Material supporting pane: vùng chính bên trái, pane hỗ
+ * trợ bên phải. Dưới 1600px pane xếp xuống dưới — không ép hai cột vào
+ * màn hẹp. Dùng: bọc hai khối con trực tiếp (main trước, pane sau). */
+.lp-supporting-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--lp-grid-gutter);
+}
+
+@media (min-width: 1600px) {
+  .lp-supporting-layout {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    align-items: start;
   }
 }
 

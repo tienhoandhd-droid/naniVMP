@@ -1,0 +1,128 @@
+/* =====================================================================
+ *  lotus-art.css — lớp nghệ thuật chìm (Lotus Pearl Atelier)
+ *  ---------------------------------------------------------------------
+ *  Nguyên tắc (docs/design/lotus-pearl-atelier.md §1–2):
+ *    · Ground → Subject → Accent. Hoa KHÔNG được hét to hơn dữ liệu.
+ *    · Mỗi trang tối đa MỘT artwork lớn + MỘT accent nhỏ.
+ *    · Cấm đặt sau bảng, form, audit log, modal xác nhận. Bộ kiểm
+ *      `npm run atelier` sẽ fail nếu phần tử mang art chứa các thứ đó.
+ *    · Artwork bị crop 20–40% ra khỏi mép — thấy MỘT PHẦN cánh sen là
+ *      tranh, thấy nguyên bông giữa khoảng trắng là sticker.
+ *
+ *  Kỹ thuật: SVG được dùng làm MASK, màu tô là background-color lấy từ
+ *  token — nhờ đó cùng một file art tự đổi màu theo chế độ sáng/tối
+ *  (plum đậm trên nền sứ, hồng phấn trên nền sơn mài đêm).
+ * ===================================================================== */
+
+.lp-art-layer {
+  position: relative;
+  isolation: isolate;
+  /* Motif cố ý thò ra ngoài hộp bằng offset âm; clip tại mép layer vừa
+     tạo hiệu ứng "tranh bị crop" vừa bảo đảm không bao giờ TRÀN NGANG
+     trang (luật A2). Layer chỉ được bọc vùng trang trí nên không có
+     popover nào bên trong để bị cắt oan. */
+  overflow: clip;
+}
+
+.lp-art-layer::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  background-color: var(--lp-plum);
+  opacity: var(--lp-art-opacity);
+  pointer-events: none;
+  user-select: none;
+  -webkit-mask: var(--lp-art-mask) center / contain no-repeat;
+  mask: var(--lp-art-mask) center / contain no-repeat;
+}
+
+/* --- Các motif — asset kit duy nhất, trang không tự chế motif riêng --- */
+
+/* Cành sen góc trên phải của page hero. */
+.lp-art-layer--lotus-corner::after {
+  --lp-art-mask: url("../assets/art/lotus-corner-ne.svg");
+  top: -48px;
+  right: -72px;
+  width: clamp(280px, 26vw, 520px);
+  aspect-ratio: 1;
+}
+
+/* Thân sen dọc mép phải của supporting pane / vùng trống cao. */
+.lp-art-layer--lotus-stem::after {
+  --lp-art-mask: url("../assets/art/lotus-stem-east.svg");
+  right: -40px;
+  bottom: -56px;
+  width: clamp(180px, 16vw, 300px);
+  aspect-ratio: 1 / 2;
+}
+
+/* Quỹ đạo ngọc trai quanh khoảng trống của hero — không chạy qua con số. */
+.lp-art-layer--pearl-orbit::after {
+  --lp-art-mask: url("../assets/art/pearl-orbit.svg");
+  top: -40px;
+  right: -64px;
+  width: clamp(260px, 24vw, 480px);
+  aspect-ratio: 1;
+}
+
+/* Whiplash nằm ngang cho đáy trang rộng. */
+.lp-art-layer--whiplash::after {
+  --lp-art-mask: url("../assets/art/lotus-whiplash-bottom.svg");
+  left: -80px;
+  bottom: -36px;
+  width: clamp(360px, 34vw, 640px);
+  aspect-ratio: 8 / 3;
+}
+
+/* --- Panel thương hiệu màn đăng nhập: được đậm hơn hẳn (12–18%) ------- *
+ * Đây là nơi DUY NHẤT art được là nhân vật chính, vì panel không chứa
+ * dữ liệu nghiệp vụ nào. Màu tô đổi sang sứ vì nền dưới là sơn mài đậm. */
+.lp-art-layer--login-sweep::after {
+  --lp-art-mask: url("../assets/art/lotus-corner-ne.svg");
+  background-color: var(--lp-porcelain);
+  opacity: 0.14;
+  top: -120px;
+  right: -140px;
+  width: clamp(480px, 52vw, 760px);
+  aspect-ratio: 1;
+}
+
+/* Whiplash thứ hai rất nhẹ ở đáy panel đăng nhập — accent, không focal. */
+.lp-art-layer--login-sweep::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -100px;
+  bottom: -30px;
+  width: clamp(360px, 40vw, 620px);
+  aspect-ratio: 8 / 3;
+  background-color: var(--lp-gold);
+  opacity: 0.10;
+  pointer-events: none;
+  user-select: none;
+  -webkit-mask: url("../assets/art/lotus-whiplash-bottom.svg") center / contain no-repeat;
+  mask: url("../assets/art/lotus-whiplash-bottom.svg") center / contain no-repeat;
+}
+
+/* --- Vali: MỘT nhịp xuất hiện, không bob vô hạn ----------------------- */
+@keyframes lp-vali-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lp-vali-enter {
+  animation: lp-vali-enter 420ms var(--lp-ease) 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-vali-enter { animation: none; }
+}
+
+/* --- Màn hẹp: tắt art. Điện thoại không có art-safe zone nào đủ rộng,
+ * và mỗi pixel đều đang phải làm việc. ------------------------------- */
+@media (max-width: 1023px) {
+  .lp-art-layer::after,
+  .lp-art-layer--login-sweep::before {
+    content: none;
+  }
+}

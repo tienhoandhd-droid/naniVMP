@@ -1,13 +1,15 @@
 /* WorkloadPage.jsx — Ma trận tải công việc Người × Tháng */
 import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
-import { Activity, BarChart3, ShieldAlert, Flag, Users, UserX } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, Gauge, ShieldAlert, Flag, Users, UserX } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
 import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
 import { parseD, fmtVN, clamp, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
-import { Card, CardTitle, Tag, Modal, Donut, Mascot, Pill, CauKetLuan, laThanhTra } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Donut, Pill, CauKetLuan, laThanhTra } from "../components/ui/Primitives.tsx";
+import ValiIllustration from "../components/brand/ValiIllustration.tsx";
+import type { ValiMood } from "../components/brand/ValiIllustration.tsx";
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 
@@ -256,15 +258,20 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
     };
   }, [critCount]);
 
-  const mood = overloaded.length > 0 ? "stressed" : "happy";
+  /* Ba trạng thái ngữ nghĩa của Vali (Atelier §5). Bản cũ truyền
+     "stressed" — giá trị mà Mascot không hề định nghĩa, nên biểu cảm
+     cảnh báo chưa bao giờ thật sự hiện ra. */
+  const mood: ValiMood = overloaded.length > 0
+    ? "concern"
+    : people.length > 0 ? "celebrate" : "guide";
   const thanhTra = laThanhTra();
   const bubble = thanhTra
     ? (overloaded.length > 0
       ? `${overloaded.length} người vượt ngưỡng ${CAP_MONTH} ngày công/tháng ở tháng cao điểm.`
       : `Không có người nào vượt ngưỡng ${CAP_MONTH} ngày công/tháng.`)
     : (overloaded.length > 0
-      ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng)! Bấm vào từng người xem chi tiết 💪`
-      : `Cả đội đang cân đối! Cứ giữ nhịp này là về đích VMP êm ru ✨`);
+      ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng). Bấm vào từng người xem chi tiết.`
+      : `Cả đội đang cân đối. Cứ giữ nhịp này là về đích VMP đúng hẹn.`);
   const legend = [["Nhẹ", C.mint + "38"], ["Vừa", C.mint + "80"], ["Sắp đầy", C.marigold], ["Quá tải", C.rasp]];
 
   return (
@@ -272,7 +279,14 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       {detail && <WorkloadDetailModal detail={detail} onClose={() => setDetail(null)} />}
       <Card variant="strong" style={{ background: `linear-gradient(120deg,#fff,${C.pinkMist})` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-          {!thanhTra && <div style={{ flexShrink: 0 }}><Mascot mood={mood} size={96} /></div>}
+          {/* Pearl orbit 4% chạy SAU vùng Vali — không sau dữ liệu (Atelier
+              §Phân công). Vùng này chỉ có minh hoạ, không có số liệu nào. */}
+          {!thanhTra && (
+            <div className="lp-art-layer lp-art-layer--pearl-orbit" data-lp-art="pearl-orbit"
+              style={{ flexShrink: 0 }}>
+              <ValiIllustration mood={mood} size={110} />
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 240 }}>
             <div className="pop" key={mood} style={{ background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "12px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, lineHeight: 1.5 }}>{bubble}</div>
             <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 8, fontWeight: 700 }}>Còn lại: <b style={{ color: C.lavText }}>{totalCong} ngày công</b> · <b style={{ color: C.pinkText }}>{totalHoso} hồ sơ</b> · <b style={{ color: C.mintText }}>{people.length} người</b></div>
@@ -324,13 +338,15 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(262px,1fr))", gap: 14 }}>
           {nguoiThat.map((p) => {
             const pk = peakMonth(p); const ratio = CAP_MONTH > 0 ? pk.eff / CAP_MONTH : 0;
-            const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, e: thanhTra ? "" : "😵" } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, e: thanhTra ? "" : "🔥" } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, e: thanhTra ? "" : "🌿" };
+            /* Icon Lucide mang ngữ nghĩa, Vali mang cảm xúc — không dùng
+               emoji trạng thái nghiệp vụ (Atelier §5). */
+            const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, I: AlertTriangle } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, I: Gauge } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, I: CheckCircle2 };
             return (
               <button key={p.name} className="vmp-lift" onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))} style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: 15, fontFamily: TEXT }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 16, flexShrink: 0 }}>{p.name[0]}</div>
                   <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 14, color: C.plum }}>{p.name}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{p.count} hạng mục</div></div>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: band.t, background: band.bg, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{band.e} {band.l}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 800, color: band.t, background: band.bg, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><band.I size={12} aria-hidden="true" /> {band.l}</span>
                 </div>
                 <div style={{ display: "flex", gap: 9, marginBottom: 12 }}>
                   <div style={{ flex: 1, background: C.lavSoft, borderRadius: 14, padding: "9px 11px" }}><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color: C.lavText, lineHeight: 1 }}>{p.congTotal}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>ngày công</div></div>
@@ -345,7 +361,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
               </button>
             );
           })}
-          {nguoiThat.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 28, color: C.mintText, fontWeight: 700 }}>🎉 Không còn hạng mục nào chưa chốt VMP!</div>}
+          {nguoiThat.length === 0 && <div style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 28, color: C.mintText, fontWeight: 700 }}><CheckCircle2 size={16} aria-hidden="true" /> Không còn hạng mục nào chưa chốt VMP!</div>}
         </div>
       </Card>
 
@@ -493,7 +509,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
               </div>
               <Pill s={a.st} small />
             </div>)}
-            {focus.length === 0 && <div style={{ textAlign: "center", padding: 22, color: C.mintText, fontWeight: 700 }}>Không còn trọng yếu cao 🎉</div>}
+            {focus.length === 0 && <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 22, color: C.mintText, fontWeight: 700 }}><CheckCircle2 size={16} aria-hidden="true" /> Không còn trọng yếu cao</div>}
           </div>
         </Card>
       </div>

@@ -5,6 +5,11 @@ export default function LuxuryBrandPanel() {
          nhận diện thương hiệu, không phải bề mặt để đọc dữ liệu. Khai báo
          để bộ kiểm thẩm mỹ (luật B6) biết đây là chủ ý. */
       data-lp-surface="fixed">
+      {/* Lacquer canvas (Atelier §màn Đăng nhập): MỘT lotus sweep sứ 14%
+          ở góc trên phải + MỘT đường whiplash vàng ở đáy. Panel không chứa
+          dữ liệu nghiệp vụ nào nên đây là nơi duy nhất art được đậm. */}
+      <div className="vq-brand-art lp-art-layer lp-art-layer--login-sweep"
+        data-lp-art="login-sweep" aria-hidden="true" />
       {/* Logo CPC1 HN đã chuyển sang panel form.
           Lý do đo được: 75% điểm ảnh của logo là đỏ, 15% là navy, độ sáng
           trung bình chỉ 74/255 — tức nó là một hình TỐI. Đặt lên nền sơn

@@ -1890,7 +1890,9 @@ function AppShell() {
             </div>
           )}
 
-          <div style={{ padding: "0 34px 38px" }}>
+          {/* Padding lấy từ token khổ màn: 24 → 32 → 36 (≥1600) → 48 (≥1900).
+              Desktop rộng thở bằng padding, không kéo card dài ra. */}
+          <div style={{ padding: "0 var(--lp-shell-pad, 34px) 38px" }}>
             {/* Loading state */}
             {objects.length === 0 && conn.status === "loading" && <SkeletonDashboard />}
 

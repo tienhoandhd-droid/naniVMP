@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 640" fill="none">
+  <!-- Thân sen dọc cho mép phải của supporting pane. Dùng làm mask. -->
+  <g stroke="#000" stroke-linecap="round" fill="none">
+    <path d="M210 640C186 540 214 470 246 404C278 338 268 250 226 186" stroke-width="3"/>
+    <path d="M250 640C238 560 258 496 280 440" stroke-width="1.8" opacity=".55"/>
+    <!-- lá sen nghiêng, bị crop bên phải -->
+    <path d="M246 404C290 386 320 392 320 392" stroke-width="2.2" opacity=".7"/>
+    <path d="M262 300C300 290 320 296 320 296" stroke-width="1.8" opacity=".5"/>
+    <!-- nụ sen đầu cành -->
+    <g stroke-width="2.6">
+      <path d="M226 186C204 148 206 108 230 76C258 106 262 150 246 190"/>
+      <path d="M196 160C188 124 196 92 222 68" opacity=".7"/>
+    </g>
+    <!-- ngọc trai nhỏ lơ lửng -->
+    <circle cx="168" cy="120" r="7" stroke-width="1.8" opacity=".55"/>
+    <circle cx="148" cy="238" r="4.5" stroke-width="1.5" opacity=".4"/>
+  </g>
+</svg>

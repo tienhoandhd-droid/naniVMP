@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" fill="none">
+  <!-- Đường whiplash Art Nouveau nằm ngang cho đáy trang rộng. Dùng làm mask. -->
+  <g stroke="#000" stroke-linecap="round" fill="none">
+    <path d="M0 190C120 150 210 210 320 176C430 142 520 202 640 158" stroke-width="3"/>
+    <path d="M0 214C140 182 240 228 360 200C470 174 560 216 640 190" stroke-width="1.8" opacity=".55"/>
+    <!-- lá nhỏ mọc từ đường chính -->
+    <path d="M210 186C224 164 246 156 268 162" stroke-width="2" opacity=".6"/>
+    <path d="M430 168C444 146 466 138 488 144" stroke-width="2" opacity=".6"/>
+    <!-- một nụ sen ở phần ba trái -->
+    <g stroke-width="2.4" opacity=".8">
+      <path d="M150 168C138 138 142 108 164 86C186 110 188 142 172 172"/>
+    </g>
+    <circle cx="540" cy="150" r="6" stroke-width="1.6" opacity=".5"/>
+  </g>
+</svg>
