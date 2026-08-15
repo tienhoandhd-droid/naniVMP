@@ -61,6 +61,7 @@ import {
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
 import { useAccess } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
+import { resolveViewIntent } from "./lib/navigationContract.ts";
 import { overviewTarget } from "./lib/navigationTargets.ts";
 import { applyWorkloadCellNavigation } from "./lib/workloadNavigation.ts";
 import type { AccessContext, ScreenId } from "./lib/access.ts";
@@ -1505,23 +1506,46 @@ function AppShell() {
     objects, acts, conn, lastSync, dataUpdatedAt, saveStatus, reloadData, silentRefresh,
     updateActivity,
   } = useVmpData();
+  /* Đưa alias về màn chuẩn NGAY tại biên đọc URL.
+     `#v=inventory` và `#v=risk` là tên cũ của "Tiến độ gộp theo đối tượng"
+     và "Cảnh báo". Chuẩn hoá ở đây, một lần, thay vì để mỗi nhánh render
+     tự nhớ — mà quên một nhánh thì đường dẫn cũ dẫn vào trang trắng. */
+  const chuanHoaView = useCallback((s: UrlState) => {
+    const y = resolveViewIntent(s.view);
+    if (!y) return { state: s, nhom: null as null | "doituong" };
+    return {
+      state: y.screenId === s.view ? s : { ...s, view: y.screenId },
+      nhom: y.presentation === "grouped-object" ? ("doituong" as const) : null,
+    };
+  }, []);
+
   // Trạng thái ban đầu: URL thắng, rồi mới tới bộ lọc nhớ từ lần trước. Ai dán
   // link cho nhau thì phải thấy ĐÚNG cái người gửi thấy, không bị bộ lọc cũ của
   // máy mình đè lên — đó là cả lý do đưa trạng thái lên URL.
-  const khoiTao = useMemo<UrlState>(() => {
+  /* Đọc URL MỘT lần, giữ cả bản thô lẫn bản đã chuẩn hoá.
+     Cần bản thô vì tên cũ `inventory` mang theo cách trình bày; chuẩn hoá
+     xong thì nó thành `progress` và thông tin đó biến mất. */
+  const khoiTaoDayDu = useMemo(() => {
     const tuUrl = docUrl(typeof window === "undefined" ? "" : window.location.hash, {
-      // `inventory` và `risk` không có mục menu nhưng App vẫn render chúng.
-      // Thiếu `inventory` ở đây thì đường dẫn cũ người dùng đã lưu bị docUrl
-      // loại và rơi về màn mặc định — đúng cái mà chú thích ở NAV_ITEMS nói
-      // là phải tránh.
+      // `inventory` và `risk` không có mục menu nhưng vẫn là đường dẫn hợp lệ.
+      // Thiếu chúng ở đây thì đường dẫn cũ người dùng đã lưu bị docUrl loại
+      // và rơi về màn mặc định — đúng cái mà chú thích ở NAV_ITEMS nói phải tránh.
       views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing"]),
       depts: DEPTS.map((d) => d.id),
       periods: PERIODS.map((p) => p[0]).concat(["custom"]),
     });
-    if (vietUrl(tuUrl)) return tuUrl;            // URL có nội dung → dùng luôn
+    if (vietUrl(tuUrl)) {
+      const { state, nhom } = chuanHoaView(tuUrl);
+      return { state, nhom };
+    }
     const nho = loadFilterPrefs(loadUser()?.email || loadUser()?.name);
-    return nho ? { ...tuUrl, ...docUrl(String(nho.hash || "")), view: tuUrl.view } : tuUrl;
-  }, []);
+    const state = nho
+      ? { ...tuUrl, ...docUrl(String(nho.hash || "")), view: tuUrl.view }
+      : tuUrl;
+    return { state, nhom: null as null | "doituong" };
+  }, [chuanHoaView]);
+
+  const khoiTao: UrlState = khoiTaoDayDu.state;
 
   const [view, setView] = useState(khoiTao.view);
   // Đối tượng cần mở sẵn khi nhảy từ "Tiến độ theo đối tượng" sang "Danh mục &
@@ -1532,7 +1556,11 @@ function AppShell() {
      trị này rồi chuyển màn — người dùng khỏi phải nhớ mã và tự dán vào ô tìm. */
   const [moHangMuc, setMoHangMuc] = useState<string>("");
   /** Cách nhóm ở màn nhập liệu: theo hạng mục hay theo đối tượng. */
-  const [nhomTheo, setNhomTheo] = useState<"hangmuc" | "doituong">("hangmuc");
+  /* Mở thẳng `#v=inventory` thì phải vào Tiến độ ở chế độ gộp theo đối
+     tượng — đó chính là ý nghĩa của tên cũ đó. */
+  const [nhomTheo, setNhomTheo] = useState<"hangmuc" | "doituong">(
+    () => khoiTaoDayDu.nhom ?? "hangmuc",
+  );
   const [showPw, setShowPw] = useState(false);
   const mainRef = useScrollTop([view]);
 
@@ -1704,8 +1732,10 @@ function AppShell() {
         depts: DEPTS.map((d) => d.id),
         periods: PERIODS.map((p) => p[0]).concat(["custom"]),
       });
-      viewTruoc.current = s.view;
-      setView(s.view);
+      const { state: sChuan, nhom } = chuanHoaView(s);
+      if (nhom) setNhomTheo(nhom);
+      viewTruoc.current = sChuan.view;
+      setView(sChuan.view);
       setDeptSel(s.deptSel);
       setAreaSel(s.areaSel);
       setPeriodFilter(s.period);
@@ -1880,11 +1910,6 @@ function AppShell() {
               )}
               {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
               {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} />}
-              {view === "inventory" && (
-                <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}
-                  onUpdate={updateActivity} onReload={reloadData} readOnly={false}
-                  onMoDanhMuc={(code, nhom) => { setMoDanhMuc({ code, nhom }); setView("source"); }} />
-              )}
               {view === "source" && <SourceCatalogView user={user} onReload={reloadData} focus={moDanhMuc} />}
               {view === "health" && <HealthView acts={filteredActs} user={user} />}
               {view === "rules" && <ActiveRulesView user={user} />}
@@ -1909,9 +1934,10 @@ function AppShell() {
                   )}
                 </>
               )}
-              {/* "risk" là mục cũ đã gộp vào Cảnh báo — giữ nhánh này để đường
-                  dẫn/nút cũ không dẫn vào trang trắng. */}
-              {(view === "alerts" || view === "risk") && <AlertsView acts={filteredActs} />}
+              {/* `risk` và `inventory` không còn nhánh render riêng: chúng đã
+                  được chuẩn hoá thành `alerts` và `progress` ngay tại biên
+                  đọc URL, nên tới đây chỉ còn tên chuẩn. */}
+              {view === "alerts" && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
               {view === "people" && <OperationalPeopleView acts={filteredActs} access={access} />}

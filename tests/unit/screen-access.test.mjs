@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { resolveAuthorizedView } from "../../src/lib/navigationContract.ts";
+
 import {
   parseAccessContext,
   legacyAccessContext,
-  firstAllowedScreen,
   SCREEN_IDS,
 } from "../../src/lib/access.ts";
 
@@ -173,15 +174,18 @@ test("đường lùi không bao giờ ở chế độ enforced", () => {
   assert.equal(legacyAccessContext(null).canView("overview"), false);
 });
 
+/* Việc "mở màn nào" nay do src/lib/navigationContract.ts quyết định — hai
+   bài kiểm dưới đây gọi qua đó thay vì gọi bản sao cũ trong access.ts.
+   Chi tiết đầy đủ nằm ở tests/unit/navigation-contract.test.mjs. */
 test("mở thẳng hash không được phép thì chuyển về màn cho phép đầu tiên", () => {
   const viewer = parseAccessContext(viewerPayload);
-  assert.equal(firstAllowedScreen(viewer, "admin"), "overview");
-  assert.equal(firstAllowedScreen(viewer, "timeline"), "timeline");
+  assert.equal(resolveAuthorizedView("admin", viewer)?.screenId, "overview");
+  assert.equal(resolveAuthorizedView("timeline", viewer)?.screenId, "timeline");
 });
 
 test("không còn màn nào thì trả null thay vì nhảy vòng quanh", () => {
   const ctx = parseAccessContext({ ok: true, mode: "enforced", business_role: null, screens: {} });
-  assert.equal(firstAllowedScreen(ctx, "overview"), null);
+  assert.equal(resolveAuthorizedView("overview", ctx), null);
 });
 
 test("danh sách màn phủ cả ba route ngoài menu", () => {

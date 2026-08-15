@@ -159,7 +159,45 @@ const trinhDuyet = await puppeteer.launch({
   await trang.close();
 }
 
-/* ---- 4. Giảm chuyển động -------------------------------------------- */
+/* ---- 4. Tên màn cũ vẫn dẫn đúng chỗ --------------------------------- */
+{
+  console.log("\nĐường dẫn cũ:");
+  for (const [hash, mongDoi, ghiChu] of [
+    ["risk", "Cảnh báo & Rủi ro", "gộp vào Cảnh báo"],
+    ["inventory", "Cập nhật tiến độ", "Tiến độ gộp theo đối tượng"],
+  ]) {
+    const trang = await trinhDuyet.newPage();
+    await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+    await nhetPhien(trang, { supabaseUrl: URL_SB });
+    await trang.setViewport({ width: 1440, height: 900 });
+    await trang.goto(`${GOC}#v=${hash}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await new Promise((r) => setTimeout(r, 2400));
+    const kq = await trang.evaluate(() => ({
+      h1: document.querySelector("h1")?.textContent?.trim() || "",
+      trang: !document.querySelector("main")?.innerText?.trim(),
+    }));
+    kiem(kq.h1 === mongDoi, `#v=${hash} dẫn tới "${mongDoi}" (${ghiChu})`, `thấy "${kq.h1}"`);
+    kiem(!kq.trang, `#v=${hash} không dẫn vào trang trắng`);
+    await trang.close();
+  }
+
+  /* `inventory` phải giữ được ý nghĩa của nó, không chỉ đúng màn. */
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=inventory`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2400));
+  const gop = await trang.evaluate(() => {
+    const nut = [...document.querySelectorAll(".vmp-doi-nhom button")]
+      .find((b) => /Theo đối tượng/.test(b.textContent || ""));
+    return nut?.classList.contains("is-chon") === true;
+  });
+  kiem(gop, "#v=inventory mở sẵn chế độ gộp theo đối tượng");
+  await trang.close();
+}
+
+/* ---- 5. Giảm chuyển động -------------------------------------------- */
 {
   console.log("\nGiảm chuyển động:");
   const trang = await trinhDuyet.newPage();

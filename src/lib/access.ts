@@ -63,25 +63,6 @@ export function laScreenId(v: unknown): v is ScreenId {
   return typeof v === "string" && SCREEN_ID_SET.has(v);
 }
 
-/** Thứ tự rơi về khi màn đang mở không được phép. `overview` đứng đầu vì
- *  đó cũng là màn mặc định của urlState. */
-const THU_TU_DU_PHONG: readonly ScreenId[] = [
-  "overview",
-  "today",
-  "timeline",
-  "alerts",
-  "progress",
-  "source",
-  "reports",
-  "workload",
-  "rules",
-  "people",
-  "health",
-  "audit",
-  "accounts",
-  "admin",
-];
-
 /* ---------- Vai trò nghiệp vụ và phạm vi dữ liệu ---------- */
 
 export const BUSINESS_ROLES = [
@@ -316,21 +297,7 @@ export function hopNhatPreview(
 
 /* ---------- Chuyển hướng an toàn ---------- */
 
-/**
- * Trả về màn nên hiển thị khi người dùng mở thẳng `requested`.
- *
- * - Được phép  → giữ nguyên `requested`.
- * - Không được → màn đầu tiên trong thứ tự dự phòng mà họ vào được.
- * - Không còn màn nào → null, để bên gọi hiện trang giải thích thay vì
- *   nhảy vòng quanh giữa các màn đều bị cấm.
- */
-export function firstAllowedScreen(
-  access: AccessContext,
-  requested: string,
-): ScreenId | null {
-  if (laScreenId(requested) && access.canView(requested)) return requested;
-  for (const id of THU_TU_DU_PHONG) {
-    if (access.canView(id)) return id;
-  }
-  return null;
-}
+/* `firstAllowedScreen` và thứ tự dự phòng của nó đã chuyển sang
+ * `src/lib/navigationContract.ts`. Giữ hai bản sao của cùng một luật
+ * "mở màn nào" là cách chắc chắn để chúng lệch nhau — mà lệch ở đây
+ * nghĩa là có người vào được màn họ không có quyền. */

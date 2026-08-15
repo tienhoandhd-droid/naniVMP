@@ -13,7 +13,7 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { C, TEXT } from "../../constants/theme.ts";
-import { firstAllowedScreen } from "../../lib/access.ts";
+import { resolveAuthorizedView } from "../../lib/navigationContract.ts";
 import type { AccessContext, ScreenId } from "../../lib/access.ts";
 
 /** Vì sao server không giải được vai trò — nói bằng tiếng người, kèm việc
@@ -59,7 +59,7 @@ export function ScreenGuard({ screenId, access, onRedirect, children }: {
   children: ReactNode;
 }) {
   const duocXem = access.canView(screenId);
-  const manThayThe = duocXem ? null : firstAllowedScreen(access, screenId);
+  const manThayThe = duocXem ? null : (resolveAuthorizedView(screenId, access)?.screenId ?? null);
   const dangThucThi = access.mode === "enforced";
 
   useEffect(() => {
