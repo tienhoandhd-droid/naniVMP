@@ -16,6 +16,10 @@ import { parseD, fmtVN, milestones, phaseStates, addDays, clamp, wlIsDone } from
 import { useDebounce } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, Modal, Pill, phaseTag, CauKetLuan } from "../components/ui/Primitives.tsx";
 import { btnPrimary } from "../constants/theme.ts";
+import MetricGrid from "../components/ui/MetricGrid.tsx";
+import {
+  buildTimelineSummary, issueLevel, laSapDenHan,
+} from "../features/timeline/timelineSummaryModel.ts";
 import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
 import { nhapCoThuLai } from "../lib/tailMan.ts";
@@ -248,14 +252,9 @@ function phaseProgress(a: Activity): number {
   return (PROG as Record<string, number>)[a.st] || 8;
 }
 
-function issueLevel(a: Activity): string {
-  const ps = phaseStates(a);
-  const hasOverPhase = [ps.p, ps.v, ps.r].includes("over");
-  if (a.st === "over" || hasOverPhase) return "over";
-  if (a.st === "done") return "done";
-  if (a.st === "prog") return "prog";
-  return "todo";
-}
+/* issueLevel đã DỜI sang features/timeline/timelineSummaryModel.ts (bước
+ * Foundation của nghiên cứu Timeline 16/08) — một nguồn chân lý cho cả
+ * strip KPI, bộ lọc tình trạng và unit test. */
 
 function ownerOf(a: Activity): string {
   const raw = (a._raw || {}) as Record<string, unknown>;
@@ -1821,45 +1820,51 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
     else if (view === "year") setView("month");
   };
 
-  const filtered = useMemo(() => {
+  /* Hai vị ngữ lọc tách bạch (nghiên cứu Timeline đợt 1): "ngoài tình
+     trạng" dùng chung cho strip KPI (facet trừ chính nó — số trên ô luôn
+     bằng số dòng khi bấm), còn tình trạng xử lý riêng vì có thêm dải
+     "soon" không nằm trong issueLevel. */
+  const khopNgoaiTinhTrang = useMemo(() => {
     const needle = dq.trim().toLowerCase();
-    return acts
-      .filter((a: Activity) => {
-        if (!a.target) return false;
-        if ((a.state || "active") !== "active") return false;
-        if (cls !== "all" && a.cls !== cls) return false;
-        if (dept !== "all" && a.dept !== dept) return false;
-        if (status !== "all" && issueLevel(a) !== status) return false;
-
-        const { start, end } = taskWindow(a);
-        if (!intersectsRange(start, end, range)) return false;
-
-        if (needle) {
-          const hay = [a.code, a.name, ownerOf(a), a.id, a.vtype, a.dep, a.crit]
-            .map((x) => String(x || "").toLowerCase());
-          if (!hay.some((x) => x.includes(needle))) return false;
-        }
-        return true;
-      })
-      .sort(compareTimelineOrder);
-  }, [acts, cls, dept, dq, range, status]);
-
-  // Tập dữ liệu cho các tab phân tích (Sơ đồ/Bố cục/Bảng): cùng bộ lọc nhưng
-  // KHÔNG giới hạn theo khung tháng/quý — để nhìn toàn cảnh.
-  const explorerActs = useMemo(() => {
-    const needle = dq.trim().toLowerCase();
-    return acts.filter((a: Activity) => {
+    return (a: Activity): boolean => {
       if ((a.state || "active") !== "active") return false;
       if (cls !== "all" && a.cls !== cls) return false;
       if (dept !== "all" && a.dept !== dept) return false;
-      if (status !== "all" && issueLevel(a) !== status) return false;
       if (needle) {
-        const hay = [a.code, a.name, ownerOf(a), a.id, a.vtype, a.dep, a.crit].map((x) => String(x || "").toLowerCase());
+        const hay = [a.code, a.name, ownerOf(a), a.id, a.vtype, a.dep, a.crit]
+          .map((x) => String(x || "").toLowerCase());
         if (!hay.some((x) => x.includes(needle))) return false;
       }
       return true;
-    });
-  }, [acts, cls, dept, dq, status]);
+    };
+  }, [cls, dept, dq]);
+
+  const khopTinhTrang = useMemo(() => (a: Activity): boolean => {
+    if (status === "all") return true;
+    if (status === "soon") return laSapDenHan(a);
+    return issueLevel(a) === status;
+  }, [status]);
+
+  const filtered = useMemo(() => acts
+    .filter((a: Activity) => {
+      if (!a.target) return false;
+      if (!khopNgoaiTinhTrang(a) || !khopTinhTrang(a)) return false;
+      const { start, end } = taskWindow(a);
+      return intersectsRange(start, end, range);
+    })
+    .sort(compareTimelineOrder), [acts, khopNgoaiTinhTrang, khopTinhTrang, range]);
+
+  // Tập dữ liệu cho các tab phân tích (Sơ đồ/Bố cục/Bảng): cùng bộ lọc nhưng
+  // KHÔNG giới hạn theo khung tháng/quý — để nhìn toàn cảnh.
+  const explorerActs = useMemo(
+    () => acts.filter((a: Activity) => khopNgoaiTinhTrang(a) && khopTinhTrang(a)),
+    [acts, khopNgoaiTinhTrang, khopTinhTrang]);
+
+  /* Strip bốn dải tình trạng — đếm SAU các bộ lọc khác, TRƯỚC bộ lọc
+     tình trạng, trên cùng một model với chính bộ lọc. */
+  const tomTat = useMemo(
+    () => buildTimelineSummary(acts.filter(khopNgoaiTinhTrang)),
+    [acts, khopNgoaiTinhTrang]);
 
   const isTimeline = workspace === "timeline";
 
@@ -1896,6 +1901,31 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
 
   return (
     <div className="timeline-page-shell">
+      {/* Strip bốn dải tình trạng (nghiên cứu Timeline đợt 1): hero duy
+          nhất là Quá hạn; bấm ô nào là bộ lọc tình trạng nhảy đúng giá
+          trị đó — cùng model với bộ lọc nên số trên ô = số dòng lọc ra. */}
+      <MetricGrid
+        label="Tình trạng timeline"
+        items={[
+          { id: "qua-han", label: "Quá hạn", value: tomTat.quaHan,
+            priority: "hero", tone: "danger",
+            hint: "trạng thái tổng hoặc bất kỳ pha nào trễ — bấm để lọc",
+            onActivate: () => setStatus("over") },
+          { id: "sap-den-han", label: "Sắp đến hạn", value: tomTat.sapDenHan,
+            priority: "supporting", tone: "warning",
+            hint: `đích VMP trong ${SOON_DAYS} ngày tới`,
+            onActivate: () => setStatus("soon") },
+          { id: "dang-lam", label: "Đang thực hiện", value: tomTat.dangThucHien,
+            priority: "supporting", tone: "info",
+            hint: "đang chạy, hạn còn xa",
+            onActivate: () => setStatus("prog") },
+          { id: "hoan-thanh", label: "Hoàn thành", value: tomTat.hoanThanh,
+            priority: "supporting", tone: "success",
+            hint: "đã đóng hồ sơ VMP",
+            onActivate: () => setStatus("done") },
+        ]}
+      />
+
       {/* Địa hình tải việc — TAB KHÁM PHÁ, không phải mặt chính (hiến pháp
           Atelier §6): 2D bên dưới trả lời mọi tác vụ; 3D chỉ dựng khi
           người dùng mở, và three.js chỉ tải lúc đó. Lựa chọn được nhớ —
@@ -2074,6 +2104,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="timeline-select" aria-label="Lọc theo tình trạng">
             <option value="all">Tất cả tình trạng</option>
             <option value="over">Cần chú ý</option>
+            <option value="soon">Sắp đến hạn</option>
             <option value="prog">Đang chạy</option>
             <option value="todo">Kế hoạch</option>
             <option value="done">Đã xong</option>

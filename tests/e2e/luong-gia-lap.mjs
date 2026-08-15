@@ -300,6 +300,30 @@ for (const [id, ten] of MAN) {
   await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await new Promise((r) => setTimeout(r, 2400));
 
+  /* Strip 4 dải tình trạng (nghiên cứu Timeline đợt 1): hero là Quá hạn,
+     bấm ô nào là bộ lọc tình trạng nhảy đúng giá trị đó. */
+  const strip = await trang.evaluate(() => {
+    const nhan = [...document.querySelectorAll(".lp-metric .lp-metric__label")]
+      .map((o) => o.textContent?.trim());
+    return {
+      nhan,
+      hero: document.querySelector(".lp-metric--hero .lp-metric__label")?.textContent?.trim(),
+    };
+  });
+  kiem(["Quá hạn", "Sắp đến hạn", "Đang thực hiện", "Hoàn thành"]
+    .every((t) => strip.nhan.includes(t)),
+  "strip đủ bốn dải tình trạng", strip.nhan.join(" | "));
+  kiem(strip.hero === "Quá hạn", "Quá hạn là ô hero", strip.hero || "(không có)");
+
+  await trang.evaluate(() => {
+    [...document.querySelectorAll(".lp-metric--action")]
+      .find((b) => b.textContent?.includes("Sắp đến hạn"))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 500));
+  const locSoon = await trang.evaluate(() =>
+    document.querySelector('select[aria-label="Lọc theo tình trạng"]')?.value);
+  kiem(locSoon === "soon", "bấm Sắp đến hạn thì bộ lọc nhảy sang soon", String(locSoon));
+
   const macDinh = await trang.evaluate(() => ({
     coCanvas: !!document.querySelector("canvas"),
     coNutMo: [...document.querySelectorAll("button")]

@@ -7660,3 +7660,39 @@ main li,
 @media (max-width: 768px) {
   .vmp-o-chon { width: 28px; height: 28px; }
 }
+
+/* =====================================================================
+ *  TIMELINE ĐỢT 1 — alias token + focus (nghiên cứu 2026-08-16)
+ *  ---------------------------------------------------------------------
+ *  Alias --tl-* trỏ về token Lotus THẬT (nghiên cứu viết theo bộ tên cũ
+ *  không tồn tại — đã phiên dịch). Không hex mới. Các thành phần swimlane
+ *  đợt sau dùng bộ alias này thay vì chạm thẳng token gốc.
+ * =================================================================== */
+.timeline-page-shell {
+  --tl-canvas: var(--lp-canvas);
+  --tl-surface: var(--lp-surface);
+  --tl-ink: var(--lp-ink);
+  --tl-muted: var(--lp-ink-muted);
+  --tl-now: var(--lp-plum);
+  --tl-selection-border: var(--lp-plum);
+  --tl-selection-bg: var(--lp-rose-soft);
+  --tl-danger: var(--lp-danger);
+  --tl-warning: var(--lp-warning);
+  --tl-success: var(--lp-success);
+  --tl-info: var(--lp-info);
+  --tl-grid-minor: var(--lp-line);
+  --tl-grid-major: var(--lp-line-strong);
+  --tl-ornament: var(--lp-gold);
+  --tl-row-height: 44px;
+  --tl-row-height-compact: 36px;
+  --tl-identity-width: 288px;
+  --tl-inspector-width: 380px;
+  --tl-motif-opacity: 0.032;
+}
+
+/* Focus phải nhìn rõ trên mọi điều khiển của timeline (WCAG Focus
+ * Appearance): outline 2px màu plum, có offset — không dựa vào màu nền. */
+.timeline-page-shell :where(button, input, select, [role="gridcell"]):focus-visible {
+  outline: 2px solid var(--tl-now);
+  outline-offset: 2px;
+}
