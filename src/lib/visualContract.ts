@@ -41,3 +41,41 @@ export const LOTUS_CHART_COLORS = {
 
 export type LotusRadiusRole = keyof typeof LOTUS_RADII;
 export type LotusChartColor = keyof typeof LOTUS_CHART_COLORS;
+
+/* =====================================================================
+ *  Vai trò dùng chung của bộ bề mặt
+ * ===================================================================== */
+
+/** Bậc nền: thường · nổi · chìm · thương hiệu. */
+export type SurfaceTone = "default" | "raised" | "sunk" | "brand";
+
+/** Sắc thái ngữ nghĩa. Mỗi sắc mang đúng một nghĩa, xem spec §5.3. */
+export type SemanticTone = "neutral" | "brand" | "success" | "warning" | "danger" | "info";
+
+/** Mức ưu tiên của một ô số liệu trong lưới. */
+export type MetricPriority = "hero" | "supporting";
+
+/** Năm trạng thái mà mọi vùng dữ liệu phải xử lý — thiếu một trạng thái là
+ *  lỗi hay gặp nhất: có dữ liệu thì đẹp, rỗng thì trắng trang. */
+export type BoundaryState = "loading" | "empty" | "filtered-empty" | "error" | "forbidden";
+
+/** Hành động mà người dùng nên được mời làm ở mỗi trạng thái. */
+export type BoundaryAction = "none" | "retry" | "clear-filters";
+
+/** Mặc định là ô phụ. Một lưới chỉ nên có một ô hero; để mặc định là hero
+ *  thì mọi ô đều to bằng nhau và mắt không biết nhìn đâu trước. */
+export function normalizeMetricPriority(priority?: MetricPriority | null): MetricPriority {
+  return priority === "hero" ? "hero" : "supporting";
+}
+
+/** Chọn hành động theo trạng thái.
+ *
+ *  Phân biệt quan trọng: "rỗng vì bộ lọc" thì mời XOÁ BỘ LỌC, còn "rỗng
+ *  thật" thì đừng mời gì cả — mời xoá bộ lọc trong khi không có bộ lọc nào
+ *  chỉ khiến người dùng bấm rồi ngơ ngác vì không có gì đổi.
+ */
+export function stateBoundaryAction(state: BoundaryState | "network-error"): BoundaryAction {
+  if (state === "filtered-empty") return "clear-filters";
+  if (state === "error" || state === "network-error") return "retry";
+  return "none";
+}
