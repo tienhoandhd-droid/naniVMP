@@ -354,6 +354,41 @@ export async function deletePlanItem(validationCode: string, reason: string): Pr
  *  commit=false chỉ xem trước. Idempotent: mã đã có thì bỏ qua, và không
  *  bao giờ đè lên cột tiến độ người dùng đã nhập. */
 /** Một nhóm cảnh báo về dữ liệu nguồn — mỗi phần tử là một đối tượng cần rà. */
+/* ---- Lịch sử một hạng mục (rpc_item_progress_history, Đợt B Task 11) ---- */
+export interface ItemProgressHistoryEntry {
+  id: string;
+  created_at: string;
+  actor: string;
+  effective_business_role: string;
+  action: string;
+  changed_fields: string[] | null;
+  reason: string | null;
+  source: string | null;
+  has_detail: boolean;
+}
+
+export async function fetchItemProgressHistory(
+  validationCode: string, limit = 50, offset = 0,
+): Promise<{ ok: boolean; total: number; history: ItemProgressHistoryEntry[]; error?: string }> {
+  if (!supabase) return { ok: false, total: 0, history: [], error: "Supabase chưa cấu hình" };
+  const goi = supabase.rpc.bind(supabase) as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  const { data, error } = await goi("rpc_item_progress_history", {
+    p_validation_code: validationCode, p_limit: limit, p_offset: offset,
+  });
+  if (error) return { ok: false, total: 0, history: [], error: error.message };
+  const kq = (data || {}) as Record<string, unknown>;
+  if (kq.ok !== true) {
+    return { ok: false, total: 0, history: [], error: String(kq.error ?? "Không đọc được lịch sử") };
+  }
+  return {
+    ok: true,
+    total: Number(kq.total ?? 0),
+    history: (Array.isArray(kq.history) ? kq.history : []) as ItemProgressHistoryEntry[],
+  };
+}
+
 export interface SourceWarnings {
   nam: number;
   /** Chắc chắn sai: không có tháng đầu tiên thì mọi mốc đều hỏng. */

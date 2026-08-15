@@ -207,6 +207,10 @@
   gap: 2px;
   padding: 14px 18px;
   min-width: 168px;
+  /* Trong container flex-wrap, thẻ không bị ép co — tiêu đề dài làm thẻ
+     phình theo max-content và kéo ngang cả dải (luật A7, bắt được ở
+     390px). Chặn trần bằng bề rộng container thì chữ tự xuống dòng. */
+  max-width: 100%;
   border-radius: 18px;
   border: 1px solid var(--lp-line);
   border-left: 3px solid var(--lp-tone-ink, var(--lp-ink));

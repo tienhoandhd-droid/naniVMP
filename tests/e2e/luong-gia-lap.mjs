@@ -157,6 +157,59 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
+/* ---- 3b. Tiến độ Lotus: KPI, dải ưu tiên, lịch sử trong hộp sửa ----- */
+{
+  console.log("\nTiến độ Lotus (desktop):");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2400));
+
+  const kpi = await trang.evaluate(() => {
+    const nhan = [...document.querySelectorAll(".lp-metric .lp-metric__label")]
+      .map((o) => o.textContent?.trim());
+    const hero = document.querySelector(".lp-metric--hero .lp-metric__label")?.textContent?.trim();
+    return {
+      nhan,
+      hero,
+      coDaiUuTien: !!document.querySelector(".lp-priority-strip"),
+      soUuTien: document.querySelectorAll(".lp-priority-strip .lp-priority").length,
+    };
+  });
+  kiem(["Đang thực hiện", "Cần xử lý", "Quá hạn", "Độ hoàn thiện dữ liệu"]
+    .every((t) => kpi.nhan.includes(t)),
+  "đủ bốn KPI đúng nhãn", kpi.nhan.join(" | "));
+  kiem(kpi.hero === "Cần xử lý", "Cần xử lý là ô hero duy nhất", kpi.hero || "(không có hero)");
+  kiem(kpi.coDaiUuTien, "có dải Cần xử lý trước tiên");
+  kiem(kpi.soUuTien > 0 && kpi.soUuTien <= 5, "dải ưu tiên có 1–5 mục", `${kpi.soUuTien}`);
+
+  /* Mở hộp sửa dòng đầu rồi mở Lịch sử thay đổi. */
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.trim() === "Cập nhật")?.click();
+  });
+  await new Promise((r) => setTimeout(r, 900));
+  const daBamLichSu = await trang.evaluate(() => {
+    const nut = [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Lịch sử thay đổi"));
+    if (!nut) return false;
+    nut.click();
+    return true;
+  });
+  await new Promise((r) => setTimeout(r, 1000));
+  const lichSu = await trang.evaluate(() => ({
+    coDong: document.body.innerText.includes("Cập nhật theo biên bản PQ-230426"),
+    coVai: document.body.innerText.includes("quan_ly_chat_luong")
+      || document.body.innerText.includes("Người kiểm thử"),
+  }));
+  kiem(daBamLichSu, "hộp sửa có mục Lịch sử thay đổi");
+  kiem(lichSu.coDong, "lịch sử hiện lý do từ rpc_item_progress_history");
+  kiem(lichSu.coVai, "lịch sử hiện người thao tác");
+  await trang.close();
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");

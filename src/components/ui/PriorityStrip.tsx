@@ -31,7 +31,11 @@ export default function PriorityStrip({ items, label }: PriorityStripProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="lp-priority-strip" role="group" aria-label={label || "Việc cần xử lý trước"}>
+    /* data-lp-scroll: trên điện thoại dải này cuộn ngang CÓ CHỦ Ý (xem
+       lotus-responsive.css) — thiếu dấu này thì luật A7 của bộ thẩm mỹ
+       coi nó là tràn ngang lỗi ngay khi có từ 3 mục trở lên. */
+    <div className="lp-priority-strip" role="group" data-lp-scroll="ngang"
+      aria-label={label || "Việc cần xử lý trước"}>
       {items.map((item) => {
         const lop = `lp-priority lp-tone--${item.tone || "neutral"}`;
         const noi_dung = (

@@ -19,7 +19,9 @@ import { txt, nguoiPhuTrach, stageOf } from "../../utils/helpers.ts";
 import { toISO } from "../../lib/n8nAdapter.ts";
 import {
   fetchTimelineFieldPermission,
+  fetchItemProgressHistory,
   setItemPerformerById,
+  type ItemProgressHistoryEntry,
   type TimelineFieldPermission,
   type TimelinePermissionMode,
 } from "../../lib/supabaseData.ts";
@@ -755,6 +757,77 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           )}
         </div>
       )}
+
+      {/* ---- Lịch sử thay đổi của HẠNG MỤC NÀY — đọc lười từ server ------
+          rpc_item_progress_history (Đợt B Task 11): server tự kiểm quyền
+          xem theo hạng mục; ở đây chỉ hiển thị. Không tải trước — đa số
+          lần mở hộp là để sửa, không phải để tra. */}
+      <LichSuHangMuc validationCode={act.id} />
     </Modal>
+  );
+}
+
+/* ====================================================================
+ *  Lịch sử thay đổi của một hạng mục — bấm mới tải, tải rồi giữ nguyên.
+ * ==================================================================== */
+function LichSuHangMuc({ validationCode }: { validationCode: string }) {
+  const [mo, setMo] = useState(false);
+  const [tt, setTt] = useState<"chua" | "dang" | "xong" | "loi">("chua");
+  const [rows, setRows] = useState<ItemProgressHistoryEntry[]>([]);
+  const [tong, setTong] = useState(0);
+  const [loi, setLoi] = useState("");
+
+  const moLichSu = async () => {
+    const sapMo = !mo;
+    setMo(sapMo);
+    if (!sapMo || tt === "xong" || tt === "dang") return;
+    setTt("dang");
+    const kq = await fetchItemProgressHistory(validationCode);
+    if (kq.ok) { setRows(kq.history); setTong(kq.total); setTt("xong"); }
+    else { setLoi(kq.error || "Không đọc được lịch sử"); setTt("loi"); }
+  };
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <button type="button" onClick={moLichSu} aria-expanded={mo}
+        style={{ display: "flex", alignItems: "center", gap: 6, border: "none",
+                 background: "transparent", cursor: "pointer", padding: "6px 0",
+                 fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plumSoft }}>
+        {mo ? "▾" : "▸"} Lịch sử thay đổi{tt === "xong" ? ` (${tong})` : ""}
+      </button>
+
+      {mo && tt === "dang" && (
+        <div style={{ fontSize: 12, color: C.plumSoft, padding: "4px 0" }}>Đang tải lịch sử…</div>
+      )}
+      {mo && tt === "loi" && (
+        <div style={{ fontSize: 12, color: C.raspText, padding: "4px 0" }}>{loi}</div>
+      )}
+      {mo && tt === "xong" && (rows.length === 0 ? (
+        <div style={{ fontSize: 12, color: C.plumSoft, padding: "4px 0" }}>
+          Chưa có thao tác nào được ghi cho hạng mục này.
+        </div>
+      ) : (
+        <ol style={{ margin: "6px 0 0", padding: 0, listStyle: "none",
+                     display: "flex", flexDirection: "column", gap: 8,
+                     maxHeight: 260, overflowY: "auto" }} className="vmp-scroll">
+          {rows.map((h) => (
+            <li key={h.id} style={{ padding: "9px 12px", borderRadius: 10,
+                                    background: C.surfaceSunk, fontFamily: TEXT, fontSize: 12,
+                                    display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", color: C.plum, fontWeight: 700 }}>
+                <span>{new Date(h.created_at).toLocaleString("vi-VN")}</span>
+                <span>· {h.actor}</span>
+                <span style={{ color: C.plumSoft, fontWeight: 600 }}>({h.effective_business_role})</span>
+              </div>
+              <div style={{ color: C.plumSoft }}>
+                {h.action}
+                {h.changed_fields?.length ? ` · cột: ${h.changed_fields.join(", ")}` : ""}
+              </div>
+              {h.reason && <div style={{ color: C.plum }}>Lý do: {h.reason}</div>}
+            </li>
+          ))}
+        </ol>
+      ))}
+    </div>
   );
 }

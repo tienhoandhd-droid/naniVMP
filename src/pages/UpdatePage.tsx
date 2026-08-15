@@ -8,7 +8,10 @@ import { supabase } from "../lib/supabaseClient.ts";
 import { useDebounce } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
 import MobileTaskList from "../components/ui/MobileTaskList.tsx";
+import MetricGrid from "../components/ui/MetricGrid.tsx";
+import PriorityStrip from "../components/ui/PriorityStrip.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
+import { buildProgressWorkspaceModel } from "../features/progress/progressWorkspaceModel.ts";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
 
@@ -68,9 +71,35 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
     inWindow.forEach((a) => m.set(a.id, stageOf(a)));
     return m;
   }, [inWindow]);
+  /* Model Lotus của màn Tiến độ (Đợt B Task 12): KPI, dải ưu tiên và hai
+     tập lọc nhanh đều tính từ MỘT chỗ — số trên ô và dòng trong bảng không
+     thể nói khác nhau. Tính trên inWindow (đúng kỳ đang xem, đúng luật ẩn
+     hàng ngừng) để các con số khớp với danh sách bên dưới. */
+  const model = useMemo(() => buildProgressWorkspaceModel(inWindow, {
+    now: new Date(), query: "", status: "all", stage: "all", priority: "all",
+  }), [inWindow]);
+  const maCanXuLy = useMemo(() => new Set(
+    model.rowsBeforeStageFilter.filter((r) => r.issues.length > 0).map((r) => r.validationCode),
+  ), [model]);
+  const maQuaHan = useMemo(() => new Set(
+    model.rowsBeforeStageFilter
+      .filter((r) => r.status !== "done" && r.overdueDays > 0)
+      .map((r) => r.validationCode),
+  ), [model]);
+
   // Bốn lỗi mà kiểm tra dữ liệu ở Supabase đang báo — cùng định nghĩa với
   // rpc_check_data_quality để hai chỗ không nói khác nhau.
   const FIXES = useMemo(() => ({
+    can_xu_ly: {
+      label: "Cần xử lý (mọi vấn đề hồ sơ)",
+      hint: "Thiếu người phụ trách theo person_id, thiếu deadline, xong thiếu ngày, lệch pha",
+      test: (a: PlanActivity) => maCanXuLy.has(String(a.id)),
+    },
+    qua_han: {
+      label: "Quá hạn",
+      hint: "Mốc chưa xong gần nhất đã đứng trước hôm nay",
+      test: (a: PlanActivity) => maQuaHan.has(String(a.id)),
+    },
     done_no_date: {
       label: "Thiếu ngày hoàn thành",
       hint: "Vi phạm ALCOA+ — đã ghi hoàn thành thì phải có ngày thực tế",
@@ -91,7 +120,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
       hint: "Trạng thái các giai đoạn mâu thuẫn nhau",
       test: (a: PlanActivity) => !!a.mismatch,
     },
-  }), []);
+  }), [maCanXuLy, maQuaHan]);
 
   /* Bốn bộ lọc chạy song song. Tách từng điều kiện ra để ĐẾM và LỌC dùng
      chung một luật — trước đây số trên ô giai đoạn đếm trên toàn kỳ, còn
@@ -237,6 +266,52 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           )}
         </div>
       </Card>
+      {/* ---- Bốn KPI Lotus: MỘT ô hero (Cần xử lý), ba ô nền ------------
+          Bấm ô là bật đúng bộ lọc tương ứng bên dưới — cùng model, cùng
+          luật, nên số trên ô luôn bằng số dòng lọc ra. */}
+      <MetricGrid
+        label="Tiến độ thẩm định"
+        items={[
+          { id: "dang", label: "Đang thực hiện", value: model.kpis.inProgress,
+            priority: "supporting", hint: "trạng thái Đang thực hiện",
+            onActivate: () => { setFst("prog"); setFix("all"); setTrang(0); } },
+          { id: "can-xu-ly", label: "Cần xử lý", value: model.kpis.needsAction,
+            priority: "hero", tone: "warning",
+            hint: "hồ sơ thiếu hoặc lệch — bấm để lọc đúng các dòng này",
+            onActivate: () => { setFix("can_xu_ly"); setFst("all"); setTrang(0); } },
+          { id: "qua-han", label: "Quá hạn", value: model.kpis.overdue,
+            priority: "supporting", tone: "danger",
+            hint: "mốc chưa xong gần nhất đã qua",
+            onActivate: () => { setFix("qua_han"); setFst("all"); setTrang(0); } },
+          { id: "hoan-thien", label: "Độ hoàn thiện dữ liệu",
+            value: `${model.kpis.completenessPercent}%`,
+            priority: "supporting",
+            tone: model.kpis.completenessPercent >= 90 ? "success" : "info",
+            hint: "người phụ trách · deadline · ngày thực tế khi đã xong" },
+        ]}
+      />
+
+      {/* Tối đa 5 dòng gấp nhất — bấm là mở đúng hộp sửa của dòng đó. */}
+      {model.priorityRows.length > 0 && (
+        <PriorityStrip
+          label="Cần xử lý trước tiên"
+          items={model.priorityRows.map((r) => ({
+            id: r.validationCode,
+            tone: (r.overdueDays > 0 ? "danger" : "warning") as "danger" | "warning",
+            value: r.validationCode,
+            label: r.title,
+            hint: [
+              r.issues.length > 0 ? "hồ sơ thiếu/lệch" : null,
+              r.overdueDays > 0 ? `trễ ${r.overdueDays} ngày` : null,
+            ].filter(Boolean).join(" · ") || undefined,
+            onActivate: readOnly ? undefined : () => {
+              const a = inWindow.find((x) => String(x.id) === r.validationCode);
+              if (a) { setEdit(a); setQuick(false); }
+            },
+          }))}
+        />
+      )}
+
       <Card variant="strong">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
           <CardTitle icon={Activity} sub="Bấm 1 ô để lọc danh sách — số trên ô đã tính cả các bộ lọc đang bật">Bản đồ giai đoạn ({stageCount.all})</CardTitle>
