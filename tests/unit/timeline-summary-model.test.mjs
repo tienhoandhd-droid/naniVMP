@@ -15,9 +15,13 @@ import {
   issueLevel, laSapDenHan, buildTimelineSummary, timDiemNong, timNutThat,
 } from "../../src/features/timeline/timelineSummaryModel.ts";
 
-const NOW = new Date("2026-08-16T00:00:00+07:00");
-/* Định dạng theo giờ ĐỊA PHƯƠNG — toISOString() là UTC, lùi 1 ngày so
- * với +07:00 và làm sai các phép đếm "trễ N ngày". */
+/* NOW = nửa đêm ĐỊA PHƯƠNG của ngày chạy test — trùng đúng vmpToday()
+ * mà phaseStates() gọi ngầm. Neo vào một ngày cố định từng làm CI (UTC)
+ * lệch 1 ngày so với máy dev (+07): chuỗi ngày sinh từ mốc cố định đổi
+ * theo múi giờ máy. Mốc trôi theo ngày chạy thì mọi khoảng cách bất biến. */
+const NOW = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+/* Định dạng theo giờ ĐỊA PHƯƠNG — toISOString() là UTC, lùi 1 ngày và
+ * làm sai các phép đếm "trễ N ngày". */
 const ngay = (lech) => {
   const d = new Date(NOW);
   d.setDate(d.getDate() + lech);
