@@ -1827,22 +1827,30 @@ select { appearance: none; -webkit-appearance: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 42px;
+  padding: 40px;
+  /* Nền: canvas + hai vầng sáng rất nhẹ. Trước đây ba mã hex cứng, nên
+     màn đăng nhập là màn DUY NHẤT không có chế độ tối — bật tối xong
+     trang vẫn trắng y nguyên. Nay đi hết qua token. */
   background:
-    radial-gradient(800px 600px at 88% -8%, #f4e7f0, transparent 60%),
-    radial-gradient(700px 600px at -6% 108%, #e8e3f5, transparent 55%),
-    linear-gradient(160deg, #fbf8fc, #f2eef7);
+    radial-gradient(820px 620px at 88% -8%, var(--lp-rose-soft), transparent 62%),
+    radial-gradient(720px 620px at -6% 108%, var(--lp-surface-2), transparent 58%),
+    var(--lp-canvas);
 }
 
 .vq-login-grid {
-  width: min(100%, 1100px);
+  width: min(100%, 1080px);
   display: grid;
-  grid-template-columns: minmax(360px, .92fr) minmax(420px, 1.08fr);
+  /* Tỷ lệ lệch nhẹ về phía form: panel thương hiệu để ngắm, form để làm
+     việc — nửa nào phải làm việc thì nửa đó rộng hơn. */
+  grid-template-columns: minmax(340px, .92fr) minmax(420px, 1.08fr);
   overflow: hidden;
-  border: 1px solid rgba(81, 32, 82, .12);
-  border-radius: 18px;
-  background: #fffdfc;
-  box-shadow: 0 30px 80px rgba(69, 28, 76, .20), 0 8px 24px rgba(94, 53, 132, .10);
+  border: 1px solid var(--lp-line);
+  /* Chỉ vàng mảnh ở mép trên — spec §6.7b. Trang trí thuần tuý, đúng 1px,
+     và là một trong bốn chỗ duy nhất được phép dùng vàng. */
+  border-top: 1px solid var(--lp-gold-hairline);
+  border-radius: 24px;
+  background: var(--lp-surface);
+  box-shadow: var(--lp-e-modal);
 }
 
 .vq-brand-panel {
@@ -1851,9 +1859,33 @@ select { appearance: none; -webkit-appearance: none; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 48px 54px 42px;
-  color: #fffdfc;
-  background: linear-gradient(155deg, #35153f, #512052 58%, #6a315d);
+  padding: 48px 56px 40px;
+  /* Panel thương hiệu giữ nền sơn mài đậm ở CẢ HAI chế độ — đây là mảng
+     màu nhận diện, không phải bề mặt đọc dữ liệu, nên nó không đảo theo
+     sáng/tối. Chữ trên nó luôn là màu sứ. */
+  color: var(--lp-porcelain, #FFFDFC);
+  background: linear-gradient(155deg, #2A0F33, #4A2A4C 56%, #6A3E60);
+}
+
+/* Hoa sen line-art, mờ 6% — spec §6.6 và §5.4: hoạ tiết chỉ được xuất
+   hiện ở shell/login/hero, và phải nhẹ tới mức gần như chỉ còn cảm giác. */
+.vq-brand-panel::before {
+  position: absolute;
+  z-index: 0;
+  left: -40px;
+  bottom: -30px;
+  width: 260px;
+  height: 208px;
+  pointer-events: none;
+  content: "";
+  opacity: .06;
+  background: currentColor;
+  mask-image: url("../assets/patterns/lotus-line.svg");
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-image: url("../assets/patterns/lotus-line.svg");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
 }
 
 .vq-brand-panel::after {
@@ -1861,7 +1893,7 @@ select { appearance: none; -webkit-appearance: none; }
   inset: 0;
   pointer-events: none;
   content: "";
-  background: radial-gradient(circle at 88% 8%, rgba(230, 180, 166, .18), transparent 25%);
+  background: radial-gradient(circle at 88% 8%, rgb(233 199 121 / .16), transparent 26%);
 }
 
 .vq-brand-logo-wrap,
@@ -1872,10 +1904,10 @@ select { appearance: none; -webkit-appearance: none; }
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(255, 253, 252, .97);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .10);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgb(255 253 252 / .97);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .10);
 }
 
 .vq-brand-logo { display: block; width: auto; height: 40px; }
@@ -1887,193 +1919,265 @@ select { appearance: none; -webkit-appearance: none; }
   bottom: 64px;
   width: 250px;
   fill: none;
-  stroke: #d7b768;
+  stroke: var(--lp-gold);
   stroke-width: 2;
   opacity: .24;
 }
 
 .vq-brand-content { margin-top: auto; }
-.vq-brand-hairline { width: 38px; height: 2px; margin-bottom: 24px; background: #d7b768; }
+
+.vq-brand-hairline {
+  width: 38px;
+  height: 2px;
+  margin-bottom: 24px;
+  background: var(--lp-gold);
+}
+
 .vq-brand-wordmark {
   display: flex;
   flex-direction: column;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 44px;
+  font-family: var(--ff-display);
+  /* Co giãn theo bề ngang thay vì một cỡ cứng: ở 1280px thì 44px vừa
+     đẹp, nhưng ở 1024px nó chạm mép panel. */
+  font-size: clamp(34px, 3.4vw, 46px);
   font-weight: 500;
-  line-height: .86;
+  line-height: .88;
   letter-spacing: -.02em;
 }
-.vq-brand-wordmark span { color: #fffdfc; }
-.vq-brand-wordmark strong { margin-top: 7px; color: #f2d896; font-weight: 500; }
+
+.vq-brand-wordmark span { color: var(--lp-porcelain); }
+.vq-brand-wordmark strong { margin-top: 7px; color: var(--lp-gold); font-weight: 500; }
+
 .vq-brand-caption {
   margin-top: 30px;
-  color: #e8c979;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
-  font-size: 11px;
+  color: var(--lp-gold);
+  font-family: var(--ff-text);
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: .27em;
+  letter-spacing: .24em;
 }
+
 .vq-brand-department {
   margin-top: 34px;
-  color: rgba(255, 253, 252, .70);
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  color: rgb(255 253 252 / .70);
+  font-family: var(--ff-text);
   font-size: 12px;
   letter-spacing: .08em;
 }
+
+/* ------------------------------------------------------------------ *
+ *  Nửa phải — nơi thật sự làm việc
+ * ------------------------------------------------------------------ */
 
 .vq-login-panel {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 52px 50px;
-  background: #fffdfc;
+  padding: 56px 52px;
+  /* Ánh ngọc trai — spec §6.7a. Chênh sáng hai đầu dưới 4% nên chữ đặt
+     lên vẫn giữ nguyên độ tương phản. */
+  background: var(--lp-sheen);
 }
-.vq-login-intro { margin-bottom: 28px; }
+
+/* Giới hạn bề ngang cột chữ. Một form kéo dài 520px thì mắt phải quét
+   ngang quá xa giữa nhãn và ô nhập; 400px là khoảng các trang đăng nhập
+   được làm kỹ đều dừng lại. */
+.vq-login-panel > * { width: 100%; max-width: 400px; margin-inline: auto; }
+
+.vq-login-intro { margin-bottom: 30px; }
+
 .vq-login-kicker {
   margin: 0 0 10px;
-  color: #8c396d;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
-  font-size: 11px;
+  color: var(--lp-rose);
+  font-family: var(--ff-text);
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: .16em;
 }
+
 .vq-login-intro h1 {
   margin: 0;
-  color: #35153f;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 35px;
+  color: var(--lp-ink);
+  font-family: var(--ff-display);
+  font-size: clamp(30px, 3.2vw, 40px);
   font-weight: 600;
-  line-height: 1.04;
+  line-height: 1.06;
+  letter-spacing: var(--lp-tracking-display);
 }
+
 .vq-login-intro > p:last-child {
   margin: 10px 0 0;
-  color: #674d63;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  color: var(--lp-ink-muted);
+  font-family: var(--ff-text);
   font-size: 14px;
   line-height: 1.6;
 }
-.vq-login-form { display: flex; flex-direction: column; gap: 16px; }
-.vq-login-field { display: flex; flex-direction: column; gap: 7px; }
+
+.vq-login-form { display: flex; flex-direction: column; gap: 20px; }
+.vq-login-field { display: flex; flex-direction: column; gap: 8px; }
+
 .vq-login-field > label {
-  color: #4c2a49;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  color: var(--lp-ink);
+  font-family: var(--ff-text);
   font-size: 13px;
   font-weight: 700;
 }
+
+/* Nút chính: MỘT màu đặc, không gradient.
+   Gradient hồng→tím cũ có hai vấn đề. Một là đầu hồng của nó nằm sát
+   raspberry — màu mà cả app dành riêng cho lỗi và quá hạn, nên nút an
+   toàn nhất trang lại mang sắc cảnh báo. Hai là gradient rực trên một
+   trang tiết chế thì chính nó thành thứ loè loẹt duy nhất. Màu đặc vừa
+   đúng luật màu ngữ nghĩa vừa sang hơn. */
 .vq-luxury-btn {
   width: 100%;
-  min-height: 54px;
-  margin-top: 4px;
+  /* Màn đăng nhập có đúng một việc để làm, nên CTA được cao hơn thang
+     chung (42–44px của màn nghiệp vụ) một bậc. */
+  min-height: 52px;
+  margin-top: 6px;
   border: 0;
   border-radius: 10px;
   cursor: pointer;
-  color: #fff;
-  background: linear-gradient(135deg, #b5477a, #68468f);
-  box-shadow: 0 8px 25px rgba(111, 88, 201, .25), 0 2px 8px rgba(181, 71, 122, .18);
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  color: var(--lp-on-plum);
+  background: var(--lp-plum);
+  box-shadow: var(--lp-e-low);
+  font-family: var(--ff-text);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: .02em;
-  transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
+  transition: transform var(--lp-mo-card) var(--lp-ease),
+              box-shadow var(--lp-mo-card) var(--lp-ease),
+              filter var(--lp-mo-card) var(--lp-ease);
 }
-.vq-luxury-btn:disabled { cursor: not-allowed; opacity: .7; }
+
+.vq-luxury-btn:disabled { cursor: not-allowed; opacity: .6; }
+
 .vq-luxury-btn:hover:not(:disabled) {
-  transform: translateY(-1px) scale(1.015);
-  filter: brightness(1.05);
-  box-shadow: 0 14px 36px rgba(111, 88, 201, .42), 0 4px 12px rgba(181, 71, 122, .28);
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: var(--lp-e-mid);
 }
-.vq-luxury-btn:active:not(:disabled) { transform: translateY(0) scale(.99); }
+
+.vq-luxury-btn:active:not(:disabled) { transform: translateY(0); }
+.vq-luxury-btn:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 3px; }
 
 .vq-input-shell {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 52px;
-  padding: 0 14px;
-  border: 1px solid #e5dce5;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--lp-line-strong);
   border-radius: 10px;
-  background: #fbf9fb;
-  color: #9d4d7d;
-  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  background: var(--lp-surface);
+  color: var(--lp-rose);
+  transition: border-color var(--lp-mo-chip) var(--lp-ease),
+              box-shadow var(--lp-mo-chip) var(--lp-ease);
 }
+
 .vq-input-shell input {
   width: 100%;
   min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
-  color: #35153f;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  color: var(--lp-ink);
+  font-family: var(--ff-text);
   font-size: 14px;
   font-weight: 500;
 }
+
+.vq-input-shell input::placeholder { color: var(--lp-disabled-ink); }
+
+/* Vòng tiêu điểm dày và rõ. Đây là thứ người dùng bàn phím dựa vào để
+   biết mình đang ở đâu; làm mảnh cho "đẹp" là bỏ rơi họ. */
 .vq-input-shell:focus-within {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 4px rgba(181, 71, 122, .10);
-  background: #fff;
+  border-color: var(--lp-plum);
+  box-shadow: 0 0 0 4px var(--lp-focus);
 }
+
 .vq-password-toggle {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  padding: 5px;
+  /* 44×44 là vùng chạm khuyến nghị của Apple HIG và Material. Nút này
+     trước đây 27×27 — bấm trượt trên điện thoại là chuyện thường. */
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  color: #6b5572;
+  color: var(--lp-ink-muted);
   background: transparent;
 }
+
+.vq-password-toggle:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 1px; }
+
 .vq-login-error {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
-  color: #ad264c;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  color: var(--c-rasp-text);
+  font-family: var(--ff-text);
   font-size: 13px;
   font-weight: 600;
 }
-.vq-login-error--server { padding: 10px 12px; border-radius: 8px; background: #fff0f3; }
+
+.vq-login-error--server {
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-danger);
+  background: var(--lp-danger-soft);
+}
+
 .vq-daily-wish {
-  margin-top: 26px;
+  margin-top: 28px;
   padding-top: 20px;
-  border-top: 1px solid #f0e8ee;
+  border-top: 1px solid var(--lp-gold-hairline);
   text-align: center;
 }
+
 .vq-daily-wish span {
-  color: #9d4d7d;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
-  font-size: 11px;
+  color: var(--lp-rose);
+  font-family: var(--ff-text);
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: .18em;
+  letter-spacing: .16em;
 }
+
 .vq-daily-wish p {
-  margin: 9px 0 0;
-  color: #674d63;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  margin: 8px 0 0;
+  color: var(--lp-ink-muted);
+  font-family: var(--ff-text);
   font-size: 13px;
   font-style: italic;
   line-height: 1.6;
 }
+
 .vq-login-notice {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 22px;
-  padding: 12px 14px;
-  border: 1px solid #f0d9b6;
+  margin-top: 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--lp-warning-line);
   border-radius: 10px;
-  background: #fffbf1;
-  color: #765323;
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  background: var(--lp-warning-bg);
+  color: var(--lp-warning);
+  font-family: var(--ff-text);
   font-size: 12px;
   line-height: 1.5;
 }
 
 /* ===== Responsive ===== */
 @media (max-width: 760px) {
-  .vq-login-page { align-items: flex-start !important; padding: 14px !important; }
+  .vq-login-page { align-items: flex-start !important; padding: 16px !important; }
   .vq-login-grid { grid-template-columns: 1fr !important; }
-  .vq-brand-panel { min-height: 164px; padding: 22px 26px; }
+  .vq-brand-panel { min-height: 164px; padding: 24px 24px; }
   .vq-brand-logo { height: 34px; }
   .vq-crown-mark { right: 8px; bottom: -20px; width: 132px; }
   .vq-brand-content { margin-top: auto; }
@@ -2081,7 +2185,7 @@ select { appearance: none; -webkit-appearance: none; }
   .vq-brand-wordmark { font-size: 29px; }
   .vq-brand-wordmark strong { margin-top: 3px; }
   .vq-brand-caption, .vq-brand-department, .vq-daily-wish { display: none; }
-  .vq-login-panel { padding: 26px 24px 28px; }
+  .vq-login-panel { padding: 24px 24px 28px; }
   .vq-login-intro { margin-bottom: 20px; }
   .vq-login-intro h1 { font-size: 31px; }
   .vq-login-intro > p:last-child { margin-top: 7px; }

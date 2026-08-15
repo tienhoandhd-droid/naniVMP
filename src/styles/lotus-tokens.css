@@ -45,6 +45,19 @@
   /* Vàng — trang trí thuần tuý. Xem chú thích đầu file. */
   --lp-gold: #C9A15B;
 
+  /* Màu sứ dùng cho chữ đặt TRÊN nền sơn mài đậm (panel thương hiệu ở
+     màn đăng nhập). Không đảo theo chế độ sáng/tối vì nền dưới nó cũng
+     không đảo. */
+  --lp-porcelain: #FFFDFC;
+
+  /* Cặp nền/chữ. Mỗi nền đặc phải khai báo sẵn màu chữ đi cùng nó, thay
+     vì mặc định "chữ trắng chắc đọc được". Ở chế độ tối --lp-plum đảo
+     thành hồng phấn sáng, nên chữ trắng trên nó chỉ còn 2.12:1 — dưới xa
+     ngưỡng AA 4.5:1. Đây đúng là lỗi mà bộ kiểm thẩm mỹ bắt được. */
+  --lp-on-plum:    var(--lp-porcelain);
+  --lp-on-success: var(--lp-porcelain);
+  --lp-on-danger:  var(--lp-porcelain);
+
   /* --- Đường nét, tiêu điểm, trạng thái vô hiệu --------------------- */
   --lp-line:             rgb(51 37 52 / 0.10);
   --lp-line-strong:      rgb(51 37 52 / 0.20);
@@ -188,6 +201,12 @@
 
   --lp-sheen:         linear-gradient(135deg, #2C222E 0%, #241C26 52%, #2A1F2B 100%);
   --lp-gold-hairline: rgb(214 181 110 / 0.30);
+
+  /* Nền sáng thì chữ phải tối. Ba màu này ở chế độ tối đều là sắc phấn
+     sáng, nên chữ trên chúng lấy màu nền trang. */
+  --lp-on-plum:    #241C26;
+  --lp-on-success: #16241E;
+  --lp-on-danger:  #33121B;
 
   --lp-glass:      rgb(36 28 38 / 0.76);
   --lp-glass-line: rgb(246 235 239 / 0.10);
