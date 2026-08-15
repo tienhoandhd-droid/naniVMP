@@ -23,7 +23,7 @@ import {
 import type {
   ServerKpi, ServerQualityIssue, DueAlert,
 } from "../lib/supabaseData.ts";
-import type { AppUser } from "../types/domain.ts";
+import type { AccessContext } from "../lib/access.ts";
 
 const SEV_TONE: Record<string, { c: string; bg: string }> = {
   error:   { c: C.raspText,     bg: C.raspSoft },
@@ -31,8 +31,11 @@ const SEV_TONE: Record<string, { c: string; bg: string }> = {
   info:    { c: C.skyText,      bg: C.skySoft },
 };
 
-export default function ServerChecksView({ user }: { user?: AppUser | null }) {
-  const canRun = user?.perm === "admin";
+export default function ServerChecksView({ access }: { access?: AccessContext | null }) {
+  /* Quyền chạy kiểm đọc từ vai NGHIỆP VỤ do server giải (rpc_my_ui_access),
+     không còn đọc user.perm phía client. RPC bên dưới vẫn tự chặn — đây
+     chỉ là không bày nút chắc chắn thất bại. */
+  const canRun = access?.businessRole === "admin";
   const year = new Date().getFullYear();
 
   const [kpi, setKpi] = useState<ServerKpi | null>(null);

@@ -75,6 +75,17 @@ export const BUSINESS_ROLES = [
 ] as const;
 export type BusinessRole = (typeof BUSINESS_ROLES)[number];
 
+/** Nhãn hiển thị của sáu vai — dùng ở badge topbar và mọi chỗ cần gọi tên
+ *  vai cho người đọc. Một map duy nhất để không màn nào tự dịch một kiểu. */
+export const BUSINESS_ROLE_LABELS: Record<BusinessRole, string> = {
+  admin: "Quản trị",
+  qa_manager: "Quản lý QA",
+  qa_staff: "QA",
+  workshop_manager: "Quản lý xưởng",
+  workshop_staff: "Nhân viên xưởng",
+  viewer: "Chỉ xem",
+};
+
 export const DATA_SCOPES = ["all", "workshop", "assigned", "own", "none"] as const;
 export type DataScope = (typeof DATA_SCOPES)[number];
 

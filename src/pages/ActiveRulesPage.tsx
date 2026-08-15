@@ -17,7 +17,7 @@ import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
 import { fetchActiveRules, recalcCriticality } from "../lib/supabaseData.ts";
 import type { ActiveRules } from "../lib/supabaseData.ts";
-import type { AppUser } from "../types/domain.ts";
+import type { AccessContext } from "../lib/access.ts";
 
 /** Màu theo điểm trọng yếu 1..9 — cao thì đỏ, thấp thì xanh. */
 function toneForScore(score: number) {
@@ -97,8 +97,9 @@ function ScoreAxis({ title, muc }: {
   );
 }
 
-export default function ActiveRulesView({ user }: { user?: AppUser | null }) {
-  const canRun = user?.perm === "admin";
+export default function ActiveRulesView({ access }: { access?: AccessContext | null }) {
+  /* Như ServerChecksView: vai nghiệp vụ từ server, không đọc user.perm. */
+  const canRun = access?.businessRole === "admin";
   const [rules, setRules] = useState<ActiveRules | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);

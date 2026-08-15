@@ -179,7 +179,7 @@ function quyenDayDu() {
   }
   return {
     mode: "enforced",
-    business_role: "quan_ly_chat_luong",
+    business_role: "admin",
     person_id: NGUOI_DUNG.id,
     screens,
   };
@@ -345,11 +345,11 @@ export function dungKhoDuLieu(kichBan) {
       ok: true, total: 2, limit: 50, offset: 0,
       history: [
         { id: "au-p1", created_at: "2026-08-14T03:00:00Z", actor: "Người kiểm thử",
-          effective_business_role: "quan_ly_chat_luong", action: "UPDATE",
+          effective_business_role: "admin", action: "UPDATE",
           changed_fields: ["ngay_validation"], reason: "Cập nhật theo biên bản PQ-230426",
           source: "rpc_update_progress", has_detail: true },
         { id: "au-p2", created_at: "2026-08-12T03:00:00Z", actor: "Người kiểm thử",
-          effective_business_role: "quan_ly_chat_luong", action: "UPDATE",
+          effective_business_role: "admin", action: "UPDATE",
           changed_fields: ["status"], reason: "Bắt đầu thẩm định",
           source: "rpc_update_progress", has_detail: true },
       ],
@@ -369,7 +369,7 @@ export function dungKhoDuLieu(kichBan) {
       total: day ? 2 : 0,
       history: day ? Array.from({ length: 2 }, (_, i) => ({
         id: `au-${i + 1}`, created_at: `2026-08-1${4 + i}T03:00:00Z`,
-        actor: "kiem-thu@vi-du.test", effective_business_role: "quan_ly_chat_luong",
+        actor: "kiem-thu@vi-du.test", effective_business_role: "admin",
         action: "update", table_name: "vmp_source_objects", record_id: "TB-100",
         changed_fields: ["frequency_months"], reason: "Điều chỉnh tần suất",
         source: "web", has_detail: true,

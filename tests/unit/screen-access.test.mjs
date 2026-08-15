@@ -7,6 +7,8 @@ import {
   parseAccessContext,
   legacyAccessContext,
   SCREEN_IDS,
+  BUSINESS_ROLES,
+  BUSINESS_ROLE_LABELS,
 } from "../../src/lib/access.ts";
 
 /* Payload mẫu — đúng hình dạng rpc_my_ui_access() trả về. */
@@ -263,4 +265,12 @@ test("ở enforced, quyền hai màn mới lấy từ server chứ không đoán
   assert.equal(qaManager.can("people", "edit_operational_people"), true);
   assert.equal(qaManager.can("accounts", "manage_accounts"), false);
   assert.equal(qaManager.canView("accounts"), false);
+});
+
+/* ---- Nhãn vai nghiệp vụ (dọn user?.perm, hậu Đợt B) ---- */
+test("mọi vai nghiệp vụ đều có nhãn hiển thị tiếng Việt", () => {
+  for (const vai of BUSINESS_ROLES) {
+    assert.equal(typeof BUSINESS_ROLE_LABELS[vai], "string");
+    assert.ok(BUSINESS_ROLE_LABELS[vai].length > 1, `thiếu nhãn cho ${vai}`);
+  }
 });

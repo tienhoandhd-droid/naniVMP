@@ -60,9 +60,15 @@ async function moTrang(trinhDuyet, { hash = "source", rong = 1440, cao = 900, su
   const trang = await trinhDuyet.newPage();
   const loiConsole = [];
   trang.on("console", (m) => {
-    if (m.type() === "error" && !/net::ERR_|realtime|WebSocket/i.test(m.text())) {
-      loiConsole.push(m.text().slice(0, 110));
-    }
+    if (m.type() !== "error") return;
+    /* Kèm URL nguồn lỗi: "Failed to load resource: 404" mà không có URL
+       thì flake trên CI không thể chẩn đoán (đã dính một lần). Font
+       Google là thứ duy nhất được phép ra mạng ngoài — CDN của nó thi
+       thoảng 404 một biến thể, không phải lỗi của app. */
+    const url = m.location()?.url || "";
+    if (/fonts\.(googleapis|gstatic)\.com/.test(url)) return;
+    if (/net::ERR_|realtime|WebSocket/i.test(m.text())) return;
+    loiConsole.push(`${m.text().slice(0, 90)} @ ${url.slice(0, 90)}`);
   });
   trang.on("pageerror", (e) => loiConsole.push(`pageerror: ${String(e.message).slice(0, 110)}`));
   const { chanNgoai } = await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day", suaKho });

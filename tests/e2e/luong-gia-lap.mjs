@@ -201,7 +201,7 @@ for (const [id, ten] of MAN) {
   await new Promise((r) => setTimeout(r, 1000));
   const lichSu = await trang.evaluate(() => ({
     coDong: document.body.innerText.includes("Cập nhật theo biên bản PQ-230426"),
-    coVai: document.body.innerText.includes("quan_ly_chat_luong")
+    coVai: document.body.innerText.includes("qa_manager")
       || document.body.innerText.includes("Người kiểm thử"),
   }));
   kiem(daBamLichSu, "hộp sửa có mục Lịch sử thay đổi");

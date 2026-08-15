@@ -13,6 +13,7 @@ import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
 import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
+import { BUSINESS_ROLE_LABELS } from "../../lib/access.ts";
 import type { AccessContext } from "../../lib/access.ts";
 
 // ======================== SIDEBAR ========================
@@ -520,13 +521,22 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           {refreshing ? "Đang tải…" : "Làm mới"}
         </button>
 
+        {/* Badge ưu tiên VAI NGHIỆP VỤ do server giải (sáu vai) — chỉ khi
+            server chưa giải được (preview/legacy) mới lùi về nhãn quyền
+            đăng nhập cũ. Đây là chỗ người dùng đối chiếu "hệ coi mình là
+            ai" với những nút họ thấy. */}
         <span className="vmp-perm-badge" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           padding: "8px 14px", borderRadius: 999, fontSize: 12, fontWeight: 800,
-          color: user?.perm === "view" ? C.skyText : C.pinkText,
-          background: user?.perm === "view" ? C.skySoft : C.pinkSoft,
+          color: (access?.businessRole ?? user?.perm) === "viewer" || user?.perm === "view"
+            ? C.skyText : C.pinkText,
+          background: (access?.businessRole ?? user?.perm) === "viewer" || user?.perm === "view"
+            ? C.skySoft : C.pinkSoft,
         }}>
-          <ShieldCheck size={14} /> {(user && PERM_LABEL[user.perm]) || user?.role}
+          <ShieldCheck size={14} />
+          {(access?.businessRole && BUSINESS_ROLE_LABELS[access.businessRole])
+            || (user && PERM_LABEL[user.perm])
+            || user?.role}
         </span>
 
       </div>

@@ -189,7 +189,7 @@ function ChangePwModal({ onClose }: { onClose: () => void }) {
  * ghi rõ cái nào chạy ở đâu — chênh nhau giữa hai tab chính là tín hiệu
  * bản trên máy đã cũ.
  * -------------------------------------------------------------- */
-function HealthView({ acts, user }: { acts: Activity[]; user?: AppUser | null }) {
+function HealthView({ acts, access }: { acts: Activity[]; access?: AccessContext | null }) {
   const [tab, setTab] = useState<"client" | "server">("client");
   const tabs = [
     { id: "client" as const, label: "Lỗi trên bản đang xem", sub: "chạy ở trình duyệt" },
@@ -212,7 +212,7 @@ function HealthView({ acts, user }: { acts: Activity[]; user?: AppUser | null })
           </button>
         ))}
       </div>
-      {tab === "client" ? <DataQualityView acts={acts} /> : <ServerChecksView user={user} />}
+      {tab === "client" ? <DataQualityView acts={acts} /> : <ServerChecksView access={access} />}
     </div>
   );
 }
@@ -1975,8 +1975,8 @@ function AppShell() {
                     ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
                     : undefined} />
               )}
-              {view === "health" && <HealthView acts={filteredActs} user={user} />}
-              {view === "rules" && <ActiveRulesView user={user} />}
+              {view === "health" && <HealthView acts={filteredActs} access={access} />}
+              {view === "rules" && <ActiveRulesView access={access} />}
               {view === "progress" && (
                 <>
                   {/* Nút đổi cách NHÓM, không phải đổi màn. Cùng dữ liệu, cùng
