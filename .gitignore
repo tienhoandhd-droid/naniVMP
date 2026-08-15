@@ -30,3 +30,9 @@ AI Dashboard - Google Sheet.json
 # Thư mục build tạm của scripts/with-preview.sh — script tự dọn khi thoát,
 # nhưng một lần bị ngắt giữa chừng là nó nằm lại và dễ lọt vào `git add -A`.
 .with-preview.*/
+
+# Visual regression: chỉ baseline LINUX (sinh từ CI) được commit; ảnh chụp
+# trên máy dev macOS lệch font rendering nên không phải chuẩn.
+tests/visual/baselines/*-darwin/
+test-results/
+playwright-report/

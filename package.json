@@ -22,7 +22,9 @@
     "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
     "shell": "node tests/e2e/lotus-shell.mjs",
     "atelier": "node tests/e2e/atelier.mjs",
-    "drift": "node scripts/check-design-drift.mjs"
+    "drift": "node scripts/check-design-drift.mjs",
+    "visual": "playwright test -c playwright.visual.config.ts",
+    "visual:capnhat": "playwright test -c playwright.visual.config.ts --update-snapshots"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -35,6 +37,7 @@
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^26.1.2",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",

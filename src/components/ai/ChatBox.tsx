@@ -15,7 +15,7 @@
  *  mà nghe rất trôi chảy — kiểu sai nguy hiểm nhất trong hệ GMP.
  * ===================================================================== */
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Sparkles, AlertTriangle } from "lucide-react";
+import { MessageCircle, X, Send, Sparkles, AlertTriangle, Database, BookOpen, Lightbulb } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import { supabase, vePhien } from "../../lib/supabaseClient.ts";
 import type { AppUser } from "../../types/domain.ts";
@@ -414,10 +414,12 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
                 ))}
               </div>
             )}
+            {/* Icon Lucide cho NGỮ NGHĨA (đây là thông báo cache), emoji
+                chỉ dành cho chữ ký persona 🌸 — quyết định Atelier vòng 2. */}
             {m.nguon === "dem" && (
-              <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 4,
-                            paddingLeft: 3, fontWeight: 700 }}>
-                💾 Bổn cung đã tra câu này, dữ liệu chưa đổi nên dùng lại
+              <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 4, paddingLeft: 3,
+                            fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                <Database size={12} /> Bổn cung đã tra câu này, dữ liệu chưa đổi nên dùng lại
               </div>
             )}
           </div>
@@ -450,10 +452,14 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
                             background: C.surfaceSunk, border: `1px dashed ${C.line}`,
                             animation: `vmpHienNhe 400ms ${MO.ease}` }}>
                 <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800,
-                              letterSpacing: 0.4, marginBottom: 5, opacity: 0.75 }}>
-                  {mauCho.loai === "tho" ? "🌸 CÔNG CHÚA NGÂM THƠ"
-                    : mauCho.loai === "nguyen_tac" ? "📖 NHÂN TIỆN, MỘT NGUYÊN TẮC GMP"
-                    : "💡 MÁCH NHỎ"}
+                              letterSpacing: 0.4, marginBottom: 5, opacity: 0.75,
+                              display: "flex", alignItems: "center", gap: 5 }}>
+                  {/* Nhãn phân loại là NGỮ NGHĨA → icon Lucide. Riêng thơ giữ
+                      🌸 vì đó là chữ ký persona, không phải trạng thái. */}
+                  {mauCho.loai === "tho" ? <>🌸 CÔNG CHÚA NGÂM THƠ</>
+                    : mauCho.loai === "nguyen_tac"
+                      ? <><BookOpen size={12} /> NHÂN TIỆN, MỘT NGUYÊN TẮC GMP</>
+                      : <><Lightbulb size={12} /> MÁCH NHỎ</>}
                 </div>
                 <div style={{ fontSize: 12, color: C.plum, lineHeight: 1.7,
                               whiteSpace: "pre-wrap",

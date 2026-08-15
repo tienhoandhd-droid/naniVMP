@@ -126,3 +126,20 @@
     content: none;
   }
 }
+
+/* =====================================================================
+ *  Thớ sơn mài trên lớp Ground (Atelier vòng 2)
+ *  ---------------------------------------------------------------------
+ *  Tile 96px phần lớn trong suốt (hạt đen/trắng alpha 6–12/255, sinh bởi
+ *  scripts/tao-lacquer-grain.mjs). Nằm TRONG background của body — tức
+ *  dưới mọi card/bảng/form, đúng luật "texture chỉ ở Ground". Sáng và
+ *  tối dùng chung một tile vì alpha đã nướng sẵn.
+ * =================================================================== */
+html[data-visual="lotus-pearl"] body {
+  background-image:
+    url("../assets/art/lacquer-grain.png"),
+    linear-gradient(160deg, var(--bg1), var(--bg2));
+  background-repeat: repeat, no-repeat;
+  background-size: 96px 96px, cover;
+  background-attachment: fixed, fixed;
+}

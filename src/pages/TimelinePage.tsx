@@ -15,6 +15,7 @@ import { CLS, DEPTS, CRIT, MONTHS, PHASE_COLOR, SOON_DAYS, vmpToday, PROG } from
 import { parseD, fmtVN, milestones, phaseStates, addDays, clamp, wlIsDone } from "../utils/helpers.ts";
 import { useDebounce } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, Modal, Pill, phaseTag, CauKetLuan } from "../components/ui/Primitives.tsx";
+import { btnPrimary } from "../constants/theme.ts";
 import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
 import { nhapCoThuLai } from "../lib/tailMan.ts";
@@ -1788,6 +1789,16 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
   const [tableStage, setTableStage] = useState("all");
   const [density, setDensity] = useState("compact");
   const [focusMonth, setFocusMonth] = useState(vmpToday().getMonth());
+  /* Tab "Khám phá 3D" có trí nhớ: three.js chỉ tải khi người dùng thật sự
+     mở, và ai đã quen dùng thì không phải bấm lại mỗi lần vào màn. */
+  const [kham3D, setKham3D] = useState(() => {
+    try { return localStorage.getItem("vmp-timeline-3d") === "mo"; }
+    catch { return false; }
+  });
+  const doiKham3D = (mo: boolean) => {
+    setKham3D(mo);
+    try { localStorage.setItem("vmp-timeline-3d", mo ? "mo" : "dong"); } catch { /* riêng tư */ }
+  };
   const [cls, setCls] = useState("all");
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
@@ -1885,18 +1896,34 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
 
   return (
     <div className="timeline-page-shell">
-      {/* Địa hình tải việc. Bảng Gantt bên dưới trả lời "hạng mục X đang ở
-          đâu"; khối này trả lời câu người xếp lịch hỏi mỗi tháng mà Gantt
-          không nói được: "tháng nào bộ phận nào bị dồn việc". */}
-      <Card variant="strong">
-        <CardTitle icon={GanttChartSquare}
-          sub="Trục ngang X là 12 tháng theo mốc đích VMP · trục sâu Z là bộ phận · chiều cao là số hạng mục đến hạn">
-          Địa hình tải việc {year}
-        </CardTitle>
-        <Suspense fallback={<div style={{ height: 420 }} />}>
-          <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong}
-            onOpenCell={onOpenWorkloadCell} />
-        </Suspense>
+      {/* Địa hình tải việc — TAB KHÁM PHÁ, không phải mặt chính (hiến pháp
+          Atelier §6): 2D bên dưới trả lời mọi tác vụ; 3D chỉ dựng khi
+          người dùng mở, và three.js chỉ tải lúc đó. Lựa chọn được nhớ —
+          người xếp lịch mở nó mỗi tuần không phải bấm lại mỗi lần. */}
+      <Card variant="strong" data-timeline-3d>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <CardTitle icon={GanttChartSquare}
+            sub={kham3D
+              ? "Trục ngang X là 12 tháng theo mốc đích VMP · trục sâu Z là bộ phận · chiều cao là số hạng mục đến hạn"
+              : "Bản đồ ba chiều Tháng × Bộ phận × Số hạng mục — để thấy tháng nào bộ phận nào bị dồn việc"}>
+            Địa hình tải việc {year}
+          </CardTitle>
+          <div style={{ flex: 1 }} />
+          <button type="button" aria-pressed={kham3D}
+            onClick={() => doiKham3D(!kham3D)}
+            style={{ ...btnPrimary, padding: "9px 16px",
+                     background: kham3D ? C.surface : undefined,
+                     color: kham3D ? C.plum : undefined,
+                     border: kham3D ? `1.5px solid ${C.pinkSoft}` : "none" }}>
+            {kham3D ? "Thu gọn 3D" : "Khám phá 3D"}
+          </button>
+        </div>
+        {kham3D && (
+          <Suspense fallback={<div style={{ height: 420 }} />}>
+            <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong}
+              onOpenCell={onOpenWorkloadCell} />
+          </Suspense>
+        )}
       </Card>
 
       <Card variant="strong" cls="timeline-workbench">

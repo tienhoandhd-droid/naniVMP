@@ -755,6 +755,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </div>
         )}
 
+        {/* BỀ MẶT 1 — dữ liệu xác thực: câu suy trực tiếp từ số liệu thật
+            bằng luật cố định, viền liền. Phân biệt với bề mặt AI bên dưới
+            (viền đứt) — hai loại nội dung không được trông giống nhau. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <Tag color={C.mintText} bg={C.mintSoft}>Suy từ số liệu thật</Tag>
+          <span style={{ fontSize: 12, color: C.plumSoft, fontFamily: TEXT, fontWeight: 600 }}>
+            luật cố định, không có AI — cùng con số với các bảng trên
+          </span>
+        </div>
         <div style={{ fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.85, fontWeight: 500,
           background: C.pinkMist, borderLeft: `4px solid ${C.pink}`, borderRadius: "0 14px 14px 0", padding: "16px 20px" }}>
           <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 7 }}>
@@ -764,17 +773,26 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
         {errAi && <div style={{ marginTop: 12, color: C.raspText, fontSize: 14, fontWeight: 800, padding: "13px 15px", borderRadius: 14, background: C.raspSoft, display: "flex", gap: 8, alignItems: "center" }}><AlertCircle size={16} /> {errAi}</div>}
         {loadingAi && <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}><RefreshCw size={22} className="spin" color={C.pink} /><div style={{ marginTop: 10 }}>AI đang phân tích…</div></div>}
+        {/* BỀ MẶT 2 — AI ĐỀ XUẤT: viền ĐỨT bao quanh cả khối, nhãn đầu và
+            lời nhắc cuối. Người ký hồ sơ GMP phải phân biệt được ngay bằng
+            mắt đâu là số đo, đâu là gợi ý của máy. */}
         {!loadingAi && !errAi && ai && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+          <div data-ai-surface style={{ marginTop: 14, padding: "14px 16px", borderRadius: 14,
+                                        border: `1.5px dashed ${C.lav}`, background: C.surface }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, flexWrap: "wrap" }}>
               <SparkIcon size={16} color={C.lavText} />
-              <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{AI_NHAN[loaiAi]}</span>
+              <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>
+                AI đề xuất · {AI_NHAN[loaiAi]}
+              </span>
               <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
               {loaiAi === "phan_tich_sau" && (
                 <Tag color={C.skyText} bg={C.skySoft}>Đọc từng dòng dữ liệu thô · mọi nhận định phải dẫn mã</Tag>
               )}
             </div>
             <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8, fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`, borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{ai}</div>
+            <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontFamily: TEXT, fontWeight: 600 }}>
+              Nội dung do AI tạo — đối chiếu với số liệu xác thực ở trên trước khi đưa vào hồ sơ.
+            </div>
           </div>
         )}
       </Card>

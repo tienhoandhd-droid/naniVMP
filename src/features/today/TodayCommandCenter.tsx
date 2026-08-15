@@ -12,9 +12,12 @@
  *  riêng: một màn tự chế là một màn sẽ lệch khỏi phần còn lại sau vài
  *  tháng.
  * ===================================================================== */
+import { useState } from "react";
+
 import MetricGrid from "../../components/ui/MetricGrid.tsx";
 import PriorityStrip from "../../components/ui/PriorityStrip.tsx";
 import StateBoundary from "../../components/ui/StateBoundary.tsx";
+import ValiIllustration from "../../components/brand/ValiIllustration.tsx";
 import { buildTodayModel } from "./todayModel.ts";
 import type { ProgressDeepLink, TodayRow } from "./todayModel.ts";
 import type { Activity } from "../../types/domain.ts";
@@ -51,10 +54,12 @@ function moTaHan(row: TodayRow): string {
   return `${row.milestoneLabel} · còn ${row.daysRemaining} ngày`;
 }
 
-function Nhom({ kind, rows, onOpenProgress }: {
+function Nhom({ kind, rows, onOpenProgress, dangChon, onChon }: {
   kind: TodayRow["kind"];
   rows: TodayRow[];
   onOpenProgress: TodayCommandCenterProps["onOpenProgress"];
+  dangChon: TodayRow | null;
+  onChon: (row: TodayRow) => void;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -65,10 +70,15 @@ function Nhom({ kind, rows, onOpenProgress }: {
       <ul className="hn-ds">
         {rows.map((row) => (
           <li key={row.validationCode} className="hn-muc">
-            <div className="hn-muc__chinh">
+            {/* Phần danh tính là NÚT CHỌN: ở màn ≥1600 nó đổ chi tiết sang
+                supporting pane; màn hẹp hơn không có pane nên chọn vô hại.
+                Nút "Cập nhật" vẫn là hành động chính, không đổi. */}
+            <button type="button" className="hn-muc__mo"
+              aria-pressed={dangChon?.validationCode === row.validationCode}
+              onClick={() => onChon(row)}>
               <b className="hn-muc__ma">{row.validationCode}</b>
               <span className="hn-muc__ten">{row.title}</span>
-            </div>
+            </button>
             <span className="hn-muc__han">{moTaHan(row)}</span>
             <button type="button" className="hn-muc__nut"
               onClick={() => onOpenProgress({
@@ -85,11 +95,56 @@ function Nhom({ kind, rows, onOpenProgress }: {
   );
 }
 
+/** Supporting pane ≥1600 (hiến pháp Atelier §6): chi tiết việc đang chọn.
+ *  Chưa chọn gì thì là Vali hướng dẫn — không phải khoảng trắng chết. */
+function PaneChiTiet({ chon, onBoChon, onOpenProgress }: {
+  chon: TodayRow | null;
+  onBoChon: () => void;
+  onOpenProgress: TodayCommandCenterProps["onOpenProgress"];
+}) {
+  return (
+    <aside className="hn-pane" aria-label="Chi tiết việc đang chọn">
+      {chon ? (
+        <div className="hn-pane__the">
+          <span className={`hn-pane__nhom lp-tone--${SAC_NHOM[chon.kind]}`}>
+            {NHAN_NHOM[chon.kind]}
+          </span>
+          <b className="hn-pane__ma">{chon.validationCode}</b>
+          <p className="hn-pane__ten">{chon.title}</p>
+          <p className="hn-pane__han">{moTaHan(chon)}</p>
+          <div className="hn-pane__nut-cum">
+            <button type="button" className="hn-muc__nut"
+              onClick={() => onOpenProgress({
+                validationCode: chon.validationCode,
+                quickFilter: chon.kind,
+                source: "today",
+              })}>
+              Cập nhật
+            </button>
+            <button type="button" className="hn-pane__bo" onClick={onBoChon}>
+              Bỏ chọn
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="hn-pane__trong">
+          <ValiIllustration mood="guide" size="small" />
+          <p className="hn-pane__goi-y">
+            Chọn một việc ở danh sách bên trái để xem chi tiết và cập nhật
+            ngay tại đây.
+          </p>
+        </div>
+      )}
+    </aside>
+  );
+}
+
 export default function TodayCommandCenter({
   acts, scopeLabel, updatedLabel, state = "ready", onRetry, onOpenProgress, now,
 }: TodayCommandCenterProps) {
   const model = buildTodayModel(acts, now ?? new Date());
   const tong = model.overdue.length + model.dueSoon.length + model.incomplete.length;
+  const [chon, setChon] = useState<TodayRow | null>(null);
 
   return (
     <div className="hn-lotus">
@@ -152,11 +207,18 @@ export default function TodayCommandCenter({
             <StateBoundary state="empty" title="Không còn việc gấp nào"
               description="Trong phạm vi đang xem, không có hạng mục nào quá hạn, sắp tới hạn hay thiếu hồ sơ." />
           ) : (
-            <>
-              <Nhom kind="overdue" rows={model.overdue} onOpenProgress={onOpenProgress} />
-              <Nhom kind="due_7d" rows={model.dueSoon} onOpenProgress={onOpenProgress} />
-              <Nhom kind="incomplete_record" rows={model.incomplete} onOpenProgress={onOpenProgress} />
-            </>
+            <div className="lp-supporting-layout hn-bo-cuc">
+              <div className="hn-chinh">
+                <Nhom kind="overdue" rows={model.overdue} onOpenProgress={onOpenProgress}
+                  dangChon={chon} onChon={setChon} />
+                <Nhom kind="due_7d" rows={model.dueSoon} onOpenProgress={onOpenProgress}
+                  dangChon={chon} onChon={setChon} />
+                <Nhom kind="incomplete_record" rows={model.incomplete} onOpenProgress={onOpenProgress}
+                  dangChon={chon} onChon={setChon} />
+              </div>
+              <PaneChiTiet chon={chon} onBoChon={() => setChon(null)}
+                onOpenProgress={onOpenProgress} />
+            </div>
           )}
         </>
       )}

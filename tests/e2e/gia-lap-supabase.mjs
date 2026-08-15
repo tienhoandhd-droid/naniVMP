@@ -453,7 +453,7 @@ export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho } 
   return { chanNgoai };
 }
 
-function traLoi(kho, u, req) {
+export function traLoi(kho, u, req) {
   /* Đủ bộ header CORS. Thiếu Allow-Headers là preflight trượt và trình
      duyệt chặn thẳng — lúc đó lỗi hiện ra dưới dạng "net::ERR_FAILED",
      rất dễ tưởng nhầm là mock chưa chạy. */

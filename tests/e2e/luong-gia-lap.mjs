@@ -231,6 +231,99 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
+/* ---- 3d. Hôm nay ≥1600: supporting pane có dữ liệu ------------------ */
+{
+  console.log("\nHôm nay — supporting pane (1600px):");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1680, height: 950 });
+  await trang.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2400));
+
+  const banDau = await trang.evaluate(() => {
+    const pane = document.querySelector(".hn-pane");
+    return {
+      coPane: !!pane && getComputedStyle(pane).display !== "none",
+      coVali: !!pane?.querySelector("svg"),
+    };
+  });
+  kiem(banDau.coPane, "≥1600 có supporting pane");
+  kiem(banDau.coVali, "chưa chọn gì thì pane là Vali hướng dẫn");
+
+  /* Chọn một việc → pane hiện chi tiết + nút Cập nhật. */
+  const maChon = await trang.evaluate(() => {
+    const nut = document.querySelector(".hn-muc__mo");
+    if (!nut) return null;
+    const ma = nut.querySelector(".hn-muc__ma")?.textContent?.trim() ?? null;
+    nut.click();
+    return ma;
+  });
+  await new Promise((r) => setTimeout(r, 500));
+  const daChon = await trang.evaluate(() => ({
+    chuPane: document.querySelector(".hn-pane")?.textContent ?? "",
+    coCapNhat: [...(document.querySelector(".hn-pane")?.querySelectorAll("button") ?? [])]
+      .some((b) => b.textContent?.trim() === "Cập nhật"),
+  }));
+  kiem(maChon !== null && daChon.chuPane.includes(maChon),
+    "chọn một việc thì pane hiện đúng mã đó", `"${maChon}"`);
+  kiem(daChon.coCapNhat, "pane có hành động Cập nhật");
+
+  /* Bỏ chọn → quay về Vali. */
+  await trang.evaluate(() => {
+    [...(document.querySelector(".hn-pane")?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent?.trim() === "Bỏ chọn")?.click();
+  });
+  await new Promise((r) => setTimeout(r, 400));
+  const boChon = await trang.evaluate(() =>
+    !!document.querySelector(".hn-pane svg"));
+  kiem(boChon, "bỏ chọn thì pane quay về Vali hướng dẫn");
+
+  /* Dưới 1600 pane ẩn — không ép hai cột vào màn hẹp. */
+  await trang.setViewport({ width: 1440, height: 900 });
+  await new Promise((r) => setTimeout(r, 500));
+  const heo = await trang.evaluate(() => {
+    const pane = document.querySelector(".hn-pane");
+    return !pane || getComputedStyle(pane).display === "none";
+  });
+  kiem(heo, "dưới 1600 pane ẩn, bố cục cũ giữ nguyên");
+  await trang.close();
+}
+
+/* ---- 3c. Timeline: 2D mặc định, 3D là tab khám phá có trí nhớ ------- */
+{
+  console.log("\nTimeline — tab Khám phá 3D:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2400));
+
+  const macDinh = await trang.evaluate(() => ({
+    coCanvas: !!document.querySelector("canvas"),
+    coNutMo: [...document.querySelectorAll("button")]
+      .some((b) => b.textContent?.includes("Khám phá 3D")),
+  }));
+  kiem(!macDinh.coCanvas, "mặc định KHÔNG dựng canvas 3D — 2D là mặt chính");
+  kiem(macDinh.coNutMo, "có nút Khám phá 3D");
+
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Khám phá 3D"))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 2600));
+  const daMo = await trang.evaluate(() => !!document.querySelector("canvas"));
+  kiem(daMo, "bấm Khám phá 3D thì canvas xuất hiện (lazy)");
+
+  /* Trí nhớ: tải lại trang, lựa chọn còn nguyên. */
+  await trang.reload({ waitUntil: "domcontentloaded" });
+  await new Promise((r) => setTimeout(r, 2800));
+  const conNho = await trang.evaluate(() => !!document.querySelector("canvas"));
+  kiem(conNho, "tải lại vẫn nhớ đang mở 3D (localStorage)");
+  await trang.close();
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");

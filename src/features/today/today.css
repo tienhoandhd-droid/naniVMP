@@ -121,3 +121,86 @@
 .hn-mota__pham-vi,
 .hn-mota__moc { font-size: 12px; font-weight: 600; }
 .hn-mota__pham-vi { color: var(--lp-ink); }
+
+/* =====================================================================
+ *  Supporting pane ≥1600 (Atelier vòng 2)
+ * =================================================================== */
+
+/* Nút chọn việc — thay div danh tính cũ, giữ nguyên bố cục bên trong. */
+.hn-muc__mo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  justify-content: center;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  border-radius: 10px;
+}
+.hn-muc__mo:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+.hn-muc__mo[aria-pressed="true"] .hn-muc__ma { color: var(--lp-plum); }
+.hn-muc__mo[aria-pressed="true"] { background: var(--lp-rose-soft); padding: 4px 8px; }
+
+/* Pane chi tiết: chỉ sống ở màn rộng — dưới 1600 ẩn hẳn, không xếp chồng
+ * xuống dưới danh sách (chi tiết đứng SAU danh sách thì chẳng hỗ trợ gì). */
+.hn-pane { display: none; }
+
+@media (min-width: 1600px) {
+  .hn-pane {
+    display: block;
+    position: sticky;
+    top: 16px;
+    padding: 20px;
+    border-radius: 24px;
+    border: 1px solid var(--lp-line);
+    background: var(--lp-surface);
+  }
+}
+
+.hn-pane__the { display: flex; flex-direction: column; gap: 10px; }
+.hn-pane__nhom {
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--lp-tone-bg, var(--lp-surface-2));
+  color: var(--lp-tone-ink, var(--lp-ink));
+}
+.hn-pane__ma {
+  font-family: var(--ff-display);
+  font-size: 26px;
+  line-height: 32px;
+  color: var(--lp-plum);
+}
+.hn-pane__ten { margin: 0; font-size: 14px; line-height: 1.6; color: var(--lp-ink); }
+.hn-pane__han { margin: 0; font-size: 13px; font-weight: 600; color: var(--lp-ink-muted); }
+.hn-pane__nut-cum { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.hn-pane__bo {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-ink-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hn-pane__trong {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 12px 6px;
+}
+.hn-pane__goi-y { margin: 0; font-size: 13px; line-height: 1.6; color: var(--lp-ink-muted); }
