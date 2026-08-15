@@ -5,9 +5,13 @@ export default function LuxuryBrandPanel() {
          nhận diện thương hiệu, không phải bề mặt để đọc dữ liệu. Khai báo
          để bộ kiểm thẩm mỹ (luật B6) biết đây là chủ ý. */
       data-lp-surface="fixed">
-      <div className="vq-brand-logo-wrap">
-        <img className="vq-brand-logo" src="./logo-cpc1hn.png" alt="CPC1 HN" />
-      </div>
+      {/* Logo CPC1 HN đã chuyển sang panel form.
+          Lý do đo được: 75% điểm ảnh của logo là đỏ, 15% là navy, độ sáng
+          trung bình chỉ 74/255 — tức nó là một hình TỐI. Đặt lên nền sơn
+          mài (độ sáng ~30–60) thì chìm, nên bản cũ phải dán một miếng nền
+          trắng phía sau. Miếng trắng đó chính là chỗ trông lệch tông.
+          Đưa logo sang nền sứ sáng là nó hiện đúng màu thật, không cần
+          khung — giống hệt cách nó nằm trên giấy tiêu đề. */}
       <svg data-testid="luxury-crown-mark" className="vq-crown-mark" viewBox="0 0 240 150" aria-hidden="true">
         <path d="M28 104 48 44l46 42 28-66 30 66 42-42 18 60" />
         <path d="M28 104h184M48 122h144" />

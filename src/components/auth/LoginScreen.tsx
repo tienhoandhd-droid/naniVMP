@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Boxes, Eye, EyeOff, Lock, XCircle } from "lucide-react";
+import { ArrowBigUp, Boxes, Eye, EyeOff, Lock, XCircle } from "lucide-react";
 import type { AppUser } from "../../types/domain.ts";
 import { loginErrorMessage, validateLogin, type LoginErrors } from "../../lib/loginForm.ts";
 import { isSupabaseConfigured } from "../../lib/supabaseConfig.ts";
@@ -40,6 +40,15 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
   const [errors, setErrors] = useState<LoginErrors>({});
   const [serverError, setServerError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  /* Caps Lock bật mà không ai báo là một trong những lý do "sai mật khẩu"
+     phổ biến nhất — người dùng gõ đúng, hệ thống từ chối, và không ai
+     hiểu vì sao. Ô mật khẩu che ký tự nên mắt không tự phát hiện được.
+     GitHub, Google và hầu hết trang đăng nhập được làm kỹ đều cảnh báo. */
+  const [capsLock, setCapsLock] = useState(false);
+  const soatCapsLock = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (typeof e.getModifierState === "function") setCapsLock(e.getModifierState("CapsLock"));
+  };
   const [loading, setLoading] = useState(false);
 
   const clearFieldError = (field: keyof LoginErrors) => {
@@ -75,6 +84,11 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
       <div className="vq-login-grid">
         <LuxuryBrandPanel />
         <section className="vq-login-panel" aria-labelledby="vmp-login-title">
+          {/* Logo đặt trên nền sứ, không khung: đây là nền duy nhất trong
+              màn này đủ sáng để hai sắc đỏ và navy của nó hiện đúng. */}
+          <img className="vq-login-logo" src="./logo-cpc1hn.png"
+            alt="CPC1 HN — Công ty Cổ phần Dược phẩm Trung ương CPC1 Hà Nội" />
+
           <div className="vq-login-intro">
             <p className="vq-login-kicker">V/Q TEAM · CPC1 HN</p>
             <h1 id="vmp-login-title">Đăng nhập VMP Monitor</h1>
@@ -92,6 +106,10 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
                   type="email"
                   autoComplete="email"
                   inputMode="email"
+                  /* Màn này chỉ có một việc để làm, và ô này là bước đầu
+                     tiên của việc đó — đưa tiêu điểm vào sẵn giúp bỏ được
+                     một cú bấm/Tab cho MỌI lần đăng nhập. */
+                  autoFocus
                   value={email}
                   onChange={(event) => { setEmail(event.target.value); clearFieldError("email"); }}
                   aria-invalid={Boolean(errors.email)}
@@ -112,19 +130,33 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
                   autoComplete="current-password"
                   value={password}
                   onChange={(event) => { setPassword(event.target.value); clearFieldError("password"); }}
+                  onKeyUp={soatCapsLock}
+                  onKeyDown={soatCapsLock}
+                  onBlur={() => setCapsLock(false)}
                   aria-invalid={Boolean(errors.password)}
-                  aria-describedby={errors.password ? "vmp-login-password-error" : undefined}
+                  aria-describedby={[
+                    errors.password ? "vmp-login-password-error" : null,
+                    capsLock ? "vmp-login-caps" : null,
+                  ].filter(Boolean).join(" ") || undefined}
                 />
-                <button className="vq-password-toggle" type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
+                <button className="vq-password-toggle" type="button"
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
                   {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                 </button>
               </div>
               {errors.password && <p id="vmp-login-password-error" className="vq-login-error" role="alert"><XCircle size={15} aria-hidden="true" />{errors.password}</p>}
+              {capsLock && (
+                <p id="vmp-login-caps" className="vq-login-caps" role="status">
+                  <ArrowBigUp size={15} aria-hidden="true" />Caps Lock đang bật
+                </p>
+              )}
             </div>
 
             {serverError && <p className="vq-login-error vq-login-error--server" role="alert"><XCircle size={15} aria-hidden="true" />{serverError}</p>}
 
-            <button className="vq-luxury-btn" type="submit" disabled={loading}>
+            <button className="vq-luxury-btn" type="submit" disabled={loading} aria-busy={loading}>
               {loading ? "Đang đăng nhập…" : "Đăng nhập"}
             </button>
           </form>

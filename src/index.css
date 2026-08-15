@@ -1855,11 +1855,16 @@ select { appearance: none; -webkit-appearance: none; }
 
 .vq-brand-panel {
   position: relative;
-  min-height: 580px;
+  /* 520px thay 580px, và nội dung căn giữa thay vì bị đẩy xuống đáy.
+     Bản cũ có logo ở đỉnh, chữ ở đáy và một khoảng trống lớn ở giữa —
+     khoảng trống đó không mang nghĩa gì, nó chỉ là hệ quả của
+     `margin-top: auto`. Khoảng thở phải là chủ ý, không phải phần thừa. */
+  min-height: 480px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   overflow: hidden;
-  padding: 48px 56px 40px;
+  padding: 48px 56px;
   /* Panel thương hiệu giữ nền sơn mài đậm ở CẢ HAI chế độ — đây là mảng
      màu nhận diện, không phải bề mặt đọc dữ liệu, nên nó không đảo theo
      sáng/tối. Chữ trên nó luôn là màu sứ. */
@@ -1896,35 +1901,46 @@ select { appearance: none; -webkit-appearance: none; }
   background: radial-gradient(circle at 88% 8%, rgb(233 199 121 / .16), transparent 26%);
 }
 
-.vq-brand-logo-wrap,
 .vq-brand-content,
 .vq-brand-department { position: relative; z-index: 1; }
 
-.vq-brand-logo-wrap {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgb(255 253 252 / .97);
-  box-shadow: 0 1px 2px rgb(0 0 0 / .10);
+/* Logo công ty, đặt trên nền sứ của panel form.
+   Không khung, không nền phụ: logo vốn đã trong suốt sẵn (52.839/72.000
+   điểm ảnh có alpha = 0), nên miếng nền trắng ở bản cũ là thứ thừa mà lại
+   là thứ nhìn lệch tông nhất trong màn. */
+.vq-login-logo {
+  display: block;
+  width: auto;
+  height: 48px;
+  margin-bottom: 22px;
 }
 
-.vq-brand-logo { display: block; width: auto; height: 40px; }
+/* Ở CHẾ ĐỘ TỐI logo cần một tấm nền sứ — và chỉ ở đó.
+   Logo có 15% điểm ảnh là navy #004080; trên nền tối #241C26 nó chỉ đạt
+   1.61:1, tức gần như không đọc được. Trên nền sứ là 10.1:1. Không thể
+   đổi màu logo công ty, nên phải đổi nền dưới nó.
+   Ở chế độ sáng thì nền trang vốn đã đủ sáng, nên tấm nền này là thừa —
+   và chính nó là miếng trắng trông lệch tông ở bản trước. */
+:root[data-theme="dark"] .vq-login-logo {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--lp-porcelain);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .28);
+}
 
 .vq-crown-mark {
   position: absolute;
   z-index: 0;
-  right: -25px;
-  bottom: 64px;
-  width: 250px;
+  right: -30px;
+  bottom: 40px;
+  width: 230px;
   fill: none;
   stroke: var(--lp-gold);
   stroke-width: 2;
   opacity: .24;
 }
 
-.vq-brand-content { margin-top: auto; }
+.vq-brand-content { margin-top: 0; }
 
 .vq-brand-hairline {
   width: 38px;
@@ -1958,7 +1974,7 @@ select { appearance: none; -webkit-appearance: none; }
 }
 
 .vq-brand-department {
-  margin-top: 34px;
+  margin-top: 28px;
   color: rgb(255 253 252 / .70);
   font-family: var(--ff-text);
   font-size: 12px;
@@ -1973,7 +1989,10 @@ select { appearance: none; -webkit-appearance: none; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 56px 52px;
+  /* 44px thay 56px: khung tổng trước đây cao tới ~950px, khiến panel
+     thương hiệu bên trái phải kéo theo một mảng trống lớn. Khoảng thở nên
+     là chủ ý, không phải hệ quả của chiều cao cột bên kia. */
+  padding: 44px 52px;
   /* Ánh ngọc trai — spec §6.7a. Chênh sáng hai đầu dưới 4% nên chữ đặt
      lên vẫn giữ nguyên độ tương phản. */
   background: var(--lp-sheen);
@@ -1982,9 +2001,14 @@ select { appearance: none; -webkit-appearance: none; }
 /* Giới hạn bề ngang cột chữ. Một form kéo dài 520px thì mắt phải quét
    ngang quá xa giữa nhãn và ô nhập; 400px là khoảng các trang đăng nhập
    được làm kỹ đều dừng lại. */
-.vq-login-panel > * { width: 100%; max-width: 400px; margin-inline: auto; }
+/* Giới hạn bề ngang cột chữ — trừ ẢNH. `width: 100%` áp cho <img> sẽ kéo
+   logo rộng bằng cả cột rồi ép về chiều cao đã đặt, làm ảnh méo và cắt. */
+.vq-login-panel > :not(img) { width: 100%; max-width: 400px; margin-inline: auto; }
+/* Logo căn cùng trục trái với kicker, H1 và form. Căn giữa một mình nó
+   tạo ra một trục thứ hai, và mắt phải nhảy qua lại giữa hai trục. */
+.vq-login-panel > img { max-width: 400px; margin-inline: auto; margin-left: max(0px, calc(50% - 200px)); }
 
-.vq-login-intro { margin-bottom: 30px; }
+.vq-login-intro { margin-bottom: 26px; }
 
 .vq-login-kicker {
   margin: 0 0 10px;
@@ -2127,6 +2151,23 @@ select { appearance: none; -webkit-appearance: none; }
   font-weight: 600;
 }
 
+/* Cảnh báo Caps Lock — dùng sắc cảnh báo, không phải sắc lỗi: người dùng
+   chưa làm gì sai, đây chỉ là một điều đáng biết trước khi bấm. */
+.vq-login-caps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-warning-line);
+  background: var(--lp-warning-bg);
+  color: var(--lp-warning);
+  font-family: var(--ff-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .vq-login-error--server {
   padding: 12px 16px;
   border-radius: 10px;
@@ -2135,7 +2176,7 @@ select { appearance: none; -webkit-appearance: none; }
 }
 
 .vq-daily-wish {
-  margin-top: 28px;
+  margin-top: 24px;
   padding-top: 20px;
   border-top: 1px solid var(--lp-gold-hairline);
   text-align: center;
@@ -2178,7 +2219,7 @@ select { appearance: none; -webkit-appearance: none; }
   .vq-login-page { align-items: flex-start !important; padding: 16px !important; }
   .vq-login-grid { grid-template-columns: 1fr !important; }
   .vq-brand-panel { min-height: 164px; padding: 24px 24px; }
-  .vq-brand-logo { height: 34px; }
+  .vq-login-logo { height: 36px; margin-bottom: 20px; }
   .vq-crown-mark { right: 8px; bottom: -20px; width: 132px; }
   .vq-brand-content { margin-top: auto; }
   .vq-brand-hairline { width: 28px; margin-bottom: 11px; }
