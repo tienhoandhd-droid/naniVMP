@@ -1994,7 +1994,13 @@ function AppShell() {
               {view === "alerts" && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
-              {view === "people" && <OperationalPeopleView acts={filteredActs} access={access} />}
+              {view === "people" && (
+                <OperationalPeopleView acts={filteredActs} access={access}
+                  scopeLabel={nhanPhamVi}
+                  updatedLabel={dataUpdatedAt
+                    ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
+                    : undefined} />
+              )}
               {view === "accounts" && <AccountAccessView access={access} />}
               {view === "phanquyen" && <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} user={user} />}
               {view === "audit" && <AuditLogView />}

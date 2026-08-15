@@ -20,8 +20,7 @@
  *  quyết định vẽ nút nào.
  * ===================================================================== */
 import { useMemo, useState } from "react";
-import { Users } from "lucide-react";
-import { Card, CardTitle } from "../components/ui/Primitives.tsx";
+import OperationalPeopleWorkspace from "../features/operationalPeople/OperationalPeopleWorkspace.tsx";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
 import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
@@ -29,9 +28,12 @@ import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
 import type { AccessContext } from "../lib/access.ts";
 import type { Activity } from "../types/domain.ts";
 
-export default function OperationalPeopleView({ acts, access }: {
+export default function OperationalPeopleView({ acts, access, scopeLabel, updatedLabel }: {
   acts: Activity[];
   access: AccessContext;
+  /** Nhãn phạm vi và mốc dữ liệu do shell cấp — màn không tự tính. */
+  scopeLabel?: string;
+  updatedLabel?: string;
 }) {
   const [person, setPerson] = useState<DirectoryPerson | null>(null);
   const [rightsRevision, setRightsRevision] = useState(0);
@@ -48,21 +50,19 @@ export default function OperationalPeopleView({ acts, access }: {
   }))].sort((a, b) => a.localeCompare(b, "vi")), [acts]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <Card variant="strong">
-        <CardTitle icon={Users}
-          sub={duocSua
-            ? "Hồ sơ nhân sự, phạm vi làm việc và phân công QA theo hạng mục. Việc nối tài khoản đăng nhập nằm ở màn Tài khoản & quyền truy cập."
-            : "Xem hồ sơ nhân sự và phân công QA. Chỉ Admin và Quản lý QA sửa được."}>
-          Nhân sự &amp; phân công
-        </CardTitle>
-        <div className="ip-workspace">
-          <StaffDirectoryPanel canEdit={duocSua} validAreas={validAreas} onSelect={setPerson} />
-          <AssignmentPanel person={person} canEdit={duocSua}
-            onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
-          <EffectiveRightsPanel person={person} revision={rightsRevision} />
-        </div>
-      </Card>
-    </div>
+    <OperationalPeopleWorkspace
+      boundaryNote={duocSua
+        ? "Hồ sơ nhân sự, phạm vi làm việc và phân công QA theo hạng mục. Việc nối tài khoản đăng nhập nằm ở màn Tài khoản & quyền truy cập."
+        : "Xem hồ sơ nhân sự và phân công QA. Chỉ Admin và Quản lý QA sửa được."}
+      scopeLabel={scopeLabel}
+      updatedLabel={updatedLabel}
+      hasSelection={person !== null}
+      directory={<StaffDirectoryPanel canEdit={duocSua} validAreas={validAreas} onSelect={setPerson} />}
+      assignment={(
+        <AssignmentPanel person={person} canEdit={duocSua}
+          onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
+      )}
+      rights={<EffectiveRightsPanel person={person} revision={rightsRevision} />}
+    />
   );
 }
