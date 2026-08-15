@@ -12,14 +12,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  issueLevel, laSapDenHan, buildTimelineSummary,
+  issueLevel, laSapDenHan, buildTimelineSummary, timDiemNong, timNutThat,
 } from "../../src/features/timeline/timelineSummaryModel.ts";
 
 const NOW = new Date("2026-08-16T00:00:00+07:00");
+/* Định dạng theo giờ ĐỊA PHƯƠNG — toISOString() là UTC, lùi 1 ngày so
+ * với +07:00 và làm sai các phép đếm "trễ N ngày". */
 const ngay = (lech) => {
   const d = new Date(NOW);
   d.setDate(d.getDate() + lech);
-  return d.toISOString().slice(0, 10);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
 /* Mốc pha suy từ target (helpers.milestones): protocol = T−60,
@@ -71,4 +74,28 @@ test("đích còn 8 ngày và mốc thẩm định chưa qua → sắp đến h�
   const sap = { id: "T-8D", st: "prog", state: "active", target: ngay(8), _raw: {} };
   assert.equal(laSapDenHan(sap, NOW), true);
   assert.equal(issueLevel(sap), "prog");
+});
+
+/* Action narrative (nghiên cứu đợt 2): "Nặng nhất" là hạng mục có mốc trễ
+ * SỚM NHẤT xa nhất về quá khứ; "nút thắt" là pha gom nhiều hạng mục trễ
+ * nhất (mỗi hạng mục tính một lần, tại pha trễ sớm nhất của nó).
+ * T-OVER (st=over, target=ngay(-5), dep mặc định 2): thẩm định = T−7 =
+ * ngay(-12) → trễ 12 ngày. T-PHASE-OVER: thẩm định = ngay(-4) → 4 ngày. */
+test("điểm nóng: hạng mục trễ nặng nhất, đúng mốc và số ngày", () => {
+  const dn = timDiemNong(FIXTURE, NOW);
+  assert.equal(dn.act.id, "T-OVER");
+  assert.equal(dn.mocTre, "Thẩm định");
+  assert.equal(dn.treNgay, 12);
+});
+
+test("nút thắt: pha gom nhiều hạng mục trễ nhất, kèm tổng quá hạn", () => {
+  assert.deepEqual(timNutThat(FIXTURE, NOW), {
+    ten: "Thẩm định", so: 2, tongQuaHan: 2,
+  });
+});
+
+test("không có hạng mục quá hạn thì điểm nóng và nút thắt đều null", () => {
+  const yen = FIXTURE.filter((a) => !["T-OVER", "T-PHASE-OVER"].includes(a.id));
+  assert.equal(timDiemNong(yen, NOW), null);
+  assert.equal(timNutThat(yen, NOW), null);
 });

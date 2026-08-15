@@ -18,8 +18,9 @@ import { Card, CardTitle, Tag, Modal, Pill, phaseTag, CauKetLuan } from "../comp
 import { btnPrimary } from "../constants/theme.ts";
 import MetricGrid from "../components/ui/MetricGrid.tsx";
 import {
-  buildTimelineSummary, issueLevel, laSapDenHan,
+  buildTimelineSummary, issueLevel, laSapDenHan, timDiemNong, timNutThat,
 } from "../features/timeline/timelineSummaryModel.ts";
+import TimelineInspector from "../features/timeline/TimelineInspector.tsx";
 import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
 import { nhapCoThuLai } from "../lib/tailMan.ts";
@@ -1803,6 +1804,18 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
   const [status, setStatus] = useState("all");
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<Activity | null>(null);
+  /* Supporting pane ≥1600 (nghiên cứu đợt 2): màn rộng thì bấm hàng đổ
+     chi tiết sang pane bên phải; màn hẹp giữ modal như cũ. */
+  const [chon, setChon] = useState<Activity | null>(null);
+  const [manRong, setManRong] = useState(() =>
+    typeof window !== "undefined" && !!window.matchMedia?.("(min-width: 1600px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1600px)");
+    const nghe = () => setManRong(mq.matches);
+    mq.addEventListener("change", nghe);
+    return () => mq.removeEventListener("change", nghe);
+  }, []);
+  const moHoSo = (a: Activity) => { if (manRong) setChon(a); else setDetail(a); };
   const dq = useDebounce(q, 300);
 
   const range = useMemo(() => rangeFor(view, focusMonth, year), [view, focusMonth, year]);
@@ -1866,6 +1879,16 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
     () => buildTimelineSummary(acts.filter(khopNgoaiTinhTrang)),
     [acts, khopNgoaiTinhTrang]);
 
+  /* Action narrative (nghiên cứu đợt 2): một câu kết luận thay vì thêm
+     biểu đồ — hạng mục trễ nặng nhất và pha nút thắt, cùng quần thể đếm
+     với strip nên các con số đối chiếu được. */
+  const diemNong = useMemo(
+    () => timDiemNong(acts.filter(khopNgoaiTinhTrang)),
+    [acts, khopNgoaiTinhTrang]);
+  const nutThat = useMemo(
+    () => timNutThat(acts.filter(khopNgoaiTinhTrang)),
+    [acts, khopNgoaiTinhTrang]);
+
   const isTimeline = workspace === "timeline";
 
   const resetFilters = () => {
@@ -1925,6 +1948,21 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
             onActivate: () => setStatus("done") },
         ]}
       />
+
+      {/* Action narrative (nghiên cứu đợt 2): câu kết luận, không phải
+          biểu đồ mới — trễ nặng nhất ở đâu và pha nào đang là nút thắt. */}
+      {diemNong && nutThat && (
+        <p className="tl-narrative">
+          Nặng nhất:{" "}
+          <button type="button" className="tl-narrative__ma tnum"
+            onClick={() => moHoSo(diemNong.act)}>
+            {diemNong.act.code}
+          </button>{" "}
+          — trễ {diemNong.treNgay} ngày ở mốc {diemNong.mocTre}.
+          {" "}Nút thắt: <b>{nutThat.ten}</b> — {nutThat.so}/{nutThat.tongQuaHan} hạng
+          mục quá hạn đang kẹt ở pha này.
+        </p>
+      )}
 
       {/* Địa hình tải việc — TAB KHÁM PHÁ, không phải mặt chính (hiến pháp
           Atelier §6): 2D bên dưới trả lời mọi tác vụ; 3D chỉ dựng khi
@@ -2137,7 +2175,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
             trả lời, phần còn lại là bằng chứng và chỗ tra cứu. */}
         <TimelineFocusLayer
           items={filtered}
-          onOpen={setDetail}
+          onOpen={moHoSo}
           onLocQuaHan={() => setStatus("over")}
         />
 
@@ -2148,6 +2186,9 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
           onNextQuarter={goNextQuarter}
         />
 
+        {/* Supporting pane ≥1600 (nghiên cứu đợt 2): sơ đồ bên trái 8 phần,
+            inspector bên phải 4 phần — cùng khung với màn Hôm nay. */}
+        <div className={manRong ? "lp-supporting-layout" : undefined}>
         <div className="timeline-map-surface">
           <div className="timeline-map-surface__head">
             <div>
@@ -2196,22 +2237,31 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
           {chartMode === "table" ? (
             <TimelineTableBoard
               items={filtered}
-              onOpen={setDetail}
+              onOpen={moHoSo}
               density={density}
               range={range}
               tableStage={tableStage}
             />
           ) : chartMode === "stage" ? (
-            <TimelineStageBoard items={filtered} onOpen={setDetail} density={density} />
+            <TimelineStageBoard items={filtered} onOpen={moHoSo} density={density} />
           ) : (
             <TimelineHybridBoard
               range={range}
               items={filtered}
               width={chartWidth}
-              onOpen={setDetail}
+              onOpen={moHoSo}
               density={density}
             />
           )}
+        </div>
+        {manRong && (
+          <TimelineInspector
+            a={chon}
+            chuSoHuu={chon ? ownerOf(chon) : ""}
+            onDong={() => setChon(null)}
+            onHoSo={setDetail}
+          />
+        )}
         </div>
         </>
         ) : null}

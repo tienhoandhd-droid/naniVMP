@@ -315,6 +315,13 @@ for (const [id, ten] of MAN) {
   "strip đủ bốn dải tình trạng", strip.nhan.join(" | "));
   kiem(strip.hero === "Quá hạn", "Quá hạn là ô hero", strip.hero || "(không có)");
 
+  /* Action narrative (nghiên cứu đợt 2): một câu kết luận dưới strip —
+     hạng mục trễ nặng nhất và pha nút thắt, không cần thêm biểu đồ. */
+  const narrative = await trang.evaluate(() =>
+    document.querySelector(".tl-narrative")?.textContent?.trim() || "");
+  kiem(narrative.includes("Nặng nhất") && narrative.includes("Nút thắt"),
+    "strip có thuyết minh Nặng nhất + Nút thắt", narrative.slice(0, 110) || "(không có)");
+
   await trang.evaluate(() => {
     [...document.querySelectorAll(".lp-metric--action")]
       .find((b) => b.textContent?.includes("Sắp đến hạn"))?.click();
@@ -345,6 +352,60 @@ for (const [id, ten] of MAN) {
   await new Promise((r) => setTimeout(r, 2800));
   const conNho = await trang.evaluate(() => !!document.querySelector("canvas"));
   kiem(conNho, "tải lại vẫn nhớ đang mở 3D (localStorage)");
+  await trang.close();
+}
+
+/* ---- 3e. Timeline: inspector supporting pane ≥1600 ------------------ */
+{
+  console.log("\nTimeline — inspector ≥1600:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1680, height: 950 });
+  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2400));
+
+  /* Mặc định là workspace Tổng quan — chuyển sang tab Timeline để có bảng. */
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.trim() === "Timeline")?.click();
+  });
+  await new Promise((r) => setTimeout(r, 800));
+
+  /* Chưa chọn gì: pane vẫn có mặt và hướng dẫn, không phải khoảng trắng. */
+  const truocChon = await trang.evaluate(() => {
+    const pane = document.querySelector("[data-timeline-inspector]");
+    return { co: !!pane, chu: pane?.textContent?.trim().length || 0 };
+  });
+  kiem(truocChon.co, "pane inspector có mặt ở màn rộng");
+  kiem(truocChon.chu > 20, "pane chưa chọn vẫn có hướng dẫn", `${truocChon.chu} ký tự`);
+
+  /* Bấm một hàng: chi tiết đổ sang pane, KHÔNG bật modal. */
+  const maHang = await trang.evaluate(() => {
+    const hang = document.querySelector(".timeline-day-row");
+    const ma = hang?.querySelector(".timeline-card-code")?.textContent?.trim() || "";
+    hang?.click();
+    return ma;
+  });
+  await new Promise((r) => setTimeout(r, 600));
+  const sauChon = await trang.evaluate(() => ({
+    paneChua: document.querySelector("[data-timeline-inspector]")?.textContent || "",
+    coModal: document.body.innerText.includes("Chi tiết hạng mục"),
+    coNutHoSo: [...document.querySelectorAll("[data-timeline-inspector] button")]
+      .some((b) => b.textContent?.includes("Hồ sơ đầy đủ")),
+  }));
+  kiem(!!maHang && sauChon.paneChua.includes(maHang),
+    "bấm hàng thì mã đổ sang pane", `${maHang} trong pane: ${sauChon.paneChua.includes(maHang)}`);
+  kiem(!sauChon.coModal, "màn rộng KHÔNG bật modal khi bấm hàng");
+  kiem(sauChon.coNutHoSo, "pane có nút Hồ sơ đầy đủ (mở modal khi cần)");
+
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("[data-timeline-inspector] button")]
+      .find((b) => b.textContent?.includes("Hồ sơ đầy đủ"))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 500));
+  const moDayDu = await trang.evaluate(() => document.body.innerText.includes("Chi tiết hạng mục"));
+  kiem(moDayDu, "nút Hồ sơ đầy đủ mở đúng modal chi tiết");
   await trang.close();
 }
 

@@ -7690,9 +7690,140 @@ main li,
   --tl-motif-opacity: 0.032;
 }
 
-/* Focus phải nhìn rõ trên mọi điều khiển của timeline (WCAG Focus
- * Appearance): outline 2px màu plum, có offset — không dựa vào màu nền. */
-.timeline-page-shell :where(button, input, select, [role="gridcell"]):focus-visible {
-  outline: 2px solid var(--tl-now);
+/* Focus phải nhìn rõ trên MỌI điều khiển của app (WCAG 2.2 Focus
+ * Appearance — nghiên cứu đợt 2 nâng từ phạm vi timeline lên toàn cục):
+ * outline 2px màu plum, có offset — không dựa vào màu nền. */
+:where(button, [href], input, select, textarea,
+  [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--lp-plum);
   outline-offset: 2px;
+}
+
+/* Semantic alias giai đoạn & trạng thái (nghiên cứu đợt 2): 2D, 3D,
+ * legend, tooltip, bảng phải nói cùng một ngôn ngữ màu — KHÔNG thêm hex
+ * mới, chỉ trỏ về token Lotus hiện hành. */
+:root {
+  --lp-stage-protocol: var(--lp-plum);
+  --lp-stage-validation: var(--lp-info);
+  --lp-stage-report: var(--lp-rose);
+  --lp-stage-vmp: var(--lp-success);
+  --lp-status-overdue: var(--lp-danger);
+  --lp-status-warning: var(--lp-warning);
+  --lp-status-done: var(--lp-success);
+}
+
+/* --- Action narrative dưới strip KPI --------------------------------- */
+.tl-narrative {
+  margin: 2px 2px 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--lp-ink-muted);
+}
+.tl-narrative b { color: var(--lp-ink); }
+.tl-narrative__ma {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--lp-plum);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* --- Inspector supporting pane ≥1600 --------------------------------- */
+.tl-inspector {
+  position: sticky;
+  top: 12px;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tl-inspector__trong {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 14px 6px;
+  font-size: 13px;
+  color: var(--lp-ink-muted);
+}
+.tl-inspector__dau {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tl-inspector__ma {
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--lp-plum);
+}
+.tl-inspector__dong {
+  margin-left: auto;
+  border: 1px solid var(--lp-line);
+  background: none;
+  color: var(--lp-ink-muted);
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tl-inspector__ten {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lp-ink);
+}
+.tl-inspector__phu {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--lp-ink-muted);
+}
+.tl-inspector__moc {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tl-inspector__hang {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--lp-surface-2, var(--lp-porcelain));
+  font-size: 12.5px;
+  color: var(--lp-ink);
+}
+.tl-inspector__moc-han { color: var(--lp-ink-muted); }
+.tl-inspector__moc-tt { font-weight: 700; }
+.tl-inspector__hang--over .tl-inspector__moc-tt { color: var(--lp-status-overdue); }
+.tl-inspector__hang--done .tl-inspector__moc-tt { color: var(--lp-status-done); }
+.tl-inspector__hang--current .tl-inspector__moc-tt { color: var(--lp-plum); }
+.tl-inspector__hang--future .tl-inspector__moc-tt { color: var(--lp-ink-muted); }
+.tl-inspector__nut-cum {
+  margin-top: 4px;
+  display: flex;
+  gap: 8px;
+}
+.tl-inspector__nut {
+  border: 1px solid var(--lp-line);
+  background: var(--lp-porcelain);
+  color: var(--lp-plum);
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
 }

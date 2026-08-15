@@ -50,6 +50,69 @@ export interface TimelineSummary {
   conLai: number;
 }
 
+/* ------- Action narrative (nghiên cứu đợt 2): điểm nóng & nút thắt -----
+ * Mỗi hạng mục quá hạn được quy về MỘT mốc trễ sớm nhất của nó (đề cương/
+ * thẩm định/báo cáo/đích VMP). "Nặng nhất" = hạng mục có mốc đó xa nhất
+ * về quá khứ; "nút thắt" = pha gom nhiều hạng mục trễ nhất. Cùng nguồn
+ * luật với strip nên các con số đối chiếu được với bộ lọc. */
+
+export interface DiemNong { act: Activity; mocTre: string; treNgay: number; }
+export interface NutThat { ten: string; so: number; tongQuaHan: number; }
+
+const NGAY_MS = 86_400_000;
+
+/** Mốc trễ sớm nhất của một hạng mục quá hạn; null nếu không quá hạn. */
+function mocTreSomNhat(a: Activity, now: Date): { ten: string; ngay: Date } | null {
+  if (issueLevel(a) !== "over") return null;
+  const ps = phaseStates(a);
+  const m = ps.m;
+  const cac: Array<{ ten: string; ngay: Date | null | undefined }> = [
+    { ten: "Đề cương", ngay: ps.p === "over" ? m.protocol : null },
+    { ten: "Thẩm định", ngay: ps.v === "over" ? m.validation : null },
+    { ten: "Báo cáo", ngay: ps.r === "over" ? m.report : null },
+    { ten: "Đích VMP", ngay: a.st === "over" && m.target && m.target < now ? m.target : null },
+  ];
+  let som: { ten: string; ngay: Date } | null = null;
+  for (const c of cac) {
+    if (c.ngay && (!som || c.ngay < som.ngay)) som = { ten: c.ten, ngay: c.ngay };
+  }
+  return som;
+}
+
+/** Hạng mục trễ nặng nhất (mốc trễ sớm nhất xa nhất về quá khứ). */
+export function timDiemNong(
+  acts: readonly Activity[], now: Date = vmpToday(),
+): DiemNong | null {
+  let kq: DiemNong | null = null;
+  for (const a of acts) {
+    if (!laActive(a)) continue;
+    const moc = mocTreSomNhat(a, now);
+    if (!moc) continue;
+    const treNgay = Math.round((now.getTime() - moc.ngay.getTime()) / NGAY_MS);
+    if (!kq || treNgay > kq.treNgay) kq = { act: a, mocTre: moc.ten, treNgay };
+  }
+  return kq;
+}
+
+/** Pha gom nhiều hạng mục trễ nhất (mỗi hạng mục tính một lần). */
+export function timNutThat(
+  acts: readonly Activity[], now: Date = vmpToday(),
+): NutThat | null {
+  const dem = new Map<string, number>();
+  let tong = 0;
+  for (const a of acts) {
+    if (!laActive(a)) continue;
+    const moc = mocTreSomNhat(a, now);
+    if (!moc) continue;
+    tong += 1;
+    dem.set(moc.ten, (dem.get(moc.ten) ?? 0) + 1);
+  }
+  if (!tong) return null;
+  let ten = "", so = 0;
+  for (const [t, s] of dem) if (s > so) { ten = t; so = s; }
+  return { ten, so, tongQuaHan: tong };
+}
+
 export function buildTimelineSummary(
   acts: readonly Activity[], now: Date = vmpToday(),
 ): TimelineSummary {
