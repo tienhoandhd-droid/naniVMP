@@ -11,6 +11,7 @@ import "./index.css";
 import "./styles/lotus-tokens.css";
 import "./styles/lotus-components.css";
 import "./styles/lotus-responsive.css";
+import "./styles/catalog-workspace.css";
 import "./features/today/today.css";
 import "./features/operationalPeople/operational-people.css";
 

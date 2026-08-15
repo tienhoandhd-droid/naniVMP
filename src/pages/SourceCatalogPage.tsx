@@ -123,8 +123,6 @@ function SourceCatalogSection({ user, onReload, focus }: {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
-  // null = đóng | {} = thêm mới | row = sửa
-  const [editing, setEditing] = useState<Partial<SourceObjectRow> | null>(null);
   const [saving, setSaving] = useState(false);
   const [gen, setGen] = useState<GenState | null>(null);   // hộp thoại sinh timeline
   const [warn, setWarn] = useState<SourceWarnings | null>(null);
@@ -139,7 +137,11 @@ function SourceCatalogSection({ user, onReload, focus }: {
   /* Đối tượng đang mở trong form. `null` là đóng. Form thay cho lối sửa
      bằng nhấn đúp: bảng không có chỗ nói trường nào bắt buộc, không kiểm
      được liên hệ giữa các trường, và không có nơi nhập lý do thay đổi. */
-  const [dangSua, setDangSua] = useState<Record<string, unknown> | null>(null);
+  /* Một state cho cả tạo lẫn sửa: cùng một hộp thoại, khác nhau ở cờ
+     `taoMoi`. Hai state riêng thì có lúc cả hai cùng khác null và hai hộp
+     thoại chồng lên nhau. */
+  const [dangSua, setDangSua] = useState<
+    { row: Record<string, unknown>; taoMoi: boolean } | null>(null);
   /* Thay đổi vừa lưu, đang chờ áp vào timeline. Mở màn xem trước ngay sau
      khi lưu — người dùng thấy ảnh hưởng lúc còn nhớ mình vừa sửa gì. */
   const [changeId, setChangeId] = useState<string | null>(null);
@@ -349,34 +351,6 @@ function SourceCatalogSection({ user, onReload, focus }: {
     return groups;
   }, [broken, warn]);
 
-  const save = async (form: Record<string, unknown>) => {
-    setSaving(true);
-    try {
-      const patch: Record<string, unknown> = {};
-      for (const f of FIELDS) {
-        if (f.key === "object_code") continue;
-        if (PERSON_FIELDS.has(f.key)) {
-          Object.assign(patch, buildSourcePerformerPatch(
-            f.key as SourcePerformerField,
-            (form[personIdField(f.key as SourcePerformerField)] as string | null) ?? null,
-            performerChoices,
-          ));
-          continue;
-        }
-        const raw = form[f.key];
-        if (raw === undefined || raw === "") continue;
-        patch[f.key] = f.num ? Number(raw) : String(raw);
-      }
-      await upsertSourceObject(kind, String(form.object_code), patch);
-      setEditing(null);
-      await load();
-      if (onReload) onReload();
-    } catch (e) {
-      alert("Lỗi lưu: " + ((e as Error).message || "không rõ"));
-    }
-    setSaving(false);
-  };
-
   const stop = async (row: SourceObjectRow) => {
     const reason = window.prompt(`Lý do ngừng dùng "${row.object_code}":`);
     if (!reason || !reason.trim()) return;
@@ -431,7 +405,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
             <Download size={15} /> Xuất Excel
           </button>
           {canEdit && (
-            <button onClick={() => setEditing({})} style={btnPrimary}>
+            <button onClick={() => setDangSua({ row: {}, taoMoi: true })} style={btnPrimary}>
               <Plus size={15} /> Thêm đối tượng
             </button>
           )}
@@ -627,7 +601,7 @@ function SourceCatalogSection({ user, onReload, focus }: {
                       /* ĐÃ BỎ sửa bằng nhấn đúp — xem CatalogObjectForm.
                          Sửa từng ô rời rạc thì không kiểm được ràng buộc
                          giữa các trường và không có chỗ nhập lý do. */
-                      onDoubleClick={canEdit ? () => setDangSua(rec) : undefined}
+                      onDoubleClick={canEdit ? () => setDangSua({ row: rec, taoMoi: false }) : undefined}
                       title={canEdit ? "Nhấn đúp để mở form sửa" : undefined}
                       style={{ padding: here ? "2px 4px" : "8px", whiteSpace: "nowrap",
                                color: i === 0 ? C.plum : C.plumSoft,
@@ -674,7 +648,9 @@ function SourceCatalogSection({ user, onReload, focus }: {
                   );})}
                   {canEdit && (
                     <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
-                      <button onClick={() => setEditing(r)} title="Sửa"
+                      <button
+                        onClick={() => setDangSua({ row: r as Record<string, unknown>, taoMoi: false })}
+                        title="Sửa"
                         style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4 }}>
                         <Pencil size={15} color={C.plum} />
                       </button>
@@ -699,10 +675,6 @@ function SourceCatalogSection({ user, onReload, focus }: {
         </TableScroll>
       </Card>
 
-      {editing && (
-        <EditModal kind={kind} row={editing} saving={saving}
-          onClose={() => setEditing(null)} onSave={save} />
-      )}
       {gen && (
         <GenerateModal state={gen} setState={setGen}
           onClose={() => setGen(null)} onDone={onReload} />
@@ -728,18 +700,22 @@ function SourceCatalogSection({ user, onReload, focus }: {
 
       {dangSua && (
         <CatalogObjectForm
-          row={dangSua}
+          row={dangSua.row}
           objectKind={kind}
           performers={performerChoices}
-          dangTaoMoi={false}
+          dangTaoMoi={dangSua.taoMoi}
           onClose={() => setDangSua(null)}
           onSaved={async (patch, lyDo, version) => {
             /* Không đổi gì thì đóng luôn — gọi RPC để ghi một patch rỗng
                chỉ tạo thêm một dòng nhật ký vô nghĩa. */
             if (!Object.keys(patch).length) { setDangSua(null); return; }
 
-            const kq = await saveCatalogObject(
-              kind, String(dangSua.object_code ?? ""), patch, lyDo, version);
+            /* Tạo mới thì mã nằm trong form (đã validate bắt buộc);
+               sửa thì mã lấy từ bản ghi gốc — ô mã lúc đó bị khoá. */
+            const ma = dangSua.taoMoi
+              ? String(patch.object_code ?? "")
+              : String(dangSua.row.object_code ?? "");
+            const kq = await saveCatalogObject(kind, ma, patch, lyDo, version);
             if (!kq.ok) {
               throw new Error(kq.error_code === "VERSION_CONFLICT"
                 ? `${kq.error ?? "Bản ghi đã bị người khác sửa"} (bản trên máy chủ: v${kq.current_version ?? "?"})`
@@ -1069,93 +1045,6 @@ function GenerateModal({ state, setState, onClose, onDone }: {
         <button onClick={() => run(true)} disabled={busy || !r || !r.so_tao_moi}
           style={{ ...btnPrimary, opacity: (busy || !r || !r.so_tao_moi) ? 0.5 : 1 }}>
           {busy ? "Đang chạy…" : `Ghi ${r ? r.so_tao_moi : ""} hạng mục`}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-/* ---------------------------------------------------------------- */
-function EditModal({ kind, row, saving, onClose, onSave }: {
-  kind: ObjectKind;
-  row: Partial<SourceObjectRow>;
-  saving: boolean;
-  onClose: () => void;
-  onSave: (form: Record<string, unknown>) => void;
-}) {
-  const isNew = !row.id;
-  const { performers } = usePerformers();
-  const performerChoices = buildActivePerformerChoices(performers);
-  const [form, setForm] = useState(() => {
-    const f: Record<string, unknown> = {};
-    const rec = row as Record<string, unknown>;
-    for (const x of FIELDS) f[x.key] = rec[x.key] ?? "";
-    return f;
-  });
-  const [personDraft, setPersonDraft] = useState<Record<SourcePerformerField, string | null | undefined>>({
-    owner_name: undefined,
-    support_name: undefined,
-  });
-  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
-  const selectedPersonId = (field: SourcePerformerField) =>
-    personDraft[field] !== undefined
-      ? personDraft[field] ?? null
-      : sourcePersonId(row as Record<string, unknown>, field, performerChoices);
-
-  const submit = () => {
-    if (!String(form.object_code || "").trim()) { alert("Phải nhập mã đối tượng."); return; }
-    onSave({
-      ...form,
-      owner_person_id: selectedPersonId("owner_name"),
-      support_person_id: selectedPersonId("support_name"),
-    });
-  };
-
-  return (
-    <Modal onClose={onClose} wide icon={Boxes}
-      title={`${isNew ? "Thêm" : "Sửa"} đối tượng — ${kind}`}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
-        {FIELDS.map((f) => (
-          <label key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.plum, fontFamily: TEXT }}>
-              {f.label}{f.required ? " *" : ""}
-            </span>
-            {PERSON_FIELDS.has(f.key) ? (
-              <PerformerSelect
-                value={selectedPersonId(f.key as SourcePerformerField)}
-                options={performerChoices}
-                ariaLabel={f.label}
-                onChange={(personId) => setPersonDraft((current) => ({
-                  ...current,
-                  [f.key]: personId,
-                }))}
-              />
-            ) : (
-              <input
-                value={String(form[f.key] ?? "")}
-                onChange={(e) => set(f.key, e.target.value)}
-                disabled={!isNew && f.lockOnEdit}
-                inputMode={f.num ? "numeric" : undefined}
-                style={{
-                  padding: "8px 10px", borderRadius: 8, fontFamily: TEXT, fontSize: 14,
-                  border: `1.5px solid ${C.pinkSoft}`,
-                  background: (!isNew && f.lockOnEdit) ? C.pinkMist : C.surface,
-                }} />
-            )}
-            {f.hint && (
-              <span style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.35 }}>{f.hint}</span>
-            )}
-          </label>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-        <button onClick={onClose}
-          style={{ ...btnPrimary, background: C.surface, color: C.plum, border: `1.5px solid ${C.pinkSoft}` }}>
-          Huỷ
-        </button>
-        <button onClick={submit} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>
-          {saving ? "Đang lưu…" : "Lưu"}
         </button>
       </div>
     </Modal>

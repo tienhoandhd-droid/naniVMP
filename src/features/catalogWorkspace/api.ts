@@ -89,7 +89,7 @@ export async function listDataset({
  * ------------------------------------------------------------------ */
 
 export async function saveRecord({
-  dataset, businessKey, recordId, patch, reason, expectedVersion,
+  dataset, businessKey, recordId, patch, reason, expectedVersion, objectKind,
 }: {
   dataset: CatalogDatasetId;
   businessKey: string;
@@ -97,6 +97,8 @@ export async function saveRecord({
   patch: CatalogRecord;
   reason?: string | null;
   expectedVersion?: number | null;
+  /** Chỉ dùng cho dataset `objects`: loại đối tượng của bản ghi. */
+  objectKind?: string | null;
 }): Promise<CatalogSaveResult> {
   if (!supabase) return chuaCauHinh();
 
@@ -126,8 +128,15 @@ export async function saveRecord({
         p_expected_version: expectedVersion ?? null,
       } as never));
     } else {
+      /* Loại đối tượng quyết định bảng nào bị ghi. Đoán bừa "Thiết bị" thì
+         một lần sửa quy trình sẽ ghi nhầm sang bảng thiết bị — nên thà
+         dừng lại và nói rõ còn hơn ghi sai chỗ. */
+      const loai = String(objectKind ?? patch.object_kind ?? "").trim();
+      if (!loai) {
+        return { ok: false, errorCode: "MISSING_OBJECT_KIND", error: "Thiếu loại đối tượng." };
+      }
       ({ data, error } = await supabase.rpc("rpc_save_catalog_object" as never, {
-        p_object_kind: String(patch.object_kind ?? "Thiết bị"),
+        p_object_kind: loai,
         p_object_code: businessKey,
         p_patch: patch,
         p_reason: reason?.trim() || null,

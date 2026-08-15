@@ -10,10 +10,21 @@
  *    · có chỗ nhập LÝ DO khi sửa thứ ảnh hưởng tới timeline.
  *
  *  Luật nằm ở src/lib/catalogForm.ts, không nằm ở đây. File này chỉ vẽ.
+ *
+ *  Khi SỬA, form mở ở dạng đối chiếu hai cột: bên trái là dữ liệu đang có
+ *  trên hệ thống, bên phải là chỗ gõ. Người ký hồ sơ GMP chịu trách nhiệm
+ *  cho con số mình vừa đổi, nên phải nhìn thấy con số cũ ngay cạnh nó —
+ *  chứ không phải nhớ trong đầu rồi bấm Lưu.
+ *
+ *  Vỏ hộp thoại (bẫy tiêu điểm, làm trơ nền, Escape, chân hộp luôn nhìn
+ *  thấy dù thân dài) thuộc về `ViewportDialog`. Ở đây không tự dựng lại —
+ *  bản trước tự dựng một lớp phủ `position: fixed` và mất cả bốn thứ đó.
  * ===================================================================== */
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Save, X } from "lucide-react";
-import { C, TEXT } from "../../constants/theme.ts";
+import { useMemo, useState } from "react";
+import { AlertTriangle, Boxes, Lock, Save } from "lucide-react";
+
+import ViewportDialog from "../ui/ViewportDialog.tsx";
+import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import {
   TRUONG_FORM, buildCatalogPatch, canLyDo, coThamDinh, validateCatalogForm,
 } from "../../lib/catalogForm.ts";
@@ -40,6 +51,16 @@ function doiSangForm(row: Record<string, unknown>): GiaTriForm {
   return form;
 }
 
+/** Giá trị đọc cho người, không phải cho máy. Ô trống hiện gạch ngang chứ
+ *  không để trắng — dòng trắng nhìn như hệ thống tải thiếu dữ liệu. */
+function doc(t: TruongForm, form: GiaTriForm): string {
+  if (t.chonNguoi) {
+    const ten = t.chonNguoi === "owner" ? form.owner_name : form.support_name;
+    return ten?.trim() || "—";
+  }
+  return (form[t.key] ?? "").trim() || "—";
+}
+
 export default function CatalogObjectForm({
   row, objectKind, performers, dangTaoMoi, onClose, onSaved,
 }: {
@@ -58,21 +79,18 @@ export default function CatalogObjectForm({
   const [moNangCao, setMoNangCao] = useState(false);
 
   const banGoc = useMemo(() => doiSangForm(row), [row]);
-  const daDoi = useMemo(
-    () => TRUONG_FORM.some((t) => (form[t.key] ?? "") !== (banGoc[t.key] ?? "")),
+  const doiGi = useMemo(
+    () => TRUONG_FORM.filter((t) => (form[t.key] ?? "") !== (banGoc[t.key] ?? "")),
     [form, banGoc],
   );
+  const daDoi = doiGi.length > 0;
   const patch = useMemo(() => buildCatalogPatch(form, row), [form, row]);
   const phaiCoLyDo = canLyDo(patch, dangTaoMoi);
 
-  /* Cảnh báo khi đóng tab mà còn thay đổi chưa lưu. Không chặn được thao
-     tác đóng modal — cái đó xử lý ở nút X bên dưới. */
-  useEffect(() => {
-    if (!daDoi) return;
-    const canh = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
-    window.addEventListener("beforeunload", canh);
-    return () => window.removeEventListener("beforeunload", canh);
-  }, [daDoi]);
+  /* Báo cho shell biết còn thay đổi chưa lưu. Bản trước gắn `beforeunload`
+     ngay tại đây; sổ dùng chung làm được đúng việc đó mà không để lại
+     listener toàn cục cho từng form. */
+  useRegisterDirtyState(`catalog-object-${String(row.object_code ?? "moi")}`, daDoi);
 
   const dat = (key: string, value: string) => {
     setForm((truoc) => ({ ...truoc, [key]: value }));
@@ -102,7 +120,10 @@ export default function CatalogObjectForm({
     try {
       const version = row.version === null || row.version === undefined
         ? null : Number(row.version);
-      await onSaved(patch, lyDo.trim() || null, dangTaoMoi ? null : version);
+      /* Tạo mới không hỏi lý do người dùng: hành động đã tự nói lên nó,
+         nên gửi lý do hệ thống để dòng nhật ký vẫn có nội dung đọc được. */
+      const lyDoGui = dangTaoMoi ? "Tạo mới từ form" : (lyDo.trim() || null);
+      await onSaved(patch, lyDoGui, dangTaoMoi ? null : version);
     } catch (e) {
       setLoiChung(e instanceof Error ? e.message : String(e));
     } finally {
@@ -113,11 +134,20 @@ export default function CatalogObjectForm({
   const veTruong = (t: TruongForm) => {
     const khoa = t.khoaSauKhiTao && !dangTaoMoi;
     const loiO = loi[t.key];
+    const id = `cof-${t.key}`;
+    const idLoi = `${id}-loi`;
+    const idGoiY = `${id}-goi-y`;
+    const daSua = (form[t.key] ?? "") !== (banGoc[t.key] ?? "");
+    const moTa = [loiO ? idLoi : null, t.goiY ? idGoiY : null].filter(Boolean).join(" ") || undefined;
+    const lop = `cw-o${daSua ? " is-doi" : ""}${loiO ? " is-loi" : ""}`;
+
     return (
-      <label key={t.key} style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220, flex: "1 1 240px" }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.plum }}>
-          {t.label}{t.batBuoc && <span style={{ color: C.raspText }}> *</span>}
-        </span>
+      <div key={t.key} className="cw-truong">
+        <label htmlFor={id} className="cw-nhan">
+          {t.label}
+          {t.batBuoc && <span className="cw-bat-buoc" aria-hidden="true">*</span>}
+          {khoa && <Lock size={13} aria-hidden="true" className="cw-khoa-icon" />}
+        </label>
 
         {t.chonNguoi ? (
           <PerformerSelect
@@ -125,122 +155,133 @@ export default function CatalogObjectForm({
             options={performers}
             allowClear
             ariaLabel={t.label}
-            onChange={(id) => dat(t.key, id ?? "")}
+            onChange={(nguoi) => dat(t.key, nguoi ?? "")}
             disabled={khoa}
           />
         ) : t.chon ? (
-          <select value={form[t.key] ?? ""} disabled={khoa} onChange={(e) => dat(t.key, e.target.value)}
-            style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 14,
-                     border: `1.5px solid ${loiO ? C.rasp : C.pinkSoft}`, background: khoa ? C.bg2 : C.surface }}>
+          <select id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
+            aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
+            onChange={(e) => dat(t.key, e.target.value)}>
             <option value="">—</option>
             {t.chon.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
         ) : (
-          <input value={form[t.key] ?? ""} disabled={khoa}
+          <input id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
             inputMode={t.so ? "numeric" : undefined}
-            onChange={(e) => dat(t.key, e.target.value)}
-            style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 14,
-                     border: `1.5px solid ${loiO ? C.rasp : C.pinkSoft}`, background: khoa ? C.bg2 : C.surface }} />
+            aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
+            onChange={(e) => dat(t.key, e.target.value)} />
         )}
 
         {/* Lỗi đặt NGAY dưới ô, không gom vào một hộp chung ở đầu form —
             người dùng phải thấy sai ở đâu mà không phải dò. */}
-        {loiO && <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{loiO}</span>}
-        {!loiO && t.goiY && <span style={{ fontSize: 12, color: C.plumSoft }}>{t.goiY}</span>}
-      </label>
+        {loiO && <p id={idLoi} className="cw-loi" role="alert">{loiO}</p>}
+        {!loiO && t.goiY && <p id={idGoiY} className="cw-goi-y">{t.goiY}</p>}
+      </div>
     );
   };
 
   const nhom = (id: NhomTruong) => TRUONG_FORM.filter((t) => t.nhom === id);
   const hienKeHoach = coThamDinh(form);
+  const khoaLuu = dangLuu || (!daDoi && !dangTaoMoi);
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(60,40,60,.35)", zIndex: 60,
-      display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, overflowY: "auto",
-    }}>
-      <div style={{
-        background: C.surface, borderRadius: 20, padding: 22, maxWidth: 980, width: "100%",
-        border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, color: C.plum,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>
-            {dangTaoMoi ? "Thêm đối tượng" : `Sửa ${row.object_code ?? ""}`}
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.plumSoft, marginLeft: 8 }}>{objectKind}</span>
-          </div>
-          <button type="button" onClick={dong} aria-label="Đóng"
-            style={{ border: "none", background: "transparent", cursor: "pointer", color: C.plumSoft }}>
-            <X size={20} />
+    <ViewportDialog
+      open
+      title={dangTaoMoi ? "Thêm đối tượng" : `Sửa ${String(row.object_code ?? "")}`}
+      description={objectKind}
+      icon={Boxes}
+      maxWidth={dangTaoMoi ? 720 : 1080}
+      onRequestClose={dong}
+      footer={
+        <>
+          <button type="button" onClick={dong} className="cw-nut cw-nut--phu">Huỷ</button>
+          <button type="button" onClick={luu} disabled={khoaLuu} className="cw-nut cw-nut--chinh">
+            <Save size={16} aria-hidden="true" /> {dangLuu ? "Đang lưu…" : "Lưu"}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className={dangTaoMoi ? "cw-than cw-than--tao" : "cw-than cw-than--sua"}>
+        {/* Cột đối chiếu chỉ có nghĩa khi đang sửa: lúc tạo mới thì "hiện
+            tại" là một cột trống hoàn toàn, chiếm chỗ mà không nói gì. */}
+        {!dangTaoMoi && (
+          <section className="cw-cot cw-cot--truoc" aria-label="Dữ liệu hiện tại">
+            <h3 className="cw-cot__ten">Dữ liệu hiện tại</h3>
+            <dl className="cw-doc">
+              {TRUONG_FORM.map((t) => {
+                const daSua = (form[t.key] ?? "") !== (banGoc[t.key] ?? "");
+                return (
+                  <div key={t.key} className={daSua ? "cw-doc__dong is-doi" : "cw-doc__dong"}>
+                    <dt>{t.label}</dt>
+                    <dd>{doc(t, banGoc)}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </section>
+        )}
 
-        {(["chinh", "ke_hoach", "phan_cong"] as const).map((id) => {
-          if (id === "ke_hoach" && !hienKeHoach) return null;
-          return (
-            <section key={id} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: C.plumSoft, marginBottom: 8 }}>
-                {TEN_NHOM[id]}
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>{nhom(id).map(veTruong)}</div>
-            </section>
-          );
-        })}
+        <section className="cw-cot cw-cot--sau"
+          aria-label={dangTaoMoi ? "Thông tin đối tượng mới" : "Sau khi thay đổi"}>
+          {!dangTaoMoi && <h3 className="cw-cot__ten">Sau khi thay đổi</h3>}
 
-        {/* Nâng cao thu gọn sẵn: mở form ra mà thấy hai chục ô thì không ai
-            biết bắt đầu từ đâu. */}
-        <section style={{ marginBottom: 16 }}>
-          <button type="button" onClick={() => setMoNangCao((v) => !v)}
-            style={{ border: "none", background: "transparent", cursor: "pointer",
-                     fontFamily: TEXT, fontSize: 13, fontWeight: 800, color: C.plumSoft, padding: 0 }}>
-            {moNangCao ? "▾" : "▸"} {TEN_NHOM.nang_cao}
-          </button>
-          {moNangCao && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
-              {nhom("nang_cao").map(veTruong)}
-            </div>
-          )}
+          {(["chinh", "ke_hoach", "phan_cong"] as const).map((id) => {
+            if (id === "ke_hoach" && !hienKeHoach) return null;
+            return (
+              <section key={id} className="cw-nhom-truong">
+                <h4 className="cw-cot__ten">{TEN_NHOM[id]}</h4>
+                <div className="cw-nhom">{nhom(id).map(veTruong)}</div>
+              </section>
+            );
+          })}
+
+          {/* Nâng cao thu gọn sẵn: mở form ra mà thấy hai chục ô thì không ai
+              biết bắt đầu từ đâu. */}
+          <details className="cw-nang-cao" open={moNangCao}
+            onToggle={(e) => setMoNangCao((e.currentTarget as HTMLDetailsElement).open)}>
+            <summary>{TEN_NHOM.nang_cao} ({nhom("nang_cao").length} trường)</summary>
+            <div className="cw-nhom">{nhom("nang_cao").map(veTruong)}</div>
+          </details>
         </section>
-
-        {phaiCoLyDo && (
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.plum }}>
-              Lý do thay đổi <span style={{ color: C.raspText }}>*</span>
-            </span>
-            <input value={lyDo} onChange={(e) => setLyDo(e.target.value)}
-              placeholder="Vì sao đổi? Câu này đi vào nhật ký, người sau đọc để hiểu."
-              style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 14,
-                       border: `1.5px solid ${loi.__lyDo ? C.rasp : C.pinkSoft}` }} />
-            {loi.__lyDo && <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{loi.__lyDo}</span>}
-            <span style={{ fontSize: 12, color: C.plumSoft }}>
-              Thay đổi này chạm tới deadline hoặc phân công, nên timeline sẽ cần cập nhật lại.
-            </span>
-          </label>
-        )}
-
-        {loiChung && (
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 12,
-                        padding: 10, borderRadius: 10, background: C.raspSoft, color: C.raspText }}>
-            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-            <span style={{ fontSize: 13 }}>{loiChung}</span>
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" onClick={dong}
-            style={{ padding: "10px 16px", borderRadius: 12, cursor: "pointer", fontFamily: TEXT,
-                     fontWeight: 700, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plum }}>
-            Huỷ
-          </button>
-          <button type="button" onClick={luu} disabled={dangLuu || (!daDoi && !dangTaoMoi)}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 12,
-                     cursor: dangLuu || (!daDoi && !dangTaoMoi) ? "not-allowed" : "pointer",
-                     fontFamily: TEXT, fontWeight: 800, border: "none",
-                     background: dangLuu || (!daDoi && !dangTaoMoi) ? C.pinkSoft : C.pink,
-                     color: dangLuu || (!daDoi && !dangTaoMoi) ? C.plumSoft : "#fff" }}>
-            <Save size={16} /> {dangLuu ? "Đang lưu…" : "Lưu"}
-          </button>
-        </div>
       </div>
-    </div>
+
+      {/* Tóm tắt đặt sau form, ngay trên hàng nút: đây là thứ cuối cùng
+          người dùng đọc trước khi chịu trách nhiệm cho thay đổi. */}
+      {!dangTaoMoi && daDoi && (
+        <section className="cw-tom-tat" aria-label="Tóm tắt thay đổi">
+          <h3>Sẽ thay đổi {doiGi.length} trường</h3>
+          <ul>
+            {doiGi.map((t) => (
+              <li key={t.key}>
+                <b>{t.label}</b>: {doc(t, banGoc)} <span aria-hidden="true">→</span> {doc(t, form)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {phaiCoLyDo && (
+        <div className="cw-truong cw-ly-do">
+          <label htmlFor="cof-ly-do" className="cw-nhan">
+            Lý do thay đổi<span className="cw-bat-buoc" aria-hidden="true">*</span>
+          </label>
+          <input id="cof-ly-do" value={lyDo} onChange={(e) => setLyDo(e.target.value)}
+            className={`cw-o${loi.__lyDo ? " is-loi" : ""}`}
+            aria-invalid={loi.__lyDo ? true : undefined}
+            aria-describedby={loi.__lyDo ? "cof-ly-do-loi" : "cof-ly-do-goi-y"}
+            placeholder="Vì sao đổi? Câu này đi vào nhật ký, người sau đọc để hiểu." />
+          {loi.__lyDo && <p id="cof-ly-do-loi" className="cw-loi" role="alert">{loi.__lyDo}</p>}
+          <p id="cof-ly-do-goi-y" className="cw-goi-y">
+            Thay đổi này chạm tới deadline hoặc phân công, nên timeline sẽ cần cập nhật lại.
+          </p>
+        </div>
+      )}
+
+      {loiChung && (
+        <p className="cw-canh-bao cw-canh-bao--loi" role="alert">
+          <AlertTriangle size={16} aria-hidden="true" /> {loiChung}
+        </p>
+      )}
+    </ViewportDialog>
   );
 }

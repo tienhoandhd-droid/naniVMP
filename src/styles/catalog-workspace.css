@@ -1,0 +1,298 @@
+/* =====================================================================
+ *  catalog-workspace.css — form và hộp thoại danh mục
+ *  ---------------------------------------------------------------------
+ *  Chỉ tạo dáng cho tiền tố `.cw-`. Vỏ hộp thoại (`.lp-dialog__*`) đã có
+ *  trong lotus-components.css và KHÔNG được đụng vào ở đây.
+ *
+ *  Mọi khoảng cách là bội số của 4px (luật A1), vùng chạm ≥ 44px ở khổ
+ *  điện thoại (A3), không chữ nào nhỏ hơn 12px (C3), và mỗi đoạn văn có
+ *  line-height ≥ 1.4 (C4).
+ * ===================================================================== */
+
+/* --------------------------------------------------------------------- *
+ *  Thân hộp thoại: một cột khi tạo, hai cột đối chiếu khi sửa
+ * --------------------------------------------------------------------- */
+.cw-than { display: grid; gap: 20px; }
+
+.cw-than--tao { grid-template-columns: 1fr; }
+
+/* Hai cột chỉ có nghĩa khi đủ chỗ đặt cạnh nhau. Hẹp hơn thì xếp dọc —
+   ép hai cột vào 380px sẽ khiến chính bảng đối chiếu phải kéo ngang, tức
+   là vi phạm luật A7 ngay ở nơi lẽ ra dễ đọc nhất. */
+.cw-than--sua { grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); }
+
+@media (max-width: 860px) {
+  .cw-than--sua { grid-template-columns: 1fr; }
+}
+
+.cw-cot { min-width: 0; }
+
+.cw-cot__ten {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-ink-muted);
+}
+
+/* Cột "hiện tại" lùi về sau bằng nền, không bằng chữ mờ: chữ mờ đi thì
+   tương phản tụt dưới 4.5:1 và luật B1 chặn ngay. */
+.cw-cot--truoc {
+  padding: 16px;
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  background: var(--lp-surface-2);
+}
+
+/* --------------------------------------------------------------------- *
+ *  Bảng đọc — giá trị hiện tại
+ * --------------------------------------------------------------------- */
+.cw-doc { margin: 0; display: grid; gap: 8px; }
+
+.cw-doc__dong {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--lp-line);
+}
+
+.cw-doc__dong:last-child { border-bottom: 0; }
+
+.cw-doc dt {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lp-ink-muted);
+}
+
+.cw-doc dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--lp-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Dòng sắp bị thay đổi: vệt màu ở mép trái + chữ đậm. Hai kênh chứ không
+   chỉ màu — luật B4. */
+.cw-doc__dong.is-doi {
+  margin-left: -16px;
+  padding-left: 12px;
+  border-left: 4px solid var(--lp-gold);
+  background: var(--lp-rose-soft);
+  border-radius: 0 10px 10px 0;
+}
+
+.cw-doc__dong.is-doi dd { font-weight: 600; }
+
+/* --------------------------------------------------------------------- *
+ *  Ô nhập
+ * --------------------------------------------------------------------- */
+.cw-nhom-truong { margin-bottom: 20px; }
+.cw-nhom-truong > .cw-cot__ten { font-size: 12px; }
+
+/* Hai cột ô nhập khi còn chỗ. Ô nhập một cột trên màn rộng tạo dòng dài
+   quá 85 ký tự — luật A4. */
+.cw-nhom {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.cw-truong { display: grid; gap: 4px; min-width: 0; }
+
+.cw-nhan {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--lp-ink);
+}
+
+.cw-bat-buoc { color: var(--lp-danger); font-weight: 700; }
+
+.cw-khoa-icon { color: var(--lp-ink-muted); flex: none; }
+
+.cw-o {
+  width: 100%;
+  min-height: 44px;             /* A3: đủ lớn cho ngón tay, mọi khổ màn */
+  padding: 8px 12px;
+  border: 1px solid var(--lp-line-strong);
+  border-radius: 10px;          /* LOTUS_RADII.control */
+  background: var(--lp-surface);
+  color: var(--lp-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cw-o:focus-visible {
+  outline: 2px solid var(--lp-focus);
+  outline-offset: 2px;
+  border-color: var(--lp-plum);
+}
+
+/* Ô khoá: nền xám nhưng chữ vẫn đọc được. Ô mờ tới mức không đọc nổi là
+   cách chắc chắn khiến người dùng tưởng dữ liệu bị mất. */
+.cw-o:disabled {
+  background: var(--lp-disabled-surface);
+  color: var(--lp-ink-muted);
+  cursor: not-allowed;
+}
+
+.cw-o.is-doi { border-color: var(--lp-gold); background: var(--lp-rose-soft); }
+
+.cw-o.is-loi { border-color: var(--lp-danger); }
+
+/* Ô đánh dấu: nhãn bọc ngoài nên cả dòng là vùng chạm. */
+.cw-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--lp-ink);
+  cursor: pointer;
+}
+
+.cw-switch input[type="checkbox"] { flex: none; }
+.cw-switch input[type="checkbox"]:disabled { cursor: not-allowed; }
+
+.cw-goi-y {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lp-ink-muted);
+}
+
+.cw-loi {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--lp-danger);
+}
+
+.cw-canh-bao {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--lp-warning-line);
+  border-radius: 10px;
+  background: var(--lp-warning-bg);
+  color: var(--lp-warning);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cw-canh-bao--loi {
+  margin: 20px 0 0;
+  border-color: var(--lp-danger);
+  background: var(--lp-danger-soft);
+  color: var(--lp-danger);
+}
+
+.cw-canh-bao svg { flex: none; margin-top: 2px; }
+
+/* --------------------------------------------------------------------- *
+ *  Nhóm nâng cao
+ * --------------------------------------------------------------------- */
+.cw-nang-cao {
+  margin-top: 16px;
+  border-top: 1px solid var(--lp-line);
+  padding-top: 12px;
+}
+
+.cw-nang-cao > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--lp-plum);
+  cursor: pointer;
+}
+
+.cw-nang-cao > summary:focus-visible {
+  outline: 2px solid var(--lp-focus);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.cw-nang-cao[open] > summary { margin-bottom: 12px; }
+
+/* --------------------------------------------------------------------- *
+ *  Tóm tắt thay đổi — thứ cuối cùng người dùng đọc trước khi bấm Lưu
+ * --------------------------------------------------------------------- */
+.cw-tom-tat {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--lp-gold-hairline);
+  border-radius: 18px;          /* LOTUS_RADII.card */
+  background: var(--lp-surface-2);
+}
+
+.cw-tom-tat h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--lp-ink);
+}
+
+.cw-tom-tat ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+
+.cw-tom-tat li {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lp-ink);
+  overflow-wrap: anywhere;
+}
+
+.cw-tom-tat b { color: var(--lp-plum); }
+
+.cw-ly-do { margin-top: 20px; }
+
+/* --------------------------------------------------------------------- *
+ *  Nút ở chân hộp thoại
+ * --------------------------------------------------------------------- */
+.cw-nut {
+  min-height: 44px;
+  padding: 8px 20px;
+  border-radius: 999px;         /* LOTUS_RADII.pill */
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--lp-mo-chip) var(--lp-ease);
+}
+
+.cw-nut:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+
+.cw-nut--chinh { background: var(--lp-plum); color: var(--lp-on-plum); }
+.cw-nut--chinh:hover:not(:disabled) { background: var(--lp-plum-2); }
+
+.cw-nut--phu {
+  background: var(--lp-surface);
+  color: var(--lp-ink);
+  border-color: var(--lp-line-strong);
+}
+.cw-nut--phu:hover { background: var(--lp-surface-2); }
+
+.cw-nut:disabled {
+  background: var(--lp-disabled-surface);
+  color: var(--lp-ink-muted);   /* ≥ 4.5:1 trên nền disabled */
+  border-color: var(--lp-line);
+  cursor: not-allowed;
+}
