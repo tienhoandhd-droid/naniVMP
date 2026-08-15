@@ -49,6 +49,15 @@ don_dep() {
     # npm sẽ để lại node mồ côi giữ cổng preview cho lần chạy sau.
     kill -TERM -- "-$PID_PREVIEW" 2>/dev/null || kill -TERM "$PID_PREVIEW" 2>/dev/null || true
     wait "$PID_PREVIEW" 2>/dev/null || true
+    # `wait` chỉ thu hồi được CON trực tiếp; node cháu trong nhóm nhận TERM
+    # nhưng cần thêm vài chục ms để chết — trên runner chậm, thoát ngay tại
+    # đây là để lại tiến trình sống sau khi script đã "xong" (CI đã bắt
+    # được đúng cảnh này). Chờ CẢ NHÓM chết, có hạn; quá hạn thì KILL.
+    for _ in $(seq 1 100); do
+      kill -0 -- "-$PID_PREVIEW" 2>/dev/null || break
+      sleep 0.05
+    done
+    kill -KILL -- "-$PID_PREVIEW" 2>/dev/null || true
     PID_PREVIEW=""
   fi
   if [ -n "$TMP" ] && [ -d "$TMP" ]; then rm -rf "$TMP"; fi
