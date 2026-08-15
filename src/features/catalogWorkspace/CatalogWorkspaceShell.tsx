@@ -44,6 +44,7 @@ import type { AccessContext } from "../../lib/access.ts";
 import type { GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../../types/domain.ts";
 import CatalogSmartTable from "./CatalogSmartTable.tsx";
 import CatalogRecordDialog from "./CatalogRecordDialog.tsx";
+import CatalogExcelImport from "./CatalogExcelImport.tsx";
 import { listDataset, listHistory, listPendingChanges } from "./api.ts";
 import { layDataset } from "./definitions.ts";
 import type {
@@ -480,10 +481,15 @@ export default function CatalogWorkspaceShell({
             </>
           )}
 
-          {/* ----- Nhập Excel (mở ở đợt sau của Đợt B) ----- */}
+          {/* ----- Nhập Excel theo mẫu chính thức ----- */}
           {vung === "import" && (
-            <StateBoundary state="empty" title="Nhập Excel theo mẫu chính thức"
-              description="Tải mẫu đúng cột, dán dữ liệu, xem trước từng dòng được kiểm, rồi ghi một lần có lý do. Phần này chưa mở ở bản hiện tại — nhập từng bản ghi vẫn làm được bằng nút Thêm ở mục Đối tượng, Sản phẩm GMP và Người nhận cảnh báo." />
+            <CatalogExcelImport
+              onCommitted={(pendingIds) => {
+                taiDoiTuong();
+                setSvTick((t) => t + 1);
+                if (pendingIds.length > 0) doiVung("pending");
+              }}
+            />
           )}
 
           {/* ----- Chờ áp dụng ----- */}

@@ -92,6 +92,37 @@ export interface CatalogChangeRow {
   last_error: string | null;
 }
 
+/* ---------------------------------------------------------------------
+ *  Nhập Excel theo lô (Đợt B Task 8+10; RPC staging thật thuộc Task 9)
+ * ------------------------------------------------------------------- */
+
+/** Một dòng gửi lên staging — đúng hình dạng ParsedCatalogRow đã chuẩn hoá. */
+export interface CatalogImportRowPayload {
+  rowNumber: number;
+  businessKey: string;
+  objectKind: string | null;
+  values: CatalogRecord;
+}
+
+export type CatalogImportBatchStatus =
+  | "uploaded" | "validated" | "committed" | "failed" | "expired";
+
+export interface CatalogImportBatch {
+  id: string;
+  status: CatalogImportBatchStatus;
+  total: number;
+}
+
+export interface CatalogImportCommitResult {
+  ok: boolean;
+  created?: number;
+  updated?: number;
+  unchanged?: number;
+  pendingChangeIds?: string[];
+  errorCode?: string;
+  error?: string;
+}
+
 /** Một dòng lịch sử — TÓM TẮT, không kèm JSON đầy đủ. */
 export interface CatalogAuditRow {
   id: string;

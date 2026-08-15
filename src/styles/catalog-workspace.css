@@ -579,3 +579,96 @@
     clip: auto;
   }
 }
+
+/* =====================================================================
+ *  NHẬP EXCEL (Đợt B Task 10)
+ * =================================================================== */
+
+.cw-import { display: flex; flex-direction: column; gap: 14px; }
+
+.cw-import__dau {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cw-import__taive { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.cw-import__chon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px dashed var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-ink-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.cw-import__chon input[type="file"] { max-width: 220px; font-size: 12px; }
+
+.cw-import__loi {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--lp-danger-soft);
+  color: var(--lp-danger);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.cw-import__tong {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cw-import__dem {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--lp-surface-2);
+  color: var(--lp-ink);
+}
+.cw-import__dem--moi      { background: var(--lp-success-soft); color: var(--lp-success); }
+.cw-import__dem--sua      { background: var(--lp-warning-bg); color: var(--lp-warning); }
+.cw-import__dem--loi      { background: var(--lp-danger-soft); color: var(--lp-danger); }
+
+.cw-tag--imp-moi      { background: var(--lp-success-soft); color: var(--lp-success); }
+.cw-tag--imp-sua      { background: var(--lp-warning-bg); color: var(--lp-warning); }
+.cw-tag--imp-khongdoi { background: var(--lp-surface-2); color: var(--lp-ink-muted); }
+.cw-tag--imp-loi      { background: var(--lp-danger-soft); color: var(--lp-danger); }
+
+.cw-import-a3 {
+  margin: 4px 0 0;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.cw-import-a3__dong {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(0, 1fr);
+  gap: 4px 14px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--lp-line);
+}
+.cw-import-a3__dong:last-child { border-bottom: 0; }
+.cw-import-a3__dong dt { font-size: 12px; font-weight: 700; color: var(--lp-ink-muted); }
+.cw-import-a3__dong dd { margin: 0; display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.cw-import-a3__truoc { color: var(--lp-ink-muted); }
+.cw-import-a3__sau { font-weight: 700; color: var(--lp-ink); }
+
+.cw-import__ghi {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-surface);
+}

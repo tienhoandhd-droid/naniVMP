@@ -12,7 +12,8 @@
 import { supabase } from "../../lib/supabaseClient.ts";
 import { layDataset } from "./definitions.ts";
 import type {
-  CatalogAuditRow, CatalogChangeRow, CatalogDatasetId, CatalogListFilters,
+  CatalogAuditRow, CatalogChangeRow, CatalogDatasetId, CatalogImportBatch,
+  CatalogImportCommitResult, CatalogImportRowPayload, CatalogListFilters,
   CatalogListResult, CatalogListRow, CatalogRecord, CatalogSaveResult,
 } from "./contracts.ts";
 
@@ -209,6 +210,106 @@ export async function listHistory(filters: {
     return { ok: true, total: Number(kq.total ?? 0), history: (kq.history || []) as CatalogAuditRow[] };
   } catch (e) {
     return { ok: false, total: 0, history: [], error: loiHaTang(e).error };
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Nhập Excel theo lô — ba RPC staging thuộc Đợt B Task 9 (migration
+ *  chưa áp). Lớp gọi này đã đúng tên RPC; chừng nào server chưa có hàm,
+ *  mọi lời gọi trả `NOT_AVAILABLE` để giao diện hiện trạng thái BỊ CHẶN
+ *  thay vì một lỗi mạng khó hiểu — và tự mở khoá khi migration được áp.
+ * ------------------------------------------------------------------ */
+
+const CHUA_CO_STAGING = {
+  ok: false as const,
+  errorCode: "NOT_AVAILABLE",
+  error: "Server chưa có RPC staging của đợt nhập Excel (Đợt B Task 9 chưa áp).",
+};
+
+/** PostgREST trả PGRST202 khi hàm không tồn tại; mock giả lập trả null. */
+function thieuHam(error: { message: string } | null, data: unknown): boolean {
+  if (error) return /PGRST202|Could not find the function|does not exist/i.test(error.message);
+  return data === null || data === undefined;
+}
+
+export async function stageCatalogImport(input: {
+  dataset: string;
+  templateVersion: string;
+  fingerprint: string;
+  fileHash?: string | null;
+  rows: CatalogImportRowPayload[];
+}): Promise<{ ok: boolean; batch?: CatalogImportBatch; errorCode?: string; error?: string }> {
+  if (!supabase) return chuaCauHinh();
+  try {
+    const { data, error } = await supabase.rpc("rpc_stage_catalog_import" as never, {
+      p_dataset: input.dataset,
+      p_template_version: input.templateVersion,
+      p_fingerprint: input.fingerprint,
+      p_file_hash: input.fileHash ?? null,
+      p_rows: input.rows,
+    } as never);
+    if (thieuHam(error, data)) return CHUA_CO_STAGING;
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    const kq = (data || {}) as Record<string, unknown>;
+    if (kq.ok !== true) {
+      return { ok: false, errorCode: String(kq.error_code ?? "UNKNOWN"), error: String(kq.error ?? "") };
+    }
+    return {
+      ok: true,
+      batch: {
+        id: String(kq.batch_id ?? ""),
+        status: String(kq.status ?? "validated") as CatalogImportBatch["status"],
+        total: Number(kq.total ?? input.rows.length),
+      },
+    };
+  } catch (e) {
+    return loiHaTang(e);
+  }
+}
+
+export async function setCatalogImportRowReason(
+  batchId: string, rowNumber: number, reason: string,
+): Promise<{ ok: boolean; errorCode?: string; error?: string }> {
+  if (!supabase) return chuaCauHinh();
+  try {
+    const { data, error } = await supabase.rpc("rpc_set_catalog_import_row_reason" as never, {
+      p_batch_id: batchId, p_row_number: rowNumber, p_reason: reason,
+    } as never);
+    if (thieuHam(error, data)) return CHUA_CO_STAGING;
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    const kq = (data || {}) as Record<string, unknown>;
+    return kq.ok === true
+      ? { ok: true }
+      : { ok: false, errorCode: String(kq.error_code ?? "UNKNOWN"), error: String(kq.error ?? "") };
+  } catch (e) {
+    return loiHaTang(e);
+  }
+}
+
+export async function commitCatalogImport(
+  batchId: string, reason: string,
+): Promise<CatalogImportCommitResult> {
+  if (!supabase) return chuaCauHinh();
+  try {
+    const { data, error } = await supabase.rpc("rpc_commit_catalog_import" as never, {
+      p_batch_id: batchId, p_reason: reason,
+    } as never);
+    if (thieuHam(error, data)) return CHUA_CO_STAGING;
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    const kq = (data || {}) as Record<string, unknown>;
+    if (kq.ok !== true) {
+      return { ok: false, errorCode: String(kq.error_code ?? "UNKNOWN"), error: String(kq.error ?? "") };
+    }
+    return {
+      ok: true,
+      created: Number(kq.created ?? 0),
+      updated: Number(kq.updated ?? 0),
+      unchanged: Number(kq.unchanged ?? 0),
+      pendingChangeIds: Array.isArray(kq.pending_change_ids)
+        ? (kq.pending_change_ids as string[]).map(String) : [],
+    };
+  } catch (e) {
+    return loiHaTang(e);
   }
 }
 

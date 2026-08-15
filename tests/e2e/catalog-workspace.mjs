@@ -17,7 +17,10 @@
  *
  *  Chạy: bash scripts/with-preview.sh -- npm run e2e:catalog
  * ===================================================================== */
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
@@ -263,6 +266,112 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   }));
   kiem(sau.timKiem === "", "deep-link chỉ áp một lần — quay lại không dính bộ lọc cũ",
     `"${sau.timKiem}"`);
+  await trang.close();
+}
+
+/* ---- 6. Nhập Excel: tải mẫu, chặn file sai, xem trước, Ghi bị chặn --- */
+{
+  console.log("\nNhập Excel:");
+
+  /* File mẫu dựng bằng CHÍNH generator của app (qua tsx). */
+  const thuMucMau = mkdtempSync(join(tmpdir(), "vmp-mau-"));
+  execFileSync(process.execPath,
+    ["--import", "tsx", new URL("./tao-mau-catalog.mjs", import.meta.url).pathname, thuMucMau],
+    { stdio: "pipe" });
+
+  const { trang } = await moTrang(trinhDuyet);
+
+  /* Đếm mọi request staging — file sai cấu trúc không được sinh RPC nào. */
+  const gọiStaging = [];
+  trang.on("request", (req) => {
+    if (req.url().includes("rpc_stage_catalog_import")) gọiStaging.push(req.url());
+  });
+
+  await trang.evaluate(() => document.querySelector('[data-cw-nav="import"]')?.click());
+  await cho(800);
+
+  /* 6a. Nút tải với đúng tên file cho từng dataset. */
+  const taiVe = await trang.evaluate(() => ({
+    mau: document.querySelector('[data-cw-taive="mau"]')?.getAttribute("data-cw-ten-file") ?? "",
+    hienTai: document.querySelector('[data-cw-taive="hientai"]')?.getAttribute("data-cw-ten-file") ?? "",
+  }));
+  kiem(taiVe.mau === "VMP_Mau_Doi_Tuong_Goc_v1.xlsx",
+    "tên file mẫu trống đúng hợp đồng", taiVe.mau);
+  kiem(taiVe.hienTai === "VMP_Doi_Tuong_Goc_Hien_Tai_v1.xlsx",
+    "tên file dữ liệu hiện tại đúng hợp đồng", taiVe.hienTai);
+
+  await trang.evaluate(() =>
+    document.querySelector('[data-cw-imp-dataset="products_gmp"]')?.click());
+  await cho(400);
+  const taiVeSP = await trang.evaluate(() => ({
+    mau: document.querySelector('[data-cw-taive="mau"]')?.getAttribute("data-cw-ten-file") ?? "",
+    hienTai: document.querySelector('[data-cw-taive="hientai"]')?.getAttribute("data-cw-ten-file") ?? "",
+  }));
+  kiem(taiVeSP.mau === "VMP_Mau_San_Pham_GMP_v1.xlsx",
+    "tên file mẫu sản phẩm đúng hợp đồng", taiVeSP.mau);
+  kiem(taiVeSP.hienTai === "VMP_San_Pham_GMP_Hien_Tai_v1.xlsx",
+    "tên file sản phẩm hiện tại đúng hợp đồng", taiVeSP.hienTai);
+  await trang.evaluate(() =>
+    document.querySelector('[data-cw-imp-dataset="source_objects"]')?.click());
+  await cho(400);
+
+  /* 6b. File sai fingerprint: từ chối rõ ràng, KHÔNG một RPC staging nào. */
+  const oChonFile = await trang.$('input[aria-label="Chọn file Excel theo mẫu"]');
+  kiem(!!oChonFile, "có ô chọn file có nhãn");
+  if (oChonFile) {
+    await oChonFile.uploadFile(join(thuMucMau, "sai-fingerprint.xlsx"));
+    await cho(1200);
+    const loi = await trang.evaluate(() => ({
+      chu: document.querySelector(".cw-import__loi")?.textContent ?? "",
+      coXemTruoc: !!document.querySelector("[data-cw-tong]"),
+    }));
+    kiem(loi.chu.includes("không khớp mẫu"), "file sai bị từ chối với lời giải thích", loi.chu.slice(0, 80));
+    kiem(!loi.coXemTruoc, "file sai không sinh bảng xem trước");
+    kiem(gọiStaging.length === 0, "file sai không sinh một RPC staging nào",
+      `${gọiStaging.length} lần gọi`);
+  }
+
+  /* 6c. File hợp lệ: phân loại mới/sửa/không đổi/lỗi + A3 cho dòng sửa. */
+  if (oChonFile) {
+    await oChonFile.uploadFile(join(thuMucMau, "hop-le.xlsx"));
+    await cho(1800);
+    const kq = await trang.evaluate(() => {
+      const tong = {};
+      for (const o of document.querySelectorAll("[data-cw-tong]")) {
+        tong[o.getAttribute("data-cw-tong")] = o.textContent?.trim();
+      }
+      return {
+        tong,
+        coNutA3: !!document.querySelector("[data-cw-imp-a3]"),
+        coXuatLoi: !!document.querySelector("[data-cw-xuat-loi]"),
+      };
+    });
+    kiem(kq.tong.moi === "1", "đếm đúng 1 dòng tạo mới", String(kq.tong.moi));
+    kiem(kq.tong.sua === "1", "đếm đúng 1 dòng sửa", String(kq.tong.sua));
+    kiem(kq.tong.khongdoi === "1", "đếm đúng 1 dòng không đổi", String(kq.tong.khongdoi));
+    kiem(kq.tong.loi === "1", "đếm đúng 1 dòng lỗi", String(kq.tong.loi));
+    kiem(kq.coNutA3, "dòng sửa có nút mở đối chiếu A3");
+    kiem(kq.coXuatLoi, "có nút xuất sổ lỗi");
+
+    await trang.evaluate(() => document.querySelector("[data-cw-imp-a3]")?.click());
+    await cho(400);
+    const a3 = await trang.evaluate(() => {
+      const o = document.querySelector(".cw-import-a3");
+      return { co: !!o, chu: o?.textContent ?? "" };
+    });
+    kiem(a3.co, "đối chiếu A3 mở được");
+    kiem(a3.chu.includes("Máy dập viên xoay tròn") && a3.chu.includes("Máy dập viên đã đổi tên"),
+      "A3 hiện cả giá trị hiện tại lẫn giá trị mới");
+
+    /* 6d. Ghi bị CHẶN khi server chưa có RPC staging (Task 9 chưa áp). */
+    const ghi = await trang.evaluate(() => ({
+      chan: document.querySelector("[data-cw-ghi-chan]")?.textContent ?? "",
+      nutKhoa: document.querySelector("[data-cw-ghi]")?.disabled ?? null,
+    }));
+    kiem(ghi.chan.includes("BỊ CHẶN"), "khu Ghi nói rõ BỊ CHẶN vì thiếu staging", ghi.chan.slice(0, 80));
+    kiem(ghi.nutKhoa === true, "nút Ghi vào hệ thống bị khoá");
+  }
+
   await trang.close();
 }
 
