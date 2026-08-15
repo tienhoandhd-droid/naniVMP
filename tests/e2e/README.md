@@ -49,6 +49,19 @@ sáng/tối đổi thật bảng màu · dữ liệu rỗng vẫn có nội dung
 Nó KHÔNG thay bộ kiểm nghiệp vụ: dữ liệu là dựng sẵn, nên nó chứng minh app
 dựng và điều hướng được, không chứng minh số liệu đúng.
 
+## Hợp đồng shell — hộp thoại, tiêu điểm, điều hướng
+
+```bash
+bash scripts/with-preview.sh -- npm run shell
+```
+
+Kiểm những thứ chỉ lộ ra khi chạy thật: bề rộng sidebar đúng 248px, hộp
+thoại căn giữa và không cao quá màn, bẫy tiêu điểm (Tab tám lần không thoát
+ra), nền có `inert`/`aria-hidden` khi hộp mở và được trả lại **đúng giá trị
+cũ** khi đóng, Escape trả tiêu điểm về đúng nút đã mở, đường dẫn cũ
+`#v=risk`/`#v=inventory` dẫn đúng chỗ và giữ nguyên ý nghĩa, và chuyển động
+tắt khi người dùng bật giảm chuyển động.
+
 ## Kiểm thẩm mỹ toàn app
 
 ```bash
