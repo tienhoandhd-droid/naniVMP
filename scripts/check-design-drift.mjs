@@ -28,6 +28,7 @@ const PHAM_VI = [
   "src/components/ui/ViewportDialog.tsx",
   "src/components/ui/DirtyStateProvider.tsx",
   "src/components/catalog/CatalogObjectForm.tsx",
+  "src/pages/SourceCatalogPage.tsx",
 ];
 
 /* File được PHÉP chứa hex: nơi khai token và art thương hiệu (màu nhân

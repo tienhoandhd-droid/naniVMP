@@ -53,31 +53,29 @@ page.on("request", (request) => {
   request.continue();
 });
 
+/* Đợt B Task 6: tab "Người thực hiện" (và màn chuyển hướng của nó) đã GỠ
+ * HẲN khỏi màn Danh mục — workspace sáu mục không còn mục nào như vậy.
+ * Tinh thần của bộ kiểm giữ nguyên: màn Danh mục không được bày bất kỳ lối
+ * mutation performer legacy nào; danh bạ chuẩn sống ở Nhân sự & phân công. */
 try {
   await dangNhap(page, GOC);
   await doiVaiTrenMan(page, "admin", "Quản trị kiểm danh bạ");
   await page.goto(`${GOC}#v=source`, { waitUntil: "domcontentloaded" });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => [...document.querySelectorAll("button")]
-    .some((button) => button.textContent?.trim() === "Người thực hiện"));
-  await page.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.trim() === "Người thực hiện")?.click());
+  await page.waitForFunction(() =>
+    document.querySelector('[aria-label="Bộ dữ liệu danh mục"]') !== null);
 
-  await page.waitForFunction(() => document.body.innerText.includes("Danh bạ người thực hiện được quản lý tại Phân quyền & trách nhiệm"));
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll("button")]
+    .some((button) => button.textContent?.trim() === "Người thực hiện")), false,
+  "màn Danh mục không còn tab Người thực hiện — danh bạ chuẩn ở Nhân sự & phân công");
   assert.equal(await page.evaluate(() => document.body.innerText.includes("Người cũ")), false,
-    "tab danh mục không còn hiển thị bảng có các nút mutation legacy");
+    "không còn bảng performer legacy nào được dựng");
   assert.equal(await page.evaluate(() => [...document.querySelectorAll("button")]
     .some((button) => button.textContent?.trim() === "Thêm dòng")), false,
   "không còn nút tạo người thực hiện gọi rpc_upsert_performer đã bị vô hiệu hóa");
   assert.equal(await page.evaluate(() => document.querySelectorAll('button[title="Sửa"], button[title="Xoá"]').length), 0,
-    "không còn control sửa/xoá người thực hiện gọi RPC legacy");
-
-  await page.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.trim() === "Đến Phân quyền & trách nhiệm")?.click());
-  await page.waitForFunction(() => window.location.hash.includes("v=phanquyen"));
-  assert.equal(await page.evaluate(() => document.body.innerText.includes("Phân quyền & trách nhiệm")), true,
-    "lời dẫn từ danh mục đưa quản trị viên đến đúng nơi tạo và quản lý danh bạ chuẩn");
-  console.log("✅ Danh mục không gọi mutation performer legacy và dẫn tới danh bạ chuẩn");
+    "không còn control sửa/xoá gọi RPC legacy");
+  console.log("✅ Màn Danh mục không còn bất kỳ lối mutation performer legacy nào");
 } finally {
   await browser.close();
 }

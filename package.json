@@ -19,6 +19,7 @@
     "doichieu": "node tests/e2e/doi-chieu-du-lieu.mjs",
     "thammy": "node tests/e2e/tham-my.mjs",
     "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs",
+    "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
     "shell": "node tests/e2e/lotus-shell.mjs",
     "atelier": "node tests/e2e/atelier.mjs",
     "drift": "node scripts/check-design-drift.mjs"

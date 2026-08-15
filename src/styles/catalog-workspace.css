@@ -296,3 +296,286 @@
   border-color: var(--lp-line);
   cursor: not-allowed;
 }
+
+/* =====================================================================
+ *  WORKSPACE SÁU MỤC (Đợt B Task 6)
+ *  ---------------------------------------------------------------------
+ *  Thanh dữ liệu trái 184px (Đối tượng · Sản phẩm GMP · Người nhận ·
+ *  Nhập Excel · Chờ áp dụng · Lịch sử) + vùng làm việc phải. Dưới 1180px
+ *  thanh co về 60px chỉ còn icon; dưới 768px nằm ngang phía trên và bảng
+ *  nhường chỗ cho thẻ (foundation tự lo cặp SmartTable/MobileTaskList).
+ * =================================================================== */
+
+.cw-workspace { display: flex; flex-direction: column; gap: 14px; }
+
+.cw-mota {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--lp-ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.cw-mota__phamvi, .cw-mota__moc { font-weight: 600; color: var(--lp-ink); }
+
+.cw-khung {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* ---- Thanh dữ liệu ---- */
+.cw-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-surface);
+  position: sticky;
+  top: 12px;
+}
+
+.cw-nav__muc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--lp-ink-muted);
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--lp-mo-chip) var(--lp-ease);
+}
+.cw-nav__muc:hover { background: var(--lp-surface-2); color: var(--lp-ink); }
+.cw-nav__muc.is-mo {
+  background: var(--lp-rose-soft);
+  color: var(--lp-plum);
+  font-weight: 700;
+}
+.cw-nav__muc:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+.cw-nav__muc svg { flex: none; }
+.cw-nav__nhan { min-width: 0; }
+
+.cw-noi-dung { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+/* ---- Chọn loại đối tượng ---- */
+.cw-kind { display: flex; flex-wrap: wrap; gap: 8px; }
+.cw-kind__muc {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-ink-muted);
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cw-kind__muc:hover { background: var(--lp-surface-2); }
+.cw-kind__muc.is-mo {
+  background: var(--lp-plum);
+  border-color: var(--lp-plum);
+  color: var(--lp-on-plum);
+  font-weight: 700;
+}
+.cw-kind__muc:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+
+/* ---- Ô tìm kiếm trong CommandBar ---- */
+.cw-tim { position: relative; flex: 1 1 220px; min-width: 160px; }
+.cw-tim__icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--lp-ink-muted);
+  pointer-events: none;
+}
+.cw-tim__o {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px 0 34px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-ink);
+  font-family: var(--ff-text);
+  font-size: 14px;
+}
+.cw-tim__o:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 1px; }
+
+/* ---- Nhãn trạng thái nhỏ trong bảng/thẻ ---- */
+.cw-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.cw-tag--bat { background: var(--lp-success-soft); color: var(--lp-success); }
+.cw-tag--tat { background: var(--lp-surface-2); color: var(--lp-ink-muted); }
+.cw-tag--loi { background: var(--lp-danger-soft); color: var(--lp-danger); }
+.cw-tag--cho { background: var(--lp-info-soft); color: var(--lp-info); }
+.cw-tag--ty-cao  { background: var(--lp-danger-soft); color: var(--lp-danger); }
+.cw-tag--ty-vua  { background: var(--lp-warning-bg); color: var(--lp-warning); }
+.cw-tag--ty-thap { background: var(--lp-success-soft); color: var(--lp-success); }
+
+.cw-ma {
+  font-family: var(--ff-text);
+  font-weight: 700;
+  color: var(--lp-plum);
+  letter-spacing: 0.01em;
+}
+.cw-nhe { font-size: 12px; color: var(--lp-ink-muted); }
+.cw-ke-hoach { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ---- Nút Sửa trong dòng ---- */
+.cw-sua {
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-plum);
+  font-family: var(--ff-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cw-sua:hover { background: var(--lp-rose-soft); }
+.cw-sua:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+.cw-sua--the { min-height: 44px; width: 100%; font-size: 13px; }
+
+/* ---- Chi tiết một đối tượng (dòng mở rộng) ---- */
+.cw-chi-tiet { display: flex; flex-direction: column; gap: 12px; }
+.cw-chi-tiet__luoi {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px 18px;
+}
+.cw-chi-tiet__o dt { font-size: 12px; font-weight: 700; color: var(--lp-ink-muted); }
+.cw-chi-tiet__o dd { margin: 2px 0 0; font-size: 13px; color: var(--lp-ink); }
+.cw-chi-tiet__chan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---- Thẻ mobile ---- */
+.cw-the { display: flex; flex-direction: column; gap: 8px; }
+.cw-the__dau {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cw-the__dong { font-size: 13px; color: var(--lp-ink-muted); }
+
+/* ---- Phân trang ---- */
+.cw-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cw-pager__nut {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-plum);
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cw-pager__nut:disabled { color: var(--lp-ink-muted); cursor: default; }
+
+/* ---- Hàng đợi thay đổi + lịch sử (một sổ cái dọc) ---- */
+.cw-lich-su {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cw-lich-su__dong {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-surface);
+}
+.cw-lich-su__chinh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ---- Hộp thoại sinh timeline ---- */
+.cw-chan-nut { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.cw-xem-truoc {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--lp-surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--lp-ink);
+}
+.cw-canh-bao-nhe { font-size: 13px; color: var(--lp-warning); font-weight: 600; }
+
+/* ---- Responsive ---- */
+/* Cột phụ nhường chỗ trước khi bảng phải cuộn ngang — danh tính, trạng
+   thái và hành động ở lại. Chỉ áp trong workspace này, không đụng bảng
+   của màn khác. */
+@media (max-width: 1180px) {
+  .cw-khung { grid-template-columns: 60px minmax(0, 1fr); gap: 12px; }
+  .cw-nav__muc { justify-content: center; padding: 0; }
+  .cw-nav__nhan {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .cw-workspace .lp-col--supporting { display: none; }
+}
+
+@media (max-width: 768px) {
+  .cw-khung { grid-template-columns: minmax(0, 1fr); }
+  /* Xuống hàng thay vì cuộn ngang: cuộn ngang giấu mục phía sau mép màn
+     (luật A7), còn hai hàng chip thì thấy đủ sáu mục ngay. */
+  .cw-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px;
+  }
+  .cw-nav__muc { justify-content: flex-start; padding: 0 12px; flex: none; }
+  .cw-nav__nhan {
+    position: static;
+    width: auto; height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+}

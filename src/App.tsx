@@ -1966,7 +1966,15 @@ function AppShell() {
               )}
               {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
               {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} />}
-              {view === "source" && <SourceCatalogView user={user} onReload={reloadData} focus={moDanhMuc} />}
+              {view === "source" && (
+                <SourceCatalogView access={access} onReload={reloadData}
+                  focus={moDanhMuc}
+                  onFocusConsumed={() => setMoDanhMuc(null)}
+                  scopeLabel={nhanPhamVi}
+                  updatedLabel={dataUpdatedAt
+                    ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
+                    : undefined} />
+              )}
               {view === "health" && <HealthView acts={filteredActs} user={user} />}
               {view === "rules" && <ActiveRulesView user={user} />}
               {view === "progress" && (

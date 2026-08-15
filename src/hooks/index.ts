@@ -30,7 +30,7 @@ import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
 import { isSupabaseConfigured, signIn, signOut, layPhien, supabase } from "../lib/supabaseClient.ts";
 import {
   fetchVmpDataFromSupabase, fetchVmpWatermark,
-  updateItemProgress, upsertObjectSupabase, deleteSourceObject, fetchPerformers,
+  updateItemProgress, upsertObjectSupabase, fetchPerformers,
 } from "../lib/supabaseData.ts";
 import { enrich } from "../utils/helpers.ts";
 import {
@@ -602,15 +602,12 @@ export function useVmpData() {
       runWrite("Lưu đối tượng", () => upsertObjectSupabase(obj)),
     [runWrite],
   );
-  const deleteObject = useCallback(
-    (kind: Parameters<typeof deleteSourceObject>[0], code: string, reason: string) =>
-      runWrite("Ngừng dùng đối tượng", () => deleteSourceObject(kind, code, reason)),
-    [runWrite],
-  );
+  /* deleteObject đã GỠ cùng deleteSourceObject (Đợt B Task 6): ngừng dùng
+     một đối tượng nay là tắt is_active qua rpc_save_catalog_object. */
 
   return {
     objects, acts: enriched, conn, lastSync, dataUpdatedAt, saveStatus,
     connectSheet, reloadData, silentRefresh, updateActivity,
-    saveObject, deleteObject, setConn,
+    saveObject, setConn,
   };
 }

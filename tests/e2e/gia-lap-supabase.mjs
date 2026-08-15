@@ -155,16 +155,27 @@ function dungDoiTuong(i) {
   };
 }
 
-/** Toàn bộ quyền màn hình — bộ kiểm cần mở được mọi màn. */
+/** Toàn bộ quyền màn hình — bộ kiểm cần mở được mọi màn.
+ *  Danh sách hành động phải là TÊN THẬT mà `rpc_my_ui_access` trả về
+ *  (xem HANH_DONG_ADMIN trong src/lib/access.ts): giao diện gate nút bằng
+ *  `access.can("source", "edit_catalog")`, nên mock ghi "edit" chung chung
+ *  là mọi nút ghi biến mất và bộ kiểm không còn phản ánh cảnh thật. */
 function quyenDayDu() {
   const man = [
     "today", "overview", "timeline", "alerts", "progress", "source",
     "workload", "reports", "rules", "people", "accounts", "phanquyen",
     "health", "audit", "admin", "chat", "risk",
   ];
+  const hanhDong = [
+    "view", "edit", "export", "manage",
+    "edit_catalog", "edit_operational_people", "generate_timeline",
+    "edit_vertical_timeline", "record_actual_validation_date",
+    "assign_workshop_staff", "view_workload", "view_rules",
+    "manage_accounts", "manage_authorization_policy",
+  ];
   const screens = {};
   for (const m of man) {
-    screens[m] = { can_view: true, scope: "all", actions: ["view", "edit", "export", "manage"] };
+    screens[m] = { can_view: true, scope: "all", actions: hanhDong };
   }
   return {
     mode: "enforced",
@@ -184,6 +195,50 @@ export function dungKhoDuLieu(kichBan) {
 
   const hangMuc = Array.from({ length: soHangMuc }, (_, i) => dungHangMuc(i));
   const doiTuong = Array.from({ length: day ? 12 : 0 }, (_, i) => dungDoiTuong(i));
+
+  /* Hai bộ danh mục phụ có đủ khoá nghiệp vụ + version — workspace Danh mục
+     đọc chúng qua rpc_list_catalog_dataset và cần các cột này để dựng dòng. */
+  const sanPham = Array.from({ length: day ? 4 : 0 }, (_, i) => ({
+    id: i + 1,
+    bfo_code: `BFO-${200 + i}`,
+    product_name: ["Paracetamol 500mg", "Amoxicillin 250mg", "Vitamin C 100mg", "Omeprazol 20mg"][i],
+    dosage_form: ["Viên nén", "Viên nang", "Viên sủi", "Viên nang"][i],
+    production_line: `Line ${(i % 2) + 1}`,
+    batch_size: `${(i + 1) * 100} kg`,
+    is_active: true,
+    version: 1,
+    updated_at: "2026-08-15T02:00:00Z",
+  }));
+  const nguoiNhan = Array.from({ length: day ? 3 : 0 }, (_, i) => ({
+    id: i + 1,
+    email: `canh-bao-${i + 1}@vi-du.test`,
+    recipient_name: `Người nhận ${i + 1}`,
+    scope_type: "tất cả",
+    alert_kind: "cả hai",
+    is_enabled: true,
+    ai_report_enabled: i === 0,
+    version: 1,
+    updated_at: "2026-08-15T02:00:00Z",
+  }));
+
+  /* rpc_list_catalog_dataset là RPC đọc theo THAM SỐ (p_dataset, p_search,
+     p_limit/p_offset) — trả cứng một mảng là mọi dataset trông giống nhau.
+     Giá trị dạng HÀM được traLoi() gọi với body của request. */
+  const listCatalogDataset = (body) => {
+    const nguon = body?.p_dataset === "products_gmp" ? sanPham
+      : body?.p_dataset === "alert_recipients" ? nguoiNhan
+      : null;
+    if (!nguon) {
+      return { ok: false, error_code: "DATASET_UNKNOWN", error: "Không có dataset" };
+    }
+    const q = String(body?.p_search ?? "").trim().toLowerCase();
+    const khop = q
+      ? nguon.filter((r) => JSON.stringify(r).toLowerCase().includes(q))
+      : nguon;
+    const off = Number(body?.p_offset ?? 0);
+    const lim = Number(body?.p_limit ?? 100);
+    return { ok: true, total: khop.length, rows: khop.slice(off, off + lim) };
+  };
 
   const nhanSu = Array.from({ length: day ? 6 : 0 }, (_, i) => ({
     id: `pf-${i}`,
@@ -216,8 +271,8 @@ export function dungKhoDuLieu(kichBan) {
     vmp_performers: nhanSu,
     vmp_source_objects: doiTuong,
     vmp_source_rows: [],
-    vmp_products_gmp: day ? [{ id: 1, product_name: "Paracetamol 500mg", dosage_form: "Viên nén", is_active: true }] : [],
-    vmp_alert_recipients: day ? [{ id: 1, email: "canh-bao@vi-du.test", is_active: true }] : [],
+    vmp_products_gmp: sanPham,
+    vmp_alert_recipients: nguoiNhan,
     vmp_staff_emails: day ? [{ id: 1, email: "nhan-vien@vi-du.test", full_name: "Nhân viên mẫu" }] : [],
     vmp_email_cho_phep: day ? [{ email: "kiem-thu@vi-du.test", role: "admin" }] : [],
     vmp_role_permissions: [],
@@ -285,6 +340,28 @@ export function dungKhoDuLieu(kichBan) {
     rpc_list_source_tabs: day
       ? [{ source_tab: "thiet_bi", rows: 12, columns: 9 }]
       : [],
+    rpc_list_catalog_dataset: listCatalogDataset,
+    rpc_list_catalog_changes: {
+      ok: true,
+      total: day ? 1 : 0,
+      changes: day ? [{
+        id: "ch-1", object_kind: "Thiết bị", object_code: "TB-100",
+        status: "pending", source_version: 3, timeline_revision: null,
+        created_at: "2026-08-15T02:00:00Z", created_by_name: "Người kiểm thử",
+        has_impact: true, apply_reason: null, last_error: null,
+      }] : [],
+    },
+    rpc_catalog_history: {
+      ok: true,
+      total: day ? 2 : 0,
+      history: day ? Array.from({ length: 2 }, (_, i) => ({
+        id: `au-${i + 1}`, created_at: `2026-08-1${4 + i}T03:00:00Z`,
+        actor: "kiem-thu@vi-du.test", effective_business_role: "quan_ly_chat_luong",
+        action: "update", table_name: "vmp_source_objects", record_id: "TB-100",
+        changed_fields: ["frequency_months"], reason: "Điều chỉnh tần suất",
+        source: "web", has_detail: true,
+      })) : [],
+    },
   };
 }
 
@@ -299,8 +376,11 @@ export function dungKhoDuLieu(kichBan) {
  * loopback và Google Fonts đều bị chặn — nếu một request lạ lọt ra ngoài
  * thì nó bị huỷ, và số lần huỷ được trả về để bộ kiểm tự tố cáo chính nó.
  */
-export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day" } = {}) {
+export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho } = {}) {
   const kho = dungKhoDuLieu(kichBan);
+  /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống viewer để
+     kiểm "không thấy nút ghi". Sửa tại chỗ, không trả kho ra ngoài. */
+  if (typeof suaKho === "function") suaKho(kho);
   const hostSupabase = new URL(supabaseUrl).host;
   const chanNgoai = [];
 
@@ -363,7 +443,15 @@ function traLoi(kho, u, req) {
     const co = Object.prototype.hasOwnProperty.call(kho, ten);
     // RPC chưa dựng sẵn trả null thay vì lỗi: màn nào dùng nó phải tự
     // xoay xở được, và đó cũng là điều luật trạng thái rỗng đòi hỏi.
-    return { status: 200, headers: dau, body: JSON.stringify(co ? kho[ten] : null) };
+    if (!co) return { status: 200, headers: dau, body: "null" };
+    let giaTri = kho[ten];
+    if (typeof giaTri === "function") {
+      // RPC phụ thuộc tham số: gọi hàm với body đã parse của request.
+      let body = null;
+      try { body = JSON.parse(req.postData() || "null"); } catch { body = null; }
+      giaTri = giaTri(body);
+    }
+    return { status: 200, headers: dau, body: JSON.stringify(giaTri) };
   }
 
   /* Bảng */

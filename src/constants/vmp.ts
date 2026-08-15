@@ -70,7 +70,7 @@ export const LOAI_LOI: Record<string, { ten: string; sua: string }> = {
   deadline_before_start: { ten: "Deadline VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
   done_no_date:          { ten: "Đánh dấu hoàn thành nhưng thiếu ngày", sua: "Vi phạm ALCOA+ — nhập ngày thực tế ở Cập nhật tiến độ" },
   date_no_done:          { ten: "Có ngày hoàn thành nhưng trạng thái chưa xong", sua: "Đặt trạng thái về Hoàn thành, hoặc xoá ngày nếu nhập nhầm" },
-  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Điền ở Danh mục & Nhập liệu → tab Người thực hiện" },
+  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Mở Nhân sự & phân công → chọn hồ sơ nhân sự để bổ sung email" },
   no_validation_type:    { ten: "Chưa xác định loại thẩm định", sua: "Đặt IQ/OQ/PQ/CV ở Danh mục nguồn rồi sinh lại timeline" },
   high_crit_no_plan:     { ten: "Trọng yếu cao nhưng vẫn ở Kế hoạch", sua: "ICH Q9 đòi làm nhóm rủi ro cao trước — xếp lịch sớm" },
 };
@@ -154,7 +154,10 @@ export const NAV_SUBS = {
   alerts: "Cảnh báo tới hạn / quá hạn / tái thẩm định — xếp theo điểm rủi ro ICH Q9, kèm ma trận QRM",
   progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
   inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
-  source: "Danh mục nguồn · Người nhận mail (cảnh báo + phân tích AI) · Danh bạ nhân sự · Người thực hiện · Sản phẩm GMP — xem, thêm, sửa, xoá trực tiếp trên web",
+  /* Sáu vùng của workspace danh mục — KHÔNG hứa "Người thực hiện" hay
+     "Danh bạ nhân sự" (đã sang Nhân sự & phân công), không hứa xoá vật lý.
+     Chuỗi này có bộ kiểm literal giữ (tests/unit/operational-copy). */
+  source: "Dữ liệu gốc Supabase · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / Excel / HTML",
   rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",

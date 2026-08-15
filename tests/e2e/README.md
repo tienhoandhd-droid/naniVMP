@@ -49,6 +49,19 @@ sáng/tối đổi thật bảng màu · dữ liệu rỗng vẫn có nội dung
 Nó KHÔNG thay bộ kiểm nghiệp vụ: dữ liệu là dựng sẵn, nên nó chứng minh app
 dựng và điều hướng được, không chứng minh số liệu đúng.
 
+## Workspace Danh mục & Nhập liệu (Đợt B Task 6)
+
+```bash
+bash scripts/with-preview.sh -- npm run e2e:catalog
+```
+
+Kiểm hợp đồng của workspace sáu mục trên màn `source`: thứ tự điều hướng
+`objects · products · alerts · import · pending · history` · đủ quyền thấy
+Thêm/Nhập Excel còn viewer không thấy lối ghi nào · bảng ngữ nghĩa có
+`<caption>` và header dính · điện thoại 390×844 dùng thẻ với CÙNG số dòng
+và cùng hành động · 1366×768 và 1093×720 không tràn ngang · deep-link từ
+màn Tiến độ mở đúng đối tượng rồi tự xoá (một lần).
+
 ## Hợp đồng shell — hộp thoại, tiêu điểm, điều hướng
 
 ```bash

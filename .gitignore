@@ -26,3 +26,7 @@ AI Dashboard - Google Sheet.json
 # Phiên brainstorm là ghi chú làm việc của người dùng, không phải mã nguồn.
 # Kế hoạch Lotus Pearl cấm commit thư mục này.
 .superpowers/brainstorm/
+
+# Thư mục build tạm của scripts/with-preview.sh — script tự dọn khi thoát,
+# nhưng một lần bị ngắt giữa chừng là nó nằm lại và dễ lọt vào `git add -A`.
+.with-preview.*/

@@ -15,7 +15,7 @@ import { supabase } from "./supabaseClient.ts";
 import { deriveActivityFields } from "./n8nAdapter.ts";
 import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/performerSelection.ts";
 import type {
-  Activity, GenerateTimelineResult, ObjectKind, ProductGmpRow, RpcResult,
+  Activity, GenerateTimelineResult, ObjectKind, RpcResult,
   SourceObjectRow, VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
   PerformerRow,
 } from "../types/domain.ts";
@@ -126,13 +126,6 @@ export async function fetchPerformers(): Promise<PerformerRow[]> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await supabase.from("vmp_performers").select("*").order("performer_name");
   if (error) throw new Error("Lỗi đọc danh sách người thực hiện: " + error.message);
-  return data || [];
-}
-
-export async function fetchProductsGmp(): Promise<ProductGmpRow[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from("vmp_products_gmp").select("*").order("bfo_code");
-  if (error) { console.error("fetchProductsGmp:", error.message); return []; }
   return data || [];
 }
 
@@ -352,33 +345,10 @@ export async function deletePlanItem(validationCode: string, reason: string): Pr
   return unwrap(data, error, "Xoá hạng mục thất bại");
 }
 
-/** Thêm/sửa một dòng danh mục nguồn (1 trong 5 mục). */
-export async function upsertSourceObject(
-  objectKind: ObjectKind,
-  objectCode: string,
-  patch: Record<string, unknown>,
-): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_upsert_source_object", {
-    p_object_kind: objectKind,
-    p_object_code: objectCode,
-    p_patch: patch as never,
-  });
-  return unwrap(data, error, "Lưu danh mục thất bại");
-}
-
-/** Ngừng sử dụng một dòng danh mục nguồn (xoá mềm — timeline vẫn tham chiếu mã). */
-export async function deleteSourceObject(
-  objectKind: ObjectKind, objectCode: string, reason: string,
-): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_delete_source_object", {
-    p_object_kind: objectKind,
-    p_object_code: objectCode,
-    p_reason: reason,
-  });
-  return unwrap(data, error, "Ngừng dùng đối tượng thất bại");
-}
+/* upsertSourceObject / deleteSourceObject đã GỠ (Đợt B Task 6): mọi lối
+ * ghi danh mục đi qua rpc_save_catalog_object — có lý do, có khoá phiên
+ * bản, có audit. Ngừng dùng = tắt is_active trong hộp thoại, không còn
+ * lệnh riêng đi vòng qua đối chiếu trước/sau. */
 
 /** Sinh hạng mục timeline từ danh mục nguồn, theo đúng luật VMP01.
  *  commit=false chỉ xem trước. Idempotent: mã đã có thì bỏ qua, và không
@@ -665,45 +635,11 @@ export async function deleteSourceRow(tab: string, rowNumber: number): Promise<R
   return unwrap(data, error, "Xoá dòng thất bại");
 }
 
-/* ---- Người nhận cảnh báo ---- */
-export async function upsertAlertRecipient(
-  id: string | null, patch: Record<string, unknown>,
-): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_upsert_alert_recipient", {
-    // RPC nhận NULL để nghĩa là 'tạo mới'; type sinh tự động khai uuid không
-    // nullable nên phải ép kiểu ở đây.
-    p_id: (id ?? null) as unknown as string,
-    p_patch: patch as never,
-  });
-  return unwrap(data, error, "Lưu người nhận thất bại");
-}
-
-export async function deleteAlertRecipient(id: string): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_delete_alert_recipient", { p_id: id });
-  return unwrap(data, error, "Xoá người nhận thất bại");
-}
-
-/* ---- Danh bạ nhân sự ---- */
-export async function upsertStaffEmail(
-  id: string | null, patch: Record<string, unknown>,
-): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_upsert_staff_email", {
-    // RPC nhận NULL để nghĩa là 'tạo mới'; type sinh tự động khai uuid không
-    // nullable nên phải ép kiểu ở đây.
-    p_id: (id ?? null) as unknown as string,
-    p_patch: patch as never,
-  });
-  return unwrap(data, error, "Lưu nhân sự thất bại");
-}
-
-export async function deleteStaffEmail(id: string): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_delete_staff_email", { p_id: id });
-  return unwrap(data, error, "Xoá nhân sự thất bại");
-}
+/* ---- Người nhận cảnh báo & Danh bạ nhân sự ----
+ * Bốn hàm upsert/delete cũ đã GỠ (Đợt B Task 6): người nhận cảnh báo ghi
+ * qua rpc_save_alert_recipient (features/catalogWorkspace/api.ts); danh bạ
+ * nhân sự quản lý ở màn Nhân sự & phân công (features/itemPermissions).
+ * fetchAlertRecipients/fetchStaffEmails giữ lại vì AiMailModal còn đọc. */
 
 /* ---- Phân quyền người dùng ----
  * Ba chốt an toàn nằm ở RPC chứ không ở đây: chỉ admin gọi được, không tự
@@ -968,22 +904,10 @@ export async function deletePerformer(id: string): Promise<RpcResult> {
   return unwrap(data, error, "Xoá người thực hiện thất bại");
 }
 
-/* ---- Sản phẩm GMP ---- */
-export async function upsertProductGmp(
-  bfoCode: string, patch: Record<string, unknown>,
-): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_upsert_product_gmp", {
-    p_bfo_code: bfoCode, p_patch: patch as never,
-  });
-  return unwrap(data, error, "Lưu sản phẩm thất bại");
-}
-
-export async function deleteProductGmp(bfoCode: string): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_delete_product_gmp", { p_bfo_code: bfoCode });
-  return unwrap(data, error, "Xoá sản phẩm thất bại");
-}
+/* ---- Sản phẩm GMP ----
+ * upsertProductGmp/deleteProductGmp/fetchProductsGmp đã GỠ (Đợt B Task 6):
+ * đọc qua rpc_list_catalog_dataset, ghi qua rpc_save_product_gmp — đều
+ * nằm ở features/catalogWorkspace/api.ts. Không còn xoá vật lý. */
 
 export async function upsertObjectSupabase(obj: {
   code: string; name: string; classification: string; department?: string | null;
