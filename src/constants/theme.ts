@@ -16,6 +16,8 @@
 
 import type { CSSProperties } from "react";
 
+import { LOTUS_RADII } from "../lib/visualContract";
+
 export const C = {
   bg1: "var(--c-bg1)", bg2: "var(--c-bg2)",
 
@@ -62,10 +64,13 @@ export const C = {
  * chữ số đều bề rộng ở index.css nên cột số thẳng hàng dọc.
  * ------------------------------------------------------------------- */
 export const TEXT = "'Be Vietnam Pro', system-ui, -apple-system, sans-serif";
-export const DISPLAY = "'Quicksand', 'Be Vietnam Pro', system-ui, sans-serif";
+/** Phông kể chuyện — Cormorant Garamond, chỉ dùng cho logo, H1, section
+ *  title lớn và số KPI hero. Đặt nó vào bảng hay nhãn là sai vai trò: nét
+ *  thanh của serif ở cỡ 12–14 px kèm dấu tiếng Việt sẽ mảnh tới mức mờ. */
+export const DISPLAY = "'Cormorant Garamond', 'Be Vietnam Pro', Georgia, serif";
 export const NUM = "'Be Vietnam Pro', system-ui, -apple-system, sans-serif";
 /** Số KPI cỡ lớn — chỗ duy nhất còn dùng phông hiển thị cho chữ số. */
-export const NUM_HERO = "'Baloo 2', 'Quicksand', system-ui, sans-serif";
+export const NUM_HERO = "'Cormorant Garamond', 'Be Vietnam Pro', Georgia, serif";
 export const GRAD = "var(--grad)";
 export const GRAD_SOFT = "var(--grad-soft)";
 
@@ -89,12 +94,21 @@ export const E = {
   modal: "var(--e-modal)",
 };
 
-/** Bo góc — thang 4 bậc, dùng nhất quán thay vì tuỳ hứng mỗi chỗ một số. */
-/* Bo góc — CHỈ BA giá trị. Bản trước có sáu (999/26/20/18/16/12) và khi mọi
- * thứ đều là hộp bo tròn thì không hộp nào nổi hơn hộp nào; mắt không biết
- * nhìn đâu trước. Tên bốn bậc giữ nguyên để code cũ không vỡ, nhưng lg/xl
- * nay trỏ về cùng một giá trị thẻ. */
-export const R = { sm: 8, md: 14, lg: 14, xl: 14, pill: 999 };
+/* Bo góc — nay ánh xạ sang thang Lotus Pearl ở spec §6.4, giữ nguyên bốn
+ * tên cũ để code cũ không vỡ:
+ *   sm  → control 10 px  (nút, ô nhập, chip nhỏ)
+ *   md  → card    18 px  (thẻ nội dung)
+ *   lg  → card    18 px  (tên cũ, cùng vai trò thẻ)
+ *   xl  → panel   24 px  (panel hero, hộp thoại)
+ * Nguồn số là LOTUS_RADII trong src/lib/visualContract.ts — đừng gõ lại
+ * con số ở nơi khác, lệch một chỗ là hỏng nhịp toàn app. */
+export const R = {
+  sm: LOTUS_RADII.control,
+  md: LOTUS_RADII.card,
+  lg: LOTUS_RADII.card,
+  xl: LOTUS_RADII.panel,
+  pill: LOTUS_RADII.pill,
+};
 
 /* ---------------------------------------------------------------------
  * Chuyển động.

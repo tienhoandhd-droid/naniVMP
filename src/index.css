@@ -105,9 +105,11 @@
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
   --s6: 24px; --s8: 32px; --s12: 48px;
 
-  /* PHÔNG — hiển thị và thân bài tách bạch, xem constants/theme.ts */
+  /* PHÔNG — kể chuyện và vận hành tách bạch, xem constants/theme.ts.
+     --ff-display nay là Cormorant Garamond: chỉ logo, H1, section title lớn
+     và số KPI hero. Mọi chữ đọc thật vẫn là --ff-text. */
   --ff-text: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
-  --ff-display: 'Quicksand', 'Be Vietnam Pro', system-ui, sans-serif;
+  --ff-display: 'Cormorant Garamond', 'Be Vietnam Pro', Georgia, serif;
   --font-num: 'Be Vietnam Pro', system-ui, sans-serif;
 
   --plum: var(--c-ink); --plum-soft: var(--c-ink-soft);
