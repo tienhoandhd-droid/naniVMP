@@ -266,7 +266,7 @@ export default function BieuDoKiemSoat({ acts, nam }: { acts: Activity[]; nam: n
     <div className="vmp-ctrl">
       <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />
 
-      <div className="vmp-ctrl-khung vmp-scroll">
+      <div className="vmp-ctrl-khung vmp-scroll" data-lp-scroll="ngang">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="vmp-ctrl-svg"

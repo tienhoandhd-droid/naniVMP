@@ -130,6 +130,8 @@ function dungHangMuc(i) {
 function dungDoiTuong(i) {
   const ten = TEN_DOI_TUONG[i % TEN_DOI_TUONG.length];
   return {
+    // Dữ liệu thật luôn có khoá chính; mock thiếu nó từng che một lỗi thật.
+    id: 1000 + i,
     code: `TB-${String(100 + i).padStart(3, "0")}`,
     name: ten,
     object_name: ten,

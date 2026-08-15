@@ -1665,7 +1665,10 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
           <strong style={{ fontFamily: TEXT, fontSize: 14, color: C.plum }}>Tải VMP theo tháng · {year}</strong>
         </div>
         <CauKetLuan chinh={klThang.chinh} phu={klThang.phu} tone={klThang.tone} />
-        <div className="vmp-scroll" style={{ overflowX: "auto" }}>
+        {/* Trục thời gian 12 tháng: cuộn ngang là CHỦ Ý, vì nén 12 cột vào
+            390px thì mỗi cột còn 30px và biểu đồ hết đọc được. Thuộc ngoại
+            lệ "bố cục hai chiều" của WCAG 1.4.10. */}
+        <div className="vmp-scroll" style={{ overflowX: "auto" }} data-lp-scroll="ngang">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(44px,1fr))", gap: 10, alignItems: "end", height: H + 46, minWidth: 620, paddingTop: 20 }}>
             {months.map((m, i) => {
               const barH = m.total / maxT * H;

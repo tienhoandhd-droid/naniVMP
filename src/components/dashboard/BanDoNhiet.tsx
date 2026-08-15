@@ -91,8 +91,11 @@ export default function BanDoNhiet({
     return 1;
   };
 
+  /* Ma trận bộ phận × tháng không xếp dọc được: bỏ một chiều là mất chính
+     thứ nó dùng để so sánh. Nên cuộn ngang ở đây là CHỦ Ý — khai báo bằng
+     data-lp-scroll để luật A7 của bộ kiểm thẩm mỹ biết mà bỏ qua. */
   return (
-    <div className="vmp-nhiet vmp-scroll">
+    <div className="vmp-nhiet vmp-scroll" data-lp-scroll="ngang">
       <table className="vmp-nhiet-bang">
         <thead>
           <tr>

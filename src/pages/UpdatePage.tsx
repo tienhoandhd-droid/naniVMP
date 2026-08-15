@@ -7,6 +7,7 @@ import { stageOf, inPeriod, nguoiPhuTrach } from "../utils/helpers.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { useDebounce } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
+import MobileTaskList from "../components/ui/MobileTaskList.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
@@ -71,7 +72,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   // rpc_check_data_quality để hai chỗ không nói khác nhau.
   const FIXES = useMemo(() => ({
     done_no_date: {
-      label: "Hoàn thành nhưng thiếu ngày",
+      label: "Thiếu ngày hoàn thành",
       hint: "Vi phạm ALCOA+ — đã ghi hoàn thành thì phải có ngày thực tế",
       test: (a: PlanActivity) => a.st === "done" && !a._raw?.ngay_vmp,
     },
@@ -81,7 +82,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
       test: (a: PlanActivity) => !a.target,
     },
     no_owner: {
-      label: "Chưa có QA phụ trách",
+      label: "Chưa phân công QA",
       hint: "Không phân công thì không ai theo",
       test: (a: PlanActivity) => !a.owner || a.owner === "—",
     },
@@ -169,8 +170,8 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 14, background: C.mintSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={22} color={C.mintText} /></div>
             <div>
-              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 16, color: C.plum }}>Theo dõi tiến độ thực tế</div>
-              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Nhập ngày và trạng thái thực tế ngay tại đây — Supabase là nơi lưu dữ liệu gốc</div>
+              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 16, color: C.plum }}>Tiến độ thẩm định</div>
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Cập nhật mốc thực tế. Dữ liệu được lưu trực tiếp tại Supabase.</div>
             </div>
           </div>
           <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Đã nối Supabase — ghi được" : "○ Chưa kết nối"}</Tag>
@@ -201,7 +202,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
             Không có thanh này thì phải dò tay 461 dòng mới tìm ra chỗ thiếu. */}
         <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${C.pinkMist}` }}>
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 8 }}>
-            CẦN BẠN ĐIỀN
+            CẦN XỬ LÝ
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={() => setFix("all")}
@@ -258,7 +259,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           ); })}
         </div>
       </Card>
-      <Card style={{ padding: 0, overflow: "hidden" }}>
+      <Card style={{ padding: 0, overflow: "hidden" }} cls="vmp-chi-desktop">
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720 }}>
             <thead><tr style={{ background: C.pinkMist }}>
@@ -313,7 +314,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                       <div style={{ margin: "8px 0 12px", display: "flex", gap: 7, flexWrap: "wrap", justifyContent: "center" }}>
                         {period !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Kỳ: {PERIODS.find(([id]) => id === period)?.[1]}</Tag>}
                         {stageF !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Giai đoạn: {STAGES.find((s) => s.id === stageF)?.label}</Tag>}
-                        {fix !== "all" && <Tag color={C.marigoldText} bg={C.marigoldSoft}>Cần điền: {FIXES[fix as keyof typeof FIXES].label}</Tag>}
+                        {fix !== "all" && <Tag color={C.marigoldText} bg={C.marigoldSoft}>Cần xử lý: {FIXES[fix as keyof typeof FIXES].label}</Tag>}
                         {fst !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Trạng thái: {(STATUS as Record<string, { label: string }>)[fst]?.label ?? fst}</Tag>}
                         {!!q.trim() && <Tag color={C.lavText} bg={C.lavSoft}>Tìm: “{q.trim()}”</Tag>}
                       </div>
@@ -326,6 +327,76 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
           </table>
         </div>
       </Card>
+
+      {/* ---- Bản điện thoại ----------------------------------------------
+          Cùng mảng `lat`, cùng bộ lọc, cùng hành động — chỉ đổi cách trình
+          bày (spec §5.5). Trước đây điện thoại phải kéo ngang một bảng rộng
+          720px chỉ để sửa một dòng; nay mỗi hạng mục là một thẻ đứng.
+          CSS cho hai bản loại trừ nhau bằng display:none nên chỉ một bản
+          nằm trong cây trợ năng ở mỗi khổ màn. */}
+      <MobileTaskList
+        label="Hạng mục thẩm định"
+        rows={lat}
+        rowKey={(a) => a.id}
+        empty={hasFilter ? "Không có hạng mục nào khớp bộ lọc đang bật." : "Chưa có hạng mục nào trong kế hoạch."}
+        renderItem={(a) => {
+          const sg = STAGES.find((s) => s.id === stageByItem.get(a.id));
+          const itemState = a.state || (a._raw && a._raw.state) || "active";
+          const isFrozen = itemState !== "active";
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, opacity: isFrozen ? 0.65 : 1 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+                <b style={{ fontFamily: NUM, fontSize: 13, color: C.pinkText, letterSpacing: ".02em" }}>{a.code}</b>
+                <Pill s={a.st} small />
+              </div>
+
+              {/* Không lặp lại mã khi hạng mục chưa có tên riêng — in cùng
+                  một chuỗi hai lần liền nhau chỉ làm thẻ dài ra vô ích. */}
+              {a.name && a.name !== a.code && (
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.plum, lineHeight: 1.4 }}>{a.name}</div>
+              )}
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag>
+                {sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}
+                {isFrozen && <StateBadge state={String(itemState)} small />}
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", fontSize: 13, color: C.plumSoft, fontWeight: 600 }}>
+                <span>Hạn: <b style={{ color: C.plum, fontFamily: NUM }}>{a.target ? a.target.split("-").reverse().join("/") : "—"}</b></span>
+                <span>QA: <b style={{ color: C.plum }}>{nguoiPhuTrach(a.owner) || "—"}</b></span>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {!readOnly && !isFrozen && stageByItem.get(a.id) !== "done" && (
+                  <button onClick={() => { setEdit(a); setQuick(true); }}
+                    style={{ flex: "1 1 auto", minHeight: 44, borderRadius: 10, border: `1px solid ${C.mint}`,
+                             background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 13,
+                             fontWeight: 700, cursor: "pointer" }}>
+                    ✓ Xong bước
+                  </button>
+                )}
+                <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
+                  disabled={readOnly || (isFrozen && !isAdmin)}
+                  style={{ ...btnPrimary, flex: "1 1 auto", minHeight: 44, fontSize: 13,
+                           display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+                           opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}>
+                  <Pencil size={14} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}
+                </button>
+              </div>
+            </div>
+          );
+        }}
+      />
+
+      {/* Phân trang dùng chung cho cả hai bản trình bày. */}
+      {list.length > 0 && (
+        <div className="vmp-chi-mobile">
+          <PhanTrang tong={list.length} trang={trang} setTrang={setTrang}
+            coTrang={coTrang} setCoTrang={setCoTrang} donVi="hạng mục" />
+        </div>
+      )}
+
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
         <b style={{ color: C.mintText }}>Supabase là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).
         Sửa ngày, trạng thái và danh mục ngay trên web — Google Sheet nay chỉ là bản tham chiếu

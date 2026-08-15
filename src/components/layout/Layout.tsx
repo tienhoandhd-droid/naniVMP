@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import {
   KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
 } from "lucide-react";
-import { C, TEXT, NUM, DISPLAY, GRAD, glass } from "../../constants/theme.ts";
+import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
 import type { ReactNode } from "react";
 import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
@@ -40,7 +40,10 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
 
   return (
     <aside className="vmp-sidebar" style={{
-      width: collapsed ? 72 : 266, flexShrink: 0, height: "100%",
+      /* 248px thay 266px — nghiên cứu đề xuất thu sidebar lại để trả thêm
+         bề ngang cho vùng dữ liệu, thứ vốn là nhân vật chính. Collapsed giữ
+         nguyên 72px. */
+      width: collapsed ? 72 : 248, flexShrink: 0, height: "100%",
       display: "flex", flexDirection: "column",
       background: `linear-gradient(180deg, ${C.surface}, ${C.pinkMist})`,
       borderRight: `1px solid ${C.line}`,
@@ -133,16 +136,20 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               <ThanhTraToggle />
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+              {/* nowrap + đệm ngang hẹp: sidebar nay là 248px thay vì 266px,
+                  và ở bề ngang đó nhãn "Mật khẩu" bị bẻ xuống hai dòng. */}
               <button onClick={onChangePw} style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "9px", borderRadius: 14, border: "none", cursor: "pointer",
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                padding: "9px 4px", borderRadius: R.sm, border: "none", cursor: "pointer",
+                whiteSpace: "nowrap",
                 background: C.lavSoft, color: C.lavText, fontFamily: TEXT, fontSize: 12, fontWeight: 800,
               }}>
                 <KeyRound size={14} /> Mật khẩu
               </button>
               <button onClick={onLogout} style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "9px", borderRadius: 14, border: "none", cursor: "pointer",
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                padding: "9px 4px", borderRadius: R.sm, border: "none", cursor: "pointer",
+                whiteSpace: "nowrap",
                 background: C.raspSoft, color: C.raspText, fontFamily: TEXT, fontSize: 12, fontWeight: 800,
               }}>
                 <LogOut size={14} /> Thoát

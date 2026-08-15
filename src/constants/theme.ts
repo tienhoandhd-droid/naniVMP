@@ -164,14 +164,16 @@ export const btnPrimary: CSSProperties = {
    * nơi gọi tự nhớ. Trước đây thiếu hai dòng này nên nút nào quên đặt
    * padding sẽ cao đúng 23px — dưới ngưỡng vùng chạm 24px của WCAG 2.5.8,
    * và không ai phát hiện vì trông vẫn "gọn gàng". */
-  padding: "10px 18px",
-  minHeight: 40,
+  padding: "0 16px",
+  minHeight: 42,
   borderRadius: R.sm,
   boxShadow: "var(--e-accent)",
   transition: `transform ${MO.fast} ${MO.spring}, box-shadow ${MO.base} ${MO.ease}`,
 };
 export const INP: CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: R.sm,
+  /* Chiều cao 42px theo bảng component token của báo cáo nghiên cứu. Đặt ở
+     đây thay vì từng ô nhập: một chỗ sửa, mọi form theo. */
+  width: "100%", minHeight: 42, padding: "0 14px", borderRadius: R.sm,
   border: `1px solid ${C.line}`, background: C.surfaceSunk,
   fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 600, outline: "none",
   transition: `border-color ${MO.fast} ${MO.ease}, box-shadow ${MO.fast} ${MO.ease}`,

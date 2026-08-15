@@ -153,7 +153,7 @@ export default function TodayView({ acts, myName, onMo, setView }: {
          tới: đã làm rồi nhưng hồ sơ chưa khép. Với ALCOA+ thì một hạng mục
          ghi "Hoàn thành" mà thiếu ngày thực tế là không kiểm chứng được. */
       if (a.st === "done" && !String(r.ngay_vmp || "").trim()) {
-        thieu.push({ a, con: null, moc: "Hoàn thành nhưng thiếu ngày" });
+        thieu.push({ a, con: null, moc: "Thiếu ngày hoàn thành" });
         continue;
       }
       if (!String(a.owner || "").trim() || a.owner === "—") {

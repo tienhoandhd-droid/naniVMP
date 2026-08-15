@@ -2174,7 +2174,7 @@ select { appearance: none; -webkit-appearance: none; }
 }
 
 /* ===== Responsive ===== */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .vq-login-page { align-items: flex-start !important; padding: 16px !important; }
   .vq-login-grid { grid-template-columns: 1fr !important; }
   .vq-brand-panel { min-height: 164px; padding: 24px 24px; }
@@ -6089,7 +6089,7 @@ button.visual-pulse__item {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .visual-console {
     padding: 9px !important;
   }
@@ -6544,7 +6544,7 @@ body { transition: background var(--mo-slow) var(--ease); }
 }
 .vmp-vongnam-nut { margin-left: 0 !important; align-self: flex-start; }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .vmp-vongnam-than { grid-template-columns: 1fr; }
   .vmp-vongnam-vong { max-width: 300px; margin: 0 auto; }
 }
@@ -7185,7 +7185,7 @@ summary { min-height: 24px; display: flex; align-items: center; }
     scroll-padding-inline-end: 96px;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .vmp-chat-fab {
     position: static !important; right: auto !important; bottom: auto !important;
     z-index: auto !important; margin: 16px 0 4px auto;
@@ -7532,3 +7532,69 @@ summary { min-height: 24px; display: flex; align-items: center; }
    không thể đúng cho cả hai. */
 .vmp-nhiet-bac-3 { color: var(--lp-porcelain); }
 :root[data-theme="dark"] .vmp-nhiet-bac-3 { color: var(--lp-on-danger); }
+
+/* ===================================================================
+ *  Hai cách trình bày cùng một dữ liệu — spec §5.5
+ *  -------------------------------------------------------------------
+ *  Desktop dùng bảng ngữ nghĩa, điện thoại dùng thẻ đứng. Loại trừ nhau
+ *  bằng display:none để chỉ MỘT bản nằm trong cây trợ năng: ẩn bằng
+ *  opacity thì trình đọc màn hình đọc trùng toàn bộ dữ liệu.
+ * =================================================================== */
+.vmp-chi-mobile { display: none; }
+
+@media (max-width: 768px) {
+  .vmp-chi-desktop { display: none !important; }
+  .vmp-chi-mobile { display: block; }
+}
+
+/* ===================================================================
+ *  Sàn vùng chạm cho mọi control — luật A3 của bộ kiểm thẩm mỹ
+ *  -------------------------------------------------------------------
+ *  Đặt ở tầng nền thay vì sửa hàng trăm nút inline một. Chỉ dùng
+ *  min-height nên nút nào đã đủ cao thì không đổi gì, còn nút thấp thì
+ *  được nâng lên — không làm vỡ bố cục theo chiều ngang.
+ *
+ *  Hai ngưỡng theo thiết bị trỏ: ngón tay cần 44px (Apple HIG,
+ *  Material 48dp), con trỏ chuột chính xác hơn nên 36px là đủ và giữ
+ *  được mật độ dữ liệu trên màn lớn.
+ * =================================================================== */
+button,
+select,
+textarea,
+input:not([type="checkbox"]):not([type="radio"]) {
+  min-height: 36px;
+}
+
+/* Nút cũng cần sàn BỀ NGANG, không chỉ chiều cao: nút icon trong bảng
+   danh mục rộng đúng 23px — vuông vắn nhưng vẫn dưới ngưỡng 24px của
+   WCAG 2.5.8. Chỉ đặt cho <button>, không đặt cho input/select vì chúng
+   vốn đã rộng theo cột. */
+button { min-width: 36px; }
+
+/* Ngoại lệ có lý do: ô bản đồ nhiệt tự có chiều cao riêng theo lưới, và
+   ép sàn vào đó sẽ kéo dãn cả bảng. Nó đã đạt 42px sẵn. */
+.vmp-nhiet-o,
+.vmp-nhiet-chon { min-height: 0; }
+
+@media (max-width: 768px) {
+  button,
+  select,
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]) {
+    min-height: 44px;
+  }
+  button { min-width: 44px; }
+}
+
+/* ===================================================================
+ *  Chiều dài dòng chữ — luật A4
+ *  -------------------------------------------------------------------
+ *  Đoạn văn chạy dài quá 85 ký tự thì mắt trượt dòng khi xuống hàng
+ *  (Butterick, Bringhurst). Giới hạn ở tầng nền cho các thẻ văn bản
+ *  thuần; bảng, nhãn và ô số liệu không bị ảnh hưởng vì chúng không
+ *  phải văn bản chạy.
+ * =================================================================== */
+main p,
+main li,
+.vmp-giai-thich,
+.vmp-table-hint { max-width: 78ch; }

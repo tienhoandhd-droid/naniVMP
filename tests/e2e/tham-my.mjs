@@ -183,6 +183,14 @@ function doTrongTrang() {
     return laVo ? rc : r;
   };
 
+  /* Ngưỡng khuyến nghị phụ thuộc thiết bị trỏ, không phải một con số duy
+     nhất. Ngón tay cần 44px (Apple HIG, Material 48dp); con trỏ chuột
+     chính xác hơn nhiều, và chính bảng component token của nghiên cứu đặt
+     filter chip ở 36px. Áp 44px cho desktop chỉ tạo ra hàng nghìn cảnh báo
+     mà không ai sửa — mà một luật không ai sửa thì sớm bị tắt. */
+  const beRong = document.documentElement.clientWidth;
+  const nguongKhuyenNghi = beRong <= 768 ? 44 : 36;
+
   const bamDuoc = tatCa.filter((el) =>
     ["BUTTON", "A", "INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)
     || el.getAttribute("role") === "button");
@@ -190,7 +198,41 @@ function doTrongTrang() {
     const r = vungChamHieuDung(el);
     const nho = Math.min(r.width, r.height);
     if (nho < 24) bao(true, "A3", `${moTa(el)} chỉ ${Math.round(r.width)}×${Math.round(r.height)}px, dưới 24px`);
-    else if (nho < 44) bao(false, "A3", `${moTa(el)} ${Math.round(r.width)}×${Math.round(r.height)}px, dưới khuyến nghị 44px`);
+    else if (nho < nguongKhuyenNghi) {
+      bao(false, "A3", `${moTa(el)} ${Math.round(r.width)}×${Math.round(r.height)}px,`
+        + ` dưới khuyến nghị ${nguongKhuyenNghi}px cho khổ ${beRong}px`);
+    }
+  }
+
+  /* ---- A7 · điện thoại không phải kéo ngang để đọc dữ liệu ----
+   * WCAG 1.4.10 Reflow cấm bắt người dùng cuộn theo cả hai chiều. A2 đã
+   * bắt trang tràn ngang, nhưng một bảng đặt min-width rồi bọc trong khung
+   * cuộn riêng thì lọt: trang không tràn, mà người dùng vẫn phải kéo ngang
+   * cả bảng chỉ để sửa một dòng. Đây đúng là tình trạng màn Tiến độ trước
+   * khi có bản thẻ cho điện thoại. */
+  if (document.documentElement.clientWidth <= 768) {
+    for (const el of tatCa) {
+      const thua = el.scrollWidth - el.clientWidth;
+      if (thua <= 40) continue;
+
+      /* Chỉ tính phần tử THẬT SỰ cuộn được. Một nhãn đặt `overflow: hidden`
+         kèm `text-overflow: ellipsis` cũng có scrollWidth lớn hơn clientWidth,
+         nhưng người dùng không kéo được gì cả — chữ chỉ bị cắt và hiện dấu
+         ba chấm. Bắt nó là báo sai bản chất luật. */
+      const tran = getComputedStyle(el).overflowX;
+      if (tran !== "auto" && tran !== "scroll") continue;
+
+      // Vùng cuộn ngang CÓ CHỦ Ý (ma trận, dải chip lọc) đánh dấu riêng.
+      if (el.closest('[data-lp-scroll="ngang"]')) continue;
+
+      /* Vùng bọc trực tiếp một <table> cũng là ngoại lệ, không cần đánh dấu
+         tay: bảng dữ liệu chính là "nội dung cần bố cục hai chiều" mà
+         WCAG 1.4.10 miễn trừ. Suy ra từ cấu trúc thì bền hơn bắt mỗi bảng
+         mới phải nhớ thêm một thuộc tính. */
+      if (el.querySelector(":scope > table")) continue;
+
+      bao(true, "A7", `${moTa(el)} bắt kéo ngang ${thua}px trên khổ điện thoại`);
+    }
   }
 
   /* ---- A5 · thứ bậc tiêu đề ---- */

@@ -528,6 +528,11 @@ export function TableScroll({ children, maxHeight = "68vh", hint = true }: {
       <div
         ref={ref}
         className={`vmp-table-wrap vmp-scroll ${canPan ? "can-pan" : ""} ${panning ? "is-panning" : ""}`}
+        /* Bảng dữ liệu nhiều cột nằm trong ngoại lệ của WCAG 2.2 — 1.4.10
+           Reflow, vốn miễn trừ "nội dung cần bố cục hai chiều để dùng hoặc
+           để hiểu". Bỏ một chiều của bảng so sánh là mất chính thứ nó dùng
+           để so sánh. Khai báo để luật A7 của bộ kiểm biết đây là chủ ý. */
+        data-lp-scroll="ngang"
         style={{ maxHeight }}
         onMouseDown={onDown}
         onMouseMove={onMove}
@@ -884,7 +889,9 @@ export function Sel({ val, set, opts, nhan }: {
       aria-label={nhan || tenHienTai || "Lựa chọn"}
       title={nhan || tenHienTai}
       style={{
-      padding: "8px 13px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`,
+      /* 42px theo bảng component token — ô chọn thấp hơn thì trên điện
+         thoại rất dễ bấm trượt sang dòng bên cạnh. */
+      minHeight: 42, padding: "0 13px", borderRadius: R.sm, border: `1.5px solid ${C.pinkSoft}`,
       background: C.surface, fontFamily: TEXT, fontSize: 14, color: C.plum,
       fontWeight: 700, cursor: "pointer", outline: "none",
     }}>

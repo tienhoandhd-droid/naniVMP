@@ -30,13 +30,32 @@ Thành công thì trả **nguyên mã thoát của lệnh bên trong**.
 
 Đặt `WITH_PREVIEW_TIMEOUT` (giây, mặc định 20) nếu máy chậm.
 
+## Luồng chính trên Supabase giả lập
+
+```bash
+bash scripts/with-preview.sh -- npm run e2e:gialap
+```
+
+Bộ E2E cũ (`npm run e2e`) đăng nhập bằng tài khoản **thật** trên project
+production, nên khi chưa có project cách ly thì không chạy được. Bộ này lấp
+đúng khoảng trống đó: mở thật trong Chrome, điều hướng thật qua cả 15 màn,
+nhưng mọi câu trả lời từ Supabase đến từ `gia-lap-supabase.mjs`.
+
+Nó kiểm: màn đăng nhập dựng đúng · 15 màn đều có đúng một `h1`, không màn
+lỗi, console sạch, không tràn ngang, không request nào lọt ra ngoài · màn
+Tiến độ trên điện thoại dùng thẻ chứ không phải bảng, nút đạt 44px · chuyển
+sáng/tối đổi thật bảng màu · dữ liệu rỗng vẫn có nội dung giải thích.
+
+Nó KHÔNG thay bộ kiểm nghiệp vụ: dữ liệu là dựng sẵn, nên nó chứng minh app
+dựng và điều hướng được, không chứng minh số liệu đúng.
+
 ## Kiểm thẩm mỹ toàn app
 
 ```bash
 bash scripts/with-preview.sh -- npm run thammy
 ```
 
-Áp 16 luật đo được ở `docs/design/luat-tham-my.md` lên **cả 17 màn**, ở hai
+Áp 17 luật đo được ở `docs/design/luat-tham-my.md` lên **cả 17 màn**, ở hai
 chế độ sáng/tối, bốn khổ màn, và hai kịch bản dữ liệu (có dữ liệu · rỗng) —
 83 lượt đo. Thoát khác 0 nếu còn vi phạm **nặng**.
 

@@ -612,7 +612,12 @@ function SourceCatalogSection({ user, onReload, focus }: {
                   )}
                   {shownFields.map((f, i) => {
                     const rec = r as Record<string, unknown>;
-                    const here = cell?.id === r.id && cell.key === f.key;
+                    /* `cell?.id === r.id` KHÔNG đủ: khi `cell` là null nó cho
+                       ra `undefined`, và nếu dòng dữ liệu cũng thiếu `id` thì
+                       `undefined === undefined` thành true — rồi `cell.key`
+                       ném lỗi và ErrorBoundary nuốt trọn cả màn. Một dòng
+                       thiếu id không đáng đổi lấy toàn bộ danh mục. */
+                    const here = cell != null && cell.id === r.id && cell.key === f.key;
                     const score = Number(rec.criticality_score);
                     return (
                     <td key={f.key} className={i === 0 ? (canEdit ? "vmp-col-pin2" : "vmp-col-pin") : undefined}
