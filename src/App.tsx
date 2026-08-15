@@ -104,7 +104,7 @@ const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
 const OperationalPeopleView = lazy(nhapCoThuLai(() => import("./pages/OperationalPeoplePage.tsx")));
 const AccountAccessView = lazy(nhapCoThuLai(() => import("./pages/AccountAccessPage.tsx")));
-const TodayView = lazy(nhapCoThuLai(() => import("./pages/TodayPage.tsx")));
+const TodayView = lazy(nhapCoThuLai(() => import("./features/today/TodayCommandCenter.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
 import VongNam from "./components/dashboard/VongNam.tsx";
@@ -1718,6 +1718,33 @@ function AppShell() {
      Không có bước này thì bấm Back sẽ quay đúng về màn vừa bị cấm, guard lại
      đá đi, và mỗi lần như vậy lại nhét thêm một mục vào lịch sử — người dùng
      bấm Back mãi không thoát nổi. */
+  /* Đường dẫn sâu từ "Hôm nay" sang "Cập nhật tiến độ".
+     Nó CHỈ đổi màn và mã hạng mục cần tập trung. Không đụng vào bộ phận,
+     khu vực, kỳ hay "việc của tôi" — nếu nó sửa phạm vi thì người dùng
+     bấm một dòng rồi thấy cả trang đổi nội dung, và không hiểu vì sao. */
+  /* Một câu ngắn mô tả phạm vi dữ liệu đang xem. Người dùng cần biết con
+     số họ đang nhìn được lọc theo gì — nếu không, hai người mở cùng màn
+     mà thấy hai con số khác nhau sẽ tưởng hệ thống sai. */
+  const nhanPhamVi = useMemo(() => {
+    const phan: string[] = [];
+    if (deptSel.length > 0) {
+      phan.push(deptSel.map((id) => DEPTS.find((d) => d.id === id)?.short || id).join(", "));
+    } else {
+      phan.push("Toàn hệ thống");
+    }
+    if (areaSel.length > 0) phan.push(`khu vực ${areaSel.join(", ")}`);
+    const kyHan = PERIODS.find(([id]) => id === periodFilter)?.[1];
+    if (kyHan && periodFilter !== "all") phan.push(String(kyHan).toLowerCase());
+    if (onlyMine) phan.push("việc của tôi");
+    return phan.join(" · ");
+  }, [deptSel, areaSel, periodFilter, onlyMine]);
+
+  const moTienDo = useCallback((link: { validationCode: string }) => {
+    setMoHangMuc(link.validationCode);
+    viewTruoc.current = "progress";
+    setView("progress");
+  }, []);
+
   const chuyenManAnToan = useCallback((manMoi: string) => {
     viewTruoc.current = manMoi;
     setView(manMoi);
@@ -1925,8 +1952,15 @@ function AppShell() {
             <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "today" && (
-                <TodayView acts={filteredActs} myName={myName} setView={setView}
-                  onMo={(a) => { setMoHangMuc(String(a.id)); setView("progress"); }} />
+                <TodayView
+                  acts={filteredActs}
+                  scopeLabel={nhanPhamVi}
+                  updatedLabel={dataUpdatedAt
+                    ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
+                    : undefined}
+                  state={conn.status === "loading" ? "loading" : conn.status === "err" ? "error" : "ready"}
+                  onRetry={reloadData}
+                  onOpenProgress={moTienDo} />
               )}
               {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
               {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} />}

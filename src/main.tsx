@@ -11,6 +11,7 @@ import "./index.css";
 import "./styles/lotus-tokens.css";
 import "./styles/lotus-components.css";
 import "./styles/lotus-responsive.css";
+import "./features/today/today.css";
 
 /* Đặt ngôn ngữ thị giác và chế độ sáng/tối TRƯỚC khi React mount — nếu để
    trong component thì trang sẽ loé bảng màu cũ một nhịp rồi mới nhảy. */

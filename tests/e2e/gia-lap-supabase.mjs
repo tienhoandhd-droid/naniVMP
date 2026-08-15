@@ -87,6 +87,11 @@ function dungHangMuc(i) {
     exec_depts: [bo],
     owner_name: `Người phụ trách ${(i % 5) + 1}`,
     support_name: `Hỗ trợ ${(i % 3) + 1}`,
+    /* person_id thật: màn "Hôm nay" chỉ nhận diện người phụ trách bằng id,
+       không bằng tên. Thiếu nó thì mọi hạng mục rơi vào nhóm "hồ sơ chưa
+       đủ" và bộ kiểm không còn phản ánh đúng cảnh vận hành.
+       Cứ mỗi 8 hạng mục thì để trống một cái, để nhóm đó vẫn có mẫu. */
+    owner_person_id: i % 8 === 7 ? null : `00000000-0000-4000-8000-${String(100 + i).padStart(12, "0")}`,
     year: 2026,
     state: "active",
     status: tt,
@@ -119,6 +124,7 @@ function dungHangMuc(i) {
     execDepts: [bo],
     owner: raw.owner_name,
     owner_name: raw.owner_name,
+    ownerPersonId: raw.owner_person_id,
     year: 2026,
     state: "active",
     crit: raw.criticality,
