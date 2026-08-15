@@ -169,6 +169,16 @@ function doTrongTrang() {
    * so với việc đo cho đúng ngay từ đầu. */
   const vungChamHieuDung = (el) => {
     const r = el.getBoundingClientRect();
+
+    /* Ô đánh dấu và nút chọn gần như luôn đi kèm một <label>, và bấm vào
+       nhãn cũng kích hoạt ô. Đo riêng cái ô 20×20 là bỏ qua toàn bộ vùng
+       chạm thật mà người dùng đang dùng. */
+    if (el.type === "checkbox" || el.type === "radio") {
+      const nhan = el.closest("label")
+        || (el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null);
+      return nhan ? nhan.getBoundingClientRect() : r;
+    }
+
     if (!["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return r;
     const cha = el.parentElement;
     if (!cha) return r;
@@ -198,6 +208,11 @@ function doTrongTrang() {
     const r = vungChamHieuDung(el);
     const nho = Math.min(r.width, r.height);
     if (nho < 24) bao(true, "A3", `${moTa(el)} chỉ ${Math.round(r.width)}×${Math.round(r.height)}px, dưới 24px`);
+    /* Ô đánh dấu và nút chọn có kích thước chuẩn riêng: 24px là quy ước
+       của mọi bảng dữ liệu dày, và phóng lên 36px thì một bảng hai mươi
+       dòng trông như bảng câu hỏi trắc nghiệm. Chúng vẫn phải đạt ngưỡng
+       BẮT BUỘC ở trên, chỉ miễn ngưỡng khuyến nghị. */
+    else if (el.type === "checkbox" || el.type === "radio") { /* đạt */ }
     else if (nho < nguongKhuyenNghi) {
       bao(false, "A3", `${moTa(el)} ${Math.round(r.width)}×${Math.round(r.height)}px,`
         + ` dưới khuyến nghị ${nguongKhuyenNghi}px cho khổ ${beRong}px`);

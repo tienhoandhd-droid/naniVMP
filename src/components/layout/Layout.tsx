@@ -94,7 +94,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                   title={collapsed ? n.label : undefined}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
-                    padding: collapsed ? "12px" : "11px 13px", borderRadius: 14,
+                    padding: collapsed ? "12px" : "12px", borderRadius: R.md,
                     border: "none", cursor: "pointer", textAlign: "left",
                     fontFamily: TEXT, fontSize: 14, width: "100%",
                     fontWeight: active ? 800 : 600,

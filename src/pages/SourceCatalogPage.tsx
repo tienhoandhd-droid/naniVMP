@@ -547,7 +547,8 @@ function SourceCatalogSection({ user, onReload, focus }: {
               <tr>
                 {canEdit && (
                   <th className="vmp-col-check" style={{ padding: "9px 6px" }}>
-                    <input type="checkbox"
+                    <input type="checkbox" className="vmp-o-chon"
+                      aria-label={picked.size === sorted.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
                       checked={sorted.length > 0 && picked.size === sorted.length}
                       onChange={(e) => setPicked(e.target.checked
                         ? new Set(sorted.map((r) => r.id)) : new Set())} />
@@ -602,7 +603,9 @@ function SourceCatalogSection({ user, onReload, focus }: {
                   {canEdit && (
                     <td className="vmp-col-check"
                       style={{ padding: "8px 6px", background: picked.has(r.id) ? C.lavSoft : undefined }}>
-                      <input type="checkbox" checked={picked.has(r.id)}
+                      <input type="checkbox" className="vmp-o-chon"
+                        aria-label={`Chọn ${String((r as Record<string, unknown>).object_code ?? r.id)}`}
+                        checked={picked.has(r.id)}
                         onChange={(e) => setPicked((prev) => {
                           const n = new Set(prev);
                           if (e.target.checked) n.add(r.id); else n.delete(r.id);

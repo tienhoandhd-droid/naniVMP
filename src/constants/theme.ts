@@ -60,8 +60,12 @@ export const C = {
  * kèm dấu tiếng Việt: font tròn hình học, x-height thấp, chữ 'a' một tầng,
  * đặt ở cỡ đó thì dấu chồng lên nhau và mắt phải căng ra đọc.
  *
- * NUM dùng cho con số trong bảng và nhãn — cùng phông thân bài, nhưng bật
- * chữ số đều bề rộng ở index.css nên cột số thẳng hàng dọc.
+ * NUM dùng cho con số trong bảng và nhãn — cùng phông thân bài.
+ *
+ * LƯU Ý một điều trái với chú thích cũ ở đây: Be Vietnam Pro KHÔNG có bảng
+ * chữ số đều bề rộng. Đo ở 13px cho "111" 16.19px, "000" 27px — và
+ * `tabular-nums` không đổi được. Cột số thẳng hàng là nhờ CĂN PHẢI
+ * (`.tnum--cot`), không phải nhờ phông.
  * ------------------------------------------------------------------- */
 export const TEXT = "'Be Vietnam Pro', system-ui, -apple-system, sans-serif";
 /** Phông kể chuyện — Cormorant Garamond, chỉ dùng cho logo, H1, section

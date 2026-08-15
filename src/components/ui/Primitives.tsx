@@ -624,8 +624,8 @@ export function Tag({ color, bg, children, style: extra }: {
 }) {
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
-      padding: "4px 11px", borderRadius: 999,
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "4px 12px", borderRadius: 999,
       fontFamily: TEXT, fontSize: 12, fontWeight: 800,
       color, background: bg, whiteSpace: "nowrap", ...extra,
     }}>

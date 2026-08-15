@@ -190,7 +190,20 @@ body {
 img { max-width: 100%; }
 
 /* Số liệu canh đều (đồng hồ, KPI, bảng) */
+/* Chữ số đều bề rộng — CÓ ĐIỀU KIỆN.
+   Đo trong Chrome ở 13px (2026-08-15): Be Vietnam Pro cho "111" 16.19px,
+   "000" 27px, "789" 25.3px. Cả `font-variant-numeric: tabular-nums` lẫn
+   `font-feature-settings: "tnum" 1` đều KHÔNG đổi được, vì bản Google
+   Fonts của phông này không kèm bảng `tnum`.
+   Hai khai báo dưới đây vẫn giữ: chúng vô hại, và sẽ có tác dụng ngay nếu
+   sau này phông đổi. Nhưng thứ THẬT SỰ làm cột số so sánh được là căn
+   phải — xem `.tnum--cot` và chú thích ở NUM_HERO trong theme.ts. */
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* Cột số trong bảng: căn phải để mép đơn vị thẳng hàng. Đây là cách duy
+   nhất còn lại khi phông không có chữ số đều bề rộng — và cũng là quy ước
+   lâu đời của mọi bảng số liệu in. */
+.tnum--cot { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ===== Accessibility: focus rõ ràng, chỉ khi dùng bàn phím ===== */
 :focus-visible {
@@ -7102,7 +7115,9 @@ body, input, select, textarea, button, table {
 body {
   font-size: var(--fs-body);
   line-height: var(--lh-base);
-  /* Chữ số đều bề rộng cho TOÀN app — cột số thẳng hàng ở mọi bảng. */
+  /* Bật `tnum` cho toàn app. Lưu ý: phông thân bài hiện KHÔNG có bảng này
+     nên nó chưa có tác dụng — xem chú thích ở lớp `.tnum`. Giữ lại để
+     không phải nhớ bật lại nếu đổi phông. */
   font-variant-numeric: tabular-nums;
   -webkit-font-feature-settings: "tnum" 1;
   font-feature-settings: "tnum" 1;
@@ -7162,9 +7177,12 @@ h1, h2, h3, .vmp-tieu-de-lon { line-height: var(--lh-tight); }
 .vmp-gt > summary::after {
   content: ""; position: absolute; inset: -4px;
 }
+/* 24px là ngưỡng vùng chạm bắt buộc của WCAG 2.2 — 2.5.8. Bản trước để
+   20px, và vì `input[type="checkbox"]` đặc hiệu hơn class nên mọi cố gắng
+   nâng kích thước bằng class riêng đều bị quy tắc này đè lại. */
 input[type="checkbox"] {
-  width: 20px; height: 20px; cursor: pointer;
-  accent-color: var(--c-pink);
+  width: 24px; height: 24px; cursor: pointer;
+  accent-color: var(--lp-plum);
 }
 /* Nhãn bọc ô đánh dấu chính là vùng bấm thật — cho nó chiều cao tối thiểu. */
 label:has(> input[type="checkbox"]) { min-height: 24px; display: inline-flex; align-items: center; }
@@ -7639,3 +7657,12 @@ main p,
 main li,
 .vmp-giai-thich,
 .vmp-table-hint { max-width: 78ch; }
+
+/* Ô đánh dấu chọn dòng — vùng chạm đạt ngưỡng WCAG 2.5.8.
+   Mặc định của trình duyệt là 13×13 (Chrome vẽ thành 20×20 sau khi áp
+   thang chữ), dưới ngưỡng 24px. Trong bảng thì càng dễ bấm trượt sang
+   dòng bên cạnh, và bấm nhầm ở đây nghĩa là chọn nhầm hạng mục để sửa
+   hàng loạt. */
+@media (max-width: 768px) {
+  .vmp-o-chon { width: 28px; height: 28px; }
+}
