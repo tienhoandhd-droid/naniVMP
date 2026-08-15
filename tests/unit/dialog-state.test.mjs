@@ -13,6 +13,7 @@ import {
   nextDialogFocus, updateDirtyRegistry, summarizeDirty,
 } from "../../src/components/ui/dialogState.ts";
 import ViewportDialog from "../../src/components/ui/ViewportDialog.tsx";
+import ShellConfirmDialog from "../../src/components/layout/ShellConfirmDialog.tsx";
 
 const GOC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const doc = (p) => readFileSync(path.join(GOC, p), "utf8");
@@ -113,4 +114,35 @@ test("hộp thoại mở bằng scale mềm theo §6.7d và tắt khi giảm chu
   const khoi = css.slice(css.indexOf(".lp-dialog"));
   assert.match(khoi, /var\(--lp-mo-modal\)/);
   assert.match(khoi, /prefers-reduced-motion/);
+});
+
+/* ---- Hộp xác nhận của shell ----------------------------------------- */
+
+const dungXacNhan = (props) => renderToStaticMarkup(
+  React.createElement(ShellConfirmDialog, {
+    open: true, title: "Còn thay đổi chưa lưu",
+    description: "Thoát bây giờ là mất phần bạn vừa nhập.",
+    onConfirm: () => {}, onCancel: () => {}, ...props,
+  }),
+);
+
+test("hộp xác nhận nêu ĐÍCH DANH form đang dở, không nói chung chung", () => {
+  const html = dungXacNhan({ keys: ["doi-mat-khau", "catalog"] });
+  assert.match(html, /Đổi mật khẩu/);
+  // renderToStaticMarkup thoát `&` thành `&amp;` — khớp cả hai dạng.
+  assert.match(html, /Danh mục (&|&amp;) Nhập liệu/);
+});
+
+test("khoá lạ vẫn được nêu ra thay vì bị nuốt mất", () => {
+  assert.match(dungXacNhan({ keys: ["form-nao-do"] }), /form-nao-do/);
+});
+
+test("không có form nào dở thì không dựng danh sách rỗng", () => {
+  assert.doesNotMatch(dungXacNhan({ keys: [] }), /<ul/);
+});
+
+test("hai lựa chọn rõ ràng, mặc định là ở lại", () => {
+  const html = dungXacNhan({ keys: ["catalog"] });
+  assert.match(html, /Ở lại/);
+  assert.match(html, /Vẫn thoát/);
 });

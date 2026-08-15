@@ -159,6 +159,28 @@ const trinhDuyet = await puppeteer.launch({
   await trang.close();
 }
 
+/* ---- 3b. Thoát khi còn việc dở thì phải hỏi lại ---------------------- */
+{
+  console.log("\nThoát khi còn việc dở:");
+  const trang = await moApp(trinhDuyet);
+
+  /* Sạch sẽ thì thoát thẳng, không hỏi han gì. */
+  const hoiKhiSach = await trang.evaluate(() => {
+    const nut = [...document.querySelectorAll("button")].find((b) => /Thoát/.test(b.textContent || ""));
+    if (!nut) return "khong-thay-nut";
+    nut.click();
+    return document.body.innerText.includes("Còn thay đổi chưa lưu") ? "co-hoi" : "khong-hoi";
+  });
+  kiem(hoiKhiSach === "khong-hoi", "không có gì dở thì thoát thẳng", hoiKhiSach);
+  await trang.close();
+
+  /* Kịch bản "còn form dở khi bấm Thoát" cần một form nằm TRONG trang.
+     Hộp Đổi mật khẩu không dùng được: đóng nó là nội dung mất, nên sổ về
+     rỗng — đúng hành vi mong muốn. Còn khi nó đang mở thì nền đã trơ, không
+     bấm được nút Thoát. Form danh mục/tiến độ đăng ký vào sổ thuộc Đợt B;
+     phần dựng hộp xác nhận được kiểm ở tests/unit/dialog-state.test.mjs. */
+}
+
 /* ---- 4. Tên màn cũ vẫn dẫn đúng chỗ --------------------------------- */
 {
   console.log("\nĐường dẫn cũ:");

@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
+import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
+import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
 import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
@@ -31,12 +33,16 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
      đây nhóm QUẢN TRỊ hiện/ẩn theo một biểu thức riêng gộp `role` với
      `accessClass`; nay nó tự biến mất khi mọi mục bên trong đều bị từ chối,
      nên thêm một màn quản trị mới không phải sửa lại điều kiện ở đây. */
-  const groups = [
-    { id: "monitor", label: "GIÁM SÁT" },
-    { id: "work", label: "THỰC HIỆN" },
-    { id: "analysis", label: "PHÂN TÍCH" },
-    { id: "admin", label: "QUẢN TRỊ" },
-  ].filter((g) => NAV_ITEMS.some((n) => n.group === g.id && access.canView(n.id)));
+  /* Thứ tự lấy từ NAV_GROUP_ORDER — cùng một nguồn với hợp đồng điều
+     hướng. Trước đây khai lại tại chỗ và để GIÁM SÁT lên đầu; spec §7.1
+     đặt THỰC HIỆN trước, vì người dùng vào đây để LÀM việc chứ không phải
+     để ngắm số liệu. */
+  const NHAN_NHOM: Record<string, string> = {
+    work: "THỰC HIỆN", monitor: "GIÁM SÁT", analysis: "PHÂN TÍCH", admin: "QUẢN TRỊ",
+  };
+  const groups = NAV_GROUP_ORDER
+    .map((id) => ({ id, label: NHAN_NHOM[id] }))
+    .filter((g) => NAV_ITEMS.some((n) => n.group === g.id && access.canView(n.id)));
 
   return (
     <aside className="vmp-sidebar" style={{
@@ -61,7 +67,12 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
       {/* Logo */}
       <div style={{ padding: "0 6px 16px" }}>
         {collapsed
-          ? <div style={{ width: 40, height: 40, borderRadius: 14, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, margin: "0 auto" }}>👑</div>
+          /* Vương miện hình học thay emoji 👑: emoji đổi hình theo hệ điều
+             hành, không ăn màu thương hiệu, và ở 16px trên Windows thì nó
+             ra một khối vàng bẹt. */
+          ? <div style={{ width: 40, height: 40, borderRadius: R.sm, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", color: "#fff" }}>
+              <CrownMark size={22} />
+            </div>
           : <CrownLogo />
         }
       </div>

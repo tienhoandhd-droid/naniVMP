@@ -136,7 +136,11 @@
 }
 
 .lp-metric__value {
+  /* Serif ở đây KHÔNG phải để điệu: đo được Cormorant cho mọi chữ số cùng
+     bề rộng 61.88px ở cỡ 42px, còn Be Vietnam Pro thì 52–87px. Cột số
+     thẳng hàng quan trọng hơn với ô thống kê đặt cạnh nhau. */
   font-family: var(--ff-display);
+  font-variant-numeric: tabular-nums;
   font-size: 30px;
   line-height: 36px;
   font-weight: 600;
@@ -212,6 +216,7 @@
 
 .lp-priority__value {
   font-family: var(--ff-display);
+  font-variant-numeric: tabular-nums;
   font-size: 28px;
   line-height: 34px;
   font-weight: 600;

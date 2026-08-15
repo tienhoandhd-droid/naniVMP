@@ -19,14 +19,18 @@
 #    3  .env.local thiếu key bắt buộc hoặc key rỗng
 #    4  build thất bại
 #    5  sản phẩm build không hợp lệ hoặc dấu vân tay không khớp
-#    6  cổng 4173 đã bị chiếm, hoặc preview chết ngay
+#    6  cổng preview đã bị chiếm, hoặc preview chết ngay
 #    7  chờ preview sẵn sàng quá hạn
 #    *  mã thoát nguyên vẹn của lệnh bên trong
 # =====================================================================
 set -euo pipefail
 
 GOC="$(pwd)"
-CONG=4173
+# Cổng có thể đổi qua biến môi trường. Cần thế vì bộ kiểm vòng đời của
+# chính script này cũng mở preview thật — để cả hai cùng dùng 4173 thì
+# chạy song song sẽ đá nhau, và lỗi hiện ra dưới dạng "cổng đang bị chiếm"
+# rất giống một lỗi thật.
+CONG="${WITH_PREVIEW_PORT:-4173}"
 MAY=127.0.0.1
 HAN_CHO_GIAY="${WITH_PREVIEW_TIMEOUT:-20}"
 TEN_DAU="/.lotus-build-input"
@@ -42,7 +46,7 @@ bao() { printf '[with-preview] %s\n' "$*" >&2; }
 don_dep() {
   if [ -n "$PID_PREVIEW" ]; then
     # Giết cả nhóm tiến trình: `npm run preview` đẻ ra node con, giết mỗi
-    # npm sẽ để lại node mồ côi giữ cổng 4173 cho lần chạy sau.
+    # npm sẽ để lại node mồ côi giữ cổng preview cho lần chạy sau.
     kill -TERM -- "-$PID_PREVIEW" 2>/dev/null || kill -TERM "$PID_PREVIEW" 2>/dev/null || true
     wait "$PID_PREVIEW" 2>/dev/null || true
     PID_PREVIEW=""
@@ -92,7 +96,7 @@ tinh_dau_vao() {
 DAU_VAO="$(tinh_dau_vao)"
 
 # --- 4. Cổng phải rảnh trước khi tốn công build ----------------------
-# Không tái dùng server lạ: nếu 4173 đang có người, dừng hẳn.
+# Không tái dùng server lạ: nếu cổng đang có người, dừng hẳn.
 if (exec 3<>"/dev/tcp/$MAY/$CONG") 2>/dev/null; then
   exec 3<&- 2>/dev/null || true
   exec 3>&- 2>/dev/null || true

@@ -69,7 +69,17 @@ export const TEXT = "'Be Vietnam Pro', system-ui, -apple-system, sans-serif";
  *  thanh của serif ở cỡ 12–14 px kèm dấu tiếng Việt sẽ mảnh tới mức mờ. */
 export const DISPLAY = "'Cormorant Garamond', 'Be Vietnam Pro', Georgia, serif";
 export const NUM = "'Be Vietnam Pro', system-ui, -apple-system, sans-serif";
-/** Số KPI cỡ lớn — chỗ duy nhất còn dùng phông hiển thị cho chữ số. */
+/** Số KPI cỡ lớn — chỗ duy nhất dùng phông hiển thị cho chữ số.
+ *
+ *  Đo trong Chrome ở cỡ 42px (2026-08-15): Cormorant Garamond cho "111",
+ *  "000" và "789" ĐỀU rộng 61.88px — tức chữ số của nó đều bề rộng, cột số
+ *  thẳng hàng. Be Vietnam Pro cho 52.30 / 87.20 / 81.70px, và
+ *  `font-variant-numeric: tabular-nums` KHÔNG đổi được con số đó vì bản
+ *  Google Fonts của nó không kèm bảng `tnum`.
+ *
+ *  Nên với KPI lớn, serif vừa đúng spec §6.3 vừa là lựa chọn đọc tốt hơn.
+ *  Chữ nhỏ trong bảng vẫn dùng NUM (sans): ở 13px thì nét thanh của serif
+ *  kèm dấu tiếng Việt mảnh tới mức mờ. */
 export const NUM_HERO = "'Cormorant Garamond', 'Be Vietnam Pro', Georgia, serif";
 export const GRAD = "var(--grad)";
 export const GRAD_SOFT = "var(--grad-soft)";

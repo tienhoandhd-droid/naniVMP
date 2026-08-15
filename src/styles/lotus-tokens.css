@@ -286,6 +286,25 @@
 }
 
 /* ===================================================================
+ *  Chữ số kiểu LINING — bật cho toàn trang
+ *  -------------------------------------------------------------------
+ *  Cormorant Garamond mặc định dùng old-style figures: số `1` thấp bằng
+ *  chữ thường, `3`/`4`/`7`/`9` thò xuống dưới đường chân. Đo bằng canvas
+ *  ở cỡ 42px cho chiều cao 17–31px, chênh **14px** giữa các chữ số. Trên
+ *  ô KPI, "18" hiện ra như "ı8" và mắt phải dừng lại một nhịp để đọc.
+ *
+ *  `lnum` kéo mọi chữ số về cùng chiều cao mà GIỮ NGUYÊN nét serif — nên
+ *  không phải đánh đổi giữa "sang" và "đọc được". Với Be Vietnam Pro thì
+ *  thuộc tính này không đổi gì, vì chữ số của nó vốn đã là lining.
+ * =================================================================== */
+
+:root[data-visual="lotus-pearl"] body,
+:root[data-visual="lotus-pearl"] {
+  font-variant-numeric: lining-nums;
+  font-feature-settings: "lnum" 1;
+}
+
+/* ===================================================================
  *  Giảm chuyển động — spec §6.7d.
  *  Rút mọi thời lượng về gần 0 ngay tại nguồn, để không phải nhớ tắt
  *  từng hiệu ứng một ở mỗi component.

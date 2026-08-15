@@ -47,9 +47,12 @@ test("bảng màu biểu đồ dùng chung chỉ có ba màu, đúng nghĩa", ()
 
 test("serif chỉ kể chuyện, sans lo vận hành — spec §5.2", () => {
   assert.match(DISPLAY, /Cormorant Garamond/);
-  assert.match(NUM_HERO, /Cormorant Garamond/);
   assert.match(TEXT, /Be Vietnam Pro/);
   assert.match(NUM, /Be Vietnam Pro/);
+  /* Số KPI lớn dùng Cormorant — không phải để điệu mà vì đo được nó là
+     phông duy nhất ở đây có chữ số ĐỀU bề rộng. Xem chú thích NUM_HERO
+     trong theme.ts và luật C6 trong docs/design/luat-tham-my.md. */
+  assert.match(NUM_HERO, /Cormorant Garamond/);
   // Phông cũ không được sót lại ở vai trò vận hành.
   assert.doesNotMatch(TEXT, /Quicksand|Baloo|Poppins/);
   assert.doesNotMatch(NUM, /Quicksand|Baloo|Poppins/);

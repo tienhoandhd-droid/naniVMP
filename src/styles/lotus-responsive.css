@@ -1,0 +1,71 @@
+/* =====================================================================
+ *  lotus-responsive.css — hợp đồng khổ màn của shell Lotus Pearl
+ *  ---------------------------------------------------------------------
+ *  Nạp SAU lotus-components.css. Ở đây chỉ có luật theo khổ màn; màu và
+ *  hình khối nằm ở hai file kia.
+ *
+ *  Bốn mốc, chọn theo thiết bị thật của người dùng chứ không theo con số
+ *  tròn: 1440 (laptop phổ biến), 1366 (laptop hẹp), 768 (tablet dọc),
+ *  390 (điện thoại). Mốc 768 cũng là ranh giới ngón tay / con trỏ chuột
+ *  mà luật A3 và A7 của bộ kiểm thẩm mỹ dùng.
+ * ===================================================================== */
+
+/* --- Lưới nội dung theo spec §6.4 ---------------------------------- */
+:root[data-visual="lotus-pearl"] {
+  --lp-shell-pad: 32px;
+  --lp-grid-gutter: 24px;
+  --lp-sidebar: 248px;
+  --lp-sidebar-thu: 72px;
+}
+
+@media (max-width: 1199px) {
+  :root[data-visual="lotus-pearl"] {
+    --lp-shell-pad: 24px;
+    --lp-grid-gutter: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root[data-visual="lotus-pearl"] {
+    --lp-shell-pad: 16px;
+    --lp-grid-gutter: 12px;
+  }
+}
+
+/* --- Ô số liệu: hero chỉ chiếm hai cột khi còn đủ chỗ --------------- */
+@media (max-width: 1199px) {
+  .lp-metric-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+}
+
+/* --- Đầu trang: hành động xuống dòng riêng khi hẹp ------------------ */
+@media (max-width: 768px) {
+  .lp-page-header { flex-direction: column; gap: 16px; }
+  .lp-page-header__actions { width: 100%; }
+  .lp-page-header__actions > * { flex: 1 1 auto; }
+}
+
+/* --- Dải việc gấp: cuộn ngang CÓ CHỦ Ý trên điện thoại -------------- *
+ * Xếp dọc thì mỗi ô chiếm một màn và người dùng mất cái nhìn tổng thể —
+ * mà tổng thể chính là việc của dải này. Đánh dấu trong markup bằng
+ * data-lp-scroll="ngang" để luật A7 biết. */
+@media (max-width: 768px) {
+  .lp-priority-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+  }
+  .lp-priority { flex: 0 0 auto; scroll-snap-align: start; }
+}
+
+/* --- Thanh hành động dính đầu vùng cuộn ----------------------------- */
+@media (max-width: 768px) {
+  .lp-command-bar--sticky { position: static; box-shadow: none; }
+}
+
+/* --- Không để nút nổi che mất hành động chính ----------------------- *
+ * Nút chat nổi góc phải dưới từng che nút "Cập nhật" của dòng cuối bảng
+ * trên điện thoại. Chừa một làn an toàn ở đáy vùng nội dung. */
+@media (max-width: 768px) {
+  main { padding-bottom: 88px; }
+}

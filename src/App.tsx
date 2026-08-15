@@ -38,7 +38,8 @@ import {
 // ===== Internal modules (refactored) =====
 import { C, TEXT, NUM, R, btnPrimary, INP } from "./constants/theme.ts";
 import ViewportDialog from "./components/ui/ViewportDialog.tsx";
-import { DirtyStateProvider, useRegisterDirtyState } from "./components/ui/DirtyStateProvider.tsx";
+import { DirtyStateProvider, useRegisterDirtyState, useDirtyStateSnapshot } from "./components/ui/DirtyStateProvider.tsx";
+import ShellConfirmDialog from "./components/layout/ShellConfirmDialog.tsx";
 import {
 
   DEPTS,
@@ -1562,6 +1563,16 @@ function AppShell() {
     () => khoiTaoDayDu.nhom ?? "hangmuc",
   );
   const [showPw, setShowPw] = useState(false);
+
+  /* Thoát mà còn form đang dở thì hỏi lại. Trước đây bấm Thoát là mất
+     trắng phần vừa gõ, không một lời cảnh báo — với form nhập liệu GMP
+     dài thì đó là mất cả buổi làm. */
+  const [hoiThoat, setHoiThoat] = useState(false);
+  const { hasDirty, keys: formDangDo } = useDirtyStateSnapshot();
+  const xinThoat = useCallback(() => {
+    if (hasDirty) { setHoiThoat(true); return; }
+    logout();
+  }, [hasDirty, logout]);
   const mainRef = useScrollTop([view]);
 
   // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + bộ phận (chọn NHIỀU) + thời gian (có Tùy chọn).
@@ -1785,10 +1796,19 @@ function AppShell() {
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>
       {showPw && <ChangePwModal onClose={() => setShowPw(false)} />}
 
+      <ShellConfirmDialog
+        open={hoiThoat}
+        title="Còn thay đổi chưa lưu"
+        description="Thoát bây giờ là mất phần bạn vừa nhập ở những chỗ dưới đây."
+        keys={formDangDo}
+        onCancel={() => setHoiThoat(false)}
+        onConfirm={() => { setHoiThoat(false); logout(); }}
+      />
+
       <Sidebar
         view={view} setView={setView} user={user} access={access}
         connected={conn.status === "ok"}
-        onLogout={logout}
+        onLogout={xinThoat}
         onChangePw={() => setShowPw(true)}
       />
 
@@ -1811,7 +1831,7 @@ function AppShell() {
             onRefresh={reloadData} refreshing={conn.status === "loading"}
             lastSync={lastSync} dataUpdatedAt={dataUpdatedAt}
             view={view} setView={setView} access={access}
-            onLogout={logout} onChangePw={() => setShowPw(true)}
+            onLogout={xinThoat} onChangePw={() => setShowPw(true)}
           />
 
           {/* Toast trạng thái lưu nổi góc phải */}

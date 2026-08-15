@@ -23,6 +23,11 @@ const MA = { USAGE: 2, ENV: 3, BUILD: 4, ARTIFACT: 5, PORT: 6, TIMEOUT: 7 };
 /** Chuỗi mồi: nếu wrapper lỡ in giá trị bí mật ra thì test bắt được. */
 const MOI_BI_MAT = "sentinel-khong-duoc-in-ra-9f3c";
 
+/** Cổng riêng cho bộ kiểm này. Dùng chung 4173 với các bộ E2E khác thì
+ *  chạy song song sẽ báo "cổng đang bị chiếm" — một lỗi giả rất giống lỗi
+ *  thật, và tốn thời gian mỗi lần ai đó gặp phải. */
+const CONG_THU = 4319;
+
 const FAKE_BUILD = `
 import fs from "node:fs";
 import path from "node:path";
@@ -110,6 +115,7 @@ function chay(goc, doi = [], moiTruong = {}) {
       ...process.env,
       NHAT_KY_GOI: nhatKyGoi,
       NHAT_KY_PID: nhatKyPid,
+      WITH_PREVIEW_PORT: String(CONG_THU),
       INNER_EXIT: "0",
       ...moiTruong,
     },
@@ -233,7 +239,7 @@ test("chạy trọn vẹn: build → preview đúng tham số → lệnh trong �
 
     const dongPreview = kq.goi.split("\n").find((d) => d.startsWith("preview"));
     assert.match(dongPreview, /--host 127\.0\.0\.1/);
-    assert.match(dongPreview, /--port 4173/);
+    assert.match(dongPreview, new RegExp(`--port ${CONG_THU}`));
     assert.match(dongPreview, /--strictPort/);
 
     assert.equal(kq.pids.length, 1);
@@ -287,11 +293,11 @@ test("dấu vân tay theo tên key của .env.local, không theo giá trị", ()
   } finally { rmSync(goc, { recursive: true, force: true }); }
 });
 
-test("cổng 4173 đang bị người khác giữ thì từ chối, không cướp cổng", async () => {
+test("cổng preview đang bị người khác giữ thì từ chối, không cướp cổng", async () => {
   const goc = dungRepoGia();
   const { createServer } = await import("node:http");
   const chan = createServer((_req, res) => { res.writeHead(200); res.end("nguoi-khac"); });
-  await new Promise((ok) => chan.listen(4173, "127.0.0.1", ok));
+  await new Promise((ok) => chan.listen(CONG_THU, "127.0.0.1", ok));
   try {
     const kq = chay(goc, LENH_TRONG);
     assert.equal(kq.ma, MA.PORT);
@@ -329,10 +335,10 @@ test("lệnh trong thất bại thì wrapper trả đúng mã thoát của nó v
   } finally { rmSync(goc, { recursive: true, force: true }); }
 });
 
-test("sau khi wrapper kết thúc thì không ai còn phục vụ ở cổng 4173", async () => {
+test("sau khi wrapper kết thúc thì không ai còn phục vụ ở cổng đó", async () => {
   const goc = dungRepoGia();
   try {
     assert.equal(chay(goc, LENH_TRONG).ma, 0);
-    await assert.rejects(fetch("http://127.0.0.1:4173/", { signal: AbortSignal.timeout(2000) }));
+    await assert.rejects(fetch(`http://127.0.0.1:${CONG_THU}/`, { signal: AbortSignal.timeout(2000) }));
   } finally { rmSync(goc, { recursive: true, force: true }); }
 });
