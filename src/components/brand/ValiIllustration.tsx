@@ -17,16 +17,21 @@
  *  thể nét mặt theo mood là việc của designer khi có bộ ảnh đủ ba trạng
  *  thái, chỉ cần thay file cùng tên.
  *
- *  Ảnh: src/assets/brand/vali-chan-dung.jpg — 512×640 JPEG ~64KB (ngân
- *  sách ≤80KB/trạng thái), nền trắng sứ; khung bo 24px (radius hero) +
- *  viền token nên đặt trên theme tối vẫn là "chân dung trên nền sứ" có
- *  chủ đích, không phải sticker.
+ *  Ảnh: src/assets/brand/vali-chan-dung.webp — 512×640 WebP có ALPHA
+ *  ~45KB (ngân sách ≤80KB/trạng thái). Nền trắng của bản v1 đã được TÁCH
+ *  (flood-fill biên + túi trắng kín giữa lọn tóc, de-matte mép) nên chân
+ *  dung nổi thẳng trên nền màn hình — sáng hay tối đều đồng bộ, không còn
+ *  ô trắng. Mép dưới (thân cắt ngang khung) được làm tan bằng CSS mask.
  * ===================================================================== */
-/* Tham chiếu ảnh bằng new URL thay vì `import ... from "*.jpg"`: Vite
+/* Tham chiếu ảnh bằng new URL thay vì `import ... from "*.webp"`: Vite
  * vẫn nhận diện và bundle như thường, còn `node --test` (không có loader
  * ảnh) chỉ tạo một chuỗi URL — hai unit test của Workload từng chết vì
  * import chuỗi tài sản này. */
-const chanDung = new URL("../../assets/brand/vali-chan-dung.jpg", import.meta.url).href;
+const chanDung = new URL("../../assets/brand/vali-chan-dung.webp", import.meta.url).href;
+
+/* Thân bị crop phẳng ở đáy khung — cho tan dần 12% cuối để cutout không
+ * thành "sticker bị cắt cụt". */
+const MEP_TAN = "linear-gradient(to bottom, #000 88%, transparent 100%)";
 
 export type ValiMood = "guide" | "concern" | "celebrate";
 
@@ -63,9 +68,8 @@ export default function ValiIllustration({
       style={{
         display: "block",
         objectFit: "cover",
-        borderRadius: 24,
-        border: "1px solid var(--lp-line)",
-        background: "var(--lp-porcelain)",
+        maskImage: MEP_TAN,
+        WebkitMaskImage: MEP_TAN,
       }}
     />
   );
