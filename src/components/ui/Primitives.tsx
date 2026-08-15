@@ -6,7 +6,7 @@ import { useId, useRef, useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { C, TEXT, NUM, NUM_HERO, MO, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
+import { C, TEXT, NUM, NUM_HERO, DISPLAY, MO, R, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
 import { XCircle } from "lucide-react";
 
@@ -342,23 +342,28 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
     : "Hãy tiếp tục duy trì tiến độ nhé!";
 
   // Token màu cho từng tone
+  /* Bốn sắc thái đi qua token ngữ nghĩa, nên chúng tự đảo đúng ở chế độ
+     tối và không thể lệch khỏi luật màu ở spec §5.3. */
   const toneColor = {
-    success: { c: "#1B6A3F", bg: "#E5F6EC", icon: "✓" },
-    danger:  { c: "#9F1F2E", bg: "#FCE6E9", icon: "!" },
-    warning: { c: "#8A5A12", bg: "#FCEFD9", icon: "⏱" },
-    info:    { c: "#3D2870", bg: "#EDE6F8", icon: "i" },
+    success: { c: "var(--c-mint-text)",     bg: "var(--c-mint-soft)",     icon: "✓" },
+    danger:  { c: "var(--c-rasp-text)",     bg: "var(--c-rasp-soft)",     icon: "!" },
+    warning: { c: "var(--c-marigold-text)", bg: "var(--c-marigold-soft)", icon: "⏱" },
+    info:    { c: "var(--c-sky-text)",      bg: "var(--c-sky-soft)",      icon: "i" },
   };
 
   return (
     <div
       style={{
         position: "relative",
-        background:
-          "radial-gradient(280px 220px at 100% 0%, #F9E8F0, transparent 60%), linear-gradient(135deg, #FCF5FA 0%, #F6EEFB 100%)",
-        borderRadius: 14,
+        /* Nền dùng ánh ngọc trai của hệ token, không phải ba mã hồng cứng.
+           Bản cũ giữ nguyên màu sáng ở chế độ tối nên thẻ này nằm giữa giao
+           diện tối như một mảnh vá — đúng thứ luật B6 của bộ kiểm thẩm mỹ
+           bắt được. */
+        background: "var(--lp-sheen)",
+        borderRadius: R.md,
         padding: "22px 22px 22px 24px",
-        border: "1px solid #F0E5EE",
-        boxShadow: "0 4px 14px rgba(148, 89, 156, 0.07)",
+        border: `1px solid ${C.line}`,
+        boxShadow: "var(--e-low)",
         overflow: "hidden",
         display: "flex",
         gap: 14,
@@ -373,14 +378,14 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
             fontFamily: TEXT,
             fontSize: 16,
             fontWeight: 800,
-            color: "#5A2F6E",
+            color: C.plum,
             letterSpacing: "-0.005em",
           }}>
             {thanhTra ? "Trợ lý phân tích" : "Công chúa Vali"}
           </div>
           <div style={{
             fontSize: 12,
-            color: "#8B6FA0",
+            color: C.plumSoft,
             fontWeight: 600,
             marginTop: 2,
           }}>
@@ -391,7 +396,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
         {/* Greeting bubble */}
         <div style={{
           fontSize: 14,
-          color: "#3D2552",
+          color: C.plum,
           fontWeight: 600,
           lineHeight: 1.55,
         }}>
@@ -411,7 +416,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
                   gap: 9,
                   alignItems: "flex-start",
                   fontSize: 12,
-                  color: "#2E1B45",
+                  color: C.plum,
                   lineHeight: 1.5,
                 }}
               >
@@ -443,7 +448,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
         <div style={{
           marginTop: "auto",
           fontSize: 12,
-          color: "#5A2F6E",
+          color: C.plum,
           fontWeight: 700,
           fontStyle: "italic",
         }}>
@@ -1160,7 +1165,7 @@ export function Pill({ s, small }: { s: string; small?: boolean }) {
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 6,
       padding: small ? "3px 9px" : "5px 12px", borderRadius: 999,
-      fontSize: small ? 11 : 12, fontWeight: 700,
+      fontSize: 12, fontWeight: 700,
       color: m.text, background: m.bg, fontFamily: TEXT, whiteSpace: "nowrap",
     }}>
       <span style={{ width: 6, height: 6, borderRadius: 999, background: m.text }} />
@@ -1184,7 +1189,7 @@ export function StateBadge({ state, small }: { state?: string; small?: boolean }
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 6,
       padding: small ? "3px 9px" : "5px 12px", borderRadius: 999,
-      fontSize: small ? 11 : 12, fontWeight: 800,
+      fontSize: 12, fontWeight: 800,
       color: m.text, background: m.bg, fontFamily: TEXT, whiteSpace: "nowrap",
       border: `1px dashed ${m.text}`,
     }}>
@@ -1406,8 +1411,10 @@ export function GuardianSilhouette({
 export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor }: {
   size?: number; navy?: string; red?: string; teamColor?: string;
 }) {
-  // size = chiều cao chữ V/Q (px). "team" sẽ scale theo.
-  const teamSize = Math.round(size * 0.42);
+  /* size = chiều cao chữ V/Q (px). "team" scale theo, nhưng KHÔNG bao giờ
+     nhỏ hơn 12px: ở cỡ 9px như bản cũ thì chữ "team" chỉ còn là một vệt
+     xám, và luật C3 của bộ kiểm thẩm mỹ bắt đúng chỗ đó. */
+  const teamSize = Math.max(12, Math.round(size * 0.42));
   const teamClr = teamColor || navy;
   return (
     <div
@@ -1415,7 +1422,10 @@ export function VQWordmark({ size = 22, navy = VQ_NAVY, red = VQ_RED, teamColor 
         display: "inline-flex",
         alignItems: "baseline",
         gap: 0,
-        fontFamily: "'Poppins', system-ui, sans-serif",
+        /* Cùng phông kể chuyện với wordmark ở màn đăng nhập. Poppins cũ là
+           họ phông thứ BA của app — luật C1 chỉ cho phép hai, và giữ thêm
+           một họ chỉ để vẽ ba chữ cái thì không đáng. */
+        fontFamily: DISPLAY,
         userSelect: "none",
         lineHeight: 1,
       }}

@@ -506,7 +506,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const selStyle = { fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "8px 13px", cursor: "pointer" };
   const chip = (on: boolean) => ({ fontFamily: TEXT, fontSize: 12, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, // C.lav (#8168CE) với chữ trắng chỉ đạt 4.37:1 — dưới ngưỡng WCAG AA
     // 4.5:1 cho chữ nhỏ. C.lavText (#5F44AD) đạt ~7:1.
-    background: on ? C.lavText : C.surface, color: on ? "#fff" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
+    background: on ? C.lavText : C.surface, color: on ? "var(--lp-on-plum)" : C.plumSoft, borderRadius: 999, padding: "8px 13px", cursor: "pointer" });
   const tabBtn = (on: boolean) => ({ display: "flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 999, cursor: "pointer", fontFamily: TEXT, fontSize: 14, fontWeight: on ? 800 : 600, border: `1.5px solid ${on ? C.pink : C.pinkSoft}`, background: on ? C.pinkSoft : C.surface, color: on ? C.plum : C.plumSoft });
 
   return (

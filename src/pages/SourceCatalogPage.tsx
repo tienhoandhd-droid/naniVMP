@@ -498,7 +498,9 @@ function SourceCatalogSection({ user, onReload, focus }: {
               <b>{Object.keys(colFil)
                 .map((k) => FIELDS.find((f) => f.key === k)?.label ?? k).join(", ")}</b>
               <button onClick={() => setColFil({})}
-                style={{ ...miniBtn, marginLeft: 7, padding: "2px 8px" }}>
+                /* padding 2px cho ra nút cao 23px — dưới ngưỡng vùng chạm
+                   24px của WCAG 2.5.8. Giữ nguyên miniBtn là vừa đủ. */
+                style={{ ...miniBtn, marginLeft: 8 }}>
                 Bỏ hết lọc
               </button>
             </>

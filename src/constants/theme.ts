@@ -160,6 +160,12 @@ export const glass: CSSProperties = {
 export const btnPrimary: CSSProperties = {
   background: GRAD, color: "#fff", border: "none", cursor: "pointer",
   fontFamily: TEXT, fontWeight: 700, fontSize: 14,
+  /* Padding và chiều cao tối thiểu nằm SẴN trong kiểu nền, không để mỗi
+   * nơi gọi tự nhớ. Trước đây thiếu hai dòng này nên nút nào quên đặt
+   * padding sẽ cao đúng 23px — dưới ngưỡng vùng chạm 24px của WCAG 2.5.8,
+   * và không ai phát hiện vì trông vẫn "gọn gàng". */
+  padding: "10px 18px",
+  minHeight: 40,
   borderRadius: R.sm,
   boxShadow: "var(--e-accent)",
   transition: `transform ${MO.fast} ${MO.spring}, box-shadow ${MO.base} ${MO.ease}`,

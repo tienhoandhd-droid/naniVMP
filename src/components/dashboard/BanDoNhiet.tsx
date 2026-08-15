@@ -63,12 +63,33 @@ export default function BanDoNhiet({
   /* Thang tuần tự: một sắc, đổi độ đậm theo giá trị. Năm bậc là đủ — quá
      năm bậc thì hai bậc cạnh nhau không phân biệt được bằng mắt, mà con số
      đã nằm sẵn trong ô rồi. */
+  /* Bốn bậc, và các mốc pha KHÔNG tuỳ ý.
+   *
+   * Thang cũ (0.15 / 0.3 / 0.5 / 0.72 / 0.92) có hai bậc giữa rơi đúng vào
+   * vùng chết: nền pha 60–80% quá sáng cho chữ sứ và quá tối cho chữ mực,
+   * nên KHÔNG màu chữ nào đạt 4.5:1 — đo được 3.05:1 và 4.35:1. Bốn mốc
+   * dưới đây được chọn để mỗi bậc có ít nhất một màu chữ đạt chuẩn ở cả
+   * chế độ sáng lẫn tối; bậc đỉnh dùng sắc đặc thay vì pha. */
   const doDam = (v: number): number => {
     if (v <= 0) return 0;
     const t = v / caoNhat;
-    return t > 0.8 ? 0.92 : t > 0.6 ? 0.72 : t > 0.4 ? 0.5 : t > 0.2 ? 0.3 : 0.15;
+    return t > 0.75 ? 1 : t > 0.45 ? 0.55 : t > 0.2 ? 0.28 : 0.14;
   };
-  const chuTren = (d: number): string => (d >= 0.5 ? "#fff" : C.plum);
+  /* Màu chữ trên ô nhiệt.
+   *
+   * Không thể chọn bằng một ngưỡng cứng như bản cũ (`d >= 0.5 ? "#fff" : ink`),
+   * vì cùng một bậc đậm cho ra hai độ sáng khác nhau ở hai chế độ: nền pha
+   * với nền trang, mà nền trang thì một bên trắng một bên than. Ở bậc giữa,
+   * chữ trắng chỉ đạt 2.7–4.4:1 — dưới ngưỡng AA.
+   *
+   * Nên việc chọn màu chữ giao cho CSS, nơi biết mình đang ở chế độ nào:
+   * component chỉ nói ô này thuộc bậc mấy. */
+  const bacCua = (d: number): 0 | 1 | 2 | 3 => {
+    if (d <= 0) return 0;
+    if (d >= 1) return 3;
+    if (d >= 0.45) return 2;
+    return 1;
+  };
 
   return (
     <div className="vmp-nhiet vmp-scroll">
@@ -93,18 +114,17 @@ export default function BanDoNhiet({
                   const isSelected = !!x && selected?.hang === i && selected?.cot === j;
                   return (
                     <td key={j} title={x?.ghiChu || `${h} · ${nhanCot[j]}: ${v} ${donVi}`}>
-                      {x && onSelect ? <button type="button" className="vmp-nhiet-o vmp-nhiet-chon"
+                      {x && onSelect ? <button type="button"
+                        className={`vmp-nhiet-o vmp-nhiet-chon vmp-nhiet-bac-${bacCua(d)}`}
                         data-workload-cell={`${i}-${j}`} aria-pressed={isSelected} onClick={() => onSelect(x)} style={{
                         background: v > 0 ? `color-mix(in srgb, ${sacDo} ${Math.round(d * 100)}%, transparent)` : "transparent",
-                        color: v > 0 ? chuTren(d) : C.plumSoft,
                         outline: isSelected ? `2px solid ${C.pink}` : undefined,
                         outlineOffset: isSelected ? 2 : undefined,
                       }}>
                         <b className="tnum" style={{ fontFamily: NUM }}>{v ? `${v}${hauTo}` : "·"}</b>
                         {x.phu != null && x.phu > 0 && <small>{x.phu} {phuLabel}</small>}
-                      </button> : <div className="vmp-nhiet-o" style={{
+                      </button> : <div className={`vmp-nhiet-o vmp-nhiet-bac-${bacCua(d)}`} style={{
                         background: v > 0 ? `color-mix(in srgb, ${sacDo} ${Math.round(d * 100)}%, transparent)` : "transparent",
-                        color: v > 0 ? chuTren(d) : C.plumSoft,
                       }}>
                         <b className="tnum" style={{ fontFamily: NUM }}>{v ? `${v}${hauTo}` : "·"}</b>
                         {x?.phu != null && x.phu > 0 && (
@@ -136,7 +156,7 @@ export default function BanDoNhiet({
       </table>
       <div className="vmp-nhiet-chu" style={{ fontFamily: TEXT }}>
         <span>Nhạt</span>
-        {[0.15, 0.3, 0.5, 0.72, 0.92].map((d) => (
+        {[0.14, 0.28, 0.55, 1].map((d) => (
           <i key={d} style={{ background: `color-mix(in srgb, ${sacDo} ${Math.round(d * 100)}%, transparent)` }} />
         ))}
         <span>Đậm — càng nhiều {donVi || "hạng mục"}</span>

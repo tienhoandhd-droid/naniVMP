@@ -402,7 +402,25 @@ export async function fetchSourceWarnings(year?: number): Promise<SourceWarnings
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await supabase.rpc("rpc_source_warnings", { p_year: year ?? undefined });
   if (error) throw new Error("Lỗi rà dữ liệu nguồn: " + error.message);
-  return asShape<SourceWarnings>(data);
+
+  /* Điền đủ năm nhóm cảnh báo trước khi trả về.
+   *
+   * Vì sao cần: màn Danh mục đọc thẳng `.chua_hoat_dong.length` trong một
+   * useMemo. Chỉ cần RPC trả thiếu một nhóm — phiên bản hàm cũ hơn, hoặc
+   * một nhánh trả sớm — là `undefined.length` ném lỗi ngay trong lúc
+   * render, và ErrorBoundary nuốt trọn cả màn: người dùng thấy trang lỗi
+   * đỏ thay vì thấy danh mục. Một trường thiếu không đáng đổi lấy cả màn.
+   */
+  const tho = asShape<Partial<SourceWarnings>>(data);
+  const mang = <T>(v: T[] | undefined): T[] => (Array.isArray(v) ? v : []);
+  return {
+    nam: typeof tho.nam === "number" ? tho.nam : (year ?? new Date().getFullYear()),
+    thieu_thang_dau: mang(tho.thieu_thang_dau),
+    chua_tung_iq: mang(tho.chua_tung_iq),
+    show_tat: mang(tho.show_tat),
+    chua_hoat_dong: mang(tho.chua_hoat_dong),
+    ma_tam: mang(tho.ma_tam),
+  };
 }
 
 export async function generateTimeline(
@@ -561,7 +579,32 @@ export async function fetchActiveRules(): Promise<ActiveRules> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await supabase.rpc("rpc_active_rules");
   if (error) throw new Error("Lỗi đọc luật: " + error.message);
-  return asShape<ActiveRules>(data);
+
+  /* Điền đủ cây mặc định trước khi trả về — cùng lý do với
+   * fetchSourceWarnings: màn Luật đọc thẳng `rules.so_lieu_hien_tai.doi_tuong_nguon`,
+   * nên chỉ cần RPC thiếu một nhánh là cả màn thành trang lỗi đỏ. Thiếu
+   * số liệu thì hiện số 0; thiếu cả màn thì không ai đọc được luật nào. */
+  const tho = asShape<Partial<ActiveRules>>(data);
+  const mang = <T>(v: T[] | undefined): T[] => (Array.isArray(v) ? v : []);
+  const obj = <T extends object>(v: T | undefined, mac_dinh: T): T =>
+    (v && typeof v === "object" ? { ...mac_dinh, ...v } : mac_dinh);
+
+  return {
+    cap_nhat: tho.cap_nhat || "",
+    diem_trong_yeu: obj(tho.diem_trong_yeu, {
+      cong_thuc: "", thang: "", phuc_tap: [], anh_huong: [], phan_bo: [],
+      da_duyet: 0, cho_duyet: 0,
+    }),
+    sinh_timeline: obj(tho.sinh_timeline, {
+      loc: "", loai_tham_dinh: [], lan_dau: "", so_lan_trong_nam: "",
+      ma_id: "", moc_thoi_gian: [], khoang_cach_bao_cao: [],
+    }),
+    phan_quyen: mang(tho.phan_quyen),
+    toan_ven_du_lieu: mang(tho.toan_ven_du_lieu),
+    so_lieu_hien_tai: obj(tho.so_lieu_hien_tai, {
+      doi_tuong_nguon: 0, co_tham_dinh: 0, hang_muc: 0, ban_ghi_audit: 0,
+    }),
+  };
 }
 
 /** Chấm lại điểm trọng yếu. Mặc định chỉ đụng dòng chưa được QA chốt tay. */

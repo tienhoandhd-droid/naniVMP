@@ -1684,7 +1684,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
                   <span style={{
                     position: "absolute", top: -18, left: 0, right: 0, textAlign: "center",
                     fontFamily: NUM,
-                    fontSize: nhan ? 13 : 11,
+                    fontSize: nhan ? 13 : 12,
                     fontWeight: nhan ? 900 : 700,
                     color: i === kpi.peakI ? C.raspText : C.plumSoft,
                     opacity: nhan ? 1 : 0.72,

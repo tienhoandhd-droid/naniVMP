@@ -486,7 +486,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           <CardTitle icon={Flag} sub="Trọng yếu cao / ≥ 7 — ưu tiên">Cần tập trung</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {focus.map(({ a, sc }) => <div key={a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
-              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: "#fff", background: sc >= 7 ? C.raspText : C.marigoldText, width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc}</span>
+              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: sc >= 7 ? "var(--lp-on-danger)" : "var(--lp-on-warning)", background: sc >= 7 ? C.raspText : C.marigoldText, width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</span></div>
                 <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{a.owner} · đích {a.target ? fmtVN(parseD(a.target)) : "—"}</div>

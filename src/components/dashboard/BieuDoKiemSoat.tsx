@@ -279,7 +279,7 @@ export default function BieuDoKiemSoat({ acts, nam }: { acts: Activity[]; nam: n
             <g key={v}>
               <line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} stroke={C.line} strokeWidth={1} />
               <text x={M.l - 8} y={y(v) + 4} textAnchor="end"
-                fontFamily={NUM} fontSize={11} fontWeight={700} fill={C.plumSoft}>
+                fontFamily={NUM} fontSize={12} fontWeight={700} fill={C.plumSoft}>
                 {pc(v)}
               </text>
             </g>
@@ -340,7 +340,7 @@ export default function BieuDoKiemSoat({ acts, nam }: { acts: Activity[]; nam: n
                   {MONTHS[d.thang]}
                 </text>
                 <text x={x(i)} y={H - M.b + 33} textAnchor="middle"
-                  fontFamily={NUM} fontSize={10} fontWeight={700} fill={C.plumSoft} opacity={0.75}>
+                  fontFamily={NUM} fontSize={12} fontWeight={700} fill={C.plumSoft} opacity={0.75}>
                   n={d.n}
                 </text>
               </g>

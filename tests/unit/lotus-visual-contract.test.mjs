@@ -66,7 +66,8 @@ test("token nền và chữ chế độ sáng đúng spec §6.1", () => {
   assert.equal(bien(KHOI_SANG, "lp-surface"), "#FFFDFC");
   assert.equal(bien(KHOI_SANG, "lp-surface-2"), "#F8F1F3");
   assert.equal(bien(KHOI_SANG, "lp-ink"), "#332534");
-  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "#756775");
+  // Đậm hơn giá trị đầu của spec — xem "Hiệu chỉnh 2026-08-15" ở spec §6.2.
+  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "#6B5C6B");
   assert.equal(bien(KHOI_SANG, "lp-plum"), "#5E365D");
   assert.equal(bien(KHOI_SANG, "lp-rose"), "#A96C87");
 });

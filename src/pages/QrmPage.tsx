@@ -183,7 +183,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {top.map((x) => { const cls = (CLS as Record<string, typeof CLS.tb>)[String(x.a.cls ?? "tb")] ?? CLS.tb; return (
               <div key={x.a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
-                <span style={{ fontSize: 12, fontWeight: 800, padding: "4px 10px", borderRadius: 999, color: "#fff", background: qrmLevel(x.score) === "cao" ? C.raspText : qrmLevel(x.score) === "tb" ? C.marigoldText : C.mintText }}>RPN {x.score}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, padding: "4px 10px", borderRadius: 999, color: qrmLevel(x.score) === "cao" ? "var(--lp-on-danger)" : qrmLevel(x.score) === "tb" ? "var(--lp-on-warning)" : "var(--lp-on-success)", background: qrmLevel(x.score) === "cao" ? C.raspText : qrmLevel(x.score) === "tb" ? C.marigoldText : C.mintText }}>RPN {x.score}</span>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}><Tag color={cls.text} bg={cls.soft}>{x.a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{x.a.name}</span></div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{x.a.id} · {x.a.dep}</div></div>
                 <Pill s={x.a.st} small />
               </div>

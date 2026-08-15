@@ -146,7 +146,7 @@ export default function CatalogObjectForm({
         {/* Lỗi đặt NGAY dưới ô, không gom vào một hộp chung ở đầu form —
             người dùng phải thấy sai ở đâu mà không phải dò. */}
         {loiO && <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{loiO}</span>}
-        {!loiO && t.goiY && <span style={{ fontSize: 11, color: C.plumSoft }}>{t.goiY}</span>}
+        {!loiO && t.goiY && <span style={{ fontSize: 12, color: C.plumSoft }}>{t.goiY}</span>}
       </label>
     );
   };
@@ -211,7 +211,7 @@ export default function CatalogObjectForm({
               style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 14,
                        border: `1.5px solid ${loi.__lyDo ? C.rasp : C.pinkSoft}` }} />
             {loi.__lyDo && <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{loi.__lyDo}</span>}
-            <span style={{ fontSize: 11, color: C.plumSoft }}>
+            <span style={{ fontSize: 12, color: C.plumSoft }}>
               Thay đổi này chạm tới deadline hoặc phân công, nên timeline sẽ cần cập nhật lại.
             </span>
           </label>

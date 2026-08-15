@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import {
   KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
 } from "lucide-react";
-import { C, TEXT, NUM, GRAD, glass } from "../../constants/theme.ts";
+import { C, TEXT, NUM, DISPLAY, GRAD, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
 import type { ReactNode } from "react";
 import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
@@ -385,9 +385,9 @@ function ThanhTraToggle() {
                border: bat ? `1.5px solid ${C.plum}` : "none",
                background: bat ? C.plum : undefined,
                cursor: "pointer", display: "flex", alignItems: "center", gap: 7 }}>
-      <ShieldCheck size={15} color={bat ? "#fff" : C.plumSoft} />
+      <ShieldCheck size={15} color={bat ? "var(--lp-on-ink)" : C.plum} />
       <span style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800,
-                     color: bat ? "#fff" : C.plumSoft, whiteSpace: "nowrap" }}>
+                     color: bat ? "var(--lp-on-ink)" : C.plum, whiteSpace: "nowrap" }}>
         {bat ? "Chế độ thanh tra" : "Thanh tra"}
       </span>
     </button>
@@ -436,7 +436,20 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
             VMP MONITOR · HỆ GIÁM SÁT THẨM ĐỊNH
           </span>
         </div>
-        <div className="vmp-title" style={{ fontSize: 28, fontWeight: 800, color: C.plum }}>{title}</div>
+        {/* Đây là <h1> chứ không phải <div> in đậm, và đó là khác biệt thật:
+            trước đây KHÔNG màn nào trong app có h1, nên trình đọc màn hình
+            không có mốc nào để nhảy tới, còn người dùng bàn phím không biết
+            nội dung trang bắt đầu ở đâu. Một h1 mỗi màn — Topbar là nơi duy
+            nhất dựng nó, nên không có chuyện hai màn cãi nhau. */}
+        <h1 className="vmp-title" style={{
+          margin: 0,
+          fontFamily: DISPLAY,
+          fontSize: "var(--lp-fs-h1)",
+          lineHeight: "var(--lp-lh-h1)",
+          fontWeight: 600,
+          letterSpacing: "var(--lp-tracking-display)",
+          color: C.plum,
+        }}>{title}</h1>
         <div style={{ fontSize: 14, color: C.plum, marginTop: 5, fontWeight: 700 }}>
           {sub || "CPC1 HN"}
           {lastSync && (

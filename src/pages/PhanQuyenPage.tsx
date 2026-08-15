@@ -1020,7 +1020,7 @@ function FullPermissionWorkspace(
       <tr key={h.khoa}>
         <td style={{ ...td, fontWeight: 800, minWidth: 250 }}>
           {h.ten}
-          <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 3,
+          <div style={{ fontSize: 12, fontWeight: 700, marginTop: 3,
                         display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
             {h.coTaiKhoan
               ? <Tag color={C.mintText} bg={C.mintSoft}>có tài khoản</Tag>
@@ -1156,7 +1156,7 @@ function FullPermissionWorkspace(
                   {h.soSuaDuoc}<span style={{ opacity: .6 }}>/{tongHangMuc}</span>
                 </span>
                 {daCu && (
-                  <div style={{ fontSize: 11, fontWeight: 800, marginTop: 3, color: C.marigoldText }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, marginTop: 3, color: C.marigoldText }}>
                     → {O_QUYEN[mucMoi].ky} chưa lưu
                   </div>
                 )}
@@ -1171,7 +1171,7 @@ function FullPermissionWorkspace(
             {h.soDungTen || "·"}
           </div>
           {spread.length > 0 && (
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}
               title="Đếm cả hai chiều: bộ phận quản lý đối tượng và bộ phận thực hiện thẩm định — một hạng mục có thể nằm ở hai bộ phận">
               {spread.map(([d, n]) => `${DEPTS.find((x) => x.id === d)?.short || d} ${n}`).join(" · ")}
             </div>
@@ -1376,7 +1376,7 @@ function FullPermissionWorkspace(
                 <tr key={x.bang}>
                   <td style={{ ...td, fontWeight: 700 }}>
                     {x.nhan}
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft,
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft,
                                   fontFamily: "ui-monospace, monospace" }}>
                       {x.bang}
                     </div>
@@ -1659,7 +1659,7 @@ function FullPermissionWorkspace(
                 <tr>
                   <td style={{ ...td, fontWeight: 800, color: C.marigoldText }} colSpan={6}>
                     Chưa ai đứng tên
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.plumSoft }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
                       {[...voChuHang.theoBp.entries()].sort((a, b) => b[1] - a[1])
                         .map(([d, n]) => `${DEPTS.find((x) => x.id === d)?.short || d} ${n}`).join(" · ")}
                     </div>

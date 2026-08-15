@@ -1,6 +1,10 @@
 export default function LuxuryBrandPanel() {
   return (
-    <section className="vq-brand-panel" aria-label="V/Q Team">
+    <section className="vq-brand-panel" aria-label="V/Q Team"
+      /* Panel này CỐ Ý giữ nền sơn mài đậm ở cả hai chế độ: nó là mảng màu
+         nhận diện thương hiệu, không phải bề mặt để đọc dữ liệu. Khai báo
+         để bộ kiểm thẩm mỹ (luật B6) biết đây là chủ ý. */
+      data-lp-surface="fixed">
       <div className="vq-brand-logo-wrap">
         <img className="vq-brand-logo" src="./logo-cpc1hn.png" alt="CPC1 HN" />
       </div>

@@ -413,7 +413,7 @@ export default function StaffDirectoryPanel({
         </div>
       </div>
 
-      <h3 id="ip-directory-title">Danh bạ chuẩn</h3>
+      <h2 id="ip-directory-title">Danh bạ chuẩn</h2>
       <p className="ip-help">Tìm theo họ tên, email hoặc mã nhân viên. Chọn đúng một người để bộ phận, tài khoản và quyền tự điền.</p>
 
       <div className="ip-search">
@@ -541,7 +541,7 @@ export default function StaffDirectoryPanel({
 
       <div className="ip-import">
         <div>
-          <h4>Nhập danh bạ bằng Excel</h4>
+          <h3>Nhập danh bạ bằng Excel</h3>
           <p className="ip-help">Tải file 11 cột, điền mã cho đủ bốn tầng phạm vi rồi chọn lại tại đây. Web kiểm toàn bộ file trước; có một dòng lỗi thì không gọi RPC nhập.</p>
         </div>
         <div className="ip-import-actions">
