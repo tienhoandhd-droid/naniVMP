@@ -34,6 +34,7 @@ import {
 } from "../../features/itemPermissions/performerSelection.ts";
 import { Tag, Modal, ROField, StateBadge } from "../ui/Primitives.tsx";
 import { progressModalContentState } from "./progressModalAccess.ts";
+import WorkshopAssignmentInline from "../../features/progress/WorkshopAssignmentInline.tsx";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
 
 /** Ngày hôm nay theo giờ máy (không dùng toISOString — lệch múi giờ VN trước 7h sáng). */
@@ -116,7 +117,7 @@ function conLai(hanISO: string): number | null {
   return Math.round((h.getTime() - t0.getTime()) / 86400000);
 }
 
-export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onReload, nextAct, onOpenNext, quickDone, editableFields, permissionMode }: {
+export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onReload, nextAct, onOpenNext, quickDone, editableFields, permissionMode, canAssignWorkshop }: {
   act: PlanActivity;
   isAdmin?: boolean;
   onClose: () => void;
@@ -131,6 +132,8 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
   /** Cho phép caller đã có quyền truyền thẳng; nếu thiếu modal tự đọc quyền hiệu lực. */
   editableFields?: readonly string[];
   permissionMode?: TimelinePermissionMode;
+  /** access.can("progress","assign_workshop_staff") — mở mục Nhân sự xưởng. */
+  canAssignWorkshop?: boolean;
   /** (id, patch, userName, reason, expectedVersion) — khoá lạc quan chống ghi đè. */
   onSave: (
     id: string,
@@ -757,6 +760,12 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
           )}
         </div>
       )}
+
+      {/* ---- Nhân sự xưởng của HẠNG MỤC NÀY — chỉ người có quyền
+          assign_workshop_staff mới thấy; ghi qua rpc_set_item_assignment
+          (an toàn xung đột, bắt buộc lý do, server kiểm phạm vi). */}
+      <WorkshopAssignmentInline validationCode={act.id}
+        canAssign={!!canAssignWorkshop} />
 
       {/* ---- Lịch sử thay đổi của HẠNG MỤC NÀY — đọc lười từ server ------
           rpc_item_progress_history (Đợt B Task 11): server tự kiểm quyền

@@ -207,6 +207,27 @@ for (const [id, ten] of MAN) {
   kiem(daBamLichSu, "hộp sửa có mục Lịch sử thay đổi");
   kiem(lichSu.coDong, "lịch sử hiện lý do từ rpc_item_progress_history");
   kiem(lichSu.coVai, "lịch sử hiện người thao tác");
+
+  /* Nhân sự xưởng ngay trong hộp sửa — người có quyền
+     assign_workshop_staff thấy phân công hiện tại và lối gán mới. */
+  const daBamXuong = await trang.evaluate(() => {
+    const nut = [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Nhân sự xưởng"));
+    if (!nut) return false;
+    nut.click();
+    return true;
+  });
+  await new Promise((r) => setTimeout(r, 1000));
+  const xuong = await trang.evaluate(() => ({
+    coNguoi: document.body.innerText.includes("Trần Văn Xưởng"),
+    coTim: !!document.querySelector('input[aria-label="Tìm nhân sự xưởng"]'),
+    coGoBo: [...document.querySelectorAll("button")]
+      .some((b) => b.textContent?.trim() === "Gỡ phân công"),
+  }));
+  kiem(daBamXuong, "hộp sửa có mục Nhân sự xưởng");
+  kiem(xuong.coNguoi, "hiện phân công xưởng hiện tại từ rpc_item_assignments");
+  kiem(xuong.coTim, "có ô tìm nhân sự xưởng để gán mới");
+  kiem(xuong.coGoBo, "phân công hiện tại có nút gỡ (kèm lý do)");
   await trang.close();
 }
 

@@ -92,7 +92,7 @@ function OMoc({ raw, dlKey, ngayKey, ttKey }: {
   );
 }
 
-export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate, onReload, readOnly = false, onMoDanhMuc }: {
+export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate, onReload, readOnly = false, onMoDanhMuc, canAssignWorkshop }: {
   objects?: VmpObject[];
   acts?: Activity[];
   isAdmin?: boolean;
@@ -102,6 +102,8 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   readOnly?: boolean;
   /** Mở đúng đối tượng này bên "Danh mục & Nhập liệu". */
   onMoDanhMuc?: (code: string, nhom?: string) => void;
+  /** access.can("progress","assign_workshop_staff") — App tính, truyền xuống hộp sửa. */
+  canAssignWorkshop?: boolean;
 }) {
   const [q, setQ] = useState("");
   const kw = useDebounce(q.trim().toLowerCase(), 250);
@@ -415,6 +417,7 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
           key={edit.id}
           act={edit}
           isAdmin={isAdmin}
+          canAssignWorkshop={canAssignWorkshop}
           onClose={() => { setEdit(null); setQuick(false); }}
           onReload={onReload}
           quickDone={quick}

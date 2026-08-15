@@ -15,7 +15,7 @@ import { buildProgressWorkspaceModel } from "../features/progress/progressWorksp
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
 
-export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true, focusId, onFocusDone }: {
+export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true, focusId, onFocusDone, canAssignWorkshop }: {
   acts: PlanActivity[];
   /** Không dùng index signature để nhận được cả ConnState (status là union). */
   conn?: { status?: string; msg?: string };
@@ -32,6 +32,8 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
   /** Mã hạng mục cần nhảy tới — màn "Hôm nay" truyền vào khi bấm Cập nhật. */
   focusId?: string;
   onFocusDone?: () => void;
+  /** access.can("progress","assign_workshop_staff") — App tính, truyền xuống hộp sửa. */
+  canAssignWorkshop?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [fst, setFst] = useState("all");
@@ -481,6 +483,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
         key={edit.id}
         act={edit}
         isAdmin={isAdmin}
+        canAssignWorkshop={canAssignWorkshop}
         quickDone={quick}
         onClose={() => { setEdit(null); setQuick(false); }}
         onReload={onReload}

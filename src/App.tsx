@@ -1990,10 +1990,12 @@ function AppShell() {
                   {nhomTheo === "doituong" ? (
                     <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}
                       onUpdate={updateActivity} onReload={reloadData} readOnly={false}
+                      canAssignWorkshop={access.can("progress", "assign_workshop_staff")}
                       onMoDanhMuc={(code, nhom) => { setMoDanhMuc({ code, nhom }); setView("source"); }} />
                   ) : (
                     <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
                       onUpdate={updateActivity} onReload={reloadData} readOnly={false}
+                      canAssignWorkshop={access.can("progress", "assign_workshop_staff")}
                       focusId={moHangMuc} onFocusDone={() => setMoHangMuc("")} />
                   )}
                 </>

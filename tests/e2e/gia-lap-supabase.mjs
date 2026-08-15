@@ -341,6 +341,37 @@ export function dungKhoDuLieu(kichBan) {
       ? [{ source_tab: "thiet_bi", rows: 12, columns: 9 }]
       : [],
     rpc_list_catalog_dataset: listCatalogDataset,
+    /* Phân công xưởng của MỘT hạng mục — WorkshopAssignmentInline đọc/ghi.
+       Hình dạng phải qua được decodeAssignment/decodeDirectoryPerson. */
+    rpc_item_assignments: {
+      ok: true,
+      assignments: day ? [{
+        assignment_id: "as-1", validation_code: "TB-100-IQ",
+        person_id: "pf-x1", user_id: null, staff_name: "Trần Văn Xưởng",
+        employee_code: "NV-901", assignment_kind: "equipment_department",
+        assignment_role: null, source: "manual", source_text: null,
+        unresolved_reason: null, expires_at: null, is_active: true,
+        grants_access: true, object_department: "xsx", area: "A1", line: null,
+      }] : [],
+    },
+    rpc_item_permission_directory: {
+      ok: true,
+      people: day ? [
+        { person_id: "pf-x1", user_id: null, employee_code: "NV-901",
+          full_name: "Trần Văn Xưởng", department: "xsx", email: null,
+          account_status: "unlinked", access_class: "workshop_staff",
+          scope_departments: ["xsx"], scope_factory_ids: [], scope_area_ids: [],
+          scope_line_ids: [], access_areas: [], version: 1,
+          email_sent_confirmed: false, is_active: true, match_status: "unique" },
+        { person_id: "pf-x2", user_id: null, employee_code: "NV-902",
+          full_name: "Lê Thị Máy", department: "xsx", email: null,
+          account_status: "unlinked", access_class: "workshop_staff",
+          scope_departments: ["xsx"], scope_factory_ids: [], scope_area_ids: [],
+          scope_line_ids: [], access_areas: [], version: 1,
+          email_sent_confirmed: false, is_active: true, match_status: "unique" },
+      ] : [],
+    },
+    rpc_set_item_assignment: { ok: true },
     rpc_item_progress_history: day ? {
       ok: true, total: 2, limit: 50, offset: 0,
       history: [
