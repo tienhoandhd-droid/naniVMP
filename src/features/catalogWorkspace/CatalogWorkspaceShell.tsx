@@ -39,6 +39,7 @@ import {
   SOURCE_KINDS, fetchSourceObjects, fetchSourceWarnings, generateTimeline,
   saveCatalogObject,
 } from "../../lib/supabaseData.ts";
+import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import type { SourceWarnings } from "../../lib/supabaseData.ts";
 import type { AccessContext } from "../../lib/access.ts";
 import type { GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../../types/domain.ts";
@@ -304,13 +305,15 @@ export default function CatalogWorkspaceShell({
 
   /* Xuất đúng phần đang lọc của bảng đối tượng — tiện tra cứu, chỉ đọc. */
   const xuatExcel = async () => {
-    const XLSX = await import("xlsx");
     const dinhNghia = layDataset("objects").fields;
-    const data = objFiltered.map((r) => Object.fromEntries(
-      dinhNghia.map((f) => [f.label, (r as Record<string, unknown>)[f.key] ?? ""])));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), kind.slice(0, 28));
-    XLSX.writeFile(wb, `VMP_${kind}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    await xuatExcelAoa([{
+      ten: kind,
+      dong: [
+        dinhNghia.map((f) => f.label),
+        ...objFiltered.map((r) =>
+          dinhNghia.map((f) => (r as Record<string, unknown>)[f.key] ?? "")),
+      ],
+    }], `VMP_${kind}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const taiLai = () => {

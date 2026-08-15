@@ -29,6 +29,7 @@ const VmpSpace3D = lazy(nhapCoThuLai(() => import("../three/VmpSpace3D.tsx")));
 import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
+import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
   periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget, hanVmp,
@@ -303,9 +304,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   };
 
   const exportExcel = async () => {
-    const XLSX = await import("xlsx");
-    const wb = XLSX.utils.book_new();
-
     const tongQuan = [
       ["Chỉ số", "Giá trị"],
       ["Phạm vi", scopeLabel],
@@ -322,7 +320,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       ["Cần hoàn thành trong kỳ", monthly.cur.due], ["Đã hoàn thành trong kỳ", monthly.cur.done],
       ["Tỷ lệ kỳ này (%)", monthly.cur.rate ?? "—"], ["Tỷ lệ kỳ trước (%)", monthly.prev?.rate ?? "—"],
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tongQuan), "Tổng quan");
 
     const KY_LABEL = { da_qua: "Đã qua", dang_dien_ra: "Đang diễn ra", chua_toi: "Chưa tới kỳ" };
     const theoThang = [
@@ -336,23 +333,16 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               : (r.meets ? "Đạt" : "Chưa đạt"),
       ]),
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(theoThang), "Theo tháng - Mục tiêu");
 
     const batCap = [
       ["Bộ phận", "Tổng", "Chậm đề cương", "Chậm thẩm định thực tế", "Chậm báo cáo", "Đang quá hạn VMP", "Tỷ lệ đúng hạn (%)"],
       ...bottleneck.map((r) => [r.label, r.total, r.overProtocol, r.overValidation, r.overReport, r.overVmp, r.onTimeRate]),
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(batCap), "Bất cập theo bộ phận");
 
     const thangToi = [
       ["Mã", "Tên", "Loại thẩm định", "Bộ phận", "Người thực hiện", "Hạn đích VMP", "Mức trọng yếu"],
       ...nextMonth.items.map((it) => [it.code, it.name, it.vtype, maBoPhan(it.depts), it.owner, it.target, it.crit]),
     ];
-    // Tên sheet Excel KHÔNG được chứa / \\ ? * [ ] và tối đa 31 ký tự —
-    // periodLabel trả "tháng 8/2026" có dấu / nên phải làm sạch, không thì
-    // cả file xuất ra hỏng.
-    const tenSheetKySau = `Ky sau ${nextMonth.monthLabel}`.replace(/[/\\?*[\]:]/g, "-").slice(0, 31);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(thangToi), tenSheetKySau);
 
     const duLieuTho = [
       ["Mã", "Tên", "Loại", "Bộ phận", "Khu vực", "Người thực hiện", "Trọng yếu",
@@ -364,9 +354,16 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         r.dl_de_cuong, r.dl_tham_dinh, r.dl_bao_cao, r.dl_vmp,
         r.ngay_de_cuong, r.ngay_tham_dinh, r.ngay_bao_cao, r.ngay_vmp, r.trang_thai]),
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(duLieuTho), "Dữ liệu thô");
 
-    XLSX.writeFile(wb, `BaoCaoQuanLy_VMP_${tenTepKy()}_CPC1HN.xlsx`);
+    // Làm sạch tên sheet (cấm / \ ? * [ ] :, tối đa 31 ký tự) nằm trong
+    // chính helper — "Ky sau tháng 8/2026" không làm hỏng file nữa.
+    await xuatExcelAoa([
+      { ten: "Tổng quan", dong: tongQuan },
+      { ten: "Theo tháng - Mục tiêu", dong: theoThang },
+      { ten: "Bất cập theo bộ phận", dong: batCap },
+      { ten: `Ky sau ${nextMonth.monthLabel}`, dong: thangToi },
+      { ten: "Dữ liệu thô", dong: duLieuTho },
+    ], `BaoCaoQuanLy_VMP_${tenTepKy()}_CPC1HN.xlsx`);
   };
 
   const moChiTiet = (title: string, rows: Activity[], giaiDoan?: GiaiDoan) =>

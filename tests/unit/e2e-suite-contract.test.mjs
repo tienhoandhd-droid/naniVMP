@@ -52,11 +52,13 @@ test("README liệt kê lệnh chạy riêng bộ kiểm danh mục người th�
 
 const LENH_LOTUS = {
   "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs",
+  "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
   shell: "node tests/e2e/lotus-shell.mjs",
   thammy: "node tests/e2e/tham-my.mjs",
+  atelier: "node tests/e2e/atelier.mjs",
 };
 
-test("ba bộ kiểm Lotus Pearl đều được đăng ký đúng một lần", async () => {
+test("các bộ kiểm Lotus Pearl đều được đăng ký đúng một lần", async () => {
   const packageJson = JSON.parse(await readRepositoryFile("package.json"));
   for (const [ten, lenh] of Object.entries(LENH_LOTUS)) {
     assert.equal(packageJson.scripts[ten], lenh,
@@ -64,7 +66,7 @@ test("ba bộ kiểm Lotus Pearl đều được đăng ký đúng một lần",
   }
 });
 
-test("README ghi cách chạy cả ba bộ", async () => {
+test("README ghi cách chạy từng bộ", async () => {
   const readme = await readRepositoryFile("tests/e2e/README.md");
   for (const ten of Object.keys(LENH_LOTUS)) {
     assert.ok(readme.includes(`npm run ${ten}`),
@@ -73,9 +75,17 @@ test("README ghi cách chạy cả ba bộ", async () => {
 });
 
 test("mọi bộ kiểm trình duyệt mới đều đi qua lớp giả lập, không chạm production", async () => {
-  for (const f of ["luong-gia-lap.mjs", "lotus-shell.mjs", "tham-my.mjs"]) {
+  for (const f of ["luong-gia-lap.mjs", "lotus-shell.mjs", "tham-my.mjs", "catalog-workspace.mjs"]) {
     const nguon = await readRepositoryFile(`tests/e2e/${f}`);
     assert.ok(nguon.includes("gia-lap-supabase.mjs"),
       `${f} phải nạp lớp giả lập Supabase`);
+  }
+});
+
+test("CI e2e-mock chạy đủ các bộ giả lập, mỗi bộ đúng một lần", async () => {
+  const ci = await readRepositoryFile(".github/workflows/deploy.yml");
+  for (const ten of ["e2e:gialap", "e2e:catalog", "shell", "thammy", "atelier"]) {
+    const dem = ci.split(`npm run ${ten}`).length - 1;
+    assert.equal(dem, 1, `deploy.yml phải chạy "npm run ${ten}" đúng một lần (thấy ${dem})`);
   }
 });

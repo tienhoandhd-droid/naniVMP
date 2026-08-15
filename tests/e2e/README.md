@@ -62,6 +62,17 @@ Thêm/Nhập Excel còn viewer không thấy lối ghi nào · bảng ngữ ngh�
 và cùng hành động · 1366×768 và 1093×720 không tràn ngang · deep-link từ
 màn Tiến độ mở đúng đối tượng rồi tự xoá (một lần).
 
+## Luật Atelier — lớp nghệ thuật, khổ rộng, Vali
+
+```bash
+bash scripts/with-preview.sh -- npm run atelier
+```
+
+Kiểm các luật của Lotus Pearl Atelier vòng 1: `--lp-shell-pad` đúng bậc
+theo 4 khổ desktop, art không nằm sau bảng/form/modal và không bắt chuột,
+opacity ≤ 12%, không emoji nghiệp vụ, Vali đúng chỗ, đăng nhập và
+giảm-chuyển-động đúng hợp đồng.
+
 ## Hợp đồng shell — hộp thoại, tiêu điểm, điều hướng
 
 ```bash
