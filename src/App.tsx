@@ -36,7 +36,9 @@ import {
 // xlsx được nạp động (dynamic import) ngay trong hàm xuất Excel để giảm bundle ban đầu.
 
 // ===== Internal modules (refactored) =====
-import { C, TEXT, NUM, btnPrimary, INP } from "./constants/theme.ts";
+import { C, TEXT, NUM, R, btnPrimary, INP } from "./constants/theme.ts";
+import ViewportDialog from "./components/ui/ViewportDialog.tsx";
+import { DirtyStateProvider, useRegisterDirtyState } from "./components/ui/DirtyStateProvider.tsx";
 import {
 
   DEPTS,
@@ -75,7 +77,6 @@ import {
   Card,
   CardTitle,
   Tag,
-  Modal,
 
   KpiCard,
   Sel,
@@ -134,21 +135,45 @@ function ChangePwModal({ onClose }: { onClose: () => void }) {
       setLoading(false);
     } else { setMsg({ type: "err", text: "Cần Supabase để đổi mật khẩu." }); }
   };
+  /* Có chữ trong ô mà chưa lưu thì báo cho sổ chung, để nút Thoát ở shell
+     biết mà hỏi lại thay vì vứt mất phần vừa gõ. */
+  useRegisterDirtyState("doi-mat-khau", (np.length > 0 || cf.length > 0) && msg.type !== "ok");
+
   return (
-    <Modal onClose={onClose} title="Đổi mật khẩu" icon={KeyRound}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+    <ViewportDialog
+      open
+      title="Đổi mật khẩu"
+      description="Mật khẩu mới tối thiểu 6 ký tự."
+      icon={KeyRound}
+      maxWidth={460}
+      onRequestClose={onClose}
+      footer={
+        <button onClick={submit} disabled={loading}
+          style={{ ...btnPrimary, minWidth: 140, opacity: loading ? 0.6 : 1 }}>
+          {loading ? "Đang lưu…" : "Xác nhận"}
+        </button>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {["Mật khẩu mới", "Xác nhận"].map((ph, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 15px", borderRadius: 14, background: C.surface, border: `1.5px solid ${C.pinkSoft}` }}>
-            <KeyRound size={16} color={C.pink} />
-            <input type="password" placeholder={ph} value={i === 0 ? np : cf} autoFocus={i === 0}
-              onChange={(e) => { (i === 0 ? setNp : setCf)(e.target.value); setMsg({ type: "", text: "" }); }}
-              style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14, color: C.plum, width: "100%", fontWeight: 600 }} />
-          </div>
+          <label key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.plum }}>{ph}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 42, padding: "0 14px", borderRadius: R.sm, background: C.surface, border: `1px solid var(--lp-line-strong)` }}>
+              <KeyRound size={16} color={C.pink} />
+              <input type="password" value={i === 0 ? np : cf} autoFocus={i === 0}
+                onChange={(e) => { (i === 0 ? setNp : setCf)(e.target.value); setMsg({ type: "", text: "" }); }}
+                style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14, color: C.plum, width: "100%", fontWeight: 600, minHeight: 40 }} />
+            </div>
+          </label>
         ))}
-        {msg.text && <div style={{ fontSize: 14, fontWeight: 800, display: "flex", alignItems: "center", gap: 6, color: msg.type === "ok" ? C.mintText : C.raspText }}>{msg.type === "ok" ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {msg.text}</div>}
-        <button onClick={submit} disabled={loading} style={{ ...btnPrimary, marginTop: 4, padding: "13px", borderRadius: 14, fontSize: 14 }}>{loading ? "Đang lưu…" : "Xác nhận"}</button>
+        {msg.text && (
+          <div role={msg.type === "ok" ? "status" : "alert"}
+            style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, color: msg.type === "ok" ? C.mintText : C.raspText }}>
+            {msg.type === "ok" ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {msg.text}
+          </div>
+        )}
       </div>
-    </Modal>
+    </ViewportDialog>
   );
 }
 
@@ -1467,7 +1492,10 @@ function GlobalFilterBar({
 /* ===================== MAIN APP =====================
  * Global CSS & keyframes → src/index.css (tĩnh, áp dụng trước first paint).
  * Fonts → index.html (nạp 1 request, không FOUC). */
-export default function App() {
+/* Nội dung thật của ứng dụng. `App` bên dưới chỉ bọc thêm sổ trạng thái
+   chưa lưu — tách ra để Provider nằm NGOÀI mọi thứ dùng nó, kể cả hộp
+   thoại Đổi mật khẩu. */
+function AppShell() {
   const { user, setUser, logout, isAdmin } = useAuth();
   /* Quyền xem từng màn do Supabase quyết, không suy từ `role`/`accessClass`.
      Trong lúc chờ — và khi server chưa có `rpc_my_ui_access` — hook trả về
@@ -1904,5 +1932,13 @@ export default function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <DirtyStateProvider>
+      <AppShell />
+    </DirtyStateProvider>
   );
 }

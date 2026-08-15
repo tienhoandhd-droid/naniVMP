@@ -18,7 +18,8 @@
     "viec": "node tests/e2e/viec-nguoi-dung.mjs",
     "doichieu": "node tests/e2e/doi-chieu-du-lieu.mjs",
     "thammy": "node tests/e2e/tham-my.mjs",
-    "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs"
+    "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs",
+    "shell": "node tests/e2e/lotus-shell.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

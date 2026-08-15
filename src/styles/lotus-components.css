@@ -433,3 +433,143 @@
 .lp-skeleton-row:nth-child(2) { width: 82%; }
 .lp-skeleton-row:nth-child(3) { width: 64%; }
 .lp-skeleton-row:nth-child(4) { width: 73%; }
+
+/* ===================================================================
+ *  ViewportDialog
+ *  -------------------------------------------------------------------
+ *  Ba ràng buộc hình học, mỗi cái vá một lỗi thật của hộp thoại cũ:
+ *   · panel cao tối đa `100vh - 40px` — nút Lưu không rơi khỏi màn;
+ *   · chỉ THÂN cuộn, đầu và chân đứng yên — luôn thấy tiêu đề và nút;
+ *   · căn giữa bằng flex trên lớp phủ fixed — không lệ thuộc transform
+ *     của tổ tiên, thứ từng đẩy hộp thoại xuống giữa chiều cao cả trang.
+ * =================================================================== */
+
+.lp-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(26 16 26 / 0.52);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: lp-dialog-mo var(--lp-mo-modal) var(--lp-ease);
+}
+
+.lp-dialog__panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid var(--lp-line);
+  border-top: 1px solid var(--lp-gold-hairline);
+  background: var(--lp-surface);
+  box-shadow: var(--lp-e-modal);
+  animation: lp-dialog-panel var(--lp-mo-modal) var(--lp-ease);
+}
+
+.lp-dialog__panel:focus { outline: none; }
+
+.lp-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex: 0 0 auto;
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid var(--lp-line);
+  background: var(--lp-sheen);
+}
+
+.lp-dialog__heading { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+
+.lp-dialog__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--lp-rose-soft);
+  color: var(--lp-plum);
+}
+
+.lp-dialog__title {
+  margin: 0;
+  font-family: var(--ff-display);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: var(--lp-tracking-display);
+  color: var(--lp-ink);
+}
+
+.lp-dialog__desc {
+  margin: 4px 0 0;
+  max-width: 58ch;
+  font-family: var(--ff-text);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--lp-ink-muted);
+}
+
+.lp-dialog__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: var(--lp-surface);
+  color: var(--lp-ink-muted);
+  cursor: pointer;
+  transition: background var(--lp-mo-chip) var(--lp-ease);
+}
+
+.lp-dialog__close:hover { background: var(--lp-surface-2); color: var(--lp-ink); }
+.lp-dialog__close:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+
+.lp-dialog__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 24px;
+  font-family: var(--ff-text);
+  color: var(--lp-ink);
+}
+
+.lp-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  padding: 16px 24px;
+  border-top: 1px solid var(--lp-line);
+  background: var(--lp-surface-2);
+}
+
+@keyframes lp-dialog-mo { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lp-dialog-panel {
+  from { opacity: 0; transform: scale(.985); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+  .lp-dialog { padding: 12px; align-items: flex-end; }
+  .lp-dialog__panel { max-height: calc(100vh - 24px); }
+  .lp-dialog__footer > * { flex: 1 1 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-dialog,
+  .lp-dialog__panel { animation: none; }
+}
