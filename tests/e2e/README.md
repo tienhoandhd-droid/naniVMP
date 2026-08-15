@@ -6,6 +6,32 @@ Supabase.
 
 ## Chạy
 
+Từ đợt Lotus Pearl trở đi, **mọi lệnh trình duyệt chạy qua một wrapper duy
+nhất** — không tự dựng preview bằng tay nữa:
+
+```bash
+bash scripts/with-preview.sh -- npm run e2e
+bash scripts/with-preview.sh -- node tests/e2e/luong-chinh.mjs
+```
+
+Wrapper sở hữu trọn vòng đời: kiểm `.env.local` đủ khoá cách ly → tính dấu
+vân tay đầu vào (mã nguồn, cấu hình, và *tên* khoá `.env.local`, không phải
+giá trị) → build vào thư mục tạm → kiểm sản phẩm → tráo vào `dist/` → mở
+đúng một `vite preview --host 127.0.0.1 --port 4173 --strictPort` → chạy lệnh
+của bạn → dừng và thu hồi đúng tiến trình đó dù thành công hay thất bại.
+
+Ba cái bẫy nó chặn: chạy nhầm trên `dist/` cũ, tái dùng server do bộ test khác
+để lại, và bỏ sót tiến trình preview còn sống giữ cổng 4173.
+
+Mã thoát: `2` sai cú pháp · `3` `.env.local` thiếu khoá hoặc khoá rỗng ·
+`4` build lỗi · `5` sản phẩm build không hợp lệ hay dấu vân tay lệch ·
+`6` cổng 4173 đã có người giữ hoặc preview chết ngay · `7` chờ quá hạn.
+Thành công thì trả **nguyên mã thoát của lệnh bên trong**.
+
+Đặt `WITH_PREVIEW_TIMEOUT` (giây, mặc định 20) nếu máy chậm.
+
+Cách cũ chỉ còn để tham khảo — nó không kiểm được `dist/` có tươi hay không:
+
 ```bash
 npm run build
 npx vite preview --port 4173 --strictPort &   # phải dựng bản build, không phải dev server
