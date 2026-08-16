@@ -27,6 +27,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { coWebGL, docMauLotus3D, dungMauLotus3D } from "../../lib/lotus3dColors.ts";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
+import { WebGLContextGuard } from "./WebGLContextGuard.tsx";
 import * as THREE from "three";
 import { wlIsDone } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
@@ -332,6 +333,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
         <div className="vmp-space3d-khung">
             <Canvas dpr={[1, 1.5]} gl={{ antialias: true, alpha: true }}
             frameloop="demand">
+            <WebGLContextGuard onLost={() => setKieu("2d")} />
             <Canh o3d={o3d} chon={chon} giamChuyenDong={giamChuyenDong} onHover={setChon} />
           </Canvas>
         </div>

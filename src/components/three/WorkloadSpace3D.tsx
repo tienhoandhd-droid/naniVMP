@@ -12,6 +12,7 @@ import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
 import { NhanTruc } from "./NhanTruc.tsx";
 import type { MotNhan } from "./NhanTruc.tsx";
 import { ThreeFallbackBoundary } from "./ThreeFallbackBoundary.tsx";
+import { WebGLContextGuard } from "./WebGLContextGuard.tsx";
 import { CauKetLuan } from "../ui/Primitives.tsx";
 
 const DEFAULT_TARGET: [number, number, number] = [0, 0.9, 0];
@@ -331,6 +332,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell,
               analytics gần như tĩnh không cần game-engine loop. */}
           <Canvas dpr={[1, 1.5]} frameloop="demand"
             gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05, outputColorSpace: THREE.SRGBColorSpace }}>
+            <WebGLContextGuard onLost={() => setMode("2d")} />
             <Scene cells={cells} maxTotal={maxTotal} selected={selected} hover={hover} giamChuyenDong={giamChuyenDong}
               onHover={setHover} onSelect={setSelected} onResetReady={onResetReady} />
           </Canvas>

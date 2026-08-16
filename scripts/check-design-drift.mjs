@@ -82,7 +82,30 @@ for (const f of files) {
   });
 }
 
-console.log(`Đã soát ${files.length} file trong phạm vi migration.`);
+/* Luật 5 (nghiên cứu 7): CẤM background trắng literal — quét TOÀN src,
+   không chỉ phạm vi migration, vì một `background:#fff` là đủ tạo mảng
+   trắng trong dark mode bất kể token đúng đến đâu. Chữ trắng trên nền
+   đặc vẫn hợp lệ; luật chỉ nhắm background. */
+const THEME_LITERAL = [
+  /background(?:-color|Color)?\s*[:=]\s*["'`]?#f{3}(?:f{3})?\b/i,
+  /background(?:-color|Color)?\s*[:=]\s*["'`]?white\b/i,
+  /background[^;\n]{0,80}rgba?\(\s*255\s*[, ]\s*255\s*[, ]\s*255/i,
+];
+const MIEN_NEN_TRANG = new Set([
+  "src/styles/lotus-tokens.css", // nơi duy nhất được khai giá trị nền
+]);
+const tatCaSrc = duyet("src").filter((f) => /\.(tsx?|css)$/.test(f) && !f.endsWith(".d.ts"));
+for (const f of tatCaSrc) {
+  if (MIEN_NEN_TRANG.has(f)) continue;
+  readFileSync(join(GOC, f), "utf8").split("\n").forEach((line, i) => {
+    const sach = line.replace(/\/\*.*?\*\//g, "").replace(/^\s*\*.*/, "").replace(/^\s*\/\/.*/, "");
+    if (THEME_LITERAL.some((re) => re.test(sach))) {
+      loi.push(`${f}:${i + 1} — nền trắng literal (dark mode sẽ thủng): ${sach.trim().slice(0, 70)}`);
+    }
+  });
+}
+
+console.log(`Đã soát ${files.length} file trong phạm vi migration + ${tatCaSrc.length} file luật nền trắng.`);
 if (loi.length) {
   console.error(`\n${loi.length} vi phạm luật thiết kế:`);
   for (const l of loi) console.error(`  ✗ ${l}`);

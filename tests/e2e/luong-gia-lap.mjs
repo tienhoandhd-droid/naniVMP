@@ -861,6 +861,66 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
+/* ---- 3q. Mất WebGL context giữa chừng → tự rơi về 2D ---------------- */
+{
+  console.log("\nMất WebGL context giữa chừng:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2600));
+  const coWebGL2 = await trang.evaluate(() => {
+    try { return !!document.createElement("canvas").getContext("webgl2"); }
+    catch { return false; }
+  });
+  if (!coWebGL2) {
+    // Headless không có WebGL2 thì nút 3D vốn bị giấu (đã kiểm ở 3o) —
+    // kịch bản mất context không tồn tại để kiểm. Không tính là hỏng.
+    console.log("  (bỏ qua: môi trường không có WebGL2 — nút 3D bị giấu, đã kiểm ở 3o)");
+  } else {
+    // Mở góc khám phá 3D trên Timeline (chunk Three lazy-load từ đây).
+    const moKham = await trang.evaluate(() => {
+      const nut = [...document.querySelectorAll("button")]
+        .find((b) => /khám phá 3d|xem bản đồ 3d/i.test(b.textContent || ""));
+      if (!nut) return false;
+      nut.click();
+      return true;
+    });
+    kiem(moKham, "có nút mở góc 3D trên Timeline");
+    // Chunk Three lazy-load rồi mới mount canvas.
+    let coCanvas = false;
+    for (let i = 0; i < 40; i += 1) {
+      coCanvas = await trang.evaluate(() => !!document.querySelector("#workload-map-3d canvas"));
+      if (coCanvas) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    kiem(coCanvas, "cảnh 3D mount được canvas");
+    if (coCanvas) {
+      // WEBGL_lose_context sinh ra đúng để mô phỏng tình huống này.
+      const mat = await trang.evaluate(() => {
+        const canvas = document.querySelector("#workload-map-3d canvas");
+        const gl = canvas?.getContext("webgl2") || canvas?.getContext("webgl");
+        const ext = gl?.getExtension("WEBGL_lose_context");
+        if (!ext) return false;
+        ext.loseContext();
+        return true;
+      });
+      kiem(mat, "mô phỏng được mất context (WEBGL_lose_context)");
+      let ve2d = false;
+      for (let i = 0; i < 30; i += 1) {
+        ve2d = await trang.evaluate(() =>
+          !document.querySelector("#workload-map-3d canvas")
+          && !!document.querySelector('button[data-map-mode="2d"].is-chon'));
+        if (ve2d) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      kiem(ve2d, "canvas chết thì trang tự rơi về bảng 2D, không màn trắng");
+    }
+  }
+  await trang.close();
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");

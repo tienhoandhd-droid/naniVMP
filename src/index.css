@@ -2389,7 +2389,7 @@ select { appearance: none; -webkit-appearance: none; }
   flex-wrap: wrap;
   padding: 9px 12px;
   border-bottom: 1px solid rgba(78,42,78,.08);
-  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,247,252,.94));
+  background: var(--lp-bg-surface); /* v4: hết literal trắng — dark không còn dải sáng */
 }
 
 .timeline-map-surface__head strong {
@@ -2558,11 +2558,11 @@ select { appearance: none; -webkit-appearance: none; }
 
 .timeline-table-row:nth-child(even) .timeline-table-stage--done,
 .timeline-table-row:hover .timeline-table-stage--done {
-  background-color: rgba(255,255,255,.98);
+  background-color: var(--lp-bg-raised); /* v4 */
 }
 
 .timeline-table-row:hover td {
-  background-color: rgba(255,255,255,.98);
+  background-color: var(--lp-bg-raised); /* v4 */
 }
 
 .timeline-table-row:hover .timeline-table-stage {
@@ -2570,7 +2570,7 @@ select { appearance: none; -webkit-appearance: none; }
 }
 
 .timeline-table-row:hover .timeline-table-stage--done {
-  background-color: rgba(255,255,255,.98);
+  background-color: var(--lp-bg-raised); /* v4 */
 }
 
 .timeline-table-row--over .timeline-table-target {
@@ -3167,7 +3167,7 @@ select { appearance: none; -webkit-appearance: none; }
   position: relative;
   height: 76px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(255,255,255,.68), rgba(248,245,252,.18));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lp-bg-raised) 68%, transparent), transparent); /* v4 */
 }
 
 .timeline-day-flow--single {
@@ -3928,7 +3928,7 @@ select { appearance: none; -webkit-appearance: none; }
 .visual-timeline__scale-track {
   position: relative;
   min-height: 52px;
-  background: linear-gradient(180deg, rgba(253,238,246,.74), rgba(255,255,255,.95));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lp-rose-soft) 74%, transparent), var(--lp-bg-surface)); /* v4 */
 }
 
 .visual-timeline__scale-track span {
@@ -6900,7 +6900,7 @@ main li,
 .tl-inspector {
   position: sticky;
   top: 12px;
-  background: var(--lp-surface);
+  background: var(--lp-bg-raised, var(--lp-surface)); /* v4: inspector = tầng raised */
   border: 1px solid var(--lp-line);
   border-radius: 16px;
   padding: 16px 18px;

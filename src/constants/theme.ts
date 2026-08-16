@@ -27,6 +27,9 @@ export const C = {
   surfaceSunk: "var(--c-surface-sunk)",
   /** Nền nổi hơn surface một bậc — dùng cho hộp thoại, menu nổi. */
   surfaceRaised: "var(--c-surface-raised)",
+  /** Tầng cao nhất (v4): popover/modal/panel nổi trên cùng. Dark sáng
+   *  hơn raised một bậc nữa — chiều sâu đến từ bậc bề mặt, không từ bóng. */
+  surfaceOverlay: "var(--lp-bg-overlay, var(--c-surface-raised))",
   /** Nền kính mờ — ĐỔI theo chế độ sáng/tối. Dùng token này thay vì gõ
    *  rgba(255,255,255,...) cứng: nền trắng cứng ở chế độ tối biến thanh
    *  công cụ thành một dải sáng và chữ trên đó gần như biến mất. */

@@ -17,28 +17,50 @@
 
 :root[data-visual="lotus-pearl"] {
   color-scheme: light;
-  color-scheme: light;
 
-  /* --- Nền và chữ — Atelier v2 -------------------------------------- *
-   * Canvas ngả hồng sâu hơn bản đầu (#FFF9F7 → #F7F0F3) để card trắng
-   * NỔI hẳn lên nền: đó là cách sơn mài tạo chiều sâu bằng lớp bề mặt,
-   * thay vì tăng bóng đổ. Nghiên cứu Atelier 15/08 §Palette. */
-  --lp-canvas:    #F7F0F3;
-  --lp-surface:   #FFFDFC;
-  --lp-surface-2: #EEE3E8; /* v3: đậm nhẹ — thoát cảnh mọi lớp pastel hoà nhau */
-  /* Bề mặt nổi trên surface — popover, modal. */
-  --lp-raised:    #FFFFFF;
-  --lp-ink:       #2F2430;
-  /* ~6.4:1 trên surface, vẫn nhạt hơn --lp-ink rõ rệt nên phân cấp còn
-     nguyên. Không được nhạt hơn nữa: ngưỡng AA là 4.5:1. */
-  --lp-ink-muted: #625560; /* v3: ~6.9:1 trên surface */
+  /* ==================================================================
+   * v4 SEMANTIC (nghiên cứu 7) — tách PIGMENT khỏi VAI TRÒ.
+   * Component mới hỏi "đây là canvas/surface/raised hay brand-solid?",
+   * không hỏi "plum hay rose?". Token cũ bên dưới trỏ var() về lớp này
+   * nên ~990 style nội tuyến đổi theo mà không sửa dòng nào.
+   *
+   * Nền NĂM TẦNG: canvas (trang) < sunken (giếng lọc, nhóm bảng)
+   * < surface (card, bảng) < raised (card chọn, inspector)
+   * < overlay (popover, modal). Light lấy chiều sâu bằng canvas đậm
+   * hơn một bậc; dark lấy chiều sâu bằng elevation sáng dần về trước.
+   * ================================================================== */
+  --lp-bg-canvas:  #F3EAEE;
+  --lp-bg-sunken:  #E9DDE3;
+  --lp-bg-surface: #FFFDFB;
+  --lp-bg-raised:  #FFFFFF;
+  --lp-bg-overlay: #FFFFFF;
+
+  --lp-text-primary:   #2F2430;
+  --lp-text-secondary: #5B4D59; /* ~7.2:1 trên surface */
+  --lp-text-tertiary:  #756975; /* chỉ metadata thật sự phụ (timestamp) */
+
+  /* Brand SOLID (mảng sơn mài đặc, hero/anchor) tách hẳn khỏi brand
+     ACCENT (link, selected). Ở dark, solid VẪN tối — không còn token
+     đảo nghĩa "light là nền đậm, dark hoá accent sáng". */
+  --lp-brand-solid:    #3E213E;
+  --lp-on-brand-solid: #FFFDFC;
+  --lp-brand:          #5A3158;
+  --lp-brand-hover:    #4A2948;
+
+  /* --- Tên cũ trỏ về v4 --------------------------------------------- */
+  --lp-canvas:    var(--lp-bg-canvas);
+  --lp-surface:   var(--lp-bg-surface);
+  --lp-surface-2: var(--lp-bg-sunken);
+  --lp-raised:    var(--lp-bg-raised);
+  --lp-ink:       var(--lp-text-primary);
+  --lp-ink-muted: var(--lp-text-secondary);
 
   /* --- Thương hiệu — thang plum ba bậc ------------------------------ *
    * 900 neo đậm cho hero/panel sơn mài, 700 cho CTA và trạng thái chọn,
    * 600 cho hover/accent. Tên cũ --lp-plum/--lp-plum-2 giữ làm bí danh
    * vì components cũ đang dùng. */
   --lp-plum-900:  #3E213E;
-  --lp-plum:      #5A3158;
+  --lp-plum:      var(--lp-brand);
   --lp-plum-700:  var(--lp-plum);
   --lp-plum-2:    #70446A;
   --lp-plum-600:  var(--lp-plum-2);
@@ -79,8 +101,8 @@
   --lp-on-ink:     var(--lp-canvas);
 
   /* --- Đường nét, tiêu điểm, trạng thái vô hiệu --------------------- */
-  --lp-line:             rgb(47 36 48 / 0.14); /* v3: card rõ lớp hơn */
-  --lp-line-strong:      rgb(47 36 48 / 0.26);
+  --lp-line:             rgb(47 36 48 / 0.16); /* v4: viền rõ hơn một nấc */
+  --lp-line-strong:      rgb(47 36 48 / 0.28);
   /* v5 (nghiên cứu 6): focus phải ĐẶC — plum 46% composite trên nền
    * sáng chỉ ~2.4:1, dưới ngưỡng 3:1 của non-text contrast. plum-2 đặc
    * đạt ~7.6:1, và không hex mới. */
@@ -95,8 +117,8 @@
 
   /* --- v3 (nghiên cứu 4+5): lacquer anchor + vai trò màu cho chart/3D.
    * 3D KHÔNG đọc CSS cascade — dùng cầu src/lib/lotus3dColors.ts. */
-  --lp-anchor:       var(--lp-plum-900);
-  --lp-anchor-hover: #4A2948;
+  --lp-anchor:       var(--lp-brand-solid);
+  --lp-anchor-hover: var(--lp-brand-hover);
   --lp-viz-base:      var(--lp-plum);
   --lp-viz-selected:  var(--lp-rose);
   --lp-viz-threshold: var(--lp-ink-muted);
@@ -168,7 +190,7 @@
   --c-bg2:            var(--lp-surface-2);
   --c-surface:        var(--lp-surface);
   --c-surface-sunk:   var(--lp-surface-2);
-  --c-surface-raised: var(--lp-surface);
+  --c-surface-raised: var(--lp-bg-raised);
   --c-ink:            var(--lp-ink);
   --c-ink-soft:       var(--lp-ink-muted);
   --c-line:           var(--lp-line);
@@ -227,22 +249,33 @@
 
 :root[data-visual="lotus-pearl"][data-theme="dark"] {
   color-scheme: dark;
-  color-scheme: dark;
 
-  --lp-canvas:    #171218;
-  --lp-surface:   #241C26;
-  --lp-surface-2: #2C222E;
-  --lp-raised:    #302632;
-  --lp-ink:       #F6EBEF;
-  --lp-ink-muted: #BCAEB8;
+  /* v4: elevation — càng gần người xem càng sáng. Chiều sâu đến từ
+     BẬC BỀ MẶT, không đến từ bóng đen (bóng gần như vô hình trên nền
+     tối; xem chú thích --lp-e-* bên dưới). */
+  --lp-bg-canvas:  #151116;
+  --lp-bg-sunken:  #1B161C;
+  --lp-bg-surface: #211A22;
+  --lp-bg-raised:  #2B222C;
+  --lp-bg-overlay: #342936;
 
-  /* Trên nền tối, tím mận đặc trở nên không đọc được, nên vai trò thương
-     hiệu đảo sang sắc phấn sáng hơn. Bí danh 700/600/rose-600 tự đi theo
+  --lp-text-primary:   #F5EEF1;
+  --lp-text-secondary: #BFB1BA;
+  --lp-text-tertiary:  #9F919B;
+
+  /* Brand solid GIỮ tối — mảng nhận diện không đảo nghĩa theo theme.
+     Accent tương tác mới là thứ đảo sang phấn sáng để đọc được. */
+  --lp-brand-solid:    #41263F;
+  --lp-on-brand-solid: #FFF7FA;
+  --lp-brand:          #D8A8BC;
+  --lp-brand-hover:    #E3B8C9; /* dark: hover SÁNG lên, không tối đi */
+
+  /* Trên nền tối, tím mận đặc trở nên không đọc được, nên vai trò accent
+     đảo sang sắc phấn sáng hơn. Bí danh 700/600/rose-600 tự đi theo
      vì chúng là var() trỏ về hai tên này. */
   --lp-plum-900:  #E2BDCD;
-  --lp-plum:      #D0A5B7;
-  --lp-plum-2:    #C495AA;
-  --lp-rose:      #D998B4;
+  --lp-plum-2:    var(--lp-brand-hover);
+  --lp-rose:      #E09BB7;
   --lp-rose-soft: #38293A;
 
   /* Nền tối nuốt bớt chi tiết mờ nên artwork cần đậm hơn một chút. */
@@ -258,16 +291,16 @@
   --lp-info:         #8FB3CE;
   --lp-info-soft:    #22303A;
 
-  --lp-gold: #D6B56E;
+  --lp-gold: #D8B76C;
 
-  --lp-line:             rgb(246 235 239 / 0.16); /* v3 */
-  --lp-line-strong:      rgb(246 235 239 / 0.28);
+  --lp-line:             rgb(245 238 241 / 0.16); /* v4: theo text-primary mới */
+  --lp-line-strong:      rgb(245 238 241 / 0.28);
   --lp-focus:            var(--lp-rose); /* v5: đặc, ~7.2:1 */
   --lp-disabled-ink:     #9E919B;
   --lp-disabled-surface: #2A232B;
 
-  --lp-sheen:         linear-gradient(135deg, #2C222E 0%, #241C26 52%, #2A1F2B 100%);
-  --lp-gold-hairline: rgb(214 181 110 / 0.30);
+  --lp-sheen:         linear-gradient(135deg, #2B222C 0%, #211A22 52%, #271E28 100%);
+  --lp-gold-hairline: rgb(216 183 108 / 0.30);
 
   /* Nền sáng thì chữ phải tối. Ba màu này ở chế độ tối đều là sắc phấn
      sáng, nên chữ trên chúng lấy màu nền trang. */
@@ -277,8 +310,8 @@
   --lp-on-warning: #2E2110;
   --lp-on-ink:     var(--lp-canvas);
 
-  --lp-glass:      rgb(36 28 38 / 0.76);
-  --lp-glass-line: rgb(246 235 239 / 0.10);
+  --lp-glass:      rgb(33 26 34 / 0.76); /* = bg-surface v4 */
+  --lp-glass-line: rgb(245 238 241 / 0.10);
   --lp-e-low:   0 1px 2px rgb(0 0 0 / .34), 0 6px 18px rgb(0 0 0 / .30);
   --lp-e-mid:   0 1px 3px rgb(0 0 0 / .40), 0 14px 34px rgb(0 0 0 / .38);
   --lp-e-high:  0 2px 6px rgb(0 0 0 / .46), 0 22px 54px rgb(0 0 0 / .46);
@@ -292,7 +325,7 @@
   --c-bg2:            var(--lp-surface-2);
   --c-surface:        var(--lp-surface);
   --c-surface-sunk:   var(--lp-surface-2);
-  --c-surface-raised: var(--lp-surface);
+  --c-surface-raised: var(--lp-bg-raised);
   --c-ink:            var(--lp-ink);
   --c-ink-soft:       var(--lp-ink-muted);
   --c-line:           var(--lp-line);
@@ -304,7 +337,7 @@
   --c-pink-deep: var(--lp-plum-2);
   --c-pink-text: var(--lp-plum);
   --c-pink-soft: var(--lp-rose-soft);
-  --c-pink-mist: #241C26;
+  --c-pink-mist: var(--lp-bg-surface);
 
   --c-lav:      var(--lp-rose);
   --c-lav-text: var(--lp-plum);
@@ -374,5 +407,12 @@
     --lp-mo-card:  1ms;
     --lp-mo-modal: 1ms;
     --lp-mo-chip:  1ms;
+  }
+
+  /* v4 (nghiên cứu 7): smooth-scroll cũng là chuyển động — người chọn
+     giảm chuyển động thì cuộn phải nhảy thẳng, không lướt. */
+  :root[data-visual="lotus-pearl"],
+  :root[data-visual="lotus-pearl"] * {
+    scroll-behavior: auto !important;
   }
 }

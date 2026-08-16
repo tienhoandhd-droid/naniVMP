@@ -312,7 +312,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
       height: "min(600px, calc(100vh - 100px))",
       display: "flex", flexDirection: "column",
       borderRadius: R.xl, overflow: "hidden",
-      background: C.surface, border: `1px solid ${C.line}`,
+      background: C.surfaceOverlay, border: `1px solid ${C.line}`,
       boxShadow: E.modal, fontFamily: TEXT,
     }} className="vmp-chat-panel vmp-view-enter">
 

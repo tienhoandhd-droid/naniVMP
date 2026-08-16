@@ -22,6 +22,7 @@ import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
+import { WebGLContextGuard } from "./WebGLContextGuard.tsx";
 import * as THREE from "three";
 import { qrmSeverity, qrmOccurrence, qrmLevel } from "../../utils/helpers.ts";
 import { coWebGL, docMauLotus3D, dungMauLotus3D } from "../../lib/lotus3dColors.ts";
@@ -241,6 +242,7 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
         <div className="vmp-space3d-khung">
             <Canvas dpr={[1, 1.5]} gl={{ antialias: true, alpha: true }}
             frameloop="demand">
+            <WebGLContextGuard onLost={() => setKieu("2d")} />
             <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} giamChuyenDong={giamChuyenDong} onHover={setChon} />
           </Canvas>
         </div>

@@ -64,16 +64,31 @@ test("thang bo góc cũ được ánh xạ sang thang Lotus", () => {
 
 /* ---- Token màu ----------------------------------------------------- */
 
-test("token nền và chữ chế độ sáng đúng palette Atelier v2", () => {
-  /* Palette v2 theo nghiên cứu 15/08 (docs/design/lotus-pearl-atelier.md
-     §3): canvas ngả hồng sâu hơn để card trắng nổi, plum sâu hơn một bậc.
-     Mọi cặp chữ/nền đã tính lại tương phản ≥ 4.5:1 trước khi đổi. */
-  assert.equal(bien(KHOI_SANG, "lp-canvas"), "#F7F0F3");
-  assert.equal(bien(KHOI_SANG, "lp-surface"), "#FFFDFC");
-  assert.equal(bien(KHOI_SANG, "lp-surface-2"), "#EEE3E8"); // v3 (nghiên cứu 4+5): figure-ground
-  assert.equal(bien(KHOI_SANG, "lp-ink"), "#2F2430");
-  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "#625560"); // v3: ~6.9:1 trên surface
-  assert.equal(bien(KHOI_SANG, "lp-plum"), "#5A3158");
+test("token nền và chữ chế độ sáng đúng semantic v4 (nghiên cứu 7)", () => {
+  /* v4 (nghiên cứu 7): tách PIGMENT khỏi VAI TRÒ. Nền có năm tầng
+     canvas/sunken/surface/raised/overlay; chữ có ba bậc; token cũ trỏ
+     var() về lớp v4 để ~990 style nội tuyến đổi theo mà không sửa dòng
+     nào. Canvas đậm hơn một bậc (#F7F0F3 → #F3EAEE) để light có chiều
+     sâu; mọi cặp chữ/nền vẫn ≥ 4.5:1. */
+  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F3EAEE");
+  assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#E9DDE3");
+  assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FFFDFB");
+  assert.equal(bien(KHOI_SANG, "lp-bg-raised"), "#FFFFFF");
+  assert.equal(bien(KHOI_SANG, "lp-bg-overlay"), "#FFFFFF");
+  assert.equal(bien(KHOI_SANG, "lp-text-primary"), "#2F2430");
+  assert.equal(bien(KHOI_SANG, "lp-text-secondary"), "#5B4D59");
+  assert.equal(bien(KHOI_SANG, "lp-text-tertiary"), "#756975");
+  // Cầu: token cũ phải TRỎ vào v4, không được giữ hex riêng lệch pha.
+  assert.equal(bien(KHOI_SANG, "lp-canvas"), "var(--lp-bg-canvas)");
+  assert.equal(bien(KHOI_SANG, "lp-surface"), "var(--lp-bg-surface)");
+  assert.equal(bien(KHOI_SANG, "lp-surface-2"), "var(--lp-bg-sunken)");
+  assert.equal(bien(KHOI_SANG, "lp-ink"), "var(--lp-text-primary)");
+  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "var(--lp-text-secondary)");
+  // Brand solid tách khỏi brand accent — không còn token đảo nghĩa theo theme.
+  assert.equal(bien(KHOI_SANG, "lp-brand-solid"), "#3E213E");
+  assert.equal(bien(KHOI_SANG, "lp-on-brand-solid"), "#FFFDFC");
+  assert.equal(bien(KHOI_SANG, "lp-brand"), "#5A3158");
+  assert.equal(bien(KHOI_SANG, "lp-plum"), "var(--lp-brand)");
   assert.equal(bien(KHOI_SANG, "lp-plum-900"), "#3E213E");
   assert.equal(bien(KHOI_SANG, "lp-rose"), "#A74F72");
 });
@@ -86,17 +101,30 @@ test("ba màu ngữ nghĩa và vàng trang trí, chế độ sáng", () => {
   assert.ok(bien(KHOI_SANG, "lp-focus"), "phải có vòng focus riêng");
 });
 
-test("chế độ tối có đủ warning, line, focus và trạng thái vô hiệu — spec §6.2", () => {
-  assert.equal(bien(KHOI_TOI, "lp-canvas"), "#171218");
-  assert.equal(bien(KHOI_TOI, "lp-surface"), "#241C26");
-  assert.equal(bien(KHOI_TOI, "lp-ink"), "#F6EBEF");
+test("chế độ tối: elevation năm tầng + warning, line, focus — v4", () => {
+  /* Dark theo nguyên tắc elevation: bề mặt phía trước SÁNG HƠN base
+     (canvas < sunken < surface < raised < overlay), không cứu chiều sâu
+     bằng bóng đen. Nghiên cứu 7 §Bộ token đề xuất. */
+  assert.equal(bien(KHOI_TOI, "lp-bg-canvas"), "#151116");
+  assert.equal(bien(KHOI_TOI, "lp-bg-sunken"), "#1B161C");
+  assert.equal(bien(KHOI_TOI, "lp-bg-surface"), "#211A22");
+  assert.equal(bien(KHOI_TOI, "lp-bg-raised"), "#2B222C");
+  assert.equal(bien(KHOI_TOI, "lp-bg-overlay"), "#342936");
+  assert.equal(bien(KHOI_TOI, "lp-text-primary"), "#F5EEF1");
+  assert.equal(bien(KHOI_TOI, "lp-text-secondary"), "#BFB1BA");
+  assert.equal(bien(KHOI_TOI, "lp-text-tertiary"), "#9F919B");
+  // Brand solid ở dark vẫn là SƠN MÀI TỐI, không đảo thành phấn sáng.
+  assert.equal(bien(KHOI_TOI, "lp-brand-solid"), "#41263F");
+  assert.equal(bien(KHOI_TOI, "lp-on-brand-solid"), "#FFF7FA");
+  assert.equal(bien(KHOI_TOI, "lp-brand"), "#D8A8BC");
+  assert.equal(bien(KHOI_TOI, "lp-rose"), "#E09BB7");
   assert.equal(bien(KHOI_TOI, "lp-success"), "#84B6A0");
   assert.equal(bien(KHOI_TOI, "lp-danger"), "#F08BA2");
   assert.equal(bien(KHOI_TOI, "lp-warning"), "#F2C47A");
   assert.equal(bien(KHOI_TOI, "lp-warning-bg"), "#352718");
   assert.equal(bien(KHOI_TOI, "lp-warning-line"), "#745026");
-  assert.equal(bien(KHOI_TOI, "lp-line"), "rgb(246 235 239 / 0.16)"); // v3
-  assert.equal(bien(KHOI_TOI, "lp-line-strong"), "rgb(246 235 239 / 0.28)"); // v3
+  assert.equal(bien(KHOI_TOI, "lp-line"), "rgb(245 238 241 / 0.16)"); // v4: theo text-primary mới
+  assert.equal(bien(KHOI_TOI, "lp-line-strong"), "rgb(245 238 241 / 0.28)");
   assert.equal(bien(KHOI_TOI, "lp-focus"), "var(--lp-rose)"); // v5: focus ĐẶC ≥3:1 (nghiên cứu 6)
   assert.equal(bien(KHOI_TOI, "lp-disabled-ink"), "#9E919B");
   assert.equal(bien(KHOI_TOI, "lp-disabled-surface"), "#2A232B");
