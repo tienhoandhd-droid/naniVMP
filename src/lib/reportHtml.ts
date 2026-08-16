@@ -158,7 +158,7 @@ ${d.nextMonth.items.length ? `<table><tr><th>Mã</th><th>Tên</th><th>Bộ phậ
   <div><div class="v">${bySeverity.warning || 0}</div><div class="l">${SEV.warning.emoji} Cảnh báo</div></div>
   <div><div class="v">${bySeverity.info || 0}</div><div class="l">${SEV.info.emoji} Thông tin</div></div>
 </div>
-${topIssues.length ? `<table><tr><th>Mức</th><th>Loại</th><th>Chi tiết</th></tr>${issueRows}</table>${d.quality.length > 15 ? `<p style="font-size:12px;color:#6E4869">… và ${d.quality.length - 15} vấn đề khác — xem đầy đủ ở màn Sức khoẻ dữ liệu.</p>` : ""}` : "<p>Không phát hiện vấn đề chất lượng dữ liệu trong phạm vi này.</p>"}
+${topIssues.length ? `<table><tr><th>Mức</th><th>Loại</th><th>Chi tiết</th></tr>${issueRows}</table>${d.quality.length > 15 ? `<p style="font-size:12px;color:#6E4869">… và ${d.quality.length - 15} vấn đề khác — xem đầy đủ ở màn Chất lượng dữ liệu.</p>` : ""}` : "<p>Không phát hiện vấn đề chất lượng dữ liệu trong phạm vi này.</p>"}
 
 <h2>7. Nhận xét & Đánh giá (AI)</h2>
 <div class="stamp">${disclaimer}</div>

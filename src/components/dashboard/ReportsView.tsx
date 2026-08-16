@@ -665,7 +665,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== Chất lượng dữ liệu ===== */}
       <Card>
-        <CardTitle icon={AlertCircle} sub="Tính trực tiếp trên phạm vi đang lọc — xem đầy đủ ở mục Sức khoẻ dữ liệu">
+        <CardTitle icon={AlertCircle} sub="Tính trực tiếp trên phạm vi đang lọc — xem đầy đủ ở mục Chất lượng dữ liệu">
           Chất lượng dữ liệu
         </CardTitle>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: quality.length ? 14 : 0 }}>

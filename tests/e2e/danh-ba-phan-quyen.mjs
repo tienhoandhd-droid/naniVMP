@@ -320,7 +320,7 @@ try {
   );
   assert.equal(
     await page.evaluate(() => [...document.querySelectorAll("button")]
-      .some((button) => button.textContent?.includes("Sức khoẻ dữ liệu"))),
+      .some((button) => button.textContent?.includes("Chất lượng dữ liệu"))),
     false,
     "equipment manager không được thấy nav admin khác",
   );

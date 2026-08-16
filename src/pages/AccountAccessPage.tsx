@@ -37,9 +37,9 @@ const TEN_MAN: Record<string, string> = {
   workload: "Phân công & Tải việc",
   reports: "Báo cáo & phân tích",
   rules: "Luật đang áp dụng",
-  people: "Nhân sự & phân công",
-  health: "Sức khoẻ dữ liệu",
-  audit: "Audit log",
+  people: "Nhân sự",
+  health: "Chất lượng dữ liệu",
+  audit: "Nhật ký thay đổi",
   accounts: "Tài khoản & quyền truy cập",
   admin: "Quản trị",
   phanquyen: "Phân quyền (cửa vào cũ)",
@@ -115,7 +115,7 @@ export default function AccountAccessView({ access }: { access: AccessContext })
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <Card variant="strong">
         <CardTitle icon={KeyRound}
-          sub="Nối hoặc gỡ tài khoản đăng nhập khỏi hồ sơ nhân sự. Sửa dữ liệu nhân sự nằm ở màn Nhân sự & phân công.">
+          sub="Nối hoặc gỡ tài khoản đăng nhập khỏi hồ sơ nhân sự. Sửa dữ liệu nhân sự nằm ở màn Nhân sự.">
           Tài khoản &amp; quyền truy cập
         </CardTitle>
         <div className="ip-workspace">

@@ -70,7 +70,7 @@ export const LOAI_LOI: Record<string, { ten: string; sua: string }> = {
   deadline_before_start: { ten: "Deadline VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
   done_no_date:          { ten: "Đánh dấu hoàn thành nhưng thiếu ngày", sua: "Vi phạm ALCOA+ — nhập ngày thực tế ở Cập nhật tiến độ" },
   date_no_done:          { ten: "Có ngày hoàn thành nhưng trạng thái chưa xong", sua: "Đặt trạng thái về Hoàn thành, hoặc xoá ngày nếu nhập nhầm" },
-  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Mở Nhân sự & phân công → chọn hồ sơ nhân sự để bổ sung email" },
+  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Mở Nhân sự → chọn hồ sơ nhân sự để bổ sung email" },
   no_validation_type:    { ten: "Chưa xác định loại thẩm định", sua: "Đặt IQ/OQ/PQ/CV ở Danh mục nguồn rồi sinh lại timeline" },
   high_crit_no_plan:     { ten: "Trọng yếu cao nhưng vẫn ở Kế hoạch", sua: "ICH Q9 đòi làm nhóm rủi ro cao trước — xếp lịch sớm" },
 };
@@ -139,18 +139,18 @@ export const NAV_ITEMS = [
      nắm. Mục `phanquyen` ở lại làm cửa vào cũ — vai Quản lý xưởng vẫn dùng
      nó để phân công hạng mục thiết bị cho tới khi việc đó chuyển sang màn
      Cập nhật tiến độ. */
-  { id: "people", label: "Nhân sự & phân công", icon: Users, group: "admin" },
+  { id: "people", label: "Nhân sự", icon: Users, group: "admin" },
   { id: "accounts", label: "Tài khoản & quyền truy cập", icon: KeyRound, group: "admin" },
   { id: "phanquyen", label: "Phân quyền & trách nhiệm", icon: ShieldCheck, group: "admin" },
-  { id: "health", label: "Sức khoẻ dữ liệu", icon: Radar, group: "admin" },
-  { id: "audit", label: "Audit log", icon: ShieldCheck, group: "admin" },
+  { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
+  { id: "audit", label: "Nhật ký thay đổi", icon: ShieldCheck, group: "admin" },
   { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin" },
 ];
 
 export const NAV_SUBS = {
   today: "Việc của tôi hôm nay — đã trễ, tới hạn trong 7 ngày, và hồ sơ cần điền nốt",
   overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
-  timeline: "Tổng quan tải việc theo tháng · Timeline các mốc Đề cương → Thẩm định → Báo cáo → Đích VMP",
+  timeline: "Đề cương → Thẩm định → Báo cáo → Đích VMP · một bộ lọc cho cả tổng quan lẫn dòng thời gian",
   alerts: "Cảnh báo tới hạn / quá hạn / tái thẩm định — xếp theo điểm rủi ro ICH Q9, kèm ma trận QRM",
   progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
   inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
@@ -162,7 +162,7 @@ export const NAV_SUBS = {
   reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / Excel / HTML",
   rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
   phanquyen: "Ma trận vai trò × hành động · người × bộ phận · khu vực/line — sửa vai trò, bộ phận và email thẳng trên bảng",
-  health: "Sức khoẻ dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng ở Supabase",
+  health: "Chất lượng dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng ở Supabase",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",
 };

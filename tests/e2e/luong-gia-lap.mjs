@@ -38,11 +38,11 @@ const MAN = [
   ["workload", "Phân công & Tải việc"],
   ["reports", "Báo cáo & phân tích"],
   ["rules", "Luật đang áp dụng"],
-  ["people", "Nhân sự & phân công"],
+  ["people", "Nhân sự"],
   ["accounts", "Tài khoản & quyền truy cập"],
   ["phanquyen", "Phân quyền & trách nhiệm"],
-  ["health", "Sức khoẻ dữ liệu"],
-  ["audit", "Audit log"],
+  ["health", "Chất lượng dữ liệu"],
+  ["audit", "Nhật ký thay đổi"],
   ["admin", "Quản trị"],
 ];
 
@@ -596,7 +596,7 @@ for (const [id, ten] of MAN) {
   await new Promise((r) => setTimeout(r, 2200));
   await trang.evaluate(() => {
     [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.includes("Thanh tra"))?.click();
+      .find((b) => /chế độ thanh tra/i.test(b.textContent || ""))?.click();
   });
   await new Promise((r) => setTimeout(r, 600));
   const sauBat = await trang.evaluate(() => ({

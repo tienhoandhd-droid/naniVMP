@@ -18,9 +18,9 @@ const MAN = [
   ["workload", "Phân công & Tải việc"],
   ["reports", "Báo cáo & phân tích"],
   ["rules", "Luật đang áp dụng"],
-  ["health", "Sức khoẻ dữ liệu"],
+  ["health", "Chất lượng dữ liệu"],
   ["phanquyen", "Phân quyền & trách nhiệm"],
-  ["audit", "Audit log"],
+  ["audit", "Nhật ký thay đổi"],
   ["admin", "Quản trị"],
 ];
 

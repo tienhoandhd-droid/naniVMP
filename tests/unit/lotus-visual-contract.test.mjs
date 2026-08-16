@@ -97,7 +97,7 @@ test("chế độ tối có đủ warning, line, focus và trạng thái vô hi�
   assert.equal(bien(KHOI_TOI, "lp-warning-line"), "#745026");
   assert.equal(bien(KHOI_TOI, "lp-line"), "rgb(246 235 239 / 0.16)"); // v3
   assert.equal(bien(KHOI_TOI, "lp-line-strong"), "rgb(246 235 239 / 0.28)"); // v3
-  assert.equal(bien(KHOI_TOI, "lp-focus"), "rgb(208 165 183 / 0.50)"); // v3
+  assert.equal(bien(KHOI_TOI, "lp-focus"), "var(--lp-rose)"); // v5: focus ĐẶC ≥3:1 (nghiên cứu 6)
   assert.equal(bien(KHOI_TOI, "lp-disabled-ink"), "#9E919B");
   assert.equal(bien(KHOI_TOI, "lp-disabled-surface"), "#2A232B");
 });

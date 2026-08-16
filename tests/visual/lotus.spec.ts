@@ -60,6 +60,7 @@ async function caiGiaLap(page: Page, che: "light" | "dark") {
 
 const MAN: Array<[string, string]> = [
   ["today", "hom-nay"],
+  ["overview", "tong-quan"],
   ["source", "danh-muc"],
   ["progress", "tien-do"],
   ["timeline", "timeline"],

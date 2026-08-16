@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
 import type { Activity } from "../../types/domain.ts";
 import { buildWorkloadMap, workloadCellColor } from "../../lib/workloadMap.ts";
-import { coWebGL, docMauLotus3D } from "../../lib/lotus3dColors.ts";
+import { coWebGL, docMauLotus3D, dungMauLotus3D } from "../../lib/lotus3dColors.ts";
 import type { WorkloadCell } from "../../lib/workloadMap.ts";
 import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
 import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
@@ -18,8 +18,9 @@ const DEFAULT_TARGET: [number, number, number] = [0, 0.9, 0];
 const MONTH_STEP = 0.54;
 const DEPARTMENT_STEP = 0.72;
 const CAO_MAX = 2.1;
-const MAU3D = docMauLotus3D();
-const RASPBERRY = MAU3D.danger;
+let MAU3D = docMauLotus3D();
+/* getter: đọc MAU3D hiện hành mỗi lần render — theme đổi là màu đổi. */
+const RASPBERRY = { get mau() { return MAU3D.danger; } };
 const DEFAULT_ELEVATION_DEGREES = 35;
 const CAMERA_AZIMUTH = Math.PI / 4;
 const CAMERA_PADDING = .84;
@@ -130,7 +131,7 @@ function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onH
         onPointerOut={() => onHover(null)}
         onClick={(event) => { event.stopPropagation(); onSelect(cell); }}>
         <boxGeometry args={[.5, 1, .54]} />
-        <meshStandardMaterial color={RASPBERRY} transparent opacity={opacity} roughness={.3} />
+        <meshStandardMaterial color={RASPBERRY.mau} transparent opacity={opacity} roughness={.3} />
       </mesh>}
     </group>
   );
@@ -283,6 +284,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell,
     return macDinh3D ? "3d" : "2d";
   });
   const ho3D = useMemo(coWebGL, []);
+  MAU3D = dungMauLotus3D();
   const setMode = (m: "3d" | "2d") => {
     setModeRaw(m);
     try { localStorage.setItem("vmp-workload-3d", m === "3d" ? "mo" : "dong"); } catch { /* riêng tư */ }

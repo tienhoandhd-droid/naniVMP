@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 /* =====================================================================
  *  lotus3dColors.ts — cầu token Lotus → màu 3D (đợt 4, nghiên cứu 4+5)
  *  ---------------------------------------------------------------------
@@ -81,13 +83,33 @@ export function docMauLotus3D(): MauLotus3D {
   };
 }
 
-/** Có WebGL không — hỏi TRƯỚC khi mount Canvas (nghiên cứu 4+5: người
- *  dùng phải nhận câu tiếng Việt tử tế, không phải "WebGL context lost"). */
+/** Có WebGL2 không — hỏi TRƯỚC khi mount Canvas (nghiên cứu 6): three.js
+ *  từ r163 đã bỏ WebGL1, app đang dùng r170 — chấp nhận webgl1 là hứa
+ *  một scene sẽ chết lúc dựng. Câu báo tiếng Việt tử tế thay cho
+ *  "WebGL context lost". */
 export function coWebGL(): boolean {
+  if (typeof document === "undefined") return false;
   try {
     const canvas = document.createElement("canvas");
-    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    return Boolean(
+      typeof WebGL2RenderingContext !== "undefined"
+      && canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: true }),
+    );
   } catch {
     return false;
   }
+}
+
+/** Hook: màu 3D ĐI THEO theme — đổi sáng/tối là scene đang mở nhận màu
+ *  mới ngay (nghiên cứu 6: hằng module chỉ đúng tới lần đổi theme đầu).
+ *  Các file scene gán kết quả vào biến module trước khi render nên mọi
+ *  component con (kể cả const dùng getter) đọc được bộ màu hiện hành. */
+export function dungMauLotus3D(): MauLotus3D {
+  const [mau, setMau] = useState<MauLotus3D>(docMauLotus3D);
+  useEffect(() => {
+    const mo = new MutationObserver(() => setMau(docMauLotus3D()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+  return mau;
 }

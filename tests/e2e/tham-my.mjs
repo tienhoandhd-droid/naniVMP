@@ -412,11 +412,11 @@ const MAN = [
   { id: "workload", ten: "Phân công & Tải việc" },
   { id: "reports", ten: "Báo cáo & phân tích" },
   { id: "rules", ten: "Luật đang áp dụng" },
-  { id: "people", ten: "Nhân sự & phân công" },
+  { id: "people", ten: "Nhân sự" },
   { id: "accounts", ten: "Tài khoản & quyền" },
   { id: "phanquyen", ten: "Phân quyền" },
-  { id: "health", ten: "Sức khoẻ dữ liệu" },
-  { id: "audit", ten: "Audit log" },
+  { id: "health", ten: "Chất lượng dữ liệu" },
+  { id: "audit", ten: "Nhật ký thay đổi" },
   { id: "admin", ten: "Quản trị" },
 ];
 

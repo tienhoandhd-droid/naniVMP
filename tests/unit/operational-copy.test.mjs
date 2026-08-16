@@ -5,7 +5,7 @@
  *
  *   · NAV_SUBS.source hiện ngay dưới tiêu đề màn và là lời hứa về những
  *     gì màn làm được. Nó không được hứa "Người thực hiện" hay "Danh bạ
- *     nhân sự" nữa — hai thứ đó đã chuyển sang màn Nhân sự & phân công —
+ *     nhân sự" nữa — hai thứ đó đã chuyển sang màn Nhân sự —
  *     và không được gợi ý có xoá vật lý.
  *
  *   · LOAI_LOI.owner_no_email.sua là hướng dẫn sửa lỗi ở màn Sức khoẻ
@@ -33,9 +33,9 @@ test("NAV_SUBS.source không còn nhắc tới Người thực hiện, Danh bạ
   assert.ok(!NAV_SUBS.source.includes("xoá"));
 });
 
-test("hướng dẫn sửa owner_no_email chỉ sang Nhân sự & phân công", () => {
+test("hướng dẫn sửa owner_no_email chỉ sang Nhân sự", () => {
   assert.equal(
     LOAI_LOI.owner_no_email.sua,
-    "Mở Nhân sự & phân công → chọn hồ sơ nhân sự để bổ sung email",
+    "Mở Nhân sự → chọn hồ sơ nhân sự để bổ sung email",
   );
 });

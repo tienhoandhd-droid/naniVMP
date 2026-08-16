@@ -410,7 +410,7 @@ export function ThanhTraToggle() {
       <ShieldCheck size={15} color={bat ? "var(--lp-on-ink)" : C.plum} />
       <span style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800,
                      color: bat ? "var(--lp-on-ink)" : C.plum, whiteSpace: "nowrap" }}>
-        {bat ? "Chế độ thanh tra" : "Thanh tra"}
+        {bat ? "Đang trình bày thanh tra" : "Chế độ thanh tra"}
       </span>
     </button>
   );

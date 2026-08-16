@@ -24,7 +24,7 @@
  * ===================================================================== */
 import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { coWebGL, docMauLotus3D } from "../../lib/lotus3dColors.ts";
+import { coWebGL, docMauLotus3D, dungMauLotus3D } from "../../lib/lotus3dColors.ts";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
@@ -52,12 +52,13 @@ const VI_TRI: [number, number, number] = [7.4, 3.9, 3.4];
 /* Màu giai đoạn = semantic token (khớp alias --lp-stage-* của CSS):
  * đề cương plum · thẩm định info · báo cáo rose · đích success.
  * Đọc lúc nạp chunk — hết bộ tím/xanh "demo" tách rời Lotus. */
-const MAU3D = docMauLotus3D();
+let MAU3D = docMauLotus3D();
+/* getter: đọc MAU3D HIỆN HÀNH mỗi lần render — theme đổi là màu đổi. */
 const GIAI_DOAN = [
-  { khoa: "tt_de_cuong", ten: "Đề cương", mau: MAU3D.plum },
-  { khoa: "tt_tham_dinh", ten: "Thẩm định", mau: MAU3D.info },
-  { khoa: "tt_bao_cao", ten: "Báo cáo", mau: MAU3D.rose },
-  { khoa: "tt_vmp", ten: "Đích VMP", mau: MAU3D.success },
+  { khoa: "tt_de_cuong", ten: "Đề cương", get mau() { return MAU3D.plum; } },
+  { khoa: "tt_tham_dinh", ten: "Thẩm định", get mau() { return MAU3D.info; } },
+  { khoa: "tt_bao_cao", ten: "Báo cáo", get mau() { return MAU3D.rose; } },
+  { khoa: "tt_vmp", ten: "Đích VMP", get mau() { return MAU3D.success; } },
 ];
 
 /** Ma trận 12 tháng × 4 giai đoạn. Tháng lấy theo MỐC ĐÍCH VMP, đúng như
@@ -95,7 +96,7 @@ const CAO = 2.0;        // đơn vị cảnh cho mốc 100%
  *  hạn ±3σ của biểu đồ kiểm soát đều dùng màu này. Một khái niệm, một màu. */
 /* Mặt phẳng mục tiêu là NGƯỠNG trung tính, không phải báo động —
  * nghiên cứu (3): "không dùng danger cho một đường target trung tính". */
-const MAU_MUC_TIEU = MAU3D.inkMuted;
+const MAU_MUC_TIEU = { get mau() { return MAU3D.inkMuted; } };
 const BUOC_T = 0.46;    // khoảng cách giữa hai tháng (trục sâu)
 const BUOC_G = 0.72;    // khoảng cách giữa hai giai đoạn (trục ngang)
 
@@ -214,9 +215,9 @@ function Canh({ o3d, chon, giamChuyenDong, onHover }: {
       <group position={[0, CAO / 2, 0]}>
         <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
           <planeGeometry args={[rongX + 0.42, sauZ + 0.36]} />
-          <meshBasicMaterial color={MAU_MUC_TIEU} transparent opacity={0.16}
+          <meshBasicMaterial color={MAU_MUC_TIEU.mau} transparent opacity={0.16}
             side={THREE.DoubleSide} depthWrite={false} />
-          <Edges threshold={1} color={MAU_MUC_TIEU} />
+          <Edges threshold={1} color={MAU_MUC_TIEU.mau} />
         </mesh>
         {/* Bốn cột mốc rất mảnh nối mặt phẳng xuống sàn: không có chúng thì
             mặt phẳng trông như trôi lơ lửng và mắt không định được nó cao
@@ -224,7 +225,7 @@ function Canh({ o3d, chon, giamChuyenDong, onHover }: {
         {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], i) => (
           <mesh key={i} position={[sx * (rongX + 0.42) / 2, -CAO / 4, sz * (sauZ + 0.36) / 2]}>
             <boxGeometry args={[0.012, CAO / 2, 0.012]} />
-            <meshBasicMaterial color={MAU_MUC_TIEU} transparent opacity={0.45} />
+            <meshBasicMaterial color={MAU_MUC_TIEU.mau} transparent opacity={0.45} />
           </mesh>
         ))}
       </group>
@@ -252,6 +253,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
   /* 2D mặc định (nghiên cứu (3) P0) — 3D là khám phá tự chọn. */
   const [kieu, setKieu] = useState<"3d" | "2d">("2d");
   const ho3D = useMemo(coWebGL, []);
+  MAU3D = dungMauLotus3D(); // màu theo theme, cập nhật cả scene đang mở
   const oNhiet: ONhiet[] = useMemo(() => o3d
     .filter((x) => x.tyLe != null)
     .map((x) => ({

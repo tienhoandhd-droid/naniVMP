@@ -24,7 +24,7 @@ import { OrthographicCamera, OrbitControls } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { qrmSeverity, qrmOccurrence, qrmLevel } from "../../utils/helpers.ts";
-import { coWebGL, docMauLotus3D } from "../../lib/lotus3dColors.ts";
+import { coWebGL, docMauLotus3D, dungMauLotus3D } from "../../lib/lotus3dColors.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
 import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
 import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
@@ -47,8 +47,13 @@ const VI_TRI: [number, number, number] = [3.2, 4.2, 7.4];
 
 /* Màu đọc từ token Lotus lúc nạp chunk (đợt 4 — hết hex "3D demo").
  * Đổi theme giữa phiên thì lần dựng scene sau mới ăn màu mới. */
-const MAU3D = docMauLotus3D();
-const MAU = { cao: MAU3D.danger, tb: MAU3D.warning, thap: MAU3D.success };
+let MAU3D = docMauLotus3D();
+/* getter: đọc MAU3D hiện hành mỗi lần render — theme đổi là màu đổi. */
+const MAU = {
+  get cao() { return MAU3D.danger; },
+  get tb() { return MAU3D.warning; },
+  get thap() { return MAU3D.success; },
+};
 
 export function dungKhoiRuiRo(acts: Activity[]): ORui[] {
   const o = new Map<string, ORui>();
@@ -175,8 +180,9 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
      thẩm định, mà WebGL thì không in được. */
   /* 2D mặc định (nghiên cứu (3) P0) — 3D là khám phá tự chọn. */
   const [kieu, setKieu] = useState<"3d" | "2d">("2d");
-  /* Không có WebGL: giấu hẳn cửa 3D, nói bằng tiếng Việt tử tế. */
+  /* Không có WebGL2: giấu hẳn cửa 3D, nói bằng tiếng Việt tử tế. */
   const ho3D = useMemo(coWebGL, []);
+  MAU3D = dungMauLotus3D();
   const oNhiet: ONhiet[] = useMemo(() => o3d.map((x) => ({
     hang: x.kn, cot: x.ng - 1, gt: x.n,
     ghiChu: `Nghiêm trọng ${x.ng} · ${TEN_KN[x.kn]}: ${x.n} hạng mục · RPN ${x.rpn}`,
