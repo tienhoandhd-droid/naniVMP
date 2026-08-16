@@ -5,13 +5,18 @@
  *  thì đến dần theo asset chủ dự án cấp. Luật: mood chưa có ảnh RIÊNG
  *  rơi về guide — không bao giờ vỡ ảnh, không cần đổi code nơi dùng.
  *
+ *  HIỆN TRẠNG (16/08): concern/celebrate là BẢN TẠM phái sinh từ chân
+ *  dung guide (concern: khung sát + tông trầm; celebrate: tông ấm sáng) —
+ *  ba mood đã tách file thật nhưng CHƯA khác dáng/biểu cảm. Khi có art
+ *  chính thức (xem docs/nghien-cuu/dat-hang-vali-v2.md) chỉ cần thay file.
+ *
  *  Khi nhận ảnh mới: tách nền → nén WebP alpha ≤80KB → đặt vào
  *  src/assets/brand/vali/vali-<mood>.webp → thêm tên vào MOOD_CO_ANH.
  *  (Không dùng import.meta.glob để node --test vẫn chạy được file này.)
  * ===================================================================== */
 
 /** Mood đã có ảnh riêng trên đĩa. */
-export const MOOD_CO_ANH: readonly string[] = ["guide"];
+export const MOOD_CO_ANH: readonly string[] = ["guide", "concern", "celebrate"];
 
 export function chonFileVali(mood: string): string {
   return MOOD_CO_ANH.includes(mood) ? mood : "guide";

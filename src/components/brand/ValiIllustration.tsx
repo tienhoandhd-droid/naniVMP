@@ -35,9 +35,8 @@ import { chonFileVali } from "./valiAssets.ts";
 
 const ANH_VALI: Record<string, string> = {
   guide: new URL("../../assets/brand/vali/vali-guide.webp", import.meta.url).href,
-  /* concern / celebrate: mở khoá khi chủ dự án cấp ảnh —
-   * concern: new URL("../../assets/brand/vali/vali-concern.webp", import.meta.url).href,
-   * celebrate: new URL("../../assets/brand/vali/vali-celebrate.webp", import.meta.url).href, */
+  concern: new URL("../../assets/brand/vali/vali-concern.webp", import.meta.url).href,
+  celebrate: new URL("../../assets/brand/vali/vali-celebrate.webp", import.meta.url).href,
 };
 
 /* Thân bị crop phẳng ở đáy khung — cho tan dần 12% cuối để cutout không
