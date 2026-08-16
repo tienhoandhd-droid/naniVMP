@@ -190,13 +190,24 @@ test("main.tsx nạp token sau index.css để cầu tương thích đè đượ
   assert.ok(viTriCu < viTriMoi, "lotus-tokens.css phải nạp sau index.css");
 });
 
-test("index.html chỉ còn nạp hai họ phông đang dùng", () => {
+test("index.html tự host đúng hai họ phông, không còn origin Google", () => {
+  // v5 hiệu năng (16/08): font tự host — không được còn bất kỳ tham chiếu
+  // fonts.googleapis/gstatic nào trên đường găng.
   const html = doc("index.html");
-  const link = html.match(/href="https:\/\/fonts\.googleapis\.com\/css2[^"]+"/)[0];
-  assert.match(link, /Cormorant\+Garamond:wght@500;600;700/);
-  assert.match(link, /Be\+Vietnam\+Pro:wght@400;500;600;700;800/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com\/css2|fonts\.gstatic\.com/,
+    "không được nạp font từ origin Google nữa");
+  const hoPhong = [...html.matchAll(/font-family: '([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(hoPhong)].sort(),
+    ["Be Vietnam Pro", "Cormorant Garamond"], "đúng hai họ phông tự host");
+  for (const w of ["400", "500", "600", "700", "800"]) {
+    assert.match(html, new RegExp(`BeVietnamPro-${w}-vietnamese\\.woff2`),
+      `Be Vietnam Pro ${w} phải có subset vietnamese`);
+  }
+  // Ghi chú lịch sử trong comment được phép nhắc tên phông cũ — chỉ cấm
+  // ngoài comment (link/style thật).
+  const khongComment = html.replace(/<!--[\s\S]*?-->/g, "");
   for (const bo of ["Baloo", "Poppins", "Quicksand"]) {
-    assert.doesNotMatch(link, new RegExp(bo), `${bo} không còn vai trò nào, không được tải`);
+    assert.doesNotMatch(khongComment, new RegExp(bo), `${bo} không còn vai trò nào, không được tải`);
   }
 });
 
