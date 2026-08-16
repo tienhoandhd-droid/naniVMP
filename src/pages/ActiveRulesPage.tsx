@@ -193,8 +193,11 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       </Card>
 
       {/* Điểm trọng yếu */}
+      {/* Sub ghi đúng nguồn hiện tại: Supabase là dữ liệu gốc từ 03/08 —
+          tab Sheet cũ chỉ còn là tham chiếu lịch sử, nói "lấy từ Sheet"
+          là mô tả một hệ đã không còn tồn tại. */}
       <Section icon={Calculator} title="Điểm trọng yếu"
-        sub="Công thức lấy từ tab '0.Rule timeline VMP' trong Google Sheet">
+        sub="Chốt trong database (migration rules_page_score_definitions) — nguồn gốc lịch sử là tab '0.Rule timeline VMP', nay Sheet chỉ còn tham chiếu">
         <div style={{ padding: "12px 14px", borderRadius: 14, background: C.lavSoft,
                       color: C.lavText, fontFamily: TEXT, fontSize: 14, fontWeight: 800,
                       marginBottom: 14 }}>
@@ -255,8 +258,10 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
                     ))}
                     <div style={{ marginTop: 3, fontWeight: 700,
                                   color: tapTrung >= 90 ? C.raspText : C.skyText }}>
+                      {/* Không emoji nghiệp vụ (hiến pháp Atelier §5) —
+                          màu chữ đã mang tín hiệu, chữ nói rõ mức độ. */}
                       {tapTrung >= 90
-                        ? `⚠️ ${tapTrung}% dồn vào một mức — trục này gần như không phân biệt`
+                        ? `${tapTrung}% dồn vào một mức — trục này gần như không phân biệt`
                         : `Phân tán tốt (mức đông nhất ${tapTrung}%)`}
                     </div>
                   </div>
@@ -322,12 +327,28 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
         ]} />
       </Section>
 
-      {/* Phân quyền */}
+      {/* Phân quyền — sáu vai nghiệp vụ đọc từ bảng vmp_screen_permissions
+          (RPC mới); RPC cũ trả bốn vai gõ cứng thì vẫn hiển thị được. */}
       <Section icon={Lock} title="Phân quyền"
-        sub="Kiểm tra nằm phía server trong RPC — giao diện chỉ ẩn nút cho gọn, không phải lớp bảo mật">
+        sub="Đọc từ bảng quyền màn hình — kiểm tra nằm phía server trong RPC, giao diện chỉ ẩn nút cho gọn, không phải lớp bảo mật">
+        {rules.phan_quyen_che_do && (
+          <div style={{ padding: "10px 13px", borderRadius: 14, marginBottom: 12,
+                        background: /enforced/i.test(rules.phan_quyen_che_do) ? C.mintSoft : C.marigoldSoft,
+                        color: /enforced/i.test(rules.phan_quyen_che_do) ? C.mintText : C.marigoldText,
+                        fontSize: 12, fontFamily: TEXT, fontWeight: 700, lineHeight: 1.6 }}>
+            Chế độ quyền màn hình: {rules.phan_quyen_che_do}
+          </div>
+        )}
         <Rows rows={rules.phan_quyen.map((x) => [
           <code key={x.vai_tro} style={{ fontSize: 12 }}>{x.vai_tro}</code>, x.quyen,
         ])} />
+        {rules.phan_quyen_ghi_chu && (
+          <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 14,
+                        background: C.skySoft, color: C.skyText,
+                        fontSize: 12, fontFamily: TEXT, lineHeight: 1.65 }}>
+            {rules.phan_quyen_ghi_chu}
+          </div>
+        )}
       </Section>
 
       {/* Toàn vẹn dữ liệu */}

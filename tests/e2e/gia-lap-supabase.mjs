@@ -331,10 +331,39 @@ export function dungKhoDuLieu(kichBan) {
       ma_tam: [],
     },
     rpc_get_audit_logs: [],
+    /* Hình dạng khớp RPC mới (20260816100000): phân quyền 6 vai đọc từ
+       bảng + chế độ áp dụng. Trang Luật phải hiện đủ 6 vai. */
     rpc_active_rules: {
-      deadline_rules: day ? [{ code: "R1", name: "Hạn đề cương trước 30 ngày", value: 30 }] : [],
-      alert_rules: [],
-      updated_at: "2026-08-15T02:00:00Z",
+      cap_nhat: "2026-08-15T02:00:00Z",
+      diem_trong_yeu: {
+        cong_thuc: "Điểm trọng yếu = Điểm mức độ phức tạp × Điểm ảnh hưởng tới chất lượng sản phẩm",
+        thang: "1 … 9",
+        phuc_tap: [{ muc: "Cao", diem: 3, mo_ta: "Hệ nhiều thành phần", vi_du: "LAF" }],
+        anh_huong: [{ muc: "Trực tiếp", diem: 3, mo_ta: "Chạm sản phẩm", vi_du: "Khí nén" }],
+        phan_bo: day ? [{ diem: 9, so_luong: 3 }, { diem: 3, so_luong: 5 }] : [],
+        da_duyet: day ? 5 : 0, cho_duyet: day ? 3 : 0,
+      },
+      sinh_timeline: {
+        loc: "Chỉ sinh cho đối tượng có Thẩm định = y",
+        loai_tham_dinh: [{ phan_loai: "Thiết bị", loai: "IQ/OQ/PQ" }],
+        lan_dau: "Năm nhập = năm thẩm định", so_lan_trong_nam: "max(1, 12 ÷ tần suất)",
+        ma_id: "{Mã}/{Năm}.{Lần}-{Loại}",
+        moc_thoi_gian: ["T = ngày cuối tháng đích", "Hạn báo cáo = T − 5 ngày"],
+        khoang_cach_bao_cao: [{ dieu_kien: "Phân loại báo cáo: A", ngay: 10 }],
+      },
+      phan_quyen: [
+        { vai_tro: "Quản trị (admin)", quyen: "Thấy 17/17 màn · phạm vi dữ liệu: toàn hệ thống" },
+        { vai_tro: "Quản lý QA (qa_manager)", quyen: "Thấy 17/17 màn · phạm vi dữ liệu: toàn hệ thống" },
+        { vai_tro: "QA (qa_staff)", quyen: "Thấy 14/17 màn · phạm vi dữ liệu: toàn hệ thống" },
+        { vai_tro: "Quản lý xưởng (workshop_manager)", quyen: "Thấy 9/17 màn · phạm vi: theo xưởng" },
+        { vai_tro: "Nhân viên xưởng (workshop_staff)", quyen: "Thấy 6/17 màn · phạm vi: được phân công" },
+        { vai_tro: "Chỉ xem (viewer)", quyen: "Thấy 8/17 màn · chỉ đọc" },
+      ],
+      phan_quyen_che_do: "Đang đối chiếu (preview) — chưa khoá ai, chỉ ghi nhận lệch",
+      phan_quyen_ghi_chu: "Ma trận đầy đủ xem và sửa ở màn Phân quyền & trách nhiệm.",
+      toan_ven_du_lieu: ["Mọi thao tác ghi đi qua RPC kiểm quyền phía server"],
+      so_lieu_hien_tai: { doi_tuong_nguon: doiTuong.length, co_tham_dinh: doiTuong.length,
+        hang_muc: soHangMuc, ban_ghi_audit: day ? 8 : 0 },
     },
     rpc_trang_thai_he_thong: {
       supabase: "ok", n8n: "ok", last_sync: "2026-08-15T02:00:00Z",

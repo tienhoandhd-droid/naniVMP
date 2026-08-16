@@ -26,8 +26,19 @@
 /* Tham chiếu ảnh bằng new URL thay vì `import ... from "*.webp"`: Vite
  * vẫn nhận diện và bundle như thường, còn `node --test` (không có loader
  * ảnh) chỉ tạo một chuỗi URL — hai unit test của Workload từng chết vì
- * import chuỗi tài sản này. */
-const chanDung = new URL("../../assets/brand/vali-chan-dung.webp", import.meta.url).href;
+ * import chuỗi tài sản này.
+ *
+ * V2 (phương án C): mỗi mood một file trong assets/brand/vali/; mood chưa
+ * có ảnh riêng rơi về guide (luật ở valiAssets.ts — có unit test). CHỈ
+ * khai new URL cho file TỒN TẠI, vì Vite build gãy với asset thiếu. */
+import { chonFileVali } from "./valiAssets.ts";
+
+const ANH_VALI: Record<string, string> = {
+  guide: new URL("../../assets/brand/vali/vali-guide.webp", import.meta.url).href,
+  /* concern / celebrate: mở khoá khi chủ dự án cấp ảnh —
+   * concern: new URL("../../assets/brand/vali/vali-concern.webp", import.meta.url).href,
+   * celebrate: new URL("../../assets/brand/vali/vali-celebrate.webp", import.meta.url).href, */
+};
 
 /* Thân bị crop phẳng ở đáy khung — cho tan dần 12% cuối để cutout không
  * thành "sticker bị cắt cụt". */
@@ -57,7 +68,7 @@ export default function ValiIllustration({
 
   return (
     <img
-      src={chanDung}
+      src={ANH_VALI[chonFileVali(mood)] ?? ANH_VALI.guide}
       width={rong}
       height={rong * 1.25}
       className={`lp-vali-enter${className ? ` ${className}` : ""}`}

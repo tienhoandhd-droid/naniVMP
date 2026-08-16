@@ -573,6 +573,10 @@ export interface ActiveRules {
     khoang_cach_bao_cao: Array<{ dieu_kien: string; ngay: number }>;
   };
   phan_quyen: Array<{ vai_tro: string; quyen: string }>;
+  /** Chế độ áp quyền màn hình (preview/enforced) — RPC mới mới có. */
+  phan_quyen_che_do?: string;
+  /** Ghi chú nơi xem/sửa ma trận đầy đủ — RPC mới mới có. */
+  phan_quyen_ghi_chu?: string;
   toan_ven_du_lieu: string[];
   so_lieu_hien_tai: {
     doi_tuong_nguon: number; co_tham_dinh: number;
@@ -605,6 +609,8 @@ export async function fetchActiveRules(): Promise<ActiveRules> {
       ma_id: "", moc_thoi_gian: [], khoang_cach_bao_cao: [],
     }),
     phan_quyen: mang(tho.phan_quyen),
+    phan_quyen_che_do: typeof tho.phan_quyen_che_do === "string" ? tho.phan_quyen_che_do : undefined,
+    phan_quyen_ghi_chu: typeof tho.phan_quyen_ghi_chu === "string" ? tho.phan_quyen_ghi_chu : undefined,
     toan_ven_du_lieu: mang(tho.toan_ven_du_lieu),
     so_lieu_hien_tai: obj(tho.so_lieu_hien_tai, {
       doi_tuong_nguon: 0, co_tham_dinh: 0, hang_muc: 0, ban_ghi_audit: 0,

@@ -114,8 +114,24 @@
   animation: lp-vali-enter 420ms var(--lp-ease) 1 both;
 }
 
+/* V2 — micro-animation MỘT LẦN theo mood (ADR-VALI-001: không loop):
+ *  · concern hiện thẳng — tình huống nghiêm túc không chào sân;
+ *  · celebrate thêm một nhịp sáng nhẹ sau khi vào (glint diadem). */
+[data-lp-vali="concern"].lp-vali-enter { animation-duration: 0ms; }
+
+@keyframes lp-vali-glint {
+  0%, 100% { filter: none; }
+  50% { filter: brightness(1.07) saturate(1.04); }
+}
+[data-lp-vali="celebrate"].lp-vali-enter {
+  animation:
+    lp-vali-enter 420ms var(--lp-ease) 1 both,
+    lp-vali-glint 900ms ease-in-out 600ms 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .lp-vali-enter { animation: none; }
+  .lp-vali-enter,
+  [data-lp-vali].lp-vali-enter { animation: none; }
 }
 
 /* --- Màn hẹp: tắt art. Điện thoại không có art-safe zone nào đủ rộng,

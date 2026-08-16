@@ -654,6 +654,25 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
+/* ---- 3l. Trang Luật: phân quyền đúng 6 vai hiện hành ---------------- */
+{
+  console.log("\nLuật đang áp dụng — 6 vai:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=rules`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2400));
+  const chu = await trang.evaluate(() => document.querySelector("main")?.innerText || "");
+  kiem(["workshop_manager", "workshop_staff", "qa_staff"].every((v) => chu.includes(v)),
+    "phân quyền liệt kê đủ các vai nghiệp vụ mới", chu.includes("workshop_manager") ? "" : "(thiếu vai xưởng)");
+  kiem(!chu.includes("department_user"), "không còn vai cũ department_user");
+  kiem(/Chế độ quyền màn hình/.test(chu), "hiện chế độ áp quyền (preview/enforced)");
+  kiem(!/Google Sheet'?\s*$/m.test(chu) && /Sheet chỉ còn tham chiếu/.test(chu),
+    "nguồn công thức ghi đúng: database là gốc, Sheet chỉ tham chiếu");
+  await trang.close();
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");
