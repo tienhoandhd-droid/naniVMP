@@ -5727,7 +5727,7 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-vongnam-than > * { min-width: 0; }
 @container (max-width: 660px) {
   .vmp-vongnam-than { grid-template-columns: 1fr; gap: 18px; }
-  .vmp-vongnam-vong { max-width: 300px; margin: 0 auto; }
+  .vmp-vongnam-vong { max-width: 348px; margin: 0 auto; }
 }
 .vmp-vongnam-vong {
   position: relative;
@@ -5758,7 +5758,7 @@ body { transition: background var(--mo-slow) var(--ease); }
 
 @media (max-width: 768px) {
   .vmp-vongnam-than { grid-template-columns: 1fr; }
-  .vmp-vongnam-vong { max-width: 300px; margin: 0 auto; }
+  .vmp-vongnam-vong { max-width: 348px; margin: 0 auto; }
 }
 
 /* =====================================================================

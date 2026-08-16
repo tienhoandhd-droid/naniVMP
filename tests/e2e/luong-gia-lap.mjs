@@ -569,6 +569,19 @@ for (const [id, ten] of MAN) {
   });
   kiem(chong.length === 0, "không phần tử chữ nào bị phần tử khác đè",
     chong.slice(0, 3).join(" | ") || "");
+
+  /* Nhãn Vòng năm không được tràn khung svg — đã dính thật với "T3 40"
+     (nhãn mang số dài ra, sườn phải bị cắt, phản hồi chủ dự án 16/08). */
+  const nhanTran = await trang.evaluate(() => {
+    const svg = document.querySelector(".vmp-vongnam-svg")?.getBoundingClientRect();
+    if (!svg) return ["(không thấy vòng năm)"];
+    return [...document.querySelectorAll(".vmp-vongnam-svg text")].filter((x) => {
+      const r = x.getBoundingClientRect();
+      return r.left < svg.left - 1 || r.right > svg.right + 1;
+    }).map((x) => x.textContent || "");
+  });
+  kiem(nhanTran.length === 0, "nhãn Vòng năm nằm trọn trong khung",
+    nhanTran.join(" | "));
   await trang.close();
 }
 

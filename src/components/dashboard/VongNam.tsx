@@ -64,8 +64,10 @@ export function dungVongNam(acts: Activity[], nam: number): OThangNam[] {
 
 /* Khung rộng hơn vòng để chừa chỗ cho nhãn tháng. Bản trước S=268 với nhãn
    đặt ở bán kính 131 — chữ "T10" neo giữa nên tràn ra ngoài mép trái và bị
-   cắt mất chữ T. */
-const S = 300;
+   cắt mất chữ T. Nâng tiếp 300 → 348 khi nhãn mang thêm SỐ (16/08): "T3 40"
+   ở sườn phải dài gấp đôi "T3", lại tràn mép — dữ liệu thật đã lộ đúng lỗi
+   này ở tháng đỉnh 40 hạng mục. 348 đủ cho "T10 999". */
+const S = 348;
 const CX = S / 2;
 const CY = S / 2;
 const R0 = 76;      // vòng gốc — mọi cột đo từ đây (đủ rộng cho chữ giữa vòng)
