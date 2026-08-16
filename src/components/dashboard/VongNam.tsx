@@ -206,10 +206,17 @@ export default function VongNam({ acts, rate, total, ben }: {
                 và tháng hiện tại vẫn được nhấn đậm để mắt có điểm neo. */}
             {o.map((x) => {
               const giua = gocThang(x.thang) + 15;
-              const [tx, ty] = toaDo(RMAX + 16, giua);
+              /* Chữ trải NGANG còn bán kính tính XUYÊN TÂM: nhãn hai bên
+                 sườn neo giữa sẽ lấn mép trong vào cánh dài (dữ liệu thật
+                 "T3 40" đè lên cánh T3 — phản hồi chủ dự án 16/08). Sườn
+                 phải neo start, sườn trái neo end — chữ mọc HƯỚNG RA
+                 NGOÀI vòng; chỉ đỉnh/đáy mới neo giữa. */
+              const cosGiua = Math.cos((giua * Math.PI) / 180);
+              const neo = cosGiua > 0.35 ? "start" : cosGiua < -0.35 ? "end" : "middle";
+              const [tx, ty] = toaDo(neo === "middle" ? RMAX + 16 : RMAX + 5, giua);
               const nhan = x.thang === dinh.thang || x.dangChay;
               return (
-                <text key={`nhan-${x.thang}`} x={tx} y={ty + 3.4} textAnchor="middle"
+                <text key={`nhan-${x.thang}`} x={tx} y={ty + 3.4} textAnchor={neo}
                   fontFamily={TEXT} fontSize={nhan ? 13 : 12}
                   fontWeight={nhan ? 900 : 700}
                   fill={x.thang === dinh.thang ? C.raspText : C.plumSoft}>
