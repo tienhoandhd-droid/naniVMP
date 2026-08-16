@@ -198,8 +198,10 @@ export default function VongNam({ acts, rate, total, ben }: {
               );
             })}
 
-            {/* Nhãn tháng chạy quanh vành. Tháng nặng nhất và tháng hiện tại
-                được ghi kèm số — hai chỗ mắt cần, không phải cả mười hai. */}
+            {/* Nhãn tháng chạy quanh vành — MỌI tháng có hạng mục đều ghi
+                số (yêu cầu chủ dự án 16/08: vòng phải thể hiện hết số,
+                không bắt người đọc rê chuột hay mở bảng). Tháng nặng nhất
+                và tháng hiện tại vẫn được nhấn đậm để mắt có điểm neo. */}
             {o.map((x) => {
               const giua = gocThang(x.thang) + 15;
               const [tx, ty] = toaDo(RMAX + 16, giua);
@@ -209,7 +211,7 @@ export default function VongNam({ acts, rate, total, ben }: {
                   fontFamily={TEXT} fontSize={nhan ? 13 : 12}
                   fontWeight={nhan ? 900 : 700}
                   fill={x.thang === dinh.thang ? C.raspText : C.plumSoft}>
-                  {MONTHS[x.thang]}{nhan ? ` ${x.tong}` : ""}
+                  {MONTHS[x.thang]}{x.tong > 0 ? ` ${x.tong}` : ""}
                 </text>
               );
             })}
