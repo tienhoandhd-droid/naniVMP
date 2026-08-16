@@ -6908,16 +6908,6 @@ main li,
   flex-direction: column;
   gap: 10px;
 }
-.tl-inspector__trong {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
-  padding: 14px 6px;
-  font-size: 13px;
-  color: var(--lp-ink-muted);
-}
 .tl-inspector__dau {
   display: flex;
   align-items: center;

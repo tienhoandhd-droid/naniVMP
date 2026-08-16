@@ -372,13 +372,14 @@ for (const [id, ten] of MAN) {
   });
   await new Promise((r) => setTimeout(r, 800));
 
-  /* Chưa chọn gì: pane vẫn có mặt và hướng dẫn, không phải khoảng trắng. */
-  const truocChon = await trang.evaluate(() => {
-    const pane = document.querySelector("[data-timeline-inspector]");
-    return { co: !!pane, chu: pane?.textContent?.trim().length || 0 };
-  });
-  kiem(truocChon.co, "pane inspector có mặt ở màn rộng");
-  kiem(truocChon.chu > 20, "pane chưa chọn vẫn có hướng dẫn", `${truocChon.chu} ký tự`);
+  /* Chưa chọn gì: KHÔNG có pane — bảng dùng trọn bề ngang (màn GMP,
+     yêu cầu chủ dự án 16/08: minh hoạ không được lấy cột của dữ liệu). */
+  const truocChon = await trang.evaluate(() => ({
+    coPane: !!document.querySelector("[data-timeline-inspector]"),
+    coVali: !!document.querySelector(".timeline-page-shell [data-lp-vali]"),
+  }));
+  kiem(!truocChon.coPane, "chưa chọn hàng thì KHÔNG chiếm cột pane");
+  kiem(!truocChon.coVali, "không có Vali trong màn dòng thời gian");
 
   /* Bấm một hàng: chi tiết đổ sang pane, KHÔNG bật modal. */
   const maHang = await trang.evaluate(() => {

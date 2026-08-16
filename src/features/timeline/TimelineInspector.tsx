@@ -13,7 +13,6 @@
 import { DEPTS } from "../../constants/vmp.ts";
 import { fmtVN, phaseStates, parseD } from "../../utils/helpers.ts";
 import { Pill } from "../../components/ui/Primitives.tsx";
-import ValiIllustration from "../../components/brand/ValiIllustration.tsx";
 import { issueLevel, laSapDenHan } from "./timelineSummaryModel.ts";
 import type { Activity } from "../../types/domain.ts";
 
@@ -28,19 +27,10 @@ export default function TimelineInspector({ a, chuSoHuu, onDong, onHoSo }: {
   onDong: () => void;
   onHoSo: (a: Activity) => void;
 }) {
-  if (!a) {
-    return (
-      <aside className="tl-inspector" data-timeline-inspector aria-label="Chi tiết hạng mục đang chọn">
-        <div className="tl-inspector__trong">
-          <ValiIllustration mood="guide" size={110} />
-          <p>
-            Chọn một hạng mục trong bảng để xem mốc, người phụ trách và
-            tình trạng tại đây — không cần mở cửa sổ che dữ liệu.
-          </p>
-        </div>
-      </aside>
-    );
-  }
+  /* Chưa chọn gì thì KHÔNG render pane (yêu cầu chủ dự án 16/08): trên
+     màn dữ liệu GMP, một cột trống có minh hoạ là một cột bị lấy mất của
+     bảng. Bảng chiếm toàn bộ bề ngang; pane chỉ mở khi bấm một hàng. */
+  if (!a) return null;
 
   const ps = phaseStates(a);
   const muc = issueLevel(a);

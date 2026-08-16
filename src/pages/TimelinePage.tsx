@@ -1950,9 +1950,9 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
           onNextQuarter={goNextQuarter}
         />
 
-        {/* Supporting pane ≥1600 (nghiên cứu đợt 2): sơ đồ bên trái 8 phần,
-            inspector bên phải 4 phần — cùng khung với màn Hôm nay. */}
-        <div className={manRong ? "lp-supporting-layout" : undefined}>
+        {/* Supporting pane ≥1600: chỉ chia 8/4 khi ĐÃ chọn một hạng mục —
+            chưa chọn thì bảng dùng trọn bề ngang (màn GMP, dữ liệu trước). */}
+        <div className={manRong && chon ? "lp-supporting-layout" : undefined}>
         <div className="timeline-map-surface">
           <div className="timeline-map-surface__head">
             <div>
@@ -1992,10 +1992,10 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
             tableStage={tableStage}
           />
         </div>
-        {manRong && (
+        {manRong && chon && (
           <TimelineInspector
             a={chon}
-            chuSoHuu={chon ? ownerOf(chon) : ""}
+            chuSoHuu={ownerOf(chon)}
             onDong={() => setChon(null)}
             onHoSo={setDetail}
           />
