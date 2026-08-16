@@ -25,7 +25,7 @@ export function layRef(url) {
 /** Mật khẩu "đúng" của người kiểm thử — bộ đổi-mật-khẩu re-auth với nó. */
 export const MAT_KHAU_DUNG = "mat-khau-dung";
 
-const NGUOI_DUNG = {
+export const NGUOI_DUNG = {
   id: "00000000-0000-4000-8000-000000000001",
   aud: "authenticated",
   role: "authenticated",
@@ -454,7 +454,7 @@ export function dungKhoDuLieu(kichBan) {
  * loopback và Google Fonts đều bị chặn — nếu một request lạ lọt ra ngoài
  * thì nó bị huỷ, và số lần huỷ được trả về để bộ kiểm tự tố cáo chính nó.
  */
-export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho } = {}) {
+export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho, doTre } = {}) {
   const kho = dungKhoDuLieu(kichBan);
   /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống viewer để
      kiểm "không thấy nút ghi". Sửa tại chỗ, không trả kho ra ngoài. */
@@ -476,7 +476,18 @@ export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho } 
     if (laNoiBo) { req.continue(); return; }
     if (laFont && req.method() === "GET") { req.continue(); return; }
 
-    if (u.host === hostSupabase) { req.respond(traLoi(kho, u, req)); return; }
+    if (u.host === hostSupabase) {
+      const phanHoi = traLoi(kho, u, req);
+      /* doTre: { ten_rpc: ms } — giả lập mạng chậm cho TỪNG RPC, để kiểm
+         được trạng thái trung gian (vẽ sớm từ bản lưu, banner đang tải).
+         Không trễ preflight OPTIONS: trình duyệt chờ preflight xong mới
+         gửi request thật, trễ cả hai là nhân đôi ngoài ý muốn. */
+      const rpc = u.pathname.match(/\/rest\/v1\/rpc\/([a-z0-9_]+)/i);
+      const ms = rpc && doTre && req.method() !== "OPTIONS" ? doTre[rpc[1]] : 0;
+      if (ms > 0) setTimeout(() => { req.respond(phanHoi).catch(() => {}); }, ms);
+      else req.respond(phanHoi);
+      return;
+    }
 
     // Bất cứ thứ gì khác: chặn và ghi sổ. Bộ kiểm không được phép gọi ra
     // ngoài — nhất là tới production hay webhook n8n.

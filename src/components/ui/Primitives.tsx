@@ -747,7 +747,11 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
   if (conn.status === "ok" && lastSync) return null;
   const isErr = conn.status === "err";
 
-  const noiDung = conn.status === "loading" ? "Đang tải dữ liệu…"
+  /* Đang loading mà màn hình đã có số (vẽ sớm từ bản lưu) thì phải nói
+     đúng điều đang xảy ra — conn.msg lúc đó là "Đang hiện bản lưu lúc…".
+     Hét "Đang tải dữ liệu…" đè lên số liệu đang hiện là tự mâu thuẫn, và
+     chính là thứ người dùng than "nút đang tải hiện rất lâu". */
+  const noiDung = conn.status === "loading" ? (conn.msg || "Đang tải dữ liệu…")
     : isErr ? `Lỗi kết nối: ${conn.msg}`
       : "Dữ liệu chưa tải. Bấm Làm mới để tải.";
 
