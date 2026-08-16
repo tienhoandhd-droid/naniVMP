@@ -164,10 +164,14 @@ export default function VongNam({ acts, rate, total, ben }: {
           <svg viewBox={`0 0 ${S} ${S}`} role="img" aria-label={moTa} className="vmp-vongnam-svg">
             {/* Rãnh nền: bề rộng tối đa của một tháng. Có rãnh thì mắt biết
                 cột dài tới đâu là "đầy", không có thì không có mốc so. */}
+            {/* Rãnh phải THOẢNG như trước token v3 (yêu cầu chủ dự án
+                16/08): surface-2 đậm lên làm cả vòng thành hình tròn đặc
+                đối xứng, nuốt mất các cánh dài ngắn — mà độ dài cánh mới
+                là nội dung. Hạ opacity trả lại thế bất đối xứng. */}
             {o.map((x) => (
               <path key={`ranh-${x.thang}`}
                 d={quat(R0, RMAX, gocThang(x.thang) + KHE, gocThang(x.thang + 1) - KHE)}
-                fill={C.surfaceSunk} />
+                fill={C.surfaceSunk} opacity={0.45} />
             ))}
 
             {o.map((x) => {

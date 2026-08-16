@@ -73,6 +73,9 @@ for (const che of ["light", "dark"] as const) {
       await page.goto(`/#v=${hash}`);
       // Chờ dữ liệu giả lập đổ xong và mọi skeleton biến mất.
       await page.waitForTimeout(3000);
+      /* Font web nạp muộn làm chữ đổi metric giữa hai lần chụp — nguồn
+         flake thật đã gặp ở 1920 (title dịch ~6px, cả trang lệch theo). */
+      await page.evaluate(() => document.fonts.ready);
       await expect(page).toHaveScreenshot(`${ten}-${che}.png`, { fullPage: true });
     });
   }
@@ -84,5 +87,6 @@ test("dang-nhap · light", async ({ page }) => {
   await page.addInitScript(() => localStorage.clear());
   await page.goto("/");
   await page.waitForTimeout(1500);
+  await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("dang-nhap-light.png", { fullPage: true });
 });
