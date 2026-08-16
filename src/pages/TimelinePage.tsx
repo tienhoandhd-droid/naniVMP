@@ -11,8 +11,8 @@ import {
   Search,
 } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
-import { CLS, DEPTS, CRIT, MONTHS, PHASE_COLOR, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
-import { parseD, fmtVN, milestones, phaseStates, addDays, clamp, wlIsDone } from "../utils/helpers.ts";
+import { CLS, DEPTS, CRIT, MONTHS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
+import { parseD, fmtVN, milestones, addDays, clamp, wlIsDone } from "../utils/helpers.ts";
 import { useDebounce } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, Modal, Pill, phaseTag, CauKetLuan } from "../components/ui/Primitives.tsx";
 import { btnPrimary } from "../constants/theme.ts";
@@ -26,7 +26,7 @@ import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 import { nhapCoThuLai } from "../lib/tailMan.ts";
 const WorkloadSpace3D = lazy(nhapCoThuLai(() => import("../components/three/WorkloadSpace3D.tsx")));
 import type { ReactNode } from "react";
-import type { Activity, Milestones } from "../types/domain.ts";
+import type { Activity } from "../types/domain.ts";
 import type { WorkloadCell } from "../lib/workloadMap.ts";
 
 // Các "không gian làm việc" gộp chung dưới menu Timeline VMP: timeline sâu +
@@ -62,11 +62,9 @@ const DENSITY_LABELS = {
   comfortable: "Đầy đủ",
 };
 
-const CHART_LABELS = {
-  table: "Bảng ngày tổng hợp",
-  stage: "Sơ đồ 3 mốc",
-  hybrid: "Sơ đồ + Gantt",
-};
+/* Dọn 16/08 (nghiên cứu 1+2): hai kiểu vẽ "Sơ đồ 3 mốc" và "Sơ đồ +
+ * Gantt" đã BỎ — cả ba cùng vẽ một bộ dữ liệu, bảng ngày tổng hợp là
+ * mặt duy nhất; logic đáng giữ của chúng đã nằm trong bảng + strip. */
 
 const TABLE_STAGE_LABELS = {
   all: "Tổng hợp",
@@ -82,23 +80,10 @@ const TABLE_STAGE_SHORT_LABELS = {
   vmp: "VMP",
 };
 
-const PHASES = [
-  { key: "p", id: "protocol", label: "Đề cương", short: "ĐC", from: "protocol", to: "validation" },
-  { key: "v", id: "validation", label: "Thẩm định thực tế", short: "TT", from: "validation", to: "report" },
-  { key: "r", id: "report", label: "Báo cáo", short: "BC", from: "report", to: "target" },
-];
-
 const MAP_STAGES = [
   { id: "protocol", label: "Đề cương", short: "ĐC", field: "tt_de_cuong", actual: "ngay_de_cuong", due: "protocol" },
   { id: "validation", label: "Thẩm định thực tế", short: "TT", field: "tt_tham_dinh", actual: "ngay_tham_dinh", due: "validation" },
   { id: "vmp", label: "Hoàn thành VMP", short: "VMP", field: "tt_vmp", actual: "ngay_vmp", due: "target" },
-];
-
-const MILESTONES = [
-  { id: "protocol", label: "Hạn đề cương", short: "ĐC", color: C.sky },
-  { id: "validation", label: "Hạn thẩm định thực tế", short: "TT", color: C.marigold },
-  { id: "report", label: "Hạn báo cáo", short: "BC", color: C.pink },
-  { id: "target", label: "Đích VMP", short: "VMP", color: C.lav },
 ];
 
 /** Khoảng thời gian đang hiển thị trên trục timeline. */
@@ -120,12 +105,6 @@ function startOfDay(d: Date | null | undefined): Date | null {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
-}
-
-function maxDate(a: Date | null, b: Date | null): Date | null {
-  if (!a) return b;
-  if (!b) return a;
-  return a > b ? a : b;
 }
 
 function minDate(a: Date | null, b: Date | null): Date | null {
@@ -166,13 +145,6 @@ function intersectsRange(
   const s = startOfDay(start)!;
   const e = startOfDay(end)!;
   return e >= startOfDay(range.start)! && s <= startOfDay(range.end)!;
-}
-
-function chartWidthFor(view: string, density: string): number {
-  const compact = density === "compact";
-  if (view === "month") return compact ? 900 : 1040;
-  if (view === "quarter") return compact ? 980 : 1120;
-  return compact ? 1120 : 1320;
 }
 
 function rangeFor(view: string, focusMonth: number | null, year: number): TimeRange {
@@ -242,15 +214,6 @@ function taskWindow(a: Activity) {
   const start = safeDate(m.protocol, fallback);
   const end = safeDate(m.target, fallback);
   return { m, start, end };
-}
-
-function phaseProgress(a: Activity): number {
-  const r = (a._raw || {}) as Record<string, unknown>;
-  if (a.st === "done" || wlIsDone(r.tt_vmp)) return 100;
-  if (wlIsDone(r.tt_bao_cao)) return 82;
-  if (wlIsDone(r.tt_tham_dinh)) return 58;
-  if (wlIsDone(r.tt_de_cuong)) return 34;
-  return (PROG as Record<string, number>)[a.st] || 8;
 }
 
 /* issueLevel đã DỜI sang features/timeline/timelineSummaryModel.ts (bước
@@ -666,56 +629,6 @@ export function TimelineRangeRail({ items, range, view, onFocusBand }: {
             </button>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-function TimelineMapStage({ a, stage }: { a: Activity; stage: (typeof MAP_STAGES)[number] }) {
-  const state = stageState(a, stage);
-  const date = state.done ? (state.actual || state.due) : state.due;
-  return (
-    <div
-      className={`timeline-map-stage timeline-map-stage--${stage.id} timeline-map-stage--${state.heat}`}
-      title={`${stage.label}: ${state.label} · Mốc ${fmtVN(state.due)}`}
-    >
-      <span>{stage.short}</span>
-      <strong>{state.label}</strong>
-      <small className="tnum">{fmtVN(date)}</small>
-    </div>
-  );
-}
-
-function TimelineMapRowContent({ a }: { a: Activity }) {
-  const cls = (CLS as Record<string, typeof CLS.tb>)[String(a.cls ?? "tb")] || CLS.tb;
-  const dept = DEPTS.find((d) => d.id === a.dept);
-  const target = parseD(a.target);
-  const owner = ownerOf(a);
-
-  return (
-    <div className="timeline-map-content">
-      <div className="timeline-map-target">
-        <span>Đích VMP</span>
-        <strong className="tnum">{fmtVN(target)}</strong>
-      </div>
-
-      <div className="timeline-map-info">
-        <div className="timeline-map-info__top">
-          <Tag color={cls.text} bg={cls.soft}>{a.vtype}</Tag>
-          <span className="timeline-card-code">{a.code}</span>
-        </div>
-        <div className="timeline-map-name">{a.name}</div>
-        <div className="timeline-map-meta">
-          <span>{owner}</span>
-          <span>{dept?.short || a.dept || "—"}</span>
-          <span>{a.crit || "TB"}</span>
-        </div>
-      </div>
-
-      <div className="timeline-map-stages">
-        {MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => (
-          <TimelineMapStage key={stage.id} a={a} stage={stage} />
-        ))}
       </div>
     </div>
   );
@@ -1264,118 +1177,6 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
   );
 }
 
-function TimelineStageBoard({ items, onOpen, density }: {
-  items: Activity[]; onOpen: (a: Activity) => void; density: string;
-}) {
-  if (!items.length) {
-    return (
-      <div className="timeline-card-board-empty">
-        Không có hạng mục nào trong khung thời gian/bộ lọc hiện tại.
-      </div>
-    );
-  }
-
-  return (
-    <div className={`timeline-map-board timeline-map-board--${density}`}>
-      <div className="timeline-map-list vmp-scroll">
-        {items.map((a: Activity) => (
-          <button
-            type="button"
-            key={a.id}
-            className={`timeline-map-row timeline-map-row--${issueLevel(a)}`}
-            onClick={() => onOpen && onOpen(a)}
-            title={`${a.code} · ${a.name}\nĐích VMP: ${fmtVN(parseD(a.target))}`}
-          >
-            <TimelineMapRowContent a={a} />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HybridChartCell({ a, range, width }: { a: Activity; range: TimeRange; width: number }) {
-  const ps = phaseStates(a);
-  const { m, start, end } = taskWindow(a);
-
-  return (
-    <div className="timeline-chart-cell timeline-hybrid-chart" style={{ width, flexBasis: width }}>
-      <ScaleBands range={range} />
-      <TodayLine range={range} />
-      <div className="timeline-task-window" style={{
-        left: `${pctInRange(start, range)}%`,
-        width: `${Math.max(.8, pctInRange(end, range) - pctInRange(start, range))}%`,
-      }} />
-      {PHASES.map((seg) => <PhaseSegment key={seg.id} seg={seg} ps={ps} m={m} range={range} />)}
-      {MILESTONES.map((ms) => (
-        <MilestoneDot key={ms.id} milestone={ms}
-          date={(m as unknown as Record<string, Date | null>)[ms.id]} range={range} />
-      ))}
-      <ProgressPin a={a} start={start} end={end} range={range} />
-    </div>
-  );
-}
-
-function TimelineHybridBoard({ range, items, width, onOpen, density }: {
-  range: TimeRange; items: Activity[]; width: number;
-  onOpen: (a: Activity) => void; density: string;
-}) {
-  if (!items.length) {
-    return (
-      <div className="timeline-card-board-empty">
-        Không có hạng mục nào trong khung thời gian/bộ lọc hiện tại.
-      </div>
-    );
-  }
-
-  const leftWidth = density === "compact" ? 520 : 600;
-
-  return (
-    <div className={`timeline-hybrid-board timeline-hybrid-board--${density} vmp-scroll`}>
-      <div style={{ minWidth: leftWidth + width }}>
-        <div className="timeline-hybrid-row timeline-hybrid-header">
-          <div className="timeline-hybrid-left timeline-hybrid-left--header" style={{ width: leftWidth, flexBasis: leftWidth }}>
-            Hạng mục · 3 mốc hoàn thành
-          </div>
-          <div className="timeline-chart-cell timeline-chart-cell--header timeline-hybrid-chart" style={{ width, flexBasis: width }}>
-            <ScaleBands range={range} />
-            <TodayLine range={range} label />
-            {range.bands.map((band: TimeRange["bands"][number], i: number) => {
-              const left = pctInRange(band.start, range);
-              const right = pctInRange(addDays(band.end, 1), range);
-              return (
-                <div
-                  key={`hybrid-label-${band.label}-${i}`}
-                  className="timeline-band-label"
-                  style={{ left: `${left}%`, width: `${Math.max(.3, right - left)}%` }}
-                >
-                  <strong>{band.label}</strong>
-                  <small>{String(band.sub ?? "")}</small>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {items.map((a: Activity) => (
-          <button
-            type="button"
-            key={a.id}
-            className={`timeline-hybrid-row timeline-hybrid-item timeline-hybrid-item--${issueLevel(a)}`}
-            onClick={() => onOpen && onOpen(a)}
-            title={`${a.code} · ${a.name}\nĐích VMP: ${fmtVN(parseD(a.target))}`}
-          >
-            <div className="timeline-hybrid-left" style={{ width: leftWidth, flexBasis: leftWidth }}>
-              <TimelineMapRowContent a={a} />
-            </div>
-            <HybridChartCell a={a} range={range} width={width} />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function ScaleBands({ range }: { range: TimeRange }) {
   return (
     <>
@@ -1403,83 +1204,6 @@ function ScaleBands({ range }: { range: TimeRange }) {
       ))}
       <div className="timeline-grid-line timeline-grid-line--end" style={{ left: "100%" }} />
     </>
-  );
-}
-
-function TodayLine({ range, label = false }: { range: TimeRange; label?: boolean }) {
-  const today = vmpToday();
-  if (!inRange(today, range)) return null;
-  return (
-    <div className="timeline-today-line" style={{ left: `${pctInRange(today, range)}%` }}>
-      {label && <span>Hôm nay</span>}
-    </div>
-  );
-}
-
-function PhaseSegment({ seg, ps, m, range }: {
-  seg: { id: string; from: string; to: string; key?: string; [k: string]: unknown };
-  /** Kết quả phaseStates(): p/v/r là trạng thái, m là mốc thời gian. */
-  ps: { p: string; v: string; r: string; [k: string]: unknown };
-  m: Milestones;
-  range: TimeRange;
-}) {
-  const mm = m as unknown as Record<string, Date | null>;
-  const from = mm[seg.from];
-  const to = mm[seg.to];
-  if (!from || !to || !intersectsRange(from, to, range)) return null;
-  const left = pctInRange(maxDate(from, range.start), range);
-  const right = pctInRange(minDate(to, addDays(range.end, 1)), range);
-  const status = String(ps[String(seg.key)] ?? "future");
-  return (
-    <div
-      className={`timeline-phase timeline-phase--${status}`}
-      title={`${seg.label}: ${fmtVN(from)} → ${fmtVN(to)}`}
-      style={{
-        left: `${left}%`,
-        width: `${Math.max(.6, right - left)}%`,
-        background: (PHASE_COLOR as Record<string, string>)[status] || PHASE_COLOR.future,
-      }}
-    />
-  );
-}
-
-function MilestoneDot({ milestone, date, range }: {
-  milestone: { id: string; label: string; color?: string; [k: string]: unknown };
-  date: Date | null;
-  range: TimeRange;
-}) {
-  if (!inRange(date, range)) return null;
-  return (
-    <span
-      className="timeline-milestone"
-      title={`${milestone.label}: ${fmtVN(date)}`}
-      style={{
-        left: `${pctInRange(date, range)}%`,
-        borderColor: milestone.color,
-        color: milestone.color,
-      }}
-      aria-label={`${milestone.label}: ${fmtVN(date)}`}
-    />
-  );
-}
-
-function ProgressPin({ a, start, end, range }: {
-  a: Activity; start: Date; end: Date; range: TimeRange;
-}) {
-  const pct = phaseProgress(a);
-  const startPct = pctInRange(start, range);
-  const endPct = pctInRange(end, range);
-  const visibleLeft = Math.min(startPct, endPct);
-  const visibleWidth = Math.max(0, Math.abs(endPct - startPct));
-  const absolute = visibleLeft + (visibleWidth * pct / 100);
-  const level = issueLevel(a);
-  return (
-    <span
-      className={`timeline-progress-pin timeline-progress-pin--${level}`}
-      title="Vị trí hiện tại trong chuỗi mốc"
-      style={{ left: `${clamp(absolute, 2.4, 97.6)}%` }}
-      aria-label="Vị trí hiện tại trong chuỗi mốc"
-    />
   );
 }
 
@@ -1573,7 +1297,11 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
     const deptM = new Map();
     let noDeadline = 0;
     for (const a of acts) {
-      const b = ovBucket(a.st);
+      /* MỘT luật quá hạn cho cả trang (dọn 16/08): trước đây Tổng quan
+         đếm theo a.st thuần còn strip/bộ lọc đếm theo issueLevel (pha
+         trễ thắng trạng thái tổng) — hai con số "Quá hạn" khác nhau trên
+         cùng màn hình là điều cấm với dữ liệu GMP. */
+      const b = ovBucket(issueLevel(a));
       // Một hạng mục thuộc NHIỀU bộ phận. Bản trước chỉ đọc a.dept (một giá
       // trị), nên bộ phận nào không bao giờ đứng tên chính thì biến mất khỏi
       // biểu đồ — RD có 21 hạng mục mà không hiện dòng nào. Mọi chỗ khác
@@ -1597,7 +1325,7 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
     const nowM = vmpToday().getMonth();
     let peakI = 0;
     months.forEach((m, i) => { if (m.total > months[peakI].total) peakI = i; });
-    const overAll = acts.filter((a: Activity) => a.st === "over").length;
+    const overAll = acts.filter((a: Activity) => issueLevel(a) === "over").length;
     const kpi = { totalAll: acts.length, overAll, thisMonth: months[nowM].total, nowM, peakI, peak: months[peakI].total };
     return { months, noDeadline, deptRows, kpi };
   }, [acts, year]);
@@ -1785,7 +1513,6 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
   const [workspace, setWorkspace] = useState("overview");
   const [view, setView] = useState("year");
   const [scope, setScope] = useState("year");
-  const [chartMode, setChartMode] = useState("table");
   const [tableStage, setTableStage] = useState("all");
   const [density, setDensity] = useState("compact");
   const [focusMonth, setFocusMonth] = useState(vmpToday().getMonth());
@@ -1819,7 +1546,6 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
   const dq = useDebounce(q, 300);
 
   const range = useMemo(() => rangeFor(view, focusMonth, year), [view, focusMonth, year]);
-  const chartWidth = chartWidthFor(view, density);
 
   const setViewMode = (mode: string) => {
     setView(mode);
@@ -2022,24 +1748,6 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
                 );
               })}
             </div>
-            {isTimeline && (
-              <div className="timeline-mode-controls" aria-label="Kiểu bản đồ timeline">
-                {Object.entries(CHART_LABELS).map(([k, label]) => (
-                  <ScopeButton
-                    key={k}
-                    active={chartMode === k}
-                    onClick={() => setChartMode(k)}
-                    title={k === "table"
-                      ? "Bảng timeline có hàng/cột rõ để quan sát sơ đồ"
-                      : k === "stage"
-                        ? "Sơ đồ gọn theo đích VMP và 3 mốc chính"
-                        : "Sơ đồ gọn kết hợp trục timeline cũ"}
-                  >
-                    {label}
-                  </ScopeButton>
-                ))}
-              </div>
-            )}
             {(isTimeline || workspace === "table") && (
               <div className="timeline-density-controls" aria-label="Mật độ hiển thị">
                 {Object.entries(DENSITY_LABELS).map(([k, label]) => (
@@ -2193,66 +1901,40 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
           <div className="timeline-map-surface__head">
             <div>
               <strong>
-                {chartMode === "table"
-                  ? tableStage === "all"
-                    ? "Sơ đồ dòng thời gian tổng hợp"
-                    : `Bảng ${(TABLE_STAGE_LABELS as Record<string, string>)[tableStage]}`
-                  : chartMode === "stage"
-                    ? "Sơ đồ 3 mốc"
-                    : "Sơ đồ 3 mốc + trục thời gian"}
+                {tableStage === "all"
+                  ? "Sơ đồ dòng thời gian tổng hợp"
+                  : `Bảng ${(TABLE_STAGE_LABELS as Record<string, string>)[tableStage]}`}
               </strong>
               <span>
-                {filtered.length} hạng mục · {chartMode === "table" && tableStage !== "all"
+                {filtered.length} hạng mục · {tableStage !== "all"
                   ? `${(TABLE_STAGE_LABELS as Record<string, string>)[tableStage]} · sắp xếp theo thời gian, mốc sắp tới trước`
                   : "Đề cương / Thẩm định thực tế / Hoàn thành VMP · ưu tiên mốc sắp tới"}
               </span>
             </div>
-            {chartMode === "table" ? (
-              <div className="timeline-table-tabs" aria-label="Chọn bảng timeline theo mốc">
-                {Object.entries(TABLE_STAGE_LABELS).map(([key, label]) => (
-                  <button
-                    type="button"
-                    key={key}
-                    data-short={(TABLE_STAGE_SHORT_LABELS as Record<string, string>)[key]}
-                    className={`timeline-table-tab timeline-table-tab--${key} ${tableStage === key ? "is-active" : ""}`}
-                    onClick={() => setTableStage(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="timeline-map-legend">
-                {MAP_STAGES.map((stage: (typeof MAP_STAGES)[number]) => (
-                  <span key={stage.id} className={`timeline-map-legend__item timeline-map-legend__item--${stage.id}`}>
-                    <i />{stage.label}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="timeline-table-tabs" aria-label="Chọn bảng timeline theo mốc">
+              {Object.entries(TABLE_STAGE_LABELS).map(([key, label]) => (
+                <button
+                  type="button"
+                  key={key}
+                  data-short={(TABLE_STAGE_SHORT_LABELS as Record<string, string>)[key]}
+                  className={`timeline-table-tab timeline-table-tab--${key} ${tableStage === key ? "is-active" : ""}`}
+                  onClick={() => setTableStage(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {chartMode === "table" && <TimelineFlowLegend />}
+          <TimelineFlowLegend />
 
-          {chartMode === "table" ? (
-            <TimelineTableBoard
-              items={filtered}
-              onOpen={moHoSo}
-              density={density}
-              range={range}
-              tableStage={tableStage}
-            />
-          ) : chartMode === "stage" ? (
-            <TimelineStageBoard items={filtered} onOpen={moHoSo} density={density} />
-          ) : (
-            <TimelineHybridBoard
-              range={range}
-              items={filtered}
-              width={chartWidth}
-              onOpen={moHoSo}
-              density={density}
-            />
-          )}
+          <TimelineTableBoard
+            items={filtered}
+            onOpen={moHoSo}
+            density={density}
+            range={range}
+            tableStage={tableStage}
+          />
         </div>
         {manRong && (
           <TimelineInspector
