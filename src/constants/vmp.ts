@@ -106,7 +106,7 @@ export const NAV_ITEMS = [
 
   // GIÁM SÁT — nhìn tình hình, không sửa gì
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard, group: "monitor" },
-  { id: "timeline", label: "Timeline VMP", icon: GanttChartSquare, group: "monitor" },
+  { id: "timeline", label: "Dòng thời gian VMP", icon: GanttChartSquare, group: "monitor" },
   { id: "alerts", label: "Cảnh báo & Rủi ro", icon: AlertCircle, group: "monitor" },
 
   // THỰC HIỆN — việc làm hằng ngày, có ghi dữ liệu
@@ -122,7 +122,7 @@ export const NAV_ITEMS = [
   // QRM – Rủi ro đã gộp vào "Cảnh báo & Rủi ro": ma trận rủi ro nằm cùng chỗ
   // với danh sách cảnh báo mà nó dùng để xếp thứ tự ưu tiên.
   { id: "workload", label: "Phân công & Tải việc", icon: Activity, group: "analysis" },
-  { id: "reports", label: "Báo cáo & AI", icon: FileBarChart, group: "analysis" },
+  { id: "reports", label: "Báo cáo & phân tích", icon: FileBarChart, group: "analysis" },
   { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
 
   // QUẢN TRỊ

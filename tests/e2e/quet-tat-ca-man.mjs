@@ -10,13 +10,13 @@ const GOC = "http://localhost:4173";
 
 const MAN = [
   ["overview", "Tổng quan"],
-  ["timeline", "Timeline VMP"],
+  ["timeline", "Dòng thời gian VMP"],
   ["alerts", "Cảnh báo & Rủi ro"],
   ["progress", "Cập nhật tiến độ"],
   ["inventory", "Tiến độ theo đối tượng"],
   ["source", "Danh mục & Nhập liệu"],
   ["workload", "Phân công & Tải việc"],
-  ["reports", "Báo cáo & AI"],
+  ["reports", "Báo cáo & phân tích"],
   ["rules", "Luật đang áp dụng"],
   ["health", "Sức khoẻ dữ liệu"],
   ["phanquyen", "Phân quyền & trách nhiệm"],

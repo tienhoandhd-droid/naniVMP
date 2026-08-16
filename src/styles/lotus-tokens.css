@@ -24,13 +24,13 @@
    * thay vì tăng bóng đổ. Nghiên cứu Atelier 15/08 §Palette. */
   --lp-canvas:    #F7F0F3;
   --lp-surface:   #FFFDFC;
-  --lp-surface-2: #F2E8ED;
+  --lp-surface-2: #EEE3E8; /* v3: đậm nhẹ — thoát cảnh mọi lớp pastel hoà nhau */
   /* Bề mặt nổi trên surface — popover, modal. */
   --lp-raised:    #FFFFFF;
   --lp-ink:       #2F2430;
   /* ~6.4:1 trên surface, vẫn nhạt hơn --lp-ink rõ rệt nên phân cấp còn
      nguyên. Không được nhạt hơn nữa: ngưỡng AA là 4.5:1. */
-  --lp-ink-muted: #685A66;
+  --lp-ink-muted: #625560; /* v3: ~6.9:1 trên surface */
 
   /* --- Thương hiệu — thang plum ba bậc ------------------------------ *
    * 900 neo đậm cho hero/panel sơn mài, 700 cho CTA và trạng thái chọn,
@@ -78,9 +78,9 @@
   --lp-on-ink:     var(--lp-canvas);
 
   /* --- Đường nét, tiêu điểm, trạng thái vô hiệu --------------------- */
-  --lp-line:             rgb(47 36 48 / 0.10);
-  --lp-line-strong:      rgb(47 36 48 / 0.20);
-  --lp-focus:            rgb(90 49 88 / 0.38);
+  --lp-line:             rgb(47 36 48 / 0.14); /* v3: card rõ lớp hơn */
+  --lp-line-strong:      rgb(47 36 48 / 0.26);
+  --lp-focus:            rgb(90 49 88 / 0.46);
   --lp-disabled-ink:     #A79BA6;
   --lp-disabled-surface: #F1EAEC;
   /* Bổ sung nghiên cứu (3): ranh giới control 3:1 và lưới biểu đồ hai
@@ -88,6 +88,18 @@
   --lp-control-boundary: var(--lp-ink-muted);
   --lp-grid-line:        rgb(47 36 48 / 0.09);
   --lp-grid-line-major:  rgb(47 36 48 / 0.18);
+
+  /* --- v3 (nghiên cứu 4+5): lacquer anchor + vai trò màu cho chart/3D.
+   * 3D KHÔNG đọc CSS cascade — dùng cầu src/lib/lotus3dColors.ts. */
+  --lp-anchor:       var(--lp-plum-900);
+  --lp-anchor-hover: #4A2948;
+  --lp-viz-base:      var(--lp-plum);
+  --lp-viz-selected:  var(--lp-rose);
+  --lp-viz-threshold: var(--lp-ink-muted);
+  --lp-viz-danger:    var(--lp-danger);
+  --lp-viz-success:   var(--lp-success);
+  --lp-viz-warning:   var(--lp-warning);
+  --lp-viz-info:      var(--lp-info);
 
   /* --- Nhịp chuyển động (nghiên cứu (3)) ---------------------------- */
   --lp-motion-fast: 140ms;
@@ -243,9 +255,9 @@
 
   --lp-gold: #D6B56E;
 
-  --lp-line:             rgb(246 235 239 / 0.12);
-  --lp-line-strong:      rgb(246 235 239 / 0.22);
-  --lp-focus:            rgb(208 165 183 / 0.42);
+  --lp-line:             rgb(246 235 239 / 0.16); /* v3 */
+  --lp-line-strong:      rgb(246 235 239 / 0.28);
+  --lp-focus:            rgb(208 165 183 / 0.50);
   --lp-disabled-ink:     #9E919B;
   --lp-disabled-surface: #2A232B;
 

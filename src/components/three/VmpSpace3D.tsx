@@ -24,6 +24,7 @@
  * ===================================================================== */
 import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { coWebGL, docMauLotus3D } from "../../lib/lotus3dColors.ts";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
@@ -48,11 +49,15 @@ export interface O3D {
    xem lý do đầy đủ ở WorkloadSpace3D.tsx. */
 const VI_TRI: [number, number, number] = [7.4, 3.9, 3.4];
 
+/* Màu giai đoạn = semantic token (khớp alias --lp-stage-* của CSS):
+ * đề cương plum · thẩm định info · báo cáo rose · đích success.
+ * Đọc lúc nạp chunk — hết bộ tím/xanh "demo" tách rời Lotus. */
+const MAU3D = docMauLotus3D();
 const GIAI_DOAN = [
-  { khoa: "tt_de_cuong", ten: "Đề cương", mau: "#8168CE" },
-  { khoa: "tt_tham_dinh", ten: "Thẩm định", mau: "#4497D2" },
-  { khoa: "tt_bao_cao", ten: "Báo cáo", mau: "#E4749F" },
-  { khoa: "tt_vmp", ten: "Đích VMP", mau: "#2A9E82" },
+  { khoa: "tt_de_cuong", ten: "Đề cương", mau: MAU3D.plum },
+  { khoa: "tt_tham_dinh", ten: "Thẩm định", mau: MAU3D.info },
+  { khoa: "tt_bao_cao", ten: "Báo cáo", mau: MAU3D.rose },
+  { khoa: "tt_vmp", ten: "Đích VMP", mau: MAU3D.success },
 ];
 
 /** Ma trận 12 tháng × 4 giai đoạn. Tháng lấy theo MỐC ĐÍCH VMP, đúng như
@@ -88,7 +93,9 @@ export function dungMaTran(acts: Activity[], nam: number): O3D[] {
 const CAO = 2.0;        // đơn vị cảnh cho mốc 100%
 /** Sắc "ngưỡng" dùng chung: đường mục tiêu ở biểu đồ phẳng và đường giới
  *  hạn ±3σ của biểu đồ kiểm soát đều dùng màu này. Một khái niệm, một màu. */
-const MAU_MUC_TIEU = "#B62E52";
+/* Mặt phẳng mục tiêu là NGƯỠNG trung tính, không phải báo động —
+ * nghiên cứu (3): "không dùng danger cho một đường target trung tính". */
+const MAU_MUC_TIEU = MAU3D.inkMuted;
 const BUOC_T = 0.46;    // khoảng cách giữa hai tháng (trục sâu)
 const BUOC_G = 0.72;    // khoảng cách giữa hai giai đoạn (trục ngang)
 
@@ -184,12 +191,12 @@ function Canh({ o3d, chon, giamChuyenDong, onHover }: {
 
       <ambientLight intensity={0.75} />
       <directionalLight position={[6, 9, 6]} intensity={1.15} />
-      <directionalLight position={[-6, 4, -5]} intensity={0.4} color="#ffe4f1" />
+      <directionalLight position={[-6, 4, -5]} intensity={0.22} color="#f2edf2" />
 
       {/* Sàn + lưới: cho khối chỗ đứng và cho mắt cái mốc để ước lượng. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]}>
         <planeGeometry args={[rongX + 0.5, sauZ + 0.4]} />
-        <meshBasicMaterial color="#F7F1F8" />
+        <meshBasicMaterial color={MAU3D.canvas} />
       </mesh>
 
       {/* MẶT PHẲNG MỤC TIÊU 50% — cắt ngang cả khối.
@@ -244,6 +251,7 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
      cần IN RA GIẤY — thì có bảng tương đương, cùng một bộ số. */
   /* 2D mặc định (nghiên cứu (3) P0) — 3D là khám phá tự chọn. */
   const [kieu, setKieu] = useState<"3d" | "2d">("2d");
+  const ho3D = useMemo(coWebGL, []);
   const oNhiet: ONhiet[] = useMemo(() => o3d
     .filter((x) => x.tyLe != null)
     .map((x) => ({
@@ -293,21 +301,24 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
       {/* Bọc hẳn một div có chiều cao rõ ràng. Bản trước tôi đặt chiều cao
           bằng bộ chọn `> div:first-child` và trượt: R3F tự sinh lớp bọc
           riêng, canvas co lại còn 150px nên cột bị cắt mất ngọn. */}
+      {!ho3D && <p className="vmp-3d-khong-ho-tro" role="status">
+        Thiết bị này không hỗ trợ chế độ 3D. Dữ liệu đầy đủ vẫn có ở cách hiển thị hai chiều.
+      </p>}
       <div className="vmp-space3d-doi">
-        <button type="button" onClick={() => setKieu("3d")}
-          className={kieu === "3d" ? "is-chon" : ""}>Khối 3D</button>
-        <button type="button" onClick={() => setKieu("2d")}
-          className={kieu === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
+        {ho3D && <button type="button" data-map-mode="3d" onClick={() => setKieu("3d")}
+          className={kieu === "3d" ? "is-chon" : ""}>Khám phá 3D</button>}
+        <button type="button" data-map-mode="2d" onClick={() => setKieu("2d")}
+          className={kieu === "2d" ? "is-chon" : ""}>Bản đồ tiến độ</button>
       </div>
 
-      {kieu === "2d" ? (
+      {(!ho3D || kieu === "2d") ? (
         <BanDoNhiet
           tenHang="Giai đoạn" tenCot="Tháng"
           o={oNhiet}
           nhanHang={GIAI_DOAN.map((g) => g.ten)}
           nhanCot={Array.from({ length: 12 }, (_, i) => `T${i + 1}`)}
           donVi="%" phuLabel="xong" hauTo="%" congTong={false}
-          sacDo="#2A9E82"
+          sacDo={MAU3D.success}
         />
       ) : (
       <div className="vmp-space3d-than">

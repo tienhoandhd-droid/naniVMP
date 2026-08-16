@@ -7033,3 +7033,14 @@ main li,
 :root[data-thanhtra="1"] .lp-art-layer::after {
   display: none !important;
 }
+
+/* Thiết bị không có WebGL: câu tiếng Việt tử tế thay cho lỗi kỹ thuật. */
+.vmp-3d-khong-ho-tro {
+  margin: 0 0 10px;
+  padding: 9px 13px;
+  border-radius: var(--lp-r-control);
+  background: var(--lp-surface-2);
+  color: var(--lp-ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}

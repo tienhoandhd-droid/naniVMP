@@ -20,11 +20,11 @@ const GOC = process.env.E2E_URL || "http://localhost:4173";
 const MAN = [
   ["today", "Hôm nay"],
   ["overview", "Tổng quan"],
-  ["timeline", "Timeline VMP"],
+  ["timeline", "Dòng thời gian VMP"],
   ["alerts", "Cảnh báo & Rủi ro"],
   ["progress", "Cập nhật tiến độ"],
   ["workload", "Phân công & Tải việc"],
-  ["reports", "Báo cáo & AI"],
+  ["reports", "Báo cáo & phân tích"],
 ];
 
 await choServer(GOC);

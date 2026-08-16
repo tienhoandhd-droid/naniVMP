@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Edges, OrthographicCamera, OrbitControls } from "@react-three/drei";
+import { OrthographicCamera, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
 import type { Activity } from "../../types/domain.ts";
 import { buildWorkloadMap, workloadCellColor } from "../../lib/workloadMap.ts";
+import { coWebGL, docMauLotus3D } from "../../lib/lotus3dColors.ts";
 import type { WorkloadCell } from "../../lib/workloadMap.ts";
 import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
 import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
@@ -17,7 +18,8 @@ const DEFAULT_TARGET: [number, number, number] = [0, 0.9, 0];
 const MONTH_STEP = 0.54;
 const DEPARTMENT_STEP = 0.72;
 const CAO_MAX = 2.1;
-const RASPBERRY = "#C72D62";
+const MAU3D = docMauLotus3D();
+const RASPBERRY = MAU3D.danger;
 const DEFAULT_ELEVATION_DEGREES = 35;
 const CAMERA_AZIMUTH = Math.PI / 4;
 const CAMERA_PADDING = .84;
@@ -118,9 +120,8 @@ function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onH
         onPointerOut={() => onHover(null)}
         onClick={(event) => { event.stopPropagation(); onSelect(cell); }}>
         <boxGeometry args={[.46, 1, .5]} />
-        <meshPhysicalMaterial color={workloadCellColor(cell.completionRate)} transparent opacity={opacity}
-          roughness={.34} metalness={.04} emissive={workloadCellColor(cell.completionRate)} emissiveIntensity={selected ? .45 : 0} />
-        <Edges threshold={15} color="#ffffff" />
+        <meshStandardMaterial color={workloadCellColor(cell.completionRate)} transparent opacity={opacity}
+          roughness={.72} metalness={0} emissive={selected ? MAU3D.rose : "#000000"} emissiveIntensity={selected ? .12 : 0} />
       </mesh>
       {cell.overdue > 0 && <mesh ref={cap}
         scale={[1, giamChuyenDong ? Math.max(.004, capHeight) : .004, 1]}
@@ -234,11 +235,11 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
       minAzimuthAngle={.35} maxAzimuthAngle={1.25} target={DEFAULT_TARGET} />
     <ambientLight intensity={.8} />
     <directionalLight position={[6, 9, 6]} intensity={1.15} />
-    <directionalLight position={[-6, 4, -5]} intensity={.35} color="#ffe4f1" />
+    <directionalLight position={[-6, 4, -5]} intensity={.22} color="#f2edf2" />
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.004, 0]}>
-      <planeGeometry args={[width + 1.4, depth + 1.4]} /><meshBasicMaterial color="#F7F1F8" />
+      <planeGeometry args={[width + 1.4, depth + 1.4]} /><meshBasicMaterial color={MAU3D.canvas} />
     </mesh>
-    <gridHelper args={[Math.max(width, depth) + 1, 12, "#E7DAEB", "#F1E8F3"]} position={[0, .001, 0]} />
+    <gridHelper args={[Math.max(width, depth) + 1, 12, MAU3D.gridMajor, MAU3D.gridMinor]} position={[0, .001, 0]} />
     <NhanTruc nhan={labels} tam={[0, CAO_MAX / 2, 0]} declutterSo />
     {cells.map((cell) => <Column key={cellKey(cell)} cell={cell} maxTotal={maxTotal}
       selected={!!selected && cellKey(selected) === cellKey(cell)} selectionActive={!!selected}
@@ -281,6 +282,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell,
     } catch { /* riêng tư */ }
     return macDinh3D ? "3d" : "2d";
   });
+  const ho3D = useMemo(coWebGL, []);
   const setMode = (m: "3d" | "2d") => {
     setModeRaw(m);
     try { localStorage.setItem("vmp-workload-3d", m === "3d" ? "mo" : "dong"); } catch { /* riêng tư */ }
@@ -313,11 +315,14 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell,
 
   return <div className="vmp-space3d">
     {conclusion && <CauKetLuan chinh={conclusion.chinh} phu={conclusion.phu} tone={conclusion.tone} />}
+    {!ho3D && <p className="vmp-3d-khong-ho-tro" role="status">
+      Thiết bị này không hỗ trợ chế độ 3D. Dữ liệu đầy đủ vẫn có ở cách hiển thị hai chiều.
+    </p>}
     <div className="vmp-space3d-doi" aria-label="Chế độ bản đồ tải việc">
-      <button type="button" data-map-mode="3d" onClick={() => setMode("3d")} className={mode === "3d" ? "is-chon" : ""}>Bản đồ 3D</button>
-      <button type="button" data-map-mode="2d" onClick={() => setMode("2d")} className={mode === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
+      {ho3D && <button type="button" data-map-mode="3d" onClick={() => setMode("3d")} className={mode === "3d" ? "is-chon" : ""}>Khám phá 3D</button>}
+      <button type="button" data-map-mode="2d" onClick={() => setMode("2d")} className={mode === "2d" ? "is-chon" : ""}>Tải công việc theo tháng</button>
     </div>
-    {mode === "3d" ? <div className="vmp-space3d-than">
+    {ho3D && mode === "3d" ? <div className="vmp-space3d-than">
       <div id="workload-map-3d" className="vmp-space3d-khung" data-testid="workload-map-3d">
         <ThreeFallbackBoundary onUse2D={() => setMode("2d")}>
           {/* demand + dpr ≤1.5 + không shadow map (nghiên cứu (3) §budget):
@@ -332,8 +337,8 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell,
       <div className="vmp-space3d-canh">
         <button type="button" className="workload-map-reset" aria-label="Về góc chuẩn" onClick={() => resetRef.current()}>Về góc chuẩn</button>
         <div className="vmp-space3d-chu" data-testid="workload-map-legend">
-          <span><i style={{ background: "#2A9E82" }} />Hoàn thành</span>
-          <span><i style={{ background: RASPBERRY }} />Quá hạn</span>
+          <span><i style={{ background: "var(--lp-success)" }} />Hoàn thành</span>
+          <span><i style={{ background: "var(--lp-danger)" }} />Quá hạn</span>
         </div>
       </div>
     </div> : <BanDoNhiet tenHang="Bộ phận" tenCot="Tháng" o={heatCells}

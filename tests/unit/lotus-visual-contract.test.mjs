@@ -70,9 +70,9 @@ test("token nền và chữ chế độ sáng đúng palette Atelier v2", () => 
      Mọi cặp chữ/nền đã tính lại tương phản ≥ 4.5:1 trước khi đổi. */
   assert.equal(bien(KHOI_SANG, "lp-canvas"), "#F7F0F3");
   assert.equal(bien(KHOI_SANG, "lp-surface"), "#FFFDFC");
-  assert.equal(bien(KHOI_SANG, "lp-surface-2"), "#F2E8ED");
+  assert.equal(bien(KHOI_SANG, "lp-surface-2"), "#EEE3E8"); // v3 (nghiên cứu 4+5): figure-ground
   assert.equal(bien(KHOI_SANG, "lp-ink"), "#2F2430");
-  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "#685A66");
+  assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "#625560"); // v3: ~6.9:1 trên surface
   assert.equal(bien(KHOI_SANG, "lp-plum"), "#5A3158");
   assert.equal(bien(KHOI_SANG, "lp-plum-900"), "#3E213E");
   assert.equal(bien(KHOI_SANG, "lp-rose"), "#A74F72");
@@ -95,9 +95,9 @@ test("chế độ tối có đủ warning, line, focus và trạng thái vô hi�
   assert.equal(bien(KHOI_TOI, "lp-warning"), "#F2C47A");
   assert.equal(bien(KHOI_TOI, "lp-warning-bg"), "#352718");
   assert.equal(bien(KHOI_TOI, "lp-warning-line"), "#745026");
-  assert.equal(bien(KHOI_TOI, "lp-line"), "rgb(246 235 239 / 0.12)");
-  assert.equal(bien(KHOI_TOI, "lp-line-strong"), "rgb(246 235 239 / 0.22)");
-  assert.equal(bien(KHOI_TOI, "lp-focus"), "rgb(208 165 183 / 0.42)");
+  assert.equal(bien(KHOI_TOI, "lp-line"), "rgb(246 235 239 / 0.16)"); // v3
+  assert.equal(bien(KHOI_TOI, "lp-line-strong"), "rgb(246 235 239 / 0.28)"); // v3
+  assert.equal(bien(KHOI_TOI, "lp-focus"), "rgb(208 165 183 / 0.50)"); // v3
   assert.equal(bien(KHOI_TOI, "lp-disabled-ink"), "#9E919B");
   assert.equal(bien(KHOI_TOI, "lp-disabled-surface"), "#2A232B");
 });

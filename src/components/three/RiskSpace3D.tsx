@@ -20,10 +20,11 @@
  * ===================================================================== */
 import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
+import { OrthographicCamera, OrbitControls } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
 import { qrmSeverity, qrmOccurrence, qrmLevel } from "../../utils/helpers.ts";
+import { coWebGL, docMauLotus3D } from "../../lib/lotus3dColors.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
 import BanDoNhiet from "../dashboard/BanDoNhiet.tsx";
 import type { ONhiet } from "../dashboard/BanDoNhiet.tsx";
@@ -44,7 +45,10 @@ export interface ORui {
    với hai khối kia: nhìn gần dọc trục Z để 9 mức trải ngang khung. */
 const VI_TRI: [number, number, number] = [3.2, 4.2, 7.4];
 
-const MAU = { cao: "#D6486D", tb: "#EDB033", thap: "#2A9E82" };
+/* Màu đọc từ token Lotus lúc nạp chunk (đợt 4 — hết hex "3D demo").
+ * Đổi theme giữa phiên thì lần dựng scene sau mới ăn màu mới. */
+const MAU3D = docMauLotus3D();
+const MAU = { cao: MAU3D.danger, tb: MAU3D.warning, thap: MAU3D.success };
 
 export function dungKhoiRuiRo(acts: Activity[]): ORui[] {
   const o = new Map<string, ORui>();
@@ -94,9 +98,10 @@ function Cot({ o, caoNhat, chon, giamChuyenDong, onHover }: {
       onPointerOver={(e) => { e.stopPropagation(); onHover(o); }}
       onPointerOut={() => onHover(null)}>
       <boxGeometry args={[0.36, 1, 0.5]} />
-      <meshPhysicalMaterial color={mau} roughness={0.34} metalness={0.04}
-        emissive={mau} emissiveIntensity={chon ? 0.5 : 0} />
-      <Edges threshold={15} color="#ffffff" />
+      {/* meshStandard mờ + không viền trắng từng cột (nghiên cứu 5):
+          analytics không phải đồ chơi bóng. Chọn = nhấn emissive nhẹ. */}
+      <meshStandardMaterial color={mau} roughness={0.72} metalness={0}
+        emissive={chon ? MAU3D.rose : "#000000"} emissiveIntensity={chon ? 0.12 : 0} />
     </mesh>
   );
 }
@@ -141,13 +146,13 @@ function Canh({ o3d, caoNhat, chon, giamChuyenDong, onHover }: {
 
       <ambientLight intensity={0.78} />
       <directionalLight position={[6, 9, 6]} intensity={1.15} />
-      <directionalLight position={[-6, 4, -5]} intensity={0.4} color="#ffe4f1" />
+      <directionalLight position={[-6, 4, -5]} intensity={0.22} color="#f2edf2" />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]}>
         <planeGeometry args={[rongX + 0.6, sauZ + 0.5]} />
-        <meshBasicMaterial color="#F7F1F8" />
+        <meshBasicMaterial color={MAU3D.canvas} />
       </mesh>
-      <gridHelper args={[Math.max(rongX, sauZ) + 0.6, 12, "#E7DAEB", "#F1E8F3"]} position={[0, 0.001, 0]} />
+      <gridHelper args={[Math.max(rongX, sauZ) + 0.6, 12, MAU3D.gridMajor, MAU3D.gridMinor]} position={[0, 0.001, 0]} />
 
       <NhanTruc nhan={nhan} tam={[0, CAO_MAX / 2, 0]} />
 
@@ -170,6 +175,8 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
      thẩm định, mà WebGL thì không in được. */
   /* 2D mặc định (nghiên cứu (3) P0) — 3D là khám phá tự chọn. */
   const [kieu, setKieu] = useState<"3d" | "2d">("2d");
+  /* Không có WebGL: giấu hẳn cửa 3D, nói bằng tiếng Việt tử tế. */
+  const ho3D = useMemo(coWebGL, []);
   const oNhiet: ONhiet[] = useMemo(() => o3d.map((x) => ({
     hang: x.kn, cot: x.ng - 1, gt: x.n,
     ghiChu: `Nghiêm trọng ${x.ng} · ${TEN_KN[x.kn]}: ${x.n} hạng mục · RPN ${x.rpn}`,
@@ -200,14 +207,17 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
   return (
     <div className="vmp-space3d">
       {ketLuan && <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />}
+      {!ho3D && <p className="vmp-3d-khong-ho-tro" role="status">
+        Thiết bị này không hỗ trợ chế độ 3D. Dữ liệu đầy đủ vẫn có ở cách hiển thị hai chiều.
+      </p>}
       <div className="vmp-space3d-doi">
-        <button type="button" onClick={() => setKieu("3d")}
-          className={kieu === "3d" ? "is-chon" : ""}>Khối 3D</button>
-        <button type="button" onClick={() => setKieu("2d")}
-          className={kieu === "2d" ? "is-chon" : ""}>Bảng nhiệt 2D</button>
+        {ho3D && <button type="button" data-map-mode="3d" onClick={() => setKieu("3d")}
+          className={kieu === "3d" ? "is-chon" : ""}>Khám phá 3D</button>}
+        <button type="button" data-map-mode="2d" onClick={() => setKieu("2d")}
+          className={kieu === "2d" ? "is-chon" : ""}>Ma trận rủi ro</button>
       </div>
 
-      {kieu === "2d" ? (
+      {(!ho3D || kieu === "2d") ? (
         <BanDoNhiet
           tenHang="Khả năng xảy ra" tenCot="Mức nghiêm trọng"
           o={oNhiet}

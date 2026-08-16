@@ -37,7 +37,7 @@ import type { WorkloadCell } from "../lib/workloadMap.ts";
 // thử từng cái mới biết cái nào có thứ mình cần.
 const WORKSPACES = [
   { id: "overview", label: "Tổng quan", icon: BarChart3 },
-  { id: "timeline", label: "Timeline", icon: GanttChartSquare },
+  { id: "timeline", label: "Dòng thời gian", icon: GanttChartSquare },
 ];
 
 const DAY_MS = 86400000;
@@ -1067,6 +1067,51 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
     .find((date) => date && date >= startOfDay(today)! && inRange(date, range));
   const nextUpcomingTime = nextUpcomingDate?.getTime() || null;
 
+  /* ẢO HOÁ HÀNG (đợt 4 — hiệu năng, nghiên cứu 4+5): dữ liệu thật ~460
+     hạng mục × hàng chục ô mỗi hàng làm cuộn giật. Vượt NGƯỠNG 100 dòng
+     thì chỉ dựng lát đang thấy (+8 hàng đệm mỗi phía); hai hàng đệm
+     rỗng giữ nguyên tổng chiều cao nên thanh cuộn không nhảy. Dưới
+     ngưỡng giữ nguyên đường cũ. Chiều cao hàng ĐO từ hàng thật đầu
+     tiên — ước lượng ban đầu chỉ dùng cho khung hình đầu. */
+  const AO_HOA_TU = 100;
+  const aoHoa = tableItems.length > AO_HOA_TU;
+  const [cuon, setCuon] = useState(0);
+  const [caoKhung, setCaoKhung] = useState(600);
+  const caoHang = useRef(density === "compact" ? 64 : 78);
+  useEffect(() => {
+    if (!aoHoa) return;
+    const el = boardRef.current;
+    if (!el) return;
+    const capNhat = () => { setCuon(el.scrollTop); setCaoKhung(el.clientHeight); };
+    capNhat();
+    let khung = 0;
+    const nghe = () => {
+      if (khung) return;
+      khung = requestAnimationFrame(() => { khung = 0; capNhat(); });
+    };
+    el.addEventListener("scroll", nghe, { passive: true });
+    const ro = new ResizeObserver(capNhat);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", nghe);
+      ro.disconnect();
+      if (khung) cancelAnimationFrame(khung);
+    };
+  }, [aoHoa]);
+  useEffect(() => {
+    if (!aoHoa) return;
+    const hang = boardRef.current?.querySelector<HTMLTableRowElement>("tbody tr.timeline-day-row");
+    const cao = hang?.getBoundingClientRect().height;
+    if (cao && cao > 20) caoHang.current = cao;
+  });
+  const hangDau = aoHoa ? Math.max(0, Math.floor(cuon / caoHang.current) - 8) : 0;
+  const hangCuoi = aoHoa
+    ? Math.min(tableItems.length, Math.ceil((cuon + caoKhung) / caoHang.current) + 8)
+    : tableItems.length;
+  const hangHienThi = aoHoa ? tableItems.slice(hangDau, hangCuoi) : tableItems;
+  const demTren = hangDau * caoHang.current;
+  const demDuoi = (tableItems.length - hangCuoi) * caoHang.current;
+
   useEffect(() => {
     const board = boardRef.current;
     if (!board || !todayVisible) return;
@@ -1131,7 +1176,12 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
           </tr>
         </thead>
         <tbody>
-          {tableItems.map((a: Activity) => {
+          {aoHoa && demTren > 0 && (
+            <tr aria-hidden="true" style={{ height: demTren }}>
+              <td colSpan={3} style={{ padding: 0, border: 0 }} />
+            </tr>
+          )}
+          {hangHienThi.map((a: Activity) => {
             const cls = (CLS as Record<string, typeof CLS.tb>)[String(a.cls ?? "tb")] || CLS.tb;
             const dept = DEPTS.find((d) => d.id === a.dept);
             const level = issueLevel(a);
@@ -1171,6 +1221,11 @@ function TimelineTableBoard({ items, onOpen, density, range, tableStage = "all" 
               </tr>
             );
           })}
+          {aoHoa && demDuoi > 0 && (
+            <tr aria-hidden="true" style={{ height: demDuoi }}>
+              <td colSpan={3} style={{ padding: 0, border: 0 }} />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -1654,7 +1709,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
           nhất là Quá hạn; bấm ô nào là bộ lọc tình trạng nhảy đúng giá
           trị đó — cùng model với bộ lọc nên số trên ô = số dòng lọc ra. */}
       <MetricGrid
-        label="Tình trạng timeline"
+        label="Tình trạng dòng thời gian"
         items={[
           { id: "qua-han", label: "Quá hạn", value: tomTat.quaHan,
             priority: "hero", tone: "danger",
@@ -1727,12 +1782,13 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
               <GanttChartSquare size={21} />
             </span>
             <div>
-              <div className="timeline-title-kicker">Timeline intelligence</div>
-              <div className="timeline-title">Timeline VMP{isTimeline ? ` · ${range.title}` : ""}</div>
+              {/* "Timeline intelligence" đã BỎ (nghiên cứu 5): tiếng Anh
+                  trang trí không mang thông tin nào cho người dùng Việt. */}
+              <div className="timeline-title">Kế hoạch VMP{isTimeline ? ` · ${range.title}` : ""}</div>
               <div className="timeline-subtitle">
                 {isTimeline
                   ? "Theo dõi 3 mốc Đề cương · Thẩm định · Hoàn thành VMP trên dòng thời gian, có vạch ngày hôm nay"
-                  : "Sơ đồ luồng, bố cục dashboard và bảng dữ liệu — cùng một bộ lọc, từ dữ liệu Supabase hiện có"}
+                  : "Tổng quan năm và dòng thời gian chi tiết — cùng một bộ lọc, từ dữ liệu Supabase hiện hành"}
               </div>
             </div>
           </div>

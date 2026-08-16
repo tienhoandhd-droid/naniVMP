@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
-import { caiGiaLap, nhetPhien } from "./gia-lap-supabase.mjs";
+import { caiGiaLap, nhetPhien, dungHangMuc } from "./gia-lap-supabase.mjs";
 
 const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
 
@@ -31,12 +31,12 @@ const URL_SB = (() => {
 const MAN = [
   ["today", "Hôm nay"],
   ["overview", "Tổng quan"],
-  ["timeline", "Timeline VMP"],
+  ["timeline", "Dòng thời gian VMP"],
   ["alerts", "Cảnh báo & Rủi ro"],
   ["progress", "Cập nhật tiến độ"],
   ["source", "Danh mục & Nhập liệu"],
   ["workload", "Phân công & Tải việc"],
-  ["reports", "Báo cáo & AI"],
+  ["reports", "Báo cáo & phân tích"],
   ["rules", "Luật đang áp dụng"],
   ["people", "Nhân sự & phân công"],
   ["accounts", "Tài khoản & quyền truy cập"],
@@ -368,7 +368,7 @@ for (const [id, ten] of MAN) {
   /* Mặc định là workspace Tổng quan — chuyển sang tab Timeline để có bảng. */
   await trang.evaluate(() => {
     [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.trim() === "Timeline")?.click();
+      .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
   });
   await new Promise((r) => setTimeout(r, 800));
 
@@ -639,18 +639,19 @@ for (const [id, ten] of MAN) {
   await new Promise((r) => setTimeout(r, 2600));
   const kq = await trang.evaluate(() => {
     const khoi = document.querySelector(".vmp-space3d");
-    const nut = [...(khoi?.querySelectorAll(".vmp-space3d-doi button") || [])];
     return {
       coKhoi: !!khoi,
       coCanvas: !!khoi?.querySelector("canvas"),
-      nut2dChon: nut.find((b) => b.textContent?.includes("2D"))?.className.includes("is-chon"),
-      coNut3d: nut.some((b) => b.textContent?.includes("3D")),
+      nut2dChon: khoi?.querySelector('button[data-map-mode="2d"]')?.className.includes("is-chon"),
+      coNut3d: !!khoi?.querySelector('button[data-map-mode="3d"]'),
+      nhan3d: khoi?.querySelector('button[data-map-mode="3d"]')?.textContent?.trim(),
     };
   });
   kiem(kq.coKhoi, "khối không gian VMP có mặt ở Báo cáo");
-  kiem(!kq.coCanvas, "mặc định KHÔNG dựng canvas — bảng nhiệt 2D là mặt chính");
-  kiem(!!kq.nut2dChon, "nút Bảng nhiệt 2D đang được chọn");
-  kiem(kq.coNut3d, "vẫn có nút Khối 3D để khám phá");
+  kiem(!kq.coCanvas, "mặc định KHÔNG dựng canvas — 2D là mặt chính");
+  kiem(!!kq.nut2dChon, "nút 2D (Bản đồ tiến độ) đang được chọn");
+  kiem(kq.coNut3d && kq.nhan3d === "Khám phá 3D",
+    "nút khám phá mang đúng tên 'Khám phá 3D'", kq.nhan3d || "(không có)");
   await trang.close();
 }
 
@@ -670,6 +671,114 @@ for (const [id, ten] of MAN) {
   kiem(/Chế độ quyền màn hình/.test(chu), "hiện chế độ áp quyền (preview/enforced)");
   kiem(!/Google Sheet'?\s*$/m.test(chu) && /Sheet chỉ còn tham chiếu/.test(chu),
     "nguồn công thức ghi đúng: database là gốc, Sheet chỉ tham chiếu");
+  await trang.close();
+}
+
+/* ---- 3m. Hiệu năng: bảng timeline ẢO HOÁ khi >100 dòng -------------- */
+{
+  console.log("\nẢo hoá bảng timeline (180 dòng):");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, {
+    supabaseUrl: URL_SB, kichBan: "day",
+    suaKho: (kho) => {
+      const ds = kho.rpc_get_vmp_dashboard.activities;
+      for (let i = ds.length; i < 180; i++) ds.push(dungHangMuc(i));
+    },
+  });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2600));
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
+  });
+  await new Promise((r) => setTimeout(r, 1200));
+
+  const truoc = await trang.evaluate(() => ({
+    soHang: document.querySelectorAll("tbody tr.timeline-day-row").length,
+    tongLoc: document.querySelector(".timeline-map-surface__head span")?.textContent || "",
+  }));
+  kiem(/180 hạng mục/.test(truoc.tongLoc), "bộ lọc thấy đủ 180 hạng mục", truoc.tongLoc.slice(0, 40));
+  kiem(truoc.soHang > 0 && truoc.soHang < 120,
+    "DOM chỉ dựng lát đang thấy (<120 hàng), không phải cả 180", `${truoc.soHang} hàng`);
+
+  /* Cuộn xuống đáy: các hàng cuối phải hiện ra (đệm giữ đúng tổng cao). */
+  const cuoi = await trang.evaluate(async () => {
+    const khung = document.querySelector(".timeline-day-board");
+    khung.scrollTop = khung.scrollHeight;
+    await new Promise((r) => setTimeout(r, 500));
+    const hang = [...document.querySelectorAll("tbody tr.timeline-day-row")];
+    return {
+      soHang: hang.length,
+      maCuoi: hang[hang.length - 1]?.querySelector(".timeline-card-code")?.textContent || "",
+    };
+  });
+  kiem(cuoi.soHang < 120 && cuoi.maCuoi.length > 0,
+    "cuộn tới đáy vẫn chỉ dựng lát nhìn thấy và có hàng cuối", `${cuoi.soHang} hàng · ${cuoi.maCuoi}`);
+  await trang.close();
+}
+
+/* ---- 3n. Hợp đồng hiệu năng: KHÔNG tải chunk 3D trước khi mở -------- */
+{
+  console.log("\nHợp đồng lazy 3D:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  /* Các mục trước có thể đã bật trí nhớ 3D — phải xoá để đo đường lạnh. */
+  await trang.evaluateOnNewDocument(() => {
+    localStorage.removeItem("vmp-timeline-3d");
+    localStorage.removeItem("vmp-workload-3d");
+  });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2600));
+
+  const truocMo = await trang.evaluate(() =>
+    performance.getEntriesByType("resource")
+      .map((e) => e.name)
+      .filter((u) => /WorkloadSpace3D|VmpSpace3D|RiskSpace3D|NhanTruc/i.test(u)));
+  kiem(truocMo.length === 0,
+    "chưa bấm Khám phá 3D thì KHÔNG chunk three.js nào được tải",
+    truocMo.map((u) => u.split("/").pop()).join(", "));
+
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Khám phá 3D"))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 2600));
+  const sauMo = await trang.evaluate(() =>
+    performance.getEntriesByType("resource")
+      .some((e) => /WorkloadSpace3D|NhanTruc/i.test(e.name)));
+  kiem(sauMo, "bấm Khám phá 3D thì chunk 3D mới được tải");
+  await trang.close();
+}
+
+/* ---- 3o. Không WebGL: câu tiếng Việt tử tế, 2D nguyên vẹn ----------- */
+{
+  console.log("\nKhông WebGL:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.evaluateOnNewDocument(() => {
+    const goc = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (loai, ...con) {
+      if (loai === "webgl" || loai === "webgl2" || loai === "experimental-webgl") return null;
+      return goc.call(this, loai, ...con);
+    };
+  });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2600));
+  const kq = await trang.evaluate(() => ({
+    thongBao: document.querySelector(".vmp-3d-khong-ho-tro")?.textContent || "",
+    conNut3d: !!document.querySelector('.vmp-space3d button[data-map-mode="3d"]'),
+    co2D: !!document.querySelector(".vmp-space3d"),
+  }));
+  kiem(/không hỗ trợ chế độ 3D/i.test(kq.thongBao),
+    "có câu tiếng Việt tử tế thay vì lỗi kỹ thuật", kq.thongBao.slice(0, 60) || "(im lặng)");
+  kiem(!kq.conNut3d, "nút Khám phá 3D được giấu khi máy không có WebGL");
+  kiem(kq.co2D, "dữ liệu 2D vẫn nguyên vẹn");
   await trang.close();
 }
 

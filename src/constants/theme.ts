@@ -172,7 +172,10 @@ export const glass: CSSProperties = {
   boxShadow: E.low,
 };
 export const btnPrimary: CSSProperties = {
-  background: GRAD, color: "#fff", border: "none", cursor: "pointer",
+  /* v3 (nghiên cứu 5): nút chính ĐẶC màu plum, không gradient — gradient
+   * dành cho hero/lacquer surface; control phẳng và rõ (tinh thần
+   * Stripe/Linear). on-plum tự đảo đúng ở dark mode. */
+  background: "var(--lp-plum)", color: "var(--lp-on-plum)", border: "none", cursor: "pointer",
   fontFamily: TEXT, fontWeight: 700, fontSize: 14,
   /* Padding và chiều cao tối thiểu nằm SẴN trong kiểu nền, không để mỗi
    * nơi gọi tự nhớ. Trước đây thiếu hai dòng này nên nút nào quên đặt

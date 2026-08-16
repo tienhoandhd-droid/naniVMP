@@ -72,7 +72,9 @@ function ngay(lech) {
   return goc.toISOString().slice(0, 10);
 }
 
-function dungHangMuc(i) {
+/** Xuất cho bộ kiểm cần dữ liệu LỚN (suaKho nhân bản hạng mục — kiểm ảo
+ *  hoá hàng của bảng timeline với >100 dòng). */
+export function dungHangMuc(i) {
   const bo = BO_PHAN[i % BO_PHAN.length];
   const tt = TRANG_THAI[i % TRANG_THAI.length];
   const loai = LOAI[i % LOAI.length];
