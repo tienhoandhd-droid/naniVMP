@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { ArrowBigUp, Boxes, Eye, EyeOff, Lock, XCircle } from "lucide-react";
+import { ArrowBigUp, Boxes, CheckCircle2, Eye, EyeOff, Lock, XCircle } from "lucide-react";
 import type { AppUser } from "../../types/domain.ts";
-import { loginErrorMessage, validateLogin, type LoginErrors } from "../../lib/loginForm.ts";
+import { emailError, loginErrorMessage, validateLogin, type LoginErrors } from "../../lib/loginForm.ts";
+import { resetMailErrorMessage } from "../../lib/passwordForm.ts";
 import { isSupabaseConfigured } from "../../lib/supabaseConfig.ts";
 import LuxuryBrandPanel from "./LuxuryBrandPanel.tsx";
 
@@ -46,6 +47,38 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
      hiểu vì sao. Ô mật khẩu che ký tự nên mắt không tự phát hiện được.
      GitHub, Google và hầu hết trang đăng nhập được làm kỹ đều cảnh báo. */
   const [capsLock, setCapsLock] = useState(false);
+
+  /* Quên mật khẩu: chỉ cần email — Supabase gửi link đặt lại về hộp thư.
+     Trạng thái tách khỏi serverError để mail-đã-gửi không bị lời chào lỗi
+     đăng nhập đè mất (và ngược lại). */
+  const [quenMsg, setQuenMsg] = useState<{ type: "ok" | "err" | ""; text: string }>({ type: "", text: "" });
+  const [dangGuiMail, setDangGuiMail] = useState(false);
+  const quenMatKhau = async () => {
+    const loiEmail = emailError(email);
+    if (loiEmail) {
+      setErrors((c) => ({ ...c, email: loiEmail }));
+      setQuenMsg({ type: "err", text: "Nhập email công việc trước — mail đặt lại mật khẩu sẽ gửi tới đó" });
+      return;
+    }
+    if (!useSupa) {
+      setQuenMsg({ type: "err", text: "Hệ thống chưa cấu hình Supabase Auth. Liên hệ IT." });
+      return;
+    }
+    setDangGuiMail(true);
+    setQuenMsg({ type: "", text: "" });
+    try {
+      const { guiMailQuenMatKhau } = await import("../../lib/supabaseClient.ts");
+      await guiMailQuenMatKhau(email.trim());
+      setQuenMsg({
+        type: "ok",
+        text: `Đã gửi mail đặt lại mật khẩu tới ${email.trim()}. Mở link trong mail (kiểm tra cả mục Spam) để đặt mật khẩu mới.`,
+      });
+    } catch (error) {
+      setQuenMsg({ type: "err", text: resetMailErrorMessage(error) });
+    } finally {
+      setDangGuiMail(false);
+    }
+  };
   const soatCapsLock = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (typeof e.getModifierState === "function") setCapsLock(e.getModifierState("CapsLock"));
   };
@@ -159,6 +192,22 @@ export default function LoginScreen({ onLogin }: { onLogin: (profile: AppUser) =
             <button className="vq-luxury-btn" type="submit" disabled={loading} aria-busy={loading}>
               {loading ? "Đang đăng nhập…" : "Đăng nhập"}
             </button>
+
+            <div className="vq-login-quen-hang">
+              <button type="button" className="vq-login-quen"
+                onClick={quenMatKhau} disabled={dangGuiMail} aria-busy={dangGuiMail}>
+                {dangGuiMail ? "Đang gửi mail…" : "Quên mật khẩu?"}
+              </button>
+            </div>
+            {quenMsg.text && (
+              <p role={quenMsg.type === "ok" ? "status" : "alert"}
+                className={quenMsg.type === "ok" ? "vq-login-quen-ok" : "vq-login-error vq-login-error--server"}>
+                {quenMsg.type === "ok"
+                  ? <CheckCircle2 size={15} aria-hidden="true" />
+                  : <XCircle size={15} aria-hidden="true" />}
+                {quenMsg.text}
+              </p>
+            )}
           </form>
 
           {useSupa ? (

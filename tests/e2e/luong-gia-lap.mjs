@@ -409,6 +409,101 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
+/* ---- 3f. Đổi mật khẩu: phải chứng minh bằng mật khẩu cũ ------------- */
+{
+  console.log("\nĐổi mật khẩu:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2200));
+
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Mật khẩu"))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 600));
+
+  const soO = await trang.evaluate(() =>
+    document.querySelectorAll('input[type="password"]').length);
+  kiem(soO === 3, "hộp thoại có BA ô: hiện tại · mới · nhắc lại", `${soO} ô`);
+
+  const dienVaGui = async (cu, moi, nhacLai) => {
+    await trang.evaluate(([a, b, c]) => {
+      const os = [...document.querySelectorAll('input[type="password"]')];
+      const dat = (o, v) => {
+        if (!o) return; // RED: thiếu ô thì để assert báo, đừng crash suite
+        const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        set.call(o, v);
+        o.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      dat(os[0], a); dat(os[1], b); dat(os[2], c);
+      [...document.querySelectorAll("button")]
+        .find((n) => n.textContent?.trim() === "Xác nhận")?.click();
+    }, [cu, moi, nhacLai]);
+    await new Promise((r) => setTimeout(r, 700));
+    return trang.evaluate(() =>
+      [...document.querySelectorAll('[role="alert"], [role="status"]')]
+        .map((n) => n.textContent?.trim()).filter(Boolean).join(" | "));
+  };
+
+  const saiCu = await dienVaGui("sai-bet", "matkhau-moi-1", "matkhau-moi-1");
+  kiem(/Mật khẩu hiện tại không đúng/.test(saiCu),
+    "sai mật khẩu cũ → báo 'Mật khẩu hiện tại không đúng'", saiCu || "(im lặng)");
+
+  const khongKhop = await dienVaGui("mat-khau-dung", "matkhau-moi-1", "matkhau-moi-2");
+  kiem(/không khớp/i.test(khongKhop),
+    "hai mật khẩu mới lệch nhau → báo 'không khớp'", khongKhop || "(im lặng)");
+
+  const thanhCong = await dienVaGui("mat-khau-dung", "matkhau-moi-1", "matkhau-moi-1");
+  kiem(/thành công/i.test(thanhCong),
+    "đúng mật khẩu cũ + cặp mới khớp → báo thành công", thanhCong || "(im lặng)");
+  await trang.close();
+}
+
+/* ---- 3g. Quên mật khẩu ở màn đăng nhập ------------------------------ */
+{
+  console.log("\nQuên mật khẩu:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  /* KHÔNG nhét phiên — và phải XOÁ localStorage: các mục trước đã nhét
+     phiên vào cùng origin nên không xoá là auto-đăng-nhập, mất màn login. */
+  await trang.evaluateOnNewDocument(() => localStorage.clear());
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(GOC, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await trang.waitForSelector('input[type="password"]', { timeout: 15_000 });
+
+  const coNut = await trang.evaluate(() =>
+    [...document.querySelectorAll("button")]
+      .some((b) => /quên mật khẩu/i.test(b.textContent || "")));
+  kiem(coNut, "màn đăng nhập có nút Quên mật khẩu");
+
+  /* Bấm khi chưa nhập email → phải nhắc nhập email, không gửi khống. */
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => /quên mật khẩu/i.test(b.textContent || ""))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 500));
+  const nhacEmail = await trang.evaluate(() =>
+    [...document.querySelectorAll('[role="alert"], [role="status"]')]
+      .map((n) => n.textContent?.trim()).filter(Boolean).join(" | "));
+  kiem(/email/i.test(nhacEmail), "chưa nhập email thì nhắc nhập email", nhacEmail || "(im lặng)");
+
+  /* Nhập email rồi bấm → báo đã gửi mail. */
+  await trang.type("#vmp-login-email", "kiem-thu@vi-du.test");
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => /quên mật khẩu/i.test(b.textContent || ""))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 800));
+  const daGui = await trang.evaluate(() =>
+    [...document.querySelectorAll('[role="alert"], [role="status"]')]
+      .map((n) => n.textContent?.trim()).filter(Boolean).join(" | "));
+  kiem(/đã gửi/i.test(daGui), "có email thì báo ĐÃ GỬI mail đặt lại", daGui || "(im lặng)");
+  await trang.close();
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");

@@ -1645,6 +1645,37 @@ select { appearance: none; -webkit-appearance: none; }
   font-weight: 600;
 }
 
+/* Quên mật khẩu — nút chữ lặng lẽ dưới nút đăng nhập: đây là lối phụ,
+   không được tranh sức nặng thị giác với hành động chính. */
+.vq-login-quen-hang {
+  display: flex;
+  justify-content: center;
+  margin-top: -4px;
+}
+.vq-login-quen {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-plum);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.vq-login-quen:disabled { opacity: 0.6; cursor: default; }
+.vq-login-quen-ok {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--lp-success);
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .vq-login-error--server {
   padding: 12px 16px;
   border-radius: 10px;

@@ -121,31 +121,72 @@ import type { Database } from "./types/database.ts";
 import {
   isSupabaseConfigured,
   changePassword,
+  datLaiMatKhauKhoiPhuc,
   supabase,
 } from "./lib/supabaseClient.ts";
+import {
+  validateChangePassword,
+  changePasswordErrorMessage,
+  type ChangePasswordErrors,
+} from "./lib/passwordForm.ts";
 
-/* ===================== Change Password ===================== */
-function ChangePwModal({ onClose }: { onClose: () => void }) {
-  const [np, setNp] = useState(""); const [cf, setCf] = useState(""); const [msg, setMsg] = useState({ type: "", text: "" }); const [loading, setLoading] = useState(false);
+/* ===================== Change Password =====================
+ * Đổi mật khẩu phải CHỨNG MINH bằng mật khẩu hiện tại (re-auth phía
+ * client — updateUser của Supabase không tự đòi). Chế độ recovery (vào
+ * bằng link email "quên mật khẩu") là ngoại lệ duy nhất: link đã là bằng
+ * chứng, ô mật khẩu cũ được ẩn đi. Luật validate + dịch lỗi nằm ở
+ * lib/passwordForm.ts để unit test được. */
+function ChangePwModal({ onClose, recovery = false }: { onClose: () => void; recovery?: boolean }) {
+  const [cu, setCu] = useState("");
+  const [moi, setMoi] = useState("");
+  const [nhacLai, setNhacLai] = useState("");
+  const [loiO, setLoiO] = useState<ChangePasswordErrors>({});
+  const [msg, setMsg] = useState({ type: "", text: "" });
+  const [loading, setLoading] = useState(false);
+
   const submit = async () => {
-    if (np.length < 6) return setMsg({ type: "err", text: "Mật khẩu mới tối thiểu 6 ký tự." });
-    if (np !== cf) return setMsg({ type: "err", text: "Xác nhận không khớp." });
-    if (isSupabaseConfigured()) {
-      setLoading(true);
-      try { await changePassword(np); setMsg({ type: "ok", text: "Đổi mật khẩu thành công!" }); setNp(""); setCf(""); }
-      catch (e) { setMsg({ type: "err", text: (e as Error).message }); }
-      setLoading(false);
-    } else { setMsg({ type: "err", text: "Cần Supabase để đổi mật khẩu." }); }
+    const loi = validateChangePassword({ cu, moi, nhacLai }, { recovery });
+    setLoiO(loi);
+    setMsg({ type: "", text: "" });
+    if (Object.keys(loi).length > 0) return;
+    if (!isSupabaseConfigured()) {
+      return setMsg({ type: "err", text: "Cần Supabase để đổi mật khẩu." });
+    }
+    setLoading(true);
+    try {
+      if (recovery) await datLaiMatKhauKhoiPhuc(moi);
+      else await changePassword(cu, moi);
+      setMsg({ type: "ok", text: "Đổi mật khẩu thành công!" });
+      setCu(""); setMoi(""); setNhacLai("");
+    } catch (e) {
+      setMsg({ type: "err", text: changePasswordErrorMessage(e) });
+    }
+    setLoading(false);
   };
+
   /* Có chữ trong ô mà chưa lưu thì báo cho sổ chung, để nút Thoát ở shell
      biết mà hỏi lại thay vì vứt mất phần vừa gõ. */
-  useRegisterDirtyState("doi-mat-khau", (np.length > 0 || cf.length > 0) && msg.type !== "ok");
+  useRegisterDirtyState("doi-mat-khau",
+    (cu.length > 0 || moi.length > 0 || nhacLai.length > 0) && msg.type !== "ok");
+
+  const cacO: Array<{ ten: keyof ChangePasswordErrors; nhan: string; giaTri: string;
+    dat: (v: string) => void; autoComplete: string }> = [
+    ...(recovery ? [] : [{
+      ten: "cu" as const, nhan: "Mật khẩu hiện tại", giaTri: cu, dat: setCu,
+      autoComplete: "current-password",
+    }]),
+    { ten: "moi", nhan: "Mật khẩu mới", giaTri: moi, dat: setMoi, autoComplete: "new-password" },
+    { ten: "nhacLai", nhan: "Nhắc lại mật khẩu mới", giaTri: nhacLai, dat: setNhacLai,
+      autoComplete: "new-password" },
+  ];
 
   return (
     <ViewportDialog
       open
-      title="Đổi mật khẩu"
-      description="Mật khẩu mới tối thiểu 6 ký tự."
+      title={recovery ? "Đặt mật khẩu mới" : "Đổi mật khẩu"}
+      description={recovery
+        ? "Bạn vào bằng link email nên không cần mật khẩu cũ. Mật khẩu mới tối thiểu 6 ký tự."
+        : "Cần mật khẩu hiện tại để xác minh. Mật khẩu mới tối thiểu 6 ký tự."}
       icon={KeyRound}
       maxWidth={460}
       onRequestClose={onClose}
@@ -157,15 +198,22 @@ function ChangePwModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {["Mật khẩu mới", "Xác nhận"].map((ph, i) => (
-          <label key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.plum }}>{ph}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 42, padding: "0 14px", borderRadius: R.sm, background: C.surface, border: `1px solid var(--lp-line-strong)` }}>
+        {cacO.map((o, i) => (
+          <label key={o.ten} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.plum }}>{o.nhan}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 42, padding: "0 14px", borderRadius: R.sm, background: C.surface, border: `1px solid ${loiO[o.ten] ? C.raspText : "var(--lp-line-strong)"}` }}>
               <KeyRound size={16} color={C.pink} />
-              <input type="password" value={i === 0 ? np : cf} autoFocus={i === 0}
-                onChange={(e) => { (i === 0 ? setNp : setCf)(e.target.value); setMsg({ type: "", text: "" }); }}
+              <input type="password" value={o.giaTri} autoFocus={i === 0}
+                autoComplete={o.autoComplete}
+                aria-invalid={Boolean(loiO[o.ten])}
+                onChange={(e) => { o.dat(e.target.value); setLoiO((l) => ({ ...l, [o.ten]: undefined })); setMsg({ type: "", text: "" }); }}
                 style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 14, color: C.plum, width: "100%", fontWeight: 600, minHeight: 40 }} />
             </div>
+            {loiO[o.ten] && (
+              <span role="alert" style={{ fontSize: 12.5, fontWeight: 700, color: C.raspText, display: "flex", alignItems: "center", gap: 5 }}>
+                <XCircle size={13} /> {loiO[o.ten]}
+              </span>
+            )}
           </label>
         ))}
         {msg.text && (
@@ -1563,6 +1611,18 @@ function AppShell() {
     () => khoiTaoDayDu.nhom ?? "hangmuc",
   );
   const [showPw, setShowPw] = useState(false);
+  /* Vào từ link email "quên mật khẩu": supabase-js (detectSessionInUrl)
+     nhặt token recovery trong hash, dựng phiên rồi phát PASSWORD_RECOVERY
+     — lúc đó mở thẳng hộp đặt mật khẩu mới, KHÔNG hỏi mật khẩu cũ (người
+     dùng quên nó mới phải đi đường này). */
+  const [khoiPhucMk, setKhoiPhucMk] = useState(false);
+  useEffect(() => {
+    if (!supabase) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((suKien) => {
+      if (suKien === "PASSWORD_RECOVERY") { setKhoiPhucMk(true); setShowPw(true); }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   /* Thoát mà còn form đang dở thì hỏi lại. Trước đây bấm Thoát là mất
      trắng phần vừa gõ, không một lời cảnh báo — với form nhập liệu GMP
@@ -1821,7 +1881,12 @@ function AppShell() {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>
-      {showPw && <ChangePwModal onClose={() => setShowPw(false)} />}
+      {showPw && (
+        <ChangePwModal
+          recovery={khoiPhucMk}
+          onClose={() => { setShowPw(false); setKhoiPhucMk(false); }}
+        />
+      )}
 
       <ShellConfirmDialog
         open={hoiThoat}

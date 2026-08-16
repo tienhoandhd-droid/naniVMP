@@ -22,7 +22,11 @@ export type AuditAction = Database["public"]["Enums"]["audit_action"];
 // Tạo client (hoặc null nếu chưa cấu hình)
 export const supabase = isSupabaseConfigured()
   ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
+      /* detectSessionInUrl BẬT để link email "quên mật khẩu" hoạt động:
+       * supabase-js nhặt #access_token…type=recovery trong hash, dựng
+       * phiên và phát PASSWORD_RECOVERY (App mở hộp đặt mật khẩu mới).
+       * Không đụng router nội bộ — router chỉ đọc hash dạng #v=… */
+      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
     })
   : null;
 
@@ -168,10 +172,41 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
   };
 }
 
-/* ---- Đổi mật khẩu ---- */
-export async function changePassword(newPassword: string): Promise<void> {
+/* ---- Đổi mật khẩu ----
+ *
+ * BẮT BUỘC chứng minh bằng mật khẩu hiện tại: updateUser() của Supabase
+ * đổi thẳng không hỏi gì — ai mượn được máy đang đăng nhập là chiếm được
+ * tài khoản. Nên re-auth bằng signInWithPassword trước; sai thì ném
+ * "MAT_KHAU_CU_SAI" để passwordForm dịch ra thông điệp tiếng Việt. */
+export async function changePassword(matKhauCu: string, matKhauMoi: string): Promise<void> {
   if (!supabase) throw new Error("Supabase chưa cấu hình.");
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  const { data } = await supabase.auth.getUser();
+  const email = data.user?.email;
+  if (!email) throw new Error("Không xác định được tài khoản hiện tại.");
+  const thu = await supabase.auth.signInWithPassword({ email, password: matKhauCu });
+  if (thu.error) throw new Error("MAT_KHAU_CU_SAI");
+  const { error } = await supabase.auth.updateUser({ password: matKhauMoi });
+  if (error) throw new Error(error.message);
+}
+
+/* ---- Đặt lại mật khẩu ở chế độ recovery ----
+ * Người dùng vào bằng link email "quên mật khẩu" — chính link đó là bằng
+ * chứng, không còn mật khẩu cũ để hỏi. */
+export async function datLaiMatKhauKhoiPhuc(matKhauMoi: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình.");
+  const { error } = await supabase.auth.updateUser({ password: matKhauMoi });
+  if (error) throw new Error(error.message);
+}
+
+/* ---- Quên mật khẩu: gửi mail đặt lại ----
+ * redirectTo trỏ về đúng trang đang chạy (Pages/preview/local đều đúng);
+ * supabase-js với detectSessionInUrl sẽ nhặt token trong hash khi người
+ * dùng quay lại và phát sự kiện PASSWORD_RECOVERY. */
+export async function guiMailQuenMatKhau(email: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình.");
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
   if (error) throw new Error(error.message);
 }
 

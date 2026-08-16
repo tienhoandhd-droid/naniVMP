@@ -22,6 +22,9 @@ export function layRef(url) {
   return new URL(url).hostname.split(".")[0];
 }
 
+/** Mật khẩu "đúng" của người kiểm thử — bộ đổi-mật-khẩu re-auth với nó. */
+export const MAT_KHAU_DUNG = "mat-khau-dung";
+
 const NGUOI_DUNG = {
   id: "00000000-0000-4000-8000-000000000001",
   aud: "authenticated",
@@ -460,9 +463,9 @@ export function traLoi(kho, u, req) {
   const dau = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS,HEAD",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD",
     "Access-Control-Allow-Headers":
-      "authorization,apikey,content-type,content-profile,accept,accept-profile,prefer,range,x-client-info",
+      "authorization,apikey,content-type,content-profile,accept,accept-profile,prefer,range,x-client-info,x-supabase-api-version",
     "Access-Control-Expose-Headers": "content-range,content-profile",
     "Access-Control-Max-Age": "600",
   };
@@ -471,7 +474,27 @@ export function traLoi(kho, u, req) {
 
   /* Auth */
   if (u.pathname.startsWith("/auth/v1/token")) {
+    /* grant_type=password có KIỂM mật khẩu: bộ đổi-mật-khẩu re-auth bằng
+       mật khẩu cũ, nên mock phải phân biệt đúng/sai. Mật khẩu đúng của
+       người kiểm thử là MAT_KHAU_DUNG; refresh_token luôn qua. */
+    let body = null;
+    try { body = JSON.parse(req.postData() || "null"); } catch { body = null; }
+    const laPassword = u.search.includes("grant_type=password");
+    if (laPassword && body && body.password !== MAT_KHAU_DUNG) {
+      return {
+        status: 400, headers: dau,
+        body: JSON.stringify({
+          code: 400, error_code: "invalid_credentials",
+          error_description: "Invalid login credentials",
+          msg: "Invalid login credentials",
+        }),
+      };
+    }
     return { status: 200, headers: dau, body: JSON.stringify(phienGia()) };
+  }
+  if (u.pathname.startsWith("/auth/v1/recover")) {
+    // Quên mật khẩu: GoTrue trả 200 rỗng dù email tồn tại hay không.
+    return { status: 200, headers: dau, body: "{}" };
   }
   if (u.pathname.startsWith("/auth/v1/user")) {
     return { status: 200, headers: dau, body: JSON.stringify(NGUOI_DUNG) };
