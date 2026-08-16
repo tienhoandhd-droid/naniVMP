@@ -28,6 +28,7 @@ import { nhapCoThuLai } from "../../lib/tailMan.ts";
 const VmpSpace3D = lazy(nhapCoThuLai(() => import("../three/VmpSpace3D.tsx")));
 import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
+import { ThanhTraToggle } from "../layout/Layout.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import {
@@ -386,9 +387,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* ===== Bộ lọc dữ liệu báo cáo — lấy số liệu theo bất kỳ lát cắt nào ===== */}
       <Card>
-        <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo bên dưới — kể cả dữ liệu thô và bản xuất. Chọn tháng/quý ở mục 2.">
-          Bộ lọc dữ liệu báo cáo quản lý
-        </CardTitle>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo bên dưới — kể cả dữ liệu thô và bản xuất. Chọn tháng/quý ở mục 2.">
+            Bộ lọc dữ liệu báo cáo quản lý
+          </CardTitle>
+          {/* Chế độ trình bày thanh tra sống ở ĐÂY (nghiên cứu (3)): nơi
+              người ta chuẩn bị đưa số liệu cho người ngoài xem — không còn
+              là toggle toàn cục vô danh trong user card. */}
+          <ThanhTraToggle />
+        </div>
         <div className="vmp-report-command-bar">
           {/* Chỉ còn chọn NĂM ở đây — năm là thứ chi phối cả mục 1 (tổng quan
               năm) lẫn biểu đồ 12 tháng. Chọn tháng/quý nằm trong chính mục 2,

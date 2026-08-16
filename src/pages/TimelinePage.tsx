@@ -1714,7 +1714,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
         </div>
         {kham3D && (
           <Suspense fallback={<div style={{ height: 420 }} />}>
-            <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong}
+            <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong} macDinh3D
               onOpenCell={onOpenWorkloadCell} />
           </Suspense>
         )}

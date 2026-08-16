@@ -144,9 +144,10 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 </div>
               </div>
             </div>
-            <div style={{ marginTop: 11 }}>
-              <ThanhTraToggle />
-            </div>
+            {/* Thanh tra đã RỜI khỏi user card (nghiên cứu (3) P1): toggle
+                toàn cục cạnh nút Thoát không nói được nó để làm gì. Giờ là
+                "chế độ trình bày thanh tra" trong màn Báo cáo & AI, có
+                banner + thay đổi thấy ngay khi bật. */}
             <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
               {/* nowrap + đệm ngang hẹp: sidebar nay là 248px thay vì 266px,
                   và ở bề ngang đó nhãn "Mật khẩu" bị bẻ xuống hai dòng. */}
@@ -310,7 +311,6 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
           <div style={{ color: C.plumSoft, fontSize: 12, fontWeight: 700, marginTop: 2 }}>{user?.role}</div>
           <div className="vmp-mobile-drawer-preferences">
             <ThemeToggle />
-            <ThanhTraToggle />
           </div>
           <button type="button" onClick={() => { onChangePw(); onActionClose(); }} className="vmp-mobile-drawer-account-action">
             <KeyRound size={15} /> Mật khẩu
@@ -392,13 +392,16 @@ function ThemeToggle() {
 }
 
 /* Công tắc chế độ thanh tra — xem dungThanhTra() trong Primitives.tsx. */
-function ThanhTraToggle() {
+/* Toggle chế độ trình bày thanh tra — nay chỉ đứng trong màn Báo cáo & AI
+   (xuất cho ReportsView dùng). Hiệu ứng khi bật: banner cố định, ẩn Vali
+   và trang trí, bỏ emoji/biệt danh — thấy ngay, không phải đoán. */
+export function ThanhTraToggle() {
   const [bat, setBat] = dungThanhTra();
   return (
     <button onClick={() => setBat(!bat)}
       title={bat
-        ? "Chế độ thanh tra ĐANG BẬT — ẩn emoji, biệt danh và xếp hạng cá nhân. Bấm để tắt."
-        : "Bật chế độ thanh tra: ngôn ngữ trung tính, không emoji, không xếp hạng cá nhân"}
+        ? "Chế độ trình bày thanh tra ĐANG BẬT — ẩn minh hoạ, emoji, biệt danh và xếp hạng cá nhân. Bấm để tắt."
+        : "Bật chế độ trình bày thanh tra: ngôn ngữ trung tính, ẩn minh hoạ trang trí, không emoji, không xếp hạng cá nhân"}
       aria-pressed={bat}
       style={{ ...glass, height: 40, padding: "0 14px", borderRadius: 999,
                border: bat ? `1.5px solid ${C.plum}` : "none",

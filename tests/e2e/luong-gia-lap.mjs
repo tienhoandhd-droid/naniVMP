@@ -504,6 +504,156 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
+/* ---- 3h. Tổng quan 1366: Phân tích chi tiết KHÔNG đè chữ ------------ */
+{
+  console.log("\nTổng quan 1366 — không đè chữ:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1366, height: 768 });
+  await trang.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2200));
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button.vmp-mo-sau")]
+      .find((x) => x.textContent?.includes("Phân tích chi tiết"))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 1000));
+
+  /* Khối phân tích phải có khu đất grid RIÊNG, không cùng ô với thẻ khác. */
+  const khu = await trang.evaluate(() => {
+    const sau = document.querySelector(".vmp-bento > .b-sau");
+    const wide = document.querySelector(".vmp-bento > .card.b-wide, .vmp-bento > .b-wide");
+    if (!sau || !wide) return { co: false };
+    const a = sau.getBoundingClientRect(); const b = wide.getBoundingClientRect();
+    const giaoDoc = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+    return { co: true, giaoDoc };
+  });
+  kiem(khu.co && khu.giaoDoc <= 0, "khối phân tích không chồng lên thẻ khác",
+    `giao dọc ${khu.giaoDoc}px`);
+
+  /* Quét chồng chữ THẬT bằng elementFromPoint qua toàn trang. */
+  const chong = await trang.evaluate(async () => {
+    const main = document.querySelector("main");
+    main.scrollTo({ top: 0 });
+    const loi = [];
+    for (let buoc = 0; buoc < 10; buoc++) {
+      await new Promise((r) => setTimeout(r, 100));
+      const la = [...document.querySelectorAll("main *")]
+        .filter((e) => e.children.length === 0 && (e.textContent || "").trim().length > 2);
+      for (const e of la) {
+        /* Chữ đang ẨN (tooltip đóng, lớp opacity 0) vẫn có rect — không
+           phải chữ người dùng thấy, bỏ qua. */
+        if (e.checkVisibility && !e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue;
+        const r0 = e.getBoundingClientRect();
+        if (r0.width < 8 || r0.height < 8) continue;
+        if (r0.top < 90 || r0.bottom > innerHeight) continue;
+        const tren = document.elementFromPoint(r0.left + r0.width / 2, r0.top + r0.height / 2);
+        if (!tren || tren === e || tren.contains(e) || e.contains(tren)) continue;
+        /* Chỉ tính phần tử đè có CHỮ TRỰC TIẾP của chính nó: div bọc
+           trong suốt, svg biểu đồ, lớp hover pointer-events:none không
+           phải là "đè chữ" theo nghĩa người dùng thấy. */
+        if (tren.closest("svg, canvas")) continue;
+        if (getComputedStyle(tren).pointerEvents === "none") continue;
+        const chuRieng = [...tren.childNodes]
+          .some((n) => n.nodeType === 3 && n.textContent.trim().length > 0);
+        if (!chuRieng) continue;
+        const chuTren = (tren.textContent || "").trim();
+        if (chuTren && !chuTren.includes((e.textContent || "").trim().slice(0, 10))) {
+          loi.push(`${e.textContent.trim().slice(0, 24)} << ${(tren.className || tren.tagName)}`.slice(0, 60));
+        }
+      }
+      main.scrollBy(0, 560);
+    }
+    return loi;
+  });
+  kiem(chong.length === 0, "không phần tử chữ nào bị phần tử khác đè",
+    chong.slice(0, 3).join(" | ") || "");
+  await trang.close();
+}
+
+/* ---- 3i. Thanh tra = chế độ trình bày có nghĩa ---------------------- */
+{
+  console.log("\nChế độ trình bày thanh tra:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2000));
+
+  const sidebar = await trang.evaluate(() =>
+    [...document.querySelectorAll("aside button, nav button")]
+      .some((b) => b.textContent?.trim() === "Thanh tra"));
+  kiem(!sidebar, "user card KHÔNG còn toggle Thanh tra vô danh");
+
+  const coVali = await trang.evaluate(() => {
+    const v = document.querySelector("[data-lp-vali]");
+    return !!v && getComputedStyle(v).display !== "none";
+  });
+  kiem(coVali, "bình thường Vali hiển thị (tiền đề cho phép thử ẩn)");
+
+  await trang.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2200));
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Thanh tra"))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 600));
+  const sauBat = await trang.evaluate(() => ({
+    banner: !!document.querySelector("[data-thanhtra-banner]"),
+    chuBanner: document.querySelector("[data-thanhtra-banner]")?.textContent || "",
+  }));
+  kiem(sauBat.banner && /trình bày thanh tra/i.test(sauBat.chuBanner),
+    "bật ở Báo cáo thì banner hiện ngay", sauBat.chuBanner.slice(0, 60) || "(không có)");
+
+  /* Sang trang khác: banner còn, Vali bị ẩn. */
+  await trang.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2000));
+  const oTrangKhac = await trang.evaluate(() => ({
+    banner: !!document.querySelector("[data-thanhtra-banner]"),
+    valiHien: (() => {
+      const v = document.querySelector("[data-lp-vali]");
+      return !!v && getComputedStyle(v).display !== "none";
+    })(),
+  }));
+  kiem(oTrangKhac.banner, "banner theo sang trang khác");
+  kiem(!oTrangKhac.valiHien, "Vali và trang trí bị ẩn khi trình bày thanh tra");
+
+  await trang.evaluate(() => {
+    document.querySelector("[data-thanhtra-banner] button")?.click();
+  });
+  await new Promise((r) => setTimeout(r, 400));
+  const daTat = await trang.evaluate(() => !document.querySelector("[data-thanhtra-banner]"));
+  kiem(daTat, "nút Tắt trên banner tắt được tại chỗ");
+  await trang.close();
+}
+
+/* ---- 3k. Báo cáo: khối VMP 2D là mặc định, 3D là khám phá ----------- */
+{
+  console.log("\nBáo cáo — khối VMP 2D mặc định:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2600));
+  const kq = await trang.evaluate(() => {
+    const khoi = document.querySelector(".vmp-space3d");
+    const nut = [...(khoi?.querySelectorAll(".vmp-space3d-doi button") || [])];
+    return {
+      coKhoi: !!khoi,
+      coCanvas: !!khoi?.querySelector("canvas"),
+      nut2dChon: nut.find((b) => b.textContent?.includes("2D"))?.className.includes("is-chon"),
+      coNut3d: nut.some((b) => b.textContent?.includes("3D")),
+    };
+  });
+  kiem(kq.coKhoi, "khối không gian VMP có mặt ở Báo cáo");
+  kiem(!kq.coCanvas, "mặc định KHÔNG dựng canvas — bảng nhiệt 2D là mặt chính");
+  kiem(!!kq.nut2dChon, "nút Bảng nhiệt 2D đang được chọn");
+  kiem(kq.coNut3d, "vẫn có nút Khối 3D để khám phá");
+  await trang.close();
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");

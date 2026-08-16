@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, Edges, OrthographicCamera, OrbitControls } from "@react-three/drei";
+import { Edges, OrthographicCamera, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { DEPTS } from "../../constants/vmp.ts";
 import type { Activity } from "../../types/domain.ts";
@@ -88,6 +88,10 @@ function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onH
   const shownCap = useRef(giamChuyenDong ? capHeight : 0.004);
   const opacity = selectionActive && !selected ? .3 : 1;
 
+  /* frameloop="demand" (vệ sinh 3D 16/08): hoạt ảnh mọc cột tự xin frame
+     bằng invalidate() cho tới khi cột chạm đích rồi NGỪNG — scene đứng
+     yên thì GPU đứng yên, không còn render loop vô hạn. */
+  const invalidate = useThree((state) => state.invalidate);
   useFrame((_, delta) => {
     if (!body.current || giamChuyenDong) return;
     shownHeight.current += (targetHeight - shownHeight.current) * Math.min(1, delta * 4.5);
@@ -100,6 +104,8 @@ function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onH
       cap.current.scale.y = capScale;
       cap.current.position.y = height + capScale / 2;
     }
+    if (Math.abs(targetHeight - shownHeight.current) > .003
+      || Math.abs(capHeight - shownCap.current) > .003) invalidate();
   });
 
   const position: [number, number, number] = [(cell.month - 6.5) * MONTH_STEP, 0, (cell.departmentIndex - (DEPTS.length - 1) / 2) * DEPARTMENT_STEP];
@@ -110,8 +116,7 @@ function Column({ cell, maxTotal, selected, selectionActive, giamChuyenDong, onH
         position={[0, giamChuyenDong ? targetHeight / 2 : .002, 0]}
         onPointerOver={(event) => { event.stopPropagation(); onHover(cell); }}
         onPointerOut={() => onHover(null)}
-        onClick={(event) => { event.stopPropagation(); onSelect(cell); }}
-        castShadow receiveShadow>
+        onClick={(event) => { event.stopPropagation(); onSelect(cell); }}>
         <boxGeometry args={[.46, 1, .5]} />
         <meshPhysicalMaterial color={workloadCellColor(cell.completionRate)} transparent opacity={opacity}
           roughness={.34} metalness={.04} emissive={workloadCellColor(cell.completionRate)} emissiveIntensity={selected ? .45 : 0} />
@@ -228,13 +233,12 @@ function Scene({ cells, maxTotal, selected, hover, giamChuyenDong, onHover, onSe
       minPolarAngle={.55} maxPolarAngle={1.25}
       minAzimuthAngle={.35} maxAzimuthAngle={1.25} target={DEFAULT_TARGET} />
     <ambientLight intensity={.8} />
-    <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow />
+    <directionalLight position={[6, 9, 6]} intensity={1.15} />
     <directionalLight position={[-6, 4, -5]} intensity={.35} color="#ffe4f1" />
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.004, 0]} receiveShadow>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.004, 0]}>
       <planeGeometry args={[width + 1.4, depth + 1.4]} /><meshBasicMaterial color="#F7F1F8" />
     </mesh>
     <gridHelper args={[Math.max(width, depth) + 1, 12, "#E7DAEB", "#F1E8F3"]} position={[0, .001, 0]} />
-    <ContactShadows position={[0, .002, 0]} opacity={.42} scale={Math.max(width, depth) + 1} blur={1.6} far={1.2} resolution={1024} />
     <NhanTruc nhan={labels} tam={[0, CAO_MAX / 2, 0]} declutterSo />
     {cells.map((cell) => <Column key={cellKey(cell)} cell={cell} maxTotal={maxTotal}
       selected={!!selected && cellKey(selected) === cellKey(cell)} selectionActive={!!selected}
@@ -251,19 +255,36 @@ export function WorkloadCellDetail({ cell, onOpenCell }: { cell: WorkloadCell | 
   </div>;
 }
 
-export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell }: {
+export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell, macDinh3D = false }: {
   acts: Activity[];
   nam: number;
   giamChuyenDong: boolean;
   onOpenCell?: (cell: WorkloadCell) => void;
+  /** true khi khối này đứng SAU một cửa opt-in 3D rõ ràng (vd tab
+   *  "Khám phá 3D" của Timeline) — lúc đó mở 3D luôn mới đúng lời hứa. */
+  macDinh3D?: boolean;
 }) {
   const cells = useMemo(() => buildWorkloadMap(acts, nam), [acts, nam]);
   const maxTotal = useMemo(() => cells.reduce((max, cell) => Math.max(max, cell.total), 1), [cells]);
   const [hover, setHover] = useState<WorkloadCell | null>(null);
   const [selected, setSelected] = useState<WorkloadCell | null>(null);
-  const [mode, setMode] = useState<"3d" | "2d">(() => (
-    typeof window !== "undefined" && window.matchMedia?.("(max-width: 760px)").matches ? "2d" : "3d"
-  ));
+  /* 2D là MẶC ĐỊNH (nghiên cứu (3) P0): bảng nhiệt trả lời câu nghiệp vụ
+     nhanh hơn; 3D là khám phá tự chọn, có trí nhớ để ai đã thích thì
+     không phải bấm lại mỗi lần. Mobile luôn 2D. */
+  const [mode, setModeRaw] = useState<"3d" | "2d">(() => {
+    if (typeof window === "undefined") return "2d";
+    if (window.matchMedia?.("(max-width: 760px)").matches) return "2d";
+    try {
+      const nho = localStorage.getItem("vmp-workload-3d");
+      if (nho === "mo") return "3d";
+      if (nho === "dong") return "2d";
+    } catch { /* riêng tư */ }
+    return macDinh3D ? "3d" : "2d";
+  });
+  const setMode = (m: "3d" | "2d") => {
+    setModeRaw(m);
+    try { localStorage.setItem("vmp-workload-3d", m === "3d" ? "mo" : "dong"); } catch { /* riêng tư */ }
+  };
   useEffect(() => {
     setHover(null);
     setSelected((current) => reconcileWorkloadSelection(current, cells));
@@ -299,7 +320,9 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell 
     {mode === "3d" ? <div className="vmp-space3d-than">
       <div id="workload-map-3d" className="vmp-space3d-khung" data-testid="workload-map-3d">
         <ThreeFallbackBoundary onUse2D={() => setMode("2d")}>
-          <Canvas dpr={[1, 2]} shadows="soft" frameloop={giamChuyenDong ? "demand" : "always"}
+          {/* demand + dpr ≤1.5 + không shadow map (nghiên cứu (3) §budget):
+              analytics gần như tĩnh không cần game-engine loop. */}
+          <Canvas dpr={[1, 1.5]} frameloop="demand"
             gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05, outputColorSpace: THREE.SRGBColorSpace }}>
             <Scene cells={cells} maxTotal={maxTotal} selected={selected} hover={hover} giamChuyenDong={giamChuyenDong}
               onHover={setHover} onSelect={setSelected} onResetReady={onResetReady} />

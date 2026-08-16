@@ -8,7 +8,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { C, TEXT, NUM, NUM_HERO, DISPLAY, MO, R, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
-import { XCircle } from "lucide-react";
+import { ShieldCheck, XCircle } from "lucide-react";
 import ValiIllustration from "../brand/ValiIllustration.tsx";
 
 // ======================== SPARKLE ========================
@@ -295,6 +295,11 @@ export function TableScroll({ children, maxHeight = "68vh", hint = true }: {
            để hiểu". Bỏ một chiều của bảng so sánh là mất chính thứ nó dùng
            để so sánh. Khai báo để luật A7 của bộ kiểm biết đây là chủ ý. */
         data-lp-scroll="ngang"
+        /* Vùng cuộn phải focus được để cuộn bằng bàn phím (axe:
+           scrollable-region-focusable — mức serious). */
+        tabIndex={0}
+        role="group"
+        aria-label="Bảng dữ liệu cuộn được"
         style={{ maxHeight }}
         onMouseDown={onDown}
         onMouseMove={onMove}
@@ -786,18 +791,52 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
  * một chế độ trung tính khi cần. Bật/tắt không đụng tới dữ liệu, chỉ đổi
  * cách trình bày — nên không có chuyện "hai bản số liệu khác nhau".
  */
+/** Ghi trạng thái chế độ thanh tra ra "một nguồn": attribute + localStorage.
+ *  Banner và mọi nơi khác theo dõi attribute nên bật/tắt từ đâu cũng khớp. */
+export function datThanhTra(bat: boolean): void {
+  document.documentElement.setAttribute("data-thanhtra", bat ? "1" : "0");
+  try {
+    if (bat) localStorage.setItem("vmp-thanhtra", "1");
+    else localStorage.removeItem("vmp-thanhtra");
+  } catch { /* localStorage bị chặn thì vẫn chạy, chỉ không nhớ */ }
+}
+
 export function dungThanhTra(): [boolean, (v: boolean) => void] {
   const [bat, setBat] = useState(() => {
     try { return localStorage.getItem("vmp-thanhtra") === "1"; } catch { return false; }
   });
+  useEffect(() => { datThanhTra(bat); }, [bat]);
+  /* Nơi khác (vd banner) có thể tắt qua datThanhTra — đồng bộ lại state. */
   useEffect(() => {
-    document.documentElement.setAttribute("data-thanhtra", bat ? "1" : "0");
-    try {
-      if (bat) localStorage.setItem("vmp-thanhtra", "1");
-      else localStorage.removeItem("vmp-thanhtra");
-    } catch { /* localStorage bị chặn thì vẫn chạy, chỉ không nhớ */ }
-  }, [bat]);
+    const mo = new MutationObserver(() =>
+      setBat(document.documentElement.getAttribute("data-thanhtra") === "1"));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-thanhtra"] });
+    return () => mo.disconnect();
+  }, []);
   return [bat, setBat];
+}
+
+/** Banner cố định khi chế độ trình bày thanh tra đang bật (nghiên cứu (3):
+ *  "bật xong phải thấy thay đổi NGAY, không cần đoán"). Nói rõ đang ẩn gì
+ *  và tắt được tại chỗ. */
+export function BangThanhTra() {
+  const [bat, setBat] = useState(laThanhTra());
+  useEffect(() => {
+    const mo = new MutationObserver(() => setBat(laThanhTra()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-thanhtra"] });
+    return () => mo.disconnect();
+  }, []);
+  if (!bat) return null;
+  return (
+    <div className="vmp-bang-thanhtra" role="status" data-thanhtra-banner>
+      <ShieldCheck size={15} />
+      <span>
+        Đang ở <b>chế độ trình bày thanh tra</b> — ngôn ngữ trung tính,
+        ẩn minh hoạ và trang trí, chỉ còn dữ liệu và nguồn.
+      </span>
+      <button type="button" onClick={() => datThanhTra(false)}>Tắt</button>
+    </div>
+  );
 }
 
 /** Đọc trạng thái chế độ thanh tra ở nơi không tiện dùng hook. */

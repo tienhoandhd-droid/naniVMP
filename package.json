@@ -24,7 +24,8 @@
     "atelier": "node tests/e2e/atelier.mjs",
     "drift": "node scripts/check-design-drift.mjs",
     "visual": "playwright test -c playwright.visual.config.ts",
-    "visual:capnhat": "playwright test -c playwright.visual.config.ts --update-snapshots"
+    "visual:capnhat": "playwright test -c playwright.visual.config.ts --update-snapshots",
+    "a11y": "playwright test -c playwright.a11y.config.ts"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -37,6 +38,7 @@
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.1.2",
     "@types/react": "^18.3.31",

@@ -83,6 +83,17 @@
   --lp-focus:            rgb(90 49 88 / 0.38);
   --lp-disabled-ink:     #A79BA6;
   --lp-disabled-surface: #F1EAEC;
+  /* Bổ sung nghiên cứu (3): ranh giới control 3:1 và lưới biểu đồ hai
+   * bậc — không hex mới, chỉ vai trò mới trên mực hiện có. */
+  --lp-control-boundary: var(--lp-ink-muted);
+  --lp-grid-line:        rgb(47 36 48 / 0.09);
+  --lp-grid-line-major:  rgb(47 36 48 / 0.18);
+
+  /* --- Nhịp chuyển động (nghiên cứu (3)) ---------------------------- */
+  --lp-motion-fast: 140ms;
+  --lp-motion-ui:   180ms;
+  --lp-motion-illustration: 700ms;
+  --lp-ease: cubic-bezier(.22, .61, .36, 1);
 
   /* --- Bán kính — CHỈ ba bậc cho component mới ---------------------- *
    * control 10 · card 16 · hero/panel 24 (pill 999 cho chip). Component

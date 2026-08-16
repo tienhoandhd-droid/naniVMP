@@ -84,7 +84,8 @@ import {
   Sel,
   SkeletonDashboard,
   SyncBanner,
-  PrincessCommentary, StatTile, MultiSelect, GiaiThich, MAU_SO, Pill} from "./components/ui/Primitives.tsx";
+  PrincessCommentary, StatTile, MultiSelect, GiaiThich, MAU_SO, Pill,
+  BangThanhTra } from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 import LoginScreen from "./components/auth/LoginScreen.tsx";
 
@@ -1228,7 +1229,9 @@ function Overview({ acts, setView, access }: {
           được trong một màn: có gì cháy, đang ở đâu, hôm nay làm gì.
           Ma trận giai đoạn, phễu, tỷ lệ theo loại, bảng theo đơn vị vẫn
           giá trị nguyên vẹn — chỉ là không thuộc màn đầu tiên. */}
-      <div className="b-wide">
+      {/* b-sau, KHÔNG phải b-wide: hai item cùng grid-area là nằm chồng
+          lên nhau — chính là bug "Phân tích chi tiết đè chữ". */}
+      <div className="b-sau">
         <button type="button" className="vmp-mo-sau" onClick={() => setSau((v) => !v)}
           aria-expanded={sau}>
           <span>{sau ? "▾" : "▸"}</span>
@@ -1925,6 +1928,10 @@ function AppShell() {
             view={view} setView={setView} access={access}
             onLogout={xinThoat} onChangePw={() => setShowPw(true)}
           />
+
+          {/* Banner chế độ trình bày thanh tra — hiện trên MỌI trang khi
+              bật (bật ở màn Báo cáo & AI), tắt được tại chỗ. */}
+          <BangThanhTra />
 
           {/* Toast trạng thái lưu nổi góc phải */}
           {saveStatus && (

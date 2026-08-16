@@ -78,13 +78,19 @@ jobs:
             npm run atelier
           '
 
+      # Cổng accessibility (nghiên cứu (3) đợt 3): axe quét 5 màn chính,
+      # 0 vi phạm critical/serious mới qua. Mức nhẹ hơn in ra để trả dần.
+      - name: Accessibility (axe — 0 critical/serious)
+        run: |
+          npx playwright install chromium --with-deps
+          bash scripts/with-preview.sh -- npm run a11y
+
       # Visual regression chỉ so được khi ĐÃ có baseline sinh từ chính môi
       # trường CI (workflow "Visual baseline" tạo ra). Chưa có thì bỏ qua
       # có thông báo — không giả vờ ĐẠT.
       - name: Visual regression (so với baseline CI)
         run: |
           if [ -d tests/visual/baselines/chromium-linux ]; then
-            npx playwright install chromium --with-deps
             bash scripts/with-preview.sh -- npm run visual
           else
             echo "BỎ QUA: chưa có baseline linux — chạy workflow 'Visual baseline' để tạo."

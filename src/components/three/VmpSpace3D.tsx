@@ -23,7 +23,7 @@
  *     được ở bảng bên dưới kể cả khi máy không có WebGL.
  * ===================================================================== */
 import { useRef, useState, useMemo } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
@@ -92,20 +92,24 @@ const MAU_MUC_TIEU = "#B62E52";
 const BUOC_T = 0.46;    // khoảng cách giữa hai tháng (trục sâu)
 const BUOC_G = 0.72;    // khoảng cách giữa hai giai đoạn (trục ngang)
 
-function Cot({ o, x, z, chon, onHover }: {
-  o: O3D; x: number; z: number; chon: boolean;
+function Cot({ o, x, z, chon, giamChuyenDong, onHover }: {
+  o: O3D; x: number; z: number; chon: boolean; giamChuyenDong: boolean;
   onHover: (o: O3D | null) => void;
 }) {
   const luoi = useRef<THREE.Mesh>(null);
   const dich = ((o.tyLe ?? 0) / 100) * CAO;
   const hienTai = useRef(0);
 
+  /* frameloop="demand": hoạt ảnh tự xin frame tới khi chạm đích rồi ngừng. */
+  const invalidate = useThree((state) => state.invalidate);
   useFrame((_, dt) => {
     if (!luoi.current) return;
-    hienTai.current += (dich - hienTai.current) * Math.min(1, dt * 4.5);
+    if (giamChuyenDong) hienTai.current = dich; // giảm chuyển động: hiện thẳng
+    else hienTai.current += (dich - hienTai.current) * Math.min(1, dt * 4.5);
     const h = Math.max(0.004, hienTai.current);
     luoi.current.scale.y = h;
     luoi.current.position.y = h / 2;
+    if (!giamChuyenDong && Math.abs(dich - hienTai.current) > 0.003) invalidate();
   });
 
   const mau = GIAI_DOAN[o.giaiDoan].mau;
@@ -116,8 +120,7 @@ function Cot({ o, x, z, chon, onHover }: {
   return (
     <mesh ref={luoi} position={[x, 0, z]}
       onPointerOver={(e) => { e.stopPropagation(); onHover(o); }}
-      onPointerOut={() => onHover(null)}
-      castShadow receiveShadow>
+      onPointerOut={() => onHover(null)}>
       <boxGeometry args={[0.4, 1, 0.28]} />
       <meshPhysicalMaterial
         color={mau} roughness={0.34} metalness={0.04}
@@ -129,7 +132,8 @@ function Cot({ o, x, z, chon, onHover }: {
   );
 }
 
-function Canh({ o3d, chon, onHover }: {
+function Canh({ o3d, chon, giamChuyenDong, onHover }: {
+  giamChuyenDong: boolean;
   o3d: O3D[]; chon: O3D | null; onHover: (o: O3D | null) => void; }) {
   const sauZ = 12 * BUOC_T;
   const rongX = GIAI_DOAN.length * BUOC_G;
@@ -179,12 +183,11 @@ function Canh({ o3d, chon, onHover }: {
       />
 
       <ambientLight intensity={0.75} />
-      <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow
-        shadow-mapSize={[1024, 1024]} />
+      <directionalLight position={[6, 9, 6]} intensity={1.15} />
       <directionalLight position={[-6, 4, -5]} intensity={0.4} color="#ffe4f1" />
 
       {/* Sàn + lưới: cho khối chỗ đứng và cho mắt cái mốc để ước lượng. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]}>
         <planeGeometry args={[rongX + 0.5, sauZ + 0.4]} />
         <meshBasicMaterial color="#F7F1F8" />
       </mesh>
@@ -222,7 +225,7 @@ function Canh({ o3d, chon, onHover }: {
       <NhanTruc nhan={nhan} tam={[0, CAO / 2, 0]} />
 
       {o3d.map((o) => (
-        <Cot key={`${o.thang}-${o.giaiDoan}`} o={o}
+        <Cot key={`${o.thang}-${o.giaiDoan}`} o={o} giamChuyenDong={giamChuyenDong}
           x={x0 + o.giaiDoan * BUOC_G} z={-(z0 + (o.thang - 1) * BUOC_T)}
           chon={!!chon && chon.thang === o.thang && chon.giaiDoan === o.giaiDoan}
           onHover={onHover} />
@@ -239,7 +242,8 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
   /* Đổi 3D ↔ 2D. Giữ 3D làm mặc định vì mặt phẳng mục tiêu cắt ngang khối
      là thứ bản phẳng không làm được; nhưng ai cần đọc số chính xác — hoặc
      cần IN RA GIẤY — thì có bảng tương đương, cùng một bộ số. */
-  const [kieu, setKieu] = useState<"3d" | "2d">("3d");
+  /* 2D mặc định (nghiên cứu (3) P0) — 3D là khám phá tự chọn. */
+  const [kieu, setKieu] = useState<"3d" | "2d">("2d");
   const oNhiet: ONhiet[] = useMemo(() => o3d
     .filter((x) => x.tyLe != null)
     .map((x) => ({
@@ -313,9 +317,9 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
             Chi tiết nay hiện ở dải bên phải — ngang tầm mắt với khung vẽ,
             không cách xa như hồi nó còn nằm dưới khung. */}
         <div className="vmp-space3d-khung">
-            <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
-            frameloop={giamChuyenDong ? "demand" : "always"}>
-            <Canh o3d={o3d} chon={chon} onHover={setChon} />
+            <Canvas dpr={[1, 1.5]} gl={{ antialias: true, alpha: true }}
+            frameloop="demand">
+            <Canh o3d={o3d} chon={chon} giamChuyenDong={giamChuyenDong} onHover={setChon} />
           </Canvas>
         </div>
 

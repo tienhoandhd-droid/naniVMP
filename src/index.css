@@ -5615,7 +5615,8 @@ body { transition: background var(--mo-slow) var(--ease); }
     "k1" "k2" "k3" "k4"
     "hero"
     "vali"
-    "wide";
+    "wide"
+    "sau";
 }
 
 @media (min-width: 720px) {
@@ -5626,7 +5627,8 @@ body { transition: background var(--mo-slow) var(--ease); }
       "k3   k4"
       "hero hero"
       "vali vali"
-      "wide wide";
+      "wide wide"
+      "sau  sau";
   }
 }
 
@@ -5644,7 +5646,8 @@ body { transition: background var(--mo-slow) var(--ease); }
       "k1   k2   k3   k4"
       "hero hero hero hero"
       "vali vali vali vali"
-      "wide wide wide wide";
+      "wide wide wide wide"
+      "sau  sau  sau  sau";
   }
 }
 
@@ -5656,6 +5659,11 @@ body { transition: background var(--mo-slow) var(--ease); }
 /* .b-risk đã rời Tổng quan sang tab QRM của trang Cảnh báo & Rủi ro. */
 .vmp-bento > .b-vali { grid-area: vali; }
 .vmp-bento > .b-wide { grid-area: wide; }
+/* BUG "Phân tích chi tiết đè chữ" (nghiên cứu (3) P1): khối phân tích
+ * gập từng dùng chung class b-wide với thẻ "Việc gấp nhất" — hai grid
+ * item CÙNG grid-area thì nằm chồng lên nhau, thanh mở gập đè thẳng lên
+ * tiêu đề thẻ kia. Khối phân tích có khu đất riêng: */
+.vmp-bento > .b-sau  { grid-area: sau; }
 
 /* Ô số liệu: dải màu mảnh bên trái thay cho viền màu cả ô. Đủ để phân
    loại bằng mắt, không đủ để át con số. */
@@ -6982,4 +6990,46 @@ main li,
   border-radius: 999px;
   padding: 7px 14px;
   cursor: pointer;
+}
+
+/* =====================================================================
+ *  CHẾ ĐỘ TRÌNH BÀY THANH TRA (nghiên cứu (3) — đợt 3)
+ *  ---------------------------------------------------------------------
+ *  Bật ở màn Báo cáo & AI. Hiệu ứng phải THẤY NGAY: banner cố định, ẩn
+ *  Vali + sparkle + artwork cảm xúc; chữ trung tính do chuTrungTinh xử.
+ * =================================================================== */
+.vmp-bang-thanhtra {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 16px;
+  border-radius: var(--lp-r-control);
+  background: var(--lp-plum);
+  color: var(--lp-on-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.vmp-bang-thanhtra b { font-weight: 800; }
+.vmp-bang-thanhtra button {
+  margin-left: auto;
+  border: 1px solid rgb(255 255 255 / 45%);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+
+/* Ẩn minh hoạ/trang trí khi trình bày thanh tra: Vali (mọi mood), sparkle
+ * nền, artwork chìm. Dữ liệu và điều khiển không bị đụng. */
+:root[data-thanhtra="1"] [data-lp-vali],
+:root[data-thanhtra="1"] .tw,
+:root[data-thanhtra="1"] .lp-art-layer::after {
+  display: none !important;
 }

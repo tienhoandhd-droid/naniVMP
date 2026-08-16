@@ -19,7 +19,7 @@
  *  Vẫn trực giao và vẫn xoay được — xem chú thích ở VmpSpace3D.tsx.
  * ===================================================================== */
 import { useRef, useState, useMemo } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera, OrbitControls, Edges } from "@react-three/drei";
 import { KhungVua, bienPhuongVi } from "./KhungVua.tsx";
 import * as THREE from "three";
@@ -67,19 +67,24 @@ const BUOC_X = 0.5;
 const BUOC_Z = 0.72;
 const CAO_MAX = 2.2;
 
-function Cot({ o, caoNhat, chon, onHover }: {
-  o: ORui; caoNhat: number; chon: boolean; onHover: (o: ORui | null) => void;
+function Cot({ o, caoNhat, chon, giamChuyenDong, onHover }: {
+  o: ORui; caoNhat: number; chon: boolean; giamChuyenDong: boolean;
+  onHover: (o: ORui | null) => void;
 }) {
   const m = useRef<THREE.Mesh>(null);
   const dich = (o.n / Math.max(1, caoNhat)) * CAO_MAX;
   const hien = useRef(0);
 
+  /* frameloop="demand": hoạt ảnh tự xin frame tới khi chạm đích rồi ngừng. */
+  const invalidate = useThree((state) => state.invalidate);
   useFrame((_, dt) => {
     if (!m.current) return;
-    hien.current += (dich - hien.current) * Math.min(1, dt * 4.5);
+    if (giamChuyenDong) hien.current = dich;   // giảm chuyển động: hiện thẳng
+    else hien.current += (dich - hien.current) * Math.min(1, dt * 4.5);
     const h = Math.max(0.004, hien.current);
     m.current.scale.y = h;
     m.current.position.y = h / 2;
+    if (!giamChuyenDong && Math.abs(dich - hien.current) > 0.003) invalidate();
   });
 
   const mau = MAU[qrmLevel(o.rpn)];
@@ -87,8 +92,7 @@ function Cot({ o, caoNhat, chon, onHover }: {
     <mesh ref={m}
       position={[(o.ng - 5) * BUOC_X, 0, (o.kn - 1.5) * BUOC_Z]}
       onPointerOver={(e) => { e.stopPropagation(); onHover(o); }}
-      onPointerOut={() => onHover(null)}
-      castShadow receiveShadow>
+      onPointerOut={() => onHover(null)}>
       <boxGeometry args={[0.36, 1, 0.5]} />
       <meshPhysicalMaterial color={mau} roughness={0.34} metalness={0.04}
         emissive={mau} emissiveIntensity={chon ? 0.5 : 0} />
@@ -97,7 +101,8 @@ function Cot({ o, caoNhat, chon, onHover }: {
   );
 }
 
-function Canh({ o3d, caoNhat, chon, onHover }: {
+function Canh({ o3d, caoNhat, chon, giamChuyenDong, onHover }: {
+  giamChuyenDong: boolean;
   o3d: ORui[]; caoNhat: number; chon: ORui | null;
   onHover: (o: ORui | null) => void;
 }) {
@@ -135,10 +140,10 @@ function Canh({ o3d, caoNhat, chon, onHover }: {
         autoRotate={false} target={[0, CAO_MAX / 2, 0]} />
 
       <ambientLight intensity={0.78} />
-      <directionalLight position={[6, 9, 6]} intensity={1.15} castShadow shadow-mapSize={[1024, 1024]} />
+      <directionalLight position={[6, 9, 6]} intensity={1.15} />
       <directionalLight position={[-6, 4, -5]} intensity={0.4} color="#ffe4f1" />
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]}>
         <planeGeometry args={[rongX + 0.6, sauZ + 0.5]} />
         <meshBasicMaterial color="#F7F1F8" />
       </mesh>
@@ -147,7 +152,7 @@ function Canh({ o3d, caoNhat, chon, onHover }: {
       <NhanTruc nhan={nhan} tam={[0, CAO_MAX / 2, 0]} />
 
       {o3d.map((o) => (
-        <Cot key={`${o.ng}-${o.kn}`} o={o} caoNhat={caoNhat}
+        <Cot key={`${o.ng}-${o.kn}`} o={o} caoNhat={caoNhat} giamChuyenDong={giamChuyenDong}
           chon={!!chon && chon.ng === o.ng && chon.kn === o.kn} onHover={onHover} />
       ))}
     </>
@@ -163,7 +168,8 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
   /* Đổi 3D ↔ 2D — xem lý do ở WorkloadSpace3D.tsx. Ở khối này bản 2D còn
      có một lợi thế riêng: ma trận rủi ro là thứ hay phải dán vào hồ sơ
      thẩm định, mà WebGL thì không in được. */
-  const [kieu, setKieu] = useState<"3d" | "2d">("3d");
+  /* 2D mặc định (nghiên cứu (3) P0) — 3D là khám phá tự chọn. */
+  const [kieu, setKieu] = useState<"3d" | "2d">("2d");
   const oNhiet: ONhiet[] = useMemo(() => o3d.map((x) => ({
     hang: x.kn, cot: x.ng - 1, gt: x.n,
     ghiChu: `Nghiêm trọng ${x.ng} · ${TEN_KN[x.kn]}: ${x.n} hạng mục · RPN ${x.rpn}`,
@@ -217,9 +223,9 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
             Chi tiết nay hiện ở dải bên phải — ngang tầm mắt với khung vẽ,
             không cách xa như hồi nó còn nằm dưới khung. */}
         <div className="vmp-space3d-khung">
-            <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }}
-            frameloop={giamChuyenDong ? "demand" : "always"}>
-            <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} onHover={setChon} />
+            <Canvas dpr={[1, 1.5]} gl={{ antialias: true, alpha: true }}
+            frameloop="demand">
+            <Canh o3d={o3d} caoNhat={caoNhat} chon={chon} giamChuyenDong={giamChuyenDong} onHover={setChon} />
           </Canvas>
         </div>
 
