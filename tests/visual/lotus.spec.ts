@@ -26,6 +26,25 @@ const URL_SB = (() => {
 
 const MOC_THOI_GIAN = new Date("2026-08-15T10:00:00+07:00");
 
+/* Font web nạp muộn làm chữ đổi metric giữa hai lần chụp — flake thật đã
+ * gặp hai lần ở 1920 (title dịch ~6px, cả trang lệch theo). fonts.ready
+ * là chưa đủ: nó chỉ đợi các request ĐÃ phát; weight phát sinh muộn vẫn
+ * swap sau khi chụp. Ép nạp tường minh từng family × weight đang dùng. */
+async function choFont(page: Page) {
+  await page.evaluate(async () => {
+    const can = [
+      '400 14px "Be Vietnam Pro"', '500 14px "Be Vietnam Pro"',
+      '600 14px "Be Vietnam Pro"', '700 14px "Be Vietnam Pro"',
+      '800 14px "Be Vietnam Pro"', '900 14px "Be Vietnam Pro"',
+      '500 32px "Cormorant Garamond"', '600 32px "Cormorant Garamond"',
+      '700 32px "Cormorant Garamond"',
+    ];
+    await Promise.all(can.map((f) => document.fonts.load(f).catch(() => [])));
+    await document.fonts.ready;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
+}
+
 async function caiGiaLap(page: Page, che: "light" | "dark") {
   const kho = dungKhoDuLieu("day");
   const hostSupabase = new URL(URL_SB).host;
@@ -74,9 +93,7 @@ for (const che of ["light", "dark"] as const) {
       await page.goto(`/#v=${hash}`);
       // Chờ dữ liệu giả lập đổ xong và mọi skeleton biến mất.
       await page.waitForTimeout(3000);
-      /* Font web nạp muộn làm chữ đổi metric giữa hai lần chụp — nguồn
-         flake thật đã gặp ở 1920 (title dịch ~6px, cả trang lệch theo). */
-      await page.evaluate(() => document.fonts.ready);
+      await choFont(page);
       await expect(page).toHaveScreenshot(`${ten}-${che}.png`, { fullPage: true });
     });
   }
@@ -88,6 +105,6 @@ test("dang-nhap · light", async ({ page }) => {
   await page.addInitScript(() => localStorage.clear());
   await page.goto("/");
   await page.waitForTimeout(1500);
-  await page.evaluate(() => document.fonts.ready);
+  await choFont(page);
   await expect(page).toHaveScreenshot("dang-nhap-light.png", { fullPage: true });
 });
