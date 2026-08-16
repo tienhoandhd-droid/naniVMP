@@ -40,7 +40,7 @@ export async function fetchVmpDataFromSupabase(
     p_include_missing: includeMissing,
   });
 
-  if (error) throw new Error("Lỗi đọc Supabase: " + error.message);
+  if (error) throw new Error("Lỗi đọc dữ liệu máy chủ: " + error.message);
 
   // computed_status trong DB được tính tại thời điểm GHI (CURRENT_DATE lúc đó),
   // nên một hạng mục quá hạn THEO THỜI GIAN (deadline trôi qua mà không có thao

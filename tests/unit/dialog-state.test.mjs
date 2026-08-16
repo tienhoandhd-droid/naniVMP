@@ -130,7 +130,7 @@ test("hộp xác nhận nêu ĐÍCH DANH form đang dở, không nói chung chun
   const html = dungXacNhan({ keys: ["doi-mat-khau", "catalog"] });
   assert.match(html, /Đổi mật khẩu/);
   // renderToStaticMarkup thoát `&` thành `&amp;` — khớp cả hai dạng.
-  assert.match(html, /Danh mục (&|&amp;) Nhập liệu/);
+  assert.match(html, /Dữ liệu nguồn/);
 });
 
 test("khoá lạ vẫn được nêu ra thay vì bị nuốt mất", () => {

@@ -26,17 +26,17 @@ import { C } from "../constants/theme.ts";
 
 /** Tên hiển thị của từng màn, để bảng ma trận đọc được bằng tiếng Việt. */
 const TEN_MAN: Record<string, string> = {
-  today: "Hôm nay",
+  today: "Việc hôm nay",
   overview: "Tổng quan",
   timeline: "Dòng thời gian VMP",
-  alerts: "Cảnh báo & Rủi ro",
+  alerts: "Cảnh báo & ưu tiên",
   risk: "Rủi ro (đường dẫn cũ)",
   progress: "Cập nhật tiến độ",
   inventory: "Tiến độ theo đối tượng",
-  source: "Danh mục & Nhập liệu",
-  workload: "Phân công & Tải việc",
-  reports: "Báo cáo & phân tích",
-  rules: "Luật đang áp dụng",
+  source: "Dữ liệu nguồn",
+  workload: "Phân công & khối lượng",
+  reports: "Báo cáo",
+  rules: "Quy tắc nghiệp vụ",
   people: "Nhân sự",
   health: "Chất lượng dữ liệu",
   audit: "Nhật ký thay đổi",

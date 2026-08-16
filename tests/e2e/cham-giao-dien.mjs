@@ -18,13 +18,13 @@ import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
 const GOC = process.env.E2E_URL || "http://localhost:4173";
 
 const MAN = [
-  ["today", "Hôm nay"],
-  ["overview", "Tổng quan"],
+  ["today", "Việc hôm nay"],
+  ["overview", "Tổng quan VMP"],
   ["timeline", "Dòng thời gian VMP"],
-  ["alerts", "Cảnh báo & Rủi ro"],
+  ["alerts", "Cảnh báo & ưu tiên"],
   ["progress", "Cập nhật tiến độ"],
-  ["workload", "Phân công & Tải việc"],
-  ["reports", "Báo cáo & phân tích"],
+  ["workload", "Phân công & khối lượng"],
+  ["reports", "Báo cáo"],
 ];
 
 await choServer(GOC);

@@ -362,7 +362,7 @@ export function dungKhoDuLieu(kichBan) {
         { vai_tro: "Chỉ xem (viewer)", quyen: "Thấy 8/17 màn · chỉ đọc" },
       ],
       phan_quyen_che_do: "Đang đối chiếu (preview) — chưa khoá ai, chỉ ghi nhận lệch",
-      phan_quyen_ghi_chu: "Ma trận đầy đủ xem và sửa ở màn Phân quyền & trách nhiệm.",
+      phan_quyen_ghi_chu: "Ma trận đầy đủ xem và sửa ở màn Vai trò & phạm vi.",
       toan_ven_du_lieu: ["Mọi thao tác ghi đi qua RPC kiểm quyền phía server"],
       so_lieu_hien_tai: { doi_tuong_nguon: doiTuong.length, co_tham_dinh: doiTuong.length,
         hang_muc: soHangMuc, ban_ghi_audit: day ? 8 : 0 },

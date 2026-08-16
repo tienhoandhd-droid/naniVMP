@@ -1,5 +1,5 @@
 /* =====================================================================
- *  SourceCatalogPage — màn "Danh mục & Nhập liệu"
+ *  SourceCatalogPage — màn "Dữ liệu nguồn"
  *  ---------------------------------------------------------------------
  *  Trang này chỉ là VỎ: toàn bộ workspace sáu mục (Đối tượng · Sản phẩm
  *  GMP · Người nhận cảnh báo · Nhập Excel · Chờ áp dụng · Lịch sử) nằm ở

@@ -100,7 +100,7 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
   onUpdate?: (id: string, patch: Record<string, unknown>, userName?: string, reason?: string, expectedVersion?: number) => void;
   onReload?: () => void;
   readOnly?: boolean;
-  /** Mở đúng đối tượng này bên "Danh mục & Nhập liệu". */
+  /** Mở đúng đối tượng này bên "Dữ liệu nguồn". */
   onMoDanhMuc?: (code: string, nhom?: string) => void;
   /** access.can("progress","assign_workshop_staff") — App tính, truyền xuống hộp sửa. */
   canAssignWorkshop?: boolean;

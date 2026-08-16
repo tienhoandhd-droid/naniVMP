@@ -107,7 +107,7 @@ try {
   const sauUrl = await cho(page, docChip, { ten: "chip đếm sau khi mở URL có bộ lọc" });
   const tieuDe = await page.evaluate(() => {
     const el = [...document.querySelectorAll("div")]
-      .find((d) => d.children.length === 0 && /Cảnh báo & Rủi ro/.test(d.textContent || ""));
+      .find((d) => d.children.length === 0 && /Cảnh báo & ưu tiên/.test(d.textContent || ""));
     return el ? el.textContent.trim() : "";
   });
   kiem("URL #v=alerts mở đúng trang Cảnh báo", /Cảnh báo/.test(tieuDe), tieuDe || "(không thấy tiêu đề)");
@@ -134,7 +134,7 @@ try {
   // Back phải chạy trên thao tác đổi màn.
   await page.goto(`${GOC}#v=overview&dept=xsx`, { waitUntil: "networkidle2" });
   await cho(page, docChip, { ten: "chip ở màn Tổng quan" });
-  /* Đổi sang "Dòng thời gian VMP", không phải "Phân công & Tải việc".
+  /* Đổi sang "Dòng thời gian VMP", không phải "Phân công & khối lượng".
      Bộ kiểm này đăng nhập bằng tài khoản CHỈ-XEM, và từ 2026-08-12 vai
      Người xem không mở được màn Phân công & Tải việc — thiết kế §3.4 ghi
      "Ẩn" cho vai đó. Trước đây họ vào được, nên phép kiểm cũ mượn màn ấy.

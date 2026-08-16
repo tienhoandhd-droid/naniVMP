@@ -314,9 +314,9 @@ try {
 
   assert.equal(
     await page.evaluate(() => [...document.querySelectorAll("button")]
-      .some((button) => button.textContent?.includes("Phân quyền & trách nhiệm"))),
+      .some((button) => button.textContent?.includes("Vai trò & phạm vi"))),
     true,
-    "equipment manager phải thấy menu Phân quyền & trách nhiệm",
+    "equipment manager phải thấy menu Vai trò & phạm vi",
   );
   assert.equal(
     await page.evaluate(() => [...document.querySelectorAll("button")]

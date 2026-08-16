@@ -12,7 +12,7 @@
  *   4. Điện thoại 390×844: bảng ẩn hẳn, thẻ hiện, CÙNG số dòng và cùng
  *      hành động — một logic, hai cách trình bày.
  *   5. 1366×768 và 1093×720 không tràn ngang.
- *   6. Deep-link từ Tiến độ (nút "Mở trong Danh mục & Nhập liệu") mở đúng
+ *   6. Deep-link từ Tiến độ (nút "Mở trong Dữ liệu nguồn") mở đúng
  *      đối tượng rồi TỰ XOÁ — quay lại không bị dính bộ lọc cũ.
  *
  *  Chạy: bash scripts/with-preview.sh -- npm run e2e:catalog
@@ -106,7 +106,7 @@ const trinhDuyet = await puppeteer.launch({
       thDinh: th ? getComputedStyle(th).position : "",
       coTimKiem: !!timKiem,
       soH1: document.querySelectorAll("h1").length,
-      phuDe: chuTrang.includes("Dữ liệu gốc Supabase"),
+      phuDe: chuTrang.includes("Dữ liệu nguồn"),
     };
   });
 
@@ -119,7 +119,7 @@ const trinhDuyet = await puppeteer.launch({
   kiem(kq.thDinh === "sticky", "header bảng dính khi cuộn", kq.thDinh);
   kiem(kq.coTimKiem, "có ô tìm kiếm có nhãn");
   kiem(kq.soH1 === 1, "đúng một h1", `thấy ${kq.soH1}`);
-  kiem(kq.phuDe, "phụ đề nêu Supabase là dữ liệu gốc");
+  kiem(kq.phuDe, "phụ đề nêu đây là dữ liệu nguồn");
 
   /* Mở dòng chi tiết. */
   await trang.evaluate(() => {
@@ -256,7 +256,7 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
     timKiem: document.querySelector('input[aria-label="Tìm trong danh mục"]')?.value ?? "",
     coChiTiet: !!document.querySelector(".lp-smart-table__detail"),
   }));
-  kiem(daBam, "có lối nhảy 'Mở trong Danh mục & Nhập liệu' ở Tiến độ");
+  kiem(daBam, "có lối nhảy 'Mở trong Dữ liệu nguồn' ở Tiến độ");
   kiem(kq.navObjects === "true", "deep-link mở đúng mục Đối tượng");
   kiem(maDaMo !== null && kq.timKiem === maDaMo,
     "ô tìm được điền sẵn mã đối tượng", `"${kq.timKiem}" vs "${maDaMo}"`);

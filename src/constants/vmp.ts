@@ -65,7 +65,7 @@ export const STAGE_COLOR = {
 // Dùng chung cho DataQualityView (Sức khoẻ dữ liệu) và ReportsView (Báo cáo
 // & AI) — một nơi định nghĩa nhãn lỗi, đổi một nơi khớp cả hai màn.
 export const LOAI_LOI: Record<string, { ten: string; sua: string }> = {
-  missing_code:          { ten: "Thiếu mã đối tượng", sua: "Sửa ở Danh mục & Nhập liệu → Danh mục nguồn" },
+  missing_code:          { ten: "Thiếu mã đối tượng", sua: "Sửa ở Dữ liệu nguồn → Danh mục nguồn" },
   duplicate_id:          { ten: "Trùng ID hạng mục", sua: "Hai dòng cùng mã thẩm định — xoá hoặc đổi mã một dòng" },
   deadline_before_start: { ten: "Deadline VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
   done_no_date:          { ten: "Đánh dấu hoàn thành nhưng thiếu ngày", sua: "Vi phạm ALCOA+ — nhập ngày thực tế ở Cập nhật tiến độ" },
@@ -102,12 +102,12 @@ export const NAV_ITEMS = [
   /* HÔM NAY đứng đầu, và nằm ở nhóm THỰC HIỆN chứ không phải GIÁM SÁT.
      App có bảy màn để đọc trên hai màn để làm, trong khi việc hằng ngày của
      QA là làm chứ không phải đọc. Màn này là cửa vào của việc đó. */
-  { id: "today", label: "Hôm nay", icon: ClipboardList, group: "work" },
+  { id: "today", label: "Việc hôm nay", icon: ClipboardList, group: "work" },
 
   // GIÁM SÁT — nhìn tình hình, không sửa gì
-  { id: "overview", label: "Tổng quan", icon: LayoutDashboard, group: "monitor" },
+  { id: "overview", label: "Tổng quan VMP", icon: LayoutDashboard, group: "monitor" },
   { id: "timeline", label: "Dòng thời gian VMP", icon: GanttChartSquare, group: "monitor" },
-  { id: "alerts", label: "Cảnh báo & Rủi ro", icon: AlertCircle, group: "monitor" },
+  { id: "alerts", label: "Cảnh báo & ưu tiên", icon: AlertCircle, group: "monitor" },
 
   // THỰC HIỆN — việc làm hằng ngày, có ghi dữ liệu
   /* MỘT mục nhập liệu, không phải hai. "Cập nhật tiến độ" và "Tiến độ theo
@@ -116,14 +116,14 @@ export const NAV_ITEMS = [
      phải nhớ "cái nào có thứ mình cần". Nay gộp: vào một chỗ rồi chọn cách
      nhóm. Màn `inventory` vẫn còn để URL cũ không chết. */
   { id: "progress", label: "Cập nhật tiến độ", icon: Pencil, group: "work" },
-  { id: "source", label: "Danh mục & Nhập liệu", icon: Boxes, group: "work" },
+  { id: "source", label: "Dữ liệu nguồn", icon: Boxes, group: "work" },
 
   // PHÂN TÍCH — ra quyết định
   // QRM – Rủi ro đã gộp vào "Cảnh báo & Rủi ro": ma trận rủi ro nằm cùng chỗ
   // với danh sách cảnh báo mà nó dùng để xếp thứ tự ưu tiên.
-  { id: "workload", label: "Phân công & Tải việc", icon: Activity, group: "analysis" },
-  { id: "reports", label: "Báo cáo & phân tích", icon: FileBarChart, group: "analysis" },
-  { id: "rules", label: "Luật đang áp dụng", icon: Scale, group: "analysis" },
+  { id: "workload", label: "Phân công & khối lượng", icon: Activity, group: "analysis" },
+  { id: "reports", label: "Báo cáo", icon: FileBarChart, group: "analysis" },
+  { id: "rules", label: "Quy tắc nghiệp vụ", icon: Scale, group: "analysis" },
 
   // QUẢN TRỊ
   /* `adminOnly` đã bị bỏ. Quyền xem từng màn nay đọc bằng `access.canView(id)`
@@ -141,10 +141,10 @@ export const NAV_ITEMS = [
      Cập nhật tiến độ. */
   { id: "people", label: "Nhân sự", icon: Users, group: "admin" },
   { id: "accounts", label: "Tài khoản & quyền truy cập", icon: KeyRound, group: "admin" },
-  { id: "phanquyen", label: "Phân quyền & trách nhiệm", icon: ShieldCheck, group: "admin" },
+  { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
   { id: "audit", label: "Nhật ký thay đổi", icon: ShieldCheck, group: "admin" },
-  { id: "admin", label: "Quản trị", icon: BarChart3, group: "admin" },
+  { id: "admin", label: "Cấu hình hệ thống", icon: BarChart3, group: "admin" },
 ];
 
 export const NAV_SUBS = {
@@ -157,12 +157,12 @@ export const NAV_SUBS = {
   /* Sáu vùng của workspace danh mục — KHÔNG hứa "Người thực hiện" hay
      "Danh bạ nhân sự" (đã sang Nhân sự & phân công), không hứa xoá vật lý.
      Chuỗi này có bộ kiểm literal giữ (tests/unit/operational-copy). */
-  source: "Dữ liệu gốc Supabase · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
+  source: "Dữ liệu nguồn · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
-  reports: "Báo cáo tuần / tháng / quý + nhận xét AI · xuất PDF / Excel / HTML",
-  rules: "Luật hệ thống đang chạy — đọc thẳng từ database nên không thể mô tả khác thực tế",
+  reports: "Tổng hợp tình hình VMP theo kỳ, gợi ý nhận xét và xuất PDF / Excel / HTML",
+  rules: "Quy tắc hệ thống đang chạy — đọc thẳng từ máy chủ nên không thể mô tả khác thực tế",
   phanquyen: "Ma trận vai trò × hành động · người × bộ phận · khu vực/line — sửa vai trò, bộ phận và email thẳng trên bảng",
-  health: "Chất lượng dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng ở Supabase",
+  health: "Chất lượng dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng trên máy chủ",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",
 };

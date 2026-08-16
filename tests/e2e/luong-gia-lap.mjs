@@ -29,21 +29,21 @@ const URL_SB = (() => {
 })();
 
 const MAN = [
-  ["today", "Hôm nay"],
-  ["overview", "Tổng quan"],
+  ["today", "Việc hôm nay"],
+  ["overview", "Tổng quan VMP"],
   ["timeline", "Dòng thời gian VMP"],
-  ["alerts", "Cảnh báo & Rủi ro"],
+  ["alerts", "Cảnh báo & ưu tiên"],
   ["progress", "Cập nhật tiến độ"],
-  ["source", "Danh mục & Nhập liệu"],
-  ["workload", "Phân công & Tải việc"],
-  ["reports", "Báo cáo & phân tích"],
-  ["rules", "Luật đang áp dụng"],
+  ["source", "Dữ liệu nguồn"],
+  ["workload", "Phân công & khối lượng"],
+  ["reports", "Báo cáo"],
+  ["rules", "Quy tắc nghiệp vụ"],
   ["people", "Nhân sự"],
   ["accounts", "Tài khoản & quyền truy cập"],
-  ["phanquyen", "Phân quyền & trách nhiệm"],
+  ["phanquyen", "Vai trò & phạm vi"],
   ["health", "Chất lượng dữ liệu"],
   ["audit", "Nhật ký thay đổi"],
-  ["admin", "Quản trị"],
+  ["admin", "Cấu hình hệ thống"],
 ];
 
 /* Lỗi console được phép bỏ qua — đều là hệ quả của việc CHẶN MẠNG, không
@@ -292,7 +292,7 @@ for (const [id, ten] of MAN) {
 
 /* ---- 3c. Timeline: 2D mặc định, 3D là tab khám phá có trí nhớ ------- */
 {
-  console.log("\nTimeline — tab Khám phá 3D:");
+  console.log("\nTimeline — tab Xem bản đồ 3D:");
   const trang = await trinhDuyet.newPage();
   await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
@@ -334,18 +334,18 @@ for (const [id, ten] of MAN) {
   const macDinh = await trang.evaluate(() => ({
     coCanvas: !!document.querySelector("canvas"),
     coNutMo: [...document.querySelectorAll("button")]
-      .some((b) => b.textContent?.includes("Khám phá 3D")),
+      .some((b) => b.textContent?.includes("Xem bản đồ 3D")),
   }));
   kiem(!macDinh.coCanvas, "mặc định KHÔNG dựng canvas 3D — 2D là mặt chính");
-  kiem(macDinh.coNutMo, "có nút Khám phá 3D");
+  kiem(macDinh.coNutMo, "có nút Xem bản đồ 3D");
 
   await trang.evaluate(() => {
     [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.includes("Khám phá 3D"))?.click();
+      .find((b) => b.textContent?.includes("Xem bản đồ 3D"))?.click();
   });
   await new Promise((r) => setTimeout(r, 2600));
   const daMo = await trang.evaluate(() => !!document.querySelector("canvas"));
-  kiem(daMo, "bấm Khám phá 3D thì canvas xuất hiện (lazy)");
+  kiem(daMo, "bấm Xem bản đồ 3D thì canvas xuất hiện (lazy)");
 
   /* Trí nhớ: tải lại trang, lựa chọn còn nguyên. */
   await trang.reload({ waitUntil: "domcontentloaded" });
@@ -664,8 +664,8 @@ for (const [id, ten] of MAN) {
   kiem(kq.coKhoi, "khối không gian VMP có mặt ở Báo cáo");
   kiem(!kq.coCanvas, "mặc định KHÔNG dựng canvas — 2D là mặt chính");
   kiem(!!kq.nut2dChon, "nút 2D (Bản đồ tiến độ) đang được chọn");
-  kiem(kq.coNut3d && kq.nhan3d === "Khám phá 3D",
-    "nút khám phá mang đúng tên 'Khám phá 3D'", kq.nhan3d || "(không có)");
+  kiem(kq.coNut3d && kq.nhan3d === "Xem bản đồ 3D",
+    "nút khám phá mang đúng tên 'Xem bản đồ 3D'", kq.nhan3d || "(không có)");
   await trang.close();
 }
 
@@ -753,18 +753,18 @@ for (const [id, ten] of MAN) {
       .map((e) => e.name)
       .filter((u) => /WorkloadSpace3D|VmpSpace3D|RiskSpace3D|NhanTruc/i.test(u)));
   kiem(truocMo.length === 0,
-    "chưa bấm Khám phá 3D thì KHÔNG chunk three.js nào được tải",
+    "chưa bấm Xem bản đồ 3D thì KHÔNG chunk three.js nào được tải",
     truocMo.map((u) => u.split("/").pop()).join(", "));
 
   await trang.evaluate(() => {
     [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.includes("Khám phá 3D"))?.click();
+      .find((b) => b.textContent?.includes("Xem bản đồ 3D"))?.click();
   });
   await new Promise((r) => setTimeout(r, 2600));
   const sauMo = await trang.evaluate(() =>
     performance.getEntriesByType("resource")
       .some((e) => /WorkloadSpace3D|NhanTruc/i.test(e.name)));
-  kiem(sauMo, "bấm Khám phá 3D thì chunk 3D mới được tải");
+  kiem(sauMo, "bấm Xem bản đồ 3D thì chunk 3D mới được tải");
   await trang.close();
 }
 
@@ -791,7 +791,7 @@ for (const [id, ten] of MAN) {
   }));
   kiem(/không hỗ trợ chế độ 3D/i.test(kq.thongBao),
     "có câu tiếng Việt tử tế thay vì lỗi kỹ thuật", kq.thongBao.slice(0, 60) || "(im lặng)");
-  kiem(!kq.conNut3d, "nút Khám phá 3D được giấu khi máy không có WebGL");
+  kiem(!kq.conNut3d, "nút Xem bản đồ 3D được giấu khi máy không có WebGL");
   kiem(kq.co2D, "dữ liệu 2D vẫn nguyên vẹn");
   await trang.close();
 }

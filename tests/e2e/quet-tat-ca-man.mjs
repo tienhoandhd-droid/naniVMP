@@ -9,19 +9,19 @@ import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
 const GOC = "http://localhost:4173";
 
 const MAN = [
-  ["overview", "Tổng quan"],
+  ["overview", "Tổng quan VMP"],
   ["timeline", "Dòng thời gian VMP"],
-  ["alerts", "Cảnh báo & Rủi ro"],
+  ["alerts", "Cảnh báo & ưu tiên"],
   ["progress", "Cập nhật tiến độ"],
   ["inventory", "Tiến độ theo đối tượng"],
-  ["source", "Danh mục & Nhập liệu"],
-  ["workload", "Phân công & Tải việc"],
-  ["reports", "Báo cáo & phân tích"],
-  ["rules", "Luật đang áp dụng"],
+  ["source", "Dữ liệu nguồn"],
+  ["workload", "Phân công & khối lượng"],
+  ["reports", "Báo cáo"],
+  ["rules", "Quy tắc nghiệp vụ"],
   ["health", "Chất lượng dữ liệu"],
-  ["phanquyen", "Phân quyền & trách nhiệm"],
+  ["phanquyen", "Vai trò & phạm vi"],
   ["audit", "Nhật ký thay đổi"],
-  ["admin", "Quản trị"],
+  ["admin", "Cấu hình hệ thống"],
 ];
 
 await choServer(GOC);

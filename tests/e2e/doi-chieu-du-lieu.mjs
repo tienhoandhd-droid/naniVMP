@@ -198,7 +198,7 @@ const soLanGoi = await p.evaluate(async () => {
   const goc = sb.rpc.bind(sb);
   sb.rpc = (...a) => { if (a[0] === "rpc_get_vmp_dashboard") dem += 1; return goc(...a); };
   const nut = [...document.querySelectorAll("a, button")];
-  for (const ten of ["Dòng thời gian VMP", "Cảnh báo & Rủi ro", "Phân công & Tải việc"]) {
+  for (const ten of ["Dòng thời gian VMP", "Cảnh báo & ưu tiên", "Phân công & khối lượng"]) {
     const x = nut.find((e) => (e.textContent || "").trim() === ten);
     x?.click();
     await new Promise((r) => setTimeout(r, 1200));

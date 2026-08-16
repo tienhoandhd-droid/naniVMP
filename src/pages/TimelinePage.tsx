@@ -1764,7 +1764,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
                      background: kham3D ? C.surface : undefined,
                      color: kham3D ? C.plum : undefined,
                      border: kham3D ? `1.5px solid ${C.pinkSoft}` : "none" }}>
-            {kham3D ? "Thu gọn 3D" : "Khám phá 3D"}
+            {kham3D ? "Thu gọn 3D" : "Xem bản đồ 3D"}
           </button>
         </div>
         {kham3D && (

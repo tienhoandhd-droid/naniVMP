@@ -724,14 +724,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           {/* Nút KHÔNG bị ẩn khi thiếu cấu hình. Bản cũ giấu nút đi nên trên
               bản deploy thiếu biến môi trường, người dùng tưởng chức năng
               không tồn tại thay vì biết là chưa cấu hình. */}
-          <div className="vmp-report-ai-actions" role="group" aria-label="Thao tác nhận xét AI">
+          <div className="vmp-report-ai-actions" role="group" aria-label="Thao tác gợi ý nhận xét">
             <button onClick={() => generateAi("bao_cao")} disabled={loadingAi || !aiConfigured()}
               title={aiConfigured() ? "Nhận xét trên số đã tổng hợp — nhanh, rẻ" : AI_SETUP_HINT}
               style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
                 borderRadius: 14, fontSize: 14, opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
                 cursor: loadingAi || !aiConfigured() ? "not-allowed" : "pointer" }}>
               {loadingAi && loaiAi === "bao_cao" ? <RefreshCw size={16} className="spin" /> : <SparkIcon size={16} />}
-              {loadingAi && loaiAi === "bao_cao" ? "AI đang phân tích…" : "Thêm nhận xét AI"}
+              {loadingAi && loaiAi === "bao_cao" ? "Đang tạo gợi ý…" : "Tạo gợi ý nhận xét"}
             </button>
             {/* Nút thứ hai chạy nhánh khác hẳn: AI đọc TỪNG DÒNG dữ liệu thô để
                 tìm quy luật chéo hạng mục, không phải diễn giải số đã gộp.

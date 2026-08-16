@@ -347,7 +347,7 @@ export function useVmpData() {
         void docWatermark();
         setConn({
           readUrl, writeUrl, status: "ok", source: "supabase",
-          msg: `Đã tải ${data.objects.length} đối tượng · ${data.activities.length} hạng mục từ Supabase ✓`,
+          msg: `Đã tải ${data.objects.length} đối tượng · ${data.activities.length} hạng mục từ máy chủ ✓`,
         });
         return;
       } catch (e) {
@@ -409,7 +409,7 @@ export function useVmpData() {
       setLastSync(Date.now());
       setConn({
         readUrl, writeUrl, status: "ok", source: data.source,
-        msg: `Đã tải ${data.objects?.length || 0} đối tượng · ${data.activities?.length || 0} hạng mục từ n8n ✓`,
+        msg: `Đã tải ${data.objects?.length || 0} đối tượng · ${data.activities?.length || 0} hạng mục từ nguồn dự phòng ✓`,
       });
     } catch (e) {
       setConn({

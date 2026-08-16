@@ -347,7 +347,7 @@ export default function CatalogWorkspaceShell({
   return (
     <div className="cw-workspace">
       <p className="cw-mota">
-        Dữ liệu gốc Supabase — xem, thêm và sửa đều có lý do; thay đổi chạm
+        Dữ liệu nguồn — xem, thêm và sửa đều có lý do; thay đổi chạm
         timeline vào hàng chờ áp dụng, mọi bước nằm lại trong lịch sử.
         {scopeLabel && <span className="cw-mota__phamvi">Phạm vi: {scopeLabel}</span>}
         {updatedLabel && <span className="cw-mota__moc">{updatedLabel}</span>}

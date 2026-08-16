@@ -219,7 +219,7 @@ export default function RiskSpace3D({ acts, giamChuyenDong }: {
       </p>}
       <div className="vmp-space3d-doi">
         {ho3D && <button type="button" data-map-mode="3d" onClick={() => setKieu("3d")}
-          className={kieu === "3d" ? "is-chon" : ""}>Khám phá 3D</button>}
+          className={kieu === "3d" ? "is-chon" : ""}>Xem bản đồ 3D</button>}
         <button type="button" data-map-mode="2d" onClick={() => setKieu("2d")}
           className={kieu === "2d" ? "is-chon" : ""}>Ma trận rủi ro</button>
       </div>

@@ -242,7 +242,7 @@ function HealthView({ acts, access }: { acts: Activity[]; access?: AccessContext
   const [tab, setTab] = useState<"client" | "server">("client");
   const tabs = [
     { id: "client" as const, label: "Lỗi trên bản đang xem", sub: "chạy ở trình duyệt" },
-    { id: "server" as const, label: "Kiểm tra tại Supabase", sub: "chạy ở máy chủ" },
+    { id: "server" as const, label: "Kiểm tra trên máy chủ", sub: "số liệu đo tại nguồn" },
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1999,7 +1999,7 @@ function AppShell() {
             {acts.length > 0 && <SyncBanner conn={conn} lastSync={lastSync} dataUpdatedAt={dataUpdatedAt} />}
 
             {/* Bộ lọc TOÀN CỤC (khu vực + thời gian) — áp cho mọi trang có dữ liệu */}
-            {/* Trang "Luật đang áp dụng" đọc thẳng cấu hình từ database, không
+            {/* Trang "Quy tắc nghiệp vụ" đọc thẳng cấu hình từ database, không
                 hiển thị hạng mục nào — thanh lọc ở đó là một bộ điều khiển
                 không điều khiển gì, lại còn ghi "461/461 hạng mục" trên một
                 trang không có hạng mục. Ẩn đi. */}

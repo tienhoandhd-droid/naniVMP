@@ -534,7 +534,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
 
           {/* Thứ tự ưu tiên trên màn này do RPN quyết định, mà RPN tính từ
               điểm trọng yếu — vốn là ĐỀ XUẤT CỦA MÁY cho tới khi QA sửa tay.
-              Trang "Luật đang áp dụng" có ghi điều đó, nhưng người dùng màn
+              Trang "Quy tắc nghiệp vụ" có ghi điều đó, nhưng người dùng màn
               Cảnh báo không sang trang kia. Nói ngay tại chỗ đang dùng. */}
           <CauKetLuan
             tone="warn"

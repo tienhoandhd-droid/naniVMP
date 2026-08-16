@@ -185,7 +185,7 @@ const trinhDuyet = await puppeteer.launch({
 {
   console.log("\nĐường dẫn cũ:");
   for (const [hash, mongDoi, ghiChu] of [
-    ["risk", "Cảnh báo & Rủi ro", "gộp vào Cảnh báo"],
+    ["risk", "Cảnh báo & ưu tiên", "gộp vào Cảnh báo"],
     ["inventory", "Cập nhật tiến độ", "Tiến độ gộp theo đối tượng"],
   ]) {
     const trang = await trinhDuyet.newPage();

@@ -23,7 +23,7 @@ import { NAV_SUBS, LOAI_LOI } from "../../src/constants/vmp.ts";
 test("NAV_SUBS.source nêu đúng sáu vùng của workspace, không hứa hẹn cũ", () => {
   assert.equal(
     NAV_SUBS.source,
-    "Dữ liệu gốc Supabase · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
+    "Dữ liệu nguồn · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
   );
 });
 

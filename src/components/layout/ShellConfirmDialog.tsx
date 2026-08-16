@@ -30,7 +30,7 @@ export interface ShellConfirmDialogProps {
  *  vẫn hơn là im lặng bỏ qua một form đang dở. */
 const TEN_FORM: Record<string, string> = {
   "doi-mat-khau": "Đổi mật khẩu",
-  "catalog": "Danh mục & Nhập liệu",
+  "catalog": "Dữ liệu nguồn",
   "progress": "Cập nhật tiến độ",
 };
 

@@ -322,7 +322,7 @@ export default function WorkloadSpace3D({ acts, nam, giamChuyenDong, onOpenCell,
       Thiết bị này không hỗ trợ chế độ 3D. Dữ liệu đầy đủ vẫn có ở cách hiển thị hai chiều.
     </p>}
     <div className="vmp-space3d-doi" aria-label="Chế độ bản đồ tải việc">
-      {ho3D && <button type="button" data-map-mode="3d" onClick={() => setMode("3d")} className={mode === "3d" ? "is-chon" : ""}>Khám phá 3D</button>}
+      {ho3D && <button type="button" data-map-mode="3d" onClick={() => setMode("3d")} className={mode === "3d" ? "is-chon" : ""}>Xem bản đồ 3D</button>}
       <button type="button" data-map-mode="2d" onClick={() => setMode("2d")} className={mode === "2d" ? "is-chon" : ""}>Tải công việc theo tháng</button>
     </div>
     {ho3D && mode === "3d" ? <div className="vmp-space3d-than">
