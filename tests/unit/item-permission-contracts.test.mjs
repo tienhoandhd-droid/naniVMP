@@ -824,11 +824,21 @@ test("đổi intent không được hạ loading của RPC đang chạy", async 
   assert.equal(operations.saving, false);
 });
 
-test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async () => {
-  const sql = await readFile(new URL(
+test("migration bắt buộc hierarchy trong quyền hiệu lực và chặn các đường ghi legacy", async (t) => {
+  /* SQL nội bộ đã tách sang kho riêng (~/Desktop/VMP-noibo) vì repo này
+     công khai. Bài kiểm chỉ chạy được khi đứng cạnh kho SQL — vắng file
+     thì skip chứ không fail: hợp đồng SQL giờ được kiểm ở kho nội bộ. */
+  const duongDan = new URL(
     "../../supabase/migrations/20260810160000_pham_vi_xuong_khu_vuc_line_va_person_id.sql",
     import.meta.url,
-  ), "utf8");
+  );
+  let sql;
+  try {
+    sql = await readFile(duongDan, "utf8");
+  } catch {
+    t.skip("supabase/ không nằm trong repo công khai — kiểm ở kho nội bộ");
+    return;
+  }
 
   assert.match(sql, /create or replace function public\.vmp_item_scope_matches/);
   assert.match(sql, /'factory_match', scope\.factory_match/);

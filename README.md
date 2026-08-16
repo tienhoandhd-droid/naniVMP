@@ -1,8 +1,5 @@
 # VMP Monitor
 
-> **Tiếp nhận dự án?** Đọc [docs/HANDOVER.md](docs/HANDOVER.md) — bàn giao 3 bước,
-> kèm `bash scripts/handover-check.sh` để tự kiểm tra kết nối (✅/❌ trong ~1 phút).
-
 VMP Monitor la dashboard theo doi Ke hoach Tham dinh Goc cua CPC1 HN. Ung dung
 doc du lieu tu Supabase read model, hien thi tien do, canh bao, workload, QRM va
 bao cao theo cac moc De cuong - Tham dinh thuc te - Bao cao - VMP.
@@ -47,15 +44,11 @@ cu, khong phai kien truc dang chay.
   phong ban, thang.
 - **Bao cao va AI**: tong hop theo ky, xuat bao cao va goi y nhan xet.
 
-## Kien truc GitHub-ready
+## Pham vi repo
 
-Repo nay duoc nang cap theo huong de doc va demo tren GitHub:
-
-- README co so do Mermaid render truc tiep tren GitHub.
-- `docs/architecture-2026-07.md` mo ta nguon du lieu va hang rao an toan.
-- `docs/github-upgrade-plan.md` ghi ro ke hoach nang cap theo phase.
-- `docs/data-contract.md` dinh nghia contract cho timeline, diagram va dashboard.
-- `docs/improvement-history.md` ghi lich su tung buoc cai tien.
+Repo cong khai nay chi chua PHAN WEB: `src/`, `public/`, `tests/`, cau hinh
+build va CI. Tai lieu van hanh, schema database (migrations), workflow n8n va
+script quan tri nam o kho noi bo rieng — khong cong khai.
 
 ## Cai dat local
 
