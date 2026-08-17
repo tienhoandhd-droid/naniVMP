@@ -6,11 +6,16 @@
  *  lối với công chúa để hai nhân vật là một bộ, không phải hai phong cách
  *  dán cạnh nhau; và để đổi cử chỉ chỉ cần sửa vài đường path.
  *
- *  Ba nét nhận dạng lấy thẳng từ ảnh: tóc đen ngắn rẽ mái, KÍNH RÂM đen,
- *  áo polo trắng cổ bẻ. Ba cử chỉ cũng lấy từ chính dáng trong ảnh:
- *    guide     — tay chỉnh gọng kính (dáng chính trong ảnh), tay kia chỉ hướng
- *    concern   — khoanh tay, đầu hơi nghiêng
- *    celebrate — giơ ngón cái (dáng thứ hai trong ảnh)
+ *  Cập nhật 17/08 (vòng 2): chủ dự án gửi thêm ảnh KHÔNG đeo kính và yêu
+ *  cầu vẽ giống khuôn mặt. Đã bỏ kính râm — kính che mất đúng bốn nét làm
+ *  nên khuôn mặt ấy: lông mày đậm gần thẳng, mắt cười híp thành cung, nụ
+ *  cười rộng khoe hàm răng trên, gò má nổi khi cười.
+ *
+ *  Nét nhận dạng còn lại lấy từ ảnh: tóc đen ngắn rẽ mái, áo polo trắng cổ
+ *  bẻ. Ba cử chỉ:
+ *    guide     — giơ tay chào, tay kia chỉ về nội dung
+ *    concern   — khoanh tay
+ *    celebrate — giơ ngón cái + cười khoe răng (đúng ảnh nhất)
  *
  *  Vì sao chibi mà vẫn hợp bộ với công chúa Art Nouveau: giữ nguyên hai
  *  chữ ký của bộ — MEDALLION vàng kép sau đầu và chi tiết sen — nên hai
@@ -30,8 +35,6 @@ const MAU = {
   da: "#EBC7AC",           // hạ sáng so với bản sáng để không chói trên nền tối
   daBong: "#D3A688",
   daVien: "#A8795C",
-  kinh: "#15111C",         // tròng kính
-  kinhGong: "#F0BE55",     // gọng vàng — dark gold token
   ao: "#E8E2EE",           // polo trắng ngà, không trắng literal
   aoBong: "#C3BAD0",
   aoVien: "#8E82A6",
@@ -113,8 +116,8 @@ export default function DungSiVali({
         fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.6" />
 
       {/* Tai */}
-      <ellipse cx="96" cy="156" rx="8" ry="11" fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.4" />
-      <ellipse cx="224" cy="156" rx="8" ry="11" fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.4" />
+      <ellipse cx="97" cy="164" rx="8" ry="10" fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.4" />
+      <ellipse cx="223" cy="164" rx="8" ry="10" fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.4" />
 
       {/* Tóc đen ngắn rẽ mái — mảng DÀY phủ kín đỉnh đầu và hai thái
           dương, chân tóc xuống sát gọng kính. Bản đầu mảng quá mỏng nên
@@ -122,16 +125,24 @@ export default function DungSiVali({
       <path d="M94 158
                C86 104 118 66 160 66
                C202 66 234 104 226 158
-               C224 142 220 130 214 122
-               C210 136 206 142 200 144
-               C198 128 192 120 182 116
-               C170 126 150 130 134 124
-               C124 132 116 144 112 158
+               C227 150 222 136 212 130
+               C196 130 172 126 148 118
+               C126 124 114 138 112 158
                C106 150 100 148 94 158 Z"
         fill={MAU.toc} />
-      {/* mái loà xoà rẽ lệch — nhịp phá đối xứng, lấy từ ảnh */}
-      <path d="M134 124C146 112 166 108 182 116C170 118 156 122 146 130Z"
-        fill={MAU.toc} />
+      {/* Mái rẽ lệch trái→phải, đổ xuống trán — nhịp phá đối xứng lấy từ
+          ảnh. Vẽ như một MẢNG liền, không phải mũi nhọn: bản trước đường
+          chân tóc bên phải thắt lại thành gai chĩa xuống che tai. */}
+      <path d="M126 122
+               C142 102 180 98 208 116
+               C206 126 206 134 206 144
+               C190 130 158 120 126 122 Z" fill={MAU.toc} />
+      {/* Tóc mai bên phải — nối mảng mái với viền ngoài, bịt khe da hình
+          lưỡi liềm ở thái dương (mái rẽ lệch nên bên này tóc dài xuống). */}
+      <path d="M196 106
+               C212 114 224 132 227 156
+               C220 150 210 138 200 126
+               C198 120 196 112 196 106 Z" fill={MAU.toc} />
       <path d="M104 146C110 120 128 102 152 98" fill="none"
         stroke={MAU.tocVien} strokeWidth="2.6" strokeLinecap="round" opacity=".8" />
       <path d="M196 104C210 114 220 132 222 152" fill="none"
@@ -139,55 +150,104 @@ export default function DungSiVali({
       <path d="M138 118C150 108 166 104 178 108" fill="none"
         stroke={MAU.tocVien} strokeWidth="1.6" strokeLinecap="round" opacity=".5" />
 
-      {/* ---- KÍNH RÂM — nét nhận dạng số một ------------------------ */}
-      <g>
-        {/* gọng ngang + càng kính hai bên */}
-        <path d="M112 156L208 156" fill="none" stroke={MAU.kinhGong} strokeWidth="2.4" />
-        <path d="M104 152L112 156M216 152L208 156" fill="none"
-          stroke={MAU.kinhGong} strokeWidth="2.2" strokeLinecap="round" />
-        {/* hai tròng bo góc, hơi vuông kiểu kính trong ảnh */}
-        <path d="M116 150h34a4 4 0 0 1 4 4v14a10 10 0 0 1-10 10h-22a10 10 0 0 1-10-10v-14a4 4 0 0 1 4-4z"
-          fill={MAU.kinh} stroke={MAU.kinhGong} strokeWidth="2" />
-        <path d="M170 150h34a4 4 0 0 1 4 4v14a10 10 0 0 1-10 10h-22a10 10 0 0 1-10-10v-14a4 4 0 0 1 4-4z"
-          fill={MAU.kinh} stroke={MAU.kinhGong} strokeWidth="2" />
-        {/* ánh sáng loé trên tròng — cho kính "có mặt kính", không phải hai ô đen */}
-        <path d="M122 154L134 154L124 172L118 168Z" fill={MAU.lav} opacity=".38" />
-        <path d="M176 154L188 154L178 172L172 168Z" fill={MAU.lav} opacity=".38" />
-        {/* concern: kính trễ xuống một chút, lộ nhíu mày phía trên */}
-        {mood === "concern" && (
-          <path d="M132 142Q142 137 152 141M168 141Q178 137 188 142" fill="none"
-            stroke={MAU.net} strokeWidth="2.2" strokeLinecap="round" opacity=".75" />
-        )}
-      </g>
+      {/* ---- MẶT: bốn nét lấy từ ảnh chủ dự án cấp (17/08) -----------
+          Bỏ kính râm để lộ khuôn mặt, vì bốn nét dưới đây mới là thứ làm
+          nhân vật "giống người thật"; kính chỉ che mất chúng:
+            1. lông mày ĐẬM, gần thẳng, đuôi hơi xếch
+            2. mắt cười HÍP thành đường cong (nét mạnh nhất trong ảnh)
+            3. nụ cười RỘNG, khoé kéo cao, khoe hàm răng trên
+            4. gò má nổi khi cười                                        */}
 
-      {/* Mũi + miệng theo mood */}
-      <path d="M160 182Q163 188 158 190" fill="none"
-        stroke={MAU.daVien} strokeWidth="1.6" strokeLinecap="round" />
+      {/* Lông mày — đậm và gần thẳng ở mọi mood, chỉ đổi độ chau */}
+      {mood === "concern" ? (
+        <path d="M124 143Q140 136 154 144M166 144Q180 136 196 143" fill="none"
+          stroke={MAU.net} strokeWidth="4.6" strokeLinecap="round" />
+      ) : (
+        <path d="M124 141Q140 133 155 138M165 138Q180 133 196 141" fill="none"
+          stroke={MAU.net} strokeWidth="4.6" strokeLinecap="round" />
+      )}
+
+      {/* Mắt */}
+      {mood === "celebrate" ? (
+        /* mắt cười híp — đúng ảnh: hai cung ngửa lên, đuôi mắt kéo dài */
+        <g>
+          <path d="M124 164Q140 148 156 163" fill="none"
+            stroke={MAU.net} strokeWidth="4.4" strokeLinecap="round" />
+          <path d="M164 163Q180 148 196 164" fill="none"
+            stroke={MAU.net} strokeWidth="4.4" strokeLinecap="round" />
+        </g>
+      ) : mood === "concern" ? (
+        /* mắt mở tròn hơn, tròng nhìn lên — lo lắng */
+        <g>
+          <ellipse cx="140" cy="160" rx="9" ry="10" fill={MAU.net} />
+          <ellipse cx="180" cy="160" rx="9" ry="10" fill={MAU.net} />
+          <circle cx="142.5" cy="156.5" r="3" fill="#FFFFFF" opacity=".9" />
+          <circle cx="182.5" cy="156.5" r="3" fill="#FFFFFF" opacity=".9" />
+        </g>
+      ) : (
+        /* mắt hạnh nhân hơi híp — dáng mắt lúc không cười to */
+        <g>
+          <path d="M126 158Q140 149 155 158Q140 168 126 158Z" fill={MAU.net} />
+          <path d="M165 158Q180 149 194 158Q180 168 165 158Z" fill={MAU.net} />
+          <circle cx="143" cy="156" r="2.4" fill="#FFFFFF" opacity=".85" />
+          <circle cx="183" cy="156" r="2.4" fill="#FFFFFF" opacity=".85" />
+        </g>
+      )}
+
+      {/* Mũi — sống thấp, cánh mũi nhẹ */}
+      <path d="M159 172Q164 182 156 185" fill="none"
+        stroke={MAU.daVien} strokeWidth="1.8" strokeLinecap="round" />
+
+      {/* Gò má nổi — chỉ ở hai mood cười, vì má chỉ nổi khi cười */}
+      {mood !== "concern" && (
+        <>
+          <ellipse cx="124" cy="180" rx="10" ry="5.5" fill={MAU.daBong} opacity=".55" />
+          <ellipse cx="196" cy="180" rx="10" ry="5.5" fill={MAU.daBong} opacity=".55" />
+        </>
+      )}
+
+      {/* Miệng */}
+      {mood === "celebrate" && (
+        /* nụ cười rộng khoe hàm răng trên — nét đặc trưng nhất của ảnh */
+        <g>
+          <path d="M136 196Q160 222 184 196Q160 206 136 196Z"
+            fill={MAU.net} stroke={MAU.net} strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M139 197Q160 204 181 197Q160 202 139 197Z" fill="#FFFFFF" />
+          {/* nếp cười hai bên khoé — kéo má lên */}
+          <path d="M132 190Q130 198 135 204M188 190Q190 198 185 204" fill="none"
+            stroke={MAU.daVien} strokeWidth="1.6" strokeLinecap="round" opacity=".7" />
+        </g>
+      )}
       {mood === "guide" && (
-        <path d="M148 198Q160 207 172 198" fill="none"
-          stroke={MAU.net} strokeWidth="2.4" strokeLinecap="round" />
+        /* cười mỉm rộng, khoé kéo cao nhưng chưa hở răng */
+        <g>
+          <path d="M141 197Q160 211 179 197" fill="none"
+            stroke={MAU.net} strokeWidth="3" strokeLinecap="round" />
+          <path d="M137 193Q136 199 140 203M183 193Q184 199 180 203" fill="none"
+            stroke={MAU.daVien} strokeWidth="1.5" strokeLinecap="round" opacity=".6" />
+        </g>
       )}
       {mood === "concern" && (
-        <path d="M150 202Q160 197 170 202" fill="none"
-          stroke={MAU.net} strokeWidth="2.4" strokeLinecap="round" />
-      )}
-      {mood === "celebrate" && (
-        <path d="M145 195Q160 213 175 195Q160 202 145 195Z" fill={MAU.net} />
+        <path d="M148 204Q160 198 172 204" fill="none"
+          stroke={MAU.net} strokeWidth="3" strokeLinecap="round" />
       )}
 
       {/* =============== CỬ CHỈ — lấy từ dáng trong ảnh ================ */}
       {mood === "guide" && (
-        /* tay phải ĐƯA LÊN CHẠM GỌNG KÍNH — dáng chính trong ảnh; tay
-           trái buông xuôi, ngón trỏ chỉ về nội dung bên dưới */
+        /* tay phải giơ lên CHÀO, bàn tay xoè; tay trái buông xuôi, ngón
+           trỏ chỉ về nội dung bên dưới. (Bản trước là "chỉnh gọng kính" —
+           bỏ kính thì cử chỉ ấy mất nghĩa.) */
         <g>
-          <path d="M204 266C224 254 226 218 218 186" fill="none"
+          <path d="M206 268C226 258 236 236 238 214" fill="none"
             stroke={MAU.ao} strokeWidth="11" strokeLinecap="round" />
-          {/* bàn tay đặt ngay cạnh gọng kính, ngón cái vươn vào gọng */}
-          <circle cx="217" cy="176" r="9.5" fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.4" />
-          <path d="M210 170C206 164 206 158 210 154" fill="none"
-            stroke={MAU.da} strokeWidth="5.5" strokeLinecap="round" />
-          <path d="M210 154L211 152" fill="none"
-            stroke={MAU.daVien} strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M232 200C226 194 228 186 236 186C244 186 250 192 250 200
+                   C250 210 244 216 238 216C232 216 230 208 232 200 Z"
+            fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.5" />
+          {/* bốn ngón xoè — cho ra bàn tay chào, không phải nắm đấm */}
+          <path d="M234 190L232 180M240 188L240 178M246 191L249 182" fill="none"
+            stroke={MAU.da} strokeWidth="5" strokeLinecap="round" />
+          <path d="M234 190L232 180M240 188L240 178M246 191L249 182" fill="none"
+            stroke={MAU.daVien} strokeWidth="1.1" strokeLinecap="round" opacity=".5" />
           <path d="M116 270C102 284 98 306 102 324" fill="none"
             stroke={MAU.ao} strokeWidth="11" strokeLinecap="round" />
           <circle cx="103" cy="330" r="9" fill={MAU.da} stroke={MAU.daVien} strokeWidth="1.4" />
