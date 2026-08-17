@@ -550,11 +550,25 @@ export function useVmpData() {
       timer = setTimeout(() => refreshRef.current?.(), 800);
     };
 
-    // S3-C FIX: subscribe CẢ vmp_plan_items VÀ vmp_objects (cả 2 enable Realtime
-    // ở migration 007). Trước đây chỉ plan_items → admin sửa danh mục (rename, đổi
-    // bộ phận, đổi tần suất) thì web không tự cập nhật.
-    const channel = supabase
-      .channel("vmp-changes")
+    /* MỘT BẢNG HỎNG KHÔNG ĐƯỢC KÉO SẬP CẢ KÊNH (sửa 17/08).
+     *
+     * Bản trước gộp ba bảng vào một kênh "vmp-changes". `system_config`
+     * KHÔNG nằm trong publication `supabase_realtime` (chỉ có
+     * vmp_plan_items và vmp_objects), nên máy chủ trả:
+     *
+     *   "Unable to subscribe to changes with given parameters …
+     *    table: system_config"  → status: error
+     *
+     * Realtime đánh lỗi cho CẢ KÊNH, không riêng tham số hỏng. Hệ quả:
+     * hai bảng nghiệp vụ tuy đã bật Realtime vẫn không gửi được sự kiện
+     * nào, và web rơi hết về polling 20 giây — đúng triệu chứng "cập nhật
+     * chậm" mà chủ dự án báo 17/08.
+     *
+     * Vì vậy: hai bảng nghiệp vụ đi một kênh riêng, system_config đi kênh
+     * riêng của nó. Nếu system_config vẫn chưa bật Realtime thì chỉ kênh
+     * ấy lỗi, luồng dữ liệu chính không hề gì. */
+    const kenhDuLieu = supabase
+      .channel("vmp-du-lieu")
       .on("postgres_changes",
         { event: "*", schema: "public", table: "vmp_plan_items" },
         debounced
@@ -563,6 +577,12 @@ export function useVmpData() {
         { event: "*", schema: "public", table: "vmp_objects" },
         debounced
       )
+      .subscribe();
+
+    /* Kênh phụ: đổi chế độ phân quyền. Được phép hỏng mà không ảnh hưởng
+     * dữ liệu — polling 20s vẫn bắt kịp việc đổi mode. */
+    const kenhCauHinh = supabase
+      .channel("vmp-cau-hinh")
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "system_config", filter: "key=eq.item_permissions_mode" },
         debounced
@@ -577,7 +597,8 @@ export function useVmpData() {
     return () => {
       clearTimeout(timer);
       clearInterval(poll);
-      supabase?.removeChannel(channel);
+      supabase?.removeChannel(kenhDuLieu);
+      supabase?.removeChannel(kenhCauHinh);
     };
   }, []);
 
