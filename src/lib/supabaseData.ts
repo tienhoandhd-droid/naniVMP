@@ -729,6 +729,63 @@ export async function setUserActive(
   return unwrap(data, error, active ? "Bật tài khoản thất bại" : "Tắt tài khoản thất bại");
 }
 
+/** Sáu vai NGHIỆP VỤ — đúng những gì `vmp_business_role()` giải ra. Đây là
+ *  từ vựng người dùng nhìn thấy; ánh xạ sang cặp (profiles.role,
+ *  vmp_performers.access_class) nằm ở RPC, không ở client. */
+export const VAI_NGHIEP_VU = [
+  { id: "admin", nhan: "Quản trị", mo: "Toàn quyền, kể cả phân quyền" },
+  { id: "qa_manager", nhan: "Quản lý QA", mo: "Xem tất cả, sửa tiến độ và danh mục" },
+  { id: "qa_staff", nhan: "Nhân viên QA", mo: "Sửa tiến độ trong phạm vi QA" },
+  { id: "workshop_manager", nhan: "Quản lý xưởng", mo: "Quản lý thiết bị của bộ phận" },
+  { id: "workshop_staff", nhan: "Nhân viên xưởng", mo: "Sửa việc được phân công" },
+  { id: "viewer", nhan: "Chỉ xem", mo: "Không sửa được gì" },
+] as const;
+
+export interface VaiNghiepVuRow {
+  user_id: string;
+  email: string | null;
+  /** null = hai bảng quyền đang lệch nhau, người này không xem được gì. */
+  business_role: string | null;
+  /** Lý do không giải được vai (vd `department_mismatch`). */
+  unresolved_reason: string | null;
+}
+
+/** Vai NGHIỆP VỤ của mọi tài khoản. Cần hàm riêng vì `rpc_nguoi_va_quyen`
+ *  trả vai ĐĂNG NHẬP, mà một `department_user` ứng với ba vai nghiệp vụ
+ *  khác nhau tuỳ access_class — client không suy ngược được. */
+export async function fetchVaiNghiepVu(): Promise<VaiNghiepVuRow[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_business_roles");
+  if (error) throw new Error(error.message);
+  const o = (data || {}) as { ok?: boolean; error?: string; nguoi?: VaiNghiepVuRow[] };
+  if (o.ok === false) throw new Error(o.error || "Không đọc được vai nghiệp vụ");
+  return o.nguoi || [];
+}
+
+/** Đổi VAI NGHIỆP VỤ — ghi đồng thời cả hai bảng quyền.
+ *
+ *  Vì sao không dùng setUserRole: quyền VMP nằm ở hai bảng và phải khớp
+ *  thành cặp; `rpc_set_user_role` từ chối đổi khi tài khoản đã nối hồ sơ,
+ *  nên admin buộc phải vào Supabase sửa tay — mà sửa tay chỉ đổi MỘT bảng,
+ *  làm cặp lệch và người đó mất sạch quyền xem (sự cố 17/08). RPC này đặt
+ *  cả hai trong một transaction và tự kiểm lại trước khi commit. */
+export async function setBusinessRole(
+  userId: string, businessRole: string, department: string | null, reason: string,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_business_role", {
+    p_user_id: userId,
+    p_business_role: businessRole,
+    p_department: department,
+    p_reason: reason,
+  });
+  return unwrap(data, error, "Đổi vai thất bại");
+}
+
 /* ---- Một người, một dòng (migration 20260801110000) ----
  * Trước đây màn Phân quyền đọc bốn nguồn — profiles, vmp_performers,
  * vmp_staff_emails, owner_name — rồi tự gộp bằng JavaScript, gộp theo CHUỖI
