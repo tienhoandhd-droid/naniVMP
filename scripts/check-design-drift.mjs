@@ -35,7 +35,10 @@ const PHAM_VI = [
    vật/motif là giá trị token được "nướng" vào tranh, có chú thích trong file). */
 const MIEN_HEX = new Set([
   "src/styles/lotus-tokens.css",
-  "src/components/brand/ValiIllustration.tsx",
+  // Hai file VẼ nhân vật (17/08): ValiIllustration.tsx nay chỉ là bộ chọn
+  // theo theme, không còn hex — phần tranh nằm ở hai file này.
+  "src/components/brand/CongChuaVali.tsx",
+  "src/components/brand/DungSiVali.tsx",
 ]);
 
 /* Emoji hay lọt vào UI trạng thái. Không quét chữ tiếng Việt nên chỉ cần
