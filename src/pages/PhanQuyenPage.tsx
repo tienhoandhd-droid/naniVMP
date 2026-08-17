@@ -77,7 +77,7 @@ import { C, NUM } from "../constants/theme.ts";
 import { DEPTS } from "../constants/vmp.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import {
-  setUserRole, upsertPerformer, fetchAssignments, setAssignment,
+  setUserRole, setUserActive, upsertPerformer, fetchAssignments, setAssignment,
   fetchRolePermissions, setRolePermission,
   fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, fetchLuatXem,
 } from "../lib/supabaseData.ts";
@@ -508,6 +508,41 @@ function FullPermissionWorkspace(
       if (r.ok) { setEmailMoi({ email: "", ghiChu: "" }); await taiDsEmail(); }
     } catch (e) {
       setKetQua((c) => ({ ...c, E: { xong: 0, tong: 1, loi: [`${email}: ${(e as Error).message}`] } }));
+    }
+    setDangLuu("");
+  };
+
+  /* ---- Bật/tắt tài khoản ------------------------------------------
+   * Tắt là CHẶN NGƯỜI THẬT khỏi hồ sơ GMP, nên hỏi lý do trước khi làm và
+   * lý do đi thẳng vào audit_logs. Không dùng ô nhập tự chế ở đây: thao
+   * tác này một-bước, không xếp cùng luồng "sửa nhiều ô rồi bấm Lưu" —
+   * trộn hai luồng thì người dùng không biết mình đã tắt ai lúc nào.
+   *
+   * Bốn chốt an toàn (chỉ admin · bắt buộc lý do · không tự tắt mình ·
+   * không tắt admin cuối) nằm ở RPC. Ở đây chỉ hỏi và báo kết quả — client
+   * luôn có thể bị bỏ qua nên client không phải chỗ đặt luật. */
+  const doiKichHoat = async (userId: string, ten: string, batLen: boolean) => {
+    const lyDo = window.prompt(
+      batLen
+        ? `Bật lại tài khoản của ${ten}.\nLý do (bắt buộc — sẽ vào nhật ký kiểm toán):`
+        : `TẮT tài khoản của ${ten}. Người này sẽ không đăng nhập được nữa.\nLý do (bắt buộc — sẽ vào nhật ký kiểm toán):`,
+      "",
+    );
+    if (lyDo === null) return;                    // người dùng bấm Huỷ
+    if (!lyDo.trim()) {
+      setKetQua((c) => ({ ...c, B: { xong: 0, tong: 1, loi: [`${ten}: chưa nhập lý do nên chưa đổi gì.`] } }));
+      return;
+    }
+    setDangLuu("B");
+    try {
+      const r = await setUserActive(userId, batLen, lyDo.trim());
+      setKetQua((c) => ({
+        ...c,
+        B: { xong: r.ok ? 1 : 0, tong: 1, loi: r.ok ? [] : [`${ten}: ${r.error}`] },
+      }));
+      if (r.ok) await taiNguoiVaQuyen();          // đọc lại để chip trạng thái khớp DB
+    } catch (e) {
+      setKetQua((c) => ({ ...c, B: { xong: 0, tong: 1, loi: [`${ten}: ${(e as Error).message}`] } }));
     }
     setDangLuu("");
   };
@@ -1027,6 +1062,19 @@ function FullPermissionWorkspace(
               : <Tag color={C.raspText} bg={C.raspSoft}>chưa có tài khoản</Tag>}
             {h.coTaiKhoan && !h.tkHoatDong && (
               <Tag color={C.raspText} bg={C.raspSoft}>đã khoá</Tag>
+            )}
+            {/* Bật/tắt ngay tại dòng của người đó — không phải mở Supabase.
+                Nút nói ra HÀNH ĐỘNG sẽ xảy ra ("Tắt tài khoản"), không nói
+                trạng thái hiện tại, để bấm nhầm không thành khoá nhầm. */}
+            {quyenSuaA && h.tkId && (
+              <button type="button" className="pq-nut" disabled={dangLuu === "B"}
+                style={{ fontSize: 11.5, padding: "2px 8px" }}
+                title={h.tkHoatDong
+                  ? `Tắt tài khoản của ${h.ten} — người này sẽ không đăng nhập được nữa. Có hỏi lý do.`
+                  : `Bật lại tài khoản của ${h.ten} — đăng nhập được trở lại. Có hỏi lý do.`}
+                onClick={() => doiKichHoat(h.tkId!, h.ten, !h.tkHoatDong)}>
+                {h.tkHoatDong ? "Tắt tài khoản" : "Bật lại"}
+              </button>
             )}
           </div>
 

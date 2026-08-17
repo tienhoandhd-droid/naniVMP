@@ -707,6 +707,28 @@ export async function setUserRole(
   return unwrap(data, error, "Đổi phân quyền thất bại");
 }
 
+/** Bật/tắt tài khoản (profiles.is_active) — admin làm thẳng trên web.
+ *
+ *  Tách khỏi setUserRole có chủ đích: gộp thì mỗi lần bật/tắt lại phải gửi
+ *  kèm vai/bộ phận/phạm vi, chỉ cần client gửi thiếu một trường là vô tình
+ *  ghi đè phân quyền của người ta.
+ *
+ *  Bốn chốt an toàn nằm ở RPC, không ở đây: chỉ admin gọi được, bắt buộc lý
+ *  do, không tự tắt mình, và không tắt admin hoạt động cuối cùng. */
+export async function setUserActive(
+  userId: string, active: boolean, reason: string,
+): Promise<RpcResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_user_active", {
+    p_user_id: userId,
+    p_active: active,
+    p_reason: reason,
+  });
+  return unwrap(data, error, active ? "Bật tài khoản thất bại" : "Tắt tài khoản thất bại");
+}
+
 /* ---- Một người, một dòng (migration 20260801110000) ----
  * Trước đây màn Phân quyền đọc bốn nguồn — profiles, vmp_performers,
  * vmp_staff_emails, owner_name — rồi tự gộp bằng JavaScript, gộp theo CHUỖI
