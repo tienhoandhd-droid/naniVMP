@@ -73,8 +73,10 @@ export default function CatalogRecordDialog({
   const [dangLuu, setDangLuu] = useState(false);
   const [loi, setLoi] = useState<CatalogSaveResult | null>(null);
   const [moNangCao, setMoNangCao] = useState(false);
-  /* Ô nào cần đặt con trỏ vào — đặt khi người dùng bấm Lưu mà còn thiếu. */
-  const [oCanNhay, setOCanNhay] = useState<string | null>(null);
+  /* Ô nào cần đặt con trỏ vào — đặt khi người dùng bấm Lưu mà còn thiếu.
+     Kèm số lần để bấm Lưu hai lần liên tiếp vẫn nhảy lại: nếu chỉ giữ tên
+     ô thì lần thứ hai giá trị không đổi và hiệu ứng không chạy nữa. */
+  const [oCanNhay, setOCanNhay] = useState<{ key: string; lan: number } | null>(null);
 
   /* Nạp lại khi người dùng mở sang bản ghi khác. Không có đoạn này thì lần
      mở thứ hai vẫn hiện dữ liệu của bản ghi thứ nhất — và tệ hơn, patch
@@ -142,7 +144,7 @@ export default function CatalogRecordDialog({
    *  "còn thiếu" mà không mở phần thu gọn là bắt người dùng đi tìm. */
   const nhayToiO = (key: string) => {
     if (nangCao.some((f) => f.key === key)) setMoNangCao(true);
-    setOCanNhay(key);
+    setOCanNhay((cu) => ({ key, lan: (cu?.lan ?? 0) + 1 }));
   };
 
   const luu = async () => {
@@ -240,7 +242,7 @@ export default function CatalogRecordDialog({
                 locked={!canEdit} lockReason={!canEdit ? "Bạn không có quyền sửa" : undefined}
                 changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`}
                 goiY={goiYCho(f.key)} error={loiTruong[f.key]}
-                autoFocus={oCanNhay === f.key} />
+                focusSignal={oCanNhay?.key === f.key ? oCanNhay.lan : undefined} />
             ))}
           </div>
 
@@ -260,7 +262,7 @@ export default function CatalogRecordDialog({
                     locked={!canEdit} lockReason={!canEdit ? "Bạn không có quyền sửa" : undefined}
                     changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`}
                     goiY={goiYCho(f.key)} error={loiTruong[f.key]}
-                    autoFocus={oCanNhay === f.key} />
+                    focusSignal={oCanNhay?.key === f.key ? oCanNhay.lan : undefined} />
                 ))}
               </div>
             </details>

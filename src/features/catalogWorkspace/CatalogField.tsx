@@ -9,6 +9,7 @@
  *  Ô mờ mà không giải thích là cách chắc chắn khiến người dùng nghĩ hệ
  *  thống hỏng: họ bấm, không gõ được, và không có gì trên màn nói tại sao.
  * ===================================================================== */
+import { useEffect, useRef } from "react";
 import { Lock } from "lucide-react";
 
 import type { CatalogFieldDefinition } from "./contracts.ts";
@@ -26,14 +27,29 @@ export interface CatalogFieldProps {
   idPrefix?: string;
   /** Giá trị đã có trong hồ sơ, gợi ý cho ô `combobox`. */
   goiY?: readonly string[];
-  /** Đặt con trỏ vào ô này — dùng khi người dùng bấm Lưu mà còn ô trống. */
-  autoFocus?: boolean;
+  /** Tín hiệu đặt con trỏ vào ô này — đổi giá trị là focus lại.
+   *  KHÔNG dùng `autoFocus`: thuộc tính đó của React chỉ có tác dụng lúc
+   *  phần tử được gắn vào cây. Ô nằm trong `<details>` thu gọn vẫn đang
+   *  mount sẵn (details chỉ ẩn, không tháo), nên `autoFocus` bật lên sau
+   *  đó không làm gì cả — bấm Lưu xong con trỏ đứng yên. */
+  focusSignal?: number;
 }
 
 export default function CatalogField({
   field, value, onChange, locked, lockReason, error, changed, idPrefix = "cf",
-  goiY, autoFocus,
+  goiY, focusSignal,
 }: CatalogFieldProps) {
+  const oRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (focusSignal === undefined) return;
+    const el = oRef.current;
+    if (!el) return;
+    el.focus();
+    // Ô có thể nằm ngoài tầm nhìn khi form dài: đưa nó vào giữa màn hình,
+    // nếu không con trỏ ở một chỗ người dùng không thấy.
+    el.scrollIntoView({ block: "center" });
+  }, [focusSignal]);
+
   const id = `${idPrefix}-${field.key}`;
   const idLoi = `${id}-loi`;
   const idGoiY = `${id}-goi-y`;
@@ -52,7 +68,7 @@ export default function CatalogField({
        nhìn thấy dấu sao mới biết. */
     required: field.required || undefined,
     "aria-required": field.required || undefined,
-    autoFocus,
+    ref: (el: HTMLElement | null) => { oRef.current = el; },
     "aria-invalid": error ? true : undefined,
     "aria-describedby": moTa,
     className: `cw-o${changed ? " is-doi" : ""}${error ? " is-loi" : ""}`,

@@ -20,7 +20,7 @@
  *  thấy dù thân dài) thuộc về `ViewportDialog`. Ở đây không tự dựng lại —
  *  bản trước tự dựng một lớp phủ `position: fixed` và mất cả bốn thứ đó.
  * ===================================================================== */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Boxes, Lock, Save } from "lucide-react";
 
 import ViewportDialog from "../ui/ViewportDialog.tsx";
@@ -90,7 +90,20 @@ export default function CatalogObjectForm({
   });
   /* Ô cần đưa tiêu điểm vào sau lần bấm Lưu thất bại — nhảy thẳng tới ô
      bắt buộc còn trống thay vì chỉ làm mờ nút Lưu. */
-  const [oCanNhay, setOCanNhay] = useState<string | null>(null);
+  /* Ô cần đặt con trỏ vào sau khi bấm Lưu mà còn thiếu. Kèm số lần bấm để
+     lần thứ hai vẫn nhảy lại — chỉ giữ tên ô thì giá trị không đổi và hiệu
+     ứng không chạy nữa.
+     KHÔNG dùng `autoFocus`: thuộc tính đó của React chỉ có tác dụng lúc
+     phần tử được gắn vào cây, mà ô trong `<details>` thu gọn vẫn đang mount
+     sẵn — bật lên sau đó không làm gì cả. */
+  const [oCanNhay, setOCanNhay] = useState<{ key: string; lan: number } | null>(null);
+  useEffect(() => {
+    if (!oCanNhay) return;
+    const el = document.getElementById(`cof-${oCanNhay.key}`);
+    if (!el) return;
+    el.focus();
+    el.scrollIntoView({ block: "center" });
+  }, [oCanNhay]);
 
   const banGoc = useMemo(() => doiSangForm(row), [row]);
   const doiGi = useMemo(
@@ -134,7 +147,7 @@ export default function CatalogObjectForm({
         // Nhóm Nâng cao đang thu gọn thì mở ra, nếu không người dùng nhận
         // một câu lỗi trỏ tới ô họ không nhìn thấy.
         if (TRUONG_FORM.find((t) => t.key === dau)?.nhom === "nang_cao") setMoNangCao(true);
-        setOCanNhay(dau);
+        setOCanNhay((cu) => ({ key: dau, lan: (cu?.lan ?? 0) + 1 }));
       }
       return;
     }
@@ -182,7 +195,6 @@ export default function CatalogObjectForm({
               <select id={id} className={lop} disabled={khoa}
                 value={dangKhac ? MA_BO_PHAN_KHAC : giaTri}
                 aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
-                autoFocus={oCanNhay === t.key}
                 onChange={(e) => {
                   setBoPhanKhac(e.target.value === MA_BO_PHAN_KHAC);
                   dat(t.key, e.target.value === MA_BO_PHAN_KHAC ? "" : e.target.value);
@@ -207,7 +219,6 @@ export default function CatalogObjectForm({
           <>
             <input id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
               list={`${id}-ds`} aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
-              autoFocus={oCanNhay === t.key}
               onChange={(e) => dat(t.key, e.target.value)} />
             <datalist id={`${id}-ds`}>
               {(goiY?.[t.goiYTu] ?? []).map((v) => <option key={v} value={v} />)}
@@ -225,7 +236,6 @@ export default function CatalogObjectForm({
         ) : t.chon ? (
           <select id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
             aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
-            autoFocus={oCanNhay === t.key}
             onChange={(e) => dat(t.key, e.target.value)}>
             <option value="">—</option>
             {t.chon.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -234,7 +244,6 @@ export default function CatalogObjectForm({
           <input id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
             inputMode={t.so ? "numeric" : undefined}
             aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
-            autoFocus={oCanNhay === t.key}
             onChange={(e) => dat(t.key, e.target.value)} />
         )}
 

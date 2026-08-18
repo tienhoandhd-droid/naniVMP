@@ -381,6 +381,106 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   await trang.close();
 }
 
+/* ---- 7. Ô bắt buộc không bị giấu, và mọi thao tác đều có phản hồi ---- *
+ *  Hai thứ bộ cũ không phủ, mà đều là lý do người dùng nghĩ web hỏng:
+ *   · nút Lưu mờ câm trong khi ô cần điền nằm trong phần Nâng cao đang
+ *     đóng — bấm không có gì xảy ra, không biết phải mở cái gì ra;
+ *   · lưu xong hộp thoại đóng cái rụp, không nói đã ghi hay chưa.
+ * --------------------------------------------------------------------- */
+{
+  console.log("\nÔ bắt buộc và phản hồi thành công/thất bại:");
+  const { trang, loiConsole } = await moTrang(trinhDuyet);
+
+  // Sang mục Người nhận cảnh báo rồi mở hộp thoại tạo mới.
+  await trang.evaluate(() => {
+    document.querySelector('[data-cw-nav="alerts"]')?.click();
+  });
+  await cho(900);
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Thêm")?.click();
+  });
+  await cho(600);
+
+  const banDau = await trang.evaluate(() => ({
+    moHop: !!document.querySelector(".cw-than"),
+    phamVi: document.querySelector("#cw-alerts-scope_type")?.value ?? "",
+    loaiCanhBao: document.querySelector("#cw-alerts-alert_kind")?.value ?? "",
+    nhanBatBuoc: [...document.querySelectorAll(".cw-bat-buoc-chu")].map((o) => o.textContent.trim()),
+    emailRequired: document.querySelector("#cw-alerts-email")?.required ?? null,
+    nutTao: [...document.querySelectorAll("button")]
+      .find((b) => b.textContent.trim() === "Tạo mới")?.disabled ?? null,
+  }));
+  kiem(banDau.moHop, "hộp thoại tạo người nhận mở được");
+  kiem(banDau.phamVi === "tất cả", "tạo mới có sẵn Phạm vi = tất cả", banDau.phamVi);
+  kiem(banDau.loaiCanhBao === "cả hai", "tạo mới có sẵn Loại cảnh báo = cả hai", banDau.loaiCanhBao);
+  kiem(banDau.nhanBatBuoc.includes("Bắt buộc"), "ô bắt buộc có nhãn chữ đọc được");
+  kiem(banDau.emailRequired === true, "ô Email mang thuộc tính required thật");
+
+  /* Bấm Tạo mới khi còn trống: KHÔNG được im lặng. Con trỏ phải nhảy vào
+     đúng ô còn thiếu, và dòng "Còn thiếu" phải gọi tên ô đó. */
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Tạo mới")?.click();
+  });
+  await cho(400);
+  const sauKhiBam = await trang.evaluate(() => ({
+    oDangChon: document.activeElement?.id ?? "",
+    conThieu: [...document.querySelectorAll(".cw-loi")].map((o) => o.textContent.trim()).join(" | "),
+    conMo: !!document.querySelector(".cw-than"),
+  }));
+  kiem(sauKhiBam.oDangChon === "cw-alerts-email",
+    "bấm Tạo mới khi thiếu thì con trỏ nhảy vào đúng ô", sauKhiBam.oDangChon || "(không ô nào)");
+  kiem(sauKhiBam.conThieu.includes("Email"), "dòng Còn thiếu gọi đúng tên ô", sauKhiBam.conThieu.slice(0, 80));
+  kiem(sauKhiBam.conMo, "thiếu ô thì hộp thoại vẫn mở, không mất dữ liệu đang gõ");
+
+  /* Email sai định dạng phải chặn ngay tại form — luật này từng nằm chết
+     trong datasetForm.ts, không file nào import. */
+  await trang.evaluate(() => {
+    const o = document.querySelector("#cw-alerts-email");
+    const dat = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    dat.call(o, "sai@");
+    o.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await cho(300);
+  const emailSai = await trang.evaluate(() => ({
+    loi: [...document.querySelectorAll(".cw-loi")].map((o) => o.textContent.trim()).join(" | "),
+    coToast: !!document.querySelector(".vmp-toast--thanhCong"),
+  }));
+  kiem(emailSai.loi.includes("Email không hợp lệ"), "email sai định dạng bị chặn tại form",
+    emailSai.loi.slice(0, 80));
+  kiem(!emailSai.coToast, "email sai thì không có toast thành công nào");
+
+  /* Email hợp lệ rồi bấm lưu: dù server giả lập trả gì, PHẢI có phản hồi. */
+  await trang.evaluate(() => {
+    const o = document.querySelector("#cw-alerts-email");
+    const dat = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    dat.call(o, "nguoi.moi@example.com");
+    o.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await cho(300);
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Tạo mới")?.click();
+  });
+  await cho(1500);
+  const sauLuu = await trang.evaluate(() => {
+    const toast = document.querySelector(".vmp-toast");
+    return {
+      coToast: !!toast,
+      loaiToast: toast?.getAttribute("data-vmp-toast") ?? "",
+      chuToast: toast?.textContent?.trim() ?? "",
+      conMo: !!document.querySelector(".cw-than"),
+    };
+  });
+  kiem(sauLuu.coToast, "lưu xong luôn có phản hồi trên màn hình", sauLuu.chuToast.slice(0, 60));
+  kiem(sauLuu.loaiToast !== "dang",
+    "toast được chốt thành công hoặc thất bại, không treo ở 'đang chạy'", sauLuu.loaiToast);
+  // Lưu hỏng thì hộp thoại phải còn nguyên để người dùng không gõ lại từ đầu.
+  kiem(sauLuu.loaiToast !== "loi" || sauLuu.conMo,
+    "lưu hỏng thì hộp thoại vẫn mở", `${sauLuu.loaiToast}/${sauLuu.conMo}`);
+
+  kiem(loiConsole.length === 0, "không lỗi console", loiConsole.join(" · ").slice(0, 160));
+  await trang.close();
+}
+
 await trinhDuyet.close();
 
 console.log(`\n${"─".repeat(52)}`);
