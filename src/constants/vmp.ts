@@ -142,13 +142,14 @@ export const NAV_ITEMS = [
      hợp lệ (hợp đồng với rpc_my_ui_access) và vẫn có alias URL, chỉ không
      còn mục menu riêng.
 
-     Mục `phanquyen` chỉ còn là cửa vào của Admin / Quản lý QA / Nhân viên
-     QA (bảng vmp_screen_permissions, migration
-     20260812090000_six_business_roles_and_screen_access.sql). Quản lý
-     xưởng / Nhân viên xưởng đã KHÔNG còn thấy màn này — việc phân công
-     hạng mục thiết bị của họ đã chuyển hẳn sang nút "Gán người xưởng"
-     ngay trong hộp Cập nhật tiến độ (`access.can("progress",
-     "assign_workshop_staff")`), không phải "sẽ chuyển" nữa. */
+     Mục `phanquyen` là CỬA VÀO chức năng, không mang dữ liệu riêng
+     (`data_scope = 'none'`). Admin / Quản lý QA / Nhân viên QA vào để quản
+     trị quyền; Quản lý xưởng cũng vào được nhưng chỉ để PHÂN CÔNG hạng mục
+     thiết bị — migration 20260812100000_quan_ly_xuong_giu_cua_phan_cong.sql
+     cấp riêng cho họ `actions = ['assign_workshop_staff']` trên màn này.
+     Nhân viên xưởng thì không.
+     (Bản trước của chú thích này nói Quản lý xưởng đã mất màn — sai, do đọc
+     seed gốc ở 20260812090000 mà bỏ qua migration cấp quyền sau nó.) */
   { id: "people", label: "Nhân sự", icon: Users, group: "admin" },
   { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },

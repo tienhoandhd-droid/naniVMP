@@ -427,10 +427,10 @@ function CurrentPermissionWorkspace({ acts, access }: {
 }
 
 export default function PhanQuyenView(props: PhanQuyenViewProps) {
-  const allowed = props.user?.role === "admin"
-    || props.user?.role === "qa_manager"
-    || props.user?.accessClass === "equipment_manager"
-    || props.user?.accessClass === "qa_manager";
+  /* Cổng gác ngoài cùng cũng hỏi SERVER, không đọc `user.role`/`accessClass`
+     nữa — hai field đó thuộc hệ 4 vai đã bỏ, và để sót ở đây thì cả màn vẫn
+     chạy theo luật cũ dù bên trong đã chuyển hết sang `access`. */
+  const allowed = props.access?.canView("phanquyen") ?? false;
   if (!allowed) {
     return (
       <Card variant="strong">
@@ -439,7 +439,11 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
       </Card>
     );
   }
-  if (props.user?.accessClass === "equipment_manager" && props.user.role !== "admin") {
+  /* Quản lý xưởng vào màn này CHỈ để phân công hạng mục thiết bị: server
+     cấp cho họ đúng một hành động `assign_workshop_staff` trên `phanquyen`
+     (migration 20260812100000_quan_ly_xuong_giu_cua_phan_cong.sql), và
+     `data_scope = 'none'` vì màn là cửa vào chức năng, không mang dữ liệu. */
+  if (props.access?.businessRole === "workshop_manager") {
     return <EquipmentAssignmentWorkspace acts={props.acts} />;
   }
   return <CurrentPermissionWorkspace acts={props.acts} access={props.access} />;
