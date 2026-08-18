@@ -60,7 +60,7 @@ p.on("console", (m) => { if (m.type() === "error") ghiLoi(m.text()); });
 const dangNhap = (ten = QA) => p.evaluate((t) => {
   const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
   localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-    ...cu, name: t, email: "e2e@test.local", role: "admin", perm: "admin",
+    ...cu, name: t, email: "e2e@test.local", role: "admin",
   }));
 }, ten);
 
@@ -71,7 +71,7 @@ const moMan = async (v, ten = QA) => {
     p.evaluate(([url, t]) => {
       const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
       localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-        ...cu, name: t, email: "e2e@test.local", role: "admin", perm: "admin",
+        ...cu, name: t, email: "e2e@test.local", role: "admin",
       }));
       history.replaceState(null, "", url);
       location.reload();

@@ -7,14 +7,17 @@ import {
   KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
 } from "lucide-react";
 import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
-import { NAV_ITEMS, PERM_LABEL } from "../../constants/vmp.ts";
+import { NAV_ITEMS } from "../../constants/vmp.ts";
 import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
 import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
 import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
-import { BUSINESS_ROLE_LABELS } from "../../lib/access.ts";
 import type { AccessContext } from "../../lib/access.ts";
+/* Nhãn 6 vai nghiệp vụ — dùng lại đúng bảng nhãn của màn Phân quyền
+   (nguồn duy nhất) thay vì `PERM_LABEL`/`BUSINESS_ROLE_LABELS` cũ, để
+   badge trên topbar và bảng phân quyền không lệch chữ nhau. */
+import { VAI_NGHIEP_VU } from "../../lib/supabaseData.ts";
 
 // ======================== SIDEBAR ========================
 export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
@@ -531,15 +534,11 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
         <span className="vmp-perm-badge" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           padding: "8px 14px", borderRadius: 999, fontSize: 12, fontWeight: 800,
-          color: (access?.businessRole ?? user?.perm) === "viewer" || user?.perm === "view"
-            ? C.skyText : C.pinkText,
-          background: (access?.businessRole ?? user?.perm) === "viewer" || user?.perm === "view"
-            ? C.skySoft : C.pinkSoft,
+          color: access?.businessRole === "viewer" ? C.skyText : C.pinkText,
+          background: access?.businessRole === "viewer" ? C.skySoft : C.pinkSoft,
         }}>
           <ShieldCheck size={14} />
-          {(access?.businessRole && BUSINESS_ROLE_LABELS[access.businessRole])
-            || (user && PERM_LABEL[user.perm])
-            || user?.role}
+          {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}
         </span>
 
       </div>

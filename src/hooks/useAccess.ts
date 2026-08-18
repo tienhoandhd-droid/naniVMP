@@ -49,7 +49,7 @@ export function useAccess(user: AppUser | null): AccessState {
     /* Dựng lại đường lùi từ chính ba trường mà effect này phụ thuộc, thay vì
        đóng gói cả object `user` vào dependency — object đổi tham chiếu mỗi
        lần render sẽ khiến effect chạy lại và gọi RPC liên tục. */
-    const quyenCu = legacyAccessContext({ name: "", role: role ?? "viewer", perm: "view", accessClass });
+    const quyenCu = legacyAccessContext({ name: "", role: role ?? "viewer", accessClass });
 
     let con = true;
     setDangTai(true);

@@ -45,7 +45,6 @@ import {
 
   DEPTS,
   DEPT_CODE,
-  PERM_LABEL,
   NAV_ITEMS,
   NAV_SUBS,
   PERIODS,
@@ -843,12 +842,13 @@ const VAI_TRO_NHAN: Record<string, { nhan: string; mau: string; nen: string }> =
   viewer:          { nhan: "Chỉ xem", mau: C.plumSoft, nen: C.pinkMist },
 };
 
-function AdminView({ conn, user, laAdminThat }: {
-  /* `laAdminThat` chứ không phải `isAdmin`: đổi vai và bật/tắt tài khoản đi
-     qua RPC chỉ nhận role "admin", trong khi `isAdmin` của web còn đúng với
-     cả quản lý QA (permMap gán perm "admin" cho qa_manager). Hiện nút cho
-     quản lý QA là mời họ bấm vào thứ chắc chắn bị server từ chối. */
+function AdminView({ conn, user, laAdminThat, access }: {
+  /* `laAdminThat` hỏi thẳng server qua access.can("accounts","manage_accounts")
+     — không còn suy từ perm cũ (permMap gán perm "admin" cho cả qa_manager,
+     hiện nút cho quản lý QA là mời họ bấm vào thứ chắc chắn bị server từ chối). */
   conn: ConnState; user?: AppUser | null; laAdminThat?: boolean;
+  /** Chỉ cần businessRole — hiện nhãn vai của phiên đang đăng nhập, thay `user.perm` cũ. */
+  access?: Pick<AccessContext, "businessRole"> | null;
 }) {
   const [tt, setTt] = useState<SystemStatus | null>(null);
   const [err, setErr] = useState("");
@@ -952,7 +952,7 @@ function AdminView({ conn, user, laAdminThat }: {
             <div style={{ fontSize: 12, fontWeight: 800, color: isSupabaseConfigured() ? C.mintText : C.raspText, textTransform: "uppercase" }}>Xác thực</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 3 }}>{isSupabaseConfigured() ? "Supabase Auth" : "Chế độ tạm (env)"}</div>
           </div>
-          {oSo("Đang đăng nhập", user?.name || "—", `${user?.role || ""} · ${(user && PERM_LABEL[user.perm]) || ""}`)}
+          {oSo("Đang đăng nhập", user?.name || "—", `${user?.role || ""} · ${(access && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}`)}
         </div>
       </Card>
 
@@ -1680,11 +1680,21 @@ function GlobalFilterBar({
    chưa lưu — tách ra để Provider nằm NGOÀI mọi thứ dùng nó, kể cả hộp
    thoại Đổi mật khẩu. */
 function AppShell() {
-  const { user, setUser, logout, isAdmin, laAdminThat } = useAuth();
+  // `isAdmin` (cờ gộp "admin HOẶC qa_manager" từ hệ vai cũ) chỉ còn dùng để
+  // truyền cho PhanQuyenPage.tsx — file đó đang được dọn ở nhánh khác, chưa
+  // bỏ hẳn tham số này. Đừng gán thêm việc mới cho `isAdmin` ở file này.
+  const { user, setUser, logout } = useAuth();
   /* Quyền xem từng màn do Supabase quyết, không suy từ `role`/`accessClass`.
      Trong lúc chờ — và khi server chưa có `rpc_my_ui_access` — hook trả về
      quyền theo luật cũ ở chế độ `preview`, nên ứng dụng chạy y như trước. */
   const { access } = useAccess(user);
+  /* Hai cờ thay cho `isAdmin` gộp cũ ở hộp Cập nhật tiến độ — mỗi cờ hỏi
+     đúng MỘT câu tới `access`, không còn suy quyền từ vai đăng nhập cũ:
+     · canChonNguoiThucHien — ai được đổi "Người thực hiện".
+     · canDoiTrangThai — khối "Trạng thái nghiệp vụ" hiện chỉ admin/QA
+       quản lý được đổi; hệ mới chưa có hành động riêng cho việc này. */
+  const canChonNguoiThucHien = access.can("source", "edit_catalog");
+  const canDoiTrangThai = access.businessRole === "admin" || access.businessRole === "qa_manager";
   const {
     objects, acts, conn, lastSync, dataUpdatedAt, saveStatus, reloadData, silentRefresh,
     updateActivity,
@@ -2186,12 +2196,14 @@ function AppShell() {
                       className={nhomTheo === "doituong" ? "is-chon" : ""}>Theo đối tượng</button>
                   </div>
                   {nhomTheo === "doituong" ? (
-                    <CatalogView objects={filteredObjects} acts={filteredActs} isAdmin={isAdmin}
+                    <CatalogView objects={filteredObjects} acts={filteredActs}
+                      canChonNguoiThucHien={canChonNguoiThucHien} canDoiTrangThai={canDoiTrangThai}
                       onUpdate={updateActivity} onReload={reloadData} readOnly={false}
                       canAssignWorkshop={access.can("progress", "assign_workshop_staff")}
                       onMoDanhMuc={(code, nhom) => { setMoDanhMuc({ code, nhom }); setView("source"); }} />
                   ) : (
-                    <UpdateView acts={filteredActs} conn={conn} isAdmin={isAdmin}
+                    <UpdateView acts={filteredActs} conn={conn}
+                      canChonNguoiThucHien={canChonNguoiThucHien} canDoiTrangThai={canDoiTrangThai}
                       onUpdate={updateActivity} onReload={reloadData} readOnly={false}
                       canAssignWorkshop={access.can("progress", "assign_workshop_staff")}
                       focusId={moHangMuc} onFocusDone={() => setMoHangMuc("")} />
@@ -2215,10 +2227,10 @@ function AppShell() {
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là
                   alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}
               {view === "phanquyen" && (
-                <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} user={user} access={access} />
+                <PhanQuyenView acts={filteredActs} user={user} access={access} />
               )}
               {view === "audit" && <AuditLogView />}
-              {view === "admin" && <AdminView conn={conn} user={user} laAdminThat={laAdminThat} />}
+              {view === "admin" && <AdminView conn={conn} user={user} laAdminThat={access.can("accounts", "manage_accounts")} access={access} />}
             </Suspense>
             </div>
             </ScreenGuard>
@@ -2227,7 +2239,7 @@ function AppShell() {
             {/* Truyền màn đang xem xuống để Vali gợi ý câu hỏi bám đúng chỗ
                 người dùng đang đứng — hỏi ở trang Cảnh báo khác hẳn hỏi ở
                 trang Tổng quan. */}
-            <Suspense fallback={null}><ChatBox user={user} trang={view} /></Suspense>
+            <Suspense fallback={null}><ChatBox user={user} trang={view} access={access} /></Suspense>
           </div>
         </div>
       </main>

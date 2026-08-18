@@ -19,6 +19,7 @@ import { MessageCircle, X, Send, Sparkles, AlertTriangle, Database, BookOpen, Li
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import { supabase, vePhien } from "../../lib/supabaseClient.ts";
 import type { AppUser } from "../../types/domain.ts";
+import type { AccessContext } from "../../lib/access.ts";
 
 interface TrichDan { nguon: string; muc?: string }
 interface Msg {
@@ -133,7 +134,11 @@ const NHIP_CHO: Array<{ tu: number; loai: string }> = [
   { tu: 32000, loai: "nguyen_tac" },
 ];
 
-export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?: string }) {
+export default function ChatBox({ user, trang, access }: {
+  user?: AppUser | null; trang?: string;
+  /** access.businessRole — Vali cần biết vai nghiệp vụ hiệu lực (hệ mới), không còn đọc user.perm cũ. */
+  access?: Pick<AccessContext, "businessRole"> | null;
+}) {
   const [mo, setMo] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
@@ -246,7 +251,7 @@ export default function ChatBox({ user, trang }: { user?: AppUser | null; trang?
           nguoi: {
             ten: user?.name || "",
             email: user?.email || "",
-            quyen: user?.perm || "",
+            quyen: access?.businessRole ?? "",
             bo_phan: user?.department || "",
           },
         }),

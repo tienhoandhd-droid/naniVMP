@@ -69,7 +69,7 @@ try {
   await page.evaluate(() => {
     const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
     localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-      ...cu, name: "E2E Tester", email: "e2e@test.local", role: "admin", perm: "admin",
+      ...cu, name: "E2E Tester", email: "e2e@test.local", role: "admin",
     }));
     localStorage.removeItem("vmp_monitor_loc_v1:e2e@test.local");
   });
@@ -204,7 +204,7 @@ try {
     await page.evaluate((ten) => {
       const cu = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "{}");
       localStorage.setItem("vmp_monitor_user_v1", JSON.stringify({
-        ...cu, name: ten, email: "e2e@test.local", role: "admin", perm: "admin",
+        ...cu, name: ten, email: "e2e@test.local", role: "admin",
       }));
     }, QA);
     // goto sang URL chỉ khác mỗi hash là điều hướng trong cùng tài liệu —

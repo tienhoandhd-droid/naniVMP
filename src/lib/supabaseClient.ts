@@ -11,7 +11,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../types/database.ts";
-import type { AppUser, Perm, UserRole } from "../types/domain.ts";
+import type { AppUser, UserRole } from "../types/domain.ts";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "./supabaseConfig.ts";
 
 export { isSupabaseConfigured } from "./supabaseConfig.ts";
@@ -141,9 +141,12 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
   if (!supabase) return null;
   const { data, error } = await supabase.from("profiles").select("*").eq("id", uid).single();
   if (error || !data) return null;
-  const permMap: Record<UserRole, Perm> = {
-    admin: "admin", qa_manager: "admin", department_user: "edit", viewer: "view",
-  };
+  /* KHÔNG còn `permMap`. Bản trước ánh xạ 4 vai đăng nhập sang một cờ
+     `perm` rút gọn, trong đó gán "admin" cho CẢ `qa_manager` — nên mọi nút
+     gate bằng cờ đó hiện ra cho quản lý QA rồi bị máy chủ từ chối. Hệ 4 vai
+     đã bỏ hẳn (18/08); quyền nay hỏi server qua `rpc_my_ui_access`. `role`
+     giữ lại vì nó vẫn là dữ liệu thật của hồ sơ và là một vế để server giải
+     ra vai nghiệp vụ. */
   const role = (data.role || "viewer") as UserRole;
   let accessClass: string | null = null;
   try {
@@ -166,7 +169,6 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
   return {
     name: data.full_name || "User",
     role,
-    perm: permMap[role] || "view",
     department: data.department || "",
     accessClass,
   };

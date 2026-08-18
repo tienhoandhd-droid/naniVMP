@@ -15,11 +15,14 @@ import { buildProgressWorkspaceModel } from "../features/progress/progressWorksp
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
 
-export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, readOnly = true, focusId, onFocusDone, canAssignWorkshop }: {
+export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, focusId, onFocusDone, canAssignWorkshop }: {
   acts: PlanActivity[];
   /** Không dùng index signature để nhận được cả ConnState (status là union). */
   conn?: { status?: string; msg?: string };
-  isAdmin?: boolean;
+  /** access.can("source","edit_catalog") — được đổi "Người thực hiện". */
+  canChonNguoiThucHien?: boolean;
+  /** access.businessRole is admin/qa_manager — được đổi/khôi phục "Trạng thái nghiệp vụ". */
+  canDoiTrangThai?: boolean;
   onUpdate?: (
     id: string,
     patch: Record<string, unknown>,
@@ -368,7 +371,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                         </button>
                       )}
                       <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
-                        disabled={readOnly || (isFrozen && !isAdmin)}
+                        disabled={readOnly || (isFrozen && !canDoiTrangThai)}
                         title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
                         style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
                     </div>
@@ -454,7 +457,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
                   </button>
                 )}
                 <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
-                  disabled={readOnly || (isFrozen && !isAdmin)}
+                  disabled={readOnly || (isFrozen && !canDoiTrangThai)}
                   style={{ ...btnPrimary, flex: "1 1 auto", minHeight: 44, fontSize: 13,
                            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
                            opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}>
@@ -482,7 +485,8 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
       {edit && !readOnly && <ProgressEditModal
         key={edit.id}
         act={edit}
-        isAdmin={isAdmin}
+        canChonNguoiThucHien={canChonNguoiThucHien}
+        canDoiTrangThai={canDoiTrangThai}
         canAssignWorkshop={canAssignWorkshop}
         quickDone={quick}
         onClose={() => { setEdit(null); setQuick(false); }}
@@ -492,7 +496,7 @@ export default function UpdateView({ acts, conn, isAdmin, onUpdate, onReload, re
         nextAct={(() => {
           const i = list.findIndex((a) => a.id === edit.id);
           if (i < 0) return null;
-          return list.slice(i + 1).find((a) => isAdmin || (a.state || a._raw?.state || "active") === "active") || null;
+          return list.slice(i + 1).find((a) => canDoiTrangThai || (a.state || a._raw?.state || "active") === "active") || null;
         })()}
         onOpenNext={(a) => { setEdit(a); setQuick(false); }}
         onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}

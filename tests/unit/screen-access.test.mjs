@@ -139,13 +139,13 @@ test("chế độ enforced mà không giải được vai trò thì không thấ
    người đang dùng. */
 
 test("đường lùi giữ nguyên luật mở màn Phân quyền hiện hành", () => {
-  const admin = legacyAccessContext({ name: "A", role: "admin", perm: "admin" });
+  const admin = legacyAccessContext({ name: "A", role: "admin" });
   assert.equal(admin.canView("phanquyen"), true);
   assert.equal(admin.canView("admin"), true);
   assert.equal(admin.canView("audit"), true);
   assert.equal(admin.canView("health"), true);
 
-  const qaManagerTheoRole = legacyAccessContext({ name: "B", role: "qa_manager", perm: "admin" });
+  const qaManagerTheoRole = legacyAccessContext({ name: "B", role: "qa_manager" });
   assert.equal(qaManagerTheoRole.canView("phanquyen"), true);
   assert.equal(qaManagerTheoRole.canView("admin"), false);
   /* Server CÓ cấp `health` và `audit` cho Quản lý QA
@@ -167,24 +167,24 @@ test("đường lùi giữ nguyên luật mở màn Phân quyền hiện hành",
   /* Nhân viên QA và người thường vẫn chỉ xem — đường lùi không được nới
      tay cho mọi vai chỉ vì vừa nới cho một vai. */
   const nhanVienQa = legacyAccessContext({
-    name: "F", role: "department_user", perm: "edit", accessClass: "qa_progress_editor",
+    name: "F", role: "department_user", accessClass: "qa_progress_editor",
   });
   assert.equal(nhanVienQa.can("source", "edit_catalog"), false);
   assert.equal(nhanVienQa.can("people", "edit_operational_people"), false);
   assert.equal(nhanVienQa.canView("audit"), false);
 
   const qaManagerTheoAccessClass = legacyAccessContext({
-    name: "C", role: "department_user", perm: "edit", accessClass: "qa_manager",
+    name: "C", role: "department_user", accessClass: "qa_manager",
   });
   assert.equal(qaManagerTheoAccessClass.canView("phanquyen"), true);
 
   const quanLyThietBi = legacyAccessContext({
-    name: "D", role: "department_user", perm: "edit", accessClass: "equipment_manager",
+    name: "D", role: "department_user", accessClass: "equipment_manager",
   });
   assert.equal(quanLyThietBi.canView("phanquyen"), true);
 
   const nhanVien = legacyAccessContext({
-    name: "E", role: "department_user", perm: "edit", accessClass: "qa_progress_editor",
+    name: "E", role: "department_user", accessClass: "qa_progress_editor",
   });
   assert.equal(nhanVien.canView("phanquyen"), false);
   assert.equal(nhanVien.canView("overview"), true);
@@ -194,7 +194,7 @@ test("đường lùi giữ nguyên luật mở màn Phân quyền hiện hành",
 
 test("đường lùi không bao giờ ở chế độ enforced", () => {
   for (const role of ["admin", "qa_manager", "department_user", "viewer"]) {
-    assert.equal(legacyAccessContext({ name: "X", role, perm: "view" }).mode, "preview");
+    assert.equal(legacyAccessContext({ name: "X", role }).mode, "preview");
   }
   assert.equal(legacyAccessContext(null).canView("overview"), false);
 });
@@ -230,7 +230,7 @@ test("preview giữ menu theo quyền cũ, chỉ lấy kết quả resolver đ�
   const { hopNhatPreview } = await import("../../src/lib/access.ts");
 
   const quyenCu = legacyAccessContext({
-    name: "Quản lý xưởng", role: "department_user", perm: "edit",
+    name: "Quản lý xưởng", role: "department_user",
     accessClass: "equipment_manager",
   });
   // Server chưa thấy access_class nào nên nó giấu màn Phân quyền.
@@ -253,14 +253,14 @@ test("preview giữ menu theo quyền cũ, chỉ lấy kết quả resolver đ�
 /* Hai màn tách ra từ Phân quyền. Đường lùi phải khớp luật đang chạy, nếu
    không việc tách màn sẽ âm thầm đổi ai vào được chỗ nào. */
 test("đường lùi mở đúng người cho hai màn mới", () => {
-  const admin = legacyAccessContext({ name: "A", role: "admin", perm: "admin" });
+  const admin = legacyAccessContext({ name: "A", role: "admin" });
   assert.equal(admin.canView("people"), true);
   assert.equal(admin.canView("accounts"), true);
 
   // Quản lý QA: sửa dữ liệu nhân sự được, nhưng không đụng vòng đời tài khoản.
   for (const u of [
-    { name: "B", role: "qa_manager", perm: "admin" },
-    { name: "C", role: "department_user", perm: "edit", accessClass: "qa_manager" },
+    { name: "B", role: "qa_manager" },
+    { name: "C", role: "department_user", accessClass: "qa_manager" },
   ]) {
     const ctx = legacyAccessContext(u);
     assert.equal(ctx.canView("people"), true, `${u.name} phải xem được Nhân sự`);
@@ -270,7 +270,7 @@ test("đường lùi mở đúng người cho hai màn mới", () => {
   // Quản lý xưởng dùng cửa cũ `phanquyen` để phân công thiết bị, không phải
   // màn Nhân sự.
   const xuong = legacyAccessContext({
-    name: "D", role: "department_user", perm: "edit", accessClass: "equipment_manager",
+    name: "D", role: "department_user", accessClass: "equipment_manager",
   });
   assert.equal(xuong.canView("phanquyen"), true);
   assert.equal(xuong.canView("people"), false);

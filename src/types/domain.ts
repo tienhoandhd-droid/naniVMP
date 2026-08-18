@@ -28,15 +28,14 @@ export type PerformerRow      = Tables["vmp_performers"]["Row"];
 /* ---------- Vai trò & quyền ---------- */
 /** Vai trò lưu trong profiles.role (enum user_role của Postgres). */
 export type UserRole = Database["public"]["Enums"]["user_role"];
-/** Quyền rút gọn dùng trong giao diện, ánh xạ từ UserRole ở supabaseClient. */
-export type Perm = "admin" | "edit" | "view";
+/* Kiểu `Perm` (admin/edit/view) đã BỎ cùng hệ 4 vai cũ, 18/08. Quyền giao
+   diện nay đọc từ `AccessContext` (src/lib/access.ts), do server cấp. */
 
 export interface AppUser {
   uid?: string;
   name: string;
   email?: string;
   role: UserRole | "viewer";
-  perm: Perm;
   department?: string;
   /** Phân loại quyền theo hạng mục của danh bạ vmp_performers. Null/thiếu khi
    * schema cũ chưa có cột hoặc tài khoản chưa nối với nhân sự. */

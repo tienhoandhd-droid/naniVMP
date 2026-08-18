@@ -497,17 +497,17 @@ const trinhDuyet = await puppeteer.launch({
     const chu = document.body.innerText;
     return {
       coEmail: chu.includes("Ai được phép có tài khoản"),
-      coMaTran: chu.includes("Vai nào xem được gì, sửa được gì"),
-      // Nửa SỬA phải là ô tích bấm được, không phải bảng chỉ để ngắm.
-      coOTichSuaDuoc: [...document.querySelectorAll("button, input[type=checkbox]")]
-        .some((el) => /vmp_role_permissions|sửa được/i.test(el.getAttribute("aria-label") || "")) 
+      coMaTranCu: chu.includes("Vai nào xem được gì, sửa được gì")
         || chu.includes("tích ở đây là đổi quyền thật"),
+      coMaTranMoi: chu.includes("Màn hình bạn được xem"),
       huongDanDungBaBuoc: chu.includes("Cấu hình hệ thống"),
     };
   });
   kiem(admin.coEmail, "admin thấy thẻ Ai được phép có tài khoản");
-  kiem(admin.coMaTran, "admin thấy ma trận Vai nào xem được gì, sửa được gì");
-  kiem(admin.coOTichSuaDuoc, "nửa SỬA nói rõ tích là đổi quyền thật");
+  /* Ma trận 4 vai cũ đã XOÁ ngày 18/08 cùng cả hệ quyền cũ. Thứ thay nó là
+     ma trận 6 vai "Màn hình bạn được xem", đọc từ rpc_my_ui_access. */
+  kiem(!admin.coMaTranCu, "không còn ma trận 4 vai của hệ cũ");
+  kiem(admin.coMaTranMoi, "admin thấy ma trận 6 vai Màn hình bạn được xem");
   kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang màn Cấu hình hệ thống");
   await a.trang.close();
 

@@ -92,10 +92,13 @@ function OMoc({ raw, dlKey, ngayKey, ttKey }: {
   );
 }
 
-export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate, onReload, readOnly = false, onMoDanhMuc, canAssignWorkshop }: {
+export default function CatalogView({ objects = [], acts = [], canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = false, onMoDanhMuc, canAssignWorkshop }: {
   objects?: VmpObject[];
   acts?: Activity[];
-  isAdmin?: boolean;
+  /** access.can("source","edit_catalog") — được đổi "Người thực hiện". */
+  canChonNguoiThucHien?: boolean;
+  /** access.businessRole is admin/qa_manager — được đổi "Trạng thái nghiệp vụ". */
+  canDoiTrangThai?: boolean;
   /** Cùng chữ ký với màn Cập nhật tiến độ — hai màn ghi qua một đường. */
   onUpdate?: (id: string, patch: Record<string, unknown>, userName?: string, reason?: string, expectedVersion?: number) => void;
   onReload?: () => void;
@@ -416,7 +419,8 @@ export default function CatalogView({ objects = [], acts = [], isAdmin, onUpdate
         <ProgressEditModal
           key={edit.id}
           act={edit}
-          isAdmin={isAdmin}
+          canChonNguoiThucHien={canChonNguoiThucHien}
+          canDoiTrangThai={canDoiTrangThai}
           canAssignWorkshop={canAssignWorkshop}
           onClose={() => { setEdit(null); setQuick(false); }}
           onReload={onReload}

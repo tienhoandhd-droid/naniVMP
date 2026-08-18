@@ -117,9 +117,12 @@ function conLai(hanISO: string): number | null {
   return Math.round((h.getTime() - t0.getTime()) / 86400000);
 }
 
-export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onChangeState, onReload, nextAct, onOpenNext, quickDone, editableFields, permissionMode, canAssignWorkshop }: {
+export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTrangThai, onClose, onSave, onChangeState, onReload, nextAct, onOpenNext, quickDone, editableFields, permissionMode, canAssignWorkshop }: {
   act: PlanActivity;
-  isAdmin?: boolean;
+  /** access.can("source","edit_catalog") — được đổi "Người thực hiện". */
+  canChonNguoiThucHien?: boolean;
+  /** access.businessRole is admin/qa_manager — được đổi "Trạng thái nghiệp vụ". */
+  canDoiTrangThai?: boolean;
   onClose: () => void;
   /** Tải lại dữ liệu sau khi đổi người thực hiện (ghi ngoài đường onSave). */
   onReload?: () => void;
@@ -619,7 +622,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       {/* Chọn chỉ đổi bản nháp; nút Lưu chung phía dưới mới gọi RPC. */}
       <div style={{ ...FIELD, marginBottom: 16 }}>
         <span style={LBL}><UserCheck size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Người thực hiện</span>
-        {isAdmin ? (
+        {canChonNguoiThucHien ? (
           <>
             <PerformerSelect
               value={performerPersonId}
@@ -718,7 +721,7 @@ export default function ProgressEditModal({ act, isAdmin, onClose, onSave, onCha
       {/* S3-G FIX: phần đổi trạng thái nghiệp vụ — chỉ admin/QA manager.
           Lý do nhập NGAY TẠI ĐÂY thay vì window.prompt: prompt hệ thống không
           có gợi ý, bấm nhầm Cancel là mất, và không đồng bộ giao diện. */}
-      {isAdmin && onChangeState && (
+      {canDoiTrangThai && onChangeState && (
         <div style={{ marginTop: 18, padding: 14, borderRadius: 14, background: "#FFF5FA", border: `1px dashed ${C.pinkSoft}` }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginBottom: 8 }}>
             ⚙️ Trạng thái nghiệp vụ (chỉ admin / QA manager)

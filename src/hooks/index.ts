@@ -195,23 +195,19 @@ export function useAuth() {
     clearSnapshot();   // máy dùng chung: không để dữ liệu người trước nằm lại
   }, []);
 
-  /* Hai cờ KHÁC NHAU, đừng dùng lẫn:
+  /* `laAdminThat` đã bỏ khỏi đây — App.tsx nay hỏi thẳng server qua
+   * access.can("accounts","manage_accounts") thay vì suy từ role cũ.
    *
-   *  · `isAdmin`  = perm "admin". `permMap` trong supabaseClient gán perm
-   *    này cho CẢ `qa_manager`, nên nó thật ra nghĩa là "admin hoặc quản lý
-   *    QA" — đúng cho quyền SỬA DỮ LIỆU (tiến độ, danh mục), là thứ QA
-   *    manager vẫn phải làm hằng ngày.
-   *
-   *  · `laAdminThat` = role "admin" trong `profiles`. Dùng cho các nút QUẢN
-   *    TRỊ TÀI KHOẢN (đổi vai, bật/tắt tài khoản) — những RPC chỉ nhận
-   *    admin. Hiện nút cho quản lý QA là mời họ bấm vào thứ chắc chắn bị
-   *    server từ chối, và họ không có cách nào biết vì sao.
+   * `isAdmin` (perm "admin" — `permMap` trong supabaseClient gán perm này
+   * cho CẢ `qa_manager`, nên thật ra nghĩa là "admin hoặc quản lý QA") vẫn
+   * còn đây CHỈ vì PhanQuyenPage.tsx chưa dọn xong (đang sửa ở nhánh khác).
+   * Đừng dùng cờ này để gate quyền SỬA ở màn mới — hỏi `access.can(...)`.
    */
-  return {
-    user, setUser, login, logout, loading,
-    isAdmin: user?.perm === "admin",
-    laAdminThat: user?.role === "admin",
-  };
+  /* KHÔNG trả cờ quyền nào nữa. Trước đây hook này sinh `isAdmin` từ
+     `user.perm` — cờ của hệ 4 vai CŨ, thực chất nghĩa là "admin HOẶC quản
+     lý QA", và là nguồn của loại lỗi hiện nút mà máy chủ từ chối. Quyền
+     nay hỏi server qua `access.can(...)` ngay tại nơi cần. */
+  return { user, setUser, login, logout, loading };
 }
 
 // ======================== useVmpData ========================

@@ -834,11 +834,16 @@ export async function fetchNguoiVaQuyen(): Promise<NguoiVaQuyen> {
 }
 
 /* ---- Nửa "XEM" của ma trận quyền (migration 20260801130000) ----
- * Quyền ĐỌC không nằm trong vmp_role_permissions mà nằm ở policy RLS của
- * Postgres. rpc_luat_xem đi đọc đúng những policy đang chạy rồi phân loại
- * ra mức cho từng vai — nên bảng trên màn hình không thể lệch với luật
- * thật. Mức 'khong_ro' nghĩa là hàm gặp một dạng biểu thức nó chưa nhận
- * diện được; lúc đó giao diện hiện nguyên văn biểu thức thay vì đoán. */
+ * Quyền ĐỌC nằm ở policy RLS của Postgres, không phải một bảng luật sửa
+ * được. rpc_luat_xem đi đọc đúng những policy đang chạy rồi phân loại ra
+ * mức cho từng vai — nên bảng trên màn hình không thể lệch với luật thật.
+ * Mức 'khong_ro' nghĩa là hàm gặp một dạng biểu thức nó chưa nhận diện
+ * được; lúc đó giao diện hiện nguyên văn biểu thức thay vì đoán.
+ *
+ * LƯU Ý (18/08): bảng vmp_role_permissions mà hàm này từng đối chiếu đã bị
+ * bỏ hẳn — quyền SỬA nay đọc từ vmp_screen_permissions qua rpc_my_ui_access
+ * (xem src/lib/access.ts). fetchLuatXem/LuatXemRow ở đây chỉ còn mô tả nửa
+ * XEM (RLS), không còn dùng chung màn với ma trận vai×quyền cũ nữa. */
 export type MucXem = "tat_ca" | "mot_phan" | "cua_minh" | "khong" | "khong_ro";
 
 export interface LuatXemRow {
@@ -904,35 +909,6 @@ export async function setEmailChoPhep(
     p_email: email, p_cho_phep: choPhep, p_ghi_chu: ghiChu ?? null,
   });
   return unwrap(data, error, "Lưu danh sách email thất bại");
-}
-
-/* ---- Ma trận A: luật vai trò × hành động (bảng vmp_role_permissions) ---- */
-export interface RolePermRow {
-  hanh_dong: string;
-  vai_tro: string;
-  muc: "co" | "bo_phan" | "phan_cong" | "khong";
-}
-
-export async function fetchRolePermissions(): Promise<RolePermRow[]> {
-  if (!supabase) return [];
-  // Bảng sinh ở migration 20260801070000 — chưa có trong types sinh tự động.
-  const { data, error } = await supabase
-    .from("vmp_role_permissions" as never)
-    .select("hanh_dong,vai_tro,muc");
-  if (error) throw new Error(error.message);
-  return (data || []) as unknown as RolePermRow[];
-}
-
-export async function setRolePermission(
-  hanhDong: string, vaiTro: string, muc: "co" | "bo_phan" | "phan_cong" | "khong",
-): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await (supabase.rpc as unknown as (
-    fn: string, args: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_role_permission", {
-    p_hanh_dong: hanhDong, p_vai_tro: vaiTro, p_muc: muc,
-  });
-  return unwrap(data, error, "Lưu luật phân quyền thất bại");
 }
 
 /* ---- Ma trận phân công: nhân viên × loại thẩm định × line ---- */
