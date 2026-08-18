@@ -7034,3 +7034,89 @@ main li,
   font-size: 12.5px;
   font-weight: 600;
 }
+
+/* =====================================================================
+ *  Vùng thông báo dùng chung (ToastProvider)
+ *  ---------------------------------------------------------------------
+ *  Trước đây toast là style nội tuyến trong App.tsx và chỉ một luồng lưu
+ *  dùng được. Đưa ra lớp CSS thật để mọi màn báo kết quả theo cùng một
+ *  cách, và để đổi màu một lần là đổi cả web.
+ * ===================================================================== */
+.vmp-toast-vung {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 380px;
+  /* Vùng chứa không được nuốt cú bấm vào thứ nằm dưới nó khi rỗng. */
+  pointer-events: none;
+}
+
+.vmp-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-md, 14px);
+  font-family: var(--ff-text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: var(--lh-small, 1.45);
+  box-shadow: var(--e-high);
+  border: 1.5px solid var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-ink);
+}
+
+.vmp-toast--thanhCong {
+  background: var(--lp-success-soft);
+  color: var(--lp-success);
+  border-color: var(--lp-success);
+}
+
+.vmp-toast--canhBao {
+  background: var(--lp-warning-bg);
+  color: var(--lp-warning);
+  border-color: var(--lp-warning-line);
+}
+
+.vmp-toast--loi {
+  background: var(--lp-danger-soft);
+  color: var(--lp-danger);
+  border-color: var(--lp-danger);
+}
+
+.vmp-toast__icon { flex: none; display: flex; }
+.vmp-toast__chu { flex: 1; }
+
+.vmp-toast__tat {
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 2px;
+  cursor: pointer;
+  color: inherit;
+  opacity: .72;
+  border-radius: var(--r-sm, 8px);
+}
+.vmp-toast__tat:hover { opacity: 1; }
+.vmp-toast__tat:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .vmp-toast { animation: vmp-toast-vao var(--lp-motion-fast, 140ms) ease-out; }
+  /* Vòng xoay của toast "đang chạy" — chỉ chạy khi người dùng không tắt
+     chuyển động; bộ kiểm ảnh cũng chạy ở chế độ reduced-motion nên ảnh
+     không bị chụp giữa vòng quay. */
+  .vmp-toast--dang .vmp-toast__icon { animation: vmp-toast-quay 900ms linear infinite; }
+}
+
+@keyframes vmp-toast-vao {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes vmp-toast-quay {
+  to { transform: rotate(360deg); }
+}

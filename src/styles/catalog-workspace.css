@@ -672,3 +672,32 @@
   border: 1px solid var(--lp-line);
   background: var(--lp-surface);
 }
+
+/* ---------------------------------------------------------------------
+ *  Nhãn "Bắt buộc" và ô combobox
+ *  ---------------------------------------------------------------------
+ *  Dấu sao một mình không nói gì với người chưa quen quy ước, và bản
+ *  trước còn để nó `aria-hidden` nên trình đọc màn hình bỏ qua hẳn —
+ *  người dùng bàn phím không có cách nào biết ô nào bắt buộc.
+ * ------------------------------------------------------------------- */
+.cw-bat-buoc-chu {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill, 999px);
+  font-size: var(--fs-label, 12px);
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: var(--lp-danger-soft);
+  color: var(--lp-danger);
+  white-space: nowrap;
+}
+
+/* Combobox phải trông khác ô text trần, nếu không không ai đoán được là
+   bấm vào có sẵn danh sách để chọn. */
+.cw-o[list] {
+  border-right-width: 4px;
+  border-right-color: var(--lp-plum-2);
+}
+
+/* Ô gõ tên bộ phận mới, hiện ngay dưới select khi chọn "Bộ phận khác…". */
+.cw-o-khac { margin-top: 6px; }

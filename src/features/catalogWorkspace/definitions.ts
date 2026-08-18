@@ -199,3 +199,23 @@ export const SOURCE_OBJECT_HEADERS: readonly string[] =
 
 export const PRODUCT_GMP_HEADERS: readonly string[] =
   PRODUCT_GMP_TEMPLATE_COLUMNS.map((c) => c.header);
+
+/**
+ * Chia trường thành nhóm luôn hiện và nhóm thu gọn.
+ *
+ * Luật cứng: trường BẮT BUỘC không bao giờ rơi vào nhóm thu gọn. Bản trước
+ * cắt bằng `fields.slice(0, 5)` — thuần theo vị trí khai — nên một ô bắt
+ * buộc nằm cuối danh sách sẽ bị giấu trong `<details>` đang đóng, còn nút
+ * Lưu thì mờ đi không nói gì. Người dùng bấm, không có chuyện gì xảy ra.
+ */
+export function chiaNhomTruong(
+  fields: readonly CatalogFieldDefinition[],
+  soChinh = 5,
+): { chinh: CatalogFieldDefinition[]; nangCao: CatalogFieldDefinition[] } {
+  const buoc = new Set<string>();
+  fields.forEach((f, i) => { if (f.required || i < soChinh) buoc.add(f.key); });
+  return {
+    chinh: fields.filter((f) => buoc.has(f.key)),
+    nangCao: fields.filter((f) => !buoc.has(f.key)),
+  };
+}

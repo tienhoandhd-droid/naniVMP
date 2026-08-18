@@ -118,7 +118,9 @@ test("trường bắt buộc để trống bị nêu tên, không im lặng gử
     { key: "ten", label: "Tên", kind: "text", required: true },
     { key: "note", label: "Ghi chú", kind: "text" },
   ];
-  assert.deepEqual(thieuTruongBatBuoc(f, { ma: "TB-1", ten: "", note: "" }), ["Tên"]);
+  assert.deepEqual(thieuTruongBatBuoc(f, { ma: "TB-1", ten: "", note: "" }),
+    [{ key: "ten", label: "Tên" }]);
   assert.deepEqual(thieuTruongBatBuoc(f, { ma: "TB-1", ten: "Máy dập" }), []);
-  assert.deepEqual(thieuTruongBatBuoc(f, {}), ["Mã đối tượng", "Tên"]);
+  assert.deepEqual(thieuTruongBatBuoc(f, {}),
+    [{ key: "ma", label: "Mã đối tượng" }, { key: "ten", label: "Tên" }]);
 });

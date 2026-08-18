@@ -110,12 +110,13 @@ export function canLyDo(
   return fields.some((f) => f.reasonRequired && Object.prototype.hasOwnProperty.call(patch, f.key));
 }
 
-/** Trường bắt buộc còn để trống — kiểm trước khi gửi, báo tại chỗ. */
+/** Trường bắt buộc còn để trống. Trả cả `key` chứ không chỉ nhãn: giao
+ *  diện cần key để mở đúng nhóm và đặt con trỏ vào đúng ô. */
 export function thieuTruongBatBuoc(
   fields: readonly CatalogFieldDefinition[],
   record: CatalogRecord,
-): string[] {
+): Array<{ key: string; label: string }> {
   return fields
     .filter((f) => f.required && chuanHoa(f.kind, record[f.key]) === null)
-    .map((f) => f.label);
+    .map((f) => ({ key: f.key, label: f.label }));
 }

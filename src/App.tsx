@@ -39,6 +39,7 @@ import {
 import { C, TEXT, NUM, R, btnPrimary, INP } from "./constants/theme.ts";
 import ViewportDialog from "./components/ui/ViewportDialog.tsx";
 import { DirtyStateProvider, useRegisterDirtyState, useDirtyStateSnapshot } from "./components/ui/DirtyStateProvider.tsx";
+import ToastProvider, { useToast } from "./components/ui/ToastProvider.tsx";
 import ShellConfirmDialog from "./components/layout/ShellConfirmDialog.tsx";
 import {
 
@@ -1679,6 +1680,22 @@ function AppShell() {
     objects, acts, conn, lastSync, dataUpdatedAt, saveStatus, reloadData, silentRefresh,
     updateActivity,
   } = useVmpData();
+
+  /* `saveStatus` của luồng lưu tiến độ giờ đi qua vỏ thông báo dùng chung.
+     Trước đây nó có một khối JSX riêng ngay trong file này — nghĩa là chỉ
+     đúng luồng đó báo được kết quả, còn mọi màn khác ghi xong thì im lặng.
+     Bơm sang toast để cả web báo theo cùng một cách. */
+  const toast = useToast();
+  const saveTruoc = useRef("");
+  useEffect(() => {
+    if (saveStatus === saveTruoc.current) return;
+    saveTruoc.current = saveStatus;
+    // "saving" không cần toast riêng: nó đổi thành saved/error rất nhanh,
+    // và một toast chớp 200ms chỉ làm màn hình giật.
+    if (saveStatus === "saved") toast.thanhCong("Đã lưu thành công");
+    else if (saveStatus === "warning") toast.canhBao("Lưu Supabase OK — Sheet chưa đồng bộ");
+    else if (saveStatus === "error") toast.loi("Lưu thất bại");
+  }, [saveStatus, toast]);
   /* Đưa alias về màn chuẩn NGAY tại biên đọc URL.
      `#v=inventory` và `#v=risk` là tên cũ của "Tiến độ gộp theo đối tượng"
      và "Cảnh báo". Chuẩn hoá ở đây, một lần, thay vì để mỗi nhánh render
@@ -2054,35 +2071,6 @@ function AppShell() {
               bật (bật ở màn Báo cáo & AI), tắt được tại chỗ. */}
           <BangThanhTra />
 
-          {/* Toast trạng thái lưu nổi góc phải */}
-          {saveStatus && (
-            <div style={{
-              position: "fixed", top: 20, right: 20, zIndex: 9999,
-              padding: "12px 18px", borderRadius: 14, fontFamily: TEXT, fontWeight: 700, fontSize: 14,
-              display: "flex", alignItems: "center", gap: 10, maxWidth: 380,
-              boxShadow: "0 8px 28px rgba(120,60,110,.22)",
-              background: saveStatus === "saving" ? C.surface
-                : saveStatus === "saved" ? C.mintSoft
-                : saveStatus === "warning" ? C.marigoldSoft : C.raspSoft,
-              color: saveStatus === "saving" ? C.plum
-                : saveStatus === "saved" ? C.mintText
-                : saveStatus === "warning" ? C.marigoldText : C.raspText,
-              border: `1.5px solid ${saveStatus === "saving" ? C.pinkSoft
-                : saveStatus === "saved" ? C.mint
-                : saveStatus === "warning" ? C.marigold : C.rasp}`,
-            }}>
-              <span style={{ fontSize: 16 }}>
-                {saveStatus === "saving" ? "⏳" : saveStatus === "saved" ? "✓" : saveStatus === "warning" ? "⚠" : "✕"}
-              </span>
-              <span>
-                {saveStatus === "saving" ? "Đang lưu…"
-                  : saveStatus === "saved" ? "Đã lưu thành công"
-                  : saveStatus === "warning" ? "Lưu Supabase OK — Sheet chưa đồng bộ"
-                  : "Lưu thất bại"}
-              </span>
-            </div>
-          )}
-
           {/* Padding lấy từ token khổ màn: 24 → 32 → 36 (≥1600) → 48 (≥1900).
               Desktop rộng thở bằng padding, không kéo card dài ra. */}
           <div style={{ padding: "0 var(--lp-shell-pad, 34px) 38px" }}>
@@ -2229,7 +2217,11 @@ function AppShell() {
 export default function App() {
   return (
     <DirtyStateProvider>
-      <AppShell />
+      {/* Vỏ thông báo bọc NGOÀI AppShell: mọi màn, mọi hộp thoại đều gọi
+          `useToast()` được, kể cả các hộp thoại dựng bằng portal. */}
+      <ToastProvider>
+        <AppShell />
+      </ToastProvider>
     </DirtyStateProvider>
   );
 }

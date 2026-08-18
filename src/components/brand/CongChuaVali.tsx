@@ -143,29 +143,34 @@ export default function CongChuaVali({
           stroke={MAU.vang} strokeWidth="1" />
       </g>
 
-      {/* ---- Chân mày ------------------------------------------------ */}
+      {/* ---- Chân mày — nhích lên 2px nhường chỗ cho mắt to ---------- */}
       {mood === "concern" ? (
-        <path d="M130 122Q142 118 152 124M168 124Q178 118 190 122"
+        <path d="M129 120Q142 115 153 122M167 122Q178 115 191 120"
           fill="none" stroke={MAU.net} strokeWidth="2" strokeLinecap="round" />
       ) : (
-        <path d="M130 119Q141 113 152 118M168 118Q179 113 190 119"
+        <path d="M129 117Q141 110 153 116M167 116Q179 110 191 117"
           fill="none" stroke={MAU.net} strokeWidth="1.8" strokeLinecap="round" opacity=".9" />
       )}
 
-      {/* ---- Mắt hạnh nhân có tròng — celebrate là mắt cười khép ----- */}
+      {/* ---- Mắt hạnh nhân có tròng — celebrate là mắt cười khép -----
+           Tròng to cần lòng trắng: hai chấm đen r6.2 đặt thẳng lên da mặt
+           trông như lỗ thủng, không phải mắt. Ellipse trắng nằm dưới tròng
+           và bị vòm mí ôm lấy, nên mắt vẫn là hạnh nhân chứ không tròn xoe. */}
       {mood === "celebrate" ? (
-        <path d="M128 140Q140 130 152 140M168 140Q180 130 192 140"
-          fill="none" stroke={MAU.net} strokeWidth="2.6" strokeLinecap="round" />
+        <path d="M126 141Q140 128 154 141M166 141Q180 128 194 141"
+          fill="none" stroke={MAU.net} strokeWidth="2.8" strokeLinecap="round" />
       ) : (
         <g>
-          <path d="M127 138Q140 128 153 138" fill="none"
-            stroke={MAU.net} strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M167 138Q180 128 193 138" fill="none"
-            stroke={MAU.net} strokeWidth="2.2" strokeLinecap="round" />
-          <circle cx="140" cy="138" r="4.6" fill={MAU.net} />
-          <circle cx="180" cy="138" r="4.6" fill={MAU.net} />
-          <circle cx="142" cy="136" r="1.6" fill="#FFFFFF" />
-          <circle cx="182" cy="136" r="1.6" fill="#FFFFFF" />
+          <ellipse cx="140" cy="139" rx="12" ry="8.4" fill="#FFFFFF" opacity=".92" />
+          <ellipse cx="180" cy="139" rx="12" ry="8.4" fill="#FFFFFF" opacity=".92" />
+          <circle cx="140" cy="139" r="6.2" fill={MAU.net} />
+          <circle cx="180" cy="139" r="6.2" fill={MAU.net} />
+          <circle cx="142.4" cy="136.4" r="2.2" fill="#FFFFFF" />
+          <circle cx="182.4" cy="136.4" r="2.2" fill="#FFFFFF" />
+          <path d="M126 139Q140 125 154 139" fill="none"
+            stroke={MAU.net} strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M166 139Q180 125 194 139" fill="none"
+            stroke={MAU.net} strokeWidth="2.4" strokeLinecap="round" />
         </g>
       )}
 
@@ -175,16 +180,16 @@ export default function CongChuaVali({
       <path d="M160 148Q162 154 159 157" fill="none"
         stroke={MAU.daVien} strokeWidth="1.6" strokeLinecap="round" />
 
-      {/* ---- Miệng theo mood ----------------------------------------- */}
+      {/* ---- Miệng theo mood — lớn hơn bản trước ~35% ----------------- */}
       {mood === "concern" && (
-        <ellipse cx="160" cy="172" rx="4.6" ry="5.4" fill={MAU.moi} opacity=".9" />
+        <ellipse cx="160" cy="173" rx="6" ry="7" fill={MAU.moi} opacity=".9" />
       )}
       {mood === "guide" && (
-        <path d="M149 170Q160 179 171 170" fill="none"
-          stroke={MAU.moi} strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M145 169Q160 181 175 169" fill="none"
+          stroke={MAU.moi} strokeWidth="2.8" strokeLinecap="round" />
       )}
       {mood === "celebrate" && (
-        <path d="M146 168Q160 184 174 168Q160 174 146 168Z" fill={MAU.moi} />
+        <path d="M141 167Q160 190 179 167Q160 176 141 167Z" fill={MAU.moi} />
       )}
 
       {/* ---- Cổ + váy cánh sen --------------------------------------- */}
