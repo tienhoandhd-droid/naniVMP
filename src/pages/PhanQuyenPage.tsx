@@ -114,6 +114,10 @@ interface HanhDong {
   giaiThich: string;
   /** Các mức đặt được cho hành động này. */
   mucChoPhep: Muc[];
+  /** Chỉ còn hiệu lực khi quyền theo hạng mục ở chế độ DỰ THẢO. Bật áp dụng
+   *  thật thì hàm chuyển sang xét theo phân công hạng mục và không đọc bảng
+   *  này nữa — người sửa bảng cần biết trước, không phải đoán. */
+  chiKhiDuThao?: boolean;
 }
 
 /* mucChoPhep phản ánh LUẬT CÓ VẾ GÌ, không phải ý muốn. Chỉ
@@ -127,11 +131,13 @@ const HANH_DONG: HanhDong[] = [
     ten: "Cập nhật tiến độ",
     giaiThich: "rpc_update_progress → ly_do_khong_sua_duoc. Đây là hành động DUY NHẤT có vế so bộ phận và phân công trong luật, nên cũng là hành động duy nhất đặt được hai mức hạn chế.\n\n• 'Bộ phận mình' so với CẢ HAI chiều: bộ phận QUẢN LÝ đối tượng và bộ phận THỰC HIỆN thẩm định. Hai chiều này lệch nhau ở 150/448 hạng mục — người XSX đi thẩm định thiết bị do QA quản lý là chuyện thường — nên chỉ so một chiều là chặn đúng người đang đi làm.\n\n• 'Theo phân công' mịn hơn một bậc: chỉ sửa được hạng mục mà ma trận phân công có tích đúng tên mình, đúng loại thẩm định, đúng line. Tích ở 'Mọi line' thì được cả bộ phận.",
     mucChoPhep: ["co", "bo_phan", "phan_cong", "khong"],
+    /* Chỉ còn hiệu lực khi quyền theo hạng mục ở DỰ THẢO — xem giaiThich. */
+    chiKhiDuThao: true,
   },
   {
     id: "set_item_state",
     ten: "Đổi trạng thái nghiệp vụ\n(Không áp dụng / Huỷ / Khôi phục)",
-    giaiThich: "rpc_set_item_state — thao tác đưa hạng mục ra khỏi kế hoạch. Luật chưa có vế so bộ phận nên chỉ đặt được Được hoặc Không.",
+    giaiThich: "rpc_set_item_state — thao tác đưa hạng mục ra khỏi kế hoạch. Luật chưa có vế so bộ phận nên chỉ đặt được Được hoặc Không.\n\nCHƯA XÁC MINH ĐƯỢC: rà toàn bộ migrations ngày 18/08 không tìm thấy nơi tạo hàm rpc_set_item_state, dù nhiều comment nhắc tới nó. Có thể hàm nằm ngoài kho migration này. Chưa có căn cứ khẳng định tích ô này có tác dụng thật.",
     mucChoPhep: ["co", "khong"],
   },
   {
@@ -142,14 +148,14 @@ const HANH_DONG: HanhDong[] = [
   },
   {
     id: "edit_catalog",
-    ten: "Sửa danh mục nguồn · người thực hiện · phân công",
-    giaiThich: "Cả họ rpc_upsert_* / rpc_delete_* (danh mục nguồn, danh bạ, người thực hiện, sản phẩm GMP, người nhận mail) và rpc_set_assignment của ma trận phân công — 20 hàm cùng đọc một dòng luật này.",
+    ten: "Sửa danh mục phụ\n(sản phẩm GMP · người nhận cảnh báo · email nhân viên)",
+    giaiThich: "CẢNH BÁO PHẠM VI — dòng luật này KHÔNG còn gác ba đường ghi chính mà tên cũ của nó hứa.\n\nĐo lại trong kho SQL (18/08): rpc_save_catalog_object (sửa đối tượng nguồn), rpc_upsert_item_permission_staff (hồ sơ nhân sự) và rpc_set_item_assignment (phân công hạng mục) đều KHÔNG đọc bảng vmp_role_permissions nữa — chúng hard-code admin/quản lý QA ngay trong thân hàm từ đợt 10-12/08, cố ý bỏ qua mọi bảng sửa được lúc chạy.\n\nÔ này giờ chỉ còn ảnh hưởng tới các CRUD phụ: sản phẩm GMP, người nhận mail cảnh báo, whitelist email nhân viên, dòng nguồn thô, xoá hạng mục kế hoạch, và ma trận phân công CŨ.\n\nBỏ tích ở đây KHÔNG khoá được việc sửa danh mục nguồn hay phân công — muốn đổi hai thứ đó phải sửa hàm ở migration.",
     mucChoPhep: ["co", "khong"],
   },
   {
     id: "admin_users",
     ten: "Quản trị người dùng, phân quyền",
-    giaiThich: "rpc_set_user_role và chính rpc_set_role_permission. Ô của vai admin bị đóng băng ở 'Được': hạ nó xuống là tự khoá mình ra ngoài, không còn ai mở lại được.",
+    giaiThich: "Ô NGUY HIỂM NHẤT BẢNG, và là ô chắc chắn còn hiệu lực. Nó gác rpc_set_user_role, rpc_set_business_role, rpc_set_user_active và chính rpc_set_role_permission.\n\nBật ô này cho một vai là trao cho vai đó quyền đổi vai người khác, khoá tài khoản người khác, VÀ tự sửa lại chính bảng này — tức là tự nới quyền cho mình. Không có đường lùi tự động.\n\nÔ của vai admin bị đóng băng ở 'Được': hạ nó xuống là tự khoá mình ra ngoài, không còn ai mở lại được.",
     mucChoPhep: ["co", "khong"],
   },
 ];
@@ -676,6 +682,12 @@ function QuanTriQuyenCards({ isAdmin = false, user }: { isAdmin?: boolean; user?
                   <td style={{ ...td, fontWeight: 700 }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       {h.ten.split("\n").map((d, i) => <span key={i}>{i ? <><br />{d}</> : d}</span>)}
+                      {h.chiKhiDuThao && (
+                        <span className="cw-bat-buoc-chu"
+                          title="Khi quyền theo hạng mục đã bật áp dụng thật, hàm xét theo phân công chứ không đọc dòng luật này nữa.">
+                          chỉ khi dự thảo
+                        </span>
+                      )}
                       <GiaiThich tieuDe={h.ten.replace("\n", " ")}>{h.giaiThich}</GiaiThich>
                     </span>
                   </td>
