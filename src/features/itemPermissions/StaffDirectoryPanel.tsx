@@ -187,7 +187,13 @@ export default function StaffDirectoryPanel({
       setResults([]);
       return;
     }
-    if (query.trim().length < 2) {
+    /* Ô rỗng KHÔNG có nghĩa "chưa gõ gì thì đừng tìm" — server
+       (rpc_item_permission_directory) đã sẵn nhánh trả về TOÀN BỘ người
+       trong phạm vi được xem khi p_query rỗng (v_query = ''). Trước đây ô
+       rỗng bị chặn ở đây cùng với ô 1 ký tự, nên mở màn Nhân sự lên là một
+       ô tìm trống trơn và một biểu mẫu rỗng — không có gì gợi ý "đã có sẵn
+       những ai". Chỉ còn chặn đúng 1 ký tự (quá ngắn, khớp lan man). */
+    if (query.trim().length === 1) {
       setResults([]);
       setLoading(false);
       return;
