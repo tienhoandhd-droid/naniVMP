@@ -24,8 +24,9 @@
  *       chịu tạo tài khoản.
  *     - Card "Tài khoản & quyền": chọn người từ danh bạ, nối/gỡ tài khoản,
  *       xem quyền hiệu lực (StaffDirectoryPanel + AccountLinkPanel +
- *       EffectiveRightsPanel). Sửa hồ sơ nhân sự/phân công đã chuyển hẳn
- *       sang màn Nhân sự — màn này không sửa nữa.
+ *       EffectiveRightsPanel). Sửa hồ sơ nhân sự/phân công QA theo hạng mục
+ *       không còn làm được trên web (màn Nhân sự đã bỏ hẳn, 19/08) — làm
+ *       thẳng trong Supabase.
  *     - MaTranQuyenManHinh: ma trận "Màn hình bạn được xem", đọc THẲNG
  *       rpc_my_ui_access của chính người đang xem — server trả gì hiện
  *       nấy, không chép luật lại bằng tay nên không thể lệch với luật thật.
@@ -399,13 +400,15 @@ function CurrentPermissionWorkspace({ acts, access }: {
       <Card variant="strong">
         <CardTitle icon={Users}
           sub="Chọn tài khoản để nối/gỡ và xem đúng quyền đang có hiệu lực. Sửa hồ sơ nhân sự
-            và phân công việc nay ở màn Nhân sự — màn này chỉ còn lo tài khoản và quyền.">
+            và phân công QA theo hạng mục không còn làm được trên web (màn Nhân sự đã bỏ,
+            19/08) — sửa thẳng trong Supabase.">
           Tài khoản &amp; quyền
         </CardTitle>
         <div className="ip-workspace">
-          {/* canEdit cố định false: sửa hồ sơ nhân sự đã chuyển hẳn sang màn
-              Nhân sự. Danh bạ ở đây chỉ để CHỌN người — nối tài khoản và xem
-              quyền hiệu lực của người đó. */}
+          {/* canEdit cố định false: sửa hồ sơ nhân sự không còn làm được trên
+              web từ khi màn Nhân sự bị bỏ (19/08) — trước đó đã chuyển hẳn
+              sang màn đó, nay không còn chỗ nào sửa được nữa. Danh bạ ở đây
+              chỉ để CHỌN người — nối tài khoản và xem quyền hiệu lực. */}
           <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson}
             revision={directoryRevision} refreshPersonId={directoryRefreshPersonId} />
           {duocQuanLyTaiKhoan && (

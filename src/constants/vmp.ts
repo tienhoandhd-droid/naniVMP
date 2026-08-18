@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3, Scale, ClipboardList, Users,
+  ShieldCheck, Radar, BarChart3, Scale, ClipboardList,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -135,22 +135,24 @@ export const NAV_ITEMS = [
      `#v=<id>`. Bốn hash `inventory`, `risk`, `phanquyen`, `accounts` mà
      App.tsx render/chuẩn hoá ngoài menu được khai trong SCREEN_IDS, không
      khai ở đây. */
-  /* "Nhân sự" và "Vai trò & phạm vi" tách từ "Phân quyền & trách nhiệm" cũ:
-     dữ liệu nhân sự và tài khoản/quyền là hai việc khác nhau, do hai nhóm
-     người khác nhau nắm. Mục "Tài khoản & quyền truy cập" từng đứng riêng
-     ở đây đã gộp hẳn vào "Vai trò & phạm vi" — `accounts` vẫn là screenId
-     hợp lệ (hợp đồng với rpc_my_ui_access) và vẫn có alias URL, chỉ không
-     còn mục menu riêng.
+  /* "Nhân sự" (sửa hồ sơ nhân sự + phân công QA theo hạng mục) đã BỎ HẲN
+     khỏi web (19/08, theo yêu cầu trực tiếp — màn không hiện danh sách gì
+     nếu chưa gõ tìm, và không có cách nào khác dọn được vì mảng dữ liệu
+     access_class/business_role tách rời, xem lịch sử chat). Việc đó nay
+     làm lại thẳng trong Supabase. `people` vẫn là screenId hợp lệ (hợp
+     đồng với rpc_my_ui_access) và có alias URL về `phanquyen`, chỉ không
+     còn mục menu riêng — xem `chuanHoaView` ở App.tsx.
+
+     Mục "Tài khoản & quyền truy cập" cũ cũng đã gộp vào "Vai trò & phạm
+     vi" cùng lý do — `accounts` vẫn là screenId hợp lệ, có alias URL,
+     không còn mục menu riêng.
 
      Mục `phanquyen` là CỬA VÀO chức năng, không mang dữ liệu riêng
      (`data_scope = 'none'`). Admin / Quản lý QA / Nhân viên QA vào để quản
      trị quyền; Quản lý xưởng cũng vào được nhưng chỉ để PHÂN CÔNG hạng mục
      thiết bị — migration 20260812100000_quan_ly_xuong_giu_cua_phan_cong.sql
      cấp riêng cho họ `actions = ['assign_workshop_staff']` trên màn này.
-     Nhân viên xưởng thì không.
-     (Bản trước của chú thích này nói Quản lý xưởng đã mất màn — sai, do đọc
-     seed gốc ở 20260812090000 mà bỏ qua migration cấp quyền sau nó.) */
-  { id: "people", label: "Nhân sự", icon: Users, group: "admin" },
+     Nhân viên xưởng thì không. */
   { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
   { id: "audit", label: "Nhật ký thay đổi", icon: ShieldCheck, group: "admin" },

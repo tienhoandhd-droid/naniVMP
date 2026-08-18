@@ -106,7 +106,6 @@ const SourceCatalogView = lazy(nhapCoThuLai(() => import("./pages/SourceCatalogP
 const ServerChecksView = lazy(nhapCoThuLai(() => import("./pages/ServerChecksPage.tsx")));
 const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
-const OperationalPeopleView = lazy(nhapCoThuLai(() => import("./pages/OperationalPeoplePage.tsx")));
 const TodayView = lazy(nhapCoThuLai(() => import("./features/today/TodayCommandCenter.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
@@ -1735,13 +1734,13 @@ function AppShell() {
      và "Cảnh báo". Chuẩn hoá ở đây, một lần, thay vì để mỗi nhánh render
      tự nhớ — mà quên một nhánh thì đường dẫn cũ dẫn vào trang trắng. */
   const chuanHoaView = useCallback((s: UrlState) => {
-    /* `accounts` (Tài khoản & quyền truy cập) đã gộp vào `phanquyen` (Vai
-       trò & phạm vi) và rời khỏi menu, nhưng vẫn là ScreenId hợp lệ trong
+    /* `accounts` (Tài khoản & quyền truy cập) và `people` (Nhân sự, bỏ
+       hẳn 19/08) đã gộp/rời khỏi menu, nhưng vẫn là ScreenId hợp lệ trong
        lib/access.ts (hợp đồng với rpc_my_ui_access ở server) nên
-       resolveViewIntent không tự coi đây là alias — nó vẫn trả về
-       `accounts` y nguyên. Ánh xạ ngay tại đây, cùng cách `inventory`/`risk`
-       đã làm, để #v=accounts cũ không rơi vào trang trắng. */
-    const vRaw = s.view === "accounts" ? "phanquyen" : s.view;
+       resolveViewIntent không tự coi đây là alias — nó vẫn trả về tên cũ y
+       nguyên. Ánh xạ ngay tại đây, cùng cách `inventory`/`risk` đã làm, để
+       #v=accounts hay #v=people cũ không rơi vào trang trắng. */
+    const vRaw = s.view === "accounts" || s.view === "people" ? "phanquyen" : s.view;
     const y = resolveViewIntent(vRaw);
     if (!y) return { state: s, nhom: null as null | "doituong" };
     return {
@@ -2231,14 +2230,10 @@ function AppShell() {
               {view === "alerts" && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
-              {view === "people" && (
-                <OperationalPeopleView acts={filteredActs} access={access}
-                  scopeLabel={nhanPhamVi}
-                  updatedLabel={dataUpdatedAt
-                    ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
-                    : undefined} />
-              )}
-              {/* Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
+              {/* Màn "Nhân sự" đã BỎ HẲN (19/08) — sửa hồ sơ nhân sự và phân công QA
+                  theo hạng mục nay làm thẳng trong Supabase. `people` không còn
+                  nhánh render, chỉ còn alias URL cũ về `phanquyen` ở chuanHoaView.
+                  Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là
                   alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}
               {view === "phanquyen" && (
