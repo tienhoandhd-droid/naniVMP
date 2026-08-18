@@ -122,13 +122,27 @@ const cotAnhHuong: SmartTableColumn<DongAnhHuong>[] = [
     cell: (h) => nhanVaiTro(h.nguoi),
   },
   {
+    id: "taikhoan",
+    header: "Tài khoản",
+    align: "center",
+    cell: (h) => (h.nguoi.user_id
+      ? <span className="ip-badge is-linked">Đã nối</span>
+      : <span className="ip-badge is-warning" title="Chưa nối tài khoản đăng nhập nên chưa vào được web">
+          Chưa nối
+        </span>),
+  },
+  {
     id: "xem",
     header: "Hạng mục xem được",
     align: "center",
     cell: (h) => (
       h.loi
         ? <span className="ip-badge is-warning" title={h.loi}>Không đo được</span>
-        : <span className={`ip-badge ${h.soXem === 0 ? "is-inactive" : "is-linked"}`}>{h.soXem}</span>
+        : <span className={`ip-badge ${
+          h.soXem > 0 ? "is-linked" : h.nguoi.user_id ? "is-inactive" : "is-warning"
+        }`} title={h.soXem === 0 && !h.nguoi.user_id
+          ? "Chưa có tài khoản nên vốn đã không xem được — bật hay không cũng vậy"
+          : undefined}>{h.soXem}</span>
     ),
   },
   {
@@ -190,7 +204,15 @@ export default function ItemPermissionModeCard() {
         // Người 0 hạng mục xem được lên đầu — đó là người sẽ mất quyền
         // xem hoàn toàn khi bật. Người "không đo được" xếp ngay sau, vì
         // cũng cần chú ý dù chưa chắc mất quyền. Còn lại theo tên.
-        const nhom = (h: DongAnhHuong) => (h.loi ? 1 : h.soXem === 0 ? 0 : 2);
+        /* Thứ tự nhóm: (0) CÓ tài khoản mà không xem được gì — đây mới là
+           người thật sự mất quyền khi bật; (1) đo lỗi; (2) chưa nối tài
+           khoản — họ vốn chưa đăng nhập được, bật hay không cũng vậy, nên
+           đừng để họ chen lên trên và làm loãng cảnh báo thật; (3) còn lại. */
+        const nhom = (h: DongAnhHuong) => {
+          if (h.loi) return 1;
+          if (h.soXem > 0) return 3;
+          return h.nguoi.user_id ? 0 : 2;
+        };
         const d = nhom(a) - nhom(b);
         return d !== 0 ? d : a.nguoi.full_name.localeCompare(b.nguoi.full_name, "vi");
       });
@@ -311,7 +333,13 @@ export default function ItemPermissionModeCard() {
           {ketQuaAnhHuong && (
             <>
               {(() => {
-                const soMatQuyen = ketQuaAnhHuong.filter((h) => !h.loi && h.soXem === 0).length;
+                /* Tách bạch hai chuyện rất khác nhau. Gộp chung thành một
+                   con số làm người đọc tưởng hàng chục người sắp mất quyền,
+                   trong khi phần lớn vốn chưa từng đăng nhập được. */
+                const soMatQuyen = ketQuaAnhHuong
+                  .filter((h) => !h.loi && h.soXem === 0 && h.nguoi.user_id).length;
+                const soChuaNoiTaiKhoan = ketQuaAnhHuong
+                  .filter((h) => !h.loi && !h.nguoi.user_id).length;
                 const soKhongDoDuoc = ketQuaAnhHuong.filter((h) => h.loi).length;
                 return (
                   <>
@@ -319,6 +347,19 @@ export default function ItemPermissionModeCard() {
                       <p className="pq-canhbao la-do" role="alert">
                         <AlertTriangle size={15} aria-hidden="true" />
                         {soMatQuyen} người sẽ không xem được hạng mục nào khi bật.
+                      </p>
+                    )}
+                    {soMatQuyen === 0 && (
+                      <p className="pq-canhbao" role="status">
+                        <Check size={15} aria-hidden="true" />
+                        Không ai đang dùng web bị mất quyền xem khi bật.
+                      </p>
+                    )}
+                    {soChuaNoiTaiKhoan > 0 && (
+                      <p className="ip-help" role="status">
+                        {soChuaNoiTaiKhoan} người chưa nối tài khoản đăng nhập — họ vốn chưa
+                        vào được web, nên bật hay không cũng không đổi gì với họ. Muốn họ dùng
+                        được thì nối tài khoản ở thẻ “Tài khoản &amp; quyền” bên dưới.
                       </p>
                     )}
                     {soKhongDoDuoc > 0 && (
