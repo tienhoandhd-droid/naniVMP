@@ -19,13 +19,19 @@ test("phân loại tạo đúng quyền sửa ở từng nhóm timeline", async 
     EQUIPMENT_TIMELINE_FIELDS,
   } = await loadContracts();
 
+  /* `view_only` đã rời danh sách chọn được (19/08): constraint DB cho phép
+     nó và nhãn ghi "Chỉ xem", nhưng `vmp_business_role()` không có nhánh nào
+     cho nó — ai bị gán sẽ có business_role null, tức MẤT SẠCH quyền chứ
+     không phải chỉ xem. Muốn một người chỉ xem thì đặt vai đăng nhập
+     `viewer` ở màn Cấu hình hệ thống. */
   assert.deepEqual(ACCESS_CLASSES.map((item) => item.id), [
-    "view_only",
     "qa_progress_editor",
     "qa_manager",
     "workshop_staff",
     "equipment_manager",
   ]);
+  assert.equal(ACCESS_CLASSES.some((item) => item.id === "view_only"), false,
+    "view_only không được chọn mới vì nó không giải ra vai nghiệp vụ nào");
   assert.equal(QA_TIMELINE_FIELDS.length, 8);
   assert.deepEqual(EQUIPMENT_TIMELINE_FIELDS, ["actual_validation_date"]);
   assert.deepEqual(

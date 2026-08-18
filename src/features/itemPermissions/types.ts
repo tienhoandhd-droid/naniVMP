@@ -1,12 +1,30 @@
+/* Phân loại quyền CHỌN ĐƯỢC. Mỗi giá trị ở đây phải map ra một vai nghiệp
+ * vụ trong `vmp_business_role()` (VMP-noibo, migration 20260812090000) —
+ * nếu không, người được gán sẽ có `business_role = null`, tức KHÔNG GIẢI
+ * ĐƯỢC VAI và mất sạch quyền, chứ không phải "quyền thấp hơn".
+ *
+ * `view_only` từng ở đây và là cái bẫy đúng loại đó: constraint của
+ * `vmp_performers.access_class` cho phép nó, nhãn ghi "Chỉ xem", nhưng hàm
+ * giải vai không có nhánh nào cho nó. Ai bị gán sẽ mất quyền hoàn toàn thay
+ * vì chỉ xem. Đã chuyển sang danh sách legacy (19/08) — không chọn mới
+ * được, nhưng bản ghi cũ đang mang nó vẫn hiện đúng thay vì rơi về rỗng.
+ * Muốn một người CHỈ XEM thì đặt vai đăng nhập `viewer` ở màn Cấu hình hệ
+ * thống; đó là nơi duy nhất ghi đủ cả bốn trường mà hàm giải vai cần. */
 export const ACCESS_CLASSES = [
-  { id: "view_only", label: "Chỉ xem" },
   { id: "qa_progress_editor", label: "QA – Cập nhật 4 mốc hoàn thành" },
   { id: "qa_manager", label: "Quản lý QA" },
   { id: "workshop_staff", label: "Nhân viên xưởng – Ghi ngày thẩm định thực tế" },
   { id: "equipment_manager", label: "Quản lý bộ phận quản lý thiết bị" },
 ] as const;
 
-export const LEGACY_ACCESS_CLASSES = ["equipment_scheduler"] as const;
+/** Giá trị còn tồn tại trong dữ liệu nhưng KHÔNG chọn mới được nữa. */
+export const LEGACY_ACCESS_CLASSES = ["equipment_scheduler", "view_only"] as const;
+
+/** Nhãn đọc được cho cả giá trị legacy — để bản ghi cũ không hiện mã thô. */
+export const NHAN_PHAN_LOAI_CU: Record<string, string> = {
+  equipment_scheduler: "Điều phối thiết bị (giá trị cũ)",
+  view_only: "Chỉ xem (giá trị cũ — KHÔNG giải ra vai nào)",
+};
 
 export type AccessClass =
   | (typeof ACCESS_CLASSES)[number]["id"]

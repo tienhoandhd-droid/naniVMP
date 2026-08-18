@@ -11,6 +11,7 @@ import {
 } from "./api.ts";
 import {
   ACCESS_CLASSES,
+  NHAN_PHAN_LOAI_CU,
   findDirectoryPersonById,
   isDirectoryPersonComplete,
   isQaAccessClass,
@@ -535,6 +536,14 @@ export default function StaffDirectoryPanel({
           <select className="pq-o" aria-label="Phân loại quyền" value={form.accessClass || ""} onChange={changeAccessClass} disabled={!canEdit}>
             <option value="">— chọn phân loại —</option>
             {ACCESS_CLASSES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            {/* Bản ghi cũ mang phân loại đã ngừng dùng vẫn phải hiện đúng giá
+                trị của nó. Không có dòng này thì mở hồ sơ ra là ô nhảy về
+                rỗng, và một cú bấm Lưu ghi đè mất phân loại đang có. */}
+            {form.accessClass && !ACCESS_CLASSES.some((item) => item.id === form.accessClass) && (
+              <option value={form.accessClass}>
+                {NHAN_PHAN_LOAI_CU[form.accessClass] ?? form.accessClass}
+              </option>
+            )}
           </select>
         </label>
         {needsScope && <>
