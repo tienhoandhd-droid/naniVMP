@@ -91,8 +91,9 @@ import ItemPermissionModeCard from "../features/itemPermissions/ItemPermissionMo
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
 import AccountLinkPanel from "../features/itemPermissions/AccountLinkPanel.tsx";
 import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
-import { resolveDirectoryWorkspaceCapabilities } from "../features/itemPermissions/workspaceCapabilities.ts";
 import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
+import { SCREEN_IDS } from "../lib/access.ts";
+import type { AccessContext } from "../lib/access.ts";
 
 /* ---------------------------------------------------------------------
  * Vai trò và các mức quyền SỬA
@@ -318,7 +319,15 @@ function ThanhLuu({ soThayDoi, dangLuu, ketQua, onLuu, onHoanTac, khoa, ghiChu }
 
 type KetQuaLuu = { xong: number; tong: number; loi: string[] } | null;
 
-type PhanQuyenViewProps = { acts: Activity[]; isAdmin?: boolean; user?: AppUser | null };
+type PhanQuyenViewProps = {
+  acts: Activity[];
+  isAdmin?: boolean;
+  user?: AppUser | null;
+  /** Dùng cho ma trận "Màn hình bạn được xem" — chuyển từ màn Tài khoản &
+   *  quyền truy cập cũ. Tuỳ chọn vì các nhánh khác của PhanQuyenView (thợ
+   *  quản lý thiết bị, khối cũ tắt bằng cờ) không cần tới nó. */
+  access?: AccessContext;
+};
 const SHOW_LEGACY_PERMISSION_WORKSPACE = false;
 
 function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
@@ -711,16 +720,116 @@ function QuanTriQuyenCards({ isAdmin = false, user }: { isAdmin?: boolean; user?
   );
 }
 
-function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
+/* ---------------------------------------------------------------------
+ * MaTranQuyenManHinh — chuyển nguyên từ AccountAccessPage.tsx (màn "Tài
+ * khoản & quyền truy cập" đã gộp vào màn này). Đọc thẳng `rpc_my_ui_access`
+ * của CHÍNH người đang xem — server trả gì hiện nấy, không phải bản chép
+ * tay có thể lệch luật thật. Xem vai khác thì phải đăng nhập bằng tài
+ * khoản vai đó, cố ý như vậy: không có đường nào để trình duyệt tự khai
+ * mình là vai khác.
+ * ------------------------------------------------------------------- */
+
+/** Tên hiển thị của từng màn, để bảng ma trận đọc được bằng tiếng Việt. */
+const TEN_MAN: Record<string, string> = {
+  today: "Việc hôm nay",
+  overview: "Tổng quan",
+  timeline: "Dòng thời gian VMP",
+  alerts: "Cảnh báo & ưu tiên",
+  risk: "Rủi ro (đường dẫn cũ)",
+  progress: "Cập nhật tiến độ",
+  inventory: "Tiến độ theo đối tượng",
+  source: "Dữ liệu nguồn",
+  workload: "Phân công & khối lượng",
+  reports: "Báo cáo",
+  rules: "Quy tắc nghiệp vụ",
+  people: "Nhân sự",
+  health: "Chất lượng dữ liệu",
+  audit: "Nhật ký thay đổi",
+  accounts: "Tài khoản & quyền truy cập",
+  admin: "Quản trị",
+  phanquyen: "Vai trò & phạm vi",
+};
+
+const TEN_PHAM_VI: Record<string, string> = {
+  all: "Toàn hệ thống",
+  workshop: "Phạm vi xưởng",
+  assigned: "Việc được giao",
+  own: "Của riêng mình",
+  none: "—",
+};
+
+function MaTranQuyenManHinh({ access }: { access: AccessContext }) {
+  return (
+    <Card variant="strong">
+      <CardTitle icon={ShieldCheck}
+        sub={access.mode === "enforced"
+          ? "Quyền đang có hiệu lực. Đây là kết quả server trả về cho chính tài khoản bạn đang dùng."
+          : "Đang ở chế độ đối chiếu: bảng này cho thấy quyền dự kiến, nhưng hệ vẫn chạy theo luật cũ."}>
+        Màn hình bạn được xem
+      </CardTitle>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+        <Tag>{access.mode === "enforced" ? "Đang áp dụng" : "Dự kiến, chưa áp dụng"}</Tag>
+        <Tag>Vai nghiệp vụ: {access.businessRole ?? "chưa giải được"}</Tag>
+        {access.unresolvedReason && <Tag>Lý do: {access.unresolvedReason}</Tag>}
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+          <thead>
+            <tr style={{ textAlign: "left", color: C.plumSoft }}>
+              <th style={{ padding: "6px 10px" }}>Màn hình</th>
+              <th style={{ padding: "6px 10px" }}>Được xem</th>
+              <th style={{ padding: "6px 10px" }}>Phạm vi dữ liệu</th>
+              <th style={{ padding: "6px 10px" }}>Hành động được phép</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SCREEN_IDS.map((id) => {
+              const xem = access.canView(id);
+              const hanhDong = [...(access.screens[id]?.actions ?? [])]
+                .filter((a) => a !== "view").sort();
+              return (
+                <tr key={id} style={{ borderTop: `1px solid ${C.line}`, opacity: xem ? 1 : 0.55 }}>
+                  <td style={{ padding: "6px 10px", fontWeight: xem ? 700 : 500 }}>
+                    {TEN_MAN[id] ?? id}
+                  </td>
+                  <td style={{ padding: "6px 10px" }}>{xem ? "Có" : "Không"}</td>
+                  <td style={{ padding: "6px 10px" }}>{TEN_PHAM_VI[access.scope(id)] ?? access.scope(id)}</td>
+                  <td style={{ padding: "6px 10px", color: C.plumSoft }}>
+                    {hanhDong.length ? hanhDong.join(", ") : (xem ? "chỉ xem" : "—")}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/* Không nhận `isAdmin` nữa: mọi quyết định quyền ở màn này hoặc hỏi server
+   (`access.can`) hoặc dựa vào `user.role` — `isAdmin` là cờ gộp "admin hoặc
+   quản lý QA", dùng ở đây chỉ sinh nút bấm được nhưng bị từ chối. */
+function CurrentPermissionWorkspace({ acts, user, access }: {
   acts: Activity[];
-  isAdmin?: boolean;
   user?: AppUser | null;
+  access?: AccessContext;
 }) {
   const [person, setPerson] = useState<DirectoryPerson | null>(null);
   const [directoryRevision, setDirectoryRevision] = useState(0);
   const [directoryRefreshPersonId, setDirectoryRefreshPersonId] = useState<string | null>(null);
   const [rightsRevision, setRightsRevision] = useState(0);
-  const { canManageDirectory, canManageQaAssignments } = resolveDirectoryWorkspaceCapabilities(isAdmin, user);
+  /* Quyền nối/gỡ tài khoản hỏi THẲNG server, không suy từ vai ở client.
+     `resolveDirectoryWorkspaceCapabilities` tính từ `isAdmin`, mà `isAdmin`
+     của web nghĩa là "admin HOẶC quản lý QA" — trong khi luật server cấp
+     `manage_accounts` cho riêng screen `accounts` của admin. Suy ở client
+     là hiện nút cho người mà máy chủ chắc chắn từ chối.
+     Vẫn hỏi theo screen `accounts` dù màn đó đã gộp vào đây: screenId ấy
+     là hợp đồng với server, còn `phanquyen` được server khai là cửa vào
+     không có hành động riêng nên hỏi theo nó sẽ luôn ra false. */
+  const duocQuanLyTaiKhoan = access?.can("accounts", "manage_accounts") ?? false;
   const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
     const raw = (activity._raw || {}) as Record<string, unknown>;
     return [activity.area, raw.area, raw.line]
@@ -745,26 +854,31 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
       {user?.role === "admin" && <QuanTriQuyenCards user={user} />}
       <Card variant="strong">
         <CardTitle icon={Users}
-          sub="Chọn nhân sự từ danh bạ chuẩn, khai phạm vi và xem đúng quyền đang có hiệu lực.">
-          Danh bạ nhân sự &amp; quyền
+          sub="Chọn tài khoản để nối/gỡ và xem đúng quyền đang có hiệu lực. Sửa hồ sơ nhân sự
+            và phân công việc nay ở màn Nhân sự — màn này chỉ còn lo tài khoản và quyền.">
+          Tài khoản &amp; quyền
         </CardTitle>
         <div className="ip-workspace">
-          <StaffDirectoryPanel canEdit={canManageDirectory} validAreas={validAreas} onSelect={setPerson}
+          {/* canEdit cố định false: sửa hồ sơ nhân sự đã chuyển hẳn sang màn
+              Nhân sự. Danh bạ ở đây chỉ để CHỌN người — nối tài khoản và xem
+              quyền hiệu lực của người đó. */}
+          <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson}
             revision={directoryRevision} refreshPersonId={directoryRefreshPersonId} />
-          {canManageDirectory && (
-            <AccountLinkPanel person={person} canManageAccounts={canManageDirectory}
+          {duocQuanLyTaiKhoan && (
+            <AccountLinkPanel person={person} canManageAccounts={duocQuanLyTaiKhoan}
               onLinked={(personId) => {
                 setDirectoryRefreshPersonId(personId);
                 setDirectoryRevision((value) => value + 1);
                 setRightsRevision((value) => value + 1);
               }} />
           )}
-          <AssignmentPanel person={person} canEdit={canManageQaAssignments}
-            qaOnly={!canManageDirectory}
-            onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
           <EffectiveRightsPanel person={person} revision={rightsRevision} />
         </div>
       </Card>
+      {/* Ma trận quyền màn hình: chuyển nguyên từ màn "Tài khoản & quyền
+          truy cập" cũ (đã gộp vào đây). Chỉ Admin thật mới thấy — cùng lý
+          do như ItemPermissionModeCard/QuanTriQuyenCards ở trên. */}
+      {user?.role === "admin" && access && <MaTranQuyenManHinh access={access} />}
     </div>
   );
 }
@@ -786,7 +900,8 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
     return <EquipmentAssignmentWorkspace acts={props.acts} />;
   }
   if (SHOW_LEGACY_PERMISSION_WORKSPACE) return <FullPermissionWorkspace {...props} />;
-  return <CurrentPermissionWorkspace acts={props.acts} isAdmin={props.isAdmin} user={props.user} />;
+  return <CurrentPermissionWorkspace acts={props.acts} user={props.user}
+    access={props.access} />;
 }
 
 function FullPermissionWorkspace(

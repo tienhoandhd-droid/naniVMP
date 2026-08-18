@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3, Scale, ClipboardList, KeyRound, Users,
+  ShieldCheck, Radar, BarChart3, Scale, ClipboardList, Users,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -132,15 +132,18 @@ export const NAV_ITEMS = [
      không diễn tả nổi sáu vai trò nghiệp vụ với phạm vi dữ liệu khác nhau.
 
      `id` của mỗi mục CHÍNH LÀ screenId dùng để tra quyền, và cũng là hash
-     `#v=<id>`. Ba hash `inventory`, `risk`, `phanquyen` mà App.tsx render
-     ngoài menu được khai trong SCREEN_IDS, không khai ở đây. */
-  /* Hai màn tách ra từ "Phân quyền & trách nhiệm": dữ liệu nhân sự và
-     vòng đời tài khoản là hai việc khác nhau, do hai nhóm người khác nhau
-     nắm. Mục `phanquyen` ở lại làm cửa vào cũ — vai Quản lý xưởng vẫn dùng
-     nó để phân công hạng mục thiết bị cho tới khi việc đó chuyển sang màn
-     Cập nhật tiến độ. */
+     `#v=<id>`. Bốn hash `inventory`, `risk`, `phanquyen`, `accounts` mà
+     App.tsx render/chuẩn hoá ngoài menu được khai trong SCREEN_IDS, không
+     khai ở đây. */
+  /* "Nhân sự" và "Vai trò & phạm vi" tách từ "Phân quyền & trách nhiệm" cũ:
+     dữ liệu nhân sự và tài khoản/quyền là hai việc khác nhau, do hai nhóm
+     người khác nhau nắm. Mục "Tài khoản & quyền truy cập" từng đứng riêng
+     ở đây đã gộp hẳn vào "Vai trò & phạm vi" — `accounts` vẫn là screenId
+     hợp lệ (hợp đồng với rpc_my_ui_access) và vẫn có alias URL, chỉ không
+     còn mục menu riêng. Mục `phanquyen` còn là cửa vào cũ — vai Quản lý
+     xưởng vẫn dùng nó để phân công hạng mục thiết bị cho tới khi việc đó
+     chuyển sang màn Cập nhật tiến độ. */
   { id: "people", label: "Nhân sự", icon: Users, group: "admin" },
-  { id: "accounts", label: "Tài khoản & quyền truy cập", icon: KeyRound, group: "admin" },
   { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
   { id: "audit", label: "Nhật ký thay đổi", icon: ShieldCheck, group: "admin" },

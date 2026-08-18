@@ -52,8 +52,10 @@ function kiem(dieuKien, ten, chiTiet = "") {
 
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Bốn màn chỉ-admin, theo src/lib/access.ts (MAN_CHI_ADMIN + accounts). */
-const MAN_CHI_ADMIN = ["accounts", "health", "audit", "admin"];
+/** Màn chỉ-admin CÓ MẶT TRÊN MENU. `accounts` vẫn là screenId hợp lệ ở
+ *  server nhưng màn đó đã gộp vào "Vai trò & phạm vi" nên không còn mục
+ *  nav — kiểm nó ở ca 1b (chuyển hướng) thay vì ở đây. */
+const MAN_CHI_ADMIN = ["health", "audit", "admin"];
 
 /** Bồi thêm những gì màn Cấu hình hệ thống / Vai trò & phạm vi cần mà kho
  *  giả lập gốc chưa có. KHÔNG đổi rpc_my_ui_access ở đây — vai vẫn admin
@@ -219,7 +221,7 @@ const trinhDuyet = await puppeteer.launch({
 
 /* ---- 1. Admin: thấy 4 màn chỉ-admin trên nav ------------------------ */
 {
-  console.log("Admin — 4 màn chỉ-admin trên nav:");
+  console.log("Admin — màn chỉ-admin trên nav:");
   const { trang, loiConsole } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin });
 
   const kq = await trang.evaluate((ids) => {
@@ -235,9 +237,35 @@ const trinhDuyet = await puppeteer.launch({
   await trang.close();
 }
 
-/* ---- 2. Viewer: không thấy 4 màn chỉ-admin --------------------------- */
+/* ---- 1b. Link cũ #v=accounts không được rơi vào trang trắng ---------- *
+ *  Màn "Tài khoản & quyền truy cập" đã gộp vào "Vai trò & phạm vi". Ai đang
+ *  lưu dấu trang link cũ phải được đưa sang màn mới, không phải nhìn một
+ *  trang trắng và tưởng web hỏng.
+ * --------------------------------------------------------------------- */
 {
-  console.log("\nViewer — không thấy 4 màn chỉ-admin:");
+  console.log("\nLink cũ #v=accounts chuyển sang Vai trò & phạm vi:");
+  const { trang, loiConsole } = await moTrang(trinhDuyet,
+    { suaKho: suaKhoAdmin, hash: "accounts" });
+  await cho(1200);
+  const kq = await trang.evaluate(() => ({
+    hash: location.hash,
+    coNoiDung: document.body.innerText.length > 200,
+    // Dấu hiệu đang ở đúng màn Vai trò & phạm vi.
+    thayDanhBa: document.body.innerText.includes("Danh bạ chuẩn")
+      || document.body.innerText.includes("Tài khoản & quyền"),
+    khongCoMucNav: !document.querySelector('[data-view="accounts"]'),
+  }));
+  kiem(kq.hash.includes("phanquyen"), "hash đổi sang #v=phanquyen", kq.hash || "(rỗng)");
+  kiem(kq.coNoiDung, "không phải trang trắng");
+  kiem(kq.thayDanhBa, "hiện đúng nội dung màn Vai trò & phạm vi");
+  kiem(kq.khongCoMucNav, "menu không còn mục Tài khoản & quyền truy cập");
+  kiem(loiConsole.length === 0, "console sạch khi đi qua link cũ", loiConsole[0] || "");
+  await trang.close();
+}
+
+/* ---- 2. Viewer: không thấy màn chỉ-admin ----------------------------- */
+{
+  console.log("\nViewer — không thấy màn chỉ-admin:");
   const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoViewer });
 
   const kq = await trang.evaluate((ids) => {
@@ -469,12 +497,14 @@ const trinhDuyet = await puppeteer.launch({
     return {
       coEmail: chu.includes("Ai được phép có tài khoản"),
       coMaTran: chu.includes("Vai nào xem được gì, sửa được gì"),
-      conThayDanhBa: chu.includes("Danh bạ nhân sự"),
+      /* Thẻ nay tên "Tài khoản & quyền" (hồ sơ nhân sự đã chuyển sang màn
+         Nhân sự), nhưng panel danh bạ vẫn còn để CHỌN người xem quyền. */
+      conThayDanhBa: chu.includes("Danh bạ chuẩn"),
     };
   });
   kiem(!qa.coEmail, "quản lý QA không thấy thẻ danh sách email");
   kiem(!qa.coMaTran, "quản lý QA không thấy ma trận vai × quyền");
-  kiem(qa.conThayDanhBa, "quản lý QA vẫn dùng được danh bạ nhân sự (không chặn nhầm cả màn)");
+  kiem(qa.conThayDanhBa, "quản lý QA vẫn chọn được người trong danh bạ (không chặn nhầm cả màn)");
   await b.trang.close();
 }
 

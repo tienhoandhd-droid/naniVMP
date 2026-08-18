@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Download, Search, Save, Upload } from "lucide-react";
+import { AlertTriangle, Check, Download, FileSpreadsheet, Search, Save, Upload } from "lucide-react";
 import { DEPTS } from "../../constants/vmp.ts";
+import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import {
   fetchPermissionPreflight,
   fetchScopeCatalog,
@@ -134,6 +135,7 @@ export default function StaffDirectoryPanel({
   const [importErrors, setImportErrors] = useState<PermissionWorkbookError[]>([]);
   const [importReason, setImportReason] = useState("");
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const requestSequence = useRef(0);
   const lastDirectoryRevision = useRef(revision);
   const knownPeople = useRef(new Map<string, DirectoryPerson>());
@@ -403,6 +405,57 @@ export default function StaffDirectoryPanel({
     }
   };
 
+  /* Xuất toàn bộ danh bạ trong phạm vi quyền của người đang xem — gọi
+     searchPermissionDirectory("") (chuỗi rỗng không lọc theo tên/email/mã)
+     chứ không lấy `results` đang hiện, vì ô tìm chỉ hiện kết quả khi đã gõ
+     ít nhất 2 ký tự. RPC vẫn giới hạn theo person.is_active và theo bộ phận
+     nếu người xem là Quản lý QA/quản lý xưởng — không phải "toàn hệ thống". */
+  const exportDirectory = async () => {
+    setExporting(true);
+    setMessage("");
+    try {
+      const [people, scopeCatalog] = await Promise.all([
+        searchPermissionDirectory(""),
+        loadScopeCatalog(),
+      ]);
+      const factoryLabel = new Map(scopeCatalog.factories.map((item) => [item.id, `${item.code} · ${item.label}`]));
+      const areaLabel = new Map(scopeCatalog.areas.map((item) => [item.id, `${item.code} · ${item.label}`]));
+      const lineLabel = new Map(scopeCatalog.lines.map((item) => [item.id, `${item.code} · ${item.label}`]));
+      const accessClassLabel = (value: AccessClass | null) =>
+        ACCESS_CLASSES.find((item) => item.id === value)?.label || value || "";
+      const accountStatusLabel = (person: DirectoryPerson) =>
+        person.account_status === "linked" ? "Đã nối tài khoản"
+          : person.account_status === "inactive" ? "Tài khoản đã khóa" : "Chưa có tài khoản";
+      const header = [
+        "Họ và tên", "Mã nhân viên", "Bộ phận", "Email", "Trạng thái tài khoản",
+        "Phân loại quyền", "Phạm vi bộ phận", "Phạm vi xưởng", "Phạm vi khu vực",
+        "Phạm vi line", "Đang làm việc",
+      ];
+      const rows = people.map((person) => [
+        person.full_name,
+        person.employee_code || "",
+        departmentLabel(person.department),
+        person.email || "",
+        accountStatusLabel(person),
+        accessClassLabel(person.access_class),
+        person.scope_departments.map((id) => departmentLabel(id)).join(", "),
+        person.scope_factory_ids.map((id) => factoryLabel.get(id) || id).join(", "),
+        person.scope_area_ids.map((id) => areaLabel.get(id) || id).join(", "),
+        person.scope_line_ids.map((id) => lineLabel.get(id) || id).join(", "),
+        person.is_active ? "Có" : "Không",
+      ]);
+      await xuatExcelAoa(
+        [{ ten: "Danh bạ", dong: [header, ...rows] }],
+        `VMP_danh-ba-nhan-su_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      setMessage(`Đã xuất ${people.length} người trong phạm vi bạn được xem (chỉ người đang hoạt động).`);
+    } catch (error) {
+      setMessage(`Không xuất được danh bạ: ${(error as Error).message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <section className="ip-panel" aria-labelledby="ip-directory-title">
       <div className={`ip-mode ${mode === "preview" ? "is-preview" : "is-enforced"}`} role="status">
@@ -541,13 +594,16 @@ export default function StaffDirectoryPanel({
 
       <div className="ip-import">
         <div>
-          <h3>Nhập danh bạ bằng Excel</h3>
-          <p className="ip-help">Tải file 11 cột, điền mã cho đủ bốn tầng phạm vi rồi chọn lại tại đây. Web kiểm toàn bộ file trước; có một dòng lỗi thì không gọi RPC nhập.</p>
+          <h3>Nhập / xuất danh bạ bằng Excel</h3>
+          <p className="ip-help">Tải file 11 cột, điền mã cho đủ bốn tầng phạm vi rồi chọn lại tại đây. Web kiểm toàn bộ file trước; có một dòng lỗi thì không gọi RPC nhập. Nút xuất lấy toàn bộ người đang hoạt động trong phạm vi bạn được xem (không chỉ những dòng đang hiện trong ô tìm), không phải toàn hệ thống nếu bạn không phải Admin.</p>
         </div>
         <div className="ip-import-actions">
           <a className="pq-nut" href={`${import.meta.env.BASE_URL}templates/phan-quyen-vmp.xlsx`} download>
             <Download size={15} /> Tải file Excel mẫu
           </a>
+          <button type="button" className="pq-nut" onClick={() => void exportDirectory()} disabled={exporting}>
+            <FileSpreadsheet size={15} /> {exporting ? "Đang xuất…" : "Xuất danh bạ Excel"}
+          </button>
           {canEdit && (
             <label className="pq-nut">
               <Upload size={15} /> Chọn file đã điền

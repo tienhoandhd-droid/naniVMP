@@ -1,15 +1,17 @@
 /* =====================================================================
  *  OperationalPeoplePage.tsx — Nhân sự & phân công
  *  ---------------------------------------------------------------------
- *  Một nửa của màn "Phân quyền & trách nhiệm" cũ, tách ra theo thiết kế
- *  §3.2: DỮ LIỆU NHÂN SỰ và VÒNG ĐỜI TÀI KHOẢN là hai việc khác nhau, do
- *  hai nhóm người khác nhau nắm.
+ *  Chia theo NGƯỜI DÙNG: đây là màn của Quản lý QA — hồ sơ nhân sự, phân
+ *  công QA theo hạng mục, nhập/xuất danh bạ Excel. DỮ LIỆU NHÂN SỰ và
+ *  VÒNG ĐỜI TÀI KHOẢN là hai việc khác nhau, do hai nhóm người khác nhau
+ *  nắm.
  *
  *    · Ở đây  — họ tên, mã nhân viên, bộ phận, phân loại quyền, phạm vi,
  *               trạng thái làm việc, phân công QA theo hạng mục.
  *               Admin và Quản lý QA sửa; Nhân viên QA chỉ xem.
  *    · Bên kia — mời/khoá tài khoản, nối hoặc gỡ tài khoản khỏi hồ sơ,
- *               đổi vai đăng nhập. Chỉ Admin. Xem AccountAccessPage.
+ *               đổi vai đăng nhập, ma trận quyền. Chỉ Admin. Xem màn
+ *               "Vai trò & phạm vi".
  *
  *  Vì sao phải tách: gộp chung thì ai sửa được danh bạ cũng đứng cạnh nút
  *  đổi quyền đăng nhập, và không có cách nào cấp quyền cho Quản lý QA sửa
@@ -52,8 +54,8 @@ export default function OperationalPeopleView({ acts, access, scopeLabel, update
   return (
     <OperationalPeopleWorkspace
       boundaryNote={duocSua
-        ? "Hồ sơ nhân sự, phạm vi làm việc và phân công QA theo hạng mục. Việc nối tài khoản đăng nhập nằm ở màn Tài khoản & quyền truy cập."
-        : "Xem hồ sơ nhân sự và phân công QA. Chỉ Admin và Quản lý QA sửa được."}
+        ? "Màn của Quản lý QA: hồ sơ nhân sự, phạm vi làm việc và phân công QA theo hạng mục, kèm nhập/xuất danh bạ Excel. Nối tài khoản đăng nhập, đổi vai và ma trận quyền nằm ở màn Vai trò & phạm vi."
+        : "Xem hồ sơ nhân sự và phân công QA. Chỉ Admin và Quản lý QA sửa được; việc đổi vai và nối tài khoản nằm ở màn Vai trò & phạm vi."}
       scopeLabel={scopeLabel}
       updatedLabel={updatedLabel}
       hasSelection={person !== null}

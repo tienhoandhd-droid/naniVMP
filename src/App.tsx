@@ -108,7 +108,6 @@ const ServerChecksView = lazy(nhapCoThuLai(() => import("./pages/ServerChecksPag
 const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
 const OperationalPeopleView = lazy(nhapCoThuLai(() => import("./pages/OperationalPeoplePage.tsx")));
-const AccountAccessView = lazy(nhapCoThuLai(() => import("./pages/AccountAccessPage.tsx")));
 const TodayView = lazy(nhapCoThuLai(() => import("./features/today/TodayCommandCenter.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
@@ -1711,7 +1710,14 @@ function AppShell() {
      và "Cảnh báo". Chuẩn hoá ở đây, một lần, thay vì để mỗi nhánh render
      tự nhớ — mà quên một nhánh thì đường dẫn cũ dẫn vào trang trắng. */
   const chuanHoaView = useCallback((s: UrlState) => {
-    const y = resolveViewIntent(s.view);
+    /* `accounts` (Tài khoản & quyền truy cập) đã gộp vào `phanquyen` (Vai
+       trò & phạm vi) và rời khỏi menu, nhưng vẫn là ScreenId hợp lệ trong
+       lib/access.ts (hợp đồng với rpc_my_ui_access ở server) nên
+       resolveViewIntent không tự coi đây là alias — nó vẫn trả về
+       `accounts` y nguyên. Ánh xạ ngay tại đây, cùng cách `inventory`/`risk`
+       đã làm, để #v=accounts cũ không rơi vào trang trắng. */
+    const vRaw = s.view === "accounts" ? "phanquyen" : s.view;
+    const y = resolveViewIntent(vRaw);
     if (!y) return { state: s, nhom: null as null | "doituong" };
     return {
       state: y.screenId === s.view ? s : { ...s, view: y.screenId },
@@ -1727,10 +1733,11 @@ function AppShell() {
      xong thì nó thành `progress` và thông tin đó biến mất. */
   const khoiTaoDayDu = useMemo(() => {
     const tuUrl = docUrl(typeof window === "undefined" ? "" : window.location.hash, {
-      // `inventory` và `risk` không có mục menu nhưng vẫn là đường dẫn hợp lệ.
-      // Thiếu chúng ở đây thì đường dẫn cũ người dùng đã lưu bị docUrl loại
-      // và rơi về màn mặc định — đúng cái mà chú thích ở NAV_ITEMS nói phải tránh.
-      views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing"]),
+      // `inventory`, `risk` và `accounts` không có mục menu nhưng vẫn là
+      // đường dẫn hợp lệ. Thiếu chúng ở đây thì đường dẫn cũ người dùng đã
+      // lưu bị docUrl loại và rơi về màn mặc định — đúng cái mà chú thích ở
+      // NAV_ITEMS nói phải tránh.
+      views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing", "accounts"]),
       depts: DEPTS.map((d) => d.id),
       periods: PERIODS.map((p) => p[0]).concat(["custom"]),
     });
@@ -1973,11 +1980,11 @@ function AppShell() {
   useEffect(() => {
     const apDung = () => {
       const s = docUrl(window.location.hash, {
-        // `inventory` và `risk` không có mục menu nhưng App vẫn render chúng.
-        // Thiếu `inventory` ở đây thì đường dẫn cũ người dùng đã lưu bị
-        // docUrl loại và rơi về màn mặc định — đúng cái mà chú thích ở
-        // NAV_ITEMS nói là phải tránh.
-        views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing"]),
+        // `inventory`, `risk` và `accounts` không có mục menu nhưng App vẫn
+        // xử lý được. Thiếu một trong chúng ở đây thì đường dẫn cũ người
+        // dùng đã lưu bị docUrl loại và rơi về màn mặc định — đúng cái mà
+        // chú thích ở NAV_ITEMS nói là phải tránh.
+        views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing", "accounts"]),
         depts: DEPTS.map((d) => d.id),
         periods: PERIODS.map((p) => p[0]).concat(["custom"]),
       });
@@ -2204,8 +2211,12 @@ function AppShell() {
                     ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
                     : undefined} />
               )}
-              {view === "accounts" && <AccountAccessView access={access} />}
-              {view === "phanquyen" && <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} user={user} />}
+              {/* Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
+                  vi — `accounts` không còn nhánh render riêng, chỉ còn là
+                  alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}
+              {view === "phanquyen" && (
+                <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} user={user} access={access} />
+              )}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} laAdminThat={laAdminThat} />}
             </Suspense>
