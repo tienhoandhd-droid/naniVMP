@@ -152,6 +152,13 @@ function dungDoiTuong(i) {
     classification: ["tb", "qt", "kho", "ht", "vc"][i % 5],
     kind: ["Thiết bị", "Quy trình", "Kho", "Hệ thống phụ trợ", "Vận chuyển"][i % 5],
     object_code: `TB-${String(100 + i).padStart(3, "0")}`,
+    /* Khu vực / line / nhóm công việc có trong dữ liệu thật và là nguồn
+       gợi ý cho các ô chọn của form đối tượng. Thiếu chúng thì ô chọn rơi
+       về ô gõ tự do và bộ kiểm không thấy được lỗi "bấm vào chỉ hiện một
+       dòng" mà người dùng gặp. */
+    area_code: `KV-${["A", "B", "C"][i % 3]}`,
+    line: `Line ${(i % 2) + 1}`,
+    work_group: ["Cơ khí", "Tiện ích", "Sạch"][i % 3],
     validate_flag: "y",
     frequency_months: 12,
     first_month: (i % 12) + 1,

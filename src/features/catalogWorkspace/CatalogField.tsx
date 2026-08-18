@@ -12,6 +12,7 @@
 import { useEffect, useRef } from "react";
 import { Lock } from "lucide-react";
 
+import ChonHoacGo from "./ChonHoacGo.tsx";
 import type { CatalogFieldDefinition } from "./contracts.ts";
 
 export interface CatalogFieldProps {
@@ -104,19 +105,23 @@ export default function CatalogField({
           ))}
         </select>
       ) : field.kind === "combobox" ? (
-        /* Gõ được, mà cũng chọn được từ những giá trị đã có trong hồ sơ.
-           Khoá cứng danh sách ở đây là sai: thiết bị mới, dây chuyền mới,
-           dạng bào chế mới xuất hiện thường xuyên hơn nhịp sửa code. Còn
-           để trống hẳn thành ô text tự do thì một dây chuyền thật sinh ra
-           ba cách viết, và lọc theo nó ra ba nhóm rời rạc. */
-        <>
-          <input {...chung} type="text" list={`${id}-ds`}
-            value={value == null ? "" : String(value)}
-            onChange={(e) => onChange(e.target.value)} />
-          <datalist id={`${id}-ds`}>
-            {(goiY || []).map((v) => <option key={v} value={v} />)}
-          </datalist>
-        </>
+        /* Chọn từ giá trị đã có trong hồ sơ, kèm lối thoát "Khác…". Ô text
+           tự do làm một dây chuyền thật sinh ra ba cách viết, và lọc theo
+           nó ra ba nhóm rời rạc — nhưng khoá cứng cũng sai vì dây chuyền
+           mới xuất hiện thường xuyên hơn nhịp sửa code. */
+        <ChonHoacGo
+          id={id}
+          className={chung.className}
+          value={value == null ? "" : String(value)}
+          options={(goiY || []).map((v) => ({ value: v, label: v }))}
+          onChange={(v) => onChange(v)}
+          disabled={khoa}
+          required={field.required}
+          ariaDescribedBy={moTa}
+          ariaInvalid={Boolean(error)}
+          nhanOGo={`${field.label} — nhập giá trị mới`}
+          focusSignal={focusSignal}
+        />
       ) : (
         <input {...chung}
           type={field.kind === "number" ? "number" : field.kind === "date" ? "date" : "text"}

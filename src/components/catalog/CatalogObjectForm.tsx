@@ -26,10 +26,11 @@ import { AlertTriangle, Boxes, Lock, Save } from "lucide-react";
 import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import {
-  TRUONG_FORM, BO_PHAN_CHUAN, MA_BO_PHAN_KHAC,
+  TRUONG_FORM, BO_PHAN_CHUAN,
   buildCatalogPatch, canLyDo, coThamDinh, validateCatalogForm, truongThieuDauTien,
 } from "../../lib/catalogForm.ts";
 import type { GiaTriForm, LoiForm, NhomTruong, TruongForm } from "../../lib/catalogForm.ts";
+import ChonHoacGo from "../../features/catalogWorkspace/ChonHoacGo.tsx";
 import PerformerSelect from "../../features/itemPermissions/PerformerSelect.tsx";
 import type { PerformerChoice } from "../../features/itemPermissions/performerSelection.ts";
 import type { GoiY } from "../../features/catalogWorkspace/suggestions.ts";
@@ -82,12 +83,9 @@ export default function CatalogObjectForm({
   const [loiChung, setLoiChung] = useState<string | null>(null);
   const [dangLuu, setDangLuu] = useState(false);
   const [moNangCao, setMoNangCao] = useState(false);
-  /* Nhớ rằng người dùng đang ở chế độ "khác", vì giá trị rỗng không phân
-     biệt được "chưa chọn gì" với "chọn khác nhưng chưa gõ". */
-  const [boPhanKhac, setBoPhanKhac] = useState(() => {
-    const v = String(row.department ?? "");
-    return v !== "" && !BO_PHAN_CHUAN.some((b) => b.ma === v);
-  });
+  /* Chế độ "khác" của từng ô do chính `ChonHoacGo` nhớ — nó biết giá trị
+     rỗng nghĩa là "chưa chọn" hay "chọn khác nhưng chưa gõ", còn form này
+     thì không cần biết. */
   /* Ô cần đưa tiêu điểm vào sau lần bấm Lưu thất bại — nhảy thẳng tới ô
      bắt buộc còn trống thay vì chỉ làm mờ nút Lưu. */
   /* Ô cần đặt con trỏ vào sau khi bấm Lưu mà còn thiếu. Kèm số lần bấm để
@@ -186,44 +184,29 @@ export default function CatalogObjectForm({
           {khoa && <Lock size={13} aria-hidden="true" className="cw-khoa-icon" />}
         </label>
 
-        {t.chonCoKhac ? (() => {
-          const giaTri = form[t.key] ?? "";
-          const trongChuan = BO_PHAN_CHUAN.some((b) => b.ma === giaTri);
-          const dangKhac = boPhanKhac || (giaTri !== "" && !trongChuan);
-          return (
-            <>
-              <select id={id} className={lop} disabled={khoa}
-                value={dangKhac ? MA_BO_PHAN_KHAC : giaTri}
-                aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
-                onChange={(e) => {
-                  setBoPhanKhac(e.target.value === MA_BO_PHAN_KHAC);
-                  dat(t.key, e.target.value === MA_BO_PHAN_KHAC ? "" : e.target.value);
-                }}>
-                <option value="">—</option>
-                {BO_PHAN_CHUAN.map((b) => <option key={b.ma} value={b.ma}>{b.ten}</option>)}
-                <option value={MA_BO_PHAN_KHAC}>Bộ phận khác…</option>
-              </select>
-              {/* Bản ghi cũ mang bộ phận ngoài sáu mã chuẩn (dữ liệu di trú
-                  từ Sheet) phải hiện đúng giá trị đang có. Không có ô này
-                  thì mở form ra là giá trị biến mất, và một cú bấm Lưu ghi
-                  đè mất bộ phận của hồ sơ đã ban hành. */}
-              {dangKhac && (
-                <input className={`${lop} cw-o-khac`} value={giaTri} disabled={khoa}
-                  aria-label={`${t.label} — nhập tên bộ phận`}
-                  placeholder="Tên bộ phận mới"
-                  onChange={(e) => dat(t.key, e.target.value)} />
-              )}
-            </>
-          );
-        })() : t.goiYTu ? (
-          <>
-            <input id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
-              list={`${id}-ds`} aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
-              onChange={(e) => dat(t.key, e.target.value)} />
-            <datalist id={`${id}-ds`}>
-              {(goiY?.[t.goiYTu] ?? []).map((v) => <option key={v} value={v} />)}
-            </datalist>
-          </>
+        {/* Bộ phận và các ô danh mục mở (khu vực, line, nhóm công việc) dùng
+            chung MỘT kiểu ô: chọn trong danh sách, cuối danh sách có lối
+            thoát để nhập giá trị mới. Bản trước dựng ô danh mục mở bằng
+            `<input list>` + datalist — trình duyệt tự lọc gợi ý theo chữ
+            đang có trong ô, nên ô đã mang "Line 1" thì bấm xuống chỉ thấy
+            đúng một dòng, và người dùng tưởng hệ chỉ biết một giá trị. */}
+        {t.chonCoKhac || t.goiYTu ? (
+          <ChonHoacGo
+            id={id}
+            className={lop}
+            value={form[t.key] ?? ""}
+            options={t.chonCoKhac
+              ? BO_PHAN_CHUAN.map((b) => ({ value: b.ma, label: b.ten }))
+              : (goiY?.[t.goiYTu ?? ""] ?? []).map((v) => ({ value: v, label: v }))}
+            onChange={(v) => dat(t.key, v)}
+            disabled={khoa}
+            required={t.batBuoc}
+            ariaDescribedBy={moTa}
+            ariaInvalid={Boolean(loiO)}
+            nhanOGo={`${t.label} — nhập giá trị mới`}
+            goiYGo={t.chonCoKhac ? "Tên bộ phận mới" : undefined}
+            focusSignal={oCanNhay?.key === t.key ? oCanNhay.lan : undefined}
+          />
         ) : t.chonNguoi ? (
           <PerformerSelect
             value={form[t.key] || null}

@@ -481,6 +481,56 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   await trang.close();
 }
 
+/* ---- 8. Ô danh mục mở phải cho thấy TOÀN BỘ giá trị đang có ---------- *
+ *  Bản đầu dựng các ô này bằng `<input list>` + datalist. Trình duyệt tự
+ *  lọc gợi ý theo chữ đang có trong ô, nên một đối tượng đã mang "Line 1"
+ *  thì bấm xuống chỉ thấy đúng một dòng — người dùng tưởng hệ thống chỉ
+ *  biết một giá trị và gõ tay lại từ đầu. Đây là phép kiểm chặn nó quay lại.
+ * --------------------------------------------------------------------- */
+{
+  console.log("\nÔ khu vực / line cho thấy đủ danh sách:");
+  const { trang, loiConsole } = await moTrang(trinhDuyet);
+
+  // Mở form sửa của đối tượng đầu tiên.
+  await trang.evaluate(() => {
+    const nut = [...document.querySelectorAll("button")]
+      .find((b) => b.textContent.trim() === "Sửa" || b.getAttribute("data-cw-sua") !== null);
+    nut?.click();
+  });
+  await cho(900);
+
+  const o = await trang.evaluate(() => {
+    const doc = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return { co: false };
+      return {
+        co: true,
+        the: el.tagName.toLowerCase(),
+        soLuaChon: el.tagName.toLowerCase() === "select" ? el.options.length : 0,
+        nhan: el.tagName.toLowerCase() === "select"
+          ? [...el.options].map((x) => x.textContent.trim()) : [],
+        giaTri: el.value,
+      };
+    };
+    return { moHop: !!document.querySelector(".cw-than"), kv: doc("cof-area_code"), line: doc("cof-line") };
+  });
+
+  kiem(o.moHop, "form sửa đối tượng mở được");
+  kiem(o.kv.the === "select", "ô Khu vực là ô chọn, không phải ô gõ tự do", String(o.kv.the));
+  kiem(o.line.the === "select", "ô Line là ô chọn, không phải ô gõ tự do", String(o.line.the));
+  /* Kho giả lập có 3 khu vực và 2 line: cộng mục "— chọn —" và mục "Khác"
+     là 5 và 4. Kiểm số thật chứ không kiểm "nhiều hơn 1" — datalist lọc
+     nhầm vẫn cho ra 2 mục và sẽ lọt. */
+  kiem(o.kv.soLuaChon === 5, "ô Khu vực hiện đủ 3 khu vực + chọn + Khác", String(o.kv.soLuaChon));
+  kiem(o.line.soLuaChon === 4, "ô Line hiện đủ 2 line + chọn + Khác", String(o.line.soLuaChon));
+  kiem(o.kv.nhan.some((n) => n.startsWith("Khác")), "ô Khu vực có lối thoát nhập giá trị mới",
+    o.kv.nhan.join(" / ").slice(0, 90));
+  kiem(o.kv.giaTri !== "", "giá trị khu vực đang có của bản ghi được chọn sẵn", o.kv.giaTri);
+
+  kiem(loiConsole.length === 0, "không lỗi console", loiConsole.join(" · ").slice(0, 160));
+  await trang.close();
+}
+
 await trinhDuyet.close();
 
 console.log(`\n${"─".repeat(52)}`);

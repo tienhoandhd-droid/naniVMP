@@ -19,13 +19,21 @@ if (!thuMuc) throw new Error("Thiếu tham số: thư mục ghi file mẫu");
 
 /* Khớp dungDoiTuong(i) trong gia-lap-supabase.mjs:
  *   TB-100 (i=0): tên "Máy dập viên xoay tròn" · dept xsx · first_month 1
+ *                 · KV-A · Line 1 · nhóm Cơ khí
  *   TB-101 (i=1): tên "Máy đóng nang tự động"  · dept cd  · first_month 2
- * Cả hai: validate_flag y · frequency_months 12 · is_active true. */
+ *                 · KV-B · Line 2 · nhóm Tiện ích
+ * Cả hai: validate_flag y · frequency_months 12 · is_active true.
+ *
+ * Dòng "giữ nguyên" (TB-101) phải khớp ĐỦ MỌI CỘT của kho giả lập. Thiếu
+ * một cột là bản nhập coi nó thành "xoá giá trị" và dòng nhảy sang nhóm
+ * "sửa" — bộ kiểm đếm sai mà không ai hiểu vì sao. */
 const DONG = [
   { object_kind: "Thiết bị", object_code: "TB-100", object_name: "Máy dập viên đã đổi tên",
-    department: "xsx", validate_flag: "y", frequency_months: 12, first_month: 1, is_active: true },
+    department: "xsx", area_code: "KV-A", line: "Line 1", work_group: "Cơ khí",
+    validate_flag: "y", frequency_months: 12, first_month: 1, is_active: true },
   { object_kind: "Thiết bị", object_code: "TB-101", object_name: "Máy đóng nang tự động",
-    department: "cd", validate_flag: "y", frequency_months: 12, first_month: 2, is_active: true },
+    department: "cd", area_code: "KV-B", line: "Line 2", work_group: "Tiện ích",
+    validate_flag: "y", frequency_months: 12, first_month: 2, is_active: true },
   { object_kind: "Thiết bị", object_code: "TB-999", object_name: "Máy mới toanh",
     department: "qa", validate_flag: "y", frequency_months: 12, first_month: 5, is_active: true },
   { object_kind: "Thiết bị", object_code: "TB-998", object_name: "",
