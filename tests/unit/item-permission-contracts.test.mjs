@@ -268,27 +268,6 @@ test("lỗi quyền A về muộn không hiện trong ngữ cảnh B", async () 
   assert.deepEqual(events, []);
 });
 
-test("QA manager được phân công nhưng không được sửa danh bạ hoặc nối tài khoản", async () => {
-  const { resolveDirectoryWorkspaceCapabilities } = await import(
-    "../../src/features/itemPermissions/workspaceCapabilities.ts"
-  );
-
-  assert.deepEqual(resolveDirectoryWorkspaceCapabilities(false, { role: "qa_manager" }), {
-    canManageDirectory: false,
-    canManageQaAssignments: true,
-  });
-  assert.deepEqual(resolveDirectoryWorkspaceCapabilities(false, {
-    role: "viewer", accessClass: "qa_manager",
-  }), {
-    canManageDirectory: false,
-    canManageQaAssignments: true,
-  });
-  assert.deepEqual(resolveDirectoryWorkspaceCapabilities(true, { role: "viewer" }), {
-    canManageDirectory: true,
-    canManageQaAssignments: true,
-  });
-});
-
 test("decoder danh bạ giữ dòng legacy thiếu cấu hình để có thể sửa", async () => {
   const { decodeDirectoryPerson } = await import(
     "../../src/features/itemPermissions/api.ts"

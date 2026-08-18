@@ -195,18 +195,13 @@ export function useAuth() {
     clearSnapshot();   // máy dùng chung: không để dữ liệu người trước nằm lại
   }, []);
 
-  /* `laAdminThat` đã bỏ khỏi đây — App.tsx nay hỏi thẳng server qua
-   * access.can("accounts","manage_accounts") thay vì suy từ role cũ.
-   *
-   * `isAdmin` (perm "admin" — `permMap` trong supabaseClient gán perm này
-   * cho CẢ `qa_manager`, nên thật ra nghĩa là "admin hoặc quản lý QA") vẫn
-   * còn đây CHỈ vì PhanQuyenPage.tsx chưa dọn xong (đang sửa ở nhánh khác).
-   * Đừng dùng cờ này để gate quyền SỬA ở màn mới — hỏi `access.can(...)`.
-   */
-  /* KHÔNG trả cờ quyền nào nữa. Trước đây hook này sinh `isAdmin` từ
-     `user.perm` — cờ của hệ 4 vai CŨ, thực chất nghĩa là "admin HOẶC quản
-     lý QA", và là nguồn của loại lỗi hiện nút mà máy chủ từ chối. Quyền
-     nay hỏi server qua `access.can(...)` ngay tại nơi cần. */
+  /* KHÔNG trả cờ quyền nào nữa (19/08, dọn xong cả `isAdmin` và
+     `laAdminThat`). Trước đây hook này sinh `isAdmin` từ `user.perm` —
+     cờ của hệ 4 vai CŨ, thực chất nghĩa là "admin HOẶC quản lý QA", và là
+     nguồn của loại lỗi hiện nút mà máy chủ từ chối; `laAdminThat` thì suy
+     từ `user.role === "admin"`, cùng bệnh chỉ khác mức độ. Quyền nay hỏi
+     server qua `access.can(...)` ngay tại nơi cần, không còn đường tắt
+     nào tính sẵn ở đây để lỡ dùng nhầm. */
   return { user, setUser, login, logout, loading };
 }
 

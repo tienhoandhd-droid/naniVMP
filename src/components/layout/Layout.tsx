@@ -143,7 +143,9 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               <div style={{ lineHeight: 1.3, overflow: "hidden", flex: 1 }}>
                 <div style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{user?.name}</div>
                 <div style={{ color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {user?.role}
+                  {/* Nhãn vai — cùng nguồn với badge topbar (VAI_NGHIEP_VU), không
+                      còn hiện thẳng `user.role` (giá trị enum thô, kiểu "qa_manager"). */}
+                  {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}
                 </div>
               </div>
             </div>
@@ -311,7 +313,9 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
 
         <div className="vmp-mobile-drawer-account">
           <div style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{user?.name || "Tài khoản"}</div>
-          <div style={{ color: C.plumSoft, fontSize: 12, fontWeight: 700, marginTop: 2 }}>{user?.role}</div>
+          <div style={{ color: C.plumSoft, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+            {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}
+          </div>
           <div className="vmp-mobile-drawer-preferences">
             <ThemeToggle />
           </div>

@@ -37,7 +37,7 @@ import { supabase } from "../lib/supabaseClient.ts";
 import { fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen } from "../lib/supabaseData.ts";
 import type { EmailChoPhepRow, NguoiQuyenRow } from "../lib/supabaseData.ts";
 import { Card, CardTitle, Tag, CauKetLuan } from "../components/ui/Primitives.tsx";
-import type { Activity, AppUser } from "../types/domain.ts";
+import type { Activity } from "../types/domain.ts";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
 import ItemPermissionModeCard from "../features/itemPermissions/ItemPermissionModeCard.tsx";
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
@@ -51,7 +51,6 @@ type KetQuaLuu = { xong: number; tong: number; loi: string[] } | null;
 
 type PhanQuyenViewProps = {
   acts: Activity[];
-  user?: AppUser | null;
   /** Dùng cho ma trận "Màn hình bạn được xem" — chuyển từ màn Tài khoản &
    *  quyền truy cập cũ. Tuỳ chọn vì nhánh thợ quản lý thiết bị của
    *  PhanQuyenView không cần tới nó. */
@@ -360,10 +359,12 @@ function CurrentPermissionWorkspace({ acts, access }: {
   const [directoryRefreshPersonId, setDirectoryRefreshPersonId] = useState<string | null>(null);
   const [rightsRevision, setRightsRevision] = useState(0);
   /* Quyền nối/gỡ tài khoản hỏi THẲNG server, không suy từ vai ở client.
-     `resolveDirectoryWorkspaceCapabilities` tính từ `isAdmin`, mà `isAdmin`
-     của web nghĩa là "admin HOẶC quản lý QA" — trong khi luật server cấp
-     `manage_accounts` cho riêng screen `accounts` của admin. Suy ở client
-     là hiện nút cho người mà máy chủ chắc chắn từ chối.
+     Bản trước tính bằng `resolveDirectoryWorkspaceCapabilities(isAdmin, user)`
+     — `isAdmin` của web nghĩa là "admin HOẶC quản lý QA" — trong khi luật
+     server cấp `manage_accounts` cho riêng screen `accounts` của admin. Suy
+     ở client là hiện nút cho người mà máy chủ chắc chắn từ chối. Hàm đó và
+     bài kiểm của nó đã XOÁ (19/08) — không còn ai gọi, giữ lại chỉ để cắm
+     ngược logic cũ vào lần sau.
      Vẫn hỏi theo screen `accounts` dù màn đó đã gộp vào đây: screenId ấy
      là hợp đồng với server, còn `phanquyen` được server khai là cửa vào
      không có hành động riêng nên hỏi theo nó sẽ luôn ra false. */

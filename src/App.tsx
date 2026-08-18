@@ -1695,9 +1695,9 @@ function GlobalFilterBar({
    chưa lưu — tách ra để Provider nằm NGOÀI mọi thứ dùng nó, kể cả hộp
    thoại Đổi mật khẩu. */
 function AppShell() {
-  // `isAdmin` (cờ gộp "admin HOẶC qa_manager" từ hệ vai cũ) chỉ còn dùng để
-  // truyền cho PhanQuyenPage.tsx — file đó đang được dọn ở nhánh khác, chưa
-  // bỏ hẳn tham số này. Đừng gán thêm việc mới cho `isAdmin` ở file này.
+  // `isAdmin` đã bỏ hẳn (19/08): PhanQuyenPage.tsx nay tự hỏi `access`,
+  // không nhận `isAdmin` hay `user` nữa. `useAuth()` cũng không còn trả cờ
+  // quyền nào — mọi quyết định "được làm gì" phải hỏi `access.can(...)`.
   const { user, setUser, logout } = useAuth();
   /* Quyền xem từng màn do Supabase quyết, không suy từ `role`/`accessClass`.
      Trong lúc chờ — và khi server chưa có `rpc_my_ui_access` — hook trả về
@@ -2242,7 +2242,7 @@ function AppShell() {
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là
                   alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}
               {view === "phanquyen" && (
-                <PhanQuyenView acts={filteredActs} user={user} access={access} />
+                <PhanQuyenView acts={filteredActs} access={access} />
               )}
               {view === "audit" && <AuditLogView />}
               {view === "admin" && <AdminView conn={conn} user={user} laAdminThat={access.can("accounts", "manage_accounts")} access={access} />}
