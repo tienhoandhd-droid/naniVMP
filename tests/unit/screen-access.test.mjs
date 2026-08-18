@@ -148,7 +148,30 @@ test("đường lùi giữ nguyên luật mở màn Phân quyền hiện hành",
   const qaManagerTheoRole = legacyAccessContext({ name: "B", role: "qa_manager", perm: "admin" });
   assert.equal(qaManagerTheoRole.canView("phanquyen"), true);
   assert.equal(qaManagerTheoRole.canView("admin"), false);
-  assert.equal(qaManagerTheoRole.canView("audit"), false);
+  /* Server CÓ cấp `health` và `audit` cho Quản lý QA
+     (20260812090000_six_business_roles_and_screen_access.sql). Bản trước
+     của đường lùi để riêng admin — lệch theo hướng nguy hiểm: ngày RPC
+     hỏng, Quản lý QA mất hai màn họ vẫn dùng hằng ngày và tưởng web hỏng. */
+  assert.equal(qaManagerTheoRole.canView("audit"), true);
+  assert.equal(qaManagerTheoRole.canView("health"), true);
+
+  /* Và cấp đúng những hành động server cấp — không hơn. Thiếu thì họ mất
+     việc; thừa `manage_accounts` thì họ thấy nút mà RPC chắc chắn từ chối. */
+  assert.equal(qaManagerTheoRole.can("source", "edit_catalog"), true);
+  assert.equal(qaManagerTheoRole.can("source", "generate_timeline"), true);
+  assert.equal(qaManagerTheoRole.can("people", "edit_operational_people"), true);
+  assert.equal(qaManagerTheoRole.can("progress", "edit_vertical_timeline"), true);
+  assert.equal(qaManagerTheoRole.can("accounts", "manage_accounts"), false);
+  assert.equal(qaManagerTheoRole.can("accounts", "manage_authorization_policy"), false);
+
+  /* Nhân viên QA và người thường vẫn chỉ xem — đường lùi không được nới
+     tay cho mọi vai chỉ vì vừa nới cho một vai. */
+  const nhanVienQa = legacyAccessContext({
+    name: "F", role: "department_user", perm: "edit", accessClass: "qa_progress_editor",
+  });
+  assert.equal(nhanVienQa.can("source", "edit_catalog"), false);
+  assert.equal(nhanVienQa.can("people", "edit_operational_people"), false);
+  assert.equal(nhanVienQa.canView("audit"), false);
 
   const qaManagerTheoAccessClass = legacyAccessContext({
     name: "C", role: "department_user", perm: "edit", accessClass: "qa_manager",

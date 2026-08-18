@@ -19,16 +19,72 @@
  *  không có nghĩa người bấm đủ quyền — server mới là nơi trả lời.
  * ===================================================================== */
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Check, Loader, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Check, Eye, Loader, ShieldCheck } from "lucide-react";
 
 import { useToast } from "../../components/ui/ToastProvider.tsx";
-import { fetchPermissionPreflight, setItemPermissionsMode } from "./api.ts";
-import type { PermissionIssue, PermissionPreflight } from "./types.ts";
+import SmartTable from "../../components/ui/SmartTable.tsx";
+import type { SmartTableColumn } from "../../components/ui/SmartTable.tsx";
+import {
+  fetchEffectiveRights,
+  fetchPermissionPreflight,
+  searchPermissionDirectory,
+  setItemPermissionsMode,
+} from "./api.ts";
+import { ACCESS_CLASSES } from "./types.ts";
+import type { DirectoryPerson, PermissionIssue, PermissionPreflight } from "./types.ts";
 
 /** Người dùng phải gõ đúng chữ này mới bật được — chống bấm nhầm trên một
  *  công tắc đổi quyền của cả hệ thống. Chữ ngắn, gõ được bằng bàn phím
  *  tiếng Việt không dấu, và nói đúng việc đang làm. */
 const CHU_XAC_NHAN = "AP DUNG";
+
+/** Nhãn vai/phân loại quyền hiển thị cho người dùng — tra theo id, giữ
+ *  nguyên chuỗi thô cho các access_class cũ (legacy) không còn trong bảng. */
+const NHAN_ACCESS_CLASS: Record<string, string> = Object.fromEntries(
+  ACCESS_CLASSES.map((c) => [c.id, c.label]),
+);
+function nhanVaiTro(nguoi: DirectoryPerson): string {
+  if (!nguoi.access_class) return "Chưa phân loại";
+  return NHAN_ACCESS_CLASS[nguoi.access_class] ?? nguoi.access_class;
+}
+
+/** Đo song song tối đa ngần này người một lúc. Nã hàng chục RPC cùng lúc
+ *  lên Supabase là tự gây nghẽn; chờ tuần tự từng người thì với vài chục
+ *  người trong danh bạ, người xem tưởng màn hình bị treo. */
+const GIOI_HAN_SONG_SONG_DO_ANH_HUONG = 4;
+
+interface DongAnhHuong {
+  nguoi: DirectoryPerson;
+  soXem: number;
+  soSua: number;
+  /** null = đo được bình thường; có chữ = RPC lỗi cho riêng người này. */
+  loi: string | null;
+}
+
+/** Chạy `worker` trên từng phần tử của `items`, tối đa `gioiHan` lời gọi
+ *  cùng lúc; gọi `baoXong` ngay sau mỗi phần tử xong để cập nhật tiến độ.
+ *  Không có await nào chen giữa lúc đọc và tăng `conLai` nên vẫn an toàn
+ *  dù chạy trong nhiều "luồng" async song song (JS đơn luồng thật sự). */
+async function chayTheoLo<T, R>(
+  items: readonly T[],
+  gioiHan: number,
+  worker: (item: T) => Promise<R>,
+  baoXong: () => void,
+): Promise<R[]> {
+  const ketQua: R[] = new Array(items.length);
+  let conLai = 0;
+  const chayMotLuong = async () => {
+    while (conLai < items.length) {
+      const i = conLai++;
+      ketQua[i] = await worker(items[i]);
+      baoXong();
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(gioiHan, items.length) }, () => chayMotLuong()),
+  );
+  return ketQua;
+}
 
 function DanhSachVanDe({ ten, ds }: { ten: string; ds: PermissionIssue[] }) {
   if (ds.length === 0) return null;
@@ -48,6 +104,42 @@ function DanhSachVanDe({ ten, ds }: { ten: string; ds: PermissionIssue[] }) {
   );
 }
 
+const cotAnhHuong: SmartTableColumn<DongAnhHuong>[] = [
+  {
+    id: "nguoi",
+    header: "Họ tên",
+    cell: (h) => (
+      <>
+        <b>{h.nguoi.full_name}</b>
+        {h.nguoi.department ? <div className="ip-muted">{h.nguoi.department}</div> : null}
+      </>
+    ),
+  },
+  {
+    id: "vai",
+    header: "Vai trò / phân loại quyền",
+    priority: "supporting",
+    cell: (h) => nhanVaiTro(h.nguoi),
+  },
+  {
+    id: "xem",
+    header: "Hạng mục xem được",
+    align: "center",
+    cell: (h) => (
+      h.loi
+        ? <span className="ip-badge is-warning" title={h.loi}>Không đo được</span>
+        : <span className={`ip-badge ${h.soXem === 0 ? "is-inactive" : "is-linked"}`}>{h.soXem}</span>
+    ),
+  },
+  {
+    id: "sua",
+    header: "Hạng mục sửa được",
+    align: "center",
+    priority: "supporting",
+    cell: (h) => (h.loi ? <span className="ip-muted">—</span> : <span>{h.soSua}</span>),
+  },
+];
+
 export default function ItemPermissionModeCard() {
   const toast = useToast();
   const [tienKiem, setTienKiem] = useState<PermissionPreflight | null>(null);
@@ -55,6 +147,61 @@ export default function ItemPermissionModeCard() {
   const [lyDo, setLyDo] = useState("");
   const [chuGo, setChuGo] = useState("");
   const [dangDoi, setDangDoi] = useState(false);
+
+  // Xem trước ảnh hưởng khi bật — CHỈ đo lúc người dùng bấm, không tự chạy
+  // lúc mở màn (mở màn mà nã hàng chục RPC là tự gây nghẽn cho chính họ).
+  const [dangDoAnhHuong, setDangDoAnhHuong] = useState(false);
+  const [tienDoDo, setTienDoDo] = useState<{ xong: number; tong: number } | null>(null);
+  const [ketQuaAnhHuong, setKetQuaAnhHuong] = useState<DongAnhHuong[] | null>(null);
+  const [loiXemTruoc, setLoiXemTruoc] = useState<string | null>(null);
+
+  const xemTruocAnhHuong = useCallback(async () => {
+    setDangDoAnhHuong(true);
+    setLoiXemTruoc(null);
+    setKetQuaAnhHuong(null);
+    try {
+      const tatCa = await searchPermissionDirectory("");
+      // Người đã nghỉ không có hạng mục nào để đo — RPC tự loại theo
+      // is_active, đo họ chỉ ra toàn số 0 giả, làm loãng nhóm cảnh báo thật.
+      const dangHoatDong = tatCa.filter((p) => p.is_active);
+      setTienDoDo({ xong: 0, tong: dangHoatDong.length });
+      let xong = 0;
+      const hang = await chayTheoLo(
+        dangHoatDong,
+        GIOI_HAN_SONG_SONG_DO_ANH_HUONG,
+        async (nguoi): Promise<DongAnhHuong> => {
+          try {
+            const { rights } = await fetchEffectiveRights({ personId: nguoi.person_id });
+            return {
+              nguoi,
+              soXem: rights.filter((r) => r.can_view).length,
+              soSua: rights.filter((r) => r.editable_fields.length > 0).length,
+              loi: null,
+            };
+          } catch (e) {
+            // Một người lỗi không được làm hỏng cả bảng — ghi rõ "không đo
+            // được" kèm lý do ngắn, những người còn lại vẫn đo bình thường.
+            return { nguoi, soXem: 0, soSua: 0, loi: (e as Error).message || "RPC lỗi không rõ lý do" };
+          }
+        },
+        () => { xong += 1; setTienDoDo({ xong, tong: dangHoatDong.length }); },
+      );
+      hang.sort((a, b) => {
+        // Người 0 hạng mục xem được lên đầu — đó là người sẽ mất quyền
+        // xem hoàn toàn khi bật. Người "không đo được" xếp ngay sau, vì
+        // cũng cần chú ý dù chưa chắc mất quyền. Còn lại theo tên.
+        const nhom = (h: DongAnhHuong) => (h.loi ? 1 : h.soXem === 0 ? 0 : 2);
+        const d = nhom(a) - nhom(b);
+        return d !== 0 ? d : a.nguoi.full_name.localeCompare(b.nguoi.full_name, "vi");
+      });
+      setKetQuaAnhHuong(hang);
+    } catch (e) {
+      setLoiXemTruoc((e as Error).message || "Không lấy được danh bạ để đo ảnh hưởng");
+    } finally {
+      setDangDoAnhHuong(false);
+      setTienDoDo(null);
+    }
+  }, []);
 
   const tai = useCallback(async () => {
     setDangTai(true);
@@ -134,6 +281,66 @@ export default function ItemPermissionModeCard() {
 
       <DanhSachVanDe ten="Lỗi bắt buộc phải sửa trước khi bật" ds={tienKiem.blocking_errors} />
       <DanhSachVanDe ten="Cảnh báo (không chặn bật)" ds={tienKiem.warnings} />
+
+      {!dangApDung && (
+        <div className="ip-form is-compact">
+          <h3>Xem trước ảnh hưởng</h3>
+          <p className="ip-help">
+            Đo bằng đúng luật quyền sẽ áp dụng — bấm mới đo, không tự chạy khi mở màn
+            này. Xong việc sẽ biết ai còn xem/sửa được gì và ai mất sạch quyền xem.
+          </p>
+          <button type="button" className="pq-nut" disabled={dangDoAnhHuong}
+            onClick={() => void xemTruocAnhHuong()}>
+            {dangDoAnhHuong
+              ? <><Loader size={15} aria-hidden="true" /> Đang đo…</>
+              : <><Eye size={15} aria-hidden="true" /> Xem trước ảnh hưởng khi bật</>}
+          </button>
+
+          {dangDoAnhHuong && tienDoDo && (
+            <p className="ip-help" role="status">
+              Đang đo {tienDoDo.xong}/{tienDoDo.tong} người…
+            </p>
+          )}
+
+          {loiXemTruoc && (
+            <p className="pq-canhbao la-do" role="alert">
+              <AlertTriangle size={15} aria-hidden="true" /> {loiXemTruoc}
+            </p>
+          )}
+
+          {ketQuaAnhHuong && (
+            <>
+              {(() => {
+                const soMatQuyen = ketQuaAnhHuong.filter((h) => !h.loi && h.soXem === 0).length;
+                const soKhongDoDuoc = ketQuaAnhHuong.filter((h) => h.loi).length;
+                return (
+                  <>
+                    {soMatQuyen > 0 && (
+                      <p className="pq-canhbao la-do" role="alert">
+                        <AlertTriangle size={15} aria-hidden="true" />
+                        {soMatQuyen} người sẽ không xem được hạng mục nào khi bật.
+                      </p>
+                    )}
+                    {soKhongDoDuoc > 0 && (
+                      <p className="pq-canhbao la-vang" role="status">
+                        <AlertTriangle size={15} aria-hidden="true" />
+                        {soKhongDoDuoc} người không đo được — di chuột vào ô "Không đo được" để xem lý do.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+              <SmartTable
+                caption="Ảnh hưởng dự kiến khi bật áp dụng quyền theo hạng mục"
+                rows={ketQuaAnhHuong}
+                rowKey={(h) => h.nguoi.person_id}
+                columns={cotAnhHuong}
+                empty="Không có ai đang hoạt động trong danh bạ để đo."
+              />
+            </>
+          )}
+        </div>
+      )}
 
       {dangApDung ? (
         <div className="ip-form is-compact">

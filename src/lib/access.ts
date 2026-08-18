@@ -250,6 +250,32 @@ const HANH_DONG_ADMIN = [
   "manage_authorization_policy",
 ];
 
+/**
+ * Hành động của Quản lý QA, chép theo ĐÚNG bảng quyền của server
+ * (VMP-noibo/supabase/migrations/20260812090000_six_business_roles_and_screen_access.sql).
+ *
+ * Vì sao phải chép: bản trước của luật dự phòng cấp `["view"]` cho mọi vai
+ * không phải admin. Nhưng server cấp cho Quản lý QA quyền sửa danh mục,
+ * sửa hồ sơ nhân sự, cập nhật tiến độ, và cho xem Chất lượng dữ liệu lẫn
+ * Nhật ký. Lệch theo hướng đó nghĩa là: ngày `rpc_my_ui_access` hỏng hoặc
+ * chưa kịp trả lời, Quản lý QA đột ngột mất gần hết việc hằng ngày và
+ * tưởng hệ thống hỏng. Lưới dự phòng phải đỡ đúng chỗ, không phải đỡ hụt.
+ *
+ * KHÔNG có `manage_accounts` và `manage_authorization_policy`: hai quyền đó
+ * server chỉ cấp cho admin, và chúng gate những nút mà RPC sẽ từ chối.
+ */
+const HANH_DONG_QA_MANAGER: Partial<Record<string, readonly string[]>> = {
+  source: ["edit_catalog", "generate_timeline"],
+  people: ["edit_operational_people"],
+  progress: ["edit_vertical_timeline"],
+  inventory: ["edit_vertical_timeline"],
+  workload: ["view_workload"],
+  rules: ["view_rules"],
+};
+
+/** Hai màn server cấp cho cả Quản lý QA, mà luật dự phòng cũ để riêng admin. */
+const MAN_QA_MANAGER_XEM_DUOC: readonly string[] = ["health", "audit"];
+
 export function legacyAccessContext(user: AppUser | null | undefined): AccessContext {
   const laAdmin = user?.role === "admin";
   const moDuocPhanQuyen = laAdmin
@@ -261,12 +287,18 @@ export function legacyAccessContext(user: AppUser | null | undefined): AccessCon
     || user?.role === "qa_manager"
     || user?.accessClass === "qa_manager";
 
+  /* Luật dự phòng chỉ biết `role` và `accessClass`, không biết vai nghiệp
+     vụ do server giải. Cả hai đường đều dẫn tới "quản lý QA" nên gộp lại. */
+  const laQaManager = !laAdmin
+    && (user?.role === "qa_manager" || user?.accessClass === "qa_manager");
+
   const screens: Record<string, ScreenPermission> = {};
   for (const id of SCREEN_IDS) {
     let thay: boolean;
     if (id === "accounts") thay = laAdmin;
     else if (id === MAN_NHAN_SU) thay = moDuocNhanSu;
     else if (id === "phanquyen") thay = moDuocPhanQuyen;
+    else if (MAN_QA_MANAGER_XEM_DUOC.includes(id)) thay = laAdmin || laQaManager;
     else if (MAN_CHI_ADMIN.includes(id)) thay = laAdmin;
     else thay = !!user;
 
@@ -274,7 +306,11 @@ export function legacyAccessContext(user: AppUser | null | undefined): AccessCon
       ? {
           canView: true,
           dataScope: "all",
-          actions: new Set(laAdmin ? HANH_DONG_ADMIN : ["view"]),
+          actions: new Set(
+            laAdmin ? HANH_DONG_ADMIN
+              : laQaManager ? ["view", ...(HANH_DONG_QA_MANAGER[id] ?? [])]
+                : ["view"],
+          ),
         }
       : TU_CHOI;
   }

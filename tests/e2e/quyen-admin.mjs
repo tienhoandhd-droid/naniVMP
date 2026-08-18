@@ -562,11 +562,13 @@ const trinhDuyet = await puppeteer.launch({
   const duPhong = await doSuaDuoc(suaKhoQaKhongCoUiAccess);
   kiem(duPhong.moDuocMan, "quản lý QA mở được màn Nhân sự ở luật dự phòng");
   kiem(duPhong.coOTen, "màn Nhân sự có ô hồ sơ để xem");
-  /* KHÔNG khẳng định "phải sửa được" — chỉ GHI LẠI hiện trạng. Luật dự
-     phòng chỉ cấp ["view"] cho mọi vai không phải admin, nên ô khoá là
-     đúng theo luật đó; phép kiểm này giữ cho hành vi ấy khỏi đổi lặng lẽ. */
-  kiem(duPhong.oTenSuaDuoc === false,
-    "ở luật dự phòng, quản lý QA CHỈ XEM — ô hồ sơ bị khoá",
+  /* Luật dự phòng nay chép theo đúng bảng quyền của server: Quản lý QA có
+     `edit_operational_people`, nên ô hồ sơ phải MỞ. Trước đây nó cấp
+     ["view"] cho mọi vai không phải admin — ngày RPC hỏng là Quản lý QA
+     mất sạch việc hằng ngày và tưởng web hỏng. Phép kiểm này giữ cho lưới
+     dự phòng khỏi hẹp lại lần nữa. */
+  kiem(duPhong.oTenSuaDuoc === true,
+    "ở luật dự phòng, quản lý QA VẪN sửa được hồ sơ (khớp bảng quyền server)",
     `oTenSuaDuoc=${duPhong.oTenSuaDuoc}`);
 
   // 9b. Server cấp edit_operational_people: giao diện phải mở khoá ngay.
@@ -575,6 +577,31 @@ const trinhDuyet = await puppeteer.launch({
     "server cấp edit_operational_people thì quản lý QA sửa được ngay, không cần sửa web",
     `oTenSuaDuoc=${duocCap.oTenSuaDuoc}`);
   kiem(duocCap.coNutLuu, "và có nút lưu hồ sơ");
+}
+
+/* ---- 9b. Xem trước ảnh hưởng trước khi bật quyền theo hạng mục ------- *
+ *  Bật `enforced` là cú bấm khó lùi: ai không được phân công sẽ mất quyền
+ *  xem ngay. Khối "Xem trước ảnh hưởng" phải có mặt và phải CHỈ đo khi
+ *  người dùng bấm — tự nã một loạt RPC mỗi lần mở màn là cách chắc chắn
+ *  làm màn Phân quyền chậm và người dùng tránh dùng nó.
+ * --------------------------------------------------------------------- */
+{
+  console.log("\nCông tắc quyền — có xem trước ảnh hưởng:");
+  const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
+  await cho(1600);
+
+  const kq = await trang.evaluate(() => {
+    const nut = [...document.querySelectorAll("button")]
+      .find((b) => /Xem trước ảnh hưởng/.test(b.textContent || ""));
+    return {
+      coNut: !!nut,
+      // Chưa bấm thì chưa có bảng nào — dấu hiệu nó không tự chạy.
+      chuaCoBang: !document.body.innerText.includes("Hạng mục xem được"),
+    };
+  });
+  kiem(kq.coNut, "có nút Xem trước ảnh hưởng khi bật");
+  kiem(kq.chuaCoBang, "chưa bấm thì chưa đo — không tự nã RPC lúc mở màn");
+  await trang.close();
 }
 
 /* ---- 10. Nhóm "Tài khoản & quyền truy cập" sau khi gộp --------------- *
