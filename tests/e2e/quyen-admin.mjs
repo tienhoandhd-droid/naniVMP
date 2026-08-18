@@ -135,6 +135,29 @@ function suaKhoQaManagerThat(kho) {
   kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
 }
 
+/** Quản lý QA khi server CHƯA có `rpc_my_ui_access` — web rơi về luật dự
+ *  phòng `legacyAccessContext`. Đó là luật đang chạy ở chế độ dự thảo. */
+function suaKhoQaKhongCoUiAccess(kho) {
+  suaKhoAdmin(kho);
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
+  delete kho.rpc_my_ui_access;
+}
+
+/** Quản lý QA khi server CÓ cấp `edit_operational_people`. Ca này chứng
+ *  minh giao diện đã sẵn sàng: mọi thứ chỉ còn chờ luật ở server. */
+function suaKhoQaDuocSuaNhanSu(kho) {
+  suaKhoAdmin(kho);
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
+  const goc = kho.rpc_my_ui_access;
+  const screens = {};
+  for (const [id, q] of Object.entries(goc.screens)) {
+    screens[id] = id === "people"
+      ? { ...q, can_view: true, actions: ["view", "edit_operational_people"] }
+      : q;
+  }
+  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
+}
+
 async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, suaKho } = {}) {
   const trang = await trinhDuyet.newPage();
   const loiConsole = [];
@@ -453,6 +476,53 @@ const trinhDuyet = await puppeteer.launch({
   kiem(!qa.coMaTran, "quản lý QA không thấy ma trận vai × quyền");
   kiem(qa.conThayDanhBa, "quản lý QA vẫn dùng được danh bạ nhân sự (không chặn nhầm cả màn)");
   await b.trang.close();
+}
+
+/* ---- 9. Màn "Nhân sự" — quản lý QA thật sự sửa được gì? ------------- *
+ *  Màn này sinh ra để quản lý QA sửa hồ sơ nhân sự mà không đụng vòng đời
+ *  tài khoản. Câu hỏi là luật quyền có cho họ làm thật không. Đo hai tình
+ *  huống thay vì suy đoán.
+ * --------------------------------------------------------------------- */
+{
+  console.log("\nMàn Nhân sự — quản lý QA sửa được tới đâu:");
+
+  const doSuaDuoc = async (suaKho) => {
+    const { trang } = await moTrang(trinhDuyet, { suaKho, hash: "people" });
+    await cho(1600);
+    const kq = await trang.evaluate(() => {
+      const oTen = document.querySelector('input[aria-label="Họ và tên trong danh bạ"]');
+      const nutLuu = [...document.querySelectorAll("button")]
+        .find((b) => /Lưu hồ sơ|Thêm vào danh bạ/.test(b.textContent || ""));
+      return {
+        moDuocMan: document.body.innerText.includes("Nhân sự")
+          || !!document.querySelector('[data-view="people"]'),
+        coOTen: !!oTen,
+        oTenSuaDuoc: oTen ? !oTen.disabled : false,
+        coNutLuu: !!nutLuu,
+        noiKhongCoQuyen: document.body.innerText.includes("Chỉ Admin và Quản lý QA sửa"),
+      };
+    });
+    await trang.close();
+    return kq;
+  };
+
+  // 9a. Luật dự phòng (chế độ dự thảo, không có rpc_my_ui_access).
+  const duPhong = await doSuaDuoc(suaKhoQaKhongCoUiAccess);
+  kiem(duPhong.moDuocMan, "quản lý QA mở được màn Nhân sự ở luật dự phòng");
+  kiem(duPhong.coOTen, "màn Nhân sự có ô hồ sơ để xem");
+  /* KHÔNG khẳng định "phải sửa được" — chỉ GHI LẠI hiện trạng. Luật dự
+     phòng chỉ cấp ["view"] cho mọi vai không phải admin, nên ô khoá là
+     đúng theo luật đó; phép kiểm này giữ cho hành vi ấy khỏi đổi lặng lẽ. */
+  kiem(duPhong.oTenSuaDuoc === false,
+    "ở luật dự phòng, quản lý QA CHỈ XEM — ô hồ sơ bị khoá",
+    `oTenSuaDuoc=${duPhong.oTenSuaDuoc}`);
+
+  // 9b. Server cấp edit_operational_people: giao diện phải mở khoá ngay.
+  const duocCap = await doSuaDuoc(suaKhoQaDuocSuaNhanSu);
+  kiem(duocCap.oTenSuaDuoc === true,
+    "server cấp edit_operational_people thì quản lý QA sửa được ngay, không cần sửa web",
+    `oTenSuaDuoc=${duocCap.oTenSuaDuoc}`);
+  kiem(duocCap.coNutLuu, "và có nút lưu hồ sơ");
 }
 
 await trinhDuyet.close();
