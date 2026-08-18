@@ -105,9 +105,12 @@ try {
   console.log("\n── 3. URL lái được màn hình + bộ lọc ──");
   await page.goto(`${GOC}#v=alerts&dept=xsx`, { waitUntil: "networkidle2" });
   const sauUrl = await cho(page, docChip, { ten: "chip đếm sau khi mở URL có bộ lọc" });
+  /* Tiêu đề màn nằm ở `h1.vmp-title`. Bản trước dò trong `div` không con —
+     đúng vào thời điểm tiêu đề còn là div; đợt đổi giao diện nâng nó lên
+     h1 và phép kiểm này hỏng âm thầm từ đó, không ai thấy vì bộ luồng
+     chính không nằm trong danh sách CI chạy khi deploy. */
   const tieuDe = await page.evaluate(() => {
-    const el = [...document.querySelectorAll("div")]
-      .find((d) => d.children.length === 0 && /Cảnh báo & ưu tiên/.test(d.textContent || ""));
+    const el = document.querySelector("h1.vmp-title") || document.querySelector("h1");
     return el ? el.textContent.trim() : "";
   });
   kiem("URL #v=alerts mở đúng trang Cảnh báo", /Cảnh báo/.test(tieuDe), tieuDe || "(không thấy tiêu đề)");

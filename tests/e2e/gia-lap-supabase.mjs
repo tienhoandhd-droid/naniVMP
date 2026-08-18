@@ -310,9 +310,25 @@ export function dungKhoDuLieu(kichBan) {
     },
     rpc_get_vmp_watermark: { year: 2026, plan_items: soHangMuc, objects: doiTuong.length, updated_at: "2026-08-15T02:00:00Z" },
     rpc_get_missing_items: [],
+    /* Hình dạng phải khớp `ServerKpi` trong src/lib/supabaseData.ts: hai
+       nhóm lồng `validation` và `documentation`. Bản trước trả một object
+       PHẲNG {total, done, overdue…} — màn "Chất lượng dữ liệu → Kiểm tra
+       trên máy chủ" đọc `kpi.validation.done` nên nổ TypeError và rơi vào
+       lưới an toàn "Tải lại trang". Mock sai hình dạng che đúng loại lỗi
+       mà bộ kiểm sinh ra để bắt. */
     rpc_dashboard_kpi: day
-      ? { total: 24, done: 6, overdue: 4, soon: 3, in_progress: 11, rate: 25 }
-      : { total: 0, done: 0, overdue: 0, soon: 0, in_progress: 0, rate: 0 },
+      ? {
+        updated_at: "2026-08-15T02:00:00Z",
+        validation: { done: 6, over: 4, todo: 14, total: 24 },
+        documentation: { done: 5, over: 2, todo: 17, total: 24 },
+        mismatch_count: 2,
+      }
+      : {
+        updated_at: "2026-08-15T02:00:00Z",
+        validation: { done: 0, over: 0, todo: 0, total: 0 },
+        documentation: { done: 0, over: 0, todo: 0, total: 0 },
+        mismatch_count: 0,
+      },
     rpc_due_alerts: day ? hangMuc.slice(0, 7).map((a) => ({
       validation_code: a.code,
       object_name: a.objName,

@@ -20,12 +20,15 @@
     "thammy": "node tests/e2e/tham-my.mjs",
     "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs",
     "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
+    "e2e:admin": "node tests/e2e/quyen-admin.mjs",
     "shell": "node tests/e2e/lotus-shell.mjs",
     "atelier": "node tests/e2e/atelier.mjs",
     "drift": "node scripts/check-design-drift.mjs",
     "visual": "playwright test -c playwright.visual.config.ts",
     "visual:capnhat": "playwright test -c playwright.visual.config.ts --update-snapshots",
-    "a11y": "playwright test -c playwright.a11y.config.ts"
+    "a11y": "playwright test -c playwright.a11y.config.ts",
+    "e2e:luongchinh": "node tests/e2e/luong-chinh.mjs",
+    "e2e:ux": "node tests/e2e/ux-refinement.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

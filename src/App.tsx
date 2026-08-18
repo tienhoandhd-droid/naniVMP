@@ -208,7 +208,11 @@ function ChangePwModal({ onClose, recovery = false }: { onClose: () => void; rec
             <span style={{ fontSize: 12, fontWeight: 700, color: C.plum }}>{o.nhan}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 42, padding: "0 14px", borderRadius: R.sm, background: C.surface, border: `1px solid ${loiO[o.ten] ? C.raspText : "var(--lp-line-strong)"}` }}>
               <KeyRound size={16} color={C.pink} />
-              <input type="password" value={o.giaTri} autoFocus={i === 0}
+              {/* `data-dialog-focus` chứ không phải `autoFocus`: vỏ hộp thoại
+                  đặt tiêu điểm một nhịp sau khi mount và sẽ ghi đè autoFocus,
+                  đẩy con trỏ về nút đóng. */}
+              <input type="password" value={o.giaTri}
+                data-dialog-focus={i === 0 ? "" : undefined}
                 autoComplete={o.autoComplete}
                 aria-invalid={Boolean(loiO[o.ten])}
                 onChange={(e) => { o.dat(e.target.value); setLoiO((l) => ({ ...l, [o.ten]: undefined })); setMsg({ type: "", text: "" }); }}

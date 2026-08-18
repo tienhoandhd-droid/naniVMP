@@ -135,12 +135,21 @@ export default function ViewportDialog({
     };
   }, [open, host, returnFocusRef]);
 
-  /* --- Tiêu điểm ban đầu -------------------------------------------- */
+  /* --- Tiêu điểm ban đầu --------------------------------------------
+   *  Mặc định là phần tử focus được đầu tiên — thường là nút đóng ở đầu
+   *  hộp, đúng cho hộp chỉ để đọc. Nhưng hộp CÓ FORM thì con trỏ phải nằm
+   *  ở ô nhập đầu tiên: mở ra là gõ được ngay, không phải Tab qua nút đóng.
+   *
+   *  `autoFocus` của React KHÔNG làm được việc đó ở đây — nó chạy lúc phần
+   *  tử mount, rồi bị chính hiệu ứng này ghi đè một nhịp sau. Nên hộp nào
+   *  muốn chỉ định ô nhận con trỏ thì đánh dấu `data-dialog-focus` lên ô đó.
+   */
   useEffect(() => {
     if (!open) return;
     const t = requestAnimationFrame(() => {
       const ds = dsFocus();
-      (ds[0] || panelRef.current)?.focus();
+      const chiDinh = panelRef.current?.querySelector<HTMLElement>("[data-dialog-focus]");
+      (chiDinh || ds[0] || panelRef.current)?.focus();
     });
     return () => cancelAnimationFrame(t);
   }, [open, dsFocus]);
