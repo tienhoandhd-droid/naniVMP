@@ -140,9 +140,15 @@ export const NAV_ITEMS = [
      người khác nhau nắm. Mục "Tài khoản & quyền truy cập" từng đứng riêng
      ở đây đã gộp hẳn vào "Vai trò & phạm vi" — `accounts` vẫn là screenId
      hợp lệ (hợp đồng với rpc_my_ui_access) và vẫn có alias URL, chỉ không
-     còn mục menu riêng. Mục `phanquyen` còn là cửa vào cũ — vai Quản lý
-     xưởng vẫn dùng nó để phân công hạng mục thiết bị cho tới khi việc đó
-     chuyển sang màn Cập nhật tiến độ. */
+     còn mục menu riêng.
+
+     Mục `phanquyen` chỉ còn là cửa vào của Admin / Quản lý QA / Nhân viên
+     QA (bảng vmp_screen_permissions, migration
+     20260812090000_six_business_roles_and_screen_access.sql). Quản lý
+     xưởng / Nhân viên xưởng đã KHÔNG còn thấy màn này — việc phân công
+     hạng mục thiết bị của họ đã chuyển hẳn sang nút "Gán người xưởng"
+     ngay trong hộp Cập nhật tiến độ (`access.can("progress",
+     "assign_workshop_staff")`), không phải "sẽ chuyển" nữa. */
   { id: "people", label: "Nhân sự", icon: Users, group: "admin" },
   { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
