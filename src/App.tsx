@@ -835,11 +835,18 @@ function docLichCron(lich: string): string {
   return `hằng ngày, ${gioChu} giờ VN${quaNgay}`;
 }
 
-const VAI_TRO_NHAN: Record<string, { nhan: string; mau: string; nen: string }> = {
-  admin:           { nhan: "Quản trị", mau: C.raspText, nen: C.raspSoft },
-  qa_manager:      { nhan: "QA quản lý", mau: C.lavText, nen: C.lavSoft },
-  department_user: { nhan: "Người bộ phận", mau: C.skyText, nen: C.skySoft },
-  viewer:          { nhan: "Chỉ xem", mau: C.plumSoft, nen: C.pinkMist },
+/* Màu cho thẻ vai NGHIỆP VỤ (6 vai). Nhãn chữ lấy từ `VAI_NGHIEP_VU` —
+   một nguồn duy nhất cho cả web — ở đây chỉ khai màu.
+   Bản trước bảng này khoá theo `profiles.role` 4 vai của hệ CŨ đã bỏ, nên
+   admin đọc bảng thấy "Người bộ phận" mà không biết người đó thật ra là
+   nhân viên QA hay quản lý xưởng — hai vai quyền khác hẳn nhau. */
+const MAU_VAI: Record<string, { mau: string; nen: string }> = {
+  admin:            { mau: C.raspText, nen: C.raspSoft },
+  qa_manager:       { mau: C.lavText, nen: C.lavSoft },
+  qa_staff:         { mau: C.lavText, nen: C.pinkMist },
+  workshop_manager: { mau: C.skyText, nen: C.skySoft },
+  workshop_staff:   { mau: C.skyText, nen: C.pinkMist },
+  viewer:           { mau: C.plumSoft, nen: C.pinkMist },
 };
 
 function AdminView({ conn, user, laAdminThat, access }: {
@@ -994,9 +1001,17 @@ function AdminView({ conn, user, laAdminThat, access }: {
                 </tr></thead>
                 <tbody>
                   {(tt.nguoi_dung || []).map((u: NonNullable<SystemStatus["nguoi_dung"]>[number]) => {
-                    const v = VAI_TRO_NHAN[u.vai_tro] || VAI_TRO_NHAN.viewer;
                     const nvRow = theoEmail.get((u.email || "").trim().toLowerCase());
                     const vaiHienTai = nvRow?.business_role || "";
+                    /* Hiện VAI NGHIỆP VỤ (nguồn: rpc_business_roles), không phải
+                       `profiles.role` mà rpc_trang_thai_he_thong trả về — cột role
+                       đó thuộc hệ 4 vai đã bỏ. Chưa giải được vai thì hiện "—",
+                       KHÔNG âm thầm gán "Chỉ xem": đoán sai quyền của người khác
+                       ngay trên bảng quản trị là kiểu sai tệ nhất. */
+                    const v = {
+                      nhan: VAI_NGHIEP_VU.find((x) => x.id === vaiHienTai)?.nhan ?? "—",
+                      ...(MAU_VAI[vaiHienTai] ?? MAU_VAI.viewer),
+                    };
                     const suaDuoc = !!laAdminThat && !!nvRow;
                     const dangBan = dangSua === nvRow?.user_id;
                     return (
