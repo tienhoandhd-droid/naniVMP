@@ -68,14 +68,16 @@ jobs:
           echo "E2E_EMAIL=gialap@example.com" >> .env.local
           echo "E2E_PASSWORD=gialap-khong-dung-that" >> .env.local
 
-      - name: E2E giả lập + catalog + quyền admin + luồng chính + UX + shell + thẩm mỹ + atelier
+      # KHÔNG thêm e2e:luongchinh / e2e:ux vào đây: hai bộ đó đăng nhập
+      # Supabase THẬT bằng E2E_EMAIL/E2E_PASSWORD, mà CI chỉ có tài khoản
+      # giả nên chúng luôn đỏ ở bước đăng nhập. Chạy chúng trên máy có
+      # .env.local thật: npm run e2e:luongchinh · npm run e2e:ux
+      - name: E2E giả lập + catalog + quyền admin + shell + thẩm mỹ + atelier
         run: |
           bash scripts/with-preview.sh -- bash -c '
             npm run e2e:gialap &&
             npm run e2e:catalog &&
             npm run e2e:admin &&
-            npm run e2e:luongchinh &&
-            npm run e2e:ux &&
             npm run shell &&
             npm run thammy &&
             npm run atelier
