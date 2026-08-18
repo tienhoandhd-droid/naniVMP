@@ -346,6 +346,371 @@ function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
   );
 }
 
+/* ---------------------------------------------------------------------
+ * QuanTriQuyenCards — mục 1 "Ai được phép có tài khoản" và mục 2
+ * "Vai nào xem được gì, sửa được gì", tách khỏi FullPermissionWorkspace
+ * bên dưới (khối cũ, đang tắt bởi SHOW_LEGACY_PERMISSION_WORKSPACE) để
+ * dùng lại ở màn đang chạy mà KHÔNG bật cả sáu khối cũ.
+ *
+ * Tự nạp dữ liệu và giữ bản nháp RIÊNG, không ăn theo state của
+ * FullPermissionWorkspace — để trích xuất không đụng hành vi của khối
+ * cũ (mục 3 của khối cũ đọc chung một "nhap" với mục 2 để xem trước quyền
+ * hiệu lực; tách state ra sẽ làm mất sự liên động đó, nên FullPermission-
+ * Workspace được giữ nguyên, không gọi lại component này).
+ * ------------------------------------------------------------------- */
+function QuanTriQuyenCards({ isAdmin = false, user }: { isAdmin?: boolean; user?: AppUser | null }) {
+  const [nguoi, setNguoi] = useState<NguoiQuyenRow[]>([]);
+  const [luatXem, setLuatXem] = useState<LuatXemRow[]>([]);
+  const [quyenA, setQuyenA] = useState<RolePermRow[]>([]);
+  const [dsEmail, setDsEmail] = useState<EmailChoPhepRow[]>([]);
+  const [emailMoi, setEmailMoi] = useState({ email: "", ghiChu: "" });
+
+  /* Bản nháp: KHOÁ Ô → giá trị mới, dùng chung cho hai bảng, phân biệt
+     bằng tiền tố khoá — xem giải thích đầy đủ ở đầu file. */
+  const [nhap, setNhap] = useState<Record<string, string>>({});
+  const [oHong, setOHong] = useState<Record<string, string>>({});
+  const [dangLuu, setDangLuu] = useState("");
+  const [ketQua, setKetQua] = useState<Record<string, KetQuaLuu>>({});
+
+  const dat = (khoa: string, gt: string) => setNhap((c) => ({ ...c, [khoa]: gt }));
+  const xoaNhap = (khoa: string) => setNhap((c) => { const n = { ...c }; delete n[khoa]; return n; });
+  const xoaHong = (khoa: string) => setOHong((c) => { const n = { ...c }; delete n[khoa]; return n; });
+  const demNhap = (...tienTo: string[]) =>
+    Object.keys(nhap).filter((k) => tienTo.some((t) => k.startsWith(t))).length;
+  const boNhap = (mocKetQua: string, ...tienTo: string[]) => {
+    const giu = (k: string) => !tienTo.some((t) => k.startsWith(t));
+    setNhap((c) => Object.fromEntries(Object.entries(c).filter(([k]) => giu(k))));
+    setOHong((c) => Object.fromEntries(Object.entries(c).filter(([k]) => giu(k))));
+    setKetQua((c) => ({ ...c, [mocKetQua]: null }));
+  };
+
+  /** Gom kết quả của một lượt lưu rồi ghi lại bản nháp: ô lưu được thì bỏ
+   *  khỏi nháp, ô hỏng thì giữ nguyên kèm lý do. */
+  const chotLuot = (
+    mocKetQua: string, tienTo: string[], tong: number, xong: number,
+    loiDs: string[], giu: Record<string, string>, hong: Record<string, string>,
+  ) => {
+    const laCua = (k: string) => tienTo.some((t) => k.startsWith(t));
+    setNhap((c) => ({ ...Object.fromEntries(Object.entries(c).filter(([k]) => !laCua(k))), ...giu }));
+    setOHong((c) => ({ ...Object.fromEntries(Object.entries(c).filter(([k]) => !laCua(k))), ...hong }));
+    setKetQua((c) => ({ ...c, [mocKetQua]: { xong, tong, loi: loiDs } }));
+  };
+
+  /* isAdmin còn đúng với cả qa_manager (xem permMap ở supabaseClient.ts),
+     nhưng rpc_set_role_permission chỉ nhận admin thật — so thêm role ở
+     đây để không mở nút SỬA cho người mà server chắc chắn từ chối. */
+  const quyenSuaA = (isAdmin || user?.role === "admin") && !!supabase;
+
+  const taiDsEmail = async () => {
+    try { setDsEmail(await fetchEmailChoPhep()); } catch { /* không có quyền thì thôi */ }
+  };
+
+  useEffect(() => {
+    if (!supabase) return;
+    /* Chỉ cần nguoi để đối chiếu "email này đã có tài khoản chưa" ở mục 1
+       — không giữ toàn bộ state trách nhiệm & phân công của mục 3. */
+    fetchNguoiVaQuyen().then((r) => setNguoi(r.nguoi)).catch(() => { /* không có quyền thì thôi */ });
+    fetchLuatXem().then(setLuatXem).catch(() => { /* không phải admin/QA thì nửa XEM để trống */ });
+    fetchRolePermissions().then(setQuyenA).catch(() => { /* không có quyền thì thôi */ });
+    taiDsEmail();
+  }, []);
+
+  /* ================= 1 · DANH SÁCH EMAIL ĐƯỢC PHÉP ================= */
+  const doiEmail = async (email: string, choPhep: boolean, ghiChu?: string) => {
+    setDangLuu("E");
+    try {
+      const r = await setEmailChoPhep(email, choPhep, ghiChu);
+      setKetQua((c) => ({
+        ...c, E: { xong: r.ok ? 1 : 0, tong: 1, loi: r.ok ? [] : [`${email}: ${r.error}`] },
+      }));
+      if (r.ok) { setEmailMoi({ email: "", ghiChu: "" }); await taiDsEmail(); }
+    } catch (e) {
+      setKetQua((c) => ({ ...c, E: { xong: 0, tong: 1, loi: [`${email}: ${(e as Error).message}`] } }));
+    }
+    setDangLuu("");
+  };
+
+  /* ================= 2 · MA TRẬN VAI × QUYỀN ================= */
+  const mucGoc = (hd: string, vai: string): Muc =>
+    (quyenA.find((q) => q.hanh_dong === hd && q.vai_tro === vai)?.muc as Muc) || "khong";
+  const khoaA = (hd: string, vai: string) => `A|${hd}|${vai}`;
+  const mucHienTai = (hd: string, vai: string): Muc =>
+    (nhap[khoaA(hd, vai)] as Muc) ?? mucGoc(hd, vai);
+
+  const bamA = (h: HanhDong, vai: string) => {
+    const vong = h.mucChoPhep;
+    const nay = mucHienTai(h.id, vai);
+    const sau = vong[(Math.max(0, vong.indexOf(nay)) + 1) % vong.length];
+    const k = khoaA(h.id, vai);
+    if (sau === mucGoc(h.id, vai)) xoaNhap(k); else dat(k, sau);
+    xoaHong(k);
+  };
+
+  const luuA = async () => {
+    const ds = Object.entries(nhap).filter(([k]) => k.startsWith("A|"));
+    setDangLuu("A");
+    let xong = 0; const loiDs: string[] = [];
+    const hong: Record<string, string> = {}; const giu: Record<string, string> = {};
+    for (const [k, v] of ds) {
+      const [, hd, vai] = k.split("|");
+      const ten = HANH_DONG.find((h) => h.id === hd)?.ten.replace("\n", " ") || hd;
+      try {
+        const r = await setRolePermission(hd, vai, v as Muc);
+        if (r.ok) xong++;
+        else { loiDs.push(`${ten} × ${vai}: ${r.error}`); hong[k] = r.error || "lỗi"; giu[k] = v; }
+      } catch (e) {
+        loiDs.push(`${ten} × ${vai}: ${(e as Error).message}`);
+        hong[k] = (e as Error).message; giu[k] = v;
+      }
+    }
+    chotLuot("A|", ["A|"], ds.length, xong, loiDs, giu, hong);
+    try { setQuyenA(await fetchRolePermissions()); } catch { /* giữ bản cũ */ }
+    setDangLuu("");
+  };
+
+  /* ---------------- kiểu dùng chung ---------------- */
+  const th: React.CSSProperties = {
+    textAlign: "left", padding: "10px 12px", fontSize: 12, fontWeight: 800,
+    color: C.plumSoft, borderBottom: `1px solid ${C.line}`, whiteSpace: "nowrap",
+  };
+  const td: React.CSSProperties = {
+    padding: "10px 12px", fontSize: 14, color: C.plum, borderBottom: `1px solid ${C.line}`,
+  };
+  const dai: React.CSSProperties = {
+    padding: "9px 12px", fontSize: 12, fontWeight: 900, letterSpacing: .3,
+    borderBottom: `1px solid ${C.line}`, background: C.surfaceSunk, color: C.plum,
+  };
+
+  return (
+    <>
+      {/* ============ 1 · AI ĐƯỢC PHÉP CÓ TÀI KHOẢN ============ */}
+      <Card variant="strong">
+        <CardTitle icon={Mail}
+          sub="Cửa vào duy nhất: không có email ở đây thì Supabase từ chối tạo tài khoản, kể cả tạo tay trong Dashboard.">
+          1 · Ai được phép có tài khoản
+        </CardTitle>
+
+        <CauKetLuan tone="ok"
+          chinh={`${dsEmail.filter((e) => e.is_active).length} email được phép tạo tài khoản.`}
+          phu="Trước 01/08/2026 bất kỳ ai trên internet cũng tự đăng ký được bằng khoá công khai nằm trong mã nguồn trang. Nay trigger ở database chặn mọi email không có trong danh sách này — chặn ở database chứ không chỉ tắt ô tick trên Dashboard, vì ô tick thì không ai nhìn lại còn trigger thì đi theo mã nguồn."
+        />
+
+        {quyenSuaA && (
+          <div className="pq-them" style={{ marginTop: 14 }}>
+            <input className="pq-o" style={{ maxWidth: 260 }} type="email" placeholder="email@congty.com"
+              aria-label="Email được phép tạo tài khoản" value={emailMoi.email}
+              onChange={(e) => setEmailMoi((c) => ({ ...c, email: e.target.value }))} />
+            <input className="pq-o" style={{ maxWidth: 260 }} placeholder="Ghi chú — ai, bộ phận nào"
+              aria-label="Ghi chú cho email này" value={emailMoi.ghiChu}
+              onChange={(e) => setEmailMoi((c) => ({ ...c, ghiChu: e.target.value }))} />
+            <button type="button" className="pq-nut la-chinh"
+              disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailMoi.email.trim()) || dangLuu === "E"}
+              onClick={() => doiEmail(emailMoi.email.trim(), true, emailMoi.ghiChu.trim())}>
+              <Plus size={15} /> Cho phép email này
+            </button>
+          </div>
+        )}
+
+        <div className="vmp-scroll" style={{ overflowX: "auto", marginTop: 12 }}>
+          <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Email</th>
+                <th style={th}>Ghi chú</th>
+                <th style={th}>Tình trạng</th>
+                <th style={th}>Đã có tài khoản</th>
+                {quyenSuaA && <th style={th} />}
+              </tr>
+            </thead>
+            <tbody>
+              {dsEmail.map((e) => {
+                const coTk = nguoi.some((n) => n.co_tai_khoan
+                  && (n.email || "").toLowerCase() === e.email);
+                return (
+                  <tr key={e.email}>
+                    <td style={{ ...td, fontWeight: 800 }}>{e.email}</td>
+                    <td style={{ ...td, fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>
+                      {e.ghi_chu || "—"}
+                    </td>
+                    <td style={td}>
+                      {e.is_active
+                        ? <Tag color={C.mintText} bg={C.mintSoft}>được phép</Tag>
+                        : <Tag color={C.plumSoft} bg={C.surfaceSunk}>đã bỏ</Tag>}
+                    </td>
+                    <td style={td}>
+                      {coTk
+                        ? <Tag color={C.mintText} bg={C.mintSoft}>rồi</Tag>
+                        : <span style={{ color: C.marigoldText, fontWeight: 700, fontSize: 12.5 }}>
+                            chưa — người này còn phải được tạo tài khoản ở Supabase
+                          </span>}
+                    </td>
+                    {quyenSuaA && (
+                      <td style={td}>
+                        {e.is_active ? (
+                          <button type="button" className="pq-nut" disabled={dangLuu === "E"}
+                            onClick={() => doiEmail(e.email, false)}
+                            title="Bỏ email khỏi danh sách. Không bỏ được nếu đang gắn với tài khoản còn hoạt động.">
+                            <Trash2 size={14} /> Bỏ
+                          </button>
+                        ) : (
+                          <button type="button" className="pq-nut" disabled={dangLuu === "E"}
+                            onClick={() => doiEmail(e.email, true)}>
+                            <Plus size={14} /> Cho phép lại
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+              {!dsEmail.length && (
+                <tr><td style={td} colSpan={5}>
+                  Chưa đọc được danh sách — cần đăng nhập bằng tài khoản admin.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {ketQua.E && (
+          <div className={`pq-canhbao ${ketQua.E.loi.length ? "la-do" : ""}`}
+            style={{ marginTop: 12, background: ketQua.E.loi.length ? undefined : C.mintSoft,
+                     color: ketQua.E.loi.length ? undefined : C.mintText }} role="status">
+            {ketQua.E.loi.length
+              ? <><AlertTriangle size={16} /> <span>{ketQua.E.loi[0]}</span></>
+              : <><Check size={16} /> <span>Đã lưu danh sách email.</span></>}
+          </div>
+        )}
+
+        <div style={{ marginTop: 14, padding: "11px 14px", borderRadius: 14, background: C.surfaceSunk,
+                      fontSize: 13, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+          <b style={{ color: C.plum }}>Thêm một người mới, đủ ba bước:</b> ① thêm email vào danh sách này →
+          ② tạo tài khoản ở <b>Supabase Dashboard → Authentication → Users → Add user</b> với đúng email đó →
+          ③ đổi vai ở màn <b>Cấu hình hệ thống</b> (thẻ "Người dùng &amp; phân quyền") và nối tài khoản với hồ
+          sơ nhân sự ở ngay màn này. Bỏ bước ① thì Supabase từ chối tạo; bỏ bước ③ thì họ đăng nhập được
+          nhưng chỉ xem được, không sửa gì.
+        </div>
+      </Card>
+
+      {/* ============ 2 · MA TRẬN VAI × QUYỀN ============ */}
+      <Card variant="strong">
+        <CardTitle icon={KeyRound}
+          sub="Hai nửa, hai nguồn luật khác nhau: nửa XEM đọc policy RLS của Postgres, nửa SỬA đọc bảng vmp_role_permissions mà 23 hàm RPC tra khi quyết định cho hay không cho">
+          2 · Vai nào xem được gì, sửa được gì
+        </CardTitle>
+
+        <div className="vmp-scroll" style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 820, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Nội dung / Hành động</th>
+                {VAI.map((v) => (
+                  <th key={v.id} style={{ ...th, textAlign: "center" }}>
+                    <div style={{ fontFamily: "ui-monospace, monospace", color: C.plum }}>{v.ten}</div>
+                    <div style={{ fontWeight: 600, opacity: .8 }}>{v.mo}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {/* ---- nửa XEM ---- */}
+              <tr>
+                <td style={dai} colSpan={5}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <Eye size={15} /> XEM ĐƯỢC GÌ — do Row Level Security của Postgres quyết, KHÔNG sửa ở đây
+                    <GiaiThich tieuDe="Vì sao nửa này không sửa được">
+                      {"Quyền đọc do Postgres chặn ở tầng dưới cùng, trước cả khi hàm RPC nào chạy. Không có bảng luật nào để tích — muốn đổi thì phải sửa policy RLS bằng migration.\n\n"
+                        + "Bảng này KHÔNG chép tay lại luật: rpc_luat_xem đi đọc chính những policy đang chạy trong pg_policy rồi phân loại ra mức. Nên nó không thể lệch với thực tế — ngày ai đó sửa policy, bảng đổi theo.\n\n"
+                        + "Ô hiện dấu '?' nghĩa là hàm gặp một dạng biểu thức nó chưa nhận diện được. Lúc đó nó KHÔNG đoán: rê chuột vào ô để đọc nguyên văn biểu thức RLS."}
+                    </GiaiThich>
+                  </span>
+                </td>
+              </tr>
+              {luatXem.map((x) => (
+                <tr key={x.bang}>
+                  <td style={{ ...td, fontWeight: 700 }}>
+                    {x.nhan}
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft,
+                                  fontFamily: "ui-monospace, monospace" }}>
+                      {x.bang}
+                    </div>
+                  </td>
+                  {VAI.map((v) => {
+                    const m = x.muc[v.id] || "khong_ro";
+                    const o = O_XEM[m];
+                    return (
+                      <td key={v.id} style={{ ...td, textAlign: "center" }}>
+                        <OTich ky={o.ky} mau={o.mau} nen={o.nen} khoa
+                          chu={`${o.chu}${x.bieu_thuc ? `\nPolicy: ${x.bieu_thuc}` : "\nBảng không có policy đọc nào"}`}
+                          nhan={`${x.nhan} × ${v.ten}`} />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              {!luatXem.length && (
+                <tr><td style={{ ...td, color: C.plumSoft }} colSpan={5}>
+                  Chưa đọc được luật xem — cần đăng nhập bằng tài khoản admin hoặc phụ trách QA.
+                </td></tr>
+              )}
+
+              {/* ---- nửa SỬA ---- */}
+              <tr>
+                <td style={dai} colSpan={5}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <Pencil size={15} /> SỬA ĐƯỢC GÌ — bảng vmp_role_permissions, tích ở đây là đổi quyền thật
+                  </span>
+                </td>
+              </tr>
+              {HANH_DONG.map((h) => (
+                <tr key={h.id}>
+                  <td style={{ ...td, fontWeight: 700 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      {h.ten.split("\n").map((d, i) => <span key={i}>{i ? <><br />{d}</> : d}</span>)}
+                      <GiaiThich tieuDe={h.ten.replace("\n", " ")}>{h.giaiThich}</GiaiThich>
+                    </span>
+                  </td>
+                  {VAI.map((v) => {
+                    const k = khoaA(h.id, v.id);
+                    const o = O_QUYEN[mucHienTai(h.id, v.id)];
+                    const dongBang = h.id === "admin_users" && v.id === "admin";
+                    return (
+                      <td key={v.id} style={{ ...td, textAlign: "center" }}>
+                        <OTich ky={o.ky} chu={dongBang ? `${o.chu} — ô đóng băng` : o.chu}
+                          mau={o.mau} nen={o.nen}
+                          khoa={!quyenSuaA || dongBang}
+                          nhap={nhap[k] != null} hong={oHong[k]}
+                          onClick={() => bamA(h, v.id)}
+                          nhan={`${h.ten.replace("\n", " ")} × ${v.ten}`} />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: "flex", gap: "8px 18px", flexWrap: "wrap", marginTop: 12,
+                      fontSize: 12.5, fontWeight: 700, color: C.plumSoft }}>
+          <span><b style={{ color: C.mintText }}>✓</b> Được — mọi hạng mục · xem toàn bộ</span>
+          <span><b style={{ color: C.marigoldText }}>◑</b> Bộ phận mình — quản lý <i>hoặc</i> thực hiện · phần không nhạy cảm</span>
+          <span><b style={{ color: C.skyText }}>◔</b> Theo phân công · chỉ của chính mình</span>
+          <span><b>✕</b> Không</span>
+          <span><b style={{ color: C.raspText }}>?</b> Chưa phân loại được policy — rê chuột đọc nguyên văn</span>
+          <span>Hai mức hạn chế ở nửa SỬA chỉ có ở hàng <b>Cập nhật tiến độ</b> — các hàm khác chưa có
+            vế so bộ phận trong luật.</span>
+        </div>
+
+        <ThanhLuu soThayDoi={demNhap("A|")} dangLuu={dangLuu === "A"}
+          ketQua={ketQua["A|"] || null} onLuu={luuA} onHoanTac={() => boNhap("A|", "A|")}
+          khoa={!quyenSuaA}
+          ghiChu="Tích chọn ở nửa SỬA để đổi mức quyền, xong bấm Lưu. Nửa XEM chỉ để đọc." />
+      </Card>
+    </>
+  );
+}
+
 function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
   acts: Activity[];
   isAdmin?: boolean;
@@ -374,6 +739,10 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
           <ItemPermissionModeCard />
         </Card>
       )}
+      {/* Ai vào được + vai nào làm gì — chỉ Admin thật mới thấy, cùng lý do
+          như ItemPermissionModeCard ở trên: RPC quản trị chỉ nhận admin
+          thật, isAdmin ở codebase này còn đúng với cả qa_manager. */}
+      {user?.role === "admin" && <QuanTriQuyenCards user={user} />}
       <Card variant="strong">
         <CardTitle icon={Users}
           sub="Chọn nhân sự từ danh bạ chuẩn, khai phạm vi và xem đúng quyền đang có hiệu lực.">

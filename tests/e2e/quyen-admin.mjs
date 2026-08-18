@@ -122,6 +122,19 @@ function suaKhoQaManager(kho) {
   kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
 }
 
+/** Quản lý QA THẬT: `profiles.role = "qa_manager"`. Đây là ca dễ lọt nhất —
+ *  `permMap` của web gán perm "admin" cho qa_manager, nên cờ `isAdmin` phía
+ *  client vẫn bật. Nếu nút quản trị tài khoản gate bằng `isAdmin` thì quản
+ *  lý QA sẽ THẤY ô đổi vai và nút Tắt, bấm vào thì RPC từ chối — người dùng
+ *  không hiểu vì sao. Kho này giữ nguyên quyền xem màn để tách bạch hai
+ *  luật: "thấy được màn" khác "làm được thao tác ghi". */
+function suaKhoQaManagerThat(kho) {
+  suaKhoAdmin(kho);
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
+  const goc = kho.rpc_my_ui_access;
+  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
+}
+
 async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, suaKho } = {}) {
   const trang = await trinhDuyet.newPage();
   const loiConsole = [];
@@ -133,6 +146,19 @@ async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, sua
     loiConsole.push(`${m.text().slice(0, 90)} @ ${url.slice(0, 90)}`);
   });
   trang.on("pageerror", (e) => loiConsole.push(`pageerror: ${String(e.message).slice(0, 110)}`));
+
+  /* Mọi trang trong cùng trình duyệt dùng CHUNG localStorage của một origin,
+     nên hồ sơ người dùng mà ca trước lưu lại (vmp_monitor_user_v1) sẽ chảy
+     sang ca sau: hạ vai xuống qa_manager trong kho giả lập mà web vẫn đọc
+     "admin" từ cache và hiện đủ nút. Xoá cache trước mỗi ca để mỗi phép
+     kiểm đứng một mình — rò rỉ trạng thái giữa các ca là loại lỗi khiến bộ
+     kiểm xanh/đỏ theo thứ tự chạy, gần như không chẩn đoán nổi. */
+  await trang.evaluateOnNewDocument(() => {
+    try {
+      localStorage.removeItem("vmp_monitor_user_v1");
+      localStorage.removeItem("vmp_snapshot_v2");
+    } catch { /* trình duyệt chặn localStorage thì cũng chẳng có cache nào */ }
+  });
 
   /* Puppeteer treo cả trang nếu window.prompt/confirm mở ra mà không ai
      xử lý. Kế hoạch được set trước mỗi lần bấm nút mở hộp thoại; mặc định
@@ -345,6 +371,87 @@ const trinhDuyet = await puppeteer.launch({
     [...document.querySelectorAll("button")].some((btn) => btn.textContent.includes("Tính lại trạng thái")));
   kiem(moDuocMan, "qa_manager vẫn mở được màn Chất lượng dữ liệu (không lẫn với luật thấy-màn)");
   kiem(!coNutQaManager, "qa_manager KHÔNG thấy nút Tính lại trạng thái (chỉ businessRole admin)");
+  await b.trang.close();
+}
+
+/* ---- 7. Quản lý QA KHÔNG thấy lối đổi vai / tắt tài khoản ----------- *
+ *  `isAdmin` của web nghĩa là "admin HOẶC quản lý QA" (permMap), nên gate
+ *  bằng nó là hiện nút cho người mà máy chủ chắc chắn từ chối. Hai phép
+ *  kiểm dưới đây chặn việc đó quay lại.
+ * --------------------------------------------------------------------- */
+{
+  console.log("\nCấu hình hệ thống — quản lý QA không có lối đổi vai:");
+
+  const { trang, loiConsole } = await moTrang(trinhDuyet,
+    { suaKho: suaKhoQaManagerThat, hash: "admin" });
+  await cho(900);
+
+  const kq = await trang.evaluate(() => {
+    const chu = document.body.innerText;
+    return {
+      coBangNguoiDung: /Người dùng .* phân quyền/.test(chu) || chu.includes("Người dùng"),
+      coODoiVai: !!document.querySelector('select[aria-label^="Vai của "]'),
+      coNutTat: [...document.querySelectorAll("button")]
+        .some((b) => ["Tắt", "Bật lại"].includes(b.textContent.trim())),
+      coCotThaoTac: [...document.querySelectorAll("th")]
+        .some((th) => th.textContent.trim() === "Thao tác"),
+      noiRoViSao: chu.includes("không đổi được vai hay bật/tắt tài khoản"),
+    };
+  });
+
+  kiem(kq.coBangNguoiDung, "quản lý QA vẫn xem được bảng người dùng");
+  kiem(!kq.coODoiVai, "quản lý QA KHÔNG thấy ô đổi vai");
+  kiem(!kq.coNutTat, "quản lý QA KHÔNG thấy nút Tắt / Bật lại");
+  kiem(!kq.coCotThaoTac, "bảng không hiện cột Thao tác rỗng cho quản lý QA");
+  // Ẩn nút mà không nói gì thì người dùng tưởng web hỏng hoặc mình bị mất quyền.
+  kiem(kq.noiRoViSao, "màn nói rõ vì sao không đổi được, thay vì ẩn câm");
+  kiem(loiConsole.length === 0, "không lỗi console", loiConsole.join(" · ").slice(0, 160));
+  await trang.close();
+}
+
+/* ---- 8. Quản trị quyền phải SỬA ĐƯỢC TRÊN WEB ----------------------- *
+ *  Hai thẻ "Ai được phép có tài khoản" và "Vai nào xem được gì, sửa được
+ *  gì" từng nằm trong khối bị tắt bằng cờ `SHOW_LEGACY_PERMISSION_WORKSPACE
+ *  = false` — tồn tại trong mã nguồn mà không ai mở được, nên việc chỉnh
+ *  quyền phải làm bằng SQL tay. Phép kiểm này chặn chúng biến mất lần nữa.
+ * --------------------------------------------------------------------- */
+{
+  console.log("\nVai trò & phạm vi — quản trị quyền sửa được ngay trên web:");
+
+  const a = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
+  await cho(1400);
+  const admin = await a.trang.evaluate(() => {
+    const chu = document.body.innerText;
+    return {
+      coEmail: chu.includes("Ai được phép có tài khoản"),
+      coMaTran: chu.includes("Vai nào xem được gì, sửa được gì"),
+      // Nửa SỬA phải là ô tích bấm được, không phải bảng chỉ để ngắm.
+      coOTichSuaDuoc: [...document.querySelectorAll("button, input[type=checkbox]")]
+        .some((el) => /vmp_role_permissions|sửa được/i.test(el.getAttribute("aria-label") || "")) 
+        || chu.includes("tích ở đây là đổi quyền thật"),
+      huongDanDungBaBuoc: chu.includes("Cấu hình hệ thống"),
+    };
+  });
+  kiem(admin.coEmail, "admin thấy thẻ Ai được phép có tài khoản");
+  kiem(admin.coMaTran, "admin thấy ma trận Vai nào xem được gì, sửa được gì");
+  kiem(admin.coOTichSuaDuoc, "nửa SỬA nói rõ tích là đổi quyền thật");
+  kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang màn Cấu hình hệ thống");
+  await a.trang.close();
+
+  // Quản lý QA: KHÔNG thấy hai thẻ này — RPC quản trị chỉ nhận admin thật.
+  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaManagerThat, hash: "phanquyen" });
+  await cho(1400);
+  const qa = await b.trang.evaluate(() => {
+    const chu = document.body.innerText;
+    return {
+      coEmail: chu.includes("Ai được phép có tài khoản"),
+      coMaTran: chu.includes("Vai nào xem được gì, sửa được gì"),
+      conThayDanhBa: chu.includes("Danh bạ nhân sự"),
+    };
+  });
+  kiem(!qa.coEmail, "quản lý QA không thấy thẻ danh sách email");
+  kiem(!qa.coMaTran, "quản lý QA không thấy ma trận vai × quyền");
+  kiem(qa.conThayDanhBa, "quản lý QA vẫn dùng được danh bạ nhân sự (không chặn nhầm cả màn)");
   await b.trang.close();
 }
 

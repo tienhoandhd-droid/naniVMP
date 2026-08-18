@@ -195,7 +195,23 @@ export function useAuth() {
     clearSnapshot();   // máy dùng chung: không để dữ liệu người trước nằm lại
   }, []);
 
-  return { user, setUser, login, logout, loading, isAdmin: user?.perm === "admin" };
+  /* Hai cờ KHÁC NHAU, đừng dùng lẫn:
+   *
+   *  · `isAdmin`  = perm "admin". `permMap` trong supabaseClient gán perm
+   *    này cho CẢ `qa_manager`, nên nó thật ra nghĩa là "admin hoặc quản lý
+   *    QA" — đúng cho quyền SỬA DỮ LIỆU (tiến độ, danh mục), là thứ QA
+   *    manager vẫn phải làm hằng ngày.
+   *
+   *  · `laAdminThat` = role "admin" trong `profiles`. Dùng cho các nút QUẢN
+   *    TRỊ TÀI KHOẢN (đổi vai, bật/tắt tài khoản) — những RPC chỉ nhận
+   *    admin. Hiện nút cho quản lý QA là mời họ bấm vào thứ chắc chắn bị
+   *    server từ chối, và họ không có cách nào biết vì sao.
+   */
+  return {
+    user, setUser, login, logout, loading,
+    isAdmin: user?.perm === "admin",
+    laAdminThat: user?.role === "admin",
+  };
 }
 
 // ======================== useVmpData ========================

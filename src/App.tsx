@@ -844,8 +844,12 @@ const VAI_TRO_NHAN: Record<string, { nhan: string; mau: string; nen: string }> =
   viewer:          { nhan: "Chỉ xem", mau: C.plumSoft, nen: C.pinkMist },
 };
 
-function AdminView({ conn, user, isAdmin }: {
-  conn: ConnState; user?: AppUser | null; isAdmin?: boolean;
+function AdminView({ conn, user, laAdminThat }: {
+  /* `laAdminThat` chứ không phải `isAdmin`: đổi vai và bật/tắt tài khoản đi
+     qua RPC chỉ nhận role "admin", trong khi `isAdmin` của web còn đúng với
+     cả quản lý QA (permMap gán perm "admin" cho qa_manager). Hiện nút cho
+     quản lý QA là mời họ bấm vào thứ chắc chắn bị server từ chối. */
+  conn: ConnState; user?: AppUser | null; laAdminThat?: boolean;
 }) {
   const [tt, setTt] = useState<SystemStatus | null>(null);
   const [err, setErr] = useState("");
@@ -985,7 +989,7 @@ function AdminView({ conn, user, isAdmin }: {
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, fontSize: 14 }}>
                 <thead><tr style={{ background: C.pinkMist }}>
                   {["Họ tên", "Email", "Vai trò", "Bộ phận", "Tình trạng", "Đăng nhập gần nhất",
-                    ...(isAdmin ? ["Thao tác"] : [])].map((h) => (
+                    ...(laAdminThat ? ["Thao tác"] : [])].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "11px 14px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr></thead>
@@ -994,7 +998,7 @@ function AdminView({ conn, user, isAdmin }: {
                     const v = VAI_TRO_NHAN[u.vai_tro] || VAI_TRO_NHAN.viewer;
                     const nvRow = theoEmail.get((u.email || "").trim().toLowerCase());
                     const vaiHienTai = nvRow?.business_role || "";
-                    const suaDuoc = !!isAdmin && !!nvRow;
+                    const suaDuoc = !!laAdminThat && !!nvRow;
                     const dangBan = dangSua === nvRow?.user_id;
                     return (
                       <tr key={u.email} style={{ borderTop: `1px solid ${C.pinkSoft}` }}>
@@ -1010,7 +1014,7 @@ function AdminView({ conn, user, isAdmin }: {
                         <td style={{ padding: "11px 14px", color: C.plumSoft, fontWeight: 600, whiteSpace: "nowrap" }}>
                           {u.dang_nhap_gan_nhat ? new Date(u.dang_nhap_gan_nhat).toLocaleString("vi-VN") : "chưa ghi nhận"}
                         </td>
-                        {isAdmin && (
+                        {laAdminThat && (
                           <td style={{ padding: "9px 14px", whiteSpace: "nowrap" }}>
                             {suaDuoc ? (
                               <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
@@ -1068,13 +1072,15 @@ function AdminView({ conn, user, isAdmin }: {
               </div>
             )}
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 10, lineHeight: 1.6 }}>
-              {isAdmin
+              {laAdminThat
                 ? <>Đổi vai và bật/tắt tài khoản ngay tại đây — ghi thẳng vào Supabase, có hỏi lý do và
                   lưu vào nhật ký kiểm toán. Đổi vai cập nhật <b>cả hai bảng quyền cùng lúc</b>, nên
                   không còn cảnh sửa tay trên Supabase rồi người dùng mất quyền xem. Ba việc vẫn phải làm
                   ở nơi khác: <b>tạo tài khoản mới</b> (Supabase → Authentication),
                   <b> nối tài khoản với hồ sơ nhân sự</b> và <b>phân công theo hạng mục</b> (màn Phân quyền).</>
-                : <>Chỉ admin mới đổi được vai và bật/tắt tài khoản.</>}
+                : <>Bạn xem được bảng này nhưng <b>không đổi được vai hay bật/tắt tài khoản</b> —
+                  hai việc đó chỉ tài khoản Admin làm được, và máy chủ cũng chặn ở lớp dưới.
+                  Cần đổi thì nhờ Admin, hoặc xin cấp vai Admin.</>}
             </div>
           </Card>
 
@@ -1675,7 +1681,7 @@ function GlobalFilterBar({
    chưa lưu — tách ra để Provider nằm NGOÀI mọi thứ dùng nó, kể cả hộp
    thoại Đổi mật khẩu. */
 function AppShell() {
-  const { user, setUser, logout, isAdmin } = useAuth();
+  const { user, setUser, logout, isAdmin, laAdminThat } = useAuth();
   /* Quyền xem từng màn do Supabase quyết, không suy từ `role`/`accessClass`.
      Trong lúc chờ — và khi server chưa có `rpc_my_ui_access` — hook trả về
      quyền theo luật cũ ở chế độ `preview`, nên ứng dụng chạy y như trước. */
@@ -2201,7 +2207,7 @@ function AppShell() {
               {view === "accounts" && <AccountAccessView access={access} />}
               {view === "phanquyen" && <PhanQuyenView acts={filteredActs} isAdmin={isAdmin} user={user} />}
               {view === "audit" && <AuditLogView />}
-              {view === "admin" && <AdminView conn={conn} user={user} isAdmin={isAdmin} />}
+              {view === "admin" && <AdminView conn={conn} user={user} laAdminThat={laAdminThat} />}
             </Suspense>
             </div>
             </ScreenGuard>
