@@ -24,10 +24,15 @@ export interface CatalogFieldProps {
   /** Đánh dấu ô đã đổi so với bản gốc. */
   changed?: boolean;
   idPrefix?: string;
+  /** Giá trị đã có trong hồ sơ, gợi ý cho ô `combobox`. */
+  goiY?: readonly string[];
+  /** Đặt con trỏ vào ô này — dùng khi người dùng bấm Lưu mà còn ô trống. */
+  autoFocus?: boolean;
 }
 
 export default function CatalogField({
   field, value, onChange, locked, lockReason, error, changed, idPrefix = "cf",
+  goiY, autoFocus,
 }: CatalogFieldProps) {
   const id = `${idPrefix}-${field.key}`;
   const idLoi = `${id}-loi`;
@@ -42,6 +47,12 @@ export default function CatalogField({
   const chung = {
     id,
     disabled: khoa,
+    /* `required` thật, không chỉ dấu sao trang trí: trình duyệt và trình
+       đọc màn hình đều cần biết ô này bắt buộc, chứ không phải chỉ người
+       nhìn thấy dấu sao mới biết. */
+    required: field.required || undefined,
+    "aria-required": field.required || undefined,
+    autoFocus,
     "aria-invalid": error ? true : undefined,
     "aria-describedby": moTa,
     className: `cw-o${changed ? " is-doi" : ""}${error ? " is-loi" : ""}`,
@@ -51,7 +62,10 @@ export default function CatalogField({
     <div className="cw-truong">
       <label htmlFor={id} className="cw-nhan">
         {field.label}
-        {field.required && <span className="cw-bat-buoc" aria-hidden="true">*</span>}
+        {/* Dấu sao một mình không nói gì với người chưa quen quy ước, mà
+            bản trước còn đặt `aria-hidden` nên trình đọc màn hình bỏ qua
+            hẳn — người dùng bàn phím không có cách nào biết ô nào bắt buộc. */}
+        {field.required && <span className="cw-bat-buoc-chu">Bắt buộc</span>}
         {khoa && <Lock size={13} aria-hidden="true" className="cw-khoa-icon" />}
       </label>
 
@@ -73,6 +87,20 @@ export default function CatalogField({
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+      ) : field.kind === "combobox" ? (
+        /* Gõ được, mà cũng chọn được từ những giá trị đã có trong hồ sơ.
+           Khoá cứng danh sách ở đây là sai: thiết bị mới, dây chuyền mới,
+           dạng bào chế mới xuất hiện thường xuyên hơn nhịp sửa code. Còn
+           để trống hẳn thành ô text tự do thì một dây chuyền thật sinh ra
+           ba cách viết, và lọc theo nó ra ba nhóm rời rạc. */
+        <>
+          <input {...chung} type="text" list={`${id}-ds`}
+            value={value == null ? "" : String(value)}
+            onChange={(e) => onChange(e.target.value)} />
+          <datalist id={`${id}-ds`}>
+            {(goiY || []).map((v) => <option key={v} value={v} />)}
+          </datalist>
+        </>
       ) : (
         <input {...chung}
           type={field.kind === "number" ? "number" : field.kind === "date" ? "date" : "text"}

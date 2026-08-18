@@ -38,7 +38,28 @@ export interface TruongForm {
   chonNguoi?: "owner" | "support";
   /** Câu giải thích đặt ngay cạnh ô nhập — đây là chỗ người nhập hay sai. */
   goiY?: string;
+  /** Ô chọn khoá danh sách chuẩn, kèm lựa chọn "khác…" mở ô gõ tự do. */
+  chonCoKhac?: boolean;
+  /** Tên cột dùng để tra gợi ý combobox từ dữ liệu đang có. */
+  goiYTu?: string;
 }
+
+/** Sáu bộ phận chuẩn — KHỚP `BO_PHAN` của catalogWorkspace/definitions.ts.
+ *  Hai nơi cùng một danh mục là chuyện đã có sẵn; đổi một bên phải đổi bên
+ *  kia, nếu không hai màn hiện hai danh sách khác nhau cho cùng một cột. */
+export const BO_PHAN_CHUAN = [
+  { ma: "xsx", ten: "Xưởng sản xuất" },
+  { ma: "cd", ten: "Cơ điện" },
+  { ma: "kho", ten: "Kho" },
+  { ma: "qc", ten: "QC – Kiểm nghiệm" },
+  { ma: "rd", ten: "RD – Nghiên cứu phát triển" },
+  { ma: "qa", ten: "QA – QLCL" },
+] as const;
+
+/** Giá trị nội bộ của lựa chọn "Bộ phận khác…" — KHÔNG bao giờ được ghi
+ *  xuống database; giao diện thấy nó thì mở ô text để người dùng gõ tên
+ *  thật, và giá trị gửi đi là tên thật đó. */
+export const MA_BO_PHAN_KHAC = "__khac__";
 
 export const TINH_TRANG = ["Đang dùng", "Ngừng dùng", "Dự phòng"] as const;
 export const CO_KHONG = ["y", "n"] as const;
@@ -55,9 +76,11 @@ export const TRUONG_FORM: readonly TruongForm[] = [
   { key: "object_code", label: "Mã đối tượng", nhom: "chinh", batBuoc: true, khoaSauKhiTao: true,
     goiY: "Khoá nghiệp vụ, không đổi được sau khi tạo. Timeline tham chiếu bằng mã này." },
   { key: "object_name", label: "Tên đối tượng", nhom: "chinh", batBuoc: true },
-  { key: "department", label: "Bộ phận quản lý", nhom: "chinh", batBuoc: true },
-  { key: "area_code", label: "Khu vực", nhom: "chinh" },
-  { key: "line", label: "Line", nhom: "chinh" },
+  { key: "department", label: "Bộ phận quản lý", nhom: "chinh", batBuoc: true,
+    chonCoKhac: true,
+    goiY: "Chọn trong danh sách. Bộ phận mới thì chọn “Bộ phận khác…” rồi gõ tên." },
+  { key: "area_code", label: "Khu vực", nhom: "chinh", goiYTu: "area_code" },
+  { key: "line", label: "Line", nhom: "chinh", goiYTu: "line" },
   { key: "status", label: "Tình trạng", nhom: "chinh", chon: TINH_TRANG },
   { key: "validate_flag", label: "Có thẩm định", nhom: "chinh", chon: CO_KHONG,
     goiY: "Chỉ 'y' mới sinh hạng mục timeline. 'n' là loại khỏi kế hoạch." },
@@ -79,7 +102,7 @@ export const TRUONG_FORM: readonly TruongForm[] = [
   { key: "owner_person_id", label: "QA phụ trách", nhom: "phan_cong", chonNguoi: "owner",
     goiY: "Chọn từ danh bạ. Tên gõ tay không dùng làm khoá được — người trùng tên sẽ gán nhầm." },
   { key: "support_person_id", label: "Người hỗ trợ", nhom: "phan_cong", chonNguoi: "support" },
-  { key: "work_group", label: "Nhóm công việc", nhom: "phan_cong" },
+  { key: "work_group", label: "Nhóm công việc", nhom: "phan_cong", goiYTu: "work_group" },
 
   // ---- 4. Nâng cao ----
   { key: "validate_reason", label: "Lý do thẩm định", nhom: "nang_cao" },
@@ -105,6 +128,16 @@ export function coThamDinh(form: GiaTriForm): boolean {
 export function truongDangHien(form: GiaTriForm): readonly TruongForm[] {
   const co = coThamDinh(form);
   return TRUONG_FORM.filter((t) => t.nhom !== "ke_hoach" || co);
+}
+
+/** Ô bắt buộc còn trống đầu tiên, theo thứ tự hiển thị. Giao diện dùng nó
+ *  để mở đúng nhóm và đặt con trỏ vào đúng ô thay vì chỉ làm mờ nút Lưu. */
+export function truongThieuDauTien(form: GiaTriForm): string | null {
+  const loi = validateCatalogForm(form);
+  for (const t of truongDangHien(form)) {
+    if (loi[t.key]) return t.key;
+  }
+  return null;
 }
 
 /**

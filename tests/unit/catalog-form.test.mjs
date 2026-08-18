@@ -8,6 +8,9 @@ import {
   coThamDinh,
   canLyDo,
   TRUONG_FORM,
+  BO_PHAN_CHUAN,
+  MA_BO_PHAN_KHAC,
+  truongThieuDauTien,
 } from "../../src/lib/catalogForm.ts";
 
 const hopLe = {
@@ -111,4 +114,38 @@ test("bốn nhóm đều có trường, và phân công dùng ID chứ không d�
   }
   const phanCong = TRUONG_FORM.filter((t) => t.nhom === "phan_cong" && t.chonNguoi);
   assert.deepEqual(phanCong.map((t) => t.key), ["owner_person_id", "support_person_id"]);
+});
+
+test("sáu bộ phận chuẩn khớp danh mục đã khai ở workspace", () => {
+  assert.deepEqual(BO_PHAN_CHUAN.map((b) => b.ma),
+    ["xsx", "cd", "kho", "qc", "rd", "qa"]);
+});
+
+test("mã 'bộ phận khác' không trùng với bất kỳ mã chuẩn nào", () => {
+  // Đây là giá trị NỘI BỘ của giao diện, không bao giờ được ghi xuống DB —
+  // trùng với một mã thật sẽ khiến "bộ phận khác" bị hiểu nhầm thành mã đó.
+  assert.equal(BO_PHAN_CHUAN.some((b) => b.ma === MA_BO_PHAN_KHAC), false);
+});
+
+test("bộ phận ngoài danh sách chuẩn vẫn hợp lệ", () => {
+  // Dữ liệu di trú từ Sheet có bộ phận không nằm trong sáu mã trên. Chặn
+  // nó ở form nghĩa là người dùng không sửa nổi bản ghi cũ nào — mà cũng
+  // không ai được phép âm thầm đổi bộ phận của hồ sơ đã ban hành.
+  const f = { object_code: "TB-9", object_name: "Máy", department: "Tổ điện lạnh", validate_flag: "n" };
+  assert.deepEqual(validateCatalogForm(f), {});
+});
+
+test("bộ phận để trống vẫn bị chặn", () => {
+  const f = { object_code: "TB-9", object_name: "Máy", department: "", validate_flag: "n" };
+  assert.equal(validateCatalogForm(f).department, "Phải nhập bộ phận quản lý");
+});
+
+test("truongThieuDauTien trả key của ô bắt buộc trống đầu tiên", () => {
+  assert.equal(truongThieuDauTien({ object_code: "", object_name: "", department: "xsx" }),
+    "object_code");
+  assert.equal(truongThieuDauTien({ object_code: "TB-1", object_name: "", department: "xsx" }),
+    "object_name");
+  assert.equal(
+    truongThieuDauTien({ object_code: "TB-1", object_name: "Máy", department: "xsx", validate_flag: "n" }),
+    null);
 });

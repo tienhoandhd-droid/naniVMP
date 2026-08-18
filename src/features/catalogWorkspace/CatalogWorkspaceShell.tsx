@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import CommandBar from "../../components/ui/CommandBar.tsx";
+import { useToast } from "../../components/ui/ToastProvider.tsx";
 import StateBoundary from "../../components/ui/StateBoundary.tsx";
 import ViewportDialog from "../../components/ui/ViewportDialog.tsx";
 import CatalogObjectForm from "../../components/catalog/CatalogObjectForm.tsx";
@@ -39,6 +40,7 @@ import {
   SOURCE_KINDS, fetchSourceObjects, fetchSourceWarnings, generateTimeline,
   saveCatalogObject,
 } from "../../lib/supabaseData.ts";
+import { useCatalogSuggestions } from "./useCatalogSuggestions.ts";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import type { SourceWarnings } from "../../lib/supabaseData.ts";
 import type { AccessContext } from "../../lib/access.ts";
@@ -91,6 +93,10 @@ export default function CatalogWorkspaceShell({
 
   const { performers } = usePerformers();
   const performerChoices = buildActivePerformerChoices(performers);
+  const toast = useToast();
+  /* Gợi ý nhập nạp một lượt cho cả màn: mở hộp thoại rồi mới gọi mạng thì
+     danh sách hiện sau con trỏ, và người dùng đã gõ xong nửa chữ. */
+  const goiY = useCatalogSuggestions();
 
   const vungHople = CAC_VUNG.filter((v) =>
     (!v.canSua || canEdit) && (!v.canSinhTimeline || canSinhTimeline));
@@ -579,6 +585,7 @@ export default function CatalogWorkspaceShell({
           row={dangSuaObj.row}
           objectKind={kind}
           performers={performerChoices}
+          goiY={goiY}
           dangTaoMoi={dangSuaObj.taoMoi}
           onClose={() => setDangSuaObj(null)}
           onSaved={async (patch, lyDo, version) => {
@@ -586,12 +593,18 @@ export default function CatalogWorkspaceShell({
             const ma = dangSuaObj.taoMoi
               ? String(patch.object_code ?? "")
               : String(dangSuaObj.row.object_code ?? "");
+            const dang = toast.dangChay(dangSuaObj.taoMoi ? `Đang tạo ${ma}…` : `Đang lưu ${ma}…`);
             const kq = await saveCatalogObject(kind, ma, patch, lyDo, version);
             if (!kq.ok) {
-              throw new Error(kq.error_code === "VERSION_CONFLICT"
+              const thongBao = kq.error_code === "VERSION_CONFLICT"
                 ? `${kq.error ?? "Bản ghi đã bị người khác sửa"} (bản trên máy chủ: v${kq.current_version ?? "?"})`
-                : (kq.error ?? "Lưu danh mục thất bại"));
+                : (kq.error ?? "Lưu danh mục thất bại");
+              dang.hong(thongBao);
+              /* Ném tiếp để form giữ nguyên hộp thoại và dữ liệu vừa gõ —
+                 đóng hộp thoại lúc lưu hỏng là bắt người dùng gõ lại từ đầu. */
+              throw new Error(thongBao);
             }
+            dang.xong(dangSuaObj.taoMoi ? `Đã tạo ${ma}` : `Đã lưu ${ma}`);
             setDangSuaObj(null);
             await taiDoiTuong();
             onReload?.();
@@ -606,6 +619,7 @@ export default function CatalogWorkspaceShell({
           dataset={dangSuaBan.dataset}
           record={dangSuaBan.record}
           canEdit={canEdit}
+          goiY={goiY}
           onClose={() => setDangSuaBan(null)}
           onSaved={() => {
             setDangSuaBan(null);
@@ -626,6 +640,7 @@ export default function CatalogWorkspaceShell({
           changeId={changeId}
           onClose={() => setChangeId(null)}
           onApplied={async () => {
+            toast.thanhCong("Đã áp thay đổi vào timeline");
             setChangeId(null);
             await taiDoiTuong();
             setPenTick((t) => t + 1);
@@ -649,15 +664,27 @@ function SinhTimelineDialog({ onClose, onDone }: {
   const [preview, setPreview] = useState<GenerateTimelineResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [loi, setLoi] = useState("");
+  const toast = useToast();
 
   const chay = async (commit: boolean) => {
     setBusy(true); setLoi("");
+    /* Chỉ báo cho lần GHI THẬT. Xem trước không đổi dữ liệu nào, mà kết
+       quả của nó đã hiện ngay trong hộp thoại rồi — thêm toast chỉ là
+       tiếng ồn. */
+    const dang = commit ? toast.dangChay("Đang ghi hạng mục timeline…") : null;
     try {
       const kq = await generateTimeline(Number(nam), commit);
-      if (commit) onDone();
-      else setPreview(kq);
+      if (commit) {
+        dang?.xong(`Đã sinh ${kq.so_tao_moi} hạng mục cho năm ${nam}`);
+        onDone();
+      } else {
+        setPreview(kq);
+      }
     } catch (e) {
-      setLoi((e as Error).message || "Không chạy được");
+      const thongBao = (e as Error).message || "Không chạy được";
+      dang?.hong(thongBao);
+      // Hộp thoại vẫn mở: người dùng đọc lỗi rồi sửa năm và thử lại ngay.
+      setLoi(thongBao);
     }
     setBusy(false);
   };

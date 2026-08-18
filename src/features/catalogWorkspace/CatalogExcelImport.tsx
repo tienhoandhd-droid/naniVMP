@@ -31,6 +31,7 @@ import {
   PRODUCT_GMP_TEMPLATE_COLUMNS, SOURCE_OBJECT_TEMPLATE_COLUMNS, layDataset,
 } from "./definitions.ts";
 import { buildCatalogPatch, diffCatalogRecord } from "./diff.ts";
+import { useToast } from "../../components/ui/ToastProvider.tsx";
 import { commitCatalogImport, listDataset, stageCatalogImport } from "./api.ts";
 import type { CatalogImportBatch, CatalogRecord } from "./contracts.ts";
 
@@ -91,6 +92,7 @@ export default function CatalogExcelImport({ onCommitted }: {
   const [loiHienTai, setLoiHienTai] = useState("");
   const [loiCauTruc, setLoiCauTruc] = useState("");
   const [parsed, setParsed] = useState<ParsedCatalogWorkbook | null>(null);
+  const toast = useToast();
   const [staging, setStaging] = useState<TrangThaiStaging>({ tt: "chua" });
   const [moA3, setMoA3] = useState<ReadonlySet<number>>(new Set());
   const [lyDo, setLyDo] = useState("");
@@ -156,6 +158,20 @@ export default function CatalogExcelImport({ onCommitted }: {
     return dem;
   }, [xemTruoc]);
 
+  /* Báo kết quả tiền kiểm ngay khi đọc xong file. Bảng bên dưới có đủ số
+     liệu, nhưng nó nằm dưới màn hình khi file dài — người dùng vừa thả file
+     xong cần biết ngay là có phải sửa gì không.
+     `xemTruocRef` chặn báo lại khi component vẽ lại vì lý do khác (gõ lý do,
+     mở một dòng ra xem) — cùng một lô mà báo hai lần là tiếng ồn. */
+  const xemTruocRef = useRef<unknown>(null);
+  useEffect(() => {
+    if (!xemTruoc || xemTruocRef.current === xemTruoc) return;
+    xemTruocRef.current = xemTruoc;
+    const hople = tong.moi + tong.sua + tong.khongdoi;
+    if (tong.loi > 0) toast.canhBao(`${tong.loi} dòng lỗi · ${hople} dòng dùng được — xem bảng bên dưới`);
+    else toast.thanhCong(`${hople} dòng hợp lệ, chưa ghi vào hệ thống`);
+  }, [xemTruoc, tong, toast]);
+
   /* ---- Staging phía server, ngay khi có bản đọc hợp lệ ---- */
   useEffect(() => {
     if (!parsed?.ok || parsed.dataset !== dataset) return undefined;
@@ -171,9 +187,18 @@ export default function CatalogExcelImport({ onCommitted }: {
       })),
     }).then((kq) => {
       if (dung) return;
-      if (kq.ok && kq.batch) setStaging({ tt: "san", batch: kq.batch });
-      else if (kq.errorCode === "NOT_AVAILABLE") setStaging({ tt: "chan", loi: kq.error || "" });
-      else setStaging({ tt: "loi", loi: kq.error || "Không staging được lô nhập" });
+      if (kq.ok && kq.batch) {
+        setStaging({ tt: "san", batch: kq.batch });
+      } else if (kq.errorCode === "NOT_AVAILABLE") {
+        /* Chưa bật nhập theo lô ở server — không phải lỗi của người dùng,
+           nên báo mức cảnh báo chứ không phải lỗi đỏ. */
+        toast.canhBao(kq.error || "Chưa bật nhập theo lô trên máy chủ");
+        setStaging({ tt: "chan", loi: kq.error || "" });
+      } else {
+        const thongBao = kq.error || "Không staging được lô nhập";
+        toast.loi(thongBao);
+        setStaging({ tt: "loi", loi: thongBao });
+      }
     });
     return () => { dung = true; };
   }, [parsed, dataset]);
@@ -189,7 +214,11 @@ export default function CatalogExcelImport({ onCommitted }: {
     setStaging({ tt: "chua" }); setKetQuaGhi(""); setLyDo("");
     const kq = await parseCatalogWorkbook(f);
     if (!kq.ok) {
-      setLoiCauTruc(kq.error || "File không hợp lệ.");
+      /* Lỗi cấu trúc file (sai mẫu, sai phiên bản) khác hẳn lỗi từng dòng:
+         không có gì để sửa trong bảng, phải tải lại đúng mẫu. Nói ngay. */
+      const thongBao = kq.error || "File không hợp lệ.";
+      toast.loi(thongBao);
+      setLoiCauTruc(thongBao);
       return;
     }
     if (kq.dataset && kq.dataset !== dataset) setDataset(kq.dataset);
@@ -228,13 +257,18 @@ export default function CatalogExcelImport({ onCommitted }: {
   const ghi = async () => {
     if (staging.tt !== "san" || !lyDo.trim()) return;
     setDangGhi(true);
+    const dang = toast.dangChay("Đang ghi lô vào hệ thống…");
     const kq = await commitCatalogImport(staging.batch.id, lyDo.trim());
     setDangGhi(false);
     if (!kq.ok) {
-      setKetQuaGhi(`Ghi thất bại: ${kq.error || kq.errorCode || "không rõ"}`);
+      const thongBao = `Ghi thất bại: ${kq.error || kq.errorCode || "không rõ"}`;
+      dang.hong(thongBao);
+      setKetQuaGhi(thongBao);
       return;
     }
-    setKetQuaGhi(`Đã ghi: ${kq.created ?? 0} tạo mới · ${kq.updated ?? 0} sửa · ${kq.unchanged ?? 0} giữ nguyên.`);
+    const tomTat = `Đã ghi: ${kq.created ?? 0} tạo mới · ${kq.updated ?? 0} sửa · ${kq.unchanged ?? 0} giữ nguyên`;
+    dang.xong(tomTat);
+    setKetQuaGhi(`${tomTat}.`);
     setParsed(null);
     onCommitted?.(kq.pendingChangeIds ?? []);
   };

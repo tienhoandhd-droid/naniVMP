@@ -19,11 +19,14 @@ import { Boxes } from "lucide-react";
 
 import ViewportDialog from "../../components/ui/ViewportDialog.tsx";
 import { useRegisterDirtyState } from "../../components/ui/DirtyStateProvider.tsx";
+import { useToast } from "../../components/ui/ToastProvider.tsx";
+import { validateDatasetForm } from "../../lib/datasetForm.ts";
 import CatalogField from "./CatalogField.tsx";
-import { layDataset } from "./definitions.ts";
+import { chiaNhomTruong, layDataset } from "./definitions.ts";
 import { buildCatalogPatch, canLyDo, diffCatalogRecord, thieuTruongBatBuoc } from "./diff.ts";
 import { saveRecord } from "./api.ts";
 import type { CatalogDatasetId, CatalogRecord, CatalogSaveResult } from "./contracts.ts";
+import type { GoiY } from "./suggestions.ts";
 
 export interface CatalogRecordDialogProps {
   open: boolean;
@@ -33,9 +36,22 @@ export interface CatalogRecordDialogProps {
   /** Bắt buộc cho dataset `objects`: loại đối tượng quyết định bảng bị ghi. */
   objectKind?: string;
   canEdit: boolean;
+  /** Giá trị đã có trong hồ sơ, gợi ý cho các ô combobox. */
+  goiY?: GoiY;
   onClose: () => void;
   onSaved: (kq: { recordId?: string; version?: number }) => void;
 }
+
+/* Bản ghi mới của Người nhận cảnh báo phải có Phạm vi và Loại cảnh báo.
+   Để trống thì bảng vẫn hiện người này "Đang bật" nhưng workflow không
+   biết lọc theo gì — họ có thể không nhận được email nào mà chẳng có lỗi
+   nào báo. Đặt mặc định rộng nhất thay vì bắt điền thêm hai ô: mặc định
+   an toàn không phiền ai, còn ô bắt buộc thì có.
+   Chuỗi phải khớp ĐÚNG CHỮ với `options` khai trong definitions.ts — sai
+   một dấu là select mở ra rỗng và người dùng tưởng mình chưa chọn. */
+const MAC_DINH_TAO_MOI: Partial<Record<CatalogDatasetId, CatalogRecord>> = {
+  alerts: { scope_type: "tất cả", alert_kind: "cả hai" },
+};
 
 /** Hiện giá trị cho người đọc, không phải cho máy. */
 function doc(v: unknown): string {
@@ -45,16 +61,20 @@ function doc(v: unknown): string {
 }
 
 export default function CatalogRecordDialog({
-  open, dataset, record, objectKind, canEdit, onClose, onSaved,
+  open, dataset, record, objectKind, canEdit, goiY, onClose, onSaved,
 }: CatalogRecordDialogProps) {
   const def = layDataset(dataset);
   const laTaoMoi = record === null;
+  const toast = useToast();
 
-  const [nhap, setNhap] = useState<CatalogRecord>(() => ({ ...(record || {}) }));
+  const [nhap, setNhap] = useState<CatalogRecord>(
+    () => ({ ...(record === null ? MAC_DINH_TAO_MOI[dataset] : {}), ...(record || {}) }));
   const [lyDo, setLyDo] = useState("");
   const [dangLuu, setDangLuu] = useState(false);
   const [loi, setLoi] = useState<CatalogSaveResult | null>(null);
   const [moNangCao, setMoNangCao] = useState(false);
+  /* Ô nào cần đặt con trỏ vào — đặt khi người dùng bấm Lưu mà còn thiếu. */
+  const [oCanNhay, setOCanNhay] = useState<string | null>(null);
 
   /* Nạp lại khi người dùng mở sang bản ghi khác. Không có đoạn này thì lần
      mở thứ hai vẫn hiện dữ liệu của bản ghi thứ nhất — và tệ hơn, patch
@@ -65,9 +85,10 @@ export default function CatalogRecordDialog({
   const [nguon, setNguon] = useState<CatalogRecord | null>(record);
   if (nguon !== record) {
     setNguon(record);
-    setNhap({ ...(record || {}) });
+    setNhap({ ...(record === null ? MAC_DINH_TAO_MOI[dataset] : {}), ...(record || {}) });
     setLyDo("");
     setLoi(null);
+    setOCanNhay(null);
   }
 
   /* Cả lúc tạo lẫn lúc sửa đều đi qua `buildCatalogPatch`: nó loại trường
@@ -83,28 +104,59 @@ export default function CatalogRecordDialog({
   const thieu = useMemo(() => thieuTruongBatBuoc(def.fields, nhap), [def.fields, nhap]);
   const phaiNeuLyDo = !laTaoMoi && canLyDo(def.fields, patch);
 
+  /* Luật riêng của từng dataset (định dạng email, phạm vi phải có mã) đã
+     nằm trong repo từ lâu nhưng KHÔNG file nào import — nghĩa là email sai
+     một ký tự hiện không bị chặn ở form, mà mail cảnh báo thì lặng lẽ
+     không tới ai. Nối lại thay vì để nó nằm chết. */
+  const loiTruong = useMemo(() => validateDatasetForm(dataset, nhap), [dataset, nhap]);
+
   // Báo cho shell biết còn thay đổi chưa lưu, để nút Thoát hỏi lại.
   useRegisterDirtyState(`catalog-${dataset}`, open && Object.keys(patch).length > 0);
 
-  /* Bốn trường đầu là "thông tin chính", phần còn lại xếp vào Nâng cao.
-     Một form mười sáu ô mở sẵn khiến người dùng không biết bắt đầu ở đâu;
-     phần lớn lần sửa chỉ đụng vài ô đầu. */
-  const chinh = def.fields.slice(0, 5);
-  const nangCao = def.fields.slice(5);
+  /* Năm trường đầu là "thông tin chính", phần còn lại xếp vào Nâng cao —
+     một form mười sáu ô mở sẵn khiến người dùng không biết bắt đầu ở đâu.
+     Nhưng ô BẮT BUỘC thì không bao giờ được rơi xuống phần thu gọn: xem
+     `chiaNhomTruong`. */
+  const { chinh, nangCao } = useMemo(() => chiaNhomTruong(def.fields), [def.fields]);
+  const thieuTrongNangCao = thieu.filter((t) => nangCao.some((f) => f.key === t.key));
+
+  /* Phạm vi "bộ phận" thì gợi ý bộ phận, "khu vực" thì gợi ý mã khu vực.
+     Gợi ý sai loại còn tệ hơn không gợi ý: người dùng chọn đại một cái
+     trông quen mắt rồi cảnh báo lọc trượt hết mà không ai biết. */
+  const goiYCho = (key: string): readonly string[] | undefined => {
+    if (dataset !== "alerts" || key !== "scope") return goiY?.[key];
+    const pv = String(nhap.scope_type ?? "").toLowerCase();
+    if (pv.includes("bộ phận")) return goiY?.department;
+    if (pv.includes("khu vực")) return goiY?.area_code;
+    return undefined;
+  };
 
   const datGiaTri = (key: string, v: unknown) => {
     setNhap((cu) => ({ ...cu, [key]: v }));
     setLoi(null);
+    // Người dùng tự chuyển sang ô khác thì đừng giật con trỏ về chỗ cũ.
+    setOCanNhay(null);
+  };
+
+  /** Mở đúng nhóm đang chứa ô có vấn đề rồi đặt con trỏ vào đó. Chỉ báo
+   *  "còn thiếu" mà không mở phần thu gọn là bắt người dùng đi tìm. */
+  const nhayToiO = (key: string) => {
+    if (nangCao.some((f) => f.key === key)) setMoNangCao(true);
+    setOCanNhay(key);
   };
 
   const luu = async () => {
-    if (thieu.length > 0) return;
+    if (thieu.length > 0) { nhayToiO(thieu[0].key); return; }
+    const keyLoi = Object.keys(loiTruong);
+    if (keyLoi.length > 0) { nhayToiO(keyLoi[0]); return; }
     if (phaiNeuLyDo && !lyDo.trim()) return;
 
     setDangLuu(true);
+    const khoa = String(nhap[def.businessKeyField] ?? "");
+    const dang = toast.dangChay(laTaoMoi ? `Đang tạo ${khoa}…` : `Đang lưu ${khoa}…`);
     const kq = await saveRecord({
       dataset,
-      businessKey: String(nhap[def.businessKeyField] ?? ""),
+      businessKey: khoa,
       recordId: record ? String(record.id ?? "") : undefined,
       patch,
       // Tạo mới thì lý do đã rõ từ chính hành động; bắt người dùng gõ thêm
@@ -115,13 +167,25 @@ export default function CatalogRecordDialog({
     });
     setDangLuu(false);
 
-    if (!kq.ok) { setLoi(kq); return; }
+    if (!kq.ok) {
+      dang.hong(kq.error || "Lưu thất bại");
+      // Hộp thoại VẪN MỞ và dữ liệu vừa gõ còn nguyên — đóng lúc lưu hỏng
+      // là bắt người dùng nhập lại từ đầu để chịu đúng lỗi đó lần nữa.
+      setLoi(kq);
+      return;
+    }
+    dang.xong(laTaoMoi ? `Đã tạo ${khoa}` : `Đã lưu ${khoa}`);
     onSaved({ recordId: kq.recordId, version: kq.version });
     onClose();
   };
 
+  /* Nút Lưu KHÔNG mờ vì thiếu ô bắt buộc. Nút mờ mà không nói vì sao là
+     cách chắc chắn khiến người dùng nghĩ hệ thống hỏng: họ bấm, không có
+     gì xảy ra, mà ô cần điền có thể đang nằm trong phần thu gọn. Cho bấm,
+     rồi mở đúng phần đó ra và đặt con trỏ vào ô còn trống.
+     Hai trường hợp còn lại vẫn mờ vì lý do hiện rõ ngay trên màn: không đủ
+     quyền (có băng báo ở đầu hộp thoại) và chưa đổi gì (không có gì để ghi). */
   const khongLuuDuoc = !canEdit || dangLuu
-    || thieu.length > 0
     || (phaiNeuLyDo && !lyDo.trim())
     || Object.keys(patch).length === 0;
 
@@ -174,20 +238,29 @@ export default function CatalogRecordDialog({
               <CatalogField key={f.key} field={f} value={nhap[f.key]}
                 onChange={(v) => datGiaTri(f.key, v)}
                 locked={!canEdit} lockReason={!canEdit ? "Bạn không có quyền sửa" : undefined}
-                changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`} />
+                changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`}
+                goiY={goiYCho(f.key)} error={loiTruong[f.key]}
+                autoFocus={oCanNhay === f.key} />
             ))}
           </div>
 
           {nangCao.length > 0 && (
             <details className="cw-nang-cao" open={moNangCao}
               onToggle={(e) => setMoNangCao((e.currentTarget as HTMLDetailsElement).open)}>
-              <summary>Nâng cao ({nangCao.length} trường)</summary>
+              {/* Nói trước còn bao nhiêu ô chưa điền bên trong: người dùng
+                  không phải mở ra mới biết có việc phải làm ở đó. */}
+              <summary>
+                Nâng cao ({nangCao.length} trường
+                {thieuTrongNangCao.length > 0 && ` · còn ${thieuTrongNangCao.length} ô chưa điền`})
+              </summary>
               <div className="cw-nhom">
                 {nangCao.map((f) => (
                   <CatalogField key={f.key} field={f} value={nhap[f.key]}
                     onChange={(v) => datGiaTri(f.key, v)}
                     locked={!canEdit} lockReason={!canEdit ? "Bạn không có quyền sửa" : undefined}
-                    changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`} />
+                    changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`}
+                    goiY={goiYCho(f.key)} error={loiTruong[f.key]}
+                    autoFocus={oCanNhay === f.key} />
                 ))}
               </div>
             </details>
@@ -211,7 +284,9 @@ export default function CatalogRecordDialog({
       )}
 
       {thieu.length > 0 && (
-        <p className="cw-loi" role="alert">Còn thiếu: {thieu.join(", ")}</p>
+        <p className="cw-loi" role="alert">
+          Còn thiếu: {thieu.map((t) => t.label).join(", ")}
+        </p>
       )}
 
       {phaiNeuLyDo && (

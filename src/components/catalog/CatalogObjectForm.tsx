@@ -26,11 +26,13 @@ import { AlertTriangle, Boxes, Lock, Save } from "lucide-react";
 import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import {
-  TRUONG_FORM, buildCatalogPatch, canLyDo, coThamDinh, validateCatalogForm,
+  TRUONG_FORM, BO_PHAN_CHUAN, MA_BO_PHAN_KHAC,
+  buildCatalogPatch, canLyDo, coThamDinh, validateCatalogForm, truongThieuDauTien,
 } from "../../lib/catalogForm.ts";
 import type { GiaTriForm, LoiForm, NhomTruong, TruongForm } from "../../lib/catalogForm.ts";
 import PerformerSelect from "../../features/itemPermissions/PerformerSelect.tsx";
 import type { PerformerChoice } from "../../features/itemPermissions/performerSelection.ts";
+import type { GoiY } from "../../features/catalogWorkspace/suggestions.ts";
 
 const TEN_NHOM: Record<NhomTruong, string> = {
   chinh: "Thông tin chính",
@@ -62,7 +64,7 @@ function doc(t: TruongForm, form: GiaTriForm): string {
 }
 
 export default function CatalogObjectForm({
-  row, objectKind, performers, dangTaoMoi, onClose, onSaved,
+  row, objectKind, performers, dangTaoMoi, onClose, onSaved, goiY,
 }: {
   row: Record<string, unknown>;
   objectKind: string;
@@ -70,6 +72,9 @@ export default function CatalogObjectForm({
   dangTaoMoi: boolean;
   onClose: () => void;
   onSaved: (patch: Record<string, unknown>, lyDo: string | null, version: number | null) => Promise<void>;
+  /** Gợi ý combobox theo cột (khu vực, line, nhóm công việc…). Tuỳ chọn —
+   *  khi chưa được truyền xuống, ô combobox chỉ đơn giản không có gợi ý. */
+  goiY?: GoiY;
 }) {
   const [form, setForm] = useState<GiaTriForm>(() => doiSangForm(row));
   const [lyDo, setLyDo] = useState("");
@@ -77,6 +82,15 @@ export default function CatalogObjectForm({
   const [loiChung, setLoiChung] = useState<string | null>(null);
   const [dangLuu, setDangLuu] = useState(false);
   const [moNangCao, setMoNangCao] = useState(false);
+  /* Nhớ rằng người dùng đang ở chế độ "khác", vì giá trị rỗng không phân
+     biệt được "chưa chọn gì" với "chọn khác nhưng chưa gõ". */
+  const [boPhanKhac, setBoPhanKhac] = useState(() => {
+    const v = String(row.department ?? "");
+    return v !== "" && !BO_PHAN_CHUAN.some((b) => b.ma === v);
+  });
+  /* Ô cần đưa tiêu điểm vào sau lần bấm Lưu thất bại — nhảy thẳng tới ô
+     bắt buộc còn trống thay vì chỉ làm mờ nút Lưu. */
+  const [oCanNhay, setOCanNhay] = useState<string | null>(null);
 
   const banGoc = useMemo(() => doiSangForm(row), [row]);
   const doiGi = useMemo(
@@ -100,6 +114,7 @@ export default function CatalogObjectForm({
       delete con[key];
       return con;
     });
+    setOCanNhay(null);
   };
 
   const dong = () => {
@@ -113,7 +128,16 @@ export default function CatalogObjectForm({
       loiMoi.__lyDo = "Sửa thông tin ảnh hưởng tới timeline thì phải nhập lý do";
     }
     setLoi(loiMoi);
-    if (Object.keys(loiMoi).length) return;
+    if (Object.keys(loiMoi).length) {
+      const dau = truongThieuDauTien(form);
+      if (dau) {
+        // Nhóm Nâng cao đang thu gọn thì mở ra, nếu không người dùng nhận
+        // một câu lỗi trỏ tới ô họ không nhìn thấy.
+        if (TRUONG_FORM.find((t) => t.key === dau)?.nhom === "nang_cao") setMoNangCao(true);
+        setOCanNhay(dau);
+      }
+      return;
+    }
 
     setDangLuu(true);
     setLoiChung(null);
@@ -145,11 +169,51 @@ export default function CatalogObjectForm({
       <div key={t.key} className="cw-truong">
         <label htmlFor={id} className="cw-nhan">
           {t.label}
-          {t.batBuoc && <span className="cw-bat-buoc" aria-hidden="true">*</span>}
+          {t.batBuoc && <span className="cw-bat-buoc-chu">Bắt buộc</span>}
           {khoa && <Lock size={13} aria-hidden="true" className="cw-khoa-icon" />}
         </label>
 
-        {t.chonNguoi ? (
+        {t.chonCoKhac ? (() => {
+          const giaTri = form[t.key] ?? "";
+          const trongChuan = BO_PHAN_CHUAN.some((b) => b.ma === giaTri);
+          const dangKhac = boPhanKhac || (giaTri !== "" && !trongChuan);
+          return (
+            <>
+              <select id={id} className={lop} disabled={khoa}
+                value={dangKhac ? MA_BO_PHAN_KHAC : giaTri}
+                aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
+                autoFocus={oCanNhay === t.key}
+                onChange={(e) => {
+                  setBoPhanKhac(e.target.value === MA_BO_PHAN_KHAC);
+                  dat(t.key, e.target.value === MA_BO_PHAN_KHAC ? "" : e.target.value);
+                }}>
+                <option value="">—</option>
+                {BO_PHAN_CHUAN.map((b) => <option key={b.ma} value={b.ma}>{b.ten}</option>)}
+                <option value={MA_BO_PHAN_KHAC}>Bộ phận khác…</option>
+              </select>
+              {/* Bản ghi cũ mang bộ phận ngoài sáu mã chuẩn (dữ liệu di trú
+                  từ Sheet) phải hiện đúng giá trị đang có. Không có ô này
+                  thì mở form ra là giá trị biến mất, và một cú bấm Lưu ghi
+                  đè mất bộ phận của hồ sơ đã ban hành. */}
+              {dangKhac && (
+                <input className={`${lop} cw-o-khac`} value={giaTri} disabled={khoa}
+                  aria-label={`${t.label} — nhập tên bộ phận`}
+                  placeholder="Tên bộ phận mới"
+                  onChange={(e) => dat(t.key, e.target.value)} />
+              )}
+            </>
+          );
+        })() : t.goiYTu ? (
+          <>
+            <input id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
+              list={`${id}-ds`} aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
+              autoFocus={oCanNhay === t.key}
+              onChange={(e) => dat(t.key, e.target.value)} />
+            <datalist id={`${id}-ds`}>
+              {(goiY?.[t.goiYTu] ?? []).map((v) => <option key={v} value={v} />)}
+            </datalist>
+          </>
+        ) : t.chonNguoi ? (
           <PerformerSelect
             value={form[t.key] || null}
             options={performers}
@@ -161,6 +225,7 @@ export default function CatalogObjectForm({
         ) : t.chon ? (
           <select id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
             aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
+            autoFocus={oCanNhay === t.key}
             onChange={(e) => dat(t.key, e.target.value)}>
             <option value="">—</option>
             {t.chon.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -169,6 +234,7 @@ export default function CatalogObjectForm({
           <input id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}
             inputMode={t.so ? "numeric" : undefined}
             aria-invalid={loiO ? true : undefined} aria-describedby={moTa}
+            autoFocus={oCanNhay === t.key}
             onChange={(e) => dat(t.key, e.target.value)} />
         )}
 

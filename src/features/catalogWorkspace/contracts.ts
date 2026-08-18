@@ -14,7 +14,7 @@ export type CatalogDatasetId = "objects" | "products" | "alerts";
 export type CatalogRecord = Record<string, unknown>;
 
 /** Kiểu dữ liệu của một trường — quyết định cách chuẩn hoá và cách dựng ô nhập. */
-export type CatalogFieldKind = "text" | "number" | "boolean" | "date" | "select";
+export type CatalogFieldKind = "text" | "number" | "boolean" | "date" | "select" | "combobox";
 
 export interface CatalogFieldDefinition {
   key: string;
