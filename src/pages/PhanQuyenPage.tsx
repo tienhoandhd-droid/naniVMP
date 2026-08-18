@@ -87,6 +87,7 @@ import type {
 import { Card, CardTitle, Tag, CauKetLuan, GiaiThich } from "../components/ui/Primitives.tsx";
 import type { Activity, AppUser } from "../types/domain.ts";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
+import ItemPermissionModeCard from "../features/itemPermissions/ItemPermissionModeCard.tsx";
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
 import AccountLinkPanel from "../features/itemPermissions/AccountLinkPanel.tsx";
 import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
@@ -364,6 +365,15 @@ function CurrentPermissionWorkspace({ acts, isAdmin = false, user }: {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Công tắc DỰ THẢO ⇄ ÁP DỤNG đặt TRÊN CÙNG: nó quyết định mọi thứ
+          bên dưới có hiệu lực thật hay chỉ là bản tính thử. Chỉ Admin thật
+          mới thấy — RPC cũng chỉ nhận Admin, hiện nút cho người khác là mời
+          họ bấm vào một thứ chắc chắn bị từ chối. */}
+      {user?.role === "admin" && (
+        <Card variant="strong">
+          <ItemPermissionModeCard />
+        </Card>
+      )}
       <Card variant="strong">
         <CardTitle icon={Users}
           sub="Chọn nhân sự từ danh bạ chuẩn, khai phạm vi và xem đúng quyền đang có hiệu lực.">

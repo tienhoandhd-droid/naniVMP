@@ -415,6 +415,24 @@ export async function fetchEffectiveRights(filters: {
   return { mode: payload.mode, rights: payload.rights.map(decodeEffectiveRight) };
 }
 
+/**
+ * Chuyển chế độ phân quyền theo hạng mục giữa DỰ THẢO và ÁP DỤNG THẬT.
+ *
+ * Đây là công tắc nặng nhất của cả hệ phân quyền: bật `enforced` là từ
+ * giây đó RLS chặn thật, ai chưa được phân công sẽ không còn xem được
+ * hạng mục của mình. Vì vậy nơi gọi phải hỏi lại và bắt nhập lý do —
+ * server cũng đòi lý do, đây chỉ là hỏi trước cho tử tế.
+ *
+ * Ai được gọi và điều kiện tiền kiểm nào phải đạt là do RPC quyết định;
+ * giao diện chỉ giấu nút cho đỡ nhầm, không phải biên chặn.
+ */
+export async function setItemPermissionsMode(
+  mode: "preview" | "enforced",
+  reason: string,
+): Promise<void> {
+  await callRpc("rpc_set_item_permissions_mode", { p_mode: mode, p_reason: reason });
+}
+
 export async function fetchPermissionPreflight(): Promise<PermissionPreflight> {
   const payload = await callRpc("rpc_item_permission_preflight", {});
   if ((payload.mode !== "preview" && payload.mode !== "enforced")
