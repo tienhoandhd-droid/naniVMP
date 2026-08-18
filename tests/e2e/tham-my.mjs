@@ -412,6 +412,7 @@ const MAN = [
   { id: "workload", ten: "Phân công & khối lượng" },
   { id: "reports", ten: "Báo cáo" },
   { id: "rules", ten: "Quy tắc nghiệp vụ" },
+  { id: "people", ten: "Nhân sự" },
   { id: "accounts", ten: "Tài khoản & quyền" },
   { id: "phanquyen", ten: "Phân quyền" },
   { id: "health", ten: "Chất lượng dữ liệu" },
