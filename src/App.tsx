@@ -251,22 +251,31 @@ function HealthView({ acts, access }: { acts: Activity[]; access?: AccessContext
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+      {/* role="tablist"/"tab" đúng chuẩn ARIA: trước đây là nút thường có
+         phụ đề lồng trong label, trình đọc màn hình đọc nguyên câu phụ đề
+         như một phần tên nút. Phụ đề nay tách qua aria-hidden, id nút nối
+         với aria-controls của khối nội dung bên dưới. */}
+      <div role="tablist" aria-label="Chọn nguồn kiểm tra"
+        style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+          <button key={t.id} id={`health-tab-${t.id}`} role="tab"
+            aria-selected={tab === t.id} aria-controls="health-tabpanel"
+            onClick={() => setTab(t.id)}
             style={{ padding: "9px 16px", borderRadius: 14, cursor: "pointer",
                      fontFamily: TEXT, fontSize: 14, fontWeight: tab === t.id ? 800 : 600,
                      border: `1.5px solid ${tab === t.id ? C.pink : C.pinkSoft}`,
                      background: tab === t.id ? C.pinkSoft : C.surface,
                      color: tab === t.id ? C.pinkText : C.plumSoft, textAlign: "left" }}>
             {t.label}
-            <span style={{ display: "block", fontSize: 12, fontWeight: 600, opacity: .75 }}>
+            <span aria-hidden="true" style={{ display: "block", fontSize: 12, fontWeight: 600, opacity: .75 }}>
               {t.sub}
             </span>
           </button>
         ))}
       </div>
-      {tab === "client" ? <DataQualityView acts={acts} /> : <ServerChecksView access={access} />}
+      <div id="health-tabpanel" role="tabpanel" aria-labelledby={`health-tab-${tab}`}>
+        {tab === "client" ? <DataQualityView acts={acts} /> : <ServerChecksView access={access} />}
+      </div>
     </div>
   );
 }

@@ -409,6 +409,9 @@ export function ThanhTraToggle() {
       title={bat
         ? "Chế độ trình bày thanh tra ĐANG BẬT — ẩn minh hoạ, emoji, biệt danh và xếp hạng cá nhân. Bấm để tắt."
         : "Bật chế độ trình bày thanh tra: ngôn ngữ trung tính, ẩn minh hoạ trang trí, không emoji, không xếp hạng cá nhân"}
+      aria-label={bat
+        ? "Chế độ trình bày thanh tra đang bật — bấm để tắt"
+        : "Bật chế độ trình bày thanh tra"}
       aria-pressed={bat}
       style={{ ...glass, height: 40, padding: "0 14px", borderRadius: 999,
                border: bat ? `1.5px solid ${C.plum}` : "none",
