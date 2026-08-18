@@ -830,6 +830,9 @@ function CurrentPermissionWorkspace({ acts, user, access }: {
      là hợp đồng với server, còn `phanquyen` được server khai là cửa vào
      không có hành động riêng nên hỏi theo nó sẽ luôn ra false. */
   const duocQuanLyTaiKhoan = access?.can("accounts", "manage_accounts") ?? false;
+  /* Quyền chỉnh CHÍNH SÁCH phân quyền (bật/tắt chế độ áp dụng, danh sách
+     email được phép, ma trận vai×quyền) — khác với quyền nối tài khoản. */
+  const duocChinhChinhSachQuyen = access?.can("accounts", "manage_authorization_policy") ?? false;
   const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
     const raw = (activity._raw || {}) as Record<string, unknown>;
     return [activity.area, raw.area, raw.line]
@@ -840,18 +843,20 @@ function CurrentPermissionWorkspace({ acts, user, access }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Công tắc DỰ THẢO ⇄ ÁP DỤNG đặt TRÊN CÙNG: nó quyết định mọi thứ
-          bên dưới có hiệu lực thật hay chỉ là bản tính thử. Chỉ Admin thật
-          mới thấy — RPC cũng chỉ nhận Admin, hiện nút cho người khác là mời
-          họ bấm vào một thứ chắc chắn bị từ chối. */}
-      {user?.role === "admin" && (
+          bên dưới có hiệu lực thật hay chỉ là bản tính thử.
+          Gate bằng CHÍNH quyền `manage_authorization_policy` mà server cấp
+          cho màn `accounts`. Trước đó quyền ấy là quyền chết: server cấp mà
+          web không hỏi tới, còn giao diện thì tự suy từ `role === "admin"`.
+          Hai nguồn cùng nói một việc thì sớm muộn lệch nhau — hỏi server là
+          hết lệch, và quyền kia mới có việc thật để làm. */}
+      {duocChinhChinhSachQuyen && (
         <Card variant="strong">
           <ItemPermissionModeCard />
         </Card>
       )}
-      {/* Ai vào được + vai nào làm gì — chỉ Admin thật mới thấy, cùng lý do
-          như ItemPermissionModeCard ở trên: RPC quản trị chỉ nhận admin
-          thật, isAdmin ở codebase này còn đúng với cả qa_manager. */}
-      {user?.role === "admin" && <QuanTriQuyenCards user={user} />}
+      {/* Ai được phép có tài khoản + vai nào làm được gì: cùng một quyền
+          chính sách như trên. */}
+      {duocChinhChinhSachQuyen && <QuanTriQuyenCards user={user} />}
       <Card variant="strong">
         <CardTitle icon={Users}
           sub="Chọn tài khoản để nối/gỡ và xem đúng quyền đang có hiệu lực. Sửa hồ sơ nhân sự
@@ -878,7 +883,7 @@ function CurrentPermissionWorkspace({ acts, user, access }: {
       {/* Ma trận quyền màn hình: chuyển nguyên từ màn "Tài khoản & quyền
           truy cập" cũ (đã gộp vào đây). Chỉ Admin thật mới thấy — cùng lý
           do như ItemPermissionModeCard/QuanTriQuyenCards ở trên. */}
-      {user?.role === "admin" && access && <MaTranQuyenManHinh access={access} />}
+      {duocChinhChinhSachQuyen && access && <MaTranQuyenManHinh access={access} />}
     </div>
   );
 }

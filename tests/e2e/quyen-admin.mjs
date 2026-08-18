@@ -124,18 +124,6 @@ function suaKhoQaManager(kho) {
   kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
 }
 
-/** Quản lý QA THẬT: `profiles.role = "qa_manager"`. Đây là ca dễ lọt nhất —
- *  `permMap` của web gán perm "admin" cho qa_manager, nên cờ `isAdmin` phía
- *  client vẫn bật. Nếu nút quản trị tài khoản gate bằng `isAdmin` thì quản
- *  lý QA sẽ THẤY ô đổi vai và nút Tắt, bấm vào thì RPC từ chối — người dùng
- *  không hiểu vì sao. Kho này giữ nguyên quyền xem màn để tách bạch hai
- *  luật: "thấy được màn" khác "làm được thao tác ghi". */
-function suaKhoQaManagerThat(kho) {
-  suaKhoAdmin(kho);
-  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
-  const goc = kho.rpc_my_ui_access;
-  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
-}
 
 /** Quản lý QA khi server CHƯA có `rpc_my_ui_access` — web rơi về luật dự
  *  phòng `legacyAccessContext`. Đó là luật đang chạy ở chế độ dự thảo. */
@@ -160,7 +148,14 @@ function suaKhoQaDuocSuaNhanSu(kho) {
   kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
 }
 
-/** Quản lý QA theo ĐÚNG bảng quyền của server
+/** Quản lý QA theo ĐÚNG bảng quyền của server — dùng cho MỌI ca quản lý QA.
+ *
+ *  Bản trước có thêm một kho "qa_manager" chỉ hạ `profiles.role` mà vẫn để
+ *  nguyên danh sách hành động đầy đủ của admin. Kho đó nói dối: nó chỉ bắt
+ *  được lỗi ở những chỗ giao diện suy quyền từ `role`, và bỏ lọt sạch những
+ *  chỗ hỏi `access.can` — đúng loại chỗ mà quyền thật sự được quyết. Đã bỏ.
+ *
+ *  Nguồn của bảng dưới đây:
  *  (VMP-noibo/supabase/migrations/20260812090000_six_business_roles_and_screen_access.sql):
  *  người, danh mục, workload, rules, health, audit thì có; `accounts` và
  *  `admin` thì KHÔNG. Mock cho họ đủ quyền như admin là mock nói dối, và
@@ -460,7 +455,7 @@ const trinhDuyet = await puppeteer.launch({
   console.log("\nCấu hình hệ thống — quản lý QA không có lối đổi vai:");
 
   const { trang, loiConsole } = await moTrang(trinhDuyet,
-    { suaKho: suaKhoQaManagerThat, hash: "admin" });
+    { suaKho: suaKhoQaTheoLuatServer, hash: "admin" });
   await cho(900);
 
   const kq = await trang.evaluate(() => {
@@ -476,12 +471,13 @@ const trinhDuyet = await puppeteer.launch({
     };
   });
 
-  kiem(kq.coBangNguoiDung, "quản lý QA vẫn xem được bảng người dùng");
+  /* Theo bảng quyền của server, quản lý QA KHÔNG có screen `admin` — nên
+     đúng đắn nhất là họ không vào được màn này. Ba phép kiểm dưới đây là
+     lưới an toàn hai lớp: dù có lọt vào (gõ thẳng URL ở chế độ đối chiếu,
+     hoặc server đổi luật), giao diện vẫn không được hiện lối đổi vai. */
   kiem(!kq.coODoiVai, "quản lý QA KHÔNG thấy ô đổi vai");
   kiem(!kq.coNutTat, "quản lý QA KHÔNG thấy nút Tắt / Bật lại");
   kiem(!kq.coCotThaoTac, "bảng không hiện cột Thao tác rỗng cho quản lý QA");
-  // Ẩn nút mà không nói gì thì người dùng tưởng web hỏng hoặc mình bị mất quyền.
-  kiem(kq.noiRoViSao, "màn nói rõ vì sao không đổi được, thay vì ẩn câm");
   kiem(loiConsole.length === 0, "không lỗi console", loiConsole.join(" · ").slice(0, 160));
   await trang.close();
 }
@@ -516,7 +512,7 @@ const trinhDuyet = await puppeteer.launch({
   await a.trang.close();
 
   // Quản lý QA: KHÔNG thấy hai thẻ này — RPC quản trị chỉ nhận admin thật.
-  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaManagerThat, hash: "phanquyen" });
+  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaTheoLuatServer, hash: "phanquyen" });
   await cho(1400);
   const qa = await b.trang.evaluate(() => {
     const chu = document.body.innerText;
