@@ -160,6 +160,32 @@ function suaKhoQaDuocSuaNhanSu(kho) {
   kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
 }
 
+/** Quản lý QA theo ĐÚNG bảng quyền của server
+ *  (VMP-noibo/supabase/migrations/20260812090000_six_business_roles_and_screen_access.sql):
+ *  người, danh mục, workload, rules, health, audit thì có; `accounts` và
+ *  `admin` thì KHÔNG. Mock cho họ đủ quyền như admin là mock nói dối, và
+ *  bộ kiểm sẽ bỏ lọt đúng loại lỗi "hiện nút mà server từ chối". */
+function suaKhoQaTheoLuatServer(kho) {
+  suaKhoAdmin(kho);
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
+  const goc = kho.rpc_my_ui_access;
+  const screens = {};
+  for (const [id, q] of Object.entries(goc.screens)) {
+    if (id === "accounts" || id === "admin") {
+      screens[id] = { can_view: false, scope: "none", actions: [] };
+    } else if (id === "people") {
+      screens[id] = { ...q, can_view: true, actions: ["view", "edit_operational_people"] };
+    } else if (id === "phanquyen") {
+      // Server khai đây là CỬA VÀO: xem được nhưng không có hành động riêng.
+      screens[id] = { can_view: true, scope: "none", actions: [] };
+    } else {
+      screens[id] = { ...q, actions: (q.actions || []).filter((h) => h !== "manage_accounts"
+        && h !== "manage_authorization_policy") };
+    }
+  }
+  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
+}
+
 async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, suaKho } = {}) {
   const trang = await trinhDuyet.newPage();
   const loiConsole = [];
@@ -553,6 +579,73 @@ const trinhDuyet = await puppeteer.launch({
     "server cấp edit_operational_people thì quản lý QA sửa được ngay, không cần sửa web",
     `oTenSuaDuoc=${duocCap.oTenSuaDuoc}`);
   kiem(duocCap.coNutLuu, "và có nút lưu hồ sơ");
+}
+
+/* ---- 10. Nhóm "Tài khoản & quyền truy cập" sau khi gộp --------------- *
+ *  Màn cũ đã gộp vào Vai trò & phạm vi. Hai thứ nó mang theo — nối/gỡ tài
+ *  khoản và ma trận quyền màn hình — phải còn nguyên với Admin, và phải
+ *  KHÔNG hiện cho vai mà server không cấp `manage_accounts`.
+ * --------------------------------------------------------------------- */
+{
+  console.log("\nTài khoản & quyền truy cập (đã gộp) — còn đủ và đúng người:");
+
+  /* Panel "Nối tài khoản" chỉ dựng khi ĐÃ CHỌN một người
+     (AccountLinkPanel.tsx:109) — nó cần hồ sơ để nói đang nối cho ai. Phải
+     chọn người trước rồi mới kiểm, nếu không phép kiểm đỏ oan. */
+  const chonMotNguoi = async (trang) => {
+    await trang.evaluate(() => {
+      const o = document.querySelector('input[aria-label="Tìm tên hoặc tài khoản"]');
+      if (!o) return;
+      const dat = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      dat.call(o, "Ng");                      // ≥2 ký tự mới kích hoạt tìm
+      o.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await cho(1200);
+    return trang.evaluate(() => {
+      const nut = document.querySelector("#ip-directory-results button");
+      if (!nut) return false;
+      nut.click();
+      return true;
+    });
+  };
+
+  const a = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
+  await cho(1500);
+  const chonDuoc = await chonMotNguoi(a.trang);
+  await cho(1200);
+  kiem(chonDuoc, "chọn được một người trong danh bạ để thao tác");
+  const admin = await a.trang.evaluate(() => {
+    const chu = document.body.innerText;
+    return {
+      coNoiTaiKhoan: chu.includes("Nối tài khoản"),
+      coMaTranManHinh: chu.includes("Màn hình bạn được xem"),
+      coQuyenHieuLuc: chu.includes("Quyền") && chu.includes("hiệu lực"),
+    };
+  });
+  kiem(admin.coNoiTaiKhoan, "admin vẫn nối/gỡ được tài khoản sau khi gộp màn");
+  kiem(admin.coMaTranManHinh, "ma trận Màn hình bạn được xem theo sang màn mới");
+  kiem(admin.coQuyenHieuLuc, "vẫn xem được quyền đang có hiệu lực của người được chọn");
+  await a.trang.close();
+
+  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaTheoLuatServer, hash: "phanquyen" });
+  await cho(1500);
+  await chonMotNguoi(b.trang);   // chọn cùng một người, để so cùng điều kiện
+  await cho(1200);
+  const qa = await b.trang.evaluate(() => {
+    const chu = document.body.innerText;
+    return {
+      coNoiTaiKhoan: chu.includes("Nối tài khoản"),
+      coMaTranManHinh: chu.includes("Màn hình bạn được xem"),
+      vaoDuocMan: chu.includes("Danh bạ chuẩn"),
+    };
+  });
+  /* Đây là phép kiểm cho đúng lỗi vừa sửa: bản trước gate nút nối tài khoản
+     bằng `isAdmin`, mà cờ đó bật cả với quản lý QA — họ thấy nút rồi bấm và
+     bị máy chủ từ chối. Nay hỏi thẳng access.can("accounts","manage_accounts"). */
+  kiem(!qa.coNoiTaiKhoan, "quản lý QA KHÔNG thấy nút nối tài khoản (server không cấp manage_accounts)");
+  kiem(!qa.coMaTranManHinh, "quản lý QA không thấy ma trận quyền màn hình");
+  kiem(qa.vaoDuocMan, "quản lý QA vẫn vào được màn và chọn được người");
+  await b.trang.close();
 }
 
 await trinhDuyet.close();
