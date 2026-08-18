@@ -3,7 +3,13 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
-import { LA_UI_ACCESS, uiAccessQuanLyXuong } from "./ui-access.mjs";
+import { LA_UI_ACCESS, uiAccessAdmin, uiAccessQuanLyQa, uiAccessQuanLyXuong } from "./ui-access.mjs";
+
+/* Vai mà SERVER (giả lập) khai — đổi biến này là đổi vai thật sự.
+   `doiVaiTrenMan` chỉ ghi localStorage (role/accessClass của hệ 4 vai CŨ);
+   từ khi cổng gác màn Phân quyền hỏi `rpc_my_ui_access`, ghi localStorage
+   không còn đổi được gì. Giả vai phải giả ở đúng chỗ web đi hỏi. */
+let uiAccessHienTai = uiAccessQuanLyXuong;
 
 const GOC = "http://localhost:4173";
 await choServer(GOC);
@@ -168,7 +174,7 @@ const answer = (request, body) => request.method() === "OPTIONS"
    chung ở ./ui-access.mjs. */
 page.on("request", (request) => {
   const url = request.url();
-  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessQuanLyXuong);
+  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessHienTai);
   if (/\/rest\/v1\/vmp_performers\?/.test(url) && /user_id=eq\./.test(url)) {
     if (request.method() !== "OPTIONS") {
       performerProfileSelects.push(new URL(url).searchParams.get("select"));
@@ -356,7 +362,8 @@ try {
     (fetch) => fetch.p_person_id === completePerson.person_id,
   ), true,
     "test race phải khởi động request A trước khi chọn B");
-  await equipmentSearch.click({ clickCount: 3 });
+  await equipmentSearch.click();
+  await equipmentSearch.evaluate((el) => el.select());
   await equipmentSearch.type("Nguyễn Văn Trùng");
   await page.waitForFunction(() => document.body.innerText.includes("first@vmp.local"));
   await page.evaluate(() => [...document.querySelectorAll("button")]
@@ -376,17 +383,30 @@ try {
   assignmentBodies.length = 0;
 
   scopeCatalogCalls = 0;
+  uiAccessHienTai = uiAccessAdmin;
   await doiVaiTrenMan(page, "admin", "Người Quản Trị");
   await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(
-    () => document.body.innerText.includes("Danh bạ nhân sự & quyền"),
+    /* Thẻ đổi tên khi gộp màn "Tài khoản & quyền truy cập" vào đây (18/08):
+       hồ sơ nhân sự chuyển sang màn Nhân sự, màn này chỉ còn lo tài khoản
+       và quyền. Bám "Danh bạ chuẩn" — tiêu đề panel, ổn định hơn tên thẻ. */
+    () => document.body.innerText.includes("Danh bạ chuẩn"),
     { timeout: 15000 },
   );
-  assert.equal(await documentContains("1 · Ai được phép có tài khoản"), false,
-    "admin không còn thấy khối tài khoản legacy bên dưới workspace hiện hành");
+  /* Thẻ "1 · Ai được phép có tài khoản" nay là TÍNH NĂNG có chủ đích cho
+     admin (đưa lên web 18/08): thêm email vào whitelist là bước ① của việc
+     tạo người mới, và chủ dự án yêu cầu làm được trên web chứ không phải
+     vào Supabase. Bản trước của phép kiểm này khẳng định nó bị ẩn — đúng
+     vào lúc nó còn nằm trong khối legacy chưa ai mở được. */
+  assert.equal(await documentContains("1 · Ai được phép có tài khoản"), true,
+    "admin phải quản lý được danh sách email ngay trên web");
+  /* Ma trận 4 vai thì XOÁ HẲN cùng hệ quyền cũ — không phải ẩn, mà không
+     còn tồn tại. Thứ thay nó là ma trận 6 vai "Màn hình bạn được xem". */
   assert.equal(await documentContains("2 · Vai nào xem được gì, sửa được gì"), false,
-    "admin không còn thấy ma trận vai trò legacy");
+    "ma trận 4 vai của hệ cũ đã xoá khỏi web");
+  assert.equal(await documentContains("Màn hình bạn được xem"), true,
+    "thay bằng ma trận 6 vai đọc từ rpc_my_ui_access");
   assert.equal(await documentContains("3 · Ma trận trách nhiệm & quyền"), false,
     "admin không còn thấy ma trận trách nhiệm legacy");
   assert.equal(await documentContains("Từ ma trận này làm gì tiếp"), false,
@@ -416,8 +436,15 @@ try {
   assert.equal(await documentContains("Phạm vi xưởng"), false);
   assert.equal(await documentContains("Không tải được danh mục phạm vi"), false);
   assert.equal(scopeCatalogCalls, 0, "form QA không được gọi RPC catalog");
-  await page.type('[aria-label="Email trong danh bạ"]', ".qa");
-  assert.equal(await page.$eval('[data-testid="save-permission-person"]', (button) => button.disabled), false);
+
+  /* SỬA HỒ SƠ nay là việc của màn Nhân sự (`#v=people`), không phải màn
+     này: đợt tách hai màn (18/08) đặt danh bạ ở đây về `canEdit={false}` —
+     admin vào đây để CHỌN người, nối tài khoản và xem quyền, còn hồ sơ thì
+     sửa ở màn của người quản lý nhân sự. Nên nút lưu phải KHÔNG có ở đây,
+     và PHẢI có ở kia. */
+  assert.equal(await page.$('[data-testid="save-permission-person"]'), null,
+    "màn Vai trò & phạm vi không còn sửa hồ sơ nhân sự");
+
   assert.equal(await documentContains("QA phụ trách chính"), true);
   assert.equal(await documentContains("QA phối hợp"), true);
   await page.waitForFunction(() => document.body.innerText.includes("chưa có quyền truy cập"));
@@ -470,7 +497,8 @@ try {
     const input = document.querySelector('[aria-label="Lý do phân công"]');
     return input && !input.disabled;
   });
-  await page.click('[aria-label="Mã hạng mục cần phân công"]', { clickCount: 3 });
+  await page.click('[aria-label="Mã hạng mục cần phân công"]');
+  await page.evaluate(() => document.querySelector('[aria-label="Mã hạng mục cần phân công"]').select());
   await page.keyboard.press("Backspace");
   await page.focus('[aria-label="Lý do phân công"]');
   await page.keyboard.down("Control");
@@ -499,7 +527,8 @@ try {
     p_expected_primary_assignment_id: null,
   });
 
-  await qaSearch.click({ clickCount: 3 });
+  await qaSearch.click();
+  await qaSearch.evaluate((el) => el.select());
   await qaSearch.type("QA Legacy");
   await page.waitForFunction(() => document.body.innerText.includes("QA Legacy Scope · QA"));
   await page.evaluate(() => [...document.querySelectorAll("button")]
@@ -516,7 +545,8 @@ try {
 
   const search = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
   assert.ok(search, "phải có ô autocomplete danh bạ");
-  await search.click({ clickCount: 3 });
+  await search.click();
+  await search.evaluate((el) => el.select());
   await search.type("Legacy");
   await page.waitForFunction(
     () => document.body.innerText.includes("Nhân Sự Legacy · chưa có bộ phận"),
@@ -568,7 +598,8 @@ try {
   assert.equal(assignmentBodies.length, assignmentCountBeforeLegacy,
     "hồ sơ legacy bị khóa không được phát sinh RPC phân công mới");
 
-  await search.click({ clickCount: 3 });
+  await search.click();
+  await search.evaluate((el) => el.select());
   await search.type("Nguyễn Văn Trùng");
   await page.select('[aria-label="Bộ phận trong danh bạ"]', "rd");
   await page.select('[aria-label="Phân loại quyền"]', "view_only");
@@ -610,6 +641,7 @@ try {
   assert.equal("staff_name" in assignmentBodies.at(-1), false);
   assert.equal("full_name" in assignmentBodies.at(-1), false);
 
+  uiAccessHienTai = uiAccessQuanLyQa;
   await doiVaiTrenMan(page, "qa_manager", "Quản lý QA");
   await page.evaluate(() => {
     const key = "vmp_monitor_user_v1";
@@ -629,7 +661,8 @@ try {
     .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
   assert.equal(await page.$('[aria-label="Phân công người đã chọn"]') !== null, true,
     "quản lý QA vẫn được phân công QA");
-  await managerSearch.click({ clickCount: 3 });
+  await managerSearch.click();
+  await managerSearch.evaluate((el) => el.select());
   await managerSearch.type("Legacy");
   await page.waitForFunction(() => document.body.innerText.includes("Nhân Sự Legacy · chưa có bộ phận"));
   await page.evaluate(() => [...document.querySelectorAll("button")]
@@ -652,7 +685,29 @@ try {
   await page.waitForFunction(() => document.body.innerText.includes("không có quyền truy cập"));
   assert.equal(await documentContains("Danh bạ nhân sự & quyền"), false,
     "persona ngoài allowlist không được dựng workspace phân quyền");
-  console.log("✅ Dòng legacy sửa được, khóa phân công và chọn đúng person_id khi trùng tên");
+  /* ---- Sửa hồ sơ nhân sự nay ở màn NHÂN SỰ, không ở màn này ----------
+     Đợt tách hai màn (18/08) đặt danh bạ ở "Vai trò & phạm vi" về chỉ-đọc:
+     admin vào đó để chọn người, nối tài khoản, xem quyền; còn hồ sơ thì sửa
+     ở màn của người quản lý nhân sự. Kiểm ở CUỐI file, sau khi kịch bản
+     chính xong — chen ngang giữa chừng sẽ phá chuỗi trạng thái đang dựng. */
+  uiAccessHienTai = uiAccessAdmin;
+  await page.goto(`${GOC}#v=people`, { waitUntil: "domcontentloaded" });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.body.innerText.includes("Danh bạ chuẩn"),
+    { timeout: 15000 });
+  const oTimNhanSu = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
+  assert.ok(oTimNhanSu, "màn Nhân sự phải có ô tìm danh bạ");
+  await oTimNhanSu.type("QA");
+  await page.waitForFunction(() => document.body.innerText.includes("hong.ngoc@vmp.local"));
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
+  await page.waitForFunction(() => !!document.querySelector('[data-testid="save-permission-person"]'),
+    { timeout: 15000 });
+  assert.equal(
+    await page.$eval('[data-testid="save-permission-person"]', (b) => b.disabled === false || b.disabled === true),
+    true, "màn Nhân sự có nút lưu hồ sơ — đây mới là chỗ sửa hồ sơ nhân sự");
+
+  console.log("✅ Dòng legacy sửa được, khóa phân công, chọn đúng person_id khi trùng tên, và hồ sơ chỉ sửa được ở màn Nhân sự");
 } finally {
   await browser.close();
 }

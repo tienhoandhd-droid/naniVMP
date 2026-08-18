@@ -191,7 +191,13 @@ async function controlState() {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
     const dialog = title?.closest(".vmp-scroll");
-    const qa = [...dialog.querySelectorAll('input[type="date"], select')];
+    /* Loại ô "Người thực hiện": nó là select nhưng KHÔNG phải control
+       ngày/trạng thái mà phép kiểm này quan tâm. Ô đó nay hiện theo quyền
+       màn hình (`source.edit_catalog`) chứ không theo cờ `isAdmin` cũ đọc
+       từ tài khoản đăng nhập, nên với payload admin nó xuất hiện và làm
+       phép đếm nhảy từ 8 lên 9 — đếm nhầm chứ không phải web sai. */
+    const qa = [...dialog.querySelectorAll('input[type="date"], select')]
+      .filter((el) => el.getAttribute("aria-label") !== "Người thực hiện");
     const schedule = dialog.querySelector('input[type="datetime-local"]');
     return {
       qaCount: qa.length,
@@ -223,7 +229,11 @@ try {
   await page.evaluate(() => {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
-    const select = title?.closest(".vmp-scroll")?.querySelector("select:not([disabled])");
+    /* Phải bỏ qua ô "Người thực hiện": nó nay là select KHÔNG bị khoá và
+       đứng TRƯỚC các ô trạng thái, nên `querySelector` đầu tiên sẽ trúng nó
+       và bài kiểm đi set "Hoàn thành" vào ô chọn người. */
+    const select = [...(title?.closest(".vmp-scroll")?.querySelectorAll("select:not([disabled])") ?? [])]
+      .find((el) => el.getAttribute("aria-label") !== "Người thực hiện");
     const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     setter.call(select, "Hoàn thành");
     select.dispatchEvent(new Event("change", { bubbles: true }));

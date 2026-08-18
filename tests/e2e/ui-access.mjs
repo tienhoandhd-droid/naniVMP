@@ -71,4 +71,26 @@ function xuong(actions) {
 }
 
 /** Khớp mọi đường gọi tới rpc_my_ui_access, kể cả preflight OPTIONS. */
+/** Quản lý QA: thấy mọi màn nghiệp vụ, sửa danh mục và hồ sơ nhân sự,
+ *  nhưng KHÔNG có `accounts`/`admin` — theo đúng bảng quyền server
+ *  (20260812090000_six_business_roles_and_screen_access.sql). */
+export const uiAccessQuanLyQa = {
+  ok: true,
+  mode: "enforced",
+  business_role: "qa_manager",
+  unresolved_reason: null,
+  screens: Object.fromEntries(MAN_HINH
+    .filter((id) => id !== "accounts" && id !== "admin")
+    .map((id) => [id, {
+      can_view: true,
+      data_scope: id === "phanquyen" ? "none" : "all",
+      actions: id === "source" ? ["edit_catalog", "generate_timeline"]
+        : id === "people" ? ["edit_operational_people"]
+          : id === "progress" || id === "inventory" ? ["edit_vertical_timeline"]
+            : id === "workload" ? ["view_workload"]
+              : id === "rules" ? ["view_rules"]
+                : ["view"],
+    }])),
+};
+
 export const LA_UI_ACCESS = /\/rpc\/rpc_my_ui_access/;

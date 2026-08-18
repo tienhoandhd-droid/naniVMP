@@ -124,7 +124,13 @@ const enabledQaControls = () => page.evaluate(() => {
   const title = [...document.querySelectorAll("span")]
     .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
   const dialog = title?.closest(".vmp-scroll");
+  /* Loại ô "Người thực hiện": là select nhưng không phải control ngày/
+     trạng thái mà phép kiểm này quan tâm. Ô đó nay hiện theo quyền màn
+     hình (`source.edit_catalog`) chứ không theo cờ `isAdmin` cũ đọc từ tài
+     khoản đăng nhập, nên với payload admin nó xuất hiện và làm phép đếm
+     nhảy từ 8 lên 9 — đếm nhầm chứ không phải web sai. */
   return [...dialog.querySelectorAll('input[type="date"], select')]
+    .filter((control) => control.getAttribute("aria-label") !== "Người thực hiện")
     .filter((control) => !control.disabled).length;
 });
 
