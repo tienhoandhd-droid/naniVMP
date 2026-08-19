@@ -10,7 +10,7 @@
 .lp-visually-hidden {
   position: absolute;
   width: 1px; height: 1px;
-  padding: 0; margin: -1px;
+  padding: 0; margin: 0px;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
@@ -46,7 +46,7 @@
 .lp-page-header__main { min-width: 0; flex: 1 1 320px; }
 
 .lp-page-header__eyebrow {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-family: var(--ff-text);
   font-size: 12px;
   font-weight: 700;
@@ -78,7 +78,7 @@
 .lp-page-header__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 18px;
+  gap: 8px 20px;
   margin-top: 12px;
   font-family: var(--ff-text);
   font-size: 12px;
@@ -91,7 +91,7 @@
 .lp-page-header__actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -102,15 +102,15 @@
 .lp-metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
+  gap: 16px;
   margin-bottom: 24px;
 }
 
 .lp-metric {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 18px 20px;
+  gap: 8px;
+  padding: 20px 20px;
   border-radius: 18px;
   border: 1px solid var(--lp-line);
   background: var(--lp-surface);
@@ -124,7 +124,7 @@
   grid-column: span 2;
   background: var(--lp-sheen);
   border-top: 1px solid var(--lp-gold-hairline);
-  padding: 22px 24px;
+  padding: 24px 24px;
 }
 
 .lp-metric__label {
@@ -180,15 +180,15 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 16px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
   border-radius: 18px;
   border: 1px solid var(--lp-line);
   background: var(--lp-surface);
 }
 
 .lp-command-bar--sticky { position: sticky; top: 0; z-index: 5; box-shadow: var(--lp-e-low); }
-.lp-command-bar__main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
-.lp-command-bar__trailing { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.lp-command-bar__main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.lp-command-bar__trailing { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 
 /* ===================================================================
  *  PriorityStrip
@@ -204,8 +204,8 @@
 .lp-priority {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 14px 18px;
+  gap: 4px;
+  padding: 16px 20px;
   min-width: 168px;
   /* Trong container flex-wrap, thẻ không bị ép co — tiêu đề dài làm thẻ
      phình theo max-content và kéo ngang cả dải (luật A7, bắt được ở
@@ -269,7 +269,7 @@
 .lp-smart-table__caption {
   caption-side: top;
   text-align: left;
-  padding: 16px 18px 10px;
+  padding: 16px 20px 12px;
   font-family: var(--ff-display);
   font-size: 20px;
   line-height: 28px;
@@ -281,7 +281,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 12px 14px;
+  padding: 12px 16px;
   background: var(--lp-surface-2);
   border-bottom: 1px solid var(--lp-line-strong);
   font-size: 12px;
@@ -292,7 +292,7 @@
 }
 
 .lp-smart-table__td {
-  padding: 14px;
+  padding: 16px;
   border-bottom: 1px solid var(--lp-line);
   color: var(--lp-ink);
   /* Dòng cao 52–58px theo spec §6.4 — chật hơn thì bảng thành bức tường chữ. */
@@ -303,7 +303,7 @@
 .lp-smart-table__tr.is-open { background: var(--lp-rose-soft); }
 
 .lp-smart-table__toggle {
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid var(--lp-line-strong);
   background: var(--lp-surface);
@@ -318,10 +318,10 @@
 .lp-smart-table__toggle:hover { background: var(--lp-rose-soft); }
 .lp-smart-table__toggle:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
 
-.lp-smart-table__detail { padding: 18px; background: var(--lp-surface-2); }
+.lp-smart-table__detail { padding: 20px; background: var(--lp-surface-2); }
 
 .lp-smart-table__empty {
-  padding: 32px 18px;
+  padding: 32px 20px;
   text-align: center;
   color: var(--lp-ink-muted);
   font-weight: 500;
@@ -341,11 +341,11 @@
   margin: 0;
   padding: 0;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .lp-mobile-task {
-  padding: 14px 16px;
+  padding: 16px 16px;
   border-radius: 18px;
   border: 1px solid var(--lp-line);
   background: var(--lp-surface);
@@ -375,7 +375,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 40px 24px;
   border-radius: 18px;
   border: 1px dashed var(--lp-line-strong);
@@ -403,8 +403,8 @@
 }
 
 .lp-state-boundary__action {
-  margin-top: 6px;
-  padding: 11px 22px;
+  margin-top: 8px;
+  padding: 12px 24px;
   border-radius: 10px;
   border: 1px solid var(--lp-line-strong);
   background: var(--lp-surface);
@@ -489,7 +489,7 @@
   justify-content: space-between;
   gap: 16px;
   flex: 0 0 auto;
-  padding: 22px 24px 14px;
+  padding: 24px 24px 16px;
   border-bottom: 1px solid var(--lp-line);
   background: var(--lp-sheen);
 }
@@ -558,7 +558,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
   flex: 0 0 auto;
   flex-wrap: wrap;
   padding: 16px 24px;
