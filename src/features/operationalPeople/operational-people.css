@@ -1,0 +1,80 @@
+/* =====================================================================
+ *  operational-people.css — bố cục màn "Nhân sự & phân công"
+ *  ---------------------------------------------------------------------
+ *  Ba mốc, chọn theo việc chứ không theo con số tròn:
+ *    ≥ 1400px  ba cột 5/4/3 — nhìn được cả ba vùng cùng lúc
+ *    1093–1399 hai cột, quyền thực tế xuống dưới
+ *    < 1093px  chọn-rồi-xem: mỗi lúc một vùng
+ * =================================================================== */
+
+.op-workspace { display: flex; flex-direction: column; }
+
+.op-workspace__mota {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 16px;
+  font-family: var(--ff-text);
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--lp-ink-muted);
+  max-width: 78ch;
+}
+
+.op-workspace__pham-vi,
+.op-workspace__moc { font-size: 12px; font-weight: 600; }
+.op-workspace__pham-vi { color: var(--lp-ink); }
+
+.op-workspace__doi-vung { display: none; gap: 8px; margin-bottom: 14px; }
+
+.op-workspace__doi-vung button {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface);
+  color: var(--lp-ink-muted);
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--lp-mo-chip) var(--lp-ease);
+}
+
+.op-workspace__doi-vung button[aria-pressed="true"] {
+  background: var(--lp-plum);
+  border-color: var(--lp-plum);
+  color: var(--lp-on-plum);
+}
+
+.op-workspace__doi-vung button:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+
+/* --- Ba cột: danh bạ rộng nhất vì nó là nơi bắt đầu ----------------- */
+.op-workspace__luoi {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.op-vung { min-width: 0; }
+
+@media (max-width: 1399px) {
+  .op-workspace__luoi {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+  }
+  /* Quyền thực tế là thông tin đọc, xuống dưới trước tiên. */
+  .op-vung--quyen { grid-column: 1 / -1; }
+}
+
+@media (max-width: 1092px) {
+  .op-workspace__doi-vung { display: flex; }
+  .op-workspace__luoi { grid-template-columns: 1fr; }
+
+  /* Chọn-rồi-xem: mỗi lúc chỉ một vùng nằm trong cây trợ năng. */
+  .op-workspace__luoi--directory .op-vung--phan-cong,
+  .op-workspace__luoi--directory .op-vung--quyen { display: none; }
+  .op-workspace__luoi--detail .op-vung--danh-ba { display: none; }
+}

@@ -38,6 +38,7 @@ const MAN = [
   ["workload", "Phân công & khối lượng"],
   ["reports", "Báo cáo"],
   ["rules", "Quy tắc nghiệp vụ"],
+  ["people", "Nhân sự"],
   ["accounts", "Tài khoản & quyền truy cập"],
   ["phanquyen", "Vai trò & phạm vi"],
   ["health", "Chất lượng dữ liệu"],
