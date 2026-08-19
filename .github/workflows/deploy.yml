@@ -29,6 +29,7 @@ concurrency:
 jobs:
   static-quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -46,6 +47,7 @@ jobs:
   e2e-mock:
     needs: static-quality
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -115,6 +117,7 @@ jobs:
       - static-quality
       - e2e-mock
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -146,6 +149,7 @@ jobs:
   deploy:
     needs: production-build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
