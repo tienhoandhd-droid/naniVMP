@@ -521,7 +521,13 @@ export default function CatalogWorkspaceShell({
                       <div className="cw-lich-su__chinh">
                         <b className="cw-ma">{c.object_code}</b>
                         <span className="cw-tag cw-tag--cho">{c.status}</span>
-                        {c.has_impact && <span className="cw-nhe">chạm timeline</span>}
+                        {/* Server đã biết TRƯỚC (has_impact) thay đổi này có đụng ngày
+                            timeline hay không — nói ngay ở đây, đừng để người dùng bấm
+                            mở "Xem ảnh hưởng" rồi mới biết nút Áp bị khoá vì không có
+                            gì để áp. Đây chính là chỗ người dùng báo "không ấn được". */}
+                        {c.has_impact
+                          ? <span className="cw-nhe">chạm timeline</span>
+                          : <span className="cw-nhe">không đổi mốc thời gian — mở ra chỉ để xem, không có gì để áp</span>}
                       </div>
                       <div className="cw-nhe">
                         {c.created_by_name} · {new Date(c.created_at).toLocaleString("vi-VN")}
