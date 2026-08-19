@@ -236,7 +236,12 @@ export function svgDeptBottleneckChart(rows: DeptBottleneckRow[], pal: ChartPale
 
   const legend = legendRow(legendItems, padL, H - 10);
 
-  return svgWrap(W, H, `<g>${body}</g><g>${legend}</g>`, "Bất cập theo bộ phận — chậm ở giai đoạn nào");
+  // legendRow() không tự gắn fill cho <text> (chỉ <circle> có màu riêng) —
+  // chữ chú giải phải thừa hưởng fill từ <g> bao ngoài, y hệt cách chart 1
+  // (svgMonthlyTargetChart) đang làm. Thiếu bọc này thì SVG rơi về fill mặc
+  // định của trình duyệt là ĐEN CỐ ĐỊNH — đúng ở nền sáng nhưng vô hình
+  // trên nền tối, vì pal.ink (var(--c-ink)) không được áp dụng.
+  return svgWrap(W, H, `<g>${body}</g><g fill="${pal.ink}">${legend}</g>`, "Bất cập theo bộ phận — chậm ở giai đoạn nào");
 }
 
 /* ======================== 3. VIỆC THÁNG TỚI THEO BỘ PHẬN ======================== */
