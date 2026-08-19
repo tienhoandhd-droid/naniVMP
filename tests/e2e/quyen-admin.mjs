@@ -125,29 +125,6 @@ function suaKhoQaManager(kho) {
 }
 
 
-/** Quản lý QA khi server CHƯA có `rpc_my_ui_access` — web rơi về luật dự
- *  phòng `legacyAccessContext`. Đó là luật đang chạy ở chế độ dự thảo. */
-function suaKhoQaKhongCoUiAccess(kho) {
-  suaKhoAdmin(kho);
-  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
-  delete kho.rpc_my_ui_access;
-}
-
-/** Quản lý QA khi server CÓ cấp `edit_operational_people`. Ca này chứng
- *  minh giao diện đã sẵn sàng: mọi thứ chỉ còn chờ luật ở server. */
-function suaKhoQaDuocSuaNhanSu(kho) {
-  suaKhoAdmin(kho);
-  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
-  const goc = kho.rpc_my_ui_access;
-  const screens = {};
-  for (const [id, q] of Object.entries(goc.screens)) {
-    screens[id] = id === "people"
-      ? { ...q, can_view: true, actions: ["view", "edit_operational_people"] }
-      : q;
-  }
-  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
-}
-
 /** Quản lý QA theo ĐÚNG bảng quyền của server — dùng cho MỌI ca quản lý QA.
  *
  *  Bản trước có thêm một kho "qa_manager" chỉ hạ `profiles.role` mà vẫn để
@@ -519,8 +496,9 @@ const trinhDuyet = await puppeteer.launch({
     return {
       coEmail: chu.includes("Ai được phép có tài khoản"),
       coMaTran: chu.includes("Vai nào xem được gì, sửa được gì"),
-      /* Thẻ nay tên "Tài khoản & quyền" (hồ sơ nhân sự đã chuyển sang màn
-         Nhân sự), nhưng panel danh bạ vẫn còn để CHỌN người xem quyền. */
+      /* Thẻ nay tên "Tài khoản & quyền" — sửa hồ sơ nhân sự không còn làm
+         được trên web (màn Nhân sự đã bỏ hẳn), nhưng panel danh bạ vẫn còn
+         để CHỌN người xem quyền. */
       conThayDanhBa: chu.includes("Danh bạ chuẩn"),
     };
   });
@@ -528,55 +506,6 @@ const trinhDuyet = await puppeteer.launch({
   kiem(!qa.coMaTran, "quản lý QA không thấy ma trận vai × quyền");
   kiem(qa.conThayDanhBa, "quản lý QA vẫn chọn được người trong danh bạ (không chặn nhầm cả màn)");
   await b.trang.close();
-}
-
-/* ---- 9. Màn "Nhân sự" — quản lý QA thật sự sửa được gì? ------------- *
- *  Màn này sinh ra để quản lý QA sửa hồ sơ nhân sự mà không đụng vòng đời
- *  tài khoản. Câu hỏi là luật quyền có cho họ làm thật không. Đo hai tình
- *  huống thay vì suy đoán.
- * --------------------------------------------------------------------- */
-{
-  console.log("\nMàn Nhân sự — quản lý QA sửa được tới đâu:");
-
-  const doSuaDuoc = async (suaKho) => {
-    const { trang } = await moTrang(trinhDuyet, { suaKho, hash: "people" });
-    await cho(1600);
-    const kq = await trang.evaluate(() => {
-      const oTen = document.querySelector('input[aria-label="Họ và tên trong danh bạ"]');
-      const nutLuu = [...document.querySelectorAll("button")]
-        .find((b) => /Lưu hồ sơ|Thêm vào danh bạ/.test(b.textContent || ""));
-      return {
-        moDuocMan: document.body.innerText.includes("Nhân sự")
-          || !!document.querySelector('[data-view="people"]'),
-        coOTen: !!oTen,
-        oTenSuaDuoc: oTen ? !oTen.disabled : false,
-        coNutLuu: !!nutLuu,
-        noiKhongCoQuyen: document.body.innerText.includes("Chỉ Admin và Quản lý QA sửa"),
-      };
-    });
-    await trang.close();
-    return kq;
-  };
-
-  // 9a. Luật dự phòng (chế độ dự thảo, không có rpc_my_ui_access).
-  const duPhong = await doSuaDuoc(suaKhoQaKhongCoUiAccess);
-  kiem(duPhong.moDuocMan, "quản lý QA mở được màn Nhân sự ở luật dự phòng");
-  kiem(duPhong.coOTen, "màn Nhân sự có ô hồ sơ để xem");
-  /* Luật dự phòng nay chép theo đúng bảng quyền của server: Quản lý QA có
-     `edit_operational_people`, nên ô hồ sơ phải MỞ. Trước đây nó cấp
-     ["view"] cho mọi vai không phải admin — ngày RPC hỏng là Quản lý QA
-     mất sạch việc hằng ngày và tưởng web hỏng. Phép kiểm này giữ cho lưới
-     dự phòng khỏi hẹp lại lần nữa. */
-  kiem(duPhong.oTenSuaDuoc === true,
-    "ở luật dự phòng, quản lý QA VẪN sửa được hồ sơ (khớp bảng quyền server)",
-    `oTenSuaDuoc=${duPhong.oTenSuaDuoc}`);
-
-  // 9b. Server cấp edit_operational_people: giao diện phải mở khoá ngay.
-  const duocCap = await doSuaDuoc(suaKhoQaDuocSuaNhanSu);
-  kiem(duocCap.oTenSuaDuoc === true,
-    "server cấp edit_operational_people thì quản lý QA sửa được ngay, không cần sửa web",
-    `oTenSuaDuoc=${duocCap.oTenSuaDuoc}`);
-  kiem(duocCap.coNutLuu, "và có nút lưu hồ sơ");
 }
 
 /* ---- 9b. Xem trước ảnh hưởng trước khi bật quyền theo hạng mục ------- *

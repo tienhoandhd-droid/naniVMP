@@ -679,8 +679,10 @@ export async function deleteSourceRow(tab: string, rowNumber: number): Promise<R
 /* ---- Người nhận cảnh báo & Danh bạ nhân sự ----
  * Bốn hàm upsert/delete cũ đã GỠ (Đợt B Task 6): người nhận cảnh báo ghi
  * qua rpc_save_alert_recipient (features/catalogWorkspace/api.ts); danh bạ
- * nhân sự quản lý ở màn Nhân sự & phân công (features/itemPermissions).
- * fetchAlertRecipients/fetchStaffEmails giữ lại vì AiMailModal còn đọc. */
+ * nhân sự (features/itemPermissions) không còn màn nào trên web sửa được
+ * nữa từ khi màn Nhân sự & phân công bị bỏ hẳn (19/08) — sửa thẳng trong
+ * Supabase. fetchAlertRecipients/fetchStaffEmails giữ lại vì AiMailModal
+ * còn đọc. */
 
 /* ---- Phân quyền người dùng ----
  * Ba chốt an toàn nằm ở RPC chứ không ở đây: chỉ admin gọi được, không tự

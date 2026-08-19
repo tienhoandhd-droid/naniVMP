@@ -6596,14 +6596,14 @@ summary { min-height: 24px; display: flex; align-items: center; }
 }
 .pq-loi ul { margin: 5px 0; padding-left: 18px; font-weight: 600; }
 .pq-nut {
-  display: inline-flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center; gap: 7px;
   font-family: var(--ff-text);
   font-size: var(--fs-sm); font-weight: 800;
   color: var(--c-ink);
   background: var(--c-surface);
   border: 1.5px solid var(--c-line-strong);
   border-radius: var(--r-md);
-  padding: 8px 16px; min-height: 40px;
+  padding: 9px 16px; min-height: 40px;
   cursor: pointer;
 }
 .pq-nut.la-chinh { color: var(--lp-on-plum); background: var(--c-pink-deep); border-color: var(--c-pink-deep); }

@@ -27,11 +27,18 @@ export const NAV_GROUP_ORDER = ["work", "monitor", "analysis", "admin"] as const
  *  hôm nay", an toàn nhất và có ích với mọi vai. Rơi về một màn tổng hợp
  *  toàn nhà máy khi người dùng chỉ có quyền hẹp là vừa vô ích vừa dễ
  *  khiến họ tưởng mình mất quyền. */
+/* `people` không nằm trong danh sách này: màn Nhân sự đã bỏ hẳn (19/08),
+   không còn nhánh render trong App.tsx. Để nó lại đây thì một người vẫn
+   được server cấp canView("people") (hợp đồng cũ chưa đổi) có thể bị chọn
+   làm "màn đầu tiên được phép" — rơi vào một hash không ai vẽ gì, tức
+   trang trắng. `accounts` giữ lại vì lý do khác: server không bao giờ cấp
+   accounts cho ai ngoài admin, và admin luôn có nhiều màn khác đứng trước
+   nó trong danh sách nên thực tế không bao giờ được chọn tới. */
 export const ORDERED_SCREEN_IDS: readonly ScreenId[] = [
   "today", "progress", "source",
   "overview", "timeline", "alerts",
   "workload", "reports", "rules",
-  "people", "accounts", "phanquyen", "health", "audit", "admin",
+  "accounts", "phanquyen", "health", "audit", "admin",
 ];
 
 /** Cách trình bày kèm theo, khi một alias mang thêm ý nghĩa. */
