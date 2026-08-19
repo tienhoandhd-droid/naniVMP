@@ -1072,6 +1072,17 @@ export interface KetQuaLuuDanhMuc {
   error?: string;
   error_code?: string;
   current_version?: number;
+  /** owner_person_id vừa được ĐẶT (20260819110000): chọn "QA phụ trách" ở
+   *  đây giờ cấp quyền THẬT (vmp_item_assignments) cho mọi hạng mục đang
+   *  hoạt động của đối tượng, không chỉ ghi tên mô tả nữa. ok đếm số hạng
+   *  mục cấp được; failed liệt kê hạng mục chưa cấp được kèm lý do. */
+  owner_assignments_ok?: number;
+  owner_assignments_failed?: Array<{ validation_code: string; error: string }>;
+  /** owner_person_id vừa bị XOÁ về rỗng: đối xứng với trên — thu hồi
+   *  đúng quyền đã cấp cho người cũ trên mọi hạng mục đang hoạt động,
+   *  vì bảng đối tượng là nguồn chân lý hai chiều cho quyền thật. */
+  owner_revocations_ok?: number;
+  owner_revocations_failed?: Array<{ validation_code: string; error: string }>;
 }
 
 export async function saveCatalogObject(
