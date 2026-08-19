@@ -1083,6 +1083,14 @@ export interface KetQuaLuuDanhMuc {
    *  vì bảng đối tượng là nguồn chân lý hai chiều cho quyền thật. */
   owner_revocations_ok?: number;
   owner_revocations_failed?: Array<{ validation_code: string; error: string }>;
+  /** support_person_id ("Người hỗ trợ") — cùng luật với owner ở trên,
+   *  vai "phối hợp" (collaborator, cộng thêm chứ không thay thế). Chốt
+   *  20260819120000 theo phản hồi trực tiếp: "cả người hỗ trợ cũng có
+   *  chức năng tương tự". */
+  support_assignments_ok?: number;
+  support_assignments_failed?: Array<{ validation_code: string; error: string }>;
+  support_revocations_ok?: number;
+  support_revocations_failed?: Array<{ validation_code: string; error: string }>;
 }
 
 export async function saveCatalogObject(
