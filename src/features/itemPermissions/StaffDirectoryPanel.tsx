@@ -503,6 +503,11 @@ export default function StaffDirectoryPanel({
                 <b>{person.full_name} · {departmentLabel(person.department)}</b>
                 <span>{person.email || "chưa có email"} · {person.employee_code || "chưa có mã NV"}</span>
                 {person.match_status === "ambiguous" && <em>Trùng tên — cần nối tay</em>}
+                {/* Hồ sơ tự tạo khi có tài khoản mới (migration 20260819090000)
+                    rỗng department/access_class/scope — đánh dấu ngay ở dòng
+                    kết quả tìm kiếm, đừng bắt Admin bấm chọn từng người mới
+                    biết ai đang thiếu. */}
+                {!isDirectoryPersonComplete(person) && <em>Hồ sơ chưa đủ — cần bổ sung</em>}
               </button>
             ))}
           </div>
