@@ -21,6 +21,11 @@ export interface ManagementReportInput {
   bottleneck: DeptBottleneckRow[];
   nextMonth: NextMonthWork;
   quality: QualityIssueLike[];
+  /** Nhận xét do AI soạn. GIỮ trong bản in nhưng luôn đóng dấu "bản nháp,
+   *  cần QA xác nhận" — người ký hồ sơ phải thấy đúng thứ mình đang ký,
+   *  kể cả phần chưa được người xác nhận. Bỏ hẳn khỏi bản in là đảo một
+   *  quyết định thiết kế của chủ dự án, không phải việc của bản sửa lỗi. */
+  ai?: string;
 }
 
 const esc = (s: unknown): string =>
@@ -32,6 +37,7 @@ function pctBadge(rate: number): string {
 }
 
 export function buildManagementReportHTML(d: ManagementReportInput): string {
+  const disclaimer = "BẢN NHÁP AI — Cần QA xác nhận trước khi phát hành";
   const now = new Date();
   const dept = deptColorMap(EXPORT_PALETTE);
 
@@ -103,6 +109,8 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
   .kpi div{flex:1;min-width:140px;background:#FDF0F7;border-radius:12px;padding:14px 16px;text-align:center}
   .kpi .v{font-size:26px;font-weight:800;color:#A83364}
   .kpi .l{font-size:11.5;color:#6E4869;font-weight:700}
+  .ai-box{background:#FDEEF6;border-left:4px solid #E4749F;padding:18px 22px;border-radius:0 12px 12px 0;margin:16px 0;white-space:pre-wrap}
+  .stamp{background:#FBE1E8;color:#B62E52;padding:6px 14px;border-radius:8px;font-weight:800;font-size:13px;display:inline-block;margin-bottom:12px}
   @page{size:A4;margin:14mm 12mm}
   @media print{
     body{max-width:none;margin:0;padding:0}
@@ -165,7 +173,11 @@ ${d.nextMonth.items.length ? `<table><tr><th>Mã</th><th>Tên</th><th>Bộ phậ
 </div>
 ${topIssues.length ? `<table><tr><th>Mức</th><th>Loại</th><th>Chi tiết</th></tr>${issueRows}</table>${d.quality.length > 15 ? `<p style="font-size:12px;color:#6E4869">… và ${d.quality.length - 15} vấn đề khác — xem đầy đủ ở màn Chất lượng dữ liệu.</p>` : ""}` : "<p>Không phát hiện vấn đề chất lượng dữ liệu trong phạm vi này.</p>"}
 
-<h2>7. QA Review & Xác nhận</h2>
+<h2>7. Nhận xét &amp; Đánh giá (AI)</h2>
+<div class="stamp">${disclaimer}</div>
+<div class="ai-box">${esc(d.ai) || "(Chưa tạo nhận xét AI)"}</div>
+
+<h2>8. QA Review &amp; Xác nhận</h2>
 <table>
 <tr><td style="width:50%;text-align:left"><b>Người lập:</b> ........................</td><td style="text-align:left"><b>Người xác nhận (QA):</b> ........................</td></tr>
 <tr><td style="text-align:left"><b>Ngày:</b> ....../....../20......</td><td style="text-align:left"><b>Ngày:</b> ....../....../20......</td></tr>
@@ -174,7 +186,7 @@ ${topIssues.length ? `<table><tr><th>Mức</th><th>Loại</th><th>Chi tiết</th
 
 <div class="footer">
 <b>Audit:</b> Snapshot tạo lúc ${now.toISOString()} · Template báo cáo quản lý v3.0 · Hệ thống VMP Monitor CPC1 HN<br/>
-<b>Lưu ý:</b> Số liệu chốt tại thời điểm tạo báo cáo, đọc thẳng từ Supabase — không bịa số. Mọi thay đổi dữ liệu sau thời điểm này không ảnh hưởng đến báo cáo đã phát hành. Bản in/xuất chính thức này không chứa nội dung do AI tạo ra — nhận xét AI (nếu có) chỉ hiển thị trên màn hình web, tách riêng và luôn đánh dấu cần QA xác nhận.
+<b>Lưu ý:</b> Số liệu chốt tại thời điểm tạo báo cáo, đọc thẳng từ Supabase — không bịa số. Mọi thay đổi dữ liệu sau thời điểm này không ảnh hưởng đến báo cáo đã phát hành. Mục 7 do AI soạn và luôn mang dấu "bản nháp — cần QA xác nhận"; nó KHÔNG thay cho kết luận của người ký.
 </div>
 </body></html>`;
 }

@@ -288,7 +288,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   }, [ky, kyLabel]);
 
   const printPDF = () => {
-    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality });
+    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
     const ifr = document.createElement("iframe");
     ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
     document.body.appendChild(ifr);
@@ -300,7 +300,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   };
 
   const downloadHtml = () => {
-    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality });
+    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
     download(`BaoCaoQuanLy_VMP_${tenTepKy()}.html`, html);
   };
 
