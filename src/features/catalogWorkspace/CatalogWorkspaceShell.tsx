@@ -611,6 +611,29 @@ export default function CatalogWorkspaceShell({
               throw new Error(thongBao);
             }
             dang.xong(dangSuaObj.taoMoi ? `Đã tạo ${ma}` : `Đã lưu ${ma}`);
+            /* owner_assignments_* và owner_revocations_* chỉ có khi patch vừa
+               đổi owner_person_id (20260819110000) — chọn/xoá QA phụ trách
+               ở đây giờ cấp/thu hồi quyền THẬT cho mọi hạng mục đang hoạt
+               động của đối tượng, không chỉ ghi/xoá tên mô tả. Báo rõ khi
+               có hạng mục chưa xử lý được (ví dụ ngoài phạm vi người thao
+               tác) — im lặng bỏ qua sẽ làm người dùng tưởng ai cũng đã
+               được cấp/thu hồi trong khi chưa. */
+            const chuaCap = kq.owner_assignments_failed ?? [];
+            const chuaThuHoi = kq.owner_revocations_failed ?? [];
+            if (chuaCap.length) {
+              toast.canhBao(
+                `Đã lưu ${ma}, nhưng còn ${chuaCap.length} hạng mục chưa cấp được quyền cho QA phụ trách mới `
+                + `(${chuaCap.slice(0, 3).map((x) => x.validation_code).join(", ")}${chuaCap.length > 3 ? "…" : ""}) — `
+                + "kiểm tra lại phạm vi người thao tác hoặc phân công tay ở màn Nhân sự.",
+              );
+            }
+            if (chuaThuHoi.length) {
+              toast.canhBao(
+                `Đã lưu ${ma}, nhưng còn ${chuaThuHoi.length} hạng mục chưa thu hồi được quyền của người phụ trách cũ `
+                + `(${chuaThuHoi.slice(0, 3).map((x) => x.validation_code).join(", ")}${chuaThuHoi.length > 3 ? "…" : ""}) — `
+                + "kiểm tra lại ở màn Nhân sự.",
+              );
+            }
             setDangSuaObj(null);
             await taiDoiTuong();
             onReload?.();
