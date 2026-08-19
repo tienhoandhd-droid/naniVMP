@@ -534,15 +534,19 @@ export default function StaffDirectoryPanel({
       )}
 
       <div className="ip-form">
-        <label>Họ và tên<input className="pq-o" aria-label="Họ và tên trong danh bạ" value={form.fullName} onChange={setField("fullName")} disabled={!canEdit} /></label>
-        <label>Mã nhân viên<input className="pq-o" aria-label="Mã nhân viên trong danh bạ" value={form.employeeCode} onChange={setField("employeeCode")} disabled={!canEdit} placeholder="Có thể bổ sung sau" /></label>
+        {/* Thứ tự trường ĐÚNG THEO thứ tự 11 cột PERMISSION_HEADERS của mẫu
+            Excel tải lên (permissionWorkbook.ts): Bộ phận → Mã nhân viên →
+            Họ và tên → Phân loại → 4 cột Phạm vi → Email → Xác nhận gửi
+            email. Chủ dự án chốt rõ: nhập tay trên web và nhập bằng Excel
+            phải cùng một hình dung, không được để hai thứ tự khác nhau. */}
         <label>Bộ phận
           <select className="pq-o" aria-label="Bộ phận trong danh bạ" value={form.department} onChange={setField("department")} disabled={!canEdit}>
             <option value="">— chọn bộ phận —</option>
             {DEPTS.map((department) => <option key={department.id} value={department.id}>{department.short} · {department.name}</option>)}
           </select>
         </label>
-        <label>Email tài khoản<input className="pq-o" type="email" aria-label="Email trong danh bạ" value={form.email} onChange={setField("email")} disabled={!canEdit} /></label>
+        <label>Mã nhân viên<input className="pq-o" aria-label="Mã nhân viên trong danh bạ" value={form.employeeCode} onChange={setField("employeeCode")} disabled={!canEdit} placeholder="Có thể bổ sung sau" /></label>
+        <label>Họ và tên<input className="pq-o" aria-label="Họ và tên trong danh bạ" value={form.fullName} onChange={setField("fullName")} disabled={!canEdit} /></label>
         <label>Phân loại
           <select className="pq-o" aria-label="Phân loại quyền" value={form.accessClass || ""} onChange={changeAccessClass} disabled={!canEdit}>
             <option value="">— chọn phân loại —</option>
@@ -594,6 +598,7 @@ export default function StaffDirectoryPanel({
           onChange={(values) => changeScope("lines", values)}
         />
         </>}
+        <label>Email tài khoản<input className="pq-o" type="email" aria-label="Email trong danh bạ" value={form.email} onChange={setField("email")} disabled={!canEdit} /></label>
         <label className="ip-check"><input type="checkbox" checked={form.emailSent} onChange={setField("emailSent")} disabled={!canEdit} /> Đã xác nhận gửi email tài khoản</label>
       </div>
 
