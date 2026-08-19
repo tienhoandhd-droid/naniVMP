@@ -288,7 +288,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   }, [ky, kyLabel]);
 
   const printPDF = () => {
-    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
+    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality });
     const ifr = document.createElement("iframe");
     ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
     document.body.appendChild(ifr);
@@ -300,7 +300,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   };
 
   const downloadHtml = () => {
-    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
+    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality });
     download(`BaoCaoQuanLy_VMP_${tenTepKy()}.html`, html);
   };
 
@@ -431,6 +431,20 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           {soChuaCoMoc > 0 && (
             <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục chưa có mốc đích VMP nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
           )}
+        </div>
+
+        {/* Đây là nơi người dùng hay nhầm "báo cáo sai số" nhất: số ở màn Báo
+            cáo chỉ tính hạng mục có mốc đích VMP RƠI VÀO năm đang chọn, còn
+            màn Tổng quan tính TOÀN BỘ hạng mục đang hoạt động, không lọc theo
+            năm. Hai cách đếm khác mục đích (báo cáo theo kỳ vs. bức tranh hiện
+            tại), không phải một trong hai bị sai — nói thẳng ra đây để không
+            ai phải đi dò lại dữ liệu. */}
+        <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: C.plumSoft,
+          background: C.pinkMist, borderRadius: 14, padding: "11px 15px", lineHeight: 1.7 }}>
+          ℹ️ Số ở đây <b style={{ color: C.plum }}>khác với màn Tổng quan</b> — đây là chủ ý, không phải lỗi:
+          màn Báo cáo chỉ đếm hạng mục có <b>mốc đích VMP rơi vào năm {ky.year}</b>, còn màn Tổng quan đếm
+          <b> toàn bộ hạng mục đang hoạt động</b> ở mọi năm (kể cả hạng mục quá hạn từ năm trước). Muốn số khớp
+          Tổng quan, đổi <b>Năm báo cáo</b> ở trên sang bao trọn các năm cần xem, hoặc đối chiếu ở màn Tổng quan.
         </div>
 
         {/* Kỳ là LÁT CẮT THEO MỐC ĐÍCH, không phải ảnh chụp quá khứ. Nói thẳng

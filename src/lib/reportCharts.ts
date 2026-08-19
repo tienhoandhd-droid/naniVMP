@@ -64,13 +64,40 @@ function svgWrap(width: number, height: number, body: string, title: string): st
   return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${esc(title)}" style="display:block;max-width:100%">${body}</svg>`;
 }
 
+/** Ước lượng bề rộng nhãn chú giải theo px/ký tự. Bản cũ (6.4px/ký tự,
+ *  hiệu chỉnh cho chữ Latin không dấu) cho ra khoảng cách quá hẹp với
+ *  tiếng Việt in đậm (700) có dấu — "Chậm thẩm định thực tế" (nhãn dài
+ *  nhất ở mục 4 "Bất cập theo bộ phận") tràn qua phần đã chừa, đè lên
+ *  chấm màu và chữ của nhãn kế ("Chậm báo cáo"). Từng thử đo bằng canvas
+ *  2D (chính xác hơn) nhưng phụ thuộc font đã NẠP XONG tại đúng thời điểm
+ *  gọi hàm — không đảm bảo, nên bỏ, dùng hằng số RỘNG RÃI: thà chú giải
+ *  thưa hơn cần thiết còn hơn chữ đè chữ trên một tài liệu GMP. */
+const PX_MOI_KY_TU = 9.4;
+
+/** Bề rộng một nhãn chú giải (chấm + khoảng cách + chữ + đệm cuối) —
+ *  TÁCH khỏi legendRow() để nơi gọi tính được tổng bề rộng cả dải chú
+ *  giải TRƯỚC khi biết viewBox cần rộng bao nhiêu, thay vì đoán một
+ *  chiều rộng cố định rồi hy vọng chú giải vừa. */
+function rongMotMuc(label: string): number {
+  return 16 + label.length * PX_MOI_KY_TU + 22;
+}
+
+/** Tổng bề rộng cả dải chú giải, tính từ x = 0. Dùng để nới viewBox khi
+ *  chú giải dài hơn phần đồ thị phía trên nó (mục 4 "Bất cập theo bộ
+ *  phận" là ca thật: nhãn "Chậm thẩm định thực tế" dài nhất trong ba
+ *  nhãn dùng ở đây, và trước kia tràn ra ngoài W=640 khiến nhãn cuối
+ *  ("Chậm báo cáo") đè lên nhãn giữa thay vì đứng sau nó). */
+function tongRongChuGiai(items: Array<{ label: string }>): number {
+  return items.reduce((s, it) => s + rongMotMuc(it.label), 0);
+}
+
 function legendRow(items: Array<{ color: string; label: string }>, x: number, y: number): string {
   let out = "";
   let cx = x;
   for (const it of items) {
     out += `<circle cx="${cx}" cy="${y}" r="4.5" fill="${it.color}" />`;
     out += `<text x="${cx + 10}" y="${y + 4}" font-size="11" font-weight="700">${esc(it.label)}</text>`;
-    cx += 16 + it.label.length * 6.4 + 22;
+    cx += rongMotMuc(it.label);
   }
   return out;
 }
@@ -173,7 +200,15 @@ export function svgDeptBottleneckChart(rows: DeptBottleneckRow[], pal: ChartPale
     .filter((r) => r.overProtocol > 0 || r.overValidation > 0 || r.overReport > 0)
     .slice(0, 8); // đủ 6 bộ phận thật + chừa chỗ nếu tách nhóm
   if (!chartRows.length) return "";
-  const W = 640;
+  const legendItems = [
+    { color: pal.lav, label: "Chậm đề cương" },
+    { color: pal.sky, label: "Chậm thẩm định thực tế" },
+    { color: pal.pink, label: "Chậm báo cáo" },
+  ];
+  // Chú giải đứng dưới phần đồ thị nhưng dùng CHUNG viewBox — nhãn dài
+  // ("Chậm thẩm định thực tế") có thể cần rộng hơn phần cột phía trên.
+  // Nới W theo chú giải, không đoán một số cố định rồi hy vọng vừa.
+  const W = Math.max(640, padL + tongRongChuGiai(legendItems) + padR);
   const H = padT + chartRows.length * (rowH + gap) + padB;
   const plotW = W - padL - padR;
   const maxVal = Math.max(1, ...chartRows.flatMap((r) => [r.overProtocol, r.overValidation, r.overReport]));
@@ -199,11 +234,7 @@ export function svgDeptBottleneckChart(rows: DeptBottleneckRow[], pal: ChartPale
     });
   });
 
-  const legend = legendRow([
-    { color: pal.lav, label: "Chậm đề cương" },
-    { color: pal.sky, label: "Chậm thẩm định thực tế" },
-    { color: pal.pink, label: "Chậm báo cáo" },
-  ], padL, H - 10);
+  const legend = legendRow(legendItems, padL, H - 10);
 
   return svgWrap(W, H, `<g>${body}</g><g>${legend}</g>`, "Bất cập theo bộ phận — chậm ở giai đoạn nào");
 }
