@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   BarChart3, CheckCircle2, ClipboardCheck, FileCheck2, Filter,
   RotateCcw, ShieldCheck, Users,
+  AlertTriangle, Clock, PauseCircle, Loader2, HelpCircle, Minus,
 } from "lucide-react";
 
 import { C, NUM, TEXT } from "../../constants/theme.ts";
@@ -204,18 +205,27 @@ const ENUM_LABEL = {
   overdue: "Quá hạn",
 };
 
-// Màu theo ngữ nghĩa chữ trạng thái (nhận diện tiếng Việt). Thứ tự có chủ đích:
-// xét phủ định ("chưa/không") TRƯỚC để "Chưa tiến hành" không bị bắt nhầm là "đang".
-function statusTone(label: string) {
-  if (label === EMPTY_LABEL) return C.plumSoft;
+// Màu + icon theo ngữ nghĩa chữ trạng thái (nhận diện tiếng Việt). Thứ tự có
+// chủ đích: xét phủ định ("chưa/không") TRƯỚC để "Chưa tiến hành" không bị
+// bắt nhầm là "đang".
+//
+// Trước chỉ có màu — sáu tông (rasp/xám/sky/mint/lav/marigold) cộng một tông
+// dự phòng (pink, TRÙNG với màu thương hiệu dùng khắp trang) đứng cạnh nhau
+// trong chấm 10px và thanh 10px thì khó phân biệt bằng mắt liếc nhanh, nhất
+// là với người kém phân biệt màu — đúng luật B4 (màu không phải kênh duy
+// nhất). Icon là kênh thứ hai không phụ thuộc màu. Tông "chưa nhận diện
+// được" đổi từ pink (dễ lẫn với màu thương hiệu) sang plum trung tính + dấu
+// hỏi, để nó NỔI lên như một ca lạ cần chú ý, không chìm vào nền UI.
+function statusTone(label: string): { mau: string; Icon: typeof CheckCircle2 } {
+  if (label === EMPTY_LABEL) return { mau: C.plumSoft, Icon: Minus };
   const x = label.toLowerCase();
-  if (/quá hạn|overdue/.test(x)) return C.raspText;
-  if (/không\s*(tiến hành|thực hiện)/.test(x)) return C.plumSoft;   // bỏ/không làm → xám
-  if (/chưa|chờ|pending/.test(x)) return C.skyText;                 // chưa/chờ xử lý
-  if (/hoàn thành|hoàn thiện|đạt|xong|done/.test(x) && !/đang/.test(x)) return C.mintText;
-  if (/tạm ngưng|tạm dừng|tạm hoãn|hoãn|ngưng/.test(x)) return C.lavText;
-  if (/đang|bổ sung|tiến hành|làm|progress/.test(x)) return C.marigoldText;
-  return C.pinkText;
+  if (/quá hạn|overdue/.test(x)) return { mau: C.raspText, Icon: AlertTriangle };
+  if (/không\s*(tiến hành|thực hiện)/.test(x)) return { mau: C.plumSoft, Icon: PauseCircle }; // bỏ/không làm → xám
+  if (/chưa|chờ|pending/.test(x)) return { mau: C.skyText, Icon: Clock };                       // chưa/chờ xử lý
+  if (/hoàn thành|hoàn thiện|đạt|xong|done/.test(x) && !/đang/.test(x)) return { mau: C.mintText, Icon: CheckCircle2 };
+  if (/tạm ngưng|tạm dừng|tạm hoãn|hoãn|ngưng/.test(x)) return { mau: C.lavText, Icon: PauseCircle };
+  if (/đang|bổ sung|tiến hành|làm|progress/.test(x)) return { mau: C.marigoldText, Icon: Loader2 };
+  return { mau: C.plum, Icon: HelpCircle };
 }
 
 // Phân bố trạng thái theo chữ trong cột, đếm theo ID thẩm định duy nhất.
@@ -307,11 +317,14 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
       {rows.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {rows.map((row) => {
-            const tone = statusTone(row.label);
+            const { mau, Icon } = statusTone(row.label);
             return (
               <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ minWidth: 190, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 999, background: tone, flexShrink: 0 }} />
+                  {/* Icon đứng trước chấm màu — kênh thứ hai để phân biệt
+                      trạng thái không chỉ dựa vào màu (luật B4). */}
+                  <Icon size={13} color={mau} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: mau, flexShrink: 0 }} />
                   <span style={{ fontSize: 12, fontWeight: 800, color: row.label === EMPTY_LABEL ? C.plumSoft : C.plum }}>
                     {row.label}
                   </span>
@@ -319,12 +332,12 @@ function StatusBreakdown({ acts }: { acts: Activity[] }) {
                 <div style={{ flex: 1, minWidth: 60 }}>
                   <div style={{ height: 10, borderRadius: 999, background: C.pinkMist, overflow: "hidden" }}>
                     <div style={{
-                      width: `${row.rate}%`, height: "100%", borderRadius: 999, background: tone,
+                      width: `${row.rate}%`, height: "100%", borderRadius: 999, background: mau,
                       transition: "width .55s cubic-bezier(.22,1,.36,1)",
                     }} />
                   </div>
                 </div>
-                <div style={{ minWidth: 88, textAlign: "right", fontFamily: NUM, fontSize: 14, fontWeight: 800, color: tone }}>
+                <div style={{ minWidth: 88, textAlign: "right", fontFamily: NUM, fontSize: 14, fontWeight: 800, color: mau }}>
                   {row.count} <span style={{ color: C.plumSoft, fontWeight: 700 }}>· {row.rate}%</span>
                 </div>
               </div>

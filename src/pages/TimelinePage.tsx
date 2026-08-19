@@ -1769,7 +1769,13 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
         </div>
         {kham3D && (
           <Suspense fallback={<div style={{ height: 420 }} />}>
-            <WorkloadSpace3D acts={acts} nam={year} giamChuyenDong={giamChuyenDong} macDinh3D
+            {/* Trước truyền `acts` thô — bấm KPI (Quá hạn/Sắp đến hạn/Đang thực
+                hiện/Hoàn thành) đổi `status` phía trên nhưng bản đồ 3D vẫn vẽ
+                nguyên năm không đổi gì, đúng cảm giác "chỉ hiện quá hạn mãi"
+                người dùng báo. Nay dùng `filtered` — cùng danh sách đã qua
+                status/cls/dept/tìm kiếm mà KPI và bảng bên dưới đang dùng, để
+                bấm một KPI là cả trang đổi theo cùng một nghĩa. */}
+            <WorkloadSpace3D acts={filtered} nam={year} giamChuyenDong={giamChuyenDong} macDinh3D
               onOpenCell={onOpenWorkloadCell} />
           </Suspense>
         )}

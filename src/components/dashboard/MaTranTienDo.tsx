@@ -20,7 +20,7 @@
  *     thích. Không có nó thì mọi tỷ lệ phần trăm khác đều đáng ngờ.
  * ===================================================================== */
 import { useMemo, useState } from "react";
-import { LayoutGrid, ShieldAlert, Flame } from "lucide-react";
+import { LayoutGrid, ShieldAlert, Flame, CheckCircle2, AlertTriangle, Clock, HelpCircle } from "lucide-react";
 import { C, TEXT, NUM } from "../../constants/theme.ts";
 import { DEPTS, vmpToday } from "../../constants/vmp.ts";
 import { parseD, fmtVN, wlIsDone, nguoiPhuTrach, qrmRpn } from "../../utils/helpers.ts";
@@ -31,11 +31,17 @@ import type { Activity } from "../../types/domain.ts";
  *  "thieu" là chỗ dữ liệu không nói được gì chứ không phải chưa làm. */
 type TrangThai = "xong" | "tre" | "chua" | "thieu";
 
-const MAU: Record<TrangThai, { nhan: string; mau: string; nen: string }> = {
-  xong:  { nhan: "Đã xong", mau: C.mintText, nen: C.mintSoft },
-  tre:   { nhan: "Trễ hạn", mau: C.raspText, nen: C.raspSoft },
-  chua:  { nhan: "Chưa tới hạn", mau: C.skyText, nen: C.skySoft },
-  thieu: { nhan: "Thiếu dữ liệu", mau: C.marigoldText, nen: C.marigoldSoft },
+/* Icon đi kèm màu — không phải trang trí. Bốn màu (xanh lá/đỏ/xanh dương/
+   cam) đứng cạnh nhau trong thanh 8px hoặc ô nhỏ vẫn có thể khó phân biệt
+   với mắt kém phân biệt màu hoặc chỉ liếc nhanh; icon là kênh THỨ HAI
+   không phụ thuộc màu, đúng luật B4 (đã đo/ghi trong luat-tham-my.md):
+   "mỗi vùng mang trạng thái phải có chữ hoặc biểu tượng đi kèm, không chỉ
+   màu". */
+const MAU: Record<TrangThai, { nhan: string; mau: string; nen: string; Icon: typeof CheckCircle2 }> = {
+  xong:  { nhan: "Đã xong", mau: C.mintText, nen: C.mintSoft, Icon: CheckCircle2 },
+  tre:   { nhan: "Trễ hạn", mau: C.raspText, nen: C.raspSoft, Icon: AlertTriangle },
+  chua:  { nhan: "Chưa tới hạn", mau: C.skyText, nen: C.skySoft, Icon: Clock },
+  thieu: { nhan: "Thiếu dữ liệu", mau: C.marigoldText, nen: C.marigoldSoft, Icon: HelpCircle },
 };
 
 const GIAI_DOAN = [
@@ -196,6 +202,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
     if (!tong) return <td style={{ padding: 6 }}><div style={{ height: 44, borderRadius: 8, background: C.pinkMist }} /></td>;
     const noiBat: TrangThai = dem.tre.length ? "tre" : dem.thieu.length ? "thieu" : dem.chua.length ? "chua" : "xong";
     const m = MAU[noiBat];
+    const NoiBatIcon = m.Icon;
     return (
       <td style={{ padding: 6 }}>
         <button
@@ -203,14 +210,27 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
           title={`${ten} — ${(Object.keys(dem) as TrangThai[]).filter((k) => dem[k].length).map((k) => `${MAU[k].nhan} ${dem[k].length}`).join(" · ")}`}
           style={{ width: "100%", border: `1.5px solid ${m.mau}22`, background: m.nen, borderRadius: 8,
                    padding: "6px 8px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: m.mau, lineHeight: 1 }}>
-            {dem[noiBat].length}
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}> / {tong}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            {/* Icon trạng thái nặng nhất — không chỉ màu mới nói lên ô này đang
+                ở tình trạng gì, khớp luật B4 (màu không phải kênh duy nhất). */}
+            <NoiBatIcon size={12} color={m.mau} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: m.mau, lineHeight: 1 }}>
+              {dem[noiBat].length}
+              <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}> / {tong}</span>
+            </span>
           </span>
-          {/* Thanh ba màu: xong · trễ · thiếu — đúng kiểu stacked bar của BMS */}
-          <span style={{ display: "flex", height: 5, borderRadius: 999, overflow: "hidden", background: C.surface }}>
+          {/* Thanh bốn màu: xong · trễ · thiếu · chưa tới hạn — đúng kiểu
+              stacked bar của BMS. Cao 8px (trước 5px, đúng thang 4px) —
+              ở 5px hai màu liền kề gần tông dễ nhoè vào nhau, nhất là khi
+              tỉ lệ mỗi đoạn nhỏ. Mỗi đoạn có title riêng để hover ra đúng
+              số, không chỉ dựa vào việc nhận ra màu. */}
+          <span style={{ display: "flex", height: 8, borderRadius: 999, overflow: "hidden", background: C.surface }}>
             {(["xong", "tre", "thieu", "chua"] as TrangThai[]).map((k) => (
-              dem[k].length ? <span key={k} style={{ width: `${(dem[k].length / tong) * 100}%`, background: MAU[k].mau }} /> : null
+              dem[k].length
+                ? <span key={k} title={`${MAU[k].nhan}: ${dem[k].length}`}
+                    style={{ width: `${(dem[k].length / tong) * 100}%`, background: MAU[k].mau,
+                             borderRight: `1px solid ${C.surface}` }} />
+                : null
             ))}
           </span>
         </button>
@@ -264,11 +284,14 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
         </div>
 
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-          {(Object.keys(MAU) as TrangThai[]).map((k) => (
-            <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
-              <span style={{ width: 12, height: 12, borderRadius: 8, background: MAU[k].mau }} />{MAU[k].nhan}
-            </span>
-          ))}
+          {(Object.keys(MAU) as TrangThai[]).map((k) => {
+            const { Icon } = MAU[k];
+            return (
+              <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: MAU[k].mau }}>
+                <Icon size={14} aria-hidden="true" />{MAU[k].nhan}
+              </span>
+            );
+          })}
           <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{tong} hạng mục</span>
         </div>
 
