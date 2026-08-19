@@ -120,9 +120,16 @@ export default function CatalogImpactPreview({ changeId, onClose, onApplied }: {
             </div>
 
             {khongCoGi && (
-              <p style={{ fontSize: 13, color: C.plumSoft, marginBottom: 14 }}>
-                Thay đổi này không làm đổi hạng mục nào trên timeline.
-              </p>
+              <div style={{ display: "flex", gap: 8, padding: 10, borderRadius: 10,
+                            background: C.mintSoft, color: C.mintText, marginBottom: 14 }}>
+                <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                <span style={{ fontSize: 13 }}>
+                  <b>Không có gì phải áp</b> — timeline đã khớp đúng dữ liệu danh mục
+                  hiện tại rồi (có thể một lượt Sinh timeline hoặc áp thay đổi khác đã
+                  cập nhật xong trước đó). Đây không phải lỗi, chỉ là không còn việc để
+                  làm cho thay đổi này. Bấm "Để sau" để đóng.
+                </span>
+              </div>
             )}
 
             {canhBao.length > 0 && (

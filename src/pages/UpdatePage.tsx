@@ -277,17 +277,26 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
       <MetricGrid
         label="Tiến độ thẩm định"
         items={[
+          /* Ba KPI dưới đây đọc từ `model.kpis`, mà model luôn tính với
+             stage="all"/query=""/status="all" (dòng buildProgressWorkspaceModel
+             ở trên) — nghĩa là con số trên ô KHÔNG biết tới bộ lọc Giai đoạn
+             hay ô Tìm đang bật. Bấm ô mà chỉ đổi fix/fst thì bộ lọc Giai đoạn
+             (stageF) hoặc ô Tìm (q) còn sót lại từ trước sẽ tiếp tục ăn vào
+             danh sách bên dưới — bấm "Cần xử lý: 277" có khi ra 0 dòng, đúng
+             kiểu lỗi "số ô báo một đằng, bảng lọc ra một nẻo". Mỗi ô kích hoạt
+             phải dọn sạch CẢ BA thứ (stageF, q) ngoài fix/fst của chính nó,
+             để số trên ô luôn đúng bằng số dòng hiện ra. */
           { id: "dang", label: "Đang thực hiện", value: model.kpis.inProgress,
             priority: "supporting", hint: "trạng thái Đang thực hiện",
-            onActivate: () => { setFst("prog"); setFix("all"); setTrang(0); } },
+            onActivate: () => { setFst("prog"); setFix("all"); setStageF("all"); setQ(""); setTrang(0); } },
           { id: "can-xu-ly", label: "Cần xử lý", value: model.kpis.needsAction,
             priority: "hero", tone: "warning",
             hint: "hồ sơ thiếu hoặc lệch — bấm để lọc đúng các dòng này",
-            onActivate: () => { setFix("can_xu_ly"); setFst("all"); setTrang(0); } },
+            onActivate: () => { setFix("can_xu_ly"); setFst("all"); setStageF("all"); setQ(""); setTrang(0); } },
           { id: "qua-han", label: "Quá hạn", value: model.kpis.overdue,
             priority: "supporting", tone: "danger",
             hint: "mốc chưa xong gần nhất đã qua",
-            onActivate: () => { setFix("qua_han"); setFst("all"); setTrang(0); } },
+            onActivate: () => { setFix("qua_han"); setFst("all"); setStageF("all"); setQ(""); setTrang(0); } },
           { id: "hoan-thien", label: "Độ hoàn thiện dữ liệu",
             value: `${model.kpis.completenessPercent}%`,
             priority: "supporting",

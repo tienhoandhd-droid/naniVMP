@@ -23,7 +23,7 @@
  * ===================================================================== */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bell, Boxes, CalendarPlus, Download, FileSpreadsheet, FlaskConical,
+  Bell, Boxes, CalendarPlus, Check, Download, FileSpreadsheet, FlaskConical,
   History, Hourglass, Plus, RefreshCw, Search,
 } from "lucide-react";
 
@@ -717,7 +717,21 @@ function SinhTimelineDialog({ onClose, onDone }: {
 
       {preview && (
         <div className="cw-xem-truoc">
-          <div><b>{preview.so_tao_moi}</b> hạng mục sẽ được tạo mới</div>
+          {/* Nút "Ghi 0 hạng mục" bị khoá mà không nói gì thêm trông như hỏng.
+              0 tạo mới nghĩa là timeline NĂM NÀY đã đủ rồi — nói thẳng ra thay
+              vì để người dùng tự đoán vì sao nút xám. */}
+          {preview.so_tao_moi === 0 ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+              <span>
+                <b>Timeline năm {nam} đã đủ</b> — cả {preview.so_bo_qua} hạng mục theo danh
+                mục hiện tại đều đã có sẵn, không có mã nào cần tạo thêm. Không phải lỗi,
+                chỉ là không còn việc để ghi.
+              </span>
+            </div>
+          ) : (
+            <div><b>{preview.so_tao_moi}</b> hạng mục sẽ được tạo mới</div>
+          )}
           <div className="cw-nhe">{preview.so_bo_qua} mã đã tồn tại → bỏ qua</div>
           {preview.so_thieu_moc > 0 && (
             <div className="cw-canh-bao-nhe">
