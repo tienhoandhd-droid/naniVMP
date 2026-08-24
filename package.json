@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:unit": "node --import tsx --test tests/unit/*.test.mjs",
+    "test:db:five-role": "bash scripts/run-five-role-db-tests.sh",
     "test:permissions": "npm run test:unit && node tests/e2e/danh-ba-phan-quyen.mjs && node tests/e2e/quyen-cot-timeline.mjs && node tests/e2e/thu-hoi-cache-phan-quyen.mjs && node tests/e2e/danh-muc-nguoi-thuc-hien.mjs",
     "gen:permission-workbook": "node scripts/permission-workbook.mjs public/templates/phan-quyen-vmp.xlsx",
     "gen:types": "supabase gen types typescript --db-url \"$SUPABASE_DB_URL\" --schema public > src/types/database.ts",
