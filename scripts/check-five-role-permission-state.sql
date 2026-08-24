@@ -56,6 +56,7 @@ declare
     'vmp.five_role_check_local_test') = 'on';
   v_preflight jsonb;
   v_warning_count integer;
+  v_warning_digest text;
 begin
   if v_local and (
        current_setting('vmp.five_role_local_test_contract', true)
@@ -251,7 +252,7 @@ begin
     into v_count, v_digest
   from inventory;
   if v_count <> 64
-     or v_digest <> 'c6f8edd60dfc7fb0cb049cac224729cc'
+     or v_digest <> 'e5631441c030967069e172ca6a68ebe1'
      or exists (
        select 1
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -263,6 +264,38 @@ begin
       message = 'CHECK_BROWSER_FUNCTION_CONTRACT';
   end if;
   raise notice 'PASS CHECK_BROWSER_FUNCTION_CONTRACT';
+
+  with inventory as (
+    select p.oid::regprocedure::text identity,
+           pg_get_function_result(p.oid) result_type,
+           l.lanname language, p.prosecdef,
+           coalesce(array_to_string(p.proconfig, ','), '') settings,
+           md5(pg_get_functiondef(p.oid)) definition_hash,
+           r.rolname owner,
+           coalesce(array_to_string(p.proacl, ','), '') acl,
+           has_function_privilege('authenticated', p.oid, 'EXECUTE') auth_exec,
+           has_function_privilege('anon', p.oid, 'EXECUTE') anon_exec,
+           has_function_privilege('public', p.oid, 'EXECUTE') public_exec,
+           has_function_privilege('service_role', p.oid, 'EXECUTE') service_exec
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    join pg_language l on l.oid = p.prolang
+    join pg_roles r on r.oid = p.proowner
+    where n.nspname = 'public'
+      and has_function_privilege('service_role', p.oid, 'EXECUTE')
+  )
+  select count(*), md5(string_agg(concat_ws('|', identity, result_type,
+           language, prosecdef, settings, definition_hash, owner, acl,
+           auth_exec, anon_exec, public_exec, service_exec), E'\n'
+           order by identity))
+    into v_count, v_digest
+  from inventory;
+  if v_count <> 207
+     or v_digest <> 'b60d876fedc438540890578da071a693' then
+    raise exception using errcode = 'check_violation',
+      message = 'CHECK_SERVICE_ROLE_FUNCTION_CONTRACT';
+  end if;
+  raise notice 'PASS CHECK_SERVICE_ROLE_FUNCTION_CONTRACT';
 
   if exists (
     select 1
@@ -300,13 +333,24 @@ begin
          md5(string_agg(code || '=' || n, E'\n' order by code))
     into v_count, v_digest
   from codes;
-  v_warning_count := jsonb_array_length(v_preflight -> 'warnings');
+  with codes as (
+    select coalesce(e ->> 'code', '<NULL>') code, count(*) n
+    from jsonb_array_elements(v_preflight -> 'warnings') e
+    group by 1
+  )
+  select coalesce(sum(n), 0)::integer,
+         coalesce(md5(string_agg(code || '=' || n, E'\n' order by code)),
+           md5(''))
+    into v_warning_count, v_warning_digest
+  from codes;
   if (v_local and (v_count <> 16
        or v_digest <> '51655dff70de3ba821367c8f3784d078'
-       or v_warning_count <> 8))
+       or v_warning_count <> 8
+       or v_warning_digest <> '1dfde6e08513295b7e91472e406e2c6b'))
      or (not v_local and (v_count <> 481
        or v_digest <> 'a987324be3986521ed2d26a183c4c318'
-       or v_warning_count <> 13)) then
+       or v_warning_count <> 13
+       or v_warning_digest <> '1c6a661e271c910e7010e872a7ef52c1')) then
     raise exception using errcode = 'check_violation',
       message = 'CHECK_ITEM_PERMISSION_BLOCKER_CONTRACT';
   end if;

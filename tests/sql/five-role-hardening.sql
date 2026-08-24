@@ -220,6 +220,8 @@ commit;
 \set qa_staff_uid '88888888-8888-4888-8888-888888888888'
 \set workshop_manager_uid '99999999-9999-4999-8999-999999999999'
 \set workshop_staff_uid 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+\set rls_profile_uid 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+\set rls_inactive_profile_uid 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 
 begin;
 
@@ -311,14 +313,25 @@ with payload as (
   select sum(n)::integer total,
          md5(string_agg(code || '=' || n, E'\n' order by code)) digest
   from codes
+), warning_codes as (
+  select coalesce(e ->> 'code', '<NULL>') code, count(*) n
+  from payload
+  cross join lateral jsonb_array_elements(j -> 'warnings') e
+  group by 1
+), warning_summary as (
+  select coalesce(sum(n), 0)::integer total,
+         coalesce(md5(string_agg(code || '=' || n, E'\n' order by code)),
+           md5('')) digest
+  from warning_codes
 )
 select pg_temp.assert_true(
   summary.total = 16
   and summary.digest = '51655dff70de3ba821367c8f3784d078'
-  and jsonb_array_length(payload.j -> 'warnings') = 8,
+  and warning_summary.total = 8
+  and warning_summary.digest = '1dfde6e08513295b7e91472e406e2c6b',
   'ITEM_PERMISSION_BLOCKER_LOCAL_CONTRACT'
 )
-from payload cross join summary;
+from payload cross join summary cross join warning_summary;
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -332,7 +345,9 @@ values
   (:'qa_manager_uid'::uuid, 'authenticated', 'authenticated', 'qa-manager-fixture@example.test', 'not-used', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
   (:'qa_staff_uid'::uuid, 'authenticated', 'authenticated', 'qa-staff-fixture@example.test', 'not-used', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
   (:'workshop_manager_uid'::uuid, 'authenticated', 'authenticated', 'workshop-manager-fixture@example.test', 'not-used', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
-  (:'workshop_staff_uid'::uuid, 'authenticated', 'authenticated', 'workshop-staff-fixture@example.test', 'not-used', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
+  (:'workshop_staff_uid'::uuid, 'authenticated', 'authenticated', 'workshop-staff-fixture@example.test', 'not-used', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+  (:'rls_profile_uid'::uuid, 'authenticated', 'authenticated', 'rls-profile-fixture@example.test', 'not-used', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+  (:'rls_inactive_profile_uid'::uuid, 'authenticated', 'authenticated', 'rls-inactive-profile-fixture@example.test', 'not-used', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
 insert into public.departments (id, name, short_name)
 values ('QA', 'Quality Assurance fixture', 'QA'),
@@ -348,6 +363,19 @@ values
   (:'qa_staff_uid'::uuid, 'QA staff fixture', 'qa-staff-fixture@example.test', 'department_user', 'QA', true),
   (:'workshop_manager_uid'::uuid, 'Workshop manager fixture', 'workshop-manager-fixture@example.test', 'department_user', 'WS', true),
   (:'workshop_staff_uid'::uuid, 'Workshop staff fixture', 'workshop-staff-fixture@example.test', 'department_user', 'WS', true);
+
+-- Transaction-only grants make the four reviewed policies observable without
+-- changing the deployed direct-profile-DML prohibition.  Their RED forms
+-- fail on the old auth_user_role() dependency after the 64-entry ACL revoke.
+insert into public.departments (id, name, short_name)
+values ('FIVE_ROLE_RLS_DELETE', 'Five-role RLS delete fixture', 'FRD');
+insert into public.system_config (key, value, description, is_sensitive)
+values
+  ('five_role_rls_public', '"public"'::jsonb, 'Five-role RLS public fixture', false),
+  ('five_role_rls_sensitive', '"sensitive"'::jsonb, 'Five-role RLS sensitive fixture', true);
+grant delete on public.departments to authenticated;
+grant insert on public.profiles to authenticated;
+grant select, update on public.system_config to authenticated;
 
 update public.vmp_performers
 set department = case
@@ -366,6 +394,78 @@ where user_id in (
   :'inactive_uid'::uuid, :'qa_manager_uid'::uuid, :'qa_staff_uid'::uuid,
   :'workshop_manager_uid'::uuid, :'workshop_staff_uid'::uuid
 );
+
+-- A regression in the browser ACL left these policies referencing the
+-- unexposed auth_user_role() helper.  Exercise policy behavior, rather than
+-- policy text, under active Admin, inactive, and active non-Admin personas.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', :'admin_uid', 'role', 'authenticated')::text, true);
+select pg_temp.assert_true(
+  (select count(*) = 2 from public.system_config
+   where key in ('five_role_rls_public', 'five_role_rls_sensitive')),
+  'ACTIVE_ADMIN_CONFIG_SELECT_RLS'
+);
+with changed as (
+  update public.system_config
+  set description = description
+  where key = 'five_role_rls_sensitive'
+  returning key
+)
+select pg_temp.assert_true((select count(*) = 1 from changed),
+  'ACTIVE_ADMIN_CONFIG_MODIFY_RLS');
+delete from public.departments where id = 'FIVE_ROLE_RLS_DELETE';
+select pg_temp.assert_true(
+  not exists (select 1 from public.departments where id = 'FIVE_ROLE_RLS_DELETE'),
+  'ACTIVE_ADMIN_DEPARTMENT_DELETE_RLS'
+);
+insert into public.profiles (id, full_name, email, role, department, is_active)
+values (:'rls_profile_uid'::uuid, 'RLS profile fixture',
+  'rls-profile-fixture@example.test', 'department_user', 'QA', true);
+select pg_temp.assert_true(
+  exists (select 1 from public.profiles where id = :'rls_profile_uid'::uuid),
+  'ACTIVE_ADMIN_PROFILE_INSERT_RLS'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', :'inactive_uid', 'role', 'authenticated')::text, true);
+select pg_temp.assert_true(
+  (select count(*) = 0 from public.system_config
+   where key in ('five_role_rls_public', 'five_role_rls_sensitive')),
+  'INACTIVE_CONFIG_SELECT_FAILS_CLOSED'
+);
+with changed as (
+  update public.system_config
+  set description = description
+  where key = 'five_role_rls_public'
+  returning key
+)
+select pg_temp.assert_true((select count(*) = 0 from changed),
+  'INACTIVE_CONFIG_MODIFY_FAILS_CLOSED'
+);
+select pg_temp.assert_denied_scalar(
+  'insert into public.profiles (id, full_name, email, role, department, is_active) values (''cccccccc-cccc-4ccc-8ccc-cccccccccccc'', ''Inactive RLS profile fixture'', ''rls-inactive-profile-fixture@example.test'', ''department_user'', ''QA'', true)',
+  'INACTIVE_PROFILE_INSERT_FAILS_CLOSED'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', :'qa_staff_uid', 'role', 'authenticated')::text, true);
+select pg_temp.assert_true(
+  (select count(*) = 1 from public.system_config
+   where key in ('five_role_rls_public', 'five_role_rls_sensitive'))
+  and exists (select 1 from public.system_config where key = 'five_role_rls_public')
+  and not exists (select 1 from public.system_config where key = 'five_role_rls_sensitive'),
+  'NON_ADMIN_CONFIG_SELECTS_ONLY_NON_SENSITIVE'
+);
+
+reset role;
+revoke delete on public.departments from authenticated;
+revoke insert on public.profiles from authenticated;
+revoke select, update on public.system_config from authenticated;
 
 set local session_replication_role = replica;
 insert into public.vmp_objects (code, name)
@@ -895,6 +995,34 @@ select pg_temp.assert_true(
   ),
   'EXACT_BROWSER_FUNCTION_SURFACE'
 );
+with inventory as (
+  select p.oid::regprocedure::text identity,
+         pg_get_function_result(p.oid) result_type,
+         l.lanname language, p.prosecdef,
+         coalesce(array_to_string(p.proconfig, ','), '') settings,
+         md5(pg_get_functiondef(p.oid)) definition_hash,
+         r.rolname owner,
+         coalesce(array_to_string(p.proacl, ','), '') acl,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE') auth_exec,
+         has_function_privilege('anon', p.oid, 'EXECUTE') anon_exec,
+         has_function_privilege('public', p.oid, 'EXECUTE') public_exec
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  join pg_language l on l.oid = p.prolang
+  join pg_roles r on r.oid = p.proowner
+  where n.nspname = 'public'
+    and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+      or has_function_privilege('anon', p.oid, 'EXECUTE')
+      or has_function_privilege('public', p.oid, 'EXECUTE'))
+)
+select pg_temp.assert_true(
+  (select count(*) = 64 from inventory)
+  and (select md5(string_agg(concat_ws('|', identity, result_type, language,
+    prosecdef, settings, definition_hash, owner, acl, auth_exec, anon_exec,
+    public_exec), E'\n' order by identity)) = 'e5631441c030967069e172ca6a68ebe1'
+       from inventory),
+  'EXACT_BROWSER_FUNCTION_CONTRACT'
+);
 select pg_temp.assert_true(
   has_function_privilege('authenticated', 'public.is_admin()', 'EXECUTE')
   and has_function_privilege('authenticated', 'public.is_admin_or_qa()', 'EXECUTE')
@@ -920,6 +1048,40 @@ select pg_temp.assert_true(
     'public.screen_access_mode()', 'EXECUTE'),
   'OUT_OF_INVENTORY_HELPERS_NOT_BROWSER_EXECUTABLE'
 );
+with inventory as (
+  select p.oid::regprocedure::text identity,
+         pg_get_function_result(p.oid) result_type,
+         l.lanname language, p.prosecdef,
+         coalesce(array_to_string(p.proconfig, ','), '') settings,
+         md5(pg_get_functiondef(p.oid)) definition_hash,
+         r.rolname owner,
+         coalesce(array_to_string(p.proacl, ','), '') acl,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE') auth_exec,
+         has_function_privilege('anon', p.oid, 'EXECUTE') anon_exec,
+         has_function_privilege('public', p.oid, 'EXECUTE') public_exec,
+         has_function_privilege('service_role', p.oid, 'EXECUTE') service_exec
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  join pg_language l on l.oid = p.prolang
+  join pg_roles r on r.oid = p.proowner
+  where n.nspname = 'public'
+    and has_function_privilege('service_role', p.oid, 'EXECUTE')
+), contract as (
+  select count(*) count,
+         md5(string_agg(concat_ws('|', identity, result_type, language,
+           prosecdef, settings, definition_hash, owner, acl, auth_exec,
+           anon_exec, public_exec, service_exec), E'\n' order by identity)) digest
+  from inventory
+)
+select pg_temp.assert_true(
+  contract.count = 207
+  and contract.digest = 'b60d876fedc438540890578da071a693'
+  and has_function_privilege('service_role',
+    'public.rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)',
+    'EXECUTE'),
+  'EXACT_SERVICE_ROLE_FUNCTION_CONTRACT'
+)
+from contract;
 
 select pg_temp.assert_true(
   not has_table_privilege('authenticated', 'public.profiles', 'UPDATE')

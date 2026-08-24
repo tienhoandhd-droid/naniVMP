@@ -242,8 +242,11 @@ test("database browser surface is the reviewed 60 plus four exact RLS helpers", 
     assert.match(source, new RegExp(`\\('${identity.replace(/[()]/g, "\\$&")}\\'\\)`));
   }
   assert.match(source, /3dd77d7f46c8b01fdcd39f96996f87d2/);
-  assert.match(source, /c6f8edd60dfc7fb0cb049cac224729cc/);
+  assert.match(source, /e5631441c030967069e172ca6a68ebe1/);
+  assert.match(source, /b60d876fedc438540890578da071a693/);
   assert.match(source, /revoke execute on all functions in schema public\s+from public, anon, authenticated/i);
+  assert.match(source,
+    /grant execute on function public\.%.+ to authenticated, service_role/i);
 });
 
 test("production apply has one immutable approved account digest", () => {
