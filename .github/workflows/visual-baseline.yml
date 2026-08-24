@@ -5,6 +5,15 @@
 #  phải sinh từ đúng môi trường sẽ so (ubuntu + chromium của Playwright);
 #  ảnh chụp trên máy dev macOS lệch font rendering nên bị gitignore.
 #  Workflow tự commit baseline mới với [skip ci].
+#
+#  --- Rà soát 19/08 ----------------------------------------------------
+#  · Job này TRƯỚC ĐÂY không có timeout-minutes nào. Run 32169816409 treo
+#    đúng 6 giờ 0 phút ở bước cài chromium (apt-get đứng im), giữ luôn
+#    hàng đợi. Nay: hạn cho cả job, và hạn riêng cho bước tải.
+#  · Bỏ --with-deps để không gọi apt nữa; cache ~/.cache/ms-playwright.
+#  · Commit baseline mang [skip ci], mà push bằng GITHUB_TOKEN vốn cũng
+#    KHÔNG kích hoạt workflow nào — nên trước đây phải vào bấm tay
+#    "Quality and Deploy" thì web mới lên. Nay bước cuối tự gọi hộ.
 # =====================================================================
 name: Visual baseline
 
@@ -13,10 +22,13 @@ on:
 
 permissions:
   contents: write
+  # Cần để `gh workflow run` kích hoạt lại Quality and Deploy ở bước cuối.
+  actions: write
 
 jobs:
   update-baseline:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -27,8 +39,15 @@ jobs:
 
       - run: npm ci
 
-      - name: Cài chromium cho Playwright
-        run: npx playwright install chromium --with-deps
+      - name: Cache chromium của Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Cài chromium cho Playwright (không đụng apt)
+        timeout-minutes: 6
+        run: npx playwright install chromium
 
       - name: Dựng .env.local giả lập (không secret thật)
         run: |
@@ -41,13 +60,25 @@ jobs:
         run: bash scripts/with-preview.sh -- npx playwright test -c playwright.visual.config.ts --update-snapshots
 
       - name: Commit baseline mới
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add tests/visual/baselines
           if git diff --cached --quiet; then
             echo "Baseline không đổi — không có gì để commit."
+            echo "da_doi=khong" >> "$GITHUB_OUTPUT"
           else
             git commit -m "test(visual): cập nhật baseline từ CI [skip ci]"
             git push
+            echo "da_doi=co" >> "$GITHUB_OUTPUT"
           fi
+
+      # Push bằng GITHUB_TOKEN không tự kích hoạt workflow nào, nên nếu
+      # không gọi tường minh ở đây thì baseline mới nằm im và web không
+      # bao giờ được dựng lại từ nó.
+      - name: Nối lại chuỗi — kích hoạt Quality and Deploy
+        if: steps.commit.outputs.da_doi == 'co'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref "${{ github.ref_name }}"
