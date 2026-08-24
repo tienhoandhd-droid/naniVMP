@@ -404,9 +404,11 @@ git commit -m "fix(security): harden five-role database permissions"
 - Modify: `src/lib/access.ts`
 - Modify: `src/hooks/useAccess.ts`
 - Modify: `src/hooks/index.ts`
+- Modify: `src/App.tsx`
 - Modify: `src/components/auth/ScreenGuard.tsx`
 - Modify: `src/features/catalogWorkspace/CatalogWorkspaceShell.tsx`
 - Modify: `src/lib/supabaseClient.ts`
+- Modify: `src/lib/snapshotCache.ts`
 - Modify: `src/features/itemPermissions/permissionWorkbook.ts`
 - Modify: `tests/unit/screen-access.test.mjs`
 - Modify: `tests/unit/snapshot-permission-cache.test.mjs`
