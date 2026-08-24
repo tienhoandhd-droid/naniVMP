@@ -4,6 +4,77 @@ This runbook deploys the database boundary before the frontend. It never
 selects accounts by email, name, or regex. Keep the reviewed seven UUIDs in a
 private shell variable; do not paste them into logs, tickets, or this repo.
 
+## Frozen release identity and evidence
+
+The reviewed implementation tree is commit
+`5b08d954cdc93aee45bad7c9bb15e0f05395b190`. The deployable release is exactly
+one documentation-only child of that commit. A commit cannot contain its own
+SHA, so obtain `RELEASE_FREEZE_SHA`, `RELEASE_RUNBOOK_BLOB_OID`, and
+`RELEASE_RUNBOOK_SHA256` from the independently signed-off release evidence
+record. Never infer them from the current checkout.
+
+Reviewed database artifacts at the implementation parent:
+
+- migration SHA-256: `82c321e40f73152bb1131a5b73067e0efc790d39d7926ac2da4b0bd191ccaf08`;
+- apply entrypoint SHA-256: `4f97a2acd684b678a02b17891e8fb5559a493fad066418df988be44f819621fc`;
+- account manifest SHA-256: `43911dbb547ce81ba0d75542d2d882dbe66dab42adf22518410431d1b0b86dc0`;
+- checker SHA-256: `63ce4020c57ed4ed953a3da4686d7a39f7e2757b70c57e0ee78c1f811a595cd4`.
+
+The sealed schema clone ran PostgreSQL `17.6`. Reviewed post-apply contracts are
+64 browser functions / `e5631441c030967069e172ca6a68ebe1`, 207 service-role
+functions / `b60d876fedc438540890578da071a693`, and production warning distribution
+13 / `1c6a661e271c910e7010e872a7ef52c1`
+(`EMPLOYEE_CODE_MISSING=13`).
+
+Local verification at the implementation parent:
+
+- typecheck: pass;
+- unit: 336 total, 335 pass, 0 fail, 1 pre-existing skip;
+- sealed database checker: 14/14 PASS and ROLLBACK;
+- five-role SQL suite: pass and ROLLBACK;
+- mock E2E: `e2e:gialap` 171 pass / 0 fail; `e2e:catalog` 75 / 0;
+  `e2e:admin` 60 / 0 plus `access transition race: pass`; wrapper cleanup
+  `PORT_4173_FREE_AFTER`;
+- drift: 49 migration-scope files and 132 white-background-rule files checked,
+  no design drift;
+- Vite build: pass (`built in 7.74s`); `dist` 53 files / 3,437,504 bytes,
+  tree SHA-256 `3eb1b88cd8bf6330ebbd7608cbfef49804057a2a57a668c3aeb044924a3e0fce`,
+  `dist/index.html` SHA-256
+  `0100469e66b33ac0aec92dc85803b770ec56a0a2a708e11465bca8043e36329c`;
+- `git diff --check origin/main...HEAD`: pass; tracked status count: 0.
+
+Before loading credentials or the private manifest, verify the release object,
+topology, runbook content, and artifacts:
+
+```bash
+readonly IMPLEMENTATION_SHA='5b08d954cdc93aee45bad7c9bb15e0f05395b190'
+readonly RUNBOOK_PATH='docs/runbooks/2026-08-24-five-role-permission-deploy.md'
+: "${RELEASE_FREEZE_SHA:?set from the signed-off release evidence record}"
+: "${RELEASE_RUNBOOK_BLOB_OID:?set from the signed-off release evidence record}"
+: "${RELEASE_RUNBOOK_SHA256:?set from the signed-off release evidence record}"
+
+test "$(git rev-parse --verify 'HEAD^{commit}')" = "$RELEASE_FREEZE_SHA"
+test "$(git rev-list --parents -n 1 "$RELEASE_FREEZE_SHA" | awk '{print NF}')" -eq 2
+test "$(git rev-parse --verify "$RELEASE_FREEZE_SHA^")" = "$IMPLEMENTATION_SHA"
+test "$(git diff-tree --no-commit-id --name-only -r "$RELEASE_FREEZE_SHA")" = "$RUNBOOK_PATH"
+git diff --quiet "$IMPLEMENTATION_SHA" "$RELEASE_FREEZE_SHA" -- . \
+  ":(exclude)$RUNBOOK_PATH"
+test "$(git rev-parse "$RELEASE_FREEZE_SHA:$RUNBOOK_PATH")" = \
+  "$RELEASE_RUNBOOK_BLOB_OID"
+test "$(git show "$RELEASE_FREEZE_SHA:$RUNBOOK_PATH" | sha256sum | awk '{print $1}')" = \
+  "$RELEASE_RUNBOOK_SHA256"
+test -z "$(git status --porcelain --untracked-files=no)"
+
+sha256sum --check <<'SHA256'
+82c321e40f73152bb1131a5b73067e0efc790d39d7926ac2da4b0bd191ccaf08  supabase/migrations/20260824120000_five_role_permission_hardening.sql
+4f97a2acd684b678a02b17891e8fb5559a493fad066418df988be44f819621fc  scripts/apply-five-role-hardening.sql
+43911dbb547ce81ba0d75542d2d882dbe66dab42adf22518410431d1b0b86dc0  scripts/apply-five-role-account-manifest.sql
+63ce4020c57ed4ed953a3da4686d7a39f7e2757b70c57e0ee78c1f811a595cd4  scripts/check-five-role-permission-state.sql
+SHA256
+```
+
+Abort before credentials, backup, or apply if any command differs or fails.
+
 ## Release inputs
 
 Use the reviewed branch commit and a private environment file. Do not print
@@ -16,16 +87,10 @@ set +a
 export VMP_ACCOUNT_IDS='seven,reviewed,comma-separated,uuid,values,go,here'
 test -n "$SUPABASE_DB_URL"
 test -n "$VMP_ACCOUNT_IDS"
-git status --short
-git rev-parse HEAD
-sha256sum supabase/migrations/20260824120000_five_role_permission_hardening.sql \
-  scripts/apply-five-role-hardening.sql \
-  scripts/apply-five-role-account-manifest.sql \
-  scripts/check-five-role-permission-state.sql
 ```
 
-Abort if the worktree is dirty, the commit is not the reviewed release commit,
-or the hashes differ from the review evidence.
+The frozen release-object checks above must pass before these private inputs are
+loaded.
 
 ## Read-only production preflight
 
@@ -83,16 +148,29 @@ select count(*) effective_browser_functions,
 from inventory;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 with payload as (select public.rpc_item_permission_preflight() j),
-codes as (
+blocker_codes as (
   select e ->> 'code' code, count(*) n
-  from payload cross join lateral
-    jsonb_array_elements(j -> 'blocking_errors') e
+  from payload cross join lateral jsonb_array_elements(j -> 'blocking_errors') e
   group by 1
+), blocker_summary as (
+  select coalesce(sum(n), 0)::integer total,
+         md5(string_agg(code || '=' || n, E'\n' order by code)) digest
+  from blocker_codes
+), warning_codes as (
+  select coalesce(e ->> 'code', '<NULL>') code, count(*) n
+  from payload cross join lateral jsonb_array_elements(j -> 'warnings') e
+  group by 1
+), warning_summary as (
+  select coalesce(sum(n), 0)::integer total,
+         coalesce(md5(string_agg(code || '=' || n, E'\n' order by code)),
+                  md5('')) digest
+  from warning_codes
 )
-select sum(n) blocker_total,
-       md5(string_agg(code || '=' || n, E'\n' order by code)) blocker_digest,
-       (select jsonb_array_length(j -> 'warnings') from payload) warning_count
-from codes;
+select blocker_summary.total blocker_total,
+       blocker_summary.digest blocker_digest,
+       warning_summary.total warning_count,
+       warning_summary.digest warning_digest
+from blocker_summary cross join warning_summary;
 select count(*) as active_admins
 from public.profiles
 where role::text = 'admin' and coalesce(is_active, true);
@@ -118,8 +196,9 @@ Required results:
 - effective browser-function baseline: 189 rows / digest
   `3dd77d7f46c8b01fdcd39f96996f87d2`;
 - item-permission preflight: 481 blockers / breakdown digest
-  `a987324be3986521ed2d26a183c4c318`, 13 warnings. The warning code is
-  `EMPLOYEE_CODE_MISSING`;
+  `a987324be3986521ed2d26a183c4c318`, 13 warnings / warning digest
+  `1c6a661e271c910e7010e872a7ef52c1`. The warning code distribution is
+  `EMPLOYEE_CODE_MISSING=13`;
 - at least one active Admin.
 
 The original `b5fb...` evidence used both an explicit boolean cast and CSV
@@ -220,7 +299,7 @@ psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 <<'PSQL'
 PSQL
 ```
 
-All thirteen `PASS` rule IDs must appear, followed by `ROLLBACK`, with no warning or
+All fourteen `PASS` rule IDs must appear, followed by `ROLLBACK`, with no warning or
 error. Separately probe one current Admin, QA Manager, QA Staff, Workshop
 Manager, Workshop Staff and one disabled account using approved test sessions.
 Output only role/status/counts. Required behavior:
@@ -242,7 +321,9 @@ requires every supplied target to be inactive, and requires exactly one
 matching hardening audit per target. It also verifies policies effective
 through `TO PUBLIC` or inherited roles, PUBLIC/anon/authenticated profile write
 revocation, the exact 64-function browser surface with outward digest
-`c6f8edd60dfc7fb0cb049cac224729cc`, the unchanged 481-blocker digest,
+`e5631441c030967069e172ca6a68ebe1`, the unchanged 481-blocker digest. The
+checker also pins the complete effective `service_role` function contract at
+207 functions / digest `b60d876fedc438540890578da071a693`,
 53 owner-matched wrapper/implementation pairs, owner-only hidden
 ACLs (including no `service_role` execute), and zero OID-bound dependents on
 hidden implementations.
