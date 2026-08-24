@@ -28,6 +28,9 @@ Frontend phải fail-closed khi chưa xác minh được quyền và không đư
 - Không xóa vật lý giá trị enum PostgreSQL `viewer`. Giá trị này được giữ làm legacy inert để tránh rewrite type và dependency.
 - Không xóa `auth.users`, performer, assignment hoặc audit lineage của bảy tài khoản.
 - Không bật `item_permissions_mode=enforced`. Production còn 481 blocker, gồm 461 hạng mục chưa có canonical scope; bật lúc này sẽ khóa người dùng hợp lệ.
+- Inventory bảo mật phải bao phủ toàn bộ hàm `public` mà PUBLIC, `anon` hoặc
+  `authenticated` có EXECUTE hiệu lực. Inventory lời gọi trong frontend chỉ là
+  hợp đồng tương thích, không phải ranh giới tấn công PostgREST.
 - Không sửa dữ liệu scope/assignment để làm preflight xanh giả tạo.
 - Không reconcile toàn bộ lịch sử migration backend đã bị loại khỏi nhánh production hiện tại.
 
@@ -168,6 +171,11 @@ Các test bắt buộc phải được quan sát RED trước implementation r�
 8. Snapshot cũ không render trước access verification.
 9. Typecheck, toàn bộ unit test, SQL security test, E2E mock, drift check và production build đều qua.
 10. `item_permissions_mode=preview` và 481 blocker không bị thay đổi ngoài dự kiến.
+11. Không còn hàm `public` nào thực thi được bởi PUBLIC/`anon`/
+    `authenticated` ngoài 60 boundary web đã guard và bốn helper RLS đã duyệt;
+    mọi RPC automation cũ ngoài frontend là `service_role`-only.
+12. `rpc_get_audit_logs` chỉ trả snapshot audit thô cho Admin/QA Manager đang
+    hoạt động; mọi vai khác bị từ chối ở server trước khi đọc dữ liệu.
 
 SQL mutation test không chạy trên production. Nó chạy trên disposable clone hoặc test database với role `authenticated` non-owner và JWT claims đại diện. Production chỉ nhận migration đã review và các postflight read-only sau commit.
 

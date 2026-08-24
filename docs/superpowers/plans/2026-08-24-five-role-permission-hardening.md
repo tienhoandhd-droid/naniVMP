@@ -511,6 +511,45 @@ git commit -m "fix(security): make five-role frontend fail closed"
 - Consumes: completed Tasks 1–3.
 - Produces: reviewed release commit whose DB and frontend evidence is reproducible.
 
+#### Accepted whole-branch DB review corrections
+
+The first whole-branch review proved that the 62 literal browser calls are not
+the full PostgREST attack surface. Before a release candidate can be frozen:
+
+- Pin the complete baseline `public` function surface on which PUBLIC, `anon`
+  or `authenticated` has effective EXECUTE (count plus owner/ACL/definition/
+  signature digest). The reviewed baseline is 189 signatures with digest
+  `3dd77d7f46c8b01fdcd39f96996f87d2` on the sealed schema clone. Abort on drift.
+- After creating the 62 source boundaries, revoke PUBLIC/`anon`/
+  `authenticated` EXECUTE from every other public function. Re-grant
+  `authenticated` only to the 60 non-service source boundaries and the exact
+  policy-helper allowlist (`is_admin()`, `is_admin_or_qa()`,
+  `vmp_current_session_is_active()`, `vmp_can_view_my_item(text)`); make the
+  three boolean helpers fail closed for inactive sessions. Preserve omitted
+  automation RPCs only for `service_role`, never for browser roles.
+- The postcondition/checker must enumerate every function effectively
+  executable by PUBLIC/`anon`/`authenticated` and reject any signature outside
+  that 64-signature allowlist. Pin the outward wrapper/ACL contract digest, not
+  only hidden implementation ownership.
+- Treat `rpc_get_audit_logs(...)` as an explicit privileged boundary. It must
+  authorize an active canonical Admin or QA Manager before parsing filters or
+  reading audit rows. Other active roles and inactive tokens receive
+  `FORBIDDEN`/session denial with no row or snapshot payload. Admin/QA Manager
+  retain the existing global-audit raw snapshot contract used by the Audit
+  screen; catalog history remains the separate three-table sanitized surface.
+- Keep the item-permission preflight semantically stable across wrapper
+  renames: map hidden `__five_role_impl_20260824` functions back to their public
+  signatures in the unfiltered-reader scanner. Assert before and after apply
+  the exact blocker breakdown: production total 481 with digest
+  `a987324be3986521ed2d26a183c4c318`
+  (`11/2/1/3/461/3` by the documented codes), warnings 13; sealed local fixture
+  total 16 with digest `51655dff70de3ba821367c8f3784d078`.
+- Add RED/GREEN behavior probes for inactive calls to the previously omitted
+  `rpc_apply_sheet_sync` and `rpc_upsert_alert_recipient`, active Workshop
+  Staff access to `rpc_get_audit_logs`, complete exposed-function inventory,
+  and unchanged blocker breakdown. Every mutation probe remains on the sealed
+  loopback clone and rolls back.
+
 - [ ] **Step 1: Run full local verification on the exact branch head**
 
 ```bash
