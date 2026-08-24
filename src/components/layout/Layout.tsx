@@ -534,15 +534,13 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           {refreshing ? "Đang tải…" : "Làm mới"}
         </button>
 
-        {/* Badge ưu tiên VAI NGHIỆP VỤ do server giải (sáu vai) — chỉ khi
-            server chưa giải được (preview/legacy) mới lùi về nhãn quyền
-            đăng nhập cũ. Đây là chỗ người dùng đối chiếu "hệ coi mình là
-            ai" với những nút họ thấy. */}
+        {/* Badge chỉ hiện vai nghiệp vụ hiệu lực do server giải; thiếu payload
+            hợp lệ thì AppShell giữ toàn bộ Layout ngoài màn hình này. */}
         <span className="vmp-perm-badge" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           padding: "8px 14px", borderRadius: 999, fontSize: 12, fontWeight: 800,
-          color: access?.businessRole === "viewer" ? C.skyText : C.pinkText,
-          background: access?.businessRole === "viewer" ? C.skySoft : C.pinkSoft,
+          color: C.pinkText,
+          background: C.pinkSoft,
         }}>
           <ShieldCheck size={14} />
           {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}

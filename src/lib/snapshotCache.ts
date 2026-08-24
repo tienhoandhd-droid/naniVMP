@@ -29,9 +29,10 @@ const VERSION = 2;
 const TTL_MS = 24 * 60 * 60 * 1000;
 
 export type SnapshotPermissionMode = "preview" | "enforced";
+export type SnapshotPermissionState = SnapshotPermissionMode | "unknown" | null;
 
 export function permissionDataPolicy(
-  mode: SnapshotPermissionMode,
+  mode: SnapshotPermissionState,
   previousMode: SnapshotPermissionMode | null,
 ): {
   allowSnapshot: boolean;
@@ -39,12 +40,27 @@ export function permissionDataPolicy(
   bypassWatermark: boolean;
   revokeBeforeFetch: boolean;
 } {
-  const enforced = mode === "enforced";
+  if (mode === "preview") {
+    return {
+      allowSnapshot: true,
+      allowLegacyFallback: true,
+      bypassWatermark: false,
+      revokeBeforeFetch: false,
+    };
+  }
+  if (mode === "enforced") {
+    return {
+      allowSnapshot: false,
+      allowLegacyFallback: false,
+      bypassWatermark: true,
+      revokeBeforeFetch: previousMode !== "enforced",
+    };
+  }
   return {
-    allowSnapshot: !enforced,
-    allowLegacyFallback: !enforced,
-    bypassWatermark: enforced,
-    revokeBeforeFetch: enforced && previousMode !== "enforced",
+    allowSnapshot: false,
+    allowLegacyFallback: false,
+    bypassWatermark: true,
+    revokeBeforeFetch: true,
   };
 }
 

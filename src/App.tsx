@@ -844,7 +844,7 @@ function docLichCron(lich: string): string {
   return `hằng ngày, ${gioChu} giờ VN${quaNgay}`;
 }
 
-/* Màu cho thẻ vai NGHIỆP VỤ (6 vai). Nhãn chữ lấy từ `VAI_NGHIEP_VU` —
+/* Màu cho thẻ năm vai NGHIỆP VỤ hiệu lực. Nhãn chữ lấy từ `VAI_NGHIEP_VU` —
    một nguồn duy nhất cho cả web — ở đây chỉ khai màu.
    Bản trước bảng này khoá theo `profiles.role` 4 vai của hệ CŨ đã bỏ, nên
    admin đọc bảng thấy "Người bộ phận" mà không biết người đó thật ra là
@@ -855,8 +855,8 @@ const MAU_VAI: Record<string, { mau: string; nen: string }> = {
   qa_staff:         { mau: C.lavText, nen: C.pinkMist },
   workshop_manager: { mau: C.skyText, nen: C.skySoft },
   workshop_staff:   { mau: C.skyText, nen: C.pinkMist },
-  viewer:           { mau: C.plumSoft, nen: C.pinkMist },
 };
+const MAU_VAI_CHUA_RO: { mau: string; nen: string } = { mau: C.plumSoft, nen: C.pinkMist };
 
 function AdminView({ conn, user, laAdminThat, access }: {
   /* `laAdminThat` hỏi thẳng server qua access.can("accounts","manage_accounts")
@@ -1019,7 +1019,7 @@ function AdminView({ conn, user, laAdminThat, access }: {
                        ngay trên bảng quản trị là kiểu sai tệ nhất. */
                     const v = {
                       nhan: VAI_NGHIEP_VU.find((x) => x.id === vaiHienTai)?.nhan ?? "—",
-                      ...(MAU_VAI[vaiHienTai] ?? MAU_VAI.viewer),
+                      ...(MAU_VAI[vaiHienTai] ?? MAU_VAI_CHUA_RO),
                     };
                     const suaDuoc = !!laAdminThat && !!nvRow;
                     const dangBan = dangSua === nvRow?.user_id;
@@ -1703,15 +1703,11 @@ function GlobalFilterBar({
 /* Nội dung thật của ứng dụng. `App` bên dưới chỉ bọc thêm sổ trạng thái
    chưa lưu — tách ra để Provider nằm NGOÀI mọi thứ dùng nó, kể cả hộp
    thoại Đổi mật khẩu. */
-function AppShell() {
-  // `isAdmin` đã bỏ hẳn (19/08): PhanQuyenPage.tsx nay tự hỏi `access`,
-  // không nhận `isAdmin` hay `user` nữa. `useAuth()` cũng không còn trả cờ
-  // quyền nào — mọi quyết định "được làm gì" phải hỏi `access.can(...)`.
-  const { user, setUser, logout } = useAuth();
-  /* Quyền xem từng màn do Supabase quyết, không suy từ `role`/`accessClass`.
-     Trong lúc chờ — và khi server chưa có `rpc_my_ui_access` — hook trả về
-     quyền theo luật cũ ở chế độ `preview`, nên ứng dụng chạy y như trước. */
-  const { access } = useAccess(user);
+function VerifiedAppShell({ user, logout, access }: {
+  user: AppUser;
+  logout: () => Promise<void>;
+  access: AccessContext;
+}) {
   /* Hai cờ thay cho `isAdmin` gộp cũ ở hộp Cập nhật tiến độ — mỗi cờ hỏi
      đúng MỘT câu tới `access`, không còn suy quyền từ vai đăng nhập cũ:
      · canChonNguoiThucHien — ai được đổi "Người thực hiện".
@@ -2058,11 +2054,6 @@ function AppShell() {
     };
   }, [silentRefresh]);
 
-  // Login screen
-  if (!user) return (
-    <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />
-  );
-
   const title = NAV_ITEMS.find((n) => n.id === view)?.label || "Tổng quan";
   const stars = [
     { t: "10%", l: "30%", s: 14, c: C.gold, d: "0s" },
@@ -2269,6 +2260,51 @@ function AppShell() {
       </main>
     </div>
   );
+}
+
+function AppShell() {
+  const { user, setUser, logout } = useAuth();
+  const { access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen } = useAccess(user);
+
+  if (!user) return <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />;
+
+  /* Chỉ outer shell được mount trước khi xác minh. Inner shell mới sở hữu
+     useVmpData và mọi effect đọc dữ liệu bảo vệ. */
+  if (dangXacMinhQuyen || loiQuyen) return (
+    <main data-access-state={dangXacMinhQuyen ? "loading" : "error"} style={{
+      minHeight: "100vh", display: "grid", placeItems: "center", padding: 24,
+      background: `linear-gradient(160deg, ${C.bg1}, ${C.bg2})`, fontFamily: TEXT, color: C.plum,
+    }}>
+      <section aria-live="polite" style={{
+        width: "min(100%, 560px)", padding: 28, borderRadius: 18, background: C.surface,
+        border: `1.5px solid ${loiQuyen ? C.raspSoft : C.pinkSoft}`, lineHeight: 1.6,
+      }}>
+        <ShieldCheck size={28} color={loiQuyen ? C.raspText : C.pink} aria-hidden="true" />
+        <h1 style={{ margin: "12px 0 6px", fontSize: 20 }}>
+          {dangXacMinhQuyen ? "Đang xác minh quyền truy cập" : "Chưa xác minh được quyền truy cập"}
+        </h1>
+        <p style={{ margin: 0, color: C.plumSoft }}>
+          {dangXacMinhQuyen
+            ? "Hệ thống đang kiểm tra quyền của phiên này trước khi mở dữ liệu."
+            : `${loiQuyen} Dữ liệu và các màn làm việc đang được giữ kín.`}
+        </p>
+        {!dangXacMinhQuyen && (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 20 }}>
+            <button type="button" onClick={taiLaiQuyen} style={btnPrimary}>
+              <RefreshCw size={16} aria-hidden="true" /> Thử lại
+            </button>
+            <button type="button" onClick={() => { void logout(); }} style={{
+              ...btnPrimary, background: C.surface, color: C.plum, border: `1px solid ${C.pinkSoft}`,
+            }}>
+              Thoát tài khoản
+            </button>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+
+  return <VerifiedAppShell user={user} logout={logout} access={access} />;
 }
 
 export default function App() {

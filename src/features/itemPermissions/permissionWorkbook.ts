@@ -13,8 +13,6 @@ const MAX_PERMISSION_WORKBOOK_ROWS = 1000;
 const MAX_PERMISSION_WORKBOOK_CELLS = 20_000;
 
 const ACCESS_CLASS_BY_LABEL: Record<string, AccessClass> = {
-  "chỉ xem": "view_only",
-  view_only: "view_only",
   "qa – cập nhật 4 mốc hoàn thành": "qa_progress_editor",
   "qa - cập nhật 4 mốc hoàn thành": "qa_progress_editor",
   qa_progress_editor: "qa_progress_editor",

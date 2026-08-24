@@ -47,6 +47,7 @@ test("file Excel phân quyền có đúng 11 cột, validation và hướng dẫ
     const classificationValidation = dataSheet.getCell("E2").dataValidation;
     assert.equal(classificationValidation.type, "list");
     assert.match(classificationValidation.formulae[0], /QA – Cập nhật 4 mốc hoàn thành/);
+    assert.doesNotMatch(classificationValidation.formulae[0], /Chỉ xem/);
 
     const guideSheet = workbook.getWorksheet("Hướng dẫn");
     const guideText = guideSheet.getColumn(1).values.join("\n");
@@ -120,6 +121,19 @@ test("parser bắt workshop_staff nhập đủ bốn tầng phạm vi", async ()
     "Phạm vi khu vực không được để trống",
     "Phạm vi line không được để trống",
   ]);
+});
+
+test("parser không còn nhận Viewer cũ là phân loại quyền hiệu lực", async () => {
+  const { parsePermissionRows, PERMISSION_HEADERS } = await import(
+    "../../src/features/itemPermissions/permissionWorkbook.ts"
+  );
+  const legacyViewer = parsePermissionRows([
+    PERMISSION_HEADERS,
+    [1, "QA", "NV01", "Nguyễn Văn A", "Chỉ xem", "QA", "X1", "KV1", "L1", "", "Không"],
+  ], { scopeCatalog });
+
+  assert.deepEqual(legacyViewer.rows, []);
+  assert.match(legacyViewer.errors[0].message, /Phân loại không hợp lệ/);
 });
 
 test("parser báo đúng dòng khi mã lạ hoặc quan hệ cha con sai", async () => {

@@ -1,97 +1,35 @@
-/* =====================================================================
- *  access.ts — Quyền MÀN HÌNH, đọc từ server
- *  ---------------------------------------------------------------------
- *  Phân biệt với `src/features/itemPermissions/`: bên đó lo quyền theo
- *  TỪNG HẠNG MỤC (ai sửa được cột nào của hạng mục nào). File này lo một
- *  câu hỏi khác và thô hơn: ai được MỞ màn hình nào. Hai lớp không thay
- *  thế nhau — mở được màn không có nghĩa là sửa được dòng trong đó.
- *
- *  Nguồn quyền là `rpc_my_ui_access()` của Supabase. File này chỉ đọc kết
- *  quả và trả lời ba câu tách bạch cho từng màn:
- *
- *      1. Có được thấy màn này không?      → canView(screenId)
- *      2. Được xem phạm vi dữ liệu nào?    → scope(screenId)
- *      3. Được làm hành động nào?          → can(screenId, action)
- *
- *  Ẩn menu KHÔNG phải là bảo mật. Biên chặn thật nằm ở RLS/RPC bên
- *  Supabase; phần này chỉ trình bày đúng những gì server đã quyết.
- *
- *  Không dùng React ở đây, để `node --test` chạy được mà không cần DOM.
- * ===================================================================== */
-import type { AppUser } from "../types/domain.ts";
+/* Quyền màn hình chỉ được cấp bởi payload tường minh của rpc_my_ui_access().
+ * Đây là lớp trình bày; RLS/RPC vẫn là biên chặn dữ liệu thực. */
 
-/* ---------------------------------------------------------------------
- *  Danh sách màn hình
- *  -------------------------------------------------------------------
- *  Phải phủ HẾT mọi hash mà App.tsx render, không chỉ những mục có trong
- *  NAV_ITEMS. Ba mục dưới đây không nằm trong menu nhưng vẫn vào được:
- *
- *    inventory — App.tsx render `view === "inventory"`; giữ có chủ ý để
- *                đường dẫn cũ người dùng đã lưu không chết.
- *    risk      — dùng chung màn với `alerts`, là hash hợp lệ đang lưu hành.
- *    phanquyen — màn Phân quyền hiện tại. Kế hoạch tách thành `people` và
- *                `accounts`, nhưng hai trang đó chưa tồn tại nên hash này
- *                vẫn là cửa vào thật, không phải cửa tương thích.
- *
- *  Bỏ sót một hash ở đây là để nó lọt qua mà không ai kiểm quyền.
- * ------------------------------------------------------------------- */
 export const SCREEN_IDS = [
-  "today",
-  "overview",
-  "timeline",
-  "alerts",
-  "risk",
-  "progress",
-  "inventory",
-  "source",
-  "workload",
-  "reports",
-  "rules",
-  "people",
-  "health",
-  "audit",
-  "accounts",
-  "admin",
-  "phanquyen",
+  "today", "overview", "timeline", "alerts", "risk", "progress", "inventory", "source",
+  "workload", "reports", "rules", "people", "health", "audit", "accounts", "admin", "phanquyen",
 ] as const;
 
 export type ScreenId = (typeof SCREEN_IDS)[number];
-
 const SCREEN_ID_SET: ReadonlySet<string> = new Set(SCREEN_IDS);
 
 export function laScreenId(v: unknown): v is ScreenId {
   return typeof v === "string" && SCREEN_ID_SET.has(v);
 }
 
-/* ---------- Vai trò nghiệp vụ và phạm vi dữ liệu ---------- */
-
+/** Năm vai nghiệp vụ hiệu lực do server có thể cấp. UserRole `viewer` cũ
+ * không thuộc hợp đồng này: nó chỉ giúp server báo `legacy_role_disabled`. */
 export const BUSINESS_ROLES = [
-  "admin",
-  "qa_manager",
-  "qa_staff",
-  "workshop_manager",
-  "workshop_staff",
-  "viewer",
+  "admin", "qa_manager", "qa_staff", "workshop_manager", "workshop_staff",
 ] as const;
 export type BusinessRole = (typeof BUSINESS_ROLES)[number];
 
-/** Nhãn hiển thị của sáu vai — dùng ở badge topbar và mọi chỗ cần gọi tên
- *  vai cho người đọc. Một map duy nhất để không màn nào tự dịch một kiểu. */
 export const BUSINESS_ROLE_LABELS: Record<BusinessRole, string> = {
   admin: "Quản trị",
   qa_manager: "Quản lý QA",
   qa_staff: "QA",
   workshop_manager: "Quản lý xưởng",
   workshop_staff: "Nhân viên xưởng",
-  viewer: "Chỉ xem",
 };
 
 export const DATA_SCOPES = ["all", "workshop", "assigned", "own", "none"] as const;
 export type DataScope = (typeof DATA_SCOPES)[number];
-
-/** `preview` = đang đối chiếu, KHÔNG khoá ai. `enforced` = quyền có hiệu lực.
- *  Cùng ý nghĩa với `ItemPermissionMode` của lớp quyền theo hạng mục, nhưng
- *  là cờ riêng (`screen_access_mode`) vì hai lớp bật/tắt độc lập. */
 export type AccessMode = "preview" | "enforced";
 
 export interface ScreenPermission {
@@ -102,9 +40,7 @@ export interface ScreenPermission {
 
 export interface AccessContext {
   mode: AccessMode;
-  /** null khi server chưa giải được vai trò nghiệp vụ của tài khoản này. */
   businessRole: BusinessRole | null;
-  /** Vì sao không giải được — để màn hình nói được câu có ích thay vì trắng. */
   unresolvedReason: string | null;
   screens: Readonly<Record<string, ScreenPermission>>;
   canView(screenId: string): boolean;
@@ -118,14 +54,11 @@ const TU_CHOI: ScreenPermission = {
   actions: new Set<string>(),
 };
 
-/* ---------- Đọc payload ---------- */
-
 function laObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 function docMode(v: unknown): AccessMode {
-  // Thiếu hoặc lạ thì coi như đang thực thi: chặt hơn là lỏng.
   return v === "preview" ? "preview" : "enforced";
 }
 
@@ -136,8 +69,6 @@ function docBusinessRole(v: unknown): BusinessRole | null {
 }
 
 function docScope(v: unknown): DataScope {
-  // Phạm vi lạ KHÔNG được hiểu thành "all". Một lỗi chính tả ở server mà
-  // được đọc rộng ra là một vụ rò dữ liệu.
   return typeof v === "string" && (DATA_SCOPES as readonly string[]).includes(v)
     ? (v as DataScope)
     : "none";
@@ -149,11 +80,8 @@ function docActions(v: unknown): ReadonlySet<string> {
 }
 
 function docQuyenMotMan(v: unknown): ScreenPermission {
-  if (!laObject(v)) return TU_CHOI;
-  const canView = v.can_view === true;
-  // Không thấy màn thì không có hành động nào — kể cả khi server lỡ gửi kèm.
-  if (!canView) return TU_CHOI;
-  return { canView: true, dataScope: docScope(v.data_scope), actions: docActions(v.actions) };
+  if (!laObject(v) || v.can_view !== true) return TU_CHOI;
+  return { canView: true, dataScope: docScope(v.data_scope ?? v.scope), actions: docActions(v.actions) };
 }
 
 function dungContext(
@@ -178,173 +106,26 @@ function dungContext(
 }
 
 /**
- * Đọc JSON của `rpc_my_ui_access()` thành ngữ cảnh quyền.
- *
- * Mặc định TỪ CHỐI ở mọi chỗ không đọc được: vai trò lạ, màn hình không
- * nằm trong danh sách đã duyệt, phạm vi lạ, payload hỏng. Hàm không bao
- * giờ ném lỗi — payload rác phải cho ra ngữ cảnh không quyền, chứ không
- * làm trắng cả ứng dụng.
- *
- * Ngoại lệ có chủ đích: ở chế độ `preview`, `business_role` có thể là null
- * mà `screens` vẫn có nội dung, vì server trả quyền theo đường cũ để đối
- * chiếu. Không được coi `business_role === null` là cớ để xoá sạch quyền.
+ * Parses only an explicit RPC payload. Malformed, missing, unknown-role, and
+ * legacy Viewer payloads all resolve to zero access. Preview is retained only
+ * when the server explicitly returns it with a valid effective business role.
  */
 export function parseAccessContext(payload: unknown): AccessContext {
   if (!laObject(payload)) return dungContext("enforced", null, null, {});
 
-  const screens: Record<string, ScreenPermission> = {};
-  const raw = payload.screens;
-  if (laObject(raw)) {
-    for (const [screenId, quyen] of Object.entries(raw)) {
-      // Màn hình không có trong danh sách đã duyệt thì bỏ qua, không tin.
-      if (!laScreenId(screenId)) continue;
-      screens[screenId] = docQuyenMotMan(quyen);
-    }
+  const unresolvedReason = typeof payload.unresolved_reason === "string" && payload.unresolved_reason.length > 0
+    ? payload.unresolved_reason
+    : null;
+  if (payload.ok !== true || !laObject(payload.screens)) {
+    return dungContext("enforced", null, unresolvedReason, {});
   }
 
-  const lyDo = payload.unresolved_reason;
-  return dungContext(
-    docMode(payload.mode),
-    docBusinessRole(payload.business_role),
-    typeof lyDo === "string" && lyDo.length > 0 ? lyDo : null,
-    screens,
-  );
-}
-
-/* ---------------------------------------------------------------------
- *  Đường lùi khi server chưa có rpc_my_ui_access
- *  -------------------------------------------------------------------
- *  Migration phân quyền màn hình đi sau bản web này. Trong lúc RPC chưa
- *  tồn tại, gọi nó sẽ lỗi — và nếu lúc đó coi là "không có quyền gì" thì
- *  mọi người mất sạch menu chỉ vì thứ tự triển khai.
- *
- *  Hàm dưới đây tái tạo ĐÚNG luật đang chạy trong Layout.tsx trước khi
- *  đổi, không phải một phiên bản gần đúng:
- *      isAdmin            = role === "admin"
- *      canOpenPermissions = isAdmin | role qa_manager | accessClass
- *                           qa_manager hoặc equipment_manager
- *      phanquyen ← canOpenPermissions;  health/audit/admin ← isAdmin
- *  Luôn đánh dấu `preview` để không chỗ nào nhầm đây là quyền thật.
- * ------------------------------------------------------------------- */
-
-/** Ba màn quản trị đang gắn `adminOnly` trong NAV_ITEMS. `phanquyen` không
- *  nằm đây vì nó có luật riêng rộng hơn. */
-const MAN_CHI_ADMIN: readonly ScreenId[] = ["health", "audit", "admin"];
-
-/** `accounts` là vòng đời tài khoản — chỉ Admin, giống ba màn quản trị kia.
- *  `people` theo đúng luật cũ của màn Phân quyền: Admin, Quản lý QA, hoặc
- *  người mang access_class qa_manager. Không mở cho equipment_manager vì
- *  phần phân công của họ nằm ở `phanquyen`. */
-const MAN_NHAN_SU: ScreenId = "people";
-
-const HANH_DONG_ADMIN = [
-  "edit_catalog",
-  "edit_operational_people",
-  "generate_timeline",
-  "edit_vertical_timeline",
-  "record_actual_validation_date",
-  "assign_workshop_staff",
-  "view_workload",
-  "view_rules",
-  "manage_accounts",
-  "manage_authorization_policy",
-];
-
-/**
- * Hành động của Quản lý QA, chép theo ĐÚNG bảng quyền của server
- * (VMP-noibo/supabase/migrations/20260812090000_six_business_roles_and_screen_access.sql).
- *
- * Vì sao phải chép: bản trước của luật dự phòng cấp `["view"]` cho mọi vai
- * không phải admin. Nhưng server cấp cho Quản lý QA quyền sửa danh mục,
- * sửa hồ sơ nhân sự, cập nhật tiến độ, và cho xem Chất lượng dữ liệu lẫn
- * Nhật ký. Lệch theo hướng đó nghĩa là: ngày `rpc_my_ui_access` hỏng hoặc
- * chưa kịp trả lời, Quản lý QA đột ngột mất gần hết việc hằng ngày và
- * tưởng hệ thống hỏng. Lưới dự phòng phải đỡ đúng chỗ, không phải đỡ hụt.
- *
- * KHÔNG có `manage_accounts` và `manage_authorization_policy`: hai quyền đó
- * server chỉ cấp cho admin, và chúng gate những nút mà RPC sẽ từ chối.
- */
-const HANH_DONG_QA_MANAGER: Partial<Record<string, readonly string[]>> = {
-  source: ["edit_catalog", "generate_timeline"],
-  people: ["edit_operational_people"],
-  progress: ["edit_vertical_timeline"],
-  inventory: ["edit_vertical_timeline"],
-  workload: ["view_workload"],
-  rules: ["view_rules"],
-};
-
-/** Hai màn server cấp cho cả Quản lý QA, mà luật dự phòng cũ để riêng admin. */
-const MAN_QA_MANAGER_XEM_DUOC: readonly string[] = ["health", "audit"];
-
-export function legacyAccessContext(user: AppUser | null | undefined): AccessContext {
-  const laAdmin = user?.role === "admin";
-  const moDuocPhanQuyen = laAdmin
-    || user?.role === "qa_manager"
-    || user?.accessClass === "qa_manager"
-    || user?.accessClass === "equipment_manager";
-
-  const moDuocNhanSu = laAdmin
-    || user?.role === "qa_manager"
-    || user?.accessClass === "qa_manager";
-
-  /* Luật dự phòng chỉ biết `role` và `accessClass`, không biết vai nghiệp
-     vụ do server giải. Cả hai đường đều dẫn tới "quản lý QA" nên gộp lại. */
-  const laQaManager = !laAdmin
-    && (user?.role === "qa_manager" || user?.accessClass === "qa_manager");
+  const role = docBusinessRole(payload.business_role);
+  if (!role) return dungContext("enforced", null, unresolvedReason, {});
 
   const screens: Record<string, ScreenPermission> = {};
-  for (const id of SCREEN_IDS) {
-    let thay: boolean;
-    if (id === "accounts") thay = laAdmin;
-    else if (id === MAN_NHAN_SU) thay = moDuocNhanSu;
-    else if (id === "phanquyen") thay = moDuocPhanQuyen;
-    else if (MAN_QA_MANAGER_XEM_DUOC.includes(id)) thay = laAdmin || laQaManager;
-    else if (MAN_CHI_ADMIN.includes(id)) thay = laAdmin;
-    else thay = !!user;
-
-    screens[id] = thay
-      ? {
-          canView: true,
-          dataScope: "all",
-          actions: new Set(
-            laAdmin ? HANH_DONG_ADMIN
-              : laQaManager ? ["view", ...(HANH_DONG_QA_MANAGER[id] ?? [])]
-                : ["view"],
-          ),
-        }
-      : TU_CHOI;
+  for (const [screenId, quyen] of Object.entries(payload.screens)) {
+    if (laScreenId(screenId)) screens[screenId] = docQuyenMotMan(quyen);
   }
-  return dungContext("preview", null, "legacy_fallback", screens);
+  return dungContext(docMode(payload.mode), role, unresolvedReason, screens);
 }
-
-/**
- * Ở chế độ `preview`: hiển thị theo quyền CŨ, nhưng giữ kết quả resolver
- * của server để đối chiếu.
- *
- * Vì sao không dùng thẳng `screens` server trả về, dù server ở preview cũng
- * cố dựng lại luật cũ: server chỉ biết những gì có trong database, còn luật
- * cũ đọc `user.accessClass` của phiên đang đăng nhập. Hai nguồn đó lệch
- * nhau ngay lúc này — bảy hồ sơ trên live có `access_class` NULL — nên tin
- * server ở preview là âm thầm đổi menu của người đang dùng.
- *
- * Preview phải nghĩa là KHÔNG đổi gì. `businessRole` và `unresolvedReason`
- * vẫn lấy từ server, vì đó chính là thứ cần đối chiếu trước khi bật enforce.
- */
-export function hopNhatPreview(
-  quyenCu: AccessContext,
-  tuServer: AccessContext,
-): AccessContext {
-  return {
-    ...quyenCu,
-    mode: "preview",
-    businessRole: tuServer.businessRole,
-    unresolvedReason: tuServer.unresolvedReason,
-  };
-}
-
-/* ---------- Chuyển hướng an toàn ---------- */
-
-/* `firstAllowedScreen` và thứ tự dự phòng của nó đã chuyển sang
- * `src/lib/navigationContract.ts`. Giữ hai bản sao của cùng một luật
- * "mở màn nào" là cách chắc chắn để chúng lệch nhau — mà lệch ở đây
- * nghĩa là có người vào được màn họ không có quyền. */

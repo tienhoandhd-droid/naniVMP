@@ -10,7 +10,7 @@
  *
  *  Bộ kiểm:
  *   1. Admin thấy 4 màn chỉ-admin trên thanh điều hướng.
- *   2. Vai không phải admin (viewer) không thấy 4 màn đó.
+ *   2. Nhân viên xưởng không thấy 4 màn đó.
  *   3. Cấu hình hệ thống: có bảng người dùng, ô đổi vai, nút Tắt/Bật lại;
  *      bấm Huỷ ở hộp hỏi lý do thì KHÔNG gọi rpc_set_business_role.
  *   4. Đổi vai có nhập lý do: gọi rpc_set_business_role đúng 1 lần, đúng
@@ -98,12 +98,10 @@ function suaKhoAdmin(kho) {
   };
 }
 
-/** Vai KHÔNG phải admin: ẩn hẳn 4 màn chỉ-admin trên rpc_my_ui_access, và
- *  hạ luôn profiles.role để user.perm/isAdmin phía client cũng khớp —
- *  không để hai nguồn quyền lệch nhau trong chính bộ kiểm. */
-function suaKhoViewer(kho) {
+/** Nhân viên xưởng: ẩn hẳn 4 màn chỉ-admin theo payload server. */
+function suaKhoNhanVienXuong(kho) {
   suaKhoAdmin(kho);
-  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "viewer" }));
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "department_user" }));
   const goc = kho.rpc_my_ui_access;
   const screens = {};
   for (const [id, q] of Object.entries(goc.screens)) {
@@ -111,7 +109,23 @@ function suaKhoViewer(kho) {
       ? { can_view: false, scope: "none", actions: [] }
       : { ...q, actions: ["view"] };
   }
-  kho.rpc_my_ui_access = { ...goc, business_role: "viewer", screens };
+  kho.rpc_my_ui_access = { ...goc, business_role: "workshop_staff", screens };
+}
+
+function suaKhoUiAccessLoi(kho) {
+  suaKhoAdmin(kho);
+  kho.rpc_errors = { rpc_my_ui_access: { status: 500, message: "Không đọc được quyền giả lập" } };
+}
+
+function suaKhoViewerCuDaTat(kho) {
+  suaKhoAdmin(kho);
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "viewer" }));
+  kho.rpc_my_ui_access = {
+    ...kho.rpc_my_ui_access,
+    business_role: "viewer",
+    unresolved_reason: "legacy_role_disabled",
+    screens: { overview: { can_view: true, scope: "all", actions: ["view"] } },
+  };
 }
 
 /** Vai nghiệp vụ qa_manager: THẤY được màn Chất lượng dữ liệu (không nằm
@@ -125,8 +139,8 @@ function suaKhoQaManager(kho) {
 }
 
 
-/** Quản lý QA khi server CHƯA có `rpc_my_ui_access` — web rơi về luật dự
- *  phòng `legacyAccessContext`. Đó là luật đang chạy ở chế độ dự thảo. */
+/** Quản lý QA khi server CHƯA có `rpc_my_ui_access`: frontend phải fail
+ *  closed, không dựng quyền từ profile/luật cũ. */
 function suaKhoQaKhongCoUiAccess(kho) {
   suaKhoAdmin(kho);
   kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
@@ -284,24 +298,46 @@ const trinhDuyet = await puppeteer.launch({
   await trang.close();
 }
 
-/* ---- 2. Viewer: không thấy màn chỉ-admin ----------------------------- */
+/* ---- 2. Nhân viên xưởng: không thấy màn chỉ-admin -------------------- */
 {
-  console.log("\nViewer — không thấy màn chỉ-admin:");
-  const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoViewer });
+  console.log("\nNhân viên xưởng — không thấy màn chỉ-admin:");
+  const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoNhanVienXuong });
 
   const kq = await trang.evaluate((ids) => {
     const co = {};
     for (const id of ids) co[id] = !!document.querySelector(`[data-view="${id}"]`);
-    // Một mục KHÔNG chỉ-admin, để chắc là viewer vẫn thấy menu nói chung
+    // Một mục KHÔNG chỉ-admin, để chắc menu không biến mất toàn bộ.
     // (không phải toàn bộ nav biến mất vì lỗi).
     co._today = !!document.querySelector('[data-view="today"]');
     return co;
   }, MAN_CHI_ADMIN);
 
   for (const id of MAN_CHI_ADMIN) {
-    kiem(!kq[id], `viewer KHÔNG thấy mục nav "${id}"`);
+    kiem(!kq[id], `nhân viên xưởng KHÔNG thấy mục nav "${id}"`);
   }
-  kiem(kq._today, "viewer vẫn thấy mục nav thường (today) — menu không vỡ toàn bộ");
+  kiem(kq._today, "nhân viên xưởng vẫn thấy mục nav thường (today) — menu không vỡ toàn bộ");
+  await trang.close();
+}
+
+/* ---- 2b. RPC quyền lỗi: không có Layout/menu/page bảo vệ ------------- */
+for (const [ten, suaKho] of [
+  ["RPC quyền lỗi", suaKhoUiAccessLoi],
+  ["Viewer cũ bị vô hiệu", suaKhoViewerCuDaTat],
+]) {
+  console.log(`\n${ten} — fail closed:`);
+  const { trang } = await moTrang(trinhDuyet, { suaKho });
+  const kq = await trang.evaluate(() => ({
+    state: document.querySelector("[data-access-state]")?.getAttribute("data-access-state"),
+    coSidebar: !!document.querySelector(".vmp-sidebar"),
+    coMenu: document.querySelectorAll("[data-view]").length,
+    coTrangBaoVe: !!document.querySelector(".vmp-view-enter"),
+    coThuLai: document.body.innerText.includes("Thử lại"),
+    coThoat: document.body.innerText.includes("Thoát tài khoản"),
+  }));
+  kiem(kq.state === "error", `${ten}: hiện trạng thái lỗi xác minh`, kq.state || "(trống)");
+  kiem(!kq.coSidebar && kq.coMenu === 0 && !kq.coTrangBaoVe,
+    `${ten}: không dựng Layout/menu/nội dung bảo vệ`);
+  kiem(kq.coThuLai && kq.coThoat, `${ten}: còn nút Thử lại và Thoát tài khoản`);
   await trang.close();
 }
 
@@ -504,10 +540,10 @@ const trinhDuyet = await puppeteer.launch({
     };
   });
   kiem(admin.coEmail, "admin thấy thẻ Ai được phép có tài khoản");
-  /* Ma trận 4 vai cũ đã XOÁ ngày 18/08 cùng cả hệ quyền cũ. Thứ thay nó là
-     ma trận 6 vai "Màn hình bạn được xem", đọc từ rpc_my_ui_access. */
+  /* Ma trận 4 vai cũ đã XOÁ. Thứ thay nó là ma trận năm vai hiệu lực
+     "Màn hình bạn được xem", đọc từ rpc_my_ui_access. */
   kiem(!admin.coMaTranCu, "không còn ma trận 4 vai của hệ cũ");
-  kiem(admin.coMaTranMoi, "admin thấy ma trận 6 vai Màn hình bạn được xem");
+  kiem(admin.coMaTranMoi, "admin thấy ma trận năm vai Màn hình bạn được xem");
   kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang màn Cấu hình hệ thống");
   await a.trang.close();
 
@@ -548,6 +584,7 @@ const trinhDuyet = await puppeteer.launch({
       return {
         moDuocMan: document.body.innerText.includes("Nhân sự")
           || !!document.querySelector('[data-view="people"]'),
+        accessState: document.querySelector("[data-access-state]")?.getAttribute("data-access-state"),
         coOTen: !!oTen,
         oTenSuaDuoc: oTen ? !oTen.disabled : false,
         coNutLuu: !!nutLuu,
@@ -558,18 +595,11 @@ const trinhDuyet = await puppeteer.launch({
     return kq;
   };
 
-  // 9a. Luật dự phòng (chế độ dự thảo, không có rpc_my_ui_access).
+  // 9a. Thiếu RPC: không có luật dự phòng từ role đăng nhập.
   const duPhong = await doSuaDuoc(suaKhoQaKhongCoUiAccess);
-  kiem(duPhong.moDuocMan, "quản lý QA mở được màn Nhân sự ở luật dự phòng");
-  kiem(duPhong.coOTen, "màn Nhân sự có ô hồ sơ để xem");
-  /* Luật dự phòng nay chép theo đúng bảng quyền của server: Quản lý QA có
-     `edit_operational_people`, nên ô hồ sơ phải MỞ. Trước đây nó cấp
-     ["view"] cho mọi vai không phải admin — ngày RPC hỏng là Quản lý QA
-     mất sạch việc hằng ngày và tưởng web hỏng. Phép kiểm này giữ cho lưới
-     dự phòng khỏi hẹp lại lần nữa. */
-  kiem(duPhong.oTenSuaDuoc === true,
-    "ở luật dự phòng, quản lý QA VẪN sửa được hồ sơ (khớp bảng quyền server)",
-    `oTenSuaDuoc=${duPhong.oTenSuaDuoc}`);
+  kiem(duPhong.accessState === "error", "thiếu RPC chuyển sang trạng thái lỗi fail-closed");
+  kiem(!duPhong.moDuocMan && !duPhong.coOTen && !duPhong.coNutLuu,
+    "thiếu RPC không mount màn Nhân sự hay thao tác hồ sơ");
 
   // 9b. Server cấp edit_operational_people: giao diện phải mở khoá ngay.
   const duocCap = await doSuaDuoc(suaKhoQaDuocSuaNhanSu);

@@ -7,7 +7,7 @@
  *   1. Sáu mục điều hướng đúng thứ tự: objects · products · alerts ·
  *      import · pending · history. Không còn "Người thực hiện".
  *   2. Quyền quyết định nút: đủ quyền thấy Thêm/Nhập Excel/Chờ áp dụng;
- *      viewer không thấy bất kỳ lối ghi nào.
+ *      nhân viên xưởng không thấy bất kỳ lối ghi nào và không mở Lịch sử.
  *   3. Bảng ngữ nghĩa thật: <caption>, header dính; mở dòng thấy chi tiết.
  *   4. Điện thoại 390×844: bảng ẩn hẳn, thẻ hiện, CÙNG số dòng và cùng
  *      hành động — một logic, hai cách trình bày.
@@ -46,14 +46,20 @@ function kiem(dieuKien, ten, chiTiet = "") {
 
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Quyền chỉ-đọc: mọi màn xem được nhưng không có hành động ghi nào. */
-function quyenViewer(kho) {
+/** Nhân viên xưởng là persona chỉ-đọc cho Danh mục: không có audit. */
+function quyenNhanVienXuong(kho) {
   const goc = kho.rpc_my_ui_access;
   const screens = {};
   for (const [id, q] of Object.entries(goc.screens)) {
     screens[id] = { ...q, actions: ["view"] };
   }
-  kho.rpc_my_ui_access = { ...goc, business_role: "viewer", screens };
+  screens.audit = { can_view: false, scope: "none", actions: [] };
+  kho.rpc_my_ui_access = { ...goc, business_role: "workshop_staff", screens };
+}
+
+function quyenQuanLyQa(kho) {
+  const goc = kho.rpc_my_ui_access;
+  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
 }
 
 async function moTrang(trinhDuyet, { hash = "source", rong = 1440, cao = 900, suaKho, isMobile = false } = {}) {
@@ -156,10 +162,10 @@ const trinhDuyet = await puppeteer.launch({
   await trang.close();
 }
 
-/* ---- 2. Viewer: không một lối ghi nào ------------------------------- */
+/* ---- 2. Nhân viên xưởng: không một lối ghi hoặc audit nào ------------ */
 {
-  console.log("\nViewer — không lối ghi:");
-  const { trang } = await moTrang(trinhDuyet, { suaKho: quyenViewer });
+  console.log("\nNhân viên xưởng — không lối ghi:");
+  const { trang } = await moTrang(trinhDuyet, { suaKho: quyenNhanVienXuong });
 
   const kq = await trang.evaluate(() => {
     const nav = document.querySelector('[aria-label="Bộ dữ liệu danh mục"]');
@@ -173,11 +179,20 @@ const trinhDuyet = await puppeteer.launch({
     };
   });
 
-  kiem(kq.muc === "objects,products,alerts,history",
-    "viewer chỉ thấy bốn mục đọc", kq.muc || "(không thấy nav)");
-  kiem(!kq.coThem, "viewer không thấy nút Thêm");
-  kiem(!kq.coSua, "viewer không thấy nút Sửa");
-  kiem(kq.soDong > 0, "viewer vẫn đọc được dữ liệu", `${kq.soDong} dòng`);
+  kiem(kq.muc === "objects,products,alerts",
+    "nhân viên xưởng không thấy Lịch sử audit", kq.muc || "(không thấy nav)");
+  kiem(!kq.coThem, "nhân viên xưởng không thấy nút Thêm");
+  kiem(!kq.coSua, "nhân viên xưởng không thấy nút Sửa");
+  kiem(kq.soDong > 0, "nhân viên xưởng vẫn đọc được dữ liệu", `${kq.soDong} dòng`);
+  await trang.close();
+}
+
+/* ---- 2b. Quản lý QA vẫn được đọc Lịch sử ---------------------------- */
+{
+  console.log("\nQuản lý QA — còn Lịch sử:");
+  const { trang } = await moTrang(trinhDuyet, { suaKho: quyenQuanLyQa });
+  const coLichSu = await trang.evaluate(() => !!document.querySelector('[data-cw-nav="history"]'));
+  kiem(coLichSu, "quản lý QA vẫn thấy mục Lịch sử");
   await trang.close();
 }
 

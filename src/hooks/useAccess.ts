@@ -1,99 +1,112 @@
-/* =====================================================================
- *  useAccess.ts — Tải quyền MÀN HÌNH của phiên hiện tại
- *  ---------------------------------------------------------------------
- *  Khác với quyền theo hạng mục ở `src/features/itemPermissions/`: hook
- *  này chỉ trả lời "được mở màn nào", không trả lời "sửa được cột nào".
- *
- *  Trong lúc chờ, và khi server chưa có `rpc_my_ui_access`, hook trả về
- *  quyền theo luật cũ ở chế độ `preview`. Lý do: migration phân quyền màn
- *  hình đi sau bản web này, và trong khoảng đó ứng dụng phải chạy y như
- *  trước chứ không được khoá ai. Ẩn menu vốn không phải bảo mật — RLS/RPC
- *  bên Supabase mới là biên chặn thật.
- * ===================================================================== */
-import { useCallback, useEffect, useState } from "react";
-import { hopNhatPreview, legacyAccessContext, parseAccessContext } from "../lib/access.ts";
+/* Quyền màn hình là fail-closed: chưa có payload hợp lệ từ server thì không
+ * màn nào được mở. Không dựng quyền từ profile, role đăng nhập, hay cache. */
+import { useCallback, useEffect, useRef, useState } from "react";
+import { parseAccessContext } from "../lib/access.ts";
 import type { AccessContext } from "../lib/access.ts";
 import { fetchUiAccess } from "../lib/supabaseData.ts";
 import type { AppUser } from "../types/domain.ts";
 
 export interface AccessState {
-  /** Luôn có giá trị, để giao diện không phải xử lý null ở mọi chỗ. */
   access: AccessContext;
   dangTai: boolean;
-  /** Chỉ khác null khi gọi RPC lỗi thật — không phải khi RPC chưa tồn tại. */
   loi: string | null;
   taiLai: () => void;
 }
 
-/** Chưa đăng nhập thì không có quyền nào. Màn đăng nhập không dùng tới. */
 const KHONG_QUYEN = parseAccessContext(null);
 
+/** Generation gate for access RPCs. It makes an identity change observable
+ * before effects run and rejects both late success and late error handlers
+ * from the previous identity. */
+export class AccessRequestGate {
+  #identity = "";
+  #generation = 0;
+
+  ensureIdentity(identity: string): boolean {
+    if (this.#identity === identity) return false;
+    this.#identity = identity;
+    this.#generation += 1;
+    return true;
+  }
+
+  begin(identity: string): number {
+    this.ensureIdentity(identity);
+    this.#generation += 1;
+    return this.#generation;
+  }
+
+  isCurrent(generation: number): boolean {
+    return generation === this.#generation;
+  }
+
+  invalidate(generation: number): void {
+    if (this.isCurrent(generation)) this.#generation += 1;
+  }
+
+  zeroAccess(): AccessContext { return KHONG_QUYEN; }
+}
+
+function dauVanTay(user: AppUser | null): string {
+  return [user?.uid ?? "", user?.role ?? "", user?.accessClass ?? ""].join("|");
+}
+
 export function useAccess(user: AppUser | null): AccessState {
-  const [access, setAccess] = useState<AccessContext>(() => legacyAccessContext(user));
-  const [dangTai, setDangTai] = useState<boolean>(!!user);
+  const identity = dauVanTay(user);
+  const [access, setAccess] = useState<AccessContext>(KHONG_QUYEN);
+  const [dangTai, setDangTai] = useState(Boolean(user?.uid));
   const [loi, setLoi] = useState<string | null>(null);
   const [lanTai, setLanTai] = useState(0);
+  const gateRef = useRef(new AccessRequestGate());
 
-  const uid = user?.uid ?? null;
-  const role = user?.role ?? null;
-  const accessClass = user?.accessClass ?? null;
+  /* Render đầu tiên sau khi đổi danh tính trả zero access ngay lập tức;
+   * effect bên dưới chỉ được phép cấp lại sau RPC của danh tính MỚI. */
+  const doiDanhTinh = gateRef.current.ensureIdentity(identity);
 
   useEffect(() => {
-    if (!uid) {
+    const generation = gateRef.current.begin(identity);
+    if (!user?.uid) {
       setAccess(KHONG_QUYEN);
       setDangTai(false);
       setLoi(null);
-      return;
+      return undefined;
     }
 
-    /* Dựng lại đường lùi từ chính ba trường mà effect này phụ thuộc, thay vì
-       đóng gói cả object `user` vào dependency — object đổi tham chiếu mỗi
-       lần render sẽ khiến effect chạy lại và gọi RPC liên tục. */
-    const quyenCu = legacyAccessContext({ name: "", role: role ?? "viewer", accessClass });
-
-    let con = true;
+    setAccess(KHONG_QUYEN);
     setDangTai(true);
     setLoi(null);
 
-    fetchUiAccess()
-      .then((kq) => {
-        if (!con) return;
-        if (kq.trangThai === "co") {
-          const tuServer = parseAccessContext(kq.payload);
-          // Preview nghĩa là KHÔNG đổi gì: hiển thị vẫn theo quyền cũ, chỉ
-          // lấy kết quả resolver về để đối chiếu. Xem hopNhatPreview.
-          setAccess(
-            tuServer.mode === "preview" ? hopNhatPreview(quyenCu, tuServer) : tuServer,
-          );
+    void fetchUiAccess()
+      .then((ketQua) => {
+        if (!gateRef.current.isCurrent(generation)) return;
+        if (ketQua.trangThai !== "co") {
+          setAccess(KHONG_QUYEN);
+          setLoi(ketQua.trangThai === "chua_co_rpc"
+            ? "Máy chủ chưa trả được quyền màn hình."
+            : ketQua.thongDiep);
           return;
         }
-        if (kq.trangThai === "chua_co_rpc") {
-          // Bình thường trong giai đoạn chuyển tiếp: giữ quyền cũ, không báo
-          // lỗi cho người dùng, nhưng vẫn để lại dấu vết cho lập trình viên.
-          console.info("useAccess: rpc_my_ui_access chưa có trên server — dùng quyền cũ.");
-          setAccess(quyenCu);
+
+        const tuServer = parseAccessContext(ketQua.payload);
+        if (!tuServer.businessRole) {
+          setAccess(KHONG_QUYEN);
+          setLoi("Máy chủ trả quyền không hợp lệ hoặc tài khoản chưa được phân loại.");
           return;
         }
-        // Lỗi thật: nói thẳng, và vẫn giữ quyền cũ để người dùng còn làm việc.
-        console.error("useAccess: không đọc được quyền màn hình —", kq.thongDiep);
-        setLoi(kq.thongDiep);
-        setAccess(quyenCu);
+        setAccess(tuServer);
       })
-      .catch((e: unknown) => {
-        if (!con) return;
-        const thongDiep = e instanceof Error ? e.message : String(e);
-        console.error("useAccess: lỗi ngoài dự kiến —", thongDiep);
-        setLoi(thongDiep);
-        setAccess(quyenCu);
+      .catch((error: unknown) => {
+        if (!gateRef.current.isCurrent(generation)) return;
+        setAccess(KHONG_QUYEN);
+        setLoi(error instanceof Error ? error.message : "Không đọc được quyền màn hình.");
       })
       .finally(() => {
-        if (con) setDangTai(false);
+        if (gateRef.current.isCurrent(generation)) setDangTai(false);
       });
 
-    return () => { con = false; };
-  }, [uid, role, accessClass, lanTai]);
+    return () => { gateRef.current.invalidate(generation); };
+  }, [identity, lanTai, user?.uid]);
 
   const taiLai = useCallback(() => setLanTai((truoc) => truoc + 1), []);
-
+  if (doiDanhTinh) return { access: KHONG_QUYEN, dangTai: Boolean(user?.uid), loi: null, taiLai };
   return { access, dangTai, loi, taiLai };
 }

@@ -26,6 +26,7 @@ const LY_DO: Record<string, string> = {
   duplicate_person_link: "Tài khoản đang nối với nhiều hồ sơ nhân sự đang hoạt động.",
   missing_access_class: "Hồ sơ nhân sự chưa được phân loại vai trò nghiệp vụ.",
   department_mismatch: "Bộ phận trên tài khoản và trên hồ sơ nhân sự không khớp.",
+  legacy_role_disabled: "Vai Chỉ xem cũ đã ngừng sử dụng; cần quản trị phân loại lại tài khoản vào một trong năm vai hiện hành.",
 };
 
 function KhongVaoDuoc({ access }: { access: AccessContext }) {

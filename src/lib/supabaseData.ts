@@ -729,7 +729,7 @@ export async function setUserActive(
   return unwrap(data, error, active ? "Bật tài khoản thất bại" : "Tắt tài khoản thất bại");
 }
 
-/** Sáu vai NGHIỆP VỤ — đúng những gì `vmp_business_role()` giải ra. Đây là
+/** Năm vai NGHIỆP VỤ hiệu lực — đúng những gì `vmp_business_role()` giải ra. Đây là
  *  từ vựng người dùng nhìn thấy; ánh xạ sang cặp (profiles.role,
  *  vmp_performers.access_class) nằm ở RPC, không ở client. */
 export const VAI_NGHIEP_VU = [
@@ -738,7 +738,6 @@ export const VAI_NGHIEP_VU = [
   { id: "qa_staff", nhan: "Nhân viên QA", mo: "Sửa tiến độ trong phạm vi QA" },
   { id: "workshop_manager", nhan: "Quản lý xưởng", mo: "Quản lý thiết bị của bộ phận" },
   { id: "workshop_staff", nhan: "Nhân viên xưởng", mo: "Sửa việc được phân công" },
-  { id: "viewer", nhan: "Chỉ xem", mo: "Không sửa được gì" },
 ] as const;
 
 export interface VaiNghiepVuRow {

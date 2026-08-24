@@ -62,14 +62,14 @@ type VungId = "objects" | "products" | "alerts" | "import" | "pending" | "histor
 
 const CAC_VUNG: Array<{
   id: VungId; nhan: string; icon: typeof Boxes;
-  canSua?: boolean; canSinhTimeline?: boolean;
+  canSua?: boolean; canSinhTimeline?: boolean; canAudit?: boolean;
 }> = [
   { id: "objects", nhan: "Đối tượng", icon: Boxes },
   { id: "products", nhan: "Sản phẩm GMP", icon: FlaskConical },
   { id: "alerts", nhan: "Người nhận cảnh báo", icon: Bell },
   { id: "import", nhan: "Nhập Excel", icon: FileSpreadsheet, canSua: true },
   { id: "pending", nhan: "Chờ áp dụng", icon: Hourglass, canSua: true, canSinhTimeline: true },
-  { id: "history", nhan: "Lịch sử", icon: History },
+  { id: "history", nhan: "Lịch sử", icon: History, canAudit: true },
 ];
 
 export interface CatalogWorkspaceShellProps {
@@ -90,6 +90,7 @@ export default function CatalogWorkspaceShell({
 }: CatalogWorkspaceShellProps) {
   const canEdit = access.can("source", "edit_catalog");
   const canSinhTimeline = access.can("source", "generate_timeline");
+  const canAudit = access.canView("audit");
 
   const { performers } = usePerformers();
   const performerChoices = buildActivePerformerChoices(performers);
@@ -99,13 +100,22 @@ export default function CatalogWorkspaceShell({
   const goiY = useCatalogSuggestions();
 
   const vungHople = CAC_VUNG.filter((v) =>
-    (!v.canSua || canEdit) && (!v.canSinhTimeline || canSinhTimeline));
+    (!v.canSua || canEdit) && (!v.canSinhTimeline || canSinhTimeline) && (!v.canAudit || canAudit));
 
   const [vung, setVung] = useState<VungId>("objects");
   const [kind, setKind] = useState<ObjectKind>(SOURCE_KINDS[0]);
   const [q, setQ] = useState("");
   const [trang, setTrang] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  /* Thu hồi quyền audit khi History đang mở phải rời tab trước khi effect
+     tải lịch sử có cơ hội tạo request mới. */
+  useEffect(() => {
+    if (vung !== "history" || canAudit) return;
+    setVung("objects");
+    setTrang(0);
+    setExpandedId(null);
+  }, [vung, canAudit]);
 
   /* ---------------- Đối tượng nguồn (đọc theo loại) ---------------- */
   const [objRows, setObjRows] = useState<SourceObjectRow[]>([]);
@@ -184,13 +194,13 @@ export default function CatalogWorkspaceShell({
   }, [vung, penTick]);
 
   useEffect(() => {
-    if (vung !== "history") return;
+    if (vung !== "history" || !canAudit) return;
     setHis((p) => ({ ...p, state: "loading" }));
     listHistory({}, trang, PAGE_SIZE).then((kq) => {
       if (kq.ok) setHis({ state: "ready", rows: kq.history, total: kq.total, err: "" });
       else setHis({ state: "error", rows: [], total: 0, err: kq.error || "Không đọc được lịch sử" });
     });
-  }, [vung, trang, hisTick]);
+  }, [vung, trang, hisTick, canAudit]);
 
   /* ---------------- Điều hướng trong workspace --------------------- */
   const doiVung = (id: VungId) => {

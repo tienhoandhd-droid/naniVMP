@@ -669,9 +669,9 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3l. Trang Luật: phân quyền đúng 6 vai hiện hành ---------------- */
+/* ---- 3l. Trang Luật: phân quyền đúng năm vai hiện hành -------------- */
 {
-  console.log("\nLuật đang áp dụng — 6 vai:");
+  console.log("\nLuật đang áp dụng — năm vai:");
   const trang = await trinhDuyet.newPage();
   await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
@@ -681,6 +681,7 @@ for (const [id, ten] of MAN) {
   const chu = await trang.evaluate(() => document.querySelector("main")?.innerText || "");
   kiem(["workshop_manager", "workshop_staff", "qa_staff"].every((v) => chu.includes(v)),
     "phân quyền liệt kê đủ các vai nghiệp vụ mới", chu.includes("workshop_manager") ? "" : "(thiếu vai xưởng)");
+  kiem(!chu.includes("(viewer)"), "không còn Viewer trong danh sách vai hiệu lực");
   kiem(!chu.includes("department_user"), "không còn vai cũ department_user");
   kiem(/Chế độ quyền màn hình/.test(chu), "hiện chế độ áp quyền (preview/enforced)");
   kiem(!/Google Sheet'?\s*$/m.test(chu) && /Sheet chỉ còn tham chiếu/.test(chu),
@@ -796,22 +797,20 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3p. Vẽ sớm từ bản lưu: mở app là thấy số, không chờ mạng ------- */
+/* ---- 3p. Chưa xác minh quyền: tuyệt đối không vẽ bản lưu ------------- */
 {
-  console.log("\nVẽ sớm từ bản lưu:");
+  console.log("\nChưa xác minh quyền — không vẽ bản lưu:");
   const trang = await trinhDuyet.newPage();
-  /* Cả hai RPC khởi động bị làm chậm 4 giây — giả lập đúng cảnh "mạng
-     công ty buổi sáng" mà người dùng than là "nút đang tải hiện rất lâu".
-     App phải vẽ NGAY bằng bản chụp trong localStorage, trước khi bất kỳ
-     RPC nào kịp trả lời, và banner phải nói thật là đang xem bản lưu. */
+  /* RPC màn hình và mode đều bị trễ 4 giây. Bản lưu tồn tại sẵn trong
+     localStorage nhưng outer shell không được mount dữ liệu bảo vệ trước
+     khi access RPC, và snapshot vẫn không được đọc trước item permission. */
   await caiGiaLap(trang, {
     supabaseUrl: URL_SB, kichBan: "day",
-    doTre: { item_permissions_mode: 4000, rpc_get_vmp_dashboard: 4000 },
+    doTre: { rpc_my_ui_access: 4000, item_permissions_mode: 4000, rpc_get_vmp_dashboard: 4000 },
   });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
-  /* Bản chụp: 24 hạng mục của khuôn giả lập + một mã riêng SNAP-CU-99-IQ
-     chỉ tồn tại trong bản lưu — nhờ nó phân biệt được đang xem bản lưu
-     hay bản mới đã đè lên. */
+  /* Dấu vân tay 25 hạng mục: nếu nó xuất hiện trước RPC thì đã đọc snapshot
+     trái phép. */
   const hangMucSnap = Array.from({ length: 24 }, (_, i) => dungHangMuc(i));
   const rieng = dungHangMuc(0);
   hangMucSnap.push({
@@ -824,29 +823,16 @@ for (const [id, ten] of MAN) {
     }));
   }, { v: 2, userId: NGUOI_DUNG.id, mode: "preview", objects: [], activities: hangMucSnap });
   await trang.setViewport({ width: 1440, height: 900 });
-  const tDau = Date.now();
   await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  /* Bản lưu có 25 hạng mục, khuôn giả lập chỉ có 24 — con số "/25 hạng
-     mục" trên thanh lọc là dấu vân tay của bản lưu. (Không soi mã trong
-     bảng: vùng cuộn không lộ hết ra innerText.) Chờ tới khi nó hiện ra;
-     ghi lại thời điểm và banner tại đúng khoảnh khắc đó. */
-  let luc = 0; let bannerLucDo = ""; let thayBanLuu = false;
-  for (let i = 0; i < 60; i += 1) {
-    const kq = await trang.evaluate(() => ({
-      thay: /\/25 hạng mục/.test(document.body.innerText || ""),
-      banner: (document.body.innerText.match(/[^\n]*bản lưu[^\n]*/i) || [""])[0]
-        || (document.body.innerText.match(/[^\n]*Đang tải dữ liệu[^\n]*/i) || [""])[0],
-    }));
-    if (kq.thay) { luc = Date.now() - tDau; bannerLucDo = kq.banner; thayBanLuu = true; break; }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  kiem(thayBanLuu, "bản lưu (25 hạng mục) được vẽ ra màn hình");
-  kiem(thayBanLuu && luc < 3500,
-    "vẽ bản lưu TRƯỚC khi RPC nào kịp trả lời (mốc 3.5s, RPC trễ 4s)", `${luc}ms`);
-  kiem(/bản lưu/i.test(bannerLucDo),
-    "banner nói thật: đang xem bản lưu, không phải 'Đang tải dữ liệu…'",
-    bannerLucDo.slice(0, 80) || "(không có banner)");
-  /* Bản mới về (sau ≥4s) thì phải ĐÈ LÊN bản lưu và banner biến mất. */
+  await new Promise((r) => setTimeout(r, 3500));
+  const truocXacMinh = await trang.evaluate(() => ({
+    coSnapshot: /\/25 hạng mục/.test(document.body.innerText || ""),
+    coTrangBaoVe: !!document.querySelector(".vmp-view-enter"),
+  }));
+  kiem(!truocXacMinh.coSnapshot && !truocXacMinh.coTrangBaoVe,
+    "trước RPC quyền: không vẽ snapshot hoặc trang bảo vệ");
+  /* Bản mới về (sau ≥4s) phải là dữ liệu server 24 hạng mục, không phải
+     bản lưu cũ 25 hạng mục. */
   let moiVe = false;
   for (let i = 0; i < 100; i += 1) {
     const kq = await trang.evaluate(() => ({
@@ -857,7 +843,7 @@ for (const [id, ten] of MAN) {
     if (!kq.conSnap && !kq.conBanner && kq.coDuLieu) { moiVe = true; break; }
     await new Promise((r) => setTimeout(r, 150));
   }
-  kiem(moiVe, "bản mới (24 hạng mục) đè lên bản lưu và banner tải biến mất");
+  kiem(moiVe, "sau xác minh: dữ liệu server (24 hạng mục) hiện thay vì snapshot cũ");
   await trang.close();
 }
 

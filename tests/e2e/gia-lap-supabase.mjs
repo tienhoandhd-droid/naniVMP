@@ -190,6 +190,7 @@ function quyenDayDu() {
     screens[m] = { can_view: true, scope: "all", actions: hanhDong };
   }
   return {
+    ok: true,
     mode: "enforced",
     business_role: "admin",
     person_id: NGUOI_DUNG.id,
@@ -260,8 +261,8 @@ export function dungKhoDuLieu(kichBan) {
     email: `nguoi${i + 1}@vi-du.test`,
     department: BO_PHAN[i % BO_PHAN.length],
     dept: BO_PHAN[i % BO_PHAN.length],
-    role: ["qa", "xuong", "viewer"][i % 3],
-    access_class: ["qa", "xuong", "viewer"][i % 3],
+    role: ["qa", "xuong", "workshop_staff"][i % 3],
+    access_class: ["qa", "xuong", "workshop_staff"][i % 3],
     is_active: true,
     active: true,
     user_id: i === 0 ? NGUOI_DUNG.id : null,
@@ -356,8 +357,8 @@ export function dungKhoDuLieu(kichBan) {
       ma_tam: [],
     },
     rpc_get_audit_logs: [],
-    /* Hình dạng khớp RPC mới (20260816100000): phân quyền 6 vai đọc từ
-       bảng + chế độ áp dụng. Trang Luật phải hiện đủ 6 vai. */
+    /* Hình dạng khớp RPC mới: phân quyền năm vai hiệu lực đọc từ bảng +
+       chế độ áp dụng. */
     rpc_active_rules: {
       cap_nhat: "2026-08-15T02:00:00Z",
       diem_trong_yeu: {
@@ -382,7 +383,6 @@ export function dungKhoDuLieu(kichBan) {
         { vai_tro: "QA (qa_staff)", quyen: "Thấy 14/17 màn · phạm vi dữ liệu: toàn hệ thống" },
         { vai_tro: "Quản lý xưởng (workshop_manager)", quyen: "Thấy 9/17 màn · phạm vi: theo xưởng" },
         { vai_tro: "Nhân viên xưởng (workshop_staff)", quyen: "Thấy 6/17 màn · phạm vi: được phân công" },
-        { vai_tro: "Chỉ xem (viewer)", quyen: "Thấy 8/17 màn · chỉ đọc" },
       ],
       phan_quyen_che_do: "Đang đối chiếu (preview) — chưa khoá ai, chỉ ghi nhận lệch",
       phan_quyen_ghi_chu: "Ma trận đầy đủ xem và sửa ở màn Vai trò & phạm vi.",
@@ -479,7 +479,7 @@ export function dungKhoDuLieu(kichBan) {
  */
 export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho, doTre } = {}) {
   const kho = dungKhoDuLieu(kichBan);
-  /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống viewer để
+  /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống nhân viên xưởng để
      kiểm "không thấy nút ghi". Sửa tại chỗ, không trả kho ra ngoài. */
   if (typeof suaKho === "function") suaKho(kho);
   const hostSupabase = new URL(supabaseUrl).host;
@@ -572,6 +572,12 @@ export function traLoi(kho, u, req) {
   const rpc = u.pathname.match(/\/rest\/v1\/rpc\/([a-z0-9_]+)/i);
   if (rpc) {
     const ten = rpc[1];
+    const loi = kho.rpc_errors?.[ten];
+    if (loi) return {
+      status: Number(loi.status) || 500,
+      headers: dau,
+      body: JSON.stringify({ message: loi.message || "RPC giả lập lỗi" }),
+    };
     const co = Object.prototype.hasOwnProperty.call(kho, ten);
     // RPC chưa dựng sẵn trả null thay vì lỗi: màn nào dùng nó phải tự
     // xoay xở được, và đó cũng là điều luật trạng thái rỗng đòi hỏi.

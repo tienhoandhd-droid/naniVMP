@@ -147,7 +147,11 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
      đã bỏ hẳn (18/08); quyền nay hỏi server qua `rpc_my_ui_access`. `role`
      giữ lại vì nó vẫn là dữ liệu thật của hồ sơ và là một vế để server giải
      ra vai nghiệp vụ. */
-  const role = (data.role || "viewer") as UserRole;
+  // Thiếu role không được gán Viewer: chỉ literal `viewer` thực sự từ DB mới
+  // được giữ để resolver báo trạng thái legacy_role_disabled; profile thiếu
+  // dữ liệu phải dừng đăng nhập thay vì biến thành một quyền giả.
+  if (typeof data.role !== "string") return null;
+  const role = data.role as UserRole;
   let accessClass: string | null = null;
   try {
     // database.ts có thể chưa được sinh lại ngay sau migration danh bạ, nên

@@ -18,7 +18,7 @@ import { parseAccessContext } from "../../src/lib/access.ts";
 function chiCho(...man) {
   const screens = {};
   for (const m of man) screens[m] = { can_view: true, scope: "all", actions: ["view"] };
-  return parseAccessContext({ mode: "enforced", business_role: "qa", screens });
+  return parseAccessContext({ ok: true, mode: "enforced", business_role: "qa_staff", screens });
 }
 
 /* ---- Thứ tự ---------------------------------------------------------- */

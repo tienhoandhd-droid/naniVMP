@@ -72,3 +72,20 @@ test("policy đọc dữ liệu fail-closed và bỏ watermark khi đang enforce
   });
   assert.equal(permissionDataPolicy("enforced", "enforced").bypassWatermark, true);
 });
+
+test("chưa xác minh quyền thì không nạp snapshot hoặc nguồn dự phòng", async () => {
+  const { permissionDataPolicy } = await import("../../src/lib/snapshotCache.ts");
+
+  assert.deepEqual(permissionDataPolicy("unknown", null), {
+    allowSnapshot: false,
+    allowLegacyFallback: false,
+    bypassWatermark: true,
+    revokeBeforeFetch: true,
+  });
+  assert.deepEqual(permissionDataPolicy(null, "preview"), {
+    allowSnapshot: false,
+    allowLegacyFallback: false,
+    bypassWatermark: true,
+    revokeBeforeFetch: true,
+  });
+});

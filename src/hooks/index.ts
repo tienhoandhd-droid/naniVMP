@@ -271,34 +271,6 @@ export function useVmpData() {
       legacyRequestId = requestId;
       const nam = new Date().getFullYear();
 
-      /* VẼ SỚM NHẤT CÓ THỂ — trước cả RPC kiểm quyền. getSession() đọc từ
-         localStorage nên không tốn vòng mạng; snapshot chỉ tồn tại ở chế độ
-         preview nên nạp thẳng với mode đó. Không lộ thêm gì: bản chụp vốn
-         nằm trong localStorage của chính người này. Nếu server nói mode đã
-         thành enforced, nhánh dưới thu hồi ngay trong nháy mắt. */
-      if (!force) {
-        try {
-          const { data: sd } = await supabase.auth.getSession();
-          if (requestId !== dataRequestRef.current) return;
-          const uid = sd.session?.user.id;
-          const cu = uid ? loadSnapshot(nam, uid, "preview") : null;
-          if (cu) {
-            setObjects(cu.objects);
-            setActs(cu.activities);
-            setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", source: "supabase",
-              msg: `Đang hiện bản lưu lúc ${new Date(cu.at).toLocaleTimeString("vi-VN")} — đang cập nhật…` }));
-          }
-        } catch { /* vẽ sớm hỏng thì đi đường thường, không được chặn đường chính */ }
-      }
-
-      /* SONG SONG: kéo dashboard ngay trong lúc chờ kiểm quyền, tiết kiệm
-         trọn một vòng mạng. An toàn vì rpc_get_vmp_dashboard tự lọc theo
-         quyền + mode Ở PHÍA SERVER — client biết mode sớm hay muộn không
-         đổi được nội dung trả về; kết quả chỉ được ÁP VÀO STATE sau khi
-         nhánh kiểm quyền dưới đây đi qua trót lọt. */
-      const dashboardPromise = fetchVmpDataFromSupabase(nam);
-      dashboardPromise.catch(() => { /* xử ở nhánh await; đây chỉ chặn unhandledrejection */ });
-
       let permissionContext: Awaited<ReturnType<typeof readItemPermissionContext>>;
       try {
         permissionContext = await readItemPermissionContext();
@@ -331,8 +303,20 @@ export function useVmpData() {
         clearProtectedData();
       }
 
+      /* Snapshot và RPC dashboard đều là dữ liệu bảo vệ. Chỉ đọc chúng SAU
+         khi item_permissions_mode của đúng phiên đã xác minh thành công. */
+      if (!force && policy.allowSnapshot) {
+        const cu = loadSnapshot(nam, permissionContext.userId, permissionContext.mode);
+        if (cu) {
+          setObjects(cu.objects);
+          setActs(cu.activities);
+          setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", source: "supabase",
+            msg: `Đang hiện bản lưu lúc ${new Date(cu.at).toLocaleTimeString("vi-VN")} — đang cập nhật…` }));
+        }
+      }
+
       try {
-        const data = await dashboardPromise;
+        const data = await fetchVmpDataFromSupabase(nam);
         if (requestId !== dataRequestRef.current) return;
         dataSigRef.current = sigOf(data.objects, data.activities);
         if (Array.isArray(data.objects)) setObjects(data.objects);

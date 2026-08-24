@@ -18,7 +18,6 @@ export const PERMISSION_HEADERS = [
 ];
 
 export const ACCESS_CLASS_LABELS = [
-  "Chỉ xem",
   "QA – Cập nhật 4 mốc hoàn thành",
   "Quản lý QA",
   "Nhân viên xưởng – Ghi ngày thẩm định thực tế",
