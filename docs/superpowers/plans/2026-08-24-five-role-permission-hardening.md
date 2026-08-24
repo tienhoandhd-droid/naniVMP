@@ -36,18 +36,42 @@
 - Consumes: `SUPABASE_DB_URL` only for `pg_dump --schema-only`; the script must reject a target test URL whose host/database equals production.
 - Produces: local-only `VMP_TEST_DB_URL`, a disposable Supabase/Postgres schema clone, and `npm run test:db:five-role`.
 
-- [ ] **Step 1: Add failing harness contract tests**
+- [ ] **Step 1: Add failing harness behavior tests**
 
-Create `tests/unit/five-role-db-harness.test.mjs` that reads the two shell scripts and asserts all of these literal safeguards exist:
+Create `tests/unit/five-role-db-harness.test.mjs` using `spawnSync` and a temporary `PATH` containing fake external executables. Exercise the real shell scripts and assert observable behavior:
 
 ```js
-assert.match(prepare, /--schema-only/);
-assert.match(prepare, /mktemp -d/);
-assert.match(prepare, /trap .*EXIT/);
-assert.match(run, /VMP_TEST_DB_URL/);
-assert.match(run, /production/i);
-assert.match(run, /five-role-hardening\.sql/);
+const missing = spawnSync("bash", ["scripts/prepare-five-role-test-db.sh"], {
+  env: { ...process.env, SUPABASE_DB_URL: "" }, encoding: "utf8",
+});
+assert.equal(missing.status, 2);
+
+const sameTarget = spawnSync("bash", ["scripts/run-five-role-db-tests.sh"], {
+  env: {
+    ...process.env,
+    SUPABASE_DB_URL: "postgresql://u:p@db.example/prod",
+    VMP_TEST_DB_URL: "postgresql://u:p@db.example/prod",
+    PATH: fakeBin,
+  },
+  encoding: "utf8",
+});
+assert.equal(sameTarget.status, 3);
+assert.equal(existsSync(psqlMarker), false);
+
+const isolated = spawnSync("bash", ["scripts/run-five-role-db-tests.sh"], {
+  env: {
+    ...process.env,
+    SUPABASE_DB_URL: "postgresql://u:p@prod.example/prod",
+    VMP_TEST_DB_URL: "postgresql://u:p@127.0.0.1/test",
+    PATH: fakeBin,
+  },
+  encoding: "utf8",
+});
+assert.equal(isolated.status, 0);
+assert.match(readFileSync(psqlMarker, "utf8"), /tests\/sql\/five-role-hardening\.sql/);
 ```
+
+The fake `psql` is the external-process boundary only; the real script's validation, branching and argument construction remain under test.
 
 Add `test:db:five-role` to `package.json` as:
 
