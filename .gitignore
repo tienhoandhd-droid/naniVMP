@@ -36,3 +36,4 @@ AI Dashboard - Google Sheet.json
 tests/visual/baselines/*-darwin/
 test-results/
 playwright-report/
+supabase/.branches/

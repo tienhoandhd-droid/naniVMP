@@ -19,6 +19,9 @@ begin
 end
 $$;
 
+-- The deployed UI invokes the resolver through SECURITY DEFINER RPCs. This
+-- transaction-only grant isolates the resolver's five-role result from that
+-- separate RPC ACL contract, and is undone by the final rollback.
 grant execute on function public.vmp_business_role(uuid) to authenticated;
 
 insert into auth.users (
@@ -68,13 +71,17 @@ set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', :'department_uid', 'role', 'authenticated')::text, true);
 
 do $$
+declare
+  v_rejected boolean := false;
 begin
-  update public.profiles set role = 'admin' where id = auth.uid();
-  if found then
-    raise exception using errcode = 'check_violation', message = 'PROFILE_SELF_ESCALATION_BLOCKED';
-  end if;
-exception
-  when insufficient_privilege then null;
+  begin
+    update public.profiles set role = 'admin' where id = auth.uid();
+    v_rejected := not found;
+  exception
+    when others then v_rejected := true;
+  end;
+
+  perform pg_temp.assert_true(v_rejected, 'PROFILE_SELF_ESCALATION_BLOCKED');
 end
 $$;
 

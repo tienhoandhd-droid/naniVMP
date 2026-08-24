@@ -50,3 +50,41 @@ DONE_WITH_CONCERNS
 
 - The public-only schema dump references `vector`, `unaccent`, and `pg_trgm` in `extensions`; the local harness bootstraps exactly those three extensions before restore. It removes `ALTER DEFAULT PRIVILEGES` statements because they target the production owner and cannot be applied by the local role; existing schema grants and RLS policies remain in the dump.
 - A schema-only clone deliberately has no production table data, so the five-role matrix starts at zero. This is expected RED evidence before Task 2 seeds/enforces the 85-row matrix, but it means the harness is structural rather than a production-data replica.
+
+---
+
+# Task 1 Fix Round 1 Report
+
+## Status
+
+DONE_WITH_CONCERNS
+
+## Base and files
+
+- Fix base: `1b009c0a605d72bbb749f0c50d0d993812b2e22d`.
+- Modified: `.gitignore`, `scripts/prepare-five-role-test-db.sh`, `tests/sql/five-role-hardening.sql`, and `tests/unit/five-role-db-harness.test.mjs`.
+
+## RED and GREEN evidence
+
+- New focused harness behavior test initially failed with `0 !== 3`: a fake `supabase status` production-equivalent target reached the script and returned success. After the guard, it exits `3` and no `psql` marker exists.
+- Harness unit suite now passes 5/5, including the new pre-destructive local-target refusal case.
+- On a fresh disposable clone, the unmodified vulnerable suite remains RED first at `PROFILE_SELF_ESCALATION_BLOCKED`.
+- A local-only temporary `BEFORE UPDATE OF role` trigger that raises SQLSTATE `P0001` moved the suite past the self-escalation check and to `DEPARTMENT_CATALOG_HISTORY_FORBIDDEN`. The temporary trigger and its function were dropped immediately afterward. This demonstrates that any update exception is treated as rejection while the separate role-state assertion remains required.
+
+## Implementation and self-review
+
+- `prepare-five-role-test-db.sh` now validates the status DB target before creating a temp directory or calling local `psql`: it must not normalize to the production host/database and must be loopback-only (`127.0.0.1`, `localhost`, or `::1`), database `postgres`, port `54322`. Every unsafe or malformed test target exits `3` without printing credentials.
+- The self-escalation PL/pgSQL block catches `WHEN OTHERS`, records rejection, and then separately asserts the profile role remains `department_user`; an exception cannot mask a changed row.
+- The temporary `GRANT EXECUTE` for `vmp_business_role(uuid)` remains deliberately scoped inside the transaction and has a comment explaining that it isolates resolver-result behavior from RPC ACL behavior. The final rollback removes it.
+- `supabase/.branches/` is ignored, so the Supabase-generated local branch state no longer leaves the worktree dirty.
+
+## Commands and output summary
+
+- `node --import tsx --test tests/unit/five-role-db-harness.test.mjs`: 5 tests passed, 0 failed.
+- `bash scripts/prepare-five-role-test-db.sh`: completed the guarded local clone and printed only its local test-URL instruction.
+- `npm run test:db:five-role`: expected RED at `PROFILE_SELF_ESCALATION_BLOCKED` on the vulnerable clone.
+- `bash -n scripts/prepare-five-role-test-db.sh scripts/run-five-role-db-tests.sh` and `git diff --check`: clean before the fix commit.
+
+## Concerns
+
+- The schema-only clone remains structural: it bootstraps the three referenced extensions and omits production-owner default-privilege statements, while production table data and matrix rows are intentionally absent.

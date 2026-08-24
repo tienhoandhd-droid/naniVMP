@@ -19,6 +19,40 @@ if [[ -z "$VMP_TEST_DB_URL" ]]; then
   exit 4
 fi
 
+export VMP_TEST_DB_URL
+if node <<'NODE'
+function normalize(url) {
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  const database = decodeURIComponent(url.pathname).replace(/^\/+/, "").split("/")[0].toLowerCase();
+  return { database, host, port: url.port };
+}
+
+let production;
+try {
+  production = normalize(new URL(process.env.SUPABASE_DB_URL));
+} catch {
+  process.exit(2);
+}
+
+let target;
+try {
+  target = normalize(new URL(process.env.VMP_TEST_DB_URL));
+} catch {
+  process.exit(3);
+}
+
+const isProductionTarget = production.host === target.host && production.database === target.database;
+const isLoopback = new Set(["127.0.0.1", "localhost", "::1"]).has(target.host);
+if (isProductionTarget || !isLoopback || target.database !== "postgres" || target.port !== "54322") {
+  process.exit(3);
+}
+NODE
+then
+  :
+else
+  exit "$?"
+fi
+
 tmp_dir="$(mktemp -d)"
 trap 'unset SOURCE_DB_URL PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE PGSSLMODE; rm -rf "$tmp_dir"' EXIT
 
