@@ -70,7 +70,10 @@ fi
 docker "${docker_args[@]}" -v "$tmp_dir:/out" postgres:17 \
   pg_dump --schema-only --schema=public --no-owner --file /out/schema.sql
 
-sed -i '/^ALTER DEFAULT PRIVILEGES /d' "$tmp_dir/schema.sql"
+# GNU sed accepts a bare -i; BSD sed (macOS) reads the next token as the
+# backup suffix, so filter through a temporary file instead of in place.
+sed '/^ALTER DEFAULT PRIVILEGES /d' "$tmp_dir/schema.sql" >"$tmp_dir/schema.trimmed.sql"
+mv "$tmp_dir/schema.trimmed.sql" "$tmp_dir/schema.sql"
 
 run_local_psql() {
   if ! env -u PGSERVICE -u PGSERVICEFILE -u PGHOSTADDR -u PGOPTIONS -u PGSSLMODE \
