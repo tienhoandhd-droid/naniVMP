@@ -1,7 +1,7 @@
 # Thiết kế siết phân quyền VMP còn năm vai trò
 
-**Ngày:** 2026-08-24  
-**Production source:** `0a118d45119576c3e2ff0a776728c9fe6f1dd434`  
+**Ngày:** 2026-08-24
+**Production source:** `0a118d45119576c3e2ff0a776728c9fe6f1dd434`
 **Phạm vi:** PostgreSQL/Supabase, hợp đồng quyền frontend, cache phiên và bảy tài khoản cần vô hiệu hóa.
 
 ## 1. Mục tiêu
