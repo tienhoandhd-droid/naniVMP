@@ -23,8 +23,7 @@ export VMP_TEST_DB_URL
 if node <<'NODE'
 function normalize(url) {
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
-  const database = decodeURIComponent(url.pathname).replace(/^\/+/, "").split("/")[0].toLowerCase();
-  return { database, host, port: url.port };
+  return { host, port: url.port };
 }
 
 let production;
@@ -36,14 +35,15 @@ try {
 
 let target;
 try {
-  target = normalize(new URL(process.env.VMP_TEST_DB_URL));
+  const url = new URL(process.env.VMP_TEST_DB_URL);
+  target = { ...normalize(url), hasQueryOrFragment: url.search !== "" || url.hash !== "", path: url.pathname, protocol: url.protocol };
 } catch {
   process.exit(3);
 }
 
-const isProductionTarget = production.host === target.host && production.database === target.database;
+const isProductionTarget = production.host === target.host;
 const isLoopback = new Set(["127.0.0.1", "localhost", "::1"]).has(target.host);
-if (isProductionTarget || !isLoopback || target.database !== "postgres" || target.port !== "54322") {
+if (isProductionTarget || !isLoopback || target.protocol !== "postgresql:" || target.path !== "/postgres" || target.port !== "54322" || target.hasQueryOrFragment) {
   process.exit(3);
 }
 NODE
@@ -53,8 +53,23 @@ else
   exit "$?"
 fi
 
+while IFS= read -r -d '' local_key && IFS= read -r -d '' local_value; do
+  export "$local_key=$local_value"
+done < <(node <<'NODE'
+const url = new URL(process.env.VMP_TEST_DB_URL);
+const pairs = [
+  ["LOCAL_PGHOST", url.hostname.replace(/^\[|\]$/g, "")],
+  ["LOCAL_PGPORT", url.port],
+  ["LOCAL_PGUSER", decodeURIComponent(url.username)],
+  ["LOCAL_PGPASSWORD", decodeURIComponent(url.password)],
+  ["LOCAL_PGDATABASE", "postgres"],
+];
+process.stdout.write(pairs.flat().join("\0") + "\0");
+NODE
+)
+
 tmp_dir="$(mktemp -d)"
-trap 'unset SOURCE_DB_URL PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE PGSSLMODE; rm -rf "$tmp_dir"' EXIT
+trap 'unset SOURCE_DB_URL PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE PGSSLMODE LOCAL_PGHOST LOCAL_PGPORT LOCAL_PGUSER LOCAL_PGPASSWORD LOCAL_PGDATABASE; rm -rf "$tmp_dir"' EXIT
 
 export SOURCE_DB_URL="$SUPABASE_DB_URL"
 while IFS= read -r -d '' pg_key && IFS= read -r -d '' pg_value; do
@@ -97,16 +112,19 @@ docker "${docker_args[@]}" -v "$tmp_dir:/out" postgres:17 \
 sed -i '/^ALTER DEFAULT PRIVILEGES /d' "$tmp_dir/schema.sql"
 
 run_local_psql() {
-  if ! psql "$@" >"$tmp_dir/psql.log" 2>&1; then
+  if ! env -u PGSERVICE -u PGSERVICEFILE -u PGHOSTADDR -u PGOPTIONS -u PGSSLMODE \
+    PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" PGUSER="$LOCAL_PGUSER" \
+    PGPASSWORD="$LOCAL_PGPASSWORD" PGDATABASE="$LOCAL_PGDATABASE" \
+    psql "$@" >"$tmp_dir/psql.log" 2>&1; then
     cat "$tmp_dir/psql.log" >&2
     return 1
   fi
 }
 
-run_local_psql "$VMP_TEST_DB_URL" -X -v ON_ERROR_STOP=1 -c 'drop schema public cascade;'
-run_local_psql "$VMP_TEST_DB_URL" -X -v ON_ERROR_STOP=1 -c 'create extension if not exists vector with schema extensions;'
-run_local_psql "$VMP_TEST_DB_URL" -X -v ON_ERROR_STOP=1 -c 'create extension if not exists unaccent with schema extensions;'
-run_local_psql "$VMP_TEST_DB_URL" -X -v ON_ERROR_STOP=1 -c 'create extension if not exists pg_trgm with schema extensions;'
-run_local_psql "$VMP_TEST_DB_URL" -X -v ON_ERROR_STOP=1 -f "$tmp_dir/schema.sql"
+run_local_psql -X -v ON_ERROR_STOP=1 -c 'drop schema public cascade;'
+run_local_psql -X -v ON_ERROR_STOP=1 -c 'create extension if not exists vector with schema extensions;'
+run_local_psql -X -v ON_ERROR_STOP=1 -c 'create extension if not exists unaccent with schema extensions;'
+run_local_psql -X -v ON_ERROR_STOP=1 -c 'create extension if not exists pg_trgm with schema extensions;'
+run_local_psql -X -v ON_ERROR_STOP=1 -f "$tmp_dir/schema.sql"
 
 echo "Local disposable schema clone is ready. Export VMP_TEST_DB_URL from Supabase status before running npm run test:db:five-role."

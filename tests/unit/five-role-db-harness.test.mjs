@@ -16,7 +16,7 @@ function makeFakeBin({ statusDbUrl = "postgresql://postgres:postgres@127.0.0.1:5
   const supabase = join(fakeBin, "supabase");
 
   mkdirSync(fakeBin);
-  writeFileSync(psql, "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >> \"$PSQL_MARKER\"\nprintf '%s\\n' 'PSQL_NOISE'\nfor ((i = 1; i <= $#; i++)); do\n  if [[ \"${!i}\" == -f ]]; then\n    next=$((i + 1))\n    if [[ -f \"${!next}\" ]]; then\n      printf 'FILE_CONTENT\\n' >> \"$PSQL_MARKER\"\n      cat \"${!next}\" >> \"$PSQL_MARKER\"\n    fi\n  fi\ndone\n");
+  writeFileSync(psql, "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >> \"$PSQL_MARKER\"\nprintf 'PGHOST=%s\\nPGPORT=%s\\nPGUSER=%s\\nPGDATABASE=%s\\nPGSERVICE=%s\\nPGSERVICEFILE=%s\\nPGHOSTADDR=%s\\nPGOPTIONS=%s\\n' \"${PGHOST:-}\" \"${PGPORT:-}\" \"${PGUSER:-}\" \"${PGDATABASE:-}\" \"${PGSERVICE:-}\" \"${PGSERVICEFILE:-}\" \"${PGHOSTADDR:-}\" \"${PGOPTIONS:-}\" >> \"$PSQL_MARKER\"\nprintf '%s\\n' 'PSQL_NOISE'\nfor ((i = 1; i <= $#; i++)); do\n  if [[ \"${!i}\" == -f ]]; then\n    next=$((i + 1))\n    if [[ -f \"${!next}\" ]]; then\n      printf 'FILE_CONTENT\\n' >> \"$PSQL_MARKER\"\n      cat \"${!next}\" >> \"$PSQL_MARKER\"\n    fi\n  fi\ndone\n");
   writeFileSync(docker, "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$DOCKER_MARKER\"\nfor ((i = 1; i <= $#; i++)); do\n  if [[ \"${!i}\" == -v ]]; then\n    next=$((i + 1))\n    mount=\"${!next}\"\n    printf '%s\\n' 'ALTER DEFAULT PRIVILEGES FOR ROLE production_owner GRANT ALL ON TABLES TO authenticated;' > \"${mount%:/out}/schema.sql\"\n  fi\ndone\n");
   writeFileSync(pgDump, "#!/usr/bin/env bash\nexit 0\n");
   writeFileSync(supabase, `#!/usr/bin/env bash\nif [[ \"$1\" == start ]]; then\n  printf '%s\\n' 'SECRET_KEY=must-not-reach-stdout'\nelif [[ \"$1\" == status ]]; then\n  printf '%s\\n' 'SUPABASE_NOISE' >&2\n  printf '%s\\n' ${JSON.stringify(`DB_URL=${statusDbUrl}`)}\nfi\n`);
@@ -48,6 +48,10 @@ test("prepare script clones only with the pinned PostgreSQL 17 container client"
         PATH: `${fakeBin}:${process.env.PATH}`,
         DOCKER_MARKER: dockerMarker,
         PSQL_MARKER: psqlMarker,
+        PGSERVICE: "production",
+        PGSERVICEFILE: "/tmp/production-service.conf",
+        PGHOSTADDR: "203.0.113.10",
+        PGOPTIONS: "-c search_path=unsafe",
       },
       encoding: "utf8",
     });
@@ -67,32 +71,50 @@ test("prepare script clones only with the pinned PostgreSQL 17 container client"
     assert.match(psqlArgs, /create extension if not exists unaccent with schema extensions/i);
     assert.match(psqlArgs, /create extension if not exists pg_trgm with schema extensions/i);
     assert.doesNotMatch(psqlArgs, /ALTER DEFAULT PRIVILEGES/);
-    assert.match(psqlArgs, /127\.0\.0\.1:54322\/postgres/);
+    assert.doesNotMatch(psqlArgs, /postgresql:\/\//);
+    assert.match(psqlArgs, /PGHOST=127\.0\.0\.1/);
+    assert.match(psqlArgs, /PGPORT=54322/);
+    assert.match(psqlArgs, /PGUSER=postgres/);
+    assert.match(psqlArgs, /PGDATABASE=postgres/);
+    assert.match(psqlArgs, /PGSERVICE=$/m);
+    assert.match(psqlArgs, /PGSERVICEFILE=$/m);
+    assert.match(psqlArgs, /PGHOSTADDR=$/m);
+    assert.match(psqlArgs, /PGOPTIONS=$/m);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("prepare script refuses a non-local Supabase status target before destructive psql", () => {
-  const { fakeBin, psqlMarker, root } = makeFakeBin({
-    statusDbUrl: "postgresql://postgres:postgres@source.example/prod",
-  });
+test("prepare script refuses non-local and query-override status targets before destructive psql", () => {
+  const unsafeTargets = [
+    "postgresql://postgres:postgres@source.example/prod",
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres?host=production.example",
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres?hostaddr=203.0.113.10",
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres?port=6543",
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres?dbname=production",
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres?service=production",
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres#production",
+  ];
 
-  try {
-    const unsafe = spawnSync("bash", ["scripts/prepare-five-role-test-db.sh"], {
-      env: {
-        ...process.env,
-        SUPABASE_DB_URL: "postgresql://u:p@source.example/prod",
-        PATH: `${fakeBin}:${process.env.PATH}`,
-        PSQL_MARKER: psqlMarker,
-      },
-      encoding: "utf8",
-    });
+  for (const statusDbUrl of unsafeTargets) {
+    const { fakeBin, psqlMarker, root } = makeFakeBin({ statusDbUrl });
 
-    assert.equal(unsafe.status, 3);
-    assert.equal(existsSync(psqlMarker), false);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
+    try {
+      const unsafe = spawnSync("bash", ["scripts/prepare-five-role-test-db.sh"], {
+        env: {
+          ...process.env,
+          SUPABASE_DB_URL: "postgresql://u:p@source.example/prod",
+          PATH: `${fakeBin}:${process.env.PATH}`,
+          PSQL_MARKER: psqlMarker,
+        },
+        encoding: "utf8",
+      });
+
+      assert.equal(unsafe.status, 3, statusDbUrl);
+      assert.equal(existsSync(psqlMarker), false, statusDbUrl);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 
