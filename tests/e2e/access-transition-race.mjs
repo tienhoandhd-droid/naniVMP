@@ -80,8 +80,12 @@ try {
     ok: true, mode: "preview", business_role: "admin", screens: { overview: { can_view: true, data_scope: "all", actions: ["view"] } },
   }}));
   await page.evaluate(waitFrame);
-  assert.match(await page.$eval("#state", (node) => node.textContent), /^locked:true:/,
-    "thành công muộn của A không được cấp lại quyền khi B đang tải");
+  assert.deepEqual(await page.evaluate(() => ({
+    businessRole: window.__accessRace.current.access.businessRole,
+    loi: window.__accessRace.current.loi,
+    dangTai: window.__accessRace.current.dangTai,
+  })), { businessRole: null, loi: null, dangTai: true },
+  "thành công/finally muộn của A không được ghi role hoặc đổi loading của B");
 
   await page.evaluate(() => window.__accessRace.deferred[2].reject(new Error("B bị từ chối")));
   await page.waitForFunction(() => document.querySelector("#state")?.textContent === "locked:false:B bị từ chối");
@@ -104,8 +108,12 @@ try {
   await page.waitForFunction(() => window.__accessRace.deferred.length === 7);
   await page.evaluate(() => window.__accessRace.deferred[5].reject(new Error("A bị từ chối muộn")));
   await page.evaluate(waitFrame);
-  assert.match(await page.$eval("#state", (node) => node.textContent), /^locked:true:/,
-    "lỗi/finally muộn của A không được hạ loading hoặc đổi trạng thái B");
+  assert.deepEqual(await page.evaluate(() => ({
+    businessRole: window.__accessRace.current.access.businessRole,
+    loi: window.__accessRace.current.loi,
+    dangTai: window.__accessRace.current.dangTai,
+  })), { businessRole: null, loi: null, dangTai: true },
+  "lỗi/finally muộn của A không được ghi error/role hoặc hạ loading của B");
   await page.evaluate(() => window.__accessRace.deferred[6].resolve({ trangThai: "co", payload: {
     ok: true, mode: "preview", business_role: "workshop_staff", screens: { overview: { can_view: true, data_scope: "workshop", actions: ["view"] } },
   }}));
