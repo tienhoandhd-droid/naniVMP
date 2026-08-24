@@ -186,10 +186,17 @@ Run `BEGIN READ ONLY ... ROLLBACK` queries and record expected hashes in the mig
 select public.screen_access_mode(), public.item_permissions_mode();
 select count(*),
   md5(string_agg(concat_ws('|', business_role, screen_id,
-    can_view, data_scope, actions::text), E'\n' order by business_role, screen_id)),
+    can_view, data_scope, actions::text), E'\n' order by business_role, screen_id))
+    as implicit_bool_array_text,
+  md5(string_agg(concat_ws('|', business_role, screen_id,
+    can_view::text, data_scope, actions::text), E'\n' order by business_role, screen_id))
+    as explicit_bool_array_text,
   md5(string_agg(concat_ws('|', business_role, screen_id,
     can_view, data_scope, array_to_string(actions, ',')), E'\n'
-    order by business_role, screen_id))
+    order by business_role, screen_id)) as implicit_bool_csv,
+  md5(string_agg(concat_ws('|', business_role, screen_id,
+    can_view::text, data_scope, array_to_string(actions, ',')), E'\n'
+    order by business_role, screen_id)) as explicit_bool_csv
 from public.vmp_screen_permissions;
 select md5(pg_get_functiondef('public.vmp_business_role(uuid)'::regprocedure));
 select md5(pg_get_functiondef('public.rpc_my_ui_access()'::regprocedure));
@@ -198,12 +205,20 @@ select md5(pg_get_functiondef('public.rpc_catalog_history_detail(uuid)'::regproc
 ```
 
 The migration raises before DDL when modes are not `enforced/preview`, matrix
-count is not 102, or either reviewed matrix digest differs. The exact
-PostgreSQL array-text digest is `0befb5a03f96dfe2dfa653f7da929cd0`;
-the earlier reviewed digest `b5fb9554b5ed69ff247c3ea54a6e3b0e` uses CSV
-normalization via `array_to_string(actions, ',')`. Assert both to preserve the
-original evidence while removing the ambiguity in its recorded query. Function
-hashes must differ from none of these reviewed live values:
+count is not 102, or any reviewed matrix digest differs. The four full-matrix
+digests above, in column order, are:
+
+```text
+implicit_bool_array_text  0befb5a03f96dfe2dfa653f7da929cd0
+explicit_bool_array_text  f23b9883743f21e86145400e11dd1167
+implicit_bool_csv         99813f36bc9dbc88fec26a18a1685d7c
+explicit_bool_csv         b5fb9554b5ed69ff247c3ea54a6e3b0e
+```
+
+The last value is the earlier reviewed digest: it used both explicit
+`can_view::text` (`true`/`false`) and CSV normalization. Assert all four so the
+original evidence is preserved and every serialization choice is explicit.
+Function hashes must differ from none of these reviewed live values:
 
 ```text
 auth_user_role()                           b23193f21fe23e5a88fa83569661a420
@@ -237,9 +252,14 @@ Rewrite `vmp_business_role(uuid)` so inactive profiles and login role `viewer` r
 
 Delete only `business_role='viewer'` matrix rows and tighten the matrix role
 constraint to the five literal roles. Assert 85 total/17 each and unchanged
-exact-array-text and legacy-CSV digests for all non-Viewer rows:
-`e6fdb0cc192a2ba344df02db4a5112c6` and
-`59feb29d5614356f97325d71ade3599e`, respectively.
+four-way digests for all non-Viewer rows, in the same order:
+
+```text
+e6fdb0cc192a2ba344df02db4a5112c6
+9be55626a34edb5123501d2b856d3480
+59feb29d5614356f97325d71ade3599e
+3586cad04d5900656b2b7f41ecb47e73
+```
 
 - [ ] **Step 3: Close direct profile privilege escalation**
 
