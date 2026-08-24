@@ -146,6 +146,13 @@ values
   ('five_role_test_fixture', 'true'::jsonb,
     'Local disposable-clone marker; never deploy to production.');
 
+-- Reproduce the legacy fallback that made an inactive QA Manager retain the
+-- old edit_catalog writer path through muc_quyen()/duoc_phep(). This is
+-- synthetic non-PII state and exists only in the disposable clone.
+insert into public.vmp_role_permissions (hanh_dong, vai_tro, muc)
+values ('edit_catalog', 'qa_manager', 'co')
+on conflict (hanh_dong, vai_tro) do update set muc = excluded.muc;
+
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -230,6 +237,21 @@ begin
        not in ('ACCOUNT_DISABLED', 'ROLE_UNRESOLVED') then
     raise exception using errcode = 'check_violation', message = p_rule_id;
   end if;
+end
+$$;
+
+create function pg_temp.assert_denied_scalar(p_sql text, p_rule_id text)
+returns void
+language plpgsql
+as $$
+begin
+  begin
+    execute p_sql;
+  exception
+    when insufficient_privilege then return;
+  end;
+
+  raise exception using errcode = 'check_violation', message = p_rule_id;
 end
 $$;
 
@@ -435,7 +457,66 @@ select pg_temp.assert_true(
   'INACTIVE_USER_CATALOG_BLOCKED'
 );
 
+reset role;
+create temporary table five_role_assignment_probe (
+  assignments_before integer not null,
+  audits_before integer not null,
+  response jsonb
+) on commit drop;
+insert into five_role_assignment_probe (assignments_before, audits_before)
+select
+  (select count(*) from public.vmp_assignment_matrix
+   where staff_name = 'FIVE ROLE INACTIVE PROBE'
+     and validation_type = 'DQ' and line = '*'),
+  (select count(*) from public.audit_logs
+   where table_name = 'vmp_assignment_matrix'
+     and record_id = 'FIVE ROLE INACTIVE PROBE'
+     and source = 'dashboard_rpc');
+grant update on five_role_assignment_probe to authenticated;
+set local role authenticated;
+update five_role_assignment_probe
+set response = public.rpc_set_assignment(
+  'FIVE ROLE INACTIVE PROBE', 'QA', 'DQ', '*', 'thuc_hien'
+);
+reset role;
+do $$
+declare
+  v_probe five_role_assignment_probe%rowtype;
+  v_assignments_after integer;
+  v_audits_after integer;
+  v_denied boolean;
+begin
+  select * into strict v_probe from five_role_assignment_probe;
+  select count(*) into v_assignments_after
+  from public.vmp_assignment_matrix
+  where staff_name = 'FIVE ROLE INACTIVE PROBE'
+    and validation_type = 'DQ' and line = '*';
+  select count(*) into v_audits_after
+  from public.audit_logs
+  where table_name = 'vmp_assignment_matrix'
+    and record_id = 'FIVE ROLE INACTIVE PROBE'
+    and source = 'dashboard_rpc';
+  v_denied := coalesce(v_probe.response ->> 'error_code', '')
+    in ('ACCOUNT_DISABLED', 'ROLE_UNRESOLVED');
+
+  if not v_denied
+     or v_assignments_after <> v_probe.assignments_before
+     or v_audits_after <> v_probe.audits_before then
+    raise exception using errcode = 'check_violation', message = format(
+      'INACTIVE_RPC_SET_ASSIGNMENT_CONTAINMENT denied=%s assignment_delta=%s audit_delta=%s',
+      v_denied,
+      v_assignments_after - v_probe.assignments_before,
+      v_audits_after - v_probe.audits_before
+    );
+  end if;
+end
+$$;
+set local role authenticated;
+
 select pg_temp.assert_denied_json('select public.rpc_active_rules()', 'INACTIVE_RPC_ACTIVE_RULES');
+select pg_temp.assert_denied_scalar('select public.item_permissions_mode()', 'INACTIVE_ITEM_PERMISSIONS_MODE');
+select pg_temp.assert_denied_json('select public.rpc_apply_catalog_change(null::uuid, null::text, null::integer)', 'INACTIVE_RPC_APPLY_CATALOG_CHANGE');
+select pg_temp.assert_denied_json('select public.rpc_business_roles()', 'INACTIVE_RPC_BUSINESS_ROLES');
 select pg_temp.assert_denied_json('select public.rpc_check_data_quality(2026)', 'INACTIVE_RPC_CHECK_DATA_QUALITY');
 select pg_temp.assert_denied_json('select public.rpc_commit_catalog_import(null::uuid, null::text)', 'INACTIVE_RPC_COMMIT_CATALOG_IMPORT');
 select pg_temp.assert_denied_json('select public.rpc_create_plan_item(''x'', ''x'', 2026, 1, ''{}''::jsonb)', 'INACTIVE_RPC_CREATE_PLAN_ITEM');
@@ -449,22 +530,43 @@ select pg_temp.assert_denied_json('select public.rpc_get_audit_logs()', 'INACTIV
 select pg_temp.assert_denied_json('select public.rpc_get_missing_items(2026)', 'INACTIVE_RPC_GET_MISSING_ITEMS');
 select pg_temp.assert_denied_json('select public.rpc_get_vmp_dashboard(2026, false, false)', 'INACTIVE_RPC_GET_VMP_DASHBOARD');
 select pg_temp.assert_denied_json('select public.rpc_get_vmp_watermark(2026)', 'INACTIVE_RPC_GET_VMP_WATERMARK');
+select pg_temp.assert_denied_json('select public.rpc_import_item_permission_staff(''[]''::jsonb, null::text)', 'INACTIVE_RPC_IMPORT_ITEM_PERMISSION_STAFF');
+select pg_temp.assert_denied_json('select public.rpc_item_assignments(null::text, null::uuid)', 'INACTIVE_RPC_ITEM_ASSIGNMENTS');
+select pg_temp.assert_denied_json('select public.rpc_item_permission_account_candidates(null::text)', 'INACTIVE_RPC_ITEM_PERMISSION_ACCOUNT_CANDIDATES');
+select pg_temp.assert_denied_json('select public.rpc_item_permission_directory(null::text)', 'INACTIVE_RPC_ITEM_PERMISSION_DIRECTORY');
+select pg_temp.assert_denied_json('select public.rpc_item_permission_preflight()', 'INACTIVE_RPC_ITEM_PERMISSION_PREFLIGHT');
+select pg_temp.assert_denied_json('select public.rpc_item_permission_scope_catalog()', 'INACTIVE_RPC_ITEM_PERMISSION_SCOPE_CATALOG');
+select pg_temp.assert_denied_json('select public.rpc_item_progress_history(null::text, 10, 0)', 'INACTIVE_RPC_ITEM_PROGRESS_HISTORY');
+select pg_temp.assert_denied_json('select public.rpc_link_item_permission_account(null::uuid, null::uuid, null::text, null::integer)', 'INACTIVE_RPC_LINK_ITEM_PERMISSION_ACCOUNT');
 select pg_temp.assert_denied_json('select public.rpc_list_catalog_changes(null, null, 10, 0)', 'INACTIVE_RPC_LIST_CATALOG_CHANGES');
 select pg_temp.assert_denied_json('select public.rpc_list_catalog_dataset(''objects'', null, ''{}''::jsonb, 10, 0)', 'INACTIVE_RPC_LIST_CATALOG_DATASET');
 select pg_temp.assert_denied_json('select public.rpc_list_source_tabs()', 'INACTIVE_RPC_LIST_SOURCE_TABS');
+select pg_temp.assert_denied_json('select public.rpc_luat_xem()', 'INACTIVE_RPC_LUAT_XEM');
+select pg_temp.assert_denied_json('select public.rpc_my_ui_access()', 'INACTIVE_RPC_MY_UI_ACCESS');
+select pg_temp.assert_denied_json('select public.rpc_nguoi_va_quyen()', 'INACTIVE_RPC_NGUOI_VA_QUYEN');
+select pg_temp.assert_denied_json('select public.rpc_preview_catalog_change(null::uuid)', 'INACTIVE_RPC_PREVIEW_CATALOG_CHANGE');
+select pg_temp.assert_denied_json('select public.rpc_preview_item_rights(null::uuid, null::text)', 'INACTIVE_RPC_PREVIEW_ITEM_RIGHTS');
 select pg_temp.assert_denied_json('select public.rpc_recalc_criticality(true)', 'INACTIVE_RPC_RECALC_CRITICALITY');
 select pg_temp.assert_denied_json('select public.rpc_refresh_computed_status()', 'INACTIVE_RPC_REFRESH_STATUS');
 select pg_temp.assert_denied_json('select public.rpc_resolve_missing(''x'', ''keep'', ''x'')', 'INACTIVE_RPC_RESOLVE_MISSING');
 select pg_temp.assert_denied_json('select public.rpc_save_alert_recipient(null::uuid, ''{}''::jsonb, null, null)', 'INACTIVE_RPC_SAVE_ALERT_RECIPIENT');
 select pg_temp.assert_denied_json('select public.rpc_save_catalog_object(''object'', ''x'', ''{}''::jsonb, null, null)', 'INACTIVE_RPC_SAVE_CATALOG_OBJECT');
 select pg_temp.assert_denied_json('select public.rpc_save_product_gmp(''x'', ''{}''::jsonb, null, null)', 'INACTIVE_RPC_SAVE_PRODUCT_GMP');
+select pg_temp.assert_denied_json('select public.rpc_set_business_role(null::uuid, null::text, null::text, null::text)', 'INACTIVE_RPC_SET_BUSINESS_ROLE');
 select pg_temp.assert_denied_json('select public.rpc_set_catalog_import_row_reason(null::uuid, 1, ''x'')', 'INACTIVE_RPC_SET_IMPORT_REASON');
+select pg_temp.assert_denied_json('select public.rpc_set_email_cho_phep(null::text, false, null::text)', 'INACTIVE_RPC_SET_EMAIL_CHO_PHEP');
+select pg_temp.assert_denied_json('select public.rpc_set_item_assignment(null::uuid, null::text, null::text, null::text, null::text, null::text, null::uuid)', 'INACTIVE_RPC_SET_ITEM_ASSIGNMENT');
 select pg_temp.assert_denied_json('select public.rpc_set_item_performer(''x'', ''x'')', 'INACTIVE_RPC_SET_ITEM_PERFORMER');
+select pg_temp.assert_denied_json('select public.rpc_set_item_performer_by_id(null::text, null::uuid, null::text)', 'INACTIVE_RPC_SET_ITEM_PERFORMER_BY_ID');
+select pg_temp.assert_denied_json('select public.rpc_set_item_permissions_mode(null::text, null::text)', 'INACTIVE_RPC_SET_ITEM_PERMISSIONS_MODE');
 select pg_temp.assert_denied_json('select public.rpc_set_item_state(''x'', ''x'', ''x'')', 'INACTIVE_RPC_SET_ITEM_STATE');
+select pg_temp.assert_denied_json('select public.rpc_set_user_active(null::uuid, false, null::text)', 'INACTIVE_RPC_SET_USER_ACTIVE');
+select pg_temp.assert_denied_json('select public.rpc_set_user_role(null::uuid, null::text, null::text, null::text, null::text)', 'INACTIVE_RPC_SET_USER_ROLE');
 select pg_temp.assert_denied_json('select public.rpc_source_warnings(2026)', 'INACTIVE_RPC_SOURCE_WARNINGS');
 select pg_temp.assert_denied_json('select public.rpc_stage_catalog_import(''objects'', ''x'', ''x'', null, ''[]''::jsonb)', 'INACTIVE_RPC_STAGE_IMPORT');
 select pg_temp.assert_denied_json('select public.rpc_trang_thai_he_thong()', 'INACTIVE_RPC_SYSTEM_STATUS');
 select pg_temp.assert_denied_json('select public.rpc_update_progress(''x'', ''{}''::jsonb, null, null, null)', 'INACTIVE_RPC_UPDATE_PROGRESS');
+select pg_temp.assert_denied_json('select public.rpc_upsert_item_permission_staff(null::uuid, ''{}''::jsonb, null::text, null::integer)', 'INACTIVE_RPC_UPSERT_ITEM_PERMISSION_STAFF');
 select pg_temp.assert_denied_json('select public.rpc_upsert_object(''x'', ''x'', null, null, null, null, null, null)', 'INACTIVE_RPC_UPSERT_OBJECT');
 select pg_temp.assert_denied_json('select public.rpc_upsert_performer(null::uuid, ''{}''::jsonb)', 'INACTIVE_RPC_UPSERT_PERFORMER');
 select pg_temp.assert_denied_json('select public.rpc_upsert_source_row(''x'', 1, ''{}''::jsonb)', 'INACTIVE_RPC_UPSERT_SOURCE_ROW');
@@ -577,7 +679,27 @@ select pg_temp.assert_true(
 
 select pg_temp.assert_true(
   not has_table_privilege('authenticated', 'public.profiles', 'UPDATE')
-  and not has_any_column_privilege('authenticated', 'public.profiles', 'UPDATE'),
+  and not has_any_column_privilege('authenticated', 'public.profiles', 'UPDATE')
+  and not has_table_privilege('anon', 'public.profiles', 'UPDATE')
+  and not has_any_column_privilege('anon', 'public.profiles', 'UPDATE')
+  and not exists (
+    select 1
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    left join lateral aclexplode(c.relacl) x on true
+    where n.nspname = 'public' and c.relname = 'profiles'
+      and x.grantee = 0 and x.privilege_type = 'UPDATE'
+  )
+  and not exists (
+    select 1
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    left join lateral aclexplode(a.attacl) x on true
+    where n.nspname = 'public' and c.relname = 'profiles'
+      and a.attnum > 0 and not a.attisdropped
+      and x.grantee = 0 and x.privilege_type = 'UPDATE'
+  ),
   'PROFILE_DIRECT_UPDATE_REVOKED'
 );
 select pg_temp.assert_true(
@@ -585,21 +707,82 @@ select pg_temp.assert_true(
   'RAW_AUDIT_SELECT_REVOKED'
 );
 select pg_temp.assert_true(
-  not exists (
+  (select count(*) = 54
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\')
+  and to_regprocedure('public.item_permissions_mode__five_role_impl_20260824()') is null
+  and not exists (
     select 1
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
+    left join pg_proc wrapper
+      on wrapper.pronamespace = p.pronamespace
+     and wrapper.proname = left(p.proname,
+       -length('__five_role_impl_20260824'))
+     and wrapper.proargtypes = p.proargtypes
     where n.nspname = 'public'
       and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\'
       and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
         or has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('service_role', p.oid, 'EXECUTE')
+        or wrapper.oid is null
+        or wrapper.proowner <> p.proowner
+        or exists (
+          select 1 from pg_depend d
+          where d.refclassid = 'pg_proc'::regclass and d.refobjid = p.oid
+        )
         or exists (
           select 1
           from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-          where a.grantee = 0 and a.privilege_type = 'EXECUTE'
+          where a.grantee <> p.proowner and a.privilege_type = 'EXECUTE'
         ))
   ),
-  'RENAMED_IMPLEMENTATIONS_NOT_BROWSER_CALLABLE'
+  'RENAMED_IMPLEMENTATIONS_OWNER_ONLY_AND_UNREFERENCED'
+);
+
+select pg_temp.assert_true(
+  not exists (
+    select 1
+    from (values
+      ('public.rpc_lien_ket_tai_khoan(uuid,uuid)'::regprocedure),
+      ('public.rpc_set_item_performer(text,text)'::regprocedure)
+    ) service_boundary(function_oid)
+    join pg_proc p on p.oid = service_boundary.function_oid
+    where has_function_privilege('authenticated', p.oid, 'EXECUTE')
+       or has_function_privilege('anon', p.oid, 'EXECUTE')
+       or has_function_privilege('service_role', p.oid, 'EXECUTE')
+       or exists (
+         select 1
+         from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
+         where x.grantee <> p.proowner and x.privilege_type = 'EXECUTE'
+       )
+  ),
+  'SERVICE_ONLY_RPCS_OWNER_ONLY'
+);
+
+select pg_temp.assert_true(
+  not exists (
+    select 1
+    from pg_policies p
+    where p.schemaname = 'public'
+      and p.tablename = any(array[
+        'audit_logs', 'data_quality_issues', 'vmp_alert_recipients',
+        'vmp_assignment_matrix', 'vmp_chat_loi_cho', 'vmp_email_cho_phep',
+        'vmp_performers', 'vmp_plan_items', 'vmp_source_objects',
+        'vmp_source_rows', 'vmp_staff_emails'
+      ]::text[])
+      and exists (
+        select 1 from unnest(p.roles) effective_role(role_name)
+        where effective_role.role_name = 'public'
+           or pg_has_role('authenticated', effective_role.role_name, 'USAGE')
+      )
+      and ((p.cmd in ('SELECT','UPDATE','DELETE','ALL')
+            and coalesce(p.qual, '') not like '%vmp_current_session_is_active%')
+        or (p.cmd in ('INSERT','UPDATE','ALL')
+            and coalesce(p.with_check, '') not like '%vmp_current_session_is_active%'))
+  ),
+  'EFFECTIVE_AUTHENTICATED_RLS_POLICIES_GUARDED'
 );
 
 rollback;

@@ -9,6 +9,7 @@ declare
   v_explicit_array text;
   v_implicit_csv text;
   v_explicit_csv text;
+  v_rpc_inventory jsonb;
 begin
   if public.screen_access_mode() is distinct from 'enforced'
      or public.item_permissions_mode() is distinct from 'preview' then
@@ -58,24 +59,85 @@ begin
       message = 'PRECONDITION_CORE_FUNCTION_DRIFTED';
   end if;
 
-  with wanted(name) as (values
-    ('auth_user_role'), ('vmp_business_role'),
-    ('vmp_business_role_unresolved_reason'), ('rpc_my_ui_access'),
-    ('rpc_active_rules'), ('rpc_catalog_history'), ('rpc_catalog_history_detail'),
-    ('rpc_check_data_quality'), ('rpc_commit_catalog_import'),
-    ('rpc_create_plan_item'), ('rpc_dashboard_kpi'), ('rpc_delete_performer'),
-    ('rpc_delete_plan_item'), ('rpc_delete_source_row'), ('rpc_due_alerts'),
-    ('rpc_generate_timeline'), ('rpc_get_audit_logs'), ('rpc_get_missing_items'),
-    ('rpc_get_vmp_dashboard'), ('rpc_get_vmp_watermark'),
-    ('rpc_list_catalog_changes'), ('rpc_list_catalog_dataset'),
-    ('rpc_list_source_tabs'), ('rpc_recalc_criticality'),
-    ('rpc_refresh_computed_status'), ('rpc_resolve_missing'),
-    ('rpc_save_alert_recipient'), ('rpc_save_catalog_object'),
-    ('rpc_save_product_gmp'), ('rpc_set_catalog_import_row_reason'),
-    ('rpc_set_item_performer'), ('rpc_set_item_state'), ('rpc_source_warnings'),
-    ('rpc_stage_catalog_import'), ('rpc_trang_thai_he_thong'),
-    ('rpc_update_progress'), ('rpc_upsert_object'), ('rpc_upsert_performer'),
-    ('rpc_upsert_source_row'), ('vmp_my_item_rights')
+  select jsonb_agg(jsonb_build_object(
+           'name', source_name,
+           'identity', source_identity,
+           'classification', source_classification
+         ) order by source_name)
+    into v_rpc_inventory
+  from (values
+    -- SOURCE_RPC_INVENTORY_BEGIN
+    ('item_permissions_mode', 'item_permissions_mode()', 'guarded_explicit'),
+    ('rpc_active_rules', 'rpc_active_rules()', 'guarded_wrapper'),
+    ('rpc_apply_catalog_change', 'rpc_apply_catalog_change(uuid,text,integer)', 'guarded_wrapper'),
+    ('rpc_business_roles', 'rpc_business_roles()', 'guarded_wrapper'),
+    ('rpc_catalog_history', 'rpc_catalog_history(jsonb,integer,integer)', 'guarded_explicit'),
+    ('rpc_catalog_history_detail', 'rpc_catalog_history_detail(uuid)', 'guarded_explicit'),
+    ('rpc_check_data_quality', 'rpc_check_data_quality(integer)', 'guarded_wrapper'),
+    ('rpc_commit_catalog_import', 'rpc_commit_catalog_import(uuid,text)', 'guarded_wrapper'),
+    ('rpc_create_plan_item', 'rpc_create_plan_item(text,text,integer,integer,jsonb)', 'guarded_wrapper'),
+    ('rpc_dashboard_kpi', 'rpc_dashboard_kpi(integer)', 'guarded_wrapper'),
+    ('rpc_delete_performer', 'rpc_delete_performer(uuid)', 'guarded_explicit'),
+    ('rpc_delete_plan_item', 'rpc_delete_plan_item(text,text)', 'guarded_wrapper'),
+    ('rpc_delete_source_row', 'rpc_delete_source_row(text,integer)', 'guarded_wrapper'),
+    ('rpc_due_alerts', 'rpc_due_alerts(integer,integer)', 'guarded_wrapper'),
+    ('rpc_generate_timeline', 'rpc_generate_timeline(integer,boolean)', 'guarded_wrapper'),
+    ('rpc_get_audit_logs', 'rpc_get_audit_logs(integer,integer,text,text,text,text,timestamp with time zone,timestamp with time zone)', 'guarded_wrapper'),
+    ('rpc_get_missing_items', 'rpc_get_missing_items(integer)', 'guarded_wrapper'),
+    ('rpc_get_vmp_dashboard', 'rpc_get_vmp_dashboard(integer,boolean,boolean)', 'guarded_wrapper'),
+    ('rpc_get_vmp_watermark', 'rpc_get_vmp_watermark(integer)', 'guarded_wrapper'),
+    ('rpc_import_item_permission_staff', 'rpc_import_item_permission_staff(jsonb,text)', 'guarded_wrapper'),
+    ('rpc_item_assignments', 'rpc_item_assignments(text,uuid)', 'guarded_wrapper'),
+    ('rpc_item_permission_account_candidates', 'rpc_item_permission_account_candidates(text)', 'guarded_wrapper'),
+    ('rpc_item_permission_directory', 'rpc_item_permission_directory(text)', 'guarded_wrapper'),
+    ('rpc_item_permission_preflight', 'rpc_item_permission_preflight()', 'guarded_wrapper'),
+    ('rpc_item_permission_scope_catalog', 'rpc_item_permission_scope_catalog()', 'guarded_wrapper'),
+    ('rpc_item_progress_history', 'rpc_item_progress_history(text,integer,integer)', 'guarded_wrapper'),
+    ('rpc_lien_ket_tai_khoan', 'rpc_lien_ket_tai_khoan(uuid,uuid)', 'service_only'),
+    ('rpc_link_item_permission_account', 'rpc_link_item_permission_account(uuid,uuid,text,integer)', 'guarded_wrapper'),
+    ('rpc_list_catalog_changes', 'rpc_list_catalog_changes(text,text,integer,integer)', 'guarded_wrapper'),
+    ('rpc_list_catalog_dataset', 'rpc_list_catalog_dataset(text,text,jsonb,integer,integer)', 'guarded_wrapper'),
+    ('rpc_list_source_tabs', 'rpc_list_source_tabs()', 'guarded_wrapper'),
+    ('rpc_luat_xem', 'rpc_luat_xem()', 'guarded_wrapper'),
+    ('rpc_my_ui_access', 'rpc_my_ui_access()', 'guarded_explicit'),
+    ('rpc_nguoi_va_quyen', 'rpc_nguoi_va_quyen()', 'guarded_wrapper'),
+    ('rpc_preview_catalog_change', 'rpc_preview_catalog_change(uuid)', 'guarded_wrapper'),
+    ('rpc_preview_item_rights', 'rpc_preview_item_rights(uuid,text)', 'guarded_wrapper'),
+    ('rpc_recalc_criticality', 'rpc_recalc_criticality(boolean)', 'guarded_wrapper'),
+    ('rpc_refresh_computed_status', 'rpc_refresh_computed_status()', 'guarded_wrapper'),
+    ('rpc_resolve_missing', 'rpc_resolve_missing(text,text,text)', 'guarded_wrapper'),
+    ('rpc_save_alert_recipient', 'rpc_save_alert_recipient(uuid,jsonb,text,integer)', 'guarded_wrapper'),
+    ('rpc_save_catalog_object', 'rpc_save_catalog_object(text,text,jsonb,text,integer)', 'guarded_wrapper'),
+    ('rpc_save_product_gmp', 'rpc_save_product_gmp(text,jsonb,text,integer)', 'guarded_wrapper'),
+    ('rpc_set_assignment', 'rpc_set_assignment(text,text,text,text,text)', 'guarded_wrapper'),
+    ('rpc_set_business_role', 'rpc_set_business_role(uuid,text,text,text)', 'guarded_wrapper'),
+    ('rpc_set_catalog_import_row_reason', 'rpc_set_catalog_import_row_reason(uuid,integer,text)', 'guarded_wrapper'),
+    ('rpc_set_email_cho_phep', 'rpc_set_email_cho_phep(text,boolean,text)', 'guarded_wrapper'),
+    ('rpc_set_item_assignment', 'rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)', 'guarded_wrapper'),
+    ('rpc_set_item_performer', 'rpc_set_item_performer(text,text)', 'service_only'),
+    ('rpc_set_item_performer_by_id', 'rpc_set_item_performer_by_id(text,uuid,text)', 'guarded_wrapper'),
+    ('rpc_set_item_permissions_mode', 'rpc_set_item_permissions_mode(text,text)', 'guarded_wrapper'),
+    ('rpc_set_item_state', 'rpc_set_item_state(text,text,text)', 'guarded_wrapper'),
+    ('rpc_set_user_active', 'rpc_set_user_active(uuid,boolean,text)', 'guarded_wrapper'),
+    ('rpc_set_user_role', 'rpc_set_user_role(uuid,text,text,text,text)', 'guarded_wrapper'),
+    ('rpc_source_warnings', 'rpc_source_warnings(integer)', 'guarded_wrapper'),
+    ('rpc_stage_catalog_import', 'rpc_stage_catalog_import(text,text,text,text,jsonb)', 'guarded_wrapper'),
+    ('rpc_trang_thai_he_thong', 'rpc_trang_thai_he_thong()', 'guarded_wrapper'),
+    ('rpc_update_progress', 'rpc_update_progress(text,jsonb,text,jsonb,integer)', 'guarded_wrapper'),
+    ('rpc_upsert_item_permission_staff', 'rpc_upsert_item_permission_staff(uuid,jsonb,text,integer)', 'guarded_wrapper'),
+    ('rpc_upsert_object', 'rpc_upsert_object(text,text,text,text,text,text,integer,text)', 'guarded_wrapper'),
+    ('rpc_upsert_performer', 'rpc_upsert_performer(uuid,jsonb)', 'guarded_explicit'),
+    ('rpc_upsert_source_row', 'rpc_upsert_source_row(text,integer,jsonb)', 'guarded_wrapper'),
+    ('vmp_my_item_rights', 'vmp_my_item_rights(text)', 'guarded_wrapper')
+    -- SOURCE_RPC_INVENTORY_END
+  ) reviewed(source_name, source_identity, source_classification);
+
+  perform set_config('vmp.five_role_source_rpc_inventory',
+    v_rpc_inventory::text, true);
+
+  with reviewed as (
+    select * from jsonb_to_recordset(v_rpc_inventory)
+      as i(name text, identity text, classification text)
   ), inventory as (
     select p.oid::regprocedure::text identity,
            pg_get_function_result(p.oid) result_type,
@@ -83,23 +145,52 @@ begin
            p.prosecdef security_definer,
            coalesce(array_to_string(p.proconfig, ','), '') settings,
            md5(pg_get_functiondef(p.oid)) definition_hash,
+           r.rolname owner,
            coalesce(array_to_string(p.proacl, ','), '') acl
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     join pg_language l on l.oid = p.prolang
-    join wanted w on w.name = p.proname
+    join pg_roles r on r.oid = p.proowner
+    join reviewed w on w.name = p.proname
     where n.nspname = 'public'
   )
   select count(*),
          md5(string_agg(concat_ws('|', identity, result_type, language,
-           security_definer, settings, definition_hash, acl), E'\n'
+           security_definer, settings, definition_hash, owner, acl), E'\n'
            order by identity))
     into v_count, v_digest
   from inventory;
 
-  if v_count <> 40 or v_digest <> 'e775145ccb42c2c7096530f98d4ef55b' then
+  if jsonb_array_length(v_rpc_inventory) <> 62
+     or v_count <> 62
+     or v_digest <> '10558e3cb339c9ee32e697d0643fd16f'
+     or exists (
+       select 1
+       from jsonb_to_recordset(v_rpc_inventory)
+         as i(name text, identity text, classification text)
+       left join pg_proc p
+         on p.oid = i.identity::regprocedure
+       where p.oid is null
+     ) then
     raise exception using errcode = 'check_violation',
       message = 'PRECONDITION_FUNCTION_INVENTORY_DRIFTED';
+  end if;
+
+  -- ALTER FUNCTION ... RENAME preserves the function OID. Refuse to rename a
+  -- reviewed boundary when a policy, view, expression, trigger, or function is
+  -- catalog-bound to that OID; such a dependent would otherwise bypass the
+  -- replacement wrapper and call the owner-only implementation directly.
+  if exists (
+    select 1
+    from jsonb_to_recordset(v_rpc_inventory)
+      as i(name text, identity text, classification text)
+    join pg_proc p on p.oid = i.identity::regprocedure
+    join pg_depend d
+      on d.refclassid = 'pg_proc'::regclass and d.refobjid = p.oid
+    where i.classification = 'guarded_wrapper'
+  ) then
+    raise exception using errcode = 'dependent_objects_still_exist',
+      message = 'PRECONDITION_GUARDED_RPC_HAS_OID_DEPENDENCY';
   end if;
 
   with direct_tables(table_name) as (values
@@ -315,6 +406,31 @@ revoke execute on function public.vmp_session_denial() from public, anon;
 grant execute on function public.vmp_session_denial()
   to authenticated, service_role;
 
+-- Preserve this function's OID because existing RLS policy expressions depend
+-- on it directly. Replacing it in place keeps those dependencies pointed at
+-- the public, guarded boundary instead of a renamed implementation.
+create or replace function public.item_permissions_mode()
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $function$
+begin
+  if coalesce(auth.role(), '') not in ('', 'service_role')
+     and not public.vmp_is_active_session(auth.uid()) then
+    raise exception using errcode = '42501',
+      message = public.vmp_session_denial() ->> 'error_code';
+  end if;
+
+  return coalesce((
+    select value #>> '{}'
+    from public.system_config
+    where key = 'item_permissions_mode'
+  ), 'preview');
+end
+$function$;
+
 create or replace function public.auth_user_role()
 returns public.user_role
 language sql
@@ -341,14 +457,26 @@ security definer
 set search_path = public, pg_temp
 as $function$
 declare
-  v_uid uuid := auth.uid();
-  v_mode text := public.screen_access_mode();
+  v_uid uuid;
+  v_mode text;
   v_role text;
   v_reason text;
   v_login text;
   v_class text;
   v_screens jsonb;
 begin
+  if coalesce(auth.role(), '') not in ('', 'service_role')
+     and not public.vmp_is_active_session(auth.uid()) then
+    return public.vmp_session_denial() || jsonb_build_object(
+      'mode', 'enforced', 'business_role', null,
+      'unresolved_reason', coalesce(
+        public.vmp_business_role_unresolved_reason(auth.uid()),
+        'role_unresolved'),
+      'screens', '{}'::jsonb);
+  end if;
+
+  v_uid := auth.uid();
+  v_mode := public.screen_access_mode();
   if v_uid is null then
     return jsonb_build_object(
       'ok', false, 'mode', 'enforced', 'business_role', null,
@@ -359,8 +487,8 @@ begin
   v_reason := public.vmp_business_role_unresolved_reason(v_uid);
 
   if not public.vmp_is_active_session(v_uid) then
-    return jsonb_build_object(
-      'ok', false, 'mode', 'enforced', 'business_role', null,
+    return public.vmp_session_denial() || jsonb_build_object(
+      'mode', 'enforced', 'business_role', null,
       'unresolved_reason', coalesce(v_reason, 'role_unresolved'),
       'screens', '{}'::jsonb);
   end if;
@@ -429,7 +557,7 @@ revoke insert, update, delete on public.profiles
   from public, anon, authenticated;
 revoke update (id, full_name, email, role, department, phone, title,
   is_active, last_login, created_at, updated_at, pham_vi)
-  on public.profiles from authenticated;
+  on public.profiles from public, anon, authenticated;
 drop policy profiles_update on public.profiles;
 
 create function public.vmp_profile_authority_guard()
@@ -485,7 +613,15 @@ begin
         'vmp_performers', 'vmp_plan_items', 'vmp_source_objects',
         'vmp_source_rows', 'vmp_staff_emails'
       ]::text[])
-      and 'authenticated'::regrole::oid = any(p.polroles)
+      and exists (
+        select 1
+        from unnest(p.polroles) effective_role(role_oid)
+        where case
+          when effective_role.role_oid = 0 then true
+          else pg_has_role('authenticated'::regrole::oid,
+            effective_role.role_oid, 'USAGE')
+        end
+      )
     order by c.relname, p.polname
   loop
     v_using := format('(%s) and public.vmp_current_session_is_active()',
@@ -535,6 +671,11 @@ declare
   v_total integer := 0;
   v_rows jsonb := '[]'::jsonb;
 begin
+  if coalesce(auth.role(), '') not in ('', 'service_role')
+     and not public.vmp_is_active_session(auth.uid()) then
+    return public.vmp_session_denial();
+  end if;
+
   v_role := public.vmp_business_role(auth.uid());
   if v_role not in ('admin', 'qa_manager') or v_role is null then
     return jsonb_build_object('ok', false, 'error_code', 'FORBIDDEN',
@@ -604,9 +745,15 @@ security definer
 set search_path = public, pg_temp
 as $function$
 declare
-  v_role text := public.vmp_business_role(auth.uid());
+  v_role text;
   v_row public.audit_logs%rowtype;
 begin
+  if coalesce(auth.role(), '') not in ('', 'service_role')
+     and not public.vmp_is_active_session(auth.uid()) then
+    return public.vmp_session_denial();
+  end if;
+
+  v_role := public.vmp_business_role(auth.uid());
   if v_role not in ('admin', 'qa_manager') or v_role is null then
     return jsonb_build_object('ok', false, 'error_code', 'FORBIDDEN',
       'error', 'Không có quyền xem chi tiết lịch sử danh mục');
@@ -655,58 +802,29 @@ grant execute on function public.rpc_catalog_history_detail(uuid)
 do $guarded_wrappers$
 declare
   r record;
+  a record;
   v_impl_name text;
   v_call_args text;
   v_body text;
   v_volatility text;
-  v_had_authenticated boolean;
-  v_had_service_role boolean;
-  v_had_anon boolean;
-  v_had_public boolean;
+  v_expected_acl jsonb;
+  v_actual_acl jsonb;
+  v_wrapper_oid oid;
 begin
   for r in
-    select p.oid, p.proname,
+    select p.oid, p.proname, i.identity,
            pg_get_function_arguments(p.oid) as full_arguments,
            pg_get_function_identity_arguments(p.oid) as identity_arguments,
            pg_get_function_result(p.oid) as result_type,
            p.proargnames, p.pronargs, p.proretset, p.provolatile,
-           p.proowner, p.proacl
-    from pg_proc p
+           p.proowner, owner_role.rolname as owner_name, p.proacl
+    from jsonb_to_recordset(current_setting(
+      'vmp.five_role_source_rpc_inventory')::jsonb)
+      as i(name text, identity text, classification text)
+    join pg_proc p on p.oid = i.identity::regprocedure
     join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public'
-      and p.oid = any(array[
-        'public.rpc_active_rules()'::regprocedure,
-        'public.rpc_check_data_quality(integer)'::regprocedure,
-        'public.rpc_commit_catalog_import(uuid,text)'::regprocedure,
-        'public.rpc_create_plan_item(text,text,integer,integer,jsonb)'::regprocedure,
-        'public.rpc_dashboard_kpi(integer)'::regprocedure,
-        'public.rpc_delete_plan_item(text,text)'::regprocedure,
-        'public.rpc_delete_source_row(text,integer)'::regprocedure,
-        'public.rpc_due_alerts(integer,integer)'::regprocedure,
-        'public.rpc_generate_timeline(integer,boolean)'::regprocedure,
-        'public.rpc_get_audit_logs(integer,integer,text,text,text,text,timestamp with time zone,timestamp with time zone)'::regprocedure,
-        'public.rpc_get_missing_items(integer)'::regprocedure,
-        'public.rpc_get_vmp_dashboard(integer,boolean,boolean)'::regprocedure,
-        'public.rpc_get_vmp_watermark(integer)'::regprocedure,
-        'public.rpc_list_catalog_changes(text,text,integer,integer)'::regprocedure,
-        'public.rpc_list_catalog_dataset(text,text,jsonb,integer,integer)'::regprocedure,
-        'public.rpc_list_source_tabs()'::regprocedure,
-        'public.rpc_recalc_criticality(boolean)'::regprocedure,
-        'public.rpc_refresh_computed_status()'::regprocedure,
-        'public.rpc_resolve_missing(text,text,text)'::regprocedure,
-        'public.rpc_save_alert_recipient(uuid,jsonb,text,integer)'::regprocedure,
-        'public.rpc_save_catalog_object(text,text,jsonb,text,integer)'::regprocedure,
-        'public.rpc_save_product_gmp(text,jsonb,text,integer)'::regprocedure,
-        'public.rpc_set_catalog_import_row_reason(uuid,integer,text)'::regprocedure,
-        'public.rpc_set_item_state(text,text,text)'::regprocedure,
-        'public.rpc_source_warnings(integer)'::regprocedure,
-        'public.rpc_stage_catalog_import(text,text,text,text,jsonb)'::regprocedure,
-        'public.rpc_trang_thai_he_thong()'::regprocedure,
-        'public.rpc_update_progress(text,jsonb,text,jsonb,integer)'::regprocedure,
-        'public.rpc_upsert_object(text,text,text,text,text,text,integer,text)'::regprocedure,
-        'public.rpc_upsert_source_row(text,integer,jsonb)'::regprocedure,
-        'public.vmp_my_item_rights(text)'::regprocedure
-      ]::oid[])
+    join pg_roles owner_role on owner_role.oid = p.proowner
+    where n.nspname = 'public' and i.classification = 'guarded_wrapper'
     order by p.oid::regprocedure::text
   loop
     v_impl_name := r.proname || '__five_role_impl_20260824';
@@ -714,17 +832,35 @@ begin
       into v_call_args
     from unnest(r.proargnames[1:r.pronargs]) with ordinality a(arg_name, ord);
 
-    v_had_authenticated := has_function_privilege('authenticated', r.oid, 'EXECUTE');
-    v_had_service_role := has_function_privilege('service_role', r.oid, 'EXECUTE');
-    v_had_anon := has_function_privilege('anon', r.oid, 'EXECUTE');
-    select exists (
-      select 1
-      from aclexplode(coalesce(r.proacl, acldefault('f', r.proowner))) a
-      where a.grantee = 0 and a.privilege_type = 'EXECUTE'
-    ) into v_had_public;
+    select coalesce(jsonb_agg(jsonb_build_array(
+             x.grantee, x.privilege_type, x.is_grantable)
+             order by x.grantee, x.privilege_type, x.is_grantable), '[]'::jsonb)
+      into v_expected_acl
+    from aclexplode(coalesce(r.proacl, acldefault('f', r.proowner))) x
+    where x.grantee <> r.proowner and x.privilege_type = 'EXECUTE';
 
     execute format('alter function public.%I(%s) rename to %I',
       r.proname, r.identity_arguments, v_impl_name);
+
+    -- The renamed implementation is owner-only, including any reviewed
+    -- nonstandard grantee rather than only the four Supabase browser roles.
+    for a in
+      select distinct x.grantee, grantee_role.rolname as grantee_name
+      from aclexplode(coalesce(r.proacl, acldefault('f', r.proowner))) x
+      left join pg_roles grantee_role on grantee_role.oid = x.grantee
+      where x.grantee <> r.proowner and x.privilege_type = 'EXECUTE'
+    loop
+      if a.grantee = 0 then
+        execute format('revoke execute on function public.%I(%s) from public',
+          v_impl_name, r.identity_arguments);
+      elsif a.grantee_name is null then
+        raise exception using errcode = 'undefined_object',
+          message = 'HIDDEN_IMPLEMENTATION_GRANTEE_MISSING';
+      else
+        execute format('revoke execute on function public.%I(%s) from %I',
+          v_impl_name, r.identity_arguments, a.grantee_name);
+      end if;
+    end loop;
 
     v_volatility := case r.provolatile
       when 'i' then 'immutable'
@@ -734,11 +870,15 @@ begin
 
     if r.proretset then
       v_body := format(
-        'begin if coalesce(auth.role(), '''') <> ''service_role'' and not public.vmp_is_active_session(auth.uid()) then return; end if; return query select * from public.%I(%s); end',
+        'begin if coalesce(auth.role(), '''') not in ('''', ''service_role'') and not public.vmp_is_active_session(auth.uid()) then return; end if; return query select * from public.%I(%s); end',
+        v_impl_name, v_call_args);
+    elsif r.result_type in ('json', 'jsonb') then
+      v_body := format(
+        'begin if coalesce(auth.role(), '''') not in ('''', ''service_role'') and not public.vmp_is_active_session(auth.uid()) then return public.vmp_session_denial(); end if; return public.%I(%s); end',
         v_impl_name, v_call_args);
     else
       v_body := format(
-        'begin if coalesce(auth.role(), '''') <> ''service_role'' and not public.vmp_is_active_session(auth.uid()) then return public.vmp_session_denial(); end if; return public.%I(%s); end',
+        'begin if coalesce(auth.role(), '''') not in ('''', ''service_role'') and not public.vmp_is_active_session(auth.uid()) then raise exception using errcode = ''42501'', message = public.vmp_session_denial() ->> ''error_code''; end if; return public.%I(%s); end',
         v_impl_name, v_call_args);
     end if;
 
@@ -746,26 +886,80 @@ begin
       'create function public.%I(%s) returns %s language plpgsql %s security definer set search_path = public, pg_temp as $wrapper$ %s $wrapper$',
       r.proname, r.full_arguments, r.result_type, v_volatility, v_body);
 
-    execute format('revoke execute on function public.%I(%s) from public, anon, authenticated, service_role',
-      v_impl_name, r.identity_arguments);
-    execute format('revoke execute on function public.%I(%s) from public, anon, authenticated, service_role',
-      r.proname, r.identity_arguments);
+    execute format('alter function public.%I(%s) owner to %I',
+      r.proname, r.identity_arguments, r.owner_name);
 
-    if v_had_public then
-      execute format('grant execute on function public.%I(%s) to public',
-        r.proname, r.identity_arguments);
-    end if;
-    if v_had_anon then
-      execute format('grant execute on function public.%I(%s) to anon',
-        r.proname, r.identity_arguments);
-    end if;
-    if v_had_authenticated then
-      execute format('grant execute on function public.%I(%s) to authenticated',
-        r.proname, r.identity_arguments);
-    end if;
-    if v_had_service_role then
-      execute format('grant execute on function public.%I(%s) to service_role',
-        r.proname, r.identity_arguments);
+    select p.oid into strict v_wrapper_oid
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = r.proname
+      and pg_get_function_identity_arguments(p.oid) = r.identity_arguments;
+
+    -- Remove CREATE FUNCTION defaults/default-ACL grants, then replay every
+    -- reviewed non-owner EXECUTE grant with its grant-option bit.
+    for a in
+      select distinct x.grantee, grantee_role.rolname as grantee_name
+      from pg_proc wrapper
+      cross join lateral aclexplode(coalesce(wrapper.proacl,
+        acldefault('f', wrapper.proowner))) x
+      left join pg_roles grantee_role on grantee_role.oid = x.grantee
+      where wrapper.oid = v_wrapper_oid and x.grantee <> wrapper.proowner
+        and x.privilege_type = 'EXECUTE'
+    loop
+      if a.grantee = 0 then
+        execute format('revoke execute on function public.%I(%s) from public',
+          r.proname, r.identity_arguments);
+      elsif a.grantee_name is null then
+        raise exception using errcode = 'undefined_object',
+          message = 'PUBLIC_WRAPPER_GRANTEE_MISSING';
+      else
+        execute format('revoke execute on function public.%I(%s) from %I',
+          r.proname, r.identity_arguments, a.grantee_name);
+      end if;
+    end loop;
+
+    for a in
+      select x.grantee, grantee_role.rolname as grantee_name, x.is_grantable
+      from aclexplode(coalesce(r.proacl, acldefault('f', r.proowner))) x
+      left join pg_roles grantee_role on grantee_role.oid = x.grantee
+      where x.grantee <> r.proowner and x.privilege_type = 'EXECUTE'
+      order by x.grantee
+    loop
+      if a.grantee = 0 then
+        execute format('grant execute on function public.%I(%s) to public%s',
+          r.proname, r.identity_arguments,
+          case when a.is_grantable then ' with grant option' else '' end);
+      elsif a.grantee_name is null then
+        raise exception using errcode = 'undefined_object',
+          message = 'PUBLIC_WRAPPER_GRANTEE_MISSING';
+      else
+        execute format('grant execute on function public.%I(%s) to %I%s',
+          r.proname, r.identity_arguments, a.grantee_name,
+          case when a.is_grantable then ' with grant option' else '' end);
+      end if;
+    end loop;
+
+    select coalesce(jsonb_agg(jsonb_build_array(
+             x.grantee, x.privilege_type, x.is_grantable)
+             order by x.grantee, x.privilege_type, x.is_grantable), '[]'::jsonb)
+      into v_actual_acl
+    from pg_proc wrapper
+    cross join lateral aclexplode(coalesce(wrapper.proacl,
+      acldefault('f', wrapper.proowner))) x
+    where wrapper.oid = v_wrapper_oid and x.grantee <> wrapper.proowner
+      and x.privilege_type = 'EXECUTE';
+
+    if v_actual_acl is distinct from v_expected_acl
+       or (select proowner from pg_proc where oid = v_wrapper_oid) <> r.proowner
+       or (select proowner from pg_proc where oid = r.oid) <> r.proowner
+       or exists (
+         select 1 from pg_proc hidden
+         cross join lateral aclexplode(coalesce(hidden.proacl,
+           acldefault('f', hidden.proowner))) x
+         where hidden.oid = r.oid and x.grantee <> hidden.proowner
+           and x.privilege_type = 'EXECUTE'
+       ) then
+      raise exception using errcode = 'check_violation',
+        message = 'WRAPPER_OWNER_OR_ACL_NOT_PRESERVED';
     end if;
   end loop;
 end
@@ -871,8 +1065,26 @@ begin
       message = 'POSTCONDITION_PERMISSION_MODES_CHANGED';
   end if;
 
-  if has_table_privilege('authenticated', 'public.profiles', 'UPDATE')
+  if has_table_privilege('authenticated', 'public.profiles', 'INSERT,UPDATE,DELETE')
+     or has_table_privilege('anon', 'public.profiles', 'INSERT,UPDATE,DELETE')
      or has_any_column_privilege('authenticated', 'public.profiles', 'UPDATE')
+     or has_any_column_privilege('anon', 'public.profiles', 'UPDATE')
+     or exists (
+       select 1
+       from pg_class c
+       cross join lateral aclexplode(coalesce(c.relacl,
+         acldefault('r', c.relowner))) x
+       where c.oid = 'public.profiles'::regclass and x.grantee = 0
+         and x.privilege_type in ('INSERT', 'UPDATE', 'DELETE')
+     )
+     or exists (
+       select 1
+       from pg_attribute a
+       cross join lateral aclexplode(a.attacl) x
+       where a.attrelid = 'public.profiles'::regclass and a.attnum > 0
+         and not a.attisdropped and x.grantee = 0
+         and x.privilege_type = 'UPDATE'
+     )
      or has_table_privilege('authenticated', 'public.audit_logs', 'SELECT') then
     raise exception using errcode = 'check_violation',
       message = 'POSTCONDITION_DIRECT_PRIVILEGE_REMAINS';
@@ -888,7 +1100,13 @@ begin
         'vmp_performers', 'vmp_plan_items', 'vmp_source_objects',
         'vmp_source_rows', 'vmp_staff_emails'
       ]::text[])
-      and 'authenticated' = any(p.roles)
+      and exists (
+        select 1 from unnest(p.roles) effective_role(role_name)
+        where case
+          when effective_role.role_name = 'public' then true
+          else pg_has_role('authenticated', effective_role.role_name, 'USAGE')
+        end
+      )
       and ((p.cmd in ('SELECT','UPDATE','DELETE','ALL')
             and coalesce(p.qual, '')
               not like '%vmp_current_session_is_active%')
@@ -904,17 +1122,47 @@ begin
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\';
-  if v_count <> 31 or exists (
+  if v_count <> 54 or exists (
     select 1
-    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    left join pg_proc wrapper
+      on wrapper.pronamespace = p.pronamespace
+     and wrapper.proname = left(p.proname,
+       -length('__five_role_impl_20260824'))
+     and wrapper.proargtypes = p.proargtypes
     where n.nspname = 'public'
       and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\'
       and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
         or has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('service_role', p.oid, 'EXECUTE')
+        or wrapper.oid is null
+        or wrapper.proowner <> p.proowner
+        or exists (
+          select 1
+          from pg_depend dependency
+          where dependency.refclassid = 'pg_proc'::regclass
+            and dependency.refobjid = p.oid
+        )
         or exists (
           select 1
           from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-          where a.grantee = 0 and a.privilege_type = 'EXECUTE'
+          where a.grantee <> p.proowner and a.privilege_type = 'EXECUTE'
+        ))
+  ) or exists (
+    select 1
+    from jsonb_to_recordset(current_setting(
+      'vmp.five_role_source_rpc_inventory')::jsonb)
+      as i(name text, identity text, classification text)
+    join pg_proc p on p.oid = i.identity::regprocedure
+    where i.classification = 'service_only'
+      and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+        or has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('service_role', p.oid, 'EXECUTE')
+        or exists (
+          select 1
+          from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+          where a.grantee <> p.proowner and a.privilege_type = 'EXECUTE'
         ))
   ) then
     raise exception using errcode = 'check_violation',

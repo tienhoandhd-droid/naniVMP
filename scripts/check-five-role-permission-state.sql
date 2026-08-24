@@ -1,6 +1,45 @@
 \set ON_ERROR_STOP on
 
+\if :{?account_ids}
+\else
 begin read only;
+do $$
+begin
+  raise exception using errcode = '22023',
+    message = 'CHECK_ACCOUNT_IDS_PSQL_VARIABLE_REQUIRED';
+end
+$$;
+\endif
+
+\if :{?five_role_local_test}
+  \if :{?five_role_local_test_contract}
+  \else
+  begin read only;
+  do $$
+  begin
+    raise exception using errcode = '42501',
+      message = 'CHECK_LOCAL_TEST_SHELL_CONTRACT_REQUIRED';
+  end
+  $$;
+  \endif
+\endif
+
+begin read only;
+
+\o /dev/null
+select set_config('vmp.five_role_check_account_ids', :'account_ids', true);
+\if :{?five_role_local_test}
+select set_config('vmp.five_role_check_expected_digest',
+  '1f8213f705d26bd656781baa08cb1f42', true);
+select set_config('vmp.five_role_check_local_test', 'on', true);
+select set_config('vmp.five_role_local_test_contract',
+  :'five_role_local_test_contract', true);
+\else
+select set_config('vmp.five_role_check_expected_digest',
+  '2c09501166eb45c3676451084230340e', true);
+select set_config('vmp.five_role_check_local_test', 'off', true);
+\endif
+\o
 
 do $checks$
 declare
@@ -9,7 +48,27 @@ declare
   v_implicit_csv text;
   v_explicit_csv text;
   v_count integer;
+  v_distinct integer;
+  v_digest text;
+  v_expected_digest text := current_setting(
+    'vmp.five_role_check_expected_digest');
+  v_local boolean := current_setting(
+    'vmp.five_role_check_local_test') = 'on';
 begin
+  if v_local and (
+       current_setting('vmp.five_role_local_test_contract', true)
+         is distinct from 'loopback-54322-postgres'
+       or current_database() <> 'postgres'
+       or current_user <> 'postgres'
+       or not exists (
+         select 1 from public.system_config
+         where key = 'five_role_test_fixture' and value = 'true'::jsonb
+       )
+     ) then
+    raise exception using errcode = '42501',
+      message = 'CHECK_LOCAL_TEST_DATABASE_CONTRACT_MISMATCH';
+  end if;
+
   if public.screen_access_mode() is distinct from 'enforced'
      or public.item_permissions_mode() is distinct from 'preview' then
     raise exception using errcode = 'check_violation',
@@ -60,17 +119,35 @@ begin
   end if;
   raise notice 'PASS CHECK_ACTIVE_SESSION_CONTRACT';
 
-  if has_table_privilege('authenticated', 'public.profiles', 'UPDATE')
+  if has_table_privilege('authenticated', 'public.profiles',
+       'INSERT,UPDATE,DELETE')
+     or has_table_privilege('anon', 'public.profiles',
+       'INSERT,UPDATE,DELETE')
      or has_any_column_privilege('authenticated', 'public.profiles', 'UPDATE')
+     or has_any_column_privilege('anon', 'public.profiles', 'UPDATE')
+     or exists (
+       select 1 from pg_class c
+       cross join lateral aclexplode(coalesce(c.relacl,
+         acldefault('r', c.relowner))) x
+       where c.oid = 'public.profiles'::regclass and x.grantee = 0
+         and x.privilege_type in ('INSERT', 'UPDATE', 'DELETE')
+     )
+     or exists (
+       select 1 from pg_attribute a
+       cross join lateral aclexplode(a.attacl) x
+       where a.attrelid = 'public.profiles'::regclass and a.attnum > 0
+         and not a.attisdropped and x.grantee = 0
+         and x.privilege_type = 'UPDATE'
+     )
      or has_table_privilege('authenticated', 'public.audit_logs', 'SELECT')
+     or has_table_privilege('anon', 'public.audit_logs', 'SELECT')
      or exists (
        select 1 from pg_policies p
        where p.schemaname = 'public' and p.tablename = 'profiles'
          and p.policyname = 'profiles_update'
      )
      or not exists (
-       select 1
-       from pg_trigger t
+       select 1 from pg_trigger t
        where t.tgrelid = 'public.profiles'::regclass
          and t.tgname = 'vmp_profiles_authority_guard'
          and not t.tgisinternal
@@ -90,7 +167,13 @@ begin
         'vmp_performers', 'vmp_plan_items', 'vmp_source_objects',
         'vmp_source_rows', 'vmp_staff_emails'
       ]::text[])
-      and 'authenticated' = any(p.roles)
+      and exists (
+        select 1 from unnest(p.roles) effective_role(role_name)
+        where case
+          when effective_role.role_name = 'public' then true
+          else pg_has_role('authenticated', effective_role.role_name, 'USAGE')
+        end
+      )
       and ((p.cmd in ('SELECT','UPDATE','DELETE','ALL')
             and coalesce(p.qual, '') not like '%vmp_current_session_is_active%')
         or (p.cmd in ('INSERT','UPDATE','ALL')
@@ -105,17 +188,34 @@ begin
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\';
-  if v_count <> 31 or exists (
+  if v_count <> 54 or exists (
     select 1
-    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    from pg_proc hidden
+    join pg_namespace n on n.oid = hidden.pronamespace
+    left join pg_proc wrapper
+      on wrapper.pronamespace = hidden.pronamespace
+     and wrapper.proname = left(hidden.proname,
+       -length('__five_role_impl_20260824'))
+     and wrapper.proargtypes = hidden.proargtypes
     where n.nspname = 'public'
-      and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\'
-      and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
-        or has_function_privilege('anon', p.oid, 'EXECUTE')
+      and hidden.proname like '%\_\_five\_role\_impl\_20260824' escape '\'
+      and (wrapper.oid is null
+        or wrapper.proowner <> hidden.proowner
+        or has_function_privilege('authenticated', hidden.oid, 'EXECUTE')
+        or has_function_privilege('anon', hidden.oid, 'EXECUTE')
+        or has_function_privilege('service_role', hidden.oid, 'EXECUTE')
         or exists (
           select 1
-          from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-          where a.grantee = 0 and a.privilege_type = 'EXECUTE'
+          from pg_depend dependency
+          where dependency.refclassid = 'pg_proc'::regclass
+            and dependency.refobjid = hidden.oid
+        )
+        or exists (
+          select 1
+          from aclexplode(coalesce(hidden.proacl,
+            acldefault('f', hidden.proowner))) x
+          where x.grantee <> hidden.proowner
+            and x.privilege_type = 'EXECUTE'
         ))
   ) then
     raise exception using errcode = 'check_violation',
@@ -123,17 +223,42 @@ begin
   end if;
   raise notice 'PASS CHECK_GUARDED_RPC_IMPLEMENTATIONS';
 
+  if exists (
+    select 1
+    from (values
+      ('public.rpc_lien_ket_tai_khoan(uuid,uuid)'::regprocedure),
+      ('public.rpc_set_item_performer(text,text)'::regprocedure)
+    ) service_boundary(function_oid)
+    join pg_proc p on p.oid = service_boundary.function_oid
+    where has_function_privilege('authenticated', p.oid, 'EXECUTE')
+       or has_function_privilege('anon', p.oid, 'EXECUTE')
+       or has_function_privilege('service_role', p.oid, 'EXECUTE')
+       or exists (
+         select 1
+         from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
+         where x.grantee <> p.proowner and x.privilege_type = 'EXECUTE'
+       )
+  ) then
+    raise exception using errcode = 'check_violation',
+      message = 'CHECK_SERVICE_ONLY_RPC_ACL';
+  end if;
+  raise notice 'PASS CHECK_SERVICE_ONLY_RPC_ACL';
+
   if has_function_privilege('public',
        'public.rpc_catalog_history(jsonb,integer,integer)', 'EXECUTE')
      or has_function_privilege('anon',
        'public.rpc_catalog_history(jsonb,integer,integer)', 'EXECUTE')
      or not has_function_privilege('authenticated',
        'public.rpc_catalog_history(jsonb,integer,integer)', 'EXECUTE')
+     or not has_function_privilege('service_role',
+       'public.rpc_catalog_history(jsonb,integer,integer)', 'EXECUTE')
      or has_function_privilege('public',
        'public.rpc_catalog_history_detail(uuid)', 'EXECUTE')
      or has_function_privilege('anon',
        'public.rpc_catalog_history_detail(uuid)', 'EXECUTE')
      or not has_function_privilege('authenticated',
+       'public.rpc_catalog_history_detail(uuid)', 'EXECUTE')
+     or not has_function_privilege('service_role',
        'public.rpc_catalog_history_detail(uuid)', 'EXECUTE') then
     raise exception using errcode = 'check_violation',
       message = 'CHECK_CATALOG_HISTORY_ACL';
@@ -147,16 +272,80 @@ begin
   end if;
   raise notice 'PASS CHECK_ACTIVE_ADMIN_REMAINS';
 
-  if (select count(*)
+  with manifest as (
+    select btrim(value)::uuid id
+    from regexp_split_to_table(current_setting(
+      'vmp.five_role_check_account_ids'), ',') value
+  )
+  select count(*), count(distinct id),
+         md5(string_agg(id::text, ',' order by id))
+    into v_count, v_distinct, v_digest
+  from manifest;
+
+  if v_count <> 7 or v_distinct <> 7 or v_digest <> v_expected_digest then
+    raise exception using errcode = 'check_violation',
+      message = 'CHECK_ACCOUNT_MANIFEST_DIGEST';
+  end if;
+
+  if exists (
+    with manifest as (
+      select btrim(value)::uuid id
+      from regexp_split_to_table(current_setting(
+        'vmp.five_role_check_account_ids'), ',') value
+    )
+    select 1
+    from manifest m
+    left join public.profiles p on p.id = m.id
+    where p.id is null or coalesce(p.is_active, true)
+  ) or (select count(*)
+        from public.profiles p
+        where p.id in (
+          select btrim(value)::uuid
+          from regexp_split_to_table(current_setting(
+            'vmp.five_role_check_account_ids'), ',') value
+        )
+          and p.role::text = 'viewer') <> 3
+     or (select count(*)
+         from public.profiles p
+         where p.id in (
+           select btrim(value)::uuid
+           from regexp_split_to_table(current_setting(
+             'vmp.five_role_check_account_ids'), ',') value
+         )
+           and p.role::text = 'department_user') <> 3
+     or (select count(*)
+         from public.profiles p
+         where p.id in (
+           select btrim(value)::uuid
+           from regexp_split_to_table(current_setting(
+             'vmp.five_role_check_account_ids'), ',') value
+         )
+           and p.role::text = 'qa_manager') <> 1 then
+    raise exception using errcode = 'check_violation',
+      message = 'CHECK_EXACT_SEVEN_DISABLED_TARGETS';
+  end if;
+
+  if exists (
+    with manifest as (
+      select btrim(value)::uuid id
+      from regexp_split_to_table(current_setting(
+        'vmp.five_role_check_account_ids'), ',') value
+    )
+    select 1
+    from manifest m
+    left join lateral (
+      select count(*) audit_count
       from public.audit_logs a
-      join public.profiles p on p.id::text = a.record_id
       where a.table_name = 'profiles'
+        and a.record_id = m.id::text
         and a.source = 'five_role_hardening'
         and a.change_reason =
           'Loại Viewer và tài khoản test theo phê duyệt 2026-08-24'
-        and not coalesce(p.is_active, true)) <> 7 then
+    ) matching_audit on true
+    where matching_audit.audit_count <> 1
+  ) then
     raise exception using errcode = 'check_violation',
-      message = 'CHECK_EXACT_SEVEN_DISABLED_AUDITS';
+      message = 'CHECK_EXACT_ONE_AUDIT_PER_TARGET';
   end if;
   raise notice 'PASS CHECK_EXACT_SEVEN_DISABLED_AUDITS';
 end

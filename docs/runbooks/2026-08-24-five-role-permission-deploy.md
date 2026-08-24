@@ -20,6 +20,7 @@ git status --short
 git rev-parse HEAD
 sha256sum supabase/migrations/20260824120000_five_role_permission_hardening.sql \
   scripts/apply-five-role-hardening.sql \
+  scripts/apply-five-role-account-manifest.sql \
   scripts/check-five-role-permission-state.sql
 ```
 
@@ -87,8 +88,8 @@ array normalization. The four named forms above remove that ambiguity.
 Validate the private manifest without printing UUIDs:
 
 ```bash
-psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
-  -v account_ids="$VMP_ACCOUNT_IDS" <<'SQL'
+psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+\getenv account_ids VMP_ACCOUNT_IDS
 begin read only;
 with manifest as (
   select btrim(value)::uuid id
@@ -123,8 +124,8 @@ VMP_BACKUP_DIR=$(mktemp -d)
 pg_dump "$SUPABASE_DB_URL" --schema-only --schema=public --no-owner \
   --file "$VMP_BACKUP_DIR/public-schema.sql"
 psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
-  -v account_ids="$VMP_ACCOUNT_IDS" \
   --csv --output "$VMP_BACKUP_DIR/reviewed-state.csv" <<'SQL'
+\getenv account_ids VMP_ACCOUNT_IDS
 begin read only;
 select 'matrix' kind, business_role key_1, screen_id key_2,
        concat_ws('|', can_view, data_scope, actions::text) state
@@ -152,10 +153,17 @@ checks postconditions, and commits. Lock timeout is 3 seconds; statement timeout
 is 60 seconds.
 
 ```bash
-psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
-  -v account_ids="$VMP_ACCOUNT_IDS" \
-  -f scripts/apply-five-role-hardening.sql
+psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 <<'PSQL'
+\getenv account_ids VMP_ACCOUNT_IDS
+\ir scripts/apply-five-role-hardening.sql
+PSQL
 ```
+
+The manifest is read from the private environment into psql over standard
+input. It is not placed in the `psql` process argument list and neither the
+apply script nor the checker prints it. The production entrypoint hardcodes
+only the approved digest `2c09501166eb45c3676451084230340e` and has no
+synthetic or caller-controlled digest path.
 
 Do not retry blindly after any error. `ON_ERROR_STOP` plus the transaction means
 a pre-commit failure rolls back. Open a new connection and inspect the checker
@@ -166,11 +174,13 @@ before deciding on a forward fix.
 Use a new connection:
 
 ```bash
-psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
-  -f scripts/check-five-role-permission-state.sql
+psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 <<'PSQL'
+\getenv account_ids VMP_ACCOUNT_IDS
+\ir scripts/check-five-role-permission-state.sql
+PSQL
 ```
 
-All nine `PASS` rule IDs must appear, followed by `ROLLBACK`, with no warning or
+All ten `PASS` rule IDs must appear, followed by `ROLLBACK`, with no warning or
 error. Separately probe one current Admin, QA Manager, QA Staff, Workshop
 Manager, Workshop Staff and one disabled account using approved test sessions.
 Output only role/status/counts. Required behavior:
@@ -184,7 +194,69 @@ Output only role/status/counts. Required behavior:
 - authenticated has no direct profile UPDATE and no raw audit SELECT;
 - 85 matrix rows remain, with `enforced` / `preview` modes.
 
+The checker recomputes the private seven-UUID digest and 3/3/1 distribution,
+requires every supplied target to be inactive, and requires exactly one
+matching hardening audit per target. It also verifies policies effective
+through `TO PUBLIC` or inherited roles, PUBLIC/anon/authenticated profile write
+revocation, 54 owner-matched wrapper/implementation pairs, owner-only hidden
+ACLs (including no `service_role` execute), and zero OID-bound dependents on
+hidden implementations.
+
 Do not run mutation fixtures against production.
+
+## RPC inventory, ownership, and schema cache
+
+The reviewed source inventory contains 62 literal browser RPC names: 54 use
+owner-preserving guarded wrappers, six are guarded in place, and two legacy
+link/name endpoints are intentionally owner-only service boundaries. The live
+signature digest includes function identity, return type, language,
+`SECURITY DEFINER`, settings, definition hash, owner, and ACL and must equal
+`10558e3cb339c9ee32e697d0643fd16f`. The migration aborts if any signature,
+overload, owner, ACL, definition, or count drifts.
+
+`item_permissions_mode()` is guarded in place because two RLS policies are
+OID-bound to it. Before any other function is renamed, the migration proves it
+has no reverse `pg_depend` entry. Postconditions and the checker prove all 54
+hidden implementations remain unreferenced, owner-matched, and owner-only.
+
+After COMMIT, request a PostgREST schema-cache reload using a new restricted
+operator connection, then wait for the DDL watcher/reload acknowledgement:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+From a new connection, repeat the read-only checker and inspect the PostgREST
+OpenAPI document with an approved service-role-compatible test credential.
+Confirm every intended public RPC path/signature is present, the two
+intentionally owner-only endpoints are absent, and no
+`__five_role_impl_20260824` path is exposed. Probe only read-only RPCs for the
+five active personas and disabled persona; do not execute mutating RPCs merely
+to test the cache. Catalog ACL/owner/dependency checks in the checker are the
+required evidence for mutating and hidden functions.
+
+## Disposable local verification only
+
+The synthetic matrix/account fixture is permitted only on the schema-only
+loopback clone. It deliberately creates non-PII `auth.users` rows because a
+schema-only dump does not include Auth data; this validates foreign keys and
+session resolution but does not reproduce production Auth triggers, identities,
+refresh tokens, or GoTrue lifecycle behavior. It is not evidence that those
+Auth workflows were tested.
+
+Use only the sealed local entrypoint, which validates the exact loopback
+`127.0.0.1`/`54322`/`postgres` URL (with no query or fragment), passes only
+validated `PG*` fields to psql, and selects the synthetic digest outside the
+production script:
+
+```bash
+export VMP_LOCAL_ACCOUNT_IDS='71000000-0000-4000-8000-000000000001,71000000-0000-4000-8000-000000000002,71000000-0000-4000-8000-000000000003,71000000-0000-4000-8000-000000000004,71000000-0000-4000-8000-000000000005,71000000-0000-4000-8000-000000000006,71000000-0000-4000-8000-000000000007'
+bash scripts/apply-five-role-hardening-local-test.sh apply
+bash scripts/apply-five-role-hardening-local-test.sh check
+```
+
+Never invoke either local-test SQL file against production and never add the
+synthetic digest or fixture marker path to the production entrypoint.
 
 ## Frontend ordering
 
