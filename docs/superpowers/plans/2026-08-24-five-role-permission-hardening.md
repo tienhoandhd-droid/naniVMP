@@ -170,9 +170,13 @@ git commit -m "test(security): reproduce five-role permission gaps"
 **Files:**
 - Create: `supabase/migrations/20260824120000_five_role_permission_hardening.sql`
 - Create: `scripts/apply-five-role-hardening.sql`
+- Create: `scripts/apply-five-role-account-manifest.sql`
+- Create: `scripts/apply-five-role-hardening-local-test.sh`
+- Create: `scripts/apply-five-role-hardening-local-test.sql`
 - Create: `scripts/check-five-role-permission-state.sql`
 - Create: `docs/runbooks/2026-08-24-five-role-permission-deploy.md`
 - Modify: `tests/sql/five-role-hardening.sql`
+- Create: `tests/unit/five-role-rpc-inventory.test.mjs`
 
 **Interfaces:**
 - Consumes: live five-role resolver/function/policy definitions and a psql variable `account_ids` containing exactly seven comma-separated UUIDs.
@@ -279,7 +283,12 @@ Add a `BEFORE UPDATE OF role, department, is_active, pham_vi` trigger whose func
 
 Patch `auth_user_role()` to return NULL unless `vmp_is_active_session(auth.uid())` is true, without introducing recursion into `vmp_business_role`/`vmp_is_active_session`.
 
-Add an early `ACCOUNT_DISABLED`/`ROLE_UNRESOLVED` return or exception to every authenticated SECURITY DEFINER function invoked by `src`:
+Derive a canonical inventory from every actual `src` RPC call expression (61
+distinct names at the reviewed source HEAD), resolve every live signature and
+classify it as guarded, intentionally service-only, or explicitly transitively
+safe. Add an early `ACCOUNT_DISABLED`/`ROLE_UNRESOLVED` return or exception to
+every authenticated SECURITY DEFINER boundary in that inventory. The list below
+is the original 36-boundary seed, not a complete allowlist:
 
 ```text
 rpc_active_rules, rpc_catalog_history, rpc_catalog_history_detail,
@@ -297,9 +306,28 @@ rpc_upsert_object, rpc_upsert_performer, rpc_upsert_source_row,
 vmp_my_item_rights
 ```
 
+In particular, include `rpc_set_assignment` and every other live browser call
+omitted by the original seed. Add a source-to-migration inventory test that
+fails whenever a frontend RPC call lacks an explicit reviewed classification.
+Seed a legacy `edit_catalog` permission and prove an inactive QA Manager cannot
+use `rpc_set_assignment`, mutate `vmp_assignment_matrix`, or create its audit
+side effects.
+
 For direct tables used by `src` (`audit_logs`, `data_quality_issues`, `vmp_alert_recipients`, `vmp_assignment_matrix`, `vmp_chat_loi_cho`, `vmp_email_cho_phep`, `vmp_performers`, `vmp_plan_items`, `vmp_source_objects`, `vmp_source_rows`, `vmp_staff_emails`), either revoke authenticated access when an RPC façade exists or require `vmp_is_active_session(auth.uid())` in every authenticated RLS policy. Keep self SELECT on `profiles` so an inactive user can display the disabled-account state, but no application data.
 
-The migration must abort if a named live RPC/table is absent or its signature/policy set differs from the captured inventory; do not silently skip an endpoint.
+The migration must abort if a named live RPC/table is absent or its
+signature/policy set differs from the captured inventory; do not silently skip
+an endpoint. Include function owner in the pinned inventory. Dynamic wrappers
+must have the same owner as their hidden implementation, preserve the reviewed
+public signature/defaults/result/volatility and intended ACL, and leave every
+hidden implementation owner-only. Postconditions must assert owner equality and
+no hidden-implementation EXECUTE for PUBLIC, anon, authenticated, service_role,
+or any other non-owner grantee.
+
+When rewriting/checking RLS, cover policies effective for authenticated through
+`TO PUBLIC` or inherited roles as well as policies explicitly `TO
+authenticated`. Revoke and verify profile column writes for PUBLIC and anon in
+addition to authenticated.
 
 - [ ] **Step 5: Harden catalog-history RPCs**
 
@@ -315,7 +343,10 @@ List returns only `id`, timestamp, actor snapshot, effective role, action, table
 
 - [ ] **Step 6: Add exact seven-account transactional apply script**
 
-`scripts/apply-five-role-hardening.sql` must:
+`scripts/apply-five-role-hardening.sql` must accept only the approved production
+digest; it must contain no caller-controlled digest override. Put the synthetic
+digest in a separate local-test entrypoint guarded by the same loopback target
+validation as the disposable harness. The production entrypoint must:
 
 ```sql
 \set ON_ERROR_STOP on
@@ -329,15 +360,21 @@ Parse `:'account_ids'` to seven UUIDs, assert uniqueness, active state, distribu
 
 - [ ] **Step 7: Verify GREEN on disposable clone**
 
-Apply the migration and a synthetic seven-account manifest to the disposable clone, then run:
+Apply the migration and a synthetic seven-account manifest to the disposable
+clone through the local-only entrypoint, then run:
 
 ```bash
 npm run test:db:five-role
 psql "$VMP_TEST_DB_URL" -X -v ON_ERROR_STOP=1 \
+  -v account_ids="$VMP_LOCAL_ACCOUNT_IDS" \
   -f scripts/check-five-role-permission-state.sql
 ```
 
 Expected: all rule IDs PASS; no SQL warning/error; transaction read-only in the checker.
+
+The checker must recompute the supplied manifest digest, prove exactly those
+seven profiles are inactive, and require exactly one matching hardening audit
+per distinct target. It must not infer “exact seven” from an unscoped count.
 
 - [ ] **Step 8: Write deployment/rollback runbook and commit**
 
