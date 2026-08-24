@@ -7,38 +7,20 @@ if [[ -z "${SUPABASE_DB_URL:-}" || -z "${VMP_TEST_DB_URL:-}" ]]; then
   exit 2
 fi
 
-normalize_target() {
-  node - "$1" <<'NODE'
-const value = process.argv[2];
-try {
-  const url = new URL(value);
-  const host = url.hostname.toLowerCase().replace(/\.$/, "");
-  const database = decodeURIComponent(url.pathname)
-    .replace(/^\/+/, "")
-    .split("/")[0]
-    .toLowerCase();
+tmp_dir="$(mktemp -d)"
+trap 'unset LOCAL_PGHOST LOCAL_PGPORT LOCAL_PGUSER LOCAL_PGPASSWORD LOCAL_PGDATABASE; rm -rf "$tmp_dir"' EXIT
 
-  if (!host || !database) process.exit(1);
-  process.stdout.write(`${host}\t${database}`);
-} catch {
-  process.exit(1);
-}
-NODE
-}
-
-production_target="$(normalize_target "$SUPABASE_DB_URL")" || {
-  echo "SUPABASE_DB_URL is not a valid PostgreSQL URL." >&2
-  exit 2
-}
-test_target="$(normalize_target "$VMP_TEST_DB_URL")" || {
-  echo "VMP_TEST_DB_URL is not a valid PostgreSQL URL." >&2
-  exit 2
-}
-
-if [[ "$production_target" == "$test_target" ]]; then
-  echo "Refusing to run database tests against the production host and database." >&2
-  exit 3
+if node scripts/parse-five-role-local-db.mjs >"$tmp_dir/local-connection"; then
+  :
+else
+  exit "$?"
 fi
+while IFS= read -r -d '' local_key && IFS= read -r -d '' local_value; do
+  export "$local_key=$local_value"
+done <"$tmp_dir/local-connection"
 
-psql "$VMP_TEST_DB_URL" -X -v ON_ERROR_STOP=1 \
+env -u PGSERVICE -u PGSERVICEFILE -u PGHOSTADDR -u PGOPTIONS -u PGSSLMODE \
+  PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" PGUSER="$LOCAL_PGUSER" \
+  PGPASSWORD="$LOCAL_PGPASSWORD" PGDATABASE="$LOCAL_PGDATABASE" \
+  psql -X -v ON_ERROR_STOP=1 \
   -f tests/sql/five-role-hardening.sql

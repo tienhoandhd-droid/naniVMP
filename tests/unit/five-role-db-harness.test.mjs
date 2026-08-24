@@ -118,25 +118,41 @@ test("prepare script refuses non-local and query-override status targets before 
   }
 });
 
-test("runner aborts before psql when test target matches production", () => {
-  const { fakeBin, psqlMarker, root } = makeFakeBin();
+test("runner refuses unsafe targets before psql", () => {
+  const unsafeTargets = [
+    "postgresql://u:p@prod.example/prod",
+    "postgresql://u:p@remote.example:54322/postgres",
+    "postgresql://u:p@127.0.0.1/postgres",
+    "postgresql://u:p@127.0.0.1:54323/postgres",
+    "postgresql://u:p@127.0.0.1:54322/not-postgres",
+    "postgresql://u:p@127.0.0.1:54322/postgres?host=production.example",
+    "postgresql://u:p@127.0.0.1:54322/postgres?hostaddr=203.0.113.10",
+    "postgresql://u:p@127.0.0.1:54322/postgres?port=6543",
+    "postgresql://u:p@127.0.0.1:54322/postgres?dbname=production",
+    "postgresql://u:p@127.0.0.1:54322/postgres?service=production",
+    "postgresql://u:p@127.0.0.1:54322/postgres#production",
+  ];
 
-  try {
-    const sameTarget = spawnSync("bash", ["scripts/run-five-role-db-tests.sh"], {
-      env: {
-        ...process.env,
-        SUPABASE_DB_URL: "postgresql://u:p@db.example/prod",
-        VMP_TEST_DB_URL: "postgresql://u:p@db.example/prod",
-        PATH: `${fakeBin}:${process.env.PATH}`,
-        PSQL_MARKER: psqlMarker,
-      },
-      encoding: "utf8",
-    });
+  for (const VMP_TEST_DB_URL of unsafeTargets) {
+    const { fakeBin, psqlMarker, root } = makeFakeBin();
 
-    assert.equal(sameTarget.status, 3);
-    assert.equal(existsSync(psqlMarker), false);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
+    try {
+      const unsafe = spawnSync("bash", ["scripts/run-five-role-db-tests.sh"], {
+        env: {
+          ...process.env,
+          SUPABASE_DB_URL: "postgresql://u:p@prod.example/prod",
+          VMP_TEST_DB_URL,
+          PATH: `${fakeBin}:${process.env.PATH}`,
+          PSQL_MARKER: psqlMarker,
+        },
+        encoding: "utf8",
+      });
+
+      assert.equal(unsafe.status, 3, VMP_TEST_DB_URL);
+      assert.equal(existsSync(psqlMarker), false, VMP_TEST_DB_URL);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 
@@ -148,15 +164,29 @@ test("runner invokes psql with the five-role SQL suite for an isolated target", 
       env: {
         ...process.env,
         SUPABASE_DB_URL: "postgresql://u:p@prod.example/prod",
-        VMP_TEST_DB_URL: "postgresql://u:p@127.0.0.1/test",
+        VMP_TEST_DB_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
         PATH: `${fakeBin}:${process.env.PATH}`,
         PSQL_MARKER: psqlMarker,
+        PGSERVICE: "production",
+        PGSERVICEFILE: "/tmp/production-service.conf",
+        PGHOSTADDR: "203.0.113.10",
+        PGOPTIONS: "-c search_path=unsafe",
       },
       encoding: "utf8",
     });
 
     assert.equal(isolated.status, 0);
-    assert.match(readFileSync(psqlMarker, "utf8"), /tests\/sql\/five-role-hardening\.sql/);
+    const psqlArgs = readFileSync(psqlMarker, "utf8");
+    assert.match(psqlArgs, /tests\/sql\/five-role-hardening\.sql/);
+    assert.doesNotMatch(psqlArgs, /postgresql:\/\//);
+    assert.match(psqlArgs, /PGHOST=127\.0\.0\.1/);
+    assert.match(psqlArgs, /PGPORT=54322/);
+    assert.match(psqlArgs, /PGUSER=postgres/);
+    assert.match(psqlArgs, /PGDATABASE=postgres/);
+    assert.match(psqlArgs, /PGSERVICE=$/m);
+    assert.match(psqlArgs, /PGSERVICEFILE=$/m);
+    assert.match(psqlArgs, /PGHOSTADDR=$/m);
+    assert.match(psqlArgs, /PGOPTIONS=$/m);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

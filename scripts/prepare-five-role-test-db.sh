@@ -20,56 +20,17 @@ if [[ -z "$VMP_TEST_DB_URL" ]]; then
 fi
 
 export VMP_TEST_DB_URL
-if node <<'NODE'
-function normalize(url) {
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
-  return { host, port: url.port };
-}
+tmp_dir="$(mktemp -d)"
+trap 'unset SOURCE_DB_URL PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE PGSSLMODE LOCAL_PGHOST LOCAL_PGPORT LOCAL_PGUSER LOCAL_PGPASSWORD LOCAL_PGDATABASE; rm -rf "$tmp_dir"' EXIT
 
-let production;
-try {
-  production = normalize(new URL(process.env.SUPABASE_DB_URL));
-} catch {
-  process.exit(2);
-}
-
-let target;
-try {
-  const url = new URL(process.env.VMP_TEST_DB_URL);
-  target = { ...normalize(url), hasQueryOrFragment: url.search !== "" || url.hash !== "", path: url.pathname, protocol: url.protocol };
-} catch {
-  process.exit(3);
-}
-
-const isProductionTarget = production.host === target.host;
-const isLoopback = new Set(["127.0.0.1", "localhost", "::1"]).has(target.host);
-if (isProductionTarget || !isLoopback || target.protocol !== "postgresql:" || target.path !== "/postgres" || target.port !== "54322" || target.hasQueryOrFragment) {
-  process.exit(3);
-}
-NODE
-then
+if node scripts/parse-five-role-local-db.mjs >"$tmp_dir/local-connection"; then
   :
 else
   exit "$?"
 fi
-
 while IFS= read -r -d '' local_key && IFS= read -r -d '' local_value; do
   export "$local_key=$local_value"
-done < <(node <<'NODE'
-const url = new URL(process.env.VMP_TEST_DB_URL);
-const pairs = [
-  ["LOCAL_PGHOST", url.hostname.replace(/^\[|\]$/g, "")],
-  ["LOCAL_PGPORT", url.port],
-  ["LOCAL_PGUSER", decodeURIComponent(url.username)],
-  ["LOCAL_PGPASSWORD", decodeURIComponent(url.password)],
-  ["LOCAL_PGDATABASE", "postgres"],
-];
-process.stdout.write(pairs.flat().join("\0") + "\0");
-NODE
-)
-
-tmp_dir="$(mktemp -d)"
-trap 'unset SOURCE_DB_URL PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE PGSSLMODE LOCAL_PGHOST LOCAL_PGPORT LOCAL_PGUSER LOCAL_PGPASSWORD LOCAL_PGDATABASE; rm -rf "$tmp_dir"' EXIT
+done <"$tmp_dir/local-connection"
 
 export SOURCE_DB_URL="$SUPABASE_DB_URL"
 while IFS= read -r -d '' pg_key && IFS= read -r -d '' pg_value; do
