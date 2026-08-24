@@ -184,8 +184,12 @@ Run `BEGIN READ ONLY ... ROLLBACK` queries and record expected hashes in the mig
 
 ```sql
 select public.screen_access_mode(), public.item_permissions_mode();
-select count(*), md5(string_agg(concat_ws('|', business_role, screen_id,
-  can_view, data_scope, actions::text), E'\n' order by business_role, screen_id))
+select count(*),
+  md5(string_agg(concat_ws('|', business_role, screen_id,
+    can_view, data_scope, actions::text), E'\n' order by business_role, screen_id)),
+  md5(string_agg(concat_ws('|', business_role, screen_id,
+    can_view, data_scope, array_to_string(actions, ',')), E'\n'
+    order by business_role, screen_id))
 from public.vmp_screen_permissions;
 select md5(pg_get_functiondef('public.vmp_business_role(uuid)'::regprocedure));
 select md5(pg_get_functiondef('public.rpc_my_ui_access()'::regprocedure));
@@ -193,7 +197,13 @@ select md5(pg_get_functiondef('public.rpc_catalog_history(jsonb,integer,integer)
 select md5(pg_get_functiondef('public.rpc_catalog_history_detail(uuid)'::regprocedure));
 ```
 
-The migration raises before DDL when modes are not `enforced/preview`, matrix count is not 102, the matrix digest differs from `b5fb9554b5ed69ff247c3ea54a6e3b0e`, or function hashes differ from these reviewed live values:
+The migration raises before DDL when modes are not `enforced/preview`, matrix
+count is not 102, or either reviewed matrix digest differs. The exact
+PostgreSQL array-text digest is `0befb5a03f96dfe2dfa653f7da929cd0`;
+the earlier reviewed digest `b5fb9554b5ed69ff247c3ea54a6e3b0e` uses CSV
+normalization via `array_to_string(actions, ',')`. Assert both to preserve the
+original evidence while removing the ambiguity in its recorded query. Function
+hashes must differ from none of these reviewed live values:
 
 ```text
 auth_user_role()                           b23193f21fe23e5a88fa83569661a420
@@ -225,7 +235,11 @@ $$;
 
 Rewrite `vmp_business_role(uuid)` so inactive profiles and login role `viewer` resolve NULL before any admin/viewer shortcut. Rewrite unresolved reason so active legacy Viewer returns `legacy_role_disabled`. Rewrite `rpc_my_ui_access()` so failed active-session validation returns enforced/empty screens.
 
-Delete only `business_role='viewer'` matrix rows and tighten the matrix role constraint to the five literal roles. Assert 85 total/17 each and unchanged digest for all non-Viewer rows.
+Delete only `business_role='viewer'` matrix rows and tighten the matrix role
+constraint to the five literal roles. Assert 85 total/17 each and unchanged
+exact-array-text and legacy-CSV digests for all non-Viewer rows:
+`e6fdb0cc192a2ba344df02db4a5112c6` and
+`59feb29d5614356f97325d71ade3599e`, respectively.
 
 - [ ] **Step 3: Close direct profile privilege escalation**
 
