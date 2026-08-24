@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
 import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
-/* Nhãn 6 vai nghiệp vụ — dùng lại đúng bảng nhãn của màn Phân quyền
+/* Nhãn năm vai nghiệp vụ hiệu lực — dùng lại đúng bảng nhãn của màn Phân quyền
    (nguồn duy nhất) thay vì `PERM_LABEL`/`BUSINESS_ROLE_LABELS` cũ, để
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
 import { VAI_NGHIEP_VU } from "../../lib/supabaseData.ts";

@@ -1,8 +1,10 @@
 /* Quyền màn hình là fail-closed: chưa có payload hợp lệ từ server thì không
  * màn nào được mở. Không dựng quyền từ profile, role đăng nhập, hay cache. */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { parseAccessContext } from "../lib/access.ts";
 import type { AccessContext } from "../lib/access.ts";
+import { clearVmpCache } from "../lib/n8nAdapter.ts";
+import { clearSnapshot } from "../lib/snapshotCache.ts";
 import { fetchUiAccess } from "../lib/supabaseData.ts";
 import type { AppUser } from "../types/domain.ts";
 
@@ -50,7 +52,42 @@ function dauVanTay(user: AppUser | null): string {
   return [user?.uid ?? "", user?.role ?? "", user?.accessClass ?? ""].join("|");
 }
 
-export function useAccess(user: AppUser | null): AccessState {
+/** Dọn dữ liệu bền ngay tại ranh giới vỏ quyền, trước khi shell đã xác minh
+ * có thể mount lại `useVmpData`. Không để snapshot/cache của tuple cũ sống
+ * qua đổi role/accessClass cùng một UID hoặc qua lỗi đọc quyền. */
+export function useAccessCacheTransition(user: AppUser | null, state: AccessState): void {
+  const identity = dauVanTay(user);
+  const daXacMinh = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    const doiDanhTinh = daXacMinh.current !== null && daXacMinh.current !== identity;
+    if (!user?.uid) {
+      clearSnapshot();
+      clearVmpCache();
+      daXacMinh.current = null;
+      return;
+    }
+    if (doiDanhTinh) {
+      clearSnapshot();
+      clearVmpCache();
+      /* Ghi tuple MỚI ngay trong commit loading. Lần commit verified kế tiếp
+       * sẽ không xem chính B là dữ liệu cũ rồi xóa snapshot của B lần nữa. */
+      daXacMinh.current = identity;
+      return;
+    }
+    if (state.loi) {
+      clearSnapshot();
+      clearVmpCache();
+      return;
+    }
+    if (!state.dangTai && state.access.businessRole) daXacMinh.current = identity;
+  }, [identity, user?.uid, state.access.businessRole, state.dangTai, state.loi]);
+}
+
+export function useAccess(
+  user: AppUser | null,
+  readUiAccess: typeof fetchUiAccess = fetchUiAccess,
+): AccessState {
   const identity = dauVanTay(user);
   const [access, setAccess] = useState<AccessContext>(KHONG_QUYEN);
   const [dangTai, setDangTai] = useState(Boolean(user?.uid));
@@ -75,7 +112,7 @@ export function useAccess(user: AppUser | null): AccessState {
     setDangTai(true);
     setLoi(null);
 
-    void fetchUiAccess()
+    void readUiAccess()
       .then((ketQua) => {
         if (!gateRef.current.isCurrent(generation)) return;
         if (ketQua.trangThai !== "co") {
@@ -104,7 +141,7 @@ export function useAccess(user: AppUser | null): AccessState {
       });
 
     return () => { gateRef.current.invalidate(generation); };
-  }, [identity, lanTai, user?.uid]);
+  }, [identity, lanTai, user?.uid, readUiAccess]);
 
   const taiLai = useCallback(() => setLanTai((truoc) => truoc + 1), []);
   if (doiDanhTinh) return { access: KHONG_QUYEN, dangTai: Boolean(user?.uid), loi: null, taiLai };

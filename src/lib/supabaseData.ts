@@ -8,8 +8,8 @@
  *  DEFINER + đọc role/bộ phận từ bảng profiles). Client KHÔNG có quyền ghi
  *  thẳng bảng, nên không thể lách bằng cách gọi supabase.from(...).update().
  *
- *  Phân quyền: admin/qa_manager toàn quyền · department_user chỉ sửa tiến độ
- *  hạng mục thuộc bộ phận mình · viewer chỉ đọc.
+ *  Phân quyền hiệu lực được server giải thành đúng năm BusinessRole; client
+ *  không suy quyền từ role đăng nhập hoặc vai Viewer cũ.
  * ===================================================================== */
 import { supabase } from "./supabaseClient.ts";
 import { deriveActivityFields } from "./n8nAdapter.ts";

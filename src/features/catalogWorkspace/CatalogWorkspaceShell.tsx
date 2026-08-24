@@ -21,7 +21,7 @@
  *  mỗi trang, gõ tìm kiếm chờ 250 ms, và mỗi request mang một số thứ tự
  *  tăng dần để câu trả lời cũ không đè được câu trả lời mới.
  * ===================================================================== */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Bell, Boxes, CalendarPlus, Check, Download, FileSpreadsheet, FlaskConical,
   History, Hourglass, Plus, RefreshCw, Search,
@@ -110,7 +110,7 @@ export default function CatalogWorkspaceShell({
 
   /* Thu hồi quyền audit khi History đang mở phải rời tab trước khi effect
      tải lịch sử có cơ hội tạo request mới. */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (vung !== "history" || canAudit) return;
     setVung("objects");
     setTrang(0);

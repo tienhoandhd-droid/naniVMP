@@ -60,7 +60,7 @@ import {
   wlIsDone,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
-import { useAccess } from "./hooks/useAccess.ts";
+import { useAccess, useAccessCacheTransition } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { resolveViewIntent } from "./lib/navigationContract.ts";
 import { overviewTarget } from "./lib/navigationTargets.ts";
@@ -2265,6 +2265,9 @@ function VerifiedAppShell({ user, logout, access }: {
 function AppShell() {
   const { user, setUser, logout } = useAuth();
   const { access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen } = useAccess(user);
+  useAccessCacheTransition(user, {
+    access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen,
+  });
 
   if (!user) return <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />;
 
