@@ -167,6 +167,7 @@ from (values
   ('71000000-0000-4000-8000-000000000005'::uuid, 'target-department-2@example.test'),
   ('71000000-0000-4000-8000-000000000006'::uuid, 'target-department-3@example.test'),
   ('71000000-0000-4000-8000-000000000007'::uuid, 'target-qa-manager@example.test'),
+  ('71000000-0000-4000-8000-000000000098'::uuid, 'blocker-control@example.test'),
   ('71000000-0000-4000-8000-000000000099'::uuid, 'control-admin@example.test')
 ) as fixture_users(id, email)
 on conflict (id) do update
@@ -180,7 +181,8 @@ set aud = excluded.aud,
     updated_at = excluded.updated_at;
 
 insert into public.departments (id, name, short_name)
-values ('FIVE_ROLE_TEST', 'Five-role local fixture', 'FRT');
+values ('FIVE_ROLE_TEST', 'Five-role local fixture', 'FRT'),
+       ('qa', 'Five-role QA fixture', 'QA');
 
 insert into public.profiles (id, full_name, email, role, department, is_active)
 values
@@ -190,8 +192,20 @@ values
   ('71000000-0000-4000-8000-000000000004', 'Target Department 1', 'target-department-1@example.test', 'department_user', 'FIVE_ROLE_TEST', true),
   ('71000000-0000-4000-8000-000000000005', 'Target Department 2', 'target-department-2@example.test', 'department_user', 'FIVE_ROLE_TEST', true),
   ('71000000-0000-4000-8000-000000000006', 'Target Department 3', 'target-department-3@example.test', 'department_user', 'FIVE_ROLE_TEST', true),
-  ('71000000-0000-4000-8000-000000000007', 'Target QA manager', 'target-qa-manager@example.test', 'qa_manager', 'FIVE_ROLE_TEST', true),
+  ('71000000-0000-4000-8000-000000000007', 'Target QA manager', 'target-qa-manager@example.test', 'qa_manager', 'qa', true),
+  ('71000000-0000-4000-8000-000000000098', 'Blocker control', 'blocker-control@example.test', 'qa_manager', 'FIVE_ROLE_TEST', true),
   ('71000000-0000-4000-8000-000000000099', 'Control Admin', 'control-admin@example.test', 'admin', null, true);
+
+-- Keep the approved target QA Manager internally valid so disabling it does
+-- not change the reviewed local preflight breakdown.  A separate non-target
+-- synthetic control deliberately carries the one INVALID_MANAGER_PRINCIPAL
+-- and INCOMPLETE_ACTIVE_PERSON findings represented in the 16-row digest.
+update public.vmp_performers
+set access_class = 'qa_manager', department = 'qa'
+where user_id = '71000000-0000-4000-8000-000000000007'::uuid;
+update public.vmp_performers
+set employee_code = 'FIVE-ROLE-BLOCKER-CONTROL'
+where user_id = '71000000-0000-4000-8000-000000000098'::uuid;
 
 commit;
 \quit
@@ -255,11 +269,56 @@ begin
 end
 $$;
 
+-- Execute as the current invoker and convert an EXECUTE revocation into the
+-- same fail-closed shape as an active-session JSON denial.  This lets the
+-- containment probes measure table/audit deltas without aborting the outer
+-- transaction when an omitted legacy RPC is correctly no longer browser
+-- executable.
+create function pg_temp.capture_json_denial(p_sql text)
+returns jsonb
+language plpgsql
+as $$
+declare
+  v_payload jsonb;
+begin
+  begin
+    execute p_sql into v_payload;
+  exception
+    when insufficient_privilege then
+      return jsonb_build_object('ok', false, 'error_code', 'EXECUTE_REVOKED');
+  end;
+  return v_payload;
+end
+$$;
+grant execute on function pg_temp.capture_json_denial(text) to authenticated;
+
 -- The deployed UI invokes the resolver through SECURITY DEFINER RPCs. This
 -- transaction-only grant isolates the resolver's five-role result from that
 -- separate RPC ACL contract, and is undone by the final rollback.
 grant execute on function public.vmp_business_role(uuid) to authenticated;
 grant execute on function public.vmp_business_role_unresolved_reason(uuid) to authenticated;
+
+select set_config('request.jwt.claims',
+  json_build_object('role', 'service_role')::text, true);
+with payload as (
+  select public.rpc_item_permission_preflight() j
+), codes as (
+  select e ->> 'code' code, count(*) n
+  from payload
+  cross join lateral jsonb_array_elements(j -> 'blocking_errors') e
+  group by 1
+), summary as (
+  select sum(n)::integer total,
+         md5(string_agg(code || '=' || n, E'\n' order by code)) digest
+  from codes
+)
+select pg_temp.assert_true(
+  summary.total = 16
+  and summary.digest = '51655dff70de3ba821367c8f3784d078'
+  and jsonb_array_length(payload.j -> 'warnings') = 8,
+  'ITEM_PERMISSION_BLOCKER_LOCAL_CONTRACT'
+)
+from payload cross join summary;
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -309,6 +368,8 @@ where user_id in (
 );
 
 set local session_replication_role = replica;
+insert into public.vmp_objects (code, name)
+values ('FIVE-ROLE-OBJECT-FIXTURE', 'Five-role object fixture');
 insert into public.vmp_plan_items (id, object_code, validation_code, criticality_score)
 values ('FIVE-ROLE-PLAN-FIXTURE', 'FIVE-ROLE-OBJECT-FIXTURE', 'FIVE-ROLE-VALIDATION-FIXTURE', 5);
 set local session_replication_role = origin;
@@ -456,6 +517,22 @@ select pg_temp.assert_true(
   coalesce(public.rpc_catalog_history('{}', 10, 0)->>'ok', 'true') = 'false',
   'INACTIVE_USER_CATALOG_BLOCKED'
 );
+select pg_temp.assert_true(
+  not public.vmp_current_session_is_active()
+  and not public.is_admin()
+  and not public.is_admin_or_qa()
+  and not public.vmp_can_view_my_item('FIVE-ROLE-VALIDATION-FIXTURE'),
+  'INACTIVE_BOOLEAN_HELPERS_FAIL_CLOSED'
+);
+select pg_temp.assert_true(
+  (select coalesce(payload ->> 'error_code', '')
+            in ('ACCOUNT_DISABLED', 'ROLE_UNRESOLVED')
+          and not (payload::text ~ 'old_data|new_data')
+   from (select public.rpc_get_audit_logs(
+     10, 0, null, null, null, :'department_uid', null, null
+   ) payload) denied),
+  'INACTIVE_RAW_AUDIT_DENIED_WITHOUT_SNAPSHOTS'
+);
 
 reset role;
 create temporary table five_role_assignment_probe (
@@ -511,10 +588,91 @@ begin
   end if;
 end
 $$;
+
+create temporary table five_role_omitted_rpc_probe (
+  missing_from_sheet_before boolean,
+  plan_audits_before integer not null,
+  alert_rows_before integer not null,
+  alert_audits_before integer not null,
+  sheet_response jsonb,
+  alert_response jsonb
+) on commit drop;
+insert into five_role_omitted_rpc_probe (
+  missing_from_sheet_before, plan_audits_before,
+  alert_rows_before, alert_audits_before
+)
+select
+  (select missing_from_sheet from public.vmp_plan_items
+   where validation_code = 'FIVE-ROLE-VALIDATION-FIXTURE'),
+  (select count(*) from public.audit_logs
+   where table_name = 'vmp_plan_items'
+     and record_id = 'FIVE-ROLE-PLAN-FIXTURE'),
+  (select count(*) from public.vmp_alert_recipients
+   where lower(email) = 'five-role-inactive-probe@example.test'),
+  (select count(*) from public.audit_logs
+   where table_name = 'vmp_alert_recipients');
+grant update on five_role_omitted_rpc_probe to authenticated;
+
+set local role authenticated;
+update five_role_omitted_rpc_probe
+set sheet_response = pg_temp.capture_json_denial(
+      $sql$select public.rpc_apply_sheet_sync(
+        'update', 'FIVE-ROLE-VALIDATION-FIXTURE',
+        '{"missing_from_sheet":true}'::jsonb)$sql$),
+    alert_response = pg_temp.capture_json_denial(
+      $sql$select public.rpc_upsert_alert_recipient(
+        null::uuid, '{"email":"five-role-inactive-probe@example.test"}'::jsonb)$sql$);
+
+reset role;
+do $$
+declare
+  v_probe five_role_omitted_rpc_probe%rowtype;
+  v_missing_from_sheet_after boolean;
+  v_plan_audits_after integer;
+  v_alert_rows_after integer;
+  v_alert_audits_after integer;
+begin
+  select * into strict v_probe from five_role_omitted_rpc_probe;
+  select missing_from_sheet into v_missing_from_sheet_after
+  from public.vmp_plan_items
+  where validation_code = 'FIVE-ROLE-VALIDATION-FIXTURE';
+  select count(*) into v_plan_audits_after
+  from public.audit_logs
+  where table_name = 'vmp_plan_items'
+    and record_id = 'FIVE-ROLE-PLAN-FIXTURE';
+  select count(*) into v_alert_rows_after
+  from public.vmp_alert_recipients
+  where lower(email) = 'five-role-inactive-probe@example.test';
+  select count(*) into v_alert_audits_after
+  from public.audit_logs
+  where table_name = 'vmp_alert_recipients';
+
+  if coalesce(v_probe.sheet_response ->> 'error_code', '')
+       not in ('ACCOUNT_DISABLED', 'ROLE_UNRESOLVED', 'EXECUTE_REVOKED')
+     or coalesce(v_probe.alert_response ->> 'error_code', '')
+       not in ('ACCOUNT_DISABLED', 'ROLE_UNRESOLVED', 'EXECUTE_REVOKED')
+     or v_missing_from_sheet_after is distinct from v_probe.missing_from_sheet_before
+     or v_plan_audits_after <> v_probe.plan_audits_before
+     or v_alert_rows_after <> v_probe.alert_rows_before
+     or v_alert_audits_after <> v_probe.alert_audits_before then
+    raise exception using errcode = 'check_violation', message = format(
+      'INACTIVE_OMITTED_RPC_CONTAINMENT sheet_code=%s alert_code=%s missing_from_sheet=%s->%s plan_audit_delta=%s alert_row_delta=%s alert_audit_delta=%s',
+      coalesce(v_probe.sheet_response ->> 'error_code', '<none>'),
+      coalesce(v_probe.alert_response ->> 'error_code', '<none>'),
+      v_probe.missing_from_sheet_before, v_missing_from_sheet_after,
+      v_plan_audits_after - v_probe.plan_audits_before,
+      v_alert_rows_after - v_probe.alert_rows_before,
+      v_alert_audits_after - v_probe.alert_audits_before
+    );
+  end if;
+end
+$$;
 set local role authenticated;
 
 select pg_temp.assert_denied_json('select public.rpc_active_rules()', 'INACTIVE_RPC_ACTIVE_RULES');
 select pg_temp.assert_denied_scalar('select public.item_permissions_mode()', 'INACTIVE_ITEM_PERMISSIONS_MODE');
+select pg_temp.assert_denied_scalar('select public.muc_quyen(''view'', ''admin'')', 'OUT_OF_INVENTORY_PURE_HELPER_REVOKED');
+select pg_temp.assert_denied_scalar('select public.screen_access_mode()', 'OUT_OF_INVENTORY_MODE_HELPER_REVOKED');
 select pg_temp.assert_denied_json('select public.rpc_apply_catalog_change(null::uuid, null::text, null::integer)', 'INACTIVE_RPC_APPLY_CATALOG_CHANGE');
 select pg_temp.assert_denied_json('select public.rpc_business_roles()', 'INACTIVE_RPC_BUSINESS_ROLES');
 select pg_temp.assert_denied_json('select public.rpc_check_data_quality(2026)', 'INACTIVE_RPC_CHECK_DATA_QUALITY');
@@ -577,6 +735,20 @@ select pg_temp.assert_true(
 
 reset role;
 set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', :'workshop_staff_uid', 'role', 'authenticated')::text,
+  true);
+select pg_temp.assert_true(
+  (select coalesce(payload ->> 'error_code', '') = 'FORBIDDEN'
+          and not (payload::text ~ 'old_data|new_data')
+   from (select public.rpc_get_audit_logs(
+     10, 0, null, null, null, :'department_uid', null, null
+   ) payload) denied),
+  'WORKSHOP_STAFF_RAW_AUDIT_FORBIDDEN'
+);
+
+reset role;
+set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', :'admin_uid', 'role', 'authenticated')::text, true);
 
 select pg_temp.assert_true(
@@ -596,6 +768,16 @@ select pg_temp.assert_true(
     ->'history'->'old_data'->>'private') = 'old',
   'ADMIN_CATALOG_AUDIT_DETAIL_ALLOWED'
 );
+select pg_temp.assert_true(
+  (public.rpc_get_audit_logs(
+     10, 0, null, null, null, :'department_uid', null, null
+   ) -> 'logs' -> 0 -> 'old_data' ->> 'private') = 'old'
+  and
+  (public.rpc_get_audit_logs(
+     10, 0, null, null, null, :'department_uid', null, null
+   ) -> 'logs' -> 0 -> 'new_data' ->> 'private') = 'new',
+  'ADMIN_RAW_AUDIT_CONTRACT_PRESERVED'
+);
 
 reset role;
 set local role authenticated;
@@ -612,6 +794,16 @@ select pg_temp.assert_true(
 select pg_temp.assert_true(
   (public.rpc_catalog_history_detail(:'profile_audit_id'::uuid)->>'error_code') = 'NOT_FOUND',
   'QA_MANAGER_PROFILE_AUDIT_DETAIL_NOT_FOUND'
+);
+select pg_temp.assert_true(
+  (public.rpc_get_audit_logs(
+     10, 0, null, null, null, :'department_uid', null, null
+   ) -> 'logs' -> 0 -> 'old_data' ->> 'private') = 'old'
+  and
+  (public.rpc_get_audit_logs(
+     10, 0, null, null, null, :'department_uid', null, null
+   ) -> 'logs' -> 0 -> 'new_data' ->> 'private') = 'new',
+  'QA_MANAGER_RAW_AUDIT_CONTRACT_PRESERVED'
 );
 
 reset role;
@@ -677,6 +869,58 @@ select pg_temp.assert_true(
   'FIVE_ROLE_SCREEN_MATRIX_RETAINED_EXPLICIT_CSV_DIGEST'
 );
 
+-- Restore the deployed ACL before catalog assertions; the two direct resolver
+-- grants above were transaction-only test adapters for persona resolution.
+revoke execute on function public.vmp_business_role(uuid) from authenticated;
+revoke execute on function public.vmp_business_role_unresolved_reason(uuid)
+  from authenticated;
+
+select pg_temp.assert_true(
+  (select count(*) = 64
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+       or has_function_privilege('anon', p.oid, 'EXECUTE')
+       or has_function_privilege('public', p.oid, 'EXECUTE')))
+  and (select count(*) = 64
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+  and not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and (has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('public', p.oid, 'EXECUTE'))
+  ),
+  'EXACT_BROWSER_FUNCTION_SURFACE'
+);
+select pg_temp.assert_true(
+  has_function_privilege('authenticated', 'public.is_admin()', 'EXECUTE')
+  and has_function_privilege('authenticated', 'public.is_admin_or_qa()', 'EXECUTE')
+  and has_function_privilege('authenticated',
+    'public.vmp_current_session_is_active()', 'EXECUTE')
+  and has_function_privilege('authenticated',
+    'public.vmp_can_view_my_item(text)', 'EXECUTE')
+  and not has_function_privilege('authenticated',
+    'public.rpc_apply_sheet_sync(text,text,jsonb)', 'EXECUTE')
+  and not has_function_privilege('authenticated',
+    'public.rpc_upsert_alert_recipient(uuid,jsonb)', 'EXECUTE')
+  and has_function_privilege('service_role',
+    'public.rpc_apply_sheet_sync(text,text,jsonb)', 'EXECUTE')
+  and has_function_privilege('service_role',
+    'public.rpc_upsert_alert_recipient(uuid,jsonb)', 'EXECUTE'),
+  'BROWSER_ALLOWLIST_AND_SERVICE_AUTOMATION'
+);
+select pg_temp.assert_true(
+  not has_function_privilege('authenticated', 'public.muc_quyen(text,text)', 'EXECUTE')
+  and not has_function_privilege('authenticated',
+    'public.vmp_business_role(uuid)', 'EXECUTE')
+  and not has_function_privilege('authenticated',
+    'public.screen_access_mode()', 'EXECUTE'),
+  'OUT_OF_INVENTORY_HELPERS_NOT_BROWSER_EXECUTABLE'
+);
+
 select pg_temp.assert_true(
   not has_table_privilege('authenticated', 'public.profiles', 'UPDATE')
   and not has_any_column_privilege('authenticated', 'public.profiles', 'UPDATE')
@@ -707,7 +951,7 @@ select pg_temp.assert_true(
   'RAW_AUDIT_SELECT_REVOKED'
 );
 select pg_temp.assert_true(
-  (select count(*) = 54
+  (select count(*) = 53
    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\')

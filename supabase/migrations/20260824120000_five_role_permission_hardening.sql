@@ -10,11 +10,83 @@ declare
   v_implicit_csv text;
   v_explicit_csv text;
   v_rpc_inventory jsonb;
+  v_old_claims text := current_setting('request.jwt.claims', true);
+  v_preflight jsonb;
+  v_warning_count integer;
+  v_expected_blocker_count integer;
+  v_expected_blocker_digest text;
+  v_expected_warning_count integer;
+  v_local boolean := current_setting(
+    'vmp.five_role_local_test_contract', true)
+      = 'loopback-54322-postgres';
 begin
   if public.screen_access_mode() is distinct from 'enforced'
      or public.item_permissions_mode() is distinct from 'preview' then
     raise exception using errcode = 'check_violation',
       message = 'PRECONDITION_PERMISSION_MODES_DRIFTED';
+  end if;
+
+  with inventory as (
+    select p.oid::regprocedure::text identity,
+           pg_get_function_result(p.oid) result_type,
+           l.lanname language, p.prosecdef,
+           coalesce(array_to_string(p.proconfig, ','), '') settings,
+           md5(pg_get_functiondef(p.oid)) definition_hash,
+           r.rolname owner,
+           coalesce(array_to_string(p.proacl, ','), '') acl,
+           has_function_privilege('authenticated', p.oid, 'EXECUTE') auth_exec,
+           has_function_privilege('anon', p.oid, 'EXECUTE') anon_exec,
+           has_function_privilege('public', p.oid, 'EXECUTE') public_exec
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    join pg_language l on l.oid = p.prolang
+    join pg_roles r on r.oid = p.proowner
+    where n.nspname = 'public'
+      and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+        or has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('public', p.oid, 'EXECUTE'))
+  )
+  select count(*), md5(string_agg(concat_ws('|', identity, result_type,
+           language, prosecdef, settings, definition_hash, owner, acl,
+           auth_exec, anon_exec, public_exec), E'\n' order by identity))
+    into v_count, v_digest
+  from inventory;
+
+  if v_count <> 189
+     or v_digest <> '3dd77d7f46c8b01fdcd39f96996f87d2' then
+    raise exception using errcode = 'check_violation',
+      message = 'PRECONDITION_EFFECTIVE_FUNCTION_SURFACE_DRIFTED';
+  end if;
+
+  if v_local then
+    v_expected_blocker_count := 16;
+    v_expected_blocker_digest := '51655dff70de3ba821367c8f3784d078';
+    v_expected_warning_count := 8;
+  else
+    v_expected_blocker_count := 481;
+    v_expected_blocker_digest := 'a987324be3986521ed2d26a183c4c318';
+    v_expected_warning_count := 13;
+  end if;
+
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  select public.rpc_item_permission_preflight() into v_preflight;
+  with codes as (
+    select e ->> 'code' code, count(*) n
+    from jsonb_array_elements(v_preflight -> 'blocking_errors') e
+    group by 1
+  )
+  select coalesce(sum(n), 0)::integer,
+         md5(string_agg(code || '=' || n, E'\n' order by code))
+    into v_count, v_digest
+  from codes;
+  v_warning_count := jsonb_array_length(v_preflight -> 'warnings');
+  perform set_config('request.jwt.claims', coalesce(v_old_claims, ''), true);
+
+  if v_count <> v_expected_blocker_count
+     or v_digest <> v_expected_blocker_digest
+     or v_warning_count <> v_expected_warning_count then
+    raise exception using errcode = 'check_violation',
+      message = 'PRECONDITION_ITEM_PERMISSION_BLOCKERS_DRIFTED';
   end if;
 
   select count(*),
@@ -82,7 +154,7 @@ begin
     ('rpc_delete_source_row', 'rpc_delete_source_row(text,integer)', 'guarded_wrapper'),
     ('rpc_due_alerts', 'rpc_due_alerts(integer,integer)', 'guarded_wrapper'),
     ('rpc_generate_timeline', 'rpc_generate_timeline(integer,boolean)', 'guarded_wrapper'),
-    ('rpc_get_audit_logs', 'rpc_get_audit_logs(integer,integer,text,text,text,text,timestamp with time zone,timestamp with time zone)', 'guarded_wrapper'),
+    ('rpc_get_audit_logs', 'rpc_get_audit_logs(integer,integer,text,text,text,text,timestamp with time zone,timestamp with time zone)', 'guarded_explicit'),
     ('rpc_get_missing_items', 'rpc_get_missing_items(integer)', 'guarded_wrapper'),
     ('rpc_get_vmp_dashboard', 'rpc_get_vmp_dashboard(integer,boolean,boolean)', 'guarded_wrapper'),
     ('rpc_get_vmp_watermark', 'rpc_get_vmp_watermark(integer)', 'guarded_wrapper'),
@@ -371,6 +443,43 @@ revoke execute on function public.vmp_current_session_is_active()
 grant execute on function public.vmp_current_session_is_active()
   to authenticated, service_role;
 
+-- These four helpers are the only non-source functions intentionally exposed
+-- to the browser because authenticated RLS policy expressions invoke them.
+-- Each one is SECURITY DEFINER so its owner-only resolver dependencies remain
+-- callable after the final browser-wide function revocation.
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $function$
+  select public.vmp_current_session_is_active()
+     and public.vmp_business_role(auth.uid()) = 'admin'
+$function$;
+
+create or replace function public.is_admin_or_qa()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $function$
+  select public.vmp_current_session_is_active()
+     and public.vmp_business_role(auth.uid()) in ('admin', 'qa_manager')
+$function$;
+
+create or replace function public.vmp_can_view_my_item(p_validation_code text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $function$
+  select public.vmp_current_session_is_active()
+     and public.vmp_can_view_item(auth.uid(), p_validation_code)
+$function$;
+
 create function public.vmp_session_denial()
 returns jsonb
 language plpgsql
@@ -648,6 +757,69 @@ $policies$;
 
 revoke all on public.audit_logs from public, anon, authenticated;
 
+-- The item-permission preflight allowlist is expressed in outward public
+-- signatures.  Wrapper generation keeps implementation OIDs but renames
+-- them; normalize that private suffix before comparing so the blocker set is
+-- stable and hidden implementation names never become new semantic findings.
+create or replace function public.vmp_unfiltered_security_definer_item_readers()
+returns table(signature text)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $function$
+  with allowed(signature, reason) as (
+    values
+      ('audit_plan_item_changes()', 'trigger audit, không trả dữ liệu cho trình duyệt'),
+      ('audit_plan_item_changes_v2()', 'trigger audit, không trả dữ liệu cho trình duyệt'),
+      ('ly_do_khong_sua_duoc(text,uuid)', 'helper kiểm quyền ghi legacy'),
+      ('vmp_item_rights(uuid,text)', 'lõi tính quyền phải đọc hạng mục đích'),
+      ('rpc_item_permission_preflight()', 'admin-only, kiểm độ đầy đủ trước enforced'),
+      ('rpc_luat_xem()', 'admin/QA-only, chỉ nhắc tên bảng trong metadata policy'),
+      ('rpc_apply_assignments(boolean)', 'RPC ghi đồng bộ người phụ trách'),
+      ('rpc_apply_sheet_sync(text,text,jsonb)', 'RPC ghi service sync'),
+      ('rpc_create_plan_item(text,text,integer,integer,jsonb)', 'RPC ghi tạo hạng mục'),
+      ('rpc_delete_plan_item(text,text)', 'RPC ghi xóa mềm hạng mục'),
+      ('rpc_generate_timeline(integer,boolean)', 'RPC ghi sinh timeline'),
+      ('rpc_recalc_criticality(boolean)', 'RPC ghi tính lại độ trọng yếu'),
+      ('rpc_reconcile_orphan_objects(text[])', 'RPC ghi đối soát dữ liệu nguồn'),
+      ('rpc_refresh_computed_status()', 'RPC ghi tính lại trạng thái'),
+      ('rpc_refresh_source_item_assignments()', 'RPC ghi đồng bộ phân công nguồn'),
+      ('rpc_register_alert(text,text,text,text,text,text,text)', 'RPC ghi cảnh báo'),
+      ('rpc_resolve_missing(text,text,text)', 'RPC ghi xử lý hạng mục thiếu'),
+      ('rpc_rollback_vmp_sheet_sync(uuid)', 'RPC service khôi phục snapshot'),
+      ('rpc_set_item_assignment(uuid,text,text,text,text)', 'RPC ghi phân công'),
+      ('rpc_set_item_performer(text,text)', 'RPC ghi người thực hiện'),
+      ('rpc_item_assignments(text,uuid)', 'RPC quản lý đọc phân công canonical'),
+      ('rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)', 'RPC ghi phân công canonical'),
+      ('rpc_upsert_source_object(text,text,jsonb)', 'RPC ghi source và mirror person_id'),
+      ('rpc_set_item_state(text,text,text)', 'RPC ghi trạng thái nghiệp vụ'),
+      ('rpc_sync_vmp_sheet_snapshot(text,text,text,jsonb,jsonb)', 'RPC service đồng bộ snapshot'),
+      ('rpc_sync_vmp_sheet_snapshot_with_extras(text,text,text,jsonb,jsonb)', 'RPC service đồng bộ dữ liệu mở rộng'),
+      ('rpc_update_progress(text,jsonb,text,jsonb,integer)', 'RPC ghi tiến độ đã kiểm quyền trường')
+  ), candidates as (
+    select case
+      when p.proname like '%\_\_five\_role\_impl\_20260824' escape '\'
+        then format('%s(%s)', left(p.proname,
+          -length('__five_role_impl_20260824')),
+          replace(pg_catalog.oidvectortypes(p.proargtypes), ', ', ','))
+      else p.oid::regprocedure::text
+    end as signature
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prosecdef
+      and pg_get_functiondef(p.oid) ilike '%vmp_plan_items%'
+      and pg_get_functiondef(p.oid) not ilike '%vmp_can_view_item%'
+      and pg_get_functiondef(p.oid) not ilike '%vmp_visible_plan_items%'
+  )
+  select candidate.signature
+  from candidates candidate
+  left join allowed on allowed.signature = candidate.signature
+  where allowed.signature is null
+  order by candidate.signature
+$function$;
+
 create or replace function public.rpc_catalog_history(
   p_filters jsonb default '{}'::jsonb,
   p_limit integer default 50,
@@ -798,6 +970,89 @@ grant execute on function public.rpc_catalog_history(jsonb,integer,integer)
   to authenticated, service_role;
 grant execute on function public.rpc_catalog_history_detail(uuid)
   to authenticated, service_role;
+
+-- Preserve the legacy Audit-screen payload for the two reviewed privileged
+-- roles, but authorize before interpreting filters or reading audit rows.
+-- This function is replaced in place (not hidden behind the generic active
+-- wrapper) so role authorization is the outward SECURITY DEFINER boundary.
+create or replace function public.rpc_get_audit_logs(
+  p_limit integer default 100,
+  p_offset integer default 0,
+  p_table_name text default null,
+  p_action text default null,
+  p_user_email text default null,
+  p_record_id text default null,
+  p_from_date timestamptz default null,
+  p_to_date timestamptz default null
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $function$
+declare
+  result jsonb;
+  v_role text;
+begin
+  if coalesce(auth.role(), '') not in ('', 'service_role')
+     and not public.vmp_is_active_session(auth.uid()) then
+    return public.vmp_session_denial();
+  end if;
+
+  v_role := public.vmp_business_role(auth.uid());
+  if v_role is null or v_role not in ('admin', 'qa_manager') then
+    return jsonb_build_object(
+      'ok', false,
+      'error_code', 'FORBIDDEN',
+      'error', 'Không có quyền xem nhật ký kiểm toán'
+    );
+  end if;
+
+  select jsonb_build_object(
+    'total', case
+      when p_table_name is null and p_action is null
+       and p_user_email is null and p_record_id is null
+       and p_from_date is null and p_to_date is null
+      then greatest((select reltuples::bigint from pg_class
+                     where oid = 'public.audit_logs'::regclass), 0)
+      else (
+        select count(*) from public.audit_logs
+        where (p_table_name is null or table_name = p_table_name)
+          and (p_action is null or action::text = p_action)
+          and (p_user_email is null
+            or user_email ilike '%' || p_user_email || '%')
+          and (p_record_id is null or record_id = p_record_id)
+          and (p_from_date is null or created_at >= p_from_date)
+          and (p_to_date is null or created_at <= p_to_date)
+      )
+    end,
+    'total_uoc_luong',
+      p_table_name is null and p_action is null and p_user_email is null
+      and p_record_id is null and p_from_date is null and p_to_date is null,
+    'logs', (
+      select coalesce(jsonb_agg(row_to_json(l.*) order by l.created_at desc),
+                      '[]'::jsonb)
+      from (
+        select id, user_email, action::text, table_name, record_id,
+               old_data, new_data, change_reason, source, created_at
+        from public.audit_logs
+        where (p_table_name is null or table_name = p_table_name)
+          and (p_action is null or action::text = p_action)
+          and (p_user_email is null
+            or user_email ilike '%' || p_user_email || '%')
+          and (p_record_id is null or record_id = p_record_id)
+          and (p_from_date is null or created_at >= p_from_date)
+          and (p_to_date is null or created_at <= p_to_date)
+        order by created_at desc
+        limit p_limit offset p_offset
+      ) l
+    )
+  ) into result;
+
+  return result;
+end
+$function$;
 
 do $guarded_wrappers$
 declare
@@ -1016,16 +1271,117 @@ as $function$
         'error', 'Đường lưu người thực hiện cũ đã ngừng; dùng danh bạ phân quyền có reason và version'
       )
     else public.vmp_session_denial()
-  end
+end
 $function$;
+
+-- Browser EXECUTE is an explicit outward allowlist, independent of which
+-- functions happen to be referenced by the current frontend.  Start from an
+-- empty PUBLIC/anon/authenticated surface, then expose the 60 reviewed
+-- non-service source boundaries and exactly four RLS helpers.
+revoke execute on all functions in schema public
+  from public, anon, authenticated;
+
+do $function_acl$
+declare
+  r record;
+  a record;
+begin
+  for r in
+    select i.identity
+    from jsonb_to_recordset(current_setting(
+      'vmp.five_role_source_rpc_inventory')::jsonb)
+      as i(name text, identity text, classification text)
+    where i.classification <> 'service_only'
+    order by i.identity
+  loop
+    execute format('grant execute on function public.%s to authenticated',
+      r.identity);
+  end loop;
+
+  grant execute on function public.is_admin() to authenticated;
+  grant execute on function public.is_admin_or_qa() to authenticated;
+  grant execute on function public.vmp_current_session_is_active()
+    to authenticated;
+  grant execute on function public.vmp_can_view_my_item(text)
+    to authenticated;
+
+  -- Source-declared service-only compatibility boundaries remain owner-only.
+  for r in
+    select p.oid, p.oid::regprocedure::text identity, p.proowner
+    from jsonb_to_recordset(current_setting(
+      'vmp.five_role_source_rpc_inventory')::jsonb)
+      as i(name text, identity text, classification text)
+    join pg_proc p on p.oid = i.identity::regprocedure
+    where i.classification = 'service_only'
+  loop
+    for a in
+      select distinct x.grantee, roles.rolname grantee_name
+      from aclexplode(coalesce((select proacl from pg_proc where oid = r.oid),
+             acldefault('f', r.proowner))) x
+      left join pg_roles roles on roles.oid = x.grantee
+      where x.grantee <> r.proowner and x.privilege_type = 'EXECUTE'
+    loop
+      if a.grantee = 0 then
+        execute format('revoke execute on function %s from public', r.identity);
+      elsif a.grantee_name is not null then
+        execute format('revoke execute on function %s from %I',
+          r.identity, a.grantee_name);
+      end if;
+    end loop;
+  end loop;
+
+  -- Automation RPCs omitted from the source compatibility inventory are not
+  -- browser APIs.  Remove every non-owner ACL, then expose them only to the
+  -- Supabase service role.  Hidden implementations are always owner-only.
+  for r in
+    select p.oid, p.oid::regprocedure::text identity, p.proowner
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname like 'rpc\_%' escape '\'
+      and p.proname not like '%\_\_five\_role\_impl\_20260824' escape '\'
+      and not exists (
+        select 1
+        from jsonb_to_recordset(current_setting(
+          'vmp.five_role_source_rpc_inventory')::jsonb)
+          as i(name text, identity text, classification text)
+        where i.identity::regprocedure = p.oid
+      )
+    order by p.oid::regprocedure::text
+  loop
+    for a in
+      select distinct x.grantee, roles.rolname grantee_name
+      from aclexplode(coalesce((select proacl from pg_proc where oid = r.oid),
+             acldefault('f', r.proowner))) x
+      left join pg_roles roles on roles.oid = x.grantee
+      where x.grantee <> r.proowner and x.privilege_type = 'EXECUTE'
+    loop
+      if a.grantee = 0 then
+        execute format('revoke execute on function %s from public', r.identity);
+      elsif a.grantee_name is not null then
+        execute format('revoke execute on function %s from %I',
+          r.identity, a.grantee_name);
+      end if;
+    end loop;
+    execute format('grant execute on function %s to service_role', r.identity);
+  end loop;
+end
+$function_acl$;
 
 do $postconditions$
 declare
   v_count integer;
+  v_digest text;
   v_implicit_array text;
   v_explicit_array text;
   v_implicit_csv text;
   v_explicit_csv text;
+  v_preflight jsonb;
+  v_warning_count integer;
+  v_old_claims text := current_setting('request.jwt.claims', true);
+  v_local boolean := current_setting(
+    'vmp.five_role_local_test_contract', true)
+      = 'loopback-54322-postgres';
 begin
   select count(*),
          md5(string_agg(concat_ws('|', business_role, screen_id,
@@ -1063,6 +1419,106 @@ begin
      or public.item_permissions_mode() is distinct from 'preview' then
     raise exception using errcode = 'check_violation',
       message = 'POSTCONDITION_PERMISSION_MODES_CHANGED';
+  end if;
+
+  if (select count(*)
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+          or has_function_privilege('anon', p.oid, 'EXECUTE')
+          or has_function_privilege('public', p.oid, 'EXECUTE'))) <> 64
+     or (select count(*)
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and has_function_privilege('authenticated', p.oid, 'EXECUTE')) <> 64
+     or exists (
+       select 1
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and (has_function_privilege('anon', p.oid, 'EXECUTE')
+           or has_function_privilege('public', p.oid, 'EXECUTE'))
+     )
+     or exists (
+       with expected(identity) as (
+         select i.identity
+         from jsonb_to_recordset(current_setting(
+           'vmp.five_role_source_rpc_inventory')::jsonb)
+           as i(name text, identity text, classification text)
+         where i.classification <> 'service_only'
+         union all values
+           ('is_admin()'), ('is_admin_or_qa()'),
+           ('vmp_current_session_is_active()'),
+           ('vmp_can_view_my_item(text)')
+       ), actual(identity) as (
+         select p.oid::regprocedure::text
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+             or has_function_privilege('anon', p.oid, 'EXECUTE')
+             or has_function_privilege('public', p.oid, 'EXECUTE'))
+       )
+       (select identity from expected except select identity from actual)
+       union all
+       (select identity from actual except select identity from expected)
+     ) then
+    raise exception using errcode = 'check_violation',
+      message = 'POSTCONDITION_BROWSER_FUNCTION_ALLOWLIST_INVALID';
+  end if;
+
+  with inventory as (
+    select p.oid::regprocedure::text identity,
+           pg_get_function_result(p.oid) result_type,
+           l.lanname language, p.prosecdef,
+           coalesce(array_to_string(p.proconfig, ','), '') settings,
+           md5(pg_get_functiondef(p.oid)) definition_hash,
+           r.rolname owner,
+           coalesce(array_to_string(p.proacl, ','), '') acl,
+           has_function_privilege('authenticated', p.oid, 'EXECUTE') auth_exec,
+           has_function_privilege('anon', p.oid, 'EXECUTE') anon_exec,
+           has_function_privilege('public', p.oid, 'EXECUTE') public_exec
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    join pg_language l on l.oid = p.prolang
+    join pg_roles r on r.oid = p.proowner
+    where n.nspname = 'public'
+      and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+        or has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('public', p.oid, 'EXECUTE'))
+  )
+  select count(*), md5(string_agg(concat_ws('|', identity, result_type,
+           language, prosecdef, settings, definition_hash, owner, acl,
+           auth_exec, anon_exec, public_exec), E'\n' order by identity))
+    into v_count, v_digest
+  from inventory;
+  if v_count <> 64
+     or v_digest <> 'c6f8edd60dfc7fb0cb049cac224729cc' then
+    raise exception using errcode = 'check_violation',
+      message = 'POSTCONDITION_BROWSER_FUNCTION_CONTRACT_DRIFTED';
+  end if;
+
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  select public.rpc_item_permission_preflight() into v_preflight;
+  with codes as (
+    select e ->> 'code' code, count(*) n
+    from jsonb_array_elements(v_preflight -> 'blocking_errors') e
+    group by 1
+  )
+  select coalesce(sum(n), 0)::integer,
+         md5(string_agg(code || '=' || n, E'\n' order by code))
+    into v_count, v_digest
+  from codes;
+  v_warning_count := jsonb_array_length(v_preflight -> 'warnings');
+  perform set_config('request.jwt.claims', coalesce(v_old_claims, ''), true);
+  if (v_local and (v_count <> 16
+       or v_digest <> '51655dff70de3ba821367c8f3784d078'
+       or v_warning_count <> 8))
+     or (not v_local and (v_count <> 481
+       or v_digest <> 'a987324be3986521ed2d26a183c4c318'
+       or v_warning_count <> 13)) then
+    raise exception using errcode = 'check_violation',
+      message = format(
+        'POSTCONDITION_ITEM_PERMISSION_BLOCKERS_DRIFTED count=%s digest=%s warnings=%s',
+        v_count, v_digest, v_warning_count);
   end if;
 
   if has_table_privilege('authenticated', 'public.profiles', 'INSERT,UPDATE,DELETE')
@@ -1122,7 +1578,7 @@ begin
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\';
-  if v_count <> 54 or exists (
+  if v_count <> 53 or exists (
     select 1
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace

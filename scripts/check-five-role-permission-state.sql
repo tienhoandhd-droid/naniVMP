@@ -54,6 +54,8 @@ declare
     'vmp.five_role_check_expected_digest');
   v_local boolean := current_setting(
     'vmp.five_role_check_local_test') = 'on';
+  v_preflight jsonb;
+  v_warning_count integer;
 begin
   if v_local and (
        current_setting('vmp.five_role_local_test_contract', true)
@@ -188,7 +190,7 @@ begin
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname like '%\_\_five\_role\_impl\_20260824' escape '\';
-  if v_count <> 54 or exists (
+  if v_count <> 53 or exists (
     select 1
     from pg_proc hidden
     join pg_namespace n on n.oid = hidden.pronamespace
@@ -222,6 +224,93 @@ begin
       message = 'CHECK_GUARDED_RPC_IMPLEMENTATIONS';
   end if;
   raise notice 'PASS CHECK_GUARDED_RPC_IMPLEMENTATIONS';
+
+  with inventory as (
+    select p.oid::regprocedure::text identity,
+           pg_get_function_result(p.oid) result_type,
+           l.lanname language, p.prosecdef,
+           coalesce(array_to_string(p.proconfig, ','), '') settings,
+           md5(pg_get_functiondef(p.oid)) definition_hash,
+           r.rolname owner,
+           coalesce(array_to_string(p.proacl, ','), '') acl,
+           has_function_privilege('authenticated', p.oid, 'EXECUTE') auth_exec,
+           has_function_privilege('anon', p.oid, 'EXECUTE') anon_exec,
+           has_function_privilege('public', p.oid, 'EXECUTE') public_exec
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    join pg_language l on l.oid = p.prolang
+    join pg_roles r on r.oid = p.proowner
+    where n.nspname = 'public'
+      and (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+        or has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('public', p.oid, 'EXECUTE'))
+  )
+  select count(*), md5(string_agg(concat_ws('|', identity, result_type,
+           language, prosecdef, settings, definition_hash, owner, acl,
+           auth_exec, anon_exec, public_exec), E'\n' order by identity))
+    into v_count, v_digest
+  from inventory;
+  if v_count <> 64
+     or v_digest <> 'c6f8edd60dfc7fb0cb049cac224729cc'
+     or exists (
+       select 1
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and (has_function_privilege('anon', p.oid, 'EXECUTE')
+           or has_function_privilege('public', p.oid, 'EXECUTE'))
+     ) then
+    raise exception using errcode = 'check_violation',
+      message = 'CHECK_BROWSER_FUNCTION_CONTRACT';
+  end if;
+  raise notice 'PASS CHECK_BROWSER_FUNCTION_CONTRACT';
+
+  if exists (
+    select 1
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname like 'rpc\_%' escape '\'
+      and p.proname not like '%\_\_five\_role\_impl\_20260824' escape '\'
+      and not has_function_privilege('authenticated', p.oid, 'EXECUTE')
+      and p.oid not in (
+        'public.rpc_lien_ket_tai_khoan(uuid,uuid)'::regprocedure,
+        'public.rpc_set_item_performer(text,text)'::regprocedure
+      )
+      and (not has_function_privilege('service_role', p.oid, 'EXECUTE')
+        or exists (
+          select 1
+          from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
+          where x.grantee <> p.proowner
+            and x.grantee <> 'service_role'::regrole::oid
+            and x.privilege_type = 'EXECUTE'
+        ))
+  ) then
+    raise exception using errcode = 'check_violation',
+      message = 'CHECK_OMITTED_AUTOMATION_RPC_ACL';
+  end if;
+  raise notice 'PASS CHECK_OMITTED_AUTOMATION_RPC_ACL';
+
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  select public.rpc_item_permission_preflight() into v_preflight;
+  with codes as (
+    select e ->> 'code' code, count(*) n
+    from jsonb_array_elements(v_preflight -> 'blocking_errors') e
+    group by 1
+  )
+  select coalesce(sum(n), 0)::integer,
+         md5(string_agg(code || '=' || n, E'\n' order by code))
+    into v_count, v_digest
+  from codes;
+  v_warning_count := jsonb_array_length(v_preflight -> 'warnings');
+  if (v_local and (v_count <> 16
+       or v_digest <> '51655dff70de3ba821367c8f3784d078'
+       or v_warning_count <> 8))
+     or (not v_local and (v_count <> 481
+       or v_digest <> 'a987324be3986521ed2d26a183c4c318'
+       or v_warning_count <> 13)) then
+    raise exception using errcode = 'check_violation',
+      message = 'CHECK_ITEM_PERMISSION_BLOCKER_CONTRACT';
+  end if;
+  raise notice 'PASS CHECK_ITEM_PERMISSION_BLOCKER_CONTRACT';
 
   if exists (
     select 1

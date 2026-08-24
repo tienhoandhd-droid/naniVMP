@@ -213,6 +213,39 @@ test("every source RPC call has exactly one reviewed migration classification", 
   ].join("\n"));
 });
 
+test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {
+  const source = readFileSync(
+    "supabase/migrations/20260824120000_five_role_permission_hardening.sql",
+    "utf8",
+  );
+  const inventory = reviewedMigrationInventory(source);
+  const counts = [...inventory.values()].reduce((result, row) => {
+    result[row.classification] = (result[row.classification] ?? 0) + 1;
+    return result;
+  }, {});
+
+  assert.deepEqual(counts, {
+    guarded_wrapper: 53,
+    guarded_explicit: 7,
+    service_only: 2,
+  });
+  assert.equal(
+    [...inventory.values()].filter(({ classification }) => classification !== "service_only").length,
+    60,
+  );
+  for (const identity of [
+    "is_admin()",
+    "is_admin_or_qa()",
+    "vmp_current_session_is_active()",
+    "vmp_can_view_my_item(text)",
+  ]) {
+    assert.match(source, new RegExp(`\\('${identity.replace(/[()]/g, "\\$&")}\\'\\)`));
+  }
+  assert.match(source, /3dd77d7f46c8b01fdcd39f96996f87d2/);
+  assert.match(source, /c6f8edd60dfc7fb0cb049cac224729cc/);
+  assert.match(source, /revoke execute on all functions in schema public\s+from public, anon, authenticated/i);
+});
+
 test("production apply has one immutable approved account digest", () => {
   const source = readFileSync("scripts/apply-five-role-hardening.sql", "utf8");
 

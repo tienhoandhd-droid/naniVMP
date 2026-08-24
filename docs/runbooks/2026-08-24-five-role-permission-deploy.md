@@ -58,6 +58,41 @@ select md5(pg_get_functiondef(
   'public.rpc_catalog_history(jsonb,integer,integer)'::regprocedure));
 select md5(pg_get_functiondef(
   'public.rpc_catalog_history_detail(uuid)'::regprocedure));
+with inventory as (
+  select p.oid::regprocedure::text identity,
+         pg_get_function_result(p.oid) result_type,
+         l.lanname language, p.prosecdef,
+         coalesce(array_to_string(p.proconfig, ','), '') settings,
+         md5(pg_get_functiondef(p.oid)) definition_hash,
+         r.rolname owner, coalesce(array_to_string(p.proacl, ','), '') acl,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE') auth_exec,
+         has_function_privilege('anon', p.oid, 'EXECUTE') anon_exec,
+         has_function_privilege('public', p.oid, 'EXECUTE') public_exec
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  join pg_language l on l.oid = p.prolang
+  join pg_roles r on r.oid = p.proowner
+  where n.nspname = 'public' and (
+    has_function_privilege('authenticated', p.oid, 'EXECUTE')
+    or has_function_privilege('anon', p.oid, 'EXECUTE')
+    or has_function_privilege('public', p.oid, 'EXECUTE'))
+)
+select count(*) effective_browser_functions,
+       md5(string_agg(concat_ws('|', identity, result_type, language,
+         prosecdef, settings, definition_hash, owner, acl, auth_exec,
+         anon_exec, public_exec), E'\n' order by identity)) surface_digest
+from inventory;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+with payload as (select public.rpc_item_permission_preflight() j),
+codes as (
+  select e ->> 'code' code, count(*) n
+  from payload cross join lateral
+    jsonb_array_elements(j -> 'blocking_errors') e
+  group by 1
+)
+select sum(n) blocker_total,
+       md5(string_agg(code || '=' || n, E'\n' order by code)) blocker_digest,
+       (select jsonb_array_length(j -> 'warnings') from payload) warning_count
+from codes;
 select count(*) as active_admins
 from public.profiles
 where role::text = 'admin' and coalesce(is_active, true);
@@ -80,6 +115,11 @@ Required results:
   `7e03ac3e48da9f0d3a83e18cd92409ce`,
   `d5cc4d836c5039230f7e46a936b42f57`,
   `b2675c46e69e46492799ed0ea8841d13`;
+- effective browser-function baseline: 189 rows / digest
+  `3dd77d7f46c8b01fdcd39f96996f87d2`;
+- item-permission preflight: 481 blockers / breakdown digest
+  `a987324be3986521ed2d26a183c4c318`, 13 warnings. The warning code is
+  `EMPLOYEE_CODE_MISSING`;
 - at least one active Admin.
 
 The original `b5fb...` evidence used both an explicit boolean cast and CSV
@@ -180,7 +220,7 @@ psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 <<'PSQL'
 PSQL
 ```
 
-All ten `PASS` rule IDs must appear, followed by `ROLLBACK`, with no warning or
+All thirteen `PASS` rule IDs must appear, followed by `ROLLBACK`, with no warning or
 error. Separately probe one current Admin, QA Manager, QA Staff, Workshop
 Manager, Workshop Staff and one disabled account using approved test sessions.
 Output only role/status/counts. Required behavior:
@@ -189,6 +229,9 @@ Output only role/status/counts. Required behavior:
 - disabled account gets empty UI, dashboard, catalog and item access, and no
   writer succeeds with its existing token;
 - non-Admin/non-QA-Manager catalog history gets `FORBIDDEN`;
+- non-Admin/non-QA-Manager `rpc_get_audit_logs` gets `FORBIDDEN` before filter
+  parsing or data access; Admin/QA Manager retain its reviewed raw global-audit
+  payload contract;
 - Admin and QA Manager list only allowlisted catalog audits; list contains no
   `old_data`/`new_data`; out-of-scope detail is `NOT_FOUND`;
 - authenticated has no direct profile UPDATE and no raw audit SELECT;
@@ -198,7 +241,9 @@ The checker recomputes the private seven-UUID digest and 3/3/1 distribution,
 requires every supplied target to be inactive, and requires exactly one
 matching hardening audit per target. It also verifies policies effective
 through `TO PUBLIC` or inherited roles, PUBLIC/anon/authenticated profile write
-revocation, 54 owner-matched wrapper/implementation pairs, owner-only hidden
+revocation, the exact 64-function browser surface with outward digest
+`c6f8edd60dfc7fb0cb049cac224729cc`, the unchanged 481-blocker digest,
+53 owner-matched wrapper/implementation pairs, owner-only hidden
 ACLs (including no `service_role` execute), and zero OID-bound dependents on
 hidden implementations.
 
@@ -206,17 +251,24 @@ Do not run mutation fixtures against production.
 
 ## RPC inventory, ownership, and schema cache
 
-The reviewed source inventory contains 62 literal browser RPC names: 54 use
-owner-preserving guarded wrappers, six are guarded in place, and two legacy
+The reviewed source inventory contains 62 literal browser RPC names: 53 use
+owner-preserving guarded wrappers, seven are guarded in place, and two legacy
 link/name endpoints are intentionally owner-only service boundaries. The live
 signature digest includes function identity, return type, language,
 `SECURITY DEFINER`, settings, definition hash, owner, and ACL and must equal
 `10558e3cb339c9ee32e697d0643fd16f`. The migration aborts if any signature,
 overload, owner, ACL, definition, or count drifts.
 
+The complete pre-DDL effective browser surface is separately pinned at 189
+functions / `3dd77d7f46c8b01fdcd39f96996f87d2`. Final DDL revokes
+PUBLIC/anon/authenticated from every public function and grants authenticated
+only the 60 non-service source boundaries plus `is_admin()`,
+`is_admin_or_qa()`, `vmp_current_session_is_active()`, and
+`vmp_can_view_my_item(text)`. Omitted automation RPCs are service-role-only.
+
 `item_permissions_mode()` is guarded in place because two RLS policies are
 OID-bound to it. Before any other function is renamed, the migration proves it
-has no reverse `pg_depend` entry. Postconditions and the checker prove all 54
+has no reverse `pg_depend` entry. Postconditions and the checker prove all 53
 hidden implementations remain unreferenced, owner-matched, and owner-only.
 
 After COMMIT, request a PostgREST schema-cache reload using a new restricted
