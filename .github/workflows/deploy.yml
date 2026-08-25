@@ -16,6 +16,11 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact commit to quality-check without deploying Pages
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -26,38 +31,63 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  TZ: Asia/Bangkok
+
 jobs:
   static-quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_commit || github.sha }}
+          fetch-depth: 0
+
+      - name: Require the dispatched exact commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.18.0
           cache: npm
           cache-dependency-path: ./package-lock.json
 
       - run: npm ci
+      - name: Install bundled full Chromium
+        run: npx playwright install chromium --with-deps --no-shell
+      - run: npm run visual:runtime
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run drift
 
   e2e-mock:
     needs: static-quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_commit || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.18.0
           cache: npm
           cache-dependency-path: ./package-lock.json
 
       - run: npm ci
+
+      - name: Install bundled full Chromium
+        run: npx playwright install chromium --with-deps --no-shell
+
+      - name: Verify sealed visual baseline contract
+        run: npm run visual:contract
 
       # .env.local chỉ cần URL hợp lệ về mặt hình thức: E2E giả lập chặn
       # toàn bộ mạng ra ngoài và tự trả lời thay Supabase.
@@ -89,19 +119,12 @@ jobs:
       # 0 vi phạm critical/serious mới qua. Mức nhẹ hơn in ra để trả dần.
       - name: Accessibility (axe — 0 critical/serious)
         run: |
-          npx playwright install chromium --with-deps
           bash scripts/with-preview.sh -- npm run a11y
 
-      # Visual regression chỉ so được khi ĐÃ có baseline sinh từ chính môi
-      # trường CI (workflow "Visual baseline" tạo ra). Chưa có thì bỏ qua
-      # có thông báo — không giả vờ ĐẠT.
+      # Visual regression runs only after the read-only seal check above has
+      # established that every Linux snapshot is present and unchanged.
       - name: Visual regression (so với baseline CI)
-        run: |
-          if [ -d tests/visual/baselines/chromium-linux ]; then
-            bash scripts/with-preview.sh -- npm run visual
-          else
-            echo "BỎ QUA: chưa có baseline linux — chạy workflow 'Visual baseline' để tạo."
-          fi
+        run: bash scripts/with-preview.sh -- npm run visual
 
       - name: Lưu ảnh chênh lệch khi visual fail
         if: failure()
@@ -112,18 +135,18 @@ jobs:
           if-no-files-found: ignore
 
   production-build:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - static-quality
       - e2e-mock
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.18.0
           cache: npm
           cache-dependency-path: ./package-lock.json
 
@@ -147,8 +170,9 @@ jobs:
           path: ./dist
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: production-build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
       name: github-pages

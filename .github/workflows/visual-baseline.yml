@@ -1,53 +1,117 @@
-# =====================================================================
-#  visual-baseline.yml — cập nhật baseline visual regression TRÊN CI
-#  ---------------------------------------------------------------------
-#  Chạy tay (workflow_dispatch) khi giao diện đổi CÓ CHỦ ĐÍCH. Ảnh chuẩn
-#  phải sinh từ đúng môi trường sẽ so (ubuntu + chromium của Playwright);
-#  ảnh chụp trên máy dev macOS lệch font rendering nên bị gitignore.
-#  Workflow tự commit baseline mới với [skip ci].
-# =====================================================================
 name: Visual baseline
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact feature-branch commit to generate and seal
+        required: true
+        type: string
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
   update-baseline:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      TZ: Asia/Bangkok
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse main and require the dispatched branch's exact commit
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          DISPATCH_REF_TYPE: ${{ github.ref_type }}
+          DISPATCH_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_REF_TYPE" = branch
+          test -n "$DISPATCH_BRANCH"
+          test "$DISPATCH_BRANCH" != main
+          case "$EXPECTED_COMMIT" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *) echo "expected_commit must be a lowercase 40-character commit SHA" >&2; exit 1 ;;
+          esac
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+          git merge-base --is-ancestor "$EXPECTED_COMMIT" "origin/$DISPATCH_BRANCH"
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.18.0
           cache: npm
+          cache-dependency-path: ./package-lock.json
 
-      - run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Cài chromium cho Playwright
-        run: npx playwright install chromium --with-deps
+      - name: Install bundled full Chromium
+        run: npx playwright install chromium --with-deps --no-shell
 
-      - name: Dựng .env.local giả lập (không secret thật)
+      - name: Verify pinned visual runtime
+        run: npm run visual:runtime
+
+      - name: Create mock environment
         run: |
-          echo "VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}" > .env.local
-          echo "VITE_SUPABASE_ANON=${{ vars.VITE_SUPABASE_ANON }}" >> .env.local
-          echo "E2E_EMAIL=gialap@example.com" >> .env.local
-          echo "E2E_PASSWORD=gialap-khong-dung-that" >> .env.local
+          set -euo pipefail
+          cat > .env.local <<'EOF'
+          VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL || 'https://gialap.supabase.co' }}
+          VITE_SUPABASE_ANON=${{ vars.VITE_SUPABASE_ANON || 'gialap-anon-key' }}
+          E2E_EMAIL=gialap@example.com
+          E2E_PASSWORD=gialap-khong-dung-that
+          EOF
 
-      - name: Chụp lại toàn bộ baseline
-        run: bash scripts/with-preview.sh -- npx playwright test -c playwright.visual.config.ts --update-snapshots
+      - name: Update all Linux visual snapshots
+        run: bash scripts/with-preview.sh -- npm run visual:capnhat
 
-      - name: Commit baseline mới
+      - name: Seal the exact baseline tree
+        run: npm run visual:baseline:seal
+
+      - name: Verify the sealed baseline tree
+        run: npm run visual:contract
+
+      - name: Compare the sealed visual matrix
         run: |
+          set -euo pipefail
+          bash scripts/with-preview.sh -- npm run visual 2>&1 | tee visual-output.log
+          grep -Eq '^[[:space:]]*39 passed( \(|$)' visual-output.log
+
+      - name: Stage and validate exactly 39 PNGs plus the seal
+        run: |
+          set -euo pipefail
+          git add tests/visual/baselines tests/visual/baseline-contract.env
+          test -z "$(git diff --cached --name-only --diff-filter=DR)"
+          mapfile -t changed < <(git diff --cached --name-only)
+          test "${#changed[@]}" -eq 40
+          png_count=0
+          for file in "${changed[@]}"; do
+            if [ "$file" = tests/visual/baseline-contract.env ]; then
+              continue
+            fi
+            case "$file" in
+              tests/visual/baselines/*-linux/*.png) png_count=$((png_count + 1)) ;;
+              *) echo "unexpected generated path: $file" >&2; exit 1 ;;
+            esac
+          done
+          test "$png_count" -eq 39
+          test "$(find tests/visual/baselines -type f -path '*-linux/*.png' -name '*.png' | wc -l | tr -d ' ')" -eq 39
+          git diff --cached --check
+
+      - name: Commit and push generated baseline artifacts
+        env:
+          DISPATCH_BRANCH: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add tests/visual/baselines
-          if git diff --cached --quiet; then
-            echo "Baseline không đổi — không có gì để commit."
-          else
-            git commit -m "test(visual): cập nhật baseline từ CI [skip ci]"
-            git push
-          fi
+          git commit -m "test(visual): cập nhật baseline từ CI"
+          generated_commit="$(git rev-parse HEAD)"
+          git push origin "HEAD:refs/heads/$DISPATCH_BRANCH"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/dispatches" \
+            -f "ref=$DISPATCH_BRANCH" \
+            -f "inputs[expected_commit]=$generated_commit"
+          echo "CONTROLLER_MONITOR_SHA=$generated_commit"
