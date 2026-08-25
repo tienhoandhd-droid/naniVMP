@@ -27,6 +27,9 @@
     "drift": "node scripts/check-design-drift.mjs",
     "visual": "playwright test -c playwright.visual.config.ts",
     "visual:capnhat": "playwright test -c playwright.visual.config.ts --update-snapshots",
+    "visual:runtime": "node --import tsx scripts/check-visual-runtime.mjs --runtime",
+    "visual:baseline:seal": "node --import tsx scripts/check-visual-runtime.mjs --write-baseline-contract",
+    "visual:contract": "node --import tsx scripts/check-visual-runtime.mjs --verify-baseline",
     "a11y": "playwright test -c playwright.a11y.config.ts",
     "e2e:luongchinh": "node tests/e2e/luong-chinh.mjs",
     "e2e:ux": "node tests/e2e/ux-refinement.mjs"

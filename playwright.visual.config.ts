@@ -32,8 +32,9 @@ export default defineConfig({
     baseURL: process.env.VMP_E2E_URL || "http://127.0.0.1:4173",
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
-    // Máy dev dùng Chrome hệ thống (không tải browser); CI cài chromium.
-    channel: process.env.CI ? undefined : "chrome",
+    timezoneId: "Asia/Bangkok",
+    // Cùng Chromium do Playwright cài ở local và CI, không dùng Chrome hệ thống.
+    channel: "chromium",
     // Ép sRGB khi chụp: headless trên macOS mặc định chụp theo profile màn
     // hình (Display-P3) làm ảnh bạc màu — đã dính khi thay art Vali.
     launchOptions: { args: ["--force-color-profile=srgb"] },
