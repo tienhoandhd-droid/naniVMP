@@ -90,7 +90,7 @@ end-to-end tests, accessibility, visual, build, final SQL seals and final
 identity. It also proves process/port cleanup, output digests, clean HEAD/tree,
 consistent claim/manifest/ownership/terminal, and the completion marker.
 
-Expected totals are unit 338 passed, zero failed, one skipped; drift 49/132;
+Expected totals are unit 340 passed, zero failed, one skipped; drift 49/132;
 end-to-end 171/0, 75/0, 60/0, access-transition race pass, shell 29/0,
 tham-my zero critical and atelier 177/0; accessibility 5/5; visual 39/39; build
 zero.
@@ -108,4 +108,3 @@ revert commit only. Any unexpected remote drift, residual critical/important
 finding after three correction rounds, official claim collision, matrix
 failure, CI failure, Pages commit mismatch, or deployment probe failure is a
 preserved STOP rather than a retry.
-
