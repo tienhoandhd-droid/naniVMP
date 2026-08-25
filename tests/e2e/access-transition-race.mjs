@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createConnection } from "node:net";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
@@ -9,7 +10,44 @@ const PORT = 4178;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(PORT), "--strictPort"], {
   stdio: "ignore",
+  detached: true,
 });
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isPortOpen = () => new Promise((resolve) => {
+  const socket = createConnection({ host: "127.0.0.1", port: PORT });
+  let settled = false;
+  const finish = (open) => {
+    if (settled) return;
+    settled = true;
+    socket.destroy();
+    resolve(open);
+  };
+  socket.setTimeout(250, () => finish(false));
+  socket.once("connect", () => finish(true));
+  socket.once("error", () => finish(false));
+});
+
+async function waitForPortClosed({ timeoutMs = 5000, intervalMs = 50 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    if (!(await isPortOpen())) return;
+    await delay(intervalMs);
+  }
+  throw new Error(`Vite vẫn giữ cổng ${PORT} sau ${timeoutMs}ms`);
+}
+
+function waitForChildExit(child, timeoutMs = 5000) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`npm dev không thoát sau ${timeoutMs}ms`)), timeoutMs);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 const payload = (role) => ({
@@ -147,9 +185,20 @@ try {
   console.log("access transition race: pass");
 } finally {
   await browser?.close();
-  if (server.exitCode === null) {
-    const stopped = new Promise((resolve) => server.once("exit", resolve));
-    server.kill("SIGTERM");
+  if (!Number.isInteger(server.pid) || server.pid <= 0) {
+    throw new Error("npm dev không có PID hợp lệ để dọn process group");
+  }
+  if (server.exitCode === null && server.signalCode === null) {
+    const stopped = waitForChildExit(server);
+    try {
+      process.kill(-server.pid, "SIGTERM");
+    } catch (error) {
+      if (error?.code !== "ESRCH") {
+        stopped.catch(() => {});
+        throw error;
+      }
+    }
     await stopped;
   }
+  await waitForPortClosed();
 }
