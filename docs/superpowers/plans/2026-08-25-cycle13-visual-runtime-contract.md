@@ -36,20 +36,23 @@ TypeScript configuration, Node test runner, Bash, GitHub Actions.
 - Modify: `package.json`
 - Create: `scripts/check-visual-runtime.mjs`
 - Create: `tests/unit/visual-runtime-contract.test.mjs`
-- Modify: `.github/workflows/visual-baseline.yml`
-- Modify: `.github/workflows/deploy.yml`
 
 **Interfaces:**
 
-- Produces `npm run visual:contract`, a browser-free verifier.
+- Produces `npm run visual:runtime`, a browser-free verifier that checks the
+  pinned config/package/browser but neither reads nor requires a baseline
+  seal.
 - Visual config exposes fixed Bangkok timezone and bundled Chromium channel.
 
 - [ ] Write three unit contracts that inspect real config/checker inputs and
   fail because the contract is absent.
 - [ ] Run pinned Node with `--import tsx --test` and record the expected RED.
-- [ ] Implement the minimum checker/config/package/workflow changes.
+- [ ] Implement the minimum checker/config/package changes and three explicit
+  package commands: `visual:runtime`, `visual:baseline:seal`, and
+  `visual:contract`.
 - [ ] Rerun the focused unit file and require three passes.
-- [ ] Run static workflow/config checks and review the exact diff.
+- [ ] Run `npm run visual:runtime`, static config checks, and review the exact
+  diff. Do not create a placeholder or old-baseline seal.
 - [ ] Commit and push the feature branch for baseline generation.
 
 ### Task 2: Guarded baseline regeneration
@@ -58,14 +61,28 @@ TypeScript configuration, Node test runner, Bash, GitHub Actions.
 
 - Create: `tests/visual/baseline-contract.env`
 - Regenerate: exactly 39 PNGs under `tests/visual/baselines/*-linux/`
+- Modify: `scripts/check-visual-runtime.mjs`
+- Modify: `tests/unit/visual-runtime-contract.test.mjs`
+- Modify: `.github/workflows/visual-baseline.yml`
+- Modify: `.github/workflows/deploy.yml`
 
 **Interfaces:**
 
 - Consumes the exact Task 1 feature commit as workflow input.
 - Produces one workflow commit containing only 40 generated artifacts.
+- `visual:baseline:seal` runs the runtime check, requires 39 Linux PNGs,
+  computes their deterministic tree digest, and atomically writes the seal.
+- `visual:contract` is read-only: it reruns the runtime check and requires the
+  sealed count/tree digest to match exactly.
 
 - [ ] Run visual once against old baselines and preserve the expected 39-fail
   RED without updating snapshots.
+- [ ] Add temporary-fixture unit coverage for seal generation and read-only
+  verification; require the focused contract suite green.
+- [ ] Make the guarded workflow run, in order: dependency install, bundled
+  Chromium install, `visual:runtime`, mock environment creation, snapshot
+  update, `visual:baseline:seal`, `visual:contract`, visual comparison, exact
+  `39 passed`, and exact 40-file generated-diff validation.
 - [ ] Dispatch the guarded baseline workflow on the exact feature commit.
 - [ ] Monitor it through contract, generation, 39-pass comparison and commit.
 - [ ] Fetch and fast-forward the local feature branch to its generated commit.
@@ -133,4 +150,3 @@ TypeScript configuration, Node test runner, Bash, GitHub Actions.
   and Pages deployment.
 - [ ] Probe the deployed Pages URL and verify it serves the expected commit;
   record final handoff evidence.
-
