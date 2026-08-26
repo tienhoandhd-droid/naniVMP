@@ -104,8 +104,9 @@ export function filterCatalogObjects(
     if (text && !SEARCH_FIELDS.some((key) => normalized(record[key]).includes(text))) return false;
     if (!exactFacet(row.department, filters.department)) return false;
     if (!exactFacet(row.area_code, filters.area)) return false;
-    if (filters.validation === "validated" && row.validate_flag !== "y") return false;
-    if (filters.validation === "outside" && row.validate_flag === "y") return false;
+    const validation = normalized(row.validate_flag);
+    if (filters.validation === "validated" && validation !== "y") return false;
+    if (filters.validation === "outside" && validation === "y") return false;
     if (filters.firstMonth === "missing" && hasValue(row.first_month)) return false;
     if (filters.firstMonth === "present" && !hasValue(row.first_month)) return false;
     if (!matchesOwner(row.owner_name, filters.owner)) return false;

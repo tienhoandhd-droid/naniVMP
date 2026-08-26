@@ -47,8 +47,11 @@ test("filter conjunction normalizes text and includes owner_name plus note", () 
 
 test("validation, first month, owner and frequency categories use their exact boundaries", () => {
   assert.deepEqual(filterCatalogObjects(rows, {
+    ...CATALOG_OBJECT_FILTERS_ALL, validation: "validated",
+  }).map((row) => row.object_code), ["TB-100", "QT-300"], "Y hoa vẫn là đã thẩm định");
+  assert.deepEqual(filterCatalogObjects(rows, {
     ...CATALOG_OBJECT_FILTERS_ALL, validation: "outside",
-  }).map((row) => row.object_code), ["TB-200", "QT-300"], "chỉ y thường thuộc kế hoạch");
+  }).map((row) => row.object_code), ["TB-200"], "chỉ giá trị khác y mới ngoài kế hoạch");
   assert.deepEqual(filterCatalogObjects(rows, {
     ...CATALOG_OBJECT_FILTERS_ALL, firstMonth: "missing", owner: "unassigned", frequency: "gt12",
   }).map((row) => row.object_code), ["TB-200"]);

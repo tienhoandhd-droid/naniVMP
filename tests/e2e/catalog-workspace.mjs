@@ -568,6 +568,21 @@ async function chuanBiApV1(trang) {
     && document.querySelector('[data-cw-kind="Thiết bị"]')?.getAttribute("aria-pressed") === "true"
     && document.querySelectorAll(".lp-mobile-task").length === 25, { timeout: 10_000 });
   kiem(true, "xóa bộ lọc giữ nguyên loại đối tượng đang chọn");
+
+  await trang.type('input[aria-label="Tìm trong danh mục"]', "Máy lọc");
+  await trang.waitForFunction(() => document.querySelector("[data-cw-filter-count]")?.textContent?.includes("1 điều kiện") === true
+    && document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("1–25 / 31") === true, { timeout: 10_000 });
+  await trang.click(".cw-pager__nut:last-child");
+  await trang.waitForFunction(() => document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("26–31") === true,
+    { timeout: 10_000 });
+  await trang.click(".lp-smart-table__toggle");
+  await trang.waitForSelector(".lp-smart-table__detail", { timeout: 10_000 });
+  await trang.evaluate(() => [...document.querySelectorAll("[data-cw-filter-chip]")]
+    .find((chip) => chip.getAttribute("aria-label")?.startsWith("Bỏ lọc Từ khóa:"))?.click());
+  await trang.waitForFunction(() => !document.querySelector("[data-cw-filter-count]")
+    && document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("1–25 / 31") === true
+    && !document.querySelector(".lp-smart-table__detail"), { timeout: 10_000 });
+  kiem(true, "bỏ chip từ khóa trở về trang đầu và đóng chi tiết");
   kiem(loiConsole.length === 0, "không lỗi console ở bộ lọc đối tượng", loiConsole.join(" · ").slice(0, 160));
   await trang.close();
 }

@@ -258,6 +258,11 @@ export default function CatalogWorkspaceShell({
     setTrang(0);
     setExpandedId(null);
   };
+  const xoaTuKhoaObj = () => {
+    setQ("");
+    setTrang(0);
+    setExpandedId(null);
+  };
 
   const objList = useMemo<CatalogListRow[]>(() =>
     objFiltered.slice(trang * PAGE_SIZE, (trang + 1) * PAGE_SIZE).map((r) => ({
@@ -510,7 +515,7 @@ export default function CatalogWorkspaceShell({
                   <span data-cw-filter-count aria-live="polite">Đang lọc {objFilterCount} điều kiện · {objFiltered.length} đối tượng</span>
                   {objFilterChips.map((chip) => <button key={chip.key} type="button" className="cw-filter-chip" data-cw-filter-chip
                     aria-label={`Bỏ lọc ${chip.label}`} onClick={() => {
-                      if (chip.key === "text") setQ("");
+                      if (chip.key === "text") xoaTuKhoaObj();
                       else doiBoLocObj(chip.key, clearCatalogObjectFilter(objFilterState, chip.key)[chip.key]);
                     }}>{chip.label} ×</button>)}
                   <button type="button" className="cw-nut cw-nut--phu" data-cw-clear-filters onClick={xoaTatCaBoLocObj}>Xóa bộ lọc</button>
