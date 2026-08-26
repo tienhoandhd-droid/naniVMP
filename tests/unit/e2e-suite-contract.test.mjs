@@ -82,10 +82,66 @@ test("mọi bộ kiểm trình duyệt mới đều đi qua lớp giả lập, k
   }
 });
 
-test("CI e2e-mock chạy đủ ba bộ giả lập cốt lõi, mỗi bộ đúng một lần", async () => {
+function extractWorkflowJob(workflow, jobName, nextJobName) {
+  const job = workflow.match(
+    new RegExp(
+      `^  ${jobName}:\\n([\\s\\S]*?)(?=^  ${nextJobName}:\\n)`,
+      "mu",
+    ),
+  );
+  assert.ok(job, `deploy.yml phải có job ${jobName} trước ${nextJobName}`);
+  return job[1];
+}
+
+test("CI tách concurrency release main khỏi từng run không deploy", async () => {
   const ci = await readRepositoryFile(".github/workflows/deploy.yml");
-  for (const ten of ["e2e:gialap", "e2e:catalog", "e2e:admin"]) {
-    const dem = ci.split(`npm run ${ten}`).length - 1;
-    assert.equal(dem, 1, `deploy.yml phải chạy "npm run ${ten}" đúng một lần (thấy ${dem})`);
+  const concurrency = ci.match(/^concurrency:\n([\s\S]*?)(?=^\S)/mu);
+  assert.ok(concurrency, "deploy.yml phải có top-level concurrency block");
+
+  assert.match(
+    concurrency[1],
+    /group:\s*\$\{\{\s*github\.event_name\s*==\s*'push'\s*&&\s*github\.ref\s*==\s*'refs\/heads\/main'\s*&&\s*'pages-main'\s*\|\|\s*format\('pages-non-deploy-\{0\}',\s*github\.run_id\)\s*\}\}/u,
+    "push main phải dùng group pages-main, còn PR/manual phải nhận group riêng theo run_id",
+  );
+  assert.match(concurrency[1], /cancel-in-progress:\s*false/u);
+});
+
+test("CI e2e-mock chỉ chạy ba bộ giả lập cốt lõi được duyệt", async () => {
+  const ci = await readRepositoryFile(".github/workflows/deploy.yml");
+  const e2eMock = extractWorkflowJob(ci, "e2e-mock", "production-build");
+  const e2eInvocations = [...e2eMock.matchAll(/npm run (e2e:[a-z0-9:-]+)/gu)]
+    .map((match) => match[1]);
+
+  assert.deepEqual(
+    e2eInvocations,
+    ["e2e:gialap", "e2e:catalog", "e2e:admin"],
+    "e2e-mock phải chỉ gọi đúng ba bộ E2E lõi, đúng thứ tự và không lặp",
+  );
+
+  for (const ten of [
+    "visual:runtime",
+    "visual:contract",
+    "visual",
+    "drift",
+    "shell",
+    "thammy",
+    "atelier",
+    "a11y",
+  ]) {
+    assert.equal(
+      ci.includes(`npm run ${ten}`),
+      false,
+      `release workflow không được gọi "npm run ${ten}"`,
+    );
   }
+  assert.equal(
+    ci.includes("actions/upload-artifact"),
+    false,
+    "release workflow không được tải artifact visual",
+  );
+  assert.match(
+    ci,
+    /production-build:[\s\S]*?needs:\s*\n\s*- static-quality\s*\n\s*- e2e-mock/u,
+    "production-build phải chờ cả static-quality và e2e-mock",
+  );
 });

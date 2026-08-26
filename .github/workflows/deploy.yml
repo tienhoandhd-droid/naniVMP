@@ -26,7 +26,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  # Chỉ các push main cùng chia sẻ hàng đợi phát hành. PR và dispatch chỉ
+  # kiểm tra chất lượng nên dùng group riêng theo run, không chặn release.
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'pages-main' || format('pages-non-deploy-{0}', github.run_id) }}
   cancel-in-progress: false
 
 env:

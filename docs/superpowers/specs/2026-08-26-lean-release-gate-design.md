@@ -8,8 +8,9 @@ triển khai khi các kiểm tra tối thiểu và bản build đều thành cô
 
 ## Phạm vi
 
-Chỉ sửa `.github/workflows/deploy.yml`. Không đổi mã ứng dụng, dữ liệu,
-Supabase, bộ kiểm thử hiện có hoặc workflow cập nhật ảnh thủ công.
+Chỉ sửa `.github/workflows/deploy.yml` và hợp đồng unit kiểm workflow tại
+`tests/unit/e2e-suite-contract.test.mjs`. Không đổi mã ứng dụng, dữ liệu,
+Supabase, package script, bộ kiểm thử E2E hoặc workflow cập nhật ảnh thủ công.
 
 ## Cổng phát hành mới
 
@@ -42,6 +43,10 @@ nhóm E2E. Chỉ push lên `main` mới tiếp tục build production và triể
 GitHub Pages. Build vẫn phụ thuộc vào cả hai job kiểm tra, vì vậy kiểm tra thất
 bại sẽ không phát hành.
 
+Các push `main` cùng dùng một concurrency group để release vẫn tuần tự. Mỗi PR
+và workflow dispatch dùng group theo `run_id`, nên không thể xếp hàng sau hoặc
+thay thế một release `main` đang chờ.
+
 ## Xử lý lỗi
 
 Workflow dừng ngay khi bất kỳ lệnh kiểm tra nào thất bại. Không tự động thử lại
@@ -53,7 +58,8 @@ hành; chúng được kiểm tra theo nhu cầu thay vì ở mọi commit.
 Trước khi đưa lên `main`:
 
 1. kiểm tra cú pháp workflow;
-2. chạy kiểm tra hợp đồng để chứng minh workflow chỉ gọi đúng các lệnh đã duyệt;
+2. chạy kiểm tra hợp đồng unit để chứng minh workflow chỉ gọi đúng các lệnh đã
+   duyệt, giữ dependency build và tách concurrency release khỏi run không deploy;
 3. chạy typecheck và unit test bằng Node.js 24;
 4. đẩy nhánh và xác nhận GitHub Actions chạy thành công ba nhóm E2E;
 5. chỉ sau đó fast-forward lên \`main\` và xác nhận build cùng GitHub Pages.
