@@ -1963,7 +1963,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
             </label>
           </div>
         )}
-        <div className="timeline-filter-chips" aria-label="Bộ lọc đang áp dụng">
+        <div className="timeline-filter-chips" role="group" aria-label="Bộ lọc đang áp dụng">
           {filterChips.map((chip) => (
             <button key={chip.key} type="button" data-timeline-filter-chip aria-label={`Bỏ ${chip.label}`}
               onClick={() => clearOneFilter(chip.key)}>
