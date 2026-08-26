@@ -82,9 +82,9 @@ test("mọi bộ kiểm trình duyệt mới đều đi qua lớp giả lập, k
   }
 });
 
-test("CI e2e-mock chạy đủ các bộ giả lập, mỗi bộ đúng một lần", async () => {
+test("CI e2e-mock chạy đủ ba bộ giả lập cốt lõi, mỗi bộ đúng một lần", async () => {
   const ci = await readRepositoryFile(".github/workflows/deploy.yml");
-  for (const ten of ["e2e:gialap", "e2e:catalog", "shell", "thammy", "atelier"]) {
+  for (const ten of ["e2e:gialap", "e2e:catalog", "e2e:admin"]) {
     const dem = ci.split(`npm run ${ten}`).length - 1;
     assert.equal(dem, 1, `deploy.yml phải chạy "npm run ${ten}" đúng một lần (thấy ${dem})`);
   }
