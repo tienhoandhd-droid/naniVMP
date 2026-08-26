@@ -163,7 +163,7 @@ test("runtime verifier rejects a symlinked bundled Chromium executable before ha
   assert.match(runtime.stderr, /bundled Chromium executable path must not be a symlink/u);
 });
 
-test("baseline seal is an atomic 0600 single-link exact ordered tree contract that verification only reads", (t) => {
+test("baseline seal is an atomic writer-0600 single-link exact ordered tree contract that verification only reads", (t) => {
   const fixture = createBaselineFixture();
   t.after(() => rmSync(fixture, { recursive: true, force: true }));
 
@@ -181,6 +181,20 @@ test("baseline seal is an atomic 0600 single-link exact ordered tree contract th
   const verifiedMetadata = statSync(contract);
   assert.equal(verifiedMetadata.ino, sealedMetadata.ino);
   assert.equal(verifiedMetadata.mtimeMs, sealedMetadata.mtimeMs);
+
+  chmodSync(contract, 0o644);
+  const checkoutMode = runFixture(fixture, "--verify-baseline");
+  assert.equal(checkoutMode.status, 0, checkoutMode.stderr || checkoutMode.stdout);
+  const checkoutMetadata = statSync(contract);
+  assert.equal(checkoutMetadata.ino, sealedMetadata.ino);
+  assert.equal(checkoutMetadata.mtimeMs, sealedMetadata.mtimeMs);
+  assert.equal(checkoutMetadata.mode & 0o777, 0o644);
+
+  chmodSync(contract, 0o755);
+  const executableSeal = runFixture(fixture, "--verify-baseline");
+  assert.notEqual(executableSeal.status, 0);
+  assert.match(executableSeal.stderr, /baseline seal must not be executable/u);
+  chmodSync(contract, 0o600);
 
   writeFileSync(contract, `${fixtureSeal()}EXTRA=1\n`);
   const extraKey = runFixture(fixture, "--verify-baseline");

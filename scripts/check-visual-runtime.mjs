@@ -227,7 +227,8 @@ async function verifyBaselineContract() {
   }
   const { metadata } = seal;
   requireContract(metadata.isFile(), "baseline seal must be a regular file");
-  requireContract((metadata.mode & 0o777) === 0o600, "baseline seal must have mode 0600");
+  requireContract((metadata.mode & 0o111) === 0,
+    "baseline seal must not be executable");
   requireContract(metadata.nlink === 1, "baseline seal must have one hard link");
   const { treeDigest } = collectSealedBaseline();
   verifyBaselineSealContents(seal.contents, treeDigest);
