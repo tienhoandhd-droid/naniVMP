@@ -1152,6 +1152,12 @@ export interface ApplyCatalogChangeV2Input {
   overrideConfirmed: boolean;
 }
 
+export type KetQuaApDungV2 = KetQuaApDung & {
+  so_ghi_de_deadline?: number;
+  so_deadline_override?: number;
+  da_ap_truoc_do?: boolean;
+};
+
 /** Ép kiểu tại một chỗ: types sinh từ schema trước migration 20260812130000.
  *  PHẢI bind — supabase.rpc dùng `this` bên trong. */
 function goiRpc() {
@@ -1187,7 +1193,7 @@ export async function previewCatalogChangeV2(changeId: string): Promise<AnhHuong
 
 export async function applyCatalogChangeV2(
   input: ApplyCatalogChangeV2Input,
-): Promise<KetQuaApDung & { so_ghi_de_deadline?: number; da_ap_truoc_do?: boolean }> {
+): Promise<KetQuaApDungV2> {
   const { data, error } = await goiRpc()("rpc_apply_catalog_change_v2", {
     p_change_id: input.changeId,
     p_reason: input.reason,
@@ -1196,7 +1202,7 @@ export async function applyCatalogChangeV2(
     p_override_confirmed: input.overrideConfirmed,
   });
   if (error) throw new Error("Áp vào timeline thất bại: " + error.message);
-  return asShape<KetQuaApDung & { so_ghi_de_deadline?: number; da_ap_truoc_do?: boolean }>(data);
+  return asShape<KetQuaApDungV2>(data);
 }
 
 // ============================================================

@@ -4,8 +4,11 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   CatalogImpactPreviewContent,
+  beginCatalogImpactPreviewLoad,
   closeCatalogImpactIfIdle,
   createCatalogImpactApplyCoordinator,
+  failCatalogImpactPreviewLoad,
+  finishCatalogImpactPreviewLoad,
 } from "../../src/components/catalog/CatalogImpactPreview.tsx";
 import { toggleDeadlineOverride } from "../../src/features/catalogWorkspace/catalogTimelineOverrideModel.ts";
 
@@ -96,6 +99,25 @@ test("blocked progressed candidate names the exact blocker and has no selection 
   assert.match(html, /Hạng mục đã bị hủy/);
   assert.match(html, /Không thể áp — thiếu: Tháng thẩm định đầu tiên/);
   assert.doesNotMatch(html, /aria-label="Chọn cập nhật deadline CCTB01\/2026\.01-PQ"/);
+});
+
+test("a failed replacement preview clears the prior change before it can be applied", () => {
+  const loaded = finishCatalogImpactPreviewLoad("change-1", preview({ tao: [{ validation_code: "old", validation_type: "PQ", deadline_vmp: "2026-04-15", thieu: [] }] }));
+  assert.equal(loaded.preview?.timeline_revision, 11);
+
+  assert.deepEqual(beginCatalogImpactPreviewLoad("change-2"), { changeId: "change-2", preview: null, loading: true, error: null });
+  assert.deepEqual(finishCatalogImpactPreviewLoad("change-2", { ok: false, error: "Không xem trước được change-2" }), {
+    changeId: "change-2",
+    preview: null,
+    loading: false,
+    error: "Không xem trước được change-2",
+  });
+  assert.deepEqual(failCatalogImpactPreviewLoad("change-2", new Error("Mạng bị ngắt")), {
+    changeId: "change-2",
+    preview: null,
+    loading: false,
+    error: "Mạng bị ngắt",
+  });
 });
 
 test("override submission sends the selected code and previewed item version once", async () => {

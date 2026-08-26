@@ -10,6 +10,32 @@ type ApplyV2Result = KetQuaApDung & { so_ghi_de_deadline?: number; da_ap_truoc_d
 type Mutation = (input: ApplyCatalogChangeV2Input) => Promise<ApplyV2Result>;
 export type CatalogImpactApplyOutcome = { kind: "applied" } | { kind: "busy" } | { kind: "rejected"; message: string };
 
+export interface CatalogImpactPreviewLoadState {
+  changeId: string;
+  preview: AnhHuongTimelineV2 | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export function beginCatalogImpactPreviewLoad(changeId: string): CatalogImpactPreviewLoadState {
+  return { changeId, preview: null, loading: true, error: null };
+}
+
+export function finishCatalogImpactPreviewLoad(changeId: string, result: AnhHuongTimelineV2): CatalogImpactPreviewLoadState {
+  return result.ok
+    ? { changeId, preview: result, loading: false, error: null }
+    : { changeId, preview: null, loading: false, error: result.error ?? "Không xem trước được" };
+}
+
+export function failCatalogImpactPreviewLoad(changeId: string, error: unknown): CatalogImpactPreviewLoadState {
+  return {
+    changeId,
+    preview: null,
+    loading: false,
+    error: error instanceof Error ? error.message : String(error),
+  };
+}
+
 /** Synchronous lock: React state alone cannot prevent two rapid clicks before rerender. */
 export function createCatalogImpactApplyCoordinator() {
   let busy = false;
@@ -164,20 +190,21 @@ export function CatalogImpactPreviewContent({ preview, loading, error, reason, r
 }
 
 export default function CatalogImpactPreview({ changeId, onClose, onApplied }: { changeId: string; onClose: () => void; onApplied: () => void }) {
-  const [preview, setPreview] = useState<AnhHuongTimelineV2 | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<CatalogImpactPreviewLoadState>(() => beginCatalogImpactPreviewLoad(changeId));
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DeadlineOverrideSelection[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const [applying, setApplying] = useState(false);
   const coordinator = useRef(createCatalogImpactApplyCoordinator());
+  const preview = loadState.changeId === changeId ? loadState.preview : null;
+  const loading = loadState.changeId === changeId ? loadState.loading : true;
+  const error = loadState.changeId === changeId ? loadState.error : null;
 
   useEffect(() => {
     let current = true;
-    setLoading(true); setError(null); setReasonError(null); setSelected([]); setConfirmed(false); setReason("");
-    previewCatalogChangeV2(changeId).then((result) => { if (!current) return; if (!result.ok) { setError(result.error ?? "Không xem trước được"); return; } setPreview(result); }).catch((loadError: unknown) => { if (current) setError(loadError instanceof Error ? loadError.message : String(loadError)); }).finally(() => { if (current) setLoading(false); });
+    setLoadState(beginCatalogImpactPreviewLoad(changeId)); setReasonError(null); setSelected([]); setConfirmed(false); setReason("");
+    previewCatalogChangeV2(changeId).then((result) => { if (current) setLoadState(finishCatalogImpactPreviewLoad(changeId, result)); }).catch((loadError: unknown) => { if (current) setLoadState(failCatalogImpactPreviewLoad(changeId, loadError)); });
     return () => { current = false; };
   }, [changeId]);
 
@@ -186,10 +213,10 @@ export default function CatalogImpactPreview({ changeId, onClose, onApplied }: {
     const normalCount = normalChangeCount(preview);
     const validation = canApplyCatalogImpact({ normalChangeCount: normalCount, selected, reason, confirmed });
     if (!validation.ok) { setReasonError(validation.reason); return; }
-    setApplying(true); setError(null); setReasonError(null);
+    setApplying(true); setLoadState((current) => ({ ...current, error: null })); setReasonError(null);
     const outcome = await coordinator.current.run({ changeId, reason, expectedTimelineRevision: preview?.timeline_revision ?? null, deadlineOverrides: selected, overrideConfirmed: confirmed, normalChangeCount: normalCount, mutate: applyCatalogChangeV2 });
     if (outcome.kind === "applied") onApplied();
-    else if (outcome.kind === "rejected") setError(outcome.message);
+    else if (outcome.kind === "rejected") setLoadState((current) => ({ ...current, error: outcome.message }));
     setApplying(false);
   };
 
