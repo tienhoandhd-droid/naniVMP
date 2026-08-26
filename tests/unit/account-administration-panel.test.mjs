@@ -101,6 +101,24 @@ test("manager chỉ thấy Sửa vai khi có callback", () => {
   assert.match(renderToStaticMarkup(React.createElement(AccountAdministrationContent, { ...base, onEditRole: () => {} })), /Sửa vai/);
 });
 
+test("panel hiện nhãn tiếng Việt từ catalog, không lộ mã vai kỹ thuật", () => {
+  const [baseRow] = loadFixtureRows();
+  const row = { ...baseRow, businessRole: "qa_staff", unresolvedReason: null };
+  const snapshot = { rows: [row], errors: {} };
+  const html = renderToStaticMarkup(React.createElement(AccountAdministrationContent, {
+    snapshot,
+    rows: snapshot.rows,
+    loading: false,
+    canManageAccounts: false,
+    reload: async () => null,
+    onRetry: () => {},
+    onStartActivation: () => {},
+  }));
+
+  assert.match(html, /Vai: Nhân viên QA/);
+  assert.doesNotMatch(html, /qa_staff/);
+});
+
 test("không thể hủy dialog sau khi mutation bắt đầu", () => {
   const html = renderToStaticMarkup(React.createElement(ActivationDialog, {
     draft: { row: { userId: "u1" }, next: false, reason: "Lý do", token: 1 },

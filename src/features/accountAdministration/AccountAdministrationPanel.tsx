@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchNguoiVaQuyen, fetchVaiNghiepVu, setUserActive, type NguoiVaQuyen, type VaiNghiepVuRow } from "../../lib/supabaseData.ts";
 import { searchPermissionDirectory } from "../itemPermissions/api.ts";
+import { businessRoleLabel } from "../../lib/businessRoles.ts";
 import { buildAccountAdministrationRows, type AccountAdministrationRow } from "./accountAdministrationModel.ts";
 import type { DirectoryPerson } from "../itemPermissions/types.ts";
 export type AccountSourceName = "accounts" | "roles" | "directory";
@@ -145,7 +146,7 @@ export function AccountAdministrationContent({
             {row.readiness.some((item) => item.state === "unknown") && (
               <span data-badge="unknown">Chưa xác minh</span>
             )}
-            <p>Vai: {row.businessRole || "Chưa giải được"} · Phạm vi: {row.scopeSummary}</p>
+            <p>Vai: {businessRoleLabel(row.businessRole)} · Phạm vi: {row.scopeSummary}</p>
             <ul aria-label="Checklist sẵn sàng">
               {row.readiness.map((item) => (
                 <li key={item.key} data-state={item.state}>
