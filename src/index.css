@@ -2014,6 +2014,12 @@ select { appearance: none; -webkit-appearance: none; }
   font-weight: 700;
 }
 
+.planned-deadline-backdrop { position: fixed; inset: 0; z-index: 90; overflow: auto; padding: 24px; background: rgba(45,24,43,.42); }
+.planned-deadline-dialog { max-width: 760px; margin: auto; padding: 22px; border-radius: 16px; background: var(--c-surface); color: var(--plum); }
+.planned-deadline-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.planned-deadline-dialog label { display: grid; gap: 5px; margin: 10px 0; font-weight: 700; }
+.planned-deadline-protected { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px 14px; font-size: 13px; }
+
 .timeline-insight-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3692,6 +3698,7 @@ select { appearance: none; -webkit-appearance: none; }
   .timeline-advanced-filter-panel {
     grid-template-columns: 1fr;
   }
+  .planned-deadline-grid, .planned-deadline-protected { grid-template-columns: 1fr; }
 
   .timeline-quarter-controls,
   .timeline-scope-inline,
