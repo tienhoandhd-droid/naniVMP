@@ -89,6 +89,96 @@ const trinhDuyet = await puppeteer.launch({
   executablePath: CHROME, headless: "new", args: ["--no-sandbox"],
 });
 
+/* ---- Hợp đồng V2: ghi đè deadline hạng mục đã có tiến độ ------------- */
+const CHANGE_ID_V2 = "change-v2-progressed";
+const REVISION_V2 = 41;
+const MA_HANG_MUC_V2 = "CCTB01/2026.01-PQ";
+const VERSION_HANG_MUC_V2 = 7;
+const LY_DO_AP_V2 = "Xác nhận theo biên bản QA-26/08";
+
+const nhanChonDeadlineV2 = `Chọn cập nhật deadline ${MA_HANG_MUC_V2}`;
+
+async function moXemTruocDeadlineV2(applyResult) {
+  const applyBodies = [];
+  const pageState = await moTrang(trinhDuyet, {
+    suaKho(kho) {
+      kho.rpc_apply_catalog_change_v2 = (body) => {
+        applyBodies.push(body);
+        return applyResult;
+      };
+    },
+  });
+  const { trang } = pageState;
+
+  await trang.waitForSelector("[data-cw-sua]", { timeout: 10_000 });
+  await trang.click("[data-cw-sua]");
+  await trang.waitForSelector("#cof-frequency_months", { timeout: 10_000 });
+  await trang.select("#cof-frequency_months", "6");
+  await trang.waitForSelector("#cof-ly-do", { timeout: 10_000 });
+  await trang.type("#cof-ly-do", "Điều chỉnh tần suất theo hồ sơ QA");
+  await trang.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((button) => button.textContent?.trim() === "Lưu" && !button.disabled), { timeout: 10_000 });
+  await trang.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Lưu")?.click());
+
+  await trang.waitForFunction((label) => [...document.querySelectorAll("div")]
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline")
+    && [...document.querySelectorAll('input[type="checkbox"]')]
+      .some((input) => input.getAttribute("aria-label") === label),
+  { timeout: 10_000 }, nhanChonDeadlineV2);
+
+  return { ...pageState, applyBodies };
+}
+
+async function chuanBiApDeadlineV2(trang) {
+  await trang.evaluate((label) => {
+    const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
+      .find((input) => input.getAttribute("aria-label") === label);
+    candidate?.click();
+  }, nhanChonDeadlineV2);
+  await trang.waitForFunction((label) => [...document.querySelectorAll('input[type="checkbox"]')]
+    .some((input) => input.getAttribute("aria-label") === label && input.checked),
+  { timeout: 10_000 }, nhanChonDeadlineV2);
+
+  const reasonSelector = 'input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]';
+  await trang.type(reasonSelector, LY_DO_AP_V2);
+  await trang.waitForFunction((selector, reason) => document.querySelector(selector)?.value === reason,
+    { timeout: 10_000 }, reasonSelector, LY_DO_AP_V2);
+
+  await trang.evaluate(() => {
+    const label = [...document.querySelectorAll("label")]
+      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn"));
+    label?.querySelector('input[type="checkbox"]')?.click();
+  });
+  await trang.waitForFunction((label, selector, reason) => {
+    const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
+      .find((input) => input.getAttribute("aria-label") === label);
+    const confirmation = [...document.querySelectorAll("label")]
+      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn"))
+      ?.querySelector('input[type="checkbox"]');
+    return candidate?.checked === true
+      && document.querySelector(selector)?.value === reason
+      && confirmation?.checked === true
+      && [...document.querySelectorAll("button")]
+        .some((button) => button.textContent?.trim() === "Áp vào timeline" && !button.disabled);
+  }, { timeout: 10_000 }, nhanChonDeadlineV2, reasonSelector, LY_DO_AP_V2);
+}
+
+async function bamApDeadlineV2(trang) {
+  await trang.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Áp vào timeline")?.click());
+}
+
+function expectedApplyBodyV2() {
+  return {
+    p_change_id: CHANGE_ID_V2,
+    p_reason: LY_DO_AP_V2,
+    p_expected_timeline_revision: REVISION_V2,
+    p_deadline_overrides: [{ validation_code: MA_HANG_MUC_V2, expected_item_version: VERSION_HANG_MUC_V2 }],
+    p_override_confirmed: true,
+  };
+}
+
 /* ---- 1. Đủ quyền: sáu mục, nút ghi, bảng ngữ nghĩa ------------------ */
 {
   console.log("Đủ quyền — cấu trúc sáu mục:");
@@ -543,6 +633,143 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   kiem(o.kv.giaTri !== "", "giá trị khu vực đang có của bản ghi được chọn sẵn", o.kv.giaTri);
 
   kiem(loiConsole.length === 0, "không lỗi console", loiConsole.join(" · ").slice(0, 160));
+  await trang.close();
+}
+
+/* ---- 9. V2: ghi đè deadline khi hạng mục đã có tiến độ -------------- */
+{
+  console.log("\nGhi đè deadline V2 — thành công:");
+  const { trang, loiConsole, chanNgoai, applyBodies } = await moXemTruocDeadlineV2({
+    ok: true,
+    so_tao: 0,
+    so_sua: 0,
+    so_dung: 0,
+    so_ghi_de_deadline: 1,
+    da_ap_truoc_do: false,
+  });
+
+  const preview = await trang.evaluate((label) => {
+    const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
+      .find((input) => input.getAttribute("aria-label") === label);
+    const article = candidate?.closest("article");
+    return { unchecked: candidate?.checked === false, text: article?.textContent ?? "" };
+  }, nhanChonDeadlineV2);
+  kiem(preview.unchecked, "candidate deadline V2 bắt đầu chưa được chọn");
+  for (const text of [
+    MA_HANG_MUC_V2,
+    "actual_validation_date: 20/03/2026",
+    "10/02/2026", "24/02/2026",
+    "20/02/2026", "05/03/2026",
+    "25/02/2026", "10/03/2026",
+    "28/02/2026", "15/03/2026",
+  ]) {
+    kiem(preview.text.includes(text), `candidate V2 hiển thị ${text}`, preview.text.slice(0, 240));
+  }
+
+  await chuanBiApDeadlineV2(trang);
+  await bamApDeadlineV2(trang);
+  await trang.waitForFunction(() => document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')
+    ?.textContent?.includes("Đã áp thay đổi vào timeline") === true, { timeout: 10_000 });
+  await trang.waitForFunction(() => ![...document.querySelectorAll("div")]
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+  const success = await trang.evaluate(() => ({
+    toast: document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')?.textContent ?? "",
+    dialogConMo: [...document.querySelectorAll("div")]
+      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+  }));
+  kiem(JSON.stringify(applyBodies) === JSON.stringify([expectedApplyBodyV2()]),
+    "apply V2 gửi đúng change/version/override/xác nhận", JSON.stringify(applyBodies));
+  kiem(success.toast.includes("Đã áp thay đổi vào timeline"), "toast báo áp timeline thành công", success.toast);
+  kiem(!success.dialogConMo, "áp thành công đóng hộp xem trước timeline");
+  kiem(loiConsole.length === 0, "không lỗi console ở luồng override V2", loiConsole.join(" · ").slice(0, 160));
+  kiem(chanNgoai.length === 0, "override V2 không gọi ra ngoài", chanNgoai[0] || "");
+  await trang.close();
+}
+
+const LOI_AP_DUNG_V2 = [
+  {
+    code: "MISSING_SOURCE_DATA",
+    response: {
+      ok: false,
+      error_code: "MISSING_SOURCE_DATA",
+      error: "Không tính đủ deadline cho CCTB01/2026.01-PQ",
+      missing: [{ validation_code: MA_HANG_MUC_V2, fields: ["Tháng thẩm định đầu tiên"] }],
+    },
+    phaiThay: ["Không tính đủ deadline cho CCTB01/2026.01-PQ", "thiếu: Tháng thẩm định đầu tiên"],
+    giuTrangThai: false,
+  },
+  {
+    code: "VERSION_CONFLICT",
+    response: {
+      ok: false,
+      error_code: "VERSION_CONFLICT",
+      error: "Timeline đã thay đổi, hãy xem trước lại",
+      details: [{ validation_code: MA_HANG_MUC_V2, expected_item_version: 7, current_item_version: 8 }],
+    },
+    phaiThay: ["Timeline đã thay đổi, hãy xem trước lại"],
+    giuTrangThai: true,
+  },
+  {
+    code: "ITEM_STATE_CHANGED",
+    response: {
+      ok: false,
+      error_code: "ITEM_STATE_CHANGED",
+      error: "Hạng mục CCTB01/2026.01-PQ đã đổi trạng thái, hãy xem trước lại",
+      details: [{ validation_code: MA_HANG_MUC_V2, expected_item_version: 7, current_item_version: 8 }],
+    },
+    phaiThay: ["Hạng mục CCTB01/2026.01-PQ đã đổi trạng thái, hãy xem trước lại"],
+    giuTrangThai: false,
+  },
+  {
+    code: "FORBIDDEN",
+    response: {
+      ok: false,
+      error_code: "FORBIDDEN",
+      error: "Chỉ Admin và Quản lý QA được cập nhật deadline của hạng mục đã có tiến độ",
+    },
+    phaiThay: ["Chỉ Admin và Quản lý QA được cập nhật deadline của hạng mục đã có tiến độ"],
+    giuTrangThai: false,
+  },
+];
+
+for (const scenario of LOI_AP_DUNG_V2) {
+  console.log(`\nGhi đè deadline V2 — ${scenario.code}:`);
+  const { trang, loiConsole, chanNgoai, applyBodies } = await moXemTruocDeadlineV2(scenario.response);
+  await chuanBiApDeadlineV2(trang);
+  await bamApDeadlineV2(trang);
+  await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
+  await trang.evaluate(() => new Promise((resolve) => requestAnimationFrame(
+    () => requestAnimationFrame(resolve),
+  )));
+
+  const failure = await trang.evaluate((label, reason) => {
+    const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
+      .find((input) => input.getAttribute("aria-label") === label);
+    const confirmation = [...document.querySelectorAll("label")]
+      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn"))
+      ?.querySelector('input[type="checkbox"]');
+    return {
+      alert: document.querySelector('[role="alert"]')?.textContent ?? "",
+      dialogConMo: [...document.querySelectorAll("div")]
+        .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+      candidateDuocChon: candidate?.checked === true,
+      lyDoConLai: document.querySelector('input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]')?.value === reason,
+      daXacNhan: confirmation?.checked === true,
+    };
+  }, nhanChonDeadlineV2, LY_DO_AP_V2);
+
+  for (const text of scenario.phaiThay) {
+    kiem(failure.alert.includes(text), `${scenario.code} hiện đúng lỗi: ${text}`, failure.alert);
+  }
+  kiem(failure.dialogConMo, `${scenario.code} giữ hộp xem trước mở`);
+  kiem(JSON.stringify(applyBodies) === JSON.stringify([expectedApplyBodyV2()]),
+    `${scenario.code} chỉ gọi đúng một mutation`, JSON.stringify(applyBodies));
+  if (scenario.giuTrangThai) {
+    kiem(failure.candidateDuocChon && failure.lyDoConLai && failure.daXacNhan,
+      "VERSION_CONFLICT giữ lựa chọn, lý do và xác nhận", JSON.stringify(failure));
+  }
+  kiem(loiConsole.length === 0, `${scenario.code} không lỗi console`, loiConsole.join(" · ").slice(0, 160));
+  kiem(chanNgoai.length === 0, `${scenario.code} không gọi ra ngoài`, chanNgoai[0] || "");
   await trang.close();
 }
 

@@ -64,6 +64,72 @@ const TEN_DOI_TUONG = [
   "Xe tải lạnh vận chuyển", "Máy đo độ hoà tan", "Cân phân tích",
 ];
 
+/* Fixture V2 cho luồng ghi đè deadline của hạng mục đã có tiến độ.  Mọi
+ * scenario E2E dùng cùng bản xem trước thật này; chỉ response apply được
+ * thay cục bộ theo từng boundary server. */
+const CHANGE_ID_TIMELINE_V2 = "change-v2-progressed";
+const TIMELINE_REVISION_V2 = 41;
+const VALIDATION_CODE_TIMELINE_V2 = "CCTB01/2026.01-PQ";
+const ITEM_VERSION_TIMELINE_V2 = 7;
+
+const UNG_VIEN_DEADLINE_DA_TIEN_DO = {
+  validation_code: VALIDATION_CODE_TIMELINE_V2,
+  item_version: ITEM_VERSION_TIMELINE_V2,
+  eligible: true,
+  blocker_code: null,
+  blocker_reason: null,
+  missing: [],
+  progress: {
+    actual_protocol_date: null,
+    actual_validation_date: "2026-03-20",
+    actual_report_date: null,
+    actual_vmp_date: null,
+    status_protocol: "chua",
+    status_validation: "completed",
+    status_report: "chua",
+    status_vmp: "chua",
+  },
+  deadline_protocol_cu: "2026-02-10",
+  deadline_protocol_moi: "2026-02-24",
+  deadline_validation_cu: "2026-02-20",
+  deadline_validation_moi: "2026-03-05",
+  deadline_report_cu: "2026-02-25",
+  deadline_report_moi: "2026-03-10",
+  deadline_vmp_cu: "2026-02-28",
+  deadline_vmp_moi: "2026-03-15",
+};
+
+const LUU_DANH_MUC_V2_OK = {
+  ok: true,
+  object_code: "TB-100",
+  version: 4,
+  change_id: CHANGE_ID_TIMELINE_V2,
+  timeline_revision: TIMELINE_REVISION_V2,
+  pending_timeline: true,
+};
+
+const XEM_TRUOC_TIMELINE_V2_OK = {
+  ok: true,
+  change_id: CHANGE_ID_TIMELINE_V2,
+  object_code: "TB-100",
+  timeline_revision: TIMELINE_REVISION_V2,
+  tao: [],
+  sua: [],
+  dung: [],
+  giu_nguyen: [],
+  canh_bao: [],
+  deadline_overrides: [UNG_VIEN_DEADLINE_DA_TIEN_DO],
+};
+
+const AP_DUNG_TIMELINE_V2_OK = {
+  ok: true,
+  so_tao: 0,
+  so_sua: 0,
+  so_dung: 0,
+  so_ghi_de_deadline: 1,
+  da_ap_truoc_do: false,
+};
+
 /** Ngày dạng chuỗi, lệch `lech` ngày so với mốc cố định của bộ kiểm.
  *  Dùng mốc cố định thay vì hôm nay để hai lần chạy cho cùng kết quả. */
 function ngay(lech) {
@@ -398,6 +464,9 @@ export function dungKhoDuLieu(kichBan) {
       ? [{ source_tab: "thiet_bi", rows: 12, columns: 9 }]
       : [],
     rpc_list_catalog_dataset: listCatalogDataset,
+    rpc_save_catalog_object: () => LUU_DANH_MUC_V2_OK,
+    rpc_preview_catalog_change_v2: () => XEM_TRUOC_TIMELINE_V2_OK,
+    rpc_apply_catalog_change_v2: () => AP_DUNG_TIMELINE_V2_OK,
     /* Phân công xưởng của MỘT hạng mục — WorkshopAssignmentInline đọc/ghi.
        Hình dạng phải qua được decodeAssignment/decodeDirectoryPerson. */
     rpc_item_assignments: {
