@@ -28,6 +28,12 @@ const CATALOG_V2_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const MANUAL_DEADLINE_REVIEWED_RPC = new Map([
+  ["rpc_update_planned_deadlines", {
+    identity: "rpc_update_planned_deadlines(text,jsonb,text,integer,boolean)",
+    classification: "guarded_explicit",
+  }],
+]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
   .join(",");
@@ -217,14 +223,22 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql",
     "utf8",
   );
-  for (const name of CATALOG_V2_REVIEWED_RPC.keys()) {
+  const manualDeadlineMigration = readFileSync(
+    "supabase/migrations/20260826170000_manual_planned_deadline_edit.sql",
+    "utf8",
+  );
+  for (const name of [...CATALOG_V2_REVIEWED_RPC.keys(), ...MANUAL_DEADLINE_REVIEWED_RPC.keys()]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
   }
-  const reviewedInventory = new Map([...migrationInventory, ...CATALOG_V2_REVIEWED_RPC]);
+  const reviewedInventory = new Map([
+    ...migrationInventory,
+    ...CATALOG_V2_REVIEWED_RPC,
+    ...MANUAL_DEADLINE_REVIEWED_RPC,
+  ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 64, "reviewed source HEAD must expose 64 literal RPC targets");
+  assert.equal(sourceNames.length, 65, "reviewed source HEAD must expose 65 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -237,6 +251,11 @@ test("every source RPC call has exactly one reviewed migration classification", 
   assert.match(catalogV2Migration, /create function public\.rpc_apply_catalog_change_v2\(\s*p_change_id uuid,\s*p_reason text,\s*p_expected_timeline_revision integer,\s*p_deadline_overrides jsonb,\s*p_override_confirmed boolean\s*\)/is);
   assert.match(catalogV2Migration, /grant execute on function public\.rpc_preview_catalog_change_v2\(uuid\) to authenticated,service_role;/i);
   assert.match(catalogV2Migration, /grant execute on function public\.rpc_apply_catalog_change_v2\(uuid,text,integer,jsonb,boolean\) to authenticated,service_role;/i);
+  assert.deepEqual(MANUAL_DEADLINE_REVIEWED_RPC, new Map([
+    ["rpc_update_planned_deadlines", { identity: "rpc_update_planned_deadlines(text,jsonb,text,integer,boolean)", classification: "guarded_explicit" }],
+  ]));
+  assert.match(manualDeadlineMigration, /create function public\.rpc_update_planned_deadlines\(\s*p_validation_code text,\s*p_deadlines jsonb,\s*p_reason text,\s*p_expected_version integer,\s*p_confirmed boolean\s*\)/is);
+  assert.match(manualDeadlineMigration, /grant execute on function public\.rpc_update_planned_deadlines\(\s*text\s*,\s*jsonb\s*,\s*text\s*,\s*integer\s*,\s*boolean\s*\)\s*to authenticated\s*,\s*service_role;/is);
 });
 
 test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {

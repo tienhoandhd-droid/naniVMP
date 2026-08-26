@@ -72,7 +72,9 @@ function hasValue(value: unknown): boolean {
 }
 
 function numeric(value: unknown): number | null {
-  const valueNumber = typeof value === "number" ? value : Number(String(value ?? "").trim());
+  const text = visible(value);
+  if (!text) return null;
+  const valueNumber = typeof value === "number" ? value : Number(text);
   return Number.isFinite(valueNumber) ? valueNumber : null;
 }
 

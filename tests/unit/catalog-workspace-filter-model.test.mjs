@@ -60,6 +60,19 @@ test("validation, first month, owner and frequency categories use their exact bo
   }).map((row) => row.object_code), ["TB-100", "QT-300"], "12 nằm ở nhóm 12 tháng hoặc ít hơn");
 });
 
+test("missing or blank frequency never becomes zero months", () => {
+  const missingFrequencyRows = [
+    { ...rows[0], id: "obj-null", object_code: "NULL", frequency_months: null },
+    { ...rows[0], id: "obj-blank", object_code: "BLANK", frequency_months: "   " },
+  ];
+  for (const frequency of ["lte12", "gt12"]) {
+    assert.deepEqual(filterCatalogObjects(missingFrequencyRows, {
+      ...CATALOG_OBJECT_FILTERS_ALL,
+      frequency,
+    }).map((row) => row.object_code), []);
+  }
+});
+
 test("visible owner option is normalized and matches exactly one owner", () => {
   const options = catalogObjectFilterOptions(rows);
   assert.deepEqual(options.departments, [{ value: "qa", label: "QA" }, { value: "xsx", label: "XSX" }]);

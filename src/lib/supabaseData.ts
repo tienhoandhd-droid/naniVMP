@@ -76,8 +76,8 @@ export async function updatePlannedDeadlines(
   const client = supabase;
   if (!client) throw new PlannedDeadlineTransportError("Supabase chưa cấu hình");
 
-  return updatePlannedDeadlinesViaRpc(async (rpcName, args) => {
-    const { data, error } = await client.rpc(rpcName as never, args as never);
+  return updatePlannedDeadlinesViaRpc(async (_rpcName, args) => {
+    const { data, error } = await client.rpc("rpc_update_planned_deadlines" as never, args as never);
     return { data, error: error ? { message: error.message } : null };
   }, input);
 }
