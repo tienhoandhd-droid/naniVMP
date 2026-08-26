@@ -24,9 +24,10 @@ function candidateStatus(candidate: AccountCandidate): string {
 }
 
 export function AccountCandidateOption({ candidate }: { candidate: AccountCandidate }) {
+  if (!candidate.is_active) return null;
   return (
     <option value={candidate.user_id}
-      disabled={!candidate.is_active || candidate.linked_person_id !== null}>
+      disabled={candidate.linked_person_id !== null}>
       {candidateLabel(candidate)} · {candidateStatus(candidate)}
     </option>
   );

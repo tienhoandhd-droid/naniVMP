@@ -19,6 +19,7 @@ import {
   type AccessClass,
   type DirectoryPerson,
 } from "./types.ts";
+import { visibleSortedDirectoryPeople } from "./accountListModel.ts";
 import {
   parsePermissionWorkbook,
   type ParsedPermissionRow,
@@ -202,7 +203,7 @@ export default function StaffDirectoryPanel({
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const people = await searchPermissionDirectory(query);
+        const people = visibleSortedDirectoryPeople(await searchPermissionDirectory(query));
         if (sequence === requestSequence.current) setResults(people);
       } catch (error) {
         if (sequence === requestSequence.current) setMessage((error as Error).message);
@@ -249,7 +250,7 @@ export default function StaffDirectoryPanel({
       targetPersonId: refreshPersonId,
       getCurrentSelectedPersonId: () => currentSelectedPersonId.current,
       knownPeople: knownPeople.current,
-      search: searchPermissionDirectory,
+      search: async (query) => visibleSortedDirectoryPeople(await searchPermissionDirectory(query)),
     }).then(({ person, shouldSelect }) => {
       if (!active) return;
       if (person) {
@@ -294,7 +295,7 @@ export default function StaffDirectoryPanel({
           submittedFullName,
           getCurrentSelectedPersonId: () => currentSelectedPersonId.current,
           knownPeople: knownPeople.current,
-          search: searchPermissionDirectory,
+          search: async (query) => visibleSortedDirectoryPeople(await searchPermissionDirectory(query)),
           onSelect: choose,
         });
       } catch (error) {
@@ -422,7 +423,7 @@ export default function StaffDirectoryPanel({
     setMessage("");
     try {
       const [people, scopeCatalog] = await Promise.all([
-        searchPermissionDirectory(""),
+        searchPermissionDirectory("").then(visibleSortedDirectoryPeople),
         loadScopeCatalog(),
       ]);
       const factoryLabel = new Map(scopeCatalog.factories.map((item) => [item.id, `${item.code} · ${item.label}`]));

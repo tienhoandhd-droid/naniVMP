@@ -116,7 +116,7 @@ test("chỉ Admin nhìn thấy thao tác nối tài khoản", async () => {
   assert.match(admin, /Lý do nối tài khoản/);
 });
 
-test("ứng viên tài khoản không hoạt động bị khóa và có nhãn trạng thái", async () => {
+test("ứng viên tài khoản không hoạt động không được dựng thành option", async () => {
   const { AccountCandidateOption } = await import(
     "../../src/features/itemPermissions/AccountLinkPanel.tsx"
   );
@@ -134,8 +134,67 @@ test("ứng viên tài khoản không hoạt động bị khóa và có nhãn tr
     }),
   ));
 
-  assert.match(markup, /disabled=""/);
-  assert.match(markup, /tài khoản không hoạt động/);
+  assert.doesNotMatch(markup, /user-inactive/);
+  assert.doesNotMatch(markup, /inactive@vmp\.local/);
+  assert.doesNotMatch(markup, /tài khoản không hoạt động/);
+});
+
+test("API tài khoản loại inactive và xếp candidates theo vai, tên, email, user_id", async () => {
+  const { prepareAccountCandidates } = await import(
+    "../../src/features/itemPermissions/api.ts"
+  );
+  const candidates = [
+    {
+      user_id: "user-viewer",
+      email: "viewer@vmp.local",
+      full_name: "Người Xem",
+      role: "viewer",
+      department: "qa",
+      is_active: true,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-inactive",
+      email: "inactive@vmp.local",
+      full_name: "Tài khoản không hoạt động",
+      role: "admin",
+      department: null,
+      is_active: false,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-admin-z",
+      email: "same@vmp.local",
+      full_name: "Đặng Thị Hồng Ngọc",
+      role: "admin",
+      department: null,
+      is_active: true,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-qa-manager",
+      email: "qa-manager@vmp.local",
+      full_name: "Quản lý QA",
+      role: "qa_manager",
+      department: "qa",
+      is_active: true,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-admin-a",
+      email: "same@vmp.local",
+      full_name: "Đặng Thị Hồng Ngọc",
+      role: "admin",
+      department: null,
+      is_active: true,
+      linked_person_id: null,
+    },
+  ];
+
+  assert.deepEqual(
+    prepareAccountCandidates(candidates).map((candidate) => candidate.user_id),
+    ["user-admin-a", "user-admin-z", "user-qa-manager", "user-viewer"],
+  );
 });
 
 test("hoàn tất nối muộn vẫn báo target A sau khi người dùng chọn B", async () => {

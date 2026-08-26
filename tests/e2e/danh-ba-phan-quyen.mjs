@@ -105,6 +105,88 @@ const duplicateSaved = {
   match_status: "ambiguous",
 };
 
+const inactiveDirectoryPerson = {
+  ...completePerson,
+  person_id: "aaaaaaaa-1111-4111-8111-000000000020",
+  full_name: "Ẩn Inactive E2E",
+  email: "inactive-directory-e2e@vmp.local",
+  account_status: "inactive",
+  access_class: "qa_manager",
+};
+
+const emptyDirectoryResults = [
+  {
+    ...completePerson,
+    person_id: "aaaaaaaa-1111-4111-8111-000000000023",
+    full_name: "Zulu Xưởng E2E",
+    email: "zulu-workshop-e2e@vmp.local",
+    access_class: "workshop_staff",
+  },
+  inactiveDirectoryPerson,
+  {
+    ...completePerson,
+    person_id: "aaaaaaaa-1111-4111-8111-000000000022",
+    full_name: "Thiết Bị E2E",
+    email: "equipment-e2e@vmp.local",
+    access_class: "equipment_manager",
+  },
+  {
+    ...completePerson,
+    person_id: "aaaaaaaa-1111-4111-8111-000000000021",
+    user_id: null,
+    full_name: "Alpha Xưởng E2E",
+    email: "unlinked-e2e@vmp.local",
+    account_status: "unlinked",
+    access_class: "workshop_staff",
+  },
+  {
+    ...completePerson,
+    person_id: "aaaaaaaa-1111-4111-8111-000000000024",
+    full_name: "QA A E2E",
+    email: "qa-a-e2e@vmp.local",
+    access_class: "qa_manager",
+  },
+];
+
+const accountCandidatesE2E = [
+  {
+    user_id: "user-viewer-e2e",
+    email: "viewer-e2e@vmp.local",
+    full_name: "Zulu Viewer E2E",
+    role: "viewer",
+    department: "qa",
+    is_active: true,
+    linked_person_id: null,
+  },
+  {
+    user_id: "user-inactive-e2e",
+    email: "inactive-candidate-e2e@vmp.local",
+    full_name: "Ứng viên inactive E2E",
+    role: "admin",
+    department: null,
+    is_active: false,
+    linked_person_id: null,
+  },
+  {
+    user_id: "user-qa-manager-e2e",
+    email: "qa-manager-e2e@vmp.local",
+    full_name: "QA Manager E2E",
+    role: "qa_manager",
+    department: "qa",
+    is_active: true,
+    linked_person_id: null,
+  },
+  {
+    user_id: "user-admin-e2e",
+    email: "admin-e2e@vmp.local",
+    full_name: "Admin E2E",
+    role: "admin",
+    department: null,
+    is_active: true,
+    linked_person_id: null,
+  },
+];
+
 const assignmentFor = (person, validationCode, assignmentKind = "equipment_department", assignmentRole = null) => ({
   assignment_id: `cccccccc-3333-4333-8333-${validationCode === "A-LATE" ? "000000000001" : "000000000002"}`,
   validation_code: validationCode,
@@ -193,7 +275,8 @@ page.on("request", (request) => {
         ? [{ ...legacyPerson, user_id: legacyLinked ? "dddddddd-4444-4444-8444-444444444444" : null,
           account_status: legacyLinked ? "linked" : "unlinked", version: legacyLinked ? 2 : 1 }]
         : query.includes("QA") ? [qaPerson]
-        : query.includes("Hồng") ? [completePerson] : [duplicateFirst, duplicateSaved];
+        : query.includes("Hồng") ? [completePerson]
+          : query === "" ? emptyDirectoryResults : [duplicateFirst, duplicateSaved];
     return answer(request, { ok: true, people });
   }
   if (/\/rpc\/rpc_item_permission_preflight/.test(url)) {
@@ -278,7 +361,8 @@ page.on("request", (request) => {
     return answer(request, { ok: true, action: "assign" });
   }
   if (/\/rpc\/rpc_item_permission_account_candidates/.test(url)) {
-    return answer(request, { ok: true, accounts: [{
+    const body = JSON.parse(request.postData() || "{}");
+    const accounts = String(body.p_query || "").includes("Legacy") ? [{
       user_id: "dddddddd-4444-4444-8444-444444444444",
       email: "legacy.link@vmp.local",
       full_name: "Tài khoản Legacy",
@@ -286,7 +370,8 @@ page.on("request", (request) => {
       department: "qa",
       is_active: true,
       linked_person_id: null,
-    }] });
+    }] : accountCandidatesE2E;
+    return answer(request, { ok: true, accounts });
   }
   if (/\/rpc\/rpc_link_item_permission_account/.test(url)) {
     if (request.method() !== "OPTIONS") {
@@ -393,6 +478,31 @@ try {
        và quyền. Bám "Danh bạ chuẩn" — tiêu đề panel, ổn định hơn tên thẻ. */
     () => document.body.innerText.includes("Danh bạ chuẩn"),
     { timeout: 15000 },
+  );
+  await page.waitForFunction(() => document.querySelectorAll("#ip-directory-results button").length === 4);
+  assert.equal(await documentContains("Ẩn Inactive E2E"), false,
+    "danh bạ không dựng hồ sơ có tài khoản inactive");
+  assert.equal(await documentContains("Alpha Xưởng E2E"), true,
+    "danh bạ vẫn giữ người chưa nối tài khoản");
+  assert.deepEqual(
+    await page.$$eval("#ip-directory-results button", (buttons) => buttons.map(
+      (button) => button.querySelector("b")?.textContent,
+    )),
+    ["QA A E2E · RD", "Thiết Bị E2E · RD", "Alpha Xưởng E2E · RD", "Zulu Xưởng E2E · RD"],
+    "danh bạ hiển thị theo vai rồi tên, không theo thứ tự RPC",
+  );
+  await page.evaluate(() => [...document.querySelectorAll("#ip-directory-results button")]
+    .find((button) => button.textContent?.includes("unlinked-e2e@vmp.local"))?.click());
+  await page.type('[aria-label="Tìm tài khoản để nối"]', "E2E");
+  await page.waitForFunction(() => document.querySelectorAll(
+    '[aria-label="Tài khoản sẽ nối"] option[value]'
+  ).length === 4);
+  assert.equal(await documentContains("Ứng viên inactive E2E"), false,
+    "tìm tài khoản không dựng candidate inactive");
+  assert.deepEqual(
+    await page.$$eval('[aria-label="Tài khoản sẽ nối"] option', (options) => options.map((option) => option.value)),
+    ["", "user-admin-e2e", "user-qa-manager-e2e", "user-viewer-e2e"],
+    "candidate active hiển thị theo vai rồi tên, không theo thứ tự RPC",
   );
   /* Thẻ "1 · Ai được phép có tài khoản" nay là TÍNH NĂNG có chủ đích cho
      admin (đưa lên web 18/08): thêm email vào whitelist là bước ① của việc

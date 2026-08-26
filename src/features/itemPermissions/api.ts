@@ -15,6 +15,7 @@ import {
   type RightsBasis,
 } from "./types.ts";
 import type { RootScopeOption, ScopeCatalog, ScopeOption } from "./scopeHierarchy.ts";
+import { visibleSortedAccountCandidates } from "./accountListModel.ts";
 
 type JsonObject = Record<string, unknown>;
 
@@ -283,10 +284,16 @@ export async function searchActivePerformers(query = ""): Promise<DirectoryPerso
   return (await searchPermissionDirectory(query)).filter((person) => person.is_active);
 }
 
+export function prepareAccountCandidates(
+  candidates: readonly AccountCandidate[],
+): AccountCandidate[] {
+  return visibleSortedAccountCandidates(candidates);
+}
+
 export async function searchAccountCandidates(query = ""): Promise<AccountCandidate[]> {
   const payload = await callRpc("rpc_item_permission_account_candidates", { p_query: query });
   if (!Array.isArray(payload.accounts)) throw new Error("Kết quả tài khoản thiếu accounts");
-  return payload.accounts.map(decodeAccountCandidate);
+  return prepareAccountCandidates(payload.accounts.map(decodeAccountCandidate));
 }
 
 export function createLinkPermissionAccountArgs(
