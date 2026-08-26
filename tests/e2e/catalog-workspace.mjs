@@ -1100,6 +1100,10 @@ for (const scenario of LOI_AP_DUNG_V2) {
   });
   await trang.waitForFunction(() => [...document.querySelectorAll("div")]
     .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+  /* Tiêu đề hộp thoại xuất hiện ngay khi effect preview BẮT ĐẦU, nên không
+     chứng minh fallback V1 đã trả về. Đợi hết trạng thái tải — khi đó RPC
+     V1 đã được mock ghi nhận trước lúc React vẽ kết quả. */
+  await trang.waitForFunction(() => !document.body.innerText.includes("Đang tính ảnh hưởng…"), { timeout: 10_000 });
   const state = await trang.evaluate((label) => ({
     hasOverrideCheckbox: [...document.querySelectorAll('input[type="checkbox"]')]
       .some((input) => input.getAttribute("aria-label") === label),
