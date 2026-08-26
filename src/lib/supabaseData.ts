@@ -1164,7 +1164,7 @@ function goiRpc() {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
   return supabase.rpc.bind(supabase) as unknown as (
     fn: string, args: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
 }
 
 export async function previewCatalogChange(changeId: string): Promise<AnhHuongTimeline> {
@@ -1187,6 +1187,7 @@ export async function applyCatalogChange(
 
 export async function previewCatalogChangeV2(changeId: string): Promise<AnhHuongTimelineV2> {
   const { data, error } = await goiRpc()("rpc_preview_catalog_change_v2", { p_change_id: changeId });
+  if (error && maLoiThieuHam(error)) return asShape<AnhHuongTimelineV2>(await previewCatalogChange(changeId));
   if (error) throw new Error("Không xem trước được ảnh hưởng: " + error.message);
   return asShape<AnhHuongTimelineV2>(data);
 }
@@ -1201,6 +1202,11 @@ export async function applyCatalogChangeV2(
     p_deadline_overrides: input.deadlineOverrides,
     p_override_confirmed: input.overrideConfirmed,
   });
+  if (error && maLoiThieuHam(error) && input.deadlineOverrides.length === 0) {
+    return asShape<KetQuaApDungV2>(await applyCatalogChange(
+      input.changeId, input.reason, input.expectedTimelineRevision,
+    ));
+  }
   if (error) throw new Error("Áp vào timeline thất bại: " + error.message);
   return asShape<KetQuaApDungV2>(data);
 }
@@ -1224,6 +1230,10 @@ export type UiAccessKetQua =
 /** Mã lỗi PostgREST/Postgres khi hàm chưa tồn tại trong schema. */
 const MA_LOI_THIEU_HAM = new Set(["PGRST202", "42883"]);
 
+function maLoiThieuHam(error: { code?: string } | null): boolean {
+  return error?.code !== undefined && MA_LOI_THIEU_HAM.has(error.code);
+}
+
 export async function fetchUiAccess(): Promise<UiAccessKetQua> {
   if (!supabase) return { trangThai: "loi", thongDiep: "Supabase chưa cấu hình" };
 
@@ -1243,7 +1253,7 @@ export async function fetchUiAccess(): Promise<UiAccessKetQua> {
   const { data, error } = await goi("rpc_my_ui_access");
 
   if (error) {
-    if (error.code && MA_LOI_THIEU_HAM.has(error.code)) return { trangThai: "chua_co_rpc" };
+    if (maLoiThieuHam(error)) return { trangThai: "chua_co_rpc" };
     return { trangThai: "loi", thongDiep: error.message };
   }
   if (data == null) return { trangThai: "chua_co_rpc" };

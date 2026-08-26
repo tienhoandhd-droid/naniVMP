@@ -255,6 +255,115 @@ function expectedApplySuccessV2() {
   };
 }
 
+const XEM_TRUOC_V1_OK = {
+  ok: true,
+  change_id: CHANGE_ID_V2,
+  object_code: "CCTB01",
+  timeline_revision: REVISION_V2,
+  tao: [],
+  sua: [{
+    validation_code: MA_HANG_MUC_V2,
+    validation_type: "PQ",
+    deadline_vmp_cu: "2026-08-31",
+    deadline_vmp_moi: "2026-03-31",
+  }],
+  dung: [],
+  giu_nguyen: [],
+  canh_bao: [],
+};
+
+const XEM_TRUOC_V2_CO_GHI_DE = {
+  ...XEM_TRUOC_V1_OK,
+  sua: [],
+  giu_nguyen: [{
+    validation_code: MA_HANG_MUC_V2,
+    ly_do: "Đã có tiến độ; chỉ cập nhật deadline kế hoạch khi xác nhận đặc biệt",
+  }],
+  deadline_overrides: [{
+    validation_code: MA_HANG_MUC_V2,
+    item_version: VERSION_HANG_MUC_V2,
+    eligible: true,
+    blocker_code: null,
+    blocker_reason: null,
+    missing: [],
+    progress: {
+      actual_protocol_date: null, actual_validation_date: "2026-03-20",
+      actual_report_date: null, actual_vmp_date: null,
+      status_protocol: "chua", status_validation: "completed",
+      status_report: "chua", status_vmp: "chua",
+    },
+    deadline_protocol_cu: "2026-06-30", deadline_protocol_moi: "2026-01-18",
+    deadline_validation_cu: "2026-07-31", deadline_validation_moi: "2026-03-24",
+    deadline_report_cu: "2026-08-15", deadline_report_moi: "2026-03-26",
+    deadline_vmp_cu: "2026-08-31", deadline_vmp_moi: "2026-03-31",
+  }],
+};
+
+const AP_DUNG_V1_OK = {
+  ok: true,
+  so_tao: 0,
+  so_sua: 1,
+  so_dung: 0,
+  so_giu_nguyen: 0,
+};
+
+function expectedApplyBodyV1() {
+  return {
+    p_change_id: CHANGE_ID_V2,
+    p_reason: LY_DO_AP_V2,
+    p_expected_timeline_revision: REVISION_V2,
+  };
+}
+
+async function moXemTruocFallbackV2({ previewV2Error, applyV2Error, previewV2 = XEM_TRUOC_V1_OK } = {}) {
+  const v1PreviewBodies = [];
+  const v1ApplyBodies = [];
+  const v2PreviewBodies = [];
+  const v2ApplyBodies = [];
+  const pageState = await moTrang(trinhDuyet, {
+    suaKho(kho) {
+      const source = kho.vmp_source_objects[0];
+      Object.assign(source, {
+        code: "CCTB01", object_code: "CCTB01", obj: "CCTB01",
+        object_name: "Thiết bị deadline có tiến độ", name: "Thiết bị deadline có tiến độ",
+        objName: "Thiết bị deadline có tiến độ", frequency_months: 12, first_month: 3, version: 4,
+      });
+      if (previewV2Error || applyV2Error) {
+        kho.rpc_errors = {
+          ...(previewV2Error ? { rpc_preview_catalog_change_v2: previewV2Error } : {}),
+          ...(applyV2Error ? { rpc_apply_catalog_change_v2: applyV2Error } : {}),
+        };
+      }
+      kho.rpc_preview_catalog_change_v2 = (body) => { v2PreviewBodies.push(body); return previewV2; };
+      kho.rpc_apply_catalog_change_v2 = (body) => { v2ApplyBodies.push(body); return AP_DUNG_V1_OK; };
+      kho.rpc_preview_catalog_change = (body) => { v1PreviewBodies.push(body); return XEM_TRUOC_V1_OK; };
+      kho.rpc_apply_catalog_change = (body) => { v1ApplyBodies.push(body); return AP_DUNG_V1_OK; };
+    },
+  });
+  const { trang } = pageState;
+  await trang.waitForSelector("[data-cw-sua]", { timeout: 10_000 });
+  await trang.click("[data-cw-sua]");
+  await trang.waitForSelector("#cof-frequency_months", { timeout: 10_000 });
+  await trang.select("#cof-frequency_months", "6");
+  await trang.waitForSelector("#cof-ly-do", { timeout: 10_000 });
+  await trang.type("#cof-ly-do", "Điều chỉnh tần suất theo hồ sơ QA");
+  await trang.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((button) => button.textContent?.trim() === "Lưu" && !button.disabled), { timeout: 10_000 });
+  await trang.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Lưu")?.click());
+  return { ...pageState, v1PreviewBodies, v1ApplyBodies, v2PreviewBodies, v2ApplyBodies };
+}
+
+async function chuanBiApV1(trang) {
+  const reasonSelector = 'input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]';
+  await trang.waitForSelector(reasonSelector, { timeout: 10_000 });
+  await trang.type(reasonSelector, LY_DO_AP_V2);
+  await trang.waitForFunction((selector, reason) => document.querySelector(selector)?.value === reason,
+    { timeout: 10_000 }, reasonSelector, LY_DO_AP_V2);
+  await trang.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((button) => button.textContent?.trim() === "Áp vào timeline" && !button.disabled), { timeout: 10_000 });
+}
+
 /* ---- 1. Đủ quyền: sáu mục, nút ghi, bảng ngữ nghĩa ------------------ */
 {
   console.log("Đủ quyền — cấu trúc sáu mục:");
@@ -864,6 +973,90 @@ for (const scenario of LOI_AP_DUNG_V2) {
   }
   kiem(loiConsole.length === 0, `${scenario.code} không lỗi console`, loiConsole.join(" · ").slice(0, 160));
   kiem(chanNgoai.length === 0, `${scenario.code} không gọi ra ngoài`, chanNgoai[0] || "");
+  await trang.close();
+}
+
+/* ---- 10. V2 chưa có: chỉ fallback chính xác, không hạ an toàn -------- */
+{
+  console.log("\nCatalog V2 fallback — preview PGRST202:");
+  const { trang, loiConsole, chanNgoai, v1PreviewBodies, v1ApplyBodies } = await moXemTruocFallbackV2({
+    previewV2Error: { status: 404, code: "PGRST202", message: "V2 chưa được triển khai" },
+  });
+  await trang.waitForFunction(() => [...document.querySelectorAll("div")]
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+  const state = await trang.evaluate((label) => ({
+    hasOverrideCheckbox: [...document.querySelectorAll('input[type="checkbox"]')]
+      .some((input) => input.getAttribute("aria-label") === label),
+    hasAlert: !!document.querySelector('[role="alert"]'),
+  }), nhanChonDeadlineV2);
+  kiem(JSON.stringify(v1PreviewBodies) === JSON.stringify([{ p_change_id: CHANGE_ID_V2 }]),
+    "PGRST202 preview chỉ fallback V1 với đúng change id", JSON.stringify(v1PreviewBodies));
+  kiem(v1ApplyBodies.length === 0, "PGRST202 preview chưa tạo mutation V1");
+  kiem(!state.hasOverrideCheckbox, "preview V1 không mở lối ghi đè deadline");
+  kiem(!state.hasAlert, "PGRST202 preview fallback không báo lỗi giả");
+  kiem(chanNgoai.length === 0, "PGRST202 preview fallback không gọi ra ngoài", chanNgoai[0] || "");
+  await trang.close();
+}
+
+{
+  console.log("\nCatalog V2 fallback — apply 42883 không có override:");
+  const { trang, loiConsole, chanNgoai, v1ApplyBodies } = await moXemTruocFallbackV2({
+    applyV2Error: { status: 404, code: "42883", message: "V2 chưa được triển khai" },
+  });
+  await trang.waitForFunction(() => [...document.querySelectorAll("div")]
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+  await chuanBiApV1(trang);
+  await bamApDeadlineV2(trang);
+  await trang.waitForFunction(() => document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')
+    ?.textContent?.includes("Đã áp thay đổi vào timeline") === true, { timeout: 10_000 });
+  kiem(JSON.stringify(v1ApplyBodies) === JSON.stringify([expectedApplyBodyV1()]),
+    "42883 apply fallback giữ nguyên body V1", JSON.stringify(v1ApplyBodies));
+  kiem(chanNgoai.length === 0, "42883 apply fallback không gọi ra ngoài", chanNgoai[0] || "");
+  await trang.close();
+}
+
+{
+  console.log("\nCatalog V2 fallback — PGRST203 không được hạ về V1:");
+  const { trang, loiConsole, chanNgoai, v1PreviewBodies, v1ApplyBodies } = await moXemTruocFallbackV2({
+    previewV2Error: { status: 400, code: "PGRST203", message: "RPC overload mơ hồ" },
+  });
+  await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
+  const state = await trang.evaluate(() => ({
+    alert: document.querySelector('[role="alert"]')?.textContent ?? "",
+    dialogOpen: [...document.querySelectorAll("div")]
+      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+  }));
+  kiem(v1PreviewBodies.length === 0 && v1ApplyBodies.length === 0,
+    "PGRST203 không gọi bất kỳ RPC V1 nào", JSON.stringify({ v1PreviewBodies, v1ApplyBodies }));
+  kiem(state.dialogOpen && state.alert.includes("RPC overload mơ hồ"),
+    "PGRST203 giữ hộp và hiện lỗi thật", JSON.stringify(state));
+  kiem(chanNgoai.length === 0, "PGRST203 không gọi ra ngoài", chanNgoai[0] || "");
+  await trang.close();
+}
+
+{
+  console.log("\nCatalog V2 fallback — đã chọn override thì phải chặn:");
+  const { trang, loiConsole, chanNgoai, v1ApplyBodies } = await moXemTruocFallbackV2({
+    applyV2Error: { status: 404, code: "PGRST202", message: "V2 chưa được triển khai" },
+    previewV2: XEM_TRUOC_V2_CO_GHI_DE,
+  });
+  await trang.waitForFunction((label) => [...document.querySelectorAll('input[type="checkbox"]')]
+    .some((input) => input.getAttribute("aria-label") === label), { timeout: 10_000 }, nhanChonDeadlineV2);
+  await chuanBiApDeadlineV2(trang);
+  await bamApDeadlineV2(trang);
+  await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
+  const state = await trang.evaluate((label, reason) => ({
+    alert: document.querySelector('[role="alert"]')?.textContent ?? "",
+    dialogOpen: [...document.querySelectorAll("div")]
+      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+    selected: [...document.querySelectorAll('input[type="checkbox"]')]
+      .some((input) => input.getAttribute("aria-label") === label && input.checked),
+    reason: document.querySelector('input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]')?.value === reason,
+  }), nhanChonDeadlineV2, LY_DO_AP_V2);
+  kiem(v1ApplyBodies.length === 0, "override đã chọn không được fallback sang V1");
+  kiem(state.dialogOpen && state.selected && state.reason && state.alert.includes("V2 chưa được triển khai"),
+    "override bị chặn nhưng giữ nguyên bằng chứng người dùng đã nhập", JSON.stringify(state));
+  kiem(chanNgoai.length === 0, "override bị chặn không gọi ra ngoài", chanNgoai[0] || "");
   await trang.close();
 }
 

@@ -670,7 +670,10 @@ export function traLoi(kho, u, req) {
     if (loi) return {
       status: Number(loi.status) || 500,
       headers: dau,
-      body: JSON.stringify({ message: loi.message || "RPC giả lập lỗi" }),
+      body: JSON.stringify({
+        ...(loi.code ? { code: loi.code } : {}),
+        message: loi.message || "RPC giả lập lỗi",
+      }),
     };
     const co = Object.prototype.hasOwnProperty.call(kho, ten);
     // RPC chưa dựng sẵn trả null thay vì lỗi: màn nào dùng nó phải tự
