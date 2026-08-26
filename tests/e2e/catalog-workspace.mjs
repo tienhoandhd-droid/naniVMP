@@ -90,8 +90,8 @@ const trinhDuyet = await puppeteer.launch({
 });
 
 /* ---- Hợp đồng V2: ghi đè deadline hạng mục đã có tiến độ ------------- */
-const CHANGE_ID_V2 = "change-v2-progressed";
-const REVISION_V2 = 41;
+const CHANGE_ID_V2 = "94000000-0000-4000-8000-000000000001";
+const REVISION_V2 = 3;
 const MA_HANG_MUC_V2 = "CCTB01/2026.01-PQ";
 const VERSION_HANG_MUC_V2 = 7;
 const LY_DO_AP_V2 = "Xác nhận theo biên bản QA-26/08";
@@ -100,11 +100,43 @@ const nhanChonDeadlineV2 = `Chọn cập nhật deadline ${MA_HANG_MUC_V2}`;
 
 async function moXemTruocDeadlineV2(applyResult) {
   const applyBodies = [];
+  const applyResults = [];
+  const previewBodies = [];
+  const previewResults = [];
+  const saveBodies = [];
+  const saveResults = [];
   const pageState = await moTrang(trinhDuyet, {
     suaKho(kho) {
+      const source = kho.vmp_source_objects[0];
+      Object.assign(source, {
+        code: "CCTB01",
+        object_code: "CCTB01",
+        obj: "CCTB01",
+        object_name: "Thiết bị deadline có tiến độ",
+        name: "Thiết bị deadline có tiến độ",
+        objName: "Thiết bị deadline có tiến độ",
+        frequency_months: 12,
+        first_month: 3,
+        version: 4,
+      });
+      const save = kho.rpc_save_catalog_object;
+      const preview = kho.rpc_preview_catalog_change_v2;
+      const apply = kho.rpc_apply_catalog_change_v2;
+      kho.rpc_save_catalog_object = (body) => {
+        const result = save(body);
+        saveBodies.push(body); saveResults.push(result);
+        return result;
+      };
+      kho.rpc_preview_catalog_change_v2 = (body) => {
+        const result = preview(body);
+        previewBodies.push(body); previewResults.push(result);
+        return result;
+      };
       kho.rpc_apply_catalog_change_v2 = (body) => {
+        const result = applyResult ?? apply(body);
         applyBodies.push(body);
-        return applyResult;
+        applyResults.push(result);
+        return result;
       };
     },
   });
@@ -127,7 +159,7 @@ async function moXemTruocDeadlineV2(applyResult) {
       .some((input) => input.getAttribute("aria-label") === label),
   { timeout: 10_000 }, nhanChonDeadlineV2);
 
-  return { ...pageState, applyBodies };
+  return { ...pageState, applyBodies, applyResults, previewBodies, previewResults, saveBodies, saveResults };
 }
 
 async function chuanBiApDeadlineV2(trang) {
@@ -176,6 +208,50 @@ function expectedApplyBodyV2() {
     p_expected_timeline_revision: REVISION_V2,
     p_deadline_overrides: [{ validation_code: MA_HANG_MUC_V2, expected_item_version: VERSION_HANG_MUC_V2 }],
     p_override_confirmed: true,
+  };
+}
+
+function expectedSaveResultV2() {
+  return {
+    ok: true,
+    object_code: "CCTB01",
+    version: 4,
+    change_id: CHANGE_ID_V2,
+    timeline_revision: REVISION_V2,
+    pending_timeline: true,
+  };
+}
+
+function expectedApplySuccessV2() {
+  return {
+    ok: true,
+    change_id: CHANGE_ID_V2,
+    object_code: "CCTB01",
+    so_tao: 0,
+    so_sua: 0,
+    so_dung: 0,
+    so_giu_nguyen: 1,
+    so_deadline_override: 1,
+    timeline_revision: REVISION_V2,
+    actor_id: "00000000-0000-4000-8000-000000000001",
+    effective_role: "admin",
+    reason: LY_DO_AP_V2,
+    deadline_overrides: [{
+      validation_code: MA_HANG_MUC_V2,
+      item_version_cu: VERSION_HANG_MUC_V2,
+      item_version_moi: 8,
+      deadline_protocol_cu: "2026-06-30",
+      deadline_protocol_moi: "2026-01-18",
+      deadline_validation_cu: "2026-07-31",
+      deadline_validation_moi: "2026-03-24",
+      deadline_report_cu: "2026-08-15",
+      deadline_report_moi: "2026-03-26",
+      deadline_vmp_cu: "2026-08-31",
+      deadline_vmp_moi: "2026-03-31",
+      actual_dates_unchanged: true,
+      statuses_unchanged: true,
+    }],
+    da_ap_truoc_do: false,
   };
 }
 
@@ -639,14 +715,9 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
 /* ---- 9. V2: ghi đè deadline khi hạng mục đã có tiến độ -------------- */
 {
   console.log("\nGhi đè deadline V2 — thành công:");
-  const { trang, loiConsole, chanNgoai, applyBodies } = await moXemTruocDeadlineV2({
-    ok: true,
-    so_tao: 0,
-    so_sua: 0,
-    so_dung: 0,
-    so_ghi_de_deadline: 1,
-    da_ap_truoc_do: false,
-  });
+  const {
+    trang, loiConsole, chanNgoai, applyBodies, applyResults, previewBodies, previewResults, saveBodies, saveResults,
+  } = await moXemTruocDeadlineV2();
 
   const preview = await trang.evaluate((label) => {
     const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
@@ -658,13 +729,28 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   for (const text of [
     MA_HANG_MUC_V2,
     "actual_validation_date: 20/03/2026",
-    "10/02/2026", "24/02/2026",
-    "20/02/2026", "05/03/2026",
-    "25/02/2026", "10/03/2026",
-    "28/02/2026", "15/03/2026",
+    "30/06/2026", "18/01/2026",
+    "31/07/2026", "24/03/2026",
+    "15/08/2026", "26/03/2026",
+    "31/08/2026", "31/03/2026",
   ]) {
     kiem(preview.text.includes(text), `candidate V2 hiển thị ${text}`, preview.text.slice(0, 240));
   }
+  kiem(JSON.stringify(saveBodies.map((body) => body?.p_object_code)) === JSON.stringify(["CCTB01"]),
+    "save V2 liên kết cùng đối tượng CCTB01", JSON.stringify(saveBodies));
+  kiem(JSON.stringify(saveResults) === JSON.stringify([expectedSaveResultV2()]),
+    "save V2 trả UUID/change/revision đã duyệt", JSON.stringify(saveResults));
+  kiem(JSON.stringify(previewBodies) === JSON.stringify([{ p_change_id: CHANGE_ID_V2 }]),
+    "preview V2 dùng đúng UUID change đã lưu", JSON.stringify(previewBodies));
+  kiem(previewResults.length === 1
+    && previewResults[0]?.object_code === "CCTB01"
+    && previewResults[0]?.change_id === CHANGE_ID_V2
+    && previewResults[0]?.timeline_revision === REVISION_V2
+    && JSON.stringify(previewResults[0]?.giu_nguyen) === JSON.stringify([{
+      validation_code: MA_HANG_MUC_V2,
+      ly_do: "Đã có tiến độ; chỉ cập nhật deadline kế hoạch khi xác nhận đặc biệt",
+    }]),
+  "preview V2 giữ base giu_nguyen cùng candidate progressed", JSON.stringify(previewResults));
 
   await chuanBiApDeadlineV2(trang);
   await bamApDeadlineV2(trang);
@@ -679,6 +765,8 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   }));
   kiem(JSON.stringify(applyBodies) === JSON.stringify([expectedApplyBodyV2()]),
     "apply V2 gửi đúng change/version/override/xác nhận", JSON.stringify(applyBodies));
+  kiem(JSON.stringify(applyResults) === JSON.stringify([expectedApplySuccessV2()]),
+    "apply V2 trả đủ hợp đồng so_deadline_override đã duyệt", JSON.stringify(applyResults));
   kiem(success.toast.includes("Đã áp thay đổi vào timeline"), "toast báo áp timeline thành công", success.toast);
   kiem(!success.dialogConMo, "áp thành công đóng hộp xem trước timeline");
   kiem(loiConsole.length === 0, "không lỗi console ở luồng override V2", loiConsole.join(" · ").slice(0, 160));
@@ -703,10 +791,11 @@ const LOI_AP_DUNG_V2 = [
     response: {
       ok: false,
       error_code: "VERSION_CONFLICT",
-      error: "Timeline đã thay đổi, hãy xem trước lại",
-      details: [{ validation_code: MA_HANG_MUC_V2, expected_item_version: 7, current_item_version: 8 }],
+      error: "Timeline đã đổi — xem trước lại",
+      expected_timeline_revision: REVISION_V2,
+      current_timeline_revision: 4,
     },
-    phaiThay: ["Timeline đã thay đổi, hãy xem trước lại"],
+    phaiThay: ["Timeline đã đổi — xem trước lại"],
     giuTrangThai: true,
   },
   {
@@ -714,10 +803,13 @@ const LOI_AP_DUNG_V2 = [
     response: {
       ok: false,
       error_code: "ITEM_STATE_CHANGED",
-      error: "Hạng mục CCTB01/2026.01-PQ đã đổi trạng thái, hãy xem trước lại",
-      details: [{ validation_code: MA_HANG_MUC_V2, expected_item_version: 7, current_item_version: 8 }],
+      error: "Hạng mục CCTB01/2026.01-PQ đã đổi sau khi xem trước; hãy xem trước lại",
+      validation_code: MA_HANG_MUC_V2,
+      expected_item_version: VERSION_HANG_MUC_V2,
+      current_item_version: 8,
+      requires_fresh_preview: true,
     },
-    phaiThay: ["Hạng mục CCTB01/2026.01-PQ đã đổi trạng thái, hãy xem trước lại"],
+    phaiThay: ["Hạng mục CCTB01/2026.01-PQ đã đổi sau khi xem trước; hãy xem trước lại"],
     giuTrangThai: false,
   },
   {
@@ -734,7 +826,7 @@ const LOI_AP_DUNG_V2 = [
 
 for (const scenario of LOI_AP_DUNG_V2) {
   console.log(`\nGhi đè deadline V2 — ${scenario.code}:`);
-  const { trang, loiConsole, chanNgoai, applyBodies } = await moXemTruocDeadlineV2(scenario.response);
+  const { trang, loiConsole, chanNgoai, applyBodies, applyResults } = await moXemTruocDeadlineV2(scenario.response);
   await chuanBiApDeadlineV2(trang);
   await bamApDeadlineV2(trang);
   await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
@@ -764,6 +856,8 @@ for (const scenario of LOI_AP_DUNG_V2) {
   kiem(failure.dialogConMo, `${scenario.code} giữ hộp xem trước mở`);
   kiem(JSON.stringify(applyBodies) === JSON.stringify([expectedApplyBodyV2()]),
     `${scenario.code} chỉ gọi đúng một mutation`, JSON.stringify(applyBodies));
+  kiem(JSON.stringify(applyResults) === JSON.stringify([scenario.response]),
+    `${scenario.code} trả đúng payload RPC đã duyệt`, JSON.stringify(applyResults));
   if (scenario.giuTrangThai) {
     kiem(failure.candidateDuocChon && failure.lyDoConLai && failure.daXacNhan,
       "VERSION_CONFLICT giữ lựa chọn, lý do và xác nhận", JSON.stringify(failure));

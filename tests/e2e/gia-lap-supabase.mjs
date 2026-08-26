@@ -67,8 +67,8 @@ const TEN_DOI_TUONG = [
 /* Fixture V2 cho luồng ghi đè deadline của hạng mục đã có tiến độ.  Mọi
  * scenario E2E dùng cùng bản xem trước thật này; chỉ response apply được
  * thay cục bộ theo từng boundary server. */
-const CHANGE_ID_TIMELINE_V2 = "change-v2-progressed";
-const TIMELINE_REVISION_V2 = 41;
+const CHANGE_ID_TIMELINE_V2 = "94000000-0000-4000-8000-000000000001";
+const TIMELINE_REVISION_V2 = 3;
 const VALIDATION_CODE_TIMELINE_V2 = "CCTB01/2026.01-PQ";
 const ITEM_VERSION_TIMELINE_V2 = 7;
 
@@ -89,19 +89,19 @@ const UNG_VIEN_DEADLINE_DA_TIEN_DO = {
     status_report: "chua",
     status_vmp: "chua",
   },
-  deadline_protocol_cu: "2026-02-10",
-  deadline_protocol_moi: "2026-02-24",
-  deadline_validation_cu: "2026-02-20",
-  deadline_validation_moi: "2026-03-05",
-  deadline_report_cu: "2026-02-25",
-  deadline_report_moi: "2026-03-10",
-  deadline_vmp_cu: "2026-02-28",
-  deadline_vmp_moi: "2026-03-15",
+  deadline_protocol_cu: "2026-06-30",
+  deadline_protocol_moi: "2026-01-18",
+  deadline_validation_cu: "2026-07-31",
+  deadline_validation_moi: "2026-03-24",
+  deadline_report_cu: "2026-08-15",
+  deadline_report_moi: "2026-03-26",
+  deadline_vmp_cu: "2026-08-31",
+  deadline_vmp_moi: "2026-03-31",
 };
 
 const LUU_DANH_MUC_V2_OK = {
   ok: true,
-  object_code: "TB-100",
+  object_code: "CCTB01",
   version: 4,
   change_id: CHANGE_ID_TIMELINE_V2,
   timeline_revision: TIMELINE_REVISION_V2,
@@ -111,22 +111,47 @@ const LUU_DANH_MUC_V2_OK = {
 const XEM_TRUOC_TIMELINE_V2_OK = {
   ok: true,
   change_id: CHANGE_ID_TIMELINE_V2,
-  object_code: "TB-100",
+  object_code: "CCTB01",
   timeline_revision: TIMELINE_REVISION_V2,
   tao: [],
   sua: [],
   dung: [],
-  giu_nguyen: [],
+  giu_nguyen: [{
+    validation_code: VALIDATION_CODE_TIMELINE_V2,
+    ly_do: "Đã có tiến độ; chỉ cập nhật deadline kế hoạch khi xác nhận đặc biệt",
+  }],
   canh_bao: [],
   deadline_overrides: [UNG_VIEN_DEADLINE_DA_TIEN_DO],
 };
 
 const AP_DUNG_TIMELINE_V2_OK = {
   ok: true,
+  change_id: CHANGE_ID_TIMELINE_V2,
+  object_code: "CCTB01",
   so_tao: 0,
   so_sua: 0,
   so_dung: 0,
-  so_ghi_de_deadline: 1,
+  so_giu_nguyen: 1,
+  so_deadline_override: 1,
+  timeline_revision: TIMELINE_REVISION_V2,
+  actor_id: NGUOI_DUNG.id,
+  effective_role: "admin",
+  reason: "Xác nhận theo biên bản QA-26/08",
+  deadline_overrides: [{
+    validation_code: VALIDATION_CODE_TIMELINE_V2,
+    item_version_cu: ITEM_VERSION_TIMELINE_V2,
+    item_version_moi: 8,
+    deadline_protocol_cu: "2026-06-30",
+    deadline_protocol_moi: "2026-01-18",
+    deadline_validation_cu: "2026-07-31",
+    deadline_validation_moi: "2026-03-24",
+    deadline_report_cu: "2026-08-15",
+    deadline_report_moi: "2026-03-26",
+    deadline_vmp_cu: "2026-08-31",
+    deadline_vmp_moi: "2026-03-31",
+    actual_dates_unchanged: true,
+    statuses_unchanged: true,
+  }],
   da_ap_truoc_do: false,
 };
 
