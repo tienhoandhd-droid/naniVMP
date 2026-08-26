@@ -78,6 +78,48 @@ test("không ghép hai tài khoản trùng email bằng email", () => {
   assert.equal(readiness(rows[0], "business_role").state, "unknown");
 });
 
+test("hai role cùng user_id luôn không giải vai, bất kể thứ tự nguồn", () => {
+  const sources = {
+    accounts: [account()],
+    directory: [person()],
+  };
+  const firstThenSecond = buildAccountAdministrationRows({
+    ...sources,
+    roles: [role({ business_role: "qa_staff" }), role({ business_role: "qa_manager" })],
+  })[0];
+  const secondThenFirst = buildAccountAdministrationRows({
+    ...sources,
+    roles: [role({ business_role: "qa_manager" }), role({ business_role: "qa_staff" })],
+  })[0];
+
+  for (const row of [firstThenSecond, secondThenFirst]) {
+    assert.equal(row.businessRole, null);
+    assert.equal(row.unresolvedReason, "role_source_ambiguous");
+    assert.equal(readiness(row, "business_role").state, "unknown");
+  }
+});
+
+test("hai hồ sơ cùng person_id luôn không xác nhận nối, bất kể thứ tự nguồn", () => {
+  const sources = {
+    accounts: [account()],
+    roles: [role()],
+  };
+  const firstThenSecond = buildAccountAdministrationRows({
+    ...sources,
+    directory: [person({ full_name: "Người A" }), person({ full_name: "Người B", department: "workshop" })],
+  })[0];
+  const secondThenFirst = buildAccountAdministrationRows({
+    ...sources,
+    directory: [person({ full_name: "Người B", department: "workshop" }), person({ full_name: "Người A" })],
+  })[0];
+
+  for (const row of [firstThenSecond, secondThenFirst]) {
+    assert.equal(row.directoryPerson, null);
+    assert.equal(readiness(row, "person_link").state, "unknown");
+    assert.equal(readiness(row, "department").state, "unknown");
+  }
+});
+
 test("tài khoản inactive được đánh dấu thiếu và có hành động khôi phục", () => {
   const row = buildAccountAdministrationRows({
     accounts: [account({ tk_hoat_dong: false })],

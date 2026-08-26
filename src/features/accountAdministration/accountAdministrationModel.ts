@@ -43,13 +43,15 @@ export interface AccountAdministrationRow {
 }
 
 export function buildAccountAdministrationRows(sources: AccountAdministrationSources): AccountAdministrationRow[] {
-  const rolesByUserId = new Map(sources.roles.map((role) => [role.user_id, role]));
-  const peopleByPersonId = new Map(sources.directory.map((person) => [person.person_id, person]));
+  const rolesByUserId = indexUniqueBy(sources.roles, (role) => role.user_id);
+  const peopleByPersonId = indexUniqueBy(sources.directory, (person) => person.person_id);
 
   return sources.accounts.map((account) => {
-    const roleSource = account.user_id ? rolesByUserId.get(account.user_id) ?? null : null;
-    const person = account.pid ? peopleByPersonId.get(account.pid) ?? null : null;
-    return buildRow(account, roleSource, person);
+    const roleSourceAmbiguous = Boolean(account.user_id && rolesByUserId.ambiguous.has(account.user_id));
+    const personSourceAmbiguous = Boolean(account.pid && peopleByPersonId.ambiguous.has(account.pid));
+    const roleSource = account.user_id ? rolesByUserId.values.get(account.user_id) ?? null : null;
+    const person = account.pid ? peopleByPersonId.values.get(account.pid) ?? null : null;
+    return buildRow(account, roleSource, person, roleSourceAmbiguous, personSourceAmbiguous);
   });
 }
 
@@ -103,11 +105,13 @@ function buildRow(
   account: NguoiQuyenRow,
   roleSource: VaiNghiepVuRow | null,
   person: DirectoryPerson | null,
+  roleSourceAmbiguous: boolean,
+  personSourceAmbiguous: boolean,
 ): AccountAdministrationRow {
   const businessRole = roleSource && isBusinessRole(roleSource.business_role)
     ? roleSource.business_role
     : null;
-  const unresolvedReason = resolveUnresolvedReason(roleSource, businessRole);
+  const unresolvedReason = resolveUnresolvedReason(roleSource, businessRole, roleSourceAmbiguous);
   const correctlyLinked = Boolean(
     account.user_id
     && account.pid
@@ -122,6 +126,8 @@ function buildRow(
     businessRole,
     roleSource,
     person,
+    roleSourceAmbiguous,
+    personSourceAmbiguous,
     correctlyLinked,
     accountDepartment,
   });
@@ -148,8 +154,10 @@ function buildRow(
 function resolveUnresolvedReason(
   roleSource: VaiNghiepVuRow | null,
   businessRole: BusinessRole | null,
+  roleSourceAmbiguous: boolean,
 ): string | null {
   if (businessRole) return null;
+  if (roleSourceAmbiguous) return "role_source_ambiguous";
   if (!roleSource) return "role_source_missing";
   return roleSource.unresolved_reason
     ?? (roleSource.business_role ? "business_role_invalid" : "role_unresolved");
@@ -160,10 +168,21 @@ function buildReadiness(args: {
   businessRole: BusinessRole | null;
   roleSource: VaiNghiepVuRow | null;
   person: DirectoryPerson | null;
+  roleSourceAmbiguous: boolean;
+  personSourceAmbiguous: boolean;
   correctlyLinked: boolean;
   accountDepartment: string | null;
 }): ReadinessItem[] {
-  const { account, businessRole, roleSource, person, correctlyLinked, accountDepartment } = args;
+  const {
+    account,
+    businessRole,
+    roleSource,
+    person,
+    roleSourceAmbiguous,
+    personSourceAmbiguous,
+    correctlyLinked,
+    accountDepartment,
+  } = args;
   const accountItem = !account.user_id || !account.co_tai_khoan
     ? item("account", "Tài khoản", "missing", "Chưa có tài khoản đăng nhập.", "Tạo hoặc nối tài khoản.")
     : !account.tk_hoat_dong
@@ -172,13 +191,17 @@ function buildReadiness(args: {
 
   const linkItem = !account.user_id || !account.pid
     ? item("person_link", "Nối hồ sơ", "missing", "Tài khoản chưa nối hồ sơ bằng ID.", "Nối tài khoản với hồ sơ.")
+    : personSourceAmbiguous
+      ? item("person_link", "Nối hồ sơ", "unknown", "Có nhiều hồ sơ cùng person_id nên chưa thể xác minh nối hồ sơ.")
     : !person
       ? item("person_link", "Nối hồ sơ", "missing", "Không tìm thấy hồ sơ theo person_id.", "Kiểm tra person_id và nối lại tài khoản.")
       : !correctlyLinked
         ? item("person_link", "Nối hồ sơ", "missing", "Hồ sơ tìm được đang thuộc user_id khác.", "Nối lại đúng tài khoản với hồ sơ.")
         : item("person_link", "Nối hồ sơ", "ready", "Tài khoản và hồ sơ khớp bằng ID.");
 
-  const roleItem = !roleSource
+  const roleItem = roleSourceAmbiguous
+    ? item("business_role", "Vai nghiệp vụ", "unknown", "Có nhiều nguồn vai cùng user_id nên chưa thể xác minh.")
+    : !roleSource
     ? item("business_role", "Vai nghiệp vụ", "unknown", "Chưa có nguồn vai theo user_id để xác minh.")
     : !businessRole
       ? item("business_role", "Vai nghiệp vụ", "missing", "Server chưa giải được một trong năm vai nghiệp vụ.", "Chọn lại vai để sửa dữ liệu lệch.")
@@ -296,4 +319,23 @@ function item(
   nextAction: string | null = null,
 ): ReadinessItem {
   return { key, label, state, detail, nextAction };
+}
+
+function indexUniqueBy<T>(values: readonly T[], keyOf: (value: T) => string): {
+  values: Map<string, T>;
+  ambiguous: Set<string>;
+} {
+  const unique = new Map<string, T>();
+  const ambiguous = new Set<string>();
+  for (const value of values) {
+    const key = keyOf(value);
+    if (ambiguous.has(key)) continue;
+    if (unique.has(key)) {
+      unique.delete(key);
+      ambiguous.add(key);
+      continue;
+    }
+    unique.set(key, value);
+  }
+  return { values: unique, ambiguous };
 }
