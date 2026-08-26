@@ -391,6 +391,86 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
+/* ---- 3d. Timeline: advanced filters share the same result sets ------- */
+{
+  console.log("\nTimeline — bộ lọc nâng cao:");
+  const trang = await trinhDuyet.newPage();
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1680, height: 950 });
+  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2400));
+
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
+    document.querySelector("[data-timeline-filter-toggle]")?.click();
+  });
+  await trang.waitForFunction(() => !!document.querySelector("[data-timeline-filter-panel]"));
+  const panel = await trang.evaluate(() => ({
+    expanded: document.querySelector("[data-timeline-filter-toggle]")?.getAttribute("aria-expanded"),
+    filters: [...document.querySelectorAll("[data-timeline-filter]")].map((o) => o.getAttribute("data-timeline-filter")),
+    live: document.querySelector("[data-timeline-filter-count]")?.getAttribute("aria-live"),
+  }));
+  kiem(panel.expanded === "true", "nút bộ lọc nâng cao công bố trạng thái mở", String(panel.expanded));
+  kiem(["type", "owner", "phase", "readiness"].every((id) => panel.filters.includes(id)),
+    "panel có đủ type · owner · phase · readiness", panel.filters.join(" | "));
+  kiem(panel.live === "polite", "số hạng mục lọc được công bố nhẹ nhàng", String(panel.live));
+
+  /* Bộ lọc mới tạo chip có thể bỏ riêng, còn Xoá lọc trả mọi điều kiện về all. */
+  await trang.select("[data-timeline-filter=\"type\"]", "IQ");
+  await trang.waitForFunction(() =>
+    document.querySelector("[data-timeline-filter=\"type\"]")?.value === "IQ"
+    && [...document.querySelectorAll("[data-timeline-filter-chip]")].some((chip) => chip.textContent?.includes("Loại: IQ")));
+  const chip = await trang.evaluate(() => ({
+    text: [...document.querySelectorAll("[data-timeline-filter-chip]")].map((o) => o.textContent?.trim()).join(" | "),
+    label: document.querySelector("[data-timeline-filter-chip]")?.getAttribute("aria-label"),
+  }));
+  kiem(chip.text.includes("Loại: IQ"), "lọc loại tạo chip đang áp dụng", chip.text || "(không có)");
+  kiem(chip.label?.startsWith("Bỏ "), "chip có tên bỏ lọc cho bàn phím/trợ năng", String(chip.label));
+  await trang.click("[data-timeline-clear-filters]");
+  await trang.waitForFunction(() =>
+    document.querySelector("[data-timeline-filter=\"type\"]")?.value === "all"
+    && !document.querySelector("[data-timeline-filter-chip]"));
+  kiem(true, "Xoá lọc xoá cả filter mới và chip");
+
+  /* KPI tình trạng đếm trên summary base và bấm nó phải khớp explorer/display. */
+  await trang.evaluate(() => {
+    [...document.querySelectorAll(".lp-metric--action")]
+      .find((b) => b.textContent?.includes("Sắp đến hạn"))?.click();
+  });
+  await trang.waitForFunction(() =>
+    document.querySelector('select[aria-label="Lọc theo tình trạng"]')?.value === "soon");
+  const statusCounts = await trang.evaluate(() => ({
+    kpi: Number([...document.querySelectorAll(".lp-metric")]
+      .find((o) => o.querySelector(".lp-metric__label")?.textContent?.trim() === "Sắp đến hạn")
+      ?.querySelector(".lp-metric__value")?.textContent || "NaN"),
+    display: Number(document.querySelector("[data-timeline-filter-count]")?.textContent?.match(/^\s*(\d+)/)?.[1] || "NaN"),
+  }));
+  kiem(statusCounts.kpi === statusCounts.display,
+    "KPI Sắp đến hạn bằng đúng số dòng status-filter", `${statusCounts.kpi} / ${statusCounts.display}`);
+
+  /* Chọn một hàng rồi thay điều kiện loại khác: selection phải tự đóng. */
+  await trang.click("[data-timeline-clear-filters]");
+  await trang.waitForSelector(".timeline-day-row");
+  const selected = await trang.evaluate(() => {
+    const row = document.querySelector(".timeline-day-row");
+    const code = row?.querySelector(".timeline-card-code")?.textContent?.trim() || "";
+    row?.click();
+    return code;
+  });
+  await trang.waitForFunction(() => !!document.querySelector("[data-timeline-inspector]"));
+  const differentType = await trang.evaluate((code) => {
+    const current = code.split("-").at(-1);
+    return [...document.querySelectorAll("[data-timeline-filter=\"type\"] option")]
+      .map((o) => o.value).find((value) => value !== "all" && value !== current) || "all";
+  }, selected);
+  await trang.select("[data-timeline-filter=\"type\"]", differentType);
+  await trang.waitForFunction(() => !document.querySelector("[data-timeline-inspector]"));
+  kiem(differentType !== "all", "đổi type khác hàng đã chọn làm selection tự xoá", `${selected} → ${differentType}`);
+  await trang.close();
+}
+
 /* ---- 3e. Timeline: inspector supporting pane ≥1600 ------------------ */
 {
   console.log("\nTimeline — inspector ≥1600:");

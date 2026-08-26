@@ -1957,6 +1957,63 @@ select { appearance: none; -webkit-appearance: none; }
   font-weight: 900;
 }
 
+.timeline-advanced-filter-toggle,
+.timeline-filter-chips button {
+  border: 1px solid rgba(142,111,208,.34);
+  border-radius: 999px;
+  background: var(--c-surface);
+  color: var(--plum);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
+.timeline-advanced-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid rgba(142,111,208,.2);
+  border-radius: 14px;
+  background: rgba(253,238,246,.46);
+}
+
+.timeline-advanced-filter-panel label {
+  display: grid;
+  gap: 5px;
+  color: var(--plum-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.timeline-advanced-filter-panel select {
+  width: 100%;
+}
+
+.timeline-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.timeline-filter-chips button {
+  border-color: rgba(194,73,122,.28);
+  background: rgba(253,238,246,.86);
+  color: var(--pink-text);
+  padding: 5px 9px;
+}
+
+.timeline-filter-count {
+  margin: 8px 0 0;
+  color: var(--plum-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .timeline-insight-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3630,6 +3687,10 @@ select { appearance: none; -webkit-appearance: none; }
   .timeline-command-bar,
   .timeline-filter-row--workbench {
     padding: 8px;
+  }
+
+  .timeline-advanced-filter-panel {
+    grid-template-columns: 1fr;
   }
 
   .timeline-quarter-controls,

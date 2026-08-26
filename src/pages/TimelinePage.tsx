@@ -18,8 +18,11 @@ import { Card, CardTitle, Tag, Modal, Pill, phaseTag, CauKetLuan } from "../comp
 import { btnPrimary } from "../constants/theme.ts";
 import MetricGrid from "../components/ui/MetricGrid.tsx";
 import {
-  buildTimelineSummary, issueLevel, laSapDenHan, timDiemNong, timNutThat,
+  buildTimelineSummary, issueLevel, timDiemNong, timNutThat,
 } from "../features/timeline/timelineSummaryModel.ts";
+import {
+  buildTimelineFilterSets, TIMELINE_FILTER_DEFAULTS, timelineActiveFilterCount, timelineFilterChips, timelineOwnerOf,
+} from "../features/timeline/timelineFilterModel.ts";
 import TimelineInspector from "../features/timeline/TimelineInspector.tsx";
 import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
@@ -113,10 +116,6 @@ function minDate(a: Date | null, b: Date | null): Date | null {
   return a < b ? a : b;
 }
 
-function safeDate(d: Date | null | undefined, fallback: Date): Date {
-  return d && !isNaN(d.getTime()) ? d : fallback;
-}
-
 function daysInclusive(start: Date, end: Date): number {
   return Math.max(1, Math.round(
     ((startOfDay(end)?.getTime() ?? 0) - (startOfDay(start)?.getTime() ?? 0)) / DAY_MS) + 1);
@@ -134,17 +133,6 @@ function inRange(date: Date | null | undefined, range: { start: Date; end: Date 
   if (!date) return false;
   const d = startOfDay(date)!;
   return d >= startOfDay(range.start)! && d <= startOfDay(range.end)!;
-}
-
-function intersectsRange(
-  start: Date | null | undefined,
-  end: Date | null | undefined,
-  range: { start: Date; end: Date },
-): boolean {
-  if (!start || !end) return false;
-  const s = startOfDay(start)!;
-  const e = startOfDay(end)!;
-  return e >= startOfDay(range.start)! && s <= startOfDay(range.end)!;
 }
 
 function rangeFor(view: string, focusMonth: number | null, year: number): TimeRange {
@@ -206,14 +194,6 @@ function rangeFor(view: string, focusMonth: number | null, year: number): TimeRa
   }
 
   return { view, year, start, end, title, kicker, bands, days: daysInclusive(start, end) };
-}
-
-function taskWindow(a: Activity) {
-  const m = a.m || milestones(a);
-  const fallback = parseD(a.target) ?? vmpToday();
-  const start = safeDate(m.protocol, fallback);
-  const end = safeDate(m.target, fallback);
-  return { m, start, end };
 }
 
 /* issueLevel đã DỜI sang features/timeline/timelineSummaryModel.ts (bước
@@ -1585,6 +1565,11 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
   const [q, setQ] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [phaseFilter, setPhaseFilter] = useState("all");
+  const [readinessFilter, setReadinessFilter] = useState("all");
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [detail, setDetail] = useState<Activity | null>(null);
   /* Supporting pane ≥1600 (nghiên cứu đợt 2): màn rộng thì bấm hàng đổ
      chi tiết sang pane bên phải; màn hẹp giữ modal như cũ. */
@@ -1601,6 +1586,10 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
   const dq = useDebounce(q, 300);
 
   const range = useMemo(() => rangeFor(view, focusMonth, year), [view, focusMonth, year]);
+  const typeOptions = useMemo(() => [...new Set(acts.map((a) => String(a.vtype || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "vi")), [acts]);
+  const ownerOptions = useMemo(() => [...new Set(acts.map(timelineOwnerOf).filter((owner) => owner !== "—"))]
+    .sort((a, b) => a.localeCompare(b, "vi")), [acts]);
 
   const setViewMode = (mode: string) => {
     setView(mode);
@@ -1614,61 +1603,30 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
     else if (view === "year") setView("month");
   };
 
-  /* Hai vị ngữ lọc tách bạch (nghiên cứu Timeline đợt 1): "ngoài tình
-     trạng" dùng chung cho strip KPI (facet trừ chính nó — số trên ô luôn
-     bằng số dòng khi bấm), còn tình trạng xử lý riêng vì có thêm dải
-     "soon" không nằm trong issueLevel. */
-  const khopNgoaiTinhTrang = useMemo(() => {
-    const needle = dq.trim().toLowerCase();
-    return (a: Activity): boolean => {
-      if ((a.state || "active") !== "active") return false;
-      if (cls !== "all" && a.cls !== cls) return false;
-      if (dept !== "all" && a.dept !== dept) return false;
-      if (needle) {
-        const hay = [a.code, a.name, ownerOf(a), a.id, a.vtype, a.dep, a.crit]
-          .map((x) => String(x || "").toLowerCase());
-        if (!hay.some((x) => x.includes(needle))) return false;
-      }
-      return true;
-    };
-  }, [cls, dept, dq]);
-
-  const khopTinhTrang = useMemo(() => (a: Activity): boolean => {
-    if (status === "all") return true;
-    if (status === "soon") return laSapDenHan(a);
-    return issueLevel(a) === status;
-  }, [status]);
-
-  const filtered = useMemo(() => acts
-    .filter((a: Activity) => {
-      if (!a.target) return false;
-      if (!khopNgoaiTinhTrang(a) || !khopTinhTrang(a)) return false;
-      const { start, end } = taskWindow(a);
-      return intersectsRange(start, end, range);
-    })
-    .sort(compareTimelineOrder), [acts, khopNgoaiTinhTrang, khopTinhTrang, range]);
-
-  // Tập dữ liệu cho các tab phân tích (Sơ đồ/Bố cục/Bảng): cùng bộ lọc nhưng
-  // KHÔNG giới hạn theo khung tháng/quý — để nhìn toàn cảnh.
-  const explorerActs = useMemo(
-    () => acts.filter((a: Activity) => khopNgoaiTinhTrang(a) && khopTinhTrang(a)),
-    [acts, khopNgoaiTinhTrang, khopTinhTrang]);
+  const timelineFilters = useMemo(() => ({
+    ...TIMELINE_FILTER_DEFAULTS,
+    cls, dept, status, q: dq, type: typeFilter, owner: ownerFilter, phase: phaseFilter, readiness: readinessFilter,
+  }), [cls, dept, status, dq, typeFilter, ownerFilter, phaseFilter, readinessFilter]);
+  const timelineSets = useMemo(() => buildTimelineFilterSets({ activities: acts, filters: timelineFilters, range }),
+    [acts, timelineFilters, range]);
+  const filtered = timelineSets.display;
+  const explorerActs = timelineSets.explorer;
 
   /* Strip bốn dải tình trạng — đếm SAU các bộ lọc khác, TRƯỚC bộ lọc
      tình trạng, trên cùng một model với chính bộ lọc. */
   const tomTat = useMemo(
-    () => buildTimelineSummary(acts.filter(khopNgoaiTinhTrang)),
-    [acts, khopNgoaiTinhTrang]);
+    () => buildTimelineSummary(timelineSets.summaryBase),
+    [timelineSets.summaryBase]);
 
   /* Action narrative (nghiên cứu đợt 2): một câu kết luận thay vì thêm
      biểu đồ — hạng mục trễ nặng nhất và pha nút thắt, cùng quần thể đếm
      với strip nên các con số đối chiếu được. */
   const diemNong = useMemo(
-    () => timDiemNong(acts.filter(khopNgoaiTinhTrang)),
-    [acts, khopNgoaiTinhTrang]);
+    () => timDiemNong(timelineSets.summaryBase),
+    [timelineSets.summaryBase]);
   const nutThat = useMemo(
-    () => timNutThat(acts.filter(khopNgoaiTinhTrang)),
-    [acts, khopNgoaiTinhTrang]);
+    () => timNutThat(timelineSets.summaryBase),
+    [timelineSets.summaryBase]);
 
   const isTimeline = workspace === "timeline";
 
@@ -1677,6 +1635,10 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
     setDept("all");
     setStatus("all");
     setQ("");
+    setTypeFilter("all");
+    setOwnerFilter("all");
+    setPhaseFilter("all");
+    setReadinessFilter("all");
   };
 
   const shiftRange = (delta: number) => {
@@ -1701,7 +1663,21 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
     setScope("period");
   };
   void focusBand;
-  const hasFilters = cls !== "all" || dept !== "all" || status !== "all" || q.trim();
+  const filterChips = timelineFilterChips({ ...timelineFilters, q });
+  const hasFilters = filterChips.length > 0;
+  const clearOneFilter = (key: string) => {
+    if (key === "cls") setCls("all");
+    else if (key === "dept") setDept("all");
+    else if (key === "status") setStatus("all");
+    else if (key === "q") setQ("");
+    else if (key === "type") setTypeFilter("all");
+    else if (key === "owner") setOwnerFilter("all");
+    else if (key === "phase") setPhaseFilter("all");
+    else if (key === "readiness") setReadinessFilter("all");
+  };
+  useEffect(() => {
+    if (chon && !filtered.some((a) => a.id === chon.id)) setChon(null);
+  }, [chon, filtered]);
 
   return (
     <div className="timeline-page-shell">
@@ -1923,14 +1899,75 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Tìm mã, tên, QA, loại thẩm định…"
+              aria-label="Tìm trong timeline"
             />
           </div>
+          <button
+            type="button"
+            className="timeline-advanced-filter-toggle"
+            data-timeline-filter-toggle
+            aria-expanded={advancedFiltersOpen}
+            aria-controls="timeline-advanced-filter-panel"
+            onClick={() => setAdvancedFiltersOpen((open) => !open)}
+          >
+            Bộ lọc nâng cao ({timelineActiveFilterCount({ ...timelineFilters, q })})
+          </button>
           {hasFilters && (
-            <button type="button" onClick={resetFilters} className="timeline-clear-btn">
+            <button type="button" onClick={resetFilters} className="timeline-clear-btn" data-timeline-clear-filters>
               Xoá lọc
             </button>
           )}
         </div>
+        {advancedFiltersOpen && (
+          <div id="timeline-advanced-filter-panel" className="timeline-advanced-filter-panel" data-timeline-filter-panel>
+            <label>
+              Loại thẩm định
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} data-timeline-filter="type">
+                <option value="all">Tất cả loại</option>
+                {typeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </label>
+            <label>
+              Người phụ trách
+              <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} data-timeline-filter="owner">
+                <option value="all">Tất cả người phụ trách</option>
+                <option value="assigned">Đã phân công</option>
+                <option value="unassigned">Chưa phân công</option>
+                {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+              </select>
+            </label>
+            <label>
+              Pha sớm nhất chưa xong
+              <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)} data-timeline-filter="phase">
+                <option value="all">Tất cả pha</option>
+                <option value="protocol">Đề cương</option>
+                <option value="validation">Thẩm định</option>
+                <option value="report">Báo cáo</option>
+                <option value="vmp">VMP</option>
+                <option value="done">Đã hoàn thành</option>
+              </select>
+            </label>
+            <label>
+              Sẵn sàng deadline
+              <select value={readinessFilter} onChange={(e) => setReadinessFilter(e.target.value)} data-timeline-filter="readiness">
+                <option value="all">Tất cả mức sẵn sàng</option>
+                <option value="ready">Đủ 4 deadline</option>
+                <option value="missing">Thiếu deadline</option>
+              </select>
+            </label>
+          </div>
+        )}
+        <div className="timeline-filter-chips" aria-label="Bộ lọc đang áp dụng">
+          {filterChips.map((chip) => (
+            <button key={chip.key} type="button" data-timeline-filter-chip aria-label={`Bỏ ${chip.label}`}
+              onClick={() => clearOneFilter(chip.key)}>
+              {chip.label} <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+        <p className="timeline-filter-count" data-timeline-filter-count aria-live="polite">
+          {filtered.length} hạng mục hiển thị
+        </p>
 
         {workspace === "overview" ? (
           <TimelineOverview
