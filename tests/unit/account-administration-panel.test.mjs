@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadAccountAdministrationSnapshot, activateAccount, applySourceUncertainty, stableRowKey } from "../../src/features/accountAdministration/AccountAdministrationPanel.tsx";
+import { loadAccountAdministrationSnapshot, activateAccount, applySourceUncertainty, stableRowKey, createActivationCoordinator } from "../../src/features/accountAdministration/AccountAdministrationPanel.tsx";
 
 const account = (overrides = {}) => ({ pid: "p1", user_id: "u1", ten: "A", email: "a@test", bo_phan: "QA", bo_phan_nguoi: "QA", bo_phan_tai_khoan: "QA", vai: null, pham_vi_rieng: null, muc: null, co_tai_khoan: true, tk_hoat_dong: true, so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 1, ...overrides });
 const person = { person_id: "p1", user_id: "u1", employee_code: null, full_name: "A", department: "QA", email: "a@test", account_status: "active", access_class: null, scope_departments: [], scope_factory_ids: [], scope_area_ids: [], scope_line_ids: [], version: 1, access_areas: [], email_sent_confirmed: true, is_active: true, match_status: "matched" };
@@ -35,3 +35,17 @@ test("duplicate activation submissions are rejected by operation token", async (
   assert.equal((await second).kind, "busy"); resolve(); await first; assert.equal(calls, 1);
 });
 test("stable row key is unique for unidentified rows", () => { assert.notEqual(stableRowKey({ key: "account:unidentified" }, 0), stableRowKey({ key: "account:unidentified" }, 1)); });
+test("coordinator serializes calls and checks capability before mutation", async () => {
+  let calls = 0; let resolve; const pending = new Promise((r) => { resolve = r; }); const coordinator = createActivationCoordinator();
+  const first = coordinator.run({ userId: "u1", nextActive: false, reason: "x", canManage: () => true, mutate: async () => { calls++; await pending; return { ok: true }; }, reload: async () => ({ userId: "u1", accountActive: false }), });
+  assert.equal((await coordinator.run({ userId: "u1", nextActive: false, reason: "x", canManage: () => true, mutate: async () => { calls++; return { ok: true }; }, reload: async () => ({ userId: "u1", accountActive: false }) })).kind, "busy"); resolve(); assert.equal((await first).kind, "verified"); assert.equal(calls, 1);
+});
+test("coordinator returns stale after capability changes or reload race", async () => {
+  let allowed = true; const coordinator = createActivationCoordinator();
+  const result = await coordinator.run({ userId: "u1", nextActive: false, reason: "x", canManage: () => allowed, mutate: async () => { allowed = false; return { ok: true }; }, reload: async () => ({ userId: "u1", accountActive: false }) });
+  assert.equal(result.kind, "stale");
+});
+test("coordinator requires exact user and active state for verification", async () => {
+  const coordinator = createActivationCoordinator(); const result = await coordinator.run({ userId: "u1", nextActive: false, reason: "x", canManage: () => true, mutate: async () => ({ ok: true }), reload: async () => ({ userId: "other", accountActive: false }) });
+  assert.equal(result.kind, "written_unverified");
+});
