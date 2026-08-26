@@ -51,7 +51,7 @@ test("README liệt kê lệnh chạy riêng bộ kiểm danh mục người th�
  * ------------------------------------------------------------------- */
 
 const LENH_LOTUS = {
-  "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs && node tests/e2e/tai-khoan-an-sap-xep.mjs",
+  "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs && node tests/e2e/tai-khoan-an-sap-xep.mjs && node tests/e2e/timeline-deadline-edit.mjs",
   "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
   shell: "node tests/e2e/lotus-shell.mjs",
   thammy: "node tests/e2e/tham-my.mjs",
@@ -75,7 +75,7 @@ test("README ghi cách chạy từng bộ", async () => {
 });
 
 test("mọi bộ kiểm trình duyệt mới đều đi qua lớp giả lập, không chạm production", async () => {
-  for (const f of ["luong-gia-lap.mjs", "tai-khoan-an-sap-xep.mjs", "lotus-shell.mjs", "tham-my.mjs", "catalog-workspace.mjs"]) {
+  for (const f of ["luong-gia-lap.mjs", "tai-khoan-an-sap-xep.mjs", "timeline-deadline-edit.mjs", "lotus-shell.mjs", "tham-my.mjs", "catalog-workspace.mjs"]) {
     const nguon = await readRepositoryFile(`tests/e2e/${f}`);
     assert.ok(nguon.includes("gia-lap-supabase.mjs"),
       `${f} phải nạp lớp giả lập Supabase`);
@@ -162,5 +162,10 @@ test("CI e2e-mock chỉ chạy ba bộ giả lập cốt lõi được duyệt",
     ci,
     /production-build:[\s\S]*?needs:\s*\n\s*- static-quality\s*\n\s*- e2e-mock/u,
     "production-build phải chờ cả static-quality và e2e-mock",
+  );
+  assert.match(
+    e2eMock,
+    /VITE_MANUAL_PLANNED_DEADLINES_ENABLED:\s*true/u,
+    "mock E2E phải build deadline editor với feature gate bật tường minh",
   );
 });

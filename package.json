@@ -19,7 +19,7 @@
     "viec": "node tests/e2e/viec-nguoi-dung.mjs",
     "doichieu": "node tests/e2e/doi-chieu-du-lieu.mjs",
     "thammy": "node tests/e2e/tham-my.mjs",
-    "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs && node tests/e2e/tai-khoan-an-sap-xep.mjs",
+    "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs && node tests/e2e/tai-khoan-an-sap-xep.mjs && node tests/e2e/timeline-deadline-edit.mjs",
     "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
     "e2e:admin": "node tests/e2e/quyen-admin.mjs && node tests/e2e/access-transition-race.mjs",
     "shell": "node tests/e2e/lotus-shell.mjs",

@@ -171,6 +171,21 @@ export function dungHangMuc(i) {
   const loai = LOAI[i % LOAI.length];
   const ten = TEN_DOI_TUONG[i % TEN_DOI_TUONG.length];
   const maDoiTuong = `TB-${String(100 + i).padStart(3, "0")}`;
+  const manualDeadlineFixture = i === 0 ? {
+    deadline_protocol: "2026-09-01",
+    deadline_validation: "2026-09-05",
+    deadline_report: "2026-09-10",
+    deadline_vmp: "2026-09-15",
+    actual_protocol_date: "2026-08-01",
+    actual_validation_date: "2026-08-03",
+    actual_report_date: "2026-08-05",
+    actual_vmp_date: "2026-08-07",
+    status_protocol: "completed",
+    status_validation: "completed",
+    status_report: "planned",
+    status_vmp: "planned",
+    version: 7,
+  } : {};
   // Rải mốc: một phần quá hạn, một phần sắp tới, còn lại còn xa.
   const lech = [-45, -12, -3, 5, 20, 60, 120][i % 7];
 
@@ -204,6 +219,7 @@ export function dungHangMuc(i) {
     validation_done: ["cho_bc", "bc", "done"].includes(tt),
     report_done: tt === "done",
     updated_at: "2026-08-15T02:00:00Z",
+    ...manualDeadlineFixture,
   };
 
   return {
@@ -225,6 +241,15 @@ export function dungHangMuc(i) {
     state: "active",
     crit: raw.criticality,
     score: raw.criticality_score,
+    version: raw.version,
+    dlProtocol: raw.deadline_protocol,
+    dlValidation: raw.deadline_validation,
+    dlReport: raw.deadline_report,
+    dlVmp: raw.deadline_vmp,
+    actProtocol: raw.actual_protocol_date,
+    actValidation: raw.actual_validation_date,
+    actReport: raw.actual_report_date,
+    actVmp: raw.actual_vmp_date,
     _raw: raw,
   };
 }
@@ -342,6 +367,54 @@ export function dungKhoDuLieu(kichBan) {
     const off = Number(body?.p_offset ?? 0);
     const lim = Number(body?.p_limit ?? 100);
     return { ok: true, total: khop.length, rows: khop.slice(off, off + lim) };
+  };
+
+  const updatePlannedDeadlines = (body) => {
+    const item = hangMuc.find((row) => row.code === body?.p_validation_code);
+    const deadlines = body?.p_deadlines;
+    if (!item || typeof deadlines !== "object" || deadlines === null) {
+      return {
+        ok: false,
+        error_code: "ITEM_NOT_FOUND",
+        error: "Không tìm thấy hạng mục giả lập",
+      };
+    }
+
+    const oldDeadlines = {
+      deadline_protocol: item.dlProtocol ?? null,
+      deadline_validation: item.dlValidation ?? null,
+      deadline_report: item.dlReport ?? null,
+      deadline_vmp: item.dlVmp ?? null,
+    };
+    const nextDeadlines = {
+      deadline_protocol: deadlines.deadline_protocol ?? null,
+      deadline_validation: deadlines.deadline_validation ?? null,
+      deadline_report: deadlines.deadline_report ?? null,
+      deadline_vmp: deadlines.deadline_vmp ?? null,
+    };
+    const previousVersion = Number(item.version ?? 0);
+
+    item.dlProtocol = nextDeadlines.deadline_protocol;
+    item.dlValidation = nextDeadlines.deadline_validation;
+    item.dlReport = nextDeadlines.deadline_report;
+    item.dlVmp = nextDeadlines.deadline_vmp;
+    item.version = previousVersion + 1;
+    Object.assign(item._raw, nextDeadlines, { version: item.version });
+
+    return {
+      ok: true,
+      validation_code: item.code,
+      old_deadlines: oldDeadlines,
+      new_deadlines: nextDeadlines,
+      changed_fields: Object.keys(nextDeadlines).filter((key) =>
+        oldDeadlines[key] !== nextDeadlines[key]),
+      previous_version: previousVersion,
+      current_version: item.version,
+      actor_id: NGUOI_DUNG.id,
+      effective_role: "admin",
+      reason: body?.p_reason ?? "",
+      protected_fields_preserved: true,
+    };
   };
 
   const nhanSu = Array.from({ length: day ? 6 : 0 }, (_, i) => ({
@@ -492,6 +565,7 @@ export function dungKhoDuLieu(kichBan) {
     rpc_save_catalog_object: () => LUU_DANH_MUC_V2_OK,
     rpc_preview_catalog_change_v2: () => XEM_TRUOC_TIMELINE_V2_OK,
     rpc_apply_catalog_change_v2: () => AP_DUNG_TIMELINE_V2_OK,
+    rpc_update_planned_deadlines: updatePlannedDeadlines,
     /* Phân công xưởng của MỘT hạng mục — WorkshopAssignmentInline đọc/ghi.
        Hình dạng phải qua được decodeAssignment/decodeDirectoryPerson. */
     rpc_item_assignments: {

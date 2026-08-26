@@ -97,6 +97,8 @@ jobs:
 
       # Cổng tinh gọn chỉ giữ các luồng giả lập, danh mục và quyền quản trị.
       - name: E2E cốt lõi — luồng giả lập + danh mục + quyền quản trị
+        env:
+          VITE_MANUAL_PLANNED_DEADLINES_ENABLED: true
         run: |
           bash scripts/with-preview.sh -- bash -c '
             npm run e2e:gialap &&

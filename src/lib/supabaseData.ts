@@ -24,13 +24,62 @@ import type {
   DeadlineOverrideSelection,
   ProgressedDeadlineCandidate,
 } from "../features/catalogWorkspace/catalogTimelineOverrideModel.ts";
-import type { PlannedDeadlineResult, PlannedDeadlineSnapshot } from "../features/timeline/plannedDeadlineEditModel.ts";
+import type {
+  PlannedDeadlineResult,
+  UpdatePlannedDeadlinesInput,
+} from "../features/timeline/plannedDeadlineEditModel.ts";
 
-export async function updatePlannedDeadlines(input: { validationCode:string; deadlines:PlannedDeadlineSnapshot; reason:string; expectedVersion:number; confirmed:boolean }): Promise<PlannedDeadlineResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  const { data, error } = await supabase.rpc("rpc_update_planned_deadlines" as never, { p_validation_code: input.validationCode, p_deadlines: input.deadlines, p_reason: input.reason.trim(), p_expected_version: input.expectedVersion, p_confirmed: input.confirmed } as never);
-  if (error) throw new Error(error.message);
+export interface PlannedDeadlineRpcResponse {
+  data: unknown;
+  error: { message: string } | null;
+}
+
+export type PlannedDeadlineRpc = (
+  rpcName: "rpc_update_planned_deadlines",
+  args: {
+    p_validation_code: string;
+    p_deadlines: UpdatePlannedDeadlinesInput["deadlines"];
+    p_reason: string;
+    p_expected_version: number;
+    p_confirmed: boolean;
+  },
+) => Promise<PlannedDeadlineRpcResponse>;
+
+export class PlannedDeadlineTransportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PlannedDeadlineTransportError";
+  }
+}
+
+export async function updatePlannedDeadlinesViaRpc(
+  rpc: PlannedDeadlineRpc,
+  input: UpdatePlannedDeadlinesInput,
+): Promise<PlannedDeadlineResult> {
+  const { data, error } = await rpc("rpc_update_planned_deadlines", {
+    p_validation_code: input.validationCode,
+    p_deadlines: input.deadlines,
+    p_reason: input.reason.trim(),
+    p_expected_version: input.expectedVersion,
+    p_confirmed: input.confirmed,
+  });
+  if (error) throw new PlannedDeadlineTransportError(error.message);
+
+  // Failure JSON is a domain response, including its exact error_code and
+  // conflict versions. Only transport/PostgREST failures throw above.
   return data as PlannedDeadlineResult;
+}
+
+export async function updatePlannedDeadlines(
+  input: UpdatePlannedDeadlinesInput,
+): Promise<PlannedDeadlineResult> {
+  const client = supabase;
+  if (!client) throw new PlannedDeadlineTransportError("Supabase chưa cấu hình");
+
+  return updatePlannedDeadlinesViaRpc(async (rpcName, args) => {
+    const { data, error } = await client.rpc(rpcName as never, args as never);
+    return { data, error: error ? { message: error.message } : null };
+  }, input);
 }
 
 /** RPC trả jsonb nên type sinh tự động là Json — ép về hình dạng đã biết ngay
