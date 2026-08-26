@@ -59,6 +59,8 @@ jobs:
           cache-dependency-path: ./package-lock.json
 
       - run: npm ci
+      - name: Install bundled Chromium for unit contracts
+        run: npx playwright install chromium --with-deps --no-shell
       - run: npm run typecheck
       - run: npm run test:unit
 

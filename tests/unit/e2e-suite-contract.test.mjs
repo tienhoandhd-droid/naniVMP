@@ -106,6 +106,25 @@ test("CI tách concurrency release main khỏi từng run không deploy", async 
   assert.match(concurrency[1], /cancel-in-progress:\s*false/u);
 });
 
+test("CI static-quality cài Chromium đóng gói trước khi chạy unit contracts", async () => {
+  const ci = await readRepositoryFile(".github/workflows/deploy.yml");
+  const staticQuality = extractWorkflowJob(ci, "static-quality", "e2e-mock");
+  const chromiumInstall = "npx playwright install chromium --with-deps --no-shell";
+  const chromiumInstallations = [...staticQuality.matchAll(
+    new RegExp(chromiumInstall, "gu"),
+  )];
+
+  assert.equal(
+    chromiumInstallations.length,
+    1,
+    "static-quality phải cài đúng một Chromium đóng gói cho unit contracts",
+  );
+  assert.ok(
+    chromiumInstallations[0].index < staticQuality.indexOf("npm run test:unit"),
+    "static-quality phải cài Chromium trước khi chạy npm run test:unit",
+  );
+});
+
 test("CI e2e-mock chỉ chạy ba bộ giả lập cốt lõi được duyệt", async () => {
   const ci = await readRepositoryFile(".github/workflows/deploy.yml");
   const e2eMock = extractWorkflowJob(ci, "e2e-mock", "production-build");
