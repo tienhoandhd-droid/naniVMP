@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadAccountAdministrationSnapshot, activateAccount, applySourceUncertainty, stableRowKey, createActivationCoordinator } from "../../src/features/accountAdministration/AccountAdministrationPanel.tsx";
+import { loadAccountAdministrationSnapshot, activateAccount, applySourceUncertainty, stableRowKey, createActivationCoordinator, resolveReloadedAccount, createActivationUiState } from "../../src/features/accountAdministration/AccountAdministrationPanel.tsx";
 
 const account = (overrides = {}) => ({ pid: "p1", user_id: "u1", ten: "A", email: "a@test", bo_phan: "QA", bo_phan_nguoi: "QA", bo_phan_tai_khoan: "QA", vai: null, pham_vi_rieng: null, muc: null, co_tai_khoan: true, tk_hoat_dong: true, so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 1, ...overrides });
 const person = { person_id: "p1", user_id: "u1", employee_code: null, full_name: "A", department: "QA", email: "a@test", account_status: "active", access_class: null, scope_departments: [], scope_factory_ids: [], scope_area_ids: [], scope_line_ids: [], version: 1, access_areas: [], email_sent_confirmed: true, is_active: true, match_status: "matched" };
@@ -48,4 +48,17 @@ test("coordinator returns stale after capability changes or reload race", async 
 test("coordinator requires exact user and active state for verification", async () => {
   const coordinator = createActivationCoordinator(); const result = await coordinator.run({ userId: "u1", nextActive: false, reason: "x", canManage: () => true, mutate: async () => ({ ok: true }), reload: async () => ({ userId: "other", accountActive: false }) });
   assert.equal(result.kind, "written_unverified");
+});
+test("reload resolver rejects superseded generations and source errors", () => {
+  const row = { userId: "u1", accountActive: false }; const snapshot = { rows: [row], errors: {} };
+  assert.equal(resolveReloadedAccount(snapshot, "u1", () => false), null);
+  assert.equal(resolveReloadedAccount({ rows: [row], errors: { roles: "down" } }, "u1", () => true), null);
+  assert.equal(resolveReloadedAccount(snapshot, "u1", () => true), row);
+});
+test("activation reload rejection is written_unverified, not rejected", async () => {
+  const coordinator = createActivationCoordinator(); const result = await coordinator.run({ userId: "u1", nextActive: false, reason: "x", canManage: () => true, mutate: async () => ({ ok: true }), reload: async () => { throw new Error("reload down"); } });
+  assert.equal(result.kind, "written_unverified");
+});
+test("ui operation token allows cancel to release only its own in-flight state", () => {
+  const state = createActivationUiState(); const first = state.begin(); assert.equal(state.isCurrent(first), true); state.cancel(first); assert.equal(state.isCurrent(first), false); const second = state.begin(); assert.notEqual(first, second); assert.equal(state.isCurrent(second), true);
 });
