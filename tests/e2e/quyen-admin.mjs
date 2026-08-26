@@ -11,10 +11,9 @@
  *  Bộ kiểm:
  *   1. Admin thấy 4 màn chỉ-admin trên thanh điều hướng.
  *   2. Nhân viên xưởng không thấy 4 màn đó.
- *   3. Cấu hình hệ thống: có bảng người dùng, ô đổi vai, nút Tắt/Bật lại;
- *      bấm Huỷ ở hộp hỏi lý do thì KHÔNG gọi rpc_set_business_role.
- *   4. Đổi vai có nhập lý do: gọi rpc_set_business_role đúng 1 lần, đúng
- *      tham số vai mới.
+ *   3. Cấu hình hệ thống không còn bảng đổi vai trùng lặp.
+ *   4. Vai trò & phạm vi: bản nháp/Huỷ không ghi; Lưu đổi vai và bật/tắt
+ *      gọi đúng một RPC, đúng UUID ngay cả khi hai tài khoản trùng email.
  *   5. Thẻ "Chế độ áp dụng quyền theo hạng mục" ở Vai trò & phạm vi: admin
  *      thấy; nút "Bật áp dụng quyền thật" khoá khi thiếu lý do/chữ xác
  *      nhận, mở khoá khi nhập đủ.
@@ -98,6 +97,56 @@ function suaKhoAdmin(kho) {
   };
 }
 
+const USER_B = "22222222-2222-4222-8222-222222222222";
+
+/** Hai tài khoản cố ý trùng email để khóa hợp đồng: mọi thao tác phải chọn
+ *  bằng UUID, tuyệt đối không ghép theo email/tên. Mutation cập nhật kho
+ *  giả lập để lần reload đối chiếu sau ghi nhìn thấy trạng thái mới. */
+function suaKhoRolePanel(kho) {
+  suaKhoAdmin(kho);
+  const accounts = [
+    {
+      pid: "pf-a", user_id: NGUOI_DUNG.id, ten: "Người A", email: "trung@vmp.test",
+      bo_phan: "qa", bo_phan_nguoi: "qa", bo_phan_tai_khoan: "qa", vai: "admin",
+      pham_vi_rieng: null, muc: null, co_tai_khoan: true, tk_hoat_dong: true,
+      so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 0,
+    },
+    {
+      pid: "pf-b", user_id: USER_B, ten: "Người B", email: "trung@vmp.test",
+      bo_phan: "qa", bo_phan_nguoi: "qa", bo_phan_tai_khoan: "qa", vai: "department_user",
+      pham_vi_rieng: null, muc: null, co_tai_khoan: true, tk_hoat_dong: true,
+      so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 1,
+    },
+  ];
+  const roles = [
+    { user_id: NGUOI_DUNG.id, email: "trung@vmp.test", business_role: "admin", unresolved_reason: null },
+    { user_id: USER_B, email: "trung@vmp.test", business_role: "qa_staff", unresolved_reason: null },
+  ];
+  kho.rpc_nguoi_va_quyen = () => ({ ok: true, tong_hang_muc: 0, nguoi: accounts });
+  kho.rpc_business_roles = () => ({ ok: true, nguoi: roles });
+  kho.rpc_item_permission_directory = {
+    ok: true,
+    people: accounts.map((row) => ({
+      person_id: row.pid, user_id: row.user_id, employee_code: row.pid.toUpperCase(),
+      full_name: row.ten, department: "qa", email: row.email, account_status: "linked",
+      access_class: row.user_id === USER_B ? "qa_progress_editor" : "admin",
+      scope_departments: [], scope_factory_ids: [], scope_area_ids: [], scope_line_ids: [],
+      version: 1, access_areas: [], email_sent_confirmed: true, is_active: true,
+      match_status: "unique",
+    })),
+  };
+  kho.rpc_set_business_role = (body) => {
+    const role = roles.find((row) => row.user_id === body?.p_user_id);
+    if (role) role.business_role = body.p_business_role;
+    return { ok: true };
+  };
+  kho.rpc_set_user_active = (body) => {
+    const account = accounts.find((row) => row.user_id === body?.p_user_id);
+    if (account) account.tk_hoat_dong = body.p_active;
+    return { ok: true };
+  };
+}
+
 /** Nhân viên xưởng: ẩn hẳn 4 màn chỉ-admin theo payload server. */
 function suaKhoNhanVienXuong(kho) {
   suaKhoAdmin(kho);
@@ -172,7 +221,7 @@ function suaKhoQaTheoLuatServer(kho) {
   kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
 }
 
-async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, suaKho } = {}) {
+async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, suaKho, doTre } = {}) {
   const trang = await trinhDuyet.newPage();
   const loiConsole = [];
   trang.on("console", (m) => {
@@ -219,7 +268,7 @@ async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, sua
     (goiRpc[ten] ||= []).push(req);
   });
 
-  const { chanNgoai } = await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day", suaKho });
+  const { chanNgoai } = await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day", suaKho, doTre });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
   await trang.setViewport({ width: rong, height: cao });
   await trang.goto(`${GOC}#v=${hash}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
@@ -318,72 +367,113 @@ for (const [ten, suaKho] of [
   await trang.close();
 }
 
-/* ---- 3. Cấu hình hệ thống: bảng người dùng, ô đổi vai, nút Tắt ------- */
+/* ---- 3. Cấu hình hệ thống không còn bảng đổi vai trùng lặp ---------- */
 {
-  console.log("\nCấu hình hệ thống — bảng người dùng và nút:");
-  const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "admin" });
+  console.log("\nCấu hình hệ thống — không còn quản trị vai trùng lặp:");
+  const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoRolePanel, hash: "admin" });
+  const kq = await trang.evaluate(() => ({
+    coBangCu: document.body.innerText.includes("Người dùng & phân quyền"),
+    coSelectCu: !!document.querySelector('select[aria-label^="Vai của "]'),
+  }));
+  kiem(!kq.coBangCu, "đã bỏ thẻ Người dùng & phân quyền khỏi Cấu hình hệ thống");
+  kiem(!kq.coSelectCu, "Cấu hình hệ thống không còn select đổi vai cũ");
+  await trang.close();
+}
 
-  const kq = await trang.evaluate(() => {
-    const trs = document.querySelectorAll("table tbody tr");
-    const select = document.querySelector('select[aria-label^="Vai của "]');
-    const nutTat = [...document.querySelectorAll("button")]
-      .find((b) => b.textContent.trim() === "Tắt" || b.textContent.trim() === "Bật lại");
-    return {
-      coBang: trs.length > 0,
-      soDong: trs.length,
-      coOVai: !!select,
-      nhanOVai: select?.getAttribute("aria-label") || "",
-      coNutTatBat: !!nutTat,
-      chuNutTatBat: nutTat?.textContent.trim() || "",
-    };
+/* ---- 4. Vai trò & phạm vi: draft/Huỷ không ghi, Lưu đúng UUID ------- */
+{
+  console.log("\nVai trò & phạm vi — đổi vai bằng UUID dù trùng email:");
+  const { trang, goiRpc, chanNgoai, loiConsole } = await moTrang(trinhDuyet,
+    { suaKho: suaKhoRolePanel, hash: "phanquyen" });
+  const articleB = 'article[aria-label="Người B"]';
+  await trang.waitForSelector(articleB, { timeout: 10_000 });
+
+  await trang.evaluate((selector) => {
+    [...document.querySelectorAll(`${selector} button`)]
+      .find((button) => button.textContent.trim() === "Sửa vai")?.click();
+  }, articleB);
+  await trang.waitForSelector('select[aria-label="Vai nghiệp vụ mới"]');
+  await trang.select('select[aria-label="Vai nghiệp vụ mới"]', "qa_manager");
+  await cho(150);
+  kiem((goiRpc.rpc_set_business_role || []).length === 0,
+    "chọn vai mới chỉ tạo bản nháp, chưa gọi RPC");
+  await trang.evaluate(() => {
+    const editor = document.querySelector('section[aria-labelledby="account-role-editor-title"]');
+    [...(editor?.querySelectorAll("button") || [])]
+      .find((button) => button.textContent.trim() === "Hủy")?.click();
   });
+  await cho(150);
+  kiem((goiRpc.rpc_set_business_role || []).length === 0,
+    "Hủy bản nháp không gọi rpc_set_business_role");
 
-  kiem(kq.coBang, "màn Cấu hình hệ thống có bảng người dùng", `${kq.soDong} dòng`);
-  kiem(kq.coOVai, "có ô đổi vai (select) cho tài khoản", kq.nhanOVai);
-  kiem(kq.coNutTatBat, "có nút Tắt/Bật lại", kq.chuNutTatBat);
-  await trang.close();
-}
-
-/* Khối 3 tách riêng phần "Huỷ" ra một trang mới để tránh state của select
- * bị kẹt giữa hai kịch bản (đã đổi ở DOM nhưng React coi như chưa đổi). */
-{
-  console.log("\nCấu hình hệ thống — Huỷ hộp hỏi lý do thì KHÔNG gọi RPC:");
-  const { trang, datKeHoach, goiRpc } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "admin" });
-
-  datKeHoach({ accept: false }); // Huỷ hộp prompt
-  await trang.select('select[aria-label^="Vai của "]', "qa_manager");
-  await cho(700);
-
-  const soLanGoi = (goiRpc.rpc_set_business_role || []).length;
-  kiem(soLanGoi === 0, "Huỷ hộp hỏi lý do thì KHÔNG gọi rpc_set_business_role",
-    `${soLanGoi} lần gọi`);
-  await trang.close();
-}
-
-/* ---- 4. Đổi vai có nhập lý do: gọi RPC đúng 1 lần, đúng tham số ------ */
-{
-  console.log("\nCấu hình hệ thống — nhập lý do thì gọi đúng 1 lần, đúng vai mới:");
-  const { trang, datKeHoach, goiRpc } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "admin" });
-
-  datKeHoach({ accept: true, text: "Đổi vai để kiểm tra tự động (e2e quyen-admin)" });
-  await trang.select('select[aria-label^="Vai của "]', "qa_manager");
+  await trang.select('select[aria-label="Vai nghiệp vụ mới"]', "qa_manager");
+  await trang.type('textarea[aria-label="Lý do đổi vai"]', "Điều chuyển E2E theo UUID");
+  await trang.evaluate(() => {
+    const editor = document.querySelector('section[aria-labelledby="account-role-editor-title"]');
+    [...(editor?.querySelectorAll("button") || [])]
+      .find((button) => button.textContent.trim() === "Lưu thay đổi")?.click();
+  });
   await cho(900);
 
-  const goi = goiRpc.rpc_set_business_role || [];
-  kiem(goi.length === 1, "gọi rpc_set_business_role đúng một lần", `${goi.length} lần`);
-  if (goi.length >= 1) {
-    let body = null;
-    try { body = JSON.parse(goi[0].postData() || "null"); } catch { body = null; }
-    kiem(body?.p_business_role === "qa_manager",
-      "tham số vai mới đúng qa_manager", JSON.stringify(body));
-    kiem(body?.p_user_id === NGUOI_DUNG.id, "tham số user_id đúng người đang sửa", body?.p_user_id);
-    kiem(typeof body?.p_reason === "string" && body.p_reason.trim().length > 0,
-      "tham số lý do được gửi kèm, không rỗng", JSON.stringify(body?.p_reason));
+  const calls = goiRpc.rpc_set_business_role || [];
+  kiem(calls.length === 1, "đổi vai gọi RPC đúng một lần", `${calls.length} lần`);
+  if (calls[0]) {
+    const body = JSON.parse(calls[0].postData() || "null");
+    kiem(body?.p_user_id === USER_B, "đổi đúng UUID Người B dù email trùng", body?.p_user_id);
+    kiem(body?.p_business_role === "qa_manager", "vai mới đúng qa_manager", body?.p_business_role);
+    kiem(body?.p_reason === "Điều chuyển E2E theo UUID", "lý do được gửi đúng", body?.p_reason);
   }
-  /* Sau khi RPC thành công, màn phải cho biết đã đổi — không im lặng. */
-  const ketQua = await trang.evaluate(() =>
-    document.body.innerText.includes("nay là") || document.body.innerText.includes("QA quản lý"));
-  kiem(ketQua, "màn báo kết quả sau khi đổi vai thành công");
+  kiem(chanNgoai.length === 0, "ca đổi vai không có request thoát giả lập", chanNgoai[0] || "");
+  kiem(loiConsole.length === 0, "console sạch khi đổi vai", loiConsole[0] || "");
+  await trang.close();
+}
+
+/* ---- 4b. Bật/tắt: Hủy không ghi, bấm nhanh vẫn đúng một UUID -------- */
+{
+  console.log("\nVai trò & phạm vi — tắt tài khoản đúng một lần bằng UUID:");
+  const { trang, goiRpc, chanNgoai, loiConsole } = await moTrang(trinhDuyet, {
+    suaKho: suaKhoRolePanel,
+    hash: "phanquyen",
+    doTre: { rpc_set_user_active: 450 },
+  });
+  const articleB = 'article[aria-label="Người B"]';
+  await trang.waitForSelector(articleB, { timeout: 10_000 });
+  const moDialog = () => trang.evaluate((selector) => {
+    [...document.querySelectorAll(`${selector} button`)]
+      .find((button) => button.textContent.trim() === "Tắt")?.click();
+  }, articleB);
+
+  await moDialog();
+  await trang.waitForSelector('textarea[aria-label="Lý do đổi trạng thái"]');
+  await trang.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"][aria-label="Đổi trạng thái tài khoản"]');
+    [...(dialog?.querySelectorAll("button") || [])]
+      .find((button) => button.textContent.trim() === "Hủy")?.click();
+  });
+  kiem((goiRpc.rpc_set_user_active || []).length === 0,
+    "Hủy trước xác nhận không gọi rpc_set_user_active");
+
+  await moDialog();
+  await trang.type('textarea[aria-label="Lý do đổi trạng thái"]', "Tạm khóa E2E theo UUID");
+  await trang.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"][aria-label="Đổi trạng thái tài khoản"]');
+    const button = [...(dialog?.querySelectorAll("button") || [])]
+      .find((candidate) => candidate.textContent.trim() === "Xác nhận");
+    button?.click();
+    button?.click();
+  });
+  await cho(1200);
+
+  const calls = goiRpc.rpc_set_user_active || [];
+  kiem(calls.length === 1, "bấm xác nhận nhanh vẫn gọi active RPC đúng một lần", `${calls.length} lần`);
+  if (calls[0]) {
+    const body = JSON.parse(calls[0].postData() || "null");
+    kiem(body?.p_user_id === USER_B, "tắt đúng UUID Người B dù email trùng", body?.p_user_id);
+    kiem(body?.p_active === false, "trạng thái đích là tắt", JSON.stringify(body));
+    kiem(body?.p_reason === "Tạm khóa E2E theo UUID", "lý do tắt được gửi đúng", body?.p_reason);
+  }
+  kiem(chanNgoai.length === 0, "ca tắt tài khoản không có request thoát giả lập", chanNgoai[0] || "");
+  kiem(loiConsole.length === 0, "console sạch khi tắt tài khoản", loiConsole[0] || "");
   await trang.close();
 }
 
@@ -513,7 +603,7 @@ for (const [ten, suaKho] of [
       coMaTranCu: chu.includes("Vai nào xem được gì, sửa được gì")
         || chu.includes("tích ở đây là đổi quyền thật"),
       coMaTranMoi: chu.includes("Màn hình bạn được xem"),
-      huongDanDungBaBuoc: chu.includes("Cấu hình hệ thống"),
+      huongDanDungBaBuoc: chu.includes("Sẵn sàng theo vai trò & phạm vi"),
     };
   });
   kiem(admin.coEmail, "admin thấy thẻ Ai được phép có tài khoản");
@@ -521,7 +611,7 @@ for (const [ten, suaKho] of [
      "Màn hình bạn được xem", đọc từ rpc_my_ui_access. */
   kiem(!admin.coMaTranCu, "không còn ma trận 4 vai của hệ cũ");
   kiem(admin.coMaTranMoi, "admin thấy ma trận năm vai Màn hình bạn được xem");
-  kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang màn Cấu hình hệ thống");
+  kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang thẻ sẵn sàng vai trò");
   await a.trang.close();
 
   // Quản lý QA: KHÔNG thấy hai thẻ này — RPC quản trị chỉ nhận admin thật.
