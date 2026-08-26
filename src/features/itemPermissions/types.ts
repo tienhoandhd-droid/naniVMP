@@ -1,3 +1,5 @@
+import { BUSINESS_ROLE_CATALOG } from "../../lib/businessRoles.ts";
+
 /* Phân loại quyền CHỌN ĐƯỢC. Mỗi giá trị ở đây phải map ra một vai nghiệp
  * vụ trong `vmp_business_role()` (VMP-noibo, migration 20260812090000) —
  * nếu không, người được gán sẽ có `business_role = null`, tức KHÔNG GIẢI
@@ -10,11 +12,18 @@
  * được, nhưng bản ghi cũ đang mang nó vẫn hiện đúng thay vì rơi về rỗng.
  * Vai đăng nhập `viewer` là giá trị legacy riêng, không phải một vai nghiệp
  * vụ và không được chọn mới trong danh bạ. */
+const ACCESS_CLASS_ROLE_MAP = {
+  qa_progress_editor: "qa_staff",
+  qa_manager: "qa_manager",
+  workshop_staff: "workshop_staff",
+  equipment_manager: "workshop_manager",
+} as const;
+
 export const ACCESS_CLASSES = [
-  { id: "qa_progress_editor", label: "QA – Cập nhật 4 mốc hoàn thành" },
-  { id: "qa_manager", label: "Quản lý QA" },
-  { id: "workshop_staff", label: "Nhân viên xưởng – Ghi ngày thẩm định thực tế" },
-  { id: "equipment_manager", label: "Quản lý bộ phận quản lý thiết bị" },
+  { id: "qa_progress_editor", label: BUSINESS_ROLE_CATALOG[ACCESS_CLASS_ROLE_MAP.qa_progress_editor].label },
+  { id: "qa_manager", label: BUSINESS_ROLE_CATALOG[ACCESS_CLASS_ROLE_MAP.qa_manager].label },
+  { id: "workshop_staff", label: BUSINESS_ROLE_CATALOG[ACCESS_CLASS_ROLE_MAP.workshop_staff].label },
+  { id: "equipment_manager", label: BUSINESS_ROLE_CATALOG[ACCESS_CLASS_ROLE_MAP.equipment_manager].label },
 ] as const;
 
 /** Giá trị còn tồn tại trong dữ liệu nhưng KHÔNG chọn mới được nữa. */
