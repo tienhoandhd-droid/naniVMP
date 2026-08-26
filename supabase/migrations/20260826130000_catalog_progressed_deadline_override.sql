@@ -24,6 +24,7 @@ begin
     'public.rpc_preview_catalog_change__five_role_impl_20260824(uuid)',
     'public.rpc_apply_catalog_change__five_role_impl_20260824(uuid,text,integer)',
     'public.vmp_tinh_moc_thoi_gian(integer,integer,integer,integer,text,numeric,text)',
+    'public.vmp_parse_depts(text)',
     'public.audit_plan_item_changes_v2()',
     'public.vmp_is_active_session(uuid)',
     'public.vmp_session_denial()',
@@ -55,6 +56,8 @@ begin
        '22bb11d3d91c02a2f98b95cf5d0ffdff504158a3f6e5a4703d11d9a6cda518b2'),
       ('public.vmp_tinh_moc_thoi_gian(integer,integer,integer,integer,text,numeric,text)',
        '8683f1d6f448b5326cd0f1a89b1f1954f1265243b9dca84f1a7268c27db5e8f1'),
+      ('public.vmp_parse_depts(text)',
+       'efdb744892bdeab64a932e2c9d6bdf2121250185b0f5ad0a08cec311d953c2bd'),
       ('public.audit_plan_item_changes_v2()',
        '07ac27f98feecfb5c9bd6941e17943fb910ea715e72ffdcb5c96132acdf26243'),
       ('public.vmp_is_active_session(uuid)',
@@ -165,6 +168,28 @@ begin
           acldefault('f',v_owner))) a
          where a.grantee<>v_owner and a.privilege_type='EXECUTE')<>1 then
     raise exception using errcode='check_violation',message='CATALOG_V2_PRECONDITION_DEADLINE_HELPER';
+  end if;
+
+  v_proc := 'public.vmp_parse_depts(text)'::regprocedure;
+  if (select proowner from pg_proc where oid=v_proc) <> v_owner
+     or (select prosecdef from pg_proc where oid=v_proc)
+     or (select provolatile from pg_proc where oid=v_proc) <> 'i'
+     or (select proconfig from pg_proc where oid=v_proc)
+        is distinct from array['search_path=public, pg_temp']
+     or has_function_privilege('authenticated',v_proc,'EXECUTE')
+     or not has_function_privilege('service_role',v_proc,'EXECUTE')
+     or has_function_privilege('anon',v_proc,'EXECUTE')
+     or has_function_privilege('public',v_proc,'EXECUTE')
+     or (select count(*) from aclexplode(coalesce((select proacl from pg_proc where oid=v_proc),
+          acldefault('f',v_owner))) a
+         where a.grantee<>v_owner and a.privilege_type='EXECUTE')<>1
+     or not exists (
+       select 1 from aclexplode(coalesce((select proacl from pg_proc where oid=v_proc),
+         acldefault('f',v_owner))) a
+       where a.grantor=v_owner and a.grantee='service_role'::regrole
+         and a.privilege_type='EXECUTE' and not a.is_grantable
+     ) then
+    raise exception using errcode='check_violation',message='CATALOG_V2_PRECONDITION_DEPARTMENT_HELPER';
   end if;
 
   v_proc := 'public.audit_plan_item_changes_v2()'::regprocedure;

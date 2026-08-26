@@ -137,6 +137,10 @@ check_precondition_drift searchpath \
   "alter function public.audit_plan_item_changes_v2() set search_path=public,pg_temp"
 check_precondition_drift schema \
   "alter table public.vmp_catalog_changes drop column applied_at"
+check_precondition_drift helperbody \
+  "create or replace function public.vmp_parse_depts(p_raw text) returns text[] language plpgsql immutable security invoker set search_path=public,pg_temp as \$function\$ begin return array['drift']::text[]; end \$function\$"
+check_precondition_drift missinghelper \
+  "drop function public.vmp_parse_depts(text)"
 
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql"
