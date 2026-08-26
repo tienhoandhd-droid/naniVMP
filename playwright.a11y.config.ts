@@ -13,7 +13,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.VMP_E2E_URL || "http://127.0.0.1:4173",
     viewport: { width: 1440, height: 900 },
-    channel: process.env.CI ? undefined : "chrome",
+    channel: "chromium",
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
 });
