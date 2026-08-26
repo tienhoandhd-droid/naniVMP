@@ -18,6 +18,16 @@ import { parse } from "@babel/parser";
 
 const CLASSIFICATION_START = "-- SOURCE_RPC_INVENTORY_BEGIN";
 const CLASSIFICATION_END = "-- SOURCE_RPC_INVENTORY_END";
+const CATALOG_V2_REVIEWED_RPC = new Map([
+  ["rpc_preview_catalog_change_v2", {
+    identity: "rpc_preview_catalog_change_v2(uuid)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_apply_catalog_change_v2", {
+    identity: "rpc_apply_catalog_change_v2(uuid,text,integer,jsonb,boolean)",
+    classification: "guarded_explicit",
+  }],
+]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
   .join(",");
@@ -203,14 +213,30 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260824120000_five_role_permission_hardening.sql",
     "utf8",
   ));
+  const catalogV2Migration = readFileSync(
+    "supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql",
+    "utf8",
+  );
+  for (const name of CATALOG_V2_REVIEWED_RPC.keys()) {
+    assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
+  }
+  const reviewedInventory = new Map([...migrationInventory, ...CATALOG_V2_REVIEWED_RPC]);
   const sourceNames = [...sourceInventory.keys()].sort();
-  const reviewedNames = [...migrationInventory.keys()].sort();
+  const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 62, "reviewed source HEAD must expose 62 literal RPC targets");
+  assert.equal(sourceNames.length, 64, "reviewed source HEAD must expose 64 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
   ].join("\n"));
+  assert.deepEqual(CATALOG_V2_REVIEWED_RPC, new Map([
+    ["rpc_preview_catalog_change_v2", { identity: "rpc_preview_catalog_change_v2(uuid)", classification: "guarded_explicit" }],
+    ["rpc_apply_catalog_change_v2", { identity: "rpc_apply_catalog_change_v2(uuid,text,integer,jsonb,boolean)", classification: "guarded_explicit" }],
+  ]));
+  assert.match(catalogV2Migration, /create function public\.rpc_preview_catalog_change_v2\(p_change_id uuid\)/i);
+  assert.match(catalogV2Migration, /create function public\.rpc_apply_catalog_change_v2\(\s*p_change_id uuid,\s*p_reason text,\s*p_expected_timeline_revision integer,\s*p_deadline_overrides jsonb,\s*p_override_confirmed boolean\s*\)/is);
+  assert.match(catalogV2Migration, /grant execute on function public\.rpc_preview_catalog_change_v2\(uuid\) to authenticated,service_role;/i);
+  assert.match(catalogV2Migration, /grant execute on function public\.rpc_apply_catalog_change_v2\(uuid,text,integer,jsonb,boolean\) to authenticated,service_role;/i);
 });
 
 test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {

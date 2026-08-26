@@ -20,6 +20,10 @@ import type {
   SourceObjectRow, VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
   PerformerRow,
 } from "../types/domain.ts";
+import type {
+  DeadlineOverrideSelection,
+  ProgressedDeadlineCandidate,
+} from "../features/catalogWorkspace/catalogTimelineOverrideModel.ts";
 
 /** RPC trả jsonb nên type sinh tự động là Json — ép về hình dạng đã biết ngay
  *  tại biên đọc, để phần còn lại của ứng dụng làm việc với kiểu thật. */
@@ -1136,6 +1140,18 @@ export interface KetQuaApDung {
   error_code?: string;
 }
 
+export interface AnhHuongTimelineV2 extends AnhHuongTimeline {
+  deadline_overrides?: ProgressedDeadlineCandidate[];
+}
+
+export interface ApplyCatalogChangeV2Input {
+  changeId: string;
+  reason: string;
+  expectedTimelineRevision: number | null;
+  deadlineOverrides: readonly DeadlineOverrideSelection[];
+  overrideConfirmed: boolean;
+}
+
 /** Ép kiểu tại một chỗ: types sinh từ schema trước migration 20260812130000.
  *  PHẢI bind — supabase.rpc dùng `this` bên trong. */
 function goiRpc() {
@@ -1161,6 +1177,26 @@ export async function applyCatalogChange(
   });
   if (error) throw new Error("Áp vào timeline thất bại: " + error.message);
   return asShape<KetQuaApDung>(data);
+}
+
+export async function previewCatalogChangeV2(changeId: string): Promise<AnhHuongTimelineV2> {
+  const { data, error } = await goiRpc()("rpc_preview_catalog_change_v2", { p_change_id: changeId });
+  if (error) throw new Error("Không xem trước được ảnh hưởng: " + error.message);
+  return asShape<AnhHuongTimelineV2>(data);
+}
+
+export async function applyCatalogChangeV2(
+  input: ApplyCatalogChangeV2Input,
+): Promise<KetQuaApDung & { so_ghi_de_deadline?: number; da_ap_truoc_do?: boolean }> {
+  const { data, error } = await goiRpc()("rpc_apply_catalog_change_v2", {
+    p_change_id: input.changeId,
+    p_reason: input.reason,
+    p_expected_timeline_revision: input.expectedTimelineRevision,
+    p_deadline_overrides: input.deadlineOverrides,
+    p_override_confirmed: input.overrideConfirmed,
+  });
+  if (error) throw new Error("Áp vào timeline thất bại: " + error.message);
+  return asShape<KetQuaApDung & { so_ghi_de_deadline?: number; da_ap_truoc_do?: boolean }>(data);
 }
 
 // ============================================================
