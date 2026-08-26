@@ -159,7 +159,7 @@ Expected: PASS and typecheck exit 0.
 
 - [ ] **Step 6: Extend the real E2E fixture and assertions**
 
-In the fake `rpc_item_permission_directory` response, add one complete person with `account_status: "inactive"` and a distinctive name that would otherwise appear, plus visible rows in scrambled access-class/name order. In the fake account-candidate response, include an inactive distinctive candidate and at least two active roles in scrambled order. After loading the **Vai trò & phạm vi** screen with an empty directory search, assert:
+Use a focused hermetic browser fixture registered under the current CI `e2e:gialap` group. The fixture must install `caiGiaLap()` and `nhetPhien()` before navigation, override `rpc_item_permission_directory` with one complete person having `account_status: "inactive"` plus visible rows in scrambled access-class/name order, and override account candidates with an inactive distinctive candidate plus active roles in scrambled order. After loading the **Vai trò & phạm vi** screen with an empty directory search, assert:
 
 - inactive directory text is absent;
 - unlinked visible person remains;
@@ -168,13 +168,20 @@ In the fake `rpc_item_permission_directory` response, add one complete person wi
 
 Use DOM-observable assertions against the real page; do not assert that the request mock exists.
 
+Runtime adjustment after root-cause investigation: do not add this feature to
+`danh-ba-phan-quyen.mjs`. That legacy suite mixes real Auth with partial mocks,
+contains post-removal People-screen flows, and is not part of current CI. Add a
+small `tests/e2e/tai-khoan-an-sap-xep.mjs` fixture and register it after
+`luong-gia-lap.mjs` in `e2e:gialap`; restore the legacy file to its pre-task
+state. Assert `chanNgoai` is empty so no Supabase request can escape the mock.
+
 - [ ] **Step 7: Run targeted E2E GREEN**
 
 Run:
 
 ```bash
 export PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH
-bash scripts/with-preview.sh -- node tests/e2e/danh-ba-phan-quyen.mjs
+bash scripts/with-preview.sh -- node tests/e2e/tai-khoan-an-sap-xep.mjs
 ```
 
 Expected: exit 0 with all assertions reached. The wrapper builds a fresh artifact and cleans its preview process.
