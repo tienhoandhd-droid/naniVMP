@@ -399,7 +399,9 @@ for (const [id, ten] of MAN) {
   await nhetPhien(trang, { supabaseUrl: URL_SB });
   await trang.setViewport({ width: 1680, height: 950 });
   await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2400));
+  await trang.waitForFunction(() =>
+    [...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === "Dòng thời gian")
+    && !!document.querySelector("[data-timeline-filter-toggle]"));
 
   await trang.evaluate(() => {
     [...document.querySelectorAll("button")]
