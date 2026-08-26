@@ -16,12 +16,17 @@ fi
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 tmp_dir="$(mktemp -d)"
 test_database="vmp_catalog_deadline_${$}_${RANDOM}"
+test_databases=("$test_database")
 
 cleanup() {
-  if [[ -n "${LOCAL_PGHOST:-}" && "$test_database" =~ ^vmp_catalog_deadline_[0-9]+_[0-9]+$ ]]; then
-    PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" PGUSER="$LOCAL_PGUSER" \
-      PGPASSWORD="$LOCAL_PGPASSWORD" dropdb --if-exists --force "$test_database" \
-      >/dev/null 2>&1 || true
+  if [[ -n "${LOCAL_PGHOST:-}" ]]; then
+    for cleanup_database in "${test_databases[@]}"; do
+      if [[ "$cleanup_database" =~ ^vmp_catalog_deadline_[0-9]+_[0-9]+(_[a-z]+)?$ ]]; then
+        PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" PGUSER="$LOCAL_PGUSER" \
+          PGPASSWORD="$LOCAL_PGPASSWORD" dropdb --if-exists --force "$cleanup_database" \
+          >/dev/null 2>&1 || true
+      fi
+    done
   fi
   find "$tmp_dir" -mindepth 1 -delete
   rmdir "$tmp_dir"
@@ -79,6 +84,33 @@ if [[ "$(tail -n 1 "$tmp_dir/clone-contract")" != "t" ]]; then
   exit 3
 fi
 
+check_precondition_drift() {
+  local suffix="$1"
+  local drift_sql="$2"
+  local drift_database="${test_database}_${suffix}"
+  local drift_log="$tmp_dir/precondition-${suffix}.log"
+  local migration_status
+  test_databases+=("$drift_database")
+  createdb -T "$test_database" "$drift_database"
+  psql -X -v ON_ERROR_STOP=1 -d "$drift_database" -c "$drift_sql" >/dev/null
+  set +e
+  psql -X -v ON_ERROR_STOP=1 -d "$drift_database" \
+    -f "$repo_dir/supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql" \
+    >"$drift_log" 2>&1
+  migration_status=$?
+  set -e
+
+  if [[ $migration_status -eq 0 ]] \
+     || ! grep -q 'CATALOG_V2_PRECONDITION_' "$drift_log" \
+     || [[ "$(psql -X -qAt -d "$drift_database" -c "select to_regprocedure('public.vmp_lock_catalog_object_v2(text,text)') is null")" != "t" ]]; then
+    sed -n '1,220p' "$drift_log" >&2
+    echo "Migration did not reject $suffix drift before DDL." >&2
+    exit 1
+  fi
+  echo "PASS PRECONDITION rejected ${suffix} drift before DDL"
+  dropdb --force "$drift_database"
+}
+
 if [[ "$mode" == "--expect-red" ]]; then
   set +e
   psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
@@ -98,6 +130,13 @@ if [[ "$mode" == "--expect-red" ]]; then
   echo "PASS RED undefined_function rpc_apply_catalog_change_v2"
   exit 0
 fi
+
+check_precondition_drift definition \
+  "create or replace function public.rpc_preview_catalog_change(p_change_id uuid) returns jsonb language plpgsql stable security definer set search_path=public,pg_temp as \$function\$ begin return '{\"ok\":false,\"error_code\":\"DRIFT\"}'::jsonb; end \$function\$"
+check_precondition_drift searchpath \
+  "alter function public.audit_plan_item_changes_v2() set search_path=public,pg_temp"
+check_precondition_drift schema \
+  "alter table public.vmp_catalog_changes drop column applied_at"
 
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql"
@@ -130,6 +169,34 @@ assert_advisory_waiters() {
   return 1
 }
 
+assert_backend_wait() {
+  local application_name="$1"
+  local wait_type="$2"
+  local wait_event="$3"
+  local matched=0
+  for _attempt in {1..60}; do
+    matched="$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c \
+      "select count(*) from pg_stat_activity where datname=current_database() and application_name='$application_name' and wait_event_type='$wait_type' and wait_event='$wait_event'")"
+    if [[ "$matched" == "1" ]]; then return 0; fi
+    sleep 0.05
+  done
+  echo "Expected backend $application_name waiting on $wait_type/$wait_event, observed $matched." >&2
+  return 1
+}
+
+assert_backend_lock_wait() {
+  local application_name="$1"
+  local matched=0
+  for _attempt in {1..60}; do
+    matched="$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c \
+      "select count(*) from pg_stat_activity where datname=current_database() and application_name='$application_name' and wait_event_type='Lock'")"
+    if [[ "$matched" == "1" ]]; then return 0; fi
+    sleep 0.05
+  done
+  echo "Expected backend $application_name waiting on a row lock, observed $matched." >&2
+  return 1
+}
+
 hold_mutex() {
   local object_code="$1"
   psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c \
@@ -139,6 +206,30 @@ hold_mutex() {
 }
 
 claims="json_build_object('role','service_role')::text"
+
+# A legacy direct writer does not take the catalog mutex. V2 must therefore
+# lock the stable source-object/identity superset, including a malformed row that
+# the preview does not advertise, before entering V1.
+run_rpc "with g as (select set_config('request.jwt.claims',$claims,false) c) select public.rpc_apply_catalog_change_v2('a1000000-0000-4000-8000-000000000003','lock stable superset',1,'[{\"validation_code\":\"CCTB-CONC-LS/2026.01-PQ\",\"expected_item_version\":7}]'::jsonb,true) from g where c is not null" "$tmp_dir/lock-superset-apply.json" &
+lock_superset_apply_pid=$!
+assert_backend_wait 'lock-superset-apply.json' 'Timeout' 'PgSleep'
+run_rpc "update public.vmp_plan_items set owner_name='Legacy writer after lock' where validation_code='CCTB-CONC-LS/2026.BAD-X'" "$tmp_dir/lock-superset-writer.json" &
+lock_superset_writer_pid=$!
+assert_backend_lock_wait 'lock-superset-writer.json'
+wait "$lock_superset_apply_pid"
+wait "$lock_superset_writer_pid"
+node - "$tmp_dir/lock-superset-apply.json" <<'NODE'
+import { readFileSync } from "node:fs";
+const value = JSON.parse(readFileSync(process.argv[2], "utf8").trim().split("\n").at(-1));
+if (value.ok !== true || value.da_ap_truoc_do !== false) throw new Error(`lock-superset apply ${JSON.stringify(value)}`);
+NODE
+if [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c "select version=12 and owner_name='Legacy writer after lock' from public.vmp_plan_items where validation_code='CCTB-CONC-LS/2026.BAD-X'")" != "t" ]]; then
+  echo "Stable-superset legacy writer final state mismatch." >&2
+  exit 1
+fi
+psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c \
+  "drop trigger catalog_test_lock_superset_pause on public.vmp_source_objects; drop function auth.catalog_test_lock_superset_pause()"
+echo "PASS CONCURRENCY stable-superset legacy-writer"
 
 hold_mutex 'CCTB-CONC-AA'
 barrier_pid="$mutex_pid"

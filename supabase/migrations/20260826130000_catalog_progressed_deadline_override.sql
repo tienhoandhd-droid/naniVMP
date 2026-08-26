@@ -35,6 +35,43 @@ begin
     end if;
   end loop;
 
+  -- Pin the exact reviewed dependency bodies before trusting any wrapper,
+  -- hidden implementation, authorization helper, deadline calculation or
+  -- audit path. Metadata-only checks permit a body-drifted definer to pass.
+  if exists (
+    select 1
+    from (values
+      ('public.rpc_save_catalog_object(text,text,jsonb,text,integer)',
+       'e7c6ac003f467a357d778b8b773bd58754c8ffb4c54483d1a8734426119daa95'),
+      ('public.rpc_preview_catalog_change(uuid)',
+       '2b23b696b0a8e56c88097b7acabe1bd3a37ef70c1f92ca1f0a693e054db0fb60'),
+      ('public.rpc_apply_catalog_change(uuid,text,integer)',
+       '580383f96aa3fb308ce74149257f9a353ef7181b15d81f2135d6e400f0c7353d'),
+      ('public.rpc_save_catalog_object__five_role_impl_20260824(text,text,jsonb,text,integer)',
+       '601c067cf9789772b1eb272c10754b980f50fa13647f7967eba2e893634cffbc'),
+      ('public.rpc_preview_catalog_change__five_role_impl_20260824(uuid)',
+       '76fc67a4a4eb71734ddb3eff69af25355596954a220e1d97dad2e9ee72a2e1eb'),
+      ('public.rpc_apply_catalog_change__five_role_impl_20260824(uuid,text,integer)',
+       '22bb11d3d91c02a2f98b95cf5d0ffdff504158a3f6e5a4703d11d9a6cda518b2'),
+      ('public.vmp_tinh_moc_thoi_gian(integer,integer,integer,integer,text,numeric,text)',
+       '8683f1d6f448b5326cd0f1a89b1f1954f1265243b9dca84f1a7268c27db5e8f1'),
+      ('public.audit_plan_item_changes_v2()',
+       '07ac27f98feecfb5c9bd6941e17943fb910ea715e72ffdcb5c96132acdf26243'),
+      ('public.vmp_is_active_session(uuid)',
+       'e52a0cece430ad8b8319819b633fd4fc8aa92bc2d2fac083a33b22f609e1f417'),
+      ('public.vmp_session_denial()',
+       '8ff11d9d103ea62dd1c8786b1aa766bcfe6386bf6d4ec5b3729062c850609ad1'),
+      ('public.vmp_business_role(uuid)',
+       '45b2dfab1f9463b234a3754e8ee022450749f8418d6fc4a966b09fe8d52c3156')
+    ) reviewed(signature,definition_sha256)
+    join pg_proc p on p.oid=reviewed.signature::regprocedure
+    where encode(extensions.digest(pg_get_functiondef(p.oid),'sha256'),'hex')
+          is distinct from reviewed.definition_sha256
+  ) then
+    raise exception using errcode='check_violation',
+      message='CATALOG_V2_PRECONDITION_DEPENDENCY_DEFINITION';
+  end if;
+
   if to_regclass('public.vmp_source_objects') is null
      or to_regclass('public.vmp_plan_items') is null
      or to_regclass('public.vmp_catalog_changes') is null
@@ -76,6 +113,28 @@ begin
   end loop;
 
   foreach v_required in array array[
+    'public.vmp_is_active_session(uuid)',
+    'public.vmp_session_denial()',
+    'public.vmp_business_role(uuid)'
+  ] loop
+    v_proc:=v_required::regprocedure;
+    if (select proowner from pg_proc where oid=v_proc)<>v_owner
+       or not (select prosecdef from pg_proc where oid=v_proc)
+       or (select proconfig from pg_proc where oid=v_proc)
+          is distinct from array['search_path=public, pg_temp']
+       or not has_function_privilege('service_role',v_proc,'EXECUTE')
+       or has_function_privilege('authenticated',v_proc,'EXECUTE')
+       or has_function_privilege('anon',v_proc,'EXECUTE')
+       or has_function_privilege('public',v_proc,'EXECUTE')
+       or (select count(*) from aclexplode(coalesce((select proacl from pg_proc where oid=v_proc),
+            acldefault('f',v_owner))) a
+           where a.grantee<>v_owner and a.privilege_type='EXECUTE')<>1 then
+      raise exception using errcode='check_violation',
+        message='CATALOG_V2_PRECONDITION_AUTH_HELPER '||v_required;
+    end if;
+  end loop;
+
+  foreach v_required in array array[
     'public.rpc_save_catalog_object__five_role_impl_20260824(text,text,jsonb,text,integer)',
     'public.rpc_preview_catalog_change__five_role_impl_20260824(uuid)',
     'public.rpc_apply_catalog_change__five_role_impl_20260824(uuid,text,integer)'
@@ -111,6 +170,8 @@ begin
   v_proc := 'public.audit_plan_item_changes_v2()'::regprocedure;
   if (select proowner from pg_proc where oid=v_proc) <> v_owner
      or not (select prosecdef from pg_proc where oid=v_proc)
+     or (select proconfig from pg_proc where oid=v_proc)
+        is distinct from array['search_path=public']
      or not has_function_privilege('service_role',v_proc,'EXECUTE')
      or has_function_privilege('authenticated',v_proc,'EXECUTE')
      or has_function_privilege('anon',v_proc,'EXECUTE')
@@ -130,23 +191,88 @@ begin
   if exists (
     select required.column_name
     from (values
-      ('vmp_plan_items','validation_code'),('vmp_plan_items','object_code'),
-      ('vmp_plan_items','validation_type'),('vmp_plan_items','year'),
-      ('vmp_plan_items','version'),('vmp_plan_items','is_active'),
-      ('vmp_plan_items','item_state'),('vmp_plan_items','deadline_protocol'),
-      ('vmp_plan_items','deadline_validation'),('vmp_plan_items','deadline_report'),
-      ('vmp_plan_items','deadline_vmp'),('vmp_plan_items','actual_protocol_date'),
-      ('vmp_plan_items','actual_validation_date'),('vmp_plan_items','actual_report_date'),
-      ('vmp_plan_items','actual_vmp_date'),('vmp_plan_items','status_protocol'),
-      ('vmp_plan_items','status_validation'),('vmp_plan_items','status_report'),
-      ('vmp_plan_items','status_vmp'),('vmp_source_objects','timeline_revision'),
-      ('vmp_source_objects','timeline_applied_revision'),('vmp_source_objects','validate_flag'),
-      ('vmp_source_objects','first_month'),('vmp_catalog_changes','apply_result'),
-      ('audit_logs','changed_fields'),('audit_logs','effective_business_role')
-    ) required(table_name,column_name)
-    left join information_schema.columns c on c.table_schema='public'
-      and c.table_name=required.table_name and c.column_name=required.column_name
-    where c.column_name is null
+      ('vmp_plan_items','id','text'),
+      ('vmp_plan_items','validation_code','text'),('vmp_plan_items','object_code','text'),
+      ('vmp_plan_items','validation_type','text'),('vmp_plan_items','report_class','text'),
+      ('vmp_plan_items','effort_days','numeric(4,1)'),('vmp_plan_items','year','integer'),
+      ('vmp_plan_items','version','integer'),('vmp_plan_items','is_active','boolean'),
+      ('vmp_plan_items','item_state','text'),('vmp_plan_items','deadline_protocol','date'),
+      ('vmp_plan_items','deadline_validation','date'),('vmp_plan_items','deadline_report','date'),
+      ('vmp_plan_items','deadline_vmp','date'),('vmp_plan_items','actual_protocol_date','date'),
+      ('vmp_plan_items','actual_validation_date','date'),('vmp_plan_items','actual_report_date','date'),
+      ('vmp_plan_items','actual_vmp_date','date'),('vmp_plan_items','status_protocol','phase_status'),
+      ('vmp_plan_items','status_validation','phase_status'),('vmp_plan_items','status_report','phase_status'),
+      ('vmp_plan_items','status_vmp','phase_status'),('vmp_plan_items','computed_status','item_status'),
+      ('vmp_plan_items','owner_id','uuid'),('vmp_plan_items','owner_name','text'),
+      ('vmp_plan_items','secondary_owner','text'),
+      ('vmp_plan_items','criticality','criticality'),
+      ('vmp_plan_items','created_by','uuid'),('vmp_plan_items','updated_by','uuid'),
+      ('vmp_plan_items','created_at','timestamp with time zone'),
+      ('vmp_plan_items','updated_at','timestamp with time zone'),
+      ('vmp_plan_items','missing_from_sheet','boolean'),('vmp_plan_items','scheduled_date','date'),
+      ('vmp_plan_items','criticality_score','integer'),('vmp_plan_items','departments','text[]'),
+      ('vmp_plan_items','is_doc_complete','boolean'),('vmp_plan_items','has_mismatch','text'),
+      ('vmp_plan_items','requires_qa_approval','boolean'),('vmp_plan_items','qa_approved_by','uuid'),
+      ('vmp_plan_items','qa_approved_at','timestamp with time zone'),
+      ('vmp_plan_items','sheet_row_id','text'),('vmp_plan_items','last_synced','timestamp with time zone'),
+      ('vmp_plan_items','deleted_from_sheet','boolean'),('vmp_plan_items','deleted_at','timestamp with time zone'),
+      ('vmp_plan_items','delete_reason','text'),('vmp_plan_items','missing_since','timestamp with time zone'),
+      ('vmp_plan_items','source_sync_run_id','uuid'),('vmp_plan_items','source_sheet_row','integer'),
+      ('vmp_plan_items','source_sheet_data','jsonb'),('vmp_plan_items','execution_departments','text[]'),
+      ('vmp_plan_items','status_protocol_text','text'),('vmp_plan_items','status_validation_text','text'),
+      ('vmp_plan_items','status_report_text','text'),('vmp_plan_items','status_vmp_text','text'),
+      ('vmp_plan_items','department_text','text'),('vmp_plan_items','work_group','text'),
+      ('vmp_plan_items','scheduled_at','timestamp with time zone'),
+      ('vmp_plan_items','owner_person_id','uuid'),('vmp_plan_items','support_person_id','uuid'),
+      ('vmp_source_objects','id','uuid'),('vmp_source_objects','object_kind','text'),
+      ('vmp_source_objects','object_code','text'),('vmp_source_objects','object_name','text'),
+      ('vmp_source_objects','department','text'),('vmp_source_objects','area_code','text'),
+      ('vmp_source_objects','line','text'),('vmp_source_objects','status','text'),
+      ('vmp_source_objects','show_flag','text'),
+      ('vmp_source_objects','validate_flag','text'),('vmp_source_objects','frequency_months','integer'),
+      ('vmp_source_objects','validate_reason','text'),
+      ('vmp_source_objects','report_class','text'),('vmp_source_objects','workdays','integer'),
+      ('vmp_source_objects','critical_point','text'),('vmp_source_objects','first_month','integer'),
+      ('vmp_source_objects','year_ref','integer'),('vmp_source_objects','source_tab','text'),
+      ('vmp_source_objects','source_row','integer'),('vmp_source_objects','extra','jsonb'),
+      ('vmp_source_objects','created_at','timestamp with time zone'),
+      ('vmp_source_objects','updated_at','timestamp with time zone'),
+      ('vmp_source_objects','is_active','boolean'),('vmp_source_objects','edited_on_web','boolean'),
+      ('vmp_source_objects','updated_by','uuid'),('vmp_source_objects','note','text'),
+      ('vmp_source_objects','complexity_score','integer'),
+      ('vmp_source_objects','quality_impact_score','integer'),
+      ('vmp_source_objects','criticality_score','integer'),
+      ('vmp_source_objects','criticality_source','text'),('vmp_source_objects','owner_name','text'),
+      ('vmp_source_objects','support_name','text'),('vmp_source_objects','work_group','text'),
+      ('vmp_source_objects','owner_person_id','uuid'),('vmp_source_objects','support_person_id','uuid'),
+      ('vmp_source_objects','version','integer'),
+      ('vmp_source_objects','timeline_revision','integer'),
+      ('vmp_source_objects','timeline_applied_revision','integer'),
+      ('vmp_catalog_changes','id','uuid'),('vmp_catalog_changes','object_kind','text'),
+      ('vmp_catalog_changes','object_code','text'),('vmp_catalog_changes','source_version','integer'),
+      ('vmp_catalog_changes','timeline_revision','integer'),
+      ('vmp_catalog_changes','old_data','jsonb'),('vmp_catalog_changes','new_data','jsonb'),
+      ('vmp_catalog_changes','status','text'),('vmp_catalog_changes','impact','jsonb'),
+      ('vmp_catalog_changes','apply_result','jsonb'),('vmp_catalog_changes','applied_by','uuid'),
+      ('vmp_catalog_changes','applied_at','timestamp with time zone'),
+      ('vmp_catalog_changes','apply_reason','text'),('vmp_catalog_changes','last_error','text'),
+      ('vmp_catalog_changes','created_by','uuid'),('vmp_catalog_changes','created_at','timestamp with time zone'),
+      ('audit_logs','id','uuid'),('audit_logs','user_id','uuid'),('audit_logs','user_email','text'),
+      ('audit_logs','user_name','text'),('audit_logs','user_role','user_role'),
+      ('audit_logs','action','audit_action'),
+      ('audit_logs','table_name','text'),('audit_logs','record_id','text'),
+      ('audit_logs','validation_code','text'),('audit_logs','changed_fields','text[]'),
+      ('audit_logs','change_reason','text'),('audit_logs','old_data','jsonb'),
+      ('audit_logs','new_data','jsonb'),('audit_logs','ip_address','inet'),
+      ('audit_logs','user_agent','text'),('audit_logs','source','text'),
+      ('audit_logs','created_at','timestamp with time zone'),('audit_logs','effective_business_role','text')
+    ) required(table_name,column_name,data_type)
+    left join pg_class rel on rel.relname=required.table_name
+      and rel.relnamespace='public'::regnamespace
+    left join pg_attribute a on a.attrelid=rel.oid and a.attname=required.column_name
+      and not a.attisdropped
+    where a.attname is null
+       or format_type(a.atttypid,a.atttypmod) is distinct from required.data_type
   ) then
     raise exception using errcode='check_violation',message='CATALOG_V2_PRECONDITION_COLUMNS';
   end if;
@@ -336,7 +462,10 @@ declare
   v_candidates jsonb := '[]'::jsonb;
   v_match text[];
   v_occurrence integer;
-  v_moc record;
+  v_deadline_protocol date;
+  v_deadline_validation date;
+  v_deadline_report date;
+  v_deadline_vmp date;
   v_missing jsonb;
   v_eligible boolean;
   v_blocker text;
@@ -357,15 +486,16 @@ begin
     if v_match is not null then
       begin v_occurrence:=v_match[2]::integer; exception when others then v_occurrence:=null; end;
     end if;
+    v_deadline_protocol:=null; v_deadline_validation:=null;
+    v_deadline_report:=null; v_deadline_vmp:=null; v_missing:='[]'::jsonb;
     if v_item.id is not null and v_occurrence is not null then
-      select * into v_moc from public.vmp_tinh_moc_thoi_gian(
+      select moc.deadline_protocol,moc.deadline_validation,
+             moc.deadline_report,moc.deadline_vmp,coalesce(to_jsonb(moc.thieu),'[]'::jsonb)
+      into v_deadline_protocol,v_deadline_validation,
+           v_deadline_report,v_deadline_vmp,v_missing
+      from public.vmp_tinh_moc_thoi_gian(
         v_item.year,v_source.first_month,coalesce(nullif(v_source.frequency_months,0),12),
-        v_occurrence,v_source.report_class,v_source.workdays,v_item.validation_type);
-      v_missing:=coalesce(to_jsonb(v_moc.thieu),'[]'::jsonb);
-    else
-      v_missing:='[]'::jsonb;
-      v_moc.deadline_protocol:=null; v_moc.deadline_validation:=null;
-      v_moc.deadline_report:=null; v_moc.deadline_vmp:=null;
+        v_occurrence,v_source.report_class,v_source.workdays,v_item.validation_type) moc;
     end if;
 
     v_blocker:=null; v_reason:=null;
@@ -374,20 +504,20 @@ begin
     elsif coalesce(lower(v_source.validate_flag),'n')<>'y' or not coalesce(v_source.is_active,true) then v_blocker:='STOP_FLOW'; v_reason:='Đối tượng đang thuộc luồng Dừng';
     elsif not coalesce(v_item.is_active,true) then v_blocker:='ITEM_INACTIVE'; v_reason:='Hạng mục không còn hiệu lực';
     elsif v_item.item_state is distinct from 'active' then v_blocker:='ITEM_STATE_INACTIVE'; v_reason:='Hạng mục đã hủy hoặc không áp dụng';
-    elsif v_match is null or v_match[1]::integer<>v_item.year
+    elsif v_match is null or v_occurrence is null or v_match[1]::integer<>v_item.year
        or v_match[1]::integer<>extract(year from now())::integer
        or v_match[3] is distinct from v_item.validation_type
        or v_item.validation_code is distinct from
           (v_item.object_code||'/'||v_match[1]||'.'||v_match[2]||'-'||v_match[3])
       then v_blocker:='INVALID_ITEM_IDENTITY'; v_reason:='Mã hạng mục không khớp định danh năm/lần/loại';
     elsif jsonb_array_length(v_missing)>0
-       or v_moc.deadline_protocol is null or v_moc.deadline_validation is null
-       or v_moc.deadline_report is null or v_moc.deadline_vmp is null
+       or v_deadline_protocol is null or v_deadline_validation is null
+       or v_deadline_report is null or v_deadline_vmp is null
       then v_blocker:='MISSING_SOURCE_DATA'; v_reason:='Không tính đủ bốn deadline';
-    elsif not (v_item.deadline_protocol is distinct from v_moc.deadline_protocol
-       or v_item.deadline_validation is distinct from v_moc.deadline_validation
-       or v_item.deadline_report is distinct from v_moc.deadline_report
-       or v_item.deadline_vmp is distinct from v_moc.deadline_vmp)
+    elsif not (v_item.deadline_protocol is distinct from v_deadline_protocol
+       or v_item.deadline_validation is distinct from v_deadline_validation
+       or v_item.deadline_report is distinct from v_deadline_report
+       or v_item.deadline_vmp is distinct from v_deadline_vmp)
       then v_blocker:='NO_ACTIONABLE_CHANGE'; v_reason:='Deadline hiện tại đã khớp nguồn';
     end if;
     v_eligible:=v_blocker is null;
@@ -404,10 +534,10 @@ begin
         'status_validation',v_item.status_validation,
         'status_report',v_item.status_report,
         'status_vmp',v_item.status_vmp),
-      'deadline_protocol_cu',v_item.deadline_protocol,'deadline_protocol_moi',v_moc.deadline_protocol,
-      'deadline_validation_cu',v_item.deadline_validation,'deadline_validation_moi',v_moc.deadline_validation,
-      'deadline_report_cu',v_item.deadline_report,'deadline_report_moi',v_moc.deadline_report,
-      'deadline_vmp_cu',v_item.deadline_vmp,'deadline_vmp_moi',v_moc.deadline_vmp);
+      'deadline_protocol_cu',v_item.deadline_protocol,'deadline_protocol_moi',v_deadline_protocol,
+      'deadline_validation_cu',v_item.deadline_validation,'deadline_validation_moi',v_deadline_validation,
+      'deadline_report_cu',v_item.deadline_report,'deadline_report_moi',v_deadline_report,
+      'deadline_vmp_cu',v_item.deadline_vmp,'deadline_vmp_moi',v_deadline_vmp);
   end loop;
   return v_base||jsonb_build_object('deadline_overrides',v_candidates);
 end
@@ -455,12 +585,21 @@ declare
   v_moc record;
   v_match text[];
   v_codes text[];
+  v_selected_codes text[];
+  v_locked_codes text[];
+  v_inventory_before text[];
+  v_inventory_after text[];
+  v_expected_inventory text[];
+  v_year integer:=extract(year from now())::integer;
   v_expected integer;
   v_index integer:=0;
   v_count integer;
   v_v1 jsonb;
   v_snapshots jsonb:='{}'::jsonb;
+  v_locked_snapshots jsonb:='{}'::jsonb;
   v_snapshot jsonb;
+  v_source_snapshot jsonb;
+  v_current jsonb;
   v_deadline_results jsonb:='[]'::jsonb;
   v_result jsonb;
   v_effective_role text;
@@ -541,16 +680,50 @@ begin
       'current_timeline_revision',v_source.timeline_revision);
   end if;
 
+  select coalesce(array_agg(value->>'validation_code' order by value->>'validation_code'),'{}'::text[])
+  into v_selected_codes from jsonb_array_elements(p_deadline_overrides);
+
+  -- Lock a deterministic stable superset before the authoritative preview:
+  -- every row currently owned by the source object, every current-year row
+  -- whose terminal identity names it, and every explicitly selected code.
+  -- A later preview row outside this locked set is rejected before mutation.
+  perform 1 from public.vmp_plan_items pi
+  where pi.object_code=v_source.object_code
+     or (pi.year=v_year and left(pi.validation_code,length(v_source.object_code)+1)=v_source.object_code||'/')
+     or pi.validation_code=any(v_selected_codes)
+  order by pi.validation_code for update;
+
+  select coalesce(array_agg(pi.validation_code order by pi.validation_code),'{}'::text[]),
+         coalesce(jsonb_object_agg(pi.validation_code,to_jsonb(pi) order by pi.validation_code),'{}'::jsonb)
+  into v_locked_codes,v_locked_snapshots
+  from public.vmp_plan_items pi
+  where pi.object_code=v_source.object_code
+     or (pi.year=v_year and left(pi.validation_code,length(v_source.object_code)+1)=v_source.object_code||'/')
+     or pi.validation_code=any(v_selected_codes);
+
+  select coalesce(array_agg(pi.validation_code order by pi.validation_code),'{}'::text[])
+  into v_inventory_before
+  from public.vmp_plan_items pi
+  where pi.object_code=v_source.object_code
+     or (pi.year=v_year and left(pi.validation_code,length(v_source.object_code)+1)=v_source.object_code||'/');
+  v_source_snapshot:=to_jsonb(v_source);
+
   v_preview:=public.rpc_preview_catalog_change_v2(p_change_id);
   if coalesce((v_preview->>'ok')::boolean,false) is not true then return v_preview; end if;
-  select array_agg(distinct code order by code) into v_codes from (
+  select coalesce(array_agg(distinct code order by code),'{}'::text[]) into v_codes from (
     select value->>'validation_code' code from jsonb_array_elements(coalesce(v_preview->'tao','[]'))
     union all select value->>'validation_code' from jsonb_array_elements(coalesce(v_preview->'sua','[]'))
     union all select value->>'validation_code' from jsonb_array_elements(coalesce(v_preview->'dung','[]'))
     union all select value->>'validation_code' from jsonb_array_elements(coalesce(v_preview->'giu_nguyen','[]'))
   ) impact where code is not null;
-  perform 1 from public.vmp_plan_items
-  where validation_code=any(coalesce(v_codes,'{}'::text[])) order by validation_code for update;
+  if exists (
+    select 1 from unnest(v_codes) impact(code)
+    join public.vmp_plan_items pi on pi.validation_code=impact.code
+    where not (impact.code=any(v_locked_codes))
+  ) then
+    return jsonb_build_object('ok',false,'error_code','WRITE_MISMATCH',
+      'error','Không thể ghi nguyên tử; toàn bộ thay đổi đã được hoàn tác');
+  end if;
 
   for v_selection in select value from jsonb_array_elements(p_deadline_overrides) loop
     select * into v_item from public.vmp_plan_items where validation_code=v_selection->>'validation_code';
@@ -568,7 +741,6 @@ begin
     end if;
   end loop;
 
-  v_preview:=public.rpc_preview_catalog_change_v2(p_change_id);
   for v_selection in select value from jsonb_array_elements(p_deadline_overrides) loop
     select value into v_candidate from jsonb_array_elements(coalesce(v_preview->'deadline_overrides','[]'))
     where value->>'validation_code'=v_selection->>'validation_code';
@@ -618,13 +790,53 @@ begin
       select * into v_moc from public.vmp_tinh_moc_thoi_gian(v_item.year,v_source.first_month,
         coalesce(nullif(v_source.frequency_months,0),12),v_match[2]::integer,
         v_source.report_class,v_source.workdays,v_item.validation_type);
-      if v_item.object_code is distinct from v_source.object_code
+      if v_item.id is distinct from v_entry->>'validation_code'
+         or v_item.validation_code is distinct from v_entry->>'validation_code'
+         or v_item.object_code is distinct from v_source.object_code
          or v_item.validation_type is distinct from v_entry->>'validation_type'
-         or v_item.year is distinct from extract(year from now())::integer
+         or v_item.year is distinct from v_year
+         or v_item.report_class is distinct from coalesce(v_source.report_class,'Không phụ thuộc')
+         or v_item.effort_days is distinct from v_source.workdays::numeric
          or v_item.deadline_protocol is distinct from v_moc.deadline_protocol
          or v_item.deadline_validation is distinct from v_moc.deadline_validation
          or v_item.deadline_report is distinct from v_moc.deadline_report
-         or v_item.deadline_vmp is distinct from v_moc.deadline_vmp then
+         or v_item.deadline_vmp is distinct from v_moc.deadline_vmp
+         or v_item.departments is distinct from public.vmp_parse_depts(coalesce(v_source.department,''))
+         or v_item.created_by is distinct from auth.uid()
+         or v_item.updated_by is distinct from auth.uid()
+         or v_item.owner_id is not null or v_item.owner_name is not null
+         or v_item.secondary_owner is not null
+         or v_item.actual_protocol_date is not null or v_item.actual_validation_date is not null
+         or v_item.actual_report_date is not null or v_item.actual_vmp_date is not null
+         or v_item.status_protocol is distinct from 'not_started'
+         or v_item.status_validation is distinct from 'not_started'
+         or v_item.status_report is distinct from 'not_started'
+         or v_item.status_vmp is distinct from 'not_started'
+         or v_item.is_active is distinct from true
+         or v_item.item_state is distinct from 'active'
+         or v_item.version<>0
+         or (to_jsonb(v_item)-array[
+               'id','validation_code','object_code','validation_type','report_class','effort_days','year',
+               'deadline_protocol','deadline_validation','deadline_report','deadline_vmp',
+               'departments','created_by','updated_by','created_at','updated_at',
+               'computed_status','is_doc_complete','has_mismatch',
+               'status_protocol_text','status_validation_text','status_report_text','status_vmp_text'])
+            is distinct from '{
+              "owner_id":null,"owner_name":null,"secondary_owner":null,
+              "criticality_score":null,"criticality":"medium",
+              "actual_protocol_date":null,"actual_validation_date":null,
+              "actual_report_date":null,"actual_vmp_date":null,"scheduled_date":null,
+              "status_protocol":"not_started","status_validation":"not_started",
+              "status_report":"not_started","status_vmp":"not_started",
+              "is_active":true,"requires_qa_approval":false,
+              "qa_approved_by":null,"qa_approved_at":null,
+              "sheet_row_id":null,"last_synced":null,"deleted_from_sheet":false,
+              "deleted_at":null,"delete_reason":null,"missing_from_sheet":false,
+              "missing_since":null,"item_state":"active","version":0,
+              "source_sync_run_id":null,"source_sheet_row":null,"source_sheet_data":{},
+              "execution_departments":null,"department_text":null,"work_group":null,
+              "scheduled_at":null,"owner_person_id":null,"support_person_id":null
+            }'::jsonb then
         raise exception using errcode='P2001',message='CREATE_POSTSTATE';
       end if;
     end loop;
@@ -636,23 +848,87 @@ begin
       select * into v_moc from public.vmp_tinh_moc_thoi_gian(v_item.year,v_source.first_month,
         coalesce(nullif(v_source.frequency_months,0),12),v_match[2]::integer,
         v_source.report_class,v_source.workdays,v_item.validation_type);
-      if v_item.object_code is distinct from v_source.object_code
+      v_snapshot:=v_locked_snapshots->(v_entry->>'validation_code');
+      if v_snapshot is null
+         or v_item.object_code is distinct from v_source.object_code
          or (v_source.report_class is not null and v_item.report_class is distinct from v_source.report_class)
          or (v_source.workdays is not null and v_item.effort_days is distinct from v_source.workdays::numeric)
          or v_item.deadline_protocol is distinct from v_moc.deadline_protocol
          or v_item.deadline_validation is distinct from v_moc.deadline_validation
          or v_item.deadline_report is distinct from v_moc.deadline_report
-         or v_item.deadline_vmp is distinct from v_moc.deadline_vmp then
+         or v_item.deadline_vmp is distinct from v_moc.deadline_vmp
+         or v_item.version is distinct from (v_snapshot->>'version')::integer+1
+         or v_item.updated_by is distinct from auth.uid()
+         or (to_jsonb(v_item)-array['deadline_protocol','deadline_validation','deadline_report','deadline_vmp',
+               'report_class','effort_days','computed_status','is_doc_complete','has_mismatch',
+               'status_protocol_text','status_validation_text','status_report_text','status_vmp_text',
+               'version','updated_at','updated_by'])
+            is distinct from
+            (v_snapshot-array['deadline_protocol','deadline_validation','deadline_report','deadline_vmp',
+               'report_class','effort_days','computed_status','is_doc_complete','has_mismatch',
+               'status_protocol_text','status_validation_text','status_report_text','status_vmp_text',
+               'version','updated_at','updated_by']) then
         raise exception using errcode='P2001',message='UPDATE_POSTSTATE';
       end if;
     end loop;
     for v_entry in select value from jsonb_array_elements(coalesce(v_preview->'dung','[]')) loop
       select * into v_item from public.vmp_plan_items where validation_code=v_entry->>'validation_code';
-      if not found or v_item.object_code is distinct from v_source.object_code
-         or coalesce(v_item.is_active,true) or v_item.item_state is distinct from 'not_applicable' then
+      v_snapshot:=v_locked_snapshots->(v_entry->>'validation_code');
+      if not found or v_snapshot is null
+         or v_item.object_code is distinct from v_source.object_code
+         or coalesce(v_item.is_active,true) or v_item.item_state is distinct from 'not_applicable'
+         or v_item.version is distinct from (v_snapshot->>'version')::integer+1
+         or v_item.updated_by is distinct from auth.uid()
+         or (to_jsonb(v_item)-array['is_active','item_state','computed_status','is_doc_complete','has_mismatch',
+               'status_protocol_text','status_validation_text','status_report_text','status_vmp_text',
+               'version','updated_at','updated_by'])
+            is distinct from
+            (v_snapshot-array['is_active','item_state','computed_status','is_doc_complete','has_mismatch',
+               'status_protocol_text','status_validation_text','status_report_text','status_vmp_text',
+               'version','updated_at','updated_by']) then
         raise exception using errcode='P2001',message='STOP_POSTSTATE';
       end if;
     end loop;
+
+    -- Inventory is exact: V1 may add only the authoritative `tao` codes and
+    -- may neither delete nor create any other source row.
+    select coalesce(array_agg(distinct code order by code),'{}'::text[])
+    into v_expected_inventory from (
+      select unnest(v_inventory_before) code
+      union all
+      select value->>'validation_code' from jsonb_array_elements(coalesce(v_preview->'tao','[]'))
+    ) expected where code is not null;
+    select coalesce(array_agg(pi.validation_code order by pi.validation_code),'{}'::text[])
+    into v_inventory_after from public.vmp_plan_items pi
+    where pi.object_code=v_source.object_code
+       or (pi.year=v_year and left(pi.validation_code,length(v_source.object_code)+1)=v_source.object_code||'/');
+    if v_inventory_after is distinct from v_expected_inventory then
+      raise exception using errcode='P2001',message='ITEM_INVENTORY_POSTSTATE';
+    end if;
+
+    -- Every pre-existing row outside normal update/stop is byte-for-byte
+    -- unchanged by V1. This includes progressed overrides and superset-only
+    -- rows that the preview did not advertise.
+    for v_entry in select to_jsonb(code) value from unnest(v_locked_codes) code loop
+      if not exists (select 1 from jsonb_array_elements(coalesce(v_preview->'sua','[]')) e
+                     where e->>'validation_code'=v_entry#>>'{}')
+         and not exists (select 1 from jsonb_array_elements(coalesce(v_preview->'dung','[]')) e
+                         where e->>'validation_code'=v_entry#>>'{}') then
+        select to_jsonb(pi) into v_current from public.vmp_plan_items pi
+        where pi.validation_code=v_entry#>>'{}';
+        if v_current is distinct from v_locked_snapshots->(v_entry#>>'{}') then
+          raise exception using errcode='P2001',message='UNCHANGED_ITEM_POSTSTATE';
+        end if;
+      end if;
+    end loop;
+
+    select to_jsonb(so) into v_current from public.vmp_source_objects so where so.id=v_source.id;
+    if v_current is null
+       or (v_current-array['timeline_applied_revision','updated_at'])
+          is distinct from (v_source_snapshot-array['timeline_applied_revision','updated_at'])
+       or (v_current->>'timeline_applied_revision')::integer is distinct from v_source.timeline_revision then
+      raise exception using errcode='P2001',message='SOURCE_POSTSTATE';
+    end if;
 
     for v_selection in select value from jsonb_array_elements(p_deadline_overrides) loop
       select value into v_candidate from jsonb_array_elements(v_preview->'deadline_overrides')
@@ -689,10 +965,6 @@ begin
         'actual_dates_unchanged',true,'statuses_unchanged',true);
     end loop;
 
-    if (select timeline_applied_revision from public.vmp_source_objects where id=v_source.id)
-       is distinct from v_source.timeline_revision then
-      raise exception using errcode='P2001',message='SOURCE_APPLIED_REVISION';
-    end if;
     v_effective_role:=case when coalesce(auth.role(),'')='service_role' then 'service_role'
       else public.vmp_business_role(auth.uid()) end;
     v_result:=jsonb_build_object(
