@@ -24,6 +24,8 @@ import {
   buildTimelineFilterSets, TIMELINE_FILTER_DEFAULTS, timelineActiveFilterCount, timelineFilterChips, timelineOwnerOf,
 } from "../features/timeline/timelineFilterModel.ts";
 import TimelineInspector from "../features/timeline/TimelineInspector.tsx";
+import PlannedDeadlineDialog from "../features/timeline/PlannedDeadlineDialog.tsx";
+import { canPresentPlannedDeadlineEdit } from "../features/timeline/plannedDeadlineEditModel.ts";
 import BieuDoKiemSoat from "../components/dashboard/BieuDoKiemSoat.tsx";
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
 import { nhapCoThuLai } from "../lib/tailMan.ts";
@@ -1242,7 +1244,7 @@ function ScaleBands({ range }: { range: TimeRange }) {
   );
 }
 
-function ActivityDetailModal({ a, onClose }: { a: Activity | null; onClose: () => void }) {
+function ActivityDetailModal({ a, onClose, canEditPlannedDeadlines, onEditPlannedDeadlines }: { a: Activity | null; onClose: () => void; canEditPlannedDeadlines:boolean; onEditPlannedDeadlines:(a:Activity)=>void }) {
   if (!a) return null;
   const r = a._raw || {};
   const m = a.m || milestones(a);
@@ -1294,6 +1296,7 @@ function ActivityDetailModal({ a, onClose }: { a: Activity | null; onClose: () =
           </div>
         ))}
       </div>
+      {canEditPlannedDeadlines && <button type="button" data-timeline-edit-planned-deadlines onClick={() => onEditPlannedDeadlines(a)}>Chỉnh deadline kế hoạch</button>}
     </Modal>
   );
 }
@@ -1535,9 +1538,10 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
   );
 }
 
-export default function TimelineView({ acts, onOpenWorkloadCell }: {
+export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = null, onReload = () => {} }: {
   acts: Activity[];
   onOpenWorkloadCell?: (cell: WorkloadCell) => void;
+  businessRole?: string | null; onReload?: () => void;
 }) {
   const year = vmpToday().getFullYear();
   const giamChuyenDong = useMemo(
@@ -1571,6 +1575,8 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
   const [readinessFilter, setReadinessFilter] = useState("all");
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [detail, setDetail] = useState<Activity | null>(null);
+  const [plannedEdit, setPlannedEdit] = useState<Activity | null>(null);
+  const canEditPlannedDeadlines = canPresentPlannedDeadlineEdit(import.meta.env.VITE_MANUAL_PLANNED_DEADLINES_ENABLED, businessRole);
   /* Supporting pane ≥1600 (nghiên cứu đợt 2): màn rộng thì bấm hàng đổ
      chi tiết sang pane bên phải; màn hẹp giữ modal như cũ. */
   const [chon, setChon] = useState<Activity | null>(null);
@@ -2041,6 +2047,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
             chuSoHuu={ownerOf(chon)}
             onDong={() => setChon(null)}
             onHoSo={setDetail}
+            canEditPlannedDeadlines={canEditPlannedDeadlines} onEditPlannedDeadlines={setPlannedEdit}
           />
         )}
         </div>
@@ -2048,7 +2055,8 @@ export default function TimelineView({ acts, onOpenWorkloadCell }: {
         ) : null}
       </Card>
 
-      <ActivityDetailModal a={detail} onClose={() => setDetail(null)} />
+      <ActivityDetailModal a={detail} onClose={() => setDetail(null)} canEditPlannedDeadlines={canEditPlannedDeadlines} onEditPlannedDeadlines={setPlannedEdit} />
+      {plannedEdit && <PlannedDeadlineDialog a={plannedEdit} onClose={() => setPlannedEdit(null)} onReload={onReload} />}
     </div>
   );
 }

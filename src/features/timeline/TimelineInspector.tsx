@@ -20,12 +20,14 @@ const NHAN_PHA: Record<string, string> = {
   over: "Trễ", done: "Xong", current: "Đang làm", future: "Sắp tới",
 };
 
-export default function TimelineInspector({ a, chuSoHuu, onDong, onHoSo }: {
+export default function TimelineInspector({ a, chuSoHuu, onDong, onHoSo, canEditPlannedDeadlines = false, onEditPlannedDeadlines }: {
   a: Activity | null;
   /** ownerOf(a) — luật gom chủ sở hữu nằm ở trang, pane chỉ hiển thị. */
   chuSoHuu: string;
   onDong: () => void;
   onHoSo: (a: Activity) => void;
+  canEditPlannedDeadlines?: boolean;
+  onEditPlannedDeadlines?: (a: Activity) => void;
 }) {
   /* Chưa chọn gì thì KHÔNG render pane (yêu cầu chủ dự án 16/08): trên
      màn dữ liệu GMP, một cột trống có minh hoạ là một cột bị lấy mất của
@@ -79,6 +81,7 @@ export default function TimelineInspector({ a, chuSoHuu, onDong, onHoSo }: {
         <button type="button" className="tl-inspector__nut" onClick={() => onHoSo(a)}>
           Hồ sơ đầy đủ
         </button>
+        {canEditPlannedDeadlines && <button type="button" className="tl-inspector__nut" data-timeline-edit-planned-deadlines onClick={() => onEditPlannedDeadlines?.(a)}>Chỉnh deadline kế hoạch</button>}
       </div>
     </aside>
   );

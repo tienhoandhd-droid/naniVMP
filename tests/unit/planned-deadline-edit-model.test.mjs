@@ -1,0 +1,5 @@
+import test from "node:test"; import assert from "node:assert/strict";
+import { canPresentPlannedDeadlineEdit, validatePlannedDeadlineDraft } from "../../src/features/timeline/plannedDeadlineEditModel.ts";
+const before={deadline_protocol:"2026-01-01",deadline_validation:"2026-01-02",deadline_report:"2026-01-03",deadline_vmp:"2026-01-04"};
+test("gate chỉ admin/qa_manager khi env đúng",()=>{assert.equal(canPresentPlannedDeadlineEdit("true","admin"),true);assert.equal(canPresentPlannedDeadlineEdit("true","qa_staff"),false);assert.equal(canPresentPlannedDeadlineEdit("false","qa_manager"),false)});
+test("draft cần reason confirmation, không xoá/đảo/noop",()=>{assert.match(validatePlannedDeadlineDraft(before,before,"x",true),/Không có/);assert.match(validatePlannedDeadlineDraft(before,{...before,deadline_protocol:null},"x",true),/Không được/);assert.match(validatePlannedDeadlineDraft(before,{...before,deadline_protocol:"2026-02-01"},"x",true),/thứ tự/);assert.equal(validatePlannedDeadlineDraft(before,{...before,deadline_vmp:"2026-01-05"},"x",true),null)});

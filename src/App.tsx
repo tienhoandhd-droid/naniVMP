@@ -2008,7 +2008,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   onOpenProgress={moTienDo} />
               )}
               {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
-              {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} />}
+              {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} businessRole={access.businessRole} onReload={reloadData} />}
               {view === "source" && (
                 <SourceCatalogView access={access} onReload={reloadData}
                   focus={moDanhMuc}

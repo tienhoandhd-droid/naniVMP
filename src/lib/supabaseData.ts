@@ -24,6 +24,14 @@ import type {
   DeadlineOverrideSelection,
   ProgressedDeadlineCandidate,
 } from "../features/catalogWorkspace/catalogTimelineOverrideModel.ts";
+import type { PlannedDeadlineResult, PlannedDeadlineSnapshot } from "../features/timeline/plannedDeadlineEditModel.ts";
+
+export async function updatePlannedDeadlines(input: { validationCode:string; deadlines:PlannedDeadlineSnapshot; reason:string; expectedVersion:number; confirmed:boolean }): Promise<PlannedDeadlineResult> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const { data, error } = await supabase.rpc("rpc_update_planned_deadlines" as never, { p_validation_code: input.validationCode, p_deadlines: input.deadlines, p_reason: input.reason.trim(), p_expected_version: input.expectedVersion, p_confirmed: input.confirmed } as never);
+  if (error) throw new Error(error.message);
+  return data as PlannedDeadlineResult;
+}
 
 /** RPC trả jsonb nên type sinh tự động là Json — ép về hình dạng đã biết ngay
  *  tại biên đọc, để phần còn lại của ứng dụng làm việc với kiểu thật. */
