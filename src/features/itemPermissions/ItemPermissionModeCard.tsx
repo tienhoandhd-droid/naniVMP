@@ -39,14 +39,11 @@ import type { DirectoryPerson, PermissionIssue, PermissionPreflight } from "./ty
  *  tiếng Việt không dấu, và nói đúng việc đang làm. */
 const CHU_XAC_NHAN = "AP DUNG";
 
-/** Nhãn vai/phân loại quyền hiển thị cho người dùng — tra theo id, giữ
- *  nguyên chuỗi thô cho các access_class cũ (legacy) không còn trong bảng. */
-const NHAN_ACCESS_CLASS: Record<string, string> = Object.fromEntries(
-  ACCESS_CLASSES.map((c) => [c.id, c.label]),
-);
+/** Nhãn phân loại quyền hiển thị dùng chung với danh bạ; giữ nguyên chuỗi
+ *  thô cho các access_class cũ (legacy) không còn trong bảng. */
 function nhanVaiTro(nguoi: DirectoryPerson): string {
   if (!nguoi.access_class) return "Chưa phân loại";
-  return NHAN_ACCESS_CLASS[nguoi.access_class] ?? nguoi.access_class;
+  return ACCESS_CLASSES.find((item) => item.id === nguoi.access_class)?.label ?? nguoi.access_class;
 }
 
 /** Đo song song tối đa ngần này người một lúc. Nã hàng chục RPC cùng lúc

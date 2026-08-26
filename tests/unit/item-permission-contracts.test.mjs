@@ -22,8 +22,7 @@ test("phân loại tạo đúng quyền sửa ở từng nhóm timeline", async 
   /* `view_only` đã rời danh sách chọn được (19/08): constraint DB cho phép
      nó và nhãn ghi "Chỉ xem", nhưng `vmp_business_role()` không có nhánh nào
      cho nó — ai bị gán sẽ có business_role null, tức MẤT SẠCH quyền chứ
-     không phải chỉ xem. Muốn một người chỉ xem thì đặt vai đăng nhập
-     `viewer` ở màn Cấu hình hệ thống. */
+     không phải chỉ xem. Đây là giá trị legacy, không phải một vai nghiệp vụ. */
   assert.deepEqual(ACCESS_CLASSES.map((item) => item.id), [
     "qa_progress_editor",
     "qa_manager",

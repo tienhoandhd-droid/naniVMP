@@ -14,6 +14,7 @@
 import { supabase } from "./supabaseClient.ts";
 import { deriveActivityFields } from "./n8nAdapter.ts";
 import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/performerSelection.ts";
+import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS } from "./businessRoles.ts";
 import type {
   Activity, GenerateTimelineResult, ObjectKind, RpcResult,
   SourceObjectRow, VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
@@ -732,13 +733,10 @@ export async function setUserActive(
 /** Năm vai NGHIỆP VỤ hiệu lực — đúng những gì `vmp_business_role()` giải ra. Đây là
  *  từ vựng người dùng nhìn thấy; ánh xạ sang cặp (profiles.role,
  *  vmp_performers.access_class) nằm ở RPC, không ở client. */
-export const VAI_NGHIEP_VU = [
-  { id: "admin", nhan: "Quản trị", mo: "Toàn quyền, kể cả phân quyền" },
-  { id: "qa_manager", nhan: "Quản lý QA", mo: "Xem tất cả, sửa tiến độ và danh mục" },
-  { id: "qa_staff", nhan: "Nhân viên QA", mo: "Sửa tiến độ trong phạm vi QA" },
-  { id: "workshop_manager", nhan: "Quản lý xưởng", mo: "Quản lý thiết bị của bộ phận" },
-  { id: "workshop_staff", nhan: "Nhân viên xưởng", mo: "Sửa việc được phân công" },
-] as const;
+export const VAI_NGHIEP_VU = BUSINESS_ROLE_IDS.map((id) => {
+  const role = BUSINESS_ROLE_CATALOG[id];
+  return { id: role.id, nhan: role.label, mo: role.description };
+});
 
 export interface VaiNghiepVuRow {
   user_id: string;

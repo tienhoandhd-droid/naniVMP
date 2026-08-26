@@ -8,8 +8,8 @@
  * giải vai không có nhánh nào cho nó. Ai bị gán sẽ mất quyền hoàn toàn thay
  * vì chỉ xem. Đã chuyển sang danh sách legacy (19/08) — không chọn mới
  * được, nhưng bản ghi cũ đang mang nó vẫn hiện đúng thay vì rơi về rỗng.
- * Muốn một người CHỈ XEM thì đặt vai đăng nhập `viewer` ở màn Cấu hình hệ
- * thống; đó là nơi duy nhất ghi đủ cả bốn trường mà hàm giải vai cần. */
+ * Vai đăng nhập `viewer` là giá trị legacy riêng, không phải một vai nghiệp
+ * vụ và không được chọn mới trong danh bạ. */
 export const ACCESS_CLASSES = [
   { id: "qa_progress_editor", label: "QA – Cập nhật 4 mốc hoàn thành" },
   { id: "qa_manager", label: "Quản lý QA" },

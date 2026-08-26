@@ -8,6 +8,7 @@ import {
   BUSINESS_ROLES,
   BUSINESS_ROLE_LABELS,
 } from "../../src/lib/access.ts";
+import { BUSINESS_ROLE_CATALOG } from "../../src/lib/businessRoles.ts";
 
 const managerPayload = {
   ok: true, mode: "enforced", business_role: "workshop_manager", unresolved_reason: null,
@@ -166,6 +167,7 @@ test("mọi vai nghiệp vụ hiệu lực đều có nhãn hiển thị tiếng
   for (const vai of BUSINESS_ROLES) {
     assert.equal(typeof BUSINESS_ROLE_LABELS[vai], "string");
     assert.ok(BUSINESS_ROLE_LABELS[vai].length > 1, `thiếu nhãn cho ${vai}`);
+    assert.equal(BUSINESS_ROLE_LABELS[vai], BUSINESS_ROLE_CATALOG[vai].label);
   }
 });
 
