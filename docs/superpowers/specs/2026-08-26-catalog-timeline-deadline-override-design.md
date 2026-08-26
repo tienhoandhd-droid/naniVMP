@@ -43,7 +43,7 @@ Các cột sau phải giữ nguyên tuyệt đối:
 - trạng thái hoạt động của hạng mục;
 - người thực hiện và phân công;
 - mã hạng mục, loại thẩm định và đối tượng;
-- phiên bản hoặc trường nghiệp vụ không liên quan, ngoại trừ trường kiểm toán mà cơ chế ghi hiện hành bắt buộc cập nhật.
+- trường nghiệp vụ không liên quan, ngoại trừ `version` phải tăng đúng một lần và trường kiểm toán mà cơ chế ghi hiện hành bắt buộc cập nhật.
 
 ## 4. Xem trước và giao diện
 
@@ -53,7 +53,8 @@ Mỗi dòng `giu_nguyen` trả thêm:
 - bốn deadline mới được tính từ dữ liệu nguồn;
 - danh sách trường dữ liệu nguồn còn thiếu;
 - các ngày thực tế hoặc trạng thái cụ thể khiến hạng mục được coi là đã có tiến độ;
-- cờ `co_the_ghi_de_deadline` và lý do khi cờ này là `false`.
+- cờ `co_the_ghi_de_deadline` và lý do khi cờ này là `false`;
+- `item_version`, là phiên bản toàn hàng tăng đúng một lần sau mọi cập nhật nghiệp vụ.
 
 Nếu deadline mới khác deadline hiện tại và không thiếu dữ liệu, giao diện hiện lựa chọn “Cập nhật deadline kế hoạch dù hạng mục đã có tiến độ”. Mặc định lựa chọn này tắt. Khi bật, người dùng thấy lại mã hạng mục, deadline cũ → mới và cảnh báo rõ ngày thực tế/trạng thái sẽ không đổi.
 
@@ -69,16 +70,18 @@ Mọi kết quả không thực hiện được phải trả `ok: false`, `error
 | `FORBIDDEN` | Không phải Admin/Quản lý QA | Nêu đúng quyền cần có |
 | `REASON_REQUIRED` | Lý do rỗng | Nêu trường Lý do bắt buộc |
 | `CHANGE_NOT_FOUND` | Không tìm thấy thay đổi | Nêu thay đổi không còn tồn tại |
-| `ALREADY_APPLIED` | Thay đổi đã áp | Trả `ok: true`, `da_ap_truoc_do: true` và kết quả cũ; không ghi lần hai |
+| Không có mã lỗi (idempotent) | Thay đổi đã áp | Trả `ok: true`, `da_ap_truoc_do: true` và kết quả cũ; không ghi lần hai |
 | `SUPERSEDED` | Có thay đổi danh mục mới hơn | Yêu cầu mở lần xem trước mới |
 | `OBJECT_NOT_FOUND` | Đối tượng nguồn không còn tồn tại | Nêu mã đối tượng |
 | `VERSION_CONFLICT` | Timeline/danh mục đổi sau khi xem trước | Trả phiên bản đã xem và phiên bản hiện tại |
+| `EXPECTED_REVISION_REQUIRED` | Request override thiếu phiên bản timeline | Nêu phải xem trước lại trước khi áp |
+| `INVALID_OVERRIDE_PAYLOAD` | JSON sai kiểu, thiếu/thừa khóa, version null/không nguyên, mã rỗng hoặc trùng | Trả vị trí và lý do payload không hợp lệ |
 | `NO_ACTIONABLE_CHANGE` | Không có deadline khác và không có thao tác thường | Nêu timeline đã khớp |
 | `MISSING_SOURCE_DATA` | Không tính đủ deadline | Trả chính xác danh sách trường thiếu theo từng mã hạng mục |
 | `OVERRIDE_NOT_CONFIRMED` | Có yêu cầu ghi đè nhưng chưa xác nhận | Nêu cần bật xác nhận đặc biệt |
 | `INVALID_OVERRIDE_ITEM` | Mã chọn không thuộc nhóm được phép | Trả danh sách mã không hợp lệ |
 | `ITEM_NOT_FOUND` | Hạng mục biến mất trước khi áp | Trả mã hạng mục |
-| `ITEM_STATE_CHANGED` | Tiến độ/trạng thái đã đổi sau xem trước | Nêu trường nào đổi và yêu cầu xem trước lại |
+| `ITEM_STATE_CHANGED` | Toàn hàng đã có cập nhật sau xem trước | Nêu mã hạng mục, phiên bản đã xem, phiên bản hiện tại và yêu cầu xem trước lại; không đoán cột thay đổi khi request không mang snapshot cũ |
 | `WRITE_MISMATCH` | Số dòng cập nhật không đúng dự kiến | Không commit; trả mã chưa ghi được |
 | `NETWORK` / lỗi máy chủ | Không gọi được máy chủ | Nêu chưa ghi dữ liệu và dữ liệu cũ còn nguyên |
 
@@ -86,30 +89,39 @@ Thông báo giao diện ưu tiên `error` và danh sách chi tiết do máy ch�
 
 ## 6. Tính nguyên tử, cạnh tranh và kiểm toán
 
-Lần áp chạy trong một transaction. Tất cả thao tác tạo, đổi, dừng và ghi đè deadline cùng thành công hoặc toàn bộ rollback. Không có trạng thái cập nhật một nửa.
+Lần áp chạy trong một transaction. Tất cả thao tác tạo, đổi, dừng và ghi đè deadline cùng thành công hoặc toàn bộ rollback. Không có trạng thái cập nhật một nửa. Phần mutation nằm trong một PL/pgSQL exception subtransaction: nếu hậu kiểm phát hiện lệch, subtransaction rollback trước khi RPC trả JSON lỗi.
 
-Máy chủ khóa dòng thay đổi danh mục và các hạng mục được ghi đè, tính lại ảnh hưởng ngay trong transaction, rồi kiểm tra phiên bản. Hai người áp đồng thời không thể ghi chồng. Gửi lại cùng yêu cầu không ghi lần hai.
+Mọi đường lưu danh mục, apply V1 và apply V2 lấy cùng transaction-scoped advisory mutex từ cặp bất biến `(object_kind, object_code)` trước row lock. Mutex khiến các đường cũ không thể giữ khóa chéo trên cùng đối tượng. Sau mutex, V2 khóa change → source object → toàn bộ hạng mục hiện có trong impact, sắp theo `validation_code`.
+
+`vmp_plan_items.version` trở thành row revision thật: một trigger duy nhất đặt `NEW.version = OLD.version + 1` trên mọi UPDATE, kể cả writer cũ. Writer đang tự cộng version vẫn chỉ tăng đúng một lần vì trigger ghi đè về giá trị chuẩn. Máy chủ tính lại ảnh hưởng trong transaction, so phiên bản timeline và từng item version sau khi đã khóa. Hai người áp đồng thời không thể ghi chồng. Gửi lại cùng yêu cầu không ghi lần hai.
+
+Apply V2 không tin bộ đếm do apply V1 trả về. Sau V1, nó kiểm hậu trạng thái của từng thao tác tạo/đổi/dừng thường và từng override. Bất kỳ dòng nào không đạt hậu trạng thái dự kiến đều trả `WRITE_MISMATCH` sau rollback toàn bộ subtransaction.
 
 Kết quả áp và nhật ký phải chứa:
 
 - người thực hiện và vai trò hiệu lực;
 - lý do;
 - mã hạng mục;
-- bốn deadline cũ và mới;
+- bốn deadline cũ và mới, gồm cả `deadline_validation`;
 - xác nhận rằng ngày thực tế và trạng thái không đổi;
 - số hạng mục tạo, đổi thường, dừng, ghi đè và giữ nguyên.
 
 ## 7. Quyền và tương thích
 
-RPC mới hoặc RPC được mở rộng phải giữ active-session guard của five-role hardening. Hidden implementation tiếp tục owner-only; trình duyệt chỉ được gọi public boundary đã kiểm vai trò. Không cấp quyền trực tiếp lên bảng.
+RPC mới hoặc RPC được mở rộng phải giữ active-session guard của five-role hardening. Hai V2 public boundary là SECURITY DEFINER có `search_path` cố định và kiểm active session + role trước khi đọc dữ liệu. Helper mới là SECURITY INVOKER, owner-only. V2 chỉ gọi public V1 wrappers; không tham chiếu trực tiếp tên hidden `__five_role_impl_20260824`. Không cấp quyền trực tiếp lên bảng.
+
+Public wrapper save và V1 apply được thay in-place để lấy shared object mutex trước khi chuyển vào implementation hiện có. ACL/owner cũ phải được giữ chính xác. Sau migration, browser/service function inventory được rebaseline thành hợp đồng cũ cộng đúng hai V2 boundary, không có delta khác; preflight unfiltered item-reader không được tăng ngoài thay đổi đã review.
 
 Lời gọi áp ba tham số hiện tại tiếp tục hoạt động như cũ và không tự ghi đè deadline. Chỉ lời gọi có danh sách mã ghi đè và xác nhận tường minh mới dùng hành vi mới.
 
 ## 8. Kiểm thử và phát hành
 
 - Unit RED/GREEN cho model giao diện, ánh xạ lỗi và payload xác nhận.
-- SQL RED/GREEN trên cơ sở dữ liệu thử dùng fixture có tiến độ: deadline đổi, ngày thực tế/trạng thái giữ nguyên; thiếu dữ liệu, sai quyền, stale revision, mã không hợp lệ và ghi hai lần đều có kết quả chính xác.
+- SQL RED/GREEN trên cơ sở dữ liệu thử dùng fixture có tiến độ: deadline đổi, ngày thực tế/trạng thái giữ nguyên; thiếu dữ liệu, sai quyền, stale revision, stale item qua writer cũ, payload sai/trùng, mã không hợp lệ và ghi hai lần đều có kết quả chính xác.
 - Kiểm thử transaction rollback khi một mã trong lô không hợp lệ.
+- Kiểm thử fault injection sau khi V1 đã mutation để chứng minh rollback cả normal/override/audit/source revision.
+- Kiểm thử hai session cho save/apply và apply/apply để chứng minh không deadlock/lost update.
+- Kiểm thử post-V2 exact ACL inventory khi V2 đang được cài, không chỉ chạy lại baseline trước V2.
 - E2E giả lập cho thao tác chọn ghi đè, lý do bắt buộc, thông báo thiếu dữ liệu và thông báo xung đột.
 - Chạy typecheck, toàn bộ unit, build và E2E liên quan trước khi đề nghị push.
 - Không chạy mutation test trên production. Production chỉ nhận migration đã review, backup đúng quy trình và postflight chỉ đọc sau khi có phê duyệt triển khai riêng.
