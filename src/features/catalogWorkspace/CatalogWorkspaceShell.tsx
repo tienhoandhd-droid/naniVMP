@@ -634,14 +634,14 @@ export default function CatalogWorkspaceShell({
               toast.canhBao(
                 `Đã lưu ${ma}, nhưng còn ${chuaCap.length} hạng mục chưa cấp được quyền cho QA phụ trách mới `
                 + `(${chuaCap.slice(0, 3).map((x) => x.validation_code).join(", ")}${chuaCap.length > 3 ? "…" : ""}) — `
-                + "kiểm tra lại phạm vi người thao tác hoặc phân công tay ở màn Nhân sự.",
+                + "liên hệ quản trị viên để kiểm tra phạm vi người thao tác hoặc phân công tay.",
               );
             }
             if (chuaThuHoi.length) {
               toast.canhBao(
                 `Đã lưu ${ma}, nhưng còn ${chuaThuHoi.length} hạng mục chưa thu hồi được quyền của người phụ trách cũ `
                 + `(${chuaThuHoi.slice(0, 3).map((x) => x.validation_code).join(", ")}${chuaThuHoi.length > 3 ? "…" : ""}) — `
-                + "kiểm tra lại ở màn Nhân sự.",
+                + "liên hệ quản trị viên để kiểm tra lại phân công.",
               );
             }
             setDangSuaObj(null);

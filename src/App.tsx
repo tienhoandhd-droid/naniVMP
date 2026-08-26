@@ -62,7 +62,7 @@ import {
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
 import { useAccess, useAccessCacheTransition } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
-import { resolveViewIntent } from "./lib/navigationContract.ts";
+import { resolveAuthorizedView, resolveViewIntent } from "./lib/navigationContract.ts";
 import { overviewTarget } from "./lib/navigationTargets.ts";
 import { applyWorkloadCellNavigation } from "./lib/workloadNavigation.ts";
 import type { AccessContext, ScreenId } from "./lib/access.ts";
@@ -106,7 +106,6 @@ const SourceCatalogView = lazy(nhapCoThuLai(() => import("./pages/SourceCatalogP
 const ServerChecksView = lazy(nhapCoThuLai(() => import("./pages/ServerChecksPage.tsx")));
 const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
-const OperationalPeopleView = lazy(nhapCoThuLai(() => import("./pages/OperationalPeoplePage.tsx")));
 const TodayView = lazy(nhapCoThuLai(() => import("./features/today/TodayCommandCenter.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
@@ -1735,6 +1734,10 @@ function VerifiedAppShell({ user, logout, access }: {
     else if (saveStatus === "warning") toast.canhBao("Lưu Supabase OK — Sheet chưa đồng bộ");
     else if (saveStatus === "error") toast.loi("Lưu thất bại");
   }, [saveStatus, toast]);
+  const rawUrlViews = useMemo(() => NAV_ITEMS.map((item) => item.id).concat([
+    "risk", "inventory", "missing", "accounts", "people",
+  ]), []);
+
   /* Đưa alias về màn chuẩn NGAY tại biên đọc URL.
      `#v=inventory` và `#v=risk` là tên cũ của "Tiến độ gộp theo đối tượng"
      và "Cảnh báo". Chuẩn hoá ở đây, một lần, thay vì để mỗi nhánh render
@@ -1748,12 +1751,18 @@ function VerifiedAppShell({ user, logout, access }: {
        đã làm, để #v=accounts cũ không rơi vào trang trắng. */
     const vRaw = s.view === "accounts" ? "phanquyen" : s.view;
     const y = resolveViewIntent(vRaw);
-    if (!y) return { state: s, nhom: null as null | "doituong" };
+    if (!y) {
+      const fallback = resolveAuthorizedView(vRaw, access);
+      return {
+        state: { ...s, view: fallback?.screenId ?? "missing" },
+        nhom: null as null | "doituong",
+      };
+    }
     return {
       state: y.screenId === s.view ? s : { ...s, view: y.screenId },
       nhom: y.presentation === "grouped-object" ? ("doituong" as const) : null,
     };
-  }, []);
+  }, [access]);
 
   // Trạng thái ban đầu: URL thắng, rồi mới tới bộ lọc nhớ từ lần trước. Ai dán
   // link cho nhau thì phải thấy ĐÚNG cái người gửi thấy, không bị bộ lọc cũ của
@@ -1763,11 +1772,9 @@ function VerifiedAppShell({ user, logout, access }: {
      xong thì nó thành `progress` và thông tin đó biến mất. */
   const khoiTaoDayDu = useMemo(() => {
     const tuUrl = docUrl(typeof window === "undefined" ? "" : window.location.hash, {
-      // `inventory`, `risk` và `accounts` không có mục menu nhưng vẫn là
-      // đường dẫn hợp lệ. Thiếu chúng ở đây thì đường dẫn cũ người dùng đã
-      // lưu bị docUrl loại và rơi về màn mặc định — đúng cái mà chú thích ở
-      // NAV_ITEMS nói phải tránh.
-      views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing", "accounts"]),
+      // `people` chỉ còn là token URL lịch sử: phải đọc nó ở đây để luật
+      // quyền bên trên chọn màn thay thế, thay vì để docUrl nuốt về overview.
+      views: rawUrlViews,
       depts: DEPTS.map((d) => d.id),
       periods: PERIODS.map((p) => p[0]).concat(["custom"]),
     });
@@ -1780,7 +1787,7 @@ function VerifiedAppShell({ user, logout, access }: {
       ? { ...tuUrl, ...docUrl(String(nho.hash || "")), view: tuUrl.view }
       : tuUrl;
     return { state, nhom: null as null | "doituong" };
-  }, [chuanHoaView]);
+  }, [chuanHoaView, rawUrlViews]);
 
   const khoiTao: UrlState = khoiTaoDayDu.state;
 
@@ -2010,11 +2017,9 @@ function VerifiedAppShell({ user, logout, access }: {
   useEffect(() => {
     const apDung = () => {
       const s = docUrl(window.location.hash, {
-        // `inventory`, `risk` và `accounts` không có mục menu nhưng App vẫn
-        // xử lý được. Thiếu một trong chúng ở đây thì đường dẫn cũ người
-        // dùng đã lưu bị docUrl loại và rơi về màn mặc định — đúng cái mà
-        // chú thích ở NAV_ITEMS nói là phải tránh.
-        views: NAV_ITEMS.map((n) => n.id).concat(["risk", "inventory", "missing", "accounts"]),
+        // `people` chỉ còn là token URL lịch sử và được resolve theo quyền
+        // hiện thời trong chuanHoaView.
+        views: rawUrlViews,
         depts: DEPTS.map((d) => d.id),
         periods: PERIODS.map((p) => p[0]).concat(["custom"]),
       });
@@ -2035,7 +2040,7 @@ function VerifiedAppShell({ user, logout, access }: {
       window.removeEventListener("popstate", apDung);
       window.removeEventListener("hashchange", apDung);
     };
-  }, []);
+  }, [chuanHoaView, rawUrlViews]);
 
   // (MỚI) Giữ dữ liệu tươi: làm mới khi quay lại tab; RELOAD khi sang NGÀY MỚI
   // (VMP_TODAY và "hôm nay" tính lúc tải trang → tránh "quá hạn/ngày còn lại" bị cũ khi mở lâu).
@@ -2231,13 +2236,6 @@ function VerifiedAppShell({ user, logout, access }: {
               {view === "alerts" && <AlertsView acts={filteredActs} />}
               {view === "workload" && <WorkloadView acts={filteredActs} />}
               {view === "reports" && <ReportsView acts={filteredActs} />}
-              {view === "people" && (
-                <OperationalPeopleView acts={filteredActs} access={access}
-                  scopeLabel={nhanPhamVi}
-                  updatedLabel={dataUpdatedAt
-                    ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
-                    : undefined} />
-              )}
               {/* Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là
                   alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}

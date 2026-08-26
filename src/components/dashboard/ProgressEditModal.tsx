@@ -636,10 +636,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
             />
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.45 }}>
               {selectedPerformer
-                ? <>Email: <b style={{ color: C.plum }}>{selectedPerformer.email || "chưa có — bổ sung ở tab Người thực hiện"}</b>{selectedPerformer.department ? ` · ${selectedPerformer.department}` : " · chưa có bộ phận"}</>
+                ? <>Email: <b style={{ color: C.plum }}>{selectedPerformer.email || "chưa có — liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự"}</b>{selectedPerformer.department ? ` · ${selectedPerformer.department}` : " · chưa có bộ phận"}</>
                 : ownerPersonIdNow && performerPersonId === ownerPersonIdNow
                   ? <b style={{ color: C.raspText }}>Liên kết hiện tại không còn trong danh sách người đang hoạt động — hãy chọn lại.</b>
-                  : "Chưa phân công. Tên mới chỉ được tạo ở Danh mục & Nhập liệu → tab Người thực hiện."}
+                  : "Chưa phân công. Liên hệ quản trị viên để cập nhật hồ sơ nhân sự."}
               {whoChanged && <> · Áp dụng cho <b>mọi hạng mục của đối tượng {act.code}</b> (phân công lưu ở đối tượng nên không bị đồng bộ Sheet xoá).</>}
             </span>
           </>

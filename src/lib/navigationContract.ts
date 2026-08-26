@@ -31,7 +31,7 @@ export const ORDERED_SCREEN_IDS: readonly ScreenId[] = [
   "today", "progress", "source",
   "overview", "timeline", "alerts",
   "workload", "reports", "rules",
-  "people", "accounts", "phanquyen", "health", "audit", "admin",
+  "accounts", "phanquyen", "health", "audit", "admin",
 ];
 
 /** Cách trình bày kèm theo, khi một alias mang thêm ý nghĩa. */

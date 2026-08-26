@@ -24,8 +24,8 @@
  *       chịu tạo tài khoản.
  *     - Card "Tài khoản & quyền": chọn người từ danh bạ, nối/gỡ tài khoản,
  *       xem quyền hiệu lực (StaffDirectoryPanel + AccountLinkPanel +
- *       EffectiveRightsPanel). Sửa hồ sơ nhân sự/phân công đã chuyển hẳn
- *       sang màn Nhân sự — màn này không sửa nữa.
+ *       EffectiveRightsPanel). Cập nhật hồ sơ và phân công được quản trị
+ *       viên xử lý theo quy trình quản trị.
  *     - MaTranQuyenManHinh: ma trận "Màn hình bạn được xem", đọc THẲNG
  *       rpc_my_ui_access của chính người đang xem — server trả gì hiện
  *       nấy, không chép luật lại bằng tay nên không thể lệch với luật thật.
@@ -114,8 +114,7 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
 
   useEffect(() => {
     if (!supabase) return;
-    /* Chỉ cần nguoi để đối chiếu "email này đã có tài khoản chưa" ở mục 1
-       — không giữ toàn bộ state trách nhiệm & phân công của màn Nhân sự. */
+    /* Chỉ cần nguoi để đối chiếu "email này đã có tài khoản chưa" ở mục 1. */
     fetchNguoiVaQuyen().then((r) => setNguoi(r.nguoi)).catch(() => { /* không có quyền thì thôi */ });
     taiDsEmail();
   }, []);
@@ -280,7 +279,6 @@ const TEN_MAN: Record<string, string> = {
   workload: "Phân công & khối lượng",
   reports: "Báo cáo",
   rules: "Quy tắc nghiệp vụ",
-  people: "Nhân sự",
   health: "Chất lượng dữ liệu",
   audit: "Nhật ký thay đổi",
   accounts: "Tài khoản & quyền truy cập",
@@ -398,14 +396,13 @@ function CurrentPermissionWorkspace({ acts, access }: {
       {duocChinhChinhSachQuyen && <QuanTriQuyenCards duocSua={duocChinhChinhSachQuyen} />}
       <Card variant="strong">
         <CardTitle icon={Users}
-          sub="Chọn tài khoản để nối/gỡ và xem đúng quyền đang có hiệu lực. Sửa hồ sơ nhân sự
-            và phân công việc nay ở màn Nhân sự — màn này chỉ còn lo tài khoản và quyền.">
+          sub="Chọn tài khoản để nối/gỡ và xem đúng quyền đang có hiệu lực. Liên hệ quản trị viên
+            khi cần cập nhật hồ sơ nhân sự hoặc phân công việc.">
           Tài khoản &amp; quyền
         </CardTitle>
         <div className="ip-workspace">
-          {/* canEdit cố định false: sửa hồ sơ nhân sự đã chuyển hẳn sang màn
-              Nhân sự. Danh bạ ở đây chỉ để CHỌN người — nối tài khoản và xem
-              quyền hiệu lực của người đó. */}
+          {/* Danh bạ ở đây chỉ để CHỌN người — nối tài khoản và xem quyền
+              hiệu lực của người đó. */}
           <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson}
             revision={directoryRevision} refreshPersonId={directoryRefreshPersonId} />
           {duocQuanLyTaiKhoan && (
@@ -449,4 +446,3 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
   }
   return <CurrentPermissionWorkspace acts={props.acts} access={props.access} />;
 }
-

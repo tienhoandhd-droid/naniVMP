@@ -308,7 +308,7 @@ export function runDataQualityChecks(acts: Activity[]) {
 
     // 6. Thiếu email QA
     if (a.owner && a.owner !== "—" && !r.email_qa) {
-      issues.push({ type: "owner_no_email", severity: "info", id: a.id, msg: `QA "${a.owner}" chưa có email — không nhận được cảnh báo. Bổ sung ở Danh mục & Nhập liệu → tab Người thực hiện.` });
+      issues.push({ type: "owner_no_email", severity: "info", id: a.id, msg: `QA "${a.owner}" chưa có email — không nhận được cảnh báo. Liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự.` });
     }
 
     // 7. Thiếu loại thẩm định

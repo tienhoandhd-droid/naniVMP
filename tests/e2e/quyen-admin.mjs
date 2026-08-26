@@ -139,29 +139,6 @@ function suaKhoQaManager(kho) {
 }
 
 
-/** Quản lý QA khi server CHƯA có `rpc_my_ui_access`: frontend phải fail
- *  closed, không dựng quyền từ profile/luật cũ. */
-function suaKhoQaKhongCoUiAccess(kho) {
-  suaKhoAdmin(kho);
-  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
-  delete kho.rpc_my_ui_access;
-}
-
-/** Quản lý QA khi server CÓ cấp `edit_operational_people`. Ca này chứng
- *  minh giao diện đã sẵn sàng: mọi thứ chỉ còn chờ luật ở server. */
-function suaKhoQaDuocSuaNhanSu(kho) {
-  suaKhoAdmin(kho);
-  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
-  const goc = kho.rpc_my_ui_access;
-  const screens = {};
-  for (const [id, q] of Object.entries(goc.screens)) {
-    screens[id] = id === "people"
-      ? { ...q, can_view: true, actions: ["view", "edit_operational_people"] }
-      : q;
-  }
-  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
-}
-
 /** Quản lý QA theo ĐÚNG bảng quyền của server — dùng cho MỌI ca quản lý QA.
  *
  *  Bản trước có thêm một kho "qa_manager" chỉ hạ `profiles.role` mà vẫn để
@@ -566,47 +543,24 @@ for (const [ten, suaKho] of [
   await b.trang.close();
 }
 
-/* ---- 9. Màn "Nhân sự" — quản lý QA thật sự sửa được gì? ------------- *
- *  Màn này sinh ra để quản lý QA sửa hồ sơ nhân sự mà không đụng vòng đời
- *  tài khoản. Câu hỏi là luật quyền có cho họ làm thật không. Đo hai tình
- *  huống thay vì suy đoán.
- * --------------------------------------------------------------------- */
+/* ---- 9. Grant people lịch sử không mở lại page Nhân sự -------------- */
 {
-  console.log("\nMàn Nhân sự — quản lý QA sửa được tới đâu:");
-
-  const doSuaDuoc = async (suaKho) => {
-    const { trang } = await moTrang(trinhDuyet, { suaKho, hash: "people" });
-    await cho(1600);
-    const kq = await trang.evaluate(() => {
-      const oTen = document.querySelector('input[aria-label="Họ và tên trong danh bạ"]');
-      const nutLuu = [...document.querySelectorAll("button")]
-        .find((b) => /Lưu hồ sơ|Thêm vào danh bạ/.test(b.textContent || ""));
-      return {
-        moDuocMan: document.body.innerText.includes("Nhân sự")
-          || !!document.querySelector('[data-view="people"]'),
-        accessState: document.querySelector("[data-access-state]")?.getAttribute("data-access-state"),
-        coOTen: !!oTen,
-        oTenSuaDuoc: oTen ? !oTen.disabled : false,
-        coNutLuu: !!nutLuu,
-        noiKhongCoQuyen: document.body.innerText.includes("Chỉ Admin và Quản lý QA sửa"),
-      };
-    });
-    await trang.close();
-    return kq;
-  };
-
-  // 9a. Thiếu RPC: không có luật dự phòng từ role đăng nhập.
-  const duPhong = await doSuaDuoc(suaKhoQaKhongCoUiAccess);
-  kiem(duPhong.accessState === "error", "thiếu RPC chuyển sang trạng thái lỗi fail-closed");
-  kiem(!duPhong.moDuocMan && !duPhong.coOTen && !duPhong.coNutLuu,
-    "thiếu RPC không mount màn Nhân sự hay thao tác hồ sơ");
-
-  // 9b. Server cấp edit_operational_people: giao diện phải mở khoá ngay.
-  const duocCap = await doSuaDuoc(suaKhoQaDuocSuaNhanSu);
-  kiem(duocCap.oTenSuaDuoc === true,
-    "server cấp edit_operational_people thì quản lý QA sửa được ngay, không cần sửa web",
-    `oTenSuaDuoc=${duocCap.oTenSuaDuoc}`);
-  kiem(duocCap.coNutLuu, "và có nút lưu hồ sơ");
+  console.log("\nNhân sự đã gỡ — quản lý QA theo luật server vẫn rơi về today:");
+  // Fixture này cố ý còn cấp people/edit_operational_people từ server.
+  const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoQaTheoLuatServer, hash: "people" });
+  await cho(1400);
+  const kq = await trang.evaluate(() => ({
+    tieuDe: document.querySelector("h1")?.textContent?.trim() || "",
+    coMenuNhanSu: !!document.querySelector('[data-view="people"]'),
+    coEditorCu: !!document.querySelector('input[aria-label="Họ và tên trong danh bạ"]'),
+    coNutLuuCu: [...document.querySelectorAll("button")]
+      .some((b) => /Lưu hồ sơ|Thêm vào danh bạ/.test(b.textContent || "")),
+  }));
+  kiem(kq.tieuDe === "Việc hôm nay", "#v=people của quản lý QA rơi về today", kq.tieuDe);
+  kiem(!kq.coMenuNhanSu, "grant people lịch sử không hiện lại menu Nhân sự");
+  kiem(!kq.coEditorCu && !kq.coNutLuuCu,
+    "fallback không dựng editor hay nút lưu hồ sơ Nhân sự cũ");
+  await trang.close();
 }
 
 /* ---- 9b. Xem trước ảnh hưởng trước khi bật quyền theo hạng mục ------- *

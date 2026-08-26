@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3, Scale, ClipboardList, Users,
+  ShieldCheck, Radar, BarChart3, Scale, ClipboardList,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -70,7 +70,7 @@ export const LOAI_LOI: Record<string, { ten: string; sua: string }> = {
   deadline_before_start: { ten: "Deadline VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
   done_no_date:          { ten: "Đánh dấu hoàn thành nhưng thiếu ngày", sua: "Vi phạm ALCOA+ — nhập ngày thực tế ở Cập nhật tiến độ" },
   date_no_done:          { ten: "Có ngày hoàn thành nhưng trạng thái chưa xong", sua: "Đặt trạng thái về Hoàn thành, hoặc xoá ngày nếu nhập nhầm" },
-  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Mở Nhân sự → chọn hồ sơ nhân sự để bổ sung email" },
+  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự" },
   no_validation_type:    { ten: "Chưa xác định loại thẩm định", sua: "Đặt IQ/OQ/PQ/CV ở Danh mục nguồn rồi sinh lại timeline" },
   high_crit_no_plan:     { ten: "Trọng yếu cao nhưng vẫn ở Kế hoạch", sua: "ICH Q9 đòi làm nhóm rủi ro cao trước — xếp lịch sớm" },
 };
@@ -135,12 +135,9 @@ export const NAV_ITEMS = [
      `#v=<id>`. Bốn hash `inventory`, `risk`, `phanquyen`, `accounts` mà
      App.tsx render/chuẩn hoá ngoài menu được khai trong SCREEN_IDS, không
      khai ở đây. */
-  /* "Nhân sự" và "Vai trò & phạm vi" tách từ "Phân quyền & trách nhiệm" cũ:
-     dữ liệu nhân sự và tài khoản/quyền là hai việc khác nhau, do hai nhóm
-     người khác nhau nắm. Mục "Tài khoản & quyền truy cập" từng đứng riêng
-     ở đây đã gộp hẳn vào "Vai trò & phạm vi" — `accounts` vẫn là screenId
-     hợp lệ (hợp đồng với rpc_my_ui_access) và vẫn có alias URL, chỉ không
-     còn mục menu riêng.
+  /* Mục "Tài khoản & quyền truy cập" từng đứng riêng ở đây đã gộp hẳn vào
+     "Vai trò & phạm vi" — `accounts` vẫn là screenId hợp lệ (hợp đồng với
+     rpc_my_ui_access) và vẫn có alias URL, chỉ không còn mục menu riêng.
 
      Mục `phanquyen` là CỬA VÀO chức năng, không mang dữ liệu riêng
      (`data_scope = 'none'`). Admin / Quản lý QA / Nhân viên QA vào để quản
@@ -150,7 +147,6 @@ export const NAV_ITEMS = [
      Nhân viên xưởng thì không.
      (Bản trước của chú thích này nói Quản lý xưởng đã mất màn — sai, do đọc
      seed gốc ở 20260812090000 mà bỏ qua migration cấp quyền sau nó.) */
-  { id: "people", label: "Nhân sự", icon: Users, group: "admin" },
   { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
   { id: "audit", label: "Nhật ký thay đổi", icon: ShieldCheck, group: "admin" },
@@ -165,13 +161,13 @@ export const NAV_SUBS = {
   progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
   inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
   /* Sáu vùng của workspace danh mục — KHÔNG hứa "Người thực hiện" hay
-     "Danh bạ nhân sự" (đã sang Nhân sự & phân công), không hứa xoá vật lý.
+     "Danh bạ nhân sự", không hứa xoá vật lý.
      Chuỗi này có bộ kiểm literal giữ (tests/unit/operational-copy). */
   source: "Dữ liệu nguồn · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Tổng hợp tình hình VMP theo kỳ, gợi ý nhận xét và xuất PDF / Excel / HTML",
   rules: "Quy tắc hệ thống đang chạy — đọc thẳng từ máy chủ nên không thể mô tả khác thực tế",
-  phanquyen: "Ma trận vai trò × hành động · người × bộ phận · khu vực/line — sửa vai trò, bộ phận và email thẳng trên bảng",
+  phanquyen: "Danh bạ chuẩn · nối/gỡ tài khoản · quyền hiệu lực · phân công hạng mục theo phạm vi được cấp",
   health: "Chất lượng dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng trên máy chủ",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",

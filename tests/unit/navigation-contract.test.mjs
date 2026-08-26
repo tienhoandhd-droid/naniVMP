@@ -12,7 +12,8 @@ import {
   NAV_GROUP_ORDER, ORDERED_SCREEN_IDS,
   resolveViewIntent, resolveAuthorizedView,
 } from "../../src/lib/navigationContract.ts";
-import { parseAccessContext } from "../../src/lib/access.ts";
+import { NAV_ITEMS } from "../../src/constants/vmp.ts";
+import { parseAccessContext, SCREEN_IDS } from "../../src/lib/access.ts";
 
 /** Dựng ngữ cảnh quyền chỉ cho phép đúng những màn được liệt kê. */
 function chiCho(...man) {
@@ -32,6 +33,12 @@ test("thứ tự rơi về bắt đầu bằng today, không phải một màn t
   assert.equal(new Set(ORDERED_SCREEN_IDS).size, ORDERED_SCREEN_IDS.length, "không được lặp");
 });
 
+test("frontend không còn công bố màn Nhân sự trong menu, screen hay thứ tự rơi về", () => {
+  assert.equal(NAV_ITEMS.some((item) => item.id === "people"), false);
+  assert.equal(SCREEN_IDS.includes("people"), false);
+  assert.equal(ORDERED_SCREEN_IDS.includes("people"), false);
+});
+
 /* ---- Chuẩn hoá tên, chưa xét quyền ----------------------------------- */
 
 test("risk là tên gọi khác của alerts", () => {
@@ -46,6 +53,7 @@ test("inventory giữ nguyên ý định gộp theo đối tượng", () => {
 
 test("tên chuẩn trả về chính nó, tên lạ trả null", () => {
   assert.deepEqual(resolveViewIntent("progress"), { screenId: "progress" });
+  assert.equal(resolveViewIntent("people"), null, "Nhân sự không còn là ý định route frontend");
   assert.equal(resolveViewIntent("missing"), null);
   assert.equal(resolveViewIntent(""), null);
   assert.equal(resolveViewIntent(undefined), null);

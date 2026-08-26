@@ -3,7 +3,7 @@
 
 export const SCREEN_IDS = [
   "today", "overview", "timeline", "alerts", "risk", "progress", "inventory", "source",
-  "workload", "reports", "rules", "people", "health", "audit", "accounts", "admin", "phanquyen",
+  "workload", "reports", "rules", "health", "audit", "accounts", "admin", "phanquyen",
 ] as const;
 
 export type ScreenId = (typeof SCREEN_IDS)[number];

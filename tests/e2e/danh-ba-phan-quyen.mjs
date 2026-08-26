@@ -685,29 +685,7 @@ try {
   await page.waitForFunction(() => document.body.innerText.includes("không có quyền truy cập"));
   assert.equal(await documentContains("Danh bạ nhân sự & quyền"), false,
     "persona ngoài allowlist không được dựng workspace phân quyền");
-  /* ---- Sửa hồ sơ nhân sự nay ở màn NHÂN SỰ, không ở màn này ----------
-     Đợt tách hai màn (18/08) đặt danh bạ ở "Vai trò & phạm vi" về chỉ-đọc:
-     admin vào đó để chọn người, nối tài khoản, xem quyền; còn hồ sơ thì sửa
-     ở màn của người quản lý nhân sự. Kiểm ở CUỐI file, sau khi kịch bản
-     chính xong — chen ngang giữa chừng sẽ phá chuỗi trạng thái đang dựng. */
-  uiAccessHienTai = uiAccessAdmin;
-  await page.goto(`${GOC}#v=people`, { waitUntil: "domcontentloaded" });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.body.innerText.includes("Danh bạ chuẩn"),
-    { timeout: 15000 });
-  const oTimNhanSu = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
-  assert.ok(oTimNhanSu, "màn Nhân sự phải có ô tìm danh bạ");
-  await oTimNhanSu.type("QA");
-  await page.waitForFunction(() => document.body.innerText.includes("hong.ngoc@vmp.local"));
-  await page.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
-  await page.waitForFunction(() => !!document.querySelector('[data-testid="save-permission-person"]'),
-    { timeout: 15000 });
-  assert.equal(
-    await page.$eval('[data-testid="save-permission-person"]', (b) => b.disabled === false || b.disabled === true),
-    true, "màn Nhân sự có nút lưu hồ sơ — đây mới là chỗ sửa hồ sơ nhân sự");
-
-  console.log("✅ Dòng legacy sửa được, khóa phân công, chọn đúng person_id khi trùng tên, và hồ sơ chỉ sửa được ở màn Nhân sự");
+  console.log("✅ Dòng legacy sửa được, khóa phân công, chọn đúng person_id khi trùng tên");
 } finally {
   await browser.close();
 }

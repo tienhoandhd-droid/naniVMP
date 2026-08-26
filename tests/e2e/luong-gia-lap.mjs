@@ -38,7 +38,6 @@ const MAN = [
   ["workload", "Phân công & khối lượng"],
   ["reports", "Báo cáo"],
   ["rules", "Quy tắc nghiệp vụ"],
-  ["people", "Nhân sự"],
   ["accounts", "Tài khoản & quyền truy cập"],
   ["phanquyen", "Vai trò & phạm vi"],
   ["health", "Chất lượng dữ liệu"],
@@ -124,6 +123,43 @@ for (const [id, ten] of MAN) {
   kiem(chanNgoai.length === 0, `${ten}: không gọi ra ngoài môi trường cách ly`, chanNgoai[0] || "");
 
   await trang.close();
+}
+
+/* ---- 2b. Grant people cũ không khôi phục menu hay editor ------------ */
+{
+  console.log("\nNhân sự đã gỡ — grant cũ chỉ rơi về màn được phép:");
+  const trang = await trinhDuyet.newPage();
+  const { chanNgoai } = await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  // Fixture admin vẫn trả `people` và `edit_operational_people`; frontend
+  // phải bỏ qua grant lịch sử đó và chọn today, không dựng editor cũ.
+  await trang.goto(`${GOC}#v=people`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2200));
+
+  const desktop = await trang.evaluate(() => ({
+    coMenuNhanSu: !!document.querySelector('.vmp-sidebar [data-view="people"]'),
+    tieuDe: document.querySelector("h1")?.textContent?.trim() || "",
+    coEditorCu: !!document.querySelector('input[aria-label="Họ và tên trong danh bạ"]'),
+  }));
+  kiem(!desktop.coMenuNhanSu, "desktop không còn mục Nhân sự dù fixture còn grant");
+  kiem(desktop.tieuDe === "Việc hôm nay", "#v=people rơi về today khi today + overview đều được cấp", desktop.tieuDe);
+  kiem(!desktop.coEditorCu, "#v=people không dựng editor hồ sơ Nhân sự cũ");
+  kiem(chanNgoai.length === 0, "fallback people không gọi ra ngoài môi trường cách ly", chanNgoai[0] || "");
+  await trang.close();
+
+  const dienThoai = await trinhDuyet.newPage();
+  await caiGiaLap(dienThoai, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(dienThoai, { supabaseUrl: URL_SB });
+  await dienThoai.setViewport({ width: 390, height: 844, isMobile: true });
+  await dienThoai.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await new Promise((r) => setTimeout(r, 2200));
+  await dienThoai.click('[aria-label="Mở menu"]');
+  await dienThoai.waitForSelector("#vmp-mobile-drawer");
+  const mobile = await dienThoai.evaluate(() =>
+    !!document.querySelector('#vmp-mobile-drawer [data-view="people"]'));
+  kiem(!mobile, "mobile drawer không còn mục Nhân sự dù fixture còn grant");
+  await dienThoai.close();
 }
 
 /* ---- 3. Màn tiến độ trên điện thoại dùng thẻ, không phải bảng ------- */

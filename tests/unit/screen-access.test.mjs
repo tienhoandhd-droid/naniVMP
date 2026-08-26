@@ -128,25 +128,38 @@ test("không còn màn nào thì trả null thay vì nhảy vòng quanh", () => 
   assert.equal(resolveAuthorizedView("overview", ctx), null);
 });
 
-test("danh sách màn phủ cả ba route ngoài menu", () => {
+test("danh sách màn phủ các route ngoài menu còn được hỗ trợ", () => {
   for (const id of ["inventory", "risk", "phanquyen"]) {
     assert.ok(SCREEN_IDS.includes(id), `SCREEN_IDS phải có ${id}`);
   }
-  assert.equal(SCREEN_IDS.length, 17);
-  assert.equal(new Set(SCREEN_IDS).size, 17);
+  assert.equal(SCREEN_IDS.includes("people"), false);
+  assert.equal(SCREEN_IDS.length, 16);
+  assert.equal(new Set(SCREEN_IDS).size, 16);
 });
 
-test("ở enforced, quyền hai màn mới lấy từ server chứ không đoán", () => {
+test("grant people lịch sử từ server bị frontend bỏ qua", () => {
   const qaManager = parseAccessContext({
     ok: true, mode: "enforced", business_role: "qa_manager", unresolved_reason: null,
     screens: {
       people: { can_view: true, data_scope: "all", actions: ["edit_operational_people"] },
+      today: { can_view: true, data_scope: "all", actions: ["view"] },
+      overview: { can_view: true, data_scope: "all", actions: ["view"] },
       accounts: { can_view: false, data_scope: "none", actions: [] },
     },
   });
-  assert.equal(qaManager.can("people", "edit_operational_people"), true);
+  assert.equal(qaManager.canView("people"), false);
+  assert.equal(qaManager.can("people", "edit_operational_people"), false);
+  assert.equal(resolveAuthorizedView("people", qaManager)?.screenId, "today");
   assert.equal(qaManager.can("accounts", "manage_accounts"), false);
   assert.equal(qaManager.canView("accounts"), false);
+});
+
+test("URL people rơi về màn đầu tiên thực sự được cấp, không khóa cứng một đích", () => {
+  const chiTongQuan = parseAccessContext({
+    ok: true, mode: "enforced", business_role: "qa_staff", unresolved_reason: null,
+    screens: { overview: { can_view: true, data_scope: "all", actions: ["view"] } },
+  });
+  assert.equal(resolveAuthorizedView("people", chiTongQuan)?.screenId, "overview");
 });
 
 test("mọi vai nghiệp vụ hiệu lực đều có nhãn hiển thị tiếng Việt", () => {

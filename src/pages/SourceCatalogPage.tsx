@@ -7,7 +7,7 @@
  *
  *  Lịch sử: bản trước của file này dài ~1500 dòng — bảng 19 cột tự chế,
  *  sửa từng ô bằng nhấn đúp, ba "bộ dữ liệu đơn giản" với modal riêng và
- *  nút xoá vật lý, tab Người thực hiện đã chết. Tất cả đã thay bằng bộ
+ *  nút xoá vật lý, mục nhập liệu người phụ trách đã chết. Tất cả đã thay bằng bộ
  *  trình bày dùng chung của Foundation (SmartTable + MobileTaskList) và
  *  hai hộp thoại có lý do + khoá phiên bản (CatalogObjectForm cho đối
  *  tượng, CatalogRecordDialog cho hai dataset còn lại). Không còn lối ghi
