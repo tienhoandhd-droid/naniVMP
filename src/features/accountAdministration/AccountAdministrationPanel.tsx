@@ -58,16 +58,165 @@ export async function activateAccount(args: ActivationArgs): Promise<{ kind: "ve
 }
 export function stableRowKey(row: Pick<AccountAdministrationRow, "key">, index: number): string { return `${row.key}:${index}`; }
 const defaultLoaders: AccountAdministrationLoaders = { loadAccounts: fetchNguoiVaQuyen, loadRoles: fetchVaiNghiepVu, loadDirectory: () => searchPermissionDirectory("") };
+
+export interface ActivationDraft {
+  row: AccountAdministrationRow;
+  next: boolean;
+  reason: string;
+  token: number;
+}
+
+export function ActivationDialog({
+  draft,
+  status,
+  submitting,
+  onReason,
+  onCancel,
+  onConfirm,
+}: {
+  draft: ActivationDraft;
+  status: string | null;
+  submitting: boolean;
+  onReason: (reason: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div role="dialog" aria-label="Đổi trạng thái tài khoản">
+      <p>{draft.row.userId} → {draft.next ? "hoạt động" : "tắt"}</p>
+      <textarea
+        aria-label="Lý do đổi trạng thái"
+        value={draft.reason}
+        disabled={submitting}
+        onChange={(event) => onReason(event.target.value)}
+      />
+      <button disabled={submitting} onClick={onCancel}>Hủy</button>
+      <button disabled={!draft.reason.trim() || submitting} onClick={onConfirm}>Xác nhận</button>
+      {status && <p role="alert">{status}</p>}
+    </div>
+  );
+}
+
+export function AccountAdministrationContent({
+  snapshot,
+  rows,
+  loading,
+  canManageAccounts,
+  controlsDisabled = false,
+  reload,
+  onRetry,
+  onEditRole,
+  onStartActivation,
+}: {
+  snapshot: AccountAdministrationSnapshot;
+  rows: AccountAdministrationRow[];
+  loading: boolean;
+  canManageAccounts: boolean;
+  controlsDisabled?: boolean;
+  reload: ReloadAccountByUserId;
+  onRetry: () => void;
+  onEditRole?: AccountAdministrationPanelProps["onEditRole"];
+  onStartActivation: (row: AccountAdministrationRow) => void;
+}) {
+  return (
+    <section aria-label="Quản trị tài khoản và vai trò">
+      <h2>Trạng thái tài khoản</h2>
+      {loading && <p role="status">Đang tải dữ liệu…</p>}
+      {snapshot.errors.accounts && (
+        <div role="alert">
+          Không tải được tài khoản: {snapshot.errors.accounts}{" "}
+          <button onClick={onRetry}>Tải lại</button>
+        </div>
+      )}
+      {Object.entries(snapshot.errors)
+        .filter(([key]) => key !== "accounts")
+        .map(([key, value]) => (
+          <div role="status" key={key}>
+            Nguồn {key} chưa xác minh: {value}{" "}
+            <button onClick={onRetry}>Tải lại</button>
+          </div>
+        ))}
+      <div>
+        {rows.map((row, index) => (
+          <article key={stableRowKey(row, index)} aria-label={row.name}>
+            <h3>{row.name}</h3>
+            <p>{row.email || "Không có email"} · user_id: {row.userId || "thiếu"}</p>
+            {!row.accountActive && <span data-badge="inactive">Không hoạt động</span>}
+            {row.readiness.some((item) => item.state === "unknown") && (
+              <span data-badge="unknown">Chưa xác minh</span>
+            )}
+            <p>Vai: {row.businessRole || "Chưa giải được"} · Phạm vi: {row.scopeSummary}</p>
+            <ul aria-label="Checklist sẵn sàng">
+              {row.readiness.map((item) => (
+                <li key={item.key} data-state={item.state}>
+                  {item.label}: {item.detail}{item.nextAction && <> — {item.nextAction}</>}
+                </li>
+              ))}
+            </ul>
+            {canManageAccounts && row.userId && (
+              <div>
+                {onEditRole && (
+                  <button disabled={controlsDisabled} onClick={() => onEditRole(row, reload)}>Sửa vai</button>
+                )}
+                <button disabled={controlsDisabled} onClick={() => onStartActivation(row)}>
+                  {row.accountActive ? "Tắt" : "Bật lại"}
+                </button>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function AccountAdministrationView({ canManageAccounts, revision = 0, loaders = defaultLoaders, mutateActive = setUserActive, onEditRole }: AccountAdministrationPanelProps) {
   const [snapshot, setSnapshot] = useState<AccountAdministrationSnapshot>({ rows: [], errors: {} }); const [loading, setLoading] = useState(true); const generation = useRef(0);
   const load = useCallback(async () => { const current = ++generation.current; setLoading(true); try { const next = await loadAccountAdministrationSnapshot(loaders); if (current === generation.current) setSnapshot(next); } catch (error) { if (current === generation.current) setSnapshot({ rows: [], errors: { accounts: errorMessage(error) } }); } finally { if (current === generation.current) setLoading(false); } }, [loaders]);
   useEffect(() => { void load(); }, [load, revision]);
   const reload = useCallback(async (userId: string) => { const request = ++generation.current; const next = await loadAccountAdministrationSnapshot(loaders); if (generation.current !== request) return null; setSnapshot(next); return resolveReloadedAccount({ ...next, rows: applySourceUncertainty(next.rows, next.errors) }, userId, () => generation.current === request); }, [loaders]);
-  const [draft, setDraft] = useState<{ row: AccountAdministrationRow; next: boolean; reason: string; token: number } | null>(null); const activeGeneration = useRef(0); const uiOperation = useRef(createActivationUiState()); const coordinator = useRef(createActivationCoordinator()); const [status, setStatus] = useState<string | null>(null); const [submitting, setSubmitting] = useState(false);
+  const [draft, setDraft] = useState<ActivationDraft | null>(null); const activeGeneration = useRef(0); const uiOperation = useRef(createActivationUiState()); const coordinator = useRef(createActivationCoordinator()); const [status, setStatus] = useState<string | null>(null); const [submitting, setSubmitting] = useState(false);
   useEffect(() => { if (!canManageAccounts) { activeGeneration.current += 1; setDraft(null); setSubmitting(false); } }, [canManageAccounts]);
   const confirm = async () => { const userId = draft?.row.userId; if (!userId || submitting || !draft) return; setSubmitting(true); const target = draft; const outcome = await coordinator.current.run({ userId, nextActive: target.next, reason: target.reason.trim(), canManage: () => canManageAccounts && activeGeneration.current === target.token && uiOperation.current.isCurrent(target.token), mutate: mutateActive, reload }); if (uiOperation.current.isCurrent(target.token)) { if (outcome.kind === "verified") setDraft(null); else if (outcome.kind !== "stale") setStatus(outcome.message || "Không thể xác minh trạng thái"); setSubmitting(false); } };
   const rows = applySourceUncertainty(snapshot.rows, snapshot.errors);
-  return <section aria-label="Quản trị tài khoản và vai trò"><h2>Trạng thái tài khoản</h2>{loading && <p role="status">Đang tải dữ liệu…</p>}{snapshot.errors.accounts && <div role="alert">Không tải được tài khoản: {snapshot.errors.accounts} <button onClick={() => void load()}>Tải lại</button></div>}{Object.entries(snapshot.errors).filter(([key]) => key !== "accounts").map(([key, value]) => <div role="status" key={key}>Nguồn {key} chưa xác minh: {value} <button onClick={() => void load()}>Tải lại</button></div>)}<div>{rows.map((row, index) => <article key={stableRowKey(row, index)} aria-label={row.name}><h3>{row.name}</h3><p>{row.email || "Không có email"} · user_id: {row.userId || "thiếu"}</p>{!row.accountActive && <span data-badge="inactive">Không hoạt động</span>}{row.readiness.some((item) => item.state === "unknown") && <span data-badge="unknown">Chưa xác minh</span>}<p>Vai: {row.businessRole || "Chưa giải được"} · Phạm vi: {row.scopeSummary}</p><ul aria-label="Checklist sẵn sàng">{row.readiness.map((item) => <li key={item.key} data-state={item.state}>{item.label}: {item.detail}{item.nextAction && <> — {item.nextAction}</>}</li>)}</ul>{canManageAccounts && row.userId && <div>{onEditRole && <button onClick={() => onEditRole(row, reload)}>Sửa vai</button>}<button onClick={() => { setStatus(null); const token = uiOperation.current.begin(); activeGeneration.current = token; setDraft({ row, next: !row.accountActive, reason: "", token }); }}>{row.accountActive ? "Tắt" : "Bật lại"}</button></div>}</article>)}</div>{draft && <div role="dialog" aria-label="Đổi trạng thái tài khoản"><p>{draft.row.userId} → {draft.next ? "hoạt động" : "tắt"}</p><textarea aria-label="Lý do đổi trạng thái" value={draft.reason} onChange={(event) => setDraft({ ...draft, reason: event.target.value })} /><button onClick={() => { uiOperation.current.cancel(draft.token); activeGeneration.current += 1; setDraft(null); setSubmitting(false); }}>Hủy</button><button onClick={() => void confirm()} disabled={!draft.reason.trim() || submitting}>Xác nhận</button>{status && <p role="alert">{status}</p>}</div>}</section>;
+  const startActivation = (row: AccountAdministrationRow) => {
+    if (submitting) return;
+    setStatus(null);
+    const token = uiOperation.current.begin();
+    activeGeneration.current = token;
+    setDraft({ row, next: !row.accountActive, reason: "", token });
+  };
+  const cancel = () => {
+    if (!draft || submitting) return;
+    uiOperation.current.cancel(draft.token);
+    activeGeneration.current += 1;
+    setDraft(null);
+  };
+  return (
+    <>
+      <AccountAdministrationContent
+        snapshot={snapshot}
+        rows={rows}
+        loading={loading}
+        canManageAccounts={canManageAccounts}
+        controlsDisabled={submitting}
+        reload={reload}
+        onRetry={() => { void load(); }}
+        onEditRole={onEditRole}
+        onStartActivation={startActivation}
+      />
+      {draft && (
+        <ActivationDialog
+          draft={draft}
+          status={status}
+          submitting={submitting}
+          onReason={(reason) => setDraft({ ...draft, reason })}
+          onCancel={cancel}
+          onConfirm={() => { void confirm(); }}
+        />
+      )}
+    </>
+  );
 }
 
 export function AccountAdministrationPanel(props: AccountAdministrationPanelProps) {

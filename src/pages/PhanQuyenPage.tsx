@@ -34,7 +34,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck, Users, AlertTriangle, Check, Plus, Mail, Trash2 } from "lucide-react";
 import { C } from "../constants/theme.ts";
 import { supabase } from "../lib/supabaseClient.ts";
-import { fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen } from "../lib/supabaseData.ts";
+import { fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, setBusinessRole } from "../lib/supabaseData.ts";
 import type { EmailChoPhepRow, NguoiQuyenRow } from "../lib/supabaseData.ts";
 import { Card, CardTitle, Tag, CauKetLuan } from "../components/ui/Primitives.tsx";
 import type { Activity } from "../types/domain.ts";
@@ -43,6 +43,10 @@ import ItemPermissionModeCard from "../features/itemPermissions/ItemPermissionMo
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
 import AccountLinkPanel from "../features/itemPermissions/AccountLinkPanel.tsx";
 import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
+import { AccountAdministrationPanel } from "../features/accountAdministration/AccountAdministrationPanel.tsx";
+import type { ReloadAccountByUserId } from "../features/accountAdministration/AccountAdministrationPanel.tsx";
+import AccountRoleEditor from "../features/accountAdministration/AccountRoleEditor.tsx";
+import type { AccountAdministrationRow } from "../features/accountAdministration/accountAdministrationModel.ts";
 import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
 import { SCREEN_IDS } from "../lib/access.ts";
 import type { AccessContext } from "../lib/access.ts";
@@ -248,8 +252,8 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
                       fontSize: 13, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
           <b style={{ color: C.plum }}>Thêm một người mới, đủ ba bước:</b> ① thêm email vào danh sách này →
           ② tạo tài khoản ở <b>Supabase Dashboard → Authentication → Users → Add user</b> với đúng email đó →
-          ③ đổi vai ở màn <b>Cấu hình hệ thống</b> (thẻ "Người dùng &amp; phân quyền") và nối tài khoản với hồ
-          sơ nhân sự ở ngay màn này. Bỏ bước ① thì Supabase từ chối tạo; bỏ bước ③ thì họ đăng nhập được
+          ③ chọn vai ở thẻ <b>Sẵn sàng theo vai trò &amp; phạm vi</b> và nối tài khoản với hồ
+          sơ ở ngay màn này. Bỏ bước ① thì Supabase từ chối tạo; bỏ bước ③ thì họ đăng nhập được
           nhưng chỉ xem được, không sửa gì.
         </div>
       </Card>
@@ -356,6 +360,10 @@ function CurrentPermissionWorkspace({ acts, access }: {
   const [directoryRevision, setDirectoryRevision] = useState(0);
   const [directoryRefreshPersonId, setDirectoryRefreshPersonId] = useState<string | null>(null);
   const [rightsRevision, setRightsRevision] = useState(0);
+  const [roleEditor, setRoleEditor] = useState<{
+    row: AccountAdministrationRow;
+    reload: ReloadAccountByUserId;
+  } | null>(null);
   /* Quyền nối/gỡ tài khoản hỏi THẲNG server, không suy từ vai ở client.
      Bản trước tính bằng `resolveDirectoryWorkspaceCapabilities(isAdmin, user)`
      — `isAdmin` của web nghĩa là "admin HOẶC quản lý QA" — trong khi luật
@@ -394,6 +402,27 @@ function CurrentPermissionWorkspace({ acts, access }: {
       {/* Ai được phép có tài khoản + vai nào làm được gì: cùng một quyền
           chính sách như trên. */}
       {duocChinhChinhSachQuyen && <QuanTriQuyenCards duocSua={duocChinhChinhSachQuyen} />}
+      <Card variant="strong">
+        <CardTitle icon={ShieldCheck}
+          sub="Mỗi tài khoản được đối chiếu bằng UUID với vai nghiệp vụ, hồ sơ, phạm vi và phân công.">
+          Sẵn sàng theo vai trò &amp; phạm vi
+        </CardTitle>
+        <AccountAdministrationPanel
+          canManageAccounts={duocQuanLyTaiKhoan}
+          onEditRole={duocQuanLyTaiKhoan
+            ? (row, reload) => setRoleEditor({ row, reload })
+            : undefined}
+        />
+        {duocQuanLyTaiKhoan && roleEditor && (
+          <AccountRoleEditor
+            row={roleEditor.row}
+            canEdit={duocQuanLyTaiKhoan}
+            mutateRole={setBusinessRole}
+            reloadByUserId={roleEditor.reload}
+            onVerified={() => setRoleEditor(null)}
+          />
+        )}
+      </Card>
       <Card variant="strong">
         <CardTitle icon={Users}
           sub="Chọn tài khoản để nối/gỡ và xem đúng quyền đang có hiệu lực. Liên hệ quản trị viên

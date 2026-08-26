@@ -70,10 +70,9 @@ import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
 import type { UrlState } from "./lib/urlState.ts";
 import {
-  fetchSystemStatus, fetchVaiNghiepVu, setBusinessRole, setUserActive,
-  VAI_NGHIEP_VU,
+  fetchSystemStatus, VAI_NGHIEP_VU,
 } from "./lib/supabaseData.ts";
-import type { SystemStatus, VaiNghiepVuRow } from "./lib/supabaseData.ts";
+import type { SystemStatus } from "./lib/supabaseData.ts";
 import type { ConnState } from "./hooks/index.ts";
 
 // ===== UI Primitives =====
@@ -843,25 +842,8 @@ function docLichCron(lich: string): string {
   return `hằng ngày, ${gioChu} giờ VN${quaNgay}`;
 }
 
-/* Màu cho thẻ năm vai NGHIỆP VỤ hiệu lực. Nhãn chữ lấy từ `VAI_NGHIEP_VU` —
-   một nguồn duy nhất cho cả web — ở đây chỉ khai màu.
-   Bản trước bảng này khoá theo `profiles.role` 4 vai của hệ CŨ đã bỏ, nên
-   admin đọc bảng thấy "Người bộ phận" mà không biết người đó thật ra là
-   nhân viên QA hay quản lý xưởng — hai vai quyền khác hẳn nhau. */
-const MAU_VAI: Record<string, { mau: string; nen: string }> = {
-  admin:            { mau: C.raspText, nen: C.raspSoft },
-  qa_manager:       { mau: C.lavText, nen: C.lavSoft },
-  qa_staff:         { mau: C.lavText, nen: C.pinkMist },
-  workshop_manager: { mau: C.skyText, nen: C.skySoft },
-  workshop_staff:   { mau: C.skyText, nen: C.pinkMist },
-};
-const MAU_VAI_CHUA_RO: { mau: string; nen: string } = { mau: C.plumSoft, nen: C.pinkMist };
-
-function AdminView({ conn, user, laAdminThat, access }: {
-  /* `laAdminThat` hỏi thẳng server qua access.can("accounts","manage_accounts")
-     — không còn suy từ perm cũ (permMap gán perm "admin" cho cả qa_manager,
-     hiện nút cho quản lý QA là mời họ bấm vào thứ chắc chắn bị server từ chối). */
-  conn: ConnState; user?: AppUser | null; laAdminThat?: boolean;
+function AdminView({ conn, user, access }: {
+  conn: ConnState; user?: AppUser | null;
   /** Chỉ cần businessRole — hiện nhãn vai của phiên đang đăng nhập, thay `user.perm` cũ. */
   access?: Pick<AccessContext, "businessRole"> | null;
 }) {
@@ -869,15 +851,6 @@ function AdminView({ conn, user, laAdminThat, access }: {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [moCauHinh, setMoCauHinh] = useState(false);
-  /* rpc_trang_thai_he_thong trả tên/email/vai nhưng KHÔNG trả user_id, mà
-     không có user_id thì không gọi được RPC ghi nào. Lấy user_id từ bảng
-     vai nghiệp vụ — bảng ấy đọc email từ chính `profiles`, nên khớp email
-     luôn trúng. (Bản trước khớp qua danh bạ NHÂN SỰ và trượt đúng một
-     người: hồ sơ nhân sự của chị Nhi còn ghi email cũ.) */
-  const [vaiNv, setVaiNv] = useState<VaiNghiepVuRow[]>([]);
-  const [dangSua, setDangSua] = useState("");
-  const [ketQua, setKetQua] = useState<{ ok: boolean; msg: string } | null>(null);
-
   const load = useCallback(async () => {
     setLoading(true); setErr("");
     try {
@@ -885,56 +858,9 @@ function AdminView({ conn, user, laAdminThat, access }: {
       if (r?.ok === false) setErr(r.error || "Không đọc được trạng thái hệ thống");
       else setTt(r);
     } catch (e) { setErr((e as Error).message || "Không đọc được trạng thái hệ thống"); }
-    /* Hỏng thì bảng vẫn đọc được, chỉ mất phần thao tác — mất một nửa còn
-       hơn màn hình trắng. */
-    try { setVaiNv(await fetchVaiNghiepVu()); } catch { setVaiNv([]); }
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
-
-  const theoEmail = useMemo(() => {
-    const m = new Map<string, VaiNghiepVuRow>();
-    for (const n of vaiNv) {
-      if (n.email) m.set(n.email.trim().toLowerCase(), n);
-    }
-    return m;
-  }, [vaiNv]);
-
-  const doiVai = async (row: VaiNghiepVuRow, vaiMoi: string, ten: string, boPhan: string | null) => {
-    const lyDo = window.prompt(
-      `Đổi vai của ${ten} thành "${VAI_NGHIEP_VU.find((v) => v.id === vaiMoi)?.nhan || vaiMoi}".\n`
-      + "Lý do (bắt buộc — sẽ vào nhật ký kiểm toán):", "");
-    if (lyDo === null) return;
-    if (!lyDo.trim()) { setKetQua({ ok: false, msg: `${ten}: chưa nhập lý do nên chưa đổi gì.` }); return; }
-    setDangSua(row.user_id);
-    try {
-      const r = await setBusinessRole(row.user_id, vaiMoi, boPhan, lyDo.trim());
-      setKetQua(r.ok
-        ? { ok: true, msg: `${ten} nay là ${VAI_NGHIEP_VU.find((v) => v.id === vaiMoi)?.nhan}.` }
-        : { ok: false, msg: `${ten}: ${r.error}` });
-      if (r.ok) await load();
-    } catch (e) { setKetQua({ ok: false, msg: `${ten}: ${(e as Error).message}` }); }
-    setDangSua("");
-  };
-
-  const doiKichHoat = async (row: VaiNghiepVuRow, batLen: boolean, ten: string) => {
-    const lyDo = window.prompt(
-      batLen
-        ? `Bật lại tài khoản của ${ten}.\nLý do (bắt buộc — sẽ vào nhật ký kiểm toán):`
-        : `TẮT tài khoản của ${ten}. Người này sẽ không đăng nhập được nữa.\nLý do (bắt buộc — sẽ vào nhật ký kiểm toán):`,
-      "");
-    if (lyDo === null) return;
-    if (!lyDo.trim()) { setKetQua({ ok: false, msg: `${ten}: chưa nhập lý do nên chưa đổi gì.` }); return; }
-    setDangSua(row.user_id);
-    try {
-      const r = await setUserActive(row.user_id, batLen, lyDo.trim());
-      setKetQua(r.ok
-        ? { ok: true, msg: `${ten}: đã ${batLen ? "bật lại" : "tắt"} tài khoản.` }
-        : { ok: false, msg: `${ten}: ${r.error}` });
-      if (r.ok) await load();
-    } catch (e) { setKetQua({ ok: false, msg: `${ten}: ${(e as Error).message}` }); }
-    setDangSua("");
-  };
 
   const oSo = (nhan: string, giaTri: React.ReactNode, phu?: string) => (
     <div style={{ padding: "13px 15px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
@@ -992,117 +918,6 @@ function AdminView({ conn, user, laAdminThat, access }: {
               {oSo("Người thực hiện", String(d.nguoi_thuc_hien ?? "—"))}
               {oSo("Dòng nhật ký", String(d.dong_nhat_ky ?? "—"), "ALCOA+ audit trail")}
               {oSo("Dung lượng", String(d.dung_luong ?? "—"), "cả database")}
-            </div>
-          </Card>
-
-          <Card>
-            <CardTitle icon={Users} sub={`${tt.nguoi_dung?.length || 0} tài khoản · vai trò quyết định ai ghi được gì`}>
-              Người dùng &amp; phân quyền
-            </CardTitle>
-            <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, fontSize: 14 }}>
-                <thead><tr style={{ background: C.pinkMist }}>
-                  {["Họ tên", "Email", "Vai trò", "Bộ phận", "Tình trạng", "Đăng nhập gần nhất",
-                    ...(laAdminThat ? ["Thao tác"] : [])].map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "11px 14px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr></thead>
-                <tbody>
-                  {(tt.nguoi_dung || []).map((u: NonNullable<SystemStatus["nguoi_dung"]>[number]) => {
-                    const nvRow = theoEmail.get((u.email || "").trim().toLowerCase());
-                    const vaiHienTai = nvRow?.business_role || "";
-                    /* Hiện VAI NGHIỆP VỤ (nguồn: rpc_business_roles), không phải
-                       `profiles.role` mà rpc_trang_thai_he_thong trả về — cột role
-                       đó thuộc hệ 4 vai đã bỏ. Chưa giải được vai thì hiện "—",
-                       KHÔNG âm thầm gán "Chỉ xem": đoán sai quyền của người khác
-                       ngay trên bảng quản trị là kiểu sai tệ nhất. */
-                    const v = {
-                      nhan: VAI_NGHIEP_VU.find((x) => x.id === vaiHienTai)?.nhan ?? "—",
-                      ...(MAU_VAI[vaiHienTai] ?? MAU_VAI_CHUA_RO),
-                    };
-                    const suaDuoc = !!laAdminThat && !!nvRow;
-                    const dangBan = dangSua === nvRow?.user_id;
-                    return (
-                      <tr key={u.email} style={{ borderTop: `1px solid ${C.pinkSoft}` }}>
-                        <td style={{ padding: "11px 14px", fontWeight: 800, color: C.plum }}>{u.ten}</td>
-                        <td style={{ padding: "11px 14px", color: C.plumSoft, fontWeight: 600 }}>{u.email}</td>
-                        <td style={{ padding: "11px 14px" }}><Tag color={v.mau} bg={v.nen}>{v.nhan}</Tag></td>
-                        <td style={{ padding: "11px 14px", color: C.plumSoft, fontWeight: 600 }}>{u.bo_phan || "—"}</td>
-                        <td style={{ padding: "11px 14px" }}>
-                          <Tag color={u.dang_dung ? C.mintText : C.raspText} bg={u.dang_dung ? C.mintSoft : C.raspSoft}>
-                            {u.dang_dung ? "Đang dùng" : "Đã khoá"}
-                          </Tag>
-                        </td>
-                        <td style={{ padding: "11px 14px", color: C.plumSoft, fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {u.dang_nhap_gan_nhat ? new Date(u.dang_nhap_gan_nhat).toLocaleString("vi-VN") : "chưa ghi nhận"}
-                        </td>
-                        {laAdminThat && (
-                          <td style={{ padding: "9px 14px", whiteSpace: "nowrap" }}>
-                            {suaDuoc ? (
-                              <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                                {/* Ô vai đặt VAI NGHIỆP VỤ, không phải role đăng nhập:
-                                    quyền nằm ở hai bảng và RPC đặt cả hai cùng lúc, nên
-                                    người dùng chỉ cần nói "muốn người này làm gì". */}
-                                <select value={vaiHienTai || ""} disabled={dangBan}
-                                  aria-label={`Vai của ${u.ten}`}
-                                  onChange={(e) => doiVai(nvRow!, e.target.value, u.ten, u.bo_phan || null)}
-                                  style={{ fontFamily: TEXT, fontSize: 12.5, fontWeight: 700,
-                                    color: vaiHienTai ? C.plum : C.raspText,
-                                    border: `1.5px solid ${vaiHienTai ? C.pinkSoft : C.raspSoft}`,
-                                    background: C.surface,
-                                    borderRadius: 10, padding: "6px 9px", cursor: dangBan ? "wait" : "pointer" }}
-                                  title={vaiHienTai ? undefined
-                                    : `Hai bảng quyền đang lệch (${nvRow?.unresolved_reason || "không rõ lý do"}) — người này không xem được gì. Chọn lại vai để hệ tự đặt đúng cả hai bảng.`}>
-                                  {!vaiHienTai && (
-                                    <option value="">⚠ chưa giải được vai</option>
-                                  )}
-                                  {VAI_NGHIEP_VU.map((x) => (
-                                    <option key={x.id} value={x.id}>{x.nhan}</option>
-                                  ))}
-                                </select>
-                                <button type="button" disabled={dangBan}
-                                  onClick={() => doiKichHoat(nvRow!, !u.dang_dung, u.ten)}
-                                  title={u.dang_dung
-                                    ? `Tắt tài khoản của ${u.ten} — không đăng nhập được nữa. Có hỏi lý do.`
-                                    : `Bật lại tài khoản của ${u.ten}. Có hỏi lý do.`}
-                                  style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 700,
-                                    color: u.dang_dung ? C.raspText : C.mintText,
-                                    border: `1.5px solid ${u.dang_dung ? C.raspSoft : C.mintSoft}`,
-                                    background: C.surface, borderRadius: 999, padding: "6px 12px",
-                                    cursor: dangBan ? "wait" : "pointer" }}>
-                                  {u.dang_dung ? "Tắt" : "Bật lại"}
-                                </button>
-                              </div>
-                            ) : (
-                              <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-                                không đọc được tài khoản
-                              </span>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {ketQua && (
-              <div style={{ marginTop: 10, padding: "9px 13px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                color: ketQua.ok ? C.mintText : C.raspText,
-                background: ketQua.ok ? C.mintSoft : C.raspSoft }}>
-                {ketQua.msg}
-              </div>
-            )}
-            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 10, lineHeight: 1.6 }}>
-              {laAdminThat
-                ? <>Đổi vai và bật/tắt tài khoản ngay tại đây — ghi thẳng vào Supabase, có hỏi lý do và
-                  lưu vào nhật ký kiểm toán. Đổi vai cập nhật <b>cả hai bảng quyền cùng lúc</b>, nên
-                  không còn cảnh sửa tay trên Supabase rồi người dùng mất quyền xem. Ba việc vẫn phải làm
-                  ở nơi khác: <b>tạo tài khoản mới</b> (Supabase → Authentication),
-                  <b> nối tài khoản với hồ sơ nhân sự</b> và <b>phân công theo hạng mục</b> (màn Phân quyền).</>
-                : <>Bạn xem được bảng này nhưng <b>không đổi được vai hay bật/tắt tài khoản</b> —
-                  hai việc đó chỉ tài khoản Admin làm được, và máy chủ cũng chặn ở lớp dưới.
-                  Cần đổi thì nhờ Admin, hoặc xin cấp vai Admin.</>}
             </div>
           </Card>
 
@@ -2243,7 +2058,7 @@ function VerifiedAppShell({ user, logout, access }: {
                 <PhanQuyenView acts={filteredActs} access={access} />
               )}
               {view === "audit" && <AuditLogView />}
-              {view === "admin" && <AdminView conn={conn} user={user} laAdminThat={access.can("accounts", "manage_accounts")} access={access} />}
+              {view === "admin" && <AdminView conn={conn} user={user} access={access} />}
             </Suspense>
             </div>
             </ScreenGuard>

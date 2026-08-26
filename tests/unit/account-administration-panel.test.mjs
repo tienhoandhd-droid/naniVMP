@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadAccountAdministrationSnapshot, activateAccount, applySourceUncertainty, stableRowKey, createActivationCoordinator, resolveReloadedAccount, createActivationUiState } from "../../src/features/accountAdministration/AccountAdministrationPanel.tsx";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { loadAccountAdministrationSnapshot, activateAccount, applySourceUncertainty, stableRowKey, createActivationCoordinator, resolveReloadedAccount, createActivationUiState, AccountAdministrationContent, ActivationDialog } from "../../src/features/accountAdministration/AccountAdministrationPanel.tsx";
 
 const account = (overrides = {}) => ({ pid: "p1", user_id: "u1", ten: "A", email: "a@test", bo_phan: "QA", bo_phan_nguoi: "QA", bo_phan_tai_khoan: "QA", vai: null, pham_vi_rieng: null, muc: null, co_tai_khoan: true, tk_hoat_dong: true, so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 1, ...overrides });
 const person = { person_id: "p1", user_id: "u1", employee_code: null, full_name: "A", department: "QA", email: "a@test", account_status: "active", access_class: null, scope_departments: [], scope_factory_ids: [], scope_area_ids: [], scope_line_ids: [], version: 1, access_areas: [], email_sent_confirmed: true, is_active: true, match_status: "matched" };
@@ -62,3 +64,74 @@ test("activation reload rejection is written_unverified, not rejected", async ()
 test("ui operation token allows cancel to release only its own in-flight state", () => {
   const state = createActivationUiState(); const first = state.begin(); assert.equal(state.isCurrent(first), true); state.cancel(first); assert.equal(state.isCurrent(first), false); const second = state.begin(); assert.notEqual(first, second); assert.equal(state.isCurrent(second), true);
 });
+
+test("nội dung panel hiện đủ sáu mục, badge và ẩn controls với người không có quyền", () => {
+  const snapshot = awaitSnapshotForMarkup();
+  const html = renderToStaticMarkup(React.createElement(AccountAdministrationContent, {
+    snapshot,
+    rows: applySourceUncertainty(snapshot.rows, snapshot.errors),
+    loading: false,
+    canManageAccounts: false,
+    reload: async () => null,
+    onRetry: () => {},
+    onStartActivation: () => {},
+  }));
+  for (const label of ["Tài khoản", "Nối hồ sơ", "Vai nghiệp vụ", "Bộ phận", "Phạm vi", "Phân công"]) {
+    assert.match(html, new RegExp(label));
+  }
+  assert.match(html, /Không hoạt động/);
+  assert.match(html, /Chưa xác minh/);
+  assert.match(html, /Tải lại/);
+  assert.doesNotMatch(html, /Sửa vai/);
+  assert.doesNotMatch(html, />Bật lại</);
+});
+
+test("manager chỉ thấy Sửa vai khi có callback", () => {
+  const snapshot = awaitSnapshotForMarkup();
+  const base = {
+    snapshot,
+    rows: applySourceUncertainty(snapshot.rows, snapshot.errors),
+    loading: false,
+    canManageAccounts: true,
+    reload: async () => null,
+    onRetry: () => {},
+    onStartActivation: () => {},
+  };
+  assert.doesNotMatch(renderToStaticMarkup(React.createElement(AccountAdministrationContent, base)), /Sửa vai/);
+  assert.match(renderToStaticMarkup(React.createElement(AccountAdministrationContent, { ...base, onEditRole: () => {} })), /Sửa vai/);
+});
+
+test("không thể hủy dialog sau khi mutation bắt đầu", () => {
+  const html = renderToStaticMarkup(React.createElement(ActivationDialog, {
+    draft: { row: { userId: "u1" }, next: false, reason: "Lý do", token: 1 },
+    status: null,
+    submitting: true,
+    onReason: () => {},
+    onCancel: () => {},
+    onConfirm: () => {},
+  }));
+  assert.match(html, /<button disabled="">Hủy<\/button>/);
+  assert.match(html, /<button disabled="">Xác nhận<\/button>/);
+});
+
+function awaitSnapshotForMarkup() {
+  const rows = loadFixtureRows();
+  return { rows, errors: { roles: "roles down" } };
+}
+
+function loadFixtureRows() {
+  return applySourceUncertainty([
+    {
+      key: "user:u1", userId: "u1", personId: "p1", name: "A", email: "a@test",
+      accountDepartment: "QA", personDepartment: "QA", accountActive: false,
+      businessRole: null, unresolvedReason: "role_source_missing", scopeMode: null,
+      scopeSummary: "Chưa xác minh vai trò", sourceAccount: account({ tk_hoat_dong: false }),
+      directoryPerson: person,
+      readiness: [
+        ["account", "Tài khoản", "missing"], ["person_link", "Nối hồ sơ", "ready"],
+        ["business_role", "Vai nghiệp vụ", "unknown"], ["department", "Bộ phận", "unknown"],
+        ["scope", "Phạm vi", "unknown"], ["assignment", "Phân công", "unknown"],
+      ].map(([key, label, state]) => ({ key, label, state, detail: label, nextAction: null })),
+    },
+  ], { roles: "roles down" });
+}
