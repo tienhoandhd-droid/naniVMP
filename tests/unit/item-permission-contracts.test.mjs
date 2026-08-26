@@ -844,3 +844,233 @@ test("chọn kết quả lưu theo person_id dù hai dòng trùng tên", async (
   assert.equal(findDirectoryPersonById(people, "person-saved"), people[1]);
   assert.equal(findDirectoryPersonById(people, "person-missing"), null);
 });
+
+test("danh bạ ẩn tài khoản inactive, xếp theo vai và không đổi input", async () => {
+  const { visibleSortedDirectoryPeople } = await import(
+    "../../src/features/itemPermissions/accountListModel.ts"
+  );
+  const people = [
+    {
+      person_id: "person-inactive-manager",
+      user_id: "user-inactive-manager",
+      employee_code: "NV-000",
+      full_name: "Nguyễn Văn A",
+      department: "qa",
+      email: "inactive-manager@vmp.local",
+      account_status: "inactive",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: false,
+      is_active: false,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-unlinked-unknown",
+      user_id: null,
+      employee_code: null,
+      full_name: "Ẩn Danh",
+      department: null,
+      email: null,
+      account_status: "unlinked",
+      access_class: null,
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: false,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-workshop",
+      user_id: "user-workshop",
+      employee_code: "NV-003",
+      full_name: "Trần Thị Xưởng",
+      department: "workshop",
+      email: "workshop@vmp.local",
+      account_status: "linked",
+      access_class: "workshop_staff",
+      scope_departments: ["workshop"],
+      scope_factory_ids: ["factory-1"],
+      scope_area_ids: ["area-1"],
+      scope_line_ids: ["line-1"],
+      version: 1,
+      access_areas: ["A1"],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-equipment",
+      user_id: "user-equipment",
+      employee_code: "NV-002",
+      full_name: "Lê Thị Thiết Bị",
+      department: "equipment",
+      email: "equipment@vmp.local",
+      account_status: "linked",
+      access_class: "equipment_manager",
+      scope_departments: ["equipment"],
+      scope_factory_ids: ["factory-1"],
+      scope_area_ids: ["area-1"],
+      scope_line_ids: ["line-1"],
+      version: 1,
+      access_areas: ["A1"],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-qa-staff",
+      user_id: "user-qa-staff",
+      employee_code: "NV-004",
+      full_name: "Phạm Thị QA",
+      department: "qa",
+      email: "qa-staff@vmp.local",
+      account_status: "linked",
+      access_class: "qa_progress_editor",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-qa-manager-z",
+      user_id: "user-qa-manager-z",
+      employee_code: "NV-006",
+      full_name: "Đặng Thị Hồng Ngọc",
+      department: "qa",
+      email: "zeta@vmp.local",
+      account_status: "linked",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-qa-manager-a",
+      user_id: "user-qa-manager-a",
+      employee_code: "NV-005",
+      full_name: "Đặng Thị Hồng Ngọc",
+      department: "qa",
+      email: "alpha@vmp.local",
+      account_status: "linked",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+  ];
+  const originalIds = people.map((person) => person.person_id);
+
+  const visible = visibleSortedDirectoryPeople(people);
+
+  assert.deepEqual(visible.map((person) => person.person_id), [
+    "person-qa-manager-a",
+    "person-qa-manager-z",
+    "person-qa-staff",
+    "person-equipment",
+    "person-workshop",
+    "person-unlinked-unknown",
+  ]);
+  assert.equal(visible.some((person) => person.person_id === "person-inactive-manager"), false);
+  assert.deepEqual(people.map((person) => person.person_id), originalIds);
+});
+
+test("ứng viên chỉ hiện tài khoản active, theo vai legacy và không đổi input", async () => {
+  const { visibleSortedAccountCandidates } = await import(
+    "../../src/features/itemPermissions/accountListModel.ts"
+  );
+  const candidates = [
+    {
+      user_id: "user-inactive-admin",
+      email: "inactive-admin@vmp.local",
+      full_name: "Quản trị cũ",
+      role: "admin",
+      department: null,
+      is_active: false,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-viewer",
+      email: "viewer@vmp.local",
+      full_name: "Người xem",
+      role: "viewer",
+      department: "qa",
+      is_active: true,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-department",
+      email: "department@vmp.local",
+      full_name: "Người bộ phận",
+      role: "department_user",
+      department: "production",
+      is_active: true,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-qa-manager",
+      email: "qa-manager@vmp.local",
+      full_name: "Quản lý QA",
+      role: "qa_manager",
+      department: "qa",
+      is_active: true,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-admin-z",
+      email: "zeta@vmp.local",
+      full_name: "Đặng Thị Hồng Ngọc",
+      role: "admin",
+      department: null,
+      is_active: true,
+      linked_person_id: null,
+    },
+    {
+      user_id: "user-admin-a",
+      email: "alpha@vmp.local",
+      full_name: "Đặng Thị Hồng Ngọc",
+      role: "admin",
+      department: null,
+      is_active: true,
+      linked_person_id: null,
+    },
+  ];
+  const originalIds = candidates.map((candidate) => candidate.user_id);
+
+  const visible = visibleSortedAccountCandidates(candidates);
+
+  assert.deepEqual(visible.map((candidate) => candidate.user_id), [
+    "user-admin-a",
+    "user-admin-z",
+    "user-qa-manager",
+    "user-department",
+    "user-viewer",
+  ]);
+  assert.equal(visible.some((candidate) => candidate.user_id === "user-inactive-admin"), false);
+  assert.deepEqual(candidates.map((candidate) => candidate.user_id), originalIds);
+});
