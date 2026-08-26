@@ -493,6 +493,75 @@ async function chuanBiApV1(trang) {
   await trang.close();
 }
 
+/* ---- 2c. Bộ lọc Đối tượng: một mảng cho đếm/bảng/thẻ/xuất ------------ */
+{
+  console.log("\nBộ lọc nâng cao Đối tượng:");
+  const { trang, loiConsole } = await moTrang(trinhDuyet, { suaKho(kho) {
+    const mau = kho.vmp_source_objects[0];
+    kho.vmp_source_objects = Array.from({ length: 31 }, (_, index) => ({
+      ...mau,
+      id: 81_000 + index,
+      code: index === 0 ? "TB-FILTER-ONE" : `TB-FILTER-${index}`,
+      object_code: index === 0 ? "TB-FILTER-ONE" : `TB-FILTER-${index}`,
+      object_name: index === 0 ? "Máy lọc mục tiêu" : `Máy lọc nền ${index}`,
+      kind: "Thiết bị", object_kind: "Thiết bị",
+      department: index === 0 ? " QA " : "SX",
+      area_code: index === 0 ? " A1 " : "B2",
+      owner_name: index === 0 ? " Nguyễn An " : "Trần Bình",
+      validate_flag: "y", first_month: index === 0 ? 4 : 3,
+      frequency_months: 12, note: index === 0 ? "Theo dõi nhiệt độ" : "Dòng nền",
+    }));
+  } });
+
+  await trang.waitForSelector("[data-cw-filter-toggle]", { timeout: 10_000 });
+  await trang.waitForFunction(() => document.querySelectorAll(".lp-smart-table tbody tr").length === 25,
+    { timeout: 10_000 });
+  await trang.click(".cw-pager__nut:last-child");
+  await trang.waitForFunction(() => document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("26–31") === true,
+    { timeout: 10_000 });
+  await trang.click(".lp-smart-table__toggle");
+  await trang.waitForSelector(".lp-smart-table__detail", { timeout: 10_000 });
+
+  await trang.click("[data-cw-filter-toggle]");
+  await trang.waitForFunction(() => document.querySelector("[data-cw-filter-panel]")?.hasAttribute("hidden") === false,
+    { timeout: 10_000 });
+  await trang.select('[data-cw-filter="validation"]', "validated");
+  await trang.waitForFunction(() => document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("1–25 / 31") === true
+    && !document.querySelector(".lp-smart-table__detail"), { timeout: 10_000 });
+
+  await trang.select('[data-cw-filter="department"]', "qa");
+  await trang.select('[data-cw-filter="area"]', "a1");
+  await trang.select('[data-cw-filter="first-month"]', "present");
+  await trang.select('[data-cw-filter="owner"]', "owner:nguyễn an");
+  await trang.select('[data-cw-filter="frequency"]', "lte12");
+  await trang.waitForFunction(() => {
+    const count = document.querySelector("[data-cw-filter-count]")?.textContent ?? "";
+    return count.includes("6 điều kiện") && count.includes("1 đối tượng")
+      && document.querySelectorAll(".lp-smart-table tbody tr").length === 1
+      && document.querySelector("[data-cw-export-count]")?.getAttribute("data-cw-export-count") === "1";
+  }, { timeout: 10_000 });
+  const desktop = await trang.evaluate(() => ({
+    chips: document.querySelectorAll("[data-cw-filter-chip]").length,
+    row: document.querySelector(".lp-smart-table tbody tr")?.textContent ?? "",
+    exportCount: document.querySelector("[data-cw-export-count]")?.getAttribute("data-cw-export-count"),
+  }));
+  kiem(desktop.chips === 6, "sáu chip phản ánh sáu bộ lọc nâng cao", String(desktop.chips));
+  kiem(desktop.row.includes("TB-FILTER-ONE"), "bảng dùng đúng mảng đã lọc", desktop.row);
+  kiem(desktop.exportCount === "1", "xuất Excel nhận đúng toàn bộ mảng đã lọc", String(desktop.exportCount));
+
+  await trang.waitForFunction(() => document.querySelectorAll(".lp-mobile-task").length === 1, { timeout: 10_000 });
+  const mobile = await trang.evaluate(() => document.querySelector(".lp-mobile-task")?.textContent ?? "");
+  kiem(mobile.includes("TB-FILTER-ONE"), "thẻ điện thoại dùng cùng mảng đã lọc", mobile);
+
+  await trang.click("[data-cw-clear-filters]");
+  await trang.waitForFunction(() => !document.querySelector("[data-cw-filter-count]")
+    && document.querySelector('[data-cw-kind="Thiết bị"]')?.getAttribute("aria-pressed") === "true"
+    && document.querySelectorAll(".lp-mobile-task").length === 25, { timeout: 10_000 });
+  kiem(true, "xóa bộ lọc giữ nguyên loại đối tượng đang chọn");
+  kiem(loiConsole.length === 0, "không lỗi console ở bộ lọc đối tượng", loiConsole.join(" · ").slice(0, 160));
+  await trang.close();
+}
+
 /* ---- 3. Điện thoại 390×844: thẻ thay bảng, cùng dữ liệu -------------- */
 {
   console.log("\nĐiện thoại 390×844:");

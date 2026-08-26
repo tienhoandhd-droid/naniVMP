@@ -50,6 +50,11 @@ import CatalogRecordDialog from "./CatalogRecordDialog.tsx";
 import CatalogExcelImport from "./CatalogExcelImport.tsx";
 import { listDataset, listHistory, listPendingChanges } from "./api.ts";
 import { layDataset } from "./definitions.ts";
+import {
+  CATALOG_OBJECT_FILTERS_ALL, activeCatalogObjectFilterChips,
+  catalogObjectActiveFilterCount, catalogObjectFilterOptions, clearCatalogObjectFilter,
+  filterCatalogObjects, type CatalogObjectFilters,
+} from "./catalogWorkspaceFilterModel.ts";
 import type {
   CatalogAuditRow, CatalogChangeRow, CatalogDatasetId, CatalogListRow, CatalogRecord,
 } from "./contracts.ts";
@@ -105,6 +110,8 @@ export default function CatalogWorkspaceShell({
   const [vung, setVung] = useState<VungId>("objects");
   const [kind, setKind] = useState<ObjectKind>(SOURCE_KINDS[0]);
   const [q, setQ] = useState("");
+  const [objFilters, setObjFilters] = useState<CatalogObjectFilters>(CATALOG_OBJECT_FILTERS_ALL);
+  const [moBoLocObj, setMoBoLocObj] = useState(false);
   const [trang, setTrang] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -206,13 +213,14 @@ export default function CatalogWorkspaceShell({
   const doiVung = (id: VungId) => {
     setVung(id);
     setQ("");
+    setObjFilters(CATALOG_OBJECT_FILTERS_ALL);
     setTrang(0);
     setExpandedId(null);
   };
 
   const doiKind = (k: ObjectKind) => {
     setKind(k);
-    setQ(""); setTrang(0); setExpandedId(null);
+    setQ(""); setObjFilters(CATALOG_OBJECT_FILTERS_ALL); setTrang(0); setExpandedId(null);
   };
 
   /* Deep-link: áp dataset + tìm kiếm + mở dòng, rồi báo App xoá — CHỈ một
@@ -225,6 +233,7 @@ export default function CatalogWorkspaceShell({
       setKind(focus.nhom as ObjectKind);
     }
     setQ(focus.code);
+    setObjFilters(CATALOG_OBJECT_FILTERS_ALL);
     setTrang(0);
     setFocusCode(focus.code);
     onFocusConsumed?.();
@@ -232,13 +241,23 @@ export default function CatalogWorkspaceShell({
   }, [focus]);
 
   /* ---------------- View-model dùng chung desktop/mobile ----------- */
-  const objFields = useMemo(() => layDataset("objects").fields.map((f) => f.key), []);
-  const objFiltered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return objRows;
-    return objRows.filter((r) => objFields.some(
-      (k) => String((r as Record<string, unknown>)[k] ?? "").toLowerCase().includes(s)));
-  }, [objRows, q, objFields]);
+  const objFilterState = useMemo<CatalogObjectFilters>(() => ({ ...objFilters, text: q }), [objFilters, q]);
+  const objFiltered = useMemo(() => filterCatalogObjects(objRows, objFilterState), [objRows, objFilterState]);
+  const objFilterOptions = useMemo(() => catalogObjectFilterOptions(objRows), [objRows]);
+  const objFilterChips = useMemo(() => activeCatalogObjectFilterChips(objFilterState), [objFilterState]);
+  const objFilterCount = useMemo(() => catalogObjectActiveFilterCount(objFilterState), [objFilterState]);
+
+  const doiBoLocObj = <K extends keyof CatalogObjectFilters>(key: K, value: CatalogObjectFilters[K]) => {
+    setObjFilters((previous) => ({ ...previous, [key]: value }));
+    setTrang(0);
+    setExpandedId(null);
+  };
+  const xoaTatCaBoLocObj = () => {
+    setQ("");
+    setObjFilters(CATALOG_OBJECT_FILTERS_ALL);
+    setTrang(0);
+    setExpandedId(null);
+  };
 
   const objList = useMemo<CatalogListRow[]>(() =>
     objFiltered.slice(trang * PAGE_SIZE, (trang + 1) * PAGE_SIZE).map((r) => ({
@@ -406,11 +425,18 @@ export default function CatalogWorkspaceShell({
                   onChange={(e) => { setQ(e.target.value); setTrang(0); setExpandedId(null); }}
                 />
               </div>
+              {vung === "objects" && (
+                <button type="button" className="cw-nut" data-cw-filter-toggle
+                  aria-expanded={moBoLocObj} aria-controls="cw-object-filter-panel"
+                  onClick={() => setMoBoLocObj((mo) => !mo)}>
+                  Bộ lọc{objFilterCount > 0 ? ` (${objFilterCount})` : ""}
+                </button>
+              )}
               <button type="button" className="cw-nut" onClick={taiLai}>
                 <RefreshCw size={15} aria-hidden="true" /> Tải lại
               </button>
               {vung === "objects" && (
-                <button type="button" className="cw-nut" onClick={xuatExcel}>
+                <button type="button" className="cw-nut" data-cw-export-count={objFiltered.length} onClick={xuatExcel}>
                   <Download size={15} aria-hidden="true" /> Xuất Excel
                 </button>
               )}
@@ -436,6 +462,61 @@ export default function CatalogWorkspaceShell({
                 ))}
               </div>
 
+              <section id="cw-object-filter-panel" className="cw-filter-panel" data-cw-filter-panel hidden={!moBoLocObj} aria-label="Bộ lọc nâng cao đối tượng">
+                <div className="cw-filter-panel__luoi">
+                  <label className="cw-truong">Bộ phận
+                    <select className="cw-o" data-cw-filter="department" value={objFilters.department}
+                      onChange={(e) => doiBoLocObj("department", e.target.value)}>
+                      <option value="all">Tất cả bộ phận</option>
+                      {objFilterOptions.departments.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="cw-truong">Khu vực
+                    <select className="cw-o" data-cw-filter="area" value={objFilters.area}
+                      onChange={(e) => doiBoLocObj("area", e.target.value)}>
+                      <option value="all">Tất cả khu vực</option>
+                      {objFilterOptions.areas.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="cw-truong">Thẩm định
+                    <select className="cw-o" data-cw-filter="validation" value={objFilters.validation}
+                      onChange={(e) => doiBoLocObj("validation", e.target.value as CatalogObjectFilters["validation"])}>
+                      <option value="all">Tất cả</option><option value="validated">Có thẩm định</option><option value="outside">Ngoài kế hoạch</option>
+                    </select>
+                  </label>
+                  <label className="cw-truong">Tháng đầu tiên
+                    <select className="cw-o" data-cw-filter="first-month" value={objFilters.firstMonth}
+                      onChange={(e) => doiBoLocObj("firstMonth", e.target.value as CatalogObjectFilters["firstMonth"])}>
+                      <option value="all">Tất cả</option><option value="missing">Thiếu tháng đầu tiên</option><option value="present">Có tháng đầu tiên</option>
+                    </select>
+                  </label>
+                  <label className="cw-truong">Người phụ trách
+                    <select className="cw-o" data-cw-filter="owner" value={objFilters.owner}
+                      onChange={(e) => doiBoLocObj("owner", e.target.value as CatalogObjectFilters["owner"])}>
+                      <option value="all">Tất cả</option><option value="assigned">Đã phân công</option><option value="unassigned">Chưa phân công</option>
+                      {objFilterOptions.owners.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="cw-truong">Tần suất
+                    <select className="cw-o" data-cw-filter="frequency" value={objFilters.frequency}
+                      onChange={(e) => doiBoLocObj("frequency", e.target.value as CatalogObjectFilters["frequency"])}>
+                      <option value="all">Tất cả</option><option value="lte12">12 tháng hoặc ít hơn</option><option value="gt12">Hơn 12 tháng</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+              {objFilterCount > 0 && (
+                <div className="cw-filter-summary">
+                  <span data-cw-filter-count aria-live="polite">Đang lọc {objFilterCount} điều kiện · {objFiltered.length} đối tượng</span>
+                  {objFilterChips.map((chip) => <button key={chip.key} type="button" className="cw-filter-chip" data-cw-filter-chip
+                    aria-label={`Bỏ lọc ${chip.label}`} onClick={() => {
+                      if (chip.key === "text") setQ("");
+                      else doiBoLocObj(chip.key, clearCatalogObjectFilter(objFilterState, chip.key)[chip.key]);
+                    }}>{chip.label} ×</button>)}
+                  <button type="button" className="cw-nut cw-nut--phu" data-cw-clear-filters onClick={xoaTatCaBoLocObj}>Xóa bộ lọc</button>
+                </div>
+              )}
+
               {objState === "loading" && (
                 <StateBoundary state="loading" title="Đang tải danh mục nguồn" skeletonRows={5} />
               )}
@@ -446,10 +527,10 @@ export default function CatalogWorkspaceShell({
               {objState === "ready" && (
                 <>
                   <CatalogWarningsSummary warnings={warningGroups} />
-                  {objFiltered.length === 0 && q.trim() ? (
+                  {objFiltered.length === 0 && objFilterCount > 0 ? (
                     <StateBoundary state="filtered-empty" title="Không có dòng nào khớp"
-                      description={`Không đối tượng nào trong "${kind}" khớp với từ đang tìm.`}
-                      onClearFilters={() => { setQ(""); setTrang(0); }} />
+                      description={`Bộ lọc hiện tại không có đối tượng nào trong "${kind}" phù hợp.`}
+                      onClearFilters={xoaTatCaBoLocObj} />
                   ) : (
                     <CatalogSmartTable
                       dataset="objects"

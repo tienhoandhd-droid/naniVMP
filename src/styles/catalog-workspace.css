@@ -414,6 +414,43 @@
 }
 .cw-tim__o:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 1px; }
 
+/* ---- Bộ lọc nâng cao Đối tượng: đóng/mở riêng để CommandBar vẫn gọn ---- */
+.cw-filter-panel {
+  padding: 12px;
+  border: 1px solid var(--lp-line);
+  border-radius: 12px;
+  background: var(--lp-surface-2);
+}
+.cw-filter-panel__luoi {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.cw-filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cw-filter-chip {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--lp-line-strong);
+  border-radius: 999px;
+  background: var(--lp-rose-soft);
+  color: var(--lp-plum);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cw-filter-chip:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+@media (max-width: 720px) {
+  .cw-filter-panel__luoi { grid-template-columns: 1fr; }
+  .cw-filter-panel { padding: 12px; }
+}
+
 /* ---- Nhãn trạng thái nhỏ trong bảng/thẻ ---- */
 .cw-tag {
   display: inline-flex;
