@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 
-const NODE_24 = "/home/admin1/.nvm/versions/node/v24.18.0/bin/node";
+const NODE = process.execPath;
 const ROOT = new URL("../..", import.meta.url);
 
 function loadAccessibilityChannel(ci) {
@@ -13,7 +13,7 @@ function loadAccessibilityChannel(ci) {
     delete env.CI;
   }
 
-  const loaded = spawnSync(NODE_24, [
+  const loaded = spawnSync(NODE, [
     "--import",
     "tsx",
     "--input-type=module",
