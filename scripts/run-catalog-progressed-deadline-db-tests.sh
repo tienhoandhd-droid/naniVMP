@@ -3,8 +3,8 @@
 set -euo pipefail
 
 mode="${1:-}"
-if [[ -n "$mode" && "$mode" != "--expect-red" ]]; then
-  echo "Usage: $0 [--expect-red]" >&2
+if [[ -n "$mode" && "$mode" != "--expect-red" && "$mode" != "--expect-manual-red" ]]; then
+  echo "Usage: $0 [--expect-red|--expect-manual-red]" >&2
   exit 2
 fi
 
@@ -111,6 +111,33 @@ check_precondition_drift() {
   dropdb --force "$drift_database"
 }
 
+check_manual_precondition_drift() {
+  local suffix="$1"
+  local drift_sql="$2"
+  local drift_database="${test_database}_manual${suffix}"
+  local drift_log="$tmp_dir/manual-precondition-${suffix}.log"
+  local migration_status
+  test_databases+=("$drift_database")
+  createdb -T "$test_database" "$drift_database"
+  psql -X -v ON_ERROR_STOP=1 -d "$drift_database" -c "$drift_sql" >/dev/null
+  set +e
+  psql -X -v ON_ERROR_STOP=1 -d "$drift_database" \
+    -f "$repo_dir/supabase/migrations/20260826170000_manual_planned_deadline_edit.sql" \
+    >"$drift_log" 2>&1
+  migration_status=$?
+  set -e
+
+  if [[ $migration_status -eq 0 ]] \
+     || ! grep -q 'MANUAL_DEADLINE_PRECONDITION_' "$drift_log" \
+     || [[ "$(psql -X -qAt -d "$drift_database" -c "select to_regprocedure('public.vmp_update_planned_deadlines_impl(text,jsonb,text,integer,boolean)') is null")" != "t" ]]; then
+    sed -n '1,220p' "$drift_log" >&2
+    echo "Manual migration did not reject $suffix drift before DDL." >&2
+    exit 1
+  fi
+  echo "PASS MANUAL PRECONDITION rejected ${suffix} drift before DDL"
+  dropdb --force "$drift_database"
+}
+
 if [[ "$mode" == "--expect-red" ]]; then
   set +e
   psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
@@ -144,13 +171,53 @@ check_precondition_drift missinghelper \
 
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql"
+
+if [[ "$mode" == "--expect-manual-red" ]]; then
+  set +e
+  psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+    -f "$repo_dir/tests/sql/manual-planned-deadline-edit.sql" \
+    >"$tmp_dir/manual-red.log" 2>&1
+  manual_red_status=$?
+  set -e
+  if [[ $manual_red_status -eq 0 ]]; then
+    echo "Expected RED but the manual planned-deadline suite passed." >&2
+    exit 1
+  fi
+  if ! grep -Eq 'function public\.rpc_update_planned_deadlines\(.*\) does not exist|undefined_function' \
+      "$tmp_dir/manual-red.log"; then
+    sed -n '1,220p' "$tmp_dir/manual-red.log" >&2
+    echo "Manual RED failed for a reason other than the missing RPC." >&2
+    exit 1
+  fi
+  echo "PASS RED undefined_function rpc_update_planned_deadlines"
+  exit 0
+fi
+
+check_manual_precondition_drift definition \
+  "create or replace function public.vmp_plan_item_row_revision_v2() returns trigger language plpgsql volatile security invoker set search_path=public,pg_temp as \$function\$ begin new.version:=old.version+2; return new; end \$function\$"
+check_manual_precondition_drift searchpath \
+  "alter function public.audit_plan_item_changes_v2() set search_path=public,pg_temp"
+check_manual_precondition_drift schema \
+  "alter table public.vmp_plan_items alter column version drop not null"
+check_manual_precondition_drift overload \
+  "create function public.rpc_update_planned_deadlines(text) returns jsonb language sql as \$function\$ select '{}'::jsonb \$function\$"
+check_manual_precondition_drift assignmentdependency \
+  "alter function public.rpc_set_item_assignment__five_role_impl_20260824(uuid,text,text,text,text,text,uuid) set search_path=pg_temp,public"
+
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/supabase/migrations/20260826170000_manual_planned_deadline_edit.sql"
+
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/tests/sql/catalog-progressed-deadline-override.sql"
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/tests/sql/manual-planned-deadline-edit.sql"
 
 # Committed setup is isolated to the disposable database so two real backend
 # sessions can contend on the same advisory mutex and rows.
 psql -X -v ON_ERROR_STOP=1 -v catalog_concurrency_setup=1 -d "$test_database" \
   -f "$repo_dir/tests/sql/catalog-progressed-deadline-override.sql"
+psql -X -v ON_ERROR_STOP=1 -v manual_concurrency_setup=1 -d "$test_database" \
+  -f "$repo_dir/tests/sql/manual-planned-deadline-edit.sql"
 
 run_rpc() {
   local sql="$1"
@@ -222,7 +289,7 @@ lock_superset_writer_pid=$!
 assert_backend_lock_wait 'lock-superset-writer.json'
 wait "$lock_superset_apply_pid"
 wait "$lock_superset_writer_pid"
-node - "$tmp_dir/lock-superset-apply.json" <<'NODE'
+node --input-type=module - "$tmp_dir/lock-superset-apply.json" <<'NODE'
 import { readFileSync } from "node:fs";
 const value = JSON.parse(readFileSync(process.argv[2], "utf8").trim().split("\n").at(-1));
 if (value.ok !== true || value.da_ap_truoc_do !== false) throw new Error(`lock-superset apply ${JSON.stringify(value)}`);
@@ -248,7 +315,7 @@ wait "$barrier_pid"
 wait "$apply_a_pid"
 wait "$apply_b_pid"
 
-node - "$tmp_dir/apply-a.json" "$tmp_dir/apply-b.json" <<'NODE'
+node --input-type=module - "$tmp_dir/apply-a.json" "$tmp_dir/apply-b.json" <<'NODE'
 import { readFileSync } from "node:fs";
 const values = process.argv.slice(2).map((path) => JSON.parse(readFileSync(path, "utf8").trim().split("\n").at(-1)));
 if (!values.every((value) => value.ok === true)) throw new Error("apply/apply returned a non-success payload");
@@ -269,7 +336,7 @@ wait "$barrier_pid"
 wait "$save_apply_apply_pid"
 wait "$save_apply_save_pid"
 
-node - "$tmp_dir/save-apply-apply.json" "$tmp_dir/save-apply-save.json" <<'NODE'
+node --input-type=module - "$tmp_dir/save-apply-apply.json" "$tmp_dir/save-apply-save.json" <<'NODE'
 import { readFileSync } from "node:fs";
 const [apply, save] = process.argv.slice(2).map((path) => JSON.parse(readFileSync(path, "utf8").trim().split("\n").at(-1)));
 if (apply.ok !== true || save.ok !== true) throw new Error(`save/apply failure ${JSON.stringify({ apply, save })}`);
@@ -306,7 +373,57 @@ end
 $concurrency$;
 SQL
 
+manual_mm_deadlines='{"deadline_protocol":"2026-09-02","deadline_validation":"2026-09-16","deadline_report":"2026-09-23","deadline_vmp":"2026-10-01"}'
+run_rpc "with g as (select set_config('request.jwt.claims',$claims,false) c) select public.rpc_update_planned_deadlines('CCTB-MANUAL-MM/2026.01-PQ','$manual_mm_deadlines'::jsonb,'manual/manual A',7,true) from g where c is not null" "$tmp_dir/manual-mm-a.json" &
+manual_mm_a_pid=$!
+assert_backend_wait 'manual-mm-a.json' 'Timeout' 'PgSleep'
+run_rpc "with g as (select set_config('request.jwt.claims',$claims,false) c) select public.rpc_update_planned_deadlines('CCTB-MANUAL-MM/2026.01-PQ','$manual_mm_deadlines'::jsonb,'manual/manual B',7,true) from g where c is not null" "$tmp_dir/manual-mm-b.json" &
+manual_mm_b_pid=$!
+assert_backend_lock_wait 'manual-mm-b.json'
+wait "$manual_mm_a_pid"
+wait "$manual_mm_b_pid"
+node --input-type=module - "$tmp_dir/manual-mm-a.json" "$tmp_dir/manual-mm-b.json" <<'NODE'
+import { readFileSync } from "node:fs";
+const [first, second] = process.argv.slice(2).map((path) => JSON.parse(readFileSync(path, "utf8").trim().split("\n").at(-1)));
+if (first.ok !== true || first.current_version !== 8) throw new Error(`manual/manual winner ${JSON.stringify(first)}`);
+if (second.ok !== false || second.error_code !== "VERSION_CONFLICT" || second.current_version !== 8) {
+  throw new Error(`manual/manual stale result ${JSON.stringify(second)}`);
+}
+NODE
+if [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c "select version=8 and deadline_protocol='2026-09-02' and deadline_validation='2026-09-16' and deadline_report='2026-09-23' and deadline_vmp='2026-10-01' and (select count(*) from public.audit_logs where validation_code='CCTB-MANUAL-MM/2026.01-PQ' and source='manual_planned_deadline_edit')=1 from public.vmp_plan_items where validation_code='CCTB-MANUAL-MM/2026.01-PQ'")" != "t" ]]; then
+  echo "Manual/manual final state or audit mismatch." >&2
+  exit 1
+fi
+echo "PASS CONCURRENCY manual/manual one winner one stale conflict"
+
+manual_mc_deadlines='{"deadline_protocol":"2026-09-03","deadline_validation":"2026-09-17","deadline_report":"2026-09-24","deadline_vmp":"2026-10-02"}'
+run_rpc "with g as (select set_config('request.jwt.claims',$claims,false) c) select public.rpc_update_planned_deadlines('CCTB-MANUAL-MC/2026.01-PQ','$manual_mc_deadlines'::jsonb,'manual/catalog manual winner',7,true) from g where c is not null" "$tmp_dir/manual-mc-manual.json" &
+manual_mc_manual_pid=$!
+assert_backend_wait 'manual-mc-manual.json' 'Timeout' 'PgSleep'
+run_rpc "with g as (select set_config('request.jwt.claims',$claims,false) c) select public.rpc_apply_catalog_change_v2('a3000000-0000-4000-8000-000000000001','manual/catalog catalog stale',1,'[{\"validation_code\":\"CCTB-MANUAL-MC/2026.01-PQ\",\"expected_item_version\":7}]'::jsonb,true) from g where c is not null" "$tmp_dir/manual-mc-catalog.json" &
+manual_mc_catalog_pid=$!
+assert_backend_lock_wait 'manual-mc-catalog.json'
+wait "$manual_mc_manual_pid"
+wait "$manual_mc_catalog_pid"
+node --input-type=module - "$tmp_dir/manual-mc-manual.json" "$tmp_dir/manual-mc-catalog.json" <<'NODE'
+import { readFileSync } from "node:fs";
+const [manual, catalog] = process.argv.slice(2).map((path) => JSON.parse(readFileSync(path, "utf8").trim().split("\n").at(-1)));
+if (manual.ok !== true || manual.current_version !== 8) throw new Error(`manual/catalog manual winner ${JSON.stringify(manual)}`);
+if (catalog.ok !== false || catalog.error_code !== "ITEM_STATE_CHANGED") {
+  throw new Error(`manual/catalog catalog stale result ${JSON.stringify(catalog)}`);
+}
+NODE
+if [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c "select pi.version=8 and pi.deadline_protocol='2026-09-03' and pi.deadline_validation='2026-09-17' and pi.deadline_report='2026-09-24' and pi.deadline_vmp='2026-10-02' and ch.status='pending' and (select count(*) from public.audit_logs where validation_code=pi.validation_code and source='manual_planned_deadline_edit')=1 from public.vmp_plan_items pi cross join public.vmp_catalog_changes ch where pi.validation_code='CCTB-MANUAL-MC/2026.01-PQ' and ch.id='a3000000-0000-4000-8000-000000000001'")" != "t" ]]; then
+  echo "Manual/catalog final state or audit mismatch." >&2
+  exit 1
+fi
+psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c \
+  "drop trigger manual_deadline_concurrency_pause on public.vmp_plan_items; drop function auth.manual_deadline_concurrency_pause()"
+echo "PASS CONCURRENCY manual/catalog manual winner catalog stale conflict"
+
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/tests/sql/manual-planned-deadline-security.sql"
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/tests/sql/catalog-progressed-deadline-security.sql"
 
-echo "PASS GREEN business fault-injection concurrency security ROLLBACK"
+echo "PASS GREEN business fault-injection concurrency security ACL five-role ROLLBACK"

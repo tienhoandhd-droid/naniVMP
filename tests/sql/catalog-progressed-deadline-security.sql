@@ -51,10 +51,10 @@ with browser_inventory as (
   from service_inventory
 )
 select pg_temp.assert_true(
-  browser_contract.count=66
-  and browser_contract.digest='a23d311a4e17b338e93eaf689d116334684cedcf4803d41030a0cf954d0fbf7e'
-  and service_contract.count=209
-  and service_contract.digest='11f1869a3dc2fc5507129f841d3dfc7fa4c2c792fed9206ecf86d01022ddc3a0',
+  browser_contract.count=67
+  and browser_contract.digest='fbb5815077262640c78e2541ed4fe870e37e45b7c8b0806ba10b589696d1e3dc'
+  and service_contract.count=210
+  and service_contract.digest='216d718818f0ca1bc30091ae6a8db40e1d4ca518fcebf3825747f561a6dd9e95',
   format('POST_V2_ACL_CONTRACT browser=%s/%s service=%s/%s',browser_contract.count,browser_contract.digest,
     service_contract.count,service_contract.digest))
 from browser_contract cross join service_contract;
@@ -113,5 +113,5 @@ select pg_temp.assert_true(
   'NO_NEW_UNFILTERED_SECURITY_DEFINER_ITEM_READER '||signatures)
 from findings;
 
-\echo 'PASS SECURITY post-V2 counts=66/209'
+\echo 'PASS SECURITY post-manual counts=67/210'
 rollback;
