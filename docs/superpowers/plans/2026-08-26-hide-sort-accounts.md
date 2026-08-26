@@ -205,7 +205,7 @@ Expected: all commands exit 0. These are the same three moderate mock E2E groups
 - [ ] **Step 9: Commit Task 2**
 
 ```bash
-git add src/features/itemPermissions/api.ts src/features/itemPermissions/StaffDirectoryPanel.tsx src/features/itemPermissions/AccountLinkPanel.tsx tests/unit/item-permission-contracts.test.mjs tests/e2e/danh-ba-phan-quyen.mjs
+git add package.json src/features/itemPermissions/accountListModel.ts src/features/itemPermissions/api.ts src/features/itemPermissions/StaffDirectoryPanel.tsx src/features/itemPermissions/AccountLinkPanel.tsx tests/unit/item-permission-contracts.test.mjs tests/e2e/tai-khoan-an-sap-xep.mjs
 git commit -m "feat(accounts): hide inactive and sort role lists"
 ```
 

@@ -1,7 +1,7 @@
 # Thiết kế ẩn và sắp xếp tài khoản
 
-**Ngày:** 2026-08-26  
-**Nền phát triển:** `origin/main` tại `79565b22fb88239952ed640ce230d47364e9e28d`  
+**Ngày:** 2026-08-26
+**Nền phát triển:** `origin/main` tại `79565b22fb88239952ed640ce230d47364e9e28d`
 **Phạm vi:** Màn **Vai trò & phạm vi**, danh bạ chuẩn và ô chọn tài khoản để nối.
 
 ## 1. Mục tiêu

@@ -30,6 +30,7 @@ import {
   searchPermissionDirectory,
   setItemPermissionsMode,
 } from "./api.ts";
+import { visibleSortedDirectoryPeople } from "./accountListModel.ts";
 import { ACCESS_CLASSES } from "./types.ts";
 import type { DirectoryPerson, PermissionIssue, PermissionPreflight } from "./types.ts";
 
@@ -52,6 +53,15 @@ function nhanVaiTro(nguoi: DirectoryPerson): string {
  *  lên Supabase là tự gây nghẽn; chờ tuần tự từng người thì với vài chục
  *  người trong danh bạ, người xem tưởng màn hình bị treo. */
 const GIOI_HAN_SONG_SONG_DO_ANH_HUONG = 4;
+
+/** Danh sách đo ảnh hưởng chỉ giữ performer còn làm việc và không còn gắn
+ * với tài khoản đã bị vô hiệu hóa. Giữ chung quy tắc hiển thị của danh bạ
+ * để bảng xem trước không vô tình đưa một tài khoản đã ẩn trở lại. */
+export function prepareImpactDirectoryPeople(
+  people: readonly DirectoryPerson[],
+): DirectoryPerson[] {
+  return visibleSortedDirectoryPeople(people).filter((person) => person.is_active);
+}
 
 interface DongAnhHuong {
   nguoi: DirectoryPerson;
@@ -177,7 +187,8 @@ export default function ItemPermissionModeCard() {
       const tatCa = await searchPermissionDirectory("");
       // Người đã nghỉ không có hạng mục nào để đo — RPC tự loại theo
       // is_active, đo họ chỉ ra toàn số 0 giả, làm loãng nhóm cảnh báo thật.
-      const dangHoatDong = tatCa.filter((p) => p.is_active);
+      // Cùng lúc, không được đưa trở lại bảng một tài khoản đã vô hiệu hóa.
+      const dangHoatDong = prepareImpactDirectoryPeople(tatCa);
       setTienDoDo({ xong: 0, tong: dangHoatDong.length });
       let xong = 0;
       const hang = await chayTheoLo(

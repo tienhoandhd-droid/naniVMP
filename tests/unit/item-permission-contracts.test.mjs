@@ -1101,6 +1101,95 @@ test("danh bạ ẩn tài khoản inactive, xếp theo vai và không đổi inp
   assert.deepEqual(people.map((person) => person.person_id), originalIds);
 });
 
+test("xem trước ảnh hưởng chỉ đo performer còn làm việc với tài khoản còn hiệu lực", async () => {
+  const { prepareImpactDirectoryPeople } = await import(
+    "../../src/features/itemPermissions/ItemPermissionModeCard.tsx"
+  );
+  const people = [
+    {
+      person_id: "person-inactive-account",
+      user_id: "user-inactive-account",
+      employee_code: "NV-101",
+      full_name: "Quản lý QA đã vô hiệu hóa",
+      department: "qa",
+      email: "inactive-account@vmp.local",
+      account_status: "inactive",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-left-company",
+      user_id: "user-left-company",
+      employee_code: "NV-102",
+      full_name: "QA đã nghỉ",
+      department: "qa",
+      email: "left-company@vmp.local",
+      account_status: "linked",
+      access_class: "qa_progress_editor",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: false,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-unlinked-active",
+      user_id: null,
+      employee_code: "NV-103",
+      full_name: "Nhân viên xưởng chưa nối",
+      department: "workshop",
+      email: null,
+      account_status: "unlinked",
+      access_class: "workshop_staff",
+      scope_departments: ["workshop"],
+      scope_factory_ids: ["factory-1"],
+      scope_area_ids: ["area-1"],
+      scope_line_ids: ["line-1"],
+      version: 1,
+      access_areas: ["A1"],
+      email_sent_confirmed: false,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-linked-active",
+      user_id: "user-linked-active",
+      employee_code: "NV-104",
+      full_name: "Quản lý QA còn hiệu lực",
+      department: "qa",
+      email: "linked-active@vmp.local",
+      account_status: "linked",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+  ];
+
+  assert.deepEqual(
+    prepareImpactDirectoryPeople(people).map((person) => person.person_id),
+    ["person-linked-active", "person-unlinked-active"],
+  );
+});
+
 test("danh bạ dùng comparator tên tiếng Việt ở cùng vai", async () => {
   const { visibleSortedDirectoryPeople } = await import(
     "../../src/features/itemPermissions/accountListModel.ts"

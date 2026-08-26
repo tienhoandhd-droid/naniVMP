@@ -51,7 +51,7 @@ test("README liệt kê lệnh chạy riêng bộ kiểm danh mục người th�
  * ------------------------------------------------------------------- */
 
 const LENH_LOTUS = {
-  "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs",
+  "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs && node tests/e2e/tai-khoan-an-sap-xep.mjs",
   "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
   shell: "node tests/e2e/lotus-shell.mjs",
   thammy: "node tests/e2e/tham-my.mjs",
@@ -75,7 +75,7 @@ test("README ghi cách chạy từng bộ", async () => {
 });
 
 test("mọi bộ kiểm trình duyệt mới đều đi qua lớp giả lập, không chạm production", async () => {
-  for (const f of ["luong-gia-lap.mjs", "lotus-shell.mjs", "tham-my.mjs", "catalog-workspace.mjs"]) {
+  for (const f of ["luong-gia-lap.mjs", "tai-khoan-an-sap-xep.mjs", "lotus-shell.mjs", "tham-my.mjs", "catalog-workspace.mjs"]) {
     const nguon = await readRepositoryFile(`tests/e2e/${f}`);
     assert.ok(nguon.includes("gia-lap-supabase.mjs"),
       `${f} phải nạp lớp giả lập Supabase`);
