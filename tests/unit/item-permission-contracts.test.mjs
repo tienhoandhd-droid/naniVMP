@@ -866,7 +866,7 @@ test("danh bạ ẩn tài khoản inactive, xếp theo vai và không đổi inp
       version: 1,
       access_areas: [],
       email_sent_confirmed: false,
-      is_active: false,
+      is_active: true,
       match_status: "unique",
     },
     {
@@ -886,6 +886,44 @@ test("danh bạ ẩn tài khoản inactive, xếp theo vai và không đổi inp
       access_areas: [],
       email_sent_confirmed: false,
       is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-linked-stale",
+      user_id: "user-linked-stale",
+      employee_code: "NV-007",
+      full_name: "Hồ Sơ Liên kết cũ",
+      department: "qa",
+      email: "linked-stale@vmp.local",
+      account_status: "linked",
+      access_class: "qa_progress_editor",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: false,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-unlinked-stale",
+      user_id: null,
+      employee_code: null,
+      full_name: "Vô danh cũ",
+      department: null,
+      email: null,
+      account_status: "unlinked",
+      access_class: null,
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: false,
+      is_active: false,
       match_status: "unique",
     },
     {
@@ -991,13 +1029,119 @@ test("danh bạ ẩn tài khoản inactive, xếp theo vai và không đổi inp
   assert.deepEqual(visible.map((person) => person.person_id), [
     "person-qa-manager-a",
     "person-qa-manager-z",
+    "person-linked-stale",
     "person-qa-staff",
     "person-equipment",
     "person-workshop",
     "person-unlinked-unknown",
+    "person-unlinked-stale",
   ]);
   assert.equal(visible.some((person) => person.person_id === "person-inactive-manager"), false);
+  assert.equal(visible.some((person) => person.person_id === "person-linked-stale"), true);
+  assert.equal(visible.some((person) => person.person_id === "person-unlinked-stale"), true);
   assert.deepEqual(people.map((person) => person.person_id), originalIds);
+});
+
+test("danh bạ dùng comparator tên tiếng Việt ở cùng vai", async () => {
+  const { visibleSortedDirectoryPeople } = await import(
+    "../../src/features/itemPermissions/accountListModel.ts"
+  );
+  const people = [
+    {
+      person_id: "person-vietnamese-an",
+      user_id: "user-vietnamese-an",
+      employee_code: "NV-009",
+      full_name: "Ân QA",
+      department: "qa",
+      email: "an@vmp.local",
+      account_status: "linked",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-vietnamese-anh",
+      user_id: "user-vietnamese-anh",
+      employee_code: "NV-008",
+      full_name: "Ánh QA",
+      department: "qa",
+      email: "anh@vmp.local",
+      account_status: "linked",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+  ];
+
+  assert.deepEqual(
+    visibleSortedDirectoryPeople(people).map((person) => person.person_id),
+    ["person-vietnamese-anh", "person-vietnamese-an"],
+  );
+});
+
+test("danh bạ dùng person_id làm tie-break cuối khi tên và email trùng", async () => {
+  const { visibleSortedDirectoryPeople } = await import(
+    "../../src/features/itemPermissions/accountListModel.ts"
+  );
+  const people = [
+    {
+      person_id: "person-id-z",
+      user_id: "user-id-z",
+      employee_code: "NV-011",
+      full_name: "Nguyễn Văn Trùng",
+      department: "qa",
+      email: "same@vmp.local",
+      account_status: "linked",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+    {
+      person_id: "person-id-a",
+      user_id: "user-id-a",
+      employee_code: "NV-010",
+      full_name: "Nguyễn Văn Trùng",
+      department: "qa",
+      email: "same@vmp.local",
+      account_status: "linked",
+      access_class: "qa_manager",
+      scope_departments: [],
+      scope_factory_ids: [],
+      scope_area_ids: [],
+      scope_line_ids: [],
+      version: 1,
+      access_areas: [],
+      email_sent_confirmed: true,
+      is_active: true,
+      match_status: "unique",
+    },
+  ];
+
+  assert.deepEqual(
+    visibleSortedDirectoryPeople(people).map((person) => person.person_id),
+    ["person-id-a", "person-id-z"],
+  );
 });
 
 test("ứng viên chỉ hiện tài khoản active, theo vai legacy và không đổi input", async () => {

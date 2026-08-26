@@ -51,7 +51,9 @@ function compareAccountCandidates(left: AccountCandidate, right: AccountCandidat
 export function visibleSortedDirectoryPeople(
   people: readonly DirectoryPerson[],
 ): DirectoryPerson[] {
-  return [...people].filter((person) => person.is_active).sort(compareDirectoryPeople);
+  return [...people]
+    .filter((person) => person.account_status !== "inactive")
+    .sort(compareDirectoryPeople);
 }
 
 export function visibleSortedAccountCandidates(
