@@ -330,6 +330,7 @@ async function moXemTruocFallbackV2({ previewV2Error, applyV2Error, previewV2 = 
   const v1ApplyBodies = [];
   const v2PreviewBodies = [];
   const v2ApplyBodies = [];
+  const rpcSequence = [];
   const pageState = await moTrang(trinhDuyet, {
     suaKho(kho) {
       const source = kho.vmp_source_objects[0];
@@ -346,8 +347,14 @@ async function moXemTruocFallbackV2({ previewV2Error, applyV2Error, previewV2 = 
       }
       kho.rpc_preview_catalog_change_v2 = () => previewV2;
       kho.rpc_apply_catalog_change_v2 = () => AP_DUNG_V1_OK;
-      kho.rpc_preview_catalog_change = (body) => { v1PreviewBodies.push(body); return XEM_TRUOC_V1_OK; };
-      kho.rpc_apply_catalog_change = (body) => { v1ApplyBodies.push(body); return AP_DUNG_V1_OK; };
+      kho.rpc_preview_catalog_change = (body) => {
+        v1PreviewBodies.push(body); rpcSequence.push({ rpc: "rpc_preview_catalog_change", body });
+        return XEM_TRUOC_V1_OK;
+      };
+      kho.rpc_apply_catalog_change = (body) => {
+        v1ApplyBodies.push(body); rpcSequence.push({ rpc: "rpc_apply_catalog_change", body });
+        return AP_DUNG_V1_OK;
+      };
     },
   });
   const { trang } = pageState;
@@ -360,8 +367,11 @@ async function moXemTruocFallbackV2({ previewV2Error, applyV2Error, previewV2 = 
     if (!rpc) return;
     let body = null;
     try { body = JSON.parse(request.postData() || "null"); } catch { body = null; }
-    if (rpc === "rpc_preview_catalog_change_v2") v2PreviewBodies.push(body);
-    else if (rpc === "rpc_apply_catalog_change_v2") v2ApplyBodies.push(body);
+    if (rpc === "rpc_preview_catalog_change_v2") {
+      v2PreviewBodies.push(body); rpcSequence.push({ rpc, body });
+    } else if (rpc === "rpc_apply_catalog_change_v2") {
+      v2ApplyBodies.push(body); rpcSequence.push({ rpc, body });
+    }
   });
   await trang.waitForSelector("[data-cw-sua]", { timeout: 10_000 });
   await trang.click("[data-cw-sua]");
@@ -373,7 +383,7 @@ async function moXemTruocFallbackV2({ previewV2Error, applyV2Error, previewV2 = 
     .some((button) => button.textContent?.trim() === "Lưu" && !button.disabled), { timeout: 10_000 });
   await trang.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => button.textContent?.trim() === "Lưu")?.click());
-  return { ...pageState, v1PreviewBodies, v1ApplyBodies, v2PreviewBodies, v2ApplyBodies };
+  return { ...pageState, v1PreviewBodies, v1ApplyBodies, v2PreviewBodies, v2ApplyBodies, rpcSequence };
 }
 
 async function chuanBiApV1(trang) {
@@ -1070,7 +1080,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
 /* ---- 10. V2 chưa có: chỉ fallback chính xác, không hạ an toàn -------- */
 {
   console.log("\nCatalog V2 fallback — preview PGRST202:");
-  const { trang, loiConsole, chanNgoai, v2PreviewBodies, v1PreviewBodies, v1ApplyBodies } = await moXemTruocFallbackV2({
+  const { trang, loiConsole, chanNgoai, v2PreviewBodies, v1PreviewBodies, v1ApplyBodies, rpcSequence } = await moXemTruocFallbackV2({
     previewV2Error: { status: 404, code: "PGRST202", message: "V2 chưa được triển khai" },
   });
   await trang.waitForFunction(() => [...document.querySelectorAll("div")]
@@ -1084,6 +1094,10 @@ for (const scenario of LOI_AP_DUNG_V2) {
     "PGRST202 preview gọi V2 trước với đúng change id", JSON.stringify(v2PreviewBodies));
   kiem(JSON.stringify(v1PreviewBodies) === JSON.stringify([{ p_change_id: CHANGE_ID_V2 }]),
     "PGRST202 preview sau đó fallback V1 với đúng change id", JSON.stringify(v1PreviewBodies));
+  kiem(JSON.stringify(rpcSequence) === JSON.stringify([
+    { rpc: "rpc_preview_catalog_change_v2", body: { p_change_id: CHANGE_ID_V2 } },
+    { rpc: "rpc_preview_catalog_change", body: { p_change_id: CHANGE_ID_V2 } },
+  ]), "PGRST202 preview theo đúng thứ tự V2 rồi V1", JSON.stringify(rpcSequence));
   kiem(v1ApplyBodies.length === 0, "PGRST202 preview chưa tạo mutation V1");
   kiem(!state.hasOverrideCheckbox, "preview V1 không mở lối ghi đè deadline");
   kiem(!state.hasAlert, "PGRST202 preview fallback không báo lỗi giả");
@@ -1093,11 +1107,12 @@ for (const scenario of LOI_AP_DUNG_V2) {
 
 {
   console.log("\nCatalog V2 fallback — apply 42883 không có override:");
-  const { trang, loiConsole, chanNgoai, v2ApplyBodies, v1ApplyBodies } = await moXemTruocFallbackV2({
+  const { trang, loiConsole, chanNgoai, v2ApplyBodies, v1ApplyBodies, rpcSequence } = await moXemTruocFallbackV2({
     applyV2Error: { status: 404, code: "42883", message: "V2 chưa được triển khai" },
   });
   await trang.waitForFunction(() => [...document.querySelectorAll("div")]
     .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+  rpcSequence.splice(0);
   await chuanBiApV1(trang);
   await bamApDeadlineV2(trang);
   await trang.waitForFunction(() => document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')
@@ -1106,13 +1121,17 @@ for (const scenario of LOI_AP_DUNG_V2) {
     "42883 apply gọi V2 trước với body không override đầy đủ", JSON.stringify(v2ApplyBodies));
   kiem(JSON.stringify(v1ApplyBodies) === JSON.stringify([expectedApplyBodyV1()]),
     "42883 apply sau đó fallback giữ nguyên body V1", JSON.stringify(v1ApplyBodies));
+  kiem(JSON.stringify(rpcSequence) === JSON.stringify([
+    { rpc: "rpc_apply_catalog_change_v2", body: expectedApplyBodyV2WithoutOverride() },
+    { rpc: "rpc_apply_catalog_change", body: expectedApplyBodyV1() },
+  ]), "42883 apply theo đúng thứ tự V2 rồi V1 với body đầy đủ", JSON.stringify(rpcSequence));
   kiem(chanNgoai.length === 0, "42883 apply fallback không gọi ra ngoài", chanNgoai[0] || "");
   await trang.close();
 }
 
 {
   console.log("\nCatalog V2 fallback — PGRST203 không được hạ về V1:");
-  const { trang, loiConsole, chanNgoai, v2PreviewBodies, v1PreviewBodies, v1ApplyBodies } = await moXemTruocFallbackV2({
+  const { trang, loiConsole, chanNgoai, v2PreviewBodies, v1PreviewBodies, v1ApplyBodies, rpcSequence } = await moXemTruocFallbackV2({
     previewV2Error: { status: 400, code: "PGRST203", message: "RPC overload mơ hồ" },
   });
   await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
@@ -1125,6 +1144,9 @@ for (const scenario of LOI_AP_DUNG_V2) {
     "PGRST203 gọi đúng V2 preview trước khi báo lỗi", JSON.stringify(v2PreviewBodies));
   kiem(v1PreviewBodies.length === 0 && v1ApplyBodies.length === 0,
     "PGRST203 không gọi bất kỳ RPC V1 nào", JSON.stringify({ v1PreviewBodies, v1ApplyBodies }));
+  kiem(JSON.stringify(rpcSequence) === JSON.stringify([
+    { rpc: "rpc_preview_catalog_change_v2", body: { p_change_id: CHANGE_ID_V2 } },
+  ]), "PGRST203 chỉ gọi V2, không có fallback", JSON.stringify(rpcSequence));
   kiem(state.dialogOpen && state.alert.includes("RPC overload mơ hồ"),
     "PGRST203 giữ hộp và hiện lỗi thật", JSON.stringify(state));
   kiem(chanNgoai.length === 0, "PGRST203 không gọi ra ngoài", chanNgoai[0] || "");
@@ -1133,12 +1155,13 @@ for (const scenario of LOI_AP_DUNG_V2) {
 
 {
   console.log("\nCatalog V2 fallback — đã chọn override thì phải chặn:");
-  const { trang, loiConsole, chanNgoai, v2ApplyBodies, v1ApplyBodies } = await moXemTruocFallbackV2({
+  const { trang, loiConsole, chanNgoai, v2ApplyBodies, v1ApplyBodies, rpcSequence } = await moXemTruocFallbackV2({
     applyV2Error: { status: 404, code: "PGRST202", message: "V2 chưa được triển khai" },
     previewV2: XEM_TRUOC_V2_CO_GHI_DE,
   });
   await trang.waitForFunction((label) => [...document.querySelectorAll('input[type="checkbox"]')]
     .some((input) => input.getAttribute("aria-label") === label), { timeout: 10_000 }, nhanChonDeadlineV2);
+  rpcSequence.splice(0);
   await chuanBiApDeadlineV2(trang);
   await bamApDeadlineV2(trang);
   await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
@@ -1153,6 +1176,9 @@ for (const scenario of LOI_AP_DUNG_V2) {
   kiem(JSON.stringify(v2ApplyBodies) === JSON.stringify([expectedApplyBodyV2()]),
     "override đã chọn gọi đúng V2 apply trước khi bị chặn", JSON.stringify(v2ApplyBodies));
   kiem(v1ApplyBodies.length === 0, "override đã chọn không được fallback sang V1");
+  kiem(JSON.stringify(rpcSequence) === JSON.stringify([
+    { rpc: "rpc_apply_catalog_change_v2", body: expectedApplyBodyV2() },
+  ]), "override đã chọn chỉ gọi V2, không có fallback", JSON.stringify(rpcSequence));
   kiem(state.dialogOpen && state.selected && state.reason && state.alert.includes("V2 chưa được triển khai"),
     "override bị chặn nhưng giữ nguyên bằng chứng người dùng đã nhập", JSON.stringify(state));
   kiem(chanNgoai.length === 0, "override bị chặn không gọi ra ngoài", chanNgoai[0] || "");
