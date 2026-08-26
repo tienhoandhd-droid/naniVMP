@@ -107,7 +107,7 @@ test("mutation bị từ chối giữ lỗi mà không reload", async () => {
   assert.equal(reloaded, false);
 });
 
-test("reload lỗi sau khi ghi không retry mutation", async () => {
+test("reload lỗi sau khi ghi cảnh báo đã ghi và không retry mutation", async () => {
   let mutations = 0;
   const outcome = await commitRoleDraft({
     draft: draft(),
@@ -117,7 +117,10 @@ test("reload lỗi sau khi ghi không retry mutation", async () => {
   });
 
   assert.equal(mutations, 1);
-  assert.deepEqual(outcome, { kind: "written_unverified", message: "Mất kết nối" });
+  assert.deepEqual(outcome, {
+    kind: "written_unverified",
+    message: "Đã ghi thay đổi nhưng chưa đối chiếu lại được: Mất kết nối",
+  });
 });
 
 test("reload trả vai khác thì báo mismatch", async () => {
@@ -162,4 +165,18 @@ test("editor SSR nêu đối chiếu, lý do bắt buộc, hủy và lưu", () =
   assert.match(html, /Lý do/);
   assert.match(html, /Hủy/);
   assert.match(html, /Lưu thay đổi/);
+});
+
+test("editor giữ vai chưa giải được ở trạng thái chưa chọn", () => {
+  const html = renderToStaticMarkup(React.createElement(AccountRoleEditor, {
+    row: row({ businessRole: null }),
+    canEdit: true,
+    mutateRole: async () => ({ ok: true }),
+    reloadByUserId: async () => row(),
+    onVerified: () => {},
+  }));
+
+  assert.match(html, /<option value="" selected="">Chọn vai nghiệp vụ<\/option>/);
+  assert.match(html, /Chưa chọn vai nghiệp vụ/);
+  assert.doesNotMatch(html, /<option value="qa_staff" selected="">/);
 });

@@ -22,6 +22,8 @@ export type RoleCommitOutcome =
   | { kind: "written_unverified"; message: string }
   | { kind: "mismatch"; actualRole: BusinessRole | null };
 
+const WRITTEN_UNVERIFIED_MESSAGE = "Đã ghi thay đổi nhưng chưa đối chiếu lại được";
+
 export async function commitRoleDraft({
   draft,
   mutate,
@@ -53,12 +55,12 @@ export async function commitRoleDraft({
     reloaded = await reload(draft.targetUserId);
   } catch (error) {
     return isCurrent(draft.targetUserId)
-      ? { kind: "written_unverified", message: messageFrom(error, "Đã ghi thay đổi nhưng chưa đối chiếu lại được.") }
+      ? { kind: "written_unverified", message: writtenUnverifiedMessage(error) }
       : { kind: "stale" };
   }
   if (!isCurrent(draft.targetUserId)) return { kind: "stale" };
   if (!reloaded || reloaded.userId !== draft.targetUserId) {
-    return { kind: "written_unverified", message: "Đã ghi thay đổi nhưng chưa đối chiếu lại được." };
+    return { kind: "written_unverified", message: WRITTEN_UNVERIFIED_MESSAGE };
   }
   if (reloaded.businessRole !== draft.nextRole) {
     return { kind: "mismatch", actualRole: reloaded.businessRole };
@@ -78,11 +80,21 @@ function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-function scopeDescription(role: BusinessRole): string {
+function writtenUnverifiedMessage(error: unknown): string {
+  const detail = messageFrom(error, "");
+  return detail ? `${WRITTEN_UNVERIFIED_MESSAGE}: ${detail}` : WRITTEN_UNVERIFIED_MESSAGE;
+}
+
+function scopeDescription(role: BusinessRole | ""): string {
+  if (!role) return "Chọn vai nghiệp vụ để xem cách hiểu phạm vi";
   const scopeMode = BUSINESS_ROLE_CATALOG[role].scopeMode;
   if (scopeMode === "role_policy") return "Theo chính sách vai";
   if (scopeMode === "qa_assignment") return "Theo phân công QA";
   return "Theo bộ phận, xưởng, khu vực và dây chuyền canonical";
+}
+
+function selectedRoleLabel(role: BusinessRole | ""): string {
+  return role ? businessRoleLabel(role) : "Chưa chọn vai nghiệp vụ";
 }
 
 function shortUserId(userId: string | null): string {
@@ -97,8 +109,8 @@ export default function AccountRoleEditor({
   reloadByUserId,
   onVerified,
 }: AccountRoleEditorProps) {
-  const initialRole = row.businessRole ?? "qa_staff";
-  const [nextRole, setNextRole] = useState<BusinessRole>(initialRole);
+  const initialRole = row.businessRole ?? "";
+  const [nextRole, setNextRole] = useState<BusinessRole | "">(initialRole);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -106,23 +118,26 @@ export default function AccountRoleEditor({
   currentUserId.current = row.userId;
 
   useEffect(() => {
-    setNextRole(row.businessRole ?? "qa_staff");
+    setNextRole(row.businessRole ?? "");
     setReason("");
     setSaving(false);
     setMessage("");
   }, [row.key, row.businessRole]);
 
-  const plan = useMemo(() => planBusinessRoleChange(row, nextRole), [nextRole, row]);
-  const canSave = canEdit && plan.canSave && Boolean(reason.trim()) && !saving;
+  const plan = useMemo(
+    () => nextRole ? planBusinessRoleChange(row, nextRole) : null,
+    [nextRole, row],
+  );
+  const canSave = canEdit && Boolean(plan?.canSave) && Boolean(reason.trim()) && !saving;
 
   const cancel = () => {
-    setNextRole(row.businessRole ?? "qa_staff");
+    setNextRole(row.businessRole ?? "");
     setReason("");
     setMessage("");
   };
 
   const save = async () => {
-    if (!canSave) return;
+    if (!canSave || !plan || !nextRole) return;
     const draft: RoleDraft = {
       targetUserId: plan.userId,
       originalRole: row.businessRole,
@@ -160,16 +175,18 @@ export default function AccountRoleEditor({
       <label>Vai mới
         <select className="pq-o" aria-label="Vai nghiệp vụ mới" value={nextRole}
           disabled={!canEdit || saving}
-          onChange={(event) => { setNextRole(event.target.value as BusinessRole); setMessage(""); }}>
+          onChange={(event) => { setNextRole(event.target.value as BusinessRole | ""); setMessage(""); }}>
+          <option value="">Chọn vai nghiệp vụ</option>
           {BUSINESS_ROLE_IDS.map((role) => (
             <option key={role} value={role}>{BUSINESS_ROLE_CATALOG[role].label}</option>
           ))}
         </select>
       </label>
       <p className="ip-help">
-        {businessRoleLabel(row.businessRole)} → <b>{businessRoleLabel(nextRole)}</b>. {scopeDescription(nextRole)}.
+        {businessRoleLabel(row.businessRole)} → <b>{selectedRoleLabel(nextRole)}</b>. {scopeDescription(nextRole)}.
       </p>
-      {plan.blocker && <p className="ip-message" role="alert">{plan.blocker}</p>}
+      {!nextRole && <p className="ip-message" role="alert">Chưa chọn vai nghiệp vụ.</p>}
+      {plan?.blocker && <p className="ip-message" role="alert">{plan.blocker}</p>}
       <label>Lý do <span aria-hidden="true">(bắt buộc)</span>
         <textarea className="pq-o" aria-label="Lý do đổi vai" value={reason} rows={2} required
           disabled={!canEdit || saving}
