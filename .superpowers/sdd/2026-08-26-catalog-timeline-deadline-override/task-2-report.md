@@ -176,3 +176,200 @@ deadlines.
 - Independent `gpt-5.6-sol` review is still required and is owned by the root
   agent. Do not start frontend Task 3 until that review reaches 0 Critical /
   0 Important and root has re-inspected the committed diff and fresh evidence.
+
+## Fix wave 1 — independent-review remediation
+
+**Status:** DONE_WITH_CONCERNS
+
+The initial independent review reported Spec ❌, 0 Critical / 4 Important.
+Implementation commit `070e6eb` addresses all four findings in one bounded
+database/security wave. This section records the covering RED/GREEN evidence;
+the root-owned independent rereview remains pending.
+
+### Covering scope
+
+The fix commit changes only three of the four Task 2 owned implementation/test
+files:
+
+- `supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql`
+- `tests/sql/catalog-progressed-deadline-override.sql`
+- `scripts/run-catalog-progressed-deadline-db-tests.sh`
+
+`tests/sql/catalog-progressed-deadline-security.sql` required no source change;
+the full runner executed it unchanged and proved its exact installed ACL
+inventory and digests after the hardened migration. No frontend, plan, prior
+sealed migration, production database, or file outside Task 2 ownership was
+modified by the implementation commit.
+
+### Fix-wave RED evidence
+
+All RED demonstrations ran only on random disposable databases cloned from the
+reviewed loopback five-role fixture, with Node 24.18.0 on `PATH`.
+
+Before dependency/schema preconditions were hardened, a temporary test-runner
+RED mode applied the original migration to three deliberately drifted clones:
+
+```text
+VMP_TEST_DB_URL="$(supabase status -o env 2>/dev/null | awk -F= '$1=="DB_URL"{sub(/^[^=]*=/,""); gsub(/^"|"$/ ,""); print; exit}')" \
+SUPABASE_DB_URL='postgresql://readonly:unused@production.invalid/vmp' \
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH \
+bash scripts/run-catalog-progressed-deadline-db-tests.sh --expect-review-red
+
+PASS RED precondition accepted definition drift
+PASS RED precondition accepted searchpath drift
+PASS RED precondition accepted schema drift
+exit 0
+```
+
+This was the intended RED: the prior migration incorrectly accepted a
+body-drifted public preview, a drifted audit `search_path`, and a missing
+referenced change-table column. The temporary acceptance mode was removed; the
+committed default runner now requires each clone to reject the migration before
+the first V2 DDL.
+
+After the precondition checks were green but before the preview used typed
+nullable deadline scalars, the full disposable runner reached the first
+malformed candidate and failed with the review's predicted database exception:
+
+```text
+VMP_TEST_DB_URL="$(supabase status -o env 2>/dev/null | awk -F= '$1=="DB_URL"{sub(/^[^=]*=/,""); gsub(/^"|"$/ ,""); print; exit}')" \
+SUPABASE_DB_URL='postgresql://readonly:unused@production.invalid/vmp' \
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH \
+bash scripts/run-catalog-progressed-deadline-db-tests.sh
+
+ERROR: record "v_moc" is not assigned yet
+DETAIL: The tuple structure of a not-yet-assigned record is indeterminate.
+CONTEXT: PL/pgSQL assignment "v_moc.deadline_protocol:=null"
+```
+
+After that repair, the exact injected V1 create post-state test failed against
+the prior subset verification:
+
+```text
+ERROR: V1_CREATE_POSTSTATE_LITERAL expected=WRITE_MISMATCH actual={"ok":true,...}
+```
+
+The injected unexpected create field was therefore observably committed by the
+old check rather than rejected. Additional committed cases cover unexpected
+inventory, source, normal-update, and stop fields.
+
+Finally, the stable-superset concurrency test was run once with the new
+superset criterion deliberately weakened, then restored. The real legacy
+writer did not block, producing the required RED:
+
+```text
+Expected backend lock-superset-writer.json waiting on a row lock, observed 0.
+exit 1
+```
+
+The malformed current-year row is outside the previewed impact, so this RED
+specifically distinguishes a stable pre-preview lock superset from locking only
+the advertised impact.
+
+### Fix-wave GREEN evidence
+
+Fresh final full disposable-database command after commit-ready self-review:
+
+```text
+VMP_TEST_DB_URL="$(supabase status -o env 2>/dev/null | awk -F= '$1=="DB_URL"{sub(/^[^=]*=/,""); gsub(/^"|"$/ ,""); print; exit}')" \
+SUPABASE_DB_URL='postgresql://readonly:unused@production.invalid/vmp' \
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH \
+bash scripts/run-catalog-progressed-deadline-db-tests.sh
+
+PASS PRECONDITION rejected definition drift before DDL
+PASS PRECONDITION rejected searchpath drift before DDL
+PASS PRECONDITION rejected schema drift before DDL
+PASS FAULT_INJECTION exact V1 create update stop inventory source
+PASS BUSINESS progressed-deadline override
+PASS FAULT_INJECTION post-mutation rollback
+PASS CONCURRENCY stable-superset legacy-writer
+NOTICE: PASS CONCURRENCY apply/apply save/apply
+PASS SECURITY post-V2 counts=66/209
+PASS GREEN business fault-injection concurrency security ROLLBACK
+exit 0
+```
+
+Fresh unchanged five-role baseline:
+
+```text
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH npm run test:db:five-role
+exit 0; final statement: ROLLBACK
+```
+
+Fresh relevant unit regression:
+
+```text
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH npm run test:unit
+tests 405; pass 404; fail 0; skipped 1; exit 0
+```
+
+Final static gates:
+
+```text
+bash -n scripts/run-catalog-progressed-deadline-db-tests.sh
+git diff --check
+git diff --cached --check
+all exit 0
+```
+
+### Exact ACL counts and digests after the fix
+
+The unchanged security suite recomputed the complete installed function
+inventories after the hardened V2 migration:
+
+| Surface | Exact count | Exact SHA-256 digest |
+|---|---:|---|
+| authenticated/browser | 66 | `a23d311a4e17b338e93eaf689d116334684cedcf4803d41030a0cf954d0fbf7e` |
+| service_role | 209 | `11f1869a3dc2fc5507129f841d3dfc7fa4c2c792fed9206ecf86d01022ddc3a0` |
+
+The fix adds no grant and changes no public executable function definition.
+The migration now also pins SHA-256 definitions for all eleven trusted reviewed
+dependencies, exact fixed search paths for trusted SECURITY DEFINER helpers,
+and the complete name/type inventory of all four referenced tables before DDL.
+
+### Fault-injection and concurrency evidence
+
+The exact V1 verifier is challenged independently by five transaction-local
+faults: an unexpected create field, an unexpected extra inventory row, a
+protected source-field mutation, an unexpected normal-update field, and an
+unexpected stop field. Each call returns the full literal `WRITE_MISMATCH`
+object and proves the change row, source row, complete scoped item inventory,
+and audit count equal their pre-call snapshots. The original post-override
+row-count fault also remains mandatory and green.
+
+The new real-backend contention family begins a V2 apply, pauses it after the
+stable row locks have been acquired, and starts a legacy direct writer against
+a malformed same-source current-year row omitted by preview. The runner proves
+the apply backend is at `Timeout/PgSleep`, then proves the legacy writer is
+waiting on a PostgreSQL row `Lock`. Both complete within finite timeouts and
+the writer's final row revision is exactly 12. Existing advisory-mutex
+apply/apply and save/apply contention families remain green.
+
+### Fix-wave self-review against the four Important findings
+
+- **Important 1:** V2 locks, in sorted order and before authoritative preview,
+  the union of all source-owned rows, all current-year source-identity rows,
+  and all explicitly selected codes. It snapshots that set, rejects any
+  existing authoritative impact outside it, verifies exact scoped inventory,
+  exact allowed normal update/stop deltas, the complete normal-create state
+  apart from explicitly derived/timestamp fields, all pre-existing unchanged
+  rows, and the protected source row.
+- **Important 2:** the migration hashes all eleven trusted reviewed function
+  definitions, checks exact authorization-helper and audit search paths, and
+  exact-name/type checks every referenced column before any V2 DDL. Dedicated
+  body/search-path/schema drift clones must abort before the lock helper exists.
+- **Important 3:** preview now uses initialized typed `date` scalars and a
+  typed JSON missing-field value. Exact literals cover malformed terminal
+  identity, occurrence integer overflow, and a disappeared current row without
+  a database exception.
+- **Important 4:** error paths now use complete JSON-literal assertions,
+  including details arrays/indices/reasons, exact missing-source fields and
+  Vietnamese error text, version conflict, missing/wrong-membership overrides,
+  no-op, write mismatch, first success, and the full stored idempotent result.
+  Active authenticated Admin and Quản lý QA both cross preview and apply
+  boundaries successfully; QA staff remains denied.
+
+No known Critical or Important issue remains from fix-wave self-review. The
+sole concern is procedural: the independent `gpt-5.6-sol` rereview must be
+dispatched by the root agent and must reach 0 Critical / 0 Important before
+Task 3 consumes the contract.
