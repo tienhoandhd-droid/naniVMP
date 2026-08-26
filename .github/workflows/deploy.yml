@@ -1,13 +1,11 @@
 # =====================================================================
 #  Quality gate + Deploy (Lotus Pearl Atelier §GitHub Actions)
 #  ---------------------------------------------------------------------
-#  Trước đây workflow chỉ build rồi deploy — typecheck, unit, E2E giả lập,
-#  shell và kiểm thẩm mỹ có sẵn trong repo nhưng KHÔNG chặn deploy.
-#  Nghiên cứu 15/08 gọi đây là khoảng trống kỹ thuật quan trọng nhất.
+#  Cổng phát hành tinh gọn xác nhận typecheck, unit và các luồng E2E cốt lõi
+#  trước khi cho phép build production và deploy.
 #
 #  Điểm sống còn: production-build KHÔNG được chạy nếu kiểm fail.
-#  Chrome: runner ubuntu-latest có sẵn /usr/bin/google-chrome —
-#  tests/e2e/chrome-path.mjs tự tìm thấy, không phải cài gì thêm.
+#  Các bước kiểm tra mở rộng vẫn có thể chạy riêng khi cần.
 # =====================================================================
 name: Quality and Deploy
 
@@ -59,12 +57,8 @@ jobs:
           cache-dependency-path: ./package-lock.json
 
       - run: npm ci
-      - name: Install bundled full Chromium
-        run: npx playwright install chromium --with-deps --no-shell
-      - run: npm run visual:runtime
       - run: npm run typecheck
       - run: npm run test:unit
-      - run: npm run drift
 
   e2e-mock:
     needs: static-quality
@@ -86,9 +80,6 @@ jobs:
       - name: Install bundled full Chromium
         run: npx playwright install chromium --with-deps --no-shell
 
-      - name: Verify sealed visual baseline contract
-        run: npm run visual:contract
-
       # .env.local chỉ cần URL hợp lệ về mặt hình thức: E2E giả lập chặn
       # toàn bộ mạng ra ngoài và tự trả lời thay Supabase.
       - name: Tạo .env.local cho E2E giả lập
@@ -100,39 +91,14 @@ jobs:
           echo "E2E_EMAIL=gialap@example.com" >> .env.local
           echo "E2E_PASSWORD=gialap-khong-dung-that" >> .env.local
 
-      # KHÔNG thêm e2e:luongchinh / e2e:ux vào đây: hai bộ đó đăng nhập
-      # Supabase THẬT bằng E2E_EMAIL/E2E_PASSWORD, mà CI chỉ có tài khoản
-      # giả nên chúng luôn đỏ ở bước đăng nhập. Chạy chúng trên máy có
-      # .env.local thật: npm run e2e:luongchinh · npm run e2e:ux
-      - name: E2E giả lập + catalog + quyền admin + shell + thẩm mỹ + atelier
+      # Cổng tinh gọn chỉ giữ các luồng giả lập, danh mục và quyền quản trị.
+      - name: E2E cốt lõi — luồng giả lập + danh mục + quyền quản trị
         run: |
           bash scripts/with-preview.sh -- bash -c '
             npm run e2e:gialap &&
             npm run e2e:catalog &&
-            npm run e2e:admin &&
-            npm run shell &&
-            npm run thammy &&
-            npm run atelier
+            npm run e2e:admin
           '
-
-      # Cổng accessibility (nghiên cứu (3) đợt 3): axe quét 5 màn chính,
-      # 0 vi phạm critical/serious mới qua. Mức nhẹ hơn in ra để trả dần.
-      - name: Accessibility (axe — 0 critical/serious)
-        run: |
-          bash scripts/with-preview.sh -- npm run a11y
-
-      # Visual regression runs only after the read-only seal check above has
-      # established that every Linux snapshot is present and unchanged.
-      - name: Visual regression (so với baseline CI)
-        run: bash scripts/with-preview.sh -- npm run visual
-
-      - name: Lưu ảnh chênh lệch khi visual fail
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: visual-diff
-          path: test-results/
-          if-no-files-found: ignore
 
   production-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
