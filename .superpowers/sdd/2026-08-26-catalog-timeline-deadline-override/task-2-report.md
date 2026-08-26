@@ -373,3 +373,149 @@ No known Critical or Important issue remains from fix-wave self-review. The
 sole concern is procedural: the independent `gpt-5.6-sol` rereview must be
 dispatched by the root agent and must reach 0 Critical / 0 Important before
 Task 3 consumes the contract.
+
+## Fix wave 2 — bounded N1 dependency remediation
+
+**Status:** DONE_WITH_CONCERNS
+
+Wave-1 rereview reported all four original Important findings addressed and one
+new Important N1: the create post-state verifier calls `vmp_parse_depts`, but
+that runtime dependency was absent from the fail-closed precondition. Commit
+`0e3fa78` addresses only N1; no original finding, frontend, plan, prior sealed
+migration, or production system was reopened or changed.
+
+### Resolved reviewed helper contract
+
+Read-only inspection of the reviewed local five-role fixture resolved this
+exact dependency before test or implementation changes:
+
+```text
+signature: public.vmp_parse_depts(text)
+result: text[]
+language: plpgsql
+owner: postgres
+security: INVOKER
+volatility: IMMUTABLE
+parallel: UNSAFE
+search_path: public, pg_temp
+ACL: {postgres=X/postgres,service_role=X/postgres}
+pg_get_functiondef SHA-256: efdb744892bdeab64a932e2c9d6bdf2121250185b0f5ad0a08cec311d953c2bd
+```
+
+The migration now requires the resolved signature, pins that exact definition
+SHA-256, and checks owner, invoker security, exact fixed search path,
+immutability, and the exact single non-owner EXECUTE grant to `service_role`
+from the owner without grant option. `authenticated`, `anon`, and `PUBLIC`
+remain denied.
+
+### Wave-2 RED evidence
+
+The committed runner tests the real migration on separately cloned disposable
+databases and requires both failures to occur before
+`public.vmp_lock_catalog_object_v2(text,text)` exists. Before the migration fix,
+the missing-helper clone was run first with:
+
+```text
+VMP_TEST_DB_URL="$(supabase status -o env 2>/dev/null | awk -F= '$1=="DB_URL"{sub(/^[^=]*=/,""); gsub(/^"|"$/ ,""); print; exit}')" \
+SUPABASE_DB_URL='postgresql://readonly:unused@production.invalid/vmp' \
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH \
+bash scripts/run-catalog-progressed-deadline-db-tests.sh
+
+BEGIN
+DO
+CREATE FUNCTION
+...
+COMMIT
+Migration did not reject missinghelper drift before DDL.
+exit 1
+```
+
+The migration's `COMMIT` proves that absence was wrongly accepted through all
+DDL, while the runner correctly rejected that outcome. The two clone calls were
+then ordered with body drift first and the same exact command produced the
+independent second RED:
+
+```text
+BEGIN
+DO
+CREATE FUNCTION
+...
+COMMIT
+Migration did not reject helperbody drift before DDL.
+exit 1
+```
+
+The body clone preserves the resolved signature, owner, invoker mode,
+immutability, search path, and ACL while replacing only its implementation, so
+this failure specifically proves the previous definition-pin gap.
+
+### Wave-2 GREEN evidence
+
+Fresh final full disposable-database command after the exact ACL self-review:
+
+```text
+VMP_TEST_DB_URL="$(supabase status -o env 2>/dev/null | awk -F= '$1=="DB_URL"{sub(/^[^=]*=/,""); gsub(/^"|"$/ ,""); print; exit}')" \
+SUPABASE_DB_URL='postgresql://readonly:unused@production.invalid/vmp' \
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH \
+bash scripts/run-catalog-progressed-deadline-db-tests.sh
+
+PASS PRECONDITION rejected definition drift before DDL
+PASS PRECONDITION rejected searchpath drift before DDL
+PASS PRECONDITION rejected schema drift before DDL
+PASS PRECONDITION rejected helperbody drift before DDL
+PASS PRECONDITION rejected missinghelper drift before DDL
+PASS FAULT_INJECTION exact V1 create update stop inventory source
+PASS BUSINESS progressed-deadline override
+PASS FAULT_INJECTION post-mutation rollback
+PASS CONCURRENCY stable-superset legacy-writer
+NOTICE: PASS CONCURRENCY apply/apply save/apply
+PASS SECURITY post-V2 counts=66/209
+PASS GREEN business fault-injection concurrency security ROLLBACK
+exit 0
+```
+
+The unchanged post-V2 ACL contract remains exact:
+
+| Surface | Exact count | Exact SHA-256 digest |
+|---|---:|---|
+| authenticated/browser | 66 | `a23d311a4e17b338e93eaf689d116334684cedcf4803d41030a0cf954d0fbf7e` |
+| service_role | 209 | `11f1869a3dc2fc5507129f841d3dfc7fa4c2c792fed9206ecf86d01022ddc3a0` |
+
+Fresh five-role baseline with the required local/disposable guards:
+
+```text
+VMP_TEST_DB_URL="$(supabase status -o env 2>/dev/null | awk -F= '$1=="DB_URL"{sub(/^[^=]*=/,""); gsub(/^"|"$/ ,""); print; exit}')" \
+SUPABASE_DB_URL='postgresql://readonly:unused@production.invalid/vmp' \
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH \
+npm run test:db:five-role
+
+exit 0; final statement: ROLLBACK
+```
+
+Relevant unit and static gates:
+
+```text
+PATH=/home/admin1/.nvm/versions/node/v24.18.0/bin:$PATH npm run test:unit
+tests 405; pass 404; fail 0; skipped 1; exit 0
+
+bash -n scripts/run-catalog-progressed-deadline-db-tests.sh
+git diff --check
+git diff --cached --check
+all exit 0
+```
+
+### Wave-2 self-review and concerns
+
+- The helper is checked in the missing-function loop before the first V2 DDL.
+- Definition hashing occurs in the same pre-DDL dependency digest as the other
+  reviewed runtime dependencies.
+- The dedicated metadata branch exactly constrains the requested
+  owner/security/search-path/ACL/volatility contract.
+- Both clone tests use the existing bounded cleanup list and validate their
+  random database names before force-drop.
+- The implementation commit changes only the two N1 covering files: the owned
+  migration and disposable runner.
+
+No known Critical or Important implementation concern remains. The sole
+concern is procedural: root must dispatch the independent wave-2 rereview, and
+Task 3 remains blocked until it reports 0 Critical / 0 Important.
