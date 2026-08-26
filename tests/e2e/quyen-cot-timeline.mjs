@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
-import { dangNhap, doiVaiTrenMan } from "./dang-nhap.mjs";
+import { docEnv, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
-import { LA_UI_ACCESS, uiAccessAdmin } from "./ui-access.mjs";
+import { LA_UI_ACCESS, uiAccessQuanLyQa } from "./ui-access.mjs";
+import {
+  MAT_KHAU_DUNG, NGUOI_DUNG, dungKhoDuLieu, traLoi,
+} from "./gia-lap-supabase.mjs";
 
-const GOC = "http://localhost:4173";
+const GOC = process.env.VMP_E2E_ORIGIN || "http://localhost:4173";
 await choServer(GOC);
+const mockSupabaseOrigin = new URL(docEnv().VITE_SUPABASE_URL).origin;
 
 const bangkokToday = () => {
   const parts = new Intl.DateTimeFormat("en", {
@@ -18,7 +22,8 @@ const bangkokToday = () => {
   const part = (type) => parts.find((item) => item.type === type)?.value || "";
   return `${part("year")}-${part("month")}-${part("day")}`;
 };
-const WORKSHOP_DATE = bangkokToday();
+const QA_MANAGER_DATE = bangkokToday();
+const WORKSHOP_DATE = QA_MANAGER_DATE;
 
 const QA_FIELDS = [
   "actual_protocol_date", "status_protocol",
@@ -46,7 +51,9 @@ const ACTIVITY = {
     dl_tham_dinh: "2026-10-01",
     dl_bao_cao: "2026-11-01",
     dl_vmp: "2026-12-31",
-    tt_de_cuong: "not_started",
+    // Hồ sơ legacy đã có trạng thái hoàn thành nhưng thiếu ngày. QA Manager
+    // sửa đúng một actual field; form không cần gửi kèm status không đổi.
+    tt_de_cuong: "completed",
     tt_tham_dinh: "not_started",
     tt_bao_cao: "not_started",
     tt_vmp: "not_started",
@@ -72,13 +79,14 @@ const page = await browser.newPage();
 await page.emulateTimezone("UTC");
 await page.setViewport({ width: 1500, height: 1100 });
 await page.setRequestInterception(true);
+const mockSupabase = dungKhoDuLieu("day");
 
 let mode = "enforced";
-const primaryQa = {
+const qaManagerRight = {
   can_view: true,
   editable_fields: QA_FIELDS,
-  view_reason: "QA phụ trách chính theo phân công hạng mục",
-  assignment_sources: ["qa_primary"],
+  view_reason: "Quản lý QA xem toàn bộ hạng mục hoạt động",
+  assignment_sources: [],
   scope_match: true,
   area_match: true,
 };
@@ -106,10 +114,11 @@ const workshopStaff = {
   scope_match: true,
   area_match: true,
 };
-let right = primaryQa;
+let right = qaManagerRight;
 let updateShouldFail = false;
 const updateBodies = [];
 const permissionBodies = [];
+const unexpectedRequests = [];
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "*",
@@ -121,10 +130,16 @@ const answer = (request, body) => request.method() === "OPTIONS"
 
 page.on("request", (request) => {
   const url = request.url();
-  /* Bộ kiểm này soi lớp quyền THEO HẠNG MỤC. Nó vẫn phải vào được màn Cập
-     nhật tiến độ trước đã, mà quyền mở màn nay do server quyết — tài khoản
-     E2E là viewer nên sẽ bị chặn nếu không giả lập ở đây. */
-  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessAdmin);
+  if (url.startsWith("data:") || url.startsWith("blob:")) return request.continue();
+  const parsedUrl = new URL(url);
+  if (parsedUrl.origin !== mockSupabaseOrigin) {
+    if (parsedUrl.origin === GOC) return request.continue();
+    unexpectedRequests.push(`${request.method()} ${parsedUrl.origin}${parsedUrl.pathname}`);
+    return request.abort();
+  }
+  /* Bài kiểm này cần đúng persona Quản lý QA ở cả lớp quyền màn hình lẫn
+     allowlist theo hạng mục; auth/profile nền cũng được mock, không ra mạng. */
+  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessQuanLyQa);
   if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
     return answer(request, {
       activities: right === unassignedQa ? [NEXT_ACTIVITY] : [ACTIVITY, NEXT_ACTIVITY],
@@ -152,8 +167,27 @@ page.on("request", (request) => {
     return answer(request, { ok: true });
   }
   if (/\/vmp_performers/.test(url)) return answer(request, []);
-  request.continue();
+  if (/\/(?:auth|rest)\/v1\//.test(url)) {
+    return request.respond(traLoi(mockSupabase, parsedUrl, request));
+  }
+  unexpectedRequests.push(`${request.method()} ${parsedUrl.origin}${parsedUrl.pathname}`);
+  request.abort();
 });
+
+async function dangNhapGiaLap() {
+  await page.goto(GOC, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("input[type=password]", { timeout: 30000 });
+  const inputs = await page.$$("input");
+  await inputs[0].type(NGUOI_DUNG.email);
+  const password = await page.$("input[type=password]");
+  await password.type(MAT_KHAU_DUNG);
+  await password.press("Enter");
+  await page.waitForFunction(
+    () => document.querySelectorAll("input[type=password]").length === 0,
+    { timeout: 30000 },
+  );
+  await page.waitForFunction(() => document.body.innerText.includes("hạng mục"), { timeout: 45000 });
+}
 
 async function closeModal() {
   const hasModal = await page.evaluate(() => [...document.querySelectorAll("span")]
@@ -202,6 +236,8 @@ async function controlState() {
     return {
       qaCount: qa.length,
       qaEnabled: qa.filter((control) => !control.disabled).length,
+      actualLabelCount: [...dialog.querySelectorAll("span")]
+        .filter((node) => node.textContent?.trim() === "Ngày hoàn thành thực tế").length,
       scheduleEnabled: !!schedule && !schedule.disabled,
       scheduleValue: schedule?.value || "",
       hasSave: [...dialog.querySelectorAll("button")]
@@ -212,39 +248,61 @@ async function controlState() {
 }
 
 try {
-  await dangNhap(page, GOC);
-  await doiVaiTrenMan(page, "edit", "Người kiểm quyền timeline");
+  await dangNhapGiaLap();
+  await doiVaiTrenMan(page, "edit", "Quản lý QA E2E");
   await page.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded" });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.body.innerText.includes("TB-E2E-01"));
 
-  await openPersona("enforced", primaryQa);
+  await openPersona("enforced", qaManagerRight);
   assert.deepEqual(permissionBodies[0], { p_validation_code: ACTIVITY.id },
     "frontend chỉ gửi mã hạng mục vào wrapper quyền của chính auth.uid");
   const qa = await controlState();
   assert.equal(qa.qaCount, 8, "QA phải có đúng tám control ngày/trạng thái");
   assert.equal(qa.qaEnabled, 8, "QA phải sửa được đủ tám trường QA");
+  assert.equal(qa.actualLabelCount, 4,
+    "bốn ô ngày QA phải giữ đúng nhãn Ngày hoàn thành thực tế");
   assert.equal(qa.scheduleEnabled, false, "QA không được sửa scheduled_at");
   assert.equal(qa.scheduleValue, "2026-08-12T14:35", "giờ Bangkok phải hiển thị không lệch theo timezone trình duyệt");
-  await page.evaluate(() => {
+  await page.evaluate((actualDate) => {
     const title = [...document.querySelectorAll("span")]
+      .find((node) => node.textContent?.trim() === "1. Đề cương");
+    const block = title?.closest("div[style*='border']");
+    const input = block?.querySelector('input[type="date"]');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter.call(input, actualDate);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, QA_MANAGER_DATE);
+  await page.type("textarea", "QA Manager bổ sung ngày đề cương thực tế");
+  await page.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  updateShouldFail = true;
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
+  await page.waitForFunction(() => document.body.innerText.includes("Lưu E2E thất bại"));
+  const qaDraftAfterFailure = await page.evaluate(() => {
+    const modalTitle = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
-    /* Phải bỏ qua ô "Người thực hiện": nó nay là select KHÔNG bị khoá và
-       đứng TRƯỚC các ô trạng thái, nên `querySelector` đầu tiên sẽ trúng nó
-       và bài kiểm đi set "Hoàn thành" vào ô chọn người. */
-    const select = [...(title?.closest(".vmp-scroll")?.querySelectorAll("select:not([disabled])") ?? [])]
-      .find((el) => el.getAttribute("aria-label") !== "Người thực hiện");
-    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
-    setter.call(select, "Hoàn thành");
-    select.dispatchEvent(new Event("change", { bubbles: true }));
+    return [...(modalTitle?.closest(".vmp-scroll")
+      ?.querySelectorAll('input[type="date"]') ?? [])].map((input) => input.value);
   });
-  await page.waitForFunction(() => document.body.innerText.includes("Chưa lưu được:"));
-  assert.equal(
-    await page.evaluate(() => [...document.querySelectorAll("button")]
-      .find((button) => button.textContent?.includes("Lưu & mở tiếp"))?.disabled),
-    true,
-    "Lưu & mở tiếp phải dùng cùng điều kiện thieuGi với nút Lưu",
-  );
+  assert.equal(qaDraftAfterFailure[0], QA_MANAGER_DATE,
+    "RPC từ chối phải giữ nguyên actual-date draft của QA Manager");
+  assert.deepEqual(updateBodies[0], {
+    p_validation_code: ACTIVITY.id,
+    p_patch: { actual_protocol_date: QA_MANAGER_DATE },
+    p_reason: "QA Manager bổ sung ngày đề cương thực tế",
+    p_sheet_patch: null,
+    p_expected_version: 0,
+  }, "QA Manager gửi đúng một actual field cùng reason và optimistic version");
+  updateShouldFail = false;
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
+  await page.waitForFunction(() => ![...document.querySelectorAll("span")]
+    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  assert.deepEqual(updateBodies[1], updateBodies[0],
+    "QA Manager có thể thử lại nguyên bản nháp sau lỗi server");
 
   // Đường tắt đã điền sẵn hai trường QA trước khi quyền về, tạo một bản nháp
   // hỗn hợp. Enforced vẫn chỉ được gửi ngày thẩm định thực tế mà xưởng được cấp.
@@ -254,19 +312,12 @@ try {
     "nhân viên xưởng chỉ được sửa ngày thẩm định thực tế trong tám trường QA");
   assert.equal(workshop.scheduleEnabled, false, "nhân viên xưởng không được sửa lịch thẩm định");
 
-  await page.evaluate((workshopDate) => {
-    const title = [...document.querySelectorAll("span")]
-      .find((node) => node.textContent?.trim() === "2. Thẩm định thực tế");
-    const block = title?.closest("div[style*='border']");
-    const input = block?.querySelector('input[type="date"]');
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    setter.call(input, workshopDate);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  }, WORKSHOP_DATE);
+  // Hồ sơ mock đã hoàn thành đề cương, nên đường tắt mở đúng bước 2 và
+  // điền sẵn ngày thẩm định hôm nay. Quyền xưởng lọc status khỏi bản chênh.
   await page.type("textarea", "Xưởng ghi nhận ngày thẩm định thực tế");
   await page.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  const workshopUpdateStart = updateBodies.length;
   updateShouldFail = true;
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
@@ -278,13 +329,16 @@ try {
     "RPC lỗi thì modal phải giữ nguyên để người dùng thử lại",
   );
   updateShouldFail = false;
+  await page.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
   await page.waitForFunction(() => ![...document.querySelectorAll("span")]
     .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
-  assert.equal(updateBodies.length, 2, "sau lỗi người dùng có thể thử lưu lại cùng bản nháp");
-  assert.deepEqual(Object.keys(updateBodies[1].p_patch), ["actual_validation_date"]);
-  assert.equal(updateBodies[1].p_patch.actual_validation_date, WORKSHOP_DATE,
+  assert.equal(updateBodies.length, workshopUpdateStart + 2,
+    "sau lỗi người dùng có thể thử lưu lại cùng bản nháp");
+  assert.deepEqual(Object.keys(updateBodies[workshopUpdateStart + 1].p_patch), ["actual_validation_date"]);
+  assert.equal(updateBodies[workshopUpdateStart + 1].p_patch.actual_validation_date, WORKSHOP_DATE,
     "nhân viên xưởng chỉ được gửi ngày thẩm định thực tế xuống RPC");
 
   await openPersona("enforced", collaboratorQa);
@@ -312,6 +366,8 @@ try {
   assert.equal(preview.qaEnabled, 8, "preview giữ nguyên tám control QA đang chạy");
   assert.equal(preview.scheduleEnabled, true, "preview không áp allowlist dự kiến lên lịch");
   assert.equal(preview.hasSave, true, "preview giữ hành vi lưu hiện tại");
+  assert.deepEqual(unexpectedRequests, [],
+    "focused E2E không được để request ngoài preview/mock origin đi ra mạng");
 
   console.log("✅ Timeline khóa đúng QA/xưởng, preview không cưỡng chế và giờ Bangkok không lệch");
 } finally {
