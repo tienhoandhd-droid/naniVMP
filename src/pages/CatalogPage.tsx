@@ -425,6 +425,7 @@ export default function CatalogView({ objects = [], acts = [], canChonNguoiThucH
           onClose={() => { setEdit(null); setQuick(false); }}
           onReload={onReload}
           quickDone={quick}
+          permissionMode="preview"
           nextAct={(() => {
             const i = danhSachPhang.findIndex((x) => x.id === edit.id);
             return i >= 0 ? danhSachPhang[i + 1] ?? null : null;

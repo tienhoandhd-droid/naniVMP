@@ -1,6 +1,44 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createServer } from "vite";
+
+const ACT = {
+  id: "ITEM-1",
+  code: "VMP-001",
+  name: "Hạng mục thử nghiệm",
+  vtype: "Thiết bị",
+  owner: "QA",
+  st: "todo",
+  _raw: {},
+};
+
+let vite;
+let ProgressEditModal;
+
+async function loadProgressEditModal() {
+  if (!vite) vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
+  if (!ProgressEditModal) {
+    ({ default: ProgressEditModal } = await vite.ssrLoadModule("/src/components/dashboard/ProgressEditModal.tsx"));
+  }
+  return ProgressEditModal;
+}
+
+async function renderModal({ editableFields, permissionMode = "enforced", quickDone = false } = {}) {
+  const Modal = await loadProgressEditModal();
+  return renderToStaticMarkup(React.createElement(ProgressEditModal, {
+    act: ACT,
+    editableFields,
+    permissionMode,
+    quickDone,
+    onClose: () => {},
+    onSave: () => {},
+  }));
+}
+
+test.after(async () => { await vite?.close(); });
 
 async function loadAccessState() {
   const module = await import("../../src/components/dashboard/progressModalAccess.ts");
@@ -39,6 +77,25 @@ test("quick-done chỉ điền hai field khi cả hai đều được cấp", as
   assert.match(source, /const canMarkDone = canEditForm\(dCol\) && canEditForm\(tCol\);/);
   assert.match(source, /const canQuickDone = !!quickDoneCols && canEditForm\(quickDoneCols\[0\]\) && canEditForm\(quickDoneCols\[1\]\);/);
   assert.match(source, /if \(!quickDone \|\| !quickDoneCols \|\| !canQuickDone\) return;/);
+});
+
+test("QA status-only và Workshop date-only không dựng quick-done trong modal", async () => {
+  const qaStatusOnly = await renderModal({ editableFields: ["status_protocol"], quickDone: true });
+  const workshopDateOnly = await renderModal({ editableFields: ["actual_validation_date"], quickDone: true });
+
+  assert.doesNotMatch(qaStatusOnly, /✓ Xong hôm nay/);
+  assert.doesNotMatch(workshopDateOnly, /✓ Xong hôm nay/);
+});
+
+test("caller Catalog giữ preview đầy đủ còn Update truyền enforced allow-list", async () => {
+  const preview = await renderModal({ permissionMode: "preview" });
+  const catalogSource = await readFile(new URL("../../src/pages/CatalogPage.tsx", import.meta.url), "utf8");
+  const updateSource = await readFile(new URL("../../src/pages/UpdatePage.tsx", import.meta.url), "utf8");
+
+  assert.match(preview, /type="date"/);
+  assert.match(preview, /type="datetime-local"/);
+  assert.match(catalogSource, /<ProgressEditModal[\s\S]*permissionMode="preview"/);
+  assert.match(updateSource, /<ProgressEditModal[\s\S]*editableFields=\{rightsState\.rights\.get\(edit\.id\)\?\.editableFields\}[\s\S]*permissionMode="enforced"/);
 });
 
 test("validation ALCOA không đọc field bị ẩn", async () => {

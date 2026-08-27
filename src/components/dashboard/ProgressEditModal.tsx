@@ -502,10 +502,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
                 ? <Tag color={C.raspText} bg={C.raspSoft}>trễ {-con} ngày</Tag>
                 : <Tag color={con <= 7 ? C.marigoldText : C.plumSoft} bg={con <= 7 ? C.marigoldSoft : C.pinkMist}>còn {con} ngày</Tag>
             )}
-            {!isDone && (
-              <button onClick={markDone(dCol, tCol)} disabled={khoaBoiTruoc || !canMarkDone}
-                title={!canMarkDone ? "Bạn không có quyền sửa hai cột của bước này." : khoaBoiTruoc ? `Phải xong "${truoc!.ten}" trước đã — bốn bước đi theo thứ tự.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
-                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc || !canMarkDone ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc || !canMarkDone ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc || !canMarkDone ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: khoaBoiTruoc || !canMarkDone ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+            {!isDone && canMarkDone && (
+              <button onClick={markDone(dCol, tCol)} disabled={khoaBoiTruoc}
+                title={khoaBoiTruoc ? `Phải xong "${truoc!.ten}" trước đã — bốn bước đi theo thứ tự.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
+                style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: khoaBoiTruoc ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
                 ✓ Xong hôm nay
               </button>
             )}
