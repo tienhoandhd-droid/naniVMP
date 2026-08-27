@@ -20,7 +20,7 @@ test_databases=()
 cleanup() {
   if [[ -n "${LOCAL_PGHOST:-}" ]]; then
     for cleanup_database in "${test_databases[@]}"; do
-      if [[ "$cleanup_database" =~ ^vmp_qa_alignment_[0-9]+_[0-9]+(_(definition|metadata|acl|wrapper_owner|writer_acl|schema|collation|manifest_missing|manifest_duplicate|manifest_wrong|manifest_after_khoa|manifest_refresh|manifest_success))?$ ]]; then
+      if [[ "$cleanup_database" =~ ^vmp_qa_alignment_[0-9]+_[0-9]+(_(definition|metadata|acl|wrapper_owner|writer_acl|schema|collation|assigned_hash|assigned_schema|assigned_failure|manifest_template|manifest_missing|manifest_duplicate|manifest_wrong|manifest_after_khoa|manifest_refresh|manifest_success))?$ ]]; then
         PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" PGUSER="$LOCAL_PGUSER" \
           PGPASSWORD="$LOCAL_PGPASSWORD" dropdb --if-exists --force \
           "$cleanup_database" >/dev/null 2>&1 || true
@@ -376,29 +376,175 @@ psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/tests/sql/qa-rights-account-alignment-security.sql"
 
-# Task 2 RED gate. The fixture transaction validates the reviewed resolver,
-# linked personas, assignment rows and preview mode before it checks for the
-# new zero-argument browser RPC. This prevents a broken fixture from being
-# mistaken for the intended missing-feature failure.
+# Preserve the reviewed pre-assigned-progress state for the account-manifest
+# regression cases below. Those older deployment scripts intentionally pin the
+# old progress wrapper and must be tested before this forward wrapper swap.
+manifest_template_database="${test_database}_manifest_template"
+createdb -T "$test_database" "$manifest_template_database"
+test_databases+=("$manifest_template_database")
+
+assigned_progress_state_hash() {
+  local database="$1"
+  psql -X -qAt -v ON_ERROR_STOP=1 -d "$database" <<'SQL'
+select encode(extensions.digest(concat_ws('|',
+  coalesce(pg_get_functiondef(to_regprocedure(
+    'public.vmp_allowed_timeline_fields(uuid,text)')),'missing'),
+  coalesce(pg_get_functiondef(to_regprocedure(
+    'public.rpc_update_progress(text,jsonb,text,jsonb,integer)')),'missing'),
+  coalesce(pg_get_functiondef(to_regprocedure(
+    'public.rpc_update_progress__five_role_impl_20260824(text,jsonb,text,jsonb,integer)')),'missing'),
+  coalesce(pg_get_functiondef(to_regprocedure(
+    'public.rpc_my_editable_progress_rights()')),'missing'),
+  coalesce(pg_get_functiondef(to_regprocedure(
+    'public.rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)')),'missing'),
+  coalesce((select proacl::text from pg_proc where oid=to_regprocedure(
+    'public.rpc_update_progress(text,jsonb,text,jsonb,integer)')),'missing'),
+  coalesce((select proacl::text from pg_proc where oid=to_regprocedure(
+    'public.rpc_update_progress__five_role_impl_20260824(text,jsonb,text,jsonb,integer)')),'missing'),
+  coalesce((select proacl::text from pg_proc where oid=to_regprocedure(
+    'public.rpc_my_editable_progress_rights()')),'missing'),
+  coalesce((select proacl::text from pg_proc where oid=to_regprocedure(
+    'public.rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)')),'missing'),
+  coalesce((select value::text from public.system_config
+    where key='item_permissions_mode'),'missing'),
+  coalesce((select jsonb_agg(jsonb_build_array(attribute.attnum,
+      attribute.attname,format_type(attribute.atttypid,attribute.atttypmod),
+      attribute.attnotnull) order by attribute.attnum)::text
+    from pg_attribute attribute
+    where attribute.attrelid='public.vmp_plan_items'::regclass
+      and attribute.attnum>0 and not attribute.attisdropped),'[]')
+),'sha256'),'hex');
+SQL
+}
+
+check_assigned_progress_precondition() {
+  local suffix="$1"
+  local marker="$2"
+  local database="${test_database}_${suffix}"
+  local before_hash after_hash migration_status
+  createdb -T "$test_database" "$database"
+  test_databases+=("$database")
+
+  case "$suffix" in
+    assigned_hash)
+      psql -X -v ON_ERROR_STOP=1 -d "$database" >/dev/null <<'SQL'
+create or replace function public.vmp_allowed_timeline_fields(
+  p_uid uuid,p_validation_code text
+)
+returns text[] language sql stable security definer
+set search_path=public,pg_temp
+as $$ select '{}'::text[] $$;
+SQL
+      ;;
+    assigned_schema)
+      psql -X -v ON_ERROR_STOP=1 -d "$database" -c \
+        "alter table public.vmp_plan_items add column assigned_progress_drift text" \
+        >/dev/null
+      ;;
+    *)
+      echo "Unknown assigned progress precondition fixture: $suffix" >&2
+      exit 2
+      ;;
+  esac
+
+  before_hash="$(assigned_progress_state_hash "$database")"
+  set +e
+  psql -X -v ON_ERROR_STOP=1 -d "$database" \
+    -f "$repo_dir/supabase/migrations/20260827130000_assigned_progress_visibility.sql" \
+    >"$tmp_dir/${suffix}.log" 2>&1
+  migration_status=$?
+  set -e
+  after_hash="$(assigned_progress_state_hash "$database")"
+  if [[ $migration_status -eq 0 ]] \
+     || ! grep -q "$marker" "$tmp_dir/${suffix}.log" \
+     || [[ "$after_hash" != "$before_hash" ]]; then
+    sed -n '1,260p' "$tmp_dir/${suffix}.log" >&2
+    echo "Assigned progress migration did not reject $suffix before mutation." >&2
+    exit 1
+  fi
+  echo "PASS ASSIGNED PRECONDITION rejected $suffix without writer or ACL mutation"
+  dropdb --force "$database"
+}
+
+check_assigned_progress_precondition assigned_hash \
+  ASSIGNED_PROGRESS_PRECONDITION_DEPENDENCY_DRIFT
+check_assigned_progress_precondition assigned_schema \
+  ASSIGNED_PROGRESS_PRECONDITION_TABLE_SCHEMA_DRIFT
+
+assigned_failure_database="${test_database}_assigned_failure"
+createdb -T "$test_database" "$assigned_failure_database"
+test_databases+=("$assigned_failure_database")
+assigned_failure_before="$(assigned_progress_state_hash "$assigned_failure_database")"
 set +e
-psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
-  -f "$repo_dir/tests/sql/assigned-progress-visibility.sql" \
-  >"$tmp_dir/assigned-progress-red.log" 2>&1
-assigned_progress_red_status=$?
+env PGOPTIONS='-c vmp.assigned_progress_fault=before_wrapper' \
+  psql -X -v ON_ERROR_STOP=1 -d "$assigned_failure_database" \
+    -f "$repo_dir/supabase/migrations/20260827130000_assigned_progress_visibility.sql" \
+    >"$tmp_dir/assigned-failure.log" 2>&1
+assigned_failure_status=$?
 set -e
-if [[ $assigned_progress_red_status -eq 0 ]]; then
-  echo "Expected assigned-progress visibility RED, but the focused suite passed." >&2
+assigned_failure_after="$(assigned_progress_state_hash "$assigned_failure_database")"
+if [[ $assigned_failure_status -eq 0 ]] \
+   || ! grep -q 'ASSIGNED_PROGRESS_INJECTED_BEFORE_WRAPPER' \
+        "$tmp_dir/assigned-failure.log" \
+   || [[ "$assigned_failure_after" != "$assigned_failure_before" ]]; then
+  sed -n '1,260p' "$tmp_dir/assigned-failure.log" >&2
+  echo "Assigned progress failure injection did not roll back before wrapper swap." >&2
   exit 1
 fi
-if ! grep -q 'ASSIGNED_PROGRESS_BATCH_RPC_MISSING' \
-    "$tmp_dir/assigned-progress-red.log"; then
-  sed -n '1,320p' "$tmp_dir/assigned-progress-red.log" >&2
-  echo "Assigned-progress RED failed before the missing batch RPC assertion." >&2
+echo "PASS ASSIGNED ROLLBACK injected pre-wrapper failure preserved old public/private writer state"
+dropdb --force "$assigned_failure_database"
+
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/supabase/migrations/20260827130000_assigned_progress_visibility.sql"
+
+assigned_progress_contract() {
+  local database="$1"
+  psql -X -qAt -v ON_ERROR_STOP=1 -d "$database" <<'SQL'
+select string_agg(concat_ws('|',procedure.oid::regprocedure::text,
+  encode(extensions.digest(pg_get_functiondef(procedure.oid),'sha256'),'hex'),
+  encode(extensions.digest(concat_ws('|',owner.rolname,language.lanname,
+    procedure.prosecdef::text,procedure.provolatile::text,
+    procedure.proparallel::text,procedure.proisstrict::text,
+    procedure.proleakproof::text,
+    coalesce(array_to_string(procedure.proconfig,','),''),
+    coalesce(array_to_string(procedure.proacl,','),''),
+    pg_get_function_result(procedure.oid)),'sha256'),'hex')),E'\n'
+  order by procedure.oid::regprocedure::text)
+from pg_proc procedure
+join pg_namespace namespace on namespace.oid=procedure.pronamespace
+join pg_roles owner on owner.oid=procedure.proowner
+join pg_language language on language.oid=procedure.prolang
+where namespace.nspname='public'
+  and procedure.proname in ('rpc_my_editable_progress_rights',
+    'rpc_update_progress__assigned_impl_20260827','rpc_update_progress');
+SQL
+}
+
+assigned_progress_expected_contract=$'rpc_my_editable_progress_rights()|a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b|2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492\nrpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)|a669d06b71d453758a2fbc44ef87882870e167afd2c657994268f498b975872d|796e6afd55e5b79a064cf28ea74ff5b0a79589434d67e373b2c529482669d661\nrpc_update_progress(text,jsonb,text,jsonb,integer)|7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e|895edcfcd1fc3695a3bed4f873c2089bc1f7c55def39c2dd70d97c53a2524c81'
+assigned_progress_contract_before_rerun="$(assigned_progress_contract "$test_database")"
+if [[ "$assigned_progress_contract_before_rerun" != \
+      "$assigned_progress_expected_contract" ]]; then
+  echo "$assigned_progress_contract_before_rerun" >&2
+  echo "Assigned progress installed function contract is not reviewed." >&2
   exit 1
 fi
-sed -n '1,320p' "$tmp_dir/assigned-progress-red.log" >&2
-echo "EXPECTED RED assigned progress batch RPC is not installed" >&2
-exit 1
+
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/supabase/migrations/20260827130000_assigned_progress_visibility.sql"
+assigned_progress_contract_after_rerun="$(assigned_progress_contract "$test_database")"
+if [[ "$assigned_progress_contract_after_rerun" != \
+      "$assigned_progress_contract_before_rerun" ]]; then
+  echo "$assigned_progress_contract_before_rerun" >&2
+  echo "$assigned_progress_contract_after_rerun" >&2
+  echo "Assigned progress migration rerun changed definitions, metadata, or ACL." >&2
+  exit 1
+fi
+echo "PASS ASSIGNED IDEMPOTENCE definitions metadata ACL and global mode preserved"
+
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/tests/sql/assigned-progress-visibility.sql"
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/tests/sql/assigned-progress-visibility-security.sql"
 
 mode_contract="$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
 select (select value from public.system_config where key='screen_access_mode')='"enforced"'::jsonb
@@ -410,7 +556,7 @@ if [[ "$mode_contract" != "t" ]]; then
   exit 1
 fi
 
-psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+psql -X -v ON_ERROR_STOP=1 -d "$manifest_template_database" \
   -f "$repo_dir/tests/sql/qa-rights-account-manifest.sql"
 
 khoa_id="99000000-0000-4000-8000-000000000001"
@@ -439,12 +585,12 @@ select encode(extensions.digest(concat_ws('|',
 SQL
 }
 
+manifest_clone_database=""
 create_manifest_clone() {
   local suffix="$1"
-  local database="${test_database}_${suffix}"
-  createdb -T "$test_database" "$database"
-  test_databases+=("$database")
-  printf '%s' "$database"
+  manifest_clone_database="${test_database}_${suffix}"
+  createdb -T "$manifest_template_database" "$manifest_clone_database"
+  test_databases+=("$manifest_clone_database")
 }
 
 expect_manifest_failure() {
@@ -467,14 +613,16 @@ expect_manifest_failure() {
   echo "PASS MANIFEST rejected $marker without account assignment or audit drift"
 }
 
-manifest_missing_db="$(create_manifest_clone manifest_missing)"
+create_manifest_clone manifest_missing
+manifest_missing_db="$manifest_clone_database"
 expect_manifest_failure "$manifest_missing_db" \
   VIEWER_IDS_PSQL_VARIABLE_REQUIRED \
   psql -X -v ON_ERROR_STOP=1 -d "$manifest_missing_db" \
     -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
     -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
 
-manifest_duplicate_db="$(create_manifest_clone manifest_duplicate)"
+create_manifest_clone manifest_duplicate
+manifest_duplicate_db="$manifest_clone_database"
 expect_manifest_failure "$manifest_duplicate_db" \
   ACCOUNT_MANIFEST_REQUIRES_FOUR_UNIQUE_UUIDS \
   psql -X -v ON_ERROR_STOP=1 -d "$manifest_duplicate_db" \
@@ -482,7 +630,8 @@ expect_manifest_failure "$manifest_duplicate_db" \
     -v viewer_ids="$viewer_one_id,$viewer_one_id" \
     -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
 
-manifest_wrong_db="$(create_manifest_clone manifest_wrong)"
+create_manifest_clone manifest_wrong
+manifest_wrong_db="$manifest_clone_database"
 psql -X -v ON_ERROR_STOP=1 -d "$manifest_wrong_db" -c \
   "update public.vmp_performers set access_class=null where user_id='$khoa_id'::uuid" \
   >/dev/null
@@ -493,7 +642,8 @@ expect_manifest_failure "$manifest_wrong_db" \
     -v viewer_ids="$viewer_one_id,$viewer_two_id" \
     -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
 
-manifest_after_khoa_db="$(create_manifest_clone manifest_after_khoa)"
+create_manifest_clone manifest_after_khoa
+manifest_after_khoa_db="$manifest_clone_database"
 expect_manifest_failure "$manifest_after_khoa_db" \
   QA_ALIGNMENT_INJECTED_AFTER_KHOA \
   env PGOPTIONS='-c vmp.qa_alignment_fault=after_khoa' \
@@ -502,7 +652,8 @@ expect_manifest_failure "$manifest_after_khoa_db" \
     -v viewer_ids="$viewer_one_id,$viewer_two_id" \
     -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
 
-manifest_refresh_db="$(create_manifest_clone manifest_refresh)"
+create_manifest_clone manifest_refresh
+manifest_refresh_db="$manifest_clone_database"
 psql -X -v ON_ERROR_STOP=1 -d "$manifest_refresh_db" >/dev/null <<'SQL'
 create or replace function public.rpc_refresh_source_item_assignments()
 returns jsonb language sql security definer set search_path=public,pg_temp
@@ -515,7 +666,8 @@ expect_manifest_failure "$manifest_refresh_db" \
     -v viewer_ids="$viewer_one_id,$viewer_two_id" \
     -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
 
-manifest_success_db="$(create_manifest_clone manifest_success)"
+create_manifest_clone manifest_success
+manifest_success_db="$manifest_clone_database"
 if ! psql -X -v ON_ERROR_STOP=1 -d "$manifest_success_db" \
   -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
   -v viewer_ids="$viewer_one_id,$viewer_two_id" \

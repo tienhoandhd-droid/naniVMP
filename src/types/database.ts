@@ -3384,6 +3384,7 @@ export type Database = {
         Args: { p_error?: string; p_idempotency_key: string; p_ok: boolean }
         Returns: Json
       }
+      rpc_my_editable_progress_rights: { Args: never; Returns: Json }
       rpc_my_ui_access: { Args: never; Returns: Json }
       rpc_nguoi_va_quyen: { Args: never; Returns: Json }
       rpc_preview_catalog_change: {
@@ -4111,4 +4112,3 @@ export const Constants = {
     },
   },
 } as const
-
