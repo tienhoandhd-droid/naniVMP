@@ -629,6 +629,7 @@ function replaceSection(source, start, end, replacement) {
 const patchEnd = "  -- Tên cũ chỉ còn là đường tương thích; mọi kiểm quyền dùng scheduled_at.\n";
 const itemFetchStart = "  select * into v_item from public.vmp_plan_items\n";
 const itemFetchEnd = "  if v_item.id is null then\n";
+const versionCheckStart = "  if p_expected_version is not null and v_item.version is distinct from p_expected_version then\n";
 const authorizationEnd = "  if coalesce(v_item.item_state, 'active') <> 'active' then\n";
 let normalizedNew = newSource;
 normalizedNew = replaceSection(
@@ -652,8 +653,12 @@ normalizedNew = replaceSection(
 normalizedNew = replaceSection(
   normalizedNew,
   "  -- Re-resolve after lock acquisition so assignment revocation during a lock\n",
+  versionCheckStart,
+  "",
+);
+normalizedNew = normalizedNew.replace(
   authorizationEnd,
-  section(oldSource, "  if v_mode = 'enforced' then\n", authorizationEnd),
+  section(oldSource, "  if v_mode = 'enforced' then\n", authorizationEnd) + authorizationEnd,
 );
 
 const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
@@ -690,7 +695,7 @@ where namespace.nspname='public'
 SQL
 }
 
-assigned_progress_expected_contract=$'rpc_my_editable_progress_rights()|a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b|2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492\nrpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)|740ed7f1d6b5f61759879b99f3829acbe87a74ba05d5b5dc6594edf20da9f437|796e6afd55e5b79a064cf28ea74ff5b0a79589434d67e373b2c529482669d661\nrpc_update_progress(text,jsonb,text,jsonb,integer)|7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e|895edcfcd1fc3695a3bed4f873c2089bc1f7c55def39c2dd70d97c53a2524c81'
+assigned_progress_expected_contract=$'rpc_my_editable_progress_rights()|a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b|2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492\nrpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)|d0df69bd8e9f7a2d8cfa5f5f87bd15e4559599d05c125e0b35f038ca5b25865a|796e6afd55e5b79a064cf28ea74ff5b0a79589434d67e373b2c529482669d661\nrpc_update_progress(text,jsonb,text,jsonb,integer)|7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e|895edcfcd1fc3695a3bed4f873c2089bc1f7c55def39c2dd70d97c53a2524c81'
 assigned_progress_contract_before_rerun="$(assigned_progress_contract "$test_database")"
 if [[ "$assigned_progress_contract_before_rerun" != \
       "$assigned_progress_expected_contract" ]]; then
@@ -756,6 +761,11 @@ values (
   'PQ',2026,'Hóa lý',5,current_date+30,current_date+60,current_date+90,
   current_date+120,'not_started','not_started','not_started','not_started',
   true,'active',60,array['qa'],array['qa'],'{"fixture":"concurrency"}'
+),(
+  'APV-CONCURRENT/2026.02-PQ','APV-CONCURRENT/2026.02-PQ','APV-CONCURRENT',
+  'PQ',2026,'Hóa lý',5,current_date+30,current_date+60,current_date+90,
+  current_date+120,'not_started','not_started','not_started','not_started',
+  true,'active',70,array['qa'],array['qa'],'{"fixture":"revocation_wait"}'
 );
 
 insert into public.vmp_item_assignments (
@@ -765,6 +775,16 @@ insert into public.vmp_item_assignments (
 select 'APV-CONCURRENT/2026.01-PQ',performer.id,performer.user_id,
        performer.performer_name,'qa','qa_manager','collaborator',true,
        'Assigned progress concurrency assignment'
+from public.vmp_performers performer
+where performer.user_id='99012000-0000-4000-8000-000000000001'::uuid;
+
+insert into public.vmp_item_assignments (
+  validation_code,performer_id,user_id,staff_name,assignment_kind,
+  source,assignment_role,is_active,change_reason
+)
+select 'APV-CONCURRENT/2026.02-PQ',performer.id,performer.user_id,
+       performer.performer_name,'qa','qa_manager','collaborator',true,
+       'Assigned progress revocation-wait assignment'
 from public.vmp_performers performer
 where performer.user_id='99012000-0000-4000-8000-000000000001'::uuid;
 
@@ -861,6 +881,153 @@ if [[ $assigned_concurrency_status_one -ne 0 ]] \
   exit 1
 fi
 echo "PASS ASSIGNED CONCURRENCY one winner one version_conflict one audit no lost update"
+
+assigned_revocation_before="$(psql -X -qAt -v ON_ERROR_STOP=1 \
+  -d "$assigned_concurrency_database" <<'SQL'
+select item.version||'|'||(select count(*) from public.audit_logs audit
+  where audit.validation_code=item.validation_code)
+from public.vmp_plan_items item
+where item.validation_code='APV-CONCURRENT/2026.02-PQ';
+SQL
+)"
+assigned_revocation_before_version="${assigned_revocation_before%%|*}"
+assigned_revocation_before_audits="${assigned_revocation_before##*|}"
+assigned_revoker_app="apv-revoker-${$}-${RANDOM}"
+assigned_waiter_app="apv-waiter-${$}-${RANDOM}"
+
+PGAPPNAME="$assigned_revoker_app" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -d "$assigned_concurrency_database" \
+  >"$tmp_dir/revocation-revoker.log" 2>&1 <<'SQL' &
+begin;
+update public.vmp_plan_items
+set status_protocol='in_progress'
+where validation_code='APV-CONCURRENT/2026.02-PQ';
+update public.vmp_item_assignments
+set is_active=false,
+    change_reason='Concurrency fixture revokes assignment while writer waits'
+where validation_code='APV-CONCURRENT/2026.02-PQ'
+  and user_id='99012000-0000-4000-8000-000000000001'::uuid
+  and is_active;
+select 'REVOCATION_REVOKER_STATE|'||item.version||'|'||
+       (select count(*) from public.audit_logs audit
+        where audit.validation_code=item.validation_code)
+from public.vmp_plan_items item
+where item.validation_code='APV-CONCURRENT/2026.02-PQ';
+select pg_sleep(2.5);
+commit;
+SQL
+assigned_revoker_pid=$!
+
+assigned_revoker_ready=false
+for assigned_poll_attempt in {1..60}; do
+  if [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 \
+      -d "$assigned_concurrency_database" \
+      -v application_name="$assigned_revoker_app" <<'SQL'
+select exists (
+  select 1 from pg_stat_activity
+  where application_name=:'application_name'
+    and wait_event='PgSleep'
+);
+SQL
+  )" == "t" ]]; then
+    assigned_revoker_ready=true
+    break
+  fi
+  sleep 0.05
+done
+if [[ "$assigned_revoker_ready" != "true" ]]; then
+  set +e
+  wait "$assigned_revoker_pid"
+  assigned_revoker_status=$?
+  set -e
+  sed -n '1,120p' "$tmp_dir/revocation-revoker.log" >&2
+  echo "ASSIGNED_PROGRESS_REVOCATION_REVOKER_NOT_READY status=$assigned_revoker_status" >&2
+  exit 1
+fi
+
+PGAPPNAME="$assigned_waiter_app" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -v expected_version="$assigned_revocation_before_version" \
+  -d "$assigned_concurrency_database" \
+  >"$tmp_dir/revocation-waiter.log" 2>&1 <<'SQL' &
+begin;
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"99012000-0000-4000-8000-000000000001","role":"authenticated"}';
+select public.rpc_update_progress(
+  'APV-CONCURRENT/2026.02-PQ','{"status_protocol":"overdue"}'::jsonb,
+  null,null,:'expected_version'::integer);
+commit;
+SQL
+assigned_waiter_pid=$!
+
+assigned_waiter_blocked=false
+for assigned_poll_attempt in {1..60}; do
+  if [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 \
+      -d "$assigned_concurrency_database" \
+      -v application_name="$assigned_waiter_app" <<'SQL'
+select exists (
+  select 1 from pg_stat_activity
+  where application_name=:'application_name'
+    and wait_event_type='Lock'
+);
+SQL
+  )" == "t" ]]; then
+    assigned_waiter_blocked=true
+    break
+  fi
+  sleep 0.05
+done
+
+set +e
+wait "$assigned_revoker_pid"
+assigned_revoker_status=$?
+wait "$assigned_waiter_pid"
+assigned_waiter_status=$?
+set -e
+
+assigned_revocation_after="$(psql -X -qAt -v ON_ERROR_STOP=1 \
+  -d "$assigned_concurrency_database" <<'SQL'
+select item.version||'|'||(select count(*) from public.audit_logs audit
+  where audit.validation_code=item.validation_code)||'|'||
+  coalesce((select bool_or(assignment.is_active)::text
+    from public.vmp_item_assignments assignment
+    where assignment.validation_code=item.validation_code
+      and assignment.user_id='99012000-0000-4000-8000-000000000001'::uuid),'missing')
+from public.vmp_plan_items item
+where item.validation_code='APV-CONCURRENT/2026.02-PQ';
+SQL
+)"
+assigned_revocation_after_version="${assigned_revocation_after%%|*}"
+assigned_revocation_after_tail="${assigned_revocation_after#*|}"
+assigned_revocation_after_audits="${assigned_revocation_after_tail%%|*}"
+assigned_revocation_after_active="${assigned_revocation_after##*|}"
+assigned_revocation_denials="$(grep -c '"code": "item_field_forbidden"' \
+  "$tmp_dir/revocation-waiter.log" || true)"
+assigned_revocation_leaks="$(grep -c '"current_version"' \
+  "$tmp_dir/revocation-waiter.log" || true)"
+assigned_revoker_state="$(grep '^REVOCATION_REVOKER_STATE|' \
+  "$tmp_dir/revocation-revoker.log" || true)"
+assigned_revoker_state="${assigned_revoker_state#REVOCATION_REVOKER_STATE|}"
+assigned_revoker_version="${assigned_revoker_state%%|*}"
+assigned_revoker_audits="${assigned_revoker_state##*|}"
+if [[ "$assigned_waiter_blocked" != "true" ]] \
+   || [[ $assigned_revoker_status -ne 0 ]] \
+   || [[ $assigned_waiter_status -ne 0 ]] \
+   || [[ "$assigned_revocation_denials" != "1" ]] \
+   || [[ "$assigned_revocation_leaks" != "0" ]] \
+   || [[ ! "$assigned_revoker_version" =~ ^[0-9]+$ ]] \
+   || [[ ! "$assigned_revoker_audits" =~ ^[0-9]+$ ]] \
+   || [[ "$assigned_revoker_version" -le "$assigned_revocation_before_version" ]] \
+   || [[ "$assigned_revoker_audits" -le "$assigned_revocation_before_audits" ]] \
+   || [[ "$assigned_revocation_after_version" != "$assigned_revoker_version" ]] \
+   || [[ "$assigned_revocation_after_audits" != "$assigned_revoker_audits" ]] \
+   || [[ "$assigned_revocation_after_active" != "false" ]]; then
+  sed -n '1,120p' "$tmp_dir/revocation-revoker.log" >&2
+  sed -n '1,120p' "$tmp_dir/revocation-waiter.log" >&2
+  echo "ASSIGNED_PROGRESS_REVOCATION_CONTRACT before=$assigned_revocation_before revoker=$assigned_revoker_state after=$assigned_revocation_after blocked=$assigned_waiter_blocked denials=$assigned_revocation_denials leaks=$assigned_revocation_leaks statuses=$assigned_revoker_status/$assigned_waiter_status" >&2
+  exit 1
+fi
+echo "PASS ASSIGNED REVOCATION WAIT post-lock rights denial precedes version conflict without row audit mutation"
 dropdb --force "$assigned_concurrency_database"
 
 mode_contract="$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'

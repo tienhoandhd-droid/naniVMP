@@ -144,7 +144,7 @@ begin
        'a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b',
        '2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492'),
       ('public.rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)',
-       '740ed7f1d6b5f61759879b99f3829acbe87a74ba05d5b5dc6594edf20da9f437',
+       'd0df69bd8e9f7a2d8cfa5f5f87bd15e4559599d05c125e0b35f038ca5b25865a',
        '796e6afd55e5b79a064cf28ea74ff5b0a79589434d67e373b2c529482669d661'),
       ('public.rpc_update_progress(text,jsonb,text,jsonb,integer)',
        '7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e',
@@ -454,14 +454,6 @@ begin
       'Không tìm thấy mã thẩm định: ' || p_validation_code);
   end if;
 
-  if p_expected_version is not null and v_item.version is distinct from p_expected_version then
-    return jsonb_build_object(
-      'ok', false, 'code', 'version_conflict',
-      'error', 'Hạng mục đã được người khác cập nhật trong lúc bạn đang sửa. Vui lòng tải lại dữ liệu và thử lại.',
-      'current_version', v_item.version
-    );
-  end if;
-
   -- Re-resolve after lock acquisition so assignment revocation during a lock
   -- wait still fails closed before any audit setting or row mutation.
   v_allowed := public.vmp_allowed_timeline_fields(auth.uid(),p_validation_code);
@@ -489,6 +481,14 @@ begin
         array_to_string(v_bad_fields,', '),
       'forbidden_fields',to_jsonb(v_bad_fields),
       'allowed_fields',to_jsonb(v_allowed)
+    );
+  end if;
+
+  if p_expected_version is not null and v_item.version is distinct from p_expected_version then
+    return jsonb_build_object(
+      'ok', false, 'code', 'version_conflict',
+      'error', 'Hạng mục đã được người khác cập nhật trong lúc bạn đang sửa. Vui lòng tải lại dữ liệu và thử lại.',
+      'current_version', v_item.version
     );
   end if;
 
@@ -706,7 +706,7 @@ begin
           'a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b'
      or encode(extensions.digest(pg_get_functiondef(v_private),'sha256'),'hex')
         is distinct from
-          '740ed7f1d6b5f61759879b99f3829acbe87a74ba05d5b5dc6594edf20da9f437'
+          'd0df69bd8e9f7a2d8cfa5f5f87bd15e4559599d05c125e0b35f038ca5b25865a'
      or encode(extensions.digest(pg_get_functiondef(v_public),'sha256'),'hex')
         is distinct from
           '7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e' then
