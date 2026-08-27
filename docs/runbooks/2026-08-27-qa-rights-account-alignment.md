@@ -4,7 +4,7 @@
 
 **Nguồn chuẩn ban đầu:** `origin/main@45d6c53075d17fa52effcab69eb25850bb28d060`
 
-**Trạng thái:** chỉ là gói phát hành đã chuẩn bị; chưa được phép ghi production, deploy, push hoặc merge.
+**Trạng thái:** người dùng đã phê duyệt hoàn tất đến production và deploy trong phiên thực hiện ngày 2026-08-27; người vận hành vẫn phải lưu bằng chứng cửa sổ thay đổi và postflight.
 
 Runbook này chỉ áp dụng cho bốn UUID đã được đối chiếu ngoài Git:
 
@@ -39,9 +39,9 @@ Chạy từ repository root. So sánh đúng từng ký tự; lệch một hash 
 | `supabase/migrations/20260826170000_manual_planned_deadline_edit.sql` | `2eddcf0141260acd7f613608871e5b4e057715645337ec0adc82fd30b9437a01` |
 | `supabase/migrations/20260826180000_qa_manager_actual_date_principal_normalization.sql` | `d8066924f3268b283310a324aa6430301d4bb2c7c29ad1066e3572e5f517dcaa` |
 | `supabase/migrations/20260827100000_qa_rights_account_alignment.sql` | `99975799b9a5995fe7dd6c969a2e63a4e9522dbff14ac1ec6977d93ceb1db355` |
-| `scripts/apply-qa-rights-account-alignment.sql` | `ae0276cba0981961a0ca2a03855725537e80aec28601dc3b74e62db36b311fa8` |
-| `scripts/apply-qa-rights-account-manifest.sql` | `0afb5cba7160cea89bdeb7da9f3e783f991e2eb860c3bb9c1ee06db86dfebd51` |
-| `scripts/check-qa-rights-account-alignment.sql` | `5e30136ec7c039a3e71afe4088fae1adc1f7018ad703653bf6cd496bc7ec6a87` |
+| `scripts/apply-qa-rights-account-alignment.sql` | `ce81b16d7b17bf2752d649f9c285031955422857714779387614f35ae6ea095b` |
+| `scripts/apply-qa-rights-account-manifest.sql` | `6d22c0bfb83a3add51ad2a8707421e5eefdc2160f8e39c397507909d3ee695ba` |
+| `scripts/check-qa-rights-account-alignment.sql` | `a73d3fb4dedab257de3d9f78462995f5309a0d77ddeb466fab5d08482ec25e05` |
 
 Lệnh kiểm:
 
@@ -73,12 +73,19 @@ Sau đó:
 
 ```bash
 chmod 600 /secure/vmp/qa-rights-account-ids.psql
-export QA_ALIGNMENT_DATABASE_URL='postgresql://...'
+export PGSERVICEFILE='/secure/vmp/qa-rights-pg-service.conf'
+export PGSERVICE='vmp_qa_alignment'
 export QA_ALIGNMENT_ID_FILE='/secure/vmp/qa-rights-account-ids.psql'
 export QA_ALIGNMENT_BACKUP_DIR='/secure/vmp/backups/qa-rights-2026-08-27'
+chmod 600 "$PGSERVICEFILE"
 umask 077
 install -d -m 700 "$QA_ALIGNMENT_BACKUP_DIR"
 ```
+
+`$PGSERVICEFILE` phải là file PostgreSQL service `0600` chứa host, port,
+database, user, password và `sslmode=require` dưới section
+`[vmp_qa_alignment]`. Không truyền URI chứa mật khẩu trên command line; các
+lệnh dưới đây chỉ truyền tên service không nhạy cảm.
 
 Không đưa URL, UUID, email, tên hoặc nội dung backup vào terminal log dùng chung, ticket công khai hay Git.
 
@@ -87,7 +94,7 @@ Không đưa URL, UUID, email, tên hoặc nội dung backup vào terminal log d
 Mở một kết nối mới. Đoạn dưới chỉ trả các số đếm và cờ boolean, không trả UUID, email hoặc tên:
 
 ```bash
-psql "$QA_ALIGNMENT_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+psql "service=$PGSERVICE" -X -v ON_ERROR_STOP=1 \
   -f "$QA_ALIGNMENT_ID_FILE" <<'SQL'
 begin read only;
 
@@ -162,11 +169,11 @@ Trạng thái đã review ngày 2026-08-27 là: bốn UUID duy nhất; 102 dòng
 Backup chứa dữ liệu cá nhân và phải ở vùng mã hóa, quyền hạn chế:
 
 ```bash
-pg_dump --format=custom --no-owner --schema=public --schema=auth \
-  --file="$QA_ALIGNMENT_BACKUP_DIR/pre-release.dump" \
-  "$QA_ALIGNMENT_DATABASE_URL"
+pg_dump --dbname="service=$PGSERVICE" --format=custom --no-owner \
+  --schema=public --schema=auth \
+  --file="$QA_ALIGNMENT_BACKUP_DIR/pre-release.dump"
 
-psql "$QA_ALIGNMENT_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+psql "service=$PGSERVICE" -X -v ON_ERROR_STOP=1 \
   -o "$QA_ALIGNMENT_BACKUP_DIR/function-definitions.txt" \
   -c "select p.oid::regprocedure, pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('vmp_business_role','vmp_item_rights','vmp_my_item_rights','vmp_allowed_timeline_fields','rpc_update_progress','rpc_refresh_source_item_assignments') order by p.oid::regprocedure::text"
 
@@ -181,7 +188,7 @@ Xác nhận cả hai lệnh cuối exit 0. Không tiếp tục chỉ vì file ba
 Entrypoint chạy schema trước rồi mới chạy manifest bốn tài khoản:
 
 ```bash
-psql "$QA_ALIGNMENT_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+psql "service=$PGSERVICE" -X -v ON_ERROR_STOP=1 \
   -f "$QA_ALIGNMENT_ID_FILE" \
   -f scripts/apply-qa-rights-account-alignment.sql \
   >"$QA_ALIGNMENT_BACKUP_DIR/apply.log" 2>&1
@@ -189,7 +196,7 @@ psql "$QA_ALIGNMENT_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
 
 Ranh giới transaction phải được hiểu đúng:
 
-- mỗi migration schema tự sở hữu `BEGIN`/`COMMIT`, nên các migration đã commit trước không tự hoàn tác nếu migration sau lỗi;
+- entrypoint bọc migration five-role trong transaction riêng vì migration đó dùng guard transaction-local; bốn migration schema sau tự sở hữu `BEGIN`/`COMMIT`, nên các migration đã commit trước không tự hoàn tác nếu migration sau lỗi;
 - manifest bốn tài khoản, bốn audit và đúng một lần `rpc_refresh_source_item_assignments()` nằm trong một transaction riêng; lỗi ở bất kỳ bước nào trước `COMMIT` của manifest sẽ hoàn tác toàn bộ phần tài khoản/audit/phân công;
 - `ON_ERROR_STOP` dừng ở lỗi đầu tiên; nó không biến chuỗi migration thành một transaction chung.
 
@@ -200,7 +207,7 @@ Nếu lệnh lỗi, không chạy tiếp checker, không tự chạy lại mù q
 Không tái sử dụng connection apply:
 
 ```bash
-psql "$QA_ALIGNMENT_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+psql "service=$PGSERVICE" -X -v ON_ERROR_STOP=1 \
   -f "$QA_ALIGNMENT_ID_FILE" \
   -f scripts/check-qa-rights-account-alignment.sql \
   >"$QA_ALIGNMENT_BACKUP_DIR/postflight.log" 2>&1
@@ -226,7 +233,7 @@ Nếu checker thiếu một persona có phân công để probe, không tự c�
 Chỉ sau khi checker đạt, yêu cầu PostgREST nạp lại metadata:
 
 ```bash
-psql "$QA_ALIGNMENT_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+psql "service=$PGSERVICE" -X -v ON_ERROR_STOP=1 \
   -c "notify pgrst, 'reload schema'"
 ```
 

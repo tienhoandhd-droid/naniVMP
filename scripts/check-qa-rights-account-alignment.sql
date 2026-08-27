@@ -222,26 +222,38 @@ begin
   if exists (
     select 1
     from public.vmp_plan_items item
-    join public.vmp_performers performer
-      on performer.id = item.owner_person_id and performer.is_active
     where item.is_active and item.owner_person_id is not null
       and not exists (
-        select 1 from public.vmp_item_assignments assignment
-        where assignment.validation_code = item.validation_code
-          and assignment.performer_id = item.owner_person_id
-          and assignment.assignment_kind = 'qa' and assignment.is_active
+        select 1
+        from public.vmp_performers performer
+        join public.vmp_item_assignments assignment
+          on assignment.performer_id = performer.id
+         and assignment.user_id = performer.user_id
+        where performer.id = item.owner_person_id and performer.is_active
+          and assignment.validation_code = item.validation_code
+          and assignment.assignment_kind = 'qa'
+          and assignment.source in ('sheet_qa','qa_manager')
+          and assignment.assignment_role in ('primary','collaborator')
+          and assignment.unresolved_reason is null and assignment.is_active
+          and (assignment.expires_at is null or assignment.expires_at > now())
       )
   ) or exists (
     select 1
     from public.vmp_plan_items item
-    join public.vmp_performers performer
-      on performer.id = item.support_person_id and performer.is_active
     where item.is_active and item.support_person_id is not null
       and not exists (
-        select 1 from public.vmp_item_assignments assignment
-        where assignment.validation_code = item.validation_code
-          and assignment.performer_id = item.support_person_id
-          and assignment.assignment_kind = 'qa' and assignment.is_active
+        select 1
+        from public.vmp_performers performer
+        join public.vmp_item_assignments assignment
+          on assignment.performer_id = performer.id
+         and assignment.user_id = performer.user_id
+        where performer.id = item.support_person_id and performer.is_active
+          and assignment.validation_code = item.validation_code
+          and assignment.assignment_kind = 'qa'
+          and assignment.source in ('sheet_qa','qa_manager')
+          and assignment.assignment_role in ('primary','collaborator')
+          and assignment.unresolved_reason is null and assignment.is_active
+          and (assignment.expires_at is null or assignment.expires_at > now())
       )
   ) or exists (
     select 1 from public.vmp_plan_items item
@@ -250,6 +262,20 @@ begin
     where item.is_active and item.owner_person_id is null
       and item.support_person_id is null and assignment.is_active
       and assignment.source like 'sheet\_qa%' escape '\'
+  ) or exists (
+    select 1
+    from public.vmp_item_assignments assignment
+    join public.vmp_plan_items item
+      on item.validation_code = assignment.validation_code and item.is_active
+    left join public.vmp_performers performer
+      on performer.id = assignment.performer_id and performer.is_active
+    where assignment.source = 'sheet_qa' and assignment.is_active
+      and (assignment.expires_at is not null and assignment.expires_at <= now()
+        or assignment.unresolved_reason is not null
+        or performer.id is null
+        or assignment.user_id is distinct from performer.user_id
+        or assignment.performer_id is distinct from item.owner_person_id
+           and assignment.performer_id is distinct from item.support_person_id)
   ) then
     raise exception using errcode = 'check_violation',
       message = 'CHECK_SOURCE_ASSIGNMENTS';
@@ -299,7 +325,57 @@ begin
      or has_function_privilege('public',
           'public.rpc_refresh_source_item_assignments()', 'EXECUTE')
      or not has_function_privilege('service_role',
-          'public.rpc_refresh_source_item_assignments()', 'EXECUTE') then
+          'public.rpc_refresh_source_item_assignments()', 'EXECUTE')
+     or not exists (
+       select 1 from pg_proc function_row
+       join pg_roles owner on owner.oid=function_row.proowner
+       where function_row.oid='public.vmp_item_rights(uuid,text)'::regprocedure
+         and owner.rolname='postgres' and function_row.prosecdef
+         and function_row.provolatile='s'
+         and function_row.proconfig=array['search_path=public, pg_temp']
+         and function_row.proacl=array[
+           'postgres=X/postgres','service_role=X/postgres']::aclitem[]
+         and encode(extensions.digest(pg_get_functiondef(function_row.oid),
+           'sha256'),'hex')='9cfba864d7ea650370d6d76c33e2afcfbf941bb6918a90eeedec77f0513ab0db'
+     )
+     or not exists (
+       select 1 from pg_proc function_row
+       join pg_roles owner on owner.oid=function_row.proowner
+       where function_row.oid='public.vmp_my_item_rights(text)'::regprocedure
+         and owner.rolname='postgres' and function_row.prosecdef
+         and function_row.provolatile='s'
+         and function_row.proconfig=array['search_path=public, pg_temp']
+         and function_row.proacl=array['postgres=X/postgres',
+           'service_role=X/postgres','authenticated=X/postgres']::aclitem[]
+         and encode(extensions.digest(pg_get_functiondef(function_row.oid),
+           'sha256'),'hex')='c7a326defaedd0cf9056a284e480d69027a56cd35f2ca6f09b4a9e321f1ad76d'
+     )
+     or not exists (
+       select 1 from pg_proc function_row
+       join pg_roles owner on owner.oid=function_row.proowner
+       where function_row.oid=
+         'public.rpc_update_progress(text,jsonb,text,jsonb,integer)'::regprocedure
+         and owner.rolname='postgres' and function_row.prosecdef
+         and function_row.provolatile='v'
+         and function_row.proconfig=array['search_path=public, pg_temp']
+         and function_row.proacl=array['postgres=X/postgres',
+           'service_role=X/postgres','authenticated=X/postgres']::aclitem[]
+         and encode(extensions.digest(pg_get_functiondef(function_row.oid),
+           'sha256'),'hex')='da25f8acbcc5aa3e029e581acb79f210cf1d6c61ab0e8458e4ff89146e75f4a0'
+     )
+     or not exists (
+       select 1 from pg_proc function_row
+       join pg_roles owner on owner.oid=function_row.proowner
+       where function_row.oid=
+         'public.rpc_refresh_source_item_assignments()'::regprocedure
+         and owner.rolname='postgres' and function_row.prosecdef
+         and function_row.provolatile='v'
+         and function_row.proconfig=array['search_path=public, pg_temp']
+         and function_row.proacl=array[
+           'postgres=X/postgres','service_role=X/postgres']::aclitem[]
+         and encode(extensions.digest(pg_get_functiondef(function_row.oid),
+           'sha256'),'hex')='a4bd208fc467a14b9d0383d6af486f59a66f52d8b68d4bc614b92627a73524e7'
+     ) then
     raise exception using errcode = 'check_violation',
       message = 'CHECK_SECURITY_ACL';
   end if;

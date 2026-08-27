@@ -32,8 +32,14 @@ test("release entrypoint applies the reviewed transaction-owning schema chain be
     "the nonexistent legacy preview function would falsely rerun old migrations");
   assert.doesNotMatch(source, /apply-five-role-hardening\.sql/i);
   assert.doesNotMatch(source, /apply-five-role-account-manifest\.sql/i);
-  assert.doesNotMatch(source, /(^|\n)\s*(?:begin|commit)\s*;/i,
-    "included migrations own their transactions; the entrypoint must not claim an outer transaction");
+  assert.match(source,
+    /begin;[\s\S]{0,300}20260824120000_five_role_permission_hardening\.sql[\s\S]{0,100}commit;/i,
+    "the five-role migration consumes transaction-local guards and must be wrapped explicitly");
+  assert.match(source,
+    /9cfba864d7ea650370d6d76c33e2afcfbf941bb6918a90eeedec77f0513ab0db/,
+    "schema-ready bypass must pin the installed item-rights definition");
+  assert.match(source, /owner_name='postgres'[\s\S]*prosecdef[\s\S]*proacl=/,
+    "schema-ready bypass must pin owner, SECURITY DEFINER and ACL metadata");
 });
 
 test("database runner proves exact-four rollback, checker, and idempotent rerun", async () => {
