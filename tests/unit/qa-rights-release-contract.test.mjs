@@ -129,3 +129,91 @@ test("postflight checker is read-only and verifies roles, field rights, assignme
     "the checker must not contain a top-level mutating statement");
   assert.doesNotMatch(source, /(?:[\w.+-]+@|[0-9a-f]{8}-[0-9a-f-]{27,})/i);
 });
+
+test("assigned-progress postflight is fail-closed, read-only, sanitized, and pins every release boundary", async () => {
+  const source = await read("scripts/check-assigned-progress-visibility.sql");
+
+  assert.match(source, /\\set ON_ERROR_STOP on/i);
+  assert.match(source, /begin read only;/i);
+  assert.match(source, /set local lock_timeout\s*=\s*'3s'/i);
+  assert.match(source, /set local statement_timeout\s*=\s*'60s'/i);
+  assert.match(source, /rollback;/i);
+  for (const marker of [
+    "CHECK_ASSIGNED_PROGRESS_PERMISSION_MODES",
+    "CHECK_ASSIGNED_PROGRESS_FUNCTION_CONTRACT",
+    "CHECK_ASSIGNED_PROGRESS_ACL",
+    "CHECK_ASSIGNED_PROGRESS_WRITER_GUARDS",
+    "CHECK_ASSIGNED_PROGRESS_SOURCE_DATA_UNCHANGED",
+    "CHECK_ASSIGNED_PROGRESS_ADMIN_NINE_FIELDS",
+    "CHECK_ASSIGNED_PROGRESS_QA_MANAGER_EIGHT_FIELDS",
+    "CHECK_ASSIGNED_PROGRESS_QA_STAFF_SEVEN_FIELDS",
+    "CHECK_ASSIGNED_PROGRESS_WORKSHOP_ONE_FIELD",
+    "CHECK_ASSIGNED_PROGRESS_UNASSIGNED_HIDDEN",
+    "CHECK_ASSIGNED_PROGRESS_THIEN_MY_HT02_HIDDEN",
+  ]) assert.match(source, new RegExp(marker));
+  for (const hash of [
+    "a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b",
+    "d0df69bd8e9f7a2d8cfa5f5f87bd15e4559599d05c125e0b35f038ca5b25865a",
+    "7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e",
+    "55f7f86442b88a12c39e1f3cb6dd867d0aae0a684db78365bcef673a473e2644",
+    "9cfba864d7ea650370d6d76c33e2afcfbf941bb6918a90eeedec77f0513ab0db",
+    "235d5d2e4ff760a7640e2687be430a8a188a56d380b7cf7b72e6018bc71d9a3c",
+    "a4bd208fc467a14b9d0383d6af486f59a66f52d8b68d4bc614b92627a73524e7",
+  ]) assert.match(source, new RegExp(hash));
+  assert.match(source, /rpc_save_catalog_object\(text,text,jsonb,text,integer\)/);
+  assert.match(source, /HT-02/);
+  assert.match(source, /assignments=0/);
+  assert.doesNotMatch(source,
+    /^\s*(?:insert|update|delete|truncate|alter|create|drop|notify|grant|revoke)\b/im,
+    "the postflight must contain no top-level database mutation");
+  assert.doesNotMatch(source, /(?:[\w.+-]+@|[0-9a-f]{8}-[0-9a-f-]{27,})/i);
+});
+
+test("assigned-progress forward recovery restores only the reviewed public writer wrapper", async () => {
+  const source = await read("scripts/forward-recover-assigned-progress-visibility.sql");
+
+  assert.match(source, /\\set ON_ERROR_STOP on/i);
+  assert.match(source, /begin;[\s\S]*commit;/i);
+  assert.match(source, /set local lock_timeout\s*=\s*'3s'/i);
+  assert.match(source, /set local statement_timeout\s*=\s*'120s'/i);
+  assert.match(source,
+    /return public\.rpc_update_progress__five_role_impl_20260824\(/i);
+  assert.match(source, /da25f8acbcc5aa3e029e581acb79f210cf1d6c61ab0e8458e4ff89146e75f4a0/);
+  assert.match(source, /7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e/);
+  assert.match(source, /a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b/);
+  assert.match(source, /d0df69bd8e9f7a2d8cfa5f5f87bd15e4559599d05c125e0b35f038ca5b25865a/);
+  assert.match(source, /ASSIGNED_PROGRESS_RECOVERY_PRECONDITION/);
+  assert.match(source, /ASSIGNED_PROGRESS_RECOVERY_POSTCONDITION/);
+  assert.doesNotMatch(source, /drop\s+function/i,
+    "the additive batch boundary and owner-only implementation remain installed");
+  assert.doesNotMatch(source,
+    /^\s*(?:insert|update|delete|truncate)\b/im,
+    "recovery must not change modes, roles, assignments, or Source Data rows");
+});
+
+test("assigned-progress runbook pins artifacts and orders backup, apply, postflight, cache reload, and frontend release", async () => {
+  const source = await read("docs/runbooks/2026-08-27-assigned-progress-visibility.md");
+
+  for (const artifact of [
+    "supabase/migrations/20260827130000_assigned_progress_visibility.sql",
+    "scripts/check-assigned-progress-visibility.sql",
+    "scripts/forward-recover-assigned-progress-visibility.sql",
+  ]) assert.match(source, new RegExp(artifact.replaceAll(".", "\\.")));
+  assert.match(source, /REVIEWED_RELEASE_SHA/);
+  assert.match(source, /EXPECTED_MIGRATION_SHA256/);
+  assert.match(source, /EXPECTED_CHECKER_SHA256/);
+  assert.match(source, /EXPECTED_RECOVERY_SHA256/);
+  assert.match(source, /PREVIOUS_PAGES_SHA/);
+  assert.match(source, /PGSERVICEFILE/);
+  assert.match(source, /postgres:17/);
+  assert.match(source, /0700/);
+  assert.match(source, /0600/);
+  assert.match(source, /postflight-before-reload\.log/);
+  assert.match(source, /notify pgrst, 'reload schema'/i);
+  assert.match(source, /postflight-after-reload\.log/);
+  assert.match(source, /migration repair --status applied 20260827130000/);
+  assert.match(source, /e2e:progress-rights/);
+  assert.match(source, /item_permissions_mode[^\n]*preview/i);
+  assert.match(source, /forward-recover-assigned-progress-visibility\.sql/);
+  assert.doesNotMatch(source, /REPLACE_WITH|UUID_DA_DOI_CHIEU|TODO|TBD/i);
+});
