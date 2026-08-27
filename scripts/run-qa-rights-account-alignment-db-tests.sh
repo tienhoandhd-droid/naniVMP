@@ -376,6 +376,30 @@ psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/tests/sql/qa-rights-account-alignment-security.sql"
 
+# Task 2 RED gate. The fixture transaction validates the reviewed resolver,
+# linked personas, assignment rows and preview mode before it checks for the
+# new zero-argument browser RPC. This prevents a broken fixture from being
+# mistaken for the intended missing-feature failure.
+set +e
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/tests/sql/assigned-progress-visibility.sql" \
+  >"$tmp_dir/assigned-progress-red.log" 2>&1
+assigned_progress_red_status=$?
+set -e
+if [[ $assigned_progress_red_status -eq 0 ]]; then
+  echo "Expected assigned-progress visibility RED, but the focused suite passed." >&2
+  exit 1
+fi
+if ! grep -q 'ASSIGNED_PROGRESS_BATCH_RPC_MISSING' \
+    "$tmp_dir/assigned-progress-red.log"; then
+  sed -n '1,320p' "$tmp_dir/assigned-progress-red.log" >&2
+  echo "Assigned-progress RED failed before the missing batch RPC assertion." >&2
+  exit 1
+fi
+sed -n '1,320p' "$tmp_dir/assigned-progress-red.log" >&2
+echo "EXPECTED RED assigned progress batch RPC is not installed" >&2
+exit 1
+
 mode_contract="$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
 select (select value from public.system_config where key='screen_access_mode')='"enforced"'::jsonb
    and (select value from public.system_config where key='item_permissions_mode')='"preview"'::jsonb;
