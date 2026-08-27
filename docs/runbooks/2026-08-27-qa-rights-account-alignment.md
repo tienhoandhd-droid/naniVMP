@@ -34,20 +34,20 @@ Chạy từ repository root. So sánh đúng từng ký tự; lệch một hash 
 
 | Artifact | SHA-256 được duyệt |
 |---|---|
-| `supabase/migrations/20260824120000_five_role_permission_hardening.sql` | `82c321e40f73152bb1131a5b73067e0efc790d39d7926ac2da4b0bd191ccaf08` |
+| `supabase/migrations/20260827090000_five_role_permission_hardening_current_preflight.sql` | `db5088ed53bd490b7ea750dba997a46672cac21512592d29a67a0dab3984f01c` |
 | `supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql` | `818ee26a963b53c4977b0604d65ecb4779922bc4d009d0ae1965c1f51d8d16fc` |
 | `supabase/migrations/20260826170000_manual_planned_deadline_edit.sql` | `2eddcf0141260acd7f613608871e5b4e057715645337ec0adc82fd30b9437a01` |
 | `supabase/migrations/20260826180000_qa_manager_actual_date_principal_normalization.sql` | `d8066924f3268b283310a324aa6430301d4bb2c7c29ad1066e3572e5f517dcaa` |
 | `supabase/migrations/20260827100000_qa_rights_account_alignment.sql` | `99975799b9a5995fe7dd6c969a2e63a4e9522dbff14ac1ec6977d93ceb1db355` |
-| `scripts/apply-qa-rights-account-alignment.sql` | `ce81b16d7b17bf2752d649f9c285031955422857714779387614f35ae6ea095b` |
-| `scripts/apply-qa-rights-account-manifest.sql` | `6d22c0bfb83a3add51ad2a8707421e5eefdc2160f8e39c397507909d3ee695ba` |
-| `scripts/check-qa-rights-account-alignment.sql` | `a73d3fb4dedab257de3d9f78462995f5309a0d77ddeb466fab5d08482ec25e05` |
+| `scripts/apply-qa-rights-account-alignment.sql` | `b081bb88fe4d97906fc251d9845076fd2f326c29013c049d3a4e9d13d3cde6c9` |
+| `scripts/apply-qa-rights-account-manifest.sql` | `fa1865a27bd06236feb22fd54afd34ca42859b8015524b431c84d7f1cd2c8739` |
+| `scripts/check-qa-rights-account-alignment.sql` | `9152c229fdbe2918e476443852bd2b556e350d3d2eb439f7cf5c7930a9e97dc0` |
 
 Lệnh kiểm:
 
 ```bash
 sha256sum \
-  supabase/migrations/20260824120000_five_role_permission_hardening.sql \
+  supabase/migrations/20260827090000_five_role_permission_hardening_current_preflight.sql \
   supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql \
   supabase/migrations/20260826170000_manual_planned_deadline_edit.sql \
   supabase/migrations/20260826180000_qa_manager_actual_date_principal_normalization.sql \
@@ -127,7 +127,6 @@ select jsonb_build_object(
 
 select jsonb_build_object(
   'active_items', count(*) filter (where is_active),
-  'owner_person_items', count(*) filter (where is_active and owner_person_id is not null),
   'support_person_items', count(*) filter (where is_active and support_person_id is not null),
   'items_without_owner_or_support', count(*) filter (
     where is_active and owner_person_id is null and support_person_id is null),
@@ -141,9 +140,9 @@ select jsonb_build_object(
     join public.vmp_performers performer
       on performer.user_id=profile.id and performer.is_active
     where profile.id=:'khoa_id'::uuid and profile.role::text='department_user'
-      and profile.department='QA' and coalesce(profile.is_active,true)
+      and profile.department='qa' and coalesce(profile.is_active,true)
       and performer.access_class='qa_progress_editor'
-      and performer.department='QA'),
+      and performer.department='qa'),
   'dat_legacy_state', exists (
     select 1 from public.profiles profile
     join public.vmp_performers performer
@@ -162,7 +161,7 @@ rollback;
 SQL
 ```
 
-Trạng thái đã review ngày 2026-08-27 là: bốn UUID duy nhất; 102 dòng ma trận, 17 dòng Viewer; ba Viewer hoạt động; Khoa ở trạng thái Nhân viên QA; Đạt là Viewer có performer `qc` và `access_class` rỗng; 461 hạng mục hoạt động; 281 có `owner_person_id`; 126 có `support_person_id`; 180 thiếu cả hai; bảng phân công có 0 dòng. Nếu khác, dừng và review lại manifest cũng như dữ liệu nguồn. Không sửa dữ liệu để ép preflight đạt.
+Trạng thái đã review ngày 2026-08-27 là: bốn UUID duy nhất; 102 dòng ma trận, 17 dòng Viewer; ba Viewer hoạt động; Khoa ở trạng thái Nhân viên QA với mã bộ phận canonical `qa`; Đạt là Viewer có performer `qc` và `access_class` rỗng; 461 hạng mục hoạt động; 281 có `owner_person_id`; 126 có `support_person_id`; 180 thiếu cả hai; bảng phân công có 0 dòng. Nếu khác, dừng và review lại manifest cũng như dữ liệu nguồn. Không sửa dữ liệu để ép preflight đạt.
 
 ## 5. Backup trước ghi
 

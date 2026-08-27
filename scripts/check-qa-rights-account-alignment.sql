@@ -46,6 +46,7 @@ declare
   v_user uuid;
   v_dat_person uuid;
   v_right record;
+  v_assignment record;
 begin
   select array_agg(btrim(value)::uuid order by btrim(value)::uuid)
     into v_viewers
@@ -87,10 +88,10 @@ begin
         on performer.user_id = profile.id and performer.is_active
       where profile.id = v_khoa
         and profile.role::text = 'qa_manager'
-        and profile.department = 'QA'
+        and profile.department = 'qa'
         and coalesce(profile.is_active, true)
         and performer.access_class = 'qa_manager'
-        and performer.department = 'QA') <> 1
+        and performer.department = 'qa') <> 1
      or (select count(*) from public.vmp_performers
          where user_id = v_khoa and is_active) <> 1
      or public.vmp_business_role(v_khoa) is distinct from 'qa_manager' then
@@ -194,35 +195,40 @@ begin
   end if;
   raise notice 'PASS CHECK_QA_STAFF_SEVEN_FIELDS';
 
-  select performer.user_id, performer.id, assignment.validation_code
-    into v_user, v_person, v_item
-  from public.vmp_item_assignments assignment
-  join public.vmp_performers performer
-    on performer.id = assignment.performer_id and performer.is_active
-  join public.vmp_plan_items item
-    on item.validation_code = assignment.validation_code and item.is_active
-  where assignment.assignment_kind = 'equipment_department'
-    and assignment.is_active
-    and public.vmp_business_role(performer.user_id) = 'workshop_staff'
-  order by (performer.user_id = v_dat) desc,
-           assignment.validation_code, performer.id limit 1;
-  if v_user is null then
-    raise exception using errcode = 'check_violation',
-      message = 'CHECK_WORKSHOP_STAFF_ONE_FIELD';
-  end if;
-  select * into v_right from public.vmp_item_rights(v_user, v_item);
-  if v_right.can_view is not true
-     or v_right.editable_fields is distinct from
-        array['actual_validation_date']::text[] then
-    raise exception using errcode = 'check_violation',
-      message = 'CHECK_WORKSHOP_STAFF_ONE_FIELD';
-  end if;
-  raise notice 'PASS CHECK_WORKSHOP_STAFF_ONE_FIELD';
+  v_count := 0;
+  for v_assignment in
+    select distinct performer.user_id,assignment.validation_code
+    from public.vmp_item_assignments assignment
+    join public.vmp_performers performer
+      on performer.id=assignment.performer_id and performer.is_active
+    join public.vmp_plan_items item
+      on item.validation_code=assignment.validation_code and item.is_active
+    where assignment.assignment_kind='equipment_department'
+      and assignment.is_active
+      and (assignment.expires_at is null or assignment.expires_at>now())
+      and public.vmp_business_role(performer.user_id)='workshop_staff'
+  loop
+    select * into v_right from public.vmp_item_rights(
+      v_assignment.user_id,v_assignment.validation_code);
+    if v_right.can_view is not true
+       or v_right.editable_fields is distinct from
+          array['actual_validation_date']::text[] then
+      raise exception using errcode = 'check_violation',
+        message = 'CHECK_WORKSHOP_STAFF_ONE_FIELD';
+    end if;
+    v_count := v_count + 1;
+  end loop;
+  raise notice 'PASS CHECK_WORKSHOP_STAFF_ONE_FIELD assignments=%', v_count;
 
   if exists (
     select 1
     from public.vmp_plan_items item
     where item.is_active and item.owner_person_id is not null
+      and exists (
+        select 1 from public.vmp_performers eligible
+        where eligible.id=item.owner_person_id and eligible.is_active
+          and public.vmp_business_role(eligible.user_id)='qa_staff'
+      )
       and not exists (
         select 1
         from public.vmp_performers performer
@@ -230,6 +236,7 @@ begin
           on assignment.performer_id = performer.id
          and assignment.user_id = performer.user_id
         where performer.id = item.owner_person_id and performer.is_active
+          and public.vmp_business_role(performer.user_id)='qa_staff'
           and assignment.validation_code = item.validation_code
           and assignment.assignment_kind = 'qa'
           and assignment.source in ('sheet_qa','qa_manager')
@@ -241,6 +248,11 @@ begin
     select 1
     from public.vmp_plan_items item
     where item.is_active and item.support_person_id is not null
+      and exists (
+        select 1 from public.vmp_performers eligible
+        where eligible.id=item.support_person_id and eligible.is_active
+          and public.vmp_business_role(eligible.user_id)='qa_staff'
+      )
       and not exists (
         select 1
         from public.vmp_performers performer
@@ -248,6 +260,7 @@ begin
           on assignment.performer_id = performer.id
          and assignment.user_id = performer.user_id
         where performer.id = item.support_person_id and performer.is_active
+          and public.vmp_business_role(performer.user_id)='qa_staff'
           and assignment.validation_code = item.validation_code
           and assignment.assignment_kind = 'qa'
           and assignment.source in ('sheet_qa','qa_manager')
@@ -270,12 +283,12 @@ begin
     left join public.vmp_performers performer
       on performer.id = assignment.performer_id and performer.is_active
     where assignment.source = 'sheet_qa' and assignment.is_active
+      and assignment.performer_id is not null
+      and performer.user_id is not null
       and (assignment.expires_at is not null and assignment.expires_at <= now()
-        or assignment.unresolved_reason is not null
         or performer.id is null
         or assignment.user_id is distinct from performer.user_id
-        or assignment.performer_id is distinct from item.owner_person_id
-           and assignment.performer_id is distinct from item.support_person_id)
+        or assignment.unresolved_reason is not null)
   ) then
     raise exception using errcode = 'check_violation',
       message = 'CHECK_SOURCE_ASSIGNMENTS';

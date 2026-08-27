@@ -3,9 +3,7 @@
 begin;
 
 insert into public.departments (id, name, short_name)
-values
-  ('QA', 'QA account alignment fixture', 'QA'),
-  ('qc', 'QC account alignment fixture', 'QC');
+values ('qc', 'QC account alignment fixture', 'QC');
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -26,7 +24,7 @@ values
 insert into public.profiles (id, full_name, email, role, department, is_active)
 values
   ('99000000-0000-4000-8000-000000000001', 'QA Integration Khoa',
-   'qa-account-khoa@example.test', 'department_user', 'QA', true),
+   'qa-account-khoa@example.test', 'department_user', 'qa', true),
   ('99000000-0000-4000-8000-000000000002', 'QA Integration Dat',
    'qa-account-dat@example.test', 'viewer', 'qc', true),
   ('99000000-0000-4000-8000-000000000003', 'QA Integration Viewer One',
@@ -34,7 +32,7 @@ values
   ('99000000-0000-4000-8000-000000000004', 'QA Integration Viewer Two',
    'qa-account-viewer-two@example.test', 'viewer', null, true),
   ('99000000-0000-4000-8000-000000000005', 'QA Integration Staff',
-   'qa-account-staff@example.test', 'department_user', 'QA', true);
+   'qa-account-staff@example.test', 'department_user', 'qa', true);
 
 insert into public.vmp_scope_factories (
   id, code, name, department_id, is_active
@@ -53,7 +51,7 @@ values (
 update public.vmp_performers
 set department = case
       when user_id = '99000000-0000-4000-8000-000000000002'::uuid then 'qc'
-      else 'QA'
+      else 'qa'
     end,
     access_class = case
       when user_id in (

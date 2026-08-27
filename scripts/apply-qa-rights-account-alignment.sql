@@ -104,7 +104,7 @@ select (
 begin;
 set local lock_timeout = '3s';
 set local statement_timeout = '120s';
-\ir ../supabase/migrations/20260824120000_five_role_permission_hardening.sql
+\ir ../supabase/migrations/20260827090000_five_role_permission_hardening_current_preflight.sql
 commit;
 \ir ../supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql
 \ir ../supabase/migrations/20260826170000_manual_planned_deadline_edit.sql

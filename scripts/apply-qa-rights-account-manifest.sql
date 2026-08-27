@@ -42,7 +42,7 @@ insert into qa_rights_account_manifest (
   performer_access_class, performer_department
 )
 values
-  ('khoa', :'khoa_id'::uuid, 'qa_manager', 'QA', true, 'qa_manager', 'QA'),
+  ('khoa', :'khoa_id'::uuid, 'qa_manager', 'qa', true, 'qa_manager', 'qa'),
   ('dat', :'dat_id'::uuid, 'department_user', 'qc', true, 'workshop_staff', 'qc');
 
 insert into qa_rights_account_manifest (
@@ -127,7 +127,7 @@ begin
       message = 'ACCOUNT_MANIFEST_SCHEMA_COLUMN_DRIFT';
   end if;
 
-  if not exists (select 1 from public.departments where id = 'QA')
+  if not exists (select 1 from public.departments where id = 'qa')
      or not exists (select 1 from public.departments where id = 'qc')
      or public.screen_access_mode() is distinct from 'enforced'
      or public.item_permissions_mode() is distinct from 'preview'
@@ -240,10 +240,10 @@ begin
   from qa_rights_account_before before_state
   where case before_state.target_kind
     when 'khoa' then before_state.profile_role = 'department_user'
-      and before_state.profile_department = 'QA'
+      and before_state.profile_department = 'qa'
       and before_state.profile_is_active
       and before_state.performer_access_class = 'qa_progress_editor'
-      and before_state.performer_department = 'QA'
+      and before_state.performer_department = 'qa'
       and before_state.performer_is_active
       and before_state.effective_business_role = 'qa_staff'
     when 'dat' then before_state.profile_role = 'viewer'
@@ -263,10 +263,10 @@ begin
   from qa_rights_account_before before_state
   where case before_state.target_kind
     when 'khoa' then before_state.profile_role = 'qa_manager'
-      and before_state.profile_department = 'QA'
+      and before_state.profile_department = 'qa'
       and before_state.profile_is_active
       and before_state.performer_access_class = 'qa_manager'
-      and before_state.performer_department = 'QA'
+      and before_state.performer_department = 'qa'
       and before_state.performer_is_active
       and before_state.effective_business_role = 'qa_manager'
     when 'dat' then before_state.profile_role = 'department_user'
@@ -327,13 +327,13 @@ begin
 
   update public.profiles profile
   set role = 'qa_manager'::public.user_role,
-      department = 'QA', is_active = true, updated_at = now()
+      department = 'qa', is_active = true, updated_at = now()
   from qa_rights_account_manifest manifest
   where manifest.target_kind = 'khoa' and profile.id = manifest.id;
   get diagnostics v_profiles = row_count;
 
   update public.vmp_performers performer
-  set access_class = 'qa_manager', department = 'QA',
+  set access_class = 'qa_manager', department = 'qa',
       version = performer.version + 1, updated_at = now()
   from qa_rights_account_manifest manifest
   where manifest.target_kind = 'khoa'
@@ -470,6 +470,69 @@ begin
 end
 $refresh_assignments$;
 
+-- owner_person_id/support_person_id are the canonical person links used by the
+-- application. The legacy source refresh resolves only one QA name column, so
+-- materialize any still-missing QA Staff links without granting by department.
+with candidates as (
+  select item.validation_code,item.owner_person_id performer_id,0 priority
+  from public.vmp_plan_items item
+  where item.is_active and item.owner_person_id is not null
+  union all
+  select item.validation_code,item.support_person_id,1
+  from public.vmp_plan_items item
+  where item.is_active and item.support_person_id is not null
+), eligible as (
+  select distinct on (candidate.validation_code,candidate.performer_id)
+         candidate.validation_code,candidate.performer_id,candidate.priority,
+         performer.user_id,performer.performer_name,performer.employee_code
+  from candidates candidate
+  join public.vmp_performers performer
+    on performer.id=candidate.performer_id and performer.is_active
+  where (select apply_required from qa_rights_release_state)
+    and public.vmp_business_role(performer.user_id)='qa_staff'
+  order by candidate.validation_code,candidate.performer_id,candidate.priority
+)
+insert into public.vmp_item_assignments (
+  validation_code,performer_id,user_id,staff_name,employee_code,
+  assignment_kind,assignment_role,source,is_active,change_reason
+)
+select eligible.validation_code,eligible.performer_id,eligible.user_id,
+       eligible.performer_name,eligible.employee_code,'qa','collaborator',
+       'qa_manager',true,
+       'Đồng bộ phân công từ owner_person_id/support_person_id canonical'
+from eligible
+where not exists (
+  select 1 from public.vmp_item_assignments assignment
+  where assignment.validation_code=eligible.validation_code
+    and assignment.performer_id=eligible.performer_id
+    and assignment.user_id=eligible.user_id
+    and assignment.assignment_kind='qa' and assignment.is_active
+    and (assignment.expires_at is null or assignment.expires_at>now())
+);
+
+update public.vmp_item_assignments
+set assignment_role='collaborator'
+where assignment_kind='qa' and is_active
+  and (select apply_required from qa_rights_release_state)
+  and assignment_role is distinct from 'collaborator';
+
+with ranked as (
+  select assignment.id,row_number() over (
+    partition by assignment.validation_code
+    order by (assignment.source='sheet_qa') desc,
+             assignment.created_at,assignment.id) position
+  from public.vmp_item_assignments assignment
+  where (select apply_required from qa_rights_release_state)
+    and assignment.assignment_kind='qa' and assignment.is_active
+    and assignment.performer_id is not null
+    and assignment.user_id is not null
+    and assignment.unresolved_reason is null
+    and (assignment.expires_at is null or assignment.expires_at>now())
+)
+update public.vmp_item_assignments assignment
+set assignment_role='primary'
+from ranked where ranked.id=assignment.id and ranked.position=1;
+
 \o /dev/null
 select set_config(
   'request.jwt.claims',
@@ -501,9 +564,9 @@ begin
       on performer.user_id = manifest.id and performer.is_active
     where case manifest.target_kind
       when 'khoa' then profile.role::text <> 'qa_manager'
-        or profile.department <> 'QA' or not coalesce(profile.is_active, true)
+        or profile.department <> 'qa' or not coalesce(profile.is_active, true)
         or performer.access_class is distinct from 'qa_manager'
-        or performer.department is distinct from 'QA'
+        or performer.department is distinct from 'qa'
         or public.vmp_business_role(manifest.id) is distinct from 'qa_manager'
       when 'dat' then profile.role::text <> 'department_user'
         or profile.department <> 'qc' or not coalesce(profile.is_active, true)
@@ -539,6 +602,11 @@ begin
     select 1
     from public.vmp_plan_items item
     where item.is_active and item.owner_person_id is not null
+      and exists (
+        select 1 from public.vmp_performers eligible
+        where eligible.id=item.owner_person_id and eligible.is_active
+          and public.vmp_business_role(eligible.user_id)='qa_staff'
+      )
       and not exists (
         select 1
         from public.vmp_performers performer
@@ -546,6 +614,7 @@ begin
           on assignment.performer_id = performer.id
          and assignment.user_id = performer.user_id
         where performer.id = item.owner_person_id and performer.is_active
+          and public.vmp_business_role(performer.user_id)='qa_staff'
           and assignment.validation_code = item.validation_code
           and assignment.assignment_kind = 'qa'
           and assignment.source in ('sheet_qa','qa_manager')
@@ -557,6 +626,11 @@ begin
     select 1
     from public.vmp_plan_items item
     where item.is_active and item.support_person_id is not null
+      and exists (
+        select 1 from public.vmp_performers eligible
+        where eligible.id=item.support_person_id and eligible.is_active
+          and public.vmp_business_role(eligible.user_id)='qa_staff'
+      )
       and not exists (
         select 1
         from public.vmp_performers performer
@@ -564,6 +638,7 @@ begin
           on assignment.performer_id = performer.id
          and assignment.user_id = performer.user_id
         where performer.id = item.support_person_id and performer.is_active
+          and public.vmp_business_role(performer.user_id)='qa_staff'
           and assignment.validation_code = item.validation_code
           and assignment.assignment_kind = 'qa'
           and assignment.source in ('sheet_qa','qa_manager')
@@ -586,12 +661,12 @@ begin
     left join public.vmp_performers performer
       on performer.id = assignment.performer_id and performer.is_active
     where assignment.source = 'sheet_qa' and assignment.is_active
+      and assignment.performer_id is not null
+      and performer.user_id is not null
       and (assignment.expires_at is not null and assignment.expires_at <= now()
-        or assignment.unresolved_reason is not null
         or performer.id is null
         or assignment.user_id is distinct from performer.user_id
-        or assignment.performer_id is distinct from item.owner_person_id
-           and assignment.performer_id is distinct from item.support_person_id)
+        or assignment.unresolved_reason is not null)
   ) then
     raise exception using errcode = 'check_violation',
       message = 'ACCOUNT_MANIFEST_SOURCE_ASSIGNMENT_POSTSTATE';
