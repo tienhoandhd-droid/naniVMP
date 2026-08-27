@@ -1,7 +1,7 @@
 # Thiết kế hiệu chỉnh vai trò tài khoản và quyền tiến độ
 
-**Ngày:** 2026-08-27  
-**Nguồn mã:** `origin/main@45d6c53075d17fa52effcab69eb25850bb28d060`  
+**Ngày:** 2026-08-27
+**Nguồn mã:** `origin/main@45d6c53075d17fa52effcab69eb25850bb28d060`
 **Phạm vi:** hiệu chỉnh phần đã xây; không xây lại hệ thống vai trò, phân công hoặc giao diện quản trị.
 
 ## 1. Mục tiêu
