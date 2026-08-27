@@ -25,9 +25,15 @@ const bangkokToday = () => {
 const QA_MANAGER_DATE = bangkokToday();
 const WORKSHOP_DATE = QA_MANAGER_DATE;
 
-const QA_FIELDS = [
+const QA_MANAGER_FIELDS = [
   "actual_protocol_date", "status_protocol",
   "actual_validation_date", "status_validation",
+  "actual_report_date", "status_report",
+  "actual_vmp_date", "status_vmp",
+];
+const QA_STAFF_FIELDS = [
+  "actual_protocol_date", "status_protocol",
+  "status_validation",
   "actual_report_date", "status_report",
   "actual_vmp_date", "status_vmp",
 ];
@@ -84,7 +90,7 @@ const mockSupabase = dungKhoDuLieu("day");
 let mode = "enforced";
 const qaManagerRight = {
   can_view: true,
-  editable_fields: QA_FIELDS,
+  editable_fields: QA_MANAGER_FIELDS,
   view_reason: "Quản lý QA xem toàn bộ hạng mục hoạt động",
   assignment_sources: [],
   scope_match: true,
@@ -92,7 +98,7 @@ const qaManagerRight = {
 };
 const collaboratorQa = {
   can_view: true,
-  editable_fields: QA_FIELDS,
+  editable_fields: QA_STAFF_FIELDS,
   view_reason: "QA phối hợp theo phân công hạng mục",
   assignment_sources: ["qa_collaborator"],
   scope_match: true,
@@ -344,8 +350,39 @@ try {
   await openPersona("enforced", collaboratorQa);
   const collaborator = await controlState();
   assert.equal(collaborator.qaCount, 8, "QA phối hợp có đúng tám control QA");
-  assert.equal(collaborator.qaEnabled, 8, "QA phối hợp sửa được đủ tám trường QA");
+  assert.equal(collaborator.qaEnabled, 7,
+    "Nhân viên QA chỉ sửa được bảy trường, không gồm ngày thẩm định thực tế");
   assert.equal(collaborator.scheduleEnabled, false, "QA phối hợp không được xếp lịch");
+  const qaStaffValidationControl = await page.evaluate(() => {
+    const title = [...document.querySelectorAll("span")]
+      .find((node) => node.textContent?.trim().startsWith("2. Thẩm định thực tế"));
+    const block = title?.closest("div[style*='border']");
+    const actualDate = block?.querySelector('input[type="date"]');
+    const status = block?.querySelector("select");
+    return { actualDateDisabled: actualDate?.disabled, statusDisabled: status?.disabled };
+  });
+  assert.deepEqual(qaStaffValidationControl, { actualDateDisabled: true, statusDisabled: false },
+    "Nhân viên QA thấy ngày thẩm định bị khóa nhưng vẫn sửa được trạng thái thẩm định");
+  await page.evaluate(() => {
+    const title = [...document.querySelectorAll("span")]
+      .find((node) => node.textContent?.trim().startsWith("2. Thẩm định thực tế"));
+    const status = title?.closest("div[style*='border']")?.querySelector("select");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    setter?.call(status, "Đang thực hiện");
+    status?.dispatchEvent(new Event("input", { bubbles: true }));
+    status?.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  const qaStaffUpdateStart = updateBodies.length;
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
+  await page.waitForFunction(() => ![...document.querySelectorAll("span")]
+    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  assert.deepEqual(updateBodies[qaStaffUpdateStart].p_patch, { status_validation: "in_progress" },
+    "Nhân viên QA chỉ gửi trạng thái thẩm định được cấp xuống RPC");
+  assert.equal(Object.hasOwn(updateBodies[qaStaffUpdateStart].p_patch, "actual_validation_date"), false,
+    "request của Nhân viên QA không chứa actual_validation_date");
 
   await closeModal();
   mode = "enforced";

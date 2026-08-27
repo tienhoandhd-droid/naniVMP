@@ -15,7 +15,8 @@ async function loadContracts() {
 test("phân loại tạo đúng quyền sửa ở từng nhóm timeline", async () => {
   const {
     ACCESS_CLASSES,
-    QA_TIMELINE_FIELDS,
+    QA_MANAGER_TIMELINE_FIELDS,
+    QA_STAFF_TIMELINE_FIELDS,
     EQUIPMENT_TIMELINE_FIELDS,
   } = await loadContracts();
 
@@ -31,12 +32,28 @@ test("phân loại tạo đúng quyền sửa ở từng nhóm timeline", async 
   ]);
   assert.equal(ACCESS_CLASSES.some((item) => item.id === "view_only"), false,
     "view_only không được chọn mới vì nó không giải ra vai nghiệp vụ nào");
-  assert.equal(QA_TIMELINE_FIELDS.length, 8);
+  assert.deepEqual(QA_STAFF_TIMELINE_FIELDS, [
+    "actual_protocol_date",
+    "status_protocol",
+    "status_validation",
+    "actual_report_date",
+    "status_report",
+    "actual_vmp_date",
+    "status_vmp",
+  ]);
+  assert.deepEqual(QA_MANAGER_TIMELINE_FIELDS, [
+    "actual_protocol_date",
+    "status_protocol",
+    "actual_validation_date",
+    "status_validation",
+    "actual_report_date",
+    "status_report",
+    "actual_vmp_date",
+    "status_vmp",
+  ]);
+  assert.equal(QA_STAFF_TIMELINE_FIELDS.includes("actual_validation_date"), false,
+    "Nhân viên QA không có quyền ghi ngày thẩm định thực tế");
   assert.deepEqual(EQUIPMENT_TIMELINE_FIELDS, ["actual_validation_date"]);
-  assert.deepEqual(
-    QA_TIMELINE_FIELDS.filter((field) => EQUIPMENT_TIMELINE_FIELDS.includes(field)),
-    ["actual_validation_date"],
-  );
 });
 
 test("khớp tên giữ nguyên dấu và chỉ chuẩn hóa khoảng trắng, hoa thường", async () => {

@@ -39,7 +39,19 @@ export type AccessClass =
   | (typeof ACCESS_CLASSES)[number]["id"]
   | (typeof LEGACY_ACCESS_CLASSES)[number];
 
-export const QA_TIMELINE_FIELDS = [
+/** Bảy trường tiến độ Nhân viên QA được server cấp trên hạng mục được phân công. */
+export const QA_STAFF_TIMELINE_FIELDS = [
+  "actual_protocol_date",
+  "status_protocol",
+  "status_validation",
+  "actual_report_date",
+  "status_report",
+  "actual_vmp_date",
+  "status_vmp",
+] as const;
+
+/** Tám trường tiến độ Quản lý QA được server cấp trên mọi hạng mục hoạt động. */
+export const QA_MANAGER_TIMELINE_FIELDS = [
   "actual_protocol_date",
   "status_protocol",
   "actual_validation_date",
@@ -53,7 +65,7 @@ export const QA_TIMELINE_FIELDS = [
 export const EQUIPMENT_TIMELINE_FIELDS = ["actual_validation_date"] as const;
 
 export type EditableTimelineField =
-  | (typeof QA_TIMELINE_FIELDS)[number]
+  | (typeof QA_MANAGER_TIMELINE_FIELDS)[number]
   | (typeof EQUIPMENT_TIMELINE_FIELDS)[number]
   | "scheduled_at";
 
