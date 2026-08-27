@@ -42,4 +42,14 @@ PASS — 8/8
 
 - Request capture kiểm exact `rpc_save_catalog_object`, batch `{}`, per-item validation code và changed-only `rpc_update_progress`; mọi request ngoài preview/mock bị assert rỗng.
 - Không exercise replace/remove Source Data.
-- Catalog và revoke-cache regressions cần được runner parent chạy lại trong focused block đầy đủ nếu thời gian CI cục bộ không đủ; không có application change trong Task 6.
+- Catalog và revoke-cache regressions đã được chạy lại trong focused block đầy đủ; không có application change trong Task 6.
+
+## Hoàn tất focused regression
+
+- Node `v24.18.0`.
+- Focused block theo brief PASS: matrix quyền, cross-screen assignment, Catalog `150 đạt · 0 hỏng`, và revoke-cache race.
+- `e2e:progress-rights` PASS cả matrix và cross-screen.
+- Contract CI `tests/unit/e2e-suite-contract.test.mjs` PASS `8/8`; `npm run typecheck` PASS.
+- Matrix hiện pin đủ Admin, QA Manager, QA được gán, QA chưa được gán và Workshop. `scheduled_at` chỉ render trong case Admin khi server trả field đó trong allowlist; QA Manager/QA/Workshop đều không có schedule.
+- Revoke-cache đã bỏ đăng nhập thật bằng phiên Supabase giả, cấp batch-rights mock, và scope modal vào `.vmp-scroll` đang hiển thị. Ba race contract được giữ: batch revoke đóng modal/xóa item; response per-item cũ về muộn không phục hồi item/modal; per-item transport failure khi focus vẫn fail-closed và không làm ứng dụng sập.
+- Root cause flake cuối là mock `vmp_performers` bị generic REST handler bắt trước và trả row có `full_name`, trong khi modal cần `performer_name`; handler chuyên biệt nay chạy trước generic route và trả fixture rỗng đúng contract của test.

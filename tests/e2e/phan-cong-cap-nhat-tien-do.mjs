@@ -50,7 +50,11 @@ function findButton(page, text) {
 
 function validationBlockState(page) {
   return page.evaluate(() => {
-    const spans = [...document.querySelectorAll("span")];
+    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+      .find((candidate) => candidate.getClientRects().length > 0
+        && [...candidate.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+    const spans = [...(dialog?.querySelectorAll("span") ?? [])];
     const title = spans
       .find((node) => (node.textContent || "").replace(/\s+/g, " ").trim()
         .startsWith("2. Thẩm định thực tế"));
@@ -64,7 +68,7 @@ function validationBlockState(page) {
         blockStyle: block?.getAttribute("style"), html: block?.innerHTML.slice(0, 600) }
         : spans.map((node) => (node.textContent || "").replace(/\s+/g, " ").trim())
           .filter((text) => text.includes("Thẩm định thực tế")),
-      modalText: document.querySelector(".vmp-scroll")?.textContent?.replace(/\s+/g, " ").trim(),
+      modalText: dialog?.textContent?.replace(/\s+/g, " ").trim(),
     };
   });
 }
@@ -177,12 +181,21 @@ try {
     const style = getComputedStyle(button);
     return style.display !== "none" && style.visibility !== "hidden" && button.getClientRects().length > 0;
   }), true, "nút Cập nhật desktop phải hiện hữu và tương tác được");
+  const itemReadsBeforeOpen = itemBodies.length;
   await assigned.page.click(progressButton);
-  await assigned.page.waitForFunction(() => [...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"), { timeout: 30_000 });
+  await assigned.page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")), { timeout: 30_000 });
+  for (let i = 0; i < 100 && itemBodies.length === itemReadsBeforeOpen; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(itemBodies.length > itemReadsBeforeOpen, "mở modal phải phát sinh per-item rights read mới");
+  await assigned.page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && dialog.innerText.includes("Quyền theo từng cột đang áp dụng")));
   assert.deepEqual(itemBodies.at(-1), { p_validation_code: ITEM_ID }, "modal phải reload quyền từng item");
   const validation = await validationBlockState(assigned.page);
-  console.log("validation-stage diagnostic", JSON.stringify(validation.diagnostic), validation.modalText);
   const { diagnostic: _diagnostic, modalText: _modalText, ...validationResult } = validation;
   assert.deepEqual(validationResult, {
     hasStatus: true, dates: 0, forbiddenLabel: false,
@@ -201,8 +214,10 @@ try {
   await assigned.page.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => button.textContent?.trim() === "Lưu 1 thay đổi" && !button.disabled));
   await findButton(assigned.page, "Lưu 1 thay đổi");
-  await assigned.page.waitForFunction(() => ![...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  await assigned.page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
   assert.deepEqual(updateBodies, [{
     p_validation_code: ITEM_ID, p_patch: { status_validation: "in_progress" },
     p_reason: PROGRESS_REASON, p_sheet_patch: null, p_expected_version: 0,

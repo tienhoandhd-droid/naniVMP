@@ -96,6 +96,11 @@ const qaManagerRight = {
   scope_match: true,
   area_match: true,
 };
+const adminRight = {
+  ...qaManagerRight,
+  editable_fields: [...QA_MANAGER_FIELDS, "scheduled_at"],
+  view_reason: "Admin được cấp toàn bộ cột tiến độ và lịch thẩm định",
+};
 const collaboratorQa = {
   can_view: true,
   editable_fields: QA_STAFF_FIELDS,
@@ -322,12 +327,25 @@ try {
   assert.deepEqual(updateBodies[1], updateBodies[0],
     "QA Manager có thể thử lại nguyên bản nháp sau lỗi server");
 
+  await openPersona("enforced", adminRight);
+  const admin = await controlState();
+  assert.equal(admin.qaCount, 8, "Admin giữ đủ tám control ngày/trạng thái QA");
+  assert.equal(admin.qaEnabled, 8, "Admin sửa được đủ tám trường QA được server cấp");
+  assert.equal(admin.scheduleEnabled, true,
+    "Admin chỉ thấy lịch thẩm định khi batch/per-item allowlist có scheduled_at");
+  assert.equal(admin.scheduleValue, "2026-08-12T14:35",
+    "scheduled_at hiển thị theo Asia/Bangkok khi được server cấp");
+
   // Đường tắt đã điền sẵn hai trường QA trước khi quyền về, tạo một bản nháp
   // hỗn hợp. Enforced vẫn chỉ được gửi ngày thẩm định thực tế mà xưởng được cấp.
   await openPersona("enforced", workshopStaff, { quick: true });
   const workshop = await controlState();
+  assert.equal(workshop.qaCount, 1,
+    "nhân viên xưởng chỉ còn đúng một control QA trong DOM, không giữ field cấm dạng disabled");
   assert.equal(workshop.qaEnabled, 1,
     "nhân viên xưởng chỉ được sửa ngày thẩm định thực tế trong tám trường QA");
+  assert.equal(workshop.actualLabelCount, 1,
+    "nhân viên xưởng chỉ thấy nhãn ngày thực tế của bước thẩm định");
   assert.equal(workshop.scheduleEnabled, false, "nhân viên xưởng không được sửa lịch thẩm định");
 
   // Hồ sơ mock đã hoàn thành đề cương, nên đường tắt mở đúng bước 2 và
