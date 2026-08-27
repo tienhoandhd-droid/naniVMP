@@ -35,6 +35,7 @@ import {
 import { Tag, Modal, ROField, StateBadge } from "../ui/Primitives.tsx";
 import { progressModalContentState } from "./progressModalAccess.ts";
 import WorkshopAssignmentInline from "../../features/progress/WorkshopAssignmentInline.tsx";
+import { visibleProgressStageFields } from "../../features/progress/editableProgressRights.ts";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
 
 /** Ngày hôm nay theo giờ máy (không dùng toISOString — lệch múi giờ VN trước 7h sáng). */
@@ -169,15 +170,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     ngay_bao_cao: toISO(raw.ngay_bao_cao), tt_bao_cao: ttOpt(raw.tt_bao_cao),
     ngay_vmp: toISO(raw.ngay_vmp), tt_vmp: ttOpt(raw.tt_vmp),
   };
-  // Đường tắt "✓ Xong bước" từ bảng: điền sẵn vào BẢN NHÁP (state), không đụng
-  // init — nhờ vậy vẫn tính là "có thay đổi" và vẫn bắt buộc lý do như thường.
-  const start = { ...init };
-  if (quickDone && BLOCK_COLS[curBlock]) {
-    const [dc, tc] = BLOCK_COLS[curBlock];
-    start[dc] = start[dc] || todayISO();
-    start[tc] = "Hoàn thành";
-  }
-  const [f, setF] = useState(start);
+  const [f, setF] = useState(init);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
   const [fieldPermission, setFieldPermission] = useState<TimelineFieldPermission | null>(() =>
@@ -206,10 +199,19 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       setFieldPermission(null);
       setPermissionError("");
       fetchTimelineFieldPermission(act.id).then((permission) => {
-        if (active && currentRequest === requestVersion) setFieldPermission(permission);
+        if (!active || currentRequest !== requestVersion) return;
+        if (!permission.canView) {
+          setF({ ...init });
+          setReason("");
+          setErr("");
+        }
+        setFieldPermission(permission);
       }).catch((error: unknown) => {
         if (!active || currentRequest !== requestVersion) return;
         setPermissionError((error as Error).message || "Không tải được quyền hạng mục");
+        setF({ ...init });
+        setReason("");
+        setErr("");
         // Không biết quyền mới thì không được suy đoán người dùng còn xem được.
         setFieldPermission({ mode: "enforced", canView: false, editableFields: [], reason: "Không thể xác nhận quyền xem" });
       });
@@ -234,7 +236,28 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   const canEditForm = (formKey: string) => canEdit(FORM_TO_DB_COLUMN[formKey]);
   const timelineViewOnly = fieldPermission?.mode === "enforced"
     && fieldPermission.editableFields.length === 0;
+  const visibleFields = visibleProgressStageFields(
+    isEnforced ? fieldPermission?.editableFields || [] : Object.values(FORM_TO_DB_COLUMN),
+  );
+  const stageFields = (n: number) => [
+    visibleFields.protocol,
+    visibleFields.validation,
+    visibleFields.report,
+    visibleFields.vmp,
+  ][n - 1];
+  const quickDoneCols = BLOCK_COLS[curBlock];
+  const canQuickDone = !!quickDoneCols && canEditForm(quickDoneCols[0]) && canEditForm(quickDoneCols[1]);
   const contentState = progressModalContentState(fieldPermission, permissionError);
+  // Đường tắt chỉ được áp dụng sau khi có allow-list, và phải có quyền ở cả
+  // hai cột để không tự chèn một trạng thái đang bị ẩn.
+  useEffect(() => {
+    if (!quickDone || !quickDoneCols || !canQuickDone) return;
+    setF((current) => ({
+      ...current,
+      [quickDoneCols[0]]: current[quickDoneCols[0]] || todayISO(),
+      [quickDoneCols[1]]: "Hoàn thành",
+    }));
+  }, [canQuickDone, quickDone, quickDoneCols]);
   /* ---- Đổi trạng thái nghiệp vụ: chọn trạng thái → nhập lý do tại chỗ → xác nhận ---- */
   const [pendingState, setPendingState] = useState<string | null>(null);
   const [stateReason, setStateReason] = useState("");
@@ -242,8 +265,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     setF((p) => ({ ...p, [k]: e.target.value }));
   // Nhập ngày hoàn thành thực tế → tự kéo trạng thái về "Hoàn thành" (vẫn sửa
   // lại được) — chặn từ gốc lỗi "lệch pha hồ sơ" ngày có mà trạng thái không.
-  const setDate = (dCol: string, tCol: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setF((p) => ({ ...p, [dCol]: e.target.value, [tCol]: e.target.value ? "Hoàn thành" : p[tCol] }));
+  const setDate = (dCol: string, tCol: string, canSetStatus: boolean) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setF((p) => ({ ...p, [dCol]: e.target.value,
+      ...(canSetStatus ? { [tCol]: e.target.value ? "Hoàn thành" : p[tCol] } : {}),
+    }));
   const markDone = (dCol: string, tCol: string) => () =>
     setF((p) => ({ ...p, [dCol]: p[dCol] || todayISO(), [tCol]: "Hoàn thành" }));
 
@@ -283,13 +308,15 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     for (let i = 1; i < CHUOI.length; i++) {
       const tr = CHUOI[i - 1], sau = CHUOI[i];
       const dTr = f[tr.d] || "", dSau = f[sau.d] || "";
-      if (dTr && dSau && dSau < dTr) {
+      const canValidateDateOrder = canEditForm(tr.d) && canEditForm(sau.d);
+      const canValidateStatusOrder = canEditForm(tr.t) && canEditForm(sau.t);
+      if (canValidateDateOrder && dTr && dSau && dSau < dTr) {
         out.push({
           msg: `Ngày ${sau.ten.toLowerCase()} (${ngayVN(dSau)}) sớm hơn ngày ${tr.ten.toLowerCase()} (${ngayVN(dTr)}).`,
           keys: [tr.d, sau.d],
         });
       }
-      if (f[sau.t] === "Hoàn thành" && f[tr.t] !== "Hoàn thành") {
+      if (canValidateStatusOrder && f[sau.t] === "Hoàn thành" && f[tr.t] !== "Hoàn thành") {
         out.push({
           msg: `Đánh dấu ${sau.ten.toLowerCase()} HOÀN THÀNH trong khi ${tr.ten.toLowerCase()} chưa hoàn thành.`,
           keys: [tr.t, sau.t],
@@ -315,13 +342,14 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
      * sửa được chính những dòng hỏng đó.
      */
     for (const b of CHUOI) {
-      if (f[b.t] === "Hoàn thành" && !f[b.d]) {
+      const canValidateStage = canEditForm(b.d) && canEditForm(b.t);
+      if (canValidateStage && f[b.t] === "Hoàn thành" && !f[b.d]) {
         out.push({
           msg: `${b.ten} ghi HOÀN THÀNH nhưng chưa có ngày thực tế — ALCOA+ đòi ghi rõ xong lúc nào.`,
           keys: [b.t, b.d],
         });
       }
-      if (f[b.d] && f[b.t] !== "Hoàn thành") {
+      if (canValidateStage && f[b.d] && f[b.t] !== "Hoàn thành") {
         out.push({
           msg: `${b.ten} đã có ngày thực tế (${ngayVN(f[b.d])}) nhưng trạng thái vẫn là "${f[b.t] || "chưa nhập"}".`,
           keys: [b.d, b.t],
@@ -342,7 +370,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
      Thuộc tính max của ô nhập chỉ chặn khi bấm chọn trên lịch; gõ tay hoặc
      dán vào thì vẫn lọt. Kiểm lại ở đây, và server còn kiểm lần nữa. */
   const ngayTuongLai = CHUOI
-    .filter((s) => f[s.d] && f[s.d] > todayISO())
+    .filter((s) => canEditForm(s.d) && f[s.d] && f[s.d] > todayISO())
     .map((s) => `${s.ten} (${ngayVN(f[s.d])})`);
 
   /* Còn thiếu gì để lưu được — MỘT câu, dùng cho cả nút và dải cảnh báo.
@@ -447,6 +475,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   };
   const stage = (s: (typeof CHUOI)[number], truoc: (typeof CHUOI)[number] | null) => {
     const { n, d: dCol, t: tCol } = s;
+    if (stageFields(n).length === 0) return null;
     const dl = toISO(raw[s.dl]);
     const isDone = f[tCol] === "Hoàn thành" && !!f[dCol];
     const isCur = curBlock === n && !isDone;
@@ -488,15 +517,19 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
               có ngày làm. Trước đây ô này để trống max nên chọn được 2027.
               Lịch thẩm định bên dưới thì NGƯỢC LẠI: nó là ngày hẹn, tương
               lai mới đúng — nên không chặn. */}
-          <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" max={todayISO()} value={f[dCol]} onChange={setDate(dCol, tCol)} disabled={!canEditForm(dCol)} style={{ ...INP, opacity: canEditForm(dCol) ? 1 : 0.62, cursor: canEditForm(dCol) ? "auto" : "not-allowed" }} /></div>
-          <div style={FIELD}><span style={LBL}>Trạng thái</span>{sel(tCol)}</div>
+          {canEditForm(dCol) && (
+            <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" max={todayISO()} value={f[dCol]} onChange={setDate(dCol, tCol, canEditForm(tCol))} style={{ ...INP }} /></div>
+          )}
+          {canEditForm(tCol) && (
+            <div style={FIELD}><span style={LBL}>Trạng thái</span>{sel(tCol)}</div>
+          )}
         </div>
         {/* Lịch thẩm định thuộc về CHÍNH bước thẩm định. Trước đây nó nằm tận
             trên đầu hộp, tách rời khỏi ô ngày thẩm định thực tế mà nó ấn định. */}
-        {n === 2 && (
+        {n === 2 && canEdit("scheduled_at") && (
           <div style={{ ...FIELD, marginTop: 12 }}>
             <span style={LBL}>Lịch thẩm định (bộ phận xếp)</span>
-            <input type="datetime-local" value={f.lich_td} onChange={set("lich_td")} disabled={!canEdit("scheduled_at")} style={{ ...INP, opacity: canEdit("scheduled_at") ? 1 : 0.62, cursor: canEdit("scheduled_at") ? "auto" : "not-allowed" }} />
+            <input type="datetime-local" value={f.lich_td} onChange={set("lich_td")} style={{ ...INP }} />
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
               Ngày bộ phận hẹn vào làm. Khác với ngày hoàn thành thực tế ở trên.
             </span>
@@ -509,10 +542,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
             Dữ liệu gốc ghi: <b style={{ color: C.plum }}>{ttGoc}</b>
           </div>
         )}
-        {f[tCol] === "Hoàn thành" && !f[dCol] && (
+        {canEditForm(dCol) && f[tCol] === "Hoàn thành" && !f[dCol] && (
           <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: "#b00020" }}>
             Đã ghi Hoàn thành nhưng thiếu ngày thực tế — sẽ bị báo lỗi ALCOA+.{" "}
-            <button onClick={() => setF((p) => ({ ...p, [dCol]: todayISO() }))} disabled={!canEditForm(dCol)}
+            <button onClick={() => setF((p) => ({ ...p, [dCol]: todayISO() }))}
               style={{ border: "none", background: "none", color: C.mintText, fontFamily: TEXT, fontWeight: 800, fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
               Điền hôm nay
             </button>
@@ -568,10 +601,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
             ? <>🔒 <b>Quyền theo từng cột đang áp dụng.</b>{timelineViewOnly
               ? ` Chỉ xem — ${fieldPermission?.reason || "không được sửa cột timeline nào"}.`
               : ` Bạn được sửa ${fieldPermission?.editableFields.length || 0} cột timeline.`}</>
-            : <>ℹ️ <b>Quyền dự kiến chưa áp dụng.</b> Modal vẫn giữ hành vi và luật đang chạy hiện tại.</>}
+            : null}
         {permissionError && <> Không tải được quyền: {permissionError} — tạm khóa để an toàn.</>}
       </div>
-      {quickDone && BLOCK_COLS[curBlock] && (
+      {quickDone && canQuickDone && (
         <div style={{ background: C.mintSoft, border: `1px solid ${C.mint}`, borderRadius: 14, padding: "10px 14px", marginBottom: 16, fontSize: 12, fontWeight: 700, color: C.mintText, lineHeight: 1.55 }}>
           ⚡ Đã điền sẵn <b>hôm nay + Hoàn thành</b> cho bước hiện tại — kiểm tra lại ngày,
           chọn lý do rồi bấm Lưu. Chưa ghi gì cho tới khi bạn Lưu.

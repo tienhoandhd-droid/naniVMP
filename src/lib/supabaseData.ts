@@ -248,26 +248,18 @@ export async function fetchTimelineFieldPermission(
 ): Promise<TimelineFieldPermission> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
 
-  const [modeResult, rightsResult] = await Promise.all([
-    supabase.rpc("item_permissions_mode" as never),
-    supabase.rpc("vmp_my_item_rights" as never, {
-      p_validation_code: validationCode,
-    } as never),
-  ]);
-  if (modeResult.error) throw new Error("Không đọc được chế độ phân quyền: " + modeResult.error.message);
+  const rightsResult = await supabase.rpc("vmp_my_item_rights" as never, {
+    p_validation_code: validationCode,
+  } as never);
   if (rightsResult.error) throw new Error("Không đọc được quyền hạng mục: " + rightsResult.error.message);
 
-  const mode = modeResult.data;
-  if (mode !== "preview" && mode !== "enforced") {
-    throw new Error("Chế độ phân quyền không hợp lệ");
-  }
   const rows = Array.isArray(rightsResult.data) ? rightsResult.data : [rightsResult.data];
   const row = (rows[0] || {}) as Record<string, unknown>;
   const editableFields = Array.isArray(row.editable_fields)
     ? row.editable_fields.filter((field): field is string => typeof field === "string")
     : [];
   return {
-    mode,
+    mode: "enforced",
     canView: row.can_view === true,
     editableFields,
     reason: typeof row.view_reason === "string" && row.view_reason.trim()

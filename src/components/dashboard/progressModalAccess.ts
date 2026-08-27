@@ -5,14 +5,13 @@ export interface ProgressModalPermission {
 
 export type ProgressModalContentState = "checking" | "revoked" | "error" | "content";
 
-/** Chỉ dựng dữ liệu hạng mục khi quyền xem còn được xác nhận.
- * Preview giữ nguyên hành vi cũ: can_view dự kiến không được dùng để ẩn modal. */
+/** Chỉ dựng dữ liệu hạng mục khi quyền xem còn được xác nhận. */
 export function progressModalContentState(
   permission: ProgressModalPermission | null,
   permissionError: string,
 ): ProgressModalContentState {
   if (!permission) return "checking";
-  if (permission.mode === "enforced" && !permission.canView) {
+  if (!permission.canView) {
     return permissionError ? "error" : "revoked";
   }
   return "content";
