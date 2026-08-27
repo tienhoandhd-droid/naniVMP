@@ -12,7 +12,6 @@
  *  không suy quyền từ role đăng nhập hoặc vai Viewer cũ.
  * ===================================================================== */
 import { supabase } from "./supabaseClient.ts";
-import { deriveActivityFields } from "./n8nAdapter.ts";
 import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/performerSelection.ts";
 import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS } from "./businessRoles.ts";
 import type {
@@ -28,6 +27,10 @@ import type {
   PlannedDeadlineResult,
   UpdatePlannedDeadlinesInput,
 } from "../features/timeline/plannedDeadlineEditModel.ts";
+import {
+  parseEditableProgressRights,
+  type EditableProgressRight,
+} from "../features/progress/editableProgressRights.ts";
 
 export interface PlannedDeadlineRpcResponse {
   data: unknown;
@@ -110,6 +113,10 @@ export async function fetchVmpDataFromSupabase(
   // _raw (có dl_vmp + trạng thái) ngay khi đọc — luôn tươi theo ngày hôm nay,
   // đồng nhất với đường ghi lạc quan và đường đọc qua n8n.
   const payload = asShape<{ activities?: Activity[]; objects?: VmpObject[]; updated_at?: string }>(data);
+  // n8nAdapter đọc cấu hình Vite cũ. Chỉ màn dashboard cần adapter này; để
+  // boundary RPC quyền có thể được kiểm thử độc lập dưới Node, nạp trễ tại
+  // đúng đường đọc dữ liệu thay vì khởi tạo nó khi import module.
+  const { deriveActivityFields } = await import("./n8nAdapter.ts");
   const activities: Activity[] = (payload.activities || []).map((a: Activity) =>
     a && a._raw ? ({ ...a, ...deriveActivityFields(a._raw) } as Activity) : a
   );
@@ -198,6 +205,43 @@ export interface TimelineFieldPermission {
   canView: boolean;
   editableFields: readonly string[];
   reason: string;
+}
+
+/** Biên RPC đọc tập quyền theo lô của phiên hiện tại. Chỉ nhận đúng RPC không
+ *  tham số: database tự suy `auth.uid()` và không cho trình duyệt giả người dùng. */
+export type EditableProgressRightsRpc = (
+  rpcName: "rpc_my_editable_progress_rights",
+) => Promise<{ data: unknown; error: { message: string } | null }>;
+
+/** Chỉ lượt nạp cuối cùng được quyền thay tập quyền đang hiển thị. */
+export function createProgressRightsGenerationGate() {
+  let generation = 0;
+  return {
+    begin: () => ++generation,
+    isCurrent: (request: number) => request === generation,
+    invalidate: () => { generation += 1; },
+  };
+}
+
+export async function fetchMyEditableProgressRightsViaRpc(
+  rpc: EditableProgressRightsRpc,
+): Promise<EditableProgressRight[]> {
+  const { data, error } = await rpc("rpc_my_editable_progress_rights");
+  if (error) throw new Error("Không tải được quyền cập nhật tiến độ: " + error.message);
+  try {
+    return parseEditableProgressRights(data);
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "phản hồi máy chủ không hợp lệ";
+    throw new Error("Không thể xác nhận quyền cập nhật tiến độ: " + message);
+  }
+}
+
+/** Tập quyền của chính phiên hiện tại. Không dùng `item_permissions_mode`:
+ *  màn Cập nhật tiến độ có writer enforced riêng, còn mode toàn cục vẫn preview. */
+export async function fetchMyEditableProgressRights(): Promise<EditableProgressRight[]> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  const rpc = supabase.rpc.bind(supabase) as unknown as EditableProgressRightsRpc;
+  return fetchMyEditableProgressRightsViaRpc(rpc);
 }
 
 /** Quyền hiệu lực của chính người đang đăng nhập trên một hạng mục.

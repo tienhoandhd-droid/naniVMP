@@ -1,5 +1,5 @@
 /* UpdatePage.jsx — Cập nhật tiến độ thực tế */
-import { useState, useMemo, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pencil, Search, Activity } from "lucide-react";
 import { C, TEXT, NUM, GRAD, btnPrimary, INP } from "../constants/theme.ts";
 import { STATUS, STAGES, PERIODS } from "../constants/vmp.ts";
@@ -12,8 +12,31 @@ import MetricGrid from "../components/ui/MetricGrid.tsx";
 import PriorityStrip from "../components/ui/PriorityStrip.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import { buildProgressWorkspaceModel } from "../features/progress/progressWorkspaceModel.ts";
+import {
+  createProgressRightsGenerationGate,
+  fetchMyEditableProgressRights,
+} from "../lib/supabaseData.ts";
+import {
+  filterEditableProgressActivities,
+  indexEditableProgressRights,
+  type EditableProgressRight,
+} from "../features/progress/editableProgressRights.ts";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
+
+type ProgressRightsStatus = "loading" | "error" | "ready";
+
+type ProgressRightsState = {
+  status: ProgressRightsStatus;
+  rights: ReadonlyMap<string, EditableProgressRight>;
+  error: string;
+};
+
+const EMPTY_PROGRESS_RIGHTS = new Map<string, EditableProgressRight>();
+
+function progressRightsLoadingState(): ProgressRightsState {
+  return { status: "loading", rights: EMPTY_PROGRESS_RIGHTS, error: "" };
+}
 
 export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, focusId, onFocusDone, canAssignWorkshop }: {
   acts: PlanActivity[];
@@ -30,7 +53,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
     reason?: string,
     expectedVersion?: number,
   ) => void;
-  onReload?: () => void;
+  onReload?: () => void | Promise<unknown>;
   readOnly?: boolean;
   /** Mã hạng mục cần nhảy tới — màn "Hôm nay" truyền vào khi bấm Cập nhật. */
   focusId?: string;
@@ -60,16 +83,51 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
      có phải việc của mình không". Chúng vẫn tra được, chỉ là không chen vào
      luồng làm việc hằng ngày nữa. */
   const [hienNgung, setHienNgung] = useState(false);
-  const inWindow = useMemo(() => acts.filter((a) => {
+  const rightsGate = useRef(createProgressRightsGenerationGate());
+  const [rightsState, setRightsState] = useState<ProgressRightsState>(progressRightsLoadingState);
+  const reloadRights = useCallback(async () => {
+    const request = rightsGate.current.begin();
+    // Quyền cũ không được dùng trong khoảng trống giữa hai lần nạp.
+    setRightsState(progressRightsLoadingState());
+    try {
+      const rights = indexEditableProgressRights(await fetchMyEditableProgressRights());
+      if (!rightsGate.current.isCurrent(request)) return;
+      setRightsState({ status: "ready", rights, error: "" });
+    } catch (cause) {
+      if (!rightsGate.current.isCurrent(request)) return;
+      const message = cause instanceof Error ? cause.message : "Không thể xác nhận quyền cập nhật tiến độ";
+      setRightsState({ status: "error", rights: EMPTY_PROGRESS_RIGHTS, error: message });
+    }
+  }, []);
+  useEffect(() => {
+    const reloadWhenVisible = () => {
+      if (document.visibilityState !== "hidden") void reloadRights();
+    };
+    void reloadRights();
+    window.addEventListener("focus", reloadWhenVisible);
+    document.addEventListener("visibilitychange", reloadWhenVisible);
+    return () => {
+      rightsGate.current.invalidate();
+      window.removeEventListener("focus", reloadWhenVisible);
+      document.removeEventListener("visibilitychange", reloadWhenVisible);
+    };
+  }, [reloadRights]);
+  const scopedActs = useMemo(
+    () => rightsState.status === "ready"
+      ? filterEditableProgressActivities(acts, rightsState.rights)
+      : [],
+    [acts, rightsState],
+  );
+  const inWindow = useMemo(() => scopedActs.filter((a) => {
     if (!inPeriod(a, period)) return false;
     if (hienNgung) return true;
     const st = String(a.state || (a._raw && (a._raw as Record<string, unknown>).state) || "active");
     return st === "active";
-  }), [acts, period, hienNgung]);
-  const soNgung = useMemo(() => acts.filter((a) => {
+  }), [scopedActs, period, hienNgung]);
+  const soNgung = useMemo(() => scopedActs.filter((a) => {
     const st = String(a.state || (a._raw && (a._raw as Record<string, unknown>).state) || "active");
     return st !== "active";
-  }).length, [acts]);
+  }).length, [scopedActs]);
   // Tính giai đoạn 1 lần/hạng mục rồi tái dùng (trước đây stageOf chạy ~7 lần/hàng).
   const stageByItem = useMemo(() => {
     const m = new Map();
@@ -182,23 +240,62 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
   // chỉ có 2 trang, màn hình rỗng và trông như mất dữ liệu.
   useEffect(() => { setTrang(0); }, [stageF, fix, fst, kw, period, hienNgung]);
 
+  // Phân công vừa bị thu hồi hoặc quyền vừa lỗi: đóng hộp ngay, trước khi nó
+  // có thể hiển thị dữ liệu cũ hay gửi một bản nháp cũ.
+  useEffect(() => {
+    if (!edit) return;
+    if (rightsState.status !== "ready" || !rightsState.rights.has(edit.id)) {
+      setEdit(null);
+      setQuick(false);
+    }
+  }, [edit, rightsState]);
+
   /* Nhảy tới đúng hạng mục mà màn "Hôm nay" vừa bấm: đổ mã vào ô tìm và bỏ
      mọi bộ lọc đang chắn, vì hạng mục đó có thể không nằm trong lát cắt hiện
      tại — bấm Cập nhật mà ra danh sách rỗng thì tệ hơn là không có nút. */
   useEffect(() => {
-    if (!focusId) return;
+    if (!focusId || rightsState.status !== "ready" || !rightsState.rights.has(focusId)) return;
     setQ(focusId);
     setFix("all"); setStageF("all"); setFst("all"); setPeriod("all");
     setTrang(0);
     onFocusDone?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusId]);
+  }, [focusId, rightsState, onFocusDone]);
 
   const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all";
   const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); setQ(""); setPeriod("all"); };
   const linked = conn?.status === "ok";
+  const handleProgressReload = useCallback(async () => {
+    try {
+      await onReload?.();
+    } finally {
+      await reloadRights();
+    }
+  }, [onReload, reloadRights]);
+  if (rightsState.status !== "ready") {
+    const isError = rightsState.status === "error";
+    return (
+      <div data-progress-rights-state={rightsState.status} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 14, background: C.mintSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={22} color={C.mintText} /></div>
+            <div>
+              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 16, color: C.plum }}>Tiến độ thẩm định</div>
+              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Cập nhật mốc thực tế. Dữ liệu được lưu trực tiếp tại Supabase.</div>
+            </div>
+          </div>
+          <div role={isError ? "alert" : "status"} style={{ marginTop: 16, padding: "14px 16px", borderRadius: 12, background: isError ? C.raspSoft : C.marigoldSoft, color: isError ? C.raspText : C.marigoldText, fontSize: 13, fontWeight: 700, lineHeight: 1.6 }}>
+            {isError
+              ? `Không thể tải quyền cập nhật tiến độ. Không hiển thị hạng mục để bảo vệ dữ liệu. ${rightsState.error}`
+              : "Đang xác nhận hạng mục bạn được phân công…"}
+          </div>
+          {isError && <button type="button" onClick={() => { void reloadRights(); }} style={{ ...btnPrimary, marginTop: 14, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Thử lại</button>}
+        </Card>
+      </div>
+    );
+  }
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+    <div data-progress-rights-state="ready" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <Card>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -356,7 +453,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
             </tr></thead>
             <tbody>
               {lat.map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
-                <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? C.surfaceSunk : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
+                <tr key={a.id} data-progress-item={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? C.surfaceSunk : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
                   <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 14 }}>{a.code}</td>
                   <td style={{ padding: "12px 16px", color: C.plum, fontSize: 14 }}>
                     {a.name}
@@ -409,7 +506,9 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
                       </div>
                       <button onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá hết bộ lọc</button>
                     </>
-                  ) : "Chưa có hạng mục nào trong kế hoạch."}
+                  ) : scopedActs.length === 0
+                    ? "Bạn chưa có hạng mục được phân công để cập nhật."
+                    : "Chưa có hạng mục nào trong kế hoạch."}
                 </td></tr>
               )}
             </tbody>
@@ -433,7 +532,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
           const itemState = a.state || (a._raw && a._raw.state) || "active";
           const isFrozen = itemState !== "active";
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, opacity: isFrozen ? 0.65 : 1 }}>
+            <div data-progress-item={a.id} style={{ display: "flex", flexDirection: "column", gap: 10, opacity: isFrozen ? 0.65 : 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
                 <b style={{ fontFamily: NUM, fontSize: 13, color: C.pinkText, letterSpacing: ".02em" }}>{a.code}</b>
                 <Pill s={a.st} small />
@@ -499,7 +598,9 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
         canAssignWorkshop={canAssignWorkshop}
         quickDone={quick}
         onClose={() => { setEdit(null); setQuick(false); }}
-        onReload={onReload}
+        onReload={handleProgressReload}
+        editableFields={rightsState.rights.get(edit.id)?.editableFields}
+        permissionMode="enforced"
         // Hạng mục kế tiếp TRONG danh sách đang lọc — nhập hàng loạt không phải
         // đóng hộp rồi dò lại bảng. Bỏ qua hạng mục đóng băng nếu không phải admin.
         nextAct={(() => {
@@ -525,7 +626,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
             if (r && r.ok === false) throw new Error(r.error);
             alert(`✓ Đã đổi trạng thái ${id} → ${newState}`);
             setEdit(null); setQuick(false);
-            if (onReload) onReload();   // (MỚI) tải lại ngay để badge + đếm KPI cập nhật tức thì
+            void handleProgressReload(); // nạp lại dashboard và tập quyền trước khi hiện danh sách mới
           } catch (e) {
             alert("Lỗi đổi trạng thái: " + ((e as Error).message || "không rõ"));
           }
