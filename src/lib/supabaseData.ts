@@ -12,6 +12,7 @@
  *  không suy quyền từ role đăng nhập hoặc vai Viewer cũ.
  * ===================================================================== */
 import { supabase } from "./supabaseClient.ts";
+import { deriveActivityFields } from "./n8nAdapter.ts";
 import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/performerSelection.ts";
 import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS } from "./businessRoles.ts";
 import type {
@@ -113,10 +114,6 @@ export async function fetchVmpDataFromSupabase(
   // _raw (có dl_vmp + trạng thái) ngay khi đọc — luôn tươi theo ngày hôm nay,
   // đồng nhất với đường ghi lạc quan và đường đọc qua n8n.
   const payload = asShape<{ activities?: Activity[]; objects?: VmpObject[]; updated_at?: string }>(data);
-  // n8nAdapter đọc cấu hình Vite cũ. Chỉ màn dashboard cần adapter này; để
-  // boundary RPC quyền có thể được kiểm thử độc lập dưới Node, nạp trễ tại
-  // đúng đường đọc dữ liệu thay vì khởi tạo nó khi import module.
-  const { deriveActivityFields } = await import("./n8nAdapter.ts");
   const activities: Activity[] = (payload.activities || []).map((a: Activity) =>
     a && a._raw ? ({ ...a, ...deriveActivityFields(a._raw) } as Activity) : a
   );

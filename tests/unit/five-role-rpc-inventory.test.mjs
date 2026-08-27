@@ -34,6 +34,12 @@ const MANUAL_DEADLINE_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const ASSIGNED_PROGRESS_REVIEWED_RPC = new Map([
+  ["rpc_my_editable_progress_rights", {
+    identity: "rpc_my_editable_progress_rights()",
+    classification: "guarded_explicit",
+  }],
+]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
   .join(",");
@@ -227,18 +233,27 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260826170000_manual_planned_deadline_edit.sql",
     "utf8",
   );
-  for (const name of [...CATALOG_V2_REVIEWED_RPC.keys(), ...MANUAL_DEADLINE_REVIEWED_RPC.keys()]) {
+  const assignedProgressMigration = readFileSync(
+    "supabase/migrations/20260827130000_assigned_progress_visibility.sql",
+    "utf8",
+  );
+  for (const name of [
+    ...CATALOG_V2_REVIEWED_RPC.keys(),
+    ...MANUAL_DEADLINE_REVIEWED_RPC.keys(),
+    ...ASSIGNED_PROGRESS_REVIEWED_RPC.keys(),
+  ]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
   }
   const reviewedInventory = new Map([
     ...migrationInventory,
     ...CATALOG_V2_REVIEWED_RPC,
     ...MANUAL_DEADLINE_REVIEWED_RPC,
+    ...ASSIGNED_PROGRESS_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 65, "reviewed source HEAD must expose 65 literal RPC targets");
+  assert.equal(sourceNames.length, 66, "reviewed source HEAD must expose 66 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -256,6 +271,14 @@ test("every source RPC call has exactly one reviewed migration classification", 
   ]));
   assert.match(manualDeadlineMigration, /create function public\.rpc_update_planned_deadlines\(\s*p_validation_code text,\s*p_deadlines jsonb,\s*p_reason text,\s*p_expected_version integer,\s*p_confirmed boolean\s*\)/is);
   assert.match(manualDeadlineMigration, /grant execute on function public\.rpc_update_planned_deadlines\(\s*text\s*,\s*jsonb\s*,\s*text\s*,\s*integer\s*,\s*boolean\s*\)\s*to authenticated\s*,\s*service_role;/is);
+  assert.deepEqual(ASSIGNED_PROGRESS_REVIEWED_RPC, new Map([
+    ["rpc_my_editable_progress_rights", { identity: "rpc_my_editable_progress_rights()", classification: "guarded_explicit" }],
+  ]));
+  assert.match(assignedProgressMigration, /create or replace function public\.rpc_my_editable_progress_rights\(\)\s*returns jsonb\s*language plpgsql\s*stable\s*security definer\s*set search_path=public,pg_temp/is);
+  assert.match(assignedProgressMigration, /alter function public\.rpc_my_editable_progress_rights\(\)\s*set search_path=public,pg_temp;/is);
+  assert.match(assignedProgressMigration, /revoke all on function public\.rpc_my_editable_progress_rights\(\)\s*from public,anon,authenticated,service_role;/is);
+  assert.match(assignedProgressMigration, /grant execute on function public\.rpc_my_editable_progress_rights\(\)\s*to service_role;/is);
+  assert.match(assignedProgressMigration, /grant execute on function public\.rpc_my_editable_progress_rights\(\)\s*to authenticated;/is);
 });
 
 test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {
