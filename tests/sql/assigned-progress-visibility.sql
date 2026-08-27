@@ -504,6 +504,28 @@ begin
     raise exception using errcode='check_violation',
       message='ASSIGNED_PROGRESS_UNASSIGNED_QA_MUTATED';
   end if;
+
+  v_result := public.rpc_update_progress(
+    'APV-UNASSIGNED/2026.01-PQ',null::jsonb,
+    null,null,(v_before ->> 'version')::integer);
+  perform pg_temp.assert_code(
+    v_result,'patch_invalid','ASSIGNED_PROGRESS_UNASSIGNED_NULL_NOT_DENIED');
+  if pg_temp.item_snapshot('APV-UNASSIGNED/2026.01-PQ') is distinct from v_before
+     or pg_temp.audit_count('APV-UNASSIGNED/2026.01-PQ') <> v_audit_before then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_UNASSIGNED_NULL_MUTATED_OR_AUDITED';
+  end if;
+
+  v_result := public.rpc_update_progress(
+    'APV-UNASSIGNED/2026.01-PQ','{}'::jsonb,
+    null,null,(v_before ->> 'version')::integer);
+  perform pg_temp.assert_code(
+    v_result,'patch_invalid','ASSIGNED_PROGRESS_UNASSIGNED_EMPTY_NOT_DENIED');
+  if pg_temp.item_snapshot('APV-UNASSIGNED/2026.01-PQ') is distinct from v_before
+     or pg_temp.audit_count('APV-UNASSIGNED/2026.01-PQ') <> v_audit_before then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_UNASSIGNED_EMPTY_MUTATED_OR_AUDITED';
+  end if;
 end
 $qa_writer$;
 

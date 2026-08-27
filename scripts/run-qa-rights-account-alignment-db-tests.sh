@@ -18,18 +18,76 @@ test_database="vmp_qa_alignment_${$}_${RANDOM}"
 test_databases=()
 
 cleanup() {
+  local original_status=$?
+  local cleanup_status=0
+  local cleanup_database cleanup_drop_log survivors survivor_query_status
+  local cleanup_index
+  trap - EXIT
+  set +e
+
   if [[ -n "${LOCAL_PGHOST:-}" ]]; then
-    for cleanup_database in "${test_databases[@]}"; do
-      if [[ "$cleanup_database" =~ ^vmp_qa_alignment_[0-9]+_[0-9]+(_(definition|metadata|acl|wrapper_owner|writer_acl|schema|collation|assigned_hash|assigned_schema|assigned_failure|manifest_template|manifest_missing|manifest_duplicate|manifest_wrong|manifest_after_khoa|manifest_refresh|manifest_success))?$ ]]; then
-        PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" PGUSER="$LOCAL_PGUSER" \
-          PGPASSWORD="$LOCAL_PGPASSWORD" dropdb --if-exists --force \
-          "$cleanup_database" >/dev/null 2>&1 || true
+    for ((cleanup_index=${#test_databases[@]}-1; cleanup_index>=0; cleanup_index--)); do
+      cleanup_database="${test_databases[$cleanup_index]}"
+      if [[ "$cleanup_database" =~ ^vmp_qa_alignment_[0-9]+_[0-9]+(_(definition|metadata|acl|wrapper_owner|writer_acl|schema|collation|assigned_hash|assigned_schema|assigned_constraint|assigned_unique|assigned_trigger|assigned_failure|assigned_concurrency|manifest_template|manifest_missing|manifest_duplicate|manifest_wrong|manifest_after_khoa|manifest_refresh|manifest_success))?$ ]]; then
+        cleanup_drop_log="$tmp_dir/cleanup-drop-${cleanup_index}.log"
+        if ! PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" \
+          PGUSER="$LOCAL_PGUSER" PGPASSWORD="$LOCAL_PGPASSWORD" \
+          dropdb --if-exists --force "$cleanup_database" \
+            > /dev/null 2>"$cleanup_drop_log"; then
+          sed -n '1,120p' "$cleanup_drop_log" >&2
+          echo "CLEANUP DROP FAILED database=$cleanup_database" >&2
+          cleanup_status=1
+        fi
+      else
+        echo "CLEANUP REFUSED unvalidated database=$cleanup_database" >&2
+        cleanup_status=1
       fi
     done
+
+    survivors="$(PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" \
+      PGUSER="$LOCAL_PGUSER" PGPASSWORD="$LOCAL_PGPASSWORD" \
+      psql -X -qAt -v ON_ERROR_STOP=1 -d "$LOCAL_PGDATABASE" \
+        -v run_prefix="$test_database" <<'SQL'
+select datname from pg_database
+where datname=:'run_prefix'
+   or left(datname,length(:'run_prefix')+1)=:'run_prefix'||'_'
+order by datname;
+SQL
+    )"
+    survivor_query_status=$?
+    if [[ $survivor_query_status -ne 0 ]]; then
+      echo "CLEANUP SURVIVOR QUERY FAILED prefix=$test_database" >&2
+      cleanup_status=1
+    elif [[ -n "$survivors" ]]; then
+      echo "CLEANUP SURVIVORS prefix=$test_database" >&2
+      printf '%s\n' "$survivors" >&2
+      cleanup_status=1
+    fi
+  elif [[ ${#test_databases[@]} -gt 0 ]]; then
+    echo "CLEANUP CONNECTION MISSING with tracked disposable databases" >&2
+    cleanup_status=1
   fi
-  find "$tmp_dir" -mindepth 1 -delete
-  rmdir "$tmp_dir"
+
+  if [[ -d "$tmp_dir" ]]; then
+    if ! find "$tmp_dir" -mindepth 1 -delete; then
+      echo "CLEANUP TEMP CONTENT FAILED directory=$tmp_dir" >&2
+      cleanup_status=1
+    fi
+    if ! rmdir "$tmp_dir"; then
+      echo "CLEANUP TEMP DIRECTORY FAILED directory=$tmp_dir" >&2
+      cleanup_status=1
+    fi
+  fi
   unset LOCAL_PGHOST LOCAL_PGPORT LOCAL_PGUSER LOCAL_PGPASSWORD LOCAL_PGDATABASE
+
+  if [[ $cleanup_status -ne 0 ]]; then
+    if [[ $original_status -ne 0 ]]; then
+      exit "$original_status"
+    fi
+    exit 1
+  fi
+  echo "PASS CLEANUP no disposable database leaked by runner"
+  exit "$original_status"
 }
 trap cleanup EXIT
 
@@ -412,7 +470,29 @@ select encode(extensions.digest(concat_ws('|',
       attribute.attnotnull) order by attribute.attnum)::text
     from pg_attribute attribute
     where attribute.attrelid='public.vmp_plan_items'::regclass
-      and attribute.attnum>0 and not attribute.attisdropped),'[]')
+      and attribute.attnum>0 and not attribute.attisdropped),'[]'),
+  coalesce((select string_agg(format('%s|%s|%s',constraint_row.conname,
+      constraint_row.contype,pg_get_constraintdef(constraint_row.oid)),E'\n'
+      order by constraint_row.conname)
+    from pg_constraint constraint_row
+    where constraint_row.conrelid='public.vmp_plan_items'::regclass),'missing'),
+  coalesce((select format('%s|%s|%s|%s|%s|%s',index_class.relname,
+      index_row.indisunique,index_row.indisvalid,index_row.indisready,
+      index_row.indimmediate,pg_get_indexdef(index_row.indexrelid))
+    from pg_index index_row
+    join pg_class index_class on index_class.oid=index_row.indexrelid
+    where index_row.indrelid='public.vmp_plan_items'::regclass
+      and index_class.relname='idx_plan_validation_code'),'missing'),
+  coalesce((select string_agg(format('%s|%s|%s|%s',trigger_row.tgname,
+      trigger_row.tgenabled,trigger_row.tgfoid::regprocedure,
+      pg_get_triggerdef(trigger_row.oid)),E'\n' order by trigger_row.tgname)
+    from pg_trigger trigger_row
+    where trigger_row.tgrelid='public.vmp_plan_items'::regclass
+      and not trigger_row.tgisinternal
+      and trigger_row.tgfoid in (
+        'public.audit_plan_item_changes_v2()'::regprocedure,
+        'public.vmp_plan_item_row_revision_v2()'::regprocedure
+      )),'missing')
 ),'sha256'),'hex');
 SQL
 }
@@ -439,6 +519,21 @@ SQL
     assigned_schema)
       psql -X -v ON_ERROR_STOP=1 -d "$database" -c \
         "alter table public.vmp_plan_items add column assigned_progress_drift text" \
+        >/dev/null
+      ;;
+    assigned_constraint)
+      psql -X -v ON_ERROR_STOP=1 -d "$database" -c \
+        "alter table public.vmp_plan_items add constraint assigned_progress_review_drift check (true) not valid" \
+        >/dev/null
+      ;;
+    assigned_unique)
+      psql -X -v ON_ERROR_STOP=1 -d "$database" -c \
+        "alter index public.idx_plan_validation_code rename to assigned_progress_unique_drift" \
+        >/dev/null
+      ;;
+    assigned_trigger)
+      psql -X -v ON_ERROR_STOP=1 -d "$database" -c \
+        "alter table public.vmp_plan_items disable trigger audit_vmp_plan_items_v2" \
         >/dev/null
       ;;
     *)
@@ -470,6 +565,12 @@ check_assigned_progress_precondition assigned_hash \
   ASSIGNED_PROGRESS_PRECONDITION_DEPENDENCY_DRIFT
 check_assigned_progress_precondition assigned_schema \
   ASSIGNED_PROGRESS_PRECONDITION_TABLE_SCHEMA_DRIFT
+check_assigned_progress_precondition assigned_constraint \
+  ASSIGNED_PROGRESS_PRECONDITION_PLAN_CONSTRAINT_DRIFT
+check_assigned_progress_precondition assigned_unique \
+  ASSIGNED_PROGRESS_PRECONDITION_PLAN_UNIQUE_INDEX_DRIFT
+check_assigned_progress_precondition assigned_trigger \
+  ASSIGNED_PROGRESS_PRECONDITION_PLAN_TRIGGER_DRIFT
 
 assigned_failure_database="${test_database}_assigned_failure"
 createdb -T "$test_database" "$assigned_failure_database"
@@ -497,6 +598,75 @@ dropdb --force "$assigned_failure_database"
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/supabase/migrations/20260827130000_assigned_progress_visibility.sql"
 
+psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c \
+  "select prosrc from pg_proc where oid='public.rpc_update_progress__five_role_impl_20260824(text,jsonb,text,jsonb,integer)'::regprocedure" \
+  >"$tmp_dir/assigned-old-writer.sql"
+psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -c \
+  "select prosrc from pg_proc where oid='public.rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)'::regprocedure" \
+  >"$tmp_dir/assigned-new-writer.sql"
+node --input-type=commonjs - \
+  "$tmp_dir/assigned-old-writer.sql" \
+  "$tmp_dir/assigned-new-writer.sql" <<'NODE'
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+
+const oldSource = fs.readFileSync(process.argv[2], "utf8");
+const newSource = fs.readFileSync(process.argv[3], "utf8");
+
+function section(source, start, end) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex);
+  if (startIndex < 0 || endIndex < 0 || source.indexOf(start, startIndex + 1) >= 0) {
+    throw new Error(`writer comparison boundary drift: ${start.trim()}`);
+  }
+  return source.slice(startIndex, endIndex);
+}
+
+function replaceSection(source, start, end, replacement) {
+  return source.replace(section(source, start, end), replacement);
+}
+
+const patchEnd = "  -- Tên cũ chỉ còn là đường tương thích; mọi kiểm quyền dùng scheduled_at.\n";
+const itemFetchStart = "  select * into v_item from public.vmp_plan_items\n";
+const itemFetchEnd = "  if v_item.id is null then\n";
+const authorizationEnd = "  if coalesce(v_item.item_state, 'active') <> 'active' then\n";
+let normalizedNew = newSource;
+normalizedNew = replaceSection(
+  normalizedNew,
+  "  v_patch jsonb := p_patch;\n",
+  patchEnd,
+  section(oldSource, "  v_patch jsonb := coalesce(p_patch, '{}'::jsonb);\n", patchEnd),
+);
+normalizedNew = replaceSection(
+  normalizedNew,
+  "  -- Authorize before taking the row lock so an unassigned caller cannot hold\n",
+  itemFetchStart,
+  "",
+);
+normalizedNew = replaceSection(
+  normalizedNew,
+  itemFetchStart,
+  itemFetchEnd,
+  section(oldSource, itemFetchStart, itemFetchEnd),
+);
+normalizedNew = replaceSection(
+  normalizedNew,
+  "  -- Re-resolve after lock acquisition so assignment revocation during a lock\n",
+  authorizationEnd,
+  section(oldSource, "  if v_mode = 'enforced' then\n", authorizationEnd),
+);
+
+const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
+if (normalizedNew !== oldSource) {
+  throw new Error(
+    `ASSIGNED_PROGRESS_WRITER_NORMALIZATION_DRIFT old=${digest(oldSource)} normalized=${digest(normalizedNew)}`,
+  );
+}
+console.log(
+  `PASS ASSIGNED WRITER NORMALIZATION old=${digest(oldSource)} new=${digest(newSource)} normalized=${digest(normalizedNew)} intentional=patch_validation,row_lock,authorization`,
+);
+NODE
+
 assigned_progress_contract() {
   local database="$1"
   psql -X -qAt -v ON_ERROR_STOP=1 -d "$database" <<'SQL'
@@ -520,7 +690,7 @@ where namespace.nspname='public'
 SQL
 }
 
-assigned_progress_expected_contract=$'rpc_my_editable_progress_rights()|a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b|2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492\nrpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)|a669d06b71d453758a2fbc44ef87882870e167afd2c657994268f498b975872d|796e6afd55e5b79a064cf28ea74ff5b0a79589434d67e373b2c529482669d661\nrpc_update_progress(text,jsonb,text,jsonb,integer)|7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e|895edcfcd1fc3695a3bed4f873c2089bc1f7c55def39c2dd70d97c53a2524c81'
+assigned_progress_expected_contract=$'rpc_my_editable_progress_rights()|a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b|2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492\nrpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)|740ed7f1d6b5f61759879b99f3829acbe87a74ba05d5b5dc6594edf20da9f437|796e6afd55e5b79a064cf28ea74ff5b0a79589434d67e373b2c529482669d661\nrpc_update_progress(text,jsonb,text,jsonb,integer)|7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e|895edcfcd1fc3695a3bed4f873c2089bc1f7c55def39c2dd70d97c53a2524c81'
 assigned_progress_contract_before_rerun="$(assigned_progress_contract "$test_database")"
 if [[ "$assigned_progress_contract_before_rerun" != \
       "$assigned_progress_expected_contract" ]]; then
@@ -545,6 +715,153 @@ psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/tests/sql/assigned-progress-visibility.sql"
 psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
   -f "$repo_dir/tests/sql/assigned-progress-visibility-security.sql"
+
+assigned_concurrency_database="${test_database}_assigned_concurrency"
+createdb -T "$test_database" "$assigned_concurrency_database"
+test_databases+=("$assigned_concurrency_database")
+psql -X -v ON_ERROR_STOP=1 -d "$assigned_concurrency_database" >/dev/null <<'SQL'
+insert into auth.users (
+  id,aud,role,email,encrypted_password,email_confirmed_at,
+  raw_app_meta_data,raw_user_meta_data,created_at,updated_at
+)
+values (
+  '99012000-0000-4000-8000-000000000001','authenticated','authenticated',
+  'assigned-progress-concurrency@example.test','x',now(),'{}','{}',now(),now()
+);
+
+insert into public.profiles (id,full_name,email,role,department,is_active)
+values (
+  '99012000-0000-4000-8000-000000000001','Assigned Progress Concurrency QA',
+  'assigned-progress-concurrency@example.test','department_user','qa',true
+);
+
+update public.vmp_performers
+set department='qa',access_class='qa_progress_editor',is_active=true
+where user_id='99012000-0000-4000-8000-000000000001'::uuid;
+
+insert into public.vmp_objects (
+  code,name,classification,department,frequency_months
+)
+values ('APV-CONCURRENT','Assigned progress concurrency item','tb','qa',12);
+
+insert into public.vmp_plan_items (
+  id,validation_code,object_code,validation_type,year,report_class,
+  effort_days,deadline_protocol,deadline_validation,deadline_report,
+  deadline_vmp,status_protocol,status_validation,status_report,status_vmp,
+  is_active,item_state,version,departments,execution_departments,
+  source_sheet_data
+)
+values (
+  'APV-CONCURRENT/2026.01-PQ','APV-CONCURRENT/2026.01-PQ','APV-CONCURRENT',
+  'PQ',2026,'Hóa lý',5,current_date+30,current_date+60,current_date+90,
+  current_date+120,'not_started','not_started','not_started','not_started',
+  true,'active',60,array['qa'],array['qa'],'{"fixture":"concurrency"}'
+);
+
+insert into public.vmp_item_assignments (
+  validation_code,performer_id,user_id,staff_name,assignment_kind,
+  source,assignment_role,is_active,change_reason
+)
+select 'APV-CONCURRENT/2026.01-PQ',performer.id,performer.user_id,
+       performer.performer_name,'qa','qa_manager','collaborator',true,
+       'Assigned progress concurrency assignment'
+from public.vmp_performers performer
+where performer.user_id='99012000-0000-4000-8000-000000000001'::uuid;
+
+create function public.apv_concurrency_delay()
+returns trigger language plpgsql set search_path=public,pg_temp as $$
+begin
+  if old.validation_code='APV-CONCURRENT/2026.01-PQ' then
+    perform pg_sleep(1.5);
+  end if;
+  return new;
+end
+$$;
+create trigger apv_concurrency_delay_before_update
+before update on public.vmp_plan_items
+for each row execute function public.apv_concurrency_delay();
+SQL
+
+assigned_concurrency_before="$(psql -X -qAt -v ON_ERROR_STOP=1 \
+  -d "$assigned_concurrency_database" <<'SQL'
+select item.version||'|'||(select count(*) from public.audit_logs audit
+  where audit.validation_code=item.validation_code)
+from public.vmp_plan_items item
+where item.validation_code='APV-CONCURRENT/2026.01-PQ';
+SQL
+)"
+assigned_concurrency_before_version="${assigned_concurrency_before%%|*}"
+assigned_concurrency_before_audits="${assigned_concurrency_before##*|}"
+
+psql -X -qAt -v ON_ERROR_STOP=1 \
+  -v expected_version="$assigned_concurrency_before_version" \
+  -d "$assigned_concurrency_database" \
+  >"$tmp_dir/concurrency-one.log" 2>&1 <<'SQL' &
+begin;
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"99012000-0000-4000-8000-000000000001","role":"authenticated"}';
+select public.rpc_update_progress(
+  'APV-CONCURRENT/2026.01-PQ','{"status_protocol":"in_progress"}'::jsonb,
+  null,null,:'expected_version'::integer);
+commit;
+SQL
+assigned_concurrency_pid_one=$!
+psql -X -qAt -v ON_ERROR_STOP=1 \
+  -v expected_version="$assigned_concurrency_before_version" \
+  -d "$assigned_concurrency_database" \
+  >"$tmp_dir/concurrency-two.log" 2>&1 <<'SQL' &
+begin;
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"99012000-0000-4000-8000-000000000001","role":"authenticated"}';
+select public.rpc_update_progress(
+  'APV-CONCURRENT/2026.01-PQ','{"status_protocol":"overdue"}'::jsonb,
+  null,null,:'expected_version'::integer);
+commit;
+SQL
+assigned_concurrency_pid_two=$!
+
+set +e
+wait "$assigned_concurrency_pid_one"
+assigned_concurrency_status_one=$?
+wait "$assigned_concurrency_pid_two"
+assigned_concurrency_status_two=$?
+set -e
+
+assigned_concurrency_after="$(psql -X -qAt -v ON_ERROR_STOP=1 \
+  -d "$assigned_concurrency_database" <<'SQL'
+select item.version||'|'||(select count(*) from public.audit_logs audit
+  where audit.validation_code=item.validation_code)
+from public.vmp_plan_items item
+where item.validation_code='APV-CONCURRENT/2026.01-PQ';
+SQL
+)"
+assigned_concurrency_successes="$(
+  (grep -h -c '"ok": true' "$tmp_dir/concurrency-one.log" \
+    "$tmp_dir/concurrency-two.log" || true) | awk '{total+=$1} END {print total+0}'
+)"
+assigned_concurrency_conflicts="$(
+  (grep -h -c '"code": "version_conflict"' "$tmp_dir/concurrency-one.log" \
+    "$tmp_dir/concurrency-two.log" || true) | awk '{total+=$1} END {print total+0}'
+)"
+assigned_concurrency_after_version="${assigned_concurrency_after%%|*}"
+assigned_concurrency_after_audits="${assigned_concurrency_after##*|}"
+if [[ $assigned_concurrency_status_one -ne 0 ]] \
+   || [[ $assigned_concurrency_status_two -ne 0 ]] \
+   || [[ "$assigned_concurrency_successes" != "1" ]] \
+   || [[ "$assigned_concurrency_conflicts" != "1" ]] \
+   || [[ "$assigned_concurrency_after_version" -ne \
+         $((assigned_concurrency_before_version + 1)) ]] \
+   || [[ "$assigned_concurrency_after_audits" -ne \
+         $((assigned_concurrency_before_audits + 1)) ]]; then
+  sed -n '1,120p' "$tmp_dir/concurrency-one.log" >&2
+  sed -n '1,120p' "$tmp_dir/concurrency-two.log" >&2
+  echo "ASSIGNED_PROGRESS_CONCURRENCY_CONTRACT before=$assigned_concurrency_before after=$assigned_concurrency_after successes=$assigned_concurrency_successes conflicts=$assigned_concurrency_conflicts statuses=$assigned_concurrency_status_one/$assigned_concurrency_status_two" >&2
+  exit 1
+fi
+echo "PASS ASSIGNED CONCURRENCY one winner one version_conflict one audit no lost update"
+dropdb --force "$assigned_concurrency_database"
 
 mode_contract="$(psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
 select (select value from public.system_config where key='screen_access_mode')='"enforced"'::jsonb

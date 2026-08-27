@@ -15,6 +15,8 @@ declare
   v_column_hash text;
   v_constraint_hash text;
   v_enum_hash text;
+  v_index_hash text;
+  v_trigger_hash text;
 begin
   foreach v_required in array array[
     'public.vmp_is_active_session(uuid)',
@@ -142,7 +144,7 @@ begin
        'a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b',
        '2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492'),
       ('public.rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)',
-       'a669d06b71d453758a2fbc44ef87882870e167afd2c657994268f498b975872d',
+       '740ed7f1d6b5f61759879b99f3829acbe87a74ba05d5b5dc6594edf20da9f437',
        '796e6afd55e5b79a064cf28ea74ff5b0a79589434d67e373b2c529482669d661'),
       ('public.rpc_update_progress(text,jsonb,text,jsonb,integer)',
        '7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e',
@@ -249,6 +251,61 @@ begin
       message='ASSIGNED_PROGRESS_PRECONDITION_ASSIGNMENT_CONSTRAINT_DRIFT';
   end if;
 
+  select encode(extensions.digest(string_agg(format('%s|%s|%s',
+           constraint_row.conname,constraint_row.contype,
+           pg_get_constraintdef(constraint_row.oid)),E'\n'
+           order by constraint_row.conname),'sha256'),'hex')
+  into v_constraint_hash
+  from pg_constraint constraint_row
+  where constraint_row.conrelid='public.vmp_plan_items'::regclass;
+  if v_constraint_hash is distinct from
+     '997145e4ffcbc907a33493df165f28f3176331f966d64077a657e3b905c90dfa' then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_PRECONDITION_PLAN_CONSTRAINT_DRIFT';
+  end if;
+
+  select encode(extensions.digest(format('%s|%s|%s|%s|%s|%s',
+           index_class.relname,index_row.indisunique,index_row.indisvalid,
+           index_row.indisready,index_row.indimmediate,
+           pg_get_indexdef(index_row.indexrelid)),'sha256'),'hex')
+  into v_index_hash
+  from pg_index index_row
+  join pg_class index_class on index_class.oid=index_row.indexrelid
+  where index_row.indrelid='public.vmp_plan_items'::regclass
+    and index_class.relname='idx_plan_validation_code';
+  if v_index_hash is distinct from
+     'd401ae4fe3f32ce8118e1ec1a7f1f6d5b6e2b3d4b9d8fbf2ad7b6a3580057408' then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_PRECONDITION_PLAN_UNIQUE_INDEX_DRIFT';
+  end if;
+
+  select encode(extensions.digest(string_agg(format('%s|%s|%s|%s',
+           trigger_row.tgname,trigger_row.tgenabled,
+           trigger_row.tgfoid::regprocedure,
+           pg_get_triggerdef(trigger_row.oid)),E'\n'
+           order by trigger_row.tgname),'sha256'),'hex')
+  into v_trigger_hash
+  from pg_trigger trigger_row
+  where trigger_row.tgrelid='public.vmp_plan_items'::regclass
+    and not trigger_row.tgisinternal
+    and trigger_row.tgfoid in (
+      'public.audit_plan_item_changes_v2()'::regprocedure,
+      'public.vmp_plan_item_row_revision_v2()'::regprocedure
+    );
+  if (select count(*)
+      from pg_trigger trigger_row
+      where trigger_row.tgrelid='public.vmp_plan_items'::regclass
+        and not trigger_row.tgisinternal
+        and trigger_row.tgfoid in (
+          'public.audit_plan_item_changes_v2()'::regprocedure,
+          'public.vmp_plan_item_row_revision_v2()'::regprocedure
+        ))<>2
+     or v_trigger_hash is distinct from
+       '30c16bc9a9e5ee65a0a3302601db77b2870d6f16553e7999c412ba9a2c74d47d' then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_PRECONDITION_PLAN_TRIGGER_DRIFT';
+  end if;
+
   for v_required in select * from unnest(array['phase_status','user_role']) loop
     select encode(extensions.digest(string_agg(enum_value.enumlabel,E'\n'
              order by enum_value.enumsortorder),'sha256'),'hex')
@@ -331,14 +388,18 @@ declare
   v_item_dept text;
   v_requires_reason boolean := false;
   v_outbox_id bigint := null;
-  v_patch jsonb := coalesce(p_patch, '{}'::jsonb);
+  v_patch jsonb := p_patch;
   v_mode text := public.item_permissions_mode();
   v_allowed text[] := '{}'::text[];
   v_bad_fields text[] := '{}'::text[];
   v_scheduled_at timestamptz;
 begin
-  if jsonb_typeof(v_patch) <> 'object' then
-    return jsonb_build_object('ok', false, 'error', 'Patch phải là một object JSON');
+  if v_patch is null
+     or jsonb_typeof(v_patch) <> 'object'
+     or v_patch = '{}'::jsonb then
+    return jsonb_build_object(
+      'ok',false,'code','patch_invalid',
+      'error','Patch phải là một object JSON không rỗng');
   end if;
 
   -- Tên cũ chỉ còn là đường tương thích; mọi kiểm quyền dùng scheduled_at.
@@ -355,8 +416,39 @@ begin
     return jsonb_build_object('ok', false, 'error', 'Không xác định được người dùng');
   end if;
 
+  -- Authorize before taking the row lock so an unassigned caller cannot hold
+  -- an item lock or learn whether the submitted version is current.
+  v_allowed := public.vmp_allowed_timeline_fields(auth.uid(),p_validation_code);
+  if cardinality(coalesce(v_allowed,'{}'::text[]))=0 then
+    return jsonb_build_object(
+      'ok',false,
+      'code','item_field_forbidden',
+      'error','Bạn không có trường tiến độ nào được phép cập nhật',
+      'forbidden_fields',to_jsonb(array(
+        select key from jsonb_object_keys(v_patch) keys(key) order by key)),
+      'allowed_fields','[]'::jsonb
+    );
+  end if;
+
+  select coalesce(array_agg(key order by key),'{}'::text[])
+  into v_bad_fields
+  from jsonb_object_keys(v_patch) as keys(key)
+  where not (key=any(v_allowed));
+
+  if cardinality(v_bad_fields)>0 then
+    return jsonb_build_object(
+      'ok',false,
+      'code','item_field_forbidden',
+      'error','Bạn không được cập nhật các trường: '||
+        array_to_string(v_bad_fields,', '),
+      'forbidden_fields',to_jsonb(v_bad_fields),
+      'allowed_fields',to_jsonb(v_allowed)
+    );
+  end if;
+
   select * into v_item from public.vmp_plan_items
-  where validation_code = p_validation_code and is_active = true;
+  where validation_code = p_validation_code and is_active = true
+  for update;
   if v_item.id is null then
     return jsonb_build_object('ok', false, 'error',
       'Không tìm thấy mã thẩm định: ' || p_validation_code);
@@ -370,7 +462,20 @@ begin
     );
   end if;
 
+  -- Re-resolve after lock acquisition so assignment revocation during a lock
+  -- wait still fails closed before any audit setting or row mutation.
   v_allowed := public.vmp_allowed_timeline_fields(auth.uid(),p_validation_code);
+  if cardinality(coalesce(v_allowed,'{}'::text[]))=0 then
+    return jsonb_build_object(
+      'ok',false,
+      'code','item_field_forbidden',
+      'error','Bạn không có trường tiến độ nào được phép cập nhật',
+      'forbidden_fields',to_jsonb(array(
+        select key from jsonb_object_keys(v_patch) keys(key) order by key)),
+      'allowed_fields','[]'::jsonb
+    );
+  end if;
+
   select coalesce(array_agg(key order by key),'{}'::text[])
   into v_bad_fields
   from jsonb_object_keys(v_patch) as keys(key)
@@ -601,12 +706,15 @@ begin
           'a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b'
      or encode(extensions.digest(pg_get_functiondef(v_private),'sha256'),'hex')
         is distinct from
-          'a669d06b71d453758a2fbc44ef87882870e167afd2c657994268f498b975872d'
+          '740ed7f1d6b5f61759879b99f3829acbe87a74ba05d5b5dc6594edf20da9f437'
      or encode(extensions.digest(pg_get_functiondef(v_public),'sha256'),'hex')
         is distinct from
           '7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e' then
-    raise exception using errcode='check_violation',
-      message='ASSIGNED_PROGRESS_POSTCONDITION_FUNCTION_CONTRACT';
+    raise exception using errcode='check_violation', message=format(
+      'ASSIGNED_PROGRESS_POSTCONDITION_FUNCTION_CONTRACT batch=%s private=%s public=%s',
+      encode(extensions.digest(pg_get_functiondef(v_batch),'sha256'),'hex'),
+      encode(extensions.digest(pg_get_functiondef(v_private),'sha256'),'hex'),
+      encode(extensions.digest(pg_get_functiondef(v_public),'sha256'),'hex'));
   end if;
 
   if has_function_privilege('public',v_batch,'EXECUTE')

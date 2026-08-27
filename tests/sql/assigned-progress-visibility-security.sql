@@ -184,20 +184,27 @@ values
   ('99011000-0000-4000-8000-000000000001','authenticated','authenticated',
    'assigned-progress-security@example.test','x',now(),'{}','{}',now(),now()),
   ('99011000-0000-4000-8000-000000000002','authenticated','authenticated',
-   'assigned-progress-security-inactive@example.test','x',now(),'{}','{}',now(),now());
+   'assigned-progress-security-inactive@example.test','x',now(),'{}','{}',now(),now()),
+  ('99011000-0000-4000-8000-000000000003','authenticated','authenticated',
+   'assigned-progress-security-unassigned@example.test','x',now(),'{}','{}',now(),now());
 
 insert into public.profiles (id,full_name,email,role,department,is_active)
 values
   ('99011000-0000-4000-8000-000000000001','Assigned Progress Security QA',
    'assigned-progress-security@example.test','department_user','qa',true),
   ('99011000-0000-4000-8000-000000000002','Assigned Progress Security Inactive',
-   'assigned-progress-security-inactive@example.test','department_user','qa',false);
+   'assigned-progress-security-inactive@example.test','department_user','qa',false),
+  ('99011000-0000-4000-8000-000000000003','Assigned Progress Security Unassigned',
+   'assigned-progress-security-unassigned@example.test','department_user','qa',true);
 
 update public.vmp_performers
 set department='qa', access_class='qa_progress_editor',
-    is_active=user_id='99011000-0000-4000-8000-000000000001'::uuid
+    is_active=user_id in (
+      '99011000-0000-4000-8000-000000000001'::uuid,
+      '99011000-0000-4000-8000-000000000003'::uuid
+    )
 where user_id between '99011000-0000-4000-8000-000000000001'::uuid
-                  and '99011000-0000-4000-8000-000000000002'::uuid;
+                  and '99011000-0000-4000-8000-000000000003'::uuid;
 
 insert into public.vmp_objects (
   code,name,classification,department,frequency_months
@@ -322,6 +329,63 @@ begin
   end if;
 end
 $malicious_mixed_patch$;
+
+select set_config('request.jwt.claims',json_build_object(
+  'sub','99011000-0000-4000-8000-000000000003','role','authenticated')::text,
+  true);
+do $unassigned_empty_patch_security$
+declare
+  v_before jsonb := pg_temp.item_snapshot('APV-SECURITY/2026.01-PQ');
+  v_audit_before bigint := pg_temp.audit_count('APV-SECURITY/2026.01-PQ');
+  v_result jsonb;
+begin
+  v_result := public.rpc_update_progress(
+    'APV-SECURITY/2026.01-PQ',null::jsonb,null,null,
+    (v_before ->> 'version')::integer);
+  perform pg_temp.assert_code(
+    v_result,'patch_invalid','ASSIGNED_PROGRESS_SECURITY_UNASSIGNED_NULL_NOT_DENIED');
+  if pg_temp.item_snapshot('APV-SECURITY/2026.01-PQ') is distinct from v_before
+     or pg_temp.audit_count('APV-SECURITY/2026.01-PQ') <> v_audit_before then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_SECURITY_UNASSIGNED_NULL_MUTATED_OR_AUDITED';
+  end if;
+
+  v_result := public.rpc_update_progress(
+    'APV-SECURITY/2026.01-PQ','{}'::jsonb,null,null,
+    (v_before ->> 'version')::integer);
+  perform pg_temp.assert_code(
+    v_result,'patch_invalid','ASSIGNED_PROGRESS_SECURITY_UNASSIGNED_EMPTY_NOT_DENIED');
+  if pg_temp.item_snapshot('APV-SECURITY/2026.01-PQ') is distinct from v_before
+     or pg_temp.audit_count('APV-SECURITY/2026.01-PQ') <> v_audit_before then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_SECURITY_UNASSIGNED_EMPTY_MUTATED_OR_AUDITED';
+  end if;
+
+  v_result := public.rpc_update_progress(
+    'APV-SECURITY/2026.01-PQ','{"status_validation":"in_progress"}'::jsonb,
+    null,null,(v_before ->> 'version')::integer);
+  perform pg_temp.assert_code(
+    v_result,'item_field_forbidden',
+    'ASSIGNED_PROGRESS_SECURITY_ZERO_ALLOWLIST_NOT_DENIED');
+  if pg_temp.item_snapshot('APV-SECURITY/2026.01-PQ') is distinct from v_before
+     or pg_temp.audit_count('APV-SECURITY/2026.01-PQ') <> v_audit_before then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_SECURITY_ZERO_ALLOWLIST_MUTATED_OR_AUDITED';
+  end if;
+
+  v_result := public.rpc_update_progress(
+    'APV-SECURITY/2026.01-PQ','{"status_validation":"in_progress"}'::jsonb,
+    null,null,(v_before ->> 'version')::integer-1);
+  perform pg_temp.assert_code(
+    v_result,'item_field_forbidden',
+    'ASSIGNED_PROGRESS_SECURITY_UNASSIGNED_VERSION_LEAKED_BEFORE_AUTH');
+  if pg_temp.item_snapshot('APV-SECURITY/2026.01-PQ') is distinct from v_before
+     or pg_temp.audit_count('APV-SECURITY/2026.01-PQ') <> v_audit_before then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_SECURITY_STALE_UNASSIGNED_MUTATED_OR_AUDITED';
+  end if;
+end
+$unassigned_empty_patch_security$;
 
 select set_config('request.jwt.claims',json_build_object(
   'sub','99011000-0000-4000-8000-000000000002','role','authenticated')::text,
