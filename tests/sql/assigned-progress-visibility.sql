@@ -47,6 +47,23 @@ as $$
   where audit.validation_code = p_validation_code
 $$;
 
+create function pg_temp.audit_effect_count(
+  p_validation_code text,
+  p_field text,
+  p_expected_value jsonb
+)
+returns bigint
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select count(*) from public.audit_logs audit
+  where audit.validation_code = p_validation_code
+    and audit.changed_fields @> array[p_field]::text[]
+    and audit.new_data -> p_field is not distinct from p_expected_value
+$$;
+
 create function pg_temp.active_assignment_count(
   p_validation_code text,
   p_user_id uuid,
@@ -273,6 +290,14 @@ begin
   for v_row in
     select value from jsonb_array_elements(v_batch -> 'rights') rows(value)
   loop
+    if (select count(*) from jsonb_object_keys(v_row)) <> 3
+       or exists (
+         select 1 from jsonb_object_keys(v_row) keys(key)
+         where key not in ('validation_code','editable_fields','view_reason')
+       ) then
+      raise exception using errcode='check_violation',
+        message='ASSIGNED_PROGRESS_ADMIN_BATCH_KEYS ' || v_row::text;
+    end if;
     select editable_fields into strict v_expected
     from public.vmp_my_item_rights(v_row ->> 'validation_code');
     if v_row -> 'editable_fields' is distinct from to_jsonb(v_expected) then
@@ -312,7 +337,12 @@ begin
   end if;
   for v_row in select value from jsonb_array_elements(v_batch -> 'rights') value
   loop
-    if v_row -> 'editable_fields' is distinct from '[
+    if (select count(*) from jsonb_object_keys(v_row)) <> 3
+       or exists (
+         select 1 from jsonb_object_keys(v_row) keys(key)
+         where key not in ('validation_code','editable_fields','view_reason')
+       )
+       or v_row -> 'editable_fields' is distinct from '[
       "actual_protocol_date","status_protocol",
       "actual_validation_date","status_validation",
       "actual_report_date","status_report",
@@ -385,21 +415,33 @@ declare
   v_before jsonb;
   v_after jsonb;
   v_audit_before bigint;
+  v_audit_effect_before bigint;
   v_result jsonb;
   v_version integer;
 begin
-  select version into strict v_version from public.vmp_plan_items
-  where validation_code='APV-ASSIGNED/2026.01-PQ';
+  v_before := pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ');
+  v_version := (v_before ->> 'version')::integer;
+  v_audit_before := pg_temp.audit_count('APV-ASSIGNED/2026.01-PQ');
+  v_audit_effect_before := pg_temp.audit_effect_count(
+    'APV-ASSIGNED/2026.01-PQ','status_validation','"in_progress"'::jsonb);
   v_result := public.rpc_update_progress(
     'APV-ASSIGNED/2026.01-PQ','{"status_validation":"in_progress"}',
     null,null,v_version);
-  if v_result ->> 'ok' is distinct from 'true' then
+  v_after := pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ');
+  if v_result ->> 'ok' is distinct from 'true'
+     or (v_result ->> 'version')::integer is distinct from v_version + 1
+     or v_after ->> 'status_validation' is distinct from 'in_progress'
+     or (v_after ->> 'version')::integer is distinct from v_version + 1
+     or pg_temp.audit_count('APV-ASSIGNED/2026.01-PQ') <> v_audit_before + 1
+     or pg_temp.audit_effect_count(
+       'APV-ASSIGNED/2026.01-PQ','status_validation','"in_progress"'::jsonb)
+       <> v_audit_effect_before + 1 then
     raise exception using errcode='check_violation',
-      message='ASSIGNED_PROGRESS_QA_CROSS_DEPARTMENT_ALLOWED_REJECTED '
-        || v_result::text;
+      message='ASSIGNED_PROGRESS_QA_ALLOWED_WRITE_EFFECT '
+        || jsonb_build_object('result',v_result,'before',v_before,'after',v_after)::text;
   end if;
 
-  v_before := pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ');
+  v_before := v_after;
   v_audit_before := pg_temp.audit_count('APV-ASSIGNED/2026.01-PQ');
   v_version := (v_before ->> 'version')::integer;
   v_result := public.rpc_update_progress(
@@ -449,27 +491,46 @@ select set_config('request.jwt.claims', json_build_object(
 do $workshop_writer$
 declare
   v_before jsonb;
+  v_after jsonb;
+  v_audit_before bigint;
+  v_audit_effect_before bigint;
   v_result jsonb;
+  v_version integer;
 begin
   v_before := pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ');
+  v_version := (v_before ->> 'version')::integer;
+  v_audit_before := pg_temp.audit_count('APV-ASSIGNED/2026.01-PQ');
+  v_audit_effect_before := pg_temp.audit_effect_count(
+    'APV-ASSIGNED/2026.01-PQ','actual_validation_date',to_jsonb(current_date));
   v_result := public.rpc_update_progress(
     'APV-ASSIGNED/2026.01-PQ',
     jsonb_build_object('actual_validation_date',current_date),
     'Workshop records actual validation date',null,
-    (v_before ->> 'version')::integer);
-  if v_result ->> 'ok' is distinct from 'true' then
+    v_version);
+  v_after := pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ');
+  if v_result ->> 'ok' is distinct from 'true'
+     or (v_result ->> 'version')::integer is distinct from v_version + 1
+     or v_after ->> 'actual_validation_date' is distinct from current_date::text
+     or (v_after ->> 'version')::integer is distinct from v_version + 1
+     or pg_temp.audit_count('APV-ASSIGNED/2026.01-PQ') <> v_audit_before + 1
+     or pg_temp.audit_effect_count(
+       'APV-ASSIGNED/2026.01-PQ','actual_validation_date',to_jsonb(current_date))
+       <> v_audit_effect_before + 1 then
     raise exception using errcode='check_violation',
-      message='ASSIGNED_PROGRESS_WORKSHOP_ACTUAL_DATE_REJECTED '||v_result::text;
+      message='ASSIGNED_PROGRESS_WORKSHOP_ALLOWED_WRITE_EFFECT '
+        || jsonb_build_object('result',v_result,'before',v_before,'after',v_after)::text;
   end if;
-  v_before := pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ');
+  v_before := v_after;
+  v_audit_before := pg_temp.audit_count('APV-ASSIGNED/2026.01-PQ');
   v_result := public.rpc_update_progress(
     'APV-ASSIGNED/2026.01-PQ','{"status_validation":"completed"}',
     'Workshop cannot write QA status',null,(v_before ->> 'version')::integer);
   perform pg_temp.assert_code(
     v_result,'item_field_forbidden','ASSIGNED_PROGRESS_WORKSHOP_STATUS_NOT_DENIED');
-  if pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ') is distinct from v_before then
+  if pg_temp.item_snapshot('APV-ASSIGNED/2026.01-PQ') is distinct from v_before
+     or pg_temp.audit_count('APV-ASSIGNED/2026.01-PQ') <> v_audit_before then
     raise exception using errcode='check_violation',
-      message='ASSIGNED_PROGRESS_WORKSHOP_FORBIDDEN_STATUS_MUTATED';
+      message='ASSIGNED_PROGRESS_WORKSHOP_FORBIDDEN_STATUS_MUTATED_OR_AUDITED';
   end if;
 end
 $workshop_writer$;
