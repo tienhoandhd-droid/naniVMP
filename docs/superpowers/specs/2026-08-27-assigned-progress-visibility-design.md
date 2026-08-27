@@ -69,11 +69,13 @@ Không lọc toàn bộ dashboard toàn cục; các màn báo cáo và giám sá
 
 Backend vẫn kiểm allowlist lần cuối; việc ẩn UI không thay thế kiểm tra bảo mật.
 
-### 4.4. Kích hoạt quyền thật
+### 4.4. Áp quyền thật riêng cho Cập nhật tiến độ
 
-Sau khi migration/RPC, frontend và E2E đạt, đổi `item_permissions_mode` từ `preview` sang `enforced` bằng RPC quản trị hiện có với lý do phát hành. Database được kích hoạt trước, frontend production được triển khai ngay sau đó trong cùng cửa sổ thay đổi.
+`item_permissions_mode` tiếp tục ở `preview` vì nó điều khiển phạm vi xem hạng mục của nhiều màn khác và preflight toàn hệ thống còn blocker ngoài phạm vi Cập nhật tiến độ. Đợt này không ép bật mode toàn cục và không hạ mức preflight để đi vòng bộ chặn.
 
-Nếu frontend deploy thất bại sau khi database đã enforced, giao diện hiện tại vẫn khóa theo `editable_fields` thay vì mở rộng quyền; có thể rollback mode về `preview` bằng RPC quản trị trong runbook, không sửa trực tiếp bảng cấu hình.
+Forward migration thay riêng writer `rpc_update_progress` để luôn kiểm `vmp_allowed_timeline_fields()` trước khi ghi, không còn rơi vào luật bộ phận cũ khi mode toàn cục là preview. RPC quyền theo lô dành cho màn Cập nhật tiến độ cũng luôn trả quyền hiệu lực 8/7/1 từ `vmp_item_rights`, không dùng mode toàn cục để mở form.
+
+Frontend bỏ banner “Quyền dự kiến chưa áp dụng” trong modal Cập nhật tiến độ và coi quyền writer này là enforced. Nếu frontend deploy thất bại sau migration, backend vẫn fail-closed; giao diện cũ có thể còn hiện ô thừa nhưng writer từ chối mọi field ngoài allowlist. Rollback dùng forward migration khôi phục wrapper/writer đã backup và deployment frontend trước, không đổi mode hoặc dữ liệu phân công.
 
 ## 5. Trạng thái giao diện
 
@@ -117,12 +119,11 @@ Nếu frontend deploy thất bại sau khi database đã enforced, giao diện h
 ## 7. Triển khai và rollback
 
 1. Backup database và chạy preflight chỉ đọc.
-2. Áp migration thêm RPC theo transaction; chưa đổi mode.
+2. Áp migration thêm RPC quyền theo lô và cưỡng chế allowlist riêng cho `rpc_update_progress`; giữ nguyên mode toàn cục.
 3. Chạy database integration/security trên clone và postflight production mới.
 4. Build và chạy unit/E2E trên exact SHA.
-5. Chuyển mode sang `enforced` bằng RPC quản trị.
-6. Deploy frontend exact SHA, kiểm tra persona thật và asset production.
-7. Nếu có lỗi, rollback mode bằng RPC trước; frontend có thể rollback theo deployment trước. Không xóa phân công và không sửa trực tiếp dữ liệu tài khoản.
+5. Deploy frontend exact SHA, kiểm tra persona thật và asset production.
+6. Nếu có lỗi, áp forward recovery cho writer/RPC rồi rollback deployment frontend. Không đổi mode, không xóa phân công và không sửa trực tiếp dữ liệu tài khoản.
 
 ## 8. Ngoài phạm vi
 
