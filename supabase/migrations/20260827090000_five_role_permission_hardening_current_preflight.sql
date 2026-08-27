@@ -1,7 +1,8 @@
 -- Five-role permission hardening forward migration for the production
 -- preflight snapshot reviewed on 2026-08-27. It runs inside the release
 -- entrypoint transaction. Logic matches 20260824120000; only the exact live
--- blocker/warning locks are updated to 479 blockers and 14 warnings.
+-- blocker/warning locks are updated to 479 blockers and 14 warnings. The
+-- trigger-function ACL is also normalized against production default grants.
 
 do $preconditions$
 declare
@@ -700,7 +701,7 @@ end
 $function$;
 
 revoke execute on function public.vmp_profile_authority_guard()
-  from public, anon, authenticated;
+  from public, anon, authenticated, service_role;
 
 create trigger vmp_profiles_authority_guard
 before update of role, department, is_active, pham_vi

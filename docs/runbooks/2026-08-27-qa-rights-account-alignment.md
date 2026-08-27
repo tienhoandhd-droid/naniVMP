@@ -34,7 +34,7 @@ Chạy từ repository root. So sánh đúng từng ký tự; lệch một hash 
 
 | Artifact | SHA-256 được duyệt |
 |---|---|
-| `supabase/migrations/20260827090000_five_role_permission_hardening_current_preflight.sql` | `db5088ed53bd490b7ea750dba997a46672cac21512592d29a67a0dab3984f01c` |
+| `supabase/migrations/20260827090000_five_role_permission_hardening_current_preflight.sql` | `0d95aa22ce0edb3f12706920dd735125a174df31521222f3f4b29975e72dbf7d` |
 | `supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql` | `818ee26a963b53c4977b0604d65ecb4779922bc4d009d0ae1965c1f51d8d16fc` |
 | `supabase/migrations/20260826170000_manual_planned_deadline_edit.sql` | `2eddcf0141260acd7f613608871e5b4e057715645337ec0adc82fd30b9437a01` |
 | `supabase/migrations/20260826180000_qa_manager_actual_date_principal_normalization.sql` | `d8066924f3268b283310a324aa6430301d4bb2c7c29ad1066e3572e5f517dcaa` |

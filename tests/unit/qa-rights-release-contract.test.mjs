@@ -67,10 +67,17 @@ test("current-preflight five-role migration changes only reviewed live locks", a
     .replaceAll("v_expected_warning_count := 14;", "v_expected_warning_count := 13;")
     .replaceAll("7bc0aa25501a745ddc161e13ef5dab9a", "1c6a661e271c910e7010e872a7ef52c1")
     .replaceAll("v_count <> 479", "v_count <> 481")
-    .replaceAll("v_warning_count <> 14", "v_warning_count <> 13");
+    .replaceAll("v_warning_count <> 14", "v_warning_count <> 13")
+    .replace(
+      "from public, anon, authenticated, service_role;",
+      "from public, anon, authenticated;",
+    );
 
   assert.equal(restored, body(oldSource),
-    "forward copy may differ from the reviewed hardening only in exact live preflight locks");
+    "forward copy may differ only in live locks and the reviewed trigger ACL normalization");
+  assert.match(currentSource,
+    /revoke execute on function public\.vmp_profile_authority_guard\(\)[\s\S]{0,100}from public, anon, authenticated, service_role;/i,
+    "production default privileges must not leak trigger EXECUTE to service_role");
 });
 
 test("account manifest is exact-four, fail-closed, auditable, and refreshes assignments once", async () => {
