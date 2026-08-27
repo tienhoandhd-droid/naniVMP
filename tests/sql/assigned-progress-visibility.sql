@@ -83,6 +83,28 @@ as $$
     and (assignment.expires_at is null or assignment.expires_at > now())
 $$;
 
+create function pg_temp.active_performer_id(p_user_id uuid)
+returns uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select performer.id from public.vmp_performers performer
+  where performer.user_id = p_user_id and performer.is_active
+$$;
+
+create function pg_temp.system_config_value(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select config.value from public.system_config config
+  where config.key = p_key
+$$;
+
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -545,8 +567,12 @@ declare
   v_owner uuid;
   v_result jsonb;
 begin
-  select id into strict v_owner from public.vmp_performers
-  where user_id='99010000-0000-4000-8000-000000000003'::uuid;
+  v_owner := pg_temp.active_performer_id(
+    '99010000-0000-4000-8000-000000000003'::uuid);
+  if v_owner is null then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_SOURCE_OWNER_PERFORMER_FIXTURE_MISSING';
+  end if;
   v_result := public.rpc_save_catalog_object(
     'Thiết bị','APV-SOURCE',jsonb_build_object('owner_person_id',v_owner),
     'Assign QA owner from Source Data',1);
@@ -583,8 +609,7 @@ select pg_temp.assert_code(
   'ACCOUNT_DISABLED','ASSIGNED_PROGRESS_INACTIVE_SESSION_NOT_DENIED');
 
 select pg_temp.assert_true(
-  (select value from public.system_config where key='item_permissions_mode')
-    = '"preview"'::jsonb,
+  pg_temp.system_config_value('item_permissions_mode') = '"preview"'::jsonb,
   'ASSIGNED_PROGRESS_SUITE_CHANGED_GLOBAL_MODE');
 
 \echo 'PASS BUSINESS assigned-only list writer and Source Data owner cascade in preview mode'
