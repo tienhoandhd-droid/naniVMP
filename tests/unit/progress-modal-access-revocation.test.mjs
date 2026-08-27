@@ -98,6 +98,19 @@ test("caller Catalog giữ preview đầy đủ còn Update truyền enforced al
   assert.match(updateSource, /<ProgressEditModal[\s\S]*editableFields=\{rightsState\.rights\.get\(edit\.id\)\?\.editableFields\}[\s\S]*permissionMode="enforced"/);
 });
 
+test("preview bỏ qua reload riêng, còn enforced revalidate và fail-closed", async () => {
+  const access = await import("../../src/components/dashboard/progressModalAccess.ts");
+  const source = await readFile(new URL("../../src/components/dashboard/ProgressEditModal.tsx", import.meta.url), "utf8");
+
+  assert.equal(access.skipsProgressPermissionRevalidation("preview"), true);
+  assert.equal(access.skipsProgressPermissionRevalidation("enforced"), false);
+  assert.equal(access.skipsProgressPermissionRevalidation(undefined), false);
+  assert.match(source, /if \(skipsProgressPermissionRevalidation\(permissionMode\)\) \{/);
+  assert.match(source, /setFieldPermission\(null\);[\s\S]*fetchTimelineFieldPermission\(act\.id\)/);
+  assert.match(source, /if \(!permission\.canView\) \{[\s\S]*setF\(\{ \.\.\.init \}\)[\s\S]*setReason\(""\)[\s\S]*setErr\(""\)/);
+  assert.match(source, /window\.addEventListener\("focus", reloadWhenVisible\)/);
+});
+
 test("validation ALCOA không đọc field bị ẩn", async () => {
   const source = await readFile(new URL("../../src/components/dashboard/ProgressEditModal.tsx", import.meta.url), "utf8");
 

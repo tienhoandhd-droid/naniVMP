@@ -33,7 +33,7 @@ import {
   resolveUniquePerformerIdByName,
 } from "../../features/itemPermissions/performerSelection.ts";
 import { Tag, Modal, ROField, StateBadge } from "../ui/Primitives.tsx";
-import { progressModalContentState } from "./progressModalAccess.ts";
+import { progressModalContentState, skipsProgressPermissionRevalidation } from "./progressModalAccess.ts";
 import WorkshopAssignmentInline from "../../features/progress/WorkshopAssignmentInline.tsx";
 import { visibleProgressStageFields } from "../../features/progress/editableProgressRights.ts";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
@@ -180,7 +180,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   );
   const [permissionError, setPermissionError] = useState("");
   useEffect(() => {
-    if (permissionMode) {
+    if (skipsProgressPermissionRevalidation(permissionMode)) {
       setFieldPermission({
         mode: permissionMode,
         canView: true,
