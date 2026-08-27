@@ -152,6 +152,7 @@ async function newPage({ key, user, uiAccess }) {
     kichBan: "day",
     nguoiDung: user,
     mangNghiemNgat: true,
+    previewOrigin: GOC,
     suaKho(kho) {
       kho.vmp_source_objects = [{ ...SOURCE }];
       kho.vmp_performers = [{ ...ASSIGNED }, { ...UNASSIGNED }];

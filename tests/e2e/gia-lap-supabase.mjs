@@ -644,8 +644,9 @@ export function dungKhoDuLieu(kichBan) {
  * PHẢI gọi TRƯỚC lần điều hướng đầu tiên của trang. Mọi host ngoài
  * loopback và Google Fonts đều bị chặn — nếu một request lạ lọt ra ngoài
  * thì nó bị huỷ, và số lần huỷ được trả về để bộ kiểm tự tố cáo chính nó.
- * `mangNghiemNgat` tắt ngoại lệ Google Fonts cho các contract hermetic;
- * mặc định false để các bộ kiểm thẩm mỹ cũ giữ nguyên hành vi.
+ * `mangNghiemNgat` chỉ cho `previewOrigin` exact và mock Supabase, đồng
+ * thời tắt ngoại lệ Google Fonts; mặc định false để các bộ kiểm thẩm mỹ
+ * cũ giữ nguyên hành vi loopback/font.
  */
 export async function caiGiaLap(trang, {
   supabaseUrl,
@@ -654,12 +655,14 @@ export async function caiGiaLap(trang, {
   doTre,
   nguoiDung = NGUOI_DUNG,
   mangNghiemNgat = false,
+  previewOrigin,
 } = {}) {
   const kho = dungKhoDuLieu(kichBan);
   /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống nhân viên xưởng để
      kiểm "không thấy nút ghi". Sửa tại chỗ, không trả kho ra ngoài. */
   if (typeof suaKho === "function") suaKho(kho);
   const hostSupabase = new URL(supabaseUrl).host;
+  const originPreview = previewOrigin ? new URL(previewOrigin).origin : null;
   const chanNgoai = [];
 
   await trang.setRequestInterception(true);
@@ -670,12 +673,6 @@ export async function caiGiaLap(trang, {
     if (url.startsWith("data:") || url.startsWith("blob:")) { req.continue(); return; }
 
     const u = new URL(url);
-    const laNoiBo = u.hostname === "127.0.0.1" || u.hostname === "localhost";
-    const laFont = /^fonts\.(googleapis|gstatic)\.com$/.test(u.hostname);
-
-    if (laNoiBo) { req.continue(); return; }
-    if (!mangNghiemNgat && laFont && req.method() === "GET") { req.continue(); return; }
-
     if (u.host === hostSupabase) {
       const phanHoi = traLoi(kho, u, req, { nguoiDung });
       /* doTre: { ten_rpc: ms } — giả lập mạng chậm cho TỪNG RPC, để kiểm
@@ -688,6 +685,12 @@ export async function caiGiaLap(trang, {
       else req.respond(phanHoi);
       return;
     }
+
+    const laNoiBo = u.hostname === "127.0.0.1" || u.hostname === "localhost";
+    const laFont = /^fonts\.(googleapis|gstatic)\.com$/.test(u.hostname);
+    if (mangNghiemNgat && originPreview && u.origin === originPreview) { req.continue(); return; }
+    if (!mangNghiemNgat && laNoiBo) { req.continue(); return; }
+    if (!mangNghiemNgat && laFont && req.method() === "GET") { req.continue(); return; }
 
     // Bất cứ thứ gì khác: chặn và ghi sổ. Bộ kiểm không được phép gọi ra
     // ngoài — nhất là tới production hay webhook n8n.
