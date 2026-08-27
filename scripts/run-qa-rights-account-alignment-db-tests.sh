@@ -20,7 +20,7 @@ test_databases=()
 cleanup() {
   if [[ -n "${LOCAL_PGHOST:-}" ]]; then
     for cleanup_database in "${test_databases[@]}"; do
-      if [[ "$cleanup_database" =~ ^vmp_qa_alignment_[0-9]+_[0-9]+(_(definition|metadata|acl|wrapper_owner|writer_acl|schema|collation))?$ ]]; then
+      if [[ "$cleanup_database" =~ ^vmp_qa_alignment_[0-9]+_[0-9]+(_(definition|metadata|acl|wrapper_owner|writer_acl|schema|collation|manifest_missing|manifest_duplicate|manifest_wrong|manifest_after_khoa|manifest_refresh|manifest_success))?$ ]]; then
         PGHOST="$LOCAL_PGHOST" PGPORT="$LOCAL_PGPORT" PGUSER="$LOCAL_PGUSER" \
           PGPASSWORD="$LOCAL_PGPASSWORD" dropdb --if-exists --force \
           "$cleanup_database" >/dev/null 2>&1 || true
@@ -385,5 +385,152 @@ if [[ "$mode_contract" != "t" ]]; then
   echo "Focused QA rights suite changed production enforcement modes." >&2
   exit 1
 fi
+
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+  -f "$repo_dir/tests/sql/qa-rights-account-manifest.sql"
+
+khoa_id="99000000-0000-4000-8000-000000000001"
+dat_id="99000000-0000-4000-8000-000000000002"
+viewer_one_id="99000000-0000-4000-8000-000000000003"
+viewer_two_id="99000000-0000-4000-8000-000000000004"
+
+manifest_state_hash() {
+  local database="$1"
+  psql -X -qAt -v ON_ERROR_STOP=1 -d "$database" <<'SQL'
+select encode(extensions.digest(concat_ws('|',
+  coalesce((select jsonb_agg(to_jsonb(profile) order by profile.id)::text
+    from public.profiles profile
+    where profile.id between '99000000-0000-4000-8000-000000000001'::uuid
+                         and '99000000-0000-4000-8000-000000000005'::uuid), '[]'),
+  coalesce((select jsonb_agg(to_jsonb(performer) order by performer.id)::text
+    from public.vmp_performers performer
+    where performer.user_id between '99000000-0000-4000-8000-000000000001'::uuid
+                               and '99000000-0000-4000-8000-000000000005'::uuid), '[]'),
+  coalesce((select jsonb_agg(to_jsonb(assignment) order by assignment.id)::text
+    from public.vmp_item_assignments assignment), '[]'),
+  coalesce((select jsonb_agg(to_jsonb(audit) order by audit.id)::text
+    from public.audit_logs audit
+    where audit.source in ('qa_rights_account_alignment','sheet_assignment_refresh')), '[]')
+), 'sha256'), 'hex');
+SQL
+}
+
+create_manifest_clone() {
+  local suffix="$1"
+  local database="${test_database}_${suffix}"
+  createdb -T "$test_database" "$database"
+  test_databases+=("$database")
+  printf '%s' "$database"
+}
+
+expect_manifest_failure() {
+  local database="$1"
+  local marker="$2"
+  shift 2
+  local before_hash after_hash status
+  before_hash="$(manifest_state_hash "$database")"
+  set +e
+  "$@" >"$tmp_dir/${database}.log" 2>&1
+  status=$?
+  set -e
+  after_hash="$(manifest_state_hash "$database")"
+  if [[ $status -eq 0 ]] || ! grep -q "$marker" "$tmp_dir/${database}.log" \
+     || [[ "$after_hash" != "$before_hash" ]]; then
+    sed -n '1,260p' "$tmp_dir/${database}.log" >&2
+    echo "Manifest case $database did not fail closed with $marker." >&2
+    exit 1
+  fi
+  echo "PASS MANIFEST rejected $marker without account assignment or audit drift"
+}
+
+manifest_missing_db="$(create_manifest_clone manifest_missing)"
+expect_manifest_failure "$manifest_missing_db" \
+  VIEWER_IDS_PSQL_VARIABLE_REQUIRED \
+  psql -X -v ON_ERROR_STOP=1 -d "$manifest_missing_db" \
+    -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+    -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
+
+manifest_duplicate_db="$(create_manifest_clone manifest_duplicate)"
+expect_manifest_failure "$manifest_duplicate_db" \
+  ACCOUNT_MANIFEST_REQUIRES_FOUR_UNIQUE_UUIDS \
+  psql -X -v ON_ERROR_STOP=1 -d "$manifest_duplicate_db" \
+    -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+    -v viewer_ids="$viewer_one_id,$viewer_one_id" \
+    -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
+
+manifest_wrong_db="$(create_manifest_clone manifest_wrong)"
+psql -X -v ON_ERROR_STOP=1 -d "$manifest_wrong_db" -c \
+  "update public.vmp_performers set access_class=null where user_id='$khoa_id'::uuid" \
+  >/dev/null
+expect_manifest_failure "$manifest_wrong_db" \
+  ACCOUNT_MANIFEST_PARTIAL_STATE_REFUSED \
+  psql -X -v ON_ERROR_STOP=1 -d "$manifest_wrong_db" \
+    -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+    -v viewer_ids="$viewer_one_id,$viewer_two_id" \
+    -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
+
+manifest_after_khoa_db="$(create_manifest_clone manifest_after_khoa)"
+expect_manifest_failure "$manifest_after_khoa_db" \
+  QA_ALIGNMENT_INJECTED_AFTER_KHOA \
+  env PGOPTIONS='-c vmp.qa_alignment_fault=after_khoa' \
+  psql -X -v ON_ERROR_STOP=1 -d "$manifest_after_khoa_db" \
+    -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+    -v viewer_ids="$viewer_one_id,$viewer_two_id" \
+    -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
+
+manifest_refresh_db="$(create_manifest_clone manifest_refresh)"
+psql -X -v ON_ERROR_STOP=1 -d "$manifest_refresh_db" >/dev/null <<'SQL'
+create or replace function public.rpc_refresh_source_item_assignments()
+returns jsonb language sql security definer set search_path=public,pg_temp
+as $$ select jsonb_build_object('ok',false,'error_code','INJECTED_REFRESH_FAILURE') $$;
+SQL
+expect_manifest_failure "$manifest_refresh_db" \
+  ACCOUNT_MANIFEST_ASSIGNMENT_REFRESH_FAILED \
+  psql -X -v ON_ERROR_STOP=1 -d "$manifest_refresh_db" \
+    -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+    -v viewer_ids="$viewer_one_id,$viewer_two_id" \
+    -f "$repo_dir/scripts/apply-qa-rights-account-manifest.sql"
+
+manifest_success_db="$(create_manifest_clone manifest_success)"
+if ! psql -X -v ON_ERROR_STOP=1 -d "$manifest_success_db" \
+  -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+  -v viewer_ids="$viewer_one_id,$viewer_two_id" \
+  -f "$repo_dir/scripts/apply-qa-rights-account-alignment.sql" \
+  >"$tmp_dir/manifest-success.log" 2>&1; then
+  sed -n '1,260p' "$tmp_dir/manifest-success.log" >&2
+  echo "Exact-four manifest success apply failed." >&2
+  exit 1
+fi
+if ! psql -X -v ON_ERROR_STOP=1 -d "$manifest_success_db" \
+  -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+  -v viewer_ids="$viewer_one_id,$viewer_two_id" \
+  -f "$repo_dir/scripts/check-qa-rights-account-alignment.sql" \
+  >"$tmp_dir/manifest-check.log" 2>&1; then
+  sed -n '1,260p' "$tmp_dir/manifest-check.log" >&2
+  echo "Exact-four manifest checker failed." >&2
+  exit 1
+fi
+success_hash="$(manifest_state_hash "$manifest_success_db")"
+if ! psql -X -v ON_ERROR_STOP=1 -d "$manifest_success_db" \
+  -v khoa_id="$khoa_id" -v dat_id="$dat_id" \
+  -v viewer_ids="$viewer_one_id,$viewer_two_id" \
+  -f "$repo_dir/scripts/apply-qa-rights-account-alignment.sql" \
+  >"$tmp_dir/manifest-rerun.log" 2>&1; then
+  sed -n '1,260p' "$tmp_dir/manifest-rerun.log" >&2
+  echo "Exact-four manifest idempotent rerun failed." >&2
+  exit 1
+fi
+rerun_hash="$(manifest_state_hash "$manifest_success_db")"
+if [[ "$success_hash" != "$rerun_hash" ]] \
+   || ! grep -q 'PASS CHECK_QA_MANAGER_EIGHT_FIELDS' "$tmp_dir/manifest-check.log" \
+   || ! grep -q 'PASS CHECK_QA_STAFF_SEVEN_FIELDS' "$tmp_dir/manifest-check.log" \
+   || ! grep -q 'PASS CHECK_WORKSHOP_STAFF_ONE_FIELD' "$tmp_dir/manifest-check.log"; then
+  sed -n '1,260p' "$tmp_dir/manifest-success.log" >&2
+  sed -n '1,260p' "$tmp_dir/manifest-check.log" >&2
+  sed -n '1,260p' "$tmp_dir/manifest-rerun.log" >&2
+  echo "Exact-four manifest success/checker/rerun contract failed." >&2
+  exit 1
+fi
+echo "PASS MANIFEST exact-four atomic refresh checker and idempotent rerun"
 
 echo "PASS GREEN QA manager eight QA staff seven workshop one atomic security modes ROLLBACK"
