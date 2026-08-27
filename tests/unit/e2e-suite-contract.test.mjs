@@ -53,6 +53,7 @@ test("README liệt kê lệnh chạy riêng bộ kiểm danh mục người th�
 const LENH_LOTUS = {
   "e2e:gialap": "node tests/e2e/luong-gia-lap.mjs && node tests/e2e/tai-khoan-an-sap-xep.mjs && node tests/e2e/timeline-deadline-edit.mjs",
   "e2e:catalog": "node tests/e2e/catalog-workspace.mjs",
+  "e2e:progress-rights": "node tests/e2e/quyen-cot-timeline.mjs && node tests/e2e/phan-cong-cap-nhat-tien-do.mjs",
   shell: "node tests/e2e/lotus-shell.mjs",
   thammy: "node tests/e2e/tham-my.mjs",
   atelier: "node tests/e2e/atelier.mjs",
@@ -133,8 +134,8 @@ test("CI e2e-mock chỉ chạy ba bộ giả lập cốt lõi được duyệt",
 
   assert.deepEqual(
     e2eInvocations,
-    ["e2e:gialap", "e2e:catalog", "e2e:admin"],
-    "e2e-mock phải chỉ gọi đúng ba bộ E2E lõi, đúng thứ tự và không lặp",
+    ["e2e:gialap", "e2e:catalog", "e2e:progress-rights", "e2e:admin"],
+    "e2e-mock phải chỉ gọi đúng bốn bộ E2E lõi, đúng thứ tự và không lặp",
   );
 
   for (const ten of [

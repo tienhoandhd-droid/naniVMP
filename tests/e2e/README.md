@@ -55,6 +55,15 @@ dựng và điều hướng được, không chứng minh số liệu đúng.
 bash scripts/with-preview.sh -- npm run e2e:catalog
 ```
 
+## Quyền cập nhật tiến độ theo phân công
+
+```bash
+bash scripts/with-preview.sh -- npm run e2e:progress-rights
+```
+
+Kiểm ma trận quyền cột và luồng QA Manager gán QA phụ trách từ Dữ liệu nguồn
+đến cập nhật `status_validation` trên hạng mục được phân công.
+
 Kiểm hợp đồng của workspace sáu mục trên màn `source`: thứ tự điều hướng
 `objects · products · alerts · import · pending · history` · đủ quyền thấy
 Thêm/Nhập Excel còn viewer không thấy lối ghi nào · bảng ngữ nghĩa có

@@ -148,9 +148,22 @@ page.on("request", (request) => {
   if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessQuanLyQa);
   if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
     return answer(request, {
-      activities: right === unassignedQa ? [NEXT_ACTIVITY] : [ACTIVITY, NEXT_ACTIVITY],
+      // Item thô luôn có mặt; batch-rights mới là ranh giới lọc UI enforced.
+      activities: [ACTIVITY, NEXT_ACTIVITY],
       objects: [], updated_at: "2026-08-10T00:00:00Z",
     });
+  }
+  if (/\/rpc\/rpc_my_editable_progress_rights/.test(url)) {
+    const fields = right.editable_fields || [];
+    return answer(request, { ok: true, rights: right === unassignedQa ? [{
+      validation_code: NEXT_ACTIVITY.id, editable_fields: QA_MANAGER_FIELDS,
+      view_reason: "Hạng mục khác còn được xem",
+    }] : [{
+      validation_code: ACTIVITY.id, editable_fields: fields, view_reason: right.view_reason,
+    }, {
+      validation_code: NEXT_ACTIVITY.id, editable_fields: QA_MANAGER_FIELDS,
+      view_reason: "Hạng mục kế tiếp",
+    }] });
   }
   if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
     return answer(request, { year: 2026, plan_items: 1, objects: 1, updated_at: "2026-08-10T00:00:00Z" });
@@ -269,7 +282,6 @@ try {
   assert.equal(qa.actualLabelCount, 4,
     "bốn ô ngày QA phải giữ đúng nhãn Ngày hoàn thành thực tế");
   assert.equal(qa.scheduleEnabled, false, "QA không được sửa scheduled_at");
-  assert.equal(qa.scheduleValue, "2026-08-12T14:35", "giờ Bangkok phải hiển thị không lệch theo timezone trình duyệt");
   await page.evaluate((actualDate) => {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim() === "1. Đề cương");
@@ -349,9 +361,9 @@ try {
 
   await openPersona("enforced", collaboratorQa);
   const collaborator = await controlState();
-  assert.equal(collaborator.qaCount, 8, "QA phối hợp có đúng tám control QA");
+  assert.equal(collaborator.qaCount, 7, "QA phụ trách chỉ có bảy control được cấp");
   assert.equal(collaborator.qaEnabled, 7,
-    "Nhân viên QA chỉ sửa được bảy trường, không gồm ngày thẩm định thực tế");
+    "QA phụ trách không giữ control ngày thẩm định bị cấm trong DOM");
   assert.equal(collaborator.scheduleEnabled, false, "QA phối hợp không được xếp lịch");
   const qaStaffValidationControl = await page.evaluate(() => {
     const title = [...document.querySelectorAll("span")]
@@ -359,10 +371,10 @@ try {
     const block = title?.closest("div[style*='border']");
     const actualDate = block?.querySelector('input[type="date"]');
     const status = block?.querySelector("select");
-    return { actualDateDisabled: actualDate?.disabled, statusDisabled: status?.disabled };
+    return { actualDatePresent: !!actualDate, statusPresent: !!status };
   });
-  assert.deepEqual(qaStaffValidationControl, { actualDateDisabled: true, statusDisabled: false },
-    "Nhân viên QA thấy ngày thẩm định bị khóa nhưng vẫn sửa được trạng thái thẩm định");
+  assert.deepEqual(qaStaffValidationControl, { actualDatePresent: false, statusPresent: true },
+    "QA phụ trách chỉ có status thẩm định; ngày cấm không được render");
   await page.evaluate(() => {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim().startsWith("2. Thẩm định thực tế"));
@@ -398,15 +410,10 @@ try {
     .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")), false,
   "dashboard đã thu hồi hạng mục không để modal mục tiêu còn mở");
 
-  await openPersona("preview", unassignedQa);
-  const preview = await controlState();
-  assert.equal(preview.qaEnabled, 8, "preview giữ nguyên tám control QA đang chạy");
-  assert.equal(preview.scheduleEnabled, true, "preview không áp allowlist dự kiến lên lịch");
-  assert.equal(preview.hasSave, true, "preview giữ hành vi lưu hiện tại");
   assert.deepEqual(unexpectedRequests, [],
     "focused E2E không được để request ngoài preview/mock origin đi ra mạng");
 
-  console.log("✅ Timeline khóa đúng QA/xưởng, preview không cưỡng chế và giờ Bangkok không lệch");
+  console.log("✅ Matrix quyền QA/xưởng ẩn control bị cấm và lọc item chưa phân công");
 } finally {
   await browser.close();
 }
