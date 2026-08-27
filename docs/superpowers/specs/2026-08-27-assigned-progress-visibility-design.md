@@ -1,13 +1,11 @@
-# Hiển thị cập nhật theo phân công và giới hạn Dữ liệu nguồn
+# Hiển thị hạng mục cập nhật theo phân công
 
 **Ngày chốt:** 2026-08-27
-**Phạm vi:** màn Cập nhật tiến độ, modal Cập nhật tiến độ, tab Dữ liệu nguồn và các chế độ quyền production.
+**Phạm vi:** màn Cập nhật tiến độ, modal Cập nhật tiến độ và chế độ quyền hạng mục production.
 
 ## 1. Mục tiêu
 
 Màn Cập nhật tiến độ chỉ hiển thị những hạng mục mà người đang đăng nhập thực sự có ít nhất một trường tiến độ được phép cập nhật. Trong modal, chỉ dựng các trường nằm trong danh sách quyền hiệu lực do database trả về. Người dùng không còn nhìn thấy hạng mục hoặc ô nhập mà họ không thể lưu.
-
-Tab Dữ liệu nguồn chỉ xuất hiện và chỉ mở được với Admin hoặc Quản lý QA. Các vai còn lại không cần xem dữ liệu nguồn và không nhận quyền màn hình này.
 
 ## 2. Luật nghiệp vụ
 
@@ -21,9 +19,6 @@ Tab Dữ liệu nguồn chỉ xuất hiện và chỉ mở được với Admin 
 - Lịch thẩm định không thuộc danh sách 8/7/1 nên không xuất hiện như một ô cập nhật trong modal này.
 - Tiêu đề bước và thông tin nền chỉ xuất hiện khi bước đó có ít nhất một trường được phép sửa. Trong một bước có quyền một phần, chỉ các ô được phép mới được dựng.
 - Admin giữ quyền hiện tại do resolver server trả về; frontend không tự suy quyền từ tên vai trò.
-- Chỉ `admin` và `qa_manager` có `can_view=true`, phạm vi `all` trên màn `source`; hai vai này giữ các hành động Dữ liệu nguồn hiện có.
-- `qa_staff`, `workshop_manager` và `workshop_staff` có `can_view=false`, phạm vi `none` và danh sách hành động rỗng trên màn `source`.
-- Điều hướng không hiển thị tab Dữ liệu nguồn khi `access.canView("source")` là false. Gõ trực tiếp hash/URL của màn này cũng bị `ScreenGuard` chuyển về màn an toàn.
 
 ## 3. Nguyên nhân hiện tại
 
@@ -78,12 +73,6 @@ Sau khi migration/RPC, frontend và E2E đạt, đổi `item_permissions_mode` t
 
 Nếu frontend deploy thất bại sau khi database đã enforced, giao diện hiện tại vẫn khóa theo `editable_fields` thay vì mở rộng quyền; có thể rollback mode về `preview` bằng RPC quản trị trong runbook, không sửa trực tiếp bảng cấu hình.
 
-### 4.5. Quyền tab Dữ liệu nguồn
-
-Migration cập nhật đúng ba dòng `source` của `qa_staff`, `workshop_manager` và `workshop_staff` thành `can_view=false`, `data_scope='none'`, `actions='{}'`; hai dòng `admin` và `qa_manager` phải giữ nguyên quyền đầy đủ. Tổng ma trận vẫn là 85 dòng và năm vai, không xóa hàng để tránh làm sai contract hiện có.
-
-`rpc_my_ui_access()` tiếp tục là nguồn duy nhất cho menu và `ScreenGuard`. Frontend không thêm danh sách vai trò riêng để quyết định tab. Các thao tác ghi Dữ liệu nguồn vẫn phải giữ kiểm tra `edit_catalog`/`generate_timeline` ở server; thay đổi quyền xem không được mở thêm ACL hoặc đường RPC.
-
 ## 5. Trạng thái giao diện
 
 - **Đang kiểm tra quyền:** skeleton/thông báo tải, danh sách trống.
@@ -91,7 +80,6 @@ Migration cập nhật đúng ba dòng `source` của `qa_staff`, `workshop_mana
 - **Lỗi đọc quyền:** thông báo lỗi và nút thử lại; không hiển thị hạng mục từ cache.
 - **Có quyền:** chỉ hiển thị hạng mục và field được server cho phép.
 - **Quyền bị thu hồi:** đóng/khóa modal hiện tại, tải lại tập quyền và bỏ hạng mục khỏi danh sách.
-- **Không có quyền Dữ liệu nguồn:** không dựng mục điều hướng; deep-link được chuyển về màn đầu tiên mà người dùng có quyền xem.
 
 ## 6. Kiểm thử chấp nhận
 
@@ -103,7 +91,6 @@ Migration cập nhật đúng ba dòng `source` của `qa_staff`, `workshop_mana
 - Nhân viên xưởng chỉ nhận hạng mục được phân công, đúng phạm vi và đúng một trường.
 - Phiên inactive/Viewer không nhận dữ liệu.
 - RPC không cho caller truyền user ID, không mở rộng EXECUTE và ổn định khi chạy lặp migration.
-- Ma trận `source` chỉ cho Admin và Quản lý QA xem; ba vai còn lại có scope `none`, actions rỗng; tổng ma trận vẫn đúng 85 dòng.
 
 ### Unit/UI
 
@@ -112,7 +99,6 @@ Migration cập nhật đúng ba dòng `source` của `qa_staff`, `workshop_mana
 - Bước không còn field không tồn tại trong DOM.
 - Quick action và nút Lưu không thể tạo payload chứa field bị cấm.
 - Lỗi quyền và quyền bị thu hồi đều fail-closed.
-- Menu không có tab Dữ liệu nguồn với ba vai bị từ chối và `ScreenGuard` chặn deep-link; frontend chỉ đọc payload `rpc_my_ui_access`, không suy vai cục bộ.
 
 ### E2E
 
@@ -122,12 +108,11 @@ Migration cập nhật đúng ba dòng `source` của `qa_staff`, `workshop_mana
 - Nhân viên xưởng được phân công chỉ thấy Ngày thẩm định thực tế.
 - Thu hồi phân công khi tab đang mở làm hạng mục biến mất sau refresh/focus.
 - Payload gửi lên không chứa field ẩn và database chấp nhận field hợp lệ.
-- Admin và Quản lý QA mở được Dữ liệu nguồn; Nhân viên QA, Quản lý xưởng và Nhân viên xưởng không thấy tab và không mở được bằng deep-link.
 
 ## 7. Triển khai và rollback
 
 1. Backup database và chạy preflight chỉ đọc.
-2. Áp migration thêm RPC và thu hẹp ba dòng quyền màn `source` theo transaction; chưa đổi mode hạng mục.
+2. Áp migration thêm RPC theo transaction; chưa đổi mode.
 3. Chạy database integration/security trên clone và postflight production mới.
 4. Build và chạy unit/E2E trên exact SHA.
 5. Chuyển mode sang `enforced` bằng RPC quản trị.
@@ -140,4 +125,3 @@ Migration cập nhật đúng ba dòng `source` của `qa_staff`, `workshop_mana
 - Không thay đổi quyền của các màn báo cáo/giám sát khác.
 - Không khôi phục Viewer.
 - Không mở quyền Lịch thẩm định trong modal tiến độ.
-- Không đổi quyền Dữ liệu nguồn của Admin hoặc Quản lý QA.
