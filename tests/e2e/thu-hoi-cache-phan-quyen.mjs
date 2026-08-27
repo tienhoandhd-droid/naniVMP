@@ -38,6 +38,9 @@ let holdNextRights = false;
 let heldRightsRequest = null;
 let rightsReads = 0;
 let batchRightsReads = 0;
+const batchBodies = [];
+const itemBodies = [];
+const unexpectedRequests = [];
 let staleRightsRequest = null;
 let markStaleRightsFinished = null;
 let failNextRights = false;
@@ -61,6 +64,7 @@ await nhetPhien(page, { supabaseUrl: docEnv().VITE_SUPABASE_URL });
 await page.setRequestInterception(true);
 page.on("request", (request) => {
   const url = request.url();
+  if (url.startsWith("data:") || url.startsWith("blob:")) return request.continue();
   const parsed = new URL(url);
   if (/\/rest\/v1\/vmp_performers/.test(url)) return answer(request, []);
   if (parsed.origin === mockSupabaseOrigin && (/\/auth\/v1\//.test(url) || /\/rest\/v1\/(?!rpc\/)/.test(url))) {
@@ -87,6 +91,7 @@ page.on("request", (request) => {
   }
   if (/\/rpc\/rpc_my_editable_progress_rights/.test(url)) {
     batchRightsReads += request.method() === "OPTIONS" ? 0 : 1;
+    if (request.method() !== "OPTIONS") batchBodies.push(JSON.parse(request.postData() || "{}"));
     const fields = collaboratorAssigned ? QA_FIELDS : [];
     const rights = mode === "preview" || collaboratorAssigned
       ? [secret, allowed].map((activity) => ({
@@ -99,6 +104,7 @@ page.on("request", (request) => {
   if (/\/rpc\/vmp_my_item_rights/.test(url)) {
     if (request.method() === "OPTIONS") return answer(request, []);
     rightsReads += 1;
+    itemBodies.push(JSON.parse(request.postData() || "{}"));
     if (failNextRights) {
       failNextRights = false;
       return answer(request, { message: "forced rights failure" }, 500);
@@ -127,7 +133,9 @@ page.on("request", (request) => {
     }
     return answer(request, { activities: [secret], objects: [] });
   }
-  request.continue();
+  if (parsed.origin === GOC) return request.continue();
+  unexpectedRequests.push(`${request.method()} ${parsed.origin}${parsed.pathname}`);
+  return request.abort();
 });
 page.on("requestfinished", (request) => {
   if (request === staleRightsRequest) markStaleRightsFinished?.();
@@ -294,6 +302,14 @@ try {
   assert.equal(failNextRights, false, "mock lỗi per-item phải được tiêu thụ");
   assert.equal(await page.evaluate(() => document.body.innerText.includes("Ứng dụng gặp lỗi khi hiển thị")), false,
     "lỗi per-item sau khi modal đóng không được làm sập ứng dụng");
+  assert.deepEqual(batchBodies,
+    Array.from({ length: batchBodies.length }, () => ({})),
+    "mọi batch POST ở mọi phase revoke phải có body đúng {}");
+  assert.deepEqual(itemBodies,
+    Array.from({ length: itemBodies.length }, () => ({ p_validation_code: secret.id })),
+    "mọi per-item POST ở mọi phase revoke chỉ gửi đúng mã hạng mục đang mở");
+  assert.deepEqual(unexpectedRequests, [],
+    "revoke E2E phải abort và ghi nhận mọi request ngoài preview/mock origin");
   console.log("✅ Đổi enforced thu hồi cache; modal không lộ nội dung khi mất hoặc không tải được quyền");
 } finally {
   await browser.close();

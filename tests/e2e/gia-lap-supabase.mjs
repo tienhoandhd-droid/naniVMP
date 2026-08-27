@@ -37,7 +37,7 @@ export const NGUOI_DUNG = {
 };
 
 /** Phiên giả có hạn xa, để supabase-js không đi làm mới token qua mạng. */
-export function phienGia() {
+export function phienGia(nguoiDung = NGUOI_DUNG) {
   const hetHan = Math.floor(Date.now() / 1000) + 60 * 60 * 8;
   return {
     access_token: "gia-lap-khong-phai-token-that",
@@ -45,7 +45,7 @@ export function phienGia() {
     expires_in: 28_800,
     expires_at: hetHan,
     refresh_token: "gia-lap-refresh",
-    user: NGUOI_DUNG,
+    user: nguoiDung,
   };
 }
 
@@ -644,8 +644,17 @@ export function dungKhoDuLieu(kichBan) {
  * PHẢI gọi TRƯỚC lần điều hướng đầu tiên của trang. Mọi host ngoài
  * loopback và Google Fonts đều bị chặn — nếu một request lạ lọt ra ngoài
  * thì nó bị huỷ, và số lần huỷ được trả về để bộ kiểm tự tố cáo chính nó.
+ * `mangNghiemNgat` tắt ngoại lệ Google Fonts cho các contract hermetic;
+ * mặc định false để các bộ kiểm thẩm mỹ cũ giữ nguyên hành vi.
  */
-export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho, doTre } = {}) {
+export async function caiGiaLap(trang, {
+  supabaseUrl,
+  kichBan = "day",
+  suaKho,
+  doTre,
+  nguoiDung = NGUOI_DUNG,
+  mangNghiemNgat = false,
+} = {}) {
   const kho = dungKhoDuLieu(kichBan);
   /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống nhân viên xưởng để
      kiểm "không thấy nút ghi". Sửa tại chỗ, không trả kho ra ngoài. */
@@ -665,10 +674,10 @@ export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho, d
     const laFont = /^fonts\.(googleapis|gstatic)\.com$/.test(u.hostname);
 
     if (laNoiBo) { req.continue(); return; }
-    if (laFont && req.method() === "GET") { req.continue(); return; }
+    if (!mangNghiemNgat && laFont && req.method() === "GET") { req.continue(); return; }
 
     if (u.host === hostSupabase) {
-      const phanHoi = traLoi(kho, u, req);
+      const phanHoi = traLoi(kho, u, req, { nguoiDung });
       /* doTre: { ten_rpc: ms } — giả lập mạng chậm cho TỪNG RPC, để kiểm
          được trạng thái trung gian (vẽ sớm từ bản lưu, banner đang tải).
          Không trễ preflight OPTIONS: trình duyệt chờ preflight xong mới
@@ -689,7 +698,7 @@ export async function caiGiaLap(trang, { supabaseUrl, kichBan = "day", suaKho, d
   return { chanNgoai };
 }
 
-export function traLoi(kho, u, req) {
+export function traLoi(kho, u, req, { nguoiDung = NGUOI_DUNG } = {}) {
   /* Đủ bộ header CORS. Thiếu Allow-Headers là preflight trượt và trình
      duyệt chặn thẳng — lúc đó lỗi hiện ra dưới dạng "net::ERR_FAILED",
      rất dễ tưởng nhầm là mock chưa chạy. */
@@ -723,14 +732,14 @@ export function traLoi(kho, u, req) {
         }),
       };
     }
-    return { status: 200, headers: dau, body: JSON.stringify(phienGia()) };
+    return { status: 200, headers: dau, body: JSON.stringify(phienGia(nguoiDung)) };
   }
   if (u.pathname.startsWith("/auth/v1/recover")) {
     // Quên mật khẩu: GoTrue trả 200 rỗng dù email tồn tại hay không.
     return { status: 200, headers: dau, body: "{}" };
   }
   if (u.pathname.startsWith("/auth/v1/user")) {
-    return { status: 200, headers: dau, body: JSON.stringify(NGUOI_DUNG) };
+    return { status: 200, headers: dau, body: JSON.stringify(nguoiDung) };
   }
   if (u.pathname.startsWith("/auth/v1/logout")) {
     return { status: 204, headers: dau, body: "" };
@@ -787,10 +796,14 @@ export function traLoi(kho, u, req) {
 }
 
 /** Nhét phiên giả vào localStorage trước khi trang chạy JavaScript. */
-export async function nhetPhien(trang, { supabaseUrl, cheDo = "light" } = {}) {
+export async function nhetPhien(trang, {
+  supabaseUrl,
+  cheDo = "light",
+  nguoiDung = NGUOI_DUNG,
+} = {}) {
   const khoa = `sb-${layRef(supabaseUrl)}-auth-token`;
   await trang.evaluateOnNewDocument((k, phien, che) => {
     localStorage.setItem(k, JSON.stringify(phien));
     localStorage.setItem("vmp-theme", che);
-  }, khoa, phienGia(), cheDo);
+  }, khoa, phienGia(nguoiDung), cheDo);
 }

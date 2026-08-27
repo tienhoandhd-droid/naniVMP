@@ -3,9 +3,11 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { docEnv, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
-import { LA_UI_ACCESS, uiAccessQuanLyQa } from "./ui-access.mjs";
 import {
-  MAT_KHAU_DUNG, NGUOI_DUNG, dungKhoDuLieu, traLoi,
+  LA_UI_ACCESS, uiAccessAdmin, uiAccessQuanLyQa,
+} from "./ui-access.mjs";
+import {
+  NGUOI_DUNG, dungKhoDuLieu, nhetPhien, traLoi,
 } from "./gia-lap-supabase.mjs";
 
 const GOC = process.env.VMP_E2E_ORIGIN || "http://localhost:4173";
@@ -81,13 +83,8 @@ const browser = await puppeteer.launch({
   headless: "new",
   args: ["--no-sandbox", ...CHROME_GL_ARGS],
 });
-const page = await browser.newPage();
-await page.emulateTimezone("UTC");
-await page.setViewport({ width: 1500, height: 1100 });
-await page.setRequestInterception(true);
 const mockSupabase = dungKhoDuLieu("day");
 
-let mode = "enforced";
 const qaManagerRight = {
   can_view: true,
   editable_fields: QA_MANAGER_FIELDS,
@@ -125,10 +122,11 @@ const workshopStaff = {
   scope_match: true,
   area_match: true,
 };
-let right = qaManagerRight;
 let updateShouldFail = false;
 const updateBodies = [];
 const permissionBodies = [];
+const batchBodies = [];
+const batchPhases = [];
 const unexpectedRequests = [];
 const cors = {
   "access-control-allow-origin": "*",
@@ -139,116 +137,188 @@ const answer = (request, body) => request.method() === "OPTIONS"
   ? request.respond({ status: 204, headers: cors, body: "" })
   : request.respond({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(body) });
 
-page.on("request", (request) => {
-  const url = request.url();
-  if (url.startsWith("data:") || url.startsWith("blob:")) return request.continue();
-  const parsedUrl = new URL(url);
-  if (parsedUrl.origin !== mockSupabaseOrigin) {
-    if (parsedUrl.origin === GOC) return request.continue();
-    unexpectedRequests.push(`${request.method()} ${parsedUrl.origin}${parsedUrl.pathname}`);
-    return request.abort();
-  }
-  /* Bài kiểm này cần đúng persona Quản lý QA ở cả lớp quyền màn hình lẫn
-     allowlist theo hạng mục; auth/profile nền cũng được mock, không ra mạng. */
-  if (LA_UI_ACCESS.test(url)) return answer(request, uiAccessQuanLyQa);
-  if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
-    return answer(request, {
-      // Item thô luôn có mặt; batch-rights mới là ranh giới lọc UI enforced.
-      activities: [ACTIVITY, NEXT_ACTIVITY],
-      objects: [], updated_at: "2026-08-10T00:00:00Z",
-    });
-  }
-  if (/\/rpc\/rpc_my_editable_progress_rights/.test(url)) {
-    const fields = right.editable_fields || [];
-    return answer(request, { ok: true, rights: right === unassignedQa ? [{
-      validation_code: NEXT_ACTIVITY.id, editable_fields: QA_MANAGER_FIELDS,
-      view_reason: "Hạng mục khác còn được xem",
-    }] : [{
-      validation_code: ACTIVITY.id, editable_fields: fields, view_reason: right.view_reason,
-    }, {
-      validation_code: NEXT_ACTIVITY.id, editable_fields: QA_MANAGER_FIELDS,
-      view_reason: "Hạng mục kế tiếp",
-    }] });
-  }
-  if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
-    return answer(request, { year: 2026, plan_items: 1, objects: 1, updated_at: "2026-08-10T00:00:00Z" });
-  }
-  if (/\/rpc\/item_permissions_mode/.test(url)) return answer(request, mode);
-  if (/\/rpc\/vmp_my_item_rights/.test(url)) {
-    if (request.method() !== "OPTIONS") permissionBodies.push(JSON.parse(request.postData() || "{}"));
-    return answer(request, [right]);
-  }
-  if (/\/rpc\/rpc_update_progress/.test(url)) {
-    if (request.method() !== "OPTIONS") updateBodies.push(JSON.parse(request.postData() || "{}"));
-    if (request.method() !== "OPTIONS" && updateShouldFail) {
-      return request.respond({
-        status: 400,
-        headers: cors,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "E2E_SAVE_FAILED", message: "Lưu E2E thất bại" }),
+const userFor = (suffix, email, fullName) => ({
+  ...NGUOI_DUNG,
+  id: `98000000-0000-4000-8000-${suffix}`,
+  email,
+  user_metadata: { full_name: fullName },
+});
+const staffUiAccess = (businessRole, dataScope) => ({
+  ok: true,
+  mode: "enforced",
+  business_role: businessRole,
+  unresolved_reason: null,
+  screens: {
+    progress: { can_view: true, data_scope: dataScope, actions: ["view"] },
+  },
+});
+const qaStaffUiAccess = staffUiAccess("qa_staff", "qa_assignment");
+const workshopUiAccess = staffUiAccess("workshop_staff", "workshop_assignment");
+const PERSONAS = {
+  qaManager: {
+    key: "qa_manager", label: "Quản lý QA E2E", mode: "enforced", right: qaManagerRight,
+    user: userFor("000000000031", "qa-manager-matrix@vi-du.test", "Quản lý QA matrix E2E"),
+    uiAccess: uiAccessQuanLyQa,
+  },
+  admin: {
+    key: "admin", label: "Admin E2E", mode: "enforced", right: adminRight,
+    user: userFor("000000000032", "admin-matrix@vi-du.test", "Admin matrix E2E"),
+    uiAccess: uiAccessAdmin,
+  },
+  workshop: {
+    key: "workshop", label: "Nhân viên xưởng E2E", mode: "enforced", right: workshopStaff,
+    user: userFor("000000000033", "workshop-matrix@vi-du.test", "Nhân viên xưởng matrix E2E"),
+    uiAccess: workshopUiAccess,
+  },
+  assignedQa: {
+    key: "assigned_qa", label: "QA phụ trách E2E", mode: "enforced", right: collaboratorQa,
+    user: userFor("000000000034", "qa-assigned-matrix@vi-du.test", "QA phụ trách matrix E2E"),
+    uiAccess: qaStaffUiAccess,
+  },
+  unassignedQa: {
+    key: "unassigned_qa", label: "QA chưa phân công E2E", mode: "enforced", right: unassignedQa,
+    user: userFor("000000000035", "qa-unassigned-matrix@vi-du.test", "QA chưa phân công matrix E2E"),
+    uiAccess: qaStaffUiAccess,
+  },
+};
+const PERSONAS_KEYS = ["qa_manager", "admin", "workshop", "assigned_qa", "unassigned_qa"];
+
+let page;
+async function newPersonaPage(persona) {
+  const nextPage = await browser.newPage();
+  await nextPage.emulateTimezone("UTC");
+  await nextPage.setViewport({ width: 1500, height: 1100 });
+  await nhetPhien(nextPage, { supabaseUrl: docEnv().VITE_SUPABASE_URL, nguoiDung: persona.user });
+  await nextPage.setRequestInterception(true);
+  nextPage.on("request", (request) => {
+    const url = request.url();
+    if (url.startsWith("data:") || url.startsWith("blob:")) return request.continue();
+    const parsedUrl = new URL(url);
+    if (parsedUrl.origin !== mockSupabaseOrigin) {
+      if (parsedUrl.origin === GOC) return request.continue();
+      unexpectedRequests.push(`${persona.key}: ${request.method()} ${parsedUrl.origin}${parsedUrl.pathname}`);
+      return request.abort();
+    }
+    if (LA_UI_ACCESS.test(url)) return answer(request, persona.uiAccess);
+    if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
+      return answer(request, {
+        activities: [ACTIVITY, NEXT_ACTIVITY],
+        objects: [], updated_at: "2026-08-10T00:00:00Z",
       });
     }
-    return answer(request, { ok: true });
-  }
-  if (/\/vmp_performers/.test(url)) return answer(request, []);
-  if (/\/(?:auth|rest)\/v1\//.test(url)) {
-    return request.respond(traLoi(mockSupabase, parsedUrl, request));
-  }
-  unexpectedRequests.push(`${request.method()} ${parsedUrl.origin}${parsedUrl.pathname}`);
-  request.abort();
-});
-
-async function dangNhapGiaLap() {
-  await page.goto(GOC, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("input[type=password]", { timeout: 30000 });
-  const inputs = await page.$$("input");
-  await inputs[0].type(NGUOI_DUNG.email);
-  const password = await page.$("input[type=password]");
-  await password.type(MAT_KHAU_DUNG);
-  await password.press("Enter");
-  await page.waitForFunction(
-    () => document.querySelectorAll("input[type=password]").length === 0,
-    { timeout: 30000 },
-  );
-  await page.waitForFunction(() => document.body.innerText.includes("hạng mục"), { timeout: 45000 });
+    if (/\/rpc\/rpc_my_editable_progress_rights/.test(url)) {
+      if (request.method() !== "OPTIONS") {
+        batchBodies.push({ persona: persona.key, body: JSON.parse(request.postData() || "{}") });
+      }
+      const fields = persona.right.editable_fields || [];
+      return answer(request, { ok: true, rights: persona.right === unassignedQa ? [{
+        validation_code: NEXT_ACTIVITY.id, editable_fields: QA_MANAGER_FIELDS,
+        view_reason: "Hạng mục khác còn được xem",
+      }] : [{
+        validation_code: ACTIVITY.id, editable_fields: fields, view_reason: persona.right.view_reason,
+      }, {
+        validation_code: NEXT_ACTIVITY.id, editable_fields: QA_MANAGER_FIELDS,
+        view_reason: "Hạng mục kế tiếp",
+      }] });
+    }
+    if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
+      return answer(request, { year: 2026, plan_items: 1, objects: 1, updated_at: "2026-08-10T00:00:00Z" });
+    }
+    if (/\/rpc\/item_permissions_mode/.test(url)) return answer(request, persona.mode);
+    if (/\/rpc\/vmp_my_item_rights/.test(url)) {
+      if (request.method() !== "OPTIONS") {
+        permissionBodies.push({ persona: persona.key, body: JSON.parse(request.postData() || "{}") });
+      }
+      return answer(request, [persona.right]);
+    }
+    if (/\/rpc\/rpc_update_progress/.test(url)) {
+      if (request.method() !== "OPTIONS") updateBodies.push(JSON.parse(request.postData() || "{}"));
+      if (request.method() !== "OPTIONS" && updateShouldFail) {
+        return request.respond({
+          status: 400,
+          headers: cors,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "E2E_SAVE_FAILED", message: "Lưu E2E thất bại" }),
+        });
+      }
+      return answer(request, { ok: true });
+    }
+    if (/\/vmp_performers/.test(url)) return answer(request, []);
+    if (/\/(?:auth|rest)\/v1\//.test(url)) {
+      return request.respond(traLoi(mockSupabase, parsedUrl, request, { nguoiDung: persona.user }));
+    }
+    unexpectedRequests.push(`${persona.key}: ${request.method()} ${parsedUrl.origin}${parsedUrl.pathname}`);
+    return request.abort();
+  });
+  return nextPage;
 }
 
 async function closeModal() {
-  const hasModal = await page.evaluate(() => [...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  const hasModal = await page.evaluate(() => [...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
   if (!hasModal) return;
   await page.evaluate(() => {
-    [...document.querySelectorAll("button")]
+    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+      .find((candidate) => candidate.getClientRects().length > 0
+        && [...candidate.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+    [...(dialog?.querySelectorAll("button") ?? [])]
       .find((button) => button.textContent?.trim() === "Hủy")?.click();
   });
-  await page.waitForFunction(() => ![...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
 }
 
-async function openPersona(nextMode, nextRight, { quick = false } = {}) {
-  await closeModal();
-  mode = nextMode;
-  right = nextRight;
-  await page.evaluate((useQuick) => {
-    [...document.querySelectorAll("button")]
+async function loadPersona(persona) {
+  if (page) await page.close();
+  page = await newPersonaPage(persona);
+  const batchReadsBeforePersona = batchBodies.length;
+  await page.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded" });
+  await doiVaiTrenMan(page, "edit", persona.label);
+  for (let i = 0; i < 100 && batchBodies.length === batchReadsBeforePersona; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(batchBodies.length > batchReadsBeforePersona,
+    `persona ${persona.key} phải đọc batch-rights mới bằng session riêng`);
+  assert.deepEqual(batchBodies.at(-1), { persona: persona.key, body: {} },
+    "batch-rights không nhận persona hoặc mã item từ browser");
+  batchPhases.push({ persona: persona.key, count: batchBodies.length - batchReadsBeforePersona });
+  await page.waitForSelector('[data-progress-rights-state="ready"]');
+}
+
+async function openPersona(persona, { quick = false } = {}) {
+  await loadPersona(persona);
+  await page.waitForSelector(`.vmp-chi-desktop [data-progress-item="${ACTIVITY.id}"]`);
+  await page.evaluate(([useQuick, itemId]) => {
+    const row = document.querySelector(`.vmp-chi-desktop [data-progress-item="${itemId}"]`);
+    [...(row?.querySelectorAll("button") ?? [])]
       .find((button) => button.textContent?.trim() === (useQuick ? "✓ Xong bước" : "Cập nhật"))?.click();
-  }, quick);
-  await page.waitForFunction(() => [...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  }, [quick, ACTIVITY.id]);
+  await page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
   await page.waitForFunction(
-    (expectedMode) => document.body.innerText.includes(expectedMode === "preview"
-      ? "Quyền dự kiến chưa áp dụng"
-      : "Quyền theo từng cột đang áp dụng"),
+    (expectedMode) => [...document.querySelectorAll(".vmp-scroll")]
+      .some((dialog) => dialog.getClientRects().length > 0
+        && dialog.innerText.includes(expectedMode === "preview"
+          ? "Quyền dự kiến chưa áp dụng"
+          : "Quyền theo từng cột đang áp dụng")),
     {},
-    nextMode,
+    persona.mode,
   );
 }
 
 async function controlState() {
   return page.evaluate(() => {
-    const title = [...document.querySelectorAll("span")]
-      .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
-    const dialog = title?.closest(".vmp-scroll");
+    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+      .find((candidate) => candidate.getClientRects().length > 0
+        && [...candidate.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
     /* Loại ô "Người thực hiện": nó là select nhưng KHÔNG phải control
        ngày/trạng thái mà phép kiểm này quan tâm. Ô đó nay hiện theo quyền
        màn hình (`source.edit_catalog`) chứ không theo cờ `isAdmin` cũ đọc
@@ -262,6 +332,7 @@ async function controlState() {
       qaEnabled: qa.filter((control) => !control.disabled).length,
       actualLabelCount: [...dialog.querySelectorAll("span")]
         .filter((node) => node.textContent?.trim() === "Ngày hoàn thành thực tế").length,
+      schedulePresent: !!schedule,
       scheduleEnabled: !!schedule && !schedule.disabled,
       scheduleValue: schedule?.value || "",
       hasSave: [...dialog.querySelectorAll("button")]
@@ -272,21 +343,17 @@ async function controlState() {
 }
 
 try {
-  await dangNhapGiaLap();
-  await doiVaiTrenMan(page, "edit", "Quản lý QA E2E");
-  await page.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded" });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.body.innerText.includes("TB-E2E-01"));
-
-  await openPersona("enforced", qaManagerRight);
-  assert.deepEqual(permissionBodies[0], { p_validation_code: ACTIVITY.id },
+  await openPersona(PERSONAS.qaManager);
+  assert.deepEqual(permissionBodies[0], {
+    persona: "qa_manager", body: { p_validation_code: ACTIVITY.id },
+  },
     "frontend chỉ gửi mã hạng mục vào wrapper quyền của chính auth.uid");
   const qa = await controlState();
   assert.equal(qa.qaCount, 8, "QA phải có đúng tám control ngày/trạng thái");
   assert.equal(qa.qaEnabled, 8, "QA phải sửa được đủ tám trường QA");
   assert.equal(qa.actualLabelCount, 4,
     "bốn ô ngày QA phải giữ đúng nhãn Ngày hoàn thành thực tế");
-  assert.equal(qa.scheduleEnabled, false, "QA không được sửa scheduled_at");
+  assert.equal(qa.schedulePresent, false, "QA không được có scheduled_at trong DOM");
   await page.evaluate((actualDate) => {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim() === "1. Đề cương");
@@ -305,10 +372,11 @@ try {
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
   await page.waitForFunction(() => document.body.innerText.includes("Lưu E2E thất bại"));
   const qaDraftAfterFailure = await page.evaluate(() => {
-    const modalTitle = [...document.querySelectorAll("span")]
-      .find((node) => node.textContent?.trim() === "Cập nhật tiến độ");
-    return [...(modalTitle?.closest(".vmp-scroll")
-      ?.querySelectorAll('input[type="date"]') ?? [])].map((input) => input.value);
+    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+      .find((candidate) => candidate.getClientRects().length > 0
+        && [...candidate.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+    return [...(dialog?.querySelectorAll('input[type="date"]') ?? [])].map((input) => input.value);
   });
   assert.equal(qaDraftAfterFailure[0], QA_MANAGER_DATE,
     "RPC từ chối phải giữ nguyên actual-date draft của QA Manager");
@@ -322,23 +390,25 @@ try {
   updateShouldFail = false;
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
-  await page.waitForFunction(() => ![...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
   assert.deepEqual(updateBodies[1], updateBodies[0],
     "QA Manager có thể thử lại nguyên bản nháp sau lỗi server");
 
-  await openPersona("enforced", adminRight);
+  await openPersona(PERSONAS.admin);
   const admin = await controlState();
   assert.equal(admin.qaCount, 8, "Admin giữ đủ tám control ngày/trạng thái QA");
   assert.equal(admin.qaEnabled, 8, "Admin sửa được đủ tám trường QA được server cấp");
+  assert.equal(admin.schedulePresent, true,
+    "Admin chỉ có lịch thẩm định khi batch/per-item allowlist có scheduled_at");
   assert.equal(admin.scheduleEnabled, true,
     "Admin chỉ thấy lịch thẩm định khi batch/per-item allowlist có scheduled_at");
   assert.equal(admin.scheduleValue, "2026-08-12T14:35",
     "scheduled_at hiển thị theo Asia/Bangkok khi được server cấp");
 
-  // Đường tắt đã điền sẵn hai trường QA trước khi quyền về, tạo một bản nháp
-  // hỗn hợp. Enforced vẫn chỉ được gửi ngày thẩm định thực tế mà xưởng được cấp.
-  await openPersona("enforced", workshopStaff, { quick: true });
+  await openPersona(PERSONAS.workshop);
   const workshop = await controlState();
   assert.equal(workshop.qaCount, 1,
     "nhân viên xưởng chỉ còn đúng một control QA trong DOM, không giữ field cấm dạng disabled");
@@ -346,10 +416,47 @@ try {
     "nhân viên xưởng chỉ được sửa ngày thẩm định thực tế trong tám trường QA");
   assert.equal(workshop.actualLabelCount, 1,
     "nhân viên xưởng chỉ thấy nhãn ngày thực tế của bước thẩm định");
-  assert.equal(workshop.scheduleEnabled, false, "nhân viên xưởng không được sửa lịch thẩm định");
+  assert.equal(workshop.schedulePresent, false,
+    "nhân viên xưởng không được có lịch thẩm định trong DOM");
+  const workshopStages = await page.evaluate(() => {
+    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+      .find((candidate) => candidate.getClientRects().length > 0
+        && [...candidate.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+    return [1, 2, 3, 4].map((stage) => {
+      const title = [...(dialog?.querySelectorAll("span") ?? [])]
+        .find((node) => node.textContent?.trim().startsWith(`${stage}. `));
+      const block = title?.closest("div[style*='border']");
+      return {
+        dates: block?.querySelectorAll('input[type="date"]').length ?? 0,
+        statuses: block?.querySelectorAll("select").length ?? 0,
+        actualLabels: [...(block?.querySelectorAll("span") ?? [])]
+          .filter((node) => node.textContent?.trim() === "Ngày hoàn thành thực tế").length,
+      };
+    });
+  });
+  assert.deepEqual(workshopStages, [
+    { dates: 0, statuses: 0, actualLabels: 0 },
+    { dates: 1, statuses: 0, actualLabels: 1 },
+    { dates: 0, statuses: 0, actualLabels: 0 },
+    { dates: 0, statuses: 0, actualLabels: 0 },
+  ], "Workshop chỉ có actual_validation_date trong đúng bước 2; các stage khác rỗng");
 
-  // Hồ sơ mock đã hoàn thành đề cương, nên đường tắt mở đúng bước 2 và
-  // điền sẵn ngày thẩm định hôm nay. Quyền xưởng lọc status khỏi bản chênh.
+  // Quyền date-only không đủ điều kiện dùng đường tắt “Xong bước”; nhập ngày
+  // thủ công ở đúng stage 2 để không dựa vào bản quyền của persona trước.
+  await page.evaluate((actualDate) => {
+    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+      .find((candidate) => candidate.getClientRects().length > 0
+        && [...candidate.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+    const title = [...(dialog?.querySelectorAll("span") ?? [])]
+      .find((node) => node.textContent?.trim().startsWith("2. Thẩm định thực tế"));
+    const input = title?.closest("div[style*='border']")?.querySelector('input[type="date"]');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, actualDate);
+    input?.dispatchEvent(new Event("input", { bubbles: true }));
+    input?.dispatchEvent(new Event("change", { bubbles: true }));
+  }, WORKSHOP_DATE);
   await page.type("textarea", "Xưởng ghi nhận ngày thẩm định thực tế");
   await page.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
@@ -359,8 +466,10 @@ try {
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
   await page.waitForFunction(() => document.body.innerText.includes("Lưu E2E thất bại"));
   assert.equal(
-    await page.evaluate(() => [...document.querySelectorAll("span")]
-      .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")),
+    await page.evaluate(() => [...document.querySelectorAll(".vmp-scroll")]
+      .some((dialog) => dialog.getClientRects().length > 0
+        && [...dialog.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"))),
     true,
     "RPC lỗi thì modal phải giữ nguyên để người dùng thử lại",
   );
@@ -369,20 +478,23 @@ try {
     .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
-  await page.waitForFunction(() => ![...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
   assert.equal(updateBodies.length, workshopUpdateStart + 2,
     "sau lỗi người dùng có thể thử lưu lại cùng bản nháp");
   assert.deepEqual(Object.keys(updateBodies[workshopUpdateStart + 1].p_patch), ["actual_validation_date"]);
   assert.equal(updateBodies[workshopUpdateStart + 1].p_patch.actual_validation_date, WORKSHOP_DATE,
     "nhân viên xưởng chỉ được gửi ngày thẩm định thực tế xuống RPC");
 
-  await openPersona("enforced", collaboratorQa);
+  await openPersona(PERSONAS.assignedQa);
   const collaborator = await controlState();
   assert.equal(collaborator.qaCount, 7, "QA phụ trách chỉ có bảy control được cấp");
   assert.equal(collaborator.qaEnabled, 7,
     "QA phụ trách không giữ control ngày thẩm định bị cấm trong DOM");
-  assert.equal(collaborator.scheduleEnabled, false, "QA phối hợp không được xếp lịch");
+  assert.equal(collaborator.schedulePresent, false,
+    "QA phối hợp không được có lịch thẩm định trong DOM");
   const qaStaffValidationControl = await page.evaluate(() => {
     const title = [...document.querySelectorAll("span")]
       .find((node) => node.textContent?.trim().startsWith("2. Thẩm định thực tế"));
@@ -407,26 +519,45 @@ try {
   const qaStaffUpdateStart = updateBodies.length;
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
-  await page.waitForFunction(() => ![...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
   assert.deepEqual(updateBodies[qaStaffUpdateStart].p_patch, { status_validation: "in_progress" },
     "Nhân viên QA chỉ gửi trạng thái thẩm định được cấp xuống RPC");
   assert.equal(Object.hasOwn(updateBodies[qaStaffUpdateStart].p_patch, "actual_validation_date"), false,
     "request của Nhân viên QA không chứa actual_validation_date");
 
-  await closeModal();
-  mode = "enforced";
-  right = unassignedQa;
-  await page.reload({ waitUntil: "domcontentloaded" });
+  await loadPersona(PERSONAS.unassignedQa);
   await page.waitForFunction(() => document.body.innerText.includes("TB-E2E-02"));
   assert.equal(await page.evaluate(() => document.body.innerText.includes("TB-E2E-01")), false,
     "QA chưa phân công không thấy hạng mục mục tiêu trên dashboard enforced");
   assert.equal(await page.evaluate((targetCode) => [...document.querySelectorAll("tr")]
     .some((row) => row.innerText.includes(targetCode)), ACTIVITY.code), false,
   "không có dòng hạng mục thì QA chưa phân công không thể mở modal cập nhật");
-  assert.equal(await page.evaluate(() => [...document.querySelectorAll("span")]
-    .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")), false,
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll(".vmp-scroll")]
+    .some((dialog) => dialog.getClientRects().length > 0
+      && [...dialog.querySelectorAll("span")]
+        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"))), false,
   "dashboard đã thu hồi hạng mục không để modal mục tiêu còn mở");
+
+  assert.deepEqual(batchBodies.map(({ body }) => body),
+    Array.from({ length: batchBodies.length }, () => ({})),
+    "mọi batch POST ở mọi persona phải có body đúng {}");
+  assert.deepEqual(batchPhases.map(({ persona }) => persona),
+    ["qa_manager", "admin", "workshop", "assigned_qa", "unassigned_qa"],
+    "matrix phải đọc batch-rights mới ở đủ năm session persona");
+  assert.deepEqual(Object.fromEntries(PERSONAS_KEYS.map((persona) => [
+    persona, batchBodies.filter((entry) => entry.persona === persona).length,
+  ])), {
+    qa_manager: 1, admin: 1, workshop: 1, assigned_qa: 1, unassigned_qa: 1,
+  }, "mỗi phase persona phải phát sinh đúng một batch POST");
+  assert.deepEqual(permissionBodies.map(({ body }) => body),
+    Array.from({ length: permissionBodies.length }, () => ({ p_validation_code: ACTIVITY.id })),
+    "mọi per-item POST chỉ gửi đúng mã hạng mục mục tiêu");
+  assert.deepEqual(permissionBodies.map(({ persona }) => persona),
+    ["qa_manager", "admin", "workshop", "assigned_qa"],
+    "bốn persona có row phải reload per-item bằng đúng session riêng");
 
   assert.deepEqual(unexpectedRequests, [],
     "focused E2E không được để request ngoài preview/mock origin đi ra mạng");
