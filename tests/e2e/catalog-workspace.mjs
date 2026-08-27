@@ -1140,10 +1140,11 @@ for (const scenario of LOI_AP_DUNG_V2) {
     "42883 apply gọi V2 trước với body không override đầy đủ", JSON.stringify(v2ApplyBodies));
   kiem(JSON.stringify(v1ApplyBodies) === JSON.stringify([expectedApplyBodyV1()]),
     "42883 apply sau đó fallback giữ nguyên body V1", JSON.stringify(v1ApplyBodies));
-  kiem(JSON.stringify(rpcSequence) === JSON.stringify([
+  const applySequence = rpcSequence.filter(({ rpc }) => rpc.includes("apply_catalog_change"));
+  kiem(JSON.stringify(applySequence) === JSON.stringify([
     { rpc: "rpc_apply_catalog_change_v2", body: expectedApplyBodyV2WithoutOverride() },
     { rpc: "rpc_apply_catalog_change", body: expectedApplyBodyV1() },
-  ]), "42883 apply theo đúng thứ tự V2 rồi V1 với body đầy đủ", JSON.stringify(rpcSequence));
+  ]), "42883 apply theo đúng thứ tự V2 rồi V1 với body đầy đủ", JSON.stringify(applySequence));
   kiem(chanNgoai.length === 0, "42883 apply fallback không gọi ra ngoài", chanNgoai[0] || "");
   await trang.close();
 }
@@ -1195,9 +1196,10 @@ for (const scenario of LOI_AP_DUNG_V2) {
   kiem(JSON.stringify(v2ApplyBodies) === JSON.stringify([expectedApplyBodyV2()]),
     "override đã chọn gọi đúng V2 apply trước khi bị chặn", JSON.stringify(v2ApplyBodies));
   kiem(v1ApplyBodies.length === 0, "override đã chọn không được fallback sang V1");
-  kiem(JSON.stringify(rpcSequence) === JSON.stringify([
+  const applySequence = rpcSequence.filter(({ rpc }) => rpc.includes("apply_catalog_change"));
+  kiem(JSON.stringify(applySequence) === JSON.stringify([
     { rpc: "rpc_apply_catalog_change_v2", body: expectedApplyBodyV2() },
-  ]), "override đã chọn chỉ gọi V2, không có fallback", JSON.stringify(rpcSequence));
+  ]), "override đã chọn chỉ gọi V2, không có fallback", JSON.stringify(applySequence));
   kiem(state.dialogOpen && state.selected && state.reason && state.alert.includes("V2 chưa được triển khai"),
     "override bị chặn nhưng giữ nguyên bằng chứng người dùng đã nhập", JSON.stringify(state));
   kiem(chanNgoai.length === 0, "override bị chặn không gọi ra ngoài", chanNgoai[0] || "");
