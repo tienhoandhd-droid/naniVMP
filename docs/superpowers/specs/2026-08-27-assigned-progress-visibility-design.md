@@ -14,7 +14,7 @@ Màn Cập nhật tiến độ chỉ hiển thị những hạng mục mà ngư�
 - Nhân viên xưởng chỉ thấy hạng mục có phân công xưởng đang hoạt động, chưa hết hạn và khớp phạm vi của mình.
 - Hạng mục không có trường nào được phép cập nhật không xuất hiện trong màn Cập nhật tiến độ. Không hiển thị thẻ chỉ đọc và không cho mở modal.
 - Khi Admin hoặc Quản lý QA chọn **QA phụ trách** từ danh bạ trong Dữ liệu nguồn bằng luồng hiện có, sau lần nạp quyền kế tiếp các hạng mục đã được luồng đó phân công phải xuất hiện ở màn Cập nhật tiến độ của người vừa được chọn.
-- Khi luồng Dữ liệu nguồn hiện có xóa hoặc thay QA phụ trách, hạng mục phải biến mất khỏi màn Cập nhật tiến độ của người cũ và xuất hiện với người mới. Không thay đổi giao diện, RPC lưu, dữ liệu hoặc quyền truy cập của Dữ liệu nguồn trong đợt này.
+- Luồng E2E chéo màn hình của đợt này bắt đầu từ hạng mục chưa có QA phụ trách: Quản lý QA thêm người bằng Dữ liệu nguồn hiện có, lưu thành công, rồi hạng mục phải xuất hiện trong Cập nhật tiến độ của người đó. Không thay đổi giao diện, RPC lưu, dữ liệu hoặc quyền truy cập của Dữ liệu nguồn trong đợt này; hành vi thay/xóa người của writer Dữ liệu nguồn hiện có nằm ngoài phạm vi.
 - Quản lý QA thấy đúng tám trường: ngày và trạng thái của Đề cương, Thẩm định thực tế, Báo cáo và Tổng kết VMP.
 - Nhân viên QA thấy đúng bảy trường trên hạng mục được phân công: tất cả tám trường trên trừ Ngày thẩm định thực tế.
 - Nhân viên xưởng thấy đúng một trường trên hạng mục được phân công: Ngày thẩm định thực tế.
@@ -92,7 +92,7 @@ Frontend bỏ banner “Quyền dự kiến chưa áp dụng” trong modal Cậ
 - Admin và Quản lý QA nhận toàn bộ hạng mục hoạt động cùng đúng tám trường.
 - Nhân viên QA chỉ nhận hạng mục được phân công và đúng bảy trường.
 - Nhân viên QA không nhận HT-02 khi chưa được phân công.
-- Tập quyền cập nhật phản ánh phân công do luồng QA phụ trách hiện có tạo/thu hồi; đợt này không thay đổi contract lưu Dữ liệu nguồn.
+- Tập quyền cập nhật phản ánh phân công hiệu lực; E2E chéo màn hình xác minh phân công được luồng QA phụ trách hiện có tạo khi thêm người. Đợt này không thay đổi contract lưu Dữ liệu nguồn.
 - Nhân viên xưởng chỉ nhận hạng mục được phân công, đúng phạm vi và đúng một trường.
 - Phiên inactive/Viewer không nhận dữ liệu.
 - RPC không cho caller truyền user ID, không mở rộng EXECUTE và ổn định khi chạy lặp migration.
@@ -113,7 +113,7 @@ Frontend bỏ banner “Quyền dự kiến chưa áp dụng” trong modal Cậ
 - Nhân viên xưởng được phân công chỉ thấy Ngày thẩm định thực tế.
 - Thu hồi phân công khi tab đang mở làm hạng mục biến mất sau refresh/focus.
 - Luồng liên màn đầy đủ: Quản lý QA vào Dữ liệu nguồn, chọn QA phụ trách và lưu bằng luồng hiện có; đăng nhập đúng tài khoản QA, vào Cập nhật tiến độ và thấy hạng mục; trường Ngày thẩm định thực tế không tồn tại; lưu một trường hợp lệ thành công.
-- Luồng ngược: Quản lý QA xóa hoặc thay người; sau khi tài khoản QA cũ refresh/focus, hạng mục biến mất; tài khoản QA mới thấy hạng mục. E2E phải kiểm request/payload thật của hai màn, không chỉ gọi trực tiếp hàm lọc frontend.
+- E2E phải kiểm request/payload thật của hai màn cho luồng thêm QA phụ trách từ trạng thái chưa có người, không chỉ gọi trực tiếp hàm lọc frontend. Các fixture không được phân công vẫn phải chứng minh hạng mục không xuất hiện.
 - Payload gửi lên không chứa field ẩn và database chấp nhận field hợp lệ.
 
 ## 7. Triển khai và rollback

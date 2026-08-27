@@ -41,7 +41,7 @@
 - Modify `src/components/dashboard/progressModalAccess.ts`: progress-specific enforced content state; remove the preview bypass from this surface.
 - Modify `tests/unit/progress-modal-access-revocation.test.mjs`: revoke/refresh behavior under the dedicated progress contract.
 - Modify `tests/e2e/quyen-cot-timeline.mjs`: field DOM and payload matrix for Admin/QA Manager/assigned QA/unassigned QA/Workshop Staff.
-- Create `tests/e2e/phan-cong-cap-nhat-tien-do.mjs`: full Dữ liệu nguồn QA-owner → UpdatePage visibility → revoke/replace cross-screen flow.
+- Create `tests/e2e/phan-cong-cap-nhat-tien-do.mjs`: full Dữ liệu nguồn add QA-owner from unassigned → UpdatePage visibility cross-screen flow.
 - Modify `package.json`: add `e2e:progress-rights` and include it in `test:permissions`.
 - Modify `.github/workflows/deploy.yml`: run the progress-rights E2E in the deployment gate.
 - Modify `tests/unit/five-role-rpc-inventory.test.mjs`: register the new RPC as an additive reviewed explicit boundary, raise the literal source count from 65 to 66 and assert migration ACL/definition text.
@@ -149,7 +149,7 @@ Set `system_config.item_permissions_mode` to `preview`, then assert assigned QA 
 
 - [ ] **Step 4: Assert source-owner integration without changing source code**
 
-Call the existing reviewed `rpc_save_catalog_object` as QA Manager to set `owner_person_id`; assert its existing assignment cascade creates an active QA assignment. Then switch JWT claims to that QA and assert the new batch RPC contains the generated item. Remove/replace owner through the same existing RPC and assert the batch result changes for old/new personas.
+Call the existing reviewed `rpc_save_catalog_object` as QA Manager on an object without QA owner to set `owner_person_id`; assert its existing assignment cascade creates an active QA assignment. Then switch JWT claims to that QA and assert the new batch RPC contains the generated item. Keep replace/remove behavior of the existing Source Data writer out of scope and do not alter it as a shortcut.
 
 - [ ] **Step 5: Add security RED tests**
 
@@ -321,7 +321,7 @@ Assert forbidden labels/inputs are absent from DOM (not disabled), unassigned QA
 
 - [ ] **Step 2: Write cross-screen E2E RED**
 
-Flow: sign in as QA Manager → open Dữ liệu nguồn → edit an object → choose QA phụ trách → save → switch to that QA persona → open Cập nhật tiến độ → assigned item exists → open modal → actual validation date absent → update `status_validation` successfully. Then switch manager, replace/remove QA owner, switch old/new QA and verify disappear/appear after focus.
+Flow: sign in as QA Manager → open Dữ liệu nguồn on an object without QA owner → choose QA phụ trách → save → switch to that QA persona → open Cập nhật tiến độ → assigned item exists → open modal → actual validation date absent → update `status_validation` successfully. A separate unassigned persona/item fixture must remain absent; do not exercise or change the existing Source Data replace/remove writer in this delivery.
 
 - [ ] **Step 3: Assert real browser request contracts**
 
