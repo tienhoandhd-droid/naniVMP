@@ -42,6 +42,21 @@ export interface WorkshopScopeEditorState {
   reason: string;
 }
 
+export interface WorkshopMutationForbiddenInput {
+  coverage: WorkshopCoverageState;
+  choices: WorkshopScopeChoicesState;
+  selectedPersonId: string | null;
+  editor: WorkshopScopeEditorState;
+  error: string;
+}
+
+export interface WorkshopMutationForbiddenTransition {
+  coverage: WorkshopCoverageState;
+  choices: WorkshopScopeChoicesState;
+  selectedPersonId: null;
+  editor: WorkshopScopeEditorState;
+}
+
 export function workshopCoverageRequestIsCurrent(
   current: WorkshopCoverageRequestFence,
   request: WorkshopCoverageRequestFence,
@@ -60,6 +75,32 @@ export function initialWorkshopScopeChoicesState(): WorkshopScopeChoicesState {
 /** A person change, cancel, or unsafe mutation error must not reuse its reason. */
 export function clearWorkshopScopeEditor(_previous: WorkshopScopeEditorState): WorkshopScopeEditorState {
   return { editingGrantId: null, department: "", areaCode: "", line: "", reason: "" };
+}
+
+/** Wipe protected Source-derived values as soon as any scope mutation is denied. */
+export function clearWorkshopCoverageForForbidden(
+  state: WorkshopCoverageState,
+  error: string,
+): WorkshopCoverageState {
+  return {
+    ...state, status: "error", rows: [], authorizedTotal: 0, nextCursor: null,
+    error: { ok: false, errorCode: "FORBIDDEN", error },
+  };
+}
+
+/** One fail-closed transition shared by immediate mutation denial handling and tests. */
+export function workshopMutationForbiddenTransition(
+  input: WorkshopMutationForbiddenInput,
+): WorkshopMutationForbiddenTransition {
+  return {
+    coverage: clearWorkshopCoverageForForbidden(input.coverage, input.error),
+    choices: {
+      ...input.choices, status: "error", rows: [], nextCursor: null,
+      error: { errorCode: "FORBIDDEN", error: input.error },
+    },
+    selectedPersonId: null,
+    editor: clearWorkshopScopeEditor(input.editor),
+  };
 }
 
 function mergeByPersonId(
@@ -89,7 +130,7 @@ export function reduceWorkshopCoverage(
   if (action.requestId !== state.activeRequestId) return state;
   if (!action.result.ok) {
     if (action.result.errorCode === "FORBIDDEN") {
-      return { ...state, status: "error", rows: [], authorizedTotal: 0, nextCursor: null, error: action.result };
+      return clearWorkshopCoverageForForbidden(state, action.result.error);
     }
     return { ...state, status: "error", error: action.result };
   }

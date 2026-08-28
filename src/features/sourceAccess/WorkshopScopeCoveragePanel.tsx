@@ -6,7 +6,7 @@ import { normalizeWorkshopScopeDraft, type SourceWorkshopCoveragePerson, type So
 import { useSourceWorkshopCoverage } from "./useSourceWorkshopCoverage.ts";
 import {
   applyOptimisticWorkshopScopeGrant, clearWorkshopScopeEditor, initialWorkshopScopeChoicesState,
-  reduceWorkshopScopeChoices,
+  reduceWorkshopScopeChoices, workshopMutationForbiddenTransition,
 } from "./workshopScopeModel.ts";
 
 function unique(values: readonly string[]): string[] {
@@ -43,7 +43,7 @@ export default function WorkshopScopeCoveragePanel({
 }: {
   areaLessSourceCount?: number;
 }) {
-  const { state, query, search, refresh, loadMore, setState } = useSourceWorkshopCoverage();
+  const { state, query, search, refresh, loadMore, clearForbidden, setState } = useSourceWorkshopCoverage();
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [editingGrantId, setEditingGrantId] = useState<string | null>(null);
   const [department, setDepartment] = useState("");
@@ -64,6 +64,20 @@ export default function WorkshopScopeCoveragePanel({
     const cleared = clearWorkshopScopeEditor({ editingGrantId, department, areaCode, line, reason });
     setEditingGrantId(cleared.editingGrantId); setDepartment(cleared.department); setAreaCode(cleared.areaCode);
     setLine(cleared.line); setReason(cleared.reason);
+  };
+
+  const clearMutationForbidden = (error: string) => {
+    const transition = workshopMutationForbiddenTransition({
+      coverage: state, choices, selectedPersonId,
+      editor: { editingGrantId, department, areaCode, line, reason }, error,
+    });
+    choicesRequest.current += 1;
+    clearForbidden(error);
+    setChoices(transition.choices);
+    setSelectedPersonId(transition.selectedPersonId);
+    setEditingGrantId(transition.editor.editingGrantId); setDepartment(transition.editor.department);
+    setAreaCode(transition.editor.areaCode); setLine(transition.editor.line); setReason(transition.editor.reason);
+    setMessage(error);
   };
 
   useEffect(() => {
@@ -142,6 +156,10 @@ export default function WorkshopScopeCoveragePanel({
       });
       if (request !== mutationRequest.current) return;
       if (!result.ok) {
+        if (result.errorCode === "FORBIDDEN") {
+          clearMutationForbidden(result.error);
+          return;
+        }
         if (result.errorCode === "VERSION_CONFLICT") refresh();
         if (result.errorCode !== "NETWORK" && result.errorCode !== "NOT_CONFIGURED" && result.errorCode !== "MALFORMED_RESPONSE") {
           setReason("");

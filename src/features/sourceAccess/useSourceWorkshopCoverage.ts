@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listSourceWorkshopCoverage } from "./api.ts";
 import {
-  initialWorkshopCoverageState, reduceWorkshopCoverage, workshopCoverageRequestIsCurrent,
+  clearWorkshopCoverageForForbidden, initialWorkshopCoverageState, reduceWorkshopCoverage, workshopCoverageRequestIsCurrent,
   type WorkshopCoverageState,
 } from "./workshopScopeModel.ts";
 
@@ -57,5 +57,12 @@ export function useSourceWorkshopCoverage() {
     void load({ search: state.search, append: true });
   }, [load, state.nextCursor, state.search, state.status]);
 
-  return { state, query, search, refresh, loadMore, setState };
+  /** Invalidate every in-flight page before clearing a mutation-denied view. */
+  const clearForbidden = useCallback((error: string) => {
+    generation.current += 1;
+    requestId.current += 1;
+    setState((previous) => clearWorkshopCoverageForForbidden(previous, error));
+  }, []);
+
+  return { state, query, search, refresh, loadMore, clearForbidden, setState };
 }

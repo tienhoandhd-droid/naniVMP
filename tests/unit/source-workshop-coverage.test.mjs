@@ -13,6 +13,7 @@ import {
   initialWorkshopScopeChoicesState,
   reduceWorkshopCoverage,
   reduceWorkshopScopeChoices,
+  workshopMutationForbiddenTransition,
   workshopCoverageRequestIsCurrent,
 } from "../../src/features/sourceAccess/workshopScopeModel.ts";
 
@@ -211,4 +212,32 @@ test("editor reset never carries a prior reason into another person or a retry a
     clearWorkshopScopeEditor({ editingGrantId: GRANT_A, department: "Xưởng A", areaCode: "KV-01", line: "Dây 2", reason: "Lý do cũ" }),
     { editingGrantId: null, department: "", areaCode: "", line: "", reason: "" },
   );
+});
+
+test("a mutation FORBIDDEN transition clears all cached protected coverage before any refresh", () => {
+  const coverage = reduceWorkshopCoverage(initialWorkshopCoverageState(), {
+    type: "resolve", requestId: 0, append: false, result: decodeSourceWorkshopCoverageResponse(coveragePage),
+  });
+  const choices = reduceWorkshopScopeChoices(
+    reduceWorkshopScopeChoices(initialWorkshopScopeChoicesState(), { type: "start", requestId: 1, append: false }),
+    {
+      type: "resolve", requestId: 1, append: false,
+      result: decodeSourceWorkshopScopeChoicesResponse({
+        ok: true, rows: [{ department: "Xưởng A", area_code: "KV-01", line: null }], next_cursor: null,
+      }),
+    },
+  );
+  const next = workshopMutationForbiddenTransition({
+    coverage, choices, selectedPersonId: PERSON_A,
+    editor: { editingGrantId: GRANT_A, department: "Xưởng A", areaCode: "KV-01", line: "Dây 2", reason: "Lý do cũ" },
+    error: "Quyền đã bị thu hồi",
+  });
+
+  assert.equal(next.coverage.rows.length, 0);
+  assert.equal(next.coverage.authorizedTotal, 0);
+  assert.equal(next.coverage.nextCursor, null);
+  assert.equal(next.choices.rows.length, 0);
+  assert.equal(next.choices.nextCursor, null);
+  assert.equal(next.selectedPersonId, null);
+  assert.equal(next.editor.reason, "");
 });
