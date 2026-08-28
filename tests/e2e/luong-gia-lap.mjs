@@ -275,7 +275,7 @@ for (const [id, ten] of MAN) {
   await nhetPhien(trang, { supabaseUrl: URL_SB });
   await trang.setViewport({ width: 1680, height: 950 });
   await trang.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2400));
+  await trang.waitForFunction(() => document.querySelectorAll(".hn-muc").length > 0, { timeout: 5_000 });
 
   const banDau = await trang.evaluate(() => {
     const pane = document.querySelector(".hn-pane");
@@ -287,23 +287,29 @@ for (const [id, ten] of MAN) {
   kiem(banDau.coPane, "≥1600 có supporting pane");
   kiem(banDau.coVali, "chưa chọn gì thì pane là Vali hướng dẫn");
 
-  /* Chọn một việc → pane hiện chi tiết + nút Cập nhật. */
+  /* Chọn một việc → pane hiện chi tiết + nút Cập nhật tiến độ. */
   const maChon = await trang.evaluate(() => {
-    const nut = document.querySelector(".hn-muc__mo");
-    if (!nut) return null;
-    const ma = nut.querySelector(".hn-muc__ma")?.textContent?.trim() ?? null;
+    const maNode = document.querySelector(".hn-muc__ma");
+    const nut = maNode?.closest(".hn-muc")?.querySelector(".hn-muc__mo");
+    if (!nut || !maNode) return null;
+    const ma = maNode.textContent?.trim() ?? null;
     nut.click();
     return ma;
   });
-  await new Promise((r) => setTimeout(r, 500));
+  await trang.waitForFunction((code) => {
+    const pane = document.querySelector(".hn-pane");
+    return pane?.textContent?.includes(code)
+      && [...pane.querySelectorAll("button")]
+        .some((button) => button.textContent?.trim() === "Cập nhật tiến độ");
+  }, { timeout: 5_000 }, maChon);
   const daChon = await trang.evaluate(() => ({
     chuPane: document.querySelector(".hn-pane")?.textContent ?? "",
     coCapNhat: [...(document.querySelector(".hn-pane")?.querySelectorAll("button") ?? [])]
-      .some((b) => b.textContent?.trim() === "Cập nhật"),
+      .some((b) => b.textContent?.trim() === "Cập nhật tiến độ"),
   }));
   kiem(maChon !== null && daChon.chuPane.includes(maChon),
     "chọn một việc thì pane hiện đúng mã đó", `"${maChon}"`);
-  kiem(daChon.coCapNhat, "pane có hành động Cập nhật");
+  kiem(daChon.coCapNhat, "pane có hành động Cập nhật tiến độ");
 
   /* Bỏ chọn → quay về Vali. */
   await trang.evaluate(() => {
