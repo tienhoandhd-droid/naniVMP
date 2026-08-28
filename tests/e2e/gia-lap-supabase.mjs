@@ -321,6 +321,17 @@ function quyenDayDu() {
 export function dungKhoDuLieu(kichBan) {
   const day = kichBan === "day";
   const soHangMuc = day ? 24 : 0;
+  const adminEditableFields = [
+    "actual_protocol_date",
+    "status_protocol",
+    "actual_validation_date",
+    "status_validation",
+    "actual_report_date",
+    "status_report",
+    "actual_vmp_date",
+    "status_vmp",
+    "scheduled_at",
+  ];
 
   const hangMuc = Array.from({ length: soHangMuc }, (_, i) => dungHangMuc(i));
   const doiTuong = Array.from({ length: day ? 12 : 0 }, (_, i) => dungDoiTuong(i));
@@ -466,8 +477,23 @@ export function dungKhoDuLieu(kichBan) {
 
     /* --- RPC --- */
     rpc_my_ui_access: quyenDayDu(),
+    rpc_my_editable_progress_rights: {
+      ok: true,
+      rights: hangMuc.map((item) => ({
+        validation_code: item.code,
+        editable_fields: adminEditableFields,
+        view_reason: "Quản trị toàn hệ thống",
+      })),
+    },
     item_permissions_mode: "preview",
-    vmp_my_item_rights: [],
+    vmp_my_item_rights: [{
+      can_view: true,
+      editable_fields: adminEditableFields,
+      view_reason: "Quản trị toàn hệ thống",
+      assignment_sources: [],
+      scope_match: true,
+      area_match: true,
+    }],
     rpc_get_vmp_dashboard: {
       activities: hangMuc,
       objects: doiTuong,

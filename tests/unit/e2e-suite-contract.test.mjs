@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { dungKhoDuLieu } from "../e2e/gia-lap-supabase.mjs";
 
 const legacyDirectoryCommand = "node tests/e2e/danh-muc-nguoi-thuc-hien.mjs";
 
@@ -11,6 +12,43 @@ async function readRepositoryFile(relativePath) {
 function commandsIn(script) {
   return script.split(/\s*&&\s*/u).map((command) => command.trim());
 }
+
+test("fixture E2E mặc định cấp quyền tiến độ theo lô cho toàn bộ hạng mục của admin", () => {
+  const kho = dungKhoDuLieu("day");
+  const payload = typeof kho.rpc_my_editable_progress_rights === "function"
+    ? kho.rpc_my_editable_progress_rights()
+    : kho.rpc_my_editable_progress_rights;
+
+  assert.equal(payload?.ok, true);
+  assert.equal(payload?.rights?.length, 24);
+  assert.deepEqual(payload.rights[0], {
+    validation_code: "TB-100-IQ",
+    editable_fields: [
+      "actual_protocol_date",
+      "status_protocol",
+      "actual_validation_date",
+      "status_validation",
+      "actual_report_date",
+      "status_report",
+      "actual_vmp_date",
+      "status_vmp",
+      "scheduled_at",
+    ],
+    view_reason: "Quản trị toàn hệ thống",
+  });
+
+  const itemRights = typeof kho.vmp_my_item_rights === "function"
+    ? kho.vmp_my_item_rights({ p_validation_code: "TB-100-IQ" })
+    : kho.vmp_my_item_rights;
+  assert.deepEqual(itemRights, [{
+    can_view: true,
+    editable_fields: payload.rights[0].editable_fields,
+    view_reason: "Quản trị toàn hệ thống",
+    assignment_sources: [],
+    scope_match: true,
+    area_match: true,
+  }]);
+});
 
 test("cả test:permissions và e2e đều chạy bộ kiểm danh mục người thực hiện đúng một lần", async () => {
   const packageJson = JSON.parse(await readRepositoryFile("package.json"));
