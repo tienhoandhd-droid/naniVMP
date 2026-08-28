@@ -356,13 +356,24 @@ Review the complete generated `pg_proc` inventory. Manager-gate all Source
 writers/history/import/pending functions. Rights-filter any legitimate lower-role
 reader. Revoke execute from renamed/private implementations. Gate
 `rpc_list_catalog_dataset` products/alerts to Admin/QA Manager. Do not merely
-add a session check.
+add a session check. Pin `muc_quyen(text,text)` as a permission dependency and
+close direct client access to `vmp_legacy_action_map`: enable RLS, revoke all
+table/column privileges from PUBLIC, anon, authenticated, and service_role,
+retain the exact postgres owner ACL, do not FORCE RLS, and add zero policies.
+Pin the exact signature, owner, SECURITY DEFINER, search path, ACL, and reviewed
+definition hashes of both `muc_quyen(text,text)` and `duoc_phep(text,text)`, then
+prove both still return the reviewed action/role matrix. No application or
+reviewed service code writes this mapping directly.
 
 - [ ] **Step 4: Replace RLS**
 
 Install exact Source/item/grant/assignment policies from the design and align
 products/alerts with manager-only access. Assert no permissive authenticated
-policy remains and direct mutations remain revoked.
+policy remains and direct mutations remain revoked. Assert owner-only exact
+`relacl`, `relrowsecurity=true`, `relforcerowsecurity=false`, zero policies, and
+zero non-owner column ACL for `vmp_legacy_action_map`. Low-role direct SELECT,
+INSERT, UPDATE, and DELETE probes must all fail without changing its mapping
+digest; resolver compatibility must pass afterward.
 
 - [ ] **Step 5: Run security/performance GREEN**
 

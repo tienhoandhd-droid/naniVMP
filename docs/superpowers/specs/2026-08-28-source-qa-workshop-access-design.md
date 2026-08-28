@@ -454,6 +454,14 @@ even when a caller bypasses the navigation.
   Source, grants, plan items, assignments, profiles, and performers.
 - Products/alert-recipient RLS is aligned with the manager-only Source dataset
   rule so direct table reads cannot bypass `rpc_list_catalog_dataset`.
+- `vmp_legacy_action_map` is a permission dependency of `muc_quyen` and is not
+  client-managed data. Enable RLS without FORCE, expose zero policies, revoke
+  all table and column privileges from PUBLIC, anon, authenticated, and
+  service_role, and retain only the exact postgres owner ACL with no non-owner
+  column ACL. Existing postgres-owned SECURITY DEFINER permission resolution
+  continues to read it. This closes the
+  reviewed baseline path where a lower role could rewrite a legacy action into
+  an action it already owns and thereby influence older authorization checks.
 
 Service role is not silently treated as a browser persona. Maintenance calls
 must enter an explicitly classified service-only function.
@@ -761,9 +769,13 @@ production apply and again before the final completion claim.
 7. **Partial catalog/projection update:** old writer reports per-item failures.
    Mitigation: one transaction, no partial success arrays, stable lock order,
    and exact protected-row assertions.
-8. **Non-object Source leak:** nav currently exposes global datasets.
+8. **Mutable legacy permission mapping:** the reviewed baseline grants direct
+   authenticated mutation on `vmp_legacy_action_map`, which feeds `muc_quyen`.
+   Mitigation: fail RED until exact owner-only ACL/RLS is installed while
+   preserving the reviewed `muc_quyen`/`duoc_phep` SECURITY DEFINER paths.
+9. **Non-object Source leak:** nav currently exposes global datasets.
    Mitigation: both UI closure and manager-only server/RLS checks.
-9. **Production partial rollout:** linked SQL files commit individually.
+10. **Production partial rollout:** linked SQL files commit individually.
    Mitigation: immutable exact artifacts, read-only preflight, expand-first safe
    stop, transactional enforce file, postflight before frontend, forward-only
    recovery.
