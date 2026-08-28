@@ -19,12 +19,12 @@ export function TodayScopeControl({ scope, currentPersonId, onChange }: TodaySco
     onChange(scope === "mine" ? "team" : "mine");
   };
 
-  return <div className="visual-filter-bar" aria-label="Phạm vi việc hôm nay">
-    <button type="button" className="visual-reset-btn" aria-label={presentation.actionLabel}
+  return <div className="timeline-scope-inline" aria-label="Phạm vi việc hôm nay">
+    <button type="button" className="timeline-scope-btn" aria-label={presentation.actionLabel}
       aria-pressed={scope === "mine"} disabled={personalActionDisabled} onClick={changeScope}>
       {presentation.actionLabel}
     </button>
-    {presentation.warning && <div className="visual-filter-field" role="status">{presentation.warning}</div>}
+    {presentation.warning && <div className="timeline-scope-hint" role="status">{presentation.warning}</div>}
   </div>;
 }
 

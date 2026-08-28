@@ -56,15 +56,16 @@ test("presents Today scope labels and unlinked-account warning", () => {
 
 test("renders an accessible Today scope control and warns when the account is unlinked", () => {
   const mine = render({ scope: "mine", currentPersonId: "person-a", onChange: () => {} });
-  assert.match(mine, /<button[^>]*type="button"[^>]*aria-pressed="true"[^>]*>Xem việc cả đội<\/button>/);
+  assert.match(mine, /<div class="timeline-scope-inline" aria-label="Phạm vi việc hôm nay">/);
+  assert.match(mine, /<button[^>]*type="button"[^>]*class="timeline-scope-btn"[^>]*aria-label="Xem việc cả đội"[^>]*aria-pressed="true"[^>]*>Xem việc cả đội<\/button>/);
   assert.equal((mine.match(/<button\b/g) || []).length, 1);
 
   const team = render({ scope: "team", currentPersonId: "person-a", onChange: () => {} });
-  assert.match(team, /<button[^>]*type="button"[^>]*aria-pressed="false"[^>]*>Chỉ xem việc của tôi<\/button>/);
+  assert.match(team, /<button[^>]*type="button"[^>]*class="timeline-scope-btn"[^>]*aria-label="Chỉ xem việc của tôi"[^>]*aria-pressed="false"[^>]*>Chỉ xem việc của tôi<\/button>/);
 
   const unlinked = render({ scope: "team", currentPersonId: null, onChange: () => {} });
   assert.match(unlinked, /disabled/);
-  assert.match(unlinked, /role="status"/);
+  assert.match(unlinked, /<div class="timeline-scope-hint" role="status">/);
   assert.match(unlinked, /nhờ Admin nối hồ sơ/);
 });
 
