@@ -223,10 +223,17 @@ export function buildCatalogPatch(
  *  sách, nếu không người dùng sẽ bị server từ chối mà form không báo trước. */
 export const TRUONG_ANH_HUONG_TIMELINE: readonly string[] = [
   "frequency_months", "first_month", "report_class", "workdays",
-  "validate_flag", "is_active", "owner_person_id", "support_person_id",
+  "validate_flag", "is_active",
+];
+
+/** Phân công QA cấp/thu quyền ngay trên Dữ liệu nguồn. Nó phải có lý do
+ * truy vết riêng, nhưng tuyệt đối không được đưa vào thay đổi timeline. */
+export const TRUONG_PHAN_CONG_QA: readonly string[] = [
+  "owner_person_id", "support_person_id",
 ];
 
 export function canLyDo(patch: Record<string, unknown>, dangTaoMoi: boolean): boolean {
   if (dangTaoMoi) return false;
-  return TRUONG_ANH_HUONG_TIMELINE.some((k) => k in patch);
+  return TRUONG_ANH_HUONG_TIMELINE.some((k) => k in patch)
+    || TRUONG_PHAN_CONG_QA.some((k) => k in patch);
 }

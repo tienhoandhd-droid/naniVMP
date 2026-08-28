@@ -7,6 +7,8 @@ import {
   truongDangHien,
   coThamDinh,
   canLyDo,
+  TRUONG_ANH_HUONG_TIMELINE,
+  TRUONG_PHAN_CONG_QA,
   TRUONG_FORM,
   BO_PHAN_CHUAN,
   MA_BO_PHAN_KHAC,
@@ -100,6 +102,14 @@ test("chỉ đòi lý do khi đụng thứ ảnh hưởng timeline", () => {
   assert.equal(canLyDo({ owner_person_id: "x" }, false), true);
   // Tạo mới thì lý do là "tạo mới từ form", không bắt người dùng gõ.
   assert.equal(canLyDo({ frequency_months: 6 }, true), false);
+});
+
+test("phân công QA cần lý do truy vết nhưng không phải thay đổi timeline", () => {
+  for (const field of ["owner_person_id", "support_person_id"]) {
+    assert.equal(TRUONG_ANH_HUONG_TIMELINE.includes(field), false);
+    assert.equal(TRUONG_PHAN_CONG_QA.includes(field), true);
+    assert.equal(canLyDo({ [field]: "aaaaaaaa-1111-4111-8111-111111111111" }, false), true);
+  }
 });
 
 test("mã đối tượng khoá sau khi tạo", () => {

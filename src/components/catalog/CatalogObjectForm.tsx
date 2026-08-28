@@ -31,8 +31,8 @@ import {
 } from "../../lib/catalogForm.ts";
 import type { GiaTriForm, LoiForm, NhomTruong, TruongForm } from "../../lib/catalogForm.ts";
 import ChonHoacGo from "../../features/catalogWorkspace/ChonHoacGo.tsx";
-import PerformerSelect from "../../features/itemPermissions/PerformerSelect.tsx";
-import type { PerformerChoice } from "../../features/itemPermissions/performerSelection.ts";
+import QaPersonSelect from "../../features/sourceAccess/QaPersonSelect.tsx";
+import { useSourceQaCandidates } from "../../features/sourceAccess/useSourceQaCandidates.ts";
 import type { GoiY } from "../../features/catalogWorkspace/suggestions.ts";
 
 const TEN_NHOM: Record<NhomTruong, string> = {
@@ -65,11 +65,10 @@ function doc(t: TruongForm, form: GiaTriForm): string {
 }
 
 export default function CatalogObjectForm({
-  row, objectKind, performers, dangTaoMoi, onClose, onSaved, goiY,
+  row, objectKind, dangTaoMoi, onClose, onSaved, goiY,
 }: {
   row: Record<string, unknown>;
   objectKind: string;
-  performers: readonly PerformerChoice[];
   dangTaoMoi: boolean;
   onClose: () => void;
   onSaved: (patch: Record<string, unknown>, lyDo: string | null, version: number | null) => Promise<void>;
@@ -83,6 +82,13 @@ export default function CatalogObjectForm({
   const [loiChung, setLoiChung] = useState<string | null>(null);
   const [dangLuu, setDangLuu] = useState(false);
   const [moNangCao, setMoNangCao] = useState(false);
+  /* Danh bạ này là RPC quyền hẹp của Source: không dùng danh sách nhân sự
+     toàn cục và không bao giờ chọn theo tên. Hai ID hiện có được hỏi kèm để
+     trạng thái không còn đủ điều kiện vẫn nhìn thấy và có thể xoá rõ ràng. */
+  const qaCandidates = useSourceQaCandidates([
+    String(form.owner_person_id ?? "").trim(),
+    String(form.support_person_id ?? "").trim(),
+  ]);
   /* Chế độ "khác" của từng ô do chính `ChonHoacGo` nhớ — nó biết giá trị
      rỗng nghĩa là "chưa chọn" hay "chọn khác nhưng chưa gõ", còn form này
      thì không cần biết. */
@@ -111,6 +117,7 @@ export default function CatalogObjectForm({
   const daDoi = doiGi.length > 0;
   const patch = useMemo(() => buildCatalogPatch(form, row), [form, row]);
   const phaiCoLyDo = canLyDo(patch, dangTaoMoi);
+  const doiPhanCongQa = "owner_person_id" in patch || "support_person_id" in patch;
 
   /* Báo cho shell biết còn thay đổi chưa lưu. Bản trước gắn `beforeunload`
      ngay tại đây; sổ dùng chung làm được đúng việc đó mà không để lại
@@ -136,7 +143,9 @@ export default function CatalogObjectForm({
   const luu = async () => {
     const loiMoi = validateCatalogForm(form);
     if (phaiCoLyDo && !lyDo.trim()) {
-      loiMoi.__lyDo = "Sửa thông tin ảnh hưởng tới timeline thì phải nhập lý do";
+      loiMoi.__lyDo = doiPhanCongQa
+        ? "Thay đổi phân công QA phải nhập lý do"
+        : "Sửa thông tin ảnh hưởng tới timeline thì phải nhập lý do";
     }
     setLoi(loiMoi);
     if (Object.keys(loiMoi).length) {
@@ -208,12 +217,13 @@ export default function CatalogObjectForm({
             focusSignal={oCanNhay?.key === t.key ? oCanNhay.lan : undefined}
           />
         ) : t.chonNguoi ? (
-          <PerformerSelect
+          <QaPersonSelect
             value={form[t.key] || null}
-            options={performers}
-            allowClear
             ariaLabel={t.label}
             onChange={(nguoi) => dat(t.key, nguoi ?? "")}
+            state={qaCandidates.state}
+            onRetry={qaCandidates.retry}
+            onLoadMore={qaCandidates.loadMore}
             disabled={khoa}
           />
         ) : t.chon ? (

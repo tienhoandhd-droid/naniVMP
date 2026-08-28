@@ -34,8 +34,6 @@ import ViewportDialog from "../../components/ui/ViewportDialog.tsx";
 import CatalogObjectForm from "../../components/catalog/CatalogObjectForm.tsx";
 import CatalogImpactPreview from "../../components/catalog/CatalogImpactPreview.tsx";
 import CatalogWarningsSummary, { type CatalogWarning } from "../../components/catalog/CatalogWarningsSummary.tsx";
-import { usePerformers } from "../../hooks/index.ts";
-import { buildActivePerformerChoices } from "../itemPermissions/performerSelection.ts";
 import {
   SOURCE_KINDS, fetchSourceObjects, fetchSourceWarnings, generateTimeline,
   saveCatalogObject,
@@ -101,8 +99,6 @@ export default function CatalogWorkspaceShell({
   const canViewCatalogHistory = access.businessRole === "admin"
     || access.businessRole === "qa_manager";
 
-  const { performers } = usePerformers();
-  const performerChoices = buildActivePerformerChoices(performers);
   const toast = useToast();
   /* Gợi ý nhập nạp một lượt cho cả màn: mở hộp thoại rồi mới gọi mạng thì
      danh sách hiện sau con trỏ, và người dùng đã gõ xong nửa chữ. */
@@ -692,7 +688,6 @@ export default function CatalogWorkspaceShell({
         <CatalogObjectForm
           row={dangSuaObj.row}
           objectKind={kind}
-          performers={performerChoices}
           goiY={goiY}
           dangTaoMoi={dangSuaObj.taoMoi}
           onClose={() => setDangSuaObj(null)}
@@ -713,29 +708,6 @@ export default function CatalogWorkspaceShell({
               throw new Error(thongBao);
             }
             dang.xong(dangSuaObj.taoMoi ? `Đã tạo ${ma}` : `Đã lưu ${ma}`);
-            /* owner_assignments_* và owner_revocations_* chỉ có khi patch vừa
-               đổi owner_person_id (20260819110000) — chọn/xoá QA phụ trách
-               ở đây giờ cấp/thu hồi quyền THẬT cho mọi hạng mục đang hoạt
-               động của đối tượng, không chỉ ghi/xoá tên mô tả. Báo rõ khi
-               có hạng mục chưa xử lý được (ví dụ ngoài phạm vi người thao
-               tác) — im lặng bỏ qua sẽ làm người dùng tưởng ai cũng đã
-               được cấp/thu hồi trong khi chưa. */
-            const chuaCap = kq.owner_assignments_failed ?? [];
-            const chuaThuHoi = kq.owner_revocations_failed ?? [];
-            if (chuaCap.length) {
-              toast.canhBao(
-                `Đã lưu ${ma}, nhưng còn ${chuaCap.length} hạng mục chưa cấp được quyền cho QA phụ trách mới `
-                + `(${chuaCap.slice(0, 3).map((x) => x.validation_code).join(", ")}${chuaCap.length > 3 ? "…" : ""}) — `
-                + "liên hệ quản trị viên để kiểm tra phạm vi người thao tác hoặc phân công tay.",
-              );
-            }
-            if (chuaThuHoi.length) {
-              toast.canhBao(
-                `Đã lưu ${ma}, nhưng còn ${chuaThuHoi.length} hạng mục chưa thu hồi được quyền của người phụ trách cũ `
-                + `(${chuaThuHoi.slice(0, 3).map((x) => x.validation_code).join(", ")}${chuaThuHoi.length > 3 ? "…" : ""}) — `
-                + "liên hệ quản trị viên để kiểm tra lại phân công.",
-              );
-            }
             setDangSuaObj(null);
             await taiDoiTuong();
             onReload?.();
