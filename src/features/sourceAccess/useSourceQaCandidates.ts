@@ -15,6 +15,7 @@ export function useSourceQaCandidates(currentIds: readonly string[]) {
   );
   const includeKey = includeIds.join("\u0000");
   const [state, setState] = useState<SourceQaCandidatesState>(() => initialSourceQaCandidatesState(includeIds));
+  const [query, setQuery] = useState("");
   const requestId = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
@@ -41,6 +42,7 @@ export function useSourceQaCandidates(currentIds: readonly string[]) {
   useEffect(() => {
     const nextFence = invalidateSourceQaRequestFence(requestFence.current, includeKey);
     requestFence.current = nextFence;
+    setQuery(nextFence.query);
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
@@ -52,6 +54,7 @@ export function useSourceQaCandidates(currentIds: readonly string[]) {
   }, [includeKey]); // load intentionally changes as pagination state changes; IDs define a fresh directory scope.
 
   const search = useCallback((value: string) => {
+    setQuery(value);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
@@ -65,5 +68,5 @@ export function useSourceQaCandidates(currentIds: readonly string[]) {
     void load({ search: state.search, append: true });
   }, [load, state.nextCursor, state.search, state.status]);
 
-  return { state, search, retry, loadMore };
+  return { state, query, search, retry, loadMore };
 }

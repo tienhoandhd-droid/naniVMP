@@ -26,17 +26,18 @@ export interface SourceQaRequestFence {
   includeKey: string;
   generation: number;
   cancelPendingDebounce: boolean;
+  query: string;
 }
 
 export function initialSourceQaRequestFence(includeKey: string): SourceQaRequestFence {
-  return { includeKey, generation: 0, cancelPendingDebounce: false };
+  return { includeKey, generation: 0, cancelPendingDebounce: false, query: "" };
 }
 
 export function invalidateSourceQaRequestFence(
   previous: SourceQaRequestFence,
   includeKey: string,
 ): SourceQaRequestFence {
-  return { includeKey, generation: previous.generation + 1, cancelPendingDebounce: true };
+  return { includeKey, generation: previous.generation + 1, cancelPendingDebounce: true, query: "" };
 }
 
 export function sourceQaRequestIsCurrent(

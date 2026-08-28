@@ -5,6 +5,7 @@ import {
   decodeSourceQaCandidatesResponse,
   decodeSourceObjectListResponse,
   decodeWorkshopScopeGrantResponse,
+  sourceQaCandidateLabel,
 } from "../../src/features/sourceAccess/contracts.ts";
 
 const PERSON_A = "aaaaaaaa-1111-4111-8111-111111111111";
@@ -103,6 +104,28 @@ test("candidate contract keeps an RPC failure distinct from successful zero rows
     ok: false, error_code: "FORBIDDEN", error: "Không có quyền",
   });
   assert.deepEqual(failure, { ok: false, errorCode: "FORBIDDEN", error: "Không có quyền" });
+});
+
+test("included current preserves a missing QA assignment as an ID-only, actionable state", () => {
+  const result = decodeSourceQaCandidatesResponse({
+    ok: true,
+    rows: [],
+    included_current: [{
+      person_id: PERSON_B,
+      performer_name: null,
+      normalized_full_name: null,
+      email: null,
+      department: null,
+      eligible: false,
+      ineligibility_reason: "PERSON_NOT_FOUND",
+    }],
+    authorized_total: 0,
+    next_cursor: null,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.includedCurrent[0].ineligibilityReason, "PERSON_NOT_FOUND");
+  assert.equal(sourceQaCandidateLabel(result.includedCurrent[0]), `ID …${PERSON_B.slice(-8)}`);
 });
 
 test("Source list contract accepts only the locked 38-field wire shape", () => {

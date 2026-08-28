@@ -225,6 +225,7 @@ export default function CatalogObjectForm({
             ariaInvalid={Boolean(loiO)}
             onChange={(nguoi) => dat(t.key, nguoi ?? "")}
             state={qaCandidates.state}
+            query={qaCandidates.query}
             onRetry={qaCandidates.retry}
             onLoadMore={qaCandidates.loadMore}
             onSearch={qaCandidates.search}

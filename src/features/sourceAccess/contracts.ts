@@ -14,15 +14,18 @@ export type SourceQaCandidateErrorCode =
   | "NOT_CONFIGURED"
   | "MALFORMED_RESPONSE";
 
-export interface SourceQaCandidateIdentity {
+export interface SourceQaCandidateDisplay {
   personId: string;
-  fullName: string;
-  normalizedFullName: string;
+  fullName: string | null;
+  normalizedFullName: string | null;
   email: string | null;
   department: string | null;
 }
 
-export interface SourceQaCandidate extends SourceQaCandidateIdentity {
+/** Eligible directory rows always have a complete identity. */
+export interface SourceQaCandidate extends SourceQaCandidateDisplay {
+  fullName: string;
+  normalizedFullName: string;
   roleName: string;
 }
 
@@ -33,7 +36,8 @@ export type SourceQaCandidateIneligibilityReason =
   | "ACCOUNT_DISABLED"
   | "ROLE_INELIGIBLE";
 
-export interface IncludedSourceQaCandidate extends SourceQaCandidateIdentity {
+/** A current assignment may survive its personnel row so it can be removed safely. */
+export interface IncludedSourceQaCandidate extends SourceQaCandidateDisplay {
   eligible: boolean;
   ineligibilityReason: SourceQaCandidateIneligibilityReason | null;
 }
@@ -225,12 +229,26 @@ function json(value: unknown, label: string): JsonValue {
   return Object.fromEntries(Object.entries(raw).map(([key, entry]) => [key, json(entry, `${label}.${key}`)]));
 }
 
-function candidateIdentity(value: unknown, label: string): SourceQaCandidateIdentity {
+function candidateIdentity(value: unknown, label: string): SourceQaCandidateDisplay & {
+  fullName: string;
+  normalizedFullName: string;
+} {
   const raw = record(value, label);
   return {
     personId: uuid(raw.person_id, `${label}.person_id`),
     fullName: string(raw.performer_name, `${label}.performer_name`),
     normalizedFullName: string(raw.normalized_full_name, `${label}.normalized_full_name`),
+    email: nullableString(raw.email, `${label}.email`),
+    department: nullableString(raw.department, `${label}.department`),
+  };
+}
+
+function candidateDisplay(value: unknown, label: string): SourceQaCandidateDisplay {
+  const raw = record(value, label);
+  return {
+    personId: uuid(raw.person_id, `${label}.person_id`),
+    fullName: nullableString(raw.performer_name, `${label}.performer_name`),
+    normalizedFullName: nullableString(raw.normalized_full_name, `${label}.normalized_full_name`),
     email: nullableString(raw.email, `${label}.email`),
     department: nullableString(raw.department, `${label}.department`),
   };
@@ -278,7 +296,7 @@ export function decodeSourceQaCandidatesResponse(value: unknown): SourceQaCandid
         throw new SourceAccessContractError(`Source QA candidate response.included_current[${index}] has inconsistent eligibility.`);
       }
       return {
-        ...candidateIdentity(included, `Source QA candidate response.included_current[${index}]`),
+        ...candidateDisplay(included, `Source QA candidate response.included_current[${index}]`),
         eligible: included.eligible,
         ineligibilityReason: reason as SourceQaCandidateIneligibilityReason | null,
       };
@@ -291,6 +309,14 @@ export function decodeSourceQaCandidatesResponse(value: unknown): SourceQaCandid
     authorizedTotal: raw.authorized_total as number,
     nextCursor: candidateCursor(raw.next_cursor),
   };
+}
+
+/** Render identity without inventing a name for a deleted personnel record. */
+export function sourceQaCandidateLabel(person: SourceQaCandidateDisplay): string {
+  if (!person.fullName) return `ID …${person.personId.slice(-8)}`;
+  const identity = [person.fullName, person.email ?? "chưa có email", person.department ?? "chưa có bộ phận"];
+  identity.push(`ID …${person.personId.slice(-8)}`);
+  return identity.join(" · ");
 }
 
 function sourceListRow(value: unknown, label: string): SourceObjectListRow {

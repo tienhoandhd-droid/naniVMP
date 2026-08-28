@@ -91,5 +91,6 @@ test("a new include scope invalidates a queued debounce and any response from th
   const changed = invalidateSourceQaRequestFence(before, "owner-b");
   assert.equal(sourceQaRequestIsCurrent(changed, queued), false);
   assert.equal(changed.cancelPendingDebounce, true);
+  assert.equal(changed.query, "");
   assert.equal(sourceQaRequestIsCurrent(changed, { includeKey: "owner-b", generation: changed.generation }), true);
 });

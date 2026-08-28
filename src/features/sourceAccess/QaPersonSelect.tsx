@@ -1,7 +1,7 @@
-import { useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { RefreshCw } from "lucide-react";
 import { C, TEXT } from "../../constants/theme.ts";
-import type { IncludedSourceQaCandidate, SourceQaCandidateIdentity } from "./contracts.ts";
+import { sourceQaCandidateLabel, type IncludedSourceQaCandidate } from "./contracts.ts";
 import type { SourceQaCandidatesState } from "./sourceAccessModel.ts";
 
 const LY_DO_KHONG_DU_DIEU_KIEN: Record<string, string> = {
@@ -12,12 +12,6 @@ const LY_DO_KHONG_DU_DIEU_KIEN: Record<string, string> = {
   ROLE_INELIGIBLE: "không còn vai trò QA phù hợp",
 };
 
-function label(person: SourceQaCandidateIdentity): string {
-  const identity = [person.fullName, person.email ?? "chưa có email", person.department ?? "chưa có bộ phận"];
-  identity.push(`ID …${person.personId.slice(-8)}`);
-  return identity.join(" · ");
-}
-
 function current(state: SourceQaCandidatesState, personId: string | null): IncludedSourceQaCandidate | null {
   if (!personId) return null;
   return state.includedCurrent.find((person) => person.personId === personId) ?? null;
@@ -25,7 +19,7 @@ function current(state: SourceQaCandidatesState, personId: string | null): Inclu
 
 export default function QaPersonSelect({
   id, value, state, ariaLabel, ariaDescribedBy, ariaInvalid, disabled = false,
-  onChange, onRetry, onLoadMore, onSearch,
+  query, onChange, onRetry, onLoadMore, onSearch,
 }: {
   id: string;
   value: string | null;
@@ -37,9 +31,9 @@ export default function QaPersonSelect({
   onChange: (personId: string | null) => void;
   onRetry: () => void;
   onLoadMore: () => void;
+  query: string;
   onSearch: (value: string) => void;
 }) {
-  const [query, setQuery] = useState("");
   const selectedCurrent = current(state, value);
   const ineligible = selectedCurrent && !selectedCurrent.eligible ? selectedCurrent : null;
   const selectable = state.status === "ready" && !disabled;
@@ -62,7 +56,6 @@ export default function QaPersonSelect({
         value={query}
         onChange={(event) => {
           const nextQuery = event.target.value;
-          setQuery(nextQuery);
           onSearch(nextQuery);
         }}
         placeholder="Nhập tên QA…"
@@ -81,9 +74,9 @@ export default function QaPersonSelect({
         style={style}
       >
         <option value="">— chưa phân công —</option>
-        {ineligible && <option value={ineligible.personId} disabled>{label(ineligible)} — không còn đủ điều kiện</option>}
-        {currentEligibleOutsidePage && <option value={currentEligibleOutsidePage.personId}>{label(currentEligibleOutsidePage)}</option>}
-        {rows.map((person) => <option key={person.personId} value={person.personId}>{label(person)}</option>)}
+        {ineligible && <option value={ineligible.personId} disabled>{sourceQaCandidateLabel(ineligible)} — không còn đủ điều kiện</option>}
+        {currentEligibleOutsidePage && <option value={currentEligibleOutsidePage.personId}>{sourceQaCandidateLabel(currentEligibleOutsidePage)}</option>}
+        {rows.map((person) => <option key={person.personId} value={person.personId}>{sourceQaCandidateLabel(person)}</option>)}
       </select>
       {value && !disabled && !selectable && (
         <button type="button" className="cw-nut cw-nut--phu" onClick={() => onChange(null)}>
