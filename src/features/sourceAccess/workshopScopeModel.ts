@@ -1,6 +1,7 @@
 import type {
   SourceWorkshopCoverageFailure, SourceWorkshopCoveragePerson, SourceWorkshopCoverageResult,
-  SourceWorkshopCoverageCursor, WorkshopScopeGrant,
+  SourceWorkshopCoverageCursor, SourceWorkshopScopeChoicesCursor, SourceWorkshopScopeChoicesFailure,
+  SourceWorkshopScopeChoicesResult, SourceWorkshopScopeChoice, WorkshopScopeGrant,
 } from "./contracts.ts";
 
 export type WorkshopCoverageStatus = "idle" | "loading" | "ready" | "error";
@@ -21,6 +22,26 @@ export type WorkshopCoverageAction =
 
 export interface WorkshopCoverageRequestFence { generation: number }
 
+export interface WorkshopScopeChoicesState {
+  status: WorkshopCoverageStatus;
+  activeRequestId: number;
+  rows: SourceWorkshopScopeChoice[];
+  nextCursor: SourceWorkshopScopeChoicesCursor | null;
+  error: Pick<SourceWorkshopScopeChoicesFailure, "errorCode" | "error"> | null;
+}
+
+export type WorkshopScopeChoicesAction =
+  | { type: "start"; requestId: number; append: boolean }
+  | { type: "resolve"; requestId: number; result: SourceWorkshopScopeChoicesResult; append: boolean };
+
+export interface WorkshopScopeEditorState {
+  editingGrantId: string | null;
+  department: string;
+  areaCode: string;
+  line: string;
+  reason: string;
+}
+
 export function workshopCoverageRequestIsCurrent(
   current: WorkshopCoverageRequestFence,
   request: WorkshopCoverageRequestFence,
@@ -30,6 +51,15 @@ export function workshopCoverageRequestIsCurrent(
 
 export function initialWorkshopCoverageState(): WorkshopCoverageState {
   return { status: "idle", activeRequestId: 0, search: "", rows: [], authorizedTotal: 0, nextCursor: null, error: null };
+}
+
+export function initialWorkshopScopeChoicesState(): WorkshopScopeChoicesState {
+  return { status: "idle", activeRequestId: 0, rows: [], nextCursor: null, error: null };
+}
+
+/** A person change, cancel, or unsafe mutation error must not reuse its reason. */
+export function clearWorkshopScopeEditor(_previous: WorkshopScopeEditorState): WorkshopScopeEditorState {
+  return { editingGrantId: null, department: "", areaCode: "", line: "", reason: "" };
 }
 
 function mergeByPersonId(
@@ -57,7 +87,12 @@ export function reduceWorkshopCoverage(
     };
   }
   if (action.requestId !== state.activeRequestId) return state;
-  if (!action.result.ok) return { ...state, status: "error", error: action.result };
+  if (!action.result.ok) {
+    if (action.result.errorCode === "FORBIDDEN") {
+      return { ...state, status: "error", rows: [], authorizedTotal: 0, nextCursor: null, error: action.result };
+    }
+    return { ...state, status: "error", error: action.result };
+  }
   return {
     ...state,
     status: "ready",
@@ -65,6 +100,40 @@ export function reduceWorkshopCoverage(
     authorizedTotal: action.result.authorizedTotal,
     nextCursor: action.result.nextCursor,
     error: null,
+  };
+}
+
+function mergeChoices(
+  current: readonly SourceWorkshopScopeChoice[], next: readonly SourceWorkshopScopeChoice[],
+): SourceWorkshopScopeChoice[] {
+  const byTuple = new Map(current.map((choice) => [`${choice.department}\u0000${choice.areaCode}\u0000${choice.line ?? ""}`, choice]));
+  next.forEach((choice) => byTuple.set(`${choice.department}\u0000${choice.areaCode}\u0000${choice.line ?? ""}`, choice));
+  return [...byTuple.values()];
+}
+
+/** Choice tuples are protected data too: deny clears their previous page. */
+export function reduceWorkshopScopeChoices(
+  state: WorkshopScopeChoicesState,
+  action: WorkshopScopeChoicesAction,
+): WorkshopScopeChoicesState {
+  if (action.type === "start") {
+    return {
+      ...state, status: "loading", activeRequestId: action.requestId,
+      rows: action.append ? state.rows : [], nextCursor: action.append ? state.nextCursor : null, error: null,
+    };
+  }
+  if (action.requestId !== state.activeRequestId) return state;
+  if (!action.result.ok) {
+    const error = { errorCode: action.result.errorCode, error: action.result.error };
+    if (action.result.errorCode === "FORBIDDEN") {
+      return { ...state, status: "error", rows: [], nextCursor: null, error };
+    }
+    return { ...state, status: "error", error };
+  }
+  return {
+    ...state, status: "ready",
+    rows: action.append ? mergeChoices(state.rows, action.result.rows) : action.result.rows,
+    nextCursor: action.result.nextCursor, error: null,
   };
 }
 

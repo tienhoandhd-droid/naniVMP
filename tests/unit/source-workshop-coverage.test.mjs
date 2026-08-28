@@ -9,7 +9,10 @@ import {
 import {
   initialWorkshopCoverageState,
   applyOptimisticWorkshopScopeGrant,
+  clearWorkshopScopeEditor,
+  initialWorkshopScopeChoicesState,
   reduceWorkshopCoverage,
+  reduceWorkshopScopeChoices,
   workshopCoverageRequestIsCurrent,
 } from "../../src/features/sourceAccess/workshopScopeModel.ts";
 
@@ -102,6 +105,28 @@ test("scope choices preserve a blank line as the area-wide option and reject mal
   );
 });
 
+test("coverage and scope-choice decoders fail closed when Source returns a blank non-null line", () => {
+  assert.throws(
+    () => decodeSourceWorkshopCoverageResponse({
+      ...coveragePage,
+      rows: [{ ...coveragePage.rows[0], grants: [{ ...grant, line: " ", line_key: " " }] }],
+    }),
+    /line/i,
+  );
+  assert.throws(
+    () => decodeSourceWorkshopScopeChoicesResponse({
+      ok: true, rows: [{ department: "Xưởng A", area_code: "KV-01", line: "  " }], next_cursor: null,
+    }),
+    /line/i,
+  );
+  assert.throws(
+    () => decodeSourceWorkshopScopeChoicesResponse({
+      ok: true, rows: [], next_cursor: { department: "Xưởng A", area_code: "KV-01", line: " " },
+    }),
+    /line/i,
+  );
+});
+
 test("draft normalizer requires a reason and maps a blank line to area-wide coverage", () => {
   assert.deepEqual(
     normalizeWorkshopScopeDraft({
@@ -141,4 +166,49 @@ test("optimistic revoke changes only the targeted grant until the authoritative 
   assert.equal(next[0].grants[0].isActive, false);
   assert.equal(next[0].grants[0].version, 2);
   assert.equal(next[1].grants.length, 0);
+});
+
+test("a denied load-more clears retained workshop coverage rather than exposing stale grants", () => {
+  const page = decodeSourceWorkshopCoverageResponse(coveragePage);
+  assert.equal(page.ok, true);
+  if (!page.ok) return;
+  const ready = reduceWorkshopCoverage(initialWorkshopCoverageState(), {
+    type: "resolve", requestId: 0, append: false, result: page,
+  });
+  const loadingMore = reduceWorkshopCoverage(ready, { type: "start", requestId: 1, search: "", append: true });
+  const denied = reduceWorkshopCoverage(loadingMore, {
+    type: "resolve", requestId: 1, append: true,
+    result: { ok: false, errorCode: "FORBIDDEN", error: "Quyền đã bị thu hồi" },
+  });
+
+  assert.equal(denied.status, "error");
+  assert.equal(denied.rows.length, 0);
+  assert.equal(denied.authorizedTotal, 0);
+  assert.equal(denied.nextCursor, null);
+});
+
+test("a denied scope-choice response clears cached tuples while retaining the structured error", () => {
+  const loading = reduceWorkshopScopeChoices(initialWorkshopScopeChoicesState(), { type: "start", requestId: 1, append: false });
+  const ready = reduceWorkshopScopeChoices(loading, {
+    type: "resolve", requestId: 1, append: false,
+    result: decodeSourceWorkshopScopeChoicesResponse({
+      ok: true, rows: [{ department: "Xưởng A", area_code: "KV-01", line: null }], next_cursor: null,
+    }),
+  });
+  const loadingRetry = reduceWorkshopScopeChoices(ready, { type: "start", requestId: 2, append: false });
+  const denied = reduceWorkshopScopeChoices(loadingRetry, {
+    type: "resolve", requestId: 2, append: false,
+    result: { ok: false, errorCode: "FORBIDDEN", error: "Quyền đã bị thu hồi" },
+  });
+
+  assert.equal(denied.rows.length, 0);
+  assert.equal(denied.nextCursor, null);
+  assert.deepEqual(denied.error, { errorCode: "FORBIDDEN", error: "Quyền đã bị thu hồi" });
+});
+
+test("editor reset never carries a prior reason into another person or a retry after unsafe failure", () => {
+  assert.deepEqual(
+    clearWorkshopScopeEditor({ editingGrantId: GRANT_A, department: "Xưởng A", areaCode: "KV-01", line: "Dây 2", reason: "Lý do cũ" }),
+    { editingGrantId: null, department: "", areaCode: "", line: "", reason: "" },
+  );
 });

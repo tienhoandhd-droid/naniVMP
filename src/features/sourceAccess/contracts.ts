@@ -504,6 +504,9 @@ function workshopScopeGrant(value: unknown, label: string): WorkshopScopeGrant {
   if ((line === null) !== (lineKey === null)) {
     throw new SourceAccessContractError(`${label}.line and line_key must both be null or both be populated.`);
   }
+  if ((line !== null && !line.trim()) || (lineKey !== null && !lineKey.trim())) {
+    throw new SourceAccessContractError(`${label}.line must be null or nonblank.`);
+  }
   const version = integer(raw.version, `${label}.version`);
   if (version < 1) throw new SourceAccessContractError(`${label}.version must be positive.`);
   if (typeof raw.is_active !== "boolean") throw new SourceAccessContractError(`${label}.is_active must be boolean.`);
@@ -587,7 +590,9 @@ export function decodeSourceWorkshopScopeChoicesResponse(value: unknown): Source
     const department = string(row.department, `${label}.department`).trim();
     const areaCode = string(row.area_code, `${label}.area_code`).trim();
     if (!department || !areaCode) throw new SourceAccessContractError(`${label}.department and area_code must be nonblank.`);
-    return { department, areaCode, line: nullableString(row.line, `${label}.line`) };
+    const line = nullableString(row.line, `${label}.line`);
+    if (line !== null && !line.trim()) throw new SourceAccessContractError(`${label}.line must be null or nonblank.`);
+    return { department, areaCode, line };
   };
   const cursor = raw.next_cursor === null ? null : (() => {
     const row = decodeChoice(raw.next_cursor, "Workshop scope choices response.next_cursor");

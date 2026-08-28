@@ -2,25 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { btnPrimary, cardDefault, C, INP, TEXT } from "../../constants/theme.ts";
 import { listSourceWorkshopScopeChoices, setSourceWorkshopScopeGrant } from "./api.ts";
-import { normalizeWorkshopScopeDraft, type SourceWorkshopCoveragePerson, type SourceWorkshopScopeChoice, type SourceWorkshopScopeChoicesCursor, type WorkshopScopeGrant } from "./contracts.ts";
+import { normalizeWorkshopScopeDraft, type SourceWorkshopCoveragePerson, type SourceWorkshopScopeChoicesCursor, type WorkshopScopeGrant } from "./contracts.ts";
 import { useSourceWorkshopCoverage } from "./useSourceWorkshopCoverage.ts";
-import { applyOptimisticWorkshopScopeGrant } from "./workshopScopeModel.ts";
-
-type ChoicesState =
-  | { status: "loading"; rows: SourceWorkshopScopeChoice[]; nextCursor: SourceWorkshopScopeChoicesCursor | null; error: null }
-  | { status: "ready"; rows: SourceWorkshopScopeChoice[]; nextCursor: SourceWorkshopScopeChoicesCursor | null; error: null }
-  | { status: "error"; rows: SourceWorkshopScopeChoice[]; nextCursor: SourceWorkshopScopeChoicesCursor | null; error: string };
-
-const EMPTY_CHOICES: ChoicesState = { status: "loading", rows: [], nextCursor: null, error: null };
+import {
+  applyOptimisticWorkshopScopeGrant, clearWorkshopScopeEditor, initialWorkshopScopeChoicesState,
+  reduceWorkshopScopeChoices,
+} from "./workshopScopeModel.ts";
 
 function unique(values: readonly string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right, "vi"));
-}
-
-function mergeChoices(current: readonly SourceWorkshopScopeChoice[], next: readonly SourceWorkshopScopeChoice[]): SourceWorkshopScopeChoice[] {
-  const byTuple = new Map(current.map((choice) => [`${choice.department}\u0000${choice.areaCode}\u0000${choice.line ?? ""}`, choice]));
-  next.forEach((choice) => byTuple.set(`${choice.department}\u0000${choice.areaCode}\u0000${choice.line ?? ""}`, choice));
-  return [...byTuple.values()];
 }
 
 function optimisticGrant({
@@ -60,7 +50,7 @@ export default function WorkshopScopeCoveragePanel({
   const [areaCode, setAreaCode] = useState("");
   const [line, setLine] = useState("");
   const [reason, setReason] = useState("");
-  const [choices, setChoices] = useState<ChoicesState>(EMPTY_CHOICES);
+  const [choices, setChoices] = useState(initialWorkshopScopeChoicesState);
   const [choicesRetry, setChoicesRetry] = useState(0);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -70,14 +60,26 @@ export default function WorkshopScopeCoveragePanel({
   const selectedPerson = state.rows.find((person) => person.personId === selectedPersonId) ?? null;
   const editingGrant = selectedPerson?.grants.find((grant) => grant.id === editingGrantId) ?? null;
 
+  const clearEditor = () => {
+    const cleared = clearWorkshopScopeEditor({ editingGrantId, department, areaCode, line, reason });
+    setEditingGrantId(cleared.editingGrantId); setDepartment(cleared.department); setAreaCode(cleared.areaCode);
+    setLine(cleared.line); setReason(cleared.reason);
+  };
+
   useEffect(() => {
     if (selectedPersonId || state.rows.length === 0) return;
     setSelectedPersonId(state.rows[0].personId);
   }, [selectedPersonId, state.rows]);
 
+  useEffect(() => {
+    if (state.status !== "error" || state.error?.errorCode !== "FORBIDDEN") return;
+    setSelectedPersonId(null);
+    clearEditor();
+  }, [state.error, state.status]);
+
   const loadChoices = useCallback(async (append = false, cursor: SourceWorkshopScopeChoicesCursor | null = null) => {
     const request = ++choicesRequest.current;
-    setChoices((previous) => ({ status: "loading", rows: append ? previous.rows : [], nextCursor: append ? previous.nextCursor : null, error: null }));
+    setChoices((previous) => reduceWorkshopScopeChoices(previous, { type: "start", requestId: request, append }));
     const result = await listSourceWorkshopScopeChoices({
       department: department || null,
       areaCode: areaCode || null,
@@ -85,17 +87,15 @@ export default function WorkshopScopeCoveragePanel({
       limit: 50,
     });
     if (request !== choicesRequest.current) return;
-    if (!result.ok) {
-      setChoices((previous) => ({ status: "error", rows: previous.rows, nextCursor: previous.nextCursor, error: result.error }));
-      return;
-    }
-    setChoices((previous) => ({
-      status: "ready", rows: append ? mergeChoices(previous.rows, result.rows) : result.rows,
-      nextCursor: result.nextCursor, error: null,
-    }));
+    setChoices((previous) => reduceWorkshopScopeChoices(previous, { type: "resolve", requestId: request, result, append }));
   }, [areaCode, department]);
 
   useEffect(() => { void loadChoices(); }, [loadChoices, choicesRetry]);
+
+  useEffect(() => {
+    if (choices.status !== "error" || choices.error?.errorCode !== "FORBIDDEN") return;
+    clearEditor();
+  }, [choices.error, choices.status]);
 
   const departments = useMemo(() => unique(choices.rows.map((choice) => choice.department)), [choices.rows]);
   const areas = useMemo(() => unique(choices.rows
@@ -107,14 +107,13 @@ export default function WorkshopScopeCoveragePanel({
 
   const selectPerson = (person: SourceWorkshopCoveragePerson) => {
     setSelectedPersonId(person.personId);
-    setEditingGrantId(null);
-    setDepartment(""); setAreaCode(""); setLine(""); setMessage("");
+    clearEditor(); setMessage("");
   };
 
   const beginEdit = (grant: WorkshopScopeGrant) => {
     setEditingGrantId(grant.id);
     setDepartment(grant.department); setAreaCode(grant.areaCode); setLine(grant.line ?? "");
-    setMessage("");
+    setReason(""); setMessage("");
   };
 
   const save = async (isActive: boolean, direct?: {
@@ -144,6 +143,9 @@ export default function WorkshopScopeCoveragePanel({
       if (request !== mutationRequest.current) return;
       if (!result.ok) {
         if (result.errorCode === "VERSION_CONFLICT") refresh();
+        if (result.errorCode !== "NETWORK" && result.errorCode !== "NOT_CONFIGURED" && result.errorCode !== "MALFORMED_RESPONSE") {
+          setReason("");
+        }
         setMessage(result.error);
         return;
       }
@@ -152,7 +154,7 @@ export default function WorkshopScopeCoveragePanel({
         ...previous,
         rows: applyOptimisticWorkshopScopeGrant(previous.rows, { personId: currentPersonId, grant }),
       }));
-      setEditingGrantId(null); setReason("");
+      clearEditor();
       setMessage(isActive ? "Đã lưu phạm vi xưởng; đang đồng bộ dữ liệu máy chủ." : "Đã thu hồi phạm vi; đang đồng bộ dữ liệu máy chủ.");
       refresh();
     } finally {
@@ -238,13 +240,13 @@ export default function WorkshopScopeCoveragePanel({
               </select>
               <p>Để trống dây chuyền nghĩa là quyền xem toàn khu vực đã chọn.</p>
               {choices.status === "loading" && <p role="status">Đang tải lựa chọn từ Source…</p>}
-              {choices.status === "error" && <p role="alert">Không tải được lựa chọn Source: {choices.error} <button type="button" className="cw-nut cw-nut--phu" onClick={() => setChoicesRetry((value) => value + 1)}>Thử lại</button></p>}
+              {choices.status === "error" && <p role="alert">Không tải được lựa chọn Source: {choices.error?.error} <button type="button" className="cw-nut cw-nut--phu" onClick={() => setChoicesRetry((value) => value + 1)}>Thử lại</button></p>}
               {choices.status === "ready" && choices.nextCursor && <button type="button" className="cw-nut cw-nut--phu" onClick={() => void loadChoices(true, choices.nextCursor)}>Tải thêm lựa chọn Source</button>}
               <label htmlFor="workshop-scope-reason">Lý do thay đổi</label>
               <textarea id="workshop-scope-reason" value={reason} onChange={(event) => setReason(event.target.value)} required style={{ ...INP, minHeight: 76, paddingTop: 10 }} disabled={saving} />
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                 <button type="submit" style={btnPrimary} disabled={saving || choices.status !== "ready"}>{saving ? "Đang lưu…" : editingGrant ? "Lưu thay đổi" : "Thêm phạm vi"}</button>
-                {editingGrant && <button type="button" className="cw-nut cw-nut--phu" onClick={() => { setEditingGrantId(null); setDepartment(""); setAreaCode(""); setLine(""); }}>Hủy</button>}
+                {editingGrant && <button type="button" className="cw-nut cw-nut--phu" onClick={clearEditor}>Hủy</button>}
               </div>
             </form>
           </div>}
