@@ -69,6 +69,16 @@ const contentProps = (rightsState = readyRights, overrides = {}) => ({
 });
 const count = (html, expression) => (html.match(expression) || []).length;
 
+function findElement(node, predicate) {
+  if (!React.isValidElement(node)) return null;
+  if (predicate(node)) return node;
+  for (const child of React.Children.toArray(node.props.children)) {
+    const found = findElement(child, predicate);
+    if (found) return found;
+  }
+  return null;
+}
+
 test("Today content presents four queues, reason badges, safe CTA, and accordion semantics", () => {
   const html = render(contentProps());
   assert.match(html, /Quá hạn/);
@@ -97,6 +107,36 @@ test("Today content presents four queues, reason badges, safe CTA, and accordion
   }
   assert.doesNotMatch(html, /aria-pressed/);
   assert.equal(count(html, /<button[^>]*>Cập nhật tiến độ<\/button>/g), 1);
+});
+
+test("selected desktop pane offers Bỏ chọn without changing editable or read-only CTA rules", async () => {
+  const { TodaySupportingPane } = await import("../../src/features/today/TodayCommandCenter.tsx");
+  assert.equal(typeof TodaySupportingPane, "function");
+  let clearCount = 0;
+  const onClearSelection = () => { clearCount += 1; };
+
+  const editableHtml = renderToStaticMarkup(React.createElement(TodaySupportingPane, {
+    row: overdueEditable, onOpenProgress, onClearSelection,
+  }));
+  const readOnlyHtml = renderToStaticMarkup(React.createElement(TodaySupportingPane, {
+    row: todayReadOnly, onOpenProgress, onClearSelection,
+  }));
+  const emptyHtml = renderToStaticMarkup(React.createElement(TodaySupportingPane, {
+    row: null, onOpenProgress, onClearSelection,
+  }));
+
+  assert.equal(count(editableHtml, /<button[^>]*>Bỏ chọn<\/button>/g), 1);
+  assert.equal(count(readOnlyHtml, /<button[^>]*>Bỏ chọn<\/button>/g), 1);
+  assert.doesNotMatch(emptyHtml, /Bỏ chọn/);
+  assert.equal(count(editableHtml, /<button[^>]*>Cập nhật tiến độ<\/button>/g), 1);
+  assert.doesNotMatch(readOnlyHtml, /Cập nhật tiến độ/);
+
+  const paneTree = TodaySupportingPane({ row: overdueEditable, onOpenProgress, onClearSelection });
+  const clearButton = findElement(paneTree, (element) =>
+    element.type === "button" && element.props.children === "Bỏ chọn");
+  assert.ok(clearButton, "selected pane must expose a Bỏ chọn button");
+  clearButton.props.onClick();
+  assert.equal(clearCount, 1);
 });
 
 test("Today content keeps rows readable while rights load or fail closed", () => {

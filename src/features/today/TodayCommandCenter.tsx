@@ -132,13 +132,18 @@ function TodayQueueSection({ section, rows, expandedCode, onToggle, onOpenProgre
   </section>;
 }
 
-function TodaySupportingPane({ row, onOpenProgress }: { row: TodayActionRow | null; onOpenProgress: (link: ProgressDeepLink) => void }) {
+export function TodaySupportingPane({ row, onOpenProgress, onClearSelection }: {
+  row: TodayActionRow | null;
+  onOpenProgress: (link: ProgressDeepLink) => void;
+  onClearSelection: () => void;
+}) {
   return <aside id="today-supporting-pane" className="hn-pane" aria-label="Chi tiết việc đang chọn">
     {row ? <div className="hn-pane__the">
       <span className={`hn-pane__nhom lp-tone--${SECTION_META[row.section].tone}`}>{SECTION_META[row.section].label}</span>
       <b className="hn-pane__ma">{row.validationCode}</b><p className="hn-pane__ten">{row.title}</p>
       <TodayRowDetails row={row} id={`today-pane-${detailId(row)}`} />
       {row.canEditProgress && <button type="button" className="hn-muc__nut" onClick={() => onOpenProgress(progressLink(row))}>Cập nhật tiến độ</button>}
+      <button type="button" className="hn-muc__nut" onClick={onClearSelection}>Bỏ chọn</button>
     </div> : <div className="hn-pane__trong"><ValiIllustration mood="guide" size="small" />
       <p className="hn-pane__goi-y">Chọn một việc để xem các thông tin hỗ trợ trước khi cập nhật tiến độ.</p>
     </div>}
@@ -175,7 +180,8 @@ export function TodayCommandCenterContent({
     ) : <div className="lp-supporting-layout hn-bo-cuc"><div className="hn-chinh">
       {(Object.keys(SECTION_META) as TodaySection[]).map((section) => <TodayQueueSection key={section} section={section}
         rows={model.sections[section]} expandedCode={expandedCode} onToggle={toggle} onOpenProgress={onOpenProgress} />)}
-    </div><TodaySupportingPane row={selectedRow} onOpenProgress={onOpenProgress} /></div>}
+    </div><TodaySupportingPane row={selectedRow} onOpenProgress={onOpenProgress}
+      onClearSelection={() => setExpandedCode(null)} /></div>}
   </div>;
 }
 
