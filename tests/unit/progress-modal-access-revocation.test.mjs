@@ -94,7 +94,8 @@ test("caller Catalog giữ preview đầy đủ còn Update truyền enforced al
 
   assert.match(preview, /type="date"/);
   assert.match(preview, /type="datetime-local"/);
-  assert.match(catalogSource, /<ProgressEditModal[\s\S]*permissionMode="preview"/);
+  assert.match(catalogSource, /<ProgressEditModal[\s\S]*key=\{progressValidationCode\(edit\)\}[\s\S]*permissionMode="preview"/);
+  assert.match(catalogSource, /findIndex\(\(x\) =>\s*progressValidationCode\(x\) === progressValidationCode\(edit\)\)/);
   assert.match(updateSource, /<ProgressEditModal[\s\S]*editableFields=\{rightsState\.rights\.get\(progressValidationCode\(edit\)\)\?\.editableFields\}[\s\S]*permissionMode="enforced"/);
 });
 
@@ -213,7 +214,7 @@ test("preview bỏ qua reload riêng, còn enforced revalidate và fail-closed",
   assert.equal(access.skipsProgressPermissionRevalidation("enforced"), false);
   assert.equal(access.skipsProgressPermissionRevalidation(undefined), false);
   assert.match(source, /if \(skipsProgressPermissionRevalidation\(permissionMode\)\) \{/);
-  assert.match(source, /setFieldPermission\(null\);[\s\S]*fetchTimelineFieldPermission\(act\.id\)/);
+  assert.match(source, /setFieldPermission\(null\);[\s\S]*operationTarget\.run\(fetchTimelineFieldPermission\)/);
   assert.match(source, /if \(!permission\.canView\) \{[\s\S]*setF\(\{ \.\.\.init \}\)[\s\S]*setReason\(""\)[\s\S]*setErr\(""\)/);
   assert.match(source, /window\.addEventListener\("focus", reloadWhenVisible\)/);
 });

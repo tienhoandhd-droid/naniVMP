@@ -14,6 +14,7 @@ import { parseD, fmtVN, txt, wlIsDone } from "../utils/helpers.ts";
 import { Card, Tag, Pill, PhanTrang } from "../components/ui/Primitives.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import KhongThamDinhCard from "../components/catalog/KhongThamDinhCard.tsx";
+import { progressValidationCode } from "../features/progress/editableProgressRights.ts";
 import { useDebounce } from "../hooks/index.ts";
 import type { Activity, VmpObject } from "../types/domain.ts";
 
@@ -417,7 +418,7 @@ export default function CatalogView({ objects = [], acts = [], canChonNguoiThucH
           bắt buộc lý do theo ALCOA+, gán được người thực hiện. */}
       {edit && !readOnly && (
         <ProgressEditModal
-          key={edit.id}
+          key={progressValidationCode(edit)}
           act={edit}
           canChonNguoiThucHien={canChonNguoiThucHien}
           canDoiTrangThai={canDoiTrangThai}
@@ -427,7 +428,8 @@ export default function CatalogView({ objects = [], acts = [], canChonNguoiThucH
           quickDone={quick}
           permissionMode="preview"
           nextAct={(() => {
-            const i = danhSachPhang.findIndex((x) => x.id === edit.id);
+            const i = danhSachPhang.findIndex((x) =>
+              progressValidationCode(x) === progressValidationCode(edit));
             return i >= 0 ? danhSachPhang[i + 1] ?? null : null;
           })()}
           onOpenNext={(a) => { setEdit(a); setQuick(false); }}

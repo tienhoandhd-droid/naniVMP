@@ -36,6 +36,10 @@ import { Tag, Modal, ROField, StateBadge } from "../ui/Primitives.tsx";
 import { progressModalContentState, skipsProgressPermissionRevalidation } from "./progressModalAccess.ts";
 import WorkshopAssignmentInline from "../../features/progress/WorkshopAssignmentInline.tsx";
 import { visibleProgressStageFields } from "../../features/progress/editableProgressRights.ts";
+import {
+  createProgressModalOperationTarget,
+  type ProgressModalOperationTarget,
+} from "../../features/progress/progressModalOperationTarget.ts";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
 
 /** Ngày hôm nay theo giờ máy (không dùng toISOString — lệch múi giờ VN trước 7h sáng). */
@@ -129,7 +133,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   onReload?: () => void;
   /** Hạng mục kế tiếp trong danh sách đang lọc — có thì hiện nút "mở tiếp". */
   nextAct?: PlanActivity | null;
-  /** Mở hạng mục khác ngay trong hộp (cha phải remount bằng key={act.id}). */
+  /** Mở hạng mục khác ngay trong hộp (cha phải remount bằng mã validation chính tắc). */
   onOpenNext?: (a: PlanActivity) => void;
   /** Mở hộp với bước hiện tại đã điền sẵn "hôm nay + Hoàn thành" — chỉ còn chọn lý do và Lưu. */
   quickDone?: boolean;
@@ -148,6 +152,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   ) => unknown | Promise<unknown>;
   onChangeState?: (id: string, newState: string, reason?: string) => void;
 }) {
+  const operationTarget = createProgressModalOperationTarget(act);
   const raw = act._raw || {};
   const currentState = act.state || raw.state || "active";
   // Chuẩn hoá trạng thái đang lưu (có thể là enum Supabase: completed/in_progress/
@@ -198,7 +203,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       // trong lúc tab vừa quay lại hoặc request mới còn đang bay.
       setFieldPermission(null);
       setPermissionError("");
-      fetchTimelineFieldPermission(act.id).then((permission) => {
+      operationTarget.run(fetchTimelineFieldPermission).then((permission) => {
         if (!active || currentRequest !== requestVersion) return;
         if (!permission.canView) {
           setF({ ...init });
@@ -228,7 +233,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       window.removeEventListener("focus", reloadWhenVisible);
       document.removeEventListener("visibilitychange", reloadWhenVisible);
     };
-  }, [act.id, editableFields, permissionMode]);
+  }, [operationTarget.validationCode, editableFields, permissionMode]);
   const isEnforced = fieldPermission?.mode === "enforced";
   const permissionLoading = fieldPermission == null;
   const canEdit = (dbColumn: string) => !permissionLoading
@@ -413,7 +418,11 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       }
       setSavingWho(true);
       try {
-        const r = await setItemPerformerById(act.id, performerPersonId, reason.trim());
+        const r = await operationTarget.run(
+          setItemPerformerById,
+          performerPersonId,
+          reason.trim(),
+        );
         if (!r.ok) { setErr(r.error || "Gán người thực hiện thất bại"); setSavingWho(false); return; }
       } catch (e) {
         setErr((e as Error).message || "Gán người thực hiện thất bại");
@@ -444,8 +453,8 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       doiRoi.forEach((k) => { patch[k] = f[k] || ""; });
       setSavingProgress(true);
       try {
-        const result = await onSave(
-          act.id,
+        const result = await operationTarget.run(
+          onSave,
           patch,
           undefined,
           reason.trim() || undefined,
@@ -586,7 +595,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     <Modal onClose={onClose} title="Cập nhật tiến độ" icon={Pencil} wide>
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16 }}>
         <div style={{ fontWeight: 800, color: C.plum, fontSize: 14 }}>{act.code} · {act.name}</div>
-        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {act.id} · QA: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {operationTarget.validationCode} · QA: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
       </div>
       <div style={{
         background: permissionLoading ? C.marigoldSoft : isEnforced ? C.lavSoft : C.mintSoft,
@@ -783,7 +792,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
                   placeholder={pendingState === "not_applicable" ? "VD: thiết bị ngừng dùng từ Q3/2026…" : pendingState === "cancelled" ? "VD: theo phê duyệt CAPA #…" : "VD: thiết bị đưa vào dùng lại…"}
                   style={{ ...INP, flex: 1, minWidth: 220 }} />
                 <button disabled={!stateReason.trim()}
-                  onClick={() => onChangeState(act.id, pendingState, stateReason.trim())}
+                  onClick={() => operationTarget.run(onChangeState, pendingState, stateReason.trim())}
                   style={{ ...btnPrimary, padding: "9px 16px", borderRadius: 8, fontSize: 12, opacity: stateReason.trim() ? 1 : 0.5, cursor: stateReason.trim() ? "pointer" : "not-allowed" }}>
                   Xác nhận
                 </button>
@@ -800,14 +809,14 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       {/* ---- Nhân sự xưởng của HẠNG MỤC NÀY — chỉ người có quyền
           assign_workshop_staff mới thấy; ghi qua rpc_set_item_assignment
           (an toàn xung đột, bắt buộc lý do, server kiểm phạm vi). */}
-      <WorkshopAssignmentInline validationCode={act.id}
+      <WorkshopAssignmentInline validationCode={operationTarget.validationCode}
         canAssign={!!canAssignWorkshop} />
 
       {/* ---- Lịch sử thay đổi của HẠNG MỤC NÀY — đọc lười từ server ------
           rpc_item_progress_history (Đợt B Task 11): server tự kiểm quyền
           xem theo hạng mục; ở đây chỉ hiển thị. Không tải trước — đa số
           lần mở hộp là để sửa, không phải để tra. */}
-      <LichSuHangMuc validationCode={act.id} />
+      <LichSuHangMuc operationTarget={operationTarget} />
     </Modal>
   );
 }
@@ -815,7 +824,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
 /* ====================================================================
  *  Lịch sử thay đổi của một hạng mục — bấm mới tải, tải rồi giữ nguyên.
  * ==================================================================== */
-function LichSuHangMuc({ validationCode }: { validationCode: string }) {
+function LichSuHangMuc({ operationTarget }: { operationTarget: ProgressModalOperationTarget }) {
   const [mo, setMo] = useState(false);
   const [tt, setTt] = useState<"chua" | "dang" | "xong" | "loi">("chua");
   const [rows, setRows] = useState<ItemProgressHistoryEntry[]>([]);
@@ -827,7 +836,7 @@ function LichSuHangMuc({ validationCode }: { validationCode: string }) {
     setMo(sapMo);
     if (!sapMo || tt === "xong" || tt === "dang") return;
     setTt("dang");
-    const kq = await fetchItemProgressHistory(validationCode);
+    const kq = await operationTarget.run(fetchItemProgressHistory);
     if (kq.ok) { setRows(kq.history); setTong(kq.total); setTt("xong"); }
     else { setLoi(kq.error || "Không đọc được lịch sử"); setTt("loi"); }
   };
