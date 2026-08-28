@@ -95,13 +95,21 @@ function activityState(activity: Activity): string {
   return String(activity.state ?? rawOf(activity).state ?? "active");
 }
 
-function validationCode(activity: Activity): string {
-  return String(firstValue(activity, "validationCode", ["validation_code", "code", "id"]) ?? "");
+function validationCode(activity: Activity): string | null {
+  const source = activity as unknown as Raw;
+  const raw = rawOf(activity);
+  for (const key of ["validationCode", "validation_code", "code"]) {
+    for (const values of [source, raw]) {
+      const value = values[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+  return null;
 }
 
 function title(activity: Activity): string {
   const value = firstValue(activity, "objName", ["name", "object_name", "code", "validationCode", "id"]);
-  return typeof value === "string" && value.trim() ? value.trim() : validationCode(activity);
+  return typeof value === "string" && value.trim() ? value.trim() : validationCode(activity) ?? "";
 }
 
 function department(activity: Activity): string {
@@ -121,9 +129,15 @@ function ownerPersonId(activity: Activity): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function supportPersonId(activity: Activity): string | null {
+  const value = firstValue(activity, "supportPersonId", ["support_person_id"]);
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 export function isTodayActivityMine(activity: Activity, personId: string): boolean {
-  const owner = ownerPersonId(activity);
-  return Boolean(owner && typeof personId === "string" && owner === personId.trim());
+  if (typeof personId !== "string" || !personId.trim()) return false;
+  const id = personId.trim();
+  return ownerPersonId(activity) === id || supportPersonId(activity) === id;
 }
 
 function criticality(activity: Activity): string {
@@ -145,10 +159,10 @@ function unfinishedStages(activity: Activity): Array<{ label: string; deadline: 
   }));
 }
 
-function permission(activity: Activity, options: {
+function permission(options: {
   rights: ReadonlyMap<string, EditableProgressRight>;
   rightsStatus: TodayRightsStatus;
-}): Pick<TodayActionRow, "canEditProgress" | "editableFields" | "permissionReason"> {
+}, code: string): Pick<TodayActionRow, "canEditProgress" | "editableFields" | "permissionReason"> {
   if (options.rightsStatus !== "ready") {
     return {
       canEditProgress: false,
@@ -158,7 +172,7 @@ function permission(activity: Activity, options: {
         : "Không tải được quyền cập nhật tiến độ",
     };
   }
-  const right = options.rights.get(validationCode(activity));
+  const right = options.rights.get(code);
   if (!right) return { canEditProgress: false, editableFields: [], permissionReason: "Không có quyền cập nhật tiến độ" };
   return { canEditProgress: true, editableFields: [...right.editableFields], permissionReason: right.reason };
 }
@@ -194,6 +208,8 @@ function makeRow(activity: Activity, today: string, options: {
   rightsStatus: TodayRightsStatus;
 }): TodayActionRow | null {
   if (activityState(activity) !== "active") return null;
+  const code = validationCode(activity);
+  if (!code) return null;
   const unfinished = unfinishedStages(activity);
   const blockingStage = unfinished[0]?.label ?? "Đích VMP";
   const dated = unfinished.find((stage) => stage.deadline !== null);
@@ -209,9 +225,9 @@ function makeRow(activity: Activity, today: string, options: {
     reason.kind === "missing_owner" || reason.kind === "missing_actual_completion" || reason.kind === "missing_schedule"));
   if (section === null) return null;
   return {
-    validationCode: validationCode(activity), title: title(activity), department: department(activity),
+    validationCode: code, title: title(activity), department: department(activity),
     ownerName: ownerName(activity), criticality: criticality(activity), criticalityScore: criticalityScore(activity),
-    blockingStage, deadlineStage, daysRemaining, reasons, section, ...permission(activity, options),
+    blockingStage, deadlineStage, daysRemaining, reasons, section, ...permission(options, code),
   };
 }
 
@@ -261,6 +277,7 @@ export interface TodayRow {
   milestoneLabel: string;
   daysRemaining: number | null;
   kind: TodayRowKind;
+  reasons: TodayReasonKind[];
 }
 export interface TodayModel {
   overdue: TodayRow[];
@@ -274,6 +291,7 @@ function legacyRow(row: TodayActionRow): TodayRow {
     validationCode: row.validationCode, title: row.title,
     milestoneLabel: row.reasons.find((reason) => reason.stage)?.stage ?? row.blockingStage,
     daysRemaining: row.daysRemaining, kind,
+    reasons: row.reasons.map((reason) => reason.kind),
   };
 }
 export function buildTodayModel(activities: Activity[], now: Date): TodayModel {

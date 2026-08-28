@@ -85,6 +85,7 @@ function Nhom({ kind, rows, onOpenProgress, dangChon, onChon }: {
                 validationCode: row.validationCode,
                 quickFilter: row.kind,
                 source: "today",
+                reasons: row.reasons,
               })}>
               Cập nhật
             </button>
@@ -118,6 +119,7 @@ function PaneChiTiet({ chon, onBoChon, onOpenProgress }: {
                 validationCode: chon.validationCode,
                 quickFilter: chon.kind,
                 source: "today",
+                reasons: chon.reasons,
               })}>
               Cập nhật
             </button>
@@ -198,6 +200,7 @@ export default function TodayCommandCenter({
                   validationCode: model.nextAction!.validationCode,
                   quickFilter: model.nextAction!.kind,
                   source: "today",
+                  reasons: model.nextAction!.reasons,
                 }),
               }]}
             />

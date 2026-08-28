@@ -90,10 +90,23 @@ test("chỉ person id chính tắc quyết định ownership, kể cả id trong
     owner: "Nguyễn Văn A", ownerPersonId: ID_A, supportPersonId: ID_B,
   };
   assert.equal(isTodayActivityMine(activity, ID_A), true);
-  assert.equal(isTodayActivityMine(activity, ID_B), false);
+  assert.equal(isTodayActivityMine(activity, ID_B), true);
   assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, _raw: { owner_person_id: ID_A } }, ID_A), true);
-  assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, _raw: { support_person_id: ID_A } }, ID_A), false);
+  assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, supportPersonId: ID_A }, ID_A), true);
+  assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, supportPersonId: null, _raw: { support_person_id: ID_A } }, ID_A), true);
+  assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, supportPersonId: null, _raw: { support_person_id: ID_B } }, ID_A), false);
   assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null }, ID_A), false);
+});
+
+test("không tạo dòng hay khóa quyền bằng id khi thiếu canonical validation code", () => {
+  const model = buildTodayActionModel([{
+    id: "legacy-only-id", st: "prog", state: "active", dlProtocol: "2026-08-01", ownerPersonId: ID_A,
+  }], {
+    now: HOM_NAY,
+    rights: new Map([["legacy-only-id", right("legacy-only-id")]]),
+    rightsStatus: "ready",
+  });
+  assert.deepEqual(model.rows, []);
 });
 
 test("tra quyền theo validationCode, không theo activity.id", () => {
@@ -139,6 +152,26 @@ test("ưu tiên theo urgency rồi score, editability, số ngày và mã tiến
   });
   assert.deepEqual(model.rows.map((row) => row.validationCode), ["A", "B", "C", "LATE"]);
   assert.equal(model.nextAction?.validationCode, "A");
+});
+
+test("tie-break editability đứng trước số ngày khi urgency và score bằng nhau", () => {
+  const model = buildTodayActionModel([
+    { id: "NO-RIGHT", validationCode: "NO-RIGHT", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
+    { id: "EDITABLE", validationCode: "EDITABLE", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
+  ], {
+    now: HOM_NAY,
+    rights: new Map([["EDITABLE", right("EDITABLE")]]),
+    rightsStatus: "ready",
+  });
+  assert.deepEqual(model.rows.map((row) => row.validationCode), ["EDITABLE", "NO-RIGHT"]);
+});
+
+test("tie-break số ngày đứng trước mã khi urgency, score và editability bằng nhau", () => {
+  const model = buildTodayActionModel([
+    { id: "LATER", validationCode: "LATER", st: "prog", state: "active", dlProtocol: "2026-08-16", score: 9, ownerPersonId: ID_A },
+    { id: "SOONER", validationCode: "SOONER", st: "prog", state: "active", dlProtocol: "2026-08-15", score: 9, ownerPersonId: ID_A },
+  ], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
+  assert.deepEqual(model.rows.map((row) => row.validationCode), ["SOONER", "LATER"]);
 });
 
 test("KPI và rows dùng cùng tập dữ liệu, nextAction là dòng đầu tiên đã sort", () => {
