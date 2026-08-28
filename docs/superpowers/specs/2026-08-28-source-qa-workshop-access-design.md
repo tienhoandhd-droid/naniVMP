@@ -80,7 +80,8 @@ runtime assumptions:
 - the QA assignment projection is incomplete: two owner assignments and 24
   support assignments are missing;
 - 389 total assignment rows;
-- 16 active performers and seven currently eligible QA selector people;
+- 16 active performers and six currently eligible QA selector people after the
+  approved 2026-08-28 QA Manager-to-Admin promotion;
 - screen mode is `enforced`; item-permission mode remains `preview`;
 - Source permissions currently give Admin/QA Manager all-data edit/generate,
   QA staff all-data view, and workshop roles a nominal workshop scope;
@@ -697,7 +698,7 @@ fresh session.
 
 ### 11.1 Database behavior
 
-- Seven live eligible QA candidates are returned under the reviewed production
+- Six live eligible QA candidates are returned under the reviewed production
   snapshot, inactive/non-QA/ambiguous people are excluded, and endpoint failure
   is distinguishable from a successful empty result.
 - Owner and support each grant QA view and seven-field edit immediately after
