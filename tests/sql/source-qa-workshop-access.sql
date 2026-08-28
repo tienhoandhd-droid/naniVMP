@@ -144,6 +144,81 @@ begin
 end
 $$;
 
+create function pg_temp.assert_support_only_projection()
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare
+  v_source_id uuid:='9a010000-0000-4000-8000-000000000105';
+  v_code text:='SACCESS-SUPPORT-ONLY/2026.01-PQ';
+  v_support uuid:=pg_temp.performer_id('9a010000-0000-4000-8000-000000000004');
+  v_unrelated uuid:=pg_temp.performer_id('9a010000-0000-4000-8000-000000000005');
+  v_assignments_after_first text;
+  v_audits_after_first text;
+begin
+  perform public.vmp_reconcile_source_qa_projection(v_source_id);
+
+  if (select count(*) from public.vmp_item_assignments assignment
+      where assignment.validation_code=v_code
+        and assignment.performer_id=v_support
+        and assignment.assignment_kind='qa' and assignment.is_active
+        and (assignment.expires_at is null or assignment.expires_at>now()))<>1
+     or not exists (
+       select 1 from public.vmp_item_assignments assignment
+       where assignment.validation_code=v_code
+         and assignment.performer_id=v_support
+         and assignment.assignment_kind='qa' and assignment.is_active
+         and assignment.assignment_role='collaborator'
+         and assignment.source='source_support'
+     )
+     or exists (
+       select 1 from public.vmp_item_assignments assignment
+       where assignment.validation_code=v_code and assignment.is_active
+         and assignment.assignment_kind='qa'
+         and (assignment.source='source_owner'
+              or (assignment.performer_id=v_support
+                  and assignment.assignment_role='primary'))
+     ) then
+    raise exception using errcode='check_violation',
+      message='SQA_SUPPORT_ONLY_REMAINS_COLLABORATOR';
+  end if;
+
+  if not exists (
+       select 1 from public.vmp_item_assignments assignment
+       where assignment.validation_code=v_code
+         and assignment.performer_id=v_unrelated
+         and assignment.assignment_kind='qa' and assignment.is_active
+         and assignment.assignment_role='primary'
+         and assignment.source='qa_manager'
+     ) then
+    raise exception using errcode='check_violation',
+      message='SQA_SUPPORT_ONLY_UNRELATED_PRIMARY_PRESERVED';
+  end if;
+
+  select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+                 order by assignment.id)::text,'[]'))
+    into v_assignments_after_first
+  from public.vmp_item_assignments assignment
+  where assignment.validation_code=v_code;
+  select md5(coalesce(jsonb_agg(to_jsonb(audit)
+                 order by audit.id)::text,'[]'))
+    into v_audits_after_first
+  from public.audit_logs audit
+  where audit.validation_code=v_code;
+
+  perform public.vmp_reconcile_source_qa_projection(v_source_id);
+  if (select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+                    order by assignment.id)::text,'[]'))
+      from public.vmp_item_assignments assignment
+      where assignment.validation_code=v_code) is distinct from v_assignments_after_first
+     or (select md5(coalesce(jsonb_agg(to_jsonb(audit)
+                    order by audit.id)::text,'[]'))
+         from public.audit_logs audit
+         where audit.validation_code=v_code) is distinct from v_audits_after_first then
+    raise exception using errcode='check_violation',
+      message='SQA_SUPPORT_ONLY_SECOND_RECONCILE_IDEMPOTENT';
+  end if;
+end
+$$;
+
 insert into auth.users(
   id,aud,role,email,encrypted_password,email_confirmed_at,
   raw_app_meta_data,raw_user_meta_data,created_at,updated_at
@@ -343,6 +418,61 @@ select 'SACCESS-DEDUP/2026.01-PQ',performer.id,performer.user_id,
 from public.vmp_performers performer
 where performer.user_id='9a010000-0000-4000-8000-000000000005'::uuid;
 
+insert into public.vmp_objects(
+  code,name,classification,department,area,line,frequency_months
+)
+values (
+  'SACCESS-SUPPORT-ONLY','Source access support only','tb',
+  'SACCESS_WS','SACCESS_AREA','LINE_A',12
+);
+
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision,
+  owner_person_id,owner_name,support_person_id,support_name
+)
+select '9a010000-0000-4000-8000-000000000105','Thiết bị',
+       'SACCESS-SUPPORT-ONLY','Source access support only','SACCESS_WS',
+       'SACCESS_AREA','LINE_A','y',12,'Hóa lý',5,1,2026,
+       'source-access-test',105,5,0,0,null,null,
+       performer.id,performer.performer_name
+from public.vmp_performers performer
+where performer.user_id='9a010000-0000-4000-8000-000000000004'::uuid;
+
+insert into public.vmp_plan_items(
+  id,validation_code,object_code,validation_type,year,report_class,effort_days,
+  deadline_protocol,deadline_validation,deadline_report,deadline_vmp,
+  status_protocol,status_validation,status_report,status_vmp,is_active,
+  item_state,version,departments,execution_departments,source_sheet_data,
+  owner_person_id,support_person_id
+)
+select 'SACCESS-SUPPORT-ONLY/2026.01-PQ','SACCESS-SUPPORT-ONLY/2026.01-PQ',
+       'SACCESS-SUPPORT-ONLY','PQ',2026,'Hóa lý',5,
+       current_date+30,current_date+60,current_date+90,current_date+120,
+       'not_started','not_started','not_started','not_started',true,'active',5,
+       array['SACCESS_WS'],array['SACCESS_WS'],
+       '{"fixture":"SACCESS-SUPPORT-ONLY"}'::jsonb,null,performer.id
+from public.vmp_performers performer
+where performer.user_id='9a010000-0000-4000-8000-000000000004'::uuid;
+
+insert into public.vmp_item_assignments(
+  validation_code,performer_id,user_id,staff_name,assignment_kind,source,
+  assignment_role,is_active,change_reason,created_by,updated_by
+)
+select 'SACCESS-SUPPORT-ONLY/2026.01-PQ',performer.id,performer.user_id,
+       performer.performer_name,'qa','qa_manager',fixture.assignment_role,true,
+       fixture.change_reason,
+       '9a010000-0000-4000-8000-000000000002',
+       '9a010000-0000-4000-8000-000000000002'
+from (values
+  ('9a010000-0000-4000-8000-000000000004'::uuid,'collaborator',
+   'Existing support-only manual collaborator'),
+  ('9a010000-0000-4000-8000-000000000005'::uuid,'primary',
+   'Unrelated primary must remain primary')
+) fixture(user_id,assignment_role,change_reason)
+join public.vmp_performers performer on performer.user_id=fixture.user_id;
+
 update public.system_config set value=to_jsonb('preview'::text)
 where key='item_permissions_mode';
 
@@ -357,13 +487,27 @@ select pg_temp.assert_true(
   and to_regprocedure('public.vmp_reconcile_source_qa_projection(uuid)') is not null
   and to_regclass('public.uq_vmp_source_objects_active_object_code') is not null
   and to_regclass('public.idx_vmp_plan_items_object_year_active') is not null
+  and (select index.indisunique and index.indisvalid
+              and pg_get_indexdef(index.indexrelid)=
+                'CREATE UNIQUE INDEX vmp_item_assignments_one_active_qa_primary ON public.vmp_item_assignments USING btree (validation_code) WHERE ((assignment_kind = ''qa''::text) AND (assignment_role = ''primary''::text) AND is_active)'
+       from pg_index index
+       where index.indexrelid=
+         'public.vmp_item_assignments_one_active_qa_primary'::regclass)
+  and (select index.indisunique and index.indisvalid
+              and pg_get_indexdef(index.indexrelid)=
+                'CREATE UNIQUE INDEX vmp_item_assignments_one_active_qa_person ON public.vmp_item_assignments USING btree (validation_code, performer_id, assignment_kind) WHERE ((performer_id IS NOT NULL) AND (assignment_kind = ''qa''::text) AND is_active)'
+       from pg_index index
+       where index.indexrelid=
+         'public.vmp_item_assignments_one_active_qa_person'::regclass)
   and not has_function_privilege(
     'authenticated','public.rpc_refresh_source_item_assignments()','EXECUTE')
   and not has_function_privilege(
     'service_role','public.rpc_refresh_source_item_assignments()','EXECUTE')
   and not exists (
     select 1 from public.vmp_item_assignments assignment
-    where assignment.validation_code='SACCESS-DEDUP/2026.01-PQ'
+    where assignment.validation_code in (
+      'SACCESS-DEDUP/2026.01-PQ','SACCESS-SUPPORT-ONLY/2026.01-PQ'
+    )
       and assignment.source in ('source_owner','source_support')
   ),
   'SOURCE_ACCESS_EXPAND_SCHEMA_RELATION_GRANTS_REVISION_INDEXES');
@@ -382,6 +526,20 @@ select pg_temp.assert_true(
   'SOURCE_ACCESS_SCHEMA_MISSING vmp_source_workshop_scope_grants rpc_list_source_objects SQA_OWNER');
 
 select pg_temp.assert_dedup_projection();
+select pg_temp.assert_support_only_projection();
+
+select pg_temp.assert_true(
+  (select index.indisunique and index.indisvalid
+          and pg_get_indexdef(index.indexrelid)=
+            'CREATE UNIQUE INDEX vmp_item_assignments_one_active_qa_primary ON public.vmp_item_assignments USING btree (validation_code) WHERE ((assignment_kind = ''qa''::text) AND (assignment_role = ''primary''::text) AND is_active)'
+   from pg_index index where index.indexrelid=
+     'public.vmp_item_assignments_one_active_qa_primary'::regclass)
+  and (select index.indisunique and index.indisvalid
+          and pg_get_indexdef(index.indexrelid)=
+            'CREATE UNIQUE INDEX vmp_item_assignments_one_active_qa_person ON public.vmp_item_assignments USING btree (validation_code, performer_id, assignment_kind) WHERE ((performer_id IS NOT NULL) AND (assignment_kind = ''qa''::text) AND is_active)'
+   from pg_index index where index.indexrelid=
+     'public.vmp_item_assignments_one_active_qa_person'::regclass),
+  'SQA_EXISTING_ONE_ACTIVE_PRIMARY_AND_PERSON_INDEXES_PRESERVED');
 
 insert into public.vmp_source_workshop_scope_grants(
   id,performer_id,department,department_key,area_code,area_key,line,line_key,

@@ -5,15 +5,15 @@ set -euo pipefail
 phase="full"
 if [[ $# -gt 0 ]]; then
   if [[ $# -ne 2 || "$1" != "--phase" ]]; then
-    echo "Usage: $0 [--phase expand|behavior|security|performance]" >&2
+    echo "Usage: $0 [--phase expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance]" >&2
     exit 2
   fi
   phase="$2"
 fi
 case "$phase" in
-  full|expand|behavior|security|performance) ;;
+  full|expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance) ;;
   *)
-    echo "Usage: $0 [--phase expand|behavior|security|performance]" >&2
+    echo "Usage: $0 [--phase expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance]" >&2
     exit 2
     ;;
 esac
@@ -195,8 +195,130 @@ SQL
 done
 echo "PASS CLONE PostgreSQL 17 reviewed baseline and historical migrations"
 
+projection_state() {
+  psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
+with plan_projection as (
+  select count(*) row_count,
+         encode(extensions.digest(convert_to(coalesce(string_agg(
+           to_jsonb(plan_item)::text,E'\n' order by plan_item.id::text
+         ),''),'UTF8'),'sha256'),'hex') row_digest
+  from public.vmp_plan_items plan_item
+), assignment_projection as (
+  select count(*) row_count,
+         encode(extensions.digest(convert_to(coalesce(string_agg(
+           to_jsonb(assignment)::text,E'\n' order by assignment.id::text
+         ),''),'UTF8'),'sha256'),'hex') row_digest
+  from public.vmp_item_assignments assignment
+)
+select concat_ws('|',plan_projection.row_count,plan_projection.row_digest,
+  assignment_projection.row_count,assignment_projection.row_digest)
+from plan_projection cross join assignment_projection;
+SQL
+}
+
+pre_expand_projection_state="$(projection_state)"
+if [[ ! "$pre_expand_projection_state" =~ ^[0-9]+\|[0-9a-f]{64}\|[0-9]+\|[0-9a-f]{64}$ ]]; then
+  echo "SOURCE_ACCESS_PRE_EXPAND_PROJECTION_SNAPSHOT_INVALID" >&2
+  exit 3
+fi
+
 expand_migration="$repo_dir/supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql"
 enforce_migration="$repo_dir/supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql"
+
+assert_expand_state() {
+  local rule_id="$1"
+  local actual_projection_state
+
+  # Deliberately reconnect after expand and after every aborted enforce attempt.
+  psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" -v rule_id="$rule_id" <<'SQL'
+select set_config('vmp.source_access_assert_rule',:'rule_id',false);
+do $assert_expand_state$
+declare
+  v_rule_id text:=current_setting('vmp.source_access_assert_rule');
+  v_function regprocedure:=to_regprocedure('public.rpc_refresh_source_item_assignments()');
+  v_definition text;
+  v_result jsonb;
+begin
+  if v_function is null then
+    raise exception using errcode='check_violation',message=v_rule_id||' missing_stub';
+  end if;
+  select pg_get_functiondef(v_function::oid) into v_definition;
+  if encode(extensions.digest(convert_to(v_definition,'UTF8'),'sha256'),'hex')
+       <>'bce51a727187ff4544421391e4f1e03ee9e7336efa10e3ebfbcd71f7c71db3cd'
+     or v_definition is distinct from $expected_stub$CREATE OR REPLACE FUNCTION public.rpc_refresh_source_item_assignments()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+  return jsonb_build_object(
+    'ok', false,
+    'error_code', 'SOURCE_ACCESS_UPGRADE_IN_PROGRESS',
+    'error', 'Nâng cấp quyền Source đang được áp dụng'
+  );
+end
+$function$
+$expected_stub$ then
+    raise exception using errcode='check_violation',message=v_rule_id||' stub_definition';
+  end if;
+  if not exists (
+       select 1 from pg_proc procedure
+       join pg_roles owner on owner.oid=procedure.proowner
+       join pg_language language on language.oid=procedure.prolang
+       where procedure.oid=v_function::oid
+         and owner.rolname='postgres' and language.lanname='plpgsql'
+         and procedure.provolatile='v' and procedure.prosecdef
+         and procedure.proparallel='u' and not procedure.proisstrict
+         and not procedure.proleakproof
+         and procedure.proconfig=array['search_path=public, pg_temp']
+         and procedure.proacl::text='{postgres=X/postgres}'
+     )
+     or (select count(*) from pg_proc procedure
+         join pg_namespace namespace on namespace.oid=procedure.pronamespace
+         where namespace.nspname='public'
+           and procedure.proname='rpc_refresh_source_item_assignments')<>1
+     or has_function_privilege('authenticated',v_function,'EXECUTE')
+     or has_function_privilege('service_role',v_function,'EXECUTE')
+     or has_function_privilege('anon',v_function,'EXECUTE')
+     or has_function_privilege('public',v_function,'EXECUTE') then
+    raise exception using errcode='check_violation',message=v_rule_id||' stub_acl_metadata';
+  end if;
+  v_result:=public.rpc_refresh_source_item_assignments();
+  if v_result->>'ok' is distinct from 'false'
+     or v_result->>'error_code' is distinct from 'SOURCE_ACCESS_UPGRADE_IN_PROGRESS' then
+    raise exception using errcode='check_violation',message=v_rule_id||' owner_invocation';
+  end if;
+end
+$assert_expand_state$;
+SQL
+
+  actual_projection_state="$(projection_state)"
+  if [[ "$actual_projection_state" != "$pre_expand_projection_state" ]]; then
+    echo "$rule_id projection_changed expected=$pre_expand_projection_state actual=$actual_projection_state" >&2
+    exit 1
+  fi
+  echo "PASS $rule_id exact stub owner-only ACL and unchanged real projections"
+}
+
+apply_expected_enforce_failure() {
+  local failpoint="$1"
+  local rule_id="$2"
+  local failure_log="$tmp_dir/enforce-${failpoint}.log"
+
+  if PGOPTIONS="-c vmp.source_access_enforce_failpoint=$failpoint" \
+      psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
+        -f "$enforce_migration" >"$failure_log" 2>&1; then
+    echo "$rule_id expected enforce migration failure" >&2
+    exit 1
+  fi
+  if ! grep -Fq "$rule_id" "$failure_log"; then
+    sed -n '1,160p' "$failure_log" >&2
+    echo "$rule_id missing injected failure marker" >&2
+    exit 1
+  fi
+  assert_expand_state "$rule_id"
+}
 
 if [[ "$phase" == "expand" ]]; then
   if [[ ! -f "$expand_migration" ]]; then
@@ -204,18 +326,46 @@ if [[ "$phase" == "expand" ]]; then
     exit 4
   fi
   psql -X -v ON_ERROR_STOP=1 -d "$test_database" -f "$expand_migration"
+  assert_expand_state 'SACCESS_EXPAND_STUB_FAILS_CLOSED'
+elif [[ "$phase" == "enforce-failure-before-repair" ||
+        "$phase" == "enforce-failure-after-repair" ]]; then
+  if [[ ! -f "$expand_migration" || ! -f "$enforce_migration" ]]; then
+    echo "Both Source access migrations are required for --phase $phase." >&2
+    exit 4
+  fi
+  psql -X -v ON_ERROR_STOP=1 -d "$test_database" -f "$expand_migration"
+  assert_expand_state 'SACCESS_EXPAND_STUB_FAILS_CLOSED'
+  if [[ "$phase" == "enforce-failure-before-repair" ]]; then
+    apply_expected_enforce_failure \
+      'before_repair' 'SACCESS_ENFORCE_FAILURE_BEFORE_REPAIR_ROLLS_BACK'
+  else
+    apply_expected_enforce_failure \
+      'after_repair_before_commit' 'SACCESS_ENFORCE_FAILURE_AFTER_REPAIR_ROLLS_BACK'
+  fi
 elif [[ "$phase" != "full" ]]; then
   if [[ ! -f "$expand_migration" || ! -f "$enforce_migration" ]]; then
     echo "Both Source access migrations are required for --phase $phase." >&2
     exit 4
   fi
   psql -X -v ON_ERROR_STOP=1 -d "$test_database" -f "$expand_migration"
+  assert_expand_state 'SACCESS_EXPAND_STUB_FAILS_CLOSED'
+  apply_expected_enforce_failure \
+    'before_repair' 'SACCESS_ENFORCE_FAILURE_BEFORE_REPAIR_ROLLS_BACK'
+  apply_expected_enforce_failure \
+    'after_repair_before_commit' 'SACCESS_ENFORCE_FAILURE_AFTER_REPAIR_ROLLS_BACK'
   psql -X -v ON_ERROR_STOP=1 -d "$test_database" -f "$enforce_migration"
 else
-  [[ ! -f "$expand_migration" ]] || \
+  [[ ! -f "$expand_migration" ]] || {
     psql -X -v ON_ERROR_STOP=1 -d "$test_database" -f "$expand_migration"
-  [[ ! -f "$enforce_migration" ]] || \
+    assert_expand_state 'SACCESS_EXPAND_STUB_FAILS_CLOSED'
+  }
+  [[ ! -f "$enforce_migration" ]] || {
+    apply_expected_enforce_failure \
+      'before_repair' 'SACCESS_ENFORCE_FAILURE_BEFORE_REPAIR_ROLLS_BACK'
+    apply_expected_enforce_failure \
+      'after_repair_before_commit' 'SACCESS_ENFORCE_FAILURE_AFTER_REPAIR_ROLLS_BACK'
     psql -X -v ON_ERROR_STOP=1 -d "$test_database" -f "$enforce_migration"
+  }
 fi
 
 run_behavior() {
@@ -227,6 +377,8 @@ run_behavior() {
 case "$phase" in
   expand)
     run_behavior expand
+    ;;
+  enforce-failure-before-repair|enforce-failure-after-repair)
     ;;
   behavior)
     run_behavior behavior
