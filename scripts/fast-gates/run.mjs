@@ -1,7 +1,7 @@
 import { spawn, execFile as execFileCallback } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, open, readFile, rename, stat } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { performance } from "node:perf_hooks";
@@ -82,10 +82,20 @@ async function writeAtomicJson(path, value) {
   const destination = resolve(path);
   await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
   const temporary = `${destination}.tmp-${process.pid}-${randomUUID()}`;
-  const handle = await open(temporary, "wx", 0o600);
-  try { await handle.writeFile(`${JSON.stringify(value)}\n`, "utf8"); await handle.sync(); } finally { await handle.close(); }
-  await chmod(temporary, 0o600);
-  await rename(temporary, destination);
+  let handle = null;
+  try {
+    handle = await open(temporary, "wx", 0o600);
+    await handle.writeFile(`${JSON.stringify(value)}\n`, "utf8");
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await chmod(temporary, 0o600);
+    await rename(temporary, destination);
+  } catch (error) {
+    if (handle) await handle.close().catch(() => {});
+    await unlink(temporary).catch(() => {});
+    throw error;
+  }
 }
 
 export function createOrderedWriter(write) {
@@ -108,23 +118,57 @@ function waitForClose(child) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
   return new Promise((resolveClose) => child.once("close", resolveClose));
 }
-export async function terminateProcessGroup({ child, timeoutMs = 1000, kill = process.kill, wait = waitForClose }) {
+function groupExists(pgid, kill) {
+  try {
+    kill(-pgid, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    throw error;
+  }
+}
+function sleep(milliseconds) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
+async function groupGoneBefore(pgid, { timeoutMs, pollIntervalMs, kill, now = Date.now, delay = sleep }) {
+  const deadline = now() + timeoutMs;
+  while (groupExists(pgid, kill)) {
+    if (now() >= deadline) return false;
+    await delay(Math.min(pollIntervalMs, Math.max(0, deadline - now())));
+  }
+  return true;
+}
+async function closesBefore(close, timeoutMs) {
+  let timeout;
+  const closed = await Promise.race([
+    close.then(() => true),
+    new Promise((resolveTimeout) => { timeout = setTimeout(() => resolveTimeout(false), timeoutMs); }),
+  ]);
+  clearTimeout(timeout);
+  return closed;
+}
+export async function terminateProcessGroup({
+  child,
+  timeoutMs = 1000,
+  pollIntervalMs = 25,
+  kill = process.kill,
+  wait = waitForClose,
+  now = Date.now,
+  delay = sleep,
+}) {
   if (!child?.pid) return { result: "not_required", termSent: false, killSent: false, closed: true };
   const close = wait(child);
   let termSent = false;
   let killSent = false;
   try { kill(-child.pid, "SIGTERM"); termSent = true; } catch (error) { if (error?.code !== "ESRCH") throw error; }
-  let timeout;
-  const closedAfterTerm = await Promise.race([
-    close.then(() => true),
-    new Promise((resolveTimeout) => { timeout = setTimeout(() => resolveTimeout(false), timeoutMs); }),
-  ]);
-  clearTimeout(timeout);
-  if (!closedAfterTerm) {
+  let gone = await groupGoneBefore(child.pid, { timeoutMs, pollIntervalMs, kill, now, delay });
+  if (!gone) {
     try { kill(-child.pid, "SIGKILL"); killSent = true; } catch (error) { if (error?.code !== "ESRCH") throw error; }
-    await close;
+    gone = await groupGoneBefore(child.pid, { timeoutMs, pollIntervalMs, kill, now, delay });
   }
-  return { result: "terminated", termSent, killSent, closed: true };
+  const childClosed = await closesBefore(close, timeoutMs);
+  const closed = gone && childClosed;
+  return { result: closed ? "terminated" : "failed", termSent, killSent, closed };
 }
 
 function safeSha(value, expression) { return typeof value === "string" && expression.test(value) ? value : null; }
@@ -187,7 +231,7 @@ export async function executeGateRun({
         const result = await spawnCommand({
           command: entry.command, args: [...entry.args], cwd: repoDir, shell: false,
           onChild(child) { activeChild = child; },
-          onOutput(data) { writer.append(data); },
+          onOutput(data) { writer.append(data).catch(() => {}); },
         });
         await writer.flush();
         await cleanupPromise;
@@ -206,7 +250,13 @@ export async function executeGateRun({
   } finally {
     if (cleanupPromise) await cleanupPromise;
     if (rawLog) {
-      try { if (writer) await writer.flush(); rawLogEvidence = await rawLogFinalizer(rawLog); } catch {
+      if (writer) {
+        try { await writer.flush(); } catch {
+          status = isInterrupted() ? "incomplete" : "failed";
+          errorKind ??= "raw_log_write";
+        }
+      }
+      try { rawLogEvidence = await rawLogFinalizer(rawLog); } catch {
         rawLogEvidence = blankRawLog(); status = isInterrupted() ? "incomplete" : "failed"; errorKind ??= "raw_log_finalize";
       }
     } else errorKind ??= "raw_log_setup";
@@ -246,24 +296,25 @@ function extractReceiptPath(argv, repoDir) {
 export async function runCli(argv = process.argv.slice(2), { repoDir = process.cwd(), readSelection = readSelectionFromCli, onRunController, ...executionOptions } = {}) {
   const recoverableReceiptPath = extractReceiptPath(argv, repoDir);
   let options;
+  let selection;
   try {
     options = parseArguments(argv);
-    const selection = await readSelection({ ...options, repoDir });
-    return await executeGateRun({ selection, receiptPath: isAbsolute(options.receiptPath) ? options.receiptPath : resolve(repoDir, options.receiptPath), repoDir, finalMode: options.finalMode, onRunController, ...executionOptions });
+    selection = await readSelection({ ...options, repoDir });
   } catch {
     if (!recoverableReceiptPath) throw new Error("fast gate setup failed before a receipt path was available");
     return executeGateRun({ selection: { mode: "full_fallback", reasons: ["runner-error"] }, receiptPath: recoverableReceiptPath, repoDir, setupError: options ? "selection_read" : "argument_parse", onRunController, ...executionOptions });
   }
+  return executeGateRun({ selection, receiptPath: isAbsolute(options.receiptPath) ? options.receiptPath : resolve(repoDir, options.receiptPath), repoDir, finalMode: options.finalMode, onRunController, ...executionOptions });
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), { runner = runCli, signalSource = process } = {}) {
   let controller = null;
   let interruptedBeforeController = false;
   let interruptedSignal = null;
   const stop = (signal) => { interruptedBeforeController = true; interruptedSignal = signal; void controller?.interrupt(signal); };
-  process.once("SIGINT", stop); process.once("SIGTERM", stop);
+  signalSource.once("SIGINT", stop); signalSource.once("SIGTERM", stop);
   try {
-    const receipt = await runCli(argv, {
+    const receipt = await runner(argv, {
       onRunController: (value) => {
         controller = value;
         if (interruptedBeforeController) void controller.interrupt(interruptedSignal);
@@ -272,7 +323,7 @@ export async function main(argv = process.argv.slice(2)) {
     process.exitCode = receipt.status === "passed" ? 0 : 1;
     return receipt;
   }
-  finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); }
+  finally { signalSource.removeListener("SIGINT", stop); signalSource.removeListener("SIGTERM", stop); }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

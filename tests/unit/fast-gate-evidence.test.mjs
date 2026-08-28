@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,6 +9,7 @@ import {
   assertNodeVersion,
   createOrderedWriter,
   executeGateRun,
+  main,
   resolveGatePlan,
   runCli,
   terminateProcessGroup,
@@ -238,6 +239,7 @@ test("raw log close failure writes a failed receipt", async (t) => {
     stateHome: directory,
     nodeVersion: "v24.18.0",
     exists: () => true,
+    rawLogFactory: async () => ({ handle: { write: async () => {} } }),
     spawnCommand: fakeSpawner([{ output: "partial\n" }], []),
     rawLogFinalizer: async () => { throw new Error("close failed"); },
     output: () => {},
@@ -283,6 +285,103 @@ test("owned process group receives TERM then closes descendants", async (t) => {
     closed: true,
   });
   assert.throws(() => process.kill(grandchildPid, 0), /ESRCH/u);
+});
+
+test("owned process group escalates to KILL when a descendant ignores TERM", async (t) => {
+  const child = spawn(process.execPath, ["-e", [
+    "const { spawn } = require('node:child_process');",
+    "const grandchild = spawn(process.execPath, ['-e', \"process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)\"], { stdio: 'ignore' });",
+    "process.stdout.write(String(grandchild.pid));",
+    "setInterval(() => {}, 1000);",
+  ].join(" ")], { detached: true, stdio: ["ignore", "pipe", "ignore"] });
+  t.after(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} });
+  const grandchildPid = Number(await new Promise((resolvePid) => child.stdout.once("data", (data) => resolvePid(data.toString()))));
+  await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+
+  const cleanup = await terminateProcessGroup({ child, timeoutMs: 75, pollIntervalMs: 10 });
+
+  assert.equal(cleanup.result, "terminated");
+  assert.equal(cleanup.termSent, true);
+  assert.equal(cleanup.killSent, true);
+  assert.equal(cleanup.closed, true);
+  assert.throws(() => process.kill(-child.pid, 0), /ESRCH/u);
+  assert.throws(() => process.kill(grandchildPid, 0), /ESRCH/u);
+});
+
+test("rejected raw writer flush still invokes the raw finalizer and fails the receipt", async (t) => {
+  const directory = await fixtureDirectory(t);
+  let finalized = false;
+  const receipt = await executeGateRun({
+    selection: focusedSelection(),
+    receiptPath: join(directory, "flush-failure.json"),
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    exists: () => true,
+    rawLogFactory: async () => ({ handle: { write: async () => { throw new Error("write failed"); } } }),
+    rawLogFinalizer: async () => {
+      finalized = true;
+      return { closed: true, bytes: 0, sha256: SHA256 };
+    },
+    spawnCommand: fakeSpawner([{ output: "broken\n" }], []),
+    output: () => {},
+  });
+
+  assert.equal(finalized, true);
+  assert.equal(receipt.status, "failed");
+});
+
+test("receipt-write failure removes the atomic temporary and is not retried as selection failure", async (t) => {
+  const directory = await fixtureDirectory(t);
+  const receiptPath = join(directory, "receipt-target");
+  await mkdir(receiptPath);
+  await assert.rejects(executeGateRun({
+    selection: focusedSelection(),
+    receiptPath,
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    exists: () => true,
+    spawnCommand: fakeSpawner([{ output: "ok\n" }], []),
+    output: () => {},
+  }));
+  assert.equal((await readdir(directory)).some((entry) => entry.startsWith("receipt-target.tmp-")), false);
+
+  let writes = 0;
+  await assert.rejects(runCli(["--selection", "fixture.json", "--receipt", join(directory, "write-failure.json")], {
+    repoDir: directory,
+    readSelection: async () => ({ mode: "full_fallback" }),
+    writeReceipt: async () => { writes += 1; throw new Error("receipt write failed"); },
+    output: () => {},
+  }));
+  assert.equal(writes, 1);
+});
+
+test("signal received before the runner controller produces an incomplete receipt", async (t) => {
+  const directory = await fixtureDirectory(t);
+  t.after(() => { process.exitCode = undefined; });
+  const listeners = new Map();
+  const signalSource = {
+    once(signal, listener) { listeners.set(signal, listener); },
+    removeListener(signal) { listeners.delete(signal); },
+  };
+  const receipt = await main([], {
+    signalSource,
+    runner: async (_argv, options) => {
+      listeners.get("SIGTERM")("SIGTERM");
+      return executeGateRun({
+        selection: focusedSelection(),
+        receiptPath: join(directory, "pre-controller-signal.json"),
+        stateHome: directory,
+        nodeVersion: "v24.18.0",
+        exists: () => true,
+        spawnCommand: fakeSpawner([{ output: "should-not-run\n" }], []),
+        onRunController: options.onRunController,
+        output: () => {},
+      });
+    },
+  });
+
+  assert.equal(receipt.status, "incomplete");
+  assert.equal(receipt.exit.signal, "SIGTERM");
 });
 
 test("raw log hash and byte count match the closed file", async (t) => {
