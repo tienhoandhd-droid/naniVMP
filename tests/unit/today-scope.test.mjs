@@ -42,7 +42,9 @@ test("scopes personal Today work by canonical owner and support IDs", () => {
   assert.deepEqual(filterTodayScope(rows, {
     areas: [], departments: [], onlyMine: true, currentPersonId: "person-a",
   }).map((row) => row.validationCode), ["OWNED", "SUPPORTED"]);
+});
 
+test("keeps unrelated Today rows in team scope", () => {
   assert.deepEqual(filterTodayScope(rows, {
     areas: [], departments: [], onlyMine: false, currentPersonId: null,
   }).map((row) => row.validationCode), ["OWNED", "SUPPORTED", "OTHER", "NO-TARGET"]);

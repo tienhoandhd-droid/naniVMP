@@ -21,6 +21,15 @@ export function defaultTodayPersonScope(
     : "team";
 }
 
+export function normalizeTodayPersonScope(
+  scope: TodayPersonScope,
+  currentPersonId: string | null,
+): TodayPersonScope {
+  return scope === "mine" && !canUsePersonalTodayScope(currentPersonId)
+    ? "team"
+    : scope;
+}
+
 export function presentTodayPersonScope(
   scope: TodayPersonScope,
   currentPersonId: string | null,

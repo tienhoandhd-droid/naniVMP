@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const {
   canUsePersonalTodayScope,
   defaultTodayPersonScope,
+  normalizeTodayPersonScope,
   presentTodayPersonScope,
 } = await import("../../src/features/today/todayPersonScope.ts");
 const { TodayScopeControl } = await import("../../src/features/today/TodayScopeControl.tsx");
@@ -41,6 +42,12 @@ test("defaults Today person scope from QA staff role and linked person", () => {
 test("recognizes a usable linked person ID", () => {
   assert.equal(canUsePersonalTodayScope(" person-a "), true);
   assert.equal(canUsePersonalTodayScope(""), false);
+});
+
+test("normalizes a personal Today scope to team when identity is lost", () => {
+  assert.equal(normalizeTodayPersonScope("mine", null), "team");
+  assert.equal(normalizeTodayPersonScope("team", "person-a"), "team");
+  assert.equal(normalizeTodayPersonScope("mine", "person-a"), "mine");
 });
 
 test("presents Today scope labels and unlinked-account warning", () => {

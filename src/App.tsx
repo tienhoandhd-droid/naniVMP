@@ -92,6 +92,13 @@ import {
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 import LoginScreen from "./components/auth/LoginScreen.tsx";
 import TodayCommandCenter from "./features/today/TodayCommandCenter.tsx";
+import { TodayScopeControl } from "./features/today/TodayScopeControl.tsx";
+import {
+  defaultTodayPersonScope,
+  normalizeTodayPersonScope,
+  presentTodayPersonScope,
+  type TodayPersonScope,
+} from "./features/today/todayPersonScope.ts";
 import { filterTodayScope } from "./features/today/todayScope.ts";
 import { isTodayActivityMine, type ProgressDeepLink } from "./features/today/todayModel.ts";
 
@@ -1350,7 +1357,9 @@ function GlobalFilterBar({
   areaSel, setAreaSel, deptSel, setDeptSel, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
   areaOptions, deptOptions, shown, total, soNgung = 0,
-  onlyMine, setOnlyMine, personLinked, todayMode = false,
+  onlyMine, setOnlyMine, personLinked,
+  todayPersonScope, setTodayPersonScope, currentPersonId,
+  todayMode = false,
 }: {
   areaSel: string[];
   setAreaSel: (v: string[]) => void;
@@ -1372,6 +1381,9 @@ function GlobalFilterBar({
   setOnlyMine: (v: boolean) => void;
   /** Tài khoản chỉ được bật phạm vi cá nhân khi đã nối khóa nhân sự chính tắc. */
   personLinked: boolean;
+  todayPersonScope: TodayPersonScope;
+  setTodayPersonScope: (scope: TodayPersonScope) => void;
+  currentPersonId: string | null;
   /** Today tự quản cửa sổ 7 ngày, nên kỳ nhớ chỉ được hiển thị ở màn khác. */
   todayMode?: boolean;
 }) {
@@ -1397,7 +1409,7 @@ function GlobalFilterBar({
   const toggleDept = (v: string) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
   const toggleArea = (v: string) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
   const active = deptSel.length > 0 || areaSel.length > 0
-    || (!todayMode && (!!customFrom || !!customTo)) || onlyMine;
+    || (!todayMode && (!!customFrom || !!customTo || onlyMine));
   const soLoc = deptSel.length + areaSel.length + (!todayMode && (customFrom || customTo) ? 1 : 0);
   const resetAll = () => {
     setDeptSel([]);
@@ -1406,8 +1418,8 @@ function GlobalFilterBar({
       setPeriod("all");
       setCustomFrom("");
       setCustomTo("");
+      setOnlyMine(false);
     }
-    setOnlyMine(false);
   };
   // Thời gian CHỈ theo mốc ngày: có nhập ngày -> bật lọc "custom"; xoá hết -> "all".
   const onFrom = (v: string) => { setCustomFrom(v); setPeriod((v || customTo) ? "custom" : "all"); };
@@ -1431,26 +1443,36 @@ function GlobalFilterBar({
   return (
     <div aria-label="Phạm vi toàn hệ thống" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
       <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>
-      {/* Việc của tôi — lọc theo khóa nhân sự owner/support chính tắc.
-          Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
-          vào trong hộp thì coi như không có. */}
-      <button type="button" onClick={() => setOnlyMine(!onlyMine)} aria-pressed={onlyMine}
-        disabled={!personLinked}
-        title={personLinked
-          ? "Chỉ hiện hạng mục có khóa nhân sự của bạn ở người phụ trách hoặc người hỗ trợ"
-          : "Tài khoản chưa liên kết nhân sự nên chưa thể lọc Việc của tôi"}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8,
-          border: `1px solid ${onlyMine ? C.mintText : C.pinkSoft}`,
-          background: onlyMine ? C.mintSoft : "transparent",
-          color: onlyMine ? C.mintText : C.plumSoft,
-          opacity: personLinked ? 1 : 0.55,
-          fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: personLinked ? "pointer" : "not-allowed" }}>
-        <Users size={14} /> Việc của tôi
-      </button>
-      {!personLinked && (
-        <span style={{ fontSize: 11, color: C.marigoldText, fontWeight: 700 }}>
-          Tài khoản chưa liên kết nhân sự; nhờ quản trị nối hồ sơ để dùng Việc của tôi.
-        </span>
+      {todayMode ? (
+        <TodayScopeControl
+          scope={todayPersonScope}
+          currentPersonId={currentPersonId}
+          onChange={setTodayPersonScope}
+        />
+      ) : (
+        <>
+          {/* Việc của tôi — lọc theo khóa nhân sự owner/support chính tắc.
+              Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
+              vào trong hộp thì coi như không có. */}
+          <button type="button" onClick={() => setOnlyMine(!onlyMine)} aria-pressed={onlyMine}
+            disabled={!personLinked}
+            title={personLinked
+              ? "Chỉ hiện hạng mục có khóa nhân sự của bạn ở người phụ trách hoặc người hỗ trợ"
+              : "Tài khoản chưa liên kết nhân sự nên chưa thể lọc Việc của tôi"}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8,
+              border: `1px solid ${onlyMine ? C.mintText : C.pinkSoft}`,
+              background: onlyMine ? C.mintSoft : "transparent",
+              color: onlyMine ? C.mintText : C.plumSoft,
+              opacity: personLinked ? 1 : 0.55,
+              fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: personLinked ? "pointer" : "not-allowed" }}>
+            <Users size={14} /> Việc của tôi
+          </button>
+          {!personLinked && (
+            <span style={{ fontSize: 11, color: C.marigoldText, fontWeight: 700 }}>
+              Tài khoản chưa liên kết nhân sự; nhờ Admin nối hồ sơ để dùng Việc của tôi.
+            </span>
+          )}
+        </>
       )}
 
       {/* + Lọc (Bộ phận / Khu vực) */}
@@ -1679,9 +1701,14 @@ function VerifiedAppShell({ user, logout, access }: {
   const [customFrom, setCustomFrom] = useState(khoiTao.customFrom);   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState(khoiTao.customTo);         // yyyy-mm-dd
   const [onlyMine, setOnlyMine] = useState(currentPersonId ? khoiTao.onlyMine : false);
+  const [todayPersonScope, setTodayPersonScope] = useState<TodayPersonScope>(() =>
+    defaultTodayPersonScope(access.businessRole, currentPersonId));
   useEffect(() => {
     if (!currentPersonId && onlyMine) setOnlyMine(false);
   }, [currentPersonId, onlyMine]);
+  useEffect(() => {
+    setTodayPersonScope((scope) => normalizeTodayPersonScope(scope, currentPersonId));
+  }, [currentPersonId]);
   // App là nơi duy nhất quyết định đích theo quyền. Bản đồ chỉ nhận callback
   // khi có một màn hợp lệ, vì vậy nó không thể tạo CTA dẫn tới màn bị chặn.
   const workloadListTarget = overviewTarget(access, "soon");
@@ -1756,9 +1783,15 @@ function VerifiedAppShell({ user, logout, access }: {
   const todayActs = useMemo(() => filterTodayScope(acts, {
     areas: areaSel,
     departments: deptSel,
-    onlyMine,
+    onlyMine: todayPersonScope === "mine",
     currentPersonId,
-  }), [acts, areaSel, currentPersonId, deptSel, onlyMine]);
+  }), [acts, areaSel, currentPersonId, deptSel, todayPersonScope]);
+  const allTodayActs = useMemo(() => filterTodayScope(acts, {
+    areas: [],
+    departments: [],
+    onlyMine: todayPersonScope === "mine",
+    currentPersonId,
+  }), [acts, currentPersonId, todayPersonScope]);
   /* Mẫu số của thanh lọc phải đếm HẠNG MỤC ĐANG HOẠT ĐỘNG.
      Đo được: RPC trả 461 dòng = 448 đang hoạt động + 13 "Không áp dụng".
      Thanh lọc ghi 461 nhưng mọi màn bên dưới đều lọc bỏ 13 dòng kia, nên
@@ -1770,7 +1803,9 @@ function VerifiedAppShell({ user, logout, access }: {
   const soSong = useMemo(() => acts.filter(laSong).length, [acts]);
   const soSongHien = useMemo(() => filteredActs.filter(laSong).length, [filteredActs]);
   const soSongToday = useMemo(() => todayActs.filter(laSong).length, [todayActs]);
+  const soSongTodayTotal = useMemo(() => allTodayActs.filter(laSong).length, [allTodayActs]);
   const soNgung = acts.length - soSong;
+  const soNgungToday = allTodayActs.length - soSongTodayTotal;
 
   const filteredObjects = useMemo(() => objects.filter((o) => {
     if (areaSel.length && !areaSel.includes(String(o.area || "").trim())) return false;
@@ -1837,16 +1872,15 @@ function VerifiedAppShell({ user, logout, access }: {
   }, [deptSel, areaSel, periodFilter, onlyMine]);
 
   const nhanPhamViToday = useMemo(() => {
-    const phan: string[] = [];
+    const phan: string[] = [presentTodayPersonScope(todayPersonScope, currentPersonId).heading];
     if (deptSel.length > 0) {
       phan.push(deptSel.map((id) => DEPTS.find((d) => d.id === id)?.short || id).join(", "));
     } else {
       phan.push("Toàn hệ thống");
     }
     if (areaSel.length > 0) phan.push(`khu vực ${areaSel.join(", ")}`);
-    if (onlyMine) phan.push("việc của tôi");
     return phan.join(" · ");
-  }, [areaSel, deptSel, onlyMine]);
+  }, [areaSel, currentPersonId, deptSel, todayPersonScope]);
 
   const clearTodayScope = useCallback(() => {
     setDeptSel([]);
@@ -2033,8 +2067,12 @@ function VerifiedAppShell({ user, logout, access }: {
                 customFrom={customFrom} setCustomFrom={setCustomFrom}
                 customTo={customTo} setCustomTo={setCustomTo}
                 areaOptions={areaOptions} deptOptions={deptOptions}
-                shown={view === "today" ? soSongToday : soSongHien} total={soSong} soNgung={soNgung}
+                shown={view === "today" ? soSongToday : soSongHien}
+                total={view === "today" ? soSongTodayTotal : soSong}
+                soNgung={view === "today" ? soNgungToday : soNgung}
                 onlyMine={onlyMine} setOnlyMine={setOnlyMine}
+                todayPersonScope={todayPersonScope} setTodayPersonScope={setTodayPersonScope}
+                currentPersonId={currentPersonId}
                 personLinked={currentPersonId !== null} todayMode={view === "today"}
               />
             )}
