@@ -36,6 +36,12 @@ begin
   if exists (
     select 1
     from (values
+      ('public.vmp_is_active_session(uuid)',
+       'e52a0cece430ad8b8319819b633fd4fc8aa92bc2d2fac083a33b22f609e1f417',
+       'c15c1a154cce836fd7c53553da6b8694837818bd489a7bb5654cfb65bc9b2cd6'),
+      ('public.vmp_session_denial()',
+       '8ff11d9d103ea62dd1c8786b1aa766bcfe6386bf6d4ec5b3729062c850609ad1',
+       '4cf828cdcd9d7121ff65b0ce2042a37468fba5a603a9b7c4da5f7645c7fbe6ab'),
       ('public.rpc_my_editable_progress_rights()',
        'a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b',
        '2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492'),
@@ -130,6 +136,36 @@ begin
       message='ASSIGNED_PROGRESS_RECOVERY_POSTCONDITION_PUBLIC_WRITER';
   end if;
 
+  if exists (
+    select 1
+    from (values
+      ('public.vmp_is_active_session(uuid)',
+       'e52a0cece430ad8b8319819b633fd4fc8aa92bc2d2fac083a33b22f609e1f417',
+       'c15c1a154cce836fd7c53553da6b8694837818bd489a7bb5654cfb65bc9b2cd6'),
+      ('public.vmp_session_denial()',
+       '8ff11d9d103ea62dd1c8786b1aa766bcfe6386bf6d4ec5b3729062c850609ad1',
+       '4cf828cdcd9d7121ff65b0ce2042a37468fba5a603a9b7c4da5f7645c7fbe6ab')
+    ) reviewed(signature,definition_hash,metadata_hash)
+    left join pg_proc procedure
+      on procedure.oid=to_regprocedure(reviewed.signature)
+    left join pg_roles owner on owner.oid=procedure.proowner
+    left join pg_language language on language.oid=procedure.prolang
+    where procedure.oid is null
+       or encode(extensions.digest(pg_get_functiondef(procedure.oid),'sha256'),'hex')
+            is distinct from reviewed.definition_hash
+       or encode(extensions.digest(concat_ws('|',owner.rolname,language.lanname,
+            procedure.prosecdef::text,procedure.provolatile::text,
+            procedure.proparallel::text,procedure.proisstrict::text,
+            procedure.proleakproof::text,
+            coalesce(array_to_string(procedure.proconfig,','),''),
+            coalesce(array_to_string(procedure.proacl,','),''),
+            pg_get_function_result(procedure.oid)),'sha256'),'hex')
+            is distinct from reviewed.metadata_hash
+  ) then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_RECOVERY_POSTCONDITION_HELPER_CONTRACT';
+  end if;
+
   if has_function_privilege('public',v_public,'EXECUTE')
      or has_function_privilege('anon',v_public,'EXECUTE')
      or not has_function_privilege('authenticated',v_public,'EXECUTE')
@@ -144,6 +180,18 @@ begin
        'public.rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)','EXECUTE') then
     raise exception using errcode='check_violation',
       message='ASSIGNED_PROGRESS_RECOVERY_POSTCONDITION_ACL';
+  end if;
+
+  if has_function_privilege('public','public.vmp_is_active_session(uuid)','EXECUTE')
+     or has_function_privilege('anon','public.vmp_is_active_session(uuid)','EXECUTE')
+     or has_function_privilege('authenticated','public.vmp_is_active_session(uuid)','EXECUTE')
+     or not has_function_privilege('service_role','public.vmp_is_active_session(uuid)','EXECUTE')
+     or has_function_privilege('public','public.vmp_session_denial()','EXECUTE')
+     or has_function_privilege('anon','public.vmp_session_denial()','EXECUTE')
+     or has_function_privilege('authenticated','public.vmp_session_denial()','EXECUTE')
+     or not has_function_privilege('service_role','public.vmp_session_denial()','EXECUTE') then
+    raise exception using errcode='check_violation',
+      message='ASSIGNED_PROGRESS_RECOVERY_POSTCONDITION_HELPER_ACL';
   end if;
 
   if public.screen_access_mode() is distinct from 'enforced'

@@ -29,8 +29,8 @@ Hash được duyệt dưới đây là literal, không phải placeholder. Bấ
 
 ```bash
 EXPECTED_MIGRATION_SHA256='acf812cb90bbecef73a6c05aefbea106be84b3974acd49660a9342bdc14c284f'
-EXPECTED_CHECKER_SHA256='9e60cf49eceb1582d24ff95606ddb161f09ca10cd2544a357998990a302a426d'
-EXPECTED_RECOVERY_SHA256='a1bbdd7f8a76ac3e0f50d9252f84bf04331438586b90835761fba4e449f36389'
+EXPECTED_CHECKER_SHA256='dab3065406b90e47481c2c4d17a368a311bbdccbc222b49b085abd20cf898559'
+EXPECTED_RECOVERY_SHA256='d2005965f74840d0b13564179538486df046c7519511b843e5c2cdaad64126fc'
 EXPECTED_WORKFLOW_SHA256='dfb2bec71efd33701606d6440685858ae6838ade3302cf4ff703b91ce996558c'
 
 test "$(sha256sum supabase/migrations/20260827130000_assigned_progress_visibility.sql | awk '{print $1}')" = "$EXPECTED_MIGRATION_SHA256"
@@ -59,6 +59,7 @@ umask 077
 export PGSERVICEFILE='/secure/vmp/assigned-progress-pg-service.conf'
 export PGSERVICE='vmp_assigned_progress'
 export PERSONA_ID_FILE='/secure/vmp/assigned-progress-personas.psql'
+EXPECTED_PROJECT_REF='ivembmikfhtyzhtqebgh'
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 export EVIDENCE_DIR="/secure/vmp/backups/assigned-progress-${REVIEWED_RELEASE_SHA}-${STAMP}"
 
@@ -68,6 +69,20 @@ test -f "$PERSONA_ID_FILE"
 test "$(stat -c '%a' "$PERSONA_ID_FILE")" = 600
 install -d -m 700 "$EVIDENCE_DIR"
 test "$(stat -c '%a' "$EVIDENCE_DIR")" = 700
+
+# Chứng minh Supabase CLI và PostgreSQL service cùng trỏ vào một project.
+test "$(tr -d '\r\n' < supabase/.temp/project-ref)" = "$EXPECTED_PROJECT_REF"
+jq -e --arg ref "$EXPECTED_PROJECT_REF" '.ref == $ref' \
+  supabase/.temp/linked-project.json >/dev/null
+PGSERVICE_HOST="$(awk -F= '/^[[:space:]]*host[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2; exit}' "$PGSERVICEFILE")"
+PGSERVICE_USER="$(awk -F= '/^[[:space:]]*user[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2; exit}' "$PGSERVICEFILE")"
+test -n "$PGSERVICE_HOST"
+test -n "$PGSERVICE_USER"
+if test "$PGSERVICE_HOST" != "db.${EXPECTED_PROJECT_REF}.supabase.co" \
+   && test "$PGSERVICE_USER" != "postgres.${EXPECTED_PROJECT_REF}"; then
+  echo 'PGSERVICE không khớp project ref đã duyệt' >&2
+  exit 1
+fi
 ```
 
 ## 3. Backup PostgreSQL 17 và preflight chỉ đọc
@@ -115,7 +130,7 @@ SQL
 test -s "$EVIDENCE_DIR/function-definitions-before.txt"
 ```
 
-Baseline production không được waive là 479 blocker (`99a46e1c1a96ea8ea612056d6f596af3`) và 14 warning (`7bc0aa25501a745ddc161e13ef5dab9a`). Checker chỉ ghi marker PASS nếu baseline này, mode `enforced/preview`, Source Data hashes, ACL/search path/wrapper target và persona contracts đều còn nguyên.
+Baseline production không được waive là 514 blocker (`82020b2908015d95f228f6caacf90f3a`) và 14 warning (`7bc0aa25501a745ddc161e13ef5dab9a`). Checker chỉ ghi marker PASS nếu baseline này, mode `enforced/preview`, Source Data hashes, ACL/search path/wrapper target và persona contracts đều còn nguyên.
 
 ## 4. Apply database một lần
 
@@ -147,11 +162,22 @@ Workshop có thể chưa có persona được phân công thật. Marker `PASS C
 Lệnh `psql -f` không tự cập nhật `supabase_migrations.schema_migrations`. Sau postflight đầu tiên đạt và chỉ khi migration-history mutation nằm trong cùng phê duyệt, đối chiếu linked project rồi ghi đúng version:
 
 ```bash
-supabase migration list --linked > "$EVIDENCE_DIR/migration-list-before.txt"
+MIGRATION_VERSION='20260827130000'
+test "$(tr -d '\r\n' < supabase/.temp/project-ref)" = "$EXPECTED_PROJECT_REF"
+jq -e --arg ref "$EXPECTED_PROJECT_REF" '.ref == $ref' \
+  supabase/.temp/linked-project.json >/dev/null
+supabase migration list --linked --output json \
+  > "$EVIDENCE_DIR/migration-list-before.json"
+jq -e --arg version "$MIGRATION_VERSION" \
+  '[.migrations[] | select(.remote == $version)] | length == 0' \
+  "$EVIDENCE_DIR/migration-list-before.json" >/dev/null
 supabase migration repair --status applied 20260827130000 --linked --yes \
   > "$EVIDENCE_DIR/migration-repair.log" 2>&1
-supabase migration list --linked > "$EVIDENCE_DIR/migration-list-after.txt"
-test "$(rg -c '20260827130000' "$EVIDENCE_DIR/migration-list-after.txt")" = 1
+supabase migration list --linked --output json \
+  > "$EVIDENCE_DIR/migration-list-after.json"
+jq -e --arg version "$MIGRATION_VERSION" \
+  '[.migrations[] | select(.remote == $version)] | length == 1' \
+  "$EVIDENCE_DIR/migration-list-after.json" >/dev/null
 ```
 
 Nếu linked project không chứng minh đúng database/service đang phát hành, dừng và không repair. Release ledger chuẩn gồm exact SHA, ba artifact hash, backup hash, apply log, checker log và migration-list before/after.
@@ -195,19 +221,72 @@ Chỉ sau database postflight và independent review đạt mới dispatch quali
 ```bash
 REPO='tienhoandhd-droid/naniVMP'
 FEATURE_BRANCH='feat/qa-rights-account-alignment'
+git push origin "$REVIEWED_RELEASE_SHA:refs/heads/$FEATURE_BRANCH"
+test "$(git ls-remote origin "refs/heads/$FEATURE_BRANCH" | awk '{print $1}')" = \
+  "$REVIEWED_RELEASE_SHA"
+
+QUALITY_DISPATCH_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+export REVIEWED_RELEASE_SHA QUALITY_DISPATCH_AT
 gh workflow run deploy.yml --repo "$REPO" --ref "$FEATURE_BRANCH" \
   -f expected_commit="$REVIEWED_RELEASE_SHA"
-QUALITY_RUN_ID="$(gh run list --repo "$REPO" --workflow deploy.yml \
-  --commit "$REVIEWED_RELEASE_SHA" --event workflow_dispatch --limit 1 \
-  --json databaseId --jq '.[0].databaseId')"
+for attempt in $(seq 1 30); do
+  QUALITY_RUN_IDS="$(gh api \
+    "repos/$REPO/actions/workflows/deploy.yml/runs?event=workflow_dispatch&branch=$FEATURE_BRANCH&per_page=20" \
+    --jq '[.workflow_runs[] | select(.head_sha == env.REVIEWED_RELEASE_SHA and .created_at >= env.QUALITY_DISPATCH_AT) | .id] | unique | .[]')"
+  test "$(wc -w <<<"$QUALITY_RUN_IDS")" -le 1
+  test -n "$QUALITY_RUN_IDS" && break
+  sleep 2
+done
+QUALITY_RUN_ID="$QUALITY_RUN_IDS"
 test -n "$QUALITY_RUN_ID"
 gh run watch "$QUALITY_RUN_ID" --repo "$REPO" --exit-status
 test "$(gh run view "$QUALITY_RUN_ID" --repo "$REPO" --json headSha --jq .headSha)" = "$REVIEWED_RELEASE_SHA"
 gh run view "$QUALITY_RUN_ID" --repo "$REPO" --json headSha,conclusion,jobs,url \
   > "$EVIDENCE_DIR/quality-run.json"
+
+REMOTE_MAIN_BEFORE="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+git fetch --prune origin
+test "$(git rev-parse origin/main)" = "$REMOTE_MAIN_BEFORE"
+test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$REMOTE_MAIN_BEFORE"
+git merge-base --is-ancestor "$REMOTE_MAIN_BEFORE" "$REVIEWED_RELEASE_SHA"
+
+PAGES_PUSH_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+export PAGES_PUSH_AT
+git push origin "$REVIEWED_RELEASE_SHA:refs/heads/main"
+test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$REVIEWED_RELEASE_SHA"
+
+for attempt in $(seq 1 30); do
+  PAGES_RUN_IDS="$(gh api \
+    "repos/$REPO/actions/workflows/deploy.yml/runs?event=push&branch=main&per_page=20" \
+    --jq '[.workflow_runs[] | select(.head_sha == env.REVIEWED_RELEASE_SHA and .created_at >= env.PAGES_PUSH_AT) | .id] | unique | .[]')"
+  test "$(wc -w <<<"$PAGES_RUN_IDS")" -le 1
+  test -n "$PAGES_RUN_IDS" && break
+  sleep 2
+done
+PAGES_RUN_ID="$PAGES_RUN_IDS"
+test -n "$PAGES_RUN_ID"
+gh run watch "$PAGES_RUN_ID" --repo "$REPO" --exit-status
+test "$(gh run view "$PAGES_RUN_ID" --repo "$REPO" --json headSha --jq .headSha)" = "$REVIEWED_RELEASE_SHA"
+gh run view "$PAGES_RUN_ID" --repo "$REPO" --json headSha,conclusion,jobs,url \
+  > "$EVIDENCE_DIR/pages-run.json"
+
+PAGES_DEPLOYMENT_ID="$(gh api \
+  "repos/$REPO/deployments?environment=github-pages&sha=$REVIEWED_RELEASE_SHA&per_page=20" \
+  --jq '[.[] | select(.sha == env.REVIEWED_RELEASE_SHA and .environment == "github-pages")][0].id')"
+test -n "$PAGES_DEPLOYMENT_ID"
+PAGE_URL="$(gh api "repos/$REPO/deployments/$PAGES_DEPLOYMENT_ID/statuses" \
+  --jq '[.[] | select(.state == "success")][0].environment_url')"
+test -n "$PAGE_URL"
+PAGE_HTTP_STATUS="$(curl -sS -o "$EVIDENCE_DIR/page.html" -w '%{http_code}' "$PAGE_URL")"
+test "$PAGE_HTTP_STATUS" = 200
+ASSET_PATH="$(rg -o 'assets/[^"]+\.js' "$EVIDENCE_DIR/page.html" | head -n 1)"
+test -n "$ASSET_PATH"
+ASSET_HTTP_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' \
+  "${PAGE_URL%/}/${ASSET_PATH#./}")"
+test "$ASSET_HTTP_STATUS" = 200
 ```
 
-Fast-forward/push main và Pages deploy chỉ theo phê duyệt push/deploy hiện hữu. Xác minh push run, Pages deployment metadata, page HTTP 200 và JS asset HTTP 200 đều gắn đúng `REVIEWED_RELEASE_SHA`; giữ `PREVIOUS_PAGES_SHA` để forward recovery frontend.
+Các gate trên không dùng nhánh `main` cục bộ. Chúng chỉ fast-forward remote từ `REMOTE_MAIN_BEFORE` sang exact SHA đã review, rồi khóa workflow run và deployment GitHub Pages vào cùng SHA. Giữ `PREVIOUS_PAGES_SHA` để forward recovery frontend.
 
 ## 8. Forward recovery đã review
 

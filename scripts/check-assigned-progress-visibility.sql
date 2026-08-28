@@ -61,9 +61,9 @@ declare
   v_warning_digest text;
   v_local boolean;
 begin
-  if v_admin=v_manager or v_admin=v_assigned_qa or v_admin=v_unassigned_qa
-     or v_admin=v_thien_my or v_manager=v_assigned_qa
-     or v_manager=v_unassigned_qa or v_manager=v_thien_my then
+  if (select count(distinct persona_id)
+      from unnest(array[v_admin,v_manager,v_assigned_qa,v_unassigned_qa,v_thien_my])
+        persona(persona_id)) <> 5 then
     raise exception using errcode='check_violation',
       message='CHECK_ASSIGNED_PROGRESS_PERSONA_IDS_INVALID';
   end if;
@@ -78,6 +78,12 @@ begin
   if exists (
     select 1
     from (values
+      ('public.vmp_is_active_session(uuid)',
+       'e52a0cece430ad8b8319819b633fd4fc8aa92bc2d2fac083a33b22f609e1f417',
+       'c15c1a154cce836fd7c53553da6b8694837818bd489a7bb5654cfb65bc9b2cd6'),
+      ('public.vmp_session_denial()',
+       '8ff11d9d103ea62dd1c8786b1aa766bcfe6386bf6d4ec5b3729062c850609ad1',
+       '4cf828cdcd9d7121ff65b0ce2042a37468fba5a603a9b7c4da5f7645c7fbe6ab'),
       ('public.rpc_my_editable_progress_rights()',
        'a769f237d9f92c52ca9bfb5c5f6511a3b96078dd3015678bc6e78003f7243f6b',
        '2a1ef91d0f29fa4af8e8a31223aea79e81dbf05d2c6c031cc6225d41f1d27492'),
@@ -124,7 +130,15 @@ begin
   end if;
   raise notice 'PASS CHECK_ASSIGNED_PROGRESS_FUNCTION_CONTRACT exact hashes';
 
-  if has_function_privilege('public','public.rpc_my_editable_progress_rights()','EXECUTE')
+  if has_function_privilege('public','public.vmp_is_active_session(uuid)','EXECUTE')
+     or has_function_privilege('anon','public.vmp_is_active_session(uuid)','EXECUTE')
+     or has_function_privilege('authenticated','public.vmp_is_active_session(uuid)','EXECUTE')
+     or not has_function_privilege('service_role','public.vmp_is_active_session(uuid)','EXECUTE')
+     or has_function_privilege('public','public.vmp_session_denial()','EXECUTE')
+     or has_function_privilege('anon','public.vmp_session_denial()','EXECUTE')
+     or has_function_privilege('authenticated','public.vmp_session_denial()','EXECUTE')
+     or not has_function_privilege('service_role','public.vmp_session_denial()','EXECUTE')
+     or has_function_privilege('public','public.rpc_my_editable_progress_rights()','EXECUTE')
      or has_function_privilege('anon','public.rpc_my_editable_progress_rights()','EXECUTE')
      or not has_function_privilege('authenticated','public.rpc_my_editable_progress_rights()','EXECUTE')
      or not has_function_privilege('service_role','public.rpc_my_editable_progress_rights()','EXECUTE')
@@ -182,8 +196,8 @@ begin
        or v_digest<>'51655dff70de3ba821367c8f3784d078'
        or v_warning_count<>8
        or v_warning_digest<>'1dfde6e08513295b7e91472e406e2c6b'))
-     or (not v_local and (v_count<>479
-       or v_digest<>'99a46e1c1a96ea8ea612056d6f596af3'
+     or (not v_local and (v_count<>514
+       or v_digest<>'82020b2908015d95f228f6caacf90f3a'
        or v_warning_count<>14
        or v_warning_digest<>'7bc0aa25501a745ddc161e13ef5dab9a')) then
     raise exception using errcode='check_violation',
@@ -295,13 +309,10 @@ begin
     on performer.id=assignment.performer_id and performer.is_active
   join public.vmp_plan_items item
     on item.validation_code=assignment.validation_code and item.is_active
-  cross join lateral public.vmp_item_rights(
-    performer.user_id,assignment.validation_code) rights
   where assignment.assignment_kind='equipment_department'
     and assignment.is_active
     and (assignment.expires_at is null or assignment.expires_at>now())
     and public.vmp_business_role(performer.user_id)='workshop_staff'
-    and rights.can_view
   order by assignment.validation_code,performer.id limit 1;
   if v_workshop is null then
     raise notice 'PASS CHECK_ASSIGNED_PROGRESS_WORKSHOP_ONE_FIELD assignments=0';

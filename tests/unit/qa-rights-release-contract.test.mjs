@@ -217,3 +217,125 @@ test("assigned-progress runbook pins artifacts and orders backup, apply, postfli
   assert.match(source, /forward-recover-assigned-progress-visibility\.sql/);
   assert.doesNotMatch(source, /REPLACE_WITH|UUID_DA_DOI_CHIEU|TODO|TBD/i);
 });
+
+test("assigned-progress release pins the reviewed 514-blocker production baseline", async () => {
+  const [checker, runbook] = await Promise.all([
+    read("scripts/check-assigned-progress-visibility.sql"),
+    read("docs/runbooks/2026-08-27-assigned-progress-visibility.md"),
+  ]);
+
+  for (const source of [checker, runbook]) {
+    assert.match(source, /514/);
+    assert.match(source, /82020b2908015d95f228f6caacf90f3a/);
+    assert.match(source, /14/);
+    assert.match(source, /7bc0aa25501a745ddc161e13ef5dab9a/);
+    assert.doesNotMatch(source, /479 blocker|v_count\s*<>\s*479/i);
+  }
+});
+
+test("assigned-progress workshop probe selects a real assignment before evaluating batch rights", async () => {
+  const source = await read("scripts/check-assigned-progress-visibility.sql");
+  const selection = source.match(
+    /select performer\.user_id into v_workshop[\s\S]*?order by[\s\S]*?limit 1;/i,
+  )?.[0];
+
+  assert.ok(selection, "checker must select an active workshop assignment fixture");
+  assert.match(selection, /assignment\.assignment_kind='equipment_department'/);
+  assert.match(selection, /assignment\.is_active/);
+  assert.match(selection, /performer\.is_active/);
+  assert.match(selection, /item\.is_active/);
+  assert.match(selection, /vmp_business_role\(performer\.user_id\)='workshop_staff'/);
+  assert.doesNotMatch(selection, /vmp_item_rights|rights\.can_view/i,
+    "a broken resolver must fail the batch assertion, not turn a real fixture into assignments=0");
+  assert.match(source,
+    /if v_workshop is null then[\s\S]*assignments=0[\s\S]*rpc_my_editable_progress_rights\(\)[\s\S]*\["actual_validation_date"\]/i);
+});
+
+test("assigned-progress checker and recovery pin both session-helper definitions, metadata, and ACL", async () => {
+  const [checker, recovery] = await Promise.all([
+    read("scripts/check-assigned-progress-visibility.sql"),
+    read("scripts/forward-recover-assigned-progress-visibility.sql"),
+  ]);
+  const helperContracts = [
+    [
+      "public.vmp_is_active_session(uuid)",
+      "e52a0cece430ad8b8319819b633fd4fc8aa92bc2d2fac083a33b22f609e1f417",
+      "c15c1a154cce836fd7c53553da6b8694837818bd489a7bb5654cfb65bc9b2cd6",
+    ],
+    [
+      "public.vmp_session_denial()",
+      "8ff11d9d103ea62dd1c8786b1aa766bcfe6386bf6d4ec5b3729062c850609ad1",
+      "4cf828cdcd9d7121ff65b0ce2042a37468fba5a603a9b7c4da5f7645c7fbe6ab",
+    ],
+  ];
+
+  for (const [signature, definitionHash, metadataHash] of helperContracts) {
+    for (const literal of [signature, definitionHash, metadataHash]) {
+      assert.match(checker, new RegExp(literal.replaceAll(/[().]/g, "\\$&")));
+      assert.ok(recovery.split(literal).length >= 3,
+        `${signature} contract must be pinned in recovery pre- and postconditions`);
+    }
+  }
+  assert.match(checker,
+    /has_function_privilege\('public','public\.vmp_is_active_session\(uuid\)','EXECUTE'\)[\s\S]*has_function_privilege\('service_role','public\.vmp_is_active_session\(uuid\)','EXECUTE'\)/i);
+  assert.match(checker,
+    /has_function_privilege\('public','public\.vmp_session_denial\(\)','EXECUTE'\)[\s\S]*has_function_privilege\('authenticated','public\.vmp_session_denial\(\)','EXECUTE'\)/i);
+  assert.match(recovery, /ASSIGNED_PROGRESS_RECOVERY_POSTCONDITION_HELPER_ACL/);
+});
+
+test("assigned-progress checker requires all five persona IDs to be pairwise distinct", async () => {
+  const source = await read("scripts/check-assigned-progress-visibility.sql");
+
+  assert.match(source,
+    /count\(distinct persona_id\)[\s\S]*unnest\(array\[v_admin,v_manager,v_assigned_qa,v_unassigned_qa,v_thien_my\]\)/i);
+  assert.match(source, /<>\s*5/);
+});
+
+test("assigned-progress runbook pushes and verifies exact feature and main SHAs with unambiguous workflow and Pages evidence", async () => {
+  const source = await read("docs/runbooks/2026-08-27-assigned-progress-visibility.md");
+  const ordered = (...needles) => {
+    let previous = -1;
+    for (const needle of needles) {
+      const index = source.indexOf(needle);
+      assert.ok(index > previous, `${needle} must exist in release order`);
+      previous = index;
+    }
+  };
+
+  ordered(
+    'git push origin "$REVIEWED_RELEASE_SHA:refs/heads/$FEATURE_BRANCH"',
+    'refs/heads/$FEATURE_BRANCH',
+    "gh workflow run deploy.yml",
+    "QUALITY_RUN_ID",
+    "REMOTE_MAIN_BEFORE",
+    'git push origin "$REVIEWED_RELEASE_SHA:refs/heads/main"',
+    "PAGES_RUN_ID",
+    "PAGES_DEPLOYMENT_ID",
+    "PAGE_HTTP_STATUS",
+    "ASSET_HTTP_STATUS",
+  );
+  assert.match(source, /created_at[\s\S]*QUALITY_DISPATCH_AT/,
+    "quality run discovery must exclude old runs");
+  assert.match(source, /created_at[\s\S]*PAGES_PUSH_AT/,
+    "push run discovery must exclude old runs");
+  assert.match(source, /merge-base --is-ancestor "\$REMOTE_MAIN_BEFORE" "\$REVIEWED_RELEASE_SHA"/);
+  assert.match(source, /PAGES_DEPLOYMENT_ID[\s\S]*github-pages[\s\S]*REVIEWED_RELEASE_SHA/);
+  assert.match(source, /PAGE_HTTP_STATUS[\s\S]*= 200/);
+  assert.match(source, /ASSET_HTTP_STATUS[\s\S]*= 200/);
+  assert.doesNotMatch(source, /git (?:checkout|switch|merge|rebase) main/,
+    "release must never depend on the unrelated local main branch");
+});
+
+test("assigned-progress runbook proves the linked project and exact remote migration JSON before repair", async () => {
+  const source = await read("docs/runbooks/2026-08-27-assigned-progress-visibility.md");
+
+  assert.match(source, /EXPECTED_PROJECT_REF='ivembmikfhtyzhtqebgh'/);
+  assert.match(source, /supabase\/\.temp\/project-ref/);
+  assert.match(source, /supabase\/\.temp\/linked-project\.json/);
+  assert.match(source, /PGSERVICE_HOST/);
+  assert.match(source, /PGSERVICE_USER/);
+  assert.ok((source.match(/migration list --linked --output json/g) ?? []).length >= 2);
+  assert.match(source, /jq[\s\S]*\.remote/);
+  assert.match(source, /select\(\.remote\s*==\s*\$version\)/);
+  assert.doesNotMatch(source, /rg -c '20260827130000'/);
+});
