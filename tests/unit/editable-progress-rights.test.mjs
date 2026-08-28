@@ -5,6 +5,7 @@ import {
   filterEditableProgressActivities,
   indexEditableProgressRights,
   parseEditableProgressRights,
+  progressValidationCode,
   visibleProgressStageFields,
 } from "../../src/features/progress/editableProgressRights.ts";
 import {
@@ -37,6 +38,18 @@ test("lọc quyền theo validationCode chính tắc khi legacy id khác mã", (
     ], rights).map((row) => row.id),
     ["legacy-id"],
   );
+});
+
+test("mã thẩm định chính tắc ưu tiên validationCode rồi id, không dùng mã đối tượng", () => {
+  assert.equal(progressValidationCode({
+    id: "VMP-E2E-01",
+    code: "TB-E2E-01",
+  }), "VMP-E2E-01");
+  assert.equal(progressValidationCode({
+    id: "legacy-id",
+    validationCode: "VMP-E2E-02",
+    code: "TB-E2E-02",
+  }), "VMP-E2E-02");
 });
 
 test("không cấp quyền bằng legacy id khi canonical validationCode không khớp", () => {

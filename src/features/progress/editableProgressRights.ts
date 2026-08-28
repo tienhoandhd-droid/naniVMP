@@ -127,7 +127,10 @@ export function progressValidationCode(activity: {
   validationCode?: unknown;
   code?: unknown;
 }): string {
-  for (const value of [activity.validationCode, activity.code, activity.id]) {
+  // `id` is the canonical item/validation identifier on both the Supabase
+  // dashboard and the legacy n8n adapter. `code` may be the parent object
+  // code, so it is only a last-resort compatibility fallback.
+  for (const value of [activity.validationCode, activity.id, activity.code]) {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
   return "";
