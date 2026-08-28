@@ -33,7 +33,6 @@
 | `src/App.tsx` | Today-only state, filtering, count/label, and filter-bar integration |
 | `tests/unit/today-person-scope.test.mjs` | Pure model and rendered control contracts |
 | `tests/unit/today-scope.test.mjs` | Canonical owner/support and team filtering regression |
-| `tests/unit/progress-modal-access-revocation.test.mjs` | Static shell wiring regression |
 | `tests/e2e/today-personal-scope.mjs` | Linked QA, manager/admin, unlinked, and same-name personas |
 | `package.json` | Targeted `e2e:today-scope` command |
 
@@ -175,26 +174,27 @@ git commit -m "feat(today): add explicit team scope control"
 **Files:**
 - Modify: `src/App.tsx`
 - Modify: `tests/unit/today-scope.test.mjs`
-- Modify: `tests/unit/progress-modal-access-revocation.test.mjs`
+- Modify: `tests/unit/today-person-scope.test.mjs`
 
 **Interfaces:** Consumes Tasks 1–2 and produces `todayPersonScope` state used only by Today.
 
 - [ ] **Step 1: Write shell/filter RED**
 
-Extend the tests to require canonical owner/support in `mine`, unrelated rows in `team`, and shell wiring:
+Extend the tests to require canonical owner/support in `mine`, unrelated rows in `team`, and identity-loss normalization:
 
 ```js
-assert.match(source, /defaultTodayPersonScope\(access\.businessRole, currentPersonId\)/);
-assert.match(source, /onlyMine:\s*todayPersonScope === "mine"/);
-assert.match(source, /<TodayScopeControl[\s\S]*scope=\{todayPersonScope\}/);
+assert.equal(normalizeTodayPersonScope("mine", null), "team");
+assert.equal(normalizeTodayPersonScope("team", "person-a"), "team");
+assert.equal(normalizeTodayPersonScope("mine", "person-a"), "mine");
 ```
 
-Assert `clearTodayScope` clears only department/area and never calls `setTodayPersonScope` or `setOnlyMine`.
+The E2E in Task 4 proves the actual shell wiring, role defaults, toggle, and
+department/area clear behavior; do not grep application source text as a test.
 
 - [ ] **Step 2: Prove RED**
 
 ```bash
-node --import tsx --test tests/unit/today-scope.test.mjs tests/unit/progress-modal-access-revocation.test.mjs
+node --import tsx --test tests/unit/today-scope.test.mjs tests/unit/today-person-scope.test.mjs
 ```
 
 - [ ] **Step 3: Implement state and filtering**
@@ -206,17 +206,32 @@ const [todayPersonScope, setTodayPersonScope] = useState<TodayPersonScope>(() =>
   defaultTodayPersonScope(access.businessRole, currentPersonId));
 ```
 
-If identity disappears while scope is `mine`, switch to `team`. Do not reset an explicit team choice on rerender. Pass `onlyMine: todayPersonScope === "mine"` to `filterTodayScope`; keep global `onlyMine` and `me=1` unchanged.
+Export and use this pure identity-transition helper:
+
+```ts
+export function normalizeTodayPersonScope(
+  scope: TodayPersonScope,
+  currentPersonId: string | null,
+): TodayPersonScope {
+  return scope === "mine" && !canUsePersonalTodayScope(currentPersonId)
+    ? "team" : scope;
+}
+```
+
+If identity disappears while scope is `mine`, switch to `team` through this
+helper. Do not reset an explicit team choice on rerender. Pass
+`onlyMine: todayPersonScope === "mine"` to `filterTodayScope`; keep global
+`onlyMine` and `me=1` unchanged.
 
 In `GlobalFilterBar`, render `TodayScopeControl` instead of the generic My work button for Today. Today active/reset calculations ignore global `onlyMine`; reset preserves `todayPersonScope`; the count uses Today rows; the label starts with `Việc hôm nay của tôi` or `Việc hôm nay của cả đội` and appends department/area. Change the non-Today unlinked copy to `Tài khoản chưa liên kết nhân sự; nhờ Admin nối hồ sơ để dùng Việc của tôi.`
 
 - [ ] **Step 4: Prove GREEN and commit**
 
 ```bash
-node --import tsx --test tests/unit/today-person-scope.test.mjs tests/unit/today-scope.test.mjs tests/unit/today-model.test.mjs tests/unit/today-command-center.test.mjs tests/unit/progress-modal-access-revocation.test.mjs
+node --import tsx --test tests/unit/today-person-scope.test.mjs tests/unit/today-scope.test.mjs tests/unit/today-model.test.mjs tests/unit/today-command-center.test.mjs
 npm run typecheck
 git diff --check
-git add src/App.tsx tests/unit/today-scope.test.mjs tests/unit/progress-modal-access-revocation.test.mjs
+git add src/App.tsx src/features/today/todayPersonScope.ts tests/unit/today-scope.test.mjs tests/unit/today-person-scope.test.mjs
 git commit -m "fix(today): default QA staff to personal work"
 ```
 
@@ -272,7 +287,7 @@ Terra reviews UI/accessibility/E2E realism. Sol reviews role defaults, canonical
 - [ ] **Step 3: Run fresh gate**
 
 ```bash
-node --import tsx --test tests/unit/today-person-scope.test.mjs tests/unit/today-scope.test.mjs tests/unit/today-model.test.mjs tests/unit/today-command-center.test.mjs tests/unit/progress-modal-access-revocation.test.mjs
+node --import tsx --test tests/unit/today-person-scope.test.mjs tests/unit/today-scope.test.mjs tests/unit/today-model.test.mjs tests/unit/today-command-center.test.mjs
 npm run typecheck
 bash scripts/with-preview.sh -- npm run e2e:today-scope
 npm run build
