@@ -582,6 +582,14 @@ set local role authenticated;
 
 select set_config('request.jwt.claims',json_build_object(
   'sub','9a010000-0000-4000-8000-000000000003','role','authenticated')::text,true);
+select pg_temp.assert_true(
+  not public.vmp_can_view_source_object(
+    '9a010000-0000-4000-8000-000000000004',
+    '9a010000-0000-4000-8000-000000000101')
+  and not public.vmp_can_view_plan_item(
+    '9a010000-0000-4000-8000-000000000004',
+    'SACCESS-LINE-A/2026.01-PQ'),
+  'SACCESS_TARGET_UID_SUBSTITUTION_REJECTED_FOR_AUTHENTICATED_CALLER');
 do $owner_rights$
 declare
   v_right record;
@@ -747,6 +755,69 @@ end
 $assignment_without_scope$;
 
 reset role;
+do $progress_failures_atomic_and_source_immutable$
+declare
+  v_source jsonb:=pg_temp.source_snapshot('SACCESS-LINE-A');
+  v_item jsonb;
+  v_audits text;
+  v_result jsonb;
+  v_version integer:=pg_temp.item_version('SACCESS-LINE-A/2026.01-PQ');
+begin
+  select to_jsonb(item) into strict v_item
+  from public.vmp_plan_items item
+  where item.validation_code='SACCESS-LINE-A/2026.01-PQ';
+  select md5(coalesce(jsonb_agg(to_jsonb(audit)
+               order by audit.id)::text,'[]')) into v_audits
+  from public.audit_logs audit;
+
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000003',
+    'role','authenticated')::text,true);
+  set local role authenticated;
+  v_result:=public.rpc_update_progress(
+    'SACCESS-LINE-A/2026.01-PQ',jsonb_build_object(
+      'status_protocol','completed','actual_validation_date',current_date),
+    'QA mixed allowed forbidden must fail',null,v_version);
+  perform pg_temp.assert_code(v_result,'item_field_forbidden',
+    'SQA_PROGRESS_MIXED_PAYLOAD_ATOMIC');
+
+  reset role;
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000007',
+    'role','authenticated')::text,true);
+  set local role authenticated;
+  v_result:=public.rpc_update_progress(
+    'SACCESS-LINE-A/2026.01-PQ',jsonb_build_object(
+      'actual_validation_date',current_date,'status_protocol','completed'),
+    'Workshop mixed allowed forbidden must fail',null,v_version);
+  perform pg_temp.assert_code(v_result,'item_field_forbidden',
+    'SWS_PROGRESS_MIXED_PAYLOAD_ATOMIC');
+
+  reset role;
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000003',
+    'role','authenticated')::text,true);
+  set local role authenticated;
+  v_result:=public.rpc_update_progress(
+    'SACCESS-LINE-A/2026.01-PQ','{"status_protocol":"in_progress"}',
+    'QA stale version must fail',null,v_version+1);
+  perform pg_temp.assert_code(v_result,'version_conflict',
+    'SQA_PROGRESS_STALE_VERSION_ATOMIC');
+
+  reset role;
+  if (select to_jsonb(item) from public.vmp_plan_items item
+      where item.validation_code='SACCESS-LINE-A/2026.01-PQ')
+       is distinct from v_item
+     or pg_temp.source_snapshot('SACCESS-LINE-A') is distinct from v_source
+     or (select md5(coalesce(jsonb_agg(to_jsonb(audit)
+                      order by audit.id)::text,'[]'))
+         from public.audit_logs audit) is distinct from v_audits then
+    raise exception using errcode='check_violation',
+      message='SPROGRESS_FAILURE_ATOMIC_ITEM_SOURCE_AUDIT_IMMUTABLE';
+  end if;
+end
+$progress_failures_atomic_and_source_immutable$;
+
 do $progress_source_immutable$
 declare
   v_before jsonb:=pg_temp.source_snapshot('SACCESS-LINE-A');
@@ -787,8 +858,13 @@ set local role authenticated;
 select set_config('request.jwt.claims',json_build_object(
   'sub','9a010000-0000-4000-8000-000000000002','role','authenticated')::text,true);
 do $replace_and_clear$
-declare v_result jsonb;
+declare v_result jsonb; v_pending_before bigint;
 begin
+  reset role;
+  select count(*) into v_pending_before
+  from public.vmp_catalog_changes change
+  where change.object_code='SACCESS-LINE-A';
+  set local role authenticated;
   v_result:=public.rpc_save_catalog_object(
     'Thiết bị','SACCESS-LINE-A',jsonb_build_object(
       'owner_person_id',pg_temp.performer_id('9a010000-0000-4000-8000-000000000005'),
@@ -799,6 +875,13 @@ begin
     raise exception using errcode='check_violation',
       message='SQA_REPLACE_AND_CLEAR_IMMEDIATE save='||v_result::text;
   end if;
+  reset role;
+  if (select count(*) from public.vmp_catalog_changes change
+      where change.object_code='SACCESS-LINE-A')<>v_pending_before then
+    raise exception using errcode='check_violation',
+      message='SQA_ASSIGNMENT_ONLY_SAVE_CREATES_ZERO_PENDING_ROWS';
+  end if;
+  set local role authenticated;
 end
 $replace_and_clear$;
 
@@ -846,5 +929,1460 @@ select pg_temp.assert_true(
       and (change.new_data ? 'owner_person_id' or change.new_data ? 'support_person_id')
   ),'SQA_REPLACE_AND_CLEAR_IMMEDIATE no_pending_access_fields');
 
-\echo 'PASS BUSINESS Source QA owner/support workshop area/line assignment boundary and immutability'
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object(
+  'sub','9a010000-0000-4000-8000-000000000002','role','authenticated')::text,true);
+do $access_reason_and_atomic_failure$
+declare
+  v_before jsonb:=pg_temp.source_snapshot('SACCESS-LINE-B');
+  v_pending_before bigint;
+  v_result jsonb;
+begin
+  reset role;
+  select count(*) into v_pending_before
+  from public.vmp_catalog_changes change
+  where change.object_code='SACCESS-LINE-B';
+  set local role authenticated;
+
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-LINE-B',jsonb_build_object(
+      'owner_person_id',pg_temp.performer_id(
+        '9a010000-0000-4000-8000-000000000005')
+    ),null,pg_temp.source_version('SACCESS-LINE-B'));
+  perform pg_temp.assert_code(
+    v_result,'REASON_REQUIRED','SQA_ACCESS_CHANGE_REASON_REQUIRED');
+
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-LINE-B',jsonb_build_object(
+      'owner_person_id',pg_temp.performer_id(
+        '9a010000-0000-4000-8000-000000000008'),
+      'frequency_months',6
+    ),'Invalid principal must roll back every field',
+    pg_temp.source_version('SACCESS-LINE-B'));
+  perform pg_temp.assert_code(
+    v_result,'PERSON_NOT_ELIGIBLE','SQA_MIXED_INVALID_ACCESS_ATOMIC_FAILURE');
+
+  reset role;
+  if pg_temp.source_snapshot('SACCESS-LINE-B') is distinct from v_before
+     or (select count(*) from public.vmp_catalog_changes change
+         where change.object_code='SACCESS-LINE-B')<>v_pending_before then
+    raise exception using errcode='check_violation',
+      message='SQA_MIXED_INVALID_ACCESS_ATOMIC_FAILURE mutated';
+  end if;
+  set local role authenticated;
+end
+$access_reason_and_atomic_failure$;
+
+do $mixed_access_timeline$
+declare
+  v_result jsonb;
+  v_change jsonb;
+  v_frequency_before integer;
+  v_pending_before bigint;
+begin
+  reset role;
+  select frequency_months into strict v_frequency_before
+  from public.vmp_source_objects
+  where object_code='SACCESS-LINE-B' and is_active;
+  select count(*) into v_pending_before
+  from public.vmp_catalog_changes change
+  where change.object_code='SACCESS-LINE-B';
+  set local role authenticated;
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-LINE-B',jsonb_build_object(
+      'owner_person_id',pg_temp.performer_id(
+        '9a010000-0000-4000-8000-000000000005'),
+      'support_person_id',null,
+      'frequency_months',6
+    ),'Access is immediate while timeline remains pending',
+    pg_temp.source_version('SACCESS-LINE-B'));
+  if v_result->>'ok' is distinct from 'true'
+     or v_result ? 'owner_assignments_failed'
+     or v_result ? 'owner_revocations_failed' then
+    raise exception using errcode='check_violation',
+      message='SQA_MIXED_ACCESS_TIMELINE_ATOMIC save='||v_result::text;
+  end if;
+
+  reset role;
+  select change.new_data into strict v_change
+  from public.vmp_catalog_changes change
+  where change.object_code='SACCESS-LINE-B'
+    and change.status in ('pending','previewed')
+  order by change.created_at desc,change.id desc limit 1;
+  if (select count(*) from public.vmp_catalog_changes change
+      where change.object_code='SACCESS-LINE-B')<>v_pending_before+1
+     or v_change is distinct from '{"frequency_months":6}'::jsonb
+     or exists (
+       select 1 from public.vmp_catalog_changes change
+       where change.object_code='SACCESS-LINE-B'
+         and (change.new_data ? 'owner_person_id'
+              or change.new_data ? 'support_person_id'
+              or change.old_data ? 'owner_person_id'
+              or change.old_data ? 'support_person_id')
+     ) then
+    raise exception using errcode='check_violation',
+      message='SQA_PENDING_JSON_EXCLUDES_ACCESS_FIELDS new_data='||v_change::text;
+  end if;
+  if (select owner_person_id from public.vmp_source_objects
+      where object_code='SACCESS-LINE-B' and is_active)
+       is distinct from pg_temp.performer_id(
+         '9a010000-0000-4000-8000-000000000005')
+     or (select frequency_months from public.vmp_source_objects
+         where object_code='SACCESS-LINE-B' and is_active)
+          is distinct from v_frequency_before
+     or exists (
+       select 1 from public.vmp_source_objects
+       where object_code='SACCESS-LINE-B' and is_active
+         and support_person_id is not null
+     ) then
+    raise exception using errcode='check_violation',
+      message='SQA_MIXED_ACCESS_TIMELINE_ATOMIC relationship_or_early_timeline';
+  end if;
+  set local role authenticated;
+end
+$mixed_access_timeline$;
+
+reset role;
+insert into public.vmp_objects(
+  code,name,classification,department,area,line,frequency_months
+) values (
+  'SACCESS-NEW-TIMELINE','New Source timeline staging','tb',
+  'SACCESS_WS','SACCESS_AREA','LINE_A',12
+);
+set local role authenticated;
+do $new_source_timeline_is_staged$
+declare
+  v_result jsonb;
+  v_change jsonb;
+begin
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-NEW-TIMELINE',jsonb_build_object(
+      'object_name','New Source timeline staging',
+      'department','SACCESS_WS','area_code','SACCESS_AREA','line','LINE_A',
+      'frequency_months',7
+    ),'New Source timeline must remain pending',null);
+  if v_result->>'ok' is distinct from 'true' then
+    raise exception using errcode='check_violation',
+      message='SQA_NEW_SOURCE_TIMELINE_SAVE_FAILED result='||v_result::text;
+  end if;
+  reset role;
+  select change.new_data into strict v_change
+  from public.vmp_catalog_changes change
+  where change.object_code='SACCESS-NEW-TIMELINE'
+    and change.status in ('pending','previewed');
+  if v_change is distinct from '{"frequency_months":7}'::jsonb
+     or (select frequency_months from public.vmp_source_objects
+         where object_code='SACCESS-NEW-TIMELINE' and is_active)
+          is not distinct from 7 then
+    raise exception using errcode='check_violation',
+      message='SQA_NEW_SOURCE_TIMELINE_NOT_STAGED payload='||v_change::text;
+  end if;
+  set local role authenticated;
+end
+$new_source_timeline_is_staged$;
+
+do $unrelated_save_keeps_ineligible_existing_selection$
+declare
+  v_result jsonb;
+begin
+  reset role;
+  update public.profiles
+  set is_active=false
+  where id='9a010000-0000-4000-8000-000000000005'::uuid;
+  set local role authenticated;
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-LINE-B',
+    '{"note":"Unrelated save with retained ineligible owner"}'::jsonb,
+    null,pg_temp.source_version('SACCESS-LINE-B'));
+  if v_result->>'ok' is distinct from 'true' then
+    raise exception using errcode='check_violation',
+      message='SQA_UNRELATED_SAVE_BLOCKED_BY_INELIGIBLE_EXISTING_SELECTION result='||
+              v_result::text;
+  end if;
+  raise exception using errcode='P7777',
+    message='SQA_UNRELATED_SAVE_INELIGIBLE_SELECTION_ROLLBACK';
+exception when sqlstate 'P7777' then
+  if sqlerrm<>'SQA_UNRELATED_SAVE_INELIGIBLE_SELECTION_ROLLBACK' then
+    raise;
+  end if;
+end
+$unrelated_save_keeps_ineligible_existing_selection$;
+
+do $runtime_save_atomic_failure$
+declare
+  v_source text;
+  v_plans text;
+  v_assignments text;
+  v_audits text;
+  v_pending text;
+  v_revision bigint;
+  v_result jsonb;
+begin
+  reset role;
+  select md5(to_jsonb(source_object)::text) into strict v_source
+  from public.vmp_source_objects source_object
+  where source_object.object_code='SACCESS-LINE-A' and source_object.is_active;
+  select md5(coalesce(jsonb_agg(to_jsonb(item)
+               order by item.id)::text,'[]')) into v_plans
+  from public.vmp_plan_items item
+  where item.object_code='SACCESS-LINE-A';
+  select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+               order by assignment.id)::text,'[]')) into v_assignments
+  from public.vmp_item_assignments assignment
+  where assignment.validation_code in (
+    select item.validation_code from public.vmp_plan_items item
+    where item.object_code='SACCESS-LINE-A'
+  );
+  select md5(coalesce(jsonb_agg(to_jsonb(audit)
+               order by audit.id)::text,'[]')) into v_audits
+  from public.audit_logs audit;
+  select md5(coalesce(jsonb_agg(to_jsonb(change)
+               order by change.id)::text,'[]')) into v_pending
+  from public.vmp_catalog_changes change;
+  select revision into strict v_revision
+  from public.vmp_authorization_revision where singleton;
+  set local role authenticated;
+
+  perform set_config('vmp.source_access_save_failpoint',
+                     'after_projection_before_audit',true);
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-LINE-A',jsonb_build_object(
+      'owner_person_id',pg_temp.performer_id(
+        '9a010000-0000-4000-8000-000000000003'),
+      'frequency_months',3
+    ),'Deterministic runtime atomic rollback proof',
+    pg_temp.source_version('SACCESS-LINE-A'));
+  perform set_config('vmp.source_access_save_failpoint','',true);
+  perform pg_temp.assert_code(
+    v_result,'SAVE_FAILED','SQA_RUNTIME_SAVE_FAILURE_RETURNS_ONE_FAILURE');
+
+  reset role;
+  if (select md5(to_jsonb(source_object)::text)
+      from public.vmp_source_objects source_object
+      where source_object.object_code='SACCESS-LINE-A'
+        and source_object.is_active) is distinct from v_source
+     or (select md5(coalesce(jsonb_agg(to_jsonb(item)
+                      order by item.id)::text,'[]'))
+         from public.vmp_plan_items item
+         where item.object_code='SACCESS-LINE-A') is distinct from v_plans
+     or (select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+                      order by assignment.id)::text,'[]'))
+         from public.vmp_item_assignments assignment
+         where assignment.validation_code in (
+           select item.validation_code from public.vmp_plan_items item
+           where item.object_code='SACCESS-LINE-A'
+         )) is distinct from v_assignments
+     or (select md5(coalesce(jsonb_agg(to_jsonb(audit)
+                      order by audit.id)::text,'[]'))
+         from public.audit_logs audit) is distinct from v_audits
+     or (select md5(coalesce(jsonb_agg(to_jsonb(change)
+                      order by change.id)::text,'[]'))
+         from public.vmp_catalog_changes change) is distinct from v_pending
+     or (select revision from public.vmp_authorization_revision
+         where singleton) is distinct from v_revision then
+    raise exception using errcode='check_violation',
+      message='SQA_RUNTIME_SAVE_FAILURE_ROLLS_BACK_SOURCE_PLAN_ASSIGNMENT_AUDIT_PENDING_REVISION';
+  end if;
+  set local role authenticated;
+end
+$runtime_save_atomic_failure$;
+
+do $coverage_create_revoke$
+declare
+  v_person uuid:=pg_temp.performer_id(
+    '9a010000-0000-4000-8000-000000000008');
+  v_list jsonb;
+  v_page jsonb;
+  v_page_two jsonb;
+  v_choices jsonb;
+  v_result jsonb;
+  v_grant_id uuid;
+  v_grant_version integer;
+  v_old_version integer;
+  v_audit_count bigint;
+  v_grants_before bigint;
+  v_invalid_audits_before bigint;
+  v_right record;
+begin
+  v_list:=public.rpc_list_source_workshop_coverage('',null,50);
+  if v_list->>'ok' is distinct from 'true'
+     or not exists (
+       select 1 from jsonb_array_elements(v_list->'rows') row_value
+       where (row_value->>'person_id')::uuid=v_person
+     ) then
+    raise exception using errcode='check_violation',
+      message='SWS_COVERAGE_INCLUDES_ZERO_GRANT_ACTIVE_PERSON payload='||v_list::text;
+  end if;
+  v_page:=public.rpc_list_source_workshop_coverage('',null,1);
+  v_page_two:=public.rpc_list_source_workshop_coverage(
+    '',v_page->'next_cursor',1);
+  if v_page->>'ok' is distinct from 'true'
+     or v_page->'next_cursor' is null
+     or v_page_two->>'ok' is distinct from 'true'
+     or (v_page->'rows'->0->>'person_id') is not distinct from
+        (v_page_two->'rows'->0->>'person_id') then
+    raise exception using errcode='check_violation',
+      message='SWS_COVERAGE_KEYSET_LIMIT_PAGE payload='||
+              jsonb_build_array(v_page,v_page_two)::text;
+  end if;
+  v_result:=public.rpc_list_source_workshop_coverage('',null,51);
+  perform pg_temp.assert_code(
+    v_result,'INVALID_LIMIT','SWS_COVERAGE_LIMIT_CAPPED_AT_50');
+
+  v_choices:=public.rpc_source_workshop_scope_choices(
+    'SACCESS_WS','SACCESS_AREA','',null,50);
+  if v_choices->>'ok' is distinct from 'true'
+     or not exists (
+       select 1 from jsonb_array_elements(v_choices->'rows') row_value
+       where row_value->>'department'='SACCESS_WS'
+         and row_value->>'area_code'='SACCESS_AREA'
+         and row_value->>'line'='LINE_B'
+     ) then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_CHOICES_REAL_ACTIVE_SOURCE_TUPLES payload='||v_choices::text;
+  end if;
+  v_page:=public.rpc_source_workshop_scope_choices(
+    'SACCESS_WS','SACCESS_AREA','',null,1);
+  v_page_two:=public.rpc_source_workshop_scope_choices(
+    'SACCESS_WS','SACCESS_AREA','',v_page->'next_cursor',1);
+  if v_page->>'ok' is distinct from 'true'
+     or v_page->'next_cursor' is null
+     or v_page_two->>'ok' is distinct from 'true'
+     or v_page->'rows'->0 is not distinct from v_page_two->'rows'->0 then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_CHOICES_KEYSET_LIMIT_PAGE payload='||
+              jsonb_build_array(v_page,v_page_two)::text;
+  end if;
+  v_result:=public.rpc_source_workshop_scope_choices(
+    'SACCESS_WS','SACCESS_AREA','',null,51);
+  perform pg_temp.assert_code(
+    v_result,'INVALID_LIMIT','SWS_SCOPE_CHOICES_LIMIT_CAPPED_AT_50');
+
+  reset role;
+  select count(*) into v_grants_before
+  from public.vmp_source_workshop_scope_grants;
+  select count(*) into v_invalid_audits_before from public.audit_logs;
+  set local role authenticated;
+
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    null,v_person,'SACCESS_WS','SACCESS_AREA','LINE_B',true,'',null);
+  perform pg_temp.assert_code(
+    v_result,'REASON_REQUIRED','SWS_SCOPE_GRANT_REASON_REQUIRED');
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    null,v_person,'SACCESS_WS','NO_SUCH_AREA',null,true,
+    'Invalid real tuple must fail',null);
+  perform pg_temp.assert_code(
+    v_result,'SCOPE_NOT_FOUND','SWS_SCOPE_GRANT_REAL_TUPLE_REQUIRED');
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    null,'9a010000-0000-4000-8000-00000000dead',
+    'SACCESS_WS','SACCESS_AREA','LINE_B',true,
+    'Unlinked performer must fail',null);
+  perform pg_temp.assert_code(
+    v_result,'PERSON_NOT_ELIGIBLE','SWS_SCOPE_GRANT_UNLINKED_DENIED');
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    null,pg_temp.performer_id('9a010000-0000-4000-8000-000000000005'),
+    'SACCESS_WS','SACCESS_AREA','LINE_B',true,
+    'Wrong-role performer must fail',null);
+  perform pg_temp.assert_code(
+    v_result,'PERSON_NOT_ELIGIBLE','SWS_SCOPE_GRANT_WRONG_ROLE_DENIED');
+
+  reset role;
+  begin
+    insert into public.vmp_performers(
+      performer_name,email,department,is_active,user_id,access_class
+    ) values (
+      'Ambiguous workshop duplicate','ambiguous-workshop@example.test',
+      'SACCESS_WS',true,'9a010000-0000-4000-8000-000000000008',
+      'workshop_staff'
+    );
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_AMBIGUOUS_PRINCIPAL_SCHEMA_GUARD missing_error';
+  exception when unique_violation then
+    null;
+  end;
+  if (select count(*) from public.vmp_source_workshop_scope_grants)<>
+       v_grants_before
+     or (select count(*) from public.audit_logs)<>v_invalid_audits_before then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_INVALID_CALLS_MUTATION_FREE';
+  end if;
+  set local role authenticated;
+
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    null,v_person,'SACCESS_WS','SACCESS_AREA','LINE_B',true,
+    'Grant line B coverage for atomic writer test',null);
+  if v_result->>'ok' is distinct from 'true' then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_CREATE_ELIGIBLE_REAL_TUPLE result='||v_result::text;
+  end if;
+  v_grant_id:=(v_result->>'grant_id')::uuid;
+  v_grant_version:=(v_result->>'version')::integer;
+  reset role;
+  if not exists (
+    select 1 from public.vmp_source_workshop_scope_grants grant_row
+    where grant_row.id=v_grant_id and grant_row.department_key='saccess_ws'
+      and grant_row.area_key='saccess_area' and grant_row.line_key='line_b'
+      and grant_row.is_active
+  ) then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_NORMALIZED_KEYS';
+  end if;
+  set local role authenticated;
+
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    null,v_person,'SACCESS_WS','SACCESS_AREA','LINE_B',true,
+    'Duplicate active tuple must fail',null);
+  perform pg_temp.assert_code(
+    v_result,'DUPLICATE_ACTIVE_SCOPE','SWS_SCOPE_GRANT_DUPLICATE_DENIED');
+
+  v_old_version:=v_grant_version;
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    v_grant_id,v_person,'SACCESS_WS','SACCESS_AREA',null,true,
+    'Change line grant to area grant',v_grant_version);
+  if v_result->>'ok' is distinct from 'true' then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_CHANGE_VERSIONED result='||v_result::text;
+  end if;
+  v_grant_version:=(v_result->>'version')::integer;
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    v_grant_id,v_person,'SACCESS_WS','SACCESS_AREA',null,true,
+    'Stale version must fail',v_old_version);
+  perform pg_temp.assert_code(
+    v_result,'VERSION_CONFLICT','SWS_SCOPE_GRANT_STALE_VERSION_DENIED');
+
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000008',
+    'role','authenticated')::text,true);
+  select * into strict v_right
+  from public.vmp_my_item_rights('SACCESS-LINE-B/2026.01-PQ');
+  if v_right.can_view is not true
+     or v_right.editable_fields is distinct from
+        array['actual_validation_date']::text[] then
+    raise exception using errcode='check_violation',
+      message='SWS_GRANT_AND_ASSIGNMENT_ENABLE_EXACT_EDIT '||to_jsonb(v_right)::text;
+  end if;
+
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000002',
+    'role','authenticated')::text,true);
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    v_grant_id,v_person,'SACCESS_WS','SACCESS_AREA','LINE_B',false,
+    'Revoke line B coverage for atomic writer test',v_grant_version);
+  if v_result->>'ok' is distinct from 'true'
+     or v_result->>'version' is distinct from (v_grant_version+1)::text then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_SOFT_REVOKE_VERSIONED result='||v_result::text;
+  end if;
+  reset role;
+  if not exists (
+       select 1 from public.vmp_source_workshop_scope_grants grant_row
+       where grant_row.id=v_grant_id and not grant_row.is_active
+         and grant_row.version=v_grant_version+1
+     ) or (select count(*) from public.audit_logs audit
+           where audit.table_name='vmp_source_workshop_scope_grants'
+             and audit.record_id=v_grant_id::text
+             and nullif(btrim(audit.change_reason),'') is not null)<>3 then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_SOFT_HISTORY_AND_AUDIT_METADATA';
+  end if;
+  set local role authenticated;
+
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000008',
+    'role','authenticated')::text,true);
+  select * into strict v_right
+  from public.vmp_my_item_rights('SACCESS-LINE-B/2026.01-PQ');
+  if coalesce(v_right.can_view,false)
+     or v_right.editable_fields is distinct from '{}'::text[] then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_REVOKE_IMMEDIATE '||to_jsonb(v_right)::text;
+  end if;
+  reset role;
+  select count(*) into v_audit_count from public.audit_logs;
+  set local role authenticated;
+  v_result:=public.rpc_set_source_workshop_scope_grant(
+    v_grant_id,v_person,'SACCESS_WS','SACCESS_AREA',null,true,
+    'Workshop caller cannot restore own grant',v_grant_version+1);
+  perform pg_temp.assert_code(
+    v_result,'FORBIDDEN','SWS_SCOPE_GRANT_NON_MANAGER_DENIED');
+  reset role;
+  if (select count(*) from public.audit_logs)<>v_audit_count
+     or (select version from public.vmp_source_workshop_scope_grants
+         where id=v_grant_id)<>v_grant_version+1 then
+    raise exception using errcode='check_violation',
+      message='SWS_SCOPE_GRANT_DENIAL_MUTATION_FREE';
+  end if;
+  set local role authenticated;
+end
+$coverage_create_revoke$;
+
+reset role;
+insert into public.vmp_objects(
+  code,name,classification,department,area,line,frequency_months
+) values (
+  'SACCESS-ORPHAN-GUARD','Source relation guard fixture','tb',
+  'SACCESS_WS','SACCESS_AREA','LINE_A',12
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object(
+  'sub','9a010000-0000-4000-8000-000000000002','role','authenticated')::text,true);
+do $writer_relation_guards$
+declare
+  v_result jsonb;
+  v_source_before jsonb;
+  v_plan_before jsonb;
+  v_assignments_before text;
+  v_audits_before text;
+begin
+  begin
+    v_result:=public.rpc_create_plan_item(
+      'SACCESS-ORPHAN-GUARD','PQ',2026,1,'{}'::jsonb);
+    raise exception using errcode='check_violation',
+      message='SREL_ITEM_WRITER_REQUIRES_ACTIVE_SOURCE missing_error result='||
+              v_result::text;
+  exception when foreign_key_violation then
+    null;
+  end;
+  if exists (
+       select 1 from public.vmp_plan_items item
+       where item.object_code='SACCESS-ORPHAN-GUARD' and item.is_active
+     ) then
+    raise exception using errcode='check_violation',
+      message='SREL_ITEM_WRITER_REQUIRES_ACTIVE_SOURCE mutated';
+  end if;
+
+  reset role;
+  insert into public.vmp_source_objects(
+    object_kind,object_code,source_tab,source_row,is_active
+  ) values (
+    'Thiết bị','SACCESS-ORPHAN-GUARD','source-access-test',998,false
+  );
+  set local role authenticated;
+  begin
+    v_result:=public.rpc_create_plan_item(
+      'SACCESS-ORPHAN-GUARD','PQ',2026,2,'{}'::jsonb);
+    raise exception using errcode='check_violation',
+      message='SREL_ITEM_WRITER_REQUIRES_ACTIVE_NOT_INACTIVE_SOURCE missing_error result='||
+              v_result::text;
+  exception when foreign_key_violation then
+    null;
+  end;
+  reset role;
+  if exists (
+       select 1 from public.vmp_plan_items item
+       where item.object_code='SACCESS-ORPHAN-GUARD' and item.is_active
+     ) then
+    raise exception using errcode='check_violation',
+      message='SREL_ITEM_WRITER_REQUIRES_ACTIVE_NOT_INACTIVE_SOURCE mutated';
+  end if;
+  delete from public.vmp_source_objects
+  where object_kind='Thiết bị' and object_code='SACCESS-ORPHAN-GUARD';
+
+  select to_jsonb(item) into strict v_plan_before
+  from public.vmp_plan_items item
+  where item.validation_code='SACCESS-LINE-A/2026.01-PQ';
+  select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+                  order by assignment.id)::text,'[]'))
+    into v_assignments_before
+  from public.vmp_item_assignments assignment
+  where assignment.validation_code='SACCESS-LINE-A/2026.01-PQ';
+  select md5(coalesce(jsonb_agg(to_jsonb(audit)
+                  order by audit.id)::text,'[]'))
+    into v_audits_before from public.audit_logs audit;
+  insert into public.vmp_source_objects(
+    object_kind,object_code,source_tab,source_row,is_active,
+    owner_person_id,owner_name
+  )
+  select 'Quy trình','SACCESS-LINE-A','source-access-test',997,false,
+         performer.id,performer.performer_name
+  from public.vmp_performers performer
+  where performer.user_id='9a010000-0000-4000-8000-000000000003';
+  if (select to_jsonb(item) from public.vmp_plan_items item
+      where item.validation_code='SACCESS-LINE-A/2026.01-PQ')
+       is distinct from v_plan_before
+     or (select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+                         order by assignment.id)::text,'[]'))
+         from public.vmp_item_assignments assignment
+         where assignment.validation_code='SACCESS-LINE-A/2026.01-PQ')
+          is distinct from v_assignments_before
+     or (select md5(coalesce(jsonb_agg(to_jsonb(audit)
+                         order by audit.id)::text,'[]'))
+         from public.audit_logs audit) is distinct from v_audits_before then
+    raise exception using errcode='check_violation',
+      message='SREL_INACTIVE_DUPLICATE_SOURCE_CANNOT_RECONCILE_ACTIVE_PROJECTION';
+  end if;
+  begin
+    update public.vmp_source_objects
+    set is_active=true
+    where object_kind='Quy trình' and object_code='SACCESS-LINE-A';
+    raise exception using errcode='check_violation',
+      message='SREL_SECOND_ACTIVE_SOURCE_CODE_ACTIVATION_DENIED missing_error';
+  exception when unique_violation then
+    null;
+  end;
+  if (select count(*) from public.vmp_source_objects
+      where object_code='SACCESS-LINE-A' and is_active)<>1
+     or not exists (
+       select 1 from public.vmp_source_objects
+       where object_kind='Quy trình' and object_code='SACCESS-LINE-A'
+         and not is_active
+     ) then
+    raise exception using errcode='check_violation',
+      message='SREL_SECOND_ACTIVE_SOURCE_CODE_ACTIVATION_DENIED mutated';
+  end if;
+  delete from public.vmp_source_objects
+  where object_kind='Quy trình' and object_code='SACCESS-LINE-A';
+
+  -- Activation is the only time an inactive row may begin reconciling. Build
+  -- a deliberate pre-enforcement-style active-plan drift under a disabled
+  -- relation guard, then prove inactive -> active repairs it atomically.
+  insert into public.vmp_source_objects(
+    object_kind,object_code,source_tab,source_row,is_active,
+    owner_person_id,owner_name
+  )
+  select 'Thiết bị','SACCESS-ORPHAN-GUARD','source-access-test',996,false,
+         performer.id,performer.performer_name
+  from public.vmp_performers performer
+  where performer.user_id='9a010000-0000-4000-8000-000000000003';
+  execute 'alter table public.vmp_plan_items disable trigger vmp_plan_items_active_source_guard';
+  insert into public.vmp_plan_items(
+    id,validation_code,object_code,validation_type,year,is_active,
+    created_by,updated_by
+  ) values (
+    'SACCESS-ORPHAN-GUARD/2026.03-PQ',
+    'SACCESS-ORPHAN-GUARD/2026.03-PQ','SACCESS-ORPHAN-GUARD','PQ',2026,true,
+    auth.uid(),auth.uid()
+  );
+  execute 'alter table public.vmp_plan_items enable trigger vmp_plan_items_active_source_guard';
+  update public.vmp_source_objects
+  set is_active=true
+  where object_kind='Thiết bị' and object_code='SACCESS-ORPHAN-GUARD';
+  if not exists (
+       select 1 from public.vmp_plan_items item
+       join public.vmp_source_objects source_object
+         on source_object.object_code=item.object_code
+        and source_object.is_active
+       where item.validation_code='SACCESS-ORPHAN-GUARD/2026.03-PQ'
+         and item.owner_person_id=source_object.owner_person_id
+     ) or not exists (
+       select 1 from public.vmp_item_assignments assignment
+       join public.vmp_source_objects source_object
+         on source_object.owner_person_id=assignment.performer_id
+        and source_object.object_code='SACCESS-ORPHAN-GUARD'
+        and source_object.is_active
+       where assignment.validation_code='SACCESS-ORPHAN-GUARD/2026.03-PQ'
+         and assignment.assignment_kind='qa'
+         and assignment.assignment_role='primary'
+         and assignment.source='source_owner' and assignment.is_active
+     ) then
+    raise exception using errcode='check_violation',
+      message='SREL_INACTIVE_TO_ACTIVE_SOURCE_RECONCILES_PROJECTION';
+  end if;
+  delete from public.vmp_item_assignments
+  where validation_code='SACCESS-ORPHAN-GUARD/2026.03-PQ';
+  delete from public.vmp_plan_items
+  where validation_code='SACCESS-ORPHAN-GUARD/2026.03-PQ';
+  delete from public.vmp_source_objects
+  where object_kind='Thiết bị' and object_code='SACCESS-ORPHAN-GUARD';
+
+  begin
+    update public.vmp_source_objects
+    set object_code='SACCESS-REKEY-MUST-FAIL'
+    where object_code='SACCESS-LINE-A' and is_active;
+    raise exception using errcode='check_violation',
+      message='SREL_SOURCE_REKEY_WITH_ACTIVE_ITEMS_DENIED missing_error';
+  exception when foreign_key_violation then
+    null;
+  end;
+  if not exists (
+    select 1 from public.vmp_source_objects
+    where object_code='SACCESS-LINE-A' and is_active
+  ) then
+    raise exception using errcode='check_violation',
+      message='SREL_SOURCE_REKEY_WITH_ACTIVE_ITEMS_DENIED mutated';
+  end if;
+  begin
+    delete from public.vmp_source_objects
+    where object_code='SACCESS-LINE-A' and is_active;
+    raise exception using errcode='check_violation',
+      message='SREL_SOURCE_DELETE_WITH_ACTIVE_ITEMS_DENIED missing_error';
+  exception when foreign_key_violation then
+    null;
+  end;
+  if not exists (
+    select 1 from public.vmp_source_objects
+    where object_code='SACCESS-LINE-A' and is_active
+  ) then
+    raise exception using errcode='check_violation',
+      message='SREL_SOURCE_DELETE_WITH_ACTIVE_ITEMS_DENIED mutated';
+  end if;
+
+  v_source_before:=pg_temp.source_snapshot('SACCESS-LINE-A');
+  begin
+    update public.vmp_source_objects
+    set owner_person_id=pg_temp.performer_id(
+      '9a010000-0000-4000-8000-000000000008')
+    where object_code='SACCESS-LINE-A' and is_active;
+    raise exception using errcode='P7778',
+      message='SREL_DIRECT_INVALID_OWNER_UPDATE_DENIED missing_error';
+  exception when check_violation then
+    null;
+  end;
+  begin
+    insert into public.vmp_source_objects(
+      object_kind,object_code,source_tab,source_row,owner_person_id
+    ) values (
+      'Thiết bị','SACCESS-DIRECT-OWNER-INSERT','source-access-test',999,
+      pg_temp.performer_id('9a010000-0000-4000-8000-000000000008')
+    );
+    raise exception using errcode='P7778',
+      message='SREL_DIRECT_INVALID_OWNER_INSERT_DENIED missing_error';
+  exception when check_violation then
+    null;
+  end;
+  if exists (
+       select 1 from public.vmp_source_objects
+       where object_code='SACCESS-DIRECT-OWNER-INSERT'
+     ) or pg_temp.source_snapshot('SACCESS-LINE-A') is distinct from
+          v_source_before then
+    raise exception using errcode='check_violation',
+      message='SREL_DIRECT_INVALID_OWNER_WRITES_MUTATION_FREE';
+  end if;
+
+  -- A valid unreviewed owner write cannot bypass projection either. Prove the
+  -- Source, plan-item, and assignment rows reconcile, then intentionally roll
+  -- the nested statement subtransaction back so later tests keep their fixture.
+  begin
+    update public.vmp_source_objects
+    set owner_person_id=pg_temp.performer_id(
+      '9a010000-0000-4000-8000-000000000005')
+    where object_code='SACCESS-LINE-A' and is_active;
+    if not exists (
+         select 1 from public.vmp_plan_items item
+         where item.object_code='SACCESS-LINE-A' and item.is_active
+           and item.owner_person_id=pg_temp.performer_id(
+             '9a010000-0000-4000-8000-000000000005')
+       ) or not exists (
+         select 1 from public.vmp_item_assignments assignment
+         join public.vmp_plan_items item
+           on item.validation_code=assignment.validation_code
+         where item.object_code='SACCESS-LINE-A' and item.is_active
+           and assignment.performer_id=pg_temp.performer_id(
+             '9a010000-0000-4000-8000-000000000005')
+           and assignment.assignment_kind='qa'
+           and assignment.assignment_role='primary'
+           and assignment.is_active
+       ) then
+      raise exception using errcode='check_violation',
+        message='SREL_DIRECT_VALID_OWNER_NOT_RECONCILED';
+    end if;
+    raise exception using errcode='P7777',
+      message='SREL_DIRECT_VALID_OWNER_RECONCILED_ROLLBACK';
+  exception when sqlstate 'P7777' then
+    if sqlerrm<>'SREL_DIRECT_VALID_OWNER_RECONCILED_ROLLBACK' then
+      raise;
+    end if;
+  end;
+  if pg_temp.source_snapshot('SACCESS-LINE-A') is distinct from
+       v_source_before then
+    raise exception using errcode='check_violation',
+      message='SREL_DIRECT_VALID_OWNER_ROLLBACK_FAILED';
+  end if;
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000002',
+    'role','service_role')::text,true);
+  set local role service_role;
+  v_result:=public.rpc_upsert_source_object(
+    'Thiết bị','SACCESS-LINE-A',jsonb_build_object(
+      'owner_person_id',pg_temp.performer_id(
+        '9a010000-0000-4000-8000-000000000008')));
+  reset role;
+  perform pg_temp.assert_code(v_result,'PERSON_NOT_ELIGIBLE',
+    'SREL_SERVICE_UPSERT_CANNOT_BYPASS_QA_ELIGIBILITY');
+  if pg_temp.source_snapshot('SACCESS-LINE-A') is distinct from v_source_before then
+    raise exception using errcode='check_violation',
+      message='SREL_UNREVIEWED_OWNER_WRITERS_MUTATION_FREE';
+  end if;
+  set local role authenticated;
+end
+$writer_relation_guards$;
+
+reset role;
+insert into public.vmp_catalog_changes(
+  object_kind,object_code,source_version,timeline_revision,
+  old_data,new_data,created_by
+) values (
+  'Thiết bị','SACCESS-LINE-A',
+  pg_temp.source_version('SACCESS-LINE-A'),1,
+  jsonb_build_object('frequency_months',12,
+    'owner_person_id',pg_temp.performer_id(
+      '9a010000-0000-4000-8000-000000000005')),
+  jsonb_build_object('frequency_months',6,
+    'support_person_id',pg_temp.performer_id(
+      '9a010000-0000-4000-8000-000000000005')),
+  '9a010000-0000-4000-8000-000000000002'
+);
+select pg_temp.assert_true(
+  not exists (
+    select 1 from public.vmp_catalog_changes change
+    where change.object_code='SACCESS-LINE-A'
+      and (change.old_data ? 'owner_person_id'
+           or change.old_data ? 'support_person_id'
+           or change.new_data ? 'owner_person_id'
+           or change.new_data ? 'support_person_id')
+  ),'SQA_CATALOG_PENDING_TRIGGER_STRIPS_ACCESS_FOR_V1_V2');
+
+alter table public.vmp_catalog_changes
+  disable trigger vmp_catalog_changes_timeline_only;
+insert into public.vmp_catalog_changes(
+  id,object_kind,object_code,source_version,timeline_revision,
+  old_data,new_data,created_by
+) values (
+  '9a010000-0000-4000-8000-0000000002ff',
+  'Thiết bị','SACCESS-LINE-A',pg_temp.source_version('SACCESS-LINE-A'),
+  (select timeline_revision from public.vmp_source_objects
+   where object_code='SACCESS-LINE-A' and is_active),
+  '{"frequency_months":12,"owner_person_id":null}'::jsonb,
+  jsonb_build_object('frequency_months',3,
+    'owner_person_id',pg_temp.performer_id(
+      '9a010000-0000-4000-8000-000000000003')),
+  '9a010000-0000-4000-8000-000000000002'
+);
+alter table public.vmp_catalog_changes
+  enable trigger vmp_catalog_changes_timeline_only;
+
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object(
+  'sub','9a010000-0000-4000-8000-000000000002',
+  'role','authenticated')::text,true);
+do $legacy_access_replay_rejected$
+declare
+  v_before jsonb;
+  v_result jsonb;
+  v_revision integer;
+begin
+  reset role;
+  v_before:=pg_temp.source_snapshot('SACCESS-LINE-A');
+  select timeline_revision into strict v_revision
+  from public.vmp_source_objects
+  where object_code='SACCESS-LINE-A' and is_active;
+  set local role authenticated;
+
+  v_result:=public.rpc_preview_catalog_change(
+    '9a010000-0000-4000-8000-0000000002ff');
+  perform pg_temp.assert_code(v_result,'ACCESS_FIELDS_NOT_APPLICABLE',
+    'SQA_V1_PREVIEW_REJECTS_LEGACY_ACCESS_KEYS');
+  v_result:=public.rpc_apply_catalog_change(
+    '9a010000-0000-4000-8000-0000000002ff',
+    'Legacy V1 replay must fail',v_revision);
+  perform pg_temp.assert_code(v_result,'ACCESS_FIELDS_NOT_APPLICABLE',
+    'SQA_V1_APPLY_REJECTS_LEGACY_ACCESS_KEYS');
+  v_result:=public.rpc_preview_catalog_change_v2(
+    '9a010000-0000-4000-8000-0000000002ff');
+  perform pg_temp.assert_code(v_result,'ACCESS_FIELDS_NOT_APPLICABLE',
+    'SQA_V2_PREVIEW_REJECTS_LEGACY_ACCESS_KEYS');
+  v_result:=public.rpc_apply_catalog_change_v2(
+    '9a010000-0000-4000-8000-0000000002ff',
+    'Legacy V2 replay must fail',v_revision,
+    '{}'::jsonb,false);
+  perform pg_temp.assert_code(v_result,'ACCESS_FIELDS_NOT_APPLICABLE',
+    'SQA_V2_APPLY_REJECTS_LEGACY_ACCESS_KEYS');
+
+  reset role;
+  if pg_temp.source_snapshot('SACCESS-LINE-A') is distinct from v_before
+     or (select status from public.vmp_catalog_changes
+         where id='9a010000-0000-4000-8000-0000000002ff')<>'pending' then
+    raise exception using errcode='check_violation',
+      message='SQA_V1_V2_ACCESS_REPLAY_REJECTION_MUTATION_FREE';
+  end if;
+  set local role authenticated;
+end
+$legacy_access_replay_rejected$;
+reset role;
+delete from public.vmp_catalog_changes
+where id='9a010000-0000-4000-8000-0000000002ff';
+
+select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+         order by assignment.id)::text,'[]')) refresh_equipment_before
+from public.vmp_item_assignments assignment
+where assignment.assignment_kind='equipment_department'
+\gset
+set local role service_role;
+select public.rpc_refresh_source_item_assignments() refresh_first
+\gset
+reset role;
+select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+         order by assignment.id)::text,'[]')) refresh_assignments_after_first
+from public.vmp_item_assignments assignment
+\gset
+select md5(coalesce(jsonb_agg(to_jsonb(audit)
+         order by audit.id)::text,'[]')) refresh_audits_after_first
+from public.audit_logs audit
+\gset
+set local role service_role;
+select public.rpc_refresh_source_item_assignments() refresh_second
+\gset
+reset role;
+select pg_temp.assert_true(
+  (:'refresh_first'::jsonb)->>'ok'='true'
+  and (:'refresh_second'::jsonb)->>'ok'='true'
+  and coalesce((( :'refresh_second'::jsonb)->>'plan_updated')::integer,-1)=0
+  and coalesce((( :'refresh_second'::jsonb)->>'inserted')::integer,-1)=0
+  and coalesce((( :'refresh_second'::jsonb)->>'reactivated')::integer,-1)=0
+  and coalesce((( :'refresh_second'::jsonb)->>'revoked')::integer,-1)=0
+  and coalesce((( :'refresh_second'::jsonb)->>'demoted')::integer,-1)=0
+  and (select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+                    order by assignment.id)::text,'[]'))
+       from public.vmp_item_assignments assignment)
+      =:'refresh_assignments_after_first'
+  and (select md5(coalesce(jsonb_agg(to_jsonb(audit)
+                    order by audit.id)::text,'[]'))
+       from public.audit_logs audit)=:'refresh_audits_after_first'
+  and (select md5(coalesce(jsonb_agg(to_jsonb(assignment)
+                    order by assignment.id)::text,'[]'))
+       from public.vmp_item_assignments assignment
+       where assignment.assignment_kind='equipment_department')
+      =:'refresh_equipment_before',
+  'SQA_FINAL_SERVICE_REFRESH_PROJECTION_AWARE_EQUIPMENT_ISOLATED_IDEMPOTENT');
+
+\echo 'PASS BUSINESS Source QA owner/support workshop coverage atomic save refresh and immutability'
+rollback;
+
+-- These dblink sessions use only the disposable local clone. They exercise
+-- both commit orders against the committed pre-expand repair fixture, because
+-- rows created by the rollback-only business transaction are intentionally not
+-- visible to a second database session.
+begin;
+set local lock_timeout='5s';
+set local statement_timeout='120s';
+create extension if not exists dblink with schema extensions;
+
+create function pg_temp.assert_true(p_condition boolean,p_rule_id text)
+returns void language plpgsql as $$
+begin
+  if not coalesce(p_condition,false) then
+    raise exception using errcode='check_violation',message=p_rule_id;
+  end if;
+end
+$$;
+
+create temp table source_access_concurrency_result(
+  case_name text primary key,payload jsonb not null
+) on commit drop;
+
+select extensions.dblink_connect(
+  connection_name,
+  format('host=host.docker.internal port=54322 user=postgres password=postgres dbname=%s',
+         current_database())
+)
+from unnest(array[
+  'saccess_qa_progress','saccess_qa_revoke',
+  'saccess_ws_progress','saccess_ws_revoke','saccess_setup'
+]) connection_name;
+
+-- QA progress linearizes before owner revoke: progress holds Source KEY SHARE,
+-- the canonical save waits for Source UPDATE, then both may commit.
+select extensions.dblink_send_query(
+  'saccess_qa_progress',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"9a040000-0000-4000-8000-000000000001","role":"authenticated"}',true)
+    ), locked as materialized (
+      select source_object.id from claims,
+           public.vmp_source_objects source_object
+      where source_object.object_code='SACCESS-PRE-EXPAND'
+        and source_object.is_active for key share
+    ), paused as materialized (
+      select pg_sleep(1) from locked
+    )
+    select public.rpc_update_progress(
+      'SACCESS-PRE-EXPAND/2026.01-PQ',
+      '{"status_protocol":"in_progress"}'::jsonb,
+      'QA progress-first concurrency proof',null,%s)
+    from paused
+  $remote$,(select version from public.vmp_plan_items
+             where validation_code='SACCESS-PRE-EXPAND/2026.01-PQ'))
+);
+select pg_sleep(0.2);
+select extensions.dblink_send_query(
+  'saccess_qa_revoke',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"9a040000-0000-4000-8000-000000000001","role":"service_role"}',true)
+    )
+    select public.rpc_save_catalog_object(
+      'Thiết bị','SACCESS-PRE-EXPAND','{"owner_person_id":null}'::jsonb,
+      'QA progress-first owner revoke',%s) from claims
+  $remote$,(select version from public.vmp_source_objects
+             where object_code='SACCESS-PRE-EXPAND' and is_active))
+);
+insert into source_access_concurrency_result
+select 'qa_progress_first_progress',payload
+from extensions.dblink_get_result('saccess_qa_progress') as result(payload jsonb);
+insert into source_access_concurrency_result
+select 'qa_progress_first_revoke',payload
+from extensions.dblink_get_result('saccess_qa_revoke') as result(payload jsonb);
+-- libpq exposes a trailing empty result after every asynchronous query. Drain
+-- it before reusing either named connection for the opposite commit order.
+select payload
+from extensions.dblink_get_result('saccess_qa_progress') as result(payload jsonb);
+select payload
+from extensions.dblink_get_result('saccess_qa_revoke') as result(payload jsonb);
+select pg_temp.assert_true(
+  (select payload->>'ok' from source_access_concurrency_result
+   where case_name='qa_progress_first_progress')='true'
+  and (select payload->>'ok' from source_access_concurrency_result
+       where case_name='qa_progress_first_revoke')='true',
+  'SQA_CONCURRENCY_PROGRESS_BEFORE_REVOKE_BOTH_LINEARIZE');
+
+-- Restore the owner, then hold Source UPDATE in the revoke session. Progress
+-- starts second, waits at Source KEY SHARE, and must deny after revoke commits.
+select payload from extensions.dblink(
+  'saccess_setup',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"9a040000-0000-4000-8000-000000000001","role":"service_role"}',true)
+    )
+    select public.rpc_save_catalog_object(
+      'Thiết bị','SACCESS-PRE-EXPAND',jsonb_build_object(
+        'owner_person_id',(select id from public.vmp_performers
+          where user_id='9a040000-0000-4000-8000-000000000001'::uuid
+            and is_active)),
+      'Restore QA owner for revoke-first proof',%s) from claims
+  $remote$,(select version from public.vmp_source_objects
+             where object_code='SACCESS-PRE-EXPAND' and is_active))
+) as result(payload jsonb)
+\gset qa_restore_
+select pg_temp.assert_true(
+  :'qa_restore_payload'::jsonb->>'ok'='true',
+  'SQA_CONCURRENCY_OWNER_RESTORE');
+
+truncate source_access_concurrency_result;
+select extensions.dblink_send_query(
+  'saccess_qa_revoke',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"9a040000-0000-4000-8000-000000000001","role":"service_role"}',true)
+    ), locked as materialized (
+      select source_object.id from claims,
+           public.vmp_source_objects source_object
+      where source_object.object_code='SACCESS-PRE-EXPAND'
+        and source_object.is_active for update
+    ), paused as materialized (select pg_sleep(1) from locked)
+    select public.rpc_save_catalog_object(
+      'Thiết bị','SACCESS-PRE-EXPAND','{"owner_person_id":null}'::jsonb,
+      'QA revoke-first concurrency proof',%s) from paused
+  $remote$,(select version from public.vmp_source_objects
+             where object_code='SACCESS-PRE-EXPAND' and is_active))
+);
+select pg_sleep(0.2);
+select extensions.dblink_send_query(
+  'saccess_qa_progress',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"9a040000-0000-4000-8000-000000000001","role":"authenticated"}',true)
+    )
+    select public.rpc_update_progress(
+      'SACCESS-PRE-EXPAND/2026.01-PQ',
+      '{"status_protocol":"completed"}'::jsonb,
+      'QA revoke-first must deny',null,%s) from claims
+  $remote$,(select version from public.vmp_plan_items
+             where validation_code='SACCESS-PRE-EXPAND/2026.01-PQ'))
+);
+insert into source_access_concurrency_result
+select 'qa_revoke_first_revoke',payload
+from extensions.dblink_get_result('saccess_qa_revoke') as result(payload jsonb);
+insert into source_access_concurrency_result
+select 'qa_revoke_first_progress',payload
+from extensions.dblink_get_result('saccess_qa_progress') as result(payload jsonb);
+select pg_temp.assert_true(
+  (select payload->>'ok' from source_access_concurrency_result
+   where case_name='qa_revoke_first_revoke')='true'
+  and (select payload->>'ok' from source_access_concurrency_result
+       where case_name='qa_revoke_first_progress')='false'
+  and (select payload->>'code' from source_access_concurrency_result
+       where case_name='qa_revoke_first_progress')='item_field_forbidden',
+  'SQA_CONCURRENCY_REVOKE_BEFORE_PROGRESS_DENIES');
+
+-- Create one committed workshop actor only inside the disposable clone.
+select extensions.dblink_exec('saccess_setup',$remote$
+  insert into auth.users(
+    id,aud,role,email,encrypted_password,email_confirmed_at,
+    raw_app_meta_data,raw_user_meta_data,created_at,updated_at
+  ) values (
+    '9a050000-0000-4000-8000-000000000001','authenticated','authenticated',
+    'source-concurrency-workshop@example.test','x',now(),'{}','{}',now(),now()
+  );
+  insert into public.profiles(
+    id,full_name,email,role,department,is_active
+  ) values (
+    '9a050000-0000-4000-8000-000000000001',
+    'Source Concurrency Workshop','source-concurrency-workshop@example.test',
+    'department_user','QA',true
+  );
+  update public.vmp_performers set department='QA',
+    access_class='workshop_staff',is_active=true
+  where user_id='9a050000-0000-4000-8000-000000000001';
+  insert into public.vmp_source_workshop_scope_grants(
+    id,performer_id,department,department_key,area_code,area_key,line,line_key,
+    valid_from,is_active,version,change_reason
+  ) select '9a050000-0000-4000-8000-000000000101',performer.id,
+    'QA',public.vmp_source_scope_key('QA'),
+    'SACCESS_PRE_AREA',public.vmp_source_scope_key('SACCESS_PRE_AREA'),
+    'SACCESS_PRE_LINE',public.vmp_source_scope_key('SACCESS_PRE_LINE'),
+    transaction_timestamp(),true,1,'Workshop concurrency fixture'
+  from public.vmp_performers performer
+  where performer.user_id='9a050000-0000-4000-8000-000000000001';
+  insert into public.vmp_item_assignments(
+    validation_code,performer_id,user_id,staff_name,assignment_kind,source,
+    assignment_role,is_active,change_reason
+  ) select 'SACCESS-PRE-EXPAND/2026.01-PQ',performer.id,performer.user_id,
+    performer.performer_name,'equipment_department','equipment_manager',
+    null,true,'Workshop concurrency fixture'
+  from public.vmp_performers performer
+  where performer.user_id='9a050000-0000-4000-8000-000000000001';
+$remote$);
+
+select profile.id admin_id from public.profiles profile
+where profile.is_active and public.vmp_business_role(profile.id)='admin'
+order by profile.id limit 1
+\gset
+
+-- Workshop progress-first holds grant SHARE; manager revoke waits for UPDATE.
+truncate source_access_concurrency_result;
+select extensions.dblink_send_query(
+  'saccess_ws_progress',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"9a050000-0000-4000-8000-000000000001","role":"authenticated"}',true)
+    ), source_lock as materialized (
+      select source_object.id from claims,
+           public.vmp_source_objects source_object
+      where source_object.object_code='SACCESS-PRE-EXPAND'
+        and source_object.is_active for key share
+    ), grant_lock as materialized (
+      select grant_row.id from source_lock,
+           public.vmp_source_workshop_scope_grants grant_row
+      where grant_row.id='9a050000-0000-4000-8000-000000000101'
+        and grant_row.is_active for share
+    ), paused as materialized (select pg_sleep(1) from grant_lock)
+    select public.rpc_update_progress(
+      'SACCESS-PRE-EXPAND/2026.01-PQ',
+      jsonb_build_object('actual_validation_date',current_date),
+      'Workshop progress-first concurrency proof',null,%s) from paused
+  $remote$,(select version from public.vmp_plan_items
+             where validation_code='SACCESS-PRE-EXPAND/2026.01-PQ'))
+);
+select pg_sleep(0.2);
+select revision ws_pf_revision_before
+from public.vmp_authorization_revision where singleton
+\gset
+select extensions.dblink_send_query(
+  'saccess_ws_revoke',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"%s","role":"authenticated"}',true)
+    )
+    select public.rpc_set_source_workshop_scope_grant(
+      '9a050000-0000-4000-8000-000000000101',
+      (select id from public.vmp_performers where
+       user_id='9a050000-0000-4000-8000-000000000001' and is_active),
+      'QA','SACCESS_PRE_AREA','SACCESS_PRE_LINE',false,
+      'Workshop progress-first scope revoke',1) from claims
+  $remote$,:'admin_id')
+);
+insert into source_access_concurrency_result
+select 'ws_progress_first_progress',payload
+from extensions.dblink_get_result('saccess_ws_progress') as result(payload jsonb);
+insert into source_access_concurrency_result
+select 'ws_progress_first_revoke',payload
+from extensions.dblink_get_result('saccess_ws_revoke') as result(payload jsonb);
+select payload
+from extensions.dblink_get_result('saccess_ws_progress') as result(payload jsonb);
+select payload
+from extensions.dblink_get_result('saccess_ws_revoke') as result(payload jsonb);
+select pg_temp.assert_true(
+  (select payload->>'ok' from source_access_concurrency_result
+   where case_name='ws_progress_first_progress')='true'
+  and (select payload->>'ok' from source_access_concurrency_result
+       where case_name='ws_progress_first_revoke')='true',
+  'SWS_CONCURRENCY_PROGRESS_BEFORE_REVOKE_BOTH_LINEARIZE');
+select pg_temp.assert_true(
+  (select revision from public.vmp_authorization_revision where singleton)=
+    :'ws_pf_revision_before'::bigint+1,
+  'SWS_SCOPE_SETTER_TOUCHES_AUTHORIZATION_REVISION_EXACTLY_ONCE');
+
+-- Restore, then hold grant UPDATE in revoke-first order. Progress waits at its
+-- grant SHARE lock and denies after the revoke commits.
+select payload from extensions.dblink(
+  'saccess_setup',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"%s","role":"authenticated"}',true)
+    )
+    select public.rpc_set_source_workshop_scope_grant(
+      '9a050000-0000-4000-8000-000000000101',
+      (select id from public.vmp_performers where
+       user_id='9a050000-0000-4000-8000-000000000001' and is_active),
+      'QA','SACCESS_PRE_AREA','SACCESS_PRE_LINE',true,
+      'Restore workshop scope for revoke-first proof',2) from claims
+  $remote$,:'admin_id')
+) as result(payload jsonb)
+\gset ws_restore_
+select pg_temp.assert_true(
+  :'ws_restore_payload'::jsonb->>'ok'='true',
+  'SWS_CONCURRENCY_SCOPE_RESTORE');
+
+truncate source_access_concurrency_result;
+select extensions.dblink_send_query(
+  'saccess_ws_revoke',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"%s","role":"authenticated"}',true)
+    ), source_lock as materialized (
+      select source_object.id from claims,
+           public.vmp_source_objects source_object
+      where source_object.object_code='SACCESS-PRE-EXPAND'
+        and source_object.is_active for key share
+    ), grant_lock as materialized (
+      select grant_row.id from source_lock,
+           public.vmp_source_workshop_scope_grants grant_row
+      where grant_row.id='9a050000-0000-4000-8000-000000000101'
+        for update
+    ), paused as materialized (select pg_sleep(1) from grant_lock)
+    select public.rpc_set_source_workshop_scope_grant(
+      '9a050000-0000-4000-8000-000000000101',
+      (select id from public.vmp_performers where
+       user_id='9a050000-0000-4000-8000-000000000001' and is_active),
+      'QA','SACCESS_PRE_AREA','SACCESS_PRE_LINE',false,
+      'Workshop revoke-first concurrency proof',3) from paused
+  $remote$,:'admin_id')
+);
+select pg_sleep(0.2);
+select extensions.dblink_send_query(
+  'saccess_ws_progress',format($remote$
+    with claims as materialized (
+      select set_config('request.jwt.claims',
+        '{"sub":"9a050000-0000-4000-8000-000000000001","role":"authenticated"}',true)
+    )
+    select public.rpc_update_progress(
+      'SACCESS-PRE-EXPAND/2026.01-PQ',
+      jsonb_build_object('actual_validation_date',current_date-1),
+      'Workshop revoke-first must deny',null,%s) from claims
+  $remote$,(select version from public.vmp_plan_items
+             where validation_code='SACCESS-PRE-EXPAND/2026.01-PQ'))
+);
+insert into source_access_concurrency_result
+select 'ws_revoke_first_revoke',payload
+from extensions.dblink_get_result('saccess_ws_revoke') as result(payload jsonb);
+insert into source_access_concurrency_result
+select 'ws_revoke_first_progress',payload
+from extensions.dblink_get_result('saccess_ws_progress') as result(payload jsonb);
+select pg_temp.assert_true(
+  (select payload->>'ok' from source_access_concurrency_result
+   where case_name='ws_revoke_first_revoke')='true'
+  and (select payload->>'ok' from source_access_concurrency_result
+       where case_name='ws_revoke_first_progress')='false'
+  and (select payload->>'code' from source_access_concurrency_result
+       where case_name='ws_revoke_first_progress')='item_field_forbidden',
+  'SWS_CONCURRENCY_REVOKE_BEFORE_PROGRESS_DENIES');
+
+select extensions.dblink_exec('saccess_setup',$remote$
+  update public.vmp_plan_items
+  set updated_by='9a040000-0000-4000-8000-000000000001'
+  where updated_by='9a050000-0000-4000-8000-000000000001';
+  delete from public.vmp_progress_events
+  where changed_by='9a050000-0000-4000-8000-000000000001';
+  delete from public.audit_logs
+  where user_id='9a050000-0000-4000-8000-000000000001';
+  delete from public.vmp_item_assignments
+  where user_id='9a050000-0000-4000-8000-000000000001';
+  delete from public.vmp_source_workshop_scope_grants
+  where id='9a050000-0000-4000-8000-000000000101';
+  delete from public.vmp_performers
+  where user_id='9a050000-0000-4000-8000-000000000001';
+  delete from public.profiles
+  where id='9a050000-0000-4000-8000-000000000001';
+  delete from auth.users
+  where id='9a050000-0000-4000-8000-000000000001';
+$remote$);
+
+-- Drain the trailing empty results from the earlier QA revoke-first async
+-- pair before reusing those exact connections for lock-order regressions.
+select payload from extensions.dblink_get_result(
+  'saccess_qa_progress') as result(payload jsonb);
+select payload from extensions.dblink_get_result(
+  'saccess_qa_revoke') as result(payload jsonb);
+
+-- Deployment gate regression: the canonical writer holds its object advisory,
+-- then a Source tuple, then asks for ROW EXCLUSIVE through UPDATE. The
+-- migration-shaped session drains that same advisory before Source SRX. Both
+-- complete; taking SRX before the advisory would form a table/tuple cycle.
+select extensions.dblink_exec('saccess_qa_progress',$remote$
+  create function pg_temp.saccess_source_row_then_update()
+  returns jsonb language plpgsql as $function$
+  declare v_source_id uuid;
+  begin
+    perform set_config('lock_timeout','5s',true);
+    perform public.vmp_lock_catalog_object_v2(
+      'Thiết bị','SACCESS-PRE-EXPAND');
+    select source_object.id into strict v_source_id
+    from public.vmp_source_objects source_object
+    where source_object.object_code='SACCESS-PRE-EXPAND'
+      and source_object.is_active for update;
+    perform pg_sleep(1);
+    update public.vmp_source_objects source_object
+    set owner_name=source_object.owner_name where source_object.id=v_source_id;
+    return jsonb_build_object('ok',true);
+  end
+  $function$;
+$remote$);
+select extensions.dblink_exec('saccess_qa_revoke',$remote$
+  create function pg_temp.saccess_enforce_source_gate()
+  returns jsonb language plpgsql as $function$
+  begin
+    perform set_config('lock_timeout','5s',true);
+    lock table public.profiles in share row exclusive mode;
+    lock table public.vmp_performers in share row exclusive mode;
+    perform public.vmp_lock_catalog_object_v2(
+      'Thiết bị','SACCESS-PRE-EXPAND');
+    lock table public.vmp_source_objects in share row exclusive mode;
+    perform 1 from public.vmp_source_objects source_object
+    where source_object.object_code='SACCESS-PRE-EXPAND'
+      and source_object.is_active for update;
+    return jsonb_build_object('ok',true);
+  end
+  $function$;
+$remote$);
+truncate source_access_concurrency_result;
+select extensions.dblink_send_query(
+  'saccess_qa_progress','select pg_temp.saccess_source_row_then_update()');
+select pg_sleep(0.2);
+select extensions.dblink_send_query(
+  'saccess_qa_revoke','select pg_temp.saccess_enforce_source_gate()');
+insert into source_access_concurrency_result
+select 'deployment_source_writer',payload
+from extensions.dblink_get_result('saccess_qa_progress') as result(payload jsonb);
+insert into source_access_concurrency_result
+select 'deployment_source_gate',payload
+from extensions.dblink_get_result('saccess_qa_revoke') as result(payload jsonb);
+select payload from extensions.dblink_get_result(
+  'saccess_qa_progress') as result(payload jsonb);
+select payload from extensions.dblink_get_result(
+  'saccess_qa_revoke') as result(payload jsonb);
+select pg_temp.assert_true(
+  (select bool_and(payload->>'ok'='true')
+   from source_access_concurrency_result),
+  'SDEPLOY_SOURCE_ADVISORY_DRAIN_PRECEDES_SRX_TABLE_GATE');
+
+-- Runtime relation regression: Source reconciliation holds Source then asks
+-- for plan; the reviewed sheet writer must acquire that exact Source/master
+-- relation before its implementation tuple-locks plan. The row trigger is the
+-- NOWAIT validation backstop after this per-object ordering gate.
+select extensions.dblink_exec('saccess_qa_progress',$remote$
+  create function pg_temp.saccess_source_then_reconcile()
+  returns jsonb language plpgsql as $function$
+  declare v_source_id uuid;
+  begin
+    perform set_config('lock_timeout','5s',true);
+    select source_object.id into strict v_source_id
+    from public.vmp_source_objects source_object
+    where source_object.object_code='SACCESS-PRE-EXPAND'
+      and source_object.is_active for update;
+    perform pg_sleep(1);
+    perform public.vmp_reconcile_source_qa_projection(v_source_id);
+    return jsonb_build_object('ok',true);
+  end
+  $function$;
+$remote$);
+select extensions.dblink_exec('saccess_qa_revoke',$remote$
+  create function pg_temp.saccess_plan_relation_update()
+  returns jsonb language plpgsql as $function$
+  begin
+    perform set_config('lock_timeout','5s',true);
+    return public.rpc_apply_sheet_sync(
+      'update','SACCESS-PRE-EXPAND/2026.01-PQ',
+      jsonb_build_object('object_code','SACCESS-PRE-EXPAND'));
+  end
+  $function$;
+$remote$);
+truncate source_access_concurrency_result;
+select extensions.dblink_send_query(
+  'saccess_qa_progress','select pg_temp.saccess_source_then_reconcile()');
+select pg_sleep(0.2);
+select extensions.dblink_send_query(
+  'saccess_qa_revoke','select pg_temp.saccess_plan_relation_update()');
+insert into source_access_concurrency_result
+select 'runtime_source_reconcile',payload
+from extensions.dblink_get_result('saccess_qa_progress') as result(payload jsonb);
+insert into source_access_concurrency_result
+select 'runtime_plan_relation',payload
+from extensions.dblink_get_result('saccess_qa_revoke') as result(payload jsonb);
+select payload from extensions.dblink_get_result(
+  'saccess_qa_progress') as result(payload jsonb);
+select payload from extensions.dblink_get_result(
+  'saccess_qa_revoke') as result(payload jsonb);
+select pg_temp.assert_true(
+  (select bool_and(payload->>'ok'='true')
+   from source_access_concurrency_result),
+  'SRUNTIME_PLAN_RELATION_EXACT_SOURCE_PRELOCK_PRECEDES_ITEM_TUPLE');
+
+-- Per-object scope regression: holding the complete relation-write lock set
+-- for Source A must not block a Source tuple update for unrelated Source B.
+-- The rejected global statement/table gate would time out the B session.
+select extensions.dblink_exec('saccess_qa_progress',$remote$
+  create function pg_temp.saccess_hold_relation_a()
+  returns jsonb language plpgsql as $function$
+  declare v_result jsonb;
+  begin
+    perform set_config('lock_timeout','5s',true);
+    v_result:=public.rpc_apply_sheet_sync(
+      'update','SACCESS-PRE-EXPAND/2026.01-PQ',
+      jsonb_build_object('object_code','SACCESS-PRE-EXPAND'));
+    perform pg_sleep(1);
+    return v_result;
+  end
+  $function$;
+$remote$);
+select extensions.dblink_exec('saccess_qa_revoke',$remote$
+  create function pg_temp.saccess_update_unrelated_source_b()
+  returns jsonb language plpgsql as $function$
+  begin
+    perform set_config('lock_timeout','500ms',true);
+    perform 1 from public.vmp_source_objects source_object
+    where source_object.object_code='SACCESS-SUPPORT-ONLY'
+      and source_object.is_active for update;
+    return jsonb_build_object('ok',true);
+  end
+  $function$;
+$remote$);
+truncate source_access_concurrency_result;
+select extensions.dblink_send_query(
+  'saccess_qa_progress','select pg_temp.saccess_hold_relation_a()');
+select pg_sleep(0.2);
+select extensions.dblink_send_query(
+  'saccess_qa_revoke','select pg_temp.saccess_update_unrelated_source_b()');
+insert into source_access_concurrency_result
+select 'runtime_relation_source_a',payload
+from extensions.dblink_get_result('saccess_qa_progress') as result(payload jsonb);
+insert into source_access_concurrency_result
+select 'runtime_unrelated_source_b',payload
+from extensions.dblink_get_result('saccess_qa_revoke') as result(payload jsonb);
+select payload from extensions.dblink_get_result(
+  'saccess_qa_progress') as result(payload jsonb);
+select payload from extensions.dblink_get_result(
+  'saccess_qa_revoke') as result(payload jsonb);
+select pg_temp.assert_true(
+  (select bool_and(payload->>'ok'='true')
+   from source_access_concurrency_result),
+  'SRUNTIME_RELATION_PRELOCK_DOES_NOT_BLOCK_UNRELATED_SOURCE');
+
+select extensions.dblink_disconnect(connection_name)
+from unnest(array[
+  'saccess_qa_progress','saccess_qa_revoke',
+  'saccess_ws_progress','saccess_ws_revoke','saccess_setup'
+]) connection_name;
+
+\echo 'PASS CONCURRENCY QA/workshop revocation and Source/plan deployment/runtime lock orders'
 rollback;

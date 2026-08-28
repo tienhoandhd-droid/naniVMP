@@ -377,6 +377,8 @@ select signature,'service' from unnest(array[
   'rpc_upsert_source_object(text,text,jsonb)','vmp_ai_dau_van()',
   'vmp_ai_ghi_dem()','vmp_allowed_timeline_fields(uuid,text)',
   'vmp_can_view_item(uuid,text)','vmp_item_rights(uuid,text)',
+  'vmp_item_scope_matches(uuid,text)',
+  'vmp_source_workshop_scope_match(uuid,uuid)',
   'vmp_sync_item_assignments_from_performer()',
   'vmp_unfiltered_security_definer_item_readers()',
   'vmp_visible_plan_items()',
@@ -387,6 +389,7 @@ insert into expected_source_definer(signature,classification)
 select signature,'owner' from unnest(array[
   'rpc_active_rules__five_role_impl_20260824()',
   'rpc_apply_catalog_change__five_role_impl_20260824(uuid,text,integer)',
+  'vmp_apply_catalog_change_v2_impl(uuid,text,integer,jsonb,boolean)',
   'rpc_check_data_quality__five_role_impl_20260824(integer)',
   'rpc_commit_catalog_import__five_role_impl_20260824(uuid,text)',
   'rpc_create_plan_item__five_role_impl_20260824(text,text,integer,integer,jsonb)',
@@ -419,8 +422,17 @@ select signature,'owner' from unnest(array[
   'rpc_stage_catalog_import__five_role_impl_20260824(text,text,text,text,jsonb)',
   'rpc_trang_thai_he_thong__five_role_impl_20260824()',
   'rpc_update_progress__five_role_impl_20260824(text,jsonb,text,jsonb,integer)',
+  'rpc_apply_sheet_sync__source_impl_20260828(text,text,jsonb)',
+  'rpc_rollback_vmp_sheet_sync__source_impl_20260828(uuid)',
+  'rpc_sync_vmp_sheet_snapshot__source_impl_20260828(text,text,text,jsonb,jsonb)',
+  'vmp_exact_active_source_for_item(text)',
+  'vmp_enforce_active_plan_source_relation()',
+  'vmp_guard_active_source_rekey()',
+  'vmp_guard_plan_master_rekey()',
   'vmp_harden_dashboard_object_scope()',
+  'vmp_lock_source_plan_relations(text[])',
   'vmp_my_item_rights__five_role_impl_20260824(text)',
+  'vmp_reconcile_source_access_trigger()',
   'vmp_set_item_assignment_unhardened(uuid,text,text,text,text)',
   'vmp_upsert_source_object_before_person_id(text,text,jsonb)'
 ]::text[]) signature;
@@ -428,6 +440,7 @@ select signature,'owner' from unnest(array[
 insert into expected_source_definer(signature,classification)
 select signature,'browser' from unnest(array[
   'rpc_active_rules()','rpc_apply_catalog_change(uuid,text,integer)',
+  'rpc_apply_catalog_change_v2(uuid,text,integer,jsonb,boolean)',
   'rpc_catalog_history_detail(uuid)','rpc_catalog_history(jsonb,integer,integer)',
   'rpc_check_data_quality(integer)','rpc_commit_catalog_import(uuid,text)',
   'rpc_create_plan_item(text,text,integer,integer,jsonb)',
@@ -439,6 +452,7 @@ select signature,'browser' from unnest(array[
   'rpc_link_item_permission_account(uuid,uuid,text,integer)',
   'rpc_list_catalog_dataset(text,text,jsonb,integer,integer)','rpc_luat_xem()',
   'rpc_nguoi_va_quyen()','rpc_preview_catalog_change(uuid)',
+  'rpc_preview_catalog_change_v2(uuid)',
   'rpc_preview_item_rights(uuid,text)','rpc_recalc_criticality(boolean)',
   'rpc_refresh_computed_status()','rpc_resolve_missing(text,text,text)',
   'rpc_save_alert_recipient(uuid,jsonb,text,integer)',
@@ -470,7 +484,9 @@ set expected_proconfig=array['search_path=public, pg_temp']::text[]
 where signature in (
   'audit_plan_item_changes()','rpc_active_rules()',
   'rpc_alert_context(text,integer)','rpc_apply_catalog_change(uuid,text,integer)',
+  'rpc_apply_catalog_change_v2(uuid,text,integer,jsonb,boolean)',
   'rpc_apply_catalog_change__five_role_impl_20260824(uuid,text,integer)',
+  'vmp_apply_catalog_change_v2_impl(uuid,text,integer,jsonb,boolean)',
   'rpc_apply_sheet_sync(text,text,jsonb)',
   'rpc_catalog_history(jsonb,integer,integer)','rpc_catalog_history_detail(uuid)',
   'rpc_check_data_quality(integer)',
@@ -501,6 +517,7 @@ where signature in (
   'rpc_list_catalog_dataset__five_role_impl_20260824(text,text,jsonb,integer,integer)',
   'rpc_luat_xem()','rpc_nguoi_va_quyen()',
   'rpc_preview_catalog_change(uuid)',
+  'rpc_preview_catalog_change_v2(uuid)',
   'rpc_preview_catalog_change__five_role_impl_20260824(uuid)',
   'rpc_preview_item_rights(uuid,text)',
   'rpc_preview_item_rights__five_role_impl_20260824(uuid,text)',
@@ -533,13 +550,21 @@ where signature in (
   'rpc_update_progress(text,jsonb,text,jsonb,integer)',
   'rpc_upsert_source_object(text,text,jsonb)','vmp_allowed_timeline_fields(uuid,text)',
   'vmp_can_view_item(uuid,text)','vmp_can_view_my_item(text)',
+  'vmp_enforce_active_plan_source_relation()',
+  'vmp_exact_active_source_for_item(text)',
+  'vmp_guard_active_source_rekey()',
+  'vmp_guard_plan_master_rekey()',
   'vmp_harden_dashboard_object_scope()','vmp_item_rights(uuid,text)',
   'vmp_my_item_rights(text)','vmp_my_item_rights__five_role_impl_20260824(text)',
+  'vmp_lock_source_plan_relations(text[])',
   'vmp_set_item_assignment_unhardened(uuid,text,text,text,text)',
   'vmp_sync_item_assignments_from_performer()',
   'vmp_unfiltered_security_definer_item_readers()',
   'vmp_upsert_source_object_before_person_id(text,text,jsonb)',
+  'vmp_reconcile_source_access_trigger()',
   'vmp_visible_plan_items()',
+  'vmp_item_scope_matches(uuid,text)',
+  'vmp_source_workshop_scope_match(uuid,uuid)',
   'rpc_export_source_objects(text,text,jsonb,jsonb,integer)',
   'rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)',
   'rpc_list_source_workshop_coverage(text,jsonb,integer)',
@@ -551,6 +576,13 @@ where signature in (
   'rpc_source_workshop_scope_choices(text,text,text,jsonb,integer)',
   'vmp_can_view_plan_item(uuid,text)','vmp_can_view_source_object(uuid,uuid)',
   'vmp_reconcile_source_qa_projection(uuid)'
+);
+
+update expected_source_definer
+set expected_proconfig=array['search_path=public, pg_temp']::text[]
+where signature in (
+  'rpc_apply_sheet_sync__source_impl_20260828(text,text,jsonb)',
+  'rpc_rollback_vmp_sheet_sync__source_impl_20260828(uuid)'
 );
 
 update expected_source_definer
@@ -599,6 +631,7 @@ where signature in (
 update expected_source_definer
 set expected_proconfig=array['search_path=public, extensions, pg_temp']::text[]
 where signature in (
+  'rpc_sync_vmp_sheet_snapshot__source_impl_20260828(text,text,text,jsonb,jsonb)',
   'rpc_sync_vmp_sheet_snapshot(text,text,text,jsonb,jsonb)',
   'rpc_sync_vmp_sheet_snapshot_with_extras(text,text,text,jsonb,jsonb)'
 );
@@ -749,6 +782,24 @@ with expected_private(signature,language_name,volatility,classification,
      '\mmanage_qa_assignment\M'),
     ('vmp_can_manage_source_workshop_scope(uuid)','sql','s','service',
      '\mmanage_workshop_scope\M'),
+    ('vmp_source_workshop_scope_match(uuid,uuid)','sql','s','service',
+     '\mvmp_source_workshop_scope_grants\M'),
+    ('vmp_item_scope_matches(uuid,text)','sql','s','service',
+     '\mvmp_exact_active_source_for_item\M'),
+    ('vmp_exact_active_source_for_item(text)','sql','s','owner',
+     '\mvmp_objects\M'),
+    ('vmp_enforce_active_plan_source_relation()','plpgsql','v','owner',
+     '\mSOURCE_ACCESS_ACTIVE_ITEM_REQUIRES_EXACT_SOURCE\M'),
+    ('vmp_guard_active_source_rekey()','plpgsql','v','owner',
+     '\mSOURCE_ACCESS_ACTIVE_SOURCE_HAS_ACTIVE_ITEMS\M'),
+    ('vmp_guard_plan_master_rekey()','plpgsql','v','owner',
+     '\mSOURCE_ACCESS_MASTER_OBJECT_HAS_ACTIVE_ITEMS\M'),
+    ('vmp_lock_source_plan_relations(text[])','plpgsql','v','owner',
+     '\mfor key share of source_object,master_object\M'),
+    ('vmp_reconcile_source_access_trigger()','plpgsql','v','owner',
+     '\mvmp_reconcile_source_qa_projection\M'),
+    ('vmp_strip_catalog_pending_access_fields()','plpgsql','v','owner',
+     '\mowner_person_id\M'),
     ('vmp_touch_authorization_revision()','plpgsql','v','owner',
      '\mvmp_authorization_revision\M')
 ), actual_private as (
@@ -777,7 +828,7 @@ with expected_private(signature,language_name,volatility,classification,
     else array['postgres']::text[] end) grantee
 )
 select pg_temp.assert_true(
-  (select count(*) from actual_private)=3
+  (select count(*) from actual_private)=12
   and not exists (
     select 1 from actual_private
     where owner_name<>'postgres' or actual_language<>language_name
@@ -788,6 +839,118 @@ select pg_temp.assert_true(
   and not exists (select * from actual_acl except select * from expected_acl)
   and not exists (select * from expected_acl except select * from actual_acl),
   'SOURCE_ACCESS_EXACT_PRIVATE_HELPER_DEFINITION_ACL_CLASSIFICATION');
+
+with expected_writer(signature,required_definition) as (
+  values
+    ('rpc_apply_catalog_change(uuid,text,integer)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_apply_catalog_change_v2(uuid,text,integer,jsonb,boolean)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_generate_timeline(integer,boolean)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_create_plan_item(text,text,integer,integer,jsonb)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_commit_catalog_import(uuid,text)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_delete_plan_item(text,text)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_set_item_state(text,text,text)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_resolve_missing(text,text,text)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_apply_sheet_sync(text,text,jsonb)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_sync_vmp_sheet_snapshot(text,text,text,jsonb,jsonb)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_rollback_vmp_sheet_sync(uuid)',
+     '\mvmp_lock_source_plan_relations\M'),
+    ('rpc_save_catalog_object__five_role_impl_20260824(text,text,jsonb,text,integer)',
+     '\mlock table public.vmp_source_objects in row exclusive mode\M'),
+    ('rpc_sync_vmp_sheet_snapshot_with_extras(text,text,text,jsonb,jsonb)',
+     '\mrpc_sync_vmp_sheet_snapshot\M')
+), actual_writer as (
+  select expected.*,procedure.oid,
+         pg_get_functiondef(procedure.oid) definition
+  from expected_writer expected
+  join pg_proc procedure
+    on procedure.oid=to_regprocedure('public.'||expected.signature)
+)
+select pg_temp.assert_true(
+  (select count(*) from actual_writer)=13
+  and not exists (
+    select 1 from actual_writer
+    where definition !~ required_definition
+  ),
+  'SOURCE_ACCESS_RELATION_WRITERS_PRELOCK_SOURCE_BEFORE_PLAN');
+
+with expected_trigger(relation_name,trigger_name,function_signature) as (
+  values
+    ('vmp_plan_items','vmp_plan_items_active_source_guard',
+     'vmp_enforce_active_plan_source_relation()'),
+    ('vmp_source_objects','vmp_source_objects_active_relation_guard',
+     'vmp_guard_active_source_rekey()'),
+    ('vmp_source_objects','vmp_source_objects_active_delete_guard',
+     'vmp_guard_active_source_rekey()'),
+    ('vmp_source_objects','vmp_source_objects_access_insert_projection',
+     'vmp_reconcile_source_access_trigger()'),
+    ('vmp_source_objects','vmp_source_objects_access_projection',
+     'vmp_reconcile_source_access_trigger()'),
+    ('vmp_objects','vmp_objects_source_relation_update_guard',
+     'vmp_guard_plan_master_rekey()'),
+    ('vmp_objects','vmp_objects_source_relation_delete_guard',
+     'vmp_guard_plan_master_rekey()')
+), actual_trigger as (
+  select expected.*,trigger_row.tgenabled,
+         trigger_row.tgfoid::regprocedure::text actual_function,
+         pg_get_triggerdef(trigger_row.oid) definition
+  from expected_trigger expected
+  join pg_class relation on relation.relname=expected.relation_name
+  join pg_namespace namespace on namespace.oid=relation.relnamespace
+    and namespace.nspname='public'
+  join pg_trigger trigger_row on trigger_row.tgrelid=relation.oid
+    and trigger_row.tgname=expected.trigger_name
+    and not trigger_row.tgisinternal
+)
+select pg_temp.assert_true(
+  (select count(*) from actual_trigger)=7
+  and not exists (
+    select 1 from actual_trigger
+    where tgenabled<>'O' or actual_function<>function_signature
+       or definition !~ ('EXECUTE FUNCTION '||
+                          replace(replace(function_signature,'(','\('),
+                                  ')','\)'))
+  )
+  and (select definition from actual_trigger
+       where trigger_name='vmp_source_objects_access_insert_projection')
+        ~ '\mnew.is_active IS TRUE\M'
+  and (select definition from actual_trigger
+       where trigger_name='vmp_source_objects_access_projection')
+        ~ 'UPDATE OF owner_person_id, support_person_id, is_active'
+  and (select definition from actual_trigger
+       where trigger_name='vmp_source_objects_access_projection')
+        ~ '\mold.is_active IS DISTINCT FROM true\M',
+  'SOURCE_ACCESS_RELATION_TRIGGER_EXACT_RELATION_FUNCTION_ENABLED');
+
+select pg_temp.assert_true(
+  (select owner.rolname='postgres' and language.lanname='sql'
+          and procedure.provolatile='i' and not procedure.prosecdef
+          and procedure.proconfig is not distinct from
+              array['search_path=pg_catalog']::text[]
+          and procedure.proacl::text=
+              '{postgres=X/postgres,service_role=X/postgres}'
+   from pg_proc procedure
+   join pg_roles owner on owner.oid=procedure.proowner
+   join pg_language language on language.oid=procedure.prolang
+   where procedure.oid=
+     'public.vmp_catalog_timeline_fields()'::regprocedure)
+  and public.vmp_catalog_timeline_fields()=array[
+    'frequency_months','first_month','report_class','workdays',
+    'validate_flag','is_active'
+  ]::text[]
+  and pg_get_functiondef(
+    'public.vmp_can_view_source_object(uuid,uuid)'::regprocedure
+  )~'p_uid is not distinct from auth.uid\(\)',
+  'SOURCE_ACCESS_EXACT_TIMELINE_FIELDS_AND_ALTERNATE_UID_DEFENSE');
 
 select pg_temp.assert_true(
   to_regprocedure('public.vmp_unfiltered_security_definer_item_readers()') is not null
