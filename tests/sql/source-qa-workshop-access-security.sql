@@ -304,7 +304,7 @@ create temp table expected_protected_view(
 ) on commit drop;
 insert into expected_protected_view values
   ('vmp_item_assignments','vmp_active_item_assignments','v',
-   'd0ee7fcd1d5aa09faa5d3767fad10b5d7591f9ff7c8e8e6534d06b4f99f846e'),
+   'd0ee7fcd1d5aa09faa5d3767fad10b5d75981f9ff7c8e8e6534d06b4f99f846e'),
   ('vmp_plan_items','vmp_ai_tu_dien','v',
    '95fc2b0512e8df958fa9ddf9514623091eb6aa2cf0f8a8de54489ac54bc25b9a'),
   ('vmp_plan_items','vmp_status_current','v',
@@ -381,15 +381,13 @@ select signature,'service' from unnest(array[
   'vmp_source_workshop_scope_match(uuid,uuid)',
   'vmp_sync_item_assignments_from_performer()',
   'vmp_unfiltered_security_definer_item_readers()',
-  'vmp_visible_plan_items()',
-  'vmp_reconcile_source_qa_projection(uuid)'
+  'vmp_visible_plan_items()'
 ]::text[]) signature;
 
 insert into expected_source_definer(signature,classification)
 select signature,'owner' from unnest(array[
   'rpc_active_rules__five_role_impl_20260824()',
   'rpc_apply_catalog_change__five_role_impl_20260824(uuid,text,integer)',
-  'vmp_apply_catalog_change_v2_impl(uuid,text,integer,jsonb,boolean)',
   'rpc_check_data_quality__five_role_impl_20260824(integer)',
   'rpc_commit_catalog_import__five_role_impl_20260824(uuid,text)',
   'rpc_create_plan_item__five_role_impl_20260824(text,text,integer,integer,jsonb)',
@@ -424,6 +422,9 @@ select signature,'owner' from unnest(array[
   'rpc_update_progress__five_role_impl_20260824(text,jsonb,text,jsonb,integer)',
   'rpc_apply_sheet_sync__source_impl_20260828(text,text,jsonb)',
   'rpc_rollback_vmp_sheet_sync__source_impl_20260828(uuid)',
+  'rpc_nguoi_va_quyen__admin_visibility_delegate_20260828()',
+  'rpc_preview_item_rights__admin_visibility_delegate_20260828(uuid,text)',
+  'rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)',
   'rpc_sync_vmp_sheet_snapshot__source_impl_20260828(text,text,text,jsonb,jsonb)',
   'vmp_exact_active_source_for_item(text)',
   'vmp_enforce_active_plan_source_relation()',
@@ -433,6 +434,7 @@ select signature,'owner' from unnest(array[
   'vmp_lock_source_plan_relations(text[])',
   'vmp_my_item_rights__five_role_impl_20260824(text)',
   'vmp_reconcile_source_access_trigger()',
+  'vmp_reconcile_source_qa_projection(uuid)',
   'vmp_set_item_assignment_unhardened(uuid,text,text,text,text)',
   'vmp_upsert_source_object_before_person_id(text,text,jsonb)'
 ]::text[]) signature;
@@ -465,12 +467,12 @@ select signature,'browser' from unnest(array[
   'rpc_stage_catalog_import(text,text,text,text,jsonb)',
   'rpc_trang_thai_he_thong()',
   'rpc_update_progress(text,jsonb,text,jsonb,integer)',
+  'rpc_update_planned_deadlines(text,jsonb,text,integer,boolean)',
   'vmp_can_view_my_item(text)','vmp_my_item_rights(text)',
   'rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)',
   'rpc_source_object_facets(text,jsonb)',
   'rpc_export_source_objects(text,text,jsonb,jsonb,integer)',
   'rpc_source_field_suggestions(text,text,text,jsonb,integer)',
-  'rpc_source_qa_candidates(text,jsonb,integer,uuid[])',
   'rpc_list_source_workshop_coverage(text,jsonb,integer)',
   'rpc_source_workshop_scope_choices(text,text,text,jsonb,integer)',
   'rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)',
@@ -516,10 +518,12 @@ where signature in (
   'rpc_list_catalog_dataset(text,text,jsonb,integer,integer)',
   'rpc_list_catalog_dataset__five_role_impl_20260824(text,text,jsonb,integer,integer)',
   'rpc_luat_xem()','rpc_nguoi_va_quyen()',
+  'rpc_nguoi_va_quyen__admin_visibility_delegate_20260828()',
   'rpc_preview_catalog_change(uuid)',
   'rpc_preview_catalog_change_v2(uuid)',
   'rpc_preview_catalog_change__five_role_impl_20260824(uuid)',
   'rpc_preview_item_rights(uuid,text)',
+  'rpc_preview_item_rights__admin_visibility_delegate_20260828(uuid,text)',
   'rpc_preview_item_rights__five_role_impl_20260824(uuid,text)',
   'rpc_recalc_criticality(boolean)','rpc_reconcile_orphan_objects(text[])',
   'rpc_refresh_computed_status()',
@@ -547,7 +551,9 @@ where signature in (
   'rpc_source_warnings(integer)','rpc_stage_catalog_import(text,text,text,text,jsonb)',
   'rpc_stage_catalog_import__five_role_impl_20260824(text,text,text,text,jsonb)',
   'rpc_trang_thai_he_thong()',
+  'rpc_update_planned_deadlines(text,jsonb,text,integer,boolean)',
   'rpc_update_progress(text,jsonb,text,jsonb,integer)',
+  'rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)',
   'rpc_upsert_source_object(text,text,jsonb)','vmp_allowed_timeline_fields(uuid,text)',
   'vmp_can_view_item(uuid,text)','vmp_can_view_my_item(text)',
   'vmp_enforce_active_plan_source_relation()',
@@ -801,7 +807,13 @@ with expected_private(signature,language_name,volatility,classification,
     ('vmp_strip_catalog_pending_access_fields()','plpgsql','v','owner',
      '\mowner_person_id\M'),
     ('vmp_touch_authorization_revision()','plpgsql','v','owner',
-     '\mvmp_authorization_revision\M')
+     '\mvmp_authorization_revision\M'),
+    ('vmp_current_actor_can_manage_source_qa_assignment()','sql','s','browser',
+     '\mvmp_can_manage_source_qa_assignment\M'),
+    ('vmp_current_actor_can_manage_source_workshop_scope()','sql','s','browser',
+     '\mvmp_can_manage_source_workshop_scope\M'),
+    ('vmp_current_actor_is_active()','sql','s','browser',
+     '\mvmp_is_active_session\M')
 ), actual_private as (
   select expected.*,procedure.oid,owner.rolname owner_name,
          language.lanname actual_language,procedure.provolatile actual_volatility,
@@ -824,11 +836,12 @@ with expected_private(signature,language_name,volatility,classification,
   select expected.signature,grantee,'EXECUTE'::text privilege_type,false is_grantable
   from expected_private expected
   cross join lateral unnest(case expected.classification
+    when 'browser' then array['postgres','service_role','authenticated']::text[]
     when 'service' then array['postgres','service_role']::text[]
     else array['postgres']::text[] end) grantee
 )
 select pg_temp.assert_true(
-  (select count(*) from actual_private)=12
+  (select count(*) from actual_private)=15
   and not exists (
     select 1 from actual_private
     where owner_name<>'postgres' or actual_language<>language_name
@@ -968,6 +981,37 @@ select pg_temp.assert_true(
   ),
   'SOURCE_ACCESS_SECURITY_DEFINER_INVENTORY_HAS_UNREVIEWED_READER');
 
+-- The generated inventory must not allow a new reader to self-classify merely
+-- by calling an approved visibility helper. This transaction-local canary
+-- proves the reader still appears in the unreviewed result until an explicit
+-- signature/reason is added to the migration allowlist.
+create function public.vmp_source_reader_inventory_canary()
+returns integer
+language sql
+stable
+security definer
+set search_path=public,pg_temp
+as $function$
+  select count(*)::integer
+  from public.vmp_plan_items item
+  where public.vmp_can_view_item(auth.uid(),item.validation_code)
+$function$;
+
+select pg_temp.assert_true(
+  pg_get_functiondef(
+    'public.vmp_unfiltered_security_definer_item_readers()'::regprocedure
+  ) !~* 'not ilike ''%vmp_can_view_item%'''
+  and pg_get_functiondef(
+    'public.vmp_unfiltered_security_definer_item_readers()'::regprocedure
+  ) !~* 'not ilike ''%vmp_visible_plan_items%'''
+  and exists (
+    select 1 from public.vmp_unfiltered_security_definer_item_readers()
+    where signature='vmp_source_reader_inventory_canary()'
+  ),
+  'SOURCE_ACCESS_SECURITY_DEFINER_INVENTORY_HELPER_BYPASS');
+
+drop function public.vmp_source_reader_inventory_canary();
+
 create temp table expected_protected_policy(
   relation_name text primary key,policy_name text not null,command "char" not null,
   permissive boolean not null,roles text[] not null,
@@ -983,15 +1027,15 @@ insert into expected_protected_policy values
   ('vmp_source_workshop_scope_grants',
    'source_workshop_scope_grants_manager_or_self_select','r',true,
    array['authenticated'],
-   $grant_policy$(vmp_can_manage_source_workshop_scope(auth.uid()) OR (EXISTS ( SELECT 1
+   $grant_policy$(vmp_current_actor_can_manage_source_workshop_scope() OR (vmp_current_actor_is_active() AND (EXISTS ( SELECT 1
    FROM vmp_performers performer
-  WHERE ((performer.id = vmp_source_workshop_scope_grants.performer_id) AND (performer.user_id = auth.uid()) AND performer.is_active))))$grant_policy$,
+  WHERE ((performer.id = vmp_source_workshop_scope_grants.performer_id) AND (performer.user_id = auth.uid()) AND performer.is_active)))))$grant_policy$,
    null),
   ('vmp_item_assignments','item_assignments_manager_or_self_select','r',true,
    array['authenticated'],
-   $assignment_policy$(vmp_can_manage_source_qa_assignment(auth.uid()) OR (EXISTS ( SELECT 1
+   $assignment_policy$(vmp_current_actor_can_manage_source_qa_assignment() OR (vmp_current_actor_is_active() AND (EXISTS ( SELECT 1
    FROM vmp_performers performer
-  WHERE ((performer.id = vmp_item_assignments.performer_id) AND (performer.user_id = auth.uid()) AND performer.is_active))))$assignment_policy$,
+  WHERE ((performer.id = vmp_item_assignments.performer_id) AND (performer.user_id = auth.uid()) AND performer.is_active)))))$assignment_policy$,
    null);
 
 with actual_policy as (
@@ -1049,7 +1093,7 @@ select pg_temp.assert_true(
     select 1 from actual_policy
     where polcmd<>'r' or not polpermissive
        or polroles<>array[(select oid from pg_roles where rolname='authenticated')]
-       or using_expression<>'vmp_can_manage_source_qa_assignment(auth.uid())'
+       or using_expression<>'vmp_current_actor_can_manage_source_qa_assignment()'
        or check_expression is not null
   )
   and not exists (
@@ -1088,11 +1132,17 @@ values
   ('9a020000-0000-4000-8000-000000000002','authenticated','authenticated',
    'source-security-workshop@example.test','x',now(),'{}','{}',now(),now()),
   ('9a020000-0000-4000-8000-000000000003','authenticated','authenticated',
-   'source-security-unrelated@example.test','x',now(),'{}','{}',now(),now());
+   'source-security-unrelated@example.test','x',now(),'{}','{}',now(),now()),
+  ('9a020000-0000-4000-8000-000000000004','authenticated','authenticated',
+   'source-security-manager@example.test','x',now(),'{}','{}',now(),now()),
+  ('9a020000-0000-4000-8000-000000000005','authenticated','authenticated',
+   'source-security-inactive@example.test','x',now(),'{}','{}',now(),now());
 
 insert into public.departments(id,name,short_name)
 values ('QA','Source security QA fixture','QA'),
-       ('SSEC_WS','Source security workshop fixture','SSW')
+       ('SSEC_WS','Source security workshop fixture','SSW'),
+       ('FILTER_CONTRACT','Source server filter fixture','SFC'),
+       ('FILTER_SCOPE','Source scope choice fixture','SFS')
 on conflict(id) do nothing;
 
 insert into public.profiles(id,full_name,email,role,department,is_active)
@@ -1102,19 +1152,46 @@ values
   ('9a020000-0000-4000-8000-000000000002','Source Security Workshop',
    'source-security-workshop@example.test','department_user','SSEC_WS',true),
   ('9a020000-0000-4000-8000-000000000003','Source Security Unrelated',
-   'source-security-unrelated@example.test','department_user','SSEC_WS',true);
+   'source-security-unrelated@example.test','department_user','SSEC_WS',true),
+  ('9a020000-0000-4000-8000-000000000004','Source Security Manager',
+   'source-security-manager@example.test','qa_manager','QA',true),
+  ('9a020000-0000-4000-8000-000000000005','Source Security Inactive QA',
+   'source-security-inactive@example.test','qa_manager','QA',true);
 
 update public.vmp_performers
-set department=case when user_id='9a020000-0000-4000-8000-000000000001'
+set department=case when user_id in (
+                      '9a020000-0000-4000-8000-000000000001'::uuid,
+                      '9a020000-0000-4000-8000-000000000004'::uuid
+                    )
                     then 'QA' else 'SSEC_WS' end,
-    access_class=case when user_id='9a020000-0000-4000-8000-000000000001'
-                      then 'qa_progress_editor' else 'workshop_staff' end,
+    access_class=case
+      when user_id='9a020000-0000-4000-8000-000000000001'::uuid
+        then 'qa_progress_editor'
+      when user_id='9a020000-0000-4000-8000-000000000004'::uuid
+        then 'qa_manager'
+      else 'workshop_staff' end,
     is_active=true
 where user_id in (
   '9a020000-0000-4000-8000-000000000001'::uuid,
   '9a020000-0000-4000-8000-000000000002'::uuid,
-  '9a020000-0000-4000-8000-000000000003'::uuid
+  '9a020000-0000-4000-8000-000000000003'::uuid,
+  '9a020000-0000-4000-8000-000000000004'::uuid
 );
+
+update public.vmp_performers
+set id='9a020000-0000-4000-8000-000000000139',
+    is_active=false,department='QA',access_class='qa_manager'
+where user_id='9a020000-0000-4000-8000-000000000005'::uuid;
+
+-- Duplicate display names must never influence dashboard identity. The
+-- canonical owner's unusable local address makes any returned email proof that
+-- the reader selected the unrelated performer by name.
+update public.vmp_performers
+set email='source-security-qa.local'
+where user_id='9a020000-0000-4000-8000-000000000001'::uuid;
+update public.vmp_performers
+set performer_name='Source Security QA'
+where user_id='9a020000-0000-4000-8000-000000000003'::uuid;
 
 insert into public.vmp_objects(
   code,name,classification,department,area,line,frequency_months
@@ -1122,6 +1199,27 @@ insert into public.vmp_objects(
 values (
   'SSEC-DENIED','Source security RLS denied row','tb','SSEC_WS',
   'SSEC_DENIED_AREA','SSEC_DENIED_LINE',12
+),(
+  'SSEC-QA-ALLOWED','Source security QA allowed row','tb','QA',
+  'SSEC_QA_AREA','SSEC_QA_LINE',12
+),(
+  'SSEC-WS-ALLOWED','Source security workshop allowed row','tb','SSEC_WS',
+  'SSEC_WS_AREA','SSEC_WS_LINE',12
+),(
+  'FILTER-CONTRACT-A','Server filter contract A','tb','FILTER_CONTRACT',
+  'FILTER_AREA_A','FILTER_LINE_A',12
+),(
+  'FILTER-CONTRACT-B','Server filter contract B','tb','FILTER_CONTRACT',
+  'FILTER_AREA_B','FILTER_LINE_B',24
+),(
+  'FILTER-SCOPE-BLANK','Server scope blank line','tb','FILTER_SCOPE',
+  'FILTER_SCOPE_AREA',null,12
+),(
+  'FILTER-SCOPE-SPACE','Server scope whitespace line','tb','FILTER_SCOPE',
+  'FILTER_SCOPE_AREA',null,12
+),(
+  'FILTER-SCOPE-LINE','Server scope named line','tb','FILTER_SCOPE',
+  'FILTER_SCOPE_AREA','FILTER_SCOPE_LINE',12
 );
 insert into public.vmp_source_objects(
   id,object_kind,object_code,object_name,department,area_code,line,
@@ -1131,9 +1229,75 @@ insert into public.vmp_source_objects(
 values (
   '9a020000-0000-4000-8000-000000000110','Thiết bị','SSEC-DENIED',
   'Source security RLS denied row','SSEC_WS','SSEC_DENIED_AREA',
-  'SSEC_DENIED_LINE','y',12,'Hóa lý',5,1,2026,
+  'SSEC_DENIED_LINE','y',12,'Hóa lý',5,null,2026,
   'source-access-security',92110,1,0,0
 );
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision,
+  owner_person_id,owner_name
+)
+select '9a020000-0000-4000-8000-000000000120','Thiết bị','SSEC-QA-ALLOWED',
+       'Source security QA allowed row','QA','SSEC_QA_AREA','SSEC_QA_LINE',
+       'y',12,'Hóa lý',5,null,2026,'source-access-security',92120,1,0,0,
+       performer.id,performer.performer_name
+from public.vmp_performers performer
+where performer.user_id='9a020000-0000-4000-8000-000000000001'::uuid;
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision
+)
+values (
+  '9a020000-0000-4000-8000-000000000121','Thiết bị','SSEC-WS-ALLOWED',
+  'Source security workshop allowed row','SSEC_WS','SSEC_WS_AREA',
+  'SSEC_WS_LINE','y',12,'Hóa lý',5,null,2026,
+  'source-access-security',92121,1,0,0
+);
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision,
+  owner_person_id,owner_name,work_group,note
+)
+select '9a020000-0000-4000-8000-000000000130','Thiết bị','FILTER-CONTRACT-A',
+       'Server filter contract A','FILTER_CONTRACT','FILTER_AREA_A',
+       'FILTER_LINE_A','y',12,'Hóa lý',5,null,2026,
+       'source-access-security',92130,1,0,0,performer.id,
+       performer.performer_name,'FILTER_GROUP_ALPHA','FILTER_NOTE_NEEDLE'
+from public.vmp_performers performer
+where performer.user_id='9a020000-0000-4000-8000-000000000004'::uuid;
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision,
+  work_group,note
+)
+values (
+  '9a020000-0000-4000-8000-000000000131','Thiết bị','FILTER-CONTRACT-B',
+  'Server filter contract B','FILTER_CONTRACT','FILTER_AREA_B',
+  'FILTER_LINE_B','n',24,'Hóa lý',5,3,2026,
+  'source-access-security',92131,1,0,0,'FILTER_GROUP_BETA','FILTER_NOTE_OTHER'
+);
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision
+)
+values
+  ('9a020000-0000-4000-8000-000000000132','Thiết bị',
+   'FILTER-SCOPE-BLANK','Server scope blank line','FILTER_SCOPE',
+   'FILTER_SCOPE_AREA','','n',12,'Hóa lý',5,null,2026,
+   'source-access-security',92132,1,0,0),
+  ('9a020000-0000-4000-8000-000000000133','Thiết bị',
+   'FILTER-SCOPE-SPACE','Server scope whitespace line','FILTER_SCOPE',
+   'FILTER_SCOPE_AREA','   ','n',12,'Hóa lý',5,null,2026,
+   'source-access-security',92133,1,0,0),
+  ('9a020000-0000-4000-8000-000000000134','Thiết bị',
+   'FILTER-SCOPE-LINE','Server scope named line','FILTER_SCOPE',
+   'FILTER_SCOPE_AREA','FILTER_SCOPE_LINE','n',12,'Hóa lý',5,null,2026,
+   'source-access-security',92134,1,0,0);
 insert into public.vmp_plan_items(
   id,validation_code,object_code,validation_type,year,report_class,effort_days,
   deadline_protocol,deadline_validation,deadline_report,deadline_vmp,
@@ -1147,6 +1311,25 @@ values (
   true,'active',1,array['SSEC_WS'],array['SSEC_WS'],
   '{"fixture":"source-access-security"}'::jsonb
 );
+insert into public.vmp_plan_items(
+  id,validation_code,object_code,validation_type,year,report_class,effort_days,
+  deadline_protocol,deadline_validation,deadline_report,deadline_vmp,
+  status_protocol,status_validation,status_report,status_vmp,is_active,
+  item_state,version,departments,execution_departments,source_sheet_data,
+  owner_person_id,owner_name
+)
+select fixture.validation_code,fixture.validation_code,fixture.object_code,'PQ',
+       2026,'Hóa lý',5,current_date+30,current_date+60,current_date+90,
+       current_date+120,'not_started','not_started','not_started','not_started',
+       true,'active',1,array[fixture.department],array[fixture.department],
+       '{"fixture":"source-access-security-visible"}'::jsonb,
+       source_object.owner_person_id,source_object.owner_name
+from (values
+  ('SSEC-QA-ALLOWED/2026.01-PQ','SSEC-QA-ALLOWED','QA'),
+  ('SSEC-WS-ALLOWED/2026.01-PQ','SSEC-WS-ALLOWED','SSEC_WS')
+) fixture(validation_code,object_code,department)
+join public.vmp_source_objects source_object
+  on source_object.object_code=fixture.object_code and source_object.is_active;
 insert into public.vmp_source_workshop_scope_grants(
   id,performer_id,department,department_key,area_code,area_key,line,line_key,
   valid_from,expires_at,is_active,version,change_reason
@@ -1157,6 +1340,16 @@ select '9a020000-0000-4000-8000-000000000111',performer.id,
        transaction_timestamp(),null,true,1,'Unrelated RLS grant fixture'
 from public.vmp_performers performer
 where performer.user_id='9a020000-0000-4000-8000-000000000003'::uuid;
+insert into public.vmp_source_workshop_scope_grants(
+  id,performer_id,department,department_key,area_code,area_key,line,line_key,
+  valid_from,expires_at,is_active,version,change_reason
+)
+select '9a020000-0000-4000-8000-000000000112',performer.id,
+       'SSEC_WS',public.vmp_source_scope_key('SSEC_WS'),
+       'SSEC_WS_AREA',public.vmp_source_scope_key('SSEC_WS_AREA'),null,null,
+       transaction_timestamp(),null,true,1,'Workshop visible-set fixture'
+from public.vmp_performers performer
+where performer.user_id='9a020000-0000-4000-8000-000000000002'::uuid;
 insert into public.vmp_item_assignments(
   validation_code,performer_id,user_id,staff_name,assignment_kind,source,
   assignment_role,is_active,change_reason
@@ -1223,6 +1416,321 @@ begin
   perform pg_temp.assert_forbidden(
     public.rpc_catalog_history('{}'::jsonb,1,0),
     p_persona||'_HISTORY_FORBIDDEN');
+  perform pg_temp.assert_forbidden(
+    public.rpc_source_field_suggestions(
+      'Thiết bị','department','',null,10),
+    p_persona||'_SOURCE_SUGGESTIONS_FORBIDDEN');
+  perform pg_temp.assert_forbidden(
+    public.rpc_source_qa_candidates('',null,10,'{}'::uuid[]),
+    p_persona||'_SOURCE_QA_CANDIDATES_FORBIDDEN');
+  perform pg_temp.assert_forbidden(
+    public.rpc_list_source_workshop_coverage('',null,10),
+    p_persona||'_SOURCE_COVERAGE_DIRECTORY_FORBIDDEN');
+  perform pg_temp.assert_forbidden(
+    public.rpc_source_workshop_scope_choices(null,null,null,null,10),
+    p_persona||'_SOURCE_SCOPE_CHOICES_FORBIDDEN');
+end
+$$;
+
+create function pg_temp.assert_visible_source_surfaces(
+  p_user_id uuid,p_allowed_code text,p_allowed_scope_marker text,p_rule_id text
+)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare
+  v_list jsonb;
+  v_facets jsonb;
+  v_export jsonb;
+  v_dashboard jsonb;
+  v_watermark jsonb;
+  v_warnings jsonb;
+begin
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_user_id,'role','authenticated')::text,true);
+
+  v_list:=public.rpc_list_source_objects(
+    'Thiết bị','SSEC','{}'::jsonb,null,100,false,null);
+  v_facets:=public.rpc_source_object_facets('Thiết bị','{}'::jsonb);
+  v_export:=public.rpc_export_source_objects(
+    'Thiết bị','SSEC','{}'::jsonb,null,100);
+  v_dashboard:=public.rpc_get_vmp_dashboard(2026,false,false);
+  v_watermark:=public.rpc_get_vmp_watermark(2026);
+  v_warnings:=public.rpc_source_warnings(2026);
+
+  if v_list->>'ok' is distinct from 'true'
+     or jsonb_array_length(v_list->'rows')<>1
+     or v_list#>>'{rows,0,object_code}' is distinct from p_allowed_code
+     or v_list->>'authorized_total' is distinct from '1'
+     or v_list::text like '%SSEC-DENIED%'
+     or v_facets->>'ok' is distinct from 'true'
+     or v_facets::text not like '%'||p_allowed_scope_marker||'%'
+     or v_facets::text like '%SSEC_DENIED_AREA%'
+     or v_export->>'ok' is distinct from 'true'
+     or jsonb_array_length(v_export->'rows')<>1
+     or v_export#>>'{rows,0,object_code}' is distinct from p_allowed_code
+     or v_export::text like '%SSEC-DENIED%'
+     or v_dashboard::text not like '%'||p_allowed_code||'%'
+     or v_dashboard::text like '%SSEC-DENIED%'
+     or jsonb_array_length(v_dashboard->'objects')<>1
+     or jsonb_array_length(v_dashboard->'activities')<>1
+     or (p_allowed_code='SSEC-QA-ALLOWED' and exists (
+       select 1 from jsonb_array_elements(v_dashboard->'activities') activity
+       where activity->>'code'=p_allowed_code
+         and activity#>>'{_raw,email_qa}' is not null
+     ))
+     or (v_dashboard->>'authorization_revision')::bigint is distinct from
+        (select revision from public.vmp_authorization_revision where singleton)
+     or (v_dashboard->>'authorization_revision')::bigint<=0
+     or v_watermark->>'objects' is distinct from '1'
+     or v_watermark->>'plan_items' is distinct from '1'
+     or (v_watermark->>'authorization_revision')::bigint is distinct from
+        (select revision from public.vmp_authorization_revision where singleton)
+     or (v_watermark->>'authorization_revision')::bigint<=0
+     or v_warnings::text not like '%'||p_allowed_code||'%'
+     or v_warnings::text like '%SSEC-DENIED%' then
+    raise exception using errcode='check_violation',
+      message=format('%s list=%s facets=%s export=%s dashboard=%s watermark=%s warnings=%s',
+        p_rule_id,v_list,v_facets,v_export,v_dashboard,v_watermark,v_warnings);
+  end if;
+
+  if not exists (
+    select 1 from public.audit_logs audit
+    where audit.user_id=p_user_id and audit.action='EXPORT'
+      and audit.table_name='vmp_source_objects'
+  ) then
+    raise exception using errcode='check_violation',
+      message=p_rule_id||'_EXPORT_AUDIT_MISSING';
+  end if;
+end
+$$;
+
+create function pg_temp.assert_manager_source_api_contract(p_user_id uuid)
+returns void language plpgsql security invoker as $$
+declare
+  v_suggestions jsonb;
+  v_candidates jsonb;
+  v_invalid jsonb;
+begin
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_user_id,'role','authenticated')::text,true);
+  v_suggestions:=public.rpc_source_field_suggestions(
+    'Thiết bị','department','SSEC',null,10);
+  v_candidates:=public.rpc_source_qa_candidates(
+    'source security qa',null,10,
+    array['9a020000-0000-4000-8000-000000000139'::uuid]);
+  v_invalid:=public.rpc_source_field_suggestions(
+    'Thiết bị','owner_person_id','',null,10);
+
+  if v_suggestions->>'ok' is distinct from 'true'
+     or jsonb_array_length(v_suggestions->'rows')<>1
+     or v_suggestions#>>'{rows,0,value}' is distinct from 'SSEC_WS'
+     or v_candidates->>'ok' is distinct from 'true'
+     or jsonb_array_length(v_candidates->'rows')<>1
+     or v_candidates#>>'{rows,0,performer_name}' is distinct from
+        'Source Security QA'
+     or jsonb_array_length(v_candidates->'included_current')<>1
+     or v_candidates#>>'{included_current,0,eligible}' is distinct from 'false'
+     or v_candidates#>>'{included_current,0,ineligibility_reason}' is distinct from
+        'PERFORMER_INACTIVE'
+     or v_invalid->>'ok' is distinct from 'false'
+     or v_invalid->>'error_code' is distinct from 'INVALID_FIELD'
+     or public.rpc_list_source_objects(
+          'Thiết bị','SSEC','{}'::jsonb,null,101,false,null
+        )->>'error_code' is distinct from 'INVALID_LIMIT'
+     or public.rpc_export_source_objects(
+          'Thiết bị','SSEC','{}'::jsonb,null,501
+        )->>'error_code' is distinct from 'INVALID_LIMIT'
+     or public.rpc_export_source_objects(
+          'Thiết bị','SSEC','{}'::jsonb,
+          '{"object_code":"SSEC-MISSING","id":"bad"}'::jsonb,100
+        )->>'error_code' is distinct from 'INVALID_CURSOR'
+     or public.rpc_export_source_objects(
+          'Thiết bị','SSEC','{}'::jsonb,
+          '{"object_code":"SSEC-MISSING","id":"00000000-0000-0000-0000-000000000000"}'::jsonb,
+          100
+        )->>'error_code' is distinct from 'CURSOR_EXPIRED'
+     or public.rpc_source_qa_candidates('',null,51,'{}'::uuid[])
+          ->>'error_code' is distinct from 'INVALID_LIMIT' then
+    raise exception using errcode='check_violation',
+      message=format('SOURCE_ACCESS_PAGED_MANAGER_API_CONTRACT suggestions=%s candidates=%s invalid=%s',
+                     v_suggestions,v_candidates,v_invalid);
+  end if;
+end
+$$;
+
+create function pg_temp.assert_single_source_result(
+  p_payload jsonb,p_expected_code text,p_rule_id text
+)
+returns void language plpgsql security invoker as $$
+begin
+  if p_payload->>'ok' is distinct from 'true'
+     or coalesce(jsonb_array_length(p_payload->'rows'),-1)<>1
+     or p_payload#>>'{rows,0,object_code}' is distinct from p_expected_code
+     or p_payload->>'authorized_total' is distinct from '1' then
+    raise exception using errcode='check_violation',
+      message=format('%s payload=%s',p_rule_id,p_payload);
+  end if;
+end
+$$;
+
+create function pg_temp.assert_manager_server_filter_contract(p_user_id uuid)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare
+  v_facets jsonb;
+  v_export jsonb;
+  v_suggestions jsonb;
+  v_scope_first jsonb;
+  v_scope_second jsonb;
+begin
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_user_id,'role','authenticated')::text,true);
+
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị','FILTER_NOTE_NEEDLE','{"department":"filter_contract"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-A','SOURCE_ACCESS_SERVER_FILTER_SEARCH');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","validation":"validated"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-A','SOURCE_ACCESS_SERVER_FILTER_VALIDATED');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","validation":"outside"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-B','SOURCE_ACCESS_SERVER_FILTER_OUTSIDE');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","first_month":"missing"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-A','SOURCE_ACCESS_SERVER_FILTER_FIRST_MISSING');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","first_month":"present"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-B','SOURCE_ACCESS_SERVER_FILTER_FIRST_PRESENT');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","owner":"assigned"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-A','SOURCE_ACCESS_SERVER_FILTER_ASSIGNED');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","owner":"unassigned"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-B','SOURCE_ACCESS_SERVER_FILTER_UNASSIGNED');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","owner":"owner:source security manager"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-A','SOURCE_ACCESS_SERVER_FILTER_OWNER_NAME');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","frequency":"lte12"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-A','SOURCE_ACCESS_SERVER_FILTER_FREQUENCY_LOW');
+  perform pg_temp.assert_single_source_result(public.rpc_list_source_objects(
+    'Thiết bị',null,
+    '{"department":"filter_contract","frequency":"gt12"}'::jsonb,
+    null,100,false,null),'FILTER-CONTRACT-B','SOURCE_ACCESS_SERVER_FILTER_FREQUENCY_HIGH');
+
+  v_facets:=public.rpc_source_object_facets(
+    'Thiết bị','{"department":"filter_contract"}'::jsonb);
+  if v_facets->>'ok' is distinct from 'true'
+     or coalesce(jsonb_array_length(v_facets->'departments'),-1)<>1
+     or not (v_facets->'departments' @>
+        '[{"value":"FILTER_CONTRACT","count":2}]'::jsonb)
+     or coalesce(jsonb_array_length(v_facets->'areas'),-1)<>2
+     or not (v_facets->'owners' @>
+        '[{"value":"owner:source security manager","name":"Source Security Manager","count":1}]'::jsonb)
+     or v_facets->'validation' is distinct from
+        '[{"value":"outside","count":1},{"value":"validated","count":1}]'::jsonb
+     or v_facets->'first_month' is distinct from
+        '[{"value":"missing","count":1},{"value":"present","count":1}]'::jsonb
+     or v_facets->'ownership' is distinct from
+        '[{"value":"assigned","count":1},{"value":"unassigned","count":1}]'::jsonb
+     or v_facets->'frequency' is distinct from
+        '[{"value":"gt12","count":1},{"value":"lte12","count":1}]'::jsonb then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_SERVER_FILTER_FACETS payload='||v_facets;
+  end if;
+
+  v_export:=public.rpc_export_source_objects('Thiết bị',null,
+    '{"department":"filter_contract","frequency":"gt12"}'::jsonb,null,500);
+  perform pg_temp.assert_single_source_result(
+    v_export,'FILTER-CONTRACT-B','SOURCE_ACCESS_SERVER_FILTER_EXPORT');
+
+  v_suggestions:=public.rpc_source_field_suggestions(
+    'Thiết bị','work_group','FILTER_GROUP_',null,50);
+  if v_suggestions->>'ok' is distinct from 'true'
+     or coalesce(jsonb_array_length(v_suggestions->'rows'),-1)<>2 then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_WORK_GROUP_SUGGESTION payload='||v_suggestions;
+  end if;
+
+  v_scope_first:=public.rpc_source_workshop_scope_choices(
+    ' FILTER_SCOPE ',' FILTER_SCOPE_AREA ',null,null,1);
+  v_scope_second:=public.rpc_source_workshop_scope_choices(
+    'FILTER_SCOPE','FILTER_SCOPE_AREA',null,v_scope_first->'next_cursor',1);
+  if v_scope_first is distinct from jsonb_build_object(
+       'ok',true,
+       'rows',jsonb_build_array(jsonb_build_object(
+         'department','FILTER_SCOPE','area_code','FILTER_SCOPE_AREA','line',null)),
+       'next_cursor',jsonb_build_object(
+         'department','FILTER_SCOPE','area_code','FILTER_SCOPE_AREA','line',null))
+     or v_scope_second is distinct from jsonb_build_object(
+       'ok',true,
+       'rows',jsonb_build_array(jsonb_build_object(
+         'department','FILTER_SCOPE','area_code','FILTER_SCOPE_AREA',
+         'line','FILTER_SCOPE_LINE')),
+       'next_cursor',null)
+     or encode(extensions.digest(convert_to(
+       v_scope_first::text||E'\n'||v_scope_second::text,'UTF8'),
+       'sha256'),'hex')<>
+       '25389d865e7738b80b61f0404cc031a08d9399748c3e8b575dd9274fea668f17'
+  then
+    raise exception using errcode='check_violation',
+      message=format(
+        'SOURCE_ACCESS_SCOPE_CHOICE_CANONICAL_BLANK_LINE first=%s second=%s',
+        v_scope_first,v_scope_second);
+  end if;
+
+  if public.rpc_list_source_objects(
+       'Thiết bị',null,'{"unknown":"x"}'::jsonb,null,100,false,null
+     )->>'error_code' is distinct from 'INVALID_FILTERS'
+     or public.rpc_list_source_objects(
+       'Thiết bị',null,'{"department":1}'::jsonb,null,100,false,null
+     )->>'error_code' is distinct from 'INVALID_FILTERS'
+     or public.rpc_list_source_objects(
+       'Thiết bị',null,'{"validation":"other"}'::jsonb,null,100,false,null
+     )->>'error_code' is distinct from 'INVALID_FILTERS'
+     or public.rpc_source_object_facets(
+       'Thiết bị','{"unknown":"x"}'::jsonb
+     )->>'error_code' is distinct from 'INVALID_FILTERS'
+     or public.rpc_export_source_objects(
+       'Thiết bị',null,'{"frequency":"other"}'::jsonb,null,500
+     )->>'error_code' is distinct from 'INVALID_FILTERS' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_SERVER_FILTER_INVALID_FILTERS';
+  end if;
+end
+$$;
+
+create function pg_temp.assert_filter_after_authorization(p_user_id uuid)
+returns void language plpgsql security invoker as $$
+declare
+  v_owned jsonb;
+  v_unassigned jsonb;
+begin
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_user_id,'role','authenticated')::text,true);
+  v_owned:=public.rpc_list_source_objects('Thiết bị',null,
+    '{"department":"filter_contract","owner":"assigned"}'::jsonb,
+    null,100,false,null);
+  v_unassigned:=public.rpc_list_source_objects('Thiết bị',null,
+    '{"department":"filter_contract","owner":"unassigned"}'::jsonb,
+    null,100,false,null);
+  if v_owned->>'ok' is distinct from 'true'
+     or v_owned->>'authorized_total' is distinct from '0'
+     or coalesce(jsonb_array_length(v_owned->'rows'),-1)<>0
+     or v_unassigned->>'ok' is distinct from 'true'
+     or v_unassigned->>'authorized_total' is distinct from '0'
+     or coalesce(jsonb_array_length(v_unassigned->'rows'),-1)<>0 then
+    raise exception using errcode='check_violation',
+      message=format(
+        'SOURCE_ACCESS_FILTER_APPLIES_AFTER_AUTHORIZATION owned=%s unassigned=%s',
+        v_owned,v_unassigned);
+  end if;
 end
 $$;
 
@@ -1238,6 +1746,25 @@ select set_config('request.jwt.claims',json_build_object(
 select pg_temp.assert_protected_source_rows_hidden('SOURCE_WORKSHOP');
 select pg_temp.assert_protected_non_source_tables_hidden('SOURCE_WORKSHOP');
 select pg_temp.assert_manager_surfaces_forbidden('SOURCE_WORKSHOP');
+
+select pg_temp.assert_visible_source_surfaces(
+  '9a020000-0000-4000-8000-000000000001'::uuid,
+  'SSEC-QA-ALLOWED','SSEC_QA_AREA',
+  'SOURCE_ACCESS_QA_VISIBLE_SET_REUSED_BY_ALL_READERS');
+select pg_temp.assert_filter_after_authorization(
+  '9a020000-0000-4000-8000-000000000001'::uuid);
+select pg_temp.assert_visible_source_surfaces(
+  '9a020000-0000-4000-8000-000000000002'::uuid,
+  'SSEC-WS-ALLOWED','SSEC_WS_AREA',
+  'SOURCE_ACCESS_WORKSHOP_VISIBLE_SET_REUSED_BY_ALL_READERS');
+
+select set_config('request.jwt.claims',json_build_object(
+  'sub','9a020000-0000-4000-8000-000000000004',
+  'role','authenticated')::text,true);
+select pg_temp.assert_manager_source_api_contract(
+  '9a020000-0000-4000-8000-000000000004'::uuid);
+select pg_temp.assert_manager_server_filter_contract(
+  '9a020000-0000-4000-8000-000000000004'::uuid);
 
 \echo 'PASS SECURITY exact metadata ACL overload RLS inventory direct mutation and manager-only surfaces'
 rollback;

@@ -38,6 +38,7 @@ begin
          ) child(node)
        )
        select 1 from plan_node where node->>'Relation Name'=p_relation
+         and coalesce((node->>'Actual Loops')::integer,0)>0
      ) or not exists (
        with recursive plan_node as (
          select p_plan->0->'Plan' node
@@ -50,6 +51,7 @@ begin
        )
        select 1 from plan_node where node->>'Index Name'=p_index
          and node->>'Node Type' in ('Index Scan','Index Only Scan','Bitmap Index Scan')
+         and coalesce((node->>'Actual Loops')::integer,0)>0
      ) then
     raise exception using errcode='check_violation',
       message=format('%s relation=%s index=%s',p_rule_id,p_relation,p_index);
@@ -66,6 +68,7 @@ begin
        )
        select 1 from plan_node
        where node->>'Node Type' in ('Seq Scan','Parallel Seq Scan')
+         and coalesce((node->>'Actual Loops')::integer,0)>0
          and node->>'Relation Name' in (
            'vmp_source_objects','vmp_plan_items','vmp_item_assignments',
            'vmp_source_workshop_scope_grants','vmp_performers'
@@ -159,7 +162,7 @@ $body$),
   ('vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)',
    'query_path',
    'p_actor uuid, p_object_kind text, p_search text, p_filters jsonb, p_cursor jsonb, p_limit integer, p_include_inactive boolean, p_object_id uuid',
-   'TABLE(payload jsonb)','add582e576d178a7f4d204a8ec8bfa71431b6436ddae72efbe58d749908584b2',$body$
+   'TABLE(payload jsonb)','819079f0ec8d9e710cf3a9cebcdc3ccb7734ab21e8e4b23db6875488d3bf3bcf',$body$
 with actor as (
   select p_actor actor_id,public.vmp_business_role(p_actor) role_name,
          exists (
@@ -183,37 +186,89 @@ with actor as (
          case when p_cursor is not null and jsonb_typeof(p_cursor)='object'
                 and jsonb_typeof(p_cursor->'object_code')='string'
               then p_cursor->>'object_code' end cursor_code
-), authorized as (
+), manager_authorized as (
   select source_object.*
-  from public.vmp_source_objects source_object cross join actor
-  where actor.role_name in ('admin','qa_manager')
-     or (actor.role_name='qa_staff' and source_object.is_active and exists (
-       select 1 from public.vmp_performers performer
-       where performer.user_id=actor.actor_id and performer.is_active
-         and performer.id in (
-           source_object.owner_person_id,source_object.support_person_id
-         )
-     ))
-     or (actor.role_name in ('workshop_manager','workshop_staff')
-         and source_object.is_active and exists (
-       select 1
-       from public.vmp_performers performer
-       join public.vmp_source_workshop_scope_grants grant_row
-         on grant_row.performer_id=performer.id and grant_row.is_active
-        and grant_row.valid_from<=transaction_timestamp()
-        and (grant_row.expires_at is null
-             or grant_row.expires_at>transaction_timestamp())
-       where performer.user_id=actor.actor_id and performer.is_active
-         and source_object.department is not null
-         and source_object.area_code is not null
-         and public.vmp_source_scope_key(source_object.department)=
-             grant_row.department_key
-         and public.vmp_source_scope_key(source_object.area_code)=grant_row.area_key
-         and (grant_row.line_key is null or (
-           source_object.line is not null and
-           public.vmp_source_scope_key(source_object.line)=grant_row.line_key
-         ))
-     ))
+  from actor
+  join public.vmp_source_objects source_object
+    on actor.role_name in ('admin','qa_manager')
+), qa_authorized as (
+  select source_object.*
+  from actor
+  join public.vmp_performers performer
+    on actor.role_name='qa_staff'
+   and performer.user_id=actor.actor_id and performer.is_active
+  join public.vmp_source_objects source_object
+    on source_object.is_active is true
+   and source_object.owner_person_id=performer.id
+  union
+  select source_object.*
+  from actor
+  join public.vmp_performers performer
+    on actor.role_name='qa_staff'
+   and performer.user_id=actor.actor_id and performer.is_active
+  join public.vmp_source_objects source_object
+    on source_object.is_active is true
+   and source_object.support_person_id=performer.id
+), workshop_authorized as (
+  select source_object.*
+  from actor
+  join public.vmp_performers performer
+    on actor.role_name in ('workshop_manager','workshop_staff')
+   and performer.user_id=actor.actor_id and performer.is_active
+  join public.vmp_source_workshop_scope_grants grant_row
+    on grant_row.performer_id=performer.id and grant_row.is_active
+   and grant_row.line_key is null
+   and grant_row.valid_from<=transaction_timestamp()
+   and (grant_row.expires_at is null
+        or grant_row.expires_at>transaction_timestamp())
+  join lateral (
+    select scoped_source.*
+    from public.vmp_source_objects scoped_source
+    where scoped_source.is_active is true
+      and nullif(public.vmp_source_scope_key(scoped_source.department),'')
+          is not null
+      and nullif(public.vmp_source_scope_key(scoped_source.area_code),'')
+          is not null
+      and public.vmp_source_scope_key(scoped_source.department)=
+          grant_row.department_key
+      and public.vmp_source_scope_key(scoped_source.area_code)=
+          grant_row.area_key
+    offset 0
+  ) source_object on true
+  union
+  select source_object.*
+  from actor
+  join public.vmp_performers performer
+    on actor.role_name in ('workshop_manager','workshop_staff')
+   and performer.user_id=actor.actor_id and performer.is_active
+  join public.vmp_source_workshop_scope_grants grant_row
+    on grant_row.performer_id=performer.id and grant_row.is_active
+   and grant_row.line_key is not null
+   and grant_row.valid_from<=transaction_timestamp()
+   and (grant_row.expires_at is null
+        or grant_row.expires_at>transaction_timestamp())
+  join lateral (
+    select scoped_source.*
+    from public.vmp_source_objects scoped_source
+    where scoped_source.is_active is true
+      and nullif(public.vmp_source_scope_key(scoped_source.department),'')
+          is not null
+      and nullif(public.vmp_source_scope_key(scoped_source.area_code),'')
+          is not null
+      and nullif(public.vmp_source_scope_key(scoped_source.line),'') is not null
+      and public.vmp_source_scope_key(scoped_source.department)=
+          grant_row.department_key
+      and public.vmp_source_scope_key(scoped_source.area_code)=
+          grant_row.area_key
+      and public.vmp_source_scope_key(scoped_source.line)=grant_row.line_key
+    offset 0
+  ) source_object on true
+), authorized as (
+  select * from manager_authorized
+  union all
+  select * from qa_authorized
+  union all
+  select * from workshop_authorized
 ), filtered as (
   select authorized.*
   from authorized cross join actor
@@ -221,16 +276,8 @@ with actor as (
          or (actor.role_name in ('admin','qa_manager')
              and coalesce(p_include_inactive,false)))
     and (p_object_kind is null or authorized.object_kind=p_object_kind)
-    and (coalesce(btrim(p_search),'')=''
-         or authorized.object_code ilike '%'||btrim(p_search)||'%'
-         or authorized.object_name ilike '%'||btrim(p_search)||'%')
-    and (coalesce(p_filters,'{}'::jsonb)='{}'::jsonb
-         or (not (p_filters?'department')
-             or authorized.department=p_filters->>'department')
-        and (not (p_filters?'area_code')
-             or authorized.area_code=p_filters->>'area_code')
-        and (not (p_filters?'line')
-             or authorized.line=p_filters->>'line'))
+    and public.vmp_source_object_matches_filters(
+          authorized,p_search,p_filters)
     and (p_object_id is null or authorized.id=p_object_id)
 ), cursor_status as (
   select cursor_input.*,
@@ -260,7 +307,7 @@ select case
     'ok',false,'error_code','ROLE_UNRESOLVED','error','Không xác định được vai trò nghiệp vụ')
   when p_limit is null or p_limit<1 or p_limit>100 then jsonb_build_object(
     'ok',false,'error_code','INVALID_LIMIT','error','Giới hạn phải từ 1 đến 100')
-  when p_filters is not null and jsonb_typeof(p_filters)<>'object' then
+  when not public.vmp_source_filters_valid(p_filters) then
     jsonb_build_object(
       'ok',false,'error_code','INVALID_FILTERS','error','Bộ lọc phải là JSON object')
   when not cursor_status.valid then jsonb_build_object(
@@ -281,19 +328,136 @@ end payload
 from actor cross join cursor_status
 $body$),
   ('vmp_editable_progress_rights_path(uuid)','query_path','p_actor uuid',
-   'TABLE(payload jsonb)','cd9e1f136c88965f907157a37d26e8eca55942f229b9f43ce929d96e823347d0',$body$
+   'TABLE(payload jsonb)','81cd88d6aa2673f0bde59e94980d7e20acc075d95964a7f554b5dc3311af609c',$body$
 with actor as (
   select public.vmp_business_role(p_actor) role_name,
          exists (
            select 1 from public.profiles profile
            where profile.id=p_actor and coalesce(profile.is_active,true)
          ) active_account
-), resolved as (
+), actor_person as (
+  select performer.id person_id
+  from actor
+  join public.vmp_performers performer
+    on performer.user_id=p_actor and performer.is_active
+), admin_resolved as (
   select item.validation_code,rights.editable_fields,rights.view_reason
-  from public.vmp_plan_items item
-  cross join lateral public.vmp_item_rights(p_actor,item.validation_code) rights
-  where item.is_active and rights.can_view
+  from actor
+  join public.vmp_plan_items item
+    on actor.role_name='admin' and item.is_active is true
+  cross join lateral public.vmp_item_rights(
+    p_actor,item.validation_code
+  ) rights
+  where rights.can_view
     and cardinality(coalesce(rights.editable_fields,'{}'::text[]))>0
+), qa_manager_resolved as (
+  select item.validation_code,
+         array[
+           'actual_protocol_date','status_protocol',
+           'actual_validation_date','status_validation',
+           'actual_report_date','status_report',
+           'actual_vmp_date','status_vmp'
+         ]::text[] editable_fields,
+         'Quản lý QA xem toàn bộ hạng mục hoạt động'::text view_reason
+  from actor
+  join public.vmp_plan_items item
+    on actor.role_name='qa_manager'
+   and public.vmp_can_manage_source_qa_assignment(p_actor)
+   and item.is_active is true
+), qa_sources as (
+  select source_object.object_code
+  from actor cross join actor_person
+  join public.vmp_source_objects source_object
+    on source_object.is_active is true
+   and source_object.owner_person_id=actor_person.person_id
+  where actor.role_name='qa_staff'
+  union
+  select source_object.object_code
+  from actor cross join actor_person
+  join public.vmp_source_objects source_object
+    on source_object.is_active is true
+   and source_object.support_person_id=actor_person.person_id
+  where actor.role_name='qa_staff'
+), qa_resolved as (
+  select item.validation_code,
+         array[
+           'actual_protocol_date','status_protocol','status_validation',
+           'actual_report_date','status_report','actual_vmp_date','status_vmp'
+         ]::text[] editable_fields,
+         'Quan hệ QA trực tiếp trên Source'::text view_reason
+  from qa_sources
+  join public.vmp_plan_items item
+    on item.object_code=qa_sources.object_code and item.is_active is true
+), workshop_sources as (
+  select scoped_source.object_code,actor_person.person_id
+  from actor cross join actor_person
+  join public.vmp_source_workshop_scope_grants grant_row
+    on grant_row.performer_id=actor_person.person_id
+   and grant_row.is_active and grant_row.line_key is null
+   and grant_row.valid_from<=transaction_timestamp()
+   and (grant_row.expires_at is null
+        or grant_row.expires_at>transaction_timestamp())
+  join lateral (
+    select source_object.object_code
+    from public.vmp_source_objects source_object
+    where source_object.is_active is true
+      and nullif(public.vmp_source_scope_key(source_object.department),'')
+          is not null
+      and nullif(public.vmp_source_scope_key(source_object.area_code),'')
+          is not null
+      and public.vmp_source_scope_key(source_object.department)=
+          grant_row.department_key
+      and public.vmp_source_scope_key(source_object.area_code)=grant_row.area_key
+    offset 0
+  ) scoped_source on true
+  where actor.role_name in ('workshop_manager','workshop_staff')
+  union
+  select scoped_source.object_code,actor_person.person_id
+  from actor cross join actor_person
+  join public.vmp_source_workshop_scope_grants grant_row
+    on grant_row.performer_id=actor_person.person_id
+   and grant_row.is_active and grant_row.line_key is not null
+   and grant_row.valid_from<=transaction_timestamp()
+   and (grant_row.expires_at is null
+        or grant_row.expires_at>transaction_timestamp())
+  join lateral (
+    select source_object.object_code
+    from public.vmp_source_objects source_object
+    where source_object.is_active is true
+      and nullif(public.vmp_source_scope_key(source_object.department),'')
+          is not null
+      and nullif(public.vmp_source_scope_key(source_object.area_code),'')
+          is not null
+      and nullif(public.vmp_source_scope_key(source_object.line),'') is not null
+      and public.vmp_source_scope_key(source_object.department)=
+          grant_row.department_key
+      and public.vmp_source_scope_key(source_object.area_code)=grant_row.area_key
+      and public.vmp_source_scope_key(source_object.line)=grant_row.line_key
+    offset 0
+  ) scoped_source on true
+  where actor.role_name in ('workshop_manager','workshop_staff')
+), workshop_resolved as (
+  select distinct item.validation_code,
+         array['actual_validation_date']::text[] editable_fields,
+         'Có phạm vi Source và phân công xưởng đang hoạt động'::text view_reason
+  from workshop_sources
+  join public.vmp_plan_items item
+    on item.object_code=workshop_sources.object_code and item.is_active is true
+  join public.vmp_item_assignments assignment
+    on assignment.validation_code=item.validation_code
+   and assignment.performer_id=workshop_sources.person_id
+   and assignment.assignment_kind='equipment_department'
+   and assignment.is_active is true
+   and (assignment.expires_at is null
+        or assignment.expires_at>transaction_timestamp())
+), resolved as (
+  select * from admin_resolved
+  union all
+  select * from qa_manager_resolved
+  union all
+  select * from qa_resolved
+  union all
+  select * from workshop_resolved
 )
 select case
   when not actor.active_account then jsonb_build_object(
@@ -314,7 +478,7 @@ $body$),
   ('vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])',
    'query_path',
    'p_actor uuid, p_search text, p_cursor jsonb, p_limit integer, p_include_ids uuid[]',
-   'TABLE(payload jsonb)','13c2292a5f25ccdded15170ece32bc91d5a9dd4173ea3a3022ddea3fb88db83e',$body$
+   'TABLE(payload jsonb)','d6fb610656d4ee118db24cc1cf40609731794ce4b1f6546b59c0743cb625471a',$body$
 with actor as (
   select public.vmp_business_role(p_actor) role_name,
          exists (
@@ -344,7 +508,8 @@ with actor as (
          public.vmp_business_role(performer.user_id) role_name
   from public.vmp_performers performer
   join public.profiles profile on profile.id=performer.user_id
-  where performer.is_active and performer.user_id is not null
+  where performer.is_active is true and performer.user_id is not null
+    and performer.access_class in ('qa_manager','qa_progress_editor')
     and coalesce(profile.is_active,true)
     and public.vmp_business_role(profile.id) in ('qa_staff','qa_manager')
     and (coalesce(btrim(p_search),'')=''
@@ -436,15 +601,15 @@ insert into expected_query_path_contract values
   ('rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)',
    'vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)',
    '602434023178d4bae267ccb6c98697179ef1e569d57e12df0278a1c203add3fa',
-   'add582e576d178a7f4d204a8ec8bfa71431b6436ddae72efbe58d749908584b2'),
+   '819079f0ec8d9e710cf3a9cebcdc3ccb7734ab21e8e4b23db6875488d3bf3bcf'),
   ('rpc_my_editable_progress_rights()',
    'vmp_editable_progress_rights_path(uuid)',
    'd6848fa43fe2987da187e2d25857273126379d9d0720c4bccc955a5187f3ef7a',
-   'cd9e1f136c88965f907157a37d26e8eca55942f229b9f43ce929d96e823347d0'),
+   '81cd88d6aa2673f0bde59e94980d7e20acc075d95964a7f554b5dc3311af609c'),
   ('rpc_source_qa_candidates(text,jsonb,integer,uuid[])',
    'vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])',
    'd129ca77b7e5a62bed142bc1acf3970517692febcf3b53585f2be378c6a9488b',
-   '13c2292a5f25ccdded15170ece32bc91d5a9dd4173ea3a3022ddea3fb88db83e');
+   'd6fb610656d4ee118db24cc1cf40609731794ce4b1f6546b59c0743cb625471a');
 
 with actual_function as (
   select expected.*,procedure.oid,procedure.proname,
@@ -727,6 +892,11 @@ insert into captured_plan values (
     (select user_id from perf_people where rn=4)
   ))
 ),(
+  'item_rights_workshop',pg_temp.explain_json(format(
+    'select * from public.vmp_editable_progress_rights_path(%L::uuid)',
+    (select user_id from perf_people where rn=2)
+  ))
+),(
   'candidate_search',pg_temp.explain_json(format(
     'select * from public.vmp_source_qa_candidates_page_path(%L::uuid,%L,null,50,%L::uuid[])',
     (select user_id from perf_people where rn=1),'Source Performance Candidate','{}'
@@ -735,14 +905,16 @@ insert into captured_plan values (
 
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='qa_list'),
-  'vmp_source_objects','idx_vmp_source_objects_active_owner','SOURCE_ACCESS_PLAN_QA_LIST');
+  'vmp_source_objects','vmp_source_objects_owner_person_idx',
+  'SOURCE_ACCESS_PLAN_QA_LIST');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='workshop_area_list'),
   'vmp_source_objects','idx_vmp_source_objects_active_scope_area',
   'SOURCE_ACCESS_PLAN_WORKSHOP_AREA_LIST');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='workshop_area_list'),
-  'vmp_source_workshop_scope_grants','idx_vmp_source_workshop_grants_area',
+  'vmp_source_workshop_scope_grants',
+  'uq_vmp_source_workshop_grants_active_area',
   'SOURCE_ACCESS_PLAN_WORKSHOP_AREA_GRANTS');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='workshop_line_list'),
@@ -750,19 +922,20 @@ select pg_temp.assert_plan_contract(
   'SOURCE_ACCESS_PLAN_WORKSHOP_LINE_LIST');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='workshop_line_list'),
-  'vmp_source_workshop_scope_grants','idx_vmp_source_workshop_grants_line',
+  'vmp_source_workshop_scope_grants',
+  'uq_vmp_source_workshop_grants_active_line',
   'SOURCE_ACCESS_PLAN_WORKSHOP_LINE_GRANTS');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='item_rights_batch'),
-  'vmp_plan_items','idx_vmp_plan_items_object_year_active',
+  'vmp_plan_items','idx_plan_obj',
   'SOURCE_ACCESS_PLAN_ITEM_RIGHTS_BATCH');
 select pg_temp.assert_plan_contract(
-  (select document from captured_plan where plan_name='item_rights_batch'),
-  'vmp_item_assignments','idx_vmp_item_assignments_active_performer_validation_kind',
+  (select document from captured_plan where plan_name='item_rights_workshop'),
+  'vmp_item_assignments','vmp_item_assignments_linked_uniq',
   'SOURCE_ACCESS_PLAN_ITEM_RIGHTS_ASSIGNMENTS');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='candidate_search'),
-  'vmp_performers','idx_vmp_performers_active_candidate',
+  'vmp_performers','vmp_performers_user_id_uniq',
   'SOURCE_ACCESS_PLAN_CANDIDATE_SEARCH');
 
 select pg_temp.assert_plan_has_protected_work(document,
