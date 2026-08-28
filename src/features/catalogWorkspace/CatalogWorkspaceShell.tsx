@@ -87,7 +87,7 @@ export interface CatalogWorkspaceShellProps {
   updatedLabel?: string;
   /** Quyền Source đổi thì Task 7 tăng revision này để mọi page/warning cũ
    * bị loại trước khi có thể tiếp tục hiển thị. */
-  authorizationRevision?: number;
+  authorizationRevision: number | null;
   /** Deep-link từ màn Tiến độ: mở đúng đối tượng rồi tự xoá (một lần). */
   focus?: { code: string; nhom?: string } | null;
   onFocusConsumed?: () => void;
@@ -103,6 +103,8 @@ export default function CatalogWorkspaceShell({
   const canEdit = access.can("source", "edit_catalog");
   const canSinhTimeline = access.can("source", "generate_timeline");
   const canManageWorkshopScope = access.can("source", "manage_workshop_scope");
+  const hasAuthorizationRevision = Number.isSafeInteger(authorizationRevision)
+    && (authorizationRevision ?? 0) > 0;
   /* Đây là lịch sử nghiệp vụ của Dữ liệu nguồn, không phải màn Nhật ký
      thay đổi trong khu vực Quản trị. RPC rpc_catalog_history chấp nhận đúng
      Admin và Quản lý QA, nên giao diện phải phản chiếu cùng biên vai trò. */
@@ -113,15 +115,19 @@ export default function CatalogWorkspaceShell({
   const toast = useToast();
   /* Gợi ý nhập nạp một lượt cho cả màn: mở hộp thoại rồi mới gọi mạng thì
      danh sách hiện sau con trỏ, và người dùng đã gõ xong nửa chữ. */
-  const catalogSuggestions = useCatalogSuggestions(canManageSourceDatasets);
+  const catalogSuggestions = useCatalogSuggestions(canManageSourceDatasets && hasAuthorizationRevision);
   const goiY = catalogSuggestions.goiY;
 
-  const vungIds = useMemo(() => catalogWorkspaceRegionIds({
-    businessRole: access.businessRole,
-    canEdit,
-    canGenerateTimeline: canSinhTimeline,
-    canManageWorkshopScope,
-  }), [access.businessRole, canEdit, canSinhTimeline, canManageWorkshopScope]);
+  const vungIds = useMemo(() => hasAuthorizationRevision
+    ? catalogWorkspaceRegionIds({
+      businessRole: access.businessRole,
+      canEdit,
+      canGenerateTimeline: canSinhTimeline,
+      canManageWorkshopScope,
+    })
+    : (["objects"] as VungId[]), [
+    hasAuthorizationRevision, access.businessRole, canEdit, canSinhTimeline, canManageWorkshopScope,
+  ]);
   const vungHople = CAC_VUNG.filter((v) => vungIds.includes(v.id));
 
   const [vung, setVung] = useState<VungId>("objects");
@@ -162,19 +168,24 @@ export default function CatalogWorkspaceShell({
     ...objFilters,
     text: sourceSearch,
   }), [objFilters, sourceSearch]);
-  const sourceAccessKey = `${access.mode}|${access.businessRole ?? "unresolved"}|${access.scope("source")}|${authorizationRevision ?? 0}`;
+  const sourceAccessKey = `${access.mode}|${access.businessRole ?? "unresolved"}|${access.scope("source")}|${authorizationRevision ?? "pending"}`;
   const objQueryKey = useMemo(() => JSON.stringify([
     sourceAccessKey, kind, objServerFilter.search, objServerFilter.filters,
   ]), [sourceAccessKey, kind, objServerFilter]);
 
   useLayoutEffect(() => {
+    objSeq.current += 1;
     setObjCursor(initialCatalogSourceCursorStack());
+    setObjRows([]);
+    setObjTotal(0);
+    setObjState("loading");
     setExpandedId(null);
   }, [objQueryKey]);
 
   const taiDoiTuong = useCallback(async () => {
     const seq = ++objSeq.current;
     setObjState("loading");
+    if (!hasAuthorizationRevision) return;
     const result = await listSourceObjectPage({
       objectKind: kind,
       search: objServerFilter.search,
@@ -196,13 +207,17 @@ export default function CatalogWorkspaceShell({
     setObjCursor((previous) => resolveCatalogSourceCursorPage(previous, result.nextCursor));
     setObjErr("");
     setObjState("ready");
-  }, [sourceAccessKey, kind, objCursor.cursors, objCursor.page, objServerFilter]);
+  }, [sourceAccessKey, hasAuthorizationRevision, kind, objCursor.cursors, objCursor.page, objServerFilter]);
 
   useEffect(() => { taiDoiTuong(); }, [taiDoiTuong]);
 
   useEffect(() => {
     const seq = ++facetSeq.current;
     setFacetErr("");
+    if (!hasAuthorizationRevision) {
+      setObjFacets(null);
+      return;
+    }
     const facetFilters = encodeCatalogObjectServerFilters(CATALOG_OBJECT_FILTERS_ALL).filters;
     listSourceObjectFacets({ objectKind: kind, filters: facetFilters }).then((result) => {
       if (seq !== facetSeq.current) return;
@@ -213,13 +228,15 @@ export default function CatalogWorkspaceShell({
       }
       setObjFacets(result);
     });
-  }, [sourceAccessKey, kind]);
+  }, [sourceAccessKey, hasAuthorizationRevision, kind]);
 
   const [warn, setWarn] = useState<SourceWarnings | null>(null);
   const [warnErr, setWarnErr] = useState("");
   useEffect(() => {
     let active = true;
     setWarn(null);
+    setWarnErr("");
+    if (!hasAuthorizationRevision) return () => { active = false; };
     fetchSourceWarnings()
       .then((value) => {
         if (!active) return;
@@ -232,12 +249,12 @@ export default function CatalogWorkspaceShell({
         setWarnErr(cause instanceof Error ? cause.message : String(cause));
       });
     return () => { active = false; };
-  }, [sourceAccessKey]);
+  }, [sourceAccessKey, hasAuthorizationRevision]);
 
   const [coverageAreaLess, setCoverageAreaLess] = useState(0);
   const [coverageReadinessErr, setCoverageReadinessErr] = useState("");
   useEffect(() => {
-    if (!canManageWorkshopScope) {
+    if (!canManageWorkshopScope || !hasAuthorizationRevision) {
       setCoverageAreaLess(0);
       setCoverageReadinessErr("");
       return;
@@ -257,7 +274,23 @@ export default function CatalogWorkspaceShell({
       setCoverageReadinessErr("");
     });
     return () => { active = false; };
-  }, [canManageWorkshopScope, sourceAccessKey]);
+  }, [canManageWorkshopScope, hasAuthorizationRevision, sourceAccessKey]);
+
+  /* Revision mất/đổi phải làm dữ liệu đang mở biến mất trước paint, đồng
+     thời vô hiệu mọi page/facet response được mở dưới revision cũ. */
+  useLayoutEffect(() => {
+    objSeq.current += 1;
+    facetSeq.current += 1;
+    setObjRows([]);
+    setObjTotal(0);
+    setObjFacets(null);
+    setWarn(null);
+    setFacetErr("");
+    setWarnErr("");
+    setCoverageAreaLess(0);
+    setCoverageReadinessErr("");
+    setObjState("loading");
+  }, [sourceAccessKey]);
 
   /* ------------- Sản phẩm GMP / Người nhận (đọc qua RPC) ----------- */
   const [svRows, setSvRows] = useState<CatalogListRow[]>([]);
@@ -268,7 +301,7 @@ export default function CatalogWorkspaceShell({
   const svSeq = useRef(0);
 
   useEffect(() => {
-    if (!canManageSourceDatasets || (vung !== "products" && vung !== "alerts")) return undefined;
+    if (!hasAuthorizationRevision || !canManageSourceDatasets || (vung !== "products" && vung !== "alerts")) return undefined;
     const dataset = vung as CatalogDatasetId;
     const seq = ++svSeq.current;
     setSvState("loading");
@@ -288,7 +321,7 @@ export default function CatalogWorkspaceShell({
       setSvState("ready");
     }, DO_TRE_TIM_KIEM_MS);
     return () => clearTimeout(hen);
-  }, [vung, q, trang, svTick, canManageSourceDatasets]);
+  }, [vung, q, trang, svTick, canManageSourceDatasets, hasAuthorizationRevision]);
 
   /* ---------------- Chờ áp dụng và Lịch sử ------------------------- */
   const [pen, setPen] = useState<{ state: TrangThaiTai; changes: CatalogChangeRow[]; err: string }>(
@@ -298,23 +331,33 @@ export default function CatalogWorkspaceShell({
   const [penTick, setPenTick] = useState(0);
   const [hisTick, setHisTick] = useState(0);
 
+  useLayoutEffect(() => {
+    svSeq.current += 1;
+    setSvRows([]);
+    setSvTotal(0);
+    setSvState("loading");
+    setSvErr("");
+    setPen({ state: "loading", changes: [], err: "" });
+    setHis({ state: "loading", rows: [], total: 0, err: "" });
+  }, [sourceAccessKey]);
+
   useEffect(() => {
-    if (vung !== "pending" || !canManageSourceDatasets || !canEdit || !canSinhTimeline) return;
+    if (!hasAuthorizationRevision || vung !== "pending" || !canManageSourceDatasets || !canEdit || !canSinhTimeline) return;
     setPen((p) => ({ ...p, state: "loading" }));
     listPendingChanges().then((kq) => {
       if (kq.ok) setPen({ state: "ready", changes: kq.changes, err: "" });
       else setPen({ state: "error", changes: [], err: kq.error || "Không đọc được hàng đợi" });
     });
-  }, [vung, penTick, canManageSourceDatasets, canEdit, canSinhTimeline]);
+  }, [vung, penTick, canManageSourceDatasets, canEdit, canSinhTimeline, hasAuthorizationRevision]);
 
   useEffect(() => {
-    if (vung !== "history" || !canManageSourceDatasets || !canViewCatalogHistory) return;
+    if (!hasAuthorizationRevision || vung !== "history" || !canManageSourceDatasets || !canViewCatalogHistory) return;
     setHis((p) => ({ ...p, state: "loading" }));
     listHistory({}, trang, PAGE_SIZE).then((kq) => {
       if (kq.ok) setHis({ state: "ready", rows: kq.history, total: kq.total, err: "" });
       else setHis({ state: "error", rows: [], total: 0, err: kq.error || "Không đọc được lịch sử" });
     });
-  }, [vung, trang, hisTick, canManageSourceDatasets, canViewCatalogHistory]);
+  }, [vung, trang, hisTick, canManageSourceDatasets, canViewCatalogHistory, hasAuthorizationRevision]);
 
   /* ---------------- Điều hướng trong workspace --------------------- */
   const doiVung = (id: VungId) => {
@@ -391,13 +434,15 @@ export default function CatalogWorkspaceShell({
     })), [objRows]);
 
   useEffect(() => {
-    if (!focusCode) return;
+    /* Đợi truy vấn server đã nhận đúng deep-link. Nếu mở ngay trên objList
+       cũ trước nhịp debounce, effect đổi query kế tiếp sẽ đóng dòng vừa mở. */
+    if (!focusCode || sourceSearch !== focusCode) return;
     const dong = objList.find((r) => r.businessKey === focusCode);
     if (dong) {
       setExpandedId(dong.recordId);
       setFocusCode(null);
     }
-  }, [focusCode, objList]);
+  }, [focusCode, objList, sourceSearch]);
 
   /* ---------------- Cảnh báo danh mục (như bản cũ) ------------------ */
   const warningGroups = useMemo<CatalogWarning[]>(() => {
@@ -440,6 +485,13 @@ export default function CatalogWorkspaceShell({
   const [dangSuaBan, setDangSuaBan] = useState<{ dataset: CatalogDatasetId; record: CatalogRecord | null } | null>(null);
   const [moSinh, setMoSinh] = useState(false);
   const [changeId, setChangeId] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    setDangSuaObj(null);
+    setDangSuaBan(null);
+    setMoSinh(false);
+    setChangeId(null);
+  }, [sourceAccessKey]);
 
   const moThem = () => {
     if (vung === "objects") setDangSuaObj({ row: {}, taoMoi: true });
@@ -488,7 +540,7 @@ export default function CatalogWorkspaceShell({
   };
 
   const coTimKiem = vung === "objects" || vung === "products" || vung === "alerts";
-  const coThem = canEdit && (vung === "objects" || vung === "products" || vung === "alerts");
+  const coThem = hasAuthorizationRevision && canEdit && (vung === "objects" || vung === "products" || vung === "alerts");
 
   /* ---------------- Phân trang dùng chung -------------------------- */
   const hienTrang = vung === "objects" ? objCursor.page : trang;
@@ -519,8 +571,9 @@ export default function CatalogWorkspaceShell({
   return (
     <div className="cw-workspace">
       <p className="cw-mota">
-        Dữ liệu nguồn — xem, thêm và sửa đều có lý do; thay đổi chạm
-        timeline vào hàng chờ áp dụng, mọi bước nằm lại trong lịch sử.
+        {canEdit
+          ? "Dữ liệu nguồn — xem, thêm và sửa đều có lý do; thay đổi chạm timeline vào hàng chờ áp dụng, mọi bước nằm lại trong lịch sử."
+          : "Dữ liệu nguồn — chỉ hiển thị các đối tượng bạn được phân quyền xem; quyền cập nhật tiến độ được kiểm tra riêng trên từng hạng mục."}
         {scopeLabel && <span className="cw-mota__phamvi">Phạm vi: {scopeLabel}</span>}
         {updatedLabel && <span className="cw-mota__moc">{updatedLabel}</span>}
       </p>
@@ -579,11 +632,12 @@ export default function CatalogWorkspaceShell({
                 <RefreshCw size={15} aria-hidden="true" /> Tải lại
               </button>
               {vung === "objects" && (
-                <button type="button" className="cw-nut" data-cw-export-count={objTotal} onClick={xuatExcel}>
+                <button type="button" className="cw-nut" data-cw-export-count={objTotal}
+                  disabled={!hasAuthorizationRevision} onClick={xuatExcel}>
                   <Download size={15} aria-hidden="true" /> Xuất Excel
                 </button>
               )}
-              {vung === "objects" && canSinhTimeline && (
+              {vung === "objects" && canSinhTimeline && hasAuthorizationRevision && (
                 <button type="button" className="cw-nut" onClick={() => setMoSinh(true)}>
                   <CalendarPlus size={15} aria-hidden="true" /> Sinh timeline
                 </button>
@@ -693,7 +747,7 @@ export default function CatalogWorkspaceShell({
             </>
           )}
 
-          {vung === "coverage" && canManageWorkshopScope && (
+          {vung === "coverage" && canManageWorkshopScope && hasAuthorizationRevision && (
             <>
               {coverageReadinessErr && (
                 <p role="alert" className="cw-loi">Không kiểm tra được Source thiếu khu vực: {coverageReadinessErr}</p>

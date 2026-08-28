@@ -2,9 +2,9 @@
  *  catalog-workspace.mjs — kiểm workspace Danh mục & Nhập liệu (Đợt B Task 6)
  *  ---------------------------------------------------------------------
  *  Chạy trên Supabase giả lập (gia-lap-supabase.mjs) — không request nào
- *  ra ngoài. Bộ này kiểm HỢP ĐỒNG của workspace sáu mục:
+ *  ra ngoài. Bộ này kiểm HỢP ĐỒNG workspace theo quyền:
  *
- *   1. Sáu mục điều hướng đúng thứ tự: objects · products · alerts ·
+ *   1. Admin/Quản lý QA có bảy mục: objects · coverage · products · alerts ·
  *      import · pending · history. Không còn "Người thực hiện".
  *   2. Quyền quyết định nút: đủ quyền thấy Thêm/Nhập Excel/Chờ áp dụng;
  *      nhân viên xưởng không thấy bất kỳ lối ghi nào và không mở Lịch sử.
@@ -396,9 +396,9 @@ async function chuanBiApV1(trang) {
     .some((button) => button.textContent?.trim() === "Áp vào timeline" && !button.disabled), { timeout: 10_000 });
 }
 
-/* ---- 1. Đủ quyền: sáu mục, nút ghi, bảng ngữ nghĩa ------------------ */
+/* ---- 1. Đủ quyền: bảy mục, nút ghi, bảng ngữ nghĩa ----------------- */
 {
-  console.log("Đủ quyền — cấu trúc sáu mục:");
+  console.log("Đủ quyền — cấu trúc bảy mục:");
   const { trang, loiConsole, chanNgoai } = await moTrang(trinhDuyet);
 
   const kq = await trang.evaluate(() => {
@@ -423,8 +423,8 @@ async function chuanBiApV1(trang) {
     };
   });
 
-  kiem(kq.thuTu === "objects,products,alerts,import,pending,history",
-    "sáu mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
+  kiem(kq.thuTu === "objects,coverage,products,alerts,import,pending,history",
+    "bảy mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
   kiem(kq.coThem, "đủ quyền thấy nút Thêm");
   kiem(kq.coNhapExcel, "đủ quyền thấy mục Nhập Excel");
   kiem(!kq.coNguoiThucHien, "không còn chữ 'Người thực hiện' trên màn");
@@ -486,8 +486,8 @@ async function chuanBiApV1(trang) {
     };
   });
 
-  kiem(kq.muc === "objects,products,alerts",
-    "nhân viên xưởng không thấy Lịch sử audit", kq.muc || "(không thấy nav)");
+  kiem(kq.muc === "objects",
+    "nhân viên xưởng chỉ thấy đối tượng Source theo quyền", kq.muc || "(không thấy nav)");
   kiem(!kq.coThem, "nhân viên xưởng không thấy nút Thêm");
   kiem(!kq.coSua, "nhân viên xưởng không thấy nút Sửa");
   kiem(kq.soDong > 0, "nhân viên xưởng vẫn đọc được dữ liệu", `${kq.soDong} dòng`);
@@ -529,8 +529,12 @@ async function chuanBiApV1(trang) {
   await trang.click(".cw-pager__nut:last-child");
   await trang.waitForFunction(() => document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("26–31") === true,
     { timeout: 10_000 });
+  await trang.waitForFunction(() => document.querySelectorAll(".lp-smart-table tbody tr").length === 6
+    && document.querySelector(".lp-smart-table__toggle")?.getAttribute("aria-expanded") === "false",
+  { timeout: 10_000 });
   await trang.click(".lp-smart-table__toggle");
-  await trang.waitForSelector(".lp-smart-table__detail", { timeout: 10_000 });
+  await trang.waitForFunction(() => document.querySelector(".lp-smart-table__toggle")?.getAttribute("aria-expanded") === "true"
+    && !!document.querySelector(".lp-smart-table__detail"), { timeout: 10_000 });
 
   await trang.click("[data-cw-filter-toggle]");
   await trang.waitForFunction(() => document.querySelector("[data-cw-filter-panel]")?.hasAttribute("hidden") === false,
@@ -570,13 +574,18 @@ async function chuanBiApV1(trang) {
   kiem(true, "xóa bộ lọc giữ nguyên loại đối tượng đang chọn");
 
   await trang.type('input[aria-label="Tìm trong danh mục"]', "Máy lọc");
+  await cho(500); // chờ debounce + page Source theo từ khóa mới
   await trang.waitForFunction(() => document.querySelector("[data-cw-filter-count]")?.textContent?.includes("1 điều kiện") === true
     && document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("1–25 / 31") === true, { timeout: 10_000 });
   await trang.click(".cw-pager__nut:last-child");
   await trang.waitForFunction(() => document.querySelector(".cw-pager .cw-nhe")?.textContent?.includes("26–31") === true,
     { timeout: 10_000 });
+  await trang.waitForFunction(() => document.querySelectorAll(".lp-smart-table tbody tr").length === 6
+    && document.querySelector(".lp-smart-table__toggle")?.getAttribute("aria-expanded") === "false",
+  { timeout: 10_000 });
   await trang.click(".lp-smart-table__toggle");
-  await trang.waitForSelector(".lp-smart-table__detail", { timeout: 10_000 });
+  await trang.waitForFunction(() => document.querySelector(".lp-smart-table__toggle")?.getAttribute("aria-expanded") === "true"
+    && !!document.querySelector(".lp-smart-table__detail"), { timeout: 10_000 });
   await trang.evaluate(() => [...document.querySelectorAll("[data-cw-filter-chip]")]
     .find((chip) => chip.getAttribute("aria-label")?.startsWith("Bỏ lọc Từ khóa:"))?.click());
   await trang.waitForFunction(() => !document.querySelector("[data-cw-filter-count]")
@@ -758,22 +767,13 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
         coXuatLoi: !!document.querySelector("[data-cw-xuat-loi]"),
       };
     });
-    kiem(kq.tong.moi === "1", "đếm đúng 1 dòng tạo mới", String(kq.tong.moi));
-    kiem(kq.tong.sua === "1", "đếm đúng 1 dòng sửa", String(kq.tong.sua));
-    kiem(kq.tong.khongdoi === "1", "đếm đúng 1 dòng không đổi", String(kq.tong.khongdoi));
+    kiem(kq.tong.server === "3", "ba dòng hợp lệ được máy chủ có quyền đối chiếu", String(kq.tong.server));
+    kiem(kq.tong.moi === "0" && kq.tong.sua === "0" && kq.tong.khongdoi === "0",
+      "trình duyệt không tự suy đoán mới/sửa/không đổi từ toàn bộ Source",
+      JSON.stringify(kq.tong));
     kiem(kq.tong.loi === "1", "đếm đúng 1 dòng lỗi", String(kq.tong.loi));
-    kiem(kq.coNutA3, "dòng sửa có nút mở đối chiếu A3");
+    kiem(!kq.coNutA3, "Source không dựng đối chiếu A3 từ dữ liệu ngoài phạm vi quyền");
     kiem(kq.coXuatLoi, "có nút xuất sổ lỗi");
-
-    await trang.evaluate(() => document.querySelector("[data-cw-imp-a3]")?.click());
-    await cho(400);
-    const a3 = await trang.evaluate(() => {
-      const o = document.querySelector(".cw-import-a3");
-      return { co: !!o, chu: o?.textContent ?? "" };
-    });
-    kiem(a3.co, "đối chiếu A3 mở được");
-    kiem(a3.chu.includes("Máy dập viên xoay tròn") && a3.chu.includes("Máy dập viên đã đổi tên"),
-      "A3 hiện cả giá trị hiện tại lẫn giá trị mới");
 
     /* 6d. Ghi bị CHẶN khi server chưa có RPC staging (Task 9 chưa áp). */
     const ghi = await trang.evaluate(() => ({

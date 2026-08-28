@@ -276,10 +276,14 @@ async function openToday({
       kho.rpc_get_vmp_dashboard = {
         activities: activities.map((row) => ({ ...row, _raw: { ...row._raw } })),
         objects: objects.map((row) => ({ ...row })),
+        source: "supabase",
         updated_at: "2026-08-28T00:00:00Z",
+        authorization_revision: 7,
+        year: 2026,
       };
       kho.rpc_get_vmp_watermark = {
-        year: 2026, plan_items: activities.length, objects: objects.length, updated_at: "2026-08-28T00:00:00Z",
+        year: 2026, plan_items: activities.length, objects: objects.length,
+        updated_at: "2026-08-28T00:00:00Z", authorization_revision: 7,
       };
       kho.rpc_my_editable_progress_rights = { ok: true, rights: [] };
     },

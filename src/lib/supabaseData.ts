@@ -17,9 +17,14 @@ import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/perfo
 import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS } from "./businessRoles.ts";
 import type {
   Activity, GenerateTimelineResult, ObjectKind, RpcResult,
-  VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
+  VmpDataset, AlertRecipientRow, StaffEmailRow,
   PerformerRow,
 } from "../types/domain.ts";
+import {
+  decodeAuthorizationWatermark,
+  decodeAuthorizedDashboard,
+  type AuthorizationWatermark,
+} from "./dashboardAuthorizationContracts.ts";
 import type {
   DeadlineOverrideSelection,
   ProgressedDeadlineCandidate,
@@ -113,17 +118,19 @@ export async function fetchVmpDataFromSupabase(
   // tác ghi) sẽ không tự đổi sang 'over'. Vì vậy tính lại st/docDone/target từ
   // _raw (có dl_vmp + trạng thái) ngay khi đọc — luôn tươi theo ngày hôm nay,
   // đồng nhất với đường ghi lạc quan và đường đọc qua n8n.
-  const payload = asShape<{ activities?: Activity[]; objects?: VmpObject[]; updated_at?: string }>(data);
-  const activities: Activity[] = (payload.activities || []).map((a: Activity) =>
+  const payload = decodeAuthorizedDashboard(data);
+  const activities: Activity[] = payload.activities.map((a: Activity) =>
     a && a._raw ? ({ ...a, ...deriveActivityFields(a._raw) } as Activity) : a
   );
 
   return {
-    objects: payload.objects || [],
+    objects: payload.objects,
     activities,
     source: "supabase",
     count: activities.length,
-    updated_at: payload.updated_at,
+    updated_at: payload.updatedAt,
+    authorizationRevision: payload.authorizationRevision,
+    year: payload.year,
   };
 }
 
@@ -132,13 +139,13 @@ export async function fetchVmpDataFromSupabase(
 // ============================================================
 // Trả { year, plan_items, objects, updated_at }. Frontend so chuỗi watermark
 // trước khi refetch toàn bộ dashboard → poll 20s gần như miễn phí khi không đổi.
-export async function fetchVmpWatermark(year?: number): Promise<unknown> {
-  if (!supabase) return null;
+export async function fetchVmpWatermark(year?: number): Promise<AuthorizationWatermark> {
+  if (!supabase) throw new Error("Supabase chưa cấu hình");
   const { data, error } = await supabase.rpc("rpc_get_vmp_watermark", {
     p_year: year || new Date().getFullYear(),
   });
-  if (error) { console.warn("fetchVmpWatermark:", error.message); return null; }
-  return data || null;
+  if (error) throw new Error("Lỗi đọc watermark phân quyền: " + error.message);
+  return decodeAuthorizationWatermark(data);
 }
 
 // ============================================================

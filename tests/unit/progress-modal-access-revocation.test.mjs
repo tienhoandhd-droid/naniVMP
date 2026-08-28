@@ -139,7 +139,8 @@ test("silent refresh gates watermark and fail-closed state by current request", 
   assert.ok(readerStart >= 0, "missing pure watermark reader");
   assert.doesNotMatch(reader, /setDataUpdatedAt/);
   assert.match(refresh, /const wmPromise = readWatermark\(\)/);
-  assert.match(refresh, /wm = await wmPromise;[\s\S]*if \(requestId !== dataRequestRef\.current\) return;[\s\S]*setDataUpdatedAt\(wm\.updated_at\)/);
+  assert.match(refresh, /wm = await wmPromise;[\s\S]*if \(requestId !== dataRequestRef\.current\) return;[\s\S]*revisionChanged[\s\S]*clearProtectedData\(\);[\s\S]*setDataUpdatedAt\(wm\.updatedAt\)/);
+  assert.match(refresh, /matchedAuthorizationRevision\([\s\S]*authorizationRevisionRef\.current = matchedRevision;[\s\S]*setAuthorizationRevision\(matchedRevision\)/);
   assert.match(refresh, /catch \(cause\) \{[\s\S]*if \(requestId !== dataRequestRef\.current\) return;[\s\S]*permissionModeRef\.current = null;[\s\S]*clearProtectedData\(\);[\s\S]*setConn\([\s\S]*status: "err"[\s\S]*Thử lại/);
 });
 
@@ -166,7 +167,7 @@ test("silent refresh success recovers a retryable connection error", async () =>
 
   const source = await readFile(new URL("../../src/hooks/index.ts", import.meta.url), "utf8");
   const refresh = source.slice(source.indexOf("const silentRefresh"), source.indexOf("/* Chỉ nạp dữ liệu", source.indexOf("const silentRefresh")));
-  assert.match(refresh, /if \(ws === wmSigRef\.current\) \{[\s\S]*setConn\(\(current\) => silentRefreshSuccessConn\(current\)\);[\s\S]*return;/);
+  assert.match(refresh, /if \(ws === wmSigRef\.current[\s\S]*authorizationRevisionRef\.current === wm\.authorizationRevision\) \{[\s\S]*setConn\(\(current\) => silentRefreshSuccessConn\(current\)\);[\s\S]*return;/);
   assert.match(refresh, /if \(sig === dataSigRef\.current\) \{[\s\S]*setConn\(\(current\) => silentRefreshSuccessConn\(current\)\);[\s\S]*return;/);
   assert.match(refresh, /setLastSync\(Date\.now\(\)\);[\s\S]*setConn\(\(current\) => silentRefreshSuccessConn\(current, \{[\s\S]*objects: data\.objects\.length,[\s\S]*activities: data\.activities\.length/);
 });

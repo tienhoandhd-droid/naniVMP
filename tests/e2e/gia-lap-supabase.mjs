@@ -287,6 +287,83 @@ function dungDoiTuong(i) {
   };
 }
 
+function sourceObjectWire(row, index) {
+  const objectKind = row.object_kind || row.kind || "Thiết bị";
+  const objectCode = String(row.object_code || row.code || `MOCK-${index + 1}`);
+  return {
+    id: typeof row.id === "string" && /^[0-9a-f-]{36}$/i.test(row.id)
+      ? row.id : `91000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    object_kind: objectKind,
+    object_code: objectCode,
+    source_tab: "mock",
+    source_row: index + 1,
+    extra: {},
+    created_at: row.created_at || "2026-08-01T00:00:00Z",
+    updated_at: row.updated_at || "2026-08-15T02:00:00Z",
+    is_active: row.is_active !== false,
+    edited_on_web: Boolean(row.edited_on_web),
+    criticality_source: row.criticality_source || "auto",
+    version: Number(row.version || 1),
+    timeline_revision: Number(row.timeline_revision || 1),
+    timeline_applied_revision: Number(row.timeline_applied_revision || 1),
+    object_name: row.object_name || row.name || null,
+    department: row.department || row.dept || null,
+    area_code: row.area_code || null,
+    line: row.line || null,
+    status: row.status || null,
+    show_flag: row.show_flag || null,
+    validate_flag: row.validate_flag || null,
+    validate_reason: row.validate_reason || null,
+    report_class: row.report_class || null,
+    critical_point: row.critical_point || null,
+    note: row.note || null,
+    owner_name: row.owner_name || row.owner || null,
+    support_name: row.support_name || row.support || null,
+    work_group: row.work_group || null,
+    frequency_months: row.frequency_months == null || !Number.isFinite(Number(row.frequency_months)) ? null : Number(row.frequency_months),
+    workdays: row.workdays == null || !Number.isFinite(Number(row.workdays)) ? null : Number(row.workdays),
+    first_month: row.first_month == null || !Number.isFinite(Number(row.first_month)) ? null : Number(row.first_month),
+    year_ref: row.year_ref == null || !Number.isFinite(Number(row.year_ref)) ? null : Number(row.year_ref),
+    complexity_score: row.complexity_score == null || !Number.isFinite(Number(row.complexity_score)) ? null : Number(row.complexity_score),
+    quality_impact_score: row.quality_impact_score == null || !Number.isFinite(Number(row.quality_impact_score)) ? null : Number(row.quality_impact_score),
+    criticality_score: row.criticality_score == null || !Number.isFinite(Number(row.criticality_score)) ? null : Number(row.criticality_score),
+    updated_by: row.updated_by || null,
+    owner_person_id: row.owner_person_id || (row.owner_name
+      ? `93000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}` : null),
+    support_person_id: row.support_person_id || null,
+  };
+}
+
+function normalizedSourceValue(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
+}
+
+function filteredSourceWireRows(sourceRows, body = {}) {
+  const kind = body?.p_object_kind;
+  const search = normalizedSourceValue(body?.p_search);
+  const filters = body?.p_filters && typeof body.p_filters === "object" ? body.p_filters : {};
+  return sourceRows.map(sourceObjectWire)
+    .filter((row) => !kind || row.object_kind === kind)
+    .filter((row) => !search || [
+      row.object_code, row.object_name, row.department, row.area_code, row.line,
+      row.owner_name, row.report_class, row.work_group, row.note,
+    ].some((value) => normalizedSourceValue(value).includes(search)))
+    .filter((row) => !filters.department || normalizedSourceValue(row.department) === normalizedSourceValue(filters.department))
+    .filter((row) => !filters.area_code || normalizedSourceValue(row.area_code) === normalizedSourceValue(filters.area_code))
+    .filter((row) => !filters.line || normalizedSourceValue(row.line) === normalizedSourceValue(filters.line))
+    .filter((row) => filters.validation === "outside" ? normalizedSourceValue(row.validate_flag) !== "y"
+      : filters.validation === "validated" ? normalizedSourceValue(row.validate_flag) === "y" : true)
+    .filter((row) => filters.first_month === "missing" ? row.first_month === null
+      : filters.first_month === "present" ? row.first_month !== null : true)
+    .filter((row) => filters.owner === "assigned" ? row.owner_person_id !== null
+      : filters.owner === "unassigned" ? row.owner_person_id === null
+      : typeof filters.owner === "string" && filters.owner.startsWith("owner:")
+        ? normalizedSourceValue(row.owner_name) === filters.owner.slice("owner:".length) : true)
+    .filter((row) => filters.frequency === "lte12" ? row.frequency_months !== null && row.frequency_months <= 12
+      : filters.frequency === "gt12" ? row.frequency_months !== null && row.frequency_months > 12 : true)
+    .sort((a, b) => a.object_code.localeCompare(b.object_code, "vi") || a.id.localeCompare(b.id));
+}
+
 /** Toàn bộ quyền màn hình — bộ kiểm cần mở được mọi màn.
  *  Danh sách hành động phải là TÊN THẬT mà `rpc_my_ui_access` trả về
  *  (xem HANH_DONG_ADMIN trong src/lib/access.ts): giao diện gate nút bằng
@@ -304,6 +381,7 @@ function quyenDayDu() {
     "edit_vertical_timeline", "record_actual_validation_date",
     "assign_workshop_staff", "view_workload", "view_rules",
     "manage_accounts", "manage_authorization_policy",
+    "manage_qa_assignment", "manage_workshop_scope",
   ];
   const screens = {};
   for (const m of man) {
@@ -448,7 +526,7 @@ export function dungKhoDuLieu(kichBan) {
     user_id: i === 0 ? NGUOI_DUNG.id : null,
   }));
 
-  return {
+  const store = {
     /* --- Auth --- */
     "/auth/v1/token": phienGia(),
     "/auth/v1/user": NGUOI_DUNG,
@@ -502,9 +580,98 @@ export function dungKhoDuLieu(kichBan) {
     rpc_get_vmp_dashboard: {
       activities: hangMuc,
       objects: doiTuong,
+      source: "supabase",
       updated_at: "2026-08-15T02:00:00Z",
+      authorization_revision: 7,
+      year: 2026,
     },
-    rpc_get_vmp_watermark: { year: 2026, plan_items: soHangMuc, objects: doiTuong.length, updated_at: "2026-08-15T02:00:00Z" },
+    rpc_get_vmp_watermark: {
+      year: 2026, plan_items: soHangMuc, objects: doiTuong.length,
+      updated_at: "2026-08-15T02:00:00Z", authorization_revision: 7,
+    },
+    rpc_list_source_objects: (body = {}) => {
+      const limit = Number(body?.p_limit || 25);
+      const allRows = filteredSourceWireRows(store.vmp_source_objects, body);
+      const cursor = body?.p_cursor;
+      const start = cursor ? Math.max(0, allRows.findIndex((row) => row.object_code === cursor.object_code && row.id === cursor.id) + 1) : 0;
+      const rows = allRows.slice(start, start + limit);
+      const last = rows.at(-1);
+      return {
+        ok: true,
+        rows,
+        authorized_total: allRows.length,
+        next_cursor: start + rows.length < allRows.length && last
+          ? { object_code: last.object_code, id: last.id } : null,
+      };
+    },
+    rpc_export_source_objects: (body = {}) => {
+      const allRows = filteredSourceWireRows(store.vmp_source_objects, body);
+      const limit = Number(body?.p_limit || 500);
+      const cursor = body?.p_cursor;
+      const start = cursor ? Math.max(0, allRows.findIndex((row) => row.object_code === cursor.object_code && row.id === cursor.id) + 1) : 0;
+      const rows = allRows.slice(start, start + limit);
+      const last = rows.at(-1);
+      return {
+        ok: true, rows, authorized_total: allRows.length,
+        next_cursor: start + rows.length < allRows.length && last
+          ? { object_code: last.object_code, id: last.id } : null,
+      };
+    },
+    rpc_source_object_facets: (body = {}) => {
+      const rows = filteredSourceWireRows(store.vmp_source_objects, body);
+      const counted = (values) => [...new Set(values.filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "vi"))
+        .map((value) => ({ value, count: values.filter((candidate) => candidate === value).length }));
+      const validated = rows.filter((row) => String(row.validate_flag).toLowerCase() === "y").length;
+      const present = rows.filter((row) => row.first_month !== null).length;
+      const assigned = rows.filter((row) => row.owner_person_id !== null).length;
+      const lte12 = rows.filter((row) => row.frequency_months !== null && row.frequency_months <= 12).length;
+      return {
+        ok: true,
+        departments: counted(rows.map((row) => normalizedSourceValue(row.department))),
+        areas: counted(rows.map((row) => normalizedSourceValue(row.area_code))),
+        owners: [...new Map(rows.filter((row) => row.owner_person_id && row.owner_name).map((row) => [
+          normalizedSourceValue(row.owner_name), {
+            value: `owner:${normalizedSourceValue(row.owner_name)}`,
+            person_id: row.owner_person_id,
+            name: String(row.owner_name).trim(),
+            count: rows.filter((candidate) => normalizedSourceValue(candidate.owner_name) === normalizedSourceValue(row.owner_name)).length,
+          },
+        ])).values()],
+        validation: [{ value: "outside", count: rows.length - validated }, { value: "validated", count: validated }],
+        first_month: [{ value: "missing", count: rows.length - present }, { value: "present", count: present }],
+        ownership: [{ value: "assigned", count: assigned }, { value: "unassigned", count: rows.length - assigned }],
+        frequency: [{ value: "gt12", count: rows.length - lte12 }, { value: "lte12", count: lte12 }],
+      };
+    },
+    rpc_source_field_suggestions: (body = {}) => {
+      const field = body?.p_field;
+      const allowed = new Set(["department", "area_code", "line", "status", "report_class", "work_group"]);
+      if (!allowed.has(field)) return { ok: false, error_code: "INVALID_FIELD", error: "Trường không hợp lệ" };
+      const values = [...new Set(store.vmp_source_objects.map((row) => String(row[field] || "").trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "vi"));
+      return { ok: true, rows: values.map((value) => ({ value, count: 1 })), next_cursor: null };
+    },
+    rpc_source_qa_candidates: {
+      ok: true,
+      rows: nhanSu.slice(0, 3).map((person, index) => ({
+        person_id: `92000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        performer_name: person.full_name,
+        normalized_full_name: person.full_name.toLocaleLowerCase("vi"),
+        email: person.email,
+        department: "QA",
+        role_name: "qa_staff",
+      })),
+      included_current: [],
+      authorized_total: Math.min(3, nhanSu.length),
+      next_cursor: null,
+    },
+    rpc_list_source_workshop_coverage: {
+      ok: true, rows: [], authorized_total: 0, next_cursor: null,
+    },
+    rpc_source_workshop_scope_choices: {
+      ok: true, rows: [], next_cursor: null,
+    },
     rpc_get_missing_items: [],
     /* Hình dạng phải khớp `ServerKpi` trong src/lib/supabaseData.ts: hai
        nhóm lồng `validation` và `documentation`. Bản trước trả một object
@@ -663,6 +830,7 @@ export function dungKhoDuLieu(kichBan) {
       })) : [],
     },
   };
+  return store;
 }
 
 /* ------------------------------------------------------------------ *

@@ -83,11 +83,17 @@ page.on("request", (request) => {
     return answer(request, {
       activities,
       objects: activities.map((activity) => ({ code: activity.code, name: activity.name })),
+      source: "supabase",
       updated_at: "2026-08-10T00:00:00Z",
+      authorization_revision: 7,
+      year: 2026,
     });
   }
   if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
-    return answer(request, { year: 2026, plan_items: 2, objects: 2, updated_at: "2026-08-10T00:00:00Z" });
+    return answer(request, {
+      year: 2026, plan_items: 2, objects: 2,
+      updated_at: "2026-08-10T00:00:00Z", authorization_revision: 7,
+    });
   }
   if (/\/rpc\/rpc_my_editable_progress_rights/.test(url)) {
     batchRightsReads += request.method() === "OPTIONS" ? 0 : 1;

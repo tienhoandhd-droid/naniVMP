@@ -215,6 +215,9 @@ export interface VmpDataset {
   source: "supabase" | "n8n";
   count: number;
   updated_at?: string | null;
+  /** Có ở payload Supabase được lọc quyền; n8n legacy không có. */
+  authorizationRevision?: number;
+  year?: number;
 }
 
 /** Cấu hình kết nối lưu ở localStorage. */

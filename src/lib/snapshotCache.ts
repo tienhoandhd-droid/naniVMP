@@ -22,10 +22,10 @@
  * ===================================================================== */
 import type { Activity, VmpObject } from "../types/domain.ts";
 
-const KEY = "vmp_snapshot_v2";
-const LEGACY_KEY = "vmp_snapshot_v1";
+const KEY = "vmp_snapshot_v3";
+const LEGACY_KEYS = ["vmp_snapshot_v1", "vmp_snapshot_v2"] as const;
 /** Tăng số này mỗi khi hình dạng Activity/VmpObject đổi. */
-const VERSION = 2;
+const VERSION = 3;
 const TTL_MS = 24 * 60 * 60 * 1000;
 
 export type SnapshotPermissionMode = "preview" | "enforced";
@@ -43,7 +43,10 @@ export function permissionDataPolicy(
   if (mode === "preview") {
     return {
       allowSnapshot: true,
-      allowLegacyFallback: true,
+      /* Source/item visibility is now server-filtered and revisioned. The
+       * legacy n8n payload has neither guarantee, even while item mode says
+       * preview, so it can no longer be a browser fallback. */
+      allowLegacyFallback: false,
       bypassWatermark: false,
       revokeBeforeFetch: false,
     };
@@ -69,6 +72,7 @@ interface Snapshot {
   year: number;
   userId: string;
   mode: SnapshotPermissionMode;
+  authorizationRevision: number;
   at: number;
   objects: VmpObject[];
   activities: Activity[];
@@ -78,17 +82,23 @@ export function saveSnapshot(
   year: number,
   userId: string,
   mode: SnapshotPermissionMode,
+  authorizationRevision: number,
   objects: VmpObject[],
   activities: Activity[],
 ): void {
   try {
-    localStorage.removeItem(LEGACY_KEY);
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
     if (mode === "enforced") {
       localStorage.removeItem(KEY);
       return;
     }
+    if (!Number.isSafeInteger(authorizationRevision) || authorizationRevision <= 0) {
+      localStorage.removeItem(KEY);
+      return;
+    }
     const s: Snapshot = {
-      v: VERSION, year, userId, mode, at: Date.now(), objects, activities,
+      v: VERSION, year, userId, mode, authorizationRevision,
+      at: Date.now(), objects, activities,
     };
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
@@ -101,9 +111,10 @@ export function loadSnapshot(
   year: number,
   userId: string,
   mode: SnapshotPermissionMode,
+  authorizationRevision: number,
 ): { objects: VmpObject[]; activities: Activity[]; at: number } | null {
   try {
-    localStorage.removeItem(LEGACY_KEY);
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
     if (mode === "enforced") {
       localStorage.removeItem(KEY);
       return null;
@@ -111,7 +122,10 @@ export function loadSnapshot(
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as Snapshot;
-    if (s.v !== VERSION || s.year !== year || s.userId !== userId || s.mode !== mode) {
+    if (!Number.isSafeInteger(authorizationRevision) || authorizationRevision <= 0
+        || !Number.isSafeInteger(s.authorizationRevision) || s.authorizationRevision <= 0
+        || s.v !== VERSION || s.year !== year || s.userId !== userId || s.mode !== mode
+        || s.authorizationRevision !== authorizationRevision) {
       localStorage.removeItem(KEY);
       return null;
     }
@@ -124,6 +138,6 @@ export function loadSnapshot(
 export function clearSnapshot(): void {
   try {
     localStorage.removeItem(KEY);
-    localStorage.removeItem(LEGACY_KEY);
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch { /* ignore */ }
 }

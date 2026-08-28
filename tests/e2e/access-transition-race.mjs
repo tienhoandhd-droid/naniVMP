@@ -74,7 +74,7 @@ try {
     const fetchAccess = () => new Promise((resolve, reject) => deferred.push({ resolve, reject }));
     const userA = { uid: "same-user", role: "admin", accessClass: "broad" };
     const userB = { uid: "same-user", role: "department_user", accessClass: "workshop_staff" };
-    saveSnapshot(2026, userA.uid, "preview", [], [{ code: "TB-BROAD", id: "broad", name: "Dữ liệu rộng" }]);
+    saveSnapshot(2026, userA.uid, "preview", 7, [], [{ code: "TB-BROAD", id: "broad", name: "Dữ liệu rộng" }]);
     localStorage.setItem("vmp_cache", JSON.stringify({ data: { activities: [{ code: "TB-BROAD" }] }, ts: Date.now() }));
 
     const mount = document.createElement("div");
@@ -91,7 +91,7 @@ try {
       if (access.dangTai || access.loi || !access.access.businessRole) {
         return React.createElement("output", { id: "state" }, `locked:${access.dangTai}:${access.loi || ""}`);
       }
-      const snapshot = loadSnapshot(2026, user.uid, "preview");
+      const snapshot = loadSnapshot(2026, user.uid, "preview", 7);
       return React.createElement("output", { id: "state" }, `protected:${snapshot?.activities[0]?.code || "none"}:${access.access.businessRole}`);
     }
 
@@ -111,7 +111,7 @@ try {
   await page.waitForFunction(() => window.__accessRace.deferred.length === 3);
   await page.waitForFunction(() => document.querySelector("#state")?.textContent?.startsWith("locked:true:"));
   assert.deepEqual(await page.evaluate(() => ({
-    snapshot: localStorage.getItem("vmp_snapshot_v2"), cache: localStorage.getItem("vmp_cache"),
+    snapshot: localStorage.getItem("vmp_snapshot_v3"), cache: localStorage.getItem("vmp_cache"),
   })), { snapshot: null, cache: null }, "đổi tuple cùng UID phải dọn cache trước khi shell được mở lại");
 
   await page.evaluate(() => window.__accessRace.deferred[1].resolve({ trangThai: "co", payload: {
@@ -159,7 +159,7 @@ try {
 
   await page.evaluate(() => {
     const { userB, saveSnapshot } = window.__accessRace;
-    saveSnapshot(2026, userB.uid, "preview", [], [{ code: "TB-CUNG-TUPLE", id: "same", name: "Bản chụp cùng tuple" }]);
+    saveSnapshot(2026, userB.uid, "preview", 7, [], [{ code: "TB-CUNG-TUPLE", id: "same", name: "Bản chụp cùng tuple" }]);
     window.__accessRace.current.taiLai();
   });
   await page.waitForFunction(() => window.__accessRace.deferred.length === 8);
@@ -170,7 +170,7 @@ try {
 
   await page.evaluate(() => {
     const { userB, saveSnapshot } = window.__accessRace;
-    saveSnapshot(2026, userB.uid, "preview", [], [{ code: "TB-LOI", id: "error", name: "Bản chụp trước lỗi" }]);
+    saveSnapshot(2026, userB.uid, "preview", 7, [], [{ code: "TB-LOI", id: "error", name: "Bản chụp trước lỗi" }]);
     localStorage.setItem("vmp_cache", JSON.stringify({ data: { activities: [{ code: "TB-LOI" }] }, ts: Date.now() }));
     window.__accessRace.current.taiLai();
   });
@@ -178,7 +178,7 @@ try {
   await page.evaluate(() => window.__accessRace.deferred[8].reject(new Error("RPC quyền lỗi")));
   await page.waitForFunction(() => document.querySelector("#state")?.textContent === "locked:false:RPC quyền lỗi");
   assert.deepEqual(await page.evaluate(() => ({
-    snapshot: localStorage.getItem("vmp_snapshot_v2"), cache: localStorage.getItem("vmp_cache"),
+    snapshot: localStorage.getItem("vmp_snapshot_v3"), cache: localStorage.getItem("vmp_cache"),
   })), { snapshot: null, cache: null }, "lỗi RPC quyền cũng phải dọn cả snapshot và cache legacy");
 
   await page.evaluate(() => window.__accessRace.root.unmount());

@@ -55,6 +55,10 @@ import {
   permissionDataPolicy,
   type SnapshotPermissionMode,
 } from "../lib/snapshotCache.ts";
+import {
+  matchedAuthorizationRevision,
+  type AuthorizationWatermark,
+} from "../lib/dashboardAuthorizationContracts.ts";
 
 async function readItemPermissionContext(): Promise<{
   userId: string;
@@ -237,6 +241,7 @@ export function useVmpData() {
   // trả lời được: rpc_get_vmp_dashboard trả 'updated_at', now() nên vô dụng cho
   // việc này, còn rpc_get_vmp_watermark trả max(updated_at) thật.
   const [dataUpdatedAt, setDataUpdatedAt] = useState<string | null>(null);
+  const [authorizationRevision, setAuthorizationRevision] = useState<number | null>(null);
   const [saveStatus, setSaveStatus] = useState(""); // "saving" | "saved" | "error" | ""
   // Chữ ký dữ liệu gần nhất — để bỏ qua setState khi poll/Realtime trả về dữ liệu
   // y hệt (tránh re-render toàn bộ bảng/biểu đồ mỗi 2 phút khi không có thay đổi).
@@ -246,17 +251,15 @@ export function useVmpData() {
   const wmSigRef = useRef("");
   const permissionModeRef = useRef<SnapshotPermissionMode | null>(null);
   const permissionUserRef = useRef("");
+  const authorizationRevisionRef = useRef<number | null>(null);
   const dataRequestRef = useRef(0);
-  const wmSig = (wm: { plan_items?: number; objects?: number; updated_at?: string } | null): string =>
-    wm ? `${wm.plan_items}|${wm.objects}|${wm.updated_at}` : "";
-  type Watermark = { plan_items?: number; objects?: number; updated_at?: string };
-  /** Chỉ đọc watermark. Caller phải kiểm generation trước khi áp vào state;
-   *  hỏng thì trả null vì độ tươi không được làm hỏng đường nạp chính. */
-  const readWatermark = useCallback(async (): Promise<Watermark | null> => {
-    try {
-      return (await fetchVmpWatermark(new Date().getFullYear())) as Watermark | null;
-    } catch { return null; }
-  }, []);
+  const wmSig = (wm: AuthorizationWatermark): string =>
+    `${wm.planItems}|${wm.objects}|${wm.updatedAt}|${wm.authorizationRevision}`;
+  /** Watermark là nửa thứ hai của authorization handshake. Lỗi hay payload
+   * thiếu revision phải ném để caller thu hồi dữ liệu, không được coi là
+   * “không thay đổi”. */
+  const readWatermark = useCallback(async (): Promise<AuthorizationWatermark> =>
+    fetchVmpWatermark(new Date().getFullYear()), []);
   const sigOf = (objs: VmpObject[] | null, activities: Activity[]): string => {
     try { return JSON.stringify(activities) + "|" + (objs ? objs.length : 0); }
     catch { return String(Date.now()); }
@@ -268,6 +271,8 @@ export function useVmpData() {
     if (invalidateRequests) dataRequestRef.current += 1;
     dataSigRef.current = "";
     wmSigRef.current = "";
+    authorizationRevisionRef.current = null;
+    setAuthorizationRevision(null);
     setObjects([]);
     setActs([]);
     clearSnapshot();
@@ -316,21 +321,50 @@ export function useVmpData() {
         clearProtectedData();
       }
 
-      /* Snapshot và RPC dashboard đều là dữ liệu bảo vệ. Chỉ đọc chúng SAU
-         khi item_permissions_mode của đúng phiên đã xác minh thành công. */
-      if (!force && policy.allowSnapshot) {
-        const cu = loadSnapshot(nam, permissionContext.userId, permissionContext.mode);
-        if (cu) {
-          setObjects(cu.objects);
-          setActs(cu.activities);
-          setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", source: "supabase",
-            msg: `Đang hiện bản lưu lúc ${new Date(cu.at).toLocaleTimeString("vi-VN")} — đang cập nhật…` }));
-        }
-      }
-
       try {
-        const data = await fetchVmpDataFromSupabase(nam);
+        /* Dashboard chạy song song để không trả thêm một vòng mạng. Promise
+           được biến thành kết quả có nhãn để nếu watermark hỏng thì request
+           dashboard còn lại cũng không tạo unhandled rejection. */
+        const dashboardPromise = fetchVmpDataFromSupabase(nam).then(
+          (data) => ({ ok: true as const, data }),
+          (error: unknown) => ({ ok: false as const, error }),
+        );
+        const wm = await readWatermark();
         if (requestId !== dataRequestRef.current) return;
+        if (wm.year !== nam) throw new Error("Watermark trả sai năm yêu cầu");
+        const revisionChanged = authorizationRevisionRef.current !== null
+          && authorizationRevisionRef.current !== wm.authorizationRevision;
+        if (revisionChanged) clearProtectedData();
+
+        /* Snapshot chỉ được mở sau khi một watermark tươi xác nhận đúng
+           revision. Dashboard vẫn đang tải song song ở phía trên. */
+        if (!force && policy.allowSnapshot) {
+          const cu = loadSnapshot(
+            nam,
+            permissionContext.userId,
+            permissionContext.mode,
+            wm.authorizationRevision,
+          );
+          if (cu) {
+            setObjects(cu.objects);
+            setActs(cu.activities);
+            setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", source: "supabase",
+              msg: `Đang hiện bản lưu lúc ${new Date(cu.at).toLocaleTimeString("vi-VN")} — đang cập nhật…` }));
+          }
+        }
+
+        const dashboardResult = await dashboardPromise;
+        if (!dashboardResult.ok) throw dashboardResult.error;
+        const data = dashboardResult.data;
+        if (requestId !== dataRequestRef.current) return;
+        const matchedRevision = matchedAuthorizationRevision({
+          year: data.year ?? 0,
+          authorizationRevision: data.authorizationRevision ?? 0,
+        }, wm);
+        authorizationRevisionRef.current = matchedRevision;
+        setAuthorizationRevision(matchedRevision);
+        wmSigRef.current = wmSig(wm);
+        setDataUpdatedAt(wm.updatedAt);
         dataSigRef.current = sigOf(data.objects, data.activities);
         if (Array.isArray(data.objects)) setObjects(data.objects);
         if (Array.isArray(data.activities)) setActs(data.activities);
@@ -339,6 +373,7 @@ export function useVmpData() {
             nam,
             permissionContext.userId,
             permissionContext.mode,
+            matchedRevision,
             data.objects || [],
             data.activities || [],
           );
@@ -347,12 +382,6 @@ export function useVmpData() {
         }
         if (readUrl || writeUrl) saveConn(readUrl, writeUrl);
         setLastSync(Date.now());
-        // Không chặn first paint, nhưng watermark cũ không được ghi vào state
-        // sau khi một request dữ liệu mới hơn đã bắt đầu.
-        void readWatermark().then((wm) => {
-          if (requestId !== dataRequestRef.current) return;
-          if (wm?.updated_at) setDataUpdatedAt(wm.updated_at);
-        });
         setConn({
           readUrl, writeUrl, status: "ok", source: "supabase",
           msg: `Đã tải ${data.objects.length} đối tượng · ${data.activities.length} hạng mục từ máy chủ ✓`,
@@ -439,10 +468,8 @@ export function useVmpData() {
     const requestId = ++dataRequestRef.current;
     let permissionContext: Awaited<ReturnType<typeof readItemPermissionContext>>;
     try {
-      /* Bắn watermark SONG SONG với kiểm mode — hai RPC độc lập, chờ nối
-         tiếp là trả thêm một vòng mạng mỗi 20 giây không để làm gì. Kết
-         quả watermark chỉ được DÙNG sau khi mode đã kiểm xong ở dưới.
-         readWatermark không bao giờ ném (hỏng thì trả null). */
+      /* Bắn watermark SONG SONG với kiểm mode — hai RPC độc lập. Watermark
+         hỏng sẽ ném và thu hồi dữ liệu trong catch bên dưới. */
       const wmPromise = readWatermark();
       // Mode là một phần của quyền đọc, nên phải kiểm ở MỌI lượt poll. Chỉ
       // nhìn watermark hạng mục sẽ bỏ sót lúc Admin đổi preview → enforced.
@@ -460,7 +487,7 @@ export function useVmpData() {
         clearProtectedData();
       }
 
-      let wm: Watermark | null;
+      let wm: AuthorizationWatermark;
       let prefetchedData: Awaited<ReturnType<typeof fetchVmpDataFromSupabase>> | null = null;
       if (policy.bypassWatermark) {
         // Enforced vẫn tải payload ngay; Promise.all chỉ gom điểm commit để
@@ -473,24 +500,33 @@ export function useVmpData() {
         wm = await wmPromise;
       }
       if (requestId !== dataRequestRef.current) return;
-      if (wm?.updated_at) setDataUpdatedAt(wm.updated_at);
+      const revisionChanged = authorizationRevisionRef.current !== null
+        && authorizationRevisionRef.current !== wm.authorizationRevision;
+      if (revisionChanged) clearProtectedData();
+      setDataUpdatedAt(wm.updatedAt);
 
-      if (!policy.bypassWatermark && !identityChanged && !modeChanged) {
+      if (!policy.bypassWatermark && !identityChanged && !modeChanged && !revisionChanged) {
         // Preview giữ tối ưu cũ: dữ liệu không đổi thì không kéo payload nặng.
-        if (wm) {
-          const ws = wmSig(wm);
-          if (ws === wmSigRef.current) {
-            setConn((current) => silentRefreshSuccessConn(current));
-            return;
-          }
-          wmSigRef.current = ws;
+        const ws = wmSig(wm);
+        if (ws === wmSigRef.current
+            && authorizationRevisionRef.current === wm.authorizationRevision) {
+          setConn((current) => silentRefreshSuccessConn(current));
+          return;
         }
+        wmSigRef.current = ws;
       }
 
       // Enforced luôn đi qua RPC đã lọc quyền: thu hồi phân công phải phản ánh
       // dù updated_at/count của dữ liệu nghiệp vụ không đổi.
       const data = prefetchedData ?? await fetchVmpDataFromSupabase(new Date().getFullYear());
       if (requestId !== dataRequestRef.current) return;
+      const matchedRevision = matchedAuthorizationRevision({
+        year: data.year ?? 0,
+        authorizationRevision: data.authorizationRevision ?? 0,
+      }, wm);
+      authorizationRevisionRef.current = matchedRevision;
+      setAuthorizationRevision(matchedRevision);
+      wmSigRef.current = wmSig(wm);
       const sig = sigOf(data.objects, data.activities);
       // Chốt chặn 2: nếu payload y hệt thì bỏ qua setState (tránh re-render).
       if (sig === dataSigRef.current) {
@@ -505,6 +541,7 @@ export function useVmpData() {
           new Date().getFullYear(),
           permissionContext.userId,
           permissionContext.mode,
+          matchedRevision,
           data.objects || [],
           data.activities || [],
         );
@@ -688,7 +725,7 @@ export function useVmpData() {
      một đối tượng nay là tắt is_active qua rpc_save_catalog_object. */
 
   return {
-    objects, acts: enriched, conn, lastSync, dataUpdatedAt, saveStatus,
+    objects, acts: enriched, conn, lastSync, dataUpdatedAt, authorizationRevision, saveStatus,
     connectSheet, reloadData, silentRefresh, updateActivity,
     saveObject, setConn,
   };

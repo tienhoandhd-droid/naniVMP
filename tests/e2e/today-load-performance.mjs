@@ -126,13 +126,17 @@ try {
       kho.rpc_get_vmp_dashboard = () => ({
         activities: largeActivities,
         objects: kho.vmp_source_objects,
+        source: "supabase",
         updated_at: "2026-08-28T01:00:00Z",
+        authorization_revision: 7,
+        year: 2026,
       });
       kho.rpc_get_vmp_watermark = {
         year: 2026,
         plan_items: largeActivities.length,
         objects: kho.vmp_source_objects.length,
         updated_at: "2026-08-28T01:00:00Z",
+        authorization_revision: 7,
       };
     },
   });

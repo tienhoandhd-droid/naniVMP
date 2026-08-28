@@ -163,9 +163,15 @@ async function newPage({ key, user, uiAccess }) {
           { ...ACTIVITY, _raw: { ...ACTIVITY._raw } },
           { ...UNASSIGNED_ACTIVITY, _raw: { ...UNASSIGNED_ACTIVITY._raw } },
         ], objects: [{ ...SOURCE }],
+        source: "supabase",
         updated_at: "2026-08-27T00:00:00Z",
+        authorization_revision: 7,
+        year: 2026,
       });
-      kho.rpc_get_vmp_watermark = { year: 2026, plan_items: 1, objects: 1, updated_at: "2026-08-27T00:00:00Z" };
+      kho.rpc_get_vmp_watermark = {
+        year: 2026, plan_items: 1, objects: 1,
+        updated_at: "2026-08-27T00:00:00Z", authorization_revision: 7,
+      };
       kho.rpc_my_editable_progress_rights = (body) => {
         batchBodies.push({ persona: key, body });
         const editable_fields = rightsFor();

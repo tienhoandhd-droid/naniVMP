@@ -203,7 +203,8 @@ async function newPersonaPage(persona) {
     if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
       return answer(request, {
         activities: [ACTIVITY, NEXT_ACTIVITY],
-        objects: [], updated_at: "2026-08-10T00:00:00Z",
+        objects: [], source: "supabase", updated_at: "2026-08-10T00:00:00Z",
+        authorization_revision: 7, year: 2026,
       });
     }
     if (/\/rpc\/rpc_my_editable_progress_rights/.test(url)) {
@@ -222,7 +223,10 @@ async function newPersonaPage(persona) {
       }] });
     }
     if (/\/rpc\/rpc_get_vmp_watermark/.test(url)) {
-      return answer(request, { year: 2026, plan_items: 1, objects: 1, updated_at: "2026-08-10T00:00:00Z" });
+      return answer(request, {
+        year: 2026, plan_items: 1, objects: 1,
+        updated_at: "2026-08-10T00:00:00Z", authorization_revision: 7,
+      });
     }
     if (/\/rpc\/item_permissions_mode/.test(url)) return answer(request, persona.mode);
     if (/\/rpc\/vmp_my_item_rights/.test(url)) {

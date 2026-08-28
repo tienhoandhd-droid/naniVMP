@@ -1578,7 +1578,7 @@ function VerifiedAppShell({ user, logout, access }: {
   const canChonNguoiThucHien = access.can("source", "edit_catalog");
   const canDoiTrangThai = access.businessRole === "admin" || access.businessRole === "qa_manager";
   const {
-    objects, acts, conn, lastSync, dataUpdatedAt, saveStatus, reloadData, silentRefresh,
+    objects, acts, conn, lastSync, dataUpdatedAt, authorizationRevision, saveStatus, reloadData, silentRefresh,
     updateActivity,
   } = useVmpData();
   const currentPersonId = String(user.personId ?? "").trim() || null;
@@ -2110,6 +2110,7 @@ function VerifiedAppShell({ user, logout, access }: {
               {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} businessRole={access.businessRole} onReload={reloadData} />}
               {view === "source" && (
                 <SourceCatalogView access={access} onReload={reloadData}
+                  authorizationRevision={authorizationRevision}
                   focus={moDanhMuc}
                   onFocusConsumed={() => setMoDanhMuc(null)}
                   scopeLabel={nhanPhamVi}
