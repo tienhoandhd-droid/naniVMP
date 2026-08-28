@@ -1,7 +1,7 @@
 # Phát hành quyền Cập nhật tiến độ theo phân công
 
 **Ngày soạn:** 2026-08-27
-**Phạm vi:** migration `20260827130000`, checker chỉ đọc, reload schema cache và frontend exact-SHA.
+**Phạm vi:** migrations `20260827130000` + `20260828100000`, checker chỉ đọc, reload schema cache và frontend exact-SHA.
 **Trạng thái:** chưa chạy production. Runbook không cấp quyền production; mỗi thao tác backup, apply, migration-history repair, `NOTIFY`, push và deploy cần phê duyệt cửa sổ phát hành riêng.
 
 Release này giữ nguyên `screen_access_mode=enforced` và `item_permissions_mode=preview`. Không đổi role tài khoản, không thêm/xóa phân công, không sửa bản ghi Dữ liệu nguồn và không hạ baseline blocker để làm postflight đạt.
@@ -29,16 +29,19 @@ Hash được duyệt dưới đây là literal, không phải placeholder. Bấ
 
 ```bash
 EXPECTED_MIGRATION_SHA256='acf812cb90bbecef73a6c05aefbea106be84b3974acd49660a9342bdc14c284f'
+EXPECTED_ALLOWLIST_SHA256='b3a85cfd622ebc238d777853e573e30846e660ff850d0421c632e832aee4e6a3'
 EXPECTED_CHECKER_SHA256='dab3065406b90e47481c2c4d17a368a311bbdccbc222b49b085abd20cf898559'
 EXPECTED_RECOVERY_SHA256='d2005965f74840d0b13564179538486df046c7519511b843e5c2cdaad64126fc'
 EXPECTED_WORKFLOW_SHA256='dfb2bec71efd33701606d6440685858ae6838ade3302cf4ff703b91ce996558c'
 
 test "$(sha256sum supabase/migrations/20260827130000_assigned_progress_visibility.sql | awk '{print $1}')" = "$EXPECTED_MIGRATION_SHA256"
+test "$(sha256sum supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql | awk '{print $1}')" = "$EXPECTED_ALLOWLIST_SHA256"
 test "$(sha256sum scripts/check-assigned-progress-visibility.sql | awk '{print $1}')" = "$EXPECTED_CHECKER_SHA256"
 test "$(sha256sum scripts/forward-recover-assigned-progress-visibility.sql | awk '{print $1}')" = "$EXPECTED_RECOVERY_SHA256"
 test "$(sha256sum .github/workflows/deploy.yml | awk '{print $1}')" = "$EXPECTED_WORKFLOW_SHA256"
 git diff --exit-code "$RELEASE_SHA" -- \
   supabase/migrations/20260827130000_assigned_progress_visibility.sql \
+  supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql \
   scripts/check-assigned-progress-visibility.sql \
   scripts/forward-recover-assigned-progress-visibility.sql \
   .github/workflows/deploy.yml
@@ -151,9 +154,13 @@ PGOPTIONS='-c lock_timeout=3s -c statement_timeout=120s' \
 psql "service=$PGSERVICE" -X -v ON_ERROR_STOP=1 \
   -f supabase/migrations/20260827130000_assigned_progress_visibility.sql \
   > "$EVIDENCE_DIR/apply.log" 2>&1
+PGOPTIONS='-c lock_timeout=3s -c statement_timeout=120s' \
+psql "service=$PGSERVICE" -X -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql \
+  > "$EVIDENCE_DIR/apply-allowlist.log" 2>&1
 ```
 
-Migration tự sở hữu một transaction. Lỗi trước `COMMIT`, timeout, mất kết nối hoặc xác nhận commit mơ hồ đều là hard stop. Không retry mù; mở connection mới, kiểm definition hash và xác định trạng thái đã commit hay chưa.
+Mỗi migration tự sở hữu một transaction. Lỗi trước `COMMIT`, timeout, mất kết nối hoặc xác nhận commit mơ hồ đều là hard stop. Không retry mù; mở connection mới, kiểm definition hash và xác định trạng thái đã commit hay chưa.
 
 ## 5. Postflight trên connection mới và migration history
 
@@ -173,6 +180,7 @@ Lệnh `psql -f` không tự cập nhật `supabase_migrations.schema_migrations
 
 ```bash
 MIGRATION_VERSION='20260827130000'
+ALLOWLIST_MIGRATION_VERSION='20260828100000'
 test "$(tr -d '\r\n' < supabase/.temp/project-ref)" = "$EXPECTED_PROJECT_REF"
 jq -e --arg ref "$EXPECTED_PROJECT_REF" '.ref == $ref' \
   supabase/.temp/linked-project.json >/dev/null
@@ -181,16 +189,24 @@ supabase --output-format json migration list --linked \
 jq -e --arg version "$MIGRATION_VERSION" \
   '[.migrations[] | select(.remote == $version)] | length == 0' \
   "$EVIDENCE_DIR/migration-list-before.json" >/dev/null
+jq -e --arg version "$ALLOWLIST_MIGRATION_VERSION" \
+  '[.migrations[] | select(.remote == $version)] | length == 0' \
+  "$EVIDENCE_DIR/migration-list-before.json" >/dev/null
 supabase migration repair --status applied 20260827130000 --linked --yes \
   > "$EVIDENCE_DIR/migration-repair.log" 2>&1
+supabase migration repair --status applied 20260828100000 --linked --yes \
+  > "$EVIDENCE_DIR/migration-repair-allowlist.log" 2>&1
 supabase --output-format json migration list --linked \
   > "$EVIDENCE_DIR/migration-list-after.json"
 jq -e --arg version "$MIGRATION_VERSION" \
   '[.migrations[] | select(.remote == $version)] | length == 1' \
   "$EVIDENCE_DIR/migration-list-after.json" >/dev/null
+jq -e --arg version "$ALLOWLIST_MIGRATION_VERSION" \
+  '[.migrations[] | select(.remote == $version)] | length == 1' \
+  "$EVIDENCE_DIR/migration-list-after.json" >/dev/null
 ```
 
-Nếu linked project không chứng minh đúng database/service đang phát hành, dừng và không repair. Release ledger chuẩn gồm exact SHA, ba artifact hash, backup hash, apply log, checker log và migration-list before/after.
+Nếu linked project không chứng minh đúng database/service đang phát hành, dừng và không repair. Release ledger chuẩn gồm exact SHA, bốn artifact hash, backup hash, apply log, checker log và migration-list before/after.
 
 ## 6. Reload PostgREST rồi postflight lần hai
 

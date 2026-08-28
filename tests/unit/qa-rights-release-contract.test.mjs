@@ -197,11 +197,13 @@ test("assigned-progress runbook pins artifacts and orders backup, apply, postfli
 
   for (const artifact of [
     "supabase/migrations/20260827130000_assigned_progress_visibility.sql",
+    "supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql",
     "scripts/check-assigned-progress-visibility.sql",
     "scripts/forward-recover-assigned-progress-visibility.sql",
   ]) assert.match(source, new RegExp(artifact.replaceAll(".", "\\.")));
   assert.match(source, /REVIEWED_RELEASE_SHA/);
   assert.match(source, /EXPECTED_MIGRATION_SHA256/);
+  assert.match(source, /EXPECTED_ALLOWLIST_SHA256/);
   assert.match(source, /EXPECTED_CHECKER_SHA256/);
   assert.match(source, /EXPECTED_RECOVERY_SHA256/);
   assert.match(source, /PREVIOUS_PAGES_SHA/);
@@ -213,6 +215,7 @@ test("assigned-progress runbook pins artifacts and orders backup, apply, postfli
   assert.match(source, /notify pgrst, 'reload schema'/i);
   assert.match(source, /postflight-after-reload\.log/);
   assert.match(source, /migration repair --status applied 20260827130000/);
+  assert.match(source, /migration repair --status applied 20260828100000/);
   assert.match(source, /e2e:progress-rights/);
   assert.match(source, /item_permissions_mode[^\n]*preview/i);
   assert.match(source, /forward-recover-assigned-progress-visibility\.sql/);
@@ -290,6 +293,31 @@ test("assigned-progress checker requires all five persona IDs to be pairwise dis
   assert.match(source,
     /count\(distinct persona_id\)[\s\S]*unnest\(array\[v_admin,v_manager,v_assigned_qa,v_unassigned_qa,v_thien_my\]\)/i);
   assert.match(source, /<>\s*5/);
+});
+
+test("assigned-progress preflight follow-up allowlists only the two reviewed security-definer functions", async () => {
+  const source = await read("supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql");
+
+  assert.match(source, /^begin;/m);
+  assert.match(source, /^commit;/m);
+  assert.equal((source.match(/rpc_my_editable_progress_rights\(\)/g) ?? []).length, 3);
+  assert.equal((source.match(/rpc_update_progress__assigned_impl_20260827\(text,jsonb,text,jsonb,integer\)/g) ?? []).length, 3);
+  assert.match(source, /acd365815ebaeabc18de2f79f23dbd0a466fef67e8c69a601cb261c72cef5e9d/,
+    "precondition must pin the exact helper definition observed before the follow-up");
+  assert.match(source, /7ae2e60331ef00e45bc7193c7388a99754dc6a51159a9e34bcbf6af502c90522/,
+    "precondition must also accept only the exact reviewed post-state for idempotence");
+  assert.match(source, /proacl=array\['postgres=X\/postgres','service_role=X\/postgres',\s*'authenticated=X\/postgres'\]::aclitem\[\]/,
+    "batch RPC ACL must be pinned before allowlisting");
+  assert.match(source, /proacl=array\['postgres=X\/postgres'\]::aclitem\[\]/,
+    "private writer must remain owner-only before allowlisting");
+  assert.ok((source.match(/\) is distinct from true/g) ?? []).length >= 4,
+    "every metadata/ACL predicate must fail closed when PostgreSQL returns NULL");
+  assert.match(source, /v_count\s*<>\s*514/);
+  assert.match(source, /v_digest\s*<>\s*'82020b2908015d95f228f6caacf90f3a'/);
+  assert.match(source, /v_warning_count\s*<>\s*14/);
+  assert.match(source, /v_warning_digest\s*<>\s*'7bc0aa25501a745ddc161e13ef5dab9a'/);
+  assert.doesNotMatch(source, /insert into|update\s+public\.|delete from|truncate/iu,
+    "follow-up must not mutate business data");
 });
 
 test("assigned-progress runbook pushes and verifies exact feature and main SHAs with unambiguous workflow and Pages evidence", async () => {
