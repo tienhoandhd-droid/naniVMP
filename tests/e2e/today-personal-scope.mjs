@@ -66,7 +66,9 @@ function bangkokDay(offset) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
-function activity({ code, ownerPersonId = null, supportPersonId = null, department = "qa" }) {
+function activity({
+  code, ownerPersonId = null, supportPersonId = null, department = "qa", area = "QA-AREA-E2E",
+}) {
   const deadline = bangkokDay(-1);
   const ownerName = "QA Trùng Tên";
   const raw = {
@@ -76,6 +78,7 @@ function activity({ code, ownerPersonId = null, supportPersonId = null, departme
     validation_type: "PQ",
     department,
     exec_depts: [department],
+    area_code: area,
     owner_name: ownerName,
     support_name: supportPersonId ? "QA hỗ trợ Today" : null,
     owner_person_id: ownerPersonId,
@@ -98,6 +101,7 @@ function activity({ code, ownerPersonId = null, supportPersonId = null, departme
     dept: department,
     depts: [department],
     execDepts: [department],
+    area,
     owner: ownerName,
     owner_name: ownerName,
     ownerPersonId,
@@ -114,7 +118,10 @@ const ACTIVITIES = [
   activity({ code: CODE.support, ownerPersonId: PERSON.unrelatedOtherDepartment, supportPersonId: PERSON.staff }),
   // Same display name as the linked QA staff member, deliberately another person ID.
   activity({ code: CODE.sameNameUnrelated, ownerPersonId: PERSON.unrelatedSameName }),
-  activity({ code: CODE.otherDepartment, ownerPersonId: PERSON.unrelatedOtherDepartment, department: "xsx" }),
+  activity({
+    code: CODE.otherDepartment, ownerPersonId: PERSON.unrelatedOtherDepartment,
+    department: "xsx", area: "XSX-AREA-E2E",
+  }),
   activity({ code: CODE.manager, ownerPersonId: PERSON.manager }),
   activity({ code: CODE.admin, ownerPersonId: PERSON.admin }),
 ];
@@ -161,6 +168,20 @@ async function waitForTodayCodes(page, expectedCodes) {
   }, { timeout: 15_000 }, expectedCodes);
 }
 
+async function waitForExactTodayCodes(page, expectedCodes) {
+  const expected = [...expectedCodes].sort();
+  try {
+    await page.waitForFunction((want) => {
+      const shown = [...new Set([...document.querySelectorAll(".hn-muc .hn-muc__ma")]
+        .map((node) => node.textContent?.trim())
+        .filter(Boolean))].sort();
+      return JSON.stringify(shown) === JSON.stringify(want);
+    }, { timeout: 15_000 }, expected);
+  } catch (cause) {
+    throw new Error(`Today rows did not reach ${JSON.stringify(expected)}; saw ${JSON.stringify(await visibleTodayCodes(page))}`, { cause });
+  }
+}
+
 async function assertScopeButton(page, label, { disabled = false } = {}) {
   const state = await page.$eval(`button[aria-label="${label}"]`, (button) => ({
     disabled: button.disabled,
@@ -170,7 +191,47 @@ async function assertScopeButton(page, label, { disabled = false } = {}) {
   assert.equal(state.disabled, disabled, `${label} disabled state`);
 }
 
-async function openToday({ user, businessRole, personId = null }) {
+async function openGlobalFilter(page) {
+  await page.evaluate(() => {
+    const filterBar = document.querySelector('[aria-label="Phạm vi toàn hệ thống"]');
+    const button = [...(filterBar?.querySelectorAll("button") || [])]
+      .find((candidate) => candidate.textContent?.trim().startsWith("Bộ lọc"));
+    if (!(button instanceof HTMLButtonElement)) throw new Error("Không tìm thấy nút Bộ lọc");
+    button.click();
+  });
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="Phạm vi toàn hệ thống"] button')]
+    .some((button) => button.textContent?.trim().startsWith("Bộ lọc")
+      && button.getAttribute("aria-expanded") === "true"), { timeout: 5_000 });
+}
+
+async function selectGlobalFilter(page, label) {
+  await page.evaluate((expectedLabel) => {
+    const filterBar = document.querySelector('[aria-label="Phạm vi toàn hệ thống"]');
+    const option = [...(filterBar?.querySelectorAll("button") || [])]
+      .find((candidate) => candidate.textContent?.includes(expectedLabel));
+    if (!(option instanceof HTMLButtonElement)) throw new Error(`Không tìm thấy lựa chọn lọc ${expectedLabel}`);
+    option.click();
+  }, label);
+  await page.waitForFunction((expectedLabel) => [...document.querySelectorAll('[aria-label="Phạm vi toàn hệ thống"] button')]
+    .some((button) => button.textContent?.includes(expectedLabel) && button.getAttribute("aria-pressed") === "true"),
+  { timeout: 5_000 }, label);
+}
+
+async function clearGlobalFilters(page) {
+  await page.evaluate(() => {
+    const filterBar = document.querySelector('[aria-label="Phạm vi toàn hệ thống"]');
+    const button = [...(filterBar?.querySelectorAll("button") || [])]
+      .find((candidate) => candidate.textContent?.trim() === "Xóa lọc");
+    if (!(button instanceof HTMLButtonElement)) throw new Error("Không tìm thấy nút Xóa lọc");
+    button.click();
+  });
+  await page.waitForFunction(() => {
+    const hash = new URLSearchParams(location.hash.slice(1));
+    return !hash.has("dept") && !hash.has("area");
+  }, { timeout: 5_000 });
+}
+
+async function openToday({ user, businessRole, personId = null, hash = "v=today" }) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1500, height: 1000 });
   await page.evaluateOnNewDocument(() => localStorage.clear());
@@ -199,7 +260,9 @@ async function openToday({ user, businessRole, personId = null }) {
       kho.rpc_my_ui_access = accessFor(businessRole);
       kho.rpc_get_vmp_dashboard = {
         activities: ACTIVITIES.map((row) => ({ ...row, _raw: { ...row._raw } })),
-        objects: [],
+        objects: ACTIVITIES.map((row) => ({
+          code: row.code, name: row.name, dept: row.dept, area: row.area, cls: "tb", crit: "TB",
+        })),
         updated_at: "2026-08-28T00:00:00Z",
       };
       kho.rpc_get_vmp_watermark = {
@@ -208,7 +271,7 @@ async function openToday({ user, businessRole, personId = null }) {
       kho.rpc_my_editable_progress_rights = { ok: true, rights: [] };
     },
   });
-  await page.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.goto(`${GOC}#${hash}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"), { timeout: 15_000 });
   return { page, chanNgoai };
 }
@@ -222,7 +285,7 @@ const browser = await puppeteer.launch({
 try {
   {
     const { page, chanNgoai } = await openToday({
-      user: USER.staff, businessRole: "qa_staff", personId: PERSON.staff,
+      user: USER.staff, businessRole: "qa_staff", personId: PERSON.staff, hash: "v=today&me=1",
     });
     try {
       await waitForTodayCodes(page, [CODE.owner, CODE.support]);
@@ -236,12 +299,46 @@ try {
       await assertScopeButton(page, "Xem việc cả đội");
       assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của tôi/,
         "linked QA staff opens Today in personal scope");
+      assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get("me")), "1",
+        "pre-existing global My work URL state reaches Today unchanged");
 
       await page.click('button[aria-label="Xem việc cả đội"]');
       await waitForTodayCodes(page, [CODE.sameNameUnrelated]);
       await assertScopeButton(page, "Chỉ xem việc của tôi");
       assert.ok((await visibleTodayCodes(page)).includes(CODE.sameNameUnrelated),
         "the team action reveals the same-department unrelated row");
+
+      await openGlobalFilter(page);
+      assert.equal(await page.evaluate(() => [...document.querySelectorAll("button")]
+        .some((button) => button.textContent?.includes("QA-AREA-E2E"))), true,
+      "the filter-reset E2E fixture exposes a selectable QA area");
+      await selectGlobalFilter(page, "QA – QLCL");
+      await selectGlobalFilter(page, "QA-AREA-E2E");
+      await page.waitForFunction(() => {
+        const hash = new URLSearchParams(location.hash.slice(1));
+        return hash.get("dept") === "qa" && hash.get("area") === "QA-AREA-E2E" && hash.get("me") === "1";
+      }, { timeout: 5_000 });
+      await clearGlobalFilters(page);
+      await assertScopeButton(page, "Chỉ xem việc của tôi");
+      assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của cả đội/,
+        "clearing department and area leaves the explicit Today team scope unchanged");
+      assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get("me")), "1",
+        "clearing Today department and area does not mutate the global My work URL state");
+
+      await page.click('[data-view="overview"]');
+      await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Tổng quan"), { timeout: 5_000 });
+      const overviewGlobalState = await page.evaluate(() => ({
+        hash: new URLSearchParams(location.hash.slice(1)).get("me"),
+        onlyMine: [...document.querySelectorAll('[aria-label="Phạm vi toàn hệ thống"] button')]
+          .find((button) => button.textContent?.includes("Việc của tôi"))?.getAttribute("aria-pressed"),
+      }));
+      assert.deepEqual(overviewGlobalState, { hash: "1", onlyMine: "true" },
+        "global My work remains enabled after Today filters reset");
+      await page.click('[data-view="today"]');
+      await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"), { timeout: 5_000 });
+      await assertScopeButton(page, "Chỉ xem việc của tôi");
+      assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của cả đội/,
+        "returning to Today preserves the explicitly selected team scope");
       assert.equal(chanNgoai.length, 0, "linked QA staff scenario must remain fully intercepted");
     } finally {
       await page.close();
@@ -260,7 +357,7 @@ try {
         `${persona.label} opens Today in team scope`);
 
       await page.click('button[aria-label="Chỉ xem việc của tôi"]');
-      await waitForTodayCodes(page, [persona.ownCode]);
+      await waitForExactTodayCodes(page, [persona.ownCode]);
       const personalCodes = await visibleTodayCodes(page);
       assert.ok(!personalCodes.includes(CODE.owner) && !personalCodes.includes(CODE.sameNameUnrelated),
         `${persona.label} can narrow team Today to its linked canonical performer`);
