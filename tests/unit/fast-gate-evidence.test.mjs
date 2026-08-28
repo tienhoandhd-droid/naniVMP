@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
   assertNodeVersion,
+  createOrderedWriter,
   executeGateRun,
   resolveGatePlan,
+  runCli,
+  terminateProcessGroup,
 } from "../../scripts/fast-gates/run.mjs";
 import { runPreviewSuites } from "../../scripts/fast-gates/run-preview-suites.mjs";
 
@@ -30,9 +34,43 @@ function fakeSpawner(events, calls) {
   };
 }
 
+const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/iu;
+const SHA256 = "a".repeat(64);
+const BASE_SHA = "b".repeat(40);
+const HEAD_SHA = "c".repeat(40);
+
+function focusedSelection() {
+  return {
+    schemaVersion: 1,
+    mode: "focused",
+    baseSha: BASE_SHA,
+    headSha: HEAD_SHA,
+    dirtyTreeSha256: SHA256,
+    changedPathsSha256: SHA256,
+    manifestSha256: SHA256,
+    matchedRuleIds: ["docs-only"],
+    reasons: ["focused-rules"],
+    gates: ["diff-check"],
+  };
+}
+
 test("registry rejects unknown gates and Node versions other than v24.18.0", () => {
   assert.throws(() => assertNodeVersion("v22.0.0"), /v24\.18\.0/u);
   assert.throws(() => resolveGatePlan({ gates: ["not-a-gate"] }), /unknown gate/u);
+});
+
+test("failed Node version is retained in the receipt evidence", async (t) => {
+  const directory = await fixtureDirectory(t);
+  const receipt = await executeGateRun({
+    selection: focusedSelection(),
+    receiptPath: join(directory, "wrong-node.json"),
+    stateHome: directory,
+    nodeVersion: "v22.0.0",
+    output: () => {},
+  });
+
+  assert.equal(receipt.status, "failed");
+  assert.equal(receipt.nodeVersion, "v22.0.0");
 });
 
 test("duplicate gates are executed once in stable order", () => {
@@ -105,6 +143,148 @@ test("failed command or interrupt cannot produce a passing receipt", async (t) =
   }
 });
 
+test("receipt records complete sanitized evidence with UTC monotonic timing and no UUID", async (t) => {
+  const directory = await fixtureDirectory(t);
+  const wallClock = [new Date("2026-08-28T01:02:03.000Z"), new Date("2026-08-28T01:02:04.000Z")];
+  const monotonic = [100, 120, 140, 175];
+  const receipt = await executeGateRun({
+    selection: focusedSelection(),
+    receiptPath: join(directory, "receipt.json"),
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    exists: () => true,
+    spawnCommand: fakeSpawner([{ output: "ok\n" }], []),
+    output: () => {},
+    now: () => wallClock.shift(),
+    monotonicNow: () => monotonic.shift(),
+  });
+
+  assert.deepEqual(receipt.selection, focusedSelection());
+  assert.deepEqual(receipt.gates[0].argv, ["git", "diff", "--check"]);
+  assert.equal(receipt.nodeVersion, "v24.18.0");
+  assert.equal(receipt.startedAtUtc, "2026-08-28T01:02:03.000Z");
+  assert.equal(receipt.finishedAtUtc, "2026-08-28T01:02:04.000Z");
+  assert.equal(receipt.durationMs, 75);
+  assert.deepEqual(receipt.exit, { code: 0, signal: null });
+  assert.deepEqual(receipt.cleanup, {
+    result: "not_required",
+    termSent: false,
+    killSent: false,
+    closed: true,
+  });
+  assert.deepEqual(Object.keys(receipt).sort(), [
+    "cleanup",
+    "durationMs",
+    "errorKind",
+    "exit",
+    "finishedAtUtc",
+    "gates",
+    "nodeVersion",
+    "rawLog",
+    "requiresFullGate",
+    "schemaVersion",
+    "selection",
+    "startedAtUtc",
+    "status",
+  ]);
+  assert.doesNotMatch(JSON.stringify(receipt), UUID);
+});
+
+test("raw writes are serialized in emitted stdout and stderr order", async () => {
+  const values = [];
+  const writer = createOrderedWriter(async (value) => {
+    if (value === "stdout-first") await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
+    values.push(value);
+  });
+
+  await Promise.all([
+    writer.append("stdout-first"),
+    writer.append("stderr-second"),
+    writer.append("stdout-third"),
+  ]);
+
+  assert.deepEqual(values, ["stdout-first", "stderr-second", "stdout-third"]);
+});
+
+test("selection and argument failures still write a failed requested receipt", async (t) => {
+  const directory = await fixtureDirectory(t);
+  const receiptPath = join(directory, "selection-failure.json");
+  const receipt = await runCli(["--selection", "missing.json", "--receipt", receiptPath], {
+    repoDir: directory,
+    readSelection: async () => { throw new Error("selection unavailable"); },
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    output: () => {},
+  });
+
+  assert.equal(receipt.status, "failed");
+  assert.equal(JSON.parse(await readFile(receiptPath, "utf8")).status, "failed");
+  const argumentReceiptPath = join(directory, "argument-failure.json");
+  const argumentReceipt = await runCli(["--unknown", "--receipt", argumentReceiptPath], {
+    repoDir: directory,
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    output: () => {},
+  });
+  assert.equal(argumentReceipt.status, "failed");
+  assert.equal(JSON.parse(await readFile(argumentReceiptPath, "utf8")).status, "failed");
+});
+
+test("raw log close failure writes a failed receipt", async (t) => {
+  const directory = await fixtureDirectory(t);
+  const receipt = await executeGateRun({
+    selection: focusedSelection(),
+    receiptPath: join(directory, "close-failure.json"),
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    exists: () => true,
+    spawnCommand: fakeSpawner([{ output: "partial\n" }], []),
+    rawLogFinalizer: async () => { throw new Error("close failed"); },
+    output: () => {},
+  });
+
+  assert.equal(receipt.status, "failed");
+  assert.equal(receipt.rawLog.closed, false);
+});
+
+test("raw log setup failure still writes a failed requested receipt", async (t) => {
+  const directory = await fixtureDirectory(t);
+  const receiptPath = join(directory, "raw-log-setup-failure.json");
+  const receipt = await executeGateRun({
+    selection: focusedSelection(),
+    receiptPath,
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    rawLogFactory: async () => { throw new Error("state unavailable"); },
+    output: () => {},
+  });
+
+  assert.equal(receipt.status, "failed");
+  assert.equal(receipt.rawLog.closed, false);
+  assert.equal(JSON.parse(await readFile(receiptPath, "utf8")).status, "failed");
+});
+
+test("owned process group receives TERM then closes descendants", async (t) => {
+  const child = spawn(process.execPath, ["-e", [
+    "const { spawn } = require('node:child_process');",
+    "const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+    "process.stdout.write(String(grandchild.pid));",
+    "setInterval(() => {}, 1000);",
+  ].join(" ")], { detached: true, stdio: ["ignore", "pipe", "ignore"] });
+  t.after(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} });
+  const grandchildPid = Number(await new Promise((resolvePid) => child.stdout.once("data", (data) => resolvePid(data.toString()))));
+
+  const cleanup = await terminateProcessGroup({ child, timeoutMs: 500 });
+
+  assert.deepEqual(cleanup, {
+    result: "terminated",
+    termSent: true,
+    killSent: false,
+    closed: true,
+  });
+  assert.throws(() => process.kill(grandchildPid, 0), /ESRCH/u);
+});
+
 test("raw log hash and byte count match the closed file", async (t) => {
   const directory = await fixtureDirectory(t);
   const receipt = await executeGateRun({
@@ -116,7 +296,8 @@ test("raw log hash and byte count match the closed file", async (t) => {
     spawnCommand: fakeSpawner([{ output: "first\nsecond\n" }], []),
     output: () => {},
   });
-  const rawLog = await readFile(join(directory, "vmp-fast-gates", receipt.rawLog.runId, receipt.rawLog.file));
+  const [runDirectory] = await readdir(join(directory, "vmp-fast-gates"));
+  const rawLog = await readFile(join(directory, "vmp-fast-gates", runDirectory, "raw.log"));
 
   assert.equal(receipt.rawLog.sha256, sha256(rawLog));
   assert.equal(receipt.rawLog.bytes, rawLog.byteLength);
@@ -142,6 +323,23 @@ test("receipt redacts URL email UUID and secret sentinels by construction", asyn
   assert.doesNotMatch(receiptText, /@example\.invalid/u);
   assert.doesNotMatch(receiptText, /123e4567/u);
   assert.doesNotMatch(receiptText, /sentinel/u);
+});
+
+test("receipt rejects UUID-shaped selection identifiers", async (t) => {
+  const directory = await fixtureDirectory(t);
+  const selection = focusedSelection();
+  selection.matchedRuleIds = ["123e4567-e89b-12d3-a456-426614174000"];
+  selection.reasons = ["123e4567-e89b-12d3-a456-426614174000"];
+  selection.gates = ["123e4567-e89b-12d3-a456-426614174000"];
+  const receipt = await executeGateRun({
+    selection,
+    receiptPath: join(directory, "uuid-selection.json"),
+    stateHome: directory,
+    nodeVersion: "v24.18.0",
+    output: () => {},
+  });
+
+  assert.doesNotMatch(JSON.stringify(receipt), UUID);
 });
 
 test("receipt is atomically replaced and incomplete cleanup is failed", async (t) => {
