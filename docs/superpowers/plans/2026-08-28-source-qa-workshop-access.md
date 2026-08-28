@@ -74,6 +74,9 @@ SQA_SUPPORT_CAN_VIEW_AND_EDIT_7
 SQA_UNRELATED_DENIED
 SQA_ASSIGNMENT_PROJECTION_NOT_AUTHORITY
 SQA_REPLACE_AND_CLEAR_IMMEDIATE
+SQA_SUPPORT_ONLY_REMAINS_COLLABORATOR
+SACCESS_ENFORCE_FAILURE_BEFORE_REPAIR_ROLLS_BACK
+SACCESS_ENFORCE_FAILURE_AFTER_REPAIR_ROLLS_BACK
 SWS_AREA_VIEW_WITHOUT_ITEM_ASSIGNMENT
 SWS_AREA_VIEW_HAS_NO_EDIT_WITHOUT_ASSIGNMENT
 SWS_LINE_DOES_NOT_CROSS_LINE
@@ -86,6 +89,13 @@ The projection test deletes the compatibility QA assignment inside the test
 transaction and still expects canonical owner/support access. The Source
 immutability test snapshots `to_jsonb(vmp_source_objects)` before QA/workshop
 actual/status writes and compares it afterward.
+
+The support-only fixture has no Source owner. Reconciliation must preserve one
+canonical support collaborator without inventing or promoting a primary. The
+two enforce failure-injection phases abort immediately before repair and again
+after repair but before commit, then reconnect and prove the database is still
+at the expand state: the fail-closed refresh stub remains installed, service
+execute remains revoked, and projection hashes/counts are unchanged.
 
 - [ ] **Step 3: Write security RED**
 
@@ -171,17 +181,30 @@ RLS enabled but no broad policy; mutations are not granted to authenticated.
 
 Create singleton `vmp_authorization_revision`, its touch helper/transactional
 triggers, Source owner/support/list/scope indexes, candidate indexes, and active
-assignment indexes. Trigger changes must touch the revision once per
-transaction and never mutate Source business fields.
+assignment indexes. Preserve and assert both existing partial unique indexes:
+`vmp_item_assignments_one_active_qa_primary` and
+`vmp_item_assignments_one_active_qa_person`; do not relax either one. Trigger
+changes must touch the revision once per transaction and never mutate Source
+business fields.
 
-- [ ] **Step 5: Add private projection reconciler and repair drift**
+- [ ] **Step 5: Add private reconciler and fence the expand gap**
 
 Implement `vmp_reconcile_source_qa_projection(uuid)`. Lock Source, related items,
-then Source-owned QA assignments in stable order. Synchronize plan owner/support
-and `source_owner`/`source_support` projection rows; soft-revoke stale projection
-rows. Run it for Source objects in stable ID order. Postcondition requires zero
-Source/plan mismatch and zero missing active owner/support projection for
-eligible canonical relationships. Rights tests must still ignore projection.
+then active/reusable inactive QA assignments in stable order. Its contract must
+demote/audit a different active primary before owner activation, soft-revoke and
+audit a same-person noncanonical row before canonical activation, keep support
+as collaborator, and use one `source_owner` primary when owner=support. Do not
+run reconciliation in expand and do not mutate current plan/assignment
+projections.
+
+Replace `rpc_refresh_source_item_assignments()` temporarily with a
+same-signature fail-closed `SOURCE_ACCESS_UPGRADE_IN_PROGRESS` stub and revoke
+service-role execute. This must block owner SQL by behavior as well as normal
+service calls by ACL. Assert the stub definition/ACL and unchanged projection
+hash/counts. Each migration takes the same transaction-scoped advisory lock;
+the operator serializes the two separate linked-CLI sessions and forbids
+concurrent legacy apply/recovery scripts. The fail-closed stub, not a lock held
+between sessions, protects the expand-to-enforce gap.
 
 - [ ] **Step 6: Run focused GREEN for expansion**
 
@@ -190,8 +213,9 @@ bash scripts/run-source-qa-workshop-access-db-tests.sh --phase expand
 git diff --check
 ```
 
-Expected: schema/backfill/index/projection checks pass; authorization tests that
-need enforcement remain expected RED and are reported separately by the harness.
+Expected: schema/index/helper/stub checks pass; service-role refresh is denied,
+existing projections are byte-unchanged, and authorization/reconciliation tests
+that need enforcement remain expected RED and are reported separately.
 
 - [ ] **Step 7: Commit**
 
@@ -207,7 +231,19 @@ git commit -m "feat(access): enforce source relation and add workshop coverage s
 - Modify: `tests/sql/source-qa-workshop-access.sql`
 - Modify: `tests/sql/source-qa-workshop-access-security.sql`
 
-- [ ] **Step 1: Implement private predicates**
+- [ ] **Step 1: Replace refresh and reconcile projections**
+
+Assert the exact expand-state schema, fail-closed refresh hash/ACL, and both QA
+unique indexes. Install a projection-aware `rpc_refresh_source_item_assignments`
+while service-role execute remains revoked. It calls the canonical reconciler in
+stable Source order, never deletes/reinserts or globally re-ranks QA rows, and
+keeps equipment maintenance isolated. Run audited reconciliation for every
+active Source, prove owner=support-aware zero drift and idempotence, then run
+all non-ACL reconciliation/security assertions. Only then restore the exact
+owner+service-role ACL, assert that final ACL and the remaining postconditions,
+and commit.
+
+- [ ] **Step 2: Implement private predicates**
 
 Create/replace the exact helpers from the design:
 
@@ -226,7 +262,7 @@ its editable array is `{'actual_validation_date'}` only when matching active,
 unexpired `equipment_department` assignment also exists. Admin/QA Manager
 rules preserve their current exact allowlists.
 
-- [ ] **Step 2: Make Source assignment save atomic and timeline-independent**
+- [ ] **Step 3: Make Source assignment save atomic and timeline-independent**
 
 Replace `rpc_save_catalog_object` behind the existing signature. Split access
 fields from planned-timeline fields; remove owner/support from
@@ -236,7 +272,7 @@ projection reconciler, audit, and touch revision. Return one success or one
 failure—remove partial `*_failed` arrays. Store no owner/support in pending
 change JSON.
 
-- [ ] **Step 3: Harden all code-relation writers without signature changes**
+- [ ] **Step 4: Harden all code-relation writers without signature changes**
 
 Review `rpc_generate_timeline`, catalog apply V1/V2, `rpc_create_plan_item`,
 `rpc_commit_catalog_import`, `rpc_upsert_source_row`, sheet sync/reconciliation,
@@ -245,7 +281,7 @@ signatures, require the locked active Source code for generated items, and let
 the unique index reject a second active Source with that code. Prevent any
 unreviewed direct owner/support update from bypassing reconciliation.
 
-- [ ] **Step 4: Add coverage APIs**
+- [ ] **Step 5: Add coverage APIs**
 
 Implement, with exact ACL/JSON error contracts:
 
@@ -259,7 +295,7 @@ The writer accepts only an active uniquely linked workshop principal and a
 department/area/optional-line tuple currently present in active Source. It uses
 optimistic version, mandatory reason, soft revoke, audit, and revision bump.
 
-- [ ] **Step 5: Serialize progress authorization with revocation**
+- [ ] **Step 6: Serialize progress authorization with revocation**
 
 Modify the enforced progress implementation so it locks Source and current
 grant/assignment evidence before resolving the field allowlist. Add two harness
@@ -267,7 +303,7 @@ sessions for QA owner revoke vs progress and workshop scope revoke vs progress.
 Exactly one valid commit order is observed; no write may commit after an earlier
 revoke commit.
 
-- [ ] **Step 6: Run business GREEN**
+- [ ] **Step 7: Run business GREEN**
 
 ```bash
 bash scripts/run-source-qa-workshop-access-db-tests.sh --phase behavior
@@ -276,7 +312,7 @@ bash scripts/run-source-qa-workshop-access-db-tests.sh --phase behavior
 Expected: every Task 1 business rule, mixed-payload atomicity, projection repair,
 and concurrency marker passes and the suite rolls back fixtures.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql tests/sql/source-qa-workshop-access*.sql
@@ -569,7 +605,9 @@ PASS markers, and verify project contract, modes, active Admin, Source/item exac
 mapping, owner/support consistency, candidate eligibility distribution, area-less
 count, grant readiness, indexes, function definitions/ACLs, RLS, and complete
 SECURITY DEFINER inventory. Postflight uses fresh connections and lower-role
-claims in rollback-only checks; no production writer probe.
+claims in rollback-only checks; no production writer probe. Capture the refresh
+definition hash and ACL at baseline, expand, and enforce; inventory cron/SQL call
+paths including `scripts/apply-qa-rights-account-manifest.sql`.
 
 - [ ] **Step 2: Implement safe forward recovery**
 
@@ -601,6 +639,10 @@ directory. Recovery relies on transaction ownership, those captures, the
 reviewed forward-recovery artifact, and read-only postflight. The runbook uses no
 pooler password/pg_dump assumption, reloads PostgREST schema only after
 postflight, and defines fresh-session persona probes and Pages exact-SHA rollback.
+Each migration acquires the same transaction-scoped release advisory lock. The
+operator keeps the separate linked-CLI calls serialized and explicitly forbids
+concurrent legacy manifest/recovery scripts until enforce postflight; the
+fail-closed refresh stub is the actual protection between migration sessions.
 
 - [ ] **Step 4: Add CI commands**
 

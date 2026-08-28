@@ -266,10 +266,19 @@ projections. The private reconciler also maintains active QA assignment rows:
   `source='source_support'`.
 
 Old Source projection rows are soft-revoked. Manual rows are not silently
-rewritten, but they are non-authoritative for source-linked QA access. The
-expand migration repairs the current missing owner/support projection and emits
-counts to the checker. A health query continues to report Source/plan/assignment
-drift independently of effective rights.
+rewritten, but they are non-authoritative for source-linked QA access. When a
+manual/legacy active row conflicts with the canonical projection, reconciliation
+soft-revokes or demotes it with an explicit row-level audit and nonblank reason.
+The two existing active-QA uniqueness indexes remain enforced. If owner and
+support are the same person, one active `source_owner` primary row satisfies
+both relationships and any duplicate `source_support` row stays inactive.
+
+The expand migration creates the private reconciler but does not run it. The
+enforce migration first installs a projection-aware refresh implementation,
+then repairs the current missing owner/support projections in stable Source
+order and emits counts to the checker. A second reconciliation is a no-op. A
+health query continues to report Source/plan/assignment drift independently of
+effective rights.
 
 ### 4.4 Authorization revision
 
@@ -586,17 +595,28 @@ cursor export pages only on explicit export.
 
 Two transaction-owned forward migrations are used:
 
-1. `20260828140000_source_qa_workshop_access_expand.sql` — schema, relation
-   backfill, grant table, authorization revision, constraints, indexes,
-   projection reconciliation, and additive helpers;
-2. `20260828150000_source_qa_workshop_access_enforce.sql` — atomic Source writer,
+1. `20260828140000_source_qa_workshop_access_expand.sql` — schema, grant table,
+   authorization revision, constraints, indexes, and additive helpers. It
+   installs a same-signature fail-closed
+   `rpc_refresh_source_item_assignments()` upgrade stub, revokes its service-role
+   execution, and proves existing plan/assignment projections are unchanged;
+2. `20260828150000_source_qa_workshop_access_enforce.sql` — projection-aware
+   refresh replacement, stable audited reconciliation, atomic Source writer,
    timeline-field separation, role predicates, item rights, RLS, all reader and
    SECURITY DEFINER replacements, capability rows, ACL/inventory, and
-   postconditions.
+   postconditions. It first proves every non-ACL reconciliation and security
+   postcondition, then restores the exact owner+service-role refresh ACL,
+   asserts that final ACL and the remaining postconditions, and commits.
 
-The expand migration can safely commit while the old reader boundary remains;
-the enforce migration is one transaction, so no browser-visible mixture of new
-RLS and old unfiltered RPCs commits.
+The expand migration can safely commit while the old reader boundary remains
+because it does not mutate projections and the destructive legacy refresh is
+temporarily replaced by an owner-safe fail-closed stub. Each migration takes
+the same transaction-scoped advisory lock. Because the linked-CLI calls are
+separate database sessions, the operator serializes them and forbids concurrent
+legacy apply/recovery scripts; the fail-closed stub is the actual protection in
+the gap. The enforce migration is one transaction, so no browser-visible
+mixture of new RLS and old unfiltered RPCs commits. A failed enforce rolls back
+to the expand state with refresh still unavailable.
 
 ### 10.2 Preflight
 
@@ -676,6 +696,12 @@ fresh session.
   commit; change/removal revokes immediately.
 - The current 26 projection gaps are repaired, but deleting a compatibility
   assignment in a rollback-only test does not remove canonical QA access.
+- A support-only Source remains one canonical collaborator; reconciliation
+  never invents or promotes a primary when the owner is empty.
+- Failure injected immediately before repair and again after repair but before
+  commit rolls the entire enforce migration back to the expand state: the
+  fail-closed refresh stub and revoked service ACL remain, and projection
+  hashes/counts are unchanged.
 - Unrelated manual QA assignment does not grant a source-linked item.
 - Workshop area grant shows Source/items without an item assignment; editable
   fields remain empty.
