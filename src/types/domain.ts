@@ -40,6 +40,8 @@ export interface AppUser {
   /** Phân loại quyền theo hạng mục của danh bạ vmp_performers. Null/thiếu khi
    * schema cũ chưa có cột hoặc tài khoản chưa nối với nhân sự. */
   accessClass?: string | null;
+  /** Khóa người chính tắc từ vmp_performers.id; khác với uid tài khoản. */
+  personId?: string | null;
   token?: string;
 }
 

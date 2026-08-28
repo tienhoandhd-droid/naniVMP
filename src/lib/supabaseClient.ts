@@ -153,19 +153,26 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
   if (typeof data.role !== "string") return null;
   const role = data.role as UserRole;
   let accessClass: string | null = null;
+  let personId: string | null = null;
   try {
-    // database.ts có thể chưa được sinh lại ngay sau migration danh bạ, nên
-    // cast tên cột ở biên query. Lỗi/RLS/schema cũ chỉ làm mất accessClass,
-    // không được biến một lần đọc phụ thành lỗi đăng nhập.
+    // Lỗi/RLS/schema cũ chỉ làm mất liên kết danh bạ, không được biến một
+    // lần đọc phụ thành lỗi đăng nhập.
     const { data: performer, error: performerError } = await supabase
       .from("vmp_performers")
-      .select("*")
+      .select("id, access_class")
       .eq("user_id" as never, uid)
       .eq("is_active", true)
       .maybeSingle();
     const performerRow = performer as unknown as Record<string, unknown> | null;
-    if (!performerError && performerRow && typeof performerRow.access_class === "string") {
-      accessClass = performerRow.access_class;
+    if (!performerError && performerRow) {
+      const canonicalPersonId = performerRow.id;
+      const rawAccessClass = performerRow.access_class;
+      personId = typeof canonicalPersonId === "string" && canonicalPersonId.trim()
+        ? canonicalPersonId.trim()
+        : null;
+      accessClass = typeof rawAccessClass === "string" && rawAccessClass.trim()
+        ? rawAccessClass.trim()
+        : null;
     }
   } catch {
     // Degrade về null: profiles vẫn là nguồn bắt buộc để xác thực và vào app.
@@ -175,6 +182,7 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
     role,
     department: data.department || "",
     accessClass,
+    personId,
   };
 }
 

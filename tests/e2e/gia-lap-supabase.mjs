@@ -202,7 +202,11 @@ export function dungHangMuc(i) {
        không bằng tên. Thiếu nó thì mọi hạng mục rơi vào nhóm "hồ sơ chưa
        đủ" và bộ kiểm không còn phản ánh đúng cảnh vận hành.
        Cứ mỗi 8 hạng mục thì để trống một cái, để nhóm đó vẫn có mẫu. */
-    owner_person_id: i % 8 === 7 ? null : `00000000-0000-4000-8000-${String(100 + i).padStart(12, "0")}`,
+    owner_person_id: i % 8 === 7
+      ? null
+      : i === 0
+        ? "person-current"
+        : `00000000-0000-4000-8000-${String(100 + i).padStart(12, "0")}`,
     year: 2026,
     state: "active",
     status: tt,
@@ -429,10 +433,11 @@ export function dungKhoDuLieu(kichBan) {
   };
 
   const nhanSu = Array.from({ length: day ? 6 : 0 }, (_, i) => ({
-    id: `pf-${i}`,
-    person_id: `pf-${i}`,
-    full_name: `Người phụ trách ${i + 1}`,
-    name: `Người phụ trách ${i + 1}`,
+    id: i === 0 ? "person-current" : `pf-${i}`,
+    // Compatibility alias only; profile lookup uses the canonical `id` above.
+    person_id: i === 0 ? "person-current" : `pf-${i}`,
+    full_name: i === 0 ? "Tên cố ý không khớp" : `Người phụ trách ${i + 1}`,
+    name: i === 0 ? "Tên cố ý không khớp" : `Người phụ trách ${i + 1}`,
     email: `nguoi${i + 1}@vi-du.test`,
     department: BO_PHAN[i % BO_PHAN.length],
     dept: BO_PHAN[i % BO_PHAN.length],
@@ -806,19 +811,30 @@ export function traLoi(kho, u, req, { nguoiDung = NGUOI_DUNG } = {}) {
   if (bang) {
     const ten = bang[1];
     const rows = Array.isArray(kho[ten]) ? kho[ten] : [];
+    const performerUserId = u.searchParams.get("user_id");
+    const performerActive = u.searchParams.get("is_active");
+    const filteredRows = ten === "vmp_performers"
+      ? rows.filter((row) => (
+        (!performerUserId || row.user_id === performerUserId.replace(/^eq\./, ""))
+        && (!performerActive || String(row.is_active) === performerActive.replace(/^eq\./, ""))
+      ))
+      : rows;
     // .single() gửi Accept: application/vnd.pgrst.object+json và đòi đúng
     // một dòng; trả mảng cho nó là supabase-js báo lỗi ngay.
     const motDong = (req.headers().accept || "").includes("pgrst.object");
     if (motDong) {
-      if (rows.length === 0) {
+      if (filteredRows.length !== 1) {
         return {
           status: 406, headers: dau,
-          body: JSON.stringify({ code: "PGRST116", message: "không có dòng nào" }),
+          body: JSON.stringify({
+            code: "PGRST116",
+            message: filteredRows.length === 0 ? "không có dòng nào" : "có nhiều hơn một dòng",
+          }),
         };
       }
-      return { status: 200, headers: dau, body: JSON.stringify(rows[0]) };
+      return { status: 200, headers: dau, body: JSON.stringify(filteredRows[0]) };
     }
-    return { status: 200, headers: dau, body: JSON.stringify(rows) };
+    return { status: 200, headers: dau, body: JSON.stringify(filteredRows) };
   }
 
   return { status: 200, headers: dau, body: "null" };
