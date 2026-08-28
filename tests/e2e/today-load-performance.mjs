@@ -20,7 +20,14 @@ const ACTION_READ_CODE = "E2E-TODAY-READ";
 const ACTION_FIELDS = ["actual_validation_date"];
 
 function isoDayFromNow(days) {
-  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(Date.now() + days * 86_400_000));
+  const part = (type) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function setUnfinishedStages(item, firstDeadline) {
