@@ -42,10 +42,16 @@ import {
 } from "../../features/progress/progressModalOperationTarget.ts";
 import type { Activity as PlanActivity } from "../../types/domain.ts";
 
-/** Ngày hôm nay theo giờ máy (không dùng toISOString — lệch múi giờ VN trước 7h sáng). */
+/** Ngày nghiệp vụ của nhà máy theo Asia/Bangkok, không phụ thuộc timezone
+ * của máy người mở web (hoặc runner CI). */
 const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 };
 
 /** Giai đoạn pipeline (stageOf) → khối nhập tương ứng trong hộp (1–4). */

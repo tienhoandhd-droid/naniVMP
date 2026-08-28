@@ -56,6 +56,8 @@ const cors = {
 };
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const revisionTimestamp = (revision) =>
+  `2026-08-28T00:00:${String(revision).padStart(2, "0")}.000Z`;
 const answer = (request, body, status = 200) => request.method() === "OPTIONS"
   ? request.respond({ status: 204, headers: cors, body: "" })
   : request.respond({ status, headers: cors, contentType: "application/json", body: JSON.stringify(body) });
@@ -80,16 +82,17 @@ const sourceRows = [
   sourceRow(ids.objectB, "SRC-E2E-B", "Line 2"),
 ];
 
-function sourceFacets() {
+function sourceFacets(rows = sourceRows) {
+  const ownerCount = rows.filter((row) => row.owner_person_id === ids.owner).length;
   return {
     ok: true,
-    departments: [{ value: "XSX", count: 2 }],
-    areas: [{ value: "A01", count: 2 }],
-    owners: [{ person_id: ids.owner, owner_name: "QA phụ trách E2E", count: 2 }],
-    validation: [{ value: "outside", count: 0 }, { value: "validated", count: 2 }],
-    first_month: [{ value: "missing", count: 0 }, { value: "present", count: 2 }],
-    ownership: [{ value: "assigned", count: 2 }, { value: "unassigned", count: 0 }],
-    frequency: [{ value: "gt12", count: 0 }, { value: "lte12", count: 2 }],
+    departments: rows.length ? [{ value: "xsx", count: rows.length }] : [],
+    areas: rows.length ? [{ value: "a01", count: rows.length }] : [],
+    owners: ownerCount ? [{ value: "owner:qa phụ trách e2e", person_id: ids.owner, name: "QA phụ trách E2E", count: ownerCount }] : [],
+    validation: [{ value: "outside", count: 0 }, { value: "validated", count: rows.length }],
+    first_month: [{ value: "missing", count: 0 }, { value: "present", count: rows.length }],
+    ownership: [{ value: "assigned", count: rows.length }, { value: "unassigned", count: 0 }],
+    frequency: [{ value: "gt12", count: 0 }, { value: "lte12", count: rows.length }],
   };
 }
 
@@ -122,7 +125,7 @@ function dashboard(persona, revoked, revision) {
   return {
     objects: allowed.map((row) => ({ code: row.object_code, name: row.object_name })),
     activities: allowed.map((row) => activity(row.object_code)),
-    source: "supabase", updated_at: `2026-08-28T00:00:0${revision}.000Z`, authorization_revision: revision, year: 2026,
+    source: "supabase", updated_at: revisionTimestamp(revision), authorization_revision: revision, year: 2026,
   };
 }
 
@@ -169,6 +172,24 @@ function choices() {
     { department: "XSX", area_code: "A01", line: "Line 1" },
     { department: "XSX", area_code: "A01", line: "Line 2" },
   ], next_cursor: null };
+}
+
+function pendingPayload(revision) {
+  return { ok: true, total: 1, changes: [{
+    id: `d1000000-0000-4000-8000-${String(revision).padStart(12, "0")}`,
+    object_kind: "Thiết bị", object_code: `PENDING-R${revision}`, status: "pending",
+    source_version: 1, timeline_revision: 1, created_at: revisionTimestamp(revision),
+    created_by_name: "E2E", has_impact: true, apply_reason: null, last_error: null,
+  }] };
+}
+
+function historyPayload(revision) {
+  return { ok: true, total: 1, history: [{
+    id: `e1000000-0000-4000-8000-${String(revision).padStart(12, "0")}`,
+    created_at: revisionTimestamp(revision), actor: "E2E", effective_business_role: "qa_manager",
+    action: "update", table_name: "vmp_source_objects", record_id: `HISTORY-R${revision}`,
+    changed_fields: ["owner_person_id"], reason: "E2E", source: "web", has_detail: true,
+  }] };
 }
 
 function warnings(rows) {
@@ -234,16 +255,19 @@ async function openPersona(persona, state) {
     if (rpc === "rpc_get_vmp_dashboard") return answer(request, dashboard(persona, state.revoked, state.revision));
     if (rpc === "rpc_get_vmp_watermark") return answer(request, {
       year: 2026, plan_items: visibleRows(persona, state.revoked).length, objects: visibleRows(persona, state.revoked).length,
-      updated_at: `2026-08-28T00:00:0${state.revision}.000Z`, authorization_revision: state.revision,
+      updated_at: revisionTimestamp(state.revision), authorization_revision: state.revision,
     });
     if (rpc === "rpc_list_source_objects") {
       const rows = visibleRows(persona, state.revoked);
+      if (state.holdOldCard && !state.revoked && body.p_filters?.validation === "outside") {
+        state.held.push({ rpc: "card_source_list", request, payload: { ok: true, rows, authorized_total: rows.length, next_cursor: null } }); return;
+      }
       if (state.holdOldSource && !state.revoked) { state.held.push({ rpc, request, payload: { ok: true, rows, authorized_total: rows.length, next_cursor: null } }); return; }
       return answer(request, { ok: true, rows, authorized_total: rows.length, next_cursor: null });
     }
     if (rpc === "rpc_source_object_facets") {
-      if (state.holdOldFacets && !state.revoked) { state.held.push({ rpc, request, payload: sourceFacets() }); return; }
-      return answer(request, sourceFacets());
+      if (state.holdOldFacets && !state.revoked) { state.held.push({ rpc, request, payload: sourceFacets(visibleRows(persona, false)) }); return; }
+      return answer(request, sourceFacets(visibleRows(persona, state.revoked)));
     }
     if (rpc === "rpc_source_warnings") {
       if (state.holdOldWarnings && !state.revoked) { state.held.push({ rpc, request, payload: warnings(visibleRows(persona, false)) }); return; }
@@ -256,10 +280,28 @@ async function openPersona(persona, state) {
       return answer(request, candidates());
     }
     if (rpc === "rpc_save_catalog_object") return answer(request, { ok: true, object_code: body.p_object_code, version: 2, timeline_revision: 1, pending_timeline: false });
-    if (rpc === "rpc_export_source_objects") return answer(request, { ok: true, rows: visibleRows(persona, state.revoked), authorized_total: visibleRows(persona, state.revoked).length, next_cursor: null });
+    if (rpc === "rpc_export_source_objects") {
+      const rows = visibleRows(persona, state.revoked);
+      const payload = { ok: true, rows, authorized_total: rows.length, next_cursor: null };
+      return answer(request, payload);
+    }
     if (rpc === "rpc_list_source_workshop_coverage") return answer(request, coverage());
     if (rpc === "rpc_source_workshop_scope_choices") return answer(request, choices());
     if (rpc === "rpc_set_source_workshop_scope_grant") return answer(request, { ok: true, grant_id: "c1000000-0000-4000-8000-000000000001", version: 2, is_active: body.p_is_active });
+    if (rpc === "rpc_list_catalog_changes") {
+      const payload = pendingPayload(state.revision);
+      if (state.holdOldPending && state.revision === state.pendingHoldRevision) {
+        state.held.push({ rpc, request, payload }); return;
+      }
+      return answer(request, payload);
+    }
+    if (rpc === "rpc_catalog_history") {
+      const payload = historyPayload(state.revision);
+      if (state.holdOldHistory && state.revision === state.historyHoldRevision) {
+        state.held.push({ rpc, request, payload }); return;
+      }
+      return answer(request, payload);
+    }
     if (rpc === "rpc_my_editable_progress_rights") {
       const canDate = persona === PERSONAS.areaWorkshop || persona === PERSONAS.lineWorkshop;
       const canQa = persona === PERSONAS.owner || persona === PERSONAS.support;
@@ -309,7 +351,11 @@ function enabledProgressFields(page) {
 }
 
 try {
-  const state = { revision: 7, revoked: false, candidateReads: 0, held: [], holdOldSource: false, holdOldWarnings: false, holdOldFacets: false };
+  const state = {
+    revision: 7, revoked: false, candidateReads: 0, held: [],
+    holdOldSource: false, holdOldWarnings: false, holdOldFacets: false, holdOldCard: false,
+    holdOldPending: false, pendingHoldRevision: 0, holdOldHistory: false, historyHoldRevision: 0,
+  };
 
   // QA manager: a failed directory read is an error with Retry, then the
   // selected canonical UUID and audit reason are sent to the only writer.
@@ -350,6 +396,39 @@ try {
   assert.deepEqual({ person: grant?.body.p_performer_id, line: grant?.body.p_line, reason: grant?.body.p_reason }, {
     person: ids.areaWorkshop, line: null, reason: "Phạm vi xưởng E2E có lý do",
   }, "area-wide workshop scope must use canonical person UUID, null line, and a reason");
+
+  // Pending/history responses opened under an older authorization revision
+  // cannot commit after the shell has cleared that generation.
+  state.holdOldPending = true; state.pendingHoldRevision = state.revision;
+  await manager.click("[data-cw-nav=pending]");
+  for (let attempt = 0; attempt < 60
+    && !state.held.some((entry) => entry.rpc === "rpc_list_catalog_changes"); attempt += 1) await wait(50);
+  assert.equal(state.held.some((entry) => entry.rpc === "rpc_list_catalog_changes"), true,
+    "old pending response must be held");
+  state.revision += 1;
+  await manager.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await manager.waitForFunction(() => document.body.innerText.includes("PENDING-R8"), { timeout: 15_000 });
+  for (const old of state.held.splice(0)) answer(old.request, old.payload);
+  await wait(300);
+  assert.equal(await manager.evaluate(() => document.body.innerText.includes("PENDING-R7")), false,
+    "late pending response must not replace the current revision");
+  state.holdOldPending = false;
+
+  state.holdOldHistory = true; state.historyHoldRevision = state.revision;
+  await manager.click("[data-cw-nav=history]");
+  for (let attempt = 0; attempt < 60
+    && !state.held.some((entry) => entry.rpc === "rpc_catalog_history"); attempt += 1) await wait(50);
+  assert.equal(state.held.some((entry) => entry.rpc === "rpc_catalog_history"), true,
+    "old history response must be held");
+  await wait(1_100);
+  state.revision = 9;
+  await manager.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await manager.waitForFunction(() => document.body.innerText.includes("HISTORY-R9"), { timeout: 15_000 });
+  for (const old of state.held.splice(0)) answer(old.request, old.payload);
+  await wait(300);
+  assert.equal(await manager.evaluate(() => document.body.innerText.includes("HISTORY-R8")), false,
+    "late history response must not replace the current revision");
+  state.holdOldHistory = false;
   await manager.close();
 
   // Lower roles receive only the object region.  The rows themselves prove
@@ -383,6 +462,7 @@ try {
   // only released after the revocation state has committed.
   const revokedOwner = await openPersona(PERSONAS.owner, state);
   await waitSource(revokedOwner, "SRC-E2E-A");
+  await revokedOwner.waitForSelector('option[value="owner:qa phụ trách e2e"]', { timeout: 15_000 });
   state.holdOldSource = true; state.holdOldFacets = true; state.holdOldWarnings = true;
   /* Mở một generation cũ còn quyền và cố ý giữ ba response Source. Focus
      dùng đúng silent-refresh path của App, nên trang không bị navigation hủy
@@ -398,7 +478,7 @@ try {
 
   // Thu hồi ở generation kế tiếp; UI phải trống trước khi ba response cũ về.
   await wait(1_100); // vượt coalesce window của visible-refresh controller
-  state.revoked = true; state.revision = 9;
+  state.revoked = true; state.revision += 1;
   await revokedOwner.evaluate(() => window.dispatchEvent(new Event("focus")));
   await revokedOwner.waitForFunction(() => !document.body.innerText.includes("SRC-E2E-A"), { timeout: 15_000 });
   assert.equal(await visibleNav(revokedOwner).then((items) => items.join(",")), "objects", "revocation closes protected Source UI to its safe object-only shell");
@@ -406,7 +486,40 @@ try {
   await wait(300);
   assert.equal(await revokedOwner.evaluate(() => document.body.innerText.includes("SRC-E2E-A")), false,
     "late old list/warning/facet responses must not repopulate revoked Source data");
+  assert.equal(await revokedOwner.$('option[value="owner:qa phụ trách e2e"]'), null,
+    "late old facet must not restore an owner option after revocation");
   await revokedOwner.close();
+
+  // Bề mặt Source phụ ở màn Tiến độ cũng phải gắn revision, không chỉ Shell.
+  // Giữ một page Source cũ qua hai generation để chứng minh Card không hồi sinh.
+  state.holdOldSource = false; state.holdOldFacets = false; state.holdOldWarnings = false;
+  state.held = []; state.revoked = false; state.revision += 1;
+  const cardOwner = await openPersona(PERSONAS.owner, state);
+  await cardOwner.goto(`${ORIGIN}#v=progress`, { waitUntil: "domcontentloaded" });
+  await cardOwner.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((button) => button.textContent?.trim() === "Theo đối tượng"));
+  await cardOwner.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Theo đối tượng")?.click());
+  await cardOwner.waitForSelector("[data-source-outside-toggle]", { timeout: 15_000 });
+  await cardOwner.click("[data-source-outside-toggle]");
+  await cardOwner.waitForFunction(() => document.querySelector("[data-source-outside-table]")?.textContent?.includes("SRC-E2E-A") === true);
+  await wait(1_100);
+  state.holdOldCard = true; state.revision += 1;
+  await cardOwner.evaluate(() => window.dispatchEvent(new Event("focus")));
+  for (let attempt = 0; attempt < 60
+    && !state.held.some((entry) => entry.rpc === "card_source_list"); attempt += 1) await wait(50);
+  assert.equal(state.held.some((entry) => entry.rpc === "card_source_list"), true,
+    "old Card Source page must be held before revocation");
+  await wait(1_100);
+  state.revoked = true; state.revision += 1;
+  await cardOwner.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await cardOwner.waitForFunction(() => document.querySelector("[data-source-outside-export]")?.disabled === true
+    && !document.querySelector("[data-source-outside-table]")?.textContent?.includes("SRC-E2E-A"), { timeout: 15_000 });
+  for (const old of state.held) answer(old.request, old.payload);
+  await wait(300);
+  assert.equal(await cardOwner.$eval("[data-source-outside-table]", (node) => node.textContent?.includes("SRC-E2E-A")), false,
+    "late Card Source response must not restore revoked Source rows");
+  await cardOwner.close();
 
   const forbiddenByLowerRole = bodies.filter((entry) => ["qa_staff", "workshop_staff"].includes(entry.role)
     && ["rpc_list_catalog_dataset", "rpc_list_catalog_changes", "rpc_catalog_history", "rpc_stage_catalog_import"].includes(entry.rpc));

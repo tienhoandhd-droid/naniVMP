@@ -14,7 +14,7 @@
  *  tả đã kết luận là phải thẩm định, nhưng cột Thẩm định vẫn để 'n'. Không
  *  tự sửa hộ: chỉ nêu ra để QA quyết.
  * ===================================================================== */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ShieldOff, Search, Download, ExternalLink, AlertTriangle } from "lucide-react";
 
 import { C, TEXT, NUM, INP } from "../../constants/theme.ts";
@@ -46,7 +46,8 @@ const td: React.CSSProperties = {
   borderTop: `1px solid ${C.line}`, verticalAlign: "top",
 };
 
-export default function KhongThamDinhCard({ onMoDanhMuc }: {
+export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }: {
+  authorizationRevision: number | null;
   /** Nhảy sang Danh mục & Nhập liệu để sửa chính dòng nguồn này. */
   onMoDanhMuc?: (code: string, nhom?: string) => void;
 }) {
@@ -57,21 +58,36 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
   const kw = useDebounce(q.trim().toLowerCase(), 250);
   const [nhom, setNhom] = useState("all");
   const [tt, setTt] = useState<"all" | "chay" | "ngung" | "soat">("all");
+  const requestSeq = useRef(0);
+  const hasAuthorizationRevision = Number.isSafeInteger(authorizationRevision)
+    && (authorizationRevision ?? 0) > 0;
+
+  /* Đây là bề mặt Source nằm ngoài tab Source. Revision mất/đổi phải xóa
+     đồng bộ trước paint và làm mọi export/request của generation cũ vô hiệu. */
+  useLayoutEffect(() => {
+    requestSeq.current += 1;
+    setRows(null);
+    setLoi("");
+    setQ("");
+    setNhom("all");
+    setTt("all");
+  }, [authorizationRevision]);
 
   // Chỉ tải khi người dùng mở thẻ ra — trang tiến độ đã nặng sẵn, không nên
   // cõng thêm một lượt đọc bảng mà đa số phiên không ai xem tới.
   useEffect(() => {
-    if (!mo || rows) return;
-    let huy = false;
+    if (!mo || rows || !hasAuthorizationRevision) return;
+    const seq = ++requestSeq.current;
+    setLoi("");
     listAllSourceObjects({
       objectKind: null,
       search: "",
       filters: { validation: "outside", first_month: "all", owner: "all", frequency: "all" },
     })
-      .then((ds) => { if (!huy) setRows(ds); })
-      .catch((e) => { if (!huy) setLoi((e as Error).message || "không rõ"); });
-    return () => { huy = true; };
-  }, [mo, rows]);
+      .then((ds) => { if (seq === requestSeq.current) setRows(ds); })
+      .catch((e) => { if (seq === requestSeq.current) setLoi((e as Error).message || "không rõ"); });
+    return () => { requestSeq.current += 1; };
+  }, [authorizationRevision, hasAuthorizationRevision, mo, rows]);
 
   const nhoms = useMemo(
     () => [...new Set((rows || []).map((r) => String(r.object_kind || "—")))].sort(),
@@ -104,6 +120,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
   }, [rows, nhom, tt, kw]);
 
   const xuatCsv = () => {
+    if (!hasAuthorizationRevision) return;
     const cot = ["Mã", "Tên", "Nhóm", "Bộ phận", "Khu vực", "Tình trạng",
       "Lý do thẩm định", "Cần rà soát"];
     const o = (v: unknown) => {
@@ -132,7 +149,7 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
 
   return (
     <Card>
-      <button type="button" onClick={() => setMo((v) => !v)}
+      <button type="button" data-source-outside-toggle onClick={() => setMo((v) => !v)}
         style={{ width: "100%", textAlign: "left", border: "none", background: "transparent",
           cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 40, height: 40, borderRadius: 14, background: C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -158,8 +175,11 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
 
       {mo && (
         <div style={{ marginTop: 14 }}>
+          {!hasAuthorizationRevision && (
+            <Tag color={C.marigoldText} bg={C.marigoldSoft}>Đang xác minh lại quyền xem Dữ liệu nguồn…</Tag>
+          )}
           {loi && <Tag color={C.raspText} bg={C.raspSoft}>Lỗi đọc danh mục: {loi}</Tag>}
-          {!rows && !loi && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Đang tải…</div>}
+          {hasAuthorizationRevision && !rows && !loi && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Đang tải…</div>}
 
           {rows && (
             <>
@@ -180,17 +200,19 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
                   <option value="all">Tất cả nhóm</option>
                   {nhoms.map((k) => <option key={k} value={k}>{k}</option>)}
                 </select>
-                <button type="button" onClick={xuatCsv} disabled={!hien.length}
+                <button type="button" data-source-outside-export onClick={xuatCsv}
+                  disabled={!hasAuthorizationRevision || !hien.length}
                   style={{ display: "inline-flex", alignItems: "center", gap: 7, fontFamily: TEXT,
                     fontSize: 12, fontWeight: 800, color: C.mintText, background: C.mintSoft,
                     border: "none", borderRadius: 999, padding: "9px 15px",
-                    cursor: hien.length ? "pointer" : "not-allowed", opacity: hien.length ? 1 : 0.5 }}>
+                    cursor: hasAuthorizationRevision && hien.length ? "pointer" : "not-allowed",
+                    opacity: hasAuthorizationRevision && hien.length ? 1 : 0.5 }}>
                   <Download size={14} /> Xuất CSV ({hien.length})
                 </button>
               </div>
 
               <TableScroll maxHeight="56vh">
-                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 900 }}>
+                <table data-source-outside-table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 900 }}>
                   <thead>
                     <tr>
                       <th style={th}>Mã</th>

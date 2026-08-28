@@ -93,9 +93,10 @@ function OMoc({ raw, dlKey, ngayKey, ttKey }: {
   );
 }
 
-export default function CatalogView({ objects = [], acts = [], canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = false, onMoDanhMuc, canAssignWorkshop }: {
+export default function CatalogView({ objects = [], acts = [], authorizationRevision, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = false, onMoDanhMuc, canAssignWorkshop }: {
   objects?: VmpObject[];
   acts?: Activity[];
+  authorizationRevision: number | null;
   /** access.can("source","edit_catalog") — được đổi "Người thực hiện". */
   canChonNguoiThucHien?: boolean;
   /** access.businessRole is admin/qa_manager — được đổi "Trạng thái nghiệp vụ". */
@@ -404,7 +405,7 @@ export default function CatalogView({ objects = [], acts = [], canChonNguoiThucH
 
       {/* Ẩn khỏi danh sách trên mà không có chỗ tra thì thành GIẤU. Thẻ này là
           chỗ tra: mở ra là thấy đủ 55 đối tượng ngoài kế hoạch kèm lý do. */}
-      <KhongThamDinhCard onMoDanhMuc={onMoDanhMuc} />
+      <KhongThamDinhCard authorizationRevision={authorizationRevision} onMoDanhMuc={onMoDanhMuc} />
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
         <b style={{ color: C.mintText }}>Supabase là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).

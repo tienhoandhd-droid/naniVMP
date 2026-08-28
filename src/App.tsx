@@ -2132,6 +2132,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   </div>
                   {nhomTheo === "doituong" ? (
                     <CatalogView objects={filteredObjects} acts={filteredActs}
+                      authorizationRevision={authorizationRevision}
                       canChonNguoiThucHien={canChonNguoiThucHien} canDoiTrangThai={canDoiTrangThai}
                       onUpdate={updateActivity} onReload={reloadData} readOnly={false}
                       canAssignWorkshop={access.can("progress", "assign_workshop_staff")}

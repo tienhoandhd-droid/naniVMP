@@ -330,9 +330,13 @@ export default function CatalogWorkspaceShell({
     { state: "loading", rows: [], total: 0, err: "" });
   const [penTick, setPenTick] = useState(0);
   const [hisTick, setHisTick] = useState(0);
+  const penSeq = useRef(0);
+  const hisSeq = useRef(0);
 
   useLayoutEffect(() => {
     svSeq.current += 1;
+    penSeq.current += 1;
+    hisSeq.current += 1;
     setSvRows([]);
     setSvTotal(0);
     setSvState("loading");
@@ -342,22 +346,26 @@ export default function CatalogWorkspaceShell({
   }, [sourceAccessKey]);
 
   useEffect(() => {
+    const seq = ++penSeq.current;
     if (!hasAuthorizationRevision || vung !== "pending" || !canManageSourceDatasets || !canEdit || !canSinhTimeline) return;
     setPen((p) => ({ ...p, state: "loading" }));
     listPendingChanges().then((kq) => {
+      if (seq !== penSeq.current) return;
       if (kq.ok) setPen({ state: "ready", changes: kq.changes, err: "" });
       else setPen({ state: "error", changes: [], err: kq.error || "Không đọc được hàng đợi" });
     });
-  }, [vung, penTick, canManageSourceDatasets, canEdit, canSinhTimeline, hasAuthorizationRevision]);
+  }, [vung, penTick, canManageSourceDatasets, canEdit, canSinhTimeline, hasAuthorizationRevision, sourceAccessKey]);
 
   useEffect(() => {
+    const seq = ++hisSeq.current;
     if (!hasAuthorizationRevision || vung !== "history" || !canManageSourceDatasets || !canViewCatalogHistory) return;
     setHis((p) => ({ ...p, state: "loading" }));
     listHistory({}, trang, PAGE_SIZE).then((kq) => {
+      if (seq !== hisSeq.current) return;
       if (kq.ok) setHis({ state: "ready", rows: kq.history, total: kq.total, err: "" });
       else setHis({ state: "error", rows: [], total: 0, err: kq.error || "Không đọc được lịch sử" });
     });
-  }, [vung, trang, hisTick, canManageSourceDatasets, canViewCatalogHistory, hasAuthorizationRevision]);
+  }, [vung, trang, hisTick, canManageSourceDatasets, canViewCatalogHistory, hasAuthorizationRevision, sourceAccessKey]);
 
   /* ---------------- Điều hướng trong workspace --------------------- */
   const doiVung = (id: VungId) => {
