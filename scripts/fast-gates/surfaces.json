@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "account-administration",
+      "paths": [
+        "src/features/accountAdministration/**",
+        "src/features/itemPermissions/**"
+      ],
+      "gates": ["diff-check", "typecheck", "unit-account", "preview-admin"]
+    },
+    {
+      "id": "catalog-workspace",
+      "paths": [
+        "src/features/catalogWorkspace/**",
+        "src/lib/catalogForm.ts",
+        "src/components/catalog/**",
+        "src/pages/CatalogPage.tsx",
+        "src/pages/SourceCatalogPage.tsx"
+      ],
+      "gates": ["diff-check", "typecheck", "unit-catalog", "preview-catalog"]
+    },
+    {
+      "id": "progress",
+      "paths": ["src/features/progress/**"],
+      "gates": ["diff-check", "typecheck", "unit-progress", "preview-progress-rights"]
+    },
+    {
+      "id": "timeline",
+      "paths": ["src/features/timeline/**", "src/pages/TimelinePage.tsx"],
+      "gates": ["diff-check", "typecheck", "unit-timeline", "preview-gialap"]
+    },
+    {
+      "id": "today",
+      "paths": ["src/features/today/**"],
+      "gates": ["diff-check", "typecheck", "unit-today", "preview-gialap"]
+    },
+    {
+      "id": "docs-only",
+      "paths": ["docs/**", "README.md"],
+      "gates": ["diff-check"]
+    }
+  ],
+  "fullFallbackPaths": [
+    ".github/**",
+    "package.json",
+    "package-lock.json",
+    "vite.config.*",
+    "playwright*.config.*",
+    ".env*",
+    "scripts/fast-gates/**",
+    "scripts/test-db-cache/**",
+    "tools/codex-skills/**",
+    "src/lib/access.ts",
+    "src/hooks/useAccess.ts",
+    "src/lib/supabase*.ts",
+    "src/types/database.ts",
+    "supabase/**",
+    "scripts/*db*",
+    "scripts/parse-five-role-local-db.mjs",
+    "tests/sql/**"
+  ]
+}
