@@ -237,3 +237,12 @@ export function canLyDo(patch: Record<string, unknown>, dangTaoMoi: boolean): bo
   return TRUONG_ANH_HUONG_TIMELINE.some((k) => k in patch)
     || TRUONG_PHAN_CONG_QA.some((k) => k in patch);
 }
+
+/** Copy is part of the permission boundary: changing Source owner/support
+ * grants/revokes QA access immediately, but does not queue a timeline edit. */
+export function goiYLyDoThayDoi(patch: Record<string, unknown>): string {
+  if (TRUONG_PHAN_CONG_QA.some((key) => key in patch)) {
+    return "Thay đổi này cấp hoặc thu quyền QA ngay và được ghi vào nhật ký phân công.";
+  }
+  return "Thay đổi này chạm tới deadline nên timeline sẽ cần cập nhật lại.";
+}

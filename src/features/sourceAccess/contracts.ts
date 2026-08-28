@@ -59,16 +59,79 @@ export interface SourceQaCandidatesFailure {
 
 export type SourceQaCandidatesResult = SourceQaCandidatesSuccess | SourceQaCandidatesFailure;
 
-export interface SourceObjectListSuccess {
-  ok: true;
-  rows: Record<string, unknown>[];
-  nextCursor: Record<string, unknown> | null;
+export interface SourceObjectListRow {
+  id: string;
+  objectKind: "Thiết bị" | "Quy trình" | "Kho" | "Hệ thống phụ trợ" | "Vận chuyển";
+  objectCode: string;
+  sourceTab: string;
+  sourceRow: number;
+  extra: JsonValue;
+  createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
+  editedOnWeb: boolean;
+  criticalitySource: "auto" | "manual";
+  version: number;
+  timelineRevision: number;
+  timelineAppliedRevision: number;
+  objectName: string | null;
+  department: string | null;
+  areaCode: string | null;
+  line: string | null;
+  status: string | null;
+  showFlag: string | null;
+  validateFlag: string | null;
+  validateReason: string | null;
+  reportClass: string | null;
+  criticalPoint: string | null;
+  note: string | null;
+  ownerName: string | null;
+  supportName: string | null;
+  workGroup: string | null;
+  frequencyMonths: number | null;
+  workdays: number | null;
+  firstMonth: number | null;
+  yearRef: number | null;
+  complexityScore: number | null;
+  qualityImpactScore: number | null;
+  criticalityScore: number | null;
+  updatedBy: string | null;
+  ownerPersonId: string | null;
+  supportPersonId: string | null;
 }
 
-export interface WorkshopScopeGrantResult {
+export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+
+export interface SourceObjectListSuccess {
   ok: true;
-  grant: { id: string } & Record<string, unknown>;
+  rows: SourceObjectListRow[];
+  authorizedTotal: number;
+  nextCursor: { objectCode: string; id: string } | null;
 }
+
+export interface SourceObjectListFailure {
+  ok: false;
+  errorCode: "ACCOUNT_DISABLED" | "ROLE_UNRESOLVED" | "INVALID_LIMIT" | "INVALID_FILTERS" | "INVALID_CURSOR" | "CURSOR_EXPIRED";
+  error: string;
+}
+
+export type SourceObjectListResult = SourceObjectListSuccess | SourceObjectListFailure;
+
+export interface WorkshopScopeGrantSuccess {
+  ok: true;
+  grantId: string;
+  version: number;
+  isActive: boolean;
+}
+
+export interface WorkshopScopeGrantFailure {
+  ok: false;
+  errorCode: "FORBIDDEN" | "REASON_REQUIRED" | "INVALID_ACTIVE_STATE" | "GRANT_NOT_FOUND" | "INVALID_SCOPE" | "SCOPE_NOT_FOUND" | "VERSION_CONFLICT" | "PERSON_NOT_ELIGIBLE" | "DUPLICATE_ACTIVE_SCOPE";
+  error: string;
+  currentVersion?: number;
+}
+
+export type WorkshopScopeGrantResult = WorkshopScopeGrantSuccess | WorkshopScopeGrantFailure;
 
 export class SourceAccessContractError extends Error {
   constructor(message: string) {
@@ -81,6 +144,24 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INELIGIBLE_REASONS = new Set<SourceQaCandidateIneligibilityReason>([
   "PERSON_NOT_FOUND", "PERFORMER_INACTIVE", "ACCOUNT_UNLINKED", "ACCOUNT_DISABLED", "ROLE_INELIGIBLE",
 ]);
+const SOURCE_OBJECT_KINDS = new Set<SourceObjectListRow["objectKind"]>([
+  "Thiết bị", "Quy trình", "Kho", "Hệ thống phụ trợ", "Vận chuyển",
+]);
+const LIST_ERROR_CODES = new Set<SourceObjectListFailure["errorCode"]>([
+  "ACCOUNT_DISABLED", "ROLE_UNRESOLVED", "INVALID_LIMIT", "INVALID_FILTERS", "INVALID_CURSOR", "CURSOR_EXPIRED",
+]);
+const GRANT_ERROR_CODES = new Set<WorkshopScopeGrantFailure["errorCode"]>([
+  "FORBIDDEN", "REASON_REQUIRED", "INVALID_ACTIVE_STATE", "GRANT_NOT_FOUND", "INVALID_SCOPE", "SCOPE_NOT_FOUND",
+  "VERSION_CONFLICT", "PERSON_NOT_ELIGIBLE", "DUPLICATE_ACTIVE_SCOPE",
+]);
+const SOURCE_LIST_ROW_KEYS = [
+  "id", "object_kind", "object_code", "source_tab", "source_row", "extra", "created_at", "updated_at",
+  "is_active", "edited_on_web", "criticality_source", "version", "timeline_revision", "timeline_applied_revision",
+  "object_name", "department", "area_code", "line", "status", "show_flag", "validate_flag", "validate_reason",
+  "report_class", "critical_point", "note", "owner_name", "support_name", "work_group", "frequency_months",
+  "workdays", "first_month", "year_ref", "complexity_score", "quality_impact_score", "criticality_score",
+  "updated_by", "owner_person_id", "support_person_id",
+] as const;
 
 function record(value: unknown, label: string): Record<string, unknown> {
   if (!value || Array.isArray(value) || typeof value !== "object") {
@@ -108,6 +189,40 @@ function uuid(value: unknown, label: string): string {
 function array(value: unknown, label: string): unknown[] {
   if (!Array.isArray(value)) throw new SourceAccessContractError(`${label} must be an array.`);
   return value;
+}
+
+function integer(value: unknown, label: string): number {
+  if (!Number.isSafeInteger(value)) throw new SourceAccessContractError(`${label} must be an integer.`);
+  return value as number;
+}
+
+function nullableInteger(value: unknown, label: string): number | null {
+  if (value === null) return null;
+  return integer(value, label);
+}
+
+function nullableUuid(value: unknown, label: string): string | null {
+  if (value === null) return null;
+  return uuid(value, label);
+}
+
+function exactKeys(raw: Record<string, unknown>, keys: readonly string[], label: string): void {
+  const actual = Object.keys(raw).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+    throw new SourceAccessContractError(`${label} must contain exactly ${expected.length} approved keys.`);
+  }
+}
+
+function json(value: unknown, label: string): JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new SourceAccessContractError(`${label} must be JSON.`);
+    return value;
+  }
+  if (Array.isArray(value)) return value.map((entry, index) => json(entry, `${label}[${index}]`));
+  const raw = record(value, label);
+  return Object.fromEntries(Object.entries(raw).map(([key, entry]) => [key, json(entry, `${label}.${key}`)]));
 }
 
 function candidateIdentity(value: unknown, label: string): SourceQaCandidateIdentity {
@@ -178,22 +293,85 @@ export function decodeSourceQaCandidatesResponse(value: unknown): SourceQaCandid
   };
 }
 
-/** Shared strict boundary for Task 6's paged Source reader. */
-export function decodeSourceObjectListResponse(value: unknown): SourceObjectListSuccess {
-  const raw = record(value, "Source list response");
-  if (raw.ok !== true) throw new SourceAccessContractError("Source list response.ok must be true.");
-  const rows = array(raw.rows, "Source list response.rows").map((row, index) =>
-    record(row, `Source list response.rows[${index}]`));
-  if (raw.next_cursor !== null && (!raw.next_cursor || Array.isArray(raw.next_cursor) || typeof raw.next_cursor !== "object")) {
-    throw new SourceAccessContractError("Source list response.next_cursor must be an object or null.");
+function sourceListRow(value: unknown, label: string): SourceObjectListRow {
+  const raw = record(value, label);
+  exactKeys(raw, SOURCE_LIST_ROW_KEYS, label);
+  const objectKind = string(raw.object_kind, `${label}.object_kind`) as SourceObjectListRow["objectKind"];
+  if (!SOURCE_OBJECT_KINDS.has(objectKind)) throw new SourceAccessContractError(`${label}.object_kind is invalid.`);
+  const criticalitySource = string(raw.criticality_source, `${label}.criticality_source`);
+  if (criticalitySource !== "auto" && criticalitySource !== "manual") {
+    throw new SourceAccessContractError(`${label}.criticality_source is invalid.`);
   }
-  return { ok: true, rows, nextCursor: raw.next_cursor as Record<string, unknown> | null };
+  return {
+    id: uuid(raw.id, `${label}.id`), objectKind, objectCode: string(raw.object_code, `${label}.object_code`),
+    sourceTab: string(raw.source_tab, `${label}.source_tab`), sourceRow: integer(raw.source_row, `${label}.source_row`),
+    extra: json(raw.extra, `${label}.extra`), createdAt: string(raw.created_at, `${label}.created_at`),
+    updatedAt: string(raw.updated_at, `${label}.updated_at`), isActive: (() => {
+      if (typeof raw.is_active !== "boolean") throw new SourceAccessContractError(`${label}.is_active must be boolean.`);
+      return raw.is_active;
+    })(),
+    editedOnWeb: (() => {
+      if (typeof raw.edited_on_web !== "boolean") throw new SourceAccessContractError(`${label}.edited_on_web must be boolean.`);
+      return raw.edited_on_web;
+    })(),
+    criticalitySource,
+    version: integer(raw.version, `${label}.version`),
+    timelineRevision: integer(raw.timeline_revision, `${label}.timeline_revision`),
+    timelineAppliedRevision: integer(raw.timeline_applied_revision, `${label}.timeline_applied_revision`),
+    objectName: nullableString(raw.object_name, `${label}.object_name`),
+    department: nullableString(raw.department, `${label}.department`), areaCode: nullableString(raw.area_code, `${label}.area_code`),
+    line: nullableString(raw.line, `${label}.line`), status: nullableString(raw.status, `${label}.status`),
+    showFlag: nullableString(raw.show_flag, `${label}.show_flag`), validateFlag: nullableString(raw.validate_flag, `${label}.validate_flag`),
+    validateReason: nullableString(raw.validate_reason, `${label}.validate_reason`), reportClass: nullableString(raw.report_class, `${label}.report_class`),
+    criticalPoint: nullableString(raw.critical_point, `${label}.critical_point`), note: nullableString(raw.note, `${label}.note`),
+    ownerName: nullableString(raw.owner_name, `${label}.owner_name`), supportName: nullableString(raw.support_name, `${label}.support_name`),
+    workGroup: nullableString(raw.work_group, `${label}.work_group`), frequencyMonths: nullableInteger(raw.frequency_months, `${label}.frequency_months`),
+    workdays: nullableInteger(raw.workdays, `${label}.workdays`), firstMonth: nullableInteger(raw.first_month, `${label}.first_month`),
+    yearRef: nullableInteger(raw.year_ref, `${label}.year_ref`), complexityScore: nullableInteger(raw.complexity_score, `${label}.complexity_score`),
+    qualityImpactScore: nullableInteger(raw.quality_impact_score, `${label}.quality_impact_score`), criticalityScore: nullableInteger(raw.criticality_score, `${label}.criticality_score`),
+    updatedBy: nullableUuid(raw.updated_by, `${label}.updated_by`), ownerPersonId: nullableUuid(raw.owner_person_id, `${label}.owner_person_id`),
+    supportPersonId: nullableUuid(raw.support_person_id, `${label}.support_person_id`),
+  };
 }
 
-/** Shared strict boundary for Task 6's coverage writer. */
+/** Exact, fail-closed boundary for Task 6's paged Source reader. */
+export function decodeSourceObjectListResponse(value: unknown): SourceObjectListResult {
+  const raw = record(value, "Source list response");
+  if (raw.ok === false) {
+    exactKeys(raw, ["ok", "error_code", "error"], "Source list error response");
+    const errorCode = string(raw.error_code, "Source list response.error_code") as SourceObjectListFailure["errorCode"];
+    if (!LIST_ERROR_CODES.has(errorCode)) throw new SourceAccessContractError("Source list response.error_code is invalid.");
+    return { ok: false, errorCode, error: string(raw.error, "Source list response.error") };
+  }
+  if (raw.ok !== true) throw new SourceAccessContractError("Source list response.ok must be boolean.");
+  exactKeys(raw, ["ok", "rows", "authorized_total", "next_cursor"], "Source list response");
+  const authorizedTotal = integer(raw.authorized_total, "Source list response.authorized_total");
+  if (authorizedTotal < 0) throw new SourceAccessContractError("Source list response.authorized_total must be non-negative.");
+  const nextCursor = raw.next_cursor === null ? null : (() => {
+    const cursor = record(raw.next_cursor, "Source list response.next_cursor");
+    exactKeys(cursor, ["object_code", "id"], "Source list response.next_cursor");
+    return { objectCode: string(cursor.object_code, "Source list response.next_cursor.object_code"), id: uuid(cursor.id, "Source list response.next_cursor.id") };
+  })();
+  return { ok: true, rows: array(raw.rows, "Source list response.rows").map((row, index) => sourceListRow(row, `Source list response.rows[${index}]`)), authorizedTotal, nextCursor };
+}
+
+/** Exact, fail-closed boundary for Task 6's coverage writer. */
 export function decodeWorkshopScopeGrantResponse(value: unknown): WorkshopScopeGrantResult {
   const raw = record(value, "Workshop scope grant response");
-  if (raw.ok !== true) throw new SourceAccessContractError("Workshop scope grant response.ok must be true.");
-  const grant = record(raw.grant, "Workshop scope grant response.grant");
-  return { ok: true, grant: { ...grant, id: uuid(grant.id, "Workshop scope grant response.grant.id") } };
+  if (raw.ok === false) {
+    const errorCode = string(raw.error_code, "Workshop scope grant response.error_code") as WorkshopScopeGrantFailure["errorCode"];
+    if (!GRANT_ERROR_CODES.has(errorCode)) throw new SourceAccessContractError("Workshop scope grant response.error_code is invalid.");
+    const keys = errorCode === "VERSION_CONFLICT" && raw.current_version !== undefined
+      ? ["ok", "error_code", "error", "current_version"]
+      : ["ok", "error_code", "error"];
+    exactKeys(raw, keys, "Workshop scope grant error response");
+    const currentVersion = raw.current_version === undefined ? undefined : integer(raw.current_version, "Workshop scope grant response.current_version");
+    return { ok: false, errorCode, error: string(raw.error, "Workshop scope grant response.error"), ...(currentVersion === undefined ? {} : { currentVersion }) };
+  }
+  if (raw.ok !== true) throw new SourceAccessContractError("Workshop scope grant response.ok must be boolean.");
+  exactKeys(raw, ["ok", "grant_id", "version", "is_active"], "Workshop scope grant response");
+  const version = integer(raw.version, "Workshop scope grant response.version");
+  if (version < 1) throw new SourceAccessContractError("Workshop scope grant response.version must be positive.");
+  if (typeof raw.is_active !== "boolean") throw new SourceAccessContractError("Workshop scope grant response.is_active must be boolean.");
+  return { ok: true, grantId: uuid(raw.grant_id, "Workshop scope grant response.grant_id"), version, isActive: raw.is_active };
 }

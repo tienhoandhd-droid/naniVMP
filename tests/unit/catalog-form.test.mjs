@@ -7,6 +7,7 @@ import {
   truongDangHien,
   coThamDinh,
   canLyDo,
+  goiYLyDoThayDoi,
   TRUONG_ANH_HUONG_TIMELINE,
   TRUONG_PHAN_CONG_QA,
   TRUONG_FORM,
@@ -110,6 +111,11 @@ test("phân công QA cần lý do truy vết nhưng không phải thay đổi ti
     assert.equal(TRUONG_PHAN_CONG_QA.includes(field), true);
     assert.equal(canLyDo({ [field]: "aaaaaaaa-1111-4111-8111-111111111111" }, false), true);
   }
+});
+
+test("gợi ý lý do của phân công QA không nói sai rằng timeline sẽ thay đổi", () => {
+  assert.doesNotMatch(goiYLyDoThayDoi({ owner_person_id: "x" }), /timeline/i);
+  assert.match(goiYLyDoThayDoi({ frequency_months: 6 }), /timeline/i);
 });
 
 test("mã đối tượng khoá sau khi tạo", () => {

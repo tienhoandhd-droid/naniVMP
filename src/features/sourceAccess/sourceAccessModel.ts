@@ -20,6 +20,32 @@ export type SourceQaCandidatesAction =
   | { type: "start"; requestId: number; search: string; append: boolean }
   | { type: "resolve"; requestId: number; result: SourceQaCandidatesResult; append: boolean };
 
+/** A small pure fence shared by the hook and unit tests. Changing the set of
+ * current IDs invalidates both any queued search and every old response. */
+export interface SourceQaRequestFence {
+  includeKey: string;
+  generation: number;
+  cancelPendingDebounce: boolean;
+}
+
+export function initialSourceQaRequestFence(includeKey: string): SourceQaRequestFence {
+  return { includeKey, generation: 0, cancelPendingDebounce: false };
+}
+
+export function invalidateSourceQaRequestFence(
+  previous: SourceQaRequestFence,
+  includeKey: string,
+): SourceQaRequestFence {
+  return { includeKey, generation: previous.generation + 1, cancelPendingDebounce: true };
+}
+
+export function sourceQaRequestIsCurrent(
+  current: SourceQaRequestFence,
+  request: Pick<SourceQaRequestFence, "includeKey" | "generation">,
+): boolean {
+  return current.includeKey === request.includeKey && current.generation === request.generation;
+}
+
 export function initialSourceQaCandidatesState(_includeIds: readonly string[]): SourceQaCandidatesState {
   return {
     status: "idle", activeRequestId: 0, search: "", rows: [], includedCurrent: [],

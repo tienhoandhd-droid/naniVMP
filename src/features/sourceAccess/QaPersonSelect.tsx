@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { RefreshCw } from "lucide-react";
 import { C, TEXT } from "../../constants/theme.ts";
 import type { IncludedSourceQaCandidate, SourceQaCandidateIdentity } from "./contracts.ts";
@@ -24,16 +24,22 @@ function current(state: SourceQaCandidatesState, personId: string | null): Inclu
 }
 
 export default function QaPersonSelect({
-  value, state, ariaLabel, disabled = false, onChange, onRetry, onLoadMore,
+  id, value, state, ariaLabel, ariaDescribedBy, ariaInvalid, disabled = false,
+  onChange, onRetry, onLoadMore, onSearch,
 }: {
+  id: string;
   value: string | null;
   state: SourceQaCandidatesState;
   ariaLabel: string;
+  ariaDescribedBy?: string;
+  ariaInvalid?: boolean;
   disabled?: boolean;
   onChange: (personId: string | null) => void;
   onRetry: () => void;
   onLoadMore: () => void;
+  onSearch: (value: string) => void;
 }) {
+  const [query, setQuery] = useState("");
   const selectedCurrent = current(state, value);
   const ineligible = selectedCurrent && !selectedCurrent.eligible ? selectedCurrent : null;
   const selectable = state.status === "ready" && !disabled;
@@ -49,8 +55,26 @@ export default function QaPersonSelect({
 
   return (
     <div>
+      <label htmlFor={`${id}-search`} className="cw-goi-y">Tìm QA đủ điều kiện</label>
+      <input
+        id={`${id}-search`}
+        type="search"
+        value={query}
+        onChange={(event) => {
+          const nextQuery = event.target.value;
+          setQuery(nextQuery);
+          onSearch(nextQuery);
+        }}
+        placeholder="Nhập tên QA…"
+        aria-label={`Tìm ${ariaLabel}`}
+        disabled={disabled}
+        className="cw-o"
+      />
       <select
+        id={id}
         aria-label={ariaLabel}
+        aria-invalid={ariaInvalid || undefined}
+        aria-describedby={ariaDescribedBy}
         value={value ?? ""}
         disabled={!selectable}
         onChange={(event) => onChange(event.target.value || null)}

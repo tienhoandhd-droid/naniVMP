@@ -19,6 +19,48 @@ const candidate = {
   role_name: "qa_staff",
 };
 
+const SOURCE_ID = "cccccccc-3333-4333-8333-333333333333";
+const sourceListRow = {
+  id: SOURCE_ID,
+  object_kind: "Thiết bị",
+  object_code: "TB-001",
+  source_tab: "Nguồn",
+  source_row: 1,
+  extra: { imported: true },
+  created_at: "2026-08-28T00:00:00.000Z",
+  updated_at: "2026-08-28T00:00:00.000Z",
+  is_active: true,
+  edited_on_web: false,
+  criticality_source: "auto",
+  version: 1,
+  timeline_revision: 0,
+  timeline_applied_revision: 0,
+  object_name: null,
+  department: null,
+  area_code: null,
+  line: null,
+  status: null,
+  show_flag: null,
+  validate_flag: null,
+  validate_reason: null,
+  report_class: null,
+  critical_point: null,
+  note: null,
+  owner_name: null,
+  support_name: null,
+  work_group: null,
+  frequency_months: null,
+  workdays: null,
+  first_month: null,
+  year_ref: null,
+  complexity_score: null,
+  quality_impact_score: null,
+  criticality_score: null,
+  updated_by: null,
+  owner_person_id: null,
+  support_person_id: null,
+};
+
 test("candidate contract decodes an authorized page and an ineligible current selection", () => {
   const result = decodeSourceQaCandidatesResponse({
     ok: true,
@@ -63,10 +105,44 @@ test("candidate contract keeps an RPC failure distinct from successful zero rows
   assert.deepEqual(failure, { ok: false, errorCode: "FORBIDDEN", error: "Không có quyền" });
 });
 
-test("source list and workshop grant contracts fail closed on malformed payloads", () => {
+test("Source list contract accepts only the locked 38-field wire shape", () => {
+  const decoded = decodeSourceObjectListResponse({
+    ok: true,
+    rows: [sourceListRow],
+    authorized_total: 1,
+    next_cursor: { object_code: "TB-001", id: SOURCE_ID },
+  });
+  assert.equal(decoded.ok, true);
+  if (!decoded.ok) return;
+  assert.equal(decoded.rows[0].objectKind, "Thiết bị");
+  assert.equal(decoded.rows[0].extra.imported, true);
+  assert.equal(decoded.nextCursor?.id, SOURCE_ID);
+});
+
+test("Source list and workshop grant contracts fail closed on malformed fields", () => {
   assert.throws(
     () => decodeSourceObjectListResponse({ ok: true, rows: "not-an-array", next_cursor: null }),
     /Source list response/i,
+  );
+  assert.throws(
+    () => decodeSourceObjectListResponse({
+      ok: true, rows: [{ ...sourceListRow, object_kind: "Tự nghĩ" }], authorized_total: 1, next_cursor: null,
+    }),
+    /object_kind/i,
+  );
+  assert.throws(
+    () => decodeSourceObjectListResponse({
+      ok: true, rows: [{ ...sourceListRow, unreviewed: true }], authorized_total: 1, next_cursor: null,
+    }),
+    /exactly 38/i,
+  );
+  assert.deepEqual(
+    decodeSourceObjectListResponse({ ok: false, error_code: "CURSOR_EXPIRED", error: "Hết hạn" }),
+    { ok: false, errorCode: "CURSOR_EXPIRED", error: "Hết hạn" },
+  );
+  assert.throws(
+    () => decodeSourceObjectListResponse({ ok: false, error_code: "FORBIDDEN", error: "Sai hợp đồng" }),
+    /error_code/i,
   );
   assert.throws(
     () => decodeSourceQaCandidatesResponse({
@@ -74,8 +150,21 @@ test("source list and workshop grant contracts fail closed on malformed payloads
     }),
     /authorized_total/i,
   );
-  assert.throws(
-    () => decodeWorkshopScopeGrantResponse({ ok: true, grant: { id: "not-a-uuid" } }),
-    /Workshop scope grant response/i,
+  assert.deepEqual(
+    decodeWorkshopScopeGrantResponse({ ok: true, grant_id: SOURCE_ID, version: 1, is_active: true }),
+    { ok: true, grantId: SOURCE_ID, version: 1, isActive: true },
+  );
+  assert.throws(() => decodeWorkshopScopeGrantResponse({
+    ok: true, grant_id: SOURCE_ID, version: 0, is_active: true,
+  }), /version/i);
+  assert.deepEqual(
+    decodeWorkshopScopeGrantResponse({
+      ok: false, error_code: "VERSION_CONFLICT", error: "Xung đột", current_version: 2,
+    }),
+    { ok: false, errorCode: "VERSION_CONFLICT", error: "Xung đột", currentVersion: 2 },
+  );
+  assert.deepEqual(
+    decodeWorkshopScopeGrantResponse({ ok: false, error_code: "VERSION_CONFLICT", error: "Xung đột" }),
+    { ok: false, errorCode: "VERSION_CONFLICT", error: "Xung đột" },
   );
 });

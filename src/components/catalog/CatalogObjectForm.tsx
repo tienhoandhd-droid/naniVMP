@@ -27,7 +27,7 @@ import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import {
   TRUONG_FORM, BO_PHAN_CHUAN,
-  buildCatalogPatch, canLyDo, coThamDinh, validateCatalogForm, truongThieuDauTien,
+  buildCatalogPatch, canLyDo, coThamDinh, goiYLyDoThayDoi, validateCatalogForm, truongThieuDauTien,
 } from "../../lib/catalogForm.ts";
 import type { GiaTriForm, LoiForm, NhomTruong, TruongForm } from "../../lib/catalogForm.ts";
 import ChonHoacGo from "../../features/catalogWorkspace/ChonHoacGo.tsx";
@@ -218,12 +218,16 @@ export default function CatalogObjectForm({
           />
         ) : t.chonNguoi ? (
           <QaPersonSelect
+            id={id}
             value={form[t.key] || null}
             ariaLabel={t.label}
+            ariaDescribedBy={moTa}
+            ariaInvalid={Boolean(loiO)}
             onChange={(nguoi) => dat(t.key, nguoi ?? "")}
             state={qaCandidates.state}
             onRetry={qaCandidates.retry}
             onLoadMore={qaCandidates.loadMore}
+            onSearch={qaCandidates.search}
             disabled={khoa}
           />
         ) : t.chon ? (
@@ -340,7 +344,7 @@ export default function CatalogObjectForm({
             placeholder="Vì sao đổi? Câu này đi vào nhật ký, người sau đọc để hiểu." />
           {loi.__lyDo && <p id="cof-ly-do-loi" className="cw-loi" role="alert">{loi.__lyDo}</p>}
           <p id="cof-ly-do-goi-y" className="cw-goi-y">
-            Thay đổi này chạm tới deadline hoặc phân công, nên timeline sẽ cần cập nhật lại.
+            {goiYLyDoThayDoi(patch)}
           </p>
         </div>
       )}

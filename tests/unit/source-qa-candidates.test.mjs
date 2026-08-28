@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { initialSourceQaCandidatesState, reduceSourceQaCandidates } from "../../src/features/sourceAccess/sourceAccessModel.ts";
+import {
+  initialSourceQaCandidatesState, initialSourceQaRequestFence,
+  invalidateSourceQaRequestFence, reduceSourceQaCandidates,
+  sourceQaRequestIsCurrent,
+} from "../../src/features/sourceAccess/sourceAccessModel.ts";
 
 const PERSON_A = "aaaaaaaa-1111-4111-8111-111111111111";
 const PERSON_B = "bbbbbbbb-2222-4222-8222-222222222222";
@@ -79,4 +83,13 @@ test("candidate model keeps an ineligible current person visible and exposes err
   });
   assert.equal(state.status, "error");
   assert.equal(state.error?.errorCode, "FORBIDDEN");
+});
+
+test("a new include scope invalidates a queued debounce and any response from the old scope", () => {
+  const before = initialSourceQaRequestFence("owner-a");
+  const queued = { includeKey: before.includeKey, generation: before.generation };
+  const changed = invalidateSourceQaRequestFence(before, "owner-b");
+  assert.equal(sourceQaRequestIsCurrent(changed, queued), false);
+  assert.equal(changed.cancelPendingDebounce, true);
+  assert.equal(sourceQaRequestIsCurrent(changed, { includeKey: "owner-b", generation: changed.generation }), true);
 });
