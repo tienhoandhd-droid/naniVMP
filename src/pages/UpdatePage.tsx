@@ -12,6 +12,7 @@ import MetricGrid from "../components/ui/MetricGrid.tsx";
 import PriorityStrip from "../components/ui/PriorityStrip.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import { buildProgressWorkspaceModel } from "../features/progress/progressWorkspaceModel.ts";
+import { createVisibleRefreshController } from "../lib/visibleRefresh.ts";
 import {
   createProgressRightsGenerationGate,
   fetchMyEditableProgressRights,
@@ -19,8 +20,11 @@ import {
 import {
   filterEditableProgressActivities,
   indexEditableProgressRights,
+  progressValidationCode,
   type EditableProgressRight,
 } from "../features/progress/editableProgressRights.ts";
+import { resolveProgressDeepLink } from "../features/progress/progressDeepLink.ts";
+import type { ProgressDeepLink } from "../features/today/todayModel.ts";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
 
@@ -38,8 +42,10 @@ function progressRightsLoadingState(): ProgressRightsState {
   return { status: "loading", rights: EMPTY_PROGRESS_RIGHTS, error: "" };
 }
 
-export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, focusId, onFocusDone, canAssignWorkshop }: {
+export default function UpdateView({ acts, readableActs = acts, conn, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, pendingProgressLink, onProgressLinkConsumed, canAssignWorkshop }: {
   acts: PlanActivity[];
+  /** Nguồn hiện còn đọc được từ shell, dùng để tìm lại đúng mã Today nằm ngoài kỳ nhớ. */
+  readableActs?: readonly PlanActivity[];
   /** Không dùng index signature để nhận được cả ConnState (status là union). */
   conn?: { status?: string; msg?: string };
   /** access.can("source","edit_catalog") — được đổi "Người thực hiện". */
@@ -55,9 +61,9 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
   ) => void;
   onReload?: () => void | Promise<unknown>;
   readOnly?: boolean;
-  /** Mã hạng mục cần nhảy tới — màn "Hôm nay" truyền vào khi bấm Cập nhật. */
-  focusId?: string;
-  onFocusDone?: () => void;
+  /** Link Today đầy đủ; chỉ consume sau khi tập quyền hiện tại cho kết quả. */
+  pendingProgressLink?: ProgressDeepLink | null;
+  onProgressLinkConsumed?: () => void;
   /** access.can("progress","assign_workshop_staff") — App tính, truyền xuống hộp sửa. */
   canAssignWorkshop?: boolean;
 }) {
@@ -83,6 +89,9 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
      có phải việc của mình không". Chúng vẫn tra được, chỉ là không chen vào
      luồng làm việc hằng ngày nữa. */
   const [hienNgung, setHienNgung] = useState(false);
+  const [focusAlert, setFocusAlert] = useState("");
+  // Chỉ giữ mã không nhạy cảm; Activity luôn được suy lại từ readableActs mỗi render.
+  const [pinnedValidationCode, setPinnedValidationCode] = useState<string | null>(null);
   const rightsGate = useRef(createProgressRightsGenerationGate());
   const [rightsState, setRightsState] = useState<ProgressRightsState>(progressRightsLoadingState);
   const reloadRights = useCallback(async () => {
@@ -100,24 +109,32 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
     }
   }, []);
   useEffect(() => {
-    const reloadWhenVisible = () => {
-      if (document.visibilityState !== "hidden") void reloadRights();
-    };
+    const controller = createVisibleRefreshController({
+      isVisible: () => document.visibilityState !== "hidden",
+      refresh: reloadRights,
+      coalesceMs: 1000,
+    });
     void reloadRights();
-    window.addEventListener("focus", reloadWhenVisible);
-    document.addEventListener("visibilitychange", reloadWhenVisible);
+    window.addEventListener("focus", controller.request);
+    document.addEventListener("visibilitychange", controller.request);
     return () => {
       rightsGate.current.invalidate();
-      window.removeEventListener("focus", reloadWhenVisible);
-      document.removeEventListener("visibilitychange", reloadWhenVisible);
+      window.removeEventListener("focus", controller.request);
+      document.removeEventListener("visibilitychange", controller.request);
     };
   }, [reloadRights]);
-  const scopedActs = useMemo(
-    () => rightsState.status === "ready"
-      ? filterEditableProgressActivities(acts, rightsState.rights)
-      : [],
-    [acts, rightsState],
-  );
+  const focusCandidate = useMemo(() => {
+    if (!pinnedValidationCode || rightsState.status !== "ready"
+      || !rightsState.rights.has(pinnedValidationCode)) return null;
+    return readableActs.find((activity) => progressValidationCode(activity) === pinnedValidationCode) ?? null;
+  }, [pinnedValidationCode, readableActs, rightsState]);
+  const scopedActs = useMemo(() => {
+    if (rightsState.status !== "ready") return [];
+    const allowed = filterEditableProgressActivities(acts, rightsState.rights);
+    if (!focusCandidate || allowed.some((activity) =>
+      progressValidationCode(activity) === pinnedValidationCode)) return allowed;
+    return [...allowed, focusCandidate];
+  }, [acts, focusCandidate, pinnedValidationCode, rightsState]);
   const inWindow = useMemo(() => scopedActs.filter((a) => {
     if (!inPeriod(a, period)) return false;
     if (hienNgung) return true;
@@ -131,14 +148,17 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
   // Tính giai đoạn 1 lần/hạng mục rồi tái dùng (trước đây stageOf chạy ~7 lần/hàng).
   const stageByItem = useMemo(() => {
     const m = new Map();
-    inWindow.forEach((a) => m.set(a.id, stageOf(a)));
+    inWindow.forEach((a) => m.set(progressValidationCode(a), stageOf(a)));
     return m;
   }, [inWindow]);
   /* Model Lotus của màn Tiến độ (Đợt B Task 12): KPI, dải ưu tiên và hai
      tập lọc nhanh đều tính từ MỘT chỗ — số trên ô và dòng trong bảng không
      thể nói khác nhau. Tính trên inWindow (đúng kỳ đang xem, đúng luật ẩn
      hàng ngừng) để các con số khớp với danh sách bên dưới. */
-  const model = useMemo(() => buildProgressWorkspaceModel(inWindow, {
+  const model = useMemo(() => buildProgressWorkspaceModel(inWindow.map((activity) => ({
+    ...activity,
+    validationCode: progressValidationCode(activity),
+  })), {
     now: new Date(), query: "", status: "all", stage: "all", priority: "all",
   }), [inWindow]);
   const maCanXuLy = useMemo(() => new Set(
@@ -156,12 +176,12 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
     can_xu_ly: {
       label: "Cần xử lý (mọi vấn đề hồ sơ)",
       hint: "Thiếu người phụ trách theo person_id, thiếu deadline, xong thiếu ngày, lệch pha",
-      test: (a: PlanActivity) => maCanXuLy.has(String(a.id)),
+      test: (a: PlanActivity) => maCanXuLy.has(progressValidationCode(a)),
     },
     qua_han: {
       label: "Quá hạn",
       hint: "Mốc chưa xong gần nhất đã đứng trước hôm nay",
-      test: (a: PlanActivity) => maQuaHan.has(String(a.id)),
+      test: (a: PlanActivity) => maQuaHan.has(progressValidationCode(a)),
     },
     done_no_date: {
       label: "Thiếu ngày hoàn thành",
@@ -190,12 +210,13 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
      bảng thì lọc thêm cả "cần bạn điền" / trạng thái / ô tìm, nên bấm ô
      ghi 85 mà bảng ra 0 dòng, nhìn như lọc hỏng. */
   const okFix    = (a: PlanActivity) => fix === "all" || !!FIXES[fix as keyof typeof FIXES]?.test(a);
-  const okStage  = (a: PlanActivity) => stageF === "all" || stageByItem.get(a.id) === stageF;
+  const okStage  = (a: PlanActivity) => stageF === "all" || stageByItem.get(progressValidationCode(a)) === stageF;
   const okStatus = (a: PlanActivity) => fst === "all" || a.st === fst;
   const okSearch = (a: PlanActivity) => {
     const s = kw;
     if (!s) return true;
-    return [a.code, a.name, a.owner, a.id, a.vtype].some((x) => String(x || "").toLowerCase().includes(s));
+    return [progressValidationCode(a), a.name, a.owner, a.vtype]
+      .some((x) => String(x || "").toLowerCase().includes(s));
   };
 
   // Đếm kiểu "facet": mỗi ô đếm trên phần đã lọc bởi CÁC bộ lọc khác, trừ
@@ -206,7 +227,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
     inWindow.forEach((a) => {
       if (!okFix(a) || !okStatus(a) || !okSearch(a)) return;
       c.all++;
-      const st = stageByItem.get(a.id);
+      const st = stageByItem.get(progressValidationCode(a));
       if (st != null && c[st] != null) c[st]++;
     });
     return c;
@@ -244,26 +265,45 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
   // có thể hiển thị dữ liệu cũ hay gửi một bản nháp cũ.
   useEffect(() => {
     if (!edit) return;
-    if (rightsState.status !== "ready" || !rightsState.rights.has(edit.id)) {
+    if (rightsState.status !== "ready" || !rightsState.rights.has(progressValidationCode(edit))) {
       setEdit(null);
       setQuick(false);
     }
   }, [edit, rightsState]);
 
-  /* Nhảy tới đúng hạng mục mà màn "Hôm nay" vừa bấm: đổ mã vào ô tìm và bỏ
-     mọi bộ lọc đang chắn, vì hạng mục đó có thể không nằm trong lát cắt hiện
-     tại — bấm Cập nhật mà ra danh sách rỗng thì tệ hơn là không có nút. */
   useEffect(() => {
-    if (!focusId || rightsState.status !== "ready" || !rightsState.rights.has(focusId)) return;
-    setQ(focusId);
-    setFix("all"); setStageF("all"); setFst("all"); setPeriod("all");
-    setTrang(0);
-    onFocusDone?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusId, rightsState, onFocusDone]);
+    if (pinnedValidationCode && rightsState.status === "ready"
+      && !rightsState.rights.has(pinnedValidationCode)) setPinnedValidationCode(null);
+  }, [pinnedValidationCode, rightsState]);
 
-  const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all";
-  const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); setQ(""); setPeriod("all"); };
+  /* Link chỉ được quyết định khi tập quyền hiện tại đã ready. Loading/error
+     giữ nguyên pending để retry không biến lỗi mạng thành kết luận thu hồi. */
+  useEffect(() => {
+    if (!pendingProgressLink || rightsState.status !== "ready") return;
+    const resolution = resolveProgressDeepLink(rightsState.rights, pendingProgressLink);
+    if (resolution.status === "revoked") {
+      setPinnedValidationCode(null);
+      setEdit(null);
+      setQuick(false);
+      setFocusAlert(`Quyền cập nhật ${resolution.validationCode} đã thay đổi; hạng mục không được mở.`);
+      onProgressLinkConsumed?.();
+      return;
+    }
+    setPinnedValidationCode(resolution.validationCode);
+    setQ(resolution.validationCode);
+    setFix("all");
+    setStageF("all");
+    setFst("all");
+    setPeriod("all");
+    setHienNgung(false);
+    setTrang(0);
+    setFocusAlert("");
+    onProgressLinkConsumed?.();
+  }, [onProgressLinkConsumed, pendingProgressLink, rightsState]);
+
+  const clearSearch = () => { setQ(""); setPinnedValidationCode(null); };
+  const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all" || hienNgung;
+  const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); clearSearch(); setPeriod("all"); setHienNgung(false); };
   const linked = conn?.status === "ok";
   const handleProgressReload = useCallback(async () => {
     try {
@@ -296,6 +336,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
   }
   return (
     <div data-progress-rights-state="ready" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {focusAlert && <div role="alert" style={{ padding: "12px 14px", borderRadius: 12, background: C.raspSoft, color: C.raspText, fontSize: 13, fontWeight: 700 }}>{focusAlert}</div>}
       <Card>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -310,7 +351,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
         <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
             <Search size={16} color={C.plumSoft} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo mã, tên, QA…" style={{ ...INP, paddingLeft: 36 }} />
+            <input value={q} onChange={(e) => { setQ(e.target.value); setPinnedValidationCode(null); }} placeholder="Tìm theo mã, tên, QA…" style={{ ...INP, paddingLeft: 36 }} />
           </div>
           {soNgung > 0 && (
             <label title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc"
@@ -385,15 +426,15 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
              để số trên ô luôn đúng bằng số dòng hiện ra. */
           { id: "dang", label: "Đang thực hiện", value: model.kpis.inProgress,
             priority: "supporting", hint: "trạng thái Đang thực hiện",
-            onActivate: () => { setFst("prog"); setFix("all"); setStageF("all"); setQ(""); setTrang(0); } },
+            onActivate: () => { setFst("prog"); setFix("all"); setStageF("all"); clearSearch(); setTrang(0); } },
           { id: "can-xu-ly", label: "Cần xử lý", value: model.kpis.needsAction,
             priority: "hero", tone: "warning",
             hint: "hồ sơ thiếu hoặc lệch — bấm để lọc đúng các dòng này",
-            onActivate: () => { setFix("can_xu_ly"); setFst("all"); setStageF("all"); setQ(""); setTrang(0); } },
+            onActivate: () => { setFix("can_xu_ly"); setFst("all"); setStageF("all"); clearSearch(); setTrang(0); } },
           { id: "qua-han", label: "Quá hạn", value: model.kpis.overdue,
             priority: "supporting", tone: "danger",
             hint: "mốc chưa xong gần nhất đã qua",
-            onActivate: () => { setFix("qua_han"); setFst("all"); setStageF("all"); setQ(""); setTrang(0); } },
+            onActivate: () => { setFix("qua_han"); setFst("all"); setStageF("all"); clearSearch(); setTrang(0); } },
           { id: "hoan-thien", label: "Độ hoàn thiện dữ liệu",
             value: `${model.kpis.completenessPercent}%`,
             priority: "supporting",
@@ -416,7 +457,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
               r.overdueDays > 0 ? `trễ ${r.overdueDays} ngày` : null,
             ].filter(Boolean).join(" · ") || undefined,
             onActivate: readOnly ? undefined : () => {
-              const a = inWindow.find((x) => String(x.id) === r.validationCode);
+              const a = inWindow.find((x) => progressValidationCode(x) === r.validationCode);
               if (a) { setEdit(a); setQuick(false); }
             },
           }))}
@@ -452,8 +493,8 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
               {["Mã", "Tên", "Loại", "QA", "Deadline", "Giai đoạn", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i > 4 ? "center" : "left", padding: "13px 16px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {lat.map((a, i) => { const sg = STAGES.find((s) => s.id === stageByItem.get(a.id)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
-                <tr key={a.id} data-progress-item={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? C.surfaceSunk : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
+              {lat.map((a, i) => { const validationCode = progressValidationCode(a); const sg = STAGES.find((s) => s.id === stageByItem.get(validationCode)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
+                <tr key={validationCode} data-progress-item={validationCode} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? C.surfaceSunk : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
                   <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 14 }}>{a.code}</td>
                   <td style={{ padding: "12px 16px", color: C.plum, fontSize: 14 }}>
                     {a.name}
@@ -469,7 +510,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
                     <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                       {/* Đường tắt: mở hộp đã điền sẵn "hôm nay + Hoàn thành" cho bước
                           hiện tại — vẫn phải chọn lý do và Lưu nên không đi tắt luật GMP. */}
-                      {!readOnly && !isFrozen && stageByItem.get(a.id) !== "done" && (
+                      {!readOnly && !isFrozen && stageByItem.get(validationCode) !== "done" && (
                         <button onClick={() => { setEdit(a); setQuick(true); }}
                           title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
                           style={{ padding: "7px 11px", borderRadius: 8, border: `1px solid ${C.mint}`, background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -525,14 +566,15 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
       <MobileTaskList
         label="Hạng mục thẩm định"
         rows={lat}
-        rowKey={(a) => a.id}
+        rowKey={(a) => progressValidationCode(a)}
         empty={hasFilter ? "Không có hạng mục nào khớp bộ lọc đang bật." : "Chưa có hạng mục nào trong kế hoạch."}
         renderItem={(a) => {
-          const sg = STAGES.find((s) => s.id === stageByItem.get(a.id));
+          const validationCode = progressValidationCode(a);
+          const sg = STAGES.find((s) => s.id === stageByItem.get(validationCode));
           const itemState = a.state || (a._raw && a._raw.state) || "active";
           const isFrozen = itemState !== "active";
           return (
-            <div data-progress-item={a.id} style={{ display: "flex", flexDirection: "column", gap: 10, opacity: isFrozen ? 0.65 : 1 }}>
+            <div data-progress-item={validationCode} style={{ display: "flex", flexDirection: "column", gap: 10, opacity: isFrozen ? 0.65 : 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
                 <b style={{ fontFamily: NUM, fontSize: 13, color: C.pinkText, letterSpacing: ".02em" }}>{a.code}</b>
                 <Pill s={a.st} small />
@@ -556,7 +598,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {!readOnly && !isFrozen && stageByItem.get(a.id) !== "done" && (
+                {!readOnly && !isFrozen && stageByItem.get(validationCode) !== "done" && (
                   <button onClick={() => { setEdit(a); setQuick(true); }}
                     style={{ flex: "1 1 auto", minHeight: 44, borderRadius: 10, border: `1px solid ${C.mint}`,
                              background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 13,
@@ -591,7 +633,7 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
         chỉ đọc, sửa trên đó sẽ không vào hệ thống.
       </div>
       {edit && !readOnly && <ProgressEditModal
-        key={edit.id}
+        key={progressValidationCode(edit)}
         act={edit}
         canChonNguoiThucHien={canChonNguoiThucHien}
         canDoiTrangThai={canDoiTrangThai}
@@ -599,12 +641,12 @@ export default function UpdateView({ acts, conn, canChonNguoiThucHien, canDoiTra
         quickDone={quick}
         onClose={() => { setEdit(null); setQuick(false); }}
         onReload={handleProgressReload}
-        editableFields={rightsState.rights.get(edit.id)?.editableFields}
+        editableFields={rightsState.rights.get(progressValidationCode(edit))?.editableFields}
         permissionMode="enforced"
         // Hạng mục kế tiếp TRONG danh sách đang lọc — nhập hàng loạt không phải
         // đóng hộp rồi dò lại bảng. Bỏ qua hạng mục đóng băng nếu không phải admin.
         nextAct={(() => {
-          const i = list.findIndex((a) => a.id === edit.id);
+          const i = list.findIndex((a) => progressValidationCode(a) === progressValidationCode(edit));
           if (i < 0) return null;
           return list.slice(i + 1).find((a) => canDoiTrangThai || (a.state || a._raw?.state || "active") === "active") || null;
         })()}

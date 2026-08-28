@@ -122,11 +122,26 @@ export function indexEditableProgressRights(
   return index;
 }
 
-export function filterEditableProgressActivities<T extends { id: string }>(
+export function progressValidationCode(activity: {
+  id: string;
+  validationCode?: unknown;
+  code?: unknown;
+}): string {
+  for (const value of [activity.validationCode, activity.code, activity.id]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+export function filterEditableProgressActivities<T extends {
+  id: string;
+  validationCode?: unknown;
+  code?: unknown;
+}>(
   activities: readonly T[],
   rights: ReadonlyMap<string, EditableProgressRight>,
 ): T[] {
-  return activities.filter((activity) => rights.has(activity.id));
+  return activities.filter((activity) => rights.has(progressValidationCode(activity)));
 }
 
 /** Chia các field được cấp quyền thành bốn bước hiển thị của modal. */

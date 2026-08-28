@@ -25,6 +25,30 @@ test("lọc hạng mục theo tập quyền sửa do server trả về", () => {
   );
 });
 
+test("lọc quyền theo validationCode chính tắc khi legacy id khác mã", () => {
+  const rights = indexEditableProgressRights([
+    { validationCode: "V-001", editableFields: ["status_report"], reason: "assigned" },
+  ]);
+
+  assert.deepEqual(
+    filterEditableProgressActivities([
+      { id: "legacy-id", validationCode: "V-001" },
+      { id: "other-id", validationCode: "V-002" },
+    ], rights).map((row) => row.id),
+    ["legacy-id"],
+  );
+});
+
+test("không cấp quyền bằng legacy id khi canonical validationCode không khớp", () => {
+  const rights = indexEditableProgressRights([
+    { validationCode: "legacy-id", editableFields: ["status_report"], reason: "assigned" },
+  ]);
+
+  assert.deepEqual(filterEditableProgressActivities([
+    { id: "legacy-id", validationCode: "V-002" },
+  ], rights), []);
+});
+
 test("giải mã payload quyền thành hợp đồng frontend", () => {
   assert.deepEqual(
     parseEditableProgressRights({

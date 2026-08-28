@@ -25,6 +25,21 @@ export interface ConnState {
   /** Nguồn dữ liệu đang dùng: "supabase" hoặc "n8n". */
   source?: string;
 }
+
+export function silentRefreshSuccessConn(
+  current: ConnState,
+  counts?: { objects: number; activities: number },
+): ConnState {
+  if (!counts && current.status === "ok") return current;
+  return {
+    ...current,
+    status: "ok",
+    source: "supabase",
+    msg: counts
+      ? `Đã làm mới ${counts.objects} đối tượng · ${counts.activities} hạng mục từ máy chủ ✓`
+      : "Đã xác minh quyền — dữ liệu hiện tại không thay đổi ✓",
+  };
+}
 import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.ts";
 import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
 import { isSupabaseConfigured, signIn, signOut, layPhien, supabase } from "../lib/supabaseClient.ts";
@@ -235,13 +250,11 @@ export function useVmpData() {
   const wmSig = (wm: { plan_items?: number; objects?: number; updated_at?: string } | null): string =>
     wm ? `${wm.plan_items}|${wm.objects}|${wm.updated_at}` : "";
   type Watermark = { plan_items?: number; objects?: number; updated_at?: string };
-  /** Đọc watermark và ghi lại tuổi dữ liệu. Hỏng thì trả null — độ tươi là
-   *  thông tin phụ, không được phép làm hỏng đường nạp dữ liệu chính. */
-  const docWatermark = useCallback(async (): Promise<Watermark | null> => {
+  /** Chỉ đọc watermark. Caller phải kiểm generation trước khi áp vào state;
+   *  hỏng thì trả null vì độ tươi không được làm hỏng đường nạp chính. */
+  const readWatermark = useCallback(async (): Promise<Watermark | null> => {
     try {
-      const wm = (await fetchVmpWatermark(new Date().getFullYear())) as Watermark | null;
-      if (wm?.updated_at) setDataUpdatedAt(wm.updated_at);
-      return wm;
+      return (await fetchVmpWatermark(new Date().getFullYear())) as Watermark | null;
     } catch { return null; }
   }, []);
   const sigOf = (objs: VmpObject[] | null, activities: Activity[]): string => {
@@ -334,8 +347,12 @@ export function useVmpData() {
         }
         if (readUrl || writeUrl) saveConn(readUrl, writeUrl);
         setLastSync(Date.now());
-        // Không await: vẽ xong đã, tuổi dữ liệu điền sau vài trăm ms.
-        void docWatermark();
+        // Không chặn first paint, nhưng watermark cũ không được ghi vào state
+        // sau khi một request dữ liệu mới hơn đã bắt đầu.
+        void readWatermark().then((wm) => {
+          if (requestId !== dataRequestRef.current) return;
+          if (wm?.updated_at) setDataUpdatedAt(wm.updated_at);
+        });
         setConn({
           readUrl, writeUrl, status: "ok", source: "supabase",
           msg: `Đã tải ${data.objects.length} đối tượng · ${data.activities.length} hạng mục từ máy chủ ✓`,
@@ -408,7 +425,7 @@ export function useVmpData() {
         msg: "Lỗi tải: " + ((e as Error)?.message || "không rõ") + " — kiểm tra URL / CORS / workflow",
       });
     }
-  }, [clearProtectedData, docWatermark]);
+  }, [clearProtectedData, readWatermark]);
 
   const reloadData = useCallback(() => {
     const c = loadConn() || {};
@@ -425,8 +442,8 @@ export function useVmpData() {
       /* Bắn watermark SONG SONG với kiểm mode — hai RPC độc lập, chờ nối
          tiếp là trả thêm một vòng mạng mỗi 20 giây không để làm gì. Kết
          quả watermark chỉ được DÙNG sau khi mode đã kiểm xong ở dưới.
-         docWatermark không bao giờ ném (hỏng thì trả null). */
-      const wmPromise = docWatermark();
+         readWatermark không bao giờ ném (hỏng thì trả null). */
+      const wmPromise = readWatermark();
       // Mode là một phần của quyền đọc, nên phải kiểm ở MỌI lượt poll. Chỉ
       // nhìn watermark hạng mục sẽ bỏ sót lúc Admin đổi preview → enforced.
       permissionContext = await readItemPermissionContext();
@@ -443,24 +460,43 @@ export function useVmpData() {
         clearProtectedData();
       }
 
+      let wm: Watermark | null;
+      let prefetchedData: Awaited<ReturnType<typeof fetchVmpDataFromSupabase>> | null = null;
+      if (policy.bypassWatermark) {
+        // Enforced vẫn tải payload ngay; Promise.all chỉ gom điểm commit để
+        // watermark và payload cùng chịu một generation check.
+        [wm, prefetchedData] = await Promise.all([
+          wmPromise,
+          fetchVmpDataFromSupabase(new Date().getFullYear()),
+        ]);
+      } else {
+        wm = await wmPromise;
+      }
+      if (requestId !== dataRequestRef.current) return;
+      if (wm?.updated_at) setDataUpdatedAt(wm.updated_at);
+
       if (!policy.bypassWatermark && !identityChanged && !modeChanged) {
         // Preview giữ tối ưu cũ: dữ liệu không đổi thì không kéo payload nặng.
-        const wm = await wmPromise;
-        if (requestId !== dataRequestRef.current) return;
         if (wm) {
           const ws = wmSig(wm);
-          if (ws === wmSigRef.current) return;
+          if (ws === wmSigRef.current) {
+            setConn((current) => silentRefreshSuccessConn(current));
+            return;
+          }
           wmSigRef.current = ws;
         }
       }
 
       // Enforced luôn đi qua RPC đã lọc quyền: thu hồi phân công phải phản ánh
       // dù updated_at/count của dữ liệu nghiệp vụ không đổi.
-      const data = await fetchVmpDataFromSupabase(new Date().getFullYear());
+      const data = prefetchedData ?? await fetchVmpDataFromSupabase(new Date().getFullYear());
       if (requestId !== dataRequestRef.current) return;
       const sig = sigOf(data.objects, data.activities);
       // Chốt chặn 2: nếu payload y hệt thì bỏ qua setState (tránh re-render).
-      if (sig === dataSigRef.current) return;
+      if (sig === dataSigRef.current) {
+        setConn((current) => silentRefreshSuccessConn(current));
+        return;
+      }
       dataSigRef.current = sig;
       if (Array.isArray(data.objects)) setObjects(data.objects);
       if (Array.isArray(data.activities)) setActs(data.activities);
@@ -476,15 +512,26 @@ export function useVmpData() {
         clearSnapshot();
       }
       setLastSync(Date.now());
-    } catch {
+      setConn((current) => silentRefreshSuccessConn(current, {
+        objects: data.objects.length,
+        activities: data.activities.length,
+      }));
+    } catch (cause) {
       if (requestId !== dataRequestRef.current) return;
       // Không đọc được mode cũng không được phép đoán là preview. Thu hồi dữ
       // liệu cũ để lỗi mạng/quyền không biến thành đường fail-open.
       permissionModeRef.current = null;
       permissionUserRef.current = "";
       clearProtectedData();
+      const message = cause instanceof Error ? cause.message : "lỗi không xác định";
+      setConn((current) => ({
+        ...current,
+        status: "err",
+        source: "supabase",
+        msg: `Không thể làm mới dữ liệu an toàn — dữ liệu cũ đã được thu hồi. ${message}. Thử lại để nạp lại quyền và dữ liệu.`,
+      }));
     }
-  }, [clearProtectedData, docWatermark]);
+  }, [clearProtectedData, readWatermark]);
 
   /* Chỉ nạp dữ liệu khi ĐÃ CÓ PHIÊN. Từ migration 20260801090000, vai
      `anon` không gọi được hàm rpc_* nào, nên gọi lúc chưa đăng nhập chỉ

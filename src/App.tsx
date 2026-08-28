@@ -65,6 +65,7 @@ import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { resolveAuthorizedView, resolveViewIntent } from "./lib/navigationContract.ts";
 import { overviewTarget } from "./lib/navigationTargets.ts";
 import { applyWorkloadCellNavigation } from "./lib/workloadNavigation.ts";
+import { createVisibleRefreshController } from "./lib/visibleRefresh.ts";
 import type { AccessContext, ScreenId } from "./lib/access.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
@@ -90,6 +91,9 @@ import {
   BangThanhTra } from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 import LoginScreen from "./components/auth/LoginScreen.tsx";
+import TodayCommandCenter from "./features/today/TodayCommandCenter.tsx";
+import { filterTodayScope } from "./features/today/todayScope.ts";
+import { isTodayActivityMine, type ProgressDeepLink } from "./features/today/todayModel.ts";
 
 /* ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm
    bundle ban đầu).
@@ -105,7 +109,6 @@ const SourceCatalogView = lazy(nhapCoThuLai(() => import("./pages/SourceCatalogP
 const ServerChecksView = lazy(nhapCoThuLai(() => import("./pages/ServerChecksPage.tsx")));
 const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
-const TodayView = lazy(nhapCoThuLai(() => import("./features/today/TodayCommandCenter.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
 import VongNam from "./components/dashboard/VongNam.tsx";
@@ -1347,7 +1350,7 @@ function GlobalFilterBar({
   areaSel, setAreaSel, deptSel, setDeptSel, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
   areaOptions, deptOptions, shown, total, soNgung = 0,
-  onlyMine, setOnlyMine, myName,
+  onlyMine, setOnlyMine, personLinked, todayMode = false,
 }: {
   areaSel: string[];
   setAreaSel: (v: string[]) => void;
@@ -1367,9 +1370,10 @@ function GlobalFilterBar({
   soNgung?: number;
   onlyMine: boolean;
   setOnlyMine: (v: boolean) => void;
-  /** Tên người đăng nhập, dùng để đối chiếu với QA phụ trách. Rỗng thì
-   *  không hiện nút — thà không có nút còn hơn có nút bấm ra 0 dòng. */
-  myName: string;
+  /** Tài khoản chỉ được bật phạm vi cá nhân khi đã nối khóa nhân sự chính tắc. */
+  personLinked: boolean;
+  /** Today tự quản cửa sổ 7 ngày, nên kỳ nhớ chỉ được hiển thị ở màn khác. */
+  todayMode?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [daChep, setDaChep] = useState(false);
@@ -1392,9 +1396,19 @@ function GlobalFilterBar({
 
   const toggleDept = (v: string) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
   const toggleArea = (v: string) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
-  const active = deptSel.length > 0 || areaSel.length > 0 || !!customFrom || !!customTo || onlyMine;
-  const soLoc = deptSel.length + areaSel.length + (customFrom || customTo ? 1 : 0);
-  const resetAll = () => { setDeptSel([]); setAreaSel([]); setPeriod("all"); setCustomFrom(""); setCustomTo(""); setOnlyMine(false); };
+  const active = deptSel.length > 0 || areaSel.length > 0
+    || (!todayMode && (!!customFrom || !!customTo)) || onlyMine;
+  const soLoc = deptSel.length + areaSel.length + (!todayMode && (customFrom || customTo) ? 1 : 0);
+  const resetAll = () => {
+    setDeptSel([]);
+    setAreaSel([]);
+    if (!todayMode) {
+      setPeriod("all");
+      setCustomFrom("");
+      setCustomTo("");
+    }
+    setOnlyMine(false);
+  };
   // Thời gian CHỈ theo mốc ngày: có nhập ngày -> bật lọc "custom"; xoá hết -> "all".
   const onFrom = (v: string) => { setCustomFrom(v); setPeriod((v || customTo) ? "custom" : "all"); };
   const onTo = (v: string) => { setCustomTo(v); setPeriod((customFrom || v) ? "custom" : "all"); };
@@ -1417,19 +1431,26 @@ function GlobalFilterBar({
   return (
     <div aria-label="Phạm vi toàn hệ thống" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
       <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>
-      {/* Việc của tôi — lọc theo QA phụ trách khớp tên người đang đăng nhập.
+      {/* Việc của tôi — lọc theo khóa nhân sự owner/support chính tắc.
           Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
           vào trong hộp thì coi như không có. */}
-      {myName && (
-        <button type="button" onClick={() => setOnlyMine(!onlyMine)} aria-pressed={onlyMine}
-          title={`Chỉ hiện hạng mục có QA phụ trách hoặc người hỗ trợ là "${myName}"`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8,
-            border: `1px solid ${onlyMine ? C.mintText : C.pinkSoft}`,
-            background: onlyMine ? C.mintSoft : "transparent",
-            color: onlyMine ? C.mintText : C.plumSoft,
-            fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-          <Users size={14} /> Việc của tôi
-        </button>
+      <button type="button" onClick={() => setOnlyMine(!onlyMine)} aria-pressed={onlyMine}
+        disabled={!personLinked}
+        title={personLinked
+          ? "Chỉ hiện hạng mục có khóa nhân sự của bạn ở người phụ trách hoặc người hỗ trợ"
+          : "Tài khoản chưa liên kết nhân sự nên chưa thể lọc Việc của tôi"}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8,
+          border: `1px solid ${onlyMine ? C.mintText : C.pinkSoft}`,
+          background: onlyMine ? C.mintSoft : "transparent",
+          color: onlyMine ? C.mintText : C.plumSoft,
+          opacity: personLinked ? 1 : 0.55,
+          fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: personLinked ? "pointer" : "not-allowed" }}>
+        <Users size={14} /> Việc của tôi
+      </button>
+      {!personLinked && (
+        <span style={{ fontSize: 11, color: C.marigoldText, fontWeight: 700 }}>
+          Tài khoản chưa liên kết nhân sự; nhờ quản trị nối hồ sơ để dùng Việc của tôi.
+        </span>
       )}
 
       {/* + Lọc (Bộ phận / Khu vực) */}
@@ -1446,10 +1467,15 @@ function GlobalFilterBar({
           <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 274, maxHeight: 380, overflowY: "auto", background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
             <div style={{ margin: "6px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khoảng thời gian</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 8px 8px" }}>
-              <input type="date" value={customFrom} onChange={(e) => onFrom(e.target.value)} style={{ ...dateInp, flex: 1 }} aria-label="Từ ngày" />
+              <input type="date" value={customFrom} onChange={(e) => onFrom(e.target.value)} disabled={todayMode} aria-label="Từ ngày" style={{ ...dateInp, flex: 1 }} />
               <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
-              <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} style={{ ...dateInp, flex: 1 }} aria-label="Đến ngày" />
+              <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} disabled={todayMode} aria-label="Đến ngày" style={{ ...dateInp, flex: 1 }} />
             </div>
+            {todayMode && (
+              <div style={{ margin: "0 8px 8px", fontSize: 11, color: C.plumSoft, fontWeight: 700 }}>
+                Việc hôm nay tự dùng cửa sổ 7 ngày.
+              </div>
+            )}
             <div style={{ margin: "6px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
             {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, ((DEPT_CHIP as Record<string, { dot?: string }>)[o.v] || {}).dot || C.pink))}
             <div style={{ margin: "8px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
@@ -1473,7 +1499,7 @@ function GlobalFilterBar({
       {areaSel.map((v) => (
         <FilterChip key={"a" + v} label={"Khu vực: " + v} onRemove={() => toggleArea(v)} style={neutralChip} />
       ))}
-      {(customFrom || customTo) && (
+      {!todayMode && (customFrom || customTo) && (
         <FilterChip label={`Ngày: ${customFrom || "…"} → ${customTo || "…"}`} onRemove={() => { setCustomFrom(""); setCustomTo(""); setPeriod("all"); }} style={neutralChip} />
       )}
 
@@ -1533,6 +1559,7 @@ function VerifiedAppShell({ user, logout, access }: {
     objects, acts, conn, lastSync, dataUpdatedAt, saveStatus, reloadData, silentRefresh,
     updateActivity,
   } = useVmpData();
+  const currentPersonId = String(user.personId ?? "").trim() || null;
 
   /* `saveStatus` của luồng lưu tiến độ giờ đi qua vỏ thông báo dùng chung.
      Trước đây nó có một khối JSX riêng ngay trong file này — nghĩa là chỉ
@@ -1613,7 +1640,7 @@ function VerifiedAppShell({ user, logout, access }: {
   const [moDanhMuc, setMoDanhMuc] = useState<{ code: string; nhom?: string } | null>(null);
   /* Mã hạng mục cần nhảy tới ở màn Cập nhật tiến độ. Màn "Hôm nay" đặt giá
      trị này rồi chuyển màn — người dùng khỏi phải nhớ mã và tự dán vào ô tìm. */
-  const [moHangMuc, setMoHangMuc] = useState<string>("");
+  const [moHangMuc, setMoHangMuc] = useState<ProgressDeepLink | null>(null);
   /** Cách nhóm ở màn nhập liệu: theo hạng mục hay theo đối tượng. */
   /* Mở thẳng `#v=inventory` thì phải vào Tiến độ ở chế độ gộp theo đối
      tượng — đó chính là ý nghĩa của tên cũ đó. */
@@ -1651,7 +1678,10 @@ function VerifiedAppShell({ user, logout, access }: {
   const [periodFilter, setPeriodFilter] = useState(khoiTao.period);
   const [customFrom, setCustomFrom] = useState(khoiTao.customFrom);   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState(khoiTao.customTo);         // yyyy-mm-dd
-  const [onlyMine, setOnlyMine] = useState(khoiTao.onlyMine);
+  const [onlyMine, setOnlyMine] = useState(currentPersonId ? khoiTao.onlyMine : false);
+  useEffect(() => {
+    if (!currentPersonId && onlyMine) setOnlyMine(false);
+  }, [currentPersonId, onlyMine]);
   // App là nơi duy nhất quyết định đích theo quyền. Bản đồ chỉ nhận callback
   // khi có một màn hợp lệ, vì vậy nó không thể tạo CTA dẫn tới màn bị chặn.
   const workloadListTarget = overviewTarget(access, "soon");
@@ -1710,23 +1740,12 @@ function VerifiedAppShell({ user, logout, access }: {
     }
     return inPeriod(a, periodFilter);
   }, [periodFilter, customFrom, customTo]);
-  /* ---- "Việc của tôi" ------------------------------------------------
-   * Đối chiếu tên người đăng nhập với QA phụ trách / người hỗ trợ. Ô người
-   * phụ trách trong Sheet có khi gói nhiều tên ("A, B") nên phải tách ra rồi
-   * mới so, chứ so cả chuỗi thì người thứ hai không bao giờ khớp.
-   * ------------------------------------------------------------------- */
-  const myName = String(user?.name || "").trim();
-  const myKey = useMemo(
-    () => myName.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase(),
-    [myName],
-  );
+  /* "Việc của tôi" chỉ dùng khóa người chính tắc; tên hiển thị trùng nhau
+     không được phép quyết định phạm vi dữ liệu. */
   const laViecCuaToi = useCallback((a: Activity) => {
-    if (!onlyMine || !myKey) return true;
-    return [a.owner, a.owner_name, a.support, a.secondary_owner].some((raw) =>
-      String(raw || "")
-        .split(/[,;/]+/)
-        .some((phan) => phan.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase() === myKey));
-  }, [onlyMine, myKey]);
+    if (!onlyMine) return true;
+    return currentPersonId !== null && isTodayActivityMine(a, currentPersonId);
+  }, [currentPersonId, onlyMine]);
 
   const filteredActs = useMemo(() => acts.filter((a) => (
     (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) &&
@@ -1734,6 +1753,12 @@ function VerifiedAppShell({ user, logout, access }: {
     matchTime(a) &&
     laViecCuaToi(a)
   )), [acts, areaSel, inDept, matchTime, laViecCuaToi]);
+  const todayActs = useMemo(() => filterTodayScope(acts, {
+    areas: areaSel,
+    departments: deptSel,
+    onlyMine,
+    currentPersonId,
+  }), [acts, areaSel, currentPersonId, deptSel, onlyMine]);
   /* Mẫu số của thanh lọc phải đếm HẠNG MỤC ĐANG HOẠT ĐỘNG.
      Đo được: RPC trả 461 dòng = 448 đang hoạt động + 13 "Không áp dụng".
      Thanh lọc ghi 461 nhưng mọi màn bên dưới đều lọc bỏ 13 dòng kia, nên
@@ -1744,6 +1769,7 @@ function VerifiedAppShell({ user, logout, access }: {
   const laSong = (a: Activity) => (a.state || "active") === "active";
   const soSong = useMemo(() => acts.filter(laSong).length, [acts]);
   const soSongHien = useMemo(() => filteredActs.filter(laSong).length, [filteredActs]);
+  const soSongToday = useMemo(() => todayActs.filter(laSong).length, [todayActs]);
   const soNgung = acts.length - soSong;
 
   const filteredObjects = useMemo(() => objects.filter((o) => {
@@ -1762,8 +1788,9 @@ function VerifiedAppShell({ user, logout, access }: {
    * Đọc: nghe popstate (Back/Forward) và hashchange (người dùng tự sửa URL).
    * ------------------------------------------------------------------- */
   const trangThaiUrl = useMemo<UrlState>(() => ({
-    view, deptSel, areaSel, period: periodFilter, customFrom, customTo, onlyMine,
-  }), [view, deptSel, areaSel, periodFilter, customFrom, customTo, onlyMine]);
+    view, deptSel, areaSel, period: periodFilter, customFrom, customTo,
+    onlyMine: currentPersonId ? onlyMine : false,
+  }), [view, deptSel, areaSel, periodFilter, customFrom, customTo, currentPersonId, onlyMine]);
 
   const viewTruoc = useRef(view);
   useEffect(() => {
@@ -1809,11 +1836,30 @@ function VerifiedAppShell({ user, logout, access }: {
     return phan.join(" · ");
   }, [deptSel, areaSel, periodFilter, onlyMine]);
 
-  const moTienDo = useCallback((link: { validationCode: string }) => {
-    setMoHangMuc(link.validationCode);
+  const nhanPhamViToday = useMemo(() => {
+    const phan: string[] = [];
+    if (deptSel.length > 0) {
+      phan.push(deptSel.map((id) => DEPTS.find((d) => d.id === id)?.short || id).join(", "));
+    } else {
+      phan.push("Toàn hệ thống");
+    }
+    if (areaSel.length > 0) phan.push(`khu vực ${areaSel.join(", ")}`);
+    if (onlyMine) phan.push("việc của tôi");
+    return phan.join(" · ");
+  }, [areaSel, deptSel, onlyMine]);
+
+  const clearTodayScope = useCallback(() => {
+    setDeptSel([]);
+    setAreaSel([]);
+  }, []);
+
+  const moTienDo = useCallback((link: ProgressDeepLink) => {
+    setMoHangMuc(link);
+    setNhomTheo("hangmuc");
     viewTruoc.current = "progress";
     setView("progress");
   }, []);
+  const consumeProgressLink = useCallback(() => setMoHangMuc(null), []);
 
   const chuyenManAnToan = useCallback((manMoi: string) => {
     viewTruoc.current = manMoi;
@@ -1847,7 +1893,7 @@ function VerifiedAppShell({ user, logout, access }: {
       setPeriodFilter(s.period);
       setCustomFrom(s.customFrom);
       setCustomTo(s.customTo);
-      setOnlyMine(s.onlyMine);
+      setOnlyMine(currentPersonId ? s.onlyMine : false);
     };
     window.addEventListener("popstate", apDung);
     window.addEventListener("hashchange", apDung);
@@ -1855,21 +1901,25 @@ function VerifiedAppShell({ user, logout, access }: {
       window.removeEventListener("popstate", apDung);
       window.removeEventListener("hashchange", apDung);
     };
-  }, [chuanHoaView, rawUrlViews]);
+  }, [chuanHoaView, currentPersonId, rawUrlViews]);
 
   // (MỚI) Giữ dữ liệu tươi: làm mới khi quay lại tab; RELOAD khi sang NGÀY MỚI
   // (VMP_TODAY và "hôm nay" tính lúc tải trang → tránh "quá hạn/ngày còn lại" bị cũ khi mở lâu).
   useEffect(() => {
     const bootDay = new Date().toDateString();
-    const onFocus = () => { if (document.visibilityState !== "hidden" && silentRefresh) silentRefresh(); };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
+    const controller = createVisibleRefreshController({
+      isVisible: () => document.visibilityState !== "hidden",
+      refresh: silentRefresh,
+      coalesceMs: 1000,
+    });
+    window.addEventListener("focus", controller.request);
+    document.addEventListener("visibilitychange", controller.request);
     const iv = setInterval(() => {
       if (new Date().toDateString() !== bootDay) window.location.reload(); // qua ngày mới → tải lại
     }, 60000);
     return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", controller.request);
+      document.removeEventListener("visibilitychange", controller.request);
       clearInterval(iv);
     };
   }, [silentRefresh]);
@@ -1983,8 +2033,9 @@ function VerifiedAppShell({ user, logout, access }: {
                 customFrom={customFrom} setCustomFrom={setCustomFrom}
                 customTo={customTo} setCustomTo={setCustomTo}
                 areaOptions={areaOptions} deptOptions={deptOptions}
-                shown={soSongHien} total={soSong} soNgung={soNgung}
-                onlyMine={onlyMine} setOnlyMine={setOnlyMine} myName={myName}
+                shown={view === "today" ? soSongToday : soSongHien} total={soSong} soNgung={soNgung}
+                onlyMine={onlyMine} setOnlyMine={setOnlyMine}
+                personLinked={currentPersonId !== null} todayMode={view === "today"}
               />
             )}
 
@@ -1997,14 +2048,16 @@ function VerifiedAppShell({ user, logout, access }: {
             <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
               {view === "today" && (
-                <TodayView
-                  acts={filteredActs}
-                  scopeLabel={nhanPhamVi}
+                <TodayCommandCenter
+                  acts={todayActs}
+                  scopeLabel={nhanPhamViToday}
                   updatedLabel={dataUpdatedAt
                     ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
                     : undefined}
                   state={conn.status === "loading" ? "loading" : conn.status === "err" ? "error" : "ready"}
                   onRetry={reloadData}
+                  hasScopeFilters={deptSel.length > 0 || areaSel.length > 0}
+                  onClearScope={clearTodayScope}
                   onOpenProgress={moTienDo} />
               )}
               {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
@@ -2037,11 +2090,12 @@ function VerifiedAppShell({ user, logout, access }: {
                       canAssignWorkshop={access.can("progress", "assign_workshop_staff")}
                       onMoDanhMuc={(code, nhom) => { setMoDanhMuc({ code, nhom }); setView("source"); }} />
                   ) : (
-                    <UpdateView acts={filteredActs} conn={conn}
+                    <UpdateView acts={filteredActs} readableActs={todayActs} conn={conn}
                       canChonNguoiThucHien={canChonNguoiThucHien} canDoiTrangThai={canDoiTrangThai}
                       onUpdate={updateActivity} onReload={reloadData} readOnly={false}
                       canAssignWorkshop={access.can("progress", "assign_workshop_staff")}
-                      focusId={moHangMuc} onFocusDone={() => setMoHangMuc("")} />
+                      pendingProgressLink={moHangMuc}
+                      onProgressLinkConsumed={consumeProgressLink} />
                   )}
                 </>
               )}
