@@ -137,6 +137,89 @@ export interface WorkshopScopeGrantFailure {
 
 export type WorkshopScopeGrantResult = WorkshopScopeGrantSuccess | WorkshopScopeGrantFailure;
 
+export interface WorkshopScopeGrant {
+  id: string;
+  performerId: string;
+  department: string;
+  departmentKey: string;
+  areaCode: string;
+  areaKey: string;
+  line: string | null;
+  lineKey: string | null;
+  validFrom: string;
+  expiresAt: string | null;
+  isActive: boolean;
+  version: number;
+  createdAt: string;
+  createdBy: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+  changeReason: string;
+}
+
+export interface SourceWorkshopCoveragePerson {
+  personId: string;
+  fullName: string;
+  normalizedFullName: string;
+  email: string | null;
+  department: string | null;
+  roleName: "workshop_manager" | "workshop_staff";
+  grants: WorkshopScopeGrant[];
+}
+
+export interface SourceWorkshopCoverageCursor {
+  normalizedFullName: string;
+  personId: string;
+}
+
+export interface SourceWorkshopCoverageSuccess {
+  ok: true;
+  rows: SourceWorkshopCoveragePerson[];
+  authorizedTotal: number;
+  nextCursor: SourceWorkshopCoverageCursor | null;
+}
+
+export interface SourceWorkshopCoverageFailure {
+  ok: false;
+  errorCode: "FORBIDDEN" | "INVALID_LIMIT" | "INVALID_CURSOR" | "NETWORK" | "NOT_CONFIGURED" | "MALFORMED_RESPONSE";
+  error: string;
+}
+
+export type SourceWorkshopCoverageResult = SourceWorkshopCoverageSuccess | SourceWorkshopCoverageFailure;
+
+export interface SourceWorkshopScopeChoice {
+  department: string;
+  areaCode: string;
+  line: string | null;
+}
+
+export interface SourceWorkshopScopeChoicesCursor {
+  department: string;
+  areaCode: string;
+  line: string | null;
+}
+
+export interface SourceWorkshopScopeChoicesSuccess {
+  ok: true;
+  rows: SourceWorkshopScopeChoice[];
+  nextCursor: SourceWorkshopScopeChoicesCursor | null;
+}
+
+export interface SourceWorkshopScopeChoicesFailure {
+  ok: false;
+  errorCode: "FORBIDDEN" | "INVALID_LIMIT" | "INVALID_CURSOR" | "NETWORK" | "NOT_CONFIGURED" | "MALFORMED_RESPONSE";
+  error: string;
+}
+
+export type SourceWorkshopScopeChoicesResult = SourceWorkshopScopeChoicesSuccess | SourceWorkshopScopeChoicesFailure;
+
+export interface WorkshopScopeDraft {
+  department: string;
+  areaCode: string;
+  line: string | null;
+  reason: string;
+}
+
 export class SourceAccessContractError extends Error {
   constructor(message: string) {
     super(message);
@@ -158,6 +241,11 @@ const GRANT_ERROR_CODES = new Set<WorkshopScopeGrantFailure["errorCode"]>([
   "FORBIDDEN", "REASON_REQUIRED", "INVALID_ACTIVE_STATE", "GRANT_NOT_FOUND", "INVALID_SCOPE", "SCOPE_NOT_FOUND",
   "VERSION_CONFLICT", "PERSON_NOT_ELIGIBLE", "DUPLICATE_ACTIVE_SCOPE",
 ]);
+const WORKSHOP_SCOPE_GRANT_KEYS = [
+  "id", "performer_id", "department", "department_key", "area_code", "area_key", "line", "line_key",
+  "valid_from", "expires_at", "is_active", "version", "created_at", "created_by", "updated_at", "updated_by",
+  "change_reason",
+] as const;
 const SOURCE_LIST_ROW_KEYS = [
   "id", "object_kind", "object_code", "source_tab", "source_row", "extra", "created_at", "updated_at",
   "is_active", "edited_on_web", "criticality_source", "version", "timeline_revision", "timeline_applied_revision",
@@ -400,4 +488,124 @@ export function decodeWorkshopScopeGrantResponse(value: unknown): WorkshopScopeG
   if (version < 1) throw new SourceAccessContractError("Workshop scope grant response.version must be positive.");
   if (typeof raw.is_active !== "boolean") throw new SourceAccessContractError("Workshop scope grant response.is_active must be boolean.");
   return { ok: true, grantId: uuid(raw.grant_id, "Workshop scope grant response.grant_id"), version, isActive: raw.is_active };
+}
+
+function timestamp(value: unknown, label: string): string {
+  const parsed = string(value, label);
+  if (Number.isNaN(Date.parse(parsed))) throw new SourceAccessContractError(`${label} must be an ISO timestamp.`);
+  return parsed;
+}
+
+function workshopScopeGrant(value: unknown, label: string): WorkshopScopeGrant {
+  const raw = record(value, label);
+  exactKeys(raw, WORKSHOP_SCOPE_GRANT_KEYS, label);
+  const line = nullableString(raw.line, `${label}.line`);
+  const lineKey = nullableString(raw.line_key, `${label}.line_key`);
+  if ((line === null) !== (lineKey === null)) {
+    throw new SourceAccessContractError(`${label}.line and line_key must both be null or both be populated.`);
+  }
+  const version = integer(raw.version, `${label}.version`);
+  if (version < 1) throw new SourceAccessContractError(`${label}.version must be positive.`);
+  if (typeof raw.is_active !== "boolean") throw new SourceAccessContractError(`${label}.is_active must be boolean.`);
+  return {
+    id: uuid(raw.id, `${label}.id`), performerId: uuid(raw.performer_id, `${label}.performer_id`),
+    department: string(raw.department, `${label}.department`), departmentKey: string(raw.department_key, `${label}.department_key`),
+    areaCode: string(raw.area_code, `${label}.area_code`), areaKey: string(raw.area_key, `${label}.area_key`),
+    line, lineKey, validFrom: timestamp(raw.valid_from, `${label}.valid_from`),
+    expiresAt: raw.expires_at === null ? null : timestamp(raw.expires_at, `${label}.expires_at`),
+    isActive: raw.is_active, version, createdAt: timestamp(raw.created_at, `${label}.created_at`),
+    createdBy: nullableUuid(raw.created_by, `${label}.created_by`), updatedAt: timestamp(raw.updated_at, `${label}.updated_at`),
+    updatedBy: nullableUuid(raw.updated_by, `${label}.updated_by`), changeReason: string(raw.change_reason, `${label}.change_reason`),
+  };
+}
+
+function workshopCoverageCursor(value: unknown, label: string): SourceWorkshopCoverageCursor | null {
+  if (value === null) return null;
+  const raw = record(value, label);
+  exactKeys(raw, ["normalized_full_name", "person_id"], label);
+  return {
+    normalizedFullName: string(raw.normalized_full_name, `${label}.normalized_full_name`),
+    personId: uuid(raw.person_id, `${label}.person_id`),
+  };
+}
+
+/** Decode the exact, manager-only paged workshop coverage directory. */
+export function decodeSourceWorkshopCoverageResponse(value: unknown): SourceWorkshopCoverageResult {
+  const raw = record(value, "Workshop coverage response");
+  if (raw.ok === false) {
+    exactKeys(raw, ["ok", "error_code", "error"], "Workshop coverage error response");
+    const errorCode = string(raw.error_code, "Workshop coverage response.error_code");
+    if (errorCode !== "FORBIDDEN" && errorCode !== "INVALID_LIMIT" && errorCode !== "INVALID_CURSOR") {
+      throw new SourceAccessContractError("Workshop coverage response.error_code is invalid.");
+    }
+    return { ok: false, errorCode, error: string(raw.error, "Workshop coverage response.error") };
+  }
+  if (raw.ok !== true) throw new SourceAccessContractError("Workshop coverage response.ok must be boolean.");
+  exactKeys(raw, ["ok", "rows", "authorized_total", "next_cursor"], "Workshop coverage response");
+  const authorizedTotal = integer(raw.authorized_total, "Workshop coverage response.authorized_total");
+  if (authorizedTotal < 0) throw new SourceAccessContractError("Workshop coverage response.authorized_total must be non-negative.");
+  return {
+    ok: true,
+    rows: array(raw.rows, "Workshop coverage response.rows").map((entry, index) => {
+      const row = record(entry, `Workshop coverage response.rows[${index}]`);
+      exactKeys(row, ["person_id", "performer_name", "normalized_full_name", "email", "department", "role_name", "grants"], `Workshop coverage response.rows[${index}]`);
+      const roleName = string(row.role_name, `Workshop coverage response.rows[${index}].role_name`);
+      if (roleName !== "workshop_manager" && roleName !== "workshop_staff") {
+        throw new SourceAccessContractError(`Workshop coverage response.rows[${index}].role_name is invalid.`);
+      }
+      return {
+        personId: uuid(row.person_id, `Workshop coverage response.rows[${index}].person_id`),
+        fullName: string(row.performer_name, `Workshop coverage response.rows[${index}].performer_name`),
+        normalizedFullName: string(row.normalized_full_name, `Workshop coverage response.rows[${index}].normalized_full_name`),
+        email: nullableString(row.email, `Workshop coverage response.rows[${index}].email`),
+        department: nullableString(row.department, `Workshop coverage response.rows[${index}].department`),
+        roleName,
+        grants: array(row.grants, `Workshop coverage response.rows[${index}].grants`).map((grant, grantIndex) => workshopScopeGrant(grant, `Workshop coverage response.rows[${index}].grants[${grantIndex}]`)),
+      };
+    }),
+    authorizedTotal,
+    nextCursor: workshopCoverageCursor(raw.next_cursor, "Workshop coverage response.next_cursor"),
+  };
+}
+
+/** Decode Source's real department/area/optional-line tuples. */
+export function decodeSourceWorkshopScopeChoicesResponse(value: unknown): SourceWorkshopScopeChoicesResult {
+  const raw = record(value, "Workshop scope choices response");
+  if (raw.ok === false) {
+    exactKeys(raw, ["ok", "error_code", "error"], "Workshop scope choices error response");
+    const errorCode = string(raw.error_code, "Workshop scope choices response.error_code");
+    if (errorCode !== "FORBIDDEN" && errorCode !== "INVALID_LIMIT" && errorCode !== "INVALID_CURSOR") {
+      throw new SourceAccessContractError("Workshop scope choices response.error_code is invalid.");
+    }
+    return { ok: false, errorCode, error: string(raw.error, "Workshop scope choices response.error") };
+  }
+  if (raw.ok !== true) throw new SourceAccessContractError("Workshop scope choices response.ok must be boolean.");
+  exactKeys(raw, ["ok", "rows", "next_cursor"], "Workshop scope choices response");
+  const decodeChoice = (entry: unknown, label: string): SourceWorkshopScopeChoice => {
+    const row = record(entry, label);
+    exactKeys(row, ["department", "area_code", "line"], label);
+    const department = string(row.department, `${label}.department`).trim();
+    const areaCode = string(row.area_code, `${label}.area_code`).trim();
+    if (!department || !areaCode) throw new SourceAccessContractError(`${label}.department and area_code must be nonblank.`);
+    return { department, areaCode, line: nullableString(row.line, `${label}.line`) };
+  };
+  const cursor = raw.next_cursor === null ? null : (() => {
+    const row = decodeChoice(raw.next_cursor, "Workshop scope choices response.next_cursor");
+    return row;
+  })();
+  return {
+    ok: true,
+    rows: array(raw.rows, "Workshop scope choices response.rows").map((entry, index) => decodeChoice(entry, `Workshop scope choices response.rows[${index}]`)),
+    nextCursor: cursor,
+  };
+}
+
+/** Client-side validation only improves feedback; the RPC repeats every check. */
+export function normalizeWorkshopScopeDraft(value: { department: string; areaCode: string; line: string; reason: string }): WorkshopScopeDraft {
+  const department = value.department.trim();
+  const areaCode = value.areaCode.trim();
+  const reason = value.reason.trim();
+  if (!department || !areaCode) throw new SourceAccessContractError("Cần chọn bộ phận và khu vực Source.");
+  if (!reason) throw new SourceAccessContractError("Cần nhập lý do thay đổi phạm vi xưởng.");
+  return { department, areaCode, line: value.line.trim() || null, reason };
 }
