@@ -1,8 +1,8 @@
 # Today Personal Scope Design
 
 **Status:** Approved
-**Date:** 2026-08-28  
-**Related design:** `docs/superpowers/specs/2026-08-28-today-action-queue-performance-design.md`  
+**Date:** 2026-08-28
+**Related design:** `docs/superpowers/specs/2026-08-28-today-action-queue-performance-design.md`
 **Related Source design:** `docs/superpowers/specs/2026-08-28-source-qa-workshop-access-design.md`
 
 ## Goal

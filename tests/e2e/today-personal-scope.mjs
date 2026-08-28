@@ -231,11 +231,26 @@ async function clearGlobalFilters(page) {
   }, { timeout: 5_000 });
 }
 
-async function openToday({ user, businessRole, personId = null, hash = "v=today" }) {
+async function openToday({
+  user,
+  businessRole,
+  personId = null,
+  hash = "v=today",
+  cachedUser = null,
+  activities = ACTIVITIES,
+  objects = activities.map((row) => ({
+    code: row.code, name: row.name, dept: row.dept, area: row.area, cls: "tb", crit: "TB",
+  })),
+}) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1500, height: 1000 });
   await page.evaluateOnNewDocument(() => localStorage.clear());
   await nhetPhien(page, { supabaseUrl: URL_SB, nguoiDung: user });
+  if (cachedUser) {
+    await page.evaluateOnNewDocument((value) => {
+      localStorage.setItem("vmp_monitor_user_v1", JSON.stringify(value));
+    }, cachedUser);
+  }
   const { chanNgoai } = await caiGiaLap(page, {
     supabaseUrl: URL_SB,
     kichBan: "day",
@@ -259,14 +274,12 @@ async function openToday({ user, businessRole, personId = null, hash = "v=today"
         : [];
       kho.rpc_my_ui_access = accessFor(businessRole);
       kho.rpc_get_vmp_dashboard = {
-        activities: ACTIVITIES.map((row) => ({ ...row, _raw: { ...row._raw } })),
-        objects: ACTIVITIES.map((row) => ({
-          code: row.code, name: row.name, dept: row.dept, area: row.area, cls: "tb", crit: "TB",
-        })),
+        activities: activities.map((row) => ({ ...row, _raw: { ...row._raw } })),
+        objects: objects.map((row) => ({ ...row })),
         updated_at: "2026-08-28T00:00:00Z",
       };
       kho.rpc_get_vmp_watermark = {
-        year: 2026, plan_items: ACTIVITIES.length, objects: 0, updated_at: "2026-08-28T00:00:00Z",
+        year: 2026, plan_items: activities.length, objects: objects.length, updated_at: "2026-08-28T00:00:00Z",
       };
       kho.rpc_my_editable_progress_rights = { ok: true, rights: [] };
     },
@@ -283,6 +296,15 @@ const browser = await puppeteer.launch({
 });
 
 try {
+  const regressionFailures = [];
+  const recordRegression = (name, check) => {
+    try {
+      check();
+    } catch (error) {
+      regressionFailures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
   {
     const { page, chanNgoai } = await openToday({
       user: USER.staff, businessRole: "qa_staff", personId: PERSON.staff, hash: "v=today&me=1",
@@ -384,6 +406,83 @@ try {
     } finally {
       await page.close();
     }
+  }
+
+  {
+    const { page, chanNgoai } = await openToday({
+      user: USER.staff,
+      businessRole: "qa_staff",
+      personId: PERSON.staff,
+      cachedUser: {
+        name: USER.staff.user_metadata.full_name,
+        uid: USER.staff.id,
+        email: USER.staff.email,
+        role: "department_user",
+        department: "qa",
+        accessClass: "qa_staff",
+        personId: null,
+      },
+    });
+    try {
+      await waitForTodayCodes(page, [CODE.owner, CODE.support]);
+      const state = await page.evaluate(() => {
+        const personalAction = document.querySelector('button[aria-label="Xem việc cả đội"]');
+        const cached = JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "null");
+        return {
+          actionAvailable: personalAction instanceof HTMLButtonElement,
+          personalHeading: /Việc hôm nay của tôi/.test(document.querySelector(".hn-mota")?.textContent || ""),
+          cachedPersonId: cached?.personId ?? null,
+        };
+      });
+      recordRegression("returning cached session refreshes the canonical performer link", () => {
+        assert.deepEqual(state, {
+          actionAvailable: true,
+          personalHeading: true,
+          cachedPersonId: PERSON.staff,
+        });
+      });
+      recordRegression("returning cached session remains fully intercepted", () => {
+        assert.equal(chanNgoai.length, 0);
+      });
+    } finally {
+      await page.close();
+    }
+  }
+
+  {
+    const { page, chanNgoai } = await openToday({
+      user: USER.unlinked,
+      businessRole: "qa_staff",
+      personId: null,
+      activities: [],
+      objects: [],
+    });
+    try {
+      const state = await page.evaluate(() => {
+        const action = document.querySelector('button[aria-label="Chỉ xem việc của tôi"]');
+        return {
+          actionAvailable: action instanceof HTMLButtonElement,
+          actionDisabled: action instanceof HTMLButtonElement ? action.disabled : null,
+          hasWarning: /Tài khoản chưa liên kết nhân sự; nhờ Admin nối hồ sơ\./.test(document.body.innerText),
+        };
+      });
+      recordRegression("zero-row unlinked Today exposes the actionable personal-scope warning", () => {
+        assert.deepEqual(state, {
+          actionAvailable: true,
+          actionDisabled: true,
+          hasWarning: true,
+        });
+      });
+      recordRegression("zero-row unlinked Today remains fully intercepted", () => {
+        assert.equal(chanNgoai.length, 0);
+      });
+    } finally {
+      await page.close();
+    }
+  }
+
+  if (regressionFailures.length) {
+    throw new Error(`Today scope regression failures:\n${regressionFailures.join("\n")}`);
   }
 } finally {
   await browser.close();

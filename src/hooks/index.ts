@@ -160,7 +160,7 @@ export function useAuth() {
           saveUser(null);
           return;
         }
-        if (tinhTrang === "co" && phien && !user) { setUser(phien); saveUser(phien); }
+        if (tinhTrang === "co" && phien) { setUser(phien); saveUser(phien); }
       })
       .catch(() => { /* không kết luận được — giữ nguyên, lần sau thử lại */ })
       .finally(() => { if (con) setLoading(false); });

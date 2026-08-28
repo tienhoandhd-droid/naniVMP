@@ -1703,12 +1703,19 @@ function VerifiedAppShell({ user, logout, access }: {
   const [onlyMine, setOnlyMine] = useState(currentPersonId ? khoiTao.onlyMine : false);
   const [todayPersonScope, setTodayPersonScope] = useState<TodayPersonScope>(() =>
     defaultTodayPersonScope(access.businessRole, currentPersonId));
+  const daChonPhamViToday = useRef(false);
+  const chonPhamViToday = useCallback((scope: TodayPersonScope) => {
+    daChonPhamViToday.current = true;
+    setTodayPersonScope(scope);
+  }, []);
   useEffect(() => {
     if (!currentPersonId && onlyMine) setOnlyMine(false);
   }, [currentPersonId, onlyMine]);
   useEffect(() => {
-    setTodayPersonScope((scope) => normalizeTodayPersonScope(scope, currentPersonId));
-  }, [currentPersonId]);
+    setTodayPersonScope((scope) => daChonPhamViToday.current
+      ? normalizeTodayPersonScope(scope, currentPersonId)
+      : defaultTodayPersonScope(access.businessRole, currentPersonId));
+  }, [access.businessRole, currentPersonId]);
   // App là nơi duy nhất quyết định đích theo quyền. Bản đồ chỉ nhận callback
   // khi có một màn hợp lệ, vì vậy nó không thể tạo CTA dẫn tới màn bị chặn.
   const workloadListTarget = overviewTarget(access, "soon");
@@ -2058,7 +2065,8 @@ function VerifiedAppShell({ user, logout, access }: {
                 hiển thị hạng mục nào — thanh lọc ở đó là một bộ điều khiển
                 không điều khiển gì, lại còn ghi "461/461 hạng mục" trên một
                 trang không có hạng mục. Ẩn đi. */}
-            {acts.length > 0 && view !== "audit" && view !== "admin" && view !== "missing"
+            {(acts.length > 0 || (view === "today" && access.can("today", "view")))
+              && view !== "audit" && view !== "admin" && view !== "missing"
               && view !== "rules" && (
               <GlobalFilterBar
                 areaSel={areaSel} setAreaSel={setAreaSel}
@@ -2071,7 +2079,7 @@ function VerifiedAppShell({ user, logout, access }: {
                 total={view === "today" ? soSongTodayTotal : soSong}
                 soNgung={view === "today" ? soNgungToday : soNgung}
                 onlyMine={onlyMine} setOnlyMine={setOnlyMine}
-                todayPersonScope={todayPersonScope} setTodayPersonScope={setTodayPersonScope}
+                todayPersonScope={todayPersonScope} setTodayPersonScope={chonPhamViToday}
                 currentPersonId={currentPersonId}
                 personLinked={currentPersonId !== null} todayMode={view === "today"}
               />
