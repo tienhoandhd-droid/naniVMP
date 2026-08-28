@@ -1,172 +1,285 @@
-/* =====================================================================
- *  todayModel.ts — chọn ra "hôm nay tôi phải làm gì"
- *  ---------------------------------------------------------------------
- *  Logic thuần, không React, không DOM: `node --test` chạy được thẳng.
- *
- *  Ba nguyên tắc, mỗi cái vá một lỗi thật của bản trước:
- *
- *  1. KHÔNG nhận diện người dùng bằng TÊN HIỂN THỊ. Nhà máy có người
- *     trùng tên, và một người đổi tên hiển thị là "việc của tôi" đổi theo.
- *     Việc lọc theo người đã do lớp phạm vi toàn cục lo bằng person_id.
- *
- *  2. Thiếu mốc hạn thì KHÔNG coi là quá hạn. Một hạng mục chưa có ngày
- *     đích chỉ nghĩa là chưa lên lịch; báo đỏ nó là báo động giả, mà báo
- *     động giả lặp lại thì người ta ngừng nhìn màu đỏ.
- *
- *  3. So sánh ngày ở nửa đêm theo giờ Bangkok. So bằng giờ máy thì cùng
- *     một hạng mục lúc 23h hôm nay và 1h sáng mai cho hai kết quả khác
- *     nhau — hồ sơ GMP không chấp nhận kiểu đó.
- * ===================================================================== */
 import type { Activity } from "../../types/domain.ts";
+import type { EditableProgressRight } from "../progress/editableProgressRights.ts";
+import type { EditableTimelineField } from "../itemPermissions/types.ts";
 
-export type TodayRowKind = "overdue" | "due_7d" | "incomplete_record";
+export type TodayReasonKind =
+  | "overdue" | "due_today" | "due_7d"
+  | "missing_owner" | "missing_actual_completion" | "missing_schedule";
+export type TodaySection = "overdue" | "today" | "upcoming" | "incomplete";
+export type TodayRightsStatus = "loading" | "ready" | "error";
 
-export interface TodayRow {
+export interface TodayReason {
+  kind: TodayReasonKind;
+  label: string;
+  stage?: string;
+  daysRemaining?: number;
+}
+
+export interface TodayActionRow {
   validationCode: string;
   title: string;
-  /** Mốc đang chờ: Đề cương / Thẩm định / Báo cáo / Đích VMP. */
-  milestoneLabel: string;
-  /** Số ngày còn lại; âm là đã trễ. `null` khi chưa có mốc. */
+  department: string;
+  ownerName: string;
+  criticality: string;
+  criticalityScore: number | null;
+  blockingStage: string;
+  deadlineStage: string | null;
   daysRemaining: number | null;
-  kind: TodayRowKind;
+  reasons: TodayReason[];
+  section: TodaySection;
+  canEditProgress: boolean;
+  editableFields: readonly EditableTimelineField[];
+  permissionReason: string;
 }
 
-export interface TodayModel {
-  overdue: TodayRow[];
-  dueSoon: TodayRow[];
-  incomplete: TodayRow[];
-  /** Việc nên làm trước nhất — hoặc `null` khi không còn gì gấp. */
-  nextAction: TodayRow | null;
+export interface TodayActionModel {
+  rows: TodayActionRow[];
+  sections: Record<TodaySection, TodayActionRow[]>;
+  kpis: { overdue: number; today: number; upcoming: number; dataQuality: number };
+  nextAction: TodayActionRow | null;
 }
 
-/** Bốn mốc, theo đúng thứ tự vòng đời thẩm định. */
-const MOC: Array<{ han: keyof Activity; thuc: keyof Activity; nhan: string }> = [
-  { han: "dlProtocol", thuc: "actProtocol", nhan: "Đề cương" },
-  { han: "dlValidation", thuc: "actValidation", nhan: "Thẩm định" },
-  { han: "dlReport", thuc: "actReport", nhan: "Báo cáo" },
-  { han: "dlVmp", thuc: "actVmp", nhan: "Đích VMP" },
-];
-
-const NGAY_MS = 86_400_000;
-
-/** Nửa đêm theo giờ Bangkok (UTC+7), trả về mốc epoch.
- *
- *  Không dùng `new Date(chuoi)` trần: chuỗi `YYYY-MM-DD` được hiểu là UTC,
- *  nên ở Việt Nam nó lệch đi 7 tiếng và một hạng mục đến hạn "hôm nay" có
- *  thể bị tính thành "hôm qua". */
-function nuaDemBangkok(gt: string | Date): number | null {
-  const d = typeof gt === "string" ? new Date(`${gt.slice(0, 10)}T00:00:00+07:00`) : gt;
-  const ms = d.getTime();
-  if (Number.isNaN(ms)) return null;
-  // Quy về nửa đêm Bangkok của chính ngày đó.
-  return Math.floor((ms + 7 * 3_600_000) / NGAY_MS) * NGAY_MS - 7 * 3_600_000;
+export interface ProgressDeepLink {
+  validationCode: string;
+  source: "today";
+  reasons: TodayReasonKind[];
+  /** Compatibility for the old command-center adapter; new callers use reasons. */
+  quickFilter?: TodayReasonKind | TodayRowKind;
 }
 
-const laChuoiNgay = (v: unknown): v is string =>
-  typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v);
+const DAY_MS = 86_400_000;
+const BANGKOK_OFFSET_MS = 7 * 3_600_000;
+const STAGES = [
+  { deadline: "dlProtocol", actual: "actProtocol", rawDeadline: ["deadline_protocol", "dl_protocol"], rawActual: ["actual_protocol_date", "ngay_de_cuong"], done: "protocol_done", label: "Đề cương" },
+  { deadline: "dlValidation", actual: "actValidation", rawDeadline: ["deadline_validation", "dl_validation"], rawActual: ["actual_validation_date", "ngay_tham_dinh"], done: "validation_done", label: "Thẩm định" },
+  { deadline: "dlReport", actual: "actReport", rawDeadline: ["deadline_report", "dl_report"], rawActual: ["actual_report_date", "ngay_bao_cao"], done: "report_done", label: "Báo cáo" },
+  { deadline: "dlVmp", actual: "actVmp", rawDeadline: ["deadline_vmp", "dl_vmp"], rawActual: ["actual_vmp_date", "ngay_vmp"], done: "vmp_done", label: "Đích VMP" },
+] as const;
+type Raw = Record<string, unknown>;
 
-/** Mốc chưa hoàn thành gần nhất CÓ HẠN.
- *
- *  Không dừng ở mốc chưa xong đầu tiên: rất thường gặp cảnh đề cương chưa
- *  có ngày hẹn trong khi ngày thẩm định thì đã chốt và đã trôi qua. Dừng
- *  sớm ở đó là im lặng bỏ sót một hạng mục quá hạn — đúng loại lỗi mà màn
- *  "Hôm nay" sinh ra để ngăn.
- *
- *  Trả về mốc chưa xong đầu tiên (để hiển thị đúng giai đoạn) kèm hạn của
- *  mốc CÓ HẠN gần nhất tính từ đó trở đi. */
-function mocDangCho(a: Activity): { nhan: string; han: string | null } | null {
-  let dau: { nhan: string; han: string | null } | null = null;
-  for (const m of MOC) {
-    if (laChuoiNgay(a[m.thuc])) continue;             // mốc này đã xong
-    const han = laChuoiNgay(a[m.han]) ? String(a[m.han]) : null;
-    if (dau === null) dau = { nhan: m.nhan, han };
-    if (han !== null) return { nhan: m.nhan, han };   // mốc chưa xong đầu tiên CÓ hạn
+function rawOf(activity: Activity): Raw { return activity._raw ?? {}; }
+
+function firstValue(activity: Activity, primary: string, aliases: readonly string[]): unknown {
+  const source = activity as unknown as Raw;
+  for (const key of [primary, ...aliases]) {
+    const value = source[key];
+    if (value !== undefined && value !== null && value !== "") return value;
   }
-  return dau;
-}
-
-/** Chủ sở hữu chính tắc. CHỈ chấp nhận person_id thật.
- *
- *  Tên hiển thị, `owner`, hay người hỗ trợ đều KHÔNG thay thế được: hai
- *  người trùng tên là chuyện có thật ở nhà máy, và gán việc nhầm người
- *  trong hồ sơ GMP là lỗi nghiêm trọng hơn nhiều so với việc để trống. */
-function coChuSoHuu(a: Activity): boolean {
-  const id = a.ownerPersonId ?? (a._raw as Record<string, unknown> | undefined)?.owner_person_id;
-  return typeof id === "string" && id.trim().length > 0;
-}
-
-function tenHienThi(a: Activity): string {
-  const ten = a.objName || a.name;
-  return typeof ten === "string" && ten.trim() ? ten.trim() : String(a.validationCode ?? a.code ?? a.id);
-}
-
-function maHangMuc(a: Activity): string {
-  return String(a.validationCode ?? a.code ?? a.id ?? "");
-}
-
-function toTodayRow(a: Activity, nay: number): TodayRow | null {
-  const xong = a.st === "done";
-  const moc = mocDangCho(a);
-
-  /* Hồ sơ chưa đủ: đã đánh dấu hoàn thành mà thiếu ngày đích thực tế,
-     hoặc đang hoạt động mà chưa có người phụ trách chính tắc. */
-  const thieuNgayXong = xong && !laChuoiNgay(a.actVmp);
-  const thieuNguoi = !coChuSoHuu(a);
-  if (thieuNgayXong || thieuNguoi) {
-    return {
-      validationCode: maHangMuc(a),
-      title: tenHienThi(a),
-      milestoneLabel: thieuNgayXong ? "Thiếu ngày hoàn thành" : "Chưa phân công QA",
-      daysRemaining: null,
-      kind: "incomplete_record",
-    };
-  }
-
-  if (xong || !moc) return null;
-
-  const han = moc.han ? nuaDemBangkok(moc.han) : null;
-  if (han == null) return null;               // chưa lên lịch, không phải quá hạn
-
-  const con = Math.round((han - nay) / NGAY_MS);
-  if (con < 0) {
-    return { validationCode: maHangMuc(a), title: tenHienThi(a), milestoneLabel: moc.nhan, daysRemaining: con, kind: "overdue" };
-  }
-  if (con <= 7) {
-    return { validationCode: maHangMuc(a), title: tenHienThi(a), milestoneLabel: moc.nhan, daysRemaining: con, kind: "due_7d" };
+  const raw = rawOf(activity);
+  for (const key of [primary, ...aliases]) {
+    if (raw[key] !== undefined && raw[key] !== null && raw[key] !== "") return raw[key];
   }
   return null;
 }
 
-/** Gấp trước, và cùng mức gấp thì xếp theo mã cho ổn định. */
-const soSanhGap = (a: TodayRow, b: TodayRow) =>
-  (a.daysRemaining ?? 0) - (b.daysRemaining ?? 0)
-  || a.validationCode.localeCompare(b.validationCode, "vi");
+function asDateString(value: unknown): string | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(value)) return null;
+  const date = value.slice(0, 10);
+  return Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ? null : date;
+}
 
-const soSanhMa = (a: TodayRow, b: TodayRow) =>
-  a.validationCode.localeCompare(b.validationCode, "vi");
+function bangkokDay(now: Date): string {
+  return new Date(now.getTime() + BANGKOK_OFFSET_MS).toISOString().slice(0, 10);
+}
 
-export function buildTodayModel(activities: Activity[], now: Date): TodayModel {
-  const nay = nuaDemBangkok(now) ?? now.getTime();
-  const rows = (activities || [])
-    .filter((a) => (a.state ?? "active") === "active")
-    .map((a) => toTodayRow(a, nay))
-    .filter((r): r is TodayRow => r !== null);
+function daysBetween(date: string, today: string): number {
+  return Math.round((Date.parse(date) - Date.parse(today)) / DAY_MS);
+}
 
-  const overdue = rows.filter((r) => r.kind === "overdue").sort(soSanhGap);
-  const dueSoon = rows.filter((r) => r.kind === "due_7d").sort(soSanhGap);
-  const incomplete = rows.filter((r) => r.kind === "incomplete_record").sort(soSanhMa);
+function stageComplete(activity: Activity, stage: typeof STAGES[number]): boolean {
+  if (asDateString(firstValue(activity, stage.actual, stage.rawActual))) return true;
+  return rawOf(activity)[stage.done] === true;
+}
 
+function activityState(activity: Activity): string {
+  return String(activity.state ?? rawOf(activity).state ?? "active");
+}
+
+function validationCode(activity: Activity): string {
+  return String(firstValue(activity, "validationCode", ["validation_code", "code", "id"]) ?? "");
+}
+
+function title(activity: Activity): string {
+  const value = firstValue(activity, "objName", ["name", "object_name", "code", "validationCode", "id"]);
+  return typeof value === "string" && value.trim() ? value.trim() : validationCode(activity);
+}
+
+function department(activity: Activity): string {
+  const value = firstValue(activity, "dept", ["department", "object_department"]);
+  if (typeof value === "string" && value.trim()) return value.trim();
+  const depts = (activity as unknown as Raw).depts;
+  return Array.isArray(depts) ? depts.filter((x): x is string => typeof x === "string").join(", ") : "";
+}
+
+function ownerName(activity: Activity): string {
+  const value = firstValue(activity, "owner_name", ["owner", "performer_name"]);
+  return typeof value === "string" && value.trim() ? value.trim() : "Chưa phân công";
+}
+
+function ownerPersonId(activity: Activity): string | null {
+  const value = firstValue(activity, "ownerPersonId", ["owner_person_id"]);
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export function isTodayActivityMine(activity: Activity, personId: string): boolean {
+  const owner = ownerPersonId(activity);
+  return Boolean(owner && typeof personId === "string" && owner === personId.trim());
+}
+
+function criticality(activity: Activity): string {
+  const value = firstValue(activity, "criticality", ["crit", "criticality_label"]);
+  return value === null ? "" : String(value);
+}
+
+function criticalityScore(activity: Activity): number | null {
+  const value = firstValue(activity, "score", ["criticality_score", "grade"]);
+  if (value === null) return null;
+  const score = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(score) ? score : null;
+}
+
+function unfinishedStages(activity: Activity): Array<{ label: string; deadline: string | null }> {
+  return STAGES.filter((stage) => !stageComplete(activity, stage)).map((stage) => ({
+    label: stage.label,
+    deadline: asDateString(firstValue(activity, stage.deadline, stage.rawDeadline)),
+  }));
+}
+
+function permission(activity: Activity, options: {
+  rights: ReadonlyMap<string, EditableProgressRight>;
+  rightsStatus: TodayRightsStatus;
+}): Pick<TodayActionRow, "canEditProgress" | "editableFields" | "permissionReason"> {
+  if (options.rightsStatus !== "ready") {
+    return {
+      canEditProgress: false,
+      editableFields: [],
+      permissionReason: options.rightsStatus === "loading"
+        ? "Đang tải quyền cập nhật tiến độ"
+        : "Không tải được quyền cập nhật tiến độ",
+    };
+  }
+  const right = options.rights.get(validationCode(activity));
+  if (!right) return { canEditProgress: false, editableFields: [], permissionReason: "Không có quyền cập nhật tiến độ" };
+  return { canEditProgress: true, editableFields: [...right.editableFields], permissionReason: right.reason };
+}
+
+function buildReasons(
+  deadlineStage: string | null,
+  daysRemaining: number | null,
+  hasOwner: boolean,
+  needsActualCompletion: boolean,
+  needsSchedule: boolean,
+): TodayReason[] {
+  const reasons: TodayReason[] = [];
+  if (deadlineStage && daysRemaining !== null) {
+    if (daysRemaining < 0) reasons.push({ kind: "overdue", label: "Quá hạn", stage: deadlineStage, daysRemaining });
+    else if (daysRemaining === 0) reasons.push({ kind: "due_today", label: "Đến hạn hôm nay", stage: deadlineStage, daysRemaining });
+    else if (daysRemaining <= 7) reasons.push({ kind: "due_7d", label: "Đến hạn trong 7 ngày", stage: deadlineStage, daysRemaining });
+  }
+  if (!hasOwner) reasons.push({ kind: "missing_owner", label: "Chưa phân công" });
+  if (needsActualCompletion) reasons.push({ kind: "missing_actual_completion", label: "Thiếu ngày hoàn thành", stage: "Đích VMP" });
+  if (needsSchedule) reasons.push({ kind: "missing_schedule", label: "Chưa lên lịch" });
+  return reasons;
+}
+
+function sectionFor(daysRemaining: number | null, hasQualityIssue: boolean): TodaySection | null {
+  if (daysRemaining !== null && daysRemaining < 0) return "overdue";
+  if (daysRemaining === 0) return "today";
+  if (daysRemaining !== null && daysRemaining <= 7) return "upcoming";
+  return hasQualityIssue ? "incomplete" : null;
+}
+
+function makeRow(activity: Activity, today: string, options: {
+  rights: ReadonlyMap<string, EditableProgressRight>;
+  rightsStatus: TodayRightsStatus;
+}): TodayActionRow | null {
+  if (activityState(activity) !== "active") return null;
+  const unfinished = unfinishedStages(activity);
+  const blockingStage = unfinished[0]?.label ?? "Đích VMP";
+  const dated = unfinished.find((stage) => stage.deadline !== null);
+  const deadlineStage = dated?.label ?? null;
+  const daysRemaining = dated?.deadline ? daysBetween(dated.deadline, today) : null;
+  const hasOwner = ownerPersonId(activity) !== null;
+  const isDone = activity.st === "done";
+  const finalActual = asDateString(firstValue(activity, "actVmp", ["actual_vmp_date", "ngay_vmp"]));
+  const needsActualCompletion = isDone && finalActual === null;
+  const needsSchedule = !isDone && unfinished.length > 0 && dated === undefined;
+  const reasons = buildReasons(deadlineStage, daysRemaining, hasOwner, needsActualCompletion, needsSchedule);
+  const section = sectionFor(daysRemaining, reasons.some((reason) =>
+    reason.kind === "missing_owner" || reason.kind === "missing_actual_completion" || reason.kind === "missing_schedule"));
+  if (section === null) return null;
   return {
-    overdue,
-    dueSoon,
-    incomplete,
-    nextAction: overdue[0] ?? dueSoon[0] ?? incomplete[0] ?? null,
+    validationCode: validationCode(activity), title: title(activity), department: department(activity),
+    ownerName: ownerName(activity), criticality: criticality(activity), criticalityScore: criticalityScore(activity),
+    blockingStage, deadlineStage, daysRemaining, reasons, section, ...permission(activity, options),
   };
 }
 
-/** Yêu cầu mở màn Tiến độ và tập trung vào đúng một hạng mục. */
-export interface ProgressDeepLink {
+const SECTION_RANK: Record<TodaySection, number> = { overdue: 0, today: 1, upcoming: 2, incomplete: 3 };
+
+/** Approved deterministic order: urgency → score → editability → days → Vietnamese code. */
+function compareRows(a: TodayActionRow, b: TodayActionRow): number {
+  const aDays = a.daysRemaining ?? Number.POSITIVE_INFINITY;
+  const bDays = b.daysRemaining ?? Number.POSITIVE_INFINITY;
+  return SECTION_RANK[a.section] - SECTION_RANK[b.section]
+    || (b.criticalityScore ?? Number.NEGATIVE_INFINITY) - (a.criticalityScore ?? Number.NEGATIVE_INFINITY)
+    || Number(b.canEditProgress) - Number(a.canEditProgress)
+    || aDays - bDays
+    || a.validationCode.localeCompare(b.validationCode, "vi");
+}
+
+export function buildTodayActionModel(
+  activities: readonly Activity[],
+  options: { now: Date; rights: ReadonlyMap<string, EditableProgressRight>; rightsStatus: TodayRightsStatus },
+): TodayActionModel {
+  const today = bangkokDay(options.now);
+  const rows = (activities ?? []).map((activity) => makeRow(activity, today, options))
+    .filter((row): row is TodayActionRow => row !== null).sort(compareRows);
+  const sections: Record<TodaySection, TodayActionRow[]> = {
+    overdue: rows.filter((row) => row.section === "overdue"),
+    today: rows.filter((row) => row.section === "today"),
+    upcoming: rows.filter((row) => row.section === "upcoming"),
+    incomplete: rows.filter((row) => row.section === "incomplete"),
+  };
+  const qualityKinds = new Set<TodayReasonKind>(["missing_owner", "missing_actual_completion", "missing_schedule"]);
+  return {
+    rows, sections,
+    kpis: {
+      overdue: sections.overdue.length, today: sections.today.length, upcoming: sections.upcoming.length,
+      dataQuality: rows.filter((row) => row.reasons.some((reason) => qualityKinds.has(reason.kind))).length,
+    },
+    nextAction: rows[0] ?? null,
+  };
+}
+
+/* Legacy adapter retained while the command-center presentation migrates to
+ * TodayActionRow. The actionable model above is the canonical API. */
+export type TodayRowKind = "overdue" | "due_7d" | "incomplete_record";
+export interface TodayRow {
   validationCode: string;
-  quickFilter: TodayRowKind;
-  source: "today";
+  title: string;
+  milestoneLabel: string;
+  daysRemaining: number | null;
+  kind: TodayRowKind;
+}
+export interface TodayModel {
+  overdue: TodayRow[];
+  dueSoon: TodayRow[];
+  incomplete: TodayRow[];
+  nextAction: TodayRow | null;
+}
+function legacyRow(row: TodayActionRow): TodayRow {
+  const kind: TodayRowKind = row.section === "overdue" ? "overdue" : row.section === "incomplete" ? "incomplete_record" : "due_7d";
+  return {
+    validationCode: row.validationCode, title: row.title,
+    milestoneLabel: row.reasons.find((reason) => reason.stage)?.stage ?? row.blockingStage,
+    daysRemaining: row.daysRemaining, kind,
+  };
+}
+export function buildTodayModel(activities: Activity[], now: Date): TodayModel {
+  const model = buildTodayActionModel(activities, { now, rights: new Map(), rightsStatus: "error" });
+  const overdue = model.sections.overdue.map(legacyRow);
+  const dueSoon = [...model.sections.today, ...model.sections.upcoming].map(legacyRow);
+  const incomplete = model.sections.incomplete.map(legacyRow);
+  return { overdue, dueSoon, incomplete, nextAction: model.nextAction ? legacyRow(model.nextAction) : null };
 }

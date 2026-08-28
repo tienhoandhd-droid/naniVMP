@@ -1,163 +1,154 @@
-/* =====================================================================
- *  today-model.test.mjs — "hôm nay tôi phải làm gì"
- *  ---------------------------------------------------------------------
- *  Fixture dựng bằng tay, mốc thời gian cố định. Trọng tâm là ba chỗ dễ
- *  sai mà lại im lặng: nhận diện người bằng tên, coi "chưa lên lịch" là
- *  quá hạn, và so ngày lệch múi giờ.
- * ===================================================================== */
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildTodayModel } from "../../src/features/today/todayModel.ts";
+import {
+  buildTodayActionModel,
+  isTodayActivityMine,
+} from "../../src/features/today/todayModel.ts";
 
 const HOM_NAY = new Date("2026-08-14T00:00:00+07:00");
 const ID_A = "11111111-1111-1111-1111-111111111111";
 const ID_B = "22222222-2222-2222-2222-222222222222";
 
-const BA_DONG = [
-  {
-    id: "V-OVER", validationCode: "V-OVER", code: "O-1", objectCode: "O-1", type: "PQ",
-    st: "prog", state: "active", dlValidation: "2026-08-10", actProtocol: "2026-07-01",
-    owner: "Trùng tên", ownerPersonId: ID_A, supportPersonId: null,
-  },
-  {
-    id: "V-SOON", validationCode: "V-SOON", code: "O-2", objectCode: "O-2", type: "IQ",
-    st: "todo", state: "active", dlProtocol: "2026-08-18",
-    owner: "Trùng tên", ownerPersonId: ID_B, supportPersonId: ID_A,
-  },
-  {
-    id: "V-MISS", validationCode: "V-MISS", code: "O-3", objectCode: "O-3", type: "OQ",
-    st: "done", state: "active", actVmp: null,
-    owner: "Tên hiển thị không đủ", ownerPersonId: null, supportPersonId: null,
-  },
-];
-
-test("chia đúng ba nhóm và chọn việc gấp nhất làm hành động kế tiếp", () => {
-  const m = buildTodayModel(BA_DONG, HOM_NAY);
-  assert.deepEqual(m.overdue.map((r) => r.validationCode), ["V-OVER"]);
-  assert.deepEqual(m.dueSoon.map((r) => r.validationCode), ["V-SOON"]);
-  assert.deepEqual(m.incomplete.map((r) => r.validationCode), ["V-MISS"]);
-  assert.equal(m.nextAction?.validationCode, "V-OVER");
+const right = (validationCode, editableFields = ["actual_protocol_date"], reason = "Được phân công") => ({
+  validationCode,
+  editableFields,
+  reason,
 });
 
-test("mốc đang chờ đi theo đúng thứ tự vòng đời", () => {
-  const m = buildTodayModel(BA_DONG, HOM_NAY);
-  // V-OVER đã xong đề cương nên mốc đang chờ là Thẩm định.
-  assert.equal(m.overdue[0].milestoneLabel, "Thẩm định");
-  // V-SOON chưa làm gì nên mốc đang chờ là Đề cương.
-  assert.equal(m.dueSoon[0].milestoneLabel, "Đề cương");
+test("tích lũy nhiều lý do và giữ dòng quá hạn ở đúng section", () => {
+  const model = buildTodayActionModel([{
+    id: "legacy-id", validationCode: "V-MULTI", st: "prog", state: "active",
+    dlProtocol: "2026-08-01", ownerPersonId: null, score: 9,
+  }], {
+    now: HOM_NAY,
+    rights: new Map([["V-MULTI", right("V-MULTI")]]),
+    rightsStatus: "ready",
+  });
+  assert.equal(model.sections.overdue[0].validationCode, "V-MULTI");
+  assert.deepEqual(model.sections.overdue[0].reasons.map((reason) => reason.kind), [
+    "overdue", "missing_owner",
+  ]);
+  assert.equal(model.kpis.dataQuality, 1);
+  assert.equal(model.sections.incomplete.length, 0);
 });
 
-test("số ngày còn lại đếm đúng, âm là đã trễ", () => {
-  const m = buildTodayModel(BA_DONG, HOM_NAY);
-  assert.equal(m.overdue[0].daysRemaining, -4);   // 10/08 so với 14/08
-  assert.equal(m.dueSoon[0].daysRemaining, 4);    // 18/08 so với 14/08
+test("tách hạn hôm nay khỏi hạn trong 7 ngày và tìm deadline sau blocking stage", () => {
+  const model = buildTodayActionModel([
+    {
+      id: "V-LATER", validationCode: "V-LATER", st: "prog", state: "active",
+      dlProtocol: null, dlValidation: "2026-08-14", ownerPersonId: ID_A,
+    },
+    {
+      id: "V-7D", validationCode: "V-7D", st: "todo", state: "active",
+      dlProtocol: "2026-08-21", ownerPersonId: ID_A,
+    },
+  ], {
+    now: HOM_NAY,
+    rights: new Map(),
+    rightsStatus: "ready",
+  });
+  const today = model.sections.today[0];
+  assert.equal(today.validationCode, "V-LATER");
+  assert.equal(today.blockingStage, "Đề cương");
+  assert.equal(today.deadlineStage, "Thẩm định");
+  assert.equal(today.daysRemaining, 0);
+  assert.deepEqual(today.reasons.map((reason) => reason.kind), ["due_today"]);
+  assert.equal(model.sections.upcoming[0].validationCode, "V-7D");
+  assert.equal(model.sections.upcoming[0].daysRemaining, 7);
+  assert.deepEqual(model.sections.upcoming[0].reasons.map((reason) => reason.kind), ["due_7d"]);
 });
 
-/* ---- Ba cái bẫy ------------------------------------------------------ */
-
-test("KHÔNG có mốc hạn thì không phải quá hạn — chỉ là chưa lên lịch", () => {
-  const m = buildTodayModel([{
-    id: "V-NOPLAN", validationCode: "V-NOPLAN", st: "todo", state: "active",
+test("việc active chưa có deadline vào incomplete với lý do missing_schedule", () => {
+  const model = buildTodayActionModel([{
+    id: "V-NOPLAN", validationCode: "V-NOPLAN", st: "prog", state: "active",
     ownerPersonId: ID_A,
-  }], HOM_NAY);
-  assert.deepEqual(m.overdue, []);
-  assert.deepEqual(m.dueSoon, []);
-  assert.deepEqual(m.incomplete, []);
-  assert.equal(m.nextAction, null);
+  }], {
+    now: HOM_NAY,
+    rights: new Map(),
+    rightsStatus: "ready",
+  });
+  assert.equal(model.sections.incomplete[0].validationCode, "V-NOPLAN");
+  assert.equal(model.sections.incomplete[0].deadlineStage, null);
+  assert.deepEqual(model.sections.incomplete[0].reasons.map((reason) => reason.kind), ["missing_schedule"]);
 });
 
-test("tên hiển thị KHÔNG thay được person_id — thiếu id là hồ sơ chưa đủ", () => {
-  const m = buildTodayModel([{
-    id: "V-TEN", validationCode: "V-TEN", st: "prog", state: "active",
-    dlValidation: "2026-08-10",
-    owner: "Nguyễn Văn A", owner_name: "Nguyễn Văn A", ownerPersonId: null,
-  }], HOM_NAY);
-  assert.deepEqual(m.overdue, [], "có tên mà không có id thì không tính là việc của ai cả");
-  assert.equal(m.incomplete[0]?.milestoneLabel, "Chưa phân công QA");
+test("loại done đầy đủ, cancelled và not_applicable; done thiếu ngày hoàn thành vẫn hiện", () => {
+  const model = buildTodayActionModel([
+    { id: "DONE", validationCode: "DONE", st: "done", state: "active", actVmp: "2026-08-01", ownerPersonId: ID_A },
+    { id: "DONE-MISS", validationCode: "DONE-MISS", st: "done", state: "active", actVmp: null, ownerPersonId: ID_A },
+    { id: "CANCEL", validationCode: "CANCEL", st: "prog", state: "cancelled", dlProtocol: "2026-08-01", ownerPersonId: ID_A },
+    { id: "NA", validationCode: "NA", st: "prog", state: "not_applicable", dlProtocol: "2026-08-01", ownerPersonId: ID_A },
+  ], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
+  assert.deepEqual(model.rows.map((row) => row.validationCode), ["DONE-MISS"]);
+  assert.deepEqual(model.sections.incomplete[0].reasons.map((reason) => reason.kind), ["missing_actual_completion"]);
 });
 
-test("người HỖ TRỢ không thay được người phụ trách chính", () => {
-  const m = buildTodayModel([{
-    id: "V-HOTRO", validationCode: "V-HOTRO", st: "prog", state: "active",
-    dlValidation: "2026-08-10", ownerPersonId: null, supportPersonId: ID_A,
-  }], HOM_NAY);
-  assert.equal(m.incomplete[0]?.milestoneLabel, "Chưa phân công QA");
+test("chỉ person id chính tắc quyết định ownership, kể cả id trong _raw", () => {
+  const activity = {
+    id: "V-OWNER", validationCode: "V-OWNER", st: "prog", state: "active",
+    owner: "Nguyễn Văn A", ownerPersonId: ID_A, supportPersonId: ID_B,
+  };
+  assert.equal(isTodayActivityMine(activity, ID_A), true);
+  assert.equal(isTodayActivityMine(activity, ID_B), false);
+  assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, _raw: { owner_person_id: ID_A } }, ID_A), true);
+  assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, _raw: { support_person_id: ID_A } }, ID_A), false);
+  assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null }, ID_A), false);
 });
 
-test("owner_person_id trong _raw vẫn được chấp nhận", () => {
-  const m = buildTodayModel([{
-    id: "V-RAW", validationCode: "V-RAW", st: "prog", state: "active",
-    dlValidation: "2026-08-10", ownerPersonId: null,
-    _raw: { owner_person_id: ID_A },
-  }], HOM_NAY);
-  assert.equal(m.overdue.length, 1);
+test("tra quyền theo validationCode, không theo activity.id", () => {
+  const model = buildTodayActionModel([{
+    id: "legacy-id", validationCode: "V-CODE", st: "prog", state: "active",
+    dlProtocol: "2026-08-14", ownerPersonId: ID_A,
+  }], {
+    now: HOM_NAY,
+    rights: new Map([["V-CODE", right("V-CODE", ["actual_protocol_date", "status_protocol"], "QA quản lý")]]),
+    rightsStatus: "ready",
+  });
+  assert.equal(model.rows[0].canEditProgress, true);
+  assert.deepEqual(model.rows[0].editableFields, ["actual_protocol_date", "status_protocol"]);
+  assert.equal(model.rows[0].permissionReason, "QA quản lý");
 });
 
-test("hạng mục không còn hoạt động thì không xuất hiện", () => {
-  for (const state of ["cancelled", "not_applicable"]) {
-    const m = buildTodayModel([{
-      id: "V-X", validationCode: "V-X", st: "prog", state,
-      dlValidation: "2026-08-01", ownerPersonId: ID_A,
-    }], HOM_NAY);
-    assert.equal(m.nextAction, null, `state=${state} vẫn lọt vào danh sách`);
+test("quyền loading hoặc error không làm lộ khả năng sửa", () => {
+  for (const rightsStatus of ["loading", "error"]) {
+    const model = buildTodayActionModel([{
+      id: "V-R", validationCode: "V-R", st: "prog", state: "active", dlProtocol: "2026-08-14",
+      ownerPersonId: ID_A,
+    }], {
+      now: HOM_NAY,
+      rights: new Map([["V-R", right("V-R")]]),
+      rightsStatus,
+    });
+    assert.equal(model.rows[0].canEditProgress, false);
+    assert.deepEqual(model.rows[0].editableFields, []);
   }
 });
 
-test("hoàn thành mà thiếu ngày đích thực tế thì vào nhóm hồ sơ chưa đủ", () => {
-  const m = buildTodayModel([{
-    id: "V-D", validationCode: "V-D", st: "done", state: "active",
-    actVmp: null, ownerPersonId: ID_A,
-  }], HOM_NAY);
-  assert.equal(m.incomplete[0]?.milestoneLabel, "Thiếu ngày hoàn thành");
+test("ưu tiên theo urgency rồi score, editability, số ngày và mã tiếng Việt", () => {
+  const rows = [
+    { id: "B", validationCode: "B", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
+    { id: "A", validationCode: "A", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
+    { id: "C", validationCode: "C", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 5, ownerPersonId: ID_A },
+    { id: "LATE", validationCode: "LATE", st: "prog", state: "active", dlProtocol: "2026-08-15", score: 9, ownerPersonId: ID_A },
+  ];
+  const model = buildTodayActionModel(rows, {
+    now: HOM_NAY,
+    rights: new Map([["B", right("B")], ["A", right("A")]]),
+    rightsStatus: "ready",
+  });
+  assert.deepEqual(model.rows.map((row) => row.validationCode), ["A", "B", "C", "LATE"]);
+  assert.equal(model.nextAction?.validationCode, "A");
 });
 
-test("hoàn thành đầy đủ thì biến khỏi danh sách hôm nay", () => {
-  const m = buildTodayModel([{
-    id: "V-OK", validationCode: "V-OK", st: "done", state: "active",
-    actVmp: "2026-08-01", ownerPersonId: ID_A,
-  }], HOM_NAY);
-  assert.equal(m.nextAction, null);
-});
-
-test("đúng hạn hôm nay là 0 ngày, không phải quá hạn", () => {
-  const m = buildTodayModel([{
-    id: "V-TODAY", validationCode: "V-TODAY", st: "todo", state: "active",
-    dlProtocol: "2026-08-14", ownerPersonId: ID_A,
-  }], HOM_NAY);
-  assert.deepEqual(m.overdue, []);
-  assert.equal(m.dueSoon[0]?.daysRemaining, 0);
-});
-
-test("so ngày ở nửa đêm Bangkok, không lệch theo giờ chạy", () => {
-  const hangMuc = [{
-    id: "V-TZ", validationCode: "V-TZ", st: "todo", state: "active",
-    dlProtocol: "2026-08-14", ownerPersonId: ID_A,
-  }];
-  // Cùng một ngày Bangkok, hai thời điểm cách nhau gần trọn ngày.
-  const sang = buildTodayModel(hangMuc, new Date("2026-08-14T00:30:00+07:00"));
-  const khuya = buildTodayModel(hangMuc, new Date("2026-08-14T23:30:00+07:00"));
-  assert.equal(sang.dueSoon[0]?.daysRemaining, khuya.dueSoon[0]?.daysRemaining,
-    "cùng một ngày mà ra hai kết quả khác nhau");
-});
-
-test("ngoài 7 ngày thì chưa cần hiện hôm nay", () => {
-  const m = buildTodayModel([{
-    id: "V-XA", validationCode: "V-XA", st: "todo", state: "active",
-    dlProtocol: "2026-09-30", ownerPersonId: ID_A,
-  }], HOM_NAY);
-  assert.equal(m.nextAction, null);
-});
-
-test("trong cùng nhóm, việc trễ nhiều hơn đứng trước", () => {
-  const m = buildTodayModel([
-    { id: "A", validationCode: "A", st: "prog", state: "active", dlValidation: "2026-08-12", ownerPersonId: ID_A },
-    { id: "B", validationCode: "B", st: "prog", state: "active", dlValidation: "2026-08-01", ownerPersonId: ID_A },
-  ], HOM_NAY);
-  assert.deepEqual(m.overdue.map((r) => r.validationCode), ["B", "A"]);
-});
-
-test("danh sách rỗng không làm vỡ", () => {
-  const m = buildTodayModel([], HOM_NAY);
-  assert.deepEqual(m, { overdue: [], dueSoon: [], incomplete: [], nextAction: null });
+test("KPI và rows dùng cùng tập dữ liệu, nextAction là dòng đầu tiên đã sort", () => {
+  const model = buildTodayActionModel([
+    { id: "O", validationCode: "O", st: "prog", state: "active", dlProtocol: "2026-08-01", ownerPersonId: ID_A },
+    { id: "T", validationCode: "T", st: "todo", state: "active", dlProtocol: "2026-08-14", ownerPersonId: ID_A },
+    { id: "U", validationCode: "U", st: "todo", state: "active", dlProtocol: "2026-08-20", ownerPersonId: ID_A },
+    { id: "I", validationCode: "I", st: "prog", state: "active", ownerPersonId: ID_A },
+  ], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
+  assert.equal(model.rows.length, 4);
+  assert.deepEqual(model.kpis, { overdue: 1, today: 1, upcoming: 1, dataQuality: 1 });
+  assert.equal(model.nextAction?.validationCode, "O");
 });
