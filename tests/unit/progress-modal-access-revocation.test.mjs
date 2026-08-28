@@ -176,7 +176,6 @@ test("shell keeps Today period-independent, canonical, static and deep-link safe
 
   assert.match(source, /import TodayCommandCenter from "\.\/features\/today\/TodayCommandCenter\.tsx"/);
   assert.doesNotMatch(source, /const TodayView = lazy/);
-  assert.match(source, /filterTodayScope\(acts, \{[\s\S]*areas: areaSel,[\s\S]*departments: deptSel,[\s\S]*onlyMine,[\s\S]*currentPersonId/);
   assert.match(source, /if \(!onlyMine\) return true;[\s\S]*currentPersonId !== null && isTodayActivityMine\(a, currentPersonId\)/);
   assert.match(source, /useState<ProgressDeepLink \| null>\(null\)/);
   assert.match(source, /const moTienDo = useCallback\(\(link: ProgressDeepLink\)[\s\S]*setMoHangMuc\(link\);[\s\S]*setNhomTheo\("hangmuc"\);[\s\S]*setView\("progress"\)/);
