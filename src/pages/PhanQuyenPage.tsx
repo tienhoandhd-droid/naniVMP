@@ -9,13 +9,9 @@
  *  bằng `access.can(...)` (src/lib/access.ts). Việc dọn phía SQL do người
  *  khác lo — file này chỉ còn phần web.
  *
- *  Màn hiện có ba nhánh, chọn bởi PhanQuyenView theo vai người đang xem:
+ *  Màn chỉ có một nhánh quản trị và chỉ Admin được dựng:
  *
- *   · EquipmentAssignmentWorkspace — riêng cho accessClass
- *     "equipment_manager" không phải admin: chỉ còn phân công hạng mục
- *     theo bộ phận quản lý thiết bị.
- *
- *   · CurrentPermissionWorkspace — nhánh chính cho admin/qa_manager:
+ *   · CurrentPermissionWorkspace — nhánh quản trị của Admin:
  *     - ItemPermissionModeCard: công tắc DỰ THẢO ⇄ ÁP DỤNG của quyền theo
  *       hạng mục, gate bằng access.can("accounts","manage_authorization_policy").
  *     - QuanTriQuyenCards: mục "1 · Ai được phép có tài khoản" — danh sách
@@ -34,8 +30,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck, Users, AlertTriangle, Check, Plus, Mail, Trash2 } from "lucide-react";
 import { C } from "../constants/theme.ts";
 import { supabase } from "../lib/supabaseClient.ts";
-import { fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, setBusinessRole } from "../lib/supabaseData.ts";
-import type { EmailChoPhepRow, NguoiQuyenRow } from "../lib/supabaseData.ts";
+import {
+  fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, fetchVaiNghiepVu,
+  setBusinessRole,
+} from "../lib/supabaseData.ts";
+import type { EmailChoPhepRow, NguoiQuyenRow, VaiNghiepVuRow } from "../lib/supabaseData.ts";
+import { accountForAllowedEmail, managementWorkspaceFor } from "../lib/managementVisibility.ts";
 import { Card, CardTitle, Tag, CauKetLuan } from "../components/ui/Primitives.tsx";
 import type { Activity } from "../types/domain.ts";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
@@ -55,36 +55,10 @@ type KetQuaLuu = { xong: number; tong: number; loi: string[] } | null;
 
 type PhanQuyenViewProps = {
   acts: Activity[];
-  /** Dùng cho ma trận "Màn hình bạn được xem" — chuyển từ màn Tài khoản &
-   *  quyền truy cập cũ. Tuỳ chọn vì nhánh thợ quản lý thiết bị của
-   *  PhanQuyenView không cần tới nó. */
+  /** Dùng cho ma trận "Màn hình bạn được xem" và chặn fail-closed trước
+   *  khi dựng bất kỳ thành phần quản trị nào. */
   access?: AccessContext;
 };
-
-function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
-  const [person, setPerson] = useState<DirectoryPerson | null>(null);
-  const validAreas = useMemo(() => [...new Set(acts.flatMap((activity) => {
-    const raw = (activity._raw || {}) as Record<string, unknown>;
-    return [activity.area, raw.area, raw.line]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean);
-  }))].sort((a, b) => a.localeCompare(b, "vi")), [acts]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <Card variant="strong">
-        <CardTitle icon={Users}
-          sub="Chọn người từ danh bạ chuẩn và phân công hạng mục thuộc bộ phận quản lý thiết bị. Hồ sơ nhân sự và ma trận quản trị chỉ Admin được sửa.">
-          Phân công theo hạng mục
-        </CardTitle>
-        <div className="ip-workspace">
-          <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson} />
-          <AssignmentPanel person={person} canEdit fixedKind="equipment_department" />
-        </div>
-      </Card>
-    </div>
-  );
-}
 
 /* ---------------------------------------------------------------------
  * QuanTriQuyenCards — mục "1 · Ai được phép có tài khoản": danh sách email
@@ -101,6 +75,8 @@ function EquipmentAssignmentWorkspace({ acts }: { acts: Activity[] }) {
  * ------------------------------------------------------------------- */
 function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
   const [nguoi, setNguoi] = useState<NguoiQuyenRow[]>([]);
+  const [vaiTaiKhoan, setVaiTaiKhoan] = useState<VaiNghiepVuRow[]>([]);
+  const [trangThaiTaiKhoan, setTrangThaiTaiKhoan] = useState<"loading" | "ready" | "error">("loading");
   const [dsEmail, setDsEmail] = useState<EmailChoPhepRow[]>([]);
   const [emailMoi, setEmailMoi] = useState({ email: "", ghiChu: "" });
 
@@ -118,8 +94,12 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
 
   useEffect(() => {
     if (!supabase) return;
-    /* Chỉ cần nguoi để đối chiếu "email này đã có tài khoản chưa" ở mục 1. */
+    /* `nguoi.email` là email danh bạ, có thể khác email đăng nhập. Vai nghiệp
+       vụ mới là nguồn tài khoản chuẩn vì mang email profiles + user_id. */
     fetchNguoiVaQuyen().then((r) => setNguoi(r.nguoi)).catch(() => { /* không có quyền thì thôi */ });
+    fetchVaiNghiepVu()
+      .then((rows) => { setVaiTaiKhoan(rows); setTrangThaiTaiKhoan("ready"); })
+      .catch(() => setTrangThaiTaiKhoan("error"));
     taiDsEmail();
   }, []);
 
@@ -190,13 +170,12 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
             </thead>
             <tbody>
               {dsEmail.map((e) => {
-                const coTk = nguoi.some((n) => n.co_tai_khoan
-                  && (n.email || "").toLowerCase() === e.email);
+                const taiKhoan = accountForAllowedEmail(e.email, vaiTaiKhoan, nguoi);
                 return (
                   <tr key={e.email}>
                     <td style={{ ...td, fontWeight: 800 }}>{e.email}</td>
                     <td style={{ ...td, fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>
-                      {e.ghi_chu || "—"}
+                      {e.ghi_chu || taiKhoan.name || "—"}
                     </td>
                     <td style={td}>
                       {e.is_active
@@ -204,7 +183,11 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
                         : <Tag color={C.plumSoft} bg={C.surfaceSunk}>đã bỏ</Tag>}
                     </td>
                     <td style={td}>
-                      {coTk
+                      {trangThaiTaiKhoan === "loading"
+                        ? <span style={{ color: C.plumSoft, fontWeight: 700, fontSize: 12.5 }}>đang kiểm tra…</span>
+                        : trangThaiTaiKhoan === "error"
+                          ? <span style={{ color: C.marigoldText, fontWeight: 700, fontSize: 12.5 }}>chưa xác minh được</span>
+                          : taiKhoan.exists
                         ? <Tag color={C.mintText} bg={C.mintSoft}>rồi</Tag>
                         : <span style={{ color: C.marigoldText, fontWeight: 700, fontSize: 12.5 }}>
                             chưa — người này còn phải được tạo tài khoản ở Supabase
@@ -442,6 +425,8 @@ function CurrentPermissionWorkspace({ acts, access }: {
                 setRightsRevision((value) => value + 1);
               }} />
           )}
+          <AssignmentPanel person={person} canEdit={duocQuanLyTaiKhoan}
+            onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
           <EffectiveRightsPanel person={person} revision={rightsRevision} />
         </div>
       </Card>
@@ -466,12 +451,14 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
       </Card>
     );
   }
-  /* Quản lý xưởng vào màn này CHỈ để phân công hạng mục thiết bị: server
-     cấp cho họ đúng một hành động `assign_workshop_staff` trên `phanquyen`
-     (migration 20260812100000_quan_ly_xuong_giu_cua_phan_cong.sql), và
-     `data_scope = 'none'` vì màn là cửa vào chức năng, không mang dữ liệu. */
-  if (props.access?.businessRole === "workshop_manager") {
-    return <EquipmentAssignmentWorkspace acts={props.acts} />;
+  const workspace = managementWorkspaceFor(props.access);
+  if (workspace === "admin-management") {
+    return <CurrentPermissionWorkspace acts={props.acts} access={props.access} />;
   }
-  return <CurrentPermissionWorkspace acts={props.acts} access={props.access} />;
+  return (
+    <Card variant="strong">
+      <CardTitle icon={ShieldCheck}>Không có quyền truy cập</CardTitle>
+      <p>Chỉ Admin được xem các hạng mục quản trị tài khoản và phân quyền.</p>
+    </Card>
+  );
 }

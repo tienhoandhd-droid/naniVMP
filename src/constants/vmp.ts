@@ -139,14 +139,9 @@ export const NAV_ITEMS = [
      "Vai trò & phạm vi" — `accounts` vẫn là screenId hợp lệ (hợp đồng với
      rpc_my_ui_access) và vẫn có alias URL, chỉ không còn mục menu riêng.
 
-     Mục `phanquyen` là CỬA VÀO chức năng, không mang dữ liệu riêng
-     (`data_scope = 'none'`). Admin / Quản lý QA / Nhân viên QA vào để quản
-     trị quyền; Quản lý xưởng cũng vào được nhưng chỉ để PHÂN CÔNG hạng mục
-     thiết bị — migration 20260812100000_quan_ly_xuong_giu_cua_phan_cong.sql
-     cấp riêng cho họ `actions = ['assign_workshop_staff']` trên màn này.
-     Nhân viên xưởng thì không.
-     (Bản trước của chú thích này nói Quản lý xưởng đã mất màn — sai, do đọc
-     seed gốc ở 20260812090000 mà bỏ qua migration cấp quyền sau nó.) */
+     Mục `phanquyen` là khu vực quản trị tài khoản, vai trò, quyền hiệu lực
+     và phân công. Từ 28/08/2026, chỉ Admin được thấy và mở mục này; mọi vai
+     khác fail-closed kể cả khi client còn cache capability cũ. */
   { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
   { id: "audit", label: "Nhật ký thay đổi", icon: ShieldCheck, group: "admin" },
@@ -167,7 +162,7 @@ export const NAV_SUBS = {
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Tổng hợp tình hình VMP theo kỳ, gợi ý nhận xét và xuất PDF / Excel / HTML",
   rules: "Quy tắc hệ thống đang chạy — đọc thẳng từ máy chủ nên không thể mô tả khác thực tế",
-  phanquyen: "Danh bạ chuẩn · nối/gỡ tài khoản · quyền hiệu lực · phân công hạng mục theo phạm vi được cấp",
+  phanquyen: "Chỉ Admin · tài khoản · vai trò · quyền hiệu lực · phân công hạng mục",
   health: "Chất lượng dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng trên máy chủ",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",

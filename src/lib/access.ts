@@ -16,6 +16,17 @@ export const SCREEN_IDS = [
 export type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_ID_SET: ReadonlySet<string> = new Set(SCREEN_IDS);
 
+/** Khu vực Quản trị là ranh giới vai trò tuyệt đối, không chịu ngoại lệ
+ * preview. `accounts` là alias route cũ của `phanquyen` nên cùng bị khóa. */
+export const ADMIN_ONLY_SCREEN_IDS = [
+  "accounts", "phanquyen", "health", "audit", "admin",
+] as const satisfies readonly ScreenId[];
+const ADMIN_ONLY_SCREEN_ID_SET: ReadonlySet<string> = new Set(ADMIN_ONLY_SCREEN_IDS);
+
+export function isAdminOnlyScreen(screenId: string): boolean {
+  return ADMIN_ONLY_SCREEN_ID_SET.has(screenId);
+}
+
 export function laScreenId(v: unknown): v is ScreenId {
   return typeof v === "string" && SCREEN_ID_SET.has(v);
 }
@@ -83,7 +94,10 @@ function dungContext(
   unresolvedReason: string | null,
   screens: Record<string, ScreenPermission>,
 ): AccessContext {
-  const lay = (screenId: string): ScreenPermission => screens[screenId] ?? TU_CHOI;
+  const lay = (screenId: string): ScreenPermission => {
+    if (isAdminOnlyScreen(screenId) && businessRole !== "admin") return TU_CHOI;
+    return screens[screenId] ?? TU_CHOI;
+  };
   return {
     mode,
     businessRole,

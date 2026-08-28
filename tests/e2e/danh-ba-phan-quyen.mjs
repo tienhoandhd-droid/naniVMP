@@ -3,13 +3,13 @@ import puppeteer from "puppeteer-core";
 import { choServer } from "./cho-server.mjs";
 import { dangNhap, doiVaiTrenMan } from "./dang-nhap.mjs";
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
-import { LA_UI_ACCESS, uiAccessAdmin, uiAccessQuanLyQa, uiAccessQuanLyXuong } from "./ui-access.mjs";
+import { LA_UI_ACCESS, uiAccessAdmin, uiAccessQuanLyQa } from "./ui-access.mjs";
 
 /* Vai mà SERVER (giả lập) khai — đổi biến này là đổi vai thật sự.
    `doiVaiTrenMan` chỉ ghi localStorage (role/accessClass của hệ 4 vai CŨ);
    từ khi cổng gác màn Phân quyền hỏi `rpc_my_ui_access`, ghi localStorage
    không còn đổi được gì. Giả vai phải giả ở đúng chỗ web đi hỏi. */
-let uiAccessHienTai = uiAccessQuanLyXuong;
+let uiAccessHienTai = uiAccessAdmin;
 
 const GOC = "http://localhost:4173";
 await choServer(GOC);
@@ -322,33 +322,33 @@ try {
     await page.evaluate(() => [...document.querySelectorAll("button")]
       .some((button) => button.textContent?.includes("Vai trò & phạm vi"))),
     true,
-    "equipment manager phải thấy menu Vai trò & phạm vi",
+    "Admin phải thấy menu Vai trò & phạm vi",
   );
   assert.equal(
     await page.evaluate(() => [...document.querySelectorAll("button")]
       .some((button) => button.textContent?.includes("Chất lượng dữ liệu"))),
-    false,
-    "equipment manager không được thấy nav admin khác",
+    true,
+    "Admin phải thấy toàn bộ nhóm Quản trị",
   );
 
   await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.body.innerText.includes("Phân công theo hạng mục"));
-  assert.equal(await documentContains("1 · Ai được phép có tài khoản"), false,
-    "equipment manager không được thấy workspace admin legacy");
+  assert.equal(await documentContains("1 · Ai được phép có tài khoản"), true,
+    "Admin được thấy workspace quản trị tài khoản");
   assert.equal(await documentContains("2 · Vai nào xem được gì, sửa được gì"), false,
-    "equipment manager không được thấy ma trận quyền toàn cục");
+    "ma trận quyền cũ không quay lại");
   assert.equal(await documentContains("Lưu hồ sơ"), false,
-    "equipment manager không được sửa StaffDirectory");
+    "hồ sơ nhân sự vẫn chỉ sửa ở màn Dữ liệu nguồn");
   assert.equal(
     await page.evaluate(() => [...document.querySelectorAll("label")]
       .some((label) => label.textContent?.includes("Vai trò phân công"))),
     false,
-    "equipment manager không được chọn nhầm vai QA",
+    "loại phân công tự suy từ hồ sơ đã chọn",
   );
 
   const equipmentSearch = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
-  assert.ok(equipmentSearch, "equipment manager cần tìm người chuẩn trước khi phân công");
+  assert.ok(equipmentSearch, "Admin cần tìm người chuẩn trước khi phân công");
   await equipmentSearch.type("Hồng");
   await page.waitForFunction(() => document.body.innerText.includes("Đặng Thị Hồng Ngọc · RD"));
   await page.evaluate(() => [...document.querySelectorAll("button")]
@@ -650,25 +650,13 @@ try {
   });
   await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.body.innerText.includes("Phân công theo hạng mục"));
+  await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"));
+  assert.equal(await documentContains("Phân công theo hạng mục"), false,
+    "quản lý QA không được dựng workspace phân công hoặc quản trị");
   assert.equal(await documentContains("Nối tài khoản"), false,
     "quản lý QA không được thấy thao tác nối tài khoản");
-  const managerSearch = await page.$('input[aria-label="Tìm tên hoặc tài khoản"]');
-  assert.ok(managerSearch, "quản lý QA vẫn được tìm người để phân công");
-  await managerSearch.type("QA");
-  await page.waitForFunction(() => document.body.innerText.includes("Đặng Thị Hồng Ngọc · QA"));
-  await page.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.includes("hong.ngoc@vmp.local"))?.click());
-  assert.equal(await page.$('[aria-label="Phân công người đã chọn"]') !== null, true,
-    "quản lý QA vẫn được phân công QA");
-  await managerSearch.click();
-  await managerSearch.evaluate((el) => el.select());
-  await managerSearch.type("Legacy");
-  await page.waitForFunction(() => document.body.innerText.includes("Nhân Sự Legacy · chưa có bộ phận"));
-  await page.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.includes("legacy@vmp.local"))?.click());
-  assert.equal(await page.$('[aria-label="Phân công người đã chọn"]'), null,
-    "quản lý QA không được gán hạng mục thiết bị cho người ngoài QA");
+  assert.equal(await page.$('input[aria-label="Tìm tên hoặc tài khoản"]'), null,
+    "quản lý QA không được tải danh bạ quản trị");
 
   await page.evaluate(() => {
     const key = "vmp_monitor_user_v1";
@@ -682,7 +670,7 @@ try {
   });
   await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.body.innerText.includes("không có quyền truy cập"));
+  await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"));
   assert.equal(await documentContains("Danh bạ nhân sự & quyền"), false,
     "persona ngoài allowlist không được dựng workspace phân quyền");
   console.log("✅ Dòng legacy sửa được, khóa phân công, chọn đúng person_id khi trùng tên");

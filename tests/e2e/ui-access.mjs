@@ -42,11 +42,7 @@ export const uiAccessAdmin = {
   }])),
 };
 
-/**
- * Quản lý xưởng: 9 màn phạm vi xưởng, cộng `phanquyen` là cửa vào chức
- * năng phân công — `data_scope` của nó là 'none' vì màn đó không mang dữ
- * liệu, xem migration 20260812100000.
- */
+/** Quản lý xưởng: các màn nghiệp vụ phạm vi xưởng, không có khu vực Quản trị. */
 export const uiAccessQuanLyXuong = {
   ok: true,
   mode: "enforced",
@@ -62,7 +58,6 @@ export const uiAccessQuanLyXuong = {
     source: xuong(["view"]),
     progress: xuong(["assign_workshop_staff", "record_actual_validation_date"]),
     inventory: xuong(["assign_workshop_staff", "record_actual_validation_date"]),
-    phanquyen: { can_view: true, data_scope: "none", actions: ["assign_workshop_staff"] },
   },
 };
 
@@ -71,16 +66,15 @@ function xuong(actions) {
 }
 
 /** Khớp mọi đường gọi tới rpc_my_ui_access, kể cả preflight OPTIONS. */
-/** Quản lý QA: thấy mọi màn nghiệp vụ, sửa danh mục và hồ sơ nhân sự,
- *  nhưng KHÔNG có `accounts`/`admin` — theo đúng bảng quyền server
- *  (20260812090000_six_business_roles_and_screen_access.sql). */
+/** Quản lý QA: thấy các màn nghiệp vụ nhưng không có màn quản trị tài khoản,
+ *  cấu hình hay Vai trò & phạm vi. */
 export const uiAccessQuanLyQa = {
   ok: true,
   mode: "enforced",
   business_role: "qa_manager",
   unresolved_reason: null,
   screens: Object.fromEntries(MAN_HINH
-    .filter((id) => id !== "accounts" && id !== "admin")
+    .filter((id) => !["accounts", "phanquyen", "health", "audit", "admin"].includes(id))
     .map((id) => [id, {
       can_view: true,
       data_scope: id === "phanquyen" ? "none" : "all",
