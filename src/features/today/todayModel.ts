@@ -98,7 +98,7 @@ function activityState(activity: Activity): string {
 function validationCode(activity: Activity): string | null {
   const source = activity as unknown as Raw;
   const raw = rawOf(activity);
-  for (const key of ["validationCode", "validation_code", "code"]) {
+  for (const key of ["validationCode", "validation_code", "id", "code"]) {
     for (const values of [source, raw]) {
       const value = values[key];
       if (typeof value === "string" && value.trim()) return value.trim();

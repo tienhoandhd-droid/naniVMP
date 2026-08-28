@@ -5,6 +5,7 @@ import {
   buildTodayActionModel,
   isTodayActivityMine,
 } from "../../src/features/today/todayModel.ts";
+import { adaptFromN8n } from "../../src/lib/n8nAdapter.ts";
 
 const HOM_NAY = new Date("2026-08-14T00:00:00+07:00");
 const ID_A = "11111111-1111-1111-1111-111111111111";
@@ -98,15 +99,27 @@ test("chỉ person id chính tắc quyết định ownership, kể cả id trong
   assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null }, ID_A), false);
 });
 
-test("không tạo dòng hay khóa quyền bằng id khi thiếu canonical validation code", () => {
-  const model = buildTodayActionModel([{
-    id: "legacy-only-id", st: "prog", state: "active", dlProtocol: "2026-08-01", ownerPersonId: ID_A,
-  }], {
+test("dùng item id chính tắc từ n8n thay vì mã đối tượng để tra quyền", () => {
+  const { activities } = adaptFromN8n({ rows: [{
+    id: "V-001-IQ",
+    ma: "OBJ-001",
+    ten: "Máy dập viên 01",
+    loai_td: "IQ",
+    qa: "QA phụ trách",
+  }] });
+  const activity = activities[0];
+  activity.dlProtocol = "2026-08-01";
+
+  assert.equal(activity.id, "V-001-IQ");
+  assert.equal(activity.code, "OBJ-001");
+
+  const model = buildTodayActionModel([activity], {
     now: HOM_NAY,
-    rights: new Map([["legacy-only-id", right("legacy-only-id")]]),
+    rights: new Map([["V-001-IQ", right("V-001-IQ")]]),
     rightsStatus: "ready",
   });
-  assert.deepEqual(model.rows, []);
+  assert.equal(model.rows[0].validationCode, "V-001-IQ");
+  assert.equal(model.rows[0].canEditProgress, true);
 });
 
 test("tra quyền theo validationCode, không theo activity.id", () => {
