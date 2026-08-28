@@ -95,7 +95,11 @@ export default function CatalogWorkspaceShell({
 }: CatalogWorkspaceShellProps) {
   const canEdit = access.can("source", "edit_catalog");
   const canSinhTimeline = access.can("source", "generate_timeline");
-  const canAudit = access.canView("audit");
+  /* Đây là lịch sử nghiệp vụ của Dữ liệu nguồn, không phải màn Nhật ký
+     thay đổi trong khu vực Quản trị. RPC rpc_catalog_history chấp nhận đúng
+     Admin và Quản lý QA, nên giao diện phải phản chiếu cùng biên vai trò. */
+  const canViewCatalogHistory = access.businessRole === "admin"
+    || access.businessRole === "qa_manager";
 
   const { performers } = usePerformers();
   const performerChoices = buildActivePerformerChoices(performers);
@@ -105,7 +109,9 @@ export default function CatalogWorkspaceShell({
   const goiY = useCatalogSuggestions();
 
   const vungHople = CAC_VUNG.filter((v) =>
-    (!v.canSua || canEdit) && (!v.canSinhTimeline || canSinhTimeline) && (!v.canAudit || canAudit));
+    (!v.canSua || canEdit)
+    && (!v.canSinhTimeline || canSinhTimeline)
+    && (!v.canAudit || canViewCatalogHistory));
 
   const [vung, setVung] = useState<VungId>("objects");
   const [kind, setKind] = useState<ObjectKind>(SOURCE_KINDS[0]);
@@ -118,11 +124,11 @@ export default function CatalogWorkspaceShell({
   /* Thu hồi quyền audit khi History đang mở phải rời tab trước khi effect
      tải lịch sử có cơ hội tạo request mới. */
   useLayoutEffect(() => {
-    if (vung !== "history" || canAudit) return;
+    if (vung !== "history" || canViewCatalogHistory) return;
     setVung("objects");
     setTrang(0);
     setExpandedId(null);
-  }, [vung, canAudit]);
+  }, [vung, canViewCatalogHistory]);
 
   /* ---------------- Đối tượng nguồn (đọc theo loại) ---------------- */
   const [objRows, setObjRows] = useState<SourceObjectRow[]>([]);
@@ -201,13 +207,13 @@ export default function CatalogWorkspaceShell({
   }, [vung, penTick]);
 
   useEffect(() => {
-    if (vung !== "history" || !canAudit) return;
+    if (vung !== "history" || !canViewCatalogHistory) return;
     setHis((p) => ({ ...p, state: "loading" }));
     listHistory({}, trang, PAGE_SIZE).then((kq) => {
       if (kq.ok) setHis({ state: "ready", rows: kq.history, total: kq.total, err: "" });
       else setHis({ state: "error", rows: [], total: 0, err: kq.error || "Không đọc được lịch sử" });
     });
-  }, [vung, trang, hisTick, canAudit]);
+  }, [vung, trang, hisTick, canViewCatalogHistory]);
 
   /* ---------------- Điều hướng trong workspace --------------------- */
   const doiVung = (id: VungId) => {
