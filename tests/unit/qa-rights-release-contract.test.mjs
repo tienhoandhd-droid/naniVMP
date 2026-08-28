@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -334,8 +335,22 @@ test("assigned-progress runbook proves the linked project and exact remote migra
   assert.match(source, /supabase\/\.temp\/linked-project\.json/);
   assert.match(source, /PGSERVICE_HOST/);
   assert.match(source, /PGSERVICE_USER/);
-  assert.ok((source.match(/migration list --linked --output json/g) ?? []).length >= 2);
+  assert.ok((source.match(/supabase --output-format json migration list --linked/g) ?? []).length >= 2);
   assert.match(source, /jq[\s\S]*\.remote/);
   assert.match(source, /select\(\.remote\s*==\s*\$version\)/);
   assert.doesNotMatch(source, /rg -c '20260827130000'/);
+
+  const functionMatch = source.match(/pgservice_matches_project\(\) \{[\s\S]*?^\}/m);
+  assert.ok(functionMatch, "runbook must define an executable PGSERVICE identity predicate");
+  const predicate = functionMatch[0];
+  const runPredicate = (host, user) => spawnSync("bash", ["-c", [
+    predicate,
+    'pgservice_matches_project "$1" "$2" "$3"',
+  ].join("\n"), "_", host, user, "ivembmikfhtyzhtqebgh"]);
+  assert.equal(runPredicate("db.ivembmikfhtyzhtqebgh.supabase.co", "postgres").status, 0);
+  assert.equal(runPredicate("aws-0-ap-southeast-1.pooler.supabase.com", "postgres.ivembmikfhtyzhtqebgh").status, 0);
+  assert.notEqual(runPredicate("wrong.example", "postgres.ivembmikfhtyzhtqebgh").status, 0,
+    "a matching user must never let the wrong host pass");
+  assert.notEqual(runPredicate("db.ivembmikfhtyzhtqebgh.supabase.co", "postgres.wrong").status, 0,
+    "a matching host must never let the wrong user pass");
 });

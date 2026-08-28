@@ -47,7 +47,8 @@ const SOURCE = {
 
 const ASSIGNED = {
   id: QA_ASSIGNED_PERSON_ID, person_id: QA_ASSIGNED_PERSON_ID,
-  full_name: "QA phụ trách E2E", name: "QA phụ trách E2E", is_active: true,
+  full_name: "QA phụ trách E2E", name: "QA phụ trách E2E",
+  performer_name: "QA phụ trách E2E", is_active: true,
   active: true, department: "qa", access_class: "qa_staff",
 };
 const UNASSIGNED = {
@@ -234,11 +235,34 @@ try {
     return style.display !== "none" && style.visibility !== "hidden" && button.getClientRects().length > 0;
   }), true, "nút Cập nhật desktop phải hiện hữu và tương tác được");
   const itemReadsBeforeOpen = itemBodies.length;
-  await assigned.page.click(progressButton);
-  await assigned.page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
-    .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")), { timeout: 30_000 });
+  // CDP click theo toạ độ thỉnh thoảng rơi vào lớp bảng đang tái bố cục sau
+  // batch-rights. Gọi click trên đúng nút vừa kiểm visible/enable vẫn đi qua
+  // handler React thật, nhưng không phụ thuộc timing layout của Chromium.
+  await assigned.page.$eval(progressButton, (button) => {
+    if (!(button instanceof HTMLButtonElement) || button.disabled) {
+      throw new Error("Nút Cập nhật không sẵn sàng");
+    }
+    button.click();
+  });
+  try {
+    await assigned.page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
+      .some((dialog) => dialog.getClientRects().length > 0
+        && [...dialog.querySelectorAll("span")]
+          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")), { timeout: 5_000 });
+  } catch (error) {
+    const diagnostic = await assigned.page.evaluate((selector) => ({
+      hash: location.hash,
+      title: document.title,
+      button: document.querySelector(selector)?.outerHTML,
+      scrolls: [...document.querySelectorAll(".vmp-scroll")].map((node) => ({
+        visible: node.getClientRects().length > 0,
+        text: node.textContent?.replace(/\s+/g, " ").trim().slice(0, 180),
+      })),
+      bodyHasModalTitle: document.body.innerText.includes("Cập nhật tiến độ"),
+      body: document.body.innerText.replace(/\s+/g, " ").trim().slice(0, 600),
+    }), progressButton);
+    throw new Error(`Modal không mở sau click: ${JSON.stringify(diagnostic)}; itemReads=${itemBodies.length}; cause=${error.message}`);
+  }
   for (let i = 0; i < 100 && itemBodies.length === itemReadsBeforeOpen; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }

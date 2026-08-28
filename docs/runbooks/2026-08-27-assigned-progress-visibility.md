@@ -78,8 +78,18 @@ PGSERVICE_HOST="$(awk -F= '/^[[:space:]]*host[[:space:]]*=/{gsub(/[[:space:]]/,"
 PGSERVICE_USER="$(awk -F= '/^[[:space:]]*user[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2; exit}' "$PGSERVICEFILE")"
 test -n "$PGSERVICE_HOST"
 test -n "$PGSERVICE_USER"
-if test "$PGSERVICE_HOST" != "db.${EXPECTED_PROJECT_REF}.supabase.co" \
-   && test "$PGSERVICE_USER" != "postgres.${EXPECTED_PROJECT_REF}"; then
+pgservice_matches_project() {
+  case "$1" in
+    "db.${3}.supabase.co")
+      test "$2" = 'postgres' || test "$2" = "postgres.${3}"
+      ;;
+    *.pooler.supabase.com)
+      test "$2" = "postgres.${3}"
+      ;;
+    *) return 1 ;;
+  esac
+}
+if ! pgservice_matches_project "$PGSERVICE_HOST" "$PGSERVICE_USER" "$EXPECTED_PROJECT_REF"; then
   echo 'PGSERVICE không khớp project ref đã duyệt' >&2
   exit 1
 fi
@@ -166,14 +176,14 @@ MIGRATION_VERSION='20260827130000'
 test "$(tr -d '\r\n' < supabase/.temp/project-ref)" = "$EXPECTED_PROJECT_REF"
 jq -e --arg ref "$EXPECTED_PROJECT_REF" '.ref == $ref' \
   supabase/.temp/linked-project.json >/dev/null
-supabase migration list --linked --output json \
+supabase --output-format json migration list --linked \
   > "$EVIDENCE_DIR/migration-list-before.json"
 jq -e --arg version "$MIGRATION_VERSION" \
   '[.migrations[] | select(.remote == $version)] | length == 0' \
   "$EVIDENCE_DIR/migration-list-before.json" >/dev/null
 supabase migration repair --status applied 20260827130000 --linked --yes \
   > "$EVIDENCE_DIR/migration-repair.log" 2>&1
-supabase migration list --linked --output json \
+supabase --output-format json migration list --linked \
   > "$EVIDENCE_DIR/migration-list-after.json"
 jq -e --arg version "$MIGRATION_VERSION" \
   '[.migrations[] | select(.remote == $version)] | length == 1' \
