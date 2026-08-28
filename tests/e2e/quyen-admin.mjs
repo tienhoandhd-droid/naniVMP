@@ -9,8 +9,9 @@
  *  `suaKho` của `caiGiaLap`, theo đúng khuôn của catalog-workspace.mjs.
  *
  *  Bộ kiểm:
- *   1. Admin thấy 4 màn chỉ-admin trên thanh điều hướng.
- *   2. Nhân viên xưởng không thấy 4 màn đó.
+ *   1. Admin thấy các màn và khối quản trị tài khoản/chính sách.
+ *   2. QA không dựng được khối quản trị qua deep-link; quản lý xưởng chỉ
+ *      còn workspace phân công riêng.
  *   3. Cấu hình hệ thống không còn bảng đổi vai trùng lặp.
  *   4. Vai trò & phạm vi: bản nháp/Huỷ không ghi; Lưu đổi vai và bật/tắt
  *      gọi đúng một RPC, đúng UUID ngay cả khi hai tài khoản trùng email.
@@ -54,7 +55,7 @@ const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Màn chỉ-admin CÓ MẶT TRÊN MENU. `accounts` vẫn là screenId hợp lệ ở
  *  server nhưng màn đó đã gộp vào "Vai trò & phạm vi" nên không còn mục
  *  nav — kiểm nó ở ca 1b (chuyển hướng) thay vì ở đây. */
-const MAN_CHI_ADMIN = ["health", "audit", "admin"];
+const MAN_CHI_ADMIN = ["phanquyen", "health", "audit", "admin"];
 
 /** Bồi thêm những gì màn Cấu hình hệ thống / Vai trò & phạm vi cần mà kho
  *  giả lập gốc chưa có. KHÔNG đổi rpc_my_ui_access ở đây — vai vẫn admin
@@ -177,17 +178,6 @@ function suaKhoViewerCuDaTat(kho) {
   };
 }
 
-/** Vai nghiệp vụ qa_manager: THẤY được màn Chất lượng dữ liệu (không nằm
- *  trong bốn màn chỉ-admin theo access.ts thật — nhưng business_role đổi
- *  để kiểm riêng luật "nút Tính lại trạng thái chỉ hiện với admin", tách
- *  bạch với luật "thấy được màn". */
-function suaKhoQaManager(kho) {
-  suaKhoAdmin(kho);
-  const goc = kho.rpc_my_ui_access;
-  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
-}
-
-
 /** Quản lý QA theo ĐÚNG bảng quyền của server — dùng cho MỌI ca quản lý QA.
  *
  *  Bản trước có thêm một kho "qa_manager" chỉ hạ `profiles.role` mà vẫn để
@@ -197,28 +187,86 @@ function suaKhoQaManager(kho) {
  *
  *  Nguồn của bảng dưới đây:
  *  (VMP-noibo/supabase/migrations/20260812090000_six_business_roles_and_screen_access.sql):
- *  người, danh mục, workload, rules, health, audit thì có; `accounts` và
- *  `admin` thì KHÔNG. Mock cho họ đủ quyền như admin là mock nói dối, và
+ *  người, danh mục, workload, rules thì có; toàn bộ nhóm Quản trị và
+ *  `accounts` thì KHÔNG. Mock cho họ đủ quyền như admin là mock nói dối, và
  *  bộ kiểm sẽ bỏ lọt đúng loại lỗi "hiện nút mà server từ chối". */
-function suaKhoQaTheoLuatServer(kho) {
+function suaKhoQaTheoLuatServer(kho, businessRole = "qa_manager") {
   suaKhoAdmin(kho);
-  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "qa_manager" }));
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: businessRole }));
   const goc = kho.rpc_my_ui_access;
   const screens = {};
   for (const [id, q] of Object.entries(goc.screens)) {
-    if (id === "accounts" || id === "admin") {
+    if (id === "accounts" || MAN_CHI_ADMIN.includes(id)) {
       screens[id] = { can_view: false, scope: "none", actions: [] };
     } else if (id === "people") {
       screens[id] = { ...q, can_view: true, actions: ["view", "edit_operational_people"] };
-    } else if (id === "phanquyen") {
-      // Server khai đây là CỬA VÀO: xem được nhưng không có hành động riêng.
-      screens[id] = { can_view: true, scope: "none", actions: [] };
     } else {
       screens[id] = { ...q, actions: (q.actions || []).filter((h) => h !== "manage_accounts"
         && h !== "manage_authorization_policy") };
     }
   }
-  kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager", screens };
+  kho.rpc_my_ui_access = { ...goc, business_role: businessRole, screens };
+}
+
+function suaKhoQaStaffTheoLuatServer(kho) {
+  suaKhoQaTheoLuatServer(kho, "qa_staff");
+}
+
+/** Mô phỏng server preview cũ cấp nhầm toàn bộ capability Admin cho QA.
+ * Frontend vẫn phải khóa cứng nhóm Quản trị theo vai canonical. */
+function suaKhoQaPreviewBiCapNham(kho) {
+  suaKhoAdmin(kho);
+  kho.rpc_my_ui_access = {
+    ...kho.rpc_my_ui_access,
+    mode: "preview",
+    business_role: "qa_manager",
+  };
+}
+
+/** Quản lý xưởng không được mở bất cứ hạng mục nào trong khu vực Quản trị. */
+function suaKhoQuanLyXuongTheoLuatServer(kho) {
+  suaKhoAdmin(kho);
+  kho.profiles = kho.profiles.map((p) => ({ ...p, role: "department_user" }));
+  const goc = kho.rpc_my_ui_access;
+  const screens = {};
+  for (const [id, q] of Object.entries(goc.screens)) {
+    screens[id] = id === "accounts" || MAN_CHI_ADMIN.includes(id)
+      ? { ...q, can_view: false, scope: "none", actions: [] }
+      : { ...q, actions: ["view"] };
+  }
+  kho.rpc_my_ui_access = { ...goc, business_role: "workshop_manager", screens };
+}
+
+const EMAIL_AUTH_KHAC_HO_SO = "tai-khoan-auth@vi-du.test";
+const EMAIL_CHUA_CO_TAI_KHOAN = "chua-co-tai-khoan@vi-du.test";
+
+/** rpc_nguoi_va_quyen mô tả email hồ sơ người thực hiện, còn
+ *  rpc_business_roles là nguồn email của TÀI KHOẢN Auth. Hai email được cố
+ *  ý làm khác nhau để trạng thái allowlist không được ghép nhầm theo hồ sơ. */
+function suaKhoAllowlistTheoEmailAuth(kho) {
+  suaKhoAdmin(kho);
+  kho.vmp_email_cho_phep = [
+    { email: EMAIL_AUTH_KHAC_HO_SO, ghi_chu: "Tài khoản đã có nhưng hồ sơ dùng email khác", is_active: true },
+    { email: EMAIL_CHUA_CO_TAI_KHOAN, ghi_chu: "Chưa tạo Auth user", is_active: true },
+  ];
+  kho.rpc_nguoi_va_quyen = {
+    ok: true,
+    tong_hang_muc: 0,
+    nguoi: [{
+      pid: "performer-khac-email", user_id: NGUOI_DUNG.id, ten: "Người có tài khoản",
+      email: "ho-so-nguoi-thuc-hien@vi-du.test", bo_phan: "qa",
+      bo_phan_nguoi: "qa", bo_phan_tai_khoan: "qa", vai: "admin",
+      pham_vi_rieng: null, muc: null, co_tai_khoan: true, tk_hoat_dong: true,
+      so_sua_duoc: 0, so_dung_ten: 0, so_phan_cong: 0,
+    }],
+  };
+  kho.rpc_business_roles = {
+    ok: true,
+    nguoi: [{
+      user_id: NGUOI_DUNG.id, email: EMAIL_AUTH_KHAC_HO_SO,
+      business_role: "admin", unresolved_reason: null,
+    }],
+  };
 }
 
 async function moTrang(trinhDuyet, { hash = "today", rong = 1440, cao = 900, suaKho, doTre } = {}) {
@@ -346,6 +394,45 @@ const trinhDuyet = await puppeteer.launch({
 }
 
 /* ---- 2b. RPC quyền lỗi: không có Layout/menu/page bảo vệ ------------- */
+{
+  console.log("\nQuản lý QA — deep-link bốn mục Quản trị đều rơi về Việc hôm nay:");
+  for (const id of MAN_CHI_ADMIN) {
+    const { trang } = await moTrang(trinhDuyet,
+      { suaKho: suaKhoQaTheoLuatServer, hash: id });
+    await trang.waitForFunction(() =>
+      document.querySelector("h1")?.textContent?.includes("Việc hôm nay"),
+    { timeout: 10_000 });
+    const biChan = await trang.evaluate((view) => ({
+      khongCoNav: !document.querySelector(`[data-view="${view}"]`),
+      oToday: document.querySelector("h1")?.textContent?.includes("Việc hôm nay") === true,
+    }), id);
+    kiem(biChan.khongCoNav && biChan.oToday,
+      `quản lý QA không thể mở trực tiếp mục Quản trị "${id}"`);
+    await trang.close();
+  }
+}
+
+/* ---- 2c. RPC quyền lỗi: không có Layout/menu/page bảo vệ ------------- */
+{
+  console.log("\nQuản lý QA — preview cấp nhầm vẫn không dựng Chất lượng dữ liệu:");
+  const { trang, goiRpc } = await moTrang(trinhDuyet,
+    { suaKho: suaKhoQaPreviewBiCapNham, hash: "health" });
+  const kq = await trang.evaluate(() => ({
+    oToday: document.querySelector("h1")?.textContent?.includes("Việc hôm nay") === true,
+    coHealth: !!document.querySelector('[data-view="health"]'),
+    coNutTinhLai: [...document.querySelectorAll("button")]
+      .some((button) => button.textContent.includes("Tính lại trạng thái")),
+  }));
+  const rpcHealth = ["rpc_dashboard_kpi", "rpc_check_data_quality", "rpc_due_alerts",
+    "rpc_refresh_computed_status"];
+  kiem(kq.oToday && !kq.coHealth && !kq.coNutTinhLai,
+    "preview không nới quyền Quản trị cho Quản lý QA");
+  kiem(!rpcHealth.some((name) => (goiRpc[name] || []).length > 0),
+    "deep-link bị chặn không gọi RPC của Chất lượng dữ liệu");
+  await trang.close();
+}
+
+/* ---- 2d. RPC quyền lỗi: không có Layout/menu/page bảo vệ ------------- */
 for (const [ten, suaKho] of [
   ["RPC quyền lỗi", suaKhoUiAccessLoi],
   ["Viewer cũ bị vô hiệu", suaKhoViewerCuDaTat],
@@ -533,19 +620,13 @@ for (const [ten, suaKho] of [
   kiem(coNutAdmin, "admin thấy nút Tính lại trạng thái ở tab Kiểm tra trên máy chủ");
   await a.trang.close();
 
-  // 6b. qa_manager (thấy được màn, nhưng KHÔNG phải vai nghiệp vụ admin):
-  //     không được thấy nút, dù màn vẫn mở được.
-  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaManager, hash: "health" });
+  // 6b. Quản lý QA bị chặn cả màn, nên không thể dựng nút ghi.
+  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaTheoLuatServer, hash: "health" });
   const moDuocMan = await b.trang.evaluate(() => !!document.querySelector('[data-view="health"]'));
-  await b.trang.evaluate(() => {
-    [...document.querySelectorAll("button")]
-      .find((btn) => btn.textContent.includes("Kiểm tra trên máy chủ"))?.click();
-  });
-  await cho(900);
   const coNutQaManager = await b.trang.evaluate(() =>
     [...document.querySelectorAll("button")].some((btn) => btn.textContent.includes("Tính lại trạng thái")));
-  kiem(moDuocMan, "qa_manager vẫn mở được màn Chất lượng dữ liệu (không lẫn với luật thấy-màn)");
-  kiem(!coNutQaManager, "qa_manager KHÔNG thấy nút Tính lại trạng thái (chỉ businessRole admin)");
+  kiem(!moDuocMan, "quản lý QA không thấy mục Chất lượng dữ liệu");
+  kiem(!coNutQaManager, "quản lý QA không dựng nút Tính lại trạng thái");
   await b.trang.close();
 }
 
@@ -614,23 +695,71 @@ for (const [ten, suaKho] of [
   kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang thẻ sẵn sàng vai trò");
   await a.trang.close();
 
-  // Quản lý QA: KHÔNG thấy hai thẻ này — RPC quản trị chỉ nhận admin thật.
-  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaTheoLuatServer, hash: "phanquyen" });
-  await cho(1400);
-  const qa = await b.trang.evaluate(() => {
+  /* QA không có bất cứ workspace quản trị nào. Dùng deep-link để chặn cả
+     trường hợp menu đã ẩn nhưng component vẫn mount theo hash cũ. */
+  for (const [ten, suaKho] of [
+    ["quản lý QA", suaKhoQaTheoLuatServer],
+    ["nhân viên QA", suaKhoQaStaffTheoLuatServer],
+  ]) {
+    const b = await moTrang(trinhDuyet, { suaKho, hash: "phanquyen" });
+    const qa = await b.trang.evaluate(() => {
+      const chu = document.body.innerText;
+      return {
+        sanSang: chu.includes("Sẵn sàng theo vai trò & phạm vi"),
+        taiKhoan: chu.includes("Tài khoản & quyền"),
+        danhBa: !!document.getElementById("ip-directory-title"),
+      };
+    });
+    kiem(!qa.sanSang, `${ten} deep-link không mount khối Sẵn sàng theo vai trò & phạm vi`);
+    kiem(!qa.taiKhoan, `${ten} deep-link không mount khối Tài khoản & quyền`);
+    kiem(!qa.danhBa, `${ten} deep-link không mount khối Danh bạ chuẩn`);
+    await b.trang.close();
+  }
+}
+
+/* ---- 8b. Quản lý xưởng không được mở khu vực Quản trị -------------- */
+{
+  console.log("\nQuản lý xưởng — không thấy khu vực Quản trị:");
+  const { trang, loiConsole } = await moTrang(trinhDuyet,
+    { suaKho: suaKhoQuanLyXuongTheoLuatServer, hash: "phanquyen" });
+  await trang.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"),
+    { timeout: 10_000 });
+  const kq = await trang.evaluate(() => {
     const chu = document.body.innerText;
     return {
-      coEmail: chu.includes("Ai được phép có tài khoản"),
-      coMaTran: chu.includes("Vai nào xem được gì, sửa được gì"),
-      /* Thẻ nay tên "Tài khoản & quyền" (hồ sơ nhân sự đã chuyển sang màn
-         Nhân sự), nhưng panel danh bạ vẫn còn để CHỌN người xem quyền. */
-      conThayDanhBa: chu.includes("Danh bạ chuẩn"),
+      workspace: chu.includes("Phân công theo hạng mục"),
+      danhBaPhanCong: !!document.getElementById("ip-directory-title"),
+      sanSang: chu.includes("Sẵn sàng theo vai trò & phạm vi"),
+      taiKhoan: chu.includes("Tài khoản & quyền"),
     };
   });
-  kiem(!qa.coEmail, "quản lý QA không thấy thẻ danh sách email");
-  kiem(!qa.coMaTran, "quản lý QA không thấy ma trận vai × quyền");
-  kiem(qa.conThayDanhBa, "quản lý QA vẫn chọn được người trong danh bạ (không chặn nhầm cả màn)");
-  await b.trang.close();
+  kiem(!kq.workspace && !kq.danhBaPhanCong,
+    "quản lý xưởng không dựng workspace hay tải danh bạ Quản trị");
+  kiem(!kq.sanSang && !kq.taiKhoan,
+    "workspace xưởng không dựng khối quản trị tài khoản");
+  kiem(loiConsole.length === 0, "console sạch khi chặn Quản lý xưởng", loiConsole[0] || "");
+  await trang.close();
+}
+
+/* ---- 8c. Allowlist đối chiếu email tài khoản Auth, không email hồ sơ -- */
+{
+  console.log("\nAllowlist — trạng thái tài khoản theo email Auth:");
+  const { trang } = await moTrang(trinhDuyet,
+    { suaKho: suaKhoAllowlistTheoEmailAuth, hash: "phanquyen" });
+  await trang.waitForFunction((coTaiKhoan, chuaCoTaiKhoan) =>
+    document.body.innerText.includes(coTaiKhoan) && document.body.innerText.includes(chuaCoTaiKhoan),
+  { timeout: 10_000 }, EMAIL_AUTH_KHAC_HO_SO, EMAIL_CHUA_CO_TAI_KHOAN);
+  const trangThai = await trang.evaluate((emails) => Object.fromEntries(
+    [...document.querySelectorAll("tr")].flatMap((tr) => {
+      const cells = [...tr.querySelectorAll("td")].map((td) => td.textContent?.replace(/\s+/g, " ").trim() || "");
+      return emails.includes(cells[0]) ? [[cells[0], cells[3] || ""]] : [];
+    }),
+  ), [EMAIL_AUTH_KHAC_HO_SO, EMAIL_CHUA_CO_TAI_KHOAN]);
+  kiem(trangThai[EMAIL_AUTH_KHAC_HO_SO] === "rồi",
+    "email Auth đã có account khác email performer vẫn báo rồi", trangThai[EMAIL_AUTH_KHAC_HO_SO]);
+  kiem(trangThai[EMAIL_CHUA_CO_TAI_KHOAN].startsWith("chưa"),
+    "email allowlist chưa có account báo chưa", trangThai[EMAIL_CHUA_CO_TAI_KHOAN]);
+  await trang.close();
 }
 
 /* ---- 9. Grant people lịch sử không mở lại page Nhân sự -------------- */
@@ -680,8 +809,8 @@ for (const [ten, suaKho] of [
 
 /* ---- 10. Nhóm "Tài khoản & quyền truy cập" sau khi gộp --------------- *
  *  Màn cũ đã gộp vào Vai trò & phạm vi. Hai thứ nó mang theo — nối/gỡ tài
- *  khoản và ma trận quyền màn hình — phải còn nguyên với Admin, và phải
- *  KHÔNG hiện cho vai mà server không cấp `manage_accounts`.
+ *  khoản và ma trận quyền màn hình — phải còn nguyên với Admin. Các ca
+ *  QA deep-link không mount workspace được kiểm riêng ở 8.
  * --------------------------------------------------------------------- */
 {
   console.log("\nTài khoản & quyền truy cập (đã gộp) — còn đủ và đúng người:");
@@ -724,25 +853,6 @@ for (const [ten, suaKho] of [
   kiem(admin.coQuyenHieuLuc, "vẫn xem được quyền đang có hiệu lực của người được chọn");
   await a.trang.close();
 
-  const b = await moTrang(trinhDuyet, { suaKho: suaKhoQaTheoLuatServer, hash: "phanquyen" });
-  await cho(1500);
-  await chonMotNguoi(b.trang);   // chọn cùng một người, để so cùng điều kiện
-  await cho(1200);
-  const qa = await b.trang.evaluate(() => {
-    const chu = document.body.innerText;
-    return {
-      coNoiTaiKhoan: chu.includes("Nối tài khoản"),
-      coMaTranManHinh: chu.includes("Màn hình bạn được xem"),
-      vaoDuocMan: chu.includes("Danh bạ chuẩn"),
-    };
-  });
-  /* Đây là phép kiểm cho đúng lỗi vừa sửa: bản trước gate nút nối tài khoản
-     bằng `isAdmin`, mà cờ đó bật cả với quản lý QA — họ thấy nút rồi bấm và
-     bị máy chủ từ chối. Nay hỏi thẳng access.can("accounts","manage_accounts"). */
-  kiem(!qa.coNoiTaiKhoan, "quản lý QA KHÔNG thấy nút nối tài khoản (server không cấp manage_accounts)");
-  kiem(!qa.coMaTranManHinh, "quản lý QA không thấy ma trận quyền màn hình");
-  kiem(qa.vaoDuocMan, "quản lý QA vẫn vào được màn và chọn được người");
-  await b.trang.close();
 }
 
 await trinhDuyet.close();

@@ -14,6 +14,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { C, TEXT } from "../../constants/theme.ts";
 import { resolveAuthorizedView } from "../../lib/navigationContract.ts";
+import { isAdminOnlyScreen } from "../../lib/access.ts";
 import type { AccessContext, ScreenId } from "../../lib/access.ts";
 
 /** Vì sao server không giải được vai trò — nói bằng tiếng người, kèm việc
@@ -61,7 +62,8 @@ export function ScreenGuard({ screenId, access, onRedirect, children }: {
 }) {
   const duocXem = access.canView(screenId);
   const manThayThe = duocXem ? null : (resolveAuthorizedView(screenId, access)?.screenId ?? null);
-  const dangThucThi = access.mode === "enforced";
+  const laQuanTriBiChan = isAdminOnlyScreen(screenId) && access.businessRole !== "admin";
+  const dangThucThi = access.mode === "enforced" || laQuanTriBiChan;
 
   useEffect(() => {
     if (!dangThucThi) {

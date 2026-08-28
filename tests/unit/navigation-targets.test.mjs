@@ -39,3 +39,23 @@ test("màn bị chặn không trả về vùng nội dung trắng trong lúc chu
   assert.match(html, /Đang mở màn bạn được phép xem/);
   assert.doesNotMatch(html, /nội dung cấm/);
 });
+
+test("preview không được nới ngoại lệ cho khu vực Quản trị chỉ-Admin", () => {
+  const previewQa = {
+    mode: "preview",
+    businessRole: "qa_manager",
+    unresolvedReason: null,
+    canView: (screen) => screen === "today",
+    can: () => false,
+    scope: () => "none",
+    screens: { today: { canView: true, dataScope: "all", actions: new Set() } },
+  };
+  const html = renderToStaticMarkup(React.createElement(ScreenGuard, {
+    screenId: "health",
+    access: previewQa,
+    onRedirect: () => {},
+    children: React.createElement("div", null, "nội dung quản trị cấm"),
+  }));
+  assert.match(html, /Đang mở màn bạn được phép xem/);
+  assert.doesNotMatch(html, /nội dung quản trị cấm/);
+});

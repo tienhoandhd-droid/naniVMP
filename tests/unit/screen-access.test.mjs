@@ -109,6 +109,28 @@ test("preview chỉ cấp quyền khi server trả payload tường minh", () =>
   assert.equal(ctx.canView("overview"), true);
 });
 
+test("mọi mục Quản trị fail-closed với vai ngoài Admin kể cả payload preview cấp nhầm", () => {
+  const screens = Object.fromEntries(
+    ["accounts", "phanquyen", "health", "audit", "admin"].map((id) => [id, {
+      can_view: true, data_scope: "all", actions: ["view", "manage_accounts"],
+    }]),
+  );
+  const qa = parseAccessContext({
+    ok: true, mode: "preview", business_role: "qa_manager", unresolved_reason: null, screens,
+  });
+  for (const id of Object.keys(screens)) {
+    assert.equal(qa.canView(id), false, `${id} phải bị đóng với Quản lý QA`);
+    assert.equal(qa.scope(id), "none");
+    assert.equal(qa.can(id, "view"), false);
+  }
+
+  const admin = parseAccessContext({
+    ok: true, mode: "preview", business_role: "admin", unresolved_reason: null, screens,
+  });
+  assert.equal(admin.canView("health"), true);
+  assert.equal(admin.canView("phanquyen"), true);
+});
+
 test("chế độ enforced mà không giải được vai trò thì không thấy màn nào", () => {
   const ctx = parseAccessContext({
     ok: true, mode: "enforced", business_role: null, unresolved_reason: "no_person_link", screens: {},
