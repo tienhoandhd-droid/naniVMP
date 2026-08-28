@@ -102,19 +102,23 @@ export function useScrollTop(deps: DependencyList) {
 /** Danh sách người thực hiện (tab "Người thực hiện") để đổ gợi ý cho ô nhập tên.
  *  Chỉ lấy người đang làm; tra cứu không phân biệt hoa thường vì tên gõ tay
  *  trong Sheet có đủ kiểu ('My', 'my', 'My2'). */
-export function usePerformers(): {
+export function usePerformers(enabled = true): {
   performers: PerformerRow[];
   names: string[];
   find: (name?: string | null) => PerformerRow | undefined;
 } {
   const [performers, setPerformers] = useState<PerformerRow[]>([]);
   useEffect(() => {
+    if (!enabled) {
+      setPerformers([]);
+      return undefined;
+    }
     let alive = true;
     fetchPerformers()
       .then((rows) => { if (alive) setPerformers(rows.filter((r) => r.is_active)); })
       .catch(() => { /* danh sách gợi ý hỏng thì ô nhập vẫn dùng được */ });
     return () => { alive = false; };
-  }, []);
+  }, [enabled]);
   const byName = useMemo(() => {
     const m = new Map<string, PerformerRow>();
     performers.forEach((p) => m.set(String(p.performer_name || "").trim().toLowerCase(), p));

@@ -278,7 +278,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     setF((p) => ({ ...p, [dCol]: p[dCol] || todayISO(), [tCol]: "Hoàn thành" }));
 
   /* ---- Người thực hiện: chỉ giữ person_id trong bản nháp tới lúc bấm Lưu ---- */
-  const { performers } = usePerformers();
+  /* Danh bạ đầy đủ chỉ cần khi vai hiện tại có quyền đổi người thực hiện.
+     QA/xưởng chỉ cập nhật cột tiến độ server cấp, nên không được phát sinh
+     một lần đọc danh bạ toàn cục chỉ vì mở hộp thoại. */
+  const { performers } = usePerformers(canChonNguoiThucHien);
   const performerChoices = buildActivePerformerChoices(performers);
   const rawOwnerPersonId = raw.owner_person_id ? String(raw.owner_person_id) : null;
   const ownerPersonIdNow = rawOwnerPersonId
