@@ -84,9 +84,14 @@ test("Today content presents four queues, reason badges, safe CTA, and accordion
   assert.match(html, /Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật/);
   assert.match(html, /Đến hạn trong 7 ngày/);
   assert.match(html, /Chưa lên lịch/);
-  assert.equal(count(html, /aria-controls=/g), 4);
+  assert.equal(count(html, /aria-controls=/g), 8);
   assert.equal(count(html, /role="region"/g), 4);
-  assert.equal(count(html, /aria-expanded="false"/g), 4);
+  assert.equal(count(html, /aria-expanded="false"/g), 8);
+  assert.equal(count(html, /hn-muc__mo--inline/g), 4);
+  assert.equal(count(html, /hn-muc__mo--desktop/g), 4);
+  assert.equal(count(html, /aria-controls="today-detail-/g), 4);
+  assert.equal(count(html, /aria-controls="today-supporting-pane"/g), 4);
+  assert.match(html, /<aside[^>]*id="today-supporting-pane"/);
   for (const id of html.match(/aria-controls="([^"]+)"/g) || []) {
     assert.match(html, new RegExp(`id="${id.slice(15, -1)}"`));
   }
@@ -143,4 +148,7 @@ test("Today CSS contains row-level long-list containment with mobile intrinsic s
   assert.match(css, /\.hn-muc\s*\{[^}]*content-visibility:\s*auto/);
   assert.match(css, /\.hn-muc\s*\{[^}]*contain-intrinsic-size:\s*auto 44px/);
   assert.match(css, /@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*?\.hn-muc\s*\{[^}]*contain-intrinsic-size:\s*auto 124px/);
+  assert.match(css, /\.hn-muc__mo--desktop\s*\{[^}]*display:\s*none/);
+  assert.match(css, /@media\s*\(min-width:\s*1600px\)\s*\{[\s\S]*?\.hn-muc__mo--inline\s*\{[^}]*display:\s*none/);
+  assert.match(css, /@media\s*\(min-width:\s*1600px\)\s*\{[\s\S]*?\.hn-muc__mo--desktop\s*\{[^}]*display:\s*flex/);
 });

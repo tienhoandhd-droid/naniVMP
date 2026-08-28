@@ -98,7 +98,11 @@ function TodayQueueRow({ row, expanded, onToggle, onOpenProgress }: {
   const id = detailId(row);
   return <li className="hn-muc">
     <div className="hn-muc__tom-tat">
-      <button type="button" className="hn-muc__mo" aria-expanded={expanded} aria-controls={id} onClick={onToggle}>
+      <button type="button" className="hn-muc__mo hn-muc__mo--inline" aria-expanded={expanded} aria-controls={id} onClick={onToggle}>
+        <b className="hn-muc__ma">{row.validationCode}</b><span className="hn-muc__ten">{row.title}</span>
+      </button>
+      <button type="button" className="hn-muc__mo hn-muc__mo--desktop" aria-expanded={expanded}
+        aria-controls="today-supporting-pane" onClick={onToggle}>
         <b className="hn-muc__ma">{row.validationCode}</b><span className="hn-muc__ten">{row.title}</span>
       </button>
       <div className="hn-muc__thong-tin">
@@ -129,7 +133,7 @@ function TodayQueueSection({ section, rows, expandedCode, onToggle, onOpenProgre
 }
 
 function TodaySupportingPane({ row, onOpenProgress }: { row: TodayActionRow | null; onOpenProgress: (link: ProgressDeepLink) => void }) {
-  return <aside className="hn-pane" aria-label="Chi tiết việc đang chọn">
+  return <aside id="today-supporting-pane" className="hn-pane" aria-label="Chi tiết việc đang chọn">
     {row ? <div className="hn-pane__the">
       <span className={`hn-pane__nhom lp-tone--${SECTION_META[row.section].tone}`}>{SECTION_META[row.section].label}</span>
       <b className="hn-pane__ma">{row.validationCode}</b><p className="hn-pane__ten">{row.title}</p>
