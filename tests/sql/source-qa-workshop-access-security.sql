@@ -339,7 +339,8 @@ select pg_temp.assert_true(
 
 create temp table expected_source_definer(
   signature text primary key,
-  classification text not null check(classification in ('browser','service','owner'))
+  classification text not null check(classification in ('browser','service','owner')),
+  expected_proconfig text[]
 ) on commit drop;
 
 insert into expected_source_definer(signature,classification)
@@ -464,6 +465,147 @@ select signature,'browser' from unnest(array[
 ]::text[]) signature
 on conflict(signature) do update set classification=excluded.classification;
 
+update expected_source_definer
+set expected_proconfig=array['search_path=public, pg_temp']::text[]
+where signature in (
+  'audit_plan_item_changes()','rpc_active_rules()',
+  'rpc_alert_context(text,integer)','rpc_apply_catalog_change(uuid,text,integer)',
+  'rpc_apply_catalog_change__five_role_impl_20260824(uuid,text,integer)',
+  'rpc_apply_sheet_sync(text,text,jsonb)',
+  'rpc_catalog_history(jsonb,integer,integer)','rpc_catalog_history_detail(uuid)',
+  'rpc_check_data_quality(integer)',
+  'rpc_check_data_quality__five_role_impl_20260824(integer)',
+  'rpc_cleanup_orphan_source_assignment_resolutions(text)',
+  'rpc_commit_catalog_import(uuid,text)',
+  'rpc_commit_catalog_import__five_role_impl_20260824(uuid,text)',
+  'rpc_create_plan_item(text,text,integer,integer,jsonb)',
+  'rpc_dashboard_kpi(integer)','rpc_dashboard_kpi__five_role_impl_20260824(integer)',
+  'rpc_delete_plan_item(text,text)','rpc_due_alerts(integer,integer)',
+  'rpc_due_alerts__five_role_impl_20260824(integer,integer)',
+  'rpc_generate_timeline(integer,boolean)','rpc_get_item_version(text)',
+  'rpc_get_missing_items(integer)',
+  'rpc_get_missing_items__five_role_impl_20260824(integer)',
+  'rpc_get_vmp_dashboard(integer,boolean,boolean)',
+  'rpc_get_vmp_dashboard__five_role_impl_20260824(integer,boolean,boolean)',
+  'rpc_get_vmp_watermark(integer)',
+  'rpc_get_vmp_watermark__five_role_impl_20260824(integer)',
+  'rpc_item_assignments(text,uuid)',
+  'rpc_item_assignments__five_role_impl_20260824(text,uuid)',
+  'rpc_item_permission_preflight()',
+  'rpc_item_permission_preflight__five_role_impl_20260824()',
+  'rpc_item_progress_history(text,integer,integer)',
+  'rpc_item_progress_history__five_role_impl_20260824(text,integer,integer)',
+  'rpc_link_item_permission_account(uuid,uuid,text,integer)',
+  'rpc_link_item_permission_account__five_role_impl_20260824(uuid,uuid,text,integer)',
+  'rpc_list_catalog_dataset(text,text,jsonb,integer,integer)',
+  'rpc_list_catalog_dataset__five_role_impl_20260824(text,text,jsonb,integer,integer)',
+  'rpc_luat_xem()','rpc_nguoi_va_quyen()',
+  'rpc_preview_catalog_change(uuid)',
+  'rpc_preview_catalog_change__five_role_impl_20260824(uuid)',
+  'rpc_preview_item_rights(uuid,text)',
+  'rpc_preview_item_rights__five_role_impl_20260824(uuid,text)',
+  'rpc_recalc_criticality(boolean)','rpc_reconcile_orphan_objects(text[])',
+  'rpc_refresh_computed_status()',
+  'rpc_refresh_computed_status__five_role_impl_20260824()',
+  'rpc_refresh_source_item_assignments()',
+  'rpc_register_alert(text,text,text,text,text,text,text)',
+  'rpc_resolve_missing(text,text,text)',
+  'rpc_resolve_missing__five_role_impl_20260824(text,text,text)',
+  'rpc_resolve_source_item_assignment(uuid,uuid,text)',
+  'rpc_rollback_vmp_sheet_sync(uuid)',
+  'rpc_save_alert_recipient(uuid,jsonb,text,integer)',
+  'rpc_save_alert_recipient__five_role_impl_20260824(uuid,jsonb,text,integer)',
+  'rpc_save_catalog_object(text,text,jsonb,text,integer)',
+  'rpc_save_catalog_object__five_role_impl_20260824(text,text,jsonb,text,integer)',
+  'rpc_save_product_gmp(text,jsonb,text,integer)',
+  'rpc_save_product_gmp__five_role_impl_20260824(text,jsonb,text,integer)',
+  'rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)',
+  'rpc_set_item_assignment__five_role_impl_20260824(uuid,text,text,text,text,text,uuid)',
+  'rpc_set_item_performer_by_id(text,uuid,text)',
+  'rpc_set_item_performer_by_id__five_role_impl_20260824(text,uuid,text)',
+  'rpc_set_item_permissions_mode(text,text)',
+  'rpc_set_item_permissions_mode__five_role_impl_20260824(text,text)',
+  'rpc_set_item_state(text,text,text)',
+  'rpc_set_item_state__five_role_impl_20260824(text,text,text)',
+  'rpc_source_warnings(integer)','rpc_stage_catalog_import(text,text,text,text,jsonb)',
+  'rpc_stage_catalog_import__five_role_impl_20260824(text,text,text,text,jsonb)',
+  'rpc_trang_thai_he_thong()',
+  'rpc_update_progress(text,jsonb,text,jsonb,integer)',
+  'rpc_upsert_source_object(text,text,jsonb)','vmp_allowed_timeline_fields(uuid,text)',
+  'vmp_can_view_item(uuid,text)','vmp_can_view_my_item(text)',
+  'vmp_harden_dashboard_object_scope()','vmp_item_rights(uuid,text)',
+  'vmp_my_item_rights(text)','vmp_my_item_rights__five_role_impl_20260824(text)',
+  'vmp_set_item_assignment_unhardened(uuid,text,text,text,text)',
+  'vmp_sync_item_assignments_from_performer()',
+  'vmp_unfiltered_security_definer_item_readers()',
+  'vmp_upsert_source_object_before_person_id(text,text,jsonb)',
+  'vmp_visible_plan_items()',
+  'rpc_export_source_objects(text,text,jsonb,jsonb,integer)',
+  'rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)',
+  'rpc_list_source_workshop_coverage(text,jsonb,integer)',
+  'rpc_my_editable_progress_rights()',
+  'rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)',
+  'rpc_source_field_suggestions(text,text,text,jsonb,integer)',
+  'rpc_source_object_facets(text,jsonb)',
+  'rpc_source_qa_candidates(text,jsonb,integer,uuid[])',
+  'rpc_source_workshop_scope_choices(text,text,text,jsonb,integer)',
+  'vmp_can_view_plan_item(uuid,text)','vmp_can_view_source_object(uuid,uuid)',
+  'vmp_reconcile_source_qa_projection(uuid)'
+);
+
+update expected_source_definer
+set expected_proconfig=array['search_path=public']::text[]
+where signature in (
+  'audit_plan_item_changes_v2()','ly_do_khong_sua_duoc(text,uuid)',
+  'rpc_active_rules__five_role_impl_20260824()',
+  'rpc_ai_cache_doc(text)','rpc_ai_chay_bo_kiem(jsonb)',
+  'rpc_ai_context(text,integer,integer)',
+  'rpc_ai_context_goc(text,integer,integer)','rpc_ai_context_gon(text,integer)',
+  'rpc_ai_do_thuc_the(text,text)','rpc_ai_doc_trang_thai(text,text,integer)',
+  'rpc_ai_dung_cau_tra_loi(text,jsonb,integer)',
+  'rpc_ai_dung_cau_tra_loi_goc(text,jsonb,integer)',
+  'rpc_ai_goi_y_tiep(jsonb,integer)','rpc_ai_hieu_cau_hoi(text)',
+  'rpc_ai_ho_so_nguoi(text,integer)','rpc_ai_kiem_mo_ho(text)',
+  'rpc_ai_mail_targets(date,boolean)','rpc_ai_muc_luc()',
+  'rpc_ai_ngu_canh_nap_san(text,integer)',
+  'rpc_ai_ngu_canh_phan_tich(text,text)',
+  'rpc_ai_ngu_canh_tam_ly(text,text,integer)','rpc_ai_nho_lai(text,text,integer)',
+  'rpc_ai_tam_su(text,jsonb,integer)','rpc_ai_tim_nguoi_mo(text,integer)',
+  'rpc_ai_tra_loi_nhanh(text,integer,jsonb,text)',
+  'rpc_ai_ve_nguoi_hoi(text,jsonb,integer)','rpc_apply_assignments(boolean)',
+  'rpc_create_plan_item__five_role_impl_20260824(text,text,integer,integer,jsonb)',
+  'rpc_delete_alert_recipient(uuid)',
+  'rpc_delete_plan_item__five_role_impl_20260824(text,text)',
+  'rpc_delete_product_gmp(text)','rpc_delete_source_object(text,text,text)',
+  'rpc_generate_timeline__five_role_impl_20260824(integer,boolean)',
+  'rpc_luat_xem__five_role_impl_20260824()',
+  'rpc_nguoi_va_quyen__five_role_impl_20260824()',
+  'rpc_recalc_criticality__five_role_impl_20260824(boolean)',
+  'rpc_source_warnings__five_role_impl_20260824(integer)',
+  'rpc_trang_thai_he_thong__five_role_impl_20260824()',
+  'rpc_update_progress__five_role_impl_20260824(text,jsonb,text,jsonb,integer)',
+  'rpc_upsert_alert_recipient(uuid,jsonb)','rpc_upsert_product_gmp(text,jsonb)',
+  'vmp_ai_dau_van()','vmp_ai_ghi_dem()'
+);
+
+update expected_source_definer
+set expected_proconfig=array['search_path=public, extensions']::text[]
+where signature in (
+  'rpc_ai_cham_tra_cuu(text)','rpc_ai_goi_y_chip(text)',
+  'rpc_ai_hieu_tu_khoa(text,integer)',
+  'rpc_ai_phan_tich_cau_hoi(text,text)','rpc_ai_thong_ke_loc(text,integer)'
+);
+
+update expected_source_definer
+set expected_proconfig=array['search_path=public, extensions, pg_temp']::text[]
+where signature in (
+  'rpc_sync_vmp_sheet_snapshot(text,text,text,jsonb,jsonb)',
+  'rpc_sync_vmp_sheet_snapshot_with_extras(text,text,text,jsonb,jsonb)'
+);
+
+alter table expected_source_definer
+  alter column expected_proconfig set not null;
+
 create temp table public_routine on commit drop as
 select procedure.oid,procedure.oid::regprocedure::text signature,
        procedure.proname,procedure.prosecdef,procedure.prosrc,procedure.proacl,
@@ -526,6 +668,18 @@ select pg_temp.assert_true(
     except select signature from source_definer_inventory
   ),
   'SOURCE_ACCESS_EXACT_TRANSITIVE_DEFINER_INVENTORY');
+
+with actual_config as (
+  select inventory.signature,procedure.proconfig expected_proconfig
+  from source_definer_inventory inventory
+  join pg_proc procedure on procedure.oid=inventory.oid
+), expected_config as (
+  select signature,expected_proconfig from expected_source_definer
+)
+select pg_temp.assert_true(
+  not exists (select * from actual_config except select * from expected_config)
+  and not exists (select * from expected_config except select * from actual_config),
+  'SOURCE_ACCESS_EXACT_TRANSITIVE_DEFINER_SEARCH_PATH_INVENTORY');
 
 with actual_acl as (
   select inventory.signature,

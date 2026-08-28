@@ -729,7 +729,7 @@ insert into captured_plan values (
 ),(
   'candidate_search',pg_temp.explain_json(format(
     'select * from public.vmp_source_qa_candidates_page_path(%L::uuid,%L,null,50,%L::uuid[])',
-    (select user_id from perf_people where rn=1),'','{}'
+    (select user_id from perf_people where rn=1),'Source Performance Candidate','{}'
   ))
 );
 
@@ -857,6 +857,7 @@ declare
   v_expected_first uuid[];
   v_expected_second uuid[];
   v_page_count integer:=0;
+  v_search constant text:='Source Performance Candidate';
 begin
   perform set_config('request.jwt.claims',json_build_object(
     'sub',p_user_id,'role','authenticated')::text,true);
@@ -869,10 +870,10 @@ begin
   v_expected_second:=v_expected[51:100];
 
   loop
-    v_page:=public.rpc_source_qa_candidates('',v_cursor,50,'{}'::uuid[]);
+    v_page:=public.rpc_source_qa_candidates(v_search,v_cursor,50,'{}'::uuid[]);
     select payload into strict v_path_page
     from public.vmp_source_qa_candidates_page_path(
-      p_user_id,'',v_cursor,50,'{}'::uuid[]);
+      p_user_id,v_search,v_cursor,50,'{}'::uuid[]);
     v_page_count:=v_page_count+1;
     select coalesce(array_agg((row_value->>'person_id')::uuid order by ordinal),
                     '{}'::uuid[])
@@ -900,6 +901,26 @@ begin
      or v_seen is distinct from v_expected then
     raise exception using errcode='check_violation',
       message='SOURCE_ACCESS_CANDIDATE_TERMINAL_TOTAL';
+  end if;
+end
+$$;
+
+create function pg_temp.assert_rights_equivalence(p_user_id uuid)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare
+  v_public jsonb;
+  v_path jsonb;
+begin
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_user_id,'role','authenticated')::text,true);
+  v_public:=public.rpc_my_editable_progress_rights();
+  select payload into strict v_path
+  from public.vmp_editable_progress_rights_path(p_user_id);
+  if v_public is distinct from v_path
+     or v_public->>'ok'<>'true'
+     or jsonb_array_length(v_public->'rights')<>410 then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_ITEM_RIGHTS_SET_BASED_AUTHORIZED_TOTAL_410 SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE';
   end if;
 end
 $$;
@@ -1090,25 +1111,8 @@ select pg_temp.assert_source_pages(
   md5('source-access-performance-user-3')::uuid,
   'SOURCE_ACCESS_WORKSHOP_LINE_EXACT_FIRST_SECOND_TERMINAL_PAGES');
 
-select set_config('request.jwt.claims',json_build_object(
-  'sub',md5('source-access-performance-user-4')::uuid,
-  'role','authenticated')::text,true);
-do $rights_equivalence$
-declare
-  v_public jsonb:=public.rpc_my_editable_progress_rights();
-  v_path jsonb;
-begin
-  select payload into strict v_path
-  from public.vmp_editable_progress_rights_path(
-    md5('source-access-performance-user-4')::uuid);
-  if v_public is distinct from v_path
-     or v_public->>'ok'<>'true'
-     or jsonb_array_length(v_public->'rights')<>410 then
-    raise exception using errcode='check_violation',
-      message='SOURCE_ACCESS_ITEM_RIGHTS_SET_BASED_AUTHORIZED_TOTAL_410 SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE';
-  end if;
-end
-$rights_equivalence$;
+select pg_temp.assert_rights_equivalence(
+  md5('source-access-performance-user-4')::uuid);
 
 select pg_temp.assert_candidate_pages(md5('source-access-performance-user-1')::uuid);
 
