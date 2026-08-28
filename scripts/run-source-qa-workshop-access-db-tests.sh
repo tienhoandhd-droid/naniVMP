@@ -195,9 +195,129 @@ SQL
 done
 echo "PASS CLONE PostgreSQL 17 reviewed baseline and historical migrations"
 
+psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
+insert into auth.users(
+  id,aud,role,email,encrypted_password,email_confirmed_at,
+  raw_app_meta_data,raw_user_meta_data,created_at,updated_at
+)
+select id,'authenticated','authenticated',email,'x',now(),'{}','{}',now(),now()
+from (values
+  ('9a040000-0000-4000-8000-000000000001'::uuid,'source-pre-expand-owner@example.test'),
+  ('9a040000-0000-4000-8000-000000000002'::uuid,'source-pre-expand-support@example.test'),
+  ('9a040000-0000-4000-8000-000000000003'::uuid,'source-pre-expand-conflict@example.test')
+) fixture(id,email);
+
+insert into public.departments(id,name,short_name)
+values ('QA','Source pre-expand QA fixture','QA')
+on conflict(id) do nothing;
+
+insert into public.profiles(id,full_name,email,role,department,is_active)
+select id,full_name,email,'department_user'::public.user_role,'QA',true
+from (values
+  ('9a040000-0000-4000-8000-000000000001'::uuid,
+   'Source Pre-expand Owner','source-pre-expand-owner@example.test'),
+  ('9a040000-0000-4000-8000-000000000002'::uuid,
+   'Source Pre-expand Support','source-pre-expand-support@example.test'),
+  ('9a040000-0000-4000-8000-000000000003'::uuid,
+   'Source Pre-expand Conflict','source-pre-expand-conflict@example.test')
+) fixture(id,full_name,email);
+
+update public.vmp_performers
+set department='QA',access_class='qa_progress_editor',is_active=true,
+    scope_departments='{}'::text[],scope_factory_ids='{}'::uuid[],
+    scope_area_ids='{}'::uuid[],scope_line_ids='{}'::uuid[]
+where user_id between '9a040000-0000-4000-8000-000000000001'::uuid
+                  and '9a040000-0000-4000-8000-000000000003'::uuid;
+
+insert into public.vmp_objects(
+  code,name,classification,department,area,line,frequency_months
+)
+values (
+  'SACCESS-PRE-EXPAND','Source pre-expand rollback fixture','tb',
+  'QA','SACCESS_PRE_AREA','SACCESS_PRE_LINE',12
+);
+
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision,
+  owner_person_id,owner_name,support_person_id,support_name
+)
+select '9a040000-0000-4000-8000-000000000010','Thiết bị',
+       'SACCESS-PRE-EXPAND','Source pre-expand rollback fixture','QA',
+       'SACCESS_PRE_AREA','SACCESS_PRE_LINE','y',12,'Hóa lý',5,1,2026,
+       'source-access-pre-expand',94010,1,0,0,
+       owner_performer.id,owner_performer.performer_name,
+       support_performer.id,support_performer.performer_name
+from public.vmp_performers owner_performer
+cross join public.vmp_performers support_performer
+where owner_performer.user_id='9a040000-0000-4000-8000-000000000001'::uuid
+  and support_performer.user_id='9a040000-0000-4000-8000-000000000002'::uuid;
+
+insert into public.vmp_plan_items(
+  id,validation_code,object_code,validation_type,year,report_class,effort_days,
+  deadline_protocol,deadline_validation,deadline_report,deadline_vmp,
+  status_protocol,status_validation,status_report,status_vmp,is_active,
+  item_state,version,departments,execution_departments,source_sheet_data,
+  owner_person_id,support_person_id
+)
+select 'SACCESS-PRE-EXPAND/2026.01-PQ','SACCESS-PRE-EXPAND/2026.01-PQ',
+       'SACCESS-PRE-EXPAND','PQ',2026,'Hóa lý',5,
+       current_date+30,current_date+60,current_date+90,current_date+120,
+       'not_started','not_started','not_started','not_started',true,'active',1,
+       array['QA'],array['QA'],'{"fixture":"source-access-pre-expand"}'::jsonb,
+       owner_performer.id,support_performer.id
+from public.vmp_performers owner_performer
+cross join public.vmp_performers support_performer
+where owner_performer.user_id='9a040000-0000-4000-8000-000000000001'::uuid
+  and support_performer.user_id='9a040000-0000-4000-8000-000000000002'::uuid;
+
+insert into public.vmp_item_assignments(
+  validation_code,performer_id,user_id,staff_name,assignment_kind,source,
+  assignment_role,is_active,change_reason,created_by,updated_by
+)
+select 'SACCESS-PRE-EXPAND/2026.01-PQ',performer.id,performer.user_id,
+       performer.performer_name,'qa','qa_manager',fixture.assignment_role,true,
+       fixture.reason,'9a040000-0000-4000-8000-000000000001',
+       '9a040000-0000-4000-8000-000000000001'
+from (values
+  ('9a040000-0000-4000-8000-000000000002'::uuid,'collaborator',
+   'Pre-expand support manual row must be replaced'),
+  ('9a040000-0000-4000-8000-000000000003'::uuid,'primary',
+   'Pre-expand conflicting primary must be demoted')
+) fixture(user_id,assignment_role,reason)
+join public.vmp_performers performer on performer.user_id=fixture.user_id;
+
+do $pre_expand_fixture$
+begin
+  if (select count(*) from public.vmp_source_objects
+      where object_code='SACCESS-PRE-EXPAND' and is_active)<>1
+     or (select count(*) from public.vmp_plan_items
+         where validation_code='SACCESS-PRE-EXPAND/2026.01-PQ' and is_active)<>1
+     or (select count(*) from public.vmp_item_assignments
+         where validation_code='SACCESS-PRE-EXPAND/2026.01-PQ' and is_active)<>2
+     or exists (
+       select 1 from public.vmp_item_assignments
+       where validation_code='SACCESS-PRE-EXPAND/2026.01-PQ'
+         and source in ('source_owner','source_support') and is_active
+     ) then
+    raise exception using errcode='check_violation',
+      message='SACCESS_PRE_EXPAND_NONZERO_REPAIR_FIXTURE_INVALID';
+  end if;
+end
+$pre_expand_fixture$;
+\echo 'PASS PRE-EXPAND nonzero constraint-valid repair rollback fixture'
+SQL
+
 projection_state() {
   psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
-with plan_projection as (
+with source_projection as (
+  select count(*) row_count,
+         encode(extensions.digest(convert_to(coalesce(string_agg(
+           to_jsonb(source_object)::text,E'\n' order by source_object.id::text
+         ),''),'UTF8'),'sha256'),'hex') row_digest
+  from public.vmp_source_objects source_object
+), plan_projection as (
   select count(*) row_count,
          encode(extensions.digest(convert_to(coalesce(string_agg(
            to_jsonb(plan_item)::text,E'\n' order by plan_item.id::text
@@ -210,14 +330,15 @@ with plan_projection as (
          ),''),'UTF8'),'sha256'),'hex') row_digest
   from public.vmp_item_assignments assignment
 )
-select concat_ws('|',plan_projection.row_count,plan_projection.row_digest,
+select concat_ws('|',source_projection.row_count,source_projection.row_digest,
+  plan_projection.row_count,plan_projection.row_digest,
   assignment_projection.row_count,assignment_projection.row_digest)
-from plan_projection cross join assignment_projection;
+from source_projection cross join plan_projection cross join assignment_projection;
 SQL
 }
 
 pre_expand_projection_state="$(projection_state)"
-if [[ ! "$pre_expand_projection_state" =~ ^[0-9]+\|[0-9a-f]{64}\|[0-9]+\|[0-9a-f]{64}$ ]]; then
+if [[ ! "$pre_expand_projection_state" =~ ^[1-9][0-9]*\|[0-9a-f]{64}\|[1-9][0-9]*\|[0-9a-f]{64}\|[1-9][0-9]*\|[0-9a-f]{64}$ ]]; then
   echo "SOURCE_ACCESS_PRE_EXPAND_PROJECTION_SNAPSHOT_INVALID" >&2
   exit 3
 fi
@@ -305,8 +426,9 @@ apply_expected_enforce_failure() {
   local failpoint="$1"
   local rule_id="$2"
   local failure_log="$tmp_dir/enforce-${failpoint}.log"
+  local mutation_line post_repair_projection_state
 
-  if PGOPTIONS="-c vmp.source_access_enforce_failpoint=$failpoint" \
+  if PGOPTIONS="-c vmp.source_access_enforce_failpoint=$failpoint -c vmp.source_access_expected_projection_state=$pre_expand_projection_state" \
       psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
         -f "$enforce_migration" >"$failure_log" 2>&1; then
     echo "$rule_id expected enforce migration failure" >&2
@@ -316,6 +438,35 @@ apply_expected_enforce_failure() {
     sed -n '1,160p' "$failure_log" >&2
     echo "$rule_id missing injected failure marker" >&2
     exit 1
+  fi
+  if [[ "$failpoint" == "before_repair" ]] &&
+      grep -Fq 'SACCESS_ENFORCE_REPAIR_REACHED' "$failure_log"; then
+    sed -n '1,200p' "$failure_log" >&2
+    echo "$rule_id crossed the repair boundary" >&2
+    exit 1
+  fi
+  if [[ "$failpoint" == "after_repair_before_commit" ]]; then
+    if ! grep -Fq 'SACCESS_ENFORCE_REPAIR_REACHED' "$failure_log"; then
+      sed -n '1,200p' "$failure_log" >&2
+      echo "$rule_id missing repair-reached marker" >&2
+      exit 1
+    fi
+    mutation_line="$(grep -F 'SACCESS_ENFORCE_REPAIR_MUTATION_CONFIRMED' \
+      "$failure_log" | tail -n 1)"
+    if [[ "$mutation_line" != *"pre=$pre_expand_projection_state"* ||
+          "$mutation_line" != *'fixture=SACCESS-PRE-EXPAND/2026.01-PQ'* ||
+          "$mutation_line" != *'canonical_owner=1 canonical_support=1 manual_revoked=1 primary_demoted=1'* ]]; then
+      sed -n '1,200p' "$failure_log" >&2
+      echo "$rule_id missing exact in-transaction repair evidence" >&2
+      exit 1
+    fi
+    post_repair_projection_state="${mutation_line#* post=}"
+    post_repair_projection_state="${post_repair_projection_state%% *}"
+    if [[ ! "$post_repair_projection_state" =~ ^[1-9][0-9]*\|[0-9a-f]{64}\|[1-9][0-9]*\|[0-9a-f]{64}\|[1-9][0-9]*\|[0-9a-f]{64}$ ||
+          "$post_repair_projection_state" == "$pre_expand_projection_state" ]]; then
+      echo "$rule_id repair evidence did not contain a changed valid projection digest" >&2
+      exit 1
+    fi
   fi
   assert_expand_state "$rule_id"
 }

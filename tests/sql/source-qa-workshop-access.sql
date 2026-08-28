@@ -352,7 +352,11 @@ select item.validation_code,performer.id,performer.user_id,performer.performer_n
        '9a010000-0000-4000-8000-000000000002'
 from public.vmp_plan_items item
 cross join public.vmp_performers performer
-where item.validation_code like 'SACCESS-%/2026.01-PQ'
+where item.validation_code in (
+    'SACCESS-LINE-A/2026.01-PQ',
+    'SACCESS-LINE-B/2026.01-PQ',
+    'SACCESS-NO-AREA/2026.01-PQ'
+  )
   and performer.user_id in (
     '9a010000-0000-4000-8000-000000000003'::uuid,
     '9a010000-0000-4000-8000-000000000004'::uuid

@@ -77,6 +77,32 @@ begin
 end
 $$;
 
+create function pg_temp.assert_plan_has_protected_work(
+  p_plan jsonb,p_rule_id text
+)
+returns void language plpgsql as $$
+begin
+  if not exists (
+    with recursive plan_node as (
+      select p_plan->0->'Plan' node
+      union all
+      select child.node
+      from plan_node parent
+      cross join lateral jsonb_array_elements(
+        coalesce(parent.node->'Plans','[]'::jsonb)
+      ) child(node)
+    )
+    select 1 from plan_node
+    where node->>'Relation Name' in (
+      'vmp_source_objects','vmp_plan_items','vmp_item_assignments',
+      'vmp_source_workshop_scope_grants','vmp_performers','profiles'
+    )
+  ) then
+    raise exception using errcode='check_violation',message=p_rule_id;
+  end if;
+end
+$$;
+
 select pg_temp.assert_true(
   to_regclass('public.vmp_source_workshop_scope_grants') is not null
   and to_regprocedure(
@@ -101,67 +127,394 @@ select pg_temp.assert_true(
   and to_regclass('public.idx_vmp_performers_active_candidate') is not null,
   'SOURCE_ACCESS_PERFORMANCE_SCHEMA_FUNCTION_OR_INDEX_MISSING rpc_list_source_objects');
 
-create temp table reviewed_query_path(signature text primary key) on commit drop;
-insert into reviewed_query_path values
-  ('vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)'),
-  ('vmp_editable_progress_rights_path(uuid)'),
-  ('vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])');
+create temp table expected_query_definition(
+  signature text primary key,definition_kind text not null,
+  arguments text not null,result_type text not null,
+  definition_sha256 text not null,reviewed_body text not null
+) on commit drop;
 
-with path_function as (
-  select reviewed.signature,procedure.oid,procedure.proname,
+insert into expected_query_definition values
+  ('rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)','delegate',
+   'p_object_kind text, p_search text, p_filters jsonb, p_cursor jsonb, p_limit integer, p_include_inactive boolean, p_object_id uuid',
+   'jsonb','602434023178d4bae267ccb6c98697179ef1e569d57e12df0278a1c203add3fa',$body$
+  select query_path.payload
+  from public.vmp_source_objects_page_path(
+    auth.uid(),p_object_kind,p_search,p_filters,p_cursor,p_limit,
+    p_include_inactive,p_object_id
+  ) query_path
+$body$),
+  ('rpc_my_editable_progress_rights()','delegate','',
+   'jsonb','d6848fa43fe2987da187e2d25857273126379d9d0720c4bccc955a5187f3ef7a',$body$
+  select query_path.payload
+  from public.vmp_editable_progress_rights_path(auth.uid()) query_path
+$body$),
+  ('rpc_source_qa_candidates(text,jsonb,integer,uuid[])','delegate',
+   'p_search text, p_cursor jsonb, p_limit integer, p_include_ids uuid[]',
+   'jsonb','d129ca77b7e5a62bed142bc1acf3970517692febcf3b53585f2be378c6a9488b',$body$
+  select query_path.payload
+  from public.vmp_source_qa_candidates_page_path(
+    auth.uid(),p_search,p_cursor,p_limit,p_include_ids
+  ) query_path
+$body$),
+  ('vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)',
+   'query_path',
+   'p_actor uuid, p_object_kind text, p_search text, p_filters jsonb, p_cursor jsonb, p_limit integer, p_include_inactive boolean, p_object_id uuid',
+   'TABLE(payload jsonb)','add582e576d178a7f4d204a8ec8bfa71431b6436ddae72efbe58d749908584b2',$body$
+with actor as (
+  select p_actor actor_id,public.vmp_business_role(p_actor) role_name,
+         exists (
+           select 1 from public.profiles profile
+           where profile.id=p_actor and coalesce(profile.is_active,true)
+         ) active_account
+), cursor_input as (
+  select case when p_cursor is null then true
+              when jsonb_typeof(p_cursor)='object'
+               and jsonb_typeof(p_cursor->'object_code')='string'
+               and jsonb_typeof(p_cursor->'id')='string'
+               and (p_cursor->>'id') ~*
+                   '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              then true else false end valid,
+         case when p_cursor is not null
+                and jsonb_typeof(p_cursor)='object'
+                and jsonb_typeof(p_cursor->'id')='string'
+                and (p_cursor->>'id') ~*
+                    '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              then (p_cursor->>'id')::uuid end cursor_id,
+         case when p_cursor is not null and jsonb_typeof(p_cursor)='object'
+                and jsonb_typeof(p_cursor->'object_code')='string'
+              then p_cursor->>'object_code' end cursor_code
+), authorized as (
+  select source_object.*
+  from public.vmp_source_objects source_object cross join actor
+  where actor.role_name in ('admin','qa_manager')
+     or (actor.role_name='qa_staff' and source_object.is_active and exists (
+       select 1 from public.vmp_performers performer
+       where performer.user_id=actor.actor_id and performer.is_active
+         and performer.id in (
+           source_object.owner_person_id,source_object.support_person_id
+         )
+     ))
+     or (actor.role_name in ('workshop_manager','workshop_staff')
+         and source_object.is_active and exists (
+       select 1
+       from public.vmp_performers performer
+       join public.vmp_source_workshop_scope_grants grant_row
+         on grant_row.performer_id=performer.id and grant_row.is_active
+        and grant_row.valid_from<=transaction_timestamp()
+        and (grant_row.expires_at is null
+             or grant_row.expires_at>transaction_timestamp())
+       where performer.user_id=actor.actor_id and performer.is_active
+         and source_object.department is not null
+         and source_object.area_code is not null
+         and public.vmp_source_scope_key(source_object.department)=
+             grant_row.department_key
+         and public.vmp_source_scope_key(source_object.area_code)=grant_row.area_key
+         and (grant_row.line_key is null or (
+           source_object.line is not null and
+           public.vmp_source_scope_key(source_object.line)=grant_row.line_key
+         ))
+     ))
+), filtered as (
+  select authorized.*
+  from authorized cross join actor
+  where (authorized.is_active
+         or (actor.role_name in ('admin','qa_manager')
+             and coalesce(p_include_inactive,false)))
+    and (p_object_kind is null or authorized.object_kind=p_object_kind)
+    and (coalesce(btrim(p_search),'')=''
+         or authorized.object_code ilike '%'||btrim(p_search)||'%'
+         or authorized.object_name ilike '%'||btrim(p_search)||'%')
+    and (coalesce(p_filters,'{}'::jsonb)='{}'::jsonb
+         or (not (p_filters?'department')
+             or authorized.department=p_filters->>'department')
+        and (not (p_filters?'area_code')
+             or authorized.area_code=p_filters->>'area_code')
+        and (not (p_filters?'line')
+             or authorized.line=p_filters->>'line'))
+    and (p_object_id is null or authorized.id=p_object_id)
+), cursor_status as (
+  select cursor_input.*,
+         p_cursor is null or exists (
+           select 1 from filtered
+           where filtered.object_code=cursor_input.cursor_code
+             and filtered.id=cursor_input.cursor_id
+         ) present
+  from cursor_input
+), paged as (
+  select filtered.*
+  from filtered cross join cursor_status
+  where p_cursor is null
+     or (filtered.object_code,filtered.id)>
+        (cursor_status.cursor_code,cursor_status.cursor_id)
+), limited as (
+  select paged.* from paged order by object_code,id
+  limit case when p_limit between 1 and 100 then p_limit+1 else 0 end
+), returned as (
+  select limited.* from limited order by object_code,id
+  limit case when p_limit between 1 and 100 then p_limit else 0 end
+)
+select case
+  when not actor.active_account then jsonb_build_object(
+    'ok',false,'error_code','ACCOUNT_DISABLED','error','Tài khoản không hoạt động')
+  when actor.role_name is null then jsonb_build_object(
+    'ok',false,'error_code','ROLE_UNRESOLVED','error','Không xác định được vai trò nghiệp vụ')
+  when p_limit is null or p_limit<1 or p_limit>100 then jsonb_build_object(
+    'ok',false,'error_code','INVALID_LIMIT','error','Giới hạn phải từ 1 đến 100')
+  when p_filters is not null and jsonb_typeof(p_filters)<>'object' then
+    jsonb_build_object(
+      'ok',false,'error_code','INVALID_FILTERS','error','Bộ lọc phải là JSON object')
+  when not cursor_status.valid then jsonb_build_object(
+    'ok',false,'error_code','INVALID_CURSOR','error','Con trỏ không hợp lệ')
+  when not cursor_status.present then jsonb_build_object(
+    'ok',false,'error_code','CURSOR_EXPIRED','error','Con trỏ không còn hiệu lực')
+  else jsonb_build_object(
+    'ok',true,
+    'rows',coalesce((select jsonb_agg(to_jsonb(returned) order by object_code,id)
+                     from returned),'[]'::jsonb),
+    'authorized_total',(select count(*) from filtered),
+    'next_cursor',case when (select count(*) from limited)>p_limit then (
+      select jsonb_build_object('object_code',object_code,'id',id)
+      from returned order by object_code desc,id desc limit 1
+    ) else null end
+  )
+end payload
+from actor cross join cursor_status
+$body$),
+  ('vmp_editable_progress_rights_path(uuid)','query_path','p_actor uuid',
+   'TABLE(payload jsonb)','cd9e1f136c88965f907157a37d26e8eca55942f229b9f43ce929d96e823347d0',$body$
+with actor as (
+  select public.vmp_business_role(p_actor) role_name,
+         exists (
+           select 1 from public.profiles profile
+           where profile.id=p_actor and coalesce(profile.is_active,true)
+         ) active_account
+), resolved as (
+  select item.validation_code,rights.editable_fields,rights.view_reason
+  from public.vmp_plan_items item
+  cross join lateral public.vmp_item_rights(p_actor,item.validation_code) rights
+  where item.is_active and rights.can_view
+    and cardinality(coalesce(rights.editable_fields,'{}'::text[]))>0
+)
+select case
+  when not actor.active_account then jsonb_build_object(
+    'ok',false,'error_code','ACCOUNT_DISABLED','error','Tài khoản không hoạt động')
+  when actor.role_name is null then jsonb_build_object(
+    'ok',false,'error_code','ROLE_UNRESOLVED','error','Không xác định được vai trò nghiệp vụ')
+  else jsonb_build_object(
+    'ok',true,
+    'rights',coalesce((select jsonb_agg(jsonb_build_object(
+      'validation_code',resolved.validation_code,
+      'editable_fields',to_jsonb(resolved.editable_fields),
+      'view_reason',resolved.view_reason
+    ) order by resolved.validation_code) from resolved),'[]'::jsonb)
+  )
+end payload
+from actor
+$body$),
+  ('vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])',
+   'query_path',
+   'p_actor uuid, p_search text, p_cursor jsonb, p_limit integer, p_include_ids uuid[]',
+   'TABLE(payload jsonb)','13c2292a5f25ccdded15170ece32bc91d5a9dd4173ea3a3022ddea3fb88db83e',$body$
+with actor as (
+  select public.vmp_business_role(p_actor) role_name,
+         exists (
+           select 1 from public.profiles profile
+           where profile.id=p_actor and coalesce(profile.is_active,true)
+         ) active_account
+), cursor_input as (
+  select case when p_cursor is null then true
+              when jsonb_typeof(p_cursor)='object'
+               and jsonb_typeof(p_cursor->'normalized_full_name')='string'
+               and jsonb_typeof(p_cursor->'person_id')='string'
+               and (p_cursor->>'person_id') ~*
+                   '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              then true else false end valid,
+         case when p_cursor is not null
+                and jsonb_typeof(p_cursor)='object'
+                and jsonb_typeof(p_cursor->'person_id')='string'
+                and (p_cursor->>'person_id') ~*
+                    '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              then (p_cursor->>'person_id')::uuid end cursor_id,
+         case when p_cursor is not null and jsonb_typeof(p_cursor)='object'
+                and jsonb_typeof(p_cursor->'normalized_full_name')='string'
+              then p_cursor->>'normalized_full_name' end cursor_name
+), candidate as (
+  select performer.id person_id,performer.performer_name,
+         performer.normalized_full_name,performer.email,performer.department,
+         public.vmp_business_role(performer.user_id) role_name
+  from public.vmp_performers performer
+  join public.profiles profile on profile.id=performer.user_id
+  where performer.is_active and performer.user_id is not null
+    and coalesce(profile.is_active,true)
+    and public.vmp_business_role(profile.id) in ('qa_staff','qa_manager')
+    and (coalesce(btrim(p_search),'')=''
+         or performer.normalized_full_name like
+              public.vmp_source_scope_key(p_search)||'%')
+), cursor_status as (
+  select cursor_input.*,
+         p_cursor is null or exists (
+           select 1 from candidate
+           where candidate.normalized_full_name=cursor_input.cursor_name
+             and candidate.person_id=cursor_input.cursor_id
+         ) present
+  from cursor_input
+), paged as (
+  select candidate.* from candidate cross join cursor_status
+  where p_cursor is null
+     or (candidate.normalized_full_name,candidate.person_id)>
+        (cursor_status.cursor_name,cursor_status.cursor_id)
+), limited as (
+  select paged.* from paged
+  order by normalized_full_name,person_id
+  limit case when p_limit between 1 and 50 then p_limit+1 else 0 end
+), returned as (
+  select limited.* from limited order by normalized_full_name,person_id
+  limit case when p_limit between 1 and 50 then p_limit else 0 end
+), included as (
+  select requested.person_id,performer.performer_name,
+         performer.normalized_full_name,performer.email,performer.department,
+         coalesce(
+           public.vmp_business_role(performer.user_id) in ('qa_staff','qa_manager'),
+           false
+         ) eligible,
+         case
+           when performer.id is null then 'PERSON_NOT_FOUND'
+           when not performer.is_active then 'PERFORMER_INACTIVE'
+           when performer.user_id is null then 'ACCOUNT_UNLINKED'
+           when not coalesce(profile.is_active,false) then 'ACCOUNT_DISABLED'
+           when public.vmp_business_role(performer.user_id)
+                not in ('qa_staff','qa_manager')
+             or public.vmp_business_role(performer.user_id) is null
+             then 'ROLE_INELIGIBLE'
+           else null
+         end ineligibility_reason
+  from (
+    select distinct unnest(coalesce(p_include_ids,'{}'::uuid[])) person_id
+  ) requested
+  left join public.vmp_performers performer on performer.id=requested.person_id
+  left join public.profiles profile on profile.id=performer.user_id
+)
+select case
+  when not actor.active_account then jsonb_build_object(
+    'ok',false,'error_code','ACCOUNT_DISABLED','error','Tài khoản không hoạt động')
+  when actor.role_name is null then jsonb_build_object(
+    'ok',false,'error_code','ROLE_UNRESOLVED','error','Không xác định được vai trò nghiệp vụ')
+  when actor.role_name not in ('admin','qa_manager') then jsonb_build_object(
+    'ok',false,'error_code','FORBIDDEN','error','Không có quyền chọn QA phụ trách')
+  when p_limit is null or p_limit<1 or p_limit>50 then jsonb_build_object(
+    'ok',false,'error_code','INVALID_LIMIT','error','Giới hạn phải từ 1 đến 50')
+  when not cursor_status.valid then jsonb_build_object(
+    'ok',false,'error_code','INVALID_CURSOR','error','Con trỏ không hợp lệ')
+  when not cursor_status.present then jsonb_build_object(
+    'ok',false,'error_code','CURSOR_EXPIRED','error','Con trỏ không còn hiệu lực')
+  else jsonb_build_object(
+    'ok',true,
+    'rows',coalesce((select jsonb_agg(jsonb_build_object(
+      'person_id',person_id,'performer_name',performer_name,
+      'normalized_full_name',normalized_full_name,'email',email,
+      'department',department,'role_name',role_name
+    ) order by normalized_full_name,person_id) from returned),'[]'::jsonb),
+    'included_current',coalesce((select jsonb_agg(to_jsonb(included)
+      order by included.normalized_full_name nulls last,included.person_id)
+      from included),'[]'::jsonb),
+    'authorized_total',(select count(*) from candidate),
+    'next_cursor',case when (select count(*) from limited)>p_limit then (
+      select jsonb_build_object(
+        'normalized_full_name',normalized_full_name,'person_id',person_id)
+      from returned order by normalized_full_name desc,person_id desc limit 1
+    ) else null end
+  )
+end payload
+from actor cross join cursor_status
+$body$);
+
+create temp table expected_query_path_contract(
+  public_signature text primary key,path_signature text unique not null,
+  public_definition_sha256 text not null,path_definition_sha256 text not null
+) on commit drop;
+insert into expected_query_path_contract values
+  ('rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)',
+   'vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)',
+   '602434023178d4bae267ccb6c98697179ef1e569d57e12df0278a1c203add3fa',
+   'add582e576d178a7f4d204a8ec8bfa71431b6436ddae72efbe58d749908584b2'),
+  ('rpc_my_editable_progress_rights()',
+   'vmp_editable_progress_rights_path(uuid)',
+   'd6848fa43fe2987da187e2d25857273126379d9d0720c4bccc955a5187f3ef7a',
+   'cd9e1f136c88965f907157a37d26e8eca55942f229b9f43ce929d96e823347d0'),
+  ('rpc_source_qa_candidates(text,jsonb,integer,uuid[])',
+   'vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])',
+   'd129ca77b7e5a62bed142bc1acf3970517692febcf3b53585f2be378c6a9488b',
+   '13c2292a5f25ccdded15170ece32bc91d5a9dd4173ea3a3022ddea3fb88db83e');
+
+with actual_function as (
+  select expected.*,procedure.oid,procedure.proname,
          owner.rolname owner_name,language.lanname language_name,
          procedure.provolatile,procedure.prosecdef,procedure.proparallel,
-         procedure.proconfig,pg_get_functiondef(procedure.oid) definition
-  from reviewed_query_path reviewed
+         procedure.proisstrict,procedure.proleakproof,procedure.proconfig,
+         procedure.pronargdefaults,procedure.prosrc,
+         pg_get_function_arguments(procedure.oid) actual_arguments,
+         pg_get_function_result(procedure.oid) actual_result,
+         encode(extensions.digest(convert_to(
+           pg_get_functiondef(procedure.oid),'UTF8'),'sha256'),'hex') actual_hash
+  from expected_query_definition expected
   join pg_proc procedure
-    on procedure.oid=to_regprocedure('public.'||reviewed.signature)
+    on procedure.oid=to_regprocedure('public.'||expected.signature)
   join pg_roles owner on owner.oid=procedure.proowner
   join pg_language language on language.oid=procedure.prolang
 ), actual_acl as (
-  select path.signature,
+  select actual.signature,
          case when acl.grantee=0 then 'PUBLIC'
               else acl.grantee::regrole::text end grantee,
          acl.privilege_type,acl.is_grantable
-  from path_function path
-  join pg_proc procedure on procedure.oid=path.oid
+  from actual_function actual
+  join pg_proc procedure on procedure.oid=actual.oid
   cross join lateral aclexplode(procedure.proacl) acl
 ), expected_acl as (
-  select reviewed.signature,grantee,'EXECUTE'::text privilege_type,false is_grantable
-  from reviewed_query_path reviewed
-  cross join lateral unnest(array['postgres','service_role']::text[]) grantee
+  select expected.signature,grantee,'EXECUTE'::text privilege_type,
+         false is_grantable
+  from expected_query_definition expected
+  cross join lateral unnest(case expected.definition_kind
+    when 'delegate' then
+      array['postgres','service_role','authenticated']::text[]
+    else array['postgres','service_role']::text[] end) grantee
 )
 select pg_temp.assert_true(
-  (select count(*) from path_function)=3
+  (select count(*) from actual_function)=6
+  and (select count(*) from expected_query_path_contract)=3
   and not exists (
-    select 1 from path_function
+    select 1 from actual_function
     where owner_name<>'postgres' or language_name<>'sql' or provolatile<>'s'
-       or prosecdef or proparallel<>'s' or proconfig is not null
-       or definition !~ '\mpublic\.'
+       or proparallel<>'u' or proisstrict or proleakproof
+       or pronargdefaults<>0 or actual_arguments<>arguments
+       or actual_result<>result_type or prosrc is distinct from reviewed_body
+       or actual_hash<>definition_sha256
+       or case definition_kind
+            when 'delegate' then not prosecdef
+              or proconfig is distinct from array['search_path=public, pg_temp']
+            else prosecdef or proconfig is not null
+          end
+       or (select count(*) from pg_proc overload
+           join pg_namespace namespace on namespace.oid=overload.pronamespace
+           where namespace.nspname='public'
+             and overload.proname=actual_function.proname)<>1
   )
   and not exists (select * from actual_acl except select * from expected_acl)
   and not exists (select * from expected_acl except select * from actual_acl)
-  and regexp_count(pg_get_functiondef(
-        'public.rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)'::regprocedure
-      ),'\mvmp_source_objects_page_path\M')=1
-  and regexp_count(pg_get_functiondef(
-        'public.rpc_my_editable_progress_rights()'::regprocedure
-      ),'\mvmp_editable_progress_rights_path\M')=1
-  and regexp_count(pg_get_functiondef(
-        'public.rpc_source_qa_candidates(text,jsonb,integer,uuid[])'::regprocedure
-      ),'\mvmp_source_qa_candidates_page_path\M')=1
-  and pg_get_functiondef(to_regprocedure(
-        'public.vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)'
-      )) ~ '\mvmp_source_objects\M'
-  and pg_get_functiondef(to_regprocedure(
-        'public.vmp_editable_progress_rights_path(uuid)'
-      )) ~ '\mvmp_plan_items\M'
-  and pg_get_functiondef(to_regprocedure(
-        'public.vmp_editable_progress_rights_path(uuid)'
-      )) ~ '\mvmp_item_assignments\M'
-  and pg_get_functiondef(to_regprocedure(
-        'public.vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])'
-      )) ~ '\mvmp_performers\M',
-  'SOURCE_ACCESS_EXACT_PRODUCTION_SET_BASED_QUERY_PATHS');
+  and not exists (
+    select 1 from expected_query_path_contract contract
+    join expected_query_definition public_definition
+      on public_definition.signature=contract.public_signature
+    join expected_query_definition path_definition
+      on path_definition.signature=contract.path_signature
+    where public_definition.definition_kind<>'delegate'
+       or path_definition.definition_kind<>'query_path'
+       or public_definition.definition_sha256<>
+          contract.public_definition_sha256
+       or path_definition.definition_sha256<>contract.path_definition_sha256
+       or regexp_count(public_definition.reviewed_body,
+             '\m'||split_part(contract.path_signature,'(',1)||'\M')<>1
+  ),
+  'SOURCE_ACCESS_EXACT_PUBLIC_PATH_DEFINITION_HASHES');
 
 insert into public.departments(id,name,short_name)
 values ('QA','Source performance QA fixture','QA'),
@@ -204,6 +557,27 @@ where performer.user_id=people.user_id;
 
 update perf_people people set performer_id=performer.id
 from public.vmp_performers performer where performer.user_id=people.user_id;
+
+insert into auth.users(
+  id,aud,role,email,encrypted_password,email_confirmed_at,
+  raw_app_meta_data,raw_user_meta_data,created_at,updated_at
+)
+values
+  ('9a030000-0000-4000-8000-000000000001','authenticated','authenticated',
+   'source-perf-inactive@example.test','x',now(),'{}','{}',now(),now()),
+  ('9a030000-0000-4000-8000-000000000002','authenticated','authenticated',
+   'source-perf-unresolved@example.test','x',now(),'{}','{}',now(),now());
+
+insert into public.profiles(id,full_name,email,role,department,is_active)
+values
+  ('9a030000-0000-4000-8000-000000000001','Source Performance Inactive',
+   'source-perf-inactive@example.test','department_user','QA',false),
+  ('9a030000-0000-4000-8000-000000000002','Source Performance Unresolved',
+   'source-perf-unresolved@example.test','department_user','QA',true);
+
+update public.vmp_performers
+set department='QA',access_class=null,is_active=true
+where user_id='9a030000-0000-4000-8000-000000000002'::uuid;
 
 select pg_temp.assert_true(
   (select count(*) from perf_people where performer_id is not null)=1000,
@@ -391,12 +765,19 @@ select pg_temp.assert_plan_contract(
   'vmp_performers','idx_vmp_performers_active_candidate',
   'SOURCE_ACCESS_PLAN_CANDIDATE_SEARCH');
 
+select pg_temp.assert_plan_has_protected_work(document,
+  'SOURCE_ACCESS_PLAN_CONTAINS_INLINED_PROTECTED_WORK '||plan_name)
+from captured_plan;
+
 create function pg_temp.assert_source_pages(p_user_id uuid,p_rule_id text)
 returns void language plpgsql security definer set search_path=public,pg_temp as $$
 declare
   v_first jsonb;
   v_second jsonb;
   v_terminal jsonb;
+  v_first_path jsonb;
+  v_second_path jsonb;
+  v_terminal_path jsonb;
   v_first_codes text[];
   v_second_codes text[];
   v_terminal_codes text[];
@@ -412,6 +793,17 @@ begin
     'Thiết bị','SPERF','{}'::jsonb,v_first->'next_cursor',100,false,null);
   v_terminal:=public.rpc_list_source_objects(
     'Thiết bị','SPERF','{}'::jsonb,v_second->'next_cursor',100,false,null);
+  select payload into strict v_first_path
+  from public.vmp_source_objects_page_path(
+    p_user_id,'Thiết bị','SPERF','{}'::jsonb,null,100,false,null);
+  select payload into strict v_second_path
+  from public.vmp_source_objects_page_path(
+    p_user_id,'Thiết bị','SPERF','{}'::jsonb,
+    v_first->'next_cursor',100,false,null);
+  select payload into strict v_terminal_path
+  from public.vmp_source_objects_page_path(
+    p_user_id,'Thiết bị','SPERF','{}'::jsonb,
+    v_second->'next_cursor',100,false,null);
 
   select array_agg(row_value->>'object_code' order by ordinal)
   into v_first_codes
@@ -443,9 +835,12 @@ begin
      or coalesce(jsonb_typeof(v_terminal->'next_cursor'),'null')<>'null'
      or v_first_codes && v_second_codes
      or v_first_codes && v_terminal_codes
-     or v_second_codes && v_terminal_codes then
+     or v_second_codes && v_terminal_codes
+     or v_first is distinct from v_first_path
+     or v_second is distinct from v_second_path
+     or v_terminal is distinct from v_terminal_path then
     raise exception using errcode='check_violation',
-      message=p_rule_id;
+      message=p_rule_id||' SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE';
   end if;
 end
 $$;
@@ -454,6 +849,7 @@ create function pg_temp.assert_candidate_pages(p_user_id uuid)
 returns void language plpgsql security definer set search_path=public,pg_temp as $$
 declare
   v_page jsonb;
+  v_path_page jsonb;
   v_cursor jsonb:=null;
   v_rows uuid[];
   v_seen uuid[]:='{}'::uuid[];
@@ -474,6 +870,9 @@ begin
 
   loop
     v_page:=public.rpc_source_qa_candidates('',v_cursor,50,'{}'::uuid[]);
+    select payload into strict v_path_page
+    from public.vmp_source_qa_candidates_page_path(
+      p_user_id,'',v_cursor,50,'{}'::uuid[]);
     v_page_count:=v_page_count+1;
     select coalesce(array_agg((row_value->>'person_id')::uuid order by ordinal),
                     '{}'::uuid[])
@@ -483,6 +882,7 @@ begin
        or v_page->>'authorized_total' is distinct from '998'
        or cardinality(v_rows)>50
        or v_seen && v_rows
+       or v_page is distinct from v_path_page
        or (v_page_count=1 and v_rows is distinct from v_expected_first)
        or (v_page_count=2 and v_rows is distinct from v_expected_second) then
       raise exception using errcode='check_violation',
@@ -504,7 +904,181 @@ begin
 end
 $$;
 
+create function pg_temp.assert_public_path_edge_equivalence(
+  p_manager uuid,p_non_manager uuid,p_inactive uuid,p_unresolved uuid,
+  p_ineligible_person uuid
+)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare
+  v_public jsonb;
+  v_path jsonb;
+begin
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_manager,'role','authenticated')::text,true);
+
+  v_public:=public.rpc_list_source_objects(
+    'Thiết bị','NO-SUCH-SOURCE','{}'::jsonb,null,1,false,null);
+  select payload into strict v_path
+  from public.vmp_source_objects_page_path(
+    p_manager,'Thiết bị','NO-SUCH-SOURCE','{}'::jsonb,null,1,false,null);
+  if v_public is distinct from v_path or v_public->>'ok'<>'true'
+     or v_public->'rows'<>'[]'::jsonb then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE successful_zero_list';
+  end if;
+
+  v_public:=public.rpc_list_source_objects(
+    'Thiết bị','SPERF','{}'::jsonb,
+    '{"object_code":"SPERF-00001","id":"bad"}'::jsonb,1,false,null);
+  select payload into strict v_path
+  from public.vmp_source_objects_page_path(
+    p_manager,'Thiết bị','SPERF','{}'::jsonb,
+    '{"object_code":"SPERF-00001","id":"bad"}'::jsonb,1,false,null);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'INVALID_CURSOR' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_CURSOR_PASSTHROUGH invalid_list_cursor';
+  end if;
+
+  v_public:=public.rpc_list_source_objects(
+    'Thiết bị','SPERF','{}'::jsonb,
+    '{"object_code":"SPERF-MISSING","id":"00000000-0000-0000-0000-000000000000"}'::jsonb,
+    1,false,null);
+  select payload into strict v_path
+  from public.vmp_source_objects_page_path(
+    p_manager,'Thiết bị','SPERF','{}'::jsonb,
+    '{"object_code":"SPERF-MISSING","id":"00000000-0000-0000-0000-000000000000"}'::jsonb,
+    1,false,null);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'CURSOR_EXPIRED' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_CURSOR_PASSTHROUGH expired_list_cursor';
+  end if;
+
+  v_public:=public.rpc_list_source_objects(
+    'Thiết bị','SPERF','{}'::jsonb,null,0,false,null);
+  select payload into strict v_path
+  from public.vmp_source_objects_page_path(
+    p_manager,'Thiết bị','SPERF','{}'::jsonb,null,0,false,null);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'INVALID_LIMIT' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE invalid_list_limit';
+  end if;
+
+  v_public:=public.rpc_source_qa_candidates(
+    'NO-SUCH-CANDIDATE',null,1,array[p_ineligible_person]);
+  select payload into strict v_path
+  from public.vmp_source_qa_candidates_page_path(
+    p_manager,'NO-SUCH-CANDIDATE',null,1,array[p_ineligible_person]);
+  if v_public is distinct from v_path or v_public->>'ok'<>'true'
+     or v_public->'rows'<>'[]'::jsonb
+     or jsonb_array_length(v_public->'included_current')<>1
+     or v_public#>>'{included_current,0,eligible}'<>'false' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE included_current';
+  end if;
+
+  v_public:=public.rpc_source_qa_candidates(
+    '',
+    '{"normalized_full_name":"missing","person_id":"bad"}'::jsonb,
+    1,'{}'::uuid[]);
+  select payload into strict v_path
+  from public.vmp_source_qa_candidates_page_path(
+    p_manager,'',
+    '{"normalized_full_name":"missing","person_id":"bad"}'::jsonb,
+    1,'{}'::uuid[]);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'INVALID_CURSOR' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_CURSOR_PASSTHROUGH invalid_candidate_cursor';
+  end if;
+
+  v_public:=public.rpc_source_qa_candidates(
+    '',
+    '{"normalized_full_name":"missing","person_id":"00000000-0000-0000-0000-000000000000"}'::jsonb,
+    1,'{}'::uuid[]);
+  select payload into strict v_path
+  from public.vmp_source_qa_candidates_page_path(
+    p_manager,'',
+    '{"normalized_full_name":"missing","person_id":"00000000-0000-0000-0000-000000000000"}'::jsonb,
+    1,'{}'::uuid[]);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'CURSOR_EXPIRED' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_CURSOR_PASSTHROUGH expired_candidate_cursor';
+  end if;
+
+  v_public:=public.rpc_source_qa_candidates('',null,51,'{}'::uuid[]);
+  select payload into strict v_path
+  from public.vmp_source_qa_candidates_page_path(
+    p_manager,'',null,51,'{}'::uuid[]);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'INVALID_LIMIT' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE invalid_candidate_limit';
+  end if;
+
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_non_manager,'role','authenticated')::text,true);
+  v_public:=public.rpc_source_qa_candidates('',null,1,'{}'::uuid[]);
+  select payload into strict v_path
+  from public.vmp_source_qa_candidates_page_path(
+    p_non_manager,'',null,1,'{}'::uuid[]);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'FORBIDDEN' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_AUTH_ERROR_ENVELOPE non_manager';
+  end if;
+
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_inactive,'role','authenticated')::text,true);
+  v_public:=public.rpc_list_source_objects(
+    'Thiết bị','SPERF','{}'::jsonb,null,1,false,null);
+  select payload into strict v_path
+  from public.vmp_source_objects_page_path(
+    p_inactive,'Thiết bị','SPERF','{}'::jsonb,null,1,false,null);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'ACCOUNT_DISABLED' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_AUTH_ERROR_ENVELOPE inactive';
+  end if;
+
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub',p_unresolved,'role','authenticated')::text,true);
+  v_public:=public.rpc_my_editable_progress_rights();
+  select payload into strict v_path
+  from public.vmp_editable_progress_rights_path(p_unresolved);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'ROLE_UNRESOLVED' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_AUTH_ERROR_ENVELOPE unresolved';
+  end if;
+
+  perform set_config('request.jwt.claims','{}',true);
+  v_public:=public.rpc_list_source_objects(
+    'Thiết bị','SPERF','{}'::jsonb,null,1,false,null);
+  select payload into strict v_path
+  from public.vmp_source_objects_page_path(
+    null,'Thiết bị','SPERF','{}'::jsonb,null,1,false,null);
+  if v_public is distinct from v_path or v_public->>'ok'<>'false'
+     or v_public->>'error_code'<>'ACCOUNT_DISABLED' then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_PUBLIC_PATH_AUTH_ERROR_ENVELOPE null_uid';
+  end if;
+end
+$$;
+
 set local role authenticated;
+
+select pg_temp.assert_public_path_edge_equivalence(
+  md5('source-access-performance-user-1')::uuid,
+  md5('source-access-performance-user-4')::uuid,
+  '9a030000-0000-4000-8000-000000000001'::uuid,
+  '9a030000-0000-4000-8000-000000000002'::uuid,
+  (select id from public.vmp_performers
+   where user_id='9a030000-0000-4000-8000-000000000002'::uuid)
+);
 
 select pg_temp.assert_source_pages(
   md5('source-access-performance-user-4')::uuid,
@@ -519,10 +1093,22 @@ select pg_temp.assert_source_pages(
 select set_config('request.jwt.claims',json_build_object(
   'sub',md5('source-access-performance-user-4')::uuid,
   'role','authenticated')::text,true);
-select pg_temp.assert_true(
-  public.rpc_my_editable_progress_rights()->>'ok'='true'
-  and jsonb_array_length(public.rpc_my_editable_progress_rights()->'rights')=410,
-  'SOURCE_ACCESS_ITEM_RIGHTS_SET_BASED_AUTHORIZED_TOTAL_410');
+do $rights_equivalence$
+declare
+  v_public jsonb:=public.rpc_my_editable_progress_rights();
+  v_path jsonb;
+begin
+  select payload into strict v_path
+  from public.vmp_editable_progress_rights_path(
+    md5('source-access-performance-user-4')::uuid);
+  if v_public is distinct from v_path
+     or v_public->>'ok'<>'true'
+     or jsonb_array_length(v_public->'rights')<>410 then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_ITEM_RIGHTS_SET_BASED_AUTHORIZED_TOTAL_410 SOURCE_ACCESS_PUBLIC_PATH_JSON_EQUIVALENCE';
+  end if;
+end
+$rights_equivalence$;
 
 select pg_temp.assert_candidate_pages(md5('source-access-performance-user-1')::uuid);
 
