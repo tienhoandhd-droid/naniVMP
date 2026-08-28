@@ -139,9 +139,9 @@ export function useAuth() {
      Nay phiên thật là nguồn chân lý: không có phiên thì rơi về màn đăng nhập.
 
      Vẫn vẽ ngay bằng hồ sơ trong localStorage rồi mới đi hỏi, để không phải
-     nhìn màn trắng mỗi lần mở app. Chỉ khi hỏi xong mà KHÔNG có phiên mới
-     xoá — và không đụng tới hồ sơ đang có khi phiên còn sống, để bộ kiểm
-     đổi vai trên màn vẫn dùng được (quyền thật do server giữ, không do đây). */
+     nhìn màn trắng mỗi lần mở app. Kết quả `co` thay cache bằng hồ sơ chính
+     tắc mới nhất; `khong_ro` giữ cache để chịu được lỗi mạng tạm thời; chỉ
+     kết quả `khong` chắc chắn mới xoá hồ sơ và đưa về màn đăng nhập. */
   useEffect(() => {
     if (!isSupabaseConfigured()) { setLoading(false); return; }
     let con = true;
