@@ -7,7 +7,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { gomGoiY } from "../../src/features/catalogWorkspace/suggestions.ts";
+import {
+  collectCatalogSuggestionPages,
+  decodeCatalogSuggestionPage,
+  gomGoiY,
+} from "../../src/features/catalogWorkspace/suggestions.ts";
 
 test("gom giá trị distinct, bỏ rỗng, sắp theo bảng chữ cái", () => {
   const rows = [
@@ -39,4 +43,36 @@ test("số cũng thành gợi ý dạng chuỗi", () => {
 
 test("không có dòng nào thì mỗi khoá là mảng rỗng", () => {
   assert.deepEqual(gomGoiY([], ["line"]), { line: [] });
+});
+
+test("gợi ý Source giải mã đúng page server và chặn wire shape lạ", () => {
+  assert.deepEqual(decodeCatalogSuggestionPage({
+    ok: true,
+    rows: [{ value: "Line 1", count: 2 }],
+    next_cursor: { value: "Line 1" },
+  }), {
+    ok: true,
+    rows: [{ value: "Line 1", count: 2 }],
+    nextCursor: { value: "Line 1" },
+  });
+  assert.throws(() => decodeCatalogSuggestionPage({
+    ok: true, rows: [{ value: "Line 1", count: -1 }], next_cursor: null,
+  }), /count/i);
+  assert.deepEqual(decodeCatalogSuggestionPage({
+    ok: false, error_code: "FORBIDDEN", error: "Không có quyền",
+  }), { ok: false, errorCode: "FORBIDDEN", error: "Không có quyền" });
+});
+
+test("collector gợi ý đi hết cursor, không lặp và không nuốt lỗi server", async () => {
+  const values = await collectCatalogSuggestionPages(async (cursor) => cursor === null
+    ? { ok: true, rows: [{ value: "A", count: 2 }], nextCursor: { value: "A" } }
+    : { ok: true, rows: [{ value: "B", count: 1 }], nextCursor: null });
+  assert.deepEqual(values, ["A", "B"]);
+
+  await assert.rejects(() => collectCatalogSuggestionPages(async () => ({
+    ok: false, errorCode: "FORBIDDEN", error: "Không có quyền",
+  })), /FORBIDDEN/);
+  await assert.rejects(() => collectCatalogSuggestionPages(async () => ({
+    ok: true, rows: [{ value: "A", count: 1 }], nextCursor: { value: "A" },
+  })), /cursor/i);
 });

@@ -22,10 +22,10 @@ import assert from "node:assert/strict";
 import { NAV_SUBS, LOAI_LOI } from "../../src/constants/vmp.ts";
 import { runDataQualityChecks } from "../../src/utils/helpers.ts";
 
-test("NAV_SUBS.source nêu đúng sáu vùng của workspace, không hứa hẹn cũ", () => {
+test("NAV_SUBS.source nêu đúng phạm vi theo quyền của workspace, không hứa hẹn cũ", () => {
   assert.equal(
     NAV_SUBS.source,
-    "Dữ liệu nguồn · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
+    "Dữ liệu nguồn · Đối tượng theo quyền; Admin/Quản lý QA có thêm phân công QA, phạm vi xưởng và công cụ danh mục",
   );
 });
 

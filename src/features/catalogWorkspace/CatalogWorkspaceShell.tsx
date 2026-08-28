@@ -15,11 +15,9 @@
  *  không bày ra lối đi chắc chắn thất bại.
  *
  *  Ba dataset dùng CÙNG bộ trình bày (CatalogSmartTable): desktop bảng,
- *  điện thoại thẻ, cùng một mảng dòng. Đối tượng nguồn đọc theo loại như
- *  cũ (fetchSourceObjects); Sản phẩm GMP và Người nhận cảnh báo đọc qua
- *  rpc_list_catalog_dataset — phân trang và đếm tổng ở server, 25 dòng
- *  mỗi trang, gõ tìm kiếm chờ 250 ms, và mỗi request mang một số thứ tự
- *  tăng dần để câu trả lời cũ không đè được câu trả lời mới.
+ *  điện thoại thẻ, cùng một mảng dòng. Source dùng RPC keyset theo đúng
+ *  quyền; sản phẩm/cảnh báo dùng RPC offset manager-only. Cả hai đều đếm
+ *  tổng ở server, 25 dòng mỗi trang, debounce 250 ms và sequence fence.
  * ===================================================================== */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -34,8 +32,9 @@ import ViewportDialog from "../../components/ui/ViewportDialog.tsx";
 import CatalogObjectForm from "../../components/catalog/CatalogObjectForm.tsx";
 import CatalogImpactPreview from "../../components/catalog/CatalogImpactPreview.tsx";
 import CatalogWarningsSummary, { type CatalogWarning } from "../../components/catalog/CatalogWarningsSummary.tsx";
+import WorkshopScopeCoveragePanel from "../sourceAccess/WorkshopScopeCoveragePanel.tsx";
 import {
-  SOURCE_KINDS, fetchSourceObjects, fetchSourceWarnings, generateTimeline,
+  SOURCE_KINDS, fetchSourceWarnings, generateTimeline,
   saveCatalogObject,
 } from "../../lib/supabaseData.ts";
 import { useCatalogSuggestions } from "./useCatalogSuggestions.ts";
@@ -46,28 +45,35 @@ import type { GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../../
 import CatalogSmartTable from "./CatalogSmartTable.tsx";
 import CatalogRecordDialog from "./CatalogRecordDialog.tsx";
 import CatalogExcelImport from "./CatalogExcelImport.tsx";
-import { listDataset, listHistory, listPendingChanges } from "./api.ts";
+import {
+  exportAllSourceObjects, listDataset, listHistory, listPendingChanges,
+  listSourceObjectFacets, listSourceObjectPage,
+} from "./api.ts";
 import { layDataset } from "./definitions.ts";
 import {
   CATALOG_OBJECT_FILTERS_ALL, activeCatalogObjectFilterChips,
-  catalogObjectActiveFilterCount, catalogObjectFilterOptions, clearCatalogObjectFilter,
-  filterCatalogObjects, type CatalogObjectFilters,
+  catalogObjectActiveFilterCount, catalogWorkspaceRegionIds, clearCatalogObjectFilter,
+  encodeCatalogObjectServerFilters, initialCatalogSourceCursorStack,
+  moveCatalogSourceCursorBack, moveCatalogSourceCursorForward,
+  resolveCatalogSourceCursorPage, type CatalogObjectFilters, type CatalogSourceCursorStack,
 } from "./catalogWorkspaceFilterModel.ts";
 import type {
   CatalogAuditRow, CatalogChangeRow, CatalogDatasetId, CatalogListRow, CatalogRecord,
+  CatalogSourceFacetsSuccess,
 } from "./contracts.ts";
 
 const PAGE_SIZE = 25;
 const DO_TRE_TIM_KIEM_MS = 250;
 
 /** Sáu mục của workspace — thứ tự này là hợp đồng, có bộ kiểm giữ. */
-type VungId = "objects" | "products" | "alerts" | "import" | "pending" | "history";
+type VungId = "objects" | "coverage" | "products" | "alerts" | "import" | "pending" | "history";
 
 const CAC_VUNG: Array<{
   id: VungId; nhan: string; icon: typeof Boxes;
   canSua?: boolean; canSinhTimeline?: boolean; canAudit?: boolean;
 }> = [
   { id: "objects", nhan: "Đối tượng", icon: Boxes },
+  { id: "coverage", nhan: "Phạm vi xưởng", icon: Boxes },
   { id: "products", nhan: "Sản phẩm GMP", icon: FlaskConical },
   { id: "alerts", nhan: "Người nhận cảnh báo", icon: Bell },
   { id: "import", nhan: "Nhập Excel", icon: FileSpreadsheet, canSua: true },
@@ -79,6 +85,9 @@ export interface CatalogWorkspaceShellProps {
   access: AccessContext;
   scopeLabel?: string;
   updatedLabel?: string;
+  /** Quyền Source đổi thì Task 7 tăng revision này để mọi page/warning cũ
+   * bị loại trước khi có thể tiếp tục hiển thị. */
+  authorizationRevision?: number;
   /** Deep-link từ màn Tiến độ: mở đúng đối tượng rồi tự xoá (một lần). */
   focus?: { code: string; nhom?: string } | null;
   onFocusConsumed?: () => void;
@@ -89,25 +98,31 @@ export interface CatalogWorkspaceShellProps {
 type TrangThaiTai = "loading" | "error" | "ready";
 
 export default function CatalogWorkspaceShell({
-  access, scopeLabel, updatedLabel, focus, onFocusConsumed, onReload,
+  access, scopeLabel, updatedLabel, authorizationRevision, focus, onFocusConsumed, onReload,
 }: CatalogWorkspaceShellProps) {
   const canEdit = access.can("source", "edit_catalog");
   const canSinhTimeline = access.can("source", "generate_timeline");
+  const canManageWorkshopScope = access.can("source", "manage_workshop_scope");
   /* Đây là lịch sử nghiệp vụ của Dữ liệu nguồn, không phải màn Nhật ký
      thay đổi trong khu vực Quản trị. RPC rpc_catalog_history chấp nhận đúng
      Admin và Quản lý QA, nên giao diện phải phản chiếu cùng biên vai trò. */
   const canViewCatalogHistory = access.businessRole === "admin"
     || access.businessRole === "qa_manager";
 
+  const canManageSourceDatasets = access.businessRole === "admin" || access.businessRole === "qa_manager";
   const toast = useToast();
   /* Gợi ý nhập nạp một lượt cho cả màn: mở hộp thoại rồi mới gọi mạng thì
      danh sách hiện sau con trỏ, và người dùng đã gõ xong nửa chữ. */
-  const goiY = useCatalogSuggestions();
+  const catalogSuggestions = useCatalogSuggestions(canManageSourceDatasets);
+  const goiY = catalogSuggestions.goiY;
 
-  const vungHople = CAC_VUNG.filter((v) =>
-    (!v.canSua || canEdit)
-    && (!v.canSinhTimeline || canSinhTimeline)
-    && (!v.canAudit || canViewCatalogHistory));
+  const vungIds = useMemo(() => catalogWorkspaceRegionIds({
+    businessRole: access.businessRole,
+    canEdit,
+    canGenerateTimeline: canSinhTimeline,
+    canManageWorkshopScope,
+  }), [access.businessRole, canEdit, canSinhTimeline, canManageWorkshopScope]);
+  const vungHople = CAC_VUNG.filter((v) => vungIds.includes(v.id));
 
   const [vung, setVung] = useState<VungId>("objects");
   const [kind, setKind] = useState<ObjectKind>(SOURCE_KINDS[0]);
@@ -117,42 +132,132 @@ export default function CatalogWorkspaceShell({
   const [trang, setTrang] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  /* Thu hồi quyền audit khi History đang mở phải rời tab trước khi effect
-     tải lịch sử có cơ hội tạo request mới. */
+  /* Thu hồi quyền khi đang ở một tab quản lý phải rời tab trước khi effect
+     của tab cũ có cơ hội tạo request mới. */
   useLayoutEffect(() => {
-    if (vung !== "history" || canViewCatalogHistory) return;
+    if (vungIds.includes(vung)) return;
     setVung("objects");
     setTrang(0);
     setExpandedId(null);
-  }, [vung, canViewCatalogHistory]);
+  }, [vung, vungIds]);
 
   /* ---------------- Đối tượng nguồn (đọc theo loại) ---------------- */
   const [objRows, setObjRows] = useState<SourceObjectRow[]>([]);
+  const [objTotal, setObjTotal] = useState(0);
   const [objState, setObjState] = useState<TrangThaiTai>("loading");
   const [objErr, setObjErr] = useState("");
+  const [objFacets, setObjFacets] = useState<CatalogSourceFacetsSuccess | null>(null);
+  const [facetErr, setFacetErr] = useState("");
+  const [sourceSearch, setSourceSearch] = useState("");
+  const [objCursor, setObjCursor] = useState<CatalogSourceCursorStack>(initialCatalogSourceCursorStack);
   const objSeq = useRef(0);
+  const facetSeq = useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSourceSearch(q.trim()), DO_TRE_TIM_KIEM_MS);
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  const objServerFilter = useMemo(() => encodeCatalogObjectServerFilters({
+    ...objFilters,
+    text: sourceSearch,
+  }), [objFilters, sourceSearch]);
+  const sourceAccessKey = `${access.mode}|${access.businessRole ?? "unresolved"}|${access.scope("source")}|${authorizationRevision ?? 0}`;
+  const objQueryKey = useMemo(() => JSON.stringify([
+    sourceAccessKey, kind, objServerFilter.search, objServerFilter.filters,
+  ]), [sourceAccessKey, kind, objServerFilter]);
+
+  useLayoutEffect(() => {
+    setObjCursor(initialCatalogSourceCursorStack());
+    setExpandedId(null);
+  }, [objQueryKey]);
 
   const taiDoiTuong = useCallback(async () => {
     const seq = ++objSeq.current;
     setObjState("loading");
-    try {
-      const rows = await fetchSourceObjects({ kind });
-      if (seq !== objSeq.current) return;
-      setObjRows(rows);
-      setObjState("ready");
-    } catch (e) {
-      if (seq !== objSeq.current) return;
-      setObjErr((e as Error).message || "Lỗi tải danh mục");
+    const result = await listSourceObjectPage({
+      objectKind: kind,
+      search: objServerFilter.search,
+      filters: objServerFilter.filters,
+      cursor: objCursor.cursors[objCursor.page] ?? null,
+      limit: PAGE_SIZE,
+    });
+    if (seq !== objSeq.current) return;
+    if (!result.ok) {
+      setObjRows([]);
+      setObjTotal(0);
+      setObjCursor((previous) => resolveCatalogSourceCursorPage(previous, null));
+      setObjErr(result.error || "Lỗi tải danh mục");
       setObjState("error");
+      return;
     }
-  }, [kind]);
+    setObjRows(result.rows);
+    setObjTotal(result.authorizedTotal);
+    setObjCursor((previous) => resolveCatalogSourceCursorPage(previous, result.nextCursor));
+    setObjErr("");
+    setObjState("ready");
+  }, [sourceAccessKey, kind, objCursor.cursors, objCursor.page, objServerFilter]);
 
   useEffect(() => { taiDoiTuong(); }, [taiDoiTuong]);
 
-  const [warn, setWarn] = useState<SourceWarnings | null>(null);
   useEffect(() => {
-    fetchSourceWarnings().then(setWarn).catch(() => setWarn(null));
-  }, []);
+    const seq = ++facetSeq.current;
+    setFacetErr("");
+    const facetFilters = encodeCatalogObjectServerFilters(CATALOG_OBJECT_FILTERS_ALL).filters;
+    listSourceObjectFacets({ objectKind: kind, filters: facetFilters }).then((result) => {
+      if (seq !== facetSeq.current) return;
+      if (!result.ok) {
+        setObjFacets(null);
+        setFacetErr(result.error);
+        return;
+      }
+      setObjFacets(result);
+    });
+  }, [sourceAccessKey, kind]);
+
+  const [warn, setWarn] = useState<SourceWarnings | null>(null);
+  const [warnErr, setWarnErr] = useState("");
+  useEffect(() => {
+    let active = true;
+    setWarn(null);
+    fetchSourceWarnings()
+      .then((value) => {
+        if (!active) return;
+        setWarn(value);
+        setWarnErr("");
+      })
+      .catch((cause) => {
+        if (!active) return;
+        setWarn(null);
+        setWarnErr(cause instanceof Error ? cause.message : String(cause));
+      });
+    return () => { active = false; };
+  }, [sourceAccessKey]);
+
+  const [coverageAreaLess, setCoverageAreaLess] = useState(0);
+  const [coverageReadinessErr, setCoverageReadinessErr] = useState("");
+  useEffect(() => {
+    if (!canManageWorkshopScope) {
+      setCoverageAreaLess(0);
+      setCoverageReadinessErr("");
+      return;
+    }
+    let active = true;
+    const defaults = encodeCatalogObjectServerFilters(CATALOG_OBJECT_FILTERS_ALL).filters;
+    listSourceObjectFacets({ objectKind: null, filters: defaults }).then((result) => {
+      if (!active) return;
+      if (!result.ok) {
+        setCoverageAreaLess(0);
+        setCoverageReadinessErr(result.error);
+        return;
+      }
+      const total = result.ownership.reduce((sum, item) => sum + item.count, 0);
+      const withArea = result.areas.reduce((sum, item) => sum + item.count, 0);
+      setCoverageAreaLess(Math.max(0, total - withArea));
+      setCoverageReadinessErr("");
+    });
+    return () => { active = false; };
+  }, [canManageWorkshopScope, sourceAccessKey]);
 
   /* ------------- Sản phẩm GMP / Người nhận (đọc qua RPC) ----------- */
   const [svRows, setSvRows] = useState<CatalogListRow[]>([]);
@@ -163,7 +268,7 @@ export default function CatalogWorkspaceShell({
   const svSeq = useRef(0);
 
   useEffect(() => {
-    if (vung !== "products" && vung !== "alerts") return undefined;
+    if (!canManageSourceDatasets || (vung !== "products" && vung !== "alerts")) return undefined;
     const dataset = vung as CatalogDatasetId;
     const seq = ++svSeq.current;
     setSvState("loading");
@@ -183,7 +288,7 @@ export default function CatalogWorkspaceShell({
       setSvState("ready");
     }, DO_TRE_TIM_KIEM_MS);
     return () => clearTimeout(hen);
-  }, [vung, q, trang, svTick]);
+  }, [vung, q, trang, svTick, canManageSourceDatasets]);
 
   /* ---------------- Chờ áp dụng và Lịch sử ------------------------- */
   const [pen, setPen] = useState<{ state: TrangThaiTai; changes: CatalogChangeRow[]; err: string }>(
@@ -194,22 +299,22 @@ export default function CatalogWorkspaceShell({
   const [hisTick, setHisTick] = useState(0);
 
   useEffect(() => {
-    if (vung !== "pending") return;
+    if (vung !== "pending" || !canManageSourceDatasets || !canEdit || !canSinhTimeline) return;
     setPen((p) => ({ ...p, state: "loading" }));
     listPendingChanges().then((kq) => {
       if (kq.ok) setPen({ state: "ready", changes: kq.changes, err: "" });
       else setPen({ state: "error", changes: [], err: kq.error || "Không đọc được hàng đợi" });
     });
-  }, [vung, penTick]);
+  }, [vung, penTick, canManageSourceDatasets, canEdit, canSinhTimeline]);
 
   useEffect(() => {
-    if (vung !== "history" || !canViewCatalogHistory) return;
+    if (vung !== "history" || !canManageSourceDatasets || !canViewCatalogHistory) return;
     setHis((p) => ({ ...p, state: "loading" }));
     listHistory({}, trang, PAGE_SIZE).then((kq) => {
       if (kq.ok) setHis({ state: "ready", rows: kq.history, total: kq.total, err: "" });
       else setHis({ state: "error", rows: [], total: 0, err: kq.error || "Không đọc được lịch sử" });
     });
-  }, [vung, trang, hisTick, canViewCatalogHistory]);
+  }, [vung, trang, hisTick, canManageSourceDatasets, canViewCatalogHistory]);
 
   /* ---------------- Điều hướng trong workspace --------------------- */
   const doiVung = (id: VungId) => {
@@ -244,8 +349,17 @@ export default function CatalogWorkspaceShell({
 
   /* ---------------- View-model dùng chung desktop/mobile ----------- */
   const objFilterState = useMemo<CatalogObjectFilters>(() => ({ ...objFilters, text: q }), [objFilters, q]);
-  const objFiltered = useMemo(() => filterCatalogObjects(objRows, objFilterState), [objRows, objFilterState]);
-  const objFilterOptions = useMemo(() => catalogObjectFilterOptions(objRows), [objRows]);
+  const objFilterOptions = useMemo(() => ({
+    departments: (objFacets?.departments ?? []).map((option) => ({
+      value: option.value, label: `${option.value} (${option.count})`,
+    })),
+    areas: (objFacets?.areas ?? []).map((option) => ({
+      value: option.value, label: `${option.value} (${option.count})`,
+    })),
+    owners: (objFacets?.owners ?? []).map((option) => ({
+      value: option.value, label: `${option.name} (${option.count})`,
+    })),
+  }), [objFacets]);
   const objFilterChips = useMemo(() => activeCatalogObjectFilterChips(objFilterState), [objFilterState]);
   const objFilterCount = useMemo(() => catalogObjectActiveFilterCount(objFilterState), [objFilterState]);
 
@@ -267,14 +381,14 @@ export default function CatalogWorkspaceShell({
   };
 
   const objList = useMemo<CatalogListRow[]>(() =>
-    objFiltered.slice(trang * PAGE_SIZE, (trang + 1) * PAGE_SIZE).map((r) => ({
+    objRows.map((r) => ({
       dataset: "objects",
       recordId: String(r.id),
       businessKey: String(r.object_code),
       version: Number((r as Record<string, unknown>).version ?? 1),
       updatedAt: String((r as Record<string, unknown>).updated_at ?? ""),
       data: r as unknown as CatalogRecord,
-    })), [objFiltered, trang]);
+    })), [objRows]);
 
   useEffect(() => {
     if (!focusCode) return;
@@ -286,16 +400,13 @@ export default function CatalogWorkspaceShell({
   }, [focusCode, objList]);
 
   /* ---------------- Cảnh báo danh mục (như bản cũ) ------------------ */
-  const broken = useMemo(
-    () => objRows.filter((r) => r.validate_flag === "y" && r.first_month == null),
-    [objRows]);
   const warningGroups = useMemo<CatalogWarning[]>(() => {
     const groups: CatalogWarning[] = [];
-    if (broken.length > 0) groups.push({
+    if ((warn?.thieu_thang_dau.length ?? 0) > 0) groups.push({
       id: "missing-first-month", tone: "bad", blocking: true,
-      title: `${broken.length} đối tượng thiếu "Tháng thẩm định đầu tiên"`,
+      title: `${warn!.thieu_thang_dau.length} đối tượng thiếu "Tháng thẩm định đầu tiên"`,
       body: "Toàn bộ mốc thời gian của chúng không tính được — timeline sẽ để trống ô ngày.",
-      items: broken.map((item) => item.object_code),
+      items: warn!.thieu_thang_dau.map((item) => item.object_code),
     });
     if ((warn?.ma_tam?.length ?? 0) > 0) groups.push({
       id: "temporary-code", tone: "bad", blocking: true,
@@ -322,7 +433,7 @@ export default function CatalogWorkspaceShell({
       items: warn.chua_hoat_dong.map((item) => item.object_code),
     });
     return groups;
-  }, [broken, warn]);
+  }, [warn]);
 
   /* ---------------- Hộp thoại ------------------------------------- */
   const [dangSuaObj, setDangSuaObj] = useState<{ row: Record<string, unknown>; taoMoi: boolean } | null>(null);
@@ -347,15 +458,26 @@ export default function CatalogWorkspaceShell({
 
   /* Xuất đúng phần đang lọc của bảng đối tượng — tiện tra cứu, chỉ đọc. */
   const xuatExcel = async () => {
-    const dinhNghia = layDataset("objects").fields;
-    await xuatExcelAoa([{
-      ten: kind,
-      dong: [
-        dinhNghia.map((f) => f.label),
-        ...objFiltered.map((r) =>
-          dinhNghia.map((f) => (r as Record<string, unknown>)[f.key] ?? "")),
-      ],
-    }], `VMP_${kind}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const progress = toast.dangChay("Đang xuất toàn bộ dòng Source được phép xem…");
+    try {
+      const dinhNghia = layDataset("objects").fields;
+      const rows = await exportAllSourceObjects({
+        objectKind: kind,
+        search: objServerFilter.search,
+        filters: objServerFilter.filters,
+      });
+      await xuatExcelAoa([{
+        ten: kind,
+        dong: [
+          dinhNghia.map((f) => f.label),
+          ...rows.map((r) =>
+            dinhNghia.map((f) => (r as Record<string, unknown>)[f.key] ?? "")),
+        ],
+      }], `VMP_${kind}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      progress.xong(`Đã xuất ${rows.length} dòng Source.`);
+    } catch (cause) {
+      progress.hong(`Không xuất được Source: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
   };
 
   const taiLai = () => {
@@ -369,19 +491,27 @@ export default function CatalogWorkspaceShell({
   const coThem = canEdit && (vung === "objects" || vung === "products" || vung === "alerts");
 
   /* ---------------- Phân trang dùng chung -------------------------- */
-  const tongDong = vung === "objects" ? objFiltered.length
+  const hienTrang = vung === "objects" ? objCursor.page : trang;
+  const tongDong = vung === "objects" ? objTotal
     : vung === "history" ? his.total : svTotal;
   const soTrang = Math.max(1, Math.ceil(tongDong / PAGE_SIZE));
 
   const veTrang = tongDong > PAGE_SIZE && (
     <nav className="cw-pager" aria-label="Phân trang">
       <span className="cw-nhe">
-        {`Đang xem ${trang * PAGE_SIZE + 1}–${Math.min(tongDong, (trang + 1) * PAGE_SIZE)} / ${tongDong}`}
+        {`Đang xem ${hienTrang * PAGE_SIZE + 1}–${Math.min(tongDong, hienTrang * PAGE_SIZE + (vung === "objects" ? objRows.length : PAGE_SIZE))} / ${tongDong}`}
       </span>
-      <button type="button" className="cw-pager__nut" disabled={trang === 0}
-        onClick={() => setTrang((t) => Math.max(0, t - 1))}>Trước</button>
-      <button type="button" className="cw-pager__nut" disabled={trang >= soTrang - 1}
-        onClick={() => setTrang((t) => Math.min(soTrang - 1, t + 1))}>Sau</button>
+      <button type="button" className="cw-pager__nut" disabled={hienTrang === 0}
+        onClick={() => {
+          if (vung === "objects") setObjCursor(moveCatalogSourceCursorBack);
+          else setTrang((t) => Math.max(0, t - 1));
+        }}>Trước</button>
+      <button type="button" className="cw-pager__nut"
+        disabled={vung === "objects" ? objCursor.nextCursor === null : hienTrang >= soTrang - 1}
+        onClick={() => {
+          if (vung === "objects") setObjCursor(moveCatalogSourceCursorForward);
+          else setTrang((t) => Math.min(soTrang - 1, t + 1));
+        }}>Sau</button>
     </nav>
   );
 
@@ -415,6 +545,12 @@ export default function CatalogWorkspaceShell({
         </nav>
 
         <div className="cw-noi-dung">
+          {catalogSuggestions.error && canManageSourceDatasets && (
+            <p role="alert" className="cw-loi">
+              {catalogSuggestions.error}{" "}
+              <button type="button" className="cw-nut cw-nut--phu" onClick={catalogSuggestions.retry}>Thử tải lại gợi ý</button>
+            </p>
+          )}
           {coTimKiem && (
             <CommandBar label="Hành động danh mục"
               trailing={coThem && (
@@ -443,7 +579,7 @@ export default function CatalogWorkspaceShell({
                 <RefreshCw size={15} aria-hidden="true" /> Tải lại
               </button>
               {vung === "objects" && (
-                <button type="button" className="cw-nut" data-cw-export-count={objFiltered.length} onClick={xuatExcel}>
+                <button type="button" className="cw-nut" data-cw-export-count={objTotal} onClick={xuatExcel}>
                   <Download size={15} aria-hidden="true" /> Xuất Excel
                 </button>
               )}
@@ -514,7 +650,7 @@ export default function CatalogWorkspaceShell({
               </section>
               {objFilterCount > 0 && (
                 <div className="cw-filter-summary">
-                  <span data-cw-filter-count aria-live="polite">Đang lọc {objFilterCount} điều kiện · {objFiltered.length} đối tượng</span>
+                  <span data-cw-filter-count aria-live="polite">Đang lọc {objFilterCount} điều kiện · {objTotal} đối tượng</span>
                   {objFilterChips.map((chip) => <button key={chip.key} type="button" className="cw-filter-chip" data-cw-filter-chip
                     aria-label={`Bỏ lọc ${chip.label}`} onClick={() => {
                       if (chip.key === "text") xoaTuKhoaObj();
@@ -523,6 +659,8 @@ export default function CatalogWorkspaceShell({
                   <button type="button" className="cw-nut cw-nut--phu" data-cw-clear-filters onClick={xoaTatCaBoLocObj}>Xóa bộ lọc</button>
                 </div>
               )}
+              {facetErr && <p role="alert" className="cw-loi">Không tải được bộ lọc Source: {facetErr}</p>}
+              {warnErr && <p role="alert" className="cw-loi">Không tải được cảnh báo Source: {warnErr}</p>}
 
               {objState === "loading" && (
                 <StateBoundary state="loading" title="Đang tải danh mục nguồn" skeletonRows={5} />
@@ -534,7 +672,7 @@ export default function CatalogWorkspaceShell({
               {objState === "ready" && (
                 <>
                   <CatalogWarningsSummary warnings={warningGroups} />
-                  {objFiltered.length === 0 && objFilterCount > 0 ? (
+                  {objRows.length === 0 && objFilterCount > 0 ? (
                     <StateBoundary state="filtered-empty" title="Không có dòng nào khớp"
                       description={`Bộ lọc hiện tại không có đối tượng nào trong "${kind}" phù hợp.`}
                       onClearFilters={xoaTatCaBoLocObj} />
@@ -552,6 +690,15 @@ export default function CatalogWorkspaceShell({
                   {veTrang}
                 </>
               )}
+            </>
+          )}
+
+          {vung === "coverage" && canManageWorkshopScope && (
+            <>
+              {coverageReadinessErr && (
+                <p role="alert" className="cw-loi">Không kiểm tra được Source thiếu khu vực: {coverageReadinessErr}</p>
+              )}
+              <WorkshopScopeCoveragePanel areaLessSourceCount={coverageAreaLess} onChanged={onReload} />
             </>
           )}
 

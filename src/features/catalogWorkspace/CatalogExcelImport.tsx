@@ -21,7 +21,6 @@ import { Download, FileSpreadsheet, Upload } from "lucide-react";
 
 import StateBoundary from "../../components/ui/StateBoundary.tsx";
 import { useRegisterDirtyState } from "../../components/ui/DirtyStateProvider.tsx";
-import { fetchSourceObjects } from "../../lib/supabaseData.ts";
 import {
   CATALOG_TEMPLATE_VERSION, TEMPLATE_CONTRACTS,
   generateCatalogWorkbook, parseCatalogWorkbook,
@@ -32,7 +31,7 @@ import {
 } from "./definitions.ts";
 import { buildCatalogPatch, diffCatalogRecord } from "./diff.ts";
 import { useToast } from "../../components/ui/ToastProvider.tsx";
-import { commitCatalogImport, listDataset, stageCatalogImport } from "./api.ts";
+import { commitCatalogImport, exportAllSourceObjects, listDataset, stageCatalogImport } from "./api.ts";
 import type { CatalogImportBatch, CatalogRecord } from "./contracts.ts";
 
 const TEN_FILE: Record<CatalogTemplateDataset, { mau: string; hientai: string }> = {
@@ -51,7 +50,7 @@ const NHAN_DATASET: Record<CatalogTemplateDataset, string> = {
   products_gmp: "Sản phẩm GMP",
 };
 
-type PhanLoai = "moi" | "sua" | "khongdoi" | "loi";
+type PhanLoai = "server" | "moi" | "sua" | "khongdoi" | "loi";
 
 interface DongXemTruoc extends ParsedCatalogRow {
   loai: PhanLoai;
@@ -115,10 +114,7 @@ export default function CatalogExcelImport({ onCommitted }: {
     (async () => {
       try {
         const map = new Map<string, CatalogRecord>();
-        if (dataset === "source_objects") {
-          const rows = await fetchSourceObjects({ kind: null, includeInactive: true });
-          for (const r of rows) map.set(String(r.object_code), r as unknown as CatalogRecord);
-        } else {
+        if (dataset !== "source_objects") {
           let page = 0;
           for (;;) {
             const kq = await listDataset({ dataset: "products", page, pageSize: 500 });
@@ -141,6 +137,9 @@ export default function CatalogExcelImport({ onCommitted }: {
     if (!parsed?.ok || parsed.dataset !== dataset || !hienTai) return null;
     return parsed.rows.map((r) => {
       if (r.errors.length > 0) return { ...r, loai: "loi", doi: [] };
+      /* Source được đối chiếu trong staging/commit có audit ở server. Không
+         tải toàn bảng vào browser chỉ để đoán trước create/update. */
+      if (dataset === "source_objects") return { ...r, loai: "server", doi: [] };
       const cur = hienTai.get(r.businessKey);
       if (!cur) return { ...r, loai: "moi", doi: [] };
       const patch = buildCatalogPatch(truong, cur, r.values);
@@ -153,7 +152,7 @@ export default function CatalogExcelImport({ onCommitted }: {
   }, [parsed, dataset, hienTai, truong]);
 
   const tong = useMemo(() => {
-    const dem: Record<PhanLoai, number> = { moi: 0, sua: 0, khongdoi: 0, loi: 0 };
+    const dem: Record<PhanLoai, number> = { server: 0, moi: 0, sua: 0, khongdoi: 0, loi: 0 };
     for (const r of xemTruoc ?? []) dem[r.loai] += 1;
     return dem;
   }, [xemTruoc]);
@@ -167,7 +166,7 @@ export default function CatalogExcelImport({ onCommitted }: {
   useEffect(() => {
     if (!xemTruoc || xemTruocRef.current === xemTruoc) return;
     xemTruocRef.current = xemTruoc;
-    const hople = tong.moi + tong.sua + tong.khongdoi;
+    const hople = tong.server + tong.moi + tong.sua + tong.khongdoi;
     if (tong.loi > 0) toast.canhBao(`${tong.loi} dòng lỗi · ${hople} dòng dùng được — xem bảng bên dưới`);
     else toast.thanhCong(`${hople} dòng hợp lệ, chưa ghi vào hệ thống`);
   }, [xemTruoc, tong, toast]);
@@ -227,8 +226,21 @@ export default function CatalogExcelImport({ onCommitted }: {
 
   /* ---- Tải mẫu / dữ liệu hiện tại ---- */
   const taiMau = async (loai: "mau" | "hientai") => {
-    const rows = loai === "mau" ? [] : [...(hienTai?.values() ?? [])];
-    taiXuong(await generateCatalogWorkbook(dataset, rows), TEN_FILE[dataset][loai]);
+    try {
+      let rows: CatalogRecord[] = [];
+      if (loai === "hientai" && dataset === "source_objects") {
+        rows = (await exportAllSourceObjects({
+          objectKind: null, search: "", filters: {
+            validation: "all", first_month: "all", owner: "all", frequency: "all",
+          },
+        })) as unknown as CatalogRecord[];
+      } else if (loai === "hientai") {
+        rows = [...(hienTai?.values() ?? [])];
+      }
+      taiXuong(await generateCatalogWorkbook(dataset, rows), TEN_FILE[dataset][loai]);
+    } catch (cause) {
+      toast.loi(`Không tạo được file Excel: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
   };
 
   /* ---- Sổ lỗi: mẫu + hai cột Mã lỗi · Mô tả lỗi ---- */
@@ -277,7 +289,7 @@ export default function CatalogExcelImport({ onCommitted }: {
   const ghiDuoc = staging.tt === "san" && soLoi === 0 && lyDo.trim() !== "" && !dangGhi;
 
   const NHAN_LOAI: Record<PhanLoai, string> = {
-    moi: "Tạo mới", sua: "Sửa", khongdoi: "Không đổi", loi: "Lỗi",
+    server: "Máy chủ đối chiếu", moi: "Tạo mới", sua: "Sửa", khongdoi: "Không đổi", loi: "Lỗi",
   };
 
   return (
@@ -338,7 +350,7 @@ export default function CatalogExcelImport({ onCommitted }: {
       {xemTruoc && (
         <>
           <div className="cw-import__tong" role="group" aria-label="Tổng kết xem trước">
-            {(["moi", "sua", "khongdoi", "loi"] as PhanLoai[]).map((l) => (
+            {(["server", "moi", "sua", "khongdoi", "loi"] as PhanLoai[]).map((l) => (
               <span key={l} className={`cw-import__dem cw-import__dem--${l}`}>
                 {NHAN_LOAI[l]}: <b data-cw-tong={l}>{tong[l]}</b>
               </span>

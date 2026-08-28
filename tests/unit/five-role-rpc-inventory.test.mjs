@@ -40,6 +40,40 @@ const ASSIGNED_PROGRESS_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const SOURCE_ACCESS_REVIEWED_RPC = new Map([
+  ["rpc_export_source_objects", {
+    identity: "rpc_export_source_objects(text,text,jsonb,jsonb,integer)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_list_source_objects", {
+    identity: "rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_list_source_workshop_coverage", {
+    identity: "rpc_list_source_workshop_coverage(text,jsonb,integer)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_set_source_workshop_scope_grant", {
+    identity: "rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_source_field_suggestions", {
+    identity: "rpc_source_field_suggestions(text,text,text,jsonb,integer)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_source_object_facets", {
+    identity: "rpc_source_object_facets(text,jsonb)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_source_qa_candidates", {
+    identity: "rpc_source_qa_candidates(text,jsonb,integer,uuid[])",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_source_workshop_scope_choices", {
+    identity: "rpc_source_workshop_scope_choices(text,text,text,jsonb,integer)",
+    classification: "guarded_explicit",
+  }],
+]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
   .join(",");
@@ -237,10 +271,15 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260827130000_assigned_progress_visibility.sql",
     "utf8",
   );
+  const sourceAccessMigration = readFileSync(
+    "supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql",
+    "utf8",
+  );
   for (const name of [
     ...CATALOG_V2_REVIEWED_RPC.keys(),
     ...MANUAL_DEADLINE_REVIEWED_RPC.keys(),
     ...ASSIGNED_PROGRESS_REVIEWED_RPC.keys(),
+    ...SOURCE_ACCESS_REVIEWED_RPC.keys(),
   ]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
   }
@@ -249,11 +288,12 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...CATALOG_V2_REVIEWED_RPC,
     ...MANUAL_DEADLINE_REVIEWED_RPC,
     ...ASSIGNED_PROGRESS_REVIEWED_RPC,
+    ...SOURCE_ACCESS_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 66, "reviewed source HEAD must expose 66 literal RPC targets");
+  assert.equal(sourceNames.length, 74, "reviewed source HEAD must expose 74 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -279,6 +319,15 @@ test("every source RPC call has exactly one reviewed migration classification", 
   assert.match(assignedProgressMigration, /revoke all on function public\.rpc_my_editable_progress_rights\(\)\s*from public,anon,authenticated,service_role;/is);
   assert.match(assignedProgressMigration, /grant execute on function public\.rpc_my_editable_progress_rights\(\)\s*to service_role;/is);
   assert.match(assignedProgressMigration, /grant execute on function public\.rpc_my_editable_progress_rights\(\)\s*to authenticated;/is);
+  for (const [name, { identity }] of SOURCE_ACCESS_REVIEWED_RPC) {
+    assert.match(
+      sourceAccessMigration,
+      new RegExp(`create(?: or replace)? function public\\.${name}\\(`, "i"),
+      `${identity} must be defined by the additive Source access migration`,
+    );
+  }
+  assert.match(sourceAccessMigration, /grant execute on function public\.rpc_source_qa_candidates\(\s*text\s*,\s*jsonb\s*,\s*integer\s*,\s*uuid\[\]\s*\)\s*to authenticated\s*,\s*service_role;/is);
+  assert.match(sourceAccessMigration, /grant execute on function public\.rpc_list_source_workshop_coverage\(\s*text\s*,\s*jsonb\s*,\s*integer\s*\)[\s\S]*?public\.rpc_set_source_workshop_scope_grant\([\s\S]*?to authenticated\s*,\s*service_role;/i);
 });
 
 test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {

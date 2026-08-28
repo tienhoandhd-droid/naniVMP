@@ -4,8 +4,14 @@ import assert from "node:assert/strict";
 import {
   CATALOG_OBJECT_FILTERS_ALL,
   activeCatalogObjectFilterChips,
+  catalogWorkspaceRegionIds,
   catalogObjectFilterOptions,
+  encodeCatalogObjectServerFilters,
   filterCatalogObjects,
+  initialCatalogSourceCursorStack,
+  moveCatalogSourceCursorBack,
+  moveCatalogSourceCursorForward,
+  resolveCatalogSourceCursorPage,
 } from "../../src/features/catalogWorkspace/catalogWorkspaceFilterModel.ts";
 
 const rows = [
@@ -98,4 +104,72 @@ test("active chips describe every active filter and filtering never mutates sour
     "text", "department", "validation", "firstMonth", "owner", "frequency",
   ]);
   assert.equal(activeCatalogObjectFilterChips(CATALOG_OBJECT_FILTERS_ALL).length, 0);
+});
+
+test("server filter encoder emits only the seven frozen keys and keeps search separate", () => {
+  assert.deepEqual(encodeCatalogObjectServerFilters({
+    text: "  máy dập  ",
+    department: "qa",
+    area: "a1",
+    validation: "validated",
+    firstMonth: "missing",
+    owner: "owner:nguyễn an",
+    frequency: "lte12",
+  }), {
+    search: "máy dập",
+    filters: {
+      department: "qa",
+      area_code: "a1",
+      validation: "validated",
+      first_month: "missing",
+      owner: "owner:nguyễn an",
+      frequency: "lte12",
+    },
+  });
+
+  assert.deepEqual(encodeCatalogObjectServerFilters(CATALOG_OBJECT_FILTERS_ALL), {
+    search: "",
+    filters: {
+      validation: "all",
+      first_month: "all",
+      owner: "all",
+      frequency: "all",
+    },
+  });
+});
+
+test("keyset cursor stack moves forward/back and reset never reuses a stale filter cursor", () => {
+  const first = initialCatalogSourceCursorStack();
+  assert.deepEqual(first, { page: 0, cursors: [null], nextCursor: null });
+
+  const resolved = resolveCatalogSourceCursorPage(first, { objectCode: "TB-025", id: "aaaaaaaa-1111-4111-8111-111111111111" });
+  const second = moveCatalogSourceCursorForward(resolved);
+  assert.equal(second.page, 1);
+  assert.deepEqual(second.cursors[1], resolved.nextCursor);
+  assert.equal(moveCatalogSourceCursorBack(second).page, 0);
+  assert.deepEqual(initialCatalogSourceCursorStack(), first, "query/kind/filter change gets a fresh stack");
+});
+
+test("lower Source roles get objects only while managers receive only capability-backed regions", () => {
+  for (const businessRole of ["qa_staff", "workshop_manager", "workshop_staff", null]) {
+    assert.deepEqual(catalogWorkspaceRegionIds({
+      businessRole,
+      canEdit: true,
+      canGenerateTimeline: true,
+      canManageWorkshopScope: true,
+    }), ["objects"]);
+  }
+
+  assert.deepEqual(catalogWorkspaceRegionIds({
+    businessRole: "qa_manager",
+    canEdit: true,
+    canGenerateTimeline: true,
+    canManageWorkshopScope: true,
+  }), ["objects", "coverage", "products", "alerts", "import", "pending", "history"]);
+  assert.deepEqual(catalogWorkspaceRegionIds({
+    businessRole: "admin",
+    canEdit: false,
+    canGenerateTimeline: false,
+    canManageWorkshopScope: false,
+  }), ["objects", "products", "alerts", "history"]);
 });

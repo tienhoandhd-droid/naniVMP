@@ -17,7 +17,7 @@ import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/perfo
 import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS } from "./businessRoles.ts";
 import type {
   Activity, GenerateTimelineResult, ObjectKind, RpcResult,
-  SourceObjectRow, VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
+  VmpDataset, VmpObject, AlertRecipientRow, StaffEmailRow,
   PerformerRow,
 } from "../types/domain.ts";
 import type {
@@ -160,19 +160,6 @@ export async function fetchMissingItems(year?: number): Promise<unknown[]> {
 export const SOURCE_KINDS: ObjectKind[] = [
   "Thiết bị", "Quy trình", "Kho", "Hệ thống phụ trợ", "Vận chuyển",
 ];
-
-export async function fetchSourceObjects(
-  { kind = null, includeInactive = false }:
-    { kind?: ObjectKind | null; includeInactive?: boolean } = {},
-): Promise<SourceObjectRow[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-  let q = supabase.from("vmp_source_objects").select("*");
-  if (kind) q = q.eq("object_kind", kind);
-  if (!includeInactive) q = q.eq("is_active", true);
-  const { data, error } = await q.order("object_kind").order("object_code");
-  if (error) throw new Error("Lỗi đọc danh mục nguồn: " + error.message);
-  return data || [];
-}
 
 export async function fetchAlertRecipients(): Promise<AlertRecipientRow[]> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");

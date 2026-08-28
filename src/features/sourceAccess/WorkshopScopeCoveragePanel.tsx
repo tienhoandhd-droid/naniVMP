@@ -39,9 +39,10 @@ function optimisticGrant({
  * count because only the server-paged Source shell can calculate it safely.
  */
 export default function WorkshopScopeCoveragePanel({
-  areaLessSourceCount = 0,
+  areaLessSourceCount = 0, onChanged,
 }: {
   areaLessSourceCount?: number;
+  onChanged?: () => void;
 }) {
   const { state, query, search, refresh, loadMore, clearForbidden, setState } = useSourceWorkshopCoverage();
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
@@ -174,6 +175,7 @@ export default function WorkshopScopeCoveragePanel({
       }));
       clearEditor();
       setMessage(isActive ? "Đã lưu phạm vi xưởng; đang đồng bộ dữ liệu máy chủ." : "Đã thu hồi phạm vi; đang đồng bộ dữ liệu máy chủ.");
+      onChanged?.();
       refresh();
     } finally {
       if (request === mutationRequest.current) setSaving(false);

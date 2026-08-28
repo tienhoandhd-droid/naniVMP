@@ -10,12 +10,27 @@
  *  ngoại lệ cho lỗi nghiệp vụ — ngoại lệ chỉ dành cho hỏng hạ tầng.
  * ===================================================================== */
 import { supabase } from "../../lib/supabaseClient.ts";
+import {
+  decodeSourceObjectListResponse,
+  type SourceObjectListRow,
+} from "../sourceAccess/contracts.ts";
+import type { SourceObjectRow } from "../../types/domain.ts";
 import { layDataset } from "./definitions.ts";
 import type {
   CatalogAuditRow, CatalogChangeRow, CatalogDatasetId, CatalogImportBatch,
   CatalogImportCommitResult, CatalogImportRowPayload, CatalogListFilters,
   CatalogListResult, CatalogListRow, CatalogRecord, CatalogSaveResult,
+  CatalogSourceFacetsResult, CatalogSourcePage,
 } from "./contracts.ts";
+import {
+  collectCatalogSourceExportPages,
+  decodeCatalogSourceFacetsResponse,
+} from "./contracts.ts";
+import {
+  collectCatalogSuggestionPages,
+  decodeCatalogSuggestionPage,
+  type CatalogSuggestionPage,
+} from "./suggestions.ts";
 
 /** Bọc lỗi hạ tầng thành kết quả có mã, để nơi gọi không phải try/catch. */
 function loiHaTang(e: unknown): { ok: false; errorCode: string; error: string } {
@@ -25,6 +40,190 @@ function loiHaTang(e: unknown): { ok: false; errorCode: string; error: string } 
 
 function chuaCauHinh(): { ok: false; errorCode: string; error: string } {
   return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+}
+
+export type CatalogSourceObjectPageResult =
+  | (CatalogSourcePage<SourceObjectRow> & { ok: true })
+  | { ok: false; rows: []; authorizedTotal: 0; nextCursor: null; errorCode: string; error: string };
+
+function sourceContractRowToDomain(row: SourceObjectListRow): SourceObjectRow {
+  return {
+    id: row.id,
+    object_kind: row.objectKind,
+    object_code: row.objectCode,
+    source_tab: row.sourceTab,
+    source_row: row.sourceRow,
+    extra: row.extra as SourceObjectRow["extra"],
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+    is_active: row.isActive,
+    edited_on_web: row.editedOnWeb,
+    criticality_source: row.criticalitySource,
+    version: row.version,
+    timeline_revision: row.timelineRevision,
+    timeline_applied_revision: row.timelineAppliedRevision,
+    object_name: row.objectName,
+    department: row.department,
+    area_code: row.areaCode,
+    line: row.line,
+    status: row.status,
+    show_flag: row.showFlag,
+    validate_flag: row.validateFlag,
+    validate_reason: row.validateReason,
+    report_class: row.reportClass,
+    critical_point: row.criticalPoint,
+    note: row.note,
+    owner_name: row.ownerName,
+    support_name: row.supportName,
+    work_group: row.workGroup,
+    frequency_months: row.frequencyMonths,
+    workdays: row.workdays,
+    first_month: row.firstMonth,
+    year_ref: row.yearRef,
+    complexity_score: row.complexityScore,
+    quality_impact_score: row.qualityImpactScore,
+    criticality_score: row.criticalityScore,
+    updated_by: row.updatedBy,
+    owner_person_id: row.ownerPersonId,
+    support_person_id: row.supportPersonId,
+  };
+}
+
+function sourcePageFailure(errorCode: string, error: string): CatalogSourceObjectPageResult {
+  return { ok: false, rows: [], authorizedTotal: 0, nextCursor: null, errorCode, error };
+}
+
+function decodeSourcePage(data: unknown): CatalogSourceObjectPageResult {
+  try {
+    const decoded = decodeSourceObjectListResponse(data);
+    if (!decoded.ok) return sourcePageFailure(decoded.errorCode, decoded.error);
+    return {
+      ok: true,
+      rows: decoded.rows.map(sourceContractRowToDomain),
+      authorizedTotal: decoded.authorizedTotal,
+      nextCursor: decoded.nextCursor,
+    };
+  } catch (cause) {
+    return sourcePageFailure("MALFORMED_RESPONSE", `Máy chủ trả dữ liệu Source không hợp lệ: ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
+}
+
+export interface CatalogSourceObjectPageInput {
+  objectKind: string | null;
+  search: string;
+  filters: Record<string, string>;
+  cursor: { objectCode: string; id: string } | null;
+  limit?: number;
+  includeInactive?: boolean;
+  objectId?: string | null;
+}
+
+/** Rights-filtered keyset page; no browser table read is used. */
+export async function listSourceObjectPage(input: CatalogSourceObjectPageInput): Promise<CatalogSourceObjectPageResult> {
+  if (!supabase) return sourcePageFailure("NOT_CONFIGURED", "Supabase chưa được cấu hình.");
+  try {
+    const { data, error } = await supabase.rpc("rpc_list_source_objects" as never, {
+      p_object_kind: input.objectKind,
+      p_search: input.search,
+      p_filters: input.filters,
+      p_cursor: input.cursor ? { object_code: input.cursor.objectCode, id: input.cursor.id } : null,
+      p_limit: input.limit ?? 25,
+      p_include_inactive: input.includeInactive ?? false,
+      p_object_id: input.objectId ?? null,
+    } as never);
+    if (error) return sourcePageFailure("NETWORK", error.message);
+    return decodeSourcePage(data);
+  } catch (cause) {
+    return sourcePageFailure("NETWORK", `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
+}
+
+export async function listSourceObjectFacets(input: {
+  objectKind: string | null;
+  filters: Record<string, string>;
+}): Promise<CatalogSourceFacetsResult | { ok: false; errorCode: "NETWORK" | "NOT_CONFIGURED" | "MALFORMED_RESPONSE"; error: string }> {
+  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+  try {
+    const { data, error } = await supabase.rpc("rpc_source_object_facets" as never, {
+      p_object_kind: input.objectKind,
+      p_filters: input.filters,
+    } as never);
+    if (error) return { ok: false, errorCode: "NETWORK", error: error.message };
+    try {
+      return decodeCatalogSourceFacetsResponse(data);
+    } catch (cause) {
+      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: `Máy chủ trả facets không hợp lệ: ${cause instanceof Error ? cause.message : String(cause)}` };
+    }
+  } catch (cause) {
+    return { ok: false, errorCode: "NETWORK", error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}` };
+  }
+}
+
+async function exportSourceObjectPage(
+  input: Omit<CatalogSourceObjectPageInput, "cursor" | "limit" | "includeInactive" | "objectId">,
+  cursor: { objectCode: string; id: string } | null,
+): Promise<CatalogSourcePage<SourceObjectRow>> {
+  if (!supabase) throw new Error("Source export NOT_CONFIGURED");
+  const { data, error } = await supabase.rpc("rpc_export_source_objects" as never, {
+    p_object_kind: input.objectKind,
+    p_search: input.search,
+    p_filters: input.filters,
+    p_cursor: cursor ? { object_code: cursor.objectCode, id: cursor.id } : null,
+    p_limit: 500,
+  } as never);
+  if (error) throw new Error(`Source export NETWORK: ${error.message}`);
+  const decoded = decodeSourcePage(data);
+  if (!decoded.ok) throw new Error(`Source export ${decoded.errorCode}: ${decoded.error}`);
+  return decoded;
+}
+
+export async function exportAllSourceObjects(
+  input: Omit<CatalogSourceObjectPageInput, "cursor" | "limit" | "includeInactive" | "objectId">,
+): Promise<SourceObjectRow[]> {
+  return collectCatalogSourceExportPages((cursor) => exportSourceObjectPage(input, cursor));
+}
+
+/** Read every authorized row through the non-auditing list path. Use this only
+ * for bounded derived UI such as the lazy “không thẩm định” card. */
+export async function listAllSourceObjects(
+  input: Omit<CatalogSourceObjectPageInput, "cursor" | "limit" | "includeInactive" | "objectId">,
+): Promise<SourceObjectRow[]> {
+  return collectCatalogSourceExportPages(async (cursor) => {
+    const page = await listSourceObjectPage({ ...input, cursor, limit: 100 });
+    if (!page.ok) throw new Error(`Source list ${page.errorCode}: ${page.error}`);
+    return page;
+  });
+}
+
+async function listSourceFieldSuggestionPage(input: {
+  objectKind: string | null;
+  field: string;
+  search: string;
+  cursor: { value: string } | null;
+}): Promise<CatalogSuggestionPage> {
+  if (!supabase) throw new Error("Source suggestion NOT_CONFIGURED: Supabase chưa được cấu hình.");
+  const { data, error } = await supabase.rpc("rpc_source_field_suggestions" as never, {
+    p_object_kind: input.objectKind,
+    p_field: input.field,
+    p_search: input.search,
+    p_cursor: input.cursor,
+    p_limit: 50,
+  } as never);
+  if (error) throw new Error(`Source suggestion NETWORK: ${error.message}`);
+  return decodeCatalogSuggestionPage(data);
+}
+
+export async function listAllSourceFieldSuggestions(input: {
+  objectKind?: string | null;
+  field: string;
+  search?: string;
+}): Promise<string[]> {
+  return collectCatalogSuggestionPages((cursor) => listSourceFieldSuggestionPage({
+    objectKind: input.objectKind ?? null,
+    field: input.field,
+    search: input.search?.trim() ?? "",
+    cursor,
+  }));
 }
 
 /** Chuẩn hoá một dòng thô từ server về hình dạng chung. */

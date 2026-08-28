@@ -38,6 +38,20 @@ export interface CatalogObjectFilterChip {
   label: string;
 }
 
+export interface CatalogSourceCursor {
+  objectCode: string;
+  id: string;
+}
+
+export interface CatalogSourceCursorStack {
+  page: number;
+  cursors: Array<CatalogSourceCursor | null>;
+  nextCursor: CatalogSourceCursor | null;
+}
+
+export type CatalogWorkspaceRegionId =
+  | "objects" | "coverage" | "products" | "alerts" | "import" | "pending" | "history";
+
 const SEARCH_FIELDS = [
   "object_code", "object_name", "department", "area_code", "line", "owner_name",
   "report_class", "work_group", "note",
@@ -61,6 +75,64 @@ const FREQUENCY_LABEL: Record<CatalogFrequencyFilter, string> = {
 
 function normalized(value: unknown): string {
   return String(value ?? "").trim().toLocaleLowerCase("vi");
+}
+
+/** Encode the exact server filter vocabulary. Text search is a separate RPC
+ * argument; inactive `all` enums stay explicit so the server can reject drift. */
+export function encodeCatalogObjectServerFilters(filters: CatalogObjectFilters): {
+  search: string;
+  filters: Record<string, string>;
+} {
+  const encoded: Record<string, string> = {
+    validation: filters.validation,
+    first_month: filters.firstMonth,
+    owner: filters.owner,
+    frequency: filters.frequency,
+  };
+  if (filters.department !== "all") encoded.department = filters.department;
+  if (filters.area !== "all") encoded.area_code = filters.area;
+  return { search: filters.text.trim(), filters: encoded };
+}
+
+export function initialCatalogSourceCursorStack(): CatalogSourceCursorStack {
+  return { page: 0, cursors: [null], nextCursor: null };
+}
+
+export function resolveCatalogSourceCursorPage(
+  state: CatalogSourceCursorStack,
+  nextCursor: CatalogSourceCursor | null,
+): CatalogSourceCursorStack {
+  return { ...state, nextCursor };
+}
+
+export function moveCatalogSourceCursorForward(state: CatalogSourceCursorStack): CatalogSourceCursorStack {
+  if (!state.nextCursor) return state;
+  const cursors = state.cursors.slice(0, state.page + 1);
+  cursors.push(state.nextCursor);
+  return { page: state.page + 1, cursors, nextCursor: null };
+}
+
+export function moveCatalogSourceCursorBack(state: CatalogSourceCursorStack): CatalogSourceCursorStack {
+  if (state.page === 0) return state;
+  return { ...state, page: state.page - 1, nextCursor: null };
+}
+
+/** Non-manager Source viewers are deliberately object-only. Server ACLs are
+ * authoritative; this list prevents presenting routes guaranteed to fail. */
+export function catalogWorkspaceRegionIds(input: {
+  businessRole: string | null;
+  canEdit: boolean;
+  canGenerateTimeline: boolean;
+  canManageWorkshopScope: boolean;
+}): CatalogWorkspaceRegionId[] {
+  if (input.businessRole !== "admin" && input.businessRole !== "qa_manager") return ["objects"];
+  const regions: CatalogWorkspaceRegionId[] = ["objects"];
+  if (input.canManageWorkshopScope) regions.push("coverage");
+  regions.push("products", "alerts");
+  if (input.canEdit) regions.push("import");
+  if (input.canEdit && input.canGenerateTimeline) regions.push("pending");
+  regions.push("history");
+  return regions;
 }
 
 function visible(value: unknown): string {

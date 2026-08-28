@@ -58,6 +58,168 @@ export interface CatalogListResult {
   error?: string;
 }
 
+export interface CatalogSourceFacetOption {
+  value: string;
+  count: number;
+}
+
+export interface CatalogSourceOwnerFacet extends CatalogSourceFacetOption {
+  personId: string;
+  name: string;
+}
+
+export interface CatalogSourceFacetsSuccess {
+  ok: true;
+  departments: CatalogSourceFacetOption[];
+  areas: CatalogSourceFacetOption[];
+  owners: CatalogSourceOwnerFacet[];
+  validation: Array<CatalogSourceFacetOption & { value: "outside" | "validated" }>;
+  firstMonth: Array<CatalogSourceFacetOption & { value: "missing" | "present" }>;
+  ownership: Array<CatalogSourceFacetOption & { value: "assigned" | "unassigned" }>;
+  frequency: Array<CatalogSourceFacetOption & { value: "gt12" | "lte12" }>;
+}
+
+export interface CatalogSourceFacetsFailure {
+  ok: false;
+  errorCode: "ACCOUNT_DISABLED" | "ROLE_UNRESOLVED" | "INVALID_FILTERS";
+  error: string;
+}
+
+export type CatalogSourceFacetsResult = CatalogSourceFacetsSuccess | CatalogSourceFacetsFailure;
+
+type UnknownRecord = Record<string, unknown>;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function contractRecord(value: unknown, label: string): UnknownRecord {
+  if (!value || Array.isArray(value) || typeof value !== "object") throw new Error(`${label} must be an object`);
+  return value as UnknownRecord;
+}
+
+function contractExactKeys(value: UnknownRecord, expected: readonly string[], label: string): void {
+  const actual = Object.keys(value).sort();
+  const approved = [...expected].sort();
+  if (actual.length !== approved.length || actual.some((key, index) => key !== approved[index])) {
+    throw new Error(`${label} must contain the exact approved keys`);
+  }
+}
+
+function contractString(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a nonblank string`);
+  return value.trim();
+}
+
+function contractCount(value: unknown, label: string): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error(`${label} count must be a non-negative integer`);
+  return value as number;
+}
+
+function facetArray(value: unknown, label: string): CatalogSourceFacetOption[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((entry, index) => {
+    const row = contractRecord(entry, `${label}[${index}]`);
+    contractExactKeys(row, ["value", "count"], `${label}[${index}]`);
+    return {
+      value: contractString(row.value, `${label}[${index}].value`),
+      count: contractCount(row.count, `${label}[${index}].count`),
+    };
+  });
+}
+
+function fixedFacetArray<const T extends string>(
+  value: unknown,
+  label: string,
+  expected: readonly T[],
+): Array<CatalogSourceFacetOption & { value: T }> {
+  const rows = facetArray(value, label);
+  const allowed = new Set<string>(expected);
+  if (rows.length !== expected.length || rows.some((row) => !allowed.has(row.value))
+      || new Set(rows.map((row) => row.value)).size !== expected.length) {
+    throw new Error(`${label} must contain exactly ${expected.join(", ")}`);
+  }
+  return rows as Array<CatalogSourceFacetOption & { value: T }>;
+}
+
+/** Strict runtime boundary for the rights-filtered Source facet RPC. */
+export function decodeCatalogSourceFacetsResponse(value: unknown): CatalogSourceFacetsResult {
+  const raw = contractRecord(value, "Source facets response");
+  if (raw.ok === false) {
+    contractExactKeys(raw, ["ok", "error_code", "error"], "Source facets error response");
+    const errorCode = contractString(raw.error_code, "Source facets error_code");
+    if (errorCode !== "ACCOUNT_DISABLED" && errorCode !== "ROLE_UNRESOLVED" && errorCode !== "INVALID_FILTERS") {
+      throw new Error("Source facets error_code is invalid");
+    }
+    return { ok: false, errorCode, error: contractString(raw.error, "Source facets error") };
+  }
+  if (raw.ok !== true) throw new Error("Source facets response.ok must be boolean");
+  contractExactKeys(raw, [
+    "ok", "departments", "areas", "owners", "validation", "first_month", "ownership", "frequency",
+  ], "Source facets response");
+  if (!Array.isArray(raw.owners)) throw new Error("Source facets owners must be an array");
+  const owners = raw.owners.map((entry, index): CatalogSourceOwnerFacet => {
+    const row = contractRecord(entry, `Source facets owners[${index}]`);
+    contractExactKeys(row, ["value", "person_id", "name", "count"], `Source facets owners[${index}]`);
+    const personId = contractString(row.person_id, `Source facets owners[${index}].person_id`);
+    if (!UUID_PATTERN.test(personId)) throw new Error(`Source facets owners[${index}].person_id must be UUID`);
+    const ownerValue = contractString(row.value, `Source facets owners[${index}].value`);
+    if (!ownerValue.startsWith("owner:") || !ownerValue.slice("owner:".length)) {
+      throw new Error(`Source facets owners[${index}].value is invalid`);
+    }
+    return {
+      value: ownerValue,
+      personId,
+      name: contractString(row.name, `Source facets owners[${index}].name`),
+      count: contractCount(row.count, `Source facets owners[${index}].count`),
+    };
+  });
+  return {
+    ok: true,
+    departments: facetArray(raw.departments, "Source facets departments"),
+    areas: facetArray(raw.areas, "Source facets areas"),
+    owners,
+    validation: fixedFacetArray(raw.validation, "Source facets validation", ["outside", "validated"]),
+    firstMonth: fixedFacetArray(raw.first_month, "Source facets first_month", ["missing", "present"]),
+    ownership: fixedFacetArray(raw.ownership, "Source facets ownership", ["assigned", "unassigned"]),
+    frequency: fixedFacetArray(raw.frequency, "Source facets frequency", ["gt12", "lte12"]),
+  };
+}
+
+export interface CatalogSourcePage<T> {
+  ok: true;
+  rows: T[];
+  authorizedTotal: number;
+  nextCursor: { objectCode: string; id: string } | null;
+}
+
+/** Consume the audited export endpoint page-by-page without accepting cursor
+ * loops, total drift, partial success, or a terminal short export. */
+export async function collectCatalogSourceExportPages<T>(
+  fetchPage: (cursor: { objectCode: string; id: string } | null) => Promise<CatalogSourcePage<T>>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: { objectCode: string; id: string } | null = null;
+  let expectedTotal: number | null = null;
+  for (let page = 0; page < 10_000; page += 1) {
+    const result = await fetchPage(cursor);
+    if (!Number.isSafeInteger(result.authorizedTotal) || result.authorizedTotal < 0) {
+      throw new Error("Source export total is invalid");
+    }
+    if (expectedTotal === null) expectedTotal = result.authorizedTotal;
+    else if (result.authorizedTotal !== expectedTotal) throw new Error("Source export total changed between pages");
+    rows.push(...result.rows);
+    if (rows.length > expectedTotal) throw new Error("Source export returned more rows than total");
+    if (!result.nextCursor) {
+      if (rows.length !== expectedTotal) throw new Error("Source export terminal page does not match total");
+      return rows;
+    }
+    const cursorKey = `${result.nextCursor.objectCode}\u0000${result.nextCursor.id}`;
+    if (seenCursors.has(cursorKey)) throw new Error("Source export cursor repeated");
+    seenCursors.add(cursorKey);
+    cursor = result.nextCursor;
+  }
+  throw new Error("Source export exceeded the safe page limit");
+}
+
 export interface CatalogSaveResult {
   ok: boolean;
   version?: number;

@@ -6,9 +6,8 @@
  *  giấu: thanh tra GMP hỏi "sao cái máy này không thẩm định?" mà không mở
  *  ra được câu trả lời là hỏng. Đây là chỗ tra đó.
  *
- *  Đọc THẲNG vmp_source_objects chứ không dùng `objects` của dashboard RPC,
- *  vì RPC không trả hai cột quan trọng nhất của màn này: `status` (còn chạy
- *  hay đã ngưng) và `validate_reason` (cột "Lý do thẩm định" của Sheet).
+ *  Đọc qua RPC Source phân trang theo đúng quyền hiện tại; không đọc bảng
+ *  trực tiếp và không tái dùng mảng dashboard thiếu status/validate_reason.
  *
  *  Cảnh báo "cần rà soát": dòng CÒN HOẠT ĐỘNG mà chính phần lý do lại viết
  *  "cần/nên … thẩm định". Đó là mâu thuẫn trong dữ liệu gốc — người viết mô
@@ -21,7 +20,7 @@ import { ShieldOff, Search, Download, ExternalLink, AlertTriangle } from "lucide
 import { C, TEXT, NUM, INP } from "../../constants/theme.ts";
 import { Card, Tag, TableScroll } from "../ui/Primitives.tsx";
 import { txt, download } from "../../utils/helpers.ts";
-import { fetchSourceObjects } from "../../lib/supabaseData.ts";
+import { listAllSourceObjects } from "../../features/catalogWorkspace/api.ts";
 import { useDebounce } from "../../hooks/index.ts";
 import type { SourceObjectRow } from "../../types/domain.ts";
 
@@ -64,8 +63,12 @@ export default function KhongThamDinhCard({ onMoDanhMuc }: {
   useEffect(() => {
     if (!mo || rows) return;
     let huy = false;
-    fetchSourceObjects()
-      .then((ds) => { if (!huy) setRows(ds.filter((r) => r.validate_flag !== "y")); })
+    listAllSourceObjects({
+      objectKind: null,
+      search: "",
+      filters: { validation: "outside", first_month: "all", owner: "all", frequency: "all" },
+    })
+      .then((ds) => { if (!huy) setRows(ds); })
       .catch((e) => { if (!huy) setLoi((e as Error).message || "không rõ"); });
     return () => { huy = true; };
   }, [mo, rows]);

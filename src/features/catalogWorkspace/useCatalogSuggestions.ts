@@ -14,8 +14,7 @@
  * ===================================================================== */
 import { useEffect, useState } from "react";
 
-import { fetchSourceObjects } from "../../lib/supabaseData.ts";
-import { listDataset } from "./api.ts";
+import { listAllSourceFieldSuggestions, listDataset } from "./api.ts";
 import { gomGoiY } from "./suggestions.ts";
 import type { GoiY } from "./suggestions.ts";
 
@@ -28,25 +27,46 @@ const KHOA_SAN_PHAM = [
  *  làm chậm màn mà không thêm gợi ý nào. */
 const SO_DONG_GOI_Y = 500;
 
-export function useCatalogSuggestions(): GoiY {
+export function useCatalogSuggestions(enabled: boolean): {
+  goiY: GoiY;
+  error: string | null;
+  retry: () => void;
+} {
   const [goiY, setGoiY] = useState<GoiY>({});
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      setGoiY({});
+      setError(null);
+      return undefined;
+    }
+    setError(null);
     let con = true;
     (async () => {
       const kq: GoiY = {};
       try {
-        const rows = await fetchSourceObjects({ kind: null, includeInactive: true });
-        Object.assign(kq, gomGoiY(rows as unknown as Array<Record<string, unknown>>, [...KHOA_DOI_TUONG]));
-      } catch { /* Gợi ý hỏng không được chặn nhập liệu — ô vẫn gõ tay được. */ }
+        const values = await Promise.all(KHOA_DOI_TUONG.map(async (field) => [
+          field,
+          await listAllSourceFieldSuggestions({ field }),
+        ] as const));
+        values.forEach(([field, suggestions]) => { kq[field] = suggestions; });
+      } catch (cause) {
+        if (con) setError(`Không tải được gợi ý Source: ${cause instanceof Error ? cause.message : String(cause)}`);
+      }
       try {
         const sp = await listDataset({ dataset: "products", query: "", page: 0, pageSize: SO_DONG_GOI_Y });
-        if (sp.ok) Object.assign(kq, gomGoiY(sp.rows.map((r) => r.data), [...KHOA_SAN_PHAM]));
-      } catch { /* như trên */ }
+        if (!sp.ok) throw new Error(sp.error || "Không đọc được gợi ý sản phẩm");
+        Object.assign(kq, gomGoiY(sp.rows.map((r) => r.data), [...KHOA_SAN_PHAM]));
+      } catch (cause) {
+        if (con) setError((previous) => previous
+          ?? `Không tải được gợi ý sản phẩm: ${cause instanceof Error ? cause.message : String(cause)}`);
+      }
       if (con) setGoiY(kq);
     })();
     return () => { con = false; };
-  }, []);
+  }, [enabled, tick]);
 
-  return goiY;
+  return { goiY, error, retry: () => setTick((value) => value + 1) };
 }

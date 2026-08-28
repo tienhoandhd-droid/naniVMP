@@ -158,7 +158,7 @@ export const NAV_SUBS = {
   /* Sáu vùng của workspace danh mục — KHÔNG hứa "Người thực hiện" hay
      "Danh bạ nhân sự", không hứa xoá vật lý.
      Chuỗi này có bộ kiểm literal giữ (tests/unit/operational-copy). */
-  source: "Dữ liệu nguồn · Đối tượng · Sản phẩm GMP · Người nhận cảnh báo · Excel đúng mẫu · Chờ áp dụng · Lịch sử",
+  source: "Dữ liệu nguồn · Đối tượng theo quyền; Admin/Quản lý QA có thêm phân công QA, phạm vi xưởng và công cụ danh mục",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
   reports: "Tổng hợp tình hình VMP theo kỳ, gợi ý nhận xét và xuất PDF / Excel / HTML",
   rules: "Quy tắc hệ thống đang chạy — đọc thẳng từ máy chủ nên không thể mô tả khác thực tế",
