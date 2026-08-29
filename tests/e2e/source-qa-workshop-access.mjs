@@ -402,6 +402,20 @@ try {
   await manager.select("#workshop-scope-department", "XSX");
   await manager.select("#workshop-scope-area", "A01");
   await manager.type("#workshop-scope-reason", "Phạm vi xưởng E2E có lý do");
+  try {
+    await manager.waitForFunction(() => {
+      const button = document.querySelector('form[aria-label="Thiết lập phạm vi xưởng"] button[type="submit"]');
+      return button instanceof HTMLButtonElement && !button.disabled;
+    }, { timeout: 15_000 });
+  } catch (cause) {
+    const formState = await manager.$eval('form[aria-label="Thiết lập phạm vi xưởng"]', (form) => ({
+      submitDisabled: form.querySelector('button[type="submit"]')?.disabled ?? null,
+      department: form.querySelector("#workshop-scope-department")?.value ?? null,
+      area: form.querySelector("#workshop-scope-area")?.value ?? null,
+      choicesStatus: [...form.querySelectorAll("[role=status], [role=alert]")].map((node) => node.textContent?.trim()),
+    }));
+    throw new Error(`Form phạm vi xưởng chưa sẵn sàng: ${JSON.stringify(formState)}`, { cause });
+  }
   await manager.evaluate(() => document.querySelector('form[aria-label="Thiết lập phạm vi xưởng"] button[type="submit"]')?.click());
   await manager.waitForFunction(() => document.body.innerText.includes("Đã lưu phạm vi xưởng"));
   const grant = bodies.findLast((entry) => entry.rpc === "rpc_set_source_workshop_scope_grant");
