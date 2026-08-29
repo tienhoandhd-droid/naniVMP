@@ -660,7 +660,43 @@ begin
     and (select owner_person_id from public.vmp_plan_items where validation_code=v_code)=v_admin_person
     and (select support_person_id from public.vmp_plan_items where validation_code=v_code)=v_missing_person,
     'SQA_INELIGIBLE_RELATION_REJECTED_SAVE_IS_ATOMIC');
-  set local role authenticated;
+
+  update public.vmp_plan_items
+  set is_active=false
+  where validation_code=v_code;
+  update public.vmp_source_objects
+  set is_active=false
+  where id=v_source_id;
+  update public.vmp_source_objects
+  set is_active=true
+  where id=v_source_id;
+  update public.vmp_plan_items
+  set is_active=true
+  where validation_code=v_code;
+  if (select owner_person_id from public.vmp_source_objects where id=v_source_id)
+         is distinct from v_admin_person
+     or (select support_person_id from public.vmp_source_objects where id=v_source_id)
+         is distinct from v_missing_person
+     or (select owner_name from public.vmp_source_objects where id=v_source_id)
+         is distinct from v_source_before->>'owner_name'
+     or (select support_name from public.vmp_source_objects where id=v_source_id)
+         is distinct from v_source_before->>'support_name'
+     or exists (
+       select 1 from public.vmp_item_assignments assignment
+       where assignment.validation_code=v_code
+         and assignment.source in ('source_owner','source_support')
+         and assignment.is_active
+     ) then
+    raise exception using errcode='check_violation',
+      message='SQA_INELIGIBLE_REACTIVATION_RELATION_NOT_DISPLAY_ONLY';
+  end if;
+  select * into strict v_right
+  from public.vmp_item_rights(v_unrelated_person,v_code);
+  if v_right.can_view is not false
+     or v_right.editable_fields is distinct from '{}'::text[] then
+    raise exception using errcode='check_violation',
+      message='SQA_INELIGIBLE_REACTIVATION_GRANTS_SOURCE_RIGHTS';
+  end if;
 end
 $ineligible_existing_relation$;
 

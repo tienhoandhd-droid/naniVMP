@@ -119,7 +119,7 @@ begin
   if encode(extensions.digest(convert_to(pg_get_functiondef(
        'public.vmp_reconcile_source_qa_projection(uuid)'::regprocedure),
        'UTF8'),'sha256'),'hex') <>
-       'e74e12b5803dfcc541b2fed9f0316f64a4b056b8fa388892cda51b6854283402'
+       'ddbfc4df2615f6dffc6bc087b3a19bc2bca07b01a72bf2cca9dfa3a450c9434f'
      or encode(extensions.digest(convert_to(pg_get_functiondef(
        'public.vmp_exact_active_source_for_item(text)'::regprocedure),
        'UTF8'),'sha256'),'hex') <>
@@ -2160,10 +2160,53 @@ volatile
 security definer
 set search_path=public,pg_temp
 as $function$
+declare
+  v_validate_owner boolean := case when tg_op='INSERT' then true else
+    old.owner_person_id is distinct from new.owner_person_id end;
+  v_validate_support boolean := case when tg_op='INSERT' then true else
+    old.support_person_id is distinct from new.support_person_id end;
 begin
-  -- This is deliberately unconditional. Custom GUCs are caller-settable and
-  -- therefore cannot be trusted as an authorization fence; every changed or
-  -- inserted canonical relation is validated and reconciled before commit.
+  -- Custom GUCs are caller-settable and cannot be trusted as an authorization
+  -- fence. Validate only newly introduced/activated relations; an unchanged
+  -- ineligible relation remains display-only for unrelated saves.
+  if new.is_active is true and v_validate_owner
+     and new.owner_person_id is not null
+     and not exists (
+       select 1
+       from public.vmp_performers performer
+       join public.profiles profile on profile.id=performer.user_id
+       where performer.id=new.owner_person_id
+         and performer.is_active is true
+         and performer.user_id is not null
+         and profile.is_active is true
+         and public.vmp_business_role(performer.user_id) in ('qa_staff','qa_manager')
+         and (select count(*) from public.vmp_performers active_performer
+              where active_performer.user_id=performer.user_id
+                and active_performer.is_active is true)=1
+     ) then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_TRIGGER_OWNER_NOT_ELIGIBLE';
+  end if;
+  if new.is_active is true and v_validate_support
+     and new.support_person_id is not null
+     and not exists (
+       select 1
+       from public.vmp_performers performer
+       join public.profiles profile on profile.id=performer.user_id
+       where performer.id=new.support_person_id
+         and performer.is_active is true
+         and performer.user_id is not null
+         and profile.is_active is true
+         and public.vmp_business_role(performer.user_id) in ('qa_staff','qa_manager')
+         and (select count(*) from public.vmp_performers active_performer
+              where active_performer.user_id=performer.user_id
+                and active_performer.is_active is true)=1
+     ) then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_TRIGGER_SUPPORT_NOT_ELIGIBLE';
+  end if;
+
+  -- Every accepted active relation is reconciled before commit.
   perform public.vmp_reconcile_source_qa_projection(new.id);
   return new;
 end
@@ -3942,6 +3985,20 @@ begin
          on source_object.object_code=master_object.code
         and source_object.is_active is true
        where item.is_active and source_object.owner_person_id is not null
+         and exists (
+           select 1
+           from public.vmp_performers performer
+           join public.profiles profile on profile.id=performer.user_id
+           where performer.id=source_object.owner_person_id
+             and performer.is_active is true
+             and performer.user_id is not null
+             and profile.is_active is true
+             and public.vmp_business_role(performer.user_id) in
+                 ('qa_staff','qa_manager')
+             and (select count(*) from public.vmp_performers active_performer
+                  where active_performer.user_id=performer.user_id
+                    and active_performer.is_active is true)=1
+         )
          and (select count(*) from public.vmp_item_assignments assignment
               where assignment.validation_code=item.validation_code
                 and assignment.performer_id=source_object.owner_person_id
@@ -3961,6 +4018,20 @@ begin
        where item.is_active and source_object.support_person_id is not null
          and source_object.support_person_id is distinct from
              source_object.owner_person_id
+         and exists (
+           select 1
+           from public.vmp_performers performer
+           join public.profiles profile on profile.id=performer.user_id
+           where performer.id=source_object.support_person_id
+             and performer.is_active is true
+             and performer.user_id is not null
+             and profile.is_active is true
+             and public.vmp_business_role(performer.user_id) in
+                 ('qa_staff','qa_manager')
+             and (select count(*) from public.vmp_performers active_performer
+                  where active_performer.user_id=performer.user_id
+                    and active_performer.is_active is true)=1
+         )
          and (select count(*) from public.vmp_item_assignments assignment
               where assignment.validation_code=item.validation_code
                 and assignment.performer_id=source_object.support_person_id
@@ -3968,6 +4039,72 @@ begin
                 and assignment.assignment_role='collaborator'
                 and assignment.source='source_support'
                 and assignment.is_active)<>1
+     )
+     or exists (
+       select 1
+       from public.vmp_plan_items item
+       join public.vmp_objects master_object
+         on master_object.code=item.object_code
+       join public.vmp_source_objects source_object
+         on source_object.object_code=master_object.code
+        and source_object.is_active is true
+       where item.is_active
+         and source_object.owner_person_id is not null
+         and not exists (
+           select 1
+           from public.vmp_performers performer
+           join public.profiles profile on profile.id=performer.user_id
+           where performer.id=source_object.owner_person_id
+             and performer.is_active is true
+             and performer.user_id is not null
+             and profile.is_active is true
+             and public.vmp_business_role(performer.user_id) in
+                 ('qa_staff','qa_manager')
+             and (select count(*) from public.vmp_performers active_performer
+                  where active_performer.user_id=performer.user_id
+                    and active_performer.is_active is true)=1
+         )
+         and exists (
+           select 1
+           from public.vmp_item_assignments assignment
+           where assignment.validation_code=item.validation_code
+             and assignment.assignment_kind='qa'
+             and assignment.source='source_owner'
+             and assignment.is_active
+         )
+     )
+     or exists (
+       select 1
+       from public.vmp_plan_items item
+       join public.vmp_objects master_object
+         on master_object.code=item.object_code
+       join public.vmp_source_objects source_object
+         on source_object.object_code=master_object.code
+        and source_object.is_active is true
+       where item.is_active
+         and source_object.support_person_id is not null
+         and not exists (
+           select 1
+           from public.vmp_performers performer
+           join public.profiles profile on profile.id=performer.user_id
+           where performer.id=source_object.support_person_id
+             and performer.is_active is true
+             and performer.user_id is not null
+             and profile.is_active is true
+             and public.vmp_business_role(performer.user_id) in
+                 ('qa_staff','qa_manager')
+             and (select count(*) from public.vmp_performers active_performer
+                  where active_performer.user_id=performer.user_id
+                    and active_performer.is_active is true)=1
+         )
+         and exists (
+           select 1
+           from public.vmp_item_assignments assignment
+           where assignment.validation_code=item.validation_code
+             and assignment.assignment_kind='qa'
+             and assignment.source='source_support'
+             and assignment.is_active
+         )
      )
      or exists (
        select 1 from public.vmp_catalog_changes change
