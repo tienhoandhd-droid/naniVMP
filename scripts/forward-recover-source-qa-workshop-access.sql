@@ -11,7 +11,6 @@ SELECT pg_advisory_xact_lock(
 DO $recovery_precondition$
 DECLARE
   v_projection text;
-  v_hash text;
   v_revision bigint;
 BEGIN
   IF current_setting('server_version_num')::integer NOT BETWEEN 170000 AND 179999
@@ -35,7 +34,7 @@ BEGIN
        <> 'b0d178faa5b18b66d319b6dc40be80acba998d02c816798e492f9fbbe1729173'
      OR encode(extensions.digest(pg_get_functiondef(
        'public.vmp_reconcile_source_qa_projection(uuid)'::regprocedure),'sha256'),'hex')
-       <> 'e74e12b5803dfcc541b2fed9f0316f64a4b056b8fa388892cda51b6854283402'
+       <> 'ddbfc4df2615f6dffc6bc087b3a19bc2bca07b01a72bf2cca9dfa3a450c9434f'
      OR encode(extensions.digest(pg_get_functiondef(
        'public.vmp_touch_authorization_revision()'::regprocedure),'sha256'),'hex')
        <> 'edcc77dd4e37606e19e0340d3e5117faaed5c75cd068462d0069201e97dec8e4' THEN
@@ -232,6 +231,9 @@ DECLARE
   v_expected text:=current_setting('vmp.source_access_recovery_projection');
   v_revision_before bigint:=current_setting('vmp.source_access_recovery_revision_before')::bigint;
   v_revision_after bigint;
+  v_admin uuid;
+  v_manager uuid;
+  v_actor uuid;
   v_lower_actor uuid;
   v_lower_workshop uuid;
   v_result jsonb;
@@ -256,13 +258,49 @@ BEGIN
      OR NOT has_function_privilege('authenticated','public.rpc_source_workshop_scope_choices(text,text,text,jsonb,integer)','EXECUTE')
      OR has_function_privilege('public','public.rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)','EXECUTE')
      OR has_function_privilege('anon','public.rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)','EXECUTE')
+     OR has_table_privilege('anon','public.vmp_source_objects','SELECT')
+     OR has_table_privilege('authenticated','public.vmp_source_objects','SELECT')
+     OR has_table_privilege('anon','public.vmp_plan_items','SELECT')
+     OR has_table_privilege('authenticated','public.vmp_plan_items','SELECT')
+     OR has_table_privilege('anon','public.vmp_source_workshop_scope_grants','SELECT')
+     OR has_table_privilege('authenticated','public.vmp_source_workshop_scope_grants','SELECT')
+     OR has_table_privilege('anon','public.vmp_item_assignments','SELECT')
+     OR has_table_privilege('authenticated','public.vmp_item_assignments','SELECT')
+     OR EXISTS (
+       SELECT 1 FROM pg_class relation
+       CROSS JOIN LATERAL aclexplode(
+         coalesce(relation.relacl,acldefault('r'::"char",relation.relowner))) acl
+       WHERE relation.oid='public.vmp_source_objects'::regclass
+         AND acl.grantee=0 AND acl.privilege_type='SELECT'
+     )
+     OR EXISTS (
+       SELECT 1 FROM pg_class relation
+       CROSS JOIN LATERAL aclexplode(
+         coalesce(relation.relacl,acldefault('r'::"char",relation.relowner))) acl
+       WHERE relation.oid='public.vmp_plan_items'::regclass
+         AND acl.grantee=0 AND acl.privilege_type='SELECT'
+     )
+     OR EXISTS (
+       SELECT 1 FROM pg_class relation
+       CROSS JOIN LATERAL aclexplode(
+         coalesce(relation.relacl,acldefault('r'::"char",relation.relowner))) acl
+       WHERE relation.oid='public.vmp_source_workshop_scope_grants'::regclass
+         AND acl.grantee=0 AND acl.privilege_type='SELECT'
+     )
+     OR EXISTS (
+       SELECT 1 FROM pg_class relation
+       CROSS JOIN LATERAL aclexplode(
+         coalesce(relation.relacl,acldefault('r'::"char",relation.relowner))) acl
+       WHERE relation.oid='public.vmp_item_assignments'::regclass
+         AND acl.grantee=0 AND acl.privilege_type='SELECT'
+     )
      OR NOT EXISTS (
        SELECT 1 FROM pg_proc procedure
        WHERE procedure.oid='public.rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)'::regprocedure
          AND procedure.proacl::text='{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}'
      )
      OR (SELECT proacl::text FROM pg_proc
-         WHERE oid='public.vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)'::regprocedure)
+       WHERE oid='public.vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)'::regprocedure)
           IS DISTINCT FROM '{postgres=X/postgres,service_role=X/postgres}' THEN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_RECOVERY_POSTCONDITION';
@@ -281,12 +319,54 @@ BEGIN
        'public.vmp_can_view_plan_item(uuid,text)'::regprocedure),'sha256'),'hex')
        IS DISTINCT FROM 'c6528d13c96629273d413d0b64c2a0565f3d0387bdd0cc5074361f710d484e9f' THEN
     RAISE EXCEPTION USING errcode='check_violation',
-      message='SOURCE_ACCESS_RECOVERY_POSTCONDITION_MANAGER_PREDICATE_HASH';
+          message='SOURCE_ACCESS_RECOVERY_POSTCONDITION_MANAGER_PREDICATE_HASH';
   END IF;
+
+  SELECT profile.id INTO v_admin
+  FROM public.profiles profile
+  WHERE profile.role='admin'::public.user_role
+    AND profile.is_active IS TRUE
+    AND public.vmp_business_role(profile.id)='admin'
+  ORDER BY profile.id LIMIT 1;
+  SELECT profile.id INTO v_manager
+  FROM public.profiles profile
+  WHERE profile.role='qa_manager'::public.user_role
+    AND profile.is_active IS TRUE
+    AND public.vmp_business_role(profile.id)='qa_manager'
+  ORDER BY profile.id LIMIT 1;
+  IF v_admin IS NULL OR v_manager IS NULL OR v_admin=v_manager THEN
+    RAISE EXCEPTION USING errcode='check_violation',
+      message='SOURCE_ACCESS_RECOVERY_ACTIVE_MANAGER_PERSONAS_MISSING';
+  END IF;
+
+  FOREACH v_actor IN ARRAY ARRAY[v_admin,v_manager] LOOP
+    PERFORM set_config('request.jwt.claims',json_build_object(
+      'sub',v_actor,'role','authenticated')::text,true);
+    v_result:=public.rpc_list_source_objects(null,null,'{}'::jsonb,null,10,false,null);
+    IF v_result->>'ok' IS DISTINCT FROM 'true'
+       OR upper(coalesce(v_result->>'error_code',v_result->>'code',''))='FORBIDDEN' THEN
+      RAISE EXCEPTION USING errcode='check_violation',
+        message=case when v_actor=v_admin
+          then 'SOURCE_ACCESS_RECOVERY_ADMIN_SOURCE_LIST_NOT_ALLOWED'
+          else 'SOURCE_ACCESS_RECOVERY_MANAGER_SOURCE_LIST_NOT_ALLOWED' end;
+    END IF;
+    v_result:=public.rpc_source_qa_candidates('', null, 10, '{}'::uuid[]);
+    IF v_result->>'ok' IS DISTINCT FROM 'true'
+       OR upper(coalesce(v_result->>'error_code',v_result->>'code',''))='FORBIDDEN' THEN
+      RAISE EXCEPTION USING errcode='check_violation',
+        message=case when v_actor=v_admin
+          then 'SOURCE_ACCESS_RECOVERY_ADMIN_READ_NOT_ALLOWED code='||
+            coalesce(v_result->>'error_code',v_result->>'code','unknown')
+          else 'SOURCE_ACCESS_RECOVERY_MANAGER_READ_NOT_ALLOWED code='||
+            coalesce(v_result->>'error_code',v_result->>'code','unknown') end;
+    END IF;
+  END LOOP;
+  PERFORM set_config('request.jwt.claims','',true);
+
   SELECT performer.user_id INTO v_lower_actor
   FROM public.vmp_performers performer
   JOIN public.profiles profile ON profile.id=performer.user_id
-  WHERE performer.is_active AND performer.user_id IS NOT NULL AND profile.is_active
+  WHERE performer.is_active AND performer.user_id IS NOT NULL AND profile.is_active IS TRUE
     AND public.vmp_business_role(performer.user_id)='qa_staff'
   ORDER BY performer.id LIMIT 1;
   IF v_lower_actor IS NOT NULL THEN
@@ -298,12 +378,17 @@ BEGIN
       RAISE EXCEPTION USING errcode='check_violation',
         message='SOURCE_ACCESS_RECOVERY_LOWER_SOURCE_LIST_NOT_FORBIDDEN';
     END IF;
+    v_result:=public.rpc_source_qa_candidates('', null, 10, '{}'::uuid[]);
+    IF upper(coalesce(v_result->>'error_code',v_result->>'code',''))<>'FORBIDDEN' THEN
+      RAISE EXCEPTION USING errcode='check_violation',
+        message='SOURCE_ACCESS_RECOVERY_LOWER_MANAGER_READ_NOT_FORBIDDEN';
+    END IF;
     PERFORM set_config('request.jwt.claims','',true);
   END IF;
   SELECT performer.user_id INTO v_lower_workshop
   FROM public.vmp_performers performer
   JOIN public.profiles profile ON profile.id=performer.user_id
-  WHERE performer.is_active AND performer.user_id IS NOT NULL AND profile.is_active
+  WHERE performer.is_active AND performer.user_id IS NOT NULL AND profile.is_active IS TRUE
     AND public.vmp_business_role(performer.user_id) IN ('workshop_manager','workshop_staff')
   ORDER BY performer.id LIMIT 1;
   IF v_lower_workshop IS NOT NULL THEN
@@ -314,6 +399,11 @@ BEGIN
        OR v_result ? 'rows' THEN
       RAISE EXCEPTION USING errcode='check_violation',
         message='SOURCE_ACCESS_RECOVERY_LOWER_WORKSHOP_LIST_NOT_FORBIDDEN';
+    END IF;
+    v_result:=public.rpc_source_qa_candidates('', null, 10, '{}'::uuid[]);
+    IF upper(coalesce(v_result->>'error_code',v_result->>'code',''))<>'FORBIDDEN' THEN
+      RAISE EXCEPTION USING errcode='check_violation',
+        message='SOURCE_ACCESS_RECOVERY_LOWER_WORKSHOP_READ_NOT_FORBIDDEN';
     END IF;
     PERFORM set_config('request.jwt.claims','',true);
   END IF;

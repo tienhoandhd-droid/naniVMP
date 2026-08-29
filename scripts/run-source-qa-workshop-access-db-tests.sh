@@ -5,15 +5,15 @@ set -euo pipefail
 phase="full"
 if [[ $# -gt 0 ]]; then
   if [[ $# -ne 2 || "$1" != "--phase" ]]; then
-    echo "Usage: $0 [--phase expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance]" >&2
+    echo "Usage: $0 [--phase expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance|recovery]" >&2
     exit 2
   fi
   phase="$2"
 fi
 case "$phase" in
-  full|expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance) ;;
+  full|expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance|recovery) ;;
   *)
-    echo "Usage: $0 [--phase expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance]" >&2
+    echo "Usage: $0 [--phase expand|enforce-failure-before-repair|enforce-failure-after-repair|behavior|security|performance|recovery]" >&2
     exit 2
     ;;
 esac
@@ -660,6 +660,80 @@ else
   }
 fi
 
+if [[ "$phase" == "recovery" ]]; then
+  # Recovery postconditions require one active persona for each preserved and
+  # denied boundary. Keep these identities local to the disposable clone.
+  psql -X -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
+insert into auth.users(
+  id,aud,role,email,encrypted_password,email_confirmed_at,
+  raw_app_meta_data,raw_user_meta_data,created_at,updated_at
+) values
+  ('9a070000-0000-4000-8000-000000000001','authenticated','authenticated',
+   'source-recovery-admin@example.test','x',now(),'{}','{}',now(),now()),
+  ('9a070000-0000-4000-8000-000000000002','authenticated','authenticated',
+   'source-recovery-manager@example.test','x',now(),'{}','{}',now(),now()),
+  ('9a070000-0000-4000-8000-000000000003','authenticated','authenticated',
+   'source-recovery-workshop@example.test','x',now(),'{}','{}',now(),now());
+
+insert into public.profiles(id,full_name,email,role,department,is_active)
+values
+  ('9a070000-0000-4000-8000-000000000001','Source Recovery Admin',
+   'source-recovery-admin@example.test','admin'::public.user_role,'QA',true),
+  ('9a070000-0000-4000-8000-000000000002','Source Recovery QA Manager',
+   'source-recovery-manager@example.test','qa_manager'::public.user_role,'QA',true),
+  ('9a070000-0000-4000-8000-000000000003','Source Recovery Workshop',
+   'source-recovery-workshop@example.test','department_user'::public.user_role,'QA',true);
+
+update public.vmp_performers
+set performer_name=case user_id
+      when '9a070000-0000-4000-8000-000000000001' then 'Source Recovery Admin'
+      when '9a070000-0000-4000-8000-000000000002' then 'Source Recovery QA Manager'
+      else 'Source Recovery Workshop' end,
+    email=case user_id
+      when '9a070000-0000-4000-8000-000000000001' then 'source-recovery-admin@example.test'
+      when '9a070000-0000-4000-8000-000000000002' then 'source-recovery-manager@example.test'
+      else 'source-recovery-workshop@example.test' end,
+    department='QA',is_active=true,
+    access_class=case user_id
+      when '9a070000-0000-4000-8000-000000000001' then 'view_only'
+      when '9a070000-0000-4000-8000-000000000002' then 'qa_manager'
+      else 'workshop_staff' end
+where user_id in (
+  '9a070000-0000-4000-8000-000000000001',
+  '9a070000-0000-4000-8000-000000000002',
+  '9a070000-0000-4000-8000-000000000003'
+);
+
+do $$
+begin
+  if (select count(*) from public.vmp_performers
+      where user_id in (
+        '9a070000-0000-4000-8000-000000000001',
+        '9a070000-0000-4000-8000-000000000002',
+        '9a070000-0000-4000-8000-000000000003')
+        and is_active)<>3 then
+    raise exception using errcode='check_violation',
+      message='SOURCE_ACCESS_RECOVERY_PERSONA_PERFORMERS_MISSING';
+  end if;
+end
+$$;
+SQL
+  recovery_artifact="$repo_dir/scripts/forward-recover-source-qa-workshop-access.sql"
+  recovery_log="$tmp_dir/recovery.log"
+  if ! psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" \
+      -f "$recovery_artifact" >"$recovery_log" 2>&1; then
+    sed -n '1,240p' "$recovery_log" >&2
+    echo "SOURCE_ACCESS_RECOVERY_PHASE_FAILED" >&2
+    exit 1
+  fi
+  if ! grep -Fxq 'PASS SOURCE_ACCESS_RECOVERY' "$recovery_log"; then
+    sed -n '1,240p' "$recovery_log" >&2
+    echo "SOURCE_ACCESS_RECOVERY_FINAL_SELECT_MISSING" >&2
+    exit 1
+  fi
+  echo "PASS SOURCE_ACCESS_RECOVERY_FINAL_SELECT"
+fi
+
 run_behavior() {
   local sql_phase="$1"
   psql -X -v ON_ERROR_STOP=1 -v source_access_phase="$sql_phase" \
@@ -683,6 +757,8 @@ case "$phase" in
     psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
       -f "$repo_dir/tests/sql/source-qa-workshop-access-performance.sql"
     ;;
+  recovery)
+    ;;
   full)
     run_behavior behavior
     psql -X -v ON_ERROR_STOP=1 -d "$test_database" \
@@ -692,4 +768,8 @@ case "$phase" in
     ;;
 esac
 
-echo "PASS SOURCE ACCESS phase=$phase rollback-only suites"
+if [[ "$phase" == "recovery" ]]; then
+  echo "PASS SOURCE ACCESS phase=recovery disposable forward-only suite"
+else
+  echo "PASS SOURCE ACCESS phase=$phase rollback-only suites"
+fi

@@ -164,6 +164,80 @@ test("forward recovery increments authorization revision and proves that increme
     "recovery postcondition must reject an unexpected revision value");
 });
 
+test("forward recovery pins the reviewed reconciler and uses fail-closed persona probes", async () => {
+  const recovery = await read(
+    "scripts/forward-recover-source-qa-workshop-access.sql",
+  );
+
+  assert.match(recovery, new RegExp(
+    "vmp_reconcile_source_qa_projection\\(uuid\\)'::regprocedure\\)[\\s\\S]{0,100}"
+      + "<> 'ddbfc4df2615f6dffc6bc087b3a19bc2bca07b01a72bf2cca9dfa3a450c9434f'",
+  ),
+    "recovery must pin the reviewed PostgreSQL 17 reconciler hash");
+  assert.doesNotMatch(recovery, /\bv_hash\b/,
+    "recovery must not carry an unused function-hash variable");
+  assert.doesNotMatch(recovery,
+    /\bprofile\.is_active\b(?!\s+IS\s+TRUE\b)/i,
+    "recovery persona probes must require profile.is_active IS TRUE");
+});
+
+test("forward recovery retains manager execution, closes direct reads, and probes lower roles", async () => {
+  const recovery = await read(
+    "scripts/forward-recover-source-qa-workshop-access.sql",
+  );
+
+  for (const relation of [
+    "vmp_source_objects",
+    "vmp_plan_items",
+    "vmp_source_workshop_scope_grants",
+    "vmp_item_assignments",
+  ]) {
+    assert.match(recovery,
+      new RegExp(`REVOKE\\s+SELECT[\\s\\S]{0,180}public\\.${relation}[\\s\\S]{0,260}FROM authenticated`, "i"),
+      `${relation} direct SELECT must remain closed to authenticated`);
+    assert.match(recovery,
+      new RegExp(`aclexplode[\\s\\S]{0,220}public\\.${relation}[\\s\\S]{0,180}grantee=0[\\s\\S]{0,100}privilege_type='SELECT'`, "i"),
+      `${relation} must reject a direct PUBLIC SELECT ACL`);
+  }
+  for (const rpc of [
+    "rpc_list_source_objects",
+    "rpc_save_catalog_object",
+  ]) {
+    assert.doesNotMatch(recovery,
+      new RegExp(`REVOKE\\s+[^;]*ON\\s+FUNCTION\\s+public\\.${rpc}\\b[^;]*\\bauthenticated\\b`, "i"),
+      `${rpc} must retain authenticated execution for managers`);
+  }
+  assert.match(recovery,
+    /role_name\s+IN\s*\(\s*'admin'\s*,\s*'qa_manager'\s*\)/i,
+    "recovery predicate must retain Admin and QA Manager");
+  assert.match(recovery,
+    /SOURCE_ACCESS_RECOVERY_LOWER_SOURCE_LIST_NOT_FORBIDDEN/i,
+    "recovery must probe lower QA Source-list denial");
+  assert.match(recovery,
+    /SOURCE_ACCESS_RECOVERY_LOWER_WORKSHOP_LIST_NOT_FORBIDDEN/i,
+    "recovery must probe workshop Source-list denial");
+  assert.match(recovery,
+    /SOURCE_ACCESS_RECOVERY_MANAGER_SOURCE_LIST_NOT_ALLOWED[\s\S]{0,700}SOURCE_ACCESS_RECOVERY_MANAGER_READ_NOT_ALLOWED/i,
+    "recovery must exercise both manager Source-list and manager-read paths");
+});
+
+test("PG17 source DB runner exposes a recovery phase with final SELECT verification", async () => {
+  const runner = await read("scripts/run-source-qa-workshop-access-db-tests.sh");
+
+  assert.match(runner,
+    /phase expand\|enforce-failure-before-repair\|enforce-failure-after-repair\|behavior\|security\|performance\|recovery/,
+    "runner usage must expose recovery");
+  assert.match(runner,
+    /recovery_artifact="\$repo_dir\/scripts\/forward-recover-source-qa-workshop-access\.sql"/,
+    "recovery must name the reviewed artifact");
+  assert.match(runner,
+    /psql\s+-X\s+-qAt\s+-v ON_ERROR_STOP=1[\s\S]{0,180}-f "\$recovery_artifact"[\s\S]{0,300}PASS SOURCE_ACCESS_RECOVERY/,
+    "recovery must execute the artifact with ON_ERROR_STOP and require its final PASS");
+  assert.match(runner,
+    /phase=recovery disposable forward-only suite/,
+    "recovery must not be mislabeled as rollback-only");
+});
+
 test("forward recovery preserves authenticated execution of shared Source RPCs and never changes data or passwords", async () => {
   const recovery = stripSqlComments(
     await read("scripts/forward-recover-source-qa-workshop-access.sql"),
