@@ -100,6 +100,39 @@ test("expand policy fingerprints are stable across PostgreSQL role OIDs", async 
     "policy fingerprints must not hash environment-specific role OIDs");
 });
 
+test("expand pins reviewed historical triggers equally in production and fixtures", async () => {
+  const expand = await read(
+    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql",
+  );
+
+  assert.match(expand,
+    /'vmp_plan_items'[\s\S]{0,520}\b9\s*,\s*'0289cb83a680a78b4c5a9eabee77b0ef7b455d404d8268cab93018158db63209'/i);
+  assert.match(expand,
+    /'vmp_item_assignments'[\s\S]{0,520}\b2\s*,\s*'904cf755231a0dbb158d5e0019c9383f3cf2ce5c53a976ab8fc4c190fffc99e1'/i);
+  assert.doesNotMatch(expand,
+    /v_expected\.relation_name\s*=\s*'vmp_(?:plan_items|item_assignments)'\s+and\s+v_is_fixture/i,
+    "reviewed historical triggers must not be fixture-only exceptions");
+
+  assert.match(expand,
+    /'audit_logs'[\s\S]{0,300}\b3\s*,\s*'962219063d18ca9459155e690dd9644fc6b26a1a75bb23368e43adcc74839525'/i);
+  assert.doesNotMatch(expand,
+    /v_expected\.relation_name\s*=\s*'audit_logs'\s+and\s+v_is_fixture/i,
+    "the reviewed audit constraint set must not be a fixture-only exception");
+
+  assert.doesNotMatch(expand, /\bv_is_fixture\b/i,
+    "the exact dependency contract must not branch on a stale fixture marker");
+  for (const hash of [
+    "f1d5c93ff47de4563100f1ce9a54ada9d7b6d0ee908a9914f14327f2fa7af849",
+    "81fbd19e43d3859cd28cb958fc311f1f8b693f659aca9371155433a0b70a1d29",
+    "9cfba864d7ea650370d6d76c33e2afcfbf941bb6918a90eeedec77f0513ab0db",
+    "7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e",
+    "4f69863a23c5353fda09332a04f7643c58b8d9e0ceb126b52790e4b61162ba4c",
+    "7d129948d001e7587adea78028a726f9dafa730b749b05d4912b9526aae4d686",
+  ]) {
+    assert.match(expand, new RegExp(hash));
+  }
+});
+
 test("Source preflight blocks Source-item mismatch while reporting repair inventory", async () => {
   const preflight = await read("scripts/check-source-qa-workshop-access-preflight.sql");
 

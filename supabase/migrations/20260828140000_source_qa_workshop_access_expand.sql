@@ -47,7 +47,6 @@ declare
   v_master_mapping_issues bigint;
   v_duplicate_source_codes bigint;
   v_projection_mismatch bigint;
-  v_is_fixture boolean;
 begin
   if current_setting('server_version_num')::integer not between 170000 and 179999
      or (select pg_encoding_to_char(encoding) from pg_database
@@ -62,11 +61,6 @@ begin
     raise exception using errcode = 'check_violation',
       message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_DATABASE_CONTRACT';
   end if;
-
-  select exists (
-    select 1 from public.system_config
-    where key = 'five_role_test_fixture' and value = 'true'::jsonb
-  ) into v_is_fixture;
 
   -- Pin every dependency table as a complete catalog object before mutation.
   -- The hashes are over ordered, stable pg_catalog strings on PostgreSQL 17.
@@ -97,14 +91,14 @@ begin
        '25e8bc9d04ffb115e23504beb2a0a91d72e581214b4e61ef4a2d41a015d7c56e',
        11, '997145e4ffcbc907a33493df165f28f3176331f966d64077a657e3b905c90dfa',
        16, '99d8449e7e7ce5904472df3a6c4e3e4e9abf970c193fd32317a33fae5dd57445',
-       7, '14e7b88e576245a88f56ccd948227dfd98f6218f15cbddd7c75d7b8e6584b297',
+       9, '0289cb83a680a78b4c5a9eabee77b0ef7b455d404d8268cab93018158db63209',
        1, 'f6ee0cd646486cbb7f19e267802008ddc252a76c5bb9c5173b8e9bfa320fdbf8',
        'ebe40005564f63ea0c8ed2541d5fc9a27b432ff5e398e9c52c50e1214bc4f663'),
       ('vmp_item_assignments', 19,
        '875435ac7d8587b02c38bc97133ae5568b9cc42bfa1dccad7625609f45762687',
        10, 'f4c89cfbd3e695b9eac72d73dc6fe4658a733d1c12cc1a0776a4b145b6464374',
        6, '11454e9eb86f98c5f48c0c62d7a052eec4102b228db4640c2c231baa9b46fc3c',
-       1, '489ac5122ffd7d89ba873930f84cb8e0e6e52a1f2222bfacab50c89c0d5fb2e5',
+       2, '904cf755231a0dbb158d5e0019c9383f3cf2ce5c53a976ab8fc4c190fffc99e1',
        1, '42fbc0850fa8fb36a3ff4d5a9fefbb2c9be59eac663a0bdc4537c5f16fcf2f87',
        'e4ba7bdd2d90d0608c9205c1863659d6d0965eca7f5d30590531c57613371c39'),
       ('vmp_screen_permissions', 7,
@@ -116,7 +110,7 @@ begin
        '2e6f04cb2503453dcb2a7aef3d558bb28bd41e74051ae0404dc9e806f13dcbfd'),
       ('audit_logs', 18,
        'c2488c36c9041d75e8fb090a7bce4a76741b3c3af4c9a86a60e917c341d45158',
-       3, '5fc816f1d17a1591c5386c59cae64333062a0559e95667c2b2de5288643679cf',
+       3, '962219063d18ca9459155e690dd9644fc6b26a1a75bb23368e43adcc74839525',
        7, '190b36b3fedbc7c48b1e186c70241929336bcf069dae517a660926e152260bfe',
        0, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
        2, '617edbc837e4039e10d4f518a10c3a2104dd439bf35929b902e5bd6589598b46',
@@ -174,16 +168,8 @@ begin
       into v_count, v_hash
     from pg_constraint constraint_row
     where constraint_row.conrelid = v_relation;
-    if v_expected.relation_name = 'audit_logs' and v_is_fixture then
-      if v_count <> 3 or v_hash <>
-           '962219063d18ca9459155e690dd9644fc6b26a1a75bb23368e43adcc74839525' then
-        raise exception using errcode = 'check_violation',
-          message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_CONSTRAINT_DRIFT ' ||
-                    v_expected.relation_name || ' count=' || v_count ||
-                    ' actual=' || v_hash || ' expected=fixture_pg17';
-      end if;
-    elsif v_count <> v_expected.constraint_count
-          or v_hash <> v_expected.constraint_hash then
+    if v_count <> v_expected.constraint_count
+       or v_hash <> v_expected.constraint_hash then
       raise exception using errcode = 'check_violation',
         message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_CONSTRAINT_DRIFT ' ||
                   v_expected.relation_name;
@@ -214,30 +200,11 @@ begin
       into v_count, v_hash
     from pg_trigger trigger_row
     where trigger_row.tgrelid = v_relation and not trigger_row.tgisinternal;
-    -- The disposable five-role fixture is reconstructed by replaying the
-    -- repository's deadline migrations and therefore has the reviewed
-    -- whole-row revision trigger in addition to the sealed audit inventory.
-    -- Keep that exception fixture-bound and exact; production accepts only
-    -- the single frozen catalog contract above.
-    if v_expected.relation_name = 'vmp_plan_items' and v_is_fixture then
-      if v_count <> 9 or v_hash <>
-           '0289cb83a680a78b4c5a9eabee77b0ef7b455d404d8268cab93018158db63209' then
-        raise exception using errcode = 'check_violation',
-          message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_TRIGGER_DRIFT ' ||
-                    v_expected.relation_name || ' count=' || v_count ||
-                    ' actual=' || v_hash ||
-                    ' expected=fixture_pg17';
-      end if;
-    elsif v_expected.relation_name = 'vmp_item_assignments' and v_is_fixture then
-      if v_count <> 2 or v_hash <>
-           '904cf755231a0dbb158d5e0019c9383f3cf2ce5c53a976ab8fc4c190fffc99e1' then
-        raise exception using errcode = 'check_violation',
-          message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_TRIGGER_DRIFT ' ||
-                    v_expected.relation_name || ' count=' || v_count ||
-                    ' actual=' || v_hash ||
-                    ' expected=fixture_pg17';
-      end if;
-    elsif v_count <> v_expected.trigger_count
+    -- The reviewed deadline and assignment migrations install these trigger
+    -- sets in both production and the disposable PG17 fixture. Pin one exact
+    -- catalog contract instead of treating production-equivalent state as a
+    -- fixture-only exception.
+    if v_count <> v_expected.trigger_count
           or v_hash <> v_expected.trigger_hash then
       raise exception using errcode = 'check_violation',
         message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_TRIGGER_DRIFT ' ||
@@ -299,7 +266,7 @@ begin
       ('vmp_is_active_session(uuid)',
        'e52a0cece430ad8b8319819b633fd4fc8aa92bc2d2fac083a33b22f609e1f417'),
       ('vmp_manager_principal(uuid)',
-       'dd06b754ecb397066aaa81047d82dcf4dc46a64c3da5b05f616f1a779090734c'),
+       'f1d5c93ff47de4563100f1ce9a54ada9d7b6d0ee908a9914f14327f2fa7af849'),
       ('vmp_normalize_person_name(text)',
        '40cefe6ab8fbfc8cf8c8f7362f66675a1a93242743fc959655a30865d9895251'),
       ('rpc_refresh_source_item_assignments()',
@@ -307,7 +274,7 @@ begin
       ('vmp_sync_item_assignments_from_performer()',
        'e96fd45baffa1c09a5587047da1d02ad3e887ffe7841e0a298b8a785fe7067a2'),
       ('rpc_save_catalog_object(text,text,jsonb,text,integer)',
-       'e7c6ac003f467a357d778b8b773bd58754c8ffb4c54483d1a8734426119daa95'),
+       '81fbd19e43d3859cd28cb958fc311f1f8b693f659aca9371155433a0b70a1d29'),
       ('rpc_save_catalog_object__five_role_impl_20260824(text,text,jsonb,text,integer)',
        '601c067cf9789772b1eb272c10754b980f50fa13647f7967eba2e893634cffbc'),
       ('rpc_upsert_source_object(text,text,jsonb)',
@@ -317,15 +284,15 @@ begin
       ('rpc_set_item_assignment__five_role_impl_20260824(uuid,text,text,text,text,text,uuid)',
        '689e52011fba0eaf98642b2584e3ce634334f163c3e7ba97390a24f01153446d'),
       ('vmp_item_rights(uuid,text)',
-       'f82b266343a54d695e16df2e9a67867d39ddc50bd11233639266eae7ca1553aa'),
+       '9cfba864d7ea650370d6d76c33e2afcfbf941bb6918a90eeedec77f0513ab0db'),
       ('vmp_item_scope_matches(uuid,text)',
        'f22cb1a41ea7148401e32ffd9a1d7f8b4001be5ab738bf2380ab041f4e8e1296'),
       ('rpc_update_progress(text,jsonb,text,jsonb,integer)',
-       'da25f8acbcc5aa3e029e581acb79f210cf1d6c61ab0e8458e4ff89146e75f4a0'),
+       '7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e'),
       ('trigger_set_updated_at()',
        '39096e1eff369abf0af690df9fa1a3d1d59b5f279587bc4b908d844baf252e71'),
       ('audit_plan_item_changes_v2()',
-       '07ac27f98feecfb5c9bd6941e17943fb910ea715e72ffdcb5c96132acdf26243'),
+       '4f69863a23c5353fda09332a04f7643c58b8d9e0ceb126b52790e4b61162ba4c'),
       ('enforce_plan_item_validation()',
        '3e9aaf189916f0a77c7d2c81545312fc5f020b2779c450e63587bedfee9ed6ec'),
       ('vmp_cache_nn_vo_hieu()',
@@ -349,22 +316,7 @@ begin
            join pg_namespace namespace on namespace.oid = procedure.pronamespace
            where namespace.nspname = 'public'
              and procedure.proname = split_part(v_expected.signature, '(', 1)) <> 1
-       or v_hash <> (case
-         when not v_is_fixture then v_expected.definition_hash
-         when v_expected.signature = 'vmp_manager_principal(uuid)' then
-           'f1d5c93ff47de4563100f1ce9a54ada9d7b6d0ee908a9914f14327f2fa7af849'
-         when v_expected.signature =
-              'rpc_save_catalog_object(text,text,jsonb,text,integer)' then
-           '81fbd19e43d3859cd28cb958fc311f1f8b693f659aca9371155433a0b70a1d29'
-         when v_expected.signature = 'vmp_item_rights(uuid,text)' then
-           '9cfba864d7ea650370d6d76c33e2afcfbf941bb6918a90eeedec77f0513ab0db'
-         when v_expected.signature =
-              'rpc_update_progress(text,jsonb,text,jsonb,integer)' then
-           '7e36d2360211c68d203e1fc47f8b9ab5794e6a2a88b21c2fea24cefcac6b5f8e'
-         when v_expected.signature = 'audit_plan_item_changes_v2()' then
-           '4f69863a23c5353fda09332a04f7643c58b8d9e0ceb126b52790e4b61162ba4c'
-         else v_expected.definition_hash
-       end) then
+       or v_hash <> v_expected.definition_hash then
       raise exception using errcode = 'check_violation',
         message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_FUNCTION_DRIFT ' ||
                   v_expected.signature || ' actual=' || coalesce(v_hash, 'missing');
@@ -529,11 +481,7 @@ begin
          'workshop_manager', 'workshop_staff'
        )
      )
-     or v_hash <> (case when v_is_fixture then
-          '7d129948d001e7587adea78028a726f9dafa730b749b05d4912b9526aae4d686'
-        else
-          '6c8fb41b9ed3336bc91cdd3fa965474b39e0ad18a22f91d24eba071328938e85'
-        end)
+     or v_hash <> '7d129948d001e7587adea78028a726f9dafa730b749b05d4912b9526aae4d686'
      or (select value from public.system_config
          where key = 'screen_access_mode') is distinct from '"enforced"'::jsonb
      or (select value from public.system_config
