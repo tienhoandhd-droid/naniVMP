@@ -23,7 +23,7 @@ import {
 import {
   buildTimelineFilterSets, TIMELINE_FILTER_DEFAULTS, timelineActiveFilterCount, timelineFilterChips, timelineOwnerOf,
 } from "../features/timeline/timelineFilterModel.ts";
-import { buildVmpMonthBands } from "../features/timeline/timelineYearModel.ts";
+import { buildVmpMonthBands, filterVmpMonthItems } from "../features/timeline/timelineYearModel.ts";
 import TimelineInspector from "../features/timeline/TimelineInspector.tsx";
 import PlannedDeadlineDialog from "../features/timeline/PlannedDeadlineDialog.tsx";
 import { canPresentPlannedDeadlineEdit } from "../features/timeline/plannedDeadlineEditModel.ts";
@@ -1628,8 +1628,11 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
   }), [cls, dept, status, dq, typeFilter, ownerFilter, phaseFilter, readinessFilter]);
   const timelineSets = useMemo(() => buildTimelineFilterSets({ activities: acts, filters: timelineFilters, range }),
     [acts, timelineFilters, range]);
-  const filtered = timelineSets.display;
   const explorerActs = timelineSets.explorer;
+  const filtered = useMemo(() => view === "month"
+    ? filterVmpMonthItems(explorerActs, year, focusMonth).sort(compareTimelineOrder)
+    : timelineSets.display,
+  [explorerActs, focusMonth, timelineSets.display, view, year]);
   const vmpMonthBands = useMemo(
     () => buildVmpMonthBands(timelineSets.summaryBase, year),
     [timelineSets.summaryBase, year],

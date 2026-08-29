@@ -20,6 +20,16 @@ const MONTH_LABELS = [
   "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
 ];
 
+/** Selects detail rows by canonical VMP deadline, never a fallback target date. */
+export function filterVmpMonthItems(items: readonly Activity[], year: number, month: number): Activity[] {
+  return items.filter((activity) => {
+    const deadline = vmpDeadlineDate(activity);
+    return deadline !== null
+      && Number(deadline.slice(0, 4)) === year
+      && Number(deadline.slice(5, 7)) - 1 === month;
+  });
+}
+
 /** Groups activities by their canonical VMP deadline, never a fallback target date. */
 export function buildVmpMonthBands(items: readonly Activity[], year: number): VmpMonthBand[] {
   const bands = MONTH_LABELS.map((label, month) => ({

@@ -433,12 +433,8 @@ for (const [id, ten] of MAN) {
         .map((code) => code.textContent?.trim()).sort(),
       stageTabs: document.querySelectorAll(".timeline-table-tabs").length,
     }));
-    kiem(JSON.stringify(thangBay.codes) === JSON.stringify([
-      "TB-100-IQ", "TB-101-OQ", "TB-102-PQ", "TB-103-PV", "TB-104-GSP",
-      "TB-107-PQ", "TB-108-PV", "TB-109-GSP", "TB-110-IQ", "TB-111-OQ",
-      "TB-114-GSP", "TB-115-IQ", "TB-116-OQ", "TB-117-PQ", "TB-118-PV",
-      "TB-121-OQ", "TB-122-PQ", "TB-123-PV",
-    ]), "mở tháng chỉ hiện các mã fixture có mốc trong tháng", thangBay.codes.join(" | "));
+    kiem(JSON.stringify(thangBay.codes) === JSON.stringify(["TB-107-PQ", "TB-114-GSP", "TB-121-OQ"]),
+      "mở tháng chỉ hiện các mã fixture có deadline VMP trong tháng", thangBay.codes.join(" | "));
     kiem(thangBay.stageTabs > 0, "mở tháng dựng lại tab mốc");
 
     await trang.evaluate(() => {
@@ -873,13 +869,17 @@ for (const [id, ten] of MAN) {
   });
   await trang.waitForSelector('[data-timeline-month-action="6"]');
   await trang.click('[data-timeline-month-action="6"]');
+  await trang.evaluate(() => {
+    [...document.querySelectorAll(".timeline-view-controls button")]
+      .find((button) => button.textContent?.trim() === "Quý")?.click();
+  });
   await trang.waitForSelector(".timeline-day-row");
 
   const truoc = await trang.evaluate(() => ({
     soHang: document.querySelectorAll("tbody tr.timeline-day-row").length,
     tongLoc: document.querySelector(".timeline-map-surface__head span")?.textContent || "",
   }));
-  kiem(/130 hạng mục/.test(truoc.tongLoc), "tháng đã mở có đủ 130 hạng mục giao với kỳ", truoc.tongLoc.slice(0, 40));
+  kiem(/155 hạng mục/.test(truoc.tongLoc), "quý đã mở có đủ 155 hạng mục giao với kỳ", truoc.tongLoc.slice(0, 40));
   kiem(truoc.soHang > 0 && truoc.soHang < 120,
     "DOM chỉ dựng lát đang thấy (<120 hàng), không phải cả 180", `${truoc.soHang} hàng`);
 
