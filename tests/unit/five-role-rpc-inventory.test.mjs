@@ -74,6 +74,12 @@ const SOURCE_ACCESS_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const TEAM_OVERVIEW_REVIEWED_RPC = new Map([
+  ["rpc_team_overview_summary", {
+    identity: "rpc_team_overview_summary(integer)",
+    classification: "guarded_explicit",
+  }],
+]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
   .join(",");
@@ -275,11 +281,16 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql",
     "utf8",
   );
+  const teamOverviewMigration = readFileSync(
+    "supabase/migrations/20260829150000_team_overview_summary.sql",
+    "utf8",
+  );
   for (const name of [
     ...CATALOG_V2_REVIEWED_RPC.keys(),
     ...MANUAL_DEADLINE_REVIEWED_RPC.keys(),
     ...ASSIGNED_PROGRESS_REVIEWED_RPC.keys(),
     ...SOURCE_ACCESS_REVIEWED_RPC.keys(),
+    ...TEAM_OVERVIEW_REVIEWED_RPC.keys(),
   ]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
   }
@@ -289,11 +300,12 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...MANUAL_DEADLINE_REVIEWED_RPC,
     ...ASSIGNED_PROGRESS_REVIEWED_RPC,
     ...SOURCE_ACCESS_REVIEWED_RPC,
+    ...TEAM_OVERVIEW_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 74, "reviewed source HEAD must expose 74 literal RPC targets");
+  assert.equal(sourceNames.length, 75, "reviewed source HEAD must expose 75 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -328,6 +340,13 @@ test("every source RPC call has exactly one reviewed migration classification", 
   }
   assert.match(sourceAccessMigration, /grant execute on function public\.rpc_source_qa_candidates\(\s*text\s*,\s*jsonb\s*,\s*integer\s*,\s*uuid\[\]\s*\)\s*to authenticated\s*,\s*service_role;/is);
   assert.match(sourceAccessMigration, /grant execute on function public\.rpc_list_source_workshop_coverage\(\s*text\s*,\s*jsonb\s*,\s*integer\s*\)[\s\S]*?public\.rpc_set_source_workshop_scope_grant\([\s\S]*?to authenticated\s*,\s*service_role;/i);
+  assert.deepEqual(TEAM_OVERVIEW_REVIEWED_RPC, new Map([
+    ["rpc_team_overview_summary", { identity: "rpc_team_overview_summary(integer)", classification: "guarded_explicit" }],
+  ]));
+  assert.match(teamOverviewMigration, /create or replace function public\.rpc_team_overview_summary\(\s*p_year integer default extract\(year from now\(\)\)::integer\s*\)/is);
+  assert.match(teamOverviewMigration, /security definer\s*set search_path\s*=\s*public\s*,\s*pg_temp/is);
+  assert.match(teamOverviewMigration, /revoke all on function public\.rpc_team_overview_summary\(integer\)\s*from public, anon, authenticated, service_role;/is);
+  assert.match(teamOverviewMigration, /grant execute on function public\.rpc_team_overview_summary\(integer\)\s*to authenticated, service_role;/is);
 });
 
 test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {

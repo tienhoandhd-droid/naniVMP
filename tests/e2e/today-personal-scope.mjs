@@ -68,9 +68,9 @@ function bangkokDay(offset) {
 
 function activity({
   code, ownerPersonId = null, supportPersonId = null, department = "qa", area = "QA-AREA-E2E",
+  ownerName = "QA Trùng Tên",
 }) {
   const deadline = bangkokDay(-1);
-  const ownerName = "QA Trùng Tên";
   const raw = {
     validation_code: code,
     object_code: code,
@@ -122,8 +122,8 @@ const ACTIVITIES = [
     code: CODE.otherDepartment, ownerPersonId: PERSON.unrelatedOtherDepartment,
     department: "xsx", area: "XSX-AREA-E2E",
   }),
-  activity({ code: CODE.manager, ownerPersonId: PERSON.manager }),
-  activity({ code: CODE.admin, ownerPersonId: PERSON.admin }),
+  activity({ code: CODE.manager, ownerPersonId: PERSON.manager, ownerName: "Quản lý QA Today" }),
+  activity({ code: CODE.admin, ownerPersonId: PERSON.admin, ownerName: "Admin Today" }),
 ];
 
 function accessFor(businessRole) {
@@ -241,7 +241,12 @@ async function openToday({
   objects = activities.map((row) => ({
     code: row.code, name: row.name, dept: row.dept, area: row.area, cls: "tb", crit: "TB",
   })),
+  teamSummary = {
+    ok: true, year: 2026, total: 10, completed: 4, rate: 40,
+    updated_at: "2026-08-29T08:30:00Z",
+  },
 }) {
+  const teamSummaryCalls = [];
   const page = await browser.newPage();
   await page.setViewport({ width: 1500, height: 1000 });
   await page.evaluateOnNewDocument(() => localStorage.clear());
@@ -286,11 +291,15 @@ async function openToday({
         updated_at: "2026-08-28T00:00:00Z", authorization_revision: 7,
       };
       kho.rpc_my_editable_progress_rights = { ok: true, rights: [] };
+      kho.rpc_team_overview_summary = (body) => {
+        teamSummaryCalls.push(body);
+        return teamSummary;
+      };
     },
   });
   await page.goto(`${GOC}#${hash}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"), { timeout: 15_000 });
-  return { page, chanNgoai };
+  return { page, chanNgoai, teamSummaryCalls };
 }
 
 const browser = await puppeteer.launch({
@@ -310,7 +319,7 @@ try {
   };
 
   {
-    const { page, chanNgoai } = await openToday({
+    const { page, chanNgoai, teamSummaryCalls } = await openToday({
       user: USER.staff, businessRole: "qa_staff", personId: PERSON.staff, hash: "v=today&me=1",
     });
     try {
@@ -359,6 +368,16 @@ try {
       }));
       assert.deepEqual(overviewGlobalState, { hash: null, personSelector: false },
         "QA staff overview does not expose the privileged person selector");
+      await page.waitForFunction(() => document.body.textContent?.includes("Tiến độ cả nhóm 40% (4/10)"),
+        { timeout: 5_000 });
+      const overviewText = await page.evaluate(() => document.body.textContent || "");
+      assert.match(overviewText, /Tiến độ cả nhóm 40% \(4\/10\)/,
+        "QA staff sees only the sealed team aggregate");
+      assert.match(overviewText, /Tiến độ của tôi 0% \(0\/2\)/,
+        "QA staff personal comparison remains derived from personal Overview rows");
+      assert.ok(!overviewText.includes(CODE.manager) && !overviewText.includes("Quản lý QA Today"),
+        "another person's item code and name must not enter the ordinary-member Overview DOM");
+      assert.equal(teamSummaryCalls.length, 1, "QA staff requests the team aggregate once");
       await page.click('[data-view="today"]');
       await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"), { timeout: 5_000 });
       await assertScopeButton(page, "Chỉ xem việc của tôi");
@@ -374,7 +393,7 @@ try {
     { label: "QA Manager", user: USER.manager, businessRole: "qa_manager", personId: PERSON.manager, ownCode: CODE.manager },
     { label: "Admin", user: USER.admin, businessRole: "admin", personId: PERSON.admin, ownCode: CODE.admin },
   ]) {
-    const { page, chanNgoai } = await openToday({
+    const { page, chanNgoai, teamSummaryCalls } = await openToday({
       ...persona,
       // Keep a remembered period that excludes the fixture's dynamic
       // deadlines; personal Today/Overview must still use the canonical
@@ -411,6 +430,10 @@ try {
         .find((tile) => tile.textContent?.includes("Quá hạn"))?.querySelector("div:nth-of-type(2)")?.textContent?.trim() ?? "");
       assert.equal(overviewOverdue, String(todayOverdue),
         `${persona.label} Overview Quá hạn matches the Today canonical-person KPI despite remembered period`);
+      assert.equal(teamSummaryCalls.length, 0,
+        `${persona.label} must not call the ordinary-member aggregate RPC`);
+      assert.equal(await page.evaluate(() => document.body.textContent?.includes("Tiến độ cả nhóm") ?? false), false,
+        `${persona.label} must not render the duplicate aggregate comparison`);
       assert.equal(chanNgoai.length, 0, `${persona.label} scenario must remain fully intercepted`);
     } finally {
       await page.close();

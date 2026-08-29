@@ -107,6 +107,10 @@ import {
 import { filterTodayScope } from "./features/today/todayScope.ts";
 import { isTodayActivityMine, type ProgressDeepLink } from "./features/today/todayModel.ts";
 import { classifyVmpDeadline } from "./lib/vmpDeadlineModel.ts";
+import {
+  useTeamOverviewSummary,
+  type TeamOverviewSummaryState,
+} from "./features/overview/useTeamOverviewSummary.ts";
 
 /* ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm
    bundle ban đầu).
@@ -1243,6 +1247,29 @@ function Overview({ acts, setView, access }: {
   );
 }
 
+function TeamOverviewComparison({ summary, acts }: {
+  summary: TeamOverviewSummaryState;
+  acts: Activity[];
+}) {
+  const personal = useMemo(() => tally(acts), [acts]);
+  return (
+    <Card variant="soft" style={{ marginBottom: 16, padding: "14px 16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10 }}>
+        <div style={{ borderRadius: 12, background: C.surface, border: `1px solid ${C.pinkSoft}`, padding: "11px 13px", color: C.plum, fontWeight: 800 }}>
+          {summary.status === "ready" && summary.data
+            ? `Tiến độ cả nhóm ${summary.data.rate}% (${summary.data.completed}/${summary.data.total})`
+            : summary.status === "error"
+              ? <><span>Chưa tải được tiến độ cả nhóm.</span>{" "}<button type="button" onClick={summary.retry}>Thử lại</button></>
+              : "Đang tải tiến độ cả nhóm…"}
+        </div>
+        <div style={{ borderRadius: 12, background: C.surface, border: `1px solid ${C.pinkSoft}`, padding: "11px 13px", color: C.plum, fontWeight: 800 }}>
+          Tiến độ của tôi {personal.rate}% ({personal.done}/{personal.total})
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /* ===================== GLOBAL FILTER BAR =====================
  * Lọc TOÀN CỤC theo Khu vực + Thời gian (tháng/quý/nửa năm/năm).
  * Đặt dưới Topbar, hiển thị trên mọi trang. */
@@ -1591,6 +1618,12 @@ function VerifiedAppShell({ user, logout, access }: {
     updateActivity,
   } = useVmpData();
   const currentPersonId = String(user.personId ?? "").trim() || null;
+  const teamOverviewSummary = useTeamOverviewSummary({
+    identity: user.uid ?? "",
+    businessRole: access.businessRole,
+    canViewOverview: access.canView("overview"),
+    year: vmpToday().getFullYear(),
+  });
 
   /* `saveStatus` của luồng lưu tiến độ giờ đi qua vỏ thông báo dùng chung.
      Trước đây nó có một khối JSX riêng ngay trong file này — nghĩa là chỉ
@@ -1815,10 +1848,13 @@ function VerifiedAppShell({ user, logout, access }: {
   const personScopeBaseActs = useMemo(() => acts.filter((a) => (
     (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) && inDept(a)
   )), [acts, areaSel, inDept]);
-  const overviewActs = useMemo(() => progressPersonScopeId === null
-    ? filteredActs
-    : personScopeBaseActs.filter((activity) => isTodayActivityMine(activity, progressPersonScopeId)),
-  [filteredActs, personScopeBaseActs, progressPersonScopeId]);
+  const overviewActs = useMemo(() => {
+    const personId = canSelectProgressPerson ? progressPersonScopeId : currentPersonId;
+    if (!canSelectProgressPerson && personId === null) return [];
+    return personId === null
+      ? filteredActs
+      : personScopeBaseActs.filter((activity) => isTodayActivityMine(activity, personId));
+  }, [canSelectProgressPerson, currentPersonId, filteredActs, personScopeBaseActs, progressPersonScopeId]);
   const todaySelectedPersonId = canSelectProgressPerson
     ? progressPersonScopeId
     : todayPersonScope === "mine" ? currentPersonId : null;
@@ -2152,7 +2188,14 @@ function VerifiedAppShell({ user, logout, access }: {
                   onClearScope={clearTodayScope}
                   onOpenProgress={moTienDo} />
               )}
-              {view === "overview" && <Overview acts={overviewActs} setView={setView} access={access} />}
+              {view === "overview" && (
+                <>
+                  {!canSelectProgressPerson && access.canView("overview") && (
+                    <TeamOverviewComparison summary={teamOverviewSummary} acts={overviewActs} />
+                  )}
+                  <Overview acts={overviewActs} setView={setView} access={access} />
+                </>
+              )}
               {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} businessRole={access.businessRole} onReload={reloadData} />}
               {view === "source" && (
                 <SourceCatalogView access={access} onReload={reloadData}
