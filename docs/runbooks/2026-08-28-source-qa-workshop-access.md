@@ -103,20 +103,24 @@ supabase backups list --project-ref ivembmikfhtyzhtqebgh --output json \
   > "$EVIDENCE_DIR/backups.json"
 ```
 
-Checker final `SELECT` phải được kiểm riêng sau khi CLI trả thành công; chỉ nhận
-đúng status row cuối, không nhận log trung gian.
+Checker final `SELECT` trả JSON qua stdout; phải kiểm riêng sau khi CLI trả thành
+công, chỉ nhận đúng một status row có đúng key `status`, không nhận log stderr.
 
 ```bash
 require_final_select() {
-  local log_file="$1"
+  local json_file="$1"
   local marker="$2"
-  rg -q "^[[:space:]]*${marker}[[:space:]]*$" "$log_file"
+  jq -e --arg marker "$marker" \
+    '(.rows | (type == "array" and length == 1))
+     and (.rows[0] | (type == "object" and .status == $marker
+       and ((keys | sort) == ["status"])))' \
+    "$json_file" >/dev/null
 }
 
 supabase db query --linked \
   --file scripts/check-source-qa-workshop-access-preflight.sql \
-  > "$EVIDENCE_DIR/preflight.log" 2>&1
-require_final_select "$EVIDENCE_DIR/preflight.log" 'PASS SOURCE_ACCESS_PREFLIGHT'
+  > "$EVIDENCE_DIR/preflight.json" 2> "$EVIDENCE_DIR/preflight.stderr.log"
+require_final_select "$EVIDENCE_DIR/preflight.json" 'PASS SOURCE_ACCESS_PREFLIGHT'
 ```
 
 Preflight tự mở `BEGIN READ ONLY` và luôn `ROLLBACK`; phải xác nhận PostgreSQL
@@ -140,10 +144,10 @@ cài refresh stub `SOURCE_ACCESS_UPGRADE_IN_PROGRESS` và revoke service execute
 ```bash
 supabase db query --linked \
   --file supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql \
-  > "$EVIDENCE_DIR/expand.log" 2>&1
+  > "$EVIDENCE_DIR/expand.json" 2> "$EVIDENCE_DIR/expand.stderr.log"
 supabase db query --linked \
   --file supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql \
-  > "$EVIDENCE_DIR/enforce.log" 2>&1
+  > "$EVIDENCE_DIR/enforce.json" 2> "$EVIDENCE_DIR/enforce.stderr.log"
 ```
 
 Không chạy lệnh thứ hai khi lệnh thứ nhất thất bại hoặc commit không rõ. Lỗi,
@@ -159,8 +163,9 @@ mới. Không dùng wrapper hoặc tệp nhập vai trò.
 ```bash
 supabase db query --linked \
   --file scripts/check-source-qa-workshop-access.sql \
-  > "$EVIDENCE_DIR/postflight-before-reload.log" 2>&1
-require_final_select "$EVIDENCE_DIR/postflight-before-reload.log" \
+  > "$EVIDENCE_DIR/postflight-before-reload.json" \
+  2> "$EVIDENCE_DIR/postflight-before-reload.stderr.log"
+require_final_select "$EVIDENCE_DIR/postflight-before-reload.json" \
   'PASS SOURCE_ACCESS_POSTFLIGHT'
 ```
 
@@ -183,11 +188,12 @@ SQL cho schema reload:
 
 ```bash
 supabase db query --linked "NOTIFY pgrst, 'reload schema';" \
-  > "$EVIDENCE_DIR/schema-reload.log" 2>&1
+  > "$EVIDENCE_DIR/schema-reload.json" 2> "$EVIDENCE_DIR/schema-reload.stderr.log"
 supabase db query --linked \
   --file scripts/check-source-qa-workshop-access.sql \
-  > "$EVIDENCE_DIR/postflight-after-reload.log" 2>&1
-require_final_select "$EVIDENCE_DIR/postflight-after-reload.log" \
+  > "$EVIDENCE_DIR/postflight-after-reload.json" \
+  2> "$EVIDENCE_DIR/postflight-after-reload.stderr.log"
+require_final_select "$EVIDENCE_DIR/postflight-after-reload.json" \
   'PASS SOURCE_ACCESS_POSTFLIGHT'
 ```
 
@@ -206,8 +212,9 @@ restore toàn database.
 test "$(sha256sum scripts/forward-recover-source-qa-workshop-access.sql | awk '{print $1}')" = "$EXPECTED_RECOVERY_SHA256"
 supabase db query --linked \
   --file scripts/forward-recover-source-qa-workshop-access.sql \
-  > "$EVIDENCE_DIR/forward-recovery.log" 2>&1
-require_final_select "$EVIDENCE_DIR/forward-recovery.log" \
+  > "$EVIDENCE_DIR/forward-recovery.json" \
+  2> "$EVIDENCE_DIR/forward-recovery.stderr.log"
+require_final_select "$EVIDENCE_DIR/forward-recovery.json" \
   'PASS SOURCE_ACCESS_RECOVERY'
 ```
 
