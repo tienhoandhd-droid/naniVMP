@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "engine": "PostgreSQL 17",
+  "postgresVersion": "17.6",
+  "command": "npm run test:db:source-access",
+  "status": "passed",
+  "completedAt": "2026-08-28T17:35:00Z",
+  "phases": [
+    "expand",
+    "enforce-failure-before-repair",
+    "enforce-failure-after-repair",
+    "behavior",
+    "security",
+    "performance"
+  ],
+  "topLevelAssertions": 75,
+  "cloneSurvivors": 0,
+  "outputSha256": "31e11c3439bd6d52362ff6149cf71a1524679560b5353cb98d49b883a00d70fd",
+  "files": {
+    "scripts/parse-five-role-local-db.mjs": "a9e8f5fe059c4de90f319433cd12c6806a51b4d2ddb90a7cbad8cef22735743a",
+    "scripts/run-source-qa-workshop-access-db-tests.sh": "3cd052054bcc092487a60fc4e3d41e84788e9de6362dd50bceddbfb9de7212fa",
+    "supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql": "818ee26a963b53c4977b0604d65ecb4779922bc4d009d0ae1965c1f51d8d16fc",
+    "supabase/migrations/20260826170000_manual_planned_deadline_edit.sql": "2eddcf0141260acd7f613608871e5b4e057715645337ec0adc82fd30b9437a01",
+    "supabase/migrations/20260826180000_qa_manager_actual_date_principal_normalization.sql": "d8066924f3268b283310a324aa6430301d4bb2c7c29ad1066e3572e5f517dcaa",
+    "supabase/migrations/20260827100000_qa_rights_account_alignment.sql": "99975799b9a5995fe7dd6c969a2e63a4e9522dbff14ac1ec6977d93ceb1db355",
+    "supabase/migrations/20260827130000_assigned_progress_visibility.sql": "acf812cb90bbecef73a6c05aefbea106be84b3974acd49660a9342bdc14c284f",
+    "supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql": "b3a85cfd622ebc238d777853e573e30846e660ff850d0421c632e832aee4e6a3",
+    "supabase/migrations/20260828130000_admin_only_management_visibility.sql": "175f5cf49b3412170990814f7083487aa99f815760d84d6ac24e8971e096e073",
+    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql": "18075012f5296a72e1c8b74df42e448b8f2dfc9d01285b85bf90c708b1b3d3c4",
+    "supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql": "363a0ef9d40f882ddabfbba2be2185ae8860367b0b126a89df82e637ece3b84b",
+    "tests/sql/source-qa-workshop-access.sql": "8a2239439dbd2e266ee24dc4a97fc368e6eb5d3d95a951d4cfd775c85dc83911",
+    "tests/sql/source-qa-workshop-access-security.sql": "7b8e1c17e34c87067db58be5cb1e3cc215579a3b99d2cdef67a1b47c09ef9a1a",
+    "tests/sql/source-qa-workshop-access-performance.sql": "91d7f7cc962e64e8a2249b6c0f52ee63164496720fbacf3b6956f3bcada6c231"
+  }
+}

@@ -64,6 +64,24 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
 
+  # GitHub không giữ credential DB production. Cổng này kiểm receipt PostgreSQL
+  # 17 đã niêm phong và fail ngay khi migration/runner/test SQL bị thay đổi.
+  source-access-db-contract:
+    needs: static-quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_commit || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+
+      - name: Verify sealed PostgreSQL 17 Source authorization evidence
+        run: node scripts/verify-source-access-db-evidence.mjs
+
   e2e-mock:
     needs: static-quality
     runs-on: ubuntu-24.04
@@ -95,14 +113,15 @@ jobs:
           echo "E2E_EMAIL=gialap@example.com" >> .env.local
           echo "E2E_PASSWORD=gialap-khong-dung-that" >> .env.local
 
-      # Cổng tinh gọn chỉ giữ các luồng giả lập, danh mục và quyền quản trị.
-      - name: E2E cốt lõi — luồng giả lập + danh mục + quyền quản trị
+      # Cổng tinh gọn giữ luồng giả lập, Source, danh mục và quyền quản trị.
+      - name: E2E cốt lõi — luồng giả lập + Source + danh mục + quyền quản trị
         env:
           VITE_MANUAL_PLANNED_DEADLINES_ENABLED: true
         run: |
           bash scripts/with-preview.sh -- bash -c '
             npm run e2e:gialap &&
             npm run e2e:catalog &&
+            npm run e2e:source-access &&
             npm run e2e:progress-rights &&
             npm run e2e:admin
           '
@@ -111,11 +130,14 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - static-quality
+      - source-access-db-contract
       - e2e-mock
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-node@v4
         with:

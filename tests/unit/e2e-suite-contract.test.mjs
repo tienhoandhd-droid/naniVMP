@@ -164,7 +164,7 @@ test("CI static-quality cài Chromium đóng gói trước khi chạy unit contr
   );
 });
 
-test("CI e2e-mock chỉ chạy ba bộ giả lập cốt lõi được duyệt", async () => {
+test("CI e2e-mock chỉ chạy năm bộ giả lập cốt lõi được duyệt", async () => {
   const ci = await readRepositoryFile(".github/workflows/deploy.yml");
   const e2eMock = extractWorkflowJob(ci, "e2e-mock", "production-build");
   const e2eInvocations = [...e2eMock.matchAll(/npm run (e2e:[a-z0-9:-]+)/gu)]
@@ -172,8 +172,8 @@ test("CI e2e-mock chỉ chạy ba bộ giả lập cốt lõi được duyệt",
 
   assert.deepEqual(
     e2eInvocations,
-    ["e2e:gialap", "e2e:catalog", "e2e:progress-rights", "e2e:admin"],
-    "e2e-mock phải chỉ gọi đúng bốn bộ E2E lõi, đúng thứ tự và không lặp",
+    ["e2e:gialap", "e2e:catalog", "e2e:source-access", "e2e:progress-rights", "e2e:admin"],
+    "e2e-mock phải chỉ gọi đúng năm bộ E2E lõi, đúng thứ tự và không lặp",
   );
 
   for (const ten of [
@@ -199,8 +199,8 @@ test("CI e2e-mock chỉ chạy ba bộ giả lập cốt lõi được duyệt",
   );
   assert.match(
     ci,
-    /production-build:[\s\S]*?needs:\s*\n\s*- static-quality\s*\n\s*- e2e-mock/u,
-    "production-build phải chờ cả static-quality và e2e-mock",
+    /production-build:[\s\S]*?needs:\s*\n\s*- static-quality\s*\n\s*- source-access-db-contract\s*\n\s*- e2e-mock/u,
+    "production-build phải chờ static-quality, Source DB contract và e2e-mock",
   );
   assert.match(
     e2eMock,
