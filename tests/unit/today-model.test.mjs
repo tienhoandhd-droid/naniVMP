@@ -20,7 +20,7 @@ const right = (validationCode, editableFields = ["actual_protocol_date"], reason
 test("tích lũy nhiều lý do và giữ dòng quá hạn ở đúng section", () => {
   const model = buildTodayActionModel([{
     id: "legacy-id", validationCode: "V-MULTI", st: "prog", state: "active",
-    dlProtocol: "2026-08-01", ownerPersonId: null, score: 9,
+    dlProtocol: "2026-08-01", dlVmp: "2026-08-01", ownerPersonId: null, score: 9,
   }], {
     now: HOM_NAY,
     rights: new Map([["V-MULTI", right("V-MULTI")]]),
@@ -34,15 +34,34 @@ test("tích lũy nhiều lý do và giữ dòng quá hạn ở đúng section", 
   assert.equal(model.sections.incomplete.length, 0);
 });
 
+test("dùng hạn VMP thay vì hạn đề cương đã trôi qua", () => {
+  const model = buildTodayActionModel([{
+    id: "V-VMP-FUTURE", validationCode: "V-VMP-FUTURE", st: "prog", state: "active",
+    dlProtocol: "2026-08-01", dlVmp: "2026-08-20", ownerPersonId: ID_A,
+  }], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
+  assert.equal(model.sections.overdue.length, 0);
+  assert.equal(model.sections.upcoming[0].validationCode, "V-VMP-FUTURE");
+  assert.equal(model.sections.upcoming[0].daysRemaining, 6);
+});
+
+test("đưa hạng mục vào quá hạn khi hạn VMP đã trôi qua", () => {
+  const model = buildTodayActionModel([{
+    id: "V-VMP-OVER", validationCode: "V-VMP-OVER", st: "over", state: "active",
+    dlProtocol: "2026-08-28", _raw: { dl_vmp: "2026-08-01", tt_vmp: "not_started" }, ownerPersonId: ID_A,
+  }], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
+  assert.equal(model.sections.overdue[0].validationCode, "V-VMP-OVER");
+  assert.equal(model.sections.overdue[0].daysRemaining, -13);
+});
+
 test("tách hạn hôm nay khỏi hạn trong 7 ngày và tìm deadline sau blocking stage", () => {
   const model = buildTodayActionModel([
     {
       id: "V-LATER", validationCode: "V-LATER", st: "prog", state: "active",
-      dlProtocol: null, dlValidation: "2026-08-14", ownerPersonId: ID_A,
+      dlProtocol: null, dlValidation: "2026-08-14", dlVmp: "2026-08-14", ownerPersonId: ID_A,
     },
     {
       id: "V-7D", validationCode: "V-7D", st: "todo", state: "active",
-      dlProtocol: "2026-08-21", ownerPersonId: ID_A,
+      dlProtocol: "2026-08-21", dlVmp: "2026-08-21", ownerPersonId: ID_A,
     },
   ], {
     now: HOM_NAY,
@@ -52,7 +71,7 @@ test("tách hạn hôm nay khỏi hạn trong 7 ngày và tìm deadline sau bloc
   const today = model.sections.today[0];
   assert.equal(today.validationCode, "V-LATER");
   assert.equal(today.blockingStage, "Đề cương");
-  assert.equal(today.deadlineStage, "Thẩm định");
+  assert.equal(today.deadlineStage, "Đích VMP");
   assert.equal(today.daysRemaining, 0);
   assert.deepEqual(today.reasons.map((reason) => reason.kind), ["due_today"]);
   assert.equal(model.sections.upcoming[0].validationCode, "V-7D");
@@ -109,6 +128,7 @@ test("dùng item id chính tắc từ n8n thay vì mã đối tượng để tra
   }] });
   const activity = activities[0];
   activity.dlProtocol = "2026-08-01";
+  activity.dlVmp = "2026-08-01";
 
   assert.equal(activity.id, "V-001-IQ");
   assert.equal(activity.code, "OBJ-001");
@@ -153,10 +173,10 @@ test("quyền loading hoặc error không làm lộ khả năng sửa", () => {
 
 test("ưu tiên theo urgency rồi score, editability, số ngày và mã tiếng Việt", () => {
   const rows = [
-    { id: "B", validationCode: "B", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
-    { id: "A", validationCode: "A", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
-    { id: "C", validationCode: "C", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 5, ownerPersonId: ID_A },
-    { id: "LATE", validationCode: "LATE", st: "prog", state: "active", dlProtocol: "2026-08-15", score: 9, ownerPersonId: ID_A },
+    { id: "B", validationCode: "B", st: "prog", state: "active", dlProtocol: "2026-08-14", dlVmp: "2026-08-14", score: 9, ownerPersonId: ID_A },
+    { id: "A", validationCode: "A", st: "prog", state: "active", dlProtocol: "2026-08-14", dlVmp: "2026-08-14", score: 9, ownerPersonId: ID_A },
+    { id: "C", validationCode: "C", st: "prog", state: "active", dlProtocol: "2026-08-14", dlVmp: "2026-08-14", score: 5, ownerPersonId: ID_A },
+    { id: "LATE", validationCode: "LATE", st: "prog", state: "active", dlProtocol: "2026-08-15", dlVmp: "2026-08-15", score: 9, ownerPersonId: ID_A },
   ];
   const model = buildTodayActionModel(rows, {
     now: HOM_NAY,
@@ -169,8 +189,8 @@ test("ưu tiên theo urgency rồi score, editability, số ngày và mã tiến
 
 test("tie-break editability đứng trước số ngày khi urgency và score bằng nhau", () => {
   const model = buildTodayActionModel([
-    { id: "NO-RIGHT", validationCode: "NO-RIGHT", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
-    { id: "EDITABLE", validationCode: "EDITABLE", st: "prog", state: "active", dlProtocol: "2026-08-14", score: 9, ownerPersonId: ID_A },
+    { id: "NO-RIGHT", validationCode: "NO-RIGHT", st: "prog", state: "active", dlProtocol: "2026-08-14", dlVmp: "2026-08-14", score: 9, ownerPersonId: ID_A },
+    { id: "EDITABLE", validationCode: "EDITABLE", st: "prog", state: "active", dlProtocol: "2026-08-14", dlVmp: "2026-08-14", score: 9, ownerPersonId: ID_A },
   ], {
     now: HOM_NAY,
     rights: new Map([["EDITABLE", right("EDITABLE")]]),
@@ -181,17 +201,17 @@ test("tie-break editability đứng trước số ngày khi urgency và score b�
 
 test("tie-break số ngày đứng trước mã khi urgency, score và editability bằng nhau", () => {
   const model = buildTodayActionModel([
-    { id: "LATER", validationCode: "LATER", st: "prog", state: "active", dlProtocol: "2026-08-16", score: 9, ownerPersonId: ID_A },
-    { id: "SOONER", validationCode: "SOONER", st: "prog", state: "active", dlProtocol: "2026-08-15", score: 9, ownerPersonId: ID_A },
+    { id: "LATER", validationCode: "LATER", st: "prog", state: "active", dlProtocol: "2026-08-16", dlVmp: "2026-08-16", score: 9, ownerPersonId: ID_A },
+    { id: "SOONER", validationCode: "SOONER", st: "prog", state: "active", dlProtocol: "2026-08-15", dlVmp: "2026-08-15", score: 9, ownerPersonId: ID_A },
   ], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
   assert.deepEqual(model.rows.map((row) => row.validationCode), ["SOONER", "LATER"]);
 });
 
 test("KPI và rows dùng cùng tập dữ liệu, nextAction là dòng đầu tiên đã sort", () => {
   const model = buildTodayActionModel([
-    { id: "O", validationCode: "O", st: "prog", state: "active", dlProtocol: "2026-08-01", ownerPersonId: ID_A },
-    { id: "T", validationCode: "T", st: "todo", state: "active", dlProtocol: "2026-08-14", ownerPersonId: ID_A },
-    { id: "U", validationCode: "U", st: "todo", state: "active", dlProtocol: "2026-08-20", ownerPersonId: ID_A },
+    { id: "O", validationCode: "O", st: "prog", state: "active", dlProtocol: "2026-08-01", dlVmp: "2026-08-01", ownerPersonId: ID_A },
+    { id: "T", validationCode: "T", st: "todo", state: "active", dlProtocol: "2026-08-14", dlVmp: "2026-08-14", ownerPersonId: ID_A },
+    { id: "U", validationCode: "U", st: "todo", state: "active", dlProtocol: "2026-08-20", dlVmp: "2026-08-20", ownerPersonId: ID_A },
     { id: "I", validationCode: "I", st: "prog", state: "active", ownerPersonId: ID_A },
   ], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
   assert.equal(model.rows.length, 4);

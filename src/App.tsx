@@ -106,6 +106,7 @@ import {
 } from "./features/today/todayPersonScope.ts";
 import { filterTodayScope } from "./features/today/todayScope.ts";
 import { isTodayActivityMine, type ProgressDeepLink } from "./features/today/todayModel.ts";
+import { classifyVmpDeadline } from "./lib/vmpDeadlineModel.ts";
 
 /* ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm
    bundle ban đầu).
@@ -1026,8 +1027,11 @@ function Overview({ acts, setView, access }: {
 }) {
   const { e, d, overdue, soon, gap, gapPts, mismatched, theoThang } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
-    const overdue = acts.filter((a) => a.alert && a.alert.kind === "over");
-    const soon = acts.filter((a) => a.alert && a.alert.kind === "soon");
+    const overdue = acts.filter((a) => classifyVmpDeadline(a, vmpToday(), 30).kind === "overdue");
+    const soon = acts.filter((a) => {
+      const kind = classifyVmpDeadline(a, vmpToday(), 30).kind;
+      return kind === "today" || kind === "soon";
+    });
 
     // Dải cột nhỏ trong ô "Tỷ lệ hồ sơ": tỷ lệ hồ sơ theo tháng đích.
     // Phải đếm ĐÚNG thước đo mà con số lớn của ô đang dùng (trạng thái báo
@@ -1070,10 +1074,10 @@ function Overview({ acts, setView, access }: {
      Đây là bản rút gọn của màn "Hôm nay", đặt ngay trên trang đầu để màn
      tổng quan có lối vào việc, không chỉ toàn số để ngắm. */
   const vieCGap = useMemo(() => {
-    const homNay = vmpToday().getTime();
     return acts
-      .filter((a) => (a.state || "active") === "active" && a.st !== "done" && a.alert?.date)
-      .map((a) => ({ a, con: Math.round((new Date(a.alert!.date).setHours(0, 0, 0, 0) - homNay) / 86400000) }))
+      .map((a) => ({ a, state: classifyVmpDeadline(a, vmpToday(), 30) }))
+      .filter(({ state }) => state.kind === "overdue" || state.kind === "today" || state.kind === "soon")
+      .map(({ a, state }) => ({ a, con: state.daysRemaining ?? 0 }))
       .sort((x, y) => x.con - y.con)
       .slice(0, 5);
   }, [acts]);
@@ -1200,7 +1204,7 @@ function Overview({ acts, setView, access }: {
                 <span className="hn-ten">
                   <b>{a.code}</b><span>{a.name}</span>
                 </span>
-                <span className="hn-meta">{a.alert?.stage} · {a.owner || "chưa có người"}</span>
+                <span className="hn-meta">Đích VMP · {a.owner || "chưa có người"}</span>
                 <Pill s={a.st} small />
                 {destinations.overdue && (
                   <button type="button" className="hn-nut" onClick={di(destinations.overdue)}>
@@ -1804,25 +1808,32 @@ function VerifiedAppShell({ user, logout, access }: {
     inDept(a) &&
     matchTime(a)
   )), [acts, areaSel, inDept, matchTime]);
+  /* Personal Today and Overview share this base: department and area are
+     global scope, while the period filter is intentionally team-Overview
+     only. A selected person's queue must not lose their overdue VMP item
+     merely because the remembered period is different. */
+  const personScopeBaseActs = useMemo(() => acts.filter((a) => (
+    (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) && inDept(a)
+  )), [acts, areaSel, inDept]);
   const overviewActs = useMemo(() => progressPersonScopeId === null
     ? filteredActs
-    : filteredActs.filter((activity) => isTodayActivityMine(activity, progressPersonScopeId)),
-  [filteredActs, progressPersonScopeId]);
+    : personScopeBaseActs.filter((activity) => isTodayActivityMine(activity, progressPersonScopeId)),
+  [filteredActs, personScopeBaseActs, progressPersonScopeId]);
   const todaySelectedPersonId = canSelectProgressPerson
     ? progressPersonScopeId
     : todayPersonScope === "mine" ? currentPersonId : null;
-  const todayActs = useMemo(() => filterTodayScope(acts, {
-    areas: areaSel,
-    departments: deptSel,
-    onlyMine: todaySelectedPersonId !== null,
-    currentPersonId: todaySelectedPersonId,
-  }), [acts, areaSel, deptSel, todaySelectedPersonId]);
-  const allTodayActs = useMemo(() => filterTodayScope(acts, {
+  const todayActs = useMemo(() => filterTodayScope(personScopeBaseActs, {
     areas: [],
     departments: [],
     onlyMine: todaySelectedPersonId !== null,
     currentPersonId: todaySelectedPersonId,
-  }), [acts, todaySelectedPersonId]);
+  }), [personScopeBaseActs, todaySelectedPersonId]);
+  const allTodayActs = useMemo(() => filterTodayScope(personScopeBaseActs, {
+    areas: [],
+    departments: [],
+    onlyMine: todaySelectedPersonId !== null,
+    currentPersonId: todaySelectedPersonId,
+  }), [personScopeBaseActs, todaySelectedPersonId]);
   /* Mẫu số của thanh lọc phải đếm HẠNG MỤC ĐANG HOẠT ĐỘNG.
      Đo được: RPC trả 461 dòng = 448 đang hoạt động + 13 "Không áp dụng".
      Thanh lọc ghi 461 nhưng mọi màn bên dưới đều lọc bỏ 13 dòng kia, nên

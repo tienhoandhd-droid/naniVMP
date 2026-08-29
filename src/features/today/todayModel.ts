@@ -1,6 +1,7 @@
 import type { Activity } from "../../types/domain.ts";
 import type { EditableProgressRight } from "../progress/editableProgressRights.ts";
 import type { EditableTimelineField } from "../itemPermissions/types.ts";
+import { classifyVmpDeadline } from "../../lib/vmpDeadlineModel.ts";
 
 export type TodayReasonKind =
   | "overdue" | "due_today" | "due_7d"
@@ -47,8 +48,6 @@ export interface ProgressDeepLink {
   quickFilter?: TodayReasonKind | TodayRowKind;
 }
 
-const DAY_MS = 86_400_000;
-const BANGKOK_OFFSET_MS = 7 * 3_600_000;
 const STAGES = [
   { deadline: "dlProtocol", actual: "actProtocol", rawDeadline: ["deadline_protocol", "dl_protocol"], rawActual: ["actual_protocol_date", "ngay_de_cuong"], done: "protocol_done", label: "Đề cương" },
   { deadline: "dlValidation", actual: "actValidation", rawDeadline: ["deadline_validation", "dl_validation"], rawActual: ["actual_validation_date", "ngay_tham_dinh"], done: "validation_done", label: "Thẩm định" },
@@ -76,14 +75,6 @@ function asDateString(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(value)) return null;
   const date = value.slice(0, 10);
   return Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ? null : date;
-}
-
-function bangkokDay(now: Date): string {
-  return new Date(now.getTime() + BANGKOK_OFFSET_MS).toISOString().slice(0, 10);
-}
-
-function daysBetween(date: string, today: string): number {
-  return Math.round((Date.parse(date) - Date.parse(today)) / DAY_MS);
 }
 
 function stageComplete(activity: Activity, stage: typeof STAGES[number]): boolean {
@@ -203,7 +194,7 @@ function sectionFor(daysRemaining: number | null, hasQualityIssue: boolean): Tod
   return hasQualityIssue ? "incomplete" : null;
 }
 
-function makeRow(activity: Activity, today: string, options: {
+function makeRow(activity: Activity, now: Date, options: {
   rights: ReadonlyMap<string, EditableProgressRight>;
   rightsStatus: TodayRightsStatus;
 }): TodayActionRow | null {
@@ -212,14 +203,14 @@ function makeRow(activity: Activity, today: string, options: {
   if (!code) return null;
   const unfinished = unfinishedStages(activity);
   const blockingStage = unfinished[0]?.label ?? "Đích VMP";
-  const dated = unfinished.find((stage) => stage.deadline !== null);
-  const deadlineStage = dated?.label ?? null;
-  const daysRemaining = dated?.deadline ? daysBetween(dated.deadline, today) : null;
+  const vmpDeadline = classifyVmpDeadline(activity, now, 7);
+  const deadlineStage = vmpDeadline.date === null ? null : "Đích VMP";
+  const daysRemaining = vmpDeadline.daysRemaining;
   const hasOwner = ownerPersonId(activity) !== null;
   const isDone = activity.st === "done";
   const finalActual = asDateString(firstValue(activity, "actVmp", ["actual_vmp_date", "ngay_vmp"]));
   const needsActualCompletion = isDone && finalActual === null;
-  const needsSchedule = !isDone && unfinished.length > 0 && dated === undefined;
+  const needsSchedule = !isDone && unfinished.length > 0 && vmpDeadline.kind === "missing";
   const reasons = buildReasons(deadlineStage, daysRemaining, hasOwner, needsActualCompletion, needsSchedule);
   const section = sectionFor(daysRemaining, reasons.some((reason) =>
     reason.kind === "missing_owner" || reason.kind === "missing_actual_completion" || reason.kind === "missing_schedule"));
@@ -248,8 +239,7 @@ export function buildTodayActionModel(
   activities: readonly Activity[],
   options: { now: Date; rights: ReadonlyMap<string, EditableProgressRight>; rightsStatus: TodayRightsStatus },
 ): TodayActionModel {
-  const today = bangkokDay(options.now);
-  const rows = (activities ?? []).map((activity) => makeRow(activity, today, options))
+  const rows = (activities ?? []).map((activity) => makeRow(activity, options.now, options))
     .filter((row): row is TodayActionRow => row !== null).sort(compareRows);
   const sections: Record<TodaySection, TodayActionRow[]> = {
     overdue: rows.filter((row) => row.section === "overdue"),

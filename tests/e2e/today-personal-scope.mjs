@@ -374,7 +374,13 @@ try {
     { label: "QA Manager", user: USER.manager, businessRole: "qa_manager", personId: PERSON.manager, ownCode: CODE.manager },
     { label: "Admin", user: USER.admin, businessRole: "admin", personId: PERSON.admin, ownCode: CODE.admin },
   ]) {
-    const { page, chanNgoai } = await openToday(persona);
+    const { page, chanNgoai } = await openToday({
+      ...persona,
+      // Keep a remembered period that excludes the fixture's dynamic
+      // deadlines; personal Today/Overview must still use the canonical
+      // person base and show the same VMP overdue count.
+      hash: "v=today&period=custom&from=2026-01-01&to=2026-01-31",
+    });
     try {
       await waitForTodayCodes(page, [CODE.owner, CODE.sameNameUnrelated, persona.ownCode]);
       await page.waitForSelector('select[aria-label="Chọn nhân sự xem tiến độ"]');
@@ -387,6 +393,12 @@ try {
       await waitForExactTodayCodes(page, [CODE.owner, CODE.support]);
       assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của QA Trùng Tên/,
         `${persona.label} can inspect another person's Today scope by canonical ID`);
+      const todayOverdue = await page.evaluate(() => {
+        const tile = [...document.querySelectorAll(".lp-metric")]
+          .find((candidate) => candidate.querySelector(".lp-metric__label")?.textContent?.trim() === "Quá hạn");
+        return Number(tile?.querySelector(".lp-metric__value")?.textContent?.trim() || "NaN");
+      });
+      assert.equal(todayOverdue, 2, `${persona.label} Today canonical-person overdue KPI`);
       await page.click('[data-view="overview"]');
       await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Tổng quan"), { timeout: 5_000 });
       assert.equal(await page.$eval('select[aria-label="Chọn nhân sự xem tiến độ"]', (select) => select.value), PERSON.staff,
@@ -395,7 +407,34 @@ try {
         .find((tile) => tile.textContent?.includes("Hoàn thành VMP"))?.textContent ?? "");
       assert.match(completionTile, /0\/2 hạng mục/,
         `${persona.label} Overview completion denominator is recalculated for the selected person`);
+      const overviewOverdue = await page.evaluate(() => [...document.querySelectorAll(".vmp-tile")]
+        .find((tile) => tile.textContent?.includes("Quá hạn"))?.querySelector("div:nth-of-type(2)")?.textContent?.trim() ?? "");
+      assert.equal(overviewOverdue, String(todayOverdue),
+        `${persona.label} Overview Quá hạn matches the Today canonical-person KPI despite remembered period`);
       assert.equal(chanNgoai.length, 0, `${persona.label} scenario must remain fully intercepted`);
+    } finally {
+      await page.close();
+    }
+  }
+
+  {
+    const future = activity({ code: "E2E-VMP-FUTURE", ownerPersonId: PERSON.staff });
+    future.dlProtocol = bangkokDay(-10);
+    future._raw.dl_vmp = bangkokDay(10);
+    const overdue = activity({ code: "E2E-VMP-OVERDUE", ownerPersonId: PERSON.staff });
+    const { page, chanNgoai } = await openToday({
+      user: USER.staff,
+      businessRole: "qa_staff",
+      personId: PERSON.staff,
+      activities: [future, overdue],
+    });
+    try {
+      await waitForExactTodayCodes(page, ["E2E-VMP-OVERDUE"]);
+      const overdueKpi = await page.evaluate(() => [...document.querySelectorAll(".lp-metric")]
+        .find((candidate) => candidate.querySelector(".lp-metric__label")?.textContent?.trim() === "Quá hạn")
+        ?.querySelector(".lp-metric__value")?.textContent?.trim() ?? "");
+      assert.equal(overdueKpi, "1", "a stale protocol deadline with future VMP deadline is not overdue");
+      assert.equal(chanNgoai.length, 0, "VMP deadline fixture must remain fully intercepted");
     } finally {
       await page.close();
     }

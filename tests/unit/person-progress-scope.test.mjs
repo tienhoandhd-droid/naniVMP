@@ -5,6 +5,7 @@ const {
   buildPersonProgressChoices,
   canSelectPersonProgressScope,
 } = await import("../../src/lib/personProgressScope.ts");
+const { filterTodayScope } = await import("../../src/features/today/todayScope.ts");
 
 test("only Admin and QA Manager can select another person's progress", () => {
   assert.equal(canSelectPersonProgressScope("admin"), true);
@@ -55,4 +56,15 @@ test("builds canonical owner and support choices without merging duplicate names
       label: "Trần QA · ID …22222222",
     },
   ]);
+});
+
+test("personal scope keeps canonical matches regardless of the remembered target period", () => {
+  const personId = "11111111-1111-4111-8111-111111111111";
+  const activity = {
+    id: "overdue-vmp", ownerPersonId: personId, supportPersonId: null,
+    area: "QA", dept: "qa", target: "2026-01-15", state: "active",
+  };
+  assert.deepEqual(filterTodayScope([activity], {
+    areas: ["QA"], departments: ["qa"], onlyMine: true, currentPersonId: personId,
+  }), [activity]);
 });
