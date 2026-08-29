@@ -120,6 +120,8 @@ async function openPage(browser, {
     .some((button) => button.textContent?.trim() === "Dòng thời gian"), { timeout: 15_000 });
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => button.textContent?.trim() === "Dòng thời gian")?.click());
+  await page.waitForSelector('[data-timeline-month-action="6"]', { timeout: 15_000 });
+  await page.click('[data-timeline-month-action="6"]');
   await page.waitForSelector(".timeline-day-row", { timeout: 15_000 });
 
   return { page, rpcBodies, rpcNames, externalRequests: chanNgoai };

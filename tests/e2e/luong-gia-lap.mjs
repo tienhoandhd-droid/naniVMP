@@ -414,6 +414,43 @@ for (const [id, ten] of MAN) {
       .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
     document.querySelector("[data-timeline-filter-toggle]")?.click();
   });
+  const namTomTat = await trang.evaluate(() => ({
+    monthActions: document.querySelectorAll("[data-timeline-month-action]").length,
+    detail: !!document.querySelector("[data-timeline-detail-board]"),
+    stageTabs: document.querySelectorAll(".timeline-table-tabs").length,
+  }));
+  kiem(namTomTat.monthActions === 12, "chế độ năm có đúng 12 thao tác mở tháng", String(namTomTat.monthActions));
+  kiem(!namTomTat.detail, "chế độ năm chưa dựng bảng chi tiết");
+  kiem(namTomTat.stageTabs === 0, "chế độ năm chưa dựng tab mốc");
+
+  if (namTomTat.monthActions === 12) {
+    await trang.click('[data-timeline-month-action="6"]');
+    await trang.waitForFunction(() =>
+      document.querySelector('select[aria-label="Chọn tháng"]')?.value === "6"
+      && !!document.querySelector("[data-timeline-detail-board]"));
+    const thangBay = await trang.evaluate(() => ({
+      codes: [...document.querySelectorAll(".timeline-day-row .timeline-card-code")]
+        .map((code) => code.textContent?.trim()).sort(),
+      stageTabs: document.querySelectorAll(".timeline-table-tabs").length,
+    }));
+    kiem(JSON.stringify(thangBay.codes) === JSON.stringify([
+      "TB-100-IQ", "TB-101-OQ", "TB-102-PQ", "TB-103-PV", "TB-104-GSP",
+      "TB-107-PQ", "TB-108-PV", "TB-109-GSP", "TB-110-IQ", "TB-111-OQ",
+      "TB-114-GSP", "TB-115-IQ", "TB-116-OQ", "TB-117-PQ", "TB-118-PV",
+      "TB-121-OQ", "TB-122-PQ", "TB-123-PV",
+    ]), "mở tháng chỉ hiện các mã fixture có mốc trong tháng", thangBay.codes.join(" | "));
+    kiem(thangBay.stageTabs > 0, "mở tháng dựng lại tab mốc");
+
+    await trang.evaluate(() => {
+      [...document.querySelectorAll("button")]
+        .find((b) => b.textContent?.trim() === "Năm")?.click();
+    });
+    await trang.waitForFunction(() => !document.querySelector("[data-timeline-detail-board]"));
+    kiem(true, "trở lại Năm lại ẩn chi tiết");
+
+    await trang.click('[data-timeline-month-action="6"]');
+    await trang.waitForSelector(".timeline-day-row");
+  }
   await trang.waitForFunction(() => !!document.querySelector("[data-timeline-filter-panel]"));
   const panel = await trang.evaluate(() => ({
     expanded: document.querySelector("[data-timeline-filter-toggle]")?.getAttribute("aria-expanded"),
@@ -494,7 +531,9 @@ for (const [id, ten] of MAN) {
     [...document.querySelectorAll("button")]
       .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
   });
-  await new Promise((r) => setTimeout(r, 800));
+  await trang.waitForSelector('[data-timeline-month-action="6"]');
+  await trang.click('[data-timeline-month-action="6"]');
+  await trang.waitForSelector(".timeline-day-row");
 
   /* Chưa chọn gì: KHÔNG có pane — bảng dùng trọn bề ngang (màn GMP,
      yêu cầu chủ dự án 16/08: minh hoạ không được lấy cột của dữ liệu). */
@@ -832,13 +871,15 @@ for (const [id, ten] of MAN) {
     [...document.querySelectorAll("button")]
       .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
   });
-  await new Promise((r) => setTimeout(r, 1200));
+  await trang.waitForSelector('[data-timeline-month-action="6"]');
+  await trang.click('[data-timeline-month-action="6"]');
+  await trang.waitForSelector(".timeline-day-row");
 
   const truoc = await trang.evaluate(() => ({
     soHang: document.querySelectorAll("tbody tr.timeline-day-row").length,
     tongLoc: document.querySelector(".timeline-map-surface__head span")?.textContent || "",
   }));
-  kiem(/180 hạng mục/.test(truoc.tongLoc), "bộ lọc thấy đủ 180 hạng mục", truoc.tongLoc.slice(0, 40));
+  kiem(/130 hạng mục/.test(truoc.tongLoc), "tháng đã mở có đủ 130 hạng mục giao với kỳ", truoc.tongLoc.slice(0, 40));
   kiem(truoc.soHang > 0 && truoc.soHang < 120,
     "DOM chỉ dựng lát đang thấy (<120 hàng), không phải cả 180", `${truoc.soHang} hàng`);
 

@@ -2342,6 +2342,22 @@ select { appearance: none; -webkit-appearance: none; }
   white-space: nowrap;
 }
 
+.timeline-range-rail__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: rgba(142,111,208,.12);
+  color: var(--plum);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .timeline-range-rail__done { height: var(--done); background: #2FA98A; }
 .timeline-range-rail__over { height: var(--over); background: #DB4F73; }
 .timeline-range-rail__prog { height: var(--prog); background: #E69A2E; }

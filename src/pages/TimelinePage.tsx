@@ -23,6 +23,7 @@ import {
 import {
   buildTimelineFilterSets, TIMELINE_FILTER_DEFAULTS, timelineActiveFilterCount, timelineFilterChips, timelineOwnerOf,
 } from "../features/timeline/timelineFilterModel.ts";
+import { buildVmpMonthBands } from "../features/timeline/timelineYearModel.ts";
 import TimelineInspector from "../features/timeline/TimelineInspector.tsx";
 import PlannedDeadlineDialog from "../features/timeline/PlannedDeadlineDialog.tsx";
 import { canPresentPlannedDeadlineEdit } from "../features/timeline/plannedDeadlineEditModel.ts";
@@ -546,11 +547,12 @@ export function TimelineInsightStrip({ items, stats, range }: {
   );
 }
 
-export function TimelineRangeRail({ items, range, view, onFocusBand }: {
+export function TimelineRangeRail({ items, range, view, onFocusBand, monthBands }: {
   items: Activity[]; range: TimeRange; view: string;
   onFocusBand?: (band: { label: string; start: Date; end: Date; [k: string]: unknown }) => void;
+  monthBands?: Array<{ month: number; label: string; count: number; done: number; overdue: number; rate: number }>;
 }) {
-  const bands = bandSummary(items, range);
+  const bands = monthBands || bandSummary(items, range);
   const maxCount = Math.max(1, ...bands.map((band) => band.count));
   const today = vmpToday();
   const todayVisible = inRange(today, range);
@@ -578,19 +580,29 @@ export function TimelineRangeRail({ items, range, view, onFocusBand }: {
         )}
         {bands.map((band, index) => {
           const canFocus = view !== "month";
+          const over = "overdue" in band ? band.overdue : band.over;
+          const prog = "prog" in band ? band.prog : Math.max(0, band.count - band.done - over);
           const load = Math.max(4, Math.round((band.count / maxCount) * 100));
           const doneW = band.count ? Math.round((band.done / band.count) * 100) : 0;
-          const overW = band.count ? Math.round((band.over / band.count) * 100) : 0;
-          const progW = band.count ? Math.round((band.prog / band.count) * 100) : 0;
+          const overW = band.count ? Math.round((over / band.count) * 100) : 0;
+          const progW = band.count ? Math.round((prog / band.count) * 100) : 0;
           return (
             <button
               type="button"
               key={`${band.label}-${index}`}
-              className={`timeline-range-rail__band ${band.over ? "timeline-range-rail__band--over" : ""} ${band.count ? "" : "timeline-range-rail__band--empty"}`}
-              onClick={() => { if (canFocus) onFocusBand?.(band); }}
+              data-timeline-month-action={"month" in band ? band.month : undefined}
+              className={`timeline-range-rail__band ${over ? "timeline-range-rail__band--over" : ""} ${band.count ? "" : "timeline-range-rail__band--empty"}`}
+              onClick={() => {
+                if (!canFocus) return;
+                onFocusBand?.({
+                  ...band,
+                  start: "start" in band ? band.start : new Date(range.year, band.month, 1),
+                  end: "end" in band ? band.end : new Date(range.year, band.month + 1, 0),
+                });
+              }}
               disabled={!canFocus}
-              title={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${band.over} cần chú ý`}
-              aria-label={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${band.over} cần chú ý`}
+              title={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${over} cần chú ý`}
+              aria-label={`${band.label}: ${band.count} đích VMP, ${band.done} hoàn thành, ${over} cần chú ý${canFocus ? ". Mở tháng" : ""}`}
               style={{
                 "--load": `${load}%`, "--done": `${doneW}%`,
                 "--over": `${overW}%`, "--prog": `${progW}%`,
@@ -607,6 +619,7 @@ export function TimelineRangeRail({ items, range, view, onFocusBand }: {
               <span className="timeline-range-rail__caption">
                 <span>{band.label}</span>
                 <small>{band.rate}% xong</small>
+                {canFocus && <em className="timeline-range-rail__action">Mở tháng</em>}
               </span>
             </button>
           );
@@ -1617,6 +1630,10 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
     [acts, timelineFilters, range]);
   const filtered = timelineSets.display;
   const explorerActs = timelineSets.explorer;
+  const vmpMonthBands = useMemo(
+    () => buildVmpMonthBands(timelineSets.summaryBase, year),
+    [timelineSets.summaryBase, year],
+  );
 
   /* Strip bốn dải tình trạng — đếm SAU các bộ lọc khác, TRƯỚC bộ lọc
      tình trạng, trên cùng một model với chính bộ lọc. */
@@ -1983,7 +2000,16 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
             onPickDept={(d) => { setDept(d); setWorkspace("timeline"); }}
           />
         ) : isTimeline ? (
-        <>
+        view === "year" ? (
+        <TimelineRangeRail
+          items={timelineSets.summaryBase}
+          range={range}
+          view={view}
+          monthBands={vmpMonthBands}
+          onFocusBand={focusBand}
+        />
+        ) : (
+        <div data-timeline-detail-board>
         {/* Lớp thuyết minh đặt TRƯỚC mọi thứ khác của tab này: nó là câu
             trả lời, phần còn lại là bằng chứng và chỗ tra cứu. */}
         <TimelineFocusLayer
@@ -2051,7 +2077,8 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
           />
         )}
         </div>
-        </>
+        </div>
+        )
         ) : null}
       </Card>
 
