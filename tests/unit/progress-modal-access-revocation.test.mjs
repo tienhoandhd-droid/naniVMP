@@ -180,21 +180,15 @@ test("shell keeps Today period-independent, canonical, static and deep-link safe
 
   assert.match(source, /import TodayCommandCenter from "\.\/features\/today\/TodayCommandCenter\.tsx"/);
   assert.doesNotMatch(source, /const TodayView = lazy/);
-  assert.match(source, /if \(!onlyMine\) return true;[\s\S]*currentPersonId !== null && isTodayActivityMine\(a, currentPersonId\)/);
   assert.match(source, /useState<ProgressDeepLink \| null>\(null\)/);
   assert.match(source, /const moTienDo = useCallback\(\(link: ProgressDeepLink\)[\s\S]*setMoHangMuc\(link\);[\s\S]*setNhomTheo\("hangmuc"\);[\s\S]*setView\("progress"\)/);
   assert.match(source, /<TodayCommandCenter[\s\S]*acts=\{todayActs\}[\s\S]*scopeLabel=\{nhanPhamViToday\}[\s\S]*hasScopeFilters=\{deptSel\.length > 0 \|\| areaSel\.length > 0\}[\s\S]*onClearScope=\{clearTodayScope\}/);
   assert.match(source, /<UpdateView acts=\{filteredActs\} readableActs=\{todayActs\}[\s\S]*pendingProgressLink=\{moHangMuc\}[\s\S]*onProgressLinkConsumed=\{consumeProgressLink\}/);
 });
 
-test("shell normalizes unlinked onlyMine and Today bar does not claim remembered period", async () => {
+test("Today bar does not claim remembered period", async () => {
   const source = await readFile(new URL("../../src/App.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /useState\(currentPersonId \? khoiTao\.onlyMine : false\)/);
-  assert.match(source, /onlyMine: currentPersonId \? onlyMine : false/);
-  assert.match(source, /setOnlyMine\(currentPersonId \? s\.onlyMine : false\)/);
-  assert.match(source, /disabled=\{!personLinked\}[\s\S]*Việc của tôi/);
-  assert.match(source, /Tài khoản chưa liên kết nhân sự/);
   assert.match(source, /disabled=\{todayMode\}[\s\S]*aria-label="Từ ngày"/);
   assert.match(source, /disabled=\{todayMode\}[\s\S]*aria-label="Đến ngày"/);
   assert.match(source, /Việc hôm nay tự dùng cửa sổ 7 ngày/);

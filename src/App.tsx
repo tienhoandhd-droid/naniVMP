@@ -66,6 +66,11 @@ import { resolveAuthorizedView, resolveViewIntent } from "./lib/navigationContra
 import { overviewTarget } from "./lib/navigationTargets.ts";
 import { applyWorkloadCellNavigation } from "./lib/workloadNavigation.ts";
 import { createVisibleRefreshController } from "./lib/visibleRefresh.ts";
+import {
+  buildPersonProgressChoices,
+  canSelectPersonProgressScope,
+  type PersonProgressChoice,
+} from "./lib/personProgressScope.ts";
 import type { AccessContext, ScreenId } from "./lib/access.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
@@ -140,6 +145,12 @@ import {
   changePasswordErrorMessage,
   type ChangePasswordErrors,
 } from "./lib/passwordForm.ts";
+
+/* Chụp ý định link trước lần render đầu. React StrictMode dựng shell hai lần
+   ở môi trường dev; nếu đọc lại sau mount thứ nhất thì URL đã có thể được
+   chuẩn hóa và làm mất `me=1` trước mount thứ hai. */
+const INITIAL_PERSONAL_SCOPE_REQUESTED = typeof window !== "undefined"
+  && docUrl(window.location.hash).onlyMine;
 
 /* ===================== Change Password =====================
  * Đổi mật khẩu phải CHỨNG MINH bằng mật khẩu hiện tại (re-auth phía
@@ -1055,9 +1066,9 @@ function Overview({ acts, setView, access }: {
   const [sau, setSau] = useState(false);
   const soLoiDl = useMemo(() => runDataQualityChecks(acts).length, [acts]);
 
-  /* Năm việc gấp nhất của người đang đăng nhập — bản rút gọn của màn "Hôm
-     nay", đặt ngay trên trang đầu. Người ta mở app ra là để làm việc, nên
-     màn đầu phải có ít nhất một lối vào việc, không chỉ toàn số để ngắm. */
+  /* Năm việc gấp nhất trong phạm vi đang chọn — cả nhóm hoặc một nhân sự.
+     Đây là bản rút gọn của màn "Hôm nay", đặt ngay trên trang đầu để màn
+     tổng quan có lối vào việc, không chỉ toàn số để ngắm. */
   const vieCGap = useMemo(() => {
     const homNay = vmpToday().getTime();
     return acts
@@ -1357,7 +1368,7 @@ function GlobalFilterBar({
   areaSel, setAreaSel, deptSel, setDeptSel, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
   areaOptions, deptOptions, shown, total, soNgung = 0,
-  onlyMine, setOnlyMine, personLinked,
+  showPersonSelector, selectedPersonId, setSelectedPersonId, personOptions,
   todayPersonScope, setTodayPersonScope, currentPersonId,
   todayMode = false,
 }: {
@@ -1377,10 +1388,11 @@ function GlobalFilterBar({
   total: number;
   /** Số hạng mục Không áp dụng / Đã huỷ — KHÔNG tính vào mẫu số. */
   soNgung?: number;
-  onlyMine: boolean;
-  setOnlyMine: (v: boolean) => void;
-  /** Tài khoản chỉ được bật phạm vi cá nhân khi đã nối khóa nhân sự chính tắc. */
-  personLinked: boolean;
+  /** Chỉ Admin/Quản lý QA có thể đổi từ cả nhóm sang một người cụ thể. */
+  showPersonSelector: boolean;
+  selectedPersonId: string | null;
+  setSelectedPersonId: (personId: string | null) => void;
+  personOptions: readonly PersonProgressChoice[];
   todayPersonScope: TodayPersonScope;
   setTodayPersonScope: (scope: TodayPersonScope) => void;
   currentPersonId: string | null;
@@ -1409,16 +1421,17 @@ function GlobalFilterBar({
   const toggleDept = (v: string) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
   const toggleArea = (v: string) => setAreaSel(areaSel.includes(v) ? areaSel.filter((x) => x !== v) : [...areaSel, v]);
   const active = deptSel.length > 0 || areaSel.length > 0
-    || (!todayMode && (!!customFrom || !!customTo || onlyMine));
+    || (showPersonSelector && selectedPersonId !== null)
+    || (!todayMode && (!!customFrom || !!customTo));
   const soLoc = deptSel.length + areaSel.length + (!todayMode && (customFrom || customTo) ? 1 : 0);
   const resetAll = () => {
     setDeptSel([]);
     setAreaSel([]);
+    setSelectedPersonId(null);
     if (!todayMode) {
       setPeriod("all");
       setCustomFrom("");
       setCustomTo("");
-      setOnlyMine(false);
     }
   };
   // Thời gian CHỈ theo mốc ngày: có nhập ngày -> bật lọc "custom"; xoá hết -> "all".
@@ -1443,37 +1456,29 @@ function GlobalFilterBar({
   return (
     <div aria-label="Phạm vi toàn hệ thống" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
       <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>
-      {todayMode ? (
+      {showPersonSelector ? (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 7, color: C.plumSoft,
+          fontFamily: TEXT, fontSize: 12, fontWeight: 800 }}>
+          <Users size={14} />
+          <span>Theo nhân sự</span>
+          <select aria-label="Chọn nhân sự xem tiến độ" value={selectedPersonId ?? ""}
+            onChange={(event) => setSelectedPersonId(event.target.value || null)}
+            style={{ ...INP, width: "auto", minWidth: 210, padding: "7px 30px 7px 10px", fontSize: 12 }}>
+            <option value="">Cả nhóm</option>
+            {personOptions.map((person) => (
+              <option key={person.personId} value={person.personId}>
+                {person.label}{person.personId === currentPersonId ? " (Tôi)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : todayMode ? (
         <TodayScopeControl
           scope={todayPersonScope}
           currentPersonId={currentPersonId}
           onChange={setTodayPersonScope}
         />
-      ) : (
-        <>
-          {/* Việc của tôi — lọc theo khóa nhân sự owner/support chính tắc.
-              Đứng riêng ngoài hộp "+ Lọc" vì đây là thao tác dùng mỗi ngày, giấu
-              vào trong hộp thì coi như không có. */}
-          <button type="button" onClick={() => setOnlyMine(!onlyMine)} aria-pressed={onlyMine}
-            disabled={!personLinked}
-            title={personLinked
-              ? "Chỉ hiện hạng mục có khóa nhân sự của bạn ở người phụ trách hoặc người hỗ trợ"
-              : "Tài khoản chưa liên kết nhân sự nên chưa thể lọc Việc của tôi"}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8,
-              border: `1px solid ${onlyMine ? C.mintText : C.pinkSoft}`,
-              background: onlyMine ? C.mintSoft : "transparent",
-              color: onlyMine ? C.mintText : C.plumSoft,
-              opacity: personLinked ? 1 : 0.55,
-              fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: personLinked ? "pointer" : "not-allowed" }}>
-            <Users size={14} /> Việc của tôi
-          </button>
-          {!personLinked && (
-            <span style={{ fontSize: 11, color: C.marigoldText, fontWeight: 700 }}>
-              Tài khoản chưa liên kết nhân sự; nhờ Admin nối hồ sơ để dùng Việc của tôi.
-            </span>
-          )}
-        </>
-      )}
+      ) : null}
 
       {/* + Lọc (Bộ phận / Khu vực) */}
       <div ref={popRef} style={{ position: "relative" }}>
@@ -1700,7 +1705,20 @@ function VerifiedAppShell({ user, logout, access }: {
   const [periodFilter, setPeriodFilter] = useState(khoiTao.period);
   const [customFrom, setCustomFrom] = useState(khoiTao.customFrom);   // yyyy-mm-dd
   const [customTo, setCustomTo] = useState(khoiTao.customTo);         // yyyy-mm-dd
-  const [onlyMine, setOnlyMine] = useState(currentPersonId ? khoiTao.onlyMine : false);
+  const canSelectProgressPerson = canSelectPersonProgressScope(access.businessRole);
+  const initialPersonalScopeRequested = useRef(INITIAL_PERSONAL_SCOPE_REQUESTED);
+  /** Mặc định là cả nhóm; chỉ link `me=1` tường minh mở chính người đăng nhập. */
+  const [selectedProgressPersonId, setSelectedProgressPersonId] = useState<string | null>(() => {
+    return initialPersonalScopeRequested.current && canSelectProgressPerson ? currentPersonId : null;
+  });
+  const personProgressChoices = useMemo(() => buildPersonProgressChoices(acts), [acts]);
+  const selectedProgressPerson = useMemo(() => personProgressChoices.find(
+    (person) => person.personId === selectedProgressPersonId) ?? null,
+  [personProgressChoices, selectedProgressPersonId]);
+  const progressPersonScopeId = !canSelectProgressPerson || selectedProgressPersonId === null
+    ? null
+    : selectedProgressPerson?.personId
+      ?? (conn.status === "idle" || conn.status === "loading" ? selectedProgressPersonId : null);
   const [todayPersonScope, setTodayPersonScope] = useState<TodayPersonScope>(() =>
     defaultTodayPersonScope(access.businessRole, currentPersonId));
   const daChonPhamViToday = useRef(false);
@@ -1709,8 +1727,15 @@ function VerifiedAppShell({ user, logout, access }: {
     setTodayPersonScope(scope);
   }, []);
   useEffect(() => {
-    if (!currentPersonId && onlyMine) setOnlyMine(false);
-  }, [currentPersonId, onlyMine]);
+    if (!initialPersonalScopeRequested.current || !canSelectProgressPerson || currentPersonId === null) return;
+    initialPersonalScopeRequested.current = false;
+    setSelectedProgressPersonId(currentPersonId);
+  }, [canSelectProgressPerson, currentPersonId]);
+  useEffect(() => {
+    if (selectedProgressPersonId !== progressPersonScopeId) {
+      setSelectedProgressPersonId(progressPersonScopeId);
+    }
+  }, [progressPersonScopeId, selectedProgressPersonId]);
   useEffect(() => {
     setTodayPersonScope((scope) => daChonPhamViToday.current
       ? normalizeTodayPersonScope(scope, currentPersonId)
@@ -1774,31 +1799,30 @@ function VerifiedAppShell({ user, logout, access }: {
     }
     return inPeriod(a, periodFilter);
   }, [periodFilter, customFrom, customTo]);
-  /* "Việc của tôi" chỉ dùng khóa người chính tắc; tên hiển thị trùng nhau
-     không được phép quyết định phạm vi dữ liệu. */
-  const laViecCuaToi = useCallback((a: Activity) => {
-    if (!onlyMine) return true;
-    return currentPersonId !== null && isTodayActivityMine(a, currentPersonId);
-  }, [currentPersonId, onlyMine]);
-
   const filteredActs = useMemo(() => acts.filter((a) => (
     (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) &&
     inDept(a) &&
-    matchTime(a) &&
-    laViecCuaToi(a)
-  )), [acts, areaSel, inDept, matchTime, laViecCuaToi]);
+    matchTime(a)
+  )), [acts, areaSel, inDept, matchTime]);
+  const overviewActs = useMemo(() => progressPersonScopeId === null
+    ? filteredActs
+    : filteredActs.filter((activity) => isTodayActivityMine(activity, progressPersonScopeId)),
+  [filteredActs, progressPersonScopeId]);
+  const todaySelectedPersonId = canSelectProgressPerson
+    ? progressPersonScopeId
+    : todayPersonScope === "mine" ? currentPersonId : null;
   const todayActs = useMemo(() => filterTodayScope(acts, {
     areas: areaSel,
     departments: deptSel,
-    onlyMine: todayPersonScope === "mine",
-    currentPersonId,
-  }), [acts, areaSel, currentPersonId, deptSel, todayPersonScope]);
+    onlyMine: todaySelectedPersonId !== null,
+    currentPersonId: todaySelectedPersonId,
+  }), [acts, areaSel, deptSel, todaySelectedPersonId]);
   const allTodayActs = useMemo(() => filterTodayScope(acts, {
     areas: [],
     departments: [],
-    onlyMine: todayPersonScope === "mine",
-    currentPersonId,
-  }), [acts, currentPersonId, todayPersonScope]);
+    onlyMine: todaySelectedPersonId !== null,
+    currentPersonId: todaySelectedPersonId,
+  }), [acts, todaySelectedPersonId]);
   /* Mẫu số của thanh lọc phải đếm HẠNG MỤC ĐANG HOẠT ĐỘNG.
      Đo được: RPC trả 461 dòng = 448 đang hoạt động + 13 "Không áp dụng".
      Thanh lọc ghi 461 nhưng mọi màn bên dưới đều lọc bỏ 13 dòng kia, nên
@@ -1809,6 +1833,7 @@ function VerifiedAppShell({ user, logout, access }: {
   const laSong = (a: Activity) => (a.state || "active") === "active";
   const soSong = useMemo(() => acts.filter(laSong).length, [acts]);
   const soSongHien = useMemo(() => filteredActs.filter(laSong).length, [filteredActs]);
+  const soSongOverview = useMemo(() => overviewActs.filter(laSong).length, [overviewActs]);
   const soSongToday = useMemo(() => todayActs.filter(laSong).length, [todayActs]);
   const soSongTodayTotal = useMemo(() => allTodayActs.filter(laSong).length, [allTodayActs]);
   const soNgung = acts.length - soSong;
@@ -1831,8 +1856,12 @@ function VerifiedAppShell({ user, logout, access }: {
    * ------------------------------------------------------------------- */
   const trangThaiUrl = useMemo<UrlState>(() => ({
     view, deptSel, areaSel, period: periodFilter, customFrom, customTo,
-    onlyMine: currentPersonId ? onlyMine : false,
-  }), [view, deptSel, areaSel, periodFilter, customFrom, customTo, currentPersonId, onlyMine]);
+    // Giữ tương thích link `me=1` cũ khi người được chọn chính là tài khoản hiện tại.
+    onlyMine: (view === "today" || view === "overview")
+      && canSelectProgressPerson
+      && (initialPersonalScopeRequested.current
+        || (progressPersonScopeId !== null && progressPersonScopeId === currentPersonId)),
+  }), [view, deptSel, areaSel, periodFilter, customFrom, customTo, canSelectProgressPerson, currentPersonId, progressPersonScopeId]);
 
   const viewTruoc = useRef(view);
   useEffect(() => {
@@ -1874,12 +1903,16 @@ function VerifiedAppShell({ user, logout, access }: {
     if (areaSel.length > 0) phan.push(`khu vực ${areaSel.join(", ")}`);
     const kyHan = PERIODS.find(([id]) => id === periodFilter)?.[1];
     if (kyHan && periodFilter !== "all") phan.push(String(kyHan).toLowerCase());
-    if (onlyMine) phan.push("việc của tôi");
     return phan.join(" · ");
-  }, [deptSel, areaSel, periodFilter, onlyMine]);
+  }, [deptSel, areaSel, periodFilter]);
 
   const nhanPhamViToday = useMemo(() => {
-    const phan: string[] = [presentTodayPersonScope(todayPersonScope, currentPersonId).heading];
+    const heading = canSelectProgressPerson
+      ? selectedProgressPerson
+        ? `Việc hôm nay của ${selectedProgressPerson.fullName}`
+        : "Việc hôm nay của cả nhóm"
+      : presentTodayPersonScope(todayPersonScope, currentPersonId).heading;
+    const phan: string[] = [heading];
     if (deptSel.length > 0) {
       phan.push(deptSel.map((id) => DEPTS.find((d) => d.id === id)?.short || id).join(", "));
     } else {
@@ -1887,7 +1920,7 @@ function VerifiedAppShell({ user, logout, access }: {
     }
     if (areaSel.length > 0) phan.push(`khu vực ${areaSel.join(", ")}`);
     return phan.join(" · ");
-  }, [areaSel, currentPersonId, deptSel, todayPersonScope]);
+  }, [areaSel, canSelectProgressPerson, currentPersonId, deptSel, selectedProgressPerson, todayPersonScope]);
 
   const clearTodayScope = useCallback(() => {
     setDeptSel([]);
@@ -1934,7 +1967,7 @@ function VerifiedAppShell({ user, logout, access }: {
       setPeriodFilter(s.period);
       setCustomFrom(s.customFrom);
       setCustomTo(s.customTo);
-      setOnlyMine(currentPersonId ? s.onlyMine : false);
+      setSelectedProgressPersonId(canSelectProgressPerson && s.onlyMine ? currentPersonId : null);
     };
     window.addEventListener("popstate", apDung);
     window.addEventListener("hashchange", apDung);
@@ -1942,7 +1975,7 @@ function VerifiedAppShell({ user, logout, access }: {
       window.removeEventListener("popstate", apDung);
       window.removeEventListener("hashchange", apDung);
     };
-  }, [chuanHoaView, currentPersonId, rawUrlViews]);
+  }, [canSelectProgressPerson, chuanHoaView, currentPersonId, rawUrlViews]);
 
   // (MỚI) Giữ dữ liệu tươi: làm mới khi quay lại tab; RELOAD khi sang NGÀY MỚI
   // (VMP_TODAY và "hôm nay" tính lúc tải trang → tránh "quá hạn/ngày còn lại" bị cũ khi mở lâu).
@@ -2075,13 +2108,15 @@ function VerifiedAppShell({ user, logout, access }: {
                 customFrom={customFrom} setCustomFrom={setCustomFrom}
                 customTo={customTo} setCustomTo={setCustomTo}
                 areaOptions={areaOptions} deptOptions={deptOptions}
-                shown={view === "today" ? soSongToday : soSongHien}
+                shown={view === "today" ? soSongToday : view === "overview" ? soSongOverview : soSongHien}
                 total={view === "today" ? soSongTodayTotal : soSong}
                 soNgung={view === "today" ? soNgungToday : soNgung}
-                onlyMine={onlyMine} setOnlyMine={setOnlyMine}
+                showPersonSelector={canSelectProgressPerson && (view === "overview" || view === "today")}
+                selectedPersonId={progressPersonScopeId} setSelectedPersonId={setSelectedProgressPersonId}
+                personOptions={personProgressChoices}
                 todayPersonScope={todayPersonScope} setTodayPersonScope={chonPhamViToday}
                 currentPersonId={currentPersonId}
-                personLinked={currentPersonId !== null} todayMode={view === "today"}
+                todayMode={view === "today"}
               />
             )}
 
@@ -2106,7 +2141,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   onClearScope={clearTodayScope}
                   onOpenProgress={moTienDo} />
               )}
-              {view === "overview" && <Overview acts={filteredActs} setView={setView} access={access} />}
+              {view === "overview" && <Overview acts={overviewActs} setView={setView} access={access} />}
               {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} businessRole={access.businessRole} onReload={reloadData} />}
               {view === "source" && (
                 <SourceCatalogView access={access} onReload={reloadData}

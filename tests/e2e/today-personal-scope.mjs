@@ -325,8 +325,8 @@ try {
       await assertScopeButton(page, "Xem việc cả đội");
       assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của tôi/,
         "linked QA staff opens Today in personal scope");
-      assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get("me")), "1",
-        "pre-existing global My work URL state reaches Today unchanged");
+      assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get("me")), null,
+        "QA staff cannot retain a hidden global My work URL state");
 
       await page.click('button[aria-label="Xem việc cả đội"]');
       await waitForTodayCodes(page, [CODE.sameNameUnrelated]);
@@ -342,24 +342,23 @@ try {
       await selectGlobalFilter(page, "QA-AREA-E2E");
       await page.waitForFunction(() => {
         const hash = new URLSearchParams(location.hash.slice(1));
-        return hash.get("dept") === "qa" && hash.get("area") === "QA-AREA-E2E" && hash.get("me") === "1";
+        return hash.get("dept") === "qa" && hash.get("area") === "QA-AREA-E2E" && hash.get("me") === null;
       }, { timeout: 5_000 });
       await clearGlobalFilters(page);
       await assertScopeButton(page, "Chỉ xem việc của tôi");
       assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của cả đội/,
         "clearing department and area leaves the explicit Today team scope unchanged");
-      assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get("me")), "1",
-        "clearing Today department and area does not mutate the global My work URL state");
+      assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get("me")), null,
+        "clearing Today department and area does not create a global My work URL state");
 
       await page.click('[data-view="overview"]');
       await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Tổng quan"), { timeout: 5_000 });
       const overviewGlobalState = await page.evaluate(() => ({
         hash: new URLSearchParams(location.hash.slice(1)).get("me"),
-        onlyMine: [...document.querySelectorAll('[aria-label="Phạm vi toàn hệ thống"] button')]
-          .find((button) => button.textContent?.includes("Việc của tôi"))?.getAttribute("aria-pressed"),
+        personSelector: document.querySelector('select[aria-label="Chọn nhân sự xem tiến độ"]') !== null,
       }));
-      assert.deepEqual(overviewGlobalState, { hash: "1", onlyMine: "true" },
-        "global My work remains enabled after Today filters reset");
+      assert.deepEqual(overviewGlobalState, { hash: null, personSelector: false },
+        "QA staff overview does not expose the privileged person selector");
       await page.click('[data-view="today"]');
       await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Việc hôm nay"), { timeout: 5_000 });
       await assertScopeButton(page, "Chỉ xem việc của tôi");
@@ -378,17 +377,48 @@ try {
     const { page, chanNgoai } = await openToday(persona);
     try {
       await waitForTodayCodes(page, [CODE.owner, CODE.sameNameUnrelated, persona.ownCode]);
-      await assertScopeButton(page, "Chỉ xem việc của tôi");
-      assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của cả đội/,
+      await page.waitForSelector('select[aria-label="Chọn nhân sự xem tiến độ"]');
+      assert.equal(await page.$eval('select[aria-label="Chọn nhân sự xem tiến độ"]', (select) => select.value), "",
+        `${persona.label} opens in team scope`);
+      assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của cả nhóm/,
         `${persona.label} opens Today in team scope`);
 
-      await page.click('button[aria-label="Chỉ xem việc của tôi"]');
-      await waitForExactTodayCodes(page, [persona.ownCode]);
-      const personalCodes = await visibleTodayCodes(page);
-      assert.ok(!personalCodes.includes(CODE.owner) && !personalCodes.includes(CODE.sameNameUnrelated),
-        `${persona.label} can narrow team Today to its linked canonical performer`);
-      await assertScopeButton(page, "Xem việc cả đội");
+      await page.select('select[aria-label="Chọn nhân sự xem tiến độ"]', PERSON.staff);
+      await waitForExactTodayCodes(page, [CODE.owner, CODE.support]);
+      assert.match(await page.$eval(".hn-mota", (node) => node.textContent || ""), /Việc hôm nay của QA Trùng Tên/,
+        `${persona.label} can inspect another person's Today scope by canonical ID`);
+      await page.click('[data-view="overview"]');
+      await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Tổng quan"), { timeout: 5_000 });
+      assert.equal(await page.$eval('select[aria-label="Chọn nhân sự xem tiến độ"]', (select) => select.value), PERSON.staff,
+        `${persona.label} keeps the selected person when moving to Overview`);
+      const completionTile = await page.evaluate(() => [...document.querySelectorAll(".vmp-tile")]
+        .find((tile) => tile.textContent?.includes("Hoàn thành VMP"))?.textContent ?? "");
+      assert.match(completionTile, /0\/2 hạng mục/,
+        `${persona.label} Overview completion denominator is recalculated for the selected person`);
       assert.equal(chanNgoai.length, 0, `${persona.label} scenario must remain fully intercepted`);
+    } finally {
+      await page.close();
+    }
+  }
+
+  {
+    const { page, chanNgoai } = await openToday({
+      user: USER.admin,
+      businessRole: "admin",
+      personId: PERSON.admin,
+      hash: "v=today&me=1",
+    });
+    try {
+      await page.waitForSelector('select[aria-label="Chọn nhân sự xem tiến độ"]');
+      const legacyState = await page.evaluate(() => ({
+        selected: document.querySelector('select[aria-label="Chọn nhân sự xem tiến độ"]')?.value ?? null,
+        personId: JSON.parse(localStorage.getItem("vmp_monitor_user_v1") || "null")?.personId ?? null,
+        me: new URLSearchParams(location.hash.slice(1)).get("me"),
+      }));
+      assert.deepEqual(legacyState, { selected: PERSON.admin, personId: PERSON.admin, me: "1" },
+        "an explicit legacy me=1 link still opens the signed-in Admin's canonical scope");
+      await waitForExactTodayCodes(page, [CODE.admin]);
+      assert.equal(chanNgoai.length, 0, "Admin legacy link scenario must remain fully intercepted");
     } finally {
       await page.close();
     }
@@ -462,6 +492,8 @@ try {
       objects: [],
     });
     try {
+      await page.waitForFunction(() => document.querySelector('button[aria-label="Chỉ xem việc của tôi"]'),
+        { timeout: 5_000 });
       const state = await page.evaluate(() => {
         const action = document.querySelector('button[aria-label="Chỉ xem việc của tôi"]');
         return {
