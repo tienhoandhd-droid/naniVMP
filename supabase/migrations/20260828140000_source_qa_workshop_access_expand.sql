@@ -2,8 +2,6 @@
 -- and performance contracts. This migration deliberately does not reconcile
 -- existing projections. The legacy refresh path is fenced until enforce.
 
-\set ON_ERROR_STOP on
-
 begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '180s';

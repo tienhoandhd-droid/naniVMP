@@ -1,8 +1,6 @@
 -- Source QA/workshop access enforcement. This migration repairs the additive
 -- projection created by expand, then atomically installs writer-time rights.
 
-\set ON_ERROR_STOP on
-
 begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '300s';

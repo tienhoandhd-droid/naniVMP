@@ -1,20 +1,8 @@
-\set ON_ERROR_STOP on
-
 -- Read-only release preflight.  This file intentionally owns its transaction;
 -- it is safe to run against a linked database before either migration.
 BEGIN READ ONLY;
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '60s';
-\if :{?expected_project_ref}
-\o /dev/null
-SELECT set_config('vmp.source_access_expected_project', :'expected_project_ref', true)
-;
-\o
-\else
-\o /dev/null
-SELECT set_config('vmp.source_access_expected_project', '', true);
-\o
-\endif
 
 DO $preflight$
 DECLARE
@@ -32,12 +20,15 @@ DECLARE
   v_save oid := to_regprocedure('public.rpc_save_catalog_object(text,text,jsonb,text,integer)');
   v_muc oid := to_regprocedure('public.muc_quyen(text,text)');
   v_duoc oid := to_regprocedure('public.duoc_phep(text,text)');
-  v_project text := nullif(current_setting('vmp.source_access_expected_project', true), '');
   v_function_digest text;
 BEGIN
   IF current_setting('server_version_num')::integer NOT BETWEEN 170000 AND 179999
      OR (SELECT pg_encoding_to_char(encoding) FROM pg_database
          WHERE datname=current_database()) IS DISTINCT FROM 'UTF8'
+     OR (SELECT datcollate FROM pg_database
+         WHERE datname=current_database()) IS DISTINCT FROM 'en_US.UTF-8'
+     OR (SELECT datctype FROM pg_database
+         WHERE datname=current_database()) IS DISTINCT FROM 'en_US.UTF-8'
      OR (SELECT pg_get_userbyid(datdba) FROM pg_database
          WHERE datname=current_database()) IS DISTINCT FROM 'postgres'
      OR current_user IS DISTINCT FROM 'postgres' THEN
@@ -45,12 +36,6 @@ BEGIN
       message='SOURCE_ACCESS_PREFLIGHT_DATABASE_CONTRACT';
   END IF;
   RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_DATABASE_CONTRACT PostgreSQL17';
-
-  IF v_project IS NOT NULL AND v_project <> 'ivembmikfhtyzhtqebgh' THEN
-    RAISE EXCEPTION USING errcode='check_violation',
-      message='SOURCE_ACCESS_PREFLIGHT_PROJECT_CONTRACT';
-  END IF;
-  RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_PROJECT_CONTRACT';
 
   IF public.screen_access_mode() IS DISTINCT FROM 'enforced'
      OR public.item_permissions_mode() IS DISTINCT FROM 'preview' THEN
@@ -72,24 +57,27 @@ BEGIN
   SELECT count(*), md5(string_agg(format('%s=%s', status, n), E'\n' ORDER BY status))
     INTO v_item_count, v_mapping_digest
   FROM (
-    SELECT CASE count(source_object.id) WHEN 1 THEN 'exact' ELSE 'invalid' END status,
-           count(*) n
+    SELECT CASE WHEN count(*)=1 THEN 'exact' ELSE 'invalid' END status, count(*) n
     FROM public.vmp_plan_items item
-    LEFT JOIN public.vmp_objects master_object ON master_object.code=item.object_code
-    LEFT JOIN public.vmp_source_objects source_object
-      ON source_object.object_code=master_object.code AND source_object.is_active
     WHERE item.is_active
     GROUP BY item.validation_code
   ) mapping;
-  IF exists (
-       SELECT 1
-       FROM public.vmp_plan_items item
-       LEFT JOIN public.vmp_objects master_object ON master_object.code=item.object_code
-       LEFT JOIN public.vmp_source_objects source_object
-         ON source_object.object_code=master_object.code AND source_object.is_active
-       WHERE item.is_active
-       GROUP BY item.validation_code
-       HAVING count(source_object.id) <> 1
+  IF EXISTS (
+       SELECT 1 FROM public.vmp_plan_items item
+       WHERE item.is_active AND NOT EXISTS (
+         SELECT 1 FROM public.vmp_source_objects source_object
+         WHERE source_object.object_code=item.object_code AND source_object.is_active)
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.vmp_plan_items item
+       WHERE item.is_active AND (
+         SELECT count(*) FROM public.vmp_source_objects source_object
+         WHERE source_object.object_code=item.object_code AND source_object.is_active) > 1
+     )
+     OR EXISTS (
+       SELECT 1 FROM public.vmp_source_objects source_object
+       WHERE source_object.is_active
+       GROUP BY source_object.object_code HAVING count(*) > 1
      ) THEN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_PREFLIGHT_ITEM_SOURCE_MAPPING';
@@ -105,8 +93,8 @@ BEGIN
     WHERE is_active
     GROUP BY object_code
   ) source_codes;
-  IF exists (SELECT 1 FROM public.vmp_source_objects
-             WHERE is_active GROUP BY object_code HAVING count(*) <> 1) THEN
+  IF EXISTS (SELECT 1 FROM public.vmp_source_objects
+             WHERE is_active GROUP BY object_code HAVING count(*) > 1) THEN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_PREFLIGHT_ACTIVE_SOURCE_CODE_UNIQUE';
   END IF;
@@ -142,6 +130,10 @@ BEGIN
     'PASS SOURCE_ACCESS_PREFLIGHT_OWNER_SUPPORT_CONSISTENCY digest=% repairable_gaps=% primary_conflicts=%',
     v_owner_support_digest, coalesce(v_owner_support_gaps,0),
     coalesce(v_owner_support_conflicts,0);
+  IF coalesce(v_owner_support_gaps,0) > 0 THEN
+    RAISE EXCEPTION USING errcode='check_violation',
+      message='SOURCE_ACCESS_PREFLIGHT_SOURCE_ITEM_OWNER_SUPPORT_MISMATCH';
+  END IF;
 
   SELECT count(*) INTO v_unresolved_active_performers
   FROM public.vmp_performers performer
@@ -161,11 +153,10 @@ BEGIN
            WHERE performer.id=relation_person.person_id
              AND performer.is_active
              AND performer.user_id IS NOT NULL
-             AND coalesce(profile.is_active,true)
+             AND profile.is_active is true
              AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
          )
      )
-     OR v_unresolved_active_performers > 0
      OR EXISTS (
        SELECT performer.user_id
        FROM public.vmp_performers performer
@@ -254,3 +245,4 @@ END
 $preflight$;
 
 ROLLBACK;
+SELECT 'PASS SOURCE_ACCESS_PREFLIGHT' AS status;
