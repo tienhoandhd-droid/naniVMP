@@ -23,6 +23,12 @@ function rawOf(activity: Activity): ActivityRecord {
   return raw && typeof raw === "object" ? raw as ActivityRecord : {};
 }
 
+function activityState(activity: Activity): string {
+  const source = recordOf(activity);
+  const raw = rawOf(activity);
+  return String(source.state ?? raw.state ?? "active");
+}
+
 function firstValue(activity: Activity, keys: readonly string[]): unknown {
   const source = recordOf(activity);
   const raw = rawOf(activity);
@@ -85,7 +91,7 @@ export function classifyVmpDeadline(
   soonDays: number,
 ): VmpDeadlineState {
   const date = vmpDeadlineDate(activity);
-  if (isVmpComplete(activity) || String(activity?.state ?? "active") !== "active") {
+  if (isVmpComplete(activity) || activityState(activity) !== "active") {
     return { kind: "done", date, daysRemaining: null };
   }
   if (date === null) return { kind: "missing", date: null, daysRemaining: null };

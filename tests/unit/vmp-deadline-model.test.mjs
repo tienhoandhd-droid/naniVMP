@@ -49,11 +49,20 @@ test("completed VMP and inactive rows are done regardless of deadline", () => {
     { state: "active", st: "prog", dlVmp: "2026-08-01", actVmp: "2026-08-02" },
     { state: "active", st: "prog", dlVmp: "2026-08-01", _raw: { vmp_done: true } },
     { state: "active", st: "prog", dlVmp: "2026-08-01", _raw: { tt_vmp: "completed" } },
-    { state: "cancelled", st: "prog", dlVmp: "2026-08-01", _raw: { tt_vmp: "not_started" } },
+    { st: "prog", dlVmp: "2026-08-01", _raw: { state: "cancelled", tt_vmp: "not_started" } },
   ]) {
     assert.equal(isVmpComplete(activity), activity.st === "done" || activity.actVmp || activity._raw?.vmp_done || activity._raw?.tt_vmp === "completed" ? true : false);
     assert.equal(classifyVmpDeadline(activity, NOW, 7).kind, "done");
   }
+});
+
+test("treats an inactive raw state as non-overdue", () => {
+  assert.deepEqual(classifyVmpDeadline({
+    st: "prog", dlVmp: "2026-08-01",
+    _raw: { state: "cancelled", tt_vmp: "not_started" },
+  }, NOW, 7), {
+    kind: "done", date: "2026-08-01", daysRemaining: null,
+  });
 });
 
 test("recognizes actual VMP dates and completed status aliases", () => {
