@@ -309,6 +309,96 @@ $pre_expand_fixture$;
 \echo 'PASS PRE-EXPAND nonzero constraint-valid repair rollback fixture'
 SQL
 
+psql -X -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
+-- Existing Source selections can point at a performer that is no longer an
+-- eligible QA principal. Keep this fixture in the pre-expand snapshot so both
+-- migrations must accept and preserve it before the post-enforce SQL probes.
+insert into auth.users(
+  id,aud,role,email,encrypted_password,email_confirmed_at,
+  raw_app_meta_data,raw_user_meta_data,created_at,updated_at
+) values (
+  '9a060000-0000-4000-8000-000000000001','authenticated','authenticated',
+  'source-ineligible-admin@example.test','x',now(),'{}','{}',now(),now()
+);
+
+insert into public.profiles(
+  id,full_name,email,role,department,is_active
+) values (
+  '9a060000-0000-4000-8000-000000000001',
+  'Source Ineligible Admin','source-ineligible-admin@example.test',
+  'admin'::public.user_role,'QA',true
+);
+
+insert into public.vmp_performers(
+  id,performer_name,email,department,is_active,user_id,access_class
+)
+select
+  '9a060000-0000-4000-8000-000000000002',
+  'Source Ineligible Admin','source-ineligible-admin@example.test',
+  'QA',true,'9a060000-0000-4000-8000-000000000001','qa_progress_editor'
+where not exists (
+  select 1 from public.vmp_performers performer
+  where performer.user_id='9a060000-0000-4000-8000-000000000001'
+);
+
+update public.vmp_performers
+set performer_name='Source Ineligible Admin',
+    email='source-ineligible-admin@example.test', department='QA',
+    is_active=true, access_class='qa_progress_editor'
+where user_id='9a060000-0000-4000-8000-000000000001';
+
+insert into public.vmp_performers(
+  performer_name,email,department,is_active,user_id,access_class
+) values (
+  'Source Ineligible Missing User','source-ineligible-missing@example.test',
+  'QA',true,null,'qa_progress_editor'
+);
+
+insert into public.vmp_objects(
+  code,name,classification,department,area,line,frequency_months
+) values (
+  'SACCESS-INELIGIBLE','Source ineligible relation fixture','tb',
+  'QA','SACCESS_INELIGIBLE_AREA','SACCESS_INELIGIBLE_LINE',12
+);
+
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision,
+  owner_person_id,owner_name,support_person_id,support_name
+)
+select '9a060000-0000-4000-8000-000000000101','Thiết bị',
+       'SACCESS-INELIGIBLE','Source ineligible relation fixture','QA',
+       'SACCESS_INELIGIBLE_AREA','SACCESS_INELIGIBLE_LINE','y',12,'Hóa lý',
+       5,1,2026,'source-access-ineligible',96010,1,0,0,
+       admin_performer.id,admin_performer.performer_name,
+       missing_performer.id,missing_performer.performer_name
+from public.vmp_performers admin_performer
+cross join public.vmp_performers missing_performer
+where admin_performer.user_id='9a060000-0000-4000-8000-000000000001'::uuid
+  and missing_performer.email='source-ineligible-missing@example.test';
+
+insert into public.vmp_plan_items(
+  id,validation_code,object_code,validation_type,year,report_class,effort_days,
+  deadline_protocol,deadline_validation,deadline_report,deadline_vmp,
+  status_protocol,status_validation,status_report,status_vmp,is_active,
+  item_state,version,departments,execution_departments,source_sheet_data,
+  owner_person_id,support_person_id,owner_name,secondary_owner
+)
+select 'SACCESS-INELIGIBLE/2026.01-PQ',
+       'SACCESS-INELIGIBLE/2026.01-PQ','SACCESS-INELIGIBLE','PQ',2026,
+       'Hóa lý',5,current_date+30,current_date+60,current_date+90,
+       current_date+120,'not_started','not_started','not_started','not_started',
+       true,'active',1,array['QA'],array['QA'],
+       '{"fixture":"source-access-ineligible"}'::jsonb,
+       admin_performer.id,missing_performer.id,
+       admin_performer.performer_name,missing_performer.performer_name
+from public.vmp_performers admin_performer
+cross join public.vmp_performers missing_performer
+where admin_performer.user_id='9a060000-0000-4000-8000-000000000001'::uuid
+  and missing_performer.email='source-ineligible-missing@example.test';
+SQL
+
 projection_state() {
   psql -X -qAt -v ON_ERROR_STOP=1 -d "$test_database" <<'SQL'
 with source_projection as (
@@ -359,6 +449,8 @@ declare
   v_function regprocedure:=to_regprocedure('public.rpc_refresh_source_item_assignments()');
   v_definition text;
   v_result jsonb;
+  v_right record;
+  v_ineligible_link_count integer;
 begin
   if v_function is null then
     raise exception using errcode='check_violation',message=v_rule_id||' missing_stub';
@@ -382,6 +474,21 @@ end
 $function$
 $expected_stub$ then
     raise exception using errcode='check_violation',message=v_rule_id||' stub_definition';
+  end if;
+  select count(*) into v_ineligible_link_count
+  from public.vmp_source_objects source_object
+  join public.vmp_performers owner_performer
+    on owner_performer.id=source_object.owner_person_id
+   and owner_performer.user_id='9a060000-0000-4000-8000-000000000001'::uuid
+  join public.vmp_performers missing_performer
+    on missing_performer.id=source_object.support_person_id
+   and missing_performer.email='source-ineligible-missing@example.test'
+  where source_object.id='9a060000-0000-4000-8000-000000000101'::uuid
+    and source_object.is_active
+    and owner_performer.is_active
+    and missing_performer.user_id is null;
+  if v_ineligible_link_count <> 1 then
+    raise exception using errcode='check_violation',message=v_rule_id||' ineligible_source_link count='||v_ineligible_link_count;
   end if;
   if not exists (
        select 1 from pg_proc procedure
@@ -409,6 +516,40 @@ $expected_stub$ then
   if v_result->>'ok' is distinct from 'false'
      or v_result->>'error_code' is distinct from 'SOURCE_ACCESS_UPGRADE_IN_PROGRESS' then
     raise exception using errcode='check_violation',message=v_rule_id||' owner_invocation';
+  end if;
+
+  -- Existing ineligible relations are display-only: preserve linked IDs and
+  -- names, revoke all canonical Source labels, and grant no QA item rights.
+  if exists (
+       select 1 from public.vmp_item_assignments assignment
+       where assignment.validation_code='SACCESS-INELIGIBLE/2026.01-PQ'
+         and assignment.source in ('source_owner','source_support')
+         and assignment.is_active
+     ) then
+    raise exception using errcode='check_violation',message=v_rule_id||' ineligible_canonical';
+  end if;
+  if not exists (
+       select 1
+       from public.vmp_plan_items item
+       join public.vmp_source_objects source_object
+         on source_object.object_code=item.object_code and source_object.is_active
+       where item.validation_code='SACCESS-INELIGIBLE/2026.01-PQ'
+         and item.owner_person_id=source_object.owner_person_id
+         and item.support_person_id=source_object.support_person_id
+         and item.owner_name=source_object.owner_name
+         and item.secondary_owner=source_object.support_name
+     ) then
+    raise exception using errcode='check_violation',message=v_rule_id||' ineligible_display';
+  end if;
+  select * into strict v_right
+  from public.vmp_item_rights(
+    (select performer.id from public.vmp_performers performer
+     where performer.user_id='71000000-0000-4000-8000-000000000001'::uuid
+       and performer.is_active),
+    'SACCESS-INELIGIBLE/2026.01-PQ');
+  if v_right.can_view is not false
+     or v_right.editable_fields is distinct from '{}'::text[] then
+    raise exception using errcode='check_violation',message=v_rule_id||' ineligible_rights';
   end if;
 end
 $assert_expand_state$;

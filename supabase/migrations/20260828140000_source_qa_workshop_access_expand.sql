@@ -40,8 +40,11 @@ declare
   v_unresolved_performers bigint;
   v_projection_missing bigint;
   v_projection_conflicts bigint;
+  v_ineligible_current_relations bigint;
+  v_missing_relations bigint;
   v_canonical_missing bigint;
   v_canonical_multiple bigint;
+  v_master_mapping_issues bigint;
   v_duplicate_source_codes bigint;
   v_projection_mismatch bigint;
   v_is_fixture boolean;
@@ -532,12 +535,12 @@ begin
          where key = 'item_permissions_mode') is distinct from '"preview"'::jsonb
      or not exists (
        select 1 from public.profiles profile
-       where coalesce(profile.is_active, true)
+       where profile.is_active is true
          and public.vmp_business_role(profile.id) = 'admin'
      )
      or exists (
        select 1 from public.profiles profile
-       where coalesce(profile.is_active, true)
+       where profile.is_active is true
          and (profile.role::text = 'viewer'
               or public.vmp_business_role(profile.id) = 'viewer')
      ) then
@@ -597,7 +600,13 @@ begin
     select count(*) from public.vmp_source_objects source_object
     where source_object.object_code = item.object_code
       and source_object.is_active is true
-  ) > 1;
+    ) > 1;
+
+  select count(*) into v_master_mapping_issues
+  from public.vmp_plan_items item
+  where item.is_active is true
+    and (select count(*) from public.vmp_objects master_object
+         where master_object.code = item.object_code) <> 1;
 
   select count(*) into v_duplicate_source_codes
   from (
@@ -625,6 +634,10 @@ begin
     raise exception using errcode = 'check_violation',
       message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_CANONICAL_MULTIPLE count=' ||
                 v_canonical_multiple;
+  elsif v_master_mapping_issues > 0 then
+    raise exception using errcode = 'check_violation',
+      message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_MASTER_MAPPING count=' ||
+                v_master_mapping_issues;
   elsif v_duplicate_source_codes > 0 then
     raise exception using errcode = 'check_violation',
       message = 'SOURCE_ACCESS_EXPAND_PRECONDITION_DUPLICATE_SOURCE_CODE count=' ||
@@ -635,13 +648,18 @@ begin
                 v_projection_mismatch;
   end if;
 
-  if exists (
-    select 1
-    from public.vmp_source_objects source_object
-    cross join lateral unnest(array[
-      source_object.owner_person_id, source_object.support_person_id
-    ]) relation_person(person_id)
-    where relation_person.person_id is not null and not exists (
+  select count(*) into v_ineligible_current_relations
+  from public.vmp_source_objects source_object
+  cross join lateral unnest(array[
+    source_object.owner_person_id, source_object.support_person_id
+  ]) relation_person(person_id)
+  where source_object.is_active is true
+    and relation_person.person_id is not null
+    and exists (
+      select 1 from public.vmp_performers performer
+      where performer.id = relation_person.person_id
+    )
+    and not exists (
       select 1
       from public.vmp_performers performer
       join public.profiles profile on profile.id = performer.user_id
@@ -651,8 +669,21 @@ begin
         and public.vmp_business_role(performer.user_id) in (
           'qa_staff', 'qa_manager'
         )
-    )
-  )
+    );
+
+  select count(*) into v_missing_relations
+  from public.vmp_source_objects source_object
+  cross join lateral unnest(array[
+    source_object.owner_person_id, source_object.support_person_id
+  ]) relation_person(person_id)
+  where source_object.is_active is true
+    and relation_person.person_id is not null
+    and not exists (
+      select 1 from public.vmp_performers performer
+      where performer.id = relation_person.person_id
+    );
+
+  if v_missing_relations > 0
      or exists (
        select performer.user_id
        from public.vmp_performers performer
@@ -673,10 +704,21 @@ begin
   join public.vmp_source_objects source_object
     on source_object.object_code = item.object_code
    and source_object.is_active is true
+   and source_object.owner_person_id is not distinct from item.owner_person_id
+   and source_object.support_person_id is not distinct from item.support_person_id
   cross join lateral unnest(array[
     source_object.owner_person_id, source_object.support_person_id
   ]) relation_person(person_id)
   where item.is_active is true and relation_person.person_id is not null
+    and exists (
+      select 1
+      from public.vmp_performers performer
+      join public.profiles profile on profile.id = performer.user_id
+      where performer.id = relation_person.person_id
+        and performer.is_active is true and performer.user_id is not null
+        and profile.is_active is true
+        and public.vmp_business_role(performer.user_id) in ('qa_staff', 'qa_manager')
+    )
     and not exists (
       select 1 from public.vmp_item_assignments assignment
       where assignment.validation_code = item.validation_code
@@ -688,17 +730,29 @@ begin
   from public.vmp_plan_items item
   join public.vmp_source_objects source_object
     on source_object.object_code = item.object_code
-   and source_object.is_active is true
+    and source_object.is_active is true
+   and source_object.owner_person_id is not distinct from item.owner_person_id
+   and source_object.support_person_id is not distinct from item.support_person_id
   join public.vmp_item_assignments assignment
     on assignment.validation_code = item.validation_code
    and assignment.assignment_kind = 'qa' and assignment.is_active
    and assignment.assignment_role = 'primary'
   where item.is_active is true and source_object.owner_person_id is not null
+    and exists (
+      select 1
+      from public.vmp_performers performer
+      join public.profiles profile on profile.id = performer.user_id
+      where performer.id = source_object.owner_person_id
+        and performer.is_active is true and performer.user_id is not null
+        and profile.is_active is true
+        and public.vmp_business_role(performer.user_id) in ('qa_staff', 'qa_manager')
+    )
     and assignment.performer_id is distinct from source_object.owner_person_id;
 
   raise notice
-    'SOURCE_ACCESS_EXPAND_INVENTORY unresolved_active_performers=% projection_missing=% primary_conflicts=%',
-    v_unresolved_performers, v_projection_missing, v_projection_conflicts;
+    'SOURCE_ACCESS_EXPAND_INVENTORY unresolved_active_performers=% projection_missing=% primary_conflicts=% ineligible_current_relations=%',
+    v_unresolved_performers, v_projection_missing, v_projection_conflicts,
+    v_ineligible_current_relations;
 
   with source_projection as (
     select count(*) row_count,
@@ -1114,6 +1168,8 @@ declare
   v_revoked integer := 0;
   v_demoted integer := 0;
   v_rows integer;
+  v_owner_eligible boolean := false;
+  v_support_eligible boolean := false;
 begin
   select source_object.* into strict v_source
   from public.vmp_source_objects source_object
@@ -1176,46 +1232,49 @@ begin
            assignment.assignment_role, assignment.source, assignment.id
   for update;
 
-  -- Re-read and validate after every required lock is held. The all-nonnull
-  -- performer linkage unique index prevents an alternate row from appearing;
-  -- this count remains an explicit fail-closed proof at invocation time.
+  -- Re-read after every required lock is held. Existing performer rows are
+  -- retained for display even when they are not eligible for QA authority;
+  -- only a missing performer row remains fail-closed because its display
+  -- projection cannot be reconstructed safely.
   if v_source.owner_person_id is not null then
     select performer.* into strict v_owner
     from public.vmp_performers performer
-    where performer.id = v_source.owner_person_id
-      and performer.is_active is true and performer.user_id is not null;
+    where performer.id = v_source.owner_person_id;
 
     select count(*) into v_rows
     from public.vmp_performers performer
     where performer.user_id = v_owner.user_id and performer.is_active is true;
-    if v_owner.user_id is distinct from v_owner_user_snapshot
-       or v_rows <> 1 or not exists (
-      select 1 from public.profiles profile
-      where profile.id = v_owner.user_id and profile.is_active is true
-        and public.vmp_business_role(v_owner.user_id) in ('qa_staff', 'qa_manager')
-    ) then
-      raise exception using errcode = 'check_violation',
-        message = 'SOURCE_ACCESS_RECONCILE_INVALID_OWNER_PRINCIPAL';
+    if v_owner.user_id is not null
+       and v_owner.user_id is not distinct from v_owner_user_snapshot
+       and v_owner.is_active is true
+       and v_rows = 1
+       and exists (
+         select 1 from public.profiles profile
+         where profile.id = v_owner.user_id and profile.is_active is true
+           and public.vmp_business_role(v_owner.user_id) in ('qa_staff', 'qa_manager')
+       ) then
+      v_owner_eligible := true;
     end if;
   end if;
 
   if v_source.support_person_id is not null then
     select performer.* into strict v_support
     from public.vmp_performers performer
-    where performer.id = v_source.support_person_id
-      and performer.is_active is true and performer.user_id is not null;
+    where performer.id = v_source.support_person_id;
 
     select count(*) into v_rows
     from public.vmp_performers performer
     where performer.user_id = v_support.user_id and performer.is_active is true;
-    if v_support.user_id is distinct from v_support_user_snapshot
-       or v_rows <> 1 or not exists (
-      select 1 from public.profiles profile
-      where profile.id = v_support.user_id and profile.is_active is true
-        and public.vmp_business_role(v_support.user_id) in ('qa_staff', 'qa_manager')
-    ) then
-      raise exception using errcode = 'check_violation',
-        message = 'SOURCE_ACCESS_RECONCILE_INVALID_SUPPORT_PRINCIPAL';
+    if v_support.user_id is not null
+       and v_support.user_id is not distinct from v_support_user_snapshot
+       and v_support.is_active is true
+       and v_rows = 1
+       and exists (
+         select 1 from public.profiles profile
+         where profile.id = v_support.user_id and profile.is_active is true
+           and public.vmp_business_role(v_support.user_id) in ('qa_staff', 'qa_manager')
+       ) then
+      v_support_eligible := true;
     end if;
   end if;
 
@@ -1255,12 +1314,14 @@ begin
         and assignment.assignment_kind = 'qa' and assignment.is_active
         and (
           (assignment.source = 'source_owner' and not (
-            v_source.owner_person_id is not null
+            v_owner_eligible
             and assignment.performer_id is not distinct from
                 v_source.owner_person_id
           ))
           or
           (assignment.source = 'source_support' and not (
+            v_support_eligible
+            and
             assignment.performer_id is not distinct from
               v_source.support_person_id
             and v_source.support_person_id is not null
@@ -1289,7 +1350,7 @@ begin
       v_revoked := v_revoked + 1;
     end loop;
 
-    if v_source.owner_person_id is not null then
+    if v_owner_eligible then
       -- Preserve history: revoke same-person noncanonical rows rather than
       -- rewriting their source label into the canonical tuple.
       for v_assignment in
@@ -1389,7 +1450,7 @@ begin
       end if;
     end if;
 
-    if v_source.support_person_id is not null
+    if v_support_eligible
        and v_source.support_person_id is distinct from v_source.owner_person_id then
       for v_assignment in
         select assignment.*
@@ -1472,6 +1533,7 @@ begin
        from public.vmp_plan_items item
        where item.object_code = v_source.object_code and item.is_active is true
          and v_source.owner_person_id is not null
+         and v_owner_eligible
          and (select count(*)
               from public.vmp_item_assignments assignment
               where assignment.validation_code = item.validation_code
@@ -1486,6 +1548,7 @@ begin
        from public.vmp_plan_items item
        where item.object_code = v_source.object_code and item.is_active is true
          and v_source.support_person_id is not null
+         and v_support_eligible
          and v_source.support_person_id is distinct from v_source.owner_person_id
          and (select count(*)
               from public.vmp_item_assignments assignment
@@ -1501,6 +1564,7 @@ begin
        from public.vmp_plan_items item
        where item.object_code = v_source.object_code and item.is_active is true
          and v_source.owner_person_id is not null
+         and v_owner_eligible
          and v_source.owner_person_id is not distinct from
              v_source.support_person_id
          and (select count(*)
@@ -1520,12 +1584,14 @@ begin
        where item.object_code = v_source.object_code and item.is_active is true
          and (
            (assignment.source = 'source_owner' and not (
-             v_source.owner_person_id is not null
+             v_owner_eligible
              and assignment.performer_id is not distinct from
                  v_source.owner_person_id
            ))
            or
            (assignment.source = 'source_support' and not (
+             v_support_eligible
+             and
              assignment.performer_id is not distinct from
                v_source.support_person_id
              and v_source.support_person_id is not null
@@ -1533,6 +1599,34 @@ begin
                v_source.owner_person_id
            ))
          )
+     )
+     -- Ineligible existing relations are display-only and must have zero
+     -- active canonical Source assignments after reconciliation.
+     or exists (
+       select 1
+       from public.vmp_plan_items item
+       join public.vmp_item_assignments assignment
+         on assignment.validation_code = item.validation_code
+        and assignment.assignment_kind = 'qa'
+        and assignment.source = 'source_owner'
+        and assignment.is_active
+       where item.object_code = v_source.object_code and item.is_active is true
+         and v_source.owner_person_id is not null
+         and not v_owner_eligible
+         and assignment.performer_id is not distinct from v_source.owner_person_id
+     )
+     or exists (
+       select 1
+       from public.vmp_plan_items item
+       join public.vmp_item_assignments assignment
+         on assignment.validation_code = item.validation_code
+        and assignment.assignment_kind = 'qa'
+        and assignment.source = 'source_support'
+        and assignment.is_active
+       where item.object_code = v_source.object_code and item.is_active is true
+         and v_source.support_person_id is not null
+         and not v_support_eligible
+         and assignment.performer_id is not distinct from v_source.support_person_id
      )
      or exists (
        select 1 from pg_index index_row

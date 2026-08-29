@@ -73,6 +73,7 @@ test("read-only Source preflight and postflight end with an explicit SELECT PASS
 
 test("Source checkers use explicit active profile predicates for every persona", async () => {
   for (const path of [
+    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql",
     "scripts/check-source-qa-workshop-access-preflight.sql",
     "scripts/check-source-qa-workshop-access.sql",
   ]) {
@@ -108,6 +109,39 @@ test("Source preflight blocks Source-item mismatch while reporting repair invent
   assert.match(preflight,
     /RAISE\s+NOTICE[\s\S]{0,900}projection[_ ]missing[\s\S]{0,500}primary[_ ]conflicts?[\s\S]{0,500}unresolved[_ ]active[_ ]performers/i,
     "all repair inventory counts must be reported together, not silently discarded");
+});
+
+test("Source preflight requires an unambiguous master-object canonical mapping", async () => {
+  const preflight = await read("scripts/check-source-qa-workshop-access-preflight.sql");
+
+  assert.match(preflight, /public\.vmp_objects\b/i,
+    "preflight must inspect the canonical master-object relation");
+  assert.match(preflight,
+    /(?:NOT\s+EXISTS[\s\S]{0,900}vmp_objects|count\s*\(\s*\*\s*\)[^;]{0,300}(?:vmp_objects|master_object)[^;]{0,100}(?:<>|!=|=\s*0|>\s*1))/i,
+    "preflight must detect a missing or ambiguous master object");
+  assert.match(preflight,
+    /RAISE\s+EXCEPTION[\s\S]{0,2600}SOURCE_ACCESS_PREFLIGHT_[A-Z0-9_]*(?:MAPPING|MASTER|CANONICAL)/i,
+    "master-object canonical drift must be a preflight blocker");
+});
+
+test("expand reconciler inventories ineligible existing relations without granting canonical QA access", async () => {
+  const expand = await read(
+    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql",
+  );
+  const preflight = await read("scripts/check-source-qa-workshop-access-preflight.sql");
+
+  assert.match(expand, /ineligible[_ ]current[_ ]relations/i,
+    "expand must classify existing ineligible relations as sanitized inventory");
+  assert.match(preflight, /ineligible[_ ]current[_ ]relations/i,
+    "preflight must report existing ineligible relations without blocking them");
+  assert.match(expand, /v_(?:owner|support)_eligible/i,
+    "reconciler must distinguish eligible from ineligible linked performers");
+  assert.match(expand,
+    /(?:zero|count\s*\(\s*\*\s*\)[^;]{0,500}(?:source_owner|source_support))[\s\S]{0,1800}(?:ineligible|not\s+v_(?:owner|support)_eligible)/i,
+    "reconciler must prove zero active canonical assignments for ineligible relations");
+  assert.doesNotMatch(expand,
+    /SOURCE_ACCESS_RECONCILE_INVALID_(?:OWNER|SUPPORT)_PRINCIPAL/i,
+    "ineligible existing relations must not be rejected by the reconciler");
 });
 
 test("forward recovery increments authorization revision and proves that increment", async () => {

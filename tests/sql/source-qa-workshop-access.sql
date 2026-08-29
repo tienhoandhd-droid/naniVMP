@@ -545,6 +545,125 @@ select pg_temp.assert_true(
      'public.vmp_item_assignments_one_active_qa_person'::regclass),
   'SQA_EXISTING_ONE_ACTIVE_PRIMARY_AND_PERSON_INDEXES_PRESERVED');
 
+do $ineligible_existing_relation$
+declare
+  v_source_id uuid:='9a060000-0000-4000-8000-000000000101';
+  v_code text:='SACCESS-INELIGIBLE/2026.01-PQ';
+  v_admin_person uuid;
+  v_missing_person uuid;
+  v_unrelated_person uuid;
+  v_source_before jsonb;
+  v_result jsonb;
+  v_right record;
+begin
+  select performer.id into strict v_admin_person
+  from public.vmp_performers performer
+  where performer.email='source-ineligible-admin@example.test'
+    and performer.is_active is true;
+  select performer.id into strict v_missing_person
+  from public.vmp_performers performer
+  where performer.email='source-ineligible-missing@example.test';
+  select performer.id into strict v_unrelated_person
+  from public.vmp_performers performer
+  where performer.user_id='71000000-0000-4000-8000-000000000001'::uuid
+    and performer.is_active is true;
+  select to_jsonb(source_object) into strict v_source_before
+  from public.vmp_source_objects source_object
+  where source_object.id=v_source_id;
+  insert into public.vmp_item_assignments(
+    validation_code,performer_id,user_id,staff_name,assignment_kind,source,
+    assignment_role,is_active,change_reason
+  )
+  select v_code,performer.id,performer.user_id,performer.performer_name,
+         'qa',fixture.source_name,fixture.assignment_role,true,
+         'Ineligible existing relation stale canonical fixture'
+  from (values
+    (v_admin_person,'source_owner','primary'),
+    (v_missing_person,'source_support','collaborator')
+  ) fixture(performer_id,source_name,assignment_role)
+  join public.vmp_performers performer on performer.id=fixture.performer_id;
+
+  perform public.vmp_reconcile_source_qa_projection(v_source_id);
+
+  if (select owner_person_id from public.vmp_source_objects
+      where id=v_source_id) is distinct from v_admin_person
+     or (select support_person_id from public.vmp_source_objects
+         where id=v_source_id) is distinct from v_missing_person
+     or (select owner_name from public.vmp_source_objects
+         where id=v_source_id) is distinct from v_source_before->>'owner_name'
+     or (select support_name from public.vmp_source_objects
+         where id=v_source_id) is distinct from v_source_before->>'support_name'
+     or (select owner_person_id from public.vmp_plan_items
+         where validation_code=v_code) is distinct from v_admin_person
+     or (select support_person_id from public.vmp_plan_items
+         where validation_code=v_code) is distinct from v_missing_person
+     or (select owner_name from public.vmp_plan_items
+         where validation_code=v_code) is distinct from v_source_before->>'owner_name'
+     or (select secondary_owner from public.vmp_plan_items
+         where validation_code=v_code) is distinct from v_source_before->>'support_name' then
+    raise exception using errcode='check_violation',
+      message='SQA_INELIGIBLE_RELATION_DISPLAY_PROJECTION_NOT_PRESERVED';
+  end if;
+  if exists (
+       select 1 from public.vmp_item_assignments assignment
+       where assignment.validation_code=v_code
+         and assignment.source in ('source_owner','source_support')
+         and assignment.is_active
+     )
+     or not exists (
+       select 1 from public.audit_logs audit
+       where audit.validation_code=v_code
+         and audit.source='source_qa_projection_reconcile'
+         and audit.changed_fields @> array['is_active']::text[]
+         and audit.old_data->>'is_active'='true'
+         and audit.new_data->>'is_active'='false'
+     ) then
+    raise exception using errcode='check_violation',
+      message='SQA_INELIGIBLE_RELATION_CANONICAL_ASSIGNMENTS_NOT_REVOKED';
+  end if;
+  select * into strict v_right
+  from public.vmp_item_rights(v_unrelated_person, v_code);
+  if v_right.can_view is not false or v_right.editable_fields is distinct from '{}'::text[] then
+    raise exception using errcode='check_violation',
+      message='SQA_UNRESOLVED_PERFORMER_RECEIVES_SOURCE_RIGHTS';
+  end if;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000002',
+    'role','authenticated')::text,true);
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-INELIGIBLE','{"note":"Unrelated save retains ineligible selections"}'::jsonb,
+    'Retain existing ineligible Source relation while saving an unrelated field',
+    (select version from public.vmp_source_objects where id=v_source_id));
+  if v_result->>'ok' is distinct from 'true' then
+    raise exception using errcode='check_violation',
+      message='SQA_UNRELATED_SAVE_RETAINS_INELIGIBLE_RELATION result='||v_result::text;
+  end if;
+  reset role;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',json_build_object(
+    'sub','9a010000-0000-4000-8000-000000000002',
+    'role','authenticated')::text,true);
+  v_result:=public.rpc_save_catalog_object(
+    'Thiết bị','SACCESS-INELIGIBLE',jsonb_build_object(
+      'owner_person_id',v_missing_person),
+    'Reject newly selected unresolved owner',
+    (select version from public.vmp_source_objects where id=v_source_id));
+  perform pg_temp.assert_code(v_result,'PERSON_NOT_ELIGIBLE',
+    'SQA_NEW_INELIGIBLE_RELATION_REJECTED');
+  reset role;
+  perform pg_temp.assert_true(
+    (select owner_person_id from public.vmp_source_objects where id=v_source_id)=v_admin_person
+    and (select support_person_id from public.vmp_source_objects where id=v_source_id)=v_missing_person
+    and (select owner_person_id from public.vmp_plan_items where validation_code=v_code)=v_admin_person
+    and (select support_person_id from public.vmp_plan_items where validation_code=v_code)=v_missing_person,
+    'SQA_INELIGIBLE_RELATION_REJECTED_SAVE_IS_ATOMIC');
+  set local role authenticated;
+end
+$ineligible_existing_relation$;
+
 insert into public.vmp_source_workshop_scope_grants(
   id,performer_id,department,department_key,area_code,area_key,line,line_key,
   valid_from,expires_at,is_active,version,created_by,updated_by,change_reason

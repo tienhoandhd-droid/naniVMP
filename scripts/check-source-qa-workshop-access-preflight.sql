@@ -8,6 +8,7 @@ DO $preflight$
 DECLARE
   v_admin_count bigint;
   v_item_count bigint;
+  v_master_mapping_issues bigint;
   v_mapping_digest text;
   v_source_digest text;
   v_owner_support_digest text;
@@ -15,6 +16,7 @@ DECLARE
   v_projection_missing bigint;
   v_primary_conflicts bigint;
   v_unresolved_active_performers bigint;
+  v_ineligible_current_relations bigint;
   v_candidate_count bigint;
   v_area_less bigint;
   v_refresh oid := to_regprocedure('public.rpc_refresh_source_item_assignments()');
@@ -63,12 +65,19 @@ BEGIN
     WHERE item.is_active IS TRUE
     GROUP BY item.validation_code
   ) mapping;
+  SELECT count(*) INTO v_master_mapping_issues
+  FROM public.vmp_plan_items item
+  WHERE item.is_active IS TRUE
+    AND (SELECT count(*)
+         FROM public.vmp_objects master_object
+         WHERE master_object.code=item.object_code) <> 1;
   IF EXISTS (
        SELECT 1 FROM public.vmp_plan_items item
        WHERE item.is_active IS TRUE AND NOT EXISTS (
          SELECT 1 FROM public.vmp_source_objects source_object
          WHERE source_object.object_code=item.object_code AND source_object.is_active IS TRUE)
      )
+     OR v_master_mapping_issues > 0
      OR EXISTS (
        SELECT 1 FROM public.vmp_plan_items item
        WHERE item.is_active IS TRUE AND (
@@ -81,10 +90,10 @@ BEGIN
        GROUP BY source_object.object_code HAVING count(*) > 1
      ) THEN
     RAISE EXCEPTION USING errcode='check_violation',
-      message='SOURCE_ACCESS_PREFLIGHT_ITEM_SOURCE_MAPPING';
+      message='SOURCE_ACCESS_PREFLIGHT_ITEM_MASTER_SOURCE_MAPPING';
   END IF;
-  RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_ITEM_SOURCE_MAPPING count=% digest=%',
-    v_item_count, v_mapping_digest;
+  RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_ITEM_SOURCE_MAPPING count=% master_mapping_issues=% digest=%',
+    v_item_count, v_master_mapping_issues, v_mapping_digest;
 
   SELECT md5(string_agg(format('%s=%s', status, n), E'\n' ORDER BY status))
     INTO v_source_digest
@@ -119,6 +128,28 @@ BEGIN
   SELECT count(*) INTO v_unresolved_active_performers
   FROM public.vmp_performers performer
   WHERE performer.is_active IS TRUE AND performer.user_id IS NULL;
+
+  SELECT count(*) INTO v_ineligible_current_relations
+  FROM public.vmp_source_objects source_object
+  CROSS JOIN LATERAL unnest(array[
+    source_object.owner_person_id, source_object.support_person_id
+  ]) relation_person(person_id)
+  WHERE source_object.is_active IS TRUE
+    AND relation_person.person_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM public.vmp_performers performer
+      WHERE performer.id=relation_person.person_id
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.vmp_performers performer
+      JOIN public.profiles profile ON profile.id=performer.user_id
+      WHERE performer.id=relation_person.person_id
+        AND performer.is_active IS TRUE
+        AND performer.user_id IS NOT NULL
+        AND profile.is_active IS TRUE
+        AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
+    );
 
   -- Only an otherwise consistent Source -> item relation belongs to the
   -- projection inventory. A relation mismatch remains a release blocker and
@@ -179,45 +210,41 @@ BEGIN
     )
     AND assignment.performer_id IS DISTINCT FROM source_object.owner_person_id;
   RAISE NOTICE
-    'PASS SOURCE_ACCESS_PREFLIGHT_OWNER_SUPPORT_CONSISTENCY digest=% owner_support_mismatches=% projection_missing=% primary_conflicts=% unresolved_active_performers=%',
+    'PASS SOURCE_ACCESS_PREFLIGHT_OWNER_SUPPORT_CONSISTENCY digest=% owner_support_mismatches=% projection_missing=% primary_conflicts=% unresolved_active_performers=% ineligible_current_relations=%',
     v_owner_support_digest, coalesce(v_owner_support_mismatches,0),
     coalesce(v_projection_missing,0), coalesce(v_primary_conflicts,0),
-    coalesce(v_unresolved_active_performers,0);
+    coalesce(v_unresolved_active_performers,0),
+    coalesce(v_ineligible_current_relations,0);
   IF coalesce(v_owner_support_mismatches,0) > 0 THEN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_PREFLIGHT_SOURCE_ITEM_OWNER_SUPPORT_MISMATCH';
   END IF;
 
   IF EXISTS (
-       SELECT 1
-       FROM public.vmp_source_objects source_object
-       CROSS JOIN LATERAL unnest(array[
-         source_object.owner_person_id, source_object.support_person_id
-       ]) relation_person(person_id)
-       WHERE relation_person.person_id IS NOT NULL
-         AND NOT EXISTS (
-           SELECT 1
-           FROM public.vmp_performers performer
-           JOIN public.profiles profile ON profile.id=performer.user_id
-           WHERE performer.id=relation_person.person_id
-             AND performer.is_active IS TRUE
-             AND performer.user_id IS NOT NULL
-             AND profile.is_active is true
-             AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
-         )
-     )
-     OR EXISTS (
        SELECT performer.user_id
        FROM public.vmp_performers performer
        WHERE performer.is_active IS TRUE AND performer.user_id IS NOT NULL
        GROUP BY performer.user_id
        HAVING count(*) > 1
+     )
+     OR EXISTS (
+       SELECT 1
+       FROM public.vmp_source_objects source_object
+       CROSS JOIN LATERAL unnest(array[
+         source_object.owner_person_id, source_object.support_person_id
+       ]) relation_person(person_id)
+       WHERE source_object.is_active IS TRUE
+         AND relation_person.person_id IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM public.vmp_performers performer
+           WHERE performer.id=relation_person.person_id
+         )
      ) THEN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_PREFLIGHT_QA_PRINCIPAL';
   END IF;
-  RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_QA_PRINCIPAL unresolved_active_performers=%',
-    v_unresolved_active_performers;
+  RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_QA_PRINCIPAL unresolved_active_performers=% ineligible_current_relations=%',
+    v_unresolved_active_performers, v_ineligible_current_relations;
 
   SELECT count(*) INTO v_candidate_count
   FROM public.vmp_performers performer
