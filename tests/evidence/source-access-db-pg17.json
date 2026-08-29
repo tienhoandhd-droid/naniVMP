@@ -34,7 +34,7 @@
   },
   "releaseArtifactFiles": {
     "scripts/check-source-qa-workshop-access-preflight.sql": "374c120408990e4389d22842fb1f89cf8964734d17e8ff9d1d9e786d29392b2b",
-    "scripts/check-source-qa-workshop-access.sql": "7da35442b61fcf67f224e5d4b2d0ad7abc93aefa3a430b5190366cbdcf8161dc",
+    "scripts/check-source-qa-workshop-access.sql": "5c2b20afd22b7b2bb1f52065ab926b29fdc78aafabf0e3467114d935e7052ab7",
     "scripts/forward-recover-source-qa-workshop-access.sql": "bded4691229fca9b70715aad02ce82b393a2372245a80c32f0172b6451b2110d"
   }
 }

@@ -87,7 +87,7 @@ BEGIN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_POSTFLIGHT_ACTIVE_ADMIN_MANAGER';
   END IF;
-  IF v_admin=v_manager OR (v_owner IS NOT NULL AND v_owner=v_support) THEN
+  IF v_admin=v_manager THEN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_POSTFLIGHT_PERSONA_IDS_INVALID';
   END IF;

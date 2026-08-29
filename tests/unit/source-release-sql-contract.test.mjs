@@ -314,6 +314,15 @@ test("postflight discovers personas from the database and conditionally probes o
     "postflight must guard probes when an optional persona is absent");
 });
 
+test("postflight permits one eligible QA account to be both owner and support", async () => {
+  const postflight = stripSqlComments(await read(
+    "scripts/check-source-qa-workshop-access.sql",
+  ));
+
+  assert.doesNotMatch(postflight, /\bv_owner\s*=\s*v_support\b/i,
+    "owner and support are optional probes, not identities that must differ");
+});
+
 test("postflight reports the actual number of non-object surface probes", async () => {
   const postflight = await read("scripts/check-source-qa-workshop-access.sql");
 
