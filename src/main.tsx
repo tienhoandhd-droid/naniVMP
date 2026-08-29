@@ -12,6 +12,7 @@ import "./styles/lotus-tokens.css";
 import "./styles/lotus-components.css";
 import "./styles/lotus-responsive.css";
 import "./styles/lotus-art.css";
+import "./styles/lotus-shell.css";
 import "./styles/catalog-workspace.css";
 import "./features/today/today.css";
 

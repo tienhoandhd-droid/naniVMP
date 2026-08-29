@@ -82,7 +82,6 @@ import type { ConnState } from "./hooks/index.ts";
 
 // ===== UI Primitives =====
 import {
-  Sparkle,
   Card,
   CardTitle,
   Tag,
@@ -1488,7 +1487,7 @@ function GlobalFilterBar({
   );
 
   return (
-    <div aria-label="Phạm vi toàn hệ thống" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 18, padding: "10px 14px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
+    <div aria-label="Phạm vi toàn hệ thống" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 14, padding: "6px 12px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
       <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>
       {showPersonSelector ? (
         <label style={{ display: "inline-flex", alignItems: "center", gap: 7, color: C.plumSoft,
@@ -1497,7 +1496,7 @@ function GlobalFilterBar({
           <span>Theo nhân sự</span>
           <select aria-label="Chọn nhân sự xem tiến độ" value={selectedPersonId ?? ""}
             onChange={(event) => setSelectedPersonId(event.target.value || null)}
-            style={{ ...INP, width: "auto", minWidth: 210, padding: "7px 30px 7px 10px", fontSize: 12 }}>
+            style={{ ...INP, width: "auto", minWidth: 170, padding: "6px 30px 6px 10px", fontSize: 12 }}>
             <option value="">Cả nhóm</option>
             {personOptions.map((person) => (
               <option key={person.personId} value={person.personId}>
@@ -2051,12 +2050,6 @@ function VerifiedAppShell({ user, logout, access }: {
   }, [silentRefresh]);
 
   const title = NAV_ITEMS.find((n) => n.id === view)?.label || "Tổng quan";
-  const stars = [
-    { t: "10%", l: "30%", s: 14, c: C.gold, d: "0s" },
-    { t: "24%", l: "92%", s: 12, c: C.pink, d: ".8s" },
-    { t: "55%", l: "96%", s: 16, c: C.lav, d: "1.4s" },
-    { t: "82%", l: "34%", s: 12, c: C.sky, d: ".5s" },
-  ];
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>
@@ -2083,19 +2076,12 @@ function VerifiedAppShell({ user, logout, access }: {
         onChangePw={() => setShowPw(true)}
       />
 
-      <main ref={mainRef} className="vmp-scroll" style={{
+      {/* Nền theo thiết kế 29/08 (lotus-shell.css .vmp-main-nen): ánh hồng–
+          lavender toả từ góc như cũ, thêm tranh hồ sen mờ ở góc phải (không
+          đè chữ) và vân sơn mài; bỏ sao lấp lánh. */}
+      <main ref={mainRef} className="vmp-scroll vmp-main-nen" style={{
         flex: 1, overflowY: "auto", position: "relative",
-        background: `radial-gradient(720px 520px at 88% -6%, ${C.pinkMist}, transparent 60%),
-          radial-gradient(640px 520px at -6% 104%, ${C.lavSoft}, transparent 55%),
-          radial-gradient(520px 420px at 50% 55%, rgba(226,241,250,.45), transparent 70%),
-          linear-gradient(160deg, ${C.bg1}, ${C.bg2})`,
       }}>
-        {stars.map((s, i) => (
-          <div key={i} className="tw" style={{ position: "absolute", top: s.t, left: s.l, animationDelay: s.d }}>
-            <Sparkle size={s.s} color={s.c} />
-          </div>
-        ))}
-
         <div style={{ position: "relative", zIndex: 1 }}>
           <Topbar
             title={title} user={user} sub={(NAV_SUBS as Record<string, string>)[view]}
@@ -2258,6 +2244,11 @@ function VerifiedAppShell({ user, logout, access }: {
             </Suspense>
             </div>
             </ScreenGuard>
+
+            {/* Chân trang: giờ đồng bộ (rời khỏi phụ đề topbar, anh Hoàn chốt 30/08). */}
+            {lastSync && (
+              <p className="vmp-chan-trang">Đồng bộ lúc {new Date(lastSync).toLocaleTimeString("vi-VN")}</p>
+            )}
 
             {/* Trợ lý hỏi đáp — nổi ở góc, không chiếm chỗ của bảng dữ liệu */}
             {/* Truyền màn đang xem xuống để Vali gợi ý câu hỏi bám đúng chỗ

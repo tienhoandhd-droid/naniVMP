@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import MetricGrid from "../../components/ui/MetricGrid.tsx";
-import PriorityStrip from "../../components/ui/PriorityStrip.tsx";
 import StateBoundary from "../../components/ui/StateBoundary.tsx";
 import ValiIllustration from "../../components/brand/ValiIllustration.tsx";
 import { createProgressRightsGenerationGate, fetchMyEditableProgressRights } from "../../lib/supabaseData.ts";
@@ -64,6 +63,23 @@ function deadlineFact(row: TodayActionRow): string {
   if (row.daysRemaining < 0) return `mốc ${row.deadlineStage} · trễ ${Math.abs(row.daysRemaining)} ngày`;
   if (row.daysRemaining === 0) return `mốc ${row.deadlineStage} · hạn hôm nay`;
   return `mốc ${row.deadlineStage} · còn ${row.daysRemaining} ngày`;
+}
+
+/** Lời Vali mở đầu trang — dựng từ model, không bịa số. */
+function valiNoiGi(model: TodayActionModel): { mood: "guide" | "concern" | "celebrate"; nhan: string; loi: string } {
+  const dau = model.nextAction;
+  if (model.rows.length === 0) {
+    return { mood: "celebrate", nhan: "nhẹ nhõm", loi: "Hôm nay nhẹ: không còn việc gấp nào trong phạm vi này." };
+  }
+  if (model.kpis.overdue > 0 && dau) {
+    return { mood: "concern", nhan: "đang lo",
+      loi: `Mình đếm được ${model.kpis.overdue} việc quá hạn. Nên bắt đầu từ ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
+  }
+  if (dau) {
+    return { mood: "guide", nhan: "dẫn đường",
+      loi: `Không có việc quá hạn. Gần nhất là ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
+  }
+  return { mood: "guide", nhan: "dẫn đường", loi: "Mình đã xếp việc theo hạn, mức độ quan trọng và quyền cập nhật." };
 }
 
 function TodayRightsNotice({ status, error, onRetry }: Pick<RightsState, "status" | "error"> & { onRetry: () => void }) {
@@ -157,28 +173,59 @@ export function TodayCommandCenterContent({
   const selectedRow = model.rows.find((row) => row.validationCode === expandedCode) ?? null;
   useEffect(() => { if (expandedCode !== null && selectedRow === null) setExpandedCode(null); }, [expandedCode, selectedRow]);
   const toggle = useCallback((code: string) => setExpandedCode((current) => current === code ? null : code), []);
+  /* Vali đọc tình hình cùng người dùng (thiết kế 29/08): câu dẫn là lời
+     Vali, tâm trạng theo dữ liệu — quá hạn → lo; trống việc → nhẹ nhõm;
+     còn lại → dẫn đường. Chỉ dùng ba mood chính thức (ADR-VALI-001). */
+  const vali = valiNoiGi(model);
+  /* Bộ lọc theo nhóm (anh Hoàn chốt 30/08): bấm ô số liệu để chỉ xem nhóm đó,
+     bấm lại để bỏ. Không lọc thì vẫn thấy đủ bốn nhóm như trước. */
+  const [locNhom, setLocNhom] = useState<TodaySection | null>(null);
+  const chonNhom = useCallback((section: TodaySection) => setLocNhom((current) => current === section ? null : section), []);
+  const oSo = (id: TodaySection, label: string, value: number, tone: "danger" | "warning" | "info", hint: string) => ({
+    id, label, value, tone, hint, selected: locNhom === id, onActivate: () => chonNhom(id),
+  });
+  const nhomHien = (Object.keys(SECTION_META) as TodaySection[]).filter((section) => locNhom === null || section === locNhom);
+  const dau = model.nextAction;
   return <div className="hn-lotus">
-    <p className="hn-mota">Hàng đợi gồm việc quá hạn, đến hạn hôm nay, trong bảy ngày tới và hồ sơ cần hoàn thiện.
-      {scopeLabel && <span className="hn-mota__pham-vi">Phạm vi: {scopeLabel}</span>}
-      {updatedLabel && <span className="hn-mota__moc">{updatedLabel}</span>}</p>
+    <section className="hn-hero" aria-label="Vali tóm tắt hôm nay">
+      <div className="hn-hero__vali">
+        <div className={`hn-vali hn-vali--${vali.mood}`} role="img" aria-label={`Công chúa Vali ${vali.nhan}`} />
+        <span className="hn-vali__nhan">Vali · {vali.nhan}</span>
+      </div>
+      <div className="hn-hero__loi">
+        <p className="hn-loi">{vali.loi}</p>
+        <p className="hn-mota">Hàng đợi gồm việc quá hạn, đến hạn hôm nay, trong bảy ngày tới và hồ sơ cần hoàn thiện.
+          {scopeLabel && <span className="hn-mota__pham-vi">Phạm vi: {scopeLabel}</span>}
+          {updatedLabel && <span className="hn-mota__moc">{updatedLabel}</span>}</p>
+        {/* "Làm trước tiên" gộp vào hero thành một nút (anh Hoàn chốt 30/08) —
+            cùng đích với thẻ ưu tiên cũ: mở Cập nhật tiến độ đúng hạng mục;
+            không có quyền sửa thì chỉ hiện chữ, không thành nút. */}
+        {dau && <div className="hn-hero__uu-tien">
+          <span className="hn-hero__eyebrow">Làm trước tiên</span>
+          {dau.canEditProgress
+            ? <button type="button" className="hn-hero__cta" onClick={() => onOpenProgress(progressLink(dau))}>
+                Mở {dau.validationCode} <span aria-hidden="true">→</span></button>
+            : <span className="hn-hero__cta hn-hero__cta--chu">{dau.validationCode} · {dau.title}</span>}
+          <span className="hn-hero__goi-y">Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. {deadlineFact(dau)}</span>
+        </div>}
+      </div>
+    </section>
     <TodayRightsNotice status={rightsState.status} error={rightsState.error} onRetry={onRetryRights} />
     <MetricGrid label="Việc hôm nay" items={[
-      { id: "overdue", label: "Quá hạn", value: model.kpis.overdue, tone: "danger", hint: "cần xử lý trước tiên" },
-      { id: "today", label: "Hạn hôm nay", value: model.kpis.today, tone: "warning", hint: "cần theo dõi trong ngày" },
-      { id: "upcoming", label: "Trong 7 ngày", value: model.kpis.upcoming, tone: "warning", hint: "chuẩn bị trước hạn" },
-      { id: "incomplete", label: "Hồ sơ cần hoàn thiện", value: model.kpis.dataQuality, tone: "info", hint: "bổ sung thông tin còn thiếu" },
+      oSo("overdue", "Quá hạn", model.kpis.overdue, "danger", "cần xử lý trước tiên"),
+      oSo("today", "Hạn hôm nay", model.kpis.today, "warning", "cần theo dõi trong ngày"),
+      oSo("upcoming", "Trong 7 ngày", model.kpis.upcoming, "warning", "chuẩn bị trước hạn"),
+      oSo("incomplete", "Hồ sơ cần hoàn thiện", model.kpis.dataQuality, "info", "bổ sung thông tin còn thiếu"),
     ]} />
-    {model.nextAction && <PriorityStrip label="Làm trước tiên" items={[{
-      id: model.nextAction.validationCode, tone: SECTION_META[model.nextAction.section].tone, value: model.nextAction.validationCode,
-      label: model.nextAction.title, hint: `Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. ${deadlineFact(model.nextAction)}`,
-      ...(model.nextAction.canEditProgress ? { onActivate: () => onOpenProgress(progressLink(model.nextAction!)) } : {}),
-    }]} />}
     {model.rows.length === 0 ? (hasScopeFilters
       ? <StateBoundary state="filtered-empty" title="Không có việc trong phạm vi đã lọc"
           description={scopeLabel ? `Phạm vi hiện tại: ${scopeLabel}.` : "Phạm vi hiện tại không có việc phù hợp."} onClearFilters={onClearScope} />
       : <StateBoundary state="empty" title="Không còn việc gấp nào" description="Không có hạng mục quá hạn, đến hạn hôm nay, trong bảy ngày tới hoặc cần hoàn thiện." />
     ) : <div className="lp-supporting-layout hn-bo-cuc"><div className="hn-chinh">
-      {(Object.keys(SECTION_META) as TodaySection[]).map((section) => <TodayQueueSection key={section} section={section}
+      {locNhom !== null && model.sections[locNhom].length === 0 && <StateBoundary state="filtered-empty"
+        title={`Nhóm "${SECTION_META[locNhom].label}" đang trống`} description="Bấm lại ô số liệu hoặc xoá bộ lọc để xem đủ bốn nhóm."
+        onClearFilters={() => setLocNhom(null)} />}
+      {nhomHien.map((section) => <TodayQueueSection key={section} section={section}
         rows={model.sections[section]} expandedCode={expandedCode} onToggle={toggle} onOpenProgress={onOpenProgress} />)}
     </div><TodaySupportingPane row={selectedRow} onOpenProgress={onOpenProgress}
       onClearSelection={() => setExpandedCode(null)} /></div>}

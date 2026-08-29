@@ -56,3 +56,63 @@
   .hn-pane { display: block; position: sticky; top: 16px; align-self: start; padding: 20px; border: 1px solid var(--lp-line); border-radius: 24px; background: var(--lp-surface); }
   .hn-pane .hn-muc__chi-tiet { display: block; padding: 0; border: 0; }
 }
+
+/* =====================================================================
+ *  Thiết kế 29/08 (Hướng B+): hero Vali + câu dẫn, dòng việc dạng bảng.
+ *  Radius chỉ 10/16/18/24/999; màu qua token; ảnh Vali qua url().
+ * ===================================================================== */
+.hn-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 0 14px;
+  align-items: center;
+  padding: 18px 24px;
+  border: 1px solid var(--lp-line);
+  border-top: 1px solid var(--lp-gold-hairline);
+  border-radius: 24px;
+  background: var(--lp-sheen);
+  box-shadow: var(--lp-e-mid);
+  overflow: hidden;
+}
+.hn-hero__vali { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hn-vali {
+  width: 118px;
+  height: 150px;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: contain;
+  filter: drop-shadow(0 10px 18px rgb(62 33 62 / .18));
+}
+.hn-vali--guide { background-image: url("../../assets/brand/vali/vali-chibi-guide.webp"); }
+.hn-vali--concern { background-image: url("../../assets/brand/vali/vali-chibi-concern.webp"); }
+.hn-vali--celebrate { background-image: url("../../assets/brand/vali/vali-chibi-celebrate.webp"); }
+.hn-vali__nhan { display: flex; align-items: center; gap: 6px; font-family: var(--ff-display); font-style: italic; font-size: 12.5px; font-weight: 600; color: var(--lp-plum); letter-spacing: .02em; white-space: nowrap; }
+.hn-vali__nhan::before, .hn-vali__nhan::after { content: ""; width: 16px; height: 1px; background: var(--lp-gold); }
+.hn-hero__loi { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.hn-loi { margin: 0; font-family: var(--ff-display); font-size: 24px; line-height: 1.32; font-weight: 600; color: var(--lp-ink); max-width: 40ch; text-wrap: balance; }
+.hn-loi::before { content: "\201C"; margin-right: 2px; color: var(--lp-gold); font-size: 30px; line-height: 0; vertical-align: -6px; }
+.hn-loi::after { content: "\201D"; margin-left: 2px; color: var(--lp-gold); font-size: 30px; line-height: 0; vertical-align: -6px; }
+@media (max-width: 768px) {
+  .hn-hero { grid-template-columns: 1fr; gap: 10px; padding: 16px; }
+  .hn-hero__vali { flex-direction: row; justify-content: flex-start; gap: 10px; }
+  .hn-vali { width: 72px; height: 92px; }
+  .hn-loi { font-size: 20px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hn-vali { animation: hn-vali-vao 220ms var(--lp-ease) both; }
+  @keyframes hn-vali-vao { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+}
+/* Dòng việc: nền raised, viền mảnh, mã kiểu mono cho nhịp số. */
+.hn-muc { border-left-width: 1px; border-radius: 16px; background: var(--lp-bg-raised); }
+.hn-muc__ma { font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+.hn-muc__nut { border-radius: 10px; }
+.hn-nhom__ten { font-size: 24px; }
+/* "Làm trước tiên" trong hero: một nút, cùng đích với thẻ ưu tiên cũ. */
+.hn-hero__uu-tien { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
+.hn-hero__eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--lp-rose); }
+.hn-hero__cta { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--lp-plum); color: var(--lp-on-plum, #fff); font-family: var(--ff-text); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--lp-e-low); }
+.hn-hero__cta:hover { background: var(--lp-brand-hover); }
+.hn-hero__cta:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+.hn-hero__cta--chu { background: transparent; box-shadow: none; padding: 0; color: var(--lp-plum); cursor: default; }
+.hn-hero__goi-y { flex-basis: 100%; font-size: 13px; color: var(--lp-ink-muted); }

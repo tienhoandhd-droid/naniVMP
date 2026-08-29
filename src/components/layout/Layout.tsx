@@ -11,7 +11,7 @@ import { NAV_ITEMS } from "../../constants/vmp.ts";
 import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
 import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
-import { Sparkle, CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
+import { CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
 /* Nhãn năm vai nghiệp vụ hiệu lực — dùng lại đúng bảng nhãn của màn Phân quyền
@@ -61,12 +61,8 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
       position: "relative", overflow: "hidden",
       transition: "width .25s ease, padding .25s ease",
     }}>
-      <div className="tw" style={{ position: "absolute", top: 90, right: 18 }}>
-        <Sparkle size={13} color={C.pink} />
-      </div>
-      <div className="tw" style={{ position: "absolute", bottom: 140, left: 16 }}>
-        <Sparkle size={11} color={C.lav} />
-      </div>
+      {/* Sao lấp lánh đã bỏ (thiết kế 29/08): trang trí chỉ ở mép trang,
+          không rải sau vùng đọc. */}
 
       {/* Logo */}
       <div style={{ padding: "0 6px 16px" }}>
@@ -461,12 +457,19 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "22px 34px", gap: 20, flexWrap: "wrap",
     }}>
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
-          <Sparkle size={14} color={C.pink} />
-          <span style={{ fontSize: 12, color: C.pinkText, fontWeight: 900, letterSpacing: 1.6 }}>
-            VMP MONITOR · HỆ GIÁM SÁT THẨM ĐỊNH
-          </span>
+      {/* Khối trái co giãn để hàng nút bên phải luôn ở góc phải (thiết kế 29/08). */}
+      <div style={{ flex: "1 1 360px", minWidth: 0 }}>
+        {/* Masthead "VMP Monitor · Hệ giám sát thẩm định" là chủ thể của
+            trang (thiết kế 29/08): chữ V lớn, Monitor nghiêng, nét vàng uốn
+            kiểu Art Nouveau, phụ đề giãn cách. Kiểu dáng ở lotus-shell.css. */}
+        <div className="vmp-masthead" aria-label="VMP Monitor · Hệ giám sát thẩm định">
+          <span className="vmp-masthead__ten"><b>V</b>MP <i>Monitor</i></span>
+          <svg className="vmp-masthead__net" width="200" height="14" viewBox="0 0 250 16" aria-hidden="true">
+            <path d="M2 10C40 2 70 15 105 8C140 1 170 14 205 7C225 3 238 5 248 9" fill="none" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M118 8C114 3 116 0 121 1C122 5 120 8 118 8Z" />
+            <circle cx="248" cy="9" r="1.8" />
+          </svg>
+          <span className="vmp-masthead__phu">Hệ giám sát thẩm định</span>
         </div>
         {/* Đây là <h1> chứ không phải <div> in đậm, và đó là khác biệt thật:
             trước đây KHÔNG màn nào trong app có h1, nên trình đọc màn hình
@@ -484,11 +487,9 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
         }}>{title}</h1>
         <div style={{ fontSize: 14, color: C.plum, marginTop: 5, fontWeight: 700 }}>
           {sub || "CPC1 HN"}
-          {lastSync && (
-            <span style={{ marginLeft: 12, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
-              · Đồng bộ: {new Date(lastSync).toLocaleTimeString("vi-VN")}
-            </span>
-          )}
+          {/* Giờ đồng bộ đã rời khỏi phụ đề (anh Hoàn chốt 30/08): nó đổi từng
+              phút làm dòng này nhấp nháy và gãy dòng. Nay nằm ở tooltip nút
+              Làm mới và ở chân trang (App.tsx). */}
           {/* Mốc dữ liệu luôn hiện, không đợi tới lúc quá ngưỡng mới báo: sự cố
               21 ngày lần trước không ai phát hiện chính vì màn hình im lặng khi
               mọi thứ "trông vẫn bình thường".
@@ -524,7 +525,8 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           <Menu size={19} color={C.pinkText} />
         </button>
         <ThemeToggle />
-        <button onClick={onRefresh} title="Làm mới dữ liệu" className="vmp-lift" style={{
+        <button onClick={onRefresh} className="vmp-lift"
+          title={lastSync ? `Làm mới dữ liệu · Đồng bộ lúc ${new Date(lastSync).toLocaleTimeString("vi-VN")}` : "Làm mới dữ liệu"} style={{
           ...glass, borderRadius: 14, padding: "9px 15px",
           display: "flex", alignItems: "center", gap: 8,
           border: "none", cursor: "pointer",

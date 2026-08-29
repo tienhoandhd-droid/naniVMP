@@ -1441,10 +1441,19 @@ export function CrownLogo() {
           style={{ height: 30, width: "auto", display: "block" }}
         />
       </div>
-      <div>
-        <VQWordmark size={18} />
-        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
-          CPC1 HN · QLCL
+      {/* Khối chữ V/Q TEAM viết theo lối "bức tranh nhỏ ở rìa" (thiết kế
+          29/08): V/Q serif + gạch chéo vàng, TEAM vàng giãn cách, dòng
+          nghiêng Validation & Qualification, nét sóng vàng + đơn vị. Logo
+          CPC1 HN giữ nguyên. Kiểu dáng nằm ở lotus-shell.css (.vq-brand). */}
+      <div className="vq-brand">
+        <div className="vq-brand__dong">
+          <span className="vq-brand__vq">V<svg className="vq-brand__gach" width="11" height="24" viewBox="0 0 11 24" aria-hidden="true"><line x1="9.5" y1="1.5" x2="1.5" y2="22.5" strokeWidth="1.6" strokeLinecap="round" /></svg>Q</span>
+          <span className="vq-brand__team">Team</span>
+        </div>
+        <div className="vq-brand__tagline">Validation &amp; Qualification</div>
+        <div className="vq-brand__donvi">
+          <svg width="40" height="12" viewBox="0 0 54 14" aria-hidden="true"><path d="M1 9C10 3 18 12 27 7C36 2 44 11 53 6" fill="none" strokeWidth="1.1" strokeLinecap="round" /><circle cx="27" cy="7" r="1.6" /></svg>
+          <span>CPC1 HN · QLCL</span>
         </div>
       </div>
     </div>

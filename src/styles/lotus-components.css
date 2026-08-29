@@ -582,3 +582,6 @@
   .lp-dialog,
   .lp-dialog__panel { animation: none; }
 }
+
+/* Ô số liệu đang dùng làm bộ lọc (thiết kế 29/08): viền vàng, nền sáng hơn. */
+.lp-metric--action.is-selected { border-color: var(--lp-gold); box-shadow: 0 0 0 1px var(--lp-gold), var(--lp-e-low); background: var(--lp-bg-raised); }

@@ -1,0 +1,104 @@
+/* =====================================================================
+ *  lotus-shell.css — vỏ ứng dụng theo thiết kế 29/08/2026 (Hướng B+)
+ *  ---------------------------------------------------------------------
+ *  · Nền <main>: ánh hồng–lavender toả từ góc (giữ hồn bản gốc) + tranh
+ *    hồ sen mờ ở góc phải, mờ dần về vùng đọc, KHÔNG đè lên chữ + vân sơn
+ *    mài rất nhẹ. Không còn sao lấp lánh.
+ *  · Masthead "VMP Monitor · Hệ giám sát thẩm định" ở Topbar.
+ *  · Khối thương hiệu V/Q TEAM ở Sidebar (logo CPC1 HN giữ nguyên).
+ *  Mọi màu lấy từ token --lp-*; ảnh tham chiếu qua url() để node --test
+ *  không phải import webp.
+ * ===================================================================== */
+
+.vmp-main-nen {
+  background:
+    radial-gradient(820px 620px at 88% -8%, var(--lp-rose-soft), transparent 62%),
+    radial-gradient(720px 620px at -6% 108%, var(--lp-surface-2), transparent 58%),
+    var(--lp-canvas);
+  isolation: isolate;
+}
+/* Tranh hồ sen (áo yếm, thêm sen) — góc phải trên, crop và mờ dần. */
+.vmp-main-nen::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -40px;
+  width: 640px;
+  height: 560px;
+  /* Lấy phần bên phải của tranh (đuôi tóc + cụm sen), người chỉ còn thấp thoáng. */
+  background: url("../assets/art/nen-dam-sen.webp") no-repeat -560px 0 / 1180px auto;
+  opacity: 0.42;
+  -webkit-mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, #000 35%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, #000 35%);
+  mask-composite: intersect;
+  pointer-events: none;
+  z-index: 0;
+}
+/* Vân sơn mài — chất liệu thay hoa văn. */
+.vmp-main-nen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("../assets/art/lacquer-grain.png") repeat 0 0 / 96px 96px;
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 0;
+}
+:root[data-theme="dark"] .vmp-main-nen::before { opacity: 0.28; }
+:root[data-theme="dark"] .vmp-main-nen::after { opacity: 0.1; mix-blend-mode: screen; }
+@media (max-width: 768px) {
+  .vmp-main-nen::before { width: 420px; height: 300px; background-size: 640px auto; background-position: -150px 0; opacity: 0.35; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .vmp-main-nen::before, .vmp-main-nen::after { display: none; }
+}
+
+/* ---- Masthead ---------------------------------------------------- */
+.vmp-masthead {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+.vmp-masthead__ten {
+  font-family: var(--ff-display);
+  font-style: italic;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--lp-plum);
+  letter-spacing: -0.005em;
+}
+.vmp-masthead__ten b { font-style: normal; font-weight: 700; font-size: 34px; }
+.vmp-masthead__ten i { font-weight: 500; }
+.vmp-masthead__net { flex: none; margin: 0 -4px 2px; stroke: var(--lp-gold); fill: var(--lp-gold); }
+.vmp-masthead__phu {
+  padding-bottom: 3px;
+  font-family: var(--ff-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--lp-rose);
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .vmp-masthead { gap: 8px; }
+  .vmp-masthead__net { display: none; }
+  .vmp-masthead__phu { display: none; }
+}
+
+/* ---- Khối thương hiệu V/Q TEAM (sidebar) --------------------------- */
+.vq-brand { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vq-brand__dong { display: flex; align-items: baseline; gap: 6px; line-height: 1; }
+.vq-brand__vq { font-family: var(--ff-display); font-size: 26px; font-weight: 600; color: var(--lp-plum); letter-spacing: 0.01em; }
+.vq-brand__gach { vertical-align: -5px; margin: 0 -1px; stroke: var(--lp-gold); }
+.vq-brand__team { font-family: var(--ff-display); font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lp-gold); }
+.vq-brand__tagline { margin-top: 3px; font-family: var(--ff-display); font-style: italic; font-size: 12.5px; font-weight: 500; color: var(--lp-plum); letter-spacing: 0.02em; white-space: nowrap; }
+.vq-brand__donvi { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lp-ink-muted); white-space: nowrap; }
+.vq-brand__donvi svg { flex: none; stroke: var(--lp-gold); fill: var(--lp-gold); }
+
+/* ---- Chân trang: giờ đồng bộ ------------------------------------- */
+.vmp-chan-trang { margin: 28px 0 0; font-size: 12px; font-weight: 600; color: var(--lp-ink-muted); text-align: right; }

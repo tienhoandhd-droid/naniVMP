@@ -25,6 +25,8 @@ export interface MetricItem {
   priority?: MetricPriority;
   /** Có hàm này thì ô trở thành nút thật; không có thì là chữ tĩnh. */
   onActivate?: () => void;
+  /** Ô đang được chọn làm bộ lọc — viền vàng + aria-current. */
+  selected?: boolean;
 }
 
 export interface MetricGridProps {
@@ -56,7 +58,8 @@ export default function MetricGrid({ items, label }: MetricGridProps) {
 
         if (item.onActivate) {
           return (
-            <button key={item.id} type="button" className={`${lop} lp-metric--action`} onClick={item.onActivate}>
+            <button key={item.id} type="button" className={`${lop} lp-metric--action${item.selected ? " is-selected" : ""}`}
+              aria-current={item.selected ? "true" : undefined} onClick={item.onActivate}>
               <NoiDung item={item} />
             </button>
           );
