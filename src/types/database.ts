@@ -1076,6 +1076,24 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_authorization_revision: {
+        Row: {
+          revision: number
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          revision?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          revision?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vmp_catalog_changes: {
         Row: {
           applied_at: string | null
@@ -1573,6 +1591,27 @@ export type Database = {
           embedding?: string | null
           id?: never
           metadata?: Json | null
+        }
+        Relationships: []
+      }
+      vmp_legacy_action_map: {
+        Row: {
+          ghi_chu: string | null
+          hanh_dong_cu: string
+          hanh_dong_moi: string
+          screen_id: string
+        }
+        Insert: {
+          ghi_chu?: string | null
+          hanh_dong_cu: string
+          hanh_dong_moi: string
+          screen_id: string
+        }
+        Update: {
+          ghi_chu?: string | null
+          hanh_dong_cu?: string
+          hanh_dong_moi?: string
+          screen_id?: string
         }
         Relationships: []
       }
@@ -2781,6 +2820,74 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_source_workshop_scope_grants: {
+        Row: {
+          area_code: string
+          area_key: string
+          change_reason: string
+          created_at: string
+          created_by: string | null
+          department: string
+          department_key: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          line: string | null
+          line_key: string | null
+          performer_id: string
+          updated_at: string
+          updated_by: string | null
+          valid_from: string
+          version: number
+        }
+        Insert: {
+          area_code: string
+          area_key: string
+          change_reason: string
+          created_at?: string
+          created_by?: string | null
+          department: string
+          department_key: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          line?: string | null
+          line_key?: string | null
+          performer_id: string
+          updated_at?: string
+          updated_by?: string | null
+          valid_from?: string
+          version?: number
+        }
+        Update: {
+          area_code?: string
+          area_key?: string
+          change_reason?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          department_key?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          line?: string | null
+          line_key?: string | null
+          performer_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          valid_from?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vmp_source_workshop_scope_grants_performer_id_fkey"
+            columns: ["performer_id"]
+            isOneToOne: false
+            referencedRelation: "vmp_performers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vmp_staff_emails: {
         Row: {
           created_at: string
@@ -3073,6 +3180,7 @@ export type Database = {
       }
       muc_xem: { Args: { p_bieu_thuc: string; p_vai: string }; Returns: string }
       rpc_active_rules: { Args: never; Returns: Json }
+      rpc_active_rules__five_role_impl_20260824: { Args: never; Returns: Json }
       rpc_ai_cache_doc: { Args: { p_question: string }; Returns: Json }
       rpc_ai_cache_nn_luu: {
         Args: { p_cau_hoi: string; p_phan_hoi: Json; p_vector: string }
@@ -3228,8 +3336,35 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_apply_catalog_change__five_role_impl_20260824: {
+        Args: {
+          p_change_id: string
+          p_expected_timeline_revision?: number
+          p_reason: string
+        }
+        Returns: Json
+      }
+      rpc_apply_catalog_change_v2: {
+        Args: {
+          p_change_id: string
+          p_deadline_overrides: Json
+          p_expected_timeline_revision: number
+          p_override_confirmed: boolean
+          p_reason: string
+        }
+        Returns: Json
+      }
       rpc_apply_sheet_sync: {
         Args: { p_op: string; p_patch: Json; p_validation_code: string }
+        Returns: Json
+      }
+      rpc_apply_sheet_sync__source_impl_20260828: {
+        Args: { p_op: string; p_patch: Json; p_validation_code: string }
+        Returns: Json
+      }
+      rpc_business_roles: { Args: never; Returns: Json }
+      rpc_business_roles__five_role_impl_20260824: {
+        Args: never
         Returns: Json
       }
       rpc_catalog_history: {
@@ -3238,11 +3373,19 @@ export type Database = {
       }
       rpc_catalog_history_detail: { Args: { p_id: string }; Returns: Json }
       rpc_check_data_quality: { Args: { p_year?: number }; Returns: Json }
+      rpc_check_data_quality__five_role_impl_20260824: {
+        Args: { p_year?: number }
+        Returns: Json
+      }
       rpc_cleanup_orphan_source_assignment_resolutions: {
         Args: { p_reason: string }
         Returns: Json
       }
       rpc_commit_catalog_import: {
+        Args: { p_batch_id: string; p_reason: string }
+        Returns: Json
+      }
+      rpc_commit_catalog_import__five_role_impl_20260824: {
         Args: { p_batch_id: string; p_reason: string }
         Returns: Json
       }
@@ -3256,7 +3399,21 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_create_plan_item__five_role_impl_20260824: {
+        Args: {
+          p_object_code: string
+          p_occurrence?: number
+          p_patch?: Json
+          p_validation_type: string
+          p_year?: number
+        }
+        Returns: Json
+      }
       rpc_dashboard_kpi: { Args: { p_year?: number }; Returns: Json }
+      rpc_dashboard_kpi__five_role_impl_20260824: {
+        Args: { p_year?: number }
+        Returns: Json
+      }
       rpc_deactivate_object: {
         Args: { p_code: string; p_reason: string }
         Returns: Json
@@ -3264,6 +3421,10 @@ export type Database = {
       rpc_delete_alert_recipient: { Args: { p_id: string }; Returns: Json }
       rpc_delete_performer: { Args: { p_id: string }; Returns: Json }
       rpc_delete_plan_item: {
+        Args: { p_reason: string; p_validation_code: string }
+        Returns: Json
+      }
+      rpc_delete_plan_item__five_role_impl_20260824: {
         Args: { p_reason: string; p_validation_code: string }
         Returns: Json
       }
@@ -3276,12 +3437,34 @@ export type Database = {
         Args: { p_row_number: number; p_source_tab: string }
         Returns: Json
       }
+      rpc_delete_source_row__five_role_impl_20260824: {
+        Args: { p_row_number: number; p_source_tab: string }
+        Returns: Json
+      }
       rpc_delete_staff_email: { Args: { p_id: string }; Returns: Json }
       rpc_due_alerts: {
         Args: { p_soon_days?: number; p_year?: number }
         Returns: Json
       }
+      rpc_due_alerts__five_role_impl_20260824: {
+        Args: { p_soon_days?: number; p_year?: number }
+        Returns: Json
+      }
+      rpc_export_source_objects: {
+        Args: {
+          p_cursor: Json
+          p_filters: Json
+          p_limit: number
+          p_object_kind: string
+          p_search: string
+        }
+        Returns: Json
+      }
       rpc_generate_timeline: {
+        Args: { p_commit?: boolean; p_year?: number }
+        Returns: Json
+      }
+      rpc_generate_timeline__five_role_impl_20260824: {
         Args: { p_commit?: boolean; p_year?: number }
         Returns: Json
       }
@@ -3303,6 +3486,10 @@ export type Database = {
         Returns: number
       }
       rpc_get_missing_items: { Args: { p_year?: number }; Returns: Json }
+      rpc_get_missing_items__five_role_impl_20260824: {
+        Args: { p_year?: number }
+        Returns: Json
+      }
       rpc_get_vmp_dashboard: {
         Args: {
           p_include_cancelled?: boolean
@@ -3311,8 +3498,24 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_get_vmp_dashboard__five_role_impl_20260824: {
+        Args: {
+          p_include_cancelled?: boolean
+          p_include_missing?: boolean
+          p_year?: number
+        }
+        Returns: Json
+      }
       rpc_get_vmp_watermark: { Args: { p_year?: number }; Returns: Json }
+      rpc_get_vmp_watermark__five_role_impl_20260824: {
+        Args: { p_year?: number }
+        Returns: Json
+      }
       rpc_import_item_permission_staff: {
+        Args: { p_reason: string; p_rows: Json }
+        Returns: Json
+      }
+      rpc_import_item_permission_staff__five_role_impl_20260824: {
         Args: { p_reason: string; p_rows: Json }
         Returns: Json
       }
@@ -3320,7 +3523,15 @@ export type Database = {
         Args: { p_person_id?: string; p_validation_code?: string }
         Returns: Json
       }
+      rpc_item_assignments__five_role_impl_20260824: {
+        Args: { p_person_id?: string; p_validation_code?: string }
+        Returns: Json
+      }
       rpc_item_permission_account_candidates: {
+        Args: { p_query?: string }
+        Returns: Json
+      }
+      rpc_item_permission_account_candidates__five_role_impl_20260824: {
         Args: { p_query?: string }
         Returns: Json
       }
@@ -3328,9 +3539,25 @@ export type Database = {
         Args: { p_query?: string }
         Returns: Json
       }
+      rpc_item_permission_directory__five_role_impl_20260824: {
+        Args: { p_query?: string }
+        Returns: Json
+      }
       rpc_item_permission_preflight: { Args: never; Returns: Json }
+      rpc_item_permission_preflight__five_role_impl_20260824: {
+        Args: never
+        Returns: Json
+      }
       rpc_item_permission_scope_catalog: { Args: never; Returns: Json }
+      rpc_item_permission_scope_catalog__five_role_impl_20260824: {
+        Args: never
+        Returns: Json
+      }
       rpc_item_progress_history: {
+        Args: { p_limit?: number; p_offset?: number; p_validation_code: string }
+        Returns: Json
+      }
+      rpc_item_progress_history__five_role_impl_20260824: {
         Args: { p_limit?: number; p_offset?: number; p_validation_code: string }
         Returns: Json
       }
@@ -3359,7 +3586,25 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_link_item_permission_account__five_role_impl_20260824: {
+        Args: {
+          p_expected_version: number
+          p_person_id: string
+          p_reason: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       rpc_list_catalog_changes: {
+        Args: {
+          p_limit?: number
+          p_object_kind?: string
+          p_offset?: number
+          p_status?: string
+        }
+        Returns: Json
+      }
+      rpc_list_catalog_changes__five_role_impl_20260824: {
         Args: {
           p_limit?: number
           p_object_kind?: string
@@ -3378,16 +3623,67 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_list_catalog_dataset__five_role_impl_20260824: {
+        Args: {
+          p_dataset: string
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+        }
+        Returns: Json
+      }
+      rpc_list_source_objects: {
+        Args: {
+          p_cursor: Json
+          p_filters: Json
+          p_include_inactive: boolean
+          p_limit: number
+          p_object_id: string
+          p_object_kind: string
+          p_search: string
+        }
+        Returns: Json
+      }
       rpc_list_source_tabs: { Args: never; Returns: Json }
+      rpc_list_source_tabs__five_role_impl_20260824: {
+        Args: never
+        Returns: Json
+      }
+      rpc_list_source_workshop_coverage: {
+        Args: { p_cursor: Json; p_limit: number; p_search: string }
+        Returns: Json
+      }
       rpc_luat_xem: { Args: never; Returns: Json }
+      rpc_luat_xem__five_role_impl_20260824: { Args: never; Returns: Json }
       rpc_mark_alert_sent: {
         Args: { p_error?: string; p_idempotency_key: string; p_ok: boolean }
         Returns: Json
       }
       rpc_my_editable_progress_rights: { Args: never; Returns: Json }
       rpc_my_ui_access: { Args: never; Returns: Json }
+      rpc_my_ui_access__admin_visibility_delegate_20260828: {
+        Args: never
+        Returns: Json
+      }
       rpc_nguoi_va_quyen: { Args: never; Returns: Json }
+      rpc_nguoi_va_quyen__admin_visibility_delegate_20260828: {
+        Args: never
+        Returns: Json
+      }
+      rpc_nguoi_va_quyen__five_role_impl_20260824: {
+        Args: never
+        Returns: Json
+      }
       rpc_preview_catalog_change: {
+        Args: { p_change_id: string }
+        Returns: Json
+      }
+      rpc_preview_catalog_change__five_role_impl_20260824: {
+        Args: { p_change_id: string }
+        Returns: Json
+      }
+      rpc_preview_catalog_change_v2: {
         Args: { p_change_id: string }
         Returns: Json
       }
@@ -3395,12 +3691,28 @@ export type Database = {
         Args: { p_person_id?: string; p_validation_code?: string }
         Returns: Json
       }
+      rpc_preview_item_rights__admin_visibility_delegate_20260828: {
+        Args: { p_person_id?: string; p_validation_code?: string }
+        Returns: Json
+      }
+      rpc_preview_item_rights__five_role_impl_20260824: {
+        Args: { p_person_id?: string; p_validation_code?: string }
+        Returns: Json
+      }
       rpc_recalc_criticality: { Args: { p_only_auto?: boolean }; Returns: Json }
+      rpc_recalc_criticality__five_role_impl_20260824: {
+        Args: { p_only_auto?: boolean }
+        Returns: Json
+      }
       rpc_reconcile_orphan_objects: {
         Args: { p_codes_in_sheet: string[] }
         Returns: Json
       }
       rpc_refresh_computed_status: { Args: never; Returns: Json }
+      rpc_refresh_computed_status__five_role_impl_20260824: {
+        Args: never
+        Returns: Json
+      }
       rpc_refresh_source_item_assignments: { Args: never; Returns: Json }
       rpc_register_alert: {
         Args: {
@@ -3422,6 +3734,14 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_resolve_missing__five_role_impl_20260824: {
+        Args: {
+          p_decision: string
+          p_reason: string
+          p_validation_code: string
+        }
+        Returns: Json
+      }
       rpc_resolve_outbox: {
         Args: { p_error?: string; p_id: number; p_ok: boolean }
         Returns: Json
@@ -3434,7 +3754,20 @@ export type Database = {
         Args: { p_sync_run_id: string }
         Returns: Json
       }
+      rpc_rollback_vmp_sheet_sync__source_impl_20260828: {
+        Args: { p_sync_run_id: string }
+        Returns: Json
+      }
       rpc_save_alert_recipient: {
+        Args: {
+          p_expected_version?: number
+          p_id: string
+          p_patch: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      rpc_save_alert_recipient__five_role_impl_20260824: {
         Args: {
           p_expected_version?: number
           p_id: string
@@ -3453,7 +3786,26 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_save_catalog_object__five_role_impl_20260824: {
+        Args: {
+          p_expected_version?: number
+          p_object_code: string
+          p_object_kind: string
+          p_patch: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
       rpc_save_product_gmp: {
+        Args: {
+          p_bfo_code: string
+          p_expected_version?: number
+          p_patch: Json
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      rpc_save_product_gmp__five_role_impl_20260824: {
         Args: {
           p_bfo_code: string
           p_expected_version?: number
@@ -3472,7 +3824,39 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_set_assignment__five_role_impl_20260824: {
+        Args: {
+          p_department: string
+          p_line: string
+          p_staff_name: string
+          p_vai_tro: string
+          p_validation_type: string
+        }
+        Returns: Json
+      }
+      rpc_set_business_role: {
+        Args: {
+          p_business_role: string
+          p_department?: string
+          p_reason?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      rpc_set_business_role__five_role_impl_20260824: {
+        Args: {
+          p_business_role: string
+          p_department?: string
+          p_reason?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       rpc_set_catalog_import_row_reason: {
+        Args: { p_batch_id: string; p_reason: string; p_row_number: number }
+        Returns: Json
+      }
+      rpc_set_catalog_import_row_reason__five_role_impl_20260824: {
         Args: { p_batch_id: string; p_reason: string; p_row_number: number }
         Returns: Json
       }
@@ -3480,7 +3864,23 @@ export type Database = {
         Args: { p_cho_phep: boolean; p_email: string; p_ghi_chu?: string }
         Returns: Json
       }
+      rpc_set_email_cho_phep__five_role_impl_20260824: {
+        Args: { p_cho_phep: boolean; p_email: string; p_ghi_chu?: string }
+        Returns: Json
+      }
       rpc_set_item_assignment: {
+        Args: {
+          p_action: string
+          p_assignment_kind: string
+          p_assignment_role: string
+          p_expected_primary_assignment_id?: string
+          p_person_id: string
+          p_reason: string
+          p_validation_code: string
+        }
+        Returns: Json
+      }
+      rpc_set_item_assignment__five_role_impl_20260824: {
         Args: {
           p_action: string
           p_assignment_kind: string
@@ -3504,7 +3904,19 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_set_item_performer_by_id__five_role_impl_20260824: {
+        Args: {
+          p_person_id: string
+          p_reason: string
+          p_validation_code: string
+        }
+        Returns: Json
+      }
       rpc_set_item_permissions_mode: {
+        Args: { p_mode: string; p_reason: string }
+        Returns: Json
+      }
+      rpc_set_item_permissions_mode__five_role_impl_20260824: {
         Args: { p_mode: string; p_reason: string }
         Returns: Json
       }
@@ -3512,8 +3924,33 @@ export type Database = {
         Args: { p_reason: string; p_state: string; p_validation_code: string }
         Returns: Json
       }
+      rpc_set_item_state__five_role_impl_20260824: {
+        Args: { p_reason: string; p_state: string; p_validation_code: string }
+        Returns: Json
+      }
       rpc_set_role_permission: {
         Args: { p_hanh_dong: string; p_muc: string; p_vai_tro: string }
+        Returns: Json
+      }
+      rpc_set_source_workshop_scope_grant: {
+        Args: {
+          p_area_code: string
+          p_department: string
+          p_expected_version: number
+          p_grant_id: string
+          p_is_active: boolean
+          p_line: string
+          p_performer_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      rpc_set_user_active: {
+        Args: { p_active: boolean; p_reason?: string; p_user_id: string }
+        Returns: Json
+      }
+      rpc_set_user_active__five_role_impl_20260824: {
+        Args: { p_active: boolean; p_reason?: string; p_user_id: string }
         Returns: Json
       }
       rpc_set_user_role: {
@@ -3526,7 +3963,54 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_set_user_role__five_role_impl_20260824: {
+        Args: {
+          p_department: string
+          p_pham_vi?: string
+          p_reason?: string
+          p_role: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      rpc_source_field_suggestions: {
+        Args: {
+          p_cursor: Json
+          p_field: string
+          p_limit: number
+          p_object_kind: string
+          p_search: string
+        }
+        Returns: Json
+      }
+      rpc_source_object_facets: {
+        Args: { p_filters: Json; p_object_kind: string }
+        Returns: Json
+      }
+      rpc_source_qa_candidates: {
+        Args: {
+          p_cursor: Json
+          p_include_ids: string[]
+          p_limit: number
+          p_search: string
+        }
+        Returns: Json
+      }
       rpc_source_warnings: { Args: { p_year?: number }; Returns: Json }
+      rpc_source_warnings__five_role_impl_20260824: {
+        Args: { p_year?: number }
+        Returns: Json
+      }
+      rpc_source_workshop_scope_choices: {
+        Args: {
+          p_area_code: string
+          p_cursor: Json
+          p_department: string
+          p_limit: number
+          p_search: string
+        }
+        Returns: Json
+      }
       rpc_stage_catalog_import: {
         Args: {
           p_dataset: string
@@ -3537,7 +4021,27 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_stage_catalog_import__five_role_impl_20260824: {
+        Args: {
+          p_dataset: string
+          p_file_hash?: string
+          p_fingerprint: string
+          p_rows?: Json
+          p_template_version: string
+        }
+        Returns: Json
+      }
       rpc_sync_vmp_sheet_snapshot: {
+        Args: {
+          p_headers: Json
+          p_rows: Json
+          p_sheet_gid: string
+          p_sheet_id: string
+          p_tab_name: string
+        }
+        Returns: Json
+      }
+      rpc_sync_vmp_sheet_snapshot__source_impl_20260828: {
         Args: {
           p_headers: Json
           p_rows: Json
@@ -3562,7 +4066,41 @@ export type Database = {
         Returns: Json
       }
       rpc_trang_thai_he_thong: { Args: never; Returns: Json }
+      rpc_trang_thai_he_thong__five_role_impl_20260824: {
+        Args: never
+        Returns: Json
+      }
+      rpc_update_planned_deadlines: {
+        Args: {
+          p_confirmed: boolean
+          p_deadlines: Json
+          p_expected_version: number
+          p_reason: string
+          p_validation_code: string
+        }
+        Returns: Json
+      }
       rpc_update_progress: {
+        Args: {
+          p_expected_version?: number
+          p_patch: Json
+          p_reason?: string
+          p_sheet_patch?: Json
+          p_validation_code: string
+        }
+        Returns: Json
+      }
+      rpc_update_progress__assigned_impl_20260827: {
+        Args: {
+          p_expected_version?: number
+          p_patch: Json
+          p_reason?: string
+          p_sheet_patch?: Json
+          p_validation_code: string
+        }
+        Returns: Json
+      }
+      rpc_update_progress__five_role_impl_20260824: {
         Args: {
           p_expected_version?: number
           p_patch: Json
@@ -3585,7 +4123,29 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_upsert_item_permission_staff__five_role_impl_20260824: {
+        Args: {
+          p_expected_version: number
+          p_patch: Json
+          p_person_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       rpc_upsert_object: {
+        Args: {
+          p_area: string
+          p_classification: string
+          p_code: string
+          p_criticality: string
+          p_department: string
+          p_frequency_months: number
+          p_name: string
+          p_notes?: string
+        }
+        Returns: Json
+      }
+      rpc_upsert_object__five_role_impl_20260824: {
         Args: {
           p_area: string
           p_classification: string
@@ -3614,6 +4174,10 @@ export type Database = {
         Args: { p_payload: Json; p_row_number: number; p_source_tab: string }
         Returns: Json
       }
+      rpc_upsert_source_row__five_role_impl_20260824: {
+        Args: { p_payload: Json; p_row_number: number; p_source_tab: string }
+        Returns: Json
+      }
       rpc_upsert_staff_email: {
         Args: { p_id: string; p_patch: Json }
         Returns: Json
@@ -3629,10 +4193,28 @@ export type Database = {
         Args: { p_uid: string; p_validation_code: string }
         Returns: string[]
       }
+      vmp_apply_catalog_change_v2_impl: {
+        Args: {
+          p_change_id: string
+          p_deadline_overrides: Json
+          p_expected_timeline_revision: number
+          p_override_confirmed: boolean
+          p_reason: string
+        }
+        Returns: Json
+      }
       vmp_business_role: { Args: { p_uid: string }; Returns: string }
       vmp_business_role_unresolved_reason: {
         Args: { p_uid: string }
         Returns: string
+      }
+      vmp_can_manage_source_qa_assignment: {
+        Args: { p_uid: string }
+        Returns: boolean
+      }
+      vmp_can_manage_source_workshop_scope: {
+        Args: { p_uid: string }
+        Returns: boolean
       }
       vmp_can_view_item: {
         Args: { p_uid: string; p_validation_code: string }
@@ -3642,8 +4224,81 @@ export type Database = {
         Args: { p_validation_code: string }
         Returns: boolean
       }
+      vmp_can_view_plan_item: {
+        Args: { p_uid: string; p_validation_code: string }
+        Returns: boolean
+      }
+      vmp_can_view_source_object: {
+        Args: { p_source_id: string; p_uid: string }
+        Returns: boolean
+      }
       vmp_catalog_timeline_fields: { Args: never; Returns: string[] }
+      vmp_current_actor_can_manage_source_qa_assignment: {
+        Args: never
+        Returns: boolean
+      }
+      vmp_current_actor_can_manage_source_workshop_scope: {
+        Args: never
+        Returns: boolean
+      }
+      vmp_current_actor_is_active: { Args: never; Returns: boolean }
+      vmp_current_session_is_active: { Args: never; Returns: boolean }
       vmp_don_dau_vet_dong_bo: { Args: { p_giu?: number }; Returns: Json }
+      vmp_editable_progress_rights_path: {
+        Args: { p_actor: string }
+        Returns: {
+          payload: Json
+        }[]
+      }
+      vmp_exact_active_source_for_item: {
+        Args: { p_validation_code: string }
+        Returns: {
+          area_code: string | null
+          complexity_score: number | null
+          created_at: string
+          critical_point: string | null
+          criticality_score: number | null
+          criticality_source: string
+          department: string | null
+          edited_on_web: boolean
+          extra: Json
+          first_month: number | null
+          frequency_months: number | null
+          id: string
+          is_active: boolean
+          line: string | null
+          note: string | null
+          object_code: string
+          object_kind: string
+          object_name: string | null
+          owner_name: string | null
+          owner_person_id: string | null
+          quality_impact_score: number | null
+          report_class: string | null
+          show_flag: string | null
+          source_row: number
+          source_tab: string
+          status: string | null
+          support_name: string | null
+          support_person_id: string | null
+          timeline_applied_revision: number
+          timeline_revision: number
+          updated_at: string
+          updated_by: string | null
+          validate_flag: string | null
+          validate_reason: string | null
+          version: number
+          work_group: string | null
+          workdays: number | null
+          year_ref: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "vmp_source_objects"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       vmp_hang_muc_da_co_tien_do: {
         Args: { p_validation_code: string }
         Returns: boolean
@@ -3661,6 +4316,7 @@ export type Database = {
           kieu: string
         }[]
       }
+      vmp_is_active_session: { Args: { p_uid?: string }; Returns: boolean }
       vmp_item_rights: {
         Args: { p_uid: string; p_validation_code: string }
         Returns: {
@@ -3725,6 +4381,14 @@ export type Database = {
         }
         Returns: string[]
       }
+      vmp_lock_catalog_object_v2: {
+        Args: { p_object_code: string; p_object_kind: string }
+        Returns: undefined
+      }
+      vmp_lock_source_plan_relations: {
+        Args: { p_object_codes: string[] }
+        Returns: undefined
+      }
       vmp_luu_tru_nhat_ky: { Args: { p_thang?: number }; Returns: Json }
       vmp_ma_phan_loai: { Args: { p_kind: string }; Returns: string }
       vmp_manager_principal: {
@@ -3748,12 +4412,31 @@ export type Database = {
           view_reason: string
         }[]
       }
+      vmp_my_item_rights__five_role_impl_20260824: {
+        Args: { p_validation_code: string }
+        Returns: {
+          area_match: boolean
+          assignment_sources: string[]
+          can_view: boolean
+          editable_fields: string[]
+          scope_match: boolean
+          view_reason: string
+        }[]
+      }
       vmp_normalize_person_name: { Args: { p_name: string }; Returns: string }
       vmp_parse_depts: { Args: { p_raw: string }; Returns: string[] }
       vmp_parse_scheduled_at: { Args: { p_value: string }; Returns: string }
       vmp_phase_status_text: {
         Args: { p: Database["public"]["Enums"]["phase_status"] }
         Returns: string
+      }
+      vmp_preview_catalog_change_v2_impl: {
+        Args: { p_change_id: string }
+        Returns: Json
+      }
+      vmp_reconcile_source_qa_projection: {
+        Args: { p_source_id: string }
+        Returns: Json
       }
       vmp_score_complexity: {
         Args: { p_kind: string; p_name: string; p_report_class?: string }
@@ -3767,6 +4450,7 @@ export type Database = {
         Args: { p_department: string; p_kind: string; p_name: string }
         Returns: number
       }
+      vmp_session_denial: { Args: never; Returns: Json }
       vmp_set_item_assignment_unhardened: {
         Args: {
           p_action: string
@@ -3793,6 +4477,47 @@ export type Database = {
         Args: { p_index: number; p_values: Json }
         Returns: string
       }
+      vmp_source_filters_valid: { Args: { p_filters: Json }; Returns: boolean }
+      vmp_source_object_matches_filters: {
+        Args: {
+          p_filters: Json
+          p_search: string
+          p_source: Database["public"]["Tables"]["vmp_source_objects"]["Row"]
+        }
+        Returns: boolean
+      }
+      vmp_source_objects_page_path: {
+        Args: {
+          p_actor: string
+          p_cursor: Json
+          p_filters: Json
+          p_include_inactive: boolean
+          p_limit: number
+          p_object_id: string
+          p_object_kind: string
+          p_search: string
+        }
+        Returns: {
+          payload: Json
+        }[]
+      }
+      vmp_source_qa_candidates_page_path: {
+        Args: {
+          p_actor: string
+          p_cursor: Json
+          p_include_ids: string[]
+          p_limit: number
+          p_search: string
+        }
+        Returns: {
+          payload: Json
+        }[]
+      }
+      vmp_source_scope_key: { Args: { p_value: string }; Returns: string }
+      vmp_source_workshop_scope_match: {
+        Args: { p_person_id: string; p_source_id: string }
+        Returns: boolean
+      }
       vmp_tinh_moc_thoi_gian: {
         Args: {
           p_first_month: number
@@ -3816,6 +4541,16 @@ export type Database = {
         Returns: {
           signature: string
         }[]
+      }
+      vmp_update_planned_deadlines_impl: {
+        Args: {
+          p_confirmed: boolean
+          p_deadlines: Json
+          p_expected_version: number
+          p_reason: string
+          p_validation_code: string
+        }
+        Returns: Json
       }
       vmp_upsert_item_permission_staff_before_focused_enforcement: {
         Args: {
