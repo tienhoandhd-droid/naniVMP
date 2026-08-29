@@ -398,7 +398,7 @@ try {
   // line. The payload preserves NULL for area-wide coverage and includes a reason.
   await manager.click("[data-cw-nav=coverage]");
   await manager.waitForSelector("#workshop-coverage-search");
-  await manager.click('button[aria-pressed="false"]');
+  await manager.waitForSelector('form[aria-label="Thiết lập phạm vi xưởng"]');
   await manager.select("#workshop-scope-department", "XSX");
   await manager.select("#workshop-scope-area", "A01");
   await manager.type("#workshop-scope-reason", "Phạm vi xưởng E2E có lý do");
