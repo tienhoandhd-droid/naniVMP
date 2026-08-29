@@ -71,7 +71,22 @@ test("read-only Source preflight and postflight end with an explicit SELECT PASS
   }
 });
 
-test("Source preflight blocks Source-item mismatch while reporting assignment gaps and conflicts", async () => {
+test("Source checkers use explicit active profile predicates for every persona", async () => {
+  for (const path of [
+    "scripts/check-source-qa-workshop-access-preflight.sql",
+    "scripts/check-source-qa-workshop-access.sql",
+  ]) {
+    const sql = await read(path);
+
+    assert.doesNotMatch(sql, /coalesce\s*\(\s*profile\.is_active\s*,\s*true\s*\)/i,
+      `${path} must not treat a NULL profile active flag as active`);
+    assert.doesNotMatch(sql,
+      /\bprofile\.is_active\b(?!\s+IS\s+TRUE\b)/i,
+      `${path} must use profile.is_active IS TRUE for every persona predicate`);
+  }
+});
+
+test("Source preflight blocks Source-item mismatch while reporting repair inventory", async () => {
   const preflight = await read("scripts/check-source-qa-workshop-access-preflight.sql");
 
   assert.match(preflight, /\bvmp_plan_items\b[\s\S]*\bvmp_source_objects\b/i);
@@ -82,13 +97,17 @@ test("Source preflight blocks Source-item mismatch while reporting assignment ga
     /RAISE\s+EXCEPTION[\s\S]{0,2200}SOURCE_ACCESS_PREFLIGHT_[A-Z0-9_]*(?:MAPPING|MISMATCH|SOURCE_ITEM)/i,
     "a Source-item mismatch must be a release blocker");
 
-  assert.match(preflight, /(?:repairable[_ ]gaps?|projection[_ ]missing|assignment[_ ]gaps?)/i,
-    "preflight must expose assignment-gap evidence");
+  assert.match(preflight, /projection[_ ]missing/i,
+    "preflight must expose projection-missing inventory");
   assert.match(preflight, /(?:primary[_ ]conflicts?|assignment[_ ]conflicts?)/i,
     "preflight must expose assignment-conflict evidence");
+  assert.match(preflight, /unresolved[_ ]active[_ ]performers/i,
+    "preflight must expose unresolved active performer inventory");
+  assert.doesNotMatch(preflight, /repairable[_ ]gaps?/i,
+    "a Source-item mismatch must not be mislabeled as repairable inventory");
   assert.match(preflight,
-    /(?:RAISE\s+NOTICE|SELECT)[\s\S]{0,900}(?:repairable[_ ]gaps?|projection[_ ]missing|assignment[_ ]gaps?)[\s\S]{0,500}(?:primary[_ ]conflicts?|assignment[_ ]conflicts?)/i,
-    "assignment gaps and conflicts must be reported, not silently discarded");
+    /RAISE\s+NOTICE[\s\S]{0,900}projection[_ ]missing[\s\S]{0,500}primary[_ ]conflicts?[\s\S]{0,500}unresolved[_ ]active[_ ]performers/i,
+    "all repair inventory counts must be reported together, not silently discarded");
 });
 
 test("forward recovery increments authorization revision and proves that increment", async () => {
@@ -139,4 +158,15 @@ test("postflight discovers personas from the database and conditionally probes o
   assert.match(postflight,
     /\bIF\s+v_(?:[A-Za-z0-9_]*(?:id|persona)|admin|manager|owner|support|unrelated|workshop)[A-Za-z0-9_]*\s+IS\s+NOT\s+NULL\b[\s\S]{0,1400}\b(?:PERFORM|SELECT|rpc_)/i,
     "postflight must guard probes when an optional persona is absent");
+});
+
+test("postflight reports the actual number of non-object surface probes", async () => {
+  const postflight = await read("scripts/check-source-qa-workshop-access.sql");
+
+  assert.doesNotMatch(postflight,
+    /NON_OBJECT_SURFACES_FORBIDDEN\s+count\s*=\s*2/i,
+    "postflight must not claim two probes when personas are optional");
+  assert.match(postflight,
+    /NON_OBJECT_SURFACES_FORBIDDEN\s+count\s*=%['\s,)]/i,
+    "postflight must print a dynamic non-object probe count");
 });

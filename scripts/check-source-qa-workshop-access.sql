@@ -16,6 +16,7 @@ DECLARE
   v_count bigint;
   v_revision bigint;
   v_actor uuid;
+  v_non_object_surface_probes bigint := 0;
 BEGIN
   IF current_setting('server_version_num')::integer NOT BETWEEN 170000 AND 179999
      OR current_user IS DISTINCT FROM 'postgres'
@@ -35,34 +36,39 @@ BEGIN
   -- the release command line or into its output.
   SELECT profile.id INTO v_admin
   FROM public.profiles profile
-  WHERE profile.role='admin'::public.user_role AND coalesce(profile.is_active,true)
+  WHERE profile.role='admin'::public.user_role AND profile.is_active IS TRUE
   ORDER BY profile.id LIMIT 1;
   SELECT profile.id INTO v_manager
   FROM public.profiles profile
-  WHERE profile.role='qa_manager'::public.user_role AND coalesce(profile.is_active,true)
+  WHERE profile.role='qa_manager'::public.user_role AND profile.is_active IS TRUE
   ORDER BY profile.id LIMIT 1;
   SELECT performer.user_id INTO v_owner
   FROM public.vmp_source_objects source_object
   JOIN public.vmp_performers performer ON performer.id=source_object.owner_person_id
   JOIN public.profiles profile ON profile.id=performer.user_id
-  WHERE source_object.is_active AND performer.is_active AND performer.user_id IS NOT NULL
-    AND profile.is_active AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
+  WHERE source_object.is_active IS TRUE AND performer.is_active IS TRUE
+    AND performer.user_id IS NOT NULL
+    AND profile.is_active IS TRUE
+    AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
   ORDER BY source_object.object_code,performer.id LIMIT 1;
   SELECT performer.user_id INTO v_support
   FROM public.vmp_source_objects source_object
   JOIN public.vmp_performers performer ON performer.id=source_object.support_person_id
   JOIN public.profiles profile ON profile.id=performer.user_id
-  WHERE source_object.is_active AND performer.is_active AND performer.user_id IS NOT NULL
-    AND profile.is_active AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
+  WHERE source_object.is_active IS TRUE AND performer.is_active IS TRUE
+    AND performer.user_id IS NOT NULL
+    AND profile.is_active IS TRUE
+    AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
   ORDER BY source_object.object_code,performer.id LIMIT 1;
   SELECT performer.user_id INTO v_unrelated
   FROM public.vmp_performers performer
   JOIN public.profiles profile ON profile.id=performer.user_id
-  WHERE performer.is_active AND performer.user_id IS NOT NULL AND profile.is_active
+  WHERE performer.is_active IS TRUE AND performer.user_id IS NOT NULL
+    AND profile.is_active IS TRUE
     AND public.vmp_business_role(performer.user_id)='qa_staff'
     AND NOT EXISTS (
       SELECT 1 FROM public.vmp_source_objects source_object
-      WHERE source_object.is_active
+      WHERE source_object.is_active IS TRUE
         AND performer.id IN (source_object.owner_person_id,source_object.support_person_id))
   ORDER BY performer.id LIMIT 1;
   IF to_regclass('public.vmp_source_workshop_scope_grants') IS NOT NULL THEN
@@ -70,9 +76,10 @@ BEGIN
     FROM public.vmp_source_workshop_scope_grants grant_row
     JOIN public.vmp_performers performer ON performer.id=grant_row.performer_id
     JOIN public.profiles profile ON profile.id=performer.user_id
-    WHERE grant_row.is_active AND grant_row.valid_from<=transaction_timestamp()
+    WHERE grant_row.is_active IS TRUE AND grant_row.valid_from<=transaction_timestamp()
       AND (grant_row.expires_at IS NULL OR grant_row.expires_at>transaction_timestamp())
-      AND performer.is_active AND performer.user_id IS NOT NULL AND profile.is_active
+      AND performer.is_active IS TRUE AND performer.user_id IS NOT NULL
+      AND profile.is_active IS TRUE
       AND public.vmp_business_role(performer.user_id) IN ('workshop_manager','workshop_staff')
     ORDER BY grant_row.id LIMIT 1;
   END IF;
@@ -94,8 +101,10 @@ BEGIN
 
   IF public.vmp_business_role(v_admin) IS DISTINCT FROM 'admin'
      OR public.vmp_business_role(v_manager) IS DISTINCT FROM 'qa_manager'
-     OR NOT EXISTS (SELECT 1 FROM public.profiles WHERE id=v_admin AND coalesce(is_active,true))
-     OR NOT EXISTS (SELECT 1 FROM public.profiles WHERE id=v_manager AND coalesce(is_active,true)) THEN
+     OR NOT EXISTS (SELECT 1 FROM public.profiles profile
+                    WHERE profile.id=v_admin AND profile.is_active IS TRUE)
+     OR NOT EXISTS (SELECT 1 FROM public.profiles profile
+                    WHERE profile.id=v_manager AND profile.is_active IS TRUE) THEN
     RAISE EXCEPTION USING errcode='check_violation',
       message='SOURCE_ACCESS_POSTFLIGHT_ACTIVE_ADMIN_MANAGER';
   END IF;
@@ -117,13 +126,14 @@ BEGIN
     SELECT 1 FROM public.vmp_plan_items item
     LEFT JOIN public.vmp_objects master_object ON master_object.code=item.object_code
     LEFT JOIN public.vmp_source_objects source_object
-      ON source_object.object_code=master_object.code AND source_object.is_active
-    WHERE item.is_active
+      ON source_object.object_code=master_object.code AND source_object.is_active IS TRUE
+    WHERE item.is_active IS TRUE
     GROUP BY item.validation_code HAVING count(source_object.id) <> 1
   ) OR EXISTS (
     SELECT 1 FROM public.vmp_source_objects source_object
-    JOIN public.vmp_plan_items item ON item.object_code=source_object.object_code AND item.is_active
-    WHERE source_object.is_active
+    JOIN public.vmp_plan_items item ON item.object_code=source_object.object_code
+                                   AND item.is_active IS TRUE
+    WHERE source_object.is_active IS TRUE
       AND (source_object.owner_person_id IS DISTINCT FROM item.owner_person_id
         OR source_object.support_person_id IS DISTINCT FROM item.support_person_id)
   ) THEN
@@ -131,7 +141,7 @@ BEGIN
       message='SOURCE_ACCESS_POSTFLIGHT_EXACT_MAPPING_OWNER_SUPPORT';
   END IF;
   SELECT count(*), md5(string_agg(object_code, E'\n' ORDER BY object_code))
-    INTO v_count,v_digest FROM public.vmp_source_objects WHERE is_active;
+    INTO v_count,v_digest FROM public.vmp_source_objects WHERE is_active IS TRUE;
   RAISE NOTICE 'PASS SOURCE_ACCESS_POSTFLIGHT_EXACT_MAPPING count=% digest=%', v_count,v_digest;
 
   IF EXISTS (SELECT 1 FROM (VALUES
@@ -257,8 +267,8 @@ BEGIN
        OR NOT EXISTS (
          SELECT 1 FROM public.vmp_source_workshop_scope_grants grant_row
          JOIN public.vmp_performers performer ON performer.id=grant_row.performer_id
-         WHERE performer.user_id=v_workshop AND performer.is_active
-           AND grant_row.is_active AND grant_row.valid_from<=transaction_timestamp()
+         WHERE performer.user_id=v_workshop AND performer.is_active IS TRUE
+           AND grant_row.is_active IS TRUE AND grant_row.valid_from<=transaction_timestamp()
            AND (grant_row.expires_at IS NULL OR grant_row.expires_at>transaction_timestamp())
        ) THEN
       RAISE EXCEPTION USING errcode='check_violation', message='SOURCE_ACCESS_POSTFLIGHT_WORKSHOP_SCOPE';
@@ -313,8 +323,10 @@ BEGIN
     IF upper(coalesce(v_result->>'error_code',v_result->>'code','')) <> 'FORBIDDEN' THEN
       RAISE EXCEPTION USING errcode='check_violation', message='SOURCE_ACCESS_POSTFLIGHT_SCOPE_CHOICES_FORBIDDEN';
     END IF;
+    v_non_object_surface_probes := v_non_object_surface_probes + 1;
   END LOOP;
-  RAISE NOTICE 'PASS SOURCE_ACCESS_POSTFLIGHT_NON_OBJECT_SURFACES_FORBIDDEN count=2';
+  RAISE NOTICE 'PASS SOURCE_ACCESS_POSTFLIGHT_NON_OBJECT_SURFACES_FORBIDDEN count=%',
+    v_non_object_surface_probes;
 
   PERFORM set_config('request.jwt.claims','',true);
 END
