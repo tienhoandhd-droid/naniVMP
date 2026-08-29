@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const repoDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const evidencePath = "tests/evidence/source-access-db-pg17.json";
-const protectedFiles = Object.freeze([
+// These files are the exact inputs consumed by the 75-assertion DB receipt.
+const coreDbFiles = Object.freeze([
   "scripts/parse-five-role-local-db.mjs",
   "scripts/run-source-qa-workshop-access-db-tests.sh",
   "supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql",
@@ -21,6 +22,14 @@ const protectedFiles = Object.freeze([
   "tests/sql/source-qa-workshop-access-security.sql",
   "tests/sql/source-qa-workshop-access-performance.sql",
 ]);
+// Release SQL is integrity-pinned separately: this does not claim that these
+// artifacts were executed by the DB receipt above.
+const releaseArtifactFiles = Object.freeze([
+  "scripts/check-source-qa-workshop-access-preflight.sql",
+  "scripts/check-source-qa-workshop-access.sql",
+  "scripts/forward-recover-source-qa-workshop-access.sql",
+]);
+const protectedFiles = Object.freeze([...coreDbFiles, ...releaseArtifactFiles]);
 const requiredPhases = Object.freeze([
   "expand",
   "enforce-failure-before-repair",
@@ -41,6 +50,7 @@ const requiredEvidenceFields = Object.freeze([
   "cloneSurvivors",
   "outputSha256",
   "files",
+  "releaseArtifactFiles",
 ]);
 const sha256Pattern = /^[a-f0-9]{64}$/u;
 const isoUtcTimestampPattern =
@@ -94,15 +104,26 @@ export async function verifySourceAccessDbEvidence(options = {}) {
     throw new Error("incomplete Source access DB phase evidence");
   }
   if (JSON.stringify(Object.keys(evidence.files ?? {}).sort())
-    !== JSON.stringify([...protectedFiles].sort())) {
-    throw new Error("incomplete Source access DB protected-file inventory");
+    !== JSON.stringify([...coreDbFiles].sort())) {
+    throw new Error("incomplete Source access DB core-file inventory");
+  }
+  if (JSON.stringify(Object.keys(evidence.releaseArtifactFiles ?? {}).sort())
+    !== JSON.stringify([...releaseArtifactFiles].sort())) {
+    throw new Error("incomplete Source access release-artifact inventory");
   }
 
-  for (const relativePath of protectedFiles) {
+  for (const relativePath of coreDbFiles) {
     const expected = evidence.files[relativePath];
     if (!sha256Pattern.test(expected ?? "")
       || await hashRegularFile(relativePath, verificationRepoDir) !== expected) {
       throw new Error(`stale Source access DB evidence: ${relativePath}`);
+    }
+  }
+  for (const relativePath of releaseArtifactFiles) {
+    const expected = evidence.releaseArtifactFiles[relativePath];
+    if (!sha256Pattern.test(expected ?? "")
+      || await hashRegularFile(relativePath, verificationRepoDir) !== expected) {
+      throw new Error(`stale Source access release-artifact integrity: ${relativePath}`);
     }
   }
 
@@ -110,6 +131,8 @@ export async function verifySourceAccessDbEvidence(options = {}) {
     engine: evidence.engine,
     status: evidence.status,
     protectedFileCount: protectedFiles.length,
+    coreDbFileCount: coreDbFiles.length,
+    releaseArtifactFileCount: releaseArtifactFiles.length,
     outputSha256: evidence.outputSha256,
   };
 }
@@ -117,7 +140,7 @@ export async function verifySourceAccessDbEvidence(options = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   verifySourceAccessDbEvidence()
     .then((result) => process.stdout.write(
-      `PASS sealed Source access DB evidence ${result.engine} files=${result.protectedFileCount} output=${result.outputSha256}\n`,
+      `PASS sealed Source access DB evidence ${result.engine} files=${result.protectedFileCount} core=${result.coreDbFileCount} release=${result.releaseArtifactFileCount} output=${result.outputSha256}\n`,
     ))
     .catch((error) => {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

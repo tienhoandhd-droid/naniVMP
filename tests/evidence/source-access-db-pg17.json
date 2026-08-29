@@ -4,7 +4,7 @@
   "postgresVersion": "17.6",
   "command": "npm run test:db:source-access",
   "status": "passed",
-  "completedAt": "2026-08-28T17:35:00Z",
+  "completedAt": "2026-08-29T03:55:24Z",
   "phases": [
     "expand",
     "enforce-failure-before-repair",
@@ -15,10 +15,10 @@
   ],
   "topLevelAssertions": 75,
   "cloneSurvivors": 0,
-  "outputSha256": "31e11c3439bd6d52362ff6149cf71a1524679560b5353cb98d49b883a00d70fd",
+  "outputSha256": "df2fec3fda4c20e3885f2090b7b778de4e542dc8f8c901a3eeba6810229e8657",
   "files": {
     "scripts/parse-five-role-local-db.mjs": "a9e8f5fe059c4de90f319433cd12c6806a51b4d2ddb90a7cbad8cef22735743a",
-    "scripts/run-source-qa-workshop-access-db-tests.sh": "3cd052054bcc092487a60fc4e3d41e84788e9de6362dd50bceddbfb9de7212fa",
+    "scripts/run-source-qa-workshop-access-db-tests.sh": "71d51243a1093aa6460917ee2a1883ec9b32ab6ed5603cde5d08c9e58522245b",
     "supabase/migrations/20260826130000_catalog_progressed_deadline_override.sql": "818ee26a963b53c4977b0604d65ecb4779922bc4d009d0ae1965c1f51d8d16fc",
     "supabase/migrations/20260826170000_manual_planned_deadline_edit.sql": "2eddcf0141260acd7f613608871e5b4e057715645337ec0adc82fd30b9437a01",
     "supabase/migrations/20260826180000_qa_manager_actual_date_principal_normalization.sql": "d8066924f3268b283310a324aa6430301d4bb2c7c29ad1066e3572e5f517dcaa",
@@ -26,10 +26,15 @@
     "supabase/migrations/20260827130000_assigned_progress_visibility.sql": "acf812cb90bbecef73a6c05aefbea106be84b3974acd49660a9342bdc14c284f",
     "supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql": "b3a85cfd622ebc238d777853e573e30846e660ff850d0421c632e832aee4e6a3",
     "supabase/migrations/20260828130000_admin_only_management_visibility.sql": "175f5cf49b3412170990814f7083487aa99f815760d84d6ac24e8971e096e073",
-    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql": "18075012f5296a72e1c8b74df42e448b8f2dfc9d01285b85bf90c708b1b3d3c4",
-    "supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql": "363a0ef9d40f882ddabfbba2be2185ae8860367b0b126a89df82e637ece3b84b",
-    "tests/sql/source-qa-workshop-access.sql": "8a2239439dbd2e266ee24dc4a97fc368e6eb5d3d95a951d4cfd775c85dc83911",
+    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql": "b5b3bb4a01ef11f927e22d30c728c948c1b83f4bd4f09a1c5f240b8332004bac",
+    "supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql": "2a55ff7a8220d0c08527d483f488881ba4feaf57115d047601107543abe4deab",
+    "tests/sql/source-qa-workshop-access.sql": "6f6603abaaea4526b9eaf2f10d9d7001f2348bf33586301ce5446b371224a0cb",
     "tests/sql/source-qa-workshop-access-security.sql": "7b8e1c17e34c87067db58be5cb1e3cc215579a3b99d2cdef67a1b47c09ef9a1a",
     "tests/sql/source-qa-workshop-access-performance.sql": "91d7f7cc962e64e8a2249b6c0f52ee63164496720fbacf3b6956f3bcada6c231"
+  },
+  "releaseArtifactFiles": {
+    "scripts/check-source-qa-workshop-access-preflight.sql": "374c120408990e4389d22842fb1f89cf8964734d17e8ff9d1d9e786d29392b2b",
+    "scripts/check-source-qa-workshop-access.sql": "7da35442b61fcf67f224e5d4b2d0ad7abc93aefa3a430b5190366cbdcf8161dc",
+    "scripts/forward-recover-source-qa-workshop-access.sql": "bded4691229fca9b70715aad02ce82b393a2372245a80c32f0172b6451b2110d"
   }
 }

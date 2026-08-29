@@ -42,7 +42,11 @@ test("sealed DB verifier pins every executable Source authorization input", asyn
 
   assert.equal(result.engine, "PostgreSQL 17");
   assert.equal(result.status, "passed");
-  assert.equal(result.protectedFileCount, 14);
+  assert.equal(result.protectedFileCount, 17);
+  assert.equal(result.coreDbFileCount, 14);
+  assert.equal(result.releaseArtifactFileCount, 3);
+  assert.equal(result.outputSha256,
+    "df2fec3fda4c20e3885f2090b7b778de4e542dc8f8c901a3eeba6810229e8657");
 });
 
 test("GitHub production build checks out the event SHA explicitly", async () => {
@@ -58,7 +62,10 @@ async function makeEvidenceFixture() {
   const root = await mkdtemp(join(tmpdir(), "vmp-source-access-evidence-"));
   const evidence = JSON.parse(await read("tests/evidence/source-access-db-pg17.json"));
 
-  for (const relativePath of Object.keys(evidence.files)) {
+  for (const relativePath of [
+    ...Object.keys(evidence.files),
+    ...Object.keys(evidence.releaseArtifactFiles),
+  ]) {
     const target = join(root, relativePath);
     await mkdir(dirname(target), { recursive: true });
     await cp(new URL(`../../${relativePath}`, import.meta.url), target);
@@ -82,6 +89,23 @@ test("sealed DB verifier rejects stale protected inputs", async () => {
     await assert.rejects(fixture.verify(), /stale Source access DB evidence/);
   } finally {
     await fixture.cleanup();
+  }
+});
+
+test("sealed release integrity rejects stale checker and recovery artifacts", async () => {
+  const evidence = JSON.parse(await read("tests/evidence/source-access-db-pg17.json"));
+
+  for (const relativePath of Object.keys(evidence.releaseArtifactFiles)) {
+    const fixture = await makeEvidenceFixture();
+    try {
+      await writeFile(join(fixture.root, relativePath), "tampered release artifact\n");
+      await assert.rejects(
+        fixture.verify(),
+        new RegExp(`stale Source access release-artifact integrity: ${relativePath.replaceAll(".", "\\.")}`),
+      );
+    } finally {
+      await fixture.cleanup();
+    }
   }
 });
 
