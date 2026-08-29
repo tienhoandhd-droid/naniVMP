@@ -46,7 +46,7 @@ test("sealed DB verifier pins every executable Source authorization input", asyn
   assert.equal(result.coreDbFileCount, 14);
   assert.equal(result.releaseArtifactFileCount, 3);
   assert.equal(result.outputSha256,
-    "df2fec3fda4c20e3885f2090b7b778de4e542dc8f8c901a3eeba6810229e8657");
+    "7c291286b285ae9a850154e5031072e6fe73f593c6a292802c8a060e36d93ab1");
 });
 
 test("GitHub production build checks out the event SHA explicitly", async () => {

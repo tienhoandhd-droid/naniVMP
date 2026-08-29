@@ -4,7 +4,7 @@
   "postgresVersion": "17.6",
   "command": "npm run test:db:source-access",
   "status": "passed",
-  "completedAt": "2026-08-29T03:55:24Z",
+  "completedAt": "2026-08-29T04:41:01Z",
   "phases": [
     "expand",
     "enforce-failure-before-repair",
@@ -15,7 +15,7 @@
   ],
   "topLevelAssertions": 75,
   "cloneSurvivors": 0,
-  "outputSha256": "df2fec3fda4c20e3885f2090b7b778de4e542dc8f8c901a3eeba6810229e8657",
+  "outputSha256": "7c291286b285ae9a850154e5031072e6fe73f593c6a292802c8a060e36d93ab1",
   "files": {
     "scripts/parse-five-role-local-db.mjs": "a9e8f5fe059c4de90f319433cd12c6806a51b4d2ddb90a7cbad8cef22735743a",
     "scripts/run-source-qa-workshop-access-db-tests.sh": "71d51243a1093aa6460917ee2a1883ec9b32ab6ed5603cde5d08c9e58522245b",
@@ -26,7 +26,7 @@
     "supabase/migrations/20260827130000_assigned_progress_visibility.sql": "acf812cb90bbecef73a6c05aefbea106be84b3974acd49660a9342bdc14c284f",
     "supabase/migrations/20260828100000_assigned_progress_preflight_allowlist.sql": "b3a85cfd622ebc238d777853e573e30846e660ff850d0421c632e832aee4e6a3",
     "supabase/migrations/20260828130000_admin_only_management_visibility.sql": "175f5cf49b3412170990814f7083487aa99f815760d84d6ac24e8971e096e073",
-    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql": "b5b3bb4a01ef11f927e22d30c728c948c1b83f4bd4f09a1c5f240b8332004bac",
+    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql": "25c64d9bbab6cb790690e2660321775e4f88e68678f0616492684fbd82de13f4",
     "supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql": "2a55ff7a8220d0c08527d483f488881ba4feaf57115d047601107543abe4deab",
     "tests/sql/source-qa-workshop-access.sql": "6f6603abaaea4526b9eaf2f10d9d7001f2348bf33586301ce5446b371224a0cb",
     "tests/sql/source-qa-workshop-access-security.sql": "7b8e1c17e34c87067db58be5cb1e3cc215579a3b99d2cdef67a1b47c09ef9a1a",

@@ -87,6 +87,19 @@ test("Source checkers use explicit active profile predicates for every persona",
   }
 });
 
+test("expand policy fingerprints are stable across PostgreSQL role OIDs", async () => {
+  const expand = await read(
+    "supabase/migrations/20260828140000_source_qa_workshop_access_expand.sql",
+  );
+
+  assert.match(expand,
+    /unnest\s*\(\s*policy_row\.polroles\s*\)[\s\S]{0,240}pg_roles/i,
+    "policy fingerprints must resolve role OIDs to stable role names");
+  assert.doesNotMatch(expand,
+    /array_to_string\s*\(\s*policy_row\.polroles/i,
+    "policy fingerprints must not hash environment-specific role OIDs");
+});
+
 test("Source preflight blocks Source-item mismatch while reporting repair inventory", async () => {
   const preflight = await read("scripts/check-source-qa-workshop-access-preflight.sql");
 
