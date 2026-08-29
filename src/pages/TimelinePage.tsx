@@ -23,7 +23,7 @@ import {
 import {
   buildTimelineFilterSets, TIMELINE_FILTER_DEFAULTS, timelineActiveFilterCount, timelineFilterChips, timelineOwnerOf,
 } from "../features/timeline/timelineFilterModel.ts";
-import { buildVmpMonthBands, filterVmpMonthItems } from "../features/timeline/timelineYearModel.ts";
+import { buildVmpMonthBands, selectTimelineViewItems } from "../features/timeline/timelineYearModel.ts";
 import TimelineInspector from "../features/timeline/TimelineInspector.tsx";
 import PlannedDeadlineDialog from "../features/timeline/PlannedDeadlineDialog.tsx";
 import { canPresentPlannedDeadlineEdit } from "../features/timeline/plannedDeadlineEditModel.ts";
@@ -34,6 +34,7 @@ const WorkloadSpace3D = lazy(nhapCoThuLai(() => import("../components/three/Work
 import type { ReactNode } from "react";
 import type { Activity } from "../types/domain.ts";
 import type { WorkloadCell } from "../lib/workloadMap.ts";
+import { bangkokCalendarDate } from "../lib/vmpDeadlineModel.ts";
 
 // Các "không gian làm việc" gộp chung dưới menu Timeline VMP: timeline sâu +
 // Chỉ hai góc nhìn. Ba tab "Sơ đồ · Bố cục · Bảng" đã bỏ (29/07/2026):
@@ -547,14 +548,14 @@ export function TimelineInsightStrip({ items, stats, range }: {
   );
 }
 
-export function TimelineRangeRail({ items, range, view, onFocusBand, monthBands }: {
+export function TimelineRangeRail({ items, range, view, today, onFocusBand, monthBands }: {
   items: Activity[]; range: TimeRange; view: string;
+  today: Date;
   onFocusBand?: (band: { label: string; start: Date; end: Date; [k: string]: unknown }) => void;
   monthBands?: Array<{ month: number; label: string; count: number; done: number; overdue: number; rate: number }>;
 }) {
   const bands = monthBands || bandSummary(items, range);
   const maxCount = Math.max(1, ...bands.map((band) => band.count));
-  const today = vmpToday();
   const todayVisible = inRange(today, range);
   const modeLabel = view === "month" ? "tuần" : "tháng";
 
@@ -1339,8 +1340,9 @@ function OvKpi({ k, v, sub, color, small }: {
   );
 }
 
-function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
+function TimelineOverview({ acts, year, currentMonth, onPickMonth, onPickDept }: {
   acts: Activity[]; year: number;
+  currentMonth: number;
   onPickMonth?: (m: number) => void; onPickDept?: (d: string) => void;
 }) {
   const { months, noDeadline, deptRows, kpi } = useMemo(() => {
@@ -1373,16 +1375,16 @@ function TimelineOverview({ acts, year, onPickMonth, onPickDept }: {
       .map((d) => ({ id: d.id, code: d.short, name: d.name, ...(deptM.get(d.id) || { total: 0, done: 0, over: 0 }) }))
       .filter((r) => r.total > 0)
       .sort((x, y) => y.total - x.total);
-    const nowM = vmpToday().getMonth();
+    const nowM = currentMonth;
     let peakI = 0;
     months.forEach((m, i) => { if (m.total > months[peakI].total) peakI = i; });
     const overAll = acts.filter((a: Activity) => issueLevel(a) === "over").length;
     const kpi = { totalAll: acts.length, overAll, thisMonth: months[nowM].total, nowM, peakI, peak: months[peakI].total };
     return { months, noDeadline, deptRows, kpi };
-  }, [acts, year]);
+  }, [acts, currentMonth, year]);
 
   const maxT = Math.max(1, ...months.map((m) => m.total));
-  const H = 210, nowM = vmpToday().getMonth();
+  const H = 210, nowM = currentMonth;
   const maxDeptTotal = deptRows.length ? deptRows[0].total : 1;
 
   /* Câu kết luận của biểu đồ tháng. So tháng cao điểm với mức trung bình
@@ -1556,7 +1558,11 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
   onOpenWorkloadCell?: (cell: WorkloadCell) => void;
   businessRole?: string | null; onReload?: () => void;
 }) {
-  const year = vmpToday().getFullYear();
+  const now = new Date();
+  const bangkokToday = bangkokCalendarDate(now);
+  const year = Number(bangkokToday.slice(0, 4));
+  const currentMonth = Number(bangkokToday.slice(5, 7)) - 1;
+  const timelineToday = parseD(bangkokToday)!;
   const giamChuyenDong = useMemo(
     () => typeof window !== "undefined"
       && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
@@ -1567,7 +1573,7 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
   const [scope, setScope] = useState("year");
   const [tableStage, setTableStage] = useState("all");
   const [density, setDensity] = useState("compact");
-  const [focusMonth, setFocusMonth] = useState(vmpToday().getMonth());
+  const [focusMonth, setFocusMonth] = useState(currentMonth);
   /* Tab "Khám phá 3D" có trí nhớ: three.js chỉ tải khi người dùng thật sự
      mở, và ai đã quen dùng thì không phải bấm lại mỗi lần vào màn. */
   const [kham3D, setKham3D] = useState(() => {
@@ -1629,13 +1635,16 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
   const timelineSets = useMemo(() => buildTimelineFilterSets({ activities: acts, filters: timelineFilters, range }),
     [acts, timelineFilters, range]);
   const explorerActs = timelineSets.explorer;
+  const timelineViewItems = useMemo(() => selectTimelineViewItems({
+    view, explorerItems: explorerActs, displayItems: timelineSets.display, year, month: focusMonth,
+  }), [explorerActs, focusMonth, timelineSets.display, view, year]);
   const filtered = useMemo(() => view === "month"
-    ? filterVmpMonthItems(explorerActs, year, focusMonth).sort(compareTimelineOrder)
-    : timelineSets.display,
-  [explorerActs, focusMonth, timelineSets.display, view, year]);
+    ? timelineViewItems.detailItems.slice().sort(compareTimelineOrder)
+    : timelineViewItems.detailItems,
+  [timelineViewItems, view]);
   const vmpMonthBands = useMemo(
-    () => buildVmpMonthBands(timelineSets.summaryBase, year),
-    [timelineSets.summaryBase, year],
+    () => buildVmpMonthBands(timelineViewItems.yearBandItems, year, now),
+    [now, timelineViewItems.yearBandItems, year],
   );
 
   /* Strip bốn dải tình trạng — đếm SAU các bộ lọc khác, TRƯỚC bộ lọc
@@ -1771,13 +1780,10 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
         </div>
         {kham3D && (
           <Suspense fallback={<div style={{ height: 420 }} />}>
-            {/* Trước truyền `acts` thô — bấm KPI (Quá hạn/Sắp đến hạn/Đang thực
-                hiện/Hoàn thành) đổi `status` phía trên nhưng bản đồ 3D vẫn vẽ
-                nguyên năm không đổi gì, đúng cảm giác "chỉ hiện quá hạn mãi"
-                người dùng báo. Nay dùng `filtered` — cùng danh sách đã qua
-                status/cls/dept/tìm kiếm mà KPI và bảng bên dưới đang dùng, để
-                bấm một KPI là cả trang đổi theo cùng một nghĩa. */}
-            <WorkloadSpace3D acts={filtered} nam={year} giamChuyenDong={giamChuyenDong} macDinh3D
+            {/* 3D giữ population lifecycle/range đã có trước drill-down VMP-only.
+                Bảng chi tiết tháng dùng population riêng nên không vô tình đổi
+                tổng/cell của bản đồ khi deadline VMP nằm ở tháng kế bên. */}
+            <WorkloadSpace3D acts={timelineViewItems.workloadItems} nam={year} giamChuyenDong={giamChuyenDong} macDinh3D
               onOpenCell={onOpenWorkloadCell} />
           </Suspense>
         )}
@@ -1999,15 +2005,17 @@ export default function TimelineView({ acts, onOpenWorkloadCell, businessRole = 
           <TimelineOverview
             acts={explorerActs}
             year={year}
+            currentMonth={currentMonth}
             onPickMonth={(m) => { setFocusMonth(m); setView("month"); setWorkspace("timeline"); }}
             onPickDept={(d) => { setDept(d); setWorkspace("timeline"); }}
           />
         ) : isTimeline ? (
         view === "year" ? (
         <TimelineRangeRail
-          items={timelineSets.summaryBase}
+          items={timelineViewItems.yearBandItems}
           range={range}
           view={view}
+          today={timelineToday}
           monthBands={vmpMonthBands}
           onFocusBand={focusBand}
         />

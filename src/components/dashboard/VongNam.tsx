@@ -30,7 +30,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { C, NUM_HERO, TEXT } from "../../constants/theme.ts";
-import { MONTHS, vmpToday } from "../../constants/vmp.ts";
+import { MONTHS } from "../../constants/vmp.ts";
 import { parseD } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
 import type { Activity } from "../../types/domain.ts";
@@ -44,9 +44,10 @@ export interface OThangNam {
   dangChay: boolean;
 }
 
-export function dungVongNam(acts: Activity[], nam: number): OThangNam[] {
-  const homNay = vmpToday();
-  const thangNay = homNay.getFullYear() === nam ? homNay.getMonth() : (nam < homNay.getFullYear() ? 12 : -1);
+export function dungVongNam(acts: Activity[], nam: number, bangkokToday: string): OThangNam[] {
+  const currentYear = Number(bangkokToday.slice(0, 4));
+  const currentMonth = Number(bangkokToday.slice(5, 7)) - 1;
+  const thangNay = currentYear === nam ? currentMonth : (nam < currentYear ? 12 : -1);
   const o = Array.from({ length: 12 }, (_, thang) => ({
     thang, tong: 0, xong: 0,
     daQua: thang < thangNay,
@@ -91,29 +92,33 @@ function quat(r0: number, r1: number, a0: number, a1: number): string {
 /** Góc bắt đầu của một tháng — tháng 1 ở đỉnh vòng, chạy theo chiều kim đồng hồ. */
 const gocThang = (i: number): number => -90 + i * 30;
 
-export default function VongNam({ acts, rate, total, ben }: {
+export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: {
   acts: Activity[];
   /** Tỉ lệ hoàn thành VMP in giữa vòng — dùng chung phép đếm với KPI trang. */
   rate: number;
   total: number;
+  year: number;
+  bangkokToday: string;
   /** Cột chữ bên phải vòng (tiêu đề + phân bố trạng thái) do trang Tổng quan
    *  truyền vào. Để nguyên chỗ cũ thay vì bê vào đây: dữ liệu của nó thuộc
    *  về trang, không thuộc về biểu đồ này. */
   ben?: ReactNode;
 }) {
-  const nam = vmpToday().getFullYear();
-  const o = useMemo(() => dungVongNam(acts, nam), [acts, nam]);
+  const nam = year;
+  const o = useMemo(() => dungVongNam(acts, nam, bangkokToday), [acts, bangkokToday, nam]);
   const [bang, setBang] = useState(false);
 
   const caoNhat = Math.max(1, ...o.map((x) => x.tong));
   const dinh = o.reduce((m, x) => (x.tong > m.tong ? x : m), o[0]);
-  const homNay = vmpToday();
-  const trongNam = homNay.getFullYear() === nam;
+  const currentYear = Number(bangkokToday.slice(0, 4));
+  const currentMonth = Number(bangkokToday.slice(5, 7)) - 1;
+  const currentDay = Number(bangkokToday.slice(8, 10));
+  const trongNam = currentYear === nam;
 
   /* Kim "hôm nay": vị trí thật trong năm, tính cả phần tháng đã trôi. */
   const gocHomNay = trongNam
-    ? gocThang(homNay.getMonth())
-      + 30 * ((homNay.getDate() - 1) / new Date(nam, homNay.getMonth() + 1, 0).getDate())
+    ? gocThang(currentMonth)
+      + 30 * ((currentDay - 1) / new Date(Date.UTC(nam, currentMonth + 1, 0)).getUTCDate())
     : null;
 
   /* CÂU KẾT LUẬN — câu tổng quát nhất về cả năm: nhịp đã đi so với nhịp

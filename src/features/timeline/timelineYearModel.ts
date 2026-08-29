@@ -1,4 +1,4 @@
-import { SOON_DAYS, vmpToday } from "../../constants/vmp.ts";
+import { SOON_DAYS } from "../../constants/vmp.ts";
 import {
   classifyVmpDeadline,
   isVmpComplete,
@@ -30,13 +30,34 @@ export function filterVmpMonthItems(items: readonly Activity[], year: number, mo
   });
 }
 
+/** Keeps month detail VMP-only while preserving the established lifecycle population for 3D. */
+export function selectTimelineViewItems({
+  view,
+  explorerItems,
+  displayItems,
+  year,
+  month,
+}: {
+  view: string;
+  explorerItems: readonly Activity[];
+  displayItems: readonly Activity[];
+  year: number;
+  month: number;
+}): { detailItems: Activity[]; workloadItems: Activity[]; yearBandItems: Activity[] } {
+  return {
+    detailItems: view === "month"
+      ? filterVmpMonthItems(explorerItems, year, month)
+      : [...displayItems],
+    workloadItems: [...displayItems],
+    yearBandItems: [...explorerItems],
+  };
+}
+
 /** Groups activities by their canonical VMP deadline, never a fallback target date. */
-export function buildVmpMonthBands(items: readonly Activity[], year: number): VmpMonthBand[] {
+export function buildVmpMonthBands(items: readonly Activity[], year: number, now: Date): VmpMonthBand[] {
   const bands = MONTH_LABELS.map((label, month) => ({
     month, label, count: 0, done: 0, overdue: 0, rate: 0,
   }));
-  const now = vmpToday();
-
   for (const activity of items) {
     const deadline = vmpDeadlineDate(activity);
     if (deadline === null || Number(deadline.slice(0, 4)) !== year) continue;

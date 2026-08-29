@@ -86,5 +86,10 @@ Phạm vi cả nhóm của Tổng quan vẫn giữ hành vi bộ lọc kỳ hi�
 
 - Thay đổi được giới hạn ở helper phân loại mốc VMP, kết nối dữ liệu trong `App.tsx`, Timeline năm, một RPC tổng hợp không trả chi tiết và các test tương ứng.
 - Có một migration bổ sung RPC tổng hợp; không thay đổi bảng hoặc dữ liệu nghiệp vụ.
-- Có thể hoàn tác bằng cách revert commit tính năng; không có dữ liệu cần khôi phục.
+- Hoàn tác frontend bằng revert commit tính năng. Nếu migration đã commit, phải
+  chạy artifact bù `scripts/rollback-team-overview-summary.sql` để revoke ACL và
+  drop RPC trong một transaction, rồi xác minh function/EXECUTE đều vắng mặt;
+  chỉ xóa file migration khỏi Git không hoàn tác trạng thái PostgreSQL.
+- Runbook `docs/runbooks/2026-08-29-team-overview-summary.md` điều phối hai nửa
+  frontend/database; không có dữ liệu nghiệp vụ cần khôi phục.
 - Trước deploy: unit, typecheck, SQL contract, E2E Today/Overview, E2E Timeline, build, review độc lập. Sau push `main`: triển khai migration theo runbook, theo dõi Quality and Deploy và xác minh GitHub Pages.

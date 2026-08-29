@@ -18,7 +18,10 @@
 - Không thay đổi Source, Timeline 3D, bảng dữ liệu nghiệp vụ hoặc quyền xem chi tiết hiện hành.
 - RED phải được quan sát trước GREEN; mọi success claim phải có verification mới.
 - Database và file dùng chung làm tuần tự. Chỉ song song hóa review hoặc test độc lập.
-- Rollback: revert commit tính năng và migration chỉ tạo RPC; không có dữ liệu nghiệp vụ cần phục hồi.
+- Rollback: revert frontend và, nếu migration đã commit, chạy
+  `scripts/rollback-team-overview-summary.sql` để revoke EXECUTE rồi drop RPC
+  transactionally; xác minh function/effective privilege vắng mặt theo runbook.
+  Không có dữ liệu nghiệp vụ cần phục hồi.
 
 ---
 
@@ -280,6 +283,9 @@
   ```bash
   npm run test:unit
   npm run test:db:source-access
+  # Trên PostgreSQL local đã xác nhận đúng target: apply migration -> rollback
+  # artifact -> rollback assertions -> reapply migration -> team SQL harness.
+  # Xem docs/runbooks/2026-08-29-team-overview-summary.md.
   git diff --check
   ```
 
@@ -304,3 +310,12 @@
 - [ ] **Step 8: Verify production**
 
   Verify GitHub deployment state is `success`, Pages returns HTTP 200 and the deployed bundle contains `Tiến độ cả nhóm` and `Mở tháng`. Verify the production RPC returns only aggregate keys. Mark complete only with fresh evidence.
+
+- [ ] **Step 9: Keep an executable coordinated rollback ready**
+
+  A frontend revert alone is incomplete after the RPC migration commits. Follow
+  `docs/runbooks/2026-08-29-team-overview-summary.md`: revert/redeploy the
+  frontend through the approved workflow, apply the compensating rollback SQL,
+  then require `to_regprocedure(...) is null` and no effective EXECUTE for the
+  API roles. The rollback SQL is an operator-run artifact, never an automatic
+  forward migration.

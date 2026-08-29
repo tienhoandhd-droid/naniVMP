@@ -48,7 +48,6 @@ import {
   NAV_ITEMS,
   NAV_SUBS,
   PERIODS,
-  vmpToday,
   LOAI_LOI,
   sevOf,
 } from "./constants/vmp.ts";
@@ -106,7 +105,7 @@ import {
 } from "./features/today/todayPersonScope.ts";
 import { filterTodayScope } from "./features/today/todayScope.ts";
 import { isTodayActivityMine, type ProgressDeepLink } from "./features/today/todayModel.ts";
-import { classifyVmpDeadline } from "./lib/vmpDeadlineModel.ts";
+import { bangkokCalendarDate, classifyVmpDeadline } from "./lib/vmpDeadlineModel.ts";
 import {
   useTeamOverviewSummary,
   type TeamOverviewSummaryState,
@@ -1029,11 +1028,14 @@ function Overview({ acts, setView, access }: {
   setView?: (v: string) => void;
   access: Pick<AccessContext, "canView">;
 }) {
+  const now = new Date();
+  const currentBangkokDate = bangkokCalendarDate(now);
+  const currentBangkokYear = Number(currentBangkokDate.slice(0, 4));
   const { e, d, overdue, soon, gap, gapPts, mismatched, theoThang } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
-    const overdue = acts.filter((a) => classifyVmpDeadline(a, vmpToday(), 30).kind === "overdue");
+    const overdue = acts.filter((a) => classifyVmpDeadline(a, now, 30).kind === "overdue");
     const soon = acts.filter((a) => {
-      const kind = classifyVmpDeadline(a, vmpToday(), 30).kind;
+      const kind = classifyVmpDeadline(a, now, 30).kind;
       return kind === "today" || kind === "soon";
     });
 
@@ -1054,7 +1056,7 @@ function Overview({ acts, setView, access }: {
       mismatched: acts.filter((a) => a.mismatch),
       theoThang: thang.map((m) => (m.tong ? m.xong / m.tong : 0)),
     };
-  }, [acts]);
+  }, [acts, now]);
 
   const destinations = useMemo(() => ({
     overdue: overviewTarget(access, "overdue"),
@@ -1079,12 +1081,12 @@ function Overview({ acts, setView, access }: {
      tổng quan có lối vào việc, không chỉ toàn số để ngắm. */
   const vieCGap = useMemo(() => {
     return acts
-      .map((a) => ({ a, state: classifyVmpDeadline(a, vmpToday(), 30) }))
+      .map((a) => ({ a, state: classifyVmpDeadline(a, now, 30) }))
       .filter(({ state }) => state.kind === "overdue" || state.kind === "today" || state.kind === "soon")
       .map(({ a, state }) => ({ a, con: state.daysRemaining ?? 0 }))
       .sort((x, y) => x.con - y.con)
       .slice(0, 5);
-  }, [acts]);
+  }, [acts, now]);
 
   return (
     <div className="vmp-bento vmp-stagger">
@@ -1096,11 +1098,12 @@ function Overview({ acts, setView, access }: {
             Vòng năm nói được thứ tổng quát hơn và đọc thẳng từ hình: cả 12
             tháng khép kín, khối lượng từng tháng, phần đã xong, và kim chỉ
             mình đang đứng ở đâu trong năm. */}
-        <VongNam acts={acts} rate={e.rate} total={e.total} ben={
+        <VongNam acts={acts} rate={e.rate} total={e.total}
+          year={currentBangkokYear} bangkokToday={currentBangkokDate} ben={
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800,
                           color: C.plum, marginBottom: 3 }}>
-              Tiến độ thẩm định {vmpToday().getFullYear()}
+              Tiến độ thẩm định {currentBangkokYear}
             </div>
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
               {e.total} hạng mục trong kế hoạch năm
@@ -1144,8 +1147,8 @@ function Overview({ acts, setView, access }: {
       {/* CẨN THẬN: hai con số này KHÁC NHAU và trước đây cùng mang nhãn "Quá hạn"
           trên một màn hình — 162 vs 279 — nên không ai biết tin số nào.
           · e.over  = trạng thái hạng mục đang là "quá hạn"
-          · overdue = hạng mục có MỐC gần nhất (đề cương/thẩm định/báo cáo) đã trôi qua,
-            kể cả khi trạng thái tổng chưa chuyển. Số này luôn ≥ số kia. */}
+          · overdue = hạng mục active chưa hoàn thành có deadline VMP đã trôi qua
+            theo ngày Bangkok, kể cả khi trạng thái tổng chưa chuyển. */}
       {/* MỘT chỉ số quá hạn, không phải hai. Bản trước để "Quá hạn (trạng
           thái) 208" và "Có mốc đã quá hạn 268" cạnh nhau, người mới nhìn
           tưởng web tính sai. Nay lấy con số RỘNG hơn (theo mốc) làm chỉ số
@@ -1606,6 +1609,8 @@ function VerifiedAppShell({ user, logout, access }: {
   logout: () => Promise<void>;
   access: AccessContext;
 }) {
+  const shellNow = new Date();
+  const currentBangkokYear = Number(bangkokCalendarDate(shellNow).slice(0, 4));
   /* Hai cờ thay cho `isAdmin` gộp cũ ở hộp Cập nhật tiến độ — mỗi cờ hỏi
      đúng MỘT câu tới `access`, không còn suy quyền từ vai đăng nhập cũ:
      · canChonNguoiThucHien — ai được đổi "Người thực hiện".
@@ -1622,7 +1627,7 @@ function VerifiedAppShell({ user, logout, access }: {
     identity: user.uid ?? "",
     businessRole: access.businessRole,
     canViewOverview: access.canView("overview"),
-    year: vmpToday().getFullYear(),
+    year: currentBangkokYear,
   });
 
   /* `saveStatus` của luồng lưu tiến độ giờ đi qua vỏ thông báo dùng chung.
@@ -1783,10 +1788,10 @@ function VerifiedAppShell({ user, logout, access }: {
   const workloadListTarget = overviewTarget(access, "soon");
   const onOpenWorkloadCell = useMemo(() => workloadListTarget ? (cell: WorkloadCell) => {
     applyWorkloadCellNavigation({
-      cell, year: vmpToday().getFullYear(), target: workloadListTarget,
+      cell, year: currentBangkokYear, target: workloadListTarget,
       setDeptSel, setPeriodFilter, setCustomFrom, setCustomTo, setView,
     });
-  } : undefined, [workloadListTarget]);
+  } : undefined, [currentBangkokYear, workloadListTarget]);
   // Faceted count: số hạng mục theo mỗi bộ phận (khớp a.depts) — hiện cạnh lựa chọn.
   const deptOptions = useMemo(() => DEPTS.map((d) => ({
     v: d.id, l: d.name,

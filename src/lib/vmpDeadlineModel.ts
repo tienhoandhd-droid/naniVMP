@@ -77,7 +77,8 @@ export function isVmpComplete(activity: Activity): boolean {
   return wlIsDone(firstValue(activity, ["tt_vmp", "status_vmp"]));
 }
 
-function bangkokDay(now: Date): string {
+/** Converts a real instant to its Bangkok calendar date without host-timezone truncation. */
+export function bangkokCalendarDate(now: Date): string {
   return new Date(now.getTime() + BANGKOK_OFFSET_MS).toISOString().slice(0, 10);
 }
 
@@ -96,7 +97,7 @@ export function classifyVmpDeadline(
   }
   if (date === null) return { kind: "missing", date: null, daysRemaining: null };
 
-  const daysRemaining = daysBetween(date, bangkokDay(now));
+  const daysRemaining = daysBetween(date, bangkokCalendarDate(now));
   if (daysRemaining < 0) return { kind: "overdue", date, daysRemaining };
   if (daysRemaining === 0) return { kind: "today", date, daysRemaining };
   if (daysRemaining <= soonDays) return { kind: "soon", date, daysRemaining };

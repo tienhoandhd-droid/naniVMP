@@ -6,6 +6,7 @@ import {
   isVmpComplete,
   vmpDeadlineDate,
 } from "../../src/lib/vmpDeadlineModel.ts";
+import * as vmpDeadlineModel from "../../src/lib/vmpDeadlineModel.ts";
 
 const NOW = new Date("2026-08-29T12:00:00+07:00");
 
@@ -72,13 +73,20 @@ test("recognizes actual VMP dates and completed status aliases", () => {
   assert.equal(isVmpComplete({ _raw: { tt_vmp: "not_started" } }), false);
 });
 
-test("compares Bangkok calendar dates at the UTC boundary", () => {
-  const beforeBangkokMidnight = new Date("2026-08-28T17:00:00Z");
-  const afterBangkokMidnight = new Date("2026-08-28T17:00:01Z");
+test("compares Bangkok calendar dates immediately before and at UTC+7 midnight", () => {
+  const beforeBangkokMidnight = new Date("2026-08-29T16:59:59Z");
+  const atBangkokMidnight = new Date("2026-08-29T17:00:00Z");
   assert.deepEqual(classifyVmpDeadline({ dlVmp: "2026-08-29" }, beforeBangkokMidnight, 7), {
     kind: "today", date: "2026-08-29", daysRemaining: 0,
   });
-  assert.deepEqual(classifyVmpDeadline({ dlVmp: "2026-08-29" }, afterBangkokMidnight, 7), {
-    kind: "today", date: "2026-08-29", daysRemaining: 0,
+  assert.deepEqual(classifyVmpDeadline({ dlVmp: "2026-08-29" }, atBangkokMidnight, 7), {
+    kind: "overdue", date: "2026-08-29", daysRemaining: -1,
   });
+});
+
+test("derives the Bangkok calendar date and year from the original instant", () => {
+  assert.equal(typeof vmpDeadlineModel.bangkokCalendarDate, "function",
+    "deadline model must expose one Bangkok calendar conversion for UI callers");
+  assert.equal(vmpDeadlineModel.bangkokCalendarDate?.(new Date("2026-12-31T16:59:59Z")), "2026-12-31");
+  assert.equal(vmpDeadlineModel.bangkokCalendarDate?.(new Date("2026-12-31T17:00:00Z")), "2027-01-01");
 });

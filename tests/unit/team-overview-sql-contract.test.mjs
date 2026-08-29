@@ -70,3 +70,24 @@ test("SQL harness covers QA success, denials, service role, and exact keys", asy
   assert.match(sql, /total'\s*=\s*'2'[\s\S]{0,240}completed'\s*=\s*'1'[\s\S]{0,240}rate'\s*=\s*'50'/is);
   assert.match(sql, /rollback\s*;/is);
 });
+
+test("compensating rollback revokes the RPC ACL and drops the function transactionally", async () => {
+  const rollback = await read("scripts/rollback-team-overview-summary.sql");
+  const verification = await read("supabase/tests/team_overview_summary_rollback.sql");
+
+  assert.match(rollback, /^\s*begin\s*;/is);
+  assert.match(rollback,
+    /revoke\s+all\s+on\s+function\s+public\.rpc_team_overview_summary\s*\(\s*integer\s*\)\s+from\s+public\s*,\s*anon\s*,\s*authenticated\s*,\s*service_role\s*;/is);
+  assert.match(rollback,
+    /drop\s+function\s+public\.rpc_team_overview_summary\s*\(\s*integer\s*\)\s*;/is);
+  assert.match(rollback, /commit\s*;\s*$/is);
+  assert.doesNotMatch(rollback, /create\s+(?:or\s+replace\s+)?function/is);
+
+  assert.match(verification, /to_regprocedure\s*\(\s*'public\.rpc_team_overview_summary\(integer\)'\s*\)\s+is\s+null/is);
+  assert.match(verification,
+    /values\s*\(\s*'anon'::text\s*\)\s*,\s*\(\s*'authenticated'::text\s*\)\s*,\s*\(\s*'service_role'::text\s*\)/is);
+  assert.match(verification,
+    /has_function_privilege\s*\(\s*role_name\s*,\s*target\.oid\s*,\s*'EXECUTE'\s*\)/is);
+  assert.match(verification, /TEAM_SUMMARY_ROLLBACK_FUNCTION_ABSENT/is);
+  assert.match(verification, /TEAM_SUMMARY_ROLLBACK_EXECUTE_ABSENT/is);
+});

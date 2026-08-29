@@ -135,6 +135,7 @@ function accessFor(businessRole) {
     screens: {
       today: { can_view: true, data_scope: "all", actions: ["view"] },
       overview: { can_view: true, data_scope: "all", actions: ["view"] },
+      timeline: { can_view: true, data_scope: "all", actions: ["view"] },
     },
   };
 }
@@ -245,10 +246,25 @@ async function openToday({
     ok: true, year: 2026, total: 10, completed: 4, rate: 40,
     updated_at: "2026-08-29T08:30:00Z",
   },
+  timezone = null,
+  now = null,
 }) {
   const teamSummaryCalls = [];
   const page = await browser.newPage();
   await page.setViewport({ width: 1500, height: 1000 });
+  if (timezone) await page.emulateTimezone(timezone);
+  if (now) {
+    await page.evaluateOnNewDocument((instant) => {
+      const NativeDate = Date;
+      class FixedDate extends NativeDate {
+        constructor(...args) {
+          super(...(args.length ? args : [instant]));
+        }
+        static now() { return instant; }
+      }
+      globalThis.Date = FixedDate;
+    }, Date.parse(now));
+  }
   await page.evaluateOnNewDocument(() => localStorage.clear());
   await nhetPhien(page, { supabaseUrl: URL_SB, nguoiDung: user });
   if (cachedUser) {
@@ -435,6 +451,80 @@ try {
       assert.equal(await page.evaluate(() => document.body.textContent?.includes("Tiến độ cả nhóm") ?? false), false,
         `${persona.label} must not render the duplicate aggregate comparison`);
       assert.equal(chanNgoai.length, 0, `${persona.label} scenario must remain fully intercepted`);
+    } finally {
+      await page.close();
+    }
+  }
+
+  {
+    const boundary = activity({ code: "E2E-BANGKOK-BOUNDARY", ownerPersonId: PERSON.staff });
+    boundary.dlVmp = "2026-12-31";
+    boundary.target = "2026-12-31";
+    boundary._raw.dl_vmp = "2026-12-31";
+    const { page, chanNgoai, teamSummaryCalls } = await openToday({
+      user: USER.staff,
+      businessRole: "qa_staff",
+      personId: PERSON.staff,
+      activities: [boundary],
+      timezone: "UTC",
+      now: "2026-12-31T17:00:00Z",
+      teamSummary: {
+        ok: true, year: 2027, total: 0, completed: 0, rate: 0,
+        updated_at: "2026-12-31T17:00:00Z",
+      },
+    });
+    try {
+      const pageErrors = [];
+      page.on("pageerror", (error) => pageErrors.push(error.message));
+      await waitForExactTodayCodes(page, [boundary.code]);
+      const todayOverdue = await page.evaluate(() => [...document.querySelectorAll(".lp-metric")]
+        .find((candidate) => candidate.querySelector(".lp-metric__label")?.textContent?.trim() === "Quá hạn")
+        ?.querySelector(".lp-metric__value")?.textContent?.trim() ?? "");
+      assert.equal(todayOverdue, "1", "Today classifies the real instant at Bangkok midnight");
+
+      await page.click('[data-view="overview"]');
+      await page.waitForFunction(() => document.body.textContent?.includes("Tiến độ thẩm định 2027"), { timeout: 5_000 });
+      const overviewOverdue = await page.evaluate(() => [...document.querySelectorAll(".vmp-tile")]
+        .find((tile) => tile.textContent?.includes("Quá hạn"))?.querySelector("div:nth-of-type(2)")?.textContent?.trim() ?? "");
+      assert.equal(overviewOverdue, todayOverdue,
+        "Overview and Today classify the same real instant in a UTC browser");
+      assert.deepEqual(teamSummaryCalls, [{ p_year: 2027 }],
+        "Overview aggregate requests the Bangkok current year");
+      assert.match(await page.$eval(".vmp-vongnam-svg", (node) => node.getAttribute("aria-label") || ""),
+        /^Vòng năm 2027:/, "Overview year ring uses the same Bangkok year as its heading and RPC");
+      await page.click(".vmp-vongnam-nut");
+      const januaryRingRow = await page.evaluate(() => [...document.querySelectorAll(".vmp-ctrl-bang tbody tr")]
+        .find((row) => row.querySelector("td")?.textContent?.trim() === "T1")?.textContent || "");
+      assert.match(januaryRingRow, /Đang chạy/,
+        "Overview year ring marks January current at the Bangkok New Year boundary");
+
+      await page.click('[data-view="timeline"]');
+      try {
+        await page.waitForFunction(() => document.body.textContent?.includes("Địa hình tải việc 2027"), { timeout: 10_000 });
+      } catch (cause) {
+        const snapshot = await page.evaluate(() => ({
+          hash: location.hash,
+          heading: document.querySelector("h1")?.textContent || "",
+          body: document.body.innerText.slice(0, 1000),
+        }));
+        throw new Error(`Timeline did not expose Bangkok year: ${JSON.stringify({ snapshot, pageErrors })}`, { cause });
+      }
+      const timelineCurrentMonth = await page.evaluate(() => [...document.querySelectorAll("div")]
+        .find((node) => node.children[0]?.textContent?.trim() === "Đến hạn tháng này"
+          && node.children.length === 3)?.textContent || "");
+      assert.match(timelineCurrentMonth, /T1/,
+        "Timeline Overview uses January as the Bangkok current month");
+      assert.equal(await page.evaluate(() => [...document.querySelectorAll("button")]
+        .some((button) => button.textContent?.includes("T1 ●"))), true,
+      "Timeline Overview highlights January as current");
+      await page.evaluate(() => {
+        const button = [...document.querySelectorAll(".timeline-mode-controls button")]
+          .find((candidate) => candidate.textContent?.trim() === "Dòng thời gian");
+        if (!(button instanceof HTMLButtonElement)) throw new Error("Không tìm thấy workspace Dòng thời gian");
+        button.click();
+      });
+      await page.waitForSelector(".timeline-range-rail__today", { timeout: 5_000 });
+      assert.equal(chanNgoai.length, 0, "Bangkok boundary scenario remains fully intercepted");
     } finally {
       await page.close();
     }
