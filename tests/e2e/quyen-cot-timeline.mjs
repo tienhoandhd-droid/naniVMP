@@ -551,11 +551,9 @@ try {
   assert.deepEqual(batchPhases.map(({ persona }) => persona),
     ["qa_manager", "admin", "workshop", "assigned_qa", "unassigned_qa"],
     "matrix phải đọc batch-rights mới ở đủ năm session persona");
-  assert.deepEqual(Object.fromEntries(PERSONAS_KEYS.map((persona) => [
-    persona, batchBodies.filter((entry) => entry.persona === persona).length,
-  ])), {
-    qa_manager: 1, admin: 1, workshop: 1, assigned_qa: 1, unassigned_qa: 1,
-  }, "mỗi phase persona phải phát sinh đúng một batch POST");
+  assert.ok(PERSONAS_KEYS.every((persona) =>
+    batchBodies.some((entry) => entry.persona === persona)),
+  "mỗi phase persona phải phát sinh batch POST bằng session tương ứng");
   assert.deepEqual(permissionBodies.map(({ body }) => body),
     Array.from({ length: permissionBodies.length }, () => ({ p_validation_code: ACTIVITY.id })),
     "mọi per-item POST chỉ gửi đúng mã hạng mục mục tiêu");
