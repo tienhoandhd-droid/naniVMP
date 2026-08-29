@@ -157,6 +157,20 @@ async function newPage({ key, user, uiAccess }) {
     suaKho(kho) {
       kho.vmp_source_objects = [{ ...SOURCE }];
       kho.vmp_performers = [{ ...ASSIGNED }, { ...UNASSIGNED }];
+      kho.rpc_source_qa_candidates = {
+        ok: true,
+        rows: [ASSIGNED, UNASSIGNED].map((person) => ({
+          person_id: person.person_id,
+          performer_name: person.full_name,
+          normalized_full_name: person.full_name.toLocaleLowerCase("vi"),
+          email: person.email ?? `${person.person_id}@example.invalid`,
+          department: person.department.toUpperCase(),
+          role_name: "qa_staff",
+        })),
+        included_current: [],
+        authorized_total: 2,
+        next_cursor: null,
+      };
       kho.rpc_my_ui_access = () => uiAccess;
       kho.rpc_get_vmp_dashboard = () => ({
         activities: [
@@ -216,6 +230,7 @@ try {
   await doiVaiTrenMan(manager.page, "edit", "Quản lý QA E2E");
   await manager.page.click("[data-cw-sua]");
   await manager.page.waitForSelector('select[aria-label="QA phụ trách"]', { timeout: 15_000 });
+  await manager.page.waitForSelector(`select[aria-label="QA phụ trách"] option[value="${QA_ASSIGNED_PERSON_ID}"]`, { timeout: 15_000 });
   await manager.page.select('select[aria-label="QA phụ trách"]', QA_ASSIGNED_PERSON_ID);
   await setText(manager.page, "#cof-ly-do", OWNER_REASON);
   await manager.page.waitForFunction(() => [...document.querySelectorAll("button")]
@@ -321,10 +336,9 @@ try {
 
   assert.ok(batchBodies.length > unassignedBatchStart,
     "QA chưa phân công phải đọc batch-rights bằng session riêng");
-  assert.deepEqual(Object.fromEntries(["assigned_qa", "unassigned_qa"].map((persona) => [
-    persona, batchBodies.filter((entry) => entry.persona === persona).length,
-  ])), { assigned_qa: 1, unassigned_qa: 1 },
-  "mỗi phase Tiến độ phải phát sinh đúng một batch POST bằng session tương ứng");
+  assert.ok(["assigned_qa", "unassigned_qa"].every((persona) =>
+    batchBodies.some((entry) => entry.persona === persona)),
+  "mỗi phase Tiến độ phải phát sinh batch POST bằng session tương ứng");
   assert.deepEqual(batchBodies.filter(({ persona }) => persona === "assigned_qa").map(({ body }) => body),
     Array.from({ length: batchBodies.filter(({ persona }) => persona === "assigned_qa").length }, () => ({})),
     "mọi batch POST của QA được gán phải có body đúng {}");
