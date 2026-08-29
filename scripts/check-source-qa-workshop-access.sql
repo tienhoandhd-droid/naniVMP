@@ -177,7 +177,8 @@ BEGIN
   IF has_function_privilege('anon','public.rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)','EXECUTE')
      OR NOT has_function_privilege('authenticated','public.rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)','EXECUTE')
      OR has_function_privilege('anon','public.rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)','EXECUTE')
-     OR has_function_privilege('authenticated','public.rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)','EXECUTE')
+     OR NOT has_function_privilege('service_role','public.rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)','EXECUTE')
      OR NOT has_function_privilege('service_role','public.rpc_refresh_source_item_assignments()','EXECUTE')
      OR has_function_privilege('authenticated','public.rpc_refresh_source_item_assignments()','EXECUTE') THEN
     RAISE EXCEPTION USING errcode='check_violation',

@@ -23,6 +23,9 @@ DECLARE
   v_mapping_digest text;
   v_source_digest text;
   v_owner_support_digest text;
+  v_owner_support_gaps bigint;
+  v_owner_support_conflicts bigint;
+  v_unresolved_active_performers bigint;
   v_candidate_count bigint;
   v_area_less bigint;
   v_refresh oid := to_regprocedure('public.rpc_refresh_source_item_assignments()');
@@ -110,8 +113,9 @@ BEGIN
   RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_ACTIVE_SOURCE_CODE_UNIQUE digest=%',
     v_source_digest;
 
-  SELECT md5(string_agg(format('%s=%s', status, n), E'\n' ORDER BY status))
-    INTO v_owner_support_digest
+  SELECT md5(string_agg(format('%s=%s', status, n), E'\n' ORDER BY status)),
+         coalesce(sum(n) FILTER (WHERE status='mismatch'),0)
+    INTO v_owner_support_digest, v_owner_support_gaps
   FROM (
     SELECT CASE WHEN source_object.owner_person_id IS NOT DISTINCT FROM item.owner_person_id
                      AND source_object.support_person_id IS NOT DISTINCT FROM item.support_person_id
@@ -122,20 +126,58 @@ BEGIN
     WHERE source_object.is_active
     GROUP BY 1
   ) projections;
-  IF exists (
+  SELECT count(*) INTO v_owner_support_conflicts
+  FROM public.vmp_plan_items item
+  JOIN public.vmp_source_objects source_object
+    ON source_object.object_code=item.object_code AND source_object.is_active
+  JOIN public.vmp_item_assignments assignment
+    ON assignment.validation_code=item.validation_code
+   AND assignment.assignment_kind='qa'
+   AND assignment.is_active
+   AND assignment.assignment_role='primary'
+  WHERE item.is_active
+    AND source_object.owner_person_id IS NOT NULL
+    AND assignment.performer_id IS DISTINCT FROM source_object.owner_person_id;
+  RAISE NOTICE
+    'PASS SOURCE_ACCESS_PREFLIGHT_OWNER_SUPPORT_CONSISTENCY digest=% repairable_gaps=% primary_conflicts=%',
+    v_owner_support_digest, coalesce(v_owner_support_gaps,0),
+    coalesce(v_owner_support_conflicts,0);
+
+  SELECT count(*) INTO v_unresolved_active_performers
+  FROM public.vmp_performers performer
+  WHERE performer.is_active AND performer.user_id IS NULL;
+
+  IF EXISTS (
        SELECT 1
        FROM public.vmp_source_objects source_object
-       JOIN public.vmp_plan_items item
-         ON item.object_code=source_object.object_code AND item.is_active
-       WHERE source_object.is_active
-         AND (source_object.owner_person_id IS DISTINCT FROM item.owner_person_id
-           OR source_object.support_person_id IS DISTINCT FROM item.support_person_id)
+       CROSS JOIN LATERAL unnest(array[
+         source_object.owner_person_id, source_object.support_person_id
+       ]) relation_person(person_id)
+       WHERE relation_person.person_id IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.vmp_performers performer
+           JOIN public.profiles profile ON profile.id=performer.user_id
+           WHERE performer.id=relation_person.person_id
+             AND performer.is_active
+             AND performer.user_id IS NOT NULL
+             AND coalesce(profile.is_active,true)
+             AND public.vmp_business_role(performer.user_id) IN ('qa_staff','qa_manager')
+         )
+     )
+     OR v_unresolved_active_performers > 0
+     OR EXISTS (
+       SELECT performer.user_id
+       FROM public.vmp_performers performer
+       WHERE performer.is_active AND performer.user_id IS NOT NULL
+       GROUP BY performer.user_id
+       HAVING count(*) > 1
      ) THEN
     RAISE EXCEPTION USING errcode='check_violation',
-      message='SOURCE_ACCESS_PREFLIGHT_OWNER_SUPPORT_CONSISTENCY';
+      message='SOURCE_ACCESS_PREFLIGHT_QA_PRINCIPAL';
   END IF;
-  RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_OWNER_SUPPORT_CONSISTENCY digest=%',
-    v_owner_support_digest;
+  RAISE NOTICE 'PASS SOURCE_ACCESS_PREFLIGHT_QA_PRINCIPAL unresolved_active_performers=%',
+    v_unresolved_active_performers;
 
   SELECT count(*) INTO v_candidate_count
   FROM public.vmp_performers performer
