@@ -306,13 +306,24 @@ async function openPersona(persona, state) {
       const canDate = persona === PERSONAS.areaWorkshop || persona === PERSONAS.lineWorkshop;
       const canQa = persona === PERSONAS.owner || persona === PERSONAS.support;
       const rows = visibleRows(persona, state.revoked).map((row) => ({ validation_code: `${row.object_code}-IQ`, editable_fields: canQa ? QA_SEVEN_FIELDS : canDate ? ["actual_validation_date"] : [], view_reason: "E2E Source boundary" }));
+      if (persona === PERSONAS.areaWorkshop && state.areaRightsDelayMs > 0) {
+        setTimeout(() => answer(request, { ok: true, rights: rows }), state.areaRightsDelayMs);
+        return;
+      }
       return answer(request, { ok: true, rights: rows });
     }
     if (rpc === "vmp_my_item_rights") {
       const allowed = visibleRows(persona, state.revoked).length > 0;
       const fields = persona === PERSONAS.owner || persona === PERSONAS.support ? QA_SEVEN_FIELDS
         : (persona === PERSONAS.areaWorkshop || persona === PERSONAS.lineWorkshop) ? ["actual_validation_date"] : [];
-      return answer(request, [{ can_view: allowed, editable_fields: fields, view_reason: "E2E Source boundary", assignment_sources: [], scope_match: allowed, area_match: allowed }]);
+      const payload = [{ can_view: allowed, editable_fields: fields, view_reason: "E2E Source boundary", assignment_sources: [], scope_match: allowed, area_match: allowed }];
+      // Keep the area-workshop permission response slow enough to expose a
+      // modal-loading race: the title renders before the field allowlist.
+      if (persona === PERSONAS.areaWorkshop && state.areaItemRightsDelayMs > 0) {
+        setTimeout(() => answer(request, payload), state.areaItemRightsDelayMs);
+        return;
+      }
+      return answer(request, payload);
     }
     if (rpc === "rpc_update_progress") return answer(request, { ok: true });
     // These are intentionally denied: a lower role must never discover the
@@ -353,6 +364,7 @@ function enabledProgressFields(page) {
 try {
   const state = {
     revision: 7, revoked: false, candidateReads: 0, held: [],
+    areaRightsDelayMs: 0, areaItemRightsDelayMs: 1_500,
     holdOldSource: false, holdOldWarnings: false, holdOldFacets: false, holdOldCard: false,
     holdOldPending: false, pendingHoldRevision: 0, holdOldHistory: false, historyHoldRevision: 0,
   };
@@ -452,6 +464,17 @@ try {
     await page.waitForSelector(`[data-progress-item="SRC-E2E-A-IQ"]`, { timeout: 15_000 });
     await page.evaluate(() => [...document.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Cập nhật")?.click());
     await page.waitForFunction(() => document.body.innerText.includes("Cập nhật tiến độ"));
+    // The modal title is rendered while permission is still being checked.
+    // Wait for the exact server-authorized control count before inspecting it;
+    // this is observable readiness, not a timing cushion.
+    await page.waitForFunction((expectedCount) => {
+      const dialog = [...document.querySelectorAll(".vmp-scroll")]
+        .find((node) => node.getClientRects().length > 0
+          && [...node.querySelectorAll("span")].some((child) => child.textContent?.trim() === "Cập nhật tiến độ"));
+      const controls = [...(dialog?.querySelectorAll('input[type="date"], select') ?? [])]
+        .filter((node) => !node.disabled && node.getAttribute("aria-label") !== "Người thực hiện");
+      return controls.length === expectedCount;
+    }, { timeout: 15_000 }, expected);
     const controls = await enabledProgressFields(page);
     assert.equal(controls.length, expected, `${key} must render exactly its server-authorized progress fields: ${JSON.stringify(controls)}`);
     await page.close();
