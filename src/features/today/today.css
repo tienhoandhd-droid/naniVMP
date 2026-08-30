@@ -345,3 +345,17 @@
 .hn-hero__eyebrow { flex: none; white-space: nowrap; }
 .hn-hero__cta { flex: none; white-space: nowrap; }
 .hn-hero__goi-y { flex: 1 1 auto; }
+
+/* 30/08 — câu dẫn Vali trải ngang hơn (ít dòng gãy) và lấp bớt khoảng trống
+   giữa khối chữ với cụm số trên màn rộng. */
+.hn-hero { grid-template-columns: 118px minmax(0, 1fr) minmax(300px, auto); }
+.hn-hero__loi { max-width: 78ch; }
+.hn-loi { max-width: 64ch; }
+@media (max-width: 1400px) { .hn-loi { max-width: 46ch; } }
+/* Màn hẹp: nhường thêm bề ngang cho câu dẫn; bỏ dòng gợi ý (nội dung đã nằm
+   trong câu dẫn) thay vì để nó bị cắt giữa chừng. */
+.hn-hero { grid-template-columns: 118px minmax(0, 1fr) minmax(260px, auto); }
+@media (max-width: 1500px) {
+  .hn-hero__goi-y { display: none; }
+  .hn-loi { max-width: 52ch; }
+}

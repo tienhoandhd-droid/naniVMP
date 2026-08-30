@@ -126,3 +126,25 @@
 /* Bản gọn: khối bên phải (đếm/Chép/Xóa lọc) không giữ auto nữa, để cụm chọn
    nhân sự đẩy hẳn sang mép phải. */
 .vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > div:last-child { margin-left: 0 !important; }
+/* Bản gọn: kéo cụm chọn nhân sự lên sát hàng nút Làm mới / Quản trị. */
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: -46px; }
+@media (max-width: 900px) { .vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: 0; } }
+/* Ô chọn nhân sự bản gọn: nền nổi trên tranh, bo tròn, hẹp lại; kéo sát hàng
+   nút Làm mới / Quản trị. */
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: -56px; }
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) select {
+  /* Inline style của ô nhập dùng nền chìm (--lp-bg-sunken) nên trên tranh nền
+     hồng nó biến mất — ép nền nổi và viền rõ. */
+  min-width: 150px !important;
+  max-width: 200px !important;
+  height: 36px !important;
+  padding: 0 30px 0 10px !important;
+  background: var(--lp-bg-raised) !important;
+  border: 1px solid var(--lp-line-strong) !important;
+  border-radius: 999px !important;
+  box-shadow: var(--lp-e-low);
+  color: var(--lp-ink) !important;
+  font-weight: 600;
+}
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > label { gap: 6px; padding: 0; }
+@media (max-width: 900px) { .vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: 0; } }
