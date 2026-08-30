@@ -216,6 +216,29 @@ test("bốn mươi tám cá nằm trọn scene cố định", () => {
   assert.ok(model.densityScale >= .82 && model.densityScale <= 1);
 });
 
+test("cá nhân tự bố trí trung tâm, vòng cung và chữ S ổn định", () => {
+  const one = buildLongMonRaceModel([activity("solo", "2026-09-05")], NOW, { audience: "personal" });
+  assert.ok(one.fish[0].yPct >= 42 && one.fish[0].yPct <= 58);
+
+  const fourInput = Array.from({ length: 4 }, (_, index) =>
+    activity(`arc-${index}`, `2026-09-0${index + 1}`));
+  const four = buildLongMonRaceModel(fourInput, NOW, { audience: "personal" });
+  assert.deepEqual(overlappingPairs(four.fish), []);
+  assert.ok(Math.max(...four.fish.map((fish) => fish.yPct))
+    - Math.min(...four.fish.map((fish) => fish.yPct)) >= 18);
+
+  const tenInput = Array.from({ length: 10 }, (_, index) =>
+    activity(`s-${index}`, `2026-09-${String(index + 1).padStart(2, "0")}`));
+  const ten = buildLongMonRaceModel(tenInput, NOW, { audience: "personal" });
+  const team = buildLongMonRaceModel(tenInput, NOW, { audience: "team" });
+  assert.deepEqual(overlappingPairs(ten.fish), []);
+  assert.notDeepEqual(
+    ten.fish.map(({ xPct, yPct }) => ({ xPct, yPct })),
+    team.fish.map(({ xPct, yPct }) => ({ xPct, yPct })),
+  );
+  assert.deepEqual(ten, buildLongMonRaceModel(tenInput, NOW, { audience: "personal" }));
+});
+
 test("trường đua trình bày ba tháng, cá có tên truy cập và legend sáu loài", () => {
   const html = renderToStaticMarkup(React.createElement(LongMonRace, {
     activities: [
@@ -273,6 +296,31 @@ test("nhân viên QA chỉ thấy nhãn Ngư đồ của tôi, không có điề
   assert.match(html, /Ngư đồ của tôi/);
   assert.doesNotMatch(html, /data-long-mon-audience=/);
   assert.doesNotMatch(html, /Chọn người QA/);
+});
+
+test("component truyền audience và dùng scene cố định theo phần trăm", async () => {
+  const html = renderToStaticMarkup(React.createElement(LongMonRace, {
+    activities: [activity("fixed", "2026-09-05")],
+    now: NOW,
+    onOpen: () => {},
+    scopeControl: {
+      canChooseAudience: false,
+      audience: "personal",
+      scopeLabel: "Ngư đồ của tôi",
+      people: [],
+      selectedPersonId: "qa-a",
+      onAudienceChange: () => {},
+      onPersonChange: () => {},
+    },
+  }));
+  const source = await readFile(new URL("../../src/features/monitoring/LongMonRace.tsx", import.meta.url), "utf8");
+
+  assert.match(html, /long-mon-race__canvas long-mon-race__canvas--fixed-scene/);
+  assert.match(html, /data-density-scale="[\d.]+"/);
+  assert.match(html, /--long-mon-y:[\d.]+%/);
+  assert.doesNotMatch(html, /class="long-mon-race__canvas[^>]+style="[^"]*height:/);
+  assert.match(source, /buildLongMonRaceModel\(activities, now, \{[\s\S]*audience:\s*scopeControl\?\.audience\s*\?\?\s*"team"/);
+  assert.doesNotMatch(source, /laneCount\s*\*\s*78/);
 });
 
 test("sáu loài có sáu dáng bơi tĩnh và không dùng animation", async () => {

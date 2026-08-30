@@ -296,7 +296,12 @@ function tryTeamPlacement(
   weeks: readonly LongMonWeekBand[],
   scale: number,
 ): Map<string, PlacementPoint> | null {
-  const groups = Map.groupBy(fish, (item) => item.weekKey);
+  const groups = new Map<string, LongMonRaceFish[]>();
+  for (const item of fish) {
+    const group = groups.get(item.weekKey);
+    if (group) group.push(item);
+    else groups.set(item.weekKey, [item]);
+  }
   const orderedGroups = [...groups.entries()].sort((left, right) =>
     right[1].length - left[1].length
     || left[1][0].weekIndex - right[1][0].weekIndex);
@@ -403,13 +408,104 @@ function buildTeamPlacement(
   return { positions: new Map(), densityScale: TEAM_DENSITY_LEVELS.at(-1)! };
 }
 
+function personalPreferredY(index: number, count: number, activity: Activity): number {
+  if (count === 1) return LONG_MON_SCENE_HEIGHT_PX * .5;
+  const progress = index / (count - 1);
+  if (count <= 4) {
+    const centered = progress * 2 - 1;
+    return LONG_MON_SCENE_HEIGHT_PX * (.42 + centered * centered * .21);
+  }
+  return LONG_MON_SCENE_HEIGHT_PX * (
+    .5
+    + Math.sin(progress * Math.PI * 2 - Math.PI / 2) * .27
+    + (stableUnit(activity, "personal-row") - .5) * .025
+  );
+}
+
+function personalYCandidates(
+  preferredY: number,
+  scale: number,
+  activity: Activity,
+): number[] {
+  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * scale / 2;
+  const minY = halfHeight;
+  const maxY = LONG_MON_SCENE_HEIGHT_PX - halfHeight;
+  const step = LONG_MON_COLLISION_HEIGHT_PX * scale + 8;
+  const candidates = [clamp(preferredY, minY, maxY)];
+  for (let distance = 1; distance <= 6; distance += 1) {
+    const signFirst = stableHash(`${activity.id}:personal-sign:${distance}`) % 2 === 0 ? -1 : 1;
+    candidates.push(clamp(preferredY + signFirst * distance * step, minY, maxY));
+    candidates.push(clamp(preferredY - signFirst * distance * step, minY, maxY));
+  }
+  for (let row = 0; row < 9; row += 1) {
+    candidates.push(minY + row / 8 * (maxY - minY));
+  }
+  return [...new Set(candidates.map((value) => Number(value.toFixed(4))))]
+    .sort((left, right) => Math.abs(left - preferredY) - Math.abs(right - preferredY));
+}
+
+function tryPersonalPlacement(
+  fish: readonly LongMonRaceFish[],
+  weeks: readonly LongMonWeekBand[],
+  scale: number,
+): Map<string, PlacementPoint> | null {
+  const base = tryTeamPlacement(fish, weeks, scale);
+  if (!base) return null;
+  const ordered = [...fish].sort((left, right) =>
+    left.deadline.localeCompare(right.deadline)
+    || fishIdentity(left).localeCompare(fishIdentity(right), "vi"));
+  const positions = new Map<string, PlacementPoint>();
+  const placedRects: PlacementRect[] = [];
+
+  ordered.forEach((item, index) => {
+    const basePoint = base.get(fishIdentity(item));
+    if (!basePoint) return;
+    const preferredY = personalPreferredY(index, ordered.length, item.activity);
+    const yPx = personalYCandidates(preferredY, scale, item.activity).find((candidateY) =>
+      !overlapsAny(rectAt(basePoint.xPx, candidateY, scale), placedRects));
+    if (yPx === undefined) return;
+    const point = {
+      xPx: basePoint.xPx,
+      yPx,
+      rotateDeg: Number((basePoint.rotateDeg + stableRange(item.activity, "personal-pose", -.8, .8)).toFixed(2)),
+    };
+    positions.set(fishIdentity(item), point);
+    placedRects.push(rectAt(point.xPx, point.yPx, scale));
+  });
+
+  return positions.size === fish.length ? positions : null;
+}
+
+function buildPersonalPlacement(
+  fish: readonly LongMonRaceFish[],
+  weeks: readonly LongMonWeekBand[],
+): PlacementResult {
+  if (fish.length > 12) return buildTeamPlacement(fish, weeks);
+  const preferredScale = fish.length <= 4 ? 1.06 : 1.02;
+  for (const scale of [preferredScale, 1, .91, .82]) {
+    const positions = tryPersonalPlacement(fish, weeks, scale);
+    if (positions) return { positions, densityScale: scale };
+  }
+  const fallback = buildTeamPlacement(fish, weeks);
+  const reflected = new Map(
+    [...fallback.positions].map(([identity, point]) => [identity, {
+      ...point,
+      yPx: LONG_MON_SCENE_HEIGHT_PX - point.yPx,
+    }]),
+  );
+  return { positions: reflected, densityScale: fallback.densityScale };
+}
+
 function applyPlacement(
   fish: LongMonRaceFish[],
   weeks: readonly LongMonWeekBand[],
+  audience: "team" | "personal",
 ): { laneCount: number; densityScale: number } {
   const weekCounts = new Map<string, number>();
   for (const item of fish) weekCounts.set(item.weekKey, (weekCounts.get(item.weekKey) ?? 0) + 1);
-  const placement = buildTeamPlacement(fish, weeks);
+  const placement = audience === "personal"
+    ? buildPersonalPlacement(fish, weeks)
+    : buildTeamPlacement(fish, weeks);
 
   for (const item of fish) {
     const point = placement.positions.get(fishIdentity(item));
@@ -432,7 +528,7 @@ function applyPlacement(
 export function buildLongMonRaceModel(
   activities: readonly Activity[],
   now: Date,
-  _options: LongMonRaceLayoutOptions = {},
+  options: LongMonRaceLayoutOptions = {},
 ): LongMonRaceModel {
   const { start, endExclusive, today } = rangeAround(now);
   const weeks = weekBands(start, endExclusive);
@@ -479,7 +575,7 @@ export function buildLongMonRaceModel(
       "vi",
     ));
 
-  const { laneCount, densityScale } = applyPlacement(candidates, weeks);
+  const { laneCount, densityScale } = applyPlacement(candidates, weeks, options.audience ?? "team");
 
   const stageCounts = emptyStageCounts();
   for (const fish of candidates) stageCounts[fish.stage] += 1;
