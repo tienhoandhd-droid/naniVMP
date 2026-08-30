@@ -306,12 +306,12 @@
 
 .long-mon-race__fish-position {
   position: absolute;
-  top: clamp(42px, var(--long-mon-y), calc(100% - 70px));
+  top: clamp(40px, var(--long-mon-y), calc(100% - 40px));
   left: clamp(40px, var(--long-mon-x), calc(100% - 40px));
   display: block;
   width: 74px;
   height: 58px;
-  transform: translate(calc(-50% + var(--school-x)), var(--school-y));
+  transform: translate(calc(-50% + var(--school-x)), calc(-50% + var(--school-y)));
 }
 
 .long-mon-race__fish {
