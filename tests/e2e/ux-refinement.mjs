@@ -180,10 +180,13 @@ try {
       .some((b) => b.title === "Thông báo"));
     if (hasDeadBell) throw new Error("Nút Thông báo không hành động vẫn còn");
 
+    /* 30/08: thanh lọc đầy đủ chỉ còn ở nhóm GIÁM SÁT; nhóm THỰC HIỆN và
+       PHÂN TÍCH dùng bản gọn (không nhãn phạm vi, không nút Bộ lọc). */
+    await page.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[aria-label="Phạm vi toàn hệ thống"]');
     const globalFilterLabel = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (el) => el.textContent || "");
     if (!globalFilterLabel.includes("Phạm vi toàn hệ thống")) throw new Error(globalFilterLabel);
 
-    await page.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".vmp-bento");
     await page.waitForSelector(".b-k1 button");
     const hashBeforeKeyboardCta = await page.evaluate(() => location.hash);

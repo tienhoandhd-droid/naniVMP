@@ -114,3 +114,15 @@
 /* Lớp tranh nền cố ý thò ra ngoài mép phải (right: -60px) — kẹp lại để nó
    không tạo thanh cuộn ngang cho cả trang. */
 .vmp-main-nen { overflow-x: clip; }
+
+/* Bản gọn của thanh lọc (nhóm THỰC HIỆN, PHÂN TÍCH): chỉ còn chọn nhân sự
+   và chip đang lọc — hàng thấp, không viền dưới khi trống. */
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { padding: 0 0 6px; border-bottom: 0; }
+.vmp-thanh-loc .timeline-scope-inline { display: inline-flex; align-items: center; gap: 8px; }
+.vmp-thanh-loc .timeline-scope-btn { min-height: 32px; padding: 0 12px; border-radius: 999px; font-size: 12px; }
+/* Bản gọn: cụm chọn nhân sự nằm bên PHẢI hàng (anh Hoàn chốt 30/08). */
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > label,
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > .timeline-scope-inline { margin-left: auto; }
+/* Bản gọn: khối bên phải (đếm/Chép/Xóa lọc) không giữ auto nữa, để cụm chọn
+   nhân sự đẩy hẳn sang mép phải. */
+.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > div:last-child { margin-left: 0 !important; }

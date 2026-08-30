@@ -320,3 +320,28 @@
   .hn-muc__tom-tat, .hn-cot { grid-template-columns: 176px minmax(0, 1fr) 122px 152px; }
   .hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 176px 1fr; }
 }
+
+/* =====================================================================
+ *  30/08 — hero gọn hơn trên màn rộng: khối chữ có bề ngang tối đa, cụm số
+ *  đứng sát ngay sau, không để một mảng trống lớn ở giữa.
+ * ===================================================================== */
+.hn-hero { grid-template-columns: 118px minmax(0, auto) minmax(320px, auto); justify-content: start; column-gap: 28px; }
+.hn-hero__loi { max-width: 62ch; gap: 8px; }
+.hn-loi { max-width: 40ch; }
+/* Ba dòng phụ gộp thành một khối chữ nhỏ, ngăn bằng dấu chấm giữa. */
+.hn-mota { display: block; font-size: 13px; line-height: 20px; color: var(--lp-ink-muted); }
+.hn-mota__pham-vi, .hn-mota__moc { display: inline; font-size: 13px; font-weight: 500; color: var(--lp-ink-muted); }
+.hn-mota__pham-vi::before, .hn-mota__moc::before { content: " · "; }
+/* "Làm trước tiên" — nhãn, nút và gợi ý trên cùng một hàng. */
+.hn-hero__uu-tien { flex-wrap: nowrap; align-items: center; gap: 12px; margin-top: 2px; }
+.hn-hero__goi-y { flex-basis: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-hero__so { justify-content: flex-start; }
+@media (max-width: 1400px) {
+  .hn-hero { grid-template-columns: 118px minmax(0, 1fr) auto; }
+  .hn-hero__uu-tien { flex-wrap: wrap; }
+  .hn-hero__goi-y { white-space: normal; flex-basis: 100%; }
+}
+/* Hàng "Làm trước tiên": nhãn và nút không gãy chữ, chỉ dòng gợi ý co lại. */
+.hn-hero__eyebrow { flex: none; white-space: nowrap; }
+.hn-hero__cta { flex: none; white-space: nowrap; }
+.hn-hero__goi-y { flex: 1 1 auto; }

@@ -192,32 +192,6 @@ async function assertScopeButton(page, label, { disabled = false } = {}) {
   assert.equal(state.disabled, disabled, `${label} disabled state`);
 }
 
-async function openGlobalFilter(page) {
-  await page.evaluate(() => {
-    const filterBar = document.querySelector('[aria-label="Phạm vi toàn hệ thống"]');
-    const button = [...(filterBar?.querySelectorAll("button") || [])]
-      .find((candidate) => candidate.textContent?.trim().startsWith("Bộ lọc"));
-    if (!(button instanceof HTMLButtonElement)) throw new Error("Không tìm thấy nút Bộ lọc");
-    button.click();
-  });
-  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="Phạm vi toàn hệ thống"] button')]
-    .some((button) => button.textContent?.trim().startsWith("Bộ lọc")
-      && button.getAttribute("aria-expanded") === "true"), { timeout: 5_000 });
-}
-
-async function selectGlobalFilter(page, label) {
-  await page.evaluate((expectedLabel) => {
-    const filterBar = document.querySelector('[aria-label="Phạm vi toàn hệ thống"]');
-    const option = [...(filterBar?.querySelectorAll("button") || [])]
-      .find((candidate) => candidate.textContent?.includes(expectedLabel));
-    if (!(option instanceof HTMLButtonElement)) throw new Error(`Không tìm thấy lựa chọn lọc ${expectedLabel}`);
-    option.click();
-  }, label);
-  await page.waitForFunction((expectedLabel) => [...document.querySelectorAll('[aria-label="Phạm vi toàn hệ thống"] button')]
-    .some((button) => button.textContent?.includes(expectedLabel) && button.getAttribute("aria-pressed") === "true"),
-  { timeout: 5_000 }, label);
-}
-
 async function clearGlobalFilters(page) {
   await page.evaluate(() => {
     const filterBar = document.querySelector('[aria-label="Phạm vi toàn hệ thống"]');
@@ -359,12 +333,15 @@ try {
       assert.ok((await visibleTodayCodes(page)).includes(CODE.sameNameUnrelated),
         "the team action reveals the same-department unrelated row");
 
-      await openGlobalFilter(page);
-      assert.equal(await page.evaluate(() => [...document.querySelectorAll("button")]
-        .some((button) => button.textContent?.includes("QA-AREA-E2E"))), true,
-      "the filter-reset E2E fixture exposes a selectable QA area");
-      await selectGlobalFilter(page, "QA – QLCL");
-      await selectGlobalFilter(page, "QA-AREA-E2E");
+      /* 30/08: nhóm THỰC HIỆN dùng thanh lọc bản gọn — không còn nút "Bộ lọc"
+         tại chỗ, nên lát cắt tới từ URL (đường tắt/chia sẻ link). Nút "Xóa lọc"
+         vẫn phải gỡ được đúng như trước. */
+      await page.evaluate(() => {
+        const hash = new URLSearchParams(location.hash.slice(1));
+        hash.set("dept", "qa");
+        hash.set("area", "QA-AREA-E2E");
+        location.hash = hash.toString();
+      });
       await page.waitForFunction(() => {
         const hash = new URLSearchParams(location.hash.slice(1));
         return hash.get("dept") === "qa" && hash.get("area") === "QA-AREA-E2E" && hash.get("me") === null;

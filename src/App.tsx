@@ -1404,6 +1404,7 @@ function GlobalFilterBar({
   showPersonSelector, selectedPersonId, setSelectedPersonId, personOptions,
   todayPersonScope, setTodayPersonScope, currentPersonId,
   todayMode = false,
+  rutGon = false,
 }: {
   areaSel: string[];
   setAreaSel: (v: string[]) => void;
@@ -1431,6 +1432,10 @@ function GlobalFilterBar({
   currentPersonId: string | null;
   /** Today tự quản cửa sổ 7 ngày, nên kỳ nhớ chỉ được hiển thị ở màn khác. */
   todayMode?: boolean;
+  /** Nhóm THỰC HIỆN và PHÂN TÍCH (anh Hoàn chốt 30/08): bỏ nhãn phạm vi,
+   *  nút Bộ lọc, cụm đếm và Chép liên kết — chỉ giữ chọn nhân sự và chip
+   *  lọc đang bật (để còn đường tắt/URL vào là gỡ được). */
+  rutGon?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [daChep, setDaChep] = useState(false);
@@ -1488,12 +1493,12 @@ function GlobalFilterBar({
 
   return (
     <div aria-label="Phạm vi toàn hệ thống" className="vmp-thanh-loc" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 14, padding: "2px 0 8px" }}>
-      <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>
+      {!rutGon && <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>}
       {showPersonSelector ? (
         <label style={{ display: "inline-flex", alignItems: "center", gap: 7, color: C.plumSoft,
           fontFamily: TEXT, fontSize: 12, fontWeight: 800 }}>
           <Users size={14} />
-          <span>Theo nhân sự</span>
+          {!rutGon && <span>Theo nhân sự</span>}
           <select aria-label="Chọn nhân sự xem tiến độ" value={selectedPersonId ?? ""}
             onChange={(event) => setSelectedPersonId(event.target.value || null)}
             style={{ ...INP, width: "auto", minWidth: 170, padding: "6px 30px 6px 10px", fontSize: 12 }}>
@@ -1514,7 +1519,7 @@ function GlobalFilterBar({
       ) : null}
 
       {/* + Lọc (Bộ phận / Khu vực) */}
-      <div ref={popRef} style={{ position: "relative" }}>
+      {!rutGon && <div ref={popRef} style={{ position: "relative" }}>
         {/* Hai ô chọn ngày đã chuyển VÀO hộp này. Chúng chiếm cố định ~230px
             trên mọi màn hình cho một thao tác thỉnh thoảng mới dùng, trong khi
             phần đầu trang đã ngốn gần 1/3 chiều cao trước khi thấy nội dung.
@@ -1544,7 +1549,7 @@ function GlobalFilterBar({
               : areaOptions.map((o) => optRow(o, areaSel.includes(o.v), toggleArea, C.marigold))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* chip đang lọc */}
       {deptSel.map((v) => (
@@ -1565,7 +1570,7 @@ function GlobalFilterBar({
 
       {/* phải: đếm kết quả + xóa */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
+        {!rutGon && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
           <b style={{ color: shown < total ? C.pinkText : C.plum }}>{shown}</b>/{total} hạng mục
           <GiaiThich tieuDe={`${total} = mẫu số của thanh lọc`}>
             <span>{MAU_SO.tatCa}</span>
@@ -1578,15 +1583,15 @@ function GlobalFilterBar({
             )}
             <span>Báo cáo mục 1 dùng mẫu số HẸP HƠN: chỉ hạng mục có mốc đích VMP rơi vào năm đang chọn. Số khác nhau là do định nghĩa khác nhau, không phải do lệch dữ liệu.</span>
           </GiaiThich>
-        </span>
+        </span>}
         {/* Cả màn hình đang xem nằm trong URL, nên chép link là chia sẻ được
             nguyên lát cắt — khỏi phải dặn nhau "vào Cảnh báo rồi chọn XSX". */}
-        <button type="button" onClick={chepLien} title="Chép liên kết tới đúng màn hình và bộ lọc đang xem"
+        {!rutGon && <button type="button" onClick={chepLien} title="Chép liên kết tới đúng màn hình và bộ lọc đang xem"
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8,
             border: `1px solid ${daChep ? C.mintText : C.pinkSoft}`, background: daChep ? C.mintSoft : "transparent",
             color: daChep ? C.mintText : C.plumSoft, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
           {daChep ? <CheckCircle2 size={13} /> : <FileText size={13} />} {daChep ? "Đã chép" : "Chép liên kết"}
-        </button>
+        </button>}
         {active && (
           <button type="button" onClick={resetAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
             <XCircle size={13} /> Xóa lọc
@@ -2155,6 +2160,9 @@ function VerifiedAppShell({ user, logout, access }: {
                 todayPersonScope={todayPersonScope} setTodayPersonScope={chonPhamViToday}
                 currentPersonId={currentPersonId}
                 todayMode={view === "today"}
+                /* Nhóm THỰC HIỆN + PHÂN TÍCH dùng bản gọn: bỏ nhãn phạm vi,
+                   nút Bộ lọc, cụm đếm và Chép liên kết (anh Hoàn chốt 30/08). */
+                rutGon={["work", "analysis"].includes(NAV_ITEMS.find((n) => n.id === view)?.group || "")}
               />
             )}
 
