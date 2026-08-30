@@ -2,12 +2,12 @@
 
 ## 1. Mục tiêu
 
-Tạo một bản đồ thời gian VMP mang cảm giác của cuộc đua thực sự: mỗi thiết bị là một cá chép đang thắng dòng nước để kịp hạn VMP. Tranh phải có giá trị thẩm mỹ độc lập nhưng vẫn dành đủ khoảng trống và độ tương phản cho dữ liệu giao diện.
+Tạo một bản đồ thời gian VMP mang cảm giác của cuộc đua thực sự: mỗi thiết bị là một sinh vật đua đang thắng dòng nước để kịp hạn VMP. Sáu trạng thái dùng sáu loài cá khác silhouette để vẫn phân biệt được khi màu khó nhìn. Tranh phải có giá trị thẩm mỹ độc lập nhưng vẫn dành đủ khoảng trống và độ tương phản cho dữ liệu giao diện.
 
 ## 2. Phạm vi bản thử
 
 - Tạo một tranh nền đường đua thủy cảnh không chứa cá dữ liệu, chữ hoặc nhãn.
-- Tạo một bộ tham chiếu cá chép tròn, hơi béo, đang bơi mạnh sang phải.
+- Tạo một bộ tham chiếu sáu loài cá khác silhouette, cùng chất liệu và cùng hướng bơi mạnh sang phải.
 - Dùng các tài sản mới trong một prototype Visual Companion độc lập.
 - Không sửa `src/`, API, quyền truy cập, dữ liệu hoặc quy tắc nghiệp vụ.
 - Không dùng số liệu minh họa để kết luận nghiệp vụ GMP.
@@ -40,20 +40,21 @@ Tạo một bản đồ thời gian VMP mang cảm giác của cuộc đua thự
 
 ## 5. Cá dữ liệu
 
-- Thân cá chép bầu, tròn và hơi béo; đầu nhỏ hơn thân một chút.
-- Nhìn rõ đuôi chẻ, vây lưng, vây ngực, đường mang và mắt nhỏ.
-- Thân cong nhẹ hình chữ S; đuôi quẫy về sau; vây ép theo dòng để thể hiện tốc độ.
+- Sáu trạng thái dùng sáu loài cá nước ngọt: cá trê, cá lia thia, cá chép, cá thần tiên, cá rồng và cá nóc.
+- Mỗi loài giữ đặc điểm dễ nhận dạng: râu cá trê, vây khăn cá lia thia, thân bầu cá chép, thân tam giác cá thần tiên, thân dài cá rồng và thân tròn cá nóc.
+- Mọi loài đều được cách điệu hơi tròn, có mắt nhỏ và cùng độ chi tiết để đứng chung trong một tác phẩm.
+- Thân cong nhẹ theo chuyển động; đuôi hoặc vây quẫy về sau để thể hiện tốc độ.
 - Tư thế nghiêng ngang ba phần tư rất nhẹ, không dùng dáng nhìn từ trên xuống.
 - Biểu cảm quyết tâm nhưng vẫn ngộ nghĩnh; không nhân hóa bằng tay, chân hoặc phụ kiện.
 - Chất liệu cá đồng nhất với tranh nền, viền mềm cùng màu và không có bóng sticker.
-- Bộ tham chiếu gồm ba nhịp bơi: quẫy lên, thân thẳng tăng tốc và quẫy xuống.
+- Tất cả cùng hướng sang phải, cùng tỷ lệ thị giác và có khoảng trống tương đương quanh silhouette.
 
 ## 6. Mã hóa dữ liệu
 
 - Vị trí ngang của cá vẫn chỉ do hạn VMP quyết định.
 - Vị trí dọc dùng các luồng chống chồng lấn và không mang ý nghĩa nghiệp vụ.
-- Toàn thân cá mang một trong sáu màu tiến độ: xám mực, lam chàm, lục ngọc, tím khói, hoàng thổ và chu sa.
-- Chu sa ghi đè màu tiến độ khi quá hạn; thẻ chi tiết giữ giai đoạn thực tế trước khi quá hạn.
+- Ánh xạ kép bằng loài và màu: cá trê xám mực là chưa hoàn thành đề cương; cá lia thia lam chàm là hoàn thành đề cương; cá chép lục ngọc là hoàn thành thẩm định thực tế; cá thần tiên tím khói là hoàn thành báo cáo; cá rồng hoàng thổ là hoàn thành VMP; cá nóc chu sa là quá hạn VMP.
+- Trạng thái quá hạn dùng cá nóc chu sa thay vì chỉ ghi đè màu của loài trước đó; thẻ chi tiết giữ giai đoạn thực tế trước khi quá hạn.
 - Sắp hạn có một vệt nước vàng nhạt; quá hạn có vệt nước đỏ trầm. Không thêm cờ, số áo hoặc huy chương lên thân cá.
 
 ## 7. Tín hiệu “cuộc đua”
@@ -81,27 +82,27 @@ Constraints: preserve generous negative space; no text; no labels; no logos; no 
 Avoid: neon blue, photorealistic aquarium photography, dense plants in the center, fantasy palace, surface-view camera, top-down view, existing fish
 ```
 
-### 8.2. Bộ cá
+### 8.2. Bộ sáu loài cá
 
 ```text
 Use case: stylized-concept
-Asset type: consistent character reference sheet for timeline markers
-Primary request: three matching poses of one chubby round koi carp actively swimming to the right against a strong current
-Subject: recognizable carp anatomy, plump oval body, small head, forked tail, visible dorsal and pectoral fins, subtle barbels, small determined eye; pose 1 tail sweeps upward, pose 2 body straightens to accelerate, pose 3 tail sweeps downward
+Asset type: six-species character reference sheet for timeline markers
+Primary request: exactly six clearly different freshwater fish racers actively swimming to the right against a strong current
+Subject: one gray catfish with long whiskers and low body; one indigo betta with long flowing fins; one jade-green chubby carp with forked tail; one smoky-purple angelfish with tall triangular silhouette; one ochre-gold arowana with long slender body and upturned mouth; one vermilion-red pufferfish with a round compact silhouette
 Style/medium: simplified painterly East Asian mineral-pigment illustration, clean readable silhouette, refined and slightly playful
-Composition/framing: three isolated side-view fish, evenly spaced, all fully visible with generous padding
-Color palette: neutral pearl-gray body suitable for later six-state tinting, dark ink details, soft warm highlights
+Composition/framing: two rows of three isolated side-view fish, evenly spaced, same visual weight, all fully visible with generous padding, no overlap, every head pointing right
+Color palette: muted state colors with pearl highlights and dark ink details; gray, indigo, jade green, smoky purple, ochre gold, vermilion red
 Scene/backdrop: perfectly flat solid #00ff00 chroma-key background for background removal
-Constraints: one consistent character across all poses; flat uniform background; no shadows; no reflections; no text; no watermark; do not use #00ff00 on the fish
-Avoid: top-down koi, emoji face, human limbs, armor, clothing, oversized eyes, sticker outline, multiple species, extra fish
+Constraints: exactly six fish and six species; silhouettes must remain distinguishable at 48 px; one consistent art style; flat uniform background; no shadows; no reflections; no text; no watermark; do not use #00ff00 on the fish
+Avoid: duplicate species, look-alike body shapes, top-down fish, emoji faces, human limbs, armor, clothing, oversized eyes, sticker outlines, extra animals
 ```
 
 ## 9. Kiểm tra và nghiệm thu
 
 - Tranh nền phải đọc rõ ở tỷ lệ rộng của timeline và không chứa chữ hoặc cá dữ liệu.
 - Vùng trung tâm phải đủ yên để sáu màu cá phân biệt được.
-- Cá phải nhìn rõ là cá chép dù thu nhỏ còn khoảng 44–56 px.
-- Ba tư thế phải cùng một nhân vật và cùng chất liệu.
+- Cả sáu loài phải nhận ra bằng silhouette khi thu nhỏ còn khoảng 44–56 px và xem ở thang xám.
+- Bảng cá phải có đúng sáu loài, đúng sáu màu, cùng hướng và cùng chất liệu.
 - Chạy kiểm tra tĩnh cho sáu trạng thái, vị trí deadline và số lượng thiết bị minh họa.
 - Kiểm tra HTTP và xác nhận prototype xuất hiện trong đúng tab Chrome Visual Companion hiện có.
 
