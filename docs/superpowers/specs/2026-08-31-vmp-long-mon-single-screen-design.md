@@ -30,6 +30,8 @@ Model nhận thêm `audience: "team" | "personal"` và kích thước vùng vẽ
 - Cá vẫn được neo vào vùng tuần theo hạn VMP. Tọa độ chính xác không biểu diễn ngày; ngày chỉ hiện khi bấm.
 - Trên toàn chiều cao cố định, model tạo 6–9 dòng nước cong. Mỗi dòng có pha và biên độ khác nhau để không tạo hàng ngang.
 - Với từng cá, hash ổn định từ ID sinh thứ tự các vị trí ứng viên quanh vùng tuần. Bộ xếp hai chiều chọn vị trí đầu tiên không va chạm.
+- Tuần đông không tạo một cột dọc. Model sinh một đám điểm so le hai chiều quanh tâm tuần theo vòng xoắn vàng đã làm dẹt, rồi uốn các điểm theo dòng nước. Cách này tạo nhiều cao độ và nhiều tọa độ ngang khác nhau nhưng vẫn giữ đàn cá gần đúng vùng tuần.
+- Các tuần được xếp theo mật độ giảm dần: tuần nhiều cá được giữ vùng trống trước, sau đó tuần thưa mới điền vào các khoảng còn lại. Kiểm tra va chạm là toàn cục nên cá ở hai tuần kế bên cũng không đè nhau.
 - Khi mật độ tăng, model thử lại toàn đàn theo ba mức tỷ lệ `1`, `0.91`, `0.82`; mọi cá trong cùng một lần vẽ dùng chung mức mật độ để tranh không lộn xộn.
 - Vùng tuần được phép nới thành một cụm rộng tối đa hai lần chiều rộng tuần để xếp so le. Tâm cụm vẫn nằm tại tuần và `data-week` không đổi.
 - Mức chấp nhận tối thiểu: 48 cá trong ba tháng và 12 cá cùng một tuần phải cùng nằm trong mặt nước cố định, không chồng hộp và không làm tăng chiều cao.
@@ -57,7 +59,7 @@ Model nhận thêm `audience: "team" | "personal"` và kích thước vùng vẽ
 1. Tính vùng ba tháng và các dải tuần như hiện tại.
 2. Chọn chiến lược theo `audience` và số cá.
 3. Sinh danh sách điểm ứng viên xác định từ ID trên các đường cong trong hình chữ nhật chuẩn 820×520.
-4. Sắp cá theo tuần, deadline và mã; thử điểm theo thứ tự hash riêng của từng cá.
+4. Sắp tuần theo số cá giảm dần, sau đó sắp cá trong tuần theo deadline và mã; thử điểm theo thứ tự hash riêng của từng cá. Kết quả cuối cùng vẫn trả theo deadline và mã để giữ thứ tự bàn phím.
 5. Kiểm tra va chạm bằng kích thước đã nhân theo mức mật độ, gồm thân cá và nhãn mã.
 6. Nếu còn cá chưa đặt, giảm toàn bộ đàn sang mức mật độ kế tiếp và chạy lại từ đầu.
 7. Nếu fixture vượt năng lực thiết kế (trên 48 cá hoặc trên 12 cá một tuần), vẫn hiển thị mọi cá ở mức `0.82` và ghi cảnh báo kỹ thuật vào console trong môi trường phát triển; không gộp, giấu hoặc thay bằng con số. Trường hợp này được ghi nhận là giới hạn dữ liệu cần đánh giá tiếp, không tự làm tăng chiều cao.
@@ -83,12 +85,13 @@ Không dùng `Math.random`; không lưu tọa độ vào database và không tha
 
 1. Unit test xác nhận chiều cao scene không phụ thuộc `laneCount` và không tăng giữa fixture 1, 12, 48 cá.
 2. Unit test 1, 4 và 10 cá cá nhân tạo đội hình trung tâm/vòng cung/chữ S; cùng input cho cùng kết quả.
-3. Unit test 48 cá toàn nhóm và 12 cá cùng tuần không có cặp hộp va chạm, tất cả tọa độ nằm trong scene.
-4. Component test xác nhận `audience` được truyền vào model, canvas dùng lớp fixed-scene và không có style height từ `laneCount`.
-5. E2E 1440×1000: toàn bộ đầu tranh, mặt nước và chú giải xuất hiện trong một viewport; viewport Long Môn không cuộn dọc.
-6. E2E chuyển sang một QA ít cá: chiều cao tranh không đổi, cá được tái bố trí rộng và không còn giữ tọa độ của đàn nhóm.
-7. E2E mobile 390px: không cuộn dọc nội bộ, được kéo ngang, mọi cá vẫn nằm trong canvas và bấm mở đúng deadline.
-8. Chạy targeted unit, targeted E2E, typecheck và production build; không mở rộng sang bộ regression ngoài Long Môn.
+3. Unit test 48 cá toàn nhóm và 12 cá cùng tuần không có cặp hộp va chạm, có ít nhất 6 tọa độ ngang và 6 cao độ khác nhau trong tuần đông, tất cả tọa độ nằm trong scene.
+4. Unit test hai tuần đông liền kề xác nhận phép va chạm toàn cục và kết quả không phụ thuộc thứ tự input.
+5. Component test xác nhận `audience` được truyền vào model, canvas dùng lớp fixed-scene và không có style height từ `laneCount`.
+6. E2E 1440×1000: toàn bộ đầu tranh, mặt nước và chú giải xuất hiện trong một viewport; viewport Long Môn không cuộn dọc.
+7. E2E chuyển sang một QA ít cá: chiều cao tranh không đổi, cá được tái bố trí rộng và không còn giữ tọa độ của đàn nhóm.
+8. E2E mobile 390px: không cuộn dọc nội bộ, được kéo ngang, mọi cá vẫn nằm trong canvas và bấm mở đúng deadline.
+9. Chạy targeted unit, targeted E2E, typecheck và production build; không mở rộng sang bộ regression ngoài Long Môn.
 
 ## Ngoài phạm vi
 
