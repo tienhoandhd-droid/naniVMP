@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import MetricGrid from "../../components/ui/MetricGrid.tsx";
 import StateBoundary from "../../components/ui/StateBoundary.tsx";
-import ValiIllustration from "../../components/brand/ValiIllustration.tsx";
 import { createProgressRightsGenerationGate, fetchMyEditableProgressRights } from "../../lib/supabaseData.ts";
 import { createVisibleRefreshController } from "../../lib/visibleRefresh.ts";
 import type { Activity } from "../../types/domain.ts";
@@ -160,7 +159,7 @@ export function TodaySupportingPane({ row, onOpenProgress, onClearSelection }: {
       <TodayRowDetails row={row} id={`today-pane-${detailId(row)}`} />
       {row.canEditProgress && <button type="button" className="hn-muc__nut" onClick={() => onOpenProgress(progressLink(row))}>Cập nhật tiến độ</button>}
       <button type="button" className="hn-muc__nut" onClick={onClearSelection}>Bỏ chọn</button>
-    </div> : <div className="hn-pane__trong"><ValiIllustration mood="guide" size="small" />
+    </div> : <div className="hn-pane__trong"><div className="hn-vali hn-vali--guide hn-vali--nho" role="img" aria-label="Công chúa Vali đang hướng dẫn" />
       <p className="hn-pane__goi-y">Chọn một việc để xem các thông tin hỗ trợ trước khi cập nhật tiến độ.</p>
     </div>}
   </aside>;
@@ -209,14 +208,18 @@ export function TodayCommandCenterContent({
           <span className="hn-hero__goi-y">Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. {deadlineFact(dau)}</span>
         </div>}
       </div>
+      {/* Bốn ô số nằm NGAY TRONG hero (đúng bản thiết kế): ô "Quá hạn" là số
+          lớn, ba ô còn lại xếp cột bên cạnh; vẫn là MetricGrid, vẫn bấm lọc. */}
+      <div className="hn-hero__so">
+        <MetricGrid label="Việc hôm nay" items={[
+          oSo("overdue", "Quá hạn", model.kpis.overdue, "danger", "cần xử lý trước tiên"),
+          oSo("today", "Hạn hôm nay", model.kpis.today, "warning", "cần theo dõi trong ngày"),
+          oSo("upcoming", "Trong 7 ngày", model.kpis.upcoming, "warning", "chuẩn bị trước hạn"),
+          oSo("incomplete", "Hồ sơ cần hoàn thiện", model.kpis.dataQuality, "info", "bổ sung thông tin còn thiếu"),
+        ]} />
+      </div>
     </section>
     <TodayRightsNotice status={rightsState.status} error={rightsState.error} onRetry={onRetryRights} />
-    <MetricGrid label="Việc hôm nay" items={[
-      oSo("overdue", "Quá hạn", model.kpis.overdue, "danger", "cần xử lý trước tiên"),
-      oSo("today", "Hạn hôm nay", model.kpis.today, "warning", "cần theo dõi trong ngày"),
-      oSo("upcoming", "Trong 7 ngày", model.kpis.upcoming, "warning", "chuẩn bị trước hạn"),
-      oSo("incomplete", "Hồ sơ cần hoàn thiện", model.kpis.dataQuality, "info", "bổ sung thông tin còn thiếu"),
-    ]} />
     {model.rows.length === 0 ? (hasScopeFilters
       ? <StateBoundary state="filtered-empty" title="Không có việc trong phạm vi đã lọc"
           description={scopeLabel ? `Phạm vi hiện tại: ${scopeLabel}.` : "Phạm vi hiện tại không có việc phù hợp."} onClearFilters={onClearScope} />

@@ -116,3 +116,62 @@
 .hn-hero__cta:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
 .hn-hero__cta--chu { background: transparent; box-shadow: none; padding: 0; color: var(--lp-plum); cursor: default; }
 .hn-hero__goi-y { flex-basis: 100%; font-size: 13px; color: var(--lp-ink-muted); }
+
+/* =====================================================================
+ *  30/08 — đưa màn về ĐÚNG bản thiết kế: số trong hero, dòng việc dạng bảng.
+ * ===================================================================== */
+.hn-hero { grid-template-columns: 118px minmax(0, 1.05fr) minmax(300px, 0.95fr); gap: 0 20px; }
+.hn-hero__so { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+.hn-hero__so .lp-metric-grid { display: grid; grid-template-columns: auto 1px 1fr; gap: 0 18px; align-items: center; margin: 0; }
+.hn-hero__so .lp-metric { padding: 8px 12px; border: 1.5px solid transparent; border-radius: 16px; background: transparent; box-shadow: none; gap: 2px; }
+.hn-hero__so .lp-metric--action.is-selected { border-color: var(--lp-gold); background: var(--lp-bg-raised); box-shadow: none; }
+.hn-hero__so .lp-metric:first-child { grid-row: 1 / span 3; grid-column: 1; }
+.hn-hero__so .lp-metric:first-child .lp-metric__value { font-family: var(--ff-text); font-size: 64px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.hn-hero__so .lp-metric:first-child .lp-metric__label { font-size: 12px; font-weight: 700; color: var(--lp-ink-muted); }
+.hn-hero__so .lp-metric:first-child .lp-metric__hint { display: none; }
+.hn-hero__so .lp-metric:first-child::after { content: ""; display: none; }
+.hn-hero__so .lp-metric-grid::before { content: ""; grid-column: 2; grid-row: 1 / span 3; width: 1px; height: 96px; background: var(--lp-gold-hairline); align-self: center; }
+.hn-hero__so .lp-metric:not(:first-child) { grid-column: 3; display: grid; grid-template-columns: 40px 1fr; align-items: baseline; gap: 0 10px; padding: 4px 10px; }
+.hn-hero__so .lp-metric:not(:first-child) .lp-metric__value { font-family: var(--ff-text); font-size: 24px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hn-hero__so .lp-metric:not(:first-child) .lp-metric__label { grid-column: 2; font-size: 13px; font-weight: 500; color: var(--lp-ink-muted); order: 2; }
+.hn-hero__so .lp-metric:not(:first-child) .lp-metric__hint { display: none; }
+.hn-hero__so .lp-metric--hero { background: transparent; border-top: 1.5px solid transparent; }
+.hn-hero__so .lp-metric--hero.is-selected { border-top-color: var(--lp-gold); }
+/* Dòng việc dạng bảng: mã | tên + thông tin | nút */
+.hn-nhom { margin-bottom: 20px; border-radius: 18px; background: var(--lp-bg-raised); border: 1px solid var(--lp-line); box-shadow: var(--lp-e-low); overflow: hidden; }
+.hn-nhom__ten { margin: 0; padding: 14px 20px 10px; font-size: 22px; }
+.hn-ds { gap: 0; }
+.hn-muc { border: 0; border-top: 1px solid var(--lp-line); border-radius: 0; background: transparent; }
+.hn-muc:hover { transform: none; box-shadow: none; background: var(--lp-surface-2); }
+.hn-muc__tom-tat { display: grid; grid-template-columns: 124px minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 16px; align-items: center; min-height: 58px; padding: 8px 20px; }
+.hn-muc__mo { min-height: 40px; gap: 0; }
+.hn-muc__mo--inline, .hn-muc__mo--desktop { grid-column: 1 / span 2; grid-template-columns: 124px 1fr; align-items: center; gap: 0 16px; }
+.hn-muc__mo--inline { display: grid; }
+.hn-muc__mo--desktop { display: none; }
+.hn-muc__ma { font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 13px; font-weight: 600; letter-spacing: 0; white-space: nowrap; color: var(--lp-ink); }
+.hn-muc__ten { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.hn-muc__thong-tin { grid-column: 3; flex-wrap: nowrap; gap: 0 10px; font-size: 13px; line-height: 20px; overflow: hidden; }
+.hn-muc__thong-tin .hn-muc__han { white-space: nowrap; }
+.hn-muc__thong-tin .hn-muc__chu-so-huu, .hn-muc__thong-tin .hn-muc__phong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-muc__thong-tin .hn-muc__muc-do, .hn-muc__thong-tin .hn-muc__cho, .hn-muc__thong-tin .hn-ly-do { display: none; }
+.hn-muc__nut { grid-column: 4; min-height: 34px; padding: 0 14px; border-radius: 10px; background: var(--lp-bg-raised); white-space: nowrap; }
+.hn-vali--nho { width: 96px; height: 122px; }
+@media (min-width: 1600px) {
+  .hn-muc__mo--inline { display: none; }
+  .hn-muc__mo--desktop { display: grid; }
+  .hn-muc__thong-tin .hn-muc__phong { display: none; }
+}
+@media (max-width: 1100px) {
+  .hn-hero { grid-template-columns: 118px minmax(0, 1fr); }
+  .hn-hero__so { grid-column: 1 / -1; justify-content: flex-start; margin-top: 10px; }
+}
+@media (max-width: 768px) {
+  .hn-hero { grid-template-columns: 1fr; }
+  .hn-hero__so .lp-metric-grid { grid-template-columns: auto 1px 1fr; }
+  .hn-muc__tom-tat { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .hn-muc__mo--inline { display: flex; flex-direction: column; gap: 2px; }
+  .hn-muc__ten { white-space: normal; }
+  .hn-muc__thong-tin { flex-wrap: wrap; }
+  .hn-muc__thong-tin .hn-ly-do { display: flex; }
+  .hn-muc__nut { width: 100%; min-height: 44px; }
+}
