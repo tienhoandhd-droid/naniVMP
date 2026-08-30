@@ -57,6 +57,17 @@ function detailId(row: TodayActionRow): string {
 function progressLink(row: TodayActionRow): ProgressDeepLink {
   return { validationCode: row.validationCode, source: "today", reasons: row.reasons.map((reason) => reason.kind) };
 }
+/** Tên mốc đang chặn — cột "Mốc" trong bảng. */
+function tenMoc(row: TodayActionRow): string {
+  return row.deadlineStage ? row.deadlineStage : `Chờ ${row.blockingStage}`;
+}
+/** Số ngày còn/trễ — cột "Trễ" trong bảng. */
+function soNgay(row: TodayActionRow): { chu: string; loai: "tre" | "homnay" | "con" | "trong" } {
+  if (!row.deadlineStage || row.daysRemaining === null) return { chu: "—", loai: "trong" };
+  if (row.daysRemaining < 0) return { chu: `trễ ${Math.abs(row.daysRemaining)} ngày`, loai: "tre" };
+  if (row.daysRemaining === 0) return { chu: "hạn hôm nay", loai: "homnay" };
+  return { chu: `còn ${row.daysRemaining} ngày`, loai: "con" };
+}
 function deadlineFact(row: TodayActionRow): string {
   if (!row.deadlineStage || row.daysRemaining === null) return `Đang chờ ${row.blockingStage}`;
   if (row.daysRemaining < 0) return `mốc ${row.deadlineStage} · trễ ${Math.abs(row.daysRemaining)} ngày`;
@@ -121,6 +132,10 @@ function TodayQueueRow({ row, expanded, onToggle, onOpenProgress }: {
         <b className="hn-muc__ma">{row.validationCode}</b><span className="hn-muc__ten">{row.title}</span>
       </button>
       <div className="hn-muc__thong-tin">
+        <span className="hn-muc__moc">{tenMoc(row)}</span>
+        <span className="hn-muc__nguoi"><b>{row.ownerName}</b>{row.department ? <i> · {row.department}</i> : null}</span>
+        <span className={`hn-muc__tre hn-muc__tre--${soNgay(row).loai}`}>{soNgay(row).chu}</span>
+        {/* Chuỗi gộp giữ trong DOM cho phần chi tiết và trình đọc màn hình. */}
         <span className="hn-muc__han">{deadlineFact(row)}</span><span className="hn-muc__chu-so-huu">{row.ownerName}</span>
         <span className="hn-muc__phong">{row.department || "Chưa xác định phòng ban"}</span><span className="hn-muc__muc-do">{row.criticality || "Chưa xếp hạng"}</span>
         <span className="hn-muc__cho">Đang chờ {row.blockingStage}</span>
@@ -143,7 +158,7 @@ function TodayQueueSection({ section, rows, expandedCode, onToggle, onOpenProgre
   return <section className={`hn-nhom hn-nhom--${section} lp-tone--${meta.tone}`}>
     <h2 className="hn-nhom__ten">{meta.label} <span className="hn-nhom__dem">{rows.length}</span><span className="hn-nhom__phu">xếp theo hạn, mức độ quan trọng và quyền cập nhật</span></h2>
     {/* Hàng tiêu đề cột (đúng bản thiết kế) — chỉ để nhìn, bảng thật vẫn là danh sách có nút. */}
-    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>Phụ trách</span><span></span></div>
+    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>Phụ trách · Bộ phận</span><span>Trễ</span><span></span></div>
     <ul className="hn-ds" aria-label={meta.label}>{rows.map((row) => <TodayQueueRow key={row.validationCode} row={row}
       expanded={expandedCode === row.validationCode} onToggle={() => onToggle(row.validationCode)} onOpenProgress={onOpenProgress} />)}</ul>
   </section>;

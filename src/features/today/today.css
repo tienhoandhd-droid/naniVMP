@@ -264,3 +264,59 @@
 .hn-muc__thong-tin .hn-muc__han, .hn-muc__thong-tin .hn-muc__chu-so-huu { font-size: 13px; }
 .hn-muc__nut { min-height: 34px; padding: 0 16px; font-size: 13px; }
 .hn-muc__chi-tiet { padding: 12px 24px 16px; }
+
+/* =====================================================================
+ *  30/08 — bảng việc đúng bản thiết kế: Mã · Hạng mục · Mốc · Phụ trách ·
+ *  Bộ phận · Trễ · nút. Cột "Trễ" là số ngày kiểu mono có chấm màu.
+ * ===================================================================== */
+.hn-muc__tom-tat, .hn-cot { grid-template-columns: 172px minmax(0, 1fr) 116px minmax(0, 210px) 122px 152px; }
+.hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 172px 1fr; }
+.hn-cot span:nth-child(5) { width: auto; }
+.hn-cot span:nth-child(6) { width: 152px; }
+/* Ô hiển thị */
+.hn-muc__moc { grid-column: 3; grid-row: 1; align-self: center; font-size: 13px; color: var(--lp-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-muc__nguoi { grid-column: 4; grid-row: 1; align-self: center; font-size: 13px; color: var(--lp-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-muc__nguoi b { font-weight: 500; }
+.hn-muc__nguoi i { font-style: normal; color: var(--lp-ink-muted); }
+.hn-muc__tre { grid-column: 5; grid-row: 1; align-self: center; display: inline-flex; align-items: center; gap: 8px; font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hn-muc__tre::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: currentColor; flex: none; }
+.hn-muc__tre--tre { color: var(--lp-danger); }
+.hn-muc__tre--homnay { color: var(--lp-warning); }
+.hn-muc__tre--con { color: var(--lp-warning); }
+.hn-muc__tre--trong { color: var(--lp-ink-muted); }
+.hn-muc__tre--trong::before { display: none; }
+/* Ô cũ giữ trong DOM nhưng không hiện (nội dung đã tách sang ba ô trên). */
+.hn-muc__thong-tin .hn-muc__han,
+.hn-muc__thong-tin .hn-muc__chu-so-huu { display: none; }
+.hn-muc__nut { grid-column: 6; }
+@media (max-width: 1400px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 172px minmax(0, 1fr) 116px 122px 152px; }
+  .hn-muc__nguoi { display: none; }
+  .hn-muc__tre { grid-column: 4; }
+  .hn-muc__nut { grid-column: 5; }
+  .hn-cot span:nth-child(4) { display: none; }
+}
+@media (max-width: 1100px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 160px minmax(0, 1fr) 122px 152px; }
+  .hn-muc__moc { display: none; }
+  .hn-muc__tre { grid-column: 3; }
+  .hn-muc__nut { grid-column: 4; }
+  .hn-cot span:nth-child(3) { display: none; }
+}
+@media (max-width: 768px) {
+  .hn-muc__moc, .hn-muc__nguoi, .hn-muc__tre { grid-column: auto; }
+  .hn-muc__nguoi, .hn-muc__moc { display: inline; }
+}
+
+/* 30/08 — mã hạng mục dài nhất (CMTB508/2026.01-OQ) cần 175px: nới cột Mã
+   và cắt bằng dấu … thay vì đẩy cả bảng tràn ngang. */
+.hn-muc__tom-tat, .hn-cot { grid-template-columns: 190px minmax(0, 1fr) 116px minmax(0, 200px) 122px 152px; }
+.hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 190px 1fr; }
+.hn-muc__ma { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1400px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 190px minmax(0, 1fr) 116px 122px 152px; }
+}
+@media (max-width: 1100px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 176px minmax(0, 1fr) 122px 152px; }
+  .hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 176px 1fr; }
+}

@@ -22,11 +22,11 @@
   content: "";
   position: absolute;
   top: 0;
-  right: -60px;
-  width: 780px;
+  right: 0;
+  width: 720px;
   height: 560px;
   /* Nguyên khung tranh: cô gái áo yếm + hồ sen, mờ dần về phía vùng đọc. */
-  background: url("../assets/art/nen-dam-sen.webp") no-repeat -230px 0 / 1120px auto;
+  background: url("../assets/art/nen-dam-sen.webp") no-repeat -290px 0 / 1120px auto;
   opacity: 0.55;
   -webkit-mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, rgb(0 0 0) 35%);
   -webkit-mask-composite: source-in;
@@ -110,3 +110,7 @@
 .vmp-thanh-loc .vmp-global-filter-label { white-space: nowrap; }
 @media (max-width: 900px) { .vmp-thanh-loc { flex-wrap: wrap !important; } }
 .vmp-thanh-loc select, .vmp-thanh-loc button { border-radius: 999px !important; }
+
+/* Lớp tranh nền cố ý thò ra ngoài mép phải (right: -60px) — kẹp lại để nó
+   không tạo thanh cuộn ngang cho cả trang. */
+.vmp-main-nen { overflow-x: clip; }
