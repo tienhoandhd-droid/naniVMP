@@ -102,3 +102,7 @@
 
 /* ---- Chân trang: giờ đồng bộ ------------------------------------- */
 .vmp-chan-trang { margin: 28px 0 0; font-size: 12px; font-weight: 600; color: var(--lp-ink-muted); text-align: right; }
+
+/* ---- Thanh lọc toàn cục: hàng chip trong suốt, không hộp trắng ---- */
+.vmp-thanh-loc { border-bottom: 1px solid var(--lp-line); }
+.vmp-thanh-loc select, .vmp-thanh-loc button { border-radius: 999px !important; }

@@ -175,3 +175,11 @@
   .hn-muc__thong-tin .hn-ly-do { display: flex; }
   .hn-muc__nut { width: 100%; min-height: 44px; }
 }
+
+/* Hàng tiêu đề cột + phụ đề nhóm (đúng bản thiết kế) */
+.hn-nhom__ten { align-items: baseline; flex-wrap: wrap; }
+.hn-nhom__phu { font-family: var(--ff-text); font-size: 13px; font-weight: 500; color: var(--lp-ink-muted); }
+.hn-cot { display: grid; grid-template-columns: 124px minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 16px; padding: 0 20px; height: 34px; align-items: center; background: var(--lp-surface-2); border-top: 1px solid var(--lp-line); border-bottom: 1px solid var(--lp-line-strong); font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--lp-ink-muted); }
+.hn-cot span:last-child { width: 118px; }
+.hn-ds .hn-muc:first-child { border-top: 0; }
+@media (max-width: 768px) { .hn-cot { display: none; } }

@@ -1487,7 +1487,7 @@ function GlobalFilterBar({
   );
 
   return (
-    <div aria-label="Phạm vi toàn hệ thống" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 14, padding: "6px 12px", borderRadius: 14, background: C.glass, backdropFilter: "blur(6px)", border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)" }}>
+    <div aria-label="Phạm vi toàn hệ thống" className="vmp-thanh-loc" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 14, padding: "2px 0 8px" }}>
       <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>
       {showPersonSelector ? (
         <label style={{ display: "inline-flex", alignItems: "center", gap: 7, color: C.plumSoft,
