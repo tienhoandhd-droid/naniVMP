@@ -132,11 +132,15 @@ try {
         && background.complete
         && background.naturalWidth > 0,
       spriteLoaded,
+      canvasWidth: canvasRect?.width ?? 0,
       canvasHeight: canvasRect?.height ?? 0,
       raceHeight: raceRect?.height ?? Number.POSITIVE_INFINITY,
       windowHeight: window.innerHeight,
       viewportVerticalOverflow: viewport ? viewport.scrollHeight - viewport.clientHeight : Number.POSITIVE_INFINITY,
+      viewportHorizontalScrollable: viewport ? viewport.scrollWidth > viewport.clientWidth : false,
       densityScale: Number(document.querySelector(".long-mon-race__canvas")?.dataset.densityScale),
+      sceneWidth: Number(document.querySelector(".long-mon-race__canvas")?.dataset.sceneWidth),
+      sceneHeight: Number(document.querySelector(".long-mon-race__canvas")?.dataset.sceneHeight),
     };
   });
 
@@ -152,6 +156,12 @@ try {
   assert.ok(desktop.fishRows.every((fish) => /^\d{4}-\d{2}-\d{2}$/.test(fish.week ?? "")));
   assert.ok(desktop.canvasHeight >= 460 && desktop.canvasHeight <= 640,
     `scene không cố định trong ngưỡng: ${desktop.canvasHeight}px`);
+  assert.equal(desktop.sceneWidth, 1800);
+  assert.ok(desktop.canvasWidth >= desktop.sceneWidth,
+    `hồ nhóm chưa đủ dài: canvas=${desktop.canvasWidth}, model=${desktop.sceneWidth}`);
+  assert.equal(desktop.viewportHorizontalScrollable, true);
+  assert.ok(desktop.canvasHeight >= desktop.sceneHeight,
+    `canvas thấp hơn model: canvas=${desktop.canvasHeight}, model=${desktop.sceneHeight}`);
   assert.ok(desktop.raceHeight <= desktop.windowHeight + 2,
     `Ngư đồ cao quá một màn hình: height=${desktop.raceHeight}, viewport=${desktop.windowHeight}`);
   assert.ok(desktop.viewportVerticalOverflow <= 1,
@@ -190,7 +200,10 @@ try {
     return {
       fishRows,
       overlaps,
+      canvasWidth: document.querySelector(".long-mon-race__canvas")?.getBoundingClientRect().width ?? 0,
       canvasHeight: document.querySelector(".long-mon-race__canvas")?.getBoundingClientRect().height ?? 0,
+      sceneWidth: Number(document.querySelector(".long-mon-race__canvas")?.dataset.sceneWidth),
+      sceneHeight: Number(document.querySelector(".long-mon-race__canvas")?.dataset.sceneHeight),
       verticalOverflow: (() => {
         const viewport = document.querySelector(".long-mon-race__viewport");
         return viewport ? viewport.scrollHeight - viewport.clientHeight : Number.POSITIVE_INFINITY;
@@ -200,6 +213,10 @@ try {
   assert.ok(personal.fishRows.length > 0 && personal.fishRows.length < desktop.fishCount,
     `lọc cá nhân không đổi đàn cá: team=${desktop.fishCount}, personal=${personal.fishRows.length}`);
   assert.deepEqual(personal.overlaps, [], `cá cá nhân còn xếp chồng: ${personal.overlaps.join(", ")}`);
+  assert.equal(personal.sceneWidth, 820);
+  assert.equal(personal.sceneHeight, 520);
+  assert.ok(personal.canvasWidth < desktop.canvasWidth,
+    `hồ cá nhân chưa tự thu gọn: team=${desktop.canvasWidth}, personal=${personal.canvasWidth}`);
   assert.ok(Math.abs(personal.canvasHeight - desktop.canvasHeight) <= 1,
     `đổi scope làm đổi chiều cao scene: team=${desktop.canvasHeight}, personal=${personal.canvasHeight}`);
   assert.ok(personal.verticalOverflow <= 1, `scope cá nhân còn cuộn dọc ${personal.verticalOverflow}px`);
@@ -275,12 +292,12 @@ try {
   assert.deepEqual(mobile.smallFish, []);
   assert.deepEqual(mobile.overlaps, [], `mobile còn xếp chồng: ${mobile.overlaps.join(", ")}`);
   assert.ok(mobile.verticalOverflow <= 1, `mobile còn cuộn dọc ${mobile.verticalOverflow}px`);
-  assert.ok(mobile.canvasWidth >= 880, `scene mobile bị nén: ${mobile.canvasWidth}px`);
+  assert.ok(mobile.canvasWidth >= 1800, `hồ nhóm mobile bị nén: ${mobile.canvasWidth}px`);
   assert.deepEqual(chanNgoai, [], "Long Môn không được gọi network ngoài preview/mock");
   const mobileRace = await page.$(".long-mon-race");
   await mobileRace.screenshot({ path: mobileShot });
 
-  console.log("✓ Long Môn nằm trọn một scene, chia đúng vùng tuần và cá không chồng lấn");
+  console.log("✓ Hồ nhóm dài cố định 1800px, tuần trống co lại và cá không chồng lấn");
   console.log("✓ Admin/Quản lý QA chuyển Cả nhóm/Cá nhân; đàn cá cá nhân tự dàn lại");
   console.log("✓ desktop 1440px và mobile 390px không cuộn dọc; mobile chỉ cuộn ngang trong Ngư đồ");
   console.log(`screenshots:\n- ${desktopShot}\n- ${mobileShot}`);

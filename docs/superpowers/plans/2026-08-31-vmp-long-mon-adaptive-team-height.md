@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Mở rộng chiều cao Ngư đồ Cả nhóm theo mật độ để mọi cá có vị trí hợp lệ và không chồng lấn.
+**Goal:** Mở hồ Cả nhóm dài cố định 1.800px, nén tuần trống và tăng chiều cao dự phòng để mọi cá có vị trí hợp lệ.
 
-**Architecture:** Model trả thêm `sceneHeightPx` và bộ bố trí nhóm tính chiều cao tối thiểu từ số hàng va chạm thay vì bỏ toàn bộ vị trí khi vượt 520px. Component truyền chiều cao qua CSS custom property; cá nhân giữ scene gọn 520px, còn nhóm tăng chiều cao và để trang cuộn tự nhiên.
+**Architecture:** Model trả `sceneWidthPx`/`sceneHeightPx`, cân lại trọng số tuần theo mật độ và dùng nhiều cột trong tuần. Component truyền kích thước qua CSS custom property; nhóm cuộn ngang trên hồ 1.800px, cá nhân giữ scene gọn, chiều cao chỉ tăng khi vẫn thiếu hàng.
 
 **Tech Stack:** React 19, TypeScript, CSS, Node test runner, Puppeteer E2E.
 
@@ -17,19 +17,19 @@
 
 ---
 
-### Task 1: Model chiều cao thích ứng
+### Task 1: Model chiều dài và chiều cao thích ứng
 
 **Files:**
 - Modify: `tests/unit/long-mon-race.test.mjs`
 - Modify: `src/features/monitoring/longMonRaceModel.ts`
 
 **Interfaces:**
-- Produces: `LongMonRaceModel.sceneHeightPx: number`.
+- Produces: `LongMonRaceModel.sceneWidthPx: number` và `sceneHeightPx: number`.
 - Produces: bố trí nhóm có đầy đủ vị trí cho 20, 30 và 40 cá cùng tuần.
 
 - [ ] **Step 1: Viết kiểm thử đỏ**
 
-Thêm fixture 40 cá cùng tuần; kiểm tra `sceneHeightPx > 520`, không có cá ở đồng thời `xPct === 0 && yPct === 0`, và không có cặp va chạm khi dùng chính `sceneHeightPx`.
+Thêm fixture 20/30/40 cá cùng tuần; kiểm tra `sceneWidthPx === 1800`, không có cá ở đồng thời `xPct === 0 && yPct === 0`, và không có cặp va chạm theo kích thước scene. Thêm fixture xác nhận tuần trống hẹp hơn tuần có cá và tổng chiều rộng bằng 100%.
 
 - [ ] **Step 2: Chạy kiểm thử và xác nhận RED**
 
@@ -39,7 +39,7 @@ Expected: FAIL vì `sceneHeightPx` chưa tồn tại hoặc đàn 40 cá còn ch
 
 - [ ] **Step 3: Sửa model tối thiểu**
 
-Cho thuật toán interval-coloring trả cả số hàng. Tính chiều cao nhóm bằng `Math.max(520, rowCount * collisionHeight + (rowCount - 1) * 8)`, dùng chiều cao này khi đặt `yPx/yPct`, và không trả `Map` rỗng do thiếu chiều cao. Cá nhân vẫn đặt trong 520px.
+Đặt chiều rộng nhóm 1.800px; cân trọng số tuần trống/có cá, tạo số cột theo bề rộng tuần, rồi cho interval-coloring trả số hàng. Tính chiều cao nhóm bằng `Math.max(520, rowCount * collisionHeight + (rowCount - 1) * 8)` và không trả `Map` rỗng do thiếu chiều cao.
 
 - [ ] **Step 4: Chạy unit và typecheck**
 
@@ -58,7 +58,7 @@ Expected: 0 fail và exit 0.
 
 **Interfaces:**
 - Consumes: `LongMonRaceModel.sceneHeightPx`.
-- Produces: `--long-mon-scene-height` và `data-scene-height` trên canvas.
+- Produces: `--long-mon-scene-width`, `--long-mon-scene-height`, `data-scene-width` và `data-scene-height` trên canvas.
 
 - [ ] **Step 1: Viết kiểm thử component đỏ**
 

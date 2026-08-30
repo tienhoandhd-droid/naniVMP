@@ -88,10 +88,10 @@ test("tiến độ nhận cả ngày thực tế chuẩn hoá và cờ legacy", 
   );
 });
 
-function overlappingPairs(fish) {
+function overlappingPairs(fish, sceneWidth = SCENE_WIDTH, sceneHeight = SCENE_HEIGHT) {
   const boxes = fish.map((item) => {
-    const centerX = item.xPct / 100 * SCENE_WIDTH;
-    const centerY = item.yPct / 100 * SCENE_HEIGHT;
+    const centerX = item.xPct / 100 * sceneWidth;
+    const centerY = item.yPct / 100 * sceneHeight;
     const width = LONG_MON_COLLISION_WIDTH_PX * item.renderScale;
     const height = LONG_MON_COLLISION_HEIGHT_PX * item.renderScale;
     return {
@@ -113,6 +113,14 @@ function overlappingPairs(fish) {
     }
   }
   return overlaps;
+}
+
+function overlappingPairsInModel(model) {
+  return overlappingPairs(
+    model.fish,
+    model.sceneWidthPx ?? SCENE_WIDTH,
+    model.sceneHeightPx ?? SCENE_HEIGHT,
+  );
 }
 
 test("trường đua dùng đúng ba tháng và chia dòng sông thành vùng tuần", () => {
@@ -145,6 +153,28 @@ test("trường đua dùng đúng ba tháng và chia dòng sông thành vùng tu
   assert.ok(new Set(sameDate.map((fish) => fish.xPct)).size > 1);
 });
 
+test("tuần trống thu hẹp để nhường chiều dài cho tuần có cá", () => {
+  const model = buildLongMonRaceModel(
+    Array.from({ length: 12 }, (_, index) =>
+      activity(`weighted-${index}`, "2026-09-02")),
+    NOW,
+    { audience: "team" },
+  );
+  const occupiedKey = model.fish[0].weekKey;
+  const occupiedWeek = model.weeks.find((week) => week.key === occupiedKey);
+  const emptyFullWeeks = model.weeks.filter((week) =>
+    week.key !== occupiedKey && week.widthPct > 2);
+
+  assert.ok(emptyFullWeeks.length > 0);
+  assert.ok(occupiedWeek.widthPct > Math.max(...emptyFullWeeks.map((week) => week.widthPct)) * 1.35,
+    "tuần có đàn cá phải rộng hơn rõ rệt so với tuần trống");
+  assert.ok(Math.abs(model.weeks.reduce((sum, week) => sum + week.widthPct, 0) - 100) < .001);
+  const todayWeek = model.weeks.find((week) => week.key === "2026-08-31");
+  assert.ok(model.todayPct >= todayWeek.startPct
+    && model.todayPct <= todayWeek.startPct + todayWeek.widthPct,
+  "vạch hôm nay phải đi theo tỷ lệ tuần mới");
+});
+
 test("mười hai cá trong một tuần được xếp linh động mà không va chạm", () => {
   const deadlines = [
     "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03",
@@ -163,7 +193,11 @@ test("mười hai cá trong một tuần được xếp linh động mà không 
     "tọa độ ngang phải phân tán như một đàn cá, không lặp hai cột");
   assert.ok(new Set(model.fish.map((fish) => Math.round(fish.yPct * 10))).size >= 8,
     "tọa độ dọc phải tạo nhiều cao độ thay vì các hàng thẳng");
-  assert.deepEqual(overlappingPairs(model.fish), []);
+  const occupiedWeek = model.weeks.find((week) => week.key === model.fish[0].weekKey);
+  assert.ok(model.fish.every((fish) => fish.xPct >= occupiedWeek.startPct
+    && fish.xPct <= occupiedWeek.startPct + occupiedWeek.widthPct),
+  "tâm cá phải nằm trong đúng vùng tuần sau khi tuần được mở rộng");
+  assert.deepEqual(overlappingPairsInModel(model), []);
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
 });
 
@@ -182,7 +216,7 @@ test("ngày cùng tuần chung vùng, tuần liền kề không va chạm và la
   const groups = Map.groupBy(first.fish, (fish) => fish.deadline);
   assert.equal(groups.get("2026-09-01")[0].weekKey, groups.get("2026-09-06")[0].weekKey);
   assert.notEqual(groups.get("2026-09-06")[0].weekKey, groups.get("2026-09-07")[0].weekKey);
-  assert.deepEqual(overlappingPairs(first.fish), []);
+  assert.deepEqual(overlappingPairsInModel(first), []);
   assert.ok(first.fish.some((fish) => Math.abs(fish.renderRotateDeg) >= .5));
 });
 
@@ -194,7 +228,7 @@ test("hai tuần đông liền kề dùng va chạm toàn cục và không phụ
   const first = buildLongMonRaceModel(input, NOW, { audience: "team" });
   const reversed = buildLongMonRaceModel([...input].reverse(), NOW, { audience: "team" });
 
-  assert.deepEqual(overlappingPairs(first.fish), []);
+  assert.deepEqual(overlappingPairsInModel(first), []);
   assert.deepEqual(
     first.fish.map(({ activity: { id }, xPct, yPct }) => ({ id, xPct, yPct })),
     reversed.fish.map(({ activity: { id }, xPct, yPct }) => ({ id, xPct, yPct })),
@@ -210,20 +244,41 @@ test("bốn mươi tám cá nằm trọn scene cố định", () => {
   const model = buildLongMonRaceModel(input, NOW, { audience: "team" });
 
   assert.equal(model.fish.length, 48);
-  assert.deepEqual(overlappingPairs(model.fish), []);
+  assert.deepEqual(overlappingPairsInModel(model), []);
   assert.ok(model.fish.every((fish) => fish.xPct >= 0 && fish.xPct <= 100));
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
   assert.ok(model.densityScale >= .82 && model.densityScale <= 1);
 });
 
+test("nhóm đông dùng hồ dài cố định và chỉ tăng chiều cao khi vẫn thiếu chỗ", () => {
+  for (const count of [20, 30, 40]) {
+    const model = buildLongMonRaceModel(
+      Array.from({ length: count }, (_, index) =>
+        activity(`dense-${count}-${index}`, "2026-09-02")),
+      NOW,
+      { audience: "team" },
+    );
+
+    assert.equal(model.sceneWidthPx, 1800, `${count} cá phải dùng hồ nhóm dài cố định`);
+    assert.ok(model.sceneHeightPx >= SCENE_HEIGHT,
+      `${count} cá không được làm scene thấp hơn ${SCENE_HEIGHT}px`);
+    assert.equal(model.fish.filter((fish) => fish.xPct === 0 && fish.yPct === 0).length, 0,
+      `${count} cá không được rơi về tọa độ mặc định`);
+    assert.deepEqual(overlappingPairsInModel(model), [],
+      `${count} cá không được chồng sau khi mở rộng scene`);
+  }
+});
+
 test("cá nhân tự bố trí trung tâm, vòng cung và chữ S ổn định", () => {
   const one = buildLongMonRaceModel([activity("solo", "2026-09-05")], NOW, { audience: "personal" });
+  assert.equal(one.sceneWidthPx, SCENE_WIDTH);
+  assert.equal(one.sceneHeightPx, SCENE_HEIGHT);
   assert.ok(one.fish[0].yPct >= 42 && one.fish[0].yPct <= 58);
 
   const fourInput = Array.from({ length: 4 }, (_, index) =>
     activity(`arc-${index}`, `2026-09-0${index + 1}`));
   const four = buildLongMonRaceModel(fourInput, NOW, { audience: "personal" });
-  assert.deepEqual(overlappingPairs(four.fish), []);
+  assert.deepEqual(overlappingPairsInModel(four), []);
   assert.ok(Math.max(...four.fish.map((fish) => fish.yPct))
     - Math.min(...four.fish.map((fish) => fish.yPct)) >= 18);
 
@@ -231,7 +286,7 @@ test("cá nhân tự bố trí trung tâm, vòng cung và chữ S ổn định",
     activity(`s-${index}`, `2026-09-${String(index + 1).padStart(2, "0")}`));
   const ten = buildLongMonRaceModel(tenInput, NOW, { audience: "personal" });
   const team = buildLongMonRaceModel(tenInput, NOW, { audience: "team" });
-  assert.deepEqual(overlappingPairs(ten.fish), []);
+  assert.deepEqual(overlappingPairsInModel(ten), []);
   assert.notDeepEqual(
     ten.fish.map(({ xPct, yPct }) => ({ xPct, yPct })),
     team.fish.map(({ xPct, yPct }) => ({ xPct, yPct })),
@@ -298,7 +353,7 @@ test("nhân viên QA chỉ thấy nhãn Ngư đồ của tôi, không có điề
   assert.doesNotMatch(html, /Chọn người QA/);
 });
 
-test("component truyền audience và dùng scene cố định theo phần trăm", async () => {
+test("component truyền audience và kích thước scene thích ứng", async () => {
   const html = renderToStaticMarkup(React.createElement(LongMonRace, {
     activities: [activity("fixed", "2026-09-05")],
     now: NOW,
@@ -313,12 +368,30 @@ test("component truyền audience và dùng scene cố định theo phần trăm
       onPersonChange: () => {},
     },
   }));
+  const teamHtml = renderToStaticMarkup(React.createElement(LongMonRace, {
+    activities: [activity("team-fixed", "2026-09-05")],
+    now: NOW,
+    onOpen: () => {},
+    scopeControl: {
+      canChooseAudience: true,
+      audience: "team",
+      scopeLabel: "Cả nhóm QA",
+      people: [],
+      selectedPersonId: null,
+      onAudienceChange: () => {},
+      onPersonChange: () => {},
+    },
+  }));
   const source = await readFile(new URL("../../src/features/monitoring/LongMonRace.tsx", import.meta.url), "utf8");
 
-  assert.match(html, /long-mon-race__canvas long-mon-race__canvas--fixed-scene/);
+  assert.match(html, /long-mon-race__canvas long-mon-race__canvas--adaptive-scene/);
   assert.match(html, /data-density-scale="[\d.]+"/);
+  assert.match(html, /data-scene-width="820"/);
+  assert.match(html, /data-scene-height="520"/);
+  assert.match(html, /--long-mon-scene-width:820px/);
+  assert.match(html, /--long-mon-scene-height:520px/);
+  assert.match(teamHtml, /data-scene-width="1800"/);
   assert.match(html, /--long-mon-y:[\d.]+%/);
-  assert.doesNotMatch(html, /class="long-mon-race__canvas[^>]+style="[^"]*height:/);
   assert.match(source, /buildLongMonRaceModel\(activities, now, \{[\s\S]*audience:\s*scopeControl\?\.audience\s*\?\?\s*"team"/);
   assert.doesNotMatch(source, /laneCount\s*\*\s*78/);
 });

@@ -67,6 +67,8 @@ export interface LongMonRaceModel {
   fish: LongMonRaceFish[];
   laneCount: number;
   densityScale: number;
+  sceneWidthPx: number;
+  sceneHeightPx: number;
   todayPct: number | null;
   missingDeadlineCount: number;
   stageCounts: Record<LongMonRaceStage, number>;
@@ -87,6 +89,7 @@ export const LONG_MON_STAGE_META: readonly LongMonStageMeta[] = [
 
 const DAY_MS = 86_400_000;
 const MIN_CANVAS_WIDTH_PX = 820;
+const TEAM_CANVAS_WIDTH_PX = 1800;
 const LONG_MON_SCENE_HEIGHT_PX = 520;
 export const LONG_MON_COLLISION_WIDTH_PX = 84;
 export const LONG_MON_COLLISION_HEIGHT_PX = 78;
@@ -108,6 +111,8 @@ interface PlacementPoint {
 interface PlacementResult {
   positions: Map<string, PlacementPoint>;
   densityScale: number;
+  sceneWidthPx: number;
+  sceneHeightPx: number;
 }
 
 function utcOfIso(date: string): number {
@@ -174,11 +179,32 @@ function rangeAround(now: Date): { start: number; endExclusive: number; today: n
   };
 }
 
-function percentInRange(time: number, start: number, endExclusive: number): number {
-  return Math.max(0, Math.min(100, ((time - start) / (endExclusive - start - DAY_MS)) * 100));
+function percentInWeightedWeeks(
+  time: number,
+  weeks: readonly LongMonWeekBand[],
+  start: number,
+  endExclusive: number,
+): number {
+  if (time <= start) return 0;
+  if (time >= endExclusive) return 100;
+  const week = weeks.find((item) => {
+    const weekStart = utcOfIso(item.key);
+    return time >= Math.max(start, weekStart)
+      && time < Math.min(endExclusive, weekStart + 7 * DAY_MS);
+  });
+  if (!week) return 0;
+  const weekStart = utcOfIso(week.key);
+  const visibleStart = Math.max(start, weekStart);
+  const visibleEnd = Math.min(endExclusive, weekStart + 7 * DAY_MS);
+  const progress = (time - visibleStart) / (visibleEnd - visibleStart);
+  return week.startPct + clamp(progress, 0, 1) * week.widthPct;
 }
 
-function monthBands(start: number, endExclusive: number): LongMonMonthBand[] {
+function monthBands(
+  start: number,
+  endExclusive: number,
+  weeks: readonly LongMonWeekBand[],
+): LongMonMonthBand[] {
   const bands: LongMonMonthBand[] = [];
   for (let index = 0; index < 3; index += 1) {
     const date = new Date(start);
@@ -186,13 +212,15 @@ function monthBands(start: number, endExclusive: number): LongMonMonthBand[] {
     const bandEnd = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + index + 1, 1);
     const month = new Date(bandStart).getUTCMonth() + 1;
     const year = new Date(bandStart).getUTCFullYear();
+    const startPct = percentInWeightedWeeks(bandStart, weeks, start, endExclusive);
+    const endPct = percentInWeightedWeeks(bandEnd, weeks, start, endExclusive);
     bands.push({
       year,
       month,
       label: `Tháng ${month}`,
       shortLabel: `${String(month).padStart(2, "0")}/${year}`,
-      startPct: ((bandStart - start) / (endExclusive - start)) * 100,
-      widthPct: ((bandEnd - bandStart) / (endExclusive - start)) * 100,
+      startPct,
+      widthPct: endPct - startPct,
     });
   }
   return bands;
@@ -245,6 +273,27 @@ function weekBands(start: number, endExclusive: number): LongMonWeekBand[] {
   return weeks;
 }
 
+function weightedWeekBands(
+  weeks: readonly LongMonWeekBand[],
+  counts: ReadonlyMap<string, number>,
+): LongMonWeekBand[] {
+  const rawWidths = weeks.map((week) => {
+    const count = counts.get(week.key) ?? 0;
+    const densityWeight = count === 0
+      ? .58
+      : 1 + Math.min(.8, Math.log2(count + 1) * .16);
+    return week.widthPct * densityWeight;
+  });
+  const total = rawWidths.reduce((sum, width) => sum + width, 0);
+  let cursor = 0;
+  return weeks.map((week, index) => {
+    const widthPct = rawWidths[index] / total * 100;
+    const weighted = { ...week, startPct: cursor, widthPct };
+    cursor += widthPct;
+    return weighted;
+  });
+}
+
 function stableHash(value: string): number {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -295,7 +344,8 @@ function tryTeamPlacement(
   fish: readonly LongMonRaceFish[],
   weeks: readonly LongMonWeekBand[],
   scale: number,
-): Map<string, PlacementPoint> | null {
+  sceneWidthPx: number,
+): PlacementResult | null {
   const groups = new Map<string, LongMonRaceFish[]>();
   for (const item of fish) {
     const group = groups.get(item.weekKey);
@@ -316,27 +366,30 @@ function tryTeamPlacement(
       left.deadline.localeCompare(right.deadline)
       || fishIdentity(left).localeCompare(fishIdentity(right), "vi"));
     const week = weeks[orderedFish[0].weekIndex];
-    const weekCenterPx = (week.startPct + week.widthPct / 2) / 100 * MIN_CANVAS_WIDTH_PX;
-    const weekWidthPx = week.widthPct / 100 * MIN_CANVAS_WIDTH_PX;
-    const xRadius = Math.max(50, weekWidthPx * .95);
-    let leftColumn = clamp(weekCenterPx - xRadius, halfWidth, MIN_CANVAS_WIDTH_PX - halfWidth);
-    let rightColumn = clamp(weekCenterPx + xRadius, halfWidth, MIN_CANVAS_WIDTH_PX - halfWidth);
-    const minimumColumnGap = collisionWidth + 4;
-    if (rightColumn - leftColumn < minimumColumnGap) {
-      if (leftColumn <= halfWidth + .5) {
-        rightColumn = Math.min(MIN_CANVAS_WIDTH_PX - halfWidth, leftColumn + minimumColumnGap);
-      } else {
-        leftColumn = Math.max(halfWidth, rightColumn - minimumColumnGap);
-      }
-    }
-    const flipColumns = stableHash(week.key) % 2;
+    const weekCenterPx = (week.startPct + week.widthPct / 2) / 100 * sceneWidthPx;
+    const weekWidthPx = week.widthPct / 100 * sceneWidthPx;
+    const weekStartPx = week.startPct / 100 * sceneWidthPx;
+    const weekEndPx = weekStartPx + weekWidthPx;
+    const safeWeekStart = Math.max(halfWidth, weekStartPx + halfWidth);
+    const safeWeekEnd = Math.min(sceneWidthPx - halfWidth, weekEndPx - halfWidth);
+    const minColumnX = safeWeekStart <= safeWeekEnd
+      ? safeWeekStart
+      : clamp(weekCenterPx, halfWidth, sceneWidthPx - halfWidth);
+    const maxColumnX = safeWeekStart <= safeWeekEnd ? safeWeekEnd : minColumnX;
+    const maximumColumns = Math.max(
+      1,
+      Math.floor((maxColumnX - minColumnX) / (collisionWidth + 4)) + 1,
+    );
+    const columnCount = Math.min(orderedFish.length, maximumColumns);
+    const columns = Array.from({ length: columnCount }, (_, columnIndex) =>
+      columnCount === 1
+        ? clamp(weekCenterPx, halfWidth, sceneWidthPx - halfWidth)
+        : minColumnX + columnIndex / (columnCount - 1) * (maxColumnX - minColumnX));
+    const columnOffset = stableHash(week.key) % columnCount;
     orderedFish.forEach((item, index) => {
-      const isRight = (index + flipColumns) % 2 === 1;
-      const baseX = orderedFish.length === 1
-        ? clamp(weekCenterPx, halfWidth, MIN_CANVAS_WIDTH_PX - halfWidth)
-        : (isRight ? rightColumn : leftColumn);
+      const baseX = columns[(index + columnOffset) % columnCount];
       const jitter = stableRange(item.activity, `${item.weekKey}:x-column`, -1.5, 1.5);
-      xByIdentity.set(fishIdentity(item), clamp(baseX + jitter, halfWidth, MIN_CANVAS_WIDTH_PX - halfWidth));
+      xByIdentity.set(fishIdentity(item), clamp(baseX + jitter, minColumnX, maxColumnX));
     });
   }
 
@@ -364,29 +417,32 @@ function tryTeamPlacement(
     rowByIdentity.set(fishIdentity(item), row);
   }
 
-  const maxRows = Math.max(1, Math.floor(LONG_MON_SCENE_HEIGHT_PX / collisionHeight));
-  if (rowRights.length > maxRows) return null;
-
   const positions = new Map<string, PlacementPoint>();
+  const sceneHeightPx = Math.max(
+    LONG_MON_SCENE_HEIGHT_PX,
+    rowRights.length * collisionHeight + Math.max(0, rowRights.length - 1) * 8,
+  );
   const rowSpacing = rowRights.length <= 1
     ? 0
-    : (LONG_MON_SCENE_HEIGHT_PX - collisionHeight) / (rowRights.length - 1);
+    : (sceneHeightPx - collisionHeight) / (rowRights.length - 1);
   const spareBetweenRows = Math.max(0, rowSpacing - collisionHeight);
   const waveAmplitude = Math.min(12, spareBetweenRows / 3);
+  const driftAmplitude = Math.min(18, spareBetweenRows / 6);
 
   for (const item of fish) {
     const xPx = xByIdentity.get(fishIdentity(item))!;
     const row = rowByIdentity.get(fishIdentity(item))!;
     const baseY = rowRights.length <= 1
-      ? LONG_MON_SCENE_HEIGHT_PX / 2
+      ? sceneHeightPx / 2
       : halfHeight + row * rowSpacing;
-    const flowY = Math.sin(xPx / MIN_CANVAS_WIDTH_PX * Math.PI * 3.4 + row * .47) * waveAmplitude;
-    const yPx = clamp(baseY + flowY, halfHeight, LONG_MON_SCENE_HEIGHT_PX - halfHeight);
+    const flowY = Math.sin(xPx / sceneWidthPx * Math.PI * 3.4 + row * .47) * waveAmplitude
+      + stableRange(item.activity, "vertical-drift", -driftAmplitude, driftAmplitude);
+    const yPx = clamp(baseY + flowY, halfHeight, sceneHeightPx - halfHeight);
     positions.set(fishIdentity(item), {
       xPx,
       yPx,
       rotateDeg: Number((
-        Math.cos(xPx / MIN_CANVAS_WIDTH_PX * Math.PI * 3.4 + row * .47) * 2.2
+        Math.cos(xPx / sceneWidthPx * Math.PI * 3.4 + row * .47) * 2.2
         + stableRange(item.activity, "pose", -1.4, 1.4)
       ).toFixed(2)),
     });
@@ -394,18 +450,19 @@ function tryTeamPlacement(
 
   const finalRects = [...positions.values()].map((point) => rectAt(point.xPx, point.yPx, scale));
   if (finalRects.some((rect, index) => overlapsAny(rect, finalRects.slice(index + 1)))) return null;
-  return positions;
+  return { positions, densityScale: scale, sceneWidthPx, sceneHeightPx };
 }
 
 function buildTeamPlacement(
   fish: readonly LongMonRaceFish[],
   weeks: readonly LongMonWeekBand[],
+  sceneWidthPx = TEAM_CANVAS_WIDTH_PX,
 ): PlacementResult {
   for (const scale of TEAM_DENSITY_LEVELS) {
-    const positions = tryTeamPlacement(fish, weeks, scale);
-    if (positions) return { positions, densityScale: scale };
+    const placement = tryTeamPlacement(fish, weeks, scale, sceneWidthPx);
+    if (placement) return placement;
   }
-  return { positions: new Map(), densityScale: TEAM_DENSITY_LEVELS.at(-1)! };
+  throw new Error("Không thể bố trí đàn cá Long Môn trong scene thích ứng");
 }
 
 function personalPreferredY(index: number, count: number, activity: Activity): number {
@@ -449,7 +506,7 @@ function tryPersonalPlacement(
   weeks: readonly LongMonWeekBand[],
   scale: number,
 ): Map<string, PlacementPoint> | null {
-  const base = tryTeamPlacement(fish, weeks, scale);
+  const base = tryTeamPlacement(fish, weeks, scale, MIN_CANVAS_WIDTH_PX);
   if (!base) return null;
   const ordered = [...fish].sort((left, right) =>
     left.deadline.localeCompare(right.deadline)
@@ -458,7 +515,7 @@ function tryPersonalPlacement(
   const placedRects: PlacementRect[] = [];
 
   ordered.forEach((item, index) => {
-    const basePoint = base.get(fishIdentity(item));
+    const basePoint = base.positions.get(fishIdentity(item));
     if (!basePoint) return;
     const preferredY = personalPreferredY(index, ordered.length, item.activity);
     const yPx = personalYCandidates(preferredY, scale, item.activity).find((candidateY) =>
@@ -480,27 +537,37 @@ function buildPersonalPlacement(
   fish: readonly LongMonRaceFish[],
   weeks: readonly LongMonWeekBand[],
 ): PlacementResult {
-  if (fish.length > 12) return buildTeamPlacement(fish, weeks);
+  if (fish.length > 12) return buildTeamPlacement(fish, weeks, MIN_CANVAS_WIDTH_PX);
   const preferredScale = fish.length <= 4 ? 1.06 : 1.02;
   for (const scale of [preferredScale, 1, .91, .82]) {
     const positions = tryPersonalPlacement(fish, weeks, scale);
-    if (positions) return { positions, densityScale: scale };
+    if (positions) return {
+      positions,
+      densityScale: scale,
+      sceneWidthPx: MIN_CANVAS_WIDTH_PX,
+      sceneHeightPx: LONG_MON_SCENE_HEIGHT_PX,
+    };
   }
-  const fallback = buildTeamPlacement(fish, weeks);
+  const fallback = buildTeamPlacement(fish, weeks, MIN_CANVAS_WIDTH_PX);
   const reflected = new Map(
     [...fallback.positions].map(([identity, point]) => [identity, {
       ...point,
       yPx: LONG_MON_SCENE_HEIGHT_PX - point.yPx,
     }]),
   );
-  return { positions: reflected, densityScale: fallback.densityScale };
+  return {
+    positions: reflected,
+    densityScale: fallback.densityScale,
+    sceneWidthPx: MIN_CANVAS_WIDTH_PX,
+    sceneHeightPx: LONG_MON_SCENE_HEIGHT_PX,
+  };
 }
 
 function applyPlacement(
   fish: LongMonRaceFish[],
   weeks: readonly LongMonWeekBand[],
   audience: "team" | "personal",
-): { laneCount: number; densityScale: number } {
+): { laneCount: number; densityScale: number; sceneWidthPx: number; sceneHeightPx: number } {
   const weekCounts = new Map<string, number>();
   for (const item of fish) weekCounts.set(item.weekKey, (weekCounts.get(item.weekKey) ?? 0) + 1);
   const placement = audience === "personal"
@@ -510,8 +577,8 @@ function applyPlacement(
   for (const item of fish) {
     const point = placement.positions.get(fishIdentity(item));
     if (!point) continue;
-    item.xPct = point.xPx / MIN_CANVAS_WIDTH_PX * 100;
-    item.yPct = point.yPx / LONG_MON_SCENE_HEIGHT_PX * 100;
+    item.xPct = point.xPx / placement.sceneWidthPx * 100;
+    item.yPct = point.yPx / placement.sceneHeightPx * 100;
     item.yPx = point.yPx;
     item.lane = Math.max(0, Math.round(point.yPx / LONG_MON_COLLISION_HEIGHT_PX));
     item.renderOffsetXPx = 0;
@@ -522,7 +589,12 @@ function applyPlacement(
     item.schoolSize = weekCounts.get(item.weekKey) ?? 1;
   }
 
-  return { laneCount: 1, densityScale: placement.densityScale };
+  return {
+    laneCount: 1,
+    densityScale: placement.densityScale,
+    sceneWidthPx: placement.sceneWidthPx,
+    sceneHeightPx: placement.sceneHeightPx,
+  };
 }
 
 export function buildLongMonRaceModel(
@@ -531,8 +603,8 @@ export function buildLongMonRaceModel(
   options: LongMonRaceLayoutOptions = {},
 ): LongMonRaceModel {
   const { start, endExclusive, today } = rangeAround(now);
-  const weeks = weekBands(start, endExclusive);
-  const weekIndexByKey = new Map(weeks.map((week) => [week.key, week.index]));
+  const baseWeeks = weekBands(start, endExclusive);
+  const weekIndexByKey = new Map(baseWeeks.map((week) => [week.key, week.index]));
   const active = activities.filter(isActive);
   let missingDeadlineCount = 0;
   const candidates: LongMonRaceFish[] = [];
@@ -554,7 +626,7 @@ export function buildLongMonRaceModel(
       stage: longMonStageOf(activity, now),
       weekKey,
       weekIndex,
-      weekLabel: weeks[weekIndex].label,
+      weekLabel: baseWeeks[weekIndex].label,
       xPct: 0,
       yPct: 0,
       yPx: 0,
@@ -575,19 +647,31 @@ export function buildLongMonRaceModel(
       "vi",
     ));
 
-  const { laneCount, densityScale } = applyPlacement(candidates, weeks, options.audience ?? "team");
+  const weekCounts = new Map<string, number>();
+  for (const fish of candidates) {
+    weekCounts.set(fish.weekKey, (weekCounts.get(fish.weekKey) ?? 0) + 1);
+  }
+  const weeks = weightedWeekBands(baseWeeks, weekCounts);
+
+  const { laneCount, densityScale, sceneWidthPx, sceneHeightPx } = applyPlacement(
+    candidates,
+    weeks,
+    options.audience ?? "team",
+  );
 
   const stageCounts = emptyStageCounts();
   for (const fish of candidates) stageCounts[fish.stage] += 1;
 
   return {
-    bands: monthBands(start, endExclusive),
+    bands: monthBands(start, endExclusive, weeks),
     weeks,
     fish: candidates,
     laneCount,
     densityScale,
+    sceneWidthPx,
+    sceneHeightPx,
     todayPct: today >= start && today < endExclusive
-      ? percentInRange(today, start, endExclusive)
+      ? percentInWeightedWeeks(today, weeks, start, endExclusive)
       : null,
     missingDeadlineCount,
     stageCounts,

@@ -167,7 +167,7 @@
 .long-mon-race__viewport {
   position: relative;
   max-height: none;
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: hidden;
   background: #698980;
   scrollbar-color: rgba(237, 227, 198, .68) rgba(29, 57, 50, .2);
@@ -185,9 +185,9 @@
   overflow: hidden;
 }
 
-.long-mon-race__canvas--fixed-scene {
-  width: 100%;
-  height: clamp(460px, 62dvh, 640px);
+.long-mon-race__canvas--adaptive-scene {
+  width: max(100%, var(--long-mon-scene-width));
+  height: max(clamp(460px, 62dvh, 640px), var(--long-mon-scene-height));
 }
 
 .long-mon-race__background,
@@ -645,12 +645,12 @@
   }
 
   .long-mon-race__canvas {
-    width: 880px;
-    min-width: 880px;
+    width: max(880px, var(--long-mon-scene-width));
+    min-width: max(880px, var(--long-mon-scene-width));
   }
 
-  .long-mon-race__canvas--fixed-scene {
-    height: min(62dvh, 560px);
+  .long-mon-race__canvas--adaptive-scene {
+    height: max(min(62dvh, 560px), var(--long-mon-scene-height));
   }
 
   .long-mon-race__viewport {

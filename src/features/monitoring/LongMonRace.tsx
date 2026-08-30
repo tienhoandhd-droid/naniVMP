@@ -49,6 +49,11 @@ type FishStyle = CSSProperties & {
   "--school-rotate": string;
 };
 
+type RaceCanvasStyle = CSSProperties & {
+  "--long-mon-scene-width": string;
+  "--long-mon-scene-height": string;
+};
+
 function spriteStyle(stage: LongMonStageMeta): SpriteStyle {
   return {
     "--long-mon-sprite-x": stage.spriteX,
@@ -72,6 +77,10 @@ export default function LongMonRace({
   });
   const viewportRef = useRef<HTMLDivElement>(null);
   const metaByStage = new Map(LONG_MON_STAGE_META.map((stage) => [stage.id, stage]));
+  const canvasStyle: RaceCanvasStyle = {
+    "--long-mon-scene-width": `${model.sceneWidthPx}px`,
+    "--long-mon-scene-height": `${model.sceneHeightPx}px`,
+  };
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -138,8 +147,11 @@ export default function LongMonRace({
 
       <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="Kéo ngang để xem toàn bộ trường đua trên màn hình hẹp">
         <div
-          className="long-mon-race__canvas long-mon-race__canvas--fixed-scene"
+          className="long-mon-race__canvas long-mon-race__canvas--adaptive-scene"
           data-density-scale={model.densityScale}
+          data-scene-width={model.sceneWidthPx}
+          data-scene-height={model.sceneHeightPx}
+          style={canvasStyle}
         >
           <img className="long-mon-race__background" src={BACKGROUND_URL} alt="" aria-hidden="true" />
           <div className="long-mon-race__wash" aria-hidden="true" />
