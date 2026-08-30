@@ -2,14 +2,20 @@
  *  components/ui/Primitives.jsx — Shared UI Components
  *  Card, Tag, Modal, Donut, KpiCard, Sparkle, Skeleton, etc.
  * ===================================================================== */
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useId } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { C, TEXT, NUM, NUM_HERO, DISPLAY, MO, R, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
 import { ShieldCheck, XCircle } from "lucide-react";
-import ValiIllustration from "../brand/ValiIllustration.tsx";
+import { buildValiBrief } from "../../features/overview/valiBrief.ts";
+
+/* `new URL` để Vite vẫn fingerprint asset, còn Node unit test có thể nạp
+   Primitives mà không phải hiểu định dạng nhị phân WebP. */
+const valiGuide = new URL("../../assets/brand/vali/vali-chibi-guide.webp", import.meta.url).href;
+const valiConcern = new URL("../../assets/brand/vali/vali-chibi-concern.webp", import.meta.url).href;
+const valiCelebrate = new URL("../../assets/brand/vali/vali-chibi-celebrate.webp", import.meta.url).href;
 
 // ======================== SPARKLE ========================
 export function Sparkle({ size = 18, color = C.gold, style }: {
@@ -25,10 +31,17 @@ export function Sparkle({ size = 18, color = C.gold, style }: {
 // ======================== NHẬN XÉT CỦA VALI ========================
 // Mascot manga cũ đã bỏ — Vali editorial nằm ở components/brand/
 // ValiIllustration.tsx (Atelier §5). Ở đây chỉ còn phần lời nhận xét.
+interface CommentaryTally {
+  rate?: number;
+  done?: number;
+  total?: number;
+  todo?: number;
+  over?: number;
+}
+
 interface CommentaryStats {
-  e?: { rate?: number; todo?: number };
-  /* Thống kê hồ sơ — nơi gọi truyền kèm, phần lời nhận xét chưa dùng tới. */
-  d?: unknown;
+  e?: CommentaryTally;
+  d?: CommentaryTally;
   /* Nhận cả số lẫn mảng — tuỳ nơi gọi. */
   overdue?: number | unknown[];
   soon?: number | unknown[];
@@ -36,198 +49,85 @@ interface CommentaryStats {
 }
 
 export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
-  const { e, overdue, soon, mismatched } = stats || {};
+  const { e, d, overdue, soon, mismatched } = stats || {};
   const erate = e?.rate ?? 0;
   const eTodo = e?.todo ?? 0;
   const oCount = typeof overdue === "number" ? overdue : (overdue?.length ?? 0);
   const sCount = typeof soon === "number" ? soon : (soon?.length ?? 0);
   const mCount = typeof mismatched === "number" ? mismatched : (mismatched?.length ?? 0);
 
-  /* Ba trạng thái ngữ nghĩa của Vali (Atelier §5): concern khi dữ liệu
-     cần xử lý, celebrate khi thật sự sạch, guide cho khoảng giữa. */
-  const mood =
-    oCount >= 3 || erate < 30 ? ("concern" as const)
-    : oCount === 0 && erate >= 70 ? ("celebrate" as const)
-    : ("guide" as const);
+  const brief = buildValiBrief({
+    rate: erate,
+    done: e?.done,
+    total: e?.total,
+    todo: eTodo,
+    documentRate: d?.rate,
+    documentDone: d?.done,
+    documentTotal: d?.total,
+    overdue: oCount,
+    soon: sCount,
+    mismatched: mCount,
+  });
+  const mood = brief.mood;
+  const chibiByMood = {
+    guide: valiGuide,
+    concern: valiConcern,
+    celebrate: valiCelebrate,
+  } as const;
 
   /* Lời chào theo giờ. Ở chế độ thanh tra thì thay bằng một câu nêu phạm vi
      — vẫn có một dòng mở đầu, chỉ là không hỏi thăm giờ giấc của người đọc. */
   const thanhTra = laThanhTra();
-  const h = new Date().getHours();
-  let greeting = "Xin chào!";
-  if (thanhTra) greeting = "Tổng hợp tình hình thẩm định";
-  else if (h >= 5 && h < 11) greeting = "Chào buổi sáng!";
-  else if (h >= 11 && h < 13) greeting = "Chúc bữa trưa ngon miệng!";
-  else if (h >= 13 && h < 17) greeting = "Chào buổi chiều!";
-  else if (h >= 17 && h < 22) greeting = "Chào buổi tối!";
-  else greeting = "Khuya rồi nhỉ?";
-
-  // Build danh sách nhận xét theo data
-  const remarks = [];
-  if (oCount === 0) {
-    remarks.push({ tone: "success", text: "Chưa có hồ sơ quá hạn — tuyệt vời!" });
-  } else {
-    remarks.push({
-      tone: "danger",
-      text: `Có ${oCount} hồ sơ quá hạn cần xử lý ngay.`,
-    });
-  }
-  if (sCount > 0) {
-    remarks.push({
-      tone: "warning",
-      text: `${sCount} hồ sơ tới hạn trong 30 ngày, hãy chú ý nhé.`,
-    });
-  }
-  if (erate >= 80) {
-    remarks.push({ tone: "success", text: `Tiến độ ${erate}% — xuất sắc, tiếp tục duy trì!` });
-  } else if (erate >= 50) {
-    remarks.push({ tone: "info", text: `Tiến độ ${erate}% — đang trên đà tốt, cố lên nhé.` });
-  } else if (eTodo > 0) {
-    remarks.push({
-      tone: "warning",
-      text: `Còn ${eTodo} hồ sơ chưa hoàn tất, cần đẩy nhanh tiến độ.`,
-    });
-  }
-  if (mCount > 0) {
-    remarks.push({
-      tone: "info",
-      text: `${mCount} hồ sơ lệch pha — cần kiểm tra đồng bộ.`,
-    });
-  }
-
-  // Closing nudge — tách riêng để có cảm giác kết
-  const closing =
-    erate >= 80 ? "Hãy giữ phong độ này nhé!"
-    : oCount > 0 ? "Mình cùng giải quyết quá hạn trước nhé."
-    : "Hãy tiếp tục duy trì tiến độ nhé!";
-
-  // Token màu cho từng tone
-  /* Bốn sắc thái đi qua token ngữ nghĩa, nên chúng tự đảo đúng ở chế độ
-     tối và không thể lệch khỏi luật màu ở spec §5.3. */
-  const toneColor = {
-    success: { c: "var(--c-mint-text)",     bg: "var(--c-mint-soft)",     icon: "✓" },
-    danger:  { c: "var(--c-rasp-text)",     bg: "var(--c-rasp-soft)",     icon: "!" },
-    warning: { c: "var(--c-marigold-text)", bg: "var(--c-marigold-soft)", icon: "⏱" },
-    info:    { c: "var(--c-sky-text)",      bg: "var(--c-sky-soft)",      icon: "i" },
-  };
 
   return (
-    <div
-      style={{
-        position: "relative",
-        /* Nền dùng ánh ngọc trai của hệ token, không phải ba mã hồng cứng.
-           Bản cũ giữ nguyên màu sáng ở chế độ tối nên thẻ này nằm giữa giao
-           diện tối như một mảnh vá — đúng thứ luật B6 của bộ kiểm thẩm mỹ
-           bắt được. */
-        background: "var(--lp-sheen)",
-        borderRadius: R.md,
-        padding: "22px 22px 22px 24px",
-        border: `1px solid ${C.line}`,
-        boxShadow: "var(--e-low)",
-        overflow: "hidden",
-        display: "flex",
-        gap: 14,
-        alignItems: "stretch",
-        minHeight: 240,
-      }}
-    >
-      {/* LEFT — Speech bubble content */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-        <div>
-          <div style={{
-            fontFamily: TEXT,
-            fontSize: 16,
-            fontWeight: 800,
-            color: C.plum,
-            letterSpacing: "-0.005em",
-          }}>
-            {thanhTra ? "Trợ lý phân tích" : "Công chúa Vali"}
-          </div>
-          <div style={{
-            fontSize: 12,
-            color: C.plumSoft,
-            fontWeight: 600,
-            marginTop: 2,
-          }}>
-            Trợ lý V/Q · Báo cáo nhanh
-          </div>
-        </div>
-
-        {/* Greeting bubble */}
-        <div style={{
-          fontSize: 14,
-          color: C.plum,
-          fontWeight: 600,
-          lineHeight: 1.55,
-        }}>
-          {greeting} Mình đã xem tình hình thẩm định hôm nay rồi đó.
-        </div>
-
-        {/* Remarks list */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
-          {remarks.map((r, i) => {
-            const t = (toneColor as Record<string, { c: string; bg: string; icon: string }>)[r.tone]
-                      || toneColor.info;
-            return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  gap: 9,
-                  alignItems: "flex-start",
-                  fontSize: 12,
-                  color: C.plum,
-                  lineHeight: 1.5,
-                }}
-              >
-                <span
-                  style={{
-                    flexShrink: 0,
-                    width: 18,
-                    height: 18,
-                    borderRadius: 8,
-                    background: t.bg,
-                    color: t.c,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginTop: 1,
-                  }}
-                >
-                  {t.icon}
-                </span>
-                <span style={{ flex: 1 }}>{r.text}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Closing */}
-        <div style={{
-          marginTop: "auto",
-          fontSize: 12,
-          color: C.plum,
-          fontWeight: 700,
-          fontStyle: "italic",
-        }}>
-          {closing}
-        </div>
+    <section className={`vmp-vali-brief vmp-vali-brief--${mood}`}
+      data-vmp-vali-brief="" aria-label="Vali tóm tắt tiến độ">
+      <div className="vmp-vali-brief__chibi">
+        <img src={chibiByMood[mood]} alt={`Công chúa Vali ${brief.moodLabel}`}
+          role="img" aria-label={`Công chúa Vali ${brief.moodLabel}`}
+          data-lp-vali={mood} data-vmp-vali-chibi={mood}
+          width={320} height={400} loading="lazy" decoding="async" />
+        <span>Vali · {brief.moodLabel}</span>
       </div>
 
-      {/* RIGHT — Vali editorial (thay mascot manga cũ). Thân sen mờ chạy
-          sau vùng minh hoạ — vùng này không có dữ liệu nên được phép. */}
-      <div className="lp-art-layer lp-art-layer--lotus-stem" data-lp-art="lotus-stem"
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "center",
-        }}>
-        <ValiIllustration mood={mood} size={150} />
+      <div className="vmp-vali-brief__content">
+        <div className="vmp-vali-brief__eyebrow">Công chúa Vali · Báo cáo tổng hợp</div>
+        <h2 className="vmp-vali-brief__title">
+          {thanhTra ? "Trợ lý phân tích" : "Tình hình thẩm định"}
+        </h2>
+        <p className="vmp-vali-brief__headline">{brief.headline}</p>
+
+        <dl className="vmp-vali-brief__metrics" aria-label="Chỉ số tổng hợp">
+          {brief.metrics.map((metric) => (
+            <div key={metric.kind} data-vmp-vali-metric={metric.kind}
+              className={`vmp-vali-brief__metric vmp-vali-brief__metric--${metric.tone}`}>
+              {/* Chi tiết nằm TRONG <dd>: nhóm dl chỉ được chứa dt/dd
+                  (axe: definition-list, mức serious). Giá trị và dòng chú
+                  vẫn là hai phần tử riêng để CSS giữ nguyên bố cục. */}
+              <dt>{metric.label}</dt>
+              <dd>
+                <b className="vmp-vali-brief__metric-value">{metric.value}</b>
+                <span className="vmp-vali-brief__metric-detail">{metric.detail}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <ul className="vmp-vali-brief__observations" aria-label="Nhận xét bổ sung">
+          {brief.observations.map((item) => (
+            <li key={item.kind} data-vmp-vali-observation={item.kind}
+              className={`vmp-vali-brief__observation vmp-vali-brief__observation--${item.tone}`}>
+              {item.text}
+            </li>
+          ))}
+        </ul>
+
+        <p className="vmp-vali-brief__action" data-vmp-vali-action="">
+          <strong>Ưu tiên</strong>
+          <span>{brief.action}</span>
+        </p>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -319,15 +219,17 @@ export function TableScroll({ children, maxHeight = "68vh", hint = true }: {
   );
 }
 
-export function Card({ children, style, variant = "default", cls = "" }: {
+export function Card({ children, style, variant = "default", cls = "", id }: {
   children?: ReactNode; style?: CSSProperties; variant?: string; cls?: string;
+  /** Neo cho điều hướng trong trang (chỉ mục biên của bề mặt sổ). */
+  id?: string;
 }) {
   const base = variant === "strong" ? cardStrong : variant === "soft" ? cardSoft : cardDefault;
   // vmp-lift-3d: nghiêng rất nhẹ theo con trỏ + bóng hai tầng. Chỉ áp cho THẺ,
   // không áp cho ô số liệu — chữ số bị xô lệch là đọc sai, mà đây là màn để
   // đọc hạn thẩm định. Lớp này tự tắt khi người dùng bật "giảm chuyển động".
   return (
-    <div className={`card fade vmp-lift-3d ${cls}`} style={{ ...base, padding: 24, ...style }}>
+    <div id={id} className={`card fade vmp-lift-3d ${cls}`} style={{ ...base, padding: 24, ...style }}>
       {children}
     </div>
   );
@@ -422,15 +324,66 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: 
   onClose: () => void; title?: ReactNode; icon?: LucideIcon;
   children?: ReactNode; wide?: boolean;
 }) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  useEffect(() => {
+    previouslyFocused.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelector<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    );
+    (focusable ?? dialog)?.focus();
+
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (ev.key !== "Tab" || !dialog) return;
+      const controls = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )];
+      if (!controls.length) {
+        ev.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (ev.shiftKey && document.activeElement === first) {
+        ev.preventDefault();
+        last.focus();
+      } else if (!ev.shiftKey && document.activeElement === last) {
+        ev.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused.current?.focus();
+    };
+  }, []);
+
   return (
     <Portal>
-    <div onClick={onClose} style={{
+    <div onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} style={{
       position: "fixed", inset: 0, zIndex: 999,
       background: "rgba(78,42,78,.48)", backdropFilter: "blur(4px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: 20,
     }}>
-      <div onClick={(e) => e.stopPropagation()} className="vmp-scroll" style={{
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        tabIndex={-1} className="vmp-scroll" style={{
         background: C.pinkMist, borderRadius: 14, padding: 28,
         width: "100%", maxWidth: wide ? 620 : 440,
         maxHeight: "90vh", overflowY: "auto",
@@ -444,10 +397,11 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: 
             }}>
               <Icon size={20} color={C.lavText} />
             </div>
-            <span style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800, color: C.plum }}>{title}</span>
+            <span id={titleId} style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800, color: C.plum }}>{title}</span>
           </div>
-          <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", display: "flex" }}>
-            <XCircle size={22} color={C.plumSoft} />
+          <button type="button" aria-label="Đóng hộp thoại" onClick={onClose}
+            style={{ border: "none", background: "transparent", cursor: "pointer", display: "flex" }}>
+            <XCircle size={22} color={C.plumSoft} aria-hidden="true" />
           </button>
         </div>
         {children}
@@ -490,12 +444,13 @@ export function Donut({ segments, size = 152, stroke = 18 }: {
 }
 
 // ======================== KPI CARD ========================
-export function KpiCard({ emoji, bg, color, value, label, sub, subColor }: {
+export function KpiCard({ emoji, bg, color, value, label, sub, subColor, onClick, pressed }: {
   emoji?: ReactNode; bg?: string; color?: string; value?: ReactNode;
   label?: ReactNode; sub?: ReactNode; subColor?: string;
+  onClick?: () => void; pressed?: boolean;
 }) {
-  return (
-    <Card style={{ textAlign: "center", padding: "22px 18px" }}>
+  const content = (
+    <>
       <div style={{
         width: 52, height: 52, borderRadius: 14, margin: "0 auto 12px",
         background: bg, display: "flex", alignItems: "center", justifyContent: "center",
@@ -508,6 +463,17 @@ export function KpiCard({ emoji, bg, color, value, label, sub, subColor }: {
       </div>
       <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 6 }}>{label}</div>
       {sub && <div style={{ fontSize: 12, color: subColor || C.plumSoft, fontWeight: 700, marginTop: 3 }}>{sub}</div>}
+    </>
+  );
+  return (
+    <Card style={{ textAlign: "center", padding: onClick ? 0 : "22px 18px" }}>
+      {onClick ? (
+        <button type="button" onClick={onClick} aria-pressed={pressed}
+          style={{ width: "100%", padding: "22px 18px", border: "none", background: "transparent",
+                   color: "inherit", cursor: "pointer", font: "inherit", borderRadius: "inherit" }}>
+          {content}
+        </button>
+      ) : content}
     </Card>
   );
 }

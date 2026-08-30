@@ -6,6 +6,7 @@
  *  service. Every wait is DOM/request polling; this suite has no sleeps.
  * ===================================================================== */
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
@@ -28,7 +29,7 @@ const PROTECTED_EVIDENCE = {
 };
 
 const SUPABASE_URL = (() => {
-  const env = readFileSync(new URL("../../.env.local", import.meta.url).pathname, "utf8");
+  const env = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
   const match = env.match(/^VITE_SUPABASE_URL=(.+)$/m);
   if (!match) throw new Error(".env.local thiếu VITE_SUPABASE_URL");
   return match[1].trim();
@@ -115,21 +116,21 @@ async function openPage(browser, {
   });
   await nhetPhien(page, { supabaseUrl: SUPABASE_URL });
   await page.setViewport({ width, height: 900 });
+  /* 31/08: màn Dòng thời gian chỉ còn Ngư đồ Long Môn — không còn nút
+     chuyển workspace hay lưới tháng; hạng mục là một con cá có
+     data-long-mon-code, bấm cá mở modal hồ sơ. */
   await page.goto(`${ROOT_URL}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForFunction(() => [...document.querySelectorAll("button")]
-    .some((button) => button.textContent?.trim() === "Dòng thời gian"), { timeout: 15_000 });
-  await page.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.trim() === "Dòng thời gian")?.click());
-  await page.waitForSelector('[data-timeline-month-action="8"]', { timeout: 15_000 });
-  await page.click('[data-timeline-month-action="8"]');
-  await page.waitForSelector(".timeline-day-row", { timeout: 15_000 });
+  await page.waitForSelector("[data-long-mon-code]", { timeout: 15_000 });
 
   return { page, rpcBodies, rpcNames, externalRequests: chanNgoai };
 }
 
 async function openDialog(page) {
-  await page.evaluate((code) => [...document.querySelectorAll(".timeline-day-row")]
-    .find((row) => row.textContent?.includes(code))?.click(), VALIDATION_CODE);
+  /* click() tổng hợp thay chuột thật: lần mở thứ hai diễn ra khi modal
+     hồ sơ CŨ còn mở — chuột thật sẽ đập vào backdrop, còn click tổng hợp
+     đi thẳng vào con cá và thay `detail` bằng bản ghi đã tải lại. */
+  await page.evaluate((code) => document.querySelector(`[data-long-mon-code="${code}"]`)?.click(),
+    VALIDATION_CODE);
   await page.waitForSelector("[data-timeline-edit-planned-deadlines]", { timeout: 10_000 });
   await page.click("[data-timeline-edit-planned-deadlines]");
   await page.waitForSelector("[data-planned-deadline-dialog]", { timeout: 10_000 });
@@ -227,8 +228,8 @@ for (const { role, width, label } of [
  * clickable manual-write action even when the test build enables the flag. */
 {
   const { page } = await openPage(browser, { role: "qa_staff", width: 1440 });
-  await page.evaluate((code) => [...document.querySelectorAll(".timeline-day-row")]
-    .find((row) => row.textContent?.includes(code))?.click(), VALIDATION_CODE);
+  await page.evaluate((code) => document.querySelectorAll(`[data-long-mon-code="${code}"]`)
+    .forEach((nut) => nut.click()), VALIDATION_CODE);
   await page.waitForFunction(() => document.body.innerText.includes("Chi tiết hạng mục"),
     { timeout: 10_000 });
   check(await page.$("[data-timeline-edit-planned-deadlines]") === null,

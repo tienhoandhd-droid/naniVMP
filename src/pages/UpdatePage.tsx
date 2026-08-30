@@ -1,6 +1,6 @@
 /* UpdatePage.jsx — Cập nhật tiến độ thực tế */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Search } from "lucide-react";
+import { Pencil, Search, SlidersHorizontal, X } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
 import { STATUS, STAGES, PERIODS } from "../constants/vmp.ts";
 import { stageOf, inPeriod, nguoiPhuTrach } from "../utils/helpers.ts";
@@ -8,11 +8,11 @@ import { supabase } from "../lib/supabaseClient.ts";
 import { useDebounce } from "../hooks/index.ts";
 import { Card, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
 import MobileTaskList from "../components/ui/MobileTaskList.tsx";
-import MetricGrid from "../components/ui/MetricGrid.tsx";
 import StateBoundary from "../components/ui/StateBoundary.tsx";
 import { useToast } from "../components/ui/ToastProvider.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import { buildProgressWorkspaceModel } from "../features/progress/progressWorkspaceModel.ts";
+import { countProgressAdvancedFilters, isDetailedProgressFix } from "../features/progress/progressFilterUi.ts";
 import { createVisibleRefreshController } from "../lib/visibleRefresh.ts";
 import {
   createProgressRightsGenerationGate,
@@ -76,6 +76,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
   const [stageF, setStageF] = useState("all");
   /** Lọc nhanh theo lỗi dữ liệu — để không phải dò 461 dòng tìm chỗ thiếu. */
   const [fix, setFix] = useState("all");
+  const [moLocNangCao, setMoLocNangCao] = useState(false);
   const [edit, setEdit] = useState<PlanActivity | null>(null);
   /** Mở hộp bằng đường tắt "✓ Xong bước" — hộp sẽ điền sẵn hôm nay + Hoàn thành. */
   const [quick, setQuick] = useState(false);
@@ -263,6 +264,9 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
   // Đổi bộ lọc thì về trang đầu — không thì đang ở trang 5 mà danh sách mới
   // chỉ có 2 trang, màn hình rỗng và trông như mất dữ liệu.
   useEffect(() => { setTrang(0); }, [stageF, fix, fst, kw, period, hienNgung]);
+  useEffect(() => {
+    if (isDetailedProgressFix(fix)) setMoLocNangCao(true);
+  }, [fix]);
 
   // Phân công vừa bị thu hồi hoặc quyền vừa lỗi: đóng hộp ngay, trước khi nó
   // có thể hiển thị dữ liệu cũ hay gửi một bản nháp cũ.
@@ -310,7 +314,13 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
 
   const clearSearch = () => { setQ(""); setPinnedValidationCode(null); };
   const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all" || hienNgung;
-  const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); clearSearch(); setPeriod("all"); setHienNgung(false); };
+  const clearFilters = () => {
+    setFix("all"); setStageF("all"); setFst("all"); clearSearch(); setPeriod("all"); setHienNgung(false);
+    setMoLocNangCao(false);
+  };
+  const soLocNangCao = countProgressAdvancedFilters({
+    fix, status: fst, stage: stageF, period, showStopped: hienNgung,
+  });
   const linked = conn?.status === "ok";
   const toast = useToast();
   const handleProgressReload = useCallback(async () => {
@@ -332,11 +342,6 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     return () => window.clearTimeout(t);
   }, [pinnedValidationCode, rightsState.status, lat]);
 
-  /* Số "Đang thực hiện" đếm kiểu facet như fixCount — tôn trọng các bộ lọc
-     khác đang bật, nên bấm ô KPI chỉ bật đúng bộ lọc của nó (B2). */
-  const soDangLam = useMemo(() => inWindow.filter((a) => okFix(a) && okStage(a) && okSearch(a) && a.st === "prog").length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [inWindow, stageByItem, stageF, fix, kw, FIXES]);
   const uuTien = model.priorityRows.slice(0, 5);
   /* Không lặp mã khi hạng mục chưa có tên riêng. */
   const tenHangMuc = (r: { validationCode: string; title: string }) => r.title && r.title !== r.validationCode ? ` — ${r.title}` : "";
@@ -357,17 +362,16 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       nhan: model.kpis.completenessPercent >= 90 ? "nhẹ nhõm" : "dẫn đường",
       loi: `Hồ sơ đang sạch: ${inWindow.length} hạng mục trong kỳ, ${model.kpis.completenessPercent}% đủ dữ liệu.` };
   })();
-  const [moChipTrong, setMoChipTrong] = useState(false);
-  const chipCo = Object.entries(FIXES).filter(([k]) => (fixCount[k] || 0) > 0 || fix === k);
-  const chipTrong = Object.entries(FIXES).filter(([k]) => (fixCount[k] || 0) === 0 && fix !== k);
-  const chipLoi = (k: string, v: { label: string; hint: string }) => {
+  const chipLoi = (k: string, v: { label: string; hint: string }, label = v.label, ariaLabel?: string) => {
     const n = fixCount[k] || 0;
     const on = fix === k;
     const nang = k === "done_no_date" || k === "no_deadline";
+    const nhanh = k === "can_xu_ly" ? " pr-chip--quick pr-chip--quick-action"
+      : k === "qua_han" ? " pr-chip--quick pr-chip--quick-overdue" : "";
     return (
       <button key={k} type="button" onClick={() => setFix(on ? "all" : k)} title={v.hint} disabled={n === 0}
-        className={`pr-chip${on ? " is-on" : ""}${nang ? " pr-chip--nang" : ""}`} aria-pressed={on}>
-        {v.label} <span className="pr-chip__so">{n}</span>
+        className={`pr-chip${on ? " is-on" : ""}${nang ? " pr-chip--nang" : ""}${nhanh}`} aria-pressed={on} aria-label={ariaLabel}>
+        {label} <span className="pr-chip__so">{n}</span>
       </button>
     );
   };
@@ -387,7 +391,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         <div className="pr-hero__loi">
           <div className="pr-hero__eyebrow">
             <span>Tiến độ thẩm định</span>
-            <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Đã nối Supabase — ghi được" : "○ Chưa kết nối"}</Tag>
+            {!linked && <Tag color={C.marigoldText} bg={C.marigoldSoft}>○ Chưa kết nối</Tag>}
           </div>
           <p className="hn-loi">{vali.loi}</p>
           <p className="pr-hero__mota">Cập nhật mốc thực tế. Dữ liệu được lưu trực tiếp tại Supabase.</p>
@@ -410,92 +414,69 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         </div>
       </section>
 
-      {/* ---- Thanh tìm + lọc (gọn một khối) ------------------------------ */}
-      <Card cls="pr-loc">
-        <div className="pr-loc__hang">
-          <div className="pr-loc__tim">
-            <Search size={16} color={C.plumSoft} className="pr-loc__kinh" />
-            <input value={q} onChange={(e) => { setQ(e.target.value); setPinnedValidationCode(null); }} placeholder="Tìm theo mã, tên, QA…" aria-label="Tìm theo mã, tên, QA" style={{ ...INP, paddingLeft: 36 }} />
+      {/* ---- Thanh lọc chính + phần nâng cao đóng/mở --------------------- */}
+      <section className="pr-loc" aria-label="Lọc danh sách tiến độ">
+        <Card cls="pr-loc__mat" style={{ padding: 12 }}>
+          <div className="pr-loc__chinh">
+            <div className="pr-loc__tim">
+              <Search size={16} color={C.plumSoft} className="pr-loc__kinh" aria-hidden="true" />
+              <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPinnedValidationCode(null); }}
+                placeholder="Tìm theo mã, tên, QA…" aria-label="Tìm theo mã, tên, QA" style={{ ...INP, minHeight: undefined, paddingLeft: 36 }} />
+            </div>
+            <div className="pr-loc__nhanh" role="group" aria-label="Lọc nhanh tiến độ">
+              {chipLoi("can_xu_ly", FIXES.can_xu_ly, "Cần xử lý", "Chỉ hiện hạng mục cần xử lý")}
+              {chipLoi("qua_han", FIXES.qua_han, "Quá hạn", "Chỉ hiện hạng mục quá hạn")}
+            </div>
+            <button type="button" className={`pr-loc__mo${moLocNangCao ? " is-on" : ""}`}
+              aria-expanded={moLocNangCao} aria-controls="progress-advanced-filters"
+              onClick={() => setMoLocNangCao((open) => !open)}>
+              <SlidersHorizontal size={15} aria-hidden="true" /> Bộ lọc
+              {soLocNangCao > 0 && <span className="pr-loc__badge" aria-label={`${soLocNangCao} bộ lọc nâng cao đang áp dụng`}>{soLocNangCao}</span>}
+            </button>
+            <span className="pr-loc__dem"><b>{list.length}</b>/{inWindow.length} hạng mục</span>
+            {hasFilter && <button type="button" className="pr-loc__xoa" aria-label="Xóa bộ lọc" onClick={clearFilters}>
+              <X size={14} aria-hidden="true" /> Xóa lọc
+            </button>}
           </div>
-          {soNgung > 0 && (
-            <label className={`pr-ngung${hienNgung ? " is-on" : ""}`} title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc">
-              <input type="checkbox" checked={hienNgung} onChange={(e) => setHienNgung(e.target.checked)} />
-              Hiện cả mục đã ngừng ({soNgung})
-            </label>
-          )}
-          <select value={fst} onChange={(e) => setFst(e.target.value)} aria-label="Lọc theo trạng thái" style={{ ...INP, cursor: "pointer", maxWidth: 200 }}>
-            <option value="all">Tất cả trạng thái</option>
-            {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-          <span className="pr-loc__dem"><b>{list.length}</b>/{inWindow.length} hạng mục</span>
-        </div>
-        {/* Cần xử lý — đúng các lỗi mà kiểm tra dữ liệu ở Supabase đang báo.
-            Chip có số 0 gom lại (B4) để thanh còn một dòng. */}
-        <div className="pr-loc__hang pr-loc__hang--chip">
-          <span className="pr-loc__nhan">Cần xử lý</span>
-          <button type="button" onClick={() => setFix("all")} className={`pr-chip pr-chip--tatca${fix === "all" ? " is-on" : ""}`} aria-pressed={fix === "all"}>
-            Tất cả <span className="pr-chip__so">{fixCount.all}</span>
-          </button>
-          {chipCo.map(([k, v]) => chipLoi(k, v))}
-          {chipTrong.length > 0 && (
-            <button type="button" className="pr-chip pr-chip--mo" aria-expanded={moChipTrong} onClick={() => setMoChipTrong((o) => !o)}>
-              {moChipTrong ? "Ẩn" : `+${chipTrong.length}`} bộ lọc trống
-            </button>
-          )}
-          {moChipTrong && chipTrong.map(([k, v]) => chipLoi(k, v))}
-        </div>
-        {fix !== "all" && (
-          <div className="pr-loc__goi-y">{FIXES[fix as keyof typeof FIXES].hint}. Bấm <b>Cập nhật</b> ở từng dòng để điền.</div>
-        )}
-      </Card>
 
-      {/* ---- Bốn KPI Lotus: MỘT ô hero (Cần xử lý), ba ô nền. Số đếm kiểu
-          facet nên bấm ô chỉ bật/tắt đúng bộ lọc của ô đó (B2). ---------- */}
-      <MetricGrid
-        label="Tiến độ thẩm định"
-        items={[
-          { id: "dang", label: "Đang thực hiện", value: soDangLam,
-            priority: "supporting", hint: "trạng thái Đang thực hiện — bấm để lọc",
-            selected: fst === "prog",
-            onActivate: () => setFst(fst === "prog" ? "all" : "prog") },
-          { id: "can-xu-ly", label: "Cần xử lý", value: fixCount.can_xu_ly || 0,
-            priority: "hero", tone: "warning",
-            hint: "hồ sơ thiếu hoặc lệch — bấm để lọc đúng các dòng này",
-            selected: fix === "can_xu_ly",
-            onActivate: () => setFix(fix === "can_xu_ly" ? "all" : "can_xu_ly") },
-          { id: "qua-han", label: "Quá hạn", value: fixCount.qua_han || 0,
-            priority: "supporting", tone: "danger",
-            hint: "mốc chưa xong gần nhất đã qua",
-            selected: fix === "qua_han",
-            onActivate: () => setFix(fix === "qua_han" ? "all" : "qua_han") },
-          { id: "hoan-thien", label: "Độ hoàn thiện dữ liệu",
-            value: `${model.kpis.completenessPercent}%`,
-            priority: "supporting",
-            tone: model.kpis.completenessPercent >= 90 ? "success" : "info",
-            hint: "người phụ trách · deadline · ngày thực tế khi đã xong" },
-        ]}
-      />
-
-      {/* ---- Giai đoạn + kỳ: một hàng chip ngay trên bảng (B3) ------------ */}
-      <div className="pr-giai-doan" aria-label="Lọc theo giai đoạn và kỳ">
-        <div className="pr-giai-doan__nhom">
-          <span className="pr-loc__nhan">Giai đoạn</span>
-          <button type="button" onClick={() => setStageF("all")} className={`pr-chip pr-chip--tatca${stageF === "all" ? " is-on" : ""}`} aria-pressed={stageF === "all"}>
-            Tất cả <span className="pr-chip__so">{stageCount.all}</span>
-          </button>
-          {STAGES.map((s) => { const n = stageCount[s.id] || 0; const on = stageF === s.id; return (
-            <button key={s.id} type="button" onClick={() => setStageF(on ? "all" : s.id)} disabled={n === 0 && !on} aria-pressed={on}
-              title={n === 0 ? `Không có hạng mục nào đang ở "${s.label}" với bộ lọc hiện tại.` : `${n} hạng mục · bấm để lọc`}
-              className={`pr-chip${on ? " is-on" : ""}`} style={on ? { background: s.color, borderColor: s.color } : { color: s.color }}>
-              {s.label} <span className="pr-chip__so">{n}</span>
-            </button>
-          ); })}
-        </div>
-        <div className="pr-giai-doan__nhom pr-giai-doan__ky">
-          <span className="pr-loc__nhan">Kỳ</span>
-          {PERIODS.map(([id, lb]) => <button key={id} type="button" onClick={() => setPeriod(id)} className={`pr-chip${period === id ? " is-on" : ""}`} aria-pressed={period === id}>{lb}</button>)}
-        </div>
-      </div>
+          <div id="progress-advanced-filters" className="pr-loc__nang-cao" hidden={!moLocNangCao}>
+            <div className="pr-loc__truong-grid">
+              <label className="pr-loc__truong"><span>Trạng thái</span>
+                <select value={fst} onChange={(e) => setFst(e.target.value)} aria-label="Lọc theo trạng thái" style={{ ...INP, minHeight: undefined, cursor: "pointer" }}>
+                  <option value="all">Mọi trạng thái</option>
+                  {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </label>
+              <label className="pr-loc__truong"><span>Giai đoạn</span>
+                <select value={stageF} onChange={(e) => setStageF(e.target.value)} aria-label="Lọc theo giai đoạn" style={{ ...INP, minHeight: undefined, cursor: "pointer" }}>
+                  <option value="all">Mọi giai đoạn ({stageCount.all})</option>
+                  {STAGES.map((s) => <option key={s.id} value={s.id} disabled={(stageCount[s.id] || 0) === 0 && stageF !== s.id}>{s.label} ({stageCount[s.id] || 0})</option>)}
+                </select>
+              </label>
+              <label className="pr-loc__truong"><span>Kỳ</span>
+                <select value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Lọc theo kỳ" style={{ ...INP, minHeight: undefined, cursor: "pointer" }}>
+                  {PERIODS.map(([id, lb]) => <option key={id} value={id}>{lb}</option>)}
+                </select>
+              </label>
+              {soNgung > 0 && (
+                <label className={`pr-ngung${hienNgung ? " is-on" : ""}`} title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc">
+                  <input type="checkbox" checked={hienNgung} onChange={(e) => setHienNgung(e.target.checked)} />
+                  Hiện mục đã ngừng ({soNgung})
+                </label>
+              )}
+            </div>
+            <fieldset className="pr-loc__loi-chi-tiet">
+              <legend>Vấn đề chi tiết</legend>
+              <div className="pr-loc__chip-grid">
+                {(["done_no_date", "no_deadline", "no_owner", "mismatch"] as const).map((key) => chipLoi(key, FIXES[key]))}
+              </div>
+            </fieldset>
+            {isDetailedProgressFix(fix) && (
+              <div className="pr-loc__goi-y">{FIXES[fix as keyof typeof FIXES].hint}. Bấm <b>Cập nhật</b> ở từng dòng để điền.</div>
+            )}
+          </div>
+        </Card>
+      </section>
 
       {/* ---- Quyền đang nạp / lỗi: giữ nguyên bộ lọc phía trên, chỉ vùng
           bảng đổi (B6). Không dùng quyền cũ trong khoảng trống hai lần nạp. */}
@@ -512,23 +493,28 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
 
       {isRightsReady && <Card style={{ padding: 0, overflow: "hidden" }} cls="vmp-chi-desktop pr-bang">
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-          <table className="pr-table" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720 }}>
+          <table className="pr-table" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
             <thead><tr>
-              {["Mã", "Tên", "Loại", "QA", "Deadline", "Giai đoạn", "Trạng thái", ""].map((h, i) => <th key={i} className={i > 4 ? "pr-th pr-th--giua" : "pr-th"}>{h}</th>)}
+              {["Hạng mục", "Loại", "QA", "Mốc & hạn", "Trạng thái", "Cập nhật"].map((h, i) => (
+                <th key={h} scope="col" className={i > 3 ? "pr-th pr-th--giua" : "pr-th"}>{h}</th>
+              ))}
             </tr></thead>
             <tbody>
               {lat.map((a) => { const validationCode = progressValidationCode(a); const sg = STAGES.find((s) => s.id === stageByItem.get(validationCode)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; const tenRieng = a.name && a.name !== a.code ? a.name : ""; return (
-                <tr key={validationCode} data-progress-item={validationCode} className={`pr-row${isFrozen ? " pr-row--dong-bang" : ""}${pinnedValidationCode === validationCode ? " pr-row--focus" : ""}`}>
-                  <td className="pr-td"><span className="pr-ma">{a.code}</span></td>
-                  <td className="pr-td pr-td--ten">
-                    {tenRieng ? tenRieng : <span className="pr-td__trong">—</span>}
-                    {/* S3-G: badge Không áp dụng / Đã hủy */}
-                    {isFrozen && <div style={{ marginTop: 4 }}><StateBadge state={String(itemState)} small /></div>}
+                <tr key={validationCode} data-progress-item={validationCode}
+                  data-needs-action={maCanXuLy.has(validationCode)} data-overdue={maQuaHan.has(validationCode)}
+                  className={`pr-row${isFrozen ? " pr-row--dong-bang" : ""}${pinnedValidationCode === validationCode ? " pr-row--focus" : ""}`}>
+                  <td className="pr-td pr-td--hang-muc">
+                    <span className="pr-ma">{a.code}</span>
+                    <span className={tenRieng ? "pr-ten" : "pr-td__trong"}>{tenRieng || "Chưa đặt tên riêng"}</span>
+                    {isFrozen && <span className="pr-hang-muc__state"><StateBadge state={String(itemState)} small /></span>}
                   </td>
-                  <td className="pr-td"><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag></td>
+                  <td className="pr-td pr-td--phu">{a.vtype}</td>
                   <td className="pr-td pr-td--phu">{nguoiPhuTrach(a.owner)}</td>
-                  <td className="pr-td pr-td--so">{a.target ? a.target.split("-").reverse().join("/") : "—"}</td>
-                  <td className="pr-td pr-td--giua">{sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}</td>
+                  <td className="pr-td pr-td--moc">
+                    <span className="pr-moc__giai-doan">{sg ? sg.label : "Chưa xác định mốc"}</span>
+                    <span className="pr-moc__han">{a.target ? `Hạn ${a.target.split("-").reverse().join("/")}` : "Chưa có hạn"}</span>
+                  </td>
                   <td className="pr-td pr-td--giua"><Pill s={a.st} small /></td>
                   <td className="pr-td pr-td--giua">
                     {/* Một nút chính mỗi dòng (B5); đường tắt "✓ Xong bước" hiện
@@ -552,7 +538,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
               {/* Rỗng thì nói RÕ vì sao rỗng và bộ lọc nào đang bật — và luôn
                   có một lối đi tiếp (B7). */}
               {!list.length && (
-                <tr><td colSpan={8} className="pr-trong">
+                <tr><td colSpan={6} className="pr-trong">
                   {hasFilter ? (
                     <>
                       Không có hạng mục nào khớp bộ lọc đang bật:

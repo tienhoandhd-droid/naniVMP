@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680">
+  <defs>
+    <linearGradient id="or-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdfb"/><stop offset=".58" stop-color="#f9f3f1"/><stop offset="1" stop-color="#efe5e5"/></linearGradient>
+    <radialGradient id="or-dial"><stop stop-color="#fffefd"/><stop offset=".72" stop-color="#fbf5f4"/><stop offset="1" stop-color="#eadde1"/></radialGradient>
+    <linearGradient id="or-gold"><stop stop-color="#f4dda2"/><stop offset=".42" stop-color="#b8832f"/><stop offset="1" stop-color="#e9c871"/></linearGradient>
+    <linearGradient id="or-rasp" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#cb5874"/><stop offset="1" stop-color="#94334f"/></linearGradient>
+    <linearGradient id="or-marigold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#efc36a"/><stop offset="1" stop-color="#a9701e"/></linearGradient>
+    <linearGradient id="or-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b8cadb"/><stop offset="1" stop-color="#7894aa"/></linearGradient>
+    <filter id="or-shadow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur in="SourceAlpha" stdDeviation="14" result="blur"/><feOffset dy="10" result="offset"/><feFlood flood-color="#4d273f" flood-opacity=".18" result="color"/><feComposite in="color" in2="offset" operator="in" result="shadow"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <path id="or-track" d="M361.8 184.4 A170 170 0 0 1 438.2 184.4 L421.6 256.5 A96 96 0 0 0 378.4 256.5Z"/>
+    <path id="or-short" d="M375.3 242.9 A110 110 0 0 1 424.7 242.9 L421.6 256.5 A96 96 0 0 0 378.4 256.5Z"/>
+    <path id="or-one" d="M376.8 249.6 A103 103 0 0 1 423.2 249.6 L421.6 256.5 A96 96 0 0 0 378.4 256.5Z"/>
+    <path id="or-medium" d="M372.3 229.8 A124 124 0 0 1 427.7 229.8 L421.6 256.5 A96 96 0 0 0 378.4 256.5Z"/>
+    <path id="or-max" d="M361.8 184.4 A170 170 0 0 1 438.2 184.4 L421.6 256.5 A96 96 0 0 0 378.4 256.5Z"/>
+  </defs>
+  <rect width="1200" height="680" rx="34" fill="url(#or-bg)"/>
+  <path d="M0 112C128 54 202 83 316 0H0Z" fill="#f3dfe6" opacity=".4"/><path d="M1200 544c-116 30-180 75-254 136h254Z" fill="#e1ebe3" opacity=".65"/>
+  <g opacity=".2" fill="none" stroke="#866274"><path d="M24 612c93-82 175-73 241-8 55 55 113 64 194 15"/><path d="M18 635c101-79 180-63 243-2 57 55 119 59 199 6"/></g>
+  <text x="62" y="62" fill="#87556f" font-family="Segoe UI,sans-serif" font-size="15" font-weight="750" letter-spacing="4">BẢN GỐC TINH CHỈNH · VÒNG NĂM 2026</text>
+  <text x="62" y="94" fill="#47333f" font-family="Georgia,serif" font-size="22" font-style="italic">Giữ nguyên 12 cánh dữ liệu — chỉ làm sáng, sâu và dễ đọc hơn.</text>
+
+  <g filter="url(#or-shadow)">
+    <circle cx="400" cy="350" r="193" fill="#fffaf8" stroke="url(#or-gold)" stroke-width="1.5"/>
+    <circle cx="400" cy="350" r="181" fill="none" stroke="#8a6478" stroke-opacity=".14" stroke-dasharray="2 8"/>
+    <g fill="#e8dfe3" opacity=".52">
+      <use href="#or-track"/><use href="#or-track" transform="rotate(30 400 350)"/><use href="#or-track" transform="rotate(60 400 350)"/><use href="#or-track" transform="rotate(90 400 350)"/><use href="#or-track" transform="rotate(120 400 350)"/><use href="#or-track" transform="rotate(150 400 350)"/><use href="#or-track" transform="rotate(180 400 350)"/><use href="#or-track" transform="rotate(210 400 350)"/><use href="#or-track" transform="rotate(240 400 350)"/><use href="#or-track" transform="rotate(270 400 350)"/><use href="#or-track" transform="rotate(300 400 350)"/><use href="#or-track" transform="rotate(330 400 350)"/>
+    </g>
+    <g stroke="#fff" stroke-width="1"><use href="#or-short" fill="url(#or-rasp)"/><use href="#or-medium" fill="url(#or-rasp)" transform="rotate(180 400 350)"/><use href="#or-max" fill="url(#or-marigold)" transform="rotate(210 400 350)"/><use href="#or-short" fill="url(#or-sky)" transform="rotate(240 400 350)"/><use href="#or-short" fill="url(#or-sky)" transform="rotate(270 400 350)"/><use href="#or-short" fill="url(#or-sky)" transform="rotate(300 400 350)"/><use href="#or-one" fill="url(#or-sky)" transform="rotate(330 400 350)"/></g>
+    <circle cx="400" cy="350" r="97" fill="url(#or-dial)" stroke="#c49a50" stroke-width="2"/>
+    <circle cx="400" cy="350" r="88" fill="none" stroke="#b8832f" stroke-opacity=".25" stroke-dasharray="2 6"/>
+  </g>
+  <g stroke="#72415f" stroke-linecap="round"><line x1="361" y1="417" x2="310" y2="505" stroke-width="2"/><circle cx="310" cy="505" r="4" fill="#a83759" stroke="white" stroke-width="1.5"/></g>
+
+  <g font-family="Segoe UI,sans-serif" text-anchor="middle">
+    <g transform="translate(400 139)"><text fill="#704b61" font-size="12" font-weight="700">T1</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">2</text></g>
+    <g transform="translate(506 167)"><text fill="#704b61" font-size="12" font-weight="700">T2</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">0</text></g>
+    <g transform="translate(583 244)"><text fill="#704b61" font-size="12" font-weight="700">T3</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">0</text></g>
+    <g transform="translate(611 350)"><text fill="#704b61" font-size="12" font-weight="700">T4</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">0</text></g>
+    <g transform="translate(583 456)"><text fill="#704b61" font-size="12" font-weight="700">T5</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">0</text></g>
+    <g transform="translate(506 533)"><text fill="#704b61" font-size="12" font-weight="700">T6</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">0</text></g>
+    <g transform="translate(400 561)"><text fill="#704b61" font-size="12" font-weight="700">T7</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">4</text></g>
+    <g transform="translate(292 536)"><rect x="-30" y="-22" width="60" height="49" rx="19" fill="#a83759" stroke="#efcf84" stroke-width="2"/><text y="-3" fill="#fff" font-size="11" font-weight="750">T8</text><text y="17" fill="#fff" font-size="16" font-weight="850">11</text></g>
+    <g transform="translate(217 456)"><text fill="#704b61" font-size="12" font-weight="700">T9</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">2</text></g>
+    <g transform="translate(189 350)"><text fill="#704b61" font-size="12" font-weight="700">T10</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">2</text></g>
+    <g transform="translate(217 244)"><text fill="#704b61" font-size="12" font-weight="700">T11</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">2</text></g>
+    <g transform="translate(294 167)"><text fill="#704b61" font-size="12" font-weight="700">T12</text><text y="19" fill="#3f3039" font-size="15" font-weight="850">1</text></g>
+  </g>
+  <g text-anchor="middle"><text x="400" y="340" fill="#4b2f40" font-family="Georgia,serif" font-size="55">0%</text><path d="M360 356h80" stroke="#c39642"/><text x="400" y="383" fill="#6f5263" font-family="Segoe UI,sans-serif" font-size="13" font-weight="800" letter-spacing="2">HOÀN THÀNH VMP</text><text x="400" y="407" fill="#8e7a86" font-family="Segoe UI,sans-serif" font-size="12">trên 24 hạng mục</text></g>
+
+  <g transform="translate(739 150)">
+    <text fill="#a6762b" font-family="Segoe UI,sans-serif" font-size="12" font-weight="800" letter-spacing="3">BÁO CÁO NĂM</text>
+    <text y="47" fill="#3d2d36" font-family="Georgia,serif" font-size="37">Tiến độ thẩm định 2026</text><text y="78" fill="#786872" font-family="Segoe UI,sans-serif" font-size="15">24 hạng mục trong kế hoạch năm</text>
+    <g transform="translate(0 122)" font-family="Segoe UI,sans-serif"><rect width="390" height="265" rx="28" fill="#ffffff" fill-opacity=".76" stroke="#e1d2d8"/><g transform="translate(28 32)"><circle cx="12" cy="16" r="7" fill="#357a66"/><text x="34" y="21" fill="#5c4c55" font-size="15" font-weight="650">Hoàn thành</text><text x="332" y="25" text-anchor="end" fill="#357a66" font-family="Georgia,serif" font-size="31" font-weight="700">0</text></g><path d="M28 88h334" stroke="#e5dbe0"/><g transform="translate(28 119)"><circle cx="12" cy="16" r="7" fill="#af3c5e"/><text x="34" y="21" fill="#5c4c55" font-size="15" font-weight="650">Quá hạn</text><text x="332" y="25" text-anchor="end" fill="#af3c5e" font-family="Georgia,serif" font-size="31" font-weight="700">15</text></g><path d="M28 176h334" stroke="#e5dbe0"/><g transform="translate(28 207)"><circle cx="12" cy="16" r="7" fill="#99671e"/><text x="34" y="21" fill="#5c4c55" font-size="15" font-weight="650">Chưa hoàn thành</text><text x="332" y="25" text-anchor="end" fill="#99671e" font-family="Georgia,serif" font-size="31" font-weight="700">9</text></g></g>
+    <g transform="translate(0 424)" font-family="Segoe UI,sans-serif"><circle cx="7" cy="6" r="6" fill="#357a66"/><text x="22" y="11" fill="#695863" font-size="13">Đã xong</text><circle cx="104" cy="6" r="6" fill="#af3c5e"/><text x="119" y="11" fill="#695863" font-size="13">Đã tới hạn</text><circle cx="228" cy="6" r="6" fill="#809caf"/><text x="243" y="11" fill="#695863" font-size="13">Chưa tới hạn</text></g>
+    <path d="M0 475h390" stroke="#d9cbd1"/><text y="509" fill="#675762" font-family="Segoe UI,sans-serif" font-size="14">Tháng trọng tâm</text><text x="390" y="509" text-anchor="end" fill="#a83759" font-family="Segoe UI,sans-serif" font-size="14" font-weight="800">T8 · 11 hạng mục</text>
+  </g>
+</svg>

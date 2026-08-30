@@ -14,8 +14,9 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Radar, RefreshCw, AlertTriangle, CheckCircle2, Bell, Gauge, PlayCircle,
+  ClipboardCheck, Clock, FileCheck2,
 } from "lucide-react";
-import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
+import { C, TEXT, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag, KpiCard, TableScroll } from "../components/ui/Primitives.tsx";
 import {
   fetchDashboardKpi, checkDataQuality, fetchDueAlerts, refreshComputedStatus,
@@ -123,19 +124,19 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
         {kpi && (
           <div style={{ display: "grid", gap: 12,
                         gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-            <KpiCard emoji="📋" bg={C.mintSoft} color={C.mintText}
+            <KpiCard emoji={<ClipboardCheck size={22} aria-hidden="true" />} bg={C.mintSoft} color={C.mintText}
               value={`${kpi.validation.done}/${kpi.validation.total}`}
               label="Hạng mục hoàn thành"
               sub={`${Math.round((kpi.validation.done / Math.max(1, kpi.validation.total)) * 100)}%`}
               subColor={C.mintText} />
-            <KpiCard emoji="⏰" bg={C.raspSoft} color={C.raspText}
+            <KpiCard emoji={<Clock size={22} aria-hidden="true" />} bg={C.raspSoft} color={C.raspText}
               value={kpi.validation.over} label="Hạng mục quá hạn"
               sub={`${kpi.validation.todo} chưa làm`} subColor={C.plumSoft} />
-            <KpiCard emoji="📄" bg={C.skySoft} color={C.skyText}
+            <KpiCard emoji={<FileCheck2 size={22} aria-hidden="true" />} bg={C.skySoft} color={C.skyText}
               value={`${kpi.documentation.done}/${kpi.documentation.total}`}
               label="Hồ sơ hoàn thành"
               sub={`${kpi.documentation.over} quá hạn`} subColor={C.raspText} />
-            <KpiCard emoji="⚠️" bg={C.marigoldSoft} color={C.marigoldText}
+            <KpiCard emoji={<AlertTriangle size={22} aria-hidden="true" />} bg={C.marigoldSoft} color={C.marigoldText}
               value={kpi.mismatch_count} label="Bản ghi lệch trạng thái"
               sub="cần rà lại" subColor={C.plumSoft} />
           </div>
@@ -168,14 +169,17 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
         </div>
 
         <TableScroll maxHeight="46vh">
-          <table style={{ width: "100%", fontFamily: TEXT, fontSize: 12 }}>
+          {/* Bề mặt sổ (analysis.css): kẻ dòng, tiêu đề dính khi cuộn dọc,
+              mã thẩm định là tiêu đề dòng và dính khi cuộn ngang. */}
+          <table className="reg-table">
+            <caption>
+              Hạng mục quá hạn hoặc đến hạn trong {soonDays} ngày tới, máy chủ rà trực tiếp trên DB.
+            </caption>
             <thead>
               <tr>
                 {["Loại", "Mã thẩm định", "Đối tượng", "Bộ phận", "Giai đoạn", "Hạn", "Còn/Trễ", "Phụ trách"]
                   .map((h, i) => (
-                    <th key={h} className={i === 1 ? "vmp-col-pin" : undefined}
-                        style={{ textAlign: "left", padding: "9px 8px", whiteSpace: "nowrap",
-                                 color: C.plum, fontWeight: 800 }}>{h}</th>
+                    <th key={h} scope="col" data-reg-stick={i === 1 ? true : undefined}>{h}</th>
                   ))}
               </tr>
             </thead>
@@ -183,26 +187,23 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
               {alerts.map((a) => {
                 const over = a.alert_type === "overdue";
                 return (
-                  <tr key={`${a.validation_code}-${a.stage}`} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
-                    <td style={{ padding: "8px" }}>
+                  <tr key={`${a.validation_code}-${a.stage}`}>
+                    <td>
                       <Tag color={over ? C.raspText : C.marigoldText}
                            bg={over ? C.raspSoft : C.marigoldSoft}>
                         {over ? "quá hạn" : "sắp tới"}
                       </Tag>
                     </td>
-                    <td className="vmp-col-pin"
-                        style={{ padding: "8px", fontWeight: 700, color: C.plum, whiteSpace: "nowrap" }}>
-                      {a.validation_code}
-                    </td>
-                    <td style={{ padding: "8px", color: C.plumSoft }}>{a.object_name || a.object_code}</td>
-                    <td style={{ padding: "8px", color: C.plumSoft }}>{a.department || "—"}</td>
-                    <td style={{ padding: "8px", color: C.plumSoft, whiteSpace: "nowrap" }}>{a.stage}</td>
-                    <td style={{ padding: "8px", color: C.plumSoft, whiteSpace: "nowrap" }}>{a.due_date}</td>
-                    <td style={{ padding: "8px", fontFamily: NUM, fontWeight: 800,
-                                 color: over ? C.raspText : C.marigoldText, whiteSpace: "nowrap" }}>
+                    <th scope="row" data-reg-stick>{a.validation_code}</th>
+                    <td className="reg-muted">{a.object_name || a.object_code}</td>
+                    <td className="reg-muted">{a.department || "—"}</td>
+                    <td className="reg-muted" style={{ whiteSpace: "nowrap" }}>{a.stage}</td>
+                    <td className="reg-muted" style={{ whiteSpace: "nowrap" }}>{a.due_date}</td>
+                    <td className="reg-num" style={{ textAlign: "start",
+                                 color: over ? C.raspText : C.marigoldText, fontWeight: 800 }}>
                       {over ? `trễ ${Math.abs(a.days_left)}` : `còn ${a.days_left}`} ngày
                     </td>
-                    <td style={{ padding: "8px", color: C.plumSoft }}>{a.owner_name || "—"}</td>
+                    <td className="reg-muted">{a.owner_name || "—"}</td>
                   </tr>
                 );
               })}

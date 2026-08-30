@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 import { CHROME, CHROME_GL_ARGS } from "./chrome-path.mjs";
@@ -10,7 +11,7 @@ const GOC = "http://127.0.0.1:4173";
 await choServer(GOC);
 
 const URL_SB = (() => {
-  const noi = readFileSync(new URL("../../.env.local", import.meta.url).pathname, "utf8");
+  const noi = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
   const match = noi.match(/^VITE_SUPABASE_URL=(.+)$/m);
   if (!match) throw new Error(".env.local thiếu VITE_SUPABASE_URL");
   return match[1].trim();

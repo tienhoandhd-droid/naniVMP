@@ -89,11 +89,12 @@ export const LONG_MON_STAGE_META: readonly LongMonStageMeta[] = [
 
 const DAY_MS = 86_400_000;
 const MIN_CANVAS_WIDTH_PX = 820;
-const TEAM_CANVAS_WIDTH_PX = 1800;
-const LONG_MON_SCENE_HEIGHT_PX = 520;
-export const LONG_MON_COLLISION_WIDTH_PX = 84;
-export const LONG_MON_COLLISION_HEIGHT_PX = 78;
-const TEAM_DENSITY_LEVELS = [1, .91, .82] as const;
+const TEAM_CANVAS_WIDTH_PX = 960;
+const LONG_MON_SCENE_HEIGHT_PX = 560;
+export const LONG_MON_COLLISION_WIDTH_PX = 62;
+export const LONG_MON_COLLISION_HEIGHT_PX = 54;
+const LONG_MON_VISUAL_SCALE_MAX = 1.04;
+const TEAM_DENSITY_LEVELS = [1, .91, .82, .74, .66, .58, .5, .44] as const;
 
 interface PlacementRect {
   left: number;
@@ -170,12 +171,22 @@ export function longMonStageOf(activity: Activity, now: Date): LongMonRaceStage 
   return "catfish";
 }
 
+/* Cửa sổ 90 NGÀY (31/08, chủ dự án chốt): 4 tuần đã qua + 9 tuần sắp tới
+ * = 13 tuần ≈ 91 ngày. Bản trước chỉ 3 tuần (1 lùi + 2 tới) — người xem
+ * không thấy được hạn nào ngoài nửa tháng, trong khi chu kỳ VMP tính bằng
+ * quý. Tuần trống vẫn tự thu hẹp (weightedWeekBands) nên 13 tuần không
+ * làm loãng vùng có cá. */
+const WINDOW_BACK_WEEKS = 4;
+const WINDOW_AHEAD_WEEKS = 9;
+
 function rangeAround(now: Date): { start: number; endExclusive: number; today: number } {
   const [year, month, day] = bangkokCalendarDate(now).split("-").map(Number);
+  const today = Date.UTC(year, month - 1, day);
+  const currentWeekStart = startOfUtcWeek(today);
   return {
-    start: Date.UTC(year, month - 2, 1),
-    endExclusive: Date.UTC(year, month + 1, 1),
-    today: Date.UTC(year, month - 1, day),
+    start: currentWeekStart - WINDOW_BACK_WEEKS * 7 * DAY_MS,
+    endExclusive: currentWeekStart + WINDOW_AHEAD_WEEKS * 7 * DAY_MS,
+    today,
   };
 }
 
@@ -206,14 +217,25 @@ function monthBands(
   weeks: readonly LongMonWeekBand[],
 ): LongMonMonthBand[] {
   const bands: LongMonMonthBand[] = [];
-  for (let index = 0; index < 3; index += 1) {
-    const date = new Date(start);
-    const bandStart = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + index, 1);
-    const bandEnd = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + index + 1, 1);
-    const month = new Date(bandStart).getUTCMonth() + 1;
-    const year = new Date(bandStart).getUTCFullYear();
-    const startPct = percentInWeightedWeeks(bandStart, weeks, start, endExclusive);
-    const endPct = percentInWeightedWeeks(bandEnd, weeks, start, endExclusive);
+  const first = new Date(start);
+  for (
+    let monthStart = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1);
+    monthStart < endExclusive;
+    monthStart = Date.UTC(
+      new Date(monthStart).getUTCFullYear(),
+      new Date(monthStart).getUTCMonth() + 1,
+      1,
+    )
+  ) {
+    const monthEnd = Date.UTC(
+      new Date(monthStart).getUTCFullYear(),
+      new Date(monthStart).getUTCMonth() + 1,
+      1,
+    );
+    const month = new Date(monthStart).getUTCMonth() + 1;
+    const year = new Date(monthStart).getUTCFullYear();
+    const startPct = percentInWeightedWeeks(Math.max(start, monthStart), weeks, start, endExclusive);
+    const endPct = percentInWeightedWeeks(Math.min(endExclusive, monthEnd), weeks, start, endExclusive);
     bands.push({
       year,
       month,
@@ -322,8 +344,9 @@ function fishIdentity(fish: LongMonRaceFish): string {
 }
 
 function rectAt(xPx: number, yPx: number, scale: number): PlacementRect {
-  const halfWidth = LONG_MON_COLLISION_WIDTH_PX * scale / 2;
-  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * scale / 2;
+  const reservedScale = scale * LONG_MON_VISUAL_SCALE_MAX;
+  const halfWidth = LONG_MON_COLLISION_WIDTH_PX * reservedScale / 2;
+  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * reservedScale / 2;
   return {
     left: xPx - halfWidth,
     right: xPx + halfWidth,
@@ -338,6 +361,43 @@ function overlapsAny(rect: PlacementRect, placed: readonly PlacementRect[]): boo
     && rect.right > other.left
     && rect.top < other.bottom
     && rect.bottom > other.top);
+}
+
+function teamYCandidates(
+  item: LongMonRaceFish,
+  xPx: number,
+  sceneWidthPx: number,
+  sceneHeightPx: number,
+  scale: number,
+): number[] {
+  const reservedScale = scale * LONG_MON_VISUAL_SCALE_MAX;
+  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * reservedScale / 2;
+  const minY = halfHeight;
+  const maxY = sceneHeightPx - halfHeight;
+  const phase = stableHash(item.weekKey) % 628 / 100;
+  const flow = .5 + Math.sin(xPx / sceneWidthPx * Math.PI * 3.1 + phase) * .23;
+  const preferred = clamp(
+    (flow + stableRange(item.activity, "school-depth", -.24, .24)) * sceneHeightPx,
+    minY,
+    maxY,
+  );
+  const step = LONG_MON_COLLISION_HEIGHT_PX * reservedScale + 10;
+  const candidates = [preferred];
+
+  for (let distance = 1; distance <= 6; distance += 1) {
+    const signFirst = stableHash(`${fishIdentity(item)}:team-y:${distance}`) % 2 === 0 ? -1 : 1;
+    candidates.push(clamp(preferred + signFirst * distance * step, minY, maxY));
+    candidates.push(clamp(preferred - signFirst * distance * step, minY, maxY));
+  }
+
+  const bandCount = 13;
+  const bandOffset = stableHash(`${fishIdentity(item)}:team-band`) % bandCount;
+  for (let band = 0; band < bandCount; band += 1) {
+    const bandIndex = (band + bandOffset) % bandCount;
+    candidates.push(minY + bandIndex / (bandCount - 1) * (maxY - minY));
+  }
+
+  return [...new Set(candidates.map((value) => Number(value.toFixed(4))))];
 }
 
 function tryTeamPlacement(
@@ -355,10 +415,8 @@ function tryTeamPlacement(
   const orderedGroups = [...groups.entries()].sort((left, right) =>
     right[1].length - left[1].length
     || left[1][0].weekIndex - right[1][0].weekIndex);
-  const collisionWidth = LONG_MON_COLLISION_WIDTH_PX * scale;
-  const collisionHeight = LONG_MON_COLLISION_HEIGHT_PX * scale;
+  const collisionWidth = LONG_MON_COLLISION_WIDTH_PX * scale * LONG_MON_VISUAL_SCALE_MAX;
   const halfWidth = collisionWidth / 2;
-  const halfHeight = collisionHeight / 2;
   const xByIdentity = new Map<string, number>();
 
   for (const [, group] of orderedGroups) {
@@ -393,63 +451,35 @@ function tryTeamPlacement(
     });
   }
 
-  const orderedByInterval = [...fish].sort((left, right) => {
+  const positions = new Map<string, PlacementPoint>();
+  const placedRects: PlacementRect[] = [];
+  const sceneHeightPx = LONG_MON_SCENE_HEIGHT_PX;
+  const placementOrder = orderedGroups.flatMap(([, group]) => [...group].sort((left, right) => {
     const leftX = xByIdentity.get(fishIdentity(left)) ?? 0;
     const rightX = xByIdentity.get(fishIdentity(right)) ?? 0;
-    return leftX - rightX
-      || left.deadline.localeCompare(right.deadline)
-      || fishIdentity(left).localeCompare(fishIdentity(right), "vi");
-  });
-  const rowRights: number[] = [];
-  const rowByIdentity = new Map<string, number>();
+    return leftX - rightX || fishIdentity(left).localeCompare(fishIdentity(right), "vi");
+  }));
 
-  for (const item of orderedByInterval) {
+  for (const item of placementOrder) {
     const xPx = xByIdentity.get(fishIdentity(item))!;
-    const left = xPx - halfWidth;
-    const right = xPx + halfWidth;
-    let row = rowRights.findIndex((lastRight) => lastRight <= left);
-    if (row === -1) {
-      row = rowRights.length;
-      rowRights.push(right);
-    } else {
-      rowRights[row] = right;
-    }
-    rowByIdentity.set(fishIdentity(item), row);
-  }
-
-  const positions = new Map<string, PlacementPoint>();
-  const sceneHeightPx = Math.max(
-    LONG_MON_SCENE_HEIGHT_PX,
-    rowRights.length * collisionHeight + Math.max(0, rowRights.length - 1) * 8,
-  );
-  const rowSpacing = rowRights.length <= 1
-    ? 0
-    : (sceneHeightPx - collisionHeight) / (rowRights.length - 1);
-  const spareBetweenRows = Math.max(0, rowSpacing - collisionHeight);
-  const waveAmplitude = Math.min(12, spareBetweenRows / 3);
-  const driftAmplitude = Math.min(18, spareBetweenRows / 6);
-
-  for (const item of fish) {
-    const xPx = xByIdentity.get(fishIdentity(item))!;
-    const row = rowByIdentity.get(fishIdentity(item))!;
-    const baseY = rowRights.length <= 1
-      ? sceneHeightPx / 2
-      : halfHeight + row * rowSpacing;
-    const flowY = Math.sin(xPx / sceneWidthPx * Math.PI * 3.4 + row * .47) * waveAmplitude
-      + stableRange(item.activity, "vertical-drift", -driftAmplitude, driftAmplitude);
-    const yPx = clamp(baseY + flowY, halfHeight, sceneHeightPx - halfHeight);
+    const yPx = teamYCandidates(item, xPx, sceneWidthPx, sceneHeightPx, scale)
+      .find((candidateY) => !overlapsAny(rectAt(xPx, candidateY, scale), placedRects));
+    if (yPx === undefined) return null;
+    const phase = stableHash(item.weekKey) % 628 / 100;
+    const flowHeading = Math.cos(xPx / sceneWidthPx * Math.PI * 3.1 + phase) * 6.5;
+    const rotateDeg = clamp(
+      flowHeading + stableRange(item.activity, "pose", -4.5, 4.5),
+      -12,
+      12,
+    );
     positions.set(fishIdentity(item), {
       xPx,
       yPx,
-      rotateDeg: Number((
-        Math.cos(xPx / sceneWidthPx * Math.PI * 3.4 + row * .47) * 2.2
-        + stableRange(item.activity, "pose", -1.4, 1.4)
-      ).toFixed(2)),
+      rotateDeg: Number(rotateDeg.toFixed(2)),
     });
+    placedRects.push(rectAt(xPx, yPx, scale));
   }
 
-  const finalRects = [...positions.values()].map((point) => rectAt(point.xPx, point.yPx, scale));
-  if (finalRects.some((rect, index) => overlapsAny(rect, finalRects.slice(index + 1)))) return null;
   return { positions, densityScale: scale, sceneWidthPx, sceneHeightPx };
 }
 
@@ -462,7 +492,12 @@ function buildTeamPlacement(
     const placement = tryTeamPlacement(fish, weeks, scale, sceneWidthPx);
     if (placement) return placement;
   }
-  throw new Error("Không thể bố trí đàn cá Long Môn trong scene thích ứng");
+  const weekDensity = weeks
+    .map((week) => `${week.key}:${fish.filter((item) => item.weekKey === week.key).length}`)
+    .join(", ");
+  throw new Error(
+    `Không thể bố trí ${fish.length} cá Long Môn trong scene ${sceneWidthPx}px (${weekDensity})`,
+  );
 }
 
 function personalPreferredY(index: number, count: number, activity: Activity): number {
@@ -583,7 +618,9 @@ function applyPlacement(
     item.lane = Math.max(0, Math.round(point.yPx / LONG_MON_COLLISION_HEIGHT_PX));
     item.renderOffsetXPx = 0;
     item.renderOffsetYPx = 0;
-    item.renderScale = placement.densityScale;
+    item.renderScale = Number((
+      placement.densityScale * stableRange(item.activity, "school-scale", .88, LONG_MON_VISUAL_SCALE_MAX)
+    ).toFixed(3));
     item.renderRotateDeg = point.rotateDeg;
     item.schoolRow = item.lane;
     item.schoolSize = weekCounts.get(item.weekKey) ?? 1;

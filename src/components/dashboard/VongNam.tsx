@@ -16,20 +16,18 @@
  *  hoàn: "đi tới đâu trong năm rồi, phần còn lại nặng nhẹ thế nào".
  *
  *  Hai điều giữ cho nó vẫn đọc được, không thành đồ trang trí:
- *   · Góc mỗi tháng CỐ ĐỊNH 30°. Khối lượng mã hoá bằng ĐỘ DÀI vươn ra từ
- *     một vòng gốc chung — không phải bằng diện tích hay góc quạt. So độ
- *     dài từ cùng một mốc là phép so mắt làm được.
- *   · Màu là TRẠNG THÁI, không phải nhận dạng, và dùng đúng bốn màu trạng
- *     thái sẵn có của app: xong (xanh lá) · đã tới hạn mà chưa xong (đỏ,
- *     CHỈ cho tháng đã qua) · tháng đang chạy (cam) · chưa tới hạn (lam).
- *     Tô đỏ phần chưa xong của tháng 11 là vu oan — tháng đó chưa tới hạn.
+ *   · Góc mỗi tháng CỐ ĐỊNH 30°. Khối lượng mã hoá bằng ĐỘ DÀI cánh tính
+ *     từ một vòng gốc chung; dữ liệu đổi thì hình hoa thị đổi theo.
+ *   · Phần đã xong nằm phía trong. Trạng thái thời gian chỉ là lớp tín hiệu
+ *     tiết chế: nắp đỏ cho quá hạn, viền vàng cho tháng hiện tại, độ mờ cho
+ *     tháng tương lai — không biến vòng thành một bảng màu cạnh tranh.
  *
- *  Kim "hôm nay" chỉ đúng vị trí trong năm. Mọi con số nằm ở lớp HTML và
- *  ở bảng số bật được — không có giá trị nào chỉ đọc được bằng cách rê chuột.
+ *  Kim "hôm nay" chỉ nằm trên vành dữ liệu. Mọi con số nằm ngoài cánh,
+ *  trong lõi HTML và ở bảng số bật được — không cần rê chuột để đọc.
  * ===================================================================== */
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { C, NUM_HERO, TEXT } from "../../constants/theme.ts";
+import { NUM_HERO, TEXT } from "../../constants/theme.ts";
 import { MONTHS } from "../../constants/vmp.ts";
 import { parseD } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
@@ -42,6 +40,33 @@ export interface OThangNam {
   /** Tháng đã trôi qua hoàn toàn (mốc đích đã tới hạn). */
   daQua: boolean;
   dangChay: boolean;
+}
+
+export interface DongHoThangNam extends OThangNam {
+  tiLeXong: number;
+  tiLeKhoiLuong: number;
+  trangThai: "past" | "current" | "future";
+}
+
+export function dungDongHoNam(o: readonly OThangNam[]): DongHoThangNam[] {
+  const theoThang = new Map(o.map((x) => [x.thang, x]));
+  const months = Array.from({ length: 12 }, (_, thang) => {
+    const x = theoThang.get(thang) ?? {
+      thang,
+      tong: 0,
+      xong: 0,
+      daQua: false,
+      dangChay: false,
+    };
+    const tiLeXong = x.tong > 0 ? Math.min(1, Math.max(0, x.xong / x.tong)) : 0;
+    return { ...x, thang, tiLeXong };
+  });
+  const caoNhat = Math.max(1, ...months.map((x) => Math.max(0, x.tong)));
+  return months.map((x) => ({
+    ...x,
+    tiLeKhoiLuong: Math.max(0, x.tong) / caoNhat,
+    trangThai: x.dangChay ? "current" : x.daQua ? "past" : "future",
+  }));
 }
 
 export function dungVongNam(acts: Activity[], nam: number, bangkokToday: string): OThangNam[] {
@@ -63,24 +88,21 @@ export function dungVongNam(acts: Activity[], nam: number, bangkokToday: string)
   return o;
 }
 
-/* Khung rộng hơn vòng để chừa chỗ cho nhãn tháng. Bản trước S=268 với nhãn
-   đặt ở bán kính 131 — chữ "T10" neo giữa nên tràn ra ngoài mép trái và bị
-   cắt mất chữ T. Nâng tiếp 300 → 348 khi nhãn mang thêm SỐ (16/08): "T3 40"
-   ở sườn phải dài gấp đôi "T3", lại tràn mép — dữ liệu thật đã lộ đúng lỗi
-   này ở tháng đỉnh 40 hạng mục. 348 đủ cho "T10 999". */
-const S = 348;
+/* Khung rộng hơn cánh tối đa 62 đơn vị để nhãn hai dòng luôn ở ngoài vòng. */
+const S = 388;
 const CX = S / 2;
 const CY = S / 2;
-const R0 = 76;      // vòng gốc — mọi cột đo từ đây (đủ rộng cho chữ giữa vòng)
-const RMAX = 120;
-const KHE = 1.5;    // khe hở giữa hai tháng, tính bằng độ
+const R0 = 78;
+const RMAX = 132;
+const R_NHAN = 162;
+const KHE = 2;
 
 const toaDo = (r: number, doc: number): [number, number] => {
   const rad = (doc * Math.PI) / 180;
   return [CX + r * Math.cos(rad), CY + r * Math.sin(rad)];
 };
 
-/** Hình quạt vành khuyên từ r0 tới r1, giữa hai góc. */
+/** Hình quạt vành khuyên cho rãnh, cánh và phần trạng thái. */
 function quat(r0: number, r1: number, a0: number, a1: number): string {
   const [x0, y0] = toaDo(r1, a0);
   const [x1, y1] = toaDo(r1, a1);
@@ -106,9 +128,9 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
 }) {
   const nam = year;
   const o = useMemo(() => dungVongNam(acts, nam, bangkokToday), [acts, bangkokToday, nam]);
+  const dongHo = useMemo(() => dungDongHoNam(o), [o]);
   const [bang, setBang] = useState(false);
 
-  const caoNhat = Math.max(1, ...o.map((x) => x.tong));
   const dinh = o.reduce((m, x) => (x.tong > m.tong ? x : m), o[0]);
   const currentYear = Number(bangkokToday.slice(0, 4));
   const currentMonth = Number(bangkokToday.slice(5, 7)) - 1;
@@ -164,81 +186,72 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
 
   return (
     <div className="vmp-vongnam">
-      <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />
-
       <div className="vmp-vongnam-than">
         <div className="vmp-vongnam-vong">
-          <svg viewBox={`0 0 ${S} ${S}`} role="img" aria-label={moTa} className="vmp-vongnam-svg">
-            {/* Rãnh nền: bề rộng tối đa của một tháng. Có rãnh thì mắt biết
-                cột dài tới đâu là "đầy", không có thì không có mốc so. */}
-            {/* Rãnh phải THOẢNG như trước token v3 (yêu cầu chủ dự án
-                16/08): surface-2 đậm lên làm cả vòng thành hình tròn đặc
-                đối xứng, nuốt mất các cánh dài ngắn — mà độ dài cánh mới
-                là nội dung. Hạ opacity trả lại thế bất đối xứng. */}
-            {o.map((x) => (
-              <path key={`ranh-${x.thang}`}
-                d={quat(R0, RMAX, gocThang(x.thang) + KHE, gocThang(x.thang + 1) - KHE)}
-                fill={C.surfaceSunk} opacity={0.45} />
-            ))}
-
-            {o.map((x) => {
-              if (!x.tong) return null;
+          <svg viewBox={`0 0 ${S} ${S}`} role="img" aria-label={moTa}
+            className="vmp-vongnam-svg" data-vongnam-max-radius={RMAX}>
+            <circle className="vmp-vongnam-vien" cx={CX} cy={CY} r={RMAX + 9} aria-hidden="true" />
+            {dongHo.map((x) => {
               const a0 = gocThang(x.thang) + KHE;
               const a1 = gocThang(x.thang + 1) - KHE;
-              const dai = ((x.tong / caoNhat) * (RMAX - R0));
-              const rXong = R0 + dai * (x.xong / x.tong);
-              // Phần chưa xong dùng ĐÚNG bốn màu trạng thái mà cả app đang
-              // dùng (xong · quá hạn · đang chạy · chưa tới), không phát minh
-              // thang màu riêng cho hero. Đỏ CHỈ dành cho tháng đã qua — tô
-              // đỏ phần chưa xong của tháng 11 là vu oan, tháng đó chưa tới hạn.
-              const mauConLai = x.daQua ? C.rasp : x.dangChay ? C.marigold : C.sky;
+              const r1 = R0 + x.tiLeKhoiLuong * (RMAX - R0);
+              const rXong = R0 + (r1 - R0) * x.tiLeXong;
+              const rNap = Math.max(rXong, r1 - 9);
+              const coDuLieu = x.tong > 0 && r1 > R0;
               return (
-                <g key={`cot-${x.thang}`}>
+                <g key={`thang-${x.thang}`} data-vongnam-month={x.thang + 1}>
                   <title>
                     {`${MONTHS[x.thang]}: ${x.tong} hạng mục đến hạn, ${x.xong} đã xong`
-                      + ` (${Math.round((x.xong / x.tong) * 100)}%)`
+                      + ` (${Math.round(x.tiLeXong * 100)}%)`
                       + (x.daQua ? " · tháng đã qua" : x.dangChay ? " · tháng đang chạy" : " · chưa tới hạn")}
                   </title>
-                  <path d={quat(rXong, R0 + dai, a0, a1)} fill={mauConLai} opacity={x.daQua ? 0.92 : 0.7} />
-                  {x.xong > 0 && <path d={quat(R0, rXong, a0, a1)} fill={C.mint} />}
+                  <path data-vongnam-track="" className="vmp-vongnam-ranh"
+                    d={quat(R0, RMAX, a0, a1)} aria-hidden="true" />
+                  {coDuLieu && x.tiLeXong < 1 && (
+                    <path data-vongnam-bar="" data-vongnam-status={x.trangThai}
+                      className={`vmp-vongnam-canh vmp-vongnam-canh--${x.trangThai}`}
+                      d={quat(rXong, r1, a0, a1)} />
+                  )}
+                  {coDuLieu && x.trangThai === "past" && x.tiLeXong < 1 && rNap < r1 && (
+                    <path className="vmp-vongnam-nap-quahan"
+                      d={quat(rNap, r1, a0, a1)} aria-hidden="true" />
+                  )}
+                  {coDuLieu && x.tiLeXong > 0 && (
+                    <path data-vongnam-bar="" data-vongnam-status="done"
+                      className="vmp-vongnam-canh vmp-vongnam-canh--done"
+                      d={quat(R0, rXong, a0, a1)} />
+                  )}
                 </g>
               );
             })}
 
-            {/* Nhãn tháng chạy quanh vành — MỌI tháng có hạng mục đều ghi
-                số (yêu cầu chủ dự án 16/08: vòng phải thể hiện hết số,
-                không bắt người đọc rê chuột hay mở bảng). Tháng nặng nhất
-                và tháng hiện tại vẫn được nhấn đậm để mắt có điểm neo. */}
-            {o.map((x) => {
+            <circle className="vmp-vongnam-loi-mat" cx={CX} cy={CY} r={R0 - 2} aria-hidden="true" />
+
+            {/* Nhãn hai dòng luôn dùng cùng bán kính ngoài cánh. Không neo chữ
+                vào mép cánh: số hai chữ số vẫn không thể chèn vào dữ liệu. */}
+            {dongHo.map((x) => {
               const giua = gocThang(x.thang) + 15;
-              /* Chữ trải NGANG còn bán kính tính XUYÊN TÂM: nhãn hai bên
-                 sườn neo giữa sẽ lấn mép trong vào cánh dài (dữ liệu thật
-                 "T3 40" đè lên cánh T3 — phản hồi chủ dự án 16/08). Sườn
-                 phải neo start, sườn trái neo end — chữ mọc HƯỚNG RA
-                 NGOÀI vòng; chỉ đỉnh/đáy mới neo giữa. */
-              const cosGiua = Math.cos((giua * Math.PI) / 180);
-              const neo = cosGiua > 0.35 ? "start" : cosGiua < -0.35 ? "end" : "middle";
-              const [tx, ty] = toaDo(neo === "middle" ? RMAX + 16 : RMAX + 5, giua);
-              const nhan = x.thang === dinh.thang || x.dangChay;
+              const [tx, ty] = toaDo(R_NHAN, giua);
               return (
-                <text key={`nhan-${x.thang}`} x={tx} y={ty + 3.4} textAnchor={neo}
-                  fontFamily={TEXT} fontSize={nhan ? 13 : 12}
-                  fontWeight={nhan ? 900 : 700}
-                  fill={x.thang === dinh.thang ? C.raspText : C.plumSoft}>
-                  {MONTHS[x.thang]}{x.tong > 0 ? ` ${x.tong}` : ""}
-                </text>
+                <g key={`nhan-${x.thang}`} transform={`translate(${tx} ${ty})`}
+                  data-vongnam-label="" data-radius={R_NHAN}
+                  className={x.dangChay ? "vmp-vongnam-nhan vmp-vongnam-nhan--hientai" : "vmp-vongnam-nhan"}>
+                  {x.dangChay && <rect x={-19} y={-19} width={38} height={40} rx={13} aria-hidden="true" />}
+                  <text textAnchor="middle" fontFamily={TEXT}>
+                    <tspan x={0} y={-2} className="vmp-vongnam-nhan-thang">{MONTHS[x.thang]}</tspan>
+                    <tspan x={0} y={14} className="vmp-vongnam-nhan-so">{x.tong}</tspan>
+                  </text>
+                </g>
               );
             })}
 
-            {/* Kim hôm nay — mốc duy nhất cho biết đang đứng ở đâu trong vòng. */}
+            {/* Kim ngắn chỉ nằm trên vành dữ liệu; không cắt qua lõi hoặc chữ. */}
             {gocHomNay != null && (
-              <g>
+              <g data-vongnam-today="" className="vmp-vongnam-homnay">
                 <line
-                  x1={toaDo(R0 - 7, gocHomNay)[0]} y1={toaDo(R0 - 7, gocHomNay)[1]}
-                  x2={toaDo(RMAX + 5, gocHomNay)[0]} y2={toaDo(RMAX + 5, gocHomNay)[1]}
-                  stroke={C.pinkText} strokeWidth={2} strokeLinecap="round" />
-                <circle cx={toaDo(RMAX + 5, gocHomNay)[0]} cy={toaDo(RMAX + 5, gocHomNay)[1]}
-                  r={3.2} fill={C.pinkText} />
+                  x1={toaDo(R0 + 7, gocHomNay)[0]} y1={toaDo(R0 + 7, gocHomNay)[1]}
+                  x2={toaDo(RMAX - 3, gocHomNay)[0]} y2={toaDo(RMAX - 3, gocHomNay)[1]} />
+                <circle cx={toaDo(RMAX - 3, gocHomNay)[0]} cy={toaDo(RMAX - 3, gocHomNay)[1]} r={3.4} />
               </g>
             )}
           </svg>
@@ -246,25 +259,29 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
           {/* Số nằm ở lớp HTML giữa vòng: bôi-chép được, trình đọc màn hình
               đọc được, và không nhoè như chữ vẽ trong canvas. */}
           <div className="vmp-vongnam-loi">
-            <div style={{ fontFamily: NUM_HERO, fontSize: 42, fontWeight: 800, color: C.plum, lineHeight: 1 }}>
+            <div className="vmp-vongnam-loi-tyle" style={{ fontFamily: NUM_HERO }}>
               {rate}%
             </div>
-            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, letterSpacing: ".1em", marginTop: 3 }}>
+            <div className="vmp-vongnam-loi-nhan">
               HOÀN THÀNH VMP
             </div>
-            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
+            <div className="vmp-vongnam-loi-tong">
               trên {total} hạng mục
             </div>
           </div>
         </div>
 
         <div className="vmp-vongnam-ben">
+          <div className="vmp-vongnam-ketluan">
+            <CauKetLuan chinh={ketLuan.chinh} phu={ketLuan.phu} tone={ketLuan.tone} />
+          </div>
+
           {ben}
 
           <div className="vmp-vongnam-chu">
-            <span><i style={{ background: C.mint }} />Đã xong</span>
-            <span><i style={{ background: C.rasp }} />Đã tới hạn, chưa xong</span>
-            <span><i style={{ background: C.sky, opacity: 0.7 }} />Chưa tới hạn</span>
+            <span><i className="vmp-vongnam-chu--done" />Đã xong</span>
+            <span><i className="vmp-vongnam-chu--over" />Đã tới hạn, chưa xong</span>
+            <span><i className="vmp-vongnam-chu--future" />Chưa tới hạn</span>
             <span><i className="vmp-vongnam-kim" />Hôm nay</span>
           </div>
 

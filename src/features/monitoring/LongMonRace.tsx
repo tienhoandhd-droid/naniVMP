@@ -8,8 +8,28 @@ import {
   type LongMonStageMeta,
 } from "./longMonRaceModel.ts";
 
-const BACKGROUND_URL = "/art/monitoring/long-mon-vmp-racecourse-v15.png";
-const SPECIES_SHEET_URL = "/art/monitoring/long-mon-six-species-v15.png";
+/* BASE_URL thay vì "/": app deploy GitHub Pages dạng project
+ * (https://<user>.github.io/<repo>/) với `base: "./"` — đường dẫn tuyệt
+ * đối "/art/..." sẽ trỏ ra NGOÀI repo và cả bức tranh biến mất trên
+ * production. import.meta.env.BASE_URL luôn có "/" ở cuối. */
+const ART_BASE = `${import.meta.env?.BASE_URL ?? "/"}art/monitoring/`;
+const BACKGROUND_URL = `${ART_BASE}long-mon-vmp-racecourse-v15.png`;
+const SPECIES_SHEET_URL = `${ART_BASE}long-mon-six-species-v16.png`;
+/* Cổng Vũ Môn vẽ tay (SVG → Inkscape xuất PNG) — xem chú thích trong CSS. */
+const GATE_URL = `${ART_BASE}long-mon-vu-mon-gate-v2.png`;
+
+/* Băm id → pha/chu kỳ bơi riêng của từng con (5.6s–9.2s). Cùng thuật băm
+ * FNV như model để một hạng mục giữ nguyên dáng bơi giữa hai lần render. */
+function swimTiming(id: string): { delay: string; dur: string } {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i += 1) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const u = (hash >>> 0) / 4294967295;
+  const v = ((hash >>> 8) & 0xffff) / 65535;
+  return { delay: `${(-u * 8).toFixed(2)}s`, dur: `${(5.6 + v * 3.6).toFixed(2)}s` };
+}
 
 interface LongMonRaceProps {
   activities: readonly Activity[];
@@ -41,6 +61,8 @@ type SpriteStyle = CSSProperties & {
 };
 
 type FishStyle = CSSProperties & {
+  "--swim-delay": string;
+  "--swim-dur": string;
   "--long-mon-x": string;
   "--long-mon-y": string;
   "--school-x": string;
@@ -56,6 +78,9 @@ type RaceCanvasStyle = CSSProperties & {
 
 function spriteStyle(stage: LongMonStageMeta): SpriteStyle {
   return {
+    /* Ảnh atlas đặt từ JS (không phải CSS) để đi qua BASE_URL — url()
+       tuyệt đối trong CSS không được Vite viết lại theo base. */
+    backgroundImage: `url("${SPECIES_SHEET_URL}")`,
     "--long-mon-sprite-x": stage.spriteX,
     "--long-mon-sprite-y": stage.spriteY,
   };
@@ -92,10 +117,10 @@ export default function LongMonRace({
   }, [model.todayPct]);
 
   return (
-    <section className="long-mon-race" aria-label="Trường đua hạn VMP ba tháng">
+    <section className="long-mon-race" aria-label="Trường đua hạn VMP chín mươi ngày">
       <header className="long-mon-race__head">
         <div className="long-mon-race__title-block">
-          <span className="long-mon-race__eyebrow">Bản đồ deadline · ba tháng liền kề</span>
+          <span className="long-mon-race__eyebrow">Bản đồ deadline · 90 ngày quanh hôm nay</span>
           <h2>Long Môn VMP</h2>
           <p>
             Mỗi thiết bị là một cá. Hạn VMP đưa cá vào vùng tuần; bấm cá để xem ngày
@@ -145,7 +170,7 @@ export default function LongMonRace({
         </div>
       </header>
 
-      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="Kéo ngang để xem toàn bộ trường đua trên màn hình hẹp">
+      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="Chín mươi ngày VMP trong một màn hình; màn hình nhỏ có thể kéo ngang">
         <div
           className="long-mon-race__canvas long-mon-race__canvas--adaptive-scene"
           data-density-scale={model.densityScale}
@@ -154,6 +179,7 @@ export default function LongMonRace({
           style={canvasStyle}
         >
           <img className="long-mon-race__background" src={BACKGROUND_URL} alt="" aria-hidden="true" />
+          <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true" />
           <div className="long-mon-race__wash" aria-hidden="true" />
 
           <div className="long-mon-race__months" aria-hidden="true">
@@ -185,13 +211,16 @@ export default function LongMonRace({
           )}
 
           {model.fish.length > 0 ? (
-            <div className="long-mon-race__school" role="list" aria-label={`${model.fish.length} hạng mục có hạn VMP trong ba tháng`}>
+            <div className="long-mon-race__school" role="list" aria-label={`${model.fish.length} hạng mục có hạn VMP trong chín mươi ngày`}>
               {model.fish.map((fish) => {
                 const stage = metaByStage.get(fish.stage)!;
                 const deadline = formatDeadline(fish.deadline);
                 const code = String(fish.activity.code || fish.activity.id);
                 const name = String(fish.activity.name || fish.activity.objName || fish.activity.obj || "Hạng mục VMP");
+                const swim = swimTiming(String(fish.activity.id));
                 const style: FishStyle = {
+                  "--swim-delay": swim.delay,
+                  "--swim-dur": swim.dur,
                   "--long-mon-x": `${fish.xPct}%`,
                   "--long-mon-y": `${fish.yPct}%`,
                   "--school-x": `${fish.renderOffsetXPx}px`,
@@ -205,11 +234,12 @@ export default function LongMonRace({
                       type="button"
                       className={`long-mon-race__fish long-mon-race__fish--${fish.stage}`}
                       data-long-mon-fish={fish.activity.id}
+                      data-long-mon-code={code}
                       data-deadline={fish.deadline}
                       data-week={fish.weekKey}
                       data-anchor-x={fish.xPct}
-                      data-collision-width="84"
-                      data-collision-height="78"
+                      data-collision-width="62"
+                      data-collision-height="54"
                       aria-label={`${code} · ${stage.label} · hạn VMP ${deadline}`}
                       onClick={() => onOpen(fish.activity)}
                     >
@@ -229,7 +259,7 @@ export default function LongMonRace({
           ) : (
             <div className="long-mon-race__empty">
               <CalendarClock size={22} aria-hidden="true" />
-              <strong>{scopeControl?.emptyMessage ? "Không thể mở ngư đồ cá nhân" : "Không có hạn VMP trong ba tháng này"}</strong>
+              <strong>{scopeControl?.emptyMessage ? "Không thể mở ngư đồ cá nhân" : "Không có hạn VMP trong chín mươi ngày này"}</strong>
               <span>{scopeControl?.emptyMessage ?? "Các bộ lọc hiện tại không để lại hạng mục nào trên trường đua."}</span>
             </div>
           )}

@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
 import {
-  BarChart3, CheckCircle2, ClipboardCheck, FileCheck2, Filter,
+  CheckCircle2, ClipboardCheck, FileCheck2, Filter,
   RotateCcw, ShieldCheck, Users,
-  AlertTriangle, Clock, PauseCircle, Loader2, HelpCircle, Minus,
 } from "lucide-react";
 
 import { C, NUM, TEXT } from "../../constants/theme.ts";
 import { DEPTS, DEPT_COLOR, DEPT_DEEP } from "../../constants/vmp.ts";
-import { parseDepts, wlIsDone } from "../../utils/helpers.ts";
+import { buildCompletionFlow } from "../../features/overview/analysisStudioModel.ts";
+import { parseDepts } from "../../utils/helpers.ts";
 import { Card, CardTitle, Sel, CauKetLuan } from "../ui/Primitives.tsx";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Activity } from "../../types/domain.ts";
 
 /** Một nhóm trong bảng phân tích (theo bộ phận / người / loại...). */
@@ -20,10 +20,6 @@ interface Group {
   short?: string;
   deptId?: string;
 }
-
-/** Một chỉ số hoàn thành (đề cương / thẩm định / báo cáo / VMP).
- *  Suy thẳng từ mảng METRICS để không lệch khi thêm bớt chỉ số. */
-type Metric = (typeof METRICS)[number];
 
 /** Một dòng trong bảng phân tích: nhóm + các hạng mục + tỉ lệ hoàn thành. */
 interface GroupRow {
@@ -159,198 +155,12 @@ function dimensionGroups(activity: Activity, dimension: string): Group[] {
   return people.map((person) => ({ key: person.toLocaleLowerCase("vi"), label: person }));
 }
 
-function isMetricDone(activity: Activity, metric: Metric): boolean {
-  const raw = (activity._raw || {}) as Record<string, unknown>;
-  if (metric.id === "vmp" && activity.st === "done") return true;
-  return wlIsDone(raw[metric.field]);
-}
-
 function completionSummary(activities: Activity[]) {
-  const active = activities.filter(ACTIVE);
-  const total = active.length;
-  return Object.fromEntries(METRICS.map((metric) => {
-    const done = active.filter((activity) => isMetricDone(activity, metric)).length;
-    return [metric.id, {
-      done,
-      total,
-      rate: total ? Math.round((done / total) * 100) : 0,
-    }];
-  }));
-}
-
-/* ============================================================
- * Trạng thái theo 4 giai đoạn — LẤY ĐÚNG CHỮ trong cột Sheet
- * (không suy diễn theo deadline). Đếm theo ID thẩm định duy nhất.
- * Ô trạng thái trống → nhóm "Chưa điền thông tin".
- * ============================================================ */
-const EMPTY_LABEL = "Chưa điền thông tin";
-
-// field = chữ trạng thái tiếng Việt ĐANG HIỆU LỰC trong DB (RPC vẫn trả dưới
-// tên *_goc để khỏi phải sửa frontend, nhưng từ 29/07/2026 nó đọc từ cột
-// status_*_text của vmp_plan_items, không còn là ảnh chụp Google Sheet).
-// fallback = enum đã map.
-const STATUS_DIMS = [
-  { id: "vmp", label: "Trạng thái VMP", field: "tt_vmp_goc", fallback: "tt_vmp" },
-  { id: "dc", label: "Trạng thái đề cương", field: "tt_de_cuong_goc", fallback: "tt_de_cuong" },
-  { id: "td", label: "Thẩm định thực tế", field: "tt_tham_dinh_goc", fallback: "tt_tham_dinh" },
-  { id: "bc", label: "Trạng thái báo cáo", field: "tt_bao_cao_goc", fallback: "tt_bao_cao" },
-];
-
-// Supabase chuẩn hoá trạng thái Sheet thành enum; đổi về nhãn tiếng Việt để hiển thị.
-// Nếu ô đã là chữ gốc tiếng Việt (đường khác) thì giữ nguyên.
-const ENUM_LABEL = {
-  not_started: "Chưa thực hiện",
-  in_progress: "Đang thực hiện",
-  completed: "Hoàn thành",
-  overdue: "Quá hạn",
-};
-
-// Màu + icon theo ngữ nghĩa chữ trạng thái (nhận diện tiếng Việt). Thứ tự có
-// chủ đích: xét phủ định ("chưa/không") TRƯỚC để "Chưa tiến hành" không bị
-// bắt nhầm là "đang".
-//
-// Trước chỉ có màu — sáu tông (rasp/xám/sky/mint/lav/marigold) cộng một tông
-// dự phòng (pink, TRÙNG với màu thương hiệu dùng khắp trang) đứng cạnh nhau
-// trong chấm 10px và thanh 10px thì khó phân biệt bằng mắt liếc nhanh, nhất
-// là với người kém phân biệt màu — đúng luật B4 (màu không phải kênh duy
-// nhất). Icon là kênh thứ hai không phụ thuộc màu. Tông "chưa nhận diện
-// được" đổi từ pink (dễ lẫn với màu thương hiệu) sang plum trung tính + dấu
-// hỏi, để nó NỔI lên như một ca lạ cần chú ý, không chìm vào nền UI.
-function statusTone(label: string): { mau: string; Icon: typeof CheckCircle2 } {
-  if (label === EMPTY_LABEL) return { mau: C.plumSoft, Icon: Minus };
-  const x = label.toLowerCase();
-  if (/quá hạn|overdue/.test(x)) return { mau: C.raspText, Icon: AlertTriangle };
-  if (/không\s*(tiến hành|thực hiện)/.test(x)) return { mau: C.plumSoft, Icon: PauseCircle }; // bỏ/không làm → xám
-  if (/chưa|chờ|pending/.test(x)) return { mau: C.skyText, Icon: Clock };                       // chưa/chờ xử lý
-  if (/hoàn thành|hoàn thiện|đạt|xong|done/.test(x) && !/đang/.test(x)) return { mau: C.mintText, Icon: CheckCircle2 };
-  if (/tạm ngưng|tạm dừng|tạm hoãn|hoãn|ngưng/.test(x)) return { mau: C.lavText, Icon: PauseCircle };
-  if (/đang|bổ sung|tiến hành|làm|progress/.test(x)) return { mau: C.marigoldText, Icon: Loader2 };
-  return { mau: C.plum, Icon: HelpCircle };
-}
-
-// Phân bố trạng thái theo chữ trong cột, đếm theo ID thẩm định duy nhất.
-function statusDistribution(activities: Activity[], field: string, fallback: string) {
-  const seen = new Set();
-  const counts = new Map();
-  let total = 0;
-  for (const activity of activities) {
-    const id = clean(activity.id);
-    if (!id || seen.has(id)) continue; // mã duy nhất = ID thẩm định
-    seen.add(id);
-    total += 1;
-    const raw = (activity._raw || {}) as Record<string, unknown>;
-    let value = clean(raw[field]); // ưu tiên chữ gốc *_goc
-    if ((value === "" || value === "—") && fallback) value = clean(raw[fallback]); // fallback enum
-    if (value === "" || value === "—") value = EMPTY_LABEL; // chưa điền → nhóm riêng
-    else value = (ENUM_LABEL as Record<string, string>)[value] || value; // enum -> nhãn VN; chữ gốc giữ nguyên
-    counts.set(value, (counts.get(value) || 0) + 1);
-  }
-  const rows = [...counts.entries()]
-    .map(([label, count]) => ({ label, count, rate: total ? Math.round((count / total) * 100) : 0 }))
-    .sort((a, b) => {
-      if (a.label === EMPTY_LABEL) return 1; // "Chưa điền thông tin" xuống cuối
-      if (b.label === EMPTY_LABEL) return -1;
-      return b.count - a.count || a.label.localeCompare(b.label, "vi");
-    });
-  return { rows, total };
-}
-
-function StatusBreakdown({ acts }: { acts: Activity[] }) {
-  const [dim, setDim] = useState("vmp");
-  const active = STATUS_DIMS.find((item) => item.id === dim) || STATUS_DIMS[0];
-  const { rows, total } = useMemo(
-    () => statusDistribution(acts, active.field, active.fallback),
-    [acts, active.field, active.fallback],
-  );
-
-  const klTrangThai = useMemo(() => {
-    if (!rows.length || !total) return null;
-    const dau = rows[0];
-    const trong = rows.find((r) => r.label === EMPTY_LABEL);
-    return {
-      chinh: `${active.label}: nhóm đông nhất là "${dau.label}" với ${dau.count}/${total} hạng mục (${dau.rate}%).`,
-      phu: trong && trong.count > 0
-        ? `${trong.count} hạng mục chưa điền trạng thái ở cột này (${trong.rate}%) — số liệu bên dưới đọc trên phần đã điền.`
-        : "Mọi hạng mục đều đã có trạng thái ở cột này.",
-      tone: (trong && trong.rate >= 20 ? "warn" : "ok") as "warn" | "ok",
-    };
-  }, [rows, total, active.label]);
-
-  return (
-    <Card variant="strong">
-      <div style={{
-        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-        gap: 14, flexWrap: "wrap", marginBottom: 16,
-      }}>
-        <CardTitle icon={ClipboardCheck} sub={`Đếm theo ID thẩm định duy nhất · ${total} hạng mục · lấy đúng chữ trong cột, không suy diễn`}>
-          Trạng thái theo 4 giai đoạn
-        </CardTitle>
-        <div style={{
-          display: "inline-flex", gap: 4, padding: 4, borderRadius: 14,
-          background: C.pinkMist, border: `1px solid ${C.pinkSoft}`, flexWrap: "wrap",
-        }}>
-          {STATUS_DIMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setDim(item.id)}
-              aria-pressed={dim === item.id}
-              style={{
-                border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer",
-                fontFamily: TEXT, fontSize: 12, fontWeight: 800,
-                color: dim === item.id ? "#fff" : C.plumSoft,
-                background: dim === item.id ? C.plum : "transparent",
-                boxShadow: dim === item.id ? "0 4px 12px rgba(78,42,78,.18)" : "none",
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Nhóm chiếm đa số quyết định cách đọc cả biểu đồ: "62% còn ở Chưa
-          thực hiện" là một câu chuyện khác hẳn "62% đã Đạt". Nói ra bằng
-          chữ thay vì để người xem so chiều dài từng thanh. */}
-      {klTrangThai && <CauKetLuan chinh={klTrangThai.chinh} phu={klTrangThai.phu} tone={klTrangThai.tone} />}
-
-      {rows.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {rows.map((row) => {
-            const { mau, Icon } = statusTone(row.label);
-            return (
-              <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ minWidth: 190, display: "flex", alignItems: "center", gap: 8 }}>
-                  {/* Icon đứng trước chấm màu — kênh thứ hai để phân biệt
-                      trạng thái không chỉ dựa vào màu (luật B4). */}
-                  <Icon size={13} color={mau} aria-hidden="true" style={{ flexShrink: 0 }} />
-                  <span style={{ width: 10, height: 10, borderRadius: 999, background: mau, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 800, color: row.label === EMPTY_LABEL ? C.plumSoft : C.plum }}>
-                    {row.label}
-                  </span>
-                </div>
-                <div style={{ flex: 1, minWidth: 60 }}>
-                  <div style={{ height: 10, borderRadius: 999, background: C.pinkMist, overflow: "hidden" }}>
-                    <div style={{
-                      width: `${row.rate}%`, height: "100%", borderRadius: 999, background: mau,
-                      transition: "width .55s cubic-bezier(.22,1,.36,1)",
-                    }} />
-                  </div>
-                </div>
-                <div style={{ minWidth: 88, textAlign: "right", fontFamily: NUM, fontSize: 14, fontWeight: 800, color: mau }}>
-                  {row.count} <span style={{ color: C.plumSoft, fontWeight: 700 }}>· {row.rate}%</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 14, fontWeight: 700 }}>
-          Không có dữ liệu trạng thái.
-        </div>
-      )}
-    </Card>
-  );
+  return Object.fromEntries(buildCompletionFlow(activities).stages.map((stage) => [stage.id, {
+    done: stage.done,
+    total: stage.total,
+    rate: stage.rate,
+  }]));
 }
 
 function ProgressBar({ rate, color, height = 8 }: {
@@ -362,42 +172,6 @@ function ProgressBar({ rate, color, height = 8 }: {
         width: `${rate}%`, height: "100%", borderRadius: 999, background: color,
         transition: "width .55s cubic-bezier(.22,1,.36,1)",
       }} />
-    </div>
-  );
-}
-
-function MetricCard({ metric, value }: {
-  metric: Metric;
-  value: { done: number; total: number; rate: number };
-}) {
-  const Icon = metric.icon;
-  return (
-    <div style={{
-      minWidth: 0, padding: "17px 18px", borderRadius: 14,
-      background: `linear-gradient(145deg,#fff,${metric.soft})`,
-      border: `1px solid ${metric.color}33`,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 13 }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 14, background: metric.soft,
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>
-          <Icon size={19} color={metric.text} />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: C.plum, lineHeight: 1.25 }}>{metric.label}</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}>
-            {value.done}/{value.total} hạng mục
-          </div>
-        </div>
-      </div>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-        <span style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: metric.text, lineHeight: 1 }}>
-          {value.rate}%
-        </span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>HOÀN THÀNH</span>
-      </div>
-      <ProgressBar rate={value.rate} color={metric.color} />
     </div>
   );
 }
@@ -433,8 +207,8 @@ function groupRows(activities: Activity[], dimension: string): GroupRow[] {
       || a.label.localeCompare(b.label, "vi"));
 }
 
-function DimensionTable({ activities, dimension, setDimension }: {
-  activities: Activity[]; dimension: string; setDimension: (d: string) => void;
+function DimensionTable({ activities, dimension }: {
+  activities: Activity[]; dimension: string;
 }) {
   const rows = useMemo(() => groupRows(activities, dimension), [activities, dimension]);
   const activeDimension = DIMENSION_OPTIONS.find((item) => item.id === dimension) || DIMENSION_OPTIONS[0];
@@ -446,36 +220,7 @@ function DimensionTable({ activities, dimension, setDimension }: {
 
   return (
     <Card variant="strong">
-      <div style={{
-        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-        gap: 14, flexWrap: "wrap", marginBottom: 18,
-      }}>
-        <CardTitle icon={Users} sub={subtitle}>
-          {title}
-        </CardTitle>
-        <div style={{
-          display: "inline-flex", gap: 4, padding: 4, borderRadius: 14,
-          background: C.pinkMist, border: `1px solid ${C.pinkSoft}`, flexWrap: "wrap",
-        }}>
-          {DIMENSION_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setDimension(option.id)}
-              aria-pressed={dimension === option.id}
-              style={{
-                border: "none", borderRadius: 8, padding: "8px 10px", cursor: "pointer",
-                fontFamily: TEXT, fontSize: 12, fontWeight: 800,
-                color: dimension === option.id ? "#fff" : C.plumSoft,
-                background: dimension === option.id ? C.plum : "transparent",
-                boxShadow: dimension === option.id ? "0 4px 12px rgba(78,42,78,.18)" : "none",
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <CardTitle icon={Users} sub={subtitle}>{title}</CardTitle>
 
       {rows.length ? (
         <div className="completion-table-scroll" style={{ overflowX: "auto" }}>
@@ -599,11 +344,16 @@ const TD: CSSProperties = {
   borderBottom: `1px solid ${C.pinkSoft}`, color: C.plumSoft, fontSize: 12,
 };
 
-export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
+type ComparisonMode = "validationType" | (typeof DIMENSION_OPTIONS)[number]["id"];
+
+export default function CompletionDashboard({ acts, matrix }: {
+  acts: Activity[];
+  matrix: ReactNode;
+}) {
   const [department, setDepartment] = useState("all");
   const [validationType, setValidationType] = useState("all");
   const [person, setPerson] = useState("all");
-  const [dimension, setDimension] = useState("department");
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("validationType");
 
   const activeActs = useMemo(() => acts.filter(ACTIVE), [acts]);
   const departmentActs = useMemo(
@@ -624,6 +374,7 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
   const scopedActs = useMemo(() => typeActs.filter((activity) => (
     selectedPerson === "all" || activityPeople(activity).includes(selectedPerson)
   )), [typeActs, selectedPerson]);
+  const flow = useMemo(() => buildCompletionFlow(scopedActs), [scopedActs]);
   const summary = useMemo(() => completionSummary(scopedActs), [scopedActs]);
 
   const typeRows = useMemo(() => {
@@ -689,100 +440,137 @@ export default function CompletionDashboard({ acts }: { acts: Activity[] }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <StatusBreakdown acts={acts} />
-
-      <Card variant="strong">
-        <div style={{
-          display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-          gap: 14, flexWrap: "wrap", marginBottom: 18,
-        }}>
-          <CardTitle icon={BarChart3} sub="Tính trên các hạng mục đang hoạt động — đọc thẳng từ Supabase">
-            Tỷ lệ hoàn thành theo giai đoạn
-          </CardTitle>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, color: C.plumSoft }}>
-              <Filter size={15} />
-              <span style={{ fontSize: 12, fontWeight: 800 }}>Phạm vi</span>
-            </div>
-            <Sel
-              val={department}
-              set={(value) => { setDepartment(value); setValidationType("all"); setPerson("all"); }}
-              opts={[{ v: "all", l: "Tất cả bộ phận" }, ...DEPTS.map((item) => ({ v: item.id, l: item.name }))]}
-            />
-            <Sel
-              val={selectedType}
-              set={(value) => { setValidationType(value); setPerson("all"); }}
-              opts={[{ v: "all", l: "Tất cả loại thẩm định" }, ...validationTypes.map((type) => ({ v: type, l: type }))]}
-            />
-            <Sel
-              val={selectedPerson}
-              set={setPerson}
-              opts={[{ v: "all", l: "Tất cả người phụ trách" }, ...people.map((name) => ({ v: name, l: name }))]}
-            />
-            {(department !== "all" || selectedType !== "all" || selectedPerson !== "all") && (
-              <button type="button" onClick={resetFilters} style={{
-                display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 10px",
-                borderRadius: 14, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist,
-                color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
-              }}>
-                <RotateCcw size={14} /> Đặt lại
-              </button>
-            )}
+    <div className="overview-analysis-stack">
+      <section className="overview-analysis-layer overview-analysis-layer--flow"
+        data-analysis-layer="flow" aria-labelledby="overview-analysis-flow-title">
+        <div className="overview-analysis-layer__heading">
+          <span className="overview-analysis-layer__index" aria-hidden="true">01</span>
+          <div>
+            <h3 id="overview-analysis-flow-title">Dòng chảy 4 giai đoạn</h3>
+            <p>Đọc từ đề cương đến đích VMP để thấy bước nào đang làm hụt tiến độ.</p>
           </div>
         </div>
 
-        <div style={{
-          marginBottom: 14, padding: "9px 12px", borderRadius: 14, background: C.pinkMist,
-          color: C.plumSoft, fontSize: 12, fontWeight: 700,
-        }}>
-          {scopeLabel} · <b style={{ color: C.plum }}>{scopedActs.length}</b> hạng mục
+        <div className="analysis-filter-bar" aria-label="Lọc phân tích chuyên sâu">
+          <div className="analysis-filter-bar__label">
+            <Filter size={15} aria-hidden="true" />
+            <span>Phạm vi phân tích</span>
+          </div>
+          <Sel
+            val={department}
+            nhan="Bộ phận trong phân tích chuyên sâu"
+            set={(value) => { setDepartment(value); setValidationType("all"); setPerson("all"); }}
+            opts={[{ v: "all", l: "Tất cả bộ phận" }, ...DEPTS.map((item) => ({ v: item.id, l: item.name }))]}
+          />
+          <Sel
+            val={selectedType}
+            nhan="Loại thẩm định trong phân tích chuyên sâu"
+            set={(value) => { setValidationType(value); setPerson("all"); }}
+            opts={[{ v: "all", l: "Tất cả loại thẩm định" }, ...validationTypes.map((type) => ({ v: type, l: type }))]}
+          />
+          <Sel
+            val={selectedPerson}
+            nhan="Người phụ trách trong phân tích chuyên sâu"
+            set={setPerson}
+            opts={[{ v: "all", l: "Tất cả người phụ trách" }, ...people.map((name) => ({ v: name, l: name }))]}
+          />
+          {(department !== "all" || selectedType !== "all" || selectedPerson !== "all") && (
+            <button type="button" onClick={resetFilters} className="analysis-filter-bar__reset">
+              <RotateCcw size={14} aria-hidden="true" /> Đặt lại
+            </button>
+          )}
+        </div>
+
+        <div className="analysis-scope-note">
+          {scopeLabel} · <b>{scopedActs.length}</b> hạng mục
         </div>
 
         {klPheu && <CauKetLuan chinh={klPheu.chinh} phu={klPheu.phu} tone={klPheu.tone} />}
 
-        <div className="completion-metric-grid" style={{
-          display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12,
-        }}>
-          {METRICS.map((metric) => <MetricCard key={metric.id} metric={metric} value={summary[metric.id]} />)}
-        </div>
-      </Card>
-
-      <Card variant="strong">
-        <CardTitle icon={ClipboardCheck} sub="Hoàn thành được xác định theo trạng thái VMP của từng hạng mục">
-          Tỷ lệ hoàn thành từng loại thẩm định
-        </CardTitle>
-        {klLoai && <CauKetLuan chinh={klLoai.chinh} phu={klLoai.phu} tone={klLoai.tone} />}
-        {typeRows.length ? (
-          <div className="completion-type-grid" style={{
-            display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12,
-          }}>
-            {typeRows.map((row) => (
-              <div key={row.type} style={{
-                padding: "15px 16px", borderRadius: 14, background: C.surface,
-                border: `1px solid ${C.pinkSoft}`,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{row.type}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, marginTop: 2 }}>
-                      {row.done}/{row.total} hoàn thành VMP
-                    </div>
-                  </div>
-                  <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: C.mintText }}>{row.rate}%</div>
+        <ol className="analysis-flow" data-analysis-flow>
+          {flow.stages.map((stage, index) => {
+            const metric = METRICS.find((item) => item.id === stage.id) || METRICS[0];
+            const Icon = metric.icon;
+            return (
+              <li key={stage.id} className="analysis-flow__stage" data-analysis-stage={stage.id}>
+                {index > 0 && (
+                  <span className="analysis-flow__gap" data-analysis-gap>
+                    {stage.deltaFromPrevious && stage.deltaFromPrevious < 0
+                      ? `${stage.deltaFromPrevious} điểm`
+                      : "Không giảm"}
+                  </span>
+                )}
+                <div className="analysis-flow__stage-head">
+                  <span className="analysis-flow__icon" style={{ color: metric.text, background: metric.soft }}>
+                    <Icon size={17} aria-hidden="true" />
+                  </span>
+                  <span>{stage.label}</span>
                 </div>
-                <ProgressBar rate={row.rate} color={C.mint} height={8} />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: 28, textAlign: "center", color: C.plumSoft, fontSize: 14, fontWeight: 700 }}>
-            Không có loại thẩm định trong phạm vi đang chọn.
-          </div>
-        )}
-      </Card>
+                <strong>{stage.rate}%</strong>
+                <small>{stage.done}/{stage.total} hoàn thành</small>
+                <ProgressBar rate={stage.rate} color={metric.color} height={7} />
+              </li>
+            );
+          })}
+        </ol>
+      </section>
 
-      <DimensionTable activities={scopedActs} dimension={dimension} setDimension={setDimension} />
+      <div className="overview-analysis-layer overview-analysis-layer--matrix" data-analysis-layer="matrix">
+        {matrix}
+      </div>
+
+      <section className="overview-analysis-layer overview-analysis-layer--comparison"
+        data-analysis-layer="comparison" aria-labelledby="overview-analysis-comparison-title">
+        <div className="overview-analysis-layer__heading">
+          <span className="overview-analysis-layer__index" aria-hidden="true">03</span>
+          <div>
+            <h3 id="overview-analysis-comparison-title">So sánh cơ cấu</h3>
+            <p>Mỗi lần chỉ xem một chiều để nhận ra nhóm đang dẫn đầu hoặc tụt lại.</p>
+          </div>
+        </div>
+
+        <div className="analysis-comparison-switch" role="group" aria-label="Chọn chiều so sánh">
+          <button type="button" aria-pressed={comparisonMode === "validationType"}
+            onClick={() => setComparisonMode("validationType")}>Loại thẩm định</button>
+          {DIMENSION_OPTIONS.map((option) => (
+            <button key={option.id} type="button" aria-pressed={comparisonMode === option.id}
+              onClick={() => setComparisonMode(option.id)}>{option.label}</button>
+          ))}
+        </div>
+
+        <div data-analysis-comparison data-analysis-comparison-panel={comparisonMode}>
+          {comparisonMode === "validationType" ? (
+            <Card variant="strong">
+              <CardTitle icon={ClipboardCheck} sub="Hoàn thành được xác định theo trạng thái VMP của từng hạng mục">
+                Tỷ lệ hoàn thành từng loại thẩm định
+              </CardTitle>
+              {klLoai && <CauKetLuan chinh={klLoai.chinh} phu={klLoai.phu} tone={klLoai.tone} />}
+              {typeRows.length ? (
+                <div className="completion-type-grid">
+                  {typeRows.map((row) => (
+                    <div key={row.type} className="analysis-type-row">
+                      <div>
+                        <div className="analysis-type-row__head">
+                          <div>
+                            <b>{row.type}</b>
+                            <small>{row.done}/{row.total} hoàn thành VMP</small>
+                          </div>
+                          <strong>{row.rate}%</strong>
+                        </div>
+                        <ProgressBar rate={row.rate} color={C.mint} height={8} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="analysis-empty">Không có loại thẩm định trong phạm vi đang chọn.</div>
+              )}
+            </Card>
+          ) : (
+            <DimensionTable activities={scopedActs} dimension={comparisonMode} />
+          )}
+        </div>
+      </section>
     </div>
   );
 }

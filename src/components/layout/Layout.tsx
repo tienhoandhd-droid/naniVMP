@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS } from "../../constants/vmp.ts";
@@ -42,11 +43,27 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
      đặt THỰC HIỆN trước, vì người dùng vào đây để LÀM việc chứ không phải
      để ngắm số liệu. */
   const NHAN_NHOM: Record<string, string> = {
-    work: "THỰC HIỆN", monitor: "GIÁM SÁT", analysis: "PHÂN TÍCH", admin: "QUẢN TRỊ",
+    work: "THỰC HIỆN", monitor: "GIÁM SÁT", analysis: "PHÂN TÍCH & QUẢN TRỊ",
   };
+  /* PHÂN TÍCH và QUẢN TRỊ gộp làm MỘT mục sổ (31/08).
+     Lý do không phải là cho gọn menu: hai nhóm ấy trả lời cùng một câu
+     hỏi — "ai gánh việc gì, ai được phép làm gì, hệ đang chạy ra sao" —
+     và người dùng của chúng là cùng một người (Admin / Quản lý QA). Tách
+     đôi buộc họ nhớ mục mình cần nằm ở nhóm nào, trong khi không có việc
+     nào chỉ chạm đúng một nhóm.
+
+     Gộp Ở ĐÂY, KHÔNG gộp ở hợp đồng: `NAV_GROUP_ORDER`, `SCREEN_IDS`,
+     `group` của từng mục và mọi hash `#v=` giữ nguyên. Đây thuần tuý là
+     cách BÀY, nên `rpc_my_ui_access` và bộ kiểm phân quyền không đổi một
+     dòng. */
+  const GOP_VAO: Record<string, string> = { admin: "analysis" };
+  const nhomHienThi = (id: string) => GOP_VAO[id] ?? id;
+  const trongNhom = (groupId: string) =>
+    NAV_ITEMS.filter((n) => nhomHienThi(n.group) === groupId && access.canView(n.id));
   const groups = NAV_GROUP_ORDER
+    .filter((id) => !(id in GOP_VAO))
     .map((id) => ({ id, label: NHAN_NHOM[id] }))
-    .filter((g) => NAV_ITEMS.some((n) => n.group === g.id && access.canView(n.id)));
+    .filter((g) => trongNhom(g.id).length > 0);
 
   return (
     <aside className="vmp-sidebar" style={{
@@ -78,7 +95,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }} className="vmp-scroll">
+      <nav aria-label="Điều hướng chính" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }} className="vmp-scroll">
         {groups.map((g) => (
           <div key={g.id}>
             {!collapsed && (
@@ -86,7 +103,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 {g.label}
               </div>
             )}
-            {NAV_ITEMS.filter((n) => n.group === g.id && access.canView(n.id)).map((n) => {
+            {trongNhom(g.id).map((n) => {
               const active = view === n.id;
               const Icon = n.icon;
               return (
@@ -183,7 +200,9 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
         background: C.pinkSoft, cursor: "pointer", display: "flex",
         alignItems: "center", justifyContent: "center",
       }}>
-        {collapsed ? <Menu size={14} color={C.pinkText} /> : <X size={14} color={C.pinkText} />}
+        {collapsed
+          ? <PanelLeftOpen size={14} color={C.pinkText} aria-hidden="true" />
+          : <PanelLeftClose size={14} color={C.pinkText} aria-hidden="true" />}
       </button>
     </aside>
   );
@@ -459,15 +478,24 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
     }}>
       {/* Khối trái co giãn để hàng nút bên phải luôn ở góc phải (thiết kế 29/08). */}
       <div style={{ flex: "1 1 360px", minWidth: 0 }}>
-        {/* Masthead "VMP Monitor · Hệ giám sát thẩm định" là chủ thể của
-            trang (thiết kế 29/08): chữ V lớn, Monitor nghiêng, nét vàng uốn
-            kiểu Art Nouveau, phụ đề giãn cách. Kiểu dáng ở lotus-shell.css. */}
+        {/* Wordmark Art Nouveau: V là chữ cái neo, MP giãn nhịp như một con dấu,
+            Monitor mềm như chữ ký; nụ sen nối wordmark với mô tả hệ thống. */}
         <div className="vmp-masthead" aria-label="VMP Monitor · Hệ giám sát thẩm định">
-          <span className="vmp-masthead__ten"><b>V</b>MP <i>Monitor</i></span>
-          <svg className="vmp-masthead__net" width="200" height="14" viewBox="0 0 250 16" aria-hidden="true">
-            <path d="M2 10C40 2 70 15 105 8C140 1 170 14 205 7C225 3 238 5 248 9" fill="none" strokeWidth="1.2" strokeLinecap="round" />
-            <path d="M118 8C114 3 116 0 121 1C122 5 120 8 118 8Z" />
-            <circle cx="248" cy="9" r="1.8" />
+          <span className="vmp-masthead__ten" aria-hidden="true">
+            <span className="vmp-masthead__v">V</span>
+            <span className="vmp-masthead__mp">MP</span>
+            <i className="vmp-masthead__monitor">Monitor</i>
+          </span>
+          <svg className="vmp-masthead__net" width="214" height="20" viewBox="0 0 260 20" aria-hidden="true">
+            <path d="M2 12C34 4 61 16 98 10" fill="none" strokeWidth="1.15" strokeLinecap="round" />
+            <path d="M162 10C197 4 224 15 258 9" fill="none" strokeWidth="1.15" strokeLinecap="round" />
+            <g className="vmp-masthead__lotus">
+              <path d="M130 12C123 7 124 2 130 0C136 2 137 7 130 12Z" />
+              <path d="M129 13C120 12 116 8 118 4C124 5 128 8 129 13Z" />
+              <path d="M131 13C140 12 144 8 142 4C136 5 132 8 131 13Z" />
+              <path d="M130 12V18" fill="none" strokeWidth="1" strokeLinecap="round" />
+              <circle cx="130" cy="18" r="1.3" />
+            </g>
           </svg>
           <span className="vmp-masthead__phu">Hệ giám sát thẩm định</span>
         </div>
@@ -545,7 +573,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           background: C.pinkSoft,
         }}>
           <ShieldCheck size={14} />
-          {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}
+          Vai trò: {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}
         </span>
 
       </div>

@@ -25,12 +25,11 @@ import {
   KeyRound,
   RefreshCw,
   XCircle,
-  Plus,
 
   Radar,
   Cloud,
   FileText,
-  Clock, ClipboardCheck, FileWarning, ChevronRight, Search, Users, Scale,
+  Clock, FileWarning, ChevronRight, Search, Users, Scale,
 } from "lucide-react";
 // Lưu ý: recharts đã bị gỡ vì KHÔNG dùng (chỉ import thừa, nặng bundle).
 // xlsx được nạp động (dynamic import) ngay trong hàm xuất Excel để giảm bundle ban đầu.
@@ -56,7 +55,6 @@ import {
   docTally,
   inPeriod,
   runDataQualityChecks,
-  wlIsDone,
 } from "./utils/helpers.ts";
 import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
 import { useAccess, useAccessCacheTransition } from "./hooks/useAccess.ts";
@@ -90,7 +88,7 @@ import {
   Sel,
   SkeletonDashboard,
   SyncBanner,
-  PrincessCommentary, StatTile, MultiSelect, GiaiThich, MAU_SO, Pill,
+  PrincessCommentary, StatTile, MultiSelect,
   BangThanhTra } from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 import LoginScreen from "./components/auth/LoginScreen.tsx";
@@ -109,6 +107,8 @@ import {
   useTeamOverviewSummary,
   type TeamOverviewSummaryState,
 } from "./features/overview/useTeamOverviewSummary.ts";
+import MonitoringJourneyNav from "./features/monitoring/MonitoringJourneyNav.tsx";
+import { buildMonitoringSignatureMetrics } from "./features/monitoring/monitoringMetrics.ts";
 
 /* ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm
    bundle ban đầu).
@@ -391,10 +391,9 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
           { id: "warning", emoji: "⚠️", bg: C.marigoldSoft, color: C.marigoldText, v: sevCount.warning, l: "Cảnh báo" },
           { id: "info", emoji: "ℹ️", bg: C.skySoft, color: C.skyText, v: sevCount.info, l: "Thông tin" },
         ].map((c) => (
-          <div key={c.id} onClick={() => setFilter(filter === c.id ? "all" : c.id)} style={{ cursor: "pointer" }}>
-            <KpiCard emoji={c.emoji} bg={c.bg} color={c.color} value={c.v} label={c.l}
-              sub={filter === c.id ? "● Đang lọc" : "Bấm để lọc"} subColor={c.color} />
-          </div>
+          <KpiCard key={c.id} emoji={c.emoji} bg={c.bg} color={c.color} value={c.v} label={c.l}
+            onClick={() => setFilter(filter === c.id ? "all" : c.id)} pressed={filter === c.id}
+            sub={filter === c.id ? "● Đang lọc" : "Bấm để lọc"} subColor={c.color} />
         ))}
       </div>
 
@@ -735,15 +734,15 @@ function AuditLogView() {
           Nhật ký thao tác hệ thống
         </CardTitle>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-          <select value={filters.action} onChange={(e) => setFilters(f => ({ ...f, action: e.target.value }))}
+          <select aria-label="Lọc nhật ký theo hành động" value={filters.action} onChange={(e) => setFilters(f => ({ ...f, action: e.target.value }))}
             style={{ ...INP, maxWidth: 200, cursor: "pointer" }}>
             <option value="">Tất cả hành động</option>
             {Object.entries(actionLabels).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
-          <input placeholder="Tìm theo email..." value={filters.user}
+          <input aria-label="Lọc nhật ký theo email" placeholder="Tìm theo email..." value={filters.user}
             onChange={(e) => setFilters(f => ({ ...f, user: e.target.value }))}
             style={{ ...INP, maxWidth: 220 }} />
-          <input placeholder="Tìm theo ID hạng mục..." value={filters.record}
+          <input aria-label="Lọc nhật ký theo mã hạng mục" placeholder="Tìm theo ID hạng mục..." value={filters.record}
             onChange={(e) => setFilters(f => ({ ...f, record: e.target.value }))}
             style={{ ...INP, maxWidth: 200 }} />
           <button onClick={() => loadLogs(0)} disabled={loading}
@@ -1030,7 +1029,7 @@ function Overview({ acts, setView, access }: {
   const now = new Date();
   const currentBangkokDate = bangkokCalendarDate(now);
   const currentBangkokYear = Number(currentBangkokDate.slice(0, 4));
-  const { e, d, overdue, soon, gap, gapPts, mismatched, theoThang } = useMemo(() => {
+  const { e, d, overdue, soon, gap, gapPts, mismatched } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
     const overdue = acts.filter((a) => classifyVmpDeadline(a, now, 30).kind === "overdue");
     const soon = acts.filter((a) => {
@@ -1038,22 +1037,10 @@ function Overview({ acts, setView, access }: {
       return kind === "today" || kind === "soon";
     });
 
-    // Dải cột nhỏ trong ô "Tỷ lệ hồ sơ": tỷ lệ hồ sơ theo tháng đích.
-    // Phải đếm ĐÚNG thước đo mà con số lớn của ô đang dùng (trạng thái báo
-    // cáo) — bản trước vẽ tỷ lệ hoàn thành VMP cạnh con số tỷ lệ hồ sơ, hai
-    // thước đo khác nhau trong một ô, đọc ra kết luận sai về xu hướng.
-    const thang = Array.from({ length: 12 }, () => ({ tong: 0, xong: 0 }));
-    for (const a of acts) {
-      const t = a.target ? new Date(a.target).getMonth() : -1;
-      if (t < 0 || t > 11) continue;
-      thang[t].tong++;
-      if (wlIsDone((a._raw as Record<string, unknown> | undefined)?.tt_bao_cao)) thang[t].xong++;
-    }
     return {
       e, d, overdue, soon,
       gap: e.done - d.done, gapPts: e.rate - d.rate,
       mismatched: acts.filter((a) => a.mismatch),
-      theoThang: thang.map((m) => (m.tong ? m.xong / m.tong : 0)),
     };
   }, [acts, now]);
 
@@ -1061,31 +1048,9 @@ function Overview({ acts, setView, access }: {
     overdue: overviewTarget(access, "overdue"),
     soon: overviewTarget(access, "soon"),
     dataQuality: overviewTarget(access, "data-quality"),
-    today: overviewTarget(access, "today"),
   }), [access]);
   const di = (v: ScreenId | null) => (v && setView ? () => setView(v) : undefined);
-  const nhanCta = (v: ScreenId | null) => {
-    if (v === "progress") return "Cập nhật";
-    if (v === "alerts") return "Xem cảnh báo";
-    if (v === "today") return "Mở việc hôm nay";
-    if (v === "health") return "Xem kiểm tra";
-    if (v === "source") return "Xem danh mục";
-    return "Mở chi tiết";
-  };
-  const [sau, setSau] = useState(false);
   const soLoiDl = useMemo(() => runDataQualityChecks(acts).length, [acts]);
-
-  /* Năm việc gấp nhất trong phạm vi đang chọn — cả nhóm hoặc một nhân sự.
-     Đây là bản rút gọn của màn "Hôm nay", đặt ngay trên trang đầu để màn
-     tổng quan có lối vào việc, không chỉ toàn số để ngắm. */
-  const vieCGap = useMemo(() => {
-    return acts
-      .map((a) => ({ a, state: classifyVmpDeadline(a, now, 30) }))
-      .filter(({ state }) => state.kind === "overdue" || state.kind === "today" || state.kind === "soon")
-      .map(({ a, state }) => ({ a, con: state.daysRemaining ?? 0 }))
-      .sort((x, y) => x.con - y.con)
-      .slice(0, 5);
-  }, [acts, now]);
 
   return (
     <div className="vmp-bento vmp-stagger">
@@ -1099,7 +1064,7 @@ function Overview({ acts, setView, access }: {
             mình đang đứng ở đâu trong năm. */}
         <VongNam acts={acts} rate={e.rate} total={e.total}
           year={currentBangkokYear} bangkokToday={currentBangkokDate} ben={
-          <div style={{ minWidth: 0 }}>
+          <div className="vmp-overview-progress" style={{ minWidth: 0 }}>
             <div style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800,
                           color: C.plum, marginBottom: 3 }}>
               Tiến độ thẩm định {currentBangkokYear}
@@ -1114,7 +1079,7 @@ function Overview({ acts, setView, access }: {
                 { l: "Quá hạn", v: e.over, c: C.rasp, t: C.raspText },
                 { l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
               ].map((x) => (
-                <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div key={x.l} className="vmp-overview-progress__row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 999,
                                  background: x.c, flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700,
@@ -1152,19 +1117,15 @@ function Overview({ acts, setView, access }: {
           thái) 208" và "Có mốc đã quá hạn 268" cạnh nhau, người mới nhìn
           tưởng web tính sai. Nay lấy con số RỘNG hơn (theo mốc) làm chỉ số
           chính vì đó mới là thứ phải xử, và nói thẳng chênh lệch là gì. */}
-      <StatTile cls="b-k1" icon={AlertCircle} label="Quá hạn" value={overdue.length}
+      <StatTile cls="b-k1" icon={AlertCircle} label="Trễ đích VMP" value={overdue.length}
         tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di(destinations.overdue)}
         sub={overdue.length
           ? `${e.over} đã đổi trạng thái · ${Math.max(0, overdue.length - e.over)} mốc đã trôi mà trạng thái chưa đổi`
           : "Không còn hạng mục nào trễ"} />
 
-      <StatTile cls="b-k2" icon={Clock} label="Tới hạn 30 ngày" value={soon.length}
+      <StatTile cls="b-k2" icon={Clock} label="Tới hạn đích VMP 30 ngày" value={soon.length}
         tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di(destinations.soon)}
         sub={soon.length ? "Theo dõi để không rơi sang quá hạn" : "Tháng tới đang trống"} />
-
-      <StatTile cls="b-k3" icon={ClipboardCheck} label="Hoàn thành VMP" value={`${e.rate}%`}
-        tone={{ c: C.mintText, bg: C.mintSoft }} bars={theoThang}
-        sub={`${e.done}/${e.total} hạng mục · dải cột = tỷ lệ hồ sơ theo tháng đích`} />
 
       {/* Ô thứ tư là CHẤT LƯỢNG DỮ LIỆU, không phải một chỉ số tiến độ nữa.
           Lý do: mọi con số còn lại trên trang đều chỉ đáng tin bằng đúng chất
@@ -1174,7 +1135,7 @@ function Overview({ acts, setView, access }: {
         tone={soLoiDl > 0 ? { c: C.marigoldText, bg: C.marigoldSoft } : { c: C.mintText, bg: C.mintSoft }}
         onClick={di(destinations.dataQuality)}
         sub={soLoiDl
-          ? `${mismatched.length} lệch pha${destinations.dataQuality ? ` · ${nhanCta(destinations.dataQuality).toLowerCase()}` : ""}`
+          ? `${soLoiDl} vấn đề được phát hiện · trong đó ${mismatched.length} lệch pha`
           : "Không phát hiện vấn đề nào"} />
 
       <div className="b-vali">
@@ -1183,68 +1144,17 @@ function Overview({ acts, setView, access }: {
         }} />
       </div>
 
-      {/* Lối vào VIỆC, ngay trên màn đầu. */}
-      <Card cls="b-wide" variant="strong">
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between",
-                      gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <strong style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800, color: C.plum }}>
-            Việc gấp nhất
-          </strong>
-          {destinations.today && (
-            <button type="button" className="vmp-mo-sau" style={{ width: "auto", padding: "8px 14px" }}
-              onClick={di(destinations.today)}>{nhanCta(destinations.today)} →</button>
-          )}
-        </div>
-        {vieCGap.length === 0 ? (
-          <div style={{ padding: 16, color: C.mintText, fontWeight: 700, fontSize: 14 }}>
-            Không có hạng mục nào đang tới hạn hoặc quá hạn.
-          </div>
-        ) : (
-          <div className="hn-ds">
-            {vieCGap.map(({ a, con }) => (
-              <div key={a.id} className="hn-dong">
-                <span className={`hn-ngay ${con < 0 ? "is-tre" : "is-toi"}`}>
-                  {con < 0 ? `trễ ${Math.abs(con)}` : con === 0 ? "hôm nay" : `còn ${con}`}
-                  {con !== 0 && <small>ngày</small>}
-                </span>
-                <span className="hn-ten">
-                  <b>{a.code}</b><span>{a.name}</span>
-                </span>
-                <span className="hn-meta">Đích VMP · {a.owner || "chưa có người"}</span>
-                <Pill s={a.st} small />
-                {destinations.overdue && (
-                  <button type="button" className="hn-nut" onClick={di(destinations.overdue)}>
-                    {nhanCta(destinations.overdue)}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* PHÂN TÍCH CHI TIẾT — gập lại, không nằm trên màn đầu.
-          Trang này trước dài 6,7 màn hình với 12 khối nội dung: đó là một
-          bản báo cáo, không phải một "tổng quan". Tổng quan phải trả lời
-          được trong một màn: có gì cháy, đang ở đâu, hôm nay làm gì.
-          Ma trận giai đoạn, phễu, tỷ lệ theo loại, bảng theo đơn vị vẫn
-          giá trị nguyên vẹn — chỉ là không thuộc màn đầu tiên. */}
-      {/* b-sau, KHÔNG phải b-wide: hai item cùng grid-area là nằm chồng
-          lên nhau — chính là bug "Phân tích chi tiết đè chữ". */}
-      <div className="b-sau">
-        <button type="button" className="vmp-mo-sau" onClick={() => setSau((v) => !v)}
-          aria-expanded={sau}>
-          <span>{sau ? "▾" : "▸"}</span>
-          Phân tích chi tiết
-          <small>ma trận giai đoạn · phễu bốn giai đoạn · tỷ lệ theo loại thẩm định · theo bộ phận</small>
-        </button>
-        {sau && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
-            <MaTranTienDo acts={acts} />
-            <CompletionDashboard acts={acts} />
-          </div>
-        )}
-      </div>
+      <section className="b-sau overview-analysis-studio" data-overview-analysis-studio
+        aria-labelledby="overview-analysis-title">
+        <header className="overview-analysis-studio__header">
+          <span className="overview-analysis-studio__eyebrow">Phân tích chuyên sâu</span>
+          <h2 id="overview-analysis-title">Dòng chảy, điểm nghẽn và cơ cấu</h2>
+          <p>
+            Đọc lần lượt từ giai đoạn đang hụt, nơi tập trung vấn đề đến nhóm đang dẫn hoặc tụt lại.
+          </p>
+        </header>
+        <CompletionDashboard acts={acts} matrix={<MaTranTienDo acts={acts} />} />
+      </section>
     </div>
   );
 }
@@ -1390,7 +1300,7 @@ function FilterChip({ style, label, onRemove }: {
   style?: React.CSSProperties; label: ReactNode; onRemove: () => void;
 }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 6px 5px 11px", borderRadius: 999, fontFamily: TEXT, fontSize: 12, fontWeight: 800, ...style }}>
+    <span className="vmp-global-filter__chip" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 6px 5px 11px", borderRadius: 999, fontFamily: TEXT, fontSize: 12, fontWeight: 800, ...style }}>
       {label}
       <button type="button" onClick={onRemove} aria-label={`Bỏ ${label}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, border: "none", cursor: "pointer", background: "rgba(0,0,0,.08)", color: "inherit", fontSize: 14, lineHeight: 1, fontWeight: 900 }}>×</button>
     </span>
@@ -1400,7 +1310,7 @@ function FilterChip({ style, label, onRemove }: {
 function GlobalFilterBar({
   areaSel, setAreaSel, deptSel, setDeptSel, setPeriod,
   customFrom, setCustomFrom, customTo, setCustomTo,
-  areaOptions, deptOptions, shown, total, soNgung = 0,
+  areaOptions, deptOptions,
   showPersonSelector, selectedPersonId, setSelectedPersonId, personOptions,
   todayPersonScope, setTodayPersonScope, currentPersonId,
   todayMode = false,
@@ -1418,10 +1328,6 @@ function GlobalFilterBar({
   setCustomTo: (v: string) => void;
   areaOptions: Array<{ v: string; l: string }>;
   deptOptions: Array<{ v: string; l: string }>;
-  shown: number;
-  total: number;
-  /** Số hạng mục Không áp dụng / Đã huỷ — KHÔNG tính vào mẫu số. */
-  soNgung?: number;
   /** Chỉ Admin/Quản lý QA có thể đổi từ cả nhóm sang một người cụ thể. */
   showPersonSelector: boolean;
   selectedPersonId: string | null;
@@ -1438,22 +1344,25 @@ function GlobalFilterBar({
   rutGon?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [daChep, setDaChep] = useState(false);
-  const chepLien = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setDaChep(true);
-      setTimeout(() => setDaChep(false), 2000);
-    } catch { /* trình duyệt chặn clipboard thì người dùng copy từ thanh địa chỉ */ }
-  };
   const popRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!open) return;
     const onDoc = (ev: MouseEvent) => {
       if (popRef.current && !popRef.current.contains(ev.target as Node)) setOpen(false);
     };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        requestAnimationFrame(() => triggerRef.current?.focus());
+      }
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const toggleDept = (v: string) => setDeptSel(deptSel.includes(v) ? deptSel.filter((x) => x !== v) : [...deptSel, v]);
@@ -1482,7 +1391,7 @@ function GlobalFilterBar({
     toggle: (v: string) => void,
     dot: string,
   ) => (
-    <button key={o.v} type="button" onClick={() => toggle(o.v)} aria-pressed={on}
+    <button key={o.v} className="vmp-global-filter__option" type="button" onClick={() => toggle(o.v)} aria-pressed={on}
       style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", border: "none", background: on ? C.pinkMist : "transparent", fontFamily: TEXT, fontSize: 14, fontWeight: 700, color: C.plum, padding: "8px 9px", borderRadius: 8, cursor: "pointer" }}>
       <span style={{ width: 9, height: 9, borderRadius: 8, background: dot, flex: "none" }} />
       <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.l}</span>
@@ -1491,67 +1400,32 @@ function GlobalFilterBar({
     </button>
   );
 
-  return (
-    <div aria-label="Phạm vi toàn hệ thống" className="vmp-thanh-loc" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 14, padding: "2px 0 8px" }}>
-      {!rutGon && <span className="vmp-global-filter-label"><Filter size={14} /> Phạm vi toàn hệ thống</span>}
-      {showPersonSelector ? (
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 7, color: C.plumSoft,
-          fontFamily: TEXT, fontSize: 12, fontWeight: 800 }}>
-          <Users size={14} />
-          {!rutGon && <span>Theo nhân sự</span>}
-          <select aria-label="Chọn nhân sự xem tiến độ" value={selectedPersonId ?? ""}
-            onChange={(event) => setSelectedPersonId(event.target.value || null)}
-            style={{ ...INP, width: "auto", minWidth: 170, padding: "6px 30px 6px 10px", fontSize: 12 }}>
-            <option value="">Cả nhóm</option>
-            {personOptions.map((person) => (
-              <option key={person.personId} value={person.personId}>
-                {person.label}{person.personId === currentPersonId ? " (Tôi)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : todayMode ? (
-        <TodayScopeControl
-          scope={todayPersonScope}
-          currentPersonId={currentPersonId}
-          onChange={setTodayPersonScope}
-        />
-      ) : null}
+  const personControl = showPersonSelector ? (
+    <label className={rutGon ? undefined : "vmp-global-filter__person"} style={{ display: "inline-flex", alignItems: "center", gap: 7, color: C.plumSoft,
+      fontFamily: TEXT, fontSize: 12, fontWeight: 800 }}>
+      <Users size={14} aria-hidden="true" />
+      {!rutGon && <span>Theo nhân sự</span>}
+      <select aria-label="Chọn nhân sự xem tiến độ" value={selectedPersonId ?? ""}
+        onChange={(event) => setSelectedPersonId(event.target.value || null)}
+        style={{ ...INP, width: "auto", minWidth: 170, minHeight: rutGon ? 42 : undefined, padding: "6px 30px 6px 10px", fontSize: 12 }}>
+        <option value="">Cả nhóm</option>
+        {personOptions.map((person) => (
+          <option key={person.personId} value={person.personId}>
+            {person.label}{person.personId === currentPersonId ? " (Tôi)" : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : todayMode ? (
+    <TodayScopeControl
+      scope={todayPersonScope}
+      currentPersonId={currentPersonId}
+      onChange={setTodayPersonScope}
+    />
+  ) : null;
 
-      {/* + Lọc (Bộ phận / Khu vực) */}
-      {!rutGon && <div ref={popRef} style={{ position: "relative" }}>
-        {/* Hai ô chọn ngày đã chuyển VÀO hộp này. Chúng chiếm cố định ~230px
-            trên mọi màn hình cho một thao tác thỉnh thoảng mới dùng, trong khi
-            phần đầu trang đã ngốn gần 1/3 chiều cao trước khi thấy nội dung.
-            Số bộ lọc đang bật hiện ngay trên nút nên không giấu mất trạng thái. */}
-        <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="true" aria-expanded={open}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1px dashed ${soLoc ? C.pinkText : C.pink}`, background: open || soLoc ? C.pinkMist : "transparent", color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-          <Plus size={14} /> Bộ lọc{soLoc ? ` (${soLoc})` : ""}
-        </button>
-        {open && (
-          <div className="vmp-scroll" style={{ position: "absolute", zIndex: 60, top: "calc(100% + 8px)", left: 0, minWidth: 274, maxHeight: 380, overflowY: "auto", background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14, boxShadow: "0 16px 40px rgba(120,60,110,.2)", padding: 6 }}>
-            <div style={{ margin: "6px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khoảng thời gian</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 8px 8px" }}>
-              <input type="date" value={customFrom} onChange={(e) => onFrom(e.target.value)} disabled={todayMode} aria-label="Từ ngày" style={{ ...dateInp, flex: 1 }} />
-              <span style={{ color: C.plumSoft, fontWeight: 800 }}>→</span>
-              <input type="date" value={customTo} onChange={(e) => onTo(e.target.value)} disabled={todayMode} aria-label="Đến ngày" style={{ ...dateInp, flex: 1 }} />
-            </div>
-            {todayMode && (
-              <div style={{ margin: "0 8px 8px", fontSize: 11, color: C.plumSoft, fontWeight: 700 }}>
-                Việc hôm nay tự dùng cửa sổ 7 ngày.
-              </div>
-            )}
-            <div style={{ margin: "6px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Bộ phận</div>
-            {deptOptions.map((o) => optRow(o, deptSel.includes(o.v), toggleDept, ((DEPT_CHIP as Record<string, { dot?: string }>)[o.v] || {}).dot || C.pink))}
-            <div style={{ margin: "8px 8px 3px", fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: C.plumSoft, fontWeight: 800 }}>Khu vực</div>
-            {areaOptions.length === 0
-              ? <div style={{ padding: "8px 9px", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Không có khu vực</div>
-              : areaOptions.map((o) => optRow(o, areaSel.includes(o.v), toggleArea, C.marigold))}
-          </div>
-        )}
-      </div>}
-
-      {/* chip đang lọc */}
+  const chips = (
+    <>
       {deptSel.map((v) => (
         <FilterChip key={"d" + v}
           label={(DEPT_CODE as Record<string, string>)[v] || v.toUpperCase()}
@@ -1567,37 +1441,83 @@ function GlobalFilterBar({
       {!todayMode && (customFrom || customTo) && (
         <FilterChip label={`Ngày: ${customFrom || "…"} → ${customTo || "…"}`} onRemove={() => { setCustomFrom(""); setCustomTo(""); setPeriod("all"); }} style={neutralChip} />
       )}
+    </>
+  );
 
-      {/* phải: đếm kết quả + xóa */}
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-        {!rutGon && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700, color: C.plumSoft, fontFamily: NUM }}>
-          <b style={{ color: shown < total ? C.pinkText : C.plum }}>{shown}</b>/{total} hạng mục
-          <GiaiThich tieuDe={`${total} = mẫu số của thanh lọc`}>
-            <span>{MAU_SO.tatCa}</span>
-            {soNgung > 0 && (
-              <span>
-                Đã trừ {soNgung} hạng mục "Không áp dụng / Đã huỷ" — chúng không hiện ở màn nào,
-                nên tính vào đây sẽ ra một mẫu số không trang nào dùng. Xem chúng ở màn Cập nhật
-                tiến độ bằng ô "Hiện cả mục đã ngừng".
-              </span>
-            )}
-            <span>Báo cáo mục 1 dùng mẫu số HẸP HƠN: chỉ hạng mục có mốc đích VMP rơi vào năm đang chọn. Số khác nhau là do định nghĩa khác nhau, không phải do lệch dữ liệu.</span>
-          </GiaiThich>
-        </span>}
-        {/* Cả màn hình đang xem nằm trong URL, nên chép link là chia sẻ được
-            nguyên lát cắt — khỏi phải dặn nhau "vào Cảnh báo rồi chọn XSX". */}
-        {!rutGon && <button type="button" onClick={chepLien} title="Chép liên kết tới đúng màn hình và bộ lọc đang xem"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8,
-            border: `1px solid ${daChep ? C.mintText : C.pinkSoft}`, background: daChep ? C.mintSoft : "transparent",
-            color: daChep ? C.mintText : C.plumSoft, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-          {daChep ? <CheckCircle2 size={13} /> : <FileText size={13} />} {daChep ? "Đã chép" : "Chép liên kết"}
-        </button>}
-        {active && (
-          <button type="button" onClick={resetAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-            <XCircle size={13} /> Xóa lọc
-          </button>
-        )}
+  if (rutGon) {
+    return (
+      <div role="group" aria-label="Phạm vi toàn hệ thống" className={`vmp-thanh-loc vmp-thanh-loc--gon${todayMode ? " vmp-thanh-loc--treo" : ""}`} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 14, padding: "2px 0 8px" }}>
+        {personControl}
+        {chips}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+          {active && (
+            <button type="button" onClick={resetAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.pinkSoft}`, background: C.pinkMist, color: C.pinkText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+              <XCircle size={13} /> Xóa lọc
+            </button>
+          )}
+        </div>
       </div>
+    );
+  }
+
+  const hasVisibleChips = deptSel.length > 0 || areaSel.length > 0
+    || (!todayMode && (!!customFrom || !!customTo));
+  const closeAndFocusTrigger = () => {
+    setOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  return (
+    <div role="group" aria-label="Phạm vi toàn hệ thống" className="vmp-global-filter">
+      <div className="vmp-global-filter__primary">
+        <span className="vmp-global-filter__scope"><Filter size={15} aria-hidden="true" />Toàn hệ thống</span>
+        {personControl}
+        <div ref={popRef} className="vmp-global-filter__popover">
+          <button id="vmp-global-filter-trigger" ref={triggerRef} className="vmp-global-filter__trigger" type="button"
+            onClick={() => setOpen((value) => !value)} aria-haspopup="dialog" aria-expanded={open}
+            aria-controls="vmp-global-filter-panel">
+            Bộ lọc{soLoc ? ` (${soLoc})` : ""}
+          </button>
+          {open && (
+            <div id="vmp-global-filter-panel" role="dialog" aria-labelledby="vmp-global-filter-trigger"
+              className="vmp-global-filter__panel vmp-scroll">
+              <fieldset className="vmp-global-filter__group">
+                <legend>Khoảng thời gian</legend>
+                <div className="vmp-global-filter__dates">
+                  <input type="date" value={customFrom} onChange={(event) => onFrom(event.target.value)}
+                    disabled={todayMode} aria-label="Từ ngày" style={dateInp} />
+                  <span aria-hidden="true">→</span>
+                  <input type="date" value={customTo} onChange={(event) => onTo(event.target.value)}
+                    disabled={todayMode} aria-label="Đến ngày" style={dateInp} />
+                </div>
+                {todayMode && <p className="vmp-global-filter__hint">Việc hôm nay tự dùng cửa sổ 7 ngày.</p>}
+              </fieldset>
+              <fieldset className="vmp-global-filter__group">
+                <legend>Bộ phận</legend>
+                {deptOptions.map((option) => optRow(option, deptSel.includes(option.v), toggleDept,
+                  ((DEPT_CHIP as Record<string, { dot?: string }>)[option.v] || {}).dot || C.pink))}
+              </fieldset>
+              <fieldset className="vmp-global-filter__group">
+                <legend>Khu vực</legend>
+                {areaOptions.length === 0
+                  ? <p className="vmp-global-filter__empty">Không có khu vực</p>
+                  : areaOptions.map((option) => optRow(option, areaSel.includes(option.v), toggleArea, C.marigold))}
+              </fieldset>
+              <div className="vmp-global-filter__footer">
+                <button type="button" className="vmp-global-filter__done" onClick={closeAndFocusTrigger}>Xong</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {hasVisibleChips && (
+        <div className="vmp-global-filter__chips">
+          {chips}
+          <button type="button" className="vmp-global-filter__reset" data-global-filter-reset onClick={resetAll}>
+            <XCircle size={14} aria-hidden="true" /> Xóa tất cả
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1649,8 +1569,10 @@ function VerifiedAppShell({ user, logout, access }: {
     else if (saveStatus === "warning") toast.canhBao("Lưu Supabase OK — Sheet chưa đồng bộ");
     else if (saveStatus === "error") toast.loi("Lưu thất bại");
   }, [saveStatus, toast]);
+  /* `rules` đứng trong danh sách RIÊNG vì nó không còn mục menu (31/08)
+     nhưng hash `#v=rules` phải sống — cùng lý do `inventory`/`risk` ở đây. */
   const rawUrlViews = useMemo(() => NAV_ITEMS.map((item) => item.id).concat([
-    "risk", "inventory", "missing", "accounts", "people",
+    "risk", "inventory", "missing", "accounts", "people", "rules",
   ]), []);
 
   /* Đưa alias về màn chuẩn NGAY tại biên đọc URL.
@@ -1850,6 +1772,12 @@ function VerifiedAppShell({ user, logout, access }: {
     inDept(a) &&
     matchTime(a)
   )), [acts, areaSel, inDept, matchTime]);
+  const monitoringMetrics = useMemo(
+    () => buildMonitoringSignatureMetrics(filteredActs),
+    [filteredActs],
+  );
+  const monitoringView = (["overview", "timeline", "alerts"] as const)
+    .find((id) => id === view);
   /* Personal Today and Overview share this base: department and area are
      global scope, while the period filter is intentionally team-Overview
      only. A selected person's queue must not lose their overdue VMP item
@@ -1873,28 +1801,6 @@ function VerifiedAppShell({ user, logout, access }: {
     onlyMine: todaySelectedPersonId !== null,
     currentPersonId: todaySelectedPersonId,
   }), [personScopeBaseActs, todaySelectedPersonId]);
-  const allTodayActs = useMemo(() => filterTodayScope(personScopeBaseActs, {
-    areas: [],
-    departments: [],
-    onlyMine: todaySelectedPersonId !== null,
-    currentPersonId: todaySelectedPersonId,
-  }), [personScopeBaseActs, todaySelectedPersonId]);
-  /* Mẫu số của thanh lọc phải đếm HẠNG MỤC ĐANG HOẠT ĐỘNG.
-     Đo được: RPC trả 461 dòng = 448 đang hoạt động + 13 "Không áp dụng".
-     Thanh lọc ghi 461 nhưng mọi màn bên dưới đều lọc bỏ 13 dòng kia, nên
-     con số 461 là một mẫu số KHÔNG MÀN NÀO dùng — người đọc đối chiếu với
-     bất kỳ trang nào cũng thấy lệch, và không có cách nào biết vì sao.
-     Dữ liệu vẫn giữ nguyên cả 461 dòng (màn Cập nhật tiến độ có ô "Hiện cả
-     mục đã ngừng" cần chúng); chỉ CON SỐ ĐẾM là đổi. */
-  const laSong = (a: Activity) => (a.state || "active") === "active";
-  const soSong = useMemo(() => acts.filter(laSong).length, [acts]);
-  const soSongHien = useMemo(() => filteredActs.filter(laSong).length, [filteredActs]);
-  const soSongOverview = useMemo(() => overviewActs.filter(laSong).length, [overviewActs]);
-  const soSongToday = useMemo(() => todayActs.filter(laSong).length, [todayActs]);
-  const soSongTodayTotal = useMemo(() => allTodayActs.filter(laSong).length, [allTodayActs]);
-  const soNgung = acts.length - soSong;
-  const soNgungToday = allTodayActs.length - soSongTodayTotal;
-
   const filteredObjects = useMemo(() => objects.filter((o) => {
     if (areaSel.length && !areaSel.includes(String(o.area || "").trim())) return false;
     if (deptSel.length) {
@@ -2058,6 +1964,10 @@ function VerifiedAppShell({ user, logout, access }: {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>
+      <a className="vmp-skip-link" href="#vmp-main-content"
+        onClick={(event) => { event.preventDefault(); mainRef.current?.focus(); }}>
+        Bỏ qua điều hướng
+      </a>
       {showPw && (
         <ChangePwModal
           recovery={khoiPhucMk}
@@ -2084,7 +1994,7 @@ function VerifiedAppShell({ user, logout, access }: {
       {/* Nền theo thiết kế 29/08 (lotus-shell.css .vmp-main-nen): ánh hồng–
           lavender toả từ góc như cũ, thêm tranh hồ sen mờ ở góc phải (không
           đè chữ) và vân sơn mài; bỏ sao lấp lánh. */}
-      <main ref={mainRef} className="vmp-scroll vmp-main-nen" style={{
+      <main ref={mainRef} id="vmp-main-content" tabIndex={-1} className="vmp-scroll vmp-main-nen" style={{
         flex: 1, overflowY: "auto", position: "relative",
       }}>
         <div style={{ position: "relative", zIndex: 1 }}>
@@ -2151,9 +2061,6 @@ function VerifiedAppShell({ user, logout, access }: {
                 customFrom={customFrom} setCustomFrom={setCustomFrom}
                 customTo={customTo} setCustomTo={setCustomTo}
                 areaOptions={areaOptions} deptOptions={deptOptions}
-                shown={view === "today" ? soSongToday : view === "overview" ? soSongOverview : soSongHien}
-                total={view === "today" ? soSongTodayTotal : soSong}
-                soNgung={view === "today" ? soNgungToday : soNgung}
                 showPersonSelector={canSelectProgressPerson && (view === "overview" || view === "today")}
                 selectedPersonId={progressPersonScopeId} setSelectedPersonId={setSelectedProgressPersonId}
                 personOptions={personProgressChoices}
@@ -2174,6 +2081,15 @@ function VerifiedAppShell({ user, logout, access }: {
             <ScreenGuard screenId={view} access={access} onRedirect={chuyenManAnToan}>
             <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
+              {monitoringView && (
+                <MonitoringJourneyNav
+                  current={monitoringView}
+                  metrics={monitoringMetrics}
+                  canView={(screen) => access.canView(screen)}
+                  onNavigate={setView}
+                  scopeLabel="Theo phạm vi chung"
+                />
+              )}
               {view === "today" && (
                 <TodayCommandCenter
                   acts={todayActs}
@@ -2195,7 +2111,8 @@ function VerifiedAppShell({ user, logout, access }: {
                   <Overview acts={overviewActs} setView={setView} access={access} />
                 </>
               )}
-              {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell} businessRole={access.businessRole} onReload={reloadData} />}
+              {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell}
+                businessRole={access.businessRole} currentPersonId={currentPersonId} onReload={reloadData} />}
               {view === "source" && (
                 <SourceCatalogView access={access} onReload={reloadData}
                   authorizationRevision={authorizationRevision}

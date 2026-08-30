@@ -1,3 +1,7 @@
+if (import.meta.env.DEV) {
+  import("react-grab");
+}
+
 import React from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import ReactDOM from "react-dom/client";
@@ -16,6 +20,11 @@ import "./styles/lotus-shell.css";
 import "./styles/catalog-workspace.css";
 import "./features/today/today.css";
 import "./features/progress/progress.css";
+import "./features/catalog/catalog.css";
+import "./features/monitoring/monitoring.css";
+import "./features/monitoring/long-mon-race.css";
+import "./features/overview/overview-executive.css";
+import "./features/analysis/analysis.css";
 
 /* Đặt ngôn ngữ thị giác và chế độ sáng/tối TRƯỚC khi React mount — nếu để
    trong component thì trang sẽ loé bảng màu cũ một nhịp rồi mới nhảy. */

@@ -11,6 +11,7 @@
  *  Chạy: bash scripts/with-preview.sh -- npm run thammy
  * ===================================================================== */
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
@@ -423,7 +424,7 @@ const MAN = [
 const URL_SB = docCauHinh();
 
 function docCauHinh() {
-  const f = new URL("../../.env.local", import.meta.url).pathname;
+  const f = fileURLToPath(new URL("../../.env.local", import.meta.url));
   const noi = readFileSync(f, "utf8");
   const m = noi.match(/^VITE_SUPABASE_URL=(.+)$/m);
   if (!m) throw new Error(".env.local thiếu VITE_SUPABASE_URL");

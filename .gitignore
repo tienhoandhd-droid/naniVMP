@@ -37,3 +37,4 @@ tests/visual/baselines/*-darwin/
 test-results/
 playwright-report/
 supabase/.branches/
+tests/visual/baselines/*-win32/

@@ -45,31 +45,32 @@ Không mở thêm quyền. Component chỉ sử dụng tập dữ liệu mà RPC
 
 - Dòng sông ba tháng được chia thành các vùng tuần liên tiếp. Ranh giới tuần là dải sáng hoặc nhãn nhỏ, không dùng lưới ô cứng.
 - Deadline chỉ quyết định cá thuộc vùng tuần nào; cá không còn bị ép vào tọa độ chính xác của từng ngày.
-- Trong một vùng tuần, thuật toán xếp cá theo các luồng bơi cong và ổn định, với hộp va chạm bao gồm cả thân cá lẫn nhãn mã thiết bị.
+- Trong một vùng tuần, thuật toán dùng hash từ ID để sinh tọa độ giả ngẫu nhiên ổn định quanh các luồng bơi cong. Tải lại trang vẫn giữ nguyên đội hình; không dùng `Math.random`.
+- Tọa độ dọc bám một dải sóng mềm và được lệch riêng theo từng cá, tránh tạo hàng hoặc cột thẳng. Vùng x của cụm tuần được nới nhẹ qua ranh giới nhãn để đàn cá có khoảng thở nhưng cá vẫn mang đúng `weekKey`.
 - Khoảng cách tối thiểu giữa hai hộp va chạm là 8px. Thuật toán phải xác định theo dữ liệu và thứ tự ổn định, không dùng `Math.random`.
 - Nếu một tuần đông cá, vùng tuần bổ sung hàng bơi theo chiều dọc và chiều cao canvas tăng trong giới hạn cuộn hiện có. Không thu cá dưới vùng bấm 44×44px, không giấu cá và không gộp thành con số.
 - Các tuần liền kề cùng tham gia phép kiểm tra va chạm để cá ở hai bên ranh giới không đè lên nhau.
 - Vạch **Hôm nay** và nhãn tháng vẫn giữ. Nhãn tuần thể hiện khoảng `dd/mm–dd/mm` để người xem đọc mật độ theo tuần.
 - Ngày hạn VMP chính xác không được suy từ vị trí cá. Bấm cá mở chi tiết và phải thấy rõ `Hạn VMP: dd/mm/yyyy` cùng mã, tên, người QA và trạng thái.
 
-## Chuyển động riêng theo loài
+## Dáng bơi tĩnh riêng theo loài
 
-Chuyển động chỉ diễn ra trong phạm vi nhỏ quanh vị trí đã xếp, tối đa 4px tịnh tiến và 2° xoay; không làm cá đổi vùng tuần và không ảnh hưởng vùng bấm. Hộp va chạm phải tính cả biên độ chuyển động này:
+Ngư đồ không dùng animation. Mỗi loài có một tư thế tĩnh riêng, kết hợp góc nghiêng và tỷ lệ giả ngẫu nhiên ổn định theo ID để đàn cá sinh động mà không gây xao nhãng:
 
-- **Cá trê xám · chưa xong đề cương:** lướt chậm, đuôi nghiêng nhẹ; nhịp dài và trầm.
-- **Cá lia thia lam · xong đề cương:** rung vây mềm, thân gần như đứng yên.
-- **Cá chép ngọc · xong thực tế:** tiến–lùi đều và nhấp nhẹ theo dòng nước.
-- **Cá thần tiên tím · xong báo cáo:** trôi lên–xuống thanh, biên độ nhỏ.
-- **Cá rồng vàng · hoàn thành VMP:** lướt dài, uyển chuyển và chậm nhất.
-- **Cá nóc chu sa · quá hạn VMP:** nảy ngắn, hơi nghiêng, tạo cảm giác khẩn nhưng không giật liên tục.
+- **Cá trê xám · chưa xong đề cương:** thân thấp, hơi chúi theo dòng.
+- **Cá lia thia lam · xong đề cương:** vây nâng nhẹ, thân chếch lên.
+- **Cá chép ngọc · xong thực tế:** dáng tiến đều, đầu cao vừa phải.
+- **Cá thần tiên tím · xong báo cáo:** thân thanh, nổi cao hơn luồng nước.
+- **Cá rồng vàng · hoàn thành VMP:** dáng lướt dài, ngang và uyển chuyển.
+- **Cá nóc chu sa · quá hạn VMP:** thân tròn, hơi chúi để tạo điểm nhấn khẩn.
 
-Animation áp vào sprite/wake bên trong; wrapper và button giữ nguyên để nhãn, tooltip, focus ring và click target không rung. Mỗi cá có độ trễ âm xác định từ ID để đàn cá không chuyển động đồng bộ. Khi `prefers-reduced-motion: reduce`, tắt animation nhưng giữ nguyên đội hình tĩnh.
+Góc tổng thể đi theo tiếp tuyến gần đúng của dòng cong, giới hạn nhỏ để mã thiết bị và vùng bấm vẫn dễ đọc. Wrapper, tooltip, focus ring và click target luôn đứng yên.
 
 ## Kiến trúc và luồng dữ liệu
 
 1. `App` truyền `businessRole` và `currentPersonId` vào `TimelineView`.
 2. Một model thuần trong feature monitoring quyết định khả năng xem nhóm, chuẩn hóa phạm vi yêu cầu và lọc hạng mục theo person ID.
-3. Model bố cục Long Môn chuyển từ neo ngày sang vùng tuần, xếp hộp va chạm không chồng lấn và sinh biến nhịp bơi ổn định theo ID.
+3. Model bố cục Long Môn chuyển từ neo ngày sang vùng tuần, sinh tọa độ giả ngẫu nhiên ổn định theo ID và xếp hộp va chạm hai chiều trên các dòng cong.
 4. `TimelineView` giữ trạng thái `team | personal` và `selectedPersonId`, chỉ lọc tập dữ liệu dành cho `LongMonRace`.
 5. KPI, bảng Timeline và các bộ lọc khác không đổi trong đợt này.
 6. `LongMonRace` nhận tập hạng mục đã lọc cùng metadata/handler của điều khiển phạm vi; component không tự suy quyền.
@@ -102,7 +103,7 @@ Nguồn danh sách cá nhân tái sử dụng `buildPersonProgressChoices(acts)`
 2. Unit test lọc theo owner và support ID, không dùng tên.
 3. Component test: quản lý thấy hai nút và select khi ở cá nhân; QA staff không có các điều khiển đó.
 4. Unit test bố cục vùng tuần: cá đúng tuần, không có hai hộp va chạm, kết quả ổn định và tuần đông tự thêm hàng.
-5. Component test xác nhận sáu lớp chuyển động riêng và reduced-motion không làm mất đội hình.
+5. Component test xác nhận sáu dáng bơi tĩnh riêng và không có animation Long Môn.
 6. Một E2E quản lý: chuyển từ cả nhóm sang một QA làm giảm/đổi số cá; mọi cá không chồng lấn; bấm cá thấy đúng ngày hạn và mở hồ sơ hoạt động.
 7. Kiểm tra desktop 1440px và mobile 390px; typecheck và production build.
 

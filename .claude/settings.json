@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(inkscape:*)",
+      "Bash(\"C:/Program Files/Inkscape/bin/inkscape.com\":*)",
+      "Bash(\"C:/Program Files/Inkscape/bin/inkscape.exe\":*)"
+    ]
+  }
+}

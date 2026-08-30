@@ -21,12 +21,16 @@ import {
   parseD, fmtVN, daysBetween, addMonths, txt, nguoiPhuTrach, milestones,
   qrmRpn, qrmLevel, byRisk,
 } from "../utils/helpers.ts";
-import { Card, CardTitle, Tag, KpiCard, Modal, Pill, PhanTrang, CauKetLuan } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Pill, PhanTrang, CauKetLuan } from "../components/ui/Primitives.tsx";
 import { useDebounce, usePerformers } from "../hooks/index.ts";
-import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT } from "../lib/aiReport.ts";
+import { chayPhanTichAi, aiConfigured } from "../lib/aiReport.ts";
 import AiMailModal from "../components/ai/AiMailModal.tsx";
 import QrmView from "./QrmPage.tsx";
 import type { Activity } from "../types/domain.ts";
+import {
+  buildAlertsCommandModel,
+  type AlertRow,
+} from "../features/monitoring/alertsCommandModel.ts";
 
 const WINDOWS = [
   ["all", "Mọi thời điểm"],
@@ -48,22 +52,13 @@ const SORTS = [
   ["name", "Theo tên hạng mục"],
 ];
 
+const AI_UNAVAILABLE = "Phân tích AI chưa được bật. Dữ liệu cảnh báo vẫn đầy đủ.";
+
 const LEVEL_STYLE: Record<string, { text: string; soft: string; label: string }> = {
   cao:  { text: C.raspText,     soft: C.raspSoft,     label: "Rủi ro cao" },
   tb:   { text: C.marigoldText, soft: C.marigoldSoft, label: "Rủi ro TB" },
   thap: { text: C.mintText,     soft: C.mintSoft,     label: "Rủi ro thấp" },
 };
-
-/** Một dòng cảnh báo đã chuẩn hoá — bốn nhóm dùng chung một hình dạng để
- *  lọc, xếp thứ tự và xuất file chỉ phải viết một lần. */
-interface AlertRow {
-  a: Activity;
-  kind: "over" | "soon" | "requal" | "risk";
-  /** Số ngày còn lại (âm = đã trễ). */
-  dleft: number;
-  date: Date | null;
-  stage: string;
-}
 
 const KIND_LABEL: Record<AlertRow["kind"], string> = {
   over: "Quá hạn", soon: "Tới hạn", requal: "Tái thẩm định", risk: "Rủi ro cao",
@@ -417,6 +412,14 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all, dept, win, level, owner, kw, sort]);
 
+  const command = useMemo(() => buildAlertsCommandModel([
+    ...byKind.over,
+    ...byKind.risk,
+    ...byKind.soon,
+    ...byKind.requal,
+  ], 5), [byKind]);
+  const [topAlert, ...nextAlerts] = command.queue;
+
   /* Đếm hạng mục mà điểm trọng yếu chưa có dấu QA duyệt. Không có trường đó
      trong bản đang tải thì để 0 và câu chữ tự chuyển sang cách nói không
      khẳng định con số. */
@@ -496,12 +499,19 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     finally { setAiLoading(false); }
   };
 
-  const cards = [
-    { id: "over",   emoji: "🚨", bg: C.raspSoft,     color: C.raspText,     ring: C.rasp,     label: "Hạng mục quá hạn",            sub: "Cần xử lý ngay" },
-    { id: "soon",   emoji: "⏰", bg: C.marigoldSoft, color: C.marigoldText, ring: C.marigold, label: `Tới hạn (≤ ${SOON_DAYS} ngày)`, sub: "Theo dõi sát" },
-    { id: "risk",   emoji: "🛡️", bg: C.raspSoft,     color: C.raspText,     ring: C.rasp,     label: "Rủi ro cao chưa xong",        sub: "RPN ≥ 15 · ICH Q9" },
-    { id: "requal", emoji: "🔁", bg: C.lavSoft,      color: C.lavText,      ring: C.lav,      label: "Tái thẩm định sắp tới",       sub: "Theo tần suất" },
+  const priorityCards = [
+    { id: "over", Icon: AlertCircle, label: "Cần xử lý ngay", sub: "Hạng mục đã quá hạn" },
+    { id: "soon", Icon: CalendarClock, label: "Theo dõi 30 ngày", sub: `Tới hạn trong ${SOON_DAYS} ngày` },
+    { id: "risk", Icon: ShieldAlert, label: "Rủi ro cao cần QA xem", sub: "RPN ≥ 15 · chưa đóng" },
+    { id: "requal", Icon: RefreshCw, label: "Tái thẩm định", sub: "Chu kỳ kế tiếp cần chuẩn bị" },
   ] as const;
+
+  const topEmail = topAlert ? find(topAlert.a.owner)?.email : null;
+  const topRpn = topAlert ? qrmRpn(topAlert.a) : 0;
+  const topLevel = LEVEL_STYLE[qrmLevel(topRpn)];
+  const departmentLabel = (department: string) => department === "unassigned"
+    ? "Chưa phân bộ phận"
+    : (DEPTS.find((item) => item.id === department)?.name || department);
 
   const selStyle = { fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "8px 13px", cursor: "pointer" };
   const chip = (on: boolean) => ({ fontFamily: TEXT, fontSize: 12, fontWeight: 800, border: on ? "none" : `1.5px solid ${C.pinkSoft}`, // C.lav (#8168CE) với chữ trắng chỉ đạt 4.37:1 — dưới ngưỡng WCAG AA
@@ -510,7 +520,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const tabBtn = (on: boolean) => ({ display: "flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 999, cursor: "pointer", fontFamily: TEXT, fontSize: 14, fontWeight: on ? 800 : 600, border: `1.5px solid ${on ? C.pink : C.pinkSoft}`, background: on ? C.pinkSoft : C.surface, color: on ? C.plum : C.plumSoft });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="alerts-page-shell">
       {/* Hai mặt của cùng một việc: danh sách để làm, ma trận để nhìn tổng thể */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" onClick={() => setTab("list")} style={tabBtn(tab === "list")}>
@@ -523,12 +533,90 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
 
       {tab === "matrix" ? <QrmView acts={acts} /> : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 24 }}>
-            {cards.map((c) => (
-              <div key={c.id} onClick={() => setBucket(c.id)} style={{ cursor: "pointer", borderRadius: 14, boxShadow: bucket === c.id ? `0 0 0 3px ${c.ring}` : "none", transition: "box-shadow .2s" }}>
-                <KpiCard emoji={c.emoji} bg={c.bg} color={c.color} value={byKind[c.id].length}
-                  label={c.label} sub={bucket === c.id ? "● Đang xem" : c.sub} subColor={c.color} />
+          <section className="alerts-command" aria-labelledby="alerts-command-title">
+            <article className="alerts-command__hero">
+              <div className="alerts-command__hero-head">
+                <span className="alerts-command__eyebrow">Bàn điều phối · ưu tiên số 1</span>
+                {topAlert && <Tag color={topLevel.text} bg={topLevel.soft}>RPN {topRpn}</Tag>}
               </div>
+              <h2 id="alerts-command-title">Việc cần hành động trước</h2>
+              {topAlert ? (
+                <>
+                  <div className="alerts-command__identity">
+                    <strong>{topAlert.a.id}</strong>
+                    <span>{topAlert.a.name}</span>
+                  </div>
+                  <div className="alerts-command__facts">
+                    <span><b>{topAlert.dleft < 0 ? `Trễ ${Math.abs(topAlert.dleft)} ngày` : `Còn ${topAlert.dleft} ngày`}</b> · {topAlert.stage}</span>
+                    <span>{nguoiPhuTrach(topAlert.a.owner)}{topAlert.a.dept ? ` · ${departmentLabel(String(topAlert.a.dept))}` : ""}</span>
+                    {topAlert.date && <span>Hạn {fmtVN(topAlert.date)}</span>}
+                  </div>
+                  <div className="alerts-command__actions">
+                    <button type="button" onClick={() => moKho(topAlert)}>Mở chi tiết</button>
+                    {topEmail ? (
+                      <a href={`mailto:${topEmail}?subject=${encodeURIComponent(`[VMP] Nhắc việc: ${topAlert.a.id} — ${topAlert.a.name}`)}`}>
+                        <Mail size={15} aria-hidden="true" /> Nhắc qua email
+                      </a>
+                    ) : (
+                      <span className="alerts-command__missing-email">Chưa có email người phụ trách</span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="alerts-command__empty">
+                  <strong>Không có việc cần ưu tiên trong phạm vi này</strong>
+                  <span>Thử mở rộng bộ lọc thời gian hoặc bộ phận để xem thêm.</span>
+                </div>
+              )}
+            </article>
+
+            <aside className="alerts-command__queue" aria-label="Bốn việc ưu tiên tiếp theo">
+              <div className="alerts-command__queue-head">
+                <strong>Tiếp theo</strong>
+                <span>{nextAlerts.length} việc</span>
+              </div>
+              {nextAlerts.length ? nextAlerts.map((row, index) => {
+                const rowEmail = find(row.a.owner)?.email;
+                return (
+                  <div key={`${row.kind}-${row.a.id}`} className="alerts-command__queue-item">
+                    <button type="button" onClick={() => moKho(row)}>
+                      <span className="alerts-command__rank">{index + 2}</span>
+                      <span className="alerts-command__queue-copy">
+                        <strong>{row.a.id} · {row.a.name}</strong>
+                        <small>{row.stage} · {row.dleft < 0 ? `trễ ${Math.abs(row.dleft)} ngày` : `còn ${row.dleft} ngày`} · RPN {qrmRpn(row.a)}</small>
+                      </span>
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </button>
+                    {rowEmail && (
+                      <a aria-label={`Nhắc ${row.a.id} qua email`}
+                        href={`mailto:${rowEmail}?subject=${encodeURIComponent(`[VMP] Nhắc việc: ${row.a.id} — ${row.a.name}`)}`}>
+                        <Mail size={14} aria-hidden="true" />
+                      </a>
+                    )}
+                  </div>
+                );
+              }) : <span className="alerts-command__queue-empty">Không còn việc nào trong hàng đợi.</span>}
+            </aside>
+          </section>
+
+          <div className="alerts-priority-rail" role="group" aria-label="Bốn tín hiệu cảnh báo">
+            {priorityCards.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="alerts-priority"
+                data-priority={item.id}
+                onClick={() => setBucket(item.id)}
+                aria-pressed={bucket === item.id}
+              >
+                <span className="alerts-priority__icon"><item.Icon size={20} aria-hidden="true" /></span>
+                <span className="alerts-priority__copy">
+                  <strong>{item.label}</strong>
+                  <span>{item.sub}</span>
+                  {bucket === item.id && <span className="alerts-priority__current">Đang xem</span>}
+                </span>
+                <strong className="alerts-priority__count">{byKind[item.id].length}</strong>
+              </button>
             ))}
           </div>
 
@@ -542,9 +630,9 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             phu="Điểm máy chấm là đề xuất, không thay đánh giá của QA. Xem cách chấm và duyệt lại ở màn Luật đang áp dụng."
           />
 
-          {/* Bộ lọc: bộ phận · thời gian · mức rủi ro · người thực hiện · tìm kiếm */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "12px 15px", borderRadius: 14, background: "rgba(248,245,252,.6)", border: `1px solid ${C.pinkSoft}` }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: C.plumSoft }}><Filter size={15} /> Lọc</span>
+          {/* Bộ lọc chính giữ các quyết định phạm vi; tìm, xếp và xuất là công cụ phụ. */}
+          <div className="alerts-filter-bar">
+            <span className="alerts-filter-label"><Filter size={15} aria-hidden="true" /> Lọc</span>
             <select value={dept} onChange={(e) => setDept(e.target.value)} style={selStyle} aria-label="Lọc theo bộ phận">
               <option value="all">Tất cả bộ phận</option>
               {DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -556,36 +644,41 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
               <option value="all">Mọi người thực hiện</option>
               {owners.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <div className="alerts-time-window" role="group" aria-label="Khoảng thời gian">
               {WINDOWS.map(([k, label]) => (
-                <button key={k} type="button" onClick={() => setWin(k)} style={chip(win === k)}>{label}</button>
+                <button key={k} type="button" onClick={() => setWin(k)} style={chip(win === k)}
+                  aria-pressed={win === k}>{label}</button>
               ))}
             </div>
-            {/* Gom cụm mặc định BẬT: danh sách phẳng ở đây là hàng chục dòng
-                liên tiếp cùng "RPN 27 · Rủi ro cao · Quá hạn", sắp xếp không
-                tách được gì vì mọi dòng giống hệt nhau. */}
-            <button type="button" onClick={() => setGom((v) => !v)} style={chip(gom)}
-              title="Gom các hạng mục cùng một nhóm việc / một đối tượng thành một dòng">
-              {gom ? "Đang gom cụm" : "Danh sách phẳng"}
-            </button>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "6px 12px" }}>
-              <Search size={14} color={C.plumSoft} />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, người…"
-                style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 12, fontWeight: 600, color: C.plum, width: 150 }} />
-            </label>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: C.plumSoft, marginLeft: 4 }}><ListFilter size={15} /> Xếp</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value)} style={selStyle} aria-label="Sắp xếp">
-              {SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-            </select>
-            <button type="button" onClick={exportCsv} disabled={!shown.length}
-              style={{ ...selStyle, display: "inline-flex", alignItems: "center", gap: 6, opacity: shown.length ? 1 : 0.5 }}>
-              <Download size={14} /> Xuất CSV
-            </button>
+            <div className="alerts-view-mode" role="group" aria-label="Cách hiển thị cảnh báo">
+              <button type="button" aria-pressed={gom} onClick={() => setGom(true)}>Gom theo đối tượng</button>
+              <button type="button" aria-pressed={!gom} onClick={() => setGom(false)}>Theo từng hạng mục</button>
+            </div>
             {hasFilter && (
               <button type="button" onClick={() => { setDept("all"); setWin("all"); setLevel("all"); setOwner("all"); setQ(""); }}
-                style={{ ...selStyle, color: C.raspText, borderColor: C.raspSoft, marginLeft: "auto" }}>Xoá lọc</button>
+                className="alerts-filter-reset" style={{ ...selStyle, color: C.raspText, borderColor: C.raspSoft }}>Xoá lọc</button>
             )}
           </div>
+
+          <details className="alerts-tools">
+            <summary>Tìm kiếm &amp; công cụ</summary>
+            <div className="alerts-tools__body">
+              <label className="alerts-search">
+                <Search size={14} aria-hidden="true" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, người…"
+                  aria-label="Tìm cảnh báo"
+                  style={{ border: "none", outline: "none", background: "transparent", fontFamily: TEXT, fontSize: 12, fontWeight: 600, color: C.plum }} />
+              </label>
+              <span className="alerts-sort-label"><ListFilter size={15} aria-hidden="true" /> Xếp</span>
+              <select value={sort} onChange={(e) => setSort(e.target.value)} style={selStyle} aria-label="Sắp xếp">
+                {SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+              <button type="button" onClick={exportCsv} disabled={!shown.length}
+                style={{ ...selStyle, display: "inline-flex", alignItems: "center", gap: 6, opacity: shown.length ? 1 : 0.5 }}>
+                <Download size={14} aria-hidden="true" /> Xuất CSV
+              </button>
+            </div>
+          </details>
 
           {bucket === "requal" ? (
             <Card variant="soft">
@@ -629,21 +722,64 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             </Card>
           )}
 
+          <section className="alerts-management" aria-labelledby="alerts-management-title">
+            <div className="alerts-management__head">
+              <div>
+                <span className="alerts-command__eyebrow">Góc nhìn quản lý</span>
+                <h2 id="alerts-management-title">Điểm nghẽn trong phạm vi đang lọc</h2>
+              </div>
+              <span>{command.totalUnique} hạng mục duy nhất</span>
+            </div>
+            <div className="alerts-management__body">
+              <div className="alerts-management__metrics">
+                <article>
+                  <strong>{command.overdueRate}%</strong>
+                  <span>đang quá hạn</span>
+                  <small>Cần tháo nút thắt trước</small>
+                </article>
+                <article>
+                  <strong>{command.highRiskRate}%</strong>
+                  <span>rủi ro cao</span>
+                  <small>RPN từ 15 trở lên</small>
+                </article>
+                <article>
+                  <strong>{command.unassignedCount}</strong>
+                  <span>chưa có người</span>
+                  <small>Cần xác nhận đầu mối</small>
+                </article>
+              </div>
+              <div className="alerts-management__hotspots">
+                <div className="alerts-management__hotspots-head">
+                  <strong>Bộ phận nhiều cảnh báo</strong>
+                  <span>Tối đa 5 điểm nóng</span>
+                </div>
+                {command.hotspots.length ? command.hotspots.slice(0, 5).map((item) => (
+                  <div key={item.department} className="alerts-hotspot">
+                    <span>{departmentLabel(item.department)}</span>
+                    <i aria-hidden="true"><b style={{ width: `${item.share}%` }} /></i>
+                    <strong>{item.count}</strong>
+                    <small>{item.overdueCount} trễ · {item.highRiskCount} rủi ro cao</small>
+                  </div>
+                )) : (
+                  <div className="alerts-management__empty">Chưa có cảnh báo để phân tích điểm nghẽn.</div>
+                )}
+              </div>
+            </div>
+          </section>
+
           {/* ===== Phân tích AI cho cảnh báo + gửi mail =====
               Danh sách trả lời "cái nào trước"; phần này trả lời "vì sao đang
               nghẽn và phải nhắc ai" — rồi gửi thẳng cho người cần biết mà
               không phải chép tay sang Outlook. */}
-          <Card variant="strong">
-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
-                <SparkIcon size={18} color={C.pink} />
-                <span style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>Phân tích cảnh báo bằng AI</span>
-                <Tag color={C.plumSoft} bg={C.pinkMist}>Phạm vi: {deptLabel}</Tag>
-                <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
-              </div>
+          <details className="alerts-ai-panel">
+            <summary>
+              <span><SparkIcon size={17} aria-hidden="true" /> Phân tích cảnh báo bằng AI</span>
+              <small>Phạm vi: {deptLabel} · kết quả cần QA xác nhận</small>
+            </summary>
+            <div className="alerts-ai-panel__body">
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <button type="button" onClick={chayAi} disabled={aiLoading || !aiConfigured()}
-                  title={aiConfigured() ? undefined : AI_SETUP_HINT}
+                  title={aiConfigured() ? undefined : AI_UNAVAILABLE}
                   style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 8, padding: "10px 18px",
                     borderRadius: 14, fontSize: 14, opacity: aiLoading || !aiConfigured() ? 0.55 : 1,
                     cursor: aiLoading || !aiConfigured() ? "not-allowed" : "pointer" }}>
@@ -651,7 +787,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                   {aiLoading ? "AI đang phân tích…" : "Phân tích cảnh báo"}
                 </button>
                 <button type="button" onClick={() => setMoGuiMail(true)} disabled={!aiConfigured()}
-                  title={aiConfigured() ? "Chạy AI rồi gửi bản phân tích qua email" : AI_SETUP_HINT}
+                  title={aiConfigured() ? "Chạy AI rồi gửi bản phân tích qua email" : AI_UNAVAILABLE}
                   style={{ ...selStyle, display: "inline-flex", alignItems: "center", gap: 7,
                     background: C.lavSoft, color: C.lavText, borderColor: C.lavSoft, fontWeight: 800,
                     padding: "10px 16px", borderRadius: 14,
@@ -659,37 +795,38 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                   <Mail size={15} /> Gửi mail phân tích
                 </button>
               </div>
-            </div>
 
-            {!aiConfigured() && (
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.marigoldText, background: C.marigoldSoft,
-                borderRadius: 14, padding: "11px 15px", lineHeight: 1.6 }}>⚠️ {AI_SETUP_HINT}</div>
-            )}
-            {aiErr && (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, fontWeight: 800,
-                color: C.raspText, background: C.raspSoft, borderRadius: 14, padding: "12px 15px" }}>
-                <AlertCircle size={16} /> {aiErr}
-              </div>
-            )}
-            {aiLoading && (
-              <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}>
-                <RefreshCw size={22} className="spin" color={C.pink} />
-                <div style={{ marginTop: 10 }}>AI đang đọc lại số từ Supabase và phân tích…</div>
-              </div>
-            )}
-            {!aiLoading && !aiErr && aiText && (
-              <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8,
-                fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`,
-                borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{aiText}</div>
-            )}
-            {!aiLoading && !aiErr && !aiText && aiConfigured() && (
-              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
-                AI đọc lại số thẳng từ Supabase lúc bấm — không lấy từ bảng đang hiện, nên kết quả không
-                phụ thuộc bộ lọc rủi ro/người/từ khoá ở trên, chỉ theo bộ phận. AI chỉ nhận định, không
-                thay đánh giá của QA và không phải căn cứ phê duyệt GMP.
-              </div>
-            )}
-          </Card>
+              {!aiConfigured() && (
+                <div className="alerts-ai-unavailable">
+                  <AlertCircle size={16} aria-hidden="true" /> {AI_UNAVAILABLE}
+                </div>
+              )}
+              {aiErr && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, fontWeight: 800,
+                  color: C.raspText, background: C.raspSoft, borderRadius: 14, padding: "12px 15px" }}>
+                  <AlertCircle size={16} /> {aiErr}
+                </div>
+              )}
+              {aiLoading && (
+                <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}>
+                  <RefreshCw size={22} className="spin" color={C.pink} />
+                  <div style={{ marginTop: 10 }}>AI đang đọc lại số từ Supabase và phân tích…</div>
+                </div>
+              )}
+              {!aiLoading && !aiErr && aiText && (
+                <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8,
+                  fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`,
+                  borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{aiText}</div>
+              )}
+              {!aiLoading && !aiErr && !aiText && aiConfigured() && (
+                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+                  AI đọc lại số thẳng từ Supabase lúc bấm — không lấy từ bảng đang hiện, nên kết quả không
+                  phụ thuộc bộ lọc rủi ro/người/từ khoá ở trên, chỉ theo bộ phận. AI chỉ nhận định, không
+                  thay đánh giá của QA và không phải căn cứ phê duyệt GMP.
+                </div>
+              )}
+            </div>
+          </details>
 
           {/* Nhắc luật chấm điểm ngay dưới danh sách — để không ai phải đoán vì sao dòng này lên trên */}
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.6, padding: "0 4px" }}>

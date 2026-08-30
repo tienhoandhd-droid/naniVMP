@@ -158,8 +158,10 @@ test("chỉ vàng mảnh là biến riêng, tách khỏi vàng đặc", () => {
 });
 
 test("cỡ chữ hiển thị đã nâng theo §6.7c", () => {
-  assert.equal(bien(KHOI_SANG, "lp-fs-h1"), "36px");
-  assert.equal(bien(KHOI_SANG, "lp-lh-h1"), "44px");
+  /* 31/08 — thang chữ bản cuối: h1 nâng 36→44px (lh 50) theo đợt chỉnh
+     hiển thị của chủ dự án; KPI/brand giữ nguyên. */
+  assert.equal(bien(KHOI_SANG, "lp-fs-h1"), "44px");
+  assert.equal(bien(KHOI_SANG, "lp-lh-h1"), "50px");
   assert.equal(bien(KHOI_SANG, "lp-fs-kpi"), "42px");
   assert.equal(bien(KHOI_SANG, "lp-lh-kpi"), "48px");
   assert.equal(bien(KHOI_SANG, "lp-fs-brand"), "44px");

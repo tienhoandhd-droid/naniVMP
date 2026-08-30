@@ -100,16 +100,16 @@ const assertMobileLogin = async () => {
 
 const assertNoChatOverlap = async (viewport) => {
   await p.waitForSelector(".vmp-chat-fab");
-  await p.waitForSelector(".vmp-mo-sau");
-  await p.$eval(".vmp-mo-sau", (button) => button.scrollIntoView({ block: "end" }));
+  await p.waitForSelector("[data-overview-analysis-studio]");
+  await p.$eval("[data-overview-analysis-studio]", (section) => section.scrollIntoView({ block: "start" }));
   const geometry = await p.evaluate(() => {
     const selector = ".vmp-chat-fab";
     const chat = document.querySelector(selector);
     const chatRect = chat?.getBoundingClientRect();
-    const primary = [...document.querySelectorAll(".vmp-mo-sau, .hn-nut")]
+    const primary = [...document.querySelectorAll("[data-overview-analysis-studio] button, .hn-nut")]
       .map((button) => ({ button, rect: button.getBoundingClientRect() }))
       .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight)
-      .map(({ button, rect }) => ({ selector: button.matches(".vmp-mo-sau") ? ".vmp-mo-sau" : ".hn-nut", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } }));
+      .map(({ button, rect }) => ({ selector: button.closest("[data-overview-analysis-studio]") ? "[data-overview-analysis-studio] button" : ".hn-nut", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } }));
     return {
       position: chat ? getComputedStyle(chat).position : null,
       chat: chatRect ? { left: chatRect.left, top: chatRect.top, right: chatRect.right, bottom: chatRect.bottom } : null,
@@ -118,7 +118,7 @@ const assertNoChatOverlap = async (viewport) => {
   });
   if (!geometry.chat) throw new Error(`auth ${viewport.width}x${viewport.height}: missing .vmp-chat-fab`);
   if (geometry.position !== "fixed") throw new Error(`auth ${viewport.width}x${viewport.height}: .vmp-chat-fab position=${geometry.position}, expected fixed`);
-  if (!geometry.primary.length) throw new Error(`auth ${viewport.width}x${viewport.height}: no visible primary selector (.vmp-mo-sau, .hn-nut) after scroll`);
+  if (!geometry.primary.length) throw new Error(`auth ${viewport.width}x${viewport.height}: no visible analysis or action control after scroll`);
   const hit = geometry.primary.find((button) => overlap(geometry.chat, button.rect));
   if (hit) throw new Error(`auth ${viewport.width}x${viewport.height}: fixed .vmp-chat-fab ${JSON.stringify(rect(geometry.chat))} overlaps visible primary ${hit.selector} ${JSON.stringify(rect(hit.rect))}`);
 };

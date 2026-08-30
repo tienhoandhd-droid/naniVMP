@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import LongMonRace from "../../src/features/monitoring/LongMonRace.tsx";
+import LongMonRace, {
+  LONG_MON_SPECIES_SHEET_URL,
+} from "../../src/features/monitoring/LongMonRace.tsx";
 import {
   buildLongMonRaceModel,
   LONG_MON_COLLISION_HEIGHT_PX,
@@ -13,7 +15,7 @@ import {
 
 const NOW = new Date("2026-08-31T04:00:00.000Z");
 const SCENE_WIDTH = 820;
-const SCENE_HEIGHT = 520;
+const SCENE_HEIGHT = 560;
 
 function activity(id, deadline, raw = {}, extra = {}) {
   return {
@@ -63,6 +65,15 @@ test("Long Môn ánh xạ sáu tiến độ bằng sáu loài khác nhau", () =>
     fixtures.map((item) => longMonStageOf(item, NOW)),
     ["catfish", "betta", "carp", "angelfish", "arowana", "puffer"],
   );
+});
+
+test("atlas V16 và vùng va chạm giữ đàn cá nhỏ gọn", () => {
+  assert.equal(
+    LONG_MON_SPECIES_SHEET_URL,
+    "/art/monitoring/long-mon-six-species-v16.png",
+  );
+  assert.ok(LONG_MON_COLLISION_WIDTH_PX <= 64);
+  assert.ok(LONG_MON_COLLISION_HEIGHT_PX <= 56);
 });
 
 test("VMP đã hoàn tất giữ cá rồng dù deadline đã qua", () => {
@@ -123,30 +134,39 @@ function overlappingPairsInModel(model) {
   );
 }
 
-test("trường đua dùng đúng ba tháng và chia dòng sông thành vùng tuần", () => {
+test("trường đua phủ 90 ngày: 4 tuần đã qua và 9 tuần sắp tới", () => {
   const model = buildLongMonRaceModel([
-    activity("start", "2026-07-01"),
+    activity("start", "2026-08-03"),
     activity("same-a", "2026-08-31"),
     activity("same-b", "2026-08-31"),
     activity("same-c", "2026-08-31"),
-    activity("end", "2026-09-30"),
-    activity("outside", "2026-10-01"),
+    activity("end", "2026-11-01"),
+    activity("outside", "2026-11-02"),
+    activity("before", "2026-08-02"),
     activity("missing", null),
   ], NOW);
 
+  // NOW = 31/08/2026 (thứ Hai) → cửa sổ [03/08, 02/11), 13 tuần ≈ 90 ngày.
   assert.deepEqual(
     model.bands.map(({ year, month }) => [year, month]),
-    [[2026, 7], [2026, 8], [2026, 9]],
+    [[2026, 8], [2026, 9], [2026, 10], [2026, 11]],
   );
   assert.equal(model.fish.some((fish) => fish.activity.id === "outside"), false);
+  assert.equal(model.fish.some((fish) => fish.activity.id === "before"), false);
   assert.equal(model.missingDeadlineCount, 1);
-  assert.ok(model.weeks.length >= 13 && model.weeks.length <= 15);
+  assert.equal(model.weeks.length, 13);
+  assert.equal(model.weeks[0].key, "2026-08-03");
+  assert.equal(model.weeks[12].key, "2026-10-26");
   assert.match(model.weeks[0].label, /^\d{2}\/\d{2}–\d{2}\/\d{2}$/);
 
   const start = model.fish.find((fish) => fish.activity.id === "start");
   const end = model.fish.find((fish) => fish.activity.id === "end");
-  assert.ok(start.xPct < 10, `tuần đầu phải gần mép trái: ${start.xPct}`);
-  assert.ok(end.xPct > 90, `tuần cuối phải gần mép phải: ${end.xPct}`);
+  assert.ok(start.xPct >= model.weeks[0].startPct
+    && start.xPct <= model.weeks[0].startPct + model.weeks[0].widthPct,
+  `cá đầu kỳ phải nằm trong tuần thứ nhất: ${start.xPct}`);
+  assert.ok(end.xPct >= model.weeks[12].startPct
+    && end.xPct <= model.weeks[12].startPct + model.weeks[12].widthPct,
+  `cá cuối kỳ phải nằm trong tuần thứ mười ba: ${end.xPct}`);
 
   const sameDate = model.fish.filter((fish) => fish.deadline === "2026-08-31");
   assert.equal(new Set(sameDate.map((fish) => fish.weekKey)).size, 1);
@@ -199,6 +219,16 @@ test("mười hai cá trong một tuần được xếp linh động mà không 
   "tâm cá phải nằm trong đúng vùng tuần sau khi tuần được mở rộng");
   assert.deepEqual(overlappingPairsInModel(model), []);
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
+
+  const roundedScales = new Set(model.fish.map((fish) => fish.renderScale.toFixed(2)));
+  const roundedAngles = new Set(model.fish.map((fish) => Math.round(fish.renderRotateDeg)));
+  assert.ok(roundedScales.size >= 4,
+    "đàn cá phải có nhiều cỡ nhỏ lệch nhau thay vì cùng một tỷ lệ");
+  assert.ok(roundedAngles.size >= 4,
+    "đàn cá phải có nhiều tư thế bơi thay vì nghiêng gần như giống nhau");
+  assert.ok(model.fish.some((fish) => fish.renderRotateDeg <= -4));
+  assert.ok(model.fish.some((fish) => fish.renderRotateDeg >= 4));
+  assert.ok(model.fish.every((fish) => Math.abs(fish.renderRotateDeg) <= 12));
 });
 
 test("ngày cùng tuần chung vùng, tuần liền kề không va chạm và layout ổn định", () => {
@@ -235,10 +265,27 @@ test("hai tuần đông liền kề dùng va chạm toàn cục và không phụ
   );
 });
 
-test("bốn mươi tám cá nằm trọn scene cố định", () => {
+test("đàn thưa trên nhiều tuần vẫn bơi rải theo chiều sâu thay vì dồn sát hai mép", () => {
+  const input = Array.from({ length: 18 }, (_, index) => {
+    const dayOffset = Math.floor(index * 20 / 17);
+    const deadline = new Date(Date.UTC(2026, 7, 24 + dayOffset)).toISOString().slice(0, 10);
+    return activity(`sparse-${index}`, deadline);
+  });
+  const model = buildLongMonRaceModel(input, NOW, { audience: "team" });
+  const edgeFish = model.fish.filter((fish) => fish.yPct < 15 || fish.yPct > 85);
+  const depthBands = new Set(model.fish.map((fish) => Math.floor(fish.yPct / 10)));
+
+  assert.ok(edgeFish.length <= 5,
+    `không được dồn ${edgeFish.length}/${model.fish.length} cá sát mép trên/dưới`);
+  assert.ok(depthBands.size >= 6,
+    `đàn cá phải dùng ít nhất sáu dải chiều sâu, hiện có ${depthBands.size}`);
+  assert.deepEqual(overlappingPairsInModel(model), []);
+});
+
+test("bốn mươi tám cá trong cửa sổ 90 ngày nằm trọn scene cố định", () => {
   const input = Array.from({ length: 48 }, (_, index) => {
-    const dayOffset = Math.floor(index * 90 / 47);
-    const deadline = new Date(Date.UTC(2026, 6, 1 + dayOffset)).toISOString().slice(0, 10);
+    const dayOffset = Math.floor(index * 20 / 47);
+    const deadline = new Date(Date.UTC(2026, 7, 24 + dayOffset)).toISOString().slice(0, 10);
     return activity(`team-${index}`, deadline);
   });
   const model = buildLongMonRaceModel(input, NOW, { audience: "team" });
@@ -247,10 +294,14 @@ test("bốn mươi tám cá nằm trọn scene cố định", () => {
   assert.deepEqual(overlappingPairsInModel(model), []);
   assert.ok(model.fish.every((fish) => fish.xPct >= 0 && fish.xPct <= 100));
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
-  assert.ok(model.densityScale >= .82 && model.densityScale <= 1);
+  /* Cửa sổ 90 ngày: 48 cá dồn trong 20 ngày chiếm phần trục hẹp hơn so
+     với thời cửa sổ 21 ngày, nên mật độ được phép lùi thêm một bậc (.74).
+     Ràng buộc thật là KHÔNG VA CHẠM (đã kiểm ở trên) + không teo quá bậc
+     giữa của thang TEAM_DENSITY_LEVELS. */
+  assert.ok(model.densityScale >= .66 && model.densityScale <= 1);
 });
 
-test("nhóm đông dùng hồ dài cố định và chỉ tăng chiều cao khi vẫn thiếu chỗ", () => {
+test("nhóm đông giữ hồ vừa một màn hình", () => {
   for (const count of [20, 30, 40]) {
     const model = buildLongMonRaceModel(
       Array.from({ length: count }, (_, index) =>
@@ -259,7 +310,7 @@ test("nhóm đông dùng hồ dài cố định và chỉ tăng chiều cao khi 
       { audience: "team" },
     );
 
-    assert.equal(model.sceneWidthPx, 1800, `${count} cá phải dùng hồ nhóm dài cố định`);
+    assert.equal(model.sceneWidthPx, 960, `${count} cá phải dùng hồ nhóm vừa màn hình`);
     assert.ok(model.sceneHeightPx >= SCENE_HEIGHT,
       `${count} cá không được làm scene thấp hơn ${SCENE_HEIGHT}px`);
     assert.equal(model.fish.filter((fish) => fish.xPct === 0 && fish.yPct === 0).length, 0,
@@ -267,6 +318,20 @@ test("nhóm đông dùng hồ dài cố định và chỉ tăng chiều cao khi 
     assert.deepEqual(overlappingPairsInModel(model), [],
       `${count} cá không được chồng sau khi mở rộng scene`);
   }
+});
+
+test("tuần có tám mươi cá thực tế vẫn nằm trong hồ một màn hình", () => {
+  const model = buildLongMonRaceModel(
+    Array.from({ length: 80 }, (_, index) =>
+      activity(`overflow-${index}`, "2026-09-02")),
+    NOW,
+    { audience: "team" },
+  );
+
+  assert.equal(model.fish.length, 80);
+  assert.equal(model.sceneWidthPx, 960);
+  assert.equal(model.sceneHeightPx, SCENE_HEIGHT);
+  assert.deepEqual(overlappingPairsInModel(model), []);
 });
 
 test("cá nhân tự bố trí trung tâm, vòng cung và chữ S ổn định", () => {
@@ -294,7 +359,7 @@ test("cá nhân tự bố trí trung tâm, vòng cung và chữ S ổn định",
   assert.deepEqual(ten, buildLongMonRaceModel(tenInput, NOW, { audience: "personal" }));
 });
 
-test("trường đua trình bày ba tháng, cá có tên truy cập và legend sáu loài", () => {
+test("trường đua trình bày 90 ngày, cá có tên truy cập và legend sáu loài", () => {
   const html = renderToStaticMarkup(React.createElement(LongMonRace, {
     activities: [
       activity("dc-01", "2026-09-05"),
@@ -314,10 +379,10 @@ test("trường đua trình bày ba tháng, cá có tên truy cập và legend s
     },
   }));
 
-  assert.match(html, /aria-label="Trường đua hạn VMP ba tháng"/);
-  assert.match(html, /07\/2026/);
+  assert.match(html, /aria-label="Trường đua hạn VMP chín mươi ngày"/);
   assert.match(html, /08\/2026/);
   assert.match(html, /09\/2026/);
+  assert.doesNotMatch(html, /07\/2026/);
   assert.match(html, /<button[^>]+data-long-mon-fish="dc-01"/);
   assert.match(html, /data-deadline="2026-09-05"/);
   assert.match(html, /data-week="2026-08-31"/);
@@ -387,22 +452,34 @@ test("component truyền audience và kích thước scene thích ứng", async 
   assert.match(html, /long-mon-race__canvas long-mon-race__canvas--adaptive-scene/);
   assert.match(html, /data-density-scale="[\d.]+"/);
   assert.match(html, /data-scene-width="820"/);
-  assert.match(html, /data-scene-height="520"/);
+  assert.match(html, /data-scene-height="560"/);
   assert.match(html, /--long-mon-scene-width:820px/);
-  assert.match(html, /--long-mon-scene-height:520px/);
-  assert.match(teamHtml, /data-scene-width="1800"/);
+  assert.match(html, /--long-mon-scene-height:560px/);
+  assert.match(teamHtml, /data-scene-width="960"/);
   assert.match(html, /--long-mon-y:[\d.]+%/);
   assert.match(source, /buildLongMonRaceModel\(activities, now, \{[\s\S]*audience:\s*scopeControl\?\.audience\s*\?\?\s*"team"/);
   assert.doesNotMatch(source, /laneCount\s*\*\s*78/);
 });
 
-test("sáu loài có sáu dáng bơi tĩnh và không dùng animation", async () => {
+test("sáu loài giữ sprite riêng, cá bơi nhịp chậm và tắt được chuyển động", async () => {
   const css = await readFile(new URL("../../src/features/monitoring/long-mon-race.css", import.meta.url), "utf8");
   for (const species of ["catfish", "betta", "carp", "angelfish", "arowana", "puffer"]) {
     assert.match(css, new RegExp(`\\.long-mon-race__fish--${species} \\.long-mon-race__sprite`));
   }
-  assert.doesNotMatch(css, /@keyframes\s+long-mon-/);
-  assert.doesNotMatch(css, /animation-name:\s*long-mon-/);
+  const fishRule = css.match(/\.long-mon-race__fish\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const spriteRule = css.match(/\.long-mon-race__sprite\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.doesNotMatch(fishRule, /scale\(var\(--school-scale\)\)/,
+    "không được scale cả button vì sẽ làm vùng bấm nhỏ hơn 44px");
+  assert.match(spriteRule, /scale:\s*var\(--school-scale\)/,
+    "chỉ hình cá được thay đổi tỷ lệ trong vùng bấm cố định");
+  /* 31/08 — chủ dự án yêu cầu "thể hiện được cá đang bơi": luật cấm
+     animation cũ thay bằng ba ràng buộc chặt hơn — có nhịp bơi
+     long-mon-swim, mỗi con lệch pha riêng (--swim-*), và
+     prefers-reduced-motion tắt được toàn bộ. */
+  assert.match(css, /@keyframes long-mon-swim/);
+  assert.match(css, /var\(--swim-dur/);
+  const reduced = css.split("@media (prefers-reduced-motion: reduce)")[1] ?? "";
+  assert.match(reduced, /animation: none/);
 });
 
 test("Timeline dùng Long Môn làm lớp nhìn chính và không lặp year rail cũ", async () => {
@@ -410,8 +487,9 @@ test("Timeline dùng Long Môn làm lớp nhìn chính và không lặp year rai
   const main = await readFile(new URL("../../src/main.tsx", import.meta.url), "utf8");
 
   assert.match(source, /import LongMonRace from "\.\.\/features\/monitoring\/LongMonRace\.tsx"/);
-  assert.match(source, /const \[workspace, setWorkspace\] = useState\("timeline"\)/);
-  assert.match(source, /const \[view, setView\] = useState\("month"\)/);
+  /* 31/08: màn Dòng thời gian thu gọn còn mỗi Ngư đồ — workspace switch và
+     view state đã bỏ, chỉ cần Long Môn là lớp nhìn duy nhất. */
+  assert.doesNotMatch(source, /useState\("timeline"\)/);
   assert.match(source, /currentPersonId\?: string \| null/);
   assert.match(source, /filterLongMonScopeActivities/);
   assert.match(source, /<LongMonRace[\s\S]*activities=\{longMonActivities\}[\s\S]*scopeControl=/);

@@ -297,36 +297,49 @@ function MaTranQuyenManHinh({ access }: { access: AccessContext }) {
         {access.unresolvedReason && <Tag>Lý do: {access.unresolvedReason}</Tag>}
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
-          <thead>
-            <tr style={{ textAlign: "left", color: C.plumSoft }}>
-              <th style={{ padding: "6px 10px" }}>Màn hình</th>
-              <th style={{ padding: "6px 10px" }}>Được xem</th>
-              <th style={{ padding: "6px 10px" }}>Phạm vi dữ liệu</th>
-              <th style={{ padding: "6px 10px" }}>Hành động được phép</th>
-            </tr>
-          </thead>
-          <tbody>
-            {SCREEN_IDS.map((id) => {
-              const xem = access.canView(id);
-              const hanhDong = [...(access.screens[id]?.actions ?? [])]
-                .filter((a) => a !== "view").sort();
-              return (
-                <tr key={id} style={{ borderTop: `1px solid ${C.line}`, opacity: xem ? 1 : 0.55 }}>
-                  <td style={{ padding: "6px 10px", fontWeight: xem ? 700 : 500 }}>
-                    {TEN_MAN[id] ?? id}
-                  </td>
-                  <td style={{ padding: "6px 10px" }}>{xem ? "Có" : "Không"}</td>
-                  <td style={{ padding: "6px 10px" }}>{TEN_PHAM_VI[access.scope(id)] ?? access.scope(id)}</td>
-                  <td style={{ padding: "6px 10px", color: C.plumSoft }}>
-                    {hanhDong.length ? hanhDong.join(", ") : (xem ? "chỉ xem" : "—")}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Bề mặt sổ: kẻ dòng, hàng tiêu đề dính, có <caption> và scope.
+          Cột "Được xem" trước ghi "Có"/"Không" — hai chữ chỉ khác nhau ở
+          nét, mắt quét 16 dòng rất dễ đọc nhầm. Nay thêm dấu và tô trạng
+          thái, và cả hàng bị từ chối mờ đi như cũ. */}
+      <div className="reg reg--tron">
+        <div className="reg-scroll">
+          <table className="reg-table">
+            <caption>
+              Quyền có hiệu lực cho chính tài khoản đang đăng nhập, do máy chủ trả về
+              ({SCREEN_IDS.length} màn). Muốn xem quyền của vai khác thì phải đăng nhập
+              bằng tài khoản vai đó.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" data-reg-stick>Màn hình</th>
+                <th scope="col">Được xem</th>
+                <th scope="col">Phạm vi dữ liệu</th>
+                <th scope="col">Hành động được phép</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SCREEN_IDS.map((id) => {
+                const xem = access.canView(id);
+                const hanhDong = [...(access.screens[id]?.actions ?? [])]
+                  .filter((a) => a !== "view").sort();
+                return (
+                  <tr key={id} data-reg-off={xem ? undefined : "true"}>
+                    <th scope="row" data-reg-stick>{TEN_MAN[id] ?? id}</th>
+                    <td>
+                      <span className="reg-flag" data-on={xem ? "true" : "false"}>
+                        {xem ? "Có" : "Không"}
+                      </span>
+                    </td>
+                    <td>{TEN_PHAM_VI[access.scope(id)] ?? access.scope(id)}</td>
+                    <td className="reg-muted">
+                      {hanhDong.length ? hanhDong.join(", ") : (xem ? "chỉ xem" : "—")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </Card>
   );

@@ -27,7 +27,7 @@
   height: 560px;
   /* Nguyên khung tranh: cô gái áo yếm + hồ sen, mờ dần về phía vùng đọc. */
   background: url("../assets/art/nen-dam-sen.webp") no-repeat -290px 0 / 1120px auto;
-  opacity: 0.55;
+  opacity: 0.32;
   -webkit-mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, rgb(0 0 0) 35%);
   -webkit-mask-composite: source-in;
   mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, rgb(0 0 0) 35%);
@@ -58,34 +58,87 @@
 /* ---- Masthead ---------------------------------------------------- */
 .vmp-masthead {
   display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  margin-bottom: 6px;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  margin-bottom: 8px;
   line-height: 1;
 }
 .vmp-masthead__ten {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  flex: none;
   font-family: var(--ff-display);
-  font-style: italic;
-  font-size: 34px;
-  font-weight: 600;
   color: var(--lp-plum);
-  letter-spacing: -0.005em;
 }
-.vmp-masthead__ten b { font-style: normal; font-weight: 700; font-size: 42px; }
-.vmp-masthead__ten i { font-weight: 500; }
-.vmp-masthead__net { flex: none; margin: 0 -4px 2px; stroke: var(--lp-gold); fill: var(--lp-gold); }
+.vmp-masthead__ten::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  bottom: -7px;
+  width: 78px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--lp-gold), transparent);
+  opacity: 0.8;
+}
+.vmp-masthead__v {
+  font-size: clamp(44px, 3.4vw, 52px);
+  line-height: 0.72;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: -0.065em;
+  text-shadow: 0.5px 0 var(--lp-gold-hairline);
+}
+.vmp-masthead__mp {
+  margin-left: 0.06em;
+  font-size: clamp(25px, 2.1vw, 31px);
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.11em;
+  transform: translateY(-2px);
+}
+.vmp-masthead__monitor {
+  margin-left: 0.34em;
+  font-size: clamp(25px, 2.25vw, 33px);
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  color: var(--lp-rose);
+  transform: translateY(1px) rotate(-1deg);
+  transform-origin: left center;
+}
+.vmp-masthead__net {
+  flex: 1 1 120px;
+  width: clamp(108px, 15vw, 214px);
+  min-width: 96px;
+  max-width: 214px;
+  margin: 1px -2px 0;
+  overflow: visible;
+  stroke: var(--lp-gold);
+  fill: var(--lp-gold);
+}
+.vmp-masthead__lotus { transform-origin: 130px 10px; }
 .vmp-masthead__phu {
-  padding-bottom: 5px;
-  font-family: var(--ff-display);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.26em;
+  flex: none;
+  font-family: var(--ff-text);
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--lp-rose);
   white-space: nowrap;
 }
+@media (max-width: 1100px) {
+  .vmp-masthead__net { max-width: 132px; }
+  .vmp-masthead__phu { letter-spacing: 0.22em; }
+}
 @media (max-width: 768px) {
-  .vmp-masthead { gap: 8px; }
+  .vmp-masthead { min-height: 42px; gap: 8px; }
+  .vmp-masthead__v { font-size: 40px; }
+  .vmp-masthead__mp { font-size: 24px; }
+  .vmp-masthead__monitor { font-size: 25px; }
   .vmp-masthead__net { display: none; }
   .vmp-masthead__phu { display: none; }
 }
@@ -115,24 +168,37 @@
    không tạo thanh cuộn ngang cho cả trang. */
 .vmp-main-nen { overflow-x: clip; }
 
+/* Lối tắt bàn phím chỉ hiện khi nhận focus. */
+.vmp-skip-link {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 2000;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--lp-brand-solid);
+  color: var(--lp-on-brand-solid);
+  font-weight: 800;
+  transform: translateY(-150%);
+  transition: transform 140ms ease;
+}
+.vmp-skip-link:focus { transform: translateY(0); }
+
 /* Bản gọn của thanh lọc (nhóm THỰC HIỆN, PHÂN TÍCH): chỉ còn chọn nhân sự
    và chip đang lọc — hàng thấp, không viền dưới khi trống. */
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { padding: 0 0 6px; border-bottom: 0; }
+.vmp-thanh-loc--gon { padding: 0 0 6px; border-bottom: 0; }
 .vmp-thanh-loc .timeline-scope-inline { display: inline-flex; align-items: center; gap: 8px; }
 .vmp-thanh-loc .timeline-scope-btn { min-height: 32px; padding: 0 12px; border-radius: 999px; font-size: 12px; }
 /* Bản gọn: cụm chọn nhân sự nằm bên PHẢI hàng (anh Hoàn chốt 30/08). */
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > label,
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > .timeline-scope-inline { margin-left: auto; }
+.vmp-thanh-loc--gon > label,
+.vmp-thanh-loc--gon > .timeline-scope-inline { margin-left: auto; }
 /* Bản gọn: khối bên phải (đếm/Chép/Xóa lọc) không giữ auto nữa, để cụm chọn
    nhân sự đẩy hẳn sang mép phải. */
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > div:last-child { margin-left: 0 !important; }
-/* Bản gọn: kéo cụm chọn nhân sự lên sát hàng nút Làm mới / Quản trị. */
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: -46px; }
-@media (max-width: 900px) { .vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: 0; } }
-/* Ô chọn nhân sự bản gọn: nền nổi trên tranh, bo tròn, hẹp lại; kéo sát hàng
-   nút Làm mới / Quản trị. */
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: -56px; }
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) select {
+.vmp-thanh-loc--gon > div:last-child { margin-left: 0 !important; }
+/* Ô chọn nhân sự bản gọn: nền nổi trên tranh, bo tròn và ở đúng luồng tài liệu
+   để không đè lên topbar khi chiều rộng hoặc cỡ chữ thay đổi. */
+.vmp-thanh-loc--treo { margin-top: 0; }
+.vmp-thanh-loc--gon select {
   /* Inline style của ô nhập dùng nền chìm (--lp-bg-sunken) nên trên tranh nền
      hồng nó biến mất — ép nền nổi và viền rõ. */
   min-width: 150px !important;
@@ -146,5 +212,20 @@
   color: var(--lp-ink) !important;
   font-weight: 600;
 }
-.vmp-thanh-loc:not(:has(.vmp-global-filter-label)) > label { gap: 6px; padding: 0; }
-@media (max-width: 900px) { .vmp-thanh-loc:not(:has(.vmp-global-filter-label)) { margin-top: 0; } }
+.vmp-thanh-loc--gon > label { gap: 6px; padding: 0; }
+@media (max-width: 900px) { .vmp-thanh-loc--treo { margin-top: 0; } }
+
+/* Giữ phần tóm tắt tiến độ gần biểu đồ, tránh số liệu bị đẩy ra mép thẻ. */
+.vmp-overview-progress { width: min(100%, 480px); }
+.vmp-overview-progress__row {
+  display: grid !important;
+  grid-template-columns: 9px minmax(118px, 1fr) minmax(72px, 110px) 34px;
+}
+@media (max-width: 520px) {
+  .vmp-overview-progress__row { grid-template-columns: 9px minmax(104px, 1fr) 72px 30px; }
+}
+
+/* Bản gọn không có gì để hiện (màn không dùng chọn nhân sự) thì thu về 0 để
+   nút "Theo hạng mục / Theo đối tượng" không bị đẩy lên đè phụ đề. */
+.vmp-thanh-loc--gon { min-height: 0; }
+.vmp-thanh-loc--gon:not(:has(select)):not(:has(button)) { padding: 0; margin: 0; border: 0; }

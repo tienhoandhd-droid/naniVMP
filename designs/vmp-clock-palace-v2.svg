@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680">
+  <defs>
+    <linearGradient id="palace-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffaf6"/><stop offset=".52" stop-color="#f7eee9"/><stop offset="1" stop-color="#eadbd6"/></linearGradient>
+    <radialGradient id="palace-lacquer"><stop stop-color="#714566"/><stop offset=".68" stop-color="#4d2347"/><stop offset="1" stop-color="#2d132b"/></radialGradient>
+    <linearGradient id="palace-gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff2b8"/><stop offset=".3" stop-color="#d8aa45"/><stop offset=".65" stop-color="#9a6421"/><stop offset="1" stop-color="#f1d680"/></linearGradient>
+    <linearGradient id="palace-jade"><stop stop-color="#e5f3e9"/><stop offset="1" stop-color="#84aa96"/></linearGradient>
+    <linearGradient id="palace-blush"><stop stop-color="#fff3f4"/><stop offset="1" stop-color="#d996a5"/></linearGradient>
+    <filter id="palace-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur"/><feOffset dy="14" result="offset"/><feFlood flood-color="#3b1533" flood-opacity=".22" result="color"/><feComposite in="color" in2="offset" operator="in" result="shadow"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="palace-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <path id="palace-petal" d="M400 84 C365 128 368 186 400 220 C432 186 435 128 400 84Z"/>
+  </defs>
+  <rect width="1200" height="680" rx="36" fill="url(#palace-bg)"/>
+  <path d="M0 126 C132 58 224 68 304 0H0Z" fill="#f1d9df" opacity=".42"/><path d="M1200 514 C1052 562 1010 620 920 680h280Z" fill="#dce9df" opacity=".62"/>
+  <g opacity=".15" fill="none" stroke="#8b5f76"><path d="M24 602c80-98 152-87 226-14s135 80 220 3"/><path d="M18 626c98-93 174-71 238-4s132 67 211-2"/></g>
+  <text x="64" y="64" fill="#7a4b68" font-family="Segoe UI, sans-serif" font-size="15" font-weight="700" letter-spacing="4">PHƯƠNG ÁN A · NGỌC SEN CUNG ĐÌNH</text>
+  <text x="64" y="95" fill="#382634" font-family="Georgia, serif" font-size="22" font-style="italic">Một “bảo vật dữ liệu” trang trọng, mềm mại và có chiều sâu.</text>
+
+  <g filter="url(#palace-shadow)">
+    <circle cx="400" cy="365" r="244" fill="#fffaf6" stroke="url(#palace-gold)" stroke-width="2"/>
+    <g fill="url(#palace-blush)" stroke="#bd788a" stroke-width="1.2" opacity=".96">
+      <use href="#palace-petal"/><use href="#palace-petal" transform="rotate(30 400 365)"/><use href="#palace-petal" transform="rotate(60 400 365)"/><use href="#palace-petal" transform="rotate(90 400 365)"/><use href="#palace-petal" transform="rotate(120 400 365)"/><use href="#palace-petal" transform="rotate(150 400 365)"/><use href="#palace-petal" transform="rotate(180 400 365)"/><use href="#palace-petal" transform="rotate(210 400 365)"/><use href="#palace-petal" transform="rotate(240 400 365)"/><use href="#palace-petal" transform="rotate(270 400 365)"/><use href="#palace-petal" transform="rotate(300 400 365)"/><use href="#palace-petal" transform="rotate(330 400 365)"/>
+    </g>
+    <g fill="url(#palace-jade)" stroke="#6f9783" stroke-width="1" opacity=".84" transform="rotate(15 400 365) scale(.82) translate(88 79)">
+      <use href="#palace-petal"/><use href="#palace-petal" transform="rotate(30 400 365)"/><use href="#palace-petal" transform="rotate(60 400 365)"/><use href="#palace-petal" transform="rotate(90 400 365)"/><use href="#palace-petal" transform="rotate(120 400 365)"/><use href="#palace-petal" transform="rotate(150 400 365)"/><use href="#palace-petal" transform="rotate(180 400 365)"/><use href="#palace-petal" transform="rotate(210 400 365)"/><use href="#palace-petal" transform="rotate(240 400 365)"/><use href="#palace-petal" transform="rotate(270 400 365)"/><use href="#palace-petal" transform="rotate(300 400 365)"/><use href="#palace-petal" transform="rotate(330 400 365)"/>
+    </g>
+    <circle cx="400" cy="365" r="172" fill="url(#palace-lacquer)" stroke="url(#palace-gold)" stroke-width="9"/>
+    <circle cx="400" cy="365" r="150" fill="none" stroke="#f6ddb0" stroke-opacity=".35"/>
+    <circle cx="400" cy="365" r="140" fill="none" stroke="#eac778" stroke-width="2" stroke-dasharray="2 9"/>
+  </g>
+
+  <g font-family="Segoe UI, sans-serif" text-anchor="middle">
+    <g transform="translate(400 117)"><circle r="31" fill="#fffaf8" stroke="#c69235" stroke-width="2"/><text y="-2" fill="#623450" font-size="11" font-weight="700">T1</text><text y="16" fill="#271b23" font-size="15" font-weight="800">2</text></g>
+    <g transform="translate(524 150)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T2</text><text y="16" fill="#271b23" font-size="15" font-weight="800">0</text></g>
+    <g transform="translate(615 241)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T3</text><text y="16" fill="#271b23" font-size="15" font-weight="800">0</text></g>
+    <g transform="translate(648 365)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T4</text><text y="16" fill="#271b23" font-size="15" font-weight="800">0</text></g>
+    <g transform="translate(615 489)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T5</text><text y="16" fill="#271b23" font-size="15" font-weight="800">0</text></g>
+    <g transform="translate(524 580)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T6</text><text y="16" fill="#271b23" font-size="15" font-weight="800">0</text></g>
+    <g transform="translate(400 613)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T7</text><text y="16" fill="#271b23" font-size="15" font-weight="800">4</text></g>
+    <g transform="translate(276 580)" filter="url(#palace-glow)"><circle r="34" fill="#9f294d" stroke="#ffe5a4" stroke-width="3"/><text y="-3" fill="#fff4df" font-size="11" font-weight="700">T8</text><text y="18" fill="white" font-size="17" font-weight="800">11</text></g>
+    <g transform="translate(185 489)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T9</text><text y="16" fill="#271b23" font-size="15" font-weight="800">2</text></g>
+    <g transform="translate(152 365)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T10</text><text y="16" fill="#271b23" font-size="15" font-weight="800">2</text></g>
+    <g transform="translate(185 241)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T11</text><text y="16" fill="#271b23" font-size="15" font-weight="800">2</text></g>
+    <g transform="translate(276 150)"><circle r="29" fill="#fffaf8" stroke="#c69235"/><text y="-2" fill="#623450" font-size="11">T12</text><text y="16" fill="#271b23" font-size="15" font-weight="800">1</text></g>
+  </g>
+  <g text-anchor="middle"><text x="400" y="344" fill="#f6dfa1" font-family="Georgia,serif" font-size="62">0%</text><path d="M348 362h104" stroke="#d9aa4c"/><text x="400" y="393" fill="#fff6e6" font-family="Segoe UI,sans-serif" font-size="14" font-weight="700" letter-spacing="2">HOÀN THÀNH VMP</text><text x="400" y="420" fill="#dcbfcf" font-family="Segoe UI,sans-serif" font-size="13">trên 24 hạng mục</text></g>
+
+  <g transform="translate(740 150)">
+    <text fill="#a16e2d" font-family="Segoe UI,sans-serif" font-size="13" font-weight="700" letter-spacing="3">BÁO CÁO NĂM</text>
+    <text y="46" fill="#3c2937" font-family="Georgia,serif" font-size="35">Tiến độ thẩm định</text><text x="343" y="46" fill="#9f294d" font-family="Georgia,serif" font-size="35">2026</text>
+    <text y="77" fill="#755f6d" font-family="Segoe UI,sans-serif" font-size="15">24 hạng mục trong kế hoạch năm</text>
+    <g transform="translate(0 118)"><rect width="382" height="76" rx="22" fill="#fffaf7" stroke="#ead5c1"/><circle cx="38" cy="38" r="13" fill="#327866"/><path d="m31 38 5 5 10-12" fill="none" stroke="white" stroke-width="3"/><text x="68" y="33" fill="#5b4853" font-family="Segoe UI,sans-serif" font-size="14" font-weight="600">Hoàn thành</text><text x="68" y="57" fill="#876f7d" font-family="Segoe UI,sans-serif" font-size="12">Đã nghiệm thu</text><text x="344" y="49" text-anchor="middle" fill="#327866" font-family="Georgia,serif" font-size="30" font-weight="700">0</text></g>
+    <g transform="translate(0 208)"><rect width="382" height="76" rx="22" fill="#fff7f8" stroke="#edc7d1"/><circle cx="38" cy="38" r="13" fill="#aa3458"/><path d="M38 29v12m0 7v1" stroke="white" stroke-width="3" stroke-linecap="round"/><text x="68" y="33" fill="#5b4853" font-family="Segoe UI,sans-serif" font-size="14" font-weight="600">Quá hạn</text><text x="68" y="57" fill="#876f7d" font-family="Segoe UI,sans-serif" font-size="12">Cần ưu tiên xử lý</text><text x="344" y="49" text-anchor="middle" fill="#a72f53" font-family="Georgia,serif" font-size="30" font-weight="700">15</text></g>
+    <g transform="translate(0 298)"><rect width="382" height="76" rx="22" fill="#fffaf1" stroke="#ead4a4"/><circle cx="38" cy="38" r="13" fill="#9d681f"/><path d="M31 38h14M38 31v14" stroke="white" stroke-width="2.5"/><text x="68" y="33" fill="#5b4853" font-family="Segoe UI,sans-serif" font-size="14" font-weight="600">Chưa hoàn thành</text><text x="68" y="57" fill="#876f7d" font-family="Segoe UI,sans-serif" font-size="12">Còn trong kế hoạch</text><text x="344" y="49" text-anchor="middle" fill="#98631f" font-family="Georgia,serif" font-size="30" font-weight="700">9</text></g>
+    <path d="M0 412h382" stroke="#d9c8ce"/><text y="446" fill="#664f5c" font-family="Segoe UI,sans-serif" font-size="14" font-weight="600">Nhịp hiện tại</text><text x="382" y="446" text-anchor="end" fill="#9f294d" font-family="Segoe UI,sans-serif" font-size="14" font-weight="700">Tập trung xử lý tháng 8</text>
+  </g>
+</svg>

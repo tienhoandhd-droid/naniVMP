@@ -37,12 +37,14 @@ type TrangThai = "xong" | "tre" | "chua" | "thieu";
    không phụ thuộc màu, đúng luật B4 (đã đo/ghi trong luat-tham-my.md):
    "mỗi vùng mang trạng thái phải có chữ hoặc biểu tượng đi kèm, không chỉ
    màu". */
-const MAU: Record<TrangThai, { nhan: string; mau: string; nen: string; Icon: typeof CheckCircle2 }> = {
-  xong:  { nhan: "Đã xong", mau: C.mintText, nen: C.mintSoft, Icon: CheckCircle2 },
-  tre:   { nhan: "Trễ hạn", mau: C.raspText, nen: C.raspSoft, Icon: AlertTriangle },
-  chua:  { nhan: "Chưa tới hạn", mau: C.skyText, nen: C.skySoft, Icon: Clock },
-  thieu: { nhan: "Thiếu dữ liệu", mau: C.marigoldText, nen: C.marigoldSoft, Icon: HelpCircle },
+const MAU: Record<TrangThai, { nhan: string; Icon: typeof CheckCircle2 }> = {
+  xong:  { nhan: "Đã xong", Icon: CheckCircle2 },
+  tre:   { nhan: "Trễ hạn", Icon: AlertTriangle },
+  chua:  { nhan: "Chưa tới hạn", Icon: Clock },
+  thieu: { nhan: "Thiếu dữ liệu", Icon: HelpCircle },
 };
+
+const THU_TU_TRANG_THAI: TrangThai[] = ["xong", "tre", "thieu", "chua"];
 
 const GIAI_DOAN = [
   { id: "de_cuong",  ten: "Đề cương",   tt: "tt_de_cuong",   ngay: "ngay_de_cuong",   han: "dl_de_cuong" },
@@ -199,37 +201,46 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
   const O = ({ dem, ten }: { dem: Record<TrangThai, Activity[]>; ten: string }) => {
     const tong = (Object.keys(dem) as TrangThai[]).reduce((n, k) => n + dem[k].length, 0);
-    if (!tong) return <td style={{ padding: 6 }}><div style={{ height: 44, borderRadius: 8, background: C.pinkMist }} /></td>;
+    if (!tong) return (
+      <td className="analysis-matrix-cell-wrap">
+        <div className="analysis-matrix-cell analysis-matrix-cell--empty" aria-label={`${ten}. Không có hạng mục`} />
+      </td>
+    );
     const noiBat: TrangThai = dem.tre.length ? "tre" : dem.thieu.length ? "thieu" : dem.chua.length ? "chua" : "xong";
     const m = MAU[noiBat];
     const NoiBatIcon = m.Icon;
+    const moTaDayDu = THU_TU_TRANG_THAI
+      .filter((k) => dem[k].length)
+      .map((k) => `${MAU[k].nhan} ${dem[k].length}`)
+      .join(", ");
     return (
-      <td style={{ padding: 6 }}>
+      <td className="analysis-matrix-cell-wrap">
         <button
+          type="button"
+          className={`analysis-matrix-cell analysis-matrix-cell--${noiBat}`}
+          data-analysis-matrix-cell
+          data-matrix-primary-status={noiBat}
+          aria-label={`${ten}. Trạng thái chính ${m.nhan}: ${dem[noiBat].length} trên ${tong}. Cơ cấu: ${moTaDayDu}.`}
           onClick={() => setODangXem({ ten, ds: dem[noiBat] })}
-          title={`${ten} — ${(Object.keys(dem) as TrangThai[]).filter((k) => dem[k].length).map((k) => `${MAU[k].nhan} ${dem[k].length}`).join(" · ")}`}
-          style={{ width: "100%", border: `1.5px solid ${m.mau}22`, background: m.nen, borderRadius: 8,
-                   padding: "6px 8px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {/* Icon trạng thái nặng nhất — không chỉ màu mới nói lên ô này đang
-                ở tình trạng gì, khớp luật B4 (màu không phải kênh duy nhất). */}
-            <NoiBatIcon size={12} color={m.mau} aria-hidden="true" style={{ flexShrink: 0 }} />
-            <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: m.mau, lineHeight: 1 }}>
-              {dem[noiBat].length}
-              <span style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft }}> / {tong}</span>
+          title={`${ten} — ${moTaDayDu}`}>
+          <span className="analysis-matrix-cell__summary">
+            <span className="analysis-matrix-cell__icon">
+              <NoiBatIcon size={15} aria-hidden="true" />
+            </span>
+            <span className="analysis-matrix-cell__reading">
+              <small>{m.nhan}</small>
+              <strong>
+                {dem[noiBat].length}<em>/{tong}</em>
+              </strong>
             </span>
           </span>
-          {/* Thanh bốn màu: xong · trễ · thiếu · chưa tới hạn — đúng kiểu
-              stacked bar của BMS. Cao 8px (trước 5px, đúng thang 4px) —
-              ở 5px hai màu liền kề gần tông dễ nhoè vào nhau, nhất là khi
-              tỉ lệ mỗi đoạn nhỏ. Mỗi đoạn có title riêng để hover ra đúng
-              số, không chỉ dựa vào việc nhận ra màu. */}
-          <span style={{ display: "flex", height: 8, borderRadius: 999, overflow: "hidden", background: C.surface }}>
-            {(["xong", "tre", "thieu", "chua"] as TrangThai[]).map((k) => (
+          <span className="analysis-matrix-cell__mix" aria-hidden="true">
+            {THU_TU_TRANG_THAI.map((k) => (
               dem[k].length
-                ? <span key={k} title={`${MAU[k].nhan}: ${dem[k].length}`}
-                    style={{ width: `${(dem[k].length / tong) * 100}%`, background: MAU[k].mau,
-                             borderRight: `1px solid ${C.surface}` }} />
+                ? <span key={k}
+                    className={`analysis-matrix-cell__segment analysis-matrix-cell__segment--${k}`}
+                    data-matrix-segment={k}
+                    style={{ width: `${(dem[k].length / tong) * 100}%` }} />
                 : null
             ))}
           </span>
@@ -239,42 +250,60 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <Card variant="strong">
-        <CardTitle icon={LayoutGrid}
-          sub="Trục hàng đổi được · màu theo trạng thái nặng nhất trong ô · bấm ô để xem danh sách hạng mục">
-          Ma trận tiến độ theo giai đoạn
-        </CardTitle>
+    <section className="analysis-matrix" data-analysis-matrix aria-labelledby="overview-analysis-matrix-title">
+      <div className="overview-analysis-layer__heading">
+        <span className="overview-analysis-layer__index" aria-hidden="true">02</span>
+        <div>
+          <h3 id="overview-analysis-matrix-title">Ma trận điểm nghẽn</h3>
+          <p>Đổi trục để tìm nơi đang trễ, thiếu dữ liệu hoặc dồn tải theo giai đoạn.</p>
+        </div>
+      </div>
+
+      <Card variant="strong" cls="analysis-matrix__card">
+        <div className="analysis-matrix__masthead">
+          <CardTitle icon={LayoutGrid}
+            sub="Màu theo trạng thái nặng nhất trong ô · bấm ô để xem danh sách hạng mục"
+            right={(
+              <div className="analysis-quality-badge" data-analysis-quality-badge
+                aria-label={`Chất lượng dữ liệu ${chatLuong.diem}%, mức ${chatLuong.muc}; thiếu ${chatLuong.oThieu} trên ${chatLuong.oTong} ô`}>
+                <ShieldAlert size={18} aria-hidden="true" />
+                <span>
+                  <small>Chất lượng dữ liệu</small>
+                  <strong>{chatLuong.diem}% · {chatLuong.muc}</strong>
+                </span>
+                <em>{chatLuong.oThieu.toLocaleString("vi-VN")}/{chatLuong.oTong.toLocaleString("vi-VN")} ô thiếu</em>
+              </div>
+            )}>
+            Bản đồ trạng thái
+          </CardTitle>
+        </div>
 
         {/* Đổi trục là đổi câu hỏi — cùng một bộ dữ liệu, bốn cách nhìn */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft }}>Xem theo</span>
-          {TRUC.map((t) => {
-            const on = truc === t.id;
-            return (
-              <button key={t.id} onClick={() => { setTruc(t.id); setSoHang(12); }}
-                style={{ fontFamily: TEXT, fontSize: 12, fontWeight: on ? 800 : 600,
-                         color: on ? C.plum : C.plumSoft, borderRadius: 999, padding: "7px 14px",
-                         cursor: "pointer", border: `1.5px solid ${on ? C.pink : C.pinkSoft}`,
-                         background: on ? C.pinkSoft : C.surface }}>
-                {t.ten}
-              </button>
-            );
-          })}
-          <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginLeft: 10 }}>Cột</span>
-          {COT.map((c) => {
-            const on = cot === c.id;
-            return (
-              <button key={c.id} onClick={() => setCot(c.id)}
-                style={{ fontFamily: TEXT, fontSize: 12, fontWeight: on ? 800 : 600,
-                         color: on ? C.plum : C.plumSoft, borderRadius: 999, padding: "7px 14px",
-                         cursor: "pointer", border: `1.5px solid ${on ? C.lav : C.pinkSoft}`,
-                         background: on ? C.lavSoft : C.surface }}>
-                {c.ten}
-              </button>
-            );
-          })}
-          <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
+        <div className="analysis-matrix__toolbar">
+          <div className="analysis-matrix__choice" role="group" aria-label="Xem theo">
+            <span>Xem theo</span>
+            {TRUC.map((t) => {
+              const on = truc === t.id;
+              return (
+                <button key={t.id} type="button" aria-pressed={on}
+                  onClick={() => { setTruc(t.id); setSoHang(12); }}>
+                  {t.ten}
+                </button>
+              );
+            })}
+          </div>
+          <div className="analysis-matrix__choice" role="group" aria-label="Cột">
+            <span>Cột</span>
+            {COT.map((c) => {
+              const on = cot === c.id;
+              return (
+                <button key={c.id} type="button" aria-pressed={on} onClick={() => setCot(c.id)}>
+                  {c.ten}
+                </button>
+              );
+            })}
+          </div>
+          <span className="analysis-matrix__hint">
             {cot === "thang"
               ? "Cột tháng xếp theo MỐC ĐÍCH của hạng mục — ô trống là tháng đó không có việc"
               : truc === "bo_phan"
@@ -283,45 +312,48 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
           </span>
         </div>
 
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <div className="analysis-matrix-legend" aria-label="Chú giải trạng thái">
           {(Object.keys(MAU) as TrangThai[]).map((k) => {
             const { Icon } = MAU[k];
             return (
-              <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: MAU[k].mau }}>
-                <Icon size={14} aria-hidden="true" />{MAU[k].nhan}
+              <span key={k} className={`analysis-matrix-legend__item analysis-matrix-legend__item--${k}`}
+                data-matrix-legend-status={k}>
+                <span className="analysis-matrix-legend__dot" aria-hidden="true" />
+                <Icon size={14} aria-hidden="true" />
+                {MAU[k].nhan}
               </span>
             );
           })}
-          <span style={{ marginLeft: "auto", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{tong} hạng mục</span>
+          <span className="analysis-matrix-legend__total">{tong} hạng mục</span>
         </div>
 
-        <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: cot === "giai_doan" ? 620 : 1000 }}>
+        <div className="vmp-scroll analysis-matrix-scroll" data-analysis-matrix-table style={{ overflowX: "auto" }}>
+          <table className="analysis-matrix-table" style={{ minWidth: cot === "giai_doan" ? 720 : 1120 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", fontSize: 12, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>
+                <th scope="col" className="analysis-matrix-table__head analysis-matrix-table__corner">
                   {TRUC.find((t) => t.id === truc)?.ten}
                 </th>
                 {(cot === "giai_doan" ? GIAI_DOAN.map((g) => ({ id: g.id, ten: g.ten })) : THANG).map((g) => (
-                  <th key={g.id} style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, padding: "0 8px 8px" }}>{g.ten}</th>
+                  <th key={g.id} scope="col" className="analysis-matrix-table__head">{g.ten}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {luoi.slice(0, soHang).map((h) => (
-                <tr key={h.khoa}>
-                  <td style={{ padding: "6px 8px", maxWidth: 210 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.ten}</div>
-                    <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <tr key={h.khoa} className="analysis-matrix-table__row">
+                  <th scope="row" className="analysis-matrix-row-head">
+                    <div className="analysis-matrix-row-head__name">{h.ten}</div>
+                    <div className="analysis-matrix-row-head__meta">
                       {h.phu ? h.phu + " · " : ""}{h.tong} hạng mục
                     </div>
-                  </td>
+                  </th>
                   {h.o.map((o) => <O key={o.id} dem={o.dem} ten={`${h.ten} · ${o.ten}`} />)}
                 </tr>
               ))}
               {luoi.length > soHang && (
                 <tr><td colSpan={cot === "giai_doan" ? 5 : 13} style={{ padding: "10px 8px" }}>
-                  <button onClick={() => setSoHang((n) => n + 20)}
+                  <button type="button" onClick={() => setSoHang((n) => n + 20)}
                     style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum,
                              border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
                              borderRadius: 999, padding: "7px 14px", cursor: "pointer" }}>
@@ -337,33 +369,14 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
         </div>
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 18 }}>
-        <Card>
-          <CardTitle icon={ShieldAlert} sub="Bao nhiêu phần trăm ô trong ma trận chấm được từ dữ liệu thật">
-            Chất lượng dữ liệu
-          </CardTitle>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-            <div style={{ padding: "14px 20px", borderRadius: 14, background: chatLuong.nen, minWidth: 120, textAlign: "center" }}>
-              <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: chatLuong.mau, lineHeight: 1 }}>{chatLuong.diem}%</div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: chatLuong.mau, marginTop: 4 }}>{chatLuong.muc}</div>
-            </div>
-            <div style={{ flex: 1, minWidth: 200, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
-              <b style={{ color: C.plum }}>{chatLuong.oThieu.toLocaleString("vi-VN")}</b> trên {chatLuong.oTong.toLocaleString("vi-VN")} ô
-              không chấm được: thiếu mốc hạn, hoặc ghi hoàn thành mà không có ngày thực tế.
-              <div style={{ marginTop: 6 }}>
-                Ngưỡng: <b style={{ color: C.mintText }}>≥95% tốt</b> · <b style={{ color: C.marigoldText }}>≥80% cần chú ý</b> · dưới nữa là kém.
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card variant="soft">
+      <div className="analysis-matrix__hotspots">
+        <Card variant="soft" cls="analysis-matrix__hotspot-card">
           <CardTitle icon={Flame} sub="Nhiều hạng mục trễ, nhiều ô thiếu dữ liệu, điểm rủi ro cao">
             Đối tượng cần chú ý nhất
           </CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {diemNong.map((d) => (
-              <button key={d.ma} onClick={() => setODangXem({ ten: `${d.ma} · ${d.ten}`, ds: d.ds })}
+              <button key={d.ma} type="button" onClick={() => setODangXem({ ten: `${d.ma} · ${d.ten}`, ds: d.ds })}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14,
                          background: C.surface, border: `1px solid ${C.pinkSoft}`, cursor: "pointer", textAlign: "left" }}>
                 <span style={{ fontFamily: NUM, fontSize: 12, fontWeight: 800, color: C.plum, background: C.pinkMist, borderRadius: 8, padding: "3px 8px" }}>{d.ma}</span>
@@ -404,6 +417,6 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
           </div>
         </Modal>
       )}
-    </div>
+    </section>
   );
 }

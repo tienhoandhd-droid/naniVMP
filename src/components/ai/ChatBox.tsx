@@ -14,7 +14,7 @@
  *  hình chỉ nhìn thấy mấy đoạn đó và đếm ra con số của riêng chúng. Sai,
  *  mà nghe rất trôi chảy — kiểu sai nguy hiểm nhất trong hệ GMP.
  * ===================================================================== */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { MessageCircle, X, Send, Sparkles, AlertTriangle, Database, BookOpen, Lightbulb } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import { supabase, vePhien } from "../../lib/supabaseClient.ts";
@@ -151,6 +151,8 @@ export default function ChatBox({ user, trang, access }: {
   const mocDaRutRef = useRef<number>(-1);
   const cuoiRef = useRef<HTMLDivElement | null>(null);
   const oNhapRef = useRef<HTMLTextAreaElement | null>(null);
+  const fabRef = useRef<HTMLButtonElement | null>(null);
+  const wasOpenRef = useRef(false);
 
   const url = import.meta.env.VITE_N8N_CHAT_URL as string | undefined;
   const token = import.meta.env.VITE_N8N_CHAT_TOKEN as string | undefined;
@@ -159,7 +161,32 @@ export default function ChatBox({ user, trang, access }: {
     cuoiRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [msgs, dangHoi]);
 
-  useEffect(() => { if (mo) oNhapRef.current?.focus(); }, [mo]);
+  useEffect(() => {
+    if (mo) {
+      wasOpenRef.current = true;
+      oNhapRef.current?.focus();
+    } else if (wasOpenRef.current) {
+      /* Chờ React commit nút FAB trở lại DOM rồi mới trả focus. */
+      wasOpenRef.current = false;
+      fabRef.current?.focus();
+    }
+  }, [mo]);
+
+  const dongChat = useCallback(() => {
+    setMo(false);
+  }, []);
+
+  useEffect(() => {
+    if (!mo) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dongChat();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mo, dongChat]);
 
   /* Tải kho mẩu chờ MỘT LẦN lúc mở ô chat, không phải lúc đang chờ —
    * lúc đang chờ mà mới gọi mạng thì mẩu hiện ra sau khi câu trả lời
@@ -294,7 +321,8 @@ export default function ChatBox({ user, trang, access }: {
   /* -------------------------------------------------------------- */
   if (!mo) {
     return (
-      <button className="vmp-chat-fab" onClick={() => setMo(true)} title="Trò chuyện cùng công chúa Vali"
+      <button ref={fabRef} type="button" className="vmp-chat-fab" onClick={() => setMo(true)}
+        aria-label="Trò chuyện cùng công chúa Vali" title="Trò chuyện cùng công chúa Vali"
         style={{
           position: "fixed", right: 22, bottom: 22, zIndex: 90,
           width: 56, height: 56, borderRadius: R.pill, border: "none",
@@ -305,13 +333,13 @@ export default function ChatBox({ user, trang, access }: {
         }}
         onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.06)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; }}>
-        <MessageCircle size={24} />
+        <MessageCircle size={24} aria-hidden="true" />
       </button>
     );
   }
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="false" aria-labelledby="vmp-chat-title" style={{
       position: "fixed", right: 22, bottom: 22, zIndex: 90,
       width: "min(400px, calc(100vw - 32px))",
       height: "min(600px, calc(100vh - 100px))",
@@ -332,14 +360,14 @@ export default function ChatBox({ user, trang, access }: {
           <Sparkles size={16} color="#fff" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>
+          <div id="vmp-chat-title" style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>
             Công chúa Vali
           </div>
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
             Số liệu đọc thẳng từ database · bổn cung không đoán
           </div>
         </div>
-        <button onClick={() => setMo(false)} title="Đóng"
+        <button type="button" onClick={dongChat} aria-label="Đóng trò chuyện" title="Đóng"
           style={{ border: "none", background: "transparent", cursor: "pointer",
                    padding: 6, borderRadius: R.sm, display: "flex" }}>
           <X size={17} color={C.plumSoft} />
@@ -488,7 +516,7 @@ export default function ChatBox({ user, trang, access }: {
       <div style={{ padding: "11px 12px", borderTop: `1px solid ${C.line}`,
                     background: C.surface, flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <textarea ref={oNhapRef} value={q} rows={1}
+          <textarea ref={oNhapRef} value={q} rows={1} aria-label="Nội dung câu hỏi"
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               // Enter gửi, Shift+Enter xuống dòng — quy ước quen thuộc
@@ -499,7 +527,8 @@ export default function ChatBox({ user, trang, access }: {
                      borderRadius: R.md, border: `1px solid ${C.line}`,
                      background: C.surfaceSunk, color: C.plum, fontFamily: TEXT,
                      fontSize: 14, lineHeight: 1.5, outline: "none" }} />
-          <button onClick={() => hoi(q)} disabled={!q.trim() || dangHoi} title="Gửi"
+          <button type="button" onClick={() => hoi(q)} disabled={!q.trim() || dangHoi}
+            aria-label="Gửi câu hỏi" title="Gửi"
             style={{ width: 40, height: 40, flexShrink: 0, borderRadius: R.md,
                      border: "none", cursor: q.trim() && !dangHoi ? "pointer" : "default",
                      background: q.trim() && !dangHoi ? "var(--grad)" : C.pinkSoft,

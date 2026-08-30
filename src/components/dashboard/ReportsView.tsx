@@ -22,11 +22,11 @@ import {
   Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2, Mail, Layers,
 } from "lucide-react";
 
-import { C, TEXT, NUM, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
+import { C, TEXT, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
 // Khối 3D nạp theo yêu cầu: ai không mở trang Báo cáo thì không tải three.js.
 import { nhapCoThuLai } from "../../lib/tailMan.ts";
 const VmpSpace3D = lazy(nhapCoThuLai(() => import("../three/VmpSpace3D.tsx")));
-import { DEPTS, CRIT, LOAI_LOI, sevOf } from "../../constants/vmp.ts";
+import { DEPTS, CRIT } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
 import { ThanhTraToggle } from "../layout/Layout.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
@@ -55,8 +55,8 @@ const toolBtn = (bg: string, color: string) => ({
   border: "none", cursor: "pointer", background: bg, color, fontFamily: TEXT, fontWeight: 800, fontSize: 14,
 });
 
-const th: React.CSSProperties = { textAlign: "left", fontSize: 12, color: C.plumSoft, fontWeight: 800, padding: "0 13px 10px", whiteSpace: "nowrap" };
-const td: React.CSSProperties = { padding: "10px 13px", fontSize: 14, color: C.plum, fontWeight: 600, borderTop: `1px solid ${C.line}` };
+/* Kiểu ô bảng cục bộ (th/td) đã bỏ — mọi bảng của màn này nay đi qua
+   `.reg-table` trong analysis.css: kẻ dòng, tiêu đề dính, caption. */
 
 function uniqSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
@@ -513,16 +513,20 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </div>
         )}
         <TableScroll maxHeight={280} hint={false}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, marginTop: 16 }}>
-            <thead><tr><th style={th}>Giai đoạn</th><th style={{ ...th, textAlign: "center" }}>Số hạng mục</th></tr></thead>
+          {/* Bề mặt sổ (analysis.css): kẻ dòng, tiêu đề dính, caption cho
+              trình đọc màn hình. Cột số căn PHẢI — Be Vietnam Pro không có
+              chữ số đều bề rộng nên thẳng cột là nhờ căn phải, không nhờ font. */}
+          <table className="reg-table" style={{ marginTop: 16 }}>
+            <caption>Phân bố {ytdNam.total} hạng mục năm {ky.year} theo giai đoạn trong quy trình thẩm định.</caption>
+            <thead><tr><th scope="col">Giai đoạn</th><th scope="col" className="reg-num">Số hạng mục</th></tr></thead>
             <tbody>
               {ytdNam.byStage.map((s) => (
                 <tr key={s.id} className={s.count ? "vmp-row" : undefined}
                   role={s.count ? "button" : undefined}
                   onClick={s.count ? () => moChiTiet(`${s.label} · năm ${ky.year}`, scopedNamActive.filter((a) => stageOf(a) === s.id)) : undefined}
                   style={{ cursor: s.count ? "pointer" : "default" }}>
-                  <td style={td}>{s.label}{s.count > 0 && <span style={{ color: C.plumSoft, fontWeight: 600 }}> · bấm để xem</span>}</td>
-                  <td style={{ ...td, textAlign: "center", fontFamily: NUM }}>{s.count}</td>
+                  <td>{s.label}{s.count > 0 && <span className="reg-muted"> · bấm để xem</span>}</td>
+                  <td className="reg-num">{s.count}</td>
                 </tr>
               ))}
             </tbody>
@@ -618,33 +622,34 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           : <div style={{ fontSize: 14, color: C.plumSoft, fontWeight: 700, padding: 12 }}>Không có bộ phận nào đang chậm trong phạm vi đang chọn.</div>}
         <div style={{ height: 14 }} />
         <TableScroll maxHeight={320}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720 }}>
+          <table className="reg-table" style={{ minWidth: 720 }}>
+            <caption>Số hạng mục chậm theo từng giai đoạn, chia theo bộ phận, trong phạm vi đang lọc.</caption>
             <thead><tr>
-              <th style={th}>Bộ phận</th><th style={{ ...th, textAlign: "center" }}>Tổng</th>
-              <th style={{ ...th, textAlign: "center" }}>Chậm đề cương</th><th style={{ ...th, textAlign: "center" }}>Chậm thẩm định</th>
-              <th style={{ ...th, textAlign: "center" }}>Chậm báo cáo</th><th style={{ ...th, textAlign: "center" }}>Quá hạn VMP</th>
-              <th style={{ ...th, textAlign: "center" }}>Hoàn thành VMP</th>
+              <th scope="col" data-reg-stick>Bộ phận</th><th scope="col" className="reg-num">Tổng</th>
+              <th scope="col" className="reg-num">Chậm đề cương</th><th scope="col" className="reg-num">Chậm thẩm định</th>
+              <th scope="col" className="reg-num">Chậm báo cáo</th><th scope="col" className="reg-num">Quá hạn VMP</th>
+              <th scope="col" className="reg-num">Hoàn thành VMP</th>
             </tr></thead>
             <tbody>
               {bottleneck.map((r) => (
                 <tr key={r.dept}>
-                  <td style={td}>{r.label}</td>
-                  <td style={{ ...td, textAlign: "center", fontFamily: NUM }}>{r.total}</td>
-                  <td style={{ ...td, textAlign: "center" }}>{r.overProtocol > 0 ? <Tag color={C.lavText} bg={C.lavSoft}>{r.overProtocol}</Tag> : "—"}</td>
-                  <td style={{ ...td, textAlign: "center" }}>{r.overValidation > 0 ? <Tag color={C.skyText} bg={C.skySoft}>{r.overValidation}</Tag> : "—"}</td>
-                  <td style={{ ...td, textAlign: "center" }}>{r.overReport > 0 ? <Tag color={C.pinkText} bg={C.pinkSoft}>{r.overReport}</Tag> : "—"}</td>
-                  <td style={{ ...td, textAlign: "center" }}>{r.overVmp > 0 ? <Tag color={C.raspText} bg={C.raspSoft}>{r.overVmp}</Tag> : "—"}</td>
+                  <th scope="row" data-reg-stick>{r.label}</th>
+                  <td className="reg-num">{r.total}</td>
+                  <td className="reg-num">{r.overProtocol > 0 ? <Tag color={C.lavText} bg={C.lavSoft}>{r.overProtocol}</Tag> : "—"}</td>
+                  <td className="reg-num">{r.overValidation > 0 ? <Tag color={C.skyText} bg={C.skySoft}>{r.overValidation}</Tag> : "—"}</td>
+                  <td className="reg-num">{r.overReport > 0 ? <Tag color={C.pinkText} bg={C.pinkSoft}>{r.overReport}</Tag> : "—"}</td>
+                  <td className="reg-num">{r.overVmp > 0 ? <Tag color={C.raspText} bg={C.raspSoft}>{r.overVmp}</Tag> : "—"}</td>
                   {/* Cột này đếm HOÀN THÀNH, không phải "đúng hạn" — tên cũ
                       làm bộ phận không chậm mốc nào vẫn hiện 0% và đọc ra
                       thành "không có gì đúng hạn". Đổi tên cho khớp phép
                       đếm, và khi chưa hạng mục nào xong thì ghi "—" chứ
                       không ghi 0%: chưa có gì để đo khác với đo ra số 0. */}
-                  <td style={{ ...td, textAlign: "center", fontWeight: 800 }}>
+                  <td className="reg-num reg-total">
                     {r.total === 0 ? "—" : r.onTimeRate === 0 ? "0% (chưa mục nào xong)" : `${r.onTimeRate}%`}
                   </td>
                 </tr>
               ))}
-              {!bottleneck.length && <tr><td style={td} colSpan={7}>Không có dữ liệu trong phạm vi đang chọn.</td></tr>}
+              {!bottleneck.length && <tr><td colSpan={7}>Không có dữ liệu trong phạm vi đang chọn.</td></tr>}
             </tbody>
           </table>
         </TableScroll>
@@ -657,44 +662,50 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         </CardTitle>
         {workloadChartHtml && <div dangerouslySetInnerHTML={{ __html: workloadChartHtml }} />}
         <TableScroll maxHeight={340}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720, marginTop: 12 }}>
+          <table className="reg-table" style={{ minWidth: 720, marginTop: 12 }}>
+            <caption>Hạng mục có mốc đích VMP rơi vào {nextMonth.monthLabel}, chưa hoàn thành VMP.</caption>
             <thead><tr>
-              <th style={th}>Mã</th><th style={th}>Tên</th><th style={th}>Loại thẩm định</th><th style={th}>Bộ phận</th>
-              <th style={th}>Người thực hiện</th><th style={th}>Hạn đích VMP</th><th style={th}>Trọng yếu</th>
+              <th scope="col">Mã</th><th scope="col">Tên</th><th scope="col">Loại thẩm định</th><th scope="col">Bộ phận</th>
+              <th scope="col">Người thực hiện</th><th scope="col">Hạn đích VMP</th><th scope="col">Trọng yếu</th>
             </tr></thead>
             <tbody>
               {nextMonth.items.slice(0, 200).map((it) => (
                 <tr key={it.id}>
-                  <td style={{ ...td, fontFamily: NUM }}>{it.code}</td><td style={td}>{it.name}</td>
-                  <td style={td}>{it.vtype}</td>
-                  <td style={td}>{maBoPhan(it.depts)}</td><td style={td}>{it.owner}</td>
-                  <td style={{ ...td, fontFamily: NUM }}>{it.target}</td><td style={td}>{it.crit}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{it.code}</td><td>{it.name}</td>
+                  <td>{it.vtype}</td>
+                  <td>{maBoPhan(it.depts)}</td><td>{it.owner}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{it.target}</td><td>{it.crit}</td>
                 </tr>
               ))}
-              {!nextMonth.items.length && <tr><td style={td} colSpan={6}>Không có hạng mục nào đến hạn {nextMonth.monthLabel} trong phạm vi đang chọn.</td></tr>}
+              {/* colSpan trước ghi 6 cho bảng 7 cột — dòng "không có dữ liệu"
+                  hụt một ô, mép phải bảng thủng. */}
+              {!nextMonth.items.length && <tr><td colSpan={7}>Không có hạng mục nào đến hạn {nextMonth.monthLabel} trong phạm vi đang chọn.</td></tr>}
             </tbody>
           </table>
         </TableScroll>
       </Card>
 
-      {/* ===== Chất lượng dữ liệu ===== */}
+      {/* ===== Chất lượng dữ liệu — RÚT thành một dòng (31/08).
+          Thẻ đầy đủ (đếm ba mức + liệt kê 8 vấn đề đầu) là bản sao thu nhỏ
+          của màn "Chất lượng dữ liệu" — chính phụ đề cũ cũng thú nhận vậy
+          ("xem đầy đủ ở mục Chất lượng dữ liệu"). Hai nơi cùng liệt kê lỗi
+          thì bản ở đây luôn là bản thiếu: nó chỉ soát dữ liệu đã tải về
+          trình duyệt, còn màn kia rà thẳng trên máy chủ. Báo cáo chỉ cần
+          BIẾT dữ liệu nền có sạch không — nên giữ đúng một dòng đếm, còn
+          việc TRA lỗi thì sang màn chuyên trách. `quality` vẫn tính vì bản
+          xuất HTML/Excel cần nó (buildManagementReportHTML). */}
       <Card>
-        <CardTitle icon={AlertCircle} sub="Tính trực tiếp trên phạm vi đang lọc — xem đầy đủ ở mục Chất lượng dữ liệu">
-          Chất lượng dữ liệu
-        </CardTitle>
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: quality.length ? 14 : 0 }}>
-          <Tag color={sevOf("error").mau} bg={sevOf("error").nen}>{sevOf("error").emoji} Lỗi: {qualityBySeverity.error || 0}</Tag>
-          <Tag color={sevOf("warning").mau} bg={sevOf("warning").nen}>{sevOf("warning").emoji} Cảnh báo: {qualityBySeverity.warning || 0}</Tag>
-          <Tag color={sevOf("info").mau} bg={sevOf("info").nen}>{sevOf("info").emoji} Thông tin: {qualityBySeverity.info || 0}</Tag>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <AlertCircle size={16} aria-hidden="true" color={quality.length ? C.marigoldText : C.mintText} />
+          <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 700, color: C.plum, flex: 1, minWidth: 220 }}>
+            {quality.length === 0
+              ? "Dữ liệu nền của kỳ này sạch — không phát hiện vấn đề nào trong phạm vi đang lọc."
+              : `Dữ liệu nền có ${qualityBySeverity.error || 0} lỗi · ${qualityBySeverity.warning || 0} cảnh báo · ${qualityBySeverity.info || 0} thông tin — đã kèm vào bản xuất.`}
+          </span>
+          <a href="#v=health" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>
+            Tra từng lỗi → Chất lượng dữ liệu
+          </a>
         </div>
-        {quality.length > 0 && (
-          <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, fontSize: 14, color: C.plum, fontWeight: 600 }}>
-            {quality.slice(0, 8).map((q, i) => (
-              <li key={i}>{sevOf(q.severity).emoji} <b>{LOAI_LOI[q.type]?.ten || q.type}</b> — {q.msg}</li>
-            ))}
-            {quality.length > 8 && <li style={{ color: C.plumSoft }}>… và {quality.length - 8} vấn đề khác.</li>}
-          </ul>
-        )}
       </Card>
 
       {/* ===== Dữ liệu thô ===== */}
@@ -703,18 +714,19 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           Dữ liệu thô
         </CardTitle>
         <TableScroll maxHeight={420}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 1100 }}>
+          <table className="reg-table" style={{ minWidth: 1100 }}>
+            <caption>Dữ liệu thô theo phạm vi đang lọc — mỗi dòng một hạng mục với trạng thái bốn giai đoạn.</caption>
             <thead><tr>
-              <th style={th}>Mã</th><th style={th}>Tên</th><th style={th}>Bộ phận</th><th style={th}>Người thực hiện</th>
-              <th style={th}>TT đề cương</th><th style={th}>TT thẩm định</th><th style={th}>TT báo cáo</th><th style={th}>TT VMP</th>
-              <th style={th}>Hạn VMP</th><th style={th}>Ngày VMP thực tế</th>
+              <th scope="col" data-reg-stick>Mã</th><th scope="col">Tên</th><th scope="col">Bộ phận</th><th scope="col">Người thực hiện</th>
+              <th scope="col">TT đề cương</th><th scope="col">TT thẩm định</th><th scope="col">TT báo cáo</th><th scope="col">TT VMP</th>
+              <th scope="col">Hạn VMP</th><th scope="col">Ngày VMP thực tế</th>
             </tr></thead>
             <tbody>
               {rawRows.slice(0, 500).map((r, i) => (
                 <tr key={i}>
-                  <td style={{ ...td, fontFamily: NUM }}>{r.ma}</td><td style={td}>{r.ten}</td><td style={td}>{r.bo_phan}</td><td style={td}>{r.nguoi_thuc_hien}</td>
-                  <td style={td}>{r.tt_de_cuong}</td><td style={td}>{r.tt_tham_dinh}</td><td style={td}>{r.tt_bao_cao}</td><td style={td}>{r.tt_vmp}</td>
-                  <td style={{ ...td, fontFamily: NUM }}>{r.dl_vmp}</td><td style={{ ...td, fontFamily: NUM }}>{r.ngay_vmp || "—"}</td>
+                  <th scope="row" data-reg-stick>{r.ma}</th><td>{r.ten}</td><td>{r.bo_phan}</td><td>{r.nguoi_thuc_hien}</td>
+                  <td>{r.tt_de_cuong}</td><td>{r.tt_tham_dinh}</td><td>{r.tt_bao_cao}</td><td>{r.tt_vmp}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{r.dl_vmp}</td><td style={{ whiteSpace: "nowrap" }}>{r.ngay_vmp || "—"}</td>
                 </tr>
               ))}
             </tbody>

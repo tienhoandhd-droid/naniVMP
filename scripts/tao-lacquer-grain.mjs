@@ -14,6 +14,7 @@
  *  không đổi khi không ai đổi tham số.
  * ===================================================================== */
 import { deflateSync } from "node:zlib";
+import { fileURLToPath } from "node:url";
 import { writeFileSync } from "node:fs";
 
 const KICH_THUOC = 96;
@@ -87,6 +88,6 @@ const png = Buffer.concat([
   chunk("IEND", Buffer.alloc(0)),
 ]);
 
-const dich = new URL("../src/assets/art/lacquer-grain.png", import.meta.url).pathname;
+const dich = fileURLToPath(new URL("../src/assets/art/lacquer-grain.png", import.meta.url));
 writeFileSync(dich, png);
 console.log(`da ghi ${dich} (${png.length} byte)`);

@@ -5699,7 +5699,6 @@ body { transition: background var(--mo-slow) var(--ease); }
     "k1" "k2" "k3" "k4"
     "hero"
     "vali"
-    "wide"
     "sau";
 }
 
@@ -5711,7 +5710,6 @@ body { transition: background var(--mo-slow) var(--ease); }
       "k3   k4"
       "hero hero"
       "vali vali"
-      "wide wide"
       "sau  sau";
   }
 }
@@ -5730,7 +5728,6 @@ body { transition: background var(--mo-slow) var(--ease); }
       "k1   k2   k3   k4"
       "hero hero hero hero"
       "vali vali vali vali"
-      "wide wide wide wide"
       "sau  sau  sau  sau";
   }
 }
@@ -5742,12 +5739,257 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-bento > .b-k4   { grid-area: k4; }
 /* .b-risk đã rời Tổng quan sang tab QRM của trang Cảnh báo & Rủi ro. */
 .vmp-bento > .b-vali { grid-area: vali; }
-.vmp-bento > .b-wide { grid-area: wide; }
-/* BUG "Phân tích chi tiết đè chữ" (nghiên cứu (3) P1): khối phân tích
- * gập từng dùng chung class b-wide với thẻ "Việc gấp nhất" — hai grid
- * item CÙNG grid-area thì nằm chồng lên nhau, thanh mở gập đè thẳng lên
- * tiêu đề thẻ kia. Khối phân tích có khu đất riêng: */
 .vmp-bento > .b-sau  { grid-area: sau; }
+
+/* Bảng tin Vali: dùng cùng chibi với tab Thực hiện. Chibi giữ vai trò dẫn
+   chuyện ở cột trái; vùng rộng bên phải dành trọn cho dữ liệu tổng hợp. */
+.vmp-vali-brief {
+  --vmp-vali-accent: var(--c-sky-text);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 164px minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+  min-height: 326px;
+  padding: 24px 28px 22px;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 10% 58%, color-mix(in srgb, var(--vmp-vali-accent) 12%, transparent) 0 14%, transparent 36%),
+    linear-gradient(120deg, color-mix(in srgb, var(--c-surface) 84%, var(--c-pink-soft)) 0 34%,
+      color-mix(in srgb, var(--c-surface) 92%, var(--c-sky-soft)) 100%);
+  box-shadow: var(--e-low);
+}
+.vmp-vali-brief--concern { --vmp-vali-accent: var(--c-rasp-text); }
+.vmp-vali-brief--celebrate { --vmp-vali-accent: var(--c-mint-text); }
+.vmp-vali-brief::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 20px;
+  bottom: -88px;
+  width: 238px;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--c-gold) 38%, transparent);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 10px color-mix(in srgb, var(--c-gold) 4%, transparent);
+}
+.vmp-vali-brief::after {
+  content: "";
+  position: absolute;
+  right: 28px;
+  bottom: 0;
+  width: min(220px, 30%);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--c-gold));
+  opacity: .58;
+}
+.vmp-vali-brief__chibi {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.vmp-vali-brief__chibi img {
+  display: block;
+  width: 154px;
+  height: 205px;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 11px 17px color-mix(in srgb, var(--c-ink) 18%, transparent));
+}
+.vmp-vali-brief__chibi span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-ink);
+  font-family: 'Cormorant Garamond', 'Be Vietnam Pro', Georgia, serif;
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vmp-vali-brief__chibi span::before,
+.vmp-vali-brief__chibi span::after {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: var(--c-gold);
+}
+.vmp-vali-brief__content {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+.vmp-vali-brief__eyebrow {
+  margin-bottom: 5px;
+  color: var(--vmp-vali-accent);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.vmp-vali-brief__title {
+  margin: 0;
+  color: var(--c-ink);
+  font-family: 'Cormorant Garamond', 'Be Vietnam Pro', Georgia, serif;
+  font-size: clamp(25px, 2vw, 30px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.015em;
+}
+.vmp-vali-brief__headline {
+  max-width: 72ch;
+  margin: 10px 0 13px;
+  color: var(--c-ink);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+.vmp-vali-brief__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+.vmp-vali-brief__metric {
+  --vmp-metric: var(--c-sky-text);
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 92px;
+  padding: 11px 12px 10px;
+  border: 1px solid color-mix(in srgb, var(--vmp-metric) 15%, var(--c-line));
+  border-top: 2px solid var(--vmp-metric);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c-surface) 86%, transparent);
+}
+.vmp-vali-brief__metric--danger { --vmp-metric: var(--c-rasp-text); }
+.vmp-vali-brief__metric--warning { --vmp-metric: var(--c-marigold-text); }
+.vmp-vali-brief__metric--success { --vmp-metric: var(--c-mint-text); }
+.vmp-vali-brief__metric dt {
+  overflow: hidden;
+  color: var(--c-ink-soft);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vmp-vali-brief__metric dd {
+  margin: 4px 0 2px;
+}
+/* Giá trị + dòng chú nay cùng nằm trong <dd> (sửa axe definition-list);
+   hai lớp con giữ đúng cỡ chữ của bản cũ. */
+.vmp-vali-brief__metric-value {
+  display: block;
+  color: var(--vmp-metric);
+  font-family: var(--ff-number, 'Be Vietnam Pro', system-ui, sans-serif);
+  font-size: 24px;
+  font-weight: 850;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.vmp-vali-brief__metric-detail {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-ink-soft);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.vmp-vali-brief__observations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  margin: 11px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.vmp-vali-brief__observation {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--c-ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.vmp-vali-brief__observation::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--c-sky-text);
+}
+.vmp-vali-brief__observation--warning::before { background: var(--c-marigold-text); }
+.vmp-vali-brief__observation--success::before { background: var(--c-mint-text); }
+.vmp-vali-brief__action {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 11px 0 0;
+  padding: 9px 11px;
+  border-left: 3px solid var(--c-gold);
+  border-radius: 0 11px 11px 0;
+  background: color-mix(in srgb, var(--c-marigold-soft) 44%, var(--c-surface));
+  color: var(--c-ink);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.vmp-vali-brief__action strong { flex: none; color: var(--c-marigold-text); font-weight: 850; }
+.vmp-vali-brief__action span { font-weight: 700; }
+:root[data-thanhtra="1"] .vmp-vali-brief { grid-template-columns: minmax(0, 1fr); }
+:root[data-thanhtra="1"] .vmp-vali-brief__chibi { display: none; }
+
+@media (max-width: 900px) {
+  .vmp-vali-brief { grid-template-columns: 128px minmax(0, 1fr); gap: 18px; }
+  .vmp-vali-brief__chibi img { width: 118px; height: 160px; }
+  .vmp-vali-brief__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .vmp-vali-brief {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 12px;
+    min-height: 0;
+    padding: 16px;
+    border-radius: 20px;
+  }
+  .vmp-vali-brief::before { left: 0; bottom: -50px; width: 142px; }
+  .vmp-vali-brief::after { right: 16px; }
+  .vmp-vali-brief__chibi { align-self: start; }
+  .vmp-vali-brief__chibi img { width: 82px; height: 108px; }
+  .vmp-vali-brief__chibi span { font-size: 10px; }
+  .vmp-vali-brief__chibi span::before,
+  .vmp-vali-brief__chibi span::after { width: 6px; }
+  .vmp-vali-brief__eyebrow { font-size: 8px; letter-spacing: .08em; }
+  .vmp-vali-brief__title { font-size: 22px; }
+  .vmp-vali-brief__headline { margin: 8px 0 10px; font-size: 12px; line-height: 1.45; }
+  .vmp-vali-brief__metrics { grid-template-columns: 1fr; gap: 6px; }
+  .vmp-vali-brief__metric {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    min-height: 55px;
+    padding: 8px 10px;
+  }
+  .vmp-vali-brief__metric dt { grid-column: 1; grid-row: 1; }
+  .vmp-vali-brief__metric dd { grid-column: 2; grid-row: 1 / span 2; align-self: center; margin: 0 0 0 8px; }
+  .vmp-vali-brief__metric-value { font-size: 20px; }
+  .vmp-vali-brief__metric > span { grid-column: 1; grid-row: 2; }
+  .vmp-vali-brief__observations { grid-template-columns: 1fr; gap: 5px; }
+  .vmp-vali-brief__action { display: block; }
+  .vmp-vali-brief__action strong { display: block; margin-bottom: 2px; }
+}
 
 /* Ô số liệu: dải màu mảnh bên trái thay cho viền màu cả ô. Đủ để phân
    loại bằng mắt, không đủ để át con số. */
@@ -5796,53 +6038,215 @@ body { transition: background var(--mo-slow) var(--ease); }
    ===================================================================== */
 .vmp-vongnam {
   width: 100%;
+  --vmp-eggshell: #fbf7f2;
+  --vmp-track: #ece4df;
+  --vmp-lacquer: #713c55;
+  --vmp-lacquer-hi: #96566e;
+  --vmp-cinnabar: #b95751;
+  --vmp-antique-gold: #c1943f;
+  --vmp-pearl-sage: #7d978b;
+  --vmp-smoke: #9a9094;
   /* Xếp cột theo BỀ RỘNG CỦA THẺ, không theo bề rộng cửa sổ. Thẻ hero nằm
      trong lưới bento nên ở màn 1500px nó vẫn chỉ rộng ~575px — dùng
      media query theo cửa sổ là đo nhầm đối tượng, và kết quả là cột chữ
      bên phải bị bóp đến mức "Quá hạn (trạng thái)" vỡ làm ba dòng. */
   container-type: inline-size;
 }
+[data-theme="dark"] .vmp-vongnam {
+  --vmp-eggshell: #2b2228;
+  --vmp-track: #473940;
+  --vmp-lacquer: #9d5870;
+  --vmp-lacquer-hi: #c1768e;
+  --vmp-cinnabar: #d56e69;
+  --vmp-antique-gold: #d6ae5d;
+  --vmp-pearl-sage: #8fa89b;
+  --vmp-smoke: #9c9197;
+}
 .vmp-vongnam-than {
   display: grid;
-  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
-  gap: 12px 28px;
-  align-items: center;
+  grid-template-columns: minmax(360px, 1.12fr) minmax(310px, .88fr);
+  gap: 20px 28px;
+  align-items: start;
 }
 .vmp-vongnam-than > * { min-width: 0; }
-@container (max-width: 660px) {
+@container (max-width: 760px) {
   .vmp-vongnam-than { grid-template-columns: 1fr; gap: 20px; }
-  .vmp-vongnam-vong { max-width: 348px; margin: 0 auto; }
+  .vmp-vongnam-vong { max-width: 400px; margin: 0 auto; }
 }
 .vmp-vongnam-vong {
   position: relative;
   min-width: 0;
-  /* Quầng sáng rất nhẹ sau vòng — tách khối khỏi nền thẻ trắng mà không
-     thêm một đường viền nữa. */
-  background: radial-gradient(52% 52% at 50% 50%,
-    color-mix(in srgb, var(--c-pink) 9%, transparent), transparent 70%);
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 3px;
+  background: radial-gradient(50% 50% at 50% 50%,
+    color-mix(in srgb, var(--vmp-eggshell) 95%, var(--c-surface)) 0 44%,
+    color-mix(in srgb, var(--vmp-lacquer) 5%, transparent) 68%,
+    transparent 74%);
 }
-.vmp-vongnam-svg { display: block; width: 100%; height: auto; }
+.vmp-vongnam-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.vmp-vongnam-vien {
+  fill: none;
+  stroke: var(--vmp-antique-gold);
+  stroke-width: 1.35;
+  opacity: .62;
+  filter: drop-shadow(0 7px 10px color-mix(in srgb, var(--vmp-lacquer) 12%, transparent));
+}
+.vmp-vongnam-ranh {
+  fill: var(--vmp-track);
+  fill-opacity: .58;
+  stroke: var(--c-surface);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.vmp-vongnam-canh {
+  fill: var(--vmp-lacquer);
+  stroke: color-mix(in srgb, var(--c-surface) 88%, transparent);
+  stroke-width: .8;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 2px 2px color-mix(in srgb, var(--vmp-lacquer) 18%, transparent));
+}
+.vmp-vongnam-canh--past {
+  fill: color-mix(in srgb, var(--vmp-lacquer-hi) 62%, var(--vmp-lacquer));
+}
+.vmp-vongnam-canh--current {
+  fill: var(--vmp-lacquer);
+  stroke: var(--vmp-antique-gold);
+  stroke-width: 2.2;
+}
+.vmp-vongnam-canh--future {
+  fill: var(--vmp-lacquer);
+  opacity: .42;
+}
+.vmp-vongnam-canh--done { fill: var(--vmp-pearl-sage); }
+.vmp-vongnam-nap-quahan {
+  fill: var(--vmp-cinnabar);
+  pointer-events: none;
+}
+.vmp-vongnam-loi-mat {
+  fill: color-mix(in srgb, var(--vmp-eggshell) 84%, var(--c-surface));
+  stroke: var(--vmp-antique-gold);
+  stroke-width: 2;
+  filter: drop-shadow(0 5px 9px color-mix(in srgb, var(--vmp-lacquer) 14%, transparent));
+}
+.vmp-vongnam-nhan {
+  pointer-events: none;
+  color: var(--c-ink);
+}
+.vmp-vongnam-nhan rect {
+  fill: var(--vmp-lacquer);
+  stroke: var(--vmp-antique-gold);
+  stroke-width: 1.7;
+  filter: drop-shadow(0 4px 6px color-mix(in srgb, var(--vmp-lacquer) 24%, transparent));
+}
+.vmp-vongnam-nhan text { fill: var(--c-ink); }
+.vmp-vongnam-nhan--hientai text { fill: #fff8e6; }
+.vmp-vongnam-nhan-thang {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.vmp-vongnam-nhan-so {
+  font-size: 14px;
+  font-weight: 900;
+}
+.vmp-vongnam-homnay line {
+  stroke: var(--vmp-antique-gold);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--vmp-lacquer) 24%, transparent));
+}
+.vmp-vongnam-homnay circle {
+  fill: var(--vmp-eggshell);
+  stroke: var(--vmp-antique-gold);
+  stroke-width: 1.7;
+}
 .vmp-vongnam-loi {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; pointer-events: none;
+  padding-bottom: 1px;
 }
-.vmp-vongnam-ben { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.vmp-vongnam-loi-tyle {
+  color: var(--c-ink);
+  font-size: clamp(38px, 10cqi, 46px);
+  font-weight: 800;
+  line-height: .9;
+  font-variant-numeric: tabular-nums;
+}
+.vmp-vongnam-loi-nhan {
+  max-width: 128px;
+  margin-top: 8px;
+  color: var(--c-ink-soft);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.25;
+  letter-spacing: .095em;
+}
+.vmp-vongnam-loi-tong {
+  margin-top: 4px;
+  color: var(--c-ink-soft);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+.vmp-vongnam-ben {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--vmp-pearl-sage) 22%, var(--c-border));
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--vmp-eggshell) 76%, var(--c-surface)) 0%,
+      color-mix(in srgb, var(--vmp-pearl-sage) 7%, var(--c-surface)) 100%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 68%, transparent),
+    0 12px 30px color-mix(in srgb, var(--vmp-lacquer) 7%, transparent);
+}
+.vmp-vongnam-ben > * { width: 100%; }
+.vmp-vongnam-ketluan .vmp-ketluan {
+  margin: 0;
+  padding: 13px 15px;
+  border-left-width: 3px;
+  border-radius: 0 14px 14px 0;
+  background: color-mix(in srgb, var(--vmp-eggshell) 58%, var(--c-surface-sunk));
+}
+.vmp-vongnam-ketluan .vmp-ketluan b {
+  font-size: 13px;
+  line-height: 1.45;
+}
+.vmp-vongnam-ketluan .vmp-ketluan span {
+  font-size: 11px;
+  line-height: 1.5;
+}
 .vmp-vongnam-chu {
   display: flex; flex-wrap: wrap; gap: 8px 16px;
   font-size: 12px; font-weight: 700; color: var(--c-ink-soft);
 }
 .vmp-vongnam-chu span { display: inline-flex; align-items: center; gap: 8px; }
 .vmp-vongnam-chu i { width: 10px; height: 10px; border-radius: 8px; display: block; flex: none; }
+.vmp-vongnam-chu--done { background: var(--vmp-pearl-sage); }
+.vmp-vongnam-chu--over { background: var(--vmp-cinnabar); }
+.vmp-vongnam-chu--future { background: var(--vmp-smoke); }
 .vmp-vongnam-kim {
   width: 2px !important; height: 13px !important; border-radius: 999px !important;
-  background: var(--c-pink-text);
+  background: var(--vmp-antique-gold);
 }
 .vmp-vongnam-nut { margin-left: 0 !important; align-self: flex-start; }
 
 @media (max-width: 768px) {
   .vmp-vongnam-than { grid-template-columns: 1fr; }
-  .vmp-vongnam-vong { max-width: 348px; margin: 0 auto; }
+  .vmp-vongnam-vong { max-width: 390px; margin: 0 auto; }
+  .vmp-vongnam-ben { padding: 18px; }
 }
 
 /* =====================================================================
@@ -6377,21 +6781,6 @@ h1, h2, h3, .vmp-tieu-de-lon { line-height: var(--lh-tight); }
   letter-spacing: -.01em;
 }
 
-/* Nút mở phần "Phân tích chi tiết" ở trang Tổng quan. */
-.vmp-mo-sau {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-  padding: 16px 20px; border-radius: var(--r-md); cursor: pointer;
-  background: var(--c-surface); border: 1px solid var(--c-line);
-  font-family: inherit; font-size: var(--fs-sm); font-weight: 800; color: var(--c-ink);
-  text-align: left;
-}
-.vmp-mo-sau:hover { border-color: var(--c-pink); }
-.vmp-mo-sau > span { color: var(--c-ink-soft); font-weight: 900; }
-.vmp-mo-sau small {
-  margin-left: auto; font-size: var(--fs-label); font-weight: 600; color: var(--c-ink-soft);
-}
-@media (max-width: 720px) { .vmp-mo-sau small { display: none; } }
-
 /* Ô số liệu ở lưới bento KHÔNG kéo giãn theo chiều cao của thẻ hero.
    Trước đây chúng cao bằng nửa thẻ hero nên bên trong toàn khoảng trống,
    con số nằm chơ vơ trên đỉnh một hộp rỗng. */
@@ -6529,7 +6918,6 @@ summary { min-height: 24px; display: flex; align-items: center; }
   .vmp-space3d-doi,
   .vmp-doi-nhom,
   .vmp-gt,
-  .vmp-mo-sau,
   button, .hn-nut, .tl-focus-them, .vmp-ctrl-bangbtn,
   input, select, textarea,
   [class*="chat"], [class*="Chat"] { display: none !important; }

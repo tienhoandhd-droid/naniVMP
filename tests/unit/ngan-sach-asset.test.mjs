@@ -8,11 +8,12 @@
  *      · SVG minh hoạ/motif:  ≤ 40KB / file
  * ===================================================================== */
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 
-const GOC = new URL("../../src/assets", import.meta.url).pathname;
+const GOC = fileURLToPath(new URL("../../src/assets", import.meta.url));
 
 function quetFile(thuMuc) {
   const kq = [];

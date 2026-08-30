@@ -86,6 +86,14 @@
 }
 .hn-vali--guide { background-image: url("../../assets/brand/vali/vali-chibi-guide.webp"); }
 .hn-vali--concern { background-image: url("../../assets/brand/vali/vali-chibi-concern.webp"); }
+.hn-vali--urgent {
+  background-image: url("../../assets/brand/vali/vali-chibi-urgent.webp");
+  background-size: auto 100%;
+}
+.hn-vali--focus {
+  background-image: url("../../assets/brand/vali/vali-chibi-focus.webp");
+  background-size: auto 100%;
+}
 .hn-vali--celebrate { background-image: url("../../assets/brand/vali/vali-chibi-celebrate.webp"); }
 .hn-vali__nhan { display: flex; align-items: center; gap: 6px; font-family: var(--ff-display); font-style: italic; font-size: 12.5px; font-weight: 600; color: var(--lp-plum); letter-spacing: .02em; white-space: nowrap; }
 .hn-vali__nhan::before, .hn-vali__nhan::after { content: ""; width: 16px; height: 1px; background: var(--lp-gold); }
@@ -358,4 +366,154 @@
 @media (max-width: 1500px) {
   .hn-hero__goi-y { display: none; }
   .hn-loi { max-width: 52ch; }
+}
+
+/* =====================================================================
+ *  30/08 — Botanical QA Ledger: bảng là bàn làm việc của QA. Cột phụ
+ *  trách chỉ còn tên người; phòng ban nằm trong phần chi tiết.
+ * ===================================================================== */
+.hn-nhom {
+  position: relative;
+  isolation: isolate;
+  border-color: var(--lp-gold-hairline);
+  background: var(--lp-bg-raised);
+  box-shadow: var(--lp-e-low);
+}
+.hn-nhom::before,
+.hn-nhom::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border: 1px solid var(--lp-gold-hairline);
+  opacity: .5;
+  pointer-events: none;
+}
+.hn-nhom::before {
+  top: -28px;
+  right: 34px;
+  width: 96px;
+  height: 62px;
+  border-radius: 72% 28% 66% 34%;
+  transform: rotate(16deg);
+}
+.hn-nhom::after {
+  top: -24px;
+  right: -18px;
+  width: 78px;
+  height: 54px;
+  border-radius: 32% 68% 30% 70%;
+  transform: rotate(-18deg);
+}
+.hn-nhom__ten {
+  position: relative;
+  gap: 8px 10px;
+  padding: 16px 24px 13px;
+  background: var(--lp-sheen);
+}
+.hn-nhom__ten::before {
+  content: "";
+  width: 11px;
+  height: 8px;
+  flex: none;
+  border-radius: 75% 25% 75% 25%;
+  background: var(--lp-gold);
+  transform: rotate(36deg);
+}
+.hn-nhom__dem {
+  border: 1px solid var(--lp-gold-hairline);
+  background: var(--lp-bg-raised);
+  font-variant-numeric: tabular-nums;
+}
+.hn-cot {
+  height: 38px;
+  padding: 0 24px;
+  border-color: var(--lp-gold-hairline);
+  background: var(--lp-sheen);
+  color: var(--lp-plum);
+  font-weight: 700;
+  letter-spacing: .07em;
+}
+.hn-ds .hn-muc { box-shadow: inset 3px 0 0 transparent; }
+.hn-ds .hn-muc:nth-child(even) { background: var(--lp-bg-sunken); }
+.hn-ds .hn-muc:hover,
+.hn-ds .hn-muc:focus-within { background: var(--lp-rose-soft); }
+.hn-nhom--overdue .hn-muc { box-shadow: inset 3px 0 0 var(--lp-danger); }
+.hn-muc__tom-tat { min-height: 62px; }
+.hn-muc__ma { color: var(--lp-plum); }
+.hn-muc__ten { font-weight: 700; }
+.hn-muc__nguoi b { font-weight: 700; color: var(--lp-ink); }
+.hn-muc__tre {
+  width: max-content;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.hn-muc__tre::before { width: 6px; height: 6px; }
+.hn-muc__tre--tre { background: var(--lp-danger-soft); }
+.hn-muc__tre--homnay,
+.hn-muc__tre--con { background: var(--lp-warning-bg); }
+.hn-muc__tre--trong { border-color: var(--lp-line); background: var(--lp-surface-2); }
+.hn-muc__nut {
+  min-height: 36px;
+  border: 1px solid var(--lp-gold-hairline);
+  background: var(--lp-bg-raised);
+  color: var(--lp-plum);
+  font-weight: 700;
+}
+.hn-muc__nut:hover:not(:disabled) {
+  border-color: var(--lp-plum);
+  background: var(--lp-plum);
+  color: var(--lp-on-plum);
+}
+
+/* Giữ QA phụ trách ở màn laptop phổ biến; chỉ bỏ cột Mốc khi thật sự hẹp. */
+@media (max-width: 1400px) and (min-width: 1101px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 190px minmax(0, 1fr) 106px minmax(0, 170px) 116px 144px; }
+  .hn-muc__nguoi { display: block; }
+  .hn-muc__tre { grid-column: 5; }
+  .hn-muc__nut { grid-column: 6; }
+  .hn-cot span:nth-child(4) { display: inline; }
+  .hn-cot span:nth-child(5) { width: auto; }
+  .hn-cot span:nth-child(6) { width: 144px; }
+}
+@media (max-width: 1100px) and (min-width: 769px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 176px minmax(0, 1fr) minmax(0, 150px) 116px 144px; }
+  .hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 176px 1fr; }
+  .hn-muc__moc { display: none; }
+  .hn-muc__nguoi { display: block; grid-column: 3; }
+  .hn-muc__tre { grid-column: 4; }
+  .hn-muc__nut { grid-column: 5; }
+  .hn-cot span:nth-child(3) { display: none; }
+  .hn-cot span:nth-child(4) { display: inline; }
+}
+@media (max-width: 768px) {
+  .hn-nhom { border-radius: 16px; }
+  .hn-nhom::after { right: 6px; }
+  .hn-nhom__ten { padding: 14px 16px 12px; font-size: 22px; }
+  .hn-nhom__phu { flex-basis: 100%; padding-left: 19px; }
+  .hn-cot { display: none; }
+  .hn-muc__tom-tat {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    min-height: 0;
+    padding: 14px 16px;
+  }
+  .hn-muc__mo--inline { min-height: 44px; }
+  .hn-muc__thong-tin { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+  .hn-muc__moc,
+  .hn-muc__nguoi,
+  .hn-muc__tre { display: inline-flex; align-items: center; grid-column: auto; }
+  .hn-muc__moc::before,
+  .hn-muc__nguoi::before { margin-right: 5px; color: var(--lp-ink-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .hn-muc__moc::before { content: "Mốc"; }
+  .hn-muc__nguoi::before { content: "QA"; }
+  .hn-muc__tre { min-height: 30px; }
+  .hn-muc__nut { width: 100%; min-height: 44px; justify-self: stretch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hn-muc, .hn-muc__nut { transition: none; }
 }

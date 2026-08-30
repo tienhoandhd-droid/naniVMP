@@ -37,16 +37,18 @@ function Section({ icon: Icon, title, sub, children }: {
   );
 }
 
-/** Bảng hai cột đơn giản, dùng lại cho mọi mục luật. */
+/** Bảng hai cột đơn giản, dùng lại cho mọi mục luật.
+ *  Bề mặt sổ (analysis.css): cột đầu là <th scope="row"> — mỗi dòng là
+ *  một cặp "tên luật → nội dung", nên tên luật đúng nghĩa là tiêu đề
+ *  dòng, và trình đọc màn hình đọc được "tên luật: nội dung". */
 function Rows({ rows }: { rows: Array<[React.ReactNode, React.ReactNode]> }) {
   return (
-    <table style={{ borderCollapse: "collapse", width: "100%", fontFamily: TEXT, fontSize: 14 }}>
+    <table className="reg-table">
       <tbody>
         {rows.map(([a, b], i) => (
-          <tr key={i} style={{ borderBottom: `1px solid ${C.pinkMist}` }}>
-            <td style={{ padding: "9px 10px 9px 0", color: C.plum, fontWeight: 700,
-                         verticalAlign: "top", minWidth: 170 }}>{a}</td>
-            <td style={{ padding: "9px 0", color: C.plumSoft, lineHeight: 1.6 }}>{b}</td>
+          <tr key={i}>
+            <th scope="row" style={{ verticalAlign: "top", minWidth: 170, whiteSpace: "normal" }}>{a}</th>
+            <td className="reg-muted" style={{ lineHeight: 1.6 }}>{b}</td>
           </tr>
         ))}
       </tbody>

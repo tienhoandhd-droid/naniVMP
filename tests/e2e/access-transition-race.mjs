@@ -8,9 +8,12 @@ import { choServer } from "./cho-server.mjs";
 
 const PORT = 4178;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
+/* Windows: .cmd phải chạy qua shell (Node >=20 chặn spawn EINVAL),
+   và detached tạo process group kiểu POSIX không tồn tại trên Win. */
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(PORT), "--strictPort"], {
   stdio: "ignore",
-  detached: true,
+  detached: process.platform !== "win32",
+  shell: process.platform === "win32",
 });
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -191,7 +194,13 @@ try {
   if (server.exitCode === null && server.signalCode === null) {
     const stopped = waitForChildExit(server);
     try {
-      process.kill(-server.pid, "SIGTERM");
+      if (process.platform === "win32") {
+        /* Windows không có process group âm; taskkill /T hạ cả cây con. */
+        const { execSync } = await import("node:child_process");
+        execSync(`taskkill /PID ${server.pid} /T /F`, { stdio: "ignore" });
+      } else {
+        process.kill(-server.pid, "SIGTERM");
+      }
     } catch (error) {
       if (error?.code !== "ESRCH") {
         stopped.catch(() => {});

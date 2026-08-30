@@ -75,15 +75,31 @@ function deadlineFact(row: TodayActionRow): string {
   return `mốc ${row.deadlineStage} · còn ${row.daysRemaining} ngày`;
 }
 
+export type TodayValiMood = "urgent" | "concern" | "focus" | "guide" | "celebrate";
+
+export interface TodayValiState {
+  mood: TodayValiMood;
+  nhan: string;
+  loi: string;
+}
+
 /** Lời Vali mở đầu trang — dựng từ model, không bịa số. */
-function valiNoiGi(model: TodayActionModel): { mood: "guide" | "concern" | "celebrate"; nhan: string; loi: string } {
+export function getTodayValiState(model: TodayActionModel): TodayValiState {
   const dau = model.nextAction;
   if (model.rows.length === 0) {
     return { mood: "celebrate", nhan: "nhẹ nhõm", loi: "Hôm nay nhẹ: không còn việc gấp nào trong phạm vi này." };
   }
+  if (model.kpis.overdue >= 3 && dau) {
+    return { mood: "urgent", nhan: "rất lo",
+      loi: `Có ${model.kpis.overdue} việc quá hạn — mình đang rất lo. Xử lý ngay ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
+  }
   if (model.kpis.overdue > 0 && dau) {
     return { mood: "concern", nhan: "đang lo",
       loi: `Mình đếm được ${model.kpis.overdue} việc quá hạn. Nên bắt đầu từ ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
+  }
+  if (model.kpis.today > 0 && dau) {
+    return { mood: "focus", nhan: "tập trung",
+      loi: `Hôm nay có ${model.kpis.today} việc đến hạn. Mình tập trung trước vào ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
   }
   if (dau) {
     return { mood: "guide", nhan: "dẫn đường",
@@ -133,11 +149,11 @@ function TodayQueueRow({ row, expanded, onToggle, onOpenProgress }: {
       </button>
       <div className="hn-muc__thong-tin">
         <span className="hn-muc__moc">{tenMoc(row)}</span>
-        <span className="hn-muc__nguoi"><b>{row.ownerName}</b>{row.department ? <i> · {row.department}</i> : null}</span>
+        <span className="hn-muc__nguoi"><b>{row.ownerName}</b></span>
         <span className={`hn-muc__tre hn-muc__tre--${soNgay(row).loai}`}>{soNgay(row).chu}</span>
         {/* Chuỗi gộp giữ trong DOM cho phần chi tiết và trình đọc màn hình. */}
         <span className="hn-muc__han">{deadlineFact(row)}</span><span className="hn-muc__chu-so-huu">{row.ownerName}</span>
-        <span className="hn-muc__phong">{row.department || "Chưa xác định phòng ban"}</span><span className="hn-muc__muc-do">{row.criticality || "Chưa xếp hạng"}</span>
+        <span className="hn-muc__muc-do">{row.criticality || "Chưa xếp hạng"}</span>
         <span className="hn-muc__cho">Đang chờ {row.blockingStage}</span>
         <div className="hn-ly-do">{row.reasons.map((reason) => <span key={reason.kind} className="hn-ly-do__badge">{reason.label}</span>)}</div>
       </div>
@@ -158,7 +174,7 @@ function TodayQueueSection({ section, rows, expandedCode, onToggle, onOpenProgre
   return <section className={`hn-nhom hn-nhom--${section} lp-tone--${meta.tone}`}>
     <h2 className="hn-nhom__ten">{meta.label} <span className="hn-nhom__dem">{rows.length}</span><span className="hn-nhom__phu">xếp theo hạn, mức độ quan trọng và quyền cập nhật</span></h2>
     {/* Hàng tiêu đề cột (đúng bản thiết kế) — chỉ để nhìn, bảng thật vẫn là danh sách có nút. */}
-    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>Phụ trách · Bộ phận</span><span>Trễ</span><span></span></div>
+    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>QA phụ trách</span><span>Trễ</span><span></span></div>
     <ul className="hn-ds" aria-label={meta.label}>{rows.map((row) => <TodayQueueRow key={row.validationCode} row={row}
       expanded={expandedCode === row.validationCode} onToggle={() => onToggle(row.validationCode)} onOpenProgress={onOpenProgress} />)}</ul>
   </section>;
@@ -187,10 +203,9 @@ export function TodayCommandCenterContent({
   const selectedRow = model.rows.find((row) => row.validationCode === expandedCode) ?? null;
   useEffect(() => { if (expandedCode !== null && selectedRow === null) setExpandedCode(null); }, [expandedCode, selectedRow]);
   const toggle = useCallback((code: string) => setExpandedCode((current) => current === code ? null : code), []);
-  /* Vali đọc tình hình cùng người dùng (thiết kế 29/08): câu dẫn là lời
-     Vali, tâm trạng theo dữ liệu — quá hạn → lo; trống việc → nhẹ nhõm;
-     còn lại → dẫn đường. Chỉ dùng ba mood chính thức (ADR-VALI-001). */
-  const vali = valiNoiGi(model);
+  /* Vali đọc tình hình cùng người dùng (thiết kế 30/08): 5 mức riêng của
+     màn Hôm nay, từ rất lo khi có >= 3 việc quá hạn đến nhẹ nhõm khi trống. */
+  const vali = getTodayValiState(model);
   /* Bộ lọc theo nhóm (anh Hoàn chốt 30/08): bấm ô số liệu để chỉ xem nhóm đó,
      bấm lại để bỏ. Không lọc thì vẫn thấy đủ bốn nhóm như trước. */
   const [locNhom, setLocNhom] = useState<TodaySection | null>(null);
@@ -217,10 +232,10 @@ export function TodayCommandCenterContent({
         {dau && <div className="hn-hero__uu-tien">
           <span className="hn-hero__eyebrow">Làm trước tiên</span>
           {dau.canEditProgress
-            ? <button type="button" className="hn-hero__cta" onClick={() => onOpenProgress(progressLink(dau))}>
+            ? <button type="button" className="hn-hero__cta" title={`Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. ${deadlineFact(dau)}`}
+                onClick={() => onOpenProgress(progressLink(dau))}>
                 Mở {dau.validationCode} <span aria-hidden="true">→</span></button>
-            : <span className="hn-hero__cta hn-hero__cta--chu">{dau.validationCode} · {dau.title}</span>}
-          <span className="hn-hero__goi-y">Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. {deadlineFact(dau)}</span>
+            : <span className="hn-hero__cta hn-hero__cta--chu" title={`Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. ${deadlineFact(dau)}`}>{dau.validationCode} · {dau.title}</span>}
         </div>}
       </div>
       {/* Bốn ô số nằm NGAY TRONG hero (đúng bản thiết kế): ô "Quá hạn" là số

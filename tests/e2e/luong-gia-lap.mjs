@@ -14,6 +14,7 @@
  *  Chạy: bash scripts/with-preview.sh -- npm run e2e:gialap
  * ===================================================================== */
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
@@ -22,7 +23,7 @@ import { caiGiaLap, nhetPhien, dungHangMuc, NGUOI_DUNG } from "./gia-lap-supabas
 const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
 
 const URL_SB = (() => {
-  const noi = readFileSync(new URL("../../.env.local", import.meta.url).pathname, "utf8");
+  const noi = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
   const m = noi.match(/^VITE_SUPABASE_URL=(.+)$/m);
   if (!m) throw new Error(".env.local thiếu VITE_SUPABASE_URL");
   return m[1].trim();
@@ -203,22 +204,19 @@ for (const [id, ten] of MAN) {
   await trang.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await new Promise((r) => setTimeout(r, 2400));
 
+  /* 31/08 — UI bản cuối: MetricGrid bốn ô đã nhường chỗ cho hero Vali +
+     dải "Cần xử lý trước tiên" + cặp số đếm gọn. Test theo hợp đồng mới. */
   const kpi = await trang.evaluate(() => {
-    const nhan = [...document.querySelectorAll(".lp-metric .lp-metric__label")]
-      .map((o) => o.textContent?.trim());
-    const hero = document.querySelector(".lp-metric--hero .lp-metric__label")?.textContent?.trim();
+    const chu = document.querySelector("main")?.innerText || "";
     return {
-      nhan,
-      hero,
-      /* 30/08: dải thẻ hồng đã gộp vào hero thành các nút "Cần xử lý trước tiên". */
+      coCanXuLy: /Cần xử lý[\s\n]*\d+/.test(chu),
+      coQuaHan: /Quá hạn[\s\n]*\d+/.test(chu),
       coDaiUuTien: !!document.querySelector(".pr-hero__uu-tien"),
       soUuTien: document.querySelectorAll(".pr-hero__uu-tien .pr-uu-tien").length,
     };
   });
-  kiem(["Đang thực hiện", "Cần xử lý", "Quá hạn", "Độ hoàn thiện dữ liệu"]
-    .every((t) => kpi.nhan.includes(t)),
-  "đủ bốn KPI đúng nhãn", kpi.nhan.join(" | "));
-  kiem(kpi.hero === "Cần xử lý", "Cần xử lý là ô hero duy nhất", kpi.hero || "(không có hero)");
+  kiem(kpi.coCanXuLy, "có số đếm Cần xử lý");
+  kiem(kpi.coQuaHan, "có số đếm Quá hạn");
   kiem(kpi.coDaiUuTien, "có dải Cần xử lý trước tiên");
   kiem(kpi.soUuTien > 0 && kpi.soUuTien <= 5, "dải ưu tiên có 1–5 mục", `${kpi.soUuTien}`);
 
@@ -278,15 +276,14 @@ for (const [id, ten] of MAN) {
   await trang.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await trang.waitForFunction(() => document.querySelectorAll(".hn-muc").length > 0, { timeout: 5_000 });
 
+  /* 31/08 — thiết kế cuối: pane TRỐNG bị ẩn hẳn (`.hn-pane--trong`,
+     display:none !important) để trả bề ngang cho hàng đợi khi chưa chọn
+     gì. Hợp đồng mới: chưa chọn → không pane; chọn → pane hiện chi tiết. */
   const banDau = await trang.evaluate(() => {
     const pane = document.querySelector(".hn-pane");
-    return {
-      coPane: !!pane && getComputedStyle(pane).display !== "none",
-      coVali: !!pane?.querySelector("[data-lp-vali]"),
-    };
+    return { paneAn: !pane || getComputedStyle(pane).display === "none" };
   });
-  kiem(banDau.coPane, "≥1600 có supporting pane");
-  kiem(banDau.coVali, "chưa chọn gì thì pane là Vali hướng dẫn");
+  kiem(banDau.paneAn, "chưa chọn gì thì pane trống được ẩn");
 
   /* Chọn một việc → pane hiện chi tiết + nút Cập nhật tiến độ. */
   const maChon = await trang.evaluate(() => {
@@ -312,15 +309,17 @@ for (const [id, ten] of MAN) {
     "chọn một việc thì pane hiện đúng mã đó", `"${maChon}"`);
   kiem(daChon.coCapNhat, "pane có hành động Cập nhật tiến độ");
 
-  /* Bỏ chọn → quay về Vali. */
+  /* Bỏ chọn → pane trống lại ẩn đi (hợp đồng 31/08). */
   await trang.evaluate(() => {
     [...(document.querySelector(".hn-pane")?.querySelectorAll("button") ?? [])]
       .find((b) => b.textContent?.trim() === "Bỏ chọn")?.click();
   });
   await new Promise((r) => setTimeout(r, 400));
-  const boChon = await trang.evaluate(() =>
-    !!document.querySelector(".hn-pane [data-lp-vali]"));
-  kiem(boChon, "bỏ chọn thì pane quay về Vali hướng dẫn");
+  const boChon = await trang.evaluate(() => {
+    const pane = document.querySelector(".hn-pane");
+    return !pane || getComputedStyle(pane).display === "none";
+  });
+  kiem(boChon, "bỏ chọn thì pane trống lại ẩn");
 
   /* Dưới 1600 pane ẩn — không ép hai cột vào màn hẹp. */
   await trang.setViewport({ width: 1440, height: 900 });
@@ -333,240 +332,51 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3c. Timeline: 2D mặc định, 3D là tab khám phá có trí nhớ ------- */
+/* ---- 3c. Timeline: Ngư đồ Long Môn là mặt DUY NHẤT (31/08) ---------- */
 {
-  console.log("\nTimeline — tab Xem bản đồ 3D:");
-  const trang = await trinhDuyet.newPage();
-  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
-  await nhetPhien(trang, { supabaseUrl: URL_SB });
-  await trang.setViewport({ width: 1440, height: 900 });
-  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2400));
-
-  /* Strip 4 dải tình trạng (nghiên cứu Timeline đợt 1): hero là Quá hạn,
-     bấm ô nào là bộ lọc tình trạng nhảy đúng giá trị đó. */
-  const strip = await trang.evaluate(() => {
-    const nhan = [...document.querySelectorAll(".lp-metric .lp-metric__label")]
-      .map((o) => o.textContent?.trim());
-    return {
-      nhan,
-      hero: document.querySelector(".lp-metric--hero .lp-metric__label")?.textContent?.trim(),
-    };
-  });
-  kiem(["Quá hạn", "Sắp đến hạn", "Đang thực hiện", "Hoàn thành"]
-    .every((t) => strip.nhan.includes(t)),
-  "strip đủ bốn dải tình trạng", strip.nhan.join(" | "));
-  kiem(strip.hero === "Quá hạn", "Quá hạn là ô hero", strip.hero || "(không có)");
-
-  /* Action narrative (nghiên cứu đợt 2): một câu kết luận dưới strip —
-     hạng mục trễ nặng nhất và pha nút thắt, không cần thêm biểu đồ. */
-  const narrative = await trang.evaluate(() =>
-    document.querySelector(".tl-narrative")?.textContent?.trim() || "");
-  kiem(narrative.includes("Nặng nhất") && narrative.includes("Nút thắt"),
-    "strip có thuyết minh Nặng nhất + Nút thắt", narrative.slice(0, 110) || "(không có)");
-
-  await trang.evaluate(() => {
-    [...document.querySelectorAll(".lp-metric--action")]
-      .find((b) => b.textContent?.includes("Sắp đến hạn"))?.click();
-  });
-  await new Promise((r) => setTimeout(r, 500));
-  const locSoon = await trang.evaluate(() =>
-    document.querySelector('select[aria-label="Lọc theo tình trạng"]')?.value);
-  kiem(locSoon === "soon", "bấm Sắp đến hạn thì bộ lọc nhảy sang soon", String(locSoon));
-
-  const macDinh = await trang.evaluate(() => ({
-    coCanvas: !!document.querySelector("canvas"),
-    coNutMo: [...document.querySelectorAll("button")]
-      .some((b) => b.textContent?.includes("Xem bản đồ 3D")),
-  }));
-  kiem(!macDinh.coCanvas, "mặc định KHÔNG dựng canvas 3D — 2D là mặt chính");
-  kiem(macDinh.coNutMo, "có nút Xem bản đồ 3D");
-
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.includes("Xem bản đồ 3D"))?.click();
-  });
-  await new Promise((r) => setTimeout(r, 2600));
-  const daMo = await trang.evaluate(() => !!document.querySelector("canvas"));
-  kiem(daMo, "bấm Xem bản đồ 3D thì canvas xuất hiện (lazy)");
-
-  /* Trí nhớ: tải lại trang, lựa chọn còn nguyên. */
-  await trang.reload({ waitUntil: "domcontentloaded" });
-  await new Promise((r) => setTimeout(r, 2800));
-  const conNho = await trang.evaluate(() => !!document.querySelector("canvas"));
-  kiem(conNho, "tải lại vẫn nhớ đang mở 3D (localStorage)");
-  await trang.close();
-}
-
-/* ---- 3d. Timeline: advanced filters share the same result sets ------- */
-{
-  console.log("\nTimeline — bộ lọc nâng cao:");
+  console.log("\nTimeline — Ngư đồ Long Môn duy nhất:");
   const trang = await trinhDuyet.newPage();
   await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
   await trang.setViewport({ width: 1680, height: 950 });
   await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await trang.waitForFunction(() =>
-    [...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === "Dòng thời gian")
-    && !!document.querySelector("[data-timeline-filter-toggle]"));
+  await trang.waitForSelector("[data-long-mon-code]", { timeout: 20_000 });
 
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
-    document.querySelector("[data-timeline-filter-toggle]")?.click();
-  });
-  const namTomTat = await trang.evaluate(() => ({
-    monthActions: document.querySelectorAll("[data-timeline-month-action]").length,
-    detail: !!document.querySelector("[data-timeline-detail-board]"),
-    stageTabs: document.querySelectorAll(".timeline-table-tabs").length,
+  /* Chủ dự án chốt 31/08: "chỉ giữ bản đồ cá, mọi nội dung thể hiện ở
+     đó". Workbench Gantt, strip 4 dải, bộ lọc nâng cao, bản đồ 3D và
+     inspector pane đều đã rời màn này — khối kiểm cũ 3c/3d/3e/3m/3q thay
+     bằng hợp đồng mới dưới đây. */
+  const nguDo = await trang.evaluate(() => ({
+    soCa: document.querySelectorAll("[data-long-mon-fish]").length,
+    soLoai: document.querySelectorAll("[data-long-mon-legend]").length,
+    coHomNay: !!document.querySelector(".long-mon-race__today"),
+    soThang: document.querySelectorAll(".long-mon-race__month").length,
+    conWorkbench: !!document.querySelector(".timeline-day-board")
+      || !!document.querySelector("[data-timeline-filter-toggle]")
+      || !!document.querySelector("[data-timeline-month-action]"),
+    coCanvas3D: !!document.querySelector("canvas"),
+    tranNgang: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
   }));
-  kiem(namTomTat.monthActions === 12, "chế độ năm có đúng 12 thao tác mở tháng", String(namTomTat.monthActions));
-  kiem(!namTomTat.detail, "chế độ năm chưa dựng bảng chi tiết");
-  kiem(namTomTat.stageTabs === 0, "chế độ năm chưa dựng tab mốc");
+  kiem(nguDo.soCa > 0, "có cá trên trường đua", String(nguDo.soCa));
+  kiem(nguDo.soLoai === 6, "legend đủ sáu loài", String(nguDo.soLoai));
+  kiem(nguDo.coHomNay, "có sợi chỉ Hôm nay");
+  kiem(nguDo.soThang >= 3, "trục 90 ngày phủ ít nhất ba tháng", String(nguDo.soThang));
+  kiem(!nguDo.conWorkbench, "workbench cũ (bảng ngày, bộ lọc, lưới tháng) đã rời màn");
+  kiem(!nguDo.coCanvas3D, "không còn canvas 3D trên màn Dòng thời gian");
+  kiem(nguDo.tranNgang <= 1, "không tràn ngang", `${nguDo.tranNgang}px`);
 
-  if (namTomTat.monthActions === 12) {
-    await trang.click('[data-timeline-month-action="6"]');
-    await trang.waitForFunction(() =>
-      document.querySelector('select[aria-label="Chọn tháng"]')?.value === "6"
-      && !!document.querySelector("[data-timeline-detail-board]"));
-    const thangBay = await trang.evaluate(() => ({
-      codes: [...document.querySelectorAll(".timeline-day-row .timeline-card-code")]
-        .map((code) => code.textContent?.trim()).sort(),
-      stageTabs: document.querySelectorAll(".timeline-table-tabs").length,
-    }));
-    kiem(JSON.stringify(thangBay.codes) === JSON.stringify(["TB-107-PQ", "TB-114-GSP", "TB-121-OQ"]),
-      "mở tháng chỉ hiện các mã fixture có deadline VMP trong tháng", thangBay.codes.join(" | "));
-    kiem(thangBay.stageTabs > 0, "mở tháng dựng lại tab mốc");
-
-    await trang.evaluate(() => {
-      [...document.querySelectorAll("button")]
-        .find((b) => b.textContent?.trim() === "Năm")?.click();
-    });
-    await trang.waitForFunction(() => !document.querySelector("[data-timeline-detail-board]"));
-    kiem(true, "trở lại Năm lại ẩn chi tiết");
-
-    await trang.click('[data-timeline-month-action="6"]');
-    await trang.waitForSelector(".timeline-day-row");
-  }
-  await trang.waitForFunction(() => !!document.querySelector("[data-timeline-filter-panel]"));
-  const panel = await trang.evaluate(() => ({
-    expanded: document.querySelector("[data-timeline-filter-toggle]")?.getAttribute("aria-expanded"),
-    filters: [...document.querySelectorAll("[data-timeline-filter]")].map((o) => o.getAttribute("data-timeline-filter")),
-    live: document.querySelector("[data-timeline-filter-count]")?.getAttribute("aria-live"),
-  }));
-  kiem(panel.expanded === "true", "nút bộ lọc nâng cao công bố trạng thái mở", String(panel.expanded));
-  kiem(["type", "owner", "phase", "readiness"].every((id) => panel.filters.includes(id)),
-    "panel có đủ type · owner · phase · readiness", panel.filters.join(" | "));
-  kiem(panel.live === "polite", "số hạng mục lọc được công bố nhẹ nhàng", String(panel.live));
-
-  /* Bộ lọc mới tạo chip có thể bỏ riêng, còn Xoá lọc trả mọi điều kiện về all. */
-  await trang.select("[data-timeline-filter=\"type\"]", "IQ");
-  await trang.waitForFunction(() =>
-    document.querySelector("[data-timeline-filter=\"type\"]")?.value === "IQ"
-    && [...document.querySelectorAll("[data-timeline-filter-chip]")].some((chip) => chip.textContent?.includes("Loại: IQ")));
-  const chip = await trang.evaluate(() => ({
-    text: [...document.querySelectorAll("[data-timeline-filter-chip]")].map((o) => o.textContent?.trim()).join(" | "),
-    label: document.querySelector("[data-timeline-filter-chip]")?.getAttribute("aria-label"),
-  }));
-  kiem(chip.text.includes("Loại: IQ"), "lọc loại tạo chip đang áp dụng", chip.text || "(không có)");
-  kiem(chip.label?.startsWith("Bỏ "), "chip có tên bỏ lọc cho bàn phím/trợ năng", String(chip.label));
-  await trang.click("[data-timeline-clear-filters]");
-  await trang.waitForFunction(() =>
-    document.querySelector("[data-timeline-filter=\"type\"]")?.value === "all"
-    && !document.querySelector("[data-timeline-filter-chip]"));
-  kiem(true, "Xoá lọc xoá cả filter mới và chip");
-
-  /* KPI tình trạng đếm trên summary base và bấm nó phải khớp explorer/display. */
-  await trang.evaluate(() => {
-    [...document.querySelectorAll(".lp-metric--action")]
-      .find((b) => b.textContent?.includes("Sắp đến hạn"))?.click();
+  /* Bấm một con cá mở đúng hồ sơ hạng mục đó. */
+  const maCa = await trang.evaluate(() => {
+    const nut = document.querySelector("[data-long-mon-code]");
+    nut?.click();
+    return nut?.getAttribute("data-long-mon-code") || "";
   });
-  await trang.waitForFunction(() =>
-    document.querySelector('select[aria-label="Lọc theo tình trạng"]')?.value === "soon");
-  const statusCounts = await trang.evaluate(() => ({
-    kpi: Number([...document.querySelectorAll(".lp-metric")]
-      .find((o) => o.querySelector(".lp-metric__label")?.textContent?.trim() === "Sắp đến hạn")
-      ?.querySelector(".lp-metric__value")?.textContent || "NaN"),
-    display: Number(document.querySelector("[data-timeline-filter-count]")?.textContent?.match(/^\s*(\d+)/)?.[1] || "NaN"),
-  }));
-  kiem(statusCounts.kpi === statusCounts.display,
-    "KPI Sắp đến hạn bằng đúng số dòng status-filter", `${statusCounts.kpi} / ${statusCounts.display}`);
-
-  /* Chọn một hàng rồi thay điều kiện loại khác: selection phải tự đóng. */
-  await trang.click("[data-timeline-clear-filters]");
-  await trang.waitForSelector(".timeline-day-row");
-  const selected = await trang.evaluate(() => {
-    const row = document.querySelector(".timeline-day-row");
-    const code = row?.querySelector(".timeline-card-code")?.textContent?.trim() || "";
-    row?.click();
-    return code;
-  });
-  await trang.waitForFunction(() => !!document.querySelector("[data-timeline-inspector]"));
-  const differentType = await trang.evaluate((code) => {
-    const current = code.split("-").at(-1);
-    return [...document.querySelectorAll("[data-timeline-filter=\"type\"] option")]
-      .map((o) => o.value).find((value) => value !== "all" && value !== current) || "all";
-  }, selected);
-  await trang.select("[data-timeline-filter=\"type\"]", differentType);
-  await trang.waitForFunction(() => !document.querySelector("[data-timeline-inspector]"));
-  kiem(differentType !== "all", "đổi type khác hàng đã chọn làm selection tự xoá", `${selected} → ${differentType}`);
-  await trang.close();
-}
-
-/* ---- 3e. Timeline: inspector supporting pane ≥1600 ------------------ */
-{
-  console.log("\nTimeline — inspector ≥1600:");
-  const trang = await trinhDuyet.newPage();
-  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
-  await nhetPhien(trang, { supabaseUrl: URL_SB });
-  await trang.setViewport({ width: 1680, height: 950 });
-  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2400));
-
-  /* Mặc định là workspace Tổng quan — chuyển sang tab Timeline để có bảng. */
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
-  });
-  await trang.waitForSelector('[data-timeline-month-action="6"]');
-  await trang.click('[data-timeline-month-action="6"]');
-  await trang.waitForSelector(".timeline-day-row");
-
-  /* Chưa chọn gì: KHÔNG có pane — bảng dùng trọn bề ngang (màn GMP,
-     yêu cầu chủ dự án 16/08: minh hoạ không được lấy cột của dữ liệu). */
-  const truocChon = await trang.evaluate(() => ({
-    coPane: !!document.querySelector("[data-timeline-inspector]"),
-    coVali: !!document.querySelector(".timeline-page-shell [data-lp-vali]"),
-  }));
-  kiem(!truocChon.coPane, "chưa chọn hàng thì KHÔNG chiếm cột pane");
-  kiem(!truocChon.coVali, "không có Vali trong màn dòng thời gian");
-
-  /* Bấm một hàng: chi tiết đổ sang pane, KHÔNG bật modal. */
-  const maHang = await trang.evaluate(() => {
-    const hang = document.querySelector(".timeline-day-row");
-    const ma = hang?.querySelector(".timeline-card-code")?.textContent?.trim() || "";
-    hang?.click();
-    return ma;
-  });
-  await new Promise((r) => setTimeout(r, 600));
-  const sauChon = await trang.evaluate(() => ({
-    paneChua: document.querySelector("[data-timeline-inspector]")?.textContent || "",
-    coModal: document.body.innerText.includes("Chi tiết hạng mục"),
-    coNutHoSo: [...document.querySelectorAll("[data-timeline-inspector] button")]
-      .some((b) => b.textContent?.includes("Hồ sơ đầy đủ")),
-  }));
-  kiem(!!maHang && sauChon.paneChua.includes(maHang),
-    "bấm hàng thì mã đổ sang pane", `${maHang} trong pane: ${sauChon.paneChua.includes(maHang)}`);
-  kiem(!sauChon.coModal, "màn rộng KHÔNG bật modal khi bấm hàng");
-  kiem(sauChon.coNutHoSo, "pane có nút Hồ sơ đầy đủ (mở modal khi cần)");
-
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("[data-timeline-inspector] button")]
-      .find((b) => b.textContent?.includes("Hồ sơ đầy đủ"))?.click();
-  });
-  await new Promise((r) => setTimeout(r, 500));
-  const moDayDu = await trang.evaluate(() => document.body.innerText.includes("Chi tiết hạng mục"));
-  kiem(moDayDu, "nút Hồ sơ đầy đủ mở đúng modal chi tiết");
+  await trang.waitForFunction(() => document.body.innerText.includes("Chi tiết hạng mục"),
+    { timeout: 10_000 });
+  const trungMa = await trang.evaluate((ma) =>
+    document.body.innerText.includes(ma), maCa);
+  kiem(trungMa, "bấm cá mở modal đúng mã hạng mục", maCa);
+  await trang.keyboard.press("Escape");
   await trang.close();
 }
 
@@ -665,7 +475,7 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3h. Tổng quan 1366: Phân tích chi tiết KHÔNG đè chữ ------------ */
+/* ---- 3h. Tổng quan 1366: Phân tích chuyên sâu KHÔNG đè chữ ---------- */
 {
   console.log("\nTổng quan 1366 — không đè chữ:");
   const trang = await trinhDuyet.newPage();
@@ -674,23 +484,28 @@ for (const [id, ten] of MAN) {
   await trang.setViewport({ width: 1366, height: 768 });
   await trang.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await new Promise((r) => setTimeout(r, 2200));
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("button.vmp-mo-sau")]
-      .find((x) => x.textContent?.includes("Phân tích chi tiết"))?.click();
-  });
-  await new Promise((r) => setTimeout(r, 1000));
+  await trang.waitForSelector("[data-overview-analysis-studio]");
 
   /* Khối phân tích phải có khu đất grid RIÊNG, không cùng ô với thẻ khác. */
+  /* 31/08 — thẻ .b-wide đã rời bento trong bản thiết kế cuối; luật thật
+     là "khối phân tích không CHỒNG lên bất kỳ anh em nào", nên đo giao
+     dọc-ngang với mọi thẻ cùng lưới thay vì một thẻ chỉ định. */
   const khu = await trang.evaluate(() => {
     const sau = document.querySelector(".vmp-bento > .b-sau");
-    const wide = document.querySelector(".vmp-bento > .card.b-wide, .vmp-bento > .b-wide");
-    if (!sau || !wide) return { co: false };
-    const a = sau.getBoundingClientRect(); const b = wide.getBoundingClientRect();
-    const giaoDoc = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-    return { co: true, giaoDoc };
+    if (!sau) return { co: false, giaoMax: -1 };
+    const a = sau.getBoundingClientRect();
+    let giaoMax = 0;
+    for (const anh of sau.parentElement?.children ?? []) {
+      if (anh === sau) continue;
+      const b = anh.getBoundingClientRect();
+      const doc = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      const ngang = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      if (doc > 0 && ngang > 0) giaoMax = Math.max(giaoMax, Math.min(doc, ngang));
+    }
+    return { co: true, giaoMax };
   });
-  kiem(khu.co && khu.giaoDoc <= 0, "khối phân tích không chồng lên thẻ khác",
-    `giao dọc ${khu.giaoDoc}px`);
+  kiem(khu.co && khu.giaoMax <= 0, "khối phân tích không chồng lên thẻ khác",
+    `giao ${khu.giaoMax}px`);
 
   /* Quét chồng chữ THẬT bằng elementFromPoint qua toàn trang. */
   const chong = await trang.evaluate(async () => {
@@ -849,89 +664,24 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3m. Hiệu năng: bảng timeline ẢO HOÁ khi >100 dòng -------------- */
-{
-  console.log("\nẢo hoá bảng timeline (180 dòng):");
-  const trang = await trinhDuyet.newPage();
-  await caiGiaLap(trang, {
-    supabaseUrl: URL_SB, kichBan: "day",
-    suaKho: (kho) => {
-      const ds = kho.rpc_get_vmp_dashboard.activities;
-      for (let i = ds.length; i < 180; i++) ds.push(dungHangMuc(i));
-    },
-  });
-  await nhetPhien(trang, { supabaseUrl: URL_SB });
-  await trang.setViewport({ width: 1440, height: 900 });
-  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2600));
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.trim() === "Dòng thời gian")?.click();
-  });
-  await trang.waitForSelector('[data-timeline-month-action="6"]');
-  await trang.click('[data-timeline-month-action="6"]');
-  await trang.evaluate(() => {
-    [...document.querySelectorAll(".timeline-view-controls button")]
-      .find((button) => button.textContent?.trim() === "Quý")?.click();
-  });
-  await trang.waitForSelector(".timeline-day-row");
 
-  const truoc = await trang.evaluate(() => ({
-    soHang: document.querySelectorAll("tbody tr.timeline-day-row").length,
-    tongLoc: document.querySelector(".timeline-map-surface__head span")?.textContent || "",
-  }));
-  kiem(/155 hạng mục/.test(truoc.tongLoc), "quý đã mở có đủ 155 hạng mục giao với kỳ", truoc.tongLoc.slice(0, 40));
-  kiem(truoc.soHang > 0 && truoc.soHang < 120,
-    "DOM chỉ dựng lát đang thấy (<120 hàng), không phải cả 180", `${truoc.soHang} hàng`);
-
-  /* Cuộn xuống đáy: các hàng cuối phải hiện ra (đệm giữ đúng tổng cao). */
-  const cuoi = await trang.evaluate(async () => {
-    const khung = document.querySelector(".timeline-day-board");
-    khung.scrollTop = khung.scrollHeight;
-    await new Promise((r) => setTimeout(r, 500));
-    const hang = [...document.querySelectorAll("tbody tr.timeline-day-row")];
-    return {
-      soHang: hang.length,
-      maCuoi: hang[hang.length - 1]?.querySelector(".timeline-card-code")?.textContent || "",
-    };
-  });
-  kiem(cuoi.soHang < 120 && cuoi.maCuoi.length > 0,
-    "cuộn tới đáy vẫn chỉ dựng lát nhìn thấy và có hàng cuối", `${cuoi.soHang} hàng · ${cuoi.maCuoi}`);
-  await trang.close();
-}
-
-/* ---- 3n. Hợp đồng hiệu năng: KHÔNG tải chunk 3D trước khi mở -------- */
+/* ---- 3n. Hợp đồng hiệu năng: màn Dòng thời gian KHÔNG tải three.js --- */
 {
   console.log("\nHợp đồng lazy 3D:");
   const trang = await trinhDuyet.newPage();
   await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
-  /* Các mục trước có thể đã bật trí nhớ 3D — phải xoá để đo đường lạnh. */
-  await trang.evaluateOnNewDocument(() => {
-    localStorage.removeItem("vmp-timeline-3d");
-    localStorage.removeItem("vmp-workload-3d");
-  });
   await trang.setViewport({ width: 1440, height: 900 });
   await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2600));
-
-  const truocMo = await trang.evaluate(() =>
+  await trang.waitForSelector("[data-long-mon-code]", { timeout: 20_000 });
+  /* Ngư đồ là ảnh + DOM thuần; three.js chỉ còn phục vụ màn Báo cáo.
+     Mở Dòng thời gian mà kéo chunk 3D là lỗi hiệu năng. */
+  const chunk3D = await trang.evaluate(() =>
     performance.getEntriesByType("resource")
       .map((e) => e.name)
       .filter((u) => /WorkloadSpace3D|VmpSpace3D|RiskSpace3D|NhanTruc/i.test(u)));
-  kiem(truocMo.length === 0,
-    "chưa bấm Xem bản đồ 3D thì KHÔNG chunk three.js nào được tải",
-    truocMo.map((u) => u.split("/").pop()).join(", "));
-
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("button")]
-      .find((b) => b.textContent?.includes("Xem bản đồ 3D"))?.click();
-  });
-  await new Promise((r) => setTimeout(r, 2600));
-  const sauMo = await trang.evaluate(() =>
-    performance.getEntriesByType("resource")
-      .some((e) => /WorkloadSpace3D|NhanTruc/i.test(e.name)));
-  kiem(sauMo, "bấm Xem bản đồ 3D thì chunk 3D mới được tải");
+  kiem(chunk3D.length === 0,
+    "màn Dòng thời gian không tải chunk three.js nào", chunk3D[0] || "");
   await trang.close();
 }
 
@@ -991,8 +741,11 @@ for (const [id, ten] of MAN) {
   await trang.setViewport({ width: 1440, height: 900 });
   await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await new Promise((r) => setTimeout(r, 3500));
+  /* Màn Dòng thời gian nay là Ngư đồ: dấu vân tay snapshot là con cá mang
+     mã SNAP-CU-99-IQ (chỉ tồn tại trong bản lưu 25 hạng mục). */
   const truocXacMinh = await trang.evaluate(() => ({
-    coSnapshot: /\/25 hạng mục/.test(document.body.innerText || ""),
+    coSnapshot: !!document.querySelector('[data-long-mon-code="SNAP-CU-99-IQ"]')
+      || /\/25 hạng mục/.test(document.body.innerText || ""),
     coTrangBaoVe: !!document.querySelector(".vmp-view-enter"),
   }));
   kiem(!truocXacMinh.coSnapshot && !truocXacMinh.coTrangBaoVe,
@@ -1002,9 +755,9 @@ for (const [id, ten] of MAN) {
   let moiVe = false;
   for (let i = 0; i < 100; i += 1) {
     const kq = await trang.evaluate(() => ({
-      conSnap: /\/25 hạng mục/.test(document.body.innerText || ""),
+      conSnap: !!document.querySelector('[data-long-mon-code="SNAP-CU-99-IQ"]'),
       conBanner: /bản lưu|Đang tải dữ liệu/i.test(document.body.innerText || ""),
-      coDuLieu: /\/24 hạng mục/.test(document.body.innerText || ""),
+      coDuLieu: document.querySelectorAll("[data-long-mon-fish]").length > 0,
     }));
     if (!kq.conSnap && !kq.conBanner && kq.coDuLieu) { moiVe = true; break; }
     await new Promise((r) => setTimeout(r, 150));
@@ -1013,65 +766,6 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3q. Mất WebGL context giữa chừng → tự rơi về 2D ---------------- */
-{
-  console.log("\nMất WebGL context giữa chừng:");
-  const trang = await trinhDuyet.newPage();
-  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
-  await nhetPhien(trang, { supabaseUrl: URL_SB });
-  await trang.setViewport({ width: 1440, height: 900 });
-  await trang.goto(`${GOC}#v=timeline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2600));
-  const coWebGL2 = await trang.evaluate(() => {
-    try { return !!document.createElement("canvas").getContext("webgl2"); }
-    catch { return false; }
-  });
-  if (!coWebGL2) {
-    // Headless không có WebGL2 thì nút 3D vốn bị giấu (đã kiểm ở 3o) —
-    // kịch bản mất context không tồn tại để kiểm. Không tính là hỏng.
-    console.log("  (bỏ qua: môi trường không có WebGL2 — nút 3D bị giấu, đã kiểm ở 3o)");
-  } else {
-    // Mở góc khám phá 3D trên Timeline (chunk Three lazy-load từ đây).
-    const moKham = await trang.evaluate(() => {
-      const nut = [...document.querySelectorAll("button")]
-        .find((b) => /khám phá 3d|xem bản đồ 3d/i.test(b.textContent || ""));
-      if (!nut) return false;
-      nut.click();
-      return true;
-    });
-    kiem(moKham, "có nút mở góc 3D trên Timeline");
-    // Chunk Three lazy-load rồi mới mount canvas.
-    let coCanvas = false;
-    for (let i = 0; i < 40; i += 1) {
-      coCanvas = await trang.evaluate(() => !!document.querySelector("#workload-map-3d canvas"));
-      if (coCanvas) break;
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    kiem(coCanvas, "cảnh 3D mount được canvas");
-    if (coCanvas) {
-      // WEBGL_lose_context sinh ra đúng để mô phỏng tình huống này.
-      const mat = await trang.evaluate(() => {
-        const canvas = document.querySelector("#workload-map-3d canvas");
-        const gl = canvas?.getContext("webgl2") || canvas?.getContext("webgl");
-        const ext = gl?.getExtension("WEBGL_lose_context");
-        if (!ext) return false;
-        ext.loseContext();
-        return true;
-      });
-      kiem(mat, "mô phỏng được mất context (WEBGL_lose_context)");
-      let ve2d = false;
-      for (let i = 0; i < 30; i += 1) {
-        ve2d = await trang.evaluate(() =>
-          !document.querySelector("#workload-map-3d canvas")
-          && !!document.querySelector('button[data-map-mode="2d"].is-chon'));
-        if (ve2d) break;
-        await new Promise((r) => setTimeout(r, 200));
-      }
-      kiem(ve2d, "canvas chết thì trang tự rơi về bảng 2D, không màn trắng");
-    }
-  }
-  await trang.close();
-}
 
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {

@@ -9,7 +9,8 @@
  *  sau khi đã sạch hai mức trên. Axe chỉ bắt được một phần lỗi a11y;
  *  keyboard/manual test vẫn phải làm với người thật.
  * ===================================================================== */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
@@ -17,15 +18,34 @@ import type { Page } from "@playwright/test";
 import { dungKhoDuLieu, phienGia, layRef, traLoi } from "../e2e/gia-lap-supabase.mjs";
 
 const URL_SB = (() => {
-  const noi = readFileSync(new URL("../../.env.local", import.meta.url).pathname, "utf8");
-  const m = noi.match(/^VITE_SUPABASE_URL=(.+)$/m);
-  if (!m) throw new Error(".env.local thiếu VITE_SUPABASE_URL");
-  return m[1].trim();
+  if (process.env.VMP_E2E_SUPABASE_URL) return process.env.VMP_E2E_SUPABASE_URL;
+  try {
+    const noi = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
+    const url = noi.match(/^VITE_SUPABASE_URL=(.+)$/m)?.[1]?.trim();
+    if (url) return url;
+  } catch {
+    /* ACL local có thể chặn .env.local; tiếp tục dùng endpoint công khai trong bundle. */
+  }
+  try {
+    const assets = new URL("../../dist/assets/", import.meta.url);
+    for (const name of readdirSync(fileURLToPath(assets))) {
+      if (!name.endsWith(".js")) continue;
+      const noi = readFileSync(fileURLToPath(new URL(name, assets)), "utf8");
+      const url = noi.match(/https:\/\/[a-z0-9-]+\.supabase\.co/i)?.[0];
+      if (url) return url;
+    }
+  } catch {
+    /* Quy về lỗi cấu hình chung bên dưới, không lộ nội dung bundle. */
+  }
+  throw new Error("Không tìm thấy Supabase URL công khai cho kiểm thử a11y");
 })();
 
 async function caiGiaLap(page: Page, { dangNhap = true } = {}) {
   const kho = dungKhoDuLieu("day");
   const hostSupabase = new URL(URL_SB).host;
+  await page.addInitScript(() => {
+    (window as Window & { __REACT_GRAB_DISABLED__?: boolean }).__REACT_GRAB_DISABLED__ = true;
+  });
   await page.route("**/*", async (route) => {
     const req = route.request();
     const u = new URL(req.url());
@@ -52,19 +72,50 @@ async function caiGiaLap(page: Page, { dangNhap = true } = {}) {
   }
 }
 
-const MAN: Array<{ ten: string; hash: string; dangNhap: boolean }> = [
-  { ten: "dang-nhap", hash: "", dangNhap: false },
-  { ten: "hom-nay", hash: "#v=today", dangNhap: true },
-  { ten: "tong-quan", hash: "#v=overview", dangNhap: true },
-  { ten: "timeline", hash: "#v=timeline", dangNhap: true },
-  { ten: "bao-cao", hash: "#v=reports", dangNhap: true },
+const MAN: Array<{
+  ten: string;
+  hash: string;
+  dangNhap: boolean;
+  root: string;
+  monitoringLabel?: string;
+}> = [
+  { ten: "dang-nhap", hash: "", dangNhap: false, root: "#vmp-login-email" },
+  { ten: "hom-nay", hash: "#v=today", dangNhap: true, root: ".hn-lotus" },
+  {
+    ten: "tong-quan",
+    hash: "#v=overview",
+    dangNhap: true,
+    root: ".b-hero",
+    monitoringLabel: "Tổng quan VMP",
+  },
+  {
+    ten: "timeline",
+    hash: "#v=timeline",
+    dangNhap: true,
+    root: ".timeline-page-shell .long-mon-race",
+    monitoringLabel: "Dòng thời gian",
+  },
+  {
+    ten: "canh-bao",
+    hash: "#v=alerts",
+    dangNhap: true,
+    root: ".alerts-page-shell .alerts-priority-rail",
+    monitoringLabel: "Cảnh báo & ưu tiên",
+  },
+  { ten: "bao-cao", hash: "#v=reports", dangNhap: true, root: ".vmp-report-command-bar" },
 ];
 
 for (const man of MAN) {
   test(`axe · ${man.ten}`, async ({ page }, testInfo) => {
     await caiGiaLap(page, { dangNhap: man.dangNhap });
     await page.goto(`/${man.hash}`);
-    await page.waitForTimeout(3000);
+    await expect(page.locator(man.root)).toBeVisible({ timeout: 15_000 });
+    if (man.monitoringLabel) {
+      const current = page.locator('.monitoring-journey [aria-current="page"]');
+      await expect(current).toHaveCount(1);
+      await expect(current).toBeVisible({ timeout: 15_000 });
+      await expect(current).toContainText(man.monitoringLabel);
+    }
 
     const kq = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

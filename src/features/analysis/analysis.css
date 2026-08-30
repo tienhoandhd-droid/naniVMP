@@ -1,0 +1,478 @@
+/* =====================================================================
+ *  analysis.css — bề mặt "Sổ kiểm soát"
+ *  ---------------------------------------------------------------------
+ *  Phủ nhóm PHÂN TÍCH & QUẢN TRỊ đã gộp: Phân công · Báo cáo · Quy tắc ·
+ *  Vai trò & phạm vi · Chất lượng dữ liệu.
+ *
+ *  HƯỚNG THẨM MỸ — vì sao khác phần còn lại của web:
+ *  Sáu màn còn lại là nơi NHÌN tình hình và LÀM việc, nên chúng đúng khi
+ *  dùng thẻ bo tròn, khoảng thở rộng, tranh chìm. Năm màn ở đây là nơi
+ *  TRA và QUYẾT: ai gánh việc gì, ai được phép làm gì. Vật liệu của việc
+ *  đó trong đời thật không phải cái bảng điều khiển — nó là cuốn SỔ ĐĂNG
+ *  KÝ của phòng QA: kẻ dòng, đánh số vào lề, dấu niêm ở mục đang mở.
+ *
+ *  Ba quyết định rút từ đó:
+ *   1. KẺ DÒNG THAY VÌ ĐÓNG HỘP. Vùng dữ liệu dùng đường chỉ ngang, không
+ *      viền thẻ. Thẻ chỉ giữ ở chỗ nội dung thật sự là một VẬT rời (một
+ *      người, một nhóm việc).
+ *   2. BO GÓC SẮC HƠN. 6px cho ô sổ, so với 16px của thẻ toàn web. Chênh
+ *      lệch này là CÓ CHỦ Ý và mang thông tin: mắt biết mình đang ở bề mặt
+ *      tra cứu chứ không phải bề mặt trình bày.
+ *   3. ĐÁNH SỐ LÀ THẬT. `.reg-index` đánh 01·02·03 vì sổ kiểm soát có thứ
+ *      tự thật, và người dùng cần trích dẫn "mục 2" như phụ đề Báo cáo vẫn
+ *      đang làm. Không đánh số để trang trí.
+ *
+ *  ĐIỂM NHẤN DUY NHẤT: `.reg-load` — thang tải vẽ như lớp sơn mài chồng
+ *  dày dần, kèm khấc ▁▃▅▇. Bản trước mã hoá tải CHỈ bằng màu, và màu ấy
+ *  còn hỏng (xem WorkloadPage `heat()`). Nay hai kênh: độ dày sơn + khấc.
+ *
+ *  Mọi màu đi qua token nên đảo sáng/tối theo `[data-theme]`. Không hex.
+ * ===================================================================== */
+
+.reg {
+  /* Bán kính riêng của bề mặt sổ — sắc hơn thẻ toàn web (16px) một cách
+     có chủ ý. Khai bằng biến để đổi một chỗ là đổi cả bề mặt. */
+  --reg-r: 6px;
+  --reg-r-chip: 999px;
+
+  /* Đường chỉ. Mảnh, nhưng phải thấy được ở cả hai chế độ. */
+  --reg-rule: color-mix(in srgb, var(--lp-text-secondary) 22%, transparent);
+  --reg-rule-strong: color-mix(in srgb, var(--lp-text-secondary) 42%, transparent);
+
+  /* Lề trái của sổ — nơi đặt chỉ mục. */
+  --reg-index-w: 13rem;
+
+  /* Nhịp dòng. 2.5rem đủ cho vùng chạm 40px mà vẫn dày hơn phần còn lại
+     của web — đây là bề mặt để QUÉT, không phải để ngắm. */
+  --reg-row-h: 2.5rem;
+
+  display: grid;
+  grid-template-columns: var(--reg-index-w) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+/* =====================================================================
+ *  CHỈ MỤC BIÊN — điểm ký tên của bề mặt này
+ *  Thay cho việc cuộn mù qua sáu khối. Dính theo khung nhìn, đánh số
+ *  thật, mục đang đọc được đánh dấu bằng khấc niêm màu sơn mài.
+ * ===================================================================== */
+.reg-index {
+  position: sticky;
+  top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-inline-start: 0;
+  margin: 0;
+  list-style: none;
+  border-inline-start: 1px solid var(--reg-rule);
+}
+
+.reg-index__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-inline-start: 2px solid transparent;
+  margin-inline-start: -1px;
+  background: none;
+  color: var(--lp-text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+  transition: color var(--lp-motion-ui) var(--lp-ease),
+              border-color var(--lp-motion-ui) var(--lp-ease);
+}
+
+.reg-index__item:hover {
+  color: var(--lp-text-primary);
+  border-inline-start-color: var(--reg-rule-strong);
+}
+
+/* Khấc niêm: mục đang đọc. `aria-current="true"` là nguồn thật, class chỉ
+   để tô — không có hai nguồn trạng thái. */
+.reg-index__item[aria-current="true"] {
+  color: var(--lp-text-primary);
+  font-weight: 800;
+  border-inline-start-color: var(--lp-brand-solid);
+}
+
+/* Số hiệu mục. Đây là số THỨ TỰ trong sổ, không phải số liệu — nên nó
+   nhỏ, lùi về sau, và không bao giờ đứng một mình. */
+.reg-index__num {
+  flex: none;
+  min-width: 1.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: var(--lp-text-secondary);
+}
+
+.reg-index__item[aria-current="true"] .reg-index__num {
+  color: var(--lp-brand);
+}
+
+/* =====================================================================
+ *  THÂN SỔ
+ * ===================================================================== */
+.reg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  min-width: 0;
+}
+
+.reg-section {
+  scroll-margin-top: 1.5rem;
+  min-width: 0;
+}
+
+.reg-section__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding-block-end: 0.625rem;
+  border-block-end: 1px solid var(--reg-rule-strong);
+  margin-block-end: 1rem;
+}
+
+.reg-section__num {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: var(--lp-brand);
+}
+
+.reg-section__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--lp-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.reg-section__note {
+  margin: 0;
+  margin-inline-start: auto;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lp-text-secondary);
+  text-align: end;
+}
+
+/* =====================================================================
+ *  BẢNG SỔ — kẻ dòng, không đóng hộp
+ * ===================================================================== */
+.reg-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.reg-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+/* Chú thích bảng: đọc được bởi trình đọc màn hình, và cũng hữu ích cho
+   người sáng mắt — nói bảng này đếm cái gì, đơn vị nào. */
+.reg-table > caption {
+  caption-side: top;
+  padding-block-end: 0.625rem;
+  color: var(--lp-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: start;
+}
+
+.reg-table th,
+.reg-table td {
+  padding: 0.4375rem 0.625rem;
+  border-block-end: 1px solid var(--reg-rule);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.reg-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--lp-bg-surface);
+  border-block-end: 1px solid var(--reg-rule-strong);
+  color: var(--lp-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Cột đầu dính khi cuộn ngang. Hàng tiêu đề DÍNH LUÔN — bản trước chỉ
+   dính cột, nên cuộn qua 12 tháng là mất tên tháng. */
+.reg-table [data-reg-stick] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--lp-bg-surface);
+  border-inline-end: 1px solid var(--reg-rule);
+  white-space: nowrap;
+}
+
+.reg-table thead [data-reg-stick] {
+  z-index: 3;
+}
+
+.reg-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--lp-brand) 5%, transparent);
+}
+
+.reg-table tbody tr:hover [data-reg-stick] {
+  background: color-mix(in srgb, var(--lp-brand) 5%, var(--lp-bg-surface));
+}
+
+/* Ô số. Be Vietnam Pro KHÔNG có chữ số đều bề rộng (đo ở theme.ts), nên
+   cột thẳng hàng phải giải bằng CẤU TRÚC: căn phải + bề rộng cố định.
+   `tabular-nums` vẫn khai để phông nào có thì hưởng. */
+.reg-num {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.reg-total {
+  font-weight: 800;
+  color: var(--lp-text-primary);
+  background: color-mix(in srgb, var(--lp-brand) 6%, transparent);
+}
+
+/* =====================================================================
+ *  THANG TẢI SƠN MÀI — điểm nhấn duy nhất
+ *  Hai kênh độc lập: độ dày lớp sơn (nền) và khấc (chữ). Người không
+ *  phân biệt được màu vẫn đọc được mức tải qua khấc và qua nhãn ở
+ *  `title`/`aria-label`. Bản trước chỉ có một kênh, và kênh đó còn hỏng.
+ * ===================================================================== */
+.reg-load {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.0625rem;
+  inline-size: 100%;
+  min-block-size: var(--reg-row-h);
+  padding: 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--reg-r);
+  background: none;
+  color: var(--lp-text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color var(--lp-motion-fast) var(--lp-ease);
+}
+
+.reg-load:hover {
+  border-color: var(--reg-rule-strong);
+}
+
+/* Bốn bậc khai ở khối chú giải bên dưới — dùng chung một nguồn.
+   Nền đi qua `color-mix()` nên KHÔNG bao giờ tái diễn lỗi nối chuỗi
+   `var(--c-mint)38`, thứ đã làm chết cả bốn bậc ở bản trước.
+   Riêng bậc "quá tải" thêm viền trong: nó là bậc cần nhận ra ngay cả khi
+   liếc qua, và viền là kênh thứ ba sau nền và khấc. */
+.reg-load[data-band="over"] {
+  box-shadow: inset 0 0 0 1px var(--c-rasp-text);
+}
+
+/* Khấc — kênh thứ hai, không phụ thuộc màu. */
+.reg-load__notch {
+  font-size: 0.75rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
+.reg-load__unit {
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+/* Ô trống: vẫn kẻ dòng để mắt không mất hàng, nhưng không có sơn. */
+.reg-load--empty {
+  min-block-size: var(--reg-row-h);
+  border-radius: var(--reg-r);
+  background: color-mix(in srgb, var(--lp-text-secondary) 6%, transparent);
+}
+
+/* Bảng sổ đặt trong một thẻ có sẵn thì không cần cột chỉ mục. */
+.reg--tron {
+  display: block;
+}
+
+/* Hàng bị từ chối quyền: mờ đi, nhưng KHÔNG mờ tới mức dưới ngưỡng đọc —
+   đây là bảng để đối chiếu, hàng "không được xem" cũng là thông tin. */
+.reg-table tr[data-reg-off="true"] :is(th, td) {
+  color: var(--lp-text-secondary);
+  font-weight: 600;
+}
+
+.reg-muted {
+  color: var(--lp-text-secondary);
+}
+
+/* Cờ có/không. "Có" và "Không" chỉ khác nhau ở nét chữ, quét 16 dòng rất
+   dễ đọc nhầm — thêm nền và dấu để phân biệt được bằng hình khối. */
+.reg-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--reg-r-chip, 999px);
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.reg-flag[data-on="true"] {
+  background: color-mix(in srgb, var(--c-mint) 34%, transparent);
+  color: var(--c-mint-text);
+}
+
+.reg-flag[data-on="true"]::before {
+  content: "✓";
+}
+
+.reg-flag[data-on="false"] {
+  background: color-mix(in srgb, var(--lp-text-secondary) 14%, transparent);
+  color: var(--lp-text-secondary);
+}
+
+.reg-flag[data-on="false"]::before {
+  content: "—";
+}
+
+/* =====================================================================
+ *  CHÚ GIẢI
+ * ===================================================================== */
+.reg-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--lp-text-secondary);
+}
+
+.reg-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.reg-legend__swatch {
+  inline-size: 1.5rem;
+  block-size: 0.875rem;
+  border-radius: var(--reg-r);
+  font-size: 0.75rem;
+  line-height: 0.875rem;
+  text-align: center;
+}
+
+/* Ô chú giải dùng CHUNG bốn bậc với ô trong bảng — khai một lần, không
+   để chú giải tự bịa màu riêng rồi lệch với thứ nó đang giải thích. */
+.reg-legend__swatch[data-band="idle"],
+.reg-load[data-band="idle"] {
+  background: color-mix(in srgb, var(--c-mint) 18%, transparent);
+  color: var(--c-mint-text);
+}
+
+.reg-legend__swatch[data-band="low"],
+.reg-load[data-band="low"] {
+  background: color-mix(in srgb, var(--c-mint) 42%, transparent);
+  color: var(--c-mint-text);
+}
+
+.reg-legend__swatch[data-band="busy"],
+.reg-load[data-band="busy"] {
+  background: color-mix(in srgb, var(--c-marigold) 42%, transparent);
+  color: var(--c-marigold-text);
+}
+
+.reg-legend__swatch[data-band="over"],
+.reg-load[data-band="over"] {
+  background: color-mix(in srgb, var(--c-rasp) 42%, transparent);
+  color: var(--c-rasp-text);
+}
+
+/* =====================================================================
+ *  SÀN CHẤT LƯỢNG — focus, chạm, chuyển động, khổ hẹp
+ * ===================================================================== */
+
+/* Vòng focus: inline style KHÔNG viết được `:focus-visible`, và đó là lý
+   do cả năm màn này trước giờ đi bàn phím không thấy mình đang ở đâu. */
+.reg :is(button, a, [tabindex]):focus-visible,
+.reg-index__item:focus-visible,
+.reg-load:focus-visible {
+  outline: 2px solid var(--lp-brand);
+  outline-offset: 2px;
+  border-radius: var(--reg-r);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reg *,
+  .reg-index__item,
+  .reg-load {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Dưới 1024px: chỉ mục biên chuyển thành dải ngang cuộn được, không ép
+   người dùng mất 13rem bề ngang cho điều hướng. */
+@media (max-width: 64rem) {
+  .reg {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .reg-index {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-block: 0.5rem;
+    border-inline-start: 0;
+    border-block-end: 1px solid var(--reg-rule);
+    background: var(--lp-bg-surface);
+  }
+
+  .reg-index__item {
+    flex: none;
+    border-inline-start: 0;
+    border-block-end: 2px solid transparent;
+    margin-inline-start: 0;
+  }
+
+  .reg-index__item[aria-current="true"] {
+    border-block-end-color: var(--lp-brand-solid);
+  }
+
+  .reg-section__note {
+    display: none;
+  }
+}

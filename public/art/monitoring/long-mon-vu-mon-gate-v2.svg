@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 1120" width="540" height="1120">
+  <!-- =================================================================
+       Vũ Môn v2 — thác giữa hai vách đá mực, cầu đá cong làm "cổng".
+       v1 dựng cổng kiến trúc hai trụ mảnh: đọc ra máy dò kim loại chứ
+       không ra truyền thuyết. v2 quay về đúng hình tượng: VŨ MÔN LÀ MỘT
+       CON THÁC — cá chép vượt thác hoá rồng; kiến trúc chỉ là cây cầu
+       đá nhỏ vắt ngang đỉnh thác để gọi tên "môn".
+       Vẽ tay SVG · kiểm & xuất qua Inkscape · hoà bảng màu tranh nền:
+       mực chàm #16302b/#274a42 · sương #dfe9e2 · kem #f6ecd2 · kim #d9b45b.
+       ================================================================= -->
+  <defs>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f6ecd2" stop-opacity="0"/>
+      <stop offset=".55" stop-color="#f2e3bd" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#eed9a6" stop-opacity=".72"/>
+    </linearGradient>
+    <linearGradient id="fall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset=".4" stop-color="#f2f6ef" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#e2ece4" stop-opacity=".28"/>
+    </linearGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2c4f46"/>
+      <stop offset=".65" stop-color="#1c3a34"/>
+      <stop offset="1" stop-color="#12271f"/>
+    </linearGradient>
+    <radialGradient id="halo" cx=".5" cy=".5" r=".62">
+      <stop offset="0" stop-color="#f8eecd" stop-opacity=".8"/>
+      <stop offset=".65" stop-color="#f2e3bd" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#f2e3bd" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="mist"><feGaussianBlur stdDeviation="13"/></filter>
+  </defs>
+
+  <!-- Quầng sáng đích ở mép phải -->
+  <rect x="80" y="0" width="460" height="1120" fill="url(#glow)"/>
+  <ellipse cx="430" cy="430" rx="290" ry="360" fill="url(#halo)"/>
+
+  <!-- ============ THÁC — nhân vật chính ============ -->
+  <!-- cột thác rộng đổ từ đỉnh khe đá xuống mép nước -->
+  <g>
+    <path d="M366 178 C348 330 372 520 352 700 C340 830 362 980 348 1092 L478 1092 C494 968 472 838 486 706 C502 516 480 330 494 178 Z"
+      fill="url(#fall)" filter="url(#soft)"/>
+    <!-- ba dải lụa nổi trên thân thác -->
+    <path d="M392 190 C382 360 398 560 384 760 C376 880 388 1000 380 1088 L404 1088 C414 992 404 876 414 756 C426 556 412 360 420 190 Z" fill="#ffffff" opacity=".65"/>
+    <path d="M446 196 C440 372 452 580 442 780 C436 896 446 1008 440 1088 L462 1088 C470 1000 462 892 470 776 C480 576 470 372 476 196 Z" fill="#ffffff" opacity=".45"/>
+    <path d="M356 210 C350 380 360 580 350 770 L366 770 C374 584 366 384 372 210 Z" fill="#ffffff" opacity=".3"/>
+  </g>
+
+  <!-- ============ VÁCH ĐÁ MỰC hai bên ============ -->
+  <!-- vách trên-trái của khe thác -->
+  <g>
+    <path d="M540 0 L296 0 C318 44 300 92 336 128 C368 158 352 196 366 214 L400 236 C372 258 348 234 322 252 C296 268 306 300 288 314 L252 300 C232 336 260 372 244 404 L292 430 C328 402 344 442 384 430 C420 470 476 448 512 486 L540 470 Z"
+      fill="url(#rock)"/>
+    <path d="M296 0 C318 44 300 92 336 128 C368 158 352 196 366 214" fill="none" stroke="#d9b45b" stroke-width="2.4" opacity=".5"/>
+    <path d="M322 252 C296 268 306 300 288 314" fill="none" stroke="#d9b45b" stroke-width="2" opacity=".35"/>
+    <!-- vách dưới, đỡ chân thác -->
+    <path d="M540 1120 L280 1120 C300 1076 276 1044 302 1010 C330 976 306 936 330 912 L376 934 C400 906 380 872 408 852 L462 886 C492 862 504 902 540 894 Z"
+      fill="url(#rock)"/>
+    <path d="M302 1010 C330 976 306 936 330 912" fill="none" stroke="#d9b45b" stroke-width="2.2" opacity=".45"/>
+    <!-- cỏ kim trên vách — nhại bụi cỏ vàng của tranh nền -->
+    <g stroke="#c8a44e" stroke-width="2" fill="none" opacity=".7" stroke-linecap="round">
+      <path d="M300 302 q-8 -22 2 -40 m6 42 q2 -24 14 -34 m-30 30 q-14 -12 -12 -30"/>
+      <path d="M352 926 q-6 -20 4 -36 m4 38 q4 -22 16 -30"/>
+    </g>
+  </g>
+
+  <!-- ============ CẦU ĐÁ CONG — "MÔN" vắt ngang đỉnh thác ============ -->
+  <g>
+    <!-- nhịp cầu cong -->
+    <path d="M262 268 C330 216 470 216 538 268 L538 300 C470 252 330 252 262 300 Z" fill="url(#rock)"/>
+    <path d="M262 272 C330 222 470 222 538 272" fill="none" stroke="#d9b45b" stroke-width="3" opacity=".6"/>
+    <!-- lan can chấm cột -->
+    <g fill="#1c3a34">
+      <rect x="284" y="234" width="9" height="40" rx="3"/>
+      <rect x="336" y="218" width="9" height="42" rx="3"/>
+      <rect x="394" y="212" width="9" height="42" rx="3"/>
+      <rect x="452" y="218" width="9" height="42" rx="3"/>
+      <rect x="506" y="234" width="9" height="40" rx="3"/>
+    </g>
+    <path d="M284 236 C350 200 450 200 512 236" fill="none" stroke="#1c3a34" stroke-width="7" stroke-linecap="round"/>
+    <!-- mái đình nhỏ giữa cầu -->
+    <path d="M356 176 C382 158 418 158 444 176 L456 196 C462 206 454 212 444 206 C418 190 382 190 356 206 C346 212 338 206 344 196 Z" fill="url(#rock)"/>
+    <path d="M356 178 C382 162 418 162 444 178" fill="none" stroke="#d9b45b" stroke-width="2.6" opacity=".7"/>
+    <rect x="392" y="176" width="16" height="30" rx="3" fill="#22423a"/>
+    <circle cx="400" cy="170" r="4.5" fill="#d9b45b"/>
+    <!-- ấn vàng treo giữa nhịp: khuôn 門 cách điệu -->
+    <g>
+      <rect x="382" y="252" width="36" height="44" rx="6" fill="#22423a"/>
+      <rect x="385.5" y="255.5" width="29" height="37" rx="4.5" fill="none" stroke="#d9b45b" stroke-width="2.2" opacity=".9"/>
+      <path d="M391 263 v22 m18 -22 v22 m-18 -15 h18 m-18 9 h18" stroke="#e8cf92" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+    </g>
+  </g>
+
+  <!-- ============ RỒNG SƯƠNG trên cầu ============ -->
+  <g opacity=".2" filter="url(#mist)">
+    <path d="M150 92 C230 40 330 58 372 104 C420 156 396 204 452 216 C404 244 350 222 326 178 C302 138 250 122 208 148 C178 166 158 134 150 92 Z"
+      fill="none" stroke="#274a42" stroke-width="19" stroke-linecap="round"/>
+    <path d="M368 100 c15 -14 40 -13 53 2 c-13 11 -20 9 -29 24 c-11 -8 -19 -13 -24 -26 Z" fill="#274a42"/>
+    <circle cx="404" cy="115" r="6" fill="#d9b45b" opacity="1"/>
+    <path d="M158 100 c-15 5 -30 0 -40 -12 m56 44 c-18 9 -37 8 -50 -2" stroke="#274a42" stroke-width="8" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- ============ BỌT + VẢY VÀNG chân thác ============ -->
+  <g>
+    <ellipse cx="416" cy="1078" rx="170" ry="30" fill="#eef4ec" opacity=".55" filter="url(#soft)"/>
+    <g fill="#ffffff" opacity=".9">
+      <circle cx="344" cy="1046" r="6"/><circle cx="386" cy="1062" r="8"/><circle cx="434" cy="1050" r="5"/>
+      <circle cx="472" cy="1066" r="7"/><circle cx="506" cy="1048" r="4.5"/><circle cx="316" cy="1068" r="4.5"/>
+      <circle cx="368" cy="1030" r="3.5"/><circle cx="452" cy="1032" r="4"/>
+    </g>
+    <g fill="#d9b45b" opacity=".9">
+      <circle cx="362" cy="1006" r="2.8"/><circle cx="404" cy="988" r="2.4"/><circle cx="444" cy="1010" r="3"/>
+      <circle cx="336" cy="962" r="2"/><circle cx="470" cy="972" r="2.3"/><circle cx="416" cy="930" r="2"/>
+      <circle cx="386" cy="890" r="1.8"/><circle cx="452" cy="852" r="1.7"/><circle cx="428" cy="806" r="1.5"/>
+    </g>
+    <!-- thuỷ ba -->
+    <g stroke="#dfe9e2" stroke-width="3.2" fill="none" opacity=".55" stroke-linecap="round">
+      <path d="M262 1090 q28 -22 56 0 q28 -22 56 0"/>
+      <path d="M386 1102 q28 -22 56 0 q28 -22 56 0"/>
+      <path d="M500 1088 q22 -18 44 0"/>
+    </g>
+  </g>
+</svg>

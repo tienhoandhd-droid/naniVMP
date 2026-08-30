@@ -3,7 +3,7 @@
  *  ---------------------------------------------------------------------
  *  MỘT view-model, HAI cách trình bày (spec §5.5): desktop dùng SmartTable
  *  (bảng ngữ nghĩa có <caption>), điện thoại dùng MobileTaskList. Cả hai
- *  nhận CÙNG mảng `rows`, cùng `rowKey`, cùng callback Sửa — nên không có
+ *  nhận CÙNG mảng `rows`, cùng `rowKey`, cùng callback Cập nhật — nên không có
  *  chuyện hai bản cùng dữ liệu mà ra hai kết quả khác nhau.
  *
  *  Mỗi dataset có bộ cột RIÊNG (không ép ba dataset vào một schema): cột
@@ -61,12 +61,16 @@ function TrongYeu({ diem }: { diem: unknown }) {
   return <span className={`cw-tag cw-tag--ty-${bac}`}>{String(diem)}</span>;
 }
 
-function NutSua({ row, onEdit }: { row: CatalogListRow; onEdit: (r: CatalogListRow) => void }) {
+function NutSua({ row, onEdit, label }: {
+  row: CatalogListRow;
+  onEdit: (r: CatalogListRow) => void;
+  label: "Cập nhật" | "Sửa";
+}) {
   return (
     <button type="button" className="cw-sua" data-cw-sua
       onClick={() => onEdit(row)}
-      aria-label={`Sửa ${row.businessKey}`}>
-      Sửa
+      aria-label={`${label} ${row.businessKey}`}>
+      {label}
     </button>
   );
 }
@@ -76,22 +80,26 @@ function cotCua(
   canEdit: boolean,
   onEdit: (r: CatalogListRow) => void,
 ): SmartTableColumn<CatalogListRow>[] {
+  const editLabel = dataset === "objects" ? "Cập nhật" : "Sửa";
   const sua: SmartTableColumn<CatalogListRow>[] = canEdit ? [{
-    id: "sua", header: <span className="lp-visually-hidden">Hành động</span>,
+    id: "sua", header: editLabel,
     align: "end",
-    cell: (r) => <NutSua row={r} onEdit={onEdit} />,
+    cell: (r) => <NutSua row={r} onEdit={onEdit} label={editLabel} />,
   }] : [];
 
   if (dataset === "objects") {
     return [
-      { id: "ma", header: "Mã đối tượng",
-        cell: (r) => <b className="cw-ma">{r.businessKey}</b> },
-      { id: "ten", header: "Tên",
-        cell: (r) => doc(r.data.object_name) },
+      { id: "doituong", header: "Đối tượng",
+        cell: (r) => (
+          <span className="cw-doi-tuong">
+            <span className="cw-doi-tuong__ma cw-ma">{r.businessKey}</span>
+            <span className="cw-doi-tuong__ten">{doc(r.data.object_name)}</span>
+          </span>
+        ) },
       { id: "phamvi", header: "Bộ phận · Khu vực", priority: "supporting",
         cell: (r) => [tenBoPhan(r.data.department), doc(r.data.area_code)]
           .filter((x) => x !== "—").join(" · ") || "—" },
-      { id: "kehoach", header: "Kế hoạch thẩm định",
+      { id: "kehoach", header: "Lịch thẩm định",
         cell: (r) => (
           <span className="cw-ke-hoach">
             <TheTrangThai bat={String(r.data.validate_flag ?? "") === "y"}
@@ -180,7 +188,7 @@ function ChiTietDoiTuong({ row, canEdit, onEdit }: {
         <span className="cw-nhe">
           Mỗi lần sửa đều có lý do và nằm ở mục Lịch sử.
         </span>
-        {canEdit && <NutSua row={row} onEdit={onEdit} />}
+        {canEdit && <NutSua row={row} onEdit={onEdit} label="Cập nhật" />}
       </div>
     </div>
   );
@@ -189,11 +197,16 @@ function ChiTietDoiTuong({ row, canEdit, onEdit }: {
 /** Dòng tóm tắt cho thẻ mobile — mỗi dataset chọn 2–3 dữ kiện đắt nhất. */
 function duKienThe(dataset: CatalogDatasetId, d: Record<string, unknown>): string[] {
   if (dataset === "objects") {
+    const phamVi = [tenBoPhan(d.department), doc(d.area_code)]
+      .filter((value) => value !== "—").join(" · ") || "—";
     return [
-      `Bộ phận: ${tenBoPhan(d.department)}`,
+      doc(d.object_name),
+      `Phạm vi: ${phamVi}`,
       `QA: ${doc(d.owner_name)}`,
       thieuThangDau(d) ? "Thiếu tháng thẩm định đầu tiên"
-        : d.first_month != null ? `T${d.first_month} · ${doc(d.frequency_months)} tháng/lần` : "Ngoài kế hoạch",
+        : d.first_month != null
+          ? `Lịch: T${d.first_month} · ${doc(d.frequency_months)} tháng/lần`
+          : "Ngoài kế hoạch thẩm định",
     ];
   }
   if (dataset === "products") {
@@ -217,11 +230,12 @@ export default function CatalogSmartTable({
   dataset, rows, canEdit, onEdit, expandedRowId, onExpandedRowChange, empty,
 }: CatalogSmartTableProps) {
   const cot = cotCua(dataset, canEdit, onEdit);
+  const editLabel = dataset === "objects" ? "Cập nhật" : "Sửa";
   const khoa = (r: CatalogListRow) => r.recordId;
   const khongCo = empty || "Không có dòng nào";
 
   return (
-    <>
+    <div className={`cw-bang cw-bang--${dataset}`}>
       <SmartTable<CatalogListRow>
         caption={TEN_BANG[dataset]}
         rows={rows}
@@ -240,24 +254,19 @@ export default function CatalogSmartTable({
         rows={rows}
         rowKey={khoa}
         empty={khongCo}
-        renderItem={(r) => (
+        renderItem={(row) => (
           <div className="cw-the">
             <div className="cw-the__dau">
-              <b className="cw-ma">{r.businessKey}</b>
-              {theTrangThaiCua(dataset, r.data)}
+              <b className="cw-ma">{row.businessKey}</b>
+              {theTrangThaiCua(dataset, row.data)}
             </div>
-            {duKienThe(dataset, r.data).map((dong) => (
+            {duKienThe(dataset, row.data).map((dong) => (
               <div key={dong} className="cw-the__dong">{dong}</div>
             ))}
-            {canEdit && (
-              <button type="button" className="cw-sua cw-sua--the" data-cw-sua
-                onClick={() => onEdit(r)}>
-                Sửa
-              </button>
-            )}
+            {canEdit && <NutSua row={row} onEdit={onEdit} label={editLabel} />}
           </div>
         )}
       />
-    </>
+    </div>
   );
 }

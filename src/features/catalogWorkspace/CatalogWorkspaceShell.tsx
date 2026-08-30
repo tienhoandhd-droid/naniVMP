@@ -579,9 +579,9 @@ export default function CatalogWorkspaceShell({
   return (
     <div className="cw-workspace">
       <p className="cw-mota">
-        {canEdit
-          ? "Dữ liệu nguồn — xem, thêm và sửa đều có lý do; thay đổi chạm timeline vào hàng chờ áp dụng, mọi bước nằm lại trong lịch sử."
-          : "Dữ liệu nguồn — chỉ hiển thị các đối tượng bạn được phân quyền xem; quyền cập nhật tiến độ được kiểm tra riêng trên từng hạng mục."}
+        <span>{canEdit
+          ? "Sổ dữ liệu nguồn — tìm, kiểm tra và cập nhật đối tượng có lưu lý do."
+          : "Sổ dữ liệu nguồn — các đối tượng trong phạm vi bạn được quyền xem."}</span>
         {scopeLabel && <span className="cw-mota__phamvi">Phạm vi: {scopeLabel}</span>}
         {updatedLabel && <span className="cw-mota__moc">{updatedLabel}</span>}
       </p>
@@ -612,7 +612,51 @@ export default function CatalogWorkspaceShell({
               <button type="button" className="cw-nut cw-nut--phu" onClick={catalogSuggestions.retry}>Thử tải lại gợi ý</button>
             </p>
           )}
-          {coTimKiem && (
+          {vung === "objects" ? (
+            <>
+              <div className="cw-primary-bar" data-cw-primary-bar>
+                <CommandBar label="Nhập liệu đối tượng" trailing={coThem && (
+                  <button type="button" className="cw-nut cw-nut--chinh" data-cw-them onClick={moThem}>
+                    <Plus size={15} aria-hidden="true" /> Thêm đối tượng
+                  </button>
+                )}>
+                  <div className="cw-tim">
+                    <Search size={15} aria-hidden="true" className="cw-tim__icon" />
+                    <input
+                      className="cw-tim__o"
+                      aria-label="Tìm trong danh mục"
+                      placeholder="Tìm theo mã, tên, bộ phận…"
+                      value={q}
+                      onChange={(e) => { setQ(e.target.value); setTrang(0); setExpandedId(null); }}
+                    />
+                  </div>
+                  <button type="button" className="cw-nut" data-cw-filter-toggle
+                    aria-expanded={moBoLocObj} aria-controls="cw-object-filter-panel"
+                    onClick={() => setMoBoLocObj((mo) => !mo)}>
+                    Bộ lọc{objFilterCount > 0 ? ` (${objFilterCount})` : ""}
+                  </button>
+                </CommandBar>
+              </div>
+
+              <details className="cw-tools" data-cw-tools>
+                <summary>Công cụ dữ liệu</summary>
+                <div className="cw-tools__actions" role="group" aria-label="Công cụ dữ liệu nguồn">
+                  <button type="button" className="cw-nut" onClick={taiLai}>
+                    <RefreshCw size={15} aria-hidden="true" /> Tải lại
+                  </button>
+                  <button type="button" className="cw-nut" data-cw-export-count={objTotal}
+                    disabled={!hasAuthorizationRevision} onClick={xuatExcel}>
+                    <Download size={15} aria-hidden="true" /> Xuất Excel
+                  </button>
+                  {canSinhTimeline && hasAuthorizationRevision && (
+                    <button type="button" className="cw-nut" onClick={() => setMoSinh(true)}>
+                      <CalendarPlus size={15} aria-hidden="true" /> Sinh timeline
+                    </button>
+                  )}
+                </div>
+              </details>
+            </>
+          ) : coTimKiem && (
             <CommandBar label="Hành động danh mục"
               trailing={coThem && (
                 <button type="button" className="cw-nut cw-nut--chinh" data-cw-them onClick={moThem}>
@@ -629,27 +673,9 @@ export default function CatalogWorkspaceShell({
                   onChange={(e) => { setQ(e.target.value); setTrang(0); setExpandedId(null); }}
                 />
               </div>
-              {vung === "objects" && (
-                <button type="button" className="cw-nut" data-cw-filter-toggle
-                  aria-expanded={moBoLocObj} aria-controls="cw-object-filter-panel"
-                  onClick={() => setMoBoLocObj((mo) => !mo)}>
-                  Bộ lọc{objFilterCount > 0 ? ` (${objFilterCount})` : ""}
-                </button>
-              )}
               <button type="button" className="cw-nut" onClick={taiLai}>
                 <RefreshCw size={15} aria-hidden="true" /> Tải lại
               </button>
-              {vung === "objects" && (
-                <button type="button" className="cw-nut" data-cw-export-count={objTotal}
-                  disabled={!hasAuthorizationRevision} onClick={xuatExcel}>
-                  <Download size={15} aria-hidden="true" /> Xuất Excel
-                </button>
-              )}
-              {vung === "objects" && canSinhTimeline && hasAuthorizationRevision && (
-                <button type="button" className="cw-nut" onClick={() => setMoSinh(true)}>
-                  <CalendarPlus size={15} aria-hidden="true" /> Sinh timeline
-                </button>
-              )}
             </CommandBar>
           )}
 

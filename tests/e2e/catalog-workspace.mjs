@@ -18,6 +18,7 @@
  *  Chạy: bash scripts/with-preview.sh -- npm run e2e:catalog
  * ===================================================================== */
 import { readFileSync, mkdtempSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,7 +30,7 @@ import { caiGiaLap, nhetPhien } from "./gia-lap-supabase.mjs";
 const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
 
 const URL_SB = (() => {
-  const noi = readFileSync(new URL("../../.env.local", import.meta.url).pathname, "utf8");
+  const noi = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
   const m = noi.match(/^VITE_SUPABASE_URL=(.+)$/m);
   if (!m) throw new Error(".env.local thiếu VITE_SUPABASE_URL");
   return m[1].trim();
@@ -408,7 +409,8 @@ async function chuanBiApV1(trang) {
     const caption = document.querySelector(".lp-smart-table caption");
     const th = document.querySelector(".lp-smart-table th");
     const timKiem = document.querySelector('input[aria-label="Tìm trong danh mục"]');
-    const nutThem = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Thêm");
+    /* 31/08 — nút mang nhãn đầy đủ "Thêm đối tượng"; bám data-cw-them cho bền. */
+    const nutThem = document.querySelector("[data-cw-them]");
     return {
       thuTu: muc.map((b) => b.dataset.cwNav).join(","),
       nhanNav: muc.map((b) => b.textContent.trim()),
@@ -697,7 +699,7 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   /* File mẫu dựng bằng CHÍNH generator của app (qua tsx). */
   const thuMucMau = mkdtempSync(join(tmpdir(), "vmp-mau-"));
   execFileSync(process.execPath,
-    ["--import", "tsx", new URL("./tao-mau-catalog.mjs", import.meta.url).pathname, thuMucMau],
+    ["--import", "tsx", fileURLToPath(new URL("./tao-mau-catalog.mjs", import.meta.url)), thuMucMau],
     { stdio: "pipe" });
 
   const { trang } = await moTrang(trinhDuyet);

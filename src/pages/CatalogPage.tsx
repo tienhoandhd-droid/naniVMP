@@ -7,7 +7,7 @@
  *    (xem trước) để về sau nối đường ghi ngược Sheet — giữ read-only an toàn.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
-import { Boxes, Search, Pencil, ChevronRight, Layers, ExternalLink } from "lucide-react";
+import { Boxes, Search, Pencil, ChevronRight, Layers, ExternalLink, SlidersHorizontal, X } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
 import { CLS, DEPTS } from "../constants/vmp.ts";
 import { parseD, fmtVN, txt, wlIsDone } from "../utils/helpers.ts";
@@ -122,6 +122,7 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
    *  danh sách của trang tiến độ. Vẫn để chọn xem được, vì người dùng cần
    *  kiểm tra "cái này sao không có timeline?". */
   const [tdinh, setTdinh] = useState<"y" | "n" | "all">("y");
+  const [moLocCatalog, setMoLocCatalog] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [edit, setEdit] = useState<Activity | null>(null);
   /** Mở hộp bằng đường tắt "✓ Xong bước" — hộp điền sẵn hôm nay + Hoàn thành,
@@ -202,45 +203,72 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
   );
 
   const toggle = (code: string) => setOpen((p) => ({ ...p, [code]: !p[code] }));
+  const soLocNangCao = [cls !== "all", dept !== "all", status !== "all", year !== "all", tdinh !== "y"]
+    .filter(Boolean).length;
+  const coLocCatalog = Boolean(q.trim()) || soLocNangCao > 0;
+  const xoaLocCatalog = () => {
+    setQ("");
+    setCls("all");
+    setDept("all");
+    setStatus("all");
+    setYear("all");
+    setTdinh("y");
+    setMoLocCatalog(false);
+  };
+  const detailId = (code: string) => `catalog-object-${code.replace(/[^a-zA-Z0-9_-]/g, "-")}-details`;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <Card>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 14, background: C.lavSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Boxes size={22} color={C.lavText} /></div>
-            <div>
-              <div style={{ fontFamily: TEXT, fontWeight: 900, fontSize: 16, color: C.plum }}>Danh mục đối tượng & Tiến độ</div>
-              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Nhóm theo mã đối tượng · mỗi mã nhiều loại thẩm định / lần thẩm định trong năm</div>
-            </div>
+    <div className="catalog-progress">
+      <Card cls="catalog-progress__toolbar">
+        <header className="catalog-progress__header">
+          <span className="catalog-progress__mark" aria-hidden="true"><Boxes size={20} /></span>
+          <div>
+            <h2>Danh mục đối tượng &amp; Tiến độ</h2>
+            <p>Nhóm theo mã · theo dõi từng loại và lần thẩm định</p>
           </div>
-          {/* Nút "Thêm đối tượng" cũ mở một hộp chỉ XEM TRƯỚC dòng Sheet rồi
-              khoá nút Lưu — thêm không được. Chỗ thêm thật nằm ở Danh mục &
-              Nhập liệu, nên chỉ đường sang đó thay vì để nút giả. */}
-          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, maxWidth: 260, lineHeight: 1.5, textAlign: "right" }}>
-            Thêm đối tượng mới ở <b style={{ color: C.plum }}>Danh mục &amp; Nhập liệu</b> → Danh mục nguồn, rồi bấm <b style={{ color: C.plum }}>Sinh timeline</b>.
+        </header>
+        <div className="catalog-progress__primary">
+          <div className="catalog-progress__search">
+            <Search size={16} aria-hidden="true" />
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm mã, tên, loại thẩm định, QA…" aria-label="Tìm đối tượng và hạng mục" style={{ ...INP, minHeight: undefined }} />
           </div>
+          <button type="button" className={`catalog-progress__filter-toggle${moLocCatalog ? " is-on" : ""}`}
+            aria-expanded={moLocCatalog} aria-controls="catalog-progress-advanced-filters"
+            onClick={() => setMoLocCatalog((value) => !value)}>
+            <SlidersHorizontal size={15} aria-hidden="true" /> Bộ lọc
+            {soLocNangCao > 0 && <span className="catalog-progress__filter-count">{soLocNangCao}</span>}
+          </button>
+          <span className="catalog-progress__count"><b>{groups.length}</b> đối tượng · {totalItems} hạng mục</span>
+          {coLocCatalog && <button type="button" className="catalog-progress__clear" onClick={xoaLocCatalog}>
+            <X size={14} aria-hidden="true" /> Xóa lọc
+          </button>}
         </div>
-        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
-            <Search size={16} color={C.plumSoft} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại thẩm định, QA…" style={{ ...INP, paddingLeft: 36 }} />
-          </div>
-          <select value={cls} onChange={(e) => setCls(e.target.value)} aria-label="Lọc theo nhóm đối tượng" style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả nhóm</option>{Object.keys(CLS).map((k) => <option key={k} value={k}>{(CLS as Record<string, { label: string }>)[k].label}</option>)}</select>
-          <select value={dept} onChange={(e) => setDept(e.target.value)} aria-label="Lọc theo bộ phận" style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả bộ phận</option>{DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Lọc theo tình trạng" style={{ ...INP, cursor: "pointer", maxWidth: 170 }}><option value="all">Tất cả tình trạng</option><option value="over">Quá hạn</option><option value="prog">Đang chạy</option><option value="todo">Kế hoạch</option><option value="done">Đã xong</option></select>
-          <select value={year} onChange={(e) => setYear(e.target.value)} aria-label="Lọc theo năm thẩm định" style={{ ...INP, cursor: "pointer", maxWidth: 140 }} title="Lọc theo năm thẩm định"><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
-          <select value={tdinh} onChange={(e) => setTdinh(e.target.value as "y" | "n" | "all")} aria-label="Lọc theo có thẩm định hay không" style={{ ...INP, cursor: "pointer", maxWidth: 210 }}
-            title="Cột &quot;Thẩm định&quot; ở Danh mục nguồn. Đối tượng đánh dấu 'n' không sinh hạng mục nào nên mặc định được ẩn khỏi trang tiến độ.">
-            <option value="y">Chỉ đối tượng có thẩm định</option>
-            <option value="n">Chỉ đối tượng không thẩm định</option>
-            <option value="all">Cả hai</option>
-          </select>
+        <div id="catalog-progress-advanced-filters" className="catalog-progress__advanced" hidden={!moLocCatalog}>
+          <label><span>Nhóm đối tượng</span>
+            <select value={cls} onChange={(e) => setCls(e.target.value)} aria-label="Lọc theo nhóm đối tượng" style={{ ...INP, minHeight: undefined }}><option value="all">Tất cả nhóm</option>{Object.keys(CLS).map((k) => <option key={k} value={k}>{(CLS as Record<string, { label: string }>)[k].label}</option>)}</select>
+          </label>
+          <label><span>Bộ phận</span>
+            <select value={dept} onChange={(e) => setDept(e.target.value)} aria-label="Lọc theo bộ phận" style={{ ...INP, minHeight: undefined }}><option value="all">Tất cả bộ phận</option>{DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+          </label>
+          <label><span>Tình trạng</span>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Lọc theo tình trạng" style={{ ...INP, minHeight: undefined }}><option value="all">Tất cả tình trạng</option><option value="over">Quá hạn</option><option value="prog">Đang chạy</option><option value="todo">Kế hoạch</option><option value="done">Đã xong</option></select>
+          </label>
+          <label><span>Năm</span>
+            <select value={year} onChange={(e) => setYear(e.target.value)} aria-label="Lọc theo năm thẩm định" style={{ ...INP, minHeight: undefined }}><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
+          </label>
+          <label><span>Phạm vi thẩm định</span>
+            <select value={tdinh} onChange={(e) => setTdinh(e.target.value as "y" | "n" | "all")} aria-label="Lọc theo có thẩm định hay không" style={{ ...INP, minHeight: undefined }}
+              title="Đối tượng không thẩm định không sinh timeline và mặc định được ẩn.">
+              <option value="y">Chỉ đối tượng có thẩm định</option>
+              <option value="n">Chỉ đối tượng không thẩm định</option>
+              <option value="all">Cả hai</option>
+            </select>
+          </label>
         </div>
-        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{groups.length} đối tượng · {totalItems} hạng mục thẩm định</div>
       </Card>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="catalog-progress__list">
         {lat.map((g) => {
           const o = g.obj;
           const cl = (CLS as Record<string, typeof CLS.tb>)[String(o.cls ?? "tb")] || CLS.tb;
@@ -264,9 +292,11 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
             };
           })();
           return (
-            <Card key={o.code} style={{ padding: 0, overflow: "hidden" }}>
-              <button onClick={() => toggle(o.code)} style={{ width: "100%", textAlign: "left", border: "none", background: isOpen ? C.pinkMist : C.surface, cursor: "pointer", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                <ChevronRight size={18} color={C.plumSoft} style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s", flexShrink: 0 }} />
+            <Card key={o.code} cls="catalog-object" style={{ padding: 0, overflow: "hidden" }}>
+              <button type="button" onClick={() => toggle(o.code)} className="catalog-object__trigger"
+                data-catalog-items={g.items.length} data-catalog-statuses={[...new Set(g.items.map((item) => item.st))].join(" ")}
+                aria-expanded={Boolean(isOpen)} aria-controls={detailId(String(o.code))}>
+                <ChevronRight className="catalog-object__chevron" size={18} aria-hidden="true" />
                 <span style={{ fontFamily: NUM, fontWeight: 900, fontSize: 14, color: cl.text, background: cl.soft, padding: "3px 10px", borderRadius: 8, whiteSpace: "nowrap" }}>{o.code}</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{txt(o.name)}</div>
@@ -325,29 +355,21 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                   về bản thân đối tượng — tên, khu vực, bộ phận, tần suất, điểm
                   trọng yếu — nằm ở Danh mục & Nhập liệu. Không có lối nhảy thì
                   người dùng phải tự nhớ mã rồi sang trang kia gõ lại tay. */}
-              {isOpen && onMoDanhMuc && (
-                <div style={{ padding: "8px 16px", borderTop: `1px solid ${C.pinkSoft}`,
-                  background: "rgba(237,231,252,.28)", display: "flex", alignItems: "center",
-                  gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
-                    Sửa tên · khu vực · bộ phận · tần suất · điểm trọng yếu của đối tượng này:
-                  </span>
-                  <button type="button"
-                    onClick={() => onMoDanhMuc(String(o.code), CLS_SANG_NHOM[String(o.cls ?? "")])}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6,
-                      fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer",
-                      color: C.lavText, background: C.lavSoft, border: "none",
-                      borderRadius: 999, padding: "6px 13px" }}>
-                    <ExternalLink size={13} /> Mở trong Danh mục &amp; Nhập liệu
-                  </button>
-                </div>
-              )}
-
-              {isOpen && (
-                <div style={{ borderTop: `1px solid ${C.pinkSoft}`, padding: "10px", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div id={detailId(String(o.code))} className="catalog-object__details" hidden={!isOpen}>
+                {isOpen && <>
+                  {onMoDanhMuc && (
+                    <div className="catalog-object__source-link">
+                      <span>Sửa tên · khu vực · bộ phận · tần suất · điểm trọng yếu của đối tượng này:</span>
+                      <button type="button"
+                        onClick={() => onMoDanhMuc(String(o.code), CLS_SANG_NHOM[String(o.cls ?? "")])}>
+                        <ExternalLink size={13} aria-hidden="true" /> Mở trong Danh mục &amp; Nhập liệu
+                      </button>
+                    </div>
+                  )}
+                  <div className="catalog-object__types">
                   {groupByType(g.items).map(({ vtype, items, dupYears }) => (
-                    <div key={vtype} style={{ borderRadius: 14, border: `1px solid ${C.pinkSoft}`, overflow: "hidden" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", background: "rgba(237,231,252,.45)" }}>
+                    <div key={vtype} className="catalog-type">
+                      <div className="catalog-type__header">
                         <Tag color={C.lavText} bg={C.lavSoft}>{txt(vtype)}</Tag>
                         <span style={{ fontSize: 12, fontWeight: 800, color: C.plum }}>{items.length} lần thẩm định</span>
                         {dupYears.size > 0 && (
@@ -356,8 +378,8 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                           </span>
                         )}
                       </div>
-                      <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
+                      <div className="vmp-scroll catalog-table-scroll">
+                        <table className="catalog-milestones" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
                           <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
                             {["Năm", "ID", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
                           </tr></thead>
@@ -393,8 +415,9 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
+                  </div>
+                </>}
+              </div>
             </Card>
           );
         })}
@@ -403,7 +426,7 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
             coTrang={coTrang} setCoTrang={setCoTrang} donVi="đối tượng" />
         )}
         {!groups.length && <Card><div style={{ textAlign: "center", padding: 30, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>Không có đối tượng phù hợp bộ lọc.
-          <div style={{ marginTop: 10 }}><button type="button" onClick={() => { setQ(""); setCls("all"); setDept("all"); setStatus("all"); setYear("all"); setTdinh("y"); }} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá bộ lọc</button></div></div></Card>}
+          <div style={{ marginTop: 10 }}><button type="button" onClick={xoaLocCatalog} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá bộ lọc</button></div></div></Card>}
       </div>
 
       {/* Ẩn khỏi danh sách trên mà không có chỗ tra thì thành GIẤU. Thẻ này là

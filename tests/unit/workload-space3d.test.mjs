@@ -23,9 +23,13 @@ test("hover is transient while clicked selection persists when hover clears", ()
   assert.equal(workloadActiveCell(first, null), first);
 });
 
-test("Timeline mô tả đúng trục X là tháng và Z là bộ phận", async () => {
+test("Timeline không còn nhúng bản đồ 3D — Ngư đồ là lớp nhìn duy nhất", async () => {
+  /* 31/08 — chủ dự án chốt màn Dòng thời gian chỉ còn Long Môn; địa hình
+     tải việc 3D rời khỏi màn này nên mô tả trục cũng đi theo. Hợp đồng
+     mới: TimelinePage không import WorkloadSpace3D và không mô tả trục. */
   const source = await readFile(new URL("../../src/pages/TimelinePage.tsx", import.meta.url), "utf8");
-  assert.match(source, /Trục ngang X là 12 tháng theo mốc đích VMP · trục sâu Z là bộ phận/);
+  assert.doesNotMatch(source, /WorkloadSpace3D/);
+  assert.doesNotMatch(source, /Trục ngang X là 12 tháng/);
 });
 
 test("detail has no dead CTA and reports the complete selected workload", () => {

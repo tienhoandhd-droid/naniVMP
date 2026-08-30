@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
 import { caiGiaLap, dungHangMuc, nhetPhien } from "./gia-lap-supabase.mjs";
 
 const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
-const URL_SB = readFileSync(new URL("../../.env.local", import.meta.url).pathname, "utf8")
+const URL_SB = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8")
   .match(/^VITE_SUPABASE_URL=(.+)$/m)?.[1]?.trim();
 
 assert.ok(URL_SB, ".env.local phải có VITE_SUPABASE_URL");

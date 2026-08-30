@@ -1,15 +1,21 @@
 /* WorkloadPage.jsx — Ma trận tải công việc Người × Tháng */
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { ReactNode } from "react";
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, Gauge, ShieldAlert, Flag, Users, UserX } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Gauge, ShieldAlert, Users, UserX } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
 import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
-import { parseD, fmtVN, clamp, wlMonthOf, wlScore, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
+import { parseD, fmtVN, clamp, wlMonthOf, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
 import { Card, CardTitle, Tag, Modal, Donut, Pill, CauKetLuan, laThanhTra } from "../components/ui/Primitives.tsx";
-import ValiIllustration from "../components/brand/ValiIllustration.tsx";
 import type { ValiMood } from "../components/brand/ValiIllustration.tsx";
+
+/* Nhãn tâm trạng của Vali — CÙNG lời với màn "Việc hôm nay" (đồng nhất
+ * nhân vật 31/08): một tâm trạng, một tên gọi, trên mọi màn. */
+const NHAN_MOOD: Record<string, string> = {
+  concern: "đang lo", celebrate: "nhẹ nhõm", guide: "dẫn đường",
+  urgent: "rất lo", focus: "tập trung",
+};
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 
@@ -62,6 +68,73 @@ function WorkloadDetailModal({ detail, onClose }: {
   );
 }
 
+/* ---------------------------------------------------------------------
+ * CHỈ MỤC BIÊN — điều hướng trong trang cho bề mặt sổ.
+ *
+ * Màn này cuộn qua sáu khối lớn và trước giờ không có neo nào, nên muốn
+ * đối chiếu "sức tải từng người" với "ma trận" là phải cuộn đi cuộn lại
+ * và tự nhớ mình đang ở đâu.
+ *
+ * Đánh số 01·02·03 KHÔNG phải để trang trí: sổ kiểm soát có thứ tự thật,
+ * và chính app đã dùng lối trích dẫn ấy (phụ đề màn Báo cáo viết "đổi kỳ
+ * thì mục 2, 4, 5 chạy theo" — trong khi không mục nào hiện số). Số hiển
+ * thị làm cho lối nói đó tra được.
+ *
+ * Dùng IntersectionObserver chứ không nghe `scroll`: không tính lại vị
+ * trí mỗi khung hình, và tự im khi tab bị ẩn.
+ * ------------------------------------------------------------------- */
+type MucSo = { id: string; nhan: string };
+
+function RegisterIndex({ muc }: { muc: readonly MucSo[] }) {
+  const [dangXem, setDangXem] = useState<string>(muc[0]?.id ?? "");
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const nodes = muc
+      .map((m) => document.getElementById(m.id))
+      .filter((n): n is HTMLElement => n !== null);
+    if (!nodes.length) return;
+
+    const theoDoi = new IntersectionObserver(
+      (entries) => {
+        /* Mục đang đọc = mục cắt khung nhìn và nằm CAO nhất. Lấy theo tỉ
+           lệ hiển thị thì khối dài luôn thắng khối ngắn, kể cả khi khối
+           ngắn mới là thứ đang ở đầu màn hình. */
+        const thay = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (thay) setDangXem(thay.target.id);
+      },
+      { rootMargin: "-8% 0px -70% 0px", threshold: 0 },
+    );
+    nodes.forEach((n) => theoDoi.observe(n));
+    return () => theoDoi.disconnect();
+  }, [muc]);
+
+  return (
+    <nav className="reg-index" aria-label="Mục trong trang">
+      {muc.map((m, i) => (
+        <a key={m.id} href={`#${m.id}`} className="reg-index__item"
+          aria-current={dangXem === m.id ? "true" : undefined}>
+          <span className="reg-index__num" aria-hidden="true">
+            {String(i + 1).padStart(2, "0")}
+          </span>
+          {m.nhan}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+/** Thứ tự sáu mục của sổ Phân công. `id` trùng với `id` của <section>. */
+const MUC_SO: readonly MucSo[] = [
+  { id: "reg-suc-tai", nhan: "Sức tải từng người" },
+  { id: "reg-ma-tran", nhan: "Ma trận Người × Tháng" },
+  { id: "reg-nhom-viec", nhan: "Phân công theo nhóm việc" },
+  { id: "reg-theo-nguoi", nhan: "Tiến độ theo người" },
+  { id: "reg-trong-yeu", nhan: "Phân bố trọng yếu" },
+];
+
 export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const [scope, setScope] = useState("month");
   const [metric, setMetric] = useState("cong");
@@ -100,15 +173,31 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
     return { eff: mx, mi };
   };
 
-  // Thang tuần tự theo cường độ tải: xanh nhạt → xanh đậm → cam (sắp đầy) →
-  // đỏ (quá tải). Bỏ màu xanh dương ở giữa (không hợp thang magnitude) và
-  // đồng bộ với thẻ tải từng người (xanh=nhẹ · cam=bận · đỏ=quá tải).
-  const heat = (val: number, capv: number) => {
+  /* Thang tải — HAI kênh, không chỉ màu.
+   *
+   * Bản trước trả về `{ bg: C.rasp + "66" }`. `C.rasp` là chuỗi
+   * "var(--c-rasp)" chứ không phải hex, nên phép nối ra "var(--c-rasp)66"
+   * — CSS không hợp lệ, trình duyệt bỏ nguyên khai báo. Cả bốn bậc màu,
+   * viền ô và hai ô chú giải đều chết: ma trận chỉ còn số trần. Nay nền
+   * do CSS lo bằng `color-mix()` trên `[data-band]`, TSX chỉ nói bậc.
+   *
+   * Khấc là kênh thứ hai, đọc được khi không phân biệt được màu — thang
+   * cường độ mà chỉ mã hoá bằng màu là vi phạm luật "không dùng màu đơn
+   * thuần để truyền tin". */
+  const BAC_TAI = {
+    idle: { notch: "▁", nhan: "nhẹ" },
+    low: { notch: "▃", nhan: "vừa" },
+    busy: { notch: "▅", nhan: "sắp đầy" },
+    over: { notch: "▇", nhan: "quá tải" },
+  } as const;
+  type BacTai = keyof typeof BAC_TAI;
+
+  const bacTai = (val: number, capv: number): BacTai => {
     const ratio = capv > 0 ? val / capv : 0;
-    if (ratio > 1) return { bg: C.rasp + "66", text: C.raspText };
-    if (ratio >= 0.85) return { bg: C.marigold + "66", text: C.marigoldText };
-    if (ratio >= 0.5) return { bg: C.mint + "80", text: C.mintText };
-    return { bg: C.mint + "38", text: C.mintText };
+    if (ratio > 1) return "over";
+    if (ratio >= 0.85) return "busy";
+    if (ratio >= 0.5) return "low";
+    return "idle";
   };
 
   const totalCong = sum(pend.map(congConLai));
@@ -127,8 +216,6 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
     const k = String(a.crit ?? "");
     critCount[k] = (critCount[k] || 0) + 1;
   });
-  const focus = pend.filter((a) => a.crit === "Cao" || wlScore(a) >= 7).map((a) => ({ a, sc: wlScore(a) })).sort((x, y) => y.sc - x.sc
-      || ((parseD(x.a.target)?.getTime() ?? 0) - (parseD(y.a.target)?.getTime() ?? 0))).slice(0, 8);
 
   // Phân công theo NHÓM VIỆC — bảng phân công QA 2026 chia theo nhóm hệ
   // thống chứ không theo từng thiết bị, nên đây mới là đơn vị người dùng
@@ -272,19 +359,35 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
     : (overloaded.length > 0
       ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng). Bấm vào từng người xem chi tiết.`
       : `Cả đội đang cân đối. Cứ giữ nhịp này là về đích VMP đúng hẹn.`);
-  const legend = [["Nhẹ", C.mint + "38"], ["Vừa", C.mint + "80"], ["Sắp đầy", C.marigold], ["Quá tải", C.rasp]];
+  /* Chú giải đọc thẳng từ BAC_TAI — một nguồn cho cả ô lẫn chú giải, nên
+     không thể lệch nhau như bản trước (chú giải tự khai màu riêng, và hai
+     ô đầu còn trong suốt vì cùng lỗi nối chuỗi). */
+  const legend = (Object.keys(BAC_TAI) as BacTai[]).map((k) => ({ band: k, ...BAC_TAI[k] }));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="reg">
       {detail && <WorkloadDetailModal detail={detail} onClose={() => setDetail(null)} />}
-      <Card variant="strong" style={{ background: `linear-gradient(120deg,#fff,${C.pinkMist})` }}>
+      <RegisterIndex muc={MUC_SO} />
+      <div className="reg-body">
+      {/* Nền hero: bản trước là `linear-gradient(120deg,#fff,…)` — mã trắng
+          cứng, không đi qua token, nên ở chế độ tối nó là một mảng trắng
+          giữa trang. Luật 5 của check-design-drift.mjs sinh ra để cấm đúng
+          thứ này nhưng không bắt được vì `#fff` nằm trong template literal
+          sau `background:`. */}
+      <Card variant="strong" style={{ background: `linear-gradient(120deg, ${C.surface}, ${C.pinkMist})` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           {/* Pearl orbit 4% chạy SAU vùng Vali — không sau dữ liệu (Atelier
-              §Phân công). Vùng này chỉ có minh hoạ, không có số liệu nào. */}
+              §Phân công). Vùng này chỉ có minh hoạ, không có số liệu nào.
+              Đồng nhất nhân vật (31/08, yêu cầu chủ dự án): dùng CHUNG bộ
+              chibi webp của màn "Việc hôm nay" (`.hn-vali`, today.css) thay
+              cho ValiIllustration SVG — cùng một app không nên có hai phiên
+              bản công chúa. UpdatePage đã theo mẫu này từ trước. */}
           {!thanhTra && (
-            <div className="lp-art-layer lp-art-layer--pearl-orbit" data-lp-art="pearl-orbit"
+            <div className="lp-art-layer lp-art-layer--pearl-orbit hn-hero__vali" data-lp-art="pearl-orbit"
               style={{ flexShrink: 0 }}>
-              <ValiIllustration mood={mood} size={110} />
+              <div className={`hn-vali hn-vali--${mood} hn-vali--nho`} role="img"
+                aria-label={`Công chúa Vali ${NHAN_MOOD[mood]}`} />
+              <span className="hn-vali__nhan">Vali · {NHAN_MOOD[mood]}</span>
             </div>
           )}
           <div style={{ flex: 1, minWidth: 240 }}>
@@ -332,7 +435,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       )}
 
       {/* Capacity cards */}
-      <Card variant="strong">
+      <Card variant="strong" id="reg-suc-tai">
         <CardTitle icon={Activity} sub={`Thanh = tháng bận nhất so với ngưỡng ${CAP_MONTH} ngày công/tháng · bấm vào thẻ để xem chi tiết`}>Sức tải từng người</CardTitle>
         {klSucTai && <CauKetLuan chinh={klSucTai.chinh} phu={klSucTai.phu} tone={klSucTai.tone} />}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(262px,1fr))", gap: 14 }}>
@@ -365,48 +468,83 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         </div>
       </Card>
 
-      {/* Matrix */}
-      <Card variant="strong">
-        <CardTitle icon={BarChart3} right={<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>{legend.map(([l, c]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.plum, fontWeight: 700 }}><span style={{ width: 12, height: 12, borderRadius: 8, background: c }} />{l}</span>)}</div>} sub={`Mỗi ô = ${metric === "cong" ? "ngày công" : "hồ sơ"} · bấm vào ô để xem`}>Ma trận · Người × {scope === "month" ? "Tháng" : scope === "quarter" ? "Quý" : "Năm"}</CardTitle>
+      {/* ================= Ma trận — bề mặt sổ =================
+          Kẻ dòng thay vì đóng hộp từng ô. Hàng tiêu đề DÍNH (bản trước chỉ
+          dính cột trái, nên cuộn qua 12 tháng là mất tên tháng). Có
+          <caption> nói rõ bảng đếm gì, đơn vị nào. */}
+      <section className="reg-section" id="reg-ma-tran" aria-labelledby="reg-ma-tran-tieu-de">
+        <div className="reg-section__head">
+          <span className="reg-section__num" aria-hidden="true">02</span>
+          <h2 className="reg-section__title" id="reg-ma-tran-tieu-de">
+            Ma trận · Người × {scope === "month" ? "Tháng" : scope === "quarter" ? "Quý" : "Năm"}
+          </h2>
+          <p className="reg-section__note">Bấm một ô để xem hạng mục trong ô đó</p>
+        </div>
         {klMaTran && <CauKetLuan chinh={klMaTran.chinh} phu={klMaTran.phu} tone={klMaTran.tone} />}
-        <div style={{ overflowX: "auto" }} className="vmp-scroll">
-          <table style={{ borderCollapse: "separate", borderSpacing: 5, minWidth: scope === "month" ? 880 : 440 }}>
-            <thead><tr>
-              <th style={{ textAlign: "left", fontSize: 12, color: C.plumSoft, fontWeight: 800, padding: "0 8px 8px", position: "sticky", left: 0, background: C.surface }}>NGƯỜI</th>
-              {cols.map((c, ci) => { const isNow = scope === "month" && ci === vmpToday().getMonth(); return <th key={c} style={{ fontSize: 12, fontWeight: 800, color: isNow ? C.pinkText : C.plumSoft, padding: "0 4px 8px", minWidth: 54 }}>{c}{isNow ? " •" : ""}</th>; })}
-              <th style={{ fontSize: 12, fontWeight: 800, color: C.plum, padding: "0 6px 8px" }}>TỔNG</th>
-            </tr></thead>
+        <ul className="reg-legend">
+          {legend.map((b) => (
+            <li className="reg-legend__item" key={b.band}>
+              <span className="reg-legend__swatch" data-band={b.band} aria-hidden="true">{b.notch}</span>
+              {b.nhan}
+            </li>
+          ))}
+        </ul>
+        <div className="reg-scroll vmp-scroll">
+          <table className="reg-table">
+            <caption>
+              Sức tải còn lại theo {metric === "cong" ? "ngày công" : "hồ sơ"}, ngưỡng {cap} mỗi{" "}
+              {scope === "month" ? "tháng" : scope === "quarter" ? "quý" : "năm"}. Mỗi ô ghi số và
+              một khấc chỉ mức tải, nên đọc được cả khi không phân biệt được màu.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" data-reg-stick>Người</th>
+                {cols.map((c, ci) => {
+                  const isNow = scope === "month" && ci === vmpToday().getMonth();
+                  return (
+                    <th scope="col" key={c} className="reg-num" aria-current={isNow ? "date" : undefined}>
+                      {c}{isNow ? " ·" : ""}
+                    </th>
+                  );
+                })}
+                <th scope="col" className="reg-num">Tổng</th>
+              </tr>
+            </thead>
             <tbody>
               {people.map((p) => (
                 <tr key={p.name}>
-                  <td style={{ padding: "4px 8px", position: "sticky", left: 0, background: C.surface, zIndex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 26, height: 26, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 12, flexShrink: 0 }}>{p.name[0]}</div><span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum, whiteSpace: "nowrap" }}>{p.name}</span></div>
-                  </td>
+                  <th scope="row" data-reg-stick>{p.name}</th>
                   {cols.map((c, ci) => {
-                    const v = valIn(p, ci); const tasks = tasksIn(p, ci);
-                    if (v <= 0) return <td key={ci} style={{ textAlign: "center" }}><div style={{ height: 42, borderRadius: 8, background: C.pinkMist }} /></td>;
-                    const st = heat(v, cap);
-                    return <td key={ci} style={{ textAlign: "center" }}>
-                      <div onClick={() => openDetail(`${p.name} · ${c}`, tasks)} style={{ height: 42, borderRadius: 8, background: st.bg, border: `1px solid ${st.text}33`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                        <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: st.text, lineHeight: 1 }}>{v}</span>
-                        <span style={{ fontSize: 12, color: st.text, fontWeight: 700, opacity: .85 }}>{metric === "cong" ? "nc" : "hồ sơ"}</span>
-                      </div>
-                    </td>;
+                    const v = valIn(p, ci);
+                    const tasks = tasksIn(p, ci);
+                    if (v <= 0) {
+                      return <td key={ci}><div className="reg-load--empty" /></td>;
+                    }
+                    const band = bacTai(v, cap);
+                    const donVi = metric === "cong" ? "ngày công" : "hồ sơ";
+                    return (
+                      <td key={ci}>
+                        <button type="button" className="reg-load" data-band={band}
+                          onClick={() => openDetail(`${p.name} · ${c}`, tasks)}
+                          aria-label={`${p.name}, ${c}: ${v} ${donVi}, mức ${BAC_TAI[band].nhan}. Xem ${tasks.length} hạng mục.`}>
+                          <span aria-hidden="true">{v}</span>
+                          <span className="reg-load__notch" aria-hidden="true">{BAC_TAI[band].notch}</span>
+                        </button>
+                      </td>
+                    );
                   })}
-                  <td style={{ textAlign: "center" }}>
-                    <div style={{ height: 42, borderRadius: 8, background: peakMonth(p).eff > CAP_MONTH ? C.raspSoft : C.lavSoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: peakMonth(p).eff > CAP_MONTH ? C.raspText : C.lavText, lineHeight: 1 }}>{metric === "cong" ? p.congTotal : p.hosoTotal}</span>
-                    </div>
+                  <td className="reg-num reg-total">
+                    {metric === "cong" ? p.congTotal : p.hosoTotal}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </Card>
+      </section>
 
       {/* Phân công theo nhóm việc */}
-      <Card variant="strong">
+      <Card variant="strong" id="reg-nhom-viec">
         <CardTitle icon={Users}
           sub="Theo bảng phân công QA 2026 — bấm vào nhóm để xem toàn bộ hạng mục">
           Phân công theo nhóm việc
@@ -445,7 +583,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       </Card>
 
       {/* Bảng vinh danh cá nhân */}
-      <Card variant="soft">
+      <Card variant="soft" id="reg-theo-nguoi">
         {/* Đổi từ "Bảng vinh danh cá nhân" (có thứ hạng 1-2-3) sang bảng
             tiến độ trung tính, bỏ số thứ hạng. Lý do không phải thẩm mỹ:
             phần lớn chênh lệch ở đây đến từ PHÂN BỔ VIỆC chứ không phải năng
@@ -486,32 +624,27 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         </div>
       </Card>
 
-      {/* Focus */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 24 }}>
-        <Card variant="soft">
-          <CardTitle icon={ShieldAlert} sub="Theo mức trọng yếu">Phân bố trọng yếu</CardTitle>
-          {klTrongYeu && <CauKetLuan chinh={klTrongYeu.chinh} phu={klTrongYeu.phu} tone={klTrongYeu.tone} />}
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <Donut size={132} segments={[{ value: critCount.Cao, color: C.rasp }, { value: critCount.TB, color: C.marigold }, { value: critCount["Thấp"], color: C.mint }]} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-              {[["Cao", C.rasp, C.raspText], ["TB", C.marigold, C.marigoldText], ["Thấp", C.mint, C.mintText]].map(([k, c, t]) => <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: c }} />TY {k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: t }}>{critCount[k] || 0}</span></div>)}
-            </div>
+      {/* Trọng yếu. Thẻ "Cần tập trung" từng đứng cạnh đây đã BỎ (31/08):
+          nó là bản rút gọn của màn "Cảnh báo & ưu tiên" — cùng một phép xếp
+          theo điểm rủi ro, ít cột hơn, và không có ma trận QRM đi kèm. Chính
+          constants/vmp.ts đã chốt "ma trận rủi ro nằm cùng chỗ với danh sách
+          cảnh báo mà nó dùng để xếp thứ tự ưu tiên" — hai nơi cùng xếp hạng
+          ưu tiên thì sớm muộn lệch nhau, và người dùng phải đoán bản nào
+          thật. Ở đây chỉ giữ phân bố trọng yếu (góc nhìn KHỐI LƯỢNG), kèm
+          lối sang màn ưu tiên thật. */}
+      <Card variant="soft" id="reg-trong-yeu">
+        <CardTitle icon={ShieldAlert} sub="Theo mức trọng yếu"
+          right={<a href="#v=alerts" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>Thứ tự ưu tiên đầy đủ → Cảnh báo &amp; ưu tiên</a>}>
+          Phân bố trọng yếu
+        </CardTitle>
+        {klTrongYeu && <CauKetLuan chinh={klTrongYeu.chinh} phu={klTrongYeu.phu} tone={klTrongYeu.tone} />}
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <Donut size={132} segments={[{ value: critCount.Cao, color: C.rasp }, { value: critCount.TB, color: C.marigold }, { value: critCount["Thấp"], color: C.mint }]} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+            {[["Cao", C.rasp, C.raspText], ["TB", C.marigold, C.marigoldText], ["Thấp", C.mint, C.mintText]].map(([k, c, t]) => <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: c }} />TY {k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: t }}>{critCount[k] || 0}</span></div>)}
           </div>
-        </Card>
-        <Card variant="strong">
-          <CardTitle icon={Flag} sub="Trọng yếu cao / ≥ 7 — ưu tiên">Cần tập trung</CardTitle>
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {focus.map(({ a, sc }) => <div key={a.id} className="vmp-row vmp-lift" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
-              <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: sc >= 7 ? "var(--lp-on-danger)" : "var(--lp-on-warning)", background: sc >= 7 ? C.raspText : C.marigoldText, width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag><span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</span></div>
-                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{a.owner} · đích {a.target ? fmtVN(parseD(a.target)) : "—"}</div>
-              </div>
-              <Pill s={a.st} small />
-            </div>)}
-            {focus.length === 0 && <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 22, color: C.mintText, fontWeight: 700 }}><CheckCircle2 size={16} aria-hidden="true" /> Không còn trọng yếu cao</div>}
-          </div>
-        </Card>
+        </div>
+      </Card>
       </div>
     </div>
   );

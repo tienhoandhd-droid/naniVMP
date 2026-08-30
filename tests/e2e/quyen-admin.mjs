@@ -27,6 +27,7 @@
  *   chạy nền, rồi node tests/e2e/quyen-admin.mjs)
  * ===================================================================== */
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
@@ -35,7 +36,7 @@ import { caiGiaLap, nhetPhien, NGUOI_DUNG } from "./gia-lap-supabase.mjs";
 const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
 
 const URL_SB = (() => {
-  const noi = readFileSync(new URL("../../.env.local", import.meta.url).pathname, "utf8");
+  const noi = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
   const m = noi.match(/^VITE_SUPABASE_URL=(.+)$/m);
   if (!m) throw new Error(".env.local thiếu VITE_SUPABASE_URL");
   return m[1].trim();

@@ -6,7 +6,7 @@ import {
   Boxes, FlaskConical, Warehouse, Wind, Truck,
   LayoutDashboard, GanttChartSquare, Pencil,
   Activity, FileBarChart, AlertCircle,
-  ShieldCheck, Radar, BarChart3, Scale, ClipboardList,
+  ShieldCheck, Radar, BarChart3, ClipboardList,
 } from "lucide-react";
 import { C } from "./theme.ts";
 
@@ -123,7 +123,11 @@ export const NAV_ITEMS = [
   // với danh sách cảnh báo mà nó dùng để xếp thứ tự ưu tiên.
   { id: "workload", label: "Phân công & khối lượng", icon: Activity, group: "analysis" },
   { id: "reports", label: "Báo cáo", icon: FileBarChart, group: "analysis" },
-  { id: "rules", label: "Quy tắc nghiệp vụ", icon: Scale, group: "analysis" },
+  /* Mục "Quy tắc nghiệp vụ" đã BỎ khỏi menu (31/08, chủ dự án chốt "không
+     cần thiết"). Màn `rules` KHÔNG xoá: screenId vẫn hợp lệ trong
+     SCREEN_IDS/ORDERED_SCREEN_IDS (hợp đồng với rpc_my_ui_access), hash
+     `#v=rules` vẫn mở được — cùng nếp với `inventory`: bỏ lối vào, giữ
+     đường dẫn để URL cũ không chết. */
 
   // QUẢN TRỊ
   /* `adminOnly` đã bị bỏ. Quyền xem từng màn nay đọc bằng `access.canView(id)`

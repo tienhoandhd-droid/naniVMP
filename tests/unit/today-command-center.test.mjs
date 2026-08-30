@@ -94,6 +94,13 @@ test("Today content presents four queues, reason badges, safe CTA, and accordion
   assert.match(html, /Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật/);
   assert.match(html, /Đến hạn trong 7 ngày/);
   assert.match(html, /Chưa lên lịch/);
+  assert.match(html, /QA phụ trách/);
+  assert.doesNotMatch(html, /Phụ trách · Bộ phận/);
+  assert.match(html, /class="hn-muc__nguoi"><b>Chưa phân công QA<\/b><\/span>/);
+  const ownerCells = html.match(/<span class="hn-muc__nguoi">[\s\S]*?<\/span>/g) ?? [];
+  assert.ok(ownerCells.length > 0);
+  ownerCells.forEach((cell) => assert.doesNotMatch(cell, /<i>/));
+  assert.match(html, /<dt>Phòng ban<\/dt><dd>QA<\/dd>/);
   assert.equal(count(html, /aria-controls=/g), 8);
   assert.equal(count(html, /role="region"/g), 4);
   assert.equal(count(html, /aria-expanded="false"/g), 8);
@@ -181,6 +188,45 @@ test("Today content distinguishes filtered empty scope from a true empty queue",
 
   const emptyHtml = render(contentProps(readyRights, { model: emptyModel }));
   assert.doesNotMatch(emptyHtml, /Xoá bộ lọc/);
+});
+
+test("Vali uses five distinct expressions for empty, upcoming, due-today, overdue, and heavily overdue queues", async () => {
+  const { getTodayValiState } = await import("../../src/features/today/TodayCommandCenter.tsx");
+  assert.equal(typeof getTodayValiState, "function");
+
+  const cases = [
+    {
+      name: "empty",
+      patch: { rows: [], kpis: { overdue: 0, today: 0, upcoming: 0, dataQuality: 0 }, nextAction: null },
+      want: { mood: "celebrate", nhan: "nhẹ nhõm" },
+    },
+    {
+      name: "upcoming only",
+      patch: { rows: [upcomingReadOnly], kpis: { overdue: 0, today: 0, upcoming: 1, dataQuality: 0 }, nextAction: upcomingReadOnly },
+      want: { mood: "guide", nhan: "dẫn đường" },
+    },
+    {
+      name: "due today",
+      patch: { rows: [todayReadOnly], kpis: { overdue: 0, today: 1, upcoming: 0, dataQuality: 0 }, nextAction: todayReadOnly },
+      want: { mood: "focus", nhan: "tập trung" },
+    },
+    {
+      name: "one overdue",
+      patch: { rows: [overdueEditable], kpis: { overdue: 1, today: 0, upcoming: 0, dataQuality: 0 }, nextAction: overdueEditable },
+      want: { mood: "concern", nhan: "đang lo" },
+    },
+    {
+      name: "three overdue",
+      patch: { rows: [overdueEditable, overdueEditable, overdueEditable], kpis: { overdue: 3, today: 0, upcoming: 0, dataQuality: 0 }, nextAction: overdueEditable },
+      want: { mood: "urgent", nhan: "rất lo" },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const actual = getTodayValiState({ ...model, ...testCase.patch });
+    assert.equal(actual.mood, testCase.want.mood, `${testCase.name}: mood`);
+    assert.equal(actual.nhan, testCase.want.nhan, `${testCase.name}: accessible label`);
+  }
 });
 
 test("Today CSS contains row-level long-list containment with mobile intrinsic size", () => {
