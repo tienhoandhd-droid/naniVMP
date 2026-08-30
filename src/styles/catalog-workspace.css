@@ -418,7 +418,7 @@
 .cw-filter-panel {
   padding: 12px;
   border: 1px solid var(--lp-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--lp-surface-2);
 }
 .cw-filter-panel__luoi {

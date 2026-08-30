@@ -155,10 +155,17 @@
 
   /* --- §6.7c · Cỡ chữ hiển thị ------------------------------------- */
   --lp-fs-brand: 44px;
-  --lp-fs-h1:    36px;
-  --lp-lh-h1:    44px;
-  --lp-fs-kpi:   42px;
-  --lp-lh-kpi:   48px;
+  /* 30/08: thang chữ theo bản thiết kế Lotus B+ — H1 lớn hơn một bậc để
+     tên màn là điểm mắt rơi vào đầu tiên; KPI hero 68px cho số dẫn đầu,
+     KPI phụ 24px. */
+  --lp-fs-h1:     44px;
+  --lp-lh-h1:     50px;
+  --lp-fs-kpi:    42px;
+  --lp-lh-kpi:    48px;
+  --lp-fs-kpi-hero: 68px;
+  --lp-fs-kpi-phu:  24px;
+  --lp-fs-loi:      30px;   /* câu dẫn Vali (serif) */
+  --lp-fs-muc:      26px;   /* tiêu đề nhóm việc (serif) */
   /* Serif cỡ lớn bị rời chữ nếu để mặc định. */
   --lp-tracking-display: -0.01em;
 

@@ -16,8 +16,12 @@
  * ===================================================================== */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const GOC = new URL("..", import.meta.url).pathname;
+/* Trên Windows, URL.pathname trả "/C:/…" nên mọi statSync đều trượt và bộ
+   kiểm âm thầm quét 0 file rồi báo ĐẠT. fileURLToPath cho đường dẫn đúng
+   trên cả ba hệ điều hành. */
+const GOC = fileURLToPath(new URL("..", import.meta.url));
 
 /* Phạm vi đã migration — mở rộng dần khi từng màn chuyển hệ. */
 const PHAM_VI = [
@@ -29,6 +33,11 @@ const PHAM_VI = [
   "src/components/ui/DirtyStateProvider.tsx",
   "src/components/catalog/CatalogObjectForm.tsx",
   "src/pages/SourceCatalogPage.tsx",
+  /* 30/08 — hai màn đã chuyển sang hệ Lotus B+ và vỏ ứng dụng. */
+  "src/pages/UpdatePage.tsx",
+  "src/components/layout/Layout.tsx",
+  "src/components/ui/MetricGrid.tsx",
+  "src/components/ui/StateBoundary.tsx",
 ];
 
 /* File được PHÉP chứa hex: nơi khai token và art thương hiệu (màu nhân
@@ -51,7 +60,7 @@ function duyet(duong) {
   const day = join(GOC, duong);
   const st = statSync(day, { throwIfNoEntry: false });
   if (!st) return [];
-  if (st.isFile()) return [duong];
+  if (st.isFile()) return [duong.split("\\").join("/")];
   return readdirSync(day).flatMap((con) => duyet(join(duong, con)));
 }
 

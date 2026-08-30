@@ -32,7 +32,7 @@
 .pr-uu-tien { display: inline-flex; align-items: center; gap: 4px; min-height: 34px; padding: 0 12px; border: 1px solid var(--lp-line-strong); border-radius: 10px; background: var(--lp-bg-raised); color: var(--lp-plum); font-family: var(--ff-text); font-size: 13px; font-weight: 700; cursor: pointer; }
 .pr-uu-tien:hover { background: var(--lp-rose-soft); }
 .pr-uu-tien:disabled { cursor: default; opacity: .6; }
-.pr-uu-tien--dau { min-height: 40px; padding: 0 18px; border-color: transparent; background: var(--lp-plum); color: var(--lp-on-plum, #fff); box-shadow: var(--lp-e-low); }
+.pr-uu-tien--dau { min-height: 40px; padding: 0 18px; border-color: transparent; background: var(--lp-plum); color: var(--lp-on-plum); box-shadow: var(--lp-e-low); }
 .pr-uu-tien--dau:hover { background: var(--lp-brand-hover); }
 .pr-uu-tien--tre:not(.pr-uu-tien--dau) { border-color: var(--lp-danger-soft); color: var(--lp-danger); }
 .pr-uu-tien:focus-visible, .pr-chip:focus-visible, .pr-nut-chinh:focus-visible, .pr-nhanh:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
@@ -56,7 +56,7 @@
 .pr-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 11px; border: 1px solid var(--lp-line); border-radius: 999px; background: var(--lp-surface); color: var(--lp-ink-muted); font-family: var(--ff-text); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .pr-chip:hover:not(:disabled) { border-color: var(--lp-line-strong); color: var(--lp-ink); }
 .pr-chip:disabled { opacity: .45; cursor: default; }
-.pr-chip.is-on { border-color: var(--lp-plum); background: var(--lp-plum); color: var(--lp-on-plum, #fff); }
+.pr-chip.is-on { border-color: var(--lp-plum); background: var(--lp-plum); color: var(--lp-on-plum); }
 .pr-chip--tatca.is-on { background: var(--lp-plum-900); border-color: var(--lp-plum-900); }
 .pr-chip--nang:not(.is-on) { color: var(--lp-danger); border-color: var(--lp-danger-soft); }
 .pr-chip--nang.is-on { background: var(--lp-danger); border-color: var(--lp-danger); }
@@ -87,7 +87,7 @@
 .pr-td--giua { text-align: center; }
 .pr-hanh-dong { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .pr-nut-chinh { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 1px solid var(--lp-line-strong); border-radius: 10px; background: var(--lp-bg-raised); color: var(--lp-plum); font-family: var(--ff-text); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.pr-nut-chinh:hover:not(:disabled) { background: var(--lp-plum); color: var(--lp-on-plum, #fff); border-color: var(--lp-plum); }
+.pr-nut-chinh:hover:not(:disabled) { background: var(--lp-plum); color: var(--lp-on-plum); border-color: var(--lp-plum); }
 .pr-nut-chinh:disabled { opacity: .55; cursor: not-allowed; }
 .pr-nhanh { min-height: 34px; padding: 0 11px; border: 1px solid var(--lp-success-soft); border-radius: 10px; background: var(--lp-success-soft); color: var(--lp-success); font-family: var(--ff-text); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; opacity: 0; transition: opacity var(--lp-mo-chip, 120ms) var(--lp-ease); }
 .pr-row:hover .pr-nhanh, .pr-row:focus-within .pr-nhanh, .pr-nhanh:focus-visible { opacity: 1; }

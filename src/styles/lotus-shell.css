@@ -28,9 +28,9 @@
   /* Nguyên khung tranh: cô gái áo yếm + hồ sen, mờ dần về phía vùng đọc. */
   background: url("../assets/art/nen-dam-sen.webp") no-repeat -230px 0 / 1120px auto;
   opacity: 0.55;
-  -webkit-mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, #000 35%);
+  -webkit-mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, rgb(0 0 0) 35%);
   -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, #000 35%);
+  mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, rgb(0 0 0) 35%);
   mask-composite: intersect;
   pointer-events: none;
   z-index: 0;
@@ -66,18 +66,18 @@
 .vmp-masthead__ten {
   font-family: var(--ff-display);
   font-style: italic;
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 600;
   color: var(--lp-plum);
   letter-spacing: -0.005em;
 }
-.vmp-masthead__ten b { font-style: normal; font-weight: 700; font-size: 34px; }
+.vmp-masthead__ten b { font-style: normal; font-weight: 700; font-size: 42px; }
 .vmp-masthead__ten i { font-weight: 500; }
 .vmp-masthead__net { flex: none; margin: 0 -4px 2px; stroke: var(--lp-gold); fill: var(--lp-gold); }
 .vmp-masthead__phu {
-  padding-bottom: 3px;
+  padding-bottom: 5px;
   font-family: var(--ff-display);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.26em;
   text-transform: uppercase;
@@ -97,7 +97,7 @@
 .vq-brand__gach { vertical-align: -5px; margin: 0 -1px; stroke: var(--lp-gold); }
 .vq-brand__team { font-family: var(--ff-display); font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lp-gold); }
 .vq-brand__tagline { margin-top: 3px; font-family: var(--ff-display); font-style: italic; font-size: 12.5px; font-weight: 500; color: var(--lp-plum); letter-spacing: 0.02em; white-space: nowrap; }
-.vq-brand__donvi { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lp-ink-muted); white-space: nowrap; }
+.vq-brand__donvi { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-ink-muted); white-space: nowrap; }
 .vq-brand__donvi svg { flex: none; stroke: var(--lp-gold); fill: var(--lp-gold); }
 
 /* ---- Chân trang: giờ đồng bộ ------------------------------------- */

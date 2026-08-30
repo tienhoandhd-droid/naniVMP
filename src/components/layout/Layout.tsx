@@ -67,10 +67,10 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
       {/* Logo */}
       <div style={{ padding: "0 6px 16px" }}>
         {collapsed
-          /* Vương miện hình học thay emoji 👑: emoji đổi hình theo hệ điều
-             hành, không ăn màu thương hiệu, và ở 16px trên Windows thì nó
-             ra một khối vàng bẹt. */
-          ? <div style={{ width: 40, height: 40, borderRadius: R.sm, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", color: "#fff" }}>
+          /* Vương miện hình học thay ký tự emoji: emoji đổi hình theo hệ
+             điều hành, không ăn màu thương hiệu, và ở 16px trên Windows thì
+             nó ra một khối vàng bẹt. */
+          ? <div style={{ width: 40, height: 40, borderRadius: R.sm, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", color: "var(--lp-on-plum)" }}>
               <CrownMark size={22} />
             </div>
           : <CrownLogo />
@@ -116,13 +116,13 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
       {/* User card */}
       <div style={{
         marginTop: 14, padding: collapsed ? "10px" : "13px",
-        borderRadius: 14, background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
+        borderRadius: 16, background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
       }}>
         {collapsed ? (
           <div style={{
             width: 36, height: 36, borderRadius: 999, background: GRAD, margin: "0 auto",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 14,
+            color: "var(--lp-on-plum)", fontWeight: 800, fontFamily: NUM, fontSize: 14,
           }}>
             {user?.name?.[0] || "U"}
           </div>
@@ -132,7 +132,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               <div style={{
                 width: 40, height: 40, borderRadius: 999, flexShrink: 0,
                 background: GRAD, display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 16,
+                color: "var(--lp-on-plum)", fontWeight: 800, fontFamily: NUM, fontSize: 16,
               }}>
                 {user?.name?.[0] || "U"}
               </div>
@@ -179,7 +179,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
         title={collapsed ? "Mở rộng menu" : "Thu gọn menu"} onClick={() => setCollapsed(!collapsed)} style={{
         position: "absolute", top: 26, right: collapsed ? "50%" : 12,
         transform: collapsed ? "translateX(50%)" : "none",
-        width: 28, height: 28, borderRadius: 8, border: "none",
+        width: 28, height: 28, borderRadius: 10, border: "none",
         background: C.pinkSoft, cursor: "pointer", display: "flex",
         alignItems: "center", justifyContent: "center",
       }}>
@@ -295,7 +295,7 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
               <button key={item.id} type="button" data-view={item.id} className="vmp-nav"
                 onClick={() => { setView(item.id); onActionClose(); }}
                 style={{
-                  display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14,
+                  display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 16,
                   border: "none", cursor: "pointer", textAlign: "left", fontFamily: TEXT, fontSize: 14,
                   width: "100%", fontWeight: active ? 800 : 600, color: active ? C.plum : C.plumSoft,
                   background: active ? C.pinkSoft : "transparent", boxShadow: active ? `inset 3px 0 0 ${C.pink}` : "none",
@@ -527,7 +527,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
         <ThemeToggle />
         <button onClick={onRefresh} className="vmp-lift"
           title={lastSync ? `Làm mới dữ liệu · Đồng bộ lúc ${new Date(lastSync).toLocaleTimeString("vi-VN")}` : "Làm mới dữ liệu"} style={{
-          ...glass, borderRadius: 14, padding: "9px 15px",
+          ...glass, borderRadius: 16, padding: "9px 15px",
           display: "flex", alignItems: "center", gap: 8,
           border: "none", cursor: "pointer",
           color: C.pinkText, fontFamily: TEXT, fontWeight: 800, fontSize: 12,

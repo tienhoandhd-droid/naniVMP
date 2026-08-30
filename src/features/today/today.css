@@ -3,7 +3,7 @@
 .hn-mota { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-family: var(--ff-text); font-size: 14px; line-height: 22px; font-weight: 500; color: var(--lp-ink-muted); }
 .hn-mota__pham-vi, .hn-mota__moc { font-size: 12px; font-weight: 600; }
 .hn-mota__pham-vi { color: var(--lp-ink); }
-.hn-quyen { margin: -4px 0 0; padding: 10px 12px; border-radius: 12px; font-size: 13px; line-height: 20px; }
+.hn-quyen { margin: -4px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 20px; }
 .hn-quyen--loading { background: var(--lp-surface-2); color: var(--lp-ink-muted); }
 .hn-quyen--error { border: 1px solid var(--lp-tone-ink, var(--lp-line-strong)); background: var(--lp-tone-bg, var(--lp-surface-2)); color: var(--lp-ink); }
 .hn-quyen--error p { margin: 0; }
@@ -26,14 +26,14 @@
 .hn-muc__chu-so-huu, .hn-muc__phong, .hn-muc__muc-do, .hn-muc__cho { overflow-wrap: anywhere; }
 .hn-muc__cho::before, .hn-muc__phong::before, .hn-muc__muc-do::before { content: "· "; }
 .hn-ly-do { display: flex; flex-basis: 100%; flex-wrap: wrap; gap: 4px; }
-.hn-ly-do__badge { padding: 1px 7px; border-radius: 999px; background: var(--lp-tone-bg, var(--lp-surface-2)); color: var(--lp-tone-ink, var(--lp-ink)); font-size: 11px; font-weight: 700; }
+.hn-ly-do__badge { padding: 1px 7px; border-radius: 999px; background: var(--lp-tone-bg, var(--lp-surface-2)); color: var(--lp-tone-ink, var(--lp-ink)); font-size: 12px; font-weight: 700; }
 .hn-muc__nut { flex: none; min-height: 40px; padding: 0 16px; border: 1px solid var(--lp-line-strong); border-radius: 10px; background: var(--lp-surface); color: var(--lp-plum); font-family: var(--ff-text); font-size: 13px; font-weight: 700; cursor: pointer; }
 .hn-muc__nut:hover { background: var(--lp-rose-soft); }
 .hn-muc__chi-tiet { border-top: 1px solid var(--lp-line); padding: 12px 18px 16px; }
 .hn-muc__chi-tiet[hidden] { display: none; }
 .hn-chi-tiet__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; margin: 0 0 10px; }
 .hn-chi-tiet__facts div { min-width: 0; }
-.hn-chi-tiet__facts dt { color: var(--lp-ink-muted); font-size: 11px; font-weight: 700; }
+.hn-chi-tiet__facts dt { color: var(--lp-ink-muted); font-size: 12px; font-weight: 700; }
 .hn-chi-tiet__facts dd { margin: 2px 0 0; color: var(--lp-ink); font-size: 13px; line-height: 19px; overflow-wrap: anywhere; }
 .hn-pane { display: none; }
 .hn-pane__the { display: flex; flex-direction: column; gap: 10px; }
@@ -111,7 +111,7 @@
 /* "Làm trước tiên" trong hero: một nút, cùng đích với thẻ ưu tiên cũ. */
 .hn-hero__uu-tien { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
 .hn-hero__eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--lp-rose); }
-.hn-hero__cta { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--lp-plum); color: var(--lp-on-plum, #fff); font-family: var(--ff-text); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--lp-e-low); }
+.hn-hero__cta { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--lp-plum); color: var(--lp-on-plum); font-family: var(--ff-text); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--lp-e-low); }
 .hn-hero__cta:hover { background: var(--lp-brand-hover); }
 .hn-hero__cta:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
 .hn-hero__cta--chu { background: transparent; box-shadow: none; padding: 0; color: var(--lp-plum); cursor: default; }
@@ -179,7 +179,7 @@
 /* Hàng tiêu đề cột + phụ đề nhóm (đúng bản thiết kế) */
 .hn-nhom__ten { align-items: baseline; flex-wrap: wrap; }
 .hn-nhom__phu { font-family: var(--ff-text); font-size: 13px; font-weight: 500; color: var(--lp-ink-muted); }
-.hn-cot { display: grid; grid-template-columns: 124px minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 16px; padding: 0 20px; height: 34px; align-items: center; background: var(--lp-surface-2); border-top: 1px solid var(--lp-line); border-bottom: 1px solid var(--lp-line-strong); font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--lp-ink-muted); }
+.hn-cot { display: grid; grid-template-columns: 124px minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 16px; padding: 0 20px; height: 34px; align-items: center; background: var(--lp-surface-2); border-top: 1px solid var(--lp-line); border-bottom: 1px solid var(--lp-line-strong); font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 12px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--lp-ink-muted); }
 .hn-cot span:last-child { width: 118px; }
 .hn-ds .hn-muc:first-child { border-top: 0; }
 @media (max-width: 768px) { .hn-cot { display: none; } }
@@ -234,3 +234,33 @@
 .hn-ds > .hn-muc { width: 100%; box-sizing: border-box; }
 .hn-muc__tom-tat { width: 100%; box-sizing: border-box; }
 .hn-ds > .hn-muc { max-width: none; max-inline-size: none; }
+
+/* =====================================================================
+ *  30/08 — thang chữ & bố cục khớp bản thiết kế Lotus B+.
+ * ===================================================================== */
+.hn-hero { padding: 24px 32px; gap: 0 24px; }
+.hn-loi { font-size: var(--lp-fs-loi, 30px); line-height: 1.3; max-width: 32ch; }
+.hn-loi::before, .hn-loi::after { font-size: 36px; vertical-align: -8px; }
+.hn-hero__loi { gap: 10px; }
+.hn-mota { font-size: 13px; line-height: 20px; }
+.hn-vali__nhan { font-size: 13px; }
+.hn-hero__eyebrow { font-size: 12px; letter-spacing: .12em; }
+.hn-hero__cta { min-height: 42px; padding: 0 20px; font-size: 13px; }
+.hn-hero__goi-y { font-size: 13px; }
+.hn-hero__so .lp-metric:first-child .lp-metric__value { font-size: var(--lp-fs-kpi-hero, 68px); }
+.hn-hero__so .lp-metric:first-child .lp-metric__label { font-size: 13px; }
+.hn-hero__so .lp-metric:not(:first-child) .lp-metric__value { font-size: var(--lp-fs-kpi-phu, 24px); }
+.hn-hero__so .lp-metric:not(:first-child) .lp-metric__label { font-size: 13px; }
+.hn-hero__so .lp-metric-grid { gap: 2px 22px; }
+.hn-hero__so .lp-metric-grid::before { height: 116px; }
+/* Bảng việc */
+.hn-nhom__ten { padding: 16px 24px 12px; font-size: var(--lp-fs-muc, 26px); line-height: 1.2; }
+.hn-nhom__dem { font-size: 13px; }
+.hn-nhom__phu { font-size: 13px; }
+.hn-cot { padding: 0 24px; height: 34px; font-size: 12px; }
+.hn-muc__tom-tat { padding: 8px 24px; min-height: 58px; }
+.hn-muc__ma { font-size: 13px; }
+.hn-muc__ten { font-size: 14px; }
+.hn-muc__thong-tin .hn-muc__han, .hn-muc__thong-tin .hn-muc__chu-so-huu { font-size: 13px; }
+.hn-muc__nut { min-height: 34px; padding: 0 16px; font-size: 13px; }
+.hn-muc__chi-tiet { padding: 12px 24px 16px; }

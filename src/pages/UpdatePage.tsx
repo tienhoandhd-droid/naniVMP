@@ -505,7 +505,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
               <div role="alert" className="pr-quyen pr-quyen--loi">
                 Không thể tải quyền cập nhật tiến độ. Không hiển thị hạng mục để bảo vệ dữ liệu. {rightsState.error}
               </div>
-              <button type="button" onClick={() => { void reloadRights(); }} style={{ ...btnPrimary, marginTop: 14, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Thử lại</button>
+              <button type="button" onClick={() => { void reloadRights(); }} style={{ ...btnPrimary, marginTop: 14, padding: "8px 16px", borderRadius: 10, fontSize: 12 }}>Thử lại</button>
             </Card>
           : <div role="status" aria-busy="true"><StateBoundary state="loading" title="Đang xác nhận hạng mục bạn được phân công…" skeletonRows={6} /></div>
       )}
@@ -563,12 +563,12 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
                         {fst !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Trạng thái: {(STATUS as Record<string, { label: string }>)[fst]?.label ?? fst}</Tag>}
                         {!!q.trim() && <Tag color={C.lavText} bg={C.lavSoft}>Tìm: “{q.trim()}”</Tag>}
                       </div>
-                      <button type="button" onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá hết bộ lọc</button>
+                      <button type="button" onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 10, fontSize: 12 }}>Xoá hết bộ lọc</button>
                     </>
                   ) : scopedActs.length === 0 ? (
                     <>
                       Bạn chưa có hạng mục được phân công để cập nhật.
-                      {onMoPhanQuyen && <div className="pr-trong__chip"><button type="button" onClick={onMoPhanQuyen} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xem Vai trò &amp; phạm vi</button></div>}
+                      {onMoPhanQuyen && <div className="pr-trong__chip"><button type="button" onClick={onMoPhanQuyen} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 10, fontSize: 12 }}>Xem Vai trò &amp; phạm vi</button></div>}
                     </>
                   ) : "Chưa có hạng mục nào trong kế hoạch."}
                 </td></tr>
