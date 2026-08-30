@@ -2223,7 +2223,8 @@ function VerifiedAppShell({ user, logout, access }: {
                       onUpdate={updateActivity} onReload={reloadData} readOnly={false}
                       canAssignWorkshop={access.can("progress", "assign_workshop_staff")}
                       pendingProgressLink={moHangMuc}
-                      onProgressLinkConsumed={consumeProgressLink} />
+                      onProgressLinkConsumed={consumeProgressLink}
+                      onMoPhanQuyen={access.canView("phanquyen") ? () => setView("phanquyen") : undefined} />
                   )}
                 </>
               )}

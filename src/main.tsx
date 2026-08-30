@@ -15,6 +15,7 @@ import "./styles/lotus-art.css";
 import "./styles/lotus-shell.css";
 import "./styles/catalog-workspace.css";
 import "./features/today/today.css";
+import "./features/progress/progress.css";
 
 /* Đặt ngôn ngữ thị giác và chế độ sáng/tối TRƯỚC khi React mount — nếu để
    trong component thì trang sẽ loé bảng màu cũ một nhịp rồi mới nhảy. */

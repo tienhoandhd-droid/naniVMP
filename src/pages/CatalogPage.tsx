@@ -226,11 +226,11 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
             <Search size={16} color={C.plumSoft} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại thẩm định, QA…" style={{ ...INP, paddingLeft: 36 }} />
           </div>
-          <select value={cls} onChange={(e) => setCls(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả nhóm</option>{Object.keys(CLS).map((k) => <option key={k} value={k}>{(CLS as Record<string, { label: string }>)[k].label}</option>)}</select>
-          <select value={dept} onChange={(e) => setDept(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả bộ phận</option>{DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 170 }}><option value="all">Tất cả tình trạng</option><option value="over">Quá hạn</option><option value="prog">Đang chạy</option><option value="todo">Kế hoạch</option><option value="done">Đã xong</option></select>
-          <select value={year} onChange={(e) => setYear(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 140 }} title="Lọc theo năm thẩm định"><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
-          <select value={tdinh} onChange={(e) => setTdinh(e.target.value as "y" | "n" | "all")} style={{ ...INP, cursor: "pointer", maxWidth: 210 }}
+          <select value={cls} onChange={(e) => setCls(e.target.value)} aria-label="Lọc theo nhóm đối tượng" style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả nhóm</option>{Object.keys(CLS).map((k) => <option key={k} value={k}>{(CLS as Record<string, { label: string }>)[k].label}</option>)}</select>
+          <select value={dept} onChange={(e) => setDept(e.target.value)} aria-label="Lọc theo bộ phận" style={{ ...INP, cursor: "pointer", maxWidth: 180 }}><option value="all">Tất cả bộ phận</option>{DEPTS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Lọc theo tình trạng" style={{ ...INP, cursor: "pointer", maxWidth: 170 }}><option value="all">Tất cả tình trạng</option><option value="over">Quá hạn</option><option value="prog">Đang chạy</option><option value="todo">Kế hoạch</option><option value="done">Đã xong</option></select>
+          <select value={year} onChange={(e) => setYear(e.target.value)} aria-label="Lọc theo năm thẩm định" style={{ ...INP, cursor: "pointer", maxWidth: 140 }} title="Lọc theo năm thẩm định"><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
+          <select value={tdinh} onChange={(e) => setTdinh(e.target.value as "y" | "n" | "all")} aria-label="Lọc theo có thẩm định hay không" style={{ ...INP, cursor: "pointer", maxWidth: 210 }}
             title="Cột &quot;Thẩm định&quot; ở Danh mục nguồn. Đối tượng đánh dấu 'n' không sinh hạng mục nào nên mặc định được ẩn khỏi trang tiến độ.">
             <option value="y">Chỉ đối tượng có thẩm định</option>
             <option value="n">Chỉ đối tượng không thẩm định</option>
@@ -357,9 +357,9 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                         )}
                       </div>
                       <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 980 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
                           <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
-                            {["Năm", "ID", "1. Đề cương", "2. Thẩm định", "3. Báo cáo", "4. Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+                            {["Năm", "ID", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
                           </tr></thead>
                           <tbody>
                             {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
@@ -382,7 +382,9 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                                       ✓ Xong bước
                                     </button>
                                   )}
-                                  <button onClick={() => { setEdit(a); setQuick(false); }} style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> Cập nhật</button>
+                                  <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }} disabled={readOnly}
+                                    title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
+                                    style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={12} /> {readOnly ? "Chỉ đọc" : "Cập nhật"}</button>
                                 </td>
                               </tr>
                             ); })}
@@ -400,7 +402,8 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
           <PhanTrang tong={groups.length} trang={trang} setTrang={setTrang}
             coTrang={coTrang} setCoTrang={setCoTrang} donVi="đối tượng" />
         )}
-        {!groups.length && <Card><div style={{ textAlign: "center", padding: 30, color: C.plumSoft, fontWeight: 600 }}>Không có đối tượng phù hợp bộ lọc.</div></Card>}
+        {!groups.length && <Card><div style={{ textAlign: "center", padding: 30, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>Không có đối tượng phù hợp bộ lọc.
+          <div style={{ marginTop: 10 }}><button type="button" onClick={() => { setQ(""); setCls("all"); setDept("all"); setStatus("all"); setYear("all"); setTdinh("y"); }} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá bộ lọc</button></div></div></Card>}
       </div>
 
       {/* Ẩn khỏi danh sách trên mà không có chỗ tra thì thành GIẤU. Thẻ này là

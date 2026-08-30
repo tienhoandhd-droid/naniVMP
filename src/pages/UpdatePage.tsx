@@ -1,15 +1,16 @@
 /* UpdatePage.jsx — Cập nhật tiến độ thực tế */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Search, Activity } from "lucide-react";
-import { C, TEXT, NUM, GRAD, btnPrimary, INP } from "../constants/theme.ts";
+import { Pencil, Search } from "lucide-react";
+import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
 import { STATUS, STAGES, PERIODS } from "../constants/vmp.ts";
 import { stageOf, inPeriod, nguoiPhuTrach } from "../utils/helpers.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { useDebounce } from "../hooks/index.ts";
-import { Card, CardTitle, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
+import { Card, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
 import MobileTaskList from "../components/ui/MobileTaskList.tsx";
 import MetricGrid from "../components/ui/MetricGrid.tsx";
-import PriorityStrip from "../components/ui/PriorityStrip.tsx";
+import StateBoundary from "../components/ui/StateBoundary.tsx";
+import { useToast } from "../components/ui/ToastProvider.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import { buildProgressWorkspaceModel } from "../features/progress/progressWorkspaceModel.ts";
 import { createVisibleRefreshController } from "../lib/visibleRefresh.ts";
@@ -42,7 +43,7 @@ function progressRightsLoadingState(): ProgressRightsState {
   return { status: "loading", rights: EMPTY_PROGRESS_RIGHTS, error: "" };
 }
 
-export default function UpdateView({ acts, readableActs = acts, conn, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, pendingProgressLink, onProgressLinkConsumed, canAssignWorkshop }: {
+export default function UpdateView({ acts, readableActs = acts, conn, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, pendingProgressLink, onProgressLinkConsumed, canAssignWorkshop, onMoPhanQuyen }: {
   acts: PlanActivity[];
   /** Nguồn hiện còn đọc được từ shell, dùng để tìm lại đúng mã Today nằm ngoài kỳ nhớ. */
   readableActs?: readonly PlanActivity[];
@@ -66,6 +67,8 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
   onProgressLinkConsumed?: () => void;
   /** access.can("progress","assign_workshop_staff") — App tính, truyền xuống hộp sửa. */
   canAssignWorkshop?: boolean;
+  /** Lối đi tiếp khi chưa được phân công: mở màn Vai trò & phạm vi (B7). */
+  onMoPhanQuyen?: () => void;
 }) {
   const [q, setQ] = useState("");
   const [fst, setFst] = useState("all");
@@ -291,6 +294,10 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     }
     setPinnedValidationCode(resolution.validationCode);
     setQ(resolution.validationCode);
+    /* B1 (anh Hoàn chốt 30/08): từ "Hôm nay" bấm sang là mở luôn hộp sửa
+       đúng hạng mục — không phải tự tìm dòng rồi bấm "Cập nhật" nữa. */
+    const hangMuc = readableActs.find((activity) => progressValidationCode(activity) === resolution.validationCode);
+    if (hangMuc) { setEdit(hangMuc); setQuick(false); }
     setFix("all");
     setStageF("all");
     setFst("all");
@@ -299,12 +306,13 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     setTrang(0);
     setFocusAlert("");
     onProgressLinkConsumed?.();
-  }, [onProgressLinkConsumed, pendingProgressLink, rightsState]);
+  }, [onProgressLinkConsumed, pendingProgressLink, readableActs, rightsState]);
 
   const clearSearch = () => { setQ(""); setPinnedValidationCode(null); };
   const hasFilter = fix !== "all" || stageF !== "all" || fst !== "all" || !!q.trim() || period !== "all" || hienNgung;
   const clearFilters = () => { setFix("all"); setStageF("all"); setFst("all"); clearSearch(); setPeriod("all"); setHienNgung(false); };
   const linked = conn?.status === "ok";
+  const toast = useToast();
   const handleProgressReload = useCallback(async () => {
     try {
       await onReload?.();
@@ -312,54 +320,105 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       await reloadRights();
     }
   }, [onReload, reloadRights]);
-  if (rightsState.status !== "ready") {
-    const isError = rightsState.status === "error";
+
+  /* Deep link từ "Hôm nay" (anh Hoàn chốt 30/08 — B1): cuộn tới đúng dòng và
+     tô sáng nó, ngoài việc đã mở sẵn hộp sửa ở effect deep link phía trên. */
+  useEffect(() => {
+    if (!pinnedValidationCode || rightsState.status !== "ready") return;
+    const t = window.setTimeout(() => {
+      document.querySelector(`[data-progress-item="${CSS.escape(pinnedValidationCode)}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [pinnedValidationCode, rightsState.status, lat]);
+
+  /* Số "Đang thực hiện" đếm kiểu facet như fixCount — tôn trọng các bộ lọc
+     khác đang bật, nên bấm ô KPI chỉ bật đúng bộ lọc của nó (B2). */
+  const soDangLam = useMemo(() => inWindow.filter((a) => okFix(a) && okStage(a) && okSearch(a) && a.st === "prog").length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inWindow, stageByItem, stageF, fix, kw, FIXES]);
+  const uuTien = model.priorityRows.slice(0, 5);
+  /* Không lặp mã khi hạng mục chưa có tên riêng. */
+  const tenHangMuc = (r: { validationCode: string; title: string }) => r.title && r.title !== r.validationCode ? ` — ${r.title}` : "";
+  const moHangMuc = (validationCode: string) => {
+    const a = inWindow.find((x) => progressValidationCode(x) === validationCode);
+    if (a && !readOnly) { setEdit(a); setQuick(false); }
+  };
+  /* Lời Vali — dựng từ model, không bịa số. */
+  const vali = (() => {
+    const dau = uuTien[0];
+    if (rightsState.status !== "ready") return { mood: "guide" as const, nhan: "đang kiểm tra", loi: "Mình đang xác nhận hạng mục bạn được phân công…" };
+    if (model.kpis.needsAction > 0 && dau) return { mood: "concern" as const, nhan: "đang lo",
+      loi: `Còn ${model.kpis.needsAction} hồ sơ thiếu hoặc lệch. Mình gợi ý làm ${dau.validationCode} trước${tenHangMuc(dau)}.` };
+    if (model.kpis.overdue > 0 && dau) return { mood: "concern" as const, nhan: "đang lo",
+      loi: `Hồ sơ đã đủ, nhưng ${model.kpis.overdue} hạng mục quá hạn. Bắt đầu từ ${dau.validationCode}${tenHangMuc(dau)}.` };
+    if (inWindow.length === 0) return { mood: "guide" as const, nhan: "dẫn đường", loi: "Chưa có hạng mục nào trong kỳ đang xem." };
+    return { mood: (model.kpis.completenessPercent >= 90 ? "celebrate" : "guide") as "celebrate" | "guide",
+      nhan: model.kpis.completenessPercent >= 90 ? "nhẹ nhõm" : "dẫn đường",
+      loi: `Hồ sơ đang sạch: ${inWindow.length} hạng mục trong kỳ, ${model.kpis.completenessPercent}% đủ dữ liệu.` };
+  })();
+  const [moChipTrong, setMoChipTrong] = useState(false);
+  const chipCo = Object.entries(FIXES).filter(([k]) => (fixCount[k] || 0) > 0 || fix === k);
+  const chipTrong = Object.entries(FIXES).filter(([k]) => (fixCount[k] || 0) === 0 && fix !== k);
+  const chipLoi = (k: string, v: { label: string; hint: string }) => {
+    const n = fixCount[k] || 0;
+    const on = fix === k;
+    const nang = k === "done_no_date" || k === "no_deadline";
     return (
-      <div data-progress-rights-state={rightsState.status} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 14, background: C.mintSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={22} color={C.mintText} /></div>
-            <div>
-              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 16, color: C.plum }}>Tiến độ thẩm định</div>
-              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Cập nhật mốc thực tế. Dữ liệu được lưu trực tiếp tại Supabase.</div>
-            </div>
-          </div>
-          <div role={isError ? "alert" : "status"} style={{ marginTop: 16, padding: "14px 16px", borderRadius: 12, background: isError ? C.raspSoft : C.marigoldSoft, color: isError ? C.raspText : C.marigoldText, fontSize: 13, fontWeight: 700, lineHeight: 1.6 }}>
-            {isError
-              ? `Không thể tải quyền cập nhật tiến độ. Không hiển thị hạng mục để bảo vệ dữ liệu. ${rightsState.error}`
-              : "Đang xác nhận hạng mục bạn được phân công…"}
-          </div>
-          {isError && <button type="button" onClick={() => { void reloadRights(); }} style={{ ...btnPrimary, marginTop: 14, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Thử lại</button>}
-        </Card>
-      </div>
+      <button key={k} type="button" onClick={() => setFix(on ? "all" : k)} title={v.hint} disabled={n === 0}
+        className={`pr-chip${on ? " is-on" : ""}${nang ? " pr-chip--nang" : ""}`} aria-pressed={on}>
+        {v.label} <span className="pr-chip__so">{n}</span>
+      </button>
     );
-  }
+  };
+  const nhanNut = (isFrozen: boolean) => readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật");
+  const isRightsReady = rightsState.status === "ready";
+
   return (
-    <div data-progress-rights-state="ready" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {focusAlert && <div role="alert" style={{ padding: "12px 14px", borderRadius: 12, background: C.raspSoft, color: C.raspText, fontSize: 13, fontWeight: 700 }}>{focusAlert}</div>}
-      <Card>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 14, background: C.mintSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Pencil size={22} color={C.mintText} /></div>
-            <div>
-              <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 16, color: C.plum }}>Tiến độ thẩm định</div>
-              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Cập nhật mốc thực tế. Dữ liệu được lưu trực tiếp tại Supabase.</div>
-            </div>
-          </div>
-          <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Đã nối Supabase — ghi được" : "○ Chưa kết nối"}</Tag>
+    <div data-progress-rights-state={rightsState.status} className="pr-trang">
+      {focusAlert && <div role="alert" className="pr-canh-bao">{focusAlert}</div>}
+
+      {/* ---- Hero Vali: câu dẫn + "Làm trước tiên" (thay dải thẻ hồng) ---- */}
+      <section className="pr-hero" aria-label="Vali tóm tắt tiến độ">
+        <div className="pr-hero__vali">
+          <div className={`hn-vali hn-vali--${vali.mood}`} role="img" aria-label={`Công chúa Vali ${vali.nhan}`} />
+          <span className="hn-vali__nhan">Vali · {vali.nhan}</span>
         </div>
-        <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
-            <Search size={16} color={C.plumSoft} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-            <input value={q} onChange={(e) => { setQ(e.target.value); setPinnedValidationCode(null); }} placeholder="Tìm theo mã, tên, QA…" style={{ ...INP, paddingLeft: 36 }} />
+        <div className="pr-hero__loi">
+          <div className="pr-hero__eyebrow">
+            <span>Tiến độ thẩm định</span>
+            <Tag color={linked ? C.mintText : C.marigoldText} bg={linked ? C.mintSoft : C.marigoldSoft}>{linked ? "● Đã nối Supabase — ghi được" : "○ Chưa kết nối"}</Tag>
+          </div>
+          <p className="hn-loi">{vali.loi}</p>
+          <p className="pr-hero__mota">Cập nhật mốc thực tế. Dữ liệu được lưu trực tiếp tại Supabase.</p>
+          {uuTien.length > 0 && (
+            <div className="pr-hero__uu-tien" aria-label="Cần xử lý trước tiên">
+              <span className="pr-hero__nhan">Cần xử lý trước tiên</span>
+              {uuTien.map((r, i) => {
+                const goiY = [r.issues.length > 0 ? "hồ sơ thiếu/lệch" : null, r.overdueDays > 0 ? `trễ ${r.overdueDays} ngày` : null].filter(Boolean).join(" · ");
+                return (
+                  <button key={r.validationCode} type="button" disabled={readOnly} onClick={() => moHangMuc(r.validationCode)}
+                    className={`pr-uu-tien${i === 0 ? " pr-uu-tien--dau" : ""}${r.overdueDays > 0 ? " pr-uu-tien--tre" : ""}`}
+                    title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>
+                    {i === 0 ? "Mở " : ""}<span className="pr-ma">{r.validationCode}</span>{i === 0 && <span aria-hidden="true"> →</span>}
+                  </button>
+                );
+              })}
+              {uuTien[0] && <span className="pr-hero__goi-y">{uuTien[0].title !== uuTien[0].validationCode ? uuTien[0].title : uuTien[0].validationCode}{uuTien[0].overdueDays > 0 ? ` · trễ ${uuTien[0].overdueDays} ngày` : ""}{uuTien[0].issues.length > 0 ? " · hồ sơ thiếu/lệch" : ""}</span>}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ---- Thanh tìm + lọc (gọn một khối) ------------------------------ */}
+      <Card cls="pr-loc">
+        <div className="pr-loc__hang">
+          <div className="pr-loc__tim">
+            <Search size={16} color={C.plumSoft} className="pr-loc__kinh" />
+            <input value={q} onChange={(e) => { setQ(e.target.value); setPinnedValidationCode(null); }} placeholder="Tìm theo mã, tên, QA…" aria-label="Tìm theo mã, tên, QA" style={{ ...INP, paddingLeft: 36 }} />
           </div>
           {soNgung > 0 && (
-            <label title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc"
-              style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer",
-                       padding: "0 12px", borderRadius: 8, border: `1px solid ${hienNgung ? C.marigold : C.pinkSoft}`,
-                       background: hienNgung ? C.marigoldSoft : C.surface,
-                       fontFamily: TEXT, fontSize: 12, fontWeight: 800,
-                       color: hienNgung ? C.marigoldText : C.plumSoft }}>
+            <label className={`pr-ngung${hienNgung ? " is-on" : ""}`} title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc">
               <input type="checkbox" checked={hienNgung} onChange={(e) => setHienNgung(e.target.checked)} />
               Hiện cả mục đã ngừng ({soNgung})
             </label>
@@ -368,73 +427,47 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
             <option value="all">Tất cả trạng thái</option>
             {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
+          <span className="pr-loc__dem"><b>{list.length}</b>/{inWindow.length} hạng mục</span>
         </div>
-
-        {/* Cần bạn điền — đúng 4 lỗi mà kiểm tra dữ liệu ở Supabase đang báo.
-            Không có thanh này thì phải dò tay 461 dòng mới tìm ra chỗ thiếu. */}
-        <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${C.pinkMist}` }}>
-          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 8 }}>
-            CẦN XỬ LÝ
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={() => setFix("all")}
-              style={{ padding: "8px 14px", borderRadius: 999, border: "none", cursor: "pointer",
-                       fontFamily: TEXT, fontSize: 12, fontWeight: 800,
-                       background: fix === "all" ? GRAD : C.pinkSoft,
-                       color: fix === "all" ? "#fff" : C.plumSoft }}>
-              Tất cả ({fixCount.all})
+        {/* Cần xử lý — đúng các lỗi mà kiểm tra dữ liệu ở Supabase đang báo.
+            Chip có số 0 gom lại (B4) để thanh còn một dòng. */}
+        <div className="pr-loc__hang pr-loc__hang--chip">
+          <span className="pr-loc__nhan">Cần xử lý</span>
+          <button type="button" onClick={() => setFix("all")} className={`pr-chip pr-chip--tatca${fix === "all" ? " is-on" : ""}`} aria-pressed={fix === "all"}>
+            Tất cả <span className="pr-chip__so">{fixCount.all}</span>
+          </button>
+          {chipCo.map(([k, v]) => chipLoi(k, v))}
+          {chipTrong.length > 0 && (
+            <button type="button" className="pr-chip pr-chip--mo" aria-expanded={moChipTrong} onClick={() => setMoChipTrong((o) => !o)}>
+              {moChipTrong ? "Ẩn" : `+${chipTrong.length}`} bộ lọc trống
             </button>
-            {Object.entries(FIXES).map(([k, v]) => {
-              const n = fixCount[k] || 0;
-              const on = fix === k;
-              const nang = k === "done_no_date" || k === "no_deadline";
-              return (
-                <button key={k} onClick={() => setFix(on ? "all" : k)} title={v.hint}
-                  disabled={n === 0}
-                  style={{ padding: "8px 14px", borderRadius: 999, cursor: n ? "pointer" : "default",
-                           fontFamily: TEXT, fontSize: 12, fontWeight: 800, border: "none",
-                           opacity: n ? 1 : 0.45,
-                           background: on ? (nang ? C.raspText : C.marigoldText)
-                                          : (nang ? C.raspSoft : C.marigoldSoft),
-                           color: on ? "#fff" : (nang ? C.raspText : C.marigoldText) }}>
-                  {v.label} ({n})
-                </button>
-              );
-            })}
-          </div>
-          {fix !== "all" && (
-            <div style={{ marginTop: 9, fontSize: 12, color: C.plumSoft, lineHeight: 1.6 }}>
-              {FIXES[fix as keyof typeof FIXES].hint}. Bấm <b>Cập nhật</b> ở từng dòng để điền.
-            </div>
           )}
+          {moChipTrong && chipTrong.map(([k, v]) => chipLoi(k, v))}
         </div>
+        {fix !== "all" && (
+          <div className="pr-loc__goi-y">{FIXES[fix as keyof typeof FIXES].hint}. Bấm <b>Cập nhật</b> ở từng dòng để điền.</div>
+        )}
       </Card>
-      {/* ---- Bốn KPI Lotus: MỘT ô hero (Cần xử lý), ba ô nền ------------
-          Bấm ô là bật đúng bộ lọc tương ứng bên dưới — cùng model, cùng
-          luật, nên số trên ô luôn bằng số dòng lọc ra. */}
+
+      {/* ---- Bốn KPI Lotus: MỘT ô hero (Cần xử lý), ba ô nền. Số đếm kiểu
+          facet nên bấm ô chỉ bật/tắt đúng bộ lọc của ô đó (B2). ---------- */}
       <MetricGrid
         label="Tiến độ thẩm định"
         items={[
-          /* Ba KPI dưới đây đọc từ `model.kpis`, mà model luôn tính với
-             stage="all"/query=""/status="all" (dòng buildProgressWorkspaceModel
-             ở trên) — nghĩa là con số trên ô KHÔNG biết tới bộ lọc Giai đoạn
-             hay ô Tìm đang bật. Bấm ô mà chỉ đổi fix/fst thì bộ lọc Giai đoạn
-             (stageF) hoặc ô Tìm (q) còn sót lại từ trước sẽ tiếp tục ăn vào
-             danh sách bên dưới — bấm "Cần xử lý: 277" có khi ra 0 dòng, đúng
-             kiểu lỗi "số ô báo một đằng, bảng lọc ra một nẻo". Mỗi ô kích hoạt
-             phải dọn sạch CẢ BA thứ (stageF, q) ngoài fix/fst của chính nó,
-             để số trên ô luôn đúng bằng số dòng hiện ra. */
-          { id: "dang", label: "Đang thực hiện", value: model.kpis.inProgress,
-            priority: "supporting", hint: "trạng thái Đang thực hiện",
-            onActivate: () => { setFst("prog"); setFix("all"); setStageF("all"); clearSearch(); setTrang(0); } },
-          { id: "can-xu-ly", label: "Cần xử lý", value: model.kpis.needsAction,
+          { id: "dang", label: "Đang thực hiện", value: soDangLam,
+            priority: "supporting", hint: "trạng thái Đang thực hiện — bấm để lọc",
+            selected: fst === "prog",
+            onActivate: () => setFst(fst === "prog" ? "all" : "prog") },
+          { id: "can-xu-ly", label: "Cần xử lý", value: fixCount.can_xu_ly || 0,
             priority: "hero", tone: "warning",
             hint: "hồ sơ thiếu hoặc lệch — bấm để lọc đúng các dòng này",
-            onActivate: () => { setFix("can_xu_ly"); setFst("all"); setStageF("all"); clearSearch(); setTrang(0); } },
-          { id: "qua-han", label: "Quá hạn", value: model.kpis.overdue,
+            selected: fix === "can_xu_ly",
+            onActivate: () => setFix(fix === "can_xu_ly" ? "all" : "can_xu_ly") },
+          { id: "qua-han", label: "Quá hạn", value: fixCount.qua_han || 0,
             priority: "supporting", tone: "danger",
             hint: "mốc chưa xong gần nhất đã qua",
-            onActivate: () => { setFix("qua_han"); setFst("all"); setStageF("all"); clearSearch(); setTrang(0); } },
+            selected: fix === "qua_han",
+            onActivate: () => setFix(fix === "qua_han" ? "all" : "qua_han") },
           { id: "hoan-thien", label: "Độ hoàn thiện dữ liệu",
             value: `${model.kpis.completenessPercent}%`,
             priority: "supporting",
@@ -443,131 +476,129 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         ]}
       />
 
-      {/* Tối đa 5 dòng gấp nhất — bấm là mở đúng hộp sửa của dòng đó. */}
-      {model.priorityRows.length > 0 && (
-        <PriorityStrip
-          label="Cần xử lý trước tiên"
-          items={model.priorityRows.map((r) => ({
-            id: r.validationCode,
-            tone: (r.overdueDays > 0 ? "danger" : "warning") as "danger" | "warning",
-            value: r.validationCode,
-            label: r.title,
-            hint: [
-              r.issues.length > 0 ? "hồ sơ thiếu/lệch" : null,
-              r.overdueDays > 0 ? `trễ ${r.overdueDays} ngày` : null,
-            ].filter(Boolean).join(" · ") || undefined,
-            onActivate: readOnly ? undefined : () => {
-              const a = inWindow.find((x) => progressValidationCode(x) === r.validationCode);
-              if (a) { setEdit(a); setQuick(false); }
-            },
-          }))}
-        />
-      )}
-
-      <Card variant="strong">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-          <CardTitle icon={Activity} sub="Bấm 1 ô để lọc danh sách — số trên ô đã tính cả các bộ lọc đang bật">Bản đồ giai đoạn ({stageCount.all})</CardTitle>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {PERIODS.map(([id, lb]) => <button key={id} onClick={() => setPeriod(id)} style={{ padding: "7px 13px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: period === id ? GRAD : C.pinkSoft, color: period === id ? "#fff" : C.plumSoft }}>{lb}</button>)}
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-          <button onClick={() => setStageF("all")} style={{ textAlign: "left", border: "none", cursor: "pointer", padding: "14px 16px", borderRadius: 14, background: C.surface, boxShadow: stageF === "all" ? `0 0 0 3px ${C.pink}` : `inset 0 0 0 1px ${C.pinkSoft}` }}>
-            <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: C.plum }}>{stageCount.all}</div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginTop: 2 }}>Tất cả</div>
+      {/* ---- Giai đoạn + kỳ: một hàng chip ngay trên bảng (B3) ------------ */}
+      <div className="pr-giai-doan" aria-label="Lọc theo giai đoạn và kỳ">
+        <div className="pr-giai-doan__nhom">
+          <span className="pr-loc__nhan">Giai đoạn</span>
+          <button type="button" onClick={() => setStageF("all")} className={`pr-chip pr-chip--tatca${stageF === "all" ? " is-on" : ""}`} aria-pressed={stageF === "all"}>
+            Tất cả <span className="pr-chip__so">{stageCount.all}</span>
           </button>
           {STAGES.map((s) => { const n = stageCount[s.id] || 0; const on = stageF === s.id; return (
-            <button key={s.id} onClick={() => setStageF(on ? "all" : s.id)} disabled={n === 0 && !on}
+            <button key={s.id} type="button" onClick={() => setStageF(on ? "all" : s.id)} disabled={n === 0 && !on} aria-pressed={on}
               title={n === 0 ? `Không có hạng mục nào đang ở "${s.label}" với bộ lọc hiện tại.` : `${n} hạng mục · bấm để lọc`}
-              style={{ textAlign: "left", border: "none", cursor: n === 0 && !on ? "default" : "pointer", padding: "14px 16px", borderRadius: 14, background: s.bg, boxShadow: on ? `0 0 0 3px ${s.color}` : "none", opacity: n === 0 ? 0.55 : 1 }}>
-              <div style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: s.color }}>{n}</div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: s.color, marginTop: 2, lineHeight: 1.3 }}>{s.label}</div>
+              className={`pr-chip${on ? " is-on" : ""}`} style={on ? { background: s.color, borderColor: s.color } : { color: s.color }}>
+              {s.label} <span className="pr-chip__so">{n}</span>
             </button>
           ); })}
         </div>
-      </Card>
-      <Card style={{ padding: 0, overflow: "hidden" }} cls="vmp-chi-desktop">
+        <div className="pr-giai-doan__nhom pr-giai-doan__ky">
+          <span className="pr-loc__nhan">Kỳ</span>
+          {PERIODS.map(([id, lb]) => <button key={id} type="button" onClick={() => setPeriod(id)} className={`pr-chip${period === id ? " is-on" : ""}`} aria-pressed={period === id}>{lb}</button>)}
+        </div>
+      </div>
+
+      {/* ---- Quyền đang nạp / lỗi: giữ nguyên bộ lọc phía trên, chỉ vùng
+          bảng đổi (B6). Không dùng quyền cũ trong khoảng trống hai lần nạp. */}
+      {!isRightsReady && (
+        rightsState.status === "error"
+          ? <Card>
+              <div role="alert" className="pr-quyen pr-quyen--loi">
+                Không thể tải quyền cập nhật tiến độ. Không hiển thị hạng mục để bảo vệ dữ liệu. {rightsState.error}
+              </div>
+              <button type="button" onClick={() => { void reloadRights(); }} style={{ ...btnPrimary, marginTop: 14, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Thử lại</button>
+            </Card>
+          : <div role="status" aria-busy="true"><StateBoundary state="loading" title="Đang xác nhận hạng mục bạn được phân công…" skeletonRows={6} /></div>
+      )}
+
+      {isRightsReady && <Card style={{ padding: 0, overflow: "hidden" }} cls="vmp-chi-desktop pr-bang">
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720 }}>
-            <thead><tr style={{ background: C.pinkMist }}>
-              {["Mã", "Tên", "Loại", "QA", "Deadline", "Giai đoạn", "Trạng thái", ""].map((h, i) => <th key={i} style={{ textAlign: i > 4 ? "center" : "left", padding: "13px 16px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+          <table className="pr-table" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 720 }}>
+            <thead><tr>
+              {["Mã", "Tên", "Loại", "QA", "Deadline", "Giai đoạn", "Trạng thái", ""].map((h, i) => <th key={i} className={i > 4 ? "pr-th pr-th--giua" : "pr-th"}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {lat.map((a, i) => { const validationCode = progressValidationCode(a); const sg = STAGES.find((s) => s.id === stageByItem.get(validationCode)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; return (
-                <tr key={validationCode} data-progress-item={validationCode} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: i % 2 ? C.surfaceSunk : "transparent", opacity: isFrozen ? 0.6 : 1 }}>
-                  <td style={{ padding: "12px 16px", fontWeight: 800, color: C.plum, fontSize: 14 }}>{a.code}</td>
-                  <td style={{ padding: "12px 16px", color: C.plum, fontSize: 14 }}>
-                    {a.name}
+              {lat.map((a) => { const validationCode = progressValidationCode(a); const sg = STAGES.find((s) => s.id === stageByItem.get(validationCode)); const itemState = a.state || (a._raw && a._raw.state) || "active"; const isFrozen = itemState !== "active"; const tenRieng = a.name && a.name !== a.code ? a.name : ""; return (
+                <tr key={validationCode} data-progress-item={validationCode} className={`pr-row${isFrozen ? " pr-row--dong-bang" : ""}${pinnedValidationCode === validationCode ? " pr-row--focus" : ""}`}>
+                  <td className="pr-td"><span className="pr-ma">{a.code}</span></td>
+                  <td className="pr-td pr-td--ten">
+                    {tenRieng ? tenRieng : <span className="pr-td__trong">—</span>}
                     {/* S3-G: badge Không áp dụng / Đã hủy */}
                     {isFrozen && <div style={{ marginTop: 4 }}><StateBadge state={String(itemState)} small /></div>}
                   </td>
-                  <td style={{ padding: "12px 16px" }}><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag></td>
-                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 14, fontWeight: 600 }}>{nguoiPhuTrach(a.owner)}</td>
-                  <td style={{ padding: "12px 16px", color: C.plumSoft, fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>{a.target ? a.target.split("-").reverse().join("/") : "—"}</td>
-                  <td style={{ padding: "12px 16px", textAlign: "center" }}>{sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}</td>
-                  <td style={{ padding: "12px 16px", textAlign: "center" }}><Pill s={a.st} small /></td>
-                  <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                    <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                      {/* Đường tắt: mở hộp đã điền sẵn "hôm nay + Hoàn thành" cho bước
-                          hiện tại — vẫn phải chọn lý do và Lưu nên không đi tắt luật GMP. */}
+                  <td className="pr-td"><Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag></td>
+                  <td className="pr-td pr-td--phu">{nguoiPhuTrach(a.owner)}</td>
+                  <td className="pr-td pr-td--so">{a.target ? a.target.split("-").reverse().join("/") : "—"}</td>
+                  <td className="pr-td pr-td--giua">{sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}</td>
+                  <td className="pr-td pr-td--giua"><Pill s={a.st} small /></td>
+                  <td className="pr-td pr-td--giua">
+                    {/* Một nút chính mỗi dòng (B5); đường tắt "✓ Xong bước" hiện
+                        khi rê chuột / đưa focus vào dòng — vẫn cùng luật GMP: hộp
+                        điền sẵn hôm nay + Hoàn thành, phải chọn lý do rồi Lưu. */}
+                    <div className="pr-hanh-dong">
                       {!readOnly && !isFrozen && stageByItem.get(validationCode) !== "done" && (
-                        <button onClick={() => { setEdit(a); setQuick(true); }}
-                          title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
-                          style={{ padding: "7px 11px", borderRadius: 8, border: `1px solid ${C.mint}`, background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        <button type="button" onClick={() => { setEdit(a); setQuick(true); }} className="pr-nhanh"
+                          title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu">
                           ✓ Xong bước
                         </button>
                       )}
-                      <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
+                      <button type="button" onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
                         disabled={readOnly || (isFrozen && !canDoiTrangThai)}
                         title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
-                        style={{ ...btnPrimary, padding: "7px 14px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={13} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}</button>
+                        className="pr-nut-chinh"><Pencil size={13} /> {nhanNut(isFrozen)}</button>
                     </div>
                   </td>
                 </tr>
               ); })}
-              {list.length > 0 && (
-                <tr><td colSpan={8} style={{ padding: "4px 8px" }}>
-                  <PhanTrang tong={list.length} trang={trang} setTrang={setTrang}
-                    coTrang={coTrang} setCoTrang={setCoTrang} donVi="hạng mục" />
-                </td></tr>
-              )}
-              {/* Rỗng thì nói RÕ vì sao rỗng và bộ lọc nào đang bật — không thì
-                  người dùng tưởng dữ liệu mất hoặc trang hỏng. */}
+              {/* Rỗng thì nói RÕ vì sao rỗng và bộ lọc nào đang bật — và luôn
+                  có một lối đi tiếp (B7). */}
               {!list.length && (
-                <tr><td colSpan={8} style={{ padding: 26, textAlign: "center", color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
+                <tr><td colSpan={8} className="pr-trong">
                   {hasFilter ? (
                     <>
                       Không có hạng mục nào khớp bộ lọc đang bật:
-                      <div style={{ margin: "8px 0 12px", display: "flex", gap: 7, flexWrap: "wrap", justifyContent: "center" }}>
+                      <div className="pr-trong__chip">
                         {period !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Kỳ: {PERIODS.find(([id]) => id === period)?.[1]}</Tag>}
                         {stageF !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Giai đoạn: {STAGES.find((s) => s.id === stageF)?.label}</Tag>}
                         {fix !== "all" && <Tag color={C.marigoldText} bg={C.marigoldSoft}>Cần xử lý: {FIXES[fix as keyof typeof FIXES].label}</Tag>}
                         {fst !== "all" && <Tag color={C.lavText} bg={C.lavSoft}>Trạng thái: {(STATUS as Record<string, { label: string }>)[fst]?.label ?? fst}</Tag>}
                         {!!q.trim() && <Tag color={C.lavText} bg={C.lavSoft}>Tìm: “{q.trim()}”</Tag>}
                       </div>
-                      <button onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá hết bộ lọc</button>
+                      <button type="button" onClick={clearFilters} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xoá hết bộ lọc</button>
                     </>
-                  ) : scopedActs.length === 0
-                    ? "Bạn chưa có hạng mục được phân công để cập nhật."
-                    : "Chưa có hạng mục nào trong kế hoạch."}
+                  ) : scopedActs.length === 0 ? (
+                    <>
+                      Bạn chưa có hạng mục được phân công để cập nhật.
+                      {onMoPhanQuyen && <div className="pr-trong__chip"><button type="button" onClick={onMoPhanQuyen} style={{ ...btnPrimary, padding: "8px 16px", borderRadius: 8, fontSize: 12 }}>Xem Vai trò &amp; phạm vi</button></div>}
+                    </>
+                  ) : "Chưa có hạng mục nào trong kế hoạch."}
                 </td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </Card>
+        {list.length > 0 && (
+          <div className="pr-phan-trang">
+            <PhanTrang tong={list.length} trang={trang} setTrang={setTrang}
+              coTrang={coTrang} setCoTrang={setCoTrang} donVi="hạng mục" />
+          </div>
+        )}
+      </Card>}
 
       {/* ---- Bản điện thoại ----------------------------------------------
           Cùng mảng `lat`, cùng bộ lọc, cùng hành động — chỉ đổi cách trình
-          bày (spec §5.5). Trước đây điện thoại phải kéo ngang một bảng rộng
-          720px chỉ để sửa một dòng; nay mỗi hạng mục là một thẻ đứng.
-          CSS cho hai bản loại trừ nhau bằng display:none nên chỉ một bản
-          nằm trong cây trợ năng ở mỗi khổ màn. */}
-      <MobileTaskList
+          bày (spec §5.5). CSS cho hai bản loại trừ nhau bằng display:none nên
+          chỉ một bản nằm trong cây trợ năng ở mỗi khổ màn. */}
+      {isRightsReady && <MobileTaskList
         label="Hạng mục thẩm định"
         rows={lat}
         rowKey={(a) => progressValidationCode(a)}
-        empty={hasFilter ? "Không có hạng mục nào khớp bộ lọc đang bật." : "Chưa có hạng mục nào trong kế hoạch."}
+        empty={hasFilter
+          ? <div className="pr-trong pr-trong--mobile">Không có hạng mục nào khớp bộ lọc đang bật.
+              <div className="pr-trong__chip"><button type="button" onClick={clearFilters} style={{ ...btnPrimary, padding: "10px 16px", borderRadius: 10, fontSize: 13, minHeight: 44 }}>Xoá hết bộ lọc</button></div></div>
+          : scopedActs.length === 0
+            ? <div className="pr-trong pr-trong--mobile">Bạn chưa có hạng mục được phân công để cập nhật.
+                {onMoPhanQuyen && <div className="pr-trong__chip"><button type="button" onClick={onMoPhanQuyen} style={{ ...btnPrimary, padding: "10px 16px", borderRadius: 10, fontSize: 13, minHeight: 44 }}>Xem Vai trò &amp; phạm vi</button></div>}</div>
+            : "Chưa có hạng mục nào trong kế hoạch."}
         renderItem={(a) => {
           const validationCode = progressValidationCode(a);
           const sg = STAGES.find((s) => s.id === stageByItem.get(validationCode));
@@ -576,7 +607,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
           return (
             <div data-progress-item={validationCode} style={{ display: "flex", flexDirection: "column", gap: 10, opacity: isFrozen ? 0.65 : 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                <b style={{ fontFamily: NUM, fontSize: 13, color: C.pinkText, letterSpacing: ".02em" }}>{a.code}</b>
+                <b className="pr-ma">{a.code}</b>
                 <Pill s={a.st} small />
               </div>
 
@@ -599,28 +630,29 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {!readOnly && !isFrozen && stageByItem.get(validationCode) !== "done" && (
-                  <button onClick={() => { setEdit(a); setQuick(true); }}
+                  <button type="button" onClick={() => { setEdit(a); setQuick(true); }}
                     style={{ flex: "1 1 auto", minHeight: 44, borderRadius: 10, border: `1px solid ${C.mint}`,
                              background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 13,
                              fontWeight: 700, cursor: "pointer" }}>
                     ✓ Xong bước
                   </button>
                 )}
-                <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
+                <button type="button" onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }}
                   disabled={readOnly || (isFrozen && !canDoiTrangThai)}
+                  title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
                   style={{ ...btnPrimary, flex: "1 1 auto", minHeight: 44, fontSize: 13,
                            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
                            opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}>
-                  <Pencil size={14} /> {readOnly ? "Chỉ đọc" : (isFrozen ? "Xem/khôi phục" : "Cập nhật")}
+                  <Pencil size={14} /> {nhanNut(isFrozen)}
                 </button>
               </div>
             </div>
           );
         }}
-      />
+      />}
 
-      {/* Phân trang dùng chung cho cả hai bản trình bày. */}
-      {list.length > 0 && (
+      {/* Phân trang bản điện thoại. */}
+      {isRightsReady && list.length > 0 && (
         <div className="vmp-chi-mobile">
           <PhanTrang tong={list.length} trang={trang} setTrang={setTrang}
             coTrang={coTrang} setCoTrang={setCoTrang} donVi="hạng mục" />
@@ -653,9 +685,9 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         onOpenNext={(a) => { setEdit(a); setQuick(false); }}
         onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}
         onChangeState={async (id, newState, reason) => {
-          // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp
-          // (trước đây dùng window.prompt, dễ bấm nhầm Cancel là mất).
-          if (!supabase) { alert("Supabase chưa cấu hình."); return; }
+          // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp.
+          // Báo kết quả bằng toast của app (A4) thay vì alert() chặn màn hình.
+          if (!supabase) { toast.loi("Supabase chưa cấu hình."); return; }
           if (!reason || !reason.trim()) return;
           try {
             const { data, error } = await supabase.rpc("rpc_set_item_state", {
@@ -666,11 +698,11 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
             if (error) throw error;
             const r = data as unknown as { ok?: boolean; error?: string } | null;
             if (r && r.ok === false) throw new Error(r.error);
-            alert(`✓ Đã đổi trạng thái ${id} → ${newState}`);
+            toast.thanhCong(`Đã đổi trạng thái ${id} → ${newState}`);
             setEdit(null); setQuick(false);
             void handleProgressReload(); // nạp lại dashboard và tập quyền trước khi hiện danh sách mới
           } catch (e) {
-            alert("Lỗi đổi trạng thái: " + ((e as Error).message || "không rõ"));
+            toast.loi("Lỗi đổi trạng thái: " + ((e as Error).message || "không rõ"));
           }
         }}
       />}

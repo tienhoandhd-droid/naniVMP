@@ -210,8 +210,9 @@ for (const [id, ten] of MAN) {
     return {
       nhan,
       hero,
-      coDaiUuTien: !!document.querySelector(".lp-priority-strip"),
-      soUuTien: document.querySelectorAll(".lp-priority-strip .lp-priority").length,
+      /* 30/08: dải thẻ hồng đã gộp vào hero thành các nút "Cần xử lý trước tiên". */
+      coDaiUuTien: !!document.querySelector(".pr-hero__uu-tien"),
+      soUuTien: document.querySelectorAll(".pr-hero__uu-tien .pr-uu-tien").length,
     };
   });
   kiem(["Đang thực hiện", "Cần xử lý", "Quá hạn", "Độ hoàn thiện dữ liệu"]
