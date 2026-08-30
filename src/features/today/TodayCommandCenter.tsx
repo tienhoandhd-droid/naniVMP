@@ -143,7 +143,7 @@ function TodayQueueSection({ section, rows, expandedCode, onToggle, onOpenProgre
   return <section className={`hn-nhom hn-nhom--${section} lp-tone--${meta.tone}`}>
     <h2 className="hn-nhom__ten">{meta.label} <span className="hn-nhom__dem">{rows.length}</span><span className="hn-nhom__phu">xếp theo hạn, mức độ quan trọng và quyền cập nhật</span></h2>
     {/* Hàng tiêu đề cột (đúng bản thiết kế) — chỉ để nhìn, bảng thật vẫn là danh sách có nút. */}
-    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc · Phụ trách</span><span></span></div>
+    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>Phụ trách</span><span></span></div>
     <ul className="hn-ds" aria-label={meta.label}>{rows.map((row) => <TodayQueueRow key={row.validationCode} row={row}
       expanded={expandedCode === row.validationCode} onToggle={() => onToggle(row.validationCode)} onOpenProgress={onOpenProgress} />)}</ul>
   </section>;
@@ -154,16 +154,14 @@ export function TodaySupportingPane({ row, onOpenProgress, onClearSelection }: {
   onOpenProgress: (link: ProgressDeepLink) => void;
   onClearSelection: () => void;
 }) {
-  return <aside id="today-supporting-pane" className="hn-pane" aria-label="Chi tiết việc đang chọn">
+  return <aside id="today-supporting-pane" className={`hn-pane${row ? "" : " hn-pane--trong"}`} aria-label="Chi tiết việc đang chọn">
     {row ? <div className="hn-pane__the">
       <span className={`hn-pane__nhom lp-tone--${SECTION_META[row.section].tone}`}>{SECTION_META[row.section].label}</span>
       <b className="hn-pane__ma">{row.validationCode}</b><p className="hn-pane__ten">{row.title}</p>
       <TodayRowDetails row={row} id={`today-pane-${detailId(row)}`} />
       {row.canEditProgress && <button type="button" className="hn-muc__nut" onClick={() => onOpenProgress(progressLink(row))}>Cập nhật tiến độ</button>}
       <button type="button" className="hn-muc__nut" onClick={onClearSelection}>Bỏ chọn</button>
-    </div> : <div className="hn-pane__trong"><div className="hn-vali hn-vali--guide hn-vali--nho" role="img" aria-label="Công chúa Vali đang hướng dẫn" />
-      <p className="hn-pane__goi-y">Chọn một việc để xem các thông tin hỗ trợ trước khi cập nhật tiến độ.</p>
-    </div>}
+    </div> : null}
   </aside>;
 }
 

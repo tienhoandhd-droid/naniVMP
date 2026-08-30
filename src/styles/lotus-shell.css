@@ -22,12 +22,12 @@
   content: "";
   position: absolute;
   top: 0;
-  right: -40px;
-  width: 640px;
+  right: -60px;
+  width: 780px;
   height: 560px;
-  /* Lấy phần bên phải của tranh (đuôi tóc + cụm sen), người chỉ còn thấp thoáng. */
-  background: url("../assets/art/nen-dam-sen.webp") no-repeat -560px 0 / 1180px auto;
-  opacity: 0.42;
+  /* Nguyên khung tranh: cô gái áo yếm + hồ sen, mờ dần về phía vùng đọc. */
+  background: url("../assets/art/nen-dam-sen.webp") no-repeat -230px 0 / 1120px auto;
+  opacity: 0.55;
   -webkit-mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, #000 35%);
   -webkit-mask-composite: source-in;
   mask-image: linear-gradient(to left, rgb(0 0 0 / .95) 0%, rgb(0 0 0 / .55) 50%, transparent 100%), linear-gradient(to top, transparent 0%, #000 35%);
@@ -46,7 +46,7 @@
   pointer-events: none;
   z-index: 0;
 }
-:root[data-theme="dark"] .vmp-main-nen::before { opacity: 0.28; }
+:root[data-theme="dark"] .vmp-main-nen::before { opacity: 0.3; }
 :root[data-theme="dark"] .vmp-main-nen::after { opacity: 0.1; mix-blend-mode: screen; }
 @media (max-width: 768px) {
   .vmp-main-nen::before { width: 420px; height: 300px; background-size: 640px auto; background-position: -150px 0; opacity: 0.35; }
@@ -104,5 +104,9 @@
 .vmp-chan-trang { margin: 28px 0 0; font-size: 12px; font-weight: 600; color: var(--lp-ink-muted); text-align: right; }
 
 /* ---- Thanh lọc toàn cục: hàng chip trong suốt, không hộp trắng ---- */
-.vmp-thanh-loc { border-bottom: 1px solid var(--lp-line); }
+.vmp-thanh-loc { border-bottom: 1px solid var(--lp-line); flex-wrap: nowrap !important; overflow-x: auto; overflow-y: visible; }
+.vmp-thanh-loc > * { flex: none; }
+.vmp-thanh-loc label { white-space: nowrap; }
+.vmp-thanh-loc .vmp-global-filter-label { white-space: nowrap; }
+@media (max-width: 900px) { .vmp-thanh-loc { flex-wrap: wrap !important; } }
 .vmp-thanh-loc select, .vmp-thanh-loc button { border-radius: 999px !important; }

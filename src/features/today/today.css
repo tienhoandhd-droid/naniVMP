@@ -183,3 +183,54 @@
 .hn-cot span:last-child { width: 118px; }
 .hn-ds .hn-muc:first-child { border-top: 0; }
 @media (max-width: 768px) { .hn-cot { display: none; } }
+
+/* 30/08 — ngăn chi tiết chỉ hiện khi ĐÃ chọn việc; chưa chọn thì bảng chiếm
+   trọn bề ngang (bỏ khối "Chọn một việc để xem…"). */
+.hn-pane--trong { display: none !important; }
+.lp-supporting-layout:has(.hn-pane--trong) { grid-template-columns: minmax(0, 1fr); }
+/* Bảng việc: tách cột Mốc và Phụ trách như bản thiết kế. */
+.hn-muc__tom-tat { grid-template-columns: 132px minmax(0, 1.15fr) minmax(150px, 200px) minmax(0, 200px) auto; }
+.hn-cot { grid-template-columns: 132px minmax(0, 1.15fr) minmax(150px, 200px) minmax(0, 200px) auto; }
+.hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 132px 1fr; }
+.hn-muc__thong-tin { grid-column: 3 / span 2; display: grid; grid-template-columns: minmax(150px, 200px) minmax(0, 200px); gap: 0 16px; align-items: center; }
+.hn-muc__thong-tin .hn-muc__han { grid-column: 1; color: var(--lp-tone-ink, var(--lp-ink)); font-weight: 600; }
+.hn-muc__thong-tin .hn-muc__chu-so-huu { grid-column: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-muc__thong-tin .hn-muc__phong { grid-column: 2; justify-self: end; white-space: nowrap; color: var(--lp-ink-muted); font-size: 12px; }
+@media (min-width: 1600px) { .hn-muc__thong-tin .hn-muc__phong { display: block; } }
+@media (max-width: 1100px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 132px minmax(0, 1fr) minmax(150px, 190px) auto; }
+  .hn-muc__thong-tin { grid-column: 3; grid-template-columns: 1fr; }
+  .hn-muc__thong-tin .hn-muc__chu-so-huu, .hn-muc__thong-tin .hn-muc__phong { display: none; }
+  .hn-cot span:nth-child(4) { display: none; }
+}
+
+/* 30/08 — sửa lưới dòng việc: các ô con nằm ĐÚNG cột của hàng tiêu đề. */
+.hn-muc__thong-tin { display: contents; }
+.hn-muc__thong-tin .hn-muc__han { grid-column: 3; grid-row: 1; align-self: center; font-size: 13px; }
+.hn-muc__thong-tin .hn-muc__chu-so-huu { grid-column: 4; grid-row: 1; align-self: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.hn-muc__thong-tin .hn-muc__phong,
+.hn-muc__thong-tin .hn-muc__muc-do,
+.hn-muc__thong-tin .hn-muc__cho,
+.hn-muc__thong-tin .hn-ly-do { display: none; }
+.hn-muc__nut { grid-column: 5; grid-row: 1; justify-self: end; }
+.hn-muc__mo--inline, .hn-muc__mo--desktop { grid-row: 1; }
+.hn-cot span:nth-child(5) { width: 132px; }
+@media (max-width: 1100px) {
+  .hn-muc__thong-tin .hn-muc__chu-so-huu { display: none; }
+  .hn-muc__nut { grid-column: 4; }
+}
+@media (max-width: 768px) {
+  .hn-muc__thong-tin { display: flex; flex-wrap: wrap; }
+  .hn-muc__thong-tin .hn-muc__han,
+  .hn-muc__thong-tin .hn-muc__chu-so-huu { grid-column: auto; }
+  .hn-muc__thong-tin .hn-muc__chu-so-huu,
+  .hn-muc__thong-tin .hn-muc__phong,
+  .hn-muc__thong-tin .hn-ly-do { display: flex; }
+  .hn-muc__nut { grid-column: auto; justify-self: stretch; }
+}
+
+/* 30/08 — mục việc phải giãn hết bề ngang thì cột mới trùng hàng tiêu đề. */
+.hn-ds { align-items: stretch; }
+.hn-ds > .hn-muc { width: 100%; box-sizing: border-box; }
+.hn-muc__tom-tat { width: 100%; box-sizing: border-box; }
+.hn-ds > .hn-muc { max-width: none; max-inline-size: none; }
