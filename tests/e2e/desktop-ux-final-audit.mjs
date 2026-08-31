@@ -183,6 +183,32 @@ try {
   assert.ok(reportLink.height >= 32 && workloadLink.height >= 32);
   assert.notEqual(outlineStyle, "none");
 
+  await page.setViewport({ width: 768, height: 1000 });
+  await page.goto(`${APP_URL}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.waitForSelector(".monitoring-journey__item.is-active", { timeout: 15_000 });
+  const mobileTypography = await page.evaluate(() => {
+    const masthead = document.querySelector(".vmp-masthead__phu");
+    const active = document.querySelector(".monitoring-journey__item.is-active");
+    const journeyDescription = active?.querySelector(".monitoring-journey__copy > span");
+    const journeyMetricLabel = active?.querySelector(".monitoring-journey__metric > span");
+    const journeyCurrent = active?.querySelector(".monitoring-journey__current");
+    if (!masthead || !journeyDescription || !journeyMetricLabel || !journeyCurrent) {
+      throw new Error("Thiếu typography kiểm tra ở viewport mobile");
+    }
+    return {
+      masthead: getComputedStyle(masthead).fontSize,
+      journeyDescription: getComputedStyle(journeyDescription).fontSize,
+      journeyMetricLabel: getComputedStyle(journeyMetricLabel).fontSize,
+      journeyCurrent: getComputedStyle(journeyCurrent).fontSize,
+    };
+  });
+  assert.deepEqual(mobileTypography, {
+    masthead: "11px",
+    journeyDescription: "11px",
+    journeyMetricLabel: "11px",
+    journeyCurrent: "10px",
+  });
+
   console.log("✓ foundation desktop UX audit đạt tương phản, focus và khả năng đọc");
 } finally {
   await browser.close();

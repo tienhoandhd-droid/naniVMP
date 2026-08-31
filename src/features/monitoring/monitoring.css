@@ -101,8 +101,8 @@
 
 .monitoring-journey__copy > span,
 .monitoring-journey__metric > span {
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 11px;
+  line-height: 15px;
   opacity: .82;
 }
 
@@ -111,7 +111,7 @@
   padding: 1px 6px;
   border: 1px solid currentColor;
   border-radius: 999px;
-  font-size: 12px !important;
+  font-size: 10px !important;
   font-weight: 700;
   letter-spacing: .02em;
   opacity: 1 !important;
@@ -132,6 +132,16 @@
 
 .monitoring-journey__item.is-active .monitoring-journey__metric > strong {
   color: var(--lp-on-plum);
+}
+
+@media (min-width: 769px) {
+  .monitoring-journey__copy > span,
+  .monitoring-journey__metric > span {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .monitoring-journey__current { font-size: 12px !important; }
 }
 
 @media (min-width: 1180px) {
