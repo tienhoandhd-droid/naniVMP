@@ -206,9 +206,14 @@ export const PLABEL = {
 // với DB CURRENT_DATE và với deriveSt() (gọi new Date() tươi).
 // Sửa: dùng HÀM vmpToday() — mỗi lần gọi tự lấy ngày hiện tại.
 export const vmpToday = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+  // 31/08/2026: lấy NGÀY theo lịch Bangkok (giờ nhà máy), không theo giờ máy
+  // người dùng — máy lệch múi giờ (công tác, VPN, đồng hồ sai) làm mốc "hôm
+  // nay" lệch một ngày so với DB và các model mới (bangkokCalendarDate,
+  // ngayBangkok). Trả Date 00:00 LOCAL của ngày Bangkok để mọi phép so sánh
+  // với parseD() (cũng ra 00:00 local) giữ nguyên ngữ nghĩa cũ.
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" })
+    .format(new Date()).split("-").map(Number);
+  return new Date(y, m - 1, d);
 };
 // Backward-compat: giữ tên VMP_TODAY để KHÔNG vỡ chỗ cũ chưa kịp sửa.
 // LƯU Ý: code mới nên gọi vmpToday() — biến này chỉ là snapshot lúc load.

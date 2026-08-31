@@ -10,7 +10,7 @@
  * ===================================================================== */
 
 import { createClient } from "@supabase/supabase-js";
-import type { Database, Json } from "../types/database.ts";
+import type { Database } from "../types/database.ts";
 import type { AppUser, UserRole } from "../types/domain.ts";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "./supabaseConfig.ts";
 
@@ -224,27 +224,10 @@ export async function guiMailQuenMatKhau(email: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-/* ---- Ghi audit log ---- */
-export async function writeAuditLog(
-  action: AuditAction,
-  tableName: string,
-  recordId: string,
-  oldData: Json,
-  newData: Json,
-): Promise<void> {
-  if (!supabase) return;
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;
-  await supabase.from("audit_logs").insert({
-    user_id: session.user.id,
-    user_email: session.user.email,
-    action,
-    table_name: tableName,
-    record_id: recordId,
-    old_data: oldData,
-    new_data: newData,
-  });
-}
+/* writeAuditLog đã XOÁ (31/08/2026): bảng audit_logs bị revoke INSERT khỏi
+ * vai authenticated từ migration 20260824120000 nên hàm luôn fail im lặng,
+ * và không còn nơi gọi. Audit thật do trigger phía DB ghi qua các RPC —
+ * client không bao giờ được tự ghi nhật ký (giả mạo được). */
 
 /* ---- Lấy JWT token hiện tại (cho n8n guard) ---- */
 export async function getAccessToken(): Promise<string | null> {

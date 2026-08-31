@@ -3,8 +3,9 @@
  *  ---------------------------------------------------------------------
  *  - Nhóm theo MÃ ĐỐI TƯỢNG, sắp theo mã. Một mã có nhiều loại thẩm định
  *    (OQ/PQ/IQ…) và có thể nhiều lần/năm (tái thẩm định) → gộp về một khối.
- *  - GHI CHƯA kích hoạt: form Cập nhật/Thêm sinh sẵn "payload đúng cột Sheet"
- *    (xem trước) để về sau nối đường ghi ngược Sheet — giữ read-only an toàn.
+ *  - GHI ĐÃ kích hoạt (cập nhật 31/08/2026): nút Cập nhật mở ProgressEditModal
+ *    ghi thật qua rpc_update_progress có kiểm quyền — mô tả "read-only" cũ
+ *    là di sản thời còn đồng bộ Sheet, đã sai từ khi chuyển nhập liệu về RPC.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
 import { Boxes, Search, Pencil, ChevronRight, Layers, ExternalLink, SlidersHorizontal, X } from "lucide-react";

@@ -116,16 +116,42 @@ import { buildMonitoringSignatureMetrics } from "./features/monitoring/monitorin
    xoá mất chunk cũ, ai đang mở web lúc đó bấm sang màn khác là ăn 404. Xem
    src/lib/tailMan.ts để biết vì sao đây chính là "thỉnh thoảng lỗi tải lại
    trang". ===== */
-const TimelineView = lazy(nhapCoThuLai(() => import("./pages/TimelinePage.tsx")));
-const AlertsView = lazy(nhapCoThuLai(() => import("./pages/AlertsPage.tsx")));
+/* Loader tách tên riêng cho các màn hay dùng nhất: vừa cấp cho lazy() vừa
+ * cấp cho prefetchKhiRanh() — cùng một hàm import nên trình duyệt/module
+ * cache tự khử trùng lặp, không tải hai lần. */
+const taiTimelinePage = () => import("./pages/TimelinePage.tsx");
+const taiAlertsPage = () => import("./pages/AlertsPage.tsx");
+const taiUpdatePage = () => import("./pages/UpdatePage.tsx");
+const TimelineView = lazy(nhapCoThuLai(taiTimelinePage));
+const AlertsView = lazy(nhapCoThuLai(taiAlertsPage));
 const CatalogView = lazy(nhapCoThuLai(() => import("./pages/CatalogPage.tsx")));
 const WorkloadView = lazy(nhapCoThuLai(() => import("./pages/WorkloadPage.tsx")));
 const SourceCatalogView = lazy(nhapCoThuLai(() => import("./pages/SourceCatalogPage.tsx")));
 const ServerChecksView = lazy(nhapCoThuLai(() => import("./pages/ServerChecksPage.tsx")));
-const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
+const UpdateView = lazy(nhapCoThuLai(taiUpdatePage));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
+
+/* Prefetch chunk các màn hay dùng khi trình duyệt RẢNH — người xưởng trên
+ * 4G bấm sang màn mới không phải chờ một round-trip mạng nữa. Chỉ chạy một
+ * lần sau khi màn đầu ổn định; lỗi tải (offline, deploy giữa chừng) nuốt
+ * im lặng vì đây chỉ là tối ưu, bấm thật vẫn đi qua nhapCoThuLai() có retry. */
+let daPrefetch = false;
+function prefetchKhiRanh(): void {
+  if (daPrefetch) return;
+  daPrefetch = true;
+  const chay = () => {
+    for (const tai of [taiTimelinePage, taiUpdatePage, taiAlertsPage]) {
+      tai().catch(() => {});
+    }
+  };
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(chay, { timeout: 8000 });
+  } else {
+    setTimeout(chay, 3000);
+  }
+}
 import VongNam from "./components/dashboard/VongNam.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
@@ -659,27 +685,31 @@ function AuditLogView() {
     try {
       if (!supabase) { setLoadErr("Chưa cấu hình kết nối Supabase."); return; }
 
-      // Chỉ lấy cột BẢNG THẬT SỰ HIỆN. select("*") kéo về cả old_data lẫn
-      // new_data của 50 dòng — hai cột JSONB nặng nhất bảng — trong khi giao
-      // diện chỉ mở new_data khi người dùng bấm "Xem dữ liệu".
-      const COT = "id,created_at,user_email,action,table_name,record_id,source,new_data";
-      // Không lọc gì thì đếm ƯỚC LƯỢNG: count exact quét cả 100.400 dòng /
-      // 158MB chỉ để biết chia bao nhiêu trang (đo được 1,8 giây khi nguội).
-      const coLoc = !!(filters.action || filters.user || filters.record);
-      let query = supabase.from("audit_logs")
-        .select(COT, { count: coLoc ? "exact" : "planned" })
-        .order("created_at", { ascending: false })
-        .range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1);
-
-      if (filters.action) query = query.eq("action", filters.action as AuditRow["action"]);
-      if (filters.user) query = query.ilike("user_email", `%${filters.user}%`);
-      if (filters.record) query = query.eq("record_id", filters.record);
-
-      const { data, error, count } = await query;
+      // Bảng audit_logs đã bị revoke SELECT khỏi vai authenticated (migration
+      // 20260824120000) — đường đọc DUY NHẤT còn lại là rpc_get_audit_logs
+      // (admin/qa_manager). Query thẳng bảng như trước 31/08 luôn trả 403.
+      // RPC tự đếm ước lượng khi không lọc (total_uoc_luong) nên không cần
+      // logic count planned/exact ở client nữa.
+      const { data, error } = await supabase.rpc("rpc_get_audit_logs", {
+        p_limit: PAGE_SIZE,
+        p_offset: pg * PAGE_SIZE,
+        ...(filters.action ? { p_action: filters.action } : {}),
+        ...(filters.user ? { p_user_email: filters.user } : {}),
+        ...(filters.record ? { p_record_id: filters.record } : {}),
+      });
       if (error) throw error;
-      setLogs((data || []) as unknown as AuditRow[]);
-      setTotal(count || 0);
-      setUocLuong(!coLoc);
+      const payload = data as {
+        ok?: boolean; error?: string;
+        total?: number; total_uoc_luong?: boolean; logs?: AuditRow[];
+      } | null;
+      // RPC trả lỗi nghiệp vụ (FORBIDDEN, phiên hết hạn) trong payload chứ
+      // không ném exception — phải đọc ra, không được để bảng rỗng nói thay.
+      if (payload && payload.ok === false) {
+        throw new Error(payload.error || "Không có quyền xem nhật ký kiểm toán");
+      }
+      setLogs(payload?.logs || []);
+      setTotal(payload?.total || 0);
+      setUocLuong(!!payload?.total_uoc_luong);
       setPage(pg);
     } catch (e) {
       // Trước đây chỉ console.error rồi để bảng rỗng — người dùng đọc thành
@@ -2194,6 +2224,9 @@ function AppShell() {
   useAccessCacheTransition(user, {
     access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen,
   });
+  /* Chỉ prefetch SAU đăng nhập (màn login không cần gánh 3 chunk màn),
+     và đúng một lần cho cả phiên (cờ trong prefetchKhiRanh). */
+  useEffect(() => { if (user) prefetchKhiRanh(); }, [user]);
 
   if (!user) return <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />;
 
