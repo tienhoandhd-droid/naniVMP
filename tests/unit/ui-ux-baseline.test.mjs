@@ -73,12 +73,15 @@ test("clickable dashboard targets are native buttons", () => {
 
 test("filters are grouped, named and stay in normal document flow", () => {
   const app = source("src/App.tsx");
+  /* F1 (31/08): AuditLogView tách khỏi App.tsx — bộ lọc nhật ký giờ sống
+     ở pages/AuditLogPage.tsx, hợp đồng aria đi theo file. */
+  const audit = source("src/pages/AuditLogPage.tsx");
   const shell = source("src/styles/lotus-shell.css");
 
   assert.match(app, /role="group" aria-label="Phạm vi toàn hệ thống"/);
-  assert.match(app, /aria-label="Lọc nhật ký theo hành động"/);
-  assert.match(app, /aria-label="Lọc nhật ký theo email"/);
-  assert.match(app, /aria-label="Lọc nhật ký theo mã hạng mục"/);
+  assert.match(audit, /aria-label="Lọc nhật ký theo hành động"/);
+  assert.match(audit, /aria-label="Lọc nhật ký theo email"/);
+  assert.match(audit, /aria-label="Lọc nhật ký theo mã hạng mục"/);
   assert.doesNotMatch(shell, /\.vmp-thanh-loc--treo\s*\{\s*margin-top:\s*-\d+px/);
 });
 
