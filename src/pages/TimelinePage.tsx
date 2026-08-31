@@ -23,7 +23,6 @@ import {
 // Khối 3D nạp theo yêu cầu — chung chunk three.js với các màn khác.
 import type { ReactNode } from "react";
 import type { Activity } from "../types/domain.ts";
-import type { WorkloadCell } from "../lib/workloadMap.ts";
 import { vmpDeadlineDate } from "../lib/vmpDeadlineModel.ts";
 import { buildPersonProgressChoices } from "../lib/personProgressScope.ts";
 
@@ -567,7 +566,6 @@ class LongMonRaceGuard extends Component<RaceGuardProps, { loi: Error | null }> 
 
 export default function TimelineView({ acts, businessRole = null, currentPersonId = null, onReload = () => {} }: {
   acts: Activity[];
-  onOpenWorkloadCell?: (cell: WorkloadCell) => void;
   businessRole?: string | null;
   currentPersonId?: string | null;
   onReload?: () => void;

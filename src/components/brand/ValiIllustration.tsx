@@ -9,8 +9,7 @@
  *  Vì sao đọc theme bằng MutationObserver chứ không bằng matchMedia:
  *  app ghi thẳng `data-theme` lên <html> (Layout.tsx) và có chế độ "auto",
  *  nên thuộc tính ấy — chứ không phải sở thích hệ điều hành — mới là
- *  nguồn sự thật. Cùng cách với `dungMauLotus3D()` trong lotus3dColors.ts:
- *  bấm đổi theme là nhân vật đổi ngay, không cần tải lại trang.
+ *  nguồn sự thật: bấm đổi theme là nhân vật đổi ngay, không cần tải lại trang.
  *
  *  Hợp đồng KHÔNG đổi (nơi dùng không phải sửa gì):
  *   · props (mood / size / decorative / className);

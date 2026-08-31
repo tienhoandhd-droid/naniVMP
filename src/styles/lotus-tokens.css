@@ -122,17 +122,6 @@
   --lp-grid-line:        rgb(47 36 48 / 0.09);
   --lp-grid-line-major:  rgb(47 36 48 / 0.18);
 
-  /* --- v3 (nghiên cứu 4+5): lacquer anchor + vai trò màu cho chart/3D.
-   * 3D KHÔNG đọc CSS cascade — dùng cầu src/lib/lotus3dColors.ts. */
-  --lp-anchor:       var(--lp-brand-solid);
-  --lp-anchor-hover: var(--lp-brand-hover);
-  --lp-viz-base:      var(--lp-plum);
-  --lp-viz-selected:  var(--lp-rose);
-  --lp-viz-threshold: var(--lp-ink-muted);
-  --lp-viz-danger:    var(--lp-danger);
-  --lp-viz-success:   var(--lp-success);
-  --lp-viz-warning:   var(--lp-warning);
-  --lp-viz-info:      var(--lp-info);
 
   /* --- Nhịp chuyển động (nghiên cứu (3)) ---------------------------- */
   --lp-motion-fast: 140ms;

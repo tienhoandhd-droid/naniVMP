@@ -53,7 +53,6 @@ import { useAccess, useAccessCacheTransition } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { resolveAuthorizedView, resolveViewIntent } from "./lib/navigationContract.ts";
 import { overviewTarget } from "./lib/navigationTargets.ts";
-import { applyWorkloadCellNavigation } from "./lib/workloadNavigation.ts";
 import { createVisibleRefreshController } from "./lib/visibleRefresh.ts";
 import {
   buildPersonProgressChoices,
@@ -156,7 +155,6 @@ const ReportsViewMemo = memo(ReportsView);
 import { saveUser, loadUser, loadFilterPrefs, saveFilterPrefs } from "./lib/config.ts";
 import type { ReactNode } from "react";
 import type { Activity, AppUser } from "./types/domain.ts";
-import type { WorkloadCell } from "./lib/workloadMap.ts";
 import { supabase } from "./lib/supabaseClient.ts";
 
 /* Chụp ý định link trước lần render đầu. React StrictMode dựng shell hai lần
@@ -869,15 +867,6 @@ function VerifiedAppShell({ user, logout, access }: {
       ? normalizeTodayPersonScope(scope, currentPersonId)
       : defaultTodayPersonScope(access.businessRole, currentPersonId));
   }, [access.businessRole, currentPersonId]);
-  // App là nơi duy nhất quyết định đích theo quyền. Bản đồ chỉ nhận callback
-  // khi có một màn hợp lệ, vì vậy nó không thể tạo CTA dẫn tới màn bị chặn.
-  const workloadListTarget = overviewTarget(access, "soon");
-  const onOpenWorkloadCell = useMemo(() => workloadListTarget ? (cell: WorkloadCell) => {
-    applyWorkloadCellNavigation({
-      cell, year: currentBangkokYear, target: workloadListTarget,
-      setDeptSel, setPeriodFilter, setCustomFrom, setCustomTo, setView,
-    });
-  } : undefined, [currentBangkokYear, workloadListTarget]);
   // Faceted count: số hạng mục theo mỗi bộ phận (khớp a.depts) — hiện cạnh lựa chọn.
   const deptOptions = useMemo(() => DEPTS.map((d) => ({
     v: d.id, l: d.name,
@@ -1320,7 +1309,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   <OverviewMemo acts={overviewActs} setView={setView} access={access} />
                 </>
               )}
-              {!boundaryDuLieu && view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell}
+              {!boundaryDuLieu && view === "timeline" && <TimelineView acts={filteredActs}
                 businessRole={access.businessRole} currentPersonId={currentPersonId} onReload={reloadData} />}
               {view === "source" && (
                 <SourceCatalogView access={access} onReload={reloadData}
