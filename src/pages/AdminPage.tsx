@@ -57,6 +57,39 @@ export default function AdminView({ conn, user, access }: {
 
   const d = tt?.du_lieu || {};
 
+  /* Bàn quản trị (spec 01/09): nối trọn vòng giám sát E2 — đọc lỗi client
+     24h qua rpc_doc_loi_client. Migration 20260831170000 CHƯA áp thì RPC
+     vắng (PGRST202/42883) → hiện hộp hướng dẫn, không phải lỗi đỏ. */
+  type LoiClient = { id: number; created_at: string; user_email: string | null;
+    url: string | null; message: string; source: string };
+  const [loiClient, setLoiClient] = useState<LoiClient[] | null>(null);
+  const [loiClientTong, setLoiClientTong] = useState(0);
+  const [loiClientTrangThai, setLoiClientTrangThai] =
+    useState<"dang-tai" | "ok" | "chua-ap" | "loi">("dang-tai");
+  useEffect(() => {
+    (async () => {
+      try {
+        const { supabase } = await import("../lib/supabaseClient.ts");
+        if (!supabase) { setLoiClientTrangThai("chua-ap"); return; }
+        const rpc = supabase.rpc.bind(supabase) as unknown as (
+          ten: string, thamSo: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
+        const { data, error } = await rpc("rpc_doc_loi_client", {
+          p_limit: 20, p_tu: new Date(Date.now() - 24 * 3_600_000).toISOString(),
+        });
+        if (error) {
+          setLoiClientTrangThai(error.code === "PGRST202" || error.code === "42883" ? "chua-ap" : "loi");
+          return;
+        }
+        const kq = data as { ok?: boolean; total?: number; errors?: LoiClient[] } | null;
+        if (kq?.ok === false) { setLoiClientTrangThai("loi"); return; }
+        setLoiClient(kq?.errors ?? []);
+        setLoiClientTong(kq?.total ?? 0);
+        setLoiClientTrangThai("ok");
+      } catch { setLoiClientTrangThai("loi"); }
+    })();
+  }, []);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <Card>
@@ -124,6 +157,50 @@ export default function AdminView({ conn, user, access }: {
               ))}
               {!(tt.lich_tu_dong || []).length && <div style={{ padding: 14, color: C.plumSoft, fontWeight: 600 }}>Chưa hẹn giờ việc nào.</div>}
             </div>
+          </Card>
+
+          <Card>
+            <CardTitle icon={Radar}
+              sub={loiClientTrangThai === "ok"
+                ? `${loiClientTong} lỗi trong 24 giờ · web tự báo về (lib/baoLoi.ts) — trước đây lỗi chết trong trình duyệt người dùng`
+                : "Web tự báo lỗi runtime về database — tai mắt production"}>
+              Lỗi client 24 giờ qua
+            </CardTitle>
+            {loiClientTrangThai === "dang-tai" && (
+              <div style={{ padding: 14, color: C.plumSoft, fontWeight: 600 }}>Đang tải…</div>
+            )}
+            {loiClientTrangThai === "chua-ap" && (
+              <div style={{ padding: "13px 15px", borderRadius: 14, background: C.marigoldSoft,
+                            fontSize: 13, color: C.marigoldText, fontWeight: 700, lineHeight: 1.7 }}>
+                Kênh báo lỗi chưa bật: áp migration <span style={{ fontFamily: NUM }}>20260831170000_client_error_log.sql</span> theo
+                runbook <span style={{ fontFamily: NUM }}>docs/runbooks/2026-08-31-client-error-log.md</span>.
+                Frontend đã gắn sẵn — áp xong là cột này tự có số.
+              </div>
+            )}
+            {loiClientTrangThai === "loi" && (
+              <div style={{ padding: 14, color: C.raspText, fontWeight: 700 }}>
+                Không đọc được nhật ký lỗi client (cần vai Admin/Quản lý QA).
+              </div>
+            )}
+            {loiClientTrangThai === "ok" && (
+              (loiClient ?? []).length === 0 ? (
+                <div style={{ padding: 14, color: C.mintText, fontWeight: 700 }}>
+                  24 giờ qua web không báo lỗi nào — production sạch.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {(loiClient ?? []).map((l) => (
+                    <div key={l.id} style={{ padding: "9px 13px", borderRadius: 12,
+                                             background: C.surface, border: `1px solid ${C.raspSoft}`,
+                                             fontSize: 12, lineHeight: 1.6 }}>
+                      <b style={{ color: C.raspText }}>{new Date(l.created_at).toLocaleTimeString("vi-VN")}</b>
+                      {" · "}{l.user_email || "ẩn danh"} · <span style={{ fontFamily: NUM }}>{l.url || ""}</span>
+                      <div style={{ color: C.plum, fontWeight: 700, marginTop: 2 }}>{l.message.slice(0, 160)}</div>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
           </Card>
 
           {!!(tt.workflow_loi_7_ngay || []).length && (
