@@ -17,6 +17,7 @@ import { C, TEXT, btnPrimary, INP, FIELD, LBL } from "../../constants/theme.ts";
 import { TT_OPTS } from "../../constants/vmp.ts";
 import { txt, nguoiPhuTrach, stageOf } from "../../utils/helpers.ts";
 import { toISO } from "../../lib/n8nAdapter.ts";
+import { formatBangkokDateTime } from "../../lib/formatBangkok.ts";
 import {
   fetchTimelineFieldPermission,
   fetchItemProgressHistory,
@@ -908,7 +909,7 @@ function LichSuHangMuc({ operationTarget }: { operationTarget: ProgressModalOper
                                     background: C.surfaceSunk, fontFamily: TEXT, fontSize: 12,
                                     display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", color: C.plum, fontWeight: 700 }}>
-                <span>{new Date(h.created_at).toLocaleString("vi-VN")}</span>
+                <span>{formatBangkokDateTime(h.created_at)}</span>
                 <span>· {h.actor}</span>
                 <span style={{ color: C.plumSoft, fontWeight: 600 }}>({h.effective_business_role})</span>
               </div>

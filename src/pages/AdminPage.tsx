@@ -13,6 +13,7 @@ import type { SystemStatus } from "../lib/supabaseData.ts";
 import type { ConnState } from "../hooks/index.ts";
 import type { AppUser } from "../types/domain.ts";
 import type { AccessContext } from "../lib/access.ts";
+import { formatBangkokDateTime, formatBangkokTime } from "../lib/formatBangkok.ts";
 
 function docLichCron(lich: string): string {
   const p = String(lich || "").trim().split(/\s+/);
@@ -193,7 +194,7 @@ export default function AdminView({ conn, user, access }: {
                     <div key={l.id} style={{ padding: "9px 13px", borderRadius: 12,
                                              background: C.surface, border: `1px solid ${C.raspSoft}`,
                                              fontSize: 12, lineHeight: 1.6 }}>
-                      <b style={{ color: C.raspText }}>{new Date(l.created_at).toLocaleTimeString("vi-VN")}</b>
+                      <b style={{ color: C.raspText }}>{formatBangkokTime(l.created_at)}</b>
                       {" · "}{l.user_email || "ẩn danh"} · <span style={{ fontFamily: NUM }}>{l.url || ""}</span>
                       <div style={{ color: C.plum, fontWeight: 700, marginTop: 2 }}>{l.message.slice(0, 160)}</div>
                     </div>
@@ -213,7 +214,7 @@ export default function AdminView({ conn, user, access }: {
                   <div key={i} style={{ padding: "10px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
                     <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{wf.ten || "(không tên)"}</div>
                     <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
-                      {wf.luc ? new Date(wf.luc).toLocaleString("vi-VN") : ""} · {wf.loi || "không có mô tả lỗi"}
+                      {wf.luc ? formatBangkokDateTime(wf.luc) : ""} · {wf.loi || "không có mô tả lỗi"}
                     </div>
                   </div>
                 ))}

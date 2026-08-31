@@ -10,6 +10,7 @@ import { C, TEXT, NUM, NUM_HERO, DISPLAY, MO, R, cardDefault, cardStrong, cardSo
 import { STATUS } from "../../constants/vmp.ts";
 import { XCircle } from "lucide-react";
 import { buildValiBrief } from "../../features/overview/valiBrief.ts";
+import { formatBangkokDateTime, formatBangkokTime } from "../../lib/formatBangkok.ts";
 
 /* `new URL` để Vite vẫn fingerprint asset, còn Node unit test có thể nạp
    Primitives mà không phải hiểu định dạng nhị phân WebP. */
@@ -736,11 +737,11 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
       <span>{noiDung}</span>
       {dataUpdatedAt ? (
         <span style={{ marginLeft: "auto", fontWeight: 600, opacity: 0.8 }}>
-          Cập nhật dữ liệu: {new Date(dataUpdatedAt).toLocaleString("vi-VN")}
+          Cập nhật dữ liệu: {formatBangkokDateTime(dataUpdatedAt)}
         </span>
       ) : lastSync && (
         <span style={{ marginLeft: "auto", fontWeight: 600, opacity: 0.8 }}>
-          Đồng bộ cuối: {new Date(lastSync).toLocaleTimeString("vi-VN")}
+          Đồng bộ cuối: {formatBangkokTime(lastSync)}
         </span>
       )}
       {/* Không còn nút thu gọn: dải này giờ chỉ hiện khi đường tải thật sự

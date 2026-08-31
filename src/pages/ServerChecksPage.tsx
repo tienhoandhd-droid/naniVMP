@@ -16,6 +16,7 @@ import {
   Radar, RefreshCw, AlertTriangle, CheckCircle2, Bell, Gauge, PlayCircle,
   ClipboardCheck, Clock, FileCheck2,
 } from "lucide-react";
+import { formatBangkokDateTime } from "../lib/formatBangkok.ts";
 import { C, TEXT, btnPrimary } from "../constants/theme.ts";
 import { useXacNhan } from "../hooks/useXacNhan.tsx";
 import { useToast } from "../components/ui/ToastProvider.tsx";
@@ -142,7 +143,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
       <Card variant="strong">
         <CardTitle icon={Gauge}
           sub="Tính bằng rpc_dashboard_kpi — đây là số mà báo cáo và workflow dùng, dùng để đối chiếu với số trên dashboard">
-          Số liệu theo server {kpi?.updated_at ? `· cập nhật ${new Date(kpi.updated_at).toLocaleString("vi-VN")}` : ""}
+          Số liệu theo server {kpi?.updated_at ? `· cập nhật ${formatBangkokDateTime(kpi.updated_at)}` : ""}
         </CardTitle>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>

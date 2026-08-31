@@ -16,6 +16,7 @@ import {
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
 import StateBoundary from "../components/ui/StateBoundary.tsx";
+import { formatBangkokDateTime } from "../lib/formatBangkok.ts";
 import ShellConfirmDialog from "../components/layout/ShellConfirmDialog.tsx";
 import { fetchActiveRules, recalcCriticality } from "../lib/supabaseData.ts";
 import type { ActiveRules } from "../lib/supabaseData.ts";
@@ -227,7 +228,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       {/* Lời dẫn */}
       <Card variant="strong">
         <CardTitle icon={Scale}
-          sub={`Đọc thẳng từ database · cập nhật ${new Date(rules.cap_nhat).toLocaleString("vi-VN")}`}>
+          sub={`Đọc thẳng từ database · cập nhật ${formatBangkokDateTime(rules.cap_nhat)}`}>
           Luật hệ thống đang áp dụng
         </CardTitle>
         <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "11px 13px",

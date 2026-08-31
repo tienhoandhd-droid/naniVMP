@@ -19,6 +19,7 @@ import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.ts";
 import type { Activity } from "../types/domain.ts";
 import type { AccessContext } from "../lib/access.ts";
 import ServerChecksView from "./ServerChecksPage.tsx";
+import { formatBangkokDate, formatBangkokDateTime } from "../lib/formatBangkok.ts";
 
 export default function HealthView({ acts, access }: { acts: Activity[]; access?: AccessContext | null }) {
   /* Bàn quản trị (spec 01/09): tab ĐỐI CHIẾU là mặc định — trả lời thẳng
@@ -128,7 +129,7 @@ function DoiChieuView({ acts }: { acts: Activity[] }) {
       </table>
       {kpi?.updated_at && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-          Số máy chủ cập nhật lúc {new Date(kpi.updated_at).toLocaleString("vi-VN")} · muốn tính lại: tab Kiểm tra trên máy chủ → nút Tính lại trạng thái.
+          Số máy chủ cập nhật lúc {formatBangkokDateTime(kpi.updated_at)} · muốn tính lại: tab Kiểm tra trên máy chủ → nút Tính lại trạng thái.
         </div>
       )}
     </Card>
@@ -389,7 +390,7 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                       {ds.slice(0, 30).map((it, i) => (
                         <div key={i} style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, paddingTop: 6, borderTop: i ? `1px solid ${C.pinkMist}` : "none" }}>
                           <b style={{ color: C.plum }}>{it.plan_item_id || "—"}</b> · {it.message}
-                          {it.detected_at ? ` · ${new Date(it.detected_at).toLocaleDateString("vi-VN")}` : ""}
+                          {it.detected_at ? ` · ${formatBangkokDate(it.detected_at)}` : ""}
                         </div>
                       ))}
                       {ds.length > 30 && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, paddingTop: 6 }}>… và {ds.length - 30} bản ghi nữa</div>}

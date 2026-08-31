@@ -17,6 +17,7 @@ import { CrownLogo, tuoiDuLieu } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
 import type { ScreenId } from "../../lib/access.ts";
+import { formatBangkokDateTime, formatBangkokShortDateTime, formatBangkokTime } from "../../lib/formatBangkok.ts";
 /* Nhãn năm vai nghiệp vụ hiệu lực — dùng lại đúng bảng nhãn của màn Phân quyền
    (nguồn duy nhất) thay vì `PERM_LABEL`/`BUSINESS_ROLE_LABELS` cũ, để
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
@@ -508,18 +509,12 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
             if (!t) return null;
             return (
               <span
-                title={`Hạng mục được sửa gần nhất lúc ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`}
+                title={`Hạng mục được sửa gần nhất lúc ${formatBangkokDateTime(dataUpdatedAt)}`}
                 style={{
                   marginLeft: 10, fontSize: 12, fontWeight: 800,
                   color: C.plumSoft,
                 }}>
-                {/* Ghép tay chứ không dùng toLocaleString: với vi-VN nó trả
-                    "14:11 31-07" — giờ đứng trước ngày, đọc rất dễ nhầm. */}
-                {(() => {
-                  const d = new Date(dataUpdatedAt);
-                  const hai = (n: number) => String(n).padStart(2, "0");
-                  return `· Sửa lần cuối: ${hai(d.getDate())}/${hai(d.getMonth() + 1)} ${hai(d.getHours())}:${hai(d.getMinutes())}`;
-                })()}
+                · Sửa lần cuối: {formatBangkokShortDateTime(dataUpdatedAt)}
               </span>
             );
           })()}
@@ -534,7 +529,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
         </button>
         <ThemeToggle />
         <button onClick={onRefresh} className="vmp-lift"
-          title={lastSync ? `Làm mới dữ liệu · Đồng bộ lúc ${new Date(lastSync).toLocaleTimeString("vi-VN")}` : "Làm mới dữ liệu"} style={{
+          title={lastSync ? `Làm mới dữ liệu · Đồng bộ lúc ${formatBangkokTime(lastSync)}` : "Làm mới dữ liệu"} style={{
           ...glass, borderRadius: 16, padding: "9px 15px",
           display: "flex", alignItems: "center", gap: 8,
           border: "none", cursor: "pointer",

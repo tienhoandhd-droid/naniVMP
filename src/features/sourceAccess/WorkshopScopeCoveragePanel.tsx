@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { actionDescriptionId, firstActionBlock, type ActionBlock } from "../../components/ui/actionReadiness.ts";
+import { formatBangkokDateTime } from "../../lib/formatBangkok.ts";
 import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { btnPrimary, cardDefault, C, INP, TEXT } from "../../constants/theme.ts";
 import { listSourceWorkshopScopeChoices, setSourceWorkshopScopeGrant } from "./api.ts";
@@ -283,7 +284,7 @@ export default function WorkshopScopeCoveragePanel({
             {selectedPerson.grants.map((grant) => <article key={grant.id} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 8 }}>
               <strong>{grant.department} / {grant.areaCode} / {grant.line ?? "Toàn khu vực"}</strong>
               <div>{grant.isActive ? "Đang hiệu lực" : "Đã thu hồi"} · phiên bản {grant.version}</div>
-              <small>Cập nhật {new Date(grant.updatedAt).toLocaleString("vi-VN")} · {grant.changeReason}</small>
+              <small>Cập nhật {formatBangkokDateTime(grant.updatedAt)} · {grant.changeReason}</small>
               <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                 <button type="button" className="cw-nut cw-nut--phu" onClick={() => beginEdit(grant)}>Sửa</button>
                 {grant.isActive && <button type="button" className="cw-nut cw-nut--phu" onClick={() => revoke(grant)} disabled={saving}>Thu hồi</button>}

@@ -9,6 +9,7 @@ import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.tsx";
 import { dungBangDiff } from "../features/audit/auditDiffModel.ts";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.ts";
 import type { Database } from "../types/database.ts";
+import { formatBangkokDateTime } from "../lib/formatBangkok.ts";
 
 export default function AuditLogView() {
   /** Một dòng nhật ký thao tác từ bảng audit_logs. */
@@ -88,9 +89,7 @@ export default function AuditLogView() {
   };
 
   const fmtTime = (ts: string | number | null | undefined): string => {
-    if (!ts) return "—";
-    const d = new Date(ts);
-    return d.toLocaleDateString("vi-VN") + " " + d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    return formatBangkokDateTime(ts);
   };
 
   if (!isSupabaseConfigured()) {

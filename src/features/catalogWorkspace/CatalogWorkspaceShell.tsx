@@ -43,6 +43,7 @@ import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import type { SourceWarnings } from "../../lib/supabaseData.ts";
 import type { AccessContext } from "../../lib/access.ts";
 import type { GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../../types/domain.ts";
+import { formatBangkokDateTime } from "../../lib/formatBangkok.ts";
 import CatalogSmartTable from "./CatalogSmartTable.tsx";
 import CatalogRecordDialog from "./CatalogRecordDialog.tsx";
 import CatalogExcelImport from "./CatalogExcelImport.tsx";
@@ -865,7 +866,7 @@ export default function CatalogWorkspaceShell({
                           : <span className="cw-nhe">không đổi mốc thời gian — mở ra chỉ để xem, không có gì để áp</span>}
                       </div>
                       <div className="cw-nhe">
-                        {c.created_by_name} · {new Date(c.created_at).toLocaleString("vi-VN")}
+                        {c.created_by_name} · {formatBangkokDateTime(c.created_at)}
                         {c.last_error ? ` · lỗi: ${c.last_error}` : ""}
                       </div>
                       {canEdit && (
@@ -905,7 +906,7 @@ export default function CatalogWorkspaceShell({
                           <span className="cw-nhe">{h.table_name ?? ""}</span>
                         </div>
                         <div className="cw-nhe">
-                          {new Date(h.created_at).toLocaleString("vi-VN")} · {h.actor}
+                          {formatBangkokDateTime(h.created_at)} · {h.actor}
                           {h.changed_fields?.length ? ` · cột: ${h.changed_fields.join(", ")}` : ""}
                           {h.reason ? ` · lý do: ${h.reason}` : ""}
                         </div>

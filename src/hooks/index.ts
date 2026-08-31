@@ -15,6 +15,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { DependencyList } from "react";
 import type { Activity, PerformerRow, VmpObject } from "../types/domain.ts";
+import { formatBangkokTime } from "../lib/formatBangkok.ts";
 
 /** Trạng thái kết nối nguồn dữ liệu hiển thị trên banner. */
 export interface ConnState {
@@ -353,7 +354,7 @@ export function useVmpData() {
             setObjects(cu.objects);
             setActs(cu.activities);
             setConn((c) => ({ ...c, readUrl, writeUrl, status: "loading", source: "supabase",
-              msg: `Đang hiện bản lưu lúc ${new Date(cu.at).toLocaleTimeString("vi-VN")} — đang cập nhật…` }));
+              msg: `Đang hiện bản lưu lúc ${formatBangkokTime(cu.at)} — đang cập nhật…` }));
           }
         }
 

@@ -64,6 +64,7 @@ import type { AccessContext, ScreenId } from "./lib/access.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
 import type { UrlState } from "./lib/urlState.ts";
+import { formatBangkokDateTime, formatBangkokTime } from "./lib/formatBangkok.ts";
 
 // ===== UI Primitives =====
 import {
@@ -1303,7 +1304,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   acts={todayActs}
                   scopeLabel={nhanPhamViToday}
                   updatedLabel={dataUpdatedAt
-                    ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
+                    ? `Sửa lần cuối: ${formatBangkokDateTime(dataUpdatedAt)}`
                     : undefined}
                   state={conn.status === "loading" ? "loading" : conn.status === "err" ? "error" : "ready"}
                   onRetry={reloadData}
@@ -1328,7 +1329,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   onFocusConsumed={() => setMoDanhMuc(null)}
                   scopeLabel={nhanPhamVi}
                   updatedLabel={dataUpdatedAt
-                    ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
+                    ? `Sửa lần cuối: ${formatBangkokDateTime(dataUpdatedAt)}`
                     : undefined} />
               )}
               {view === "health" && <HealthView acts={filteredActs} access={access} />}
@@ -1381,7 +1382,7 @@ function VerifiedAppShell({ user, logout, access }: {
 
             {/* Chân trang: giờ đồng bộ (rời khỏi phụ đề topbar, anh Hoàn chốt 30/08). */}
             {lastSync && (
-              <p className="vmp-chan-trang">Đồng bộ lúc {new Date(lastSync).toLocaleTimeString("vi-VN")}</p>
+              <p className="vmp-chan-trang">Đồng bộ lúc {formatBangkokTime(lastSync)}</p>
             )}
 
             {/* Trợ lý hỏi đáp — nổi ở góc, không chiếm chỗ của bảng dữ liệu */}
