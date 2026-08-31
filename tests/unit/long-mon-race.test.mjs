@@ -477,7 +477,11 @@ test("component truyền audience và kích thước scene thích ứng", async 
   assert.match(html, /--long-mon-scene-height:560px/);
   assert.match(teamHtml, /data-scene-width="960"/);
   assert.match(html, /--long-mon-y:[\d.]+%/);
-  assert.match(source, /buildLongMonRaceModel\(activities, now, \{[\s\S]*audience:\s*scopeControl\?\.audience\s*\?\?\s*"team"/);
+  /* 31/08: model được memo hoá — audience tách ra biến riêng làm dep của
+     useMemo, nên regex khớp theo hai vế: (1) audience lấy từ scopeControl
+     với mặc định "team", (2) buildLongMonRaceModel nhận đúng biến đó. */
+  assert.match(source, /const audience = scopeControl\?\.audience \?\? "team"/);
+  assert.match(source, /buildLongMonRaceModel\(activities, now, \{ audience \}\)/);
   assert.doesNotMatch(source, /laneCount\s*\*\s*78/);
 });
 

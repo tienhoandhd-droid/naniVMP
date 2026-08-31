@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, CalendarClock, Waves } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
 import type { Activity } from "../../types/domain.ts";
 import {
@@ -17,6 +17,17 @@ const BACKGROUND_URL = `${ART_BASE}long-mon-vmp-racecourse-v15.webp`;
 const SPECIES_SHEET_URL = `${ART_BASE}long-mon-six-species-v16.webp`;
 /* Cổng Vũ Môn vẽ tay (SVG → Inkscape xuất PNG) — xem chú thích trong CSS. */
 const GATE_URL = `${ART_BASE}long-mon-vu-mon-gate-v2.webp`;
+
+/* Mồi tải cả ba tranh NGAY khi chunk màn này về — song song với việc React
+ * render — thay vì chờ <img>/CSS mount mới bắt đầu (3 chặng mạng nối tiếp:
+ * chunk JS → render → tranh). Trình duyệt tự khử trùng lặp request. */
+if (typeof window !== "undefined") {
+  for (const url of [BACKGROUND_URL, SPECIES_SHEET_URL, GATE_URL]) {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = url;
+  }
+}
 
 /* Băm id → pha/chu kỳ bơi riêng của từng con (5.6s–9.2s). Cùng thuật băm
  * FNV như model để một hạng mục giữ nguyên dáng bơi giữa hai lần render. */
@@ -91,17 +102,25 @@ function formatDeadline(value: string): string {
   return `${day}/${month}/${year}`;
 }
 
-export default function LongMonRace({
+/* Bảng meta loài cá là hằng module — dựng Map một lần, không phải mỗi render. */
+const META_BY_STAGE = new Map(LONG_MON_STAGE_META.map((stage) => [stage.id, stage]));
+
+function LongMonRace({
   activities,
   now = new Date(),
   onOpen,
   scopeControl,
 }: LongMonRaceProps) {
-  const model = buildLongMonRaceModel(activities, now, {
-    audience: scopeControl?.audience ?? "team",
-  });
+  /* buildLongMonRaceModel duyệt + băm vị trí cho TỪNG con cá (761 dòng model).
+   * Trước 31/08 nó chạy lại ở mỗi render của TimelinePage (kể cả khi chỉ đổi
+   * bộ chọn phạm vi) vì không memo — giờ chỉ tính lại khi dữ liệu/mốc đổi. */
+  const audience = scopeControl?.audience ?? "team";
+  const model = useMemo(
+    () => buildLongMonRaceModel(activities, now, { audience }),
+    [activities, now, audience],
+  );
   const viewportRef = useRef<HTMLDivElement>(null);
-  const metaByStage = new Map(LONG_MON_STAGE_META.map((stage) => [stage.id, stage]));
+  const metaByStage = META_BY_STAGE;
   const canvasStyle: RaceCanvasStyle = {
     "--long-mon-scene-width": `${model.sceneWidthPx}px`,
     "--long-mon-scene-height": `${model.sceneHeightPx}px`,
@@ -178,8 +197,14 @@ export default function LongMonRace({
           data-scene-height={model.sceneHeightPx}
           style={canvasStyle}
         >
-          <img className="long-mon-race__background" src={BACKGROUND_URL} alt="" aria-hidden="true" />
-          <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true" />
+          {/* fetchpriority="high": tranh nền LÀ nội dung chính của màn — trình
+              duyệt mặc định xếp ảnh sau JS/CSS, ép ưu tiên để bớt màn trống.
+              width/height gốc của file để giữ chỗ, tránh CLS khi tranh về
+              (CSS vẫn scale theo --long-mon-scene-*). */}
+          <img className="long-mon-race__background" src={BACKGROUND_URL} alt="" aria-hidden="true"
+            width={1823} height={863} decoding="async" fetchPriority="high" />
+          <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true"
+            width={540} height={1120} decoding="async" loading="lazy" />
           <div className="long-mon-race__wash" aria-hidden="true" />
 
           <div className="long-mon-race__months" aria-hidden="true">
@@ -292,5 +317,10 @@ export default function LongMonRace({
     </section>
   );
 }
+
+/* memo: TimelinePage đã ổn định tham chiếu props (now/scopeControl qua
+ * useMemo, onOpen qua useCallback) nên shallow-compare chặn được re-render
+ * khi state khác của trang (modal chi tiết, dialog sửa hạn) thay đổi. */
+export default memo(LongMonRace);
 
 export { BACKGROUND_URL as LONG_MON_BACKGROUND_URL, SPECIES_SHEET_URL as LONG_MON_SPECIES_SHEET_URL };

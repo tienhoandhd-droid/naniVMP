@@ -117,7 +117,9 @@ try {
       const image = new Image();
       image.onload = () => resolve(image.naturalWidth > 0);
       image.onerror = () => resolve(false);
-      image.src = "/art/monitoring/long-mon-six-species-v16.png";
+      // 31/08: PNG nguồn đã chuyển ra designs/art-goc/ (không deploy nữa) —
+      // app chỉ còn tham chiếu .webp, test cũng phải kiểm đúng file đó.
+      image.src = "/art/monitoring/long-mon-six-species-v16.webp";
     });
     return {
       monthLabels,
