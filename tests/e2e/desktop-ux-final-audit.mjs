@@ -261,13 +261,14 @@ try {
         .find((button) => button.textContent?.trim() === "Chấm lại");
       if (!confirm) throw new Error("Không tìm thấy nút xác nhận Chấm lại");
       confirm.click();
+      confirm.click();
     });
     await page.waitForFunction(
       () => document.querySelector('[role="alert"]')?.textContent?.includes("Chấm lại chưa hoàn tất"),
       { timeout: 5_000 },
     );
     page.off("request", countRecalcRequest);
-    assert.equal(recalcRequests, 1, "recalculation runs once only after confirmation");
+    assert.equal(recalcRequests, 1, "two synchronous confirms must start one recalculation only");
     console.log("✓ interactions desktop UX audit mở xác nhận trong ứng dụng");
   }
 } finally {
