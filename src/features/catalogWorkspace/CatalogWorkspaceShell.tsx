@@ -623,6 +623,7 @@ export default function CatalogWorkspaceShell({
                   <div className="cw-tim">
                     <Search size={15} aria-hidden="true" className="cw-tim__icon" />
                     <input
+                      data-desktop-primary-actionable
                       className="cw-tim__o"
                       aria-label="Tìm trong danh mục"
                       placeholder="Tìm theo mã, tên, bộ phận…"

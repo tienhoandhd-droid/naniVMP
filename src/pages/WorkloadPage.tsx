@@ -264,7 +264,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const openDetail = (title: string, tasks: PlanActivity[]) => {
     if (tasks.length) setDetail({ title, tasks });
   };
-  const Btn = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) => <button onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
+  const Btn = ({ on, onClick, children, primary = false }: { on: boolean; onClick: () => void; children: ReactNode; primary?: boolean }) => <button data-desktop-primary-actionable={primary || undefined} onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
   /* ---------------- Câu kết luận của từng biểu đồ ----------------
    * Ba biểu đồ dưới đây trước giờ chỉ bày số. Người xem phải tự quét 20
    * thẻ người, 12 cột tháng rồi tự rút ra "ai quá tải, tháng nào" — đúng
@@ -396,7 +396,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 16 }}>
-          <div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>KHUNG THỜI GIAN</div><div style={{ display: "flex", gap: 7 }}><Btn on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
+          <div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>KHUNG THỜI GIAN</div><div style={{ display: "flex", gap: 7 }}><Btn primary on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
           <div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>TÔ THEO</div><div style={{ display: "flex", gap: 7 }}><Btn on={metric === "cong"} onClick={() => setMetric("cong")}>Ngày công</Btn><Btn on={metric === "hoso"} onClick={() => setMetric("hoso")}>Hồ sơ</Btn></div></div>
         </div>
       </Card>

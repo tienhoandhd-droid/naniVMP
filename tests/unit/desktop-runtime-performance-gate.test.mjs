@@ -6,9 +6,11 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  DESKTOP_PRIMARY_ACTIONABLE_SELECTORS,
   DESKTOP_SKELETON_SELECTOR,
   DESKTOP_RUNTIME_LIMITS,
   assertDesktopRuntimeBudget,
+  desktopRuntimeRouteContract,
   recordRouteSkeletonAppearance,
   runtimeGateScreens,
 } from "../../scripts/do-hieu-nang.mjs";
@@ -70,6 +72,24 @@ test("runtime gate applies long-task and skeleton checks to a route without a pr
   }, console.warn, { requirePrimaryAction: false }), /alerts: long task 51ms vượt 50ms/);
 });
 
+test("runtime gate fails closed when an approved route misses its primary or transition skeleton marker", () => {
+  assert.throws(() => assertDesktopRuntimeBudget("alerts", {
+    primaryActionableMs: null,
+    skeletonAppearanceMs: 12,
+    maxLongTaskMs: 0,
+    domNodes: 400,
+    optionalChunksBeforeAction: [],
+  }), /alerts: primary actionable nullms vượt 2500ms/);
+  assert.throws(() => assertDesktopRuntimeBudget("alerts", {
+    primaryActionableMs: 12,
+    skeletonAppearanceMs: null,
+    maxLongTaskMs: 0,
+    domNodes: 400,
+    optionalChunksBeforeAction: [],
+  }, console.warn, { requireSkeletonAppearance: true }),
+  /alerts: skeleton transition marker không xuất hiện/);
+});
+
 test("perf budget command owns a fresh preview before the runtime gate", () => {
   const packagePath = fileURLToPath(new URL("../../package.json", import.meta.url));
   const scripts = JSON.parse(readFileSync(packagePath, "utf8")).scripts;
@@ -83,6 +103,41 @@ test("runtime CI gate covers every approved desktop route", () => {
   assert.deepEqual(runtimeGateScreens(), [
     "reports", "alerts", "progress", "source", "workload", "rules", "phanquyen",
   ]);
+});
+
+test("every approved route has an explicit primary selector and required transition skeleton", () => {
+  assert.deepEqual(DESKTOP_PRIMARY_ACTIONABLE_SELECTORS, {
+    reports: "[data-desktop-primary-actionable]",
+    alerts: "[data-desktop-primary-actionable]",
+    progress: ".pr-nut-chinh:not([disabled])",
+    source: "[data-desktop-primary-actionable]",
+    workload: "[data-desktop-primary-actionable]",
+    rules: "[data-desktop-primary-actionable]",
+    phanquyen: "[data-desktop-primary-actionable]",
+  });
+  for (const screen of runtimeGateScreens()) {
+    assert.deepEqual(desktopRuntimeRouteContract(screen), {
+      primarySelector: DESKTOP_PRIMARY_ACTIONABLE_SELECTORS[screen],
+      requireSkeletonAppearance: true,
+    });
+  }
+});
+
+test("primary selector mapping points at a source-owned readiness signal for every route", () => {
+  const sourceForScreen = {
+    reports: "src/components/dashboard/ReportsView.tsx",
+    alerts: "src/pages/AlertsPage.tsx",
+    progress: "src/pages/UpdatePage.tsx",
+    source: "src/features/catalogWorkspace/CatalogWorkspaceShell.tsx",
+    workload: "src/pages/WorkloadPage.tsx",
+    rules: "src/pages/ActiveRulesPage.tsx",
+    phanquyen: "src/pages/PhanQuyenPage.tsx",
+  };
+  for (const [screen, file] of Object.entries(sourceForScreen)) {
+    const text = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
+    const marker = DESKTOP_PRIMARY_ACTIONABLE_SELECTORS[screen];
+    assert.match(text, marker.startsWith(".") ? /pr-nut-chinh/ : /data-desktop-primary-actionable/);
+  }
 });
 
 test("runtime skeleton selector is emitted by each loading UI", () => {

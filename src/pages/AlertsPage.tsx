@@ -523,7 +523,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     <div className="alerts-page-shell">
       {/* Hai mặt của cùng một việc: danh sách để làm, ma trận để nhìn tổng thể */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => setTab("list")} style={tabBtn(tab === "list")}>
+        <button data-desktop-primary-actionable type="button" onClick={() => setTab("list")} style={tabBtn(tab === "list")}>
           <AlertCircle size={15} /> Danh sách cảnh báo
         </button>
         <button type="button" onClick={() => setTab("matrix")} style={tabBtn(tab === "matrix")}>

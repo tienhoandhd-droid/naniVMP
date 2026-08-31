@@ -21,10 +21,29 @@ export const DESKTOP_PERFORMANCE_SCREENS = [
   "reports", "alerts", "progress", "source", "workload", "rules", "phanquyen",
 ];
 
+/* Mỗi route phải chỉ rõ tín hiệu sẵn sàng của chính nội dung route. Không
+ * dùng selector shell chung: một shell hiện ra không có nghĩa là thao tác
+ * chính của màn đó đã sẵn sàng. */
+export const DESKTOP_PRIMARY_ACTIONABLE_SELECTORS = Object.freeze({
+  reports: "[data-desktop-primary-actionable]",
+  alerts: "[data-desktop-primary-actionable]",
+  progress: ".pr-nut-chinh:not([disabled])",
+  source: "[data-desktop-primary-actionable]",
+  workload: "[data-desktop-primary-actionable]",
+  rules: "[data-desktop-primary-actionable]",
+  phanquyen: "[data-desktop-primary-actionable]",
+});
+
 const OPTIONAL_REPORT_CHUNK = /(?:VmpSpace3D|VmpSpace3DCanvas|BanDoNhiet|exceljs)/i;
 
 export function runtimeGateScreens() {
   return [...DESKTOP_PERFORMANCE_SCREENS];
+}
+
+export function desktopRuntimeRouteContract(screen) {
+  const primarySelector = DESKTOP_PRIMARY_ACTIONABLE_SELECTORS[screen];
+  if (!primarySelector) throw new Error(`Không có runtime readiness contract cho route ${screen}`);
+  return { primarySelector, requireSkeletonAppearance: true };
 }
 
 export function recordRouteSkeletonAppearance(clock, now, markerPresent) {
@@ -37,14 +56,16 @@ export function assertDesktopRuntimeBudget(
   screen,
   metrics,
   warn = console.warn,
-  { requirePrimaryAction = true } = {},
+  { requirePrimaryAction = true, requireSkeletonAppearance = false } = {},
 ) {
   const failures = [];
   if (requirePrimaryAction && (metrics.primaryActionableMs == null
     || metrics.primaryActionableMs > DESKTOP_RUNTIME_LIMITS.primaryActionableMs)) {
     failures.push(`${screen}: primary actionable ${metrics.primaryActionableMs}ms vượt ${DESKTOP_RUNTIME_LIMITS.primaryActionableMs}ms`);
   }
-  if (metrics.skeletonAppearanceMs != null && metrics.skeletonAppearanceMs > DESKTOP_RUNTIME_LIMITS.skeletonAppearanceMs) {
+  if (requireSkeletonAppearance && metrics.skeletonAppearanceMs == null) {
+    failures.push(`${screen}: skeleton transition marker không xuất hiện`);
+  } else if (metrics.skeletonAppearanceMs != null && metrics.skeletonAppearanceMs > DESKTOP_RUNTIME_LIMITS.skeletonAppearanceMs) {
     failures.push(`${screen}: skeleton xuất hiện ${metrics.skeletonAppearanceMs}ms vượt ${DESKTOP_RUNTIME_LIMITS.skeletonAppearanceMs}ms`);
   }
   if (metrics.maxLongTaskMs > DESKTOP_RUNTIME_LIMITS.maxLongTaskMs) {
@@ -66,8 +87,8 @@ function docSupabaseUrl() {
   return url;
 }
 
-function installPerformanceObservers(page) {
-  return page.evaluateOnNewDocument((skeletonSelector) => {
+function installPerformanceObservers(page, primarySelector) {
+  return page.evaluateOnNewDocument((skeletonSelector, routePrimarySelector) => {
     const state = {
       primaryActionableMs: null,
       routeIntentAt: null,
@@ -81,7 +102,7 @@ function installPerformanceObservers(page) {
     };
     const observe = () => {
       const now = performance.now();
-      if (state.primaryActionableMs == null && document.querySelector("[data-desktop-primary-actionable]")) {
+      if (state.primaryActionableMs == null && document.querySelector(routePrimarySelector)) {
         state.primaryActionableMs = now;
       }
       if (document.querySelector(skeletonSelector)
@@ -96,7 +117,7 @@ function installPerformanceObservers(page) {
       }
     }).observe({ type: "longtask", buffered: true });
     document.addEventListener("DOMContentLoaded", observe, { once: true });
-  }, DESKTOP_SKELETON_SELECTOR);
+  }, DESKTOP_SKELETON_SELECTOR, primarySelector);
 }
 
 async function disableHttpCache(page) {
@@ -106,17 +127,15 @@ async function disableHttpCache(page) {
   return session;
 }
 
-async function waitForRouteSettle(page, screen) {
-  if (screen === "reports") {
-    try {
-      await page.waitForFunction(
-        () => window.__vmpDesktopPerformance?.primaryActionableMs != null,
-        { timeout: DESKTOP_RUNTIME_LIMITS.primaryActionableMs + 100 },
-      );
-    } catch {
-      // The metric below turns this into the same clear budget message.
-    }
-    return;
+async function waitForRouteSettle(page, primarySelector) {
+  try {
+    await page.waitForFunction(
+      (selector) => document.querySelector(selector) != null,
+      { timeout: DESKTOP_RUNTIME_LIMITS.primaryActionableMs + 100 },
+      primarySelector,
+    );
+  } catch {
+    // The metric below turns this into the same clear budget message.
   }
   await page.waitForNetworkIdle({ idleTime: 500, timeout: 45_000 });
 }
@@ -124,7 +143,8 @@ async function waitForRouteSettle(page, screen) {
 async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) {
   const page = await browser.newPage();
   try {
-    await installPerformanceObservers(page);
+    const contract = desktopRuntimeRouteContract(screen);
+    await installPerformanceObservers(page, contract.primarySelector);
     await disableHttpCache(page);
     await caiGiaLap(page, { supabaseUrl, kichBan: "day" });
     await nhetPhien(page, { supabaseUrl });
@@ -132,7 +152,7 @@ async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) 
     const t0 = Date.now();
     await page.goto(`${origin}#v=${screen}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
-    await waitForRouteSettle(page, screen);
+    await waitForRouteSettle(page, contract.primarySelector);
 
     const wall = Date.now() - t0;
     const metrics = await page.evaluate(() => {
@@ -152,9 +172,9 @@ async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) 
         ) / 1024),
         soRes: resources.length,
         domNodes: document.querySelectorAll("*").length,
-        primaryActionableMs: screen === "reports" && state?.primaryActionableMs == null
+        primaryActionableMs: state?.primaryActionableMs == null
           ? DESKTOP_RUNTIME_LIMITS.primaryActionableMs + 1
-          : state?.primaryActionableMs == null ? null : Math.round(state.primaryActionableMs),
+          : Math.round(state.primaryActionableMs),
         skeletonAppearanceMs: state?.skeletonAppearanceMs == null
           ? null
           : Math.round(state.skeletonAppearanceMs),
@@ -166,9 +186,7 @@ async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) 
       };
     });
     if (enforce) {
-      assertDesktopRuntimeBudget(screen, metrics, console.warn, {
-        requirePrimaryAction: screen === "reports",
-      });
+      assertDesktopRuntimeBudget(screen, metrics, console.warn);
     }
     return { screen, wall, ...metrics };
   } finally {
@@ -179,7 +197,8 @@ async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) 
 async function measureRouteSkeletonAppearance(browser, { screen, origin, supabaseUrl }) {
   const page = await browser.newPage();
   try {
-    await installPerformanceObservers(page);
+    const contract = desktopRuntimeRouteContract(screen);
+    await installPerformanceObservers(page, contract.primarySelector);
     const session = await disableHttpCache(page);
     await session.send("Network.emulateNetworkConditions", {
       offline: false,
@@ -202,7 +221,7 @@ async function measureRouteSkeletonAppearance(browser, { screen, origin, supabas
         location.hash = `#v=${target}`;
       }
     }, screen);
-    await waitForRouteSettle(page, screen);
+    await waitForRouteSettle(page, contract.primarySelector);
     return page.evaluate(() => {
       const state = window.__vmpDesktopPerformance;
       return state?.skeletonAppearanceMs == null ? null : Math.round(state.skeletonAppearanceMs);
@@ -226,11 +245,13 @@ export async function runDesktopPerformance({
     for (const screen of screens) {
       const result = await measureScreen(browser, { screen, origin, supabaseUrl, enforce });
       if (enforce) {
+        const contract = desktopRuntimeRouteContract(screen);
         result.skeletonAppearanceMs = await measureRouteSkeletonAppearance(
           browser, { screen, origin, supabaseUrl },
         );
         assertDesktopRuntimeBudget(screen, result, console.warn, {
-          requirePrimaryAction: screen === "reports",
+          requirePrimaryAction: false,
+          requireSkeletonAppearance: contract.requireSkeletonAppearance,
         });
       }
       results.push(result);

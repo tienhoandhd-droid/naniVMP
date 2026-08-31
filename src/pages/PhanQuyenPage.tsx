@@ -449,7 +449,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
             khi cần cập nhật hồ sơ nhân sự hoặc phân công việc.">
           Tài khoản &amp; quyền
         </CardTitle>
-        <div className="ip-workspace">
+        <div data-desktop-primary-actionable className="ip-workspace">
           {/* Danh bạ ở đây chỉ để CHỌN người — nối tài khoản và xem quyền
               hiệu lực của người đó. */}
           <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson}

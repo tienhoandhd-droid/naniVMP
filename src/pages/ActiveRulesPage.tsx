@@ -162,7 +162,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
   const tl = rules.sinh_timeline;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div data-desktop-primary-actionable style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Lời dẫn */}
       <Card variant="strong">
         <CardTitle icon={Scale}
