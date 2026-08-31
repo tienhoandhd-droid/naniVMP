@@ -645,7 +645,7 @@ export function SkeletonPulse({ w = "100%", h = 16, r = 8 }: {
 
 export function SkeletonDashboard() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0" }}>
+    <div data-desktop-skeleton style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0" }}>
       <Card variant="strong" style={{ display: "flex", alignItems: "center", gap: 18, padding: 24 }}>
         <SkeletonPulse w={100} h={100} r={999} />
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>

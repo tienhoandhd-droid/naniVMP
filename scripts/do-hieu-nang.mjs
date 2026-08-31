@@ -1,5 +1,5 @@
 /* Đo hiệu năng bản build production qua preview + mock Supabase.
- * Chạy trực tiếp để in lab; `--check` biến số đo Reports thành CI gate. */
+ * Chạy trực tiếp để in lab; `--check` biến số đo bảy route thành CI gate. */
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
@@ -13,6 +13,7 @@ export const DESKTOP_RUNTIME_LIMITS = {
   maxLongTaskMs: 50,
   domWarningNodes: 1_500,
 };
+export const DESKTOP_SKELETON_SELECTOR = "[data-desktop-skeleton]";
 
 /* Chỉ đo các route desktop có ngân sách riêng. Timeline/Long Môn nằm ngoài
  * phạm vi Task 6 nên không được điều hướng hay đo trong lab này. */
@@ -24,6 +25,12 @@ const OPTIONAL_REPORT_CHUNK = /(?:VmpSpace3D|VmpSpace3DCanvas|BanDoNhiet|exceljs
 
 export function runtimeGateScreens() {
   return [...DESKTOP_PERFORMANCE_SCREENS];
+}
+
+export function recordRouteSkeletonAppearance(clock, now, markerPresent) {
+  if (markerPresent && clock.routeIntentAt != null && clock.skeletonAppearanceMs == null) {
+    clock.skeletonAppearanceMs = now - clock.routeIntentAt;
+  }
 }
 
 export function assertDesktopRuntimeBudget(
@@ -60,20 +67,26 @@ function docSupabaseUrl() {
 }
 
 function installPerformanceObservers(page) {
-  return page.evaluateOnNewDocument(() => {
+  return page.evaluateOnNewDocument((skeletonSelector) => {
     const state = {
       primaryActionableMs: null,
+      routeIntentAt: null,
       skeletonAppearanceMs: null,
       maxLongTaskMs: 0,
     };
     window.__vmpDesktopPerformance = state;
+    window.__vmpStartRouteSkeletonClock = () => {
+      state.routeIntentAt = performance.now();
+      state.skeletonAppearanceMs = null;
+    };
     const observe = () => {
       const now = performance.now();
       if (state.primaryActionableMs == null && document.querySelector("[data-desktop-primary-actionable]")) {
         state.primaryActionableMs = now;
       }
-      if (state.skeletonAppearanceMs == null && document.querySelector(".vmp-skeleton")) {
-        state.skeletonAppearanceMs = now;
+      if (document.querySelector(skeletonSelector)
+        && state.routeIntentAt != null && state.skeletonAppearanceMs == null) {
+        state.skeletonAppearanceMs = now - state.routeIntentAt;
       }
     };
     new MutationObserver(observe).observe(document, { childList: true, subtree: true });
@@ -83,31 +96,43 @@ function installPerformanceObservers(page) {
       }
     }).observe({ type: "longtask", buffered: true });
     document.addEventListener("DOMContentLoaded", observe, { once: true });
-  });
+  }, DESKTOP_SKELETON_SELECTOR);
+}
+
+async function disableHttpCache(page) {
+  const session = await page.target().createCDPSession();
+  await session.send("Network.enable");
+  await session.send("Network.setCacheDisabled", { cacheDisabled: true });
+  return session;
+}
+
+async function waitForRouteSettle(page, screen) {
+  if (screen === "reports") {
+    try {
+      await page.waitForFunction(
+        () => window.__vmpDesktopPerformance?.primaryActionableMs != null,
+        { timeout: DESKTOP_RUNTIME_LIMITS.primaryActionableMs + 100 },
+      );
+    } catch {
+      // The metric below turns this into the same clear budget message.
+    }
+    return;
+  }
+  await page.waitForNetworkIdle({ idleTime: 500, timeout: 45_000 });
 }
 
 async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) {
   const page = await browser.newPage();
   try {
     await installPerformanceObservers(page);
+    await disableHttpCache(page);
     await caiGiaLap(page, { supabaseUrl, kichBan: "day" });
     await nhetPhien(page, { supabaseUrl });
     await page.setViewport({ width: 1366, height: 768 });
     const t0 = Date.now();
     await page.goto(`${origin}#v=${screen}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
-    if (screen === "reports") {
-      try {
-        await page.waitForFunction(
-          () => window.__vmpDesktopPerformance?.primaryActionableMs != null,
-          { timeout: DESKTOP_RUNTIME_LIMITS.primaryActionableMs + 100 },
-        );
-      } catch {
-        // Đo thật vẫn được đọc bên dưới để báo cùng một thông điệp budget rõ ràng.
-      }
-    } else {
-      await page.waitForNetworkIdle({ idleTime: 500, timeout: 45_000 });
-    }
+    await waitForRouteSettle(page, screen);
 
     const wall = Date.now() - t0;
     const metrics = await page.evaluate(() => {
@@ -151,6 +176,42 @@ async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) 
   }
 }
 
+async function measureRouteSkeletonAppearance(browser, { screen, origin, supabaseUrl }) {
+  const page = await browser.newPage();
+  try {
+    await installPerformanceObservers(page);
+    const session = await disableHttpCache(page);
+    await session.send("Network.emulateNetworkConditions", {
+      offline: false,
+      latency: 80,
+      downloadThroughput: 125_000,
+      uploadThroughput: 62_500,
+      connectionType: "cellular3g",
+    });
+    await caiGiaLap(page, { supabaseUrl, kichBan: "day" });
+    await nhetPhien(page, { supabaseUrl });
+    await page.setViewport({ width: 1366, height: 768 });
+    await page.goto(`${origin}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.waitForNetworkIdle({ idleTime: 500, timeout: 45_000 });
+    await page.evaluate((target) => {
+      window.__vmpStartRouteSkeletonClock?.();
+      const routeButton = document.querySelector(`[data-view="${target}"]`);
+      if (routeButton instanceof HTMLButtonElement) {
+        routeButton.click();
+      } else {
+        location.hash = `#v=${target}`;
+      }
+    }, screen);
+    await waitForRouteSettle(page, screen);
+    return page.evaluate(() => {
+      const state = window.__vmpDesktopPerformance;
+      return state?.skeletonAppearanceMs == null ? null : Math.round(state.skeletonAppearanceMs);
+    });
+  } finally {
+    await page.close();
+  }
+}
+
 export async function runDesktopPerformance({
   enforce = false,
   origin = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/",
@@ -164,6 +225,14 @@ export async function runDesktopPerformance({
     const results = [];
     for (const screen of screens) {
       const result = await measureScreen(browser, { screen, origin, supabaseUrl, enforce });
+      if (enforce) {
+        result.skeletonAppearanceMs = await measureRouteSkeletonAppearance(
+          browser, { screen, origin, supabaseUrl },
+        );
+        assertDesktopRuntimeBudget(screen, result, console.warn, {
+          requirePrimaryAction: screen === "reports",
+        });
+      }
       results.push(result);
       console.log(`${screen.padEnd(9)} wall=${result.wall}ms dcl=${result.dcl}ms tai=${result.tongKB}KB/${result.soRes}res dom=${result.domNodes} primary=${result.primaryActionableMs}ms skeleton=${result.skeletonAppearanceMs ?? "n/a"}ms long=${result.maxLongTaskMs}ms`);
       console.log(`          top: ${result.top.map((item) => `${item.n}=${item.kb}KB`).join(" · ")}`);

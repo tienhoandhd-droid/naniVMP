@@ -2,12 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  DESKTOP_SKELETON_SELECTOR,
   DESKTOP_RUNTIME_LIMITS,
   assertDesktopRuntimeBudget,
+  recordRouteSkeletonAppearance,
   runtimeGateScreens,
 } from "../../scripts/do-hieu-nang.mjs";
+import { SkeletonDashboard } from "../../src/components/ui/Primitives.tsx";
+import StateBoundary from "../../src/components/ui/StateBoundary.tsx";
 
 test("runtime gate rejects a late primary action, late skeleton appearance, and long task", () => {
   assert.deepEqual(DESKTOP_RUNTIME_LIMITS, {
@@ -77,4 +83,24 @@ test("runtime CI gate covers every approved desktop route", () => {
   assert.deepEqual(runtimeGateScreens(), [
     "reports", "alerts", "progress", "source", "workload", "rules", "phanquyen",
   ]);
+});
+
+test("runtime skeleton selector is emitted by each loading UI", () => {
+  assert.equal(DESKTOP_SKELETON_SELECTOR, "[data-desktop-skeleton]");
+  const dashboard = renderToStaticMarkup(React.createElement(SkeletonDashboard));
+  const boundary = renderToStaticMarkup(React.createElement(StateBoundary, {
+    state: "loading", title: "Đang tải dữ liệu",
+  }));
+  assert.match(dashboard, /data-desktop-skeleton/);
+  assert.match(boundary, /data-desktop-skeleton/);
+});
+
+test("route skeleton clock ignores boot and measures first marker from route intent", () => {
+  const clock = { routeIntentAt: null, skeletonAppearanceMs: null };
+  recordRouteSkeletonAppearance(clock, 173, true);
+  assert.equal(clock.skeletonAppearanceMs, null);
+  clock.routeIntentAt = 1_000;
+  recordRouteSkeletonAppearance(clock, 1_061, true);
+  recordRouteSkeletonAppearance(clock, 1_090, true);
+  assert.equal(clock.skeletonAppearanceMs, 61);
 });
