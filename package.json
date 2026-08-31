@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "perf:budget": "bash scripts/with-preview.sh -- node scripts/check-desktop-performance-budgets.mjs --runtime",
+    "perf:desktop": "node scripts/do-hieu-nang.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:unit": "node --import tsx --test tests/unit/*.test.mjs",
@@ -34,6 +36,8 @@
     "visual:runtime": "node --import tsx scripts/check-visual-runtime.mjs --runtime",
     "visual:baseline:seal": "node --import tsx scripts/check-visual-runtime.mjs --write-baseline-contract",
     "visual:contract": "node --import tsx scripts/check-visual-runtime.mjs --verify-baseline",
+    "visual:matrix:count": "node scripts/visual-matrix-contract.mjs --count",
+    "visual:matrix:verify": "node scripts/visual-matrix-contract.mjs --verify-output",
     "a11y": "playwright test -c playwright.a11y.config.ts",
     "e2e:luongchinh": "node tests/e2e/luong-chinh.mjs",
     "e2e:ux": "node tests/e2e/ux-refinement.mjs",

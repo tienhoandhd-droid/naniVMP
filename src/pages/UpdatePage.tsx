@@ -10,7 +10,7 @@ import { useDebounce } from "../hooks/index.ts";
 import { Card, Tag, Pill, StateBadge, PhanTrang, Trong } from "../components/ui/Primitives.tsx";
 import MobileTaskList from "../components/ui/MobileTaskList.tsx";
 import StateBoundary from "../components/ui/StateBoundary.tsx";
-import { useToast } from "../components/ui/ToastProvider.tsx";
+import { useScopedToast } from "../components/ui/ToastProvider.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import { buildProgressWorkspaceModel } from "../features/progress/progressWorkspaceModel.ts";
 import { countProgressAdvancedFilters, isDetailedProgressFix } from "../features/progress/progressFilterUi.ts";
@@ -323,7 +323,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     fix, status: fst, stage: stageF, period, showStopped: hienNgung,
   });
   const linked = conn?.status === "ok";
-  const toast = useToast();
+  const toast = useScopedToast();
   const handleProgressReload = useCallback(async () => {
     try {
       await onReload?.();
@@ -331,6 +331,30 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       await reloadRights();
     }
   }, [onReload, reloadRights]);
+  const doiTrangThai = async (id: string, newState: string, reason?: string) => {
+    // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp.
+    // Báo kết quả bằng toast của app (A4) thay vì alert() chặn màn hình.
+    if (!supabase) { toast.loi("Supabase chưa cấu hình."); return; }
+    if (!reason || !reason.trim()) return;
+    try {
+      const { data, error } = await supabase.rpc("rpc_set_item_state", {
+        p_validation_code: id,
+        p_state: newState,
+        p_reason: reason.trim(),
+      });
+      if (error) throw error;
+      const r = data as unknown as { ok?: boolean; error?: string } | null;
+      if (r && r.ok === false) throw new Error(r.error);
+      toast.thanhCong(`Đã đổi trạng thái ${id} → ${newState}`);
+      setEdit(null); setQuick(false);
+      void handleProgressReload(); // nạp lại dashboard và tập quyền trước khi hiện danh sách mới
+    } catch {
+      toast.loi(`Không đổi được trạng thái ${id}. Dữ liệu chưa được lưu.`, {
+        nhan: "Thử lại",
+        thucHien: () => { void doiTrangThai(id, newState, reason); },
+      });
+    }
+  };
 
   /* Deep link từ "Hôm nay" (anh Hoàn chốt 30/08 — B1): cuộn tới đúng dòng và
      tô sáng nó, ngoài việc đã mở sẵn hộp sửa ở effect deep link phía trên. */
@@ -402,11 +426,13 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
               {uuTien.map((r, i) => {
                 const goiY = [r.issues.length > 0 ? "hồ sơ thiếu/lệch" : null, r.overdueDays > 0 ? `trễ ${r.overdueDays} ngày` : null].filter(Boolean).join(" · ");
                 return (
-                  <button key={r.validationCode} type="button" disabled={readOnly} onClick={() => moHangMuc(r.validationCode)}
-                    className={`pr-uu-tien${i === 0 ? " pr-uu-tien--dau" : ""}${r.overdueDays > 0 ? " pr-uu-tien--tre" : ""}`}
-                    title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>
-                    {i === 0 ? "Mở " : ""}<span className="pr-ma">{r.validationCode}</span>{i === 0 && <span aria-hidden="true"> →</span>}
-                  </button>
+                  !readOnly
+                    ? <button key={r.validationCode} type="button" onClick={() => moHangMuc(r.validationCode)}
+                      className={`pr-uu-tien${i === 0 ? " pr-uu-tien--dau" : ""}${r.overdueDays > 0 ? " pr-uu-tien--tre" : ""}`}
+                      title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>
+                      {i === 0 && "Cập nhật "}<span className="pr-ma">{r.validationCode}</span>
+                    </button>
+                    : <span key={r.validationCode} className="pr-ma" title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>{r.validationCode}</span>
                 );
               })}
               {uuTien[0] && <span className="pr-hero__goi-y">{uuTien[0].title !== uuTien[0].validationCode ? uuTien[0].title : uuTien[0].validationCode}{uuTien[0].overdueDays > 0 ? ` · trễ ${uuTien[0].overdueDays} ngày` : ""}{uuTien[0].issues.length > 0 ? " · hồ sơ thiếu/lệch" : ""}</span>}
@@ -671,27 +697,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         })()}
         onOpenNext={(a) => { setEdit(a); setQuick(false); }}
         onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}
-        onChangeState={async (id, newState, reason) => {
-          // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp.
-          // Báo kết quả bằng toast của app (A4) thay vì alert() chặn màn hình.
-          if (!supabase) { toast.loi("Supabase chưa cấu hình."); return; }
-          if (!reason || !reason.trim()) return;
-          try {
-            const { data, error } = await supabase.rpc("rpc_set_item_state", {
-              p_validation_code: id,
-              p_state: newState,
-              p_reason: reason.trim(),
-            });
-            if (error) throw error;
-            const r = data as unknown as { ok?: boolean; error?: string } | null;
-            if (r && r.ok === false) throw new Error(r.error);
-            toast.thanhCong(`Đã đổi trạng thái ${id} → ${newState}`);
-            setEdit(null); setQuick(false);
-            void handleProgressReload(); // nạp lại dashboard và tập quyền trước khi hiện danh sách mới
-          } catch (e) {
-            toast.loi("Lỗi đổi trạng thái: " + ((e as Error).message || "không rõ"));
-          }
-        }}
+        onChangeState={doiTrangThai}
       />}
     </div>
   );

@@ -7,6 +7,7 @@
  * ===================================================================== */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 
 import {
   NAV_GROUP_ORDER, ORDERED_SCREEN_IDS,
@@ -37,6 +38,18 @@ test("frontend không còn công bố màn Nhân sự trong menu, screen hay th�
   assert.equal(NAV_ITEMS.some((item) => item.id === "people"), false);
   assert.equal(SCREEN_IDS.includes("people"), false);
   assert.equal(ORDERED_SCREEN_IDS.includes("people"), false);
+});
+
+test("metadata tiêu đề bao phủ exhaustive mọi ScreenId, kể cả route ẩn và alias", async () => {
+  // Nếu thêm ScreenId mà quên metadata, topbar/document title không được phép rơi về màn khác.
+  const url = new URL("../../src/lib/screenMetadata.ts", import.meta.url);
+  assert.equal(existsSync(url), true, "metadata phải ở module thuần, không import cả App để kiểm");
+  const metadata = await import(url.href);
+  assert.equal(typeof metadata.resolveScreenTitle, "function");
+  assert.deepEqual(Object.keys(metadata.SCREEN_TITLES).sort(), [...SCREEN_IDS].sort());
+  assert.equal(metadata.resolveScreenTitle("rules"), "Luật hệ thống đang áp dụng");
+  assert.equal(metadata.resolveScreenTitle("inventory"), "Cập nhật tiến độ");
+  assert.equal(metadata.resolveScreenTitle("accounts"), "Vai trò & phạm vi");
 });
 
 /* ---- Chuẩn hoá tên, chưa xét quyền ----------------------------------- */

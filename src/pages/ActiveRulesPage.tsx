@@ -9,16 +9,16 @@
  *  Dùng khi: đào tạo người mới · trả lời thanh tra "hệ thống áp luật gì" ·
  *  đối chiếu trước khi sửa luật.
  * ===================================================================== */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Scale, RefreshCw, Calculator, GanttChartSquare, ShieldCheck, Lock, Info,
 } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
+import StateBoundary from "../components/ui/StateBoundary.tsx";
+import ShellConfirmDialog from "../components/layout/ShellConfirmDialog.tsx";
 import { fetchActiveRules, recalcCriticality } from "../lib/supabaseData.ts";
 import type { ActiveRules } from "../lib/supabaseData.ts";
-import { useXacNhan } from "../hooks/useXacNhan.tsx";
-import { useToast } from "../components/ui/ToastProvider.tsx";
 import type { AccessContext } from "../lib/access.ts";
 
 /** Màu theo điểm trọng yếu 1..9 — cao thì đỏ, thấp thì xanh. */
@@ -101,6 +101,46 @@ function ScoreAxis({ title, muc }: {
   );
 }
 
+export type RecalcConfirmationState = "closed" | "open";
+export type RecalcConfirmationEvent = "open" | "cancel" | "confirm";
+
+export function transitionRecalcConfirmation(
+  state: RecalcConfirmationState,
+  event: RecalcConfirmationEvent,
+): RecalcConfirmationState {
+  if (event === "open") return "open";
+  if (state === "open" && (event === "cancel" || event === "confirm")) return "closed";
+  return state;
+}
+
+export function RecalcFeedback({ error, success, onRetry }: {
+  error?: string;
+  success?: string;
+  onRetry?: () => void;
+}) {
+  if (error) {
+    return (
+      <div role="alert" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 12,
+        padding: "10px 12px", borderRadius: 14, background: C.raspSoft, color: C.raspText, fontSize: 12, fontFamily: TEXT, lineHeight: 1.6 }}>
+        <span><b>Chấm lại chưa hoàn tất.</b> {error}</span>
+        {onRetry && <button type="button" onClick={onRetry}
+          style={{ ...btnPrimary, padding: "7px 10px", background: C.surface, color: C.raspText, border: `1px solid ${C.raspSoft}`, boxShadow: "none" }}>
+          Thử lại
+        </button>}
+      </div>
+    );
+  }
+  if (success) {
+    return (
+      <div role="status" style={{ marginTop: 12, padding: "10px 12px", borderRadius: 14,
+        background: C.mintSoft, color: C.mintText, fontSize: 12, fontFamily: TEXT, lineHeight: 1.6 }}>
+        {success}
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function ActiveRulesView({ access }: { access?: AccessContext | null }) {
   /* Như ServerChecksView: vai nghiệp vụ từ server, không đọc user.perm. */
   const canRun = access?.businessRole === "admin";
@@ -108,8 +148,10 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const { xacNhan, hopXacNhan } = useXacNhan();
-  const toast = useToast();
+  const [recalcConfirmation, setRecalcConfirmation] = useState<RecalcConfirmationState>("closed");
+  const [recalcError, setRecalcError] = useState("");
+  const [recalcSuccess, setRecalcSuccess] = useState("");
+  const recalcInFlight = useRef(false);
 
   const load = async () => {
     setLoading(true); setErr("");
@@ -119,56 +161,69 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
   };
   useEffect(() => { load(); }, []);
 
-  const recalc = async () => {
-    /* C3 (31/08): hộp chuẩn + toast thay window.confirm/alert. */
-    const dongY = await xacNhan({
-      title: "Chấm lại điểm trọng yếu?",
-      description: "Chỉ chấm lại các đối tượng CHƯA được QA chốt tay. "
-        + "Dòng nào QA đã sửa (nguồn = 'đã duyệt') sẽ KHÔNG bị ghi đè.",
-      confirmLabel: "Chấm lại",
-    });
-    if (!dongY) return;
-    setBusy(true);
-    try {
-      const r = await recalcCriticality(true);
-      toast.thanhCong(r.msg || "Đã chấm lại");
-      await load();
-    } catch (e) { toast.loi("Lỗi: " + ((e as Error).message || "không rõ")); }
-    setBusy(false);
+  const requestRecalc = () => {
+    setRecalcError("");
+    setRecalcSuccess("");
+    setRecalcConfirmation((state) => transitionRecalcConfirmation(state, "open"));
   };
 
-  if (loading) return <Card><div style={{ padding: 20, color: C.plumSoft }}>Đang tải luật…</div></Card>;
+  const cancelRecalc = () => {
+    setRecalcConfirmation((state) => transitionRecalcConfirmation(state, "cancel"));
+  };
+
+  const confirmRecalc = async () => {
+    if (recalcInFlight.current) return;
+    recalcInFlight.current = true;
+    setRecalcConfirmation((state) => transitionRecalcConfirmation(state, "confirm"));
+    setBusy(true);
+    setRecalcError("");
+    setRecalcSuccess("");
+    try {
+      const r = await recalcCriticality(true);
+      setRecalcSuccess(r.msg || "Đã chấm lại điểm trọng yếu.");
+      await load();
+    } catch (e) {
+      setRecalcError((e as Error).message || "Máy chủ không phản hồi. Kiểm tra kết nối rồi thử lại.");
+    } finally {
+      recalcInFlight.current = false;
+      setBusy(false);
+    }
+  };
+
+  if (loading) return (
+    <Card>
+      <StateBoundary state="loading" title="Đang tải luật đang áp dụng…" skeletonRows={4} />
+    </Card>
+  );
 
   // Lỗi kỹ thuật của Postgres ("permission denied for function …") không nói
   // cho người dùng biết phải làm gì. Dịch ra việc cần làm, giữ nguyên câu gốc
   // ở dòng nhỏ để người hỗ trợ còn tra.
-  if (err || !rules) return (
-    <Card>
-      <div style={{ padding: "18px 20px", borderRadius: 14, background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
-        <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>
-          Không đọc được luật đang áp dụng
-        </div>
-        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 6, lineHeight: 1.65 }}>
-          {/permission denied|401|JWT|not authorized/i.test(err)
-            ? "Phiên đăng nhập đã hết hạn hoặc tài khoản chưa đủ quyền. Đăng nhập lại rồi mở lại trang này."
-            : "Máy chủ không trả về dữ liệu luật. Thử lại sau ít phút; nếu vẫn vậy, gửi dòng chữ bên dưới cho người hỗ trợ."}
-        </div>
-        {err && (
-          <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 8, fontFamily: NUM,
-                        background: C.surface, borderRadius: 8, padding: "8px 11px" }}>{err}</div>
-        )}
-        <button onClick={load} style={{ ...btnPrimary, marginTop: 13, padding: "9px 18px", borderRadius: 14, fontSize: 14 }}>
-          Thử lại
-        </button>
-      </div>
-    </Card>
-  );
+  if (err || !rules) {
+    const loiPhienHoacQuyen = /permission denied|401|JWT|not authorized/i.test(err);
+    const huongDan = loiPhienHoacQuyen
+      ? "Phiên đăng nhập đã hết hạn hoặc tài khoản chưa đủ quyền. Đăng nhập lại rồi mở lại trang này."
+      : "Máy chủ không trả về dữ liệu luật. Thử lại sau ít phút; nếu vẫn vậy, gửi chi tiết kỹ thuật bên dưới cho người hỗ trợ.";
+    return (
+      <Card>
+        <StateBoundary
+          state="error"
+          title="Không đọc được luật đang áp dụng"
+          description={<>
+            <span>{huongDan}</span>
+            {err && <><br /><span>Chi tiết kỹ thuật: {err}</span></>}
+          </>}
+          onRetry={() => { void load(); }}
+        />
+      </Card>
+    );
+  }
 
   const dtl = rules.diem_trong_yeu;
   const tl = rules.sinh_timeline;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div data-desktop-primary-actionable style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Lời dẫn */}
       <Card variant="strong">
         <CardTitle icon={Scale}
@@ -286,13 +341,15 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
           <Tag color={C.marigoldText} bg={C.marigoldSoft}>{dtl.cho_duyet} chờ QA duyệt</Tag>
           <Tag color={C.mintText} bg={C.mintSoft}>{dtl.da_duyet} đã duyệt</Tag>
           {canRun && (
-            <button onClick={recalc} disabled={busy}
+            <button type="button" onClick={requestRecalc} disabled={busy}
               style={{ ...btnPrimary, background: C.surface, color: C.plum,
                        border: `1.5px solid ${C.pinkSoft}`, opacity: busy ? 0.6 : 1 }}>
               <RefreshCw size={15} /> {busy ? "Đang chấm…" : "Chấm lại (không đụng dòng đã duyệt)"}
             </button>
           )}
         </div>
+
+        <RecalcFeedback error={recalcError} success={recalcSuccess} onRetry={requestRecalc} />
 
         <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 14,
                       background: C.marigoldSoft, color: C.marigoldText,
@@ -303,6 +360,16 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
           chuyển sang "đã duyệt" và lần chấm tự động sau <b>không ghi đè</b>.
         </div>
       </Section>
+
+      <ShellConfirmDialog
+        open={recalcConfirmation === "open"}
+        title="Chấm lại điểm trọng yếu"
+        description="Chấm lại điểm trọng yếu cho các đối tượng CHƯA được QA chốt tay. Dòng QA đã sửa (nguồn “đã duyệt”) sẽ không bị ghi đè."
+        confirmLabel="Chấm lại"
+        cancelLabel="Huỷ"
+        onConfirm={() => { void confirmRecalc(); }}
+        onCancel={cancelRecalc}
+      />
 
       {/* Sinh timeline */}
       <Section icon={GanttChartSquare} title="Luật sinh hạng mục timeline"
@@ -370,7 +437,6 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
           {rules.toan_ven_du_lieu.map((x, i) => <li key={i}>{x}</li>)}
         </ul>
       </Section>
-      {hopXacNhan}
     </div>
   );
 }

@@ -21,7 +21,8 @@ import {
   parseD, fmtVN, daysBetween, addMonths, txt, nguoiPhuTrach, milestones,
   qrmRpn, qrmLevel, byRisk,
 } from "../utils/helpers.ts";
-import { Card, CardTitle, Tag, Modal, Pill, PhanTrang, CauKetLuan } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Pill, PhanTrang, CauKetLuan } from "../components/ui/Primitives.tsx";
+import ViewportDialog from "../components/ui/ViewportDialog.tsx";
 import { useDebounce, usePerformers } from "../hooks/index.ts";
 import { chayPhanTichAi, aiConfigured } from "../lib/aiReport.ts";
 import AiMailModal from "../components/ai/AiMailModal.tsx";
@@ -97,7 +98,7 @@ function phaseLabel(enumVal: unknown, sheetVal: unknown): string {
 /* Dòng cảnh báo tách khỏi AlertsView và bọc memo: trước đây hàm Row được
  tạo lại mỗi lần gõ một phím vào ô tìm, nên React coi là component MỚI và
  dựng lại toàn bộ 279 dòng — đó là chỗ trễ khi gõ. */
-const Row = memo(function Row({ r, email, onOpen }: {
+export const AlertRowItem = memo(function AlertRowItem({ r, email, onOpen }: {
 r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
 }) {
   const cls = (CLS as Record<string, typeof CLS.tb>)[String(r.a.cls ?? "tb")] ?? CLS.tb;
@@ -107,11 +108,12 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
   const edge = r.kind === "over" ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft
     : r.kind === "risk" ? C.raspSoft : C.pinkSoft;
   return (
-    <div className="vmp-row vmp-lift" role="button" tabIndex={0}
-      onClick={() => onOpen(r)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } }}
-      title="Bấm để xem timeline các mốc hạn"
-      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${edge}`, cursor: "pointer" }}>
+    <div className="vmp-row vmp-lift"
+      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${edge}` }}>
+      <button type="button" onClick={() => onOpen(r)}
+        title="Bấm để xem timeline các mốc hạn"
+        style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, padding: 0,
+          border: "none", background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer", fontFamily: TEXT }}>
       {/* Ô ngày — trễ thì đỏ, còn hạn thì cam/xanh theo nhóm */}
       <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: late ? C.raspSoft : r.kind === "soon" ? C.marigoldSoft : C.skySoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: late ? C.raspText : r.kind === "soon" ? C.marigoldText : C.skyText, lineHeight: 1 }}>{Math.abs(r.dleft)}</span>
@@ -131,9 +133,6 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
         <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
           {r.a.id} · Mốc <b style={{ color: late ? C.raspText : C.marigoldText }}>{r.stage}</b>
           {r.date ? ` · hạn ${fmtVN(r.date)}` : ""} · {nguoiPhuTrach(r.a.owner)}
-          {email ? <> (<a href={`mailto:${email}?subject=${encodeURIComponent(`[VMP] ${KIND_LABEL[r.kind]}: ${r.a.id} — ${r.a.name}`)}`}
-            onClick={(e) => e.stopPropagation()}
-            style={{ color: C.lavText, fontWeight: 700 }}>{email}</a>)</> : null}
           {r.a.dep ? ` · BC: ${r.a.dep}` : ""}
         </div>
       </div>
@@ -142,9 +141,24 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
         <Tag color={C.plumSoft} bg={C.pinkMist}>{KIND_LABEL[r.kind]}</Tag>
       </div>
       <ChevronRight size={18} color={C.plumSoft} style={{ flexShrink: 0 }} />
+      </button>
+      {email ? (
+        <a href={`mailto:${email}?subject=${encodeURIComponent(`[VMP] ${KIND_LABEL[r.kind]}: ${r.a.id} — ${r.a.name}`)}`}
+          aria-label={`Nhắc ${r.a.id} qua email: ${email}`}
+          style={{ color: C.lavText, fontWeight: 700, flexShrink: 0 }}>{email}</a>
+      ) : null}
     </div>
   );
 });
+
+export function AlertAiError({ message }: { message: string }) {
+  return (
+    <div role="alert" style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, fontWeight: 800,
+      color: C.raspText, background: C.raspSoft, borderRadius: 14, padding: "12px 15px" }}>
+      <AlertCircle size={16} aria-hidden="true" /> {message}
+    </div>
+  );
+}
 
 /** Xuất ra ngoài để test render được bằng react-dom/server. */
 export function AlertDetailModal({ r, email, onClose }: {
@@ -186,7 +200,13 @@ export function AlertDetailModal({ r, email, onClose }: {
   );
 
   return (
-    <Modal onClose={onClose} wide icon={CalendarClock} title={`Chi tiết · ${a.id}`}>
+    <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} icon={CalendarClock} title={`Chi tiết · ${a.id}`}
+      footer={(
+        <button type="button" onClick={onClose} style={{ ...btnPrimary, background: C.surface, color: C.plum,
+          border: `1.5px solid ${C.pinkSoft}` }}>
+          Đóng
+        </button>
+      )}>
       {/* Đầu hộp: hạng mục là gì, ai làm, rủi ro bao nhiêu */}
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 15px", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -276,7 +296,7 @@ export function AlertDetailModal({ r, email, onClose }: {
         báo cáo T−5, trong đó {dep} ngày là theo phân loại báo cáo “{txt(a.dep)}”. Lệch giữa hạn kế hoạch và hạn
         theo luật nghĩa là kế hoạch đang đặt khác quy tắc — kiểm lại trước khi lấy làm mốc.
       </div>
-    </Modal>
+    </ViewportDialog>
   );
 }
 
@@ -310,7 +330,7 @@ function CumRow({ c, email, onOpen }: {
       </button>
       {mo && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, background: C.surfaceSunk }}>
-          {c.rows.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={email(r.a.owner)} onOpen={onOpen} />)}
+          {c.rows.map((r) => <AlertRowItem key={`${r.kind}-${r.a.id}`} r={r} email={email(r.a.owner)} onOpen={onOpen} />)}
         </div>
       )}
     </div>
@@ -523,7 +543,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     <div className="alerts-page-shell">
       {/* Hai mặt của cùng một việc: danh sách để làm, ma trận để nhìn tổng thể */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => setTab("list")} style={tabBtn(tab === "list")}>
+        <button data-desktop-primary-actionable type="button" onClick={() => setTab("list")} style={tabBtn(tab === "list")}>
           <AlertCircle size={15} /> Danh sách cảnh báo
         </button>
         <button type="button" onClick={() => setTab("matrix")} style={tabBtn(tab === "matrix")}>
@@ -692,7 +712,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {gom
                   ? cumCat.map((c) => <CumRow key={c.khoa} c={c} email={(t) => find(t)?.email ?? undefined} onOpen={moKho} />)
-                  : shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
+                  : shownCut.map((r) => <AlertRowItem key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
                 {shown.length > 0 && (
                   <PhanTrang tong={gom ? cum.length : shown.length} trang={trang} setTrang={setTrang}
                     coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "cụm" : "hạng mục"} />
@@ -712,7 +732,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {gom
                   ? cumCat.map((c) => <CumRow key={c.khoa} c={c} email={(t) => find(t)?.email} onOpen={moKho} />)
-                  : shownCut.map((r) => <Row key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
+                  : shownCut.map((r) => <AlertRowItem key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
                 {shown.length > 0 && (
                   <PhanTrang tong={gom ? cum.length : shown.length} trang={trang} setTrang={setTrang}
                     coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "cụm" : "hạng mục"} />
@@ -805,12 +825,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                   <AlertCircle size={16} aria-hidden="true" /> {AI_UNAVAILABLE}
                 </div>
               )}
-              {aiErr && (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, fontWeight: 800,
-                  color: C.raspText, background: C.raspSoft, borderRadius: 14, padding: "12px 15px" }}>
-                  <AlertCircle size={16} /> {aiErr}
-                </div>
-              )}
+              {aiErr && <AlertAiError message={aiErr} />}
               {aiLoading && (
                 <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}>
                   <RefreshCw size={22} className="spin" color={C.pink} />

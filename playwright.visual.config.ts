@@ -11,6 +11,7 @@
  *  workflow "visual-baseline" (workflow_dispatch), không sửa tay.
  * ===================================================================== */
 import { defineConfig } from "@playwright/test";
+import { VISUAL_PROJECTS } from "./scripts/visual-matrix-contract.mjs";
 
 export default defineConfig({
   testDir: "./tests/visual",
@@ -42,9 +43,8 @@ export default defineConfig({
   /* Ma trận viewport (nghiên cứu 4+5): lỗi đè chữ trước đây chỉ lộ ở bố
    * cục nhất định — một viewport là không đủ. Project "chromium" giữ
    * NGUYÊN TÊN để baseline 1440 hiện có còn giá trị. */
-  projects: [
-    { name: "chromium", use: { browserName: "chromium" } },
-    { name: "chromium-1366", use: { browserName: "chromium", viewport: { width: 1366, height: 768 } } },
-    { name: "chromium-1920", use: { browserName: "chromium", viewport: { width: 1920, height: 1080 } } },
-  ],
+  projects: VISUAL_PROJECTS.map(({ name, viewport }) => ({
+    name,
+    use: { browserName: "chromium", viewport },
+  })),
 });

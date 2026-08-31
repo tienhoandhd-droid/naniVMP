@@ -14,6 +14,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { VISUAL_SCREENS, VISUAL_THEMES } from "../../scripts/visual-matrix-contract.mjs";
 
 // Kho giả lập là ESM thuần — Playwright (esbuild) nhập được thẳng.
 import { dungKhoDuLieu, phienGia, layRef, traLoi } from "../e2e/gia-lap-supabase.mjs";
@@ -98,18 +99,8 @@ async function caiGiaLap(page: Page, che: "light" | "dark") {
   await page.emulateMedia({ reducedMotion: "reduce" });
 }
 
-const MAN: Array<[string, string]> = [
-  ["today", "hom-nay"],
-  ["overview", "tong-quan"],
-  ["source", "danh-muc"],
-  ["progress", "tien-do"],
-  ["timeline", "timeline"],
-  ["alerts", "canh-bao"],
-  ["reports", "bao-cao"],
-];
-
-for (const che of ["light", "dark"] as const) {
-  for (const [hash, ten] of MAN) {
+for (const che of VISUAL_THEMES as Array<"light" | "dark">) {
+  for (const [hash, ten] of VISUAL_SCREENS) {
     test(`${ten} · ${che}`, async ({ page }) => {
       await caiGiaLap(page, che);
       await page.goto(`/#v=${hash}`);

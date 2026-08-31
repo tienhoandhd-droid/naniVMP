@@ -77,15 +77,16 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/with-preview.sh -- npm run visual 2>&1 | tee visual-output.log
-          grep -Eq '^[[:space:]]*39 passed( \(|$)' visual-output.log
+          npm run --silent visual:matrix:verify -- visual-output.log
 
-      - name: Stage and validate exactly 39 PNGs plus the seal
+      - name: Stage and validate the complete matrix plus the seal
         run: |
           set -euo pipefail
+          expected_count="$(npm run --silent visual:matrix:count)"
           git add tests/visual/baselines tests/visual/baseline-contract.env
           test -z "$(git diff --cached --name-only --diff-filter=DR)"
           mapfile -t changed < <(git diff --cached --name-only)
-          test "${#changed[@]}" -eq 40
+          test "${#changed[@]}" -eq "$((expected_count + 1))"
           png_count=0
           for file in "${changed[@]}"; do
             if [ "$file" = tests/visual/baseline-contract.env ]; then
@@ -96,8 +97,8 @@ jobs:
               *) echo "unexpected generated path: $file" >&2; exit 1 ;;
             esac
           done
-          test "$png_count" -eq 39
-          test "$(find tests/visual/baselines -type f -path '*-linux/*.png' -name '*.png' | wc -l | tr -d ' ')" -eq 39
+          test "$png_count" -eq "$expected_count"
+          test "$(find tests/visual/baselines -type f -path '*-linux/*.png' -name '*.png' | wc -l | tr -d ' ')" -eq "$expected_count"
           git diff --cached --check
 
       - name: Commit and push generated baseline artifacts

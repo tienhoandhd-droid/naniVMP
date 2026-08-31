@@ -344,8 +344,8 @@
 }
 
 .reg-flag[data-on="true"] {
-  background: color-mix(in srgb, var(--c-mint) 34%, transparent);
-  color: var(--c-mint-text);
+  background: var(--lp-success);
+  color: var(--lp-on-success);
 }
 
 .reg-flag[data-on="true"]::before {

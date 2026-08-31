@@ -37,7 +37,7 @@ export default function StateBoundary({
 
   if (state === "loading") {
     return (
-      <div className="lp-state-boundary lp-state-boundary--loading" aria-busy="true" aria-live="polite">
+      <div data-desktop-skeleton className="lp-state-boundary lp-state-boundary--loading" aria-busy="true" aria-live="polite">
         <span className="lp-visually-hidden">{title}</span>
         {Array.from({ length: skeletonRows }, (_, i) => (
           <span key={i} className="lp-skeleton-row" aria-hidden="true" />

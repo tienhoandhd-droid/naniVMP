@@ -261,13 +261,16 @@ export function CauKetLuan({ chinh, phu, tone = "ok" }: {
   );
 }
 
-export function CardTitle({ icon: Icon, children, sub, right }: {
+export function CardTitle({ icon: Icon, children, sub, right, level = 2 }: {
   icon?: LucideIcon;
   children?: ReactNode;
   sub?: ReactNode;
   /** Nội dung phụ căn phải (chú giải màu, nút nhỏ…). */
   right?: ReactNode;
+  /** Cấp đề mục của section đang sở hữu card này. */
+  level?: 2 | 3;
 }) {
+  const Heading = level === 3 ? "h3" : "h2";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
       {Icon && (
@@ -276,7 +279,7 @@ export function CardTitle({ icon: Icon, children, sub, right }: {
         </div>
       )}
       <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>{children}</div>
+        <Heading style={{ margin: 0, fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>{children}</Heading>
         {sub && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>{sub}</div>}
       </div>
       {right}
@@ -645,7 +648,7 @@ export function SkeletonPulse({ w = "100%", h = 16, r = 8 }: {
 
 export function SkeletonDashboard() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0" }}>
+    <div data-desktop-skeleton style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0" }}>
       <Card variant="strong" style={{ display: "flex", alignItems: "center", gap: 18, padding: 24 }}>
         <SkeletonPulse w={100} h={100} r={999} />
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>

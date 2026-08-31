@@ -7,7 +7,8 @@ import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../
 import { parseD, fmtVN, clamp, wlMonthOf, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
-import { Card, CardTitle, Tag, Modal, Donut, Pill, CauKetLuan } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Donut, Pill, CauKetLuan } from "../components/ui/Primitives.tsx";
+import ViewportDialog from "../components/ui/ViewportDialog.tsx";
 import NhomTab, { NhomTabPanel, DongSo, useNhomTab } from "../components/ui/NhomTab.tsx";
 import type { ValiMood } from "../components/brand/ValiIllustration.tsx";
 
@@ -34,7 +35,7 @@ interface WlPerson {
   critCao: number;
 }
 
-function WorkloadDetailModal({ detail, onClose }: {
+export function WorkloadDetailModal({ detail, onClose }: {
   detail: { title: string; tasks: PlanActivity[]; [k: string]: unknown };
   onClose: () => void;
 }) {
@@ -44,7 +45,13 @@ function WorkloadDetailModal({ detail, onClose }: {
   const [daChep, setDaChep] = useState(false);
   const PhaseChip = ({ label, done, cong }: { label: string; done: boolean; cong?: number | null }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
   return (
-    <Modal onClose={onClose} title={detail.title} icon={Activity} wide>
+    <ViewportDialog open onRequestClose={onClose} maxWidth={620} title={detail.title} icon={Activity}
+      footer={(
+        <button type="button" onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
+          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
+          Đóng
+        </button>
+      )}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></span>
         {/* Vận hành (spec 01/09): điều phối viên cần DANH SÁCH MÃ để dán vào
@@ -81,7 +88,7 @@ function WorkloadDetailModal({ detail, onClose }: {
           );
         })}
       </div>
-    </Modal>
+    </ViewportDialog>
   );
 }
 
@@ -235,7 +242,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const openDetail = (title: string, tasks: PlanActivity[]) => {
     if (tasks.length) setDetail({ title, tasks });
   };
-  const Btn = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) => <button onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
+  const Btn = ({ on, onClick, children, primary = false }: { on: boolean; onClick: () => void; children: ReactNode; primary?: boolean }) => <button data-desktop-primary-actionable={primary || undefined} onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
   /* ---------------- Câu kết luận của từng biểu đồ ----------------
    * Ba biểu đồ dưới đây trước giờ chỉ bày số. Người xem phải tự quét 20
    * thẻ người, 12 cột tháng rồi tự rút ra "ai quá tải, tháng nào" — đúng
@@ -349,7 +356,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           <p className="hn-loi pop" key={mood}>{bubble}</p>
           <p className="vali-hero__mota">Còn lại: <b>{totalCong} ngày công</b> · <b>{totalHoso} hồ sơ</b> · <b>{people.length} người</b></p>
           <div className="vali-hero__controls">
-            <div className="vali-hero__nhom"><span>Khung thời gian</span><div><Btn on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
+            <div className="vali-hero__nhom"><span>Khung thời gian</span><div><Btn primary on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
             <div className="vali-hero__nhom"><span>Tô theo</span><div><Btn on={metric === "cong"} onClick={() => setMetric("cong")}>Ngày công</Btn><Btn on={metric === "hoso"} onClick={() => setMetric("hoso")}>Hồ sơ</Btn></div></div>
           </div>
         </div>

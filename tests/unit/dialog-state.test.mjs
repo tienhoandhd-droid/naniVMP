@@ -12,7 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   nextDialogFocus, updateDirtyRegistry, summarizeDirty,
 } from "../../src/components/ui/dialogState.ts";
-import ViewportDialog from "../../src/components/ui/ViewportDialog.tsx";
+import ViewportDialog, { canRequestViewportDialogClose } from "../../src/components/ui/ViewportDialog.tsx";
 import ShellConfirmDialog from "../../src/components/layout/ShellConfirmDialog.tsx";
 
 const GOC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -91,6 +91,19 @@ test("nút đóng có tên đọc được", () => {
   assert.match(html, /aria-label="Đóng"/);
 });
 
+test("dismissDisabled locks every primitive dismiss route and marks the header control unavailable", () => {
+  assert.equal(canRequestViewportDialogClose(false, "escape"), true);
+  assert.equal(canRequestViewportDialogClose(false, "backdrop"), true);
+  assert.equal(canRequestViewportDialogClose(false, "button"), true);
+  assert.equal(canRequestViewportDialogClose(true, "escape"), false);
+  assert.equal(canRequestViewportDialogClose(true, "backdrop"), false);
+  assert.equal(canRequestViewportDialogClose(true, "button"), false);
+
+  const html = dungHop({ dismissDisabled: true }, "x");
+  assert.match(html, /class="lp-dialog__close lp-dialog__close--disabled"/);
+  assert.match(html, /aria-label="Đóng"[^>]*aria-disabled="true"[^>]*disabled=""/);
+});
+
 test("chân hộp thoại chỉ dựng khi có nội dung", () => {
   assert.match(dungHop({ footer: "nút" }, "x"), /lp-dialog__footer/);
   assert.doesNotMatch(dungHop({}, "x"), /lp-dialog__footer/);
@@ -114,6 +127,12 @@ test("hộp thoại mở bằng scale mềm theo §6.7d và tắt khi giảm chu
   const khoi = css.slice(css.indexOf(".lp-dialog"));
   assert.match(khoi, /var\(--lp-mo-modal\)/);
   assert.match(khoi, /prefers-reduced-motion/);
+});
+
+test("nút đóng bị khóa có affordance disabled riêng", () => {
+  const css = doc("src/styles/lotus-components.css");
+  assert.match(css, /\.lp-dialog__close--disabled[^{]*\{[^}]*cursor:\s*not-allowed/s);
+  assert.match(css, /\.lp-dialog__close:disabled[^{]*\{[^}]*opacity:/s);
 });
 
 /* ---- Hộp xác nhận của shell ----------------------------------------- */

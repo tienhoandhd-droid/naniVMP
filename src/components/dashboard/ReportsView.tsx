@@ -427,7 +427,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             {/* #6 (01/09): MỘT primary — Excel là bản mọi người thật sự nộp
                 (đủ 5 sheet); PDF/HTML là phụ, cùng một kiểu ghost để không
                 tranh nhau bằng ba màu ba kiểu như trước. */}
-            <button onClick={exportExcel} style={toolBtn(GRAD, "#fff")}><Download size={16} /> Xuất Excel (đủ 5 sheet)</button>
+            <button data-desktop-primary-actionable onClick={exportExcel} style={toolBtn(GRAD, "#fff")}><Download size={16} /> Xuất Excel (đủ 5 sheet)</button>
             <button onClick={printPDF} style={ghostBtn}><Printer size={16} /> PDF</button>
             <button onClick={downloadHtml} style={ghostBtn}><Download size={16} /> HTML</button>
           </div>

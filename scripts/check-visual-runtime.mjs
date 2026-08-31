@@ -17,11 +17,12 @@ import {
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { VISUAL_BASELINE_COUNT } from "./visual-matrix-contract.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const baselineDirectory = path.join(root, "tests", "visual", "baselines");
 const baselineContractPath = path.join(root, "tests", "visual", "baseline-contract.env");
-const expectedBaselineCount = 39;
+const expectedBaselineCount = VISUAL_BASELINE_COUNT;
 const expected = {
   browserVersion: "151.0.7922.34",
   executableSha256: "0b20b130e7edd9dd51873be867761295fe0cfad490c2b9a64f95bd3cfc08fa71",

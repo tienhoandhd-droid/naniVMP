@@ -14,11 +14,12 @@
  *  người này"; n8n đọc lại số từ Supabase rồi mới soạn. Trình duyệt không
  *  được là nguồn số liệu cho một cái mail gửi ra ngoài.
  * ===================================================================== */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Mail, Send, RefreshCw, AlertCircle, CheckCircle2, Users, Search } from "lucide-react";
 
 import { C, TEXT, btnPrimary } from "../../constants/theme.ts";
-import { Modal, Tag, TableScroll } from "../ui/Primitives.tsx";
+import { Tag, TableScroll } from "../ui/Primitives.tsx";
+import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { fetchAlertRecipients, fetchStaffEmails, fetchPerformers } from "../../lib/supabaseData.ts";
 import { chayPhanTichAi, emailHopLe, tachEmail, AI_NHAN } from "../../lib/aiReport.ts";
 import type { AiKind, AiPeriod, AiResult } from "../../lib/aiReport.ts";
@@ -34,6 +35,22 @@ interface Ung {
 }
 
 const LS_LAST = "vmp_ai_mail_last_v1";
+
+/** React state updates after this event returns, so closing must consult a
+ * synchronous lock rather than the last rendered `dangGui` value. */
+export function createAiMailSendCoordinator() {
+  let busy = false;
+  return {
+    isBusy: () => busy,
+    begin: () => {
+      if (busy) return false;
+      busy = true;
+      return true;
+    },
+    finish: () => { busy = false; },
+    requestClose: (onClose: () => void) => { if (!busy) onClose(); },
+  };
+}
 
 function gopUngVien(
   recips: { email: string; recipient_name: string | null; ai_report_enabled: boolean }[],
@@ -83,6 +100,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
   const [dangGui, setDangGui] = useState(false);
   const [ketQua, setKetQua] = useState<AiResult | null>(null);
   const [loiGui, setLoiGui] = useState("");
+  const sendCoordinator = useRef(createAiMailSendCoordinator());
 
   useEffect(() => {
     let song = true;
@@ -124,6 +142,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
   });
 
   const gui = async () => {
+    if (!guiDuoc || !sendCoordinator.current.begin()) return;
     setDangGui(true); setLoiGui(""); setKetQua(null);
     try { localStorage.setItem(LS_LAST, goTay); } catch { /* riêng tư/hết chỗ — không chặn việc gửi */ }
     try {
@@ -138,9 +157,12 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
     } catch (e) {
       setLoiGui((e as Error)?.message || "Không gọi được n8n.");
     } finally {
+      sendCoordinator.current.finish();
       setDangGui(false);
     }
   };
+
+  const requestClose = () => sendCoordinator.current.requestClose(onClose);
 
   const daGui = ketQua?.mail?.da_gui || [];
   const thatBai = ketQua?.mail?.that_bai || [];
@@ -152,8 +174,25 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
   };
 
   return (
-    <Modal onClose={onClose} wide icon={Mail}
-      title={`Gửi bản phân tích AI · ${AI_NHAN[loai].toLowerCase()}`}>
+    <ViewportDialog open onRequestClose={requestClose} maxWidth={620} icon={Mail}
+      title={`Gửi bản phân tích AI · ${AI_NHAN[loai].toLowerCase()}`}
+      dismissDisabled={dangGui}
+      footer={(
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <button onClick={requestClose} disabled={dangGui} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
+            background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: dangGui ? "not-allowed" : "pointer", opacity: dangGui ? 0.55 : 1 }}>
+            {ketQua?.ok ? "Đóng" : "Huỷ"}
+          </button>
+          <button onClick={gui} disabled={dangGui || !guiDuoc}
+            title={guiDuoc ? undefined : "Chưa chọn người nhận nào"}
+            style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
+              borderRadius: 14, fontSize: 14, opacity: dangGui || !guiDuoc ? 0.55 : 1,
+              cursor: dangGui || !guiDuoc ? "not-allowed" : "pointer" }}>
+            {dangGui ? <RefreshCw size={16} className="spin" /> : <Send size={16} />}
+            {dangGui ? "AI đang phân tích rồi gửi…" : "Chạy AI và gửi mail"}
+          </button>
+        </div>
+      )}>
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 14, lineHeight: 1.65 }}>
         Phạm vi gửi: <b style={{ color: C.plum }}>{phamViLabel}</b>
         {ky ? <> · kỳ <b style={{ color: C.plum }}>{ky.nhan}</b></> : null}.
@@ -269,20 +308,6 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18, flexWrap: "wrap" }}>
-        <button onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
-          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
-          {ketQua?.ok ? "Đóng" : "Huỷ"}
-        </button>
-        <button onClick={gui} disabled={dangGui || !guiDuoc}
-          title={guiDuoc ? undefined : "Chưa chọn người nhận nào"}
-          style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
-            borderRadius: 14, fontSize: 14, opacity: dangGui || !guiDuoc ? 0.55 : 1,
-            cursor: dangGui || !guiDuoc ? "not-allowed" : "pointer" }}>
-          {dangGui ? <RefreshCw size={16} className="spin" /> : <Send size={16} />}
-          {dangGui ? "AI đang phân tích rồi gửi…" : "Chạy AI và gửi mail"}
-        </button>
-      </div>
-    </Modal>
+    </ViewportDialog>
   );
 }

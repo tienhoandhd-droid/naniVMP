@@ -11,7 +11,7 @@
  *    · rpc_due_alerts             — ĐÚNG danh sách workflow cảnh báo sẽ gửi
  *    · rpc_refresh_computed_status— tính lại computed_status theo hôm nay
  * ===================================================================== */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Radar, RefreshCw, AlertTriangle, CheckCircle2, Bell, Gauge, PlayCircle,
   ClipboardCheck, Clock, FileCheck2,
@@ -20,6 +20,7 @@ import { C, TEXT, btnPrimary } from "../constants/theme.ts";
 import { useXacNhan } from "../hooks/useXacNhan.tsx";
 import { useToast } from "../components/ui/ToastProvider.tsx";
 import { Card, CardTitle, Tag, KpiCard, TableScroll } from "../components/ui/Primitives.tsx";
+import StateBoundary from "../components/ui/StateBoundary.tsx";
 import {
   fetchDashboardKpi, checkDataQuality, fetchDueAlerts, refreshComputedStatus,
 } from "../lib/supabaseData.ts";
@@ -45,14 +46,17 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
   const [issues, setIssues] = useState<ServerQualityIssue[]>([]);
   const [alerts, setAlerts] = useState<DueAlert[]>([]);
   const [soonDays, setSoonDays] = useState(7);
+  const [loadedSoonDays, setLoadedSoonDays] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const { xacNhan, hopXacNhan } = useXacNhan();
   const toast = useToast();
   const [err, setErr] = useState("");
   const [sevFilter, setSevFilter] = useState("all");
+  const loadGeneration = useRef(0);
 
   const load = async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true); setErr("");
     try {
       const [k, q, a] = await Promise.all([
@@ -60,11 +64,15 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
         checkDataQuality(year),
         fetchDueAlerts(year, soonDays),
       ]);
+      if (generation !== loadGeneration.current) return;
       setKpi(k); setIssues(q); setAlerts(a);
+      setLoadedSoonDays(soonDays);
     } catch (e) {
+      if (generation !== loadGeneration.current) return;
       setErr((e as Error).message || "Lỗi tải dữ liệu từ server");
+    } finally {
+      if (generation === loadGeneration.current) setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [soonDays]);
@@ -81,6 +89,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
 
   const overdue = alerts.filter((a) => a.alert_type === "overdue");
   const dueSoon = alerts.filter((a) => a.alert_type === "due_soon");
+  const snapshotSoonDays = loadedSoonDays ?? soonDays;
 
   const runRefresh = async () => {
     /* C3 (31/08): hộp chuẩn thay window.confirm/alert — theo theme, có focus
@@ -103,8 +112,32 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
     setBusy(false);
   };
 
+  /* Lần tải đầu chưa có snapshot thì cả route có đúng một readiness state.
+     Không dựng các card số 0 bên dưới: số 0 ở đây chưa phải dữ liệu sạch. */
+  if (!kpi && loading) {
+    return <StateBoundary state="loading" title="Đang tải số liệu theo server…" skeletonRows={6} />;
+  }
+  if (!kpi && err) {
+    return (
+      <StateBoundary
+        state="error"
+        title="Không đọc được số liệu theo server"
+        description={err}
+        onRetry={() => { void load(); }}
+      />
+    );
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div aria-busy={loading} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {err && (
+        <StateBoundary
+          state="error"
+          title="Không làm mới được số liệu theo server"
+          description={err}
+          onRetry={() => { void load(); }}
+        />
+      )}
       {/* ---------- KPI theo server ---------- */}
       <Card variant="strong">
         <CardTitle icon={Gauge}
@@ -126,13 +159,8 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
           )}
         </div>
 
-        {err && (
-          <div style={{ padding: 10, borderRadius: 8, background: C.raspSoft,
-                        color: C.raspText, fontSize: 14, marginBottom: 12 }}>{err}</div>
-        )}
-
         {kpi && (
-          <div style={{ display: "grid", gap: 12,
+          <div aria-busy={loading} style={{ display: "grid", gap: 12,
                         gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
             <KpiCard emoji={<ClipboardCheck size={22} aria-hidden="true" />} bg={C.mintSoft} color={C.mintText}
               value={`${kpi.validation.done}/${kpi.validation.total}`}
@@ -178,12 +206,20 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
           <Tag color={C.marigoldText} bg={C.marigoldSoft}>{dueSoon.length} sắp đến hạn</Tag>
         </div>
 
+        {loadedSoonDays != null && loadedSoonDays !== soonDays && (
+          <p role="status" style={{ margin: "-2px 0 12px", fontSize: 12, fontWeight: 700,
+            color: err ? C.marigoldText : C.plumSoft }}>
+            Đang hiển thị bản chụp theo ngưỡng {loadedSoonDays} ngày.
+            {err ? ` Ngưỡng ${soonDays} ngày chưa tải được.` : ` Đang tải ngưỡng ${soonDays} ngày…`}
+          </p>
+        )}
+
         <TableScroll maxHeight="46vh">
           {/* Bề mặt sổ (analysis.css): kẻ dòng, tiêu đề dính khi cuộn dọc,
               mã thẩm định là tiêu đề dòng và dính khi cuộn ngang. */}
           <table className="reg-table">
             <caption>
-              Hạng mục quá hạn hoặc đến hạn trong {soonDays} ngày tới, máy chủ rà trực tiếp trên DB.
+              Hạng mục quá hạn hoặc đến hạn trong {snapshotSoonDays} ngày tới, máy chủ rà trực tiếp trên DB.
             </caption>
             <thead>
               <tr>
@@ -217,7 +253,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
                   </tr>
                 );
               })}
-              {!loading && alerts.length === 0 && (
+              {!loading && !err && alerts.length === 0 && (
                 <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: C.mintText }}>
                   <CheckCircle2 size={16} style={{ verticalAlign: "-3px", marginRight: 6 }} />
                   Không có hạng mục nào đến hạn trong ngưỡng này.
@@ -270,7 +306,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
               </div>
             );
           })}
-          {!loading && shownIssues.length === 0 && (
+          {!loading && !err && shownIssues.length === 0 && (
             <div style={{ padding: 20, textAlign: "center", color: C.mintText, fontSize: 14 }}>
               <CheckCircle2 size={16} style={{ verticalAlign: "-3px", marginRight: 6 }} />
               Không phát hiện vấn đề nào.

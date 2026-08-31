@@ -421,9 +421,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   :root[data-visual="lotus-pearl"] {
-    --lp-mo-card:  1ms;
-    --lp-mo-modal: 1ms;
-    --lp-mo-chip:  1ms;
+    --lp-motion-fast: 0ms;
+    --lp-motion-ui:   0ms;
+    --lp-mo-card:     0ms;
+    --lp-mo-modal:    0ms;
+    --lp-mo-chip:     0ms;
   }
 
   /* v4 (nghiên cứu 7): smooth-scroll cũng là chuyển động — người chọn

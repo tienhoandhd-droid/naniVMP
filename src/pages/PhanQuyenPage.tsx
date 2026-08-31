@@ -38,6 +38,7 @@ import {
 import type { EmailChoPhepRow, NguoiQuyenRow, VaiNghiepVuRow } from "../lib/supabaseData.ts";
 import { accountForAllowedEmail, managementWorkspaceFor } from "../lib/managementVisibility.ts";
 import { Card, CardTitle, Tag, CauKetLuan } from "../components/ui/Primitives.tsx";
+import StateBoundary from "../components/ui/StateBoundary.tsx";
 import type { Activity } from "../types/domain.ts";
 import NhomTab, { NhomTabPanel, useNhomTab } from "../components/ui/NhomTab.tsx";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
@@ -79,6 +80,7 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
   const [nguoi, setNguoi] = useState<NguoiQuyenRow[]>([]);
   const [vaiTaiKhoan, setVaiTaiKhoan] = useState<VaiNghiepVuRow[]>([]);
   const [trangThaiTaiKhoan, setTrangThaiTaiKhoan] = useState<"loading" | "ready" | "error">("loading");
+  const [loiTaiKhoan, setLoiTaiKhoan] = useState("");
   const [dsEmail, setDsEmail] = useState<EmailChoPhepRow[]>([]);
   const [emailMoi, setEmailMoi] = useState({ email: "", ghiChu: "" });
 
@@ -94,14 +96,24 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
     try { setDsEmail(await fetchEmailChoPhep()); } catch { /* không có quyền thì thôi */ }
   };
 
+  const taiVaiTaiKhoan = async () => {
+    setTrangThaiTaiKhoan("loading");
+    setLoiTaiKhoan("");
+    try {
+      setVaiTaiKhoan(await fetchVaiNghiepVu());
+      setTrangThaiTaiKhoan("ready");
+    } catch (e) {
+      setLoiTaiKhoan((e as Error).message || "Không đọc được vai nghiệp vụ");
+      setTrangThaiTaiKhoan("error");
+    }
+  };
+
   useEffect(() => {
     if (!supabase) return;
     /* `nguoi.email` là email danh bạ, có thể khác email đăng nhập. Vai nghiệp
        vụ mới là nguồn tài khoản chuẩn vì mang email profiles + user_id. */
     fetchNguoiVaQuyen().then((r) => setNguoi(r.nguoi)).catch(() => { /* không có quyền thì thôi */ });
-    fetchVaiNghiepVu()
-      .then((rows) => { setVaiTaiKhoan(rows); setTrangThaiTaiKhoan("ready"); })
-      .catch(() => setTrangThaiTaiKhoan("error"));
+    void taiVaiTaiKhoan();
     taiDsEmail();
   }, []);
 
@@ -137,6 +149,18 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
           sub="Cửa vào duy nhất: không có email ở đây thì Supabase từ chối tạo tài khoản, kể cả tạo tay trong Dashboard.">
           1 · Ai được phép có tài khoản
         </CardTitle>
+
+        {trangThaiTaiKhoan === "loading" && (
+          <StateBoundary state="loading" title="Đang xác minh tài khoản theo vai trò…" skeletonRows={2} />
+        )}
+        {trangThaiTaiKhoan === "error" && (
+          <StateBoundary
+            state="error"
+            title="Không xác minh được tài khoản theo vai trò"
+            description={loiTaiKhoan}
+            onRetry={() => { void taiVaiTaiKhoan(); }}
+          />
+        )}
 
         <CauKetLuan tone="ok"
           chinh={`${dsEmail.filter((e) => e.is_active).length} email được phép tạo tài khoản.`}
@@ -451,7 +475,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
             khi cần cập nhật hồ sơ nhân sự hoặc phân công việc.">
           Tài khoản &amp; quyền
         </CardTitle>
-        <div className="ip-workspace">
+        <div data-desktop-primary-actionable className="ip-workspace">
           {/* Danh bạ ở đây chỉ để CHỌN người — nối tài khoản và xem quyền
               hiệu lực của người đó. */}
           <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson}

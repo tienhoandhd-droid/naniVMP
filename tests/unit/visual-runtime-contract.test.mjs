@@ -9,6 +9,7 @@ import path from "node:path";
 
 const NODE = process.execPath;
 const ROOT = new URL("../..", import.meta.url);
+const { VISUAL_BASELINE_COUNT, VISUAL_PROJECTS, VISUAL_SCREENS, VISUAL_THEMES } = await import("../../scripts/visual-matrix-contract.mjs");
 const BROWSER_EXECUTABLE = path.join(
   process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(homedir(), ".cache", "ms-playwright"),
   "chromium-1234",
@@ -27,27 +28,13 @@ function runRuntime(...args) {
   });
 }
 
-const BASELINE_PATHS = [
-  "chromium-linux",
-  "chromium-1366-linux",
-  "chromium-1920-linux",
-].flatMap((project) => [
-  "bao-cao-dark.png",
-  "bao-cao-light.png",
-  "dang-nhap-light.png",
-  "danh-muc-dark.png",
-  "danh-muc-light.png",
-  "hom-nay-dark.png",
-  "hom-nay-light.png",
-  "tien-do-dark.png",
-  "tien-do-light.png",
-  "timeline-dark.png",
-  "timeline-light.png",
-  "tong-quan-dark.png",
-  "tong-quan-light.png",
-].map((name) => `${project}/${name}`));
+const BASELINE_PATHS = VISUAL_PROJECTS.flatMap(({ name: project }) => [
+  ...VISUAL_SCREENS.flatMap(([hash, snapshotName]) => VISUAL_THEMES
+    .map((theme) => `${project}-linux/${snapshotName}-${theme}.png`)),
+  `${project}-linux/dang-nhap-light.png`,
+]);
 
-const FIXTURE_TREE_SHA256 = "7e8af642f9115bf95aea72bf320aa4c8f0d760cbb4998ec795760ec719ae6109";
+const FIXTURE_TREE_SHA256 = "39e6d0114c612c810553ba5208bb560b88ac88adb0f42b694e57bbb16dd5effb";
 const SEAL_PREFIX = [
   "VISUAL_TIMEZONE=Asia/Bangkok",
   "VISUAL_CHANNEL=chromium",
@@ -56,7 +43,7 @@ const SEAL_PREFIX = [
   "CHROMIUM_VERSION=151.0.7922.34",
   "CHROMIUM_EXECUTABLE_SHA256=0b20b130e7edd9dd51873be867761295fe0cfad490c2b9a64f95bd3cfc08fa71",
   "PLATFORM=linux-x64-ubuntu-24.04",
-  "BASELINE_PNG_COUNT=39",
+  `BASELINE_PNG_COUNT=${VISUAL_BASELINE_COUNT}`,
 ];
 
 function fixtureSeal(treeDigest = FIXTURE_TREE_SHA256) {
@@ -70,6 +57,7 @@ function createBaselineFixture() {
   mkdirSync(scripts, { recursive: true });
   mkdirSync(baselines, { recursive: true });
   cpSync(new URL("../../scripts/check-visual-runtime.mjs", import.meta.url), path.join(scripts, "check-visual-runtime.mjs"));
+  cpSync(new URL("../../scripts/visual-matrix-contract.mjs", import.meta.url), path.join(scripts, "visual-matrix-contract.mjs"));
   symlinkSync(path.join(ROOT.pathname, "node_modules"), path.join(fixture, "node_modules"), "dir");
   writeFileSync(path.join(fixture, "package.json"), JSON.stringify({ devDependencies: { "@playwright/test": "^1.62.1" } }));
   writeFileSync(path.join(fixture, "playwright.visual.config.ts"), [
@@ -113,6 +101,43 @@ test("effective visual config fixes Bangkok time and Playwright's bundled Chromi
   assert.deepEqual(JSON.parse(loaded.stdout), { timezoneId: "Asia/Bangkok", channel: "chromium" });
 });
 
+test("visual matrix derives 45 Linux baselines", async () => {
+  const c = await import("../../scripts/visual-matrix-contract.mjs");
+  assert.equal(c.VISUAL_SCREENS.length, 7);
+  assert.deepEqual(c.VISUAL_THEMES, ["light", "dark"]);
+  assert.equal(c.VISUAL_PROJECTS.length, 3);
+  assert.equal(c.VISUAL_BASELINE_COUNT, 45);
+});
+
+test("visual matrix command accepts only an exact Playwright pass count", (t) => {
+  const fixture = path.join(tmpdir(), `visual-matrix-contract-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  mkdirSync(fixture, { recursive: true });
+
+  const count = spawnSync(NODE, ["scripts/visual-matrix-contract.mjs", "--count"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  assert.equal(count.status, 0, count.stderr || count.stdout);
+  assert.equal(count.stdout, "45\n");
+
+  const exactLog = path.join(fixture, "exact.log");
+  const driftedLog = path.join(fixture, "drifted.log");
+  writeFileSync(exactLog, "  45 passed (12.0s)\n");
+  writeFileSync(driftedLog, "  44 passed (12.0s)\n");
+  const exact = spawnSync(NODE, ["scripts/visual-matrix-contract.mjs", "--verify-output", exactLog], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  const drifted = spawnSync(NODE, ["scripts/visual-matrix-contract.mjs", "--verify-output", driftedLog], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  assert.equal(exact.status, 0, exact.stderr || exact.stdout);
+  assert.notEqual(drifted.status, 0);
+  assert.match(drifted.stderr, /expected Playwright to report exactly 45 passing tests/u);
+});
+
 test("package exposes the exact visual runtime and baseline lifecycle commands", async () => {
   const packageJson = JSON.parse(await readRepositoryFile("package.json"));
 
@@ -121,11 +146,15 @@ test("package exposes the exact visual runtime and baseline lifecycle commands",
       runtime: packageJson.scripts["visual:runtime"],
       seal: packageJson.scripts["visual:baseline:seal"],
       contract: packageJson.scripts["visual:contract"],
+      matrixCount: packageJson.scripts["visual:matrix:count"],
+      matrixVerify: packageJson.scripts["visual:matrix:verify"],
     },
     {
       runtime: "node --import tsx scripts/check-visual-runtime.mjs --runtime",
       seal: "node --import tsx scripts/check-visual-runtime.mjs --write-baseline-contract",
       contract: "node --import tsx scripts/check-visual-runtime.mjs --verify-baseline",
+      matrixCount: "node scripts/visual-matrix-contract.mjs --count",
+      matrixVerify: "node scripts/visual-matrix-contract.mjs --verify-output",
     },
   );
 });
@@ -203,7 +232,7 @@ test("baseline seal is an atomic writer-0600 single-link exact ordered tree cont
 
   writeFileSync(contract, [
     ...SEAL_PREFIX,
-    "BASELINE_PNG_COUNT=39",
+    `BASELINE_PNG_COUNT=${VISUAL_BASELINE_COUNT}`,
     `BASELINE_TREE_SHA256=${FIXTURE_TREE_SHA256}`,
     "",
   ].join("\n"));

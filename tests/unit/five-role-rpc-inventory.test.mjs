@@ -80,6 +80,16 @@ const TEAM_OVERVIEW_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const CLIENT_ERROR_REVIEWED_RPC = new Map([
+  ["rpc_ghi_loi_client", {
+    identity: "rpc_ghi_loi_client(text,text,text,text)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_doc_loi_client", {
+    identity: "rpc_doc_loi_client(integer,integer,timestamptz)",
+    classification: "guarded_explicit",
+  }],
+]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
   .join(",");
@@ -285,12 +295,17 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260829150000_team_overview_summary.sql",
     "utf8",
   );
+  const clientErrorMigration = readFileSync(
+    "supabase/migrations/20260831170000_client_error_log.sql",
+    "utf8",
+  );
   for (const name of [
     ...CATALOG_V2_REVIEWED_RPC.keys(),
     ...MANUAL_DEADLINE_REVIEWED_RPC.keys(),
     ...ASSIGNED_PROGRESS_REVIEWED_RPC.keys(),
     ...SOURCE_ACCESS_REVIEWED_RPC.keys(),
     ...TEAM_OVERVIEW_REVIEWED_RPC.keys(),
+    ...CLIENT_ERROR_REVIEWED_RPC.keys(),
   ]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
   }
@@ -301,11 +316,12 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...ASSIGNED_PROGRESS_REVIEWED_RPC,
     ...SOURCE_ACCESS_REVIEWED_RPC,
     ...TEAM_OVERVIEW_REVIEWED_RPC,
+    ...CLIENT_ERROR_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 75, "reviewed source HEAD must expose 75 literal RPC targets");
+  assert.equal(sourceNames.length, 77, "reviewed source HEAD must expose 77 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -347,6 +363,15 @@ test("every source RPC call has exactly one reviewed migration classification", 
   assert.match(teamOverviewMigration, /security definer\s*set search_path\s*=\s*public\s*,\s*pg_temp/is);
   assert.match(teamOverviewMigration, /revoke all on function public\.rpc_team_overview_summary\(integer\)\s*from public, anon, authenticated, service_role;/is);
   assert.match(teamOverviewMigration, /grant execute on function public\.rpc_team_overview_summary\(integer\)\s*to authenticated, service_role;/is);
+  assert.deepEqual(CLIENT_ERROR_REVIEWED_RPC, new Map([
+    ["rpc_ghi_loi_client", { identity: "rpc_ghi_loi_client(text,text,text,text)", classification: "guarded_explicit" }],
+    ["rpc_doc_loi_client", { identity: "rpc_doc_loi_client(integer,integer,timestamptz)", classification: "guarded_explicit" }],
+  ]));
+  assert.match(clientErrorMigration, /create or replace function public\.rpc_ghi_loi_client\(\s*p_message text,\s*p_stack text default null,\s*p_url text default null,\s*p_source text default 'window\.onerror'\s*\)/is);
+  assert.match(clientErrorMigration, /create or replace function public\.rpc_doc_loi_client\(\s*p_limit integer default 100,\s*p_offset integer default 0,\s*p_tu timestamptz default null\s*\)/is);
+  assert.match(clientErrorMigration, /security definer\s*set search_path\s*=\s*public\s*,\s*pg_temp/is);
+  assert.match(clientErrorMigration, /grant execute on function public\.rpc_ghi_loi_client\(text, text, text, text\) to authenticated;/i);
+  assert.match(clientErrorMigration, /grant execute on function public\.rpc_doc_loi_client\(integer, integer, timestamptz\) to authenticated;/i);
 });
 
 test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {

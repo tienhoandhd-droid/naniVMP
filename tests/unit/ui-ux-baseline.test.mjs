@@ -3,9 +3,19 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { CardTitle } from "../../src/components/ui/Primitives.tsx";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const source = (relativePath) => readFileSync(path.join(ROOT, relativePath), "utf8");
+
+test("CardTitle renders the requested semantic heading level", () => {
+  const html = renderToStaticMarkup(React.createElement(CardTitle, { level: 3 }, "Phạm vi"));
+
+  assert.match(html, /<h3[^>]*>Phạm vi<\/h3>/);
+});
 
 test("app shell exposes keyboard landmarks and names its primary navigation", () => {
   const app = source("src/App.tsx");
