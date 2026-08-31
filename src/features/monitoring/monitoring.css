@@ -79,8 +79,10 @@
 
 .monitoring-journey__item.is-active {
   border-color: var(--lp-plum-2);
-  background: var(--lp-plum);
-  color: var(--lp-surface);
+  /* #3 (01/09): thẻ Đang xem là khối "không khí" như hero — dùng --lp-hero
+     để dark giữ plum sâu thay vì đảo thành slab hồng giữa màn đêm. */
+  background: var(--lp-hero);
+  color: var(--lp-on-hero);
   box-shadow: inset 3px 0 0 var(--lp-gold);
 }
 
@@ -261,8 +263,8 @@
   padding: clamp(20px, 3vw, 30px);
   background:
     radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--lp-gold) 18%, transparent), transparent 34%),
-    linear-gradient(135deg, var(--lp-plum), color-mix(in srgb, var(--lp-plum) 76%, var(--lp-success)));
-  color: var(--lp-on-plum);
+    linear-gradient(135deg, var(--lp-hero), color-mix(in srgb, var(--lp-hero) 76%, var(--lp-success)));
+  color: var(--lp-on-hero);
 }
 
 .alerts-page-shell .alerts-command__hero::after {
@@ -305,7 +307,7 @@
 }
 
 .alerts-page-shell .alerts-command__hero .alerts-command__eyebrow {
-  color: color-mix(in srgb, var(--lp-on-plum) 78%, var(--lp-gold));
+  color: color-mix(in srgb, var(--lp-on-hero) 78%, var(--lp-gold));
 }
 
 .alerts-page-shell .alerts-command__hero h2,
@@ -345,14 +347,14 @@
   gap: 5px 16px;
   flex-wrap: wrap;
   margin-top: 12px;
-  color: color-mix(in srgb, var(--lp-on-plum) 82%, transparent);
+  color: color-mix(in srgb, var(--lp-on-hero) 82%, transparent);
   font-size: 12px;
   font-weight: 650;
   line-height: 1.5;
 }
 
 .alerts-page-shell .alerts-command__facts b {
-  color: var(--lp-on-plum);
+  color: var(--lp-on-hero);
 }
 
 .alerts-page-shell .alerts-command__actions {
@@ -371,7 +373,7 @@
   justify-content: center;
   gap: 7px;
   padding: 9px 15px;
-  border: 1px solid color-mix(in srgb, var(--lp-on-plum) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lp-on-hero) 28%, transparent);
   border-radius: 999px;
   font-family: var(--ff-text);
   font-size: 12px;
@@ -390,14 +392,14 @@
 }
 
 .alerts-page-shell .alerts-command__actions a {
-  background: color-mix(in srgb, var(--lp-on-plum) 9%, transparent);
-  color: var(--lp-on-plum);
+  background: color-mix(in srgb, var(--lp-on-hero) 9%, transparent);
+  color: var(--lp-on-hero);
 }
 
 .alerts-page-shell .alerts-command__missing-email,
 .alerts-page-shell .alerts-command__empty,
 .alerts-page-shell .alerts-command__queue-empty {
-  color: color-mix(in srgb, var(--lp-on-plum) 72%, transparent);
+  color: color-mix(in srgb, var(--lp-on-hero) 72%, transparent);
   font-size: 12px;
   font-weight: 700;
 }
@@ -410,7 +412,7 @@
 }
 
 .alerts-page-shell .alerts-command__empty strong {
-  color: var(--lp-on-plum);
+  color: var(--lp-on-hero);
   font-size: 14px;
 }
 

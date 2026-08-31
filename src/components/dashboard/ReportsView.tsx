@@ -53,6 +53,12 @@ const toolBtn = (bg: string, color: string) => ({
   display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 14,
   border: "none", cursor: "pointer", background: bg, color, fontFamily: TEXT, fontWeight: 800, fontSize: 14,
 });
+/* Nút phụ của cụm xuất: viền mảnh, không nền — nhường sân cho primary. */
+const ghostBtn = {
+  display: "flex", alignItems: "center", gap: 8, padding: "10px 15px", borderRadius: 14,
+  border: "1.5px solid var(--lp-line-strong)", cursor: "pointer",
+  background: "transparent", color: "var(--lp-ink)", fontFamily: TEXT, fontWeight: 700, fontSize: 14,
+} as const;
 
 /* Kiểu ô bảng cục bộ (th/td) đã bỏ — mọi bảng của màn này nay đi qua
    `.reg-table` trong analysis.css: kẻ dòng, tiêu đề dính, caption. */
@@ -412,9 +418,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <MultiSelect label="Trọng yếu" allLabel="Tất cả mức" options={critOptions} selected={critSel} onChange={setCritSel} />
           </div>
           <div className="vmp-report-export-actions" role="group" aria-label="Xuất báo cáo">
-            <button onClick={printPDF} style={toolBtn(GRAD, "#fff")}><Printer size={16} /> PDF</button>
-            <button onClick={exportExcel} style={toolBtn(C.mintSoft, C.mintText)}><Download size={16} /> Excel (đủ 5 sheet)</button>
-            <button onClick={downloadHtml} style={toolBtn(C.lavSoft, C.lavText)}><Download size={16} /> HTML</button>
+            {/* #6 (01/09): MỘT primary — Excel là bản mọi người thật sự nộp
+                (đủ 5 sheet); PDF/HTML là phụ, cùng một kiểu ghost để không
+                tranh nhau bằng ba màu ba kiểu như trước. */}
+            <button onClick={exportExcel} style={toolBtn(GRAD, "#fff")}><Download size={16} /> Xuất Excel (đủ 5 sheet)</button>
+            <button onClick={printPDF} style={ghostBtn}><Printer size={16} /> PDF</button>
+            <button onClick={downloadHtml} style={ghostBtn}><Download size={16} /> HTML</button>
           </div>
         </div>
         <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>

@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, Eye, Loader, ShieldCheck } from "lucide-react";
 
 import { useToast } from "../../components/ui/ToastProvider.tsx";
+import { Card } from "../../components/ui/Primitives.tsx";
 import SmartTable from "../../components/ui/SmartTable.tsx";
 import type { SmartTableColumn } from "../../components/ui/SmartTable.tsx";
 import {
@@ -249,9 +250,11 @@ export default function ItemPermissionModeCard() {
 
   if (dangTai) {
     return (
-      <p className="ip-help" role="status">
-        <Loader size={14} aria-hidden="true" /> Đang chạy tiền kiểm phân quyền…
-      </p>
+      <Card variant="strong">
+        <p className="ip-help" role="status">
+          <Loader size={14} aria-hidden="true" /> Đang chạy tiền kiểm phân quyền…
+        </p>
+      </Card>
     );
   }
   if (!tienKiem) {
@@ -288,7 +291,11 @@ export default function ItemPermissionModeCard() {
     }
   };
 
+  /* #9 (01/09): Card bọc chuyển vào TRONG component — khi tiền kiểm không
+     chạy được (return null ở trên) sẽ không còn cái card TRẮNG RỖNG nằm
+     chơ vơ dưới bộ lọc như trước. */
   return (
+    <Card variant="strong">
     <section className="ip-panel" aria-labelledby="ipm-tieu-de">
       <h2 id="ipm-tieu-de">Chế độ áp dụng quyền theo hạng mục</h2>
       <div className={`ip-mode ${dangApDung ? "is-enforced" : "is-preview"}`} role="status">
@@ -435,5 +442,6 @@ export default function ItemPermissionModeCard() {
         </div>
       )}
     </section>
+    </Card>
   );
 }

@@ -968,6 +968,12 @@ export function ROField({ label, value }: { label: ReactNode; value: ReactNode }
   );
 }
 
+/** #8 (01/09) — Ô TRỐNG một giọng: nghiêng + mực mờ (class .vmp-trong,
+ *  lotus-components.css). Dùng thay "—" trần ở mọi bảng/nhãn hiển thị. */
+export function Trong({ nhan = "chưa có" }: { nhan?: string }) {
+  return <span className="vmp-trong">{nhan}</span>;
+}
+
 // ======================== BRAND LOGO ========================
 // Brand mark CPC1 HN logo + V/Q team wordmark (cách điệu mạnh mẽ, dứt khoát).
 // Giữ tên export "CrownLogo" để không cần đổi import nơi khác.

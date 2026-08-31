@@ -95,6 +95,11 @@
      thành hồng phấn sáng, nên chữ trắng trên nó chỉ còn 2.12:1 — dưới xa
      ngưỡng AA 4.5:1. Đây đúng là lỗi mà bộ kiểm thẩm mỹ bắt được. */
   --lp-on-plum:    var(--lp-porcelain);
+  /* HERO (01/09): mảng sơn mài đặc cho thẻ anchor/hero. KHÁC --lp-plum ở
+     chỗ nó KHÔNG đảo sáng ở dark — hero là khối không khí, đảo thành hồng
+     nhạt giữa màn đêm là một slab chói (soi ảnh Cảnh báo dark 01/09). */
+  --lp-hero: var(--lp-brand-solid);
+  --lp-on-hero: var(--lp-on-brand-solid);
   --lp-on-success: var(--lp-porcelain);
   --lp-on-danger:  var(--lp-porcelain);
   --lp-on-warning: var(--lp-porcelain);
@@ -314,6 +319,9 @@
   /* Nền sáng thì chữ phải tối. Ba màu này ở chế độ tối đều là sắc phấn
      sáng, nên chữ trên chúng lấy màu nền trang. */
   --lp-on-plum:    #241C26;
+  /* Hero giữ plum SÂU ở dark (không theo brand đảo hồng) — xem chú thích light. */
+  --lp-hero: #38203A;
+  --lp-on-hero: #F4E9F0;
   --lp-on-success: #16241E;
   --lp-on-danger:  #33121B;
   --lp-on-warning: #2E2110;

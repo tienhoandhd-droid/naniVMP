@@ -412,8 +412,11 @@ function ThemeToggle() {
 /* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
 export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, dataUpdatedAt,
-  view, setView, access, onLogout, onChangePw }: {
+  view, setView, access, onLogout, onChangePw, showMasthead = false }: {
   title?: ReactNode;
+  /** #2 (01/09): wordmark chỉ hiện ở trang nhất (Tổng quan) — lặp trên cả
+   *  14 màn là hai tầng thương hiệu đè nhau, tốn ~60px trước dữ liệu. */
+  showMasthead?: boolean;
   user?: AppUser | null;
   sub?: ReactNode;
   onRefresh?: () => void;
@@ -450,6 +453,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
       <div style={{ flex: "1 1 360px", minWidth: 0 }}>
         {/* Wordmark Art Nouveau: V là chữ cái neo, MP giãn nhịp như một con dấu,
             Monitor mềm như chữ ký; nụ sen nối wordmark với mô tả hệ thống. */}
+        {showMasthead && (
         <div className="vmp-masthead" aria-label="VMP Monitor · Hệ giám sát thẩm định">
           <span className="vmp-masthead__ten" aria-hidden="true">
             <span className="vmp-masthead__v">V</span>
@@ -469,6 +473,7 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           </svg>
           <span className="vmp-masthead__phu">Hệ giám sát thẩm định</span>
         </div>
+        )}
         {/* Đây là <h1> chứ không phải <div> in đậm, và đó là khác biệt thật:
             trước đây KHÔNG màn nào trong app có h1, nên trình đọc màn hình
             không có mốc nào để nhảy tới, còn người dùng bàn phím không biết

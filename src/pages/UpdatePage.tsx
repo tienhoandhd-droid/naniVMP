@@ -7,7 +7,7 @@ import { STATUS, STAGES, PERIODS } from "../constants/vmp.ts";
 import { stageOf, inPeriod, nguoiPhuTrach } from "../utils/helpers.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import { useDebounce } from "../hooks/index.ts";
-import { Card, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
+import { Card, Tag, Pill, StateBadge, PhanTrang, Trong } from "../components/ui/Primitives.tsx";
 import MobileTaskList from "../components/ui/MobileTaskList.tsx";
 import StateBoundary from "../components/ui/StateBoundary.tsx";
 import { useToast } from "../components/ui/ToastProvider.tsx";
@@ -611,8 +611,8 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", fontSize: 13, color: C.plumSoft, fontWeight: 600 }}>
-                <span>Hạn: <b style={{ color: C.plum, fontFamily: NUM }}>{a.target ? a.target.split("-").reverse().join("/") : "—"}</b></span>
-                <span>QA: <b style={{ color: C.plum }}>{nguoiPhuTrach(a.owner) || "—"}</b></span>
+                <span>Hạn: <b style={{ color: C.plum, fontFamily: NUM }}>{a.target ? a.target.split("-").reverse().join("/") : <Trong nhan="chưa có" />}</b></span>
+                <span>QA: <b style={{ color: C.plum }}>{nguoiPhuTrach(a.owner) || <Trong nhan="chưa phân công" />}</b></span>
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

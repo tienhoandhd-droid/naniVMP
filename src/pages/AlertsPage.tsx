@@ -544,7 +544,10 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 <>
                   <div className="alerts-command__identity">
                     <strong>{topAlert.a.id}</strong>
-                    <span>{topAlert.a.name}</span>
+                    {/* #7 (01/09): tên = mã (dữ liệu chưa đặt tên riêng) thì đừng
+                        in đôi "TB-108-PV TB-108-PV" — nhìn như lỗi render. */}
+                    {topAlert.a.name && topAlert.a.name !== String(topAlert.a.id)
+                      && <span>{topAlert.a.name}</span>}
                   </div>
                   <div className="alerts-command__facts">
                     <span><b>{topAlert.dleft < 0 ? `Trễ ${Math.abs(topAlert.dleft)} ngày` : `Còn ${topAlert.dleft} ngày`}</b> · {topAlert.stage}</span>
@@ -582,7 +585,8 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                     <button type="button" onClick={() => moKho(row)}>
                       <span className="alerts-command__rank">{index + 2}</span>
                       <span className="alerts-command__queue-copy">
-                        <strong>{row.a.id} · {row.a.name}</strong>
+                        <strong>{row.a.name && row.a.name !== String(row.a.id)
+                          ? `${row.a.id} · ${row.a.name}` : row.a.id}</strong>
                         <small>{row.stage} · {row.dleft < 0 ? `trễ ${Math.abs(row.dleft)} ngày` : `còn ${row.dleft} ngày`} · RPN {qrmRpn(row.a)}</small>
                       </span>
                       <ChevronRight size={17} aria-hidden="true" />

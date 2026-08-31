@@ -585,3 +585,14 @@
 
 /* Ô số liệu đang dùng làm bộ lọc (thiết kế 29/08): viền vàng, nền sáng hơn. */
 .lp-metric--action.is-selected { border-color: var(--lp-gold); box-shadow: 0 0 0 1px var(--lp-gold), var(--lp-e-low); background: var(--lp-bg-raised); }
+
+/* #8 (01/09) — MỘT giọng cho ô trống trên toàn app. Trước đây ba giọng
+ * cho cùng một nghĩa: "—" trần, "Chưa đặt tên riêng", "Không có thông tin"
+ * in nghiêng. Chuẩn: chữ nghiêng, mực mờ, KHÔNG opacity (bài học ROField
+ * 31/08: opacity pha loãng dưới 4.5:1). Dấu — trần chỉ còn trong dữ liệu
+ * xuất (Excel/CSV) — nơi chữ nghiêng không tồn tại. */
+.vmp-trong {
+  color: var(--lp-ink-muted);
+  font-style: italic;
+  font-weight: 500;
+}

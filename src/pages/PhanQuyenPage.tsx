@@ -232,13 +232,20 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
           </div>
         )}
 
-        <div style={{ marginTop: 14, padding: "11px 14px", borderRadius: 14, background: C.surfaceSunk,
-                      fontSize: 13, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
-          <b style={{ color: C.plum }}>Thêm một người mới, đủ ba bước:</b> ① thêm email vào danh sách này →
-          ② tạo tài khoản ở <b>Supabase Dashboard → Authentication → Users → Add user</b> với đúng email đó →
-          ③ chọn vai ở thẻ <b>Sẵn sàng theo vai trò &amp; phạm vi</b> và nối tài khoản với hồ
-          sơ ở ngay màn này. Bỏ bước ① thì Supabase từ chối tạo; bỏ bước ③ thì họ đăng nhập được
-          nhưng chỉ xem được, không sửa gì.
+        {/* #9 (01/09): hướng dẫn thành danh sách CÓ SỐ, chữ thường làm nền —
+            đậm chỉ dành cho đúng cái người ta phải bấm/tìm. Một đoạn 5 dòng
+            toàn chữ đậm dính liền là khối typography nặng nhất app cũ. */}
+        <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 14, background: C.surfaceSunk,
+                      fontSize: 13, color: C.plumSoft, fontWeight: 500, lineHeight: 1.75 }}>
+          <b style={{ color: C.plum, fontWeight: 700 }}>Thêm một người mới — ba bước</b>
+          <ol style={{ margin: "6px 0 0", paddingLeft: 20 }}>
+            <li>Thêm email vào danh sách này.</li>
+            <li>Tạo tài khoản với đúng email đó ở <b>Supabase Dashboard → Authentication → Users → Add user</b>.</li>
+            <li>Chọn vai ở thẻ <b>Sẵn sàng theo vai trò &amp; phạm vi</b> rồi nối tài khoản với hồ sơ, ngay màn này.</li>
+          </ol>
+          <span style={{ display: "block", marginTop: 6 }}>
+            Bỏ bước 1: Supabase từ chối tạo. Bỏ bước 3: đăng nhập được nhưng chỉ xem, không sửa gì.
+          </span>
         </div>
       </Card>
     </>
@@ -391,11 +398,9 @@ function CurrentPermissionWorkspace({ acts, access }: {
           web không hỏi tới, còn giao diện thì tự suy từ `role === "admin"`.
           Hai nguồn cùng nói một việc thì sớm muộn lệch nhau — hỏi server là
           hết lệch, và quyền kia mới có việc thật để làm. */}
-      {duocChinhChinhSachQuyen && (
-        <Card variant="strong">
-          <ItemPermissionModeCard />
-        </Card>
-      )}
+      {/* #9: ItemPermissionModeCard tự bọc Card — hết card trắng rỗng khi
+          tiền kiểm không chạy được (nó return null). */}
+      {duocChinhChinhSachQuyen && <ItemPermissionModeCard />}
       {/* Ai được phép có tài khoản + vai nào làm được gì: cùng một quyền
           chính sách như trên. */}
       {duocChinhChinhSachQuyen && <QuanTriQuyenCards duocSua={duocChinhChinhSachQuyen} />}

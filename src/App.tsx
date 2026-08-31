@@ -1189,6 +1189,7 @@ function VerifiedAppShell({ user, logout, access }: {
             lastSync={lastSync} dataUpdatedAt={dataUpdatedAt}
             view={view} setView={setView} access={access}
             onLogout={xinThoat} onChangePw={moDoiMatKhau}
+            showMasthead={view === "overview"}
           />
 
 

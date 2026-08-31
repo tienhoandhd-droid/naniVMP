@@ -8,6 +8,7 @@
  * ===================================================================== */
 import { memo, useMemo, useState } from "react";
 import type { Activity } from "../../types/domain.ts";
+import { Trong } from "../../components/ui/Primitives.tsx";
 import {
   buildBangDanhSach,
   NHAN_TINH_TRANG,
@@ -76,10 +77,10 @@ function LongMonBangDanhSach({ activities, now, soonDays, onOpen }: {
                           onClick={() => onOpen(goc)}>{r.name || r.code}</button>
                       ) : (r.name || r.code)}
                     </td>
-                    <td>{r.owner || "—"}</td>
-                    <td className="tnum">{r.deadline ?? "—"}</td>
+                    <td>{r.owner || <Trong nhan="chưa phân công" />}</td>
+                    <td className="tnum">{r.deadline ?? <Trong nhan="chưa có hạn" />}</td>
                     <td className="tnum">
-                      {r.daysRemaining === null ? "—"
+                      {r.daysRemaining === null ? <Trong />
                         : r.daysRemaining < 0 ? `trễ ${-r.daysRemaining} ngày`
                         : r.daysRemaining === 0 ? "hôm nay"
                         : `${r.daysRemaining} ngày`}
