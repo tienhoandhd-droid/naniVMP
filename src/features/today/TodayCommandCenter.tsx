@@ -234,7 +234,7 @@ export function TodayCommandCenterContent({
           {dau.canEditProgress
             ? <button type="button" className="hn-hero__cta" title={`Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. ${deadlineFact(dau)}`}
                 onClick={() => onOpenProgress(progressLink(dau))}>
-                Mở {dau.validationCode} <span aria-hidden="true">→</span></button>
+                Cập nhật {dau.validationCode}</button>
             : <span className="hn-hero__cta hn-hero__cta--chu" title={`Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. ${deadlineFact(dau)}`}>{dau.validationCode} · {dau.title}</span>}
         </div>}
       </div>

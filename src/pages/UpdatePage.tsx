@@ -425,11 +425,13 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
               {uuTien.map((r, i) => {
                 const goiY = [r.issues.length > 0 ? "hồ sơ thiếu/lệch" : null, r.overdueDays > 0 ? `trễ ${r.overdueDays} ngày` : null].filter(Boolean).join(" · ");
                 return (
-                  <button key={r.validationCode} type="button" disabled={readOnly} onClick={() => moHangMuc(r.validationCode)}
-                    className={`pr-uu-tien${i === 0 ? " pr-uu-tien--dau" : ""}${r.overdueDays > 0 ? " pr-uu-tien--tre" : ""}`}
-                    title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>
-                    {i === 0 ? "Mở " : ""}<span className="pr-ma">{r.validationCode}</span>{i === 0 && <span aria-hidden="true"> →</span>}
-                  </button>
+                  !readOnly
+                    ? <button key={r.validationCode} type="button" onClick={() => moHangMuc(r.validationCode)}
+                      className={`pr-uu-tien${i === 0 ? " pr-uu-tien--dau" : ""}${r.overdueDays > 0 ? " pr-uu-tien--tre" : ""}`}
+                      title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>
+                      {i === 0 && "Cập nhật "}<span className="pr-ma">{r.validationCode}</span>
+                    </button>
+                    : <span key={r.validationCode} className="pr-ma" title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>{r.validationCode}</span>
                 );
               })}
               {uuTien[0] && <span className="pr-hero__goi-y">{uuTien[0].title !== uuTien[0].validationCode ? uuTien[0].title : uuTien[0].validationCode}{uuTien[0].overdueDays > 0 ? ` · trễ ${uuTien[0].overdueDays} ngày` : ""}{uuTien[0].issues.length > 0 ? " · hồ sơ thiếu/lệch" : ""}</span>}

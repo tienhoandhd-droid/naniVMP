@@ -417,9 +417,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <MultiSelect label="Trọng yếu" allLabel="Tất cả mức" options={critOptions} selected={critSel} onChange={setCritSel} />
           </div>
           <div className="vmp-report-export-actions" role="group" aria-label="Xuất báo cáo">
-            <button onClick={printPDF} style={toolBtn(GRAD, "#fff")}><Printer size={16} /> PDF</button>
-            <button onClick={exportExcel} style={toolBtn(C.mintSoft, C.mintText)}><Download size={16} /> Excel (đủ 5 sheet)</button>
-            <button onClick={downloadHtml} style={toolBtn(C.lavSoft, C.lavText)}><Download size={16} /> HTML</button>
+            <button onClick={printPDF} style={toolBtn(GRAD, "#fff")}><Printer size={16} /> In / lưu PDF</button>
+            <button onClick={exportExcel} style={toolBtn(C.mintSoft, C.mintText)}><Download size={16} /> Tải Excel · 5 sheet</button>
+            <button onClick={downloadHtml} style={toolBtn(C.lavSoft, C.lavText)}><Download size={16} /> Tải HTML</button>
           </div>
         </div>
         <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
