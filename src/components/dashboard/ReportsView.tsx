@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { C, TEXT, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
+import { coWebGL } from "../../lib/lotus3dColors.ts";
 // Khối 3D nạp theo yêu cầu: ai không mở trang Báo cáo thì không tải three.js.
 import { nhapCoThuLai } from "../../lib/tailMan.ts";
 const VmpSpace3D = lazy(nhapCoThuLai(() => import("../three/VmpSpace3D.tsx")));
@@ -73,12 +74,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const [areaSel, setAreaSel] = useState<string[]>([]);
   const [critSel, setCritSel] = useState<string[]>([]);
   const [ky, setKy] = useState<Period>(() => periodNow());
+  const [hienBanDo, setHienBanDo] = useState(false);
+  const [cheBanDo, setCheBanDo] = useState<"2d" | "3d">("2d");
   // Người dùng bật "giảm chuyển động" thì khối 3D đứng yên, không tự xoay.
   const giamChuyenDong = useMemo(
     () => typeof window !== "undefined"
       && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
     [],
   );
+  const ho3D = useMemo(coWebGL, []);
   const [ai, setAi] = useState("");
   // Loại phân tích của bản đang hiện — quyết định nhãn hiển thị và loại mail
   // sẽ gửi, để không bao giờ gắn nhãn "phân tích sâu" lên một bản nhận xét
@@ -418,7 +422,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </div>
           <div className="vmp-report-export-actions" role="group" aria-label="Xuất báo cáo">
             <button onClick={printPDF} style={toolBtn(GRAD, "#fff")}><Printer size={16} /> In / lưu PDF</button>
-            <button onClick={exportExcel} style={toolBtn(C.mintSoft, C.mintText)}><Download size={16} /> Tải Excel · 5 sheet</button>
+            <button data-desktop-primary-actionable onClick={exportExcel} style={toolBtn(C.mintSoft, C.mintText)}><Download size={16} /> Tải Excel · 5 sheet</button>
             <button onClick={downloadHtml} style={toolBtn(C.lavSoft, C.lavText)}><Download size={16} /> Tải HTML</button>
           </div>
         </div>
@@ -600,9 +604,33 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             phần "xem dạng phẳng" — người đọc phải xem hết hình rồi mới biết
             hình đó nói gì, tức là tự suy luận trước rồi mới được xác nhận. */}
         <CauKetLuan chinh={targetVerdict} tone={monthly.cur.meets === false ? "warn" : "ok"} />
-        <Suspense fallback={<div style={{ height: 380 }} />}>
-          <VmpSpace3D acts={scopedNamActive} nam={ky.year} giamChuyenDong={giamChuyenDong} />
-        </Suspense>
+        {/* Bản đồ là khám phá theo yêu cầu, không phải điều kiện để đọc kết
+            luận. Giữ control nhẹ trên route Reports nhưng chỉ tải wrapper
+            2D/3D sau cú chọn thật; vì vậy Excel, BanDoNhiet và Canvas không
+            chen vào đường tới hành động chính của Báo cáo. */}
+        <div className="vmp-space3d">
+          {!ho3D && <p className="vmp-3d-khong-ho-tro" role="status">
+            Thiết bị này không hỗ trợ chế độ 3D. Dữ liệu đầy đủ vẫn có ở cách hiển thị hai chiều.
+          </p>}
+          <div className="vmp-space3d-doi">
+            {ho3D && <button type="button" data-map-mode="3d"
+              onClick={() => { setCheBanDo("3d"); setHienBanDo(true); }}
+              className={hienBanDo && cheBanDo === "3d" ? "is-chon" : ""}>Xem bản đồ 3D</button>}
+            <button type="button" data-map-mode="2d"
+              onClick={() => { setCheBanDo("2d"); setHienBanDo(true); }}
+              className={cheBanDo === "2d" ? "is-chon" : ""}>Bản đồ tiến độ</button>
+          </div>
+          {hienBanDo ? (
+            <Suspense fallback={<div style={{ height: 380 }} />}>
+              <VmpSpace3D acts={scopedNamActive} nam={ky.year} giamChuyenDong={giamChuyenDong}
+                initialMode={cheBanDo} />
+            </Suspense>
+          ) : (
+            <p style={{ margin: "0 0 12px", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
+              Chọn bản đồ tiến độ khi cần xem chi tiết 12 tháng; kết luận và bản phẳng vẫn sẵn ngay bên dưới.
+            </p>
+          )}
+        </div>
         <details style={{ marginTop: 12 }}>
           <summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 800, color: C.plumSoft }}>
             Xem dạng phẳng 12 tháng (bản dùng cho PDF)

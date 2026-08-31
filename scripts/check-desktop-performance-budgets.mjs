@@ -104,9 +104,18 @@ function isDirectInvocation() {
 }
 
 if (isDirectInvocation()) {
-  const result = checkDesktopPerformanceBudgets();
-  console.log(`shell ${formatKiB(result.shell)} / ${formatKiB(SHELL_BUDGET)}`);
-  for (const [entry, gzip] of Object.entries(result.routes)) {
-    console.log(`${entry} ${formatKiB(gzip)} / ${formatKiB(ROUTE_BUDGETS[entry])}`);
+  try {
+    const result = checkDesktopPerformanceBudgets();
+    console.log(`shell ${formatKiB(result.shell)} / ${formatKiB(SHELL_BUDGET)}`);
+    for (const [entry, gzip] of Object.entries(result.routes)) {
+      console.log(`${entry} ${formatKiB(gzip)} / ${formatKiB(ROUTE_BUDGETS[entry])}`);
+    }
+    if (process.argv.includes("--runtime")) {
+      const { runDesktopPerformance } = await import("./do-hieu-nang.mjs");
+      await runDesktopPerformance({ enforce: true });
+    }
+  } catch (error) {
+    console.error(`[perf budget] ${error.message}`);
+    process.exitCode = 1;
   }
 }

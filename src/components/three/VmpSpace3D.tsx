@@ -22,7 +22,7 @@
  *  3. Chữ và số ở lớp HTML, không vẽ vào WebGL — và mọi con số đều đọc
  *     được ở bảng bên dưới kể cả khi máy không có WebGL.
  * ===================================================================== */
-import { useState, useMemo, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { coWebGL, docMauLotus3D, dungMauLotus3D } from "../../lib/lotus3dColors.ts";
 
 /* three.js CHỈ tải khi người dùng bấm "Xem bản đồ 3D" — chú thích ở
@@ -81,8 +81,8 @@ export function dungMaTran(acts: Activity[], nam: number): O3D[] {
 
 
 
-export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
-  acts: Activity[]; nam: number; giamChuyenDong: boolean;
+export default function VmpSpace3D({ acts, nam, giamChuyenDong, initialMode = "2d" }: {
+  acts: Activity[]; nam: number; giamChuyenDong: boolean; initialMode?: "2d" | "3d";
 }) {
   const o3d = useMemo(() => dungMaTran(acts, nam), [acts, nam]);
   const [chon, setChon] = useState<O3D | null>(null);
@@ -90,8 +90,9 @@ export default function VmpSpace3D({ acts, nam, giamChuyenDong }: {
      là thứ bản phẳng không làm được; nhưng ai cần đọc số chính xác — hoặc
      cần IN RA GIẤY — thì có bảng tương đương, cùng một bộ số. */
   /* 2D mặc định (nghiên cứu (3) P0) — 3D là khám phá tự chọn. */
-  const [kieu, setKieu] = useState<"3d" | "2d">("2d");
+  const [kieu, setKieu] = useState<"3d" | "2d">(initialMode);
   const ho3D = useMemo(coWebGL, []);
+  useEffect(() => { setKieu(initialMode); }, [initialMode]);
   MAU3D = dungMauLotus3D(); // màu theo theme, cập nhật cả scene đang mở
   capNhatMau3D(MAU3D);
   const oNhiet: ONhiet[] = useMemo(() => o3d

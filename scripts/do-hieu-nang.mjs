@@ -1,59 +1,189 @@
 /* Đo hiệu năng bản build production qua preview + mock Supabase.
- * Cho từng màn: thời gian tới DOMContentLoaded, tổng tài nguyên đã tải,
- * top tài nguyên nặng, số DOM node, long tasks. Chạy: node scripts/do-hieu-nang.mjs */
+ * Chạy trực tiếp để in lab; `--check` biến số đo Reports thành CI gate. */
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
+
 import { CHROME } from "../tests/e2e/chrome-path.mjs";
 import { caiGiaLap, nhetPhien } from "../tests/e2e/gia-lap-supabase.mjs";
 
-const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
-const URL_SB = readFileSync(fileURLToPath(new URL("../.env.local", import.meta.url)), "utf8")
-  .match(/^VITE_SUPABASE_URL=(.+)$/m)[1].trim();
+export const DESKTOP_RUNTIME_LIMITS = {
+  primaryActionableMs: 2_500,
+  skeletonAppearanceMs: 100,
+  maxLongTaskMs: 50,
+  domWarningNodes: 1_500,
+};
 
 /* Chỉ đo các route desktop có ngân sách riêng. Timeline/Long Môn nằm ngoài
  * phạm vi Task 6 nên không được điều hướng hay đo trong lab này. */
-const MAN = ["reports", "alerts", "progress", "source", "workload", "rules", "phanquyen"];
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: ["--no-sandbox"] });
+export const DESKTOP_PERFORMANCE_SCREENS = [
+  "reports", "alerts", "progress", "source", "workload", "rules", "phanquyen",
+];
 
-for (const man of MAN) {
-  const page = await browser.newPage();
-  await page.evaluateOnNewDocument(() => {
-    window.__vmpMaxLongTask = 0;
+const OPTIONAL_REPORT_CHUNK = /(?:VmpSpace3D|VmpSpace3DCanvas|BanDoNhiet|exceljs)/i;
+
+export function runtimeGateScreens() {
+  return [...DESKTOP_PERFORMANCE_SCREENS];
+}
+
+export function assertDesktopRuntimeBudget(
+  screen,
+  metrics,
+  warn = console.warn,
+  { requirePrimaryAction = true } = {},
+) {
+  const failures = [];
+  if (requirePrimaryAction && (metrics.primaryActionableMs == null
+    || metrics.primaryActionableMs > DESKTOP_RUNTIME_LIMITS.primaryActionableMs)) {
+    failures.push(`${screen}: primary actionable ${metrics.primaryActionableMs}ms vượt ${DESKTOP_RUNTIME_LIMITS.primaryActionableMs}ms`);
+  }
+  if (metrics.skeletonAppearanceMs != null && metrics.skeletonAppearanceMs > DESKTOP_RUNTIME_LIMITS.skeletonAppearanceMs) {
+    failures.push(`${screen}: skeleton xuất hiện ${metrics.skeletonAppearanceMs}ms vượt ${DESKTOP_RUNTIME_LIMITS.skeletonAppearanceMs}ms`);
+  }
+  if (metrics.maxLongTaskMs > DESKTOP_RUNTIME_LIMITS.maxLongTaskMs) {
+    failures.push(`${screen}: long task ${metrics.maxLongTaskMs}ms vượt ${DESKTOP_RUNTIME_LIMITS.maxLongTaskMs}ms`);
+  }
+  for (const chunk of metrics.optionalChunksBeforeAction ?? []) {
+    failures.push(`${screen}: optional chunk tải trước hành động ${chunk}`);
+  }
+  if (metrics.domNodes > DESKTOP_RUNTIME_LIMITS.domWarningNodes) {
+    warn(`${screen}: DOM ${metrics.domNodes} vượt ngưỡng cảnh báo ${DESKTOP_RUNTIME_LIMITS.domWarningNodes}`);
+  }
+  if (failures.length) throw new Error(failures.join("\n"));
+}
+
+function docSupabaseUrl() {
+  const env = readFileSync(fileURLToPath(new URL("../.env.local", import.meta.url)), "utf8");
+  const url = env.match(/^VITE_SUPABASE_URL=(.+)$/m)?.[1]?.trim();
+  if (!url) throw new Error(".env.local thiếu VITE_SUPABASE_URL cho runtime performance gate");
+  return url;
+}
+
+function installPerformanceObservers(page) {
+  return page.evaluateOnNewDocument(() => {
+    const state = {
+      primaryActionableMs: null,
+      skeletonAppearanceMs: null,
+      maxLongTaskMs: 0,
+    };
+    window.__vmpDesktopPerformance = state;
+    const observe = () => {
+      const now = performance.now();
+      if (state.primaryActionableMs == null && document.querySelector("[data-desktop-primary-actionable]")) {
+        state.primaryActionableMs = now;
+      }
+      if (state.skeletonAppearanceMs == null && document.querySelector(".vmp-skeleton")) {
+        state.skeletonAppearanceMs = now;
+      }
+    };
+    new MutationObserver(observe).observe(document, { childList: true, subtree: true });
     new PerformanceObserver((entries) => {
       for (const entry of entries.getEntries()) {
-        window.__vmpMaxLongTask = Math.max(window.__vmpMaxLongTask, entry.duration);
+        state.maxLongTaskMs = Math.max(state.maxLongTaskMs, entry.duration);
       }
     }).observe({ type: "longtask", buffered: true });
+    document.addEventListener("DOMContentLoaded", observe, { once: true });
   });
-  await caiGiaLap(page, { supabaseUrl: URL_SB, kichBan: "day" });
-  await nhetPhien(page, { supabaseUrl: URL_SB });
-  await page.setViewport({ width: 1366, height: 768 });
-  const t0 = Date.now();
-  await page.goto(`${GOC}#v=${man}`, { waitUntil: "networkidle0", timeout: 45_000 });
-  const wall = Date.now() - t0;
-  const m = await page.evaluate(() => {
-    const res = performance.getEntriesByType("resource");
-    const nav = performance.getEntriesByType("navigation")[0];
-    const byType = {};
-    for (const r of res) {
-      const k = r.name.split("?")[0].split(".").pop().slice(0, 5);
-      byType[k] = (byType[k] || 0) + (r.transferSize || r.encodedBodySize || 0);
-    }
-    const top = res
-      .map((r) => ({ n: r.name.split("/").pop().slice(0, 44), kb: Math.round((r.transferSize || r.encodedBodySize || 0) / 1024) }))
-      .sort((a, b) => b.kb - a.kb).slice(0, 4);
-    return {
-      dcl: Math.round(nav?.domContentLoadedEventEnd || 0),
-      tongKB: Math.round(res.reduce((s, r) => s + (r.transferSize || r.encodedBodySize || 0), 0) / 1024),
-      soRes: res.length,
-      domNodes: document.querySelectorAll("*").length,
-      maxLongTask: Math.round(window.__vmpMaxLongTask || 0),
-      top,
-    };
-  });
-  console.log(`${man.padEnd(9)} wall=${wall}ms dcl=${m.dcl}ms tai=${m.tongKB}KB/${m.soRes}res dom=${m.domNodes} long=${m.maxLongTask}ms`);
-  console.log(`          top: ${m.top.map((t) => `${t.n}=${t.kb}KB`).join(" · ")}`);
-  await page.close();
 }
-await browser.close();
+
+async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) {
+  const page = await browser.newPage();
+  try {
+    await installPerformanceObservers(page);
+    await caiGiaLap(page, { supabaseUrl, kichBan: "day" });
+    await nhetPhien(page, { supabaseUrl });
+    await page.setViewport({ width: 1366, height: 768 });
+    const t0 = Date.now();
+    await page.goto(`${origin}#v=${screen}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+
+    if (screen === "reports") {
+      try {
+        await page.waitForFunction(
+          () => window.__vmpDesktopPerformance?.primaryActionableMs != null,
+          { timeout: DESKTOP_RUNTIME_LIMITS.primaryActionableMs + 100 },
+        );
+      } catch {
+        // Đo thật vẫn được đọc bên dưới để báo cùng một thông điệp budget rõ ràng.
+      }
+    } else {
+      await page.waitForNetworkIdle({ idleTime: 500, timeout: 45_000 });
+    }
+
+    const wall = Date.now() - t0;
+    const metrics = await page.evaluate(() => {
+      const state = window.__vmpDesktopPerformance;
+      const resources = performance.getEntriesByType("resource");
+      const navigation = performance.getEntriesByType("navigation")[0];
+      const top = resources
+        .map((resource) => ({
+          n: resource.name.split("/").pop().slice(0, 44),
+          kb: Math.round((resource.transferSize || resource.encodedBodySize || 0) / 1024),
+        }))
+        .sort((left, right) => right.kb - left.kb).slice(0, 4);
+      return {
+        dcl: Math.round(navigation?.domContentLoadedEventEnd || 0),
+        tongKB: Math.round(resources.reduce(
+          (sum, resource) => sum + (resource.transferSize || resource.encodedBodySize || 0), 0,
+        ) / 1024),
+        soRes: resources.length,
+        domNodes: document.querySelectorAll("*").length,
+        primaryActionableMs: screen === "reports" && state?.primaryActionableMs == null
+          ? DESKTOP_RUNTIME_LIMITS.primaryActionableMs + 1
+          : state?.primaryActionableMs == null ? null : Math.round(state.primaryActionableMs),
+        skeletonAppearanceMs: state?.skeletonAppearanceMs == null
+          ? null
+          : Math.round(state.skeletonAppearanceMs),
+        maxLongTaskMs: Math.round(state?.maxLongTaskMs || 0),
+        optionalChunksBeforeAction: screen === "reports" ? resources
+          .map((resource) => resource.name.split("/").pop())
+          .filter((name) => OPTIONAL_REPORT_CHUNK.test(name)) : [],
+        top,
+      };
+    });
+    if (enforce) {
+      assertDesktopRuntimeBudget(screen, metrics, console.warn, {
+        requirePrimaryAction: screen === "reports",
+      });
+    }
+    return { screen, wall, ...metrics };
+  } finally {
+    await page.close();
+  }
+}
+
+export async function runDesktopPerformance({
+  enforce = false,
+  origin = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/",
+  screens = enforce ? runtimeGateScreens() : DESKTOP_PERFORMANCE_SCREENS,
+} = {}) {
+  const browser = await puppeteer.launch({
+    executablePath: CHROME, headless: "new", args: ["--no-sandbox"],
+  });
+  try {
+    const supabaseUrl = docSupabaseUrl();
+    const results = [];
+    for (const screen of screens) {
+      const result = await measureScreen(browser, { screen, origin, supabaseUrl, enforce });
+      results.push(result);
+      console.log(`${screen.padEnd(9)} wall=${result.wall}ms dcl=${result.dcl}ms tai=${result.tongKB}KB/${result.soRes}res dom=${result.domNodes} primary=${result.primaryActionableMs}ms skeleton=${result.skeletonAppearanceMs ?? "n/a"}ms long=${result.maxLongTaskMs}ms`);
+      console.log(`          top: ${result.top.map((item) => `${item.n}=${item.kb}KB`).join(" · ")}`);
+    }
+    return results;
+  } finally {
+    await browser.close();
+  }
+}
+
+function isDirectInvocation() {
+  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
+
+if (isDirectInvocation()) {
+  const enforce = process.argv.includes("--check");
+  try {
+    await runDesktopPerformance({ enforce });
+  } catch (error) {
+    console.error(`[perf runtime] ${error.message}`);
+    process.exitCode = 1;
+  }
+}
