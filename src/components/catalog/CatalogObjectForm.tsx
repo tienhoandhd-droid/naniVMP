@@ -26,6 +26,7 @@ import "../../styles/catalog-workspace.css";
 import { AlertTriangle, Boxes, Lock, Save } from "lucide-react";
 
 import ViewportDialog from "../ui/ViewportDialog.tsx";
+import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import {
   TRUONG_FORM, BO_PHAN_CHUAN,
@@ -137,8 +138,19 @@ export default function CatalogObjectForm({
     setOCanNhay(null);
   };
 
-  const dong = () => {
-    if (daDoi && !window.confirm("Còn thay đổi chưa lưu. Đóng và bỏ các thay đổi?")) return;
+  const { xacNhan, hopXacNhan } = useXacNhan();
+
+  const dong = async () => {
+    /* C3 (31/08): hộp chuẩn thay window.confirm. */
+    if (daDoi) {
+      const dongY = await xacNhan({
+        title: "Đóng và bỏ thay đổi?",
+        description: "Biểu mẫu còn thay đổi chưa lưu. Đóng bây giờ là mất phần vừa nhập.",
+        confirmLabel: "Bỏ thay đổi",
+        cancelLabel: "Ở lại nhập tiếp",
+      });
+      if (!dongY) return;
+    }
     onClose();
   };
 
@@ -357,6 +369,7 @@ export default function CatalogObjectForm({
           <AlertTriangle size={16} aria-hidden="true" /> {loiChung}
         </p>
       )}
+      {hopXacNhan}
     </ViewportDialog>
   );
 }

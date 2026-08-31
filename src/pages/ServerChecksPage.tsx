@@ -17,6 +17,8 @@ import {
   ClipboardCheck, Clock, FileCheck2,
 } from "lucide-react";
 import { C, TEXT, btnPrimary } from "../constants/theme.ts";
+import { useXacNhan } from "../hooks/useXacNhan.tsx";
+import { useToast } from "../components/ui/ToastProvider.tsx";
 import { Card, CardTitle, Tag, KpiCard, TableScroll } from "../components/ui/Primitives.tsx";
 import {
   fetchDashboardKpi, checkDataQuality, fetchDueAlerts, refreshComputedStatus,
@@ -45,6 +47,8 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
   const [soonDays, setSoonDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const { xacNhan, hopXacNhan } = useXacNhan();
+  const toast = useToast();
   const [err, setErr] = useState("");
   const [sevFilter, setSevFilter] = useState("all");
 
@@ -79,16 +83,22 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
   const dueSoon = alerts.filter((a) => a.alert_type === "due_soon");
 
   const runRefresh = async () => {
-    if (!window.confirm(
-      "Tính lại computed_status cho toàn bộ hạng mục theo ngày hôm nay?\n"
-      + "Thao tác này ghi vào DB và được ghi vết trong audit log.")) return;
+    /* C3 (31/08): hộp chuẩn thay window.confirm/alert — theo theme, có focus
+       trap, và kết quả báo qua toast thay vì hộp trình duyệt khoá luồng. */
+    const dongY = await xacNhan({
+      title: "Tính lại trạng thái toàn bộ?",
+      description: "Tính lại computed_status cho toàn bộ hạng mục theo ngày hôm nay. "
+        + "Thao tác này ghi vào DB và được ghi vết trong audit log.",
+      confirmLabel: "Tính lại",
+    });
+    if (!dongY) return;
     setBusy(true);
     try {
       const r = await refreshComputedStatus();
-      alert(r.msg || "Đã tính lại trạng thái");
+      toast.thanhCong(r.msg || "Đã tính lại trạng thái");
       await load();
     } catch (e) {
-      alert("Lỗi: " + ((e as Error).message || "không rõ"));
+      toast.loi("Lỗi: " + ((e as Error).message || "không rõ"));
     }
     setBusy(false);
   };
@@ -268,6 +278,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
           )}
         </div>
       </Card>
+      {hopXacNhan}
     </div>
   );
 }

@@ -26,6 +26,7 @@ import {
   type PermissionWorkbookError,
 } from "./permissionWorkbook.ts";
 import LinkedMultiSelect from "./LinkedMultiSelect.tsx";
+import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import {
   filterScopeCatalog,
   pruneInvalidScope,
@@ -122,6 +123,7 @@ export default function StaffDirectoryPanel({
   const [results, setResults] = useState<DirectoryPerson[]>([]);
   const [selected, setSelected] = useState<DirectoryPerson | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const { xacNhan, hopXacNhan } = useXacNhan();
   const [savedForm, setSavedForm] = useState(emptyForm);
   const [catalog, setCatalog] = useState<ScopeCatalog>(emptyCatalog);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -325,24 +327,30 @@ export default function StaffDirectoryPanel({
       : event.target.value,
   }));
 
-  const changeAccessClass = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const changeAccessClass = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const accessClass = event.target.value ? event.target.value as AccessClass : null;
-    setForm((current) => {
-      const hasScope = Object.values(current.scope).some((values) => values.length > 0);
-      if (isQaAccessClass(accessClass) && hasScope && !window.confirm(
-        "Đổi sang phân loại QA sẽ xóa bốn tầng phạm vi hiện có. Tiếp tục?",
-      )) return current;
-      return {
-        ...current,
-        accessClass,
-        scope: isQaAccessClass(accessClass)
-          ? { departments: [], factories: [], areas: [], lines: [] }
-          : current.scope,
-      };
-    });
+    /* C3 (31/08): hỏi TRƯỚC setForm bằng hộp chuẩn — window.confirm trong
+       state-updater vừa khoá luồng vừa không await được. Đọc scope từ form
+       closure: select bị disable khi đang lưu nên form không đổi giữa chừng. */
+    const hasScope = Object.values(form.scope).some((values) => values.length > 0);
+    if (isQaAccessClass(accessClass) && hasScope) {
+      const dongY = await xacNhan({
+        title: "Đổi sang phân loại QA?",
+        description: "Bốn tầng phạm vi (bộ phận / nhà máy / khu vực / line) hiện có sẽ bị xoá — phân loại QA không dùng phạm vi tầng.",
+        confirmLabel: "Đổi và xoá phạm vi",
+      });
+      if (!dongY) return;
+    }
+    setForm((current) => ({
+      ...current,
+      accessClass,
+      scope: isQaAccessClass(accessClass)
+        ? { departments: [], factories: [], areas: [], lines: [] }
+        : current.scope,
+    }));
   };
 
-  const changeScope = (scopeKey: keyof ScopeSelection, values: string[]) => {
+  const changeScope = async (scopeKey: keyof ScopeSelection, values: string[]) => {
     const candidate = { ...form.scope, [scopeKey]: values };
     const pruned = pruneInvalidScope(catalog, candidate);
     const removed: string[] = [];
@@ -357,9 +365,14 @@ export default function StaffDirectoryPanel({
         }
       }
     }
-    if (removed.length && !window.confirm(
-      `Thay đổi này sẽ bỏ ${removed.length} lựa chọn con không còn hợp lệ:\n${removed.join("\n")}`,
-    )) return;
+    if (removed.length) {
+      const dongY = await xacNhan({
+        title: `Bỏ ${removed.length} lựa chọn con không còn hợp lệ?`,
+        description: `Thu hẹp tầng trên khiến các mục sau không còn thuộc phạm vi: ${removed.join(" · ")}.`,
+        confirmLabel: "Bỏ và tiếp tục",
+      });
+      if (!dongY) return;
+    }
     setForm((current) => ({ ...current, scope: pruned }));
   };
 
@@ -657,6 +670,7 @@ export default function StaffDirectoryPanel({
           </div>
         )}
       </div>
+      {hopXacNhan}
     </section>
   );
 }

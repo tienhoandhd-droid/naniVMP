@@ -176,11 +176,13 @@ test("CI e2e-mock chỉ chạy năm bộ giả lập cốt lõi được duyệt
     "e2e-mock phải chỉ gọi đúng năm bộ E2E lõi, đúng thứ tự và không lặp",
   );
 
+  /* 31/08: "drift" RỜI danh sách cấm — guardrail đã về 0 vi phạm và trở
+     thành gate cứng ở static-quality (trước đó nó đỏ thường trực nên phải
+     giữ ngoài CI). "budget" (ngân sách bundle) cũng là gate mới cùng ngày. */
   for (const ten of [
     "visual:runtime",
     "visual:contract",
     "visual",
-    "drift",
     "shell",
     "thammy",
     "atelier",

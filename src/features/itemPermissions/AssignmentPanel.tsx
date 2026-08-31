@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link2 } from "lucide-react";
+import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { fetchItemAssignments, ItemPermissionRpcError, setItemAssignment } from "./api.ts";
 import {
   isDirectoryPersonComplete,
@@ -21,7 +22,9 @@ export async function dispatchAssignmentWhenCurrent({
   dispatch,
 }: {
   loadAssignments: () => Promise<Array<Pick<ItemAssignment, "assignment_id" | "assignment_kind" | "assignment_role" | "is_active" | "staff_name">>>;
-  confirmReplacement: (existingPrimary: Pick<ItemAssignment, "staff_name">) => boolean;
+  /* C3 (31/08): nhận cả Promise — hộp xác nhận chuẩn (useXacNhan) là async,
+     còn test unit vẫn truyền hàm sync trả boolean như cũ. */
+  confirmReplacement: (existingPrimary: Pick<ItemAssignment, "staff_name">) => boolean | Promise<boolean>;
   isCurrent: () => boolean;
   dispatch: (action: "assign" | "replace_primary", expectedPrimaryAssignmentId: string | null) => Promise<unknown>;
 }): Promise<boolean> {
@@ -32,7 +35,7 @@ export async function dispatchAssignmentWhenCurrent({
   const expectedPrimaryAssignmentId = existingPrimary?.assignment_id ?? null;
   let action: "assign" | "replace_primary" = "assign";
   if (existingPrimary) {
-    if (!confirmReplacement(existingPrimary)) return false;
+    if (!(await confirmReplacement(existingPrimary))) return false;
     action = "replace_primary";
   }
   if (!isCurrent()) return false;
@@ -125,6 +128,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
   const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const { xacNhan, hopXacNhan } = useXacNhan();
   const requestSequence = useRef(0);
   const selectionSequence = useRef(0);
   const intentSequence = useRef(0);
@@ -191,9 +195,12 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
         mutate: () => intent.assignmentKind === "qa" && intent.assignmentRole === "primary"
           ? dispatchAssignmentWhenCurrent({
           loadAssignments: () => fetchItemAssignments({ validationCode: intent.validationCode }),
-          confirmReplacement: (existingPrimary) => window.confirm(
-            `Hạng mục này đang có QA phụ trách chính là ${existingPrimary.staff_name}. Đổi sang ${intent.fullName}?`,
-          ),
+          confirmReplacement: (existingPrimary) => xacNhan({
+            title: "Thay QA phụ trách chính?",
+            description: `Hạng mục này đang có QA phụ trách chính là ${existingPrimary.staff_name}. `
+              + `Đổi sang ${intent.fullName} — người cũ chuyển thành không còn phụ trách chính.`,
+            confirmLabel: "Thay người",
+          }),
           isCurrent: isCurrentSelection,
           dispatch: (action, expectedPrimaryAssignmentId) => setItemAssignment({
             personId: intent.personId,
@@ -350,6 +357,7 @@ export default function AssignmentPanel({ person, canEdit, fixedKind, qaOnly = f
         </>
       ) : <div className="ip-empty">Tìm và chọn một người ở danh bạ để phân công.</div>}
       {message && <div className="ip-message" role="status">{message}</div>}
+      {hopXacNhan}
     </section>
   );
 }

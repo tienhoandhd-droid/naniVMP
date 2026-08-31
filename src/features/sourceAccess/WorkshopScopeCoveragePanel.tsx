@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { btnPrimary, cardDefault, C, INP, TEXT } from "../../constants/theme.ts";
 import { listSourceWorkshopScopeChoices, setSourceWorkshopScopeGrant } from "./api.ts";
 import { normalizeWorkshopScopeDraft, type SourceWorkshopCoveragePerson, type SourceWorkshopScopeChoicesCursor, type WorkshopScopeGrant } from "./contracts.ts";
@@ -55,6 +56,7 @@ export default function WorkshopScopeCoveragePanel({
   const [choicesRetry, setChoicesRetry] = useState(0);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const { xacNhan, hopXacNhan } = useXacNhan();
   const choicesRequest = useRef(0);
   const mutationRequest = useRef(0);
 
@@ -182,13 +184,22 @@ export default function WorkshopScopeCoveragePanel({
     }
   };
 
-  const revoke = (grant: WorkshopScopeGrant) => {
+  const revoke = async (grant: WorkshopScopeGrant) => {
     if (!selectedPerson) return;
     if (!reason.trim()) {
       setMessage("Nhập lý do thay đổi trước khi thu hồi phạm vi xưởng.");
       return;
     }
-    if (!window.confirm(`Thu hồi phạm vi ${grant.department} / ${grant.areaCode}${grant.line ? ` / ${grant.line}` : " (toàn khu vực)"}?`)) return;
+    /* C3 (31/08): hộp chuẩn thay window.confirm — thu hồi quyền là thao tác
+       một chiều, hộp phải nói rõ mất gì và của ai. */
+    const dongY = await xacNhan({
+      title: "Thu hồi phạm vi xưởng?",
+      description: `${selectedPerson.fullName || "Người này"} sẽ mất quyền xem Source của `
+        + `${grant.department} / ${grant.areaCode}${grant.line ? ` / ${grant.line}` : " (toàn khu vực)"}. `
+        + "Thao tác được ghi vết kèm lý do; muốn cấp lại phải tạo phạm vi mới.",
+      confirmLabel: "Thu hồi",
+    });
+    if (!dongY) return;
     void save(false, {
       person: selectedPerson,
       grant,
@@ -272,6 +283,7 @@ export default function WorkshopScopeCoveragePanel({
           </div>}
         </div>
       )}
+      {hopXacNhan}
     </section>
   );
 }

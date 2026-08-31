@@ -17,6 +17,8 @@ import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
 import { fetchActiveRules, recalcCriticality } from "../lib/supabaseData.ts";
 import type { ActiveRules } from "../lib/supabaseData.ts";
+import { useXacNhan } from "../hooks/useXacNhan.tsx";
+import { useToast } from "../components/ui/ToastProvider.tsx";
 import type { AccessContext } from "../lib/access.ts";
 
 /** Màu theo điểm trọng yếu 1..9 — cao thì đỏ, thấp thì xanh. */
@@ -106,6 +108,8 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const { xacNhan, hopXacNhan } = useXacNhan();
+  const toast = useToast();
 
   const load = async () => {
     setLoading(true); setErr("");
@@ -116,15 +120,20 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
   useEffect(() => { load(); }, []);
 
   const recalc = async () => {
-    if (!window.confirm(
-      "Chấm lại điểm trọng yếu cho các đối tượng CHƯA được QA chốt tay?\n\n"
-      + "Dòng nào QA đã sửa (nguồn = 'đã duyệt') sẽ KHÔNG bị ghi đè.")) return;
+    /* C3 (31/08): hộp chuẩn + toast thay window.confirm/alert. */
+    const dongY = await xacNhan({
+      title: "Chấm lại điểm trọng yếu?",
+      description: "Chỉ chấm lại các đối tượng CHƯA được QA chốt tay. "
+        + "Dòng nào QA đã sửa (nguồn = 'đã duyệt') sẽ KHÔNG bị ghi đè.",
+      confirmLabel: "Chấm lại",
+    });
+    if (!dongY) return;
     setBusy(true);
     try {
       const r = await recalcCriticality(true);
-      alert(r.msg || "Đã chấm lại");
+      toast.thanhCong(r.msg || "Đã chấm lại");
       await load();
-    } catch (e) { alert("Lỗi: " + ((e as Error).message || "không rõ")); }
+    } catch (e) { toast.loi("Lỗi: " + ((e as Error).message || "không rõ")); }
     setBusy(false);
   };
 
@@ -361,6 +370,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
           {rules.toan_ven_du_lieu.map((x, i) => <li key={i}>{x}</li>)}
         </ul>
       </Section>
+      {hopXacNhan}
     </div>
   );
 }

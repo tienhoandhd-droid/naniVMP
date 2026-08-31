@@ -518,5 +518,9 @@ test("Timeline dùng Long Môn làm lớp nhìn chính và không lặp year rai
   assert.match(source, /filterLongMonScopeActivities/);
   assert.match(source, /<LongMonRace[\s\S]*activities=\{longMonActivities\}[\s\S]*scopeControl=/);
   assert.doesNotMatch(source, /view === "year" \? \(\s*<TimelineRangeRail/);
-  assert.match(main, /features\/monitoring\/long-mon-race\.css/);
+  /* B5 (31/08): CSS Long Môn RỜI entry, đi theo chunk màn Timeline — người
+     không mở màn này không phải tải. Hợp đồng đổi chiều: main.tsx KHÔNG
+     được import nữa, TimelinePage PHẢI import. */
+  assert.doesNotMatch(main, /features\/monitoring\/long-mon-race\.css/);
+  assert.match(source, /import "\.\.\/features\/monitoring\/long-mon-race\.css"/);
 });
