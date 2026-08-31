@@ -12,7 +12,7 @@ import { NAV_ITEMS } from "../../constants/vmp.ts";
 import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
 import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
-import { CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
+import { CrownLogo, tuoiDuLieu } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
 /* Nhãn năm vai nghiệp vụ hiệu lực — dùng lại đúng bảng nhãn của màn Phân quyền
@@ -162,10 +162,6 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 </div>
               </div>
             </div>
-            {/* Thanh tra đã RỜI khỏi user card (nghiên cứu (3) P1): toggle
-                toàn cục cạnh nút Thoát không nói được nó để làm gì. Giờ là
-                "chế độ trình bày thanh tra" trong màn Báo cáo & AI, có
-                banner + thay đổi thấy ngay khi bật. */}
             <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
               {/* nowrap + đệm ngang hẹp: sidebar nay là 248px thay vì 266px,
                   và ở bề ngang đó nhãn "Mật khẩu" bị bẻ xuống hai dòng. */}
@@ -413,33 +409,7 @@ function ThemeToggle() {
   );
 }
 
-/* Công tắc chế độ thanh tra — xem dungThanhTra() trong Primitives.tsx. */
-/* Toggle chế độ trình bày thanh tra — nay chỉ đứng trong màn Báo cáo & AI
-   (xuất cho ReportsView dùng). Hiệu ứng khi bật: banner cố định, ẩn Vali
-   và trang trí, bỏ emoji/biệt danh — thấy ngay, không phải đoán. */
-export function ThanhTraToggle() {
-  const [bat, setBat] = dungThanhTra();
-  return (
-    <button onClick={() => setBat(!bat)}
-      title={bat
-        ? "Chế độ trình bày thanh tra ĐANG BẬT — ẩn minh hoạ, emoji, biệt danh và xếp hạng cá nhân. Bấm để tắt."
-        : "Bật chế độ trình bày thanh tra: ngôn ngữ trung tính, ẩn minh hoạ trang trí, không emoji, không xếp hạng cá nhân"}
-      aria-label={bat
-        ? "Chế độ trình bày thanh tra đang bật — bấm để tắt"
-        : "Bật chế độ trình bày thanh tra"}
-      aria-pressed={bat}
-      style={{ ...glass, height: 40, padding: "0 14px", borderRadius: 999,
-               border: bat ? `1.5px solid ${C.plum}` : "none",
-               background: bat ? C.plum : undefined,
-               cursor: "pointer", display: "flex", alignItems: "center", gap: 7 }}>
-      <ShieldCheck size={15} color={bat ? "var(--lp-on-ink)" : C.plum} />
-      <span style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800,
-                     color: bat ? "var(--lp-on-ink)" : C.plum, whiteSpace: "nowrap" }}>
-        {bat ? "Đang trình bày thanh tra" : "Chế độ thanh tra"}
-      </span>
-    </button>
-  );
-}
+/* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
 export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, dataUpdatedAt,
   view, setView, access, onLogout, onChangePw }: {

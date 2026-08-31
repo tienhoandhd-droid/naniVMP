@@ -8,7 +8,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { C, TEXT, NUM, NUM_HERO, DISPLAY, MO, R, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
-import { ShieldCheck, XCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
 import { buildValiBrief } from "../../features/overview/valiBrief.ts";
 
 /* `new URL` để Vite vẫn fingerprint asset, còn Node unit test có thể nạp
@@ -75,9 +75,6 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
     celebrate: valiCelebrate,
   } as const;
 
-  /* Lời chào theo giờ. Ở chế độ thanh tra thì thay bằng một câu nêu phạm vi
-     — vẫn có một dòng mở đầu, chỉ là không hỏi thăm giờ giấc của người đọc. */
-  const thanhTra = laThanhTra();
 
   return (
     <section className={`vmp-vali-brief vmp-vali-brief--${mood}`}
@@ -93,7 +90,7 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
       <div className="vmp-vali-brief__content">
         <div className="vmp-vali-brief__eyebrow">Công chúa Vali · Báo cáo tổng hợp</div>
         <h2 className="vmp-vali-brief__title">
-          {thanhTra ? "Trợ lý phân tích" : "Tình hình thẩm định"}
+          {"Tình hình thẩm định"}
         </h2>
         <p className="vmp-vali-brief__headline">{brief.headline}</p>
 
@@ -747,78 +744,8 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
   );
 }
 
-/* ======================== CHẾ ĐỘ THANH TRA ========================
- * Một công tắc, ghi ở localStorage, đọc được từ mọi nơi mà không cần
- * context: `document.documentElement[data-thanhtra]`.
- *
- * Vì sao cần: hệ này có thể được cho thanh tra GMP xem. Giọng thân mật
- * ("Khuya rồi nhỉ?"), emoji 😵💪, biệt danh "công chúa Vali" và bảng xếp
- * hạng cá nhân đều là gu riêng của nơi dùng — nhưng trong một buổi thanh
- * tra thì chúng làm người đọc nghi ngờ mức nghiêm túc của cả hệ thống, kể
- * cả khi số liệu hoàn toàn đúng.
- *
- * Cách xử: KHÔNG bỏ phong cách đi. Giữ nguyên ở chế độ thường, và cho bật
- * một chế độ trung tính khi cần. Bật/tắt không đụng tới dữ liệu, chỉ đổi
- * cách trình bày — nên không có chuyện "hai bản số liệu khác nhau".
- */
-/** Ghi trạng thái chế độ thanh tra ra "một nguồn": attribute + localStorage.
- *  Banner và mọi nơi khác theo dõi attribute nên bật/tắt từ đâu cũng khớp. */
-export function datThanhTra(bat: boolean): void {
-  document.documentElement.setAttribute("data-thanhtra", bat ? "1" : "0");
-  try {
-    if (bat) localStorage.setItem("vmp-thanhtra", "1");
-    else localStorage.removeItem("vmp-thanhtra");
-  } catch { /* localStorage bị chặn thì vẫn chạy, chỉ không nhớ */ }
-}
-
-export function dungThanhTra(): [boolean, (v: boolean) => void] {
-  const [bat, setBat] = useState(() => {
-    try { return localStorage.getItem("vmp-thanhtra") === "1"; } catch { return false; }
-  });
-  useEffect(() => { datThanhTra(bat); }, [bat]);
-  /* Nơi khác (vd banner) có thể tắt qua datThanhTra — đồng bộ lại state. */
-  useEffect(() => {
-    const mo = new MutationObserver(() =>
-      setBat(document.documentElement.getAttribute("data-thanhtra") === "1"));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-thanhtra"] });
-    return () => mo.disconnect();
-  }, []);
-  return [bat, setBat];
-}
-
-/** Banner cố định khi chế độ trình bày thanh tra đang bật (nghiên cứu (3):
- *  "bật xong phải thấy thay đổi NGAY, không cần đoán"). Nói rõ đang ẩn gì
- *  và tắt được tại chỗ. */
-export function BangThanhTra() {
-  const [bat, setBat] = useState(laThanhTra());
-  useEffect(() => {
-    const mo = new MutationObserver(() => setBat(laThanhTra()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-thanhtra"] });
-    return () => mo.disconnect();
-  }, []);
-  if (!bat) return null;
-  return (
-    <div className="vmp-bang-thanhtra" role="status" data-thanhtra-banner>
-      <ShieldCheck size={15} />
-      <span>
-        Đang ở <b>chế độ trình bày thanh tra</b> — ngôn ngữ trung tính,
-        ẩn minh hoạ và trang trí, chỉ còn dữ liệu và nguồn.
-      </span>
-      <button type="button" onClick={() => datThanhTra(false)}>Tắt</button>
-    </div>
-  );
-}
-
-/** Đọc trạng thái chế độ thanh tra ở nơi không tiện dùng hook. */
-export const laThanhTra = (): boolean =>
-  typeof document !== "undefined"
-  && document.documentElement.getAttribute("data-thanhtra") === "1";
-
-/** Bỏ emoji khỏi một câu khi đang ở chế độ thanh tra. */
-export function chuTrungTinh(t: string): string {
-  if (!laThanhTra()) return t;
-  return t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s{2,}/g, " ").trim();
-}
+/* (Chế độ trình bày thanh tra đã GỠ 01/09/2026 theo yêu cầu chủ dự án —
+   chỉ còn hai giao diện sáng/tối. Xem git log nếu cần khôi phục.) */
 
 /* ======================== CHÚ THÍCH ⓘ ========================
  * Một dấu ⓘ đặt NGAY CẠNH con số nó giải thích.

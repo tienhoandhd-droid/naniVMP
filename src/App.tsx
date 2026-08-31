@@ -72,8 +72,7 @@ import {
   Sel,
   SkeletonDashboard,
   SyncBanner,
-  PrincessCommentary, StatTile, MultiSelect,
-  BangThanhTra } from "./components/ui/Primitives.tsx";
+  PrincessCommentary, StatTile, MultiSelect, } from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 /* F2 (31/08): memo tại điểm dùng — shell App giữ ~40 state; thiếu memo thì
  * MỖI phím gõ vào ô lọc render lại cả Sidebar/Topbar/màn nặng. Props các
@@ -1192,9 +1191,6 @@ function VerifiedAppShell({ user, logout, access }: {
             onLogout={xinThoat} onChangePw={moDoiMatKhau}
           />
 
-          {/* Banner chế độ trình bày thanh tra — hiện trên MỌI trang khi
-              bật (bật ở màn Báo cáo & AI), tắt được tại chỗ. */}
-          <BangThanhTra />
 
           {/* Padding lấy từ token khổ màn: 24 → 32 → 36 (≥1600) → 48 (≥1900).
               Desktop rộng thở bằng padding, không kéo card dài ra. */}

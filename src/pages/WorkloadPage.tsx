@@ -7,7 +7,7 @@ import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../
 import { parseD, fmtVN, clamp, wlMonthOf, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
-import { Card, CardTitle, Tag, Modal, Donut, Pill, CauKetLuan, laThanhTra } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Modal, Donut, Pill, CauKetLuan } from "../components/ui/Primitives.tsx";
 import type { ValiMood } from "../components/brand/ValiIllustration.tsx";
 
 /* Nhãn tâm trạng của Vali — CÙNG lời với màn "Việc hôm nay" (đồng nhất
@@ -351,14 +351,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const mood: ValiMood = overloaded.length > 0
     ? "concern"
     : people.length > 0 ? "celebrate" : "guide";
-  const thanhTra = laThanhTra();
-  const bubble = thanhTra
-    ? (overloaded.length > 0
-      ? `${overloaded.length} người vượt ngưỡng ${CAP_MONTH} ngày công/tháng ở tháng cao điểm.`
-      : `Không có người nào vượt ngưỡng ${CAP_MONTH} ngày công/tháng.`)
-    : (overloaded.length > 0
-      ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng). Bấm vào từng người xem chi tiết.`
-      : `Cả đội đang cân đối. Cứ giữ nhịp này là về đích VMP đúng hẹn.`);
+  const bubble = overloaded.length > 0
+    ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng). Bấm vào từng người xem chi tiết.`
+    : `Cả đội đang cân đối. Cứ giữ nhịp này là về đích VMP đúng hẹn.`;
   /* Chú giải đọc thẳng từ BAC_TAI — một nguồn cho cả ô lẫn chú giải, nên
      không thể lệch nhau như bản trước (chú giải tự khai màu riêng, và hai
      ô đầu còn trong suốt vì cùng lỗi nối chuỗi). */
@@ -382,7 +377,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
               chibi webp của màn "Việc hôm nay" (`.hn-vali`, today.css) thay
               cho ValiIllustration SVG — cùng một app không nên có hai phiên
               bản công chúa. UpdatePage đã theo mẫu này từ trước. */}
-          {!thanhTra && (
+          {(
             <div className="lp-art-layer lp-art-layer--pearl-orbit hn-hero__vali" data-lp-art="pearl-orbit"
               style={{ flexShrink: 0 }}>
               <div className={`hn-vali hn-vali--${mood} hn-vali--nho`} role="img"

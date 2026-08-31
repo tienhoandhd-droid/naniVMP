@@ -1805,8 +1805,6 @@ body { transition: background var(--mo-slow) var(--ease); }
 }
 .vmp-vali-brief__action strong { flex: none; color: var(--c-marigold-text); font-weight: 850; }
 .vmp-vali-brief__action span { font-weight: 700; }
-:root[data-thanhtra="1"] .vmp-vali-brief { grid-template-columns: minmax(0, 1fr); }
-:root[data-thanhtra="1"] .vmp-vali-brief__chibi { display: none; }
 
 @media (max-width: 900px) {
   .vmp-vali-brief { grid-template-columns: 128px minmax(0, 1fr); gap: 18px; }
@@ -2440,8 +2438,6 @@ body { transition: background var(--mo-slow) var(--ease); }
 
 }
 
-:root[data-thanhtra="1"] .tw,
-:root[data-thanhtra="1"] .vq-login-crown { display: none !important; }
 
 /* Nút đổi cách nhóm ở màn nhập liệu (D17) — cùng kiểu với nút đổi 3D/2D. */
 .vmp-doi-nhom {
@@ -2963,43 +2959,8 @@ main li,
  *  CHẾ ĐỘ TRÌNH BÀY THANH TRA (nghiên cứu (3) — đợt 3)
  *  ---------------------------------------------------------------------
  *  Bật ở màn Báo cáo & AI. Hiệu ứng phải THẤY NGAY: banner cố định, ẩn
- *  Vali + sparkle + artwork cảm xúc; chữ trung tính do chuTrungTinh xử.
+ *  Vali + sparkle + artwork cảm xúc.
  * =================================================================== */
-.vmp-bang-thanhtra {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border-radius: var(--lp-r-control);
-  background: var(--lp-plum);
-  color: var(--lp-on-ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-.vmp-bang-thanhtra b { font-weight: 800; }
-.vmp-bang-thanhtra button {
-  margin-left: auto;
-  border: 1px solid rgb(255 255 255 / 45%);
-  background: none;
-  color: inherit;
-  font: inherit;
-  font-weight: 800;
-  border-radius: 999px;
-  padding: 4px 16px;
-  cursor: pointer;
-}
-
-/* Ẩn minh hoạ/trang trí khi trình bày thanh tra: Vali (mọi mood), sparkle
- * nền, artwork chìm. Dữ liệu và điều khiển không bị đụng. */
-:root[data-thanhtra="1"] [data-lp-vali],
-:root[data-thanhtra="1"] .tw,
-:root[data-thanhtra="1"] .lp-art-layer::after {
-  display: none !important;
-}
 
 /* Thiết bị không có WebGL: câu tiếng Việt tử tế thay cho lỗi kỹ thuật. */
 .vmp-3d-khong-ho-tro {

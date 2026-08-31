@@ -560,62 +560,8 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3i. Thanh tra = chế độ trình bày có nghĩa ---------------------- */
-{
-  console.log("\nChế độ trình bày thanh tra:");
-  const trang = await trinhDuyet.newPage();
-  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
-  await nhetPhien(trang, { supabaseUrl: URL_SB });
-  await trang.setViewport({ width: 1440, height: 900 });
-  await trang.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2000));
-
-  const sidebar = await trang.evaluate(() =>
-    [...document.querySelectorAll("aside button, nav button")]
-      .some((b) => b.textContent?.trim() === "Thanh tra"));
-  kiem(!sidebar, "user card KHÔNG còn toggle Thanh tra vô danh");
-
-  const coVali = await trang.evaluate(() => {
-    const v = document.querySelector("[data-lp-vali]");
-    return !!v && getComputedStyle(v).display !== "none";
-  });
-  kiem(coVali, "bình thường Vali hiển thị (tiền đề cho phép thử ẩn)");
-
-  await trang.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2200));
-  await trang.evaluate(() => {
-    [...document.querySelectorAll("button")]
-      .find((b) => /chế độ thanh tra/i.test(b.textContent || ""))?.click();
-  });
-  await new Promise((r) => setTimeout(r, 600));
-  const sauBat = await trang.evaluate(() => ({
-    banner: !!document.querySelector("[data-thanhtra-banner]"),
-    chuBanner: document.querySelector("[data-thanhtra-banner]")?.textContent || "",
-  }));
-  kiem(sauBat.banner && /trình bày thanh tra/i.test(sauBat.chuBanner),
-    "bật ở Báo cáo thì banner hiện ngay", sauBat.chuBanner.slice(0, 60) || "(không có)");
-
-  /* Sang trang khác: banner còn, Vali bị ẩn. */
-  await trang.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2000));
-  const oTrangKhac = await trang.evaluate(() => ({
-    banner: !!document.querySelector("[data-thanhtra-banner]"),
-    valiHien: (() => {
-      const v = document.querySelector("[data-lp-vali]");
-      return !!v && getComputedStyle(v).display !== "none";
-    })(),
-  }));
-  kiem(oTrangKhac.banner, "banner theo sang trang khác");
-  kiem(!oTrangKhac.valiHien, "Vali và trang trí bị ẩn khi trình bày thanh tra");
-
-  await trang.evaluate(() => {
-    document.querySelector("[data-thanhtra-banner] button")?.click();
-  });
-  await new Promise((r) => setTimeout(r, 400));
-  const daTat = await trang.evaluate(() => !document.querySelector("[data-thanhtra-banner]"));
-  kiem(daTat, "nút Tắt trên banner tắt được tại chỗ");
-  await trang.close();
-}
+/* 3i (chế độ trình bày thanh tra) ĐÃ GỠ 01/09/2026 — chủ dự án bỏ
+   tính năng, chỉ giữ giao diện sáng/tối. */
 
 /* ---- 3k. Báo cáo: khối VMP 2D là mặc định, 3D là khám phá ----------- */
 {
