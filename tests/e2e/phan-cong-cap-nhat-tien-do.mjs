@@ -94,10 +94,9 @@ function findButton(page, text) {
 
 function validationBlockState(page) {
   return page.evaluate(() => {
-    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
       .find((candidate) => candidate.getClientRects().length > 0
-        && [...candidate.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+        && document.getElementById(candidate.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
     const spans = [...(dialog?.querySelectorAll("span") ?? [])];
     const title = spans
       .find((node) => (node.textContent || "").replace(/\s+/g, " ").trim()
@@ -266,16 +265,15 @@ try {
     button.click();
   });
   try {
-    await assigned.page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
+    await assigned.page.waitForFunction(() => [...document.querySelectorAll('[role="dialog"]')]
       .some((dialog) => dialog.getClientRects().length > 0
-        && [...dialog.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")), { timeout: 5_000 });
+        && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"), { timeout: 5_000 });
   } catch (error) {
     const diagnostic = await assigned.page.evaluate((selector) => ({
       hash: location.hash,
       title: document.title,
       button: document.querySelector(selector)?.outerHTML,
-      scrolls: [...document.querySelectorAll(".vmp-scroll")].map((node) => ({
+      dialogs: [...document.querySelectorAll('[role="dialog"]')].map((node) => ({
         visible: node.getClientRects().length > 0,
         text: node.textContent?.replace(/\s+/g, " ").trim().slice(0, 180),
       })),
@@ -288,7 +286,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.ok(itemBodies.length > itemReadsBeforeOpen, "mở modal phải phát sinh per-item rights read mới");
-  await assigned.page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
+  await assigned.page.waitForFunction(() => [...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
       && dialog.innerText.includes("Quyền theo từng cột đang áp dụng")));
   assert.deepEqual(itemBodies.at(-1), {
@@ -313,10 +311,9 @@ try {
   await assigned.page.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => button.textContent?.trim() === "Lưu 1 thay đổi" && !button.disabled));
   await findButton(assigned.page, "Lưu 1 thay đổi");
-  await assigned.page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+  await assigned.page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"));
   assert.deepEqual(updateBodies, [{
     p_validation_code: ITEM_ID, p_patch: { status_validation: "in_progress" },
     p_reason: PROGRESS_REASON, p_sheet_patch: null, p_expected_version: 0,

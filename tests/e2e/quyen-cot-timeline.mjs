@@ -258,23 +258,20 @@ async function newPersonaPage(persona) {
 }
 
 async function closeModal() {
-  const hasModal = await page.evaluate(() => [...document.querySelectorAll(".vmp-scroll")]
+  const hasModal = await page.evaluate(() => [...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"));
   if (!hasModal) return;
   await page.evaluate(() => {
-    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
       .find((candidate) => candidate.getClientRects().length > 0
-        && [...candidate.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+        && document.getElementById(candidate.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
     [...(dialog?.querySelectorAll("button") ?? [])]
       .find((button) => button.textContent?.trim() === "Hủy")?.click();
   });
-  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+  await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"));
 }
 
 async function loadPersona(persona) {
@@ -302,12 +299,11 @@ async function openPersona(persona, { quick = false } = {}) {
     [...(row?.querySelectorAll("button") ?? [])]
       .find((button) => button.textContent?.trim() === (useQuick ? "✓ Xong bước" : "Cập nhật"))?.click();
   }, [quick, ACTIVITY.id]);
-  await page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
+  await page.waitForFunction(() => [...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"));
   await page.waitForFunction(
-    (expectedMode) => [...document.querySelectorAll(".vmp-scroll")]
+    (expectedMode) => [...document.querySelectorAll('[role="dialog"]')]
       .some((dialog) => dialog.getClientRects().length > 0
         && dialog.innerText.includes(expectedMode === "preview"
           ? "Quyền dự kiến chưa áp dụng"
@@ -319,10 +315,9 @@ async function openPersona(persona, { quick = false } = {}) {
 
 async function controlState() {
   return page.evaluate(() => {
-    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
       .find((candidate) => candidate.getClientRects().length > 0
-        && [...candidate.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+        && document.getElementById(candidate.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
     /* Loại ô "Người thực hiện": nó là select nhưng KHÔNG phải control
        ngày/trạng thái mà phép kiểm này quan tâm. Ô đó nay hiện theo quyền
        màn hình (`source.edit_catalog`) chứ không theo cờ `isAdmin` cũ đọc
@@ -376,10 +371,9 @@ try {
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
   await page.waitForFunction(() => document.body.innerText.includes("Lưu E2E thất bại"));
   const qaDraftAfterFailure = await page.evaluate(() => {
-    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
       .find((candidate) => candidate.getClientRects().length > 0
-        && [...candidate.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+        && document.getElementById(candidate.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
     return [...(dialog?.querySelectorAll('input[type="date"]') ?? [])].map((input) => input.value);
   });
   assert.equal(qaDraftAfterFailure[0], QA_MANAGER_DATE,
@@ -394,10 +388,9 @@ try {
   updateShouldFail = false;
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
-  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+  await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"));
   assert.deepEqual(updateBodies[1], updateBodies[0],
     "QA Manager có thể thử lại nguyên bản nháp sau lỗi server");
 
@@ -423,10 +416,9 @@ try {
   assert.equal(workshop.schedulePresent, false,
     "nhân viên xưởng không được có lịch thẩm định trong DOM");
   const workshopStages = await page.evaluate(() => {
-    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
       .find((candidate) => candidate.getClientRects().length > 0
-        && [...candidate.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+        && document.getElementById(candidate.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
     return [1, 2, 3, 4].map((stage) => {
       const title = [...(dialog?.querySelectorAll("span") ?? [])]
         .find((node) => node.textContent?.trim().startsWith(`${stage}. `));
@@ -449,10 +441,9 @@ try {
   // Quyền date-only không đủ điều kiện dùng đường tắt “Xong bước”; nhập ngày
   // thủ công ở đúng stage 2 để không dựa vào bản quyền của persona trước.
   await page.evaluate((actualDate) => {
-    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
       .find((candidate) => candidate.getClientRects().length > 0
-        && [...candidate.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"));
+        && document.getElementById(candidate.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
     const title = [...(dialog?.querySelectorAll("span") ?? [])]
       .find((node) => node.textContent?.trim().startsWith("2. Thẩm định thực tế"));
     const input = title?.closest("div[style*='border']")?.querySelector('input[type="date"]');
@@ -470,10 +461,9 @@ try {
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
   await page.waitForFunction(() => document.body.innerText.includes("Lưu E2E thất bại"));
   assert.equal(
-    await page.evaluate(() => [...document.querySelectorAll(".vmp-scroll")]
+    await page.evaluate(() => [...document.querySelectorAll('[role="dialog"]')]
       .some((dialog) => dialog.getClientRects().length > 0
-        && [...dialog.querySelectorAll("span")]
-          .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"))),
+        && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ")),
     true,
     "RPC lỗi thì modal phải giữ nguyên để người dùng thử lại",
   );
@@ -482,10 +472,9 @@ try {
     .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
-  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+  await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"));
   assert.equal(updateBodies.length, workshopUpdateStart + 2,
     "sau lỗi người dùng có thể thử lưu lại cùng bản nháp");
   assert.deepEqual(Object.keys(updateBodies[workshopUpdateStart + 1].p_patch), ["actual_validation_date"]);
@@ -523,10 +512,9 @@ try {
   const qaStaffUpdateStart = updateBodies.length;
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
-  await page.waitForFunction(() => ![...document.querySelectorAll(".vmp-scroll")]
+  await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ")));
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ"));
   assert.deepEqual(updateBodies[qaStaffUpdateStart].p_patch, { status_validation: "in_progress" },
     "Nhân viên QA chỉ gửi trạng thái thẩm định được cấp xuống RPC");
   assert.equal(Object.hasOwn(updateBodies[qaStaffUpdateStart].p_patch, "actual_validation_date"), false,
@@ -539,10 +527,9 @@ try {
   assert.equal(await page.evaluate((targetCode) => [...document.querySelectorAll("tr")]
     .some((row) => row.innerText.includes(targetCode)), ACTIVITY.code), false,
   "không có dòng hạng mục thì QA chưa phân công không thể mở modal cập nhật");
-  assert.equal(await page.evaluate(() => [...document.querySelectorAll(".vmp-scroll")]
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && [...dialog.querySelectorAll("span")]
-        .some((node) => node.textContent?.trim() === "Cập nhật tiến độ"))), false,
+      && document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ")), false,
   "dashboard đã thu hồi hạng mục không để modal mục tiêu còn mở");
 
   assert.deepEqual(batchBodies.map(({ body }) => body),
