@@ -93,7 +93,7 @@ test("decoder tài khoản ứng viên và args nối tài khoản giữ hợp �
 });
 
 test("chỉ Admin nhìn thấy thao tác nối tài khoản", async () => {
-  const { default: AccountLinkPanel } = await import(
+  const { default: AccountLinkPanel, validateAccountLinkDraft } = await import(
     "../../src/features/itemPermissions/AccountLinkPanel.tsx"
   );
   const person = {
@@ -130,6 +130,15 @@ test("chỉ Admin nhìn thấy thao tác nối tài khoản", async () => {
   assert.equal(denied, "");
   assert.match(admin, /Tìm tài khoản để nối/);
   assert.match(admin, /Lý do nối tài khoản/);
+  assert.match(admin, /aria-describedby="action-noi-tai-khoan-description"/);
+  assert.doesNotMatch(admin, /<button[^>]*disabled=""[^>]*>Nối tài khoản<\/button>/);
+  assert.deepEqual(validateAccountLinkDraft({ linked: false, selectedUserId: "", reason: "" }), {
+    code: "account", message: "Chọn tài khoản cần nối.", focusId: "account-link-candidate",
+  });
+  assert.deepEqual(validateAccountLinkDraft({ linked: false, selectedUserId: "user-1", reason: "" }), {
+    code: "reason", message: "Nhập lý do nối tài khoản.", focusId: "account-link-reason",
+  });
+  assert.equal(validateAccountLinkDraft({ linked: false, selectedUserId: "user-1", reason: "Đúng hồ sơ" }), null);
 });
 
 test("ứng viên tài khoản không hoạt động không được dựng thành option", async () => {

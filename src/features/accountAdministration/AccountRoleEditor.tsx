@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS, businessRoleLabel } from "../../lib/businessRoles.ts";
 import type { BusinessRole } from "../../lib/businessRoles.ts";
 import type { setBusinessRole } from "../../lib/supabaseData.ts";
+import { actionDescriptionId, firstActionBlock, type ActionBlock } from "../../components/ui/actionReadiness.ts";
 import {
   planBusinessRoleChange,
   type AccountAdministrationRow,
@@ -76,6 +77,31 @@ export interface AccountRoleEditorProps {
   onVerified: (row: AccountAdministrationRow) => void;
 }
 
+export function validateRoleEditorDraft({
+  canEdit,
+  saving,
+  nextRole,
+  sameRole,
+  reason,
+  planBlocker,
+}: {
+  canEdit: boolean;
+  saving: boolean;
+  nextRole: BusinessRole | "";
+  sameRole: boolean;
+  reason: string;
+  planBlocker?: string | null;
+}): ActionBlock | null {
+  return firstActionBlock([
+    { blocked: !canEdit, code: "permission", message: "Bạn không có quyền đổi vai trò." },
+    { blocked: saving, code: "busy", message: "Đang lưu thay đổi…" },
+    { blocked: !nextRole, code: "role", message: "Chọn vai nghiệp vụ trước khi lưu.", focusId: "account-role-next" },
+    { blocked: Boolean(planBlocker), code: "plan", message: planBlocker || "Không thể chuẩn bị thay đổi vai trò." },
+    { blocked: sameRole, code: "change", message: "Chưa có thay đổi để lưu." },
+    { blocked: !reason.trim(), code: "reason", message: "Nhập lý do đổi vai trước khi lưu.", focusId: "account-role-reason" },
+  ]);
+}
+
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -114,6 +140,8 @@ export default function AccountRoleEditor({
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const roleRef = useRef<HTMLSelectElement | null>(null);
+  const reasonRef = useRef<HTMLTextAreaElement | null>(null);
   const currentUserId = useRef<string | null>(row.userId);
   currentUserId.current = row.userId;
 
@@ -128,7 +156,16 @@ export default function AccountRoleEditor({
     () => nextRole ? planBusinessRoleChange(row, nextRole) : null,
     [nextRole, row],
   );
-  const canSave = canEdit && Boolean(plan?.canSave) && Boolean(reason.trim()) && !saving;
+  const actionDescription = actionDescriptionId("doi vai");
+  const actionBlock = validateRoleEditorDraft({
+    canEdit,
+    saving,
+    nextRole,
+    sameRole: Boolean(nextRole) && nextRole === row.businessRole,
+    reason,
+    planBlocker: plan?.blocker,
+  });
+  const saveDisabled = !canEdit || saving || actionBlock?.code === "plan" || actionBlock?.code === "change";
 
   const cancel = () => {
     setNextRole(row.businessRole ?? "");
@@ -137,7 +174,13 @@ export default function AccountRoleEditor({
   };
 
   const save = async () => {
-    if (!canSave || !plan || !nextRole) return;
+    if (actionBlock) {
+      setMessage(actionBlock.message);
+      if (actionBlock.focusId === "account-role-next") roleRef.current?.focus();
+      if (actionBlock.focusId === "account-role-reason") reasonRef.current?.focus();
+      return;
+    }
+    if (!plan || !nextRole) return;
     const draft: RoleDraft = {
       targetUserId: plan.userId,
       originalRole: row.businessRole,
@@ -173,8 +216,10 @@ export default function AccountRoleEditor({
         <b>{row.name}</b>{row.email ? ` · ${row.email}` : ""} · user_id: {shortUserId(row.userId)}
       </p>
       <label>Vai mới
-        <select className="pq-o" aria-label="Vai nghiệp vụ mới" value={nextRole}
+        <select ref={roleRef} id="account-role-next" className="pq-o" aria-label="Vai nghiệp vụ mới" value={nextRole}
           disabled={!canEdit || saving}
+          aria-describedby={actionDescription}
+          aria-invalid={message === "Chọn vai nghiệp vụ trước khi lưu." || undefined}
           onChange={(event) => { setNextRole(event.target.value as BusinessRole | ""); setMessage(""); }}>
           <option value="">Chọn vai nghiệp vụ</option>
           {BUSINESS_ROLE_IDS.map((role) => (
@@ -188,13 +233,19 @@ export default function AccountRoleEditor({
       {!nextRole && <p className="ip-message" role="alert">Chưa chọn vai nghiệp vụ.</p>}
       {plan?.blocker && <p className="ip-message" role="alert">{plan.blocker}</p>}
       <label>Lý do <span aria-hidden="true">(bắt buộc)</span>
-        <textarea className="pq-o" aria-label="Lý do đổi vai" value={reason} rows={2} required
+        <textarea ref={reasonRef} id="account-role-reason" className="pq-o" aria-label="Lý do đổi vai" value={reason} rows={2} required
           disabled={!canEdit || saving}
+          aria-describedby={actionDescription}
+          aria-invalid={message === "Nhập lý do đổi vai trước khi lưu." || undefined}
           onChange={(event) => { setReason(event.target.value); setMessage(""); }} />
       </label>
+      <p id={actionDescription} className="ip-help">
+        {actionBlock?.message || "Sẵn sàng lưu và đối chiếu lại với máy chủ."}
+      </p>
       <div className="ip-actions">
         <button type="button" className="pq-nut" disabled={saving} onClick={cancel}>Hủy</button>
-        <button type="button" className="pq-nut la-chinh" disabled={!canSave} onClick={() => { void save(); }}>
+        <button type="button" className="pq-nut la-chinh" disabled={saveDisabled}
+          aria-describedby={actionDescription} onClick={() => { void save(); }}>
           {saving ? "Đang lưu…" : "Lưu thay đổi"}
         </button>
       </div>

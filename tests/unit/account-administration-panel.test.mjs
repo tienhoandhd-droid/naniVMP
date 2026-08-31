@@ -173,7 +173,21 @@ test("không thể hủy dialog sau khi mutation bắt đầu", () => {
     onConfirm: () => {},
   }));
   assert.match(html, /<button disabled="">Hủy<\/button>/);
-  assert.match(html, /<button disabled="">Xác nhận<\/button>/);
+  assert.match(html, /<button disabled=""[^>]*>Xác nhận<\/button>/);
+});
+
+test("dialog trạng thái cho bấm xác nhận để chỉ đúng lý do còn thiếu", () => {
+  const html = renderToStaticMarkup(React.createElement(ActivationDialog, {
+    draft: { row: { userId: "u1" }, next: false, reason: "", token: 1 },
+    status: null,
+    submitting: false,
+    onReason: () => {},
+    onCancel: () => {},
+    onConfirm: () => {},
+  }));
+  assert.match(html, /aria-describedby="action-doi-trang-thai-tai-khoan-description"/);
+  assert.doesNotMatch(html, /<button disabled="">Xác nhận<\/button>/);
+  assert.match(html, /Nhập lý do rồi xác nhận/);
 });
 
 function awaitSnapshotForMarkup() {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { actionDescriptionId } from "../../components/ui/actionReadiness.ts";
 import { fetchNguoiVaQuyen, fetchVaiNghiepVu, setUserActive, type NguoiVaQuyen, type VaiNghiepVuRow } from "../../lib/supabaseData.ts";
 import { searchPermissionDirectory } from "../itemPermissions/api.ts";
 import { businessRoleLabel } from "../../lib/businessRoles.ts";
@@ -98,17 +99,26 @@ export function ActivationDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const reasonRef = useRef<HTMLTextAreaElement | null>(null);
+  const descriptionId = actionDescriptionId("doi trang thai tai khoan");
+  const confirm = () => {
+    if (!draft.reason.trim()) reasonRef.current?.focus();
+    onConfirm();
+  };
   return (
     <div role="dialog" aria-label="Đổi trạng thái tài khoản">
       <p>{draft.row.userId} → {draft.next ? "hoạt động" : "tắt"}</p>
       <textarea
+        ref={reasonRef}
         aria-label="Lý do đổi trạng thái"
+        aria-describedby={descriptionId}
         value={draft.reason}
         disabled={submitting}
         onChange={(event) => onReason(event.target.value)}
       />
+      <p id={descriptionId}>Nhập lý do rồi xác nhận; hệ thống sẽ đọc lại đúng tài khoản sau khi ghi.</p>
       <button disabled={submitting} onClick={onCancel}>Hủy</button>
-      <button disabled={!draft.reason.trim() || submitting} onClick={onConfirm}>Xác nhận</button>
+      <button disabled={submitting} aria-describedby={descriptionId} onClick={confirm}>Xác nhận</button>
       {status && <p role="alert">{status}</p>}
     </div>
   );

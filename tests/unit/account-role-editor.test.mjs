@@ -4,7 +4,10 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { buildAccountAdministrationRows } from "../../src/features/accountAdministration/accountAdministrationModel.ts";
-import AccountRoleEditor, { commitRoleDraft } from "../../src/features/accountAdministration/AccountRoleEditor.tsx";
+import AccountRoleEditor, {
+  commitRoleDraft,
+  validateRoleEditorDraft,
+} from "../../src/features/accountAdministration/AccountRoleEditor.tsx";
 
 function row(overrides = {}) {
   const {
@@ -165,6 +168,35 @@ test("editor SSR nêu đối chiếu, lý do bắt buộc, hủy và lưu", () =
   assert.match(html, /Lý do/);
   assert.match(html, /Hủy/);
   assert.match(html, /Lưu thay đổi/);
+  assert.match(html, /Chưa có thay đổi để lưu/);
+});
+
+test("editor chỉ khóa nút lưu khi đang gửi, không khóa im lặng vì form thiếu", () => {
+  const html = renderToStaticMarkup(React.createElement(AccountRoleEditor, {
+    row: row({ businessRole: null }),
+    canEdit: true,
+    mutateRole: async () => ({ ok: true }),
+    reloadByUserId: async () => row(),
+    onVerified: () => {},
+  }));
+
+  assert.match(html, /aria-describedby="action-doi-vai-description"/);
+  assert.doesNotMatch(html, /<button[^>]*disabled=""[^>]*>Lưu thay đổi<\/button>/);
+});
+
+test("validate đổi vai trả đúng lỗi đầu tiên và focus cần sửa", () => {
+  assert.deepEqual(validateRoleEditorDraft({
+    canEdit: true, saving: false, nextRole: "", sameRole: false, reason: "",
+  }), { code: "role", message: "Chọn vai nghiệp vụ trước khi lưu.", focusId: "account-role-next" });
+  assert.deepEqual(validateRoleEditorDraft({
+    canEdit: true, saving: false, nextRole: "qa_manager", sameRole: true, reason: "Lý do",
+  }), { code: "change", message: "Chưa có thay đổi để lưu." });
+  assert.deepEqual(validateRoleEditorDraft({
+    canEdit: true, saving: false, nextRole: "qa_manager", sameRole: false, reason: "",
+  }), { code: "reason", message: "Nhập lý do đổi vai trước khi lưu.", focusId: "account-role-reason" });
+  assert.equal(validateRoleEditorDraft({
+    canEdit: true, saving: false, nextRole: "qa_manager", sameRole: false, reason: "Điều chuyển",
+  }), null);
 });
 
 test("editor giữ vai chưa giải được ở trạng thái chưa chọn", () => {

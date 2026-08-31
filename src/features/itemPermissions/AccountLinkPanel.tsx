@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { actionDescriptionId, firstActionBlock, type ActionBlock } from "../../components/ui/actionReadiness.ts";
 import {
   linkPermissionAccount,
   searchAccountCandidates,
@@ -31,6 +32,21 @@ export function AccountCandidateOption({ candidate }: { candidate: AccountCandid
       {candidateLabel(candidate)} · {candidateStatus(candidate)}
     </option>
   );
+}
+
+export function validateAccountLinkDraft({
+  linked,
+  selectedUserId,
+  reason,
+}: {
+  linked: boolean;
+  selectedUserId: string;
+  reason: string;
+}): ActionBlock | null {
+  return firstActionBlock([
+    { blocked: !linked && !selectedUserId, code: "account", message: "Chọn tài khoản cần nối.", focusId: "account-link-candidate" },
+    { blocked: !reason.trim(), code: "reason", message: linked ? "Nhập lý do gỡ nối tài khoản." : "Nhập lý do nối tài khoản.", focusId: "account-link-reason" },
+  ]);
 }
 
 export async function completeAccountLinkMutation({
@@ -68,6 +84,8 @@ export default function AccountLinkPanel({
   const [refreshNonce, setRefreshNonce] = useState(0);
   const requestSequence = useRef(0);
   const currentPersonId = useRef<string | null>(person?.person_id ?? null);
+  const candidateRef = useRef<HTMLSelectElement | null>(null);
+  const reasonRef = useRef<HTMLInputElement | null>(null);
   currentPersonId.current = person?.person_id ?? null;
 
   useEffect(() => {
@@ -109,8 +127,25 @@ export default function AccountLinkPanel({
 
   if (!canManageAccounts || !person) return null;
 
+  const descriptionId = actionDescriptionId("noi tai khoan");
+  const currentBlock = validateAccountLinkDraft({
+    linked: Boolean(person.user_id),
+    selectedUserId,
+    reason,
+  });
+
   const link = async (userId: string | null) => {
-    if (!reason.trim()) return;
+    const block = validateAccountLinkDraft({
+      linked: Boolean(person.user_id),
+      selectedUserId: userId || "",
+      reason,
+    });
+    if (block) {
+      setMessage(block.message);
+      if (block.focusId === "account-link-candidate") candidateRef.current?.focus();
+      if (block.focusId === "account-link-reason") reasonRef.current?.focus();
+      return;
+    }
     const targetPerson = person;
     setSaving(true);
     setMessage("");
@@ -147,10 +182,11 @@ export default function AccountLinkPanel({
       {person.user_id ? (
         <>
           <label>Lý do gỡ nối
-            <input className="pq-o" aria-label="Lý do gỡ nối tài khoản" value={reason}
-              onChange={(event) => setReason(event.target.value)} />
+            <input ref={reasonRef} id="account-link-reason" className="pq-o" aria-label="Lý do gỡ nối tài khoản"
+              aria-describedby={descriptionId} value={reason}
+              onChange={(event) => { setReason(event.target.value); setMessage(""); }} />
           </label>
-          <button type="button" className="pq-nut" disabled={!reason.trim() || saving}
+          <button type="button" className="pq-nut" disabled={saving} aria-describedby={descriptionId}
             onClick={() => link(null)}>
             {saving ? "Đang gỡ nối…" : "Gỡ nối tài khoản"}
           </button>
@@ -166,8 +202,9 @@ export default function AccountLinkPanel({
             {loading ? "Đang tìm…" : "Tải lại tài khoản"}
           </button>
           <label>Tài khoản sẽ nối
-            <select className="pq-o" aria-label="Tài khoản sẽ nối" value={selectedUserId}
-              onChange={(event) => setSelectedUserId(event.target.value)}>
+            <select ref={candidateRef} id="account-link-candidate" className="pq-o" aria-label="Tài khoản sẽ nối"
+              aria-describedby={descriptionId} value={selectedUserId}
+              onChange={(event) => { setSelectedUserId(event.target.value); setMessage(""); }}>
               <option value="">{query.trim().length < 2 ? "Nhập ít nhất 2 ký tự để tìm" : "Chọn tài khoản"}</option>
               {candidates.map((candidate) => (
                 <AccountCandidateOption key={candidate.user_id} candidate={candidate} />
@@ -175,16 +212,20 @@ export default function AccountLinkPanel({
             </select>
           </label>
           <label>Lý do nối tài khoản
-            <input className="pq-o" aria-label="Lý do nối tài khoản" value={reason}
-              onChange={(event) => setReason(event.target.value)} />
+            <input ref={reasonRef} id="account-link-reason" className="pq-o" aria-label="Lý do nối tài khoản"
+              aria-describedby={descriptionId} value={reason}
+              onChange={(event) => { setReason(event.target.value); setMessage(""); }} />
           </label>
           <button type="button" className="pq-nut la-chinh"
-            disabled={!selectedUserId || !reason.trim() || saving}
+            disabled={saving} aria-describedby={descriptionId}
             onClick={() => link(selectedUserId)}>
             {saving ? "Đang nối…" : "Nối tài khoản"}
           </button>
         </>
       )}
+      <p id={descriptionId} className="ip-help">
+        {currentBlock?.message || "Sẵn sàng ghi và tải lại hồ sơ theo mã cố định."}
+      </p>
       {message && <div className="ip-message" role="status">{message}</div>}
     </section>
   );
