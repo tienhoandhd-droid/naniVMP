@@ -7,6 +7,7 @@ import { CHROME } from "./chrome-path.mjs";
 import { caiGiaLap, nhetPhien } from "./gia-lap-supabase.mjs";
 
 const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
+const VIEWPORT_HEIGHT = 768;
 const supabaseUrl = process.env.VMP_E2E_SUPABASE_URL || (() => {
   try {
     const env = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
@@ -31,25 +32,27 @@ try {
   const page = await browser.newPage();
   await caiGiaLap(page, { supabaseUrl, kichBan: "day" });
   await nhetPhien(page, { supabaseUrl });
-  await page.setViewport({ width: 1366, height: 768 });
+  await page.setViewport({ width: 1366, height: VIEWPORT_HEIGHT });
 
   await page.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector("button.hn-hero__cta", { timeout: 15_000 });
   const today = await page.$eval("button.hn-hero__cta", (button) => ({
     label: button.textContent?.trim(),
     top: button.getBoundingClientRect().top,
+    bottom: button.getBoundingClientRect().bottom,
   }));
   assert.match(today.label, /^Cập nhật /u);
-  assert.ok(today.top < 768, JSON.stringify(today));
+  assert.ok(today.top >= 0 && today.bottom <= VIEWPORT_HEIGHT, JSON.stringify(today));
 
   await page.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForSelector(".pr-uu-tien--dau", { timeout: 15_000 });
-  const progress = await page.$eval(".pr-uu-tien--dau", (button) => ({
+  await page.waitForSelector("button.pr-uu-tien--dau", { timeout: 15_000 });
+  const progress = await page.$eval("button.pr-uu-tien--dau", (button) => ({
     label: button.textContent?.trim(),
     top: button.getBoundingClientRect().top,
+    bottom: button.getBoundingClientRect().bottom,
   }));
-  assert.match(progress.label, /^(Cập nhật|Xem) /u);
-  assert.ok(progress.top < 768, JSON.stringify(progress));
+  assert.match(progress.label, /^Cập nhật /u);
+  assert.ok(progress.top >= 0 && progress.bottom <= VIEWPORT_HEIGHT, JSON.stringify(progress));
 
   await page.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector(".vmp-report-export-actions button", { timeout: 15_000 });
@@ -61,11 +64,12 @@ try {
       label: button.textContent?.trim(),
       wraps: button.scrollHeight > Math.ceil(lineHeight + verticalPadding + 1),
       top: button.getBoundingClientRect().top,
+      bottom: button.getBoundingClientRect().bottom,
     };
   }));
   assert.deepEqual(reports.map(({ label }) => label), ["In / lưu PDF", "Tải Excel · 5 sheet", "Tải HTML"]);
   assert.ok(reports.every(({ wraps }) => !wraps), JSON.stringify(reports));
-  assert.ok(reports[0].top < 768, JSON.stringify(reports));
+  assert.ok(reports.every(({ top, bottom }) => top >= 0 && bottom <= VIEWPORT_HEIGHT), JSON.stringify(reports));
 
   console.log("✓ CTA desktop nói rõ đích đến, vào fold và export không xuống dòng");
 } finally {
