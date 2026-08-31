@@ -108,6 +108,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               const Icon = n.icon;
               return (
                 <button key={n.id} onClick={() => setView(n.id)} className="vmp-nav" data-view={n.id}
+                  aria-current={active ? "page" : undefined}
                   title={collapsed ? n.label : undefined}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,

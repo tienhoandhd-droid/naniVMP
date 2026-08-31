@@ -56,7 +56,8 @@ import {
   inPeriod,
   runDataQualityChecks,
 } from "./utils/helpers.ts";
-import { useScrollTop, useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
+import { useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
+import { useRouteSettlement } from "./hooks/useRouteSettlement.ts";
 import { useAccess, useAccessCacheTransition } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { resolveAuthorizedView, resolveViewIntent } from "./lib/navigationContract.ts";
@@ -1665,7 +1666,8 @@ function VerifiedAppShell({ user, logout, access }: {
     if (hasDirty) { setHoiThoat(true); return; }
     logout();
   }, [hasDirty, logout]);
-  const mainRef = useScrollTop([view]);
+  const title = NAV_ITEMS.find((n) => n.id === view)?.label || "Tổng quan";
+  const mainRef = useRouteSettlement(view, title);
 
   // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + bộ phận (chọn NHIỀU) + thời gian (có Tùy chọn).
   const [areaSel, setAreaSel] = useState<string[]>(khoiTao.areaSel);   // rỗng = tất cả khu vực
@@ -1959,8 +1961,6 @@ function VerifiedAppShell({ user, logout, access }: {
       clearInterval(iv);
     };
   }, [silentRefresh]);
-
-  const title = NAV_ITEMS.find((n) => n.id === view)?.label || "Tổng quan";
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>
