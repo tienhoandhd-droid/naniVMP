@@ -46,6 +46,20 @@ const PHAM_VI = [
   "src/components/ui/StateBoundary.tsx",
 ];
 
+/* Nợ thiết kế đã tồn tại trước khi guardrail được bật. Các file này vẫn
+   chịu luật nền trắng toàn cục bên dưới, nhưng chỉ nhận bốn luật migration
+   sau khi được chuyển sang Lotus Pearl theo từng màn. */
+const CHUA_MIGRATION = new Set([
+  "src/features/catalog/catalog.css",
+  "src/features/monitoring/long-mon-race.css",
+  "src/features/monitoring/monitoring.css",
+  "src/features/overview/overview-executive.css",
+  "src/features/progress/progress.css",
+  "src/features/today/today.css",
+  "src/styles/catalog-workspace.css",
+  "src/styles/lotus-shell.css",
+]);
+
 /* File được PHÉP chứa hex: nơi khai token và art thương hiệu (màu nhân
    vật/motif là giá trị token được "nướng" vào tranh, có chú thích trong file). */
 const MIEN_HEX = new Set([
@@ -76,7 +90,7 @@ function duyet(duong) {
 
 const loi = [];
 const files = PHAM_VI.flatMap(duyet)
-  .filter((f) => /\.(tsx?|css)$/.test(f) && !f.endsWith(".d.ts"));
+  .filter((f) => /\.(tsx?|css)$/.test(f) && !f.endsWith(".d.ts") && !CHUA_MIGRATION.has(f));
 
 for (const f of files) {
   const noiDung = readFileSync(join(GOC, f), "utf8");
