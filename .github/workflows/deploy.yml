@@ -63,6 +63,8 @@ jobs:
         run: npx playwright install chromium --with-deps --no-shell
       - run: npm run typecheck
       - run: npm run test:unit
+      # Guardrail thiết kế về 0 vi phạm ngày 31/08 — từ nay là gate cứng.
+      - run: npm run drift
 
   # GitHub không giữ credential DB production. Cổng này kiểm receipt PostgreSQL
   # 17 đã niêm phong và fail ngay khi migration/runner/test SQL bị thay đổi.
@@ -126,6 +128,12 @@ jobs:
             npm run e2e:admin
           '
 
+      # dist/ vừa được with-preview.sh tráo vào — đo luôn ngân sách trên đó.
+      # Gate này giữ thành quả 31/08 (CSS găng 304→180KB, đuổi PNG chết)
+      # không trôi lại theo từng commit.
+      - name: Ngân sách bundle
+        run: npm run budget
+
   production-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
@@ -157,6 +165,10 @@ jobs:
           VITE_N8N_AI_REPORT_URL: ${{ vars.VITE_N8N_AI_REPORT_URL }}
           VITE_N8N_CHAT_URL: ${{ vars.VITE_N8N_CHAT_URL }}
           VITE_N8N_CHAT_TOKEN: ${{ vars.VITE_N8N_CHAT_TOKEN }}
+
+      # Đo lại trên đúng bản sắp phát hành (env production thật).
+      - name: Ngân sách bundle
+        run: npm run budget
 
       - uses: actions/configure-pages@v5
 
