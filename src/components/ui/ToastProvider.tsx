@@ -10,10 +10,10 @@
  *  Luật hàng đợi nằm ở `src/lib/toastQueue.ts` — kiểm được bằng node --test
  *  mà không cần dựng trình duyệt. Ở đây chỉ vẽ và hẹn giờ.
  *
- *  Trợ năng: vùng thông báo là `aria-live="polite"` để trình đọc màn hình
- *  đọc mà không cắt ngang việc người dùng đang làm; riêng lỗi dùng
- *  `role="alert"` vì lỗi thì cần cắt ngang thật. Toast lỗi bấm tắt được —
- *  đọc xong rồi mà nó còn nằm đó che nội dung là phiền.
+ *  Trợ năng: từng toast tự mang ngữ nghĩa thông báo — `role="status"` cho
+ *  trạng thái thường và `role="alert"` cho lỗi cần đọc ngay — tránh vùng
+ *  chứa live-region lồng nhau. Toast lỗi bấm tắt được — đọc xong rồi mà nó
+ *  còn nằm đó che nội dung là phiền.
  * ===================================================================== */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
