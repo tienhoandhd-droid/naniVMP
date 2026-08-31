@@ -489,7 +489,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   };
   const sel = (k: string) => {
     const enabled = canEditForm(k);
-    return <select value={f[k]} onChange={set(k)} disabled={!enabled} style={{ ...INP, cursor: enabled ? "pointer" : "not-allowed", opacity: enabled ? 1 : 0.62 }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
+    return <select id={`pem-${k}`} value={f[k]} onChange={set(k)} disabled={!enabled} style={{ ...INP, cursor: enabled ? "pointer" : "not-allowed", opacity: enabled ? 1 : 0.62 }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
   };
   const stage = (s: (typeof CHUOI)[number], truoc: (typeof CHUOI)[number] | null) => {
     const { n, d: dCol, t: tCol } = s;
@@ -536,18 +536,18 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
               Lịch thẩm định bên dưới thì NGƯỢC LẠI: nó là ngày hẹn, tương
               lai mới đúng — nên không chặn. */}
           {canEditForm(dCol) && (
-            <div style={FIELD}><span style={LBL}>Ngày hoàn thành thực tế</span><input type="date" max={todayISO()} value={f[dCol]} onChange={setDate(dCol, tCol, canEditForm(tCol))} style={{ ...INP }} /></div>
+            <div style={FIELD}><label style={LBL} htmlFor={`pem-${dCol}`}>Ngày hoàn thành thực tế</label><input id={`pem-${dCol}`} type="date" max={todayISO()} value={f[dCol]} onChange={setDate(dCol, tCol, canEditForm(tCol))} style={{ ...INP }} /></div>
           )}
           {canEditForm(tCol) && (
-            <div style={FIELD}><span style={LBL}>Trạng thái</span>{sel(tCol)}</div>
+            <div style={FIELD}><label style={LBL} htmlFor={`pem-${tCol}`}>Trạng thái</label>{sel(tCol)}</div>
           )}
         </div>
         {/* Lịch thẩm định thuộc về CHÍNH bước thẩm định. Trước đây nó nằm tận
             trên đầu hộp, tách rời khỏi ô ngày thẩm định thực tế mà nó ấn định. */}
         {n === 2 && canEdit("scheduled_at") && (
           <div style={{ ...FIELD, marginTop: 12 }}>
-            <span style={LBL}>Lịch thẩm định (bộ phận xếp)</span>
-            <input type="datetime-local" value={f.lich_td} onChange={set("lich_td")} style={{ ...INP }} />
+            <label style={LBL} htmlFor="pem-lich-td">Lịch thẩm định (bộ phận xếp)</label>
+            <input id="pem-lich-td" type="datetime-local" value={f.lich_td} onChange={set("lich_td")} style={{ ...INP }} />
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
               Ngày bộ phận hẹn vào làm. Khác với ngày hoàn thành thực tế ở trên.
             </span>
@@ -709,7 +709,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       {/* Báo NGAY lúc gõ, không đợi bấm Lưu mới nói — người nhập sửa được tại
           chỗ thay vì điền xong hết rồi mới biết cả cụm không hợp lệ. */}
       {chan.length > 0 && (
-        <div style={{ marginTop: 14, background: C.raspSoft, border: `1px solid ${C.raspText}`, borderRadius: 14, padding: "10px 14px", fontSize: 12, fontWeight: 700, color: C.raspText, lineHeight: 1.6 }}>
+        <div role="alert" style={{ marginTop: 14, background: C.raspSoft, border: `1px solid ${C.raspText}`, borderRadius: 14, padding: "10px 14px", fontSize: 12, fontWeight: 700, color: C.raspText, lineHeight: 1.6 }}>
           ✕ Chưa lưu được — thay đổi vừa rồi làm lệch thứ tự bốn bước:
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             {chan.map((v, i) => <li key={i}>{v.msg}</li>)}
@@ -717,7 +717,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 14 }}>
-        <span style={LBL}>Lý do {needsReason ? <b style={{ color: "#b00020" }}>(bắt buộc)</b> : "(tuỳ chọn)"}</span>
+        {/* C4 (31/08): label thật + aria — trình đọc màn hình đọc được nhãn
+            khi vào ô, NGHE được lỗi khi nó xuất hiện (role=alert), và ô lý do
+            tự khai "đang không hợp lệ" khi lỗi thuộc về nó. */}
+        <label style={LBL} htmlFor="pem-ly-do">Lý do {needsReason ? <b style={{ color: "#b00020" }}>(bắt buộc)</b> : "(tuỳ chọn)"}</label>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {REASON_CHIPS.map((r) => (
             <button key={r} onClick={() => { setReason(r); if (err) setErr(""); }}
@@ -729,10 +732,12 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
             </button>
           ))}
         </div>
-        <textarea value={reason} onChange={(e) => { setReason(e.target.value); if (err) setErr(""); }}
+        <textarea id="pem-ly-do" value={reason} onChange={(e) => { setReason(e.target.value); if (err) setErr(""); }}
           rows={2} placeholder="Bấm chip ở trên hoặc gõ lý do khác…"
+          aria-invalid={!!err && /LÝ DO/i.test(err)}
+          aria-describedby={err ? "pem-loi" : undefined}
           style={{ ...INP, resize: "vertical", minHeight: 54 }} />
-        {err && <span style={{ color: "#b00020", fontSize: 12, fontWeight: 700 }}>{err}</span>}
+        {err && <span id="pem-loi" role="alert" style={{ color: "#b00020", fontSize: 12, fontWeight: 700 }}>{err}</span>}
       </div>
       {/* CÒN THIẾU GÌ — nói NGAY CẠNH NÚT, trước khi bấm.
           Đo được (2026-08-01): đường ghi từ web hoạt động tốt, nhưng người
@@ -793,11 +798,11 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
           </div>
           {pendingState && (
             <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={LBL}>
+              <label style={LBL} htmlFor="pem-ly-do-trang-thai">
                 Lý do {pendingState === "active" ? "KHÔI PHỤC về Active" : pendingState === "not_applicable" ? 'đánh dấu "Không áp dụng"' : "HỦY hạng mục"} <b style={{ color: "#b00020" }}>(bắt buộc)</b>
-              </span>
+              </label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input value={stateReason} onChange={(e) => setStateReason(e.target.value)} autoFocus
+                <input id="pem-ly-do-trang-thai" value={stateReason} onChange={(e) => setStateReason(e.target.value)} autoFocus
                   placeholder={pendingState === "not_applicable" ? "VD: thiết bị ngừng dùng từ Q3/2026…" : pendingState === "cancelled" ? "VD: theo phê duyệt CAPA #…" : "VD: thiết bị đưa vào dùng lại…"}
                   style={{ ...INP, flex: 1, minWidth: 220 }} />
                 <button disabled={!stateReason.trim()}

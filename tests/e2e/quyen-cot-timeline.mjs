@@ -334,7 +334,9 @@ async function controlState() {
     return {
       qaCount: qa.length,
       qaEnabled: qa.filter((control) => !control.disabled).length,
-      actualLabelCount: [...dialog.querySelectorAll("span")]
+      /* C4 (31/08): nhãn đổi từ <span> sang <label htmlFor> thật để trình
+         đọc màn hình đọc được — quét cả hai để hợp đồng không gãy ngược. */
+      actualLabelCount: [...dialog.querySelectorAll("span, label")]
         .filter((node) => node.textContent?.trim() === "Ngày hoàn thành thực tế").length,
       schedulePresent: !!schedule,
       scheduleEnabled: !!schedule && !schedule.disabled,
@@ -434,7 +436,7 @@ try {
       return {
         dates: block?.querySelectorAll('input[type="date"]').length ?? 0,
         statuses: block?.querySelectorAll("select").length ?? 0,
-        actualLabels: [...(block?.querySelectorAll("span") ?? [])]
+        actualLabels: [...(block?.querySelectorAll("span, label") ?? [])]
           .filter((node) => node.textContent?.trim() === "Ngày hoàn thành thực tế").length,
       };
     });
