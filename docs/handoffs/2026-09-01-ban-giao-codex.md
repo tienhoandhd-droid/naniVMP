@@ -1,0 +1,92 @@
+# BÀN GIAO — từ phiên Claude Code (31/08–01/09/2026) sang agent kế tiếp
+
+> Người kế nhiệm (Codex hoặc agent khác): đọc file này TRƯỚC khi làm bất cứ gì.
+> Quy ước làm việc chung ở `AGENTS.md` (gốc repo) + `~/.claude/CLAUDE.md` của chủ
+> dự án vẫn nguyên hiệu lực: tiếng Việt, không tự ý ghi remote, hỏi trước khi
+> push/deploy/migration, secret không vào code.
+
+## 1 · Trạng thái Git
+
+- Nhánh làm việc: **`cai-tien/desktop-wave-1`** — **33 commit** từ gốc `6fdfe01`
+  (origin/main). **CHƯA push** — chủ dự án chưa ra lệnh. `main` local = origin/main.
+- Mọi commit đều qua gate: typecheck + unit + e2e mock + (khi đụng UI) a11y/drift/budget.
+  Đọc `git log 6fdfe01..HEAD --oneline` — message tiếng Việt không dấu, mô tả đủ.
+
+## 2 · Đã làm (3 đợt lớn, có tài liệu riêng từng đợt)
+
+1. **Wave 1 nâng cấp desktop** — plan + đánh dấu commit thật:
+   `docs/superpowers/plans/2026-08-31-trien-khai-nang-cap-desktop-wave-1.md`
+   (Stage A–F: sửa nhanh, hiệu năng CSS/art, UX boundary/confirm/a11y,
+   hợp nhất logic hạn, migration bảo mật + giám sát, tách App.tsx).
+2. **Thẩm mỹ 10 mục + gỡ chế độ thanh tra** (01/09): commit `abaf9b3`..`7d83015`.
+   Chỉ còn 2 giao diện sáng/tối. Token mới: `--lp-hero`, `--lp-gold-ink`, `--lmr-*`.
+3. **Bàn quản trị** — viết lại 6 màn nhóm Phân tích & Quản trị:
+   spec `docs/superpowers/specs/2026-09-01-ban-quan-tri-design.md`,
+   commit `d8e130d`..`3be48f2`. Khung dùng chung: `src/components/ui/NhomTab.tsx`
+   (NhomTab/NhomTabPanel/DongSo/useNhomTab — tab nhớ localStorage `vmp.tab.<man>`).
+
+Đánh giá gốc toàn hệ (6 mảng, điểm số, top rủi ro): artifact
+https://claude.ai/code/artifact/8251fc3d-9d85-40fc-8ab0-309f91e0ae89 và kế hoạch mẹ
+`docs/superpowers/plans/2026-08-31-ke-hoach-cai-tien-toan-dien.md`.
+
+## 3 · VIỆC CHỜ CHỦ DỰ ÁN (đừng tự làm — cần tài khoản/quyết định của anh Hoàn)
+
+- Đổi mật khẩu Postgres production (đang yếu, plaintext ở `.env.local` — file
+  KHÔNG được commit) + mật khẩu E2E; bật IP allowlist.
+- **Apply 3 migration MỚI** (chỉ là file, CHƯA áp) theo runbook cùng tên:
+  - `20260831160000_fix_bangkok_current_date.sql` → `docs/runbooks/2026-08-31-fix-bangkok-current-date.md`
+  - `20260831170000_client_error_log.sql` → `docs/runbooks/2026-08-31-client-error-log.md`
+    (frontend ĐÃ gắn `src/lib/baoLoi.ts`, tự im lặng khi RPC vắng)
+  - `20260831180000_close_true_policies.sql` → `docs/runbooks/2026-08-31-close-true-policies.md`
+    (siết 6 bảng policy-true + `rpc_team_overview_summary` lọc phạm vi; có probe persona)
+- Bật PITR/backup Supabase, tạo project staging, kiểm n8n có verify JWT.
+- Duyệt nhánh rồi ra lệnh push/PR.
+
+## 4 · Bẫy môi trường LOCAL (máy Windows này) — đọc kỹ trước khi chạy test
+
+- `npm run test:unit` nguyên bản **TREO** khi chạy đồng thời (các test spawn giành
+  cổng 4173). Gate local đúng:
+  `FILES=$(ls tests/unit/*.test.mjs | grep -v -E "preview-lifecycle|a11y-runtime-contract|fast-gate-evidence|five-role-db-harness|five-role-rpc-inventory|login-screen-sdk-boundary|qa-rights-release-contract|visual-runtime-contract") && node --import tsx --test --test-concurrency=4 $FILES`
+  rồi chạy 8 file spawn TUẦN TỰ nếu cần. 3 file (`visual-runtime-contract`,
+  `fast-gate-evidence`, `preview-lifecycle`) **fail sẵn** do đặc thù Linux/ACL —
+  KHÔNG phải hồi quy; CI Linux là trọng tài.
+- E2E mock cần build có cờ + preview IPv4:
+  `VITE_MANUAL_PLANNED_DEADLINES_ENABLED=true npm run build`
+  `npx vite preview --port 4173 --strictPort --host 127.0.0.1` (nền)
+  rồi `node tests/e2e/<file>.mjs`. Bộ CI = 9 file trong `deploy.yml` + `shell`.
+- `tests/e2e/quet-tat-ca-man.mjs` và `npm run e2e` **đăng nhập THẬT vào production**
+  — đừng chạy trừ khi chủ dự án bảo.
+- `tests/e2e/today-personal-scope.mjs` **hỏng từ trước wave** (đã kiểm tại `6fdfe01`,
+  fail dòng 421 — tile "Hoàn thành VMP" không render trong kịch bản chọn người +
+  kỳ custom). Chưa vào CI; là việc sửa riêng.
+- Gate bắt buộc khác: `npm run drift` (0 vi phạm — ĐANG là gate CI),
+  `npm run budget` (sau build), `npx playwright test -c playwright.a11y.config.ts`
+  (15 kịch bản).
+
+## 5 · Cảnh báo toàn vẹn
+
+File plan wave-1 từng bị MỘT TIẾN TRÌNH NGOÀI ghi đè bằng ghi chú "đã hoàn thành"
+kèm 18 mã commit KHÔNG TỒN TẠI (chi tiết ở đầu file plan + commit khôi phục).
+Chủ dự án xác nhận chỉ mở một phiên — nguồn chưa rõ. Luật từ đó: **mọi [x] trong
+plan phải kèm mã commit tra được bằng `git log`**; thấy ghi chú lạ thì đối chiếu
+git trước khi tin.
+
+## 6 · Việc kế tiếp hợp lý (đã ghi trong spec/plan, chưa làm)
+
+- Ngoài-phạm-vi của Bàn quản trị: URL cho tab (đụng `src/lib/urlState.ts`),
+  chuyển-phụ-trách một-bấm từ Workload, snapshot báo cáo bất biến.
+- Kế hoạch mẹ đợt sau: dump schema gốc vào repo (cần DB URL), server thành nguồn
+  sự thật KPI (màn Đối chiếu mới là bước đệm), chức năng GMP (đính kèm hồ sơ,
+  phê duyệt điện tử, log EXPORT), sửa `today-personal-scope`.
+- Mobile: chủ dự án HOÃN — đừng làm khi chưa được yêu cầu lại.
+
+## 7 · Bản đồ file nhanh cho người mới
+
+- Khung UI dùng chung: `src/components/ui/` (NhomTab, StateBoundary, ShellConfirmDialog,
+  Primitives — có `Trong` cho ô trống); hook `src/hooks/useXacNhan.tsx`.
+- Token: `src/styles/lotus-tokens.css` (sáng + dark cùng file); guardrail:
+  `scripts/check-design-drift.mjs` (miễn trừ từng dòng bằng `/* drift-mien: lý do */`).
+- Logic hạn: `src/lib/hanChot.ts` là nguồn sự thật phép so ngày (Bangkok).
+- Model thuần có test: `bangDanhSachModel`, `doiChieuModel`, `auditDiffModel`,
+  `baoLoi` (taoBoGomLoi).
+- CSS theo route (B5): màn lazy tự import CSS của nó — xem ghi chú trong `src/main.tsx`.

@@ -1,5 +1,11 @@
 # VMP scope and verification discipline
 
+> **BÀN GIAO ĐANG MỞ (01/09/2026):** trước khi làm gì trên nhánh
+> `cai-tien/desktop-wave-1`, đọc `docs/handoffs/2026-09-01-ban-giao-codex.md`
+> — trạng thái 33 commit chưa push, 3 migration chờ chủ dự án apply, bẫy
+> test trên máy Windows local, và danh sách việc kế tiếp. Xoá khối này khi
+> nhánh đã merge và bàn giao hết hiệu lực.
+
 ## Keep narrow changes narrow
 
 - Treat the user's stated acceptance criteria as the scope boundary. Do not add adjacent features, redesign authorization architecture, or audit unrelated screens without explicit approval.
