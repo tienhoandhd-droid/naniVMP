@@ -1856,7 +1856,11 @@ function VerifiedAppShell({ user, logout, access }: {
       if (conn.status === "err") return "error";
       return "empty";
     }
-    if (filteredActs.length === 0) return "filtered-empty";
+    /* Gate theo ĐÚNG tập màn đang ăn: Tổng quan dùng overviewActs (có phạm
+       vi theo người, nới lỏng bộ lọc kỳ) — gate bằng filteredActs từng che
+       nhầm màn khi chọn người + kỳ tuỳ chọn (e2e today-scope bắt được). */
+    const tapCuaMan = view === "overview" ? overviewActs : filteredActs;
+    if (tapCuaMan.length === 0) return "filtered-empty";
     return null;
   })();
   const xoaBoLocToanCuc = useCallback(() => {

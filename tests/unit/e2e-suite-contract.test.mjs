@@ -176,17 +176,16 @@ test("CI e2e-mock chỉ chạy năm bộ giả lập cốt lõi được duyệt
     "e2e-mock phải chỉ gọi đúng năm bộ E2E lõi, đúng thứ tự và không lặp",
   );
 
-  /* 31/08: "drift" RỜI danh sách cấm — guardrail đã về 0 vi phạm và trở
-     thành gate cứng ở static-quality (trước đó nó đỏ thường trực nên phải
-     giữ ngoài CI). "budget" (ngân sách bundle) cũng là gate mới cùng ngày. */
+  /* 31/08: "drift"/"a11y"/"shell" RỜI danh sách cấm — cả ba đã xanh ổn
+     định và trở thành gate cứng (drift+budget ở static-quality, a11y thành
+     job riêng, shell vào e2e-mock). Danh sách cấm chỉ còn nhóm visual
+     (cần baseline Linux niêm phong riêng) và bộ thẩm mỹ chạy tay. */
   for (const ten of [
     "visual:runtime",
     "visual:contract",
     "visual",
-    "shell",
     "thammy",
     "atelier",
-    "a11y",
   ]) {
     assert.equal(
       ci.includes(`npm run ${ten}`),
@@ -194,11 +193,17 @@ test("CI e2e-mock chỉ chạy năm bộ giả lập cốt lõi được duyệt
       `release workflow không được gọi "npm run ${ten}"`,
     );
   }
-  assert.equal(
-    ci.includes("actions/upload-artifact"),
-    false,
-    "release workflow không được tải artifact visual",
-  );
+  /* 31/08: upload-artifact ĐƯỢC PHÉP nhưng CHỈ khi fail (bằng chứng chẩn
+     đoán, giữ release lean) — mọi lần dùng phải đứng ngay sau `if: failure()`. */
+  {
+    const dong = ci.split("\n");
+    dong.forEach((line, i) => {
+      if (!line.includes("actions/upload-artifact")) return;
+      const truoc = dong.slice(Math.max(0, i - 3), i).join("\n");
+      assert.match(truoc, /if:\s*failure\(\)/,
+        `upload-artifact ở dòng ${i + 1} phải nằm sau "if: failure()" — không tải artifact ở đường thành công`);
+    });
+  }
   assert.match(
     ci,
     /production-build:[\s\S]*?needs:\s*\n\s*- static-quality\s*\n\s*- source-access-db-contract\s*\n\s*- e2e-mock/u,

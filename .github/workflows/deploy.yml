@@ -125,8 +125,21 @@ jobs:
             npm run e2e:catalog &&
             npm run e2e:source-access &&
             npm run e2e:progress-rights &&
-            npm run e2e:admin
+            npm run e2e:admin &&
+            npm run shell
           '
+      # E4 (31/08): CI đỏ mà chỉ có log text thì chẩn đoán mù — giữ lại
+      # screenshot/trace KHI FAIL (và chỉ khi fail, giữ release lean).
+      - name: Giữ bằng chứng khi E2E fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-mock-evidence
+          path: |
+            test-results/
+            tests/e2e/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
       # dist/ vừa được with-preview.sh tráo vào — đo luôn ngân sách trên đó.
       # Gate này giữ thành quả 31/08 (CSS găng 304→180KB, đuổi PNG chết)
@@ -134,12 +147,50 @@ jobs:
       - name: Ngân sách bundle
         run: npm run budget
 
+  # E4 (31/08): cổng a11y vào CI — 15 kịch bản (14 màn + hộp Cập nhật tiến
+  # độ), ngưỡng chặn critical/serious. Trước đây axe chỉ chạy tay.
+  a11y:
+    needs: static-quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_commit || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+      - run: npm ci
+      - name: Install bundled Chromium
+        run: npx playwright install chromium --with-deps --no-shell
+      - name: Tạo .env.local cho giả lập
+        run: |
+          echo "VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL || 'https://gialap.supabase.co' }}" > .env.local
+          echo "VITE_SUPABASE_ANON=${{ vars.VITE_SUPABASE_ANON || 'gialap-anon-key' }}" >> .env.local
+          echo "E2E_EMAIL=gialap@example.com" >> .env.local
+          echo "E2E_PASSWORD=gialap-khong-dung-that" >> .env.local
+      - name: Axe 15 kịch bản
+        env:
+          VITE_MANUAL_PLANNED_DEADLINES_ENABLED: true
+        run: bash scripts/with-preview.sh -- npm run a11y
+      - name: Giữ bằng chứng khi a11y fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-evidence
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   production-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - static-quality
       - source-access-db-contract
       - e2e-mock
+      - a11y
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
