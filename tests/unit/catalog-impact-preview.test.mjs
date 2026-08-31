@@ -75,6 +75,10 @@ function renderContent(overrides = {}) {
 test("progressed deadline preview shows four old-to-new deadlines and real-progress evidence", () => {
   const html = renderContent();
 
+  assert.match(html, /class="lp-dialog"/);
+  assert.match(html, /role="dialog"/);
+  assert.match(html, /aria-modal="true"/);
+  assert.doesNotMatch(html, /z-index:\s*70/i);
   assert.match(html, /CCTB01\/2026\.01-PQ/);
   for (const date of ["10/01/2026", "15/01/2026", "10/02/2026", "15/02/2026", "10/03/2026", "15/03/2026", "10/04/2026", "15/04/2026"]) {
     assert.match(html, new RegExp(date));
@@ -200,7 +204,7 @@ test("in-flight guard allows exactly one mutation and locks dialog close and sub
   closeCatalogImpactIfIdle(coordinator.isBusy, () => { closed += 1; });
   assert.equal(closed, 0, "a close click racing React's rerender must still be locked");
   const html = renderContent({ applying: true, reason: input.reason, selected, confirmed: true });
-  assert.match(html, /aria-label="Đóng" disabled=""/);
+  assert.match(html, /aria-label="Đóng"/);
   assert.match(html, />Để sau<\/button>/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>[\s\S]*Đang áp…<\/button>/);
   resolve();

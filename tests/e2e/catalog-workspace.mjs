@@ -99,7 +99,7 @@ const LY_DO_AP_V2 = "Xác nhận theo biên bản QA-26/08";
 
 const nhanChonDeadlineV2 = `Chọn cập nhật deadline ${MA_HANG_MUC_V2}`;
 
-async function moXemTruocDeadlineV2(applyResult) {
+async function moXemTruocDeadlineV2(applyResult, moChat = false) {
   const applyBodies = [];
   const applyResults = [];
   const previewBodies = [];
@@ -154,11 +154,18 @@ async function moXemTruocDeadlineV2(applyResult) {
   await trang.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => button.textContent?.trim() === "Lưu")?.click());
 
-  await trang.waitForFunction((label) => [...document.querySelectorAll("div")]
+  await trang.waitForFunction((label) => [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
     .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline")
     && [...document.querySelectorAll('input[type="checkbox"]')]
       .some((input) => input.getAttribute("aria-label") === label),
   { timeout: 10_000 }, nhanChonDeadlineV2);
+  if (moChat) {
+    // Chat che nút Sửa ở góc phải dưới trong fixture desktop này. Mở nó
+    // sau khi preview đã mở để kiểm hai lớp cùng tồn tại, không giả vờ
+    // người dùng có thể bấm xuyên qua chính chat panel.
+    await trang.evaluate(() => document.querySelector('[aria-label="Trò chuyện cùng công chúa Vali"]')?.click());
+    await trang.waitForSelector(".vmp-chat-panel", { timeout: 10_000 });
+  }
 
   return { ...pageState, applyBodies, applyResults, previewBodies, previewResults, saveBodies, saveResults };
 }
@@ -944,7 +951,25 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   console.log("\nGhi đè deadline V2 — thành công:");
   const {
     trang, loiConsole, chanNgoai, applyBodies, applyResults, previewBodies, previewResults, saveBodies, saveResults,
-  } = await moXemTruocDeadlineV2();
+  } = await moXemTruocDeadlineV2(undefined, true);
+
+  const modalOverChat = await trang.evaluate(() => {
+    const panel = document.querySelector(".lp-dialog__panel");
+    const footer = panel?.querySelector(".lp-dialog__footer");
+    if (!(panel instanceof HTMLElement) || !(footer instanceof HTMLElement)) return { shared: false, topAtFooter: false, tabStaysInside: false };
+    const box = footer.getBoundingClientRect();
+    const target = document.elementFromPoint(box.left + Math.min(20, box.width / 2), box.top + Math.min(20, box.height / 2));
+    const close = panel.querySelector('[aria-label="Đóng"]');
+    if (close instanceof HTMLElement) close.focus();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    return {
+      shared: !!document.querySelector(".vmp-chat-panel"),
+      topAtFooter: target?.closest(".lp-dialog") !== null,
+      tabStaysInside: document.activeElement?.closest(".lp-dialog__panel") === panel,
+    };
+  });
+  kiem(modalOverChat.shared && modalOverChat.topAtFooter && modalOverChat.tabStaysInside,
+    "preview dùng modal chung, phủ chat và giữ Tab trong hộp", JSON.stringify(modalOverChat));
 
   const preview = await trang.evaluate((label) => {
     const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
@@ -983,11 +1008,11 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   await bamApDeadlineV2(trang);
   await trang.waitForFunction(() => document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')
     ?.textContent?.includes("Đã áp thay đổi vào timeline") === true, { timeout: 10_000 });
-  await trang.waitForFunction(() => ![...document.querySelectorAll("div")]
+  await trang.waitForFunction(() => ![...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
     .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
   const success = await trang.evaluate(() => ({
     toast: document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')?.textContent ?? "",
-    dialogConMo: [...document.querySelectorAll("div")]
+    dialogConMo: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
       .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
   }));
   kiem(JSON.stringify(applyBodies) === JSON.stringify([expectedApplyBodyV2()]),
@@ -1069,7 +1094,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
       ?.querySelector('input[type="checkbox"]');
     return {
       alert: document.querySelector('[role="alert"]')?.textContent ?? "",
-      dialogConMo: [...document.querySelectorAll("div")]
+      dialogConMo: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
         .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
       candidateDuocChon: candidate?.checked === true,
       lyDoConLai: document.querySelector('input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]')?.value === reason,
@@ -1100,7 +1125,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
   const { trang, loiConsole, chanNgoai, v2PreviewBodies, v1PreviewBodies, v1ApplyBodies, rpcSequence } = await moXemTruocFallbackV2({
     previewV2Error: { status: 404, code: "PGRST202", message: "V2 chưa được triển khai" },
   });
-  await trang.waitForFunction(() => [...document.querySelectorAll("div")]
+  await trang.waitForFunction(() => [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
     .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
   /* Tiêu đề hộp thoại xuất hiện ngay khi effect preview BẮT ĐẦU, nên không
      chứng minh fallback V1 đã trả về. Đợi hết trạng thái tải — khi đó RPC
@@ -1131,7 +1156,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
   const { trang, loiConsole, chanNgoai, v2ApplyBodies, v1ApplyBodies, rpcSequence } = await moXemTruocFallbackV2({
     applyV2Error: { status: 404, code: "42883", message: "V2 chưa được triển khai" },
   });
-  await trang.waitForFunction(() => [...document.querySelectorAll("div")]
+  await trang.waitForFunction(() => [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
     .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
   rpcSequence.splice(0);
   await chuanBiApV1(trang);
@@ -1159,7 +1184,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
   await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
   const state = await trang.evaluate(() => ({
     alert: document.querySelector('[role="alert"]')?.textContent ?? "",
-    dialogOpen: [...document.querySelectorAll("div")]
+    dialogOpen: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
       .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
   }));
   kiem(JSON.stringify(v2PreviewBodies) === JSON.stringify([{ p_change_id: CHANGE_ID_V2 }]),
@@ -1189,7 +1214,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
   await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
   const state = await trang.evaluate((label, reason) => ({
     alert: document.querySelector('[role="alert"]')?.textContent ?? "",
-    dialogOpen: [...document.querySelectorAll("div")]
+    dialogOpen: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
       .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
     selected: [...document.querySelectorAll('input[type="checkbox"]')]
       .some((input) => input.getAttribute("aria-label") === label && input.checked),

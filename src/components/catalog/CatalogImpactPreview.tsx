@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, Check, Lock, Plus, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Lock, Plus } from "lucide-react";
 import { C, TEXT } from "../../constants/theme.ts";
+import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { applyCatalogChangeV2, previewCatalogChangeV2 } from "../../lib/supabaseData.ts";
 import type { AnhHuongTimelineV2, ApplyCatalogChangeV2Input, KetQuaApDung } from "../../lib/supabaseData.ts";
 import { candidateHasDeadlineChange, canApplyCatalogImpact, catalogApplyErrorMessage, toggleDeadlineOverride } from "../../features/catalogWorkspace/catalogTimelineOverrideModel.ts";
@@ -167,10 +168,17 @@ export function CatalogImpactPreviewContent({ preview, loading, error, reason, r
   const card = (label: string, count: number, color: string) => <div style={{ padding: "8px 14px", borderRadius: 12, background: color, minWidth: 96 }}><div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1 }}>{count}</div><div style={{ fontSize: 12, fontWeight: 600, color: C.plumSoft }}>{label}</div></div>;
   const close = () => { if (!applying) closeCatalogImpactIfIdle(isCloseLocked, onClose); };
 
-  return <div style={{ position: "fixed", inset: 0, background: "rgba(60,40,60,.35)", zIndex: 70, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, overflowY: "auto" }}>
-    <div style={{ background: C.surface, borderRadius: 20, padding: 22, maxWidth: 880, width: "100%", border: `1.5px solid ${C.pinkSoft}`, fontFamily: TEXT, color: C.plum }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}><div style={{ fontSize: 18, fontWeight: 800 }}>Ảnh hưởng tới timeline</div><button type="button" onClick={close} aria-label="Đóng" disabled={applying} style={{ border: "none", background: "transparent", cursor: applying ? "not-allowed" : "pointer", color: C.plumSoft }}><X size={20} /></button></div>
-      <p style={{ margin: "0 0 14px", fontSize: 13, color: C.plumSoft }}>Danh mục đã lưu rồi. Timeline chỉ đổi sau khi bạn xác nhận ở đây.</p>
+  return <ViewportDialog
+    open
+    title="Ảnh hưởng tới timeline"
+    description="Danh mục đã lưu rồi. Timeline chỉ đổi sau khi bạn xác nhận ở đây."
+    maxWidth={880}
+    onRequestClose={close}
+    footer={<>
+      <button type="button" onClick={close} disabled={applying} style={{ padding: "10px 16px", borderRadius: 12, cursor: applying ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plum }}>Để sau</button>
+      <button type="button" onClick={onApply} disabled={applying || loading || !canApply.ok} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 12, cursor: applying || loading || !canApply.ok ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 800, border: "none", background: applying || loading || !canApply.ok ? C.pinkSoft : C.pink, color: applying || loading || !canApply.ok ? C.plumSoft : "#fff" }}><Check size={16} /> {applying ? "Đang áp…" : "Áp vào timeline"}</button>
+    </>}
+  >
       {loading && <p style={{ color: C.plumSoft }}>Đang tính ảnh hưởng…</p>}
       {error && <div role="alert" style={{ display: "flex", gap: 8, padding: 10, borderRadius: 10, background: C.raspSoft, color: C.raspText, marginBottom: 12 }}><AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} /><span style={{ fontSize: 13 }}>{error}</span></div>}
       {preview && !loading && <>
@@ -184,9 +192,7 @@ export function CatalogImpactPreviewContent({ preview, loading, error, reason, r
         {showApplyForm && <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}><span style={{ fontSize: 12, fontWeight: 700 }}>Lý do áp <span style={{ color: C.raspText }}>*</span></span><input value={reason} disabled={applying} onChange={(event) => onReason(event.target.value)} placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi." style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 14, border: `1.5px solid ${reasonError ? C.rasp : C.pinkSoft}` }} />{reasonError && <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{reasonError}</span>}</label>}
         {selected.length > 0 && <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, fontSize: 13 }}><input type="checkbox" checked={confirmed} disabled={applying} onChange={(event) => onConfirmed(event.target.checked)} /><span>Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn; ngày thực tế và trạng thái giữ nguyên.</span></label>}
       </>}
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><button type="button" onClick={close} disabled={applying} style={{ padding: "10px 16px", borderRadius: 12, cursor: applying ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plum }}>Để sau</button><button type="button" onClick={onApply} disabled={applying || loading || !canApply.ok} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 12, cursor: applying || loading || !canApply.ok ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 800, border: "none", background: applying || loading || !canApply.ok ? C.pinkSoft : C.pink, color: applying || loading || !canApply.ok ? C.plumSoft : "#fff" }}><Check size={16} /> {applying ? "Đang áp…" : "Áp vào timeline"}</button></div>
-    </div>
-  </div>;
+  </ViewportDialog>;
 }
 
 export default function CatalogImpactPreview({ changeId, onClose, onApplied }: { changeId: string; onClose: () => void; onApplied: () => void }) {

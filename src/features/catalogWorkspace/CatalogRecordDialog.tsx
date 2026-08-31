@@ -14,7 +14,7 @@
  *  Cơ chế hộp thoại (bẫy tiêu điểm, làm trơ nền, Escape) hoàn toàn thuộc
  *  về `ViewportDialog` của Foundation — ở đây không tự dựng lại cái nào.
  * ===================================================================== */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Boxes } from "lucide-react";
 
 import ViewportDialog from "../../components/ui/ViewportDialog.tsx";
@@ -53,6 +53,12 @@ const MAC_DINH_TAO_MOI: Partial<Record<CatalogDatasetId, CatalogRecord>> = {
   alerts: { scope_type: "tất cả", alert_kind: "cả hai" },
 };
 
+export function requiredReasonState(required: boolean, reason: string): { invalid: boolean; message: string | null } {
+  return required && !reason.trim()
+    ? { invalid: true, message: "Hãy ghi lý do thay đổi để lưu vào nhật ký." }
+    : { invalid: false, message: null };
+}
+
 /** Hiện giá trị cho người đọc, không phải cho máy. */
 function doc(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
@@ -72,6 +78,8 @@ export default function CatalogRecordDialog({
   const [lyDo, setLyDo] = useState("");
   const [dangLuu, setDangLuu] = useState(false);
   const [loi, setLoi] = useState<CatalogSaveResult | null>(null);
+  const [reasonError, setReasonError] = useState<string | null>(null);
+  const reasonInputRef = useRef<HTMLInputElement | null>(null);
   const [moNangCao, setMoNangCao] = useState(false);
   /* Ô nào cần đặt con trỏ vào — đặt khi người dùng bấm Lưu mà còn thiếu.
      Kèm số lần để bấm Lưu hai lần liên tiếp vẫn nhảy lại: nếu chỉ giữ tên
@@ -90,6 +98,7 @@ export default function CatalogRecordDialog({
     setNhap({ ...(record === null ? MAC_DINH_TAO_MOI[dataset] : {}), ...(record || {}) });
     setLyDo("");
     setLoi(null);
+    setReasonError(null);
     setOCanNhay(null);
   }
 
@@ -105,6 +114,7 @@ export default function CatalogRecordDialog({
     [def.fields, record, nhap]);
   const thieu = useMemo(() => thieuTruongBatBuoc(def.fields, nhap), [def.fields, nhap]);
   const phaiNeuLyDo = !laTaoMoi && canLyDo(def.fields, patch);
+  const reasonState = requiredReasonState(phaiNeuLyDo, lyDo);
 
   /* Luật riêng của từng dataset (định dạng email, phạm vi phải có mã) đã
      nằm trong repo từ lâu nhưng KHÔNG file nào import — nghĩa là email sai
@@ -151,7 +161,11 @@ export default function CatalogRecordDialog({
     if (thieu.length > 0) { nhayToiO(thieu[0].key); return; }
     const keyLoi = Object.keys(loiTruong);
     if (keyLoi.length > 0) { nhayToiO(keyLoi[0]); return; }
-    if (phaiNeuLyDo && !lyDo.trim()) return;
+    if (reasonState.invalid) {
+      setReasonError(reasonState.message);
+      reasonInputRef.current?.focus();
+      return;
+    }
 
     setDangLuu(true);
     const khoa = String(nhap[def.businessKeyField] ?? "");
@@ -181,14 +195,13 @@ export default function CatalogRecordDialog({
     onClose();
   };
 
-  /* Nút Lưu KHÔNG mờ vì thiếu ô bắt buộc. Nút mờ mà không nói vì sao là
+  /* Nút Lưu KHÔNG mờ vì thiếu ô bắt buộc, kể cả lý do. Nút mờ mà không nói vì sao là
      cách chắc chắn khiến người dùng nghĩ hệ thống hỏng: họ bấm, không có
      gì xảy ra, mà ô cần điền có thể đang nằm trong phần thu gọn. Cho bấm,
      rồi mở đúng phần đó ra và đặt con trỏ vào ô còn trống.
      Hai trường hợp còn lại vẫn mờ vì lý do hiện rõ ngay trên màn: không đủ
      quyền (có băng báo ở đầu hộp thoại) và chưa đổi gì (không có gì để ghi). */
   const khongLuuDuoc = !canEdit || dangLuu
-    || (phaiNeuLyDo && !lyDo.trim())
     || Object.keys(patch).length === 0;
 
   return (
@@ -297,12 +310,16 @@ export default function CatalogRecordDialog({
             Lý do thay đổi<span className="cw-bat-buoc" aria-hidden="true">*</span>
           </label>
           <input id={`cw-${dataset}-ly-do`} className="cw-o" value={lyDo}
-            onChange={(e) => setLyDo(e.target.value)}
-            aria-describedby={`cw-${dataset}-ly-do-goi-y`} />
+            ref={reasonInputRef}
+            onChange={(e) => { setLyDo(e.target.value); setReasonError(null); }}
+            aria-required="true"
+            aria-invalid={reasonError !== null}
+            aria-describedby={reasonError ? `cw-${dataset}-ly-do-goi-y cw-${dataset}-ly-do-loi` : `cw-${dataset}-ly-do-goi-y`} />
           <p id={`cw-${dataset}-ly-do-goi-y`} className="cw-goi-y">
             Thay đổi này ảnh hưởng tới timeline hoặc phạm vi báo cáo, nên hồ sơ
             cần ghi lại vì sao.
           </p>
+          {reasonError && <p id={`cw-${dataset}-ly-do-loi`} className="cw-loi" role="alert">{reasonError}</p>}
         </div>
       )}
 
