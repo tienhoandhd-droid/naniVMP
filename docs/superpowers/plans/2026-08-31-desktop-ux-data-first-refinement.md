@@ -244,7 +244,7 @@ const evidence = await page.evaluate(() => {
   return { hero, vali, action, row,
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
 });
-assert.ok(evidence.hero.top < 360 && evidence.hero.height <= 122, JSON.stringify(evidence));
+assert.ok(evidence.hero.top < 360 && evidence.hero.height <= 305, JSON.stringify(evidence));
 assert.ok(evidence.vali.width >= 72 && evidence.vali.height >= 92, JSON.stringify(evidence));
 assert.ok(evidence.action.top < 768 && evidence.row.top < 768, JSON.stringify(evidence));
 assert.ok(evidence.overflow <= 1, JSON.stringify(evidence));
@@ -258,7 +258,7 @@ Expected: FAIL missing data markers.
 
 Run: `bash scripts/with-preview.sh -- node tests/e2e/today-desktop-fold.mjs`
 
-Expected: FAIL vì hero hiện cao khoảng một Vali `150px` cộng padding và row đầu chưa vào fold; target mới yêu cầu hero không quá `122px`.
+Expected: FAIL vì hero hiện cao khoảng `385px` và row đầu chưa vào fold; target mới giảm tối thiểu khoảng `80px`, còn không quá `305px`.
 
 - [ ] **Step 4: GREEN component/CSS tối thiểu**
 
