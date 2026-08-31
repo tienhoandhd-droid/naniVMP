@@ -84,6 +84,13 @@
   box-shadow: inset 3px 0 0 var(--lp-gold);
 }
 
+/* Số của thẻ ĐANG XEM: vàng trên mận đọc được ở theme sáng, nhưng dark đảo
+   mận thành hồng nhạt → vàng-trên-hồng tàng hình (đo 01/09). currentColor
+   = màu chữ của thẻ, tự đúng ở cả hai theme. */
+.monitoring-journey__item.is-active .monitoring-journey__metric > strong {
+  color: currentColor;
+}
+
 .monitoring-journey__copy,
 .monitoring-journey__metric {
   display: flex;
@@ -376,7 +383,10 @@
 .alerts-page-shell .alerts-command__actions button {
   border-color: var(--lp-gold);
   background: var(--lp-gold);
-  color: var(--lp-plum);
+  /* KHÔNG dùng --lp-plum ở đây: dark đảo plum thành HỒNG NHẠT — hồng trên
+     nền vàng là chữ tàng hình (đo 01/09). Nền vàng sáng ở CẢ hai theme nên
+     chữ phải là mực tối đi cùng vàng. */
+  color: var(--lp-gold-ink);
 }
 
 .alerts-page-shell .alerts-command__actions a {

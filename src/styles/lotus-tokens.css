@@ -82,6 +82,8 @@
   /* Vàng — trang trí thuần tuý (~2.4:1, cấm làm chữ nhỏ hay trạng thái).
      Xem chú thích đầu file. */
   --lp-gold: #C7A15B;
+  /* Mực trên nền vàng: vàng sáng ở CẢ hai theme nên mực giữ cố định. */
+  --lp-gold-ink: #241C26;
 
   /* Màu sứ dùng cho chữ đặt TRÊN nền sơn mài đậm (panel thương hiệu ở
      màn đăng nhập). Không đảo theo chế độ sáng/tối vì nền dưới nó cũng
