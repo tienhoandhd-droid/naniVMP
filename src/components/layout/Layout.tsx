@@ -10,11 +10,13 @@ import {
 import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS } from "../../constants/vmp.ts";
 import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
+import { prefetchDesktopRoute } from "../../lib/routePrefetch.ts";
 import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
 import { CrownLogo, tuoiDuLieu, dungThanhTra } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
+import type { ScreenId } from "../../lib/access.ts";
 /* Nhãn năm vai nghiệp vụ hiệu lực — dùng lại đúng bảng nhãn của màn Phân quyền
    (nguồn duy nhất) thay vì `PERM_LABEL`/`BUSINESS_ROLE_LABELS` cũ, để
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
@@ -106,7 +108,10 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               const active = view === n.id;
               const Icon = n.icon;
               return (
-                <button key={n.id} onClick={() => setView(n.id)} className="vmp-nav" data-view={n.id}
+                <button key={n.id} onClick={() => setView(n.id)}
+                  onPointerEnter={() => prefetchDesktopRoute(n.id as ScreenId)}
+                  onFocus={() => prefetchDesktopRoute(n.id as ScreenId)}
+                  className="vmp-nav" data-view={n.id}
                   aria-current={active ? "page" : undefined}
                   title={collapsed ? n.label : undefined}
                   style={{

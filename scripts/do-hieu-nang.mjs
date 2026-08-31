@@ -11,14 +11,24 @@ const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
 const URL_SB = readFileSync(fileURLToPath(new URL("../.env.local", import.meta.url)), "utf8")
   .match(/^VITE_SUPABASE_URL=(.+)$/m)[1].trim();
 
-const MAN = ["today", "timeline", "overview", "progress", "workload", "reports", "alerts", "source"];
+/* Chỉ đo các route desktop có ngân sách riêng. Timeline/Long Môn nằm ngoài
+ * phạm vi Task 6 nên không được điều hướng hay đo trong lab này. */
+const MAN = ["reports", "alerts", "progress", "source", "workload", "rules", "phanquyen"];
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: ["--no-sandbox"] });
 
 for (const man of MAN) {
   const page = await browser.newPage();
+  await page.evaluateOnNewDocument(() => {
+    window.__vmpMaxLongTask = 0;
+    new PerformanceObserver((entries) => {
+      for (const entry of entries.getEntries()) {
+        window.__vmpMaxLongTask = Math.max(window.__vmpMaxLongTask, entry.duration);
+      }
+    }).observe({ type: "longtask", buffered: true });
+  });
   await caiGiaLap(page, { supabaseUrl: URL_SB, kichBan: "day" });
   await nhetPhien(page, { supabaseUrl: URL_SB });
-  await page.setViewport({ width: 1920, height: 1080 });
+  await page.setViewport({ width: 1366, height: 768 });
   const t0 = Date.now();
   await page.goto(`${GOC}#v=${man}`, { waitUntil: "networkidle0", timeout: 45_000 });
   const wall = Date.now() - t0;
@@ -38,10 +48,11 @@ for (const man of MAN) {
       tongKB: Math.round(res.reduce((s, r) => s + (r.transferSize || r.encodedBodySize || 0), 0) / 1024),
       soRes: res.length,
       domNodes: document.querySelectorAll("*").length,
+      maxLongTask: Math.round(window.__vmpMaxLongTask || 0),
       top,
     };
   });
-  console.log(`${man.padEnd(9)} wall=${wall}ms dcl=${m.dcl}ms tai=${m.tongKB}KB/${m.soRes}res dom=${m.domNodes}`);
+  console.log(`${man.padEnd(9)} wall=${wall}ms dcl=${m.dcl}ms tai=${m.tongKB}KB/${m.soRes}res dom=${m.domNodes} long=${m.maxLongTask}ms`);
   console.log(`          top: ${m.top.map((t) => `${t.n}=${t.kb}KB`).join(" · ")}`);
   await page.close();
 }

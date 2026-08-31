@@ -127,10 +127,10 @@ const UpdateView = lazy(nhapCoThuLai(() => import("./pages/UpdatePage.tsx")));
 const ActiveRulesView = lazy(nhapCoThuLai(() => import("./pages/ActiveRulesPage.tsx")));
 const PhanQuyenView = lazy(nhapCoThuLai(() => import("./pages/PhanQuyenPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
+const ReportsView = lazy(nhapCoThuLai(() => import("./components/dashboard/ReportsView.tsx")));
 import VongNam from "./components/dashboard/VongNam.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
-import ReportsView from "./components/dashboard/ReportsView.tsx";
 
 // ===== Legacy lib imports (kept for compatibility) =====
 import { saveUser, loadUser, loadFilterPrefs, saveFilterPrefs } from "./lib/config.ts";

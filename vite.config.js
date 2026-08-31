@@ -11,6 +11,7 @@ export default defineConfig({
   base: "./",
   build: {
     outDir: "dist",
+    manifest: true,
     target: "es2020",
     cssMinify: true,
     chunkSizeWarningLimit: 1200,
