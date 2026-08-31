@@ -58,6 +58,15 @@ try {
       await page.waitForSelector("main [role=\"alert\"]", { timeout: 15_000 });
       const retry = await page.$eval("main [role=\"alert\"] button", (button) => button.textContent?.trim() ?? "");
       assert.match(retry, /Thử lại/);
+      if (view === "health") {
+        const text = await page.$eval("main", (main) => main.textContent ?? "");
+        assert.doesNotMatch(text, /Không có hạng mục nào đến hạn trong ngưỡng này/,
+          "lỗi tải ban đầu không được giả làm kết quả cảnh báo sạch");
+        assert.doesNotMatch(text, /Không phát hiện vấn đề nào/,
+          "lỗi tải ban đầu không được giả làm kết quả chất lượng sạch");
+        assert.doesNotMatch(text, /Cảnh báo server sẽ gửi|Chất lượng dữ liệu \(0\)/,
+          "lỗi tải ban đầu phải dừng ở readiness boundary chung thay vì dựng card rỗng");
+      }
       if (view === "rules") {
         const errorText = await page.$eval("main [role=\"alert\"]", (alert) => alert.textContent ?? "");
         assert.match(errorText, /Máy chủ không trả về dữ liệu luật/);
@@ -119,6 +128,65 @@ try {
       await page.waitForFunction(() => !document.querySelector("main [role=alert]"));
       await page.waitForFunction(() => !document.querySelector('main [aria-busy="true"]'));
       assert.equal(await page.$eval("main", (main) => main.textContent?.includes("Hạng mục hoàn thành")), true);
+    } finally {
+      await page.close();
+    }
+  }
+
+
+  {
+    let store;
+    const delays = { rpc_due_alerts: 0 };
+    const page = await browser.newPage();
+    try {
+      await caiGiaLap(page, {
+        supabaseUrl: URL_SB,
+        kichBan: "day",
+        doTre: delays,
+        suaKho: (kho) => {
+          store = kho;
+          kho.rpc_due_alerts = (body) => [{
+            validation_code: body.p_soon_days === 3
+              ? "STALE-THREE"
+              : body.p_soon_days === 30 ? "LATEST-THIRTY" : `WINDOW-${body.p_soon_days}`,
+            validation_type: "PQ",
+            object_code: `OBJ-${body.p_soon_days}`,
+            object_name: `Ngưỡng ${body.p_soon_days} ngày`,
+            department: "QA",
+            owner_name: "Người kiểm thử",
+            stage: "validation",
+            due_date: "2026-09-01",
+            days_left: body.p_soon_days,
+            alert_type: "due_soon",
+          }];
+        },
+      });
+      await nhetPhien(page, { supabaseUrl: URL_SB });
+      await page.setViewport({ width: 1366, height: 768 });
+      await page.goto(`${GOC}#v=health`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await page.click("#health-tab-server");
+      await page.waitForFunction(() => document.querySelector("main")?.textContent?.includes("WINDOW-7"));
+
+      delays.rpc_due_alerts = 700;
+      const slowRequestStarted = new Promise((resolve) => {
+        const observe = (request) => {
+          if (!request.url().includes("/rpc/rpc_due_alerts") || request.method() === "OPTIONS") return;
+          page.off("request", observe);
+          resolve();
+        };
+        page.on("request", observe);
+      });
+      await bamNutTheoNhan(page, "3 ngày");
+      await slowRequestStarted;
+      delays.rpc_due_alerts = 30;
+      await bamNutTheoNhan(page, "30 ngày");
+      await page.waitForFunction(() => document.querySelector("main")?.textContent?.includes("LATEST-THIRTY"));
+      await new Promise((resolve) => setTimeout(resolve, 850));
+
+      const text = await page.$eval("main", (main) => main.textContent ?? "");
+      assert.match(text, /LATEST-THIRTY/, "request mới nhất phải sở hữu snapshot hiển thị");
+      assert.doesNotMatch(text, /STALE-THREE/, "response cũ hoàn tất muộn không được đè snapshot mới");
+      assert.ok(store, "mock store phải được khởi tạo");
     } finally {
       await page.close();
     }

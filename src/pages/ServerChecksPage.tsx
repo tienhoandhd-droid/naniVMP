@@ -11,7 +11,7 @@
  *    · rpc_due_alerts             — ĐÚNG danh sách workflow cảnh báo sẽ gửi
  *    · rpc_refresh_computed_status— tính lại computed_status theo hôm nay
  * ===================================================================== */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Radar, RefreshCw, AlertTriangle, CheckCircle2, Bell, Gauge, PlayCircle,
   ClipboardCheck, Clock, FileCheck2,
@@ -48,8 +48,10 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [sevFilter, setSevFilter] = useState("all");
+  const loadGeneration = useRef(0);
 
   const load = async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true); setErr("");
     try {
       const [k, q, a] = await Promise.all([
@@ -57,11 +59,14 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
         checkDataQuality(year),
         fetchDueAlerts(year, soonDays),
       ]);
+      if (generation !== loadGeneration.current) return;
       setKpi(k); setIssues(q); setAlerts(a);
     } catch (e) {
+      if (generation !== loadGeneration.current) return;
       setErr((e as Error).message || "Lỗi tải dữ liệu từ server");
+    } finally {
+      if (generation === loadGeneration.current) setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [soonDays]);
@@ -94,8 +99,32 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
     setBusy(false);
   };
 
+  /* Lần tải đầu chưa có snapshot thì cả route có đúng một readiness state.
+     Không dựng các card số 0 bên dưới: số 0 ở đây chưa phải dữ liệu sạch. */
+  if (!kpi && loading) {
+    return <StateBoundary state="loading" title="Đang tải số liệu theo server…" skeletonRows={6} />;
+  }
+  if (!kpi && err) {
+    return (
+      <StateBoundary
+        state="error"
+        title="Không đọc được số liệu theo server"
+        description={err}
+        onRetry={() => { void load(); }}
+      />
+    );
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div aria-busy={loading} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {err && (
+        <StateBoundary
+          state="error"
+          title="Không làm mới được số liệu theo server"
+          description={err}
+          onRetry={() => { void load(); }}
+        />
+      )}
       {/* ---------- KPI theo server ---------- */}
       <Card variant="strong">
         <CardTitle icon={Gauge}
@@ -116,28 +145,6 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
             </button>
           )}
         </div>
-
-        {err && kpi && (
-          <StateBoundary
-            state="error"
-            title="Không làm mới được số liệu theo server"
-            description={err}
-            onRetry={() => { void load(); }}
-          />
-        )}
-
-        {loading && !kpi && (
-          <StateBoundary state="loading" title="Đang tải số liệu theo server…" skeletonRows={4} />
-        )}
-
-        {err && !kpi && (
-          <StateBoundary
-            state="error"
-            title="Không đọc được số liệu theo server"
-            description={err}
-            onRetry={() => { void load(); }}
-          />
-        )}
 
         {kpi && (
           <div aria-busy={loading} style={{ display: "grid", gap: 12,
@@ -225,7 +232,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
                   </tr>
                 );
               })}
-              {!loading && alerts.length === 0 && (
+              {!loading && !err && alerts.length === 0 && (
                 <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: C.mintText }}>
                   <CheckCircle2 size={16} style={{ verticalAlign: "-3px", marginRight: 6 }} />
                   Không có hạng mục nào đến hạn trong ngưỡng này.
@@ -278,7 +285,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
               </div>
             );
           })}
-          {!loading && shownIssues.length === 0 && (
+          {!loading && !err && shownIssues.length === 0 && (
             <div style={{ padding: 20, textAlign: "center", color: C.mintText, fontSize: 14 }}>
               <CheckCircle2 size={16} style={{ verticalAlign: "-3px", marginRight: 6 }} />
               Không phát hiện vấn đề nào.

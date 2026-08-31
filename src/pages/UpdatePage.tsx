@@ -9,7 +9,7 @@ import { useDebounce } from "../hooks/index.ts";
 import { Card, Tag, Pill, StateBadge, PhanTrang } from "../components/ui/Primitives.tsx";
 import MobileTaskList from "../components/ui/MobileTaskList.tsx";
 import StateBoundary from "../components/ui/StateBoundary.tsx";
-import { useToast } from "../components/ui/ToastProvider.tsx";
+import { useScopedToast } from "../components/ui/ToastProvider.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import { buildProgressWorkspaceModel } from "../features/progress/progressWorkspaceModel.ts";
 import { countProgressAdvancedFilters, isDetailedProgressFix } from "../features/progress/progressFilterUi.ts";
@@ -322,7 +322,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     fix, status: fst, stage: stageF, period, showStopped: hienNgung,
   });
   const linked = conn?.status === "ok";
-  const toast = useToast();
+  const toast = useScopedToast();
   const handleProgressReload = useCallback(async () => {
     try {
       await onReload?.();

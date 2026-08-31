@@ -39,6 +39,24 @@ test("frontend không còn công bố màn Nhân sự trong menu, screen hay th�
   assert.equal(ORDERED_SCREEN_IDS.includes("people"), false);
 });
 
+test("metadata tiêu đề bao phủ exhaustive mọi ScreenId, kể cả route ẩn và alias", async () => {
+  // Nếu thêm ScreenId mà quên metadata, topbar/document title không được phép rơi về màn khác.
+  const { createServer } = await import("vite");
+  const vite = await createServer({
+    server: { middlewareMode: true, hmr: false }, appType: "custom",
+  });
+  try {
+    const app = await vite.ssrLoadModule("/src/App.tsx");
+    assert.equal(typeof app.resolveScreenTitle, "function");
+    assert.deepEqual(Object.keys(app.SCREEN_TITLES).sort(), [...SCREEN_IDS].sort());
+    assert.equal(app.resolveScreenTitle("rules"), "Luật hệ thống đang áp dụng");
+    assert.equal(app.resolveScreenTitle("inventory"), "Cập nhật tiến độ");
+    assert.equal(app.resolveScreenTitle("accounts"), "Vai trò & phạm vi");
+  } finally {
+    await vite.close();
+  }
+});
+
 /* ---- Chuẩn hoá tên, chưa xét quyền ----------------------------------- */
 
 test("risk là tên gọi khác của alerts", () => {

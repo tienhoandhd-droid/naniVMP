@@ -82,6 +82,17 @@ try {
     focusId: "vmp-main-content",
     title: "Tổng quan VMP — V/Q team",
   });
+
+  await page.goto(`${APP_URL}#v=rules`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.waitForFunction(() => document.querySelector("main h1")?.textContent?.trim()
+    === "Luật hệ thống đang áp dụng");
+  assert.deepEqual(await page.evaluate(() => ({
+    heading: document.querySelector("main h1")?.textContent?.trim(),
+    title: document.title,
+  })), {
+    heading: "Luật hệ thống đang áp dụng",
+    title: "Luật hệ thống đang áp dụng — V/Q team",
+  });
 } finally {
   await browser.close();
 }

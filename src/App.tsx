@@ -150,6 +150,32 @@ import {
   type ChangePasswordErrors,
 } from "./lib/passwordForm.ts";
 
+/** Metadata màn hình là authority riêng với menu: alias và route ẩn vẫn có
+ * tiêu đề đúng dù không được bày thành một mục điều hướng. `Record<ScreenId>`
+ * khiến TypeScript chặn ngay khi thêm màn mà chưa khai metadata. */
+export const SCREEN_TITLES = {
+  today: "Việc hôm nay",
+  overview: "Tổng quan VMP",
+  timeline: "Dòng thời gian VMP",
+  alerts: "Cảnh báo & ưu tiên",
+  risk: "Cảnh báo & ưu tiên",
+  progress: "Cập nhật tiến độ",
+  inventory: "Cập nhật tiến độ",
+  source: "Dữ liệu nguồn",
+  workload: "Phân công & khối lượng",
+  reports: "Báo cáo",
+  rules: "Luật hệ thống đang áp dụng",
+  health: "Chất lượng dữ liệu",
+  audit: "Nhật ký thay đổi",
+  accounts: "Vai trò & phạm vi",
+  admin: "Cấu hình hệ thống",
+  phanquyen: "Vai trò & phạm vi",
+} as const satisfies Record<ScreenId, string>;
+
+export function resolveScreenTitle(screenId: ScreenId): string {
+  return SCREEN_TITLES[screenId];
+}
+
 /* Chụp ý định link trước lần render đầu. React StrictMode dựng shell hai lần
    ở môi trường dev; nếu đọc lại sau mount thứ nhất thì URL đã có thể được
    chuẩn hóa và làm mất `me=1` trước mount thứ hai. */
@@ -1666,7 +1692,7 @@ function VerifiedAppShell({ user, logout, access }: {
     if (hasDirty) { setHoiThoat(true); return; }
     logout();
   }, [hasDirty, logout]);
-  const title = NAV_ITEMS.find((n) => n.id === view)?.label || "Tổng quan";
+  const title = resolveScreenTitle(view as ScreenId);
   const mainRef = useRouteSettlement(view, title);
 
   // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + bộ phận (chọn NHIỀU) + thời gian (có Tùy chọn).

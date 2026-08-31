@@ -35,3 +35,33 @@ test("chốt lỗi giữ action đúng chỗ trong hàng", () => {
   assert.deepEqual(settled.map((toast) => toast.id), ["t1", "t2"]);
   assert.deepEqual(settled[0].hanhDong, action);
 });
+
+test("callback toast được consume đúng một lần và dismiss vô hiệu hóa nó", async () => {
+  const { createServer } = await import("vite");
+  const vite = await createServer({
+    server: { middlewareMode: true, hmr: false }, appType: "custom",
+  });
+  try {
+    const provider = await vite.ssrLoadModule("/src/components/ui/ToastProvider.tsx");
+    assert.equal(typeof provider.createToastActionRegistry, "function");
+    const registry = provider.createToastActionRegistry();
+    let calls = 0;
+
+    registry.register("a1", () => { calls += 1; });
+    registry.consume("a1")?.();
+    registry.consume("a1")?.();
+    assert.equal(calls, 1, "hai click đồng thời không được chạy recovery hai lần");
+
+    registry.register("a2", () => { calls += 1; });
+    registry.dismiss("a2");
+    registry.consume("a2")?.();
+    assert.equal(calls, 1, "đóng toast phải xoá callback ngay lập tức");
+
+    registry.register("a3", () => { calls += 1; });
+    registry.clear();
+    registry.consume("a3")?.();
+    assert.equal(calls, 1, "tháo scope/provider phải thu hồi mọi callback");
+  } finally {
+    await vite.close();
+  }
+});
