@@ -21,6 +21,8 @@
  *  bản trước tự dựng một lớp phủ `position: fixed` và mất cả bốn thứ đó.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
+import "../../features/catalog/catalog.css"; // B5: dung .catalog-*/.cw-* — tu keo CSS khi form vao chunk khac
+import "../../styles/catalog-workspace.css";
 import { AlertTriangle, Boxes, Lock, Save } from "lucide-react";
 
 import ViewportDialog from "../ui/ViewportDialog.tsx";

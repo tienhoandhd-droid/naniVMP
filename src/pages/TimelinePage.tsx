@@ -13,6 +13,7 @@ import PlannedDeadlineDialog from "../features/timeline/PlannedDeadlineDialog.ts
 import { canPresentPlannedDeadlineEdit } from "../features/timeline/plannedDeadlineEditModel.ts";
 import LongMonRace from "../features/monitoring/LongMonRace.tsx";
 import LongMonBangDanhSach from "../features/monitoring/LongMonBangDanhSach.tsx";
+import "../features/monitoring/long-mon-race.css"; // B5: CSS theo route — chỉ ai mở màn này mới tải
 import {
   canChooseLongMonAudience,
   filterLongMonScopeActivities,

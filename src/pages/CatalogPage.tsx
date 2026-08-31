@@ -8,6 +8,7 @@
  *    là di sản thời còn đồng bộ Sheet, đã sai từ khi chuyển nhập liệu về RPC.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
+import "../features/catalog/catalog.css"; // B5: CSS theo route
 import { Boxes, Search, Pencil, ChevronRight, Layers, ExternalLink, SlidersHorizontal, X } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
 import { CLS, DEPTS } from "../constants/vmp.ts";

@@ -1,5 +1,6 @@
 /* UpdatePage.jsx — Cập nhật tiến độ thực tế */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "../features/progress/progress.css"; // B5: CSS theo route
 import { Pencil, Search, SlidersHorizontal, X } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
 import { STATUS, STAGES, PERIODS } from "../constants/vmp.ts";

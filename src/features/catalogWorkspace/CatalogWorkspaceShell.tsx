@@ -20,6 +20,7 @@
  *  tổng ở server, 25 dòng mỗi trang, debounce 250 ms và sequence fence.
  * ===================================================================== */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import "../../styles/catalog-workspace.css"; // B5: CSS theo route
 import {
   Bell, Boxes, CalendarPlus, Check, Download, FileSpreadsheet, FlaskConical,
   History, Hourglass, Plus, RefreshCw, Search,

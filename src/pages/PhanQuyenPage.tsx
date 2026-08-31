@@ -27,6 +27,7 @@
  *       nấy, không chép luật lại bằng tay nên không thể lệch với luật thật.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
+import "../styles/catalog-workspace.css"; // B5: dung .cw-* (ItemPermissionModeCard...)
 import { ShieldCheck, Users, AlertTriangle, Check, Plus, Mail, Trash2 } from "lucide-react";
 import { C } from "../constants/theme.ts";
 import { supabase } from "../lib/supabaseClient.ts";

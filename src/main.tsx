@@ -17,14 +17,19 @@ import "./styles/lotus-components.css";
 import "./styles/lotus-responsive.css";
 import "./styles/lotus-art.css";
 import "./styles/lotus-shell.css";
-import "./styles/catalog-workspace.css";
 import "./features/today/today.css";
-import "./features/progress/progress.css";
-import "./features/catalog/catalog.css";
 import "./features/monitoring/monitoring.css";
-import "./features/monitoring/long-mon-race.css";
 import "./features/overview/overview-executive.css";
 import "./features/analysis/analysis.css";
+/* B5 (31/08): CSS của màn LAZY đã rời entry — Vite tự sinh CSS chunk theo
+ * route, ai không mở màn đó không phải tải/parse:
+ *   long-mon-race.css      → pages/TimelinePage.tsx
+ *   progress.css           → pages/UpdatePage.tsx
+ *   catalog.css            → pages/CatalogPage.tsx + components/catalog/CatalogObjectForm.tsx
+ *   catalog-workspace.css  → features/catalogWorkspace/CatalogWorkspaceShell.tsx
+ *                            + pages/PhanQuyenPage.tsx + CatalogObjectForm.tsx
+ * Bốn file trên (today/monitoring/overview-executive/analysis) ở lại vì
+ * được màn EAGER dùng (Today mặc định, nav monitoring, Overview, .reg-*). */
 
 /* Đặt ngôn ngữ thị giác và chế độ sáng/tối TRƯỚC khi React mount — nếu để
    trong component thì trang sẽ loé bảng màu cũ một nhịp rồi mới nhảy. */
