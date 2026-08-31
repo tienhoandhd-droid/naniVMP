@@ -209,7 +209,7 @@ function groupRows(activities: Activity[], dimension: string): GroupRow[] {
       || a.label.localeCompare(b.label, "vi"));
 }
 
-function DimensionTable({ activities, dimension }: {
+export function DimensionTable({ activities, dimension }: {
   activities: Activity[]; dimension: string;
 }) {
   const rows = useMemo(() => groupRows(activities, dimension), [activities, dimension]);
@@ -222,7 +222,7 @@ function DimensionTable({ activities, dimension }: {
 
   return (
     <Card variant="strong">
-      <CardTitle icon={Users} sub={subtitle}>{title}</CardTitle>
+      <CardTitle level={3} icon={Users} sub={subtitle}>{title}</CardTitle>
 
       {rows.length ? (
         <div className="completion-table-scroll" style={{ overflowX: "auto" }}>
@@ -232,17 +232,18 @@ function DimensionTable({ activities, dimension }: {
             borderCollapse: "separate",
             borderSpacing: "0 8px",
           }}>
+            <caption className="lp-visually-hidden">So sánh tiến độ hoàn thành theo {activeDimension.label.toLowerCase()}</caption>
             <thead>
               <tr>
-                <th style={TH}>{activeDimension.head}</th>
-                {!isExecutionDepartment && <th style={TH}>Hạng mục</th>}
-                {METRICS.map((metric) => <th key={metric.id} style={TH}>{metric.short}</th>)}
+                <th scope="col" style={TH}>{activeDimension.head}</th>
+                {!isExecutionDepartment && <th scope="col" style={TH}>Hạng mục</th>}
+                {METRICS.map((metric) => <th key={metric.id} scope="col" style={TH}>{metric.short}</th>)}
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.key} className="vmp-row">
-                  <td style={{ ...TD, borderRadius: "14px 0 0 14px", minWidth: 200 }}>
+                  <th scope="row" style={{ ...TD, borderRadius: "14px 0 0 14px", minWidth: 200 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {row.deptId ? (
                         <div style={{
@@ -266,7 +267,7 @@ function DimensionTable({ activities, dimension }: {
                       )}
                       <span style={{ color: C.plum, fontSize: 14, fontWeight: 800 }}>{row.label}</span>
                     </div>
-                  </td>
+                  </th>
                   {!isExecutionDepartment && (
                     <td style={{ ...TD, fontFamily: NUM, fontSize: 14, fontWeight: 800, color: C.plum }}>
                       {row.activities.length}
@@ -543,7 +544,7 @@ export default function CompletionDashboard({ acts, matrix }: {
         <div data-analysis-comparison data-analysis-comparison-panel={comparisonMode}>
           {comparisonMode === "validationType" ? (
             <Card variant="strong">
-              <CardTitle icon={ClipboardCheck} sub="Hoàn thành được xác định theo trạng thái VMP của từng hạng mục">
+              <CardTitle level={3} icon={ClipboardCheck} sub="Hoàn thành được xác định theo trạng thái VMP của từng hạng mục">
                 Tỷ lệ hoàn thành từng loại thẩm định
               </CardTitle>
               {klLoai && <CauKetLuan chinh={klLoai.chinh} phu={klLoai.phu} tone={klLoai.tone} />}

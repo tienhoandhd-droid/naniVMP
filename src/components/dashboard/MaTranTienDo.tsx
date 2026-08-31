@@ -297,7 +297,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
       <Card variant="strong" cls="analysis-matrix__card">
         <div className="analysis-matrix__masthead">
-          <CardTitle icon={LayoutGrid}
+          <CardTitle level={3} icon={LayoutGrid}
             sub="Màu theo trạng thái nặng nhất trong ô · bấm ô để xem danh sách hạng mục"
             right={(
               <div className="analysis-quality-badge" data-analysis-quality-badge
@@ -365,6 +365,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
         <div className="vmp-scroll analysis-matrix-scroll" data-analysis-matrix-table style={{ overflowX: "auto" }}>
           <table className="analysis-matrix-table" style={{ minWidth: cot === "giai_doan" ? 720 : 1120 }}>
+            <caption className="lp-visually-hidden">Ma trận trạng thái theo {TRUC.find((t) => t.id === truc)?.ten.toLowerCase()} và {cot === "giai_doan" ? "giai đoạn" : "tháng"}</caption>
             <thead>
               <tr>
                 <th scope="col" className="analysis-matrix-table__head analysis-matrix-table__corner">
@@ -407,7 +408,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
       <div className="analysis-matrix__hotspots">
         <Card variant="soft" cls="analysis-matrix__hotspot-card">
-          <CardTitle icon={Flame} sub="Nhiều hạng mục trễ, nhiều ô thiếu dữ liệu, điểm rủi ro cao">
+          <CardTitle level={3} icon={Flame} sub="Nhiều hạng mục trễ, nhiều ô thiếu dữ liệu, điểm rủi ro cao">
             Đối tượng cần chú ý nhất
           </CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>

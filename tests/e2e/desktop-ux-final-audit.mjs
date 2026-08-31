@@ -27,7 +27,7 @@ const supabaseUrl = process.env.VMP_E2E_SUPABASE_URL || (() => {
 })();
 
 if (!supabaseUrl) throw new Error("Không tìm thấy Supabase URL công khai cho desktop UX audit");
-if (requestedCase && !["foundation", "interactions"].includes(requestedCase)) {
+if (requestedCase && !["foundation", "interactions", "semantics"].includes(requestedCase)) {
   throw new Error(`Không có desktop UX audit case: ${requestedCase}`);
 }
 
@@ -270,6 +270,26 @@ try {
     page.off("request", countRecalcRequest);
     assert.equal(recalcRequests, 1, "two synchronous confirms must start one recalculation only");
     console.log("✓ interactions desktop UX audit mở xác nhận trong ứng dụng");
+  }
+
+  if (!requestedCase || requestedCase === "semantics") {
+    for (const route of ["overview", "inventory"]) {
+      await page.goto(`${APP_URL}#v=${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await page.waitForSelector("h1", { timeout: 15_000 });
+      await page.waitForSelector("h2", { timeout: 15_000 });
+      const headings = await page.evaluate(() => ({
+        h1: document.querySelectorAll("h1").length,
+        h2: [...document.querySelectorAll("h2")]
+          .filter((element) => {
+            const style = getComputedStyle(element);
+            return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
+          })
+          .map((element) => element.textContent?.trim()),
+      }));
+      assert.equal(headings.h1, 1, `${route} must expose one route h1`);
+      assert.ok(headings.h2.length > 0, `${route} must expose a discoverable h2 section heading`);
+    }
+    console.log("✓ semantics desktop UX audit exposes route heading hierarchy");
   }
 } finally {
   await browser.close();

@@ -114,6 +114,31 @@ function quat(r0: number, r1: number, a0: number, a1: number): string {
 /** Góc bắt đầu của một tháng — tháng 1 ở đỉnh vòng, chạy theo chiều kim đồng hồ. */
 const gocThang = (i: number): number => -90 + i * 30;
 
+export function VongNamTable({ months }: { months: readonly OThangNam[] }) {
+  return (
+    <table>
+      <caption className="lp-visually-hidden">Tiến độ thẩm định theo tháng</caption>
+      <thead>
+        <tr><th scope="col">Tháng</th><th scope="col">Đến hạn</th><th scope="col">Đã xong</th><th scope="col">Tỉ lệ</th><th scope="col">Trạng thái</th></tr>
+      </thead>
+      {/* Không tô đỏ dòng nào: bảy trên mười hai tháng đã qua đều còn
+          việc, tô hết thì đỏ không còn là tín hiệu. Cột trạng thái đã
+          nói đủ. */}
+      <tbody>
+        {months.map((x) => (
+          <tr key={x.thang}>
+            <th scope="row">{MONTHS[x.thang]}</th>
+            <td className="tnum">{x.tong}</td>
+            <td className="tnum">{x.xong}</td>
+            <td className="tnum">{x.tong ? `${Math.round((x.xong / x.tong) * 100)}%` : "—"}</td>
+            <td>{x.daQua ? "Đã qua" : x.dangChay ? "Đang chạy" : "Chưa tới hạn"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: {
   acts: Activity[];
   /** Tỉ lệ hoàn thành VMP in giữa vòng — dùng chung phép đếm với KPI trang. */
@@ -294,25 +319,7 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
 
       {bang && (
         <div className="vmp-ctrl-bang vmp-scroll">
-          <table>
-            <thead>
-              <tr><th>Tháng</th><th>Đến hạn</th><th>Đã xong</th><th>Tỉ lệ</th><th>Trạng thái</th></tr>
-            </thead>
-            {/* Không tô đỏ dòng nào: bảy trên mười hai tháng đã qua đều còn
-                việc, tô hết thì đỏ không còn là tín hiệu. Cột trạng thái đã
-                nói đủ. */}
-            <tbody>
-              {o.map((x) => (
-                <tr key={x.thang}>
-                  <td>{MONTHS[x.thang]}</td>
-                  <td className="tnum">{x.tong}</td>
-                  <td className="tnum">{x.xong}</td>
-                  <td className="tnum">{x.tong ? `${Math.round((x.xong / x.tong) * 100)}%` : "—"}</td>
-                  <td>{x.daQua ? "Đã qua" : x.dangChay ? "Đang chạy" : "Chưa tới hạn"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <VongNamTable months={o} />
         </div>
       )}
     </div>

@@ -93,6 +93,51 @@ function OMoc({ raw, dlKey, ngayKey, ttKey }: {
   );
 }
 
+export function CatalogMilestonesTable({ items, dupYears, readOnly, onQuickDone, onEdit }: {
+  items: Activity[];
+  dupYears: Set<string>;
+  readOnly: boolean;
+  onQuickDone: (activity: Activity) => void;
+  onEdit: (activity: Activity) => void;
+}) {
+  return (
+    <table className="catalog-milestones" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
+      <caption className="lp-visually-hidden">Mốc tiến độ theo lần thẩm định</caption>
+      <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
+        {["Năm", "ID", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} scope="col" style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+      </tr></thead>
+      <tbody>
+        {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
+          <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: dup ? C.raspSoft : (i % 2 ? C.surfaceSunk : "transparent") }}>
+            <th scope="row" style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: dup ? C.raspText : C.plum, fontSize: 12, whiteSpace: "nowrap" }}>{yearOf(a)}{dup && <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, color: C.raspText }}>⚠</span>}</th>
+            <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</td>
+            <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_de_cuong" ngayKey="ngay_de_cuong" ttKey="tt_de_cuong" />
+            <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_tham_dinh" ngayKey="ngay_tham_dinh" ttKey="tt_tham_dinh" />
+            <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_bao_cao" ngayKey="ngay_bao_cao" ttKey="tt_bao_cao" />
+            <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_vmp" ngayKey="ngay_vmp" ttKey="tt_vmp" />
+            <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{txt(a.owner)}</td>
+            <td style={{ padding: "9px 12px", textAlign: "center" }}><Pill s={a.st} small /></td>
+            <td style={{ padding: "9px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
+              {!readOnly && a.st !== "done" && (
+                <button onClick={() => onQuickDone(a)}
+                  title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
+                  style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.mint}`,
+                    background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12,
+                    fontWeight: 800, cursor: "pointer", marginRight: 6 }}>
+                  ✓ Xong bước
+                </button>
+              )}
+              <button onClick={() => onEdit(a)} disabled={readOnly}
+                title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
+                style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={12} /> {readOnly ? "Chỉ đọc" : "Cập nhật"}</button>
+            </td>
+          </tr>
+        ); })}
+      </tbody>
+    </table>
+  );
+}
+
 export default function CatalogView({ objects = [], acts = [], authorizationRevision, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = false, onMoDanhMuc, canAssignWorkshop }: {
   objects?: VmpObject[];
   acts?: Activity[];
@@ -379,39 +424,9 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                         )}
                       </div>
                       <div className="vmp-scroll catalog-table-scroll">
-                        <table className="catalog-milestones" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
-                          <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
-                            {["Năm", "ID", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "QA", "Chung", ""].map((h, i) => <th key={i} style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
-                          </tr></thead>
-                          <tbody>
-                            {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
-                              <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: dup ? C.raspSoft : (i % 2 ? C.surfaceSunk : "transparent") }}>
-                                <td style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: dup ? C.raspText : C.plum, fontSize: 12, whiteSpace: "nowrap" }}>{yearOf(a)}{dup && <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, color: C.raspText }}>⚠</span>}</td>
-                                <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</td>
-                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_de_cuong" ngayKey="ngay_de_cuong" ttKey="tt_de_cuong" />
-                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_tham_dinh" ngayKey="ngay_tham_dinh" ttKey="tt_tham_dinh" />
-                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_bao_cao" ngayKey="ngay_bao_cao" ttKey="tt_bao_cao" />
-                                <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_vmp" ngayKey="ngay_vmp" ttKey="tt_vmp" />
-                                <td style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{txt(a.owner)}</td>
-                                <td style={{ padding: "9px 12px", textAlign: "center" }}><Pill s={a.st} small /></td>
-                                <td style={{ padding: "9px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
-                                  {!readOnly && a.st !== "done" && (
-                                    <button onClick={() => { setEdit(a); setQuick(true); }}
-                                      title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
-                                      style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.mint}`,
-                                        background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12,
-                                        fontWeight: 800, cursor: "pointer", marginRight: 6 }}>
-                                      ✓ Xong bước
-                                    </button>
-                                  )}
-                                  <button onClick={() => { if (!readOnly) { setEdit(a); setQuick(false); } }} disabled={readOnly}
-                                    title={readOnly ? "Đang ở chế độ chỉ đọc" : "Cập nhật tiến độ"}
-                                    style={{ ...btnPrimary, padding: "6px 12px", borderRadius: 8, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, opacity: readOnly ? 0.55 : 1, cursor: readOnly ? "not-allowed" : "pointer" }}><Pencil size={12} /> {readOnly ? "Chỉ đọc" : "Cập nhật"}</button>
-                                </td>
-                              </tr>
-                            ); })}
-                          </tbody>
-                        </table>
+                        <CatalogMilestonesTable items={items} dupYears={dupYears} readOnly={readOnly}
+                          onQuickDone={(activity) => { setEdit(activity); setQuick(true); }}
+                          onEdit={(activity) => { if (!readOnly) { setEdit(activity); setQuick(false); } }} />
                       </div>
                     </div>
                   ))}
