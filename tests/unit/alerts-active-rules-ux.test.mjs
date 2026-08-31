@@ -46,7 +46,11 @@ test("alert row keeps detail and email as separate native controls", async () =>
   }));
 
   assert.equal((html.match(/<button\b/g) || []).length, 1, "only the detail action is a button");
-  assert.match(html, /<button[^>]*type="button"[^>]*aria-label="Xem chi tiết cảnh báo PQ-001"/);
+  const detailButton = html.match(/<button\b[^>]*>([\s\S]*?)<\/button>/)?.[0] || "";
+  assert.doesNotMatch(detailButton, /aria-label=/, "the native visible text must remain the accessible name");
+  assert.match(detailButton, /Nồi hấp thử nghiệm/, "the detail name must identify the affected item");
+  assert.match(detailButton, /Thẩm định/, "the detail name must retain the alert stage");
+  assert.match(detailButton, /Tới hạn/, "the detail name must retain the alert context");
   assert.match(html, /<a[^>]*href="mailto:qa@example\.test\?subject=/);
   assert.doesNotMatch(html, /role="button"[^>]*>[\s\S]*?href="mailto:/);
 });

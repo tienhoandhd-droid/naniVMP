@@ -236,6 +236,7 @@ export default function CatalogRecordDialog({
       icon={Boxes}
       maxWidth={laTaoMoi ? 620 : 940}
       onRequestClose={requestClose}
+      dismissDisabled={dangLuu}
       footer={
         <>
           <button type="button" onClick={requestClose} disabled={dangLuu}

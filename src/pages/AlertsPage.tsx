@@ -110,7 +110,7 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
   return (
     <div className="vmp-row vmp-lift"
       style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${edge}` }}>
-      <button type="button" onClick={() => onOpen(r)} aria-label={`Xem chi tiết cảnh báo ${r.a.id}`}
+      <button type="button" onClick={() => onOpen(r)}
         title="Bấm để xem timeline các mốc hạn"
         style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, padding: 0,
           border: "none", background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer", fontFamily: TEXT }}>

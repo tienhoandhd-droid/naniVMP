@@ -35,6 +35,10 @@ export interface ViewportDialogProps {
   icon?: LucideIcon;
   maxWidth?: number;
   onRequestClose: (reason: ViewportDialogCloseReason) => void;
+  /** Khóa mọi lối đóng do người dùng khởi tạo khi mutation đang chạy.
+   *  Caller vẫn giữ coordinator đồng bộ riêng để chặn cửa sổ race trước
+   *  khi React kịp render trạng thái disabled. */
+  dismissDisabled?: boolean;
   footer?: ReactNode;
   children?: ReactNode;
   /** Trả tiêu điểm về đây khi đóng. Không truyền thì tự nhớ phần tử đang
@@ -89,9 +93,18 @@ function traLaiNen() {
   tranCu = null;
 }
 
+/** `completed` là lối đóng do caller xác nhận sau mutation; ba lối người
+ * dùng có thể kích hoạt trực tiếp phải bị primitive chặn khi đang bận. */
+export function canRequestViewportDialogClose(
+  dismissDisabled: boolean,
+  reason: ViewportDialogCloseReason,
+): boolean {
+  return !dismissDisabled || reason === "completed";
+}
+
 export default function ViewportDialog({
   open, title, description, icon: Icon, maxWidth = 560,
-  onRequestClose, footer, children, returnFocusRef,
+  onRequestClose, dismissDisabled = false, footer, children, returnFocusRef,
 }: ViewportDialogProps) {
   const uid = useId().replace(/:/g, "");
   const idTieuDe = `lp-dialog-title-${uid}`;
@@ -114,6 +127,9 @@ export default function ViewportDialog({
     return Array.from(p.querySelectorAll<HTMLElement>(CHON_FOCUS))
       .filter((el) => el.offsetParent !== null || el === document.activeElement);
   }, []);
+  const requestDismiss = useCallback((reason: ViewportDialogCloseReason) => {
+    if (canRequestViewportDialogClose(dismissDisabled, reason)) onRequestClose(reason);
+  }, [dismissDisabled, onRequestClose]);
 
   /* --- Vòng đời: làm trơ nền, bẫy tiêu điểm, trả tiêu điểm ----------- */
   useEffect(() => {
@@ -158,7 +174,7 @@ export default function ViewportDialog({
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.stopPropagation(); onRequestClose("escape"); return; }
+      if (e.key === "Escape") { e.stopPropagation(); requestDismiss("escape"); return; }
       if (e.key !== "Tab") return;
 
       const ds = dsFocus();
@@ -169,14 +185,14 @@ export default function ViewportDialog({
     };
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
-  }, [open, onRequestClose, dsFocus]);
+  }, [open, requestDismiss, dsFocus]);
 
   if (!open) return null;
 
   const noiDung = (
     <div
       className="lp-dialog"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onRequestClose("backdrop"); }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) requestDismiss("backdrop"); }}
     >
       <div
         ref={panelRef}
@@ -196,8 +212,9 @@ export default function ViewportDialog({
               {description && <p id={idMoTa} className="lp-dialog__desc">{description}</p>}
             </div>
           </div>
-          <button type="button" className="lp-dialog__close" aria-label="Đóng"
-            onClick={() => onRequestClose("button")}>
+          <button type="button" className={`lp-dialog__close${dismissDisabled ? " lp-dialog__close--disabled" : ""}`}
+            aria-label="Đóng" aria-disabled={dismissDisabled} disabled={dismissDisabled}
+            onClick={() => requestDismiss("button")}>
             <X size={18} />
           </button>
         </header>

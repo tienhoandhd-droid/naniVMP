@@ -204,7 +204,8 @@ test("in-flight guard allows exactly one mutation and locks dialog close and sub
   closeCatalogImpactIfIdle(coordinator.isBusy, () => { closed += 1; });
   assert.equal(closed, 0, "a close click racing React's rerender must still be locked");
   const html = renderContent({ applying: true, reason: input.reason, selected, confirmed: true });
-  assert.match(html, /aria-label="Đóng"/);
+  assert.match(html, /class="lp-dialog__close lp-dialog__close--disabled"/);
+  assert.match(html, /aria-label="Đóng"[^>]*aria-disabled="true"[^>]*disabled=""/);
   assert.match(html, />Để sau<\/button>/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>[\s\S]*Đang áp…<\/button>/);
   resolve();

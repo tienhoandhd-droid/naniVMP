@@ -958,22 +958,34 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   const modalOverChat = await trang.evaluate(() => {
     const panel = document.querySelector(".lp-dialog__panel");
     const footer = panel?.querySelector(".lp-dialog__footer");
-    if (!(panel instanceof HTMLElement) || !(footer instanceof HTMLElement)) return { shared: false, topAtFooter: false, tabStaysInside: false };
-    const box = footer.getBoundingClientRect();
-    const target = document.elementFromPoint(box.left + Math.min(20, box.width / 2), box.top + Math.min(20, box.height / 2));
+    const chat = document.querySelector(".vmp-chat-panel");
+    if (!(panel instanceof HTMLElement) || !(footer instanceof HTMLElement) || !(chat instanceof HTMLElement)) {
+      return { shared: false, intersectsChatAtRightEdge: false, topAtIntersection: false, tabStaysInside: false };
+    }
+    const footerBox = footer.getBoundingClientRect();
+    const chatBox = chat.getBoundingClientRect();
+    const left = Math.max(footerBox.left, chatBox.left);
+    const right = Math.min(footerBox.right, chatBox.right);
+    const top = Math.max(footerBox.top, chatBox.top);
+    const bottom = Math.min(footerBox.bottom, chatBox.bottom);
+    const intersectsChatAtRightEdge = right > left && bottom > top && right >= footerBox.right - 1;
+    const target = intersectsChatAtRightEdge
+      ? document.elementFromPoint(right - 1, top + Math.min(20, bottom - top - 1))
+      : null;
     const focusable = [...panel.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
     const first = focusable[0];
     const last = focusable.at(-1);
     if (last instanceof HTMLElement) last.focus();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
     return {
-      shared: !!document.querySelector(".vmp-chat-panel"),
-      topAtFooter: target?.closest(".lp-dialog") !== null,
+      shared: true,
+      intersectsChatAtRightEdge,
+      topAtIntersection: target instanceof Element && target.closest(".lp-dialog__footer") !== null,
       tabWrapsToFirst: document.activeElement === first,
     };
   });
-  kiem(modalOverChat.shared && modalOverChat.topAtFooter && modalOverChat.tabWrapsToFirst,
-    "preview mở khi chat đang mở, phủ chat và Tab vòng trong hộp", JSON.stringify(modalOverChat));
+  kiem(modalOverChat.shared && modalOverChat.intersectsChatAtRightEdge && modalOverChat.topAtIntersection && modalOverChat.tabWrapsToFirst,
+    "preview giao với chat tại mép phải footer, footer phủ trên chat và Tab vòng trong hộp", JSON.stringify(modalOverChat));
 
   const preview = await trang.evaluate((label) => {
     const candidate = [...document.querySelectorAll('input[type="checkbox"]')]

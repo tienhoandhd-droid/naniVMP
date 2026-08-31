@@ -174,6 +174,7 @@ export function CatalogImpactPreviewContent({ preview, loading, error, reason, r
     description="Danh mục đã lưu rồi. Timeline chỉ đổi sau khi bạn xác nhận ở đây."
     maxWidth={880}
     onRequestClose={close}
+    dismissDisabled={applying}
     footer={<>
       <button type="button" onClick={close} disabled={applying} style={{ padding: "10px 16px", borderRadius: 12, cursor: applying ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plum }}>Để sau</button>
       <button type="button" onClick={onApply} disabled={applying || loading || !canApply.ok} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 12, cursor: applying || loading || !canApply.ok ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 800, border: "none", background: applying || loading || !canApply.ok ? C.pinkSoft : C.pink, color: applying || loading || !canApply.ok ? C.plumSoft : "#fff" }}><Check size={16} /> {applying ? "Đang áp…" : "Áp vào timeline"}</button>

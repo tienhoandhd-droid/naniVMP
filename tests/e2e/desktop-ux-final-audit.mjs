@@ -52,6 +52,12 @@ const rgb = (value) => {
   return parts.slice(0, 3).map((part) => part * multiplier);
 };
 
+async function establishDesktopViewport(page, auditCase) {
+  await page.setViewport({ width: 1440, height: 1000 });
+  const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  assert.deepEqual(viewport, { width: 1440, height: 1000 }, `${auditCase} audit must run at the desktop viewport`);
+}
+
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: "new",
@@ -62,9 +68,9 @@ try {
   const page = await browser.newPage();
   await caiGiaLap(page, { supabaseUrl, kichBan: "day", previewOrigin: APP_URL });
   await nhetPhien(page, { supabaseUrl });
-  await page.setViewport({ width: 1440, height: 1000 });
 
   if (!requestedCase || requestedCase === "foundation") {
+  await establishDesktopViewport(page, "foundation");
   await page.goto(`${APP_URL}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector(".monitoring-journey__item.is-active", { timeout: 15_000 });
   const overview = await page.evaluate(() => {
@@ -214,6 +220,7 @@ try {
   }
 
   if (!requestedCase || requestedCase === "interactions") {
+    await establishDesktopViewport(page, "interactions");
     await page.goto(`${APP_URL}#v=rules`, { waitUntil: "domcontentloaded", timeout: 30_000 });
     await page.waitForFunction(
       () => [...document.querySelectorAll("button")].some((button) => button.textContent?.includes("Chấm lại")),
@@ -273,6 +280,7 @@ try {
   }
 
   if (!requestedCase || requestedCase === "semantics") {
+    await establishDesktopViewport(page, "semantics");
     for (const route of ["overview", "inventory"]) {
       await page.goto(`${APP_URL}#v=${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await page.waitForSelector("h1", { timeout: 15_000 });

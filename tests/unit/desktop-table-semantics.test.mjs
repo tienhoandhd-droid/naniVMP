@@ -113,6 +113,18 @@ test("Catalog milestones use each validation ID as the unique row header", async
   assert.equal(new Set(rowHeaders).size, 2, "duplicate-year rows must retain unique row headers");
 });
 
+test("Catalog milestones row headers retain the prior left-aligned transparent row treatment", async () => {
+  const catalog = await moduleFor("/src/pages/CatalogPage.tsx");
+  const html = render(catalog.CatalogMilestonesTable, {
+    items: [activity], dupYears: new Set(), readOnly: false,
+    onQuickDone: () => {}, onEdit: () => {},
+  });
+  const rowHeader = tableMarkup(html, "Catalog milestones").match(/<th\b(?=[^>]*scope="row")[^>]*>/)?.[0] || "";
+
+  assert.match(rowHeader, /text-align:left/, "row headers must not inherit UA centering");
+  assert.match(rowHeader, /background:transparent/, "row headers must preserve their parent row background");
+});
+
 test("completion comparison table exposes its name and header relationships", async () => {
   const completion = await moduleFor("/src/components/dashboard/CompletionDashboard.tsx");
   assert.equal(typeof completion.DimensionTable, "function", "Completion comparison must be renderable for semantic coverage");

@@ -599,7 +599,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   if (contentState !== "content") {
     const isError = contentState === "error";
     return (
-      <ViewportDialog open onRequestClose={requestClose} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
+      <ViewportDialog open onRequestClose={requestClose} dismissDisabled={savingWho || savingProgress} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
         footer={(
           <button onClick={requestClose} style={{ ...btnPrimary, background: C.surface, color: C.plum,
             border: `1.5px solid ${C.pinkSoft}` }}>Đóng</button>
@@ -625,7 +625,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     );
   }
   return (
-    <ViewportDialog open onRequestClose={requestClose} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
+    <ViewportDialog open onRequestClose={requestClose} dismissDisabled={savingWho || savingProgress} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
       footer={(
         <div style={{ display: "flex", gap: 12 }}>
           <button onClick={requestClose} disabled={savingWho || savingProgress} style={{ flex: 1, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: savingWho || savingProgress ? "not-allowed" : "pointer", opacity: savingWho || savingProgress ? 0.55 : 1 }}>Hủy</button>

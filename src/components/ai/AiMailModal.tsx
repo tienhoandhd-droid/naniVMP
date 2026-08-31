@@ -176,6 +176,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
   return (
     <ViewportDialog open onRequestClose={requestClose} maxWidth={620} icon={Mail}
       title={`Gửi bản phân tích AI · ${AI_NHAN[loai].toLowerCase()}`}
+      dismissDisabled={dangGui}
       footer={(
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
           <button onClick={requestClose} disabled={dangGui} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,

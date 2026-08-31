@@ -110,7 +110,7 @@ export function CatalogMilestonesTable({ items, dupYears, readOnly, onQuickDone,
         {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
           <tr key={a.id} style={{ borderTop: `1px solid ${C.pinkSoft}`, background: dup ? C.raspSoft : (i % 2 ? C.surfaceSunk : "transparent") }}>
             <td style={{ padding: "9px 14px", fontFamily: NUM, fontWeight: 800, color: dup ? C.raspText : C.plum, fontSize: 12, whiteSpace: "nowrap" }}>{yearOf(a)}{dup && <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, color: C.raspText }}>⚠</span>}</td>
-            <th scope="row" style={{ padding: "9px 12px", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</th>
+            <th scope="row" style={{ padding: "9px 12px", textAlign: "left", background: "transparent", color: C.plumSoft, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{a.id}</th>
             <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_de_cuong" ngayKey="ngay_de_cuong" ttKey="tt_de_cuong" />
             <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_tham_dinh" ngayKey="ngay_tham_dinh" ttKey="tt_tham_dinh" />
             <OMoc raw={(a._raw || {}) as Record<string, unknown>} dlKey="dl_bao_cao" ngayKey="ngay_bao_cao" ttKey="tt_bao_cao" />

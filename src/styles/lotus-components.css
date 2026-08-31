@@ -564,6 +564,9 @@
 
 .lp-dialog__close:hover { background: var(--lp-surface-2); color: var(--lp-ink); }
 .lp-dialog__close:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+.lp-dialog__close--disabled,
+.lp-dialog__close:disabled { cursor: not-allowed; opacity: .55; }
+.lp-dialog__close:disabled:hover { background: var(--lp-surface); color: var(--lp-ink-muted); }
 
 .lp-dialog__body {
   flex: 1 1 auto;
