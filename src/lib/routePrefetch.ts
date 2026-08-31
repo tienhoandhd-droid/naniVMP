@@ -1,4 +1,3 @@
-import { nhapCoThuLai } from "./tailMan.ts";
 import type { ScreenId } from "./access.ts";
 
 export interface DesktopPrefetchContext {
@@ -38,10 +37,17 @@ function currentContext(): DesktopPrefetchContext {
 }
 
 /** Nạp trước đúng một chunk route sau intent desktop (hover/focus). */
+export function prefetchRouteLoader(load: () => Promise<unknown>): void {
+  /* Intent prefetch không phải điều hướng thật. Chunk cũ/hỏng tại đây không
+   * được reload trang và cũng không được tạo unhandled rejection; React.lazy
+   * vẫn bọc import khi người dùng thực sự chọn màn. */
+  void load().catch(() => {});
+}
+
 export function prefetchDesktopRoute(screenId: ScreenId): void {
   const context = currentContext();
   if (!canPrefetchDesktopRoute(screenId, context)) return;
   const load = DESKTOP_ROUTE_IMPORTS[screenId];
   if (!load) return;
-  void nhapCoThuLai(load)();
+  prefetchRouteLoader(load);
 }

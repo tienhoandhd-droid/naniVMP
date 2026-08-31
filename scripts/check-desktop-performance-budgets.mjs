@@ -61,11 +61,17 @@ export function assertWithinBudget(label, actual, budget) {
   }
 }
 
-function findShellEntry(manifest) {
-  const shell = Object.entries(manifest).find(([source, entry]) =>
-    source === "index.html" || entry.isEntry === true);
-  if (!shell) throw new Error("Manifest thiếu entry shell index.html");
-  return shell[0];
+export function routeFilesOutsideShell(manifest, entryKey, shellFiles) {
+  const routeFiles = staticFilesForEntry(manifest, entryKey);
+  return new Set([...routeFiles].filter((file) => !shellFiles.has(file)));
+}
+
+export function findShellEntry(manifest) {
+  if (manifest["index.html"]) return "index.html";
+  const entries = Object.entries(manifest).filter(([, entry]) => entry.isEntry === true);
+  if (entries.length === 1) return entries[0][0];
+  if (entries.length === 0) throw new Error("Manifest không có entry shell");
+  throw new Error("Manifest có nhiều entry shell; cần index.html rõ ràng");
 }
 
 export function checkDesktopPerformanceBudgets({
@@ -79,8 +85,7 @@ export function checkDesktopPerformanceBudgets({
 
   const routes = {};
   for (const [entryKey, budget] of Object.entries(ROUTE_BUDGETS)) {
-    const routeFiles = staticFilesForEntry(manifest, entryKey);
-    const routeDelta = new Set([...routeFiles].filter((file) => !shellFiles.has(file)));
+    const routeDelta = routeFilesOutsideShell(manifest, entryKey, shellFiles);
     const gzip = gzipSizeForFiles(outputDir, routeDelta);
     assertWithinBudget(entryKey, gzip, budget);
     routes[entryKey] = gzip;
