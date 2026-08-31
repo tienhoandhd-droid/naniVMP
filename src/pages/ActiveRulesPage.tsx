@@ -138,16 +138,25 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
   // Lỗi kỹ thuật của Postgres ("permission denied for function …") không nói
   // cho người dùng biết phải làm gì. Dịch ra việc cần làm, giữ nguyên câu gốc
   // ở dòng nhỏ để người hỗ trợ còn tra.
-  if (err || !rules) return (
-    <Card>
-      <StateBoundary
-        state="error"
-        title="Không đọc được luật đang áp dụng"
-        description={err || "Máy chủ không trả về dữ liệu luật."}
-        onRetry={() => { void load(); }}
-      />
-    </Card>
-  );
+  if (err || !rules) {
+    const loiPhienHoacQuyen = /permission denied|401|JWT|not authorized/i.test(err);
+    const huongDan = loiPhienHoacQuyen
+      ? "Phiên đăng nhập đã hết hạn hoặc tài khoản chưa đủ quyền. Đăng nhập lại rồi mở lại trang này."
+      : "Máy chủ không trả về dữ liệu luật. Thử lại sau ít phút; nếu vẫn vậy, gửi chi tiết kỹ thuật bên dưới cho người hỗ trợ.";
+    return (
+      <Card>
+        <StateBoundary
+          state="error"
+          title="Không đọc được luật đang áp dụng"
+          description={<>
+            <span>{huongDan}</span>
+            {err && <><br /><span>Chi tiết kỹ thuật: {err}</span></>}
+          </>}
+          onRetry={() => { void load(); }}
+        />
+      </Card>
+    );
+  }
 
   const dtl = rules.diem_trong_yeu;
   const tl = rules.sinh_timeline;
