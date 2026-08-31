@@ -21,6 +21,8 @@
  *  Không React, không Supabase — `node --test` chạy thẳng.
  * ===================================================================== */
 
+import { mocKeTiep } from "../../lib/hanChot.ts";
+
 export type ProgressIssue =
   | "missing_owner" | "missing_deadline" | "done_without_actual_vmp" | "stage_mismatch";
 
@@ -104,16 +106,17 @@ function coOwnerId(a: ProgressActivityLike): boolean {
   return id !== null && id !== undefined && String(id).trim() !== "";
 }
 
-/** Mốc CHƯA XONG gần nhất — nguồn của "quá hạn". */
+/** Mốc CHƯA XONG gần nhất — nguồn của "quá hạn". Chọn mốc uỷ quyền cho
+ *  mocKeTiep (lib/hanChot.ts, D2 31/08) — cùng một luật với các màn khác. */
 function mocChuaXong(a: ProgressActivityLike): string | null {
   const raw = a._raw ?? {};
-  const ung: Array<string | null | undefined> = [];
-  if (!raw.protocol_done) ung.push(a.dlProtocol);
-  if (!raw.validation_done) ung.push(a.dlValidation);
-  if (!raw.report_done) ung.push(a.dlReport);
-  if (a.st !== "done") ung.push(a.target);
-  const hople = ung.filter((d): d is string => !!d).sort();
-  return hople[0] ?? null;
+  const moc = mocKeTiep([
+    { id: "protocol", hanISO: a.dlProtocol ?? null, xong: !!raw.protocol_done },
+    { id: "validation", hanISO: a.dlValidation ?? null, xong: !!raw.validation_done },
+    { id: "report", hanISO: a.dlReport ?? null, xong: !!raw.report_done },
+    { id: "vmp", hanISO: a.target ?? null, xong: a.st === "done" },
+  ]);
+  return moc?.hanISO ?? null;
 }
 
 function giaiDoanCua(a: ProgressActivityLike): ProgressStageId {

@@ -26,7 +26,11 @@ export const MST = {
 };
 
 // Progress weights by status
-export const PROG = { done: 100, prog: 55, over: 75, todo: 20, plan: 8 };
+/* D3 (31/08): over 75 → 45. Trọng số cũ vẽ hạng mục QUÁ HẠN "tiến bộ hơn"
+ * hạng mục đang làm đúng tiến độ (75 > 55) — con số ước lệ nhưng thứ tự
+ * phải có lý: xong > đang làm > quá hạn (kẹt) > chưa làm > kế hoạch.
+ * Có unit test khoá bất biến thứ tự này (prog-weight.test.mjs). */
+export const PROG = { done: 100, prog: 55, over: 45, todo: 20, plan: 8 };
 
 // ======================== CLASSIFICATIONS ========================
 export const CLS = {

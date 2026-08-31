@@ -2,6 +2,7 @@
  *  utils/helpers.js — Pure utility functions (no React dependency)
  * ===================================================================== */
 import { DEP_DAYS, SOON_DAYS, vmpToday, PROG } from "../constants/vmp.ts";
+import { tinhTrangHan } from "../lib/hanChot.ts";
 
 // ======================== DATE HELPERS ========================
 import type { Activity, AlertInfo, Milestones, VmpObject } from "../types/domain.ts";
@@ -108,11 +109,19 @@ export function nextAlert(act: Activity): AlertInfo | null {
     stage = "Đề cương"; date = m.protocol;
   }
   if (!date) return null;
-  const dleft = daysBetween(date, vmpToday());
-  let kind: AlertInfo["kind"] = null;
-  if (dleft < 0) kind = "over";
-  else if (dleft <= SOON_DAYS) kind = "soon";
+  /* D2 (31/08): số học ngày uỷ quyền cho lib/hanChot.ts — cùng một phép so
+     Bangkok với Timeline/Tiến độ. Map: overdue→over; today/soon→soon. */
+  const tt = tinhTrangHan(isoLocal(date), new Date(), SOON_DAYS);
+  if (tt.kind === "missing") return null;
+  const dleft = tt.daysRemaining as number;
+  const kind: AlertInfo["kind"] = tt.kind === "overdue" ? "over"
+    : tt.kind === "future" ? null : "soon";
   return { stage, date, dleft, kind };
+}
+
+/** Date local-midnight → chuỗi ISO y-m-d (mốc do milestones() sinh). */
+function isoLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 // ======================== STATUS HELPERS ========================

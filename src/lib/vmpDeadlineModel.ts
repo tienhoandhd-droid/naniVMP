@@ -1,5 +1,6 @@
 import type { Activity } from "../types/domain.ts";
 import { wlIsDone } from "../utils/helpers.ts";
+import { ngayLichBangkok, tinhTrangHan } from "./hanChot.ts";
 
 export type VmpDeadlineKind = "done" | "missing" | "overdue" | "today" | "soon" | "future";
 
@@ -11,8 +12,8 @@ export interface VmpDeadlineState {
 
 type ActivityRecord = Record<string, unknown>;
 
-const DAY_MS = 86_400_000;
-const BANGKOK_OFFSET_MS = 7 * 3_600_000;
+/* Hằng múi giờ đã DỜI về lib/hanChot.ts (D2, 31/08) — một nguồn sự thật
+ * cho phép so "hạn vs hôm nay"; file này chỉ còn ngữ nghĩa mốc VMP. */
 
 function recordOf(activity: Activity): ActivityRecord {
   return (activity && typeof activity === "object" ? activity : {}) as ActivityRecord;
@@ -77,13 +78,10 @@ export function isVmpComplete(activity: Activity): boolean {
   return wlIsDone(firstValue(activity, ["tt_vmp", "status_vmp"]));
 }
 
-/** Converts a real instant to its Bangkok calendar date without host-timezone truncation. */
+/** Converts a real instant to its Bangkok calendar date without host-timezone truncation.
+ *  Uỷ quyền cho hanChot.ts (D2) — giữ tên export vì ~10 nơi đang import. */
 export function bangkokCalendarDate(now: Date): string {
-  return new Date(now.getTime() + BANGKOK_OFFSET_MS).toISOString().slice(0, 10);
-}
-
-function daysBetween(date: string, today: string): number {
-  return Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS);
+  return ngayLichBangkok(now);
 }
 
 export function classifyVmpDeadline(
@@ -96,10 +94,7 @@ export function classifyVmpDeadline(
     return { kind: "done", date, daysRemaining: null };
   }
   if (date === null) return { kind: "missing", date: null, daysRemaining: null };
-
-  const daysRemaining = daysBetween(date, bangkokCalendarDate(now));
-  if (daysRemaining < 0) return { kind: "overdue", date, daysRemaining };
-  if (daysRemaining === 0) return { kind: "today", date, daysRemaining };
-  if (daysRemaining <= soonDays) return { kind: "soon", date, daysRemaining };
-  return { kind: "future", date, daysRemaining };
+  /* Số học ngày uỷ quyền cho hanChot.ts — cùng một phép so với mọi màn khác. */
+  const { kind, daysRemaining } = tinhTrangHan(date, now, soonDays);
+  return { kind: kind === "missing" ? "missing" : kind, date, daysRemaining };
 }
