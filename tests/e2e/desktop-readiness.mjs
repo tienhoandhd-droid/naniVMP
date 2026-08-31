@@ -133,6 +133,59 @@ try {
     }
   }
 
+  {
+    let store;
+    const page = await browser.newPage();
+    try {
+      await caiGiaLap(page, {
+        supabaseUrl: URL_SB,
+        kichBan: "day",
+        suaKho: (kho) => {
+          store = kho;
+          kho.rpc_due_alerts = (body) => [{
+            validation_code: `SNAPSHOT-${body.p_soon_days}`,
+            validation_type: "PQ",
+            object_code: "OBJ-SNAPSHOT",
+            object_name: "Kiểm tra ngưỡng snapshot",
+            department: "QA",
+            owner_name: "Người kiểm thử",
+            stage: "validation",
+            due_date: "2026-09-01",
+            days_left: body.p_soon_days,
+            alert_type: "due_soon",
+          }];
+        },
+      });
+      await nhetPhien(page, { supabaseUrl: URL_SB });
+      await page.setViewport({ width: 1366, height: 768 });
+      await page.goto(`${GOC}#v=health`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await page.click("#health-tab-server");
+      await page.waitForFunction(() => document.querySelector("main")?.textContent?.includes("SNAPSHOT-7"));
+
+      store.rpc_errors = { rpc_due_alerts: { status: 500, message: "Lỗi đổi ngưỡng" } };
+      await bamNutTheoNhan(page, "30 ngày");
+      await page.waitForSelector('main [role="alert"]');
+      const failed = await page.$eval("main", (main) => ({
+        text: main.textContent ?? "",
+        caption: main.querySelector(".reg-table caption")?.textContent?.trim() ?? "",
+      }));
+      assert.match(failed.text, /Đang hiển thị bản chụp theo ngưỡng 7 ngày/,
+        "refresh ngưỡng lỗi phải nói rõ rows vẫn thuộc snapshot 7 ngày");
+      assert.match(failed.caption, /trong 7 ngày tới/,
+        "caption phải mô tả snapshot đã commit, không mô tả intent 30 ngày bị lỗi");
+      assert.match(failed.text, /SNAPSHOT-7/);
+
+      store.rpc_errors = {};
+      await page.click('main [role="alert"] button');
+      await page.waitForFunction(() => !document.querySelector('main [role="alert"]'));
+      await page.waitForFunction(() => document.querySelector("main")?.textContent?.includes("SNAPSHOT-30"));
+      const recoveredCaption = await page.$eval("main .reg-table caption", (caption) => caption.textContent ?? "");
+      assert.match(recoveredCaption, /trong 30 ngày tới/);
+    } finally {
+      await page.close();
+    }
+  }
+
 
   {
     let store;

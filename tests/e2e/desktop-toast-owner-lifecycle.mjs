@@ -24,13 +24,17 @@ async function clickExact(page, selector, label) {
   if (!clicked) throw new Error(`Không tìm thấy ${selector} có nhãn “${label}”`);
 }
 
-async function createRecoveryToast(page) {
+async function submitRecoveryAction(page) {
   await page.waitForSelector("main .pr-nut-chinh:not([disabled])", { timeout: 15_000 });
   await page.click("main .pr-nut-chinh:not([disabled])");
   await page.waitForSelector('[role="dialog"]');
   await clickExact(page, '[role="dialog"] button', "⊘ Không áp dụng");
   await page.type('[role="dialog"] input[placeholder^="VD: thiết bị"]', "Kiểm tra vòng đời toast");
   await clickExact(page, '[role="dialog"] button', "Xác nhận");
+}
+
+async function createRecoveryToast(page) {
+  await submitRecoveryAction(page);
   await page.waitForSelector('.vmp-toast[data-vmp-toast="loi"] .vmp-toast__hanh-dong');
 }
 
@@ -43,9 +47,11 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   let stateRequests = 0;
+  const delays = { rpc_set_item_state: 0 };
   await caiGiaLap(page, {
     supabaseUrl: URL_SB,
     kichBan: "day",
+    doTre: delays,
     suaKho: (store) => {
       store.rpc_errors = {
         rpc_set_item_state: { status: 500, message: "Lỗi thử toast owner" },
@@ -61,6 +67,27 @@ try {
   await page.setViewport({ width: 1366, height: 768 });
   await page.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
+  delays.rpc_set_item_state = 650;
+  const delayedRequestStarted = new Promise((resolve) => {
+    const observe = (request) => {
+      if (!request.url().includes("/rpc/rpc_set_item_state") || request.method() === "OPTIONS") return;
+      page.off("request", observe);
+      resolve();
+    };
+    page.on("request", observe);
+  });
+  await submitRecoveryAction(page);
+  await delayedRequestStarted;
+  await page.evaluate(() => { location.hash = "#v=alerts"; });
+  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get("v") === "alerts");
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  assert.equal(await page.$(".vmp-toast"), null,
+    "RPC trả lỗi sau khi owner unmount không được tạo toast/action trên route mới");
+  assert.equal(stateRequests, 1, "không có recovery RPC nào tự chạy sau khi owner unmount");
+
+  delays.rpc_set_item_state = 0;
+  await page.evaluate(() => { location.hash = "#v=progress"; });
+  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get("v") === "progress");
   await createRecoveryToast(page);
   const beforeNavigation = stateRequests;
   await page.evaluate(() => { location.hash = "#v=alerts"; });

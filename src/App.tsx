@@ -58,6 +58,7 @@ import {
 } from "./utils/helpers.ts";
 import { useAuth, useVmpData, useDebounce } from "./hooks/index.ts";
 import { useRouteSettlement } from "./hooks/useRouteSettlement.ts";
+import { resolveScreenTitle } from "./lib/screenMetadata.ts";
 import { useAccess, useAccessCacheTransition } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { resolveAuthorizedView, resolveViewIntent } from "./lib/navigationContract.ts";
@@ -149,32 +150,6 @@ import {
   changePasswordErrorMessage,
   type ChangePasswordErrors,
 } from "./lib/passwordForm.ts";
-
-/** Metadata màn hình là authority riêng với menu: alias và route ẩn vẫn có
- * tiêu đề đúng dù không được bày thành một mục điều hướng. `Record<ScreenId>`
- * khiến TypeScript chặn ngay khi thêm màn mà chưa khai metadata. */
-export const SCREEN_TITLES = {
-  today: "Việc hôm nay",
-  overview: "Tổng quan VMP",
-  timeline: "Dòng thời gian VMP",
-  alerts: "Cảnh báo & ưu tiên",
-  risk: "Cảnh báo & ưu tiên",
-  progress: "Cập nhật tiến độ",
-  inventory: "Cập nhật tiến độ",
-  source: "Dữ liệu nguồn",
-  workload: "Phân công & khối lượng",
-  reports: "Báo cáo",
-  rules: "Luật hệ thống đang áp dụng",
-  health: "Chất lượng dữ liệu",
-  audit: "Nhật ký thay đổi",
-  accounts: "Vai trò & phạm vi",
-  admin: "Cấu hình hệ thống",
-  phanquyen: "Vai trò & phạm vi",
-} as const satisfies Record<ScreenId, string>;
-
-export function resolveScreenTitle(screenId: ScreenId): string {
-  return SCREEN_TITLES[screenId];
-}
 
 /* Chụp ý định link trước lần render đầu. React StrictMode dựng shell hai lần
    ở môi trường dev; nếu đọc lại sau mount thứ nhất thì URL đã có thể được

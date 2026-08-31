@@ -44,6 +44,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
   const [issues, setIssues] = useState<ServerQualityIssue[]>([]);
   const [alerts, setAlerts] = useState<DueAlert[]>([]);
   const [soonDays, setSoonDays] = useState(7);
+  const [loadedSoonDays, setLoadedSoonDays] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -61,6 +62,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
       ]);
       if (generation !== loadGeneration.current) return;
       setKpi(k); setIssues(q); setAlerts(a);
+      setLoadedSoonDays(soonDays);
     } catch (e) {
       if (generation !== loadGeneration.current) return;
       setErr((e as Error).message || "Lỗi tải dữ liệu từ server");
@@ -83,6 +85,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
 
   const overdue = alerts.filter((a) => a.alert_type === "overdue");
   const dueSoon = alerts.filter((a) => a.alert_type === "due_soon");
+  const snapshotSoonDays = loadedSoonDays ?? soonDays;
 
   const runRefresh = async () => {
     if (!window.confirm(
@@ -193,12 +196,20 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
           <Tag color={C.marigoldText} bg={C.marigoldSoft}>{dueSoon.length} sắp đến hạn</Tag>
         </div>
 
+        {loadedSoonDays != null && loadedSoonDays !== soonDays && (
+          <p role="status" style={{ margin: "-2px 0 12px", fontSize: 12, fontWeight: 700,
+            color: err ? C.marigoldText : C.plumSoft }}>
+            Đang hiển thị bản chụp theo ngưỡng {loadedSoonDays} ngày.
+            {err ? ` Ngưỡng ${soonDays} ngày chưa tải được.` : ` Đang tải ngưỡng ${soonDays} ngày…`}
+          </p>
+        )}
+
         <TableScroll maxHeight="46vh">
           {/* Bề mặt sổ (analysis.css): kẻ dòng, tiêu đề dính khi cuộn dọc,
               mã thẩm định là tiêu đề dòng và dính khi cuộn ngang. */}
           <table className="reg-table">
             <caption>
-              Hạng mục quá hạn hoặc đến hạn trong {soonDays} ngày tới, máy chủ rà trực tiếp trên DB.
+              Hạng mục quá hạn hoặc đến hạn trong {snapshotSoonDays} ngày tới, máy chủ rà trực tiếp trên DB.
             </caption>
             <thead>
               <tr>

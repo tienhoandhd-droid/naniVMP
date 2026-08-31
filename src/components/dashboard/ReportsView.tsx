@@ -608,29 +608,27 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             luận. Giữ control nhẹ trên route Reports nhưng chỉ tải wrapper
             2D/3D sau cú chọn thật; vì vậy Excel, BanDoNhiet và Canvas không
             chen vào đường tới hành động chính của Báo cáo. */}
-        <div className="vmp-space3d">
-          {!ho3D && <p className="vmp-3d-khong-ho-tro" role="status">
-            Thiết bị này không hỗ trợ chế độ 3D. Dữ liệu đầy đủ vẫn có ở cách hiển thị hai chiều.
-          </p>}
-          <div className="vmp-space3d-doi">
-            {ho3D && <button type="button" data-map-mode="3d"
-              onClick={() => { setCheBanDo("3d"); setHienBanDo(true); }}
-              className={hienBanDo && cheBanDo === "3d" ? "is-chon" : ""}>Xem bản đồ 3D</button>}
-            <button type="button" data-map-mode="2d"
-              onClick={() => { setCheBanDo("2d"); setHienBanDo(true); }}
-              className={cheBanDo === "2d" ? "is-chon" : ""}>Bản đồ tiến độ</button>
-          </div>
-          {hienBanDo ? (
-            <Suspense fallback={<div style={{ height: 380 }} />}>
-              <VmpSpace3D acts={scopedNamActive} nam={ky.year} giamChuyenDong={giamChuyenDong}
-                initialMode={cheBanDo} />
-            </Suspense>
-          ) : (
+        {hienBanDo ? (
+          <Suspense fallback={<div style={{ height: 380 }} />}>
+            <VmpSpace3D acts={scopedNamActive} nam={ky.year} giamChuyenDong={giamChuyenDong}
+              initialMode={cheBanDo} />
+          </Suspense>
+        ) : (
+          <div className="vmp-space3d">
+            {!ho3D && <p className="vmp-3d-khong-ho-tro" role="status">
+              Thiết bị này không hỗ trợ chế độ 3D. Dữ liệu đầy đủ vẫn có ở cách hiển thị hai chiều.
+            </p>}
+            <div className="vmp-space3d-doi">
+              {ho3D && <button type="button" data-map-mode="3d"
+                onClick={() => { setCheBanDo("3d"); setHienBanDo(true); }}>Xem bản đồ 3D</button>}
+              <button type="button" data-map-mode="2d"
+                onClick={() => { setCheBanDo("2d"); setHienBanDo(true); }}>Bản đồ tiến độ</button>
+            </div>
             <p style={{ margin: "0 0 12px", fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
               Chọn bản đồ tiến độ khi cần xem chi tiết 12 tháng; kết luận và bản phẳng vẫn sẵn ngay bên dưới.
             </p>
-          )}
-        </div>
+          </div>
+        )}
         <details style={{ marginTop: 12 }}>
           <summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 800, color: C.plumSoft }}>
             Xem dạng phẳng 12 tháng (bản dùng cho PDF)

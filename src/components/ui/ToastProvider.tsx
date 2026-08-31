@@ -29,6 +29,7 @@ export interface HanhDongToast {
 
 export interface ToastHandle {
   dismiss(): void;
+  onClose(listener: () => void): () => void;
 }
 
 /** Registry tách khỏi React để thao tác recovery có semantics consume-once. */
@@ -51,15 +52,18 @@ export interface BoToast {
   loi(noiDung: string, hanhDong?: HanhDongToast): ToastHandle;
   canhBao(noiDung: string): ToastHandle;
   /** Thao tác dài: mở toast "đang chạy", chốt bằng `xong` hoặc `hong`. */
-  dangChay(noiDung: string): {
-    dismiss(): void;
+  dangChay(noiDung: string): ToastHandle & {
     xong(noiDung: string): void;
     hong(noiDung: string, hanhDong?: HanhDongToast): void;
   };
 }
 
 const Ctx = createContext<BoToast | null>(null);
-const HANDLE_IM_LANG: ToastHandle = { dismiss: () => {} };
+const HANDLE_IM_LANG: ToastHandle = {
+  dismiss: () => {},
+  onClose: (listener) => { listener(); return () => {}; },
+};
+const DANG_IM_LANG = { ...HANDLE_IM_LANG, xong: () => {}, hong: () => {} };
 
 /* Gọi ngoài provider thì không nổ, chỉ im lặng. Một component tách ra kiểm
    riêng không nên chết chỉ vì thiếu vỏ thông báo bọc ngoài. */
@@ -67,34 +71,50 @@ const IM_LANG: BoToast = {
   thanhCong: () => HANDLE_IM_LANG,
   loi: () => HANDLE_IM_LANG,
   canhBao: () => HANDLE_IM_LANG,
-  dangChay: () => ({ ...HANDLE_IM_LANG, xong: () => {}, hong: () => {} }),
+  dangChay: () => DANG_IM_LANG,
 };
 
 export function useToast(): BoToast {
   return useContext(Ctx) ?? IM_LANG;
 }
 
-/** Dành cho producer có vòng đời ngắn: tháo component sẽ thu hồi toast và
- * callback của chính nó, trong khi provider toàn app vẫn tiếp tục sống. */
+/** Controller thuần cho producer có vòng đời ngắn. Factory chỉ được gọi khi
+ * scope còn active, nên promise cũ resolve/reject sau unmount không thể tạo
+ * toast mới. Handle tự rời Set khi provider báo auto-expire/cap/dismiss. */
+export function createScopedToastApi(toast: BoToast) {
+  let active = true;
+  const handles = new Set<ToastHandle>();
+  const own = <T extends ToastHandle>(create: () => T, closed: T): T => {
+    if (!active) return closed;
+    const handle = create();
+    if (!active) { handle.dismiss(); return closed; }
+    handles.add(handle);
+    handle.onClose(() => handles.delete(handle));
+    return handle;
+  };
+  const api: BoToast = {
+    thanhCong: (noiDung) => own(() => toast.thanhCong(noiDung), HANDLE_IM_LANG),
+    loi: (noiDung, action) => own(() => toast.loi(noiDung, action), HANDLE_IM_LANG),
+    canhBao: (noiDung) => own(() => toast.canhBao(noiDung), HANDLE_IM_LANG),
+    dangChay: (noiDung) => own(() => toast.dangChay(noiDung), DANG_IM_LANG),
+  };
+  return {
+    api,
+    dispose() {
+      if (!active) return;
+      active = false;
+      [...handles].forEach((handle) => handle.dismiss());
+      handles.clear();
+    },
+    pendingCount: () => handles.size,
+  };
+}
+
 export function useScopedToast(): BoToast {
   const toast = useToast();
-  const handles = useRef<Set<ToastHandle>>(new Set());
-  useEffect(() => () => {
-    handles.current.forEach((handle) => handle.dismiss());
-    handles.current.clear();
-  }, []);
-  return useMemo(() => {
-    const own = <T extends ToastHandle>(handle: T): T => {
-      handles.current.add(handle);
-      return handle;
-    };
-    return {
-      thanhCong: (noiDung) => own(toast.thanhCong(noiDung)),
-      loi: (noiDung, action) => own(toast.loi(noiDung, action)),
-      canhBao: (noiDung) => own(toast.canhBao(noiDung)),
-      dangChay: (noiDung) => own(toast.dangChay(noiDung)),
-    };
-  }, [toast]);
+  const scope = useMemo(() => createScopedToastApi(toast), [toast]);
+  useEffect(() => () => scope.dispose(), [scope]);
+  return scope.api;
 }
 
 export default function ToastProvider({ children }: { children: ReactNode }) {
@@ -104,6 +124,7 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
   const hanhDong = useRef(createToastActionRegistry());
   const hanhDongTheoToast = useRef<Map<string, string>>(new Map());
   const toastDangSong = useRef<Set<string>>(new Set());
+  const toastHandles = useRef<Map<string, { handle: ToastHandle; close(): void }>>(new Map());
 
   const huyHen = useCallback((id: string) => {
     const h = hen.current.get(id);
@@ -119,12 +140,18 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
     hanhDongTheoToast.current.delete(toastId);
   }, []);
 
+  const dongHandle = useCallback((toastId: string) => {
+    toastHandles.current.get(toastId)?.close();
+    toastHandles.current.delete(toastId);
+  }, []);
+
   const bo = useCallback((toastId: string) => {
     toastDangSong.current.delete(toastId);
     huyHen(toastId);
     huyHanhDong(toastId);
+    dongHandle(toastId);
     setDs((cu) => boToast(cu, toastId));
-  }, [huyHanhDong, huyHen]);
+  }, [dongHandle, huyHanhDong, huyHen]);
 
   const datHen = useCallback((toast: Toast) => {
     const { id } = toast;
@@ -137,9 +164,10 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
       });
       toastDangSong.current.delete(id);
       huyHanhDong(id);
+      dongHandle(id);
       hen.current.delete(id);
     }, ms));
-  }, [huyHanhDong, huyHen]);
+  }, [dongHandle, huyHanhDong, huyHen]);
 
   /* Dọn hẹn giờ khi provider tháo: timer còn sống sẽ setState lên cây đã gỡ
      và React kêu rò rỉ — mà đó cũng là rò rỉ thật. */
@@ -151,6 +179,8 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
       hanhDong.current.clear();
       hanhDongTheoToast.current.clear();
       toastDangSong.current.clear();
+      toastHandles.current.forEach(({ close }) => close());
+      toastHandles.current.clear();
     };
   }, []);
 
@@ -169,6 +199,7 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
         toastDangSong.current.delete(toast.id);
         huyHen(toast.id);
         huyHanhDong(toast.id);
+        dongHandle(toast.id);
       }
     };
     const mo = (loai: LoaiToast, noiDung: string, toastAction?: HanhDongToast) => {
@@ -182,7 +213,24 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
         return moi;
       });
       datHen(toast);
-      return { id, handle: { dismiss: () => bo(id) } };
+      let closed = false;
+      const listeners = new Set<() => void>();
+      const handle: ToastHandle = {
+        dismiss: () => { if (!closed) bo(id); },
+        onClose(listener) {
+          if (closed) { listener(); return () => {}; }
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      };
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        listeners.forEach((listener) => listener());
+        listeners.clear();
+      };
+      toastHandles.current.set(id, { handle, close });
+      return { id, handle };
     };
     return {
       thanhCong: (n) => mo("thanhCong", n).handle,
@@ -203,12 +251,13 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
         };
         return {
           dismiss: handle.dismiss,
+          onClose: handle.onClose,
           xong: (noiDung: string) => chot("thanhCong", noiDung),
           hong: (noiDung: string, a?: HanhDongToast) => chot("loi", noiDung, a),
         };
       },
     };
-  }, [bo, datHen, huyHanhDong, huyHen]);
+  }, [bo, datHen, dongHandle, huyHanhDong, huyHen]);
 
   const chayHanhDong = useCallback((toast: Toast) => {
     if (!toast.hanhDong) return;
