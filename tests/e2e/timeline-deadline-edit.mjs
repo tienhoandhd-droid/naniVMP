@@ -215,6 +215,14 @@ for (const { role, width, label } of [
     p_confirmed: true,
   }), `${label} sends exact five-parameter RPC payload`, JSON.stringify(rpcBodies[0]));
 
+  /* Chờ dashboard tải lại XONG trước khi mở lại: con cá mang data-deadline,
+     nó đổi sang hạn mới nghĩa là `acts` đã là bản sau ghi. Không chờ thì
+     lần mở lại chụp đúng object cũ và so hạn cũ — hỏng chập chờn theo
+     tốc độ refetch (bắt gặp ở biến thể qa_manager/wide). */
+  await page.waitForFunction((code, updated) =>
+    document.querySelector(`[data-long-mon-code="${code}"]`)?.getAttribute("data-deadline") === updated,
+  { timeout: 10_000 }, VALIDATION_CODE, UPDATED_VMP);
+
   await openDialog(page);
   check(await page.$eval('[data-planned-deadline-input="deadline_vmp"]', (input) => input.value) === UPDATED_VMP,
     `${label} refreshes the new planned deadline`);

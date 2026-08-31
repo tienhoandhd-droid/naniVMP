@@ -187,7 +187,9 @@
   min-height: 0;
   max-height: none;
   overflow-x: hidden;
-  overflow-y: hidden;
+  /* auto chứ không hidden: mùa cao điểm hồ sâu thêm bậc (TEAM_HEIGHT_LEVELS)
+     thì cuộn dọc, thay vì cắt cụt đàn cá dưới đáy. */
+  overflow-y: auto;
   border-radius: 18px;
   background: #698980;
   scrollbar-color: rgba(237, 227, 198, .68) rgba(29, 57, 50, .2);
@@ -476,6 +478,23 @@
   letter-spacing: .02em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ĐÀN ĐÔNG (>24 cá): giấu thẻ bài đại trà — 126 thẻ cùng lúc là một bức
+   tường chữ đè lên tranh ("nhìn vào toàn tên thiết bị, chưa thấy nghệ
+   thuật" — chủ dự án 31/08). Chỉ ba trường hợp được giữ thẻ:
+     1. cá QUÁ HẠN (nóc chu sa) — là việc phải xử, thẻ là lời gọi;
+     2. cá đang rê chuột;
+     3. cá đang nhận focus bàn phím.
+   Ai cần mã của một con bất kỳ: rê vào là thẻ + tooltip đầy đủ hiện ra. */
+[data-long-mon-density="dense"] .long-mon-race__fish:not(.long-mon-race__fish--puffer) .long-mon-race__code {
+  opacity: 0;
+  transition: opacity var(--lp-motion-fast, 140ms) ease;
+}
+
+[data-long-mon-density="dense"] .long-mon-race__fish:hover .long-mon-race__code,
+[data-long-mon-density="dense"] .long-mon-race__fish:focus-visible .long-mon-race__code {
+  opacity: 1;
 }
 
 .long-mon-race__code::before {

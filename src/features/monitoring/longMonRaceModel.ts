@@ -405,6 +405,7 @@ function tryTeamPlacement(
   weeks: readonly LongMonWeekBand[],
   scale: number,
   sceneWidthPx: number,
+  sceneHeightPx: number = LONG_MON_SCENE_HEIGHT_PX,
 ): PlacementResult | null {
   const groups = new Map<string, LongMonRaceFish[]>();
   for (const item of fish) {
@@ -453,7 +454,6 @@ function tryTeamPlacement(
 
   const positions = new Map<string, PlacementPoint>();
   const placedRects: PlacementRect[] = [];
-  const sceneHeightPx = LONG_MON_SCENE_HEIGHT_PX;
   const placementOrder = orderedGroups.flatMap(([, group]) => [...group].sort((left, right) => {
     const leftX = xByIdentity.get(fishIdentity(left)) ?? 0;
     const rightX = xByIdentity.get(fishIdentity(right)) ?? 0;
@@ -483,21 +483,66 @@ function tryTeamPlacement(
   return { positions, densityScale: scale, sceneWidthPx, sceneHeightPx };
 }
 
+/* Thang CHIỀU CAO của hồ. Sự cố production 31/08: 126 cá dồn ba tuần
+ * (80+18+28) trong cửa sổ 90 ngày làm cạn cả tám bậc mật độ ở hồ 560px —
+ * model NÉM lỗi và cả màn Dòng thời gian trắng xoá. Giờ hết bậc mật độ
+ * thì hồ SÂU THÊM một bậc rồi thử lại từ đầu; viewport chuyển sang cuộn
+ * dọc khi hồ sâu hơn màn (long-mon-race.css). Bậc sâu nhất 2240px chứa
+ * cỡ 500+ cá — vượt xa mọi kế hoạch VMP thực tế. */
+const TEAM_HEIGHT_LEVELS = [
+  LONG_MON_SCENE_HEIGHT_PX, 700, 860, 1060, 1300, 1600, 1920, 2240,
+] as const;
+
 function buildTeamPlacement(
   fish: readonly LongMonRaceFish[],
   weeks: readonly LongMonWeekBand[],
   sceneWidthPx = TEAM_CANVAS_WIDTH_PX,
 ): PlacementResult {
-  for (const scale of TEAM_DENSITY_LEVELS) {
-    const placement = tryTeamPlacement(fish, weeks, scale, sceneWidthPx);
-    if (placement) return placement;
+  for (const sceneHeightPx of TEAM_HEIGHT_LEVELS) {
+    for (const scale of TEAM_DENSITY_LEVELS) {
+      const placement = tryTeamPlacement(fish, weeks, scale, sceneWidthPx, sceneHeightPx);
+      if (placement) return placement;
+    }
   }
-  const weekDensity = weeks
-    .map((week) => `${week.key}:${fish.filter((item) => item.weekKey === week.key).length}`)
-    .join(", ");
-  throw new Error(
-    `Không thể bố trí ${fish.length} cá Long Môn trong scene ${sceneWidthPx}px (${weekDensity})`,
-  );
+  /* KHẨN CẤP — không bao giờ ném vì đông cá (chốt 31/08 sau sự cố
+   * production làm trắng màn): xếp lưới cứng theo tuần, hàng nối hàng,
+   * hồ sâu đúng bằng số hàng cần. Mất chất thơ của dòng chảy nhưng mọi
+   * con cá vẫn đúng tuần, đúng thứ tự hạn, và TRANG LUÔN SỐNG. */
+  return emergencyGridPlacement(fish, weeks, sceneWidthPx);
+}
+
+function emergencyGridPlacement(
+  fish: readonly LongMonRaceFish[],
+  weeks: readonly LongMonWeekBand[],
+  sceneWidthPx: number,
+): PlacementResult {
+  const scale = TEAM_DENSITY_LEVELS[TEAM_DENSITY_LEVELS.length - 1];
+  const cellW = LONG_MON_COLLISION_WIDTH_PX * scale * LONG_MON_VISUAL_SCALE_MAX + 4;
+  const cellH = LONG_MON_COLLISION_HEIGHT_PX * scale * LONG_MON_VISUAL_SCALE_MAX + 6;
+  const positions = new Map<string, PlacementPoint>();
+  let maxRows = 1;
+  for (const week of weeks) {
+    const inWeek = fish
+      .filter((item) => item.weekKey === week.key)
+      .sort((a, b) => a.deadline.localeCompare(b.deadline)
+        || fishIdentity(a).localeCompare(fishIdentity(b), "vi"));
+    if (!inWeek.length) continue;
+    const startPx = week.startPct / 100 * sceneWidthPx + cellW / 2;
+    const endPx = (week.startPct + week.widthPct) / 100 * sceneWidthPx - cellW / 2;
+    const cols = Math.max(1, Math.floor((endPx - startPx) / cellW) + 1);
+    inWeek.forEach((item, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      maxRows = Math.max(maxRows, row + 1);
+      positions.set(fishIdentity(item), {
+        xPx: clamp(startPx + col * cellW, cellW / 2, sceneWidthPx - cellW / 2),
+        yPx: cellH * (row + 1),
+        rotateDeg: 0,
+      });
+    });
+  }
+  const sceneHeightPx = Math.max(LONG_MON_SCENE_HEIGHT_PX, Math.ceil(cellH * (maxRows + 1.5)));
+  return { positions, densityScale: scale, sceneWidthPx, sceneHeightPx };
 }
 
 function personalPreferredY(index: number, count: number, activity: Activity): number {
@@ -587,14 +632,14 @@ function buildPersonalPlacement(
   const reflected = new Map(
     [...fallback.positions].map(([identity, point]) => [identity, {
       ...point,
-      yPx: LONG_MON_SCENE_HEIGHT_PX - point.yPx,
+      yPx: fallback.sceneHeightPx - point.yPx,
     }]),
   );
   return {
     positions: reflected,
     densityScale: fallback.densityScale,
     sceneWidthPx: MIN_CANVAS_WIDTH_PX,
-    sceneHeightPx: LONG_MON_SCENE_HEIGHT_PX,
+    sceneHeightPx: fallback.sceneHeightPx,
   };
 }
 

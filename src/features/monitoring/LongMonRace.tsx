@@ -211,7 +211,8 @@ export default function LongMonRace({
           )}
 
           {model.fish.length > 0 ? (
-            <div className="long-mon-race__school" role="list" aria-label={`${model.fish.length} hạng mục có hạn VMP trong chín mươi ngày`}>
+            <div className="long-mon-race__school" role="list"
+              data-long-mon-density={model.fish.length > 24 ? "dense" : "sparse"} aria-label={`${model.fish.length} hạng mục có hạn VMP trong chín mươi ngày`}>
               {model.fish.map((fish) => {
                 const stage = metaByStage.get(fish.stage)!;
                 const deadline = formatDeadline(fish.deadline);

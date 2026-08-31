@@ -1,5 +1,5 @@
 /* TimelinePage.jsx — Modern Gantt Timeline VMP */
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
   FileText,
@@ -515,6 +515,54 @@ function ActivityDetailModal({ a, onClose, canEditPlannedDeadlines, onEditPlanne
 
 
 
+/* ---------------------------------------------------------------------
+ * Lưới an toàn của Ngư đồ (chốt 31/08, "phải sửa dứt điểm lỗi tải trang"):
+ * bất kỳ lỗi render nào bên trong bức tranh — kể cả lớp bug chưa biết —
+ * rơi xuống một DANH SÁCH hạn VMP tối giản thay vì trang trắng. Người
+ * dùng vẫn tra được hạn, bấm được vào hạng mục, và có nút thử lại.
+ * ------------------------------------------------------------------- */
+interface RaceGuardProps {
+  children: ReactNode;
+  activities: Activity[];
+  onOpen: (a: Activity) => void;
+}
+
+class LongMonRaceGuard extends Component<RaceGuardProps, { loi: Error | null }> {
+  state = { loi: null as Error | null };
+
+  static getDerivedStateFromError(loi: Error) { return { loi }; }
+
+  componentDidCatch(loi: Error) {
+    // Đủ để lần theo từ console production; không nuốt im lặng.
+    console.error("[long-mon] tranh không dựng được, rơi về danh sách:", loi);
+  }
+
+  render() {
+    if (!this.state.loi) return this.props.children;
+    const sorted = [...this.props.activities].sort((a, b) =>
+      String(vmpDeadlineDate(a) ?? "9999").localeCompare(String(vmpDeadlineDate(b) ?? "9999")));
+    return (
+      <section className="long-mon-race long-mon-race--fallback" aria-label="Danh sách hạn VMP (chế độ dự phòng)">
+        <p style={{ margin: "0 0 12px", fontWeight: 700 }}>
+          Bức tranh Long Môn gặp lỗi hiển thị — đây là danh sách hạn VMP thay thế.
+          <button type="button" style={{ marginLeft: 12 }}
+            onClick={() => this.setState({ loi: null })}>Thử vẽ lại</button>
+        </p>
+        <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
+          {sorted.slice(0, 200).map((a) => (
+            <li key={String(a.id)}>
+              <button type="button" onClick={() => this.props.onOpen(a)}
+                style={{ background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit", textDecoration: "underline" }}>
+                {String(a.code)} · {String(a.name || "")} · hạn {vmpDeadlineDate(a) ?? "—"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+}
+
 export default function TimelineView({ acts, businessRole = null, currentPersonId = null, onReload = () => {} }: {
   acts: Activity[];
   onOpenWorkloadCell?: (cell: WorkloadCell) => void;
@@ -599,6 +647,7 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
           sua han ke hoach van di qua PlannedDeadlineDialog trong modal do,
           nen tinh nang deadline override (spec 26/08) KHONG mat.
           ===================================================================== */}
+      <LongMonRaceGuard activities={longMonActivities} onOpen={moHoSo}>
       <LongMonRace
         activities={longMonActivities}
         now={now}
@@ -614,6 +663,7 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
           onPersonChange: setSelectedLongMonPersonId,
         }}
       />
+      </LongMonRaceGuard>
 
       <ActivityDetailModal a={detail} onClose={() => setDetail(null)} canEditPlannedDeadlines={canEditPlannedDeadlines} onEditPlannedDeadlines={setPlannedEdit} />
       {plannedEdit && <PlannedDeadlineDialog a={plannedEdit} onClose={() => setPlannedEdit(null)} onReload={onReload} />}

@@ -301,6 +301,26 @@ test("bốn mươi tám cá trong cửa sổ 90 ngày nằm trọn scene cố đ
   assert.ok(model.densityScale >= .66 && model.densityScale <= 1);
 });
 
+test("sự cố production 31/08: 126 cá ba tuần dồn không được ném lỗi", () => {
+  /* Dữ liệu thật làm sập bản deploy đầu: 80 cá tuần 31/08, 18 cá tuần
+     28/09, 28 cá tuần 26/10 — cạn cả tám bậc mật độ ở hồ 560px và model
+     ném Error làm trắng màn. Hợp đồng mới: hết bậc mật độ thì hồ SÂU
+     THÊM (TEAM_HEIGHT_LEVELS), không bao giờ ném vì đông cá. */
+  const input = [];
+  for (let i = 0; i < 80; i += 1) input.push(activity(`p80-${i}`, `2026-09-0${1 + (i % 6)}`));
+  for (let i = 0; i < 18; i += 1) input.push(activity(`p18-${i}`, `2026-09-2${8 + (i % 2)}`));
+  for (let i = 0; i < 28; i += 1) input.push(activity(`p28-${i}`, i % 2 ? "2026-10-27" : "2026-10-30"));
+
+  const model = buildLongMonRaceModel(input, NOW, { audience: "team" });
+  assert.equal(model.fish.length, 126);
+  assert.deepEqual(overlappingPairsInModel(model), []);
+  assert.ok(model.fish.every((fish) => fish.xPct >= 0 && fish.xPct <= 100
+    && fish.yPct >= 0 && fish.yPct <= 100));
+  // Hồ được phép sâu hơn 560 nhưng không phi mã.
+  assert.ok(model.sceneHeightPx >= 560 && model.sceneHeightPx <= 2240,
+    `hồ sâu ${model.sceneHeightPx}px`);
+});
+
 test("nhóm đông giữ hồ vừa một màn hình", () => {
   for (const count of [20, 30, 40]) {
     const model = buildLongMonRaceModel(
