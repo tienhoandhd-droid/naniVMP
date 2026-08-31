@@ -221,7 +221,7 @@ function Overview({ acts, setView, access }: {
             mình đang đứng ở đâu trong năm. */}
         <VongNam acts={acts} rate={e.rate} total={e.total}
           year={currentBangkokYear} bangkokToday={currentBangkokDate} ben={
-          <div className="vmp-overview-progress" style={{ minWidth: 0 }}>
+          <div className="vmp-overview-progress" data-overview-total={e.total} style={{ minWidth: 0 }}>
             <div style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800,
                           color: C.plum, marginBottom: 3 }}>
               Tiến độ thẩm định {currentBangkokYear}
@@ -232,11 +232,11 @@ function Overview({ acts, setView, access }: {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               {[
-                { l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
-                { l: "Quá hạn", v: e.over, c: C.rasp, t: C.raspText },
-                { l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
+                { id: "completed", l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
+                { id: "overdue", l: "Đã chuyển quá hạn", v: e.over, c: C.rasp, t: C.raspText },
+                { id: "incomplete", l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
               ].map((x) => (
-                <div key={x.l} className="vmp-overview-progress__row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div key={x.id} data-overview-metric={x.id} className="vmp-overview-progress__row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 999,
                                  background: x.c, flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700,
@@ -246,7 +246,7 @@ function Overview({ acts, setView, access }: {
                     <div style={{ width: `${e.total ? (x.v / e.total) * 100 : 0}%`,
                                   height: "100%", background: x.c }} />
                   </div>
-                  <span style={{ fontFamily: NUM, fontSize: 20, fontWeight: 800,
+                  <span data-overview-value style={{ fontFamily: NUM, fontSize: 20, fontWeight: 800,
                                  color: x.t, minWidth: 34, textAlign: "right" }}>{x.v}</span>
                 </div>
               ))}
@@ -275,6 +275,7 @@ function Overview({ acts, setView, access }: {
           tưởng web tính sai. Nay lấy con số RỘNG hơn (theo mốc) làm chỉ số
           chính vì đó mới là thứ phải xử, và nói thẳng chênh lệch là gì. */}
       <StatTile cls="b-k1" icon={AlertCircle} label="Trễ đích VMP" value={overdue.length}
+        metricId="vmp-overdue"
         tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di(destinations.overdue)}
         sub={overdue.length
           ? `${e.over} đã đổi trạng thái · ${Math.max(0, overdue.length - e.over)} mốc đã trôi mà trạng thái chưa đổi`

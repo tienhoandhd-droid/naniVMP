@@ -416,13 +416,16 @@ try {
       await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Tổng quan"), { timeout: 5_000 });
       assert.equal(await page.$eval('select[aria-label="Chọn nhân sự xem tiến độ"]', (select) => select.value), PERSON.staff,
         `${persona.label} keeps the selected person when moving to Overview`);
-      const completionTile = await page.evaluate(() => [...document.querySelectorAll(".vmp-tile")]
-        .find((tile) => tile.textContent?.includes("Hoàn thành VMP"))?.textContent ?? "");
-      assert.match(completionTile, /0\/2 hạng mục/,
+      const overviewProgress = await page.$eval(".vmp-overview-progress", (node) => ({
+        total: node.getAttribute("data-overview-total"),
+        completed: node.querySelector('[data-overview-metric="completed"] [data-overview-value]')?.textContent?.trim(),
+        overdue: node.querySelector('[data-overview-metric="overdue"] [data-overview-value]')?.textContent?.trim(),
+      }));
+      assert.deepEqual({ total: overviewProgress.total, completed: overviewProgress.completed }, {
+        total: "2", completed: "0",
+      },
         `${persona.label} Overview completion denominator is recalculated for the selected person`);
-      const overviewOverdue = await page.evaluate(() => [...document.querySelectorAll(".vmp-tile")]
-        .find((tile) => tile.textContent?.includes("Quá hạn"))?.querySelector("div:nth-of-type(2)")?.textContent?.trim() ?? "");
-      assert.equal(overviewOverdue, String(todayOverdue),
+      assert.equal(overviewProgress.overdue, String(todayOverdue),
         `${persona.label} Overview Quá hạn matches the Today canonical-person KPI despite remembered period`);
       assert.equal(teamSummaryCalls.length, 0,
         `${persona.label} must not call the ordinary-member aggregate RPC`);
@@ -462,8 +465,10 @@ try {
 
       await page.click('[data-view="overview"]');
       await page.waitForFunction(() => document.body.textContent?.includes("Tiến độ thẩm định 2027"), { timeout: 5_000 });
-      const overviewOverdue = await page.evaluate(() => [...document.querySelectorAll(".vmp-tile")]
-        .find((tile) => tile.textContent?.includes("Quá hạn"))?.querySelector("div:nth-of-type(2)")?.textContent?.trim() ?? "");
+      const overviewOverdue = await page.$eval(
+        '[data-overview-kpi="vmp-overdue"] [data-overview-value]',
+        (node) => node.textContent?.trim() ?? "",
+      );
       assert.equal(overviewOverdue, todayOverdue,
         "Overview and Today classify the same real instant in a UTC browser");
       assert.deepEqual(teamSummaryCalls, [{ p_year: 2027 }],
@@ -472,36 +477,34 @@ try {
         /^Vòng năm 2027:/, "Overview year ring uses the same Bangkok year as its heading and RPC");
       await page.click(".vmp-vongnam-nut");
       const januaryRingRow = await page.evaluate(() => [...document.querySelectorAll(".vmp-ctrl-bang tbody tr")]
-        .find((row) => row.querySelector("td")?.textContent?.trim() === "T1")?.textContent || "");
+        .find((row) => row.querySelector("th")?.textContent?.trim() === "T1")?.textContent || "");
       assert.match(januaryRingRow, /Đang chạy/,
         "Overview year ring marks January current at the Bangkok New Year boundary");
 
       await page.click('[data-view="timeline"]');
       try {
-        await page.waitForFunction(() => document.body.textContent?.includes("Địa hình tải việc 2027"), { timeout: 10_000 });
+        await page.waitForSelector('.long-mon-race[aria-label="Trường đua hạn VMP hai tháng"]', { timeout: 10_000 });
       } catch (cause) {
         const snapshot = await page.evaluate(() => ({
           hash: location.hash,
           heading: document.querySelector("h1")?.textContent || "",
           body: document.body.innerText.slice(0, 1000),
         }));
-        throw new Error(`Timeline did not expose Bangkok year: ${JSON.stringify({ snapshot, pageErrors })}`, { cause });
+        throw new Error(`Ngư đồ không mở ở biên năm Bangkok: ${JSON.stringify({ snapshot, pageErrors })}`, { cause });
       }
-      const timelineCurrentMonth = await page.evaluate(() => [...document.querySelectorAll("div")]
-        .find((node) => node.children[0]?.textContent?.trim() === "Đến hạn tháng này"
-          && node.children.length === 3)?.textContent || "");
-      assert.match(timelineCurrentMonth, /T1/,
-        "Timeline Overview uses January as the Bangkok current month");
-      assert.equal(await page.evaluate(() => [...document.querySelectorAll("button")]
-        .some((button) => button.textContent?.includes("T1 ●"))), true,
-      "Timeline Overview highlights January as current");
-      await page.evaluate(() => {
-        const button = [...document.querySelectorAll(".timeline-mode-controls button")]
-          .find((candidate) => candidate.textContent?.trim() === "Dòng thời gian");
-        if (!(button instanceof HTMLButtonElement)) throw new Error("Không tìm thấy workspace Dòng thời gian");
-        button.click();
-      });
-      await page.waitForSelector(".timeline-range-rail__today", { timeout: 5_000 });
+      const twoMonthWindow = await page.$eval(".long-mon-race", (node) => ({
+        months: node.querySelector(".long-mon-race__months")?.textContent || "",
+        today: node.querySelector(".long-mon-race__today")?.textContent?.trim() || "",
+        hasThreeCanvas: Boolean(node.querySelector('canvas[data-engine^="three"]')),
+      }));
+      assert.match(twoMonthWindow.months, /Tháng 1\s*01\/2027/,
+        "Ngư đồ bắt đầu từ tháng hiện tại theo Bangkok");
+      assert.match(twoMonthWindow.months, /Tháng 2\s*02\/2027/,
+        "Ngư đồ chỉ nối tiếp sang tháng kế tiếp");
+      assert.equal(twoMonthWindow.today, "Hôm nay", "Ngư đồ đánh dấu đúng ngày hiện tại Bangkok");
+      assert.equal(twoMonthWindow.hasThreeCanvas, false, "Ngư đồ không kéo lại canvas 3D đã bỏ");
+      await page.click('[data-timeline-view="bang"]');
+      await page.waitForSelector('.long-mon-bang[aria-label="Bảng hạn VMP — chế độ xem danh sách"]', { timeout: 5_000 });
       assert.equal(chanNgoai.length, 0, "Bangkok boundary scenario remains fully intercepted");
     } finally {
       await page.close();

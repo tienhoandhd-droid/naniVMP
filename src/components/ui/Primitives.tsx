@@ -490,7 +490,7 @@ export function KpiCard({ emoji, bg, color, value, label, sub, subColor, onClick
  *   · có chỗ cho một dải cột nhỏ, để ô vừa nói "bao nhiêu" vừa nói
  *     "đang đi hướng nào"
  * =================================================================== */
-export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, cls = "" }: {
+export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, cls = "", metricId }: {
   icon?: LucideIcon;
   value?: ReactNode;
   label?: ReactNode;
@@ -501,6 +501,8 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
   bars?: number[];
   onClick?: () => void;
   cls?: string;
+  /** Định danh ổn định cho KPI nghiệp vụ; không dùng chữ/CSS làm hợp đồng dữ liệu. */
+  metricId?: string;
 }) {
   const t = tone || { c: C.plum, bg: C.pinkSoft };
   const content = (
@@ -517,7 +519,7 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
                        fontFamily: TEXT }}>{label}</span>
       </div>
 
-      <div style={{ fontFamily: NUM_HERO, fontSize: 28, fontWeight: 800, color: t.c,
+      <div data-overview-value={metricId ? true : undefined} style={{ fontFamily: NUM_HERO, fontSize: 28, fontWeight: 800, color: t.c,
                     lineHeight: 1, letterSpacing: -0.5 }}>{value}</div>
 
       {bars && bars.length > 0 && (
@@ -545,14 +547,14 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
                justifyContent: "space-between", minHeight: 132,
                ["--tile-accent" as string]: t.c }}>
       {onClick ? (
-        <button type="button" className="vmp-tile-action" onClick={onClick}
+        <button type="button" className="vmp-tile-action" data-overview-kpi={metricId} onClick={onClick}
           style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", gap: 8,
                    padding: 0, border: "none", background: "transparent", color: "inherit", textAlign: "left",
                    font: "inherit", cursor: "pointer" }}>
           {content}
         </button>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
+        <div data-overview-kpi={metricId} style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
           {content}
         </div>
       )}
