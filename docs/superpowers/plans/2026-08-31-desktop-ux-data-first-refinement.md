@@ -2,68 +2,67 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Khôi phục cổng chất lượng desktop, nén chrome để dữ liệu chính xuất hiện trong fold đầu, và bổ sung action dock đọc được ngay cho Long Môn mà không đổi dữ liệu hay nghiệp vụ VMP.
+**Goal:** Khôi phục cổng chất lượng desktop và đưa dữ liệu/hành động đầu tiên của Việc hôm nay, Cập nhật tiến độ và Báo cáo vào fold đầu mà không đổi dữ liệu hay nghiệp vụ VMP.
 
-**Architecture:** Thực hiện tuần tự theo ba ranh giới: guardrail phát hành, chrome desktop dùng chung, rồi Long Môn. Deadline action dock là model thuần dùng `classifyVmpDeadline()`/`vmpDeadlineDate()` làm nguồn canonical; React chỉ quản lý tab, tìm kiếm, trạng thái thu gọn và chuyển `Activity` vào callback mở modal hiện có.
+**Architecture:** Thực hiện tuần tự theo hai lớp: guardrail phát hành dùng chung, sau đó ba lát UI độc lập theo màn. Mỗi lát chỉ nén bố cục desktop bằng CSS/component cục bộ, giữ nguyên model, quyền, callback và export hiện có; geometry E2E tại `1366×768` là acceptance contract.
 
 **Tech Stack:** Node 24.18.0, React 18.3, TypeScript 7, Vite 6, Node test runner + `tsx`, Playwright 1.62, Puppeteer Core, axe-core/playwright, CSS Lotus Pearl hiện có.
 
 ## Global Constraints
 
 - Chỉ desktop tại `1366×768`, `1440×900`, `1920×1080`; không thiết kế lại mobile và không thêm baseline mobile.
-- Giữ Lotus Pearl, Vali, Long Môn và CPC1 HN; sidebar vẫn là điều hướng chính, không tạo điều hướng thứ hai.
-- Không đổi schema, migration, RLS, RPC, Supabase, công thức nghiệp vụ hoặc dữ liệu/file xuất báo cáo.
-- Không thêm framework UI, chart library, dependency runtime hoặc dependency dev mới.
+- Tạm thời tuyệt đối không sửa hoặc thêm test riêng cho `src/pages/TimelinePage.tsx`, `src/features/monitoring/LongMon*`, `src/features/monitoring/long-mon-race.css`, model Long Môn, `MonitoringJourneyNav.tsx` hay `monitoring.css`.
+- Visual matrix có thể được hợp nhất contract, nhưng không update, seal hoặc commit baseline trong tranche này.
+- Giữ Lotus Pearl, Vali và CPC1 HN; không thay logo, nhân vật, copy nghiệp vụ hay semantic colors.
+- Không đổi schema, migration, RLS, RPC, Supabase, công thức nghiệp vụ, quyền cập nhật hoặc dữ liệu/file xuất báo cáo.
+- Không thêm framework UI, chart library, runtime dependency hoặc dev dependency mới; không sửa `package-lock.json`.
 - Node CI và kiểm chứng là `24.18.0`; timezone nghiệp vụ/visual là `Asia/Bangkok`.
-- Chữ mang thông tin hoặc điều khiển tối thiểu `12px`; thang ưu tiên `12 / 14 / 16 / 24 / 32px`.
-- Radius theo vai trò: `10px` control, `16–18px` card dữ liệu, `24px` khối nhận diện lớn, `999px` chỉ pill.
-- Button/input thật, label thật, focus visible, thứ tự bàn phím theo thứ tự nhìn; không dựa vào màu hoặc hover để truyền nghĩa.
-- Không thêm animation ngoài transition ngắn; mọi motion mới tôn trọng `prefers-reduced-motion`.
-- Không push, merge, deploy hoặc mutate production. Snapshot Linux chỉ seal sau review ảnh thủ công; không tự chấp nhận diff.
-- Không sửa `package-lock.json`; mọi thay đổi package script chỉ dùng công cụ đã cài.
-- Mỗi task phải đi RED → xác nhận fail đúng lý do → GREEN tối thiểu → focused regression → review → commit cục bộ. Không bắt đầu task sau khi Critical/Important finding còn mở.
-- Preflight trước mỗi task: `git status --short` phải chỉ có thay đổi đã biết; chạy `git diff --name-only HEAD -- <files của task>` và dừng nếu có file ownership ngoài kế hoạch.
+- Chữ mang thông tin hoặc điều khiển tối thiểu `12px`; radius chỉ `10px`, `16–18px`, `24px`, và `999px` cho pill.
+- Button/input/details/summary thật, label thật, focus visible; không dựa vào màu hoặc hover để truyền nghĩa.
+- Không push, merge, deploy, dispatch workflow hoặc mutate production.
+- Mỗi task đi RED → xác nhận fail đúng lý do → GREEN tối thiểu → focused regression → independent review → commit cục bộ.
+- Preflight trước mỗi task: `git status --short`; sau đó `git diff --name-only HEAD -- <files của task>`. Dừng nếu có thay đổi không thuộc ownership đã khai báo.
 
-## Architecture, dependencies, shared state, and sequencing
+## Architecture, dependencies, shared files/state
 
-| Task | Sở hữu file triển khai | Phụ thuộc | Có thể giao song song |
+| Task | File triển khai được sở hữu | Phụ thuộc | Parallelism |
 |---|---|---|---|
-| 1 | `scripts/check-design-drift.mjs` | Không | Không; gate nền |
-| 2 | visual matrix/runtime/workflows/package scripts | Task 1 để workflow gọi drift đã test | Không; shared CI state |
-| 3 | `Layout.tsx`, `MonitoringJourneyNav.tsx`, chrome CSS | Task 2 để có baseline/axe gate | Không; shared shell |
-| 4 | model `longMonActionQueue.ts` mới | Chỉ deadline canonical hiện có | Có thể phân tích độc lập, nhưng merge tuần tự trước Task 5 |
-| 5 | Long Môn component/CSS, Timeline integration tests, axe/visual artifacts | Task 4 API, Task 2 contract, Task 3 geometry | Không; tích hợp shared Timeline |
+| 1 | `scripts/check-design-drift.mjs` | Không | Chạy đầu tiên |
+| 2 | visual contract, runtime, workflows, package scripts | Task 1 để CI gọi drift đã test | Tuần tự; shared CI state |
+| 3 | `TodayCommandCenter.tsx`, `today.css` | Task 2 | Tuần tự; không file chung với Task 4/5 |
+| 4 | `UpdatePage.tsx`, `progress.css` | Checkpoint Task 3 | Tuần tự; không file chung với Task 3/5 |
+| 5 | `ReportsView.tsx`, `reports.css` | Checkpoint Task 4 | Tuần tự; không file chung với Task 3/4 |
 
-`package.json` chỉ Task 2 được sửa. `tests/visual/lotus.spec.ts`, `tests/a11y/a11y.spec.ts`, `.github/workflows/*` chỉ Task 2/5 sửa theo thứ tự ghi rõ; primary planner kiểm diff trước khi chuyển ownership. `src/features/monitoring/long-mon-race.css` chỉ Task 5 sửa. Không chạy hai implementer cùng lúc trên cùng worktree.
+`package.json`, `.github/workflows/*`, `tests/visual/lotus.spec.ts` và `scripts/check-visual-runtime.mjs` chỉ Task 2 sửa. Task 3–5 không sửa shared shell/App/index CSS; CSS Báo cáo mới được import cục bộ từ `ReportsView.tsx`. Primary planner inspect mọi diff và chạy `git diff --name-only 6fdfe015..HEAD | rg 'TimelinePage|LongMon|long-mon|MonitoringJourney|monitoring\.css'`; expected không có output.
 
-## Rollback and recovery
+## Rollback
 
-- Rollback toàn bộ: tag local `backup/ui-desktop-before-refinement-20260831` tại `6fdfe015` hoặc bundle đã verify `/home/admin1/VMP/backups/naniVMP-ui-before-desktop-refinement-20260831.bundle`.
-- Rollback theo lát: revert commit của Task 5 → 1 theo thứ tự ngược; không reset hard và không xóa worktree.
-- Nếu baseline review không được duyệt, giữ code/test trước baseline, không chạy `visual:baseline:seal`, không commit PNG/seal, và ghi gate visual là còn mở.
-- Nếu geometry `1366×768` không đạt, revert riêng commit Task 3; model Task 4 không phụ thuộc CSS nên vẫn giữ được.
-- Nếu dock làm `LongMonRace` lỗi render, `LongMonRaceGuard` hiện có vẫn phải dựng danh sách fallback và mở đúng `ActivityDetailModal`.
+- Toàn bộ: tag local `backup/ui-desktop-before-refinement-20260831` tại `6fdfe015` hoặc bundle `/home/admin1/VMP/backups/naniVMP-ui-before-desktop-refinement-20260831.bundle` đã verify.
+- Theo lát: revert commit Task 5 → 1 theo thứ tự ngược; không `git reset --hard` và không xóa worktree.
+- Trước revert UI, xác nhận commit chỉ chứa file màn tương ứng và test của nó. Không kéo Timeline/Long Môn vào rollback.
+- Nếu visual contract chuyển sang 45 nhưng baseline vẫn 39, ghi `visual/visual:contract` là release gate còn mở; không sửa PNG/seal bằng tay và không gọi branch release-ready.
 
 ## Review checkpoints
 
-1. Sau Task 2: reviewer độc lập kiểm drift fixture, visual count/tree contract, workflow DAG và việc `production-build` phụ thuộc axe; primary rerun targeted tests.
-2. Sau Task 3: reviewer UI so ảnh thủ công 3 viewport × light/dark và kiểm CPC1 HN/Vali/Long Môn không mất; primary rerun geometry.
-3. Sau Task 4: reviewer kiểm biên ngày Bangkok, canonical deadline và mutation cases; không review bằng snapshot.
-4. Sau Task 5: Terra-or-stronger review model/UI; Sol final review shared shell, accessibility, rollback và toàn bộ diff. Primary rerun final gate mới, không dựa vào báo cáo reviewer.
+1. Sau Task 2: reviewer độc lập kiểm drift fixture, matrix count/tree contract, workflow DAG và việc build phụ thuộc axe; primary rerun targeted tests.
+2. Sau Task 3: reviewer UI kiểm Vali/Lotus và fold Việc hôm nay ở ba desktop viewport; primary rerun Today geometry.
+3. Sau Task 4: reviewer kiểm quyền/callback Cập nhật không đổi, chữ ≥12px và row đầu trong fold; primary rerun Progress geometry.
+4. Sau Task 5: reviewer kiểm bốn control + ba export action không đổi, disclosure bàn phím và KPI đầu trong fold. Final Sol review toàn diff, rollback và chứng cứ không chạm Timeline/Long Môn.
 
 ---
 
-### Task 1: Làm design-drift guardrail kiểm thử được và bắt literal nhiều dòng
+### Task 1: Design-drift guardrail bắt chữ nhỏ và background trắng nhiều dòng
 
 **Files:**
 - Modify: `scripts/check-design-drift.mjs`
 - Create: `tests/unit/design-drift.test.mjs`
 
 **Interfaces:**
-- Consumes: CSS/TS/TSX dưới root repo; CLI mặc định vẫn là `node scripts/check-design-drift.mjs`.
-- Produces: CLI test-only `--root <absolute-fixture-root>`; lỗi liệt kê đúng file/dòng, tổng số vi phạm, exit `1`; sạch exit `0`.
+- CLI production vẫn là `node scripts/check-design-drift.mjs`.
+- Test interface: `node scripts/check-design-drift.mjs --root <absolute-fixture-root>`.
+- Exit `1` và liệt kê file/dòng/tổng lỗi khi vi phạm; exit `0` khi sạch.
 
-- [ ] **Step 1: Viết test RED chạy artifact thật trên fixture**
+- [ ] **Step 1: Viết RED chạy artifact thật**
 
 ```js
 // tests/unit/design-drift.test.mjs
@@ -79,17 +78,12 @@ const run = (fixture) => spawnSync(process.execPath,
   ["scripts/check-design-drift.mjs", "--root", fixture],
   { cwd: ROOT, encoding: "utf8" });
 
-test("drift reports a sub-12px business label and multiline white background as two violations", (t) => {
+test("drift reports sub-12px text and multiline white background as two violations", (t) => {
   const fixture = path.join(tmpdir(), `vmp-drift-${process.pid}-${Date.now()}`);
   t.after(() => rmSync(fixture, { recursive: true, force: true }));
   mkdirSync(path.join(fixture, "src", "features", "probe"), { recursive: true });
-  writeFileSync(path.join(fixture, "src", "features", "probe", "probe.css"), `
-.probe { font-size: 11px; }
-.panel {
-  background:
-    #fff;
-}
-`);
+  writeFileSync(path.join(fixture, "src", "features", "probe", "probe.css"),
+    ".probe { font-size: 11px; }\n.panel {\n background:\n #fff;\n}\n");
   const result = run(fixture);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /2 vi phạm luật thiết kế/u);
@@ -97,7 +91,7 @@ test("drift reports a sub-12px business label and multiline white background as 
   assert.match(result.stderr, /nền trắng literal/u);
 });
 
-test("drift accepts semantic backgrounds and 12px text", (t) => {
+test("drift accepts semantic background and 12px text", (t) => {
   const fixture = path.join(tmpdir(), `vmp-drift-clean-${process.pid}-${Date.now()}`);
   t.after(() => rmSync(fixture, { recursive: true, force: true }));
   mkdirSync(path.join(fixture, "src", "features", "probe"), { recursive: true });
@@ -105,51 +99,31 @@ test("drift accepts semantic backgrounds and 12px text", (t) => {
     ".probe { font-size: 12px; background: var(--lp-surface); border-radius: 10px; }\n");
   const result = run(fixture);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Không có trôi thiết kế\. ĐẠT\./u);
 });
 ```
 
-- [ ] **Step 2: Chạy RED và xác nhận đúng nguyên nhân**
+- [ ] **Step 2: Chạy RED**
 
 Run: `node --import tsx --test tests/unit/design-drift.test.mjs`
 
-Expected: FAIL vì CLI hiện chưa nhận `--root` và regex nền trắng đang quét từng dòng nên fixture nhiều dòng không tạo đúng hai lỗi.
+Expected: FAIL vì CLI chưa nhận `--root` và nền trắng hiện bị quét theo từng dòng.
 
-- [ ] **Step 3: GREEN tối thiểu trong script**
+- [ ] **Step 3: GREEN tối thiểu**
 
-Trong `scripts/check-design-drift.mjs`:
+Trong script, parse duy nhất zero args hoặc `--root` + absolute path; import `node:path`. Quét background trên toàn nội dung đã mask comment nhưng giữ newline, regex cho `background/background-color` theo sau whitespace/newline rồi `#fff/#ffffff/white/rgb(255...)`; tính line từ `source.slice(0, match.index).split("\n").length`. Giữ nguyên phạm vi migration, radius/emoji/hex rules.
 
-```js
-const args = process.argv.slice(2);
-if (args.length !== 0 && !(args.length === 2 && args[0] === "--root" && path.isAbsolute(args[1]))) {
-  console.error("Usage: node scripts/check-design-drift.mjs [--root <absolute-path>]");
-  process.exit(2);
-}
-const GOC = args.length === 2 ? args[1] : fileURLToPath(new URL("..", import.meta.url));
-```
+- [ ] **Step 4: Verify và commit**
 
-Thêm `import path from "node:path"`; thay luật nền trắng bằng phép quét toàn nội dung đã mask comment nhưng giữ newline, dùng regex global cho `background(?:-color)?\s*:\s*(?:\r?\n\s*)?(?:#fff(?:fff)?\b|white\b|rgba?\(\s*255...)`, rồi tính số dòng từ `noiDung.slice(0, match.index).split("\n").length`. Không thay phạm vi migration, miễn trừ hay wording các luật khác.
+Run: `node --import tsx --test tests/unit/design-drift.test.mjs && npm run drift`
 
-- [ ] **Step 4: Chạy GREEN và regression**
-
-Run: `node --import tsx --test tests/unit/design-drift.test.mjs`
-
-Expected: `2 tests` PASS.
-
-Run: `npm run drift`
-
-Expected: PASS trên cây hiện tại hoặc FAIL chỉ với danh sách vi phạm thật cần xử trong Task 3/5; không được crash hay báo quét `0 file`.
-
-- [ ] **Step 5: Review và commit**
-
-Mutation check: đổi fixture `12px` thành `11px` phải fail; đổi `var(--lp-surface)` thành literal trắng nhiều dòng phải fail.
+Expected: fixture `2 tests` PASS; repo scan không crash/không báo 0 file.
 
 ```bash
 git add scripts/check-design-drift.mjs tests/unit/design-drift.test.mjs
 git commit -m "test(ui): khóa guardrail drift desktop"
 ```
 
-### Task 2: Một visual matrix contract và release gate drift/axe trước build
+### Task 2: Một visual matrix contract và release gate drift/axe
 
 **Files:**
 - Create: `scripts/visual-matrix-contract.mjs`
@@ -163,42 +137,39 @@ git commit -m "test(ui): khóa guardrail drift desktop"
 - Modify: `package.json`
 
 **Interfaces:**
-- Produces `VISUAL_SCREENS`, `VISUAL_THEMES`, `VISUAL_PROJECTS`, `VISUAL_BASELINE_COUNT` từ `scripts/visual-matrix-contract.mjs`; hiện tại `7 × 2 × 3 + 1 × 3 = 45` PNG.
-- `node scripts/visual-matrix-contract.mjs --count` in đúng `45`; `--verify-output <log>` xác nhận Playwright báo đúng 45 pass.
-- Release DAG: `static-quality` chạy `drift`; job `a11y` chạy sau `static-quality`; `production-build.needs` gồm `static-quality`, DB contract, E2E mock và `a11y`.
+- `VISUAL_SCREENS`, `VISUAL_THEMES`, `VISUAL_PROJECTS`, `VISUAL_BASELINE_COUNT` là một nguồn contract; current count `7 × 2 × 3 + login × 3 = 45`.
+- `--count` in `45`; `--verify-output <log>` chỉ pass khi Playwright báo đúng 45.
+- Không thêm/sửa case Timeline; chỉ thay danh sách hiện có bằng import contract.
+- `production-build.needs` gồm `static-quality`, DB contract, E2E mock và `a11y`.
 
-- [ ] **Step 1: Viết RED cho count dùng chung và workflow DAG**
+- [ ] **Step 1: RED matrix và workflow DAG**
 
-Thêm vào `tests/unit/visual-runtime-contract.test.mjs`:
+Thêm test:
 
 ```js
-test("visual matrix derives 45 Linux baselines from screens, themes, and projects", async () => {
-  const contract = await import("../../scripts/visual-matrix-contract.mjs");
-  assert.equal(contract.VISUAL_SCREENS.length, 7);
-  assert.deepEqual(contract.VISUAL_THEMES, ["light", "dark"]);
-  assert.equal(contract.VISUAL_PROJECTS.length, 3);
-  assert.equal(contract.VISUAL_BASELINE_COUNT, 45);
+test("visual matrix derives 45 Linux baselines", async () => {
+  const c = await import("../../scripts/visual-matrix-contract.mjs");
+  assert.equal(c.VISUAL_SCREENS.length, 7);
+  assert.deepEqual(c.VISUAL_THEMES, ["light", "dark"]);
+  assert.equal(c.VISUAL_PROJECTS.length, 3);
+  assert.equal(c.VISUAL_BASELINE_COUNT, 45);
 });
 ```
 
-Tạo `tests/unit/release-workflow-contract.test.mjs` để đọc YAML theo job blocks, không khóa wording step:
+`tests/unit/release-workflow-contract.test.mjs` đọc job blocks và assert hành vi DAG:
 
 ```js
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-
-const workflow = await readFile(new URL("../../.github/workflows/deploy.yml", import.meta.url), "utf8");
-const block = (name, next) => workflow.slice(workflow.indexOf(`  ${name}:`),
-  next ? workflow.indexOf(`  ${next}:`) : workflow.length);
-
-test("release build is gated by drift and accessibility", () => {
+const yml = await readFile(new URL("../../.github/workflows/deploy.yml", import.meta.url), "utf8");
+const block = (a, b) => yml.slice(yml.indexOf(`  ${a}:`), b ? yml.indexOf(`  ${b}:`) : yml.length);
+test("release build is gated by drift and axe", () => {
   assert.match(block("static-quality", "source-access-db-contract"), /npm run drift/u);
   assert.match(block("a11y", "production-build"), /needs:\s*static-quality[\s\S]*npm run a11y/u);
   const build = block("production-build", "deploy");
-  for (const need of ["static-quality", "source-access-db-contract", "e2e-mock", "a11y"]) {
+  for (const need of ["static-quality", "source-access-db-contract", "e2e-mock", "a11y"])
     assert.match(build, new RegExp(`- ${need}`));
-  }
 });
 ```
 
@@ -206,382 +177,303 @@ test("release build is gated by drift and accessibility", () => {
 
 Run: `node --import tsx --test tests/unit/visual-runtime-contract.test.mjs tests/unit/release-workflow-contract.test.mjs`
 
-Expected: FAIL `ERR_MODULE_NOT_FOUND` cho matrix contract và thiếu job `a11y`/`npm run drift`.
+Expected: FAIL missing matrix module và missing `a11y`/`npm run drift` gate.
 
-- [ ] **Step 3: GREEN matrix contract**
+- [ ] **Step 3: GREEN contract/workflows**
 
-Tạo `scripts/visual-matrix-contract.mjs` với literal route/name đang có trong `lotus.spec.ts`, ba project `chromium`, `chromium-1366`, `chromium-1920`, hai theme và công thức:
+Tạo contract với bảy route/name hiện hữu (`today`, `overview`, `source`, `progress`, `timeline`, `alerts`, `reports`), hai theme và ba project `1440×900`, `1366×768`, `1920×1080`. `lotus.spec.ts` chỉ import danh sách; không sửa callback, selector hoặc expectation Timeline. Runtime/seal/fixture test dùng derived count. Baseline workflow lấy `expected_count="$(npm run --silent visual:matrix:count)"` thay mọi literal 39.
 
-```js
-export const VISUAL_SCREENS = [
-  ["today", "hom-nay"], ["overview", "tong-quan"], ["source", "danh-muc"],
-  ["progress", "tien-do"], ["timeline", "timeline"], ["alerts", "canh-bao"],
-  ["reports", "bao-cao"],
-];
-export const VISUAL_THEMES = ["light", "dark"];
-export const VISUAL_PROJECTS = [
-  { name: "chromium", viewport: { width: 1440, height: 900 } },
-  { name: "chromium-1366", viewport: { width: 1366, height: 768 } },
-  { name: "chromium-1920", viewport: { width: 1920, height: 1080 } },
-];
-export const VISUAL_BASELINE_COUNT =
-  (VISUAL_SCREENS.length * VISUAL_THEMES.length + 1) * VISUAL_PROJECTS.length;
-```
+Thêm scripts `visual:matrix:count` và `visual:matrix:verify`. Trong deploy: `npm run drift` sau unit; job `a11y` cài Chromium, tạo mock env như E2E, chạy `bash scripts/with-preview.sh -- npm run a11y`; build needs `a11y`.
 
-CLI chỉ chấp nhận `--count` và `--verify-output <path>`; verifier parse dòng `45 passed`, exit 1 nếu lệch. Import screen/theme trong `lotus.spec.ts`, project/viewport trong config, và count trong runtime verifier. Thay fixture `BASELINE_PATHS` trong unit test bằng phép sinh từ contract; seal prefix dùng `String(VISUAL_BASELINE_COUNT)`.
-
-- [ ] **Step 4: GREEN workflow/package**
-
-Thêm scripts:
-
-```json
-"visual:matrix:count": "node scripts/visual-matrix-contract.mjs --count",
-"visual:matrix:verify": "node scripts/visual-matrix-contract.mjs --verify-output visual-output.log"
-```
-
-Trong `static-quality`, chạy `npm run drift` sau unit. Thêm job `a11y` cài Chromium, tạo `.env.local` giả lập như `e2e-mock`, rồi chạy `bash scripts/with-preview.sh -- npm run a11y`. Thêm `a11y` vào `production-build.needs`. Trong baseline workflow thay grep/count hard-code bằng `npm run visual:matrix:verify`, `expected_count="$(npm run --silent visual:matrix:count)"`, và kiểm `changed == expected_count + 1`, `png_count == expected_count`, tree count bằng `expected_count`.
-
-- [ ] **Step 5: Chạy focused GREEN**
+- [ ] **Step 4: Verify và commit**
 
 Run: `node --import tsx --test tests/unit/visual-runtime-contract.test.mjs tests/unit/release-workflow-contract.test.mjs tests/unit/a11y-runtime-contract.test.mjs`
 
-Expected: PASS.
-
 Run: `npm run visual:matrix:count`
 
-Expected stdout: `45`.
+Expected: tests PASS; stdout `45`.
 
 Run: `npm run visual:contract`
 
-Expected trước khi tạo 6 ảnh Cảnh báo còn thiếu: FAIL rõ `expected exactly 45 ... found 39`; đây là RED lifecycle hợp lệ, không được sửa seal/PNG bằng tay.
-
-- [ ] **Step 6: Review và commit**
-
-Reviewer xác nhận không còn literal `39` trong workflow/runtime/tests và config vẫn đúng ba desktop viewport.
+Expected: FAIL rõ `expected exactly 45 ... found 39`; lifecycle còn mở là chủ đích. Không update/seal baseline.
 
 ```bash
 git add scripts/visual-matrix-contract.mjs tests/visual/lotus.spec.ts playwright.visual.config.ts scripts/check-visual-runtime.mjs tests/unit/visual-runtime-contract.test.mjs tests/unit/release-workflow-contract.test.mjs .github/workflows/deploy.yml .github/workflows/visual-baseline.yml package.json
 git commit -m "ci(ui): hợp nhất visual matrix và axe gate"
 ```
 
-### Task 3: Nén desktop masthead, phạm vi và Monitoring Journey; khóa fold geometry
+### Task 3: Việc hôm nay data-first trong fold desktop, giữ nguyên Vali
 
 **Files:**
-- Modify: `src/components/layout/Layout.tsx`
-- Modify: `src/features/monitoring/MonitoringJourneyNav.tsx`
-- Modify: `src/styles/lotus-shell.css`
-- Modify: `src/features/monitoring/monitoring.css`
-- Modify: `tests/unit/monitoring-journey.test.mjs`
-- Create: `tests/e2e/desktop-data-first-geometry.mjs`
+- Modify: `src/features/today/TodayCommandCenter.tsx`
+- Modify: `src/features/today/today.css`
+- Modify: `tests/unit/today-command-center.test.mjs`
+- Create: `tests/e2e/today-desktop-fold.mjs`
 
 **Interfaces:**
-- Monitoring nav vẫn nhận nguyên `MonitoringJourneyNavProps`; output desktop là một semantic tab rail icon + title + badge count, active có `aria-current="page"`.
-- Geometry contract: tại `1366×768`, top của `.b-hero`, `.long-mon-race`, `.alerts-priority-rail` không quá `360px`; Today/Progress/Reports có data/CTA đầu tiên trong viewport.
+- `TodayCommandCenterProps`, `TodayCommandCenterContentProps`, `onOpenProgress(progressLink(row))`, bốn queue và quyền CTA không đổi.
+- Thêm `data-today-first-action` vào CTA `Làm trước tiên` và `data-today-first-row` vào row đầu của nhóm đầu tiên có dữ liệu; chỉ phục vụ observable geometry, không thêm state.
+- Acceptance `1366×768`: không redesign; giảm riêng chiều cao hero khoảng `80–100px` để CTA ưu tiên và row dữ liệu đầu tiên cùng có phần nhìn thấy trong viewport. Trả thêm khoảng `100–140px` cho cột Hạng mục bằng cách co cột Mã/QA/CTA; không đổi `MetricGrid` shared hoặc cấu trúc bốn KPI.
 
-- [ ] **Step 1: RED semantic markup**
+- [ ] **Step 1: RED structure test**
 
-Sửa test `journey nav renders...` thành các assertion hành vi:
+Trong `tests/unit/today-command-center.test.mjs`, giữ fixtures thật và thêm:
 
 ```js
-assert.match(html, /role="tablist"/);
-assert.equal((html.match(/role="tab"/g) || []).length, 2);
-assert.match(html, /aria-current="page"/);
-assert.match(html, /aria-selected="true"/);
-assert.match(html, />5<\/strong>/);
-assert.doesNotMatch(html, /Đang xem/);
-for (const item of Object.values(MONITORING_SCREEN_COPY)) {
-  assert.doesNotMatch(html, new RegExp(item.description));
-}
+test("Today marks the first business action and first queue row without changing CTA rules", () => {
+  const html = render(contentProps());
+  assert.equal(count(html, /data-today-first-action="true"/g), 1);
+  assert.equal(count(html, /data-today-first-row="true"/g), 1);
+  assert.equal(count(html, /<button[^>]*>Cập nhật tiến độ<\/button>/g), 1);
+  assert.match(html, /Công chúa Vali/);
+});
 ```
 
-Production change bị bắt: quay lại card cao có description/current pill hoặc mất semantic active tab.
+Production mutations caught: marker missing/duplicated, CTA quyền bị biến thành button đại trà, hoặc Vali bị xóa.
 
 - [ ] **Step 2: RED geometry E2E**
 
-Tạo `tests/e2e/desktop-data-first-geometry.mjs` dùng `puppeteer-core`, `caiGiaLap`, `nhetPhien`, `CHROME` theo `tests/e2e/monitoring-journey.mjs`; viewport cố định `1366×768`. Với từng route, đợi selector và đo literal:
+Tạo `tests/e2e/today-desktop-fold.mjs` từ harness `tests/e2e/today-qa-ledger.mjs`: mock `day`, strict external network, viewport `1366×768`, route `#v=today`, wait `.hn-nhom .hn-muc`. Đo:
 
 ```js
-const cases = [
-  ["overview", ".b-hero"],
-  ["timeline", ".long-mon-race"],
-  ["alerts", ".alerts-priority-rail"],
-  ["today", ".hn-queue button, .hn-command button"],
-  ["progress", ".pr-table thead, .pr-row"],
-  ["reports", ".vmp-report-command-bar + *"],
-];
-for (const [view, selector] of cases) {
-  await page.goto(`${APP_URL}#v=${view}`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(selector, { visible: true, timeout: 15_000 });
-  const box = await page.$eval(selector, (node) => node.getBoundingClientRect().toJSON());
-  assert.ok(box.top <= (view === "overview" || view === "timeline" || view === "alerts" ? 360 : 768),
-    `${view} starts below desktop fold: ${box.top}`);
-  assert.ok(box.top < 768 && box.bottom > 0, `${view} first action/data is outside fold`);
-}
+const evidence = await page.evaluate(() => {
+  const hero = document.querySelector(".hn-hero")?.getBoundingClientRect();
+  const vali = document.querySelector(".hn-vali")?.getBoundingClientRect();
+  const action = document.querySelector("[data-today-first-action]")?.getBoundingClientRect();
+  const row = document.querySelector("[data-today-first-row]")?.getBoundingClientRect();
+  return { hero, vali, action, row,
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+});
+assert.ok(evidence.hero.top < 360 && evidence.hero.height <= 122, JSON.stringify(evidence));
+assert.ok(evidence.vali.width >= 72 && evidence.vali.height >= 92, JSON.stringify(evidence));
+assert.ok(evidence.action.top < 768 && evidence.row.top < 768, JSON.stringify(evidence));
+assert.ok(evidence.overflow <= 1, JSON.stringify(evidence));
 ```
-
-Nếu selector thực tế của Today/Progress khác, chọn selector hiện hữu đầu tiên đại diện CTA/table row sau khi xem DOM; không nới điều kiện `top < 768`.
 
 - [ ] **Step 3: Chạy RED**
 
-Run: `node --import tsx --test tests/unit/monitoring-journey.test.mjs`
+Run: `node --import tsx --test tests/unit/today-command-center.test.mjs`
 
-Expected: FAIL vì nav hiện chưa có tablist/tab và vẫn render description/“Đang xem”.
+Expected: FAIL missing data markers.
 
-Run: `bash scripts/with-preview.sh -- node tests/e2e/desktop-data-first-geometry.mjs`
+Run: `bash scripts/with-preview.sh -- node tests/e2e/today-desktop-fold.mjs`
 
-Expected: FAIL ít nhất một bề mặt monitoring bắt đầu dưới `360px` hoặc data/CTA dưới fold.
+Expected: FAIL vì hero hiện cao khoảng một Vali `150px` cộng padding và row đầu chưa vào fold; target mới yêu cầu hero không quá `122px`.
 
-- [ ] **Step 4: GREEN tối thiểu desktop-only**
+- [ ] **Step 4: GREEN component/CSS tối thiểu**
 
-- Trong `MonitoringJourneyNav.tsx`, rail `role="tablist" aria-label="Ba màn giám sát"`; mỗi button `role="tab"`, `aria-selected={active}`, `aria-current`; bỏ description và pill “Đang xem”; giữ icon, title, metric number + metric label cho accessible name.
-- Trong `Layout.tsx`, chuyển padding desktop inline sang CSS variables/class hoặc giá trị `14px var(--lp-shell-pad)`; giữ h1, wordmark, thời điểm sửa, theme/refresh/role.
-- Trong `lotus-shell.css` và `monitoring.css`, chỉ dưới `@media (min-width: 1180px)`: masthead cao 40–44px, h1 dùng `32px/38px`, topbar không wrap, global filter/context gap 8–10px, journey một hàng cao không quá 56px, badge/pill tối thiểu 12px, item min-height 44px. Không sửa block mobile.
-- Dùng token Lotus có sẵn; không thêm hex/radius ngoài thang. Không đổi copy CPC1 HN.
+Trong `TodayQueueSection`, nhận prop `markFirstRow`; gắn marker chỉ khi `index === 0`. Ở `TodayCommandCenterContent`, tính `firstVisibleSection = nhomHien.find(section => model.sections[section].length > 0)` và truyền boolean; CTA editable/non-editable đều nhận `data-today-first-action="true"` khi `dau` tồn tại.
 
-- [ ] **Step 5: GREEN + review visual**
+Trong `today.css`, chỉ thêm `@media (min-width: 1180px)`: `.hn-lotus` gap 12; `.hn-hero` padding `8px 16px`, columns `72px minmax(0,1fr) minmax(300px,.95fr)`, Vali giữ nguyên artwork/state nhưng hiển thị `72×92`, quote `20px/1.2`, gap hero 10–12px. Không sửa `.hn-hero__so .lp-metric*`, không đổi `MetricGrid`, số/copy/callback KPI.
 
-Run: `node --import tsx --test tests/unit/monitoring-journey.test.mjs`
+Trong cùng desktop media query, dành chiều ngang cho tên hạng mục bằng `.hn-muc__tom-tat { grid-template-columns: 96px minmax(0,1fr) minmax(180px,.72fr) 112px; gap: 0 10px; }` và `.hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 96px minmax(0,1fr); gap: 0 10px; }`; CTA padding `0 10px`. Đây là thay đổi P1 duy nhất ngoài hero: co Mã/QA/CTA để cột tên nhận thêm khoảng `100–140px`. Không sửa block `max-width:768px`, không ẩn Vali/CTA/KPI, không đổi colors hoặc dữ liệu hàng.
 
-Run: `bash scripts/with-preview.sh -- node tests/e2e/desktop-data-first-geometry.mjs`
+- [ ] **Step 5: Verify/review/commit**
 
-Run: `npm run drift`
+Run: `node --import tsx --test tests/unit/today-command-center.test.mjs`
 
-Expected: tất cả PASS.
+Run: `bash scripts/with-preview.sh -- node tests/e2e/today-desktop-fold.mjs`
 
-Chụp review thủ công (không update snapshot):
+Run: `bash scripts/with-preview.sh -- node tests/e2e/today-qa-ledger.mjs`
 
-```bash
-bash scripts/with-preview.sh -- npm run visual -- --project=chromium-1366 --grep "tong-quan|timeline|canh-bao"
-```
+Run: `npm run drift && npm run typecheck`
 
-Expected: test visual sẽ FAIL vì intentional diff; reviewer mở `test-results/**/actual.png`, xác nhận không mất Lotus Pearl/CPC1 HN, không overlap/focus clipping, rồi ghi nhận approval trước Task 5.
-
-- [ ] **Step 6: Commit**
+Expected: PASS; QA column/detail/update modal vẫn đúng; Vali asset/state không đổi.
 
 ```bash
-git add src/components/layout/Layout.tsx src/features/monitoring/MonitoringJourneyNav.tsx src/styles/lotus-shell.css src/features/monitoring/monitoring.css tests/unit/monitoring-journey.test.mjs tests/e2e/desktop-data-first-geometry.mjs
-git commit -m "feat(ui): nén chrome giám sát desktop"
+git add src/features/today/TodayCommandCenter.tsx src/features/today/today.css tests/unit/today-command-center.test.mjs tests/e2e/today-desktop-fold.mjs
+git commit -m "feat(today): đưa hành động đầu vào fold desktop"
 ```
 
-### Task 4: Model thuần cho Long Môn action queue theo deadline canonical Bangkok
+### Task 4: Cập nhật tiến độ gọn, table-first và chữ nghiệp vụ ≥12px
 
 **Files:**
-- Create: `src/features/monitoring/longMonActionQueue.ts`
-- Create: `tests/unit/long-mon-action-queue.test.mjs`
+- Modify: `src/pages/UpdatePage.tsx`
+- Modify: `src/features/progress/progress.css`
+- Modify: `tests/unit/progress-filter-ui.test.mjs`
+- Create: `tests/e2e/progress-desktop-fold.mjs`
 
 **Interfaces:**
-- Consumes: `readonly Activity[]`, `now: Date`; `classifyVmpDeadline(activity, now, SOON_DAYS)`.
-- Produces:
+- Giữ `UpdateView` props, rights gate, deep link, `setEdit(a)`, quick filters và advanced filter state.
+- Thêm `data-progress-first-row="true"` vào row render đầu của `lat`; không đổi sorting/filtering/pagination.
+- Acceptance `1366×768`: `.pr-hero`, `.pr-loc`, `.pr-table thead` và first row nhìn thấy; advanced filters đóng mặc định; font header/badge/label computed `>=12px`.
 
-```ts
-export type LongMonActionKind = "overdue" | "due-soon";
-export interface LongMonActionItem {
-  activity: Activity;
-  code: string;
-  name: string;
-  qa: string;
-  deadline: string;
-  daysRemaining: number;
-  kind: LongMonActionKind;
-}
-export interface LongMonActionQueue {
-  overdue: LongMonActionItem[];
-  dueSoon: LongMonActionItem[];
-  counts: { overdue: number; dueSoon: number };
-}
-export function buildLongMonActionQueue(
-  activities: readonly Activity[], now: Date,
-): LongMonActionQueue;
+- [ ] **Step 1: RED unit contract cho state mặc định**
+
+Mở rộng `tests/unit/progress-filter-ui.test.mjs` bằng helper thuần đã có và literal expectations:
+
+```js
+test("progress desktop defaults keep only quick action filters visible", () => {
+  assert.equal(countProgressAdvancedFilters({ status: "all", stage: "all", period: "all", showInactive: false, issues: [] }), 0);
+  assert.equal(isDetailedProgressFix("all"), false);
+});
 ```
 
-- [ ] **Step 1: Viết RED table-driven từ literal độc lập**
+Thêm vào test integration hiện hữu hoặc test SSR của `UpdateView` assertion duy nhất `data-progress-first-row`; nếu SSR không thể qua rights effect, marker được xác nhận bằng RED E2E ở Step 2, không mock quyền chỉ để nhìn thấy row.
+
+- [ ] **Step 2: RED geometry E2E**
+
+Tạo `tests/e2e/progress-desktop-fold.mjs` từ `tests/e2e/progress-compact-filters.mjs`; mock/session y hệt, viewport `1366×768`, route `#v=progress`, wait `.pr-bang .pr-row`. Assert:
+
+```js
+const e = await page.evaluate(() => {
+  const rect = (s) => document.querySelector(s)?.getBoundingClientRect().toJSON();
+  const sizes = [".pr-th", ".pr-loc__badge", ".pr-loc__truong > span"]
+    .flatMap((s) => [...document.querySelectorAll(s)].map((n) => parseFloat(getComputedStyle(n).fontSize)));
+  return { hero: rect(".pr-hero"), filter: rect(".pr-loc"), head: rect(".pr-table thead"),
+    row: rect("[data-progress-first-row]"), sizes,
+    advancedHidden: document.querySelector("#progress-advanced-filters")?.hasAttribute("hidden"),
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+});
+assert.ok(e.hero.top < 360 && e.hero.height <= 190, JSON.stringify(e));
+assert.ok(e.filter.top < 768 && e.head.top < 768 && e.row.top < 768, JSON.stringify(e));
+assert.ok(e.advancedHidden && e.sizes.every((n) => n >= 12) && e.overflow <= 1, JSON.stringify(e));
+```
+
+- [ ] **Step 3: Chạy RED**
+
+Run: `node --import tsx --test tests/unit/progress-filter-ui.test.mjs`
+
+Expected: PASS cho characterization hiện có; đây là safety net trước CSS.
+
+Run: `bash scripts/with-preview.sh -- node tests/e2e/progress-desktop-fold.mjs`
+
+Expected: FAIL missing first-row marker, 11px labels/headers, hoặc row dưới fold.
+
+- [ ] **Step 4: GREEN tối thiểu**
+
+Trong `UpdatePage.tsx`, map `lat.map((a, index) => ...)` và gắn `data-progress-first-row={index === 0 ? "true" : undefined}` vào `<tr>`; giữ mọi data attributes/callback khác.
+
+Trong `progress.css`, nâng `.pr-loc__badge`, `.pr-loc__truong > span`, legend và `.pr-th` từ 11 lên 12px. Chỉ dưới `@media (min-width:1180px)`: `.pr-trang` gap 12, `.pr-hero` padding 12–14 và columns Vali 92px/content, `.pr-hero .hn-vali` 92×116, quote 22px, filter padding/gap gọn, table header/row padding dọc 8–9px. Quick filters vẫn hiện; advanced panel vẫn hidden mặc định; không làm `.pr-nhanh` hover-only thành đường duy nhất cập nhật vì `.pr-nut-chinh` vẫn luôn có.
+
+- [ ] **Step 5: Verify/review/commit**
+
+Run: `node --import tsx --test tests/unit/progress-filter-ui.test.mjs tests/unit/progress-workspace-model.test.mjs tests/unit/progress-deep-link.test.mjs`
+
+Run: `bash scripts/with-preview.sh -- node tests/e2e/progress-desktop-fold.mjs`
+
+Run: `bash scripts/with-preview.sh -- node tests/e2e/progress-compact-filters.mjs`
+
+Run: `npm run drift && npm run typecheck`
+
+Expected: PASS; quick/advanced filters và rights/deep link không đổi.
+
+```bash
+git add src/pages/UpdatePage.tsx src/features/progress/progress.css tests/unit/progress-filter-ui.test.mjs tests/e2e/progress-desktop-fold.mjs
+git commit -m "feat(progress): ưu tiên bảng dữ liệu trong fold desktop"
+```
+
+### Task 5: Báo cáo progressive disclosure, giữ bốn control và ba export action
+
+**Files:**
+- Modify: `src/components/dashboard/ReportsView.tsx`
+- Create: `src/components/dashboard/reports.css`
+- Create: `tests/unit/reports-view.test.mjs`
+- Create: `tests/e2e/reports-desktop-fold.mjs`
+
+**Interfaces:**
+- `ReportsView({ acts })`, report model, `printPDF`, `exportExcel`, `downloadHtml`, file names/sheets và chart data không đổi.
+- Command row vẫn có bốn control: Năm, Phạm vi, Khu vực, Mức trọng yếu; export group vẫn đúng PDF, Excel, HTML.
+- Explanations chuyển vào native `<details className="vmp-report-method">` đóng mặc định, `<summary>Cách tính báo cáo</summary>`.
+- First KPI wrapper có `data-report-first-kpi="true"` để geometry test quan sát.
+
+- [ ] **Step 1: RED SSR behavior**
+
+Tạo `tests/unit/reports-view.test.mjs` dùng `renderToStaticMarkup` và một `Activity` literal active có `dlVmp` trong năm hiện tại:
 
 ```js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildLongMonActionQueue } from "../../src/features/monitoring/longMonActionQueue.ts";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ReportsView from "../../src/components/dashboard/ReportsView.tsx";
 
-const NOW = new Date("2026-08-31T17:30:00Z"); // 01/09/2026 00:30 Bangkok
-const activity = (code, dlVmp, extra = {}) => ({
-  id: code, code, obj: code, name: `Tên ${code}`, type: "PQ", state: "active",
-  st: "prog", dlVmp, owner_name: `QA ${code}`, _raw: {}, ...extra,
-});
-
-test("queue uses Bangkok date, excludes done/missing/future, and sorts urgency then code", () => {
-  const queue = buildLongMonActionQueue([
-    activity("B", "2026-08-30"), activity("A", "2026-08-30"),
-    activity("TODAY", "2026-09-01"), activity("SOON", "2026-09-03"),
-    activity("FUTURE", "2026-12-01"), activity("MISSING", null),
-    activity("DONE", "2026-08-01", { st: "done" }),
-  ], NOW);
-  assert.deepEqual(queue.overdue.map((row) => [row.code, row.daysRemaining]), [["A", -2], ["B", -2]]);
-  assert.deepEqual(queue.dueSoon.map((row) => [row.code, row.daysRemaining]), [["TODAY", 0], ["SOON", 2]]);
-  assert.deepEqual(queue.counts, { overdue: 2, dueSoon: 2 });
-});
-
-test("queue uses canonical dlVmp and stable QA/name fallbacks", () => {
-  const queue = buildLongMonActionQueue([activity("CANON", "2026-08-31", {
-    target: "2027-01-01", name: "Máy đóng nang", owner_name: "Nguyễn QA",
-  })], NOW);
-  assert.deepEqual(queue.overdue[0], {
-    activity: activity("CANON", "2026-08-31", { target: "2027-01-01", name: "Máy đóng nang", owner_name: "Nguyễn QA" }),
-    code: "CANON", name: "Máy đóng nang", qa: "Nguyễn QA",
-    deadline: "2026-08-31", daysRemaining: -1, kind: "overdue",
-  });
+test("reports keeps four primary controls and three exports while counting copy is collapsed", () => {
+  const html = renderToStaticMarkup(React.createElement(ReportsView, { acts: [{
+    id: "R1", code: "R1", obj: "R1", name: "Máy R1", type: "PQ", state: "active",
+    st: "prog", dlVmp: `${new Date().getFullYear()}-12-01`, target: `${new Date().getFullYear()}-12-01`, _raw: {},
+  }] }));
+  for (const label of ["Năm báo cáo", "Phạm vi (bộ phận)", "Khu vực", "Mức trọng yếu"])
+    assert.match(html, new RegExp(label.replace(/[()]/g, "\\$&")));
+  assert.match(html, /aria-label="Xuất báo cáo"/);
+  for (const label of ["PDF", "Excel \(đủ 5 sheet\)", "HTML"]) assert.match(html, new RegExp(label));
+  assert.match(html, /<details class="vmp-report-method">/);
+  assert.match(html, /<summary>Cách tính báo cáo<\/summary>/);
+  assert.doesNotMatch(html, /<details[^>]*open/);
+  assert.equal((html.match(/data-report-first-kpi="true"/g) || []).length, 1);
 });
 ```
 
-- [ ] **Step 2: Chạy RED**
+- [ ] **Step 2: RED desktop geometry/keyboard**
 
-Run: `node --import tsx --test tests/unit/long-mon-action-queue.test.mjs`
-
-Expected: FAIL `ERR_MODULE_NOT_FOUND`.
-
-- [ ] **Step 3: GREEN tối thiểu**
-
-Dùng `classifyVmpDeadline`; map `overdue` vào `overdue`, `today|soon` vào `dueSoon`; bỏ `done|missing|future`. Tên: `name || objName || obj || "Hạng mục VMP"`; QA: `owner_name || owner || _raw.owner_name || "Chưa phân công QA"`; code: `code || id`. Sort overdue theo `daysRemaining` tăng dần rồi `localeCompare("vi")`; dueSoon tương tự.
-
-- [ ] **Step 4: GREEN và mutation check**
-
-Run: `node --import tsx --test tests/unit/long-mon-action-queue.test.mjs tests/unit/vmp-deadline-model.test.mjs`
-
-Expected: PASS.
-
-Mutation: thay `dlVmp` bằng `target`, đổi Bangkok sang UTC, hoặc đảo sort phải làm ít nhất một test fail.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/features/monitoring/longMonActionQueue.ts tests/unit/long-mon-action-queue.test.mjs
-git commit -m "feat(long-mon): tạo hàng đợi hành động canonical"
-```
-
-### Task 5: Tích hợp Long Môn action dock desktop, keyboard/a11y và seal visual sau duyệt
-
-**Files:**
-- Create: `src/features/monitoring/LongMonActionDock.tsx`
-- Modify: `src/features/monitoring/LongMonRace.tsx`
-- Modify: `src/features/monitoring/long-mon-race.css`
-- Modify: `tests/unit/long-mon-race.test.mjs`
-- Create: `tests/e2e/long-mon-action-dock.mjs`
-- Modify: `tests/a11y/a11y.spec.ts`
-- Modify: `tests/visual/baseline-contract.env` (chỉ workflow seal sau review)
-- Modify: `tests/visual/baselines/chromium-linux/*.png` (workflow only)
-- Modify: `tests/visual/baselines/chromium-1366-linux/*.png` (workflow only)
-- Modify: `tests/visual/baselines/chromium-1920-linux/*.png` (workflow only)
-
-**Interfaces:**
-- `LongMonActionDockProps`: `{ queue: LongMonActionQueue; scopeLabel: string; emptyReason?: string | null; onOpen: (activity: Activity) => void }`.
-- Dock mặc định mở tab `overdue` nếu có, nếu không `due-soon`; tối đa 8 dòng sau lọc; search mã/tên/QA không phân biệt hoa thường/dấu cách thừa.
-- `LongMonRaceProps` không đổi ở call-site; component tự gọi `buildLongMonActionQueue(activities, now)` và chuyển cùng `onOpen` vào dock.
-
-- [ ] **Step 1: RED SSR cho semantic dock và integration**
-
-Thêm test vào `tests/unit/long-mon-race.test.mjs` với ba activity overdue/soon, render `LongMonRace`, rồi assert:
+Tạo `tests/e2e/reports-desktop-fold.mjs` dùng cùng mock/session harness; viewport `1366×768`, route `#v=reports`, wait `.vmp-report-command-bar` và `[data-report-first-kpi]`. Assert:
 
 ```js
-assert.match(html, /aria-label="Việc cần xử lý trong Long Môn"/);
-assert.match(html, /aria-controls="long-mon-action-panel"/);
-assert.match(html, /aria-expanded="true"/);
-assert.match(html, /role="tablist"/);
-assert.match(html, /Quá hạn \(2\)/);
-assert.match(html, /Sắp hạn \(1\)/);
-assert.match(html, /aria-label="Tìm theo mã, tên hoặc QA"/);
-assert.match(html, /data-long-mon-action-code=/);
-```
-
-- [ ] **Step 2: RED browser interaction/geometry**
-
-Tạo `tests/e2e/long-mon-action-dock.mjs` theo harness `long-mon-race.mjs`, desktop `1366×768`; assert:
-
-```js
-await page.waitForSelector('.long-mon-action-dock[aria-label="Việc cần xử lý trong Long Môn"]');
-assert.ok(await page.$$eval("[data-long-mon-action-code]", (rows) => rows.length > 0 && rows.length <= 8));
-const code = await page.$eval("[data-long-mon-action-code]", (row) => row.dataset.longMonActionCode);
-await page.type('input[aria-label="Tìm theo mã, tên hoặc QA"]', code);
-assert.deepEqual(await page.$$eval("[data-long-mon-action-code]", (rows) => rows.map((r) => r.dataset.longMonActionCode)), [code]);
-await page.focus('input[aria-label="Tìm theo mã, tên hoặc QA"]');
-await page.keyboard.press("Tab");
+const e = await page.evaluate(() => {
+  const rect = (s) => document.querySelector(s)?.getBoundingClientRect().toJSON();
+  const details = document.querySelector(".vmp-report-method");
+  return { command: rect(".vmp-report-command-bar"), kpi: rect("[data-report-first-kpi]"),
+    controls: document.querySelectorAll(".vmp-report-command-bar > :not(.vmp-report-export-actions)").length,
+    exports: document.querySelectorAll(".vmp-report-export-actions button").length,
+    open: details?.hasAttribute("open"), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+});
+assert.equal(e.controls, 4); assert.equal(e.exports, 3); assert.equal(e.open, false);
+assert.ok(e.command.top < 560 && e.kpi.top < 768 && e.overflow <= 1, JSON.stringify(e));
+await page.focus(".vmp-report-method summary");
 await page.keyboard.press("Enter");
-await page.waitForSelector('[role="dialog"][aria-modal="true"]');
-assert.match(await page.$eval('[role="dialog"]', (n) => n.textContent), new RegExp(code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+assert.equal(await page.$eval(".vmp-report-method", (n) => n.hasAttribute("open")), true);
 ```
-
-Sau đóng modal, đo `.long-mon-race__today`, `.long-mon-race__gate`, `.long-mon-action-dock`; assert intersection area bằng 0, dock width `280..340`, informative computed font sizes trong dock/week/scope/code/legend đều `>=12` và document không tràn ngang.
 
 - [ ] **Step 3: Chạy RED**
 
-Run: `node --import tsx --test tests/unit/long-mon-race.test.mjs`
+Run: `node --import tsx --test tests/unit/reports-view.test.mjs`
 
-Run: `bash scripts/with-preview.sh -- node tests/e2e/long-mon-action-dock.mjs`
+Expected: FAIL missing details/summary/KPI marker.
 
-Expected: FAIL vì dock/selector chưa tồn tại.
+Run: `bash scripts/with-preview.sh -- node tests/e2e/reports-desktop-fold.mjs`
 
-- [ ] **Step 4: GREEN component tối thiểu**
+Expected: FAIL missing selector hoặc KPI dưới fold.
 
-`LongMonActionDock.tsx` dùng `useState` cho `collapsed`, `activeTab`, `query`; native buttons/input. Toggle có `aria-expanded`, `aria-controls`; tab buttons có `role="tab"`, `aria-selected`; panel `role="tabpanel"`. Normalize query bằng `trim().toLocaleLowerCase("vi")`; filter `code name qa`; `slice(0, 8)`. Mỗi row là button gọi `onOpen(item.activity)` và có nhãn chữ `Quá hạn`/`Sắp hạn`, ngày `dd/mm/yyyy`, `Trễ N ngày`/`Còn N ngày`/`Hôm nay`.
+- [ ] **Step 4: GREEN tối thiểu**
 
-Trong `LongMonRace.tsx`, thêm wrapper `.long-mon-race__stage` chứa viewport và dock; queue tạo trước render. Dock nhận `scopeLabel={scopeControl?.scopeLabel ?? "Theo phạm vi hiện tại"}` và `emptyReason={scopeControl?.emptyMessage}`. Không đổi fish model, positioning hoặc callback modal.
+Import `./reports.css` trong `ReportsView.tsx`. Giữ command bar markup/control callbacks. Bọc ba khối giải thích hiện có (`Đang xem...`, khác Tổng quan, kỳ quá khứ/tương lai) trong một `details` đóng mặc định; summary luôn hiện. Thêm `data-report-first-kpi="true"` vào grid chứa hai `StatTile` đầu tiên, không đổi props/tính số. Thay emoji ℹ️ trong copy ẩn bằng chữ thuần để drift sạch; không đổi ý nghĩa.
 
-- [ ] **Step 5: GREEN CSS desktop-only**
+Trong `reports.css`: styles token-only cho details/summary/focus; `@media (min-width:1180px)` đặt command bar grid `repeat(4,minmax(130px,1fr)) auto`, gap 10–12, export group không wrap, Card đầu compact, method margin/padding gọn. Không sửa mobile media query hiện có và không đổi CSS bảng/chart phía sau.
 
-Trong `long-mon-race.css`, thay mọi informative `7/8/9/10/11px` ở week/scope/code/tooltip/legend/note bằng tối thiểu 12px. Giảm mốc tuần ở desktop bằng CSS/markup class (ẩn nhãn xen kẽ khi cần), không thu chữ. Tại `@media (min-width: 1180px)`, `.long-mon-race__stage` là grid `minmax(0, 1fr) clamp(280px, 23vw, 340px)`; dock nằm cột phải, không position overlay. Control min-height 44px, focus outline token, surface màu/token Long Môn hiện có. Ở dưới 1180px, không thiết kế lại mobile: dock theo normal flow dưới tranh và không tạo baseline mới.
+- [ ] **Step 5: Verify exports, geometry, accessibility và commit**
 
-- [ ] **Step 6: GREEN tests + axe scope**
+Run: `node --import tsx --test tests/unit/reports-view.test.mjs tests/unit/xuat-excel.test.mjs`
 
-Run: `node --import tsx --test tests/unit/long-mon-action-queue.test.mjs tests/unit/long-mon-race.test.mjs`
+Run: `bash scripts/with-preview.sh -- node tests/e2e/reports-desktop-fold.mjs`
 
-Run: `bash scripts/with-preview.sh -- node tests/e2e/long-mon-action-dock.mjs`
-
-Run: `bash scripts/with-preview.sh -- node tests/e2e/desktop-data-first-geometry.mjs`
-
-Expected: PASS.
-
-Trong `tests/a11y/a11y.spec.ts`, giữ sáu màn hiện có và thêm chính xác `{ ten: "danh-muc", hash: "#v=source", dangNhap: true, root: "#vmp-main-content" }` và `{ ten: "tai-cong-viec", hash: "#v=work", dangNhap: true, root: "#vmp-main-content" }` vì Task 3 đổi shared shell; sau khi root hiện, đợi skeleton biến mất hoặc tối đa 3 giây trước axe. Run:
-
-`bash scripts/with-preview.sh -- npm run a11y`
-
-Expected: không critical/serious trên toàn matrix axe.
+Run: `bash scripts/with-preview.sh -- npm run a11y -- --grep "bao-cao"`
 
 Run: `npm run drift && npm run typecheck && npm run build`
 
-Expected: PASS, không warning/error mới.
-
-- [ ] **Step 7: Visual review và seal có kiểm soát**
-
-Local/CI trước seal:
-
-`bash scripts/with-preview.sh -- npm run visual`
-
-Expected: intentional diffs và 6 baseline Cảnh báo còn thiếu; không gọi hoàn tất.
-
-Do phạm vi hiện tại cấm push, agent không dispatch workflow và không tự sửa PNG/seal. Sau khi chủ/reviewer duyệt ảnh actual 3 viewport × light/dark, bàn giao exact HEAD cùng hướng dẫn để chủ dự án tự push/dispatch `visual-baseline.yml`; workflow phải tạo đúng `45 PNG + baseline-contract.env`, seal tree, verify `45 passed`, rồi chủ dự án đưa bot commit trở lại branch. Primary chỉ fetch/inspect diff ảnh khi có ủy quyền mới.
-
-- [ ] **Step 8: Final review, commit code và final verification**
-
-Commit code trước baseline artifacts:
+Expected: PASS; bốn control/ba export giữ nguyên; summary keyboard mở được; KPI đầu trong fold; axe không critical/serious.
 
 ```bash
-git add src/features/monitoring/LongMonActionDock.tsx src/features/monitoring/LongMonRace.tsx src/features/monitoring/long-mon-race.css tests/unit/long-mon-race.test.mjs tests/e2e/long-mon-action-dock.mjs tests/a11y/a11y.spec.ts
-git commit -m "feat(long-mon): thêm action dock desktop dễ truy cập"
+git add src/components/dashboard/ReportsView.tsx src/components/dashboard/reports.css tests/unit/reports-view.test.mjs tests/e2e/reports-desktop-fold.mjs
+git commit -m "feat(reports): đưa KPI vào fold bằng disclosure"
 ```
 
-Trước bàn giao không-push, chạy mới trên Node 24.18.0:
+## Final verification and no-Timeline proof
+
+Chạy mới trên Node `24.18.0`:
 
 ```bash
 npm run typecheck
 npm run test:unit
 npm run drift
 bash scripts/with-preview.sh -- npm run a11y
-bash scripts/with-preview.sh -- npm run visual
-bash scripts/with-preview.sh -- node tests/e2e/desktop-data-first-geometry.mjs
-bash scripts/with-preview.sh -- node tests/e2e/long-mon-action-dock.mjs
+bash scripts/with-preview.sh -- node tests/e2e/today-desktop-fold.mjs
+bash scripts/with-preview.sh -- node tests/e2e/progress-desktop-fold.mjs
+bash scripts/with-preview.sh -- node tests/e2e/reports-desktop-fold.mjs
+bash scripts/with-preview.sh -- node tests/e2e/today-qa-ledger.mjs
+bash scripts/with-preview.sh -- node tests/e2e/progress-compact-filters.mjs
 npm run build
+git diff --name-only 6fdfe015..HEAD | rg 'TimelinePage|LongMon|long-mon|MonitoringJourney|monitoring\.css'
 git status --short
 ```
 
-Expected: typecheck/unit/drift/axe/geometry/dock/build PASS. `npm run visual` và `npm run visual:contract` được ghi rõ là release gate còn mở vì 45 baseline chưa thể tạo/seal khi chưa được push; không gọi toàn bộ feature “release-ready”. Bàn giao gồm branch local, năm commit code, exact HEAD cần dispatch, backup bundle path, review approvals và kết quả gate. Không push/merge/deploy.
-
-## Deliberate scope cut for this executable tranche
-
-Progressive disclosure Báo cáo, giảm riêng hero Today/Progress, và xóa component Timeline legacy không render được giữ ngoài năm task này. Geometry Task 3 vẫn khóa fold của Today/Progress/Reports để phát hiện regression, nhưng không mở rộng sửa ba bề mặt nếu chúng đã đạt. Lý do: những thay đổi đó chạm shared/legacy files lớn và không cần cho deliverable guardrail + compact monitoring chrome + Long Môn dock có thể hoàn tất, review và rollback trong một phiên. Nếu geometry chứng minh một trong ba màn không đạt, tạo spec/plan tranche kế tiếp thay vì lén mở scope trong task này.
+Expected: mọi gate không-visual PASS; lệnh proof không có output. `npm run visual`/`npm run visual:contract` vẫn được báo release gate mở vì contract 45 chưa seal và scope cấm update baseline. Bàn giao branch/commit local, backup bundle, kết quả từng geometry/review; không push/merge/deploy.
