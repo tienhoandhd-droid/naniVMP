@@ -617,9 +617,9 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3k. Báo cáo: khối VMP 2D là mặc định, 3D là khám phá ----------- */
+/* ---- 3k. Báo cáo: bản đồ chỉ tải sau khi người dùng chọn ------------ */
 {
-  console.log("\nBáo cáo — khối VMP 2D mặc định:");
+  console.log("\nBáo cáo — bản đồ tải theo yêu cầu:");
   const trang = await trinhDuyet.newPage();
   await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
@@ -631,14 +631,16 @@ for (const [id, ten] of MAN) {
     return {
       coKhoi: !!khoi,
       coCanvas: !!khoi?.querySelector("canvas"),
+      coNut2d: !!khoi?.querySelector('button[data-map-mode="2d"]'),
       nut2dChon: khoi?.querySelector('button[data-map-mode="2d"]')?.className.includes("is-chon"),
       coNut3d: !!khoi?.querySelector('button[data-map-mode="3d"]'),
       nhan3d: khoi?.querySelector('button[data-map-mode="3d"]')?.textContent?.trim(),
     };
   });
   kiem(kq.coKhoi, "khối không gian VMP có mặt ở Báo cáo");
-  kiem(!kq.coCanvas, "mặc định KHÔNG dựng canvas — 2D là mặt chính");
-  kiem(!!kq.nut2dChon, "nút 2D (Bản đồ tiến độ) đang được chọn");
+  kiem(!kq.coCanvas, "chưa dựng canvas trước khi người dùng chọn bản đồ");
+  kiem(kq.coNut2d && !kq.nut2dChon,
+    "nút Bản đồ tiến độ sẵn sàng nhưng không giả trạng thái đã chọn");
   kiem(kq.coNut3d && kq.nhan3d === "Xem bản đồ 3D",
     "nút khám phá mang đúng tên 'Xem bản đồ 3D'", kq.nhan3d || "(không có)");
   await trang.close();
