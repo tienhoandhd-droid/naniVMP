@@ -7,11 +7,11 @@
  *
  *  ARIA theo đúng mẫu đã qua axe của HealthPage cũ: tablist/tab/tabpanel,
  *  aria-selected, id nối aria-controls. Điều hướng mũi tên trái/phải.
- *  Nhớ tab cuối theo màn: localStorage `vmp.tab.<man>` (URL-tab: đợt sau,
- *  đụng urlState — ghi trong spec).
+ *  Nhớ tab cuối theo màn và ghi `tab=<id>` vào URL để link sâu, Back/Forward.
  * ===================================================================== */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { docUrl, withTabInHash } from "../../lib/urlState.ts";
 
 export interface TabMuc {
   id: string;
@@ -22,19 +22,68 @@ export interface TabMuc {
   canhBao?: boolean;
 }
 
+export function nextTabIndex(key: string, current: number, total: number): number | null {
+  if (total <= 0) return null;
+  if (key === "Home") return 0;
+  if (key === "End") return total - 1;
+  if (key === "ArrowRight") return (current + 1) % total;
+  if (key === "ArrowLeft") return (current + total - 1) % total;
+  return null;
+}
+
+function ghiTabVaoUrl(tab: string, replace: boolean) {
+  if (typeof window === "undefined") return;
+  const hash = withTabInHash(window.location.hash, tab);
+  const next = hash ? `#${hash}` : `${window.location.pathname}${window.location.search}`;
+  if (window.location.hash === (hash ? `#${hash}` : "")) return;
+  if (replace) {
+    window.history.replaceState(null, "", next);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  } else {
+    window.location.hash = hash;
+  }
+}
+
 /** Tab hiện hành, khởi tạo từ localStorage, tự ghi lại khi đổi. */
 export function useNhomTab(man: string, macDinh: string, hopLe: readonly string[]):
   [string, (t: string) => void] {
+  const hopLeKey = hopLe.join("\u0000");
   const [tab, setTabRaw] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const tuUrl = docUrl(window.location.hash).tab;
+      if (hopLe.includes(tuUrl)) return tuUrl;
+    }
     try {
       const luu = localStorage.getItem(`vmp.tab.${man}`);
       return luu && hopLe.includes(luu) ? luu : macDinh;
     } catch { return macDinh; }
   });
   const setTab = useCallback((t: string) => {
+    const danhSach = hopLeKey.split("\u0000");
+    if (!danhSach.includes(t)) return;
     setTabRaw(t);
     try { localStorage.setItem(`vmp.tab.${man}`, t); } catch { /* private mode */ }
-  }, [man]);
+    ghiTabVaoUrl(t, false);
+  }, [hopLeKey, man]);
+
+  useEffect(() => {
+    const danhSach = hopLeKey.split("\u0000");
+    const tuUrl = docUrl(window.location.hash).tab;
+    if (!danhSach.includes(tuUrl)) ghiTabVaoUrl(tab, true);
+
+    const apDungTuLichSu = () => {
+      const next = docUrl(window.location.hash).tab;
+      if (!danhSach.includes(next)) return;
+      setTabRaw(next);
+      try { localStorage.setItem(`vmp.tab.${man}`, next); } catch { /* private mode */ }
+    };
+    window.addEventListener("popstate", apDungTuLichSu);
+    window.addEventListener("hashchange", apDungTuLichSu);
+    return () => {
+      window.removeEventListener("popstate", apDungTuLichSu);
+      window.removeEventListener("hashchange", apDungTuLichSu);
+    };
+  }, [hopLeKey, man]);
   return [tab, setTab];
 }
 
@@ -47,9 +96,9 @@ export default function NhomTab({ man, tabs, tab, onTab, nhan }: {
   nhan: string;
 }) {
   const onKey = (e: React.KeyboardEvent, i: number) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const j = nextTabIndex(e.key, i, tabs.length);
+    if (j === null) return;
     e.preventDefault();
-    const j = (i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
     onTab(tabs[j].id);
     document.getElementById(`${man}-tab-${tabs[j].id}`)?.focus();
   };

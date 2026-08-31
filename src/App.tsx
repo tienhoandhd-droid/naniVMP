@@ -787,6 +787,7 @@ function VerifiedAppShell({ user, logout, access }: {
   const khoiTao: UrlState = khoiTaoDayDu.state;
 
   const [view, setView] = useState(khoiTao.view);
+  const [urlTab, setUrlTab] = useState(khoiTao.tab);
   // Đối tượng cần mở sẵn khi nhảy từ "Tiến độ theo đối tượng" sang "Danh mục &
   // Nhập liệu". Dùng object mới mỗi lần bấm (không phải chuỗi) để bấm lại cùng
   // một mã vẫn kích hoạt useEffect bên kia.
@@ -1002,13 +1003,13 @@ function VerifiedAppShell({ user, logout, access }: {
    * Đọc: nghe popstate (Back/Forward) và hashchange (người dùng tự sửa URL).
    * ------------------------------------------------------------------- */
   const trangThaiUrl = useMemo<UrlState>(() => ({
-    view, deptSel, areaSel, period: periodFilter, customFrom, customTo,
+    view, tab: urlTab, deptSel, areaSel, period: periodFilter, customFrom, customTo,
     // Giữ tương thích link `me=1` cũ khi người được chọn chính là tài khoản hiện tại.
     onlyMine: (view === "today" || view === "overview")
       && canSelectProgressPerson
       && (initialPersonalScopeRequested.current
         || (progressPersonScopeId !== null && progressPersonScopeId === currentPersonId)),
-  }), [view, deptSel, areaSel, periodFilter, customFrom, customTo, canSelectProgressPerson, currentPersonId, progressPersonScopeId]);
+  }), [view, urlTab, deptSel, areaSel, periodFilter, customFrom, customTo, canSelectProgressPerson, currentPersonId, progressPersonScopeId]);
 
   const viewTruoc = useRef(view);
   useEffect(() => {
@@ -1093,7 +1094,7 @@ function VerifiedAppShell({ user, logout, access }: {
   useEffect(() => {
     if (!user) return;
     saveFilterPrefs(user.email || user.name, {
-      hash: vietUrl({ ...trangThaiUrl, view: MAC_DINH.view }),
+      hash: vietUrl({ ...trangThaiUrl, view: MAC_DINH.view, tab: "" }),
     });
   }, [trangThaiUrl, user]);
 
@@ -1110,6 +1111,7 @@ function VerifiedAppShell({ user, logout, access }: {
       if (nhom) setNhomTheo(nhom);
       viewTruoc.current = sChuan.view;
       setView(sChuan.view);
+      setUrlTab(s.tab);
       setDeptSel(s.deptSel);
       setAreaSel(s.areaSel);
       setPeriodFilter(s.period);

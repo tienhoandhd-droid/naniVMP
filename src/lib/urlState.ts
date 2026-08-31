@@ -19,6 +19,8 @@
  *  dòng ở đây và một dòng trong doc/ghi, không phải sửa chỗ thứ ba. */
 export interface UrlState {
   view: string;
+  /** Tab con của màn hiện tại; để link sâu và Back/Forward giữ đúng ngữ cảnh. */
+  tab: string;
   deptSel: string[];
   areaSel: string[];
   period: string;
@@ -30,6 +32,7 @@ export interface UrlState {
 
 export const MAC_DINH: UrlState = {
   view: "overview",
+  tab: "",
   deptSel: [],
   areaSel: [],
   period: "all",
@@ -46,6 +49,10 @@ function tachDs(raw: string): string[] {
 /** Ngày dạng yyyy-mm-dd. Không nhận chuỗi lạ để URL bịa không làm hỏng bộ lọc. */
 function ngayHopLe(raw: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+}
+
+function tabHopLe(raw: string): string {
+  return /^[a-z0-9-]{1,64}$/.test(raw) ? raw : "";
 }
 
 /**
@@ -72,6 +79,8 @@ export function docUrl(hash: string, hopLe?: {
 
   const v = lay("v");
   if (v && (!hopLe?.views || hopLe.views.includes(v))) s.view = v;
+
+  s.tab = tabHopLe(lay("tab"));
 
   const dept = tachDs(lay("dept"));
   s.deptSel = hopLe?.depts ? dept.filter((d) => hopLe.depts!.includes(d)) : dept;
@@ -106,8 +115,20 @@ export function vietUrl(s: UrlState): string {
     if (s.customTo) p.set("to", s.customTo);
   }
   if (s.onlyMine) p.set("me", "1");
+  if (s.tab) p.set("tab", s.tab);
   // URLSearchParams mã hoá dấu phẩy thành %2C — dài và khó đọc khi dán vào
   // chat. Dấu phẩy an toàn trong fragment nên trả lại nguyên hình.
+  return p.toString().replace(/%2C/g, ",");
+}
+
+/** Đổi riêng tab trong hash mà không làm rơi màn/bộ lọc đang có. */
+export function withTabInHash(hash: string, tab: string): string {
+  let raw = String(hash || "");
+  if (raw.startsWith("#")) raw = raw.slice(1);
+  const p = new URLSearchParams(raw);
+  const safeTab = tabHopLe(tab);
+  if (safeTab) p.set("tab", safeTab);
+  else p.delete("tab");
   return p.toString().replace(/%2C/g, ",");
 }
 

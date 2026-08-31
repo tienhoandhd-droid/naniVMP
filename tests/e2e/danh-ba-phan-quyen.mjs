@@ -389,7 +389,7 @@ try {
     "Admin phải thấy toàn bộ nhóm Quản trị",
   );
 
-  await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${GOC}#v=phanquyen&tab=kiem-soat`, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.removeItem("vmp.tab.phanquyen"));
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.body.innerText.includes("Bảng kiểm soát vai trò & tài khoản"));
@@ -417,6 +417,8 @@ try {
   await page.waitForFunction(() => document.body.innerText.includes("Bảng kiểm soát vai trò & tài khoản"), { timeout: 15000 });
   await page.click("#phanquyen-tab-email");
   await page.waitForFunction(() => document.body.innerText.includes("1 · Ai được phép có tài khoản"));
+  assert.match(page.url(), /#v=phanquyen&tab=email$/,
+    "tab email phải có URL có thể gửi cho đồng nghiệp");
   assert.equal(await documentContains("1 · Ai được phép có tài khoản"), true,
     "admin phải quản lý được danh sách email ngay trên web");
   /* Ma trận 4 vai thì XOÁ HẲN cùng hệ quyền cũ — không phải ẩn, mà không
@@ -426,12 +428,18 @@ try {
   await page.evaluate(() => document.querySelector("#phanquyen-tab-quyen-toi")?.click());
   await page.waitForSelector('#phanquyen-tab-quyen-toi[aria-selected="true"]');
   await page.waitForFunction(() => document.body.innerText.includes("Màn hình bạn được xem"));
+  assert.match(page.url(), /#v=phanquyen&tab=quyen-toi$/,
+    "tab quyền hiệu lực phải được ghi vào lịch sử URL");
   assert.equal(await documentContains("Màn hình bạn được xem"), true,
     "thay bằng ma trận 6 vai đọc từ rpc_my_ui_access");
   assert.equal(await documentContains("3 · Ma trận trách nhiệm & quyền"), false,
     "admin không còn thấy ma trận trách nhiệm legacy");
   assert.equal(await documentContains("Từ ma trận này làm gì tiếp"), false,
     "admin không còn thấy hướng dẫn legacy dài bên dưới");
+  await page.goBack();
+  await page.waitForSelector('#phanquyen-tab-email[aria-selected="true"]');
+  assert.match(page.url(), /#v=phanquyen&tab=email$/,
+    "Back phải quay lại đúng tab trước đó");
   await page.evaluate(() => document.querySelector("#phanquyen-tab-kiem-soat")?.click());
   await page.waitForSelector('#phanquyen-tab-kiem-soat[aria-selected="true"]');
   await page.waitForFunction(
