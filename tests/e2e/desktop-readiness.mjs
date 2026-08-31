@@ -115,6 +115,7 @@ try {
 
       store.rpc_errors = {};
       await page.click("main [role=\"alert\"] button");
+      await page.waitForSelector('main [aria-busy="true"]');
       await page.waitForFunction(() => !document.querySelector("main [role=alert]"));
       await page.waitForFunction(() => !document.querySelector('main [aria-busy="true"]'));
       assert.equal(await page.$eval("main", (main) => main.textContent?.includes("Hạng mục hoàn thành")), true);
