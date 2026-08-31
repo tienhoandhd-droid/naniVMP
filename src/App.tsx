@@ -108,6 +108,7 @@ import {
   type TeamOverviewSummaryState,
 } from "./features/overview/useTeamOverviewSummary.ts";
 import MonitoringJourneyNav from "./features/monitoring/MonitoringJourneyNav.tsx";
+import StateBoundary from "./components/ui/StateBoundary.tsx";
 import { buildMonitoringSignatureMetrics } from "./features/monitoring/monitoringMetrics.ts";
 
 /* ===== Page components (lazy-loaded — mỗi màn tải theo yêu cầu để giảm
@@ -1840,6 +1841,29 @@ function VerifiedAppShell({ user, logout, access }: {
     return true;
   }), [objects, areaSel, deptSel, objectDepts]);
 
+  /* C2 (31/08): trạng thái dữ liệu cấp router cho các màn ăn theo acts.
+     Bốn cảnh khác nhau phải có bốn câu trả lời khác nhau — trước đây cả
+     bốn đều là trang trắng/màn rỗng và người dùng báo chung "web hỏng". */
+  /* KHÔNG gồm `progress`: UpdatePage tự có StateBoundary, và màn đó còn
+     bảng "Dữ liệu nguồn ngoài phạm vi" sống độc lập với acts — che cả màn
+     khi acts rỗng là giấu luôn bằng chứng thu hồi quyền (e2e source-access
+     bắt được đúng lỗi này ngày 31/08). */
+  const MAN_THEO_ACTS = ["overview", "timeline", "health", "alerts", "workload", "reports"];
+  const boundaryDuLieu: "loading" | "error" | "empty" | "filtered-empty" | null = (() => {
+    if (!MAN_THEO_ACTS.includes(view)) return null;
+    if (acts.length === 0) {
+      if (conn.status === "loading" || conn.status === "idle") return "loading";
+      if (conn.status === "err") return "error";
+      return "empty";
+    }
+    if (filteredActs.length === 0) return "filtered-empty";
+    return null;
+  })();
+  const xoaBoLocToanCuc = useCallback(() => {
+    setAreaSel([]); setDeptSel([]); setPeriodFilter("all");
+    setCustomFrom(""); setCustomTo("");
+  }, []);
+
   /* ---- URL ↔ trạng thái ----------------------------------------------
    * Ghi: đổi MÀN thì pushState (nút Back quay về màn trước — hành vi ai cũng
    * mong đợi); chỉnh BỘ LỌC thì replaceState, vì gõ ngày tháng mà mỗi ký tự
@@ -2111,6 +2135,28 @@ function VerifiedAppShell({ user, logout, access }: {
             <ScreenGuard screenId={view} access={access} onRedirect={chuyenManAnToan}>
             <div key={view} className="vmp-view-enter">
             <Suspense fallback={<SkeletonDashboard />}>
+              {/* C2 (31/08): boundary DỮ LIỆU cấp router — một chỗ trả lời
+                  cho MỌI màn ăn theo acts, thay vì mỗi màn tự vẽ (và phần
+                  lớn quên): đang tải ≠ mạng hỏng ≠ chưa có dữ liệu ≠ bộ lọc
+                  che hết. Màn tự quản dữ liệu (today, source, rules,
+                  phanquyen, audit, admin) không đi qua đây. */}
+              {boundaryDuLieu && (
+                <StateBoundary
+                  state={boundaryDuLieu}
+                  title={boundaryDuLieu === "loading" ? "Đang tải dữ liệu VMP"
+                    : boundaryDuLieu === "error" ? "Không tải được dữ liệu"
+                    : boundaryDuLieu === "filtered-empty" ? "Bộ lọc đang che hết dữ liệu"
+                    : "Chưa có dữ liệu VMP"}
+                  description={boundaryDuLieu === "error"
+                    ? `${conn.msg || "Mạng hoặc máy chủ đang trục trặc."} Dữ liệu đã nhập không mất — thử tải lại.`
+                    : boundaryDuLieu === "filtered-empty"
+                      ? "Có dữ liệu, nhưng tổ hợp khu vực / bộ phận / thời gian đang chọn không khớp hạng mục nào."
+                      : undefined}
+                  onRetry={reloadData}
+                  onClearFilters={xoaBoLocToanCuc}
+                  skeletonRows={5}
+                />
+              )}
               {monitoringView && (
                 <MonitoringJourneyNav
                   current={monitoringView}
@@ -2133,7 +2179,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   onClearScope={clearTodayScope}
                   onOpenProgress={moTienDo} />
               )}
-              {view === "overview" && (
+              {!boundaryDuLieu && view === "overview" && (
                 <>
                   {!canSelectProgressPerson && access.canView("overview") && (
                     <TeamOverviewComparison summary={teamOverviewSummary} acts={overviewActs} />
@@ -2141,7 +2187,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   <Overview acts={overviewActs} setView={setView} access={access} />
                 </>
               )}
-              {view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell}
+              {!boundaryDuLieu && view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell}
                 businessRole={access.businessRole} currentPersonId={currentPersonId} onReload={reloadData} />}
               {view === "source" && (
                 <SourceCatalogView access={access} onReload={reloadData}
@@ -2153,7 +2199,7 @@ function VerifiedAppShell({ user, logout, access }: {
                     ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
                     : undefined} />
               )}
-              {view === "health" && <HealthView acts={filteredActs} access={access} />}
+              {!boundaryDuLieu && view === "health" && <HealthView acts={filteredActs} access={access} />}
               {view === "rules" && <ActiveRulesView access={access} />}
               {view === "progress" && (
                 <>
@@ -2186,9 +2232,9 @@ function VerifiedAppShell({ user, logout, access }: {
               {/* `risk` và `inventory` không còn nhánh render riêng: chúng đã
                   được chuẩn hoá thành `alerts` và `progress` ngay tại biên
                   đọc URL, nên tới đây chỉ còn tên chuẩn. */}
-              {view === "alerts" && <AlertsView acts={filteredActs} />}
-              {view === "workload" && <WorkloadView acts={filteredActs} />}
-              {view === "reports" && <ReportsView acts={filteredActs} />}
+              {!boundaryDuLieu && view === "alerts" && <AlertsView acts={filteredActs} />}
+              {!boundaryDuLieu && view === "workload" && <WorkloadView acts={filteredActs} />}
+              {!boundaryDuLieu && view === "reports" && <ReportsView acts={filteredActs} />}
               {/* Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là
                   alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}
