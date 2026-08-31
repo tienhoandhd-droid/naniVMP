@@ -1,5 +1,5 @@
 /* WorkloadPage.jsx — Ma trận tải công việc Người × Tháng */
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import { Activity, AlertTriangle, CheckCircle2, Gauge, ShieldAlert, Users, UserX } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
@@ -8,6 +8,7 @@ import { parseD, fmtVN, clamp, wlMonthOf, wlPending, congConLai, hoSoConLai } fr
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
 import { Card, CardTitle, Tag, Modal, Donut, Pill, CauKetLuan } from "../components/ui/Primitives.tsx";
+import NhomTab, { NhomTabPanel, DongSo, useNhomTab } from "../components/ui/NhomTab.tsx";
 import type { ValiMood } from "../components/brand/ValiIllustration.tsx";
 
 /* Nhãn tâm trạng của Vali — CÙNG lời với màn "Việc hôm nay" (đồng nhất
@@ -40,10 +41,26 @@ function WorkloadDetailModal({ detail, onClose }: {
   const tasks = [...detail.tasks].sort(
     (a, b) => (parseD(a.target)?.getTime() ?? 0) - (parseD(b.target)?.getTime() ?? 0),
   );
+  const [daChep, setDaChep] = useState(false);
   const PhaseChip = ({ label, done, cong }: { label: string; done: boolean; cong?: number | null }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
   return (
     <Modal onClose={onClose} title={detail.title} icon={Activity} wide>
-      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 14 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+        <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></span>
+        {/* Vận hành (spec 01/09): điều phối viên cần DANH SÁCH MÃ để dán vào
+            email/biên bản họp — trước đây phải gõ tay lại từng mã. */}
+        <button type="button" onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(tasks.map((a) => String(a.code)).join(", "));
+            setDaChep(true); window.setTimeout(() => setDaChep(false), 2000);
+          } catch { /* clipboard bị chặn — nút không nổ, người dùng vẫn gõ tay được */ }
+        }}
+          style={{ marginLeft: "auto", padding: "7px 13px", borderRadius: 10, cursor: "pointer",
+                   border: `1px solid ${C.pinkSoft}`, background: C.surface, color: C.plum,
+                   fontFamily: TEXT, fontSize: 12, fontWeight: 700 }}>
+          {daChep ? "Đã chép ✓" : `Chép ${tasks.length} mã`}
+        </button>
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {tasks.map((a) => {
           const ph = wlPending(a);
@@ -83,62 +100,16 @@ function WorkloadDetailModal({ detail, onClose }: {
  * Dùng IntersectionObserver chứ không nghe `scroll`: không tính lại vị
  * trí mỗi khung hình, và tự im khi tab bị ẩn.
  * ------------------------------------------------------------------- */
-type MucSo = { id: string; nhan: string };
-
-function RegisterIndex({ muc }: { muc: readonly MucSo[] }) {
-  const [dangXem, setDangXem] = useState<string>(muc[0]?.id ?? "");
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const nodes = muc
-      .map((m) => document.getElementById(m.id))
-      .filter((n): n is HTMLElement => n !== null);
-    if (!nodes.length) return;
-
-    const theoDoi = new IntersectionObserver(
-      (entries) => {
-        /* Mục đang đọc = mục cắt khung nhìn và nằm CAO nhất. Lấy theo tỉ
-           lệ hiển thị thì khối dài luôn thắng khối ngắn, kể cả khi khối
-           ngắn mới là thứ đang ở đầu màn hình. */
-        const thay = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (thay) setDangXem(thay.target.id);
-      },
-      { rootMargin: "-8% 0px -70% 0px", threshold: 0 },
-    );
-    nodes.forEach((n) => theoDoi.observe(n));
-    return () => theoDoi.disconnect();
-  }, [muc]);
-
-  return (
-    <nav className="reg-index" aria-label="Mục trong trang">
-      {muc.map((m, i) => (
-        <a key={m.id} href={`#${m.id}`} className="reg-index__item"
-          aria-current={dangXem === m.id ? "true" : undefined}>
-          <span className="reg-index__num" aria-hidden="true">
-            {String(i + 1).padStart(2, "0")}
-          </span>
-          {m.nhan}
-        </a>
-      ))}
-    </nav>
-  );
-}
-
-/** Thứ tự sáu mục của sổ Phân công. `id` trùng với `id` của <section>. */
-const MUC_SO: readonly MucSo[] = [
-  { id: "reg-suc-tai", nhan: "Sức tải từng người" },
-  { id: "reg-ma-tran", nhan: "Ma trận Người × Tháng" },
-  { id: "reg-nhom-viec", nhan: "Phân công theo nhóm việc" },
-  { id: "reg-theo-nguoi", nhan: "Tiến độ theo người" },
-  { id: "reg-trong-yeu", nhan: "Phân bố trọng yếu" },
-];
+/* RegisterIndex + MUC_SO đã GỠ (spec Bàn quản trị 01/09): sổ-cuộn-dọc 5 mục
+ * thay bằng TAB thật (NhomTab) — mỗi tab một câu hỏi vận hành, không phải
+ * cuộn qua mọi thứ để tìm một mục. */
 
 export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const [scope, setScope] = useState("month");
   const [metric, setMetric] = useState("cong");
   const [detail, setDetail] = useState<{ title: string; tasks: PlanActivity[] } | null>(null);
+  const TAB_IDS = ["suc-tai", "ma-tran", "nhom-viec", "theo-nguoi", "trong-yeu"] as const;
+  const [tab, setTab] = useNhomTab("workload", "suc-tai", TAB_IDS);
 
   const pend = useMemo(() => acts.filter((a) => a.st !== "done" && wlMonthOf(a) >= 0), [acts]);
 
@@ -360,10 +331,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
   const legend = (Object.keys(BAC_TAI) as BacTai[]).map((k) => ({ band: k, ...BAC_TAI[k] }));
 
   return (
-    <div className="reg">
+    <div className="reg reg--tron">
       {detail && <WorkloadDetailModal detail={detail} onClose={() => setDetail(null)} />}
-      <RegisterIndex muc={MUC_SO} />
-      <div className="reg-body">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* #1 (01/09): hero về KHUNG VALI dùng chung (.vali-hero, lotus-
           components.css) — cùng nhịp chibi/eyebrow/mô tả với màn Hôm nay
           và Cập nhật; hết cảnh ba màn ba kiểu đóng khung. Chibi vẫn là bộ
@@ -385,6 +355,24 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
         </div>
       </section>
 
+      {/* BÀN QUẢN TRỊ (01/09): số mở màn bấm được + tab thay cuộn. */}
+      <DongSo cacO={[
+        { nhan: "người quá tải", giaTri: overloaded.length, canhBao: overloaded.length > 0,
+          phu: `ngưỡng ${CAP_MONTH} nc/tháng`, onMo: () => setTab("suc-tai") },
+        { nhan: "hạng mục vô chủ", giaTri: voChu?.count ?? 0, canhBao: (voChu?.count ?? 0) > 0,
+          phu: voChu ? `${voChu.congTotal} ngày công` : "đã phân đủ", onMo: () => setTab("suc-tai") },
+        { nhan: "ngày công còn lại", giaTri: totalCong, phu: `${totalHoso} hồ sơ`, onMo: () => setTab("ma-tran") },
+        { nhan: "người đang gánh việc", giaTri: nguoiThat.length, onMo: () => setTab("theo-nguoi") },
+      ]} />
+      <NhomTab man="workload" nhan="Các góc nhìn phân công" tab={tab} onTab={setTab} tabs={[
+        { id: "suc-tai", nhan: "Sức tải", dem: overloaded.length, canhBao: true },
+        { id: "ma-tran", nhan: "Ma trận Người × Thời gian" },
+        { id: "nhom-viec", nhan: "Nhóm việc", dem: groups.length },
+        { id: "theo-nguoi", nhan: "Theo người", dem: board.length },
+        { id: "trong-yeu", nhan: "Trọng yếu" },
+      ]} />
+
+      <NhomTabPanel man="workload" id="suc-tai" tab={tab}>
       {/* Việc vô chủ — thẻ RIÊNG, không trộn vào danh sách người. */}
       {voChu && voChu.count > 0 && (
         <Card variant="strong" style={{ borderColor: C.marigold }}>
@@ -451,7 +439,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           {nguoiThat.length === 0 && <div style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 28, color: C.mintText, fontWeight: 700 }}><CheckCircle2 size={16} aria-hidden="true" /> Không còn hạng mục nào chưa chốt VMP!</div>}
         </div>
       </Card>
+      </NhomTabPanel>
 
+      <NhomTabPanel man="workload" id="ma-tran" tab={tab}>
       {/* ================= Ma trận — bề mặt sổ =================
           Kẻ dòng thay vì đóng hộp từng ô. Hàng tiêu đề DÍNH (bản trước chỉ
           dính cột trái, nên cuộn qua 12 tháng là mất tên tháng). Có
@@ -526,7 +516,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           </table>
         </div>
       </section>
+      </NhomTabPanel>
 
+      <NhomTabPanel man="workload" id="nhom-viec" tab={tab}>
       {/* Phân công theo nhóm việc */}
       <Card variant="strong" id="reg-nhom-viec">
         <CardTitle icon={Users}
@@ -565,7 +557,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           })}
         </div>
       </Card>
+      </NhomTabPanel>
 
+      <NhomTabPanel man="workload" id="theo-nguoi" tab={tab}>
       {/* Bảng vinh danh cá nhân */}
       <Card variant="soft" id="reg-theo-nguoi">
         {/* Đổi từ "Bảng vinh danh cá nhân" (có thứ hạng 1-2-3) sang bảng
@@ -607,7 +601,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           ))}
         </div>
       </Card>
+      </NhomTabPanel>
 
+      <NhomTabPanel man="workload" id="trong-yeu" tab={tab}>
       {/* Trọng yếu. Thẻ "Cần tập trung" từng đứng cạnh đây đã BỎ (31/08):
           nó là bản rút gọn của màn "Cảnh báo & ưu tiên" — cùng một phép xếp
           theo điểm rủi ro, ít cột hơn, và không có ma trận QRM đi kèm. Chính
@@ -629,6 +625,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           </div>
         </div>
       </Card>
+      </NhomTabPanel>
       </div>
     </div>
   );
