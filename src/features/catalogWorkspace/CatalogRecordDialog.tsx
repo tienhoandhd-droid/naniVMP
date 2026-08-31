@@ -59,8 +59,21 @@ export function requiredReasonState(required: boolean, reason: string): { invali
     : { invalid: false, message: null };
 }
 
-export function closeCatalogRecordIfIdle(saving: boolean, onClose: () => void): void {
-  if (!saving) onClose();
+export function createCatalogRecordSaveCoordinator() {
+  let busy = false;
+  return {
+    begin: () => {
+      if (busy) return false;
+      busy = true;
+      return true;
+    },
+    finish: () => { busy = false; },
+    isBusy: () => busy,
+  };
+}
+
+export function closeCatalogRecordIfIdle(isBusy: () => boolean, onClose: () => void): void {
+  if (!isBusy()) onClose();
 }
 
 /** Hiện giá trị cho người đọc, không phải cho máy. */
@@ -84,6 +97,7 @@ export default function CatalogRecordDialog({
   const [loi, setLoi] = useState<CatalogSaveResult | null>(null);
   const [reasonError, setReasonError] = useState<string | null>(null);
   const reasonInputRef = useRef<HTMLInputElement | null>(null);
+  const saveCoordinator = useRef(createCatalogRecordSaveCoordinator());
   const [moNangCao, setMoNangCao] = useState(false);
   /* Ô nào cần đặt con trỏ vào — đặt khi người dùng bấm Lưu mà còn thiếu.
      Kèm số lần để bấm Lưu hai lần liên tiếp vẫn nhảy lại: nếu chỉ giữ tên
@@ -171,32 +185,37 @@ export default function CatalogRecordDialog({
       return;
     }
 
+    if (!saveCoordinator.current.begin()) return;
     setDangLuu(true);
     const khoa = String(nhap[def.businessKeyField] ?? "");
     const dang = toast.dangChay(laTaoMoi ? `Đang tạo ${khoa}…` : `Đang lưu ${khoa}…`);
-    const kq = await saveRecord({
-      dataset,
-      businessKey: khoa,
-      recordId: record ? String(record.id ?? "") : undefined,
-      patch,
-      // Tạo mới thì lý do đã rõ từ chính hành động; bắt người dùng gõ thêm
-      // một câu giải thích vì sao thêm thiết bị mới là thủ tục vô nghĩa.
-      reason: laTaoMoi ? "Tạo mới từ form" : lyDo,
-      expectedVersion: record ? Number(record.version ?? 1) : null,
-      objectKind: objectKind || null,
-    });
-    setDangLuu(false);
+    try {
+      const kq = await saveRecord({
+        dataset,
+        businessKey: khoa,
+        recordId: record ? String(record.id ?? "") : undefined,
+        patch,
+        // Tạo mới thì lý do đã rõ từ chính hành động; bắt người dùng gõ thêm
+        // một câu giải thích vì sao thêm thiết bị mới là thủ tục vô nghĩa.
+        reason: laTaoMoi ? "Tạo mới từ form" : lyDo,
+        expectedVersion: record ? Number(record.version ?? 1) : null,
+        objectKind: objectKind || null,
+      });
 
-    if (!kq.ok) {
-      dang.hong(kq.error || "Lưu thất bại");
-      // Hộp thoại VẪN MỞ và dữ liệu vừa gõ còn nguyên — đóng lúc lưu hỏng
-      // là bắt người dùng nhập lại từ đầu để chịu đúng lỗi đó lần nữa.
-      setLoi(kq);
-      return;
+      if (!kq.ok) {
+        dang.hong(kq.error || "Lưu thất bại");
+        // Hộp thoại VẪN MỞ và dữ liệu vừa gõ còn nguyên — đóng lúc lưu hỏng
+        // là bắt người dùng nhập lại từ đầu để chịu đúng lỗi đó lần nữa.
+        setLoi(kq);
+        return;
+      }
+      dang.xong(laTaoMoi ? `Đã tạo ${khoa}` : `Đã lưu ${khoa}`);
+      onSaved({ recordId: kq.recordId, version: kq.version });
+      onClose();
+    } finally {
+      saveCoordinator.current.finish();
+      setDangLuu(false);
     }
-    dang.xong(laTaoMoi ? `Đã tạo ${khoa}` : `Đã lưu ${khoa}`);
-    onSaved({ recordId: kq.recordId, version: kq.version });
-    onClose();
   };
 
   /* Nút Lưu KHÔNG mờ vì thiếu ô bắt buộc, kể cả lý do. Nút mờ mà không nói vì sao là
@@ -207,7 +226,7 @@ export default function CatalogRecordDialog({
      quyền (có băng báo ở đầu hộp thoại) và chưa đổi gì (không có gì để ghi). */
   const khongLuuDuoc = !canEdit || dangLuu
     || Object.keys(patch).length === 0;
-  const requestClose = () => closeCatalogRecordIfIdle(dangLuu, onClose);
+  const requestClose = () => closeCatalogRecordIfIdle(saveCoordinator.current.isBusy, onClose);
 
   return (
     <ViewportDialog
