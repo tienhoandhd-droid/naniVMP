@@ -442,30 +442,39 @@
 .hn-muc__ma { color: var(--lp-plum); }
 .hn-muc__ten { font-weight: 700; }
 .hn-muc__nguoi b { font-weight: 700; color: var(--lp-ink); }
+/* #4 (01/09): BỎ pill viền cho cột trễ — mười viên thuốc đỏ xếp dọc là
+   nhiễu; chấm màu + số đậm tabular nói cùng một điều bằng 1/3 mực. */
 .hn-muc__tre {
   width: max-content;
-  min-height: 28px;
-  padding: 3px 9px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
 }
-.hn-muc__tre::before { width: 6px; height: 6px; }
-.hn-muc__tre--tre { background: var(--lp-danger-soft); }
-.hn-muc__tre--homnay,
-.hn-muc__tre--con { background: var(--lp-warning-bg); }
-.hn-muc__tre--trong { border-color: var(--lp-line); background: var(--lp-surface-2); }
+.hn-muc__tre::before { width: 7px; height: 7px; }
+.hn-muc__tre--trong { font-weight: 500; }
+/* #4: nút lặp mỗi dòng hạ xuống mức GHOST — mắt rơi vào dữ liệu; nút hiện
+   đủ đậm khi dòng được rê/focus (hàng nào cũng bấm được, chỉ bớt gào). */
 .hn-muc__nut {
   min-height: 36px;
-  border: 1px solid var(--lp-gold-hairline);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--lp-plum-2);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--lp-gold-hairline);
+}
+.hn-ds .hn-muc:hover .hn-muc__nut,
+.hn-ds .hn-muc:focus-within .hn-muc__nut {
+  border-color: var(--lp-gold-hairline);
   background: var(--lp-bg-raised);
   color: var(--lp-plum);
-  font-weight: 700;
+  text-decoration: none;
 }
 .hn-muc__nut:hover:not(:disabled) {
   border-color: var(--lp-plum);
   background: var(--lp-plum);
   color: var(--lp-on-plum);
+  text-decoration: none;
 }
 
 /* Giữ QA phụ trách ở màn laptop phổ biến; chỉ bỏ cột Mốc khi thật sự hẹp. */

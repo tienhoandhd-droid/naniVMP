@@ -352,12 +352,14 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-right: 1px solid rgba(238, 233, 210, .2);
-  background: linear-gradient(180deg, rgba(29, 65, 58, .25), rgba(29, 65, 58, .06));
-  color: rgba(250, 245, 226, .86);
-  font-size: 7px; /* drift-mien: nhãn trên tranh, khung sprite giới hạn */
+  border-right: 1px solid rgba(238, 233, 210, .28);
+  /* #5 (01/09): nhãn tuần là THƯỚC của cả bức tranh mà trước đây chìm nhất
+     tranh (7px, mực 86%). Nâng một nấc đủ đọc từ xa, vẫn nhường sân khấu. */
+  background: linear-gradient(180deg, rgba(23, 52, 46, .42), rgba(23, 52, 46, .10));
+  color: rgba(252, 248, 232, .96);
+  font-size: 9px; /* drift-mien: nhãn trên tranh, khung sprite giới hạn */
   font-weight: 800;
-  letter-spacing: -.02em;
+  letter-spacing: 0;
   text-shadow: 0 1px 3px rgba(15, 41, 36, .74);
   white-space: nowrap;
 }
@@ -490,7 +492,10 @@
   position: absolute;
   right: -10px;
   bottom: -13px;
-  max-width: 84px;
+  /* #5 (01/09): 84px cắt cụt gần như MỌI mã ("TB-109-…") — thẻ bài mà không
+     đọc được mã thì chỉ còn là vật trang trí. 128px chứa trọn mã dài nhất
+     hiện có (TB-114-GSP); ellipsis giữ làm lưới an toàn cho mã lạ. */
+  max-width: 128px;
   overflow: hidden;
   padding: 1px 7px;
   border: 1px solid rgba(217, 180, 91, .5);
@@ -937,4 +942,23 @@
   text-align: center;
   color: var(--lp-ink-muted);
   font-weight: 600;
+}
+
+/* #10 (01/09) — MỘT khoảnh khắc micro-motion có chủ đích: rê/focus vào cá
+ * thì nó quẫy đuôi một nhịp rồi thôi. Dùng thuộc tính `rotate` riêng nên
+ * không giẫm lên transform/animation bơi sẵn có; chạy đúng MỘT lần. */
+@keyframes long-mon-quay {
+  0% { rotate: 0deg; }
+  28% { rotate: -7deg; }
+  62% { rotate: 6deg; }
+  100% { rotate: 0deg; }
+}
+.long-mon-race__fish:hover .long-mon-race__sprite,
+.long-mon-race__fish:focus-visible .long-mon-race__sprite {
+  animation: long-mon-swim var(--swim-dur, 7s) ease-in-out var(--swim-delay, 0s) infinite,
+             long-mon-quay .5s ease-in-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .long-mon-race__fish:hover .long-mon-race__sprite,
+  .long-mon-race__fish:focus-visible .long-mon-race__sprite { animation: none; }
 }

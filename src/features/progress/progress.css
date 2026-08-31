@@ -122,8 +122,12 @@
 .pr-row[data-overdue="true"] .pr-moc__han { color: var(--lp-danger); font-weight: 700; }
 .pr-td--giua { text-align: center; }
 .pr-hanh-dong { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
-.pr-nut-chinh { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 1px solid var(--lp-line-strong); border-radius: 10px; background: var(--lp-bg-raised); color: var(--lp-plum); font-family: var(--ff-text); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.pr-nut-chinh:hover:not(:disabled) { background: var(--lp-plum); color: var(--lp-on-plum); border-color: var(--lp-plum); }
+/* #4 (01/09): nút lặp 24 dòng hạ về ghost — cùng luật với bảng Hôm nay
+   (today.css): mặc định gạch chân mảnh, dòng rê/focus mới nổi khối. */
+.pr-nut-chinh { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--lp-plum-2); font-family: var(--ff-text); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--lp-gold-hairline); }
+.pr-bang tr:hover .pr-nut-chinh,
+.pr-bang tr:focus-within .pr-nut-chinh { border-color: var(--lp-gold-hairline); background: var(--lp-bg-raised); color: var(--lp-plum); text-decoration: none; }
+.pr-nut-chinh:hover:not(:disabled) { background: var(--lp-plum); color: var(--lp-on-plum); border-color: var(--lp-plum); text-decoration: none; }
 .pr-nut-chinh:disabled { opacity: .55; cursor: not-allowed; }
 .pr-nhanh { min-height: 34px; padding: 0 11px; border: 1px solid var(--lp-success-soft); border-radius: 10px; background: var(--lp-success-soft); color: var(--lp-success); font-family: var(--ff-text); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; opacity: 0; transition: opacity var(--lp-mo-chip, 120ms) var(--lp-ease); }
 .pr-row:hover .pr-nhanh, .pr-row:focus-within .pr-nhanh, .pr-nhanh:focus-visible { opacity: 1; }

@@ -364,37 +364,26 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
       {detail && <WorkloadDetailModal detail={detail} onClose={() => setDetail(null)} />}
       <RegisterIndex muc={MUC_SO} />
       <div className="reg-body">
-      {/* Nền hero: bản trước là `linear-gradient(120deg,#fff,…)` — mã trắng
-          cứng, không đi qua token, nên ở chế độ tối nó là một mảng trắng
-          giữa trang. Luật 5 của check-design-drift.mjs sinh ra để cấm đúng
-          thứ này nhưng không bắt được vì `#fff` nằm trong template literal
-          sau `background:`. */}
-      <Card variant="strong" style={{ background: `linear-gradient(120deg, ${C.surface}, ${C.pinkMist})` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-          {/* Pearl orbit 4% chạy SAU vùng Vali — không sau dữ liệu (Atelier
-              §Phân công). Vùng này chỉ có minh hoạ, không có số liệu nào.
-              Đồng nhất nhân vật (31/08, yêu cầu chủ dự án): dùng CHUNG bộ
-              chibi webp của màn "Việc hôm nay" (`.hn-vali`, today.css) thay
-              cho ValiIllustration SVG — cùng một app không nên có hai phiên
-              bản công chúa. UpdatePage đã theo mẫu này từ trước. */}
-          {(
-            <div className="lp-art-layer lp-art-layer--pearl-orbit hn-hero__vali" data-lp-art="pearl-orbit"
-              style={{ flexShrink: 0 }}>
-              <div className={`hn-vali hn-vali--${mood} hn-vali--nho`} role="img"
-                aria-label={`Công chúa Vali ${NHAN_MOOD[mood]}`} />
-              <span className="hn-vali__nhan">Vali · {NHAN_MOOD[mood]}</span>
-            </div>
-          )}
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="pop" key={mood} style={{ background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "12px 16px", fontFamily: TEXT, fontSize: 14, color: C.plum, fontWeight: 700, lineHeight: 1.5 }}>{bubble}</div>
-            <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 8, fontWeight: 700 }}>Còn lại: <b style={{ color: C.lavText }}>{totalCong} ngày công</b> · <b style={{ color: C.pinkText }}>{totalHoso} hồ sơ</b> · <b style={{ color: C.mintText }}>{people.length} người</b></div>
+      {/* #1 (01/09): hero về KHUNG VALI dùng chung (.vali-hero, lotus-
+          components.css) — cùng nhịp chibi/eyebrow/mô tả với màn Hôm nay
+          và Cập nhật; hết cảnh ba màn ba kiểu đóng khung. Chibi vẫn là bộ
+          webp chung (.hn-vali, today.css). */}
+      <section className="vali-hero" aria-label="Vali tóm tắt phân công">
+        <div className="vali-hero__vali lp-art-layer lp-art-layer--pearl-orbit" data-lp-art="pearl-orbit">
+          <div className={`hn-vali hn-vali--${mood} hn-vali--nho`} role="img"
+            aria-label={`Công chúa Vali ${NHAN_MOOD[mood]}`} />
+          <span className="hn-vali__nhan">Vali · {NHAN_MOOD[mood]}</span>
+        </div>
+        <div className="vali-hero__loi">
+          <div className="vali-hero__eyebrow">Phân công &amp; khối lượng</div>
+          <p className="hn-loi pop" key={mood}>{bubble}</p>
+          <p className="vali-hero__mota">Còn lại: <b>{totalCong} ngày công</b> · <b>{totalHoso} hồ sơ</b> · <b>{people.length} người</b></p>
+          <div className="vali-hero__controls">
+            <div className="vali-hero__nhom"><span>Khung thời gian</span><div><Btn on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
+            <div className="vali-hero__nhom"><span>Tô theo</span><div><Btn on={metric === "cong"} onClick={() => setMetric("cong")}>Ngày công</Btn><Btn on={metric === "hoso"} onClick={() => setMetric("hoso")}>Hồ sơ</Btn></div></div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 16 }}>
-          <div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>KHUNG THỜI GIAN</div><div style={{ display: "flex", gap: 7 }}><Btn on={scope === "month"} onClick={() => setScope("month")}>Tháng</Btn><Btn on={scope === "quarter"} onClick={() => setScope("quarter")}>Quý</Btn><Btn on={scope === "year"} onClick={() => setScope("year")}>Năm</Btn></div></div>
-          <div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 7 }}>TÔ THEO</div><div style={{ display: "flex", gap: 7 }}><Btn on={metric === "cong"} onClick={() => setMetric("cong")}>Ngày công</Btn><Btn on={metric === "hoso"} onClick={() => setMetric("hoso")}>Hồ sơ</Btn></div></div>
-        </div>
-      </Card>
+      </section>
 
       {/* Việc vô chủ — thẻ RIÊNG, không trộn vào danh sách người. */}
       {voChu && voChu.count > 0 && (

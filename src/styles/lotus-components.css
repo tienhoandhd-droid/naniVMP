@@ -596,3 +596,47 @@
   font-style: italic;
   font-weight: 500;
 }
+
+/* #1 (01/09) — KHUNG VALI dùng chung: cùng nhịp với pr-hero (Cập nhật) và
+ * vmp-vali-brief (Hôm nay): chibi cột trái 118px, eyebrow hồng, mô tả mực
+ * mờ, hairline vàng trên đỉnh. Ba màn có Vali giờ chung MỘT dàn nhạc —
+ * khác nội dung, không khác khung. Sống ở entry vì Workload/khách mới đều
+ * cần trước khi chunk màn về. */
+.vali-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 0 18px;
+  align-items: center;
+  padding: 18px 24px;
+  border: 1px solid var(--lp-line);
+  border-top: 1px solid var(--lp-gold-hairline);
+  border-radius: 24px;
+  background: linear-gradient(120deg, var(--lp-surface), var(--lp-surface-2));
+}
+.vali-hero__vali { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.vali-hero__loi { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.vali-hero__eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--lp-rose);
+}
+.vali-hero__mota { margin: 0; font-size: 13px; color: var(--lp-ink-muted); }
+.vali-hero__mota b { color: var(--lp-ink); }
+.vali-hero__controls { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 4px; }
+.vali-hero__nhom > span {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--lp-ink-muted);
+}
+.vali-hero__nhom > div { display: flex; gap: 7px; }
+@media (max-width: 719px) {
+  .vali-hero { grid-template-columns: minmax(0, 1fr); }
+  .vali-hero__vali { display: none; }
+}
