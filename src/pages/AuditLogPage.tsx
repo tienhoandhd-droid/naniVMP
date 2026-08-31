@@ -4,8 +4,9 @@
  * ===================================================================== */
 import { useState, useEffect, useCallback } from "react";
 import { ShieldCheck, RefreshCw } from "lucide-react";
-import { C, TEXT, btnPrimary, INP } from "../constants/theme.ts";
-import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
+import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
+import { Card, CardTitle, Tag, Modal } from "../components/ui/Primitives.tsx";
+import { dungBangDiff } from "../features/audit/auditDiffModel.ts";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.ts";
 import type { Database } from "../types/database.ts";
 
@@ -20,7 +21,9 @@ export default function AuditLogView() {
   const [loadErr, setLoadErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState({ action: "", user: "", record: "" });
+  const [filters, setFilters] = useState({ action: "", user: "", record: "", tu: "", bang: "" });
+  /* Bàn quản trị (spec 01/09): dòng đang mở modal "Xem thay đổi". */
+  const [xemDiff, setXemDiff] = useState<AuditRow | null>(null);
   const PAGE_SIZE = 50;
 
   const loadLogs = useCallback(async (pg = 0) => {
@@ -41,6 +44,11 @@ export default function AuditLogView() {
         ...(filters.action ? { p_action: filters.action } : {}),
         ...(filters.user ? { p_user_email: filters.user } : {}),
         ...(filters.record ? { p_record_id: filters.record } : {}),
+        ...(filters.bang ? { p_table_name: filters.bang } : {}),
+        ...(filters.tu ? {
+          p_from_date: new Date(Date.now() - (filters.tu === "today"
+            ? 24 : 24 * 7) * 3_600_000).toISOString(),
+        } : {}),
       });
       if (error) throw error;
       const payload = data as {
@@ -120,6 +128,31 @@ export default function AuditLogView() {
           <input aria-label="Lọc nhật ký theo mã hạng mục" placeholder="Tìm theo ID hạng mục..." value={filters.record}
             onChange={(e) => setFilters(f => ({ ...f, record: e.target.value }))}
             style={{ ...INP, maxWidth: 200 }} />
+          <select aria-label="Lọc nhật ký theo bảng" value={filters.bang}
+            onChange={(e) => setFilters(f => ({ ...f, bang: e.target.value }))}
+            style={{ ...INP, maxWidth: 210, cursor: "pointer" }}>
+            <option value="">Mọi bảng</option>
+            <option value="vmp_plan_items">Hạng mục kế hoạch</option>
+            <option value="vmp_source_objects">Đối tượng nguồn</option>
+            <option value="vmp_item_assignments">Phân công hạng mục</option>
+            <option value="vmp_source_workshop_scope_grants">Phạm vi xưởng</option>
+            <option value="profiles">Hồ sơ tài khoản</option>
+          </select>
+          {/* Lọc NHANH theo thời gian — hai câu vận hành hay hỏi nhất:
+              "hôm nay ai đổi gì?" và "tuần này có gì lạ?". */}
+          <div role="group" aria-label="Lọc nhanh theo thời gian" style={{ display: "flex", gap: 6 }}>
+            {([["", "Tất cả"], ["today", "24 giờ"], ["7d", "7 ngày"]] as const).map(([v, nhan]) => (
+              <button key={v} type="button" aria-pressed={filters.tu === v}
+                onClick={() => setFilters(f => ({ ...f, tu: v }))}
+                style={{ padding: "8px 14px", borderRadius: 999, cursor: "pointer",
+                         fontFamily: TEXT, fontSize: 12, fontWeight: 700,
+                         border: `1.5px solid ${filters.tu === v ? C.plum : C.pinkSoft}`,
+                         background: filters.tu === v ? C.plum : C.surface,
+                         color: filters.tu === v ? "var(--lp-on-ink)" : C.plumSoft }}>
+                {nhan}
+              </button>
+            ))}
+          </div>
           <button onClick={() => loadLogs(0)} disabled={loading}
             style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 14, display: "flex", alignItems: "center", gap: 7 }}>
             <RefreshCw size={15} className={loading ? "spin" : ""} /> Tải lại
@@ -177,13 +210,13 @@ export default function AuditLogView() {
                       <td style={{ padding: "11px 14px", fontSize: 12, fontFamily: "monospace", color: C.lavText }}>{log.record_id || "—"}</td>
                       <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft }}>{log.source || "—"}</td>
                       <td style={{ padding: "11px 14px" }}>
-                        {log.new_data && (
-                          <details style={{ fontSize: 12 }}>
-                            <summary style={{ cursor: "pointer", color: C.lavText, fontWeight: 700 }}>Xem dữ liệu</summary>
-                            <pre style={{ fontSize: 12, color: C.plumSoft, whiteSpace: "pre-wrap", maxWidth: 300, marginTop: 4, background: C.pinkMist, padding: 8, borderRadius: 8 }}>
-                              {JSON.stringify(log.new_data, null, 2).substring(0, 500)}
-                            </pre>
-                          </details>
+                        {(log.new_data || log.old_data) && (
+                          <button type="button" onClick={() => setXemDiff(log)}
+                            style={{ padding: "6px 12px", borderRadius: 10, cursor: "pointer",
+                                     border: `1px solid ${C.pinkSoft}`, background: C.surface,
+                                     color: C.lavText, fontFamily: TEXT, fontSize: 12, fontWeight: 700 }}>
+                            Xem thay đổi
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -211,6 +244,51 @@ export default function AuditLogView() {
           </div>
         )}
       </Card>
+
+      {/* Modal THAY ĐỔI old→new — câu thanh tra hỏi là "đổi cái gì, từ giá
+          trị nào sang giá trị nào"; JSON thô bắt người đọc tự so hai cục. */}
+      {xemDiff && (() => {
+        const rows = dungBangDiff(xemDiff.old_data, xemDiff.new_data, xemDiff.changed_fields);
+        return (
+          <Modal onClose={() => setXemDiff(null)} icon={ShieldCheck}
+            title={`Thay đổi · ${xemDiff.record_id || xemDiff.table_name || ""}`}>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 12, lineHeight: 1.7 }}>
+              {fmtTime(xemDiff.created_at)} · {xemDiff.user_email || "không rõ người"} · {xemDiff.table_name || "—"}
+              {xemDiff.change_reason && (
+                <div style={{ marginTop: 4 }}>
+                  Lý do: <b style={{ color: C.plum }}>{xemDiff.change_reason}</b>
+                </div>
+              )}
+            </div>
+            {rows.length === 0 ? (
+              <div style={{ padding: 18, textAlign: "center", color: C.plumSoft, fontWeight: 600 }}>
+                Bản ghi không kèm chi tiết trường thay đổi (vd đăng nhập, xuất dữ liệu).
+              </div>
+            ) : (
+              <table className="reg-table" style={{ width: "100%" }}>
+                <caption>Từng trường thay đổi: giá trị cũ gạch ngang, giá trị mới in đậm.</caption>
+                <thead><tr>
+                  <th scope="col">Trường</th><th scope="col">Trước</th><th scope="col">Sau</th>
+                </tr></thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.field}>
+                      <th scope="row" style={{ fontFamily: NUM, fontSize: 12 }}>{r.field}</th>
+                      <td style={{ color: C.plumSoft }}>
+                        {r.cu === null ? <span className="vmp-trong">trống</span>
+                          : <s style={{ textDecorationColor: C.rasp }}>{r.cu}</s>}
+                      </td>
+                      <td style={{ fontWeight: 800, color: C.plum }}>
+                        {r.moi === null ? <span className="vmp-trong">đã xoá</span> : r.moi}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
