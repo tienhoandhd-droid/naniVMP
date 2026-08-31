@@ -455,7 +455,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
                   <div style={{ flex: 1, background: C.lavSoft, borderRadius: 14, padding: "9px 11px" }}><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color: C.lavText, lineHeight: 1 }}>{p.congTotal}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>ngày công</div></div>
                   <div style={{ flex: 1, background: C.pinkSoft, borderRadius: 14, padding: "9px 11px" }}><div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color: C.pinkText, lineHeight: 1 }}>{p.hosoTotal}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginTop: 2 }}>hồ sơ</div></div>
                 </div>
-                <div style={{ height: 8, borderRadius: 999, background: C.pinkSoft, overflow: "hidden" }}><div style={{ height: "100%", width: clamp(ratio, 0, 1) * 100 + "%", background: band.c, borderRadius: 999, transition: "width .9s ease" }} /></div>
+                <div style={{ height: 8, borderRadius: 999, background: C.pinkSoft, overflow: "hidden" }}><div style={{ height: "100%", width: "100%", background: band.c, borderRadius: 999, transform: `scaleX(${clamp(ratio, 0, 1)})`, transformOrigin: "left", transition: "transform var(--lp-motion-ui) var(--lp-ease)" }} /></div>
                 <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
                   {p.critCao > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{p.critCao} trọng yếu cao</Tag>}
                   {p.over > 0 && <Tag color={C.marigoldText} bg={C.marigoldSoft}>{p.over} quá hạn</Tag>}
@@ -567,8 +567,10 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
                   {g.owners.size ? [...g.owners].join(" · ") : "chưa có ai phụ trách"}
                 </div>
                 <div style={{ height: 7, borderRadius: 999, background: C.pinkMist, overflow: "hidden" }}>
-                  <div style={{ width: `${g.rate}%`, height: "100%",
-                                background: g.rate >= 80 ? C.mint : g.rate >= 40 ? C.marigold : C.rasp }} />
+                  <div style={{ width: "100%", height: "100%",
+                                background: g.rate >= 80 ? C.mint : g.rate >= 40 ? C.marigold : C.rasp,
+                                transform: `scaleX(${clamp(g.rate / 100, 0, 1)})`, transformOrigin: "left",
+                                transition: "transform var(--lp-motion-ui) var(--lp-ease)" }} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between",
                               marginTop: 7, fontSize: 12, fontWeight: 700 }}>
@@ -611,8 +613,10 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
               </span>
               <div style={{ width: 110, height: 7, borderRadius: 999, background: C.pinkMist,
                             overflow: "hidden", flexShrink: 0 }}>
-                <div style={{ width: `${r.rate}%`, height: "100%",
-                              background: r.rate >= 80 ? C.mint : r.rate >= 40 ? C.marigold : C.rasp }} />
+                <div style={{ width: "100%", height: "100%",
+                              background: r.rate >= 80 ? C.mint : r.rate >= 40 ? C.marigold : C.rasp,
+                              transform: `scaleX(${clamp(r.rate / 100, 0, 1)})`, transformOrigin: "left",
+                              transition: "transform var(--lp-motion-ui) var(--lp-ease)" }} />
               </div>
               <span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, width: 46,
                              textAlign: "right", flexShrink: 0,

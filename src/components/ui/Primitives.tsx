@@ -225,11 +225,8 @@ export function Card({ children, style, variant = "default", cls = "", id }: {
   id?: string;
 }) {
   const base = variant === "strong" ? cardStrong : variant === "soft" ? cardSoft : cardDefault;
-  // vmp-lift-3d: nghiêng rất nhẹ theo con trỏ + bóng hai tầng. Chỉ áp cho THẺ,
-  // không áp cho ô số liệu — chữ số bị xô lệch là đọc sai, mà đây là màn để
-  // đọc hạn thẩm định. Lớp này tự tắt khi người dùng bật "giảm chuyển động".
   return (
-    <div id={id} className={`card fade vmp-lift-3d ${cls}`} style={{ ...base, padding: 24, ...style }}>
+    <div id={id} className={`card fade ${cls}`} style={{ ...base, padding: 24, ...style }}>
       {children}
     </div>
   );
@@ -540,12 +537,12 @@ export function StatTile({ icon: Icon, value, label, sub, tone, bars, onClick, c
     </>
   );
   return (
-    <Card cls={`vmp-tile ${onClick ? "vmp-lift" : ""} ${cls}`}
+    <Card cls={`vmp-tile ${cls}`}
       style={{ padding: "17px 18px", display: "flex", flexDirection: "column",
                justifyContent: "space-between", minHeight: 132,
                ["--tile-accent" as string]: t.c }}>
       {onClick ? (
-        <button type="button" className="vmp-tile-action" onClick={onClick}
+        <button type="button" className="vmp-tile-action vmp-lift" onClick={onClick}
           style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", gap: 8,
                    padding: 0, border: "none", background: "transparent", color: "inherit", textAlign: "left",
                    font: "inherit", cursor: "pointer" }}>
@@ -1272,11 +1269,8 @@ const multiSelectMiniBtn: CSSProperties = {
 
 /* Bảng chọn phải render qua Portal, KHÔNG được để absolute trong thẻ cha.
  *
- * `.card` trong index.css có `will-change: transform` (để cú nhấc 3px lúc hover
- * chạy mượt). Thuộc tính đó tạo ra một stacking context cho MỖI thẻ, nên
- * z-index của bảng chọn chỉ còn hiệu lực bên trong thẻ chứa nó. Thẻ đứng sau
- * trong DOM luôn vẽ đè lên — mở bộ lọc ở mục Báo cáo thì danh sách bị thẻ
- * "Tổng quan số liệu" bên dưới cắt mất. Nâng z-index cao tới đâu cũng vô ích.
+ * Thẻ nội dung không còn nâng/đổi transform khi hover; bảng chọn vẫn render
+ * qua Portal để không bị cắt bởi overflow hoặc stacking context của bề mặt cha.
  *
  * Đưa ra document.body rồi định vị bằng toạ độ thật của nút là cách duy nhất
  * thoát khỏi stacking context đó. Đổi lại phải tự bám theo nút khi cuộn trang.

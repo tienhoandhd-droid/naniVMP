@@ -76,7 +76,6 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
       borderRight: `1px solid ${C.line}`,
       padding: collapsed ? "26px 8px" : "26px 16px",
       position: "relative", overflow: "hidden",
-      transition: "width .25s ease, padding .25s ease",
     }}>
       {/* Sao lấp lánh đã bỏ (thiết kế 29/08): trang trí chỉ ở mép trang,
           không rải sau vùng đọc. */}

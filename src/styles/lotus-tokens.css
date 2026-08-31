@@ -411,8 +411,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   :root[data-visual="lotus-pearl"] {
+    --lp-motion-fast: 0ms;
+    --lp-motion-ui:   0ms;
     --lp-mo-card:  1ms;
-    --lp-mo-modal: 1ms;
+    --lp-mo-modal: 0ms;
     --lp-mo-chip:  1ms;
   }
 

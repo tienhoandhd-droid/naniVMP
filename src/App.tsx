@@ -602,7 +602,7 @@ export function MismatchView({ acts }: { acts: Activity[] }) {
           </CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {group.items.map(a => (
-              <div key={a.id} className="vmp-row vmp-lift" style={{
+              <div key={a.id} className="vmp-row" style={{
                 display: "flex", alignItems: "center", gap: 12,
                 padding: "12px 14px", borderRadius: 14, background: C.surface,
                 border: `1px solid ${C.marigoldSoft}`,

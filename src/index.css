@@ -221,11 +221,6 @@ button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 .vmp-scroll::-webkit-scrollbar-track { background: transparent; }
 
 /* ===== Cards / rows / nav interactions ===== */
-.card {
-  transition: transform .28s cubic-bezier(.22,1,.36,1), box-shadow .28s ease;
-  will-change: transform;
-}
-.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); }
 .vmp-nav { transition: background .18s ease, color .18s ease; }
 .vmp-nav:hover { background: var(--pink-mist) !important; color: var(--plum) !important; }
 .vmp-row { transition: background .18s ease; }
@@ -5598,43 +5593,30 @@ button.visual-pulse__item {
  * vừa đổi, và giải thích nhân–quả (bấm đây thì mở ra kia). Ngoài ba việc
  * đó thì không animate.
  * ===================================================================== */
-:root {
-  --mo-fast: 120ms;
-  --mo-base: 220ms;
-  --mo-slow: 380ms;
-  --ease: cubic-bezier(.22,.61,.36,1);
-  --spring: cubic-bezier(.34,1.4,.64,1);
-}
-
 /* Nền trang đổi mượt khi chuyển sáng/tối, không giật một nhịp */
-body { transition: background var(--mo-slow) var(--ease); }
+body { transition: background var(--lp-mo-modal) var(--lp-ease); }
 
 /* Thẻ bấm được: nhấc lên một bậc độ nổi. Chiều sâu ở đây là tín hiệu
    "cái này bấm được", không phải trang trí. */
 .vmp-lift {
-  transition: transform var(--mo-base) var(--ease),
-              box-shadow var(--mo-base) var(--ease),
-              border-color var(--mo-fast) var(--ease);
-  will-change: transform;
+  transition: transform var(--lp-motion-ui) var(--lp-ease),
+              box-shadow var(--lp-motion-ui) var(--lp-ease),
+              border-color var(--lp-motion-fast) var(--lp-ease);
 }
 .vmp-lift:hover { transform: translateY(-2px); box-shadow: var(--e-mid); }
-.vmp-lift:active { transform: translateY(0) scale(.995); transition-duration: var(--mo-fast); }
+.vmp-lift:active { transform: translateY(0) scale(.995); transition-duration: var(--lp-motion-fast); }
 
-/* Đổi trang: trượt lên rất nhẹ + hiện dần. Đủ để mắt biết nội dung vừa
-   thay, không đủ để phải chờ. */
-/* CẢNH BÁO: khối này có transform (hoạt ảnh vào), nên MỌI phần tử
-   position:fixed nằm bên trong sẽ neo theo nó chứ không theo màn hình —
-   hộp thoại sẽ trôi xuống giữa chiều cao cả trang và người dùng chỉ thấy
-   lớp phủ. Bất cứ lớp nổi nào cũng phải bọc <Portal> (Primitives.tsx). */
-.vmp-view-enter { animation: vmpViewIn var(--mo-slow) var(--ease) both; }
+/* Đổi trang chỉ hiện dần: đủ báo nội dung mới mà không làm thay đổi hệ tọa độ
+   của dialog/fixed layer. */
+.vmp-view-enter { animation: vmpViewIn var(--lp-mo-modal) var(--lp-ease) both; }
 @keyframes vmpViewIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* Vào theo bậc — dùng cho lưới thẻ, để mắt đi theo thứ tự đọc thay vì
    bị cả lưới đập vào cùng lúc. Chỉ 6 bậc rồi thôi, dài hơn là chờ. */
-.vmp-stagger > * { animation: vmpViewIn var(--mo-base) var(--ease) both; }
+.vmp-stagger > * { animation: vmpViewIn var(--lp-motion-ui) var(--lp-ease) both; }
 .vmp-stagger > *:nth-child(1) { animation-delay: 0ms; }
 .vmp-stagger > *:nth-child(2) { animation-delay: 40ms; }
 .vmp-stagger > *:nth-child(3) { animation-delay: 80ms; }
@@ -5671,7 +5653,15 @@ body { transition: background var(--mo-slow) var(--ease); }
     transition-duration: .001ms !important;
     scroll-behavior: auto !important;
   }
-  .vmp-lift:hover { transform: none; }
+  .vmp-view-enter,
+  .vmp-stagger > *,
+  .vmp-lift,
+  .vmp-toast--dang .vmp-toast__icon,
+  [role="dialog"] {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 
@@ -6249,38 +6239,6 @@ body { transition: background var(--mo-slow) var(--ease); }
   .vmp-vongnam-ben { padding: 18px; }
 }
 
-/* =====================================================================
-   CHIỀU SÂU THẬT — lớp 3D nhẹ cho toàn app
-   ---------------------------------------------------------------------
-   Trước bản này cả file không có một dòng perspective nào: mọi thứ phẳng,
-   bóng đổ chỉ một tầng. Ở đây thêm đúng hai thứ và không hơn — nghiêng
-   theo con trỏ, và bóng hai tầng. Thẻ số liệu KHÔNG nghiêng: chữ số bị
-   xô lệch là đọc sai, mà đây là màn để đọc hạn thẩm định.
-   ===================================================================== */
-.vmp-3d-scene { perspective: 1400px; perspective-origin: 50% 30%; }
-
-.vmp-lift-3d {
-  transform-style: preserve-3d;
-  transition: transform .38s cubic-bezier(.2, .7, .3, 1), box-shadow .38s ease;
-  will-change: transform;
-}
-.vmp-lift-3d:hover {
-  transform: translateY(-3px) rotateX(1.6deg) rotateY(-1.6deg);
-  /* Bóng hai tầng: một tầng sát để dính mặt phẳng, một tầng xa và loãng
-     để ra khoảng cách. Một tầng duy nhất luôn trông như dán decal. */
-  box-shadow:
-    0 2px 6px rgba(90, 42, 84, .07),
-    0 18px 44px rgba(90, 42, 84, .14);
-}
-.vmp-lift-3d:focus-visible {
-  transform: translateY(-3px);
-  outline: 2px solid var(--c-pink);
-  outline-offset: 3px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vmp-lift-3d, .vmp-lift-3d:hover { transform: none; transition: none; }
-}
 
 /* Vương miện 3D ở panel tối màn đăng nhập. Đặt tuyệt đối, không nhận chuột,
    nằm dưới lớp chữ (chữ có z-index 1) nên tiêu đề và slogan vẫn đọc rõ. */
@@ -6852,7 +6810,7 @@ summary { min-height: 24px; display: flex; align-items: center; }
   margin-left: auto; padding: 4px 8px; border: 1px solid currentColor; border-radius: 999px;
   font-size: 12px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap;
 }
-.vmp-catalog-warning__chevron { margin-left: auto; flex: none; transition: transform var(--mo-fast) var(--ease); }
+.vmp-catalog-warning__chevron { margin-left: auto; flex: none; transition: transform var(--lp-motion-fast) var(--lp-ease); }
 .vmp-catalog-warning__blocker + .vmp-catalog-warning__chevron { margin-left: 0; }
 .vmp-catalog-warning[open] .vmp-catalog-warning__chevron { transform: rotate(180deg); }
 .vmp-catalog-warning__body { padding: 12px 12px 12px 36px; font-size: 12px; font-weight: 650; line-height: 1.55; }

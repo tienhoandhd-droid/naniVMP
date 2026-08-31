@@ -166,11 +166,13 @@ function completionSummary(activities: Activity[]) {
 function ProgressBar({ rate, color, height = 8 }: {
   rate: number; color: string; height?: number;
 }) {
+  const scale = Math.max(0, Math.min(rate, 100)) / 100;
   return (
     <div style={{ height, borderRadius: 999, background: C.pinkSoft, overflow: "hidden" }}>
       <div style={{
-        width: `${rate}%`, height: "100%", borderRadius: 999, background: color,
-        transition: "width .55s cubic-bezier(.22,1,.36,1)",
+        width: "100%", height: "100%", borderRadius: 999, background: color,
+        transform: `scaleX(${scale})`, transformOrigin: "left",
+        transition: "transform var(--lp-motion-ui) var(--lp-ease)",
       }} />
     </div>
   );
@@ -239,7 +241,7 @@ function DimensionTable({ activities, dimension }: {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.key} className="vmp-row vmp-lift">
+                <tr key={row.key} className="vmp-row">
                   <td style={{ ...TD, borderRadius: "14px 0 0 14px", minWidth: 200 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {row.deptId ? (
