@@ -24,13 +24,28 @@ async function clickExact(page, selector, label) {
   if (!clicked) throw new Error(`Không tìm thấy ${selector} có nhãn “${label}”`);
 }
 
+async function clickExactEnabledButton(page, selector, label) {
+  await page.waitForFunction((css, expected) => [...document.querySelectorAll(css)]
+    .some((node) => node instanceof HTMLButtonElement
+      && node.textContent?.trim() === expected && !node.disabled), {}, selector, label);
+  const clicked = await page.$$eval(selector, (nodes, expected) => {
+    const button = nodes.find((node) => node instanceof HTMLButtonElement
+      && node.textContent?.trim() === expected && !node.disabled);
+    if (!(button instanceof HTMLButtonElement)) return false;
+    button.click();
+    return true;
+  }, label);
+  if (!clicked) throw new Error(`Không tìm thấy ${selector} đang bật có nhãn “${label}”`);
+}
+
 async function submitRecoveryAction(page) {
   await page.waitForSelector("main .pr-nut-chinh:not([disabled])", { timeout: 15_000 });
   await page.click("main .pr-nut-chinh:not([disabled])");
   await page.waitForSelector('[role="dialog"]');
   await clickExact(page, '[role="dialog"] button', "⊘ Không áp dụng");
+  await page.waitForSelector('[role="dialog"] input[placeholder^="VD: thiết bị"]');
   await page.type('[role="dialog"] input[placeholder^="VD: thiết bị"]', "Kiểm tra vòng đời toast");
-  await clickExact(page, '[role="dialog"] button', "Xác nhận");
+  await clickExactEnabledButton(page, '[role="dialog"] button', "Xác nhận");
 }
 
 async function createRecoveryToast(page) {
