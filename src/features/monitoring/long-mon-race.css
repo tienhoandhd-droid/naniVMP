@@ -786,3 +786,130 @@
     transform: rotate(var(--school-rotate));
   }
 }
+
+/* =====================================================================
+ * Chế độ xem "Ngư đồ | Bảng" (31/08/2026) — toggle + bảng danh sách.
+ * Viết bằng token --lp-* ngay từ đầu (theo được cả dark mode), khác phần
+ * tranh phía trên vốn khoá bảng màu theo art PNG.
+ * ===================================================================== */
+.long-mon-view-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border-radius: var(--lp-r-pill, 999px);
+  background: var(--lp-surface-2);
+  border: 1px solid var(--lp-line);
+}
+.long-mon-view-switch button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  font-size: 13px;
+  padding: 7px 16px;
+  border-radius: var(--lp-r-pill, 999px);
+  background: transparent;
+  color: var(--lp-ink-muted);
+}
+.long-mon-view-switch button[aria-pressed="true"] {
+  background: var(--lp-raised);
+  color: var(--lp-ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+.long-mon-view-switch button:focus-visible {
+  outline: 2px solid var(--lp-info);
+  outline-offset: 2px;
+}
+
+.long-mon-bang {
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-r-panel, 16px);
+  padding: 16px;
+}
+.long-mon-bang__loc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.long-mon-bang__loc button {
+  border: 1px solid var(--lp-line);
+  background: var(--lp-raised);
+  color: var(--lp-ink-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--lp-r-pill, 999px);
+  cursor: pointer;
+}
+.long-mon-bang__loc button[aria-pressed="true"] {
+  background: var(--lp-ink);
+  border-color: var(--lp-ink);
+  color: var(--lp-surface);
+}
+.long-mon-bang__loc button:focus-visible {
+  outline: 2px solid var(--lp-info);
+  outline-offset: 2px;
+}
+.long-mon-bang__cuon { overflow-x: auto; }
+.long-mon-bang table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.long-mon-bang th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lp-ink-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--lp-line-strong);
+  white-space: nowrap;
+}
+.long-mon-bang td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--lp-line);
+  color: var(--lp-ink);
+  vertical-align: top;
+}
+.long-mon-bang tr[data-bang-kind="overdue"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--lp-danger);
+}
+.long-mon-bang__mo {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--lp-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.long-mon-bang__mo:focus-visible {
+  outline: 2px solid var(--lp-info);
+  outline-offset: 2px;
+}
+.long-mon-bang__tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 650;
+  padding: 2px 10px;
+  border-radius: var(--lp-r-pill, 999px);
+  background: var(--lp-surface-2);
+  color: var(--lp-ink-muted);
+}
+.long-mon-bang__tag[data-bang-tag="overdue"] { background: var(--lp-danger-soft); color: var(--lp-danger); }
+.long-mon-bang__tag[data-bang-tag="today"],
+.long-mon-bang__tag[data-bang-tag="soon"] { background: var(--lp-warning-bg); color: var(--lp-warning); }
+.long-mon-bang__tag[data-bang-tag="done"] { background: var(--lp-success-soft); color: var(--lp-success); }
+.long-mon-bang__rong {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--lp-ink-muted);
+  font-weight: 600;
+}

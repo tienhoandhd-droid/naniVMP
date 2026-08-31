@@ -1,5 +1,5 @@
 /* TimelinePage.jsx — Modern Gantt Timeline VMP */
-import { Component, useEffect, useMemo, useState } from "react";
+import { Component, useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
   FileText,
@@ -12,6 +12,7 @@ import { issueLevel } from "../features/timeline/timelineSummaryModel.ts";
 import PlannedDeadlineDialog from "../features/timeline/PlannedDeadlineDialog.tsx";
 import { canPresentPlannedDeadlineEdit } from "../features/timeline/plannedDeadlineEditModel.ts";
 import LongMonRace from "../features/monitoring/LongMonRace.tsx";
+import LongMonBangDanhSach from "../features/monitoring/LongMonBangDanhSach.tsx";
 import {
   canChooseLongMonAudience,
   filterLongMonScopeActivities,
@@ -570,11 +571,28 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
   currentPersonId?: string | null;
   onReload?: () => void;
 }) {
-  const now = new Date();
+  /* 31/08: new Date() trần ở đây tạo tham chiếu MỚI mỗi render → LongMonRace
+     (nhận `now` làm prop) dựng lại model 761 dòng dù không gì đổi. Chốt mốc
+     theo lần đổi dữ liệu: acts đổi (tải lại/ghi xong) mới lấy giờ mới — đủ
+     tươi cho thang NGÀY của trường đua 90 ngày. */
+  const now = useMemo(() => new Date(), [acts]);
   /* Tab "Khám phá 3D" có trí nhớ: three.js chỉ tải khi người dùng thật sự
      mở, và ai đã quen dùng thì không phải bấm lại mỗi lần vào màn. */
   const [longMonAudience, setLongMonAudience] = useState<LongMonAudience>(() =>
     businessRole === "qa_staff" ? "personal" : "team");
+  /* Chế độ xem "Ngư đồ | Bảng" (31/08): bức tranh là mặc định — bản sắc của
+     màn — nhưng ai cần TRA CỨU (sắp theo hạn, lọc tình trạng, đủ danh sách)
+     có đường chính thức thay vì chờ tranh crash mới thấy fallback. Nhớ lựa
+     chọn theo máy: người quen bảng không phải bấm lại mỗi lần vào. */
+  const [cheDoXem, setCheDoXem] = useState<"ngu-do" | "bang">(() => {
+    try {
+      return localStorage.getItem("vmp.timeline.view") === "bang" ? "bang" : "ngu-do";
+    } catch { return "ngu-do"; }
+  });
+  const doiCheDoXem = useCallback((v: "ngu-do" | "bang") => {
+    setCheDoXem(v);
+    try { localStorage.setItem("vmp.timeline.view", v); } catch { /* private mode */ }
+  }, []);
   const [selectedLongMonPersonId, setSelectedLongMonPersonId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Activity | null>(null);
   const [plannedEdit, setPlannedEdit] = useState<Activity | null>(null);
@@ -582,7 +600,7 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
   /* Inspector pane ≥1600 đã bỏ cùng workbench — bấm cá LUÔN mở modal hồ
      sơ. Nhánh manRong cũ trỏ vào setChon của inspector không còn render:
      màn rộng bấm cá sẽ không thấy gì cả. */
-  const moHoSo = (a: Activity) => setDetail(a);
+  const moHoSo = useCallback((a: Activity) => setDetail(a), []);
 
   const longMonPeople = useMemo(() => buildPersonProgressChoices(acts), [acts]);
   const canChooseRaceAudience = canChooseLongMonAudience(businessRole);
@@ -624,6 +642,20 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
     : canChooseRaceAudience && resolvedLongMonAudience === "personal" && longMonPeople.length === 0
       ? "Chưa có phân công QA trong dữ liệu hiện tại."
       : null;
+  /* scopeControl từng là object literal dựng inline trong JSX → tham chiếu
+     mới mỗi render, phá memo của LongMonRace. Gom về useMemo (31/08). */
+  const scopeControl = useMemo(() => ({
+    canChooseAudience: canChooseRaceAudience,
+    audience: resolvedLongMonAudience,
+    scopeLabel: longMonScopeLabel,
+    people: longMonPeople,
+    selectedPersonId: selectedLongMonPersonId,
+    emptyMessage: longMonEmptyMessage,
+    onAudienceChange: setLongMonAudience,
+    onPersonChange: setSelectedLongMonPersonId,
+  }), [canChooseRaceAudience, resolvedLongMonAudience, longMonScopeLabel,
+       longMonPeople, selectedLongMonPersonId, longMonEmptyMessage]);
+
   /* Strip bốn dải tình trạng — đếm SAU các bộ lọc khác, TRƯỚC bộ lọc
      tình trạng, trên cùng một model với chính bộ lọc. */
 
@@ -647,23 +679,32 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
           sua han ke hoach van di qua PlannedDeadlineDialog trong modal do,
           nen tinh nang deadline override (spec 26/08) KHONG mat.
           ===================================================================== */}
+      <div className="long-mon-view-switch" role="group" aria-label="Chọn cách xem dòng thời gian">
+        <button type="button" data-timeline-view="ngu-do"
+          aria-pressed={cheDoXem === "ngu-do"}
+          onClick={() => doiCheDoXem("ngu-do")}>Ngư đồ</button>
+        <button type="button" data-timeline-view="bang"
+          aria-pressed={cheDoXem === "bang"}
+          onClick={() => doiCheDoXem("bang")}>Bảng</button>
+      </div>
+
+      {cheDoXem === "bang" ? (
+        <LongMonBangDanhSach
+          activities={longMonActivities}
+          now={now}
+          soonDays={SOON_DAYS}
+          onOpen={moHoSo}
+        />
+      ) : (
       <LongMonRaceGuard activities={longMonActivities} onOpen={moHoSo}>
       <LongMonRace
         activities={longMonActivities}
         now={now}
         onOpen={moHoSo}
-        scopeControl={{
-          canChooseAudience: canChooseRaceAudience,
-          audience: resolvedLongMonAudience,
-          scopeLabel: longMonScopeLabel,
-          people: longMonPeople,
-          selectedPersonId: selectedLongMonPersonId,
-          emptyMessage: longMonEmptyMessage,
-          onAudienceChange: setLongMonAudience,
-          onPersonChange: setSelectedLongMonPersonId,
-        }}
+        scopeControl={scopeControl}
       />
       </LongMonRaceGuard>
+      )}
 
       <ActivityDetailModal a={detail} onClose={() => setDetail(null)} canEditPlannedDeadlines={canEditPlannedDeadlines} onEditPlannedDeadlines={setPlannedEdit} />
       {plannedEdit && <PlannedDeadlineDialog a={plannedEdit} onClose={() => setPlannedEdit(null)} onReload={onReload} />}
