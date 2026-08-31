@@ -13,7 +13,7 @@
  *    - Webhook URL từ .env (build-time) hoặc localStorage
  *    - AI API gọi qua Anthropic proxy (không cần key phía frontend)
  * ===================================================================== */
-import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, memo, Suspense } from "react";
 
 // ===== External libs =====
 import {
@@ -75,8 +75,14 @@ import {
   PrincessCommentary, StatTile, MultiSelect,
   BangThanhTra } from "./components/ui/Primitives.tsx";
 import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
+/* F2 (31/08): memo tại điểm dùng — shell App giữ ~40 state; thiếu memo thì
+ * MỖI phím gõ vào ô lọc render lại cả Sidebar/Topbar/màn nặng. Props các
+ * component này đã ổn định tham chiếu (useMemo/useCallback bên dưới). */
+const SidebarMemo = memo(Sidebar);
+const TopbarMemo = memo(Topbar);
 import LoginScreen from "./components/auth/LoginScreen.tsx";
 import TodayCommandCenter from "./features/today/TodayCommandCenter.tsx";
+const TodayCommandCenterMemo = memo(TodayCommandCenter);
 import { TodayScopeControl } from "./features/today/TodayScopeControl.tsx";
 import {
   defaultTodayPersonScope,
@@ -144,6 +150,7 @@ import VongNam from "./components/dashboard/VongNam.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
 import ReportsView from "./components/dashboard/ReportsView.tsx";
+const ReportsViewMemo = memo(ReportsView);
 
 // ===== Legacy lib imports (kept for compatibility) =====
 import { saveUser, loadUser, loadFilterPrefs, saveFilterPrefs } from "./lib/config.ts";
@@ -171,6 +178,7 @@ const INITIAL_PERSONAL_SCOPE_REQUESTED = typeof window !== "undefined"
  *   AuditLogView   → pages/AuditLogPage.tsx
  *   AdminView      → pages/AdminPage.tsx (kèm docLichCron)
  * Ba màn sau nạp lazy — người không mở màn quản trị không tải code đó. */
+const OverviewMemo = memo(Overview);
 function Overview({ acts, setView, access }: {
   acts: Activity[];
   setView?: (v: string) => void;
@@ -1061,6 +1069,7 @@ function VerifiedAppShell({ user, logout, access }: {
     return phan.join(" · ");
   }, [areaSel, canSelectProgressPerson, currentPersonId, deptSel, selectedProgressPerson, todayPersonScope]);
 
+  const moDoiMatKhau = useCallback(() => setShowPw(true), []);
   const clearTodayScope = useCallback(() => {
     setDeptSel([]);
     setAreaSel([]);
@@ -1161,11 +1170,11 @@ function VerifiedAppShell({ user, logout, access }: {
         onConfirm={() => { setHoiThoat(false); logout(); }}
       />
 
-      <Sidebar
+      <SidebarMemo
         view={view} setView={setView} user={user} access={access}
         connected={conn.status === "ok"}
         onLogout={xinThoat}
-        onChangePw={() => setShowPw(true)}
+        onChangePw={moDoiMatKhau}
       />
 
       {/* Nền theo thiết kế 29/08 (lotus-shell.css .vmp-main-nen): ánh hồng–
@@ -1175,12 +1184,12 @@ function VerifiedAppShell({ user, logout, access }: {
         flex: 1, overflowY: "auto", position: "relative",
       }}>
         <div style={{ position: "relative", zIndex: 1 }}>
-          <Topbar
+          <TopbarMemo
             title={title} user={user} sub={(NAV_SUBS as Record<string, string>)[view]}
             onRefresh={reloadData} refreshing={conn.status === "loading"}
             lastSync={lastSync} dataUpdatedAt={dataUpdatedAt}
             view={view} setView={setView} access={access}
-            onLogout={xinThoat} onChangePw={() => setShowPw(true)}
+            onLogout={xinThoat} onChangePw={moDoiMatKhau}
           />
 
           {/* Banner chế độ trình bày thanh tra — hiện trên MỌI trang khi
@@ -1290,7 +1299,7 @@ function VerifiedAppShell({ user, logout, access }: {
                 />
               )}
               {view === "today" && (
-                <TodayCommandCenter
+                <TodayCommandCenterMemo
                   acts={todayActs}
                   scopeLabel={nhanPhamViToday}
                   updatedLabel={dataUpdatedAt
@@ -1307,7 +1316,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   {!canSelectProgressPerson && access.canView("overview") && (
                     <TeamOverviewComparison summary={teamOverviewSummary} acts={overviewActs} />
                   )}
-                  <Overview acts={overviewActs} setView={setView} access={access} />
+                  <OverviewMemo acts={overviewActs} setView={setView} access={access} />
                 </>
               )}
               {!boundaryDuLieu && view === "timeline" && <TimelineView acts={filteredActs} onOpenWorkloadCell={onOpenWorkloadCell}
@@ -1357,7 +1366,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   đọc URL, nên tới đây chỉ còn tên chuẩn. */}
               {!boundaryDuLieu && view === "alerts" && <AlertsView acts={filteredActs} />}
               {!boundaryDuLieu && view === "workload" && <WorkloadView acts={filteredActs} />}
-              {!boundaryDuLieu && view === "reports" && <ReportsView acts={filteredActs} />}
+              {!boundaryDuLieu && view === "reports" && <ReportsViewMemo acts={filteredActs} />}
               {/* Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là
                   alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}
