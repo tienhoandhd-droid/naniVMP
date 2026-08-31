@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { C, TEXT, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag, KpiCard, TableScroll } from "../components/ui/Primitives.tsx";
+import StateBoundary from "../components/ui/StateBoundary.tsx";
 import {
   fetchDashboardKpi, checkDataQuality, fetchDueAlerts, refreshComputedStatus,
 } from "../lib/supabaseData.ts";
@@ -116,13 +117,30 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
           )}
         </div>
 
-        {err && (
-          <div style={{ padding: 10, borderRadius: 8, background: C.raspSoft,
-                        color: C.raspText, fontSize: 14, marginBottom: 12 }}>{err}</div>
+        {err && kpi && (
+          <StateBoundary
+            state="error"
+            title="Không làm mới được số liệu theo server"
+            description={err}
+            onRetry={() => { void load(); }}
+          />
+        )}
+
+        {loading && !kpi && (
+          <StateBoundary state="loading" title="Đang tải số liệu theo server…" skeletonRows={4} />
+        )}
+
+        {err && !kpi && (
+          <StateBoundary
+            state="error"
+            title="Không đọc được số liệu theo server"
+            description={err}
+            onRetry={() => { void load(); }}
+          />
         )}
 
         {kpi && (
-          <div style={{ display: "grid", gap: 12,
+          <div aria-busy={loading} style={{ display: "grid", gap: 12,
                         gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
             <KpiCard emoji={<ClipboardCheck size={22} aria-hidden="true" />} bg={C.mintSoft} color={C.mintText}
               value={`${kpi.validation.done}/${kpi.validation.total}`}

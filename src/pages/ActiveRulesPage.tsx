@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
+import StateBoundary from "../components/ui/StateBoundary.tsx";
 import { fetchActiveRules, recalcCriticality } from "../lib/supabaseData.ts";
 import type { ActiveRules } from "../lib/supabaseData.ts";
 import type { AccessContext } from "../lib/access.ts";
@@ -128,30 +129,23 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
     setBusy(false);
   };
 
-  if (loading) return <Card><div style={{ padding: 20, color: C.plumSoft }}>Đang tải luật…</div></Card>;
+  if (loading) return (
+    <Card>
+      <StateBoundary state="loading" title="Đang tải luật đang áp dụng…" skeletonRows={4} />
+    </Card>
+  );
 
   // Lỗi kỹ thuật của Postgres ("permission denied for function …") không nói
   // cho người dùng biết phải làm gì. Dịch ra việc cần làm, giữ nguyên câu gốc
   // ở dòng nhỏ để người hỗ trợ còn tra.
   if (err || !rules) return (
     <Card>
-      <div style={{ padding: "18px 20px", borderRadius: 14, background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
-        <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>
-          Không đọc được luật đang áp dụng
-        </div>
-        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 6, lineHeight: 1.65 }}>
-          {/permission denied|401|JWT|not authorized/i.test(err)
-            ? "Phiên đăng nhập đã hết hạn hoặc tài khoản chưa đủ quyền. Đăng nhập lại rồi mở lại trang này."
-            : "Máy chủ không trả về dữ liệu luật. Thử lại sau ít phút; nếu vẫn vậy, gửi dòng chữ bên dưới cho người hỗ trợ."}
-        </div>
-        {err && (
-          <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 8, fontFamily: NUM,
-                        background: C.surface, borderRadius: 8, padding: "8px 11px" }}>{err}</div>
-        )}
-        <button onClick={load} style={{ ...btnPrimary, marginTop: 13, padding: "9px 18px", borderRadius: 14, fontSize: 14 }}>
-          Thử lại
-        </button>
-      </div>
+      <StateBoundary
+        state="error"
+        title="Không đọc được luật đang áp dụng"
+        description={err || "Máy chủ không trả về dữ liệu luật."}
+        onRetry={() => { void load(); }}
+      />
     </Card>
   );
 
