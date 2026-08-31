@@ -1030,7 +1030,10 @@ export function ROField({ label, value }: { label: ReactNode; value: ReactNode }
         border: `1.5px solid ${C.lavSoft}`, background: C.lavSoft,
         fontFamily: TEXT, fontSize: 14, color: C.plumSoft, fontWeight: 600,
         display: "flex", alignItems: "center", minHeight: 20,
-        ...(isEmpty ? { fontStyle: "italic", opacity: 0.7 } : null),
+        /* C5 (31/08): bỏ opacity 0.7 — nó pha loãng chữ xuống ~3.5:1, axe
+           báo serious. Ô trống phân biệt bằng in nghiêng là đủ; màu giữ
+           nguyên plumSoft (≥4.5:1 trên nền lavSoft). */
+        ...(isEmpty ? { fontStyle: "italic" } : null),
       }}>
         {isEmpty ? "Không có thông tin" : value}
       </div>

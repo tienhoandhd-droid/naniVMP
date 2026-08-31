@@ -78,6 +78,8 @@ const MAN: Array<{
   dangNhap: boolean;
   root: string;
   monitoringLabel?: string;
+  /** timeline: bấm sang chế độ Bảng trước khi quét. */
+  moBang?: boolean;
 }> = [
   { ten: "dang-nhap", hash: "", dangNhap: false, root: "#vmp-login-email" },
   { ten: "hom-nay", hash: "#v=today", dangNhap: true, root: ".hn-lotus" },
@@ -103,13 +105,52 @@ const MAN: Array<{
     monitoringLabel: "Cảnh báo & ưu tiên",
   },
   { ten: "bao-cao", hash: "#v=reports", dangNhap: true, root: ".vmp-report-command-bar" },
+  /* C5 (31/08): 8 màn trước đây KHÔNG được quét — cổng xanh vì không nhìn
+     vào chỗ tối. Root chọn phần tử đặc trưng của từng màn (đợi dựng xong
+     mới quét, tránh chụp skeleton). */
+  { ten: "tien-do", hash: "#v=progress", dangNhap: true, root: ".vmp-doi-nhom" },
+  { ten: "phan-cong", hash: "#v=workload", dangNhap: true, root: "main" },
+  { ten: "du-lieu-nguon", hash: "#v=source", dangNhap: true, root: "main" },
+  { ten: "chat-luong", hash: "#v=health", dangNhap: true, root: "main" },
+  { ten: "nhat-ky", hash: "#v=audit", dangNhap: true, root: "main" },
+  { ten: "phan-quyen", hash: "#v=phanquyen", dangNhap: true, root: "main" },
+  { ten: "cau-hinh", hash: "#v=admin", dangNhap: true, root: "main" },
+  { ten: "timeline-bang", hash: "#v=timeline", dangNhap: true,
+    root: ".timeline-page-shell .long-mon-race", moBang: true },
 ];
+
+/* C5 (31/08): quét cả HỘP NHẬP LIỆU CHÍNH — 900 dòng form mà trước đây
+ * chưa từng bị axe soi vì mọi màn đều chụp ở trạng thái tĩnh. */
+test("axe · hop-cap-nhat-tien-do", async ({ page }, testInfo) => {
+  await caiGiaLap(page, { dangNhap: true });
+  await page.goto("/#v=progress");
+  await expect(page.locator(".vmp-doi-nhom")).toBeVisible({ timeout: 15_000 });
+  await page.locator(".pr-nut-chinh").first().click();
+  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 });
+
+  const kq = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  await testInfo.attach("axe-hop-cap-nhat.json", {
+    body: JSON.stringify(kq.violations, null, 2),
+    contentType: "application/json",
+  });
+  const nang = kq.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+  expect(nang.map((v) => ({
+    id: v.id, impact: v.impact,
+    mau: v.nodes.slice(0, 3).map((n) => n.target.join(" ")),
+  }))).toEqual([]);
+});
 
 for (const man of MAN) {
   test(`axe · ${man.ten}`, async ({ page }, testInfo) => {
     await caiGiaLap(page, { dangNhap: man.dangNhap });
     await page.goto(`/${man.hash}`);
     await expect(page.locator(man.root)).toBeVisible({ timeout: 15_000 });
+    if (man.moBang) {
+      await page.click('[data-timeline-view="bang"]');
+      await expect(page.locator(".long-mon-bang")).toBeVisible({ timeout: 10_000 });
+    }
     if (man.monitoringLabel) {
       const current = page.locator('.monitoring-journey [aria-current="page"]');
       await expect(current).toHaveCount(1);
