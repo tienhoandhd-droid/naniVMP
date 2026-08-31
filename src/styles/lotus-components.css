@@ -170,6 +170,25 @@
 .lp-metric--action:hover { transform: translateY(-2px); box-shadow: var(--lp-e-mid); }
 .lp-metric--action:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
 
+/* Phòng tuyến cuối cho control native còn inline `outline: none` từ lớp
+   legacy. `!important` chỉ dùng ở đây để thắng inline style, và chỉ khi
+   focus bằng bàn phím nên không làm đổi trạng thái click chuột. */
+:is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--lp-focus) !important;
+  outline-offset: 2px;
+}
+
+.vmp-route-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+}
+
+.vmp-route-link:focus-visible {
+  outline: 2px solid var(--lp-focus);
+  outline-offset: 2px;
+}
+
 /* ===================================================================
  *  CommandBar
  * =================================================================== */

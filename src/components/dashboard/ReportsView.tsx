@@ -728,7 +728,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               ? "Dữ liệu nền của kỳ này sạch — không phát hiện vấn đề nào trong phạm vi đang lọc."
               : `Dữ liệu nền có ${qualityBySeverity.error || 0} lỗi · ${qualityBySeverity.warning || 0} cảnh báo · ${qualityBySeverity.info || 0} thông tin — đã kèm vào bản xuất.`}
           </span>
-          <a href="#v=health" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>
+          <a className="vmp-route-link" href="#v=health" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>
             Tra từng lỗi → Chất lượng dữ liệu
           </a>
         </div>

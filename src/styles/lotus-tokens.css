@@ -93,6 +93,7 @@
      thành hồng phấn sáng, nên chữ trắng trên nó chỉ còn 2.12:1 — dưới xa
      ngưỡng AA 4.5:1. Đây đúng là lỗi mà bộ kiểm thẩm mỹ bắt được. */
   --lp-on-plum:    var(--lp-porcelain);
+  --lp-on-gold:    #2F2430;
   --lp-on-success: var(--lp-porcelain);
   --lp-on-danger:  var(--lp-porcelain);
   --lp-on-warning: var(--lp-porcelain);
@@ -312,6 +313,7 @@
   /* Nền sáng thì chữ phải tối. Ba màu này ở chế độ tối đều là sắc phấn
      sáng, nên chữ trên chúng lấy màu nền trang. */
   --lp-on-plum:    #241C26;
+  --lp-on-gold:    #241C26;
   --lp-on-success: #16241E;
   --lp-on-danger:  #33121B;
   --lp-on-warning: #2E2110;

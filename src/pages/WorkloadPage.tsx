@@ -638,7 +638,7 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
           lối sang màn ưu tiên thật. */}
       <Card variant="soft" id="reg-trong-yeu">
         <CardTitle icon={ShieldAlert} sub="Theo mức trọng yếu"
-          right={<a href="#v=alerts" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>Thứ tự ưu tiên đầy đủ → Cảnh báo &amp; ưu tiên</a>}>
+          right={<a className="vmp-route-link" href="#v=alerts" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>Thứ tự ưu tiên đầy đủ → Cảnh báo &amp; ưu tiên</a>}>
           Phân bố trọng yếu
         </CardTitle>
         {klTrongYeu && <CauKetLuan chinh={klTrongYeu.chinh} phu={klTrongYeu.phu} tone={klTrongYeu.tone} />}

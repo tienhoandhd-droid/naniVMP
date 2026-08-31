@@ -80,7 +80,7 @@
 .monitoring-journey__item.is-active {
   border-color: var(--lp-plum-2);
   background: var(--lp-plum);
-  color: var(--lp-surface);
+  color: var(--lp-on-plum);
   box-shadow: inset 3px 0 0 var(--lp-gold);
 }
 
@@ -101,8 +101,8 @@
 
 .monitoring-journey__copy > span,
 .monitoring-journey__metric > span {
-  font-size: 11px;
-  line-height: 15px;
+  font-size: 12px;
+  line-height: 16px;
   opacity: .82;
 }
 
@@ -111,7 +111,7 @@
   padding: 1px 6px;
   border: 1px solid currentColor;
   border-radius: 999px;
-  font-size: 10px !important;
+  font-size: 12px !important;
   font-weight: 700;
   letter-spacing: .02em;
   opacity: 1 !important;
@@ -128,6 +128,10 @@
   font-size: 24px;
   line-height: 24px;
   font-variant-numeric: tabular-nums;
+}
+
+.monitoring-journey__item.is-active .monitoring-journey__metric > strong {
+  color: var(--lp-on-plum);
 }
 
 @media (min-width: 1180px) {
@@ -376,7 +380,7 @@
 .alerts-page-shell .alerts-command__actions button {
   border-color: var(--lp-gold);
   background: var(--lp-gold);
-  color: var(--lp-plum);
+  color: var(--lp-on-gold);
 }
 
 .alerts-page-shell .alerts-command__actions a {
