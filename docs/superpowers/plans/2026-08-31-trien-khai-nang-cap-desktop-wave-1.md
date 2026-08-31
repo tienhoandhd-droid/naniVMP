@@ -49,35 +49,35 @@
 - [x] B2 `<img>` width/height thật (1823×863, 540×1120) + `fetchpriority=high` tranh nền + mồi tải 3 tranh khi chunk về → 718eaab
 - [x] B3 `prefetchKhiRanh()` idle-prefetch Timeline/Update/Alerts sau đăng nhập, một lần/phiên → 9deec56
 - [x] B4 Xoá CSS chết: scanner `scripts/quet-css-mo-coi.mjs` đo 439/707 lớp mồ côi; xoá 766 rule; `index.css` 7.601 → 3.106 dòng; CSS entry gzip 54,5 → 42,9KB; xoá kèm TimelineInspector + timelineFilterModel + timelineYearModel (chết) + 2 test của chúng; kiểm bằng 9 suite e2e mock CI đều ĐẠT → a53c3b6
-- [ ] B5 Tách CSS theo route: bỏ import CSS màn khỏi `main.tsx`, import trong component lazy tương ứng (today→TodayCommandCenter, monitoring+long-mon-race→TimelinePage, catalog-workspace→CatalogWorkspaceShell, progress→UpdatePage/ProgressEditModal, catalog→CatalogPage, analysis→Reports/Workload, overview-executive→Overview). Giữ entry: index.css + lotus-*. Kiểm cascade bằng e2e mock + so màu.
-- [ ] B6 `long-mon-race.css` phần tranh về token/dark-mode ở mức hợp lý (phần bảng mới đã dùng --lp-*); đưa vào phạm vi check drift.
-- [ ] B7 `scripts/kiem-ngan-sach-bundle.mjs` (CSS entry, JS găng gzip, dist tổng, cấm PNG) + script `budget` + gắn vào CI.
+- [x] B5 Tách CSS theo route — entry 304→176KB raw (gzip 34,7KB), chunk CSS cho Timeline/Update/Catalog/CatalogWorkspace/PhanQuyen; 4 file eager ở lại có ghi chú → 543b218: bỏ import CSS màn khỏi `main.tsx`, import trong component lazy tương ứng (today→TodayCommandCenter, monitoring+long-mon-race→TimelinePage, catalog-workspace→CatalogWorkspaceShell, progress→UpdatePage/ProgressEditModal, catalog→CatalogPage, analysis→Reports/Workload, overview-executive→Overview). Giữ entry: index.css + lotus-*. Kiểm cascade bằng e2e mock + so màu.
+- [x] B6 Token --lmr-* (8 token × 2 theme) cho khung Ngư đồ; drift 118 vi phạm → 0 và thành gate (sửa 2 bug script: 50% đọc thành 50px, thêm miễn trừ có-lý-do); 50 chỗ chữ <12px → 12px; radius về thang → 8b0bc9f về token/dark-mode ở mức hợp lý (phần bảng mới đã dùng --lp-*); đưa vào phạm vi check drift.
+- [x] B7 Ngân sách bundle (CSS 200KB, JS găng gzip 220KB, dist 6MB, cấm PNG lạ) + gate CI → 883a441 (CSS entry, JS găng gzip, dist tổng, cấm PNG) + script `budget` + gắn vào CI.
 
 ## Stage C — UX desktop
 
 - [x] C1 Chế độ xem `Ngư đồ | Bảng`: `bangDanhSachModel.ts` (6 unit test) + `LongMonBangDanhSach.tsx` (không cắt danh sách, lọc có đếm, CSS token --lp-*), toggle nhớ localStorage `vmp.timeline.view`, ngư đồ mặc định → e6b81a9 (e2e riêng cho bảng: thêm ở C5)
-- [ ] C2 Phủ `StateBoundary` (loading/empty/filtered-empty/error/forbidden) lên các màn còn thiếu: Alerts, Timeline, Workload, Reports, PhanQuyen, ServerChecks, QRM, SourceCatalog, ActiveRules, Catalog.
-- [ ] C3 Thay 6 `window.confirm` + 4 `alert` bằng `ShellConfirmDialog`/toast: WorkshopScopeCoveragePanel:191, StaffDirectoryPanel:332+360, AssignmentPanel:194, CatalogObjectForm:139, ActiveRulesPage:119-127, ServerChecksPage:82-91.
-- [ ] C4 A11y form ProgressEditModal: `aria-invalid` + `aria-describedby` + `role="alert"` cho lỗi; bổ sung `htmlFor` các input thiếu nhãn.
-- [ ] C5 Mở rộng quét a11y 6 → 14 màn + kịch bản mở ProgressEditModal; thêm e2e mock cho chế độ Bảng của Timeline. Viewport giữ 1440×900.
+- [x] C2 Boundary dữ liệu cấp router (loading/error/empty/filtered-empty + Thử lại/Xoá bộ lọc); gate theo đúng tập màn ăn (overviewActs cho Tổng quan — e2e today-scope bắt được); progress để màn tự quản (e2e source-access bắt được) → cabb9fc + fix trong 5fc9857 (loading/empty/filtered-empty/error/forbidden) lên các màn còn thiếu: Alerts, Timeline, Workload, Reports, PhanQuyen, ServerChecks, QRM, SourceCatalog, ActiveRules, Catalog.
+- [x] C3 useXacNhan + ShellConfirmDialog thay đủ 6 confirm + 4 alert; kết quả qua toast → 82a78d7 bằng `ShellConfirmDialog`/toast: WorkshopScopeCoveragePanel:191, StaffDirectoryPanel:332+360, AssignmentPanel:194, CatalogObjectForm:139, ActiveRulesPage:119-127, ServerChecksPage:82-91.
+- [x] C4 label thật + aria-invalid/describedby + role=alert (form chính + lý do trạng thái) → 436d2d2: `aria-invalid` + `aria-describedby` + `role="alert"` cho lỗi; bổ sung `htmlFor` các input thiếu nhãn.
+- [x] C5 Axe 6 → 15 kịch bản (8 màn bổ sung + chế độ Bảng + HỘP nhập liệu); bắt và sửa ngay 1 lỗi contrast thật (ROField opacity) → e5918f4 + kịch bản mở ProgressEditModal; thêm e2e mock cho chế độ Bảng của Timeline. Viewport giữ 1440×900.
 
 ## Stage D — Hợp nhất logic
 
-- [ ] D1 Migration `fix_bangkok_current_date` (RPC dùng `(now() at time zone 'Asia/Bangkok')::date` thay `current_date` UTC) theo pattern precondition/postcondition; KHÔNG apply — kèm runbook.
-- [ ] D2 Một định nghĩa "quá hạn" client: module `src/lib/hanChot.ts`, rewire vmpDeadlineModel/progressWorkspaceModel/helpers; unit test đối chiếu hành vi 3 đường cũ, ghi rõ khác biệt được chọn.
-- [ ] D3 Trọng số PROG: over 75 → 45 (quá hạn không thể "tiến bộ hơn" đang làm); cập nhật test.
+- [x] D1 20260831160000 (thân hàm chép nguyên văn bằng script + pre/postcondition) + runbook — CHỜ CHỦ DỰ ÁN APPLY → 9f601ad (RPC dùng `(now() at time zone 'Asia/Bangkok')::date` thay `current_date` UTC) theo pattern precondition/postcondition; KHÔNG apply — kèm runbook.
+- [x] D2 lib/hanChot.ts (6 test, có case 01:30 Bangkok); classifyVmpDeadline + mocChuaXong + nextAlert cùng uỷ quyền; hành vi giữ nguyên → ffc0871: module `src/lib/hanChot.ts`, rewire vmpDeadlineModel/progressWorkspaceModel/helpers; unit test đối chiếu hành vi 3 đường cũ, ghi rõ khác biệt được chọn.
+- [x] D3 over 75→45 + test khoá bất biến thứ tự → ffc0871: over 75 → 45 (quá hạn không thể "tiến bộ hơn" đang làm); cập nhật test.
 
 ## Stage E — Bảo mật & giám sát (artifact chờ apply)
 
-- [ ] E1 Migration siết 6 bảng policy-true (vmp_staff_emails, vmp_email_cho_phep, vmp_source_rows, vmp_chat_loi_cho, data_quality_issues, vmp_assignment_matrix) + sửa `rpc_team_overview_summary` lọc phạm vi + thêm vào verifier; client tương thích 2 pha (thử RPC mới, fallback đường cũ khi chưa apply); runbook.
-- [ ] E2 Giám sát lỗi client: `src/lib/baoLoi.ts` (onerror + unhandledrejection, chống bão, im lặng khi RPC chưa tồn tại) + migration bảng `vmp_client_errors` + RPC ghi (rate-limit) + RPC đọc (admin/QA) + runbook; gắn vào main.tsx + ErrorBoundary.
-- [ ] E3 meta-CSP trong index.html (self + supabase + n8n; font/style self; ghi chú vì sao style-src cần unsafe-inline khi còn inline style).
-- [ ] E4 CI mở rộng: job a11y; thêm nhóm e2e mock còn thiếu; upload-artifact khi fail; gọi budget. (Lưu ý: sửa deploy.yml phải giữ nguyên bất biến gate main.)
+- [x] E1 20260831180000 (drop policy cũ, policy tường minh theo vai qua vmp_la_vai; summary đếm qua vmp_visible_plan_items; pre/postcondition đầy đủ) + runbook probe persona — CHỜ APPLY; client không cần vá (RLS SELECT trả rỗng, AiMailModal đã catch) → 0b8ea3d policy-true (vmp_staff_emails, vmp_email_cho_phep, vmp_source_rows, vmp_chat_loi_cho, data_quality_issues, vmp_assignment_matrix) + sửa `rpc_team_overview_summary` lọc phạm vi + thêm vào verifier; client tương thích 2 pha (thử RPC mới, fallback đường cũ khi chưa apply); runbook.
+- [x] E2 baoLoi.ts (chống bão, im lặng tuyệt đối, tự tắt khi RPC vắng; 4 test) + migration 20260831170000 + runbook — frontend ĐÃ gắn, migration CHỜ APPLY → 9dd1baa: `src/lib/baoLoi.ts` (onerror + unhandledrejection, chống bão, im lặng khi RPC chưa tồn tại) + migration bảng `vmp_client_errors` + RPC ghi (rate-limit) + RPC đọc (admin/QA) + runbook; gắn vào main.tsx + ErrorBoundary.
+- [x] E3 CSP meta (script self, connect Supabase+n8n, object none) → 726c04e trong index.html (self + supabase + n8n; font/style self; ghi chú vì sao style-src cần unsafe-inline khi còn inline style).
+- [x] E4 job a11y 15 kịch bản + shell vào e2e-mock + upload-artifact chỉ-khi-fail + production-build needs a11y (bất biến gate main giữ nguyên); today-scope KHÔNG thêm — hỏng từ trước wave (đã kiểm tại 6fdfe01) → 5fc9857: job a11y; thêm nhóm e2e mock còn thiếu; upload-artifact khi fail; gọi budget. (Lưu ý: sửa deploy.yml phải giữ nguyên bất biến gate main.)
 
 ## Stage F — Tách App.tsx
 
-- [ ] F1 Tách ChangePwModal, HealthView+DataQualityView, AuditLogView, AdminView ra file riêng (lazy nếu hợp lý), không đổi hành vi.
-- [ ] F2 Giảm re-render shell: gom state overlay, memo màn nhận props ổn định; ghi số liệu đo.
+- [x] F1 App.tsx 2.332 → 1.451 dòng; Health/Audit/Admin thành chunk lazy; ChangePwModal named → 1ee51cd + 6d3e7c4, HealthView+DataQualityView, AuditLogView, AdminView ra file riêng (lazy nếu hợp lý), không đổi hành vi.
+- [x] F2 memo Sidebar/Topbar/Overview/Today/Reports + callback ổn định; gõ phím ô lọc không còn render lại cả cây → 3e15545: gom state overlay, memo màn nhận props ổn định; ghi số liệu đo.
 
 ## Checklist cho chủ dự án (không thể tự động)
 
