@@ -1,8 +1,8 @@
 # Desktop UX Final Audit Repairs — Design
 
-**Status:** Approved direction (Approach A)  
-**Date:** 2026-08-31  
-**Target:** VMP desktop web  
+**Status:** Approved direction (Approach A)
+**Date:** 2026-08-31
+**Target:** VMP desktop web
 
 ## Objective
 
