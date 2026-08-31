@@ -26,7 +26,7 @@
 |---|---|---|
 | Route settlement | `src/hooks/useRouteSettlement.ts`, `src/App.tsx`, `src/components/layout/Layout.tsx` | scroll/focus/title sau route, active semantics |
 | Toast recovery | `src/lib/toastQueue.ts`, `src/components/ui/ToastProvider.tsx`, toast CSS trong `src/index.css` | queue, persistent recovery action, timer cleanup, accessible controls |
-| Readiness | `src/components/ui/StateBoundary.tsx`, `src/pages/ActiveRulesPage.tsx`, `src/pages/ServerChecksPage.tsx`, `src/pages/PhanQuyenPage.tsx` | loading/error/empty và retry gần lỗi |
+| Readiness | `src/pages/ActiveRulesPage.tsx`, `src/pages/ServerChecksPage.tsx`, `src/pages/PhanQuyenPage.tsx` | áp dụng StateBoundary sẵn có cho loading/error/empty và retry gần lỗi |
 | Route CTA | `src/features/today/TodayCommandCenter.tsx`, `src/pages/UpdatePage.tsx`, `src/components/dashboard/ReportsView.tsx` | action label nói đúng kết quả |
 | Motion/affordance | `src/styles/lotus-tokens.css`, shared sections of `src/index.css`, `src/components/ui/Primitives.tsx`, `src/components/dashboard/CompletionDashboard.tsx`, `src/pages/WorkloadPage.tsx`, `src/pages/QrmPage.tsx`, shared desktop declaration in `Layout.tsx` | token, reduce-motion, no false lift, transform-only feedback |
 | Performance | `src/lib/routePrefetch.ts`, `src/App.tsx`, `src/components/layout/Layout.tsx`, `vite.config.js`, `scripts/check-desktop-performance-budgets.mjs`, `scripts/do-hieu-nang.mjs`, `package.json` | lazy Reports, intent prefetch, manifest budgets, lab evidence |
@@ -41,42 +41,37 @@
 - Create: `src/hooks/useRouteSettlement.ts`
 - Modify: `src/App.tsx`
 - Modify: `src/components/layout/Layout.tsx`
-- Create: `tests/unit/desktop-navigation-experience.test.mjs`
 - Create: `tests/e2e/desktop-navigation-experience.mjs`
 
 **Interfaces:**
 - Produces: `useRouteSettlement(view: string, title: string): RefObject<HTMLElement | null>`.
 - Preserves: route click uses `pushState`; filter change uses `replaceState`; permission fallback unchanged.
 
-- [ ] **Step 1: Write the failing source-contract test**
+- [ ] **Step 1: Write the failing browser behavior test**
 
 ```js
-import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-
-const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
-
-test("desktop route settlement owns title, scroll and focus", () => {
-  const hook = read("src/hooks/useRouteSettlement.ts");
-  const app = read("src/App.tsx");
-  assert.match(hook, /document\.title\s*=\s*`\$\{title\} — V\/Q team`/);
-  assert.match(hook, /scrollTo\(\{ top: 0, left: 0 \}\)/);
-  assert.match(hook, /focus\(\{ preventScroll: true \}\)/);
-  assert.match(app, /useRouteSettlement\(view, title\)/);
-});
-
-test("desktop navigation exposes the active page", () => {
-  const layout = read("src/components/layout/Layout.tsx");
-  assert.match(layout, /aria-current=\{active \? "page" : undefined\}/);
+await page.click('[data-view="alerts"]');
+await page.waitForFunction(() => location.hash === "#v=alerts");
+const state = await page.evaluate(() => ({
+  activeView: document.querySelector('.vmp-sidebar [aria-current="page"]')?.getAttribute("data-view"),
+  focusId: document.activeElement?.id,
+  title: document.title,
+}));
+assert.deepEqual(state, {
+  activeView: "alerts",
+  focusId: "vmp-main-content",
+  title: "Cảnh báo — V/Q team",
 });
 ```
 
+Use the existing real-browser `caiGiaLap`/`nhetPhien` setup at 1366×768. Also focus a global filter and change it without changing `view`; assert focus stays on that control. Call `page.goBack()` and assert Overview settles through the same main-focus/title path.
+
 - [ ] **Step 2: Run RED**
 
-Run: `node --import tsx --test tests/unit/desktop-navigation-experience.test.mjs`
+Run: `bash scripts/with-preview.sh -- node tests/e2e/desktop-navigation-experience.mjs`
 
-Expected: FAIL because `useRouteSettlement.ts` and `aria-current` do not exist.
+Expected: FAIL because the active nav lacks `aria-current`, focus stays on the sidebar button and the tab title is static.
 
 - [ ] **Step 3: Implement the route-settlement hook**
 
@@ -104,43 +99,21 @@ export function useRouteSettlement(view: string, title: string) {
 
 Replace `useScrollTop([view])` in `App.tsx` with `useRouteSettlement(view, title)`. Move `title` above the hook so the value exists before use. Add `aria-current={active ? "page" : undefined}` only to rendered nav buttons; do not change `setView`, alias or access logic.
 
-- [ ] **Step 4: Write the browser behavior test**
-
-Use the existing `caiGiaLap`/`nhetPhien` setup. At 1366×768, open `#v=overview`, click `[data-view="alerts"]`, then assert:
-
-```js
-const state = await page.evaluate(() => ({
-  hash: location.hash,
-  activeView: document.querySelector('.vmp-sidebar [aria-current="page"]')?.getAttribute("data-view"),
-  focusId: document.activeElement?.id,
-  title: document.title,
-}));
-assert.deepEqual(state, {
-  hash: "#v=alerts",
-  activeView: "alerts",
-  focusId: "vmp-main-content",
-  title: "Cảnh báo — V/Q team",
-});
-```
-
-Then focus a filter, change it without changing `view`, and assert focus remains on the filter. Call `page.goBack()` and assert `overview`, main focus and title settle through the same path.
-
-- [ ] **Step 5: Run GREEN and regression**
+- [ ] **Step 4: Run GREEN and regression**
 
 Run:
 
 ```bash
-node --import tsx --test tests/unit/desktop-navigation-experience.test.mjs
 npm run typecheck
 bash scripts/with-preview.sh -- node tests/e2e/desktop-navigation-experience.mjs
 ```
 
 Expected: all pass; no Timeline selector or expectation added.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/hooks/useRouteSettlement.ts src/App.tsx src/components/layout/Layout.tsx tests/unit/desktop-navigation-experience.test.mjs tests/e2e/desktop-navigation-experience.mjs
+git add src/hooks/useRouteSettlement.ts src/App.tsx src/components/layout/Layout.tsx tests/e2e/desktop-navigation-experience.mjs
 git commit -m "feat(nav): settle desktop routes with focus and title"
 ```
 
@@ -253,60 +226,68 @@ git commit -m "feat(toast): add recoverable desktop error actions"
 ### Task 3: Readiness and inline recovery
 
 **Files:**
-- Modify: `src/components/ui/StateBoundary.tsx`
 - Modify: `src/pages/ActiveRulesPage.tsx`
 - Modify: `src/pages/ServerChecksPage.tsx`
 - Modify: `src/pages/PhanQuyenPage.tsx`
-- Create: `tests/unit/desktop-readiness.test.mjs`
+- Create: `tests/e2e/desktop-readiness.mjs`
 
 **Interfaces:**
-- Consumes: existing `StateBoundaryProps` and `onRetry`.
+- Consumes: existing `StateBoundaryProps` and `onRetry`, mock Supabase `rpc_errors`.
 - Produces: `aria-busy` on loading, retry action beside errors, no toast-only validation.
 
-- [ ] **Step 1: Write failing readiness contracts**
+- [ ] **Step 1: Write the failing route behavior test**
 
 ```js
-test("async desktop pages use StateBoundary recovery", () => {
-  for (const file of ["ActiveRulesPage.tsx", "ServerChecksPage.tsx", "PhanQuyenPage.tsx"]) {
-    assert.match(read(`src/pages/${file}`), /StateBoundary/);
-  }
-  const boundary = read("src/components/ui/StateBoundary.tsx");
-  assert.match(boundary, /aria-busy=\{state === "loading" \? true : undefined\}/);
-});
+const cases = [
+  ["rules", "rpc_active_rules"],
+  ["health", "rpc_dashboard_kpi"],
+  ["phanquyen", "rpc_business_roles"],
+];
+for (const [view, rpc] of cases) {
+  const page = await browser.newPage();
+  await caiGiaLap(page, {
+    supabaseUrl: URL_SB,
+    kichBan: "day",
+    suaKho: (store) => { store.rpc_errors = { [rpc]: { status: 500, message: "Lỗi thử readiness" } }; },
+  });
+  await nhetPhien(page, { supabaseUrl: URL_SB });
+  await page.goto(`${GOC}#v=${view}`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('main [role="alert"]');
+  const retry = await page.$eval('main [role="alert"] button', (button) => button.textContent.trim());
+  assert.match(retry, /Thử lại/);
+  await page.close();
+}
 ```
 
 - [ ] **Step 2: Run RED**
 
-Run: `node --import tsx --test tests/unit/desktop-readiness.test.mjs`
+Run: `bash scripts/with-preview.sh -- node tests/e2e/desktop-readiness.mjs`
 
-Expected: FAIL for the three pages and unified busy contract.
+Expected: FAIL because Server Checks and Phân quyền do not yet expose the same inline alert + retry contract.
 
-- [ ] **Step 3: Normalize StateBoundary semantics**
-
-Make the non-loading wrapper expose `aria-busy={state === "loading" ? true : undefined}` through one shared wrapper; keep `role="alert"` only for errors and `role="status"` for non-errors. Do not move focus on background refresh.
-
-- [ ] **Step 4: Adopt the boundary in async routes**
+- [ ] **Step 3: Adopt the existing StateBoundary in async routes**
 
 - `ActiveRulesPage`: replace ad-hoc loading/error cards with `StateBoundary`; keep the detailed technical message as `description`, and `onRetry={() => { void load(); }}`.
 - `ServerChecksPage`: when initial `loading && !kpi`, show a skeleton; when `err && !kpi`, show error + retry; keep stale KPI visible during background refresh.
 - `PhanQuyenPage`: extract `taiVaiTaiKhoan`, set `loading` before retry, and render an inline error boundary with `Thử lại`; do not hide or disable unrelated permission controls.
 
-- [ ] **Step 5: Run GREEN and route regression**
+- [ ] **Step 4: Run GREEN and route regression**
 
 Run:
 
 ```bash
-node --import tsx --test tests/unit/desktop-readiness.test.mjs tests/unit/lotus-components.test.mjs
+node --import tsx --test tests/unit/lotus-components.test.mjs
 npm run typecheck
 npm run build
+bash scripts/with-preview.sh -- node tests/e2e/desktop-readiness.mjs
 ```
 
 Expected: all pass; retry stays beside the failed data region.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/ui/StateBoundary.tsx src/pages/ActiveRulesPage.tsx src/pages/ServerChecksPage.tsx src/pages/PhanQuyenPage.tsx tests/unit/desktop-readiness.test.mjs
+git add src/pages/ActiveRulesPage.tsx src/pages/ServerChecksPage.tsx src/pages/PhanQuyenPage.tsx tests/e2e/desktop-readiness.mjs
 git commit -m "feat(ux): standardize desktop readiness recovery"
 ```
 
@@ -318,31 +299,30 @@ git commit -m "feat(ux): standardize desktop readiness recovery"
 - Modify: `src/features/today/TodayCommandCenter.tsx`
 - Modify: `src/pages/UpdatePage.tsx`
 - Modify: `src/components/dashboard/ReportsView.tsx`
-- Create: `tests/unit/desktop-cta-copy.test.mjs`
+- Create: `tests/e2e/desktop-cta-copy.mjs`
 
 **Interfaces:**
 - Preserves: callbacks, export format, RPC and permission conditions.
 - Produces exact visible copy: `Cập nhật <mã>`, `Xem <mã>`, `In / lưu PDF`, `Tải Excel · 5 sheet`, `Tải HTML`.
 
-- [ ] **Step 1: Write failing copy tests**
+- [ ] **Step 1: Write the failing visible-copy browser test**
 
 ```js
-test("priority and export CTA say the result", () => {
-  const today = read("src/features/today/TodayCommandCenter.tsx");
-  const progress = read("src/pages/UpdatePage.tsx");
-  const reports = read("src/components/dashboard/ReportsView.tsx");
-  assert.match(today, /Cập nhật \{dau\.validationCode\}/);
-  assert.match(progress, /Cập nhật.*pr-ma/);
-  assert.match(reports, /In \/ lưu PDF/);
-  assert.match(reports, /Tải Excel · 5 sheet/);
-  assert.match(reports, /Tải HTML/);
-  assert.doesNotMatch(reports, /> PDF<|> HTML<|Excel \(đủ 5 sheet\)/);
-});
+await page.goto(`${GOC}#v=today`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector(".hn-hero__cta");
+assert.match(await page.$eval(".hn-hero__cta", (el) => el.textContent.trim()), /^Cập nhật /);
+
+await page.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded" });
+const labels = await page.$$eval(".vmp-report-export-actions button", (buttons) =>
+  buttons.map((button) => button.textContent.trim()));
+assert.deepEqual(labels, ["In / lưu PDF", "Tải Excel · 5 sheet", "Tải HTML"]);
 ```
+
+Use mock Supabase data and 1366×768. Add Progress assertion for the first actionable priority and geometry assertions that each export label stays on one line.
 
 - [ ] **Step 2: Run RED**
 
-Run: `node --import tsx --test tests/unit/desktop-cta-copy.test.mjs`
+Run: `bash scripts/with-preview.sh -- node tests/e2e/desktop-cta-copy.mjs`
 
 Expected: FAIL on current `Mở`, `PDF`, `Excel (đủ 5 sheet)`, `HTML`.
 
@@ -357,9 +337,9 @@ Expected: FAIL on current `Mở`, `PDF`, `Excel (đủ 5 sheet)`, `HTML`.
 Run:
 
 ```bash
-node --import tsx --test tests/unit/desktop-cta-copy.test.mjs
 npm run typecheck
-bash scripts/with-preview.sh -- npm run a11y -- --project=chromium
+bash scripts/with-preview.sh -- node tests/e2e/desktop-cta-copy.mjs
+bash scripts/with-preview.sh -- npm run a11y
 ```
 
 At 1366×768, inspect Today, Progress and Reports: primary CTA remains inside fold and no export button wraps to two lines. Overview, Alerts and Source CTA must remain unchanged.
@@ -367,7 +347,7 @@ At 1366×768, inspect Today, Progress and Reports: primary CTA remains inside fo
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/features/today/TodayCommandCenter.tsx src/pages/UpdatePage.tsx src/components/dashboard/ReportsView.tsx tests/unit/desktop-cta-copy.test.mjs
+git add src/features/today/TodayCommandCenter.tsx src/pages/UpdatePage.tsx src/components/dashboard/ReportsView.tsx tests/e2e/desktop-cta-copy.mjs
 git commit -m "fix(ux): make desktop CTA outcomes explicit"
 ```
 
@@ -384,33 +364,29 @@ git commit -m "fix(ux): make desktop CTA outcomes explicit"
 - Modify: `src/components/dashboard/CompletionDashboard.tsx`
 - Modify: `src/pages/WorkloadPage.tsx`
 - Modify: `src/pages/QrmPage.tsx`
-- Create: `tests/unit/desktop-motion-affordance.test.mjs`
+- Create: `tests/e2e/desktop-motion-affordance.mjs`
 
 **Interfaces:**
 - Consumes: `--lp-motion-fast`, `--lp-motion-ui`, `--lp-mo-modal`, `--lp-ease`.
 - Produces: lift only on `.vmp-lift` interactive elements; no persistent `will-change`; reduced motion reaches final state immediately.
 
-- [ ] **Step 1: Write failing CSS/source tests**
+- [ ] **Step 1: Write the failing computed-style browser test**
 
 ```js
-test("shared cards do not promise clickability", () => {
-  const primitives = read("src/components/ui/Primitives.tsx");
-  const css = read("src/index.css");
-  assert.doesNotMatch(primitives, /card fade vmp-lift-3d/);
-  assert.doesNotMatch(css, /\.card:hover/);
-  assert.doesNotMatch(css, /will-change:\s*transform/);
-});
+const staticCard = await page.$(".card");
+await staticCard.hover();
+assert.equal(await staticCard.evaluate((el) => getComputedStyle(el).transform), "none");
 
-test("shared motion uses Lotus tokens and reduce reaches final state", () => {
-  const css = read("src/index.css");
-  assert.doesNotMatch(css, /--mo-fast:|--mo-base:|--mo-slow:/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]*\.vmp-view-enter[\s\S]*animation:\s*none/);
-});
+const action = await page.$("button.vmp-lift");
+await action.hover();
+assert.notEqual(await action.evaluate((el) => getComputedStyle(el).transform), "none");
 ```
+
+Open a second page with `prefers-reduced-motion: reduce`; hover the same action and assert `transform === "none"`, route-enter `animationName === "none"`, and the final route content is immediately visible.
 
 - [ ] **Step 2: Run RED**
 
-Run: `node --import tsx --test tests/unit/desktop-motion-affordance.test.mjs`
+Run: `bash scripts/with-preview.sh -- node tests/e2e/desktop-motion-affordance.mjs`
 
 Expected: FAIL for global card lift, duplicate token family and persistent compositing hints.
 
@@ -446,9 +422,10 @@ Inside existing shared `prefers-reduced-motion: reduce`, add explicit final-stat
 Run:
 
 ```bash
-node --import tsx --test tests/unit/desktop-motion-affordance.test.mjs tests/unit/lotus-components.test.mjs
+node --import tsx --test tests/unit/lotus-components.test.mjs
 npm run typecheck
 npm run build
+bash scripts/with-preview.sh -- node tests/e2e/desktop-motion-affordance.mjs
 bash scripts/with-preview.sh -- node tests/e2e/giam-chuyen-dong.mjs
 ```
 
@@ -457,7 +434,7 @@ Expected: all pass; static Card does not move on hover, interactive actions reta
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/styles/lotus-tokens.css src/index.css src/components/layout/Layout.tsx src/components/ui/Primitives.tsx src/App.tsx src/components/dashboard/CompletionDashboard.tsx src/pages/WorkloadPage.tsx src/pages/QrmPage.tsx tests/unit/desktop-motion-affordance.test.mjs
+git add src/styles/lotus-tokens.css src/index.css src/components/layout/Layout.tsx src/components/ui/Primitives.tsx src/App.tsx src/components/dashboard/CompletionDashboard.tsx src/pages/WorkloadPage.tsx src/pages/QrmPage.tsx tests/e2e/desktop-motion-affordance.mjs
 git commit -m "refactor(motion): make desktop feedback purposeful"
 ```
 
@@ -482,10 +459,12 @@ git commit -m "refactor(motion): make desktop feedback purposeful"
 - [ ] **Step 1: Write failing prefetch and budget tests**
 
 ```js
-test("prefetch excludes Timeline and heavy export/3D", async () => {
-  const { PREFETCHABLE_SCREEN_IDS } = await import("../../src/lib/routePrefetch.ts");
-  assert.equal(PREFETCHABLE_SCREEN_IDS.includes("timeline"), false);
-  assert.equal(PREFETCHABLE_SCREEN_IDS.includes("reports"), true);
+test("prefetch gate rejects Timeline, Save-Data and non-desktop", async () => {
+  const { canPrefetchDesktopRoute } = await import("../../src/lib/routePrefetch.ts");
+  assert.equal(canPrefetchDesktopRoute("timeline", { desktop: true, saveData: false }), false);
+  assert.equal(canPrefetchDesktopRoute("reports", { desktop: true, saveData: true }), false);
+  assert.equal(canPrefetchDesktopRoute("reports", { desktop: false, saveData: false }), false);
+  assert.equal(canPrefetchDesktopRoute("reports", { desktop: true, saveData: false }), true);
 });
 
 test("budget helper rejects an oversized route", async () => {
@@ -574,12 +553,8 @@ git commit -m "perf(desktop): enforce route budgets and intent loading"
 
 ```bash
 node --import tsx --test \
-  tests/unit/desktop-navigation-experience.test.mjs \
   tests/unit/toast-queue.test.mjs \
   tests/unit/toast-recovery.test.mjs \
-  tests/unit/desktop-readiness.test.mjs \
-  tests/unit/desktop-cta-copy.test.mjs \
-  tests/unit/desktop-motion-affordance.test.mjs \
   tests/unit/desktop-performance-budget.test.mjs
 ```
 
@@ -592,6 +567,9 @@ npm run test:unit
 npm run visual:matrix:count
 npm run a11y
 bash scripts/with-preview.sh -- node tests/e2e/desktop-navigation-experience.mjs
+bash scripts/with-preview.sh -- node tests/e2e/desktop-readiness.mjs
+bash scripts/with-preview.sh -- node tests/e2e/desktop-cta-copy.mjs
+bash scripts/with-preview.sh -- node tests/e2e/desktop-motion-affordance.mjs
 bash scripts/with-preview.sh -- node tests/e2e/giam-chuyen-dong.mjs
 ```
 
