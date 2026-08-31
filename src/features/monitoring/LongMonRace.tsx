@@ -13,10 +13,10 @@ import {
  * đối "/art/..." sẽ trỏ ra NGOÀI repo và cả bức tranh biến mất trên
  * production. import.meta.env.BASE_URL luôn có "/" ở cuối. */
 const ART_BASE = `${import.meta.env?.BASE_URL ?? "/"}art/monitoring/`;
-const BACKGROUND_URL = `${ART_BASE}long-mon-vmp-racecourse-v15.png`;
-const SPECIES_SHEET_URL = `${ART_BASE}long-mon-six-species-v16.png`;
+const BACKGROUND_URL = `${ART_BASE}long-mon-vmp-racecourse-v15.webp`;
+const SPECIES_SHEET_URL = `${ART_BASE}long-mon-six-species-v16.webp`;
 /* Cổng Vũ Môn vẽ tay (SVG → Inkscape xuất PNG) — xem chú thích trong CSS. */
-const GATE_URL = `${ART_BASE}long-mon-vu-mon-gate-v2.png`;
+const GATE_URL = `${ART_BASE}long-mon-vu-mon-gate-v2.webp`;
 
 /* Băm id → pha/chu kỳ bơi riêng của từng con (5.6s–9.2s). Cùng thuật băm
  * FNV như model để một hạng mục giữ nguyên dáng bơi giữa hai lần render. */

@@ -70,7 +70,7 @@ test("Long Môn ánh xạ sáu tiến độ bằng sáu loài khác nhau", () =>
 test("atlas V16 và vùng va chạm giữ đàn cá nhỏ gọn", () => {
   assert.equal(
     LONG_MON_SPECIES_SHEET_URL,
-    "/art/monitoring/long-mon-six-species-v16.png",
+    "/art/monitoring/long-mon-six-species-v16.webp",
   );
   assert.ok(LONG_MON_COLLISION_WIDTH_PX <= 64);
   assert.ok(LONG_MON_COLLISION_HEIGHT_PX <= 56);
