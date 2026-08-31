@@ -30,7 +30,7 @@ import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import {
   TRUONG_FORM, BO_PHAN_CHUAN,
-  buildCatalogPatch, canLyDo, coThamDinh, goiYLyDoThayDoi, validateCatalogForm, truongThieuDauTien,
+  buildCatalogPatch, canLyDo, coThamDinh, firstCatalogFormErrorTarget, goiYLyDoThayDoi, validateCatalogForm,
 } from "../../lib/catalogForm.ts";
 import type { GiaTriForm, LoiForm, NhomTruong, TruongForm } from "../../lib/catalogForm.ts";
 import ChonHoacGo from "../../features/catalogWorkspace/ChonHoacGo.tsx";
@@ -106,7 +106,8 @@ export default function CatalogObjectForm({
   const [oCanNhay, setOCanNhay] = useState<{ key: string; lan: number } | null>(null);
   useEffect(() => {
     if (!oCanNhay) return;
-    const el = document.getElementById(`cof-${oCanNhay.key}`);
+    const id = oCanNhay.key === "__lyDo" ? "cof-ly-do" : `cof-${oCanNhay.key}`;
+    const el = document.getElementById(id);
     if (!el) return;
     el.focus();
     el.scrollIntoView({ block: "center" });
@@ -163,7 +164,7 @@ export default function CatalogObjectForm({
     }
     setLoi(loiMoi);
     if (Object.keys(loiMoi).length) {
-      const dau = truongThieuDauTien(form);
+      const dau = firstCatalogFormErrorTarget(loiMoi, form);
       if (dau) {
         // Nhóm Nâng cao đang thu gọn thì mở ra, nếu không người dùng nhận
         // một câu lỗi trỏ tới ô họ không nhìn thấy.

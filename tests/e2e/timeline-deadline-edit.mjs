@@ -249,28 +249,30 @@ for (const { role, width, label } of [
 {
   const { page, rpcBodies } = await openPage(browser);
   await openDialog(page);
-  check(await page.$eval("[data-planned-deadline-submit]", (button) => button.disabled),
-    "reason and confirmation initially block submit");
+  check(await page.$eval("[data-planned-deadline-submit]", (button) => !button.disabled),
+    "submit remains actionable so it can explain the first missing field");
+  await page.click("[data-planned-deadline-submit]");
+  check(await page.$eval('input[aria-label="Lý do chỉnh deadline kế hoạch"]',
+    (input) => document.activeElement === input), "initial submit focuses the missing reason");
 
   await setInputValue(page, '[data-planned-deadline-input="deadline_vmp"]', UPDATED_VMP);
-  check(await page.$eval("[data-planned-deadline-submit]", (button) => button.disabled),
-    "reason blocks an otherwise valid planned-deadline change");
+  await page.click("[data-planned-deadline-submit]");
+  check(await page.$eval('input[aria-label="Lý do chỉnh deadline kế hoạch"]',
+    (input) => document.activeElement === input), "reason validation points to its input");
 
   await setInputValue(page, 'input[aria-label="Lý do chỉnh deadline kế hoạch"]', REASON);
-  check(await page.$eval("[data-planned-deadline-submit]", (button) => button.disabled),
-    "confirmation blocks submit after reason is supplied");
+  await page.click("[data-planned-deadline-submit]");
+  check(await page.$eval("[data-planned-deadline-confirmation]",
+    (input) => document.activeElement === input), "confirmation validation points to its checkbox");
 
   await page.click("[data-planned-deadline-confirmation]");
-  await page.waitForFunction(() => !document.querySelector("[data-planned-deadline-submit]")?.disabled,
-    { timeout: 10_000 });
   await setInputValue(page, '[data-planned-deadline-input="deadline_protocol"]', "2026-09-06");
-  await page.waitForFunction(() => document.querySelector("[data-planned-deadline-submit]")?.disabled === true,
-    { timeout: 10_000 });
-  check(true, "out-of-order deadline blocks submit");
+  await page.click("[data-planned-deadline-submit]");
+  check(await page.$eval('[data-planned-deadline-input="deadline_protocol"]',
+    (input) => document.activeElement === input), "out-of-order deadline points to the deadline grid");
 
   await setInputValue(page, '[data-planned-deadline-input="deadline_protocol"]', "");
-  await page.waitForFunction(() => document.querySelector("[data-planned-deadline-submit]")?.disabled === true,
-    { timeout: 10_000 });
+  await page.click("[data-planned-deadline-submit]");
   check(rpcBodies.length === 0, "reason/confirmation/order/erasure blockers make no mutation");
   await page.close();
 }

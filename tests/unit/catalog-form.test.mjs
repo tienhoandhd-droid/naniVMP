@@ -14,6 +14,7 @@ import {
   BO_PHAN_CHUAN,
   MA_BO_PHAN_KHAC,
   truongThieuDauTien,
+  firstCatalogFormErrorTarget,
 } from "../../src/lib/catalogForm.ts";
 
 const hopLe = {
@@ -164,4 +165,11 @@ test("truongThieuDauTien trả key của ô bắt buộc trống đầu tiên", 
   assert.equal(
     truongThieuDauTien({ object_code: "TB-1", object_name: "Máy", department: "xsx", validate_flag: "n" }),
     null);
+});
+
+test("lỗi lý do phân công QA có đích focus riêng khi các trường khác hợp lệ", () => {
+  assert.equal(firstCatalogFormErrorTarget({ __lyDo: "Phải nhập lý do" }, hopLe), "__lyDo");
+  assert.equal(firstCatalogFormErrorTarget({ object_name: "Thiếu tên", __lyDo: "Thiếu lý do" }, {
+    ...hopLe, object_name: "",
+  }), "object_name");
 });

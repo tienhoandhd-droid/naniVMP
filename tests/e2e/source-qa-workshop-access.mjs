@@ -380,6 +380,12 @@ try {
   await manager.evaluate(() => [...document.querySelectorAll("button")].find((button) => button.textContent?.includes("Thử lại"))?.click());
   await manager.waitForSelector("#cof-owner_person_id option[value='a1000000-0000-4000-8000-000000000002']");
   await manager.select("#cof-owner_person_id", ids.unrelated);
+  const saveCountBeforeReason = bodies.filter((entry) => entry.rpc === "rpc_save_catalog_object").length;
+  await manager.click('[role="dialog"] button.cw-nut--chinh');
+  assert.equal(await manager.$eval("#cof-ly-do", (input) => document.activeElement === input), true,
+    "missing QA assignment reason must focus its input instead of silently blocking save");
+  assert.equal(bodies.filter((entry) => entry.rpc === "rpc_save_catalog_object").length, saveCountBeforeReason,
+    "missing QA assignment reason must never cross the mutation boundary");
   await manager.type("#cof-ly-do", "Phân công QA E2E có lý do");
   await manager.waitForFunction(() => [...(document.querySelector('[role="dialog"]')?.querySelectorAll("button") ?? [])]
     .some((button) => button.textContent?.trim() === "Lưu" && !button.disabled));

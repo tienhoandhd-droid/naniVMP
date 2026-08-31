@@ -140,6 +140,14 @@ export function truongThieuDauTien(form: GiaTriForm): string | null {
   return null;
 }
 
+/** Đích đầu tiên cần sửa sau khi người dùng chủ động bấm Lưu. */
+export function firstCatalogFormErrorTarget(loi: LoiForm, form: GiaTriForm): string | null {
+  for (const t of truongDangHien(form)) {
+    if (loi[t.key]) return t.key;
+  }
+  return loi.__lyDo ? "__lyDo" : Object.keys(loi)[0] ?? null;
+}
+
 /**
  * Kiểm dữ liệu nhập. Trả về map trường → thông báo; rỗng nghĩa là hợp lệ.
  *

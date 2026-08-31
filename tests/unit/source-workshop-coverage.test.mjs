@@ -16,6 +16,7 @@ import {
   workshopMutationForbiddenTransition,
   workshopCoverageRequestIsCurrent,
 } from "../../src/features/sourceAccess/workshopScopeModel.ts";
+import { validateWorkshopScopeAction } from "../../src/features/sourceAccess/WorkshopScopeCoveragePanel.tsx";
 
 const PERSON_A = "aaaaaaaa-1111-4111-8111-111111111111";
 const GRANT_A = "bbbbbbbb-2222-4222-8222-222222222222";
@@ -139,6 +140,21 @@ test("draft normalizer requires a reason and maps a blank line to area-wide cove
     () => normalizeWorkshopScopeDraft({ department: "Xưởng A", areaCode: "KV-01", line: "", reason: " " }),
     /lý do/i,
   );
+});
+
+test("nút lưu phạm vi chỉ đúng lựa chọn đầu tiên còn thiếu thay vì bị khóa im lặng", () => {
+  assert.deepEqual(validateWorkshopScopeAction({
+    choicesStatus: "ready", department: "", areaCode: "", reason: "",
+  }), { code: "department", message: "Chọn bộ phận Source.", focusId: "workshop-scope-department" });
+  assert.deepEqual(validateWorkshopScopeAction({
+    choicesStatus: "ready", department: "Xưởng A", areaCode: "", reason: "",
+  }), { code: "area", message: "Chọn khu vực Source.", focusId: "workshop-scope-area" });
+  assert.deepEqual(validateWorkshopScopeAction({
+    choicesStatus: "ready", department: "Xưởng A", areaCode: "KV-01", reason: "",
+  }), { code: "reason", message: "Nhập lý do thay đổi.", focusId: "workshop-scope-reason" });
+  assert.equal(validateWorkshopScopeAction({
+    choicesStatus: "ready", department: "Xưởng A", areaCode: "KV-01", reason: "Cấp theo hồ sơ",
+  }), null);
 });
 
 test("coverage reducer fences an older page response after a newer retry begins", () => {

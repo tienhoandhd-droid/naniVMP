@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { actionDescriptionId, firstActionBlock, type ActionBlock } from "../../components/ui/actionReadiness.ts";
 import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { btnPrimary, cardDefault, C, INP, TEXT } from "../../constants/theme.ts";
 import { listSourceWorkshopScopeChoices, setSourceWorkshopScopeGrant } from "./api.ts";
@@ -12,6 +13,23 @@ import {
 
 function unique(values: readonly string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right, "vi"));
+}
+
+export function validateWorkshopScopeAction({
+  choicesStatus, department, areaCode, reason,
+}: {
+  choicesStatus: "idle" | "loading" | "ready" | "error";
+  department: string;
+  areaCode: string;
+  reason: string;
+}): ActionBlock | null {
+  return firstActionBlock([
+    { blocked: choicesStatus === "loading" || choicesStatus === "idle", code: "choices", message: "Đang tải lựa chọn từ dữ liệu Source." },
+    { blocked: choicesStatus === "error", code: "choices", message: "Chưa tải được lựa chọn từ dữ liệu Source; hãy thử lại." },
+    { blocked: !department, code: "department", message: "Chọn bộ phận Source.", focusId: "workshop-scope-department" },
+    { blocked: !areaCode, code: "area", message: "Chọn khu vực Source.", focusId: "workshop-scope-area" },
+    { blocked: !reason.trim(), code: "reason", message: "Nhập lý do thay đổi.", focusId: "workshop-scope-reason" },
+  ]);
 }
 
 function optimisticGrant({
@@ -121,6 +139,13 @@ export default function WorkshopScopeCoveragePanel({
   const lines = useMemo(() => unique(choices.rows
     .filter((choice) => choice.department === department && choice.areaCode === areaCode && choice.line !== null)
     .map((choice) => choice.line as string)), [choices.rows, department, areaCode]);
+  const actionDescription = actionDescriptionId("luu pham vi xuong");
+  const actionBlock = validateWorkshopScopeAction({
+    choicesStatus: choices.status,
+    department,
+    areaCode,
+    reason,
+  });
 
   const selectPerson = (person: SourceWorkshopCoveragePerson) => {
     setSelectedPersonId(person.personId);
@@ -140,6 +165,16 @@ export default function WorkshopScopeCoveragePanel({
   }) => {
     const person = direct?.person ?? selectedPerson;
     if (!person) return;
+    if (!direct) {
+      const block = validateWorkshopScopeAction({
+        choicesStatus: choices.status, department, areaCode, reason,
+      });
+      if (block) {
+        setMessage(block.message);
+        if (block.focusId) document.getElementById(block.focusId)?.focus();
+        return;
+      }
+    }
     let draft;
     try {
       draft = normalizeWorkshopScopeDraft(direct?.draft ?? { department, areaCode, line, reason });
@@ -258,11 +293,11 @@ export default function WorkshopScopeCoveragePanel({
             <form onSubmit={(event) => { event.preventDefault(); void save(true); }} aria-label="Thiết lập phạm vi xưởng">
               <h3>{editingGrant ? "Sửa phạm vi" : "Thêm phạm vi"}</h3>
               <label htmlFor="workshop-scope-department">Bộ phận Source</label>
-              <select id="workshop-scope-department" value={department} onChange={(event) => { setDepartment(event.target.value); setAreaCode(""); setLine(""); }} style={INP} disabled={choices.status === "loading" || saving}>
+              <select id="workshop-scope-department" aria-describedby={actionDescription} value={department} onChange={(event) => { setDepartment(event.target.value); setAreaCode(""); setLine(""); setMessage(""); }} style={INP} disabled={choices.status === "loading" || saving}>
                 <option value="">— chọn bộ phận —</option>{departments.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               <label htmlFor="workshop-scope-area">Khu vực Source</label>
-              <select id="workshop-scope-area" value={areaCode} onChange={(event) => { setAreaCode(event.target.value); setLine(""); }} style={INP} disabled={!department || choices.status === "loading" || saving}>
+              <select id="workshop-scope-area" aria-describedby={actionDescription} value={areaCode} onChange={(event) => { setAreaCode(event.target.value); setLine(""); setMessage(""); }} style={INP} disabled={!department || choices.status === "loading" || saving}>
                 <option value="">— chọn khu vực —</option>{areas.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               <label htmlFor="workshop-scope-line">Dây chuyền (không bắt buộc)</label>
@@ -274,9 +309,10 @@ export default function WorkshopScopeCoveragePanel({
               {choices.status === "error" && <p role="alert">Không tải được lựa chọn Source: {choices.error?.error} <button type="button" className="cw-nut cw-nut--phu" onClick={() => setChoicesRetry((value) => value + 1)}>Thử lại</button></p>}
               {choices.status === "ready" && choices.nextCursor && <button type="button" className="cw-nut cw-nut--phu" onClick={() => void loadChoices(true, choices.nextCursor)}>Tải thêm lựa chọn Source</button>}
               <label htmlFor="workshop-scope-reason">Lý do thay đổi</label>
-              <textarea id="workshop-scope-reason" value={reason} onChange={(event) => setReason(event.target.value)} required style={{ ...INP, minHeight: 76, paddingTop: 10 }} disabled={saving} />
+              <textarea id="workshop-scope-reason" aria-describedby={actionDescription} value={reason} onChange={(event) => { setReason(event.target.value); setMessage(""); }} required style={{ ...INP, minHeight: 76, paddingTop: 10 }} disabled={saving} />
+              <p id={actionDescription}>{actionBlock?.message || "Sẵn sàng lưu phạm vi và đối chiếu lại với Source."}</p>
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <button type="submit" style={btnPrimary} disabled={saving || choices.status !== "ready"}>{saving ? "Đang lưu…" : editingGrant ? "Lưu thay đổi" : "Thêm phạm vi"}</button>
+                <button type="submit" style={btnPrimary} disabled={saving} aria-describedby={actionDescription}>{saving ? "Đang lưu…" : editingGrant ? "Lưu thay đổi" : "Thêm phạm vi"}</button>
                 {editingGrant && <button type="button" className="cw-nut cw-nut--phu" onClick={clearEditor}>Hủy</button>}
               </div>
             </form>

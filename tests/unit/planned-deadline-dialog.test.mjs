@@ -10,6 +10,7 @@ import PlannedDeadlineDialog from "../../src/features/timeline/PlannedDeadlineDi
 import {
   PLANNED_DEADLINE_SUCCESS_TOAST,
   createPlannedDeadlineDialogController,
+  plannedDeadlineErrorFocusId,
 } from "../../src/features/timeline/plannedDeadlineEditModel.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -100,7 +101,15 @@ test("dialog renders exactly four editable deadlines and eight protected evidenc
     assert.match(html, new RegExp(`data-planned-deadline-protected="${key}"`));
   }
   assert.match(html, /Tôi xác nhận chỉ đổi bốn deadline kế hoạch/);
-  assert.match(html, /data-planned-deadline-submit="true"[^>]*disabled=""/);
+  assert.match(html, /data-planned-deadline-submit="true"/);
+  assert.doesNotMatch(html, /data-planned-deadline-submit="true"[^>]*disabled=""/);
+  assert.match(html, /aria-describedby="planned-deadline-action-description"/);
+});
+
+test("lỗi deadline trỏ đúng ô cần sửa", () => {
+  assert.equal(plannedDeadlineErrorFocusId("Phải nhập lý do điều chỉnh deadline kế hoạch"), "planned-deadline-reason");
+  assert.equal(plannedDeadlineErrorFocusId("Phải xác nhận chỉ đổi bốn deadline kế hoạch"), "planned-deadline-confirmation");
+  assert.equal(plannedDeadlineErrorFocusId("Không có deadline nào thay đổi"), "planned-deadline-deadline_protocol");
 });
 
 test("footer, X/Escape guard, and conflict reload share the synchronous busy close policy", async () => {

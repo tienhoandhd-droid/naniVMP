@@ -10,6 +10,7 @@ import {
   PROTECTED_KEYS,
   createPlannedDeadlineDialogController,
   plannedSnapshot,
+  plannedDeadlineErrorFocusId,
   preparePlannedDeadlineUpdate,
   protectedSnapshot,
   resultMessage,
@@ -78,6 +79,7 @@ export default function PlannedDeadlineDialog({
     if (!prepared.ok) {
       setConflict(false);
       setError(prepared.error);
+      document.getElementById(plannedDeadlineErrorFocusId(prepared.error))?.focus();
       return;
     }
 
@@ -115,7 +117,8 @@ export default function PlannedDeadlineDialog({
           <button
             data-planned-deadline-submit
             type="button"
-            disabled={busy || Boolean(localError)}
+            disabled={busy}
+            aria-describedby="planned-deadline-action-description"
             onClick={() => void save()}
           >
             Lưu
@@ -133,14 +136,19 @@ export default function PlannedDeadlineDialog({
               {key}
               <span>Đã tải: {before[key] || "—"}</span>
               <input
+                id={`planned-deadline-${key}`}
                 data-planned-deadline-input={key}
+                aria-describedby="planned-deadline-action-description"
                 type="date"
                 value={draft[key] || ""}
                 disabled={busy}
-                onChange={(event) => setDraft((current) => ({
-                  ...current,
-                  [key]: event.target.value || null,
-                }))}
+                onChange={(event) => {
+                  setError("");
+                  setDraft((current) => ({
+                    ...current,
+                    [key]: event.target.value || null,
+                  }));
+                }}
               />
             </label>
           ))}
@@ -158,25 +166,33 @@ export default function PlannedDeadlineDialog({
         <label>
           Lý do
           <input
+            id="planned-deadline-reason"
             data-dialog-focus
             aria-label="Lý do chỉnh deadline kế hoạch"
+            aria-describedby="planned-deadline-action-description"
             value={reason}
             disabled={busy}
-            onChange={(event) => setReason(event.target.value)}
+            onChange={(event) => { setReason(event.target.value); setError(""); }}
           />
         </label>
 
         <label>
           <input
+            id="planned-deadline-confirmation"
             data-planned-deadline-confirmation
             type="checkbox"
             checked={confirmed}
             disabled={busy}
-            onChange={(event) => setConfirmed(event.target.checked)}
+            aria-describedby="planned-deadline-action-description"
+            onChange={(event) => { setConfirmed(event.target.checked); setError(""); }}
           />
           Tôi xác nhận chỉ đổi bốn deadline kế hoạch; ngày thực tế, trạng thái,
           người thực hiện và mã hạng mục giữ nguyên.
         </label>
+
+        <p id="planned-deadline-action-description">
+          {localError || "Sẵn sàng lưu; hệ thống sẽ kiểm tra lại phiên bản trước khi ghi."}
+        </p>
 
         {error && <p data-planned-deadline-error role="alert">{error}</p>}
         {conflict && (

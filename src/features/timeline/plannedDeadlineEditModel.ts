@@ -181,6 +181,12 @@ export function validatePlannedDeadlineDraft({
   return null;
 }
 
+export function plannedDeadlineErrorFocusId(error: string): string {
+  if (error.includes("lý do")) return "planned-deadline-reason";
+  if (error.includes("xác nhận")) return "planned-deadline-confirmation";
+  return "planned-deadline-deadline_protocol";
+}
+
 export function preparePlannedDeadlineUpdate(
   draft: PlannedDeadlineDraftValidationInput,
 ): PreparedPlannedDeadlineInput {
