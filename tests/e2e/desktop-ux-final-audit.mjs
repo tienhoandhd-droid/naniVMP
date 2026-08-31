@@ -289,6 +289,52 @@ try {
       assert.equal(headings.h1, 1, `${route} must expose one route h1`);
       assert.ok(headings.h2.length > 0, `${route} must expose a discoverable h2 section heading`);
     }
+
+    await page.goto(`${APP_URL}#v=inventory`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.waitForSelector(".catalog-object__trigger", { timeout: 15_000 });
+    await page.evaluate(() => {
+      const trigger = [...document.querySelectorAll(".catalog-object__trigger")]
+        .find((button) => Number(button.dataset.catalogItems) > 0
+          && button.dataset.catalogStatuses?.split(" ").some((status) => status !== "done"));
+      if (!trigger) throw new Error("Không tìm thấy nhóm Danh mục có thao tác nhanh");
+      trigger.click();
+    });
+    await page.waitForFunction(() => [...document.querySelectorAll(".catalog-milestones tbody tr")]
+      .some((row) => [...row.querySelectorAll("button")]
+        .some((button) => button.textContent?.trim() === "✓ Xong bước")), { timeout: 15_000 });
+    const quickCode = await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".catalog-milestones tbody tr")]
+        .find((candidate) => [...candidate.querySelectorAll("button")]
+          .some((button) => button.textContent?.trim() === "✓ Xong bước"));
+      const code = row?.querySelector(":scope > :nth-child(2)")?.textContent?.trim();
+      [...(row?.querySelectorAll("button") || [])]
+        .find((button) => button.textContent?.trim() === "✓ Xong bước")?.click();
+      return code;
+    });
+    assert.ok(quickCode, "Catalog quick action must identify its row");
+    await page.waitForFunction((code) => {
+      const dialog = document.querySelector('[role="dialog"]');
+      return dialog?.textContent?.includes(`ID: ${code}`)
+        && dialog.textContent.includes("Đã điền sẵn hôm nay + Hoàn thành");
+    }, { timeout: 15_000 }, quickCode);
+    await page.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      [...(dialog?.querySelectorAll("button") || [])]
+        .find((button) => button.textContent?.trim() === "Hủy")?.click();
+    });
+    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: 15_000 });
+
+    await page.evaluate((code) => {
+      const row = [...document.querySelectorAll(".catalog-milestones tbody tr")]
+        .find((candidate) => candidate.querySelector(":scope > :nth-child(2)")?.textContent?.trim() === code);
+      [...(row?.querySelectorAll("button") || [])]
+        .find((button) => button.textContent?.trim() === "Cập nhật")?.click();
+    }, quickCode);
+    await page.waitForFunction((code) => {
+      const dialog = document.querySelector('[role="dialog"]');
+      return dialog?.textContent?.includes(`ID: ${code}`)
+        && !dialog.textContent.includes("Đã điền sẵn hôm nay + Hoàn thành");
+    }, { timeout: 15_000 }, quickCode);
     console.log("✓ semantics desktop UX audit exposes route heading hierarchy");
   }
 } finally {

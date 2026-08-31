@@ -27,6 +27,7 @@ const activity = {
     tt_vmp: "planned",
   },
 };
+const duplicateYearActivity = { ...activity, id: "PQ-002/2026", code: "PQ-002/2026" };
 
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 
@@ -38,25 +39,54 @@ const moduleFor = async (path) => {
 
 test.after(async () => { await vite?.close(); });
 
-function assertNamedDataTable(html, label) {
+function tableMarkup(html, label) {
   const table = html.match(/<table\b[\s\S]*?<\/table>/)?.[0] || "";
   assert.ok(table, `${label} must render a native table`);
+  return table;
+}
+
+function scopedHeaders(table, scope) {
+  return [...table.matchAll(new RegExp(`<th\\b(?=[^>]*\\bscope="${scope}")[^>]*>([\\s\\S]*?)<\\/th>`, "g"))]
+    .map((match) => match[1].replace(/<[^>]+>/g, "").trim());
+}
+
+function assertNamedDataTable(html, label) {
+  const table = tableMarkup(html, label);
   const caption = table.match(/<caption\b[^>]*>([\s\S]*?)<\/caption>/)?.[1]
     .replace(/<[^>]+>/g, "")
     .trim();
   assert.ok(caption, `${label} must expose a non-empty table caption`);
-  assert.match(table, /<th\b[^>]*scope="col"/, `${label} must scope its column headers`);
-  assert.match(table, /<th\b[^>]*scope="row"/, `${label} must scope its row labels`);
+  const columnHeaders = scopedHeaders(table, "col");
+  const rowHeaders = scopedHeaders(table, "row");
+  assert.ok(columnHeaders.length > 0, `${label} must scope its column headers`);
+  assert.ok(rowHeaders.length > 0, `${label} must scope its row labels`);
+  assert.ok(columnHeaders.every(Boolean), `${label} must name every scoped column header`);
+  assert.ok(rowHeaders.every(Boolean), `${label} must name every scoped row header`);
 }
 
-test("Catalog milestones table exposes its name and header relationships", async () => {
+test("Catalog milestones table names every column header, including its actions", async () => {
   const catalog = await moduleFor("/src/pages/CatalogPage.tsx");
   assert.equal(typeof catalog.CatalogMilestonesTable, "function", "Catalog milestones must be renderable for semantic coverage");
 
-  assertNamedDataTable(render(catalog.CatalogMilestonesTable, {
-    items: [activity], dupYears: new Set(), readOnly: false,
+  const html = render(catalog.CatalogMilestonesTable, {
+    items: [activity, duplicateYearActivity], dupYears: new Set(["2026"]), readOnly: false,
     onQuickDone: () => {}, onEdit: () => {},
-  }), "Catalog milestones");
+  });
+  assertNamedDataTable(html, "Catalog milestones");
+  assert.ok(scopedHeaders(tableMarkup(html, "Catalog milestones"), "col").includes("Thao tác"),
+    "Catalog milestones must name its actions column");
+});
+
+test("Catalog milestones use each validation ID as the unique row header", async () => {
+  const catalog = await moduleFor("/src/pages/CatalogPage.tsx");
+  const html = render(catalog.CatalogMilestonesTable, {
+    items: [activity, duplicateYearActivity], dupYears: new Set(["2026"]), readOnly: false,
+    onQuickDone: () => {}, onEdit: () => {},
+  });
+  const rowHeaders = scopedHeaders(tableMarkup(html, "Catalog milestones"), "row");
+
+  assert.deepEqual(rowHeaders, [activity.id, duplicateYearActivity.id]);
+  assert.equal(new Set(rowHeaders).size, 2, "duplicate-year rows must retain unique row headers");
 });
 
 test("completion comparison table exposes its name and header relationships", async () => {
