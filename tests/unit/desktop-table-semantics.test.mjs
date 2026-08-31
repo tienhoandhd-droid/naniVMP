@@ -50,6 +50,12 @@ function scopedHeaders(table, scope) {
     .map((match) => match[1].replace(/<[^>]+>/g, "").trim());
 }
 
+function sectionHeaders(table, section) {
+  const markup = table.match(new RegExp(`<${section}\\b[^>]*>([\\s\\S]*?)<\\/${section}>`, "i"))?.[1] || "";
+  return [...markup.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)]
+    .map((match) => match[1].replace(/<[^>]+>/g, "").trim());
+}
+
 function assertNamedDataTable(html, label) {
   const table = tableMarkup(html, label);
   const caption = table.match(/<caption\b[^>]*>([\s\S]*?)<\/caption>/)?.[1]
@@ -58,11 +64,29 @@ function assertNamedDataTable(html, label) {
   assert.ok(caption, `${label} must expose a non-empty table caption`);
   const columnHeaders = scopedHeaders(table, "col");
   const rowHeaders = scopedHeaders(table, "row");
+  const theadHeaders = sectionHeaders(table, "thead");
+  const tbodyHeaders = sectionHeaders(table, "tbody");
   assert.ok(columnHeaders.length > 0, `${label} must scope its column headers`);
   assert.ok(rowHeaders.length > 0, `${label} must scope its row labels`);
+  assert.deepEqual(columnHeaders, theadHeaders, `${label} must scope every <thead> header with scope="col"`);
+  assert.deepEqual(rowHeaders, tbodyHeaders, `${label} must scope every <tbody> header with scope="row"`);
   assert.ok(columnHeaders.every(Boolean), `${label} must name every scoped column header`);
   assert.ok(rowHeaders.every(Boolean), `${label} must name every scoped row header`);
 }
+
+test("table semantics fails closed when any rendered header loses its scope", () => {
+  const unscopedColumnHeader = `
+    <table>
+      <caption>Kiểm tra</caption>
+      <thead><tr><th scope="col">Mã</th><th>Thao tác</th></tr></thead>
+      <tbody><tr><th scope="row">PQ-001/2026</th><td>Mở</td></tr></tbody>
+    </table>`;
+
+  assert.throws(
+    () => assertNamedDataTable(unscopedColumnHeader, "Scope guard"),
+    /scope="col"/,
+  );
+});
 
 test("Catalog milestones table names every column header, including its actions", async () => {
   const catalog = await moduleFor("/src/pages/CatalogPage.tsx");
