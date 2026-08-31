@@ -131,6 +131,7 @@ git commit -m "test(ui): khóa guardrail drift desktop"
 - Modify: `playwright.visual.config.ts`
 - Modify: `scripts/check-visual-runtime.mjs`
 - Modify: `tests/unit/visual-runtime-contract.test.mjs`
+- Modify: `tests/unit/e2e-suite-contract.test.mjs`
 - Create: `tests/unit/release-workflow-contract.test.mjs`
 - Modify: `.github/workflows/deploy.yml`
 - Modify: `.github/workflows/visual-baseline.yml`
