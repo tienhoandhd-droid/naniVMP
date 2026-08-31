@@ -7,6 +7,7 @@ import type { ErrorInfo, ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import { LOTUS_VISUAL_ID } from "./lib/visualContract";
+import { caiDatBaoLoi, baoLoiRender } from "./lib/baoLoi.ts";
 import { C, R, TEXT, DISPLAY } from "./constants/theme.ts";
 /* Thứ tự hai dòng dưới có ý nghĩa: lotus-tokens.css bắc cầu các token
    `--c-*` cũ sang `--lp-*` mới, nên nó phải nạp SAU index.css thì mới đè
@@ -33,6 +34,11 @@ import "./features/analysis/analysis.css";
 
 /* Đặt ngôn ngữ thị giác và chế độ sáng/tối TRƯỚC khi React mount — nếu để
    trong component thì trang sẽ loé bảng màu cũ một nhịp rồi mới nhảy. */
+/* E2 (31/08): tai mắt production — onerror/unhandledrejection báo về
+   Supabase (lib/baoLoi.ts, chống bão + im lặng khi migration chưa áp).
+   Cài TRƯỚC React mount để bắt được cả lỗi lúc khởi động. */
+caiDatBaoLoi();
+
 (function applyTheme() {
   document.documentElement.dataset.visual = LOTUS_VISUAL_ID;
   try {
@@ -50,7 +56,12 @@ interface BoundaryState { err: Error | null }
 class ErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
   constructor(props: BoundaryProps) { super(props); this.state = { err: null }; }
   static getDerivedStateFromError(err: Error): BoundaryState { return { err }; }
-  componentDidCatch(err: Error, info: ErrorInfo) { console.error("VMP Monitor crash:", err, info); }
+  componentDidCatch(err: Error, info: ErrorInfo) {
+    console.error("VMP Monitor crash:", err, info);
+    // E2 (31/08): crash render giờ CÓ NGƯỜI THẤY — báo về Supabase kèm
+    // component stack; trước đây log này chết trong browser người dùng.
+    baoLoiRender(err, info.componentStack);
+  }
   render() {
     if (this.state.err) {
       return (
