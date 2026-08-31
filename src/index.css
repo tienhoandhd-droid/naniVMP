@@ -7570,6 +7570,8 @@ main li,
   background: none;
   border: 0;
   padding: 4px;
+  min-width: 36px;
+  min-height: 36px;
   cursor: pointer;
   color: inherit;
   opacity: .72;
@@ -7577,6 +7579,20 @@ main li,
 }
 .vmp-toast__tat:hover { opacity: 1; }
 .vmp-toast__tat:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
+
+.vmp-toast__hanh-dong {
+  flex: none;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-sm, 8px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.vmp-toast__hanh-dong:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: no-preference) {
   .vmp-toast { animation: vmp-toast-vao var(--lp-motion-fast, 140ms) ease-out; }

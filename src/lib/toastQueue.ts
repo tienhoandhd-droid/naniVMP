@@ -13,19 +13,29 @@
  * ===================================================================== */
 export type LoaiToast = "dang" | "thanhCong" | "loi" | "canhBao";
 
+export interface ToastAction {
+  id: string;
+  nhan: string;
+}
+
 export interface Toast {
   id: string;
   loai: LoaiToast;
   noiDung: string;
+  hanhDong?: ToastAction;
 }
 
 /** Mili giây trước khi tự tắt. 0 nghĩa là chờ chốt, không tự tắt. */
 export const THOI_LUONG: Record<LoaiToast, number> = {
   dang: 0,
-  thanhCong: 2500,
+  thanhCong: 3500,
   canhBao: 5000,
   loi: 6000,
 };
+
+export function thoiLuongToast(toast: Toast): number {
+  return toast.loai === "loi" && toast.hanhDong ? 0 : THOI_LUONG[toast.loai];
+}
 
 /** Nhiều hơn ngần này thì toast che mất nội dung nó vừa báo là đã ghi. */
 export const TOI_DA = 4;
@@ -36,10 +46,10 @@ export function themToast(ds: readonly Toast[], t: Toast): Toast[] {
 }
 
 export function chotToast(
-  ds: readonly Toast[], id: string, loai: LoaiToast, noiDung: string,
+  ds: readonly Toast[], id: string, loai: LoaiToast, noiDung: string, hanhDong?: ToastAction,
 ): Toast[] {
-  if (!ds.some((t) => t.id === id)) return themToast(ds, { id, loai, noiDung });
-  return ds.map((t) => (t.id === id ? { id, loai, noiDung } : t));
+  if (!ds.some((t) => t.id === id)) return themToast(ds, { id, loai, noiDung, hanhDong });
+  return ds.map((t) => (t.id === id ? { id, loai, noiDung, hanhDong } : t));
 }
 
 export function boToast(ds: readonly Toast[], id: string): Toast[] {

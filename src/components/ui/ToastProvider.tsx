@@ -19,15 +19,23 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import { AlertTriangle, Check, Loader, X } from "lucide-react";
 
-import { THOI_LUONG, boToast, chotToast, themToast } from "../../lib/toastQueue.ts";
+import { boToast, chotToast, themToast, thoiLuongToast } from "../../lib/toastQueue.ts";
 import type { LoaiToast, Toast } from "../../lib/toastQueue.ts";
+
+export interface HanhDongToast {
+  nhan: string;
+  thucHien(): void;
+}
 
 export interface BoToast {
   thanhCong(noiDung: string): void;
-  loi(noiDung: string): void;
+  loi(noiDung: string, hanhDong?: HanhDongToast): void;
   canhBao(noiDung: string): void;
   /** Thao tác dài: mở toast "đang chạy", chốt bằng `xong` hoặc `hong`. */
-  dangChay(noiDung: string): { xong(noiDung: string): void; hong(noiDung: string): void };
+  dangChay(noiDung: string): {
+    xong(noiDung: string): void;
+    hong(noiDung: string, hanhDong?: HanhDongToast): void;
+  };
 }
 
 const Ctx = createContext<BoToast | null>(null);
@@ -49,6 +57,7 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
   const [ds, setDs] = useState<Toast[]>([]);
   const dem = useRef(0);
   const hen = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const hanhDong = useRef<Map<string, () => void>>(new Map());
 
   const huyHen = useCallback((id: string) => {
     const h = hen.current.get(id);
@@ -58,12 +67,23 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const datHen = useCallback((id: string, loai: LoaiToast) => {
+  const bo = useCallback((toast: Toast) => {
+    huyHen(toast.id);
+    if (toast.hanhDong) hanhDong.current.delete(toast.hanhDong.id);
+    setDs((cu) => boToast(cu, toast.id));
+  }, [huyHen]);
+
+  const datHen = useCallback((toast: Toast) => {
+    const { id } = toast;
     huyHen(id);
-    const ms = THOI_LUONG[loai];
+    const ms = thoiLuongToast(toast);
     if (!ms) return;                       // 0 = chờ chốt, không tự tắt
     hen.current.set(id, setTimeout(() => {
-      setDs((cu) => boToast(cu, id));
+      setDs((cu) => {
+        const cuToast = cu.find((t) => t.id === id);
+        if (cuToast?.hanhDong) hanhDong.current.delete(cuToast.hanhDong.id);
+        return boToast(cu, id);
+      });
       hen.current.delete(id);
     }, ms));
   }, [huyHen]);
@@ -75,38 +95,75 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
     return () => {
       dsHen.forEach(clearTimeout);
       dsHen.clear();
+      hanhDong.current.clear();
     };
   }, []);
 
   const api = useMemo<BoToast>(() => {
-    const mo = (loai: LoaiToast, noiDung: string) => {
+    const taoHanhDong = (toastAction?: HanhDongToast) => {
+      if (!toastAction) return undefined;
+      const id = `a${++dem.current}`;
+      hanhDong.current.set(id, toastAction.thucHien);
+      return { id, nhan: toastAction.nhan };
+    };
+    const boToastDaBiCap = (cu: readonly Toast[], moi: readonly Toast[]) => {
+      for (const toast of cu) {
+        if (moi.some((t) => t.id === toast.id)) continue;
+        huyHen(toast.id);
+        if (toast.hanhDong) hanhDong.current.delete(toast.hanhDong.id);
+      }
+    };
+    const mo = (loai: LoaiToast, noiDung: string, toastAction?: HanhDongToast) => {
       const id = `t${++dem.current}`;
-      setDs((cu) => themToast(cu, { id, loai, noiDung }));
-      datHen(id, loai);
+      const action = taoHanhDong(toastAction);
+      const toast = { id, loai, noiDung, hanhDong: action };
+      setDs((cu) => {
+        const moi = themToast(cu, toast);
+        boToastDaBiCap(cu, moi);
+        return moi;
+      });
+      datHen(toast);
       return id;
     };
     return {
       thanhCong: (n) => { mo("thanhCong", n); },
-      loi: (n) => { mo("loi", n); },
+      loi: (n, a) => { mo("loi", n, a); },
       canhBao: (n) => { mo("canhBao", n); },
       dangChay: (n) => {
         const id = mo("dang", n);
-        const chot = (loai: LoaiToast, noiDung: string) => {
-          setDs((cu) => chotToast(cu, id, loai, noiDung));
-          datHen(id, loai);
+        const chot = (loai: LoaiToast, noiDung: string, toastAction?: HanhDongToast) => {
+          const action = taoHanhDong(toastAction);
+          const toast = { id, loai, noiDung, hanhDong: action };
+          setDs((cu) => {
+            const toastCu = cu.find((t) => t.id === id);
+            if (toastCu?.hanhDong && toastCu.hanhDong.id !== action?.id) {
+              hanhDong.current.delete(toastCu.hanhDong.id);
+            }
+            const moi = chotToast(cu, id, loai, noiDung, action);
+            boToastDaBiCap(cu, moi);
+            return moi;
+          });
+          datHen(toast);
         };
         return {
           xong: (noiDung: string) => chot("thanhCong", noiDung),
-          hong: (noiDung: string) => chot("loi", noiDung),
+          hong: (noiDung: string, a?: HanhDongToast) => chot("loi", noiDung, a),
         };
       },
     };
-  }, [datHen]);
+  }, [datHen, huyHen]);
+
+  const chayHanhDong = useCallback((toast: Toast) => {
+    if (!toast.hanhDong) return;
+    const thucHien = hanhDong.current.get(toast.hanhDong.id);
+    bo(toast);
+    thucHien?.();
+  }, [bo]);
 
   return (
     <Ctx.Provider value={api}>
       {children}
-      <div className="vmp-toast-vung" aria-live="polite" aria-atomic="false">
+      <div className="vmp-toast-vung">
         {ds.map((t) => (
           <div
             key={t.id}
@@ -120,12 +177,17 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
                   : <AlertTriangle size={16} />}
             </span>
             <span className="vmp-toast__chu">{t.noiDung}</span>
+            {t.hanhDong && (
+              <button type="button" className="vmp-toast__hanh-dong" onClick={() => chayHanhDong(t)}>
+                {t.hanhDong.nhan}
+              </button>
+            )}
             {t.loai !== "dang" && (
               <button
                 type="button"
                 className="vmp-toast__tat"
                 aria-label="Đóng thông báo"
-                onClick={() => { huyHen(t.id); setDs((cu) => boToast(cu, t.id)); }}
+                onClick={() => bo(t)}
               >
                 <X size={14} aria-hidden="true" />
               </button>

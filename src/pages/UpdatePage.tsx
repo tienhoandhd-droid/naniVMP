@@ -330,6 +330,30 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       await reloadRights();
     }
   }, [onReload, reloadRights]);
+  const doiTrangThai = async (id: string, newState: string, reason?: string) => {
+    // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp.
+    // Báo kết quả bằng toast của app (A4) thay vì alert() chặn màn hình.
+    if (!supabase) { toast.loi("Supabase chưa cấu hình."); return; }
+    if (!reason || !reason.trim()) return;
+    try {
+      const { data, error } = await supabase.rpc("rpc_set_item_state", {
+        p_validation_code: id,
+        p_state: newState,
+        p_reason: reason.trim(),
+      });
+      if (error) throw error;
+      const r = data as unknown as { ok?: boolean; error?: string } | null;
+      if (r && r.ok === false) throw new Error(r.error);
+      toast.thanhCong(`Đã đổi trạng thái ${id} → ${newState}`);
+      setEdit(null); setQuick(false);
+      void handleProgressReload(); // nạp lại dashboard và tập quyền trước khi hiện danh sách mới
+    } catch {
+      toast.loi(`Không đổi được trạng thái ${id}. Dữ liệu chưa được lưu.`, {
+        nhan: "Thử lại",
+        thucHien: () => { void doiTrangThai(id, newState, reason); },
+      });
+    }
+  };
 
   /* Deep link từ "Hôm nay" (anh Hoàn chốt 30/08 — B1): cuộn tới đúng dòng và
      tô sáng nó, ngoài việc đã mở sẵn hộp sửa ở effect deep link phía trên. */
@@ -670,27 +694,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         })()}
         onOpenNext={(a) => { setEdit(a); setQuick(false); }}
         onSave={onUpdate ?? (() => { /* chưa nối hàm cập nhật */ })}
-        onChangeState={async (id, newState, reason) => {
-          // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp.
-          // Báo kết quả bằng toast của app (A4) thay vì alert() chặn màn hình.
-          if (!supabase) { toast.loi("Supabase chưa cấu hình."); return; }
-          if (!reason || !reason.trim()) return;
-          try {
-            const { data, error } = await supabase.rpc("rpc_set_item_state", {
-              p_validation_code: id,
-              p_state: newState,
-              p_reason: reason.trim(),
-            });
-            if (error) throw error;
-            const r = data as unknown as { ok?: boolean; error?: string } | null;
-            if (r && r.ok === false) throw new Error(r.error);
-            toast.thanhCong(`Đã đổi trạng thái ${id} → ${newState}`);
-            setEdit(null); setQuick(false);
-            void handleProgressReload(); // nạp lại dashboard và tập quyền trước khi hiện danh sách mới
-          } catch (e) {
-            toast.loi("Lỗi đổi trạng thái: " + ((e as Error).message || "không rõ"));
-          }
-        }}
+        onChangeState={doiTrangThai}
       />}
     </div>
   );
