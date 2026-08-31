@@ -143,7 +143,10 @@ try {
   await nhetPhien(page, { supabaseUrl: URL_SB });
   await page.setViewport({ width: 1500, height: 1100 });
   await page.goto(`${GOC}#v=phanquyen`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.body.innerText.includes("Danh bạ chuẩn"));
+  await page.waitForFunction(() => document.body.innerText.includes("Bảng kiểm soát vai trò & tài khoản"));
+  await page.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Liên kết tài khoản")?.click());
+  await page.waitForFunction(() => document.body.innerText.includes("Chọn hồ sơ nhân sự"));
   await page.waitForFunction(() => document.querySelectorAll("#ip-directory-results button").length === 4);
 
   assert.equal(await page.evaluate(() => document.body.innerText.includes("Ẩn Inactive E2E")), false,

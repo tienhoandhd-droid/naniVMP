@@ -575,10 +575,8 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
   /* 31/08: new Date() trần ở đây tạo tham chiếu MỚI mỗi render → LongMonRace
      (nhận `now` làm prop) dựng lại model 761 dòng dù không gì đổi. Chốt mốc
      theo lần đổi dữ liệu: acts đổi (tải lại/ghi xong) mới lấy giờ mới — đủ
-     tươi cho thang NGÀY của trường đua 90 ngày. */
+     tươi cho thang NGÀY của trường đua hai tháng. */
   const now = useMemo(() => new Date(), [acts]);
-  /* Tab "Khám phá 3D" có trí nhớ: three.js chỉ tải khi người dùng thật sự
-     mở, và ai đã quen dùng thì không phải bấm lại mỗi lần vào màn. */
   const [longMonAudience, setLongMonAudience] = useState<LongMonAudience>(() =>
     businessRole === "qa_staff" ? "personal" : "team");
   /* Chế độ xem "Ngư đồ | Bảng" (31/08): bức tranh là mặc định — bản sắc của
@@ -618,10 +616,10 @@ export default function TimelineView({ acts, businessRole = null, currentPersonI
 
 
   /* Bộ lọc + range của workbench cũ đã bỏ hẳn (31/08): Ngư đồ nhận TRỌN
-     danh sách theo quyền — cửa sổ 90 ngày do CHÍNH model Long Môn cắt
+     danh sách theo quyền — cửa sổ hai tháng do CHÍNH model Long Môn cắt
      (rangeAround), không cắt trước ở đây. Bản đầu còn cho ăn qua
      explorerActs (lọc theo range MỘT THÁNG của Gantt cũ) nên cá ngoài
-     tháng hiện tại biến mất — trường đua 90 ngày mà trống trơn. */
+     tháng hiện tại biến mất — trường đua hai tháng mà trống trơn. */
   const longMonActivities = useMemo(() => filterLongMonScopeActivities({
     activities: acts,
     businessRole,

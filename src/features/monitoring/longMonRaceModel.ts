@@ -171,21 +171,12 @@ export function longMonStageOf(activity: Activity, now: Date): LongMonRaceStage 
   return "catfish";
 }
 
-/* Cửa sổ 90 NGÀY (31/08, chủ dự án chốt): 4 tuần đã qua + 9 tuần sắp tới
- * = 13 tuần ≈ 91 ngày. Bản trước chỉ 3 tuần (1 lùi + 2 tới) — người xem
- * không thấy được hạn nào ngoài nửa tháng, trong khi chu kỳ VMP tính bằng
- * quý. Tuần trống vẫn tự thu hẹp (weightedWeekBands) nên 13 tuần không
- * làm loãng vùng có cá. */
-const WINDOW_BACK_WEEKS = 4;
-const WINDOW_AHEAD_WEEKS = 9;
-
 function rangeAround(now: Date): { start: number; endExclusive: number; today: number } {
   const [year, month, day] = bangkokCalendarDate(now).split("-").map(Number);
   const today = Date.UTC(year, month - 1, day);
-  const currentWeekStart = startOfUtcWeek(today);
   return {
-    start: currentWeekStart - WINDOW_BACK_WEEKS * 7 * DAY_MS,
-    endExclusive: currentWeekStart + WINDOW_AHEAD_WEEKS * 7 * DAY_MS,
+    start: Date.UTC(year, month - 1, 1),
+    endExclusive: Date.UTC(year, month + 1, 1),
     today,
   };
 }
@@ -484,7 +475,7 @@ function tryTeamPlacement(
 }
 
 /* Thang CHIỀU CAO của hồ. Sự cố production 31/08: 126 cá dồn ba tuần
- * (80+18+28) trong cửa sổ 90 ngày làm cạn cả tám bậc mật độ ở hồ 560px —
+ * (80+18+28) trong cửa sổ dài làm cạn cả tám bậc mật độ ở hồ 560px —
  * model NÉM lỗi và cả màn Dòng thời gian trắng xoá. Giờ hết bậc mật độ
  * thì hồ SÂU THÊM một bậc rồi thử lại từ đầu; viewport chuyển sang cuộn
  * dọc khi hồ sâu hơn màn (long-mon-race.css). Bậc sâu nhất 2240px chứa

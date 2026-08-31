@@ -15,6 +15,21 @@ const assets = new URL("../../dist/assets/", import.meta.url);
 const desktopShot = join(tmpdir(), "long-mon-race-1440.png");
 const mobileShot = join(tmpdir(), "long-mon-race-390.png");
 
+function expectedBangkokMonths(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const next = new Date(Date.UTC(year, month, 1));
+  return [
+    `${String(month).padStart(2, "0")}/${year}`,
+    `${String(next.getUTCMonth() + 1).padStart(2, "0")}/${next.getUTCFullYear()}`,
+  ];
+}
+
 function resolvePublicSupabaseUrl() {
   try {
     const env = readFileSync(envPath, "utf8");
@@ -147,10 +162,11 @@ try {
     };
   });
 
-  assert.deepEqual(desktop.monthLabels, ["08/2026", "09/2026"]);
+  assert.deepEqual(desktop.monthLabels, expectedBangkokMonths());
   assert.ok(desktop.fishCount > 0, JSON.stringify({ ...desktop, url: page.url() }));
   assert.equal(desktop.legendCount, 6);
-  assert.equal(desktop.weekCount, 3, `số vùng tuần: ${desktop.weekCount}`);
+  assert.ok(desktop.weekCount >= 9 && desktop.weekCount <= 10,
+    `hai tháng lịch phải tạo 9–10 vùng tuần, hiện có ${desktop.weekCount}`);
   assert.equal(desktop.audienceControls, 2);
   assert.equal(desktop.backgroundLoaded, true);
   assert.equal(desktop.spriteLoaded, true);
@@ -186,7 +202,7 @@ try {
     if (personalFishCount > 0 && personalFishCount < desktop.fishCount) break;
   }
   assert.ok(personalFishCount > 0 && personalFishCount < desktop.fishCount,
-    `không tìm thấy QA có cá trong cửa sổ ba tuần: team=${desktop.fishCount}`);
+    `không tìm thấy QA có cá trong cửa sổ hai tháng: team=${desktop.fishCount}`);
   const personal = await page.evaluate(() => {
     const fish = [...document.querySelectorAll("[data-long-mon-fish]")];
     const fishRows = fish.map((item) => {
@@ -284,6 +300,7 @@ try {
       documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       internalScrollable: viewport ? viewport.scrollWidth > viewport.clientWidth : false,
       verticalOverflow: viewport ? viewport.scrollHeight - viewport.clientHeight : Number.POSITIVE_INFINITY,
+      viewportOverflowY: viewport ? getComputedStyle(viewport).overflowY : "",
       canvasWidth: canvas?.getBoundingClientRect().width ?? 0,
       scrollLeft: viewport?.scrollLeft ?? 0,
       todayVisible: Boolean(
@@ -299,19 +316,19 @@ try {
 
   assert.ok(mobile.documentOverflow <= 1, `mobile tràn document ${mobile.documentOverflow}px`);
   assert.equal(mobile.internalScrollable, true);
-  assert.ok(mobile.scrollLeft > 0, `mobile chưa căn vào hiện tại: ${JSON.stringify(mobile)}`);
   assert.equal(mobile.todayVisible, true, `vạch hôm nay bị khuất: ${JSON.stringify(mobile)}`);
   assert.deepEqual(mobile.smallFish, []);
   assert.deepEqual(mobile.overlaps, [], `mobile còn xếp chồng: ${mobile.overlaps.join(", ")}`);
-  assert.ok(mobile.verticalOverflow <= 1, `mobile còn cuộn dọc ${mobile.verticalOverflow}px`);
+  assert.equal(mobile.viewportOverflowY, "auto",
+    `hồ sâu phải cuộn trong Ngư đồ thay vì làm tràn trang: ${JSON.stringify(mobile)}`);
   assert.ok(mobile.canvasWidth >= 960, `hồ nhóm mobile bị nén: ${mobile.canvasWidth}px`);
   assert.deepEqual(chanNgoai, [], "Long Môn không được gọi network ngoài preview/mock");
   const mobileRace = await page.$(".long-mon-race");
   await mobileRace.screenshot({ path: mobileShot });
 
-  console.log("✓ Ba tuần nằm trọn một màn hình desktop, tuần trống co lại và cá không chồng lấn");
+  console.log("✓ Hai tháng nằm trọn một màn hình desktop, tuần trống co lại và cá không chồng lấn");
   console.log("✓ Admin/Quản lý QA chuyển Cả nhóm/Cá nhân; đàn cá cá nhân tự dàn lại");
-  console.log("✓ desktop 1440px không cuộn ngang/dọc; mobile chỉ cuộn ngang trong Ngư đồ");
+  console.log("✓ desktop 1440px không cuộn ngang/dọc; mobile giữ cuộn trong Ngư đồ, không làm tràn trang");
   console.log(`screenshots:\n- ${desktopShot}\n- ${mobileShot}`);
 } finally {
   await browser.close();

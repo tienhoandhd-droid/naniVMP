@@ -246,7 +246,8 @@ const trinhDuyet = await puppeteer.launch({
   });
   kiem(kq.co, "hộp thoại vẫn mở được");
   kiem(kq.khongChay, "không chạy hoạt ảnh mở");
-  kiem(kq.moCard === "1ms", "thời lượng chuyển động đã rút về gần 0", kq.moCard);
+  const moCardMs = Number.parseFloat(kq.moCard);
+  kiem(Number.isFinite(moCardMs) && moCardMs <= 1, "thời lượng chuyển động đã rút về gần 0", kq.moCard);
   await trang.close();
 }
 

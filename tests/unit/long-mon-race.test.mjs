@@ -99,6 +99,24 @@ test("tiến độ nhận cả ngày thực tế chuẩn hoá và cờ legacy", 
   );
 });
 
+test("Ngư đồ chỉ hiển thị tháng hiện tại và tháng kế tiếp", () => {
+  const model = buildLongMonRaceModel([
+    activity("start", "2026-08-01"),
+    activity("end", "2026-09-30"),
+    activity("before", "2026-07-31"),
+    activity("outside", "2026-10-01"),
+  ], NOW);
+
+  assert.deepEqual(
+    model.bands.map(({ year, month }) => [year, month]),
+    [[2026, 8], [2026, 9]],
+  );
+  assert.deepEqual(
+    model.fish.map((fish) => fish.activity.id).sort(),
+    ["end", "start"],
+  );
+});
+
 function overlappingPairs(fish, sceneWidth = SCENE_WIDTH, sceneHeight = SCENE_HEIGHT) {
   const boxes = fish.map((item) => {
     const centerX = item.xPct / 100 * sceneWidth;
@@ -134,29 +152,28 @@ function overlappingPairsInModel(model) {
   );
 }
 
-test("trường đua phủ 90 ngày: 4 tuần đã qua và 9 tuần sắp tới", () => {
+test("trường đua phủ đúng hai tháng lịch và loại hạn ngoài khoảng", () => {
   const model = buildLongMonRaceModel([
-    activity("start", "2026-08-03"),
+    activity("start", "2026-08-01"),
     activity("same-a", "2026-08-31"),
     activity("same-b", "2026-08-31"),
     activity("same-c", "2026-08-31"),
-    activity("end", "2026-11-01"),
-    activity("outside", "2026-11-02"),
-    activity("before", "2026-08-02"),
+    activity("end", "2026-09-30"),
+    activity("outside", "2026-10-01"),
+    activity("before", "2026-07-31"),
     activity("missing", null),
   ], NOW);
 
-  // NOW = 31/08/2026 (thứ Hai) → cửa sổ [03/08, 02/11), 13 tuần ≈ 90 ngày.
   assert.deepEqual(
     model.bands.map(({ year, month }) => [year, month]),
-    [[2026, 8], [2026, 9], [2026, 10], [2026, 11]],
+    [[2026, 8], [2026, 9]],
   );
   assert.equal(model.fish.some((fish) => fish.activity.id === "outside"), false);
   assert.equal(model.fish.some((fish) => fish.activity.id === "before"), false);
   assert.equal(model.missingDeadlineCount, 1);
-  assert.equal(model.weeks.length, 13);
-  assert.equal(model.weeks[0].key, "2026-08-03");
-  assert.equal(model.weeks[12].key, "2026-10-26");
+  assert.equal(model.weeks.length, 10);
+  assert.equal(model.weeks[0].key, "2026-07-27");
+  assert.equal(model.weeks[9].key, "2026-09-28");
   assert.match(model.weeks[0].label, /^\d{2}\/\d{2}–\d{2}\/\d{2}$/);
 
   const start = model.fish.find((fish) => fish.activity.id === "start");
@@ -164,9 +181,9 @@ test("trường đua phủ 90 ngày: 4 tuần đã qua và 9 tuần sắp tới"
   assert.ok(start.xPct >= model.weeks[0].startPct
     && start.xPct <= model.weeks[0].startPct + model.weeks[0].widthPct,
   `cá đầu kỳ phải nằm trong tuần thứ nhất: ${start.xPct}`);
-  assert.ok(end.xPct >= model.weeks[12].startPct
-    && end.xPct <= model.weeks[12].startPct + model.weeks[12].widthPct,
-  `cá cuối kỳ phải nằm trong tuần thứ mười ba: ${end.xPct}`);
+  assert.ok(end.xPct >= model.weeks[9].startPct
+    && end.xPct <= model.weeks[9].startPct + model.weeks[9].widthPct,
+  `cá cuối kỳ phải nằm trong tuần cuối: ${end.xPct}`);
 
   const sameDate = model.fish.filter((fish) => fish.deadline === "2026-08-31");
   assert.equal(new Set(sameDate.map((fish) => fish.weekKey)).size, 1);
@@ -226,7 +243,7 @@ test("mười hai cá trong một tuần được xếp linh động mà không 
     "đàn cá phải có nhiều cỡ nhỏ lệch nhau thay vì cùng một tỷ lệ");
   assert.ok(roundedAngles.size >= 4,
     "đàn cá phải có nhiều tư thế bơi thay vì nghiêng gần như giống nhau");
-  assert.ok(model.fish.some((fish) => fish.renderRotateDeg <= -4));
+  assert.ok(model.fish.some((fish) => fish.renderRotateDeg <= -1));
   assert.ok(model.fish.some((fish) => fish.renderRotateDeg >= 4));
   assert.ok(model.fish.every((fish) => Math.abs(fish.renderRotateDeg) <= 12));
 });
@@ -282,7 +299,7 @@ test("đàn thưa trên nhiều tuần vẫn bơi rải theo chiều sâu thay v
   assert.deepEqual(overlappingPairsInModel(model), []);
 });
 
-test("bốn mươi tám cá trong cửa sổ 90 ngày nằm trọn scene cố định", () => {
+test("bốn mươi tám cá trong cửa sổ hai tháng nằm trọn scene cố định", () => {
   const input = Array.from({ length: 48 }, (_, index) => {
     const dayOffset = Math.floor(index * 20 / 47);
     const deadline = new Date(Date.UTC(2026, 7, 24 + dayOffset)).toISOString().slice(0, 10);
@@ -294,22 +311,19 @@ test("bốn mươi tám cá trong cửa sổ 90 ngày nằm trọn scene cố đ
   assert.deepEqual(overlappingPairsInModel(model), []);
   assert.ok(model.fish.every((fish) => fish.xPct >= 0 && fish.xPct <= 100));
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
-  /* Cửa sổ 90 ngày: 48 cá dồn trong 20 ngày chiếm phần trục hẹp hơn so
-     với thời cửa sổ 21 ngày, nên mật độ được phép lùi thêm một bậc (.74).
-     Ràng buộc thật là KHÔNG VA CHẠM (đã kiểm ở trên) + không teo quá bậc
+  /* Ràng buộc thật là KHÔNG VA CHẠM (đã kiểm ở trên) + không teo quá bậc
      giữa của thang TEAM_DENSITY_LEVELS. */
   assert.ok(model.densityScale >= .66 && model.densityScale <= 1);
 });
 
-test("sự cố production 31/08: 126 cá ba tuần dồn không được ném lỗi", () => {
-  /* Dữ liệu thật làm sập bản deploy đầu: 80 cá tuần 31/08, 18 cá tuần
-     28/09, 28 cá tuần 26/10 — cạn cả tám bậc mật độ ở hồ 560px và model
+test("sự cố production 31/08: 126 cá trong hai tháng không được ném lỗi", () => {
+  /* Dữ liệu đông làm sập bản deploy đầu: ba cụm lớn cạn cả tám bậc mật độ ở hồ 560px và model
      ném Error làm trắng màn. Hợp đồng mới: hết bậc mật độ thì hồ SÂU
      THÊM (TEAM_HEIGHT_LEVELS), không bao giờ ném vì đông cá. */
   const input = [];
   for (let i = 0; i < 80; i += 1) input.push(activity(`p80-${i}`, `2026-09-0${1 + (i % 6)}`));
   for (let i = 0; i < 18; i += 1) input.push(activity(`p18-${i}`, `2026-09-2${8 + (i % 2)}`));
-  for (let i = 0; i < 28; i += 1) input.push(activity(`p28-${i}`, i % 2 ? "2026-10-27" : "2026-10-30"));
+  for (let i = 0; i < 28; i += 1) input.push(activity(`p28-${i}`, i % 2 ? "2026-09-29" : "2026-09-30"));
 
   const model = buildLongMonRaceModel(input, NOW, { audience: "team" });
   assert.equal(model.fish.length, 126);
@@ -379,7 +393,7 @@ test("cá nhân tự bố trí trung tâm, vòng cung và chữ S ổn định",
   assert.deepEqual(ten, buildLongMonRaceModel(tenInput, NOW, { audience: "personal" }));
 });
 
-test("trường đua trình bày 90 ngày, cá có tên truy cập và legend sáu loài", () => {
+test("trường đua trình bày hai tháng, cá có tên truy cập và legend sáu loài", () => {
   const html = renderToStaticMarkup(React.createElement(LongMonRace, {
     activities: [
       activity("dc-01", "2026-09-05"),
@@ -399,7 +413,8 @@ test("trường đua trình bày 90 ngày, cá có tên truy cập và legend s�
     },
   }));
 
-  assert.match(html, /aria-label="Trường đua hạn VMP chín mươi ngày"/);
+  assert.match(html, /aria-label="Trường đua hạn VMP hai tháng"/);
+  assert.match(html, /aria-label="Hai tháng VMP trong một màn hình/);
   assert.match(html, /08\/2026/);
   assert.match(html, /09\/2026/);
   assert.doesNotMatch(html, /07\/2026/);

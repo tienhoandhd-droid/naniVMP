@@ -136,10 +136,10 @@ function LongMonRace({
   }, [model.todayPct]);
 
   return (
-    <section className="long-mon-race" aria-label="Trường đua hạn VMP chín mươi ngày">
+    <section className="long-mon-race" aria-label="Trường đua hạn VMP hai tháng">
       <header className="long-mon-race__head">
         <div className="long-mon-race__title-block">
-          <span className="long-mon-race__eyebrow">Bản đồ deadline · 90 ngày quanh hôm nay</span>
+          <span className="long-mon-race__eyebrow">Bản đồ deadline · tháng này và tháng kế tiếp</span>
           <h2>Long Môn VMP</h2>
           <p>
             Mỗi thiết bị là một cá. Hạn VMP đưa cá vào vùng tuần; bấm cá để xem ngày
@@ -189,7 +189,7 @@ function LongMonRace({
         </div>
       </header>
 
-      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="Chín mươi ngày VMP trong một màn hình; màn hình nhỏ có thể kéo ngang">
+      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="Hai tháng VMP trong một màn hình; màn hình nhỏ có thể kéo ngang">
         <div
           className="long-mon-race__canvas long-mon-race__canvas--adaptive-scene"
           data-density-scale={model.densityScale}
@@ -237,7 +237,7 @@ function LongMonRace({
 
           {model.fish.length > 0 ? (
             <div className="long-mon-race__school" role="list"
-              data-long-mon-density={model.fish.length > 24 ? "dense" : "sparse"} aria-label={`${model.fish.length} hạng mục có hạn VMP trong chín mươi ngày`}>
+              data-long-mon-density={model.fish.length > 24 ? "dense" : "sparse"} aria-label={`${model.fish.length} hạng mục có hạn VMP trong hai tháng`}>
               {model.fish.map((fish) => {
                 const stage = metaByStage.get(fish.stage)!;
                 const deadline = formatDeadline(fish.deadline);
@@ -285,7 +285,7 @@ function LongMonRace({
           ) : (
             <div className="long-mon-race__empty">
               <CalendarClock size={22} aria-hidden="true" />
-              <strong>{scopeControl?.emptyMessage ? "Không thể mở ngư đồ cá nhân" : "Không có hạn VMP trong chín mươi ngày này"}</strong>
+              <strong>{scopeControl?.emptyMessage ? "Không thể mở ngư đồ cá nhân" : "Không có hạn VMP trong hai tháng này"}</strong>
               <span>{scopeControl?.emptyMessage ?? "Các bộ lọc hiện tại không để lại hạng mục nào trên trường đua."}</span>
             </div>
           )}

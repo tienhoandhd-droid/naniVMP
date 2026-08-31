@@ -360,7 +360,7 @@ for (const [id, ten] of MAN) {
   kiem(nguDo.soCa > 0, "có cá trên trường đua", String(nguDo.soCa));
   kiem(nguDo.soLoai === 6, "legend đủ sáu loài", String(nguDo.soLoai));
   kiem(nguDo.coHomNay, "có sợi chỉ Hôm nay");
-  kiem(nguDo.soThang >= 3, "trục 90 ngày phủ ít nhất ba tháng", String(nguDo.soThang));
+  kiem(nguDo.soThang === 2, "Ngư đồ chỉ phủ tháng hiện tại và tháng kế tiếp", String(nguDo.soThang));
   kiem(!nguDo.conWorkbench, "workbench cũ (bảng ngày, bộ lọc, lưới tháng) đã rời màn");
   kiem(!nguDo.coCanvas3D, "không còn canvas 3D trên màn Dòng thời gian");
   kiem(nguDo.tranNgang <= 1, "không tràn ngang", `${nguDo.tranNgang}px`);
@@ -627,7 +627,7 @@ for (const [id, ten] of MAN) {
   await trang.close();
 }
 
-/* ---- 3o. Không WebGL: câu tiếng Việt tử tế, 2D nguyên vẹn ----------- */
+/* ---- 3o. Không WebGL: báo cáo phẳng vẫn nguyên vẹn ------------------ */
 {
   console.log("\nKhông WebGL:");
   const trang = await trinhDuyet.newPage();
@@ -642,16 +642,17 @@ for (const [id, ten] of MAN) {
   });
   await trang.setViewport({ width: 1440, height: 900 });
   await trang.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await new Promise((r) => setTimeout(r, 2600));
+  await trang.waitForSelector("[data-report-monthly-target-chart] svg", { timeout: 20_000 });
   const kq = await trang.evaluate(() => ({
-    thongBao: document.querySelector(".vmp-3d-khong-ho-tro")?.textContent || "",
-    conNut3d: !!document.querySelector('.vmp-space3d button[data-map-mode="3d"]'),
-    co2D: !!document.querySelector(".vmp-space3d"),
+    coBieuDoPhang: !!document.querySelector("[data-report-monthly-target-chart] svg"),
+    conKhongGian3dCu: !!document.querySelector(".vmp-space3d"),
+    conCanvas3d: !!document.querySelector('canvas[data-engine^="three.js"], .vmp-space3d canvas'),
+    conNut3d: !!document.querySelector('button[data-map-mode="3d"]'),
   }));
-  kiem(/không hỗ trợ chế độ 3D/i.test(kq.thongBao),
-    "có câu tiếng Việt tử tế thay vì lỗi kỹ thuật", kq.thongBao.slice(0, 60) || "(im lặng)");
-  kiem(!kq.conNut3d, "nút Xem bản đồ 3D được giấu khi máy không có WebGL");
-  kiem(kq.co2D, "dữ liệu 2D vẫn nguyên vẹn");
+  kiem(kq.coBieuDoPhang, "biểu đồ SVG phẳng vẫn nguyên vẹn khi máy không có WebGL");
+  kiem(!kq.conKhongGian3dCu, "không dựng lại không gian 3D đã bỏ");
+  kiem(!kq.conCanvas3d, "không tạo canvas three.js trên màn Báo cáo");
+  kiem(!kq.conNut3d, "không còn nút chuyển sang bản đồ 3D");
   await trang.close();
 }
 
