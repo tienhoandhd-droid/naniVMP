@@ -144,7 +144,17 @@ async function moXemTruocDeadlineV2(applyResult, moChat = false) {
   const { trang } = pageState;
 
   await trang.waitForSelector("[data-cw-sua]", { timeout: 10_000 });
-  await trang.click("[data-cw-sua]");
+  if (moChat) {
+    await trang.click('[aria-label="Trò chuyện cùng công chúa Vali"]');
+    await trang.waitForSelector(".vmp-chat-panel", { timeout: 10_000 });
+    await trang.evaluate(() => {
+      const edit = document.querySelector("[data-cw-sua]");
+      if (edit instanceof HTMLElement) edit.focus();
+    });
+    await trang.keyboard.press("Enter");
+  } else {
+    await trang.click("[data-cw-sua]");
+  }
   await trang.waitForSelector("#cof-frequency_months", { timeout: 10_000 });
   await trang.select("#cof-frequency_months", "6");
   await trang.waitForSelector("#cof-ly-do", { timeout: 10_000 });
@@ -159,14 +169,6 @@ async function moXemTruocDeadlineV2(applyResult, moChat = false) {
     && [...document.querySelectorAll('input[type="checkbox"]')]
       .some((input) => input.getAttribute("aria-label") === label),
   { timeout: 10_000 }, nhanChonDeadlineV2);
-  if (moChat) {
-    // Chat che nút Sửa ở góc phải dưới trong fixture desktop này. Mở nó
-    // sau khi preview đã mở để kiểm hai lớp cùng tồn tại, không giả vờ
-    // người dùng có thể bấm xuyên qua chính chat panel.
-    await trang.evaluate(() => document.querySelector('[aria-label="Trò chuyện cùng công chúa Vali"]')?.click());
-    await trang.waitForSelector(".vmp-chat-panel", { timeout: 10_000 });
-  }
-
   return { ...pageState, applyBodies, applyResults, previewBodies, previewResults, saveBodies, saveResults };
 }
 
@@ -959,17 +961,19 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
     if (!(panel instanceof HTMLElement) || !(footer instanceof HTMLElement)) return { shared: false, topAtFooter: false, tabStaysInside: false };
     const box = footer.getBoundingClientRect();
     const target = document.elementFromPoint(box.left + Math.min(20, box.width / 2), box.top + Math.min(20, box.height / 2));
-    const close = panel.querySelector('[aria-label="Đóng"]');
-    if (close instanceof HTMLElement) close.focus();
+    const focusable = [...panel.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (last instanceof HTMLElement) last.focus();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
     return {
       shared: !!document.querySelector(".vmp-chat-panel"),
       topAtFooter: target?.closest(".lp-dialog") !== null,
-      tabStaysInside: document.activeElement?.closest(".lp-dialog__panel") === panel,
+      tabWrapsToFirst: document.activeElement === first,
     };
   });
-  kiem(modalOverChat.shared && modalOverChat.topAtFooter && modalOverChat.tabStaysInside,
-    "preview dùng modal chung, phủ chat và giữ Tab trong hộp", JSON.stringify(modalOverChat));
+  kiem(modalOverChat.shared && modalOverChat.topAtFooter && modalOverChat.tabWrapsToFirst,
+    "preview mở khi chat đang mở, phủ chat và Tab vòng trong hộp", JSON.stringify(modalOverChat));
 
   const preview = await trang.evaluate((label) => {
     const candidate = [...document.querySelectorAll('input[type="checkbox"]')]

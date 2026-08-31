@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { requiredReasonState } from "../../src/features/catalogWorkspace/CatalogRecordDialog.tsx";
+import { closeCatalogRecordIfIdle, requiredReasonState } from "../../src/features/catalogWorkspace/CatalogRecordDialog.tsx";
 
 test("required reason validation trims whitespace before allowing catalog save", () => {
   assert.deepEqual(requiredReasonState(true, ""), {
@@ -11,4 +11,14 @@ test("required reason validation trims whitespace before allowing catalog save",
     invalid: false,
     message: null,
   });
+});
+
+test("record dialog ignores every close request while its save is in flight", () => {
+  let closes = 0;
+
+  closeCatalogRecordIfIdle(true, () => { closes += 1; });
+  assert.equal(closes, 0);
+
+  closeCatalogRecordIfIdle(false, () => { closes += 1; });
+  assert.equal(closes, 1);
 });

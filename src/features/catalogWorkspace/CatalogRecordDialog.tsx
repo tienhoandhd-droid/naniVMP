@@ -59,6 +59,10 @@ export function requiredReasonState(required: boolean, reason: string): { invali
     : { invalid: false, message: null };
 }
 
+export function closeCatalogRecordIfIdle(saving: boolean, onClose: () => void): void {
+  if (!saving) onClose();
+}
+
 /** Hiện giá trị cho người đọc, không phải cho máy. */
 function doc(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
@@ -203,6 +207,7 @@ export default function CatalogRecordDialog({
      quyền (có băng báo ở đầu hộp thoại) và chưa đổi gì (không có gì để ghi). */
   const khongLuuDuoc = !canEdit || dangLuu
     || Object.keys(patch).length === 0;
+  const requestClose = () => closeCatalogRecordIfIdle(dangLuu, onClose);
 
   return (
     <ViewportDialog
@@ -211,10 +216,10 @@ export default function CatalogRecordDialog({
       description={laTaoMoi ? def.description : `Đang sửa: ${String(record?.[def.businessKeyField] ?? "")}`}
       icon={Boxes}
       maxWidth={laTaoMoi ? 620 : 940}
-      onRequestClose={onClose}
+      onRequestClose={requestClose}
       footer={
         <>
-          <button type="button" onClick={onClose}
+          <button type="button" onClick={requestClose} disabled={dangLuu}
             className="cw-nut cw-nut--phu">Huỷ</button>
           <button type="button" onClick={luu} disabled={khongLuuDuoc}
             className="cw-nut cw-nut--chinh">
