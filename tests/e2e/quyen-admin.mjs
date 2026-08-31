@@ -569,6 +569,10 @@ for (const [ten, suaKho] of [
 {
   console.log("\nVai trò & phạm vi — thẻ chế độ áp dụng quyền theo hạng mục:");
   const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
+  /* Bàn quản trị (spec 01/09): màn tách 4 tab — thẻ chế độ quyền nằm ở tab
+     "Chế độ quyền hạng mục", phải bấm tab trước khi soi. */
+  await trang.waitForSelector("#phanquyen-tab-che-do", { timeout: 10_000 });
+  await trang.click("#phanquyen-tab-che-do");
   await cho(900); // fetchPermissionPreflight() là async riêng, cần thêm thời gian tải
 
   const banDau = await trang.evaluate(() => {
@@ -678,16 +682,25 @@ for (const [ten, suaKho] of [
 
   const a = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
   await cho(1400);
-  const admin = await a.trang.evaluate(() => {
-    const chu = document.body.innerText;
-    return {
-      coEmail: chu.includes("Ai được phép có tài khoản"),
-      coMaTranCu: chu.includes("Vai nào xem được gì, sửa được gì")
-        || chu.includes("tích ở đây là đổi quyền thật"),
-      coMaTranMoi: chu.includes("Màn hình bạn được xem"),
-      huongDanDungBaBuoc: chu.includes("Sẵn sàng theo vai trò & phạm vi"),
-    };
-  });
+  /* Bàn quản trị (spec 01/09): màn tách 4 tab — mỗi khối sống trong tab của
+     nó. "Tồn tại với admin" nay nghĩa là: bấm tab tương ứng thì thấy khối. */
+  const docTab = async (tabId) => {
+    await a.trang.click(`#phanquyen-tab-${tabId}`);
+    await cho(700);
+    return a.trang.evaluate(() => document.body.innerText);
+  };
+  const chuTaiKhoan = await docTab("tai-khoan");
+  const chuEmail = await docTab("email");
+  const chuQuyenToi = await docTab("quyen-toi");
+  const admin = {
+    coEmail: chuEmail.includes("Ai được phép có tài khoản"),
+    coMaTranCu: [chuTaiKhoan, chuEmail, chuQuyenToi].some((chu) =>
+      chu.includes("Vai nào xem được gì, sửa được gì")
+      || chu.includes("tích ở đây là đổi quyền thật")),
+    coMaTranMoi: chuQuyenToi.includes("Màn hình bạn được xem"),
+    huongDanDungBaBuoc: chuTaiKhoan.includes("Sẵn sàng theo vai trò & phạm vi")
+      && chuEmail.includes("Sẵn sàng theo vai trò & phạm vi"),
+  };
   kiem(admin.coEmail, "admin thấy thẻ Ai được phép có tài khoản");
   /* Ma trận 4 vai cũ đã XOÁ. Thứ thay nó là ma trận năm vai hiệu lực
      "Màn hình bạn được xem", đọc từ rpc_my_ui_access. */
@@ -747,6 +760,9 @@ for (const [ten, suaKho] of [
   console.log("\nAllowlist — trạng thái tài khoản theo email Auth:");
   const { trang } = await moTrang(trinhDuyet,
     { suaKho: suaKhoAllowlistTheoEmailAuth, hash: "phanquyen" });
+  /* Bàn quản trị: bảng allowlist sống ở tab "Email được phép". */
+  await trang.waitForSelector("#phanquyen-tab-email", { timeout: 10_000 });
+  await trang.click("#phanquyen-tab-email");
   await trang.waitForFunction((coTaiKhoan, chuaCoTaiKhoan) =>
     document.body.innerText.includes(coTaiKhoan) && document.body.innerText.includes(chuaCoTaiKhoan),
   { timeout: 10_000 }, EMAIL_AUTH_KHAC_HO_SO, EMAIL_CHUA_CO_TAI_KHOAN);
@@ -792,6 +808,8 @@ for (const [ten, suaKho] of [
 {
   console.log("\nCông tắc quyền — có xem trước ảnh hưởng:");
   const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
+  await trang.waitForSelector("#phanquyen-tab-che-do", { timeout: 10_000 });
+  await trang.click("#phanquyen-tab-che-do");
   await cho(1600);
 
   const kq = await trang.evaluate(() => {
@@ -820,6 +838,11 @@ for (const [ten, suaKho] of [
      (AccountLinkPanel.tsx:109) — nó cần hồ sơ để nói đang nối cho ai. Phải
      chọn người trước rồi mới kiểm, nếu không phép kiểm đỏ oan. */
   const chonMotNguoi = async (trang) => {
+    /* Tab được NHỚ theo localStorage (useNhomTab) — block trước có thể đã
+       để lại tab khác; danh bạ sống ở tab Tài khoản nên mở tường minh. */
+    await trang.waitForSelector("#phanquyen-tab-tai-khoan", { timeout: 10_000 });
+    await trang.click("#phanquyen-tab-tai-khoan");
+    await cho(500);
     await trang.evaluate(() => {
       const o = document.querySelector('input[aria-label="Tìm tên hoặc tài khoản"]');
       if (!o) return;
@@ -841,14 +864,16 @@ for (const [ten, suaKho] of [
   const chonDuoc = await chonMotNguoi(a.trang);
   await cho(1200);
   kiem(chonDuoc, "chọn được một người trong danh bạ để thao tác");
-  const admin = await a.trang.evaluate(() => {
-    const chu = document.body.innerText;
-    return {
-      coNoiTaiKhoan: chu.includes("Nối tài khoản"),
-      coMaTranManHinh: chu.includes("Màn hình bạn được xem"),
-      coQuyenHieuLuc: chu.includes("Quyền") && chu.includes("hiệu lực"),
-    };
-  });
+  const chuTabTaiKhoan = await a.trang.evaluate(() => document.body.innerText);
+  /* Ma trận màn hình sống ở tab "Quyền của tôi" (Bàn quản trị 01/09). */
+  await a.trang.click("#phanquyen-tab-quyen-toi");
+  await cho(700);
+  const chuTabQuyenToi = await a.trang.evaluate(() => document.body.innerText);
+  const admin = {
+    coNoiTaiKhoan: chuTabTaiKhoan.includes("Nối tài khoản"),
+    coMaTranManHinh: chuTabQuyenToi.includes("Màn hình bạn được xem"),
+    coQuyenHieuLuc: chuTabTaiKhoan.includes("Quyền") && chuTabTaiKhoan.includes("hiệu lực"),
+  };
   kiem(admin.coNoiTaiKhoan, "admin vẫn nối/gỡ được tài khoản sau khi gộp màn");
   kiem(admin.coMaTranManHinh, "ma trận Màn hình bạn được xem theo sang màn mới");
   kiem(admin.coQuyenHieuLuc, "vẫn xem được quyền đang có hiệu lực của người được chọn");

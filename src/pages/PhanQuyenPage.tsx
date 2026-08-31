@@ -39,6 +39,7 @@ import type { EmailChoPhepRow, NguoiQuyenRow, VaiNghiepVuRow } from "../lib/supa
 import { accountForAllowedEmail, managementWorkspaceFor } from "../lib/managementVisibility.ts";
 import { Card, CardTitle, Tag, CauKetLuan } from "../components/ui/Primitives.tsx";
 import type { Activity } from "../types/domain.ts";
+import NhomTab, { NhomTabPanel, useNhomTab } from "../components/ui/NhomTab.tsx";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
 import ItemPermissionModeCard from "../features/itemPermissions/ItemPermissionModeCard.tsx";
 import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
@@ -389,6 +390,13 @@ function CurrentPermissionWorkspace({ acts, access }: {
       .filter(Boolean);
   }))].sort((a, b) => a.localeCompare(b, "vi")), [acts]);
 
+  /* BÀN QUẢN TRỊ (spec 01/09): 5 khối lớn xếp chồng → 4 tab theo 4 việc
+     admin thật sự làm. DongSo bỏ qua ở màn này: các con số (tài khoản,
+     email, lỗi chặn) sống trong panel con tự fetch — kéo lên page là phịa
+     thêm một đường dữ liệu; badge tab là đủ. */
+  const [tab, setTab] = useNhomTab("phanquyen", "tai-khoan",
+    ["tai-khoan", "email", "che-do", "quyen-toi"]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Công tắc DỰ THẢO ⇄ ÁP DỤNG đặt TRÊN CÙNG: nó quyết định mọi thứ
@@ -398,12 +406,24 @@ function CurrentPermissionWorkspace({ acts, access }: {
           web không hỏi tới, còn giao diện thì tự suy từ `role === "admin"`.
           Hai nguồn cùng nói một việc thì sớm muộn lệch nhau — hỏi server là
           hết lệch, và quyền kia mới có việc thật để làm. */}
+      <NhomTab man="phanquyen" nhan="Các việc quản trị quyền" tab={tab} onTab={setTab} tabs={[
+        { id: "tai-khoan", nhan: "Tài khoản & nối hồ sơ" },
+        { id: "email", nhan: "Email được phép" },
+        { id: "che-do", nhan: "Chế độ quyền hạng mục" },
+        { id: "quyen-toi", nhan: "Quyền của tôi" },
+      ]} />
+
+      <NhomTabPanel man="phanquyen" id="che-do" tab={tab}>
       {/* #9: ItemPermissionModeCard tự bọc Card — hết card trắng rỗng khi
           tiền kiểm không chạy được (nó return null). */}
       {duocChinhChinhSachQuyen && <ItemPermissionModeCard />}
-      {/* Ai được phép có tài khoản + vai nào làm được gì: cùng một quyền
-          chính sách như trên. */}
+      </NhomTabPanel>
+
+      <NhomTabPanel man="phanquyen" id="email" tab={tab}>
       {duocChinhChinhSachQuyen && <QuanTriQuyenCards duocSua={duocChinhChinhSachQuyen} />}
+      </NhomTabPanel>
+
+      <NhomTabPanel man="phanquyen" id="tai-khoan" tab={tab}>
       <Card variant="strong">
         <CardTitle icon={ShieldCheck}
           sub="Mỗi tài khoản được đối chiếu bằng UUID với vai nghiệp vụ, hồ sơ, phạm vi và phân công.">
@@ -452,7 +472,11 @@ function CurrentPermissionWorkspace({ acts, access }: {
       {/* Ma trận quyền màn hình: chuyển nguyên từ màn "Tài khoản & quyền
           truy cập" cũ (đã gộp vào đây). Chỉ Admin thật mới thấy — cùng lý
           do như ItemPermissionModeCard/QuanTriQuyenCards ở trên. */}
-      {duocChinhChinhSachQuyen && access && <MaTranQuyenManHinh access={access} />}
+      </NhomTabPanel>
+
+      <NhomTabPanel man="phanquyen" id="quyen-toi" tab={tab}>
+      {access && <MaTranQuyenManHinh access={access} />}
+      </NhomTabPanel>
     </div>
   );
 }
