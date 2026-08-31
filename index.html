@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#4E2A4E" />
+    <!-- E3 (31/08): CSP qua meta — GitHub Pages không set được HTTP header.
+         Chặn script/style/ảnh lạ và mọi kết nối ngoài Supabase + n8n; một
+         thẻ <script> tiêm vào (XSS lưu trữ, extension độc) sẽ không chạy
+         và không gọi được ra ngoài.
+         · script-src 'self': KHÔNG unsafe-inline — bundle Vite là file .js.
+         · style-src cần 'unsafe-inline': ~990 inline style + styled JSX;
+           siết tiếp khi số đó về 0 (đợt CSS token).
+         · connect-src: *.supabase.co (REST/Auth/Realtime) + n8n nội bộ.
+         · img-src data: cho ảnh nhúng; font/media self (font tự host).
+         frame-ancestors không hoạt động trong meta nên không khai ở đây. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://n8n.cpc1hn.com; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <title>V/Q team — CPC1 HN</title>
     <meta name="description" content="V/Q team — Hệ Giám sát Thẩm định · CPC1 HN · QLCL" />
     <!-- Bắt tay TLS với Supabase ngay từ lúc parse HTML — RPC đầu tiên
