@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   buildAccountAdministrationRows,
+  buildRoleControlRows,
+  filterAndSortAccountControlRows,
   planBusinessRoleChange,
 } from "../../src/features/accountAdministration/accountAdministrationModel.ts";
 
@@ -165,37 +167,22 @@ test("nhân viên QA không diễn giải scope rỗng thành hierarchy", () => 
   })[0];
 
   assert.equal(row.scopeMode, "qa_assignment");
-  assert.equal(row.scopeSummary, "Theo phân công QA");
+  assert.equal(row.scopeSummary, "Theo Dữ liệu nguồn");
   assert.equal(readiness(row, "scope").state, "not_applicable");
-  assert.equal(readiness(row, "assignment").state, "missing");
-  assert.ok(readiness(row, "assignment").nextAction);
+  assert.equal(readiness(row, "assignment").state, "not_applicable");
+  assert.match(readiness(row, "assignment").detail, /Dữ liệu nguồn/);
 });
 
-test("vai xưởng thiếu mỗi tầng canonical đều chưa sẵn sàng", () => {
-  const scopeFields = [
-    "scope_departments",
-    "scope_factory_ids",
-    "scope_area_ids",
-    "scope_line_ids",
-  ];
+test("vai xưởng lấy phạm vi từ Dữ liệu nguồn thay vì scope legacy trên hồ sơ", () => {
+  const row = buildAccountAdministrationRows({
+    accounts: [account({ bo_phan_nguoi: "workshop", bo_phan_tai_khoan: "workshop", so_phan_cong: 0 })],
+    roles: [role({ business_role: "workshop_staff" })],
+    directory: [person({ department: "workshop", access_class: "workshop_staff", scope_departments: [], scope_factory_ids: [], scope_area_ids: [], scope_line_ids: [] })],
+  })[0];
 
-  for (const missingField of scopeFields) {
-    const scopes = {
-      scope_departments: ["workshop-a"],
-      scope_factory_ids: ["factory-a"],
-      scope_area_ids: ["area-a"],
-      scope_line_ids: ["line-a"],
-      [missingField]: [],
-    };
-    const row = buildAccountAdministrationRows({
-      accounts: [account({ bo_phan_nguoi: "workshop", bo_phan_tai_khoan: "workshop", so_phan_cong: 1 })],
-      roles: [role({ business_role: "workshop_staff" })],
-      directory: [person({ department: "workshop", access_class: "workshop_staff", ...scopes })],
-    })[0];
-
-    assert.equal(readiness(row, "scope").state, "missing", missingField);
-    assert.ok(readiness(row, "scope").nextAction, missingField);
-  }
+  assert.equal(row.scopeSummary, "Theo phạm vi Dữ liệu nguồn");
+  assert.equal(readiness(row, "scope").state, "not_applicable");
+  assert.equal(readiness(row, "assignment").state, "not_applicable");
 });
 
 test("directory có person_id đúng nhưng user_id khác không được coi là nối đúng", () => {
@@ -210,20 +197,17 @@ test("directory có person_id đúng nhưng user_id khác không được coi l�
   assert.equal(readiness(row, "department").state, "unknown");
 });
 
-test("dòng không có user_id vẫn được giữ để xử lý", () => {
+test("người trong danh bạ chưa có tài khoản không xuất hiện trong bảng tài khoản", () => {
   const rows = buildAccountAdministrationRows({
     accounts: [account({ user_id: null, pid: null, co_tai_khoan: false, ten: "Chưa có tài khoản" })],
     roles: [role({ user_id: "user-a" })],
     directory: [person()],
   });
 
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].name, "Chưa có tài khoản");
-  assert.equal(readiness(rows[0], "account").state, "missing");
-  assert.equal(readiness(rows[0], "person_link").state, "missing");
+  assert.equal(rows.length, 0);
 });
 
-test("phân công của admin và quản lý là không áp dụng còn staff cần bằng chứng", () => {
+test("bảng tài khoản không coi số phân công legacy là điều kiện sẵn sàng", () => {
   const rows = buildAccountAdministrationRows({
     accounts: [
       account({ user_id: "admin-user", pid: "admin-person", so_phan_cong: 0 }),
@@ -247,8 +231,8 @@ test("phân công của admin và quản lý là không áp dụng còn staff c�
 
   assert.equal(readiness(rows[0], "assignment").state, "not_applicable");
   assert.equal(readiness(rows[1], "assignment").state, "not_applicable");
-  assert.equal(readiness(rows[2], "assignment").state, "ready");
-  assert.equal(readiness(rows[3], "assignment").state, "missing");
+  assert.equal(readiness(rows[2], "assignment").state, "not_applicable");
+  assert.equal(readiness(rows[3], "assignment").state, "not_applicable");
 });
 
 test("kế hoạch đổi vai luôn chọn UUID và bộ phận resolver tương ứng", () => {
@@ -271,14 +255,54 @@ test("kế hoạch đổi vai luôn chọn UUID và bộ phận resolver tương
 });
 
 test("đổi vai bị chặn khi dòng không có user_id", () => {
-  const row = buildAccountAdministrationRows({
-    accounts: [account({ user_id: null, pid: null, co_tai_khoan: false })],
-    roles: [],
-    directory: [],
-  })[0];
+  const row = {
+    ...buildAccountAdministrationRows({ accounts: [account()], roles: [role()], directory: [person()] })[0],
+    userId: null,
+  };
 
   const plan = planBusinessRoleChange(row, "admin");
   assert.equal(plan.userId, "");
   assert.equal(plan.canSave, false);
   assert.ok(plan.blocker);
+});
+
+test("bảng kiểm soát luôn có đủ năm vai và đếm trạng thái tài khoản theo vai", () => {
+  const ready = {
+    key: "user:admin", name: "Admin", businessRole: "admin", accountActive: true,
+    readiness: [{ state: "ready" }, { state: "not_applicable" }],
+  };
+  const attention = {
+    key: "user:qa", name: "QA", businessRole: "qa_staff", accountActive: true,
+    readiness: [{ state: "ready" }, { state: "missing" }],
+  };
+  const unknown = {
+    key: "user:unknown", name: "Chưa rõ", businessRole: null, accountActive: true,
+    readiness: [{ state: "unknown" }],
+  };
+
+  assert.deepEqual(buildRoleControlRows([ready, attention, unknown]), [
+    { id: "admin", label: "Quản trị", scopeLabel: "Theo chính sách vai", total: 1, active: 1, ready: 1, attention: 0, unknown: 0 },
+    { id: "qa_manager", label: "Quản lý QA", scopeLabel: "Theo chính sách vai", total: 0, active: 0, ready: 0, attention: 0, unknown: 0 },
+    { id: "qa_staff", label: "Nhân viên QA", scopeLabel: "Theo Dữ liệu nguồn", total: 1, active: 1, ready: 0, attention: 1, unknown: 0 },
+    { id: "workshop_manager", label: "Quản lý xưởng", scopeLabel: "Theo phạm vi nguồn", total: 0, active: 0, ready: 0, attention: 0, unknown: 0 },
+    { id: "workshop_staff", label: "Nhân viên xưởng", scopeLabel: "Theo phạm vi nguồn", total: 0, active: 0, ready: 0, attention: 0, unknown: 0 },
+  ]);
+});
+
+test("bảng tài khoản đưa dòng cần xử lý lên trước và lọc đúng vai", () => {
+  const rows = [
+    { key: "ready", name: "An", businessRole: "qa_staff", accountActive: true, readiness: [{ state: "ready" }] },
+    { key: "unknown", name: "Bình", businessRole: "qa_staff", accountActive: true, readiness: [{ state: "unknown" }] },
+    { key: "attention", name: "Cường", businessRole: "qa_staff", accountActive: true, readiness: [{ state: "missing" }] },
+    { key: "admin", name: "Dũng", businessRole: "admin", accountActive: true, readiness: [{ state: "ready" }] },
+  ];
+
+  assert.deepEqual(
+    filterAndSortAccountControlRows(rows, "qa_staff").map((row) => row.key),
+    ["attention", "unknown", "ready"],
+  );
+  assert.deepEqual(
+    filterAndSortAccountControlRows(rows, "attention").map((row) => row.key),
+    ["attention"],
+  );
 });

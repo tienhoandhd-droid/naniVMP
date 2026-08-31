@@ -28,7 +28,7 @@
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
 import "../styles/catalog-workspace.css"; // B5: dung .cw-* (ItemPermissionModeCard...)
-import { ShieldCheck, Users, AlertTriangle, Check, Plus, Mail, Trash2 } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Check, Plus, Mail, Trash2 } from "lucide-react";
 import { C } from "../constants/theme.ts";
 import { supabase } from "../lib/supabaseClient.ts";
 import {
@@ -43,7 +43,6 @@ import type { Activity } from "../types/domain.ts";
 import NhomTab, { NhomTabPanel, useNhomTab } from "../components/ui/NhomTab.tsx";
 import StaffDirectoryPanel from "../features/itemPermissions/StaffDirectoryPanel.tsx";
 import ItemPermissionModeCard from "../features/itemPermissions/ItemPermissionModeCard.tsx";
-import AssignmentPanel from "../features/itemPermissions/AssignmentPanel.tsx";
 import AccountLinkPanel from "../features/itemPermissions/AccountLinkPanel.tsx";
 import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPanel.tsx";
 import { AccountAdministrationPanel } from "../features/accountAdministration/AccountAdministrationPanel.tsx";
@@ -132,15 +131,6 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
     setDangLuu("");
   };
 
-  /* ---------------- kiểu dùng chung ---------------- */
-  const th: React.CSSProperties = {
-    textAlign: "left", padding: "10px 12px", fontSize: 12, fontWeight: 800,
-    color: C.plumSoft, borderBottom: `1px solid ${C.line}`, whiteSpace: "nowrap",
-  };
-  const td: React.CSSProperties = {
-    padding: "10px 12px", fontSize: 14, color: C.plum, borderBottom: `1px solid ${C.line}`,
-  };
-
   return (
     <>
       {/* ============ 1 · AI ĐƯỢC PHÉP CÓ TÀI KHOẢN ============ */}
@@ -164,7 +154,7 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
 
         <CauKetLuan tone="ok"
           chinh={`${dsEmail.filter((e) => e.is_active).length} email được phép tạo tài khoản.`}
-          phu="Trước 01/08/2026 bất kỳ ai trên internet cũng tự đăng ký được bằng khoá công khai nằm trong mã nguồn trang. Nay trigger ở database chặn mọi email không có trong danh sách này — chặn ở database chứ không chỉ tắt ô tick trên Dashboard, vì ô tick thì không ai nhìn lại còn trigger thì đi theo mã nguồn."
+          phu="Danh sách được thực thi tại database."
         />
 
         {quyenSuaA && (
@@ -183,15 +173,17 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
           </div>
         )}
 
-        <div className="vmp-scroll" style={{ overflowX: "auto", marginTop: 12 }}>
-          <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse" }}>
+        <div className="reg reg--tron" style={{ marginTop: 12 }}>
+          <div className="reg-scroll">
+          <table className="reg-table" style={{ minWidth: 640 }}>
+            <caption>Email được phép tạo tài khoản và trạng thái nối tài khoản</caption>
             <thead>
               <tr>
-                <th style={th}>Email</th>
-                <th style={th}>Ghi chú</th>
-                <th style={th}>Tình trạng</th>
-                <th style={th}>Đã có tài khoản</th>
-                {quyenSuaA && <th style={th} />}
+                <th scope="col" data-reg-stick>Email</th>
+                <th scope="col">Ghi chú</th>
+                <th scope="col">Tình trạng</th>
+                <th scope="col">Đã có tài khoản</th>
+                {quyenSuaA && <th scope="col">Thao tác</th>}
               </tr>
             </thead>
             <tbody>
@@ -199,16 +191,16 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
                 const taiKhoan = accountForAllowedEmail(e.email, vaiTaiKhoan, nguoi);
                 return (
                   <tr key={e.email}>
-                    <td style={{ ...td, fontWeight: 800 }}>{e.email}</td>
-                    <td style={{ ...td, fontSize: 12.5, color: C.plumSoft, fontWeight: 700 }}>
+                    <th scope="row" data-reg-stick>{e.email}</th>
+                    <td className="reg-muted">
                       {e.ghi_chu || taiKhoan.name || "—"}
                     </td>
-                    <td style={td}>
+                    <td>
                       {e.is_active
                         ? <Tag color={C.mintText} bg={C.mintSoft}>được phép</Tag>
                         : <Tag color={C.plumSoft} bg={C.surfaceSunk}>đã bỏ</Tag>}
                     </td>
-                    <td style={td}>
+                    <td>
                       {trangThaiTaiKhoan === "loading"
                         ? <span style={{ color: C.plumSoft, fontWeight: 700, fontSize: 12.5 }}>đang kiểm tra…</span>
                         : trangThaiTaiKhoan === "error"
@@ -220,7 +212,7 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
                           </span>}
                     </td>
                     {quyenSuaA && (
-                      <td style={td}>
+                      <td>
                         {e.is_active ? (
                           <button type="button" className="pq-nut" disabled={dangLuu === "E"}
                             onClick={() => doiEmail(e.email, false)}
@@ -239,12 +231,13 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
                 );
               })}
               {!dsEmail.length && (
-                <tr><td style={td} colSpan={5}>
+                <tr><td colSpan={quyenSuaA ? 5 : 4}>
                   Chưa đọc được danh sách — cần đăng nhập bằng tài khoản admin.
                 </td></tr>
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {ketQua.E && (
@@ -257,21 +250,14 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
           </div>
         )}
 
-        {/* #9 (01/09): hướng dẫn thành danh sách CÓ SỐ, chữ thường làm nền —
-            đậm chỉ dành cho đúng cái người ta phải bấm/tìm. Một đoạn 5 dòng
-            toàn chữ đậm dính liền là khối typography nặng nhất app cũ. */}
-        <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 14, background: C.surfaceSunk,
-                      fontSize: 13, color: C.plumSoft, fontWeight: 500, lineHeight: 1.75 }}>
-          <b style={{ color: C.plum, fontWeight: 700 }}>Thêm một người mới — ba bước</b>
-          <ol style={{ margin: "6px 0 0", paddingLeft: 20 }}>
-            <li>Thêm email vào danh sách này.</li>
-            <li>Tạo tài khoản với đúng email đó ở <b>Supabase Dashboard → Authentication → Users → Add user</b>.</li>
-            <li>Chọn vai ở thẻ <b>Sẵn sàng theo vai trò &amp; phạm vi</b> rồi nối tài khoản với hồ sơ, ngay màn này.</li>
+        <details className="pq-guide">
+          <summary>Quy trình thêm người mới</summary>
+          <ol>
+            <li>Cho phép email ở bảng này.</li>
+            <li>Tạo tài khoản đúng email trong Supabase Authentication.</li>
+            <li>Chọn vai ở Bảng kiểm soát, rồi nối hồ sơ trong tab Liên kết &amp; quyền.</li>
           </ol>
-          <span style={{ display: "block", marginTop: 6 }}>
-            Bỏ bước 1: Supabase từ chối tạo. Bỏ bước 3: đăng nhập được nhưng chỉ xem, không sửa gì.
-          </span>
-        </div>
+        </details>
       </Card>
     </>
   );
@@ -389,6 +375,10 @@ function CurrentPermissionWorkspace({ acts, access }: {
   const [directoryRevision, setDirectoryRevision] = useState(0);
   const [directoryRefreshPersonId, setDirectoryRefreshPersonId] = useState<string | null>(null);
   const [rightsRevision, setRightsRevision] = useState(0);
+  const [accountRevision, setAccountRevision] = useState(0);
+  const [accountTool, setAccountTool] = useState<
+    { kind: "link" } | { kind: "rights"; person: DirectoryPerson } | null
+  >(null);
   const [roleEditor, setRoleEditor] = useState<{
     row: AccountAdministrationRow;
     reload: ReloadAccountByUserId;
@@ -414,12 +404,10 @@ function CurrentPermissionWorkspace({ acts, access }: {
       .filter(Boolean);
   }))].sort((a, b) => a.localeCompare(b, "vi")), [acts]);
 
-  /* BÀN QUẢN TRỊ (spec 01/09): 5 khối lớn xếp chồng → 4 tab theo 4 việc
-     admin thật sự làm. DongSo bỏ qua ở màn này: các con số (tài khoản,
-     email, lỗi chặn) sống trong panel con tự fetch — kéo lên page là phịa
-     thêm một đường dữ liệu; badge tab là đủ. */
-  const [tab, setTab] = useNhomTab("phanquyen", "tai-khoan",
-    ["tai-khoan", "email", "che-do", "quyen-toi"]);
+  /* Bề mặt mặc định là bảng kiểm soát. Liên kết hồ sơ và tra quyền hiệu lực
+     nằm riêng; phân công nghiệp vụ lấy Dữ liệu nguồn làm gốc. */
+  const [tab, setTab] = useNhomTab("phanquyen", "kiem-soat",
+    ["kiem-soat", "email", "che-do", "quyen-toi"]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -431,34 +419,87 @@ function CurrentPermissionWorkspace({ acts, access }: {
           Hai nguồn cùng nói một việc thì sớm muộn lệch nhau — hỏi server là
           hết lệch, và quyền kia mới có việc thật để làm. */}
       <NhomTab man="phanquyen" nhan="Các việc quản trị quyền" tab={tab} onTab={setTab} tabs={[
-        { id: "tai-khoan", nhan: "Tài khoản & nối hồ sơ" },
+        { id: "kiem-soat", nhan: "Bảng kiểm soát" },
         { id: "email", nhan: "Email được phép" },
-        { id: "che-do", nhan: "Chế độ quyền hạng mục" },
+        { id: "che-do", nhan: "Chế độ áp dụng" },
         { id: "quyen-toi", nhan: "Quyền của tôi" },
       ]} />
 
-      <NhomTabPanel man="phanquyen" id="che-do" tab={tab}>
-      {/* #9: ItemPermissionModeCard tự bọc Card — hết card trắng rỗng khi
-          tiền kiểm không chạy được (nó return null). */}
-      {duocChinhChinhSachQuyen && <ItemPermissionModeCard />}
-      </NhomTabPanel>
-
-      <NhomTabPanel man="phanquyen" id="email" tab={tab}>
-      {duocChinhChinhSachQuyen && <QuanTriQuyenCards duocSua={duocChinhChinhSachQuyen} />}
-      </NhomTabPanel>
-
-      <NhomTabPanel man="phanquyen" id="tai-khoan" tab={tab}>
+      <NhomTabPanel man="phanquyen" id="kiem-soat" tab={tab}>
       <Card variant="strong">
-        <CardTitle icon={ShieldCheck}
-          sub="Mỗi tài khoản được đối chiếu bằng UUID với vai nghiệp vụ, hồ sơ, phạm vi và phân công.">
-          Sẵn sàng theo vai trò &amp; phạm vi
+        <CardTitle icon={ShieldCheck} sub="Năm vai trò, trạng thái tài khoản và lỗi cấu hình trên cùng một mặt kiểm soát.">
+          Kiểm soát tài khoản
         </CardTitle>
-        <AccountAdministrationPanel
-          canManageAccounts={duocQuanLyTaiKhoan}
-          onEditRole={duocQuanLyTaiKhoan
-            ? (row, reload) => setRoleEditor({ row, reload })
-            : undefined}
-        />
+        <div data-desktop-primary-actionable>
+          <AccountAdministrationPanel
+            canManageAccounts={duocQuanLyTaiKhoan}
+            revision={accountRevision}
+            activeTool={accountTool?.kind === "link"
+              ? "link"
+              : accountTool?.kind === "rights"
+                ? `rights:${accountTool.person.person_id}`
+                : null}
+            onOpenAccountLink={duocQuanLyTaiKhoan
+              ? () => {
+                  setRoleEditor(null);
+                  setPerson(null);
+                  setAccountTool({ kind: "link" });
+                }
+              : undefined}
+            onViewRights={(row) => {
+              if (!row.directoryPerson) return;
+              setRoleEditor(null);
+              setAccountTool({ kind: "rights", person: row.directoryPerson });
+            }}
+            onEditRole={duocQuanLyTaiKhoan
+              ? (row, reload) => {
+                  setAccountTool(null);
+                  setRoleEditor({ row, reload });
+                }
+              : undefined}
+          />
+        </div>
+        {accountTool && (
+          <section id="pq-account-tools" className="pq-control__tool-panel" aria-labelledby="pq-account-tools-title">
+            <header>
+              <div>
+                <h3 id="pq-account-tools-title">
+                  {accountTool.kind === "link" ? "Liên kết tài khoản" : `Quyền hiệu lực · ${accountTool.person.full_name}`}
+                </h3>
+                <p>
+                  {accountTool.kind === "link"
+                    ? "Chọn nhân sự từ Dữ liệu nguồn để nối hoặc gỡ tài khoản đăng nhập."
+                    : "Đối chiếu quyền thực tế được tính từ vai trò và Dữ liệu nguồn."}
+                </p>
+              </div>
+              <button type="button" className="pq-nut" onClick={() => setAccountTool(null)}>Đóng</button>
+            </header>
+            {accountTool.kind === "link" ? (
+              <div className="ip-workspace">
+                <StaffDirectoryPanel
+                  canEdit={false}
+                  selectionOnly
+                  validAreas={validAreas}
+                  onSelect={setPerson}
+                  revision={directoryRevision}
+                  refreshPersonId={directoryRefreshPersonId}
+                />
+                <AccountLinkPanel
+                  person={person}
+                  canManageAccounts={duocQuanLyTaiKhoan}
+                  onLinked={(personId) => {
+                    setDirectoryRefreshPersonId(personId);
+                    setDirectoryRevision((value) => value + 1);
+                    setAccountRevision((value) => value + 1);
+                    setRightsRevision((value) => value + 1);
+                  }}
+                />
+              </div>
+            ) : (
+              <EffectiveRightsPanel person={accountTool.person} revision={rightsRevision} />
+            )}
+          </section>
+        )}
         {duocQuanLyTaiKhoan && roleEditor && (
           <AccountRoleEditor
             row={roleEditor.row}
@@ -469,33 +510,16 @@ function CurrentPermissionWorkspace({ acts, access }: {
           />
         )}
       </Card>
-      <Card variant="strong">
-        <CardTitle icon={Users}
-          sub="Chọn tài khoản để nối/gỡ và xem đúng quyền đang có hiệu lực. Liên hệ quản trị viên
-            khi cần cập nhật hồ sơ nhân sự hoặc phân công việc.">
-          Tài khoản &amp; quyền
-        </CardTitle>
-        <div data-desktop-primary-actionable className="ip-workspace">
-          {/* Danh bạ ở đây chỉ để CHỌN người — nối tài khoản và xem quyền
-              hiệu lực của người đó. */}
-          <StaffDirectoryPanel canEdit={false} validAreas={validAreas} onSelect={setPerson}
-            revision={directoryRevision} refreshPersonId={directoryRefreshPersonId} />
-          {duocQuanLyTaiKhoan && (
-            <AccountLinkPanel person={person} canManageAccounts={duocQuanLyTaiKhoan}
-              onLinked={(personId) => {
-                setDirectoryRefreshPersonId(personId);
-                setDirectoryRevision((value) => value + 1);
-                setRightsRevision((value) => value + 1);
-              }} />
-          )}
-          <AssignmentPanel person={person} canEdit={duocQuanLyTaiKhoan}
-            onAssignmentsChanged={() => setRightsRevision((value) => value + 1)} />
-          <EffectiveRightsPanel person={person} revision={rightsRevision} />
-        </div>
-      </Card>
-      {/* Ma trận quyền màn hình: chuyển nguyên từ màn "Tài khoản & quyền
-          truy cập" cũ (đã gộp vào đây). Chỉ Admin thật mới thấy — cùng lý
-          do như ItemPermissionModeCard/QuanTriQuyenCards ở trên. */}
+      </NhomTabPanel>
+
+      <NhomTabPanel man="phanquyen" id="che-do" tab={tab}>
+      {/* #9: ItemPermissionModeCard tự bọc Card — hết card trắng rỗng khi
+          tiền kiểm không chạy được (nó return null). */}
+      {duocChinhChinhSachQuyen && <ItemPermissionModeCard />}
+      </NhomTabPanel>
+
+      <NhomTabPanel man="phanquyen" id="email" tab={tab}>
+      {duocChinhChinhSachQuyen && <QuanTriQuyenCards duocSua={duocChinhChinhSachQuyen} />}
       </NhomTabPanel>
 
       <NhomTabPanel man="phanquyen" id="quyen-toi" tab={tab}>

@@ -1,5 +1,6 @@
 import {
   BUSINESS_ROLE_CATALOG,
+  BUSINESS_ROLE_IDS,
   isBusinessRole,
   type BusinessRole,
   type BusinessScopeMode,
@@ -42,11 +43,74 @@ export interface AccountAdministrationRow {
   directoryPerson: DirectoryPerson | null;
 }
 
+export type AccountControlState = "attention" | "unknown" | "ready";
+export type AccountControlFilter = "all" | "attention" | BusinessRole;
+
+export interface RoleControlRow {
+  id: BusinessRole;
+  label: string;
+  scopeLabel: string;
+  total: number;
+  active: number;
+  ready: number;
+  attention: number;
+  unknown: number;
+}
+
+const SCOPE_MODE_LABELS: Readonly<Record<BusinessScopeMode, string>> = {
+  role_policy: "Theo chính sách vai",
+  qa_assignment: "Theo Dữ liệu nguồn",
+  hierarchy: "Theo phạm vi nguồn",
+};
+
+export function accountControlState(
+  row: Pick<AccountAdministrationRow, "accountActive" | "readiness">,
+): AccountControlState {
+  if (!row.accountActive || row.readiness.some((item) => item.state === "missing")) return "attention";
+  if (row.readiness.some((item) => item.state === "unknown")) return "unknown";
+  return "ready";
+}
+
+export function buildRoleControlRows(
+  rows: readonly Pick<AccountAdministrationRow, "businessRole" | "accountActive" | "readiness">[],
+): RoleControlRow[] {
+  return BUSINESS_ROLE_IDS.map((id) => {
+    const members = rows.filter((row) => row.businessRole === id);
+    const states = members.map(accountControlState);
+    return {
+      id,
+      label: BUSINESS_ROLE_CATALOG[id].label,
+      scopeLabel: SCOPE_MODE_LABELS[BUSINESS_ROLE_CATALOG[id].scopeMode],
+      total: members.length,
+      active: members.filter((row) => row.accountActive).length,
+      ready: states.filter((state) => state === "ready").length,
+      attention: states.filter((state) => state === "attention").length,
+      unknown: states.filter((state) => state === "unknown").length,
+    };
+  });
+}
+
+export function filterAndSortAccountControlRows<T extends Pick<
+  AccountAdministrationRow,
+  "name" | "businessRole" | "accountActive" | "readiness"
+>>(rows: readonly T[], filter: AccountControlFilter): T[] {
+  const filtered = filter === "all"
+    ? rows
+    : filter === "attention"
+      ? rows.filter((row) => accountControlState(row) === "attention")
+      : rows.filter((row) => row.businessRole === filter);
+  const rank: Readonly<Record<AccountControlState, number>> = { attention: 0, unknown: 1, ready: 2 };
+  return [...filtered].sort((left, right) => (
+    rank[accountControlState(left)] - rank[accountControlState(right)]
+    || left.name.localeCompare(right.name, "vi")
+  ));
+}
+
 export function buildAccountAdministrationRows(sources: AccountAdministrationSources): AccountAdministrationRow[] {
   const rolesByUserId = indexUniqueBy(sources.roles, (role) => role.user_id);
   const peopleByPersonId = indexUniqueBy(sources.directory, (person) => person.person_id);
 
-  return sources.accounts.map((account) => {
+  return sources.accounts.filter((account) => Boolean(account.user_id && account.co_tai_khoan)).map((account) => {
     const roleSourceAmbiguous = Boolean(account.user_id && rolesByUserId.ambiguous.has(account.user_id));
     const personSourceAmbiguous = Boolean(account.pid && peopleByPersonId.ambiguous.has(account.pid));
     const roleSource = account.user_id ? rolesByUserId.values.get(account.user_id) ?? null : null;
@@ -213,7 +277,7 @@ function buildReadiness(args: {
     roleItem,
     departmentReadiness(businessRole, person, correctlyLinked, accountDepartment),
     scopeReadiness(businessRole, person, correctlyLinked),
-    assignmentReadiness(businessRole, account.so_phan_cong),
+    assignmentReadiness(businessRole),
   ];
 }
 
@@ -247,49 +311,30 @@ function scopeReadiness(
   if (role === "admin" || role === "qa_manager") {
     return item("scope", "Phạm vi", "not_applicable", "Theo chính sách vai.");
   }
-  if (role === "qa_staff") return item("scope", "Phạm vi", "not_applicable", "Theo phân công QA.");
+  if (role === "qa_staff") return item("scope", "Phạm vi", "not_applicable", "Theo người phụ trách/hỗ trợ tại Dữ liệu nguồn.");
   if (!correctlyLinked || !person) {
     return item("scope", "Phạm vi", "unknown", "Hồ sơ chưa được nối đúng nên chưa xác minh phạm vi.");
   }
-  const missing = missingScopeLevels(person);
-  return missing.length === 0
-    ? item("scope", "Phạm vi", "ready", "Đã cấu hình đủ bộ phận, xưởng, khu vực và dây chuyền.")
-    : item("scope", "Phạm vi", "missing", `Chưa cấu hình: ${missing.join(", ")}.`, "Chọn đủ phạm vi canonical.");
+  return item("scope", "Phạm vi", "not_applicable", "Theo phạm vi xưởng được quản lý tại Dữ liệu nguồn.");
 }
 
-function assignmentReadiness(role: BusinessRole | null, assignmentCount: number): ReadinessItem {
+function assignmentReadiness(role: BusinessRole | null): ReadinessItem {
   if (!role) return item("assignment", "Phân công", "unknown", "Chưa xác minh được vai để kiểm tra phân công.");
-  if (role === "admin" || role === "qa_manager" || role === "workshop_manager") {
-    return item("assignment", "Phân công", "not_applicable", "Vai này không cần phân công cá nhân.");
+  if (role === "qa_staff") {
+    return item("assignment", "Phân công", "not_applicable", "Theo người phụ trách/hỗ trợ tại Dữ liệu nguồn.");
   }
-  return assignmentCount > 0
-    ? item("assignment", "Phân công", "ready", `Nguồn hiện tại xác nhận ${assignmentCount} phân công.`)
-    : item("assignment", "Phân công", "missing", "Nguồn hiện tại chưa có phân công cho nhân viên.", "Tạo phân công cho nhân viên.");
+  if (role === "workshop_manager" || role === "workshop_staff") {
+    return item("assignment", "Phân công", "not_applicable", "Theo phạm vi nguồn và từng hạng mục công việc.");
+  }
+  return item("assignment", "Phân công", "not_applicable", "Vai này không cần phân công cá nhân.");
 }
 
 function summarizeScope(role: BusinessRole | null, person: DirectoryPerson | null, correctlyLinked: boolean): string {
   if (!role) return "Chưa xác minh vai trò";
   if (role === "admin" || role === "qa_manager") return "Theo chính sách vai";
-  if (role === "qa_staff") return "Theo phân công QA";
+  if (role === "qa_staff") return "Theo Dữ liệu nguồn";
   if (!correctlyLinked || !person) return "Chưa xác minh phạm vi";
-  const missing = missingScopeLevels(person);
-  return missing.length === 0
-    ? "Bộ phận, xưởng, khu vực và dây chuyền đã cấu hình"
-    : `Chưa cấu hình: ${missing.join(", ")}`;
-}
-
-function missingScopeLevels(person: DirectoryPerson): string[] {
-  const levels: Array<[string, readonly string[]]> = [
-    ["Bộ phận", person.scope_departments],
-    ["Xưởng", person.scope_factory_ids],
-    ["Khu vực", person.scope_area_ids],
-    ["Dây chuyền", person.scope_line_ids],
-  ];
-  return levels.filter(([, values]) => !hasScopeValue(values)).map(([label]) => label);
-}
-
-function hasScopeValue(values: readonly string[]): boolean {
-  return values.some((value) => value.trim().length > 0);
+  return "Theo phạm vi Dữ liệu nguồn";
 }
 
 function sameDepartment(accountDepartment: string | null, personDepartment: string | null): boolean {

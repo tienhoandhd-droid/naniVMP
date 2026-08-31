@@ -226,21 +226,12 @@ kiem("Nhập liệu", "Đổi được cách nhóm mà không phải sang màn k
   await p.evaluate(() => [...document.querySelectorAll("button")]
     .some((x) => /Theo đối tượng/.test(x.textContent || ""))), "", 1);
 
-/* ---- Cả ba khối 3D: có nút 2D, và KHÔNG có chú thích đè lên hình ---- */
+/* ---- Các khối 3D còn lại: có nút 2D, và KHÔNG có chú thích đè lên hình ---- */
 console.log("\n── Khối 3D · bản 2D thay thế và chú thích không che hình ──");
 for (const [v, ten, truoc] of [
   ["timeline", "Địa hình tải việc", null],
-  ["reports", "VMP bốn giai đoạn", "3. Đánh giá so với mục tiêu"],
-  ["alerts", "Ma trận rủi ro QRM", null],
 ]) {
   await moMan(v);
-  if (v === "alerts") {
-    await p.evaluate(() => {
-      const x = [...document.querySelectorAll("button")].find((e) => /QRM|Ma trận/.test(e.textContent || ""));
-      x?.click();
-    });
-    await cho(3500);
-  }
   if (truoc) {
     await p.evaluate((t) => {
       const el = [...document.querySelectorAll("*")].find((x) => (x.textContent || "").trim().startsWith(t));
@@ -256,6 +247,34 @@ for (const [v, ten, truoc] of [
   kiem("Khối 3D", `${ten} · có nút chuyển sang bảng 2D`, r.coKhoi && r.nut2d, "", 1);
   kiem("Khối 3D", `${ten} · không có chú thích đè lên hình`, !r.deLen, "");
 }
+
+await moMan("reports");
+const reports = await p.evaluate(() => ({
+  coBieuDoPhang: Boolean(document.querySelector("[data-report-monthly-target-chart] svg")),
+  coKhoi3d: Boolean(document.querySelector(".vmp-space3d")),
+  coCanvas: Boolean(document.querySelector("canvas[data-engine^='three.js']")),
+  coNut3d: [...document.querySelectorAll("button")]
+    .some((element) => /Xem bản đồ 3D/.test(element.textContent || "")),
+}));
+kiem("Báo cáo", "Biểu đồ phẳng thay hoàn toàn bản đồ 3D",
+  reports.coBieuDoPhang && !reports.coKhoi3d && !reports.coCanvas && !reports.coNut3d,
+  JSON.stringify(reports));
+
+await moMan("alerts");
+await p.evaluate(() => {
+  const qrm = [...document.querySelectorAll("button")]
+    .find((element) => /QRM|Ma trận/.test(element.textContent || ""));
+  qrm?.click();
+});
+await cho(3500);
+const qrm = await p.evaluate(() => ({
+  coKhoi3d: Boolean(document.querySelector(".vmp-space3d")),
+  coCanvas: Boolean(document.querySelector("canvas[data-engine^='three.js']")),
+  coNut3d: [...document.querySelectorAll("button")]
+    .some((element) => /Xem bản đồ 3D/.test(element.textContent || "")),
+}));
+kiem("QRM", "Ma trận rủi ro không còn bản đồ 3D dư thừa",
+  !qrm.coKhoi3d && !qrm.coCanvas && !qrm.coNut3d, JSON.stringify(qrm));
 
 /* ==================== VAI 4 · DÙNG TRÊN MÁY TÍNH BẢNG / ĐIỆN THOẠI ====
    Người ở xưởng và kho hiếm khi ngồi trước máy để bàn. Màn hình hẹp là

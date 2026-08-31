@@ -361,8 +361,7 @@ const trinhDuyet = await puppeteer.launch({
     hash: location.hash,
     coNoiDung: document.body.innerText.length > 200,
     // Dấu hiệu đang ở đúng màn Vai trò & phạm vi.
-    thayDanhBa: document.body.innerText.includes("Danh bạ chuẩn")
-      || document.body.innerText.includes("Tài khoản & quyền"),
+    thayDanhBa: document.body.innerText.includes("Bảng kiểm soát vai trò & tài khoản"),
     khongCoMucNav: !document.querySelector('[data-view="accounts"]'),
   }));
   kiem(kq.hash.includes("phanquyen"), "hash đổi sang #v=phanquyen", kq.hash || "(rỗng)");
@@ -473,13 +472,15 @@ for (const [ten, suaKho] of [
   console.log("\nVai trò & phạm vi — đổi vai bằng UUID dù trùng email:");
   const { trang, goiRpc, chanNgoai, loiConsole } = await moTrang(trinhDuyet,
     { suaKho: suaKhoRolePanel, hash: "phanquyen" });
-  const articleB = 'article[aria-label="Người B"]';
-  await trang.waitForSelector(articleB, { timeout: 10_000 });
+  await trang.waitForFunction(() => [...document.querySelectorAll('[data-account-control-table="true"] tbody tr')]
+    .some((row) => row.textContent.includes("Người B")), { timeout: 10_000 });
 
-  await trang.evaluate((selector) => {
-    [...document.querySelectorAll(`${selector} button`)]
+  await trang.evaluate(() => {
+    const row = [...document.querySelectorAll('[data-account-control-table="true"] tbody tr')]
+      .find((candidate) => candidate.textContent.includes("Người B"));
+    [...(row?.querySelectorAll("button") || [])]
       .find((button) => button.textContent.trim() === "Sửa vai")?.click();
-  }, articleB);
+  });
   await trang.waitForSelector('select[aria-label="Vai nghiệp vụ mới"]');
   await trang.select('select[aria-label="Vai nghiệp vụ mới"]', "qa_manager");
   await cho(150);
@@ -524,12 +525,14 @@ for (const [ten, suaKho] of [
     hash: "phanquyen",
     doTre: { rpc_set_user_active: 450 },
   });
-  const articleB = 'article[aria-label="Người B"]';
-  await trang.waitForSelector(articleB, { timeout: 10_000 });
-  const moDialog = () => trang.evaluate((selector) => {
-    [...document.querySelectorAll(`${selector} button`)]
+  await trang.waitForFunction(() => [...document.querySelectorAll('[data-account-control-table="true"] tbody tr')]
+    .some((row) => row.textContent.includes("Người B")), { timeout: 10_000 });
+  const moDialog = () => trang.evaluate(() => {
+    const row = [...document.querySelectorAll('[data-account-control-table="true"] tbody tr')]
+      .find((candidate) => candidate.textContent.includes("Người B"));
+    [...(row?.querySelectorAll("button") || [])]
       .find((button) => button.textContent.trim() === "Tắt")?.click();
-  }, articleB);
+  });
 
   await moDialog();
   await trang.waitForSelector('textarea[aria-label="Lý do đổi trạng thái"]');
@@ -569,8 +572,7 @@ for (const [ten, suaKho] of [
 {
   console.log("\nVai trò & phạm vi — thẻ chế độ áp dụng quyền theo hạng mục:");
   const { trang } = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
-  /* Bàn quản trị (spec 01/09): màn tách 4 tab — thẻ chế độ quyền nằm ở tab
-     "Chế độ quyền hạng mục", phải bấm tab trước khi soi. */
+  /* Bảng kiểm soát mới tách thẻ chế độ quyền sang tab "Chế độ áp dụng". */
   await trang.waitForSelector("#phanquyen-tab-che-do", { timeout: 10_000 });
   await trang.click("#phanquyen-tab-che-do");
   await cho(900); // fetchPermissionPreflight() là async riêng, cần thêm thời gian tải
@@ -682,14 +684,14 @@ for (const [ten, suaKho] of [
 
   const a = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
   await cho(1400);
-  /* Bàn quản trị (spec 01/09): màn tách 4 tab — mỗi khối sống trong tab của
+  /* Màn tách 5 tab — mỗi khối sống trong tab của
      nó. "Tồn tại với admin" nay nghĩa là: bấm tab tương ứng thì thấy khối. */
   const docTab = async (tabId) => {
     await a.trang.click(`#phanquyen-tab-${tabId}`);
     await cho(700);
     return a.trang.evaluate(() => document.body.innerText);
   };
-  const chuTaiKhoan = await docTab("tai-khoan");
+  const chuTaiKhoan = await docTab("kiem-soat");
   const chuEmail = await docTab("email");
   const chuQuyenToi = await docTab("quyen-toi");
   const admin = {
@@ -698,15 +700,15 @@ for (const [ten, suaKho] of [
       chu.includes("Vai nào xem được gì, sửa được gì")
       || chu.includes("tích ở đây là đổi quyền thật")),
     coMaTranMoi: chuQuyenToi.includes("Màn hình bạn được xem"),
-    huongDanDungBaBuoc: chuTaiKhoan.includes("Sẵn sàng theo vai trò & phạm vi")
-      && chuEmail.includes("Sẵn sàng theo vai trò & phạm vi"),
+    huongDanDungBaBuoc: chuTaiKhoan.includes("Bảng kiểm soát vai trò & tài khoản")
+      && chuEmail.includes("Quy trình thêm người mới"),
   };
   kiem(admin.coEmail, "admin thấy thẻ Ai được phép có tài khoản");
   /* Ma trận 4 vai cũ đã XOÁ. Thứ thay nó là ma trận năm vai hiệu lực
      "Màn hình bạn được xem", đọc từ rpc_my_ui_access. */
   kiem(!admin.coMaTranCu, "không còn ma trận 4 vai của hệ cũ");
   kiem(admin.coMaTranMoi, "admin thấy ma trận năm vai Màn hình bạn được xem");
-  kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang thẻ sẵn sàng vai trò");
+  kiem(admin.huongDanDungBaBuoc, "hướng dẫn thêm người trỏ đúng sang bảng kiểm soát");
   await a.trang.close();
 
   /* QA không có bất cứ workspace quản trị nào. Dùng deep-link để chặn cả
@@ -719,13 +721,13 @@ for (const [ten, suaKho] of [
     const qa = await b.trang.evaluate(() => {
       const chu = document.body.innerText;
       return {
-        sanSang: chu.includes("Sẵn sàng theo vai trò & phạm vi"),
-        taiKhoan: chu.includes("Tài khoản & quyền"),
+        sanSang: chu.includes("Bảng kiểm soát vai trò & tài khoản"),
+        taiKhoan: chu.includes("Liên kết tài khoản & quyền hiệu lực"),
         danhBa: !!document.getElementById("ip-directory-title"),
       };
     });
-    kiem(!qa.sanSang, `${ten} deep-link không mount khối Sẵn sàng theo vai trò & phạm vi`);
-    kiem(!qa.taiKhoan, `${ten} deep-link không mount khối Tài khoản & quyền`);
+    kiem(!qa.sanSang, `${ten} deep-link không mount Bảng kiểm soát vai trò & tài khoản`);
+    kiem(!qa.taiKhoan, `${ten} deep-link không mount Liên kết tài khoản & quyền hiệu lực`);
     kiem(!qa.danhBa, `${ten} deep-link không mount khối Danh bạ chuẩn`);
     await b.trang.close();
   }
@@ -741,10 +743,10 @@ for (const [ten, suaKho] of [
   const kq = await trang.evaluate(() => {
     const chu = document.body.innerText;
     return {
-      workspace: chu.includes("Phân công theo hạng mục"),
+      workspace: chu.includes("Liên kết tài khoản & quyền hiệu lực"),
       danhBaPhanCong: !!document.getElementById("ip-directory-title"),
-      sanSang: chu.includes("Sẵn sàng theo vai trò & phạm vi"),
-      taiKhoan: chu.includes("Tài khoản & quyền"),
+      sanSang: chu.includes("Bảng kiểm soát vai trò & tài khoản"),
+      taiKhoan: chu.includes("Liên kết tài khoản & quyền hiệu lực"),
     };
   });
   kiem(!kq.workspace && !kq.danhBaPhanCong,
@@ -768,7 +770,7 @@ for (const [ten, suaKho] of [
   { timeout: 10_000 }, EMAIL_AUTH_KHAC_HO_SO, EMAIL_CHUA_CO_TAI_KHOAN);
   const trangThai = await trang.evaluate((emails) => Object.fromEntries(
     [...document.querySelectorAll("tr")].flatMap((tr) => {
-      const cells = [...tr.querySelectorAll("td")].map((td) => td.textContent?.replace(/\s+/g, " ").trim() || "");
+      const cells = [...tr.querySelectorAll("th, td")].map((cell) => cell.textContent?.replace(/\s+/g, " ").trim() || "");
       return emails.includes(cells[0]) ? [[cells[0], cells[3] || ""]] : [];
     }),
   ), [EMAIL_AUTH_KHAC_HO_SO, EMAIL_CHUA_CO_TAI_KHOAN]);
@@ -838,10 +840,10 @@ for (const [ten, suaKho] of [
      (AccountLinkPanel.tsx:109) — nó cần hồ sơ để nói đang nối cho ai. Phải
      chọn người trước rồi mới kiểm, nếu không phép kiểm đỏ oan. */
   const chonMotNguoi = async (trang) => {
-    /* Tab được NHỚ theo localStorage (useNhomTab) — block trước có thể đã
-       để lại tab khác; danh bạ sống ở tab Tài khoản nên mở tường minh. */
-    await trang.waitForSelector("#phanquyen-tab-tai-khoan", { timeout: 10_000 });
-    await trang.click("#phanquyen-tab-tai-khoan");
+    await trang.waitForSelector("#phanquyen-tab-kiem-soat", { timeout: 10_000 });
+    await trang.click("#phanquyen-tab-kiem-soat");
+    await trang.evaluate(() => [...document.querySelectorAll("button")]
+      .find((button) => button.textContent?.trim() === "Liên kết tài khoản")?.click());
     await cho(500);
     await trang.evaluate(() => {
       const o = document.querySelector('input[aria-label="Tìm tên hoặc tài khoản"]');
@@ -865,6 +867,10 @@ for (const [ten, suaKho] of [
   await cho(1200);
   kiem(chonDuoc, "chọn được một người trong danh bạ để thao tác");
   const chuTabTaiKhoan = await a.trang.evaluate(() => document.body.innerText);
+  await a.trang.evaluate(() => document.querySelector("#pq-account-tools header button")?.click());
+  await a.trang.evaluate(() => document.querySelector('[data-account-control-table="true"] tbody button[aria-controls="pq-account-tools"]')?.click());
+  await cho(700);
+  const chuQuyenHieuLuc = await a.trang.evaluate(() => document.body.innerText);
   /* Ma trận màn hình sống ở tab "Quyền của tôi" (Bàn quản trị 01/09). */
   await a.trang.click("#phanquyen-tab-quyen-toi");
   await cho(700);
@@ -872,7 +878,7 @@ for (const [ten, suaKho] of [
   const admin = {
     coNoiTaiKhoan: chuTabTaiKhoan.includes("Nối tài khoản"),
     coMaTranManHinh: chuTabQuyenToi.includes("Màn hình bạn được xem"),
-    coQuyenHieuLuc: chuTabTaiKhoan.includes("Quyền") && chuTabTaiKhoan.includes("hiệu lực"),
+    coQuyenHieuLuc: chuQuyenHieuLuc.includes("Quyền") && chuQuyenHieuLuc.includes("hiệu lực"),
   };
   kiem(admin.coNoiTaiKhoan, "admin vẫn nối/gỡ được tài khoản sau khi gộp màn");
   kiem(admin.coMaTranManHinh, "ma trận Màn hình bạn được xem theo sang màn mới");

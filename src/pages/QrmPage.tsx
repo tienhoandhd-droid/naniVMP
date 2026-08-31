@@ -1,5 +1,5 @@
 /* QrmPage.jsx — Ma trận rủi ro thẩm định (QRM / ICH Q9) */
-import { useMemo, lazy, Suspense } from "react";
+import { useMemo } from "react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { CLS, CRIT } from "../constants/vmp.ts";
 import { valStatus, qrmRpn, qrmLevel } from "../utils/helpers.ts";
@@ -88,16 +88,7 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
 /** Ô ma trận: danh sách hạng mục theo (mức tới hạn × trạng thái). */
 type RiskGrid = Record<string, Record<string, Activity[]>>;
 
-// Khối rủi ro 3D nạp theo yêu cầu — không ai mở trang này thì không tải three.js.
-import { nhapCoThuLai } from "../lib/tailMan.ts";
-const RiskSpace3D = lazy(nhapCoThuLai(() => import("../components/three/RiskSpace3D.tsx")));
-
 export default function QrmView({ acts }: { acts: Activity[] }) {
-  const giamChuyenDong = useMemo(
-    () => typeof window !== "undefined"
-      && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-    [],
-  );
   const cols = ["Đạt", "Chưa/Đang", "Quá hạn"];
   const rowsC = ["Cao", "TB", "Thấp"];
   const grid: RiskGrid = {};
@@ -140,12 +131,6 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
         <CardTitle icon={ShieldAlert} sub="ICH Q9 / EU GMP Annex 15 — ưu tiên đối tượng ảnh hưởng GxP cao">Ma trận rủi ro thẩm định (QRM)</CardTitle>
-        {/* Khối 3D: hai trục Q9 giữ nguyên, chiều cao là SỐ HẠNG MỤC — trả
-            lời được câu bản 2D không trả lời nổi: ô đỏ kia có một hạng mục
-            hay có bốn mươi. */}
-        <Suspense fallback={<div style={{ height: 420 }} />}>
-          <RiskSpace3D acts={acts} giamChuyenDong={giamChuyenDong} />
-        </Suspense>
         <div style={{ overflowX: "auto", marginTop: 8 }} className="vmp-scroll">
           <table style={{ borderCollapse: "separate", borderSpacing: 8, margin: "0 auto" }}>
             <thead><tr><th></th>{cols.map((c) => <th key={c} style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: C.plumSoft, padding: "0 8px" }}>{c}</th>)}</tr></thead>

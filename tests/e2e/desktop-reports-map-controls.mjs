@@ -26,28 +26,26 @@ try {
   await nhetPhien(page, { supabaseUrl: URL_SB });
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForSelector('.vmp-space3d button[data-map-mode="3d"]', { timeout: 15_000 });
-
-  assert.equal(await page.$$eval(".vmp-space3d-doi", (nodes) => nodes.length), 1,
-    "gate ban đầu có đúng một nhóm chọn mode");
-  await page.click('.vmp-space3d button[data-map-mode="3d"]');
-  await page.waitForSelector(".vmp-space3d canvas", { timeout: 15_000 });
+  await page.waitForFunction(() => document.body.textContent?.includes("3. Đánh giá so với mục tiêu"),
+    { timeout: 15_000 });
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
 
   const state = await page.evaluate(() => ({
-    controlGroups: document.querySelectorAll(".vmp-space3d-doi").length,
-    buttons2d: document.querySelectorAll('button[data-map-mode="2d"]').length,
+    targetCharts: document.querySelectorAll("[data-report-monthly-target-chart]").length,
+    flatSvg: Boolean(document.querySelector("[data-report-monthly-target-chart] svg")),
+    maps3d: document.querySelectorAll(".vmp-space3d").length,
+    canvas3d: Boolean(document.querySelector("canvas[data-engine^='three.js']")),
     buttons3d: document.querySelectorAll('button[data-map-mode="3d"]').length,
-    nestedMaps: document.querySelectorAll(".vmp-space3d .vmp-space3d").length,
-    canvas: Boolean(document.querySelector(".vmp-space3d canvas")),
-    selected3d: document.querySelector('button[data-map-mode="3d"]')?.classList.contains("is-chon"),
+    collapsedFlatCharts: [...document.querySelectorAll("details > summary")]
+      .filter((summary) => /Xem dạng phẳng 12 tháng/.test(summary.textContent || "")).length,
   }));
   assert.deepEqual(state, {
-    controlGroups: 1,
-    buttons2d: 1,
-    buttons3d: 1,
-    nestedMaps: 0,
-    canvas: true,
-    selected3d: true,
+    targetCharts: 1,
+    flatSvg: true,
+    maps3d: 0,
+    canvas3d: false,
+    buttons3d: 0,
+    collapsedFlatCharts: 0,
   });
 } finally {
   await browser.close();

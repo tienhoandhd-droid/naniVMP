@@ -623,6 +623,51 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             </aside>
           </section>
 
+          <section className="alerts-management" aria-labelledby="alerts-management-title">
+            <div className="alerts-management__head">
+              <div>
+                <span className="alerts-command__eyebrow">Góc nhìn quản lý</span>
+                <h2 id="alerts-management-title">Điểm nghẽn trong phạm vi đang lọc</h2>
+              </div>
+              <span>{command.totalUnique} hạng mục duy nhất</span>
+            </div>
+            <div className="alerts-management__body">
+              <div className="alerts-management__metrics">
+                <article>
+                  <strong>{command.overdueRate}%</strong>
+                  <span>đang quá hạn</span>
+                  <small>Cần tháo nút thắt trước</small>
+                </article>
+                <article>
+                  <strong>{command.highRiskRate}%</strong>
+                  <span>rủi ro cao</span>
+                  <small>RPN từ 15 trở lên</small>
+                </article>
+                <article>
+                  <strong>{command.unassignedCount}</strong>
+                  <span>chưa có người</span>
+                  <small>Cần xác nhận đầu mối</small>
+                </article>
+              </div>
+              <div className="alerts-management__hotspots">
+                <div className="alerts-management__hotspots-head">
+                  <strong>Bộ phận nhiều cảnh báo</strong>
+                  <span>Tối đa 5 điểm nóng</span>
+                </div>
+                {command.hotspots.length ? command.hotspots.slice(0, 5).map((item) => (
+                  <div key={item.department} className="alerts-hotspot">
+                    <span>{departmentLabel(item.department)}</span>
+                    <i aria-hidden="true"><b style={{ width: `${item.share}%` }} /></i>
+                    <strong>{item.count}</strong>
+                    <small>{item.overdueCount} trễ · {item.highRiskCount} rủi ro cao</small>
+                  </div>
+                )) : (
+                  <div className="alerts-management__empty">Chưa có cảnh báo để phân tích điểm nghẽn.</div>
+                )}
+              </div>
+            </div>
+          </section>
+
           <div className="alerts-priority-rail" role="group" aria-label="Bốn tín hiệu cảnh báo">
             {priorityCards.map((item) => (
               <button
@@ -745,51 +790,6 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
               </div>
             </Card>
           )}
-
-          <section className="alerts-management" aria-labelledby="alerts-management-title">
-            <div className="alerts-management__head">
-              <div>
-                <span className="alerts-command__eyebrow">Góc nhìn quản lý</span>
-                <h2 id="alerts-management-title">Điểm nghẽn trong phạm vi đang lọc</h2>
-              </div>
-              <span>{command.totalUnique} hạng mục duy nhất</span>
-            </div>
-            <div className="alerts-management__body">
-              <div className="alerts-management__metrics">
-                <article>
-                  <strong>{command.overdueRate}%</strong>
-                  <span>đang quá hạn</span>
-                  <small>Cần tháo nút thắt trước</small>
-                </article>
-                <article>
-                  <strong>{command.highRiskRate}%</strong>
-                  <span>rủi ro cao</span>
-                  <small>RPN từ 15 trở lên</small>
-                </article>
-                <article>
-                  <strong>{command.unassignedCount}</strong>
-                  <span>chưa có người</span>
-                  <small>Cần xác nhận đầu mối</small>
-                </article>
-              </div>
-              <div className="alerts-management__hotspots">
-                <div className="alerts-management__hotspots-head">
-                  <strong>Bộ phận nhiều cảnh báo</strong>
-                  <span>Tối đa 5 điểm nóng</span>
-                </div>
-                {command.hotspots.length ? command.hotspots.slice(0, 5).map((item) => (
-                  <div key={item.department} className="alerts-hotspot">
-                    <span>{departmentLabel(item.department)}</span>
-                    <i aria-hidden="true"><b style={{ width: `${item.share}%` }} /></i>
-                    <strong>{item.count}</strong>
-                    <small>{item.overdueCount} trễ · {item.highRiskCount} rủi ro cao</small>
-                  </div>
-                )) : (
-                  <div className="alerts-management__empty">Chưa có cảnh báo để phân tích điểm nghẽn.</div>
-                )}
-              </div>
-            </div>
-          </section>
 
           {/* ===== Phân tích AI cho cảnh báo + gửi mail =====
               Danh sách trả lời "cái nào trước"; phần này trả lời "vì sao đang

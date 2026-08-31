@@ -21,6 +21,17 @@ test("quản trị vai chỉ còn ở Vai trò & phạm vi", async () => {
   assert.doesNotMatch(app, /Người dùng &amp; phân quyền/);
 });
 
+test("liên kết và quyền nằm trong bảng kiểm soát, không còn tab chi tiết", async () => {
+  const page = await readRepositoryFile("src/pages/PhanQuyenPage.tsx");
+
+  assert.doesNotMatch(page, /id: "chi-tiet"/);
+  assert.doesNotMatch(page, /id="chi-tiet"/);
+  assert.match(page, /onOpenAccountLink/);
+  assert.match(page, /onViewRights/);
+  assert.match(page, /AccountLinkPanel/);
+  assert.match(page, /EffectiveRightsPanel/);
+});
+
 test("thao tác tài khoản chỉ mở bằng capability server", async () => {
   const page = await readRepositoryFile("src/pages/PhanQuyenPage.tsx");
   assert.match(page, /access\?\.can\("accounts", "manage_accounts"\)/);

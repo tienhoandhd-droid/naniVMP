@@ -36,6 +36,8 @@ import {
 
 interface StaffDirectoryPanelProps {
   canEdit: boolean;
+  /** Chỉ dùng danh bạ làm bộ chọn hồ sơ cho luồng nối tài khoản/tra quyền. */
+  selectionOnly?: boolean;
   validAreas?: readonly string[];
   onSelect: (person: DirectoryPerson | null) => void;
   revision?: number;
@@ -115,6 +117,7 @@ export async function completeDirectorySaveWhenCurrent<T extends Pick<DirectoryP
 
 export default function StaffDirectoryPanel({
   canEdit,
+  selectionOnly = false,
   onSelect,
   revision = 0,
   refreshPersonId = null,
@@ -171,11 +174,12 @@ export default function StaffDirectoryPanel({
   };
 
   useEffect(() => {
-    if (!requiresHierarchyScope(form.accessClass)) return;
+    if (selectionOnly || !requiresHierarchyScope(form.accessClass)) return;
     void loadScopeCatalog().catch(() => undefined);
-  }, [catalogReload, form.accessClass]);
+  }, [catalogReload, form.accessClass, selectionOnly]);
 
   useEffect(() => {
+    if (selectionOnly) return;
     fetchPermissionPreflight().then((preflight) => {
       setMode(preflight.mode);
       setBlocking(preflight.blocking_errors.length);
@@ -183,7 +187,7 @@ export default function StaffDirectoryPanel({
     }).catch(() => {
       // Quản lý bộ phận được xem danh bạ nhưng chỉ Admin được chạy tiền kiểm.
     });
-  }, []);
+  }, [selectionOnly]);
 
   useEffect(() => {
     if (selected && query === selected.full_name) {
@@ -479,16 +483,18 @@ export default function StaffDirectoryPanel({
 
   return (
     <section className="ip-panel" aria-labelledby="ip-directory-title">
-      <div className={`ip-mode ${mode === "preview" ? "is-preview" : "is-enforced"}`} role="status">
+      {!selectionOnly && <div className={`ip-mode ${mode === "preview" ? "is-preview" : "is-enforced"}`} role="status">
         {mode === "preview" ? <AlertTriangle size={18} /> : <Check size={18} />}
         <div>
           <b>{mode === "preview" ? "DỰ THẢO — CHƯA ÁP DỤNG QUYỀN THẬT" : "ĐANG ÁP DỤNG QUYỀN THEO HẠNG MỤC"}</b>
           <span>{blocking} lỗi bắt buộc · {warnings} cảnh báo. Admin phải chủ động bật sau khi tiền kiểm đạt.</span>
         </div>
-      </div>
+      </div>}
 
-      <h2 id="ip-directory-title">Danh bạ chuẩn</h2>
-      <p className="ip-help">Tìm theo họ tên, email hoặc mã nhân viên. Chọn đúng một người để bộ phận, tài khoản và quyền tự điền.</p>
+      <h2 id="ip-directory-title">{selectionOnly ? "Chọn hồ sơ nhân sự" : "Danh bạ chuẩn"}</h2>
+      <p className="ip-help">{selectionOnly
+        ? "Tìm đúng hồ sơ để nối tài khoản hoặc kiểm tra quyền hiệu lực."
+        : "Tìm theo họ tên, email hoặc mã nhân viên. Chọn đúng một người để bộ phận, tài khoản và quyền tự điền."}</p>
 
       <div className="ip-search">
         <Search size={17} aria-hidden="true" />
@@ -537,8 +543,8 @@ export default function StaffDirectoryPanel({
           {selected.match_status === "ambiguous" && <span className="ip-badge is-warning">Trùng tên — cần nối tay</span>}
           {isQaAccessClass(selected.access_class) && (
             <span className="ip-badge is-warning">{selected.user_id
-              ? "Quyền phát sinh từ phân công hạng mục"
-              : "Chưa nối tài khoản — có thể chuẩn bị phân công nhưng chưa cấp quyền"}</span>
+              ? "Quyền QA lấy từ người phụ trách/hỗ trợ trong Dữ liệu nguồn"
+              : "Chưa nối tài khoản — dữ liệu nguồn chưa thể cấp quyền cho hồ sơ này"}</span>
           )}
           {!isDirectoryPersonComplete(selected) && (
             <span className="ip-badge is-warning">Hồ sơ chưa đủ — cần bổ sung bộ phận, phân loại, phạm vi và khu vực</span>
@@ -547,6 +553,7 @@ export default function StaffDirectoryPanel({
         </div>
       )}
 
+      {!selectionOnly && <>
       <div className="ip-form">
         {/* Thứ tự trường ĐÚNG THEO thứ tự 11 cột PERMISSION_HEADERS của mẫu
             Excel tải lên (permissionWorkbook.ts): Bộ phận → Mã nhân viên →
@@ -670,6 +677,8 @@ export default function StaffDirectoryPanel({
           </div>
         )}
       </div>
+      </>}
+      {message && selectionOnly && <div className="ip-message" role="status">{message}</div>}
       {hopXacNhan}
     </section>
   );

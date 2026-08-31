@@ -65,7 +65,7 @@ test("ui operation token allows cancel to release only its own in-flight state",
   const state = createActivationUiState(); const first = state.begin(); assert.equal(state.isCurrent(first), true); state.cancel(first); assert.equal(state.isCurrent(first), false); const second = state.begin(); assert.notEqual(first, second); assert.equal(state.isCurrent(second), true);
 });
 
-test("nội dung panel hiện đủ sáu mục, badge và ẩn controls với người không có quyền", () => {
+test("nội dung panel giữ đủ sáu kiểm tra trong chi tiết và ẩn controls với người không có quyền", () => {
   const snapshot = awaitSnapshotForMarkup();
   const html = renderToStaticMarkup(React.createElement(AccountAdministrationContent, {
     snapshot,
@@ -79,11 +79,55 @@ test("nội dung panel hiện đủ sáu mục, badge và ẩn controls với ng
   for (const label of ["Tài khoản", "Nối hồ sơ", "Vai nghiệp vụ", "Bộ phận", "Phạm vi", "Phân công"]) {
     assert.match(html, new RegExp(label));
   }
-  assert.match(html, /Không hoạt động/);
-  assert.match(html, /Chưa xác minh/);
+  assert.match(html, /Cần xử lý/);
+  assert.match(html, /5 vấn đề/);
   assert.match(html, /Tải lại/);
   assert.doesNotMatch(html, /Sửa vai/);
   assert.doesNotMatch(html, />Bật lại</);
+});
+
+test("workspace dùng bảng vai trò và bảng tài khoản làm bề mặt kiểm soát chính", () => {
+  const snapshot = awaitSnapshotForMarkup();
+  const html = renderToStaticMarkup(React.createElement(AccountAdministrationContent, {
+    snapshot,
+    rows: applySourceUncertainty(snapshot.rows, snapshot.errors),
+    loading: false,
+    canManageAccounts: true,
+    reload: async () => null,
+    onRetry: () => {},
+    onStartActivation: () => {},
+  }));
+
+  assert.match(html, /data-role-control-table="true"/);
+  assert.match(html, /Tổng hợp tài khoản theo 5 vai trò/);
+  for (const label of ["Quản trị", "Quản lý QA", "Nhân viên QA", "Quản lý xưởng", "Nhân viên xưởng"]) {
+    assert.match(html, new RegExp(label));
+  }
+  assert.match(html, /data-account-control-table="true"/);
+  assert.match(html, /Cần xử lý trước/);
+  assert.match(html, /<th scope="col"/);
+  assert.match(html, /<th scope="row"/);
+});
+
+test("bảng kiểm soát chứa thao tác liên kết chung và xem quyền theo từng tài khoản", () => {
+  const snapshot = awaitSnapshotForMarkup();
+  const html = renderToStaticMarkup(React.createElement(AccountAdministrationContent, {
+    snapshot,
+    rows: applySourceUncertainty(snapshot.rows, snapshot.errors),
+    loading: false,
+    canManageAccounts: true,
+    reload: async () => null,
+    onRetry: () => {},
+    onStartActivation: () => {},
+    onOpenAccountLink: () => {},
+    onViewRights: () => {},
+    activeTool: "rights:p1",
+  }));
+
+  assert.match(html, />Liên kết tài khoản</);
+  assert.match(html, /aria-controls="pq-account-tools"/);
+  assert.match(html, />Xem quyền</);
+  assert.match(html, /aria-expanded="true"/);
 });
 
 test("manager chỉ thấy Sửa vai khi có callback", () => {
@@ -115,7 +159,7 @@ test("panel hiện nhãn tiếng Việt từ catalog, không lộ mã vai kỹ t
     onStartActivation: () => {},
   }));
 
-  assert.match(html, /Vai: Nhân viên QA/);
+  assert.match(html, />Nhân viên QA</);
   assert.doesNotMatch(html, /qa_staff/);
 });
 

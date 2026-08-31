@@ -1,14 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchNguoiVaQuyen, fetchVaiNghiepVu, setUserActive, type NguoiVaQuyen, type VaiNghiepVuRow } from "../../lib/supabaseData.ts";
 import { searchPermissionDirectory } from "../itemPermissions/api.ts";
 import { businessRoleLabel } from "../../lib/businessRoles.ts";
-import { buildAccountAdministrationRows, type AccountAdministrationRow } from "./accountAdministrationModel.ts";
+import {
+  accountControlState,
+  buildAccountAdministrationRows,
+  buildRoleControlRows,
+  filterAndSortAccountControlRows,
+  type AccountAdministrationRow,
+  type AccountControlFilter,
+} from "./accountAdministrationModel.ts";
 import type { DirectoryPerson } from "../itemPermissions/types.ts";
 export type AccountSourceName = "accounts" | "roles" | "directory";
 export interface AccountAdministrationSnapshot { rows: AccountAdministrationRow[]; errors: Partial<Record<AccountSourceName, string>>; }
 export interface AccountAdministrationLoaders { loadAccounts: () => Promise<NguoiVaQuyen>; loadRoles: () => Promise<VaiNghiepVuRow[]>; loadDirectory: () => Promise<DirectoryPerson[]>; }
 export interface ReloadAccountByUserId { (userId: string): Promise<AccountAdministrationRow | null>; }
-export interface AccountAdministrationPanelProps { canManageAccounts: boolean; revision?: number; loaders?: AccountAdministrationLoaders; mutateActive?: typeof setUserActive; onEditRole?: (row: AccountAdministrationRow, reload: ReloadAccountByUserId) => void; }
+export interface AccountAdministrationPanelProps {
+  canManageAccounts: boolean;
+  revision?: number;
+  loaders?: AccountAdministrationLoaders;
+  mutateActive?: typeof setUserActive;
+  onEditRole?: (row: AccountAdministrationRow, reload: ReloadAccountByUserId) => void;
+  onOpenAccountLink?: () => void;
+  onViewRights?: (row: AccountAdministrationRow) => void;
+  activeTool?: "link" | `rights:${string}` | null;
+}
 export function resolveReloadedAccount(snapshot: AccountAdministrationSnapshot, userId: string, isCurrent: () => boolean): AccountAdministrationRow | null { if (!isCurrent() || Object.keys(snapshot.errors).length > 0) return null; return snapshot.rows.find((row) => row.userId === userId) ?? null; }
 export function createActivationUiState() { let token = 0; return { begin: () => ++token, cancel: (value: number) => { if (token === value) token++; }, isCurrent: (value: number) => token === value }; }
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
@@ -107,6 +123,9 @@ export function AccountAdministrationContent({
   reload,
   onRetry,
   onEditRole,
+  onOpenAccountLink,
+  onViewRights,
+  activeTool = null,
   onStartActivation,
 }: {
   snapshot: AccountAdministrationSnapshot;
@@ -117,11 +136,40 @@ export function AccountAdministrationContent({
   reload: ReloadAccountByUserId;
   onRetry: () => void;
   onEditRole?: AccountAdministrationPanelProps["onEditRole"];
+  onOpenAccountLink?: AccountAdministrationPanelProps["onOpenAccountLink"];
+  onViewRights?: AccountAdministrationPanelProps["onViewRights"];
+  activeTool?: AccountAdministrationPanelProps["activeTool"];
   onStartActivation: (row: AccountAdministrationRow) => void;
 }) {
+  const [filter, setFilter] = useState<AccountControlFilter>("all");
+  const roleRows = useMemo(() => buildRoleControlRows(rows), [rows]);
+  const visibleRows = useMemo(() => filterAndSortAccountControlRows(rows, filter), [filter, rows]);
+  const attentionCount = rows.filter((row) => accountControlState(row) === "attention").length;
+  const unknownCount = rows.filter((row) => accountControlState(row) === "unknown").length;
+  const stateLabel = { attention: "Cần xử lý", unknown: "Chưa xác minh", ready: "Sẵn sàng" } as const;
+
   return (
-    <section aria-label="Quản trị tài khoản và vai trò">
-      <h2>Trạng thái tài khoản</h2>
+    <section className="pq-control" aria-labelledby="pq-control-title">
+      <div className="pq-control__heading">
+        <div>
+          <h2 id="pq-control-title">Bảng kiểm soát vai trò &amp; tài khoản</h2>
+          <p>Ưu tiên tài khoản thiếu cấu hình; mở chi tiết chỉ khi cần xử lý.</p>
+        </div>
+        <div className="pq-control__filters" role="group" aria-label="Lọc bảng tài khoản">
+          <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>Tất cả <b>{rows.length}</b></button>
+          <button type="button" aria-pressed={filter === "attention"} onClick={() => setFilter("attention")}>Cần xử lý trước <b>{attentionCount}</b></button>
+          {canManageAccounts && onOpenAccountLink && (
+            <button
+              type="button"
+              aria-expanded={activeTool === "link"}
+              aria-controls="pq-account-tools"
+              onClick={onOpenAccountLink}
+            >
+              Liên kết tài khoản
+            </button>
+          )}
+        </div>
+      </div>
       {loading && <p role="status">Đang tải dữ liệu…</p>}
       {snapshot.errors.accounts && (
         <div role="alert">
@@ -137,41 +185,128 @@ export function AccountAdministrationContent({
             <button onClick={onRetry}>Tải lại</button>
           </div>
         ))}
-      <div>
-        {rows.map((row, index) => (
-          <article key={stableRowKey(row, index)} aria-label={row.name}>
-            <h3>{row.name}</h3>
-            <p>{row.email || "Không có email"} · user_id: {row.userId || "thiếu"}</p>
-            {!row.accountActive && <span data-badge="inactive">Không hoạt động</span>}
-            {row.readiness.some((item) => item.state === "unknown") && (
-              <span data-badge="unknown">Chưa xác minh</span>
-            )}
-            <p>Vai: {businessRoleLabel(row.businessRole)} · Phạm vi: {row.scopeSummary}</p>
-            <ul aria-label="Checklist sẵn sàng">
-              {row.readiness.map((item) => (
-                <li key={item.key} data-state={item.state}>
-                  {item.label}: {item.detail}{item.nextAction && <> — {item.nextAction}</>}
-                </li>
+      <div className="reg reg--tron pq-control__role-table">
+        <div className="reg-scroll">
+          <table className="reg-table" data-role-control-table="true">
+            <caption>Tổng hợp tài khoản theo 5 vai trò</caption>
+            <thead><tr>
+              <th scope="col" data-reg-stick>Vai trò</th>
+              <th scope="col">Phạm vi mặc định</th>
+              <th scope="col" className="reg-num">Tài khoản</th>
+              <th scope="col" className="reg-num">Hoạt động</th>
+              <th scope="col" className="reg-num">Sẵn sàng</th>
+              <th scope="col" className="reg-num">Cần xử lý</th>
+              <th scope="col"><span className="sr-only">Lọc</span></th>
+            </tr></thead>
+            <tbody>
+              {roleRows.map((role) => (
+                <tr key={role.id}>
+                  <th scope="row" data-reg-stick>{role.label}</th>
+                  <td>{role.scopeLabel}</td>
+                  <td className="reg-num">{role.total}</td>
+                  <td className="reg-num">{role.active}</td>
+                  <td className="reg-num"><span className="pq-control__count is-ready">{role.ready}</span></td>
+                  <td className="reg-num"><span className={`pq-control__count ${role.attention ? "is-attention" : ""}`}>{role.attention}</span></td>
+                  <td className="pq-control__action">
+                    <button type="button" aria-pressed={filter === role.id} onClick={() => setFilter(role.id)}>
+                      Xem tài khoản
+                    </button>
+                  </td>
+                </tr>
               ))}
-            </ul>
-            {canManageAccounts && row.userId && (
-              <div>
-                {onEditRole && (
-                  <button disabled={controlsDisabled} onClick={() => onEditRole(row, reload)}>Sửa vai</button>
-                )}
-                <button disabled={controlsDisabled} onClick={() => onStartActivation(row)}>
-                  {row.accountActive ? "Tắt" : "Bật lại"}
-                </button>
-              </div>
-            )}
-          </article>
-        ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="pq-control__account-head">
+        <h3>Tài khoản {filter === "all" ? "" : `· ${filter === "attention" ? "cần xử lý" : businessRoleLabel(filter)}`}</h3>
+        <span>{visibleRows.length} dòng · {unknownCount} chưa xác minh</span>
+      </div>
+      <div className="reg reg--tron">
+        <div className="reg-scroll">
+          <table className="reg-table" data-account-control-table="true">
+            <caption>Tài khoản theo trạng thái sẵn sàng; dòng cần xử lý được xếp trước</caption>
+            <thead><tr>
+              <th scope="col" data-reg-stick>Tài khoản</th>
+              <th scope="col">Vai trò</th>
+              <th scope="col">Phạm vi</th>
+              <th scope="col">Trạng thái</th>
+              <th scope="col">Kiểm tra</th>
+              <th scope="col">Thao tác</th>
+            </tr></thead>
+            <tbody>
+              {visibleRows.map((row, index) => {
+                const controlState = accountControlState(row);
+                const issueItems = row.readiness.filter((item) => item.state === "missing" || item.state === "unknown");
+                const passed = row.readiness.length - issueItems.length;
+                return (
+                  <tr key={stableRowKey(row, index)} data-control-state={controlState}>
+                    <th scope="row" data-reg-stick>
+                      <span className="pq-control__name">{row.name}</span>
+                      <span className="reg-muted">{row.email || "Chưa có email"}</span>
+                    </th>
+                    <td>{businessRoleLabel(row.businessRole)}</td>
+                    <td>{row.scopeSummary}</td>
+                    <td><span className={`pq-control__state is-${controlState}`}>{stateLabel[controlState]}</span></td>
+                    <td>
+                      <details className="pq-control__details">
+                        <summary>{passed}/{row.readiness.length} đạt{issueItems.length ? ` · ${issueItems.length} vấn đề` : ""}</summary>
+                        <ul aria-label={`Checklist sẵn sàng của ${row.name}`}>
+                          {row.readiness.map((item) => (
+                            <li key={item.key} data-state={item.state}>
+                              <b>{item.label}</b><span>{item.detail}</span>{item.nextAction && <em>{item.nextAction}</em>}
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="reg-muted">UUID: {row.userId || "thiếu"}</p>
+                      </details>
+                    </td>
+                    <td className="pq-control__row-actions">
+                      {onViewRights && row.directoryPerson && (
+                        <button
+                          type="button"
+                          aria-expanded={activeTool === `rights:${row.personId}`}
+                          aria-controls="pq-account-tools"
+                          onClick={() => onViewRights(row)}
+                        >
+                          Xem quyền
+                        </button>
+                      )}
+                      {canManageAccounts && row.userId && (
+                        <>
+                          {onEditRole && (
+                            <button type="button" disabled={controlsDisabled} onClick={() => onEditRole(row, reload)}>Sửa vai</button>
+                          )}
+                          <button type="button" disabled={controlsDisabled} onClick={() => onStartActivation(row)}>
+                            {row.accountActive ? "Tắt" : "Bật lại"}
+                          </button>
+                        </>
+                      )}
+                      {!onViewRights && !(canManageAccounts && row.userId) && <span className="reg-muted">Chỉ xem</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!visibleRows.length && <tr><td colSpan={6}>Không có tài khoản phù hợp bộ lọc.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );
 }
 
-export function AccountAdministrationView({ canManageAccounts, revision = 0, loaders = defaultLoaders, mutateActive = setUserActive, onEditRole }: AccountAdministrationPanelProps) {
+export function AccountAdministrationView({
+  canManageAccounts,
+  revision = 0,
+  loaders = defaultLoaders,
+  mutateActive = setUserActive,
+  onEditRole,
+  onOpenAccountLink,
+  onViewRights,
+  activeTool,
+}: AccountAdministrationPanelProps) {
   const [snapshot, setSnapshot] = useState<AccountAdministrationSnapshot>({ rows: [], errors: {} }); const [loading, setLoading] = useState(true); const generation = useRef(0);
   const load = useCallback(async () => { const current = ++generation.current; setLoading(true); try { const next = await loadAccountAdministrationSnapshot(loaders); if (current === generation.current) setSnapshot(next); } catch (error) { if (current === generation.current) setSnapshot({ rows: [], errors: { accounts: errorMessage(error) } }); } finally { if (current === generation.current) setLoading(false); } }, [loaders]);
   useEffect(() => { void load(); }, [load, revision]);
@@ -204,6 +339,9 @@ export function AccountAdministrationView({ canManageAccounts, revision = 0, loa
         reload={reload}
         onRetry={() => { void load(); }}
         onEditRole={onEditRole}
+        onOpenAccountLink={onOpenAccountLink}
+        onViewRights={onViewRights}
+        activeTool={activeTool}
         onStartActivation={startActivation}
       />
       {draft && (

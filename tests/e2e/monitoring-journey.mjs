@@ -84,7 +84,7 @@ async function assertMobileLayout(page, view) {
   await page.waitForSelector(".monitoring-journey", { timeout: 15_000 });
   const readiness = {
     overview: { label: "Tổng quan VMP", root: ".b-hero" },
-    timeline: { label: "Dòng thời gian", root: ".timeline-page-shell > .lp-metric-grid" },
+    timeline: { label: "Dòng thời gian", root: ".timeline-page-shell .long-mon-view-switch" },
     alerts: { label: "Cảnh báo & ưu tiên", root: ".alerts-page-shell .alerts-priority-rail" },
   }[view];
   assert.ok(readiness, `mobile view không được hỗ trợ: ${view}`);
@@ -233,7 +233,7 @@ try {
 
   await clickButtonByText(page, "Dòng thời gian");
   await page.waitForFunction(() => location.hash.includes("v=timeline"), { timeout: 15_000 });
-  await page.waitForSelector(".timeline-page-shell > .lp-metric-grid", { timeout: 15_000 });
+  await page.waitForSelector(".timeline-page-shell .long-mon-view-switch", { timeout: 15_000 });
 
   await page.setViewport({ width: 1024, height: 900 });
   const tabletJourneyVisibility = await assertCurrentJourneyVisible(
@@ -241,28 +241,22 @@ try {
     "timeline mở ở 1440px rồi thu xuống 1024px",
   );
 
+  const timelineViews = await page.$$eval("[data-timeline-view]", (items) => items.map((item) => ({
+    mode: item.getAttribute("data-timeline-view"),
+    label: item.textContent?.trim(),
+    pressed: item.getAttribute("aria-pressed"),
+  })));
+  assert.deepEqual(timelineViews.map((item) => item.mode), ["ngu-do", "bang"]);
+  assert.deepEqual(timelineViews.map((item) => item.label), ["Ngư đồ", "Bảng"]);
+  assert.equal(timelineViews.filter((item) => item.pressed === "true").length, 1);
+  assert.equal(await page.$$eval("[data-timeline-3d], .vmp-space3d", (items) => items.length), 0);
+
+  await page.click('[data-timeline-view="bang"]');
+  await page.waitForSelector('.long-mon-bang [data-bang-loc="all"]', { timeout: 15_000 });
   assert.equal(
-    await page.$$eval(".timeline-page-shell > .lp-metric-grid .lp-metric", (items) => items.length),
-    3,
+    await page.$eval('[data-timeline-view="bang"]', (item) => item.getAttribute("aria-pressed")),
+    "true",
   );
-  assert.equal(await buttonsContaining(page, "[data-timeline-3d]", "Xem bản đồ 3D"), 0);
-  assert.equal(await buttonsContaining(page, "[data-timeline-3d]", "Mở bản đồ tải việc"), 1);
-  assert.equal(await page.$$eval("[data-timeline-3d] .vmp-space3d", (items) => items.length), 0);
-
-  await clickButtonByText(page, "Mở bản đồ tải việc");
-  await page.waitForSelector("[data-timeline-3d] .vmp-space3d", { timeout: 15_000 });
-
-  const mapState = await page.evaluate(() => ({
-    threeModeButtons: [...document.querySelectorAll("[data-timeline-3d] button")]
-      .filter((item) => item.textContent?.includes("Xem bản đồ 3D")).length,
-    twoModeButtons: document.querySelectorAll('[data-timeline-3d] button[data-map-mode="2d"]').length,
-    twoDSelected: document.querySelector('[data-timeline-3d] button[data-map-mode="2d"]')
-      ?.classList.contains("is-chon") ?? false,
-    fallback: Boolean(document.querySelector("[data-timeline-3d] .vmp-3d-khong-ho-tro")),
-  }));
-  assert.equal(mapState.twoModeButtons, 1);
-  assert.equal(mapState.threeModeButtons, mapState.fallback ? 0 : 1);
-  assert.equal(mapState.twoDSelected, true);
   const tabletJourneyWidths = await page.$$eval(".monitoring-journey__item", (items) =>
     items
       .filter((item) => item.getClientRects().length > 0)
@@ -275,7 +269,7 @@ try {
   await page.screenshot({ path: screenshotPaths.timeline, fullPage: true });
 
   console.log(
-    `✓ dòng thời gian có ba metric, một cổng bản đồ 2D/3D và rail 1024px ${JSON.stringify(tabletJourneyVisibility)}`,
+    `✓ dòng thời gian có hai cách xem, bảng điều khiển được, không còn 3D và rail 1024px ${JSON.stringify(tabletJourneyVisibility)}`,
   );
 
   await clickButtonByText(page, "Cảnh báo & ưu tiên");
@@ -284,6 +278,7 @@ try {
 
   const alerts = await page.evaluate(() => {
     const priorityRail = document.querySelector(".alerts-priority-rail");
+    const management = document.querySelector(".alerts-management");
     const tools = document.querySelector("details.alerts-tools");
     const groupButtons = [...document.querySelectorAll(".alerts-view-mode button")];
     return {
@@ -296,6 +291,18 @@ try {
       commandHeroCount: document.querySelectorAll(".alerts-command__hero").length,
       commandQueueCount: document.querySelectorAll(".alerts-command__queue-item").length,
       managementCount: document.querySelectorAll(".alerts-management").length,
+      managementBeforePriority: Boolean(
+        management
+        && priorityRail
+        && (management.compareDocumentPosition(priorityRail) & Node.DOCUMENT_POSITION_FOLLOWING)
+      ),
+      managementMetricAlignment: [...document.querySelectorAll(".alerts-management__metrics article")]
+        .map((article) => {
+          const style = getComputedStyle(article);
+          return { alignItems: style.alignItems, textAlign: style.textAlign };
+        }),
+      aiButtonsDisabled: [...document.querySelectorAll(".alerts-ai-panel button")]
+        .map((button) => button.disabled),
       desktopHorizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       bodyText: document.body.textContent ?? "",
     };
@@ -304,6 +311,13 @@ try {
   assert.equal(alerts.commandHeroCount, 1);
   assert.ok(alerts.commandQueueCount >= 1 && alerts.commandQueueCount <= 4);
   assert.equal(alerts.managementCount, 1);
+  assert.equal(alerts.managementBeforePriority, true,
+    "Góc nhìn quản lý phải đứng ngay sau bàn điều phối và trước bốn tín hiệu cảnh báo");
+  assert.deepEqual(alerts.managementMetricAlignment, [
+    { alignItems: "center", textAlign: "center" },
+    { alignItems: "center", textAlign: "center" },
+    { alignItems: "center", textAlign: "center" },
+  ], "Cả ba ô chỉ số quản lý phải căn giữa chữ đồng nhất");
   assert.ok(alerts.desktopHorizontalOverflow <= 1,
     `Alerts desktop tràn ngang ${alerts.desktopHorizontalOverflow}px`);
   assert.doesNotMatch(alerts.priorityText, /🚨|⏰|🛡️|🔁/u);
@@ -312,7 +326,11 @@ try {
   assert.deepEqual(alerts.groupLabels, ["Gom theo đối tượng", "Theo từng hạng mục"]);
   assert.deepEqual(alerts.groupPressed, ["true", "false"]);
   assert.doesNotMatch(alerts.bodyText, /VITE_N8N_AI_REPORT_URL|GitHub → Settings/);
-  assert.match(alerts.bodyText, /Phân tích AI chưa được bật\. Dữ liệu cảnh báo vẫn đầy đủ\./);
+  const aiUnavailable = alerts.bodyText.includes("Phân tích AI chưa được bật. Dữ liệu cảnh báo vẫn đầy đủ.");
+  assert.deepEqual(alerts.aiButtonsDisabled, aiUnavailable ? [true, true] : [false, false]);
+  if (!aiUnavailable) {
+    assert.match(alerts.bodyText, /AI chỉ nhận định, không thay đánh giá của QA/);
+  }
 
   await clickButtonByText(page, "Theo từng hạng mục");
   const groupPressed = await page.$$eval(".alerts-view-mode button", (buttons) =>

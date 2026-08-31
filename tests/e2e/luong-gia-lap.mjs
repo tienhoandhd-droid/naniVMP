@@ -563,9 +563,9 @@ for (const [id, ten] of MAN) {
 /* 3i (chế độ trình bày thanh tra) ĐÃ GỠ 01/09/2026 — chủ dự án bỏ
    tính năng, chỉ giữ giao diện sáng/tối. */
 
-/* ---- 3k. Báo cáo: khối VMP 2D là mặc định, 3D là khám phá ----------- */
+/* ---- 3k. Báo cáo: chỉ giữ biểu đồ phẳng 12 tháng -------------------- */
 {
-  console.log("\nBáo cáo — khối VMP 2D mặc định:");
+  console.log("\nBáo cáo — biểu đồ phẳng 12 tháng:");
   const trang = await trinhDuyet.newPage();
   await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
   await nhetPhien(trang, { supabaseUrl: URL_SB });
@@ -573,20 +573,16 @@ for (const [id, ten] of MAN) {
   await trang.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await new Promise((r) => setTimeout(r, 2600));
   const kq = await trang.evaluate(() => {
-    const khoi = document.querySelector(".vmp-space3d");
     return {
-      coKhoi: !!khoi,
-      coCanvas: !!khoi?.querySelector("canvas"),
-      nut2dChon: khoi?.querySelector('button[data-map-mode="2d"]')?.className.includes("is-chon"),
-      coNut3d: !!khoi?.querySelector('button[data-map-mode="3d"]'),
-      nhan3d: khoi?.querySelector('button[data-map-mode="3d"]')?.textContent?.trim(),
+      coBieuDoPhang: !!document.querySelector("[data-report-monthly-target-chart] svg"),
+      coKhoi3d: !!document.querySelector(".vmp-space3d"),
+      coCanvas3d: !!document.querySelector("canvas[data-engine^='three.js']"),
+      coNut3d: !!document.querySelector('button[data-map-mode="3d"]'),
     };
   });
-  kiem(kq.coKhoi, "khối không gian VMP có mặt ở Báo cáo");
-  kiem(!kq.coCanvas, "mặc định KHÔNG dựng canvas — 2D là mặt chính");
-  kiem(!!kq.nut2dChon, "nút 2D (Bản đồ tiến độ) đang được chọn");
-  kiem(kq.coNut3d && kq.nhan3d === "Xem bản đồ 3D",
-    "nút khám phá mang đúng tên 'Xem bản đồ 3D'", kq.nhan3d || "(không có)");
+  kiem(kq.coBieuDoPhang, "biểu đồ phẳng 12 tháng hiển thị trực tiếp");
+  kiem(!kq.coKhoi3d && !kq.coCanvas3d && !kq.coNut3d,
+    "Báo cáo không còn bản đồ 3D", JSON.stringify(kq));
   await trang.close();
 }
 
