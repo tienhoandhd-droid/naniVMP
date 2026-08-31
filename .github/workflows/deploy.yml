@@ -63,6 +63,7 @@ jobs:
         run: npx playwright install chromium --with-deps --no-shell
       - run: npm run typecheck
       - run: npm run test:unit
+      - run: npm run drift
 
   # GitHub không giữ credential DB production. Cổng này kiểm receipt PostgreSQL
   # 17 đã niêm phong và fail ngay khi migration/runner/test SQL bị thay đổi.
@@ -126,12 +127,43 @@ jobs:
             npm run e2e:admin
           '
 
+  a11y:
+    needs: static-quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_commit || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+
+      - run: npm ci
+
+      - name: Install bundled full Chromium
+        run: npx playwright install chromium --with-deps --no-shell
+
+      - name: Tạo .env.local cho accessibility giả lập
+        run: |
+          echo "VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL || 'https://gialap.supabase.co' }}" > .env.local
+          echo "VITE_SUPABASE_ANON=${{ vars.VITE_SUPABASE_ANON || 'gialap-anon-key' }}" >> .env.local
+          echo "E2E_EMAIL=gialap@example.com" >> .env.local
+          echo "E2E_PASSWORD=gialap-khong-dung-that" >> .env.local
+
+      - name: Accessibility — axe trên preview giả lập
+        run: bash scripts/with-preview.sh -- npm run a11y
+
   production-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - static-quality
       - source-access-db-contract
       - e2e-mock
+      - a11y
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
