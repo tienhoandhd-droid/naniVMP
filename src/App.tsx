@@ -974,7 +974,7 @@ function VerifiedAppShell({ user, logout, access }: {
      bảng "Dữ liệu nguồn ngoài phạm vi" sống độc lập với acts — che cả màn
      khi acts rỗng là giấu luôn bằng chứng thu hồi quyền (e2e source-access
      bắt được đúng lỗi này ngày 31/08). */
-  const MAN_THEO_ACTS = ["overview", "timeline", "health", "alerts", "workload", "reports"];
+  const MAN_THEO_ACTS = ["overview", "timeline", "alerts", "workload", "reports"];
   const boundaryDuLieu: "loading" | "error" | "empty" | "filtered-empty" | null = (() => {
     if (!MAN_THEO_ACTS.includes(view)) return null;
     if (acts.length === 0) {
@@ -1328,7 +1328,7 @@ function VerifiedAppShell({ user, logout, access }: {
                     ? `Sửa lần cuối: ${new Date(dataUpdatedAt).toLocaleString("vi-VN")}`
                     : undefined} />
               )}
-              {!boundaryDuLieu && view === "health" && <HealthView acts={filteredActs} access={access} />}
+              {view === "health" && <HealthView acts={filteredActs} access={access} />}
               {view === "rules" && <ActiveRulesView access={access} />}
               {view === "progress" && (
                 <>

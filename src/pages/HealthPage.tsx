@@ -8,46 +8,130 @@ import { C, TEXT, NUM } from "../constants/theme.ts";
 import { LOAI_LOI, sevOf } from "../constants/vmp.ts";
 import { runDataQualityChecks } from "../utils/helpers.ts";
 import { useDebounce } from "../hooks/index.ts";
-import { Card, CardTitle, Tag, KpiCard } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, KpiCard, CauKetLuan } from "../components/ui/Primitives.tsx";
+import NhomTab, { NhomTabPanel, useNhomTab } from "../components/ui/NhomTab.tsx";
+import { soSanhDoiChieu, ketLuanDoiChieu } from "../features/health/doiChieuModel.ts";
+import { fetchDashboardKpi, checkDataQuality } from "../lib/supabaseData.ts";
+import type { ServerKpi } from "../lib/supabaseData.ts";
+import { tally, docTally } from "../utils/helpers.ts";
+import { RefreshCw } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.ts";
 import type { Activity } from "../types/domain.ts";
 import type { AccessContext } from "../lib/access.ts";
 import ServerChecksView from "./ServerChecksPage.tsx";
 
 export default function HealthView({ acts, access }: { acts: Activity[]; access?: AccessContext | null }) {
-  const [tab, setTab] = useState<"client" | "server">("client");
-  const tabs = [
-    { id: "client" as const, label: "Lỗi trên bản đang xem", sub: "chạy ở trình duyệt" },
-    { id: "server" as const, label: "Kiểm tra trên máy chủ", sub: "số liệu đo tại nguồn" },
-  ];
+  /* Bàn quản trị (spec 01/09): tab ĐỐI CHIẾU là mặc định — trả lời thẳng
+     "số trên máy tôi có nói dối không", thay vì bắt người vận hành mở hai
+     tab rồi tự so bằng mắt. Hai tab chi tiết giữ nguyên ruột. */
+  const [tab, setTab] = useNhomTab("health", "doi-chieu", ["doi-chieu", "client", "server"]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* role="tablist"/"tab" đúng chuẩn ARIA: trước đây là nút thường có
-         phụ đề lồng trong label, trình đọc màn hình đọc nguyên câu phụ đề
-         như một phần tên nút. Phụ đề nay tách qua aria-hidden, id nút nối
-         với aria-controls của khối nội dung bên dưới. */}
-      <div role="tablist" aria-label="Chọn nguồn kiểm tra"
-        style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
-        {tabs.map((t) => (
-          <button key={t.id} id={`health-tab-${t.id}`} role="tab"
-            aria-selected={tab === t.id} aria-controls="health-tabpanel"
-            onClick={() => setTab(t.id)}
-            style={{ padding: "9px 16px", borderRadius: 14, cursor: "pointer",
-                     fontFamily: TEXT, fontSize: 14, fontWeight: tab === t.id ? 800 : 600,
-                     border: `1.5px solid ${tab === t.id ? C.pink : C.pinkSoft}`,
-                     background: tab === t.id ? C.pinkSoft : C.surface,
-                     color: tab === t.id ? C.pinkText : C.plumSoft, textAlign: "left" }}>
-            {t.label}
-            <span aria-hidden="true" style={{ display: "block", fontSize: 12, fontWeight: 600, opacity: .75 }}>
-              {t.sub}
-            </span>
-          </button>
-        ))}
-      </div>
-      <div id="health-tabpanel" role="tabpanel" aria-labelledby={`health-tab-${tab}`}>
-        {tab === "client" ? <DataQualityView acts={acts} /> : <ServerChecksView access={access} />}
-      </div>
+      <NhomTab man="health" nhan="Chọn nguồn kiểm tra" tab={tab} onTab={setTab} tabs={[
+        { id: "doi-chieu", nhan: "Đối chiếu client ↔ máy chủ" },
+        { id: "client", nhan: "Lỗi trên bản đang xem" },
+        { id: "server", nhan: "Kiểm tra trên máy chủ" },
+      ]} />
+      <NhomTabPanel man="health" id="doi-chieu" tab={tab}>
+        <DoiChieuView acts={acts} />
+      </NhomTabPanel>
+      <NhomTabPanel man="health" id="client" tab={tab}>
+        <DataQualityView acts={acts} />
+      </NhomTabPanel>
+      <NhomTabPanel man="health" id="server" tab={tab}>
+        <ServerChecksView access={access} />
+      </NhomTabPanel>
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
+ * DoiChieuView — từng cặp số client/server cạnh nhau, CHỈ tô dòng lệch.
+ * Client tính trên `acts` đang nhận (đã qua bộ lọc toàn cục); dòng chú
+ * thích nói rõ điều đó — lệch do bộ lọc là lệch THẬT của bản đang xem.
+ * ------------------------------------------------------------------- */
+function DoiChieuView({ acts }: { acts: Activity[] }) {
+  const [kpi, setKpi] = useState<ServerKpi | null>(null);
+  const [soLoiServer, setSoLoiServer] = useState<number | null>(null);
+  const [dangTai, setDangTai] = useState(true);
+  const [loi, setLoi] = useState("");
+
+  const tai = async () => {
+    setDangTai(true); setLoi("");
+    try {
+      const [k, q] = await Promise.all([fetchDashboardKpi(), checkDataQuality()]);
+      setKpi(k); setSoLoiServer(q.length);
+    } catch (e) {
+      setLoi((e as Error).message || "Không đọc được số máy chủ");
+      setKpi(null); setSoLoiServer(null);
+    }
+    setDangTai(false);
+  };
+  useEffect(() => { void tai(); }, []);
+
+  const kq = useMemo(() => {
+    const e = tally(acts);
+    const d = docTally(acts);
+    const soLoiClient = runDataQualityChecks(acts).length;
+    return soSanhDoiChieu([
+      { nhan: "Hạng mục hoàn thành VMP", client: e.done, server: kpi?.validation.done ?? null },
+      { nhan: "Tổng hạng mục", client: e.total, server: kpi?.validation.total ?? null },
+      { nhan: "Hạng mục quá hạn", client: e.over, server: kpi?.validation.over ?? null },
+      { nhan: "Hồ sơ hoàn thành", client: d.done, server: kpi?.documentation.done ?? null },
+      { nhan: "Hồ sơ quá hạn", client: d.over, server: kpi?.documentation.over ?? null },
+      { nhan: "Vấn đề dữ liệu (đếm)", client: soLoiClient, server: soLoiServer },
+    ]);
+  }, [acts, kpi, soLoiServer]);
+  const kl = ketLuanDoiChieu(kq);
+
+  return (
+    <Card variant="strong">
+      <CardTitle icon={Radar}
+        sub="Client tính trên phạm vi ĐANG LỌC ở thanh trên; máy chủ tính cả năm — xoá bộ lọc trước khi kết luận lệch."
+        right={<button type="button" onClick={() => void tai()} disabled={dangTai}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                   borderRadius: 10, border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
+                   color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700,
+                   cursor: dangTai ? "wait" : "pointer" }}>
+          <RefreshCw size={13} className={dangTai ? "spin" : ""} /> {dangTai ? "Đang tải…" : "Làm mới"}
+        </button>}>
+        Đối chiếu client ↔ máy chủ
+      </CardTitle>
+      {loi && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12,
+                      background: C.raspSoft, color: C.raspText, fontSize: 13, fontWeight: 700 }}>
+          {loi} — cột máy chủ để trống, cột client vẫn đúng với bản đang xem.
+        </div>
+      )}
+      <CauKetLuan chinh={kl.chinh} tone={kl.tone} />
+      <table className="reg-table" style={{ width: "100%" }}>
+        <caption>Từng cặp số client/máy chủ; chỉ dòng lệch được tô đỏ kèm mức chênh.</caption>
+        <thead><tr>
+          <th scope="col">Con số</th>
+          <th scope="col" className="reg-num">Bản đang xem</th>
+          <th scope="col" className="reg-num">Máy chủ</th>
+          <th scope="col" className="reg-num">Chênh</th>
+        </tr></thead>
+        <tbody>
+          {kq.rows.map((r) => (
+            <tr key={r.nhan} style={r.lech ? { background: C.raspSoft } : undefined}>
+              <th scope="row">{r.nhan}</th>
+              <td className="reg-num">{r.client ?? "…"}</td>
+              <td className="reg-num">{r.server ?? "…"}</td>
+              <td className="reg-num" style={{ fontWeight: 800,
+                color: r.lech ? C.raspText : C.mintText }}>
+                {r.chenh === null ? "…" : r.chenh === 0 ? "khớp" : (r.chenh > 0 ? `+${r.chenh}` : String(r.chenh))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {kpi?.updated_at && (
+        <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
+          Số máy chủ cập nhật lúc {new Date(kpi.updated_at).toLocaleString("vi-VN")} · muốn tính lại: tab Kiểm tra trên máy chủ → nút Tính lại trạng thái.
+        </div>
+      )}
+    </Card>
   );
 }
 
