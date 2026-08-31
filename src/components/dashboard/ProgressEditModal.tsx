@@ -11,7 +11,7 @@
  *
  *  Nay chỉ còn một hộp, hai màn dùng chung, nên không thể lệch nhau nữa.
  * ===================================================================== */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, Save, UserCheck } from "lucide-react";
 import { C, TEXT, btnPrimary, INP, FIELD, LBL } from "../../constants/theme.ts";
 import { TT_OPTS } from "../../constants/vmp.ts";
@@ -87,6 +87,22 @@ const FORM_TO_DB_COLUMN: Record<string, string> = {
   lich_td: "scheduled_at",
 };
 
+/** Mutation starts before React can render the disabled state, so every close
+ * route must consult this synchronous lock as well as the visual state. */
+export function createProgressModalSaveCoordinator() {
+  let busy = false;
+  return {
+    isBusy: () => busy,
+    begin: () => {
+      if (busy) return false;
+      busy = true;
+      return true;
+    },
+    finish: () => { busy = false; },
+    requestClose: (onClose: () => void) => { if (!busy) onClose(); },
+  };
+}
+
 /** Bốn bước là MỘT CHUỖI, không phải bốn ô rời nhau: đề cương xong mới thẩm
  *  định được, thẩm định xong mới viết báo cáo, có báo cáo mới tổng kết VMP.
  *  Bảng này là chỗ duy nhất khai thứ tự đó để mọi phép kiểm dưới đây dùng
@@ -160,6 +176,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   onChangeState?: (id: string, newState: string, reason?: string) => void;
 }) {
   const operationTarget = createProgressModalOperationTarget(act);
+  const saveCoordinator = useRef(createProgressModalSaveCoordinator());
   const raw = act._raw || {};
   const currentState = act.state || raw.state || "active";
   // Chuẩn hoá trạng thái đang lưu (có thể là enum Supabase: completed/in_progress/
@@ -419,6 +436,8 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     }
     if (!formChanged && !whoChanged) { setErr("Chưa có thay đổi nào để lưu."); return; }
 
+    if (!saveCoordinator.current.begin()) return;
+    try {
     // Người thực hiện lưu riêng: nó nằm ở ĐỐI TƯỢNG chứ không ở hạng mục
     // (owner_name của hạng mục bị đồng bộ Sheet ghi đè mỗi lần chạy).
     if (whoChanged) {
@@ -487,7 +506,11 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     }
     if (goNext && nextAct && onOpenNext) onOpenNext(nextAct);
     else onClose();
+    } finally {
+      saveCoordinator.current.finish();
+    }
   };
+  const requestClose = () => saveCoordinator.current.requestClose(onClose);
   const sel = (k: string) => {
     const enabled = canEditForm(k);
     return <select value={f[k]} onChange={set(k)} disabled={!enabled} style={{ ...INP, cursor: enabled ? "pointer" : "not-allowed", opacity: enabled ? 1 : 0.62 }}>{TT_OPTS.map((o) => <option key={o} value={o}>{o || "— Chưa nhập —"}</option>)}</select>;
@@ -576,9 +599,9 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   if (contentState !== "content") {
     const isError = contentState === "error";
     return (
-      <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
+      <ViewportDialog open onRequestClose={requestClose} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
         footer={(
-          <button onClick={onClose} style={{ ...btnPrimary, background: C.surface, color: C.plum,
+          <button onClick={requestClose} style={{ ...btnPrimary, background: C.surface, color: C.plum,
             border: `1.5px solid ${C.pinkSoft}` }}>Đóng</button>
         )}>
         <div style={{ background: isError ? C.raspSoft : C.marigoldSoft,
@@ -602,10 +625,10 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     );
   }
   return (
-    <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
+    <ViewportDialog open onRequestClose={requestClose} maxWidth={620} title="Cập nhật tiến độ" icon={Pencil}
       footer={(
         <div style={{ display: "flex", gap: 12 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: "pointer" }}>Hủy</button>
+          <button onClick={requestClose} disabled={savingWho || savingProgress} style={{ flex: 1, padding: "12px", borderRadius: 14, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plumSoft, fontFamily: TEXT, fontWeight: 800, cursor: savingWho || savingProgress ? "not-allowed" : "pointer", opacity: savingWho || savingProgress ? 0.55 : 1 }}>Hủy</button>
           {!permissionLoading && !timelineViewOnly && (
             <button onClick={() => handleSave(false)} disabled={savingWho || savingProgress || !!thieuGi}
               title={thieuGi || undefined}

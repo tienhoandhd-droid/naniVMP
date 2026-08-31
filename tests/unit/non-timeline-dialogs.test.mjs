@@ -21,8 +21,10 @@ async function loadDialogs() {
       WorkloadDetailModal: workload.WorkloadDetailModal,
       MatrixDetailDialog: matrix.MatrixDetailDialog,
       ProgressEditModal: progress.default,
+      progressModule: progress,
       ChiTietKyModal: period.default,
       AiMailModal: aiMail.default,
+      aiMailModule: aiMail,
     };
   }
   return dialogs;
@@ -99,4 +101,26 @@ test("exported non-Timeline dialogs render the shared labelled dialog and footer
   ];
 
   dialogs.forEach((dialog) => assertSharedDialog(renderToStaticMarkup(dialog)));
+});
+
+test("AI mail and progress mutations synchronously reject close requests before rerender", async () => {
+  const { aiMailModule, progressModule } = await loadDialogs();
+  assert.equal(typeof aiMailModule.createAiMailSendCoordinator, "function");
+  assert.equal(typeof progressModule.createProgressModalSaveCoordinator, "function");
+
+  const coordinators = [
+    aiMailModule.createAiMailSendCoordinator(),
+    progressModule.createProgressModalSaveCoordinator(),
+  ];
+  for (const coordinator of coordinators) {
+    let closes = 0;
+    assert.equal(coordinator.begin(), true);
+    assert.equal(coordinator.isBusy(), true);
+    assert.equal(coordinator.begin(), false, "a second rapid mutation request must be rejected");
+    coordinator.requestClose(() => { closes += 1; });
+    assert.equal(closes, 0, "close must be rejected in the synchronous stale-render window");
+    coordinator.finish();
+    coordinator.requestClose(() => { closes += 1; });
+    assert.equal(closes, 1, "close must resume after the mutation settles");
+  }
 });
