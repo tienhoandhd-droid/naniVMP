@@ -29,6 +29,7 @@ const VmpSpace3D = lazy(nhapCoThuLai(() => import("../three/VmpSpace3D.tsx")));
 import { DEPTS, CRIT } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
+import NhomTab, { NhomTabPanel, DongSo, useNhomTab } from "../ui/NhomTab.tsx";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
@@ -179,6 +180,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const rawRows = useMemo(() => buildRawRows(scopedKy), [scopedKy]);
   // Truyền nhãn kỳ vào để mọi câu tự nói phạm vi — xem nhanXetTuDong().
   const autoComments = useMemo(() => nhanXetTuDong(scopedKy, kyLabel), [scopedKy, kyLabel]);
+  /* BÀN QUẢN TRỊ (spec 01/09): 3 tab theo 3 việc thật của màn — ĐỌC báo
+     cáo (mạch 1→5 là sequence thật nên giữ nguyên đánh số), TRA dữ liệu
+     thô, và LẤY nhận xét đem đi (email/biên bản). */
+  const [tab, setTab] = useNhomTab("reports", "bao-cao", ["bao-cao", "du-lieu", "nhan-xet"]);
+  const [daChepNhanXet, setDaChepNhanXet] = useState(false);
 
   const monthlyChartHtml = useMemo(
     () => svgMonthlyTargetChart(monthly.table, SCREEN_PALETTE, monthly.highlight),
@@ -465,6 +471,19 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         )}
       </Card>
 
+      <DongSo cacO={[
+        { nhan: "hạng mục năm " + String(ky.year), giaTri: ytd.total, onMo: () => setTab("bao-cao") },
+        { nhan: "hoàn thành VMP", giaTri: `${ytd.vmp.rate}%`, phu: `${ytd.vmp.done}/${ytd.total}`, onMo: () => setTab("bao-cao") },
+        { nhan: "quá hạn VMP", giaTri: ytd.vmp.over, canhBao: ytd.vmp.over > 0, onMo: () => setTab("du-lieu") },
+        { nhan: "nhận xét sẵn dùng", giaTri: autoComments.length, phu: "bấm để lấy", onMo: () => setTab("nhan-xet") },
+      ]} />
+      <NhomTab man="reports" nhan="Các phần của báo cáo" tab={tab} onTab={setTab} tabs={[
+        { id: "bao-cao", nhan: "Báo cáo quản lý" },
+        { id: "du-lieu", nhan: "Dữ liệu thô", dem: rawRows.length },
+        { id: "nhan-xet", nhan: "Nhận xét & AI", dem: autoComments.length },
+      ]} />
+
+      <NhomTabPanel man="reports" id="bao-cao" tab={tab}>
       {/* ===== 1. Tổng quan số liệu tới hiện tại ===== */}
       <Card variant="strong">
         <CardTitle icon={Boxes}
@@ -698,6 +717,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           BIẾT dữ liệu nền có sạch không — nên giữ đúng một dòng đếm, còn
           việc TRA lỗi thì sang màn chuyên trách. `quality` vẫn tính vì bản
           xuất HTML/Excel cần nó (buildManagementReportHTML). */}
+      </NhomTabPanel>
+
+      <NhomTabPanel man="reports" id="du-lieu" tab={tab}>
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <AlertCircle size={16} aria-hidden="true" color={quality.length ? C.marigoldText : C.mintText} />
@@ -743,6 +765,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         )}
       </Card>
 
+      </NhomTabPanel>
+
+      <NhomTabPanel man="reports" id="nhan-xet" tab={tab}>
       {/* ===== Nhận xét ===== */}
       <Card variant="strong">
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
@@ -795,8 +820,21 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         {/* BỀ MẶT 1 — dữ liệu xác thực: câu suy trực tiếp từ số liệu thật
             bằng luật cố định, viền liền. Phân biệt với bề mặt AI bên dưới
             (viền đứt) — hai loại nội dung không được trông giống nhau. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <Tag color={C.mintText} bg={C.mintSoft}>Suy từ số liệu thật</Tag>
+          {/* Vận hành (spec 01/09): nhận xét sinh ra để ĐEM ĐI — vào email
+              giao ban, biên bản họp. Một nút chép cả cụm, hết gõ lại. */}
+          <button type="button" onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(autoComments.map((c) => `- ${c}`).join("\n"));
+              setDaChepNhanXet(true); window.setTimeout(() => setDaChepNhanXet(false), 2000);
+            } catch { /* clipboard bị chặn thì thôi, chữ vẫn bôi-chép được */ }
+          }}
+            style={{ padding: "6px 12px", borderRadius: 10, cursor: "pointer",
+                     border: `1px solid ${C.pinkSoft}`, background: C.surface, color: C.plum,
+                     fontFamily: TEXT, fontSize: 12, fontWeight: 700 }}>
+            {daChepNhanXet ? "Đã chép ✓" : "Sao chép nhận xét"}
+          </button>
           <span style={{ fontSize: 12, color: C.plumSoft, fontFamily: TEXT, fontWeight: 600 }}>
             luật cố định, không có AI — cùng con số với các bảng trên
           </span>
@@ -833,6 +871,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </div>
         )}
       </Card>
+      </NhomTabPanel>
 
       <div style={{ ...glass, padding: "10px 16px", fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center" }}>
         Toàn bộ số liệu trên đọc thẳng từ Supabase tại thời điểm mở trang — không có số nào do AI tạo ra ngoài mục &quot;Nhận xét AI&quot;, và mục đó luôn được đánh dấu cần QA xác nhận.
