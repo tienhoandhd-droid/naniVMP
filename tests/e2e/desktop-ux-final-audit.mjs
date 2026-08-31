@@ -27,7 +27,7 @@ const supabaseUrl = process.env.VMP_E2E_SUPABASE_URL || (() => {
 })();
 
 if (!supabaseUrl) throw new Error("Không tìm thấy Supabase URL công khai cho desktop UX audit");
-if (requestedCase && requestedCase !== "foundation") {
+if (requestedCase && !["foundation", "interactions"].includes(requestedCase)) {
   throw new Error(`Không có desktop UX audit case: ${requestedCase}`);
 }
 
@@ -64,6 +64,7 @@ try {
   await nhetPhien(page, { supabaseUrl });
   await page.setViewport({ width: 1440, height: 1000 });
 
+  if (!requestedCase || requestedCase === "foundation") {
   await page.goto(`${APP_URL}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector(".monitoring-journey__item.is-active", { timeout: 15_000 });
   const overview = await page.evaluate(() => {
@@ -210,6 +211,65 @@ try {
   });
 
   console.log("✓ foundation desktop UX audit đạt tương phản, focus và khả năng đọc");
+  }
+
+  if (!requestedCase || requestedCase === "interactions") {
+    await page.goto(`${APP_URL}#v=rules`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.waitForFunction(
+      () => [...document.querySelectorAll("button")].some((button) => button.textContent?.includes("Chấm lại")),
+      { timeout: 15_000 },
+    );
+    await page.evaluate(() => {
+      window.__vmpNativeConfirmCalls = 0;
+      window.confirm = () => {
+        window.__vmpNativeConfirmCalls += 1;
+        return false;
+      };
+    });
+    await page.evaluate(() => {
+      const button = [...document.querySelectorAll("button")]
+        .find((element) => element.textContent?.includes("Chấm lại"));
+      if (!button) throw new Error("Không tìm thấy nút Chấm lại");
+      button.click();
+    });
+    await page.waitForFunction(
+      () => window.__vmpNativeConfirmCalls > 0 || Boolean(document.querySelector('[role="dialog"]')),
+      { timeout: 5_000 },
+    );
+
+    const nativeConfirmCalls = await page.evaluate(() => window.__vmpNativeConfirmCalls);
+    assert.equal(nativeConfirmCalls, 0, "Chấm lại must not invoke window.confirm");
+    const dialog = await page.$eval('[role="dialog"]', (element) => {
+      const titleId = element.getAttribute("aria-labelledby");
+      return {
+        title: titleId ? document.getElementById(titleId)?.textContent : "",
+        description: element.textContent,
+      };
+    });
+    assert.match(dialog.title || "", /Chấm lại điểm trọng yếu/);
+    assert.match(dialog.description || "", /CHƯA được QA chốt tay/);
+    let recalcRequests = 0;
+    const countRecalcRequest = (request) => {
+      if (request.url().includes("/rpc/rpc_recalc_criticality") && request.method() !== "OPTIONS") {
+        recalcRequests += 1;
+      }
+    };
+    page.on("request", countRecalcRequest);
+    await page.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      const confirm = dialog && [...dialog.querySelectorAll("button")]
+        .find((button) => button.textContent?.trim() === "Chấm lại");
+      if (!confirm) throw new Error("Không tìm thấy nút xác nhận Chấm lại");
+      confirm.click();
+    });
+    await page.waitForFunction(
+      () => document.querySelector('[role="alert"]')?.textContent?.includes("Chấm lại chưa hoàn tất"),
+      { timeout: 5_000 },
+    );
+    page.off("request", countRecalcRequest);
+    assert.equal(recalcRequests, 1, "recalculation runs once only after confirmation");
+    console.log("✓ interactions desktop UX audit mở xác nhận trong ứng dụng");
+  }
 } finally {
   await browser.close();
 }
