@@ -14,7 +14,8 @@ import { useMemo, useState } from "react";
 import { ListFilter, Download } from "lucide-react";
 
 import { C, TEXT, NUM } from "../../constants/theme.ts";
-import { Modal, Tag, TableScroll } from "../ui/Primitives.tsx";
+import { Tag, TableScroll } from "../ui/Primitives.tsx";
+import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { parseD, fmtVN, wlIsDone, nguoiPhuTrach, txt, download } from "../../utils/helpers.ts";
 import { vmpToday } from "../../constants/vmp.ts";
 import type { Activity } from "../../types/domain.ts";
@@ -111,7 +112,13 @@ export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: 
   };
 
   return (
-    <Modal onClose={onClose} wide icon={ListFilter} title={title}>
+    <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} icon={ListFilter} title={title}
+      footer={(
+        <button type="button" onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
+          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
+          Đóng
+        </button>
+      )}>
       {sub && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 12, lineHeight: 1.65 }}>{sub}</div>}
 
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
@@ -186,6 +193,6 @@ export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: 
         Danh sách này lấy đúng tập hạng mục đã tạo ra con số bạn vừa bấm — cùng bộ lọc, cùng kỳ.
         &quot;Trễ&quot; tính theo hạn của chính giai đoạn đang xem, không phải hạn đích VMP.
       </div>
-    </Modal>
+    </ViewportDialog>
   );
 }

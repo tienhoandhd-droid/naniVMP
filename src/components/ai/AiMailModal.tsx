@@ -18,7 +18,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Mail, Send, RefreshCw, AlertCircle, CheckCircle2, Users, Search } from "lucide-react";
 
 import { C, TEXT, btnPrimary } from "../../constants/theme.ts";
-import { Modal, Tag, TableScroll } from "../ui/Primitives.tsx";
+import { Tag, TableScroll } from "../ui/Primitives.tsx";
+import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { fetchAlertRecipients, fetchStaffEmails, fetchPerformers } from "../../lib/supabaseData.ts";
 import { chayPhanTichAi, emailHopLe, tachEmail, AI_NHAN } from "../../lib/aiReport.ts";
 import type { AiKind, AiPeriod, AiResult } from "../../lib/aiReport.ts";
@@ -152,8 +153,24 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
   };
 
   return (
-    <Modal onClose={onClose} wide icon={Mail}
-      title={`Gửi bản phân tích AI · ${AI_NHAN[loai].toLowerCase()}`}>
+    <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} icon={Mail}
+      title={`Gửi bản phân tích AI · ${AI_NHAN[loai].toLowerCase()}`}
+      footer={(
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <button onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
+            background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
+            {ketQua?.ok ? "Đóng" : "Huỷ"}
+          </button>
+          <button onClick={gui} disabled={dangGui || !guiDuoc}
+            title={guiDuoc ? undefined : "Chưa chọn người nhận nào"}
+            style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
+              borderRadius: 14, fontSize: 14, opacity: dangGui || !guiDuoc ? 0.55 : 1,
+              cursor: dangGui || !guiDuoc ? "not-allowed" : "pointer" }}>
+            {dangGui ? <RefreshCw size={16} className="spin" /> : <Send size={16} />}
+            {dangGui ? "AI đang phân tích rồi gửi…" : "Chạy AI và gửi mail"}
+          </button>
+        </div>
+      )}>
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 14, lineHeight: 1.65 }}>
         Phạm vi gửi: <b style={{ color: C.plum }}>{phamViLabel}</b>
         {ky ? <> · kỳ <b style={{ color: C.plum }}>{ky.nhan}</b></> : null}.
@@ -269,20 +286,6 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18, flexWrap: "wrap" }}>
-        <button onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
-          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
-          {ketQua?.ok ? "Đóng" : "Huỷ"}
-        </button>
-        <button onClick={gui} disabled={dangGui || !guiDuoc}
-          title={guiDuoc ? undefined : "Chưa chọn người nhận nào"}
-          style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
-            borderRadius: 14, fontSize: 14, opacity: dangGui || !guiDuoc ? 0.55 : 1,
-            cursor: dangGui || !guiDuoc ? "not-allowed" : "pointer" }}>
-          {dangGui ? <RefreshCw size={16} className="spin" /> : <Send size={16} />}
-          {dangGui ? "AI đang phân tích rồi gửi…" : "Chạy AI và gửi mail"}
-        </button>
-      </div>
-    </Modal>
+    </ViewportDialog>
   );
 }

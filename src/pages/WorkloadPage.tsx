@@ -7,7 +7,8 @@ import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../
 import { parseD, fmtVN, clamp, wlMonthOf, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
 import type { Activity as PlanActivity } from "../types/domain.ts";
-import { Card, CardTitle, Tag, Modal, Donut, Pill, CauKetLuan, laThanhTra } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Donut, Pill, CauKetLuan, laThanhTra } from "../components/ui/Primitives.tsx";
+import ViewportDialog from "../components/ui/ViewportDialog.tsx";
 import type { ValiMood } from "../components/brand/ValiIllustration.tsx";
 
 /* Nhãn tâm trạng của Vali — CÙNG lời với màn "Việc hôm nay" (đồng nhất
@@ -33,7 +34,7 @@ interface WlPerson {
   critCao: number;
 }
 
-function WorkloadDetailModal({ detail, onClose }: {
+export function WorkloadDetailModal({ detail, onClose }: {
   detail: { title: string; tasks: PlanActivity[]; [k: string]: unknown };
   onClose: () => void;
 }) {
@@ -42,7 +43,13 @@ function WorkloadDetailModal({ detail, onClose }: {
   );
   const PhaseChip = ({ label, done, cong }: { label: string; done: boolean; cong?: number | null }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
   return (
-    <Modal onClose={onClose} title={detail.title} icon={Activity} wide>
+    <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} title={detail.title} icon={Activity}
+      footer={(
+        <button type="button" onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
+          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
+          Đóng
+        </button>
+      )}>
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 14 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {tasks.map((a) => {
@@ -64,7 +71,7 @@ function WorkloadDetailModal({ detail, onClose }: {
           );
         })}
       </div>
-    </Modal>
+    </ViewportDialog>
   );
 }
 

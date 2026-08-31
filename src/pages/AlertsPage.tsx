@@ -21,7 +21,8 @@ import {
   parseD, fmtVN, daysBetween, addMonths, txt, nguoiPhuTrach, milestones,
   qrmRpn, qrmLevel, byRisk,
 } from "../utils/helpers.ts";
-import { Card, CardTitle, Tag, Modal, Pill, PhanTrang, CauKetLuan } from "../components/ui/Primitives.tsx";
+import { Card, CardTitle, Tag, Pill, PhanTrang, CauKetLuan } from "../components/ui/Primitives.tsx";
+import ViewportDialog from "../components/ui/ViewportDialog.tsx";
 import { useDebounce, usePerformers } from "../hooks/index.ts";
 import { chayPhanTichAi, aiConfigured } from "../lib/aiReport.ts";
 import AiMailModal from "../components/ai/AiMailModal.tsx";
@@ -186,7 +187,13 @@ export function AlertDetailModal({ r, email, onClose }: {
   );
 
   return (
-    <Modal onClose={onClose} wide icon={CalendarClock} title={`Chi tiết · ${a.id}`}>
+    <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} icon={CalendarClock} title={`Chi tiết · ${a.id}`}
+      footer={(
+        <button type="button" onClick={onClose} style={{ ...btnPrimary, background: C.surface, color: C.plum,
+          border: `1.5px solid ${C.pinkSoft}` }}>
+          Đóng
+        </button>
+      )}>
       {/* Đầu hộp: hạng mục là gì, ai làm, rủi ro bao nhiêu */}
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 15px", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -276,7 +283,7 @@ export function AlertDetailModal({ r, email, onClose }: {
         báo cáo T−5, trong đó {dep} ngày là theo phân loại báo cáo “{txt(a.dep)}”. Lệch giữa hạn kế hoạch và hạn
         theo luật nghĩa là kế hoạch đang đặt khác quy tắc — kiểm lại trước khi lấy làm mốc.
       </div>
-    </Modal>
+    </ViewportDialog>
   );
 }
 

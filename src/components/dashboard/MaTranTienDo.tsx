@@ -24,7 +24,8 @@ import { LayoutGrid, ShieldAlert, Flame, CheckCircle2, AlertTriangle, Clock, Hel
 import { C, TEXT, NUM } from "../../constants/theme.ts";
 import { DEPTS, vmpToday } from "../../constants/vmp.ts";
 import { parseD, fmtVN, wlIsDone, nguoiPhuTrach, qrmRpn } from "../../utils/helpers.ts";
-import { Card, CardTitle, Tag, Modal } from "../ui/Primitives.tsx";
+import { Card, CardTitle, Tag } from "../ui/Primitives.tsx";
+import ViewportDialog from "../ui/ViewportDialog.tsx";
 import type { Activity } from "../../types/domain.ts";
 
 /** Trạng thái một giai đoạn của một hạng mục — bốn khả năng, trong đó
@@ -97,6 +98,41 @@ function chamHangMuc(a: Activity): TrangThai {
   const dich = parseD(a.target);
   if (!dich) return "thieu";
   return dich < vmpToday() ? "tre" : "chua";
+}
+
+export function MatrixDetailDialog({ detail, onClose }: {
+  detail: { ten: string; ds: Activity[] };
+  onClose: () => void;
+}) {
+  return (
+    <ViewportDialog open onRequestClose={() => onClose()} maxWidth={620} icon={LayoutGrid} title={detail.ten}
+      footer={(
+        <button type="button" onClick={onClose} style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plumSoft,
+          background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: "11px 18px", cursor: "pointer" }}>
+          Đóng
+        </button>
+      )}>
+      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 12 }}>
+        {detail.ds.length} hạng mục
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        {detail.ds.slice(0, 40).map((a) => (
+          <div key={a.id} style={{ padding: "9px 12px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</div>
+            <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
+              {a.id} · {nguoiPhuTrach(a.owner)} · đích {a.target ? fmtVN(parseD(a.target)) : "chưa có"}
+              {a.score != null ? ` · trọng yếu ${a.score}/9` : ""}
+            </div>
+          </div>
+        ))}
+        {detail.ds.length > 40 && (
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center", padding: 8 }}>
+            … và {detail.ds.length - 40} hạng mục nữa
+          </div>
+        )}
+      </div>
+    </ViewportDialog>
+  );
 }
 
 export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
@@ -394,29 +430,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
         </Card>
       </div>
 
-      {oDangXem && (
-        <Modal onClose={() => setODangXem(null)} wide icon={LayoutGrid} title={oDangXem.ten}>
-          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 12 }}>
-            {oDangXem.ds.length} hạng mục
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {oDangXem.ds.slice(0, 40).map((a) => (
-              <div key={a.id} style={{ padding: "9px 12px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</div>
-                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
-                  {a.id} · {nguoiPhuTrach(a.owner)} · đích {a.target ? fmtVN(parseD(a.target)) : "chưa có"}
-                  {a.score != null ? ` · trọng yếu ${a.score}/9` : ""}
-                </div>
-              </div>
-            ))}
-            {oDangXem.ds.length > 40 && (
-              <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center", padding: 8 }}>
-                … và {oDangXem.ds.length - 40} hạng mục nữa
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
+      {oDangXem && <MatrixDetailDialog detail={oDangXem} onClose={() => setODangXem(null)} />}
     </section>
   );
 }
