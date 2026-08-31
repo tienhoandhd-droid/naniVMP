@@ -19,7 +19,7 @@
 .catalog-progress__filter-toggle { border: 1px solid var(--lp-gold-hairline); background: var(--lp-bg-raised); color: var(--lp-plum); }
 .catalog-progress__filter-toggle:hover,
 .catalog-progress__filter-toggle.is-on { border-color: var(--lp-line-strong); background: var(--lp-rose-soft); }
-.catalog-progress__filter-count { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: var(--lp-plum); color: var(--lp-on-plum); font-size: 11px; font-variant-numeric: tabular-nums; }
+.catalog-progress__filter-count { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: var(--lp-plum); color: var(--lp-on-plum); font-size: 12px; font-variant-numeric: tabular-nums; }
 .catalog-progress__count { margin-left: auto; color: var(--lp-ink-muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .catalog-progress__count b { color: var(--lp-plum); font-variant-numeric: tabular-nums; }
 .catalog-progress__clear { border: 1px solid transparent; background: transparent; color: var(--lp-rose); }
@@ -32,7 +32,7 @@
 .catalog-progress__advanced { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(5, minmax(145px, 1fr)); gap: 10px; padding-top: 12px; border-top: 1px solid var(--lp-gold-hairline); }
 .catalog-progress__advanced[hidden] { display: none; }
 .catalog-progress__advanced label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.catalog-progress__advanced label > span { color: var(--lp-ink-muted); font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.catalog-progress__advanced label > span { color: var(--lp-ink-muted); font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .catalog-progress__advanced select { width: 100%; min-width: 0; min-height: 42px; cursor: pointer; }
 
 .catalog-progress__list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }

@@ -508,7 +508,7 @@
   .hn-muc__nguoi,
   .hn-muc__tre { display: inline-flex; align-items: center; grid-column: auto; }
   .hn-muc__moc::before,
-  .hn-muc__nguoi::before { margin-right: 5px; color: var(--lp-ink-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .hn-muc__nguoi::before { margin-right: 5px; color: var(--lp-ink-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
   .hn-muc__moc::before { content: "Mốc"; }
   .hn-muc__nguoi::before { content: "QA"; }
   .hn-muc__tre { min-height: 30px; }

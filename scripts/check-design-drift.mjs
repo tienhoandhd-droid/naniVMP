@@ -48,6 +48,10 @@ const MIEN_HEX = new Set([
   // theo theme, không còn hex — phần tranh nằm ở hai file này.
   "src/components/brand/CongChuaVali.tsx",
   "src/components/brand/DungSiVali.tsx",
+  /* 31/08: file art Ngư đồ — khai token cục bộ --lmr-* (sáng/tối) ngay đầu
+     file, và màu chữ NẰM TRÊN tranh PNG phải khớp art nên không thể là token
+     theme. Phần khung đã đi qua --lmr-*. */
+  "src/features/monitoring/long-mon-race.css",
 ]);
 
 /* Emoji hay lọt vào UI trạng thái. Không quét chữ tiếng Việt nên chỉ cần
@@ -74,6 +78,9 @@ for (const f of files) {
 
   dong.forEach((line, i) => {
     const so = `${f}:${i + 1}`;
+    /* Miễn trừ CÓ LÝ DO trên từng dòng: `/* drift-mien: <vì sao> *​/`.
+       Không có lý do thì không miễn — grep "drift-mien" là ra sổ ngoại lệ. */
+    if (/drift-mien:\s*\S/.test(line)) return;
     // Bỏ dòng chú thích thuần tuý — luật nhắm vào code chạy thật.
     const sach = line.replace(/\/\*.*?\*\//g, "").replace(/^\s*\*.*/, "").replace(/^\s*\/\/.*/, "");
 
@@ -82,7 +89,11 @@ for (const f of files) {
       if (hex) loi.push(`${so} — mã màu ngoài token: ${hex.join(", ")}`);
     }
 
-    for (const m of sach.matchAll(/border-?[rR]adius[":\s]+"?([0-9.]+)(px)?/g)) {
+    /* Chỉ soát radius PX — thang 10/16/18/24/999 là chuẩn cho control/card.
+       Radius % (32%, 70%…) là hình organic của ngôn ngữ Lotus (hồ, cánh sen,
+       blob trang trí) — cố ép về thang px là giết đúng nét riêng đó. "50%"
+       từng bị đọc thành "50px" và báo láo vì regex bỏ đơn vị. */
+    for (const m of sach.matchAll(/border-?[rR]adius[":\s]+"?([0-9.]+)px/g)) {
       if (!RADIUS_HOP_LE.has(m[1])) loi.push(`${so} — radius lạ ${m[1]}px (chỉ 10/16/18/24/999)`);
     }
 
