@@ -352,9 +352,9 @@ function visibleNav(page) {
 
 function enabledProgressFields(page) {
   return page.evaluate(() => {
-    const dialog = [...document.querySelectorAll(".vmp-scroll")]
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
       .find((node) => node.getClientRects().length > 0
-        && [...node.querySelectorAll("span")].some((child) => child.textContent?.trim() === "Cập nhật tiến độ"));
+        && document.getElementById(node.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
     return [...(dialog?.querySelectorAll('input[type="date"], select') ?? [])]
     .filter((node) => !node.disabled && node.getAttribute("aria-label") !== "Người thực hiện")
     .map((node) => ({ id: node.id, name: node.getAttribute("name"), type: node instanceof HTMLInputElement ? node.type : "select", aria: node.getAttribute("aria-label") }));
@@ -482,9 +482,9 @@ try {
     // Wait for the exact server-authorized control count before inspecting it;
     // this is observable readiness, not a timing cushion.
     await page.waitForFunction((expectedCount) => {
-      const dialog = [...document.querySelectorAll(".vmp-scroll")]
+      const dialog = [...document.querySelectorAll('[role="dialog"]')]
         .find((node) => node.getClientRects().length > 0
-          && [...node.querySelectorAll("span")].some((child) => child.textContent?.trim() === "Cập nhật tiến độ"));
+          && document.getElementById(node.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === "Cập nhật tiến độ");
       const controls = [...(dialog?.querySelectorAll('input[type="date"], select') ?? [])]
         .filter((node) => !node.disabled && node.getAttribute("aria-label") !== "Người thực hiện");
       return controls.length === expectedCount;
