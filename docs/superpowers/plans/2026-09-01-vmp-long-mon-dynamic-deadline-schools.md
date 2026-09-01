@@ -32,7 +32,7 @@
 - Produces: `LongMonSchoolFormation`, `LongMonMotionProfile`, và các trường `deadlinePct`, `renderXPct`, `renderYPct`, `ownerStartPct`, `ownerEndPct`, `schoolFormation`, `schoolIndex`, `schoolSize`, `motionProfile` trên `LongMonRaceFish`.
 - Preserves: `buildLongMonRaceModel(activities, now, options): LongMonRaceModel` và cửa sổ 60 ngày hiện có.
 
-- [ ] **Step 1: Viết test RED cho thang thời gian tuyến tính**
+- [x] **Step 1: Viết test RED cho thang thời gian tuyến tính**
 
 Thay test “tuần trống thu hẹp” bằng hợp đồng không méo thời gian:
 
@@ -52,13 +52,13 @@ test("trục 60 ngày tuyến tính giữ Hôm nay ở giữa dù mật độ l�
 });
 ```
 
-- [ ] **Step 2: Chạy unit mục tiêu để xác nhận RED**
+- [x] **Step 2: Chạy unit mục tiêu để xác nhận RED**
 
 Run: `node --import tsx --test --test-name-pattern "trục 60 ngày tuyến tính" tests/unit/long-mon-race.test.mjs`
 
 Expected: FAIL vì `deadlinePct` chưa tồn tại và tuần còn bị `weightedWeekBands()` kéo giãn.
 
-- [ ] **Step 3: Viết test RED cho năm họ đội hình và vùng sở hữu deadline**
+- [x] **Step 3: Viết test RED cho năm họ đội hình và vùng sở hữu deadline**
 
 ```js
 test("đàn 1 5 12 24 40 cá chọn đúng họ và không rời vùng deadline", () => {
@@ -79,13 +79,13 @@ test("đàn 1 5 12 24 40 cá chọn đúng họ và không rời vùng deadline"
 });
 ```
 
-- [ ] **Step 4: Chạy test đội hình để xác nhận RED**
+- [x] **Step 4: Chạy test đội hình để xác nhận RED**
 
 Run: `node --import tsx --test --test-name-pattern "đàn 1 5 12 24 40" tests/unit/long-mon-race.test.mjs`
 
 Expected: FAIL vì model hiện nhóm theo tuần và chưa có metadata deadline/formation.
 
-- [ ] **Step 5: Cài đặt model deadline-school tối thiểu**
+- [x] **Step 5: Cài đặt model deadline-school tối thiểu**
 
 Trong `longMonRaceModel.ts`:
 
@@ -112,13 +112,13 @@ function formationOf(count: number): LongMonSchoolFormation {
 - Đặt nhóm đông trước, kiểm tra collision toàn cục với rectangle đã cộng `4px` ngang và `5px` dọc; tăng `TEAM_HEIGHT_LEVELS`, giảm `TEAM_DENSITY_LEVELS`, sau cùng dùng lưới khẩn cấp trong đúng vùng sở hữu.
 - Gán `renderXPct`/`renderYPct`; không dùng `xPct`/`yPct` làm tọa độ nghiệp vụ nữa.
 
-- [ ] **Step 6: Chạy toàn bộ unit Long Môn và sửa hồi quy trong đúng file mục tiêu**
+- [x] **Step 6: Chạy toàn bộ unit Long Môn và sửa hồi quy trong đúng file mục tiêu**
 
 Run: `node --import tsx --test tests/unit/long-mon-race.test.mjs`
 
 Expected: PASS; các assertion cũ dùng `xPct`/`yPct` được đổi sang `renderXPct`/`renderYPct`, còn `data-anchor-x` ở Task 2 sẽ dùng `deadlinePct`.
 
-- [ ] **Step 7: Commit model**
+- [x] **Step 7: Commit model**
 
 ```powershell
 git add src/features/monitoring/longMonRaceModel.ts tests/unit/long-mon-race.test.mjs
@@ -138,7 +138,7 @@ git commit -m "feat(timeline): dan ca theo deadline chinh xac"
 - Consumes: metadata model từ Task 1.
 - Produces: DOM `data-anchor-x`, `data-render-x`, `data-owner-start`, `data-owner-end`, `data-school-formation`, `data-motion-profile`; CSS variables `--motion-x`, `--motion-y`, `--motion-rotate`, `--swim-delay`, `--swim-dur`.
 
-- [ ] **Step 1: Viết test RED cho DOM truy vết và lớp thân cá**
+- [x] **Step 1: Viết test RED cho DOM truy vết và lớp thân cá**
 
 Thêm assertion SSR:
 
@@ -157,13 +157,13 @@ assert.match(css, /\.long-mon-race__fish:hover \.long-mon-race__fish-body[\s\S]*
 assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.long-mon-race__fish-body[\s\S]*animation:\s*none/);
 ```
 
-- [ ] **Step 2: Chạy test SSR/CSS để xác nhận RED**
+- [x] **Step 2: Chạy test SSR/CSS để xác nhận RED**
 
 Run: `node --import tsx --test --test-name-pattern "trường đua kể|sprite sáu loài" tests/unit/long-mon-race.test.mjs`
 
 Expected: FAIL vì DOM chưa có lớp thân/meta mới và CSS chưa có sáu profile.
 
-- [ ] **Step 3: Cài đặt DOM đứng yên và sáu profile chuyển động**
+- [x] **Step 3: Cài đặt DOM đứng yên và sáu profile chuyển động**
 
 Trong `LongMonRace.tsx`:
 
@@ -195,13 +195,13 @@ Trong `LongMonRace.tsx`:
 - Sáu keyframe không vượt `4px`, `5px`, `3deg`; duration xác định trong `5.2–10.5s`; delay âm từ hash của deadline + ID.
 - Hover/focus đặt `animation-play-state: paused`; reduced motion đặt `animation: none` và giữ transform tĩnh.
 
-- [ ] **Step 4: Chạy unit Long Môn**
+- [x] **Step 4: Chạy unit Long Môn**
 
 Run: `node --import tsx --test tests/unit/long-mon-race.test.mjs`
 
 Expected: PASS, không có warning SSR.
 
-- [ ] **Step 5: Commit UI chuyển động**
+- [x] **Step 5: Commit UI chuyển động**
 
 ```powershell
 git add src/features/monitoring/LongMonRace.tsx src/features/monitoring/long-mon-race.css tests/unit/long-mon-race.test.mjs
@@ -222,7 +222,7 @@ git commit -m "feat(timeline): lam dan ca boi linh dong"
 - Produces: `makeLongMonDensityActivities({ count, deadline, prefix })` và `LONG_MON_DENSITY_SCENARIOS` chỉ dành cho test.
 - Consumes: `caiGiaLap(..., { suaKho })` để thay riêng activities trong RPC dashboard mock, không thêm cờ production.
 
-- [ ] **Step 1: Tạo fixture dùng chung và test RED cho 120/126 cá**
+- [x] **Step 1: Tạo fixture dùng chung và test RED cho 120/126 cá**
 
 ```js
 export function makeLongMonDensityActivities({ count, deadline, prefix }) {
@@ -240,13 +240,13 @@ export function makeLongMonDensityActivities({ count, deadline, prefix }) {
 
 `LONG_MON_DENSITY_SCENARIOS` gồm `1/5/12/24/40` cùng ngày, `18+18` hai ngày kế nhau, `120` rải 60 ngày có ba deadline trên 15 cá, và `126` tại ba deadline.
 
-- [ ] **Step 2: Chạy unit density để xác nhận RED**
+- [x] **Step 2: Chạy unit density để xác nhận RED**
 
 Run: `node --import tsx --test --test-name-pattern "mô phỏng mật độ" tests/unit/long-mon-race.test.mjs`
 
 Expected: FAIL cho tới khi fixture được nối với các assertion count, ownership, collision envelope, formation và tọa độ khác `(0, 0)`.
 
-- [ ] **Step 3: Hoàn thiện unit harness và giữ toàn bộ cảnh GREEN**
+- [x] **Step 3: Hoàn thiện unit harness và giữ toàn bộ cảnh GREEN**
 
 Mỗi scenario gọi model, assert số cá bằng input hợp lệ, không overlap, không vượt owner/canvas, deterministic khi đảo input. Cảnh `18+18` assert hai `deadlinePct` khác nhau và hai vùng ownership không trộn. Cảnh `120/126` assert không ném và `sceneHeightPx <= 2240`.
 
@@ -254,7 +254,7 @@ Run: `node --import tsx --test tests/unit/long-mon-race.test.mjs`
 
 Expected: PASS.
 
-- [ ] **Step 4: Tạo E2E gallery cho toàn bộ cảnh mật độ**
+- [x] **Step 4: Tạo E2E gallery cho toàn bộ cảnh mật độ**
 
 Trong `tests/e2e/long-mon-density-gallery.mjs`, mở một page mới cho từng scenario, truyền `suaKho` vào `caiGiaLap`, rồi thay cả `rpc_get_vmp_dashboard.activities` và `rpc_get_vmp_dashboard_v2.activities` bằng fixture tương ứng. Clone cấu trúc activity gốc của từng RPC và chỉ thay `id`, `code`, `name`, `_raw.dl_vmp`, `target`, `canonical_deadline`, `canonicalDeadline`, `days_left` để vẫn qua đúng decoder production.
 
@@ -273,7 +273,7 @@ assert.equal(dense.todayVisibleOnMobile, true);
 
 Với các cảnh khác, thay `40` bằng `scenario.expectedCount`; tất cả đều phải không overlap, không clipped và mọi nút đạt `44×44px`.
 
-- [ ] **Step 5: Build mock và chạy targeted E2E**
+- [x] **Step 5: Build mock và chạy targeted E2E**
 
 Run:
 
@@ -292,7 +292,7 @@ node tests/e2e/long-mon-density-gallery.mjs
 
 Expected: PASS; tám ảnh desktop, một ảnh mobile và số liệu model được in đường dẫn temp; không có request ngoài mock.
 
-- [ ] **Step 6: Commit harness**
+- [x] **Step 6: Commit harness**
 
 ```powershell
 git add tests/fixtures/long-mon-density-fixtures.mjs tests/unit/long-mon-race.test.mjs tests/e2e/long-mon-race.mjs tests/e2e/long-mon-density-gallery.mjs
@@ -310,7 +310,7 @@ git commit -m "test(timeline): mo phong mat do dan ca Long Mon"
 - Consumes: toàn bộ thay đổi Tasks 1–3.
 - Produces: bằng chứng gate local; không phát hành remote.
 
-- [ ] **Step 1: Chạy gate mục tiêu**
+- [x] **Step 1: Chạy gate mục tiêu**
 
 ```powershell
 node --import tsx --test tests/unit/long-mon-race.test.mjs
@@ -322,7 +322,7 @@ npm run budget
 
 Expected: tất cả exit `0`; chỉ ghi riêng warning build có sẵn nếu xuất hiện.
 
-- [ ] **Step 2: Chạy targeted E2E và a11y Timeline**
+- [x] **Step 2: Chạy targeted E2E và a11y Timeline**
 
 ```powershell
 $env:VMP_E2E_URL='http://127.0.0.1:4175/'
@@ -332,7 +332,7 @@ npx playwright test -c playwright.a11y.config.ts --grep "timeline"
 
 Expected: Long Môn desktop/mobile PASS; a11y Timeline PASS; nếu tên project không khớp grep thì chạy hai case có `root: ".timeline-page-shell .long-mon-race"` bằng tên test thực tế.
 
-- [ ] **Step 3: Đối chiếu git và đánh dấu bằng commit thật**
+- [x] **Step 3: Đối chiếu git và đánh dấu bằng commit thật**
 
 Chỉ đổi checkbox `[x]` khi commit tương ứng tồn tại trong `git log --oneline`; thêm mã commit ở cuối từng Task. Sau đó:
 
@@ -341,13 +341,21 @@ git diff --check
 git status --short --branch
 ```
 
-- [ ] **Step 4: Commit trạng thái kế hoạch**
+- [x] **Step 4: Commit trạng thái kế hoạch**
 
 ```powershell
 git add docs/superpowers/plans/2026-09-01-vmp-long-mon-dynamic-deadline-schools.md
 git commit -m "docs: chot ket qua dan ca Long Mon"
 ```
 
-- [ ] **Step 5: Báo cáo bàn giao local**
+- [x] **Step 5: Báo cáo bàn giao local**
 
 Báo file thay đổi, commit local, lệnh đã chạy, kết quả từng gate, đường dẫn preview `http://127.0.0.1:4175`, và rủi ro còn lại. Không push/deploy cho tới khi người dùng yêu cầu rõ.
+
+## Bằng chứng hoàn tất
+
+- Task 1: `62329e9` — model deadline chính xác, trục tuyến tính và năm họ đội hình.
+- Task 2: `3ebf761` — sáu nhịp bơi trên hit target đứng yên.
+- Task 3: `726722f` — fixture, gallery mật độ, collision DOM và tinh chỉnh vùng neo deadline sau khi duyệt ảnh.
+- Gate chốt: unit Long Môn `25/25`; targeted E2E Long Môn + gallery đạt; a11y Timeline `2/2`; typecheck, build, drift và budget exit `0`.
+- Preview kiểm tra: `http://127.0.0.1:4175`.
