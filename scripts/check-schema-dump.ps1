@@ -12,7 +12,8 @@ $forbiddenPatterns = @(
   '(?im)^\s*INSERT\s+INTO\b',
   '(?i)postgres(?:ql)?://[^\s/:@]+:[^\s@]+@',
   '(?i)eyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+',
-  '(?i)service[_-]?role.{0,64}(key|secret|token)',
+  '(?i)\bsb_(?:secret|publishable)_[a-z0-9_-]+',
+  '(?i)\bservice[_-]?role\b',
   '(?i)(api[_-]?key|secret[_-]?key|access[_-]?token)\s*[:=]\s*[\x27\x22]?[a-z0-9_-]{8,}'
 )
 

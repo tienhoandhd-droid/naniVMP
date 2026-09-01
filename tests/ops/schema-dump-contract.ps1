@@ -47,6 +47,24 @@ CREATE FUNCTION public.rpc_apply_plan_item_private() RETURNS void LANGUAGE sql A
   $ErrorActionPreference = $previousErrorActionPreference
   if ($secretExitCode -eq 0) { throw 'Secret schema fixture was accepted' }
   if ($secretOutput -match 'fake-secret') { throw 'Validator output leaked secret fixture content' }
+
+  $literalSecretFixtures = @(
+    @{ Name = 'prefix-key'; Content = '-- sb_secret_fixture_value_12345678'; Literal = 'sb_secret_fixture_value_12345678' },
+    @{ Name = 'service-role'; Content = '-- service-role credential-fixture-value'; Literal = 'credential-fixture-value' }
+  )
+  foreach ($fixture in $literalSecretFixtures) {
+    $literalFixture = Join-Path $fixtureRoot ($fixture.Name + '-schema.sql')
+    $safeSchema = Get-Content -Raw $safeFixture
+    ($safeSchema + [Environment]::NewLine + $fixture.Content) | Set-Content -NoNewline $literalFixture
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $literalOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1 -Path $literalFixture 2>&1 | Out-String
+    $literalExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    if ($literalExitCode -eq 0) { throw "Literal secret fixture was accepted: $($fixture.Name)" }
+    if ($literalOutput -match [regex]::Escape($fixture.Literal)) { throw "Validator output leaked literal fixture content: $($fixture.Name)" }
+  }
 }
 finally {
   if (Test-Path $fixtureRoot) { Remove-Item -LiteralPath $fixtureRoot -Recurse -Force }
