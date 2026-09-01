@@ -544,6 +544,7 @@ export async function commitCatalogImport(
       created: Number(kq.created ?? 0),
       updated: Number(kq.updated ?? 0),
       unchanged: Number(kq.unchanged ?? 0),
+      committedAt: kq.committed_at == null ? undefined : String(kq.committed_at),
       pendingChangeIds: Array.isArray(kq.pending_change_ids)
         ? (kq.pending_change_ids as string[]).map(String) : [],
     };

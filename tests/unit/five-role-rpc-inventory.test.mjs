@@ -74,6 +74,12 @@ const SOURCE_ACCESS_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const SOURCE_IMPORT_PREVIEW_REVIEWED_RPC = new Map([
+  ["rpc_catalog_import_preview", {
+    identity: "rpc_catalog_import_preview(uuid,integer,integer)",
+    classification: "guarded_explicit",
+  }],
+]);
 const TEAM_OVERVIEW_REVIEWED_RPC = new Map([
   ["rpc_team_overview_summary", {
     identity: "rpc_team_overview_summary(integer)",
@@ -291,6 +297,10 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260828150000_source_qa_workshop_access_enforce.sql",
     "utf8",
   );
+  const sourceImportPreviewMigration = readFileSync(
+    "supabase/migrations/20260901090000_catalog_import_server_preview.sql",
+    "utf8",
+  );
   const teamOverviewMigration = readFileSync(
     "supabase/migrations/20260829150000_team_overview_summary.sql",
     "utf8",
@@ -304,6 +314,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...MANUAL_DEADLINE_REVIEWED_RPC.keys(),
     ...ASSIGNED_PROGRESS_REVIEWED_RPC.keys(),
     ...SOURCE_ACCESS_REVIEWED_RPC.keys(),
+    ...SOURCE_IMPORT_PREVIEW_REVIEWED_RPC.keys(),
     ...TEAM_OVERVIEW_REVIEWED_RPC.keys(),
     ...CLIENT_ERROR_REVIEWED_RPC.keys(),
   ]) {
@@ -315,13 +326,14 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...MANUAL_DEADLINE_REVIEWED_RPC,
     ...ASSIGNED_PROGRESS_REVIEWED_RPC,
     ...SOURCE_ACCESS_REVIEWED_RPC,
+    ...SOURCE_IMPORT_PREVIEW_REVIEWED_RPC,
     ...TEAM_OVERVIEW_REVIEWED_RPC,
     ...CLIENT_ERROR_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 77, "reviewed source HEAD must expose 77 literal RPC targets");
+  assert.equal(sourceNames.length, 78, "reviewed source HEAD must expose 78 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -354,6 +366,13 @@ test("every source RPC call has exactly one reviewed migration classification", 
       `${identity} must be defined by the additive Source access migration`,
     );
   }
+  assert.deepEqual(SOURCE_IMPORT_PREVIEW_REVIEWED_RPC, new Map([
+    ["rpc_catalog_import_preview", { identity: "rpc_catalog_import_preview(uuid,integer,integer)", classification: "guarded_explicit" }],
+  ]));
+  assert.match(sourceImportPreviewMigration,
+    /create or replace function public\.rpc_catalog_import_preview\(\s*p_batch_id uuid,\s*p_cursor integer default 0,\s*p_limit integer default 100\s*\)/is);
+  assert.match(sourceImportPreviewMigration,
+    /grant execute on function public\.rpc_catalog_import_preview\(uuid,integer,integer\)\s*to authenticated,service_role;/is);
   assert.match(sourceAccessMigration, /grant execute on function public\.rpc_source_qa_candidates\(\s*text\s*,\s*jsonb\s*,\s*integer\s*,\s*uuid\[\]\s*\)\s*to authenticated\s*,\s*service_role;/is);
   assert.match(sourceAccessMigration, /grant execute on function public\.rpc_list_source_workshop_coverage\(\s*text\s*,\s*jsonb\s*,\s*integer\s*\)[\s\S]*?public\.rpc_set_source_workshop_scope_grant\([\s\S]*?to authenticated\s*,\s*service_role;/i);
   assert.deepEqual(TEAM_OVERVIEW_REVIEWED_RPC, new Map([

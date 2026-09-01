@@ -1,26 +1,11 @@
-/* =====================================================================
- *  CatalogExcelImport — vòng đời nhập Excel của workspace Danh mục
- *  ---------------------------------------------------------------------
- *  Tải mẫu → dán dữ liệu → tải lên → XEM TRƯỚC từng dòng → ghi một lần
- *  có lý do. Bốn nguyên tắc:
- *
- *   1. File sai cấu trúc bị chặn NGAY Ở TRÌNH DUYỆT với lời giải thích
- *      cụ thể, và không sinh một RPC nào — server không phải đỡ rác.
- *   2. Xem trước đối chiếu với dữ liệu hiện tại: mới / sửa (kèm A3
- *      trước–sau) / không đổi / lỗi. Người ký hồ sơ thấy trước cái mình
- *      sắp chịu trách nhiệm.
- *   3. Dòng lỗi xuất được ra sổ lỗi (kèm Mã lỗi · Mô tả lỗi) để sửa
- *      trong Excel rồi tải lại — không ai phải chép tay từng lỗi.
- *   4. GHI đi qua lô staging phía server (rpc_stage/commit_catalog_import
- *      — Đợt B Task 9). Chừng nào migration đó chưa áp, khu Ghi hiện
- *      BỊ CHẶN và nút khoá; khi RPC xuất hiện thì tự mở, không cần sửa
- *      giao diện.
- * ===================================================================== */
+/* Nhập Excel có staging: Source dùng phân loại/diff từ server; sản phẩm GMP
+ * giữ đối chiếu local vì dataset nhỏ và RPC hiện tại chưa có preview riêng. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileSpreadsheet, Upload } from "lucide-react";
+import { Check, Copy, Download, FileSpreadsheet, Upload } from "lucide-react";
 
 import StateBoundary from "../../components/ui/StateBoundary.tsx";
 import { useRegisterDirtyState } from "../../components/ui/DirtyStateProvider.tsx";
+import { formatBangkokDateTime } from "../../lib/formatBangkok.ts";
 import {
   CATALOG_TEMPLATE_VERSION, TEMPLATE_CONTRACTS,
   generateCatalogWorkbook, parseCatalogWorkbook,
@@ -31,406 +16,377 @@ import {
 } from "./definitions.ts";
 import { buildCatalogPatch, diffCatalogRecord } from "./diff.ts";
 import { useToast } from "../../components/ui/ToastProvider.tsx";
-import { commitCatalogImport, exportAllSourceObjects, listDataset, stageCatalogImport } from "./api.ts";
+import {
+  commitCatalogImport, exportAllSourceObjects, fetchCatalogImportPreview,
+  listDataset, setCatalogImportRowReason, stageCatalogImport,
+} from "./api.ts";
 import type { CatalogImportBatch, CatalogRecord } from "./contracts.ts";
+import CatalogImportPreviewTable from "./CatalogImportPreviewTable.tsx";
+import {
+  appendCatalogImportPreviewPage, catalogImportCommitBlock,
+  emptyCatalogImportPreviewState, type CatalogImportPreviewState,
+} from "./catalogImportPreviewModel.ts";
 
 const TEN_FILE: Record<CatalogTemplateDataset, { mau: string; hientai: string }> = {
-  source_objects: {
-    mau: "VMP_Mau_Doi_Tuong_Goc_v1.xlsx",
-    hientai: "VMP_Doi_Tuong_Goc_Hien_Tai_v1.xlsx",
-  },
-  products_gmp: {
-    mau: "VMP_Mau_San_Pham_GMP_v1.xlsx",
-    hientai: "VMP_San_Pham_GMP_Hien_Tai_v1.xlsx",
-  },
+  source_objects: { mau: "VMP_Mau_Doi_Tuong_Goc_v1.xlsx", hientai: "VMP_Doi_Tuong_Goc_Hien_Tai_v1.xlsx" },
+  products_gmp: { mau: "VMP_Mau_San_Pham_GMP_v1.xlsx", hientai: "VMP_San_Pham_GMP_Hien_Tai_v1.xlsx" },
 };
-
 const NHAN_DATASET: Record<CatalogTemplateDataset, string> = {
-  source_objects: "Đối tượng nguồn",
-  products_gmp: "Sản phẩm GMP",
+  source_objects: "Đối tượng nguồn", products_gmp: "Sản phẩm GMP",
 };
-
-type PhanLoai = "server" | "moi" | "sua" | "khongdoi" | "loi";
-
+type PhanLoai = "moi" | "sua" | "khongdoi" | "loi";
 interface DongXemTruoc extends ParsedCatalogRow {
   loai: PhanLoai;
-  /** Chỉ dòng "sua": các trường đổi, để dựng A3. */
   doi: Array<{ label: string; truoc: unknown; sau: unknown }>;
 }
-
 type TrangThaiStaging =
-  | { tt: "chua" }
-  | { tt: "dang" }
-  | { tt: "san"; batch: CatalogImportBatch }
-  | { tt: "chan"; loi: string }
-  | { tt: "loi"; loi: string };
-
-const doc = (v: unknown): string => {
-  if (v === null || v === undefined || v === "") return "(trống)";
-  if (typeof v === "boolean") return v ? "y" : "n";
-  return String(v);
-};
-
-function taiXuong(buf: ArrayBuffer, ten: string) {
-  const blob = new Blob([buf], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = ten;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  | { tt: "chua" } | { tt: "dang" } | { tt: "san"; batch: CatalogImportBatch }
+  | { tt: "chan"; loi: string } | { tt: "loi"; loi: string };
+interface ImportReceipt {
+  dataset: CatalogTemplateDataset;
+  batchId: string;
+  created: number;
+  updated: number;
+  unchanged: number;
+  committedAt: string;
+  pendingChangeIds: string[];
 }
 
-export default function CatalogExcelImport({ onCommitted }: {
-  /** Gọi sau khi ghi lô thành công — shell tải lại dữ liệu/hàng chờ. */
+const doc = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "(trống)";
+  if (typeof value === "boolean") return value ? "y" : "n";
+  return String(value);
+};
+function taiXuong(buffer: ArrayBuffer, name: string) {
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const anchor = document.createElement("a");
+  anchor.href = URL.createObjectURL(blob); anchor.download = name; anchor.click();
+  URL.revokeObjectURL(anchor.href);
+}
+
+export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
   onCommitted?: (pendingChangeIds: string[]) => void;
+  onOpenPending?: () => void;
 }) {
   const [dataset, setDataset] = useState<CatalogTemplateDataset>("source_objects");
   const [hienTai, setHienTai] = useState<Map<string, CatalogRecord> | null>(null);
   const [loiHienTai, setLoiHienTai] = useState("");
   const [loiCauTruc, setLoiCauTruc] = useState("");
   const [parsed, setParsed] = useState<ParsedCatalogWorkbook | null>(null);
-  const toast = useToast();
   const [staging, setStaging] = useState<TrangThaiStaging>({ tt: "chua" });
   const [moA3, setMoA3] = useState<ReadonlySet<number>>(new Set());
   const [lyDo, setLyDo] = useState("");
   const [dangGhi, setDangGhi] = useState(false);
-  const [ketQuaGhi, setKetQuaGhi] = useState("");
+  const [commitError, setCommitError] = useState("");
+  const [serverPreview, setServerPreview] = useState<CatalogImportPreviewState | null>(null);
+  const [previewError, setPreviewError] = useState("");
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [receipt, setReceipt] = useState<ImportReceipt | null>(null);
+  const previewGeneration = useRef(0);
   const oFile = useRef<HTMLInputElement | null>(null);
+  const toast = useToast();
 
-  /* Còn bản xem trước chưa ghi là còn việc dở — chặn đóng nhầm. */
-  useRegisterDirtyState("catalog-excel-import", parsed !== null);
-
-  const cot = dataset === "source_objects"
-    ? SOURCE_OBJECT_TEMPLATE_COLUMNS : PRODUCT_GMP_TEMPLATE_COLUMNS;
+  useRegisterDirtyState("catalog-excel-import", parsed !== null && receipt === null);
+  const cot = dataset === "source_objects" ? SOURCE_OBJECT_TEMPLATE_COLUMNS : PRODUCT_GMP_TEMPLATE_COLUMNS;
   const truong = layDataset(dataset === "source_objects" ? "objects" : "products").fields;
 
-  /* ---- Dữ liệu hiện tại của dataset đang chọn — nền cho đối chiếu ---- */
   useEffect(() => {
-    let dung = false;
-    setHienTai(null);
-    setLoiHienTai("");
-    (async () => {
+    let cancelled = false;
+    setHienTai(null); setLoiHienTai("");
+    void (async () => {
       try {
         const map = new Map<string, CatalogRecord>();
-        if (dataset !== "source_objects") {
-          let page = 0;
-          for (;;) {
-            const kq = await listDataset({ dataset: "products", page, pageSize: 500 });
-            if (!kq.ok) throw new Error(kq.error || "Không đọc được danh mục");
-            for (const r of kq.rows) map.set(r.businessKey, r.data);
-            if ((page + 1) * 500 >= kq.total || kq.rows.length === 0) break;
-            page += 1;
+        if (dataset === "products_gmp") {
+          for (let page = 0; ; page += 1) {
+            const result = await listDataset({ dataset: "products", page, pageSize: 500 });
+            if (!result.ok) throw new Error(result.error || "Không đọc được danh mục");
+            for (const row of result.rows) map.set(row.businessKey, row.data);
+            if ((page + 1) * 500 >= result.total || result.rows.length === 0) break;
           }
         }
-        if (!dung) setHienTai(map);
-      } catch (e) {
-        if (!dung) setLoiHienTai((e as Error).message || "Không tải được dữ liệu hiện tại");
+        if (!cancelled) setHienTai(map);
+      } catch (cause) {
+        if (!cancelled) setLoiHienTai(cause instanceof Error ? cause.message : "Không tải được dữ liệu hiện tại");
       }
     })();
-    return () => { dung = true; };
+    return () => { cancelled = true; };
   }, [dataset]);
 
-  /* ---- Phân loại từng dòng so với hiện tại ---- */
   const xemTruoc = useMemo<DongXemTruoc[] | null>(() => {
-    if (!parsed?.ok || parsed.dataset !== dataset || !hienTai) return null;
-    return parsed.rows.map((r) => {
-      if (r.errors.length > 0) return { ...r, loai: "loi", doi: [] };
-      /* Source được đối chiếu trong staging/commit có audit ở server. Không
-         tải toàn bảng vào browser chỉ để đoán trước create/update. */
-      if (dataset === "source_objects") return { ...r, loai: "server", doi: [] };
-      const cur = hienTai.get(r.businessKey);
-      if (!cur) return { ...r, loai: "moi", doi: [] };
-      const patch = buildCatalogPatch(truong, cur, r.values);
-      if (Object.keys(patch).length === 0) return { ...r, loai: "khongdoi", doi: [] };
-      const doi = diffCatalogRecord(truong, cur, r.values)
-        .filter((d) => d.changed)
-        .map((d) => ({ label: d.label, truoc: d.before, sau: d.after }));
-      return { ...r, loai: "sua", doi };
+    if (dataset !== "products_gmp" || !parsed?.ok || parsed.dataset !== dataset || !hienTai) return null;
+    return parsed.rows.map((row) => {
+      if (row.errors.length > 0) return { ...row, loai: "loi", doi: [] };
+      const current = hienTai.get(row.businessKey);
+      if (!current) return { ...row, loai: "moi", doi: [] };
+      const patch = buildCatalogPatch(truong, current, row.values);
+      if (Object.keys(patch).length === 0) return { ...row, loai: "khongdoi", doi: [] };
+      return {
+        ...row, loai: "sua",
+        doi: diffCatalogRecord(truong, current, row.values).filter((item) => item.changed)
+          .map((item) => ({ label: item.label, truoc: item.before, sau: item.after })),
+      };
     });
-  }, [parsed, dataset, hienTai, truong]);
-
+  }, [dataset, hienTai, parsed, truong]);
   const tong = useMemo(() => {
-    const dem: Record<PhanLoai, number> = { server: 0, moi: 0, sua: 0, khongdoi: 0, loi: 0 };
-    for (const r of xemTruoc ?? []) dem[r.loai] += 1;
-    return dem;
+    const counts: Record<PhanLoai, number> = { moi: 0, sua: 0, khongdoi: 0, loi: 0 };
+    for (const row of xemTruoc ?? []) counts[row.loai] += 1;
+    return counts;
   }, [xemTruoc]);
 
-  /* Báo kết quả tiền kiểm ngay khi đọc xong file. Bảng bên dưới có đủ số
-     liệu, nhưng nó nằm dưới màn hình khi file dài — người dùng vừa thả file
-     xong cần biết ngay là có phải sửa gì không.
-     `xemTruocRef` chặn báo lại khi component vẽ lại vì lý do khác (gõ lý do,
-     mở một dòng ra xem) — cùng một lô mà báo hai lần là tiếng ồn. */
-  const xemTruocRef = useRef<unknown>(null);
-  useEffect(() => {
-    if (!xemTruoc || xemTruocRef.current === xemTruoc) return;
-    xemTruocRef.current = xemTruoc;
-    const hople = tong.server + tong.moi + tong.sua + tong.khongdoi;
-    if (tong.loi > 0) toast.canhBao(`${tong.loi} dòng lỗi · ${hople} dòng dùng được — xem bảng bên dưới`);
-    else toast.thanhCong(`${hople} dòng hợp lệ, chưa ghi vào hệ thống`);
-  }, [xemTruoc, tong, toast]);
+  const fetchPreviewPage = async (batchId: string, cursor: number, append: boolean, generation: number) => {
+    append ? setLoadingMore(true) : setLoadingPreview(true);
+    setPreviewError("");
+    const result = await fetchCatalogImportPreview({ batchId, cursor, limit: 100 });
+    if (generation !== previewGeneration.current) return;
+    setLoadingMore(false); setLoadingPreview(false);
+    if (!result.ok) { setPreviewError(result.error); return; }
+    try {
+      setServerPreview((current) => append
+        ? appendCatalogImportPreviewPage(current ?? emptyCatalogImportPreviewState(batchId), result.page)
+        : appendCatalogImportPreviewPage(emptyCatalogImportPreviewState(batchId), result.page));
+      if (!append) {
+        const count = result.page.batch.counts;
+        if (count.errors > 0) toast.canhBao(`${count.errors} dòng lỗi — kiểm tra bảng đối chiếu server`);
+        else toast.thanhCong(`${result.page.batch.total} dòng đã được server đối chiếu, chưa ghi`);
+      }
+    } catch (cause) {
+      setPreviewError(cause instanceof Error ? cause.message : "Không ghép được trang xem trước");
+    }
+  };
 
-  /* ---- Staging phía server, ngay khi có bản đọc hợp lệ ---- */
   useEffect(() => {
     if (!parsed?.ok || parsed.dataset !== dataset) return undefined;
-    let dung = false;
-    setStaging({ tt: "dang" });
-    stageCatalogImport({
+    let cancelled = false;
+    const generation = ++previewGeneration.current;
+    setStaging({ tt: "dang" }); setServerPreview(null); setPreviewError(""); setReceipt(null);
+    void stageCatalogImport({
       dataset,
       templateVersion: CATALOG_TEMPLATE_VERSION,
       fingerprint: TEMPLATE_CONTRACTS[dataset].fingerprint,
-      rows: parsed.rows.map((r) => ({
-        rowNumber: r.rowNumber, businessKey: r.businessKey,
-        objectKind: r.objectKind, values: r.values,
+      rows: parsed.rows.map((row) => ({
+        rowNumber: row.rowNumber, businessKey: row.businessKey,
+        objectKind: row.objectKind, values: row.values,
       })),
-    }).then((kq) => {
-      if (dung) return;
-      if (kq.ok && kq.batch) {
-        setStaging({ tt: "san", batch: kq.batch });
-      } else if (kq.errorCode === "NOT_AVAILABLE") {
-        /* Chưa bật nhập theo lô ở server — không phải lỗi của người dùng,
-           nên báo mức cảnh báo chứ không phải lỗi đỏ. */
-        toast.canhBao(kq.error || "Chưa bật nhập theo lô trên máy chủ");
-        setStaging({ tt: "chan", loi: kq.error || "" });
+    }).then((result) => {
+      if (cancelled || generation !== previewGeneration.current) return;
+      if (result.ok && result.batch) {
+        setStaging({ tt: "san", batch: result.batch });
+        if (dataset === "source_objects") void fetchPreviewPage(result.batch.id, 0, false, generation);
+      } else if (result.errorCode === "NOT_AVAILABLE") {
+        setStaging({ tt: "chan", loi: result.error || "Chưa bật nhập theo lô trên máy chủ" });
       } else {
-        const thongBao = kq.error || "Không staging được lô nhập";
-        toast.loi(thongBao);
-        setStaging({ tt: "loi", loi: thongBao });
+        const message = result.error || "Không staging được lô nhập";
+        setStaging({ tt: "loi", loi: message }); toast.loi(message);
       }
     });
-    return () => { dung = true; };
-  }, [parsed, dataset]);
+    return () => { cancelled = true; };
+  }, [dataset, parsed]);
 
-  /* ---- Chọn file ---- */
-  const chonFile = async (danhSach: FileList | null) => {
-    const f = danhSach?.[0];
-    /* Xoá value NGAY: người dùng sửa file rồi chọn lại cùng tên vẫn phải
-       kích hoạt onChange lần nữa. */
+  const resetImport = () => {
+    previewGeneration.current += 1;
+    setLoiCauTruc(""); setParsed(null); setMoA3(new Set()); setStaging({ tt: "chua" });
+    setServerPreview(null); setPreviewError(""); setLyDo(""); setCommitError(""); setReceipt(null);
+  };
+  const chonFile = async (files: FileList | null) => {
+    const file = files?.[0];
     if (oFile.current) oFile.current.value = "";
-    if (!f) return;
-    setLoiCauTruc(""); setParsed(null); setMoA3(new Set());
-    setStaging({ tt: "chua" }); setKetQuaGhi(""); setLyDo("");
-    const kq = await parseCatalogWorkbook(f);
-    if (!kq.ok) {
-      /* Lỗi cấu trúc file (sai mẫu, sai phiên bản) khác hẳn lỗi từng dòng:
-         không có gì để sửa trong bảng, phải tải lại đúng mẫu. Nói ngay. */
-      const thongBao = kq.error || "File không hợp lệ.";
-      toast.loi(thongBao);
-      setLoiCauTruc(thongBao);
-      return;
+    if (!file) return;
+    resetImport();
+    const result = await parseCatalogWorkbook(file);
+    if (!result.ok) {
+      const message = result.error || "File không hợp lệ.";
+      setLoiCauTruc(message); toast.loi(message); return;
     }
-    if (kq.dataset && kq.dataset !== dataset) setDataset(kq.dataset);
-    setParsed(kq);
+    if (result.dataset && result.dataset !== dataset) setDataset(result.dataset);
+    setParsed(result);
   };
 
-  /* ---- Tải mẫu / dữ liệu hiện tại ---- */
-  const taiMau = async (loai: "mau" | "hientai") => {
+  const taiMau = async (kind: "mau" | "hientai") => {
     try {
       let rows: CatalogRecord[] = [];
-      if (loai === "hientai" && dataset === "source_objects") {
-        rows = (await exportAllSourceObjects({
-          objectKind: null, search: "", filters: {
-            validation: "all", first_month: "all", owner: "all", frequency: "all",
-          },
-        })) as unknown as CatalogRecord[];
-      } else if (loai === "hientai") {
-        rows = [...(hienTai?.values() ?? [])];
-      }
-      taiXuong(await generateCatalogWorkbook(dataset, rows), TEN_FILE[dataset][loai]);
+      if (kind === "hientai" && dataset === "source_objects") {
+        rows = await exportAllSourceObjects({ objectKind: null, search: "", filters: {
+          validation: "all", first_month: "all", owner: "all", frequency: "all",
+        } }) as unknown as CatalogRecord[];
+      } else if (kind === "hientai") rows = [...(hienTai?.values() ?? [])];
+      taiXuong(await generateCatalogWorkbook(dataset, rows), TEN_FILE[dataset][kind]);
     } catch (cause) {
       toast.loi(`Không tạo được file Excel: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
   };
 
-  /* ---- Sổ lỗi: mẫu + hai cột Mã lỗi · Mô tả lỗi ---- */
   const xuatSoLoi = async () => {
     const ExcelJS = (await import("exceljs")).default;
-    const wb = new ExcelJS.Workbook();
-    const sheet = wb.addWorksheet("LOI");
-    sheet.addRow([...cot.map((c) => c.header), "Mã lỗi", "Mô tả lỗi"]).font = { bold: true };
-    for (const r of (xemTruoc ?? []).filter((x) => x.loai === "loi")) {
-      /* Ghi là giá trị thuần — sổ lỗi không bao giờ chứa công thức chạy được. */
-      sheet.addRow([
-        ...cot.map((c) => c.key === "object_kind"
-          ? (r.objectKind ?? "")
-          : (r.values[c.key] === null || r.values[c.key] === undefined ? ""
-            : typeof r.values[c.key] === "boolean" ? (r.values[c.key] ? "y" : "n")
-            : (r.values[c.key] as string | number))),
-        r.errors.map((e) => e.code).join("; "),
-        r.errors.map((e) => e.message).join(" · "),
-      ]);
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("LOI");
+    if (dataset === "source_objects") {
+      sheet.addRow(["Dòng", "Mã đối tượng", "Loại", "Mã lỗi", "Mô tả lỗi", "Trường"]).font = { bold: true };
+      for (const row of (serverPreview?.rows ?? []).filter((item) => item.classification === "error")) {
+        for (const error of row.errors) sheet.addRow([row.rowNumber, row.businessKey, row.objectKind ?? "", error.code, error.message, error.field ?? ""]);
+      }
+    } else {
+      sheet.addRow([...cot.map((column) => column.header), "Mã lỗi", "Mô tả lỗi"]).font = { bold: true };
+      for (const row of (xemTruoc ?? []).filter((item) => item.loai === "loi")) {
+        sheet.addRow([
+          ...cot.map((column) => column.key === "object_kind" ? (row.objectKind ?? "") : (row.values[column.key] ?? "")),
+          row.errors.map((error) => error.code).join("; "), row.errors.map((error) => error.message).join(" · "),
+        ]);
+      }
     }
-    taiXuong(await wb.xlsx.writeBuffer() as ArrayBuffer,
-      `VMP_So_Loi_Nhap_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    taiXuong(await workbook.xlsx.writeBuffer() as ArrayBuffer, `VMP_So_Loi_Nhap_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  /* ---- Ghi lô ---- */
+  const saveRowReason = async (rowNumber: number, reason: string) => {
+    if (staging.tt !== "san") return { ok: false, error: "Lô nhập chưa sẵn sàng" };
+    const result = await setCatalogImportRowReason(staging.batch.id, rowNumber, reason);
+    if (result.ok) setServerPreview((current) => current ? {
+      ...current, rows: current.rows.map((row) => row.rowNumber === rowNumber ? { ...row, rowReason: reason || null } : row),
+    } : current);
+    return { ok: result.ok, error: result.error };
+  };
+
+  const soLoi = dataset === "source_objects" ? (serverPreview?.batch?.counts.errors ?? 0) : tong.loi;
+  const previewOk = dataset === "source_objects" ? Boolean(serverPreview?.batch && !previewError) : Boolean(xemTruoc);
   const ghi = async () => {
-    if (staging.tt !== "san" || !lyDo.trim()) return;
-    setDangGhi(true);
-    const dang = toast.dangChay("Đang ghi lô vào hệ thống…");
-    const kq = await commitCatalogImport(staging.batch.id, lyDo.trim());
-    setDangGhi(false);
-    if (!kq.ok) {
-      const thongBao = `Ghi thất bại: ${kq.error || kq.errorCode || "không rõ"}`;
-      dang.hong(thongBao);
-      setKetQuaGhi(thongBao);
+    const block = catalogImportCommitBlock({
+      busy: dangGhi, previewOk,
+      status: serverPreview?.batch?.status ?? (staging.tt === "san" ? staging.batch.status : "missing"),
+      errors: soLoi, reason: lyDo,
+    });
+    if (block) {
+      setCommitError(block.message);
+      if (block.focusId) requestAnimationFrame(() => document.getElementById(block.focusId ?? "")?.focus());
       return;
     }
-    const tomTat = `Đã ghi: ${kq.created ?? 0} tạo mới · ${kq.updated ?? 0} sửa · ${kq.unchanged ?? 0} giữ nguyên`;
-    dang.xong(tomTat);
-    setKetQuaGhi(`${tomTat}.`);
-    setParsed(null);
-    onCommitted?.(kq.pendingChangeIds ?? []);
+    if (staging.tt !== "san") return;
+    setDangGhi(true); setCommitError("");
+    const progress = toast.dangChay("Đang ghi lô vào hệ thống…");
+    const result = await commitCatalogImport(staging.batch.id, lyDo.trim());
+    setDangGhi(false);
+    if (!result.ok) {
+      const conflict = result.errorCode === "STALE_VERSION" || result.errorCode === "VERSION_CONFLICT";
+      const message = conflict
+        ? "Dữ liệu nguồn đã thay đổi sau khi staging. Hãy chọn lại file để tạo bản xem trước mới; nội dung và lý do hiện tại vẫn được giữ."
+        : `Ghi thất bại: ${result.error || result.errorCode || "không rõ"}`;
+      progress.hong(message); setCommitError(message); return;
+    }
+    const nextReceipt: ImportReceipt = {
+      dataset,
+      batchId: staging.batch.id,
+      created: result.created ?? 0, updated: result.updated ?? 0, unchanged: result.unchanged ?? 0,
+      committedAt: result.committedAt ?? new Date().toISOString(),
+      pendingChangeIds: result.pendingChangeIds ?? [],
+    };
+    setReceipt(nextReceipt); setParsed(null); setServerPreview(null); setStaging({ tt: "chua" });
+    progress.xong(`Đã ghi ${nextReceipt.created} tạo mới · ${nextReceipt.updated} cập nhật · ${nextReceipt.unchanged} không đổi`);
+    onCommitted?.(nextReceipt.pendingChangeIds);
   };
 
-  const soLoi = tong.loi;
-  const ghiDuoc = staging.tt === "san" && soLoi === 0 && lyDo.trim() !== "" && !dangGhi;
-
-  const NHAN_LOAI: Record<PhanLoai, string> = {
-    server: "Máy chủ đối chiếu", moi: "Tạo mới", sua: "Sửa", khongdoi: "Không đổi", loi: "Lỗi",
+  const retryPreview = () => {
+    if (staging.tt !== "san") return;
+    void fetchPreviewPage(staging.batch.id, 0, false, previewGeneration.current);
   };
+  const loadMore = () => {
+    if (staging.tt !== "san" || !serverPreview?.nextCursor) return;
+    void fetchPreviewPage(staging.batch.id, serverPreview.nextCursor, true, previewGeneration.current);
+  };
+  const NHAN_LOAI: Record<PhanLoai, string> = { moi: "Tạo mới", sua: "Sửa", khongdoi: "Không đổi", loi: "Lỗi" };
 
   return (
     <div className="cw-import">
-      {/* ---- Chọn bộ dữ liệu + tải mẫu ---- */}
       <div className="cw-import__dau">
         <div className="cw-kind" role="group" aria-label="Bộ dữ liệu của mẫu Excel">
-          {(Object.keys(TEN_FILE) as CatalogTemplateDataset[]).map((d) => (
-            <button key={d} type="button" data-cw-imp-dataset={d}
-              className={`cw-kind__muc${dataset === d ? " is-mo" : ""}`}
-              aria-pressed={dataset === d}
-              onClick={() => setDataset(d)}>
-              {NHAN_DATASET[d]}
+          {(Object.keys(TEN_FILE) as CatalogTemplateDataset[]).map((item) => (
+            <button key={item} type="button" data-cw-imp-dataset={item}
+              className={`cw-kind__muc${dataset === item ? " is-mo" : ""}`} aria-pressed={dataset === item}
+              onClick={() => { if (item !== dataset) { resetImport(); setDataset(item); } }}>
+              {NHAN_DATASET[item]}
             </button>
           ))}
         </div>
         <div className="cw-import__taive">
-          <button type="button" className="cw-nut" data-cw-taive="mau"
-            data-cw-ten-file={TEN_FILE[dataset].mau}
-            onClick={() => taiMau("mau")}>
+          <button type="button" className="cw-nut" data-cw-taive="mau" data-cw-ten-file={TEN_FILE[dataset].mau} onClick={() => void taiMau("mau")}>
             <Download size={15} aria-hidden="true" /> Tải mẫu trống
           </button>
-          <button type="button" className="cw-nut" data-cw-taive="hientai"
-            data-cw-ten-file={TEN_FILE[dataset].hientai}
-            disabled={!hienTai}
-            title="Xuất đúng phần dữ liệu bạn được xem — không phải toàn hệ thống nếu quyền của bạn hẹp hơn"
-            onClick={() => taiMau("hientai")}>
+          <button type="button" className="cw-nut" data-cw-taive="hientai" data-cw-ten-file={TEN_FILE[dataset].hientai}
+            disabled={!hienTai} onClick={() => void taiMau("hientai")}>
             <Download size={15} aria-hidden="true" /> Tải dữ liệu hiện tại
           </button>
         </div>
       </div>
 
-      {loiHienTai && (
-        <StateBoundary state="error" title="Chưa tải được dữ liệu hiện tại để đối chiếu"
-          description={loiHienTai} />
-      )}
-
-      {/* ---- Chọn file ---- */}
+      {loiHienTai && <StateBoundary state="error" title="Chưa tải được dữ liệu hiện tại" description={loiHienTai} />}
       <label className="cw-import__chon">
         <Upload size={16} aria-hidden="true" />
-        <span>Chọn file Excel đã điền theo mẫu (.xlsx, tối đa 5 MiB, 2.000 dòng)</span>
-        <input ref={oFile} type="file" accept=".xlsx"
-          aria-label="Chọn file Excel theo mẫu"
-          onChange={(e) => chonFile(e.target.files)} />
+        <span>Chọn file Excel theo mẫu (.xlsx, tối đa 5 MiB, 2.000 dòng)</span>
+        <input ref={oFile} type="file" accept=".xlsx" aria-label="Chọn file Excel theo mẫu" onChange={(event) => void chonFile(event.target.files)} />
       </label>
+      {loiCauTruc && <p className="cw-import__loi" role="alert">{loiCauTruc} Không có gì được gửi lên server.</p>}
 
-      {loiCauTruc && (
-        <p className="cw-import__loi" role="alert">
-          {loiCauTruc} Không có gì được gửi lên server — sửa file rồi chọn lại.
-        </p>
+      {receipt && (
+        <section className="cw-import-receipt" data-cw-import-receipt aria-labelledby="cw-import-receipt-title">
+          <Check size={20} aria-hidden="true" />
+          <div><h3 id="cw-import-receipt-title">Đã ghi {NHAN_DATASET[receipt.dataset]}</h3>
+            <p>{receipt.created} tạo mới · {receipt.updated} cập nhật · {receipt.unchanged} không đổi</p>
+            <p className="cw-nhe">Batch {receipt.batchId.slice(0, 8)}… · {formatBangkokDateTime(receipt.committedAt)}</p>
+          </div>
+          <div className="cw-import-receipt__actions">
+            <button type="button" className="cw-nut cw-nut--phu" onClick={() => void navigator.clipboard.writeText(receipt.batchId).then(() => toast.thanhCong("Đã sao chép batch ID")).catch(() => toast.loi("Không sao chép được batch ID"))}>
+              <Copy size={14} aria-hidden="true" /> Sao chép ID
+            </button>
+            {receipt.pendingChangeIds.length > 0 && <button type="button" className="cw-nut" onClick={onOpenPending}>Mở Chờ áp dụng ({receipt.pendingChangeIds.length})</button>}
+          </div>
+        </section>
       )}
 
-      {/* ---- Xem trước ---- */}
-      {parsed?.ok && !xemTruoc && (
-        <StateBoundary state="loading" title="Đang đối chiếu với dữ liệu hiện tại" skeletonRows={3} />
+      {parsed?.ok && dataset === "source_objects" && loadingPreview && !serverPreview && (
+        <StateBoundary state="loading" title="Máy chủ đang đối chiếu từng dòng" skeletonRows={4} />
+      )}
+      {dataset === "source_objects" && previewError && (
+        <div className="cw-import__preview-error" role="alert"><span>{previewError}</span>
+          <button type="button" className="cw-nut" onClick={retryPreview}>Thử lại bản xem trước</button>
+        </div>
+      )}
+      {dataset === "source_objects" && serverPreview?.batch && (
+        <>
+          <CatalogImportPreviewTable state={serverPreview} loadingMore={loadingMore} onLoadMore={loadMore} onSaveRowReason={saveRowReason} />
+          {soLoi > 0 && <button type="button" className="cw-nut" data-cw-xuat-loi onClick={() => void xuatSoLoi()}>
+            <FileSpreadsheet size={15} aria-hidden="true" /> Xuất lỗi đã tải
+          </button>}
+        </>
       )}
 
-      {xemTruoc && (
+      {dataset === "products_gmp" && parsed?.ok && !xemTruoc && <StateBoundary state="loading" title="Đang đối chiếu dữ liệu hiện tại" skeletonRows={3} />}
+      {dataset === "products_gmp" && xemTruoc && (
         <>
           <div className="cw-import__tong" role="group" aria-label="Tổng kết xem trước">
-            {(["server", "moi", "sua", "khongdoi", "loi"] as PhanLoai[]).map((l) => (
-              <span key={l} className={`cw-import__dem cw-import__dem--${l}`}>
-                {NHAN_LOAI[l]}: <b data-cw-tong={l}>{tong[l]}</b>
-              </span>
-            ))}
-            {soLoi > 0 && (
-              <button type="button" className="cw-nut" data-cw-xuat-loi onClick={xuatSoLoi}>
-                <FileSpreadsheet size={15} aria-hidden="true" /> Xuất sổ lỗi
-              </button>
-            )}
+            {(["moi", "sua", "khongdoi", "loi"] as PhanLoai[]).map((item) => <span key={item} className={`cw-import__dem cw-import__dem--${item}`}>{NHAN_LOAI[item]}: <b data-cw-tong={item}>{tong[item]}</b></span>)}
+            {soLoi > 0 && <button type="button" className="cw-nut" data-cw-xuat-loi onClick={() => void xuatSoLoi()}><FileSpreadsheet size={15} aria-hidden="true" /> Xuất sổ lỗi</button>}
           </div>
-
           <ol className="cw-lich-su" aria-label="Từng dòng trong file">
-            {xemTruoc.map((r) => (
-              <li key={r.rowNumber} className="cw-lich-su__dong">
-                <div className="cw-lich-su__chinh">
-                  <span className="cw-nhe">Dòng {r.rowNumber}</span>
-                  <b className="cw-ma">{r.businessKey || "(thiếu mã)"}</b>
-                  <span className={`cw-tag cw-tag--imp-${r.loai}`}>{NHAN_LOAI[r.loai]}</span>
-                  {r.loai === "sua" && (
-                    <button type="button" className="cw-nut" data-cw-imp-a3
-                      aria-expanded={moA3.has(r.rowNumber)}
-                      onClick={() => setMoA3((p) => {
-                        const n = new Set(p);
-                        if (n.has(r.rowNumber)) n.delete(r.rowNumber); else n.add(r.rowNumber);
-                        return n;
-                      })}>
-                      {moA3.has(r.rowNumber) ? "Thu gọn" : "Đối chiếu"}
-                    </button>
-                  )}
-                </div>
-                {r.loai === "loi" && (
-                  <div className="cw-loi">{r.errors.map((e) => e.message).join(" · ")}</div>
-                )}
-                {r.loai === "sua" && moA3.has(r.rowNumber) && (
-                  <dl className="cw-import-a3">
-                    {r.doi.map((d) => (
-                      <div key={d.label} className="cw-import-a3__dong">
-                        <dt>{d.label}</dt>
-                        <dd>
-                          <s className="cw-import-a3__truoc">{doc(d.truoc)}</s>
-                          <span className="cw-import-a3__sau">{doc(d.sau)}</span>
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-              </li>
-            ))}
+            {xemTruoc.map((row) => <li key={row.rowNumber} className="cw-lich-su__dong">
+              <div className="cw-lich-su__chinh"><span className="cw-nhe">Dòng {row.rowNumber}</span><b className="cw-ma">{row.businessKey || "(thiếu mã)"}</b><span className={`cw-tag cw-tag--imp-${row.loai}`}>{NHAN_LOAI[row.loai]}</span>
+                {row.loai === "sua" && <button type="button" className="cw-nut" aria-expanded={moA3.has(row.rowNumber)} onClick={() => setMoA3((current) => { const next = new Set(current); next.has(row.rowNumber) ? next.delete(row.rowNumber) : next.add(row.rowNumber); return next; })}>{moA3.has(row.rowNumber) ? "Thu gọn" : "Đối chiếu"}</button>}
+              </div>
+              {row.loai === "loi" && <div className="cw-loi">{row.errors.map((error) => error.message).join(" · ")}</div>}
+              {row.loai === "sua" && moA3.has(row.rowNumber) && <dl className="cw-import-a3">{row.doi.map((change) => <div key={change.label} className="cw-import-a3__dong"><dt>{change.label}</dt><dd><s className="cw-import-a3__truoc">{doc(change.truoc)}</s><span className="cw-import-a3__sau">{doc(change.sau)}</span></dd></div>)}</dl>}
+            </li>)}
           </ol>
-
-          {/* ---- Ghi vào hệ thống ---- */}
-          <div className="cw-import__ghi">
-            {staging.tt === "chan" && (
-              <p className="cw-canh-bao" data-cw-ghi-chan>
-                BỊ CHẶN — {staging.loi} Xem trước ở trên vẫn đầy đủ; phần ghi
-                sẽ tự mở khi migration staging được áp theo quy trình §5.
-              </p>
-            )}
-            {staging.tt === "loi" && (
-              <p className="cw-canh-bao cw-canh-bao--loi" data-cw-ghi-chan>{staging.loi}</p>
-            )}
-            {soLoi > 0 && (
-              <p className="cw-nhe">Còn {soLoi} dòng lỗi — sửa hết trong Excel rồi tải lại mới ghi được.</p>
-            )}
-            <label className="cw-truong">
-              <span className="cw-nhan">Lý do của cả lô nhập</span>
-              <textarea className="cw-o" rows={2} value={lyDo}
-                disabled={staging.tt !== "san"}
-                placeholder="Vì sao có đợt nhập này — sẽ nằm trong audit của từng dòng"
-                onChange={(e) => setLyDo(e.target.value)} />
-            </label>
-            <div className="cw-chan-nut">
-              <button type="button" className="cw-nut cw-nut--chinh" data-cw-ghi
-                disabled={!ghiDuoc} onClick={ghi}>
-                {dangGhi ? "Đang ghi…" : "Ghi vào hệ thống"}
-              </button>
-            </div>
-            {ketQuaGhi && <p className="cw-nhe" role="status">{ketQuaGhi}</p>}
-          </div>
         </>
+      )}
+
+      {parsed?.ok && (
+        <div className="cw-import__ghi">
+          {staging.tt === "chan" && <p className="cw-canh-bao" data-cw-ghi-chan>BỊ CHẶN — {staging.loi}</p>}
+          {staging.tt === "loi" && <p className="cw-canh-bao cw-canh-bao--loi" data-cw-ghi-chan>{staging.loi}</p>}
+          {soLoi > 0 && <p className="cw-nhe">Còn {soLoi} dòng lỗi — sửa trong Excel rồi chọn lại file.</p>}
+          <label className="cw-truong" htmlFor="cw-import-batch-reason"><span className="cw-nhan">Lý do của cả lô nhập <span className="cw-bat-buoc-chu">Bắt buộc</span></span></label>
+          <textarea id="cw-import-batch-reason" className="cw-o" rows={2} value={lyDo} aria-describedby={commitError ? "cw-import-commit-error" : undefined}
+            placeholder="Vì sao có đợt nhập này — sẽ nằm trong audit" onChange={(event) => { setLyDo(event.target.value); setCommitError(""); }} />
+          {commitError && <p id="cw-import-commit-error" className="cw-import__loi" role="alert">{commitError}</p>}
+          <div className="cw-chan-nut"><button type="button" className="cw-nut cw-nut--chinh" data-cw-ghi disabled={dangGhi} onClick={() => void ghi()}>{dangGhi ? "Đang ghi…" : "Ghi vào hệ thống"}</button></div>
+        </div>
       )}
     </div>
   );

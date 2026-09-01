@@ -280,6 +280,7 @@ export interface CatalogImportCommitResult {
   created?: number;
   updated?: number;
   unchanged?: number;
+  committedAt?: string;
   pendingChangeIds?: string[];
   errorCode?: string;
   error?: string;

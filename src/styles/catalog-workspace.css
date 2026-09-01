@@ -892,6 +892,37 @@
 .cw-tag--imp-unchanged { background: var(--lp-surface-2); color: var(--lp-ink-muted); }
 .cw-tag--imp-error { background: var(--lp-danger-soft); color: var(--lp-danger); }
 
+.cw-import__preview-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--lp-danger) 28%, var(--lp-line));
+  border-radius: 12px;
+  background: var(--lp-danger-soft);
+  color: var(--lp-danger);
+}
+.cw-import-receipt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--lp-success) 35%, var(--lp-line));
+  border-radius: 16px;
+  background: var(--lp-success-soft);
+  color: var(--lp-ink);
+}
+.cw-import-receipt h3, .cw-import-receipt p { margin: 0; }
+.cw-import-receipt h3 { font-size: 16px; }
+.cw-import-receipt__actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 720px) {
+  .cw-import-receipt { grid-template-columns: auto minmax(0, 1fr); }
+  .cw-import-receipt__actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
 /* ---------------------------------------------------------------------
  *  Nhãn "Bắt buộc" và ô combobox
  *  ---------------------------------------------------------------------

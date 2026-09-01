@@ -846,8 +846,9 @@ export default function CatalogWorkspaceShell({
               onCommitted={(pendingIds) => {
                 taiDoiTuong();
                 setSvTick((t) => t + 1);
-                if (pendingIds.length > 0) doiVung("pending");
+                if (pendingIds.length > 0) setPenTick((t) => t + 1);
               }}
+              onOpenPending={() => doiVung("pending")}
             />
           )}
 

@@ -701,7 +701,7 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   await trang.close();
 }
 
-/* ---- 6. Nhập Excel: tải mẫu, chặn file sai, xem trước, Ghi bị chặn --- */
+/* ---- 6. Nhập Excel: preview server, lý do, commit và biên nhận ------- */
 {
   console.log("\nNhập Excel:");
 
@@ -711,7 +711,55 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
     ["--import", "tsx", fileURLToPath(new URL("./tao-mau-catalog.mjs", import.meta.url)), thuMucMau],
     { stdio: "pipe" });
 
-  const { trang } = await moTrang(trinhDuyet);
+  let stageCalls = 0;
+  let reasonCalls = 0;
+  const batches = [
+    "d1000000-0000-4000-8000-000000000001",
+    "d1000000-0000-4000-8000-000000000002",
+  ];
+  const previewRow = (row_number, business_key, classification, current_snapshot, patch, errors = []) => ({
+    row_number, business_key, object_kind: "Thiết bị", classification,
+    current_snapshot, patch, errors, row_reason: null,
+  });
+  const { trang } = await moTrang(trinhDuyet, { suaKho(kho) {
+    kho.rpc_stage_catalog_import = () => {
+      const batch_id = batches[Math.min(stageCalls, batches.length - 1)];
+      stageCalls += 1;
+      return { ok: true, batch_id, status: "validated", total: 4 };
+    };
+    kho.rpc_catalog_import_preview = (body) => {
+      const clean = body.p_batch_id === batches[1];
+      const allRows = [
+        previewRow(2, "TB-999", "create", null, { object_code: "TB-999", object_name: "Máy mới toanh" }),
+        previewRow(3, "TB-100", "update", { object_name: "Máy dập viên xoay tròn" }, { object_name: "Máy dập viên đã đổi tên" }),
+        previewRow(4, "TB-101", "unchanged", { object_name: "Máy đóng nang tự động" }, {}),
+        clean
+          ? previewRow(5, "TB-998", "unchanged", { object_name: "Máy đã bổ sung tên" }, {})
+          : previewRow(5, "TB-998", "error", null, {}, [{ code: "REQUIRED", message: "Thiếu tên đối tượng", field: "object_name" }]),
+      ];
+      const counts = clean
+        ? { created: 1, updated: 1, unchanged: 2, errors: 0 }
+        : { created: 1, updated: 1, unchanged: 1, errors: 1 };
+      const second = Number(body.p_cursor ?? 0) > 0;
+      return {
+        ok: true,
+        batch: { id: body.p_batch_id, dataset: "source_objects", status: "validated", total: 4, counts, created_at: "2026-09-01T01:00:00Z", committed_at: null },
+        rows: second ? allRows.slice(2) : allRows.slice(0, 2),
+        next_cursor: second ? null : 3,
+      };
+    };
+    kho.rpc_set_catalog_import_row_reason = () => {
+      reasonCalls += 1;
+      return reasonCalls === 1
+        ? { ok: false, error_code: "TRANSIENT", error: "Lỗi lưu lý do có chủ đích" }
+        : { ok: true };
+    };
+    kho.rpc_commit_catalog_import = () => ({
+      ok: true, created: 1, updated: 1, unchanged: 2,
+      committed_at: "2026-09-01T03:15:00Z",
+      pending_change_ids: ["e1000000-0000-4000-8000-000000000001"],
+    });
+  } });
 
   /* Đếm mọi request staging — file sai cấu trúc không được sinh RPC nào. */
   const gọiStaging = [];
@@ -763,36 +811,64 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
       `${gọiStaging.length} lần gọi`);
   }
 
-  /* 6c. File hợp lệ: phân loại mới/sửa/không đổi/lỗi + A3 cho dòng sửa. */
+  /* 6c. File hợp lệ: server phân loại, A3, phân trang và lưu lý do dòng. */
   if (oChonFile) {
     await oChonFile.uploadFile(join(thuMucMau, "hop-le.xlsx"));
-    await cho(1800);
+    await trang.waitForSelector("[data-cw-import-preview-table]", { timeout: 15_000 });
     const kq = await trang.evaluate(() => {
       const tong = {};
-      for (const o of document.querySelectorAll("[data-cw-tong]")) {
-        tong[o.getAttribute("data-cw-tong")] = o.textContent?.trim();
+      for (const o of document.querySelectorAll("[data-cw-preview-count]")) {
+        tong[o.getAttribute("data-cw-preview-count")] = o.querySelector("b")?.textContent?.trim();
       }
       return {
         tong,
-        coNutA3: !!document.querySelector("[data-cw-imp-a3]"),
+        coBang: !!document.querySelector("[data-cw-import-preview-table]"),
         coXuatLoi: !!document.querySelector("[data-cw-xuat-loi]"),
       };
     });
-    kiem(kq.tong.server === "3", "ba dòng hợp lệ được máy chủ có quyền đối chiếu", String(kq.tong.server));
-    kiem(kq.tong.moi === "0" && kq.tong.sua === "0" && kq.tong.khongdoi === "0",
-      "trình duyệt không tự suy đoán mới/sửa/không đổi từ toàn bộ Source",
-      JSON.stringify(kq.tong));
-    kiem(kq.tong.loi === "1", "đếm đúng 1 dòng lỗi", String(kq.tong.loi));
-    kiem(!kq.coNutA3, "Source không dựng đối chiếu A3 từ dữ liệu ngoài phạm vi quyền");
+    kiem(kq.tong.create === "1" && kq.tong.update === "1" && kq.tong.unchanged === "1" && kq.tong.error === "1",
+      "tổng create/update/unchanged/error đến từ server", JSON.stringify(kq.tong));
+    kiem(kq.coBang, "Source dùng bảng preview server có ngữ nghĩa");
     kiem(kq.coXuatLoi, "có nút xuất sổ lỗi");
 
-    /* 6d. Ghi bị CHẶN khi server chưa có RPC staging (Task 9 chưa áp). */
-    const ghi = await trang.evaluate(() => ({
-      chan: document.querySelector("[data-cw-ghi-chan]")?.textContent ?? "",
-      nutKhoa: document.querySelector("[data-cw-ghi]")?.disabled ?? null,
-    }));
-    kiem(ghi.chan.includes("BỊ CHẶN"), "khu Ghi nói rõ BỊ CHẶN vì thiếu staging", ghi.chan.slice(0, 80));
-    kiem(ghi.nutKhoa === true, "nút Ghi vào hệ thống bị khoá");
+    await trang.evaluate(() => {
+      const row = [...document.querySelectorAll("tbody tr")].find((item) => item.textContent?.includes("TB-100"));
+      row?.querySelector("button")?.click();
+    });
+    await trang.waitForFunction(() => document.body.innerText.includes("Máy dập viên xoay tròn") && document.body.innerText.includes("Máy dập viên đã đổi tên"));
+    kiem(true, "A3 hiển thị đúng trước → sau do server trả");
+
+    await trang.evaluate(() => [...document.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Tải thêm")?.click());
+    await trang.waitForFunction(() => document.body.innerText.includes("TB-998"));
+    kiem(true, "Tải thêm nối trang server không mất dòng");
+
+    await trang.type("#cw-import-row-reason-3", "Chuẩn hóa tên theo hồ sơ");
+    await trang.evaluate(() => document.querySelector("#cw-import-row-reason-3")?.parentElement?.querySelector("button")?.click());
+    await trang.waitForFunction(() => document.body.innerText.includes("Lỗi lưu lý do có chủ đích"));
+    const draftSauLoi = await trang.$eval("#cw-import-row-reason-3", (node) => node.value);
+    kiem(draftSauLoi === "Chuẩn hóa tên theo hồ sơ", "lưu lý do lỗi vẫn giữ bản nháp", draftSauLoi);
+    await trang.evaluate(() => document.querySelector("#cw-import-row-reason-3")?.parentElement?.querySelector("button")?.click());
+    await trang.waitForFunction(() => document.querySelector("#cw-import-row-reason-3")?.parentElement?.textContent?.includes("Đã lưu"));
+    kiem(true, "lưu lại lý do có phản hồi thành công");
+
+    /* Batch đầu có lỗi nên click Ghi phải giải thích, không bị khóa im lặng. */
+    await trang.evaluate(() => document.querySelector("[data-cw-ghi]")?.click());
+    await trang.waitForFunction(() => document.body.innerText.includes("Còn 1 dòng lỗi"));
+    const nutKhoa = await trang.$eval("[data-cw-ghi]", (node) => node.disabled);
+    kiem(nutKhoa === false, "nút Ghi chỉ khóa khi đang gửi, lỗi nghiệp vụ được giải thích");
+
+    /* Batch thứ hai sạch: thiếu lý do focus đúng ô, sau đó commit có receipt. */
+    await oChonFile.uploadFile(join(thuMucMau, "hop-le.xlsx"));
+    await trang.waitForFunction(() => document.querySelector('[data-cw-preview-count="error"] b')?.textContent?.trim() === "0", { timeout: 15_000 });
+    await trang.evaluate(() => document.querySelector("[data-cw-ghi]")?.click());
+    await trang.waitForFunction(() => document.activeElement?.id === "cw-import-batch-reason");
+    kiem(true, "thiếu lý do batch thì focus đúng textarea");
+    await trang.type("#cw-import-batch-reason", "Nhập theo biên bản rà soát tháng 9");
+    await trang.evaluate(() => document.querySelector("[data-cw-ghi]")?.click());
+    await trang.waitForSelector("[data-cw-import-receipt]", { timeout: 15_000 });
+    const receipt = await trang.$eval("[data-cw-import-receipt]", (node) => node.textContent ?? "");
+    kiem(receipt.includes("1 tạo mới") && receipt.includes("1 cập nhật") && receipt.includes("Mở Chờ áp dụng (1)"),
+      "commit thành công giữ biên nhận và lối Chờ áp dụng", receipt.slice(0, 140));
   }
 
   await trang.close();

@@ -92,6 +92,7 @@ export default function CatalogImportPreviewTable({
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState<number | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
+  const [rowSaved, setRowSaved] = useState<Record<number, boolean>>({});
   const rows = useMemo(() => filterCatalogImportRows(state.rows, { search, classification }), [state.rows, search, classification]);
   const batch = state.batch;
   if (!batch) return null;
@@ -105,9 +106,11 @@ export default function CatalogImportPreviewTable({
     const reason = drafts[row.rowNumber] ?? row.rowReason ?? "";
     setSaving(row.rowNumber);
     setRowErrors((current) => ({ ...current, [row.rowNumber]: "" }));
+    setRowSaved((current) => ({ ...current, [row.rowNumber]: false }));
     const result = await onSaveRowReason(row.rowNumber, reason.trim());
     setSaving(null);
     if (!result.ok) setRowErrors((current) => ({ ...current, [row.rowNumber]: result.error ?? "Không lưu được lý do" }));
+    else setRowSaved((current) => ({ ...current, [row.rowNumber]: true }));
   };
 
   return (
@@ -118,10 +121,10 @@ export default function CatalogImportPreviewTable({
           <p className="cw-nhe" aria-live="polite">Đã tải {state.loaded}/{batch.total} dòng</p>
         </div>
         <div className="cw-import-preview__summary" aria-label="Tổng phân loại từ máy chủ">
-          <span className="cw-import-preview__metric is-create"><span>Tạo mới</span><b>{batch.counts.created}</b></span>
-          <span className="cw-import-preview__metric is-update"><span>Cập nhật</span><b>{batch.counts.updated}</b></span>
-          <span className="cw-import-preview__metric"><span>Không đổi</span><b>{batch.counts.unchanged}</b></span>
-          <span className="cw-import-preview__metric is-error"><span>Lỗi</span><b>{batch.counts.errors}</b></span>
+          <span className="cw-import-preview__metric is-create" data-cw-preview-count="create"><span>Tạo mới</span><b>{batch.counts.created}</b></span>
+          <span className="cw-import-preview__metric is-update" data-cw-preview-count="update"><span>Cập nhật</span><b>{batch.counts.updated}</b></span>
+          <span className="cw-import-preview__metric" data-cw-preview-count="unchanged"><span>Không đổi</span><b>{batch.counts.unchanged}</b></span>
+          <span className="cw-import-preview__metric is-error" data-cw-preview-count="error"><span>Lỗi</span><b>{batch.counts.errors}</b></span>
         </div>
       </div>
 
@@ -156,9 +159,10 @@ export default function CatalogImportPreviewTable({
                     {row.classification === "create" || row.classification === "update" ? (
                       <div className="cw-import-preview__reason">
                         <label className="sr-only" htmlFor={`cw-import-row-reason-${row.rowNumber}`}>Lý do ngoại lệ dòng {row.rowNumber}</label>
-                        <input id={`cw-import-row-reason-${row.rowNumber}`} className="cw-o" value={draft} onChange={(event) => setDrafts((current) => ({ ...current, [row.rowNumber]: event.target.value }))} placeholder="Không bắt buộc" />
+                        <input id={`cw-import-row-reason-${row.rowNumber}`} className="cw-o" value={draft} onChange={(event) => { setDrafts((current) => ({ ...current, [row.rowNumber]: event.target.value })); setRowSaved((current) => ({ ...current, [row.rowNumber]: false })); }} placeholder="Không bắt buộc" />
                         <button type="button" className="cw-nut cw-nut--phu" disabled={saving === row.rowNumber} onClick={() => void saveReason(row)}>{saving === row.rowNumber ? "Đang lưu…" : "Lưu"}</button>
                         {rowErrors[row.rowNumber] && <span role="alert" className="cw-loi">{rowErrors[row.rowNumber]}</span>}
+                        {rowSaved[row.rowNumber] && <span role="status" className="cw-nhe">Đã lưu</span>}
                       </div>
                     ) : "—"}
                   </td>
