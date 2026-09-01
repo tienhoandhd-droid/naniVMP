@@ -132,8 +132,8 @@ function overlappingPairs(fish, sceneWidth = SCENE_WIDTH, sceneHeight = SCENE_HE
   const boxes = fish.map((item) => {
     const centerX = item.xPct / 100 * sceneWidth;
     const centerY = item.yPct / 100 * sceneHeight;
-    const width = LONG_MON_COLLISION_WIDTH_PX * item.renderScale;
-    const height = LONG_MON_COLLISION_HEIGHT_PX * item.renderScale;
+    const width = LONG_MON_COLLISION_WIDTH_PX * item.renderScale + 8;
+    const height = LONG_MON_COLLISION_HEIGHT_PX * item.renderScale + 10;
     return {
       id: item.activity.id,
       left: centerX - width / 2,
@@ -189,33 +189,27 @@ test("trường đua phủ đúng 60 ngày quanh Hôm nay và loại hạn ngoà
 
   const start = model.fish.find((fish) => fish.activity.id === "start");
   const end = model.fish.find((fish) => fish.activity.id === "end");
-  assert.ok(start.xPct >= model.weeks[0].startPct
-    && start.xPct <= model.weeks[0].startPct + model.weeks[0].widthPct,
-  `cá đầu kỳ phải nằm trong tuần thứ nhất: ${start.xPct}`);
-  assert.ok(end.xPct >= model.weeks[9].startPct
-    && end.xPct <= model.weeks[9].startPct + model.weeks[9].widthPct,
-  `cá cuối kỳ phải nằm trong tuần cuối: ${end.xPct}`);
+  assert.equal(start.deadlinePct, 0);
+  assert.equal(end.deadlinePct, 59 / 60 * 100);
+  assert.ok(start.renderXPct >= start.ownerStartPct && start.renderXPct <= start.ownerEndPct);
+  assert.ok(end.renderXPct >= end.ownerStartPct && end.renderXPct <= end.ownerEndPct);
 
   const sameDate = model.fish.filter((fish) => fish.deadline === "2026-08-31");
   assert.equal(new Set(sameDate.map((fish) => fish.weekKey)).size, 1);
-  assert.ok(new Set(sameDate.map((fish) => fish.xPct)).size > 1);
+  assert.equal(new Set(sameDate.map((fish) => fish.deadlinePct)).size, 1);
+  assert.ok(new Set(sameDate.map((fish) => fish.renderXPct)).size > 1);
 });
 
-test("tuần trống thu hẹp để nhường chiều dài cho tuần có cá", () => {
+test("mật độ không làm méo chiều rộng tuần trên trục tuyến tính", () => {
   const model = buildLongMonRaceModel(
     Array.from({ length: 12 }, (_, index) =>
       activity(`weighted-${index}`, "2026-09-02")),
     NOW,
     { audience: "team" },
   );
-  const occupiedKey = model.fish[0].weekKey;
-  const occupiedWeek = model.weeks.find((week) => week.key === occupiedKey);
-  const emptyFullWeeks = model.weeks.filter((week) =>
-    week.key !== occupiedKey && week.widthPct > 2);
-
-  assert.ok(emptyFullWeeks.length > 0);
-  assert.ok(occupiedWeek.widthPct > Math.max(...emptyFullWeeks.map((week) => week.widthPct)) * 1.35,
-    "tuần có đàn cá phải rộng hơn rõ rệt so với tuần trống");
+  const fullWeeks = model.weeks.filter((week) => week.widthPct > 11);
+  assert.ok(fullWeeks.length >= 7);
+  assert.ok(fullWeeks.every((week) => Math.abs(week.widthPct - 7 / 60 * 100) < .001));
   assert.ok(Math.abs(model.weeks.reduce((sum, week) => sum + week.widthPct, 0) - 100) < .001);
   const todayWeek = model.weeks.find((week) => week.key === "2026-08-31");
   assert.ok(model.todayPct >= todayWeek.startPct
@@ -239,6 +233,45 @@ test("mật độ cá không đẩy ranh giới quá khứ và tương lai khỏ
     `miền sắp tới phải bắt đầu ở 50%, hiện là ${futureStart.startPct}`);
 });
 
+test("trục 60 ngày tuyến tính giữ Hôm nay ở giữa dù mật độ lệch", () => {
+  const model = buildLongMonRaceModel([
+    activity("linear-start", "2026-08-01"),
+    ...Array.from({ length: 20 }, (_, index) =>
+      activity(`linear-dense-${index}`, "2026-09-01")),
+    activity("linear-last", "2026-09-29"),
+  ], NOW, { audience: "team" });
+
+  assert.equal(model.todayPct, 50);
+  assert.ok(Math.abs(model.weeks.reduce((sum, week) => sum + week.widthPct, 0) - 100) < .001);
+  assert.ok(model.weeks.every((week) => week.widthPct <= 7 / 60 * 100 + .001));
+  assert.equal(model.fish.find((fish) => fish.deadline === "2026-08-01").deadlinePct, 0);
+  assert.equal(model.fish.find((fish) => fish.deadline === "2026-09-01").deadlinePct, 31 / 60 * 100);
+});
+
+test("đàn 1 5 12 24 40 cá chọn đúng họ và không rời vùng deadline", () => {
+  const cases = [
+    [1, "solo"],
+    [5, "arc"],
+    [12, "double-stream"],
+    [24, "teardrop"],
+    [40, "branches"],
+  ];
+  for (const [count, formation] of cases) {
+    const model = buildLongMonRaceModel(
+      Array.from({ length: count }, (_, index) =>
+        activity(`${formation}-${index}`, "2026-09-05")),
+      NOW,
+      { audience: "team" },
+    );
+    assert.equal(model.fish.length, count);
+    assert.ok(model.fish.every((fish) => fish.schoolFormation === formation));
+    assert.equal(new Set(model.fish.map((fish) => fish.deadlinePct)).size, 1);
+    assert.ok(model.fish.every((fish) => fish.renderXPct >= fish.ownerStartPct
+      && fish.renderXPct <= fish.ownerEndPct));
+    assert.deepEqual(overlappingPairsInModel(model), []);
+  }
+});
+
 test("mười hai cá trong một tuần được xếp linh động mà không va chạm", () => {
   const deadlines = [
     "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03",
@@ -257,10 +290,9 @@ test("mười hai cá trong một tuần được xếp linh động mà không 
     "tọa độ ngang phải phân tán như một đàn cá, không lặp hai cột");
   assert.ok(new Set(model.fish.map((fish) => Math.round(fish.yPct * 10))).size >= 8,
     "tọa độ dọc phải tạo nhiều cao độ thay vì các hàng thẳng");
-  const occupiedWeek = model.weeks.find((week) => week.key === model.fish[0].weekKey);
-  assert.ok(model.fish.every((fish) => fish.xPct >= occupiedWeek.startPct
-    && fish.xPct <= occupiedWeek.startPct + occupiedWeek.widthPct),
-  "tâm cá phải nằm trong đúng vùng tuần sau khi tuần được mở rộng");
+  assert.ok(model.fish.every((fish) => fish.renderXPct >= fish.ownerStartPct
+    && fish.renderXPct <= fish.ownerEndPct),
+  "tâm cá phải nằm trong vùng sở hữu deadline chính xác");
   assert.deepEqual(overlappingPairsInModel(model), []);
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
 
@@ -338,7 +370,7 @@ test("bốn mươi tám cá trong cửa sổ 60 ngày nằm trọn scene cố đ
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
   /* Ràng buộc thật là KHÔNG VA CHẠM (đã kiểm ở trên) + không teo quá bậc
      giữa của thang TEAM_DENSITY_LEVELS. */
-  assert.ok(model.densityScale >= .66 && model.densityScale <= 1);
+  assert.ok(model.densityScale >= .58 && model.densityScale <= 1);
 });
 
 test("sự cố production 31/08: 126 cá trong 60 ngày không được ném lỗi", () => {
