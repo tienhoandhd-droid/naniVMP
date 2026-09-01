@@ -100,3 +100,14 @@ export function matchedAuthorizationRevision(
   }
   return dashboard.authorizationRevision;
 }
+
+/** Contract v2 serializes bigint revisions as text so JSON cannot lose precision.
+ * Existing write guards still use a JavaScript number until their RPC contract migrates. */
+export function canonicalAuthorizationRevisionToNumber(value: string): number {
+  if (!/^[1-9]\d*$/.test(value)) throw new Error("canonical authorization revision is invalid");
+  const revision = Number(value);
+  if (!Number.isSafeInteger(revision) || revision <= 0) {
+    throw new Error("canonical authorization revision exceeds the safe client range");
+  }
+  return revision;
+}
