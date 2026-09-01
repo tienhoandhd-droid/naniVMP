@@ -12,6 +12,7 @@ import { isSupabaseConfigured, changePassword, datLaiMatKhauKhoiPhuc } from "../
 import {
   validateChangePassword,
   changePasswordErrorMessage,
+  PASSWORD_MIN_LENGTH,
   type ChangePasswordErrors,
 } from "../../lib/passwordForm.ts";
 
@@ -64,8 +65,8 @@ export default function ChangePwModal({ onClose, recovery = false }: { onClose: 
       open
       title={recovery ? "Đặt mật khẩu mới" : "Đổi mật khẩu"}
       description={recovery
-        ? "Bạn vào bằng link email nên không cần mật khẩu cũ. Mật khẩu mới tối thiểu 6 ký tự."
-        : "Cần mật khẩu hiện tại để xác minh. Mật khẩu mới tối thiểu 6 ký tự."}
+        ? `Bạn vào bằng link email nên không cần mật khẩu cũ. Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự.`
+        : `Cần mật khẩu hiện tại để xác minh. Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự.`}
       icon={KeyRound}
       maxWidth={460}
       onRequestClose={onClose}

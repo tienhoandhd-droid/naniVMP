@@ -20,6 +20,8 @@ export interface ChangePasswordValues {
 
 export type ChangePasswordErrors = Partial<Record<keyof ChangePasswordValues, string>>;
 
+export const PASSWORD_MIN_LENGTH = 8;
+
 export function validateChangePassword(
   { cu, moi, nhacLai }: ChangePasswordValues,
   { recovery = false }: { recovery?: boolean } = {},
@@ -27,7 +29,9 @@ export function validateChangePassword(
   const errors: ChangePasswordErrors = {};
   if (!recovery && !cu) errors.cu = "Vui lòng nhập mật khẩu hiện tại";
   if (!moi) errors.moi = "Vui lòng nhập mật khẩu mới";
-  else if (moi.length < 6) errors.moi = "Mật khẩu mới tối thiểu 6 ký tự";
+  else if (moi.length < PASSWORD_MIN_LENGTH) {
+    errors.moi = `Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự`;
+  }
   else if (!recovery && cu && moi === cu) errors.moi = "Mật khẩu mới phải khác mật khẩu hiện tại";
   if (!errors.moi && nhacLai !== moi) errors.nhacLai = "Hai mật khẩu mới không khớp";
   return errors;
@@ -41,8 +45,8 @@ export function changePasswordErrorMessage(error: unknown): string {
   if (/should be different/i.test(message)) {
     return "Mật khẩu mới phải khác mật khẩu hiện tại";
   }
-  if (/at least 6|password.*too short/i.test(message)) {
-    return "Mật khẩu mới tối thiểu 6 ký tự";
+  if (/at least \d+|password.*too short/i.test(message)) {
+    return `Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự`;
   }
   if (/network|fetch/i.test(message)) return "Không kết nối được máy chủ. Vui lòng thử lại";
   return "Chưa đổi được mật khẩu. Vui lòng thử lại";
@@ -55,4 +59,10 @@ export function resetMailErrorMessage(error: unknown): string {
   }
   if (/network|fetch/i.test(message)) return "Không kết nối được máy chủ. Vui lòng thử lại";
   return "Chưa gửi được mail. Vui lòng thử lại";
+}
+
+export function recoverySessionErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/network|fetch/i.test(message)) return "Không kết nối được máy chủ. Vui lòng thử lại";
+  return "Liên kết đặt lại mật khẩu đã hết hạn hoặc không hợp lệ";
 }
