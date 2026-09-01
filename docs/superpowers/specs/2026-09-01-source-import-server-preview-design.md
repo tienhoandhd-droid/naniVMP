@@ -45,6 +45,11 @@ người đã tạo batch.
    lưu bằng RPC hiện có.
 7. Không có fallback phân loại ở client khi RPC mới chưa tồn tại.
 8. Chưa push, deploy hoặc apply migration trong Wave 3 local.
+9. Chỉ `admin` và `qa_manager` được thêm, sửa, nhập, tải file lên hoặc xuất
+   Dữ liệu nguồn. Các vai trò còn lại chỉ được đọc dữ liệu trong phạm vi đã
+   cấp; giới hạn này phải được chặn ở RPC, không chỉ ẩn nút trên frontend.
+10. Khu vực Dữ liệu nguồn có ghi chú ngắn: đây là dữ liệu gốc; trước khi ghi
+    phải kiểm tra bản xem trước và nêu lý do để bảo đảm truy vết.
 
 ## 4. Boundary server mới
 
@@ -63,11 +68,17 @@ public.rpc_catalog_import_preview(
 RPC là `SECURITY DEFINER`, `search_path=public,pg_temp`, và fail-closed:
 
 - phiên phải active theo `vmp_is_active_session(auth.uid())`;
+- vai trò nghiệp vụ phải là `admin` hoặc `qa_manager`;
 - batch phải có `uploaded_by = auth.uid()`;
 - `service_role` chỉ được dùng cho migration test/postflight;
 - tài khoản khác, kể cả Admin khác, không được xem batch;
 - `anon` và `PUBLIC` không có EXECUTE;
 - `authenticated` chỉ có EXECUTE qua các guard ở trên.
+
+Cùng migration này khóa RPC xuất Source để chỉ `admin` và `qa_manager` gọi
+được. Các RPC staging, sửa lý do dòng và commit phải tiếp tục fail-closed theo
+ma trận manager-writer hiện có; SQL security test chứng minh cả bốn thao tác
+nhập, sửa, commit và xuất đều từ chối vai trò khác.
 
 Không suy quyền bằng email và không nhận `uploaded_by` từ client.
 
@@ -166,6 +177,12 @@ Thay nhãn `Máy chủ đối chiếu` bằng command surface gồm:
 - bảng cột: Dòng, Mã, Trạng thái, Thay đổi/Lỗi, Lý do ngoại lệ;
 - nút `Tải thêm` khi còn `next_cursor`;
 - trạng thái “đã tải X/Y dòng” để không tạo cảm giác đã xem hết.
+
+Phía trên command surface có ghi chú ngắn, không biến thành khối hướng dẫn
+dài: “Dữ liệu nguồn là dữ liệu gốc. Chỉ Admin và Quản lý QA được thay đổi,
+nhập hoặc xuất; hãy kiểm tra bản xem trước và ghi lý do trước khi xác nhận.”
+Người chỉ đọc thấy phiên bản rút gọn nêu rõ phạm vi xem và không thấy các nút
+thêm, sửa, tải lên, tải mẫu/dữ liệu hay xuất Excel.
 
 Chi tiết từng loại:
 
@@ -276,7 +293,8 @@ wire payload chưa decode.
 - Apply migration lên production.
 - Push/deploy trước khi toàn bộ Wave 3 được duyệt.
 - Snapshot báo cáo bất biến và chữ ký điện tử.
-- Thay đổi ma trận vai trò ngoài quyền đọc batch của chính người tạo.
+- Thay đổi ma trận vai trò ngoài việc khóa ghi/nhập/xuất Source cho
+  `admin` và `qa_manager`.
 - Thay đổi định dạng file Excel hoặc tăng giới hạn 5 MiB/2.000 dòng.
 
 ## 13. Tiêu chí nghiệm thu
@@ -285,4 +303,5 @@ Wave 3 đạt khi một người có quyền có thể chọn file Source, thấ
 diff server từng dòng, xử lý lỗi/lý do, commit đúng một lần và nhận biên nhận;
 đồng thời người khác không thể dò hoặc đọc batch đó. Mọi lỗi server, payload
 lạ và conflict đều phải fail-closed nhưng giữ được bản nháp cần thiết để phục
-hồi.
+hồi. Vai trò khác chỉ đọc đúng phạm vi và không thể gọi trực tiếp RPC để thêm,
+sửa, nhập hoặc xuất Source; giao diện có ghi chú ngắn giải thích quy tắc này.

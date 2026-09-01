@@ -12,6 +12,9 @@
 
 - Server là nguồn sự thật cho `create/update/unchanged/error`; frontend không tự phân loại Source.
 - Chỉ uploader active đọc được batch của chính mình; batch khác trả cùng bề mặt `BATCH_NOT_FOUND`.
+- Chỉ `admin` và `qa_manager` được thêm, sửa, nhập, tải lên hoặc xuất Dữ liệu nguồn; vai trò khác chỉ đọc trong phạm vi.
+- Quyền ghi/nhập/xuất phải fail-closed ở RPC và được phản chiếu ở UI; không xem việc ẩn nút là kiểm soát quyền.
+- Khu vực Source phải có ghi chú ngắn rằng đây là dữ liệu gốc, cần xem trước và ghi lý do trước khi xác nhận.
 - Không trả `input`, `expected_version`, `uploaded_by` hoặc extra key qua RPC preview.
 - Không thay đổi định dạng Excel, giới hạn 5 MiB/2.000 dòng hoặc RPC commit hiện có.
 - Migration, preflight, postflight và rollback chỉ được tạo/kiểm tra local; không apply production.
@@ -138,12 +141,15 @@ git commit -m "feat: them contract preview import source"
 **Interfaces:**
 - Produces: `public.rpc_catalog_import_preview(uuid,integer,integer) returns jsonb`.
 - Consumes tables `vmp_catalog_import_batches`, `vmp_catalog_import_rows` and helper `vmp_is_active_session(uuid)`.
+- Wraps `public.rpc_export_source_objects(text,text,jsonb,jsonb,integer)` bằng guard `admin`/`qa_manager`, giữ implementation cũ để rollback an toàn.
 
 - [ ] **Step 1: Viết SQL contract test RED**
 
 ```js
 assert.match(migration, /create\s+or\s+replace\s+function\s+public\.rpc_catalog_import_preview/i);
 assert.match(migration, /batch\.uploaded_by\s*=\s*auth\.uid\(\)/i);
+assert.match(migration, /admin[\s\S]*qa_manager/i);
+assert.match(migration, /rpc_export_source_objects__manager_lock_impl_20260901/i);
 assert.match(migration, /row_number\s*>\s*p_cursor/i);
 assert.doesNotMatch(stripComments(migration), /['"]uploaded_by['"]|['"]expected_version['"]|['"]input['"]/i);
 for (const artifact of artifacts) assert.equal(countOwnedTransactions(artifact), 1);
@@ -342,10 +348,14 @@ git commit -m "feat: them bang preview import source"
 **Interfaces:**
 - Consumes: API Task 3, table Task 4, action readiness Wave 2.
 - Produces: retry preview, load-more, batch/row reason, conflict preservation, receipt and `onCommitted(pendingChangeIds)`.
+- `CatalogWorkspaceShell` chỉ render thêm/sửa/import/export khi vai trò là `admin`/`qa_manager` và capability tương ứng cho phép.
+- `CatalogWorkspaceShell` hiển thị ghi chú Source ngắn cho cả manager và người chỉ đọc.
 
 - [ ] **Step 1: Viết unit RED cho flow source**
 
 Test source contract xác nhận `source_objects` không còn được gắn `loai: "server"`, component gọi `fetchCatalogImportPreview`, giữ `lyDo` khi commit fail, và textarea có id `cw-import-batch-reason`.
+Test quyền xác nhận workshop roles không thấy nút thêm/sửa/import/export,
+không gọi được RPC tương ứng và vẫn đọc đúng bảng trong phạm vi.
 
 - [ ] **Step 2: Viết E2E RED cho server preview**
 
