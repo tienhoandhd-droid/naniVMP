@@ -7,8 +7,9 @@
 
 ## 1 · Trạng thái Git
 
-- Nhánh làm việc: **`cai-tien/desktop-wave-1`** — **20 commit** trước ref local
-  `origin/main` (`7ae2db1`). **CHƯA push** trong Wave 2; `main` local đang cũ hơn
+- Nhánh làm việc: **`cai-tien/desktop-wave-1`** — xem số commit hiện tại bằng
+  `git rev-list --count origin/main..HEAD`; ref local `origin/main` là `7ae2db1`.
+  **CHƯA push** trong Wave 2/3; `main` local đang cũ hơn
   nhánh làm việc, không dùng làm căn cứ phát hành.
 - Mọi commit đều qua gate: typecheck + unit + e2e mock + (khi đụng UI) a11y/drift/budget.
   Đọc `git log 6fdfe01..HEAD --oneline` — message tiếng Việt không dấu, mô tả đủ.
@@ -37,7 +38,7 @@
    spec/plan:
    `docs/superpowers/specs/2026-09-01-source-import-server-preview-design.md` và
    `docs/superpowers/plans/2026-09-01-source-import-server-preview.md`, commit
-   `aa76d83`..`73e9328`:
+   `aa76d83`..`HEAD`:
    - chỉ `admin`/`qa_manager` được thêm, sửa, nhập và xuất Source; vai trò khác
      chỉ đọc đúng phạm vi, UI có ghi chú ngắn giải thích dữ liệu gốc;
    - RPC preview owner-scoped, exact contract, allowlist field và keyset page;
