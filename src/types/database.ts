@@ -3372,6 +3372,10 @@ export type Database = {
         Returns: Json
       }
       rpc_catalog_history_detail: { Args: { p_id: string }; Returns: Json }
+      rpc_catalog_import_preview: {
+        Args: { p_batch_id: string; p_cursor?: number; p_limit?: number }
+        Returns: Json
+      }
       rpc_check_data_quality: { Args: { p_year?: number }; Returns: Json }
       rpc_check_data_quality__five_role_impl_20260824: {
         Args: { p_year?: number }

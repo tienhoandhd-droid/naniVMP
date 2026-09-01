@@ -31,6 +31,10 @@ import {
   decodeCatalogSuggestionPage,
   type CatalogSuggestionPage,
 } from "./suggestions.ts";
+import {
+  decodeCatalogImportPreview,
+  type CatalogImportPreviewResult,
+} from "./catalogImportPreviewContract.ts";
 
 /** Bọc lỗi hạ tầng thành kết quả có mã, để nơi gọi không phải try/catch. */
 function loiHaTang(e: unknown): { ok: false; errorCode: string; error: string } {
@@ -429,6 +433,42 @@ const CHUA_CO_STAGING = {
 function thieuHam(error: { message: string } | null, data: unknown): boolean {
   if (error) return /PGRST202|Could not find the function|does not exist/i.test(error.message);
   return data === null || data === undefined;
+}
+
+export async function fetchCatalogImportPreview(input: {
+  batchId: string;
+  cursor?: number;
+  limit?: number;
+}): Promise<CatalogImportPreviewResult> {
+  if (!supabase) {
+    return { ok: false, errorCode: "NOT_AVAILABLE", error: "Supabase chưa được cấu hình." };
+  }
+  try {
+    const { data, error } = await supabase.rpc("rpc_catalog_import_preview" as never, {
+      p_batch_id: input.batchId,
+      p_cursor: input.cursor ?? 0,
+      p_limit: input.limit ?? 100,
+    } as never);
+    if (thieuHam(error, data)) {
+      return { ok: false, errorCode: "NOT_AVAILABLE", error: "Server chưa có RPC xem trước lô nhập." };
+    }
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    try {
+      return decodeCatalogImportPreview(data);
+    } catch (cause) {
+      return {
+        ok: false,
+        errorCode: "MALFORMED_RESPONSE",
+        error: `Máy chủ trả bản xem trước không hợp lệ: ${cause instanceof Error ? cause.message : String(cause)}`,
+      };
+    }
+  } catch (cause) {
+    return {
+      ok: false,
+      errorCode: "RPC_ERROR",
+      error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}`,
+    };
+  }
 }
 
 export async function stageCatalogImport(input: {

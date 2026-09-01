@@ -10,7 +10,8 @@ export type CatalogImportPreviewBatchStatus =
   | "uploaded" | "validated" | "committed" | "failed" | "expired";
 export type CatalogImportPreviewErrorCode =
   | "INVALID_ARGUMENT" | "SESSION_INACTIVE" | "BATCH_NOT_FOUND"
-  | "FORBIDDEN" | "BATCH_EXPIRED" | "NOT_AVAILABLE" | "RPC_ERROR";
+  | "FORBIDDEN" | "BATCH_EXPIRED" | "NOT_AVAILABLE" | "RPC_ERROR"
+  | "MALFORMED_RESPONSE";
 
 export interface CatalogImportPreviewCounts {
   created: number;
