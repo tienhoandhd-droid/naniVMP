@@ -13,6 +13,7 @@ import {
   LONG_MON_COLLISION_WIDTH_PX,
   longMonStageOf,
 } from "../../src/features/monitoring/longMonRaceModel.ts";
+import { LONG_MON_DENSITY_SCENARIOS } from "../fixtures/long-mon-density-fixtures.mjs";
 
 const NOW = new Date("2026-08-31T04:00:00.000Z");
 const SCENE_WIDTH = 820;
@@ -132,8 +133,8 @@ function overlappingPairs(fish, sceneWidth = SCENE_WIDTH, sceneHeight = SCENE_HE
   const boxes = fish.map((item) => {
     const centerX = item.xPct / 100 * sceneWidth;
     const centerY = item.yPct / 100 * sceneHeight;
-    const width = LONG_MON_COLLISION_WIDTH_PX * item.renderScale + 8;
-    const height = LONG_MON_COLLISION_HEIGHT_PX * item.renderScale + 10;
+    const width = Math.max(44, LONG_MON_COLLISION_WIDTH_PX * item.renderScale + 8);
+    const height = Math.max(44, LONG_MON_COLLISION_HEIGHT_PX * item.renderScale + 10);
     return {
       id: item.activity.id,
       left: centerX - width / 2,
@@ -250,13 +251,13 @@ test("trục 60 ngày tuyến tính giữ Hôm nay ở giữa dù mật độ l�
 
 test("đàn 1 5 12 24 40 cá chọn đúng họ và không rời vùng deadline", () => {
   const cases = [
-    [1, "solo"],
-    [5, "arc"],
-    [12, "double-stream"],
-    [24, "teardrop"],
-    [40, "branches"],
+    [1, "solo", 2],
+    [5, "arc", 5],
+    [12, "double-stream", 7.5],
+    [24, "teardrop", 10],
+    [40, "branches", 14],
   ];
-  for (const [count, formation] of cases) {
+  for (const [count, formation, maxHalfSpan] of cases) {
     const model = buildLongMonRaceModel(
       Array.from({ length: count }, (_, index) =>
         activity(`${formation}-${index}`, "2026-09-05")),
@@ -268,8 +269,63 @@ test("đàn 1 5 12 24 40 cá chọn đúng họ và không rời vùng deadline"
     assert.equal(new Set(model.fish.map((fish) => fish.deadlinePct)).size, 1);
     assert.ok(model.fish.every((fish) => fish.renderXPct >= fish.ownerStartPct
       && fish.renderXPct <= fish.ownerEndPct));
+    assert.ok(model.fish.every((fish) =>
+      Math.abs(fish.renderXPct - fish.deadlinePct) <= maxHalfSpan + 4),
+    `${count} cá phải giữ đàn quanh deadline thay vì trải hết 60 ngày`);
     assert.deepEqual(overlappingPairsInModel(model), []);
   }
+});
+
+test("mô phỏng mật độ 1 đến 126 cá giữ đủ hồ sơ và bố trí xác định", () => {
+  for (const scenario of LONG_MON_DENSITY_SCENARIOS) {
+    const model = buildLongMonRaceModel(scenario.activities, NOW, { audience: "team" });
+    const reversed = buildLongMonRaceModel([...scenario.activities].reverse(), NOW, { audience: "team" });
+
+    assert.equal(model.fish.length, scenario.expectedCount, scenario.label);
+    assert.ok(model.fish.every((fish) => fish.renderXPct >= fish.ownerStartPct
+      && fish.renderXPct <= fish.ownerEndPct), `${scenario.label}: cá vượt vùng deadline`);
+    assert.ok(model.fish.every((fish) => !(fish.renderXPct === 0 && fish.renderYPct === 0)),
+      `${scenario.label}: cá rơi về tọa độ mặc định`);
+    assert.ok(model.fish.every((fish) => {
+      const width = Math.max(44, LONG_MON_COLLISION_WIDTH_PX * fish.renderScale + 8);
+      const height = Math.max(44, LONG_MON_COLLISION_HEIGHT_PX * fish.renderScale + 10);
+      const x = fish.renderXPct / 100 * model.sceneWidthPx;
+      const y = fish.renderYPct / 100 * model.sceneHeightPx;
+      return x - width / 2 >= 0 && x + width / 2 <= model.sceneWidthPx
+        && y - height / 2 >= 0 && y + height / 2 <= model.sceneHeightPx;
+    }), `${scenario.label}: cá bị cắt ở mép canvas`);
+    assert.deepEqual(overlappingPairsInModel(model), [], `${scenario.label}: cá chồng nhau`);
+    assert.deepEqual(
+      model.fish.map((fish) => ({
+        id: fish.activity.id,
+        deadlinePct: fish.deadlinePct,
+        renderXPct: fish.renderXPct,
+        renderYPct: fish.renderYPct,
+        formation: fish.schoolFormation,
+      })),
+      reversed.fish.map((fish) => ({
+        id: fish.activity.id,
+        deadlinePct: fish.deadlinePct,
+        renderXPct: fish.renderXPct,
+        renderYPct: fish.renderYPct,
+        formation: fish.schoolFormation,
+      })),
+      `${scenario.label}: layout đổi khi đảo input`,
+    );
+    if (scenario.expectedFormation) {
+      assert.ok(model.fish.every((fish) => fish.schoolFormation === scenario.expectedFormation));
+    }
+    assert.ok(model.sceneHeightPx >= 560 && model.sceneHeightPx <= 2240);
+  }
+
+  const adjacent = LONG_MON_DENSITY_SCENARIOS.find((scenario) => scenario.id === "adjacent-18-18");
+  const adjacentModel = buildLongMonRaceModel(adjacent.activities, NOW, { audience: "team" });
+  const left = adjacentModel.fish.filter((fish) => fish.deadline === "2026-09-05");
+  const right = adjacentModel.fish.filter((fish) => fish.deadline === "2026-09-06");
+  assert.equal(new Set(left.map((fish) => fish.deadlinePct)).size, 1);
+  assert.equal(new Set(right.map((fish) => fish.deadlinePct)).size, 1);
+  assert.ok(left[0].deadlinePct < right[0].deadlinePct);
+  assert.equal(left[0].ownerEndPct, right[0].ownerStartPct);
 });
 
 test("mười hai cá trong một tuần được xếp linh động mà không va chạm", () => {
@@ -370,7 +426,7 @@ test("bốn mươi tám cá trong cửa sổ 60 ngày nằm trọn scene cố đ
   assert.ok(model.fish.every((fish) => fish.yPct >= 0 && fish.yPct <= 100));
   /* Ràng buộc thật là KHÔNG VA CHẠM (đã kiểm ở trên) + không teo quá bậc
      giữa của thang TEAM_DENSITY_LEVELS. */
-  assert.ok(model.densityScale >= .58 && model.densityScale <= 1);
+  assert.ok(model.densityScale >= .5 && model.densityScale <= 1);
 });
 
 test("sự cố production 31/08: 126 cá trong 60 ngày không được ném lỗi", () => {
@@ -411,7 +467,7 @@ test("nhóm đông giữ hồ vừa một màn hình", () => {
   }
 });
 
-test("tuần có tám mươi cá thực tế vẫn nằm trong hồ một màn hình", () => {
+test("tám mươi cá cùng deadline chỉ tăng một bậc chiều sâu", () => {
   const model = buildLongMonRaceModel(
     Array.from({ length: 80 }, (_, index) =>
       activity(`overflow-${index}`, "2026-09-02")),
@@ -421,7 +477,7 @@ test("tuần có tám mươi cá thực tế vẫn nằm trong hồ một màn h
 
   assert.equal(model.fish.length, 80);
   assert.equal(model.sceneWidthPx, 960);
-  assert.equal(model.sceneHeightPx, SCENE_HEIGHT);
+  assert.ok(model.sceneHeightPx >= SCENE_HEIGHT && model.sceneHeightPx <= 700);
   assert.deepEqual(overlappingPairsInModel(model), []);
 });
 

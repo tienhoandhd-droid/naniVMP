@@ -110,10 +110,20 @@ try {
         id: item.dataset.longMonFish,
         deadline: item.dataset.deadline,
         week: item.dataset.week,
+        anchor: Number(item.dataset.anchorX),
+        renderX: Number(item.dataset.renderX),
+        ownerStart: Number(item.dataset.ownerStart),
+        ownerEnd: Number(item.dataset.ownerEnd),
+        formation: item.dataset.schoolFormation,
+        motion: item.dataset.motionProfile,
         left: rect.left,
         right: rect.right,
         top: rect.top,
         bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        hitWidth: item.offsetWidth,
+        hitHeight: item.offsetHeight,
       };
     });
     const overlaps = [];
@@ -215,6 +225,18 @@ try {
   assert.deepEqual(desktop.clippedFish, [], `cá bị cắt ở mép: ${desktop.clippedFish.join(", ")}`);
   assert.deepEqual(desktop.overlaps, [], `cá còn xếp chồng: ${desktop.overlaps.join(", ")}`);
   assert.ok(desktop.fishRows.every((fish) => /^\d{4}-\d{2}-\d{2}$/.test(fish.week ?? "")));
+  assert.ok(desktop.fishRows.every((fish) => Number.isFinite(fish.anchor)
+    && Number.isFinite(fish.renderX)
+    && fish.renderX >= fish.ownerStart
+    && fish.renderX <= fish.ownerEnd), "cá mất neo nghiệp vụ hoặc vượt vùng deadline");
+  assert.ok(desktop.fishRows.every((fish) => fish.hitWidth >= 44 && fish.hitHeight >= 44),
+    "vùng bấm cá desktop phải tối thiểu 44×44px");
+  assert.ok(desktop.fishRows.every((fish) => [
+    "solo", "arc", "double-stream", "teardrop", "branches",
+  ].includes(fish.formation)), "cá thiếu họ đội hình");
+  assert.ok(desktop.fishRows.every((fish) => [
+    "glide", "rise", "s-curve", "stream-tilt", "follow", "tail-drift",
+  ].includes(fish.motion)), "cá thiếu nhịp bơi");
   assert.ok(desktop.canvasHeight >= 500 && desktop.canvasHeight <= 680,
     `scene không cố định trong ngưỡng: ${desktop.canvasHeight}px`);
   assert.equal(desktop.sceneWidth, 960);

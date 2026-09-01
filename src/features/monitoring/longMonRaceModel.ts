@@ -127,9 +127,12 @@ const LONG_MON_SCENE_HEIGHT_PX = 560;
 export const LONG_MON_COLLISION_WIDTH_PX = 62;
 export const LONG_MON_COLLISION_HEIGHT_PX = 54;
 const LONG_MON_VISUAL_SCALE_MAX = 1.04;
+const LONG_MON_HIT_TARGET_WIDTH_PX = 44;
+const LONG_MON_HIT_TARGET_HEIGHT_PX = 44;
 const TEAM_DENSITY_LEVELS = [1, .91, .82, .74, .66, .58, .5, .44] as const;
 const MOTION_ENVELOPE_X_PX = 4;
 const MOTION_ENVELOPE_Y_PX = 5;
+const COLLISION_SAFETY_GAP_PX = .5;
 const MOTION_PROFILES: readonly LongMonMotionProfile[] = [
   "glide", "rise", "s-curve", "stream-tilt", "follow", "tail-drift",
 ];
@@ -314,6 +317,15 @@ function formationOf(count: number): LongMonSchoolFormation {
   return "branches";
 }
 
+function ownerHalfSpanPct(count: number): number {
+  if (count === 1) return 2;
+  if (count <= 5) return 5;
+  if (count <= 12) return 7.5;
+  if (count <= 30) return 10;
+  if (count <= 60) return 14;
+  return 26;
+}
+
 function groupByDeadline(fish: readonly LongMonRaceFish[]): Map<string, LongMonRaceFish[]> {
   const groups = new Map<string, LongMonRaceFish[]>();
   for (const item of fish) {
@@ -339,8 +351,11 @@ function prepareDeadlineSchools(fish: LongMonRaceFish[]): void {
     const next = deadlineIndex < deadlines.length - 1
       ? groups.get(deadlines[deadlineIndex + 1])?.[0]
       : undefined;
-    const ownerStartPct = previous ? (previous.deadlinePct + deadlinePct) / 2 : 0;
-    const ownerEndPct = next ? (deadlinePct + next.deadlinePct) / 2 : 100;
+    const halfSpanPct = ownerHalfSpanPct(group.length);
+    const midpointStart = previous ? (previous.deadlinePct + deadlinePct) / 2 : 0;
+    const midpointEnd = next ? (deadlinePct + next.deadlinePct) / 2 : 100;
+    const ownerStartPct = Math.max(midpointStart, deadlinePct - halfSpanPct);
+    const ownerEndPct = Math.min(midpointEnd, deadlinePct + halfSpanPct);
     const schoolFormation = formationOf(group.length);
     group.forEach((item, schoolIndex) => {
       item.ownerStartPct = ownerStartPct;
@@ -382,10 +397,29 @@ function fishIdentity(fish: LongMonRaceFish): string {
   return String(fish.activity.id || fish.activity.code || `${fish.weekKey}:${fish.deadline}`);
 }
 
-function rectAt(xPx: number, yPx: number, scale: number): PlacementRect {
+function reservedSize(scale: number): { width: number; height: number } {
   const reservedScale = scale * LONG_MON_VISUAL_SCALE_MAX;
-  const halfWidth = LONG_MON_COLLISION_WIDTH_PX * reservedScale / 2 + MOTION_ENVELOPE_X_PX;
-  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * reservedScale / 2 + MOTION_ENVELOPE_Y_PX;
+  return {
+    width: Math.max(
+      LONG_MON_HIT_TARGET_WIDTH_PX,
+      LONG_MON_COLLISION_WIDTH_PX * reservedScale + MOTION_ENVELOPE_X_PX * 2,
+    ) + COLLISION_SAFETY_GAP_PX,
+    height: Math.max(
+      LONG_MON_HIT_TARGET_HEIGHT_PX,
+      LONG_MON_COLLISION_HEIGHT_PX * reservedScale + MOTION_ENVELOPE_Y_PX * 2,
+    ) + COLLISION_SAFETY_GAP_PX,
+  };
+}
+
+function safeAxisXPx(percent: number, sceneWidthPx: number, scale: number): number {
+  const halfWidth = reservedSize(scale).width / 2;
+  return halfWidth + percent / 100 * Math.max(0, sceneWidthPx - halfWidth * 2);
+}
+
+function rectAt(xPx: number, yPx: number, scale: number): PlacementRect {
+  const size = reservedSize(scale);
+  const halfWidth = size.width / 2;
+  const halfHeight = size.height / 2;
   return {
     left: xPx - halfWidth,
     right: xPx + halfWidth,
@@ -408,16 +442,13 @@ function formationPreferredPoint(
   sceneHeightPx: number,
   scale: number,
 ): { xPx: number; yPx: number } {
-  const reservedScale = scale * LONG_MON_VISUAL_SCALE_MAX;
-  const halfWidth = LONG_MON_COLLISION_WIDTH_PX * reservedScale / 2 + MOTION_ENVELOPE_X_PX;
-  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * reservedScale / 2 + MOTION_ENVELOPE_Y_PX;
-  const ownerStartPx = item.ownerStartPct / 100 * sceneWidthPx;
-  const ownerEndPx = item.ownerEndPct / 100 * sceneWidthPx;
-  const safeStart = ownerStartPx + halfWidth;
-  const safeEnd = ownerEndPx - halfWidth;
-  const minX = safeStart <= safeEnd ? safeStart : ownerStartPx;
-  const maxX = safeStart <= safeEnd ? safeEnd : ownerEndPx;
-  const anchorX = item.deadlinePct / 100 * sceneWidthPx;
+  const size = reservedSize(scale);
+  const halfHeight = size.height / 2;
+  const ownerStartPx = safeAxisXPx(item.ownerStartPct, sceneWidthPx, scale);
+  const ownerEndPx = safeAxisXPx(item.ownerEndPct, sceneWidthPx, scale);
+  const minX = ownerStartPx;
+  const maxX = ownerEndPx;
+  const anchorX = safeAxisXPx(item.deadlinePct, sceneWidthPx, scale);
   const minY = halfHeight;
   const maxY = sceneHeightPx - halfHeight;
   const count = item.schoolSize;
@@ -481,14 +512,10 @@ function xCandidates(
   sceneWidthPx: number,
   scale: number,
 ): number[] {
-  const reservedScale = scale * LONG_MON_VISUAL_SCALE_MAX;
-  const halfWidth = LONG_MON_COLLISION_WIDTH_PX * reservedScale / 2 + MOTION_ENVELOPE_X_PX;
-  const ownerStartPx = item.ownerStartPct / 100 * sceneWidthPx;
-  const ownerEndPx = item.ownerEndPct / 100 * sceneWidthPx;
-  const safeStart = ownerStartPx + halfWidth;
-  const safeEnd = ownerEndPx - halfWidth;
-  const minX = safeStart <= safeEnd ? safeStart : ownerStartPx;
-  const maxX = safeStart <= safeEnd ? safeEnd : ownerEndPx;
+  const ownerStartPx = safeAxisXPx(item.ownerStartPct, sceneWidthPx, scale);
+  const ownerEndPx = safeAxisXPx(item.ownerEndPct, sceneWidthPx, scale);
+  const minX = ownerStartPx;
+  const maxX = ownerEndPx;
   const candidates = [clamp(preferredX, minX, maxX)];
   const bandCount = Math.max(3, Math.min(17, item.schoolSize));
   const offset = stableHash(`${fishIdentity(item)}:x-band`) % bandCount;
@@ -505,25 +532,33 @@ function yCandidates(
   sceneHeightPx: number,
   scale: number,
 ): number[] {
-  const reservedScale = scale * LONG_MON_VISUAL_SCALE_MAX;
-  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * reservedScale / 2 + MOTION_ENVELOPE_Y_PX;
-  const minY = halfHeight;
-  const maxY = sceneHeightPx - halfHeight;
-  const step = LONG_MON_COLLISION_HEIGHT_PX * reservedScale + 10;
+  const size = reservedSize(scale);
+  const halfHeight = size.height / 2;
+  const artInset = item.schoolSize > 30
+    ? Math.min(42, sceneHeightPx * .075)
+    : Math.min(84, sceneHeightPx * .15);
+  const minY = Math.max(halfHeight, artInset);
+  const maxY = Math.min(sceneHeightPx - halfHeight, sceneHeightPx - artInset);
+  const step = size.height + 10;
   const candidates = [clamp(preferredY, minY, maxY)];
 
   for (let distance = 1; distance <= 8; distance += 1) {
     const signFirst = stableHash(`${fishIdentity(item)}:team-y:${distance}`) % 2 === 0 ? -1 : 1;
-    candidates.push(clamp(preferredY + signFirst * distance * step, minY, maxY));
-    candidates.push(clamp(preferredY - signFirst * distance * step, minY, maxY));
+    const first = preferredY + signFirst * distance * step;
+    const second = preferredY - signFirst * distance * step;
+    if (first >= minY && first <= maxY) candidates.push(first);
+    if (second >= minY && second <= maxY) candidates.push(second);
   }
 
-  const bandCount = 21;
+  const bandCount = Math.max(21, Math.floor((maxY - minY) / (size.height + 1)) + 1);
   const bandOffset = stableHash(`${fishIdentity(item)}:team-band`) % bandCount;
-  for (let band = 0; band < bandCount; band += 1) {
-    const bandIndex = (band + bandOffset) % bandCount;
-    candidates.push(minY + bandIndex / (bandCount - 1) * (maxY - minY));
-  }
+  const bands = Array.from({ length: bandCount }, (_, bandIndex) => ({
+    bandIndex,
+    y: minY + bandIndex / Math.max(1, bandCount - 1) * (maxY - minY),
+  })).sort((left, right) =>
+    Math.abs(left.y - preferredY) - Math.abs(right.y - preferredY)
+    || (left.bandIndex + bandOffset) % bandCount - (right.bandIndex + bandOffset) % bandCount);
+  for (const band of bands) candidates.push(band.y);
 
   return [...new Set(candidates.map((value) => Number(value.toFixed(4))))];
 }
@@ -612,30 +647,80 @@ function emergencyGridPlacement(
   sceneWidthPx: number,
 ): PlacementResult {
   const scale = TEAM_DENSITY_LEVELS[TEAM_DENSITY_LEVELS.length - 1];
-  const cellW = LONG_MON_COLLISION_WIDTH_PX * scale * LONG_MON_VISUAL_SCALE_MAX + 4;
-  const cellH = LONG_MON_COLLISION_HEIGHT_PX * scale * LONG_MON_VISUAL_SCALE_MAX + 6;
+  const size = reservedSize(scale);
+  const sceneHeightPx = TEAM_HEIGHT_LEVELS[TEAM_HEIGHT_LEVELS.length - 1];
+  const rowStep = size.height + .25;
+  const rowCount = Math.max(1, Math.floor((sceneHeightPx - size.height) / rowStep) + 1);
+  const rowY = Array.from({ length: rowCount }, (_, row) =>
+    size.height / 2 + row * rowStep);
   const positions = new Map<string, PlacementPoint>();
-  let maxRows = 1;
-  const groups = groupByDeadline(fish);
+  const placedRects: PlacementRect[] = [];
+  const groups = [...groupByDeadline(fish).entries()].sort((left, right) => {
+    const leftWidth = left[1][0].ownerEndPct - left[1][0].ownerStartPct;
+    const rightWidth = right[1][0].ownerEndPct - right[1][0].ownerStartPct;
+    return leftWidth - rightWidth
+      || right[1].length - left[1].length
+      || left[0].localeCompare(right[0]);
+  });
+
   for (const [, group] of groups) {
     const ordered = [...group].sort((a, b) => a.schoolIndex - b.schoolIndex);
-    const ownerStartPx = ordered[0].ownerStartPct / 100 * sceneWidthPx;
-    const ownerEndPx = ordered[0].ownerEndPct / 100 * sceneWidthPx;
-    const startPx = ownerStartPx + cellW / 2;
-    const endPx = ownerEndPx - cellW / 2;
-    const cols = Math.max(1, Math.floor(Math.max(0, endPx - startPx) / cellW) + 1);
-    ordered.forEach((item, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      maxRows = Math.max(maxRows, row + 1);
+    const minX = safeAxisXPx(ordered[0].ownerStartPct, sceneWidthPx, scale);
+    const maxX = safeAxisXPx(ordered[0].ownerEndPct, sceneWidthPx, scale);
+    const slotCount = maxX - minX < 1
+      ? 1
+      : Math.min(21, Math.ceil((maxX - minX) / 4) + 1);
+    const xSlots = Array.from({ length: slotCount }, (_, slot) =>
+      slotCount === 1 ? minX : minX + slot / (slotCount - 1) * (maxX - minX));
+
+    for (const item of ordered) {
+      const rowOffset = stableHash(`${fishIdentity(item)}:emergency-row`) % rowCount;
+      const candidates = xSlots.map((xPx) => {
+        const freeRows = rowY.filter((yPx) =>
+          !overlapsAny(rectAt(xPx, yPx, scale), placedRects));
+        return { xPx, freeRows };
+      }).sort((left, right) =>
+        right.freeRows.length - left.freeRows.length
+        || Math.abs(left.xPx - item.deadlinePct / 100 * sceneWidthPx)
+          - Math.abs(right.xPx - item.deadlinePct / 100 * sceneWidthPx));
+      const column = candidates.find((candidate) => candidate.freeRows.length > 0);
+      if (!column) continue;
+      const yPx = column.freeRows[rowOffset % column.freeRows.length];
       positions.set(fishIdentity(item), {
-        xPx: clamp(startPx + col * cellW, ownerStartPx, ownerEndPx),
-        yPx: cellH * (row + 1),
+        xPx: column.xPx,
+        yPx,
         rotateDeg: 0,
       });
-    });
+      placedRects.push(rectAt(column.xPx, yPx, scale));
+    }
   }
-  const sceneHeightPx = Math.max(LONG_MON_SCENE_HEIGHT_PX, Math.ceil(cellH * (maxRows + 1.5)));
+
+  /* Siêu dữ liệu bất thường vượt cả lưới 2240px: vẫn trả đủ cá theo một
+     cột nối tiếp để trang không trắng. Gate mật độ thực tế phải giữ nhánh
+     này không được chạm tới. */
+  if (positions.size < fish.length) {
+    let overflowRow = rowCount;
+    for (const item of fish) {
+      if (positions.has(fishIdentity(item))) continue;
+      const xPx = clamp(
+        safeAxisXPx(item.deadlinePct, sceneWidthPx, scale),
+        size.width / 2,
+        sceneWidthPx - size.width / 2,
+      );
+      positions.set(fishIdentity(item), {
+        xPx,
+        yPx: size.height / 2 + overflowRow * size.height,
+        rotateDeg: 0,
+      });
+      overflowRow += 1;
+    }
+    return {
+      positions,
+      densityScale: scale,
+      sceneWidthPx,
+      sceneHeightPx: Math.ceil(size.height * overflowRow),
+    };
+  }
   return { positions, densityScale: scale, sceneWidthPx, sceneHeightPx };
 }
 
@@ -658,10 +743,11 @@ function personalYCandidates(
   scale: number,
   activity: Activity,
 ): number[] {
-  const halfHeight = LONG_MON_COLLISION_HEIGHT_PX * scale / 2;
+  const size = reservedSize(scale);
+  const halfHeight = size.height / 2;
   const minY = halfHeight;
   const maxY = LONG_MON_SCENE_HEIGHT_PX - halfHeight;
-  const step = LONG_MON_COLLISION_HEIGHT_PX * scale + 8;
+  const step = size.height + 8;
   const candidates = [clamp(preferredY, minY, maxY)];
   for (let distance = 1; distance <= 6; distance += 1) {
     const signFirst = stableHash(`${activity.id}:personal-sign:${distance}`) % 2 === 0 ? -1 : 1;
@@ -746,7 +832,23 @@ function applyPlacement(
   for (const item of fish) {
     const point = placement.positions.get(fishIdentity(item));
     if (!point) continue;
-    item.renderXPct = point.xPx / placement.sceneWidthPx * 100;
+    const ownerStartPct = safeAxisXPx(
+      item.ownerStartPct,
+      placement.sceneWidthPx,
+      placement.densityScale,
+    ) / placement.sceneWidthPx * 100;
+    const ownerEndPct = safeAxisXPx(
+      item.ownerEndPct,
+      placement.sceneWidthPx,
+      placement.densityScale,
+    ) / placement.sceneWidthPx * 100;
+    item.renderXPct = clamp(
+      point.xPx / placement.sceneWidthPx * 100,
+      ownerStartPct,
+      ownerEndPct,
+    );
+    item.ownerStartPct = ownerStartPct;
+    item.ownerEndPct = ownerEndPct;
     item.renderYPct = point.yPx / placement.sceneHeightPx * 100;
     item.xPct = item.renderXPct;
     item.yPct = item.renderYPct;
