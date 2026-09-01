@@ -143,6 +143,30 @@ test("axe · hop-cap-nhat-tien-do", async ({ page }, testInfo) => {
   }))).toEqual([]);
 });
 
+test("axe · hop-chuyen-phu-trach-workload", async ({ page }, testInfo) => {
+  await caiGiaLap(page, { dangNhap: true });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/#v=workload");
+  await expect(page.locator("[data-workload-detail-trigger]").first()).toBeVisible({ timeout: 15_000 });
+  await page.locator("[data-workload-detail-trigger]").first().click();
+  await expect(page.locator("[data-workload-owner-transfer]").first()).toBeVisible({ timeout: 10_000 });
+  await page.locator("[data-workload-owner-transfer]").first().click();
+  await expect(page.getByRole("dialog", { name: "Chuyển phụ trách" })).toBeVisible({ timeout: 10_000 });
+
+  const kq = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  await testInfo.attach("axe-hop-chuyen-phu-trach-workload.json", {
+    body: JSON.stringify(kq.violations, null, 2),
+    contentType: "application/json",
+  });
+  const nang = kq.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+  expect(nang.map((v) => ({
+    id: v.id, impact: v.impact,
+    mau: v.nodes.slice(0, 3).map((n) => n.target.join(" ")),
+  }))).toEqual([]);
+});
+
 for (const man of MAN) {
   test(`axe · ${man.ten}`, async ({ page }, testInfo) => {
     await caiGiaLap(page, { dangNhap: man.dangNhap });

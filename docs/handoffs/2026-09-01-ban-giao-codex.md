@@ -38,13 +38,25 @@
    spec/plan:
    `docs/superpowers/specs/2026-09-01-source-import-server-preview-design.md` và
    `docs/superpowers/plans/2026-09-01-source-import-server-preview.md`, commit
-   `aa76d83`..`HEAD`:
+   `aa76d83`..`f0da85e`:
    - chỉ `admin`/`qa_manager` được thêm, sửa, nhập và xuất Source; vai trò khác
      chỉ đọc đúng phạm vi, UI có ghi chú ngắn giải thích dữ liệu gốc;
    - RPC preview owner-scoped, exact contract, allowlist field và keyset page;
    - bảng create/update/unchanged/error, A3 trước→sau, tải thêm, lý do từng dòng;
    - nút Ghi không còn khóa im lặng: báo lỗi cạnh trường, focus đúng lý do,
      giữ draft khi RPC lỗi/conflict và giữ biên nhận sau commit.
+6. **Chuyển người phụ trách từ Khối lượng** — spec/plan:
+   `docs/superpowers/specs/2026-09-01-workload-owner-transfer-design.md` và
+   `docs/superpowers/plans/2026-09-01-workload-owner-transfer.md`:
+   - Admin/Quản lý QA mở chi tiết tải và chuyển từng hạng mục bằng UUID danh bạ;
+   - bắt buộc lý do + xác nhận người cũ → người mới; QA staff không thấy nút;
+   - dùng RPC hiện có `rpc_set_item_performer_by_id`, ghi Source canonical rồi
+     tải lại dashboard; không có migration mới.
+
+Gate mục tiêu chuyển người: unit/SSR/UI `17/17`; E2E manager + QA staff đạt;
+axe dialog `1/1`; typecheck và build exit `0`. Build còn đúng các cảnh báo font
+và dynamic-import đã có sẵn, không phát sinh lỗi mới. Preview build mới đang ở
+`http://127.0.0.1:4180` để kiểm local; chưa push/deploy.
 
 Gate chốt Wave 3 local: targeted unit/SQL contract `29/29`; RPC inventory mục
 tiêu `1/1`; Catalog E2E `151/151`; Source role E2E đạt; a11y `15/15`; typecheck,
@@ -110,8 +122,8 @@ git trước khi tin.
 
 ## 6 · Việc kế tiếp hợp lý (đã ghi trong spec/plan, chưa làm)
 
-- Ngoài-phạm-vi còn lại của Bàn quản trị: chuyển-phụ-trách một-bấm từ Workload,
-  snapshot báo cáo bất biến. URL cho tab đã hoàn tất ở `cd8cd2a`.
+- Ngoài-phạm-vi còn lại của Bàn quản trị: snapshot báo cáo bất biến. Chuyển
+  phụ trách từ Workload đã hoàn tất local; URL cho tab đã hoàn tất ở `cd8cd2a`.
 - Kế hoạch mẹ đợt sau: dump schema gốc vào repo (cần DB URL), server thành nguồn
   sự thật KPI (màn Đối chiếu mới là bước đệm), chức năng GMP (đính kèm hồ sơ,
   phê duyệt điện tử, log EXPORT).

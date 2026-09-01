@@ -1355,7 +1355,8 @@ function VerifiedAppShell({ user, logout, access }: {
                   được chuẩn hoá thành `alerts` và `progress` ngay tại biên
                   đọc URL, nên tới đây chỉ còn tên chuẩn. */}
               {!boundaryDuLieu && view === "alerts" && <AlertsView acts={filteredActs} />}
-              {!boundaryDuLieu && view === "workload" && <WorkloadView acts={filteredActs} />}
+              {!boundaryDuLieu && view === "workload" && <WorkloadView acts={filteredActs}
+                businessRole={access.businessRole} onReload={reloadData} />}
               {!boundaryDuLieu && view === "reports" && <ReportsViewMemo acts={filteredActs} />}
               {/* Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là

@@ -11,6 +11,9 @@ import { Card, CardTitle, Tag, Donut, Pill, CauKetLuan } from "../components/ui/
 import ViewportDialog from "../components/ui/ViewportDialog.tsx";
 import NhomTab, { NhomTabPanel, DongSo, useNhomTab } from "../components/ui/NhomTab.tsx";
 import type { ValiMood } from "../components/brand/ValiIllustration.tsx";
+import WorkloadOwnerTransferDialog from "../features/workload/WorkloadOwnerTransferDialog.tsx";
+import { canTransferWorkloadOwner } from "../features/workload/workloadOwnerTransferModel.ts";
+import type { BusinessRole } from "../lib/access.ts";
 
 /* Nhãn tâm trạng của Vali — CÙNG lời với màn "Việc hôm nay" (đồng nhất
  * nhân vật 31/08): một tâm trạng, một tên gọi, trên mọi màn. */
@@ -35,9 +38,11 @@ interface WlPerson {
   critCao: number;
 }
 
-export function WorkloadDetailModal({ detail, onClose }: {
+export function WorkloadDetailModal({ detail, onClose, canTransfer = false, onTransfer }: {
   detail: { title: string; tasks: PlanActivity[]; [k: string]: unknown };
   onClose: () => void;
+  canTransfer?: boolean;
+  onTransfer?: (activity: PlanActivity) => void;
 }) {
   const tasks = [...detail.tasks].sort(
     (a, b) => (parseD(a.target)?.getTime() ?? 0) - (parseD(b.target)?.getTime() ?? 0),
@@ -77,6 +82,15 @@ export function WorkloadDetailModal({ detail, onClose }: {
                 <Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag>
                 <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{a.name}</span>
                 <Pill s={a.st} small />
+                {canTransfer && onTransfer && (
+                  <button type="button" data-workload-owner-transfer={a.code}
+                    onClick={() => onTransfer(a)}
+                    style={{ marginLeft: "auto", minHeight: 32, padding: "0 11px", borderRadius: 10,
+                      cursor: "pointer", border: `1px solid ${C.lav}`, background: C.lavSoft,
+                      color: C.lavText, fontFamily: TEXT, fontSize: 12, fontWeight: 800 }}>
+                    Chuyển phụ trách
+                  </button>
+                )}
               </div>
               <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 9 }}>{a.code} · {a.owner} · đích {a.target ? fmtVN(parseD(a.target)) : "—"} · còn <b style={{ color: C.lavText }}>{congConLai(a)} nc</b></div>
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
@@ -111,10 +125,15 @@ export function WorkloadDetailModal({ detail, onClose }: {
  * thay bằng TAB thật (NhomTab) — mỗi tab một câu hỏi vận hành, không phải
  * cuộn qua mọi thứ để tìm một mục. */
 
-export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
+export default function WorkloadView({ acts, businessRole, onReload }: {
+  acts: PlanActivity[];
+  businessRole: BusinessRole | null;
+  onReload: () => void | Promise<void>;
+}) {
   const [scope, setScope] = useState("month");
   const [metric, setMetric] = useState("cong");
   const [detail, setDetail] = useState<{ title: string; tasks: PlanActivity[] } | null>(null);
+  const [transferActivity, setTransferActivity] = useState<PlanActivity | null>(null);
   const TAB_IDS = ["suc-tai", "ma-tran", "nhom-viec", "theo-nguoi", "trong-yeu"] as const;
   const [tab, setTab] = useNhomTab("workload", "suc-tai", TAB_IDS);
 
@@ -339,7 +358,16 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
 
   return (
     <div className="reg reg--tron">
-      {detail && <WorkloadDetailModal detail={detail} onClose={() => setDetail(null)} />}
+      {detail && <WorkloadDetailModal detail={detail} onClose={() => setDetail(null)}
+        canTransfer={canTransferWorkloadOwner(businessRole)}
+        onTransfer={(activity) => {
+          setDetail(null);
+          setTransferActivity(activity);
+        }} />}
+      {transferActivity && (
+        <WorkloadOwnerTransferDialog activity={transferActivity}
+          onClose={() => setTransferActivity(null)} onReload={onReload} />
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* #1 (01/09): hero về KHUNG VALI dùng chung (.vali-hero, lotus-
           components.css) — cùng nhịp chibi/eyebrow/mô tả với màn Hôm nay
@@ -424,7 +452,9 @@ export default function WorkloadView({ acts }: { acts: PlanActivity[] }) {
                emoji trạng thái nghiệp vụ (Atelier §5). */
             const band = ratio > 1 ? { l: "Quá tải", c: C.rasp, t: C.raspText, bg: C.raspSoft, I: AlertTriangle } : ratio >= 0.6 ? { l: "Khá bận", c: C.marigold, t: C.marigoldText, bg: C.marigoldSoft, I: Gauge } : { l: "Thong thả", c: C.mint, t: C.mintText, bg: C.mintSoft, I: CheckCircle2 };
             return (
-              <button key={p.name} className="vmp-lift" onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))} style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: 15, fontFamily: TEXT }}>
+              <button key={p.name} className="vmp-lift" data-workload-detail-trigger={p.name}
+                onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))}
+                style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: 15, fontFamily: TEXT }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 16, flexShrink: 0 }}>{p.name[0]}</div>
                   <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 14, color: C.plum }}>{p.name}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{p.count} hạng mục</div></div>
