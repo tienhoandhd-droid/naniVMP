@@ -94,7 +94,7 @@ assert.deepEqual(
 );
 assert.throws(() => appendCatalogImportPreviewPage(stateA, pageOfBatchB), /batch/i);
 assert.equal(catalogImportCommitBlock({ busy: false, previewOk: true,
-  status: "validated", errors: 0, reason: " " })?.fieldId, "cw-import-batch-reason");
+  status: "validated", errors: 0, reason: " " })?.focusId, "cw-import-batch-reason");
 ```
 
 - [ ] **Step 5: Cài model thuần**
@@ -102,11 +102,11 @@ assert.equal(catalogImportCommitBlock({ busy: false, previewOk: true,
 ```ts
 export function catalogImportCommitBlock(input: CommitReadinessInput): ActionBlock | null {
   return firstActionBlock([
-    input.busy ? { code: "request", message: "Đang ghi lô", fieldId: null } : null,
-    !input.previewOk ? { code: "preview", message: "Chưa có kết quả đối chiếu server", fieldId: null } : null,
-    input.status !== "validated" ? { code: "status", message: "Batch chưa sẵn sàng", fieldId: null } : null,
-    input.errors > 0 ? { code: "rows", message: `Còn ${input.errors} dòng lỗi`, fieldId: null } : null,
-    !input.reason.trim() ? { code: "required", message: "Nhập lý do của cả lô", fieldId: "cw-import-batch-reason" } : null,
+    { blocked: input.busy, code: "request", message: "Đang ghi lô" },
+    { blocked: !input.previewOk, code: "preview", message: "Chưa có kết quả đối chiếu server" },
+    { blocked: input.status !== "validated", code: "status", message: "Batch chưa sẵn sàng" },
+    { blocked: input.errors > 0, code: "rows", message: `Còn ${input.errors} dòng lỗi` },
+    { blocked: !input.reason.trim(), code: "required", message: "Nhập lý do của cả lô", focusId: "cw-import-batch-reason" },
   ]);
 }
 ```
