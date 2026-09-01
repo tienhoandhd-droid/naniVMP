@@ -302,7 +302,6 @@ function LongMonRace({
                       <span className="long-mon-race__fish-body">
                         <span className="long-mon-race__wake" aria-hidden="true" />
                         <span className="long-mon-race__sprite" style={spriteStyle(stage)} aria-hidden="true" />
-                        <span className="long-mon-race__code" aria-hidden="true">{code}</span>
                       </span>
                       <span className="long-mon-race__tooltip" aria-hidden="true">
                         <strong>{code}</strong>

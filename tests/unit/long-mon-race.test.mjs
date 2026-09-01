@@ -547,6 +547,8 @@ test("trường đua kể hành trình 60 ngày, cá có tên truy cập và leg
   assert.match(html, /data-school-formation="solo"/);
   assert.match(html, /data-motion-profile="(?:glide|rise|s-curve|stream-tilt|follow|tail-drift)"/);
   assert.match(html, /class="long-mon-race__fish-body"/);
+  assert.doesNotMatch(html, /class="long-mon-race__code"/);
+  assert.match(html, /class="long-mon-race__tooltip"/);
   assert.match(html, /data-long-mon-week="2026-08-31"/);
   assert.match(html, /--school-x:[^;]+;--school-y:[^;]+;--school-scale:[^;]+;--school-rotate:/);
   assert.match(html, /data-long-mon-audience="team"/);
