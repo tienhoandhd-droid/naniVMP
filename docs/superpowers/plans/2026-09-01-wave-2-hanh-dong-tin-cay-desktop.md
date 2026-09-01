@@ -16,6 +16,24 @@
 - TDD bắt buộc: mỗi thay đổi hành vi phải có test RED trước code production.
 - Chỉ chạy gate rộng khi thay đổi boundary dùng chung yêu cầu.
 
+## Trạng thái thực thi local (01/09/2026)
+
+Đã hoàn tất toàn bộ 8 task trên nhánh `cai-tien/desktop-wave-1`; các commit có
+thể đối chiếu trực tiếp bằng `git log`:
+
+| Task | Commit |
+| --- | --- |
+| 1 · Hợp đồng hành động | `b1835e5` |
+| 2 · Tài khoản và liên kết | `49ffba4` |
+| 3 · Phân công, phạm vi, deadline | `41a6771` |
+| 4 · Tổng quan theo người | `e0c587a` |
+| 5 · Tab quản trị trong URL | `cd8cd2a` |
+| 6 · Timestamp Bangkok | `3d18cdd` |
+| 7 · Gỡ runtime 3D | `f2e7750` |
+| 8 · Gate local và ổn định a11y | `dec1387` + bằng chứng trong bàn giao |
+
+Không có push/deploy/migration production trong đợt thực thi này.
+
 ---
 
 ### Task 1: Hợp đồng nút lưu có thể giải thích

@@ -7,8 +7,9 @@
 
 ## 1 · Trạng thái Git
 
-- Nhánh làm việc: **`cai-tien/desktop-wave-1`** — **33 commit** từ gốc `6fdfe01`
-  (origin/main). **CHƯA push** — chủ dự án chưa ra lệnh. `main` local = origin/main.
+- Nhánh làm việc: **`cai-tien/desktop-wave-1`** — **10 commit** trước ref local
+  `origin/main` (`7ae2db1`). **CHƯA push** trong Wave 2; `main` local đang cũ hơn
+  nhánh làm việc, không dùng làm căn cứ phát hành.
 - Mọi commit đều qua gate: typecheck + unit + e2e mock + (khi đụng UI) a11y/drift/budget.
   Đọc `git log 6fdfe01..HEAD --oneline` — message tiếng Việt không dấu, mô tả đủ.
 
@@ -24,6 +25,19 @@
    spec `docs/superpowers/specs/2026-09-01-ban-quan-tri-design.md`,
    commit `d8e130d`..`3be48f2`. Khung dùng chung: `src/components/ui/NhomTab.tsx`
    (NhomTab/NhomTabPanel/DongSo/useNhomTab — tab nhớ localStorage `vmp.tab.<man>`).
+4. **Wave 2 — hành động tin cậy và desktop gọn** — plan
+   `docs/superpowers/plans/2026-09-01-wave-2-hanh-dong-tin-cay-desktop.md`,
+   commit `399b2df`..`dec1387`:
+   - nút lưu tài khoản/phân công/phạm vi/deadline chỉ đúng trường cần sửa;
+   - KPI theo người khớp nguồn canonical; tab quản trị deep-link qua URL;
+   - timestamp hiển thị cố định Asia/Bangkok;
+   - gỡ toàn bộ runtime/dependency Three.js không còn dùng (2.408 dòng mã chết);
+   - ổn định a11y modal bằng reduced-motion khi quét tương phản.
+
+Gate chốt Wave 2: unit Windows `671 pass, 1 skip, 0 fail`; E2E cốt lõi
+`148/148`; quyền quản trị `80/80`; deadline `39/39`; shell `29/29`;
+Source/phạm vi và Today-person đều đạt; a11y `15/15`; drift và budget đạt;
+build production exit `0`.
 
 Đánh giá gốc toàn hệ (6 mảng, điểm số, top rủi ro): artifact
 https://claude.ai/code/artifact/8251fc3d-9d85-40fc-8ab0-309f91e0ae89 và kế hoạch mẹ
@@ -56,9 +70,8 @@ https://claude.ai/code/artifact/8251fc3d-9d85-40fc-8ab0-309f91e0ae89 và kế ho
   rồi `node tests/e2e/<file>.mjs`. Bộ CI = 9 file trong `deploy.yml` + `shell`.
 - `tests/e2e/quet-tat-ca-man.mjs` và `npm run e2e` **đăng nhập THẬT vào production**
   — đừng chạy trừ khi chủ dự án bảo.
-- `tests/e2e/today-personal-scope.mjs` **hỏng từ trước wave** (đã kiểm tại `6fdfe01`,
-  fail dòng 421 — tile "Hoàn thành VMP" không render trong kịch bản chọn người +
-  kỳ custom). Chưa vào CI; là việc sửa riêng.
+- `tests/e2e/today-personal-scope.mjs` đã được cập nhật theo hero hiện hành ở
+  `e0c587a` và đang đạt; không phục hồi assertion tile cũ đã bị thiết kế bỏ.
 - Gate bắt buộc khác: `npm run drift` (0 vi phạm — ĐANG là gate CI),
   `npm run budget` (sau build), `npx playwright test -c playwright.a11y.config.ts`
   (15 kịch bản).
@@ -73,11 +86,11 @@ git trước khi tin.
 
 ## 6 · Việc kế tiếp hợp lý (đã ghi trong spec/plan, chưa làm)
 
-- Ngoài-phạm-vi của Bàn quản trị: URL cho tab (đụng `src/lib/urlState.ts`),
-  chuyển-phụ-trách một-bấm từ Workload, snapshot báo cáo bất biến.
+- Ngoài-phạm-vi còn lại của Bàn quản trị: chuyển-phụ-trách một-bấm từ Workload,
+  snapshot báo cáo bất biến. URL cho tab đã hoàn tất ở `cd8cd2a`.
 - Kế hoạch mẹ đợt sau: dump schema gốc vào repo (cần DB URL), server thành nguồn
   sự thật KPI (màn Đối chiếu mới là bước đệm), chức năng GMP (đính kèm hồ sơ,
-  phê duyệt điện tử, log EXPORT), sửa `today-personal-scope`.
+  phê duyệt điện tử, log EXPORT).
 - Mobile: chủ dự án HOÃN — đừng làm khi chưa được yêu cầu lại.
 
 ## 7 · Bản đồ file nhanh cho người mới
