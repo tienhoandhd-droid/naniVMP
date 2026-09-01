@@ -561,10 +561,12 @@ function GlobalFilterBar({
     <label className={rutGon ? undefined : "vmp-global-filter__person"} style={{ display: "inline-flex", alignItems: "center", gap: 7, color: C.plumSoft,
       fontFamily: TEXT, fontSize: 12, fontWeight: 800 }}>
       <Users size={14} aria-hidden="true" />
-      {!rutGon && <span>Theo nhân sự</span>}
+      {!rutGon && <span>Tiến độ của</span>}
       <select aria-label="Chọn nhân sự xem tiến độ" value={selectedPersonId ?? ""}
         onChange={(event) => setSelectedPersonId(event.target.value || null)}
-        style={{ ...INP, width: "auto", minWidth: 170, minHeight: rutGon ? 42 : undefined, padding: "6px 30px 6px 10px", fontSize: 12 }}>
+        style={{ ...INP, width: "auto", minWidth: 170, minHeight: rutGon ? 42 : undefined,
+          padding: "6px 30px 6px 10px", fontSize: 12,
+          ...(!rutGon ? { border: "none", background: C.pinkMist, boxShadow: "none" } : {}) }}>
         <option value="">Cả nhóm</option>
         {personOptions.map((person) => (
           <option key={person.personId} value={person.personId}>
@@ -627,45 +629,47 @@ function GlobalFilterBar({
   return (
     <div role="group" aria-label="Phạm vi toàn hệ thống" className="vmp-global-filter">
       <div className="vmp-global-filter__primary">
-        <span className="vmp-global-filter__scope"><Filter size={15} aria-hidden="true" />Toàn hệ thống</span>
-        {personControl}
-        <div ref={popRef} className="vmp-global-filter__popover">
-          <button id="vmp-global-filter-trigger" ref={triggerRef} className="vmp-global-filter__trigger" type="button"
-            onClick={() => setOpen((value) => !value)} aria-haspopup="dialog" aria-expanded={open}
-            aria-controls="vmp-global-filter-panel">
-            Bộ lọc{soLoc ? ` (${soLoc})` : ""}
-          </button>
-          {open && (
-            <div id="vmp-global-filter-panel" role="dialog" aria-labelledby="vmp-global-filter-trigger"
-              className="vmp-global-filter__panel vmp-scroll">
-              <fieldset className="vmp-global-filter__group">
-                <legend>Khoảng thời gian</legend>
-                <div className="vmp-global-filter__dates">
-                  <input type="date" value={customFrom} onChange={(event) => onFrom(event.target.value)}
-                    disabled={todayMode} aria-label="Từ ngày" style={dateInp} />
-                  <span aria-hidden="true">→</span>
-                  <input type="date" value={customTo} onChange={(event) => onTo(event.target.value)}
-                    disabled={todayMode} aria-label="Đến ngày" style={dateInp} />
+        <div className="vmp-global-filter__left">
+          <span className="vmp-global-filter__scope"><Filter size={15} aria-hidden="true" />Toàn hệ thống</span>
+          <div ref={popRef} className="vmp-global-filter__popover">
+            <button id="vmp-global-filter-trigger" ref={triggerRef} className="vmp-global-filter__trigger" type="button"
+              onClick={() => setOpen((value) => !value)} aria-haspopup="dialog" aria-expanded={open}
+              aria-controls="vmp-global-filter-panel">
+              Bộ lọc{soLoc ? ` (${soLoc})` : ""}
+            </button>
+            {open && (
+              <div id="vmp-global-filter-panel" role="dialog" aria-labelledby="vmp-global-filter-trigger"
+                className="vmp-global-filter__panel vmp-scroll">
+                <fieldset className="vmp-global-filter__group">
+                  <legend>Khoảng thời gian</legend>
+                  <div className="vmp-global-filter__dates">
+                    <input type="date" value={customFrom} onChange={(event) => onFrom(event.target.value)}
+                      disabled={todayMode} aria-label="Từ ngày" style={dateInp} />
+                    <span aria-hidden="true">→</span>
+                    <input type="date" value={customTo} onChange={(event) => onTo(event.target.value)}
+                      disabled={todayMode} aria-label="Đến ngày" style={dateInp} />
+                  </div>
+                  {todayMode && <p className="vmp-global-filter__hint">Việc hôm nay tự dùng cửa sổ 7 ngày.</p>}
+                </fieldset>
+                <fieldset className="vmp-global-filter__group">
+                  <legend>Bộ phận</legend>
+                  {deptOptions.map((option) => optRow(option, deptSel.includes(option.v), toggleDept,
+                    ((DEPT_CHIP as Record<string, { dot?: string }>)[option.v] || {}).dot || C.pink))}
+                </fieldset>
+                <fieldset className="vmp-global-filter__group">
+                  <legend>Khu vực</legend>
+                  {areaOptions.length === 0
+                    ? <p className="vmp-global-filter__empty">Không có khu vực</p>
+                    : areaOptions.map((option) => optRow(option, areaSel.includes(option.v), toggleArea, C.marigold))}
+                </fieldset>
+                <div className="vmp-global-filter__footer">
+                  <button type="button" className="vmp-global-filter__done" onClick={closeAndFocusTrigger}>Xong</button>
                 </div>
-                {todayMode && <p className="vmp-global-filter__hint">Việc hôm nay tự dùng cửa sổ 7 ngày.</p>}
-              </fieldset>
-              <fieldset className="vmp-global-filter__group">
-                <legend>Bộ phận</legend>
-                {deptOptions.map((option) => optRow(option, deptSel.includes(option.v), toggleDept,
-                  ((DEPT_CHIP as Record<string, { dot?: string }>)[option.v] || {}).dot || C.pink))}
-              </fieldset>
-              <fieldset className="vmp-global-filter__group">
-                <legend>Khu vực</legend>
-                {areaOptions.length === 0
-                  ? <p className="vmp-global-filter__empty">Không có khu vực</p>
-                  : areaOptions.map((option) => optRow(option, areaSel.includes(option.v), toggleArea, C.marigold))}
-              </fieldset>
-              <div className="vmp-global-filter__footer">
-                <button type="button" className="vmp-global-filter__done" onClick={closeAndFocusTrigger}>Xong</button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+        {personControl}
       </div>
       {hasVisibleChips && (
         <div className="vmp-global-filter__chips">
@@ -1178,8 +1182,7 @@ function VerifiedAppShell({ user, logout, access }: {
         <div style={{ position: "relative", zIndex: 1 }}>
           <TopbarMemo
             title={title} user={user} sub={(NAV_SUBS as Record<string, string>)[view]}
-            onRefresh={reloadData} refreshing={conn.status === "loading"}
-            lastSync={lastSync} dataUpdatedAt={dataUpdatedAt}
+            dataUpdatedAt={dataUpdatedAt}
             view={view} setView={setView} access={access}
             onLogout={xinThoat} onChangePw={moDoiMatKhau}
             showMasthead={view === "overview"}

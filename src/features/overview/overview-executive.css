@@ -18,9 +18,17 @@
 .vmp-global-filter__primary {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.vmp-global-filter__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .vmp-global-filter__scope {
@@ -33,8 +41,16 @@
   white-space: nowrap;
 }
 
-.vmp-global-filter__person { min-width: 0; }
-.vmp-global-filter__person select { min-height: 36px; border-radius: 10px; }
+.vmp-global-filter__person {
+  min-width: 0;
+  margin-left: auto;
+  padding: 3px 4px 3px 11px;
+  border: 1px solid var(--lp-gold-hairline);
+  border-radius: 999px;
+  background: var(--lp-bg-raised);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 62%, transparent);
+}
+.vmp-global-filter__person select { min-height: 34px; border-radius: 999px !important; }
 .vmp-global-filter__popover { position: relative; }
 
 .vmp-global-filter__trigger,
@@ -174,8 +190,9 @@
 @media (max-width: 640px) {
   .vmp-global-filter { padding: 10px; }
   .vmp-global-filter__primary { align-items: stretch; gap: 8px; }
+  .vmp-global-filter__left { width: 100%; justify-content: space-between; }
   .vmp-global-filter__scope { min-height: 32px; }
-  .vmp-global-filter__person { width: 100%; }
+  .vmp-global-filter__person { width: 100%; margin-left: 0; }
   .vmp-global-filter__person select { min-height: 44px; min-width: 0 !important; flex: 1; }
   .vmp-global-filter__popover { flex: 1 0 100%; }
   .vmp-global-filter__trigger { width: 100%; min-height: 44px; }

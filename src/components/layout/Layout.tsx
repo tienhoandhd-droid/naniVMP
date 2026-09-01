@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
-  KeyRound, LogOut, ShieldCheck, RefreshCw, Menu, X, Sun, Moon, Monitor,
+  KeyRound, LogOut, Menu, X, Sun, Moon, Monitor,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
@@ -17,7 +17,7 @@ import { CrownLogo, tuoiDuLieu } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
 import type { ScreenId } from "../../lib/access.ts";
-import { formatBangkokDateTime, formatBangkokShortDateTime, formatBangkokTime } from "../../lib/formatBangkok.ts";
+import { formatBangkokDateTime, formatBangkokShortDateTime } from "../../lib/formatBangkok.ts";
 /* Nhãn năm vai nghiệp vụ hiệu lực — dùng lại đúng bảng nhãn của màn Phân quyền
    (nguồn duy nhất) thay vì `PERM_LABEL`/`BUSINESS_ROLE_LABELS` cũ, để
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
@@ -137,7 +137,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
       </nav>
 
       {/* User card */}
-      <div style={{
+      <div className="vmp-sidebar-account__identity" style={{
         marginTop: 14, padding: collapsed ? "10px" : "13px",
         borderRadius: 16, background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
       }}>
@@ -168,7 +168,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+            <div style={{ display: "flex", gap: 4, marginTop: 11 }}>
               {/* nowrap + đệm ngang hẹp: sidebar nay là 248px thay vì 266px,
                   và ở bề ngang đó nhãn "Mật khẩu" bị bẻ xuống hai dòng. */}
               <button onClick={onChangePw} style={{
@@ -187,6 +187,9 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               }}>
                 <LogOut size={14} /> Thoát
               </button>
+              <div className="vmp-sidebar-theme" style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+                <ThemeToggle compact />
+              </div>
             </div>
           </>
         )}
@@ -391,7 +394,7 @@ function useThemeMode(): [ThemeMode, (m: ThemeMode) => void] {
    Ba nút chiếm chỗ cố định trên mọi màn hình để phục vụ một thao tác mà
    người dùng làm vài lần trong đời. Một nút hiện trạng thái đang dùng, bấm
    thì chuyển sang chế độ kế tiếp — vẫn tới được cả ba, mà chỉ tốn 1/3 chỗ. */
-function ThemeToggle() {
+function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
   const [mode, setMode] = useThemeMode();
   const opts: Array<{ id: ThemeMode; icon: typeof Sun; label: string }> = [
     { id: "light", icon: Sun, label: "Sáng" },
@@ -407,17 +410,17 @@ function ThemeToggle() {
       onClick={() => setMode(next.id)}
       title={`Giao diện: ${cur.label} — bấm để chuyển sang ${next.label}`}
       aria-label={`Giao diện ${cur.label}. Bấm để chuyển sang ${next.label}`}
-      style={{ ...glass, width: 40, height: 40, borderRadius: 999, border: "none",
+      style={{ ...glass, width: compact ? 28 : 40, height: compact ? 28 : 40, borderRadius: 999, border: "none",
                cursor: "pointer", display: "flex", alignItems: "center",
                justifyContent: "center", padding: 0 }}>
-      <Icon size={16} color={C.pinkText} />
+      <Icon size={compact ? 14 : 16} color={C.pinkText} />
     </button>
   );
 }
 
 /* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
-export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, dataUpdatedAt,
+export function Topbar({ title, user, sub, dataUpdatedAt,
   view, setView, access, onLogout, onChangePw, showMasthead = false }: {
   title?: ReactNode;
   /** #2 (01/09): wordmark chỉ hiện ở trang nhất (Tổng quan) — lặp trên cả
@@ -425,9 +428,6 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
   showMasthead?: boolean;
   user?: AppUser | null;
   sub?: ReactNode;
-  onRefresh?: () => void;
-  refreshing?: boolean;
-  lastSync?: number | string | null;
   /** max(updated_at) trong DB — TUỔI DỮ LIỆU, không phải giờ trình duyệt tải. */
   dataUpdatedAt?: string | null;
   view: string;
@@ -497,8 +497,8 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
         <div style={{ fontSize: 14, color: C.plum, marginTop: 5, fontWeight: 700 }}>
           {sub || "CPC1 HN"}
           {/* Giờ đồng bộ đã rời khỏi phụ đề (anh Hoàn chốt 30/08): nó đổi từng
-              phút làm dòng này nhấp nháy và gãy dòng. Nay nằm ở tooltip nút
-              Làm mới và ở chân trang (App.tsx). */}
+              phút làm dòng này nhấp nháy và gãy dòng. Nay chỉ nằm ở chân
+              trang (App.tsx). */}
           {/* Mốc dữ liệu luôn hiện, không đợi tới lúc quá ngưỡng mới báo: sự cố
               21 ngày lần trước không ai phát hiện chính vì màn hình im lặng khi
               mọi thứ "trông vẫn bình thường".
@@ -527,30 +527,6 @@ export function Topbar({ title, user, sub, onRefresh, refreshing, lastSync, data
           onClick={() => setMobileMenuOpen(true)}>
           <Menu size={19} color={C.pinkText} />
         </button>
-        <ThemeToggle />
-        <button onClick={onRefresh} className="vmp-lift"
-          title={lastSync ? `Làm mới dữ liệu · Đồng bộ lúc ${formatBangkokTime(lastSync)}` : "Làm mới dữ liệu"} style={{
-          ...glass, borderRadius: 16, padding: "9px 15px",
-          display: "flex", alignItems: "center", gap: 8,
-          border: "none", cursor: "pointer",
-          color: C.pinkText, fontFamily: TEXT, fontWeight: 800, fontSize: 12,
-        }}>
-          <RefreshCw size={15} color={C.pink} className={refreshing ? "spin" : ""} />
-          {refreshing ? "Đang tải…" : "Làm mới"}
-        </button>
-
-        {/* Badge chỉ hiện vai nghiệp vụ hiệu lực do server giải; thiếu payload
-            hợp lệ thì AppShell giữ toàn bộ Layout ngoài màn hình này. */}
-        <span className="vmp-perm-badge" style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "8px 14px", borderRadius: 999, fontSize: 12, fontWeight: 800,
-          color: C.pinkText,
-          background: C.pinkSoft,
-        }}>
-          <ShieldCheck size={14} />
-          Vai trò: {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}
-        </span>
-
       </div>
       <MobileDrawer open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
         onDismiss={dismissMobileMenu} onActionClose={closeMobileMenuForAction}
