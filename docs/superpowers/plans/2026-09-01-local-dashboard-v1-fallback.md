@@ -26,8 +26,14 @@
 - Consumes: RPC v2/v1 có cùng tham số `p_year`, `p_include_missing`.
 - Produces: `VmpDataset`; v2 có `statusSource="server"`, v1 có `statusSource="compatibility"`.
 
-- [ ] Viết test RED: v2 trả `PGRST202`, adapter gọi v1 và trả dữ liệu tương thích.
-- [ ] Chạy unit, xác nhận RED do adapter đang ném ngay lỗi v2.
-- [ ] Cài fallback tối thiểu và giữ `FORBIDDEN` không fallback.
-- [ ] Chạy unit, typecheck và build.
-- [ ] Kiểm preview `http://127.0.0.1:4175` trả HTTP 200 và commit local.
+- [x] Viết test RED: v2 trả `PGRST202`, adapter gọi v1 và trả dữ liệu tương thích.
+- [x] Chạy unit, xác nhận RED do adapter đang ném ngay lỗi v2.
+- [x] Cài fallback tối thiểu và giữ `FORBIDDEN` không fallback.
+- [x] Chạy unit, typecheck và build.
+- [x] Kiểm preview `http://127.0.0.1:4175` trả HTTP 200 và commit local.
+
+## Bằng chứng
+
+- Unit adapter + contract + authorization: `11/11` đạt.
+- Typecheck và build: exit `0`.
+- Preview `4175`: HTTP `200`, trả đúng bundle mới `index-C1IqJQ2j.js`.

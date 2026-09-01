@@ -12,6 +12,7 @@
  *  không suy quyền từ role đăng nhập hoặc vai Viewer cũ.
  * ===================================================================== */
 import { supabase } from "./supabaseClient.ts";
+import { deriveActivityFields } from "./n8nAdapter.ts";
 import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/performerSelection.ts";
 import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS } from "./businessRoles.ts";
 import type {
@@ -22,6 +23,7 @@ import type {
 import {
   canonicalAuthorizationRevisionToNumber,
   decodeAuthorizationWatermark,
+  decodeAuthorizedDashboard,
   type AuthorizationWatermark,
 } from "./dashboardAuthorizationContracts.ts";
 import { decodeCanonicalDashboard } from "../features/canonicalDashboard/contracts.ts";
@@ -101,22 +103,51 @@ function asShape<T>(data: unknown): T {
 // ĐỌC: Dashboard data từ Supabase RPC
 // ============================================================
 export type CanonicalDashboardRpc = (
-  name: "rpc_get_vmp_dashboard_v2",
+  name: "rpc_get_vmp_dashboard_v2" | "rpc_get_vmp_dashboard",
   args: { p_year: number; p_include_missing: boolean },
-) => Promise<{ data: unknown; error: { message: string } | null }>;
+) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+
+function isMissingCanonicalDashboardRpc(error: { message: string; code?: string }): boolean {
+  if (error.code === "PGRST202") return true;
+  return /Could not find the function public\.rpc_get_vmp_dashboard_v2(?:\(|\s).*schema cache/i
+    .test(error.message);
+}
 
 export async function fetchCanonicalDashboardViaRpc(
   rpc: CanonicalDashboardRpc,
   year: number,
   includeMissing = false,
 ): Promise<VmpDataset> {
-  const { data, error } = await rpc("rpc_get_vmp_dashboard_v2", {
+  const args = {
     p_year: year,
     p_include_missing: includeMissing,
-  });
-  if (error) throw new Error("Lỗi đọc dữ liệu máy chủ: " + error.message);
+  };
+  const canonical = await rpc("rpc_get_vmp_dashboard_v2", args);
+  if (canonical.error && !isMissingCanonicalDashboardRpc(canonical.error)) {
+    throw new Error("Lỗi đọc dữ liệu máy chủ: " + canonical.error.message);
+  }
 
-  const payload = decodeCanonicalDashboard(data);
+  if (canonical.error) {
+    const legacy = await rpc("rpc_get_vmp_dashboard", args);
+    if (legacy.error) throw new Error("Lỗi đọc dữ liệu máy chủ: " + legacy.error.message);
+    const payload = decodeAuthorizedDashboard(legacy.data);
+    const activities: Activity[] = payload.activities.map((activity) => ({
+      ...activity,
+      ...(activity._raw ? deriveActivityFields(activity._raw) : {}),
+      statusSource: "compatibility" as const,
+    }));
+    return {
+      objects: payload.objects,
+      activities,
+      source: "supabase",
+      count: activities.length,
+      updated_at: payload.updatedAt,
+      authorizationRevision: payload.authorizationRevision,
+      year: payload.year,
+    };
+  }
+
+  const payload = decodeCanonicalDashboard(canonical.data);
   const activities: Activity[] = payload.activities.map((activity) => ({
     ...activity,
     target: activity.canonicalDeadline,
@@ -141,7 +172,7 @@ export async function fetchVmpDataFromSupabase(
   if (!client) throw new Error("Supabase chưa cấu hình");
   return fetchCanonicalDashboardViaRpc(async (rpcName, args) => {
     const { data, error } = await client.rpc(rpcName as never, args as never);
-    return { data, error: error ? { message: error.message } : null };
+    return { data, error: error ? { message: error.message, code: error.code } : null };
   }, year || new Date().getFullYear(), includeMissing);
 }
 
