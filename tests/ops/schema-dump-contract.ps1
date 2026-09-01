@@ -3,8 +3,12 @@ $ErrorActionPreference = 'Stop'
 $required = @('scripts/dump-public-schema.ps1','scripts/check-schema-dump.ps1')
 foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Missing $path" } }
 $missingSchemaPath = Join-Path ([System.IO.Path]::GetTempPath()) ("vmp-missing-schema-" + [guid]::NewGuid() + '.sql')
-& powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1 -Path $missingSchemaPath
-if ($LASTEXITCODE -ne 0) { throw 'Schema dump contract failed' }
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$missingOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1 -Path $missingSchemaPath 2>&1 | Out-String
+$missingExitCode = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorActionPreference
+if ($missingExitCode -eq 0) { throw 'Missing schema file was accepted' }
 
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("vmp-schema-dump-contract-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Force $fixtureRoot | Out-Null
@@ -80,7 +84,8 @@ CREATE FUNCTION public.rpc_apply_plan_item_private() RETURNS void LANGUAGE sql A
 
   $literalSecretFixtures = @(
     @{ Name = 'prefix-key'; Content = '-- sb_secret_fixture_value_12345678'; Literal = 'sb_secret_fixture_value_12345678' },
-    @{ Name = 'service-role'; Content = "-- SUPABASE_SERVICE_ROLE_KEY='credential-fixture-value'"; Literal = 'credential-fixture-value' }
+    @{ Name = 'service-role'; Content = "-- SUPABASE_SERVICE_ROLE_KEY='credential-fixture-value'"; Literal = 'credential-fixture-value' },
+    @{ Name = 'password-assignment'; Content = "-- PASSWORD='credential-fixture-value'"; Literal = 'credential-fixture-value' }
   )
   foreach ($fixture in $literalSecretFixtures) {
     $literalFixture = Join-Path $fixtureRoot ($fixture.Name + '-schema.sql')

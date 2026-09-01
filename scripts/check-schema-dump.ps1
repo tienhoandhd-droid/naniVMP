@@ -3,7 +3,8 @@ param([string]$Path = 'supabase/schema.sql')
 $ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path -LiteralPath $Path)) {
-  exit 0
+  Write-Error 'Schema dump file is required.'
+  exit 1
 }
 
 $schema = Get-Content -Raw -LiteralPath $Path
@@ -35,7 +36,8 @@ $credentialPatterns = @(
   '(?i)eyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+',
   '(?i)\bsb_(?:secret|publishable)_[a-z0-9_-]+',
   '(?i)\b(?:supabase[_-]?)?service[_-]?role[_-]?(?:key|secret|token)\b\s*[:=]\s*[\x27\x22]?[a-z0-9._-]{8,}',
-  '(?i)(api[_-]?key|secret[_-]?key|access[_-]?token)\s*[:=]\s*[\x27\x22]?[a-z0-9_-]{8,}'
+  '(?i)(api[_-]?key|secret[_-]?key|access[_-]?token)\s*[:=]\s*[\x27\x22]?[a-z0-9_-]{8,}',
+  '(?i)\bpassword\b\s*[:=]\s*[\x27\x22]?[a-z0-9._-]{8,}'
 )
 
 foreach ($pattern in $credentialPatterns) {
