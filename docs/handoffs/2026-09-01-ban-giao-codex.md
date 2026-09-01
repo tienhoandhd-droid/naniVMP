@@ -55,8 +55,8 @@
 
 Gate mục tiêu chuyển người: unit/SSR/UI `17/17`; E2E manager + QA staff đạt;
 axe dialog `1/1`; typecheck và build exit `0`. Build còn đúng các cảnh báo font
-và dynamic-import đã có sẵn, không phát sinh lỗi mới. Preview build mới đang ở
-`http://127.0.0.1:4180` để kiểm local; chưa push/deploy.
+và dynamic-import đã có sẵn, không phát sinh lỗi mới. Preview build mới đã được
+gom về địa chỉ chuẩn `http://127.0.0.1:4175`; chưa push/deploy.
 
 Gate chốt Wave 3 local: targeted unit/SQL contract `29/29`; RPC inventory mục
 tiêu `1/1`; Catalog E2E `151/151`; Source role E2E đạt; a11y `15/15`; typecheck,
