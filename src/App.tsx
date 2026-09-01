@@ -80,6 +80,7 @@ import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
 const SidebarMemo = memo(Sidebar);
 const TopbarMemo = memo(Topbar);
 import LoginScreen from "./components/auth/LoginScreen.tsx";
+import PasswordRecoveryScreen from "./components/auth/PasswordRecoveryScreen.tsx";
 import TodayCommandCenter from "./features/today/TodayCommandCenter.tsx";
 const TodayCommandCenterMemo = memo(TodayCommandCenter);
 import { TodayScopeControl } from "./features/today/TodayScopeControl.tsx";
@@ -155,7 +156,6 @@ const ReportsViewMemo = memo(ReportsView);
 import { saveUser, loadUser, loadFilterPrefs, saveFilterPrefs } from "./lib/config.ts";
 import type { ReactNode } from "react";
 import type { Activity, AppUser } from "./types/domain.ts";
-import { supabase } from "./lib/supabaseClient.ts";
 
 /* Chụp ý định link trước lần render đầu. React StrictMode dựng shell hai lần
    ở môi trường dev; nếu đọc lại sau mount thứ nhất thì URL đã có thể được
@@ -805,18 +805,6 @@ function VerifiedAppShell({ user, logout, access }: {
     () => khoiTaoDayDu.nhom ?? "hangmuc",
   );
   const [showPw, setShowPw] = useState(false);
-  /* Vào từ link email "quên mật khẩu": supabase-js (detectSessionInUrl)
-     nhặt token recovery trong hash, dựng phiên rồi phát PASSWORD_RECOVERY
-     — lúc đó mở thẳng hộp đặt mật khẩu mới, KHÔNG hỏi mật khẩu cũ (người
-     dùng quên nó mới phải đi đường này). */
-  const [khoiPhucMk, setKhoiPhucMk] = useState(false);
-  useEffect(() => {
-    if (!supabase) return;
-    const { data: sub } = supabase.auth.onAuthStateChange((suKien) => {
-      if (suKien === "PASSWORD_RECOVERY") { setKhoiPhucMk(true); setShowPw(true); }
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
 
   /* Thoát mà còn form đang dở thì hỏi lại. Trước đây bấm Thoát là mất
      trắng phần vừa gõ, không một lời cảnh báo — với form nhập liệu GMP
@@ -1152,8 +1140,7 @@ function VerifiedAppShell({ user, logout, access }: {
       </a>
       {showPw && (
         <ChangePwModal
-          recovery={khoiPhucMk}
-          onClose={() => { setShowPw(false); setKhoiPhucMk(false); }}
+          onClose={() => setShowPw(false)}
         />
       )}
 
@@ -1391,7 +1378,7 @@ function VerifiedAppShell({ user, logout, access }: {
 }
 
 function AppShell() {
-  const { user, setUser, logout } = useAuth();
+  const { user, setUser, logout, recoverySignal, clearRecovery } = useAuth();
   const { access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen } = useAccess(user);
   useAccessCacheTransition(user, {
     access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen,
@@ -1399,6 +1386,14 @@ function AppShell() {
   /* Chỉ prefetch SAU đăng nhập (màn login không cần gánh 3 chunk màn),
      và đúng một lần cho cả phiên (cờ trong prefetchKhiRanh). */
   useEffect(() => { if (user) prefetchKhiRanh(); }, [user]);
+
+  if (recoverySignal) return (
+    <PasswordRecoveryScreen
+      signal={recoverySignal}
+      onCompleted={async () => { await logout(); clearRecovery(); }}
+      onRequestNewLink={async () => { await logout(); clearRecovery(); }}
+    />
+  );
 
   if (!user) return <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />;
 

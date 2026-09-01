@@ -43,7 +43,16 @@ export function silentRefreshSuccessConn(
 }
 import { loadConn, saveConn, loadUser, saveUser } from "../lib/config.ts";
 import { fetchVmpData, clearVmpCache } from "../lib/n8nAdapter.ts";
-import { isSupabaseConfigured, signIn, signOut, layPhien, supabase } from "../lib/supabaseClient.ts";
+import {
+  clearPasswordRecoverySignal,
+  isSupabaseConfigured,
+  layPhien,
+  signIn,
+  signOut,
+  subscribePasswordRecovery,
+  supabase,
+  type PasswordRecoverySignal,
+} from "../lib/supabaseClient.ts";
 import {
   fetchVmpDataFromSupabase, fetchVmpWatermark,
   updateItemProgress, upsertObjectSupabase, fetchPerformers,
@@ -136,6 +145,9 @@ export function usePerformers(enabled = true): {
 export function useAuth() {
   const [user, setUser] = useState(() => loadUser());
   const [loading, setLoading] = useState(true);
+  const [recoverySignal, setRecoverySignal] = useState<PasswordRecoverySignal | null>(null);
+
+  useEffect(() => subscribePasswordRecovery(setRecoverySignal), []);
 
   /* HỒ SƠ TRONG localStorage KHÔNG PHẢI BẰNG CHỨNG CÒN PHIÊN.
      Bản trước chỉ hỏi getSession() khi localStorage rỗng. Nên khi phiên
@@ -213,10 +225,17 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     if (isSupabaseConfigured()) await signOut();
+    clearPasswordRecoverySignal();
+    setRecoverySignal(null);
     setUser(null);
     saveUser(null);
     clearVmpCache();
     clearSnapshot();   // máy dùng chung: không để dữ liệu người trước nằm lại
+  }, []);
+
+  const clearRecovery = useCallback(() => {
+    clearPasswordRecoverySignal();
+    setRecoverySignal(null);
   }, []);
 
   /* KHÔNG trả cờ quyền nào nữa (19/08, dọn xong cả `isAdmin` và
@@ -226,7 +245,7 @@ export function useAuth() {
      từ `user.role === "admin"`, cùng bệnh chỉ khác mức độ. Quyền nay hỏi
      server qua `access.can(...)` ngay tại nơi cần, không còn đường tắt
      nào tính sẵn ở đây để lỡ dùng nhầm. */
-  return { user, setUser, login, logout, loading };
+  return { user, setUser, login, logout, loading, recoverySignal, clearRecovery };
 }
 
 // ======================== useVmpData ========================

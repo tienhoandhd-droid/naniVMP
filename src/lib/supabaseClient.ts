@@ -30,6 +30,54 @@ export const supabase = isSupabaseConfigured()
     })
   : null;
 
+export type PasswordRecoverySignal = "ready" | "invalid";
+
+const recoveryListeners = new Set<(signal: PasswordRecoverySignal) => void>();
+
+function recoveryErrorFromUrl(): PasswordRecoverySignal | null {
+  if (typeof window === "undefined") return null;
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const query = new URLSearchParams(window.location.search);
+  const type = hash.get("type") || query.get("type");
+  const hasError = Boolean(
+    hash.get("error") || hash.get("error_code") || hash.get("error_description")
+    || query.get("error") || query.get("error_code") || query.get("error_description"),
+  );
+  return type === "recovery" && hasError ? "invalid" : null;
+}
+
+let passwordRecoverySignal: PasswordRecoverySignal | null = recoveryErrorFromUrl();
+
+function publishPasswordRecovery(signal: PasswordRecoverySignal) {
+  passwordRecoverySignal = signal;
+  recoveryListeners.forEach((listener) => listener(signal));
+}
+
+/* Listener gắn ngay sau khi tạo client, trước khi React dựng protected shell.
+ * Tín hiệu được giữ lại để subscriber đến muộn vẫn nhận PASSWORD_RECOVERY. */
+if (supabase) {
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") publishPasswordRecovery("ready");
+  });
+}
+
+export function subscribePasswordRecovery(
+  listener: (signal: PasswordRecoverySignal) => void,
+): () => void {
+  recoveryListeners.add(listener);
+  if (passwordRecoverySignal) {
+    const signal = passwordRecoverySignal;
+    queueMicrotask(() => {
+      if (recoveryListeners.has(listener)) listener(signal);
+    });
+  }
+  return () => recoveryListeners.delete(listener);
+}
+
+export function clearPasswordRecoverySignal(): void {
+  passwordRecoverySignal = null;
+}
+
 /* Vé của phiên đang đăng nhập, để gửi kèm khi gọi webhook n8n.
  *
  * Vì sao cần: token `x-vmp-chat` nằm trong gói JavaScript công khai — mọi
@@ -210,6 +258,14 @@ export async function datLaiMatKhauKhoiPhuc(matKhauMoi: string): Promise<void> {
   if (!supabase) throw new Error("Supabase chưa cấu hình.");
   const { error } = await supabase.auth.updateUser({ password: matKhauMoi });
   if (error) throw new Error(error.message);
+}
+
+/** Không đưa token ra UI; chỉ xác nhận SDK đã dựng xong phiên từ link mail. */
+export async function kiemTraPhienKhoiPhuc(): Promise<void> {
+  if (!supabase) throw new Error("RECOVERY_SESSION_INVALID");
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error(error.message);
+  if (!data.session) throw new Error("RECOVERY_SESSION_INVALID");
 }
 
 /* ---- Quên mật khẩu: gửi mail đặt lại ----
