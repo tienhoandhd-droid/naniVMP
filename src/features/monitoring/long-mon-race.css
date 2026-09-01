@@ -44,18 +44,20 @@
 .long-mon-race__head {
   display: flex;
   gap: 18px;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  padding: 18px 20px 15px;
+  padding: 14px 20px 12px;
   border-bottom: 1px solid rgba(40, 61, 52, .13);
-  background: linear-gradient(110deg, rgba(249, 246, 237, .98), rgba(235, 234, 224, .94));
+  background:
+    radial-gradient(circle at 55% -80%, rgba(216, 189, 118, .2), transparent 58%),
+    linear-gradient(110deg, rgba(249, 247, 240, .98), rgba(231, 235, 225, .95));
 }
 
 .long-mon-race__head-side {
   display: flex;
   flex: 0 0 auto;
   gap: 10px;
-  align-items: flex-end;
+  align-items: center;
   flex-direction: column;
 }
 
@@ -155,7 +157,7 @@
   color: var(--lmr-chu);
   font-size: 12px;
   font-weight: 850;
-  letter-spacing: .13em;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
 
@@ -175,25 +177,7 @@
   color: var(--lmr-chu-mo);
   font-size: 12px;
   font-weight: 650;
-  line-height: 1.5;
-}
-
-.long-mon-race__flow {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 8px;
-  align-items: center;
-  color: var(--lmr-chu);
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: .04em;
-  white-space: nowrap;
-}
-
-.long-mon-race__flow span {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
+  line-height: 1.35;
 }
 
 /* MỘT MÀN HÌNH (31/08, chủ dự án chốt): cả bức tranh choán đúng khung
@@ -276,7 +260,7 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(247deg, rgba(246, 236, 210, .30), rgba(246, 236, 210, .08) 34%, transparent 58%);
+  background: linear-gradient(247deg, rgba(246, 236, 210, .24), rgba(246, 236, 210, .06) 34%, transparent 58%);
   pointer-events: none;
   mix-blend-mode: soft-light;
 }
@@ -285,8 +269,64 @@
   z-index: -2;
   background:
     linear-gradient(180deg, rgba(21, 51, 48, .24), transparent 24%, transparent 75%, rgba(22, 47, 43, .32)),
-    linear-gradient(90deg, rgba(24, 52, 47, .19), rgba(225, 230, 207, .04) 36%, rgba(243, 226, 173, .10) 74%, rgba(26, 53, 47, .18));
+    linear-gradient(90deg, rgba(15, 43, 42, .22), rgba(225, 230, 207, .02) 42%, rgba(243, 226, 173, .07) 76%, rgba(26, 53, 47, .15));
   pointer-events: none;
+}
+
+/* Hai hồi của cùng một bức tranh: nửa trái lắng như ký ức, nửa phải
+   mở sáng về Long Môn. Lớp này chỉ điều tiết ánh sáng; ngày và cá vẫn
+   do model neo đúng vị trí, nên mỹ thuật không thay thế dữ liệu. */
+.long-mon-race__periods {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+.long-mon-race__period {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.long-mon-race__period--past {
+  background:
+    radial-gradient(circle at 24% 70%, rgba(7, 33, 35, .2), transparent 48%),
+    linear-gradient(90deg, rgba(6, 31, 34, .34), rgba(14, 53, 52, .08) 80%, transparent);
+}
+
+.long-mon-race__period--future {
+  background:
+    radial-gradient(circle at 86% 38%, rgba(255, 226, 157, .14), transparent 44%),
+    linear-gradient(90deg, rgba(238, 222, 178, .02), rgba(255, 226, 157, .12) 70%, rgba(252, 218, 133, .2));
+}
+
+.long-mon-race__period strong {
+  position: absolute;
+  top: 96px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(245, 237, 211, .2);
+  border-radius: 999px;
+  background: rgba(18, 49, 46, .58);
+  color: rgba(255, 250, 232, .94);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 3px rgba(9, 31, 29, .7);
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.long-mon-race__period--past strong {
+  left: 16px;
+}
+
+.long-mon-race__period--future strong {
+  right: 16px;
 }
 
 .long-mon-race__months {
@@ -323,17 +363,28 @@
   letter-spacing: .08em;
 }
 
-/* "Hôm nay" = sợi chỉ vàng buông dọc tranh, đầu mang ấn son — ngôn ngữ
-   tranh cuốn, thay vạch gạch đứt kỹ thuật. */
+/* "Hôm nay" = khe sáng nơi ký ức chuyển thành phần đường phía trước. */
 .long-mon-race__today {
   position: absolute;
   z-index: 2;
-  top: 58px;
+  top: 0;
   bottom: 0;
-  width: 1px;
-  background: linear-gradient(180deg, rgba(217, 180, 91, .95), rgba(217, 180, 91, .25));
-  filter: drop-shadow(0 0 5px rgba(249, 225, 156, .55));
+  width: 28px;
+  background: linear-gradient(90deg, transparent, rgba(255, 236, 181, .2) 42%, rgba(255, 247, 216, .34) 50%, rgba(255, 236, 181, .18) 58%, transparent);
+  filter: drop-shadow(0 0 10px rgba(249, 225, 156, .26));
+  transform: translateX(-50%);
   pointer-events: none;
+}
+
+.long-mon-race__today::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(255, 245, 209, .98), rgba(217, 180, 91, .65) 45%, rgba(217, 180, 91, .18));
+  box-shadow: 0 0 8px rgba(255, 236, 181, .7);
 }
 
 .long-mon-race__weeks {
@@ -367,7 +418,7 @@
 .long-mon-race__today span {
   position: absolute;
   top: 8px;
-  left: 0;
+  left: 50%;
   padding: 4px 8px;
   border: 1px solid rgba(248, 228, 173, .4);
   border-radius: 999px;
@@ -616,7 +667,7 @@
 }
 
 .long-mon-race__footer {
-  padding: 12px 14px;
+  padding: 9px 12px;
   border-top: 1px solid rgba(40, 61, 52, .13);
   background: rgba(247, 244, 235, .98);
 }
@@ -632,20 +683,20 @@
 
 .long-mon-race__legend li {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 7px;
   align-items: center;
   min-width: 0;
-  min-height: 48px;
-  padding: 6px 8px;
+  min-height: 42px;
+  padding: 4px 7px;
   border: 1px solid rgba(52, 77, 66, .13);
   border-radius: 10px;
   background: rgba(255, 253, 247, .72);
 }
 
 .long-mon-race__legend-sprite {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
 }
 
 .long-mon-race__legend li > span:nth-child(2) {
@@ -683,7 +734,7 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  margin-top: 9px;
+  margin-top: 6px;
   color: var(--lmr-chu-mo);
   font-size: 12px;
   font-weight: 750;
@@ -750,12 +801,6 @@
 
   .long-mon-race__person {
     justify-content: space-between;
-  }
-
-  .long-mon-race__flow {
-    width: 100%;
-    justify-content: space-between;
-    white-space: normal;
   }
 
   .long-mon-race__canvas {

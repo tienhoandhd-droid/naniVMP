@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CalendarClock, Waves } from "lucide-react";
+import { CalendarClock } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
 import type { Activity } from "../../types/domain.ts";
@@ -136,15 +136,12 @@ function LongMonRace({
   }, [model.todayPct]);
 
   return (
-    <section className="long-mon-race" aria-label="Trường đua hạn VMP hai tháng">
+    <section className="long-mon-race" aria-label="Dòng thời gian VMP 60 ngày quanh Hôm nay">
       <header className="long-mon-race__head">
         <div className="long-mon-race__title-block">
-          <span className="long-mon-race__eyebrow">Bản đồ deadline · tháng này và tháng kế tiếp</span>
+          <span className="long-mon-race__eyebrow">60 ngày quanh Hôm nay</span>
           <h2>Long Môn VMP</h2>
-          <p>
-            Mỗi thiết bị là một cá. Hạn VMP đưa cá vào vùng tuần; bấm cá để xem ngày
-            chính xác, loài và màu cho biết giai đoạn đã hoàn thành.
-          </p>
+          <p>Bấm cá để xem hạn và hồ sơ</p>
         </div>
         <div className="long-mon-race__head-side">
           {scopeControl && (
@@ -182,14 +179,10 @@ function LongMonRace({
               </span>
             </div>
           )}
-          <div className="long-mon-race__flow" aria-label="Dòng nước chảy sang trái; cá và thời gian tiến sang phải">
-            <span><Waves size={16} aria-hidden="true" /> Dòng nước <ArrowLeft size={15} aria-hidden="true" /></span>
-            <span>Thời gian &amp; cá <ArrowRight size={15} aria-hidden="true" /></span>
-          </div>
         </div>
       </header>
 
-      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="Hai tháng VMP trong một màn hình; màn hình nhỏ có thể kéo ngang">
+      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="60 ngày VMP quanh Hôm nay; màn hình nhỏ có thể kéo ngang">
         <div
           className="long-mon-race__canvas long-mon-race__canvas--adaptive-scene"
           data-density-scale={model.densityScale}
@@ -206,6 +199,19 @@ function LongMonRace({
           <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true"
             width={540} height={1120} decoding="async" loading="lazy" />
           <div className="long-mon-race__wash" aria-hidden="true" />
+
+          <div className="long-mon-race__periods" aria-hidden="true">
+            {model.periods.map((period) => (
+              <span
+                key={period.id}
+                data-long-mon-period={period.id}
+                className={`long-mon-race__period long-mon-race__period--${period.id}`}
+                style={{ left: `${period.startPct}%`, width: `${period.widthPct}%` }}
+              >
+                <strong>{period.label}</strong>
+              </span>
+            ))}
+          </div>
 
           <div className="long-mon-race__months" aria-hidden="true">
             {model.bands.map((band) => (
@@ -237,7 +243,7 @@ function LongMonRace({
 
           {model.fish.length > 0 ? (
             <div className="long-mon-race__school" role="list"
-              data-long-mon-density={model.fish.length > 24 ? "dense" : "sparse"} aria-label={`${model.fish.length} hạng mục có hạn VMP trong hai tháng`}>
+              data-long-mon-density={model.fish.length > 24 ? "dense" : "sparse"} aria-label={`${model.fish.length} hạng mục có hạn VMP trong 60 ngày`}>
               {model.fish.map((fish) => {
                 const stage = metaByStage.get(fish.stage)!;
                 const deadline = formatDeadline(fish.deadline);
@@ -285,7 +291,7 @@ function LongMonRace({
           ) : (
             <div className="long-mon-race__empty">
               <CalendarClock size={22} aria-hidden="true" />
-              <strong>{scopeControl?.emptyMessage ? "Không thể mở ngư đồ cá nhân" : "Không có hạn VMP trong hai tháng này"}</strong>
+              <strong>{scopeControl?.emptyMessage ? "Không thể mở ngư đồ cá nhân" : "Không có hạn VMP trong 30 ngày đã qua và 30 ngày sắp tới"}</strong>
               <span>{scopeControl?.emptyMessage ?? "Các bộ lọc hiện tại không để lại hạng mục nào trên trường đua."}</span>
             </div>
           )}
@@ -306,7 +312,7 @@ function LongMonRace({
           ))}
         </ul>
         <div className="long-mon-race__notes">
-          <span>{model.fish.length} hạng mục đang hiện trên trường đua</span>
+          <span>{model.fish.length} hạng mục trong 60 ngày</span>
           {model.missingDeadlineCount > 0 && (
             <span className="long-mon-race__missing">
               {model.missingDeadlineCount} hạng mục chưa có hạn VMP

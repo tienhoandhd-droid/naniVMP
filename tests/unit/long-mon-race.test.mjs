@@ -418,7 +418,7 @@ test("cá nhân tự bố trí trung tâm, vòng cung và chữ S ổn định",
   assert.deepEqual(ten, buildLongMonRaceModel(tenInput, NOW, { audience: "personal" }));
 });
 
-test("trường đua trình bày hai tháng, cá có tên truy cập và legend sáu loài", () => {
+test("trường đua kể hành trình 60 ngày, cá có tên truy cập và legend sáu loài", () => {
   const html = renderToStaticMarkup(React.createElement(LongMonRace, {
     activities: [
       activity("dc-01", "2026-09-05"),
@@ -438,8 +438,14 @@ test("trường đua trình bày hai tháng, cá có tên truy cập và legend 
     },
   }));
 
-  assert.match(html, /aria-label="Trường đua hạn VMP hai tháng"/);
-  assert.match(html, /aria-label="Hai tháng VMP trong một màn hình/);
+  assert.match(html, /aria-label="Dòng thời gian VMP 60 ngày quanh Hôm nay"/);
+  assert.match(html, /aria-label="60 ngày VMP quanh Hôm nay/);
+  assert.match(html, /data-long-mon-period="past"/);
+  assert.match(html, /30 ngày đã qua/);
+  assert.match(html, /data-long-mon-period="future"/);
+  assert.match(html, /30 ngày sắp tới/);
+  assert.match(html, /Bấm cá để xem hạn và hồ sơ/);
+  assert.doesNotMatch(html, /Dòng nước/);
   assert.match(html, /08\/2026/);
   assert.match(html, /09\/2026/);
   assert.doesNotMatch(html, /07\/2026/);

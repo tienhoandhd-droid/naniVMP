@@ -15,19 +15,29 @@ const assets = new URL("../../dist/assets/", import.meta.url);
 const desktopShot = join(tmpdir(), "long-mon-race-1440.png");
 const mobileShot = join(tmpdir(), "long-mon-race-390.png");
 
-function expectedBangkokMonths(now = new Date()) {
+function expectedRollingMonths(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
     year: "numeric",
     month: "2-digit",
+    day: "2-digit",
   }).formatToParts(now);
   const year = Number(parts.find((part) => part.type === "year")?.value);
   const month = Number(parts.find((part) => part.type === "month")?.value);
-  const next = new Date(Date.UTC(year, month, 1));
-  return [
-    `${String(month).padStart(2, "0")}/${year}`,
-    `${String(next.getUTCMonth() + 1).padStart(2, "0")}/${next.getUTCFullYear()}`,
-  ];
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  const today = Date.UTC(year, month - 1, day);
+  const start = new Date(today - 30 * 86_400_000);
+  const endExclusive = today + 30 * 86_400_000;
+  const labels = [];
+  for (
+    let cursor = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1);
+    cursor < endExclusive;
+    cursor = Date.UTC(new Date(cursor).getUTCFullYear(), new Date(cursor).getUTCMonth() + 1, 1)
+  ) {
+    const date = new Date(cursor);
+    labels.push(`${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`);
+  }
+  return labels;
 }
 
 function resolvePublicSupabaseUrl() {
@@ -128,6 +138,21 @@ try {
         || rect.bottom > canvasRect.bottom + 0.5;
     }).map((item) => item.getAttribute("aria-label"));
     const background = document.querySelector(".long-mon-race__background");
+    const periods = [...document.querySelectorAll("[data-long-mon-period]")].map((item) => {
+      const rect = item.getBoundingClientRect();
+      const style = getComputedStyle(item);
+      return {
+        id: item.dataset.longMonPeriod,
+        text: item.textContent?.trim(),
+        leftPct: canvasRect ? (rect.left - canvasRect.left) / canvasRect.width * 100 : Number.NaN,
+        widthPct: canvasRect ? rect.width / canvasRect.width * 100 : Number.NaN,
+        backgroundImage: style.backgroundImage,
+      };
+    });
+    const todayLeftPct = Number.parseFloat(
+      document.querySelector(".long-mon-race__today")?.style.left ?? "NaN",
+    );
+    const todayLabelRect = document.querySelector(".long-mon-race__today span")?.getBoundingClientRect();
     const spriteLoaded = await new Promise((resolve) => {
       const image = new Image();
       image.onload = () => resolve(image.naturalWidth > 0);
@@ -138,6 +163,11 @@ try {
     });
     return {
       monthLabels,
+      periods,
+      todayLeftPct,
+      todayLabelTop: canvasRect && todayLabelRect
+        ? todayLabelRect.top - canvasRect.top
+        : Number.NaN,
       fishCount: fish.length,
       fishRows,
       overlaps,
@@ -162,11 +192,23 @@ try {
     };
   });
 
-  assert.deepEqual(desktop.monthLabels, expectedBangkokMonths());
+  assert.deepEqual(desktop.monthLabels, expectedRollingMonths());
+  assert.deepEqual(desktop.periods.map(({ id, text }) => ({ id, text })), [
+    { id: "past", text: "30 ngày đã qua" },
+    { id: "future", text: "30 ngày sắp tới" },
+  ]);
+  assert.ok(Math.abs(desktop.periods[0].leftPct) <= .1);
+  assert.ok(Math.abs(desktop.periods[0].widthPct - 50) <= .1);
+  assert.ok(Math.abs(desktop.periods[1].leftPct - 50) <= .1);
+  assert.ok(Math.abs(desktop.periods[1].widthPct - 50) <= .1);
+  assert.ok(desktop.periods.every((period) => period.backgroundImage !== "none"));
+  assert.equal(desktop.todayLeftPct, 50);
+  assert.ok(desktop.todayLabelTop >= 0 && desktop.todayLabelTop <= 32,
+    `nhãn Hôm nay phải nằm trong dải tháng để không bị cá che, top=${desktop.todayLabelTop}`);
   assert.ok(desktop.fishCount > 0, JSON.stringify({ ...desktop, url: page.url() }));
   assert.equal(desktop.legendCount, 6);
   assert.ok(desktop.weekCount >= 9 && desktop.weekCount <= 10,
-    `hai tháng lịch phải tạo 9–10 vùng tuần, hiện có ${desktop.weekCount}`);
+    `60 ngày phải tạo 9–10 vùng tuần, hiện có ${desktop.weekCount}`);
   assert.equal(desktop.audienceControls, 2);
   assert.equal(desktop.backgroundLoaded, true);
   assert.equal(desktop.spriteLoaded, true);
@@ -202,7 +244,7 @@ try {
     if (personalFishCount > 0 && personalFishCount < desktop.fishCount) break;
   }
   assert.ok(personalFishCount > 0 && personalFishCount < desktop.fishCount,
-    `không tìm thấy QA có cá trong cửa sổ hai tháng: team=${desktop.fishCount}`);
+    `không tìm thấy QA có cá trong cửa sổ 60 ngày: team=${desktop.fishCount}`);
   const personal = await page.evaluate(() => {
     const fish = [...document.querySelectorAll("[data-long-mon-fish]")];
     const fishRows = fish.map((item) => {
@@ -326,7 +368,7 @@ try {
   const mobileRace = await page.$(".long-mon-race");
   await mobileRace.screenshot({ path: mobileShot });
 
-  console.log("✓ Hai tháng nằm trọn một màn hình desktop, tuần trống co lại và cá không chồng lấn");
+  console.log("✓ 60 ngày nằm trọn một màn hình desktop, Hôm nay ở tâm và cá không chồng lấn");
   console.log("✓ Admin/Quản lý QA chuyển Cả nhóm/Cá nhân; đàn cá cá nhân tự dàn lại");
   console.log("✓ desktop 1440px không cuộn ngang/dọc; mobile giữ cuộn trong Ngư đồ, không làm tràn trang");
   console.log(`screenshots:\n- ${desktopShot}\n- ${mobileShot}`);
