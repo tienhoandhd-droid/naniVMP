@@ -13,9 +13,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Page, TestInfo } from "@playwright/test";
 
-import { dungKhoDuLieu, phienGia, layRef, traLoi } from "../e2e/gia-lap-supabase.mjs";
+import { dungKhoDuLieu, phienGia, layRef, traLoi, NGUOI_DUNG } from "../e2e/gia-lap-supabase.mjs";
 
 const URL_SB = (() => {
   if (process.env.VMP_E2E_SUPABASE_URL) return process.env.VMP_E2E_SUPABASE_URL;
@@ -70,6 +70,67 @@ async function caiGiaLap(page: Page, { dangNhap = true } = {}) {
   } else {
     await page.addInitScript(() => localStorage.clear());
   }
+}
+
+function maHoaBase64Url(value: unknown) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function recoveryHash() {
+  const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+  const token = [
+    maHoaBase64Url({ alg: "HS256", typ: "JWT" }),
+    maHoaBase64Url({
+      aud: "authenticated", exp: expiresAt, sub: NGUOI_DUNG.id,
+      email: NGUOI_DUNG.email, role: "authenticated",
+    }),
+    "gia-lap-signature",
+  ].join(".");
+  return `#${new URLSearchParams({
+    access_token: token,
+    expires_in: "3600",
+    expires_at: String(expiresAt),
+    refresh_token: "gia-lap-recovery-refresh",
+    token_type: "bearer",
+    type: "recovery",
+  })}`;
+}
+
+async function expectKhongCoLoiA11yNang(page: Page, testInfo: TestInfo, ten: string) {
+  const kq = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  await testInfo.attach(`axe-${ten}.json`, {
+    body: JSON.stringify(kq.violations, null, 2),
+    contentType: "application/json",
+  });
+  const nang = kq.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+  expect(nang.map((v) => ({
+    id: v.id, impact: v.impact,
+    mau: v.nodes.slice(0, 3).map((n) => n.target.join(" ")),
+  }))).toEqual([]);
+}
+
+for (const kichThuoc of [
+  { ten: "desktop", width: 1440, height: 900 },
+  { ten: "mobile", width: 390, height: 844 },
+]) {
+  test(`axe auth · forgot · ${kichThuoc.ten}`, async ({ page }, testInfo) => {
+    await page.setViewportSize(kichThuoc);
+    await caiGiaLap(page, { dangNhap: false });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Quên mật khẩu?" }).click();
+    await expect(page.getByRole("heading", { name: "Khôi phục mật khẩu" })).toBeVisible();
+    await expectKhongCoLoiA11yNang(page, testInfo, `auth-forgot-${kichThuoc.ten}`);
+  });
+
+  test(`axe auth · recovery · ${kichThuoc.ten}`, async ({ page }, testInfo) => {
+    await page.setViewportSize(kichThuoc);
+    await caiGiaLap(page, { dangNhap: false });
+    await page.goto(`/?auth-a11y=recovery${recoveryHash()}`);
+    await expect(page.getByRole("heading", { name: "Đặt mật khẩu mới" })).toBeVisible();
+    await expectKhongCoLoiA11yNang(page, testInfo, `auth-recovery-${kichThuoc.ten}`);
+  });
 }
 
 const MAN: Array<{
