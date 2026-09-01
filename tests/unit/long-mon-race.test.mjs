@@ -4,6 +4,7 @@ import { test } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import LongMonRace, {
+  LONG_MON_BACKGROUND_URL,
   LONG_MON_SPECIES_SHEET_URL,
 } from "../../src/features/monitoring/LongMonRace.tsx";
 import {
@@ -68,6 +69,10 @@ test("Long Môn ánh xạ sáu tiến độ bằng sáu loài khác nhau", () =>
 });
 
 test("atlas V16 và vùng va chạm giữ đàn cá nhỏ gọn", () => {
+  assert.equal(
+    LONG_MON_BACKGROUND_URL,
+    "/art/monitoring/long-mon-vmp-racecourse-60-days-v17.webp",
+  );
   assert.equal(
     LONG_MON_SPECIES_SHEET_URL,
     "/art/monitoring/long-mon-six-species-v16.webp",

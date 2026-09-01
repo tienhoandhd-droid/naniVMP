@@ -13,7 +13,7 @@ import {
  * đối "/art/..." sẽ trỏ ra NGOÀI repo và cả bức tranh biến mất trên
  * production. import.meta.env.BASE_URL luôn có "/" ở cuối. */
 const ART_BASE = `${import.meta.env?.BASE_URL ?? "/"}art/monitoring/`;
-const BACKGROUND_URL = `${ART_BASE}long-mon-vmp-racecourse-v15.webp`;
+const BACKGROUND_URL = `${ART_BASE}long-mon-vmp-racecourse-60-days-v17.webp`;
 const SPECIES_SHEET_URL = `${ART_BASE}long-mon-six-species-v16.webp`;
 /* Cổng Vũ Môn vẽ tay (SVG → Inkscape xuất PNG) — xem chú thích trong CSS. */
 const GATE_URL = `${ART_BASE}long-mon-vu-mon-gate-v2.webp`;
@@ -202,7 +202,7 @@ function LongMonRace({
               width/height gốc của file để giữ chỗ, tránh CLS khi tranh về
               (CSS vẫn scale theo --long-mon-scene-*). */}
           <img className="long-mon-race__background" src={BACKGROUND_URL} alt="" aria-hidden="true"
-            width={1823} height={863} decoding="async" fetchPriority="high" />
+            width={1822} height={863} decoding="async" fetchPriority="high" />
           <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true"
             width={540} height={1120} decoding="async" loading="lazy" />
           <div className="long-mon-race__wash" aria-hidden="true" />
