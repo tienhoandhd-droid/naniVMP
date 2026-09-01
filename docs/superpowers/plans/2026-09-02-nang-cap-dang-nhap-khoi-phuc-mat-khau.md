@@ -30,7 +30,7 @@
 - Consumes: `ChangePasswordValues`, lỗi thô từ Supabase.
 - Produces: `PASSWORD_MIN_LENGTH = 8`, `validateChangePassword(...)`, `recoverySessionErrorMessage(error)` và các thông điệp đồng nhất cho UI đổi/recovery.
 
-- [ ] **Step 1: Viết unit test thất bại**
+- [x] **Step 1: Viết unit test thất bại** — `7d80011`
 
 Thêm các ca literal:
 
@@ -48,7 +48,7 @@ test("dịch lỗi phiên recovery hết hạn mà không lộ lỗi kỹ thuậ
 });
 ```
 
-- [ ] **Step 2: Chạy RED**
+- [x] **Step 2: Chạy RED** — `7d80011`
 
 Run:
 
@@ -58,7 +58,7 @@ node --import tsx --test tests/unit/password-form.test.mjs
 
 Expected: FAIL vì validator hiện chấp nhận 6 ký tự và chưa export `recoverySessionErrorMessage`.
 
-- [ ] **Step 3: Cài đặt tối thiểu**
+- [x] **Step 3: Cài đặt tối thiểu** — `7d80011`
 
 Trong `passwordForm.ts`:
 
@@ -80,7 +80,7 @@ export function recoverySessionErrorMessage(error: unknown): string {
 Đổi các nhánh lỗi Supabase `at least 6` thành pattern tổng quát `at least \d+|password.*too short` và copy `8 ký tự`.
 Trong `ChangePwModal`, import `PASSWORD_MIN_LENGTH` và thay cả hai mô tả `tối thiểu 6 ký tự` bằng giá trị 8 từ hằng dùng chung để UI không lệch validator.
 
-- [ ] **Step 4: Chạy GREEN và commit**
+- [x] **Step 4: Chạy GREEN và commit** — `7d80011`
 
 ```powershell
 node --import tsx --test tests/unit/password-form.test.mjs
@@ -130,7 +130,7 @@ type Props = {
 };
 ```
 
-- [ ] **Step 1: Viết static component test thất bại**
+- [x] **Step 1: Viết static component test thất bại** — `c786a4e`
 
 Render `PasswordRecoveryScreen` bằng `renderToStaticMarkup` và kiểm:
 
@@ -144,7 +144,7 @@ assert.match(htmlInvalid, /Yêu cầu liên kết mới/);
 
 Test không gọi submit và không đưa secret vào fixture.
 
-- [ ] **Step 2: Chạy RED**
+- [x] **Step 2: Chạy RED** — `c786a4e`
 
 ```powershell
 node --import tsx --test tests/unit/password-recovery-screen.test.mjs
@@ -152,13 +152,13 @@ node --import tsx --test tests/unit/password-recovery-screen.test.mjs
 
 Expected: FAIL vì component chưa tồn tại.
 
-- [ ] **Step 3: Tạo bộ bắt tín hiệu recovery sticky ở ranh giới SDK**
+- [x] **Step 3: Tạo bộ bắt tín hiệu recovery sticky ở ranh giới SDK** — `c786a4e`
 
 Ngay sau khi tạo Supabase client, đăng ký một listener sống theo vòng đời module. Khi nhận `PASSWORD_RECOVERY`, lưu tín hiệu `ready` và báo cho toàn bộ subscriber. Khi URL chứa lỗi recovery (`type=recovery` cùng `error`, `error_code=otp_expired` hoặc `error_description`), khởi tạo tín hiệu `invalid`. `subscribePasswordRecovery` phải phát lại tín hiệu đã lưu bằng `queueMicrotask` cho subscriber đến muộn; `clearPasswordRecoverySignal` xóa nó sau khi rời luồng.
 
 `kiemTraPhienKhoiPhuc()` gọi `supabase.auth.getSession()` và ném `RECOVERY_SESSION_INVALID` nếu không có session/error. Không đọc hoặc trả token về UI.
 
-- [ ] **Step 4: Nối tín hiệu vào `useAuth` và `AppShell`**
+- [x] **Step 4: Nối tín hiệu vào `useAuth` và `AppShell`** — `c786a4e`, `eceeb8c`
 
 Trong `useAuth`, subscribe/unsubscribe tín hiệu, trả `recoverySignal` và `clearRecovery`. Khi `logout`, luôn clear recovery signal/state.
 
@@ -177,7 +177,7 @@ if (!user) {
 
 Xóa listener `PASSWORD_RECOVERY` và state `khoiPhucMk` khỏi `VerifiedAppShell`; `ChangePwModal` chỉ còn phục vụ đổi mật khẩu khi đã vào app.
 
-- [ ] **Step 5: Cài đặt `PasswordRecoveryScreen` và chạy GREEN**
+- [x] **Step 5: Cài đặt `PasswordRecoveryScreen` và chạy GREEN** — `c786a4e`
 
 Component dùng `LuxuryBrandPanel`, hai trường có label/id riêng, `autocomplete="new-password"`, nút hiện/ẩn 44px, mô tả rule 8 ký tự, submit form bằng Enter. Trước `datLaiMatKhauKhoiPhuc`, gọi `kiemTraPhienKhoiPhuc`; map lỗi bằng `recoverySessionErrorMessage`. `signal="invalid"` chỉ render giải thích và nút yêu cầu liên kết mới, không render form.
 
@@ -188,7 +188,7 @@ npm run typecheck
 
 Expected: PASS và typecheck exit `0`.
 
-- [ ] **Step 6: Commit ranh giới recovery**
+- [x] **Step 6: Commit ranh giới recovery** — `c786a4e`
 
 ```powershell
 git add -- src/lib/supabaseClient.ts src/hooks/index.ts src/App.tsx src/components/auth/PasswordRecoveryScreen.tsx tests/unit/password-recovery-screen.test.mjs
@@ -220,7 +220,7 @@ type Props = {
 
 - Trạng thái nội bộ: `login | forgot | forgot-sent`; `forgot-sent` giữ email đã chuẩn hóa và `resendAt` để đếm ngược 60 giây.
 
-- [ ] **Step 1: Viết component test thất bại**
+- [x] **Step 1: Viết component test thất bại** — `0e449fc`
 
 Mở rộng test static để kiểm:
 
@@ -235,7 +235,7 @@ assert.doesNotMatch(forgotHtml, /autoComplete="current-password"/);
 
 Giữ test SDK boundary: static render `LoginScreen` không nạp `supabaseClient.ts`.
 
-- [ ] **Step 2: Chạy RED**
+- [x] **Step 2: Chạy RED** — `0e449fc`
 
 ```powershell
 node --import tsx --test tests/unit/login-screen.test.mjs tests/unit/login-screen-sdk-boundary.test.mjs
@@ -243,7 +243,7 @@ node --import tsx --test tests/unit/login-screen.test.mjs tests/unit/login-scree
 
 Expected: FAIL vì chưa có `initialMode="forgot"`, label row và copy mới.
 
-- [ ] **Step 3: Tách ba trạng thái trong `LoginScreen`**
+- [x] **Step 3: Tách ba trạng thái trong `LoginScreen`** — `0e449fc`
 
 - `login`: giữ email/password, Caps Lock và show password; chuyển `Quên mật khẩu?` vào `.vq-login-password-label-row` cạnh label.
 - `forgot`: một form email; submit qua `guiMailQuenMatKhau`, thông báo lỗi email inline, lỗi mạng/rate limit ở alert, nút phụ quay lại.
@@ -260,11 +260,11 @@ const [authNotice, setAuthNotice] = useState("");
 
 `onCompleted` của recovery đặt notice `Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.`, gọi logout/clear recovery rồi đặt `authMode="login"`. `onRequestNewLink` gọi logout/clear recovery rồi đặt `authMode="forgot"`. Khi chưa có user, truyền `initialMode={authMode}` và `notice={authNotice}` vào `LoginScreen`.
 
-- [ ] **Step 4: Tinh chỉnh CSS Lotus Pearl**
+- [x] **Step 4: Tinh chỉnh CSS Lotus Pearl** — `0e449fc`
 
 Thêm class có phạm vi `.vq-login-*` cho label row, back button, sent panel, resend row và recovery requirements. Dùng token hiện có; một CTA plum; control chính tối thiểu 44px; focus-visible rõ. Ở `max-width: 768px`, giảm phần brand và khoảng dọc để form/CTA nằm sớm; ẩn daily wish ngoài bước login. Thêm nhánh `@media (prefers-reduced-motion: reduce)` để bỏ transform/transition của CTA xác thực.
 
-- [ ] **Step 5: Chạy GREEN và commit**
+- [x] **Step 5: Chạy GREEN và commit** — `0e449fc`
 
 ```powershell
 node --import tsx --test tests/unit/login-screen.test.mjs tests/unit/login-screen-sdk-boundary.test.mjs
@@ -288,7 +288,7 @@ Expected: PASS, SDK boundary giữ nguyên và typecheck exit `0`.
 - Consumes: local app URL qua `VMP_E2E_URL`, `caiGiaLap`, `phienGia`, `NGUOI_DUNG`.
 - Produces: một targeted Chrome gate cho login/forgot/recovery; không gọi Supabase production.
 
-- [ ] **Step 1: Viết E2E thất bại cho forgot flow**
+- [x] **Step 1: Viết E2E thất bại cho forgot flow** — `eceeb8c`
 
 Không nhét phiên, mở app ở 1440×900 rồi kiểm:
 
@@ -299,7 +299,7 @@ Không nhét phiên, mở app ở 1440×900 rồi kiểm:
 
 Ở 390×844 kiểm không tràn ngang, input/CTA cao ít nhất 44px và CTA chính nằm trong chiều cao trang hợp lý.
 
-- [ ] **Step 2: Viết E2E thất bại cho recovery flow**
+- [x] **Step 2: Viết E2E thất bại cho recovery flow** — `eceeb8c`
 
 Dựng recovery URL giả có JWT payload của `NGUOI_DUNG`, `expires_at`, `refresh_token`, `token_type=bearer`, `type=recovery`; mọi request bị `caiGiaLap` chặn. Kiểm:
 
@@ -308,7 +308,7 @@ Dựng recovery URL giả có JWT payload của `NGUOI_DUNG`, `expires_at`, `ref
 3. Cặp hợp lệ gửi `PUT /auth/v1/user`, sau đó gọi logout và quay về login với thông báo thành công.
 4. URL lỗi `type=recovery&error=access_denied&error_code=otp_expired` render trạng thái hết hạn và nút yêu cầu link mới dẫn tới form forgot.
 
-- [ ] **Step 3: Chạy RED, hoàn thiện fixture tối thiểu rồi chạy GREEN**
+- [x] **Step 3: Chạy RED, hoàn thiện fixture tối thiểu rồi chạy GREEN** — `eceeb8c`, `2d80ea3`
 
 ```powershell
 $env:VMP_E2E_URL='http://127.0.0.1:4175/'; node tests/e2e/auth-recovery-flow.mjs
@@ -330,11 +330,11 @@ git diff --check
 
 Expected: tất cả exit `0`; build chỉ còn cảnh báo font/env/dynamic-import đã biết.
 
-- [ ] **Step 5: Kiểm tra trực quan và accessibility**
+- [x] **Step 5: Kiểm tra trực quan và accessibility** — `d39a039`, `2d80ea3`
 
 Chụp bằng Chrome giả lập ở 1440×900 và 390×844 cho `login`, `forgot`, `forgot-sent`, `recovery-ready`, `recovery-invalid`. Xác nhận một CTA chính, trục chữ thẳng, focus ring rõ, không cắt nội dung. Chạy kiểm tra bàn phím Tab/Shift+Tab/Enter và axe WCAG 2.2 AA trên hai kích thước; ghi chính xác vi phạm nếu còn. Xóa ảnh tạm sau khi xem.
 
-- [ ] **Step 6: Cập nhật bằng chứng và commit**
+- [x] **Step 6: Cập nhật bằng chứng và commit** — `eceeb8c`, `d39a039`, `2d80ea3`
 
 Đánh dấu checkbox, ghi số test đạt/hỏng, cảnh báo build còn lại và kết quả accessibility vào cuối plan, rồi:
 
