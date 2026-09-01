@@ -1381,13 +1381,6 @@ function AppShell() {
   const { user, setUser, logout, recoverySignal, clearRecovery } = useAuth();
   const [authMode, setAuthMode] = useState<LoginScreenMode>("login");
   const [authNotice, setAuthNotice] = useState("");
-  const { access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen } = useAccess(user);
-  useAccessCacheTransition(user, {
-    access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen,
-  });
-  /* Chỉ prefetch SAU đăng nhập (màn login không cần gánh 3 chunk màn),
-     và đúng một lần cho cả phiên (cờ trong prefetchKhiRanh). */
-  useEffect(() => { if (user) prefetchKhiRanh(); }, [user]);
 
   if (recoverySignal) return (
     <PasswordRecoveryScreen
@@ -1411,6 +1404,21 @@ function AppShell() {
     <LoginScreen initialMode={authMode} notice={authNotice}
       onLogin={(u) => { setAuthNotice(""); setUser(u); saveUser(u); }} />
   );
+
+  return <AuthorizedAppShell user={user} logout={logout} />;
+}
+
+/* Ranh giới này chỉ được mount sau khi đã loại trừ login/recovery. Nhờ đó
+ * phiên PASSWORD_RECOVERY không gọi rpc_my_ui_access hoặc prefetch dữ liệu
+ * bảo vệ trước khi người dùng đặt xong mật khẩu mới. */
+function AuthorizedAppShell({ user, logout }: { user: AppUser; logout: () => Promise<void> }) {
+  const { access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen } = useAccess(user);
+  useAccessCacheTransition(user, {
+    access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen,
+  });
+  /* Chỉ prefetch SAU đăng nhập (màn login không cần gánh 3 chunk màn),
+     và đúng một lần cho cả phiên (cờ trong prefetchKhiRanh). */
+  useEffect(() => { prefetchKhiRanh(); }, []);
 
   /* Chỉ outer shell được mount trước khi xác minh. Inner shell mới sở hữu
      useVmpData và mọi effect đọc dữ liệu bảo vệ. */
