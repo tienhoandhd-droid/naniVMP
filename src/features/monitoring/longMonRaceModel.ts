@@ -61,7 +61,15 @@ export interface LongMonWeekBand {
   widthPct: number;
 }
 
+export interface LongMonPeriodBand {
+  id: "past" | "future";
+  label: string;
+  startPct: number;
+  widthPct: number;
+}
+
 export interface LongMonRaceModel {
+  periods: LongMonPeriodBand[];
   bands: LongMonMonthBand[];
   weeks: LongMonWeekBand[];
   fish: LongMonRaceFish[];
@@ -175,8 +183,8 @@ function rangeAround(now: Date): { start: number; endExclusive: number; today: n
   const [year, month, day] = bangkokCalendarDate(now).split("-").map(Number);
   const today = Date.UTC(year, month - 1, day);
   return {
-    start: Date.UTC(year, month - 1, 1),
-    endExclusive: Date.UTC(year, month + 1, 1),
+    start: today - 30 * DAY_MS,
+    endExclusive: today + 30 * DAY_MS,
     today,
   };
 }
@@ -289,18 +297,32 @@ function weekBands(start: number, endExclusive: number): LongMonWeekBand[] {
 function weightedWeekBands(
   weeks: readonly LongMonWeekBand[],
   counts: ReadonlyMap<string, number>,
+  start: number,
+  today: number,
+  endExclusive: number,
 ): LongMonWeekBand[] {
-  const rawWidths = weeks.map((week) => {
+  const weighted = weeks.map((week) => {
     const count = counts.get(week.key) ?? 0;
     const densityWeight = count === 0
       ? .58
       : 1 + Math.min(.8, Math.log2(count + 1) * .16);
-    return week.widthPct * densityWeight;
+    const weekStart = utcOfIso(week.key);
+    const visibleStart = Math.max(start, weekStart);
+    const visibleEnd = Math.min(endExclusive, weekStart + 7 * DAY_MS);
+    const pastMs = Math.max(0, Math.min(visibleEnd, today) - visibleStart);
+    const futureMs = Math.max(0, visibleEnd - Math.max(visibleStart, today));
+    return {
+      week,
+      pastRaw: pastMs * densityWeight,
+      futureRaw: futureMs * densityWeight,
+    };
   });
-  const total = rawWidths.reduce((sum, width) => sum + width, 0);
+  const pastTotal = weighted.reduce((sum, item) => sum + item.pastRaw, 0);
+  const futureTotal = weighted.reduce((sum, item) => sum + item.futureRaw, 0);
   let cursor = 0;
-  return weeks.map((week, index) => {
-    const widthPct = rawWidths[index] / total * 100;
+  return weighted.map(({ week, pastRaw, futureRaw }) => {
+    const widthPct = (pastTotal ? pastRaw / pastTotal * 50 : 0)
+      + (futureTotal ? futureRaw / futureTotal * 50 : 0);
     const weighted = { ...week, startPct: cursor, widthPct };
     cursor += widthPct;
     return weighted;
@@ -724,7 +746,7 @@ export function buildLongMonRaceModel(
   for (const fish of candidates) {
     weekCounts.set(fish.weekKey, (weekCounts.get(fish.weekKey) ?? 0) + 1);
   }
-  const weeks = weightedWeekBands(baseWeeks, weekCounts);
+  const weeks = weightedWeekBands(baseWeeks, weekCounts, start, today, endExclusive);
 
   const { laneCount, densityScale, sceneWidthPx, sceneHeightPx } = applyPlacement(
     candidates,
@@ -736,6 +758,10 @@ export function buildLongMonRaceModel(
   for (const fish of candidates) stageCounts[fish.stage] += 1;
 
   return {
+    periods: [
+      { id: "past", label: "30 ngày đã qua", startPct: 0, widthPct: 50 },
+      { id: "future", label: "30 ngày sắp tới", startPct: 50, widthPct: 50 },
+    ],
     bands: monthBands(start, endExclusive, weeks),
     weeks,
     fish: candidates,
@@ -743,9 +769,7 @@ export function buildLongMonRaceModel(
     densityScale,
     sceneWidthPx,
     sceneHeightPx,
-    todayPct: today >= start && today < endExclusive
-      ? percentInWeightedWeeks(today, weeks, start, endExclusive)
-      : null,
+    todayPct: 50,
     missingDeadlineCount,
     stageCounts,
   };

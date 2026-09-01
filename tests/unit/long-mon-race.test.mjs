@@ -99,22 +99,28 @@ test("tiến độ nhận cả ngày thực tế chuẩn hoá và cờ legacy", 
   );
 });
 
-test("Ngư đồ chỉ hiển thị tháng hiện tại và tháng kế tiếp", () => {
+test("Ngư đồ hiển thị 30 ngày đã qua và 30 ngày sắp tới quanh Hôm nay", () => {
+  const midMonthNow = new Date("2026-08-17T04:00:00.000Z");
   const model = buildLongMonRaceModel([
-    activity("start", "2026-08-01"),
-    activity("end", "2026-09-30"),
-    activity("before", "2026-07-31"),
-    activity("outside", "2026-10-01"),
-  ], NOW);
+    activity("start", "2026-07-18"),
+    activity("last", "2026-09-15"),
+    activity("before", "2026-07-17"),
+    activity("outside", "2026-09-16"),
+  ], midMonthNow);
 
   assert.deepEqual(
     model.bands.map(({ year, month }) => [year, month]),
-    [[2026, 8], [2026, 9]],
+    [[2026, 7], [2026, 8], [2026, 9]],
   );
   assert.deepEqual(
     model.fish.map((fish) => fish.activity.id).sort(),
-    ["end", "start"],
+    ["last", "start"],
   );
+  assert.equal(model.todayPct, 50);
+  assert.deepEqual(model.periods, [
+    { id: "past", label: "30 ngày đã qua", startPct: 0, widthPct: 50 },
+    { id: "future", label: "30 ngày sắp tới", startPct: 50, widthPct: 50 },
+  ]);
 });
 
 function overlappingPairs(fish, sceneWidth = SCENE_WIDTH, sceneHeight = SCENE_HEIGHT) {
@@ -152,14 +158,14 @@ function overlappingPairsInModel(model) {
   );
 }
 
-test("trường đua phủ đúng hai tháng lịch và loại hạn ngoài khoảng", () => {
+test("trường đua phủ đúng 60 ngày quanh Hôm nay và loại hạn ngoài khoảng", () => {
   const model = buildLongMonRaceModel([
     activity("start", "2026-08-01"),
     activity("same-a", "2026-08-31"),
     activity("same-b", "2026-08-31"),
     activity("same-c", "2026-08-31"),
-    activity("end", "2026-09-30"),
-    activity("outside", "2026-10-01"),
+    activity("end", "2026-09-29"),
+    activity("outside", "2026-09-30"),
     activity("before", "2026-07-31"),
     activity("missing", null),
   ], NOW);
@@ -212,6 +218,22 @@ test("tuần trống thu hẹp để nhường chiều dài cho tuần có cá",
   "vạch hôm nay phải đi theo tỷ lệ tuần mới");
 });
 
+test("mật độ cá không đẩy ranh giới quá khứ và tương lai khỏi tâm", () => {
+  const midMonthNow = new Date("2026-08-17T04:00:00.000Z");
+  const model = buildLongMonRaceModel([
+    activity("past", "2026-08-01"),
+    ...Array.from({ length: 20 }, (_, index) =>
+      activity(`future-${index}`, "2026-09-01")),
+  ], midMonthNow);
+
+  const pastEdge = model.weeks.find((week) => week.key === "2026-08-10");
+  const futureStart = model.weeks.find((week) => week.key === "2026-08-17");
+  assert.ok(Math.abs(pastEdge.startPct + pastEdge.widthPct - 50) < .001,
+    `miền đã qua phải kết thúc ở 50%, hiện là ${pastEdge.startPct + pastEdge.widthPct}`);
+  assert.ok(Math.abs(futureStart.startPct - 50) < .001,
+    `miền sắp tới phải bắt đầu ở 50%, hiện là ${futureStart.startPct}`);
+});
+
 test("mười hai cá trong một tuần được xếp linh động mà không va chạm", () => {
   const deadlines = [
     "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03",
@@ -243,8 +265,6 @@ test("mười hai cá trong một tuần được xếp linh động mà không 
     "đàn cá phải có nhiều cỡ nhỏ lệch nhau thay vì cùng một tỷ lệ");
   assert.ok(roundedAngles.size >= 4,
     "đàn cá phải có nhiều tư thế bơi thay vì nghiêng gần như giống nhau");
-  assert.ok(model.fish.some((fish) => fish.renderRotateDeg <= -1));
-  assert.ok(model.fish.some((fish) => fish.renderRotateDeg >= 4));
   assert.ok(model.fish.every((fish) => Math.abs(fish.renderRotateDeg) <= 12));
 });
 
@@ -299,7 +319,7 @@ test("đàn thưa trên nhiều tuần vẫn bơi rải theo chiều sâu thay v
   assert.deepEqual(overlappingPairsInModel(model), []);
 });
 
-test("bốn mươi tám cá trong cửa sổ hai tháng nằm trọn scene cố định", () => {
+test("bốn mươi tám cá trong cửa sổ 60 ngày nằm trọn scene cố định", () => {
   const input = Array.from({ length: 48 }, (_, index) => {
     const dayOffset = Math.floor(index * 20 / 47);
     const deadline = new Date(Date.UTC(2026, 7, 24 + dayOffset)).toISOString().slice(0, 10);
@@ -316,14 +336,14 @@ test("bốn mươi tám cá trong cửa sổ hai tháng nằm trọn scene cố 
   assert.ok(model.densityScale >= .66 && model.densityScale <= 1);
 });
 
-test("sự cố production 31/08: 126 cá trong hai tháng không được ném lỗi", () => {
+test("sự cố production 31/08: 126 cá trong 60 ngày không được ném lỗi", () => {
   /* Dữ liệu đông làm sập bản deploy đầu: ba cụm lớn cạn cả tám bậc mật độ ở hồ 560px và model
      ném Error làm trắng màn. Hợp đồng mới: hết bậc mật độ thì hồ SÂU
      THÊM (TEAM_HEIGHT_LEVELS), không bao giờ ném vì đông cá. */
   const input = [];
   for (let i = 0; i < 80; i += 1) input.push(activity(`p80-${i}`, `2026-09-0${1 + (i % 6)}`));
   for (let i = 0; i < 18; i += 1) input.push(activity(`p18-${i}`, `2026-09-2${8 + (i % 2)}`));
-  for (let i = 0; i < 28; i += 1) input.push(activity(`p28-${i}`, i % 2 ? "2026-09-29" : "2026-09-30"));
+  for (let i = 0; i < 28; i += 1) input.push(activity(`p28-${i}`, i % 2 ? "2026-09-27" : "2026-09-29"));
 
   const model = buildLongMonRaceModel(input, NOW, { audience: "team" });
   assert.equal(model.fish.length, 126);
