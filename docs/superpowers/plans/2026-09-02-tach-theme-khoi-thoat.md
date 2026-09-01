@@ -28,11 +28,11 @@
 - Consumes: `ThemeToggle({ compact: true })`, `.vmp-sidebar-account__identity` và accessible name `Giao diện …` hiện có.
 - Produces: `.vmp-sidebar-preferences` chứa nhãn `Giao diện` cùng đúng một `ThemeToggle`; thẻ `.vmp-sidebar-account__identity` chỉ chứa nhận diện, `Mật khẩu` và `Thoát`.
 
-- [ ] **Step 1: Viết test thất bại cho ranh giới an toàn**
+- [x] **Step 1: Viết test thất bại cho ranh giới an toàn**
 
 Sửa unit test để render `Sidebar` thật, xác nhận `.vmp-sidebar-preferences` đứng trước `.vmp-sidebar-account__identity`, nút theme thuộc hàng tùy chọn và không thuộc thẻ tài khoản. Sửa E2E để kiểm tra nút theme nằm hoàn toàn trong rect hàng tùy chọn, hàng tùy chọn nằm phía trên thẻ tài khoản với khoảng cách ít nhất `8px`, và thẻ tài khoản không chứa nút theme.
 
-- [ ] **Step 2: Chạy RED**
+- [x] **Step 2: Chạy RED**
 
 ```powershell
 node --import tsx --test tests/unit/topbar-controls.test.mjs
@@ -40,7 +40,7 @@ node --import tsx --test tests/unit/topbar-controls.test.mjs
 
 Expected: FAIL vì chưa có `.vmp-sidebar-preferences` và nút theme vẫn nằm trong `.vmp-sidebar-account__identity`.
 
-- [ ] **Step 3: Cài đặt tối thiểu**
+- [x] **Step 3: Cài đặt tối thiểu**
 
 Trong `Sidebar`, khi không thu gọn, render trước thẻ tài khoản:
 
@@ -53,7 +53,7 @@ Trong `Sidebar`, khi không thu gọn, render trước thẻ tài khoản:
 
 Hàng dùng token màu hiện có, `display: flex`, căn hai đầu, vùng bấm theme tối thiểu `32×32px` và `marginTop`/`marginBottom` tạo khoảng cách rõ. Xóa `.vmp-sidebar-theme` khỏi hàng nút tài khoản; giữ `Mật khẩu` và `Thoát` cân đều.
 
-- [ ] **Step 4: Chạy GREEN và kiểm tra hành vi Chrome**
+- [x] **Step 4: Chạy GREEN và kiểm tra hành vi Chrome**
 
 ```powershell
 node --import tsx --test tests/unit/topbar-controls.test.mjs
@@ -62,7 +62,7 @@ $env:VMP_E2E_URL='http://127.0.0.1:4175/'; node tests/e2e/theme-person-layout.mj
 
 Expected: unit và E2E exit `0`; theme vẫn chuyển trạng thái, hàng tùy chọn cách thẻ tài khoản ít nhất `8px`.
 
-- [ ] **Step 5: Chạy gate hẹp và commit**
+- [x] **Step 5: Chạy gate hẹp và commit**
 
 ```powershell
 npm run typecheck
@@ -71,4 +71,13 @@ $env:VITE_MANUAL_PLANNED_DEADLINES_ENABLED='true'; npm run build
 git diff --check
 ```
 
-Expected: tất cả exit `0`; build chỉ còn cảnh báo font/dynamic-import đã biết. Kiểm tra trực quan desktop, sau đó commit đúng ba file implementation/test và cập nhật bằng chứng trong plan.
+Expected: tất cả exit `0`; build chỉ còn cảnh báo font/dynamic-import đã biết. Kiểm tra trực quan desktop, sau đó commit đúng ba file implementation/test cùng bằng chứng trong plan.
+
+## Bằng chứng hoàn thành
+
+- RED: unit hỏng đúng tại `thiếu hàng tùy chọn giao diện riêng`.
+- GREEN: unit `topbar-controls` đạt `4/4`; E2E Chrome `theme-person-layout` đạt `9/9`.
+- `typecheck`, `drift`, `git diff --check` và build production đều exit `0`.
+- Build còn cảnh báo môi trường/font và dynamic-import đã có từ trước; không phát sinh lỗi build.
+- Đã kiểm tra ảnh render thật ở `1440×900`: hàng `Giao diện` tách biệt, cách thẻ tài khoản `10px`; ảnh tạm đã xóa.
+- Local đã được bật lại tại `http://127.0.0.1:4175/` sau khi tiến trình cũ tự dừng.

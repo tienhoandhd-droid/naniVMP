@@ -46,29 +46,37 @@ console.log("Bố cục desktop:");
 {
   const page = await moTrang(browser, 1440, 900);
   const geometry = await page.evaluate(() => {
-    const theme = document.querySelector('.vmp-sidebar button[aria-label^="Giao diện "]');
+    const theme = document.querySelector('.vmp-sidebar-preferences button[aria-label^="Giao diện "]');
+    const preferences = document.querySelector(".vmp-sidebar-preferences");
     const identity = document.querySelector(".vmp-sidebar-account__identity");
     const filter = document.querySelector("#vmp-global-filter-trigger");
     const person = document.querySelector(".vmp-global-filter__person");
     const rect = (element) => element?.getBoundingClientRect();
     const themeRect = rect(theme);
+    const preferencesRect = rect(preferences);
     const identityRect = rect(identity);
     const filterRect = rect(filter);
     const personRect = rect(person);
     return {
-      themeTrongTaiKhoan: !!themeRect && !!identityRect
-        && themeRect.left >= identityRect.left && themeRect.right <= identityRect.right
-        && themeRect.top >= identityRect.top && themeRect.bottom <= identityRect.bottom,
+      themeTrongTuyChon: !!themeRect && !!preferencesRect
+        && themeRect.left >= preferencesRect.left && themeRect.right <= preferencesRect.right
+        && themeRect.top >= preferencesRect.top && themeRect.bottom <= preferencesRect.bottom,
+      themeTrongTaiKhoan: identity?.querySelectorAll('button[aria-label^="Giao diện "]').length || 0,
+      khoangCachTaiKhoan: preferencesRect && identityRect
+        ? Math.round(identityRect.top - preferencesRect.bottom)
+        : -1,
       themeTrenTopbar: document.querySelectorAll('.vmp-topbar button[aria-label^="Giao diện "]').length,
       personBenPhai: !!filterRect && !!personRect && personRect.left > filterRect.right,
       khoangCan: filterRect && personRect ? Math.round(personRect.left - filterRect.right) : -1,
     };
   });
-  kiem(geometry.themeTrongTaiKhoan, "theme nằm trong nhận diện tài khoản");
+  kiem(geometry.themeTrongTuyChon, "theme nằm trong hàng tùy chọn riêng");
+  kiem(geometry.themeTrongTaiKhoan === 0, "thẻ tài khoản không chứa nút theme", String(geometry.themeTrongTaiKhoan));
+  kiem(geometry.khoangCachTaiKhoan >= 8, "theme cách an toàn khỏi thẻ tài khoản", `${geometry.khoangCachTaiKhoan}px`);
   kiem(geometry.themeTrenTopbar === 0, "topbar không còn nút theme", String(geometry.themeTrenTopbar));
   kiem(geometry.personBenPhai, "capsule nhân sự nằm bên phải Bộ lọc", `${geometry.khoangCan}px`);
 
-  const themeSelector = '.vmp-sidebar button[aria-label^="Giao diện "]';
+  const themeSelector = '.vmp-sidebar-preferences button[aria-label^="Giao diện "]';
   const themeButton = await page.$(themeSelector);
   if (themeButton) {
     await themeButton.click();

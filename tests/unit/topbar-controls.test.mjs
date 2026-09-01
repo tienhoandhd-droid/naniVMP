@@ -43,7 +43,7 @@ test("thanh đầu nhường nút đổi giao diện cho khu vực tài khoản"
   assert.doesNotMatch(html, /aria-label="Giao diện Theo hệ thống/);
 });
 
-test("nút đổi giao diện nằm trong phần nhận diện tài khoản sidebar", () => {
+test("nút đổi giao diện nằm trong hàng tùy chọn riêng trước thẻ tài khoản", () => {
   const html = renderToStaticMarkup(React.createElement(Sidebar, {
     view: "overview",
     setView: () => {},
@@ -52,5 +52,12 @@ test("nút đổi giao diện nằm trong phần nhận diện tài khoản side
     onLogout: () => {},
     onChangePw: () => {},
   }));
-  assert.match(html, /vmp-sidebar-account__identity[\s\S]*aria-label="Giao diện Theo hệ thống/);
+  const preferencesStart = html.indexOf('class="vmp-sidebar-preferences"');
+  const accountStart = html.indexOf('class="vmp-sidebar-account__identity"');
+  const themeStart = html.indexOf('aria-label="Giao diện Theo hệ thống');
+
+  assert.ok(preferencesStart >= 0, "thiếu hàng tùy chọn giao diện riêng");
+  assert.ok(preferencesStart < themeStart, "nút theme phải thuộc hàng tùy chọn");
+  assert.ok(themeStart < accountStart, "hàng tùy chọn theme phải đứng trước thẻ tài khoản");
+  assert.doesNotMatch(html.slice(accountStart), /aria-label="Giao diện Theo hệ thống/);
 });

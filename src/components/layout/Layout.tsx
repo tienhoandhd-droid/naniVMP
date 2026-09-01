@@ -136,9 +136,28 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
         ))}
       </nav>
 
+      {!collapsed && (
+        <div
+          className="vmp-sidebar-preferences"
+          role="group"
+          aria-label="Tùy chọn giao diện"
+          style={{
+            marginTop: 14, padding: "6px 7px 6px 12px",
+            borderRadius: 14, border: `1px solid ${C.line}`,
+            background: C.pinkMist, display: "flex", alignItems: "center",
+            justifyContent: "space-between", gap: 12,
+          }}
+        >
+          <span style={{ color: C.plumSoft, fontSize: 12, fontWeight: 800, fontFamily: TEXT }}>
+            Giao diện
+          </span>
+          <ThemeToggle compact />
+        </div>
+      )}
+
       {/* User card */}
       <div className="vmp-sidebar-account__identity" style={{
-        marginTop: 14, padding: collapsed ? "10px" : "13px",
+        marginTop: collapsed ? 14 : 10, padding: collapsed ? "10px" : "13px",
         borderRadius: 16, background: C.surface, border: `1.5px solid ${C.pinkSoft}`,
       }}>
         {collapsed ? (
@@ -168,7 +187,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 4, marginTop: 11 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
               {/* nowrap + đệm ngang hẹp: sidebar nay là 248px thay vì 266px,
                   và ở bề ngang đó nhãn "Mật khẩu" bị bẻ xuống hai dòng. */}
               <button onClick={onChangePw} style={{
@@ -187,9 +206,6 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               }}>
                 <LogOut size={14} /> Thoát
               </button>
-              <div className="vmp-sidebar-theme" style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
-                <ThemeToggle compact />
-              </div>
             </div>
           </>
         )}
@@ -410,7 +426,7 @@ function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
       onClick={() => setMode(next.id)}
       title={`Giao diện: ${cur.label} — bấm để chuyển sang ${next.label}`}
       aria-label={`Giao diện ${cur.label}. Bấm để chuyển sang ${next.label}`}
-      style={{ ...glass, width: compact ? 28 : 40, height: compact ? 28 : 40, borderRadius: 999, border: "none",
+      style={{ ...glass, width: compact ? 32 : 40, height: compact ? 32 : 40, borderRadius: 999, border: "none",
                cursor: "pointer", display: "flex", alignItems: "center",
                justifyContent: "center", padding: 0 }}>
       <Icon size={compact ? 14 : 16} color={C.pinkText} />
