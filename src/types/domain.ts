@@ -128,6 +128,9 @@ export interface Activity {
   st: ActivityStatus;
   /** Nguồn kết luận trạng thái tổng; Supabase v2 luôn là server canonical. */
   statusSource?: "server" | "compatibility";
+  canonicalDeadline?: string | null;
+  daysLeft?: number | null;
+  statusAsOf?: string;
   target?: string | null;    // mốc đích đang theo dõi
   docDone?: boolean;
   effort?: number | null;

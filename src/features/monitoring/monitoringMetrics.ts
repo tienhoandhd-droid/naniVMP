@@ -23,7 +23,9 @@ export function buildMonitoringSignatureMetrics(
   now: Date = vmpToday(),
 ): MonitoringSignatureMetrics {
   return {
-    vmpOverdue: acts.filter((a) => classifyVmpDeadline(a, now, SOON_DAYS).kind === "overdue").length,
+    vmpOverdue: acts.filter((a) => a.statusSource === "server"
+      ? a.st === "over"
+      : classifyVmpDeadline(a, now, SOON_DAYS).kind === "overdue").length,
     phaseOverdue: buildTimelineSummary(acts, now).quaHan,
     highRisk: acts.filter((a) => qrmLevel(qrmRpn(a)) === "cao").length,
   };

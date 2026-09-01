@@ -76,6 +76,8 @@ export interface ProgressActivityLike {
   type?: string;
   vtype?: string;
   st?: string;
+  statusSource?: "server" | "compatibility";
+  daysLeft?: number | null;
   state?: string;
   owner?: string;
   ownerPersonId?: string | null;
@@ -136,7 +138,9 @@ function dungDong(a: ProgressActivityLike, homNay: string): ProgressWorkspaceRow
   if (a.mismatch) issues.push("stage_mismatch");
 
   const moc = a.st === "done" ? null : mocChuaXong(a);
-  const tre = moc && moc < homNay ? soNgayTre(moc, homNay) : 0;
+  const tre = a.statusSource === "server"
+    ? (a.st === "over" && typeof a.daysLeft === "number" ? Math.max(0, -a.daysLeft) : 0)
+    : (moc && moc < homNay ? soNgayTre(moc, homNay) : 0);
 
   const stageId = giaiDoanCua(a);
   return {

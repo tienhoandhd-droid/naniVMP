@@ -19,6 +19,9 @@ import type { Activity } from "../../types/domain.ts";
 /** Tình trạng gộp của một hạng mục — luật DỜI NGUYÊN VĂN từ TimelinePage:
  *  một pha trễ (đề cương/thẩm định/báo cáo) thắng trạng thái tổng. */
 export function issueLevel(a: Activity): string {
+  if (a.statusSource === "server") {
+    return a.st === "plan" ? "todo" : a.st;
+  }
   const ps = phaseStates(a);
   const hasOverPhase = [ps.p, ps.v, ps.r].includes("over");
   if (a.st === "over" || hasOverPhase) return "over";
@@ -35,9 +38,13 @@ const laActive = (a: Activity): boolean =>
 export function laSapDenHan(a: Activity, now: Date = vmpToday()): boolean {
   const muc = issueLevel(a);
   if (muc === "over" || muc === "done") return false;
-  const dich = parseD(a.target);
-  if (!dich) return false;
-  const conLai = Math.round((dich.getTime() - now.getTime()) / 86_400_000);
+  const conLai = a.statusSource === "server" && typeof a.daysLeft === "number"
+    ? a.daysLeft
+    : (() => {
+      const dich = parseD(a.target);
+      return dich ? Math.round((dich.getTime() - now.getTime()) / 86_400_000) : null;
+    })();
+  if (conLai === null) return false;
   return conLai >= 0 && conLai <= SOON_DAYS;
 }
 
@@ -64,6 +71,10 @@ const NGAY_MS = 86_400_000;
 /** Mốc trễ sớm nhất của một hạng mục quá hạn; null nếu không quá hạn. */
 function mocTreSomNhat(a: Activity, now: Date): { ten: string; ngay: Date } | null {
   if (issueLevel(a) !== "over") return null;
+  if (a.statusSource === "server") {
+    const deadline = parseD(a.canonicalDeadline ?? a.target);
+    return deadline && deadline < now ? { ten: "Đích VMP", ngay: deadline } : null;
+  }
   const ps = phaseStates(a);
   const m = ps.m;
   const cac: Array<{ ten: string; ngay: Date | null | undefined }> = [

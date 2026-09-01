@@ -203,14 +203,23 @@ function makeRow(activity: Activity, now: Date, options: {
   if (!code) return null;
   const unfinished = unfinishedStages(activity);
   const blockingStage = unfinished[0]?.label ?? "Đích VMP";
-  const vmpDeadline = classifyVmpDeadline(activity, now, 7);
-  const deadlineStage = vmpDeadline.date === null ? null : "Đích VMP";
-  const daysRemaining = vmpDeadline.daysRemaining;
+  const serverDeadline = asDateString(activity.canonicalDeadline ?? activity.target);
+  const legacyDeadline = activity.statusSource === "server" ? null : classifyVmpDeadline(activity, now, 7);
+  const deadlineStage = activity.statusSource === "server"
+    ? (serverDeadline === null ? null : "Đích VMP")
+    : (legacyDeadline?.date === null ? null : "Đích VMP");
+  const daysRemaining = activity.statusSource === "server"
+    ? (typeof activity.daysLeft === "number" && (activity.st === "over" || activity.daysLeft >= 0)
+      ? activity.daysLeft
+      : null)
+    : (legacyDeadline?.daysRemaining ?? null);
   const hasOwner = ownerPersonId(activity) !== null;
   const isDone = activity.st === "done";
   const finalActual = asDateString(firstValue(activity, "actVmp", ["actual_vmp_date", "ngay_vmp"]));
   const needsActualCompletion = isDone && finalActual === null;
-  const needsSchedule = !isDone && unfinished.length > 0 && vmpDeadline.kind === "missing";
+  const needsSchedule = !isDone && unfinished.length > 0 && (activity.statusSource === "server"
+    ? serverDeadline === null
+    : legacyDeadline?.kind === "missing");
   const reasons = buildReasons(deadlineStage, daysRemaining, hasOwner, needsActualCompletion, needsSchedule);
   const section = sectionFor(daysRemaining, reasons.some((reason) =>
     reason.kind === "missing_owner" || reason.kind === "missing_actual_completion" || reason.kind === "missing_schedule"));
