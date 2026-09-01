@@ -35,7 +35,7 @@ insert into expected_browser_function(signature,volatility,classification)
 values
   ('rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)','s','rights_reader'),
   ('rpc_source_object_facets(text,jsonb)','s','rights_reader'),
-  ('rpc_export_source_objects(text,text,jsonb,jsonb,integer)','v','rights_reader'),
+  ('rpc_export_source_objects(text,text,jsonb,jsonb,integer)','v','manager_reader'),
   ('rpc_source_field_suggestions(text,text,text,jsonb,integer)','s','manager_reader'),
   ('rpc_source_qa_candidates(text,jsonb,integer,uuid[])','s','manager_reader'),
   ('rpc_list_source_workshop_coverage(text,jsonb,integer)','s','manager_reader'),
@@ -1411,6 +1411,10 @@ begin
       'objects','source-access-v1','source-access-fingerprint',null,'[]'::jsonb),
     p_persona||'_IMPORT_FORBIDDEN');
   perform pg_temp.assert_forbidden(
+    public.rpc_export_source_objects(
+      'Thiết bị','SSEC','{}'::jsonb,null,100),
+    p_persona||'_EXPORT_FORBIDDEN');
+  perform pg_temp.assert_forbidden(
     public.rpc_list_catalog_changes('Thiết bị',null,1,0),
     p_persona||'_PENDING_FORBIDDEN');
   perform pg_temp.assert_forbidden(
@@ -1464,10 +1468,8 @@ begin
      or v_facets->>'ok' is distinct from 'true'
      or v_facets::text not like '%'||p_allowed_scope_marker||'%'
      or v_facets::text like '%SSEC_DENIED_AREA%'
-     or v_export->>'ok' is distinct from 'true'
-     or jsonb_array_length(v_export->'rows')<>1
-     or v_export#>>'{rows,0,object_code}' is distinct from p_allowed_code
-     or v_export::text like '%SSEC-DENIED%'
+     or v_export->>'ok' is distinct from 'false'
+     or v_export->>'error_code' is distinct from 'FORBIDDEN'
      or v_dashboard::text not like '%'||p_allowed_code||'%'
      or v_dashboard::text like '%SSEC-DENIED%'
      or jsonb_array_length(v_dashboard->'objects')<>1
@@ -1492,14 +1494,6 @@ begin
         p_rule_id,v_list,v_facets,v_export,v_dashboard,v_watermark,v_warnings);
   end if;
 
-  if not exists (
-    select 1 from public.audit_logs audit
-    where audit.user_id=p_user_id and audit.action='EXPORT'
-      and audit.table_name='vmp_source_objects'
-  ) then
-    raise exception using errcode='check_violation',
-      message=p_rule_id||'_EXPORT_AUDIT_MISSING';
-  end if;
 end
 $$;
 

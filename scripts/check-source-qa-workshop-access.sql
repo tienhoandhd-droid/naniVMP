@@ -299,6 +299,10 @@ BEGIN
     IF upper(coalesce(v_result->>'error_code',v_result->>'code','')) <> 'FORBIDDEN' THEN
       RAISE EXCEPTION USING errcode='check_violation', message='SOURCE_ACCESS_POSTFLIGHT_IMPORT_FORBIDDEN';
     END IF;
+    v_result:=public.rpc_export_source_objects(null,'','{}'::jsonb,null,10);
+    IF upper(coalesce(v_result->>'error_code',v_result->>'code','')) <> 'FORBIDDEN' THEN
+      RAISE EXCEPTION USING errcode='check_violation', message='SOURCE_ACCESS_POSTFLIGHT_EXPORT_FORBIDDEN';
+    END IF;
     v_result:=public.rpc_list_catalog_changes('Thiết bị',null,1,0);
     IF upper(coalesce(v_result->>'error_code',v_result->>'code','')) <> 'FORBIDDEN' THEN
       RAISE EXCEPTION USING errcode='check_violation', message='SOURCE_ACCESS_POSTFLIGHT_PENDING_FORBIDDEN';
