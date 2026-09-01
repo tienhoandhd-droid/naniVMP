@@ -8,6 +8,18 @@
 
 **Tech Stack:** PostgreSQL/Supabase RPC, React 19, TypeScript, Vite, Node test runner, Puppeteer, Playwright axe, CSS Lotus.
 
+## Execution record (local, chưa push/deploy/apply migration)
+
+- Task 1 contract/model: `178474e`.
+- Task 2 RPC, permission guard và release artifacts: `9536e89`; UI role matrix/guide: `798812d`.
+- Task 3 API/type: `cf79f3e`.
+- Task 4 bảng preview: `0c4660f`.
+- Task 5 flow stage→preview→commit→receipt: `73e9328`.
+- Gate mới nhất: targeted `29/29`, inventory mục tiêu `1/1`, Catalog E2E
+  `151/151`, Source role E2E đạt, a11y `15/15`, typecheck/build/drift/budget đạt.
+- Chưa chạy SQL security harness trên database vì migration chưa apply; đây là
+  pre/postflight bắt buộc khi được chủ dự án cho phép phát hành.
+
 ## Global Constraints
 
 - Server là nguồn sự thật cho `create/update/unchanged/error`; frontend không tự phân loại Source.

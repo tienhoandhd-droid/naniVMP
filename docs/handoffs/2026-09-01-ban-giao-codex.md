@@ -7,7 +7,7 @@
 
 ## 1 · Trạng thái Git
 
-- Nhánh làm việc: **`cai-tien/desktop-wave-1`** — **10 commit** trước ref local
+- Nhánh làm việc: **`cai-tien/desktop-wave-1`** — **20 commit** trước ref local
   `origin/main` (`7ae2db1`). **CHƯA push** trong Wave 2; `main` local đang cũ hơn
   nhánh làm việc, không dùng làm căn cứ phát hành.
 - Mọi commit đều qua gate: typecheck + unit + e2e mock + (khi đụng UI) a11y/drift/budget.
@@ -33,6 +33,22 @@
    - timestamp hiển thị cố định Asia/Bangkok;
    - gỡ toàn bộ runtime/dependency Three.js không còn dùng (2.408 dòng mã chết);
    - ổn định a11y modal bằng reduced-motion khi quét tương phản.
+5. **Wave 3 — Source import do server xác nhận + khóa quyền Dữ liệu nguồn** —
+   spec/plan:
+   `docs/superpowers/specs/2026-09-01-source-import-server-preview-design.md` và
+   `docs/superpowers/plans/2026-09-01-source-import-server-preview.md`, commit
+   `aa76d83`..`73e9328`:
+   - chỉ `admin`/`qa_manager` được thêm, sửa, nhập và xuất Source; vai trò khác
+     chỉ đọc đúng phạm vi, UI có ghi chú ngắn giải thích dữ liệu gốc;
+   - RPC preview owner-scoped, exact contract, allowlist field và keyset page;
+   - bảng create/update/unchanged/error, A3 trước→sau, tải thêm, lý do từng dòng;
+   - nút Ghi không còn khóa im lặng: báo lỗi cạnh trường, focus đúng lý do,
+     giữ draft khi RPC lỗi/conflict và giữ biên nhận sau commit.
+
+Gate chốt Wave 3 local: targeted unit/SQL contract `29/29`; RPC inventory mục
+tiêu `1/1`; Catalog E2E `151/151`; Source role E2E đạt; a11y `15/15`; typecheck,
+build, drift và budget đều exit `0`. SQL security harness đã tạo nhưng chưa chạy
+trên database vì chưa apply migration và chưa có lệnh cho phép dùng DB remote.
 
 Gate chốt Wave 2: unit Windows `671 pass, 1 skip, 0 fail`; E2E cốt lõi
 `148/148`; quyền quản trị `80/80`; deadline `39/39`; shell `29/29`;
@@ -47,12 +63,16 @@ https://claude.ai/code/artifact/8251fc3d-9d85-40fc-8ab0-309f91e0ae89 và kế ho
 
 - Đổi mật khẩu Postgres production (đang yếu, plaintext ở `.env.local` — file
   KHÔNG được commit) + mật khẩu E2E; bật IP allowlist.
-- **Apply 3 migration MỚI** (chỉ là file, CHƯA áp) theo runbook cùng tên:
+- **Apply 4 migration MỚI** (chỉ là file, CHƯA áp) theo runbook cùng tên:
   - `20260831160000_fix_bangkok_current_date.sql` → `docs/runbooks/2026-08-31-fix-bangkok-current-date.md`
   - `20260831170000_client_error_log.sql` → `docs/runbooks/2026-08-31-client-error-log.md`
     (frontend ĐÃ gắn `src/lib/baoLoi.ts`, tự im lặng khi RPC vắng)
   - `20260831180000_close_true_policies.sql` → `docs/runbooks/2026-08-31-close-true-policies.md`
     (siết 6 bảng policy-true + `rpc_team_overview_summary` lọc phạm vi; có probe persona)
+  - `20260901090000_catalog_import_server_preview.sql` →
+    `docs/runbooks/2026-09-01-catalog-import-server-preview.md`
+    (khóa export cho Admin/Quản lý QA, thêm preview batch owner-scoped; phải chạy
+    preflight/postflight/security harness đúng runbook).
 - Bật PITR/backup Supabase, tạo project staging, kiểm n8n có verify JWT.
 - Duyệt nhánh rồi ra lệnh push/PR.
 
@@ -64,6 +84,9 @@ https://claude.ai/code/artifact/8251fc3d-9d85-40fc-8ab0-309f91e0ae89 và kế ho
   rồi chạy 8 file spawn TUẦN TỰ nếu cần. 3 file (`visual-runtime-contract`,
   `fast-gate-evidence`, `preview-lifecycle`) **fail sẵn** do đặc thù Linux/ACL —
   KHÔNG phải hồi quy; CI Linux là trọng tài.
+- Riêng hai test shell trong `five-role-rpc-inventory.test.mjs` hỏng trên máy này
+  vì WSL báo `execvpe(/bin/bash) failed: No such file or directory`; phần RPC
+  inventory chạy tách bằng `--test-name-pattern "every source RPC call"` đạt.
 - E2E mock cần build có cờ + preview IPv4:
   `VITE_MANUAL_PLANNED_DEADLINES_ENABLED=true npm run build`
   `npx vite preview --port 4173 --strictPort --host 127.0.0.1` (nền)
@@ -92,6 +115,8 @@ git trước khi tin.
   sự thật KPI (màn Đối chiếu mới là bước đệm), chức năng GMP (đính kèm hồ sơ,
   phê duyệt điện tử, log EXPORT).
 - Mobile: chủ dự án HOÃN — đừng làm khi chưa được yêu cầu lại.
+- Wave 3 còn đúng bước phát hành: chủ dự án kiểm local ở
+  `http://127.0.0.1:4175`, sau đó mới cho phép push/deploy/apply migration.
 
 ## 7 · Bản đồ file nhanh cho người mới
 
