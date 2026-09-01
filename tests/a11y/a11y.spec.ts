@@ -123,6 +123,7 @@ const MAN: Array<{
  * chưa từng bị axe soi vì mọi màn đều chụp ở trạng thái tĩnh. */
 test("axe · hop-cap-nhat-tien-do", async ({ page }, testInfo) => {
   await caiGiaLap(page, { dangNhap: true });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/#v=progress");
   await expect(page.locator(".vmp-doi-nhom")).toBeVisible({ timeout: 15_000 });
   await page.locator(".pr-nut-chinh").first().click();
