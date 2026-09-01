@@ -416,6 +416,29 @@ export function dungKhoDuLieu(kichBan) {
   ];
 
   const hangMuc = Array.from({ length: soHangMuc }, (_, i) => dungHangMuc(i));
+  const canonicalHangMuc = hangMuc.map((activity) => {
+    const target = activity._raw.dl_vmp || null;
+    const daysLeft = target
+      ? Math.round((Date.parse(`${target}T00:00:00Z`) - Date.parse("2026-08-15T00:00:00Z")) / 86_400_000)
+      : null;
+    const rawStatus = activity._raw.status;
+    const st = rawStatus === "done"
+      ? "done"
+      : daysLeft !== null && daysLeft < 0
+        ? "over"
+        : ["dang_dc", "dang_td", "cho_bc", "bc"].includes(rawStatus)
+          ? "prog"
+          : target ? "todo" : "plan";
+    return {
+      ...activity,
+      st,
+      target,
+      docDone: activity._raw.report_done === true,
+      canonical_deadline: target,
+      days_left: daysLeft,
+      status_as_of: "2026-08-15",
+    };
+  });
   const doiTuong = Array.from({ length: day ? 12 : 0 }, (_, i) => dungDoiTuong(i));
 
   /* Hai bộ danh mục phụ có đủ khoá nghiệp vụ + version — workspace Danh mục
@@ -584,6 +607,29 @@ export function dungKhoDuLieu(kichBan) {
       updated_at: "2026-08-15T02:00:00Z",
       authorization_revision: 7,
       year: 2026,
+    },
+    rpc_get_vmp_dashboard_v2: {
+      contract_version: 1,
+      activities: canonicalHangMuc,
+      objects: doiTuong,
+      updated_at: "2026-08-15T02:00:00Z",
+      authorization_revision: "7",
+      year: 2026,
+      kpi: {
+        validation: {
+          done: canonicalHangMuc.filter((activity) => activity.st === "done").length,
+          over: canonicalHangMuc.filter((activity) => activity.st === "over").length,
+          todo: canonicalHangMuc.filter((activity) => activity.st !== "done" && activity.st !== "over").length,
+          total: canonicalHangMuc.length,
+        },
+        documentation: {
+          done: canonicalHangMuc.filter((activity) => activity.docDone).length,
+          over: 0,
+          todo: canonicalHangMuc.filter((activity) => !activity.docDone).length,
+          total: canonicalHangMuc.length,
+        },
+        mismatch_count: canonicalHangMuc.filter((activity) => activity.mismatch).length,
+      },
     },
     rpc_get_vmp_watermark: {
       year: 2026, plan_items: soHangMuc, objects: doiTuong.length,

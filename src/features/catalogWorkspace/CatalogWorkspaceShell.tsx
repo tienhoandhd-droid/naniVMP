@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "../../styles/catalog-workspace.css"; // B5: CSS theo route
 import {
-  Bell, Boxes, CalendarPlus, Check, Download, FileSpreadsheet, FlaskConical,
+  Bell, Boxes, CalendarClock, CalendarPlus, Check, Download, FileSpreadsheet, FlaskConical,
   History, Hourglass, Plus, RefreshCw, Search,
 } from "lucide-react";
 
@@ -34,6 +34,7 @@ import CatalogObjectForm from "../../components/catalog/CatalogObjectForm.tsx";
 import CatalogImpactPreview from "../../components/catalog/CatalogImpactPreview.tsx";
 import CatalogWarningsSummary, { type CatalogWarning } from "../../components/catalog/CatalogWarningsSummary.tsx";
 import WorkshopScopeCoveragePanel from "../sourceAccess/WorkshopScopeCoveragePanel.tsx";
+import RevalidationProposalTable from "../revalidation/RevalidationProposalTable.tsx";
 import {
   SOURCE_KINDS, fetchSourceWarnings, generateTimeline,
   saveCatalogObject,
@@ -69,7 +70,7 @@ const PAGE_SIZE = 25;
 const DO_TRE_TIM_KIEM_MS = 250;
 
 /** Sáu mục của workspace — thứ tự này là hợp đồng, có bộ kiểm giữ. */
-type VungId = "objects" | "coverage" | "products" | "alerts" | "import" | "pending" | "history";
+type VungId = "objects" | "coverage" | "products" | "alerts" | "revalidation" | "import" | "pending" | "history";
 
 const CAC_VUNG: Array<{
   id: VungId; nhan: string; icon: typeof Boxes;
@@ -79,6 +80,7 @@ const CAC_VUNG: Array<{
   { id: "coverage", nhan: "Phạm vi xưởng", icon: Boxes },
   { id: "products", nhan: "Sản phẩm GMP", icon: FlaskConical },
   { id: "alerts", nhan: "Người nhận cảnh báo", icon: Bell },
+  { id: "revalidation", nhan: "Tái thẩm định", icon: CalendarClock },
   { id: "import", nhan: "Nhập Excel", icon: FileSpreadsheet, canSua: true },
   { id: "pending", nhan: "Chờ áp dụng", icon: Hourglass, canSua: true, canSinhTimeline: true },
   { id: "history", nhan: "Lịch sử", icon: History, canAudit: true },
@@ -838,6 +840,11 @@ export default function CatalogWorkspaceShell({
                 </>
               )}
             </>
+          )}
+
+          {/* ----- Kỳ tái thẩm định từ ngày hoàn thành thực tế ----- */}
+          {vung === "revalidation" && canManageSourceDatasets && (
+            <RevalidationProposalTable canManage />
           )}
 
           {/* ----- Nhập Excel theo mẫu chính thức ----- */}

@@ -50,7 +50,7 @@ export interface CatalogSourceCursorStack {
 }
 
 export type CatalogWorkspaceRegionId =
-  | "objects" | "coverage" | "products" | "alerts" | "import" | "pending" | "history";
+  | "objects" | "coverage" | "products" | "alerts" | "revalidation" | "import" | "pending" | "history";
 
 const SEARCH_FIELDS = [
   "object_code", "object_name", "department", "area_code", "line", "owner_name",
@@ -128,7 +128,7 @@ export function catalogWorkspaceRegionIds(input: {
   if (input.businessRole !== "admin" && input.businessRole !== "qa_manager") return ["objects"];
   const regions: CatalogWorkspaceRegionId[] = ["objects"];
   if (input.canManageWorkshopScope) regions.push("coverage");
-  regions.push("products", "alerts");
+  regions.push("products", "alerts", "revalidation");
   if (input.canEdit) regions.push("import");
   if (input.canEdit && input.canGenerateTimeline) regions.push("pending");
   regions.push("history");
