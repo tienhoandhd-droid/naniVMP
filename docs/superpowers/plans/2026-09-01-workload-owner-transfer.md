@@ -18,7 +18,7 @@
 
 ---
 
-### Task 1: Model quyền và payload chuyển người
+### Task 1: Model quyền và payload chuyển người — hoàn tất `63931cc`
 
 **Files:**
 - Create: `src/features/workload/workloadOwnerTransferModel.ts`
@@ -27,7 +27,7 @@
 **Interfaces:**
 - Produces: `canTransferWorkloadOwner(role)`, `prepareWorkloadOwnerTransfer(input)` và `WorkloadOwnerTransferInput`.
 
-- [ ] **Step 1: Viết test đỏ cho ma trận quyền và validation**
+- [x] **Step 1: Viết test đỏ cho ma trận quyền và validation**
 
 ```js
 assert.equal(canTransferWorkloadOwner("admin"), true);
@@ -43,12 +43,12 @@ assert.deepEqual(prepareWorkloadOwnerTransfer({
 });
 ```
 
-- [ ] **Step 2: Chạy test và xác nhận đỏ vì module chưa tồn tại**
+- [x] **Step 2: Chạy test và xác nhận đỏ vì module chưa tồn tại**
 
 Run: `node --import tsx --test tests/unit/workload-owner-transfer-model.test.mjs`
 Expected: FAIL với lỗi không tìm thấy `workloadOwnerTransferModel.ts`.
 
-- [ ] **Step 3: Cài model tối thiểu**
+- [x] **Step 3: Cài model tối thiểu**
 
 ```ts
 export function canTransferWorkloadOwner(role: BusinessRole | null): boolean {
@@ -69,19 +69,19 @@ export function prepareWorkloadOwnerTransfer(input: WorkloadOwnerTransferInput):
 }
 ```
 
-- [ ] **Step 4: Chạy test model và xác nhận xanh**
+- [x] **Step 4: Chạy test model và xác nhận xanh**
 
 Run: `node --import tsx --test tests/unit/workload-owner-transfer-model.test.mjs`
 Expected: PASS toàn bộ trường hợp quyền, thiếu người, trùng người, thiếu lý do và payload hợp lệ.
 
-- [ ] **Step 5: Commit lát model**
+- [x] **Step 5: Commit lát model**
 
 ```powershell
 git add src/features/workload/workloadOwnerTransferModel.ts tests/unit/workload-owner-transfer-model.test.mjs
 git commit -m "feat: them model chuyen nguoi workload"
 ```
 
-### Task 2: Dialog chuyển người truy cập được
+### Task 2: Dialog chuyển người truy cập được — hoàn tất `d0902f7`
 
 **Files:**
 - Create: `src/features/workload/WorkloadOwnerTransferDialog.tsx`
@@ -91,7 +91,7 @@ git commit -m "feat: them model chuyen nguoi workload"
 - Consumes: `prepareWorkloadOwnerTransfer`, `usePerformers`, `setItemPerformerById`, `useToast`, `useXacNhan`.
 - Produces: `WorkloadOwnerTransferDialog({ activity, onClose, onReload })`.
 
-- [ ] **Step 1: Viết test SSR đỏ cho nhãn và trạng thái form**
+- [x] **Step 1: Viết test SSR đỏ cho nhãn và trạng thái form**
 
 ```js
 const html = renderToStaticMarkup(React.createElement(WorkloadOwnerTransferDialog, {
@@ -103,12 +103,12 @@ assert.match(html, /<label[^>]*for="workload-owner-reason"/);
 assert.match(html, /data-workload-owner-submit/);
 ```
 
-- [ ] **Step 2: Chạy test và xác nhận đỏ vì dialog chưa tồn tại**
+- [x] **Step 2: Chạy test và xác nhận đỏ vì dialog chưa tồn tại**
 
 Run: `node --import tsx --test tests/unit/non-timeline-dialogs.test.mjs`
 Expected: FAIL tại import/export `WorkloadOwnerTransferDialog`.
 
-- [ ] **Step 3: Cài dialog tối thiểu**
+- [x] **Step 3: Cài dialog tối thiểu**
 
 ```tsx
 <ViewportDialog open title="Chuyển phụ trách" dismissDisabled={saving} onRequestClose={() => !saving && onClose()} footer={footer}>
@@ -131,19 +131,19 @@ onReload();
 onClose();
 ```
 
-- [ ] **Step 4: Chạy test dialog và model**
+- [x] **Step 4: Chạy test dialog và model**
 
 Run: `node --import tsx --test tests/unit/workload-owner-transfer-model.test.mjs tests/unit/non-timeline-dialogs.test.mjs`
 Expected: PASS; markup có dialog dùng chung, label liên kết đúng và action rõ tên.
 
-- [ ] **Step 5: Commit dialog**
+- [x] **Step 5: Commit dialog**
 
 ```powershell
 git add src/features/workload/WorkloadOwnerTransferDialog.tsx tests/unit/non-timeline-dialogs.test.mjs
 git commit -m "feat: them hop chuyen nguoi workload"
 ```
 
-### Task 3: Tích hợp Workload và chứng minh luồng quyền
+### Task 3: Tích hợp Workload và chứng minh luồng quyền — hoàn tất `f1fed2b`
 
 **Files:**
 - Modify: `src/pages/WorkloadPage.tsx`
@@ -155,7 +155,7 @@ git commit -m "feat: them hop chuyen nguoi workload"
 - Consumes: `canTransferWorkloadOwner`, `WorkloadOwnerTransferDialog`, `businessRole`, `onReload`.
 - Produces: nút `data-workload-owner-transfer` chỉ cho manager và luồng RPC từ màn Workload.
 
-- [ ] **Step 1: Viết E2E đỏ cho Admin và QA staff**
+- [x] **Step 1: Viết E2E đỏ cho Admin và QA staff**
 
 ```js
 await admin.goto(`${APP_URL}#v=workload`);
@@ -171,12 +171,12 @@ assert.deepEqual(lastRpc("rpc_set_item_performer_by_id").body, {
 assert.equal(await staff.$("[data-workload-owner-transfer]"), null);
 ```
 
-- [ ] **Step 2: Chạy E2E và xác nhận đỏ vì chưa có trigger**
+- [x] **Step 2: Chạy E2E và xác nhận đỏ vì chưa có trigger**
 
 Run: `node tests/e2e/workload-owner-transfer.mjs`
 Expected: FAIL khi không tìm thấy `[data-workload-owner-transfer]`.
 
-- [ ] **Step 3: Nối props và hành động vào Workload**
+- [x] **Step 3: Nối props và hành động vào Workload**
 
 ```tsx
 <WorkloadView acts={filteredActs} businessRole={access.businessRole} onReload={reloadData} />
@@ -190,7 +190,7 @@ Expected: FAIL khi không tìm thấy `[data-workload-owner-transfer]`.
 )}
 ```
 
-- [ ] **Step 4: Chạy gate mục tiêu**
+- [x] **Step 4: Chạy gate mục tiêu**
 
 Run: `node tests/e2e/workload-owner-transfer.mjs`
 Expected: PASS cho payload Admin, reload sau thành công và không có action với QA staff.
@@ -204,7 +204,7 @@ Expected: exit 0.
 Run: `npm run build`
 Expected: exit 0.
 
-- [ ] **Step 5: Cập nhật bàn giao và commit**
+- [x] **Step 5: Cập nhật bàn giao và commit**
 
 Ghi trạng thái local, test đã chạy, không migration mới và chưa push/deploy vào file bàn giao.
 
