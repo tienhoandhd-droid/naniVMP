@@ -351,6 +351,8 @@ for (const [id, ten] of MAN) {
     soLoai: document.querySelectorAll("[data-long-mon-legend]").length,
     coHomNay: !!document.querySelector(".long-mon-race__today"),
     soThang: document.querySelectorAll(".long-mon-race__month").length,
+    kyHan: [...document.querySelectorAll("[data-long-mon-period]")]
+      .map((node) => node.textContent?.trim() || ""),
     conWorkbench: !!document.querySelector(".timeline-day-board")
       || !!document.querySelector("[data-timeline-filter-toggle]")
       || !!document.querySelector("[data-timeline-month-action]"),
@@ -360,7 +362,11 @@ for (const [id, ten] of MAN) {
   kiem(nguDo.soCa > 0, "có cá trên trường đua", String(nguDo.soCa));
   kiem(nguDo.soLoai === 6, "legend đủ sáu loài", String(nguDo.soLoai));
   kiem(nguDo.coHomNay, "có sợi chỉ Hôm nay");
-  kiem(nguDo.soThang === 2, "Ngư đồ chỉ phủ tháng hiện tại và tháng kế tiếp", String(nguDo.soThang));
+  kiem(nguDo.soThang >= 2 && nguDo.soThang <= 3,
+    "Ngư đồ ±30 ngày chỉ chạm 2–3 tháng lịch", String(nguDo.soThang));
+  kiem(nguDo.kyHan.some((label) => /30 ngày đã qua/i.test(label))
+      && nguDo.kyHan.some((label) => /30 ngày sắp tới/i.test(label)),
+    "Ngư đồ chia đúng 30 ngày đã qua và 30 ngày sắp tới", nguDo.kyHan.join(" | "));
   kiem(!nguDo.conWorkbench, "workbench cũ (bảng ngày, bộ lọc, lưới tháng) đã rời màn");
   kiem(!nguDo.coCanvas3D, "không còn canvas 3D trên màn Dòng thời gian");
   kiem(nguDo.tranNgang <= 1, "không tràn ngang", `${nguDo.tranNgang}px`);
@@ -455,7 +461,12 @@ for (const [id, ten] of MAN) {
     [...document.querySelectorAll("button")]
       .find((b) => /quên mật khẩu/i.test(b.textContent || ""))?.click();
   });
-  await new Promise((r) => setTimeout(r, 500));
+  await trang.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Khôi phục mật khẩu"));
+  await trang.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => /gửi liên kết đặt lại/i.test(b.textContent || ""))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 300));
   const nhacEmail = await trang.evaluate(() =>
     [...document.querySelectorAll('[role="alert"], [role="status"]')]
       .map((n) => n.textContent?.trim()).filter(Boolean).join(" | "));
@@ -465,13 +476,13 @@ for (const [id, ten] of MAN) {
   await trang.type("#vmp-login-email", "kiem-thu@vi-du.test");
   await trang.evaluate(() => {
     [...document.querySelectorAll("button")]
-      .find((b) => /quên mật khẩu/i.test(b.textContent || ""))?.click();
+      .find((b) => /gửi liên kết đặt lại/i.test(b.textContent || ""))?.click();
   });
-  await new Promise((r) => setTimeout(r, 800));
+  await trang.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Kiểm tra email"));
   const daGui = await trang.evaluate(() =>
     [...document.querySelectorAll('[role="alert"], [role="status"]')]
       .map((n) => n.textContent?.trim()).filter(Boolean).join(" | "));
-  kiem(/đã gửi/i.test(daGui), "có email thì báo ĐÃ GỬI mail đặt lại", daGui || "(im lặng)");
+  kiem(/đã (được )?gửi/i.test(daGui), "có email thì báo ĐÃ GỬI mail đặt lại", daGui || "(im lặng)");
   await trang.close();
 }
 

@@ -252,6 +252,10 @@ async function openPersona(persona, state) {
     bodies.push({ role: persona.role, rpc, body });
     if (rpc === "rpc_my_ui_access") return answer(request, uiAccess(persona));
     if (rpc === "item_permissions_mode") return answer(request, "enforced");
+    if (rpc === "rpc_get_vmp_dashboard_v2") return answer(request, {
+      code: "PGRST202",
+      message: "Could not find the function public.rpc_get_vmp_dashboard_v2 in the schema cache",
+    }, 404);
     if (rpc === "rpc_get_vmp_dashboard") return answer(request, dashboard(persona, state.revoked, state.revision));
     if (rpc === "rpc_get_vmp_watermark") return answer(request, {
       year: 2026, plan_items: visibleRows(persona, state.revoked).length, objects: visibleRows(persona, state.revoked).length,

@@ -200,6 +200,18 @@ async function newPersonaPage(persona) {
       return request.abort();
     }
     if (LA_UI_ACCESS.test(url)) return answer(request, persona.uiAccess);
+    if (/\/rpc\/rpc_get_vmp_dashboard_v2/.test(url)) {
+      if (request.method() === "OPTIONS") return answer(request, {});
+      return request.respond({
+        status: 404,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "PGRST202",
+          message: "Could not find the function public.rpc_get_vmp_dashboard_v2 in the schema cache",
+        }),
+      });
+    }
     if (/\/rpc\/rpc_get_vmp_dashboard/.test(url)) {
       return answer(request, {
         activities: [ACTIVITY, NEXT_ACTIVITY],
@@ -293,7 +305,12 @@ async function loadPersona(persona) {
 
 async function openPersona(persona, { quick = false } = {}) {
   await loadPersona(persona);
-  await page.waitForSelector(`.vmp-chi-desktop [data-progress-item="${ACTIVITY.id}"]`);
+  try {
+    await page.waitForSelector(`.vmp-chi-desktop [data-progress-item="${ACTIVITY.id}"]`);
+  } catch (cause) {
+    const screen = await page.evaluate(() => document.body.innerText.slice(0, 2_000));
+    throw new Error(`Không thấy hạng mục ${ACTIVITY.id}. Màn hiện tại: ${screen}`, { cause });
+  }
   await page.evaluate(([useQuick, itemId]) => {
     const row = document.querySelector(`.vmp-chi-desktop [data-progress-item="${itemId}"]`);
     [...(row?.querySelectorAll("button") ?? [])]
@@ -470,8 +487,19 @@ try {
     "RPC lỗi thì modal phải giữ nguyên để người dùng thử lại",
   );
   updateShouldFail = false;
-  await page.waitForFunction(() => [...document.querySelectorAll("button")]
-    .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  try {
+    await page.waitForFunction(() => [...document.querySelectorAll("button")]
+      .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  } catch (cause) {
+    const state = await page.evaluate(() => ({
+      buttons: [...document.querySelectorAll("button")]
+        .filter((button) => /Lưu|Đang lưu/.test(button.textContent || ""))
+        .map((button) => ({ text: button.textContent?.trim(), disabled: button.disabled })),
+      alerts: [...document.querySelectorAll('[role="alert"]')].map((node) => node.textContent?.trim()),
+      reason: document.querySelector("textarea")?.value,
+    }));
+    throw new Error(`Nút thử lại chưa sẵn sàng: ${JSON.stringify(state)}`, { cause });
+  }
   await page.evaluate(() => [...document.querySelectorAll("button")]
     .find((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || ""))?.click());
   await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')]

@@ -192,22 +192,26 @@ try {
     throw new Error("npm dev không có PID hợp lệ để dọn process group");
   }
   if (server.exitCode === null && server.signalCode === null) {
-    const stopped = waitForChildExit(server);
     try {
       if (process.platform === "win32") {
         /* Windows không có process group âm; taskkill /T hạ cả cây con. */
         const { execSync } = await import("node:child_process");
         execSync(`taskkill /PID ${server.pid} /T /F`, { stdio: "ignore" });
+        /* npm.cmd chạy qua shell có thể không phát event `exit` dù taskkill
+           đã hạ cả cây. Cổng đóng là bằng chứng dọn thật; unref handle cha
+           để Node không treo vì một event Windows không đến. */
+        await waitForPortClosed();
+        server.unref();
       } else {
+        const stopped = waitForChildExit(server);
         process.kill(-server.pid, "SIGTERM");
+        await stopped;
       }
     } catch (error) {
       if (error?.code !== "ESRCH") {
-        stopped.catch(() => {});
         throw error;
       }
     }
-    await stopped;
   }
   await waitForPortClosed();
 }

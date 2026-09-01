@@ -517,6 +517,24 @@ export function dungKhoDuLieu(kichBan) {
     item.version = previousVersion + 1;
     Object.assign(item._raw, nextDeadlines, { version: item.version });
 
+    /* Dashboard hiện đọc contract canonical v2. Giữ hai projection của kho
+       giả lập đồng bộ như cùng một transaction server, nếu không UI refetch
+       lại đúng RPC nhưng vẫn nhận deadline cũ từ fixture v2. */
+    const canonicalItem = canonicalHangMuc.find((row) => row.code === item.code);
+    if (canonicalItem) {
+      canonicalItem.dlProtocol = item.dlProtocol;
+      canonicalItem.dlValidation = item.dlValidation;
+      canonicalItem.dlReport = item.dlReport;
+      canonicalItem.dlVmp = item.dlVmp;
+      canonicalItem.version = item.version;
+      canonicalItem.target = item.dlVmp;
+      canonicalItem.canonical_deadline = item.dlVmp;
+      canonicalItem.days_left = item.dlVmp
+        ? Math.round((Date.parse(`${item.dlVmp}T00:00:00Z`) - Date.parse("2026-08-15T00:00:00Z")) / 86_400_000)
+        : null;
+      Object.assign(canonicalItem._raw, nextDeadlines, { version: item.version });
+    }
+
     return {
       ok: true,
       validation_code: item.code,

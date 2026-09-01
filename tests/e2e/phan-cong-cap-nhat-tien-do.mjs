@@ -171,6 +171,14 @@ async function newPage({ key, user, uiAccess }) {
         next_cursor: null,
       };
       kho.rpc_my_ui_access = () => uiAccess;
+      kho.rpc_errors = {
+        ...(kho.rpc_errors || {}),
+        rpc_get_vmp_dashboard_v2: {
+          status: 404,
+          code: "PGRST202",
+          message: "Could not find the function public.rpc_get_vmp_dashboard_v2 in the schema cache",
+        },
+      };
       kho.rpc_get_vmp_dashboard = () => ({
         activities: [
           { ...ACTIVITY, _raw: { ...ACTIVITY._raw } },

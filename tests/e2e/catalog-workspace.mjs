@@ -4,8 +4,8 @@
  *  Chạy trên Supabase giả lập (gia-lap-supabase.mjs) — không request nào
  *  ra ngoài. Bộ này kiểm HỢP ĐỒNG workspace theo quyền:
  *
- *   1. Admin/Quản lý QA có bảy mục: objects · coverage · products · alerts ·
- *      import · pending · history. Không còn "Người thực hiện".
+ *   1. Admin/Quản lý QA có tám mục: objects · coverage · products · alerts ·
+ *      revalidation · import · pending · history. Không còn "Người thực hiện".
  *   2. Quyền quyết định nút: đủ quyền thấy Thêm/Nhập Excel/Chờ áp dụng;
  *      nhân viên xưởng không thấy bất kỳ lối ghi nào và không mở Lịch sử.
  *   3. Bảng ngữ nghĩa thật: <caption>, header dính; mở dòng thấy chi tiết.
@@ -406,9 +406,9 @@ async function chuanBiApV1(trang) {
     .some((button) => button.textContent?.trim() === "Áp vào timeline" && !button.disabled), { timeout: 10_000 });
 }
 
-/* ---- 1. Đủ quyền: bảy mục, nút ghi, bảng ngữ nghĩa ----------------- */
+/* ---- 1. Đủ quyền: tám mục, nút ghi, bảng ngữ nghĩa ----------------- */
 {
-  console.log("Đủ quyền — cấu trúc bảy mục:");
+  console.log("Đủ quyền — cấu trúc tám mục:");
   const { trang, loiConsole, chanNgoai } = await moTrang(trinhDuyet);
 
   const kq = await trang.evaluate(() => {
@@ -434,8 +434,8 @@ async function chuanBiApV1(trang) {
     };
   });
 
-  kiem(kq.thuTu === "objects,coverage,products,alerts,import,pending,history",
-    "bảy mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
+  kiem(kq.thuTu === "objects,coverage,products,alerts,revalidation,import,pending,history",
+    "tám mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
   kiem(kq.coThem, "đủ quyền thấy nút Thêm");
   kiem(kq.coNhapExcel, "đủ quyền thấy mục Nhập Excel");
   kiem(!kq.coNguoiThucHien, "không còn chữ 'Người thực hiện' trên màn");
