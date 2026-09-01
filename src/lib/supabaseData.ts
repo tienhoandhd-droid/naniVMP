@@ -12,7 +12,6 @@
  *  không suy quyền từ role đăng nhập hoặc vai Viewer cũ.
  * ===================================================================== */
 import { supabase } from "./supabaseClient.ts";
-import { deriveActivityFields } from "./n8nAdapter.ts";
 import { buildSetItemPerformerByIdArgs } from "../features/itemPermissions/performerSelection.ts";
 import { BUSINESS_ROLE_CATALOG, BUSINESS_ROLE_IDS } from "./businessRoles.ts";
 import type {
@@ -21,10 +20,11 @@ import type {
   PerformerRow,
 } from "../types/domain.ts";
 import {
+  canonicalAuthorizationRevisionToNumber,
   decodeAuthorizationWatermark,
-  decodeAuthorizedDashboard,
   type AuthorizationWatermark,
 } from "./dashboardAuthorizationContracts.ts";
+import { decodeCanonicalDashboard } from "../features/canonicalDashboard/contracts.ts";
 import type {
   DeadlineOverrideSelection,
   ProgressedDeadlineCandidate,
@@ -100,38 +100,49 @@ function asShape<T>(data: unknown): T {
 // ============================================================
 // ĐỌC: Dashboard data từ Supabase RPC
 // ============================================================
-export async function fetchVmpDataFromSupabase(
-  year?: number,
+export type CanonicalDashboardRpc = (
+  name: "rpc_get_vmp_dashboard_v2",
+  args: { p_year: number; p_include_missing: boolean },
+) => Promise<{ data: unknown; error: { message: string } | null }>;
+
+export async function fetchCanonicalDashboardViaRpc(
+  rpc: CanonicalDashboardRpc,
+  year: number,
   includeMissing = false,
 ): Promise<VmpDataset> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
-
-  const { data, error } = await supabase.rpc("rpc_get_vmp_dashboard", {
-    p_year: year || new Date().getFullYear(),
+  const { data, error } = await rpc("rpc_get_vmp_dashboard_v2", {
+    p_year: year,
     p_include_missing: includeMissing,
   });
-
   if (error) throw new Error("Lỗi đọc dữ liệu máy chủ: " + error.message);
 
-  // computed_status trong DB được tính tại thời điểm GHI (CURRENT_DATE lúc đó),
-  // nên một hạng mục quá hạn THEO THỜI GIAN (deadline trôi qua mà không có thao
-  // tác ghi) sẽ không tự đổi sang 'over'. Vì vậy tính lại st/docDone/target từ
-  // _raw (có dl_vmp + trạng thái) ngay khi đọc — luôn tươi theo ngày hôm nay,
-  // đồng nhất với đường ghi lạc quan và đường đọc qua n8n.
-  const payload = decodeAuthorizedDashboard(data);
-  const activities: Activity[] = payload.activities.map((a: Activity) =>
-    a && a._raw ? ({ ...a, ...deriveActivityFields(a._raw) } as Activity) : a
-  );
-
+  const payload = decodeCanonicalDashboard(data);
+  const activities: Activity[] = payload.activities.map((activity) => ({
+    ...activity,
+    target: activity.canonicalDeadline,
+    statusSource: "server" as const,
+  }));
   return {
     objects: payload.objects,
     activities,
     source: "supabase",
     count: activities.length,
     updated_at: payload.updatedAt,
-    authorizationRevision: payload.authorizationRevision,
+    authorizationRevision: canonicalAuthorizationRevisionToNumber(payload.authorizationRevision),
     year: payload.year,
   };
+}
+
+export async function fetchVmpDataFromSupabase(
+  year?: number,
+  includeMissing = false,
+): Promise<VmpDataset> {
+  const client = supabase;
+  if (!client) throw new Error("Supabase chưa cấu hình");
+  return fetchCanonicalDashboardViaRpc(async (rpcName, args) => {
+    const { data, error } = await client.rpc(rpcName as never, args as never);
+    return { data, error: error ? { message: error.message } : null };
+  }, year || new Date().getFullYear(), includeMissing);
 }
 
 // ============================================================

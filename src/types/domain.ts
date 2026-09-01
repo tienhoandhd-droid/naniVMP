@@ -126,6 +126,8 @@ export interface Activity {
   mismatch?: string | null;
   /** Trạng thái suy ra tại thời điểm đọc. */
   st: ActivityStatus;
+  /** Nguồn kết luận trạng thái tổng; Supabase v2 luôn là server canonical. */
+  statusSource?: "server" | "compatibility";
   target?: string | null;    // mốc đích đang theo dõi
   docDone?: boolean;
   effort?: number | null;
