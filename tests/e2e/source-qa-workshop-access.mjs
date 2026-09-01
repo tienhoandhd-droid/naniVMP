@@ -469,6 +469,10 @@ try {
     const page = await openPersona(PERSONAS[key], state);
     await page.waitForSelector(".cw-workspace", { timeout: 15_000 });
     assert.deepEqual(await visibleNav(page), ["objects"], `${key} may see Source objects only, never management datasets`);
+    assert.equal(await page.$("[data-cw-them]"), null, `${key} must not receive a Source mutation control`);
+    assert.equal(await page.$("[data-cw-export-count]"), null, `${key} must not receive Source export`);
+    assert.match(await page.$eval("[data-cw-source-guide]", (node) => node.textContent ?? ""),
+      /chế độ chỉ đọc.*Chỉ Admin và Quản lý QA/i, `${key} receives the concise read-only guide`);
     for (const code of expectedCodes) await waitSource(page, code);
     for (const code of sourceRows.map((row) => row.object_code).filter((code) => !expectedCodes.includes(code))) {
       assert.equal(await page.evaluate((value) => document.body.innerText.includes(value), code), false, `${key} must not receive ${code}`);
@@ -565,8 +569,8 @@ try {
   await cardOwner.close();
 
   const forbiddenByLowerRole = bodies.filter((entry) => ["qa_staff", "workshop_staff"].includes(entry.role)
-    && ["rpc_list_catalog_dataset", "rpc_list_catalog_changes", "rpc_catalog_history", "rpc_stage_catalog_import"].includes(entry.rpc));
-  assert.deepEqual(forbiddenByLowerRole, [], "lower roles must not issue non-object catalog, import, pending, or history requests");
+    && ["rpc_list_catalog_dataset", "rpc_list_catalog_changes", "rpc_catalog_history", "rpc_stage_catalog_import", "rpc_export_source_objects"].includes(entry.rpc));
+  assert.deepEqual(forbiddenByLowerRole, [], "lower roles must not issue non-object catalog, import, export, pending, or history requests");
   assert.deepEqual(unexpected, [], "browser proof must not make network calls outside preview and intercepted Supabase");
   console.log("source QA/workshop access E2E: pass");
 } finally {

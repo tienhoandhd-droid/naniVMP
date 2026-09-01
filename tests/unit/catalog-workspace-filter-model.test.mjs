@@ -12,6 +12,7 @@ import {
   moveCatalogSourceCursorBack,
   moveCatalogSourceCursorForward,
   resolveCatalogSourceCursorPage,
+  sourceDataControls,
 } from "../../src/features/catalogWorkspace/catalogWorkspaceFilterModel.ts";
 
 const rows = [
@@ -172,4 +173,19 @@ test("lower Source roles get objects only while managers receive only capability
     canGenerateTimeline: false,
     canManageWorkshopScope: false,
   }), ["objects", "products", "alerts", "history"]);
+});
+
+test("Source controls keep lower roles read-only and require edit capability for mutations", () => {
+  assert.deepEqual(sourceDataControls("qa_staff", true), {
+    canChange: false, canImport: false, canExport: false,
+  });
+  assert.deepEqual(sourceDataControls("workshop_manager", true), {
+    canChange: false, canImport: false, canExport: false,
+  });
+  assert.deepEqual(sourceDataControls("qa_manager", true), {
+    canChange: true, canImport: true, canExport: true,
+  });
+  assert.deepEqual(sourceDataControls("admin", false), {
+    canChange: false, canImport: false, canExport: true,
+  });
 });

@@ -319,6 +319,22 @@
 }
 .cw-mota__phamvi, .cw-mota__moc { font-weight: 600; color: var(--lp-ink); }
 
+.cw-source-guide {
+  margin: -4px 0 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--lp-info) 32%, var(--lp-line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--lp-info) 7%, var(--lp-surface));
+  color: var(--lp-ink-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.cw-source-guide b { color: var(--lp-ink); }
+.cw-source-guide.is-manager {
+  border-color: color-mix(in srgb, var(--lp-success) 28%, var(--lp-line));
+  background: color-mix(in srgb, var(--lp-success) 6%, var(--lp-surface));
+}
+
 .cw-khung {
   display: grid;
   grid-template-columns: 184px minmax(0, 1fr);

@@ -57,7 +57,8 @@ import {
   catalogObjectActiveFilterCount, catalogWorkspaceRegionIds, clearCatalogObjectFilter,
   encodeCatalogObjectServerFilters, initialCatalogSourceCursorStack,
   moveCatalogSourceCursorBack, moveCatalogSourceCursorForward,
-  resolveCatalogSourceCursorPage, type CatalogObjectFilters, type CatalogSourceCursorStack,
+  resolveCatalogSourceCursorPage, sourceDataControls,
+  type CatalogObjectFilters, type CatalogSourceCursorStack,
 } from "./catalogWorkspaceFilterModel.ts";
 import type {
   CatalogAuditRow, CatalogChangeRow, CatalogDatasetId, CatalogListRow, CatalogRecord,
@@ -114,6 +115,7 @@ export default function CatalogWorkspaceShell({
     || access.businessRole === "qa_manager";
 
   const canManageSourceDatasets = access.businessRole === "admin" || access.businessRole === "qa_manager";
+  const sourceControls = sourceDataControls(access.businessRole, canEdit);
   const toast = useToast();
   /* Gợi ý nhập nạp một lượt cho cả màn: mở hộp thoại rồi mới gọi mạng thì
      danh sách hiện sau con trỏ, và người dùng đã gõ xong nửa chữ. */
@@ -504,6 +506,7 @@ export default function CatalogWorkspaceShell({
   }, [sourceAccessKey]);
 
   const moThem = () => {
+    if (!sourceControls.canChange) return;
     if (vung === "objects") setDangSuaObj({ row: {}, taoMoi: true });
     else if (vung === "products" || vung === "alerts") {
       setDangSuaBan({ dataset: vung, record: null });
@@ -511,6 +514,7 @@ export default function CatalogWorkspaceShell({
   };
 
   const suaDong = (row: CatalogListRow) => {
+    if (!sourceControls.canChange) return;
     if (row.dataset === "objects") {
       setDangSuaObj({ row: row.data as Record<string, unknown>, taoMoi: false });
     } else {
@@ -520,6 +524,7 @@ export default function CatalogWorkspaceShell({
 
   /* Xuất đúng phần đang lọc của bảng đối tượng — tiện tra cứu, chỉ đọc. */
   const xuatExcel = async () => {
+    if (!sourceControls.canExport || !hasAuthorizationRevision) return;
     const progress = toast.dangChay("Đang xuất toàn bộ dòng Source được phép xem…");
     try {
       const dinhNghia = layDataset("objects").fields;
@@ -550,7 +555,8 @@ export default function CatalogWorkspaceShell({
   };
 
   const coTimKiem = vung === "objects" || vung === "products" || vung === "alerts";
-  const coThem = hasAuthorizationRevision && canEdit && (vung === "objects" || vung === "products" || vung === "alerts");
+  const coThem = hasAuthorizationRevision && sourceControls.canChange
+    && (vung === "objects" || vung === "products" || vung === "alerts");
 
   /* ---------------- Phân trang dùng chung -------------------------- */
   const hienTrang = vung === "objects" ? objCursor.page : trang;
@@ -581,12 +587,18 @@ export default function CatalogWorkspaceShell({
   return (
     <div className="cw-workspace">
       <p className="cw-mota">
-        <span>{canEdit
-          ? "Sổ dữ liệu nguồn — tìm, kiểm tra và cập nhật đối tượng có lưu lý do."
-          : "Sổ dữ liệu nguồn — các đối tượng trong phạm vi bạn được quyền xem."}</span>
+        <span>Sổ dữ liệu nguồn — tìm và kiểm tra đối tượng theo phạm vi được cấp.</span>
         {scopeLabel && <span className="cw-mota__phamvi">Phạm vi: {scopeLabel}</span>}
         {updatedLabel && <span className="cw-mota__moc">{updatedLabel}</span>}
       </p>
+
+      <aside className={`cw-source-guide${sourceControls.canChange ? " is-manager" : ""}`}
+        aria-label="Hướng dẫn Dữ liệu nguồn" data-cw-source-guide>
+        <b>Dữ liệu nguồn là dữ liệu gốc.</b>{" "}
+        {sourceControls.canChange
+          ? "Kiểm tra bản xem trước và ghi lý do trước khi xác nhận thay đổi. Chỉ Admin và Quản lý QA được nhập hoặc xuất dữ liệu."
+          : "Bạn đang ở chế độ chỉ đọc theo phạm vi được cấp. Chỉ Admin và Quản lý QA được thay đổi, nhập hoặc xuất dữ liệu."}
+      </aside>
 
       <div className="cw-khung">
         {/* Thanh dữ liệu — sáu mục cố định, quyền quyết định mục nào hiện. */}
@@ -647,10 +659,12 @@ export default function CatalogWorkspaceShell({
                   <button type="button" className="cw-nut" onClick={taiLai}>
                     <RefreshCw size={15} aria-hidden="true" /> Tải lại
                   </button>
-                  <button type="button" className="cw-nut" data-cw-export-count={objTotal}
-                    disabled={!hasAuthorizationRevision} onClick={xuatExcel}>
-                    <Download size={15} aria-hidden="true" /> Xuất Excel
-                  </button>
+                  {sourceControls.canExport && (
+                    <button type="button" className="cw-nut" data-cw-export-count={objTotal}
+                      disabled={!hasAuthorizationRevision} onClick={xuatExcel}>
+                      <Download size={15} aria-hidden="true" /> Xuất Excel
+                    </button>
+                  )}
                   {canSinhTimeline && hasAuthorizationRevision && (
                     <button type="button" className="cw-nut" onClick={() => setMoSinh(true)}>
                       <CalendarPlus size={15} aria-hidden="true" /> Sinh timeline
@@ -771,7 +785,7 @@ export default function CatalogWorkspaceShell({
                     <CatalogSmartTable
                       dataset="objects"
                       rows={objList}
-                      canEdit={canEdit}
+                      canEdit={sourceControls.canChange}
                       onEdit={suaDong}
                       expandedRowId={expandedId}
                       onExpandedRowChange={setExpandedId}
@@ -813,7 +827,7 @@ export default function CatalogWorkspaceShell({
                     <CatalogSmartTable
                       dataset={vung}
                       rows={svRows}
-                      canEdit={canEdit}
+                      canEdit={sourceControls.canChange}
                       onEdit={suaDong}
                       empty={vung === "products"
                         ? "Chưa có sản phẩm nào."
@@ -827,7 +841,7 @@ export default function CatalogWorkspaceShell({
           )}
 
           {/* ----- Nhập Excel theo mẫu chính thức ----- */}
-          {vung === "import" && (
+          {vung === "import" && sourceControls.canImport && (
             <CatalogExcelImport
               onCommitted={(pendingIds) => {
                 taiDoiTuong();
@@ -922,7 +936,7 @@ export default function CatalogWorkspaceShell({
       </div>
 
       {/* ---------------- Hộp thoại ---------------------------------- */}
-      {dangSuaObj && (
+      {dangSuaObj && sourceControls.canChange && (
         <CatalogObjectForm
           row={dangSuaObj.row}
           objectKind={kind}
@@ -954,12 +968,12 @@ export default function CatalogWorkspaceShell({
         />
       )}
 
-      {dangSuaBan && (
+      {dangSuaBan && sourceControls.canChange && (
         <CatalogRecordDialog
           open
           dataset={dangSuaBan.dataset}
           record={dangSuaBan.record}
-          canEdit={canEdit}
+          canEdit={sourceControls.canChange}
           goiY={goiY}
           onClose={() => setDangSuaBan(null)}
           onSaved={() => {

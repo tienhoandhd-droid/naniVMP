@@ -135,6 +135,20 @@ export function catalogWorkspaceRegionIds(input: {
   return regions;
 }
 
+/** UI control matrix for canonical Source data. Server RPC guards remain the
+ * security boundary; this keeps impossible actions out of lower-role views. */
+export function sourceDataControls(
+  businessRole: string | null,
+  canEdit: boolean,
+): { canChange: boolean; canImport: boolean; canExport: boolean } {
+  const manager = businessRole === "admin" || businessRole === "qa_manager";
+  return {
+    canChange: manager && canEdit,
+    canImport: manager && canEdit,
+    canExport: manager,
+  };
+}
+
 function visible(value: unknown): string {
   return String(value ?? "").trim();
 }
