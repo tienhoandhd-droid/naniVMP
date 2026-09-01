@@ -25,7 +25,8 @@ test("app shell exposes keyboard landmarks and names its primary navigation", ()
   assert.match(app, /event\.preventDefault\(\); mainRef\.current\?\.focus\(\)/);
   assert.match(app, /<main[^>]*id="vmp-main-content"[^>]*tabIndex=\{-1\}/s);
   assert.match(layout, /<nav[^>]*aria-label="Điều hướng chính"/s);
-  assert.match(layout, /Vai trò:\s*\{/);
+  assert.doesNotMatch(layout, /vmp-perm-badge/);
+  assert.match(layout, /access\?\.businessRole && VAI_NGHIEP_VU/);
   assert.match(layout, /PanelLeftClose|PanelLeftOpen/);
 });
 
