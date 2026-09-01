@@ -12,6 +12,7 @@ async function loadDialogs() {
   if (!dialogs) {
     const alerts = await vite.ssrLoadModule("/src/pages/AlertsPage.tsx");
     const workload = await vite.ssrLoadModule("/src/pages/WorkloadPage.tsx");
+    const workloadTransfer = await vite.ssrLoadModule("/src/features/workload/WorkloadOwnerTransferDialog.tsx");
     const matrix = await vite.ssrLoadModule("/src/components/dashboard/MaTranTienDo.tsx");
     const progress = await vite.ssrLoadModule("/src/components/dashboard/ProgressEditModal.tsx");
     const period = await vite.ssrLoadModule("/src/components/dashboard/ChiTietKyModal.tsx");
@@ -19,6 +20,7 @@ async function loadDialogs() {
     dialogs = {
       AlertDetailModal: alerts.AlertDetailModal,
       WorkloadDetailModal: workload.WorkloadDetailModal,
+      WorkloadOwnerTransferDialog: workloadTransfer.default,
       MatrixDetailDialog: matrix.MatrixDetailDialog,
       ProgressEditModal: progress.default,
       progressModule: progress,
@@ -101,6 +103,39 @@ test("exported non-Timeline dialogs render the shared labelled dialog and footer
   ];
 
   dialogs.forEach((dialog) => assertSharedDialog(renderToStaticMarkup(dialog)));
+});
+
+test("workload owner transfer dialog labels identity, person and reason controls", async () => {
+  const { WorkloadOwnerTransferDialog } = await loadDialogs();
+  const html = renderToStaticMarkup(React.createElement(WorkloadOwnerTransferDialog, {
+    activity: {
+      ...activity,
+      ownerPersonId: "11111111-1111-4111-8111-111111111111",
+      _raw: {
+        ...activity._raw,
+        owner_person_id: "11111111-1111-4111-8111-111111111111",
+      },
+    },
+    performers: [{
+      id: "22222222-2222-4222-8222-222222222222",
+      performer_name: "Trần QA mới",
+      email: "qa.moi@vmp.test",
+      department: "QA",
+      employee_code: "QA002",
+      is_active: true,
+    }],
+    onClose: () => {},
+    onReload: () => {},
+  }));
+
+  assertSharedDialog(html);
+  assert.match(html, /Chuyển phụ trách/);
+  assert.match(html, /PQ-001/);
+  assert.match(html, /<label[^>]*for="workload-owner-next"/);
+  assert.match(html, /<label[^>]*for="workload-owner-reason"/);
+  assert.match(html, /id="workload-owner-next"/);
+  assert.match(html, /id="workload-owner-reason"/);
+  assert.match(html, /data-workload-owner-submit="true"/);
 });
 
 test("AI mail and progress mutations synchronously reject close requests before rerender", async () => {
