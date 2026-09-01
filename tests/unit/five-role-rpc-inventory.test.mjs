@@ -96,6 +96,26 @@ const CLIENT_ERROR_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const REVALIDATION_REVIEWED_RPC = new Map([
+  ["rpc_refresh_revalidation_proposals", {
+    identity: "rpc_refresh_revalidation_proposals(date)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_confirm_revalidation_proposal", {
+    identity: "rpc_confirm_revalidation_proposal(uuid,text,integer)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_dismiss_revalidation_proposal", {
+    identity: "rpc_dismiss_revalidation_proposal(uuid,text,integer)",
+    classification: "guarded_explicit",
+  }],
+]);
+const CANONICAL_DASHBOARD_REVIEWED_RPC = new Map([
+  ["rpc_get_vmp_dashboard_v2", {
+    identity: "rpc_get_vmp_dashboard_v2(integer,boolean)",
+    classification: "guarded_explicit",
+  }],
+]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
   .join(",");
@@ -309,6 +329,14 @@ test("every source RPC call has exactly one reviewed migration classification", 
     "supabase/migrations/20260831170000_client_error_log.sql",
     "utf8",
   );
+  const revalidationMigration = readFileSync(
+    "supabase/migrations/20260901120000_revalidation_proposals.sql",
+    "utf8",
+  );
+  const canonicalDashboardMigration = readFileSync(
+    "supabase/migrations/20260901110000_canonical_dashboard_read_model.sql",
+    "utf8",
+  );
   for (const name of [
     ...CATALOG_V2_REVIEWED_RPC.keys(),
     ...MANUAL_DEADLINE_REVIEWED_RPC.keys(),
@@ -317,6 +345,8 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...SOURCE_IMPORT_PREVIEW_REVIEWED_RPC.keys(),
     ...TEAM_OVERVIEW_REVIEWED_RPC.keys(),
     ...CLIENT_ERROR_REVIEWED_RPC.keys(),
+    ...REVALIDATION_REVIEWED_RPC.keys(),
+    ...CANONICAL_DASHBOARD_REVIEWED_RPC.keys(),
   ]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
   }
@@ -329,11 +359,13 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...SOURCE_IMPORT_PREVIEW_REVIEWED_RPC,
     ...TEAM_OVERVIEW_REVIEWED_RPC,
     ...CLIENT_ERROR_REVIEWED_RPC,
+    ...REVALIDATION_REVIEWED_RPC,
+    ...CANONICAL_DASHBOARD_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 78, "reviewed source HEAD must expose 78 literal RPC targets");
+  assert.equal(sourceNames.length, 82, "reviewed source HEAD must expose 82 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -391,6 +423,28 @@ test("every source RPC call has exactly one reviewed migration classification", 
   assert.match(clientErrorMigration, /security definer\s*set search_path\s*=\s*public\s*,\s*pg_temp/is);
   assert.match(clientErrorMigration, /grant execute on function public\.rpc_ghi_loi_client\(text, text, text, text\) to authenticated;/i);
   assert.match(clientErrorMigration, /grant execute on function public\.rpc_doc_loi_client\(integer, integer, timestamptz\) to authenticated;/i);
+  assert.deepEqual(REVALIDATION_REVIEWED_RPC, new Map([
+    ["rpc_refresh_revalidation_proposals", { identity: "rpc_refresh_revalidation_proposals(date)", classification: "guarded_explicit" }],
+    ["rpc_confirm_revalidation_proposal", { identity: "rpc_confirm_revalidation_proposal(uuid,text,integer)", classification: "guarded_explicit" }],
+    ["rpc_dismiss_revalidation_proposal", { identity: "rpc_dismiss_revalidation_proposal(uuid,text,integer)", classification: "guarded_explicit" }],
+  ]));
+  for (const [name, { identity }] of REVALIDATION_REVIEWED_RPC) {
+    assert.match(revalidationMigration,
+      new RegExp(`create or replace function public\\.${name}\\(`, "i"),
+      `${identity} must be defined by the revalidation migration`);
+    assert.match(revalidationMigration,
+      new RegExp(`grant execute on function public\\.${name}\\([\\s\\S]*?\\) to authenticated, service_role;`, "i"),
+      `${identity} must grant only the reviewed browser roles`);
+  }
+  assert.deepEqual(CANONICAL_DASHBOARD_REVIEWED_RPC, new Map([
+    ["rpc_get_vmp_dashboard_v2", { identity: "rpc_get_vmp_dashboard_v2(integer,boolean)", classification: "guarded_explicit" }],
+  ]));
+  assert.match(canonicalDashboardMigration,
+    /create or replace function public\.rpc_get_vmp_dashboard_v2\(\s*p_year integer default[\s\S]*?,\s*p_include_missing boolean default false\s*\)/i);
+  assert.match(canonicalDashboardMigration,
+    /security definer\s*set search_path\s*=\s*public\s*,\s*pg_temp/is);
+  assert.match(canonicalDashboardMigration,
+    /grant execute on function public\.rpc_get_vmp_dashboard_v2\(integer,boolean\) to authenticated, service_role;/i);
 });
 
 test("database browser surface is the reviewed 60 plus four exact RLS helpers", () => {

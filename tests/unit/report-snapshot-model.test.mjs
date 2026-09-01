@@ -7,6 +7,10 @@ import {
   validateCreateReportSnapshotInput,
 } from "../../src/features/reportSnapshots/contracts.ts";
 import { reportSnapshotFileName } from "../../src/features/reportSnapshots/reportSnapshotModel.ts";
+import {
+  createReportSnapshot,
+  prepareReportExport,
+} from "../../src/features/reportSnapshots/api.ts";
 
 const HASH = "a".repeat(64);
 const SNAPSHOT_ID = "11111111-1111-4111-8111-111111111111";
@@ -84,4 +88,18 @@ test("tên file ổn định dùng kỳ và 8 ký tự hash, không đọc dashb
   });
   assert.equal(reportSnapshotFileName(receipt, "xlsx"), "VMP_thang-08-2026_abcdef12.xlsx");
   assert.equal(reportSnapshotFileName(receipt, "pdf"), "VMP_thang-08-2026_abcdef12.pdf");
+});
+
+test("API snapshot fail closed cho tới khi backend được phát hành", async () => {
+  await assert.rejects(createReportSnapshot({
+    reportPeriod: "monthly",
+    year: 2026,
+    month: 8,
+    filters: {},
+    templateVersion: "QMS-BC-01.v2",
+  }), /chưa được phát hành trên máy chủ/i);
+  await assert.rejects(
+    prepareReportExport(SNAPSHOT_ID, "xlsx"),
+    /chưa được phát hành trên máy chủ/i,
+  );
 });

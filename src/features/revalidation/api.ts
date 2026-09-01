@@ -81,8 +81,14 @@ export async function decideRevalidation(
 ): Promise<RevalidationDecisionResult> {
   const client = supabase;
   if (!client) throw new Error("Supabase chưa cấu hình");
-  return decideRevalidationViaRpc(async (rpcName, args) => {
-    const { data, error } = await client.rpc(rpcName as never, args as never);
+  if (action === "confirm") {
+    return decideRevalidationViaRpc(async (_rpcName, args) => {
+      const { data, error } = await client.rpc("rpc_confirm_revalidation_proposal" as never, args as never);
+      return { data, error: error ? { message: error.message } : null };
+    }, action, input);
+  }
+  return decideRevalidationViaRpc(async (_rpcName, args) => {
+    const { data, error } = await client.rpc("rpc_dismiss_revalidation_proposal" as never, args as never);
     return { data, error: error ? { message: error.message } : null };
   }, action, input);
 }

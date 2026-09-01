@@ -171,7 +171,9 @@ export async function fetchVmpDataFromSupabase(
   const client = supabase;
   if (!client) throw new Error("Supabase chưa cấu hình");
   return fetchCanonicalDashboardViaRpc(async (rpcName, args) => {
-    const { data, error } = await client.rpc(rpcName as never, args as never);
+    const { data, error } = rpcName === "rpc_get_vmp_dashboard_v2"
+      ? await client.rpc("rpc_get_vmp_dashboard_v2" as never, args as never)
+      : await client.rpc("rpc_get_vmp_dashboard" as never, args as never);
     return { data, error: error ? { message: error.message, code: error.code } : null };
   }, year || new Date().getFullYear(), includeMissing);
 }
