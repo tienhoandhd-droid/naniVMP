@@ -458,22 +458,28 @@
   font: inherit;
   cursor: pointer;
   filter: drop-shadow(0 5px 5px rgba(14, 38, 34, .34));
-  transform: rotate(var(--school-rotate));
-  transform-origin: 55% 50%;
-  transition: filter 180ms ease, transform 180ms ease;
+  transition: filter 180ms ease;
 }
 
 .long-mon-race__fish:hover,
 .long-mon-race__fish:focus-visible {
   z-index: 8;
   filter: drop-shadow(0 8px 8px rgba(14, 38, 34, .46));
-  transform: translateY(-2px) rotate(var(--school-rotate));
 }
 
 .long-mon-race__fish:focus-visible {
   outline: 3px solid #f8e2a3;
   outline-offset: 3px;
   border-radius: 18px;
+}
+
+.long-mon-race__fish-body {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform: rotate(var(--school-rotate));
+  transform-origin: 55% 50%;
+  will-change: translate, rotate;
 }
 
 .long-mon-race__sprite,
@@ -821,17 +827,42 @@
   }
 }
 
-/* CÁ ĐANG BƠI (31/08, chủ dự án yêu cầu): nhịp lượn thân rất chậm —
-   dập dềnh 3px + nghiêng ±1.2° — đủ để bức tranh "sống" mà không thành
-   phòng game. Mỗi con lệch pha/chu kỳ riêng (--swim-delay/--swim-dur do
-   model băm từ id) nên đàn không bao giờ đập nhịp đều tăm tắp.
-   Tắt hẳn theo prefers-reduced-motion ở khối dưới. */
+/* Nút/focus đứng yên; chỉ thân cá bên trong bơi. Sáu nhịp giữ biên độ
+   trong phong bì model đã dành sẵn: ngang <=4px, dọc <=5px, xoay <=3deg. */
 @keyframes long-mon-swim {
   0%   { translate: 0 0; rotate: 0deg; }
-  30%  { translate: 1.5px -3px; rotate: -1.2deg; }
-  55%  { translate: 0 -1px; rotate: .4deg; }
-  80%  { translate: -1.5px 2px; rotate: 1.1deg; }
+  30%  { translate: var(--motion-x) calc(0px - var(--motion-y)); rotate: calc(0deg - var(--motion-rotate)); }
+  55%  { translate: 0 0; rotate: 0deg; }
+  80%  { translate: calc(0px - var(--motion-x)) var(--motion-y); rotate: var(--motion-rotate); }
   100% { translate: 0 0; rotate: 0deg; }
+}
+
+@keyframes long-mon-rise {
+  0%, 100% { translate: 0 0; rotate: 0deg; }
+  48% { translate: var(--motion-x) calc(0px - var(--motion-y)); rotate: calc(0deg - var(--motion-rotate)); }
+  72% { translate: calc(0px - var(--motion-x)) 0; rotate: 0deg; }
+}
+
+@keyframes long-mon-s-curve {
+  0%, 100% { translate: calc(0px - var(--motion-x)) 0; rotate: calc(0deg - var(--motion-rotate)); }
+  25% { translate: 0 calc(0px - var(--motion-y)); rotate: 0deg; }
+  55% { translate: var(--motion-x) 0; rotate: var(--motion-rotate); }
+  78% { translate: 0 var(--motion-y); rotate: 0deg; }
+}
+
+@keyframes long-mon-stream-tilt {
+  0%, 100% { translate: 0 0; rotate: calc(0deg - var(--motion-rotate)); }
+  50% { translate: var(--motion-x) calc(0px - var(--motion-y)); rotate: var(--motion-rotate); }
+}
+
+@keyframes long-mon-follow {
+  0%, 100% { translate: calc(0px - var(--motion-x)) var(--motion-y); rotate: calc(0deg - var(--motion-rotate)); }
+  45% { translate: var(--motion-x) calc(0px - var(--motion-y)); rotate: var(--motion-rotate); }
+}
+
+@keyframes long-mon-tail-drift {
+  0%, 100% { translate: 0 var(--motion-y); rotate: var(--motion-rotate); }
+  55% { translate: calc(0px - var(--motion-x)) calc(0px - var(--motion-y)); rotate: calc(0deg - var(--motion-rotate)); }
 }
 
 @keyframes long-mon-drift {
@@ -840,16 +871,43 @@
   to   { opacity: .55; translate: 0 0; }
 }
 
-.long-mon-race__sprite {
+.long-mon-race__fish-body {
   animation: long-mon-swim var(--swim-dur, 7s) ease-in-out var(--swim-delay, 0s) infinite;
 }
 
+[data-motion-profile="rise"] .long-mon-race__fish-body {
+  animation-name: long-mon-rise;
+}
+
+[data-motion-profile="s-curve"] .long-mon-race__fish-body {
+  animation-name: long-mon-s-curve;
+}
+
+[data-motion-profile="stream-tilt"] .long-mon-race__fish-body {
+  animation-name: long-mon-stream-tilt;
+}
+
+[data-motion-profile="follow"] .long-mon-race__fish-body {
+  animation-name: long-mon-follow;
+}
+
+[data-motion-profile="tail-drift"] .long-mon-race__fish-body {
+  animation-name: long-mon-tail-drift;
+}
+
 .long-mon-race__wake {
-  animation: long-mon-drift calc(var(--swim-dur, 7s) * 1.6) ease-in-out var(--swim-delay, 0s) infinite;
+  animation: long-mon-drift var(--swim-dur, 7s) ease-in-out var(--swim-delay, 0s) infinite;
+}
+
+.long-mon-race__fish:hover .long-mon-race__fish-body,
+.long-mon-race__fish:hover .long-mon-race__wake,
+.long-mon-race__fish:focus-visible .long-mon-race__fish-body,
+.long-mon-race__fish:focus-visible .long-mon-race__wake {
+  animation-play-state: paused;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .long-mon-race__sprite,
+  .long-mon-race__fish-body,
   .long-mon-race__wake {
     animation: none;
   }
@@ -858,7 +916,6 @@
   .long-mon-race__fish:hover,
   .long-mon-race__fish:focus-visible {
     transition: none;
-    transform: rotate(var(--school-rotate));
   }
 }
 

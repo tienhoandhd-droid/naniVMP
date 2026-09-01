@@ -29,17 +29,30 @@ if (typeof window !== "undefined") {
   }
 }
 
-/* Băm id → pha/chu kỳ bơi riêng của từng con (5.6s–9.2s). Cùng thuật băm
- * FNV như model để một hạng mục giữ nguyên dáng bơi giữa hai lần render. */
-function swimTiming(id: string): { delay: string; dur: string } {
+/* Deadline tạo pha nền của đàn; id tạo lệch pha và biên độ riêng. Kết quả
+ * luôn xác định để cùng dữ liệu không "nhảy đàn" sau khi tải lại. */
+function swimTiming(id: string, deadline: string): {
+  delay: string;
+  dur: string;
+  x: string;
+  y: string;
+  rotate: string;
+} {
   let hash = 2166136261;
-  for (let i = 0; i < id.length; i += 1) {
-    hash ^= id.charCodeAt(i);
+  for (let i = 0; i < `${deadline}:${id}`.length; i += 1) {
+    hash ^= `${deadline}:${id}`.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
   const u = (hash >>> 0) / 4294967295;
   const v = ((hash >>> 8) & 0xffff) / 65535;
-  return { delay: `${(-u * 8).toFixed(2)}s`, dur: `${(5.6 + v * 3.6).toFixed(2)}s` };
+  const w = ((hash >>> 16) & 0xffff) / 65535;
+  return {
+    delay: `${(-u * 9.5).toFixed(2)}s`,
+    dur: `${(5.2 + v * 5.3).toFixed(2)}s`,
+    x: `${(1.5 + u * 2.5).toFixed(2)}px`,
+    y: `${(2 + w * 3).toFixed(2)}px`,
+    rotate: `${(.8 + v * 2.2).toFixed(2)}deg`,
+  };
 }
 
 interface LongMonRaceProps {
@@ -80,6 +93,9 @@ type FishStyle = CSSProperties & {
   "--school-y": string;
   "--school-scale": number;
   "--school-rotate": string;
+  "--motion-x": string;
+  "--motion-y": string;
+  "--motion-rotate": string;
 };
 
 type RaceCanvasStyle = CSSProperties & {
@@ -111,7 +127,7 @@ function LongMonRace({
   onOpen,
   scopeControl,
 }: LongMonRaceProps) {
-  /* buildLongMonRaceModel duyệt + băm vị trí cho TỪNG con cá (761 dòng model).
+  /* buildLongMonRaceModel duyệt + băm vị trí cho từng con cá.
    * Trước 31/08 nó chạy lại ở mỗi render của TimelinePage (kể cả khi chỉ đổi
    * bộ chọn phạm vi) vì không memo — giờ chỉ tính lại khi dữ liệu/mốc đổi. */
   const audience = scopeControl?.audience ?? "team";
@@ -195,7 +211,7 @@ function LongMonRace({
               width/height gốc của file để giữ chỗ, tránh CLS khi tranh về
               (CSS vẫn scale theo --long-mon-scene-*). */}
           <img className="long-mon-race__background" src={BACKGROUND_URL} alt="" aria-hidden="true"
-            width={1822} height={863} decoding="async" fetchPriority="high" />
+            width={1822} height={863} decoding="async" {...({ fetchpriority: "high" } as Record<string, string>)} />
           <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true"
             width={540} height={1120} decoding="async" loading="lazy" />
           <div className="long-mon-race__wash" aria-hidden="true" />
@@ -249,16 +265,19 @@ function LongMonRace({
                 const deadline = formatDeadline(fish.deadline);
                 const code = String(fish.activity.code || fish.activity.id);
                 const name = String(fish.activity.name || fish.activity.objName || fish.activity.obj || "Hạng mục VMP");
-                const swim = swimTiming(String(fish.activity.id));
+                const swim = swimTiming(String(fish.activity.id), fish.deadline);
                 const style: FishStyle = {
                   "--swim-delay": swim.delay,
                   "--swim-dur": swim.dur,
-                  "--long-mon-x": `${fish.xPct}%`,
-                  "--long-mon-y": `${fish.yPct}%`,
+                  "--long-mon-x": `${fish.renderXPct}%`,
+                  "--long-mon-y": `${fish.renderYPct}%`,
                   "--school-x": `${fish.renderOffsetXPx}px`,
                   "--school-y": `${fish.renderOffsetYPx}px`,
                   "--school-scale": fish.renderScale,
                   "--school-rotate": `${fish.renderRotateDeg}deg`,
+                  "--motion-x": swim.x,
+                  "--motion-y": swim.y,
+                  "--motion-rotate": swim.rotate,
                 };
                 return (
                   <span key={fish.activity.id} className="long-mon-race__fish-position" style={style} role="listitem">
@@ -269,15 +288,22 @@ function LongMonRace({
                       data-long-mon-code={code}
                       data-deadline={fish.deadline}
                       data-week={fish.weekKey}
-                      data-anchor-x={fish.xPct}
+                      data-anchor-x={fish.deadlinePct}
+                      data-render-x={fish.renderXPct}
+                      data-owner-start={fish.ownerStartPct}
+                      data-owner-end={fish.ownerEndPct}
+                      data-school-formation={fish.schoolFormation}
+                      data-motion-profile={fish.motionProfile}
                       data-collision-width="62"
                       data-collision-height="54"
                       aria-label={`${code} · ${stage.label} · hạn VMP ${deadline}`}
                       onClick={() => onOpen(fish.activity)}
                     >
-                      <span className="long-mon-race__wake" aria-hidden="true" />
-                      <span className="long-mon-race__sprite" style={spriteStyle(stage)} aria-hidden="true" />
-                      <span className="long-mon-race__code" aria-hidden="true">{code}</span>
+                      <span className="long-mon-race__fish-body">
+                        <span className="long-mon-race__wake" aria-hidden="true" />
+                        <span className="long-mon-race__sprite" style={spriteStyle(stage)} aria-hidden="true" />
+                        <span className="long-mon-race__code" aria-hidden="true">{code}</span>
+                      </span>
                       <span className="long-mon-race__tooltip" aria-hidden="true">
                         <strong>{code}</strong>
                         <span>{name}</span>

@@ -484,6 +484,13 @@ test("trường đua kể hành trình 60 ngày, cá có tên truy cập và leg
   assert.match(html, /<button[^>]+data-long-mon-fish="dc-01"/);
   assert.match(html, /data-deadline="2026-09-05"/);
   assert.match(html, /data-week="2026-08-31"/);
+  assert.match(html, /data-anchor-x="[\d.]+"/);
+  assert.match(html, /data-render-x="[\d.]+"/);
+  assert.match(html, /data-owner-start="[\d.]+"/);
+  assert.match(html, /data-owner-end="[\d.]+"/);
+  assert.match(html, /data-school-formation="solo"/);
+  assert.match(html, /data-motion-profile="(?:glide|rise|s-curve|stream-tilt|follow|tail-drift)"/);
+  assert.match(html, /class="long-mon-race__fish-body"/);
   assert.match(html, /data-long-mon-week="2026-08-31"/);
   assert.match(html, /--school-x:[^;]+;--school-y:[^;]+;--school-scale:[^;]+;--school-rotate:/);
   assert.match(html, /data-long-mon-audience="team"/);
@@ -580,8 +587,10 @@ test("sáu loài giữ sprite riêng, cá bơi nhịp chậm và tắt được 
      prefers-reduced-motion tắt được toàn bộ. */
   assert.match(css, /@keyframes long-mon-swim/);
   assert.match(css, /var\(--swim-dur/);
+  assert.match(css, /\.long-mon-race__fish:hover \.long-mon-race__fish-body[\s\S]*?animation-play-state:\s*paused/);
+  assert.match(css, /\.long-mon-race__fish:focus-visible \.long-mon-race__fish-body[\s\S]*?animation-play-state:\s*paused/);
   const reduced = css.split("@media (prefers-reduced-motion: reduce)")[1] ?? "";
-  assert.match(reduced, /animation: none/);
+  assert.match(reduced, /\.long-mon-race__fish-body[\s\S]*?animation:\s*none/);
 });
 
 test("Timeline dùng Long Môn làm lớp nhìn chính và không lặp year rail cũ", async () => {
