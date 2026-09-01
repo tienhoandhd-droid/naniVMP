@@ -579,6 +579,20 @@ select { appearance: none; -webkit-appearance: none; }
   font-weight: 700;
 }
 
+.vq-login-password-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vq-login-password-label-row > label {
+  color: var(--lp-ink);
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* Nút chính: MỘT màu đặc, không gradient.
    Gradient hồng→tím cũ có hai vấn đề. Một là đầu hồng của nó nằm sát
    raspberry — màu mà cả app dành riêng cho lỗi và quá hạn, nên nút an
@@ -710,7 +724,7 @@ select { appearance: none; -webkit-appearance: none; }
 .vq-login-quen {
   border: none;
   background: none;
-  padding: 4px 8px;
+  padding: 6px 0;
   font-family: var(--ff-text);
   font-size: 13px;
   font-weight: 600;
@@ -720,6 +734,15 @@ select { appearance: none; -webkit-appearance: none; }
   cursor: pointer;
 }
 .vq-login-quen:disabled { opacity: 0.6; cursor: default; }
+.vq-login-quen:focus-visible,
+.vq-auth-back:focus-visible,
+.vq-auth-resend:focus-visible {
+  outline: 2px solid var(--lp-focus);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.vq-login-success,
 .vq-login-quen-ok {
   display: flex;
   align-items: flex-start;
@@ -730,6 +753,87 @@ select { appearance: none; -webkit-appearance: none; }
   font-size: 13px;
   font-weight: 600;
 }
+
+.vq-login-success {
+  padding: 11px 13px;
+  border: 1px solid var(--lp-success);
+  border-radius: 10px;
+  background: var(--lp-success-soft);
+}
+
+.vq-auth-back,
+.vq-auth-resend {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--lp-plum);
+  font-family: var(--ff-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.vq-auth-back:hover,
+.vq-auth-resend:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.vq-auth-resend:disabled { color: var(--lp-ink-muted); cursor: default; }
+
+.vq-recovery-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--lp-line-strong);
+  border-radius: 16px;
+  background: var(--lp-surface);
+  color: var(--lp-ink);
+  text-align: center;
+  font-family: var(--ff-text);
+}
+
+.vq-recovery-sent__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--lp-success);
+  background: var(--lp-success-soft);
+}
+
+.vq-recovery-sent p,
+.vq-recovery-sent small { margin: 0; line-height: 1.55; }
+.vq-recovery-sent strong { overflow-wrap: anywhere; color: var(--lp-plum); }
+.vq-recovery-sent small { color: var(--lp-ink-muted); }
+.vq-recovery-sent .vq-luxury-btn { margin-top: 8px; }
+
+.vq-recovery-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  color: var(--lp-ink-muted);
+  background: var(--lp-surface-2);
+  font-family: var(--ff-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.vq-recovery-invalid {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--lp-danger);
+}
+
+.vq-recovery-invalid > .vq-login-intro { margin-top: 16px; }
+.vq-recovery-invalid > .vq-luxury-btn { margin-top: 4px; }
 
 .vq-login-error--server {
   padding: 12px 16px;
@@ -781,7 +885,7 @@ select { appearance: none; -webkit-appearance: none; }
 @media (max-width: 768px) {
   .vq-login-page { align-items: flex-start !important; padding: 16px !important; }
   .vq-login-grid { grid-template-columns: 1fr !important; }
-  .vq-brand-panel { min-height: 164px; padding: 24px 24px; }
+  .vq-brand-panel { min-height: 148px; padding: 22px 24px; }
   .vq-login-logo { height: 36px; margin-bottom: 20px; }
   .vq-crown-mark { right: 8px; bottom: -20px; width: 132px; }
   .vq-brand-content { margin-top: auto; }
@@ -800,6 +904,11 @@ select { appearance: none; -webkit-appearance: none; }
   .vmp-topbar-actions { gap: 8px !important; max-width: 100%; }
   .vmp-mobile-menu-button { display: inline-flex; flex: none; }
 
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vq-luxury-btn { transition: none; }
+  .vq-luxury-btn:hover:not(:disabled) { transform: none; }
 }
 
 @media (max-width: 560px) {

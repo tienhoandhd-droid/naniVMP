@@ -79,7 +79,7 @@ import { Sidebar, Topbar } from "./components/layout/Layout.tsx";
  * component này đã ổn định tham chiếu (useMemo/useCallback bên dưới). */
 const SidebarMemo = memo(Sidebar);
 const TopbarMemo = memo(Topbar);
-import LoginScreen from "./components/auth/LoginScreen.tsx";
+import LoginScreen, { type LoginScreenMode } from "./components/auth/LoginScreen.tsx";
 import PasswordRecoveryScreen from "./components/auth/PasswordRecoveryScreen.tsx";
 import TodayCommandCenter from "./features/today/TodayCommandCenter.tsx";
 const TodayCommandCenterMemo = memo(TodayCommandCenter);
@@ -1379,6 +1379,8 @@ function VerifiedAppShell({ user, logout, access }: {
 
 function AppShell() {
   const { user, setUser, logout, recoverySignal, clearRecovery } = useAuth();
+  const [authMode, setAuthMode] = useState<LoginScreenMode>("login");
+  const [authNotice, setAuthNotice] = useState("");
   const { access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen } = useAccess(user);
   useAccessCacheTransition(user, {
     access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen,
@@ -1390,12 +1392,25 @@ function AppShell() {
   if (recoverySignal) return (
     <PasswordRecoveryScreen
       signal={recoverySignal}
-      onCompleted={async () => { await logout(); clearRecovery(); }}
-      onRequestNewLink={async () => { await logout(); clearRecovery(); }}
+      onCompleted={async () => {
+        setAuthMode("login");
+        setAuthNotice("Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.");
+        await logout();
+        clearRecovery();
+      }}
+      onRequestNewLink={async () => {
+        setAuthMode("forgot");
+        setAuthNotice("");
+        await logout();
+        clearRecovery();
+      }}
     />
   );
 
-  if (!user) return <LoginScreen onLogin={(u) => { setUser(u); saveUser(u); }} />;
+  if (!user) return (
+    <LoginScreen initialMode={authMode} notice={authNotice}
+      onLogin={(u) => { setAuthNotice(""); setUser(u); saveUser(u); }} />
+  );
 
   /* Chỉ outer shell được mount trước khi xác minh. Inner shell mới sở hữu
      useVmpData và mọi effect đọc dữ liệu bảo vệ. */
