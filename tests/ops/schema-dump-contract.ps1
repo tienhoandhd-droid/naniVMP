@@ -2,7 +2,8 @@ $ErrorActionPreference = 'Stop'
 
 $required = @('scripts/dump-public-schema.ps1','scripts/check-schema-dump.ps1')
 foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Missing $path" } }
-& powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1
+$missingSchemaPath = Join-Path ([System.IO.Path]::GetTempPath()) ("vmp-missing-schema-" + [guid]::NewGuid() + '.sql')
+& powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1 -Path $missingSchemaPath
 if ($LASTEXITCODE -ne 0) { throw 'Schema dump contract failed' }
 
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("vmp-schema-dump-contract-" + [guid]::NewGuid())
@@ -14,8 +15,15 @@ try {
 CREATE TABLE public.vmp_report_snapshots (id uuid PRIMARY KEY);
 CREATE TABLE public.vmp_notifications (id uuid PRIMARY KEY);
 CREATE TABLE public.audit_logs (id uuid PRIMARY KEY);
+CREATE TABLE public.schema_role_fixture (role_name text DEFAULT 'service_role');
+COMMENT ON TABLE public.schema_role_fixture IS 'reviewed by service_role';
 CREATE FUNCTION public.vmp_visible_plan_items() RETURNS SETOF public.vmp_report_snapshots LANGUAGE sql AS $$ SELECT * FROM public.vmp_report_snapshots; $$;
-CREATE FUNCTION public.rpc_apply_plan_item_private() RETURNS void LANGUAGE sql AS $$ SELECT; $$;
+CREATE FUNCTION public.rpc_apply_plan_item__five_role_impl_20260824() RETURNS void LANGUAGE sql AS $$ SELECT; $$;
+CREATE FUNCTION public.fixture_insert_private() RETURNS void LANGUAGE plpgsql AS $function$
+BEGIN
+  INSERT INTO public.schema_role_fixture(role_name) VALUES ('service_role');
+END;
+$function$;
 '@ | Set-Content -NoNewline $safeFixture
 
   & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1 -Path $safeFixture
@@ -29,6 +37,28 @@ CREATE FUNCTION public.rpc_apply_plan_item_private() RETURNS void LANGUAGE sql A
   $incompleteExitCode = $LASTEXITCODE
   $ErrorActionPreference = $previousErrorActionPreference
   if ($incompleteExitCode -eq 0) { throw 'Incomplete schema fixture was accepted' }
+
+  $inventedPrivateFixture = Join-Path $fixtureRoot 'invented-private-schema.sql'
+  (Get-Content -Raw $safeFixture).Replace(
+    'rpc_apply_plan_item__five_role_impl_20260824',
+    'rpc_apply_plan_item_private'
+  ) | Set-Content -NoNewline $inventedPrivateFixture
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $inventedPrivateOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1 -Path $inventedPrivateFixture 2>&1 | Out-String
+  $inventedPrivateExitCode = $LASTEXITCODE
+  $ErrorActionPreference = $previousErrorActionPreference
+  if ($inventedPrivateExitCode -eq 0) { throw 'Invented private RPC fixture was accepted' }
+
+  $rowDataFixture = Join-Path $fixtureRoot 'row-data-schema.sql'
+  $safeSchema = Get-Content -Raw $safeFixture
+  ($safeSchema + [Environment]::NewLine + "INSERT INTO public.schema_role_fixture(role_name) VALUES ('qa_manager');") | Set-Content -NoNewline $rowDataFixture
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $rowDataOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-schema-dump.ps1 -Path $rowDataFixture 2>&1 | Out-String
+  $rowDataExitCode = $LASTEXITCODE
+  $ErrorActionPreference = $previousErrorActionPreference
+  if ($rowDataExitCode -eq 0) { throw 'Top-level row data fixture was accepted' }
 
   $secretFixture = Join-Path $fixtureRoot 'secret-schema.sql'
   @'
@@ -50,7 +80,7 @@ CREATE FUNCTION public.rpc_apply_plan_item_private() RETURNS void LANGUAGE sql A
 
   $literalSecretFixtures = @(
     @{ Name = 'prefix-key'; Content = '-- sb_secret_fixture_value_12345678'; Literal = 'sb_secret_fixture_value_12345678' },
-    @{ Name = 'service-role'; Content = '-- service-role credential-fixture-value'; Literal = 'credential-fixture-value' }
+    @{ Name = 'service-role'; Content = "-- SUPABASE_SERVICE_ROLE_KEY='credential-fixture-value'"; Literal = 'credential-fixture-value' }
   )
   foreach ($fixture in $literalSecretFixtures) {
     $literalFixture = Join-Path $fixtureRoot ($fixture.Name + '-schema.sql')
