@@ -396,6 +396,25 @@ try {
   assert.ok(mobileCompact.commandHeight >= 43.5);
   assert.ok(mobileCompact.rowDelta < 2);
 
+  await page.click("#vmp-global-filter-trigger");
+  await page.waitForSelector("#vmp-global-filter-panel");
+  const mobilePanel = await page.$eval("#vmp-global-filter-panel", (panel) => {
+    const rect = panel.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  assert.ok(mobilePanel.left >= -1,
+    `Panel bộ lọc mobile phải nằm trong biên trái viewport: ${JSON.stringify(mobilePanel)}`);
+  assert.ok(mobilePanel.right <= mobilePanel.viewportWidth + 1,
+    `Panel bộ lọc mobile phải nằm trong biên phải viewport: ${JSON.stringify(mobilePanel)}`);
+  await page.click(".vmp-global-filter__done");
+  await page.waitForFunction(() => !document.querySelector("#vmp-global-filter-panel"));
+  await page.waitForFunction(() => document.activeElement?.id === "vmp-global-filter-trigger");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "vmp-global-filter-trigger");
+
   const mobile = await page.$eval("[data-global-filter]", (root) => ({
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     controls: [...root.querySelectorAll("button, select, input")]

@@ -215,7 +215,11 @@
   .vmp-global-filter__trigger { min-height: 44px; padding-inline: 10px; }
   .vmp-global-filter__person { width: 100%; margin-left: 0; }
   .vmp-global-filter__person select { min-height: 44px; min-width: 0 !important; flex: 1; }
-  .vmp-global-filter__panel { max-height: min(560px, calc(100vh - 112px)); }
+  .vmp-global-filter__panel {
+    right: 0;
+    left: auto;
+    max-height: min(560px, calc(100vh - 112px));
+  }
   .vmp-global-filter__dates { grid-template-columns: 1fr; }
   .vmp-global-filter__dates > span { display: none; }
   .vmp-global-filter__dates input,
