@@ -41,7 +41,7 @@
 - Consumes: `assertDesktopRuntimeBudget(screen, metrics, warn, options)` và `optionalChunksBeforeAction` hiện có.
 - Produces: `findUnexpectedColdAssets(resourceNames: string[]): string[]`; App không còn `prefetchKhiRanh()` hoặc effect gọi hàm này.
 
-- [ ] **Step 1: Viết test RED cho tài nguyên cold-load và idle-prefetch**
+- [ ] **Step 1: Viết test RED cho bộ nhận diện tài nguyên cold-load**
 
 Thêm `findUnexpectedColdAssets` vào import từ `scripts/do-hieu-nang.mjs`, sau đó thêm:
 
@@ -60,11 +60,6 @@ test("cold-route asset guard rejects Timeline art and ExcelJS only", () => {
   ]);
 });
 
-test("authenticated app shell does not idle-prefetch route chunks", () => {
-  const app = readFileSync(new URL("../../src/App.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(app, /prefetchKhiRanh/);
-  assert.doesNotMatch(app, /requestIdleCallback\(chay/);
-});
 ```
 
 - [ ] **Step 2: Chạy test để xác nhận RED**
@@ -75,7 +70,7 @@ Run:
 node --import tsx --test tests/unit/desktop-runtime-performance-gate.test.mjs
 ```
 
-Expected: FAIL vì `findUnexpectedColdAssets` chưa được export và `App.tsx` vẫn chứa `prefetchKhiRanh`.
+Expected: FAIL vì `findUnexpectedColdAssets` chưa được export.
 
 - [ ] **Step 3: Thêm bộ nhận diện tài nguyên tải sai**
 
@@ -99,7 +94,20 @@ optionalChunksBeforeAction: findUnexpectedColdAssets(
 
 Giữ `assertDesktopRuntimeBudget()` hiện tại để mọi kết quả trong mảng này làm gate thất bại với tên file cụ thể.
 
-- [ ] **Step 4: Bỏ idle-prefetch toàn cục trong App**
+- [ ] **Step 4: Chứng minh runtime RED trên bản App hiện tại**
+
+Chạy unit helper GREEN, build production khi `prefetchKhiRanh()` vẫn còn, phục vụ `dist` trên IPv4 rồi chạy runtime gate:
+
+```powershell
+node --import tsx --test tests/unit/desktop-runtime-performance-gate.test.mjs
+$env:VITE_MANUAL_PLANNED_DEADLINES_ENABLED='true'
+npm run build
+node scripts/do-hieu-nang.mjs --check
+```
+
+Expected: unit PASS; runtime FAIL và nêu tên ít nhất một file `long-mon-*.webp` được tải trước hành động ở route không phải Timeline. Đây là test hành vi chứng minh idle-prefetch hiện tại là nguyên nhân, không dùng grep source.
+
+- [ ] **Step 5: Bỏ idle-prefetch toàn cục trong App**
 
 Trong `src/App.tsx`:
 
@@ -119,7 +127,7 @@ useEffect(() => { prefetchKhiRanh(); }, []);
  * shell không tự tải route nặng sau đăng nhập. */
 ```
 
-- [ ] **Step 5: Chạy test GREEN và typecheck**
+- [ ] **Step 6: Chạy test GREEN và typecheck**
 
 Run:
 
@@ -130,7 +138,7 @@ npm run typecheck
 
 Expected: tất cả test trong file PASS; typecheck exit 0.
 
-- [ ] **Step 6: Commit Task 1**
+- [ ] **Step 7: Commit Task 1**
 
 ```powershell
 git add -- src/App.tsx scripts/do-hieu-nang.mjs tests/unit/desktop-runtime-performance-gate.test.mjs
@@ -351,4 +359,3 @@ Sau đó báo cáo:
 - mức giảm JS đường găng và tải lạnh;
 - cảnh báo build còn lại;
 - rủi ro lần đầu mở Timeline phải tải theo yêu cầu.
-
