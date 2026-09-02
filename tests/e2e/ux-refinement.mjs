@@ -183,9 +183,15 @@ try {
     /* 30/08: thanh lọc đầy đủ chỉ còn ở nhóm GIÁM SÁT; nhóm THỰC HIỆN và
        PHÂN TÍCH dùng bản gọn (không nhãn phạm vi, không nút Bộ lọc). */
     await page.goto(`${GOC}#v=overview`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector('[aria-label="Phạm vi toàn hệ thống"]');
-    const globalFilterLabel = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (el) => el.textContent || "");
-    if (!globalFilterLabel.includes("Phạm vi toàn hệ thống")) throw new Error(globalFilterLabel);
+    await page.waitForSelector('[data-global-filter]');
+    const globalFilter = await page.$eval('[data-global-filter]', (el) => ({
+      ariaLabel: el.getAttribute("aria-label") || "",
+      text: el.innerText || "",
+    }));
+    if (globalFilter.ariaLabel !== "Bộ lọc dữ liệu: đang xem tất cả") throw new Error(globalFilter.ariaLabel);
+    for (const expectedText of ["Bộ lọc dữ liệu", "Tất cả dữ liệu", "Thay đổi"]) {
+      if (!globalFilter.text.includes(expectedText)) throw new Error(globalFilter.text);
+    }
 
     await page.waitForSelector(".vmp-bento");
     await page.waitForSelector(".b-k1 button");
