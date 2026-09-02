@@ -8,6 +8,15 @@
 
 **Tech Stack:** React 18.3, TypeScript 7, Vite 6/Rollup manifest, Node test runner, Puppeteer + Chrome, Supabase mock.
 
+## Trạng thái thực thi 03/09/2026
+
+- Task 1 hoàn tất tại `1783b47`: bỏ idle-prefetch route nặng và thêm runtime guard cấm Long Môn/ExcelJS trên cold route.
+- Task 2 hoàn tất tại `0fcdc7e`: `ReportsView` là chunk riêng; manifest budget buộc route đo phải có JavaScript ngoài shell.
+- Targeted unit `19/19`, typecheck, build, bundle budgets, design drift và E2E Báo cáo `desktop-reports-map-controls.mjs` đạt.
+- Dữ liệu tải lạnh bảy route giảm từ 1.040–1.120 KB xuống 524–629 KB; JS đường găng giảm 189,8 KB xuống 168,7 KB gzip.
+- Runtime `--check` còn hỏng ở long task cold-start Báo cáo: `100 ms` vượt ngân sách `50 ms`. Trace xác định layout toàn tài liệu; hai thử nghiệm `content-visibility` và trì hoãn phép đo bảng không cải thiện nên đã hoàn tác sạch. Không mở rộng sang progressive rendering vì có rủi ro accessibility/CLS và trái mục tiêu thay đổi đơn giản.
+- `desktop-cta-copy.mjs` hỏng do assertion copy có sẵn đã lệch source: actual `Xuất Excel (đủ 5 sheet) / PDF / HTML`, expected `In / lưu PDF / Tải Excel · 5 sheet / Tải HTML`; không sửa ngoài phạm vi.
+
 ## Global Constraints
 
 - Không thay đổi giao diện, dữ liệu, quyền, API hay quy trình nghiệp vụ.
