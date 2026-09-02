@@ -410,6 +410,41 @@ try {
     `Panel bộ lọc mobile phải nằm trong biên trái viewport: ${JSON.stringify(mobilePanel)}`);
   assert.ok(mobilePanel.right <= mobilePanel.viewportWidth + 1,
     `Panel bộ lọc mobile phải nằm trong biên phải viewport: ${JSON.stringify(mobilePanel)}`);
+
+  const mobileOptions = await page.$$(".vmp-global-filter__option");
+  let mobileDepartmentOption;
+  for (const option of mobileOptions) {
+    if ((await option.evaluate((button) => button.textContent || "")).includes("Xưởng sản xuất")) {
+      mobileDepartmentOption = option;
+      break;
+    }
+  }
+  assert.ok(mobileDepartmentOption, "Panel mobile phải có option Xưởng sản xuất để thao tác");
+  await mobileDepartmentOption.click();
+  await page.waitForFunction(() =>
+    document.querySelector("[data-global-filter]")?.getAttribute("aria-label")
+      === "Bộ lọc dữ liệu: 1 điều kiện đang áp dụng");
+  const mobileSelected = await page.$eval("[data-global-filter]", (root) => ({
+    summary: root.querySelector(".vmp-global-filter__summary")?.textContent?.trim(),
+    chips: [...root.querySelectorAll(".vmp-global-filter__chips > span")]
+      .map((chip) => chip.textContent?.trim()),
+  }));
+  assert.deepEqual(mobileSelected, { summary: "XSX", chips: ["XSX×"] });
+
+  await page.click(".vmp-global-filter__done");
+  await page.waitForFunction(() => !document.querySelector("#vmp-global-filter-panel"));
+  await page.waitForFunction(() => document.activeElement?.id === "vmp-global-filter-trigger");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "vmp-global-filter-trigger");
+
+  await page.click("[data-global-filter-reset]");
+  await page.waitForFunction(() => {
+    const root = document.querySelector("[data-global-filter]");
+    return root?.getAttribute("aria-label") === "Bộ lọc dữ liệu: đang xem tất cả"
+      && root.querySelector(".vmp-global-filter__summary")?.textContent?.trim() === "Tất cả dữ liệu"
+      && !root.querySelector(".vmp-global-filter__chips");
+  });
+  await page.click("#vmp-global-filter-trigger");
+  await page.waitForSelector("#vmp-global-filter-panel");
   await page.click(".vmp-global-filter__done");
   await page.waitForFunction(() => !document.querySelector("#vmp-global-filter-panel"));
   await page.waitForFunction(() => document.activeElement?.id === "vmp-global-filter-trigger");
