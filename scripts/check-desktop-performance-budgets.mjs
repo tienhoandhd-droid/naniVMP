@@ -66,6 +66,12 @@ export function routeFilesOutsideShell(manifest, entryKey, shellFiles) {
   return new Set([...routeFiles].filter((file) => !shellFiles.has(file)));
 }
 
+export function assertRouteHasOwnJavaScript(entryKey, routeFiles) {
+  if (![...routeFiles].some((file) => file.endsWith(".js"))) {
+    throw new Error(`${entryKey} không có JavaScript chunk riêng ngoài shell`);
+  }
+}
+
 export function findShellEntry(manifest) {
   if (manifest["index.html"]) return "index.html";
   const entries = Object.entries(manifest).filter(([, entry]) => entry.isEntry === true);
@@ -86,6 +92,7 @@ export function checkDesktopPerformanceBudgets({
   const routes = {};
   for (const [entryKey, budget] of Object.entries(ROUTE_BUDGETS)) {
     const routeDelta = routeFilesOutsideShell(manifest, entryKey, shellFiles);
+    assertRouteHasOwnJavaScript(entryKey, routeDelta);
     const gzip = gzipSizeForFiles(outputDir, routeDelta);
     assertWithinBudget(entryKey, gzip, budget);
     routes[entryKey] = gzip;

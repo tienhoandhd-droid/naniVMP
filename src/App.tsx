@@ -115,6 +115,7 @@ import { buildMonitoringSignatureMetrics } from "./features/monitoring/monitorin
 const taiTimelinePage = () => import("./pages/TimelinePage.tsx");
 const taiAlertsPage = () => import("./pages/AlertsPage.tsx");
 const taiUpdatePage = () => import("./pages/UpdatePage.tsx");
+const taiReportsView = () => import("./components/dashboard/ReportsView.tsx");
 const TimelineView = lazy(nhapCoThuLai(taiTimelinePage));
 const AlertsView = lazy(nhapCoThuLai(taiAlertsPage));
 const CatalogView = lazy(nhapCoThuLai(() => import("./pages/CatalogPage.tsx")));
@@ -127,12 +128,11 @@ const HealthView = lazy(nhapCoThuLai(() => import("./pages/HealthPage.tsx")));
 const AuditLogView = lazy(nhapCoThuLai(() => import("./pages/AuditLogPage.tsx")));
 const AdminView = lazy(nhapCoThuLai(() => import("./pages/AdminPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
+const ReportsView = lazy(nhapCoThuLai(taiReportsView));
 
 import VongNam from "./components/dashboard/VongNam.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
-import ReportsView from "./components/dashboard/ReportsView.tsx";
-const ReportsViewMemo = memo(ReportsView);
 
 // ===== Legacy lib imports (kept for compatibility) =====
 import { saveUser, loadUser, loadFilterPrefs, saveFilterPrefs } from "./lib/config.ts";
@@ -1349,7 +1349,7 @@ function VerifiedAppShell({ user, logout, access }: {
               {!boundaryDuLieu && view === "alerts" && <AlertsView acts={filteredActs} />}
               {!boundaryDuLieu && view === "workload" && <WorkloadView acts={filteredActs}
                 businessRole={access.businessRole} onReload={reloadData} />}
-              {!boundaryDuLieu && view === "reports" && <ReportsViewMemo acts={filteredActs} />}
+              {!boundaryDuLieu && view === "reports" && <ReportsView acts={filteredActs} />}
               {/* Màn "Tài khoản & quyền truy cập" đã gộp vào Vai trò & phạm
                   vi — `accounts` không còn nhánh render riêng, chỉ còn là
                   alias URL cũ được chuẩn hoá về `phanquyen` ở chuanHoaView. */}

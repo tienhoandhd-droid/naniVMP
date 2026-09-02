@@ -6,6 +6,7 @@ import {
   prefetchRouteLoader,
 } from "../../src/lib/routePrefetch.ts";
 import {
+  assertRouteHasOwnJavaScript,
   assertWithinBudget,
   findShellEntry,
   routeFilesOutsideShell,
@@ -85,6 +86,20 @@ test("route budget counts only its static delta outside the shell", () => {
     [...routeFilesOutsideShell(SYNTHETIC_MANIFEST, "src/components/dashboard/ReportsView.tsx", shellFiles)].sort(),
     ["assets/reports.js", "assets/route-static.js", "assets/route.css"].sort(),
   );
+});
+
+test("route budget rejects a route folded into the shell", () => {
+  assert.throws(
+    () => assertRouteHasOwnJavaScript(
+      "src/components/dashboard/ReportsView.tsx",
+      new Set(["assets/reports.css"]),
+    ),
+    /không có JavaScript chunk riêng/,
+  );
+  assert.doesNotThrow(() => assertRouteHasOwnJavaScript(
+    "src/components/dashboard/ReportsView.tsx",
+    new Set(["assets/reports.js", "assets/reports.css"]),
+  ));
 });
 
 test("budgets stay pinned to the approved byte limits", () => {
