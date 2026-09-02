@@ -1,18 +1,9 @@
-/* GlobalFilterBar đầy đủ: bề mặt lệnh lọc hai hàng, không tác động bản rút gọn. */
+/* GlobalFilterBar đầy đủ: capsule lệnh gọn, không tác động bản rút gọn. */
 .vmp-global-filter {
   position: relative;
   z-index: 40;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
   min-width: 0;
   margin-bottom: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--lp-line);
-  border-top-color: var(--lp-gold-hairline);
-  border-radius: 16px;
-  background: var(--lp-sheen);
-  box-shadow: var(--lp-e-low);
 }
 
 .vmp-global-filter__primary {
@@ -21,23 +12,46 @@
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
-  flex-wrap: wrap;
 }
 
-.vmp-global-filter__left {
+.vmp-global-filter__command {
   display: inline-flex;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
   min-width: 0;
+  max-width: min(100%, 720px);
+  min-height: 44px;
+  overflow: visible;
+  border: 1px solid var(--lp-line);
+  border-top-color: var(--lp-gold-hairline);
+  border-radius: 14px;
+  background: var(--lp-sheen);
+  box-shadow: var(--lp-e-low);
 }
 
-.vmp-global-filter__scope {
+.vmp-global-filter__label,
+.vmp-global-filter__summary,
+.vmp-global-filter__trigger {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.vmp-global-filter__label {
   gap: 7px;
   color: var(--lp-plum);
   font-size: 12px;
   font-weight: 800;
+  white-space: nowrap;
+}
+
+.vmp-global-filter__summary {
+  overflow: hidden;
+  border-left: 1px solid var(--lp-line);
+  color: var(--lp-ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -72,7 +86,10 @@
 }
 
 .vmp-global-filter__trigger {
-  border-color: var(--lp-gold-hairline);
+  min-height: 42px;
+  border: 0;
+  border-left: 1px solid var(--lp-line);
+  border-radius: 0 13px 13px 0;
   background: var(--lp-bg-raised);
   color: var(--lp-plum);
 }
@@ -161,8 +178,7 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  padding-top: 9px;
-  border-top: 1px solid var(--lp-line);
+  margin-top: 8px;
   flex-wrap: wrap;
 }
 
@@ -188,14 +204,17 @@
 }
 
 @media (max-width: 640px) {
-  .vmp-global-filter { padding: 10px; }
-  .vmp-global-filter__primary { align-items: stretch; gap: 8px; }
-  .vmp-global-filter__left { width: 100%; justify-content: space-between; }
-  .vmp-global-filter__scope { min-height: 32px; }
+  .vmp-global-filter__primary {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .vmp-global-filter__command { width: 100%; max-width: 100%; }
+  .vmp-global-filter__label { padding-inline: 10px; }
+  .vmp-global-filter__summary { flex: 1 1 auto; padding-inline: 9px; }
+  .vmp-global-filter__trigger { min-height: 44px; padding-inline: 10px; }
   .vmp-global-filter__person { width: 100%; margin-left: 0; }
   .vmp-global-filter__person select { min-height: 44px; min-width: 0 !important; flex: 1; }
-  .vmp-global-filter__popover { flex: 1 0 100%; }
-  .vmp-global-filter__trigger { width: 100%; min-height: 44px; }
   .vmp-global-filter__panel { max-height: min(560px, calc(100vh - 112px)); }
   .vmp-global-filter__dates { grid-template-columns: 1fr; }
   .vmp-global-filter__dates > span { display: none; }

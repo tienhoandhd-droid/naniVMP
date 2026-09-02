@@ -57,9 +57,9 @@ try {
   await nhetPhien(page, { supabaseUrl });
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${APP_URL}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForSelector('[aria-label="Phạm vi toàn hệ thống"]', { timeout: 15_000 });
+  await page.waitForSelector("[data-global-filter]", { timeout: 15_000 });
 
-  const filter = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (root) => ({
+  const filter = await page.$eval("[data-global-filter]", (root) => ({
     text: root.textContent || "",
     panels: root.querySelectorAll("#vmp-global-filter-panel").length,
     expanded: root.querySelector("#vmp-global-filter-trigger")?.getAttribute("aria-expanded"),
@@ -67,6 +67,21 @@ try {
   assert.doesNotMatch(filter.text, /Chép liên kết|\/\s*\d+\s*hạng mục/);
   assert.equal(filter.panels, 0);
   assert.equal(filter.expanded, "false");
+
+  const compactInitial = await page.$eval("[data-global-filter]", (root) => {
+    const command = root.querySelector(".vmp-global-filter__command");
+    return {
+      ariaLabel: root.getAttribute("aria-label"),
+      summary: root.querySelector(".vmp-global-filter__summary")?.textContent?.trim(),
+      trigger: root.querySelector("#vmp-global-filter-trigger")?.textContent?.trim(),
+      rootWidth: root.getBoundingClientRect().width,
+      commandWidth: command?.getBoundingClientRect().width ?? 0,
+    };
+  });
+  assert.equal(compactInitial.ariaLabel, "Bộ lọc dữ liệu: đang xem tất cả");
+  assert.equal(compactInitial.summary, "Tất cả dữ liệu");
+  assert.equal(compactInitial.trigger, "Thay đổi");
+  assert.ok(compactInitial.commandWidth < compactInitial.rootWidth * 0.7);
 
   const annualClock = await page.$eval(".vmp-vongnam-svg", (svg) => {
     const maxRadius = Number(svg.getAttribute("data-vongnam-max-radius"));
@@ -253,7 +268,7 @@ try {
 
   await page.click("#vmp-global-filter-trigger");
   await page.waitForSelector("#vmp-global-filter-panel");
-  const openContract = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (root) => ({
+  const openContract = await page.$eval("[data-global-filter]", (root) => ({
     expanded: root.querySelector("#vmp-global-filter-trigger")?.getAttribute("aria-expanded"),
     labelledBy: root.querySelector("#vmp-global-filter-panel")?.getAttribute("aria-labelledby"),
     legends: [...root.querySelectorAll("#vmp-global-filter-panel legend")].map((legend) => legend.textContent?.trim()),
@@ -278,33 +293,51 @@ try {
   };
 
   await clickOption("Bộ phận", "Xưởng sản xuất");
-  await page.waitForFunction(() => document.querySelector("#vmp-global-filter-trigger")?.textContent?.includes("(1)"));
+  await page.waitForFunction(() =>
+    document.querySelector("[data-global-filter]")?.getAttribute("aria-label")
+      === "Bộ lọc dữ liệu: 1 điều kiện đang áp dụng");
   await clickOption("Khu vực", "Khu A");
-  await page.waitForFunction(() => document.querySelector("#vmp-global-filter-trigger")?.textContent?.includes("(2)"));
+  await page.waitForFunction(() =>
+    document.querySelector("[data-global-filter]")?.getAttribute("aria-label")
+      === "Bộ lọc dữ liệu: 2 điều kiện đang áp dụng");
 
-  const selected = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (root) => ({
+  const selected = await page.$eval("[data-global-filter]", (root) => ({
     trigger: root.querySelector("#vmp-global-filter-trigger")?.textContent?.trim(),
+    summary: root.querySelector(".vmp-global-filter__summary")?.textContent?.trim(),
+    ariaLabel: root.getAttribute("aria-label"),
     chips: [...root.querySelectorAll(".vmp-global-filter__chips > span")]
       .map((chip) => chip.textContent?.trim()),
     hash: window.location.hash,
   }));
-  assert.equal(selected.trigger, "Bộ lọc (2)");
+  assert.equal(selected.trigger, "Thay đổi");
+  assert.equal(selected.summary, "XSX · Khu vực Khu A");
+  assert.equal(selected.ariaLabel, "Bộ lọc dữ liệu: 2 điều kiện đang áp dụng");
   assert.deepEqual(selected.chips, ["XSX×", "Khu vực: Khu A×"]);
   assert.match(selected.hash, /dept=xsx/);
   assert.match(selected.hash, /area=Khu\+A/);
 
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector("#vmp-global-filter-panel"));
   await page.click('button[aria-label="Bỏ XSX"]');
-  await page.waitForFunction(() => document.querySelector("#vmp-global-filter-trigger")?.textContent?.trim() === "Bộ lọc (1)");
-  const afterOneChip = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (root) => {
+  await page.waitForFunction(() =>
+    document.querySelector("[data-global-filter]")?.getAttribute("aria-label")
+      === "Bộ lọc dữ liệu: 1 điều kiện đang áp dụng");
+  const afterOneChip = await page.$eval("[data-global-filter]", (root) => {
     const params = new URLSearchParams(window.location.hash.slice(1));
     return {
+      summary: root.querySelector(".vmp-global-filter__summary")?.textContent?.trim(),
+      ariaLabel: root.getAttribute("aria-label"),
       chips: [...root.querySelectorAll(".vmp-global-filter__chips > span")]
         .map((chip) => chip.textContent?.trim()),
       dept: params.get("dept"),
       area: params.get("area"),
     };
   });
-  assert.deepEqual(afterOneChip, { chips: ["Khu vực: Khu A×"], dept: null, area: "Khu A" });
+  assert.equal(afterOneChip.summary, "Khu vực Khu A");
+  assert.equal(afterOneChip.ariaLabel, "Bộ lọc dữ liệu: 1 điều kiện đang áp dụng");
+  assert.deepEqual(afterOneChip.chips, ["Khu vực: Khu A×"]);
+  assert.equal(afterOneChip.dept, null);
+  assert.equal(afterOneChip.area, "Khu A");
 
   await page.click("#vmp-global-filter-trigger");
   await page.waitForSelector("#vmp-global-filter-panel");
@@ -313,7 +346,7 @@ try {
   assert.equal(await page.evaluate(() => document.activeElement?.id), "vmp-global-filter-trigger");
 
   await page.setViewport({ width: 390, height: 844 });
-  const mobileActive = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (root) => ({
+  const mobileActive = await page.$eval("[data-global-filter]", (root) => ({
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     resetHeight: root.querySelector("[data-global-filter-reset]")?.getBoundingClientRect().height,
   }));
@@ -323,14 +356,16 @@ try {
     `Xóa tất cả mobile phải cao tối thiểu 43.5px khi filter active: ${JSON.stringify(mobileActive)}`);
   await page.setViewport({ width: 1440, height: 900 });
 
-  await page.click("#vmp-global-filter-trigger");
-  await page.waitForSelector("#vmp-global-filter-panel");
   await page.click("[data-global-filter-reset]");
-  await page.waitForFunction(() => document.querySelector("#vmp-global-filter-trigger")?.textContent?.trim() === "Bộ lọc"
-    && !document.querySelector(".vmp-global-filter__chips"));
+  await page.waitForFunction(() => {
+    const root = document.querySelector("[data-global-filter]");
+    return root?.getAttribute("aria-label") === "Bộ lọc dữ liệu: đang xem tất cả"
+      && root.querySelector(".vmp-global-filter__summary")?.textContent?.trim() === "Tất cả dữ liệu"
+      && !root.querySelector(".vmp-global-filter__chips");
+  });
   await page.click("#vmp-global-filter-trigger");
   await page.waitForSelector("#vmp-global-filter-panel");
-  const reset = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (root) => {
+  const reset = await page.$eval("[data-global-filter]", (root) => {
     const params = new URLSearchParams(window.location.hash.slice(1));
     return {
       pressed: root.querySelectorAll('#vmp-global-filter-panel button[aria-pressed="true"]').length,
@@ -345,7 +380,23 @@ try {
   await page.click(".vmp-global-filter__done");
 
   await page.setViewport({ width: 390, height: 844 });
-  const mobile = await page.$eval('[aria-label="Phạm vi toàn hệ thống"]', (root) => ({
+  const mobileCompact = await page.$eval("[data-global-filter]", (root) => {
+    const command = root.querySelector(".vmp-global-filter__command");
+    const segments = [...command.querySelectorAll(":scope > *")];
+    const tops = segments.map((segment) => segment.getBoundingClientRect().top);
+    return {
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      commandOverflow: command.scrollWidth - command.clientWidth,
+      commandHeight: command.getBoundingClientRect().height,
+      rowDelta: Math.max(...tops) - Math.min(...tops),
+    };
+  });
+  assert.ok(mobileCompact.pageOverflow <= 1);
+  assert.ok(mobileCompact.commandOverflow <= 1);
+  assert.ok(mobileCompact.commandHeight >= 43.5);
+  assert.ok(mobileCompact.rowDelta < 2);
+
+  const mobile = await page.$eval("[data-global-filter]", (root) => ({
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     controls: [...root.querySelectorAll("button, select, input")]
       .filter((control) => {
