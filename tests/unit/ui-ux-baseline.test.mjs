@@ -89,7 +89,12 @@ test("filters are grouped, named and stay in normal document flow", () => {
   const audit = source("src/pages/AuditLogPage.tsx");
   const shell = source("src/styles/lotus-shell.css");
 
-  assert.match(app, /role="group" aria-label="Phạm vi toàn hệ thống"/);
+  assert.match(app, /data-global-filter/);
+  assert.match(app, /aria-label=\{filterSummary\.ariaLabel\}/);
+  assert.match(app, /vmp-global-filter__label[\s\S]*?Bộ lọc dữ liệu/);
+  assert.match(app, /vmp-global-filter__summary/);
+  assert.match(app, /\{filterSummary\.visibleLabel\}/);
+  assert.match(app, />\s*Thay đổi\s*<\/button>/s);
   assert.match(audit, /aria-label="Lọc nhật ký theo hành động"/);
   assert.match(audit, /aria-label="Lọc nhật ký theo email"/);
   assert.match(audit, /aria-label="Lọc nhật ký theo mã hạng mục"/);

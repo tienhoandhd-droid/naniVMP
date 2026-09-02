@@ -97,6 +97,7 @@ import {
   useTeamOverviewSummary,
   type TeamOverviewSummaryState,
 } from "./features/overview/useTeamOverviewSummary.ts";
+import { presentGlobalFilterSummary } from "./features/overview/globalFilterSummary.ts";
 import MonitoringJourneyNav from "./features/monitoring/MonitoringJourneyNav.tsx";
 import ChangePwModal from "./components/auth/ChangePwModal.tsx";
 import StateBoundary from "./components/ui/StateBoundary.tsx";
@@ -527,7 +528,6 @@ function GlobalFilterBar({
   const active = deptSel.length > 0 || areaSel.length > 0
     || (showPersonSelector && selectedPersonId !== null)
     || (!todayMode && (!!customFrom || !!customTo));
-  const soLoc = deptSel.length + areaSel.length + (!todayMode && (customFrom || customTo) ? 1 : 0);
   const resetAll = () => {
     setDeptSel([]);
     setAreaSel([]);
@@ -603,6 +603,16 @@ function GlobalFilterBar({
     </>
   );
 
+  const dateLabel = !todayMode && (customFrom || customTo)
+    ? `${customFrom || "…"}–${customTo || "…"}`
+    : null;
+  const filterSummary = presentGlobalFilterSummary({
+    departmentLabels: deptSel.map((value) =>
+      (DEPT_CODE as Record<string, string>)[value] || value.toUpperCase()),
+    areaLabels: areaSel.map((value) => `Khu vực ${value}`),
+    dateLabel,
+  });
+
   if (rutGon) {
     return (
       <div role="group" aria-label="Phạm vi toàn hệ thống" className={`vmp-thanh-loc vmp-thanh-loc--gon${todayMode ? " vmp-thanh-loc--treo" : ""}`} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 40, marginBottom: 14, padding: "2px 0 8px" }}>
@@ -627,15 +637,26 @@ function GlobalFilterBar({
   };
 
   return (
-    <div role="group" aria-label="Phạm vi toàn hệ thống" className="vmp-global-filter">
+    <div
+      role="group"
+      aria-label={filterSummary.ariaLabel}
+      className="vmp-global-filter"
+      data-global-filter
+    >
       <div className="vmp-global-filter__primary">
-        <div className="vmp-global-filter__left">
-          <span className="vmp-global-filter__scope"><Filter size={15} aria-hidden="true" />Toàn hệ thống</span>
+        <div className="vmp-global-filter__command">
+          <span className="vmp-global-filter__label">
+            <Filter size={15} aria-hidden="true" />
+            Bộ lọc dữ liệu
+          </span>
+          <span className="vmp-global-filter__summary" title={filterSummary.visibleLabel}>
+            {filterSummary.visibleLabel}
+          </span>
           <div ref={popRef} className="vmp-global-filter__popover">
             <button id="vmp-global-filter-trigger" ref={triggerRef} className="vmp-global-filter__trigger" type="button"
               onClick={() => setOpen((value) => !value)} aria-haspopup="dialog" aria-expanded={open}
               aria-controls="vmp-global-filter-panel">
-              Bộ lọc{soLoc ? ` (${soLoc})` : ""}
+              Thay đổi
             </button>
             {open && (
               <div id="vmp-global-filter-panel" role="dialog" aria-labelledby="vmp-global-filter-trigger"
