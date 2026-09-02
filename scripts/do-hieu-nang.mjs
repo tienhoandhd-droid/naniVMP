@@ -34,7 +34,11 @@ export const DESKTOP_PRIMARY_ACTIONABLE_SELECTORS = Object.freeze({
   phanquyen: "[data-desktop-primary-actionable]",
 });
 
-const OPTIONAL_REPORT_CHUNK = /(?:VmpSpace3D|VmpSpace3DCanvas|BanDoNhiet|exceljs)/i;
+const UNEXPECTED_COLD_ASSET = /(?:long-mon-|exceljs)/i;
+
+export function findUnexpectedColdAssets(resourceNames) {
+  return resourceNames.filter((name) => UNEXPECTED_COLD_ASSET.test(name));
+}
 
 export function runtimeGateScreens() {
   return [...DESKTOP_PERFORMANCE_SCREENS];
@@ -179,12 +183,12 @@ async function measureScreen(browser, { screen, origin, supabaseUrl, enforce }) 
           ? null
           : Math.round(state.skeletonAppearanceMs),
         maxLongTaskMs: Math.round(state?.maxLongTaskMs || 0),
-        optionalChunksBeforeAction: screen === "reports" ? resources
-          .map((resource) => resource.name.split("/").pop())
-          .filter((name) => OPTIONAL_REPORT_CHUNK.test(name)) : [],
+        resourceNames: resources.map((resource) => resource.name.split("/").pop()),
         top,
       };
     });
+    metrics.optionalChunksBeforeAction = findUnexpectedColdAssets(metrics.resourceNames);
+    delete metrics.resourceNames;
     if (enforce) {
       assertDesktopRuntimeBudget(screen, metrics, console.warn);
     }

@@ -109,9 +109,9 @@ import { buildMonitoringSignatureMetrics } from "./features/monitoring/monitorin
    xoá mất chunk cũ, ai đang mở web lúc đó bấm sang màn khác là ăn 404. Xem
    src/lib/tailMan.ts để biết vì sao đây chính là "thỉnh thoảng lỗi tải lại
    trang". ===== */
-/* Loader tách tên riêng cho các màn hay dùng nhất: vừa cấp cho lazy() vừa
- * cấp cho prefetchKhiRanh() — cùng một hàm import nên trình duyệt/module
- * cache tự khử trùng lặp, không tải hai lần. */
+/* Loader có tên riêng cho các route lazy dùng lại trong nhapCoThuLai().
+ * Prefetch điều hướng được kiểm soát theo intent ở lib/routePrefetch.ts;
+ * shell không tự tải route nặng sau đăng nhập. */
 const taiTimelinePage = () => import("./pages/TimelinePage.tsx");
 const taiAlertsPage = () => import("./pages/AlertsPage.tsx");
 const taiUpdatePage = () => import("./pages/UpdatePage.tsx");
@@ -128,25 +128,6 @@ const AuditLogView = lazy(nhapCoThuLai(() => import("./pages/AuditLogPage.tsx"))
 const AdminView = lazy(nhapCoThuLai(() => import("./pages/AdminPage.tsx")));
 const ChatBox = lazy(nhapCoThuLai(() => import("./components/ai/ChatBox.tsx")));
 
-/* Prefetch chunk các màn hay dùng khi trình duyệt RẢNH — người xưởng trên
- * 4G bấm sang màn mới không phải chờ một round-trip mạng nữa. Chỉ chạy một
- * lần sau khi màn đầu ổn định; lỗi tải (offline, deploy giữa chừng) nuốt
- * im lặng vì đây chỉ là tối ưu, bấm thật vẫn đi qua nhapCoThuLai() có retry. */
-let daPrefetch = false;
-function prefetchKhiRanh(): void {
-  if (daPrefetch) return;
-  daPrefetch = true;
-  const chay = () => {
-    for (const tai of [taiTimelinePage, taiUpdatePage, taiAlertsPage]) {
-      tai().catch(() => {});
-    }
-  };
-  if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(chay, { timeout: 8000 });
-  } else {
-    setTimeout(chay, 3000);
-  }
-}
 import VongNam from "./components/dashboard/VongNam.tsx";
 import CompletionDashboard from "./components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "./components/dashboard/MaTranTienDo.tsx";
@@ -1437,10 +1418,6 @@ function AuthorizedAppShell({ user, logout }: { user: AppUser; logout: () => Pro
   useAccessCacheTransition(user, {
     access, dangTai: dangXacMinhQuyen, loi: loiQuyen, taiLai: taiLaiQuyen,
   });
-  /* Chỉ prefetch SAU đăng nhập (màn login không cần gánh 3 chunk màn),
-     và đúng một lần cho cả phiên (cờ trong prefetchKhiRanh). */
-  useEffect(() => { prefetchKhiRanh(); }, []);
-
   /* Chỉ outer shell được mount trước khi xác minh. Inner shell mới sở hữu
      useVmpData và mọi effect đọc dữ liệu bảo vệ. */
   if (dangXacMinhQuyen || loiQuyen) return (

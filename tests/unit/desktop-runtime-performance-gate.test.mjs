@@ -11,6 +11,7 @@ import {
   DESKTOP_RUNTIME_LIMITS,
   assertDesktopRuntimeBudget,
   desktopRuntimeRouteContract,
+  findUnexpectedColdAssets,
   recordRouteSkeletonAppearance,
   runtimeGateScreens,
 } from "../../scripts/do-hieu-nang.mjs";
@@ -41,6 +42,20 @@ test("runtime gate rejects a late primary action, late skeleton appearance, and 
       return true;
     },
   );
+});
+
+test("cold-route asset guard rejects Timeline art and ExcelJS only", () => {
+  assert.deepEqual(findUnexpectedColdAssets([
+    "index-abc.js",
+    "long-mon-vmp-racecourse-60-days-v17.webp",
+    "long-mon-six-species-v16.webp",
+    "exceljs.min-xyz.js",
+    "AlertsPage-abc.js",
+  ]), [
+    "long-mon-vmp-racecourse-60-days-v17.webp",
+    "long-mon-six-species-v16.webp",
+    "exceljs.min-xyz.js",
+  ]);
 });
 
 test("runtime gate warns but does not fail when only DOM count exceeds the advisory threshold", () => {
