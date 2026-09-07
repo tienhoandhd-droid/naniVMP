@@ -1165,7 +1165,7 @@ function VerifiedAppShell({ user, logout, access }: {
       {/* Nền theo thiết kế 29/08 (lotus-shell.css .vmp-main-nen): ánh hồng–
           lavender toả từ góc như cũ, thêm tranh hồ sen mờ ở góc phải (không
           đè chữ) và vân sơn mài; bỏ sao lấp lánh. */}
-      <main ref={mainRef} id="vmp-main-content" tabIndex={-1} className="vmp-scroll vmp-main-nen" style={{
+      <main ref={mainRef} id="vmp-main-content" data-vmp-view={view} tabIndex={-1} className="vmp-scroll vmp-main-nen" style={{
         flex: 1, overflowY: "auto", position: "relative",
       }}>
         <div style={{ position: "relative", zIndex: 1 }}>
@@ -1174,7 +1174,7 @@ function VerifiedAppShell({ user, logout, access }: {
             dataUpdatedAt={dataUpdatedAt}
             view={view} setView={setView} access={access}
             onLogout={xinThoat} onChangePw={moDoiMatKhau}
-            showMasthead={view === "overview"}
+            showMasthead={view === "overview"} compact={view === "timeline"}
           />
 
 

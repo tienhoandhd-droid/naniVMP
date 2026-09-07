@@ -63,6 +63,8 @@ jobs:
         run: npx playwright install chromium --with-deps --no-shell
       - run: npm run typecheck
       - run: npm run test:unit
+      - name: Verify backup safety contracts without credentials
+        run: python3 -B -m unittest discover -s tests/operations -p 'test_*.py'
       # Guardrail thiết kế về 0 vi phạm ngày 31/08 — từ nay là gate cứng.
       - run: npm run drift
 

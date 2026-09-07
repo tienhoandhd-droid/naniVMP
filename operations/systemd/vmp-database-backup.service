@@ -1,0 +1,10 @@
+[Unit]
+Description=VMP encrypted logical database backup
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -B %h/.local/share/vmp-operations/backup-database.py --config %h/.config/vmp-operations/backup.json
+UMask=0077
+TimeoutStartSec=30min
+NoNewPrivileges=true

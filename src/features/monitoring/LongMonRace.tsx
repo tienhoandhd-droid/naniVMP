@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarDays, Waves, Pause, Play } from "lucide-react";
+import { CalendarClock, CalendarDays, Waves, Pause, Play, Search } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Activity } from "../../types/domain.ts";
@@ -15,16 +15,15 @@ import { buildOrganicPlacements, parseLongMonView, LONG_MON_VIEW_KEY, type LongM
  * đối "/art/..." sẽ trỏ ra NGOÀI repo và cả bức tranh biến mất trên
  * production. import.meta.env.BASE_URL luôn có "/" ở cuối. */
 const ART_BASE = `${import.meta.env?.BASE_URL ?? "/"}art/monitoring/`;
-const BACKGROUND_URL = `${ART_BASE}long-mon-vmp-racecourse-60-days-v17.webp`;
+const BACKGROUND_URL = `${ART_BASE}long-mon-ngu-do-silk-v1.webp`;
 const SPECIES_SHEET_URL = `${ART_BASE}long-mon-six-species-v16.webp`;
 /* Cổng Vũ Môn vẽ tay (SVG → Inkscape xuất PNG) — xem chú thích trong CSS. */
-const GATE_URL = `${ART_BASE}long-mon-vu-mon-gate-v2.webp`;
 
-/* Mồi tải cả ba tranh NGAY khi chunk màn này về — song song với việc React
+/* Mồi tải hai tranh NGAY khi chunk màn này về — song song với việc React
  * render — thay vì chờ <img>/CSS mount mới bắt đầu (3 chặng mạng nối tiếp:
  * chunk JS → render → tranh). Trình duyệt tự khử trùng lặp request. */
 if (typeof window !== "undefined") {
-  for (const url of [BACKGROUND_URL, SPECIES_SHEET_URL, GATE_URL]) {
+  for (const url of [BACKGROUND_URL, SPECIES_SHEET_URL]) {
     const img = new Image();
     img.decoding = "async";
     img.src = url;
@@ -104,6 +103,8 @@ type FishStyle = CSSProperties & {
 type RaceCanvasStyle = CSSProperties & {
   "--long-mon-scene-width": string;
   "--long-mon-scene-height": string;
+  "--long-mon-contained-width"?: string;
+  "--long-mon-contained-height"?: string;
 };
 
 function spriteStyle(stage: LongMonStageMeta): SpriteStyle {
@@ -143,9 +144,11 @@ function LongMonRace({
     catch { return "date"; }
   });
   const [paused, setPaused] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.hidden);
   const organic = useMemo(() => view === "organic" ? buildOrganicPlacements(model.fish) : null, [model.fish, view]);
-  const sceneHeight = view === "organic" ? Math.max(500, Math.ceil(model.fish.length / 12) * 70) : model.sceneHeightPx;
+  const sceneHeight = 560;
   function changeView(next: LongMonView) {
     setView(next);
     try { localStorage.setItem(LONG_MON_VIEW_KEY, next); } catch { /* Display still works in private mode. */ }
@@ -156,10 +159,42 @@ function LongMonRace({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const raceRef = useRef<HTMLElement>(null);
+  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+  const [containedScene, setContainedScene] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const race = raceRef.current;
+    const viewport = viewportRef.current;
+    if (!race || !viewport) return;
+    const measure = () => {
+      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - race.getBoundingClientRect().top - 8)));
+      const { width, height } = viewport.getBoundingClientRect();
+      const sceneHeight = Math.floor(Math.min(height, width / 2));
+      setContainedScene({ width: sceneHeight * 2, height: sceneHeight });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(race);
+    observer.observe(viewport);
+    if (race.parentElement) observer.observe(race.parentElement);
+    window.addEventListener("resize", measure);
+    return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
+  }, [view, model.fish.length]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && query) { setQuery(""); setHighlightedId(null); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [query]);
   const metaByStage = META_BY_STAGE;
   const canvasStyle: RaceCanvasStyle = {
     "--long-mon-scene-width": `${model.sceneWidthPx}px`,
     "--long-mon-scene-height": `${sceneHeight}px`,
+    ...(containedScene ? {
+      "--long-mon-contained-width": `${containedScene.width}px`,
+      "--long-mon-contained-height": `${containedScene.height}px`,
+    } : {}),
   };
 
   useEffect(() => {
@@ -172,8 +207,21 @@ function LongMonRace({
     viewport.scrollLeft = Math.max(0, Math.min(target, viewport.scrollWidth - viewport.clientWidth));
   }, [model.todayPct, view]);
 
+  const matches = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("vi");
+    if (!needle) return [];
+    return model.fish.filter(({ activity }) => [activity.code, activity.name, activity.objName, activity.obj, activity.id]
+      .some(value => String(value ?? "").toLocaleLowerCase("vi").includes(needle))).slice(0, 8);
+  }, [model.fish, query]);
+  const highlight = (value: string) => {
+    const needle = query.trim();
+    const at = value.toLocaleLowerCase("vi").indexOf(needle.toLocaleLowerCase("vi"));
+    if (at < 0 || !needle) return value;
+    return <>{value.slice(0, at)}<mark>{value.slice(at, at + needle.length)}</mark>{value.slice(at + needle.length)}</>;
+  };
+
   return (
-    <section className="long-mon-race" data-view={view} data-paused={paused || hidden} aria-label={view === "date" ? "Dòng thời gian VMP 60 ngày quanh Hôm nay" : "Long Môn VMP · Ngư đồ nghệ thuật"}>
+    <section ref={raceRef} className="long-mon-race" style={availableHeight ? { "--long-mon-available-height": `${availableHeight}px` } as CSSProperties : undefined} data-view={view} data-paused={paused || hidden} aria-label={view === "date" ? "Dòng thời gian VMP 60 ngày quanh Hôm nay" : "Long Môn VMP · Ngư đồ nghệ thuật"}>
       <header className="long-mon-race__head">
         <div className="long-mon-race__title-block">
           <span className="long-mon-race__eyebrow">60 ngày quanh Hôm nay</span>
@@ -236,9 +284,24 @@ function LongMonRace({
           {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
           <span>{paused ? "Tiếp tục bơi" : "Tạm dừng"}</span>
         </button>
+        <label className="long-mon-race__search">
+          <Search size={15} aria-hidden="true" />
+          <span className="lp-visually-hidden">Tìm hồ sơ trong ngư đồ</span>
+          <input data-long-mon-search value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã, tên hồ sơ" />
+        </label>
+        {matches.length > 0 && <div className="long-mon-race__search-results" role="list" aria-label="Hồ sơ khớp tìm kiếm">
+          {matches.map(({ activity }) => {
+            const code = String(activity.code || activity.id);
+            const name = String(activity.name || activity.objName || activity.obj || "Hạng mục VMP");
+            return <div key={String(activity.id)} role="listitem"><button type="button" data-long-mon-search-result onClick={() => { setHighlightedId(String(activity.id)); onOpen(activity); }}>
+              <strong>{highlight(code)}</strong><span>{highlight(name)}</span>
+            </button></div>;
+          })}
+        </div>}
+        {query.trim() && matches.length === 0 && <p className="long-mon-race__search-empty" role="status">Không có hồ sơ khớp.</p>}
       </div>
 
-      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label={view === "date" ? "60 ngày VMP quanh Hôm nay; màn hình nhỏ có thể kéo ngang" : "Hồ cá nghệ thuật; dùng Tab để chọn cá và Enter để mở hồ sơ"}>
+      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label={view === "date" ? "60 ngày VMP quanh Hôm nay; dùng Tab để chọn cá và Enter để mở hồ sơ" : "Hồ cá nghệ thuật; dùng Tab để chọn cá và Enter để mở hồ sơ"}>
         <div
           className="long-mon-race__canvas long-mon-race__canvas--adaptive-scene"
           data-density-scale={model.densityScale}
@@ -251,9 +314,7 @@ function LongMonRace({
               width/height gốc của file để giữ chỗ, tránh CLS khi tranh về
               (CSS vẫn scale theo --long-mon-scene-*). */}
           <img className="long-mon-race__background" src={BACKGROUND_URL} alt="" aria-hidden="true"
-            width={1822} height={863} decoding="async" {...({ fetchpriority: "high" } as Record<string, string>)} />
-          <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true"
-            width={540} height={1120} decoding="async" loading="lazy" />
+            width={1774} height={887} decoding="async" {...({ fetchpriority: "high" } as Record<string, string>)} />
           <div className="long-mon-race__wash" aria-hidden="true" />
           {view === "organic" && <div className="long-mon-race__pond-light" aria-hidden="true"><i /><i /><i /></div>}
 
@@ -308,13 +369,14 @@ function LongMonRace({
                 const name = String(fish.activity.name || fish.activity.objName || fish.activity.obj || "Hạng mục VMP");
                 const swim = swimTiming(String(fish.activity.id), fish.deadline);
                 const placement = organic?.get(String(fish.activity.id));
+                const dateYPct = Math.max(20, Math.min(88, 21 + fish.renderYPct * .67));
                 const style: FishStyle = {
                   "--swim-delay": swim.delay,
                   "--swim-dur": swim.dur,
                   "--long-mon-x": `${placement?.xPct ?? fish.renderXPct}%`,
-                  "--long-mon-y": `${placement?.yPct ?? fish.renderYPct}%`,
-                  "--school-x": `${placement ? 0 : fish.renderOffsetXPx}px`,
-                  "--school-y": `${placement ? 0 : fish.renderOffsetYPx}px`,
+                  "--long-mon-y": `${placement?.yPct ?? dateYPct}%`,
+                  "--school-x": "0px",
+                  "--school-y": "0px",
                   "--school-scale": placement?.scale ?? fish.renderScale,
                   "--school-rotate": `${placement?.rotateDeg ?? fish.renderRotateDeg}deg`,
                   "--motion-x": swim.x,
@@ -337,6 +399,7 @@ function LongMonRace({
                       data-owner-end={fish.ownerEndPct}
                       data-school-formation={fish.schoolFormation}
                       data-motion-profile={fish.motionProfile}
+                      data-long-mon-highlighted={highlightedId === String(fish.activity.id) || undefined}
                       data-collision-width="62"
                       data-collision-height="54"
                       aria-label={`${code} · ${stage.label} · hạn VMP ${deadline}`}

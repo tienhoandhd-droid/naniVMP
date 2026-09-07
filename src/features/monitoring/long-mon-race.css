@@ -1191,7 +1191,207 @@
 .long-mon-race__footer { background: var(--lp-surface); border-color: var(--lp-line); }
 .long-mon-race__legend li { background: var(--lp-raised); border-color: var(--lp-line); }
 .long-mon-race__legend strong { white-space: normal; overflow: visible; text-wrap: balance; }
+
+/* The artwork is a complete silk painting, never a cropped texture.  The
+ * measured height is the space that remains below the compact timeline nav. */
+@media (min-width: 720px) {
+  #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact {
+    min-height: 42px;
+    padding: 5px var(--lp-shell-pad, 34px) !important;
+    flex-wrap: nowrap !important;
+  }
+  #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact .vmp-title { font-size: 25px !important; line-height: 1.05 !important; }
+  #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact .vmp-topbar__sub { margin-top: 1px !important; line-height: 1.15; }
+  #vmp-main-content[data-vmp-view="timeline"] > div > div[style*="padding"] { padding-top: 4px !important; }
+  #vmp-main-content[data-vmp-view="timeline"] .long-mon-view-switch { margin-bottom: 4px; }
+  .long-mon-race {
+    height: var(--long-mon-available-height, 680px);
+    min-height: 280px;
+  }
+  .long-mon-race__head { padding-block: 10px; }
+  .long-mon-race__toolbar { position: relative; padding-block: 7px; }
+  .long-mon-race__footer { padding-block: 6px; }
+  .long-mon-race__legend li { min-height: 34px; }
+  .long-mon-race__legend-sprite { width: 28px; height: 28px; }
+  .long-mon-race__legend li { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .long-mon-race__legend small { display: none; }
+  .long-mon-race__notes { display: none; }
+  .long-mon-race__viewport { display: grid; place-items: center; overflow: hidden; }
+  .long-mon-race__canvas,
+  .long-mon-race__canvas--adaptive-scene {
+    width: var(--long-mon-contained-width, 100%);
+    min-width: min(100%, var(--long-mon-contained-width, 100%));
+    min-height: 0;
+    height: var(--long-mon-contained-height, 100%);
+  }
+}
+.long-mon-race__background {
+  object-fit: fill;
+  object-position: center;
+}
+.long-mon-race__gate { display: none; }
+.long-mon-race__search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--lp-line);
+  border-radius: 999px;
+  background: var(--lp-raised);
+  color: var(--lp-text-secondary);
+}
+.long-mon-race__search input {
+  width: 154px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--lp-ink);
+  font: inherit;
+  font-size: 12px;
+}
+.long-mon-race__search:focus-within { outline: 3px solid var(--lp-focus); outline-offset: 2px; }
+.long-mon-race__search-results {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% - 5px);
+  right: 12px;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  padding: 5px;
+  border: 1px solid var(--lp-line-strong);
+  border-radius: 12px;
+  background: var(--lp-surface);
+  box-shadow: 0 15px 34px rgb(18 49 43 / .24);
+}
+.long-mon-race__search-results button {
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lp-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.long-mon-race__search-results button:hover,
+.long-mon-race__search-results button:focus-visible { background: var(--lp-success-soft); outline: 0; }
+.long-mon-race__search-results span { overflow: hidden; color: var(--lp-text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.long-mon-race__search-results mark { padding: 0; background: #ead18a; color: inherit; }
+.long-mon-race__search-empty {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% - 5px);
+  right: 12px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--lp-line-strong);
+  border-radius: 10px;
+  background: var(--lp-surface);
+  box-shadow: 0 12px 28px rgb(18 49 43 / .18);
+  color: var(--lp-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+.long-mon-race__fish[data-long-mon-highlighted="true"] {
+  z-index: 18;
+  outline: 3px solid #f3d47a;
+  outline-offset: 4px;
+  border-radius: 18px;
+  filter: drop-shadow(0 0 10px rgb(245 211 122 / .9));
+}
+/* Dense date mode preserves the model's x coordinate and deliberately lets
+   the visual mark shrink before the fully accessible search is needed. */
+[data-long-mon-density="dense"] .long-mon-race__fish-body { scale: .64; }
+[data-long-mon-density="dense"] .long-mon-race__wake { opacity: .18; }
+.long-mon-race[data-view="organic"] [data-long-mon-density="dense"] .long-mon-race__fish-body { scale: calc(.58 * var(--organic-facing)) .58; }
 @media (max-width: 719px) {
-  .long-mon-race { height: auto; min-height: 0; }
-  .long-mon-race__viewport { flex: none; height: max(380px, 52dvh); }
+  .long-mon-race { height: var(--long-mon-available-height, 640px); min-height: 280px; }
+  .long-mon-race__head { padding: 9px 12px; gap: 7px; }
+  .long-mon-race__eyebrow { margin-bottom: 2px; font-size: 12px; }
+  .long-mon-race h2 { font-size: 26px; }
+  .long-mon-race__title-block p { display: none; }
+  .long-mon-race__scope-status { min-height: 24px; font-size: 12px; }
+  .long-mon-race__viewport { display: grid; place-items: center; flex: 1; height: auto; overflow: hidden; }
+  .long-mon-race__canvas,
+  .long-mon-race__canvas--adaptive-scene {
+    width: var(--long-mon-contained-width, 100%);
+    min-width: min(100%, var(--long-mon-contained-width, 100%));
+    min-height: 0;
+    height: var(--long-mon-contained-height, 100%);
+  }
+  .long-mon-race__footer { padding: 4px 7px; }
+  .long-mon-race__legend { gap: 3px; }
+  .long-mon-race__legend li { min-height: 28px; padding: 2px 4px; }
+  .long-mon-race__legend-sprite { width: 22px; height: 22px; }
+  .long-mon-race__legend strong { font-size: 12px; }
+  .long-mon-race__legend small { display: none; }
+  .long-mon-race__notes { display: none; }
+  .long-mon-race__search { order: 4; width: 100%; }
+  .long-mon-race__search input { flex: 1; width: auto; }
+}
+
+/* On a desktop the route and its filter share one quiet row, leaving the
+   height to the painting. Filter chips still occupy normal document flow. */
+@media (min-width: 1100px) {
+  #vmp-main-content[data-vmp-view="timeline"] .vmp-global-filter {
+    margin-top: -46px;
+    margin-left: 360px;
+    min-height: 44px;
+    margin-bottom: 8px;
+  }
+  #vmp-main-content[data-vmp-view="timeline"] .timeline-page-shell { gap: 6px; }
+  #vmp-main-content[data-vmp-view="timeline"] .long-mon-view-switch { justify-self: start; }
+  .long-mon-race__head { padding-block: 8px; }
+  .long-mon-race__title-block { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: baseline; }
+  .long-mon-race__title-block h2 { grid-column: 1; grid-row: 1; font-size: 30px; }
+  .long-mon-race__eyebrow { grid-column: 2; grid-row: 1; margin: 0; letter-spacing: .09em; }
+  .long-mon-race__title-block p { grid-column: 1 / -1; margin: 0; }
+}
+
+/* Keep the three monitoring destinations and their live counts available as
+   compact tabs alongside the painting/table switch. */
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey {
+  padding: 0;
+  margin: 0 0 6px;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey::before { content: none; }
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__scope,
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__copy > span,
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__metric > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__rail { gap: 5px; padding: 2px; }
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__item {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding: 5px 8px;
+  gap: 7px;
+}
+#vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__metric > strong { font-size: 16px; }
+@media (min-width: 1100px) {
+  #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey { margin-left: 190px; margin-bottom: -44px; }
+}
+@media (max-width: 719px) {
+  #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact { flex-wrap: nowrap !important; padding: 8px 16px !important; gap: 8px !important; }
+  #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact > div:first-child { flex: 1 1 0 !important; }
+  #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact .vmp-title { font-size: 20px !important; }
+  #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__item { grid-template-columns: 1fr auto; padding: 4px; gap: 3px; }
+  #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__item > svg { display: none; }
+  #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__copy > strong { font-size: 12px; line-height: 15px; }
+  #vmp-main-content[data-vmp-view="timeline"] .timeline-page-shell { gap: 6px; }
+  .long-mon-race__fish-body { scale: .55; }
+  .long-mon-race[data-view="organic"] .long-mon-race__fish-body { scale: calc(.55 * var(--organic-facing)) .55; }
 }

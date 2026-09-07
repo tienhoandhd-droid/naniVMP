@@ -437,11 +437,13 @@ function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
 /* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
 export function Topbar({ title, user, sub, dataUpdatedAt,
-  view, setView, access, onLogout, onChangePw, showMasthead = false }: {
+  view, setView, access, onLogout, onChangePw, showMasthead = false, compact = false }: {
   title?: ReactNode;
   /** #2 (01/09): wordmark chỉ hiện ở trang nhất (Tổng quan) — lặp trên cả
    *  14 màn là hai tầng thương hiệu đè nhau, tốn ~60px trước dữ liệu. */
   showMasthead?: boolean;
+  /** Timeline reserves the first viewport for the live painting. */
+  compact?: boolean;
   user?: AppUser | null;
   sub?: ReactNode;
   /** max(updated_at) trong DB — TUỔI DỮ LIỆU, không phải giờ trình duyệt tải. */
@@ -467,7 +469,7 @@ export function Topbar({ title, user, sub, dataUpdatedAt,
   }, []);
 
   return (
-    <div className="vmp-topbar" style={{
+    <div className={`vmp-topbar${compact ? " vmp-topbar--compact" : ""}`} style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "22px 34px", gap: 20, flexWrap: "wrap",
     }}>
@@ -510,8 +512,8 @@ export function Topbar({ title, user, sub, dataUpdatedAt,
           letterSpacing: "var(--lp-tracking-display)",
           color: C.plum,
         }}>{title}</h1>
-        <div style={{ fontSize: 14, color: C.plum, marginTop: 5, fontWeight: 700 }}>
-          {sub || "CPC1 HN"}
+        <div className="vmp-topbar__sub" style={{ fontSize: 14, color: C.plum, marginTop: 5, fontWeight: 700 }}>
+          {!compact && (sub || "CPC1 HN")}
           {/* Giờ đồng bộ đã rời khỏi phụ đề (anh Hoàn chốt 30/08): nó đổi từng
               phút làm dòng này nhấp nháy và gãy dòng. Nay chỉ nằm ở chân
               trang (App.tsx). */}
@@ -527,7 +529,7 @@ export function Topbar({ title, user, sub, dataUpdatedAt,
               <span
                 title={`Hạng mục được sửa gần nhất lúc ${formatBangkokDateTime(dataUpdatedAt)}`}
                 style={{
-                  marginLeft: 10, fontSize: 12, fontWeight: 800,
+                  marginLeft: compact ? 0 : 10, fontSize: 12, fontWeight: 800,
                   color: C.plumSoft,
                 }}>
                 · Sửa lần cuối: {formatBangkokShortDateTime(dataUpdatedAt)}

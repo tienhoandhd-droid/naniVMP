@@ -1,0 +1,25 @@
+name: Service health
+
+on:
+  schedule:
+    # GitHub Actions scheduling is best-effort; use odd minutes to avoid the hourly peak.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+      - name: Check public site and Supabase Auth availability
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON: ${{ secrets.VITE_SUPABASE_ANON || vars.VITE_SUPABASE_ANON }}
+        run: node scripts/check-service-health.mjs

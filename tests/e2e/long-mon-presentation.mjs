@@ -23,7 +23,6 @@ try {
   await page.waitForSelector('[data-long-mon-view="date"][aria-pressed="true"]', {timeout: 5000});
   const snapshot = () => page.$$eval('[data-long-mon-fish]', nodes => nodes.map(n => [n.dataset.longMonFish, n.dataset.deadline]).sort());
   const initial = await snapshot();
-  await page.$eval(".long-mon-race", el => el.scrollIntoView({block: "start"}));
   assert.ok(initial.length > 0, 'fixture has fish');
   await page.screenshot({path: `${shotDir}/date-1440.png`, fullPage: true});
   await page.focus('[data-long-mon-view="organic"]');
@@ -45,7 +44,6 @@ try {
   await page.reload({waitUntil:'networkidle0'});
   await page.waitForSelector('.long-mon-race[data-view="organic"]');
   assert.deepEqual(await snapshot(), initial, 'view remembered without altering data');
-  await page.$eval('.long-mon-race', el => el.scrollIntoView({block:'start'}));
   await page.emulateMediaFeatures([{name:'prefers-reduced-motion', value:'reduce'}]);
   assert.equal(await page.$eval('.long-mon-race__fish-position', el => getComputedStyle(el).animationName), 'none');
   for (const theme of ['light', 'dark']) {
@@ -66,7 +64,16 @@ try {
     assert.deepEqual(violations.filter(v => ['critical','serious'].includes(v.impact)).map(v => ({id:v.id, nodes:v.nodes.map(n => n.target)})), [], `organic ${theme} accessibility`);
   }
   await page.setViewport({width:390, height:844});
-  assert.ok(await page.$eval('.long-mon-race__viewport', el => el.getBoundingClientRect().height >= 380), 'mobile pond keeps usable height');
+  await page.waitForFunction(() => {
+    const rect = document.querySelector('.long-mon-race__canvas')?.getBoundingClientRect();
+    return Boolean(rect && rect.height > 0 && rect.width > 0);
+  }, { timeout: 5_000 });
+  const mobilePond = await page.$eval('.long-mon-race__canvas', el => {
+    const rect = el.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  });
+  assert.ok(mobilePond.height >= 100 && Math.abs(mobilePond.width / mobilePond.height - 2) < .03,
+    `mobile pond keeps the complete, usable 2:1 silk painting ${JSON.stringify(mobilePond)}`);
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no page overflow on mobile');
   await page.screenshot({path:`${shotDir}/organic-390.png`,fullPage:true});
   // A blocked preference store must never prevent switching modes.
@@ -108,22 +115,71 @@ try {
         },
       });
       await nhetPhien(densePage,{supabaseUrl});
-      await densePage.setViewport({width:1440,height:1000});
+      await densePage.setViewport({width:1366,height:768});
       await densePage.goto(`${APP_URL}#v=timeline`,{waitUntil:'networkidle0'});
+      const firstView = await densePage.evaluate(() => {
+        const race = document.querySelector('.long-mon-race')?.getBoundingClientRect();
+        const canvas = document.querySelector('.long-mon-race__canvas')?.getBoundingClientRect();
+        const fish = [...document.querySelectorAll('[data-long-mon-fish]')].map(node => node.getBoundingClientRect());
+        return {
+          scrollY,
+          mainScrollTop: document.querySelector('#vmp-main-content')?.scrollTop ?? Infinity,
+          raceBottom: race?.bottom ?? Infinity,
+          canvasBottom: canvas?.bottom ?? Infinity,
+          fishOutsideViewport: fish.filter(rect => rect.top < 0 || rect.bottom > innerHeight || rect.left < 0 || rect.right > innerWidth).length,
+        };
+      });
+      assert.equal(firstView.scrollY, 0, `${count} fish paint loads without page scroll`);
+      assert.equal(firstView.mainScrollTop, 0, `${count} fish paint loads without main-panel scroll`);
+      assert.ok(firstView.raceBottom <= 768, `${count} fish painting is fully in the 1366×768 first view`);
+      assert.ok(firstView.canvasBottom <= 768, `${count} silk painting is fully in the 1366×768 first view`);
+      assert.equal(firstView.fishOutsideViewport, 0, `${count} date fish all visible in the first view`);
+      await densePage.mouse.move(10, 10);
+      await densePage.screenshot({path:`${shotDir}/date-${count}-fish-1366.png`});
       await densePage.click('[data-long-mon-view="organic"]');
       await densePage.emulateMediaFeatures([{name:'prefers-reduced-motion',value:'reduce'}]);
       const metrics = await densePage.evaluate(() => {
         const canvas = document.querySelector('.long-mon-race__canvas').getBoundingClientRect();
+        const race = document.querySelector('.long-mon-race').getBoundingClientRect();
+        const viewport = document.querySelector('.long-mon-race__viewport');
         const fish = [...document.querySelectorAll('[data-long-mon-fish]')].map(n => ({id:n.dataset.longMonFish, r:n.getBoundingClientRect()}));
-        return {count:fish.length, clipped:fish.filter(({r}) => r.left < canvas.left || r.right > canvas.right || r.top < canvas.top || r.bottom > canvas.bottom).map(n=>n.id)};
+        return {
+          count:fish.length,
+          clipped:fish.filter(({r}) => r.left < canvas.left || r.right > canvas.right || r.top < canvas.top || r.bottom > canvas.bottom).map(n=>n.id),
+          raceHeight: race.height,
+          viewportOverflow: viewport ? viewport.scrollHeight - viewport.clientHeight : Infinity,
+          canvasHeight: canvas.height,
+        };
       });
       assert.equal(metrics.count,count);
       assert.deepEqual(metrics.clipped,[], `${count} fish within scrollable pond`);
-      await densePage.$eval('.long-mon-race', el => el.scrollIntoView({block:'start'}));
+      assert.ok(metrics.raceHeight <= 1002, `${count} fish fit in the desktop viewport`);
+      assert.ok(metrics.viewportOverflow <= 1, `${count} fish do not need vertical pond scrolling`);
+      assert.ok(metrics.canvasHeight <= 680, `${count} fish stay in the contained painting frame`);
+      assert.ok(await densePage.evaluate(() => {
+        const race = document.querySelector('.long-mon-race')?.getBoundingClientRect();
+        const fish = [...document.querySelectorAll('[data-long-mon-fish]')].map(node => node.getBoundingClientRect());
+        return Boolean(race && race.bottom <= innerHeight && fish.every(rect => rect.top >= 0 && rect.bottom <= innerHeight));
+      }), `${count} organic fish remain visible without scrolling`);
+      await densePage.mouse.move(10, 10);
       await densePage.screenshot({path:`${shotDir}/organic-${count}-fish.png`,fullPage:true});
+      await densePage.type('[data-long-mon-search]', 'POND-0');
+      await densePage.waitForSelector('[data-long-mon-search-result]');
+      await densePage.click('[data-long-mon-search-result]');
+      await densePage.waitForSelector('[role="dialog"]');
+      await densePage.keyboard.press('Escape');
+      await densePage.waitForSelector('[role="dialog"]', {hidden:true});
+      const lastCode = await densePage.$eval('.long-mon-race__fish-position:last-child [data-long-mon-fish]', el => el.getAttribute('aria-label').split(' · ')[0]);
       await densePage.focus('.long-mon-race__fish-position:last-child [data-long-mon-fish]');
       await densePage.keyboard.press('Enter');
       await densePage.waitForSelector('[role="dialog"]');
+      assert.ok(await densePage.$eval('[role="dialog"]', (el, code) => el.textContent.includes(code), lastCode), 'last fish opens its own record after search dialog closes');
+      await densePage.keyboard.press('Escape');
+      for (const [width, height] of [[1440,900], [1920,1080]]) {
+        await densePage.setViewport({width,height});
+        await new Promise(resolve => setTimeout(resolve, 150));
+        assert.ok(await densePage.evaluate(() => document.querySelector('.long-mon-race').getBoundingClientRect().bottom <= innerHeight + 1), `whole painting fits ${width}x${height}`);
+      }
       assert.deepEqual(denseErrors,[]);
     } finally { await context.close(); }
   }
