@@ -75,6 +75,7 @@ export interface AccountRoleEditorProps {
   mutateRole: typeof setBusinessRole;
   reloadByUserId: (userId: string) => Promise<AccountAdministrationRow | null>;
   onVerified: (row: AccountAdministrationRow) => void;
+  onCancel: () => void;
 }
 
 export function validateRoleEditorDraft({
@@ -134,6 +135,7 @@ export default function AccountRoleEditor({
   mutateRole,
   reloadByUserId,
   onVerified,
+  onCancel,
 }: AccountRoleEditorProps) {
   const initialRole = row.businessRole ?? "";
   const [nextRole, setNextRole] = useState<BusinessRole | "">(initialRole);
@@ -168,9 +170,11 @@ export default function AccountRoleEditor({
   const saveDisabled = !canEdit || saving || actionBlock?.code === "plan" || actionBlock?.code === "change";
 
   const cancel = () => {
+    if (saving) return;
     setNextRole(row.businessRole ?? "");
     setReason("");
     setMessage("");
+    onCancel();
   };
 
   const save = async () => {

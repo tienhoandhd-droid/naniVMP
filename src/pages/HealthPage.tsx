@@ -9,6 +9,7 @@ import { LOAI_LOI, sevOf } from "../constants/vmp.ts";
 import { runDataQualityChecks } from "../utils/helpers.ts";
 import { useDebounce } from "../hooks/index.ts";
 import { Card, CardTitle, Tag, KpiCard, CauKetLuan } from "../components/ui/Primitives.tsx";
+import { CopyCodesButton } from "../components/ui/CopyCodesButton.tsx";
 import NhomTab, { NhomTabPanel, useNhomTab } from "../components/ui/NhomTab.tsx";
 import { soSanhDoiChieu, ketLuanDoiChieu } from "../features/health/doiChieuModel.ts";
 import { fetchDashboardKpi, checkDataQuality } from "../lib/supabaseData.ts";
@@ -288,10 +289,9 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                     return (
                       <div style={{ padding: "8px 15px 14px" }}>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
-                          <button style={{ ...nutNho, fontSize: 12 }}
-                            onClick={() => navigator.clipboard?.writeText(g.ds.map((x) => x.id).join("\n"))}>
-                            Sao chép {g.ds.length} mã
-                          </button>
+                          <CopyCodesButton text={g.ds.map((x) => x.id).join("\n")}
+                            label={`Sao chép ${g.ds.length} mã`} successLabel="Đã chép ✓"
+                            style={{ ...nutNho, fontSize: 12 }} />
                           <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
                             dán vào ô tìm ở Cập nhật tiến độ để xử lý từng mã
                           </span>

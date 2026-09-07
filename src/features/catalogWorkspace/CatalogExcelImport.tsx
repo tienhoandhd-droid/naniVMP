@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Download, FileSpreadsheet, Upload } from "lucide-react";
 
 import StateBoundary from "../../components/ui/StateBoundary.tsx";
+import { CopyCodesButton } from "../../components/ui/CopyCodesButton.tsx";
 import { useRegisterDirtyState } from "../../components/ui/DirtyStateProvider.tsx";
 import { formatBangkokDateTime } from "../../lib/formatBangkok.ts";
 import {
@@ -332,9 +333,9 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
             <p className="cw-nhe">Batch {receipt.batchId.slice(0, 8)}… · {formatBangkokDateTime(receipt.committedAt)}</p>
           </div>
           <div className="cw-import-receipt__actions">
-            <button type="button" className="cw-nut cw-nut--phu" onClick={() => void navigator.clipboard.writeText(receipt.batchId).then(() => toast.thanhCong("Đã sao chép batch ID")).catch(() => toast.loi("Không sao chép được batch ID"))}>
+            <CopyCodesButton text={receipt.batchId} label="Sao chép ID" className="cw-nut cw-nut--phu">
               <Copy size={14} aria-hidden="true" /> Sao chép ID
-            </button>
+            </CopyCodesButton>
             {receipt.pendingChangeIds.length > 0 && <button type="button" className="cw-nut" onClick={onOpenPending}>Mở Chờ áp dụng ({receipt.pendingChangeIds.length})</button>}
           </div>
         </section>

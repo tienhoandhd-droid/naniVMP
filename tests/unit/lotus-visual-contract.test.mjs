@@ -64,17 +64,17 @@ test("thang bo góc cũ được ánh xạ sang thang Lotus", () => {
 
 /* ---- Token màu ----------------------------------------------------- */
 
-test("token nền và chữ chế độ sáng đúng bảng ivory–rose v5", () => {
+test("token nền và chữ chế độ sáng đúng bảng ivory–sage dịu mắt", () => {
   /* v4 (nghiên cứu 7): tách PIGMENT khỏi VAI TRÒ. Nền có năm tầng
      canvas/sunken/surface/raised/overlay; chữ có ba bậc; token cũ trỏ
      var() về lớp v4 để ~990 style nội tuyến đổi theo mà không sửa dòng
-     nào. Bản v5 làm nền sứ ấm hơn (#F8F1EA), giữ lớp chìm rose nhẹ và
+     nào. Bản v5 làm nền sứ ấm hơn (#F3F2EB), giữ lớp chìm xanh xám nhẹ và
      mọi cặp chữ/nền vẫn ≥ 4.5:1. */
-  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F8F1EA");
-  assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#F1E5E1");
-  assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FFFDF9");
-  assert.equal(bien(KHOI_SANG, "lp-bg-raised"), "#FFFFFF");
-  assert.equal(bien(KHOI_SANG, "lp-bg-overlay"), "#FFFFFF");
+  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F3F2EB");
+  assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#EAEDE6");
+  assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FAFAF5");
+  assert.equal(bien(KHOI_SANG, "lp-bg-raised"), "#FDFDF8");
+  assert.equal(bien(KHOI_SANG, "lp-bg-overlay"), "#FCFCF8");
   assert.equal(bien(KHOI_SANG, "lp-text-primary"), "#34272B");
   assert.equal(bien(KHOI_SANG, "lp-text-secondary"), "#5F4D52");
   assert.equal(bien(KHOI_SANG, "lp-text-tertiary"), "#77666B");

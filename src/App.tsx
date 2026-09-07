@@ -63,7 +63,7 @@ import type { AccessContext, ScreenId } from "./lib/access.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
 import { docUrl, vietUrl, MAC_DINH } from "./lib/urlState.ts";
 import type { UrlState } from "./lib/urlState.ts";
-import { formatBangkokDateTime, formatBangkokTime } from "./lib/formatBangkok.ts";
+import { formatBangkokTime } from "./lib/formatBangkok.ts";
 
 // ===== UI Primitives =====
 import {
@@ -1305,10 +1305,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   authorizationRevision={authorizationRevision}
                   focus={moDanhMuc}
                   onFocusConsumed={() => setMoDanhMuc(null)}
-                  scopeLabel={nhanPhamVi}
-                  updatedLabel={dataUpdatedAt
-                    ? `Sửa lần cuối: ${formatBangkokDateTime(dataUpdatedAt)}`
-                    : undefined} />
+                  scopeLabel={nhanPhamVi} />
               )}
               {view === "health" && <HealthView acts={filteredActs} access={access} />}
               {view === "rules" && <ActiveRulesView access={access} />}

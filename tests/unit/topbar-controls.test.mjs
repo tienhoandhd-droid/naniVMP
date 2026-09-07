@@ -68,6 +68,8 @@ test("Today omits last-edited timestamp while keeping its subtitle", () => {
   assert.doesNotMatch(html, /Sửa lần cuối/);
   assert.match(html, /Việc của tôi hôm nay/);
 });
-test("Other screens retain the data timestamp", () => {
-  assert.match(renderTopbar({dataUpdatedAt:"2026-09-01T00:05:00Z"}), /Sửa lần cuối/);
+test("All tabs omit the decorative last-edited timestamp", () => {
+  for (const view of ["overview", "source", "timeline", "progress", "rules", "health"]) {
+    assert.doesNotMatch(renderTopbar({view, dataUpdatedAt:"2026-09-01T00:05:00Z"}), /Sửa lần cuối/);
+  }
 });

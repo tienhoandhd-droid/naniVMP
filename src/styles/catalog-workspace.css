@@ -1141,3 +1141,5 @@
   .pq-control__filters { width: 100%; }
   .pq-control__filters button { flex: 1; min-height: 44px; }
 }
+
+.cw-context-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: var(--lp-ink-muted); font-weight: 700; }

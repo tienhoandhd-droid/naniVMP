@@ -482,6 +482,12 @@ for (const [ten, suaKho] of [
       .find((button) => button.textContent.trim() === "Sửa vai")?.click();
   });
   await trang.waitForSelector('select[aria-label="Vai nghiệp vụ mới"]');
+  // Cancel an untouched draft must close the editor, not silently reset it.
+  await trang.click('section[aria-labelledby="account-role-editor-title"] button.pq-nut:not(.la-chinh)');
+  await trang.waitForSelector('section[aria-labelledby="account-role-editor-title"]', { hidden: true, timeout: 3000 });
+  kiem((goiRpc.rpc_set_business_role || []).length === 0, "Hủy khi chưa đổi vai đóng trình sửa và không ghi");
+  await trang.evaluate(() => [...document.querySelectorAll('[data-account-control-table="true"] tbody tr')].find(r => r.textContent.includes("Người B")).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === "Sửa vai") b.click(); }));
+  await trang.waitForSelector('select[aria-label="Vai nghiệp vụ mới"]');
   await trang.select('select[aria-label="Vai nghiệp vụ mới"]', "qa_manager");
   await cho(150);
   kiem((goiRpc.rpc_set_business_role || []).length === 0,
@@ -494,6 +500,10 @@ for (const [ten, suaKho] of [
   await cho(150);
   kiem((goiRpc.rpc_set_business_role || []).length === 0,
     "Hủy bản nháp không gọi rpc_set_business_role");
+  await trang.waitForSelector('section[aria-labelledby="account-role-editor-title"]', { hidden: true, timeout: 3000 });
+  await trang.evaluate(() => [...document.querySelectorAll('[data-account-control-table="true"] tbody tr')].find(r => r.textContent.includes("Người B")).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === "Sửa vai") b.click(); }));
+  await trang.waitForSelector('select[aria-label="Vai nghiệp vụ mới"]');
+  kiem(await trang.$eval('textarea[aria-label="Lý do đổi vai"]', el => el.value) === "", "Mở lại sau Hủy không giữ bản nháp cũ");
 
   await trang.select('select[aria-label="Vai nghiệp vụ mới"]', "qa_manager");
   await trang.type('textarea[aria-label="Lý do đổi vai"]', "Điều chuyển E2E theo UUID");

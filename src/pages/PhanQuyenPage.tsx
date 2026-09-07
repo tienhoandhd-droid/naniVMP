@@ -507,6 +507,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
             mutateRole={setBusinessRole}
             reloadByUserId={roleEditor.reload}
             onVerified={() => setRoleEditor(null)}
+            onCancel={() => setRoleEditor(null)}
           />
         )}
       </Card>

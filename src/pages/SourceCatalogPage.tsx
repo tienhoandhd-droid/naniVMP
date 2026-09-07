@@ -19,11 +19,10 @@ import CatalogWorkspaceShell from "../features/catalogWorkspace/CatalogWorkspace
 import type { AccessContext } from "../lib/access.ts";
 
 export default function SourceCatalogView({
-  access, scopeLabel, updatedLabel, authorizationRevision, focus, onFocusConsumed, onReload,
+  access, scopeLabel, authorizationRevision, focus, onFocusConsumed, onReload,
 }: {
   access: AccessContext;
   scopeLabel?: string;
-  updatedLabel?: string;
   authorizationRevision: number | null;
   /** Deep-link từ màn Tiến độ: mở đúng đối tượng rồi tự xoá một lần. */
   focus?: { code: string; nhom?: string } | null;
@@ -34,7 +33,6 @@ export default function SourceCatalogView({
     <CatalogWorkspaceShell
       access={access}
       scopeLabel={scopeLabel}
-      updatedLabel={updatedLabel}
       authorizationRevision={authorizationRevision}
       focus={focus}
       onFocusConsumed={onFocusConsumed}

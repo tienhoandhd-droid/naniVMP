@@ -16,7 +16,7 @@
  *  — không có chỗ nào tự bịa số. Biểu đồ dùng lib/reportCharts.ts (SVG tay,
  *  không thư viện ngoài — recharts đã bị gỡ khỏi app).
  * ===================================================================== */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   FileBarChart, Printer, Download, RefreshCw, AlertCircle, Sparkles as SparkIcon,
   Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2, Mail, Layers,
@@ -25,6 +25,8 @@ import {
 import { C, TEXT, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
 import { DEPTS, CRIT } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
+import { CopyCodesButton } from "../ui/CopyCodesButton.tsx";
+import { useToast } from "../ui/ToastProvider.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
 import NhomTab, { NhomTabPanel, DongSo, useNhomTab } from "../ui/NhomTab.tsx";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
@@ -82,6 +84,10 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   // thường (hoặc ngược lại).
   const [loaiAi, setLoaiAi] = useState<AiKind>("bao_cao");
   const [loadingAi, setLoadingAi] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const exportInFlight = useRef(false);
+  const printInFlight = useRef(false);
   const [errAi, setErrAi] = useState("");
   const [moGuiMail, setMoGuiMail] = useState(false);
   // Bấm vào bất kỳ con số nào ở mục 1 là ra danh sách hạng mục đứng sau nó.
@@ -175,7 +181,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
      cáo (mạch 1→5 là sequence thật nên giữ nguyên đánh số), TRA dữ liệu
      thô, và LẤY nhận xét đem đi (email/biên bản). */
   const [tab, setTab] = useNhomTab("reports", "bao-cao", ["bao-cao", "du-lieu", "nhan-xet"]);
-  const [daChepNhanXet, setDaChepNhanXet] = useState(false);
+  const toast = useToast();
 
   const monthlyChartHtml = useMemo(
     () => svgMonthlyTargetChart(monthly.table, SCREEN_PALETTE, monthly.highlight),
@@ -290,23 +296,59 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   }, [ky, kyLabel]);
 
   const printPDF = () => {
-    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
-    const ifr = document.createElement("iframe");
-    ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
-    document.body.appendChild(ifr);
-    const win = ifr.contentWindow;
-    if (!win) return;
-    const dd = win.document;
-    dd.open(); dd.write(html); dd.close();
-    setTimeout(() => { try { win.focus(); win.print(); } catch { /* trình duyệt chặn in */ } setTimeout(() => document.body.removeChild(ifr), 1500); }, 400);
+    if (printInFlight.current) return;
+    printInFlight.current = true;
+    setPrinting(true);
+    const dang = toast.dangChay("Đang mở hộp in báo cáo…");
+    let ifr: HTMLIFrameElement | null = null;
+    let done = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      if (timer !== null) clearTimeout(timer);
+      if (ifr?.isConnected) ifr.remove();
+      printInFlight.current = false;
+      setPrinting(false);
+      if (ok) dang.xong("Đã mở hộp in báo cáo.");
+      else dang.hong("Không mở được hộp in báo cáo. Hãy thử lại hoặc tải HTML.");
+    };
+    try {
+      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
+      ifr = document.createElement("iframe");
+      ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+      document.body.appendChild(ifr);
+      const win = ifr.contentWindow;
+      if (!win) { finish(false); return; }
+      const dd = win.document;
+      dd.open(); dd.write(html); dd.close();
+      win.addEventListener("afterprint", () => finish(true), { once: true });
+      timer = setTimeout(() => finish(true), 2_000);
+      setTimeout(() => {
+        try { win.focus(); win.print(); }
+        catch { finish(false); }
+      }, 400);
+    } catch {
+      finish(false);
+    }
   };
 
   const downloadHtml = () => {
-    const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
-    download(`BaoCaoQuanLy_VMP_${tenTepKy()}.html`, html);
+    try {
+      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
+      download(`BaoCaoQuanLy_VMP_${tenTepKy()}.html`, html);
+      toast.thanhCong("Đã tải báo cáo HTML.");
+    } catch {
+      toast.loi("Không tải được báo cáo HTML. Hãy thử lại.");
+    }
   };
 
   const exportExcel = async () => {
+    if (exportInFlight.current) return;
+    exportInFlight.current = true;
+    setExporting(true);
+    const dang = toast.dangChay("Đang tạo tệp Excel…");
+    try {
     const tongQuan = [
       ["Chỉ số", "Giá trị"],
       ["Phạm vi", scopeLabel],
@@ -367,6 +409,13 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       { ten: `Ky sau ${nextMonth.monthLabel}`, dong: thangToi },
       { ten: "Dữ liệu thô", dong: duLieuTho },
     ], `BaoCaoQuanLy_VMP_${tenTepKy()}_CPC1HN.xlsx`);
+      dang.xong("Đã tải báo cáo Excel.");
+    } catch {
+      dang.hong("Không tải được báo cáo Excel. Hãy thử lại.");
+    } finally {
+      exportInFlight.current = false;
+      setExporting(false);
+    }
   };
 
   const moChiTiet = (title: string, rows: Activity[], giaiDoan?: GiaiDoan) =>
@@ -418,9 +467,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             {/* #6 (01/09): MỘT primary — Excel là bản mọi người thật sự nộp
                 (đủ 5 sheet); PDF/HTML là phụ, cùng một kiểu ghost để không
                 tranh nhau bằng ba màu ba kiểu như trước. */}
-            <button data-desktop-primary-actionable onClick={exportExcel} style={toolBtn(GRAD, "#fff")}><Download size={16} /> Xuất Excel (đủ 5 sheet)</button>
-            <button onClick={printPDF} style={ghostBtn}><Printer size={16} /> PDF</button>
-            <button onClick={downloadHtml} style={ghostBtn}><Download size={16} /> HTML</button>
+            <button type="button" data-desktop-primary-actionable onClick={() => void exportExcel()} disabled={exporting} style={toolBtn(GRAD, "#fff")}><Download size={16} /> {exporting ? "Đang xuất Excel…" : "Xuất Excel (đủ 5 sheet)"}</button>
+            <button type="button" onClick={printPDF} disabled={printing} style={ghostBtn}><Printer size={16} /> {printing ? "Đang mở hộp in…" : "PDF"}</button>
+            <button type="button" onClick={downloadHtml} style={ghostBtn}><Download size={16} /> HTML</button>
           </div>
         </div>
         <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
@@ -803,17 +852,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <Tag color={C.mintText} bg={C.mintSoft}>Suy từ số liệu thật</Tag>
           {/* Vận hành (spec 01/09): nhận xét sinh ra để ĐEM ĐI — vào email
               giao ban, biên bản họp. Một nút chép cả cụm, hết gõ lại. */}
-          <button type="button" onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(autoComments.map((c) => `- ${c}`).join("\n"));
-              setDaChepNhanXet(true); window.setTimeout(() => setDaChepNhanXet(false), 2000);
-            } catch { /* clipboard bị chặn thì thôi, chữ vẫn bôi-chép được */ }
-          }}
+          <CopyCodesButton text={autoComments.map((c) => `- ${c}`).join("\n")}
+            label="Sao chép nhận xét" successLabel="Đã chép ✓"
             style={{ padding: "6px 12px", borderRadius: 10, cursor: "pointer",
                      border: `1px solid ${C.pinkSoft}`, background: C.surface, color: C.plum,
-                     fontFamily: TEXT, fontSize: 12, fontWeight: 700 }}>
-            {daChepNhanXet ? "Đã chép ✓" : "Sao chép nhận xét"}
-          </button>
+                     fontFamily: TEXT, fontSize: 12, fontWeight: 700 }} />
           <span style={{ fontSize: 12, color: C.plumSoft, fontFamily: TEXT, fontWeight: 600 }}>
             luật cố định, không có AI — cùng con số với các bảng trên
           </span>

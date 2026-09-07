@@ -23,7 +23,7 @@ test("commit is actionable, focuses the batch reason and preserves recovery stat
 
 test("successful commit keeps a traceable receipt with copy and pending action", () => {
   assert.match(source, /data-cw-import-receipt/);
-  assert.match(source, /navigator\.clipboard\.writeText/);
+  assert.match(source, /<CopyCodesButton text=\{receipt\.batchId\} label="Sao chép ID"/);
   assert.match(source, /formatBangkokDateTime/);
   assert.match(source, /onOpenPending/);
 });

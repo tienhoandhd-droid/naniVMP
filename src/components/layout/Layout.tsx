@@ -13,11 +13,10 @@ import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
 import { prefetchDesktopRoute } from "../../lib/routePrefetch.ts";
 import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
-import { CrownLogo, tuoiDuLieu } from "../ui/Primitives.tsx";
+import { CrownLogo } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
 import type { ScreenId } from "../../lib/access.ts";
-import { formatBangkokDateTime, formatBangkokShortDateTime } from "../../lib/formatBangkok.ts";
 /* Nhãn năm vai nghiệp vụ hiệu lực — dùng lại đúng bảng nhãn của màn Phân quyền
    (nguồn duy nhất) thay vì `PERM_LABEL`/`BUSINESS_ROLE_LABELS` cũ, để
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
@@ -436,7 +435,7 @@ function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
 
 /* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
-export function Topbar({ title, user, sub, dataUpdatedAt,
+export function Topbar({ title, user, sub,
   view, setView, access, onLogout, onChangePw, showMasthead = false, compact = false }: {
   title?: ReactNode;
   /** #2 (01/09): wordmark chỉ hiện ở trang nhất (Tổng quan) — lặp trên cả
@@ -511,25 +510,7 @@ export function Topbar({ title, user, sub, dataUpdatedAt,
           {/* Giờ đồng bộ đã rời khỏi phụ đề (anh Hoàn chốt 30/08): nó đổi từng
               phút làm dòng này nhấp nháy và gãy dòng. Nay chỉ nằm ở chân
               trang (App.tsx). */}
-          {/* Mốc dữ liệu luôn hiện, không đợi tới lúc quá ngưỡng mới báo: sự cố
-              21 ngày lần trước không ai phát hiện chính vì màn hình im lặng khi
-              mọi thứ "trông vẫn bình thường".
-              Nhưng chỉ hiện, KHÔNG tô màu báo động: Supabase là dữ liệu gốc nên
-              "lâu không đổi" chỉ nghĩa là chưa ai nhập liệu. */}
-          {view !== "today" && dataUpdatedAt && (() => {
-            const t = tuoiDuLieu(dataUpdatedAt);
-            if (!t) return null;
-            return (
-              <span
-                title={`Hạng mục được sửa gần nhất lúc ${formatBangkokDateTime(dataUpdatedAt)}`}
-                style={{
-                  marginLeft: compact ? 0 : 10, fontSize: 12, fontWeight: 800,
-                  color: C.plumSoft,
-                }}>
-                · Sửa lần cuối: {formatBangkokShortDateTime(dataUpdatedAt)}
-              </span>
-            );
-          })()}
+
         </div>
       </div>
 

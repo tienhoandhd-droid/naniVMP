@@ -48,6 +48,8 @@ import { formatBangkokDateTime } from "../../lib/formatBangkok.ts";
 import CatalogSmartTable from "./CatalogSmartTable.tsx";
 import CatalogRecordDialog from "./CatalogRecordDialog.tsx";
 import CatalogExcelImport from "./CatalogExcelImport.tsx";
+import CatalogContextHelp from "./CatalogContextHelp.tsx";
+import { canChangeCatalogHelpRegion } from "./catalogHelpContent.ts";
 import {
   exportAllSourceObjects, listDataset, listHistory, listPendingChanges,
   listSourceObjectFacets, listSourceObjectPage,
@@ -89,7 +91,6 @@ const CAC_VUNG: Array<{
 export interface CatalogWorkspaceShellProps {
   access: AccessContext;
   scopeLabel?: string;
-  updatedLabel?: string;
   /** Quyền Source đổi thì Task 7 tăng revision này để mọi page/warning cũ
    * bị loại trước khi có thể tiếp tục hiển thị. */
   authorizationRevision: number | null;
@@ -103,7 +104,7 @@ export interface CatalogWorkspaceShellProps {
 type TrangThaiTai = "loading" | "error" | "ready";
 
 export default function CatalogWorkspaceShell({
-  access, scopeLabel, updatedLabel, authorizationRevision, focus, onFocusConsumed, onReload,
+  access, scopeLabel, authorizationRevision, focus, onFocusConsumed, onReload,
 }: CatalogWorkspaceShellProps) {
   const canEdit = access.can("source", "edit_catalog");
   const canSinhTimeline = access.can("source", "generate_timeline");
@@ -591,7 +592,6 @@ export default function CatalogWorkspaceShell({
       <p className="cw-mota">
         <span>Sổ dữ liệu nguồn — tìm và kiểm tra đối tượng theo phạm vi được cấp.</span>
         {scopeLabel && <span className="cw-mota__phamvi">Phạm vi: {scopeLabel}</span>}
-        {updatedLabel && <span className="cw-mota__moc">{updatedLabel}</span>}
       </p>
 
       <aside className={`cw-source-guide${sourceControls.canChange ? " is-manager" : ""}`}
@@ -622,6 +622,10 @@ export default function CatalogWorkspaceShell({
         </nav>
 
         <div className="cw-noi-dung">
+          <div className="cw-context-heading">
+            <span>{CAC_VUNG.find((item) => item.id === vung)?.nhan}</span>
+            <CatalogContextHelp key={`${vung}:${sourceAccessKey}`} region={vung} canChange={canChangeCatalogHelpRegion(vung, { manager: canManageSourceDatasets, canEdit, canManageWorkshopScope, canGenerateTimeline: canSinhTimeline })} />
+          </div>
           {catalogSuggestions.error && canManageSourceDatasets && (
             <p role="alert" className="cw-loi">
               {catalogSuggestions.error}{" "}
@@ -862,6 +866,11 @@ export default function CatalogWorkspaceShell({
           {/* ----- Chờ áp dụng ----- */}
           {vung === "pending" && (
             <>
+              <aside className="cw-source-guide" aria-label="Cách áp dụng thay đổi">
+                <b>Dữ liệu nguồn đã lưu; lịch chưa được áp dụng từ thay đổi này.</b>
+                <p>Mở “Xem ảnh hưởng &amp; áp dụng”, kiểm tra các hạng mục tạo mới, đổi deadline, dừng hoặc giữ nguyên. Điền lý do rồi chọn “Áp vào timeline” để xác nhận. “Để sau” giữ thay đổi trong hàng đợi.</p>
+                <p>Nếu không có mốc nào cần đổi, bản xem trước chỉ dùng để kiểm tra. Hạng mục đã có tiến độ được bảo vệ; cập nhật riêng deadline cần chọn rõ từng hạng mục đủ điều kiện và xác nhận thêm. Ngày thực tế và trạng thái được giữ nguyên.</p>
+              </aside>
               {pen.state === "loading" && (
                 <StateBoundary state="loading" title="Đang tải hàng đợi thay đổi" skeletonRows={3} />
               )}

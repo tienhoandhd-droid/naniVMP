@@ -55,9 +55,13 @@ try {
       if (view === "health") {
         await page.click('#health-tab-server');
       }
-      await page.waitForSelector("main [role=\"alert\"]", { timeout: 15_000 });
-      const retry = await page.$eval("main [role=\"alert\"] button", (button) => button.textContent?.trim() ?? "");
-      assert.match(retry, /Thử lại/);
+      // Account roles are a partial-source error: verified accounts remain visible.
+      const errorRegion = view === "phanquyen" ? 'main [role="status"]' : 'main [role="alert"]';
+      if (view === "phanquyen") {
+        await page.waitForFunction(() => [...document.querySelectorAll('main [role="status"]')].some(el => el.textContent.includes("Nguồn roles chưa xác minh")));
+      } else await page.waitForSelector(errorRegion, { timeout: 15_000 });
+      const retry = await page.$eval(`${errorRegion} button`, (button) => button.textContent?.trim() ?? "");
+      assert.match(retry, /Thử lại|Tải lại/);
       if (view === "health") {
         const text = await page.$eval("main", (main) => main.textContent ?? "");
         assert.doesNotMatch(text, /Không có hạng mục nào đến hạn trong ngưỡng này/,

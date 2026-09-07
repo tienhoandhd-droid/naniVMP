@@ -12,7 +12,7 @@
 
 .vmp-main-nen {
   background:
-    radial-gradient(820px 620px at 88% -8%, var(--lp-rose-soft), transparent 62%),
+    radial-gradient(820px 620px at 88% -8%, var(--lp-nav-hover), transparent 62%),
     radial-gradient(620px 500px at -8% 108%, var(--lp-success-soft), transparent 60%),
     radial-gradient(720px 620px at 42% 108%, var(--lp-surface-2), transparent 58%),
     var(--lp-canvas);

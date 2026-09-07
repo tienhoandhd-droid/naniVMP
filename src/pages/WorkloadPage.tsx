@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import { Activity, AlertTriangle, CheckCircle2, Gauge, ShieldAlert, Users, UserX } from "lucide-react";
 import { C, TEXT, NUM, GRAD } from "../constants/theme.ts";
+import { CopyCodesButton } from "../components/ui/CopyCodesButton.tsx";
 import { WL_MONTHS, WL_QUARTERS, CAP_MONTH, CAP_HOSO_MONTH, vmpToday } from "../constants/vmp.ts";
 import { parseD, fmtVN, clamp, wlMonthOf, wlPending, congConLai, hoSoConLai } from "../utils/helpers.ts";
 // lucide-react cũng xuất icon tên Activity (dùng ở dưới) nên đặt tên khác cho kiểu.
@@ -47,7 +48,6 @@ export function WorkloadDetailModal({ detail, onClose, canTransfer = false, onTr
   const tasks = [...detail.tasks].sort(
     (a, b) => (parseD(a.target)?.getTime() ?? 0) - (parseD(b.target)?.getTime() ?? 0),
   );
-  const [daChep, setDaChep] = useState(false);
   const PhaseChip = ({ label, done, cong }: { label: string; done: boolean; cong?: number | null }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 800, padding: "3px 9px", borderRadius: 999, color: done ? C.mintText : C.marigoldText, background: done ? C.mintSoft : C.marigoldSoft }}>{done ? "✓" : "⏳"} {label}{!done && cong != null ? ` ${cong}nc` : ""}</span>;
   return (
     <ViewportDialog open onRequestClose={onClose} maxWidth={620} title={detail.title} icon={Activity}
@@ -61,17 +61,11 @@ export function WorkloadDetailModal({ detail, onClose, canTransfer = false, onTr
         <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{tasks.length} hạng mục · còn lại <b style={{ color: C.lavText }}>{sum(tasks.map(congConLai))} ngày công</b> · <b style={{ color: C.pinkText }}>{tasks.filter(hoSoConLai).length} hồ sơ</b></span>
         {/* Vận hành (spec 01/09): điều phối viên cần DANH SÁCH MÃ để dán vào
             email/biên bản họp — trước đây phải gõ tay lại từng mã. */}
-        <button type="button" onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(tasks.map((a) => String(a.code)).join(", "));
-            setDaChep(true); window.setTimeout(() => setDaChep(false), 2000);
-          } catch { /* clipboard bị chặn — nút không nổ, người dùng vẫn gõ tay được */ }
-        }}
+        <CopyCodesButton text={tasks.map((a) => String(a.code)).join(", ")}
+          label={`Chép ${tasks.length} mã`} successLabel="Đã chép ✓"
           style={{ marginLeft: "auto", padding: "7px 13px", borderRadius: 10, cursor: "pointer",
                    border: `1px solid ${C.pinkSoft}`, background: C.surface, color: C.plum,
-                   fontFamily: TEXT, fontSize: 12, fontWeight: 700 }}>
-          {daChep ? "Đã chép ✓" : `Chép ${tasks.length} mã`}
-        </button>
+                   fontFamily: TEXT, fontSize: 12, fontWeight: 700 }} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {tasks.map((a) => {

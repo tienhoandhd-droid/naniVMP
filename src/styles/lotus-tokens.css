@@ -29,11 +29,11 @@
    * < overlay (popover, modal). Light lấy chiều sâu bằng canvas đậm
    * hơn một bậc; dark lấy chiều sâu bằng elevation sáng dần về trước.
    * ================================================================== */
-  --lp-bg-canvas:  #F8F1EA;
-  --lp-bg-sunken:  #F1E5E1;
-  --lp-bg-surface: #FFFDF9;
-  --lp-bg-raised:  #FFFFFF;
-  --lp-bg-overlay: #FFFFFF;
+  --lp-bg-canvas:  #F3F2EB;
+  --lp-bg-sunken:  #EAEDE6;
+  --lp-bg-surface: #FAFAF5;
+  --lp-bg-raised:  #FDFDF8;
+  --lp-bg-overlay: #FCFCF8;
 
   --lp-text-primary:   #34272B;
   --lp-text-secondary: #5F4D52; /* ~7.2:1 trên surface */
@@ -50,7 +50,7 @@
   /* Navigation is its own interaction layer: it must never borrow the
      * success/warning/danger palette. The selected location is a quiet,
      * deep plum field; jade only acknowledges a possible next action. */
-  --lp-nav-surface:    #FFFDF9;
+  --lp-nav-surface:    #FAFAF5;
   --lp-nav-hover:      #EDF5EF;
   --lp-nav-current:    #4A2941;
   --lp-on-nav-current: #FFFDFC;
@@ -75,7 +75,7 @@
   --lp-plum-600:  var(--lp-plum-2);
   --lp-rose:      #B35872;
   --lp-rose-600:  var(--lp-rose);
-  --lp-rose-soft: #F8E7EA;
+  --lp-rose-soft: #F1ECEA;
 
   /* --- Ngữ nghĩa ---------------------------------------------------- */
   --lp-success:      #386958;
@@ -153,7 +153,7 @@
    * Chênh sáng giữa hai đầu dưới 4% nên chữ đặt lên vẫn giữ tương phản.
    * Chỉ dùng ở shell, panel hero, thẻ đăng nhập, empty state — tuyệt đối
    * không đặt sau bảng dữ liệu (spec §5.4). */
-  --lp-sheen: linear-gradient(135deg, #FFFDF9 0%, #F8EFE8 48%, #F8E7EA 100%);
+  --lp-sheen: linear-gradient(135deg, #FAFAF5 0%, #F8EFE8 48%, #F1ECEA 100%);
 
   /* --- §6.7b · Chỉ vàng mảnh --------------------------------------- */
   --lp-gold-hairline: rgb(199 161 91 / 0.38);
