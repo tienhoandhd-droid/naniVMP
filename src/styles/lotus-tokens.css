@@ -29,7 +29,7 @@
    * < overlay (popover, modal). Light lấy chiều sâu bằng canvas đậm
    * hơn một bậc; dark lấy chiều sâu bằng elevation sáng dần về trước.
    * ================================================================== */
-  --lp-bg-canvas:  #F3F2EB;
+  --lp-bg-canvas:  #F5F2EB;
   --lp-bg-sunken:  #EAEDE6;
   --lp-bg-surface: #FAFAF5;
   --lp-bg-raised:  #FDFDF8;
@@ -52,6 +52,9 @@
      * deep plum field; jade only acknowledges a possible next action. */
   --lp-nav-surface:    #FAFAF5;
   --lp-nav-hover:      #EDF5EF;
+  /* Decorative atmosphere, separate from status and interaction colors. */
+  --lp-ambient-jade:   #EDF2EA;
+  --lp-ambient-petal:  #F3E8E6;
   --lp-nav-current:    #4A2941;
   --lp-on-nav-current: #FFFDFC;
   --lp-nav-hairline:   #C7A15B;
@@ -286,6 +289,8 @@
      * remains distinct from the semantic status colours below. */
   --lp-nav-surface:    #211A22;
   --lp-nav-hover:      #26382F;
+  --lp-ambient-jade:   #26312D;
+  --lp-ambient-petal:  #32242C;
   --lp-nav-current:    #41263F;
   --lp-on-nav-current: #FFF7FA;
   --lp-nav-hairline:   #D8B76C;

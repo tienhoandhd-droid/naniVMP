@@ -1,0 +1,5 @@
+# Artistic color balance
+
+User accepted the proposed ivory / restrained jade / lotus-pink accents / deep-plum navigation direction and previously authorized main deployment. This is a narrow visual refinement, preserving original painting assets and all business data/actions.
+
+Plan: primary owns tokens and shell CSS; warm the light ivory canvas slightly, add dedicated decorative jade/petal atmospheric tokens in both themes, balance the existing ambient gradients instead of expanding green areas. Keep semantic colors, selected navigation contrast, illustration opacity and viewport geometry intact. Update the existing palette contract for the explicitly changed canvas; add no implementation-mirroring tests for decorative gradients. Run focused palette/contrast tests, typecheck/build/drift/budgets, axe and Long Mon browser/screenshot review. Independent reviewer checks the diff while primary verifies. Revert this small CSS commit for rollback. Publish via non-force Git API only after parent-tree equality and final checks, then wait for CI/deploy and verify public CSS.

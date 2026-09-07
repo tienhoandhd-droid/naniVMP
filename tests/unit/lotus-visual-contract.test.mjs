@@ -68,9 +68,9 @@ test("token nền và chữ chế độ sáng đúng bảng ivory–sage dịu m
   /* v4 (nghiên cứu 7): tách PIGMENT khỏi VAI TRÒ. Nền có năm tầng
      canvas/sunken/surface/raised/overlay; chữ có ba bậc; token cũ trỏ
      var() về lớp v4 để ~990 style nội tuyến đổi theo mà không sửa dòng
-     nào. Bản v5 làm nền sứ ấm hơn (#F3F2EB), giữ lớp chìm xanh xám nhẹ và
+     nào. Bản v5 làm nền sứ ấm hơn (#F5F2EB), giữ lớp chìm xanh xám nhẹ và
      mọi cặp chữ/nền vẫn ≥ 4.5:1. */
-  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F3F2EB");
+  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F5F2EB");
   assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#EAEDE6");
   assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FAFAF5");
   assert.equal(bien(KHOI_SANG, "lp-bg-raised"), "#FDFDF8");
