@@ -102,7 +102,7 @@ test("filters are grouped, named and stay in normal document flow", () => {
 });
 
 test("overview background and progress summary preserve dashboard legibility", () => {
-  const app = source("src/App.tsx");
+  const app = source("src/features/overview/Overview.tsx");
   const shell = source("src/styles/lotus-shell.css");
 
   assert.match(app, /className="vmp-overview-progress"/);

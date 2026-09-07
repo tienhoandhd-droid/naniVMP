@@ -290,13 +290,13 @@ test("owned process group receives TERM then closes descendants", async (t) => {
 test("owned process group escalates to KILL when a descendant ignores TERM", async (t) => {
   const child = spawn(process.execPath, ["-e", [
     "const { spawn } = require('node:child_process');",
-    "const grandchild = spawn(process.execPath, ['-e', \"process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)\"], { stdio: 'ignore' });",
-    "process.stdout.write(String(grandchild.pid));",
+    "const grandchild = spawn(process.execPath, ['-e', \"process.on('SIGTERM', () => {}); process.stdout.write(String(process.pid)); setInterval(() => {}, 1000)\"], { stdio: ['ignore', 'pipe', 'ignore'] });",
+    "grandchild.stdout.once('data', (ready) => process.stdout.write(ready));",
     "setInterval(() => {}, 1000);",
   ].join(" ")], { detached: true, stdio: ["ignore", "pipe", "ignore"] });
   t.after(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} });
   const grandchildPid = Number(await new Promise((resolvePid) => child.stdout.once("data", (data) => resolvePid(data.toString()))));
-  await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+  // Readiness comes from the descendant after its TERM handler is installed.
 
   const cleanup = await terminateProcessGroup({ child, timeoutMs: 75, pollIntervalMs: 10 });
 

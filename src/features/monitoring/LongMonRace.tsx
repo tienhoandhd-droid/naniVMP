@@ -9,6 +9,8 @@ import {
 } from "./longMonRaceModel.ts";
 
 import { buildOrganicPlacements, parseLongMonView, LONG_MON_VIEW_KEY, type LongMonView } from "./longMonPresentation.ts";
+import { importanceScale } from "./organicSwimModel.ts";
+import { useOrganicSwim } from "./useOrganicSwim.ts";
 
 /* BASE_URL thay vì "/": app deploy GitHub Pages dạng project
  * (https://<user>.github.io/<repo>/) với `base: "./"` — đường dẫn tuyệt
@@ -148,6 +150,17 @@ function LongMonRace({
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.hidden);
   const organic = useMemo(() => view === "organic" ? buildOrganicPlacements(model.fish) : null, [model.fish, view]);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const organicFish = useMemo(() => organic ? model.fish.map((fish) => ({
+    activity: fish.activity,
+    stage: fish.stage,
+    placement: organic.get(String(fish.activity.id))!,
+  })) : [], [model.fish, organic]);
+  const { registerFish, registerHeading, setFishFrozen } = useOrganicSwim({
+    active: view === "organic" && !paused && !hidden,
+    canvas: canvasRef,
+    fish: organicFish,
+  });
   const sceneHeight = 560;
   function changeView(next: LongMonView) {
     setView(next);
@@ -277,7 +290,7 @@ function LongMonRace({
           </button>
         </div>
         <p className="long-mon-race__view-hint" aria-live="polite">
-          {view === "date" ? "Vị trí cá theo hạn VMP · từ trái sang phải" : "Ngư đồ nghệ thuật · vị trí tự do, hạn VMP giữ nguyên"}
+          {view === "date" ? "Vị trí cá theo hạn VMP · từ trái sang phải · cỡ cá theo trọng yếu" : "Ngư đồ nghệ thuật · vị trí tự do · cỡ cá theo trọng yếu"}
         </p>
         <button type="button" className="long-mon-race__pause" data-long-mon-pause aria-pressed={paused}
           aria-label={paused ? "Tiếp tục bơi" : "Tạm dừng chuyển động"} onClick={() => setPaused(value => !value)}>
@@ -302,7 +315,7 @@ function LongMonRace({
       </div>
 
       <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label={view === "date" ? "60 ngày VMP quanh Hôm nay; dùng Tab để chọn cá và Enter để mở hồ sơ" : "Hồ cá nghệ thuật; dùng Tab để chọn cá và Enter để mở hồ sơ"}>
-        <div
+        <div ref={canvasRef}
           className="long-mon-race__canvas long-mon-race__canvas--adaptive-scene"
           data-density-scale={model.densityScale}
           data-scene-width={model.sceneWidthPx}
@@ -369,6 +382,7 @@ function LongMonRace({
                 const name = String(fish.activity.name || fish.activity.objName || fish.activity.obj || "Hạng mục VMP");
                 const swim = swimTiming(String(fish.activity.id), fish.deadline);
                 const placement = organic?.get(String(fish.activity.id));
+                const importance = importanceScale(fish.activity);
                 const dateYPct = Math.max(20, Math.min(88, 21 + fish.renderYPct * .67));
                 const style: FishStyle = {
                   "--swim-delay": swim.delay,
@@ -377,7 +391,11 @@ function LongMonRace({
                   "--long-mon-y": `${placement?.yPct ?? dateYPct}%`,
                   "--school-x": "0px",
                   "--school-y": "0px",
-                  "--school-scale": placement?.scale ?? fish.renderScale,
+                  // Date view retains its tested collision envelope: high is
+                  // the prior maximum and medium/low step down from it.
+                  "--school-scale": placement
+                    ? placement.scale * importance
+                    : model.densityScale * .88 * (importance / 1.14),
                   "--school-rotate": `${placement?.rotateDeg ?? fish.renderRotateDeg}deg`,
                   "--motion-x": swim.x,
                   "--motion-y": swim.y,
@@ -385,7 +403,7 @@ function LongMonRace({
                   "--organic-facing": placement && placement.rotateDeg < 0 ? -1 : 1,
                 };
                 return (
-                  <span key={fish.activity.id} className="long-mon-race__fish-position" style={style} role="listitem">
+                  <span key={fish.activity.id} ref={(node) => registerFish(String(fish.activity.id), node)} className="long-mon-race__fish-position" style={style} role="listitem">
                     <button
                       type="button"
                       className={`long-mon-race__fish long-mon-race__fish--${fish.stage}`}
@@ -399,15 +417,22 @@ function LongMonRace({
                       data-owner-end={fish.ownerEndPct}
                       data-school-formation={fish.schoolFormation}
                       data-motion-profile={fish.motionProfile}
+                      data-long-mon-importance={importance}
                       data-long-mon-highlighted={highlightedId === String(fish.activity.id) || undefined}
                       data-collision-width="62"
                       data-collision-height="54"
                       aria-label={`${code} · ${stage.label} · hạn VMP ${deadline}`}
+                      onMouseEnter={() => { if (view === "organic") setFishFrozen(String(fish.activity.id), "pointer", true); }}
+                      onMouseLeave={() => setFishFrozen(String(fish.activity.id), "pointer", false)}
+                      onFocus={() => { if (view === "organic") setFishFrozen(String(fish.activity.id), "focus", true); }}
+                      onBlur={() => setFishFrozen(String(fish.activity.id), "focus", false)}
                       onClick={() => onOpen(fish.activity)}
                     >
-                      <span className="long-mon-race__fish-body">
-                        <span className="long-mon-race__wake" aria-hidden="true" />
-                        <span className="long-mon-race__sprite" style={spriteStyle(stage)} aria-hidden="true" />
+                      <span ref={(node) => registerHeading(String(fish.activity.id), node)} className="long-mon-race__fish-heading">
+                        <span className="long-mon-race__fish-body">
+                          <span className="long-mon-race__wake" aria-hidden="true" />
+                          <span className="long-mon-race__sprite" style={spriteStyle(stage)} aria-hidden="true" />
+                        </span>
                       </span>
                       <span className="long-mon-race__tooltip" aria-hidden="true">
                         <strong>{code}</strong>
@@ -444,6 +469,7 @@ function LongMonRace({
         </ul>
         <div className="long-mon-race__notes">
           <span>{model.fish.length} hạng mục trong 60 ngày</span>
+          <span title="Dựa trên mức độ trọng yếu đã có trong hồ sơ nguồn">Kích thước cá biểu thị mức độ trọng yếu</span>
           {model.missingDeadlineCount > 0 && (
             <span className="long-mon-race__missing">
               {model.missingDeadlineCount} hạng mục chưa có hạn VMP

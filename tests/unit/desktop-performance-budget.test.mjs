@@ -107,6 +107,7 @@ test("route budget rejects a route folded into the shell", () => {
 test("budgets stay pinned to the approved byte limits", () => {
   assert.equal(SHELL_BUDGET, 275 * 1024);
   assert.deepEqual(ROUTE_BUDGETS, {
+    "src/pages/OverviewPage.tsx": 50 * 1024,
     "src/pages/TodayCommandCenterPage.tsx": 40 * 1024,
     "src/components/dashboard/ReportsView.tsx": 50 * 1024,
     "src/pages/AlertsPage.tsx": 100 * 1024,
@@ -133,4 +134,11 @@ test("shell selection prefers index and rejects ambiguous fallback entries", () 
   assert.throws(() => findShellEntry({
     "shared.js": { file: "assets/shared.js" },
   }), /không có entry/);
+});
+
+test("Overview prefetch is intent-only and has a separate route budget", () => {
+  assert.equal(canPrefetchDesktopRoute("overview", { desktop: true, saveData: false }), true);
+  assert.equal(canPrefetchDesktopRoute("overview", { desktop: true, saveData: true }), false);
+  assert.equal(canPrefetchDesktopRoute("overview", { desktop: false, saveData: false }), false);
+  assert.equal(ROUTE_BUDGETS["src/pages/OverviewPage.tsx"], 50 * 1024);
 });

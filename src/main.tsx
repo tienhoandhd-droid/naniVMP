@@ -28,8 +28,9 @@ import "./features/analysis/analysis.css";
  *   catalog.css            → pages/CatalogPage.tsx + components/catalog/CatalogObjectForm.tsx
  *   catalog-workspace.css  → features/catalogWorkspace/CatalogWorkspaceShell.tsx
  *                            + pages/PhanQuyenPage.tsx + CatalogObjectForm.tsx
- * Bốn file trên (today/monitoring/overview-executive/analysis) ở lại vì
- * được màn EAGER dùng (Today mặc định, nav monitoring, Overview, .reg-*). */
+ * overview-analysis.css → pages/OverviewPage.tsx
+ * monitoring, bộ lọc chung overview-executive và .reg-* trong analysis
+ * vẫn ở entry vì được dùng trên nhiều màn. */
 
 /* Đặt ngôn ngữ thị giác và chế độ sáng/tối TRƯỚC khi React mount — nếu để
    trong component thì trang sẽ loé bảng màu cũ một nhịp rồi mới nhảy. */

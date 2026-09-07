@@ -9,6 +9,7 @@ export interface DesktopPrefetchContext {
  * người dùng chọn. Timeline, ExcelJS và bản đồ 3D cố ý không có trong bảng
  * này: hover menu không được biến thành tải một tính năng nặng không cần. */
 const DESKTOP_ROUTE_IMPORTS: Partial<Record<ScreenId, () => Promise<unknown>>> = {
+  overview: () => import("../pages/OverviewPage.tsx"),
   today: () => import("../pages/TodayCommandCenterPage.tsx"),
   reports: () => import("../components/dashboard/ReportsView.tsx"),
   alerts: () => import("../pages/AlertsPage.tsx"),

@@ -113,9 +113,9 @@ export interface LongMonRaceLayoutOptions {
 
 export const LONG_MON_STAGE_META: readonly LongMonStageMeta[] = [
   { id: "catfish", species: "Cá trê xám", label: "Chưa hoàn thành đề cương", shortLabel: "Chưa xong đề cương", spriteX: "0%", spriteY: "0%" },
-  { id: "betta", species: "Cá lia thia lam", label: "Hoàn thành đề cương", shortLabel: "Xong đề cương", spriteX: "50%", spriteY: "0%" },
-  { id: "carp", species: "Cá chép ngọc", label: "Hoàn thành thẩm định thực tế", shortLabel: "Xong thực tế", spriteX: "100%", spriteY: "0%" },
-  { id: "angelfish", species: "Cá thần tiên tím", label: "Hoàn thành báo cáo", shortLabel: "Xong báo cáo", spriteX: "0%", spriteY: "100%" },
+  { id: "betta", species: "Cá lia thia lam", label: "Đề cương đã xong · chưa hoàn thành thẩm định thực tế", shortLabel: "Chờ xong thực tế", spriteX: "50%", spriteY: "0%" },
+  { id: "carp", species: "Cá chép ngọc", label: "Thẩm định thực tế đã xong · chưa hoàn thành báo cáo", shortLabel: "Chờ xong báo cáo", spriteX: "100%", spriteY: "0%" },
+  { id: "angelfish", species: "Cá thần tiên tím", label: "Báo cáo đã xong · dữ liệu chưa ghi nhận hoàn thành VMP", shortLabel: "Chưa ghi nhận VMP", spriteX: "0%", spriteY: "100%" },
   { id: "arowana", species: "Cá rồng vàng", label: "Hoàn thành VMP", shortLabel: "Xong VMP", spriteX: "50%", spriteY: "100%" },
   { id: "puffer", species: "Cá nóc chu sa", label: "Quá hạn VMP", shortLabel: "Quá hạn VMP", spriteX: "100%", spriteY: "100%" },
 ] as const;

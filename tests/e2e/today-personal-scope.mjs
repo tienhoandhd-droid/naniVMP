@@ -127,6 +127,49 @@ const ACTIVITIES = [
   activity({ code: CODE.admin, ownerPersonId: PERSON.admin, ownerName: "Admin Today" }),
 ];
 
+function bangkokDayAt(instant) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(instant));
+  const part = (type) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function canonicalDashboard(activities, objects, statusAsOf, year) {
+  const asOfMs = Date.parse(`${statusAsOf}T00:00:00Z`);
+  const canonicalActivities = activities.map((row) => {
+    const canonicalDeadline = row._raw.dl_vmp ?? null;
+    const daysLeft = canonicalDeadline === null ? null
+      : Math.round((Date.parse(`${canonicalDeadline}T00:00:00Z`) - asOfMs) / 86_400_000);
+    const st = canonicalDeadline === null ? "plan" : daysLeft < 0 ? "over" : "todo";
+    return {
+      ...row,
+      st,
+      target: canonicalDeadline,
+      docDone: false,
+      canonical_deadline: canonicalDeadline,
+      days_left: daysLeft,
+      status_as_of: statusAsOf,
+    };
+  });
+  const validation = {
+    done: canonicalActivities.filter((row) => row.st === "done").length,
+    over: canonicalActivities.filter((row) => row.st === "over").length,
+    todo: canonicalActivities.filter((row) => row.st !== "done" && row.st !== "over").length,
+    total: canonicalActivities.length,
+  };
+  const documentation = { done: 0, over: 0, todo: canonicalActivities.length, total: canonicalActivities.length };
+  return {
+    contract_version: 1,
+    activities: canonicalActivities,
+    objects,
+    updated_at: "2026-08-28T00:00:00Z",
+    authorization_revision: "7",
+    year,
+    kpi: { validation, documentation, mismatch_count: 0 },
+  };
+}
+
 function accessFor(businessRole) {
   return {
     ok: true,
@@ -247,6 +290,10 @@ async function openToday({
       localStorage.setItem("vmp_monitor_user_v1", JSON.stringify(value));
     }, cachedUser);
   }
+  const statusAsOf = now ? bangkokDayAt(now) : bangkokDay(0);
+  // The dashboard request follows the browser's Date year (UTC in the
+  // boundary case); the Today/Overview deadline presentation uses Bangkok.
+  const fixtureYear = new Date(now || Date.now()).getUTCFullYear();
   const { chanNgoai } = await caiGiaLap(page, {
     supabaseUrl: URL_SB,
     kichBan: "day",
@@ -275,10 +322,16 @@ async function openToday({
         source: "supabase",
         updated_at: "2026-08-28T00:00:00Z",
         authorization_revision: 7,
-        year: 2026,
+        year: fixtureYear,
       };
+      kho.rpc_get_vmp_dashboard_v2 = canonicalDashboard(
+        activities.map((row) => ({ ...row, _raw: { ...row._raw } })),
+        objects.map((row) => ({ ...row })),
+        statusAsOf,
+        fixtureYear,
+      );
       kho.rpc_get_vmp_watermark = {
-        year: 2026, plan_items: activities.length, objects: objects.length,
+        year: fixtureYear, plan_items: activities.length, objects: objects.length,
         updated_at: "2026-08-28T00:00:00Z", authorization_revision: 7,
       };
       kho.rpc_my_editable_progress_rights = { ok: true, rights: [] };
@@ -356,6 +409,7 @@ try {
 
       await page.click('[data-view="overview"]');
       await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Tổng quan"), { timeout: 5_000 });
+      await page.waitForSelector("[data-overview-total]", { timeout: 10_000 });
       const overviewGlobalState = await page.evaluate(() => ({
         hash: new URLSearchParams(location.hash.slice(1)).get("me"),
         personSelector: document.querySelector('select[aria-label="Chọn nhân sự xem tiến độ"]') !== null,
@@ -414,6 +468,7 @@ try {
       assert.equal(todayOverdue, 2, `${persona.label} Today canonical-person overdue KPI`);
       await page.click('[data-view="overview"]');
       await page.waitForFunction(() => document.querySelector("h1")?.textContent?.includes("Tổng quan"), { timeout: 5_000 });
+      await page.waitForSelector("[data-overview-total]", { timeout: 10_000 });
       assert.equal(await page.$eval('select[aria-label="Chọn nhân sự xem tiến độ"]', (select) => select.value), PERSON.staff,
         `${persona.label} keeps the selected person when moving to Overview`);
       const overviewProgress = await page.$eval(".vmp-overview-progress", (node) => ({
@@ -483,7 +538,7 @@ try {
 
       await page.click('[data-view="timeline"]');
       try {
-        await page.waitForSelector('.long-mon-race[aria-label="Trường đua hạn VMP hai tháng"]', { timeout: 10_000 });
+        await page.waitForSelector('.long-mon-race[data-view="date"]', { timeout: 10_000 });
       } catch (cause) {
         const snapshot = await page.evaluate(() => ({
           hash: location.hash,
@@ -494,13 +549,23 @@ try {
       }
       const twoMonthWindow = await page.$eval(".long-mon-race", (node) => ({
         months: node.querySelector(".long-mon-race__months")?.textContent || "",
+        weekKeys: [...node.querySelectorAll("[data-long-mon-week]")].map((week) => week.getAttribute("data-long-mon-week")),
+        periods: [...node.querySelectorAll("[data-long-mon-period]")].map((period) => ({
+          id: period.getAttribute("data-long-mon-period"), text: period.textContent?.trim(),
+        })),
         today: node.querySelector(".long-mon-race__today")?.textContent?.trim() || "",
         hasThreeCanvas: Boolean(node.querySelector('canvas[data-engine^="three"]')),
       }));
+      assert.match(twoMonthWindow.months, /Tháng 12\s*12\/2026/,
+        "Ngư đồ 60 ngày bắt đầu 30 ngày trước ngày Bangkok");
       assert.match(twoMonthWindow.months, /Tháng 1\s*01\/2027/,
-        "Ngư đồ bắt đầu từ tháng hiện tại theo Bangkok");
-      assert.match(twoMonthWindow.months, /Tháng 2\s*02\/2027/,
-        "Ngư đồ chỉ nối tiếp sang tháng kế tiếp");
+        "Ngư đồ 60 ngày vẫn chứa ngày Bangkok hiện tại");
+      assert.deepEqual(twoMonthWindow.periods, [
+        { id: "past", text: "30 ngày đã qua" },
+        { id: "future", text: "30 ngày sắp tới" },
+      ], "Ngư đồ công khai hai nửa cửa sổ 60 ngày");
+      assert.deepEqual([twoMonthWindow.weekKeys.at(0), twoMonthWindow.weekKeys.at(-1)],
+        ["2026-11-30", "2027-01-25"], "tuần hiển thị phủ cửa sổ 02/12/2026–30/01/2027");
       assert.equal(twoMonthWindow.today, "Hôm nay", "Ngư đồ đánh dấu đúng ngày hiện tại Bangkok");
       assert.equal(twoMonthWindow.hasThreeCanvas, false, "Ngư đồ không kéo lại canvas 3D đã bỏ");
       await page.click('[data-timeline-view="bang"]');

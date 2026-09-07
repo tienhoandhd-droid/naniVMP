@@ -482,6 +482,7 @@
   transform-origin: 55% 50%;
   will-change: translate, rotate;
 }
+.long-mon-race__fish-heading { position: absolute; inset: 0; display: block; transform-origin: 55% 50%; }
 
 .long-mon-race__sprite,
 .long-mon-race__legend-sprite {
@@ -1132,9 +1133,13 @@
 .long-mon-race[data-view="organic"] .long-mon-race__weeks,
 .long-mon-race[data-view="organic"] .long-mon-race__today { display: none; }
 .long-mon-race[data-view="organic"] .long-mon-race__gate { opacity: .6; }
-.long-mon-race[data-view="organic"] .long-mon-race__fish-body { scale: var(--organic-facing) 1; }
+.long-mon-race[data-view="organic"] .long-mon-race__fish-body {
+  transform: none;
+  scale: 1;
+}
 .long-mon-race[data-view="organic"] .long-mon-race__fish-position {
-  animation: long-mon-roam calc(var(--swim-dur) * 3) ease-in-out var(--swim-delay) infinite;
+  /* The hook writes only this wrapper's transform variables at 30fps. */
+  will-change: transform;
 }
 .long-mon-race__pond-light { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 .long-mon-race__pond-light i {
@@ -1151,20 +1156,13 @@
 }
 .long-mon-race__pond-light i:nth-child(2) { left: 40%; top: 60%; width: 28%; animation-delay: -6s; }
 .long-mon-race__pond-light i:nth-child(3) { left: 22%; top: 22%; width: 16%; animation-delay: -11s; }
-@keyframes long-mon-roam {
-  0%, 100% { translate: -10px 2px; }
-  25% { translate: 10px -9px; }
-  55% { translate: 16px 5px; }
-  80% { translate: -4px 10px; }
-}
 @keyframes long-mon-ripple {
   0%, 100% { scale: .85; opacity: .15; }
   50% { scale: 1.12; opacity: .4; }
 }
-/* Freeze the whole pond before a user aims or tabs; fish remain selectable. */
-.long-mon-race[data-paused="true"] *,
-.long-mon-race__viewport:hover *,
-.long-mon-race__viewport:focus-within * { animation-play-state: paused !important; }
+/* Pausing stops the decorative waves too. Hover/focus freezes only its fish
+ * through the simulation hook, so an empty area keeps the pond alive. */
+.long-mon-race[data-paused="true"] * { animation-play-state: paused !important; }
 .long-mon-race__fish-position:has(.long-mon-race__fish:hover),
 .long-mon-race__fish-position:focus-within { z-index: 20; }
 :root[data-theme="dark"] .long-mon-race__head {
@@ -1307,7 +1305,11 @@
    the visual mark shrink before the fully accessible search is needed. */
 [data-long-mon-density="dense"] .long-mon-race__fish-body { scale: .64; }
 [data-long-mon-density="dense"] .long-mon-race__wake { opacity: .18; }
-.long-mon-race[data-view="organic"] [data-long-mon-density="dense"] .long-mon-race__fish-body { scale: calc(.58 * var(--organic-facing)) .58; }
+.long-mon-race[data-view="organic"] [data-long-mon-density="dense"] .long-mon-race__fish-body { scale: .58; }
+/* The local swim loop already supplies motion for a crowded pond. Removing
+   150 independent tail/wake timelines keeps the dense painting responsive. */
+.long-mon-race[data-view="organic"] [data-long-mon-density="dense"] .long-mon-race__fish-body,
+.long-mon-race[data-view="organic"] [data-long-mon-density="dense"] .long-mon-race__wake { animation: none; }
 @media (max-width: 719px) {
   .long-mon-race { height: var(--long-mon-available-height, 640px); min-height: 280px; }
   .long-mon-race__head { padding: 9px 12px; gap: 7px; }
@@ -1393,5 +1395,5 @@
   #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__copy > strong { font-size: 12px; line-height: 15px; }
   #vmp-main-content[data-vmp-view="timeline"] .timeline-page-shell { gap: 6px; }
   .long-mon-race__fish-body { scale: .55; }
-  .long-mon-race[data-view="organic"] .long-mon-race__fish-body { scale: calc(.55 * var(--organic-facing)) .55; }
+  .long-mon-race[data-view="organic"] .long-mon-race__fish-body { scale: .55; }
 }

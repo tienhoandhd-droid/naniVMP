@@ -26,16 +26,20 @@ function seedOf(id: string): number {
 export function buildOrganicPlacements(fish: readonly LongMonRaceFish[]): Map<string, OrganicPlacement> {
   const ordered = [...fish].sort((a, b) => String(a.activity.id).localeCompare(String(b.activity.id), 'en'));
   const placements = new Map<string, OrganicPlacement>();
+  // Importance is the only size signal. Keeping this density base uniform
+  // prevents an ID-derived decoration from making a low-priority fish larger.
+  const baseScale = Math.max(.48, Math.min(1.08, 1.16 - ordered.length * .0037));
   ordered.forEach((item, index) => {
     const id = String(item.activity.id);
     const seed = seedOf(id);
     const radius = ordered.length === 1 ? 0 : Math.sqrt((index + .5) / ordered.length);
     const theta = index * Math.PI * (3 - Math.sqrt(5)) + .65;
     placements.set(id, {
-      xPct: 49 + 44 * radius * Math.cos(theta),
-      yPct: 53 + 34 * radius * Math.sin(theta),
+      // Leave a complete 54×44px fish wrapper inside the mobile 2:1 pond.
+      xPct: 49 + 39 * radius * Math.cos(theta),
+      yPct: 53 + 27 * radius * Math.sin(theta),
       rotateDeg: (seed - .5) * 56,
-      scale: Math.max(.48, Math.min(1.08, 1.1 - ordered.length * .0037 + seed * .12)),
+      scale: baseScale,
     });
   });
   return placements;
