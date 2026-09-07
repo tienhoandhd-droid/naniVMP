@@ -31,6 +31,7 @@
  * ===================================================================== */
 import { useMemo, useState } from "react";
 import { C, TEXT, NUM } from "../../constants/theme.ts";
+import { CHART_STATUS, CHART_STAGE } from "../../constants/chartTheme.ts";
 import { MONTHS, vmpToday } from "../../constants/vmp.ts";
 import { parseD } from "../../utils/helpers.ts";
 import { CauKetLuan } from "../ui/Primitives.tsx";
@@ -277,7 +278,7 @@ export default function BieuDoKiemSoat({ acts, nam }: { acts: Activity[]; nam: n
               chấp với đường giới hạn. */}
           {[0, 0.25, 0.5, 0.75, 1].map((v) => (
             <g key={v}>
-              <line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} stroke={C.line} strokeWidth={1} />
+              <line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} stroke="var(--chart-grid)" strokeWidth={1} />
               <text x={M.l - 8} y={y(v) + 4} textAnchor="end"
                 fontFamily={NUM} fontSize={12} fontWeight={700} fill={C.plumSoft}>
                 {pc(v)}
@@ -285,28 +286,28 @@ export default function BieuDoKiemSoat({ acts, nam }: { acts: Activity[]; nam: n
             </g>
           ))}
 
-          <path d={vungKiemSoat} fill={C.mintSoft} opacity={0.5} />
+          <path d={vungKiemSoat} fill={CHART_STAGE.vmp.soft} opacity={0.58} />
 
-          <path d={bacThang((d) => d.ucl)} fill="none" stroke={C.raspText}
+          <path d={bacThang((d) => d.ucl)} fill="none" stroke={CHART_STATUS.overdue.color}
             strokeWidth={1.6} strokeDasharray="7 5" opacity={0.75} />
-          <path d={bacThang((d) => d.lcl)} fill="none" stroke={C.raspText}
+          <path d={bacThang((d) => d.lcl)} fill="none" stroke={CHART_STATUS.overdue.color}
             strokeWidth={1.6} strokeDasharray="7 5" opacity={0.75} />
           <line x1={M.l} x2={W - M.r} y1={y(pTb)} y2={y(pTb)}
-            stroke={C.plum} strokeWidth={1.8} />
+            stroke={CHART_STAGE.validation.text} strokeWidth={1.8} />
 
           {/* Nhãn đường có ĐẾ nền. Không có đế thì chính đường kẻ chạy xuyên
               qua chữ — nét đứt cắt ngang chữ nhỏ là chỗ đọc sai đầu tiên. */}
-          <NhanDuong x={W - M.r - 2} y={y(pTb) - 6} mau={C.plum} co={11}>
+          <NhanDuong x={W - M.r - 2} y={y(pTb) - 6} mau={CHART_STAGE.validation.text} co={11}>
             {`Mức thường ${pc(pTb)}`}
           </NhanDuong>
-          <NhanDuong x={W - M.r - 2} y={y(diem[diem.length - 1].ucl) - 7} mau={C.raspText}>
+          <NhanDuong x={W - M.r - 2} y={y(diem[diem.length - 1].ucl) - 7} mau={CHART_STATUS.overdue.text}>
             Giới hạn trên (+3σ)
           </NhanDuong>
-          <NhanDuong x={W - M.r - 2} y={y(diem[diem.length - 1].lcl) + 15} mau={C.raspText}>
+          <NhanDuong x={W - M.r - 2} y={y(diem[diem.length - 1].lcl) + 15} mau={CHART_STATUS.overdue.text}>
             Giới hạn dưới (−3σ)
           </NhanDuong>
 
-          <path d={duongDiem} fill="none" stroke={C.plumSoft} strokeWidth={2}
+          <path d={duongDiem} fill="none" stroke={CHART_STAGE.validation.color} strokeWidth={2.4}
             strokeLinejoin="round" opacity={0.55} />
 
           {diem.map((d, i) => {
@@ -318,25 +319,25 @@ export default function BieuDoKiemSoat({ acts, nam }: { acts: Activity[]; nam: n
               <g key={d.thang}>
                 <title>{nhan}</title>
                 {d.vuot && (
-                  <circle cx={x(i)} cy={y(d.p)} r={11} fill={C.rasp} opacity={0.22} />
+                  <circle cx={x(i)} cy={y(d.p)} r={11} fill={CHART_STATUS.overdue.color} opacity={0.22} />
                 )}
                 <circle
                   cx={x(i)} cy={y(d.p)} r={d.vuot ? 6.5 : 5}
-                  fill={d.dangChay ? C.surface : d.vuot ? C.rasp : C.plumSoft}
-                  stroke={d.vuot ? C.raspText : d.dangChay ? C.plumSoft : C.surface}
+                  fill={d.dangChay ? C.surface : d.vuot ? CHART_STATUS.overdue.color : CHART_STAGE.validation.color}
+                  stroke={d.vuot ? CHART_STATUS.overdue.text : d.dangChay ? CHART_STATUS.pending.color : C.surface}
                   strokeWidth={d.dangChay ? 2 : 1.5}
                   strokeDasharray={d.dangChay ? "3 2" : undefined}
                 />
                 {d.vuot && (
                   <text x={x(i)} y={y(d.p) + (d.p < pTb ? 26 : -16)} textAnchor="middle"
-                    fontFamily={NUM} fontSize={12} fontWeight={900} fill={C.raspText}>
+                    fontFamily={NUM} fontSize={12} fontWeight={900} fill={CHART_STATUS.overdue.text}>
                     {pc(d.p)}
                   </text>
                 )}
                 <text x={x(i)} y={H - M.b + 18} textAnchor="middle"
                   fontFamily={TEXT} fontSize={11.5}
                   fontWeight={d.vuot ? 900 : 700}
-                  fill={d.vuot ? C.raspText : C.plumSoft}>
+                  fill={d.vuot ? CHART_STATUS.overdue.text : C.plumSoft}>
                   {MONTHS[d.thang]}
                 </text>
                 <text x={x(i)} y={H - M.b + 33} textAnchor="middle"

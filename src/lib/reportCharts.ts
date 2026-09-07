@@ -11,7 +11,7 @@
  *  Không dùng thư viện chart ngoài (recharts đã bị gỡ khỏi app vì không
  *  dùng) — SVG tay, nét mảnh, có <title> làm tooltip, legend cố định thứ
  *  tự màu theo đúng quy ước app: giai đoạn (đề cương=lav, thẩm định=sky,
- *  báo cáo=pink, VMP=mint) và bộ phận (DEPT_COLOR trong constants/vmp.ts).
+ *  báo cáo=ochre, VMP=jade) và bộ phận (DEPT_COLOR trong constants/vmp.ts).
  * ===================================================================== */
 import type { MonthTargetRow, DeptBottleneckRow, NextMonthByDept } from "./reportModel.ts";
 
@@ -28,24 +28,24 @@ export interface ChartPalette {
 /** Dùng trên màn hình web — biến CSS, tự đổi sáng/tối theo theme app. */
 export const SCREEN_PALETTE: ChartPalette = {
   ink: "var(--c-ink)", inkSoft: "var(--c-ink-soft)", line: "var(--c-line)", surface: "var(--c-surface)",
-  mint: "var(--c-mint)", mintText: "var(--c-mint-text)", mintSoft: "var(--c-mint-soft)",
-  sky: "var(--c-sky)", skyText: "var(--c-sky-text)", skySoft: "var(--c-sky-soft)",
-  lav: "var(--c-lav)", lavText: "var(--c-lav-text)", lavSoft: "var(--c-lav-soft)",
-  pink: "var(--c-pink)", pinkText: "var(--c-pink-text)", pinkSoft: "var(--c-pink-soft)",
-  rasp: "var(--c-rasp)", raspText: "var(--c-rasp-text)", raspSoft: "var(--c-rasp-soft)",
-  marigold: "var(--c-marigold)", marigoldText: "var(--c-marigold-text)", marigoldSoft: "var(--c-marigold-soft)",
+  mint: "var(--chart-complete)", mintText: "var(--chart-complete-text)", mintSoft: "var(--chart-complete-soft)",
+  sky: "var(--chart-validation)", skyText: "var(--chart-validation-text)", skySoft: "var(--chart-validation-soft)",
+  lav: "var(--chart-protocol)", lavText: "var(--chart-protocol-text)", lavSoft: "var(--chart-protocol-soft)",
+  pink: "var(--chart-report)", pinkText: "var(--chart-report-text)", pinkSoft: "var(--chart-report-soft)",
+  rasp: "var(--chart-overdue)", raspText: "var(--chart-overdue-text)", raspSoft: "var(--chart-overdue-soft)",
+  marigold: "var(--chart-missing)", marigoldText: "var(--chart-missing-text)", marigoldSoft: "var(--chart-missing-soft)",
 };
 
-/** Dùng cho bản xuất PDF/HTML tĩnh — hex thật của theme sáng (index.css :root),
+/** Dùng cho bản xuất PDF/HTML tĩnh — hex thật của bảng màu biểu đồ sáng (chart-palette.css),
  *  vì tài liệu xuất ra không có biến CSS của app. */
 export const EXPORT_PALETTE: ChartPalette = {
   ink: "#2d2d2d", inkSoft: "#6E4869", line: "#e7d9e3", surface: "#ffffff",
-  mint: "#2A9E82", mintText: "#146851", mintSoft: "#DAF2E9",
-  sky: "#4497D2", skyText: "#1F6796", skySoft: "#E1F0FA",
-  lav: "#8168CE", lavText: "#5F44AD", lavSoft: "#EDE8FB",
-  pink: "#E4749F", pinkText: "#A83364", pinkSoft: "#FBE4EF",
-  rasp: "#D6486D", raspText: "#B62E52", raspSoft: "#FBE1E8",
-  marigold: "#DE9128", marigoldText: "#8D550A", marigoldSoft: "#FAEDD3",
+  mint: "#23856b", mintText: "#14614e", mintSoft: "#e1f3ec",
+  sky: "#2b6f9d", skyText: "#174f78", skySoft: "#e5f1f8",
+  lav: "#7650a5", lavText: "#56347e", lavSoft: "#f0eafa",
+  pink: "#9a6b18", pinkText: "#704b08", pinkSoft: "#fbf1d8",
+  rasp: "#bf5a4f", raspText: "#91392f", raspSoft: "#f9e4e0",
+  marigold: "#b67820", marigoldText: "#85530f", marigoldSoft: "#f9ecd3",
 };
 
 /** Màu theo BỘ PHẬN — cùng thứ tự cố định với DEPT_COLOR trong constants/vmp.ts

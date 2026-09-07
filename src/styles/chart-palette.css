@@ -1,0 +1,54 @@
+/* Semantic chart palette shared by Overview and Reports. Light and dark
+   values are tuned independently so small labels and thin SVG strokes remain
+   readable in either appearance. */
+:root {
+  --chart-protocol: #7650a5;
+  --chart-protocol-text: #56347e;
+  --chart-protocol-soft: #f0eafa;
+  --chart-validation: #2b6f9d;
+  --chart-validation-text: #174f78;
+  --chart-validation-soft: #e5f1f8;
+  --chart-report: #9a6b18;
+  --chart-report-text: #704b08;
+  --chart-report-soft: #fbf1d8;
+  --chart-complete: #23856b;
+  --chart-complete-text: #14614e;
+  --chart-complete-soft: #e1f3ec;
+  --chart-overdue: #bf5a4f;
+  --chart-overdue-text: #91392f;
+  --chart-overdue-soft: #f9e4e0;
+  --chart-pending: #718198;
+  --chart-pending-text: #536276;
+  --chart-pending-soft: #e9edf2;
+  --chart-missing: #b67820;
+  --chart-missing-text: #85530f;
+  --chart-missing-soft: #f9ecd3;
+  --chart-grid: color-mix(in srgb, var(--c-ink-soft) 19%, transparent);
+  --chart-surface: color-mix(in srgb, var(--c-surface) 88%, var(--chart-complete-soft));
+}
+
+[data-theme="dark"] {
+  --chart-protocol: #bca0eb;
+  --chart-protocol-text: #d8c5fb;
+  --chart-protocol-soft: #382d4d;
+  --chart-validation: #7fc3ed;
+  --chart-validation-text: #b9e3fa;
+  --chart-validation-soft: #1f4053;
+  --chart-report: #edc66f;
+  --chart-report-text: #f7dd9d;
+  --chart-report-soft: #4b3b1c;
+  --chart-complete: #77cbae;
+  --chart-complete-text: #b1ead8;
+  --chart-complete-soft: #1d443b;
+  --chart-overdue: #ef978b;
+  --chart-overdue-text: #ffc3ba;
+  --chart-overdue-soft: #4f2c2a;
+  --chart-pending: #aab8c9;
+  --chart-pending-text: #d4deea;
+  --chart-pending-soft: #303b49;
+  --chart-missing: #edbf67;
+  --chart-missing-text: #f9d994;
+  --chart-missing-soft: #4b3a1a;
+  --chart-grid: color-mix(in srgb, var(--c-ink-soft) 30%, transparent);
+  --chart-surface: color-mix(in srgb, var(--c-surface) 82%, var(--chart-complete-soft));
+}

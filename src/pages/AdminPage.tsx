@@ -1,3 +1,4 @@
+import FieldPerformancePanel from "../features/performance/FieldPerformancePanel.tsx";
 /* =====================================================================
  *  AdminPage — Cấu hình hệ thống (trạng thái nguồn, cron, kết nối)
  *  (F1 31/08: tách từ App.tsx, nạp lazy — màn admin.)
@@ -115,6 +116,8 @@ export default function AdminView({ conn, user, access }: {
           {oSo("Đang đăng nhập", user?.name || "—", `${user?.role || ""} · ${(access && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}`)}
         </div>
       </Card>
+
+      <FieldPerformancePanel />
 
       {err && (
         <Card>

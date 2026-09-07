@@ -86,6 +86,10 @@ const TEAM_OVERVIEW_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+const FIELD_PERFORMANCE_REVIEWED_RPC = new Map([
+  ["rpc_record_web_vitals", {identity:"rpc_record_web_vitals(uuid,text,text,jsonb)",classification:"guarded_explicit"}],
+  ["rpc_web_vitals_summary", {identity:"rpc_web_vitals_summary()",classification:"guarded_explicit"}],
+]);
 const CLIENT_ERROR_REVIEWED_RPC = new Map([
   ["rpc_ghi_loi_client", {
     identity: "rpc_ghi_loi_client(text,text,text,text)",
@@ -211,6 +215,13 @@ function extractRpcCalls(file, source) {
   visitAst(ast.program, (node) => {
     if (node.type !== "CallExpression" && node.type !== "OptionalCallExpression") return;
     const callee = unwrapExpression(node.callee);
+    // keepalive telemetry uses fetch so it can flush when a page is hidden.
+    if (callee?.type === "Identifier" && callee.name === "fetch") {
+      const url = unwrapExpression(node.arguments[0]);
+      const suffix = url?.type === "TemplateLiteral" ? url.quasis.at(-1)?.value.cooked : url?.type === "StringLiteral" ? url.value : "";
+      const name = suffix?.match(/\/rest\/v1\/rpc\/([a-z0-9_]+)$/i)?.[1];
+      if (name) calls.push({name,file,line:node.loc.start.line});
+    }
     const direct = isRpcMember(callee);
     const aliasOrWrapper = callee?.type === "Identifier"
       && (aliases.has(callee.name) || wrappers.has(callee.name));
@@ -345,6 +356,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...SOURCE_IMPORT_PREVIEW_REVIEWED_RPC.keys(),
     ...TEAM_OVERVIEW_REVIEWED_RPC.keys(),
     ...CLIENT_ERROR_REVIEWED_RPC.keys(),
+    ...FIELD_PERFORMANCE_REVIEWED_RPC.keys(),
     ...REVALIDATION_REVIEWED_RPC.keys(),
     ...CANONICAL_DASHBOARD_REVIEWED_RPC.keys(),
   ]) {
@@ -359,13 +371,14 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...SOURCE_IMPORT_PREVIEW_REVIEWED_RPC,
     ...TEAM_OVERVIEW_REVIEWED_RPC,
     ...CLIENT_ERROR_REVIEWED_RPC,
+    ...FIELD_PERFORMANCE_REVIEWED_RPC,
     ...REVALIDATION_REVIEWED_RPC,
     ...CANONICAL_DASHBOARD_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 82, "reviewed source HEAD must expose 82 literal RPC targets");
+  assert.equal(sourceNames.length, 84, "reviewed source HEAD must expose 84 literal RPC targets");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),
@@ -414,6 +427,11 @@ test("every source RPC call has exactly one reviewed migration classification", 
   assert.match(teamOverviewMigration, /security definer\s*set search_path\s*=\s*public\s*,\s*pg_temp/is);
   assert.match(teamOverviewMigration, /revoke all on function public\.rpc_team_overview_summary\(integer\)\s*from public, anon, authenticated, service_role;/is);
   assert.match(teamOverviewMigration, /grant execute on function public\.rpc_team_overview_summary\(integer\)\s*to authenticated, service_role;/is);
+  const fieldMigration = readFileSync("supabase/migrations/20260907160000_web_vitals.sql","utf8");
+  for (const [name] of FIELD_PERFORMANCE_REVIEWED_RPC) {
+    assert.ok(fieldMigration.includes(`create or replace function public.${name}(`));
+    assert.match(fieldMigration, /vmp_current_session_is_active\(\) is not true/);
+  }
   assert.deepEqual(CLIENT_ERROR_REVIEWED_RPC, new Map([
     ["rpc_ghi_loi_client", { identity: "rpc_ghi_loi_client(text,text,text,text)", classification: "guarded_explicit" }],
     ["rpc_doc_loi_client", { identity: "rpc_doc_loi_client(integer,integer,timestamptz)", classification: "guarded_explicit" }],

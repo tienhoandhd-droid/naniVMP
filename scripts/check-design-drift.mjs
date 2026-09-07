@@ -63,6 +63,8 @@ const CHUA_MIGRATION = new Set([
 /* File được PHÉP chứa hex: nơi khai token và art thương hiệu (màu nhân
    vật/motif là giá trị token được "nướng" vào tranh, có chú thích trong file). */
 const MIEN_HEX = new Set([
+  // Dedicated semantic chart tokens; components consume variables, including exported SVG parity tests.
+  "src/styles/chart-palette.css",
   "src/styles/lotus-tokens.css",
   // Hai file VẼ nhân vật (17/08): ValiIllustration.tsx nay chỉ là bộ chọn
   // theo theme, không còn hex — phần tranh nằm ở hai file này.

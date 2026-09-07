@@ -87,3 +87,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// Load measurement separately after startup. Web Vitals uses buffered entries.
+// Only the initial allowlisted screen is retained; never transmit the raw hash.
+const fieldScreen = new URLSearchParams(location.hash.slice(1)).get("v") || "other";
+const loadFieldPerformance = () => {
+  void import("./lib/fieldPerformance.ts").then(module => module.startFieldPerformance(fieldScreen)).catch(() => {});
+};
+if (document.readyState === "complete") loadFieldPerformance();
+else window.addEventListener("load", loadFieldPerformance, { once: true });

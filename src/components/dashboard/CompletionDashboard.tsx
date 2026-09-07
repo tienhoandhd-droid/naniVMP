@@ -5,8 +5,9 @@ import {
 } from "lucide-react";
 
 import { C, NUM, TEXT } from "../../constants/theme.ts";
+import { CHART_STAGE } from "../../constants/chartTheme.ts";
 import { DEPTS, DEPT_COLOR, DEPT_DEEP } from "../../constants/vmp.ts";
-import { buildCompletionFlow } from "../../features/overview/analysisStudioModel.ts";
+import { buildCompletionFlow, type CompletionStage } from "../../features/overview/analysisStudioModel.ts";
 import { parseDepts } from "../../utils/helpers.ts";
 import { Card, CardTitle, Sel, CauKetLuan } from "../ui/Primitives.tsx";
 
@@ -41,9 +42,7 @@ const METRICS = [
     short: "Đề cương",
     field: "tt_de_cuong",
     icon: ClipboardCheck,
-    color: C.lav,
-    text: C.lavText,
-    soft: C.lavSoft,
+    ...CHART_STAGE.protocol,
   },
   {
     id: "validation",
@@ -51,9 +50,7 @@ const METRICS = [
     short: "Thực tế",
     field: "tt_tham_dinh",
     icon: ShieldCheck,
-    color: C.sky,
-    text: C.skyText,
-    soft: C.skySoft,
+    ...CHART_STAGE.validation,
   },
   {
     id: "report",
@@ -61,11 +58,7 @@ const METRICS = [
     short: "Hồ sơ",
     field: "tt_bao_cao",
     icon: FileCheck2,
-    // Hồng = nhận-diện giai đoạn (không mang nghĩa status). Cam/đỏ được dành
-    // riêng cho trạng thái (đang/sắp · quá hạn) nhất quán toàn app.
-    color: C.pink,
-    text: C.pinkText,
-    soft: C.pinkSoft,
+    ...CHART_STAGE.report,
   },
   {
     id: "vmp",
@@ -73,9 +66,7 @@ const METRICS = [
     short: "VMP",
     field: "tt_vmp",
     icon: CheckCircle2,
-    color: C.mint,
-    text: C.mintText,
-    soft: C.mintSoft,
+    ...CHART_STAGE.vmp,
   },
 ];
 
@@ -347,6 +338,31 @@ const TD: CSSProperties = {
   borderBottom: `1px solid ${C.pinkSoft}`, color: C.plumSoft, fontSize: 12,
 };
 
+/** The four measures are independent checkpoints, not a forced funnel. */
+export function buildFlowConclusion(stages: readonly CompletionStage[]): {
+  chinh: string; phu: string; tone: "ok" | "warn" | "over";
+} {
+  if (!stages.length || !stages[0]?.total) throw new Error("flow conclusion needs a populated completion flow");
+  let bottleneck = 0;
+  for (let index = 1; index < stages.length; index += 1) {
+    if (stages[index - 1].rate - stages[index].rate > stages[bottleneck].rate - stages[bottleneck + 1].rate) {
+      bottleneck = index - 1;
+    }
+  }
+  const drop = stages[bottleneck].rate - stages[bottleneck + 1].rate;
+  const final = stages[stages.length - 1];
+  const ratesDiffer = stages.some((stage) => stage.rate !== stages[0].rate);
+  return {
+    chinh: drop >= 8
+      ? `Tắc nhất ở khâu ${stages[bottleneck].short} → ${stages[bottleneck + 1].short}: ${stages[bottleneck].rate}% xuống ${stages[bottleneck + 1].rate}%, mất ${drop} điểm.`
+      : ratesDiffer
+        ? "Không ghi nhận mức giảm giữa các giai đoạn; tỷ lệ từng giai đoạn được tính độc lập."
+        : "Bốn giai đoạn có cùng tỷ lệ — không có khâu nào tắc riêng.",
+    phu: `Đích cuối: ${final.done}/${final.total} hạng mục đã hoàn thành VMP (${final.rate}%).`,
+    tone: (drop >= 25 ? "over" : drop >= 8 ? "warn" : "ok") as "ok" | "warn" | "over",
+  };
+}
+
 type ComparisonMode = "validationType" | (typeof DIMENSION_OPTIONS)[number]["id"];
 
 export default function CompletionDashboard({ acts, matrix }: {
@@ -378,43 +394,34 @@ export default function CompletionDashboard({ acts, matrix }: {
     selectedPerson === "all" || activityPeople(activity).includes(selectedPerson)
   )), [typeActs, selectedPerson]);
   const flow = useMemo(() => buildCompletionFlow(scopedActs), [scopedActs]);
-  const summary = useMemo(() => completionSummary(scopedActs), [scopedActs]);
-
+  // The flow has already made the four full data passes. Reuse its stages for
+  // the conclusion instead of counting exactly the same fields a second time.
   const typeRows = useMemo(() => {
+    if (comparisonMode !== "validationType") return [];
     const map = new Map();
     scopedActs.filter(ACTIVE).forEach((activity) => {
       const type = clean(activity.vtype).toUpperCase() || "CHƯA PHÂN LOẠI";
       if (!map.has(type)) map.set(type, []);
       map.get(type).push(activity);
     });
-    return [...map.entries()].map(([type, items]) => ({
-      type,
-      total: items.length,
-      done: completionSummary(items).vmp.done,
-      rate: completionSummary(items).vmp.rate,
-    })).sort((a, b) => b.total - a.total || a.type.localeCompare(b.type, "vi"));
-  }, [scopedActs]);
+    return [...map.entries()].map(([type, items]) => {
+      const typeSummary = completionSummary(items);
+      return {
+        type,
+        total: items.length,
+        done: typeSummary.vmp.done,
+        rate: typeSummary.vmp.rate,
+      };
+    }).sort((a, b) => b.total - a.total || a.type.localeCompare(b.type, "vi"));
+  }, [comparisonMode, scopedActs]);
 
   /* Phễu bốn giai đoạn: khâu tụt sâu nhất so với khâu liền trước là chỗ
      đang tắc. Bốn thẻ số cạnh nhau không tự nói ra điều đó — mắt phải trừ
      nhẩm bốn lần. */
-  const klPheu = useMemo(() => {
-    const buoc = METRICS.map((m) => ({ m, v: summary[m.id] as { done: number; total: number; rate: number } }));
-    if (!buoc.length || !buoc[0].v?.total) return null;
-    let hut = 0;
-    for (let i = 1; i < buoc.length; i += 1) {
-      if (buoc[i - 1].v.rate - buoc[i].v.rate > buoc[hut].v.rate - buoc[hut + 1].v.rate) hut = i - 1;
-    }
-    const rong = buoc[hut].v.rate - buoc[hut + 1].v.rate;
-    const cuoi = buoc[buoc.length - 1].v;
-    return {
-      chinh: rong >= 8
-        ? `Tắc nhất ở khâu ${buoc[hut].m.short} → ${buoc[hut + 1].m.short}: ${buoc[hut].v.rate}% xuống ${buoc[hut + 1].v.rate}%, mất ${rong} điểm.`
-        : `Bốn giai đoạn đi đều nhau, chênh nhau nhiều nhất ${rong} điểm — không có khâu nào tắc riêng.`,
-      phu: `Đích cuối: ${cuoi.done}/${cuoi.total} hạng mục đã hoàn thành VMP (${cuoi.rate}%).`,
-      tone: (rong >= 25 ? "over" : rong >= 8 ? "warn" : "ok") as "over" | "warn" | "ok",
-    };
-  }, [summary]);
+  const klPheu = useMemo(
+    () => flow.stages[0]?.total ? buildFlowConclusion(flow.stages) : null,
+    [flow],
+  );
 
   /* So loại thẩm định: chỉ nêu loại tụt nhất và loại dẫn đầu — người xem
      cần biết đi hỏi ai, không cần đọc lại cả mười ô. */
@@ -495,7 +502,7 @@ export default function CompletionDashboard({ acts, matrix }: {
             const metric = METRICS.find((item) => item.id === stage.id) || METRICS[0];
             const Icon = metric.icon;
             return (
-              <li key={stage.id} className="analysis-flow__stage" data-analysis-stage={stage.id}>
+              <li key={stage.id} className={`analysis-flow__stage analysis-flow__stage--${stage.id}`} data-analysis-stage={stage.id}>
                 {index > 0 && (
                   <span className="analysis-flow__gap" data-analysis-gap>
                     {stage.deltaFromPrevious && stage.deltaFromPrevious < 0
@@ -511,7 +518,9 @@ export default function CompletionDashboard({ acts, matrix }: {
                 </div>
                 <strong>{stage.rate}%</strong>
                 <small>{stage.done}/{stage.total} hoàn thành</small>
-                <ProgressBar rate={stage.rate} color={metric.color} height={7} />
+                <div className="analysis-flow__bar">
+                  <ProgressBar rate={stage.rate} color={metric.color} height={9} />
+                </div>
               </li>
             );
           })}
@@ -560,7 +569,7 @@ export default function CompletionDashboard({ acts, matrix }: {
                           </div>
                           <strong>{row.rate}%</strong>
                         </div>
-                        <ProgressBar rate={row.rate} color={C.mint} height={8} />
+                        <ProgressBar rate={row.rate} color={CHART_STAGE.vmp.color} height={8} />
                       </div>
                     </div>
                   ))}

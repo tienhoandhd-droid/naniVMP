@@ -1,0 +1,16 @@
+.field-perf-explanation,.field-perf-help { color:var(--c-ink-soft);font-size:13px;line-height:1.7; }
+.field-perf-refresh { display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 12px;border:1px solid var(--c-line);border-radius:10px;background:var(--c-surface);color:var(--c-ink);font:inherit;font-size:12px;font-weight:700;cursor:pointer; }
+.field-perf-refresh:disabled { opacity:.6;cursor:wait; }
+.field-perf-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;margin-top:18px; }
+.field-perf-metric { padding:18px;border:1px solid var(--c-line);border-radius:16px;background:var(--c-surface);border-top:3px solid var(--c-mint-text); }
+.field-perf-metric[data-rating="needs-improvement"] {border-top-color:var(--c-marigold-text);}
+.field-perf-metric[data-rating="poor"] {border-top-color:var(--c-rasp-text);}
+.field-perf-eyebrow {font-size:12px;color:var(--c-ink-soft);font-weight:700;}
+.field-perf-metric h3 {font-size:14px;margin:8px 0;color:var(--c-ink);}
+.field-perf-value {font-size:30px;font-weight:800;color:var(--c-ink);}
+.field-perf-value small {font-size:13px;font-weight:600;}
+.field-perf-rating {display:inline-block;font-size:12px;font-weight:700;margin-top:8px;color:var(--c-ink);}
+.field-perf-metric p {font-size:12px;color:var(--c-ink-soft);margin:8px 0 0;}
+.field-perf-small-sample {font-style:italic;}
+.field-perf-help {margin-top:18px;}
+.field-perf-help summary {cursor:pointer;min-height:44px;display:list-item;padding-top:10px;font-weight:700;}

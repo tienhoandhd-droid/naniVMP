@@ -1,0 +1,70 @@
+@import "./chart-palette.css";
+
+/* Completion flow uses comparison lanes instead of four unrelated cards:
+   all bars share a baseline and all values share a numeric column. A reader
+   can distinguish a stage by its edge, icon, direct value and text label. */
+.analysis-flow { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.analysis-flow__stage {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) 76px minmax(180px, .95fr);
+  gap: 3px 18px;
+  align-items: center;
+  padding: 14px 17px;
+  border-top-width: 1px;
+  border-left-width: 5px;
+}
+.analysis-flow__stage--protocol { border-top-color: var(--chart-protocol); }
+.analysis-flow__stage--validation { border-top-color: var(--chart-validation); }
+.analysis-flow__stage--report { border-top-color: var(--chart-report); }
+.analysis-flow__stage--vmp { border-top-color: var(--chart-complete); }
+.analysis-flow__stage--protocol { border-left-color: var(--chart-protocol); }
+.analysis-flow__stage--validation { border-left-color: var(--chart-validation); }
+.analysis-flow__stage--report { border-left-color: var(--chart-report); }
+.analysis-flow__stage--vmp { border-left-color: var(--chart-complete); }
+.analysis-flow__stage-head { grid-column: 1; grid-row: 1; }
+.analysis-flow__stage > strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  margin: 0;
+  text-align: right;
+  font-size: clamp(26px, 2.5vw, 34px);
+  font-variant-numeric: tabular-nums;
+}
+.analysis-flow__stage > small { grid-column: 1; grid-row: 2; margin: 0; }
+.analysis-flow__bar { grid-column: 3; grid-row: 1 / span 2; min-width: 0; }
+/* The conclusion directly names the largest drop; repeating a floating badge
+   beside every lane adds clutter and can clip in a narrow container. */
+.analysis-flow__gap { display: none; border-color: var(--chart-grid); background: var(--chart-surface); }
+
+@media (max-width: 980px) {
+  .analysis-flow__stage { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+  .analysis-flow__stage-head { grid-column: 1; grid-row: 1; }
+  .analysis-flow__stage > strong { grid-column: 2; grid-row: 1; font-size: 30px; }
+  .analysis-flow__stage > small { grid-column: 1 / span 2; grid-row: 2; }
+  .analysis-flow__bar { grid-column: 1 / span 2; grid-row: 3; }
+}
+
+/* Matrix status tokens deliberately use symbols and words in markup too. */
+.analysis-matrix-cell--xong, .analysis-matrix-legend__item--xong { --matrix-accent: var(--chart-complete); --matrix-soft: var(--chart-complete-soft); }
+.analysis-matrix-cell--tre, .analysis-matrix-legend__item--tre { --matrix-accent: var(--chart-overdue); --matrix-soft: var(--chart-overdue-soft); }
+.analysis-matrix-cell--thieu, .analysis-matrix-legend__item--thieu { --matrix-accent: var(--chart-missing); --matrix-soft: var(--chart-missing-soft); }
+.analysis-matrix-cell--chua, .analysis-matrix-legend__item--chua { --matrix-accent: var(--chart-pending); --matrix-soft: var(--chart-pending-soft); }
+
+/* Annual clock: the circle keeps calendar meaning, but restrained tracks and
+   direct labels make monthly volume and completion easier to read. */
+.vmp-vongnam { --vmp-track: var(--chart-pending-soft); --vmp-lacquer: var(--chart-validation); --vmp-lacquer-hi: var(--chart-validation-text); --vmp-cinnabar: var(--chart-overdue); --vmp-antique-gold: var(--chart-report); --vmp-pearl-sage: var(--chart-complete); --vmp-smoke: var(--chart-pending); }
+.vmp-vongnam-vien { stroke: var(--chart-grid); filter: none; }
+.vmp-vongnam-ranh { stroke: var(--c-surface); fill-opacity: .92; }
+.vmp-vongnam-canh { filter: none; }
+.vmp-vongnam-canh--future { opacity: .34; }
+.vmp-vongnam-nap-quahan { fill: var(--chart-overdue); }
+.vmp-vongnam-loi-mat { stroke: color-mix(in srgb, var(--chart-complete) 45%, var(--chart-grid)); filter: none; }
+.vmp-vongnam-ben { border-color: color-mix(in srgb, var(--chart-complete) 30%, var(--c-border)); box-shadow: none; }
+
+/* Control chart keeps statistical marks secondary to the actual series. */
+.vmp-ctrl-svg { background: linear-gradient(180deg, color-mix(in srgb, var(--chart-surface) 72%, transparent), transparent); border-radius: 16px; }
+.vmp-ctrl-chu__tam { border-top-color: var(--chart-validation-text); }
+.vmp-ctrl-chu__gh { border-top-color: var(--chart-overdue); }
+.vmp-ctrl-chu__vuot { background: var(--chart-overdue); }
+.vmp-ctrl-chu__nay { border-color: var(--chart-pending); }
+.vmp-ctrl-bangbtn:hover { border-color: var(--chart-validation); color: var(--chart-validation-text); }
