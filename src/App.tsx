@@ -1163,7 +1163,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   onFocusConsumed={() => setMoDanhMuc(null)}
                   scopeLabel={nhanPhamVi} />
               )}
-              {view === "health" && <HealthView acts={filteredActs} access={access} />}
+              {view === "health" && <HealthView acts={filteredActs} access={access} onRefresh={reloadData} refreshing={conn.status === "loading"} clientReady={conn.status === "ok"} year={currentBangkokYear} scopeFiltered={deptSel.length > 0 || areaSel.length > 0 || periodFilter !== "all"} />}
               {view === "rules" && <ActiveRulesView access={access} />}
               {view === "progress" && (
                 <>

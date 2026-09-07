@@ -2,7 +2,7 @@
  *  HealthPage — màn "Chất lượng dữ liệu": tab kiểm client + tab server
  *  (F1 31/08: tách từ App.tsx, nạp lazy.)
  * ===================================================================== */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Radar, Search, ChevronRight, FileText } from "lucide-react";
 import { C, TEXT, NUM } from "../constants/theme.ts";
 import { LOAI_LOI, sevOf } from "../constants/vmp.ts";
@@ -22,10 +22,11 @@ import type { AccessContext } from "../lib/access.ts";
 import ServerChecksView from "./ServerChecksPage.tsx";
 import { formatBangkokDate, formatBangkokDateTime } from "../lib/formatBangkok.ts";
 
-export default function HealthView({ acts, access }: { acts: Activity[]; access?: AccessContext | null }) {
-  /* Bàn quản trị (spec 01/09): tab ĐỐI CHIẾU là mặc định — trả lời thẳng
-     "số trên máy tôi có nói dối không", thay vì bắt người vận hành mở hai
-     tab rồi tự so bằng mắt. Hai tab chi tiết giữ nguyên ruột. */
+export default function HealthView({ acts, access, onRefresh, refreshing = false, clientReady = true, scopeFiltered = false, year }: {
+  acts: Activity[]; access?: AccessContext | null;
+  onRefresh?: () => Promise<void>; refreshing?: boolean; clientReady?: boolean; scopeFiltered?: boolean; year?: number;
+}) {
+  /* Đối chiếu mặc định giải thích phạm vi và quy tắc của hai nguồn. */
   const [tab, setTab] = useNhomTab("health", "doi-chieu", ["doi-chieu", "client", "server"]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -35,7 +36,7 @@ export default function HealthView({ acts, access }: { acts: Activity[]; access?
         { id: "server", nhan: "Kiểm tra trên máy chủ" },
       ]} />
       <NhomTabPanel man="health" id="doi-chieu" tab={tab}>
-        <DoiChieuView acts={acts} />
+        <DoiChieuView acts={acts} onRefresh={onRefresh} refreshing={refreshing} clientReady={clientReady} scopeFiltered={scopeFiltered} year={year} />
       </NhomTabPanel>
       <NhomTabPanel man="health" id="client" tab={tab}>
         <DataQualityView acts={acts} />
@@ -49,68 +50,85 @@ export default function HealthView({ acts, access }: { acts: Activity[]; access?
 
 /* ---------------------------------------------------------------------
  * DoiChieuView — từng cặp số client/server cạnh nhau, CHỈ tô dòng lệch.
- * Client tính trên `acts` đang nhận (đã qua bộ lọc toàn cục); dòng chú
- * thích nói rõ điều đó — lệch do bộ lọc là lệch THẬT của bản đang xem.
+ * Giữ KPI đang theo dõi và phần ngoài KPI thành hai cột. Chỉ so sánh
+ * khi không lọc và tổng phạm vi đã khớp; hai bộ kiểm tra lỗi đứng riêng.
  * ------------------------------------------------------------------- */
-function DoiChieuView({ acts }: { acts: Activity[] }) {
+function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered, year }: {
+  acts: Activity[]; onRefresh?: () => Promise<void>; refreshing:boolean; clientReady:boolean; scopeFiltered:boolean; year?:number;
+}) {
   const [kpi, setKpi] = useState<ServerKpi | null>(null);
   const [soLoiServer, setSoLoiServer] = useState<number | null>(null);
   const [dangTai, setDangTai] = useState(true);
   const [loi, setLoi] = useState("");
 
-  const tai = async () => {
+  const generation = useRef(0);
+  const tai = async (refreshClient = false) => {
+    const run = ++generation.current;
     setDangTai(true); setLoi("");
+    setKpi(null); setSoLoiServer(null);
     try {
-      const [k, q] = await Promise.all([fetchDashboardKpi(), checkDataQuality()]);
+      const [k, q] = await Promise.all([
+        fetchDashboardKpi(year), checkDataQuality(year),
+        refreshClient ? onRefresh?.() : Promise.resolve(),
+      ]);
+      if (run !== generation.current) return;
+      if (!k?.validation || !k?.documentation || !Array.isArray(q)) throw new Error("Máy chủ chưa trả đủ dữ liệu đối chiếu");
       setKpi(k); setSoLoiServer(q.length);
     } catch (e) {
+      if (run !== generation.current) return;
       setLoi((e as Error).message || "Không đọc được số máy chủ");
       setKpi(null); setSoLoiServer(null);
     }
-    setDangTai(false);
+    if (run === generation.current) setDangTai(false);
   };
-  useEffect(() => { void tai(); }, []);
+  useEffect(() => { void tai(); return () => { generation.current++; }; }, [year]);
 
   const kq = useMemo(() => {
-    const e = tally(acts);
-    const d = docTally(acts);
-    const soLoiClient = runDataQualityChecks(acts).length;
+    const e = tally(acts), d = docTally(acts);
+    // Reclassify a COPY for diagnostic counting only. Original activity state
+    // and all operational KPI remain unchanged.
+    const outside = acts.filter(a => (a.state || "active") !== "active").map(a => ({...a,state:"active" as const}));
+    const ex=tally(outside), dx=docTally(outside);
+    const comparable=clientReady && !scopeFiltered && e.total+ex.total===kpi?.validation.total;
     return soSanhDoiChieu([
-      { nhan: "Hạng mục hoàn thành VMP", client: e.done, server: kpi?.validation.done ?? null },
-      { nhan: "Tổng hạng mục", client: e.total, server: kpi?.validation.total ?? null },
-      { nhan: "Hạng mục quá hạn", client: e.over, server: kpi?.validation.over ?? null },
-      { nhan: "Hồ sơ hoàn thành", client: d.done, server: kpi?.documentation.done ?? null },
-      { nhan: "Hồ sơ quá hạn", client: d.over, server: kpi?.documentation.over ?? null },
-      { nhan: "Vấn đề dữ liệu (đếm)", client: soLoiClient, server: soLoiServer },
-    ]);
-  }, [acts, kpi, soLoiServer]);
-  const kl = ketLuanDoiChieu(kq);
+      {nhan:"Hạng mục hoàn thành VMP",client:e.done,ngoaiKpi:ex.done,server:kpi?.validation.done ?? null},
+      {nhan:"Tổng hạng mục",client:e.total,ngoaiKpi:ex.total,server:kpi?.validation.total ?? null},
+      {nhan:"Hạng mục quá hạn",client:e.over,ngoaiKpi:ex.over,server:kpi?.validation.over ?? null},
+      {nhan:"Hồ sơ hoàn thành",client:d.done,ngoaiKpi:dx.done,server:kpi?.documentation.done ?? null},
+      {nhan:"Hồ sơ quá hạn",client:d.over,ngoaiKpi:dx.over,server:kpi?.documentation.over ?? null},
+    ],comparable);
+  },[acts,kpi,scopeFiltered,clientReady]);
+  const issueCount=useMemo(()=>runDataQualityChecks(acts).length,[acts]);
+  const kl=ketLuanDoiChieu(kq);
+  const busy=dangTai || refreshing;
 
   return (
     <Card variant="strong">
       <CardTitle icon={Radar}
-        sub="Client tính trên phạm vi ĐANG LỌC ở thanh trên; máy chủ tính cả năm — xoá bộ lọc trước khi kết luận lệch."
-        right={<button type="button" onClick={() => void tai()} disabled={dangTai}
+        sub="KPI đang theo dõi + hạng mục ngoài KPI = phạm vi tổng hợp của máy chủ. Chỉ kết luận khi đã bỏ lọc và hai nguồn có cùng tổng số hạng mục."
+        right={<button type="button" onClick={() => void tai(true)} disabled={busy} data-health-refresh
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px",
                    borderRadius: 10, border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
                    color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700,
-                   cursor: dangTai ? "wait" : "pointer" }}>
-          <RefreshCw size={13} className={dangTai ? "spin" : ""} /> {dangTai ? "Đang tải…" : "Làm mới"}
+                   cursor: busy ? "wait" : "pointer" }}>
+          <RefreshCw size={13} className={busy ? "spin" : ""} /> {busy ? "Đang tải hai nguồn…" : "Làm mới hai nguồn"}
         </button>}>
         Đối chiếu client ↔ máy chủ
       </CardTitle>
       {loi && (
         <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12,
                       background: C.raspSoft, color: C.raspText, fontSize: 13, fontWeight: 700 }}>
-          {loi} — cột máy chủ để trống, cột client vẫn đúng với bản đang xem.
+          {loi} — chưa có đủ dữ liệu để kết luận khớp hay lệch.
         </div>
       )}
-      <CauKetLuan chinh={kl.chinh} tone={kl.tone} />
-      <table className="reg-table" style={{ width: "100%" }}>
-        <caption>Từng cặp số client/máy chủ; chỉ dòng lệch được tô đỏ kèm mức chênh.</caption>
+      <div data-health-conclusion><CauKetLuan chinh={busy ? "Đang tải lại dữ liệu để đối chiếu…" : !clientReady ? "Chưa tải được dữ liệu bản đang xem; chưa thể đối chiếu." : kl.chinh} tone={busy || !clientReady ? "warn" : kl.tone} /></div>
+      <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>“Ngoài KPI” gồm các hạng mục Không áp dụng hoặc Đã hủy còn trong bản dữ liệu được phép xem. Chúng chỉ được cộng để giải thích số máy chủ; không được đưa vào KPI đang theo dõi. Khi đang lọc hoặc tổng phạm vi chưa khớp, cột chênh để trống.</p>
+      <div className="vmp-scroll" role="region" aria-label="Bảng đối chiếu cùng phạm vi" tabIndex={0} style={{overflowX:"auto"}}><table data-health-comparison className="reg-table" style={{ width: "100%",minWidth:600 }}>
+        <caption>Chênh sau đối chiếu = máy chủ − KPI đang theo dõi − ngoài KPI. Không thay đổi số liệu gốc.</caption>
         <thead><tr>
           <th scope="col">Con số</th>
-          <th scope="col" className="reg-num">Bản đang xem</th>
+          <th scope="col" className="reg-num">KPI đang theo dõi</th>
+          <th scope="col" className="reg-num">Ngoài KPI</th>
           <th scope="col" className="reg-num">Máy chủ</th>
           <th scope="col" className="reg-num">Chênh</th>
         </tr></thead>
@@ -118,19 +136,26 @@ function DoiChieuView({ acts }: { acts: Activity[] }) {
           {kq.rows.map((r) => (
             <tr key={r.nhan} style={r.lech ? { background: C.raspSoft } : undefined}>
               <th scope="row">{r.nhan}</th>
-              <td className="reg-num">{r.client ?? "…"}</td>
+              <td className="reg-num">{clientReady ? r.client ?? "…" : "Chưa tải"}</td>
+              <td className="reg-num">{clientReady ? r.ngoaiKpi ?? 0 : "Chưa tải"}</td>
               <td className="reg-num">{r.server ?? "…"}</td>
               <td className="reg-num" style={{ fontWeight: 800,
                 color: r.lech ? C.raspText : C.mintText }}>
-                {r.chenh === null ? "…" : r.chenh === 0 ? "khớp" : (r.chenh > 0 ? `+${r.chenh}` : String(r.chenh))}
+                {r.chenh === null ? "Chưa đối chiếu" : r.chenh === 0 ? "khớp" : (r.chenh > 0 ? `+${r.chenh}` : String(r.chenh))}
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
+      <div data-health-quality-sources style={{marginTop:18,padding:16,borderRadius:16,background:C.surfaceSunk}}>
+        <strong>Hai bộ kiểm tra chất lượng dữ liệu</strong>
+        <p>Bản đang xem: <b data-health-client-issues>{clientReady ? issueCount : "Chưa tải được"}</b> cảnh báo · Máy chủ: <b data-health-server-issues>{soLoiServer ?? "Chưa tải được"}</b> cảnh báo.</p>
+        <p style={{fontSize:13,lineHeight:1.7}}>Hai nguồn dùng quy tắc khác nhau, nên không lấy hiệu hai số để kết luận thiếu lỗi hoặc sai đồng bộ. Một hạng mục có thể có nhiều cảnh báo. Mở từng tab để xem loại cảnh báo và cách xử lý.</p>
+        <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>Nếu nguồn không cung cấp trường email QA, bản đang xem chưa thể kiểm tra trường đó; không tự kết luận nhân sự thiếu email.</p>
+      </div>
       {kpi?.updated_at && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-          Số máy chủ cập nhật lúc {formatBangkokDateTime(kpi.updated_at)} · muốn tính lại: tab Kiểm tra trên máy chủ → nút Tính lại trạng thái.
+          Mốc dữ liệu máy chủ: {formatBangkokDateTime(kpi.updated_at)}. Khác phạm vi không phải lý do để tự đổi trạng thái hồ sơ.
         </div>
       )}
     </Card>

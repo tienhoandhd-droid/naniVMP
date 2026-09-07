@@ -135,6 +135,7 @@ jobs:
             node tests/e2e/overview-lazy-performance.mjs &&
             node tests/e2e/chart-redesign.mjs &&
             node tests/e2e/field-performance.mjs &&
+            node tests/e2e/health-reconciliation.mjs &&
             node tests/e2e/today-personal-scope.mjs &&
             node tests/e2e/catalog-context-help.mjs &&
             node tests/e2e/copy-codes-button.mjs &&

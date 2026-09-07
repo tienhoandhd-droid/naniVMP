@@ -316,7 +316,9 @@ export function runDataQualityChecks(acts: Activity[]) {
     }
 
     // 6. Thiếu email QA
-    if (a.owner && a.owner !== "—" && !r.email_qa) {
+    // An omitted field was not supplied by this read model; it is not proof
+    // that the performer has no email. Explicit null/blank remains a warning.
+    if (a.owner && a.owner !== "—" && Object.hasOwn(r, "email_qa") && !r.email_qa) {
       issues.push({ type: "owner_no_email", severity: "info", id: a.id, msg: `QA "${a.owner}" chưa có email — không nhận được cảnh báo. Liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự.` });
     }
 

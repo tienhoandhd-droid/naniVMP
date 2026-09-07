@@ -482,7 +482,7 @@ export function useVmpData() {
 
   const reloadData = useCallback(() => {
     const c = loadConn() || {};
-    connectSheet(c.readUrl || conn.readUrl, c.writeUrl || conn.writeUrl, true);
+    return connectSheet(c.readUrl || conn.readUrl, c.writeUrl || conn.writeUrl, true);
   }, [conn, connectSheet]);
 
   // Refresh "im lặng" — cập nhật dữ liệu không hiện trạng thái "đang tải"
