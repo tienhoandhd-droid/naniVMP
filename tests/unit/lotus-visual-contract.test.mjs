@@ -64,20 +64,20 @@ test("thang bo góc cũ được ánh xạ sang thang Lotus", () => {
 
 /* ---- Token màu ----------------------------------------------------- */
 
-test("token nền và chữ chế độ sáng đúng semantic v4 (nghiên cứu 7)", () => {
+test("token nền và chữ chế độ sáng đúng bảng ivory–rose v5", () => {
   /* v4 (nghiên cứu 7): tách PIGMENT khỏi VAI TRÒ. Nền có năm tầng
      canvas/sunken/surface/raised/overlay; chữ có ba bậc; token cũ trỏ
      var() về lớp v4 để ~990 style nội tuyến đổi theo mà không sửa dòng
-     nào. Canvas đậm hơn một bậc (#F7F0F3 → #F3EAEE) để light có chiều
-     sâu; mọi cặp chữ/nền vẫn ≥ 4.5:1. */
-  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F3EAEE");
-  assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#E9DDE3");
-  assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FFFDFB");
+     nào. Bản v5 làm nền sứ ấm hơn (#F8F1EA), giữ lớp chìm rose nhẹ và
+     mọi cặp chữ/nền vẫn ≥ 4.5:1. */
+  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F8F1EA");
+  assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#F1E5E1");
+  assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FFFDF9");
   assert.equal(bien(KHOI_SANG, "lp-bg-raised"), "#FFFFFF");
   assert.equal(bien(KHOI_SANG, "lp-bg-overlay"), "#FFFFFF");
-  assert.equal(bien(KHOI_SANG, "lp-text-primary"), "#2F2430");
-  assert.equal(bien(KHOI_SANG, "lp-text-secondary"), "#5B4D59");
-  assert.equal(bien(KHOI_SANG, "lp-text-tertiary"), "#756975");
+  assert.equal(bien(KHOI_SANG, "lp-text-primary"), "#34272B");
+  assert.equal(bien(KHOI_SANG, "lp-text-secondary"), "#5F4D52");
+  assert.equal(bien(KHOI_SANG, "lp-text-tertiary"), "#77666B");
   // Cầu: token cũ phải TRỎ vào v4, không được giữ hex riêng lệch pha.
   assert.equal(bien(KHOI_SANG, "lp-canvas"), "var(--lp-bg-canvas)");
   assert.equal(bien(KHOI_SANG, "lp-surface"), "var(--lp-bg-surface)");
@@ -85,12 +85,12 @@ test("token nền và chữ chế độ sáng đúng semantic v4 (nghiên cứu 
   assert.equal(bien(KHOI_SANG, "lp-ink"), "var(--lp-text-primary)");
   assert.equal(bien(KHOI_SANG, "lp-ink-muted"), "var(--lp-text-secondary)");
   // Brand solid tách khỏi brand accent — không còn token đảo nghĩa theo theme.
-  assert.equal(bien(KHOI_SANG, "lp-brand-solid"), "#3E213E");
+  assert.equal(bien(KHOI_SANG, "lp-brand-solid"), "#4A2941");
   assert.equal(bien(KHOI_SANG, "lp-on-brand-solid"), "#FFFDFC");
-  assert.equal(bien(KHOI_SANG, "lp-brand"), "#5A3158");
+  assert.equal(bien(KHOI_SANG, "lp-brand"), "#6B3B55");
   assert.equal(bien(KHOI_SANG, "lp-plum"), "var(--lp-brand)");
-  assert.equal(bien(KHOI_SANG, "lp-plum-900"), "#3E213E");
-  assert.equal(bien(KHOI_SANG, "lp-rose"), "#A74F72");
+  assert.equal(bien(KHOI_SANG, "lp-plum-900"), "#4A2941");
+  assert.equal(bien(KHOI_SANG, "lp-rose"), "#B35872");
 });
 
 test("ba màu ngữ nghĩa và vàng trang trí, chế độ sáng", () => {

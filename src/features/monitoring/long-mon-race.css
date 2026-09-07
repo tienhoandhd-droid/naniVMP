@@ -195,7 +195,7 @@
   flex: 1;
   min-height: 0;
   max-height: none;
-  overflow-x: hidden;
+  overflow-x: auto;
   /* auto chứ không hidden: mùa cao điểm hồ sâu thêm bậc (TEAM_HEIGHT_LEVELS)
      thì cuộn dọc, thay vì cắt cụt đàn cá dưới đáy. */
   overflow-y: auto;
@@ -1064,4 +1064,134 @@
 @media (prefers-reduced-motion: reduce) {
   .long-mon-race__fish:hover .long-mon-race__sprite,
   .long-mon-race__fish:focus-visible .long-mon-race__sprite { animation: none; }
+}
+
+/* Two ways to read the same authorized data: a calendar and a living pond. */
+.long-mon-race__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  flex-wrap: wrap;
+  background: var(--lp-surface);
+  border-bottom: 1px solid var(--lp-line);
+}
+.long-mon-race__view-switch {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  background: var(--lp-surface-2);
+}
+.long-mon-race__view-switch button,
+.long-mon-race__pause {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--lp-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+.long-mon-race__view-switch button[aria-pressed="true"] {
+  color: var(--lp-on-success);
+  background: var(--lp-success);
+  box-shadow: var(--e-card);
+}
+.long-mon-race__pause {
+  margin-left: auto;
+  border-color: var(--lp-line);
+  background: var(--lp-raised);
+}
+.long-mon-race__pause[aria-pressed="true"] {
+  background: var(--lp-success-soft);
+  color: var(--lp-success);
+}
+.long-mon-race__view-switch button:hover:not([aria-pressed="true"]),
+.long-mon-race__pause:hover { background: var(--lp-success-soft); color: var(--lp-success); }
+.long-mon-race__view-switch button:focus-visible,
+.long-mon-race__pause:focus-visible { outline: 3px solid var(--lp-focus); outline-offset: 3px; }
+.long-mon-race__view-hint {
+  flex: 1 1 210px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--lp-text-secondary);
+}
+.long-mon-race[data-view="organic"] .long-mon-race__periods,
+.long-mon-race[data-view="organic"] .long-mon-race__months,
+.long-mon-race[data-view="organic"] .long-mon-race__weeks,
+.long-mon-race[data-view="organic"] .long-mon-race__today { display: none; }
+.long-mon-race[data-view="organic"] .long-mon-race__gate { opacity: .6; }
+.long-mon-race[data-view="organic"] .long-mon-race__fish-body { scale: var(--organic-facing) 1; }
+.long-mon-race[data-view="organic"] .long-mon-race__fish-position {
+  animation: long-mon-roam calc(var(--swim-dur) * 3) ease-in-out var(--swim-delay) infinite;
+}
+.long-mon-race__pond-light { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.long-mon-race__pond-light i {
+  position: absolute;
+  width: 38%;
+  aspect-ratio: 2.5;
+  left: 12%;
+  top: 35%;
+  border: 1px solid color-mix(in srgb, var(--lp-porcelain) 35%, transparent);
+  border-radius: 50%;
+  opacity: .4;
+  rotate: -18deg;
+  animation: long-mon-ripple 16s ease-in-out infinite;
+}
+.long-mon-race__pond-light i:nth-child(2) { left: 40%; top: 60%; width: 28%; animation-delay: -6s; }
+.long-mon-race__pond-light i:nth-child(3) { left: 22%; top: 22%; width: 16%; animation-delay: -11s; }
+@keyframes long-mon-roam {
+  0%, 100% { translate: -10px 2px; }
+  25% { translate: 10px -9px; }
+  55% { translate: 16px 5px; }
+  80% { translate: -4px 10px; }
+}
+@keyframes long-mon-ripple {
+  0%, 100% { scale: .85; opacity: .15; }
+  50% { scale: 1.12; opacity: .4; }
+}
+/* Freeze the whole pond before a user aims or tabs; fish remain selectable. */
+.long-mon-race[data-paused="true"] *,
+.long-mon-race__viewport:hover *,
+.long-mon-race__viewport:focus-within * { animation-play-state: paused !important; }
+.long-mon-race__fish-position:has(.long-mon-race__fish:hover),
+.long-mon-race__fish-position:focus-within { z-index: 20; }
+:root[data-theme="dark"] .long-mon-race__head {
+  background: linear-gradient(110deg, var(--lp-surface), var(--lp-success-soft));
+}
+:root[data-theme="dark"] .long-mon-race__scope-switch,
+:root[data-theme="dark"] .long-mon-race__person select { background: var(--lp-surface); }
+@media (max-width: 719px) {
+  .long-mon-race__toolbar { padding: 10px; gap: 8px; }
+  .long-mon-race__view-switch { flex: 1; }
+  .long-mon-race__view-switch button { flex: 1; padding-inline: 8px; }
+  .long-mon-race__view-hint { order: 3; flex-basis: 100%; }
+  .long-mon-race__pause { padding-inline: 10px; }
+  .long-mon-race__pause span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .long-mon-race[data-view="organic"] .long-mon-race__fish-position,
+  .long-mon-race__pond-light i { animation: none; }
+  .long-mon-race__view-switch button,
+  .long-mon-race__pause { transition: none; }
+}
+
+/* Legend is interface, not artwork: follow the theme in both color channels. */
+.long-mon-race__footer { background: var(--lp-surface); border-color: var(--lp-line); }
+.long-mon-race__legend li { background: var(--lp-raised); border-color: var(--lp-line); }
+.long-mon-race__legend strong { white-space: normal; overflow: visible; text-wrap: balance; }
+@media (max-width: 719px) {
+  .long-mon-race { height: auto; min-height: 0; }
+  .long-mon-race__viewport { flex: none; height: max(380px, 52dvh); }
 }

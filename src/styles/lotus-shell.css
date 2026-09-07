@@ -13,7 +13,8 @@
 .vmp-main-nen {
   background:
     radial-gradient(820px 620px at 88% -8%, var(--lp-rose-soft), transparent 62%),
-    radial-gradient(720px 620px at -6% 108%, var(--lp-surface-2), transparent 58%),
+    radial-gradient(620px 500px at -8% 108%, var(--lp-success-soft), transparent 60%),
+    radial-gradient(720px 620px at 42% 108%, var(--lp-surface-2), transparent 58%),
     var(--lp-canvas);
   isolation: isolate;
 }
@@ -155,6 +156,42 @@
 .vq-brand__tagline { margin-top: 3px; font-family: var(--ff-display); font-style: italic; font-size: 12.5px; font-weight: 500; color: var(--lp-plum); letter-spacing: 0.02em; white-space: nowrap; }
 .vq-brand__donvi { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-ink-muted); white-space: nowrap; }
 .vq-brand__donvi svg { flex: none; stroke: var(--lp-gold); fill: var(--lp-gold); }
+
+/* Sidebar dùng inline styles để giữ layout cũ. Các lớp dưới chỉ đổi lớp
+ * hoàn thiện: ivory ấm cho nền, rose cho mục đang chọn và jade rất nhẹ cho
+ * vùng tài khoản; không đổi nhãn, biểu tượng hay thứ tự điều hướng. */
+.vmp-sidebar {
+  background:
+    radial-gradient(260px 220px at 100% 0%, var(--lp-rose-soft), transparent 72%),
+    linear-gradient(180deg, var(--lp-surface), var(--lp-surface-2)) !important;
+}
+.vmp-sidebar .vmp-nav {
+  position: relative;
+  min-height: 44px;
+  border: 1px solid transparent !important;
+}
+.vmp-sidebar .vmp-nav[aria-current="page"] {
+  background: linear-gradient(90deg, var(--lp-rose-soft), var(--lp-surface)) !important;
+  border-color: color-mix(in srgb, var(--lp-rose) 24%, var(--lp-line)) !important;
+  box-shadow: inset 3px 0 0 var(--lp-rose), var(--lp-e-low) !important;
+  color: var(--lp-brand) !important;
+}
+.vmp-sidebar .vmp-nav[aria-current="page"] svg { color: var(--lp-rose) !important; }
+.vmp-sidebar .vmp-nav:hover {
+  background: color-mix(in srgb, var(--lp-rose-soft) 72%, var(--lp-surface)) !important;
+}
+.vmp-sidebar .vmp-nav:focus-visible { outline-offset: 3px; }
+.vmp-sidebar-preferences {
+  background: color-mix(in srgb, var(--lp-rose-soft) 62%, var(--lp-surface)) !important;
+}
+.vmp-sidebar-account__identity {
+  background: linear-gradient(145deg, var(--lp-surface), var(--lp-success-soft)) !important;
+  border-color: color-mix(in srgb, var(--lp-success) 28%, var(--lp-line)) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmp-sidebar .vmp-nav { transition: none; }
+}
 
 /* ---- Chân trang: giờ đồng bộ ------------------------------------- */
 .vmp-chan-trang { margin: 28px 0 0; font-size: 12px; font-weight: 600; color: var(--lp-ink-muted); text-align: right; }

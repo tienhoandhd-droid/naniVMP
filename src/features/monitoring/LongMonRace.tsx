@@ -1,5 +1,5 @@
-import { CalendarClock } from "lucide-react";
-import { memo, useEffect, useMemo, useRef } from "react";
+import { CalendarClock, CalendarDays, Waves, Pause, Play } from "lucide-react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Activity } from "../../types/domain.ts";
 import {
@@ -7,6 +7,8 @@ import {
   LONG_MON_STAGE_META,
   type LongMonStageMeta,
 } from "./longMonRaceModel.ts";
+
+import { buildOrganicPlacements, parseLongMonView, LONG_MON_VIEW_KEY, type LongMonView } from "./longMonPresentation.ts";
 
 /* BASE_URL thay vì "/": app deploy GitHub Pages dạng project
  * (https://<user>.github.io/<repo>/) với `base: "./"` — đường dẫn tuyệt
@@ -96,6 +98,7 @@ type FishStyle = CSSProperties & {
   "--motion-x": string;
   "--motion-y": string;
   "--motion-rotate": string;
+  "--organic-facing": number;
 };
 
 type RaceCanvasStyle = CSSProperties & {
@@ -135,29 +138,47 @@ function LongMonRace({
     () => buildLongMonRaceModel(activities, now, { audience }),
     [activities, now, audience],
   );
+  const [view, setView] = useState<LongMonView>(() => {
+    try { return parseLongMonView(localStorage.getItem(LONG_MON_VIEW_KEY)); }
+    catch { return "date"; }
+  });
+  const [paused, setPaused] = useState(false);
+  const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.hidden);
+  const organic = useMemo(() => view === "organic" ? buildOrganicPlacements(model.fish) : null, [model.fish, view]);
+  const sceneHeight = view === "organic" ? Math.max(500, Math.ceil(model.fish.length / 12) * 70) : model.sceneHeightPx;
+  function changeView(next: LongMonView) {
+    setView(next);
+    try { localStorage.setItem(LONG_MON_VIEW_KEY, next); } catch { /* Display still works in private mode. */ }
+  }
+  useEffect(() => {
+    const onVisibility = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
   const viewportRef = useRef<HTMLDivElement>(null);
   const metaByStage = META_BY_STAGE;
   const canvasStyle: RaceCanvasStyle = {
     "--long-mon-scene-width": `${model.sceneWidthPx}px`,
-    "--long-mon-scene-height": `${model.sceneHeightPx}px`,
+    "--long-mon-scene-height": `${sceneHeight}px`,
   };
 
   useEffect(() => {
     const viewport = viewportRef.current;
+    if (view === "organic") { if (viewport) { viewport.scrollLeft = 0; viewport.scrollTop = 0; } return; }
     if (!viewport || viewport.scrollWidth <= viewport.clientWidth + 1) return;
     const today = viewport.querySelector<HTMLElement>(".long-mon-race__today");
     if (!today) return;
     const target = today.offsetLeft - viewport.clientWidth / 2;
     viewport.scrollLeft = Math.max(0, Math.min(target, viewport.scrollWidth - viewport.clientWidth));
-  }, [model.todayPct]);
+  }, [model.todayPct, view]);
 
   return (
-    <section className="long-mon-race" aria-label="Dòng thời gian VMP 60 ngày quanh Hôm nay">
+    <section className="long-mon-race" data-view={view} data-paused={paused || hidden} aria-label={view === "date" ? "Dòng thời gian VMP 60 ngày quanh Hôm nay" : "Long Môn VMP · Ngư đồ nghệ thuật"}>
       <header className="long-mon-race__head">
         <div className="long-mon-race__title-block">
           <span className="long-mon-race__eyebrow">60 ngày quanh Hôm nay</span>
           <h2>Long Môn VMP</h2>
-          <p>Bấm cá để xem hạn và hồ sơ</p>
+          <p>Mỗi cá một hành trình · Bấm cá để xem hạn và hồ sơ</p>
         </div>
         <div className="long-mon-race__head-side">
           {scopeControl && (
@@ -198,12 +219,31 @@ function LongMonRace({
         </div>
       </header>
 
-      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label="60 ngày VMP quanh Hôm nay; màn hình nhỏ có thể kéo ngang">
+      <div className="long-mon-race__toolbar">
+        <div className="long-mon-race__view-switch" role="group" aria-label="Cách sắp xếp cá">
+          <button type="button" data-long-mon-view="date" aria-pressed={view === "date"} onClick={() => changeView("date")}>
+            <CalendarDays size={17} aria-hidden="true" /> Theo ngày
+          </button>
+          <button type="button" data-long-mon-view="organic" aria-pressed={view === "organic"} onClick={() => changeView("organic")}>
+            <Waves size={18} aria-hidden="true" /> Bơi tự nhiên
+          </button>
+        </div>
+        <p className="long-mon-race__view-hint" aria-live="polite">
+          {view === "date" ? "Vị trí cá theo hạn VMP · từ trái sang phải" : "Ngư đồ nghệ thuật · vị trí tự do, hạn VMP giữ nguyên"}
+        </p>
+        <button type="button" className="long-mon-race__pause" data-long-mon-pause aria-pressed={paused}
+          aria-label={paused ? "Tiếp tục bơi" : "Tạm dừng chuyển động"} onClick={() => setPaused(value => !value)}>
+          {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
+          <span>{paused ? "Tiếp tục bơi" : "Tạm dừng"}</span>
+        </button>
+      </div>
+
+      <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label={view === "date" ? "60 ngày VMP quanh Hôm nay; màn hình nhỏ có thể kéo ngang" : "Hồ cá nghệ thuật; dùng Tab để chọn cá và Enter để mở hồ sơ"}>
         <div
           className="long-mon-race__canvas long-mon-race__canvas--adaptive-scene"
           data-density-scale={model.densityScale}
           data-scene-width={model.sceneWidthPx}
-          data-scene-height={model.sceneHeightPx}
+          data-scene-height={sceneHeight}
           style={canvasStyle}
         >
           {/* fetchpriority="high": tranh nền LÀ nội dung chính của màn — trình
@@ -215,6 +255,7 @@ function LongMonRace({
           <img className="long-mon-race__gate" src={GATE_URL} alt="" aria-hidden="true"
             width={540} height={1120} decoding="async" loading="lazy" />
           <div className="long-mon-race__wash" aria-hidden="true" />
+          {view === "organic" && <div className="long-mon-race__pond-light" aria-hidden="true"><i /><i /><i /></div>}
 
           <div className="long-mon-race__periods" aria-hidden="true">
             {model.periods.map((period) => (
@@ -266,18 +307,20 @@ function LongMonRace({
                 const code = String(fish.activity.code || fish.activity.id);
                 const name = String(fish.activity.name || fish.activity.objName || fish.activity.obj || "Hạng mục VMP");
                 const swim = swimTiming(String(fish.activity.id), fish.deadline);
+                const placement = organic?.get(String(fish.activity.id));
                 const style: FishStyle = {
                   "--swim-delay": swim.delay,
                   "--swim-dur": swim.dur,
-                  "--long-mon-x": `${fish.renderXPct}%`,
-                  "--long-mon-y": `${fish.renderYPct}%`,
-                  "--school-x": `${fish.renderOffsetXPx}px`,
-                  "--school-y": `${fish.renderOffsetYPx}px`,
-                  "--school-scale": fish.renderScale,
-                  "--school-rotate": `${fish.renderRotateDeg}deg`,
+                  "--long-mon-x": `${placement?.xPct ?? fish.renderXPct}%`,
+                  "--long-mon-y": `${placement?.yPct ?? fish.renderYPct}%`,
+                  "--school-x": `${placement ? 0 : fish.renderOffsetXPx}px`,
+                  "--school-y": `${placement ? 0 : fish.renderOffsetYPx}px`,
+                  "--school-scale": placement?.scale ?? fish.renderScale,
+                  "--school-rotate": `${placement?.rotateDeg ?? fish.renderRotateDeg}deg`,
                   "--motion-x": swim.x,
                   "--motion-y": swim.y,
                   "--motion-rotate": swim.rotate,
+                  "--organic-facing": placement && placement.rotateDeg < 0 ? -1 : 1,
                 };
                 return (
                   <span key={fish.activity.id} className="long-mon-race__fish-position" style={style} role="listitem">

@@ -14,6 +14,7 @@
  *  Model gom lỗi thuần (taoBoGomLoi) tách riêng cho node --test.
  * ===================================================================== */
 import { supabase } from "./supabaseClient.ts";
+import { sanitizeClientError } from "./clientErrorPrivacy.ts";
 
 export type NguonLoi = "window.onerror" | "unhandledrejection" | "error-boundary" | "thu-cong";
 
@@ -44,17 +45,22 @@ let rpcVang = false; // migration chưa áp — tắt cho hết phiên
 async function gui(message: string, stack: string | null, source: NguonLoi): Promise<void> {
   try {
     if (!supabase || rpcVang) return;
+    const sanitized = sanitizeClientError(
+      message,
+      stack,
+      `${location.pathname}${location.search}${location.hash}`,
+    );
     boGom ??= taoBoGomLoi();
-    if (!boGom.nhan(message, Date.now())) return;
+    if (!boGom.nhan(sanitized.message, Date.now())) return;
     /* RPC nằm ngoài types sinh tự động (gen types chạy lại sau khi áp
        migration 20260831170000) — ép kiểu tạm, có PGRST202 đỡ phía dưới. */
     const rpc = supabase.rpc.bind(supabase) as unknown as (
       ten: string, thamSo: Record<string, unknown>,
     ) => Promise<{ error: { code?: string } | null }>;
     const { error } = await rpc("rpc_ghi_loi_client", {
-      p_message: message.slice(0, 2000),
-      ...(stack ? { p_stack: stack.slice(0, 8000) } : {}),
-      p_url: `${location.pathname}${location.hash}`.slice(0, 500),
+      p_message: sanitized.message,
+      ...(sanitized.stack ? { p_stack: sanitized.stack } : {}),
+      p_url: sanitized.url,
       p_source: source,
     });
     // PGRST202: PostgREST không thấy hàm; 42883: Postgres không có hàm.
