@@ -70,7 +70,7 @@ try {
   if (shell.progressWidth <= 0 || shell.progressWidth > 481 || !shell.rowColumns.includes("px")) {
     throw new Error(`progress: ${JSON.stringify(shell)}`);
   }
-  if (shell.artOpacity !== "0.32") throw new Error(`opacity tranh nền: ${shell.artOpacity}`);
+  if (shell.artOpacity !== "0.17") throw new Error(`opacity tranh nền: ${shell.artOpacity}`);
 
   await page.click(".vmp-chat-fab");
   await page.waitForSelector('.vmp-chat-panel[role="dialog"]');

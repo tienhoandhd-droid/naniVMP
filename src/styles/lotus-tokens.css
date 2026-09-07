@@ -47,6 +47,15 @@
   --lp-brand:          #6B3B55;
   --lp-brand-hover:    #572E46;
 
+  /* Navigation is its own interaction layer: it must never borrow the
+     * success/warning/danger palette. The selected location is a quiet,
+     * deep plum field; jade only acknowledges a possible next action. */
+  --lp-nav-surface:    #FFFDF9;
+  --lp-nav-hover:      #EDF5EF;
+  --lp-nav-current:    #4A2941;
+  --lp-on-nav-current: #FFFDFC;
+  --lp-nav-hairline:   #C7A15B;
+
   /* --- Tên cũ trỏ về v4 --------------------------------------------- */
   --lp-canvas:    var(--lp-bg-canvas);
   --lp-surface:   var(--lp-bg-surface);
@@ -272,6 +281,14 @@
   --lp-on-brand-solid: #FFF7FA;
   --lp-brand:          #D8A8BC;
   --lp-brand-hover:    #E3B8C9; /* dark: hover SÁNG lên, không tối đi */
+
+  /* Keep navigation orientation stable across themes. Its plum selection
+     * remains distinct from the semantic status colours below. */
+  --lp-nav-surface:    #211A22;
+  --lp-nav-hover:      #26382F;
+  --lp-nav-current:    #41263F;
+  --lp-on-nav-current: #FFF7FA;
+  --lp-nav-hairline:   #D8B76C;
 
   /* Trên nền tối, tím mận đặc trở nên không đọc được, nên vai trò accent
      đảo sang sắc phấn sáng hơn. Bí danh 700/600/rose-600 tự đi theo

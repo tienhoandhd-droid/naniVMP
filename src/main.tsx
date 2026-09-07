@@ -18,7 +18,6 @@ import "./styles/lotus-components.css";
 import "./styles/lotus-responsive.css";
 import "./styles/lotus-art.css";
 import "./styles/lotus-shell.css";
-import "./features/today/today.css";
 import "./features/monitoring/monitoring.css";
 import "./features/overview/overview-executive.css";
 import "./features/analysis/analysis.css";

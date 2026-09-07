@@ -15,7 +15,7 @@ const access = parseAccessContext({
   },
 });
 
-function renderTopbar() {
+function renderTopbar(overrides = {}) {
   return renderToStaticMarkup(React.createElement(Topbar, {
     title: "Tổng quan VMP",
     user: { name: "Quản trị" },
@@ -25,6 +25,7 @@ function renderTopbar() {
     access,
     onLogout: () => {},
     onChangePw: () => {},
+    ...overrides,
   }));
 }
 
@@ -60,4 +61,13 @@ test("nút đổi giao diện nằm trong hàng tùy chọn riêng trước th�
   assert.ok(preferencesStart < themeStart, "nút theme phải thuộc hàng tùy chọn");
   assert.ok(themeStart < accountStart, "hàng tùy chọn theme phải đứng trước thẻ tài khoản");
   assert.doesNotMatch(html.slice(accountStart), /aria-label="Giao diện Theo hệ thống/);
+});
+
+test("Today omits last-edited timestamp while keeping its subtitle", () => {
+  const html = renderTopbar({view:"today", title:"Việc hôm nay", sub:"Việc của tôi hôm nay", dataUpdatedAt:"2026-09-01T00:05:00Z"});
+  assert.doesNotMatch(html, /Sửa lần cuối/);
+  assert.match(html, /Việc của tôi hôm nay/);
+});
+test("Other screens retain the data timestamp", () => {
+  assert.match(renderTopbar({dataUpdatedAt:"2026-09-01T00:05:00Z"}), /Sửa lần cuối/);
 });

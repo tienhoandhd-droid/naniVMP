@@ -78,17 +78,14 @@
 }
 
 .monitoring-journey__item.is-active {
-  border-color: var(--lp-plum-2);
-  /* #3 (01/09): thẻ Đang xem là khối "không khí" như hero — dùng --lp-hero
-     để dark giữ plum sâu thay vì đảo thành slab hồng giữa màn đêm. */
-  background: var(--lp-hero);
-  color: var(--lp-on-hero);
-  box-shadow: inset 3px 0 0 var(--lp-gold);
+  border-color: var(--lp-nav-hairline);
+  background: var(--lp-nav-current);
+  color: var(--lp-on-nav-current);
+  box-shadow: inset 3px 0 0 var(--lp-nav-hairline);
 }
 
-/* Số của thẻ ĐANG XEM: vàng trên mận đọc được ở theme sáng, nhưng dark đảo
-   mận thành hồng nhạt → vàng-trên-hồng tàng hình (đo 01/09). currentColor
-   = màu chữ của thẻ, tự đúng ở cả hai theme. */
+/* Số của thẻ ĐANG XEM lấy đúng màu chữ đã ghép với nền điều hướng, nên
+   luôn đọc được khi chuyển giữa hai theme. */
 .monitoring-journey__item.is-active .monitoring-journey__metric > strong {
   color: currentColor;
 }

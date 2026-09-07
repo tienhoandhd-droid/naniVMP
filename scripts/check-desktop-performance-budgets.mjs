@@ -5,6 +5,7 @@ import { gzipSync } from "node:zlib";
 
 export const SHELL_BUDGET = 275 * 1024;
 export const ROUTE_BUDGETS = {
+  "src/pages/TodayCommandCenterPage.tsx": 40 * 1024,
   "src/components/dashboard/ReportsView.tsx": 50 * 1024,
   "src/pages/AlertsPage.tsx": 100 * 1024,
   "src/pages/UpdatePage.tsx": 100 * 1024,

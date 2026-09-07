@@ -129,7 +129,8 @@ jobs:
             npm run e2e:progress-rights &&
             npm run e2e:admin &&
             npm run shell &&
-            node tests/e2e/long-mon-presentation.mjs
+            node tests/e2e/long-mon-presentation.mjs &&
+            node tests/e2e/today-header-performance.mjs
           '
       # E4 (31/08): CI đỏ mà chỉ có log text thì chẩn đoán mù — giữ lại
       # screenshot/trace KHI FAIL (và chỉ khi fail, giữ release lean).

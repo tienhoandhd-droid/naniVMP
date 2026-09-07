@@ -81,7 +81,7 @@ const SidebarMemo = memo(Sidebar);
 const TopbarMemo = memo(Topbar);
 import LoginScreen, { type LoginScreenMode } from "./components/auth/LoginScreen.tsx";
 import PasswordRecoveryScreen from "./components/auth/PasswordRecoveryScreen.tsx";
-import TodayCommandCenter from "./features/today/TodayCommandCenter.tsx";
+const TodayCommandCenter = lazy(nhapCoThuLai(() => import("./pages/TodayCommandCenterPage.tsx")));
 const TodayCommandCenterMemo = memo(TodayCommandCenter);
 import { TodayScopeControl } from "./features/today/TodayScopeControl.tsx";
 import {
@@ -1284,9 +1284,6 @@ function VerifiedAppShell({ user, logout, access }: {
                 <TodayCommandCenterMemo
                   acts={todayActs}
                   scopeLabel={nhanPhamViToday}
-                  updatedLabel={dataUpdatedAt
-                    ? `Sửa lần cuối: ${formatBangkokDateTime(dataUpdatedAt)}`
-                    : undefined}
                   state={conn.status === "loading" ? "loading" : conn.status === "err" ? "error" : "ready"}
                   onRetry={reloadData}
                   hasScopeFilters={deptSel.length > 0 || areaSel.length > 0}

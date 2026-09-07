@@ -107,6 +107,6 @@ test("overview background and progress summary preserve dashboard legibility", (
 
   assert.match(app, /className="vmp-overview-progress"/);
   assert.match(app, /className="vmp-overview-progress__row"/);
-  assert.match(shell, /\.vmp-main-nen::before[\s\S]*?opacity:\s*0\.32;/);
+  assert.match(shell, /\.vmp-main-nen::before[\s\S]*?opacity:\s*0\.17;/);
   assert.match(shell, /\.vmp-overview-progress__row/);
 });

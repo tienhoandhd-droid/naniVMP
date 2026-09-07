@@ -20,6 +20,8 @@ test("prefetch gate rejects Timeline, Save-Data and non-desktop", () => {
   assert.equal(canPrefetchDesktopRoute("reports", { desktop: true, saveData: true }), false);
   assert.equal(canPrefetchDesktopRoute("reports", { desktop: false, saveData: false }), false);
   assert.equal(canPrefetchDesktopRoute("reports", { desktop: true, saveData: false }), true);
+  assert.equal(canPrefetchDesktopRoute("today", { desktop: true, saveData: false }), true);
+  assert.equal(canPrefetchDesktopRoute("today", { desktop: true, saveData: true }), false);
 });
 
 test("budget helper rejects an oversized route", () => {
@@ -105,6 +107,7 @@ test("route budget rejects a route folded into the shell", () => {
 test("budgets stay pinned to the approved byte limits", () => {
   assert.equal(SHELL_BUDGET, 275 * 1024);
   assert.deepEqual(ROUTE_BUDGETS, {
+    "src/pages/TodayCommandCenterPage.tsx": 40 * 1024,
     "src/components/dashboard/ReportsView.tsx": 50 * 1024,
     "src/pages/AlertsPage.tsx": 100 * 1024,
     "src/pages/UpdatePage.tsx": 100 * 1024,

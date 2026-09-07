@@ -178,7 +178,7 @@ test("silent refresh success recovers a retryable connection error", async () =>
 test("shell keeps Today period-independent, canonical, static and deep-link safe", async () => {
   const source = await readFile(new URL("../../src/App.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /import TodayCommandCenter from "\.\/features\/today\/TodayCommandCenter\.tsx"/);
+  assert.match(source, /const TodayCommandCenter = lazy\(nhapCoThuLai\(\(\) => import\("\.\/pages\/TodayCommandCenterPage\.tsx"\)\)\)/);
   assert.doesNotMatch(source, /const TodayView = lazy/);
   assert.match(source, /useState<ProgressDeepLink \| null>\(null\)/);
   assert.match(source, /const moTienDo = useCallback\(\(link: ProgressDeepLink\)[\s\S]*setMoHangMuc\(link\);[\s\S]*setNhomTheo\("hangmuc"\);[\s\S]*setView\("progress"\)/);

@@ -461,12 +461,6 @@ export function Topbar({ title, user, sub, dataUpdatedAt,
     requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
   }, []);
   const closeMobileMenuForAction = useCallback(() => setMobileMenuOpen(false), []);
-  // Đồng hồ chỉ để kích hoạt render lại mỗi phút; giá trị không dùng trực tiếp.
-  const [, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(t);
-  }, []);
 
   return (
     <div className={`vmp-topbar${compact ? " vmp-topbar--compact" : ""}`} style={{
@@ -522,7 +516,7 @@ export function Topbar({ title, user, sub, dataUpdatedAt,
               mọi thứ "trông vẫn bình thường".
               Nhưng chỉ hiện, KHÔNG tô màu báo động: Supabase là dữ liệu gốc nên
               "lâu không đổi" chỉ nghĩa là chưa ai nhập liệu. */}
-          {dataUpdatedAt && (() => {
+          {view !== "today" && dataUpdatedAt && (() => {
             const t = tuoiDuLieu(dataUpdatedAt);
             if (!t) return null;
             return (
