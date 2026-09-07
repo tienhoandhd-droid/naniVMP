@@ -59,7 +59,7 @@
 .vmp-vongnam-canh--future { opacity: .34; }
 .vmp-vongnam-nap-quahan { fill: var(--chart-overdue); }
 .vmp-vongnam-loi-mat { stroke: color-mix(in srgb, var(--chart-complete) 45%, var(--chart-grid)); filter: none; }
-.vmp-vongnam-ben { border-color: color-mix(in srgb, var(--chart-complete) 30%, var(--c-border)); box-shadow: none; }
+.vmp-vongnam-ben { border-color: color-mix(in srgb, var(--chart-complete) 30%, var(--c-line)); box-shadow: none; }
 
 /* Control chart keeps statistical marks secondary to the actual series. */
 .vmp-ctrl-svg { background: linear-gradient(180deg, color-mix(in srgb, var(--chart-surface) 72%, transparent), transparent); border-radius: 16px; }
