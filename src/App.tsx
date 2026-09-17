@@ -55,6 +55,7 @@ import {
   buildPersonProgressChoices,
   canSelectPersonProgressScope,
   type PersonProgressChoice,
+  selectOverviewActivities,
 } from "./lib/personProgressScope.ts";
 import type { AccessContext } from "./lib/access.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
@@ -88,7 +89,7 @@ import {
   type TodayPersonScope,
 } from "./features/today/todayPersonScope.ts";
 import { filterTodayScope } from "./features/today/todayScope.ts";
-import { isTodayActivityMine, type ProgressDeepLink } from "./features/today/todayModel.ts";
+import { type ProgressDeepLink } from "./features/today/todayModel.ts";
 import { bangkokCalendarDate } from "./lib/vmpDeadlineModel.ts";
 import {
   useTeamOverviewSummary,
@@ -784,13 +785,10 @@ function VerifiedAppShell({ user, logout, access }: {
   const personScopeBaseActs = useMemo(() => acts.filter((a) => (
     (areaSel.length === 0 || areaSel.includes(String(a.area || "").trim())) && inDept(a)
   )), [acts, areaSel, inDept]);
-  const overviewActs = useMemo(() => {
-    const personId = canSelectProgressPerson ? progressPersonScopeId : currentPersonId;
-    if (!canSelectProgressPerson && personId === null) return [];
-    return personId === null
-      ? filteredActs
-      : personScopeBaseActs.filter((activity) => isTodayActivityMine(activity, personId));
-  }, [canSelectProgressPerson, currentPersonId, filteredActs, personScopeBaseActs, progressPersonScopeId]);
+  const overviewActs = useMemo(() => selectOverviewActivities(
+    access.businessRole, currentPersonId, progressPersonScopeId,
+    filteredActs, personScopeBaseActs,
+  ), [access.businessRole, currentPersonId, filteredActs, personScopeBaseActs, progressPersonScopeId]);
   const todaySelectedPersonId = canSelectProgressPerson
     ? progressPersonScopeId
     : todayPersonScope === "mine" ? currentPersonId : null;

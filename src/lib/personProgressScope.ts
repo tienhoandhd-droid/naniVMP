@@ -1,3 +1,4 @@
+import { isTodayActivityMine } from "../features/today/todayModel.ts";
 import type { BusinessRole } from "./businessRoles.ts";
 import type { Activity } from "../types/domain.ts";
 
@@ -64,4 +65,18 @@ export function buildPersonProgressChoices(
     }))
     .sort((left, right) => left.fullName.localeCompare(right.fullName, "vi")
       || left.personId.localeCompare(right.personId));
+}
+
+export function selectOverviewActivities(
+  role: BusinessRole | null, currentPersonId: string | null,
+  selectedPersonId: string | null, filteredActivities: Activity[],
+  personScopeActivities: Activity[],
+): Activity[] {
+  // Workshop visibility is already restricted by the server Source grants.
+  if (role === "workshop_manager") return filteredActivities;
+  const canSelect = canSelectPersonProgressScope(role);
+  const personId = canSelect ? selectedPersonId : currentPersonId;
+  if (!canSelect && personId === null) return [];
+  return personId === null ? filteredActivities
+    : personScopeActivities.filter((activity) => isTodayActivityMine(activity, personId));
 }

@@ -68,3 +68,21 @@ test("personal scope keeps canonical matches regardless of the remembered target
     areas: ["QA"], departments: ["qa"], onlyMine: true, currentPersonId: personId,
   }), [activity]);
 });
+
+test("workshop manager overview uses authorized globally filtered items, not QA ownership", async () => {
+  const { selectOverviewActivities } = await import("../../src/lib/personProgressScope.ts");
+  const first = { id: "xsx-1", ownerPersonId: "qa-person", area: "C1" };
+  const second = { id: "xsx-2", ownerPersonId: "other-qa", area: "C2" };
+  assert.deepEqual(selectOverviewActivities("workshop_manager", "mai", null, [first], [first, second]), [first]);
+});
+
+test("overview preserves QA personal scope and privileged optional selection", async () => {
+  const { selectOverviewActivities } = await import("../../src/lib/personProgressScope.ts");
+  const mine = { id: "mine", ownerPersonId: "qa-person" };
+  const other = { id: "other", ownerPersonId: "other-qa" };
+  assert.deepEqual(selectOverviewActivities("qa_staff", "qa-person", null, [], [mine, other]), [mine]);
+  assert.deepEqual(selectOverviewActivities("qa_staff", null, null, [other], [other]), []);
+  assert.deepEqual(selectOverviewActivities("qa_manager", "manager", null, [other], [mine, other]), [other]);
+  assert.deepEqual(selectOverviewActivities("admin", "admin", "qa-person", [], [mine, other]), [mine]);
+  assert.deepEqual(selectOverviewActivities("workshop_staff", "mai", null, [other], [other]), []);
+});
