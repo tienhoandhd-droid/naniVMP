@@ -5,12 +5,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   KeyRound, LogOut, Menu, X, Sun, Moon, Monitor,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, ClipboardCheck,
 } from "lucide-react";
 import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS } from "../../constants/vmp.ts";
 import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
 import { prefetchDesktopRoute } from "../../lib/routePrefetch.ts";
+import { useDirtyStateSnapshot } from "../ui/DirtyStateProvider.tsx";
 import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
 import { CrownLogo } from "../ui/Primitives.tsx";
@@ -21,6 +22,21 @@ import type { ScreenId } from "../../lib/access.ts";
    (nguồn duy nhất) thay vì `PERM_LABEL`/`BUSINESS_ROLE_LABELS` cũ, để
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
 import { VAI_NGHIEP_VU } from "../../lib/supabaseData.ts";
+
+// This link opens a separately guarded module. Menu visibility grants no record access.
+function QualificationLink({collapsed = false}: {collapsed?: boolean}) {
+  const {hasDirty} = useDirtyStateSnapshot();
+  return <a href="./tham-dinh-thuc-te/" className="vmp-nav" data-module="qualification"
+    onClick={event => { if(hasDirty && !window.confirm("Có dữ liệu VMP chưa lưu. Rời trang để mở Thẩm định thực tế?")) event.preventDefault(); }}
+    title={collapsed ? "Thẩm định thực tế (demo)" : undefined}
+    aria-label="Thẩm định thực tế (demo)"
+    style={{display:"flex",alignItems:"center",gap:12,padding:12,borderRadius:R.md,
+      textDecoration:"none",fontFamily:TEXT,fontSize:14,fontWeight:600,color:C.plumSoft,
+      justifyContent:collapsed ? "center" : "flex-start"}}>
+    <ClipboardCheck size={19} strokeWidth={2.2} style={{flexShrink:0}} />
+    {!collapsed && <span>Thẩm định thực tế (demo)</span>}
+  </a>;
+}
 
 // ======================== SIDEBAR ========================
 export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
@@ -131,8 +147,10 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 </button>
               );
             })}
+            {g.id === "work" && ["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationLink collapsed={collapsed} />}
           </div>
         ))}
+        {!groups.some(g => g.id === "work") && ["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationLink collapsed={collapsed} />}
       </nav>
 
       {!collapsed && (
@@ -344,6 +362,7 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
               </button>
             );
           })}
+          {["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationLink />}
         </nav>
 
         <div className="vmp-mobile-drawer-account">

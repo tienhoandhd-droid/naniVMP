@@ -40,3 +40,7 @@ supabase/.branches/
 tests/visual/baselines/*-win32/
 supabase/schema.sql
 artifacts/schema/
+
+# Generated from the same public configuration and SDK as VMP
+/public/tham-dinh-thuc-te/cloud.js
+/public/tham-dinh-thuc-te/runtime-config.js

@@ -1,0 +1,70 @@
+/* Shared responsive/form layout retained from CPC1. Fonts are supplied by VMP. */
+:root {
+  --td-bg: #ffffff;
+  --td-surface: #ffffff;
+  --td-ink: #202124;
+  --td-muted: #565b63;
+  --td-line: #dfe1e5;
+  --td-accent: #7d1831;
+  --td-accent-deep: #5b1124;
+  --td-accent-soft: #f7eef1;
+  --td-pass: #296247;
+  --td-pass-soft: #e6f0e9;
+  --td-fail: #a63a35;
+  --td-fail-soft: #fae9e7;
+  --td-warning: #86651d;
+  --td-warning-soft: #faf1d7;
+  --td-neutral-soft: #f4f5f6;
+  --td-control-line: #818791;
+  --td-radius: 14px;
+  --td-shadow: 0 10px 30px rgb(22 24 28 / 5%);
+  --td-focus: #1e3a8a;
+}
+
+body { font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+
+@media (max-width: 760px) {
+  .shell { padding: 20px 12px 48px; }
+  .masthead { display: block; }
+  .top-actions { margin-top: 16px; }
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .workspace > .sidebar { position: static; }
+  .point-list { max-height: 250px; }
+  .content-heading { display: block; }
+  .content-heading .status { margin-top: 10px; }
+  .summary-row { grid-template-columns: minmax(0, 1fr); }
+  .actionbar { position: static; }
+  .actionbar .actions { width: 100%; }
+  .actionbar .actions button { flex: 1 1 145px; }
+}
+
+@media (max-width: 390px) {
+  .shell { padding: 14px 8px 32px; }
+  .workspace > .content, .workspace > .sidebar { padding: 14px; }
+  .actionbar .actions button { flex-basis: 100%; }
+  .field-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
+.action-bar[hidden], .actionbar[hidden] { display: none !important; }
+.entry-welcome { padding: clamp(24px, 4vw, 48px); border: 1px solid var(--td-line); border-radius: var(--td-radius); background: var(--td-neutral-soft); }
+.entry-welcome h2, .entry-welcome h3 { max-width: 28ch; margin-bottom: 16px; font-size: clamp(22px, 3vw, 30px); line-height: 1.25; }
+.entry-welcome p { max-width: 58ch; color: var(--td-muted); margin-bottom: 24px; }
+.entry-welcome button { min-height: 48px; }
+
+/* Keep each populated trial and its result visible without horizontal scrolling. */
+.trial-groups { display: grid; gap: 24px; min-width: 0; }
+.trial-group { min-width: 0; margin: 0; padding: 20px; border: 1px solid var(--td-line); border-radius: 16px; }
+.trial-group legend { padding: 0 8px; font-size: 16px; font-weight: 600; }
+.trial-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 20px; }
+.trial-group .result-box { margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--td-line); }
+@media (max-width: 1100px) { .trial-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .trial-group { padding: 16px 12px; } .trial-fields { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 881px) {
+  .app-shell > .sidebar { position: sticky; top: 0; align-self: start; height: 100dvh; min-height: 0; overflow-y: auto; }
+  .app-shell > .sidebar > :not(.location-panel) { flex-shrink: 0; }
+  .app-shell .location-panel { margin-top: 0; min-height: 180px; flex: 1; }
+  .app-shell .location-list { max-height: none; }
+}

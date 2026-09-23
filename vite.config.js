@@ -1,5 +1,6 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { buildQualification } from "./scripts/build-qualification.mjs";
 
 // base: './' (đường dẫn tương đối) hoạt động tốt cho GitHub Pages dạng
 // project page (https://<user>.github.io/<repo>/) mà KHÔNG cần biết tên repo.
@@ -7,7 +8,12 @@ import react from "@vitejs/plugin-react";
 // base tương đối là an toàn. Nếu bạn deploy lên custom domain hoặc user page
 // (https://<user>.github.io/) thì có thể đổi thành '/'.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), {
+    name: "qualification-browser-assets",
+    async configResolved(config) {
+      await buildQualification(config.root, {...loadEnv(config.mode, config.root, ""), ...process.env});
+    },
+  }],
   base: "./",
   build: {
     outDir: "dist",

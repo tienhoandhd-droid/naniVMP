@@ -1,0 +1,5 @@
+/* Static adaptation of the VMP VQWordmark: original navy/red identity. */
+.vq-wordmark{display:inline-flex;align-items:baseline;white-space:nowrap;font-family:"Be Vietnam Pro",system-ui,sans-serif;font-size:28px;line-height:1;color:#1e3a8a;letter-spacing:-.04em;flex-shrink:0}
+.vq-wordmark b{font-weight:600}.vq-wordmark i{display:inline-block;color:#e63946;font-size:1.22em;font-style:normal;font-weight:600;transform:skewX(-18deg) translateY(2px);margin:0 1px}
+.vq-wordmark small{margin-left:9px;font-size:12px;line-height:1;font-weight:600;letter-spacing:.18em;color:#1e3a8a;text-transform:uppercase}
+.brand .vq-wordmark{font-size:24px}.brand{flex-wrap:wrap}.brand-identity{display:inline-flex;align-items:center;text-decoration:none;margin-bottom:18px;min-height:40px}

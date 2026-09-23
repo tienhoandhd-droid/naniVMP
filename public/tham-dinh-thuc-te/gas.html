@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Thẩm định thực tế (demo) | Khí nén và Nitơ | VMP</title>
+  <link rel="stylesheet" href="./gas.css">
+  <link rel="stylesheet" href="./theme.css">
+  <link rel="stylesheet" href="./vmp-theme.css">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+</head>
+<body data-qualification-gate="pending">
+  <a class="skip-link" href="#form-body">Đi đến vùng nhập liệu</a>
+  <main class="shell">
+    <a class="brand-identity" href="./index.html" aria-label="V/Q team, trang tổng quan"><span class="vq-wordmark" role="img" aria-label="V/Q team"><b>V</b><i aria-hidden="true">/</i><b>Q</b><small>team</small></span></a>
+    <header class="masthead">
+      <div><p class="eyebrow">VMP · THẨM ĐỊNH THỰC TẾ (DEMO)</p><h1 id="page-title">Khí nén</h1><p id="formula-version" class="muted">Đang tải cấu hình…</p></div>
+      <div class="top-actions"><a class="vmp-back-link" href="../">← Về VMP</a><a class="link-button" href="./index.html">Tổng quan</a><a class="link-button" href="./steam.html">Hơi</a><button id="air" class="system-choice" type="button" aria-pressed="true">Khí nén</button><button id="nitrogen" class="system-choice" type="button" aria-pressed="false">Nitơ</button><button id="auth-button" type="button" hidden>Đăng nhập</button></div>
+    </header>
+    <p id="connection" class="connection" role="status">Đang kết nối máy chủ…</p>
+    <div id="message" class="message" role="status" aria-live="polite"></div>
+    <div id="error-summary" class="error-summary" tabindex="-1" hidden></div>
+    <div class="workspace">
+      <aside class="sidebar" aria-label="Biểu mẫu và điểm lấy mẫu">
+        <nav id="form-tabs" class="form-tabs" aria-label="Biểu mẫu"></nav>
+        <label class="search-label" for="point-search">Tìm điểm lấy mẫu</label>
+        <input id="point-search" type="search" placeholder="Mã hoặc tên điểm">
+        <p id="point-count" class="muted"></p>
+        <div id="point-list" class="point-list" role="listbox" aria-label="Điểm lấy mẫu"></div>
+      </aside>
+      <form id="entry-form" novalidate>
+        <section class="content" aria-labelledby="form-title">
+          <div class="content-heading"><div><p id="form-kind" class="eyebrow"></p><h2 id="form-title">Đang tải</h2><p id="form-description" class="muted"></p></div><span id="form-status" class="status incomplete">Chưa tính</span></div>
+          <div id="form-body"></div>
+        </section>
+        <footer class="actionbar">
+          <span id="record-state" class="record-state">Chưa lưu trên hệ thống</span>
+          <div class="actions"><button id="draft-download" type="button">Tải bản nháp</button><button id="draft-open" type="button">Mở bản nháp</button><input id="draft-file" type="file" accept="application/json" hidden><button id="record-load" type="button">Hồ sơ đã lưu</button><button id="record-save" type="button">Lưu hồ sơ</button><button id="evaluate" type="submit" class="primary">Tính và đánh giá</button><button id="print" type="button" class="primary">In biểu mẫu</button></div>
+        </footer>
+      </form>
+    </div>
+  </main>
+  <dialog id="auth-dialog"><form id="auth-form" method="dialog"><h2>Đăng nhập VMP</h2><p>Dùng tài khoản VMP được cấp để mở và lưu hồ sơ thẩm định thực tế.</p><label>Email<input id="auth-email" type="email" autocomplete="email" required></label><label>Mật khẩu<input id="auth-password" type="password" autocomplete="current-password" required></label><p id="auth-error" class="field-error" role="alert"></p><menu><button id="auth-close" type="button">Đóng</button><button class="primary" type="submit">Đăng nhập VMP</button></menu></form></dialog>
+  <dialog id="records-dialog"><div class="dialog-content"><div class="dialog-heading"><h2>Hồ sơ khí đã lưu</h2><button id="records-close" type="button">Đóng</button></div><div id="records-list"></div></div></dialog>
+  <script src="./runtime-config.js" defer></script>
+<script src="./cloud.js" defer></script>
+<script src="./gas-api.js" defer></script>
+  <script src="./gas.js" defer></script>
+</body>
+</html>
