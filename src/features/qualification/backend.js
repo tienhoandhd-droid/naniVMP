@@ -22,13 +22,13 @@ export function makeBackend(settings, existingClient) {
   let permissions = null;
   let localLogout = false;
   const pending = new Map();
-  const rpc = async (name,args={}) => {
+  async function rpc(name,args={}) {
     const {data,error}=await client.rpc(name,args);
     if(error) {
       const err=new Error(error.message || 'Không kết nối được Supabase.');err.code=error.code;throw err;
     }
     return data;
-  };
+  }
   const download = async (name,assetPath) => {
     if(!/^v[1-9][0-9]*$/.test(assetPath))throw new Error('Phiên bản bộ mẫu không hợp lệ.');
     const {data,error}=await client.storage.from('cpc1-templates').download(`${assetPath}/${name}`);

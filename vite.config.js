@@ -11,6 +11,8 @@ export default defineConfig({
   plugins: [react(), {
     name: "qualification-browser-assets",
     async configResolved(config) {
+      // SSR unit loaders do not serve the qualification browser entrypoint.
+      if (config.command === "serve" && config.server.middlewareMode) return;
       await buildQualification(config.root, {...loadEnv(config.mode, config.root, ""), ...process.env});
     },
   }],

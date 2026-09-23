@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -119,6 +120,16 @@ const CANONICAL_DASHBOARD_REVIEWED_RPC = new Map([
     identity: "rpc_get_vmp_dashboard_v2(integer,boolean)",
     classification: "guarded_explicit",
   }],
+]);
+// Additive namespace, reviewed and applied independently of the sealed VMP baseline.
+const QUALIFICATION_REVIEWED_RPC = new Map([
+  ["cpc1_context", {identity:"cpc1_context()",classification:"guarded_explicit"}],
+  ["cpc1_config", {identity:"cpc1_config()",classification:"guarded_explicit"}],
+  ["cpc1_gas_config", {identity:"cpc1_gas_config(text)",classification:"guarded_explicit"}],
+  ["cpc1_evaluate", {identity:"cpc1_evaluate(jsonb)",classification:"guarded_explicit"}],
+  ["cpc1_save", {identity:"cpc1_save(jsonb,uuid,integer,uuid,text)",classification:"guarded_explicit"}],
+  ["cpc1_list", {identity:"cpc1_list()",classification:"guarded_explicit"}],
+  ["cpc1_load", {identity:"cpc1_load(uuid,integer)",classification:"guarded_explicit"}],
 ]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
@@ -359,6 +370,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...FIELD_PERFORMANCE_REVIEWED_RPC.keys(),
     ...REVALIDATION_REVIEWED_RPC.keys(),
     ...CANONICAL_DASHBOARD_REVIEWED_RPC.keys(),
+    ...QUALIFICATION_REVIEWED_RPC.keys(),
   ]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
   }
@@ -374,11 +386,16 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...FIELD_PERFORMANCE_REVIEWED_RPC,
     ...REVALIDATION_REVIEWED_RPC,
     ...CANONICAL_DASHBOARD_REVIEWED_RPC,
+    ...QUALIFICATION_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 84, "reviewed source HEAD must expose 84 literal RPC targets");
+  assert.equal(sourceNames.length, 91, "reviewed source HEAD must expose 91 literal RPC targets");
+  const qualificationMigration = readFileSync("supabase/migrations/20260923100000_qualification_demo.sql");
+  assert.equal(createHash("sha256").update(qualificationMigration).digest("hex"),
+    "e1c3755218071aac4c1bd4a466478b6a33f622277248a9fb4aaebdf8c4d59e76",
+    "qualification inventory must match the independently reviewed and applied migration");
   assert.deepEqual(reviewedNames, sourceNames, [
     "source RPC inventory differs from the reviewed migration classification",
     ...sourceNames.map((name) => `${name}: ${sourceInventory.get(name).join(", ")}`),

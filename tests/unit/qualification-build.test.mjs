@@ -18,3 +18,14 @@ test('qualification build uses the VMP public project and rejects administrative
   await assert.rejects(buildQualification(root,{...env,VITE_SUPABASE_ANON:service}),/anon/);
  } finally {await rm(root,{recursive:true,force:true});}
 });
+test('Vite middleware tests need no live configuration; CI production builds still require it',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'vmp-qualification-ci-'));
+ const previous=process.env.CI;process.env.CI='true';
+ try {
+  const {default:config}=await import('../../vite.config.js');
+  const plugin=config.plugins.find(p=>p.name==='qualification-browser-assets');
+  await plugin.configResolved({root,mode:'test',command:'serve',server:{middlewareMode:true}});
+  await assert.rejects(readFile(join(root,'public/tham-dinh-thuc-te/runtime-config.js')),/ENOENT/);
+  await assert.rejects(buildQualification(root,{CI:'true'}),/configuration required/);
+ } finally {if(previous===undefined)delete process.env.CI;else process.env.CI=previous;await rm(root,{recursive:true,force:true});}
+});
