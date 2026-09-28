@@ -123,6 +123,15 @@ const CANONICAL_DASHBOARD_REVIEWED_RPC = new Map([
 ]);
 // Additive namespace, reviewed and applied independently of the sealed VMP baseline.
 const QUALIFICATION_REVIEWED_RPC = new Map([
+  ["cpc1_run_list", {identity:"cpc1_run_list()",classification:"guarded_explicit"}],
+  ["cpc1_run_create", {identity:"cpc1_run_create(jsonb,uuid)",classification:"guarded_explicit"}],
+  ["cpc1_run_transition", {identity:"cpc1_run_transition(uuid,integer,text,text,uuid)",classification:"guarded_explicit"}],
+  ["cpc1_run_config", {identity:"cpc1_run_config(uuid,text)",classification:"guarded_explicit"}],
+  ["cpc1_run_load", {identity:"cpc1_run_load(uuid,uuid)",classification:"guarded_explicit"}],
+  ["cpc1_run_evaluate", {identity:"cpc1_run_evaluate(uuid,jsonb)",classification:"guarded_explicit"}],
+  ["cpc1_run_save", {identity:"cpc1_run_save(uuid,jsonb,uuid,integer,uuid)",classification:"guarded_explicit"}],
+  ["cpc1_history_list", {identity:"cpc1_history_list()",classification:"guarded_explicit"}],
+
   ["cpc1_context", {identity:"cpc1_context()",classification:"guarded_explicit"}],
   ["cpc1_config", {identity:"cpc1_config()",classification:"guarded_explicit"}],
   ["cpc1_gas_config", {identity:"cpc1_gas_config(text)",classification:"guarded_explicit"}],
@@ -391,7 +400,10 @@ test("every source RPC call has exactly one reviewed migration classification", 
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 91, "reviewed source HEAD must expose 91 literal RPC targets");
+  assert.equal(sourceNames.length, 99, "reviewed source HEAD must expose 99 literal RPC targets");
+  assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928120000_qualification_runs.sql")).digest("hex"), "c1ad3d409cd8777f020a84096a4c21fae703e321af8aadffe1c8c8684f66bc8c", "reviewed/applied qualification run and history migration");
+  assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928121000_qualification_run_entry.sql")).digest("hex"), "fcfad0a3b90d9df79b380b138176326322734969db165529d3e123c141f5a770", "reviewed/applied qualification run and history migration");
+  assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928122000_qualification_history.sql")).digest("hex"), "853190de40d499a6b56fc136de8f5fd62377eac7f71000a03a45952075aeab24", "reviewed/applied qualification run and history migration");
   const qualificationMigration = readFileSync("supabase/migrations/20260923100000_qualification_demo.sql");
   assert.equal(createHash("sha256").update(qualificationMigration).digest("hex"),
     "e1c3755218071aac4c1bd4a466478b6a33f622277248a9fb4aaebdf8c4d59e76",

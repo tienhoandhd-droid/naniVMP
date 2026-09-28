@@ -1,0 +1,61 @@
+/* VMP identity and responsive application frame. Original company artwork is reused. */
+.workspace-header,.site-header { width:min(1440px,calc(100% - 64px)); max-width:1440px; min-height:112px; margin:0 auto; padding:20px 0; gap:24px; border-bottom:1px solid var(--border); }
+.monitor-brand { display:flex; align-items:center; gap:24px; min-width:0; margin-right:auto; color:var(--accent); text-decoration:none; }
+.company-logo { display:block; flex:none; width:72px; height:auto; }
+.monitor-masthead { display:flex; flex-direction:column; gap:14px; padding-left:24px; border-left:1px solid var(--lp-gold-hairline); }
+.monitor-name { display:flex; align-items:baseline; font-family:var(--font-display); font-weight:600; line-height:1; white-space:nowrap; }
+.monitor-v { font-size:54px; line-height:.8; letter-spacing:-.065em; }
+.monitor-mp { font-size:32px; letter-spacing:.1em; }
+.monitor-name i { margin-left:10px; font-size:34px; font-weight:600; }
+.monitor-caption { color:var(--text-secondary); font-size:12px; letter-spacing:.12em; line-height:1.5; }
+.qualification-layout { display:grid; grid-template-columns:240px minmax(0,1fr); gap:32px; width:min(1440px,calc(100% - 64px)); margin:28px auto 64px; align-items:start; }
+.qualification-rail { position:sticky; top:20px; min-width:0; max-height:calc(100dvh - 176px); overflow-y:auto; scrollbar-width:thin; padding:20px 12px; border:1px solid var(--border); border-radius:var(--lp-r-panel); background:var(--lp-nav-surface); }
+.rail-identity { display:flex; flex-direction:column; gap:14px; padding:4px 12px 24px; color:var(--text-primary); text-decoration:none; }
+.rail-identity > span:last-child { font-size:14px; line-height:1.6; }
+.rail-identity small { font-size:inherit; color:var(--text-secondary); }
+.rail-identity .vq-wordmark small { font-size:10px; }
+.rail-label { padding:0 12px; margin:0 0 8px; color:var(--text-secondary); font-size:12px; }
+.rail-form-label { margin-top:24px; padding-top:20px; border-top:1px solid var(--border); }
+.qualification-rail .system-links,.qualification-rail .form-navigation nav { display:flex; flex-direction:column; gap:4px; width:100%; margin:0; padding:4px; overflow:visible; border:0; background:transparent; }
+.qualification-rail .system-links a,.qualification-rail .system-links button,.qualification-rail .nav-button,.qualification-rail .tab { width:100%; justify-content:flex-start; padding:11px 12px; font-size:13px; font-weight:500; white-space:normal; }
+.qualification-rail [aria-current="page"],.qualification-rail [aria-pressed="true"] { box-shadow:inset 3px 0 0 var(--lp-nav-hairline); }
+.qualification-layout > .app-shell,.qualification-layout > .shell,.qualification-layout > main { width:100%; min-width:0; max-width:none; margin:0; padding:0; }
+.qualification-layout .point-picker { margin:0 0 24px; }
+.qualification-layout .library { max-width:none; }
+.qualification-layout .library-tools { grid-template-columns:1fr; gap:16px; margin-top:32px; }
+.qualification-layout .system-filters { justify-content:flex-start; }
+@media(min-width:1024px) and (max-width:1399px) {
+  .qualification-layout { grid-template-columns:220px minmax(0,1fr); gap:24px; }
+  .qualification-layout .trial-groups { grid-template-columns:1fr; }
+  .qualification-layout .trial-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .qualification-layout .actions { flex-wrap:wrap; }
+  .qualification-layout .file-actions { flex-basis:100%; }
+}
+@media(max-width:1023px) {
+  .qualification-layout { display:block; margin-top:20px; }
+  .qualification-rail { position:static; max-height:none; overflow:visible; padding:0; margin-bottom:20px; background:transparent; border:0; border-radius:0; }
+  .rail-identity { flex-direction:row; align-items:center; gap:16px; padding:0 0 16px; }
+  .rail-identity .vq-wordmark { font-size:20px; }
+  .rail-label { display:none; }
+  .qualification-rail .system-links,.qualification-rail .form-navigation nav { flex-direction:row; flex-wrap:nowrap; padding:6px; gap:6px; overflow-x:auto; border:1px solid var(--border); border-radius:16px; background:var(--surface-subtle); }
+  .qualification-rail .system-links a,.qualification-rail .system-links button,.qualification-rail .nav-button,.qualification-rail .tab { width:auto; flex:0 0 auto; white-space:nowrap; }
+  .qualification-rail .form-navigation { margin-top:12px; }
+  .qualification-rail [aria-current="page"],.qualification-rail [aria-pressed="true"] { box-shadow:inset 0 -3px 0 var(--lp-nav-hairline); }
+  .workspace-header,.site-header { flex-wrap:wrap; gap:12px 20px; }
+}
+@media(max-width:767px) {
+  .workspace-header,.site-header,.qualification-layout { width:calc(100% - 32px); }
+  .workspace-header,.site-header { padding:20px 0 12px; }
+  .monitor-brand { flex:1 0 100%; gap:16px; }
+  .company-logo { width:56px; }
+  .monitor-masthead { padding-left:16px; gap:10px; }
+  .monitor-v { font-size:44px; }
+  .monitor-mp { font-size:26px; }
+  .monitor-name i { font-size:28px; margin-left:8px; }
+  .monitor-caption { font-size:12px; letter-spacing:.04em; }
+  .workspace-header .session-info { margin-left:0; margin-right:auto; }
+  .workspace-header .session-panel { left:0; right:auto; }
+  .rail-identity { gap:12px; }
+  .rail-identity > span:last-child { font-size:13px; }
+  .qualification-rail .system-links a,.qualification-rail .system-links button { padding:10px; }
+}

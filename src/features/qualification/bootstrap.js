@@ -1,9 +1,11 @@
 import { makeBackend } from './backend.js';
-const login = () => window.location.assign('../');
+const login = () => window.CPC1Embedded ? window.CPC1Embedded.goHome() : window.location.assign('../');
 const unavailable = async () => { throw new Error('Chưa cấu hình kết nối VMP.'); };
 try {
   window.CPC1Backend = makeBackend(window.CPC1_SETTINGS);
   window.CPC1Backend.openLogin = login;
+  const entryQuery=new URLSearchParams(location.search);
+  if(entryQuery.has('run'))window.CPC1Backend.bindRun(entryQuery.get('run'),entryQuery.get('record'));
   let actor = null;
   window.CPC1Backend.onSessionChange((event, session) => {
     const next = session?.user?.id || null;

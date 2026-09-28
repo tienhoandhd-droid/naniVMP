@@ -13,6 +13,8 @@ export interface CatalogObjectFilters {
   firstMonth: CatalogFirstMonthFilter;
   owner: CatalogOwnerFilter;
   frequency: CatalogFrequencyFilter;
+  vmpFrom?: string;
+  vmpTo?: string;
 }
 
 export const CATALOG_OBJECT_FILTERS_ALL: CatalogObjectFilters = {
@@ -23,6 +25,8 @@ export const CATALOG_OBJECT_FILTERS_ALL: CatalogObjectFilters = {
   firstMonth: "all",
   owner: "all",
   frequency: "all",
+  vmpFrom: "",
+  vmpTo: "",
 };
 
 export interface CatalogFilterOption { value: string; label: string }
@@ -91,6 +95,8 @@ export function encodeCatalogObjectServerFilters(filters: CatalogObjectFilters):
   };
   if (filters.department !== "all") encoded.department = filters.department;
   if (filters.area !== "all") encoded.area_code = filters.area;
+  if(filters.vmpFrom)encoded.vmp_from=filters.vmpFrom;
+  if(filters.vmpTo)encoded.vmp_to=filters.vmpTo;
   return { search: filters.text.trim(), filters: encoded };
 }
 
@@ -242,6 +248,8 @@ export function activeCatalogObjectFilterChips(filters: CatalogObjectFilters): C
     chips.push({ key: "owner", label });
   }
   if (filters.frequency !== "all") chips.push({ key: "frequency", label: FREQUENCY_LABEL[filters.frequency] });
+  if(filters.vmpFrom)chips.push({key:"vmpFrom",label:`Đích VMP từ: ${filters.vmpFrom}`});
+  if(filters.vmpTo)chips.push({key:"vmpTo",label:`Đích VMP đến: ${filters.vmpTo}`});
   return chips;
 }
 
@@ -254,4 +262,14 @@ export function clearCatalogObjectFilter(
   key: keyof CatalogObjectFilters,
 ): CatalogObjectFilters {
   return { ...filters, [key]: CATALOG_OBJECT_FILTERS_ALL[key] };
+}
+
+/** Date-only ISO bounds; never interpret missing VMP dates as report deadlines. */
+export function catalogVmpDateError(filters: Pick<CatalogObjectFilters,"vmpFrom"|"vmpTo">): string {
+  for(const value of [filters.vmpFrom,filters.vmpTo]) {
+    if(!value)continue;
+    const date=new Date(value+"T00:00:00Z");
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||value.startsWith("0000")||!Number.isFinite(date.getTime())||date.toISOString().slice(0,10)!==value)return "Nhập ngày hợp lệ cho đích VMP.";
+  }
+  return filters.vmpFrom&&filters.vmpTo&&filters.vmpFrom>filters.vmpTo?"Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.":"";
 }

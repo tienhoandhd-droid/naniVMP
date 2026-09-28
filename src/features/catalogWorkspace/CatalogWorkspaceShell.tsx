@@ -56,7 +56,7 @@ import {
 } from "./api.ts";
 import { layDataset } from "./definitions.ts";
 import {
-  CATALOG_OBJECT_FILTERS_ALL, activeCatalogObjectFilterChips,
+  CATALOG_OBJECT_FILTERS_ALL, activeCatalogObjectFilterChips, catalogVmpDateError,
   catalogObjectActiveFilterCount, catalogWorkspaceRegionIds, clearCatalogObjectFilter,
   encodeCatalogObjectServerFilters, initialCatalogSourceCursorStack,
   moveCatalogSourceCursorBack, moveCatalogSourceCursorForward,
@@ -171,6 +171,7 @@ export default function CatalogWorkspaceShell({
     return () => clearTimeout(timer);
   }, [q]);
 
+  const vmpDateError=catalogVmpDateError(objFilters);
   const objServerFilter = useMemo(() => encodeCatalogObjectServerFilters({
     ...objFilters,
     text: sourceSearch,
@@ -193,6 +194,7 @@ export default function CatalogWorkspaceShell({
     const seq = ++objSeq.current;
     setObjState("loading");
     if (!hasAuthorizationRevision) return;
+    if(vmpDateError){setObjRows([]);setObjTotal(0);setObjErr(vmpDateError);setObjState("error");return;}
     const result = await listSourceObjectPage({
       objectKind: kind,
       search: objServerFilter.search,
@@ -214,7 +216,7 @@ export default function CatalogWorkspaceShell({
     setObjCursor((previous) => resolveCatalogSourceCursorPage(previous, result.nextCursor));
     setObjErr("");
     setObjState("ready");
-  }, [sourceAccessKey, hasAuthorizationRevision, kind, objCursor.cursors, objCursor.page, objServerFilter]);
+  }, [sourceAccessKey, hasAuthorizationRevision, kind, objCursor.cursors, objCursor.page, objServerFilter, vmpDateError]);
 
   useEffect(() => { taiDoiTuong(); }, [taiDoiTuong]);
 
@@ -527,7 +529,7 @@ export default function CatalogWorkspaceShell({
 
   /* Xuất đúng phần đang lọc của bảng đối tượng — tiện tra cứu, chỉ đọc. */
   const xuatExcel = async () => {
-    if (!sourceControls.canExport || !hasAuthorizationRevision) return;
+    if (!sourceControls.canExport || !hasAuthorizationRevision || vmpDateError) return;
     const progress = toast.dangChay("Đang xuất toàn bộ dòng Source được phép xem…");
     try {
       const dinhNghia = layDataset("objects").fields;
@@ -667,7 +669,7 @@ export default function CatalogWorkspaceShell({
                   </button>
                   {sourceControls.canExport && (
                     <button type="button" className="cw-nut" data-cw-export-count={objTotal}
-                      disabled={!hasAuthorizationRevision} onClick={xuatExcel}>
+                      disabled={!hasAuthorizationRevision||!!vmpDateError} onClick={xuatExcel}>
                       <Download size={15} aria-hidden="true" /> Xuất Excel
                     </button>
                   )}
@@ -758,6 +760,23 @@ export default function CatalogWorkspaceShell({
                     </select>
                   </label>
                 </div>
+                <fieldset style={{marginTop:16,border:0,padding:0}}>
+                  <legend style={{fontWeight:600}}>Thời gian theo đích VMP</legend>
+                  <p className="cw-nhe" id="cw-vmp-date-help">Có ít nhất một hạng mục đang hoạt động có hạn VMP trong khoảng này. Bỏ trống để xem tất cả.</p>
+                  <div className="cw-filter-panel__luoi">
+                    <label className="cw-truong">Đích VMP từ ngày
+                      <input type="date" className="cw-o" data-cw-filter="vmp-from" value={objFilters.vmpFrom||""}
+                        aria-describedby={vmpDateError?"cw-vmp-date-help cw-vmp-date-error":"cw-vmp-date-help"} aria-invalid={!!vmpDateError}
+                        onChange={e=>doiBoLocObj("vmpFrom",e.target.value)} />
+                    </label>
+                    <label className="cw-truong">Đích VMP đến ngày
+                      <input type="date" className="cw-o" data-cw-filter="vmp-to" value={objFilters.vmpTo||""}
+                        aria-describedby={vmpDateError?"cw-vmp-date-help cw-vmp-date-error":"cw-vmp-date-help"} aria-invalid={!!vmpDateError}
+                        onChange={e=>doiBoLocObj("vmpTo",e.target.value)} />
+                    </label>
+                  </div>
+                  {vmpDateError&&<p id="cw-vmp-date-error" className="cw-loi" role="alert">{vmpDateError}</p>}
+                </fieldset>
               </section>
               {objFilterCount > 0 && (
                 <div className="cw-filter-summary">

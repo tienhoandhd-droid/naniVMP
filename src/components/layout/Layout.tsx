@@ -23,23 +23,31 @@ import type { ScreenId } from "../../lib/access.ts";
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
 import { VAI_NGHIEP_VU } from "../../lib/supabaseData.ts";
 
-// This link opens a separately guarded module. Menu visibility grants no record access.
-function QualificationLink({collapsed = false}: {collapsed?: boolean}) {
+import {QUALIFICATION_LINKS,qualificationHref} from "../../features/qualification/shellRoute.ts";
+
+type QualificationProps = {onOpenQualification?: (target:string)=>boolean; qualificationTarget?:string|null};
+
+// Separate module navigation; visibility never grants record access.
+function QualificationNavigation({collapsed = false,onOpenQualification,qualificationTarget}: {collapsed?: boolean}&QualificationProps) {
   const {hasDirty} = useDirtyStateSnapshot();
-  return <a href="./tham-dinh-thuc-te/" className="vmp-nav" data-module="qualification"
-    onClick={event => { if(hasDirty && !window.confirm("Có dữ liệu VMP chưa lưu. Rời trang để mở Thẩm định thực tế?")) event.preventDefault(); }}
-    title={collapsed ? "Thẩm định thực tế (demo)" : undefined}
-    aria-label="Thẩm định thực tế (demo)"
-    style={{display:"flex",alignItems:"center",gap:12,padding:12,borderRadius:R.md,
-      textDecoration:"none",fontFamily:TEXT,fontSize:14,fontWeight:600,color:C.plumSoft,
-      justifyContent:collapsed ? "center" : "flex-start"}}>
-    <ClipboardCheck size={19} strokeWidth={2.2} style={{flexShrink:0}} />
-    {!collapsed && <span>Thẩm định thực tế (demo)</span>}
-  </a>;
+  const links = QUALIFICATION_LINKS;
+  return <section data-nav-group="qualification" aria-label="Thẩm định thực tế" style={{marginBottom:8}}>
+    {!collapsed && <h2 style={{fontFamily:TEXT,fontSize:12,color:C.plumSoft,letterSpacing:1.1,fontWeight:800,padding:"10px 12px 6px",margin:0}}>THẨM ĐỊNH THỰC TẾ</h2>}
+    {(collapsed ? [{label:"Thẩm định thực tế",target:"index.html"}] : links).map(link=><a key={link.target}
+      href={qualificationHref(link.target)} className="vmp-nav" data-module="qualification"
+      aria-current={qualificationTarget?.startsWith(link.target)?"page":undefined}
+      onClick={event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||event.button!==0)return;if(onOpenQualification){event.preventDefault();onOpenQualification(link.target);return;}if(hasDirty&&!window.confirm("Có dữ liệu VMP chưa lưu. Rời trang để mở Thẩm định thực tế?"))event.preventDefault();}}
+      title={collapsed?link.label:undefined} aria-label={link.label}
+      style={{display:"flex",alignItems:"center",gap:12,padding:12,minHeight:44,boxSizing:"border-box",borderRadius:R.md,
+        textDecoration:"none",fontFamily:TEXT,fontSize:14,fontWeight:600,color:C.plumSoft,background:qualificationTarget?.startsWith(link.target)?C.pinkSoft:"transparent",
+        justifyContent:collapsed?"center":"flex-start"}}>
+      {collapsed?<ClipboardCheck size={19} strokeWidth={2.2} style={{flexShrink:0}}/>:<span>{link.label}</span>}
+    </a>)}
+  </section>;
 }
 
 // ======================== SIDEBAR ========================
-export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
+export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onOpenQualification, qualificationTarget }: {
   view: string;
   setView: (v: string) => void;
   user?: AppUser | null;
@@ -48,6 +56,8 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
   access: AccessContext;
   onLogout: () => void;
   onChangePw: () => void;
+  onOpenQualification?: (target:string)=>boolean;
+  qualificationTarget?:string|null;
   connected?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -121,7 +131,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
               </div>
             )}
             {trongNhom(g.id).map((n) => {
-              const active = view === n.id;
+              const active = !qualificationTarget && view === n.id;
               const Icon = n.icon;
               return (
                 <button key={n.id} onClick={() => setView(n.id)}
@@ -147,10 +157,9 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
                 </button>
               );
             })}
-            {g.id === "work" && ["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationLink collapsed={collapsed} />}
           </div>
         ))}
-        {!groups.some(g => g.id === "work") && ["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationLink collapsed={collapsed} />}
+        {["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationNavigation collapsed={collapsed} onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} />}
       </nav>
 
       {!collapsed && (
@@ -246,7 +255,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw }: {
   );
 }
 
-function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionClose, onLogout, onChangePw }: {
+function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionClose, onLogout, onChangePw, onOpenQualification, qualificationTarget }: {
   open: boolean;
   view: string;
   setView: (v: string) => void;
@@ -258,6 +267,8 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
   onActionClose: () => void;
   onLogout: () => void;
   onChangePw: () => void;
+  onOpenQualification?: (target:string)=>boolean;
+  qualificationTarget?:string|null;
 }) {
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -347,7 +358,7 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
         <nav aria-label="Điều hướng chính" className="vmp-mobile-drawer-nav">
           {allowedItems.map((item) => {
             const Icon = item.icon;
-            const active = view === item.id;
+            const active = !qualificationTarget && view === item.id;
             return (
               <button key={item.id} type="button" data-view={item.id} className="vmp-nav"
                 onClick={() => { setView(item.id); onActionClose(); }}
@@ -362,7 +373,7 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
               </button>
             );
           })}
-          {["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationLink />}
+        {["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationNavigation qualificationTarget={qualificationTarget} onOpenQualification={onOpenQualification ? target=>{const ok=onOpenQualification(target);if(ok)onActionClose();return ok;}:undefined} />}
         </nav>
 
         <div className="vmp-mobile-drawer-account">
@@ -455,7 +466,7 @@ function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
 /* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
 export function Topbar({ title, user, sub,
-  view, setView, access, onLogout, onChangePw, showMasthead = false, compact = false }: {
+  view, setView, access, onLogout, onChangePw, onOpenQualification, qualificationTarget, showMasthead = false, compact = false }: {
   title?: ReactNode;
   /** #2 (01/09): wordmark chỉ hiện ở trang nhất (Tổng quan) — lặp trên cả
    *  14 màn là hai tầng thương hiệu đè nhau, tốn ~60px trước dữ liệu. */
@@ -471,6 +482,8 @@ export function Topbar({ title, user, sub,
   access: AccessContext;
   onLogout: () => void;
   onChangePw: () => void;
+  onOpenQualification?: (target:string)=>boolean;
+  qualificationTarget?:string|null;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -540,7 +553,7 @@ export function Topbar({ title, user, sub,
           <Menu size={19} color={C.pinkText} />
         </button>
       </div>
-      <MobileDrawer open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
+      <MobileDrawer onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
         onDismiss={dismissMobileMenu} onActionClose={closeMobileMenuForAction}
         onLogout={onLogout} onChangePw={onChangePw} />
     </div>

@@ -1,3 +1,5 @@
+import {writeShellHistory} from "./features/qualification/shellRoute.ts";
+import {useQualificationWorkspace} from "./features/qualification/QualificationWorkspace.tsx";
 /* =====================================================================
  *  App.jsx — VMP Monitor v2.0 · Refactored Main Shell
  *  =====================================================================
@@ -670,10 +672,21 @@ function VerifiedAppShell({ user, logout, access }: {
      dài thì đó là mất cả buổi làm. */
   const [hoiThoat, setHoiThoat] = useState(false);
   const { hasDirty, keys: formDangDo } = useDirtyStateSnapshot();
+  const qualification = useQualificationWorkspace(["admin","qa_manager","qa_staff"].includes(access.businessRole||""),hasDirty);
+  const navigateView = (next:string)=>{
+    const leavingQualification=Boolean(qualification.active);
+    if(!qualification.close())return;
+    // close() creates the destination entry; the hash effect completes that entry.
+    if(leavingQualification)viewTruoc.current=next;
+    setView(next);
+  };
   const xinThoat = useCallback(() => {
+    if (qualification.active && !qualification.canLeave()) return;
     if (hasDirty) { setHoiThoat(true); return; }
+    // Finish local draft cleanup before shared Auth can unmount the child frame.
+    if(qualification.active){void qualification.endSession().then(logout);return;}
     logout();
-  }, [hasDirty, logout]);
+  }, [hasDirty, logout, qualification.canLeave, qualification.active, qualification.endSession]);
   const mainRef = useScrollTop([view]);
 
   // (MỚI) BỘ LỌC TOÀN CỤC — khu vực + bộ phận (chọn NHIỀU) + thời gian (có Tùy chọn).
@@ -860,8 +873,8 @@ function VerifiedAppShell({ user, logout, access }: {
     const doiMan = viewTruoc.current !== view;
     viewTruoc.current = view;
     try {
-      if (doiMan) window.history.pushState(null, "", moi);
-      else window.history.replaceState(null, "", moi);
+      if (doiMan) writeShellHistory(moi);
+      else writeShellHistory(moi,true);
     } catch { /* trình duyệt chặn history thì bỏ qua, app vẫn chạy */ }
   }, [trangThaiUrl, view]);
 
@@ -1010,7 +1023,8 @@ function VerifiedAppShell({ user, logout, access }: {
       />
 
       <SidebarMemo
-        view={view} setView={setView} user={user} access={access}
+        view={view} setView={navigateView} user={user} access={access}
+        onOpenQualification={qualification.open} qualificationTarget={qualification.active}
         connected={conn.status === "ok"}
         onLogout={xinThoat}
         onChangePw={moDoiMatKhau}
@@ -1020,21 +1034,23 @@ function VerifiedAppShell({ user, logout, access }: {
           lavender toả từ góc như cũ, thêm tranh hồ sen mờ ở góc phải (không
           đè chữ) và vân sơn mài; bỏ sao lấp lánh. */}
       <main ref={mainRef} id="vmp-main-content" data-vmp-view={view} tabIndex={-1} className="vmp-scroll vmp-main-nen" style={{
-        flex: 1, overflowY: "auto", position: "relative",
+        flex: 1, minWidth:0, overflowY: qualification.active ? "hidden" : "auto", position: "relative",
       }}>
-        <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ position: "relative", zIndex: 1, ...(qualification.active ? {height:"100%",display:"flex",flexDirection:"column" as const} : {}) }}>
           <TopbarMemo
-            title={title} user={user} sub={(NAV_SUBS as Record<string, string>)[view]}
+            title={qualification.active ? qualification.title : title} user={user} sub={qualification.active ? "Thẩm định thực tế" : (NAV_SUBS as Record<string, string>)[view]}
             dataUpdatedAt={dataUpdatedAt}
-            view={view} setView={setView} access={access}
+            view={view} setView={navigateView} access={access}
+            onOpenQualification={qualification.open} qualificationTarget={qualification.active}
             onLogout={xinThoat} onChangePw={moDoiMatKhau}
-            showMasthead={view === "overview"} compact={view === "timeline"}
+            showMasthead={!qualification.active && view === "overview"} compact={!qualification.active && view === "timeline"}
           />
 
 
           {/* Padding lấy từ token khổ màn: 24 → 32 → 36 (≥1600) → 48 (≥1900).
               Desktop rộng thở bằng padding, không kéo card dài ra. */}
-          <div style={{ padding: "0 var(--lp-shell-pad, 34px) 38px" }}>
+          <div style={{ padding: qualification.active ? "0 var(--lp-shell-pad, 34px) 12px" : "0 var(--lp-shell-pad, 34px) 38px", ...(qualification.active ? {flex:1,minHeight:0} : {}) }}>
+            {qualification.active ? qualification.content : <>
             {/* Loading state */}
             {objects.length === 0 && conn.status === "loading" && <SkeletonDashboard />}
 
@@ -1220,6 +1236,7 @@ function VerifiedAppShell({ user, logout, access }: {
                 người dùng đang đứng — hỏi ở trang Cảnh báo khác hẳn hỏi ở
                 trang Tổng quan. */}
             <Suspense fallback={null}><ChatBox user={user} trang={view} access={access} /></Suspense>
+            </>}
           </div>
         </div>
       </main>

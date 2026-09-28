@@ -1,0 +1,11 @@
+html.vmp-embedded, .vmp-embedded body {min-height:0;height:auto;background:transparent;}
+.vmp-embedded .workspace-header,.vmp-embedded .site-header,
+.vmp-embedded .rail-identity,.vmp-embedded .system-links,
+.vmp-embedded .rail-label:not(.rail-form-label),.vmp-embedded body>.skip-link {display:none;}
+.vmp-embedded .qualification-layout {width:100%;max-width:none;margin:0;padding:0;grid-template-columns:168px minmax(0,1fr);gap:20px;min-height:0;}
+.vmp-embedded .qualification-rail {top:0;min-width:0;}
+.vmp-embedded .workspace,.vmp-embedded .home-shell,.vmp-embedded .runs-shell {min-width:0;max-width:none;width:100%;margin:0;}
+.vmp-embedded-full .qualification-layout {display:block;}
+.vmp-embedded-full .qualification-rail {display:none;}
+@media(max-width:960px){.vmp-embedded .qualification-layout {grid-template-columns:minmax(0,1fr);gap:12px;}}
+@media print{.vmp-embedded .qualification-rail{display:none;}.vmp-embedded .qualification-layout{display:block;}}

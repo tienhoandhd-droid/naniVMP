@@ -1,0 +1,12 @@
+# Sampling point labels — local bugfix
+
+Root cause confirmed: gas appendix DOCX contains w:br line breaks but legacy extraction joins only w:t, losing boundaries; empty equipment cells add a leading middle dot. UI renders raw names directly. Shared summary derives the current point from filtered list DOM, so search hides the selected name. No form-data or PDF changes authorized.
+
+Plan: presentation-only shared formatter normalizes whitespace/empty separators and recovers observed code/text and joined text boundaries while retaining source words and bilingual content. Use it consistently in point list, selected summary, heading and searchable text. Set selected label explicitly from app state before filtering (no DOM inference). Unknown/missing name must show a transparent fallback, never invent equipment. Preserve IDs and config/raw input/result/save/report flows. Wrap long labels with aligned list content.
+
+RED: unit formatter tests (synthetic labels), browser point label retained through search with populated fixtures; source audit retains all letters/digits across every configured label. GREEN: target unit/E2E for three systems, selection/search/no-points/restore data/360 and1440px/axe; build/typecheck and source/dist/HTTP verify. Primary implementation sequential; bounded independent UI review after patch. No DB migration/query/write/deploy. Rollback snapshot private point-labels-20260928 plus remove new script/include and build local. Source config regeneration/migration not performed because this turn remains local-only; original appendix names remain authoritative.
+
+
+Verification: failing populated browser case confirmed search erased selected steam name; formatter file missing RED before implementation. GREEN5unit and populated18form targeted browser pass with6axeviews0violations/0pageerrors at360/1440. 305configuredlabelinstances preserve all source letters/digits, except code-onlynames clearly reported missing. Typecheck/build exit0;6backend/auth/PDF/adapter hashes unchanged;7source/dist/HTTP assets identical. Screenshots inspected. Unknown arbitrary camelcase brands kept unchanged; repairs restricted to observed English room/equipment prefixes. No production access or deployment.
+
+Independent terra review found additional missing Capsule/Filling and spaced bilingual boundaries; added suffix RED then exact-English-first matcher. Fresh6unit +18form/6axe/browser/build pass;305label words preserved and7servedassets match. Re-review found no remaining concrete defect.

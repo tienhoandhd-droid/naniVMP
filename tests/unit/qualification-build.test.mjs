@@ -9,8 +9,12 @@ test('qualification build uses the VMP public project and rejects administrative
  try {
   await mkdir(join(root,'src/features/qualification'),{recursive:true});
   await writeFile(join(root,'src/features/qualification/bootstrap.js'),'window.fixture=true;');
+  await mkdir(join(root,'src/styles'),{recursive:true});
+  const tokens=':root[data-visual="lotus-pearl"]{--lp-brand:#6B3B55}';
+  await writeFile(join(root,'src/styles/lotus-tokens.css'),tokens);
   const env={VITE_SUPABASE_URL:'https://vmp-test.supabase.co',VITE_SUPABASE_ANON:'sb_publishable_fixture'};
   await buildQualification(root,env);
+  assert.equal(await readFile(join(root,'public/tham-dinh-thuc-te/vmp-tokens.css'),'utf8'),tokens);
   const config=await readFile(join(root,'public/tham-dinh-thuc-te/runtime-config.js'),'utf8');
   assert.match(config,/https:\/\/vmp-test.supabase.co/);assert.match(config,/sb_publishable_fixture/);
   await assert.rejects(buildQualification(root,{...env,VITE_SUPABASE_ANON:'sb_secret_FORBIDDEN'}),/publishable/);

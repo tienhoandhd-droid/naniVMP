@@ -2,180 +2,66 @@
   "use strict";
 
   const forms = [
-    {
-      system: "Hơi tinh khiết",
-      code: "BM01",
-      title: "Khí không ngưng",
-      href: "./steam.html?form=bm01",
-    },
-    {
-      system: "Hơi tinh khiết",
-      code: "BM02",
-      title: "Chất lượng nước ngưng",
-      aliases: "hóa lý vi sinh",
-      href: "./steam.html?form=bm02",
-    },
-    {
-      system: "Hơi tinh khiết",
-      code: "BM03",
-      title: "Độ khô",
-      href: "./steam.html?form=bm03",
-    },
-    {
-      system: "Hơi tinh khiết",
-      code: "BM04",
-      title: "Quá nhiệt",
-      href: "./steam.html?form=bm04",
-    },
-    {
-      system: "Hơi tinh khiết",
-      code: "BM05",
-      title: "Tổng hợp",
-      href: "./steam.html?form=bm05",
-    },
-    {
-      system: "Khí nén",
-      code: "BM01",
-      title: "Tiểu phân",
-      href: "./gas.html?system=air&form=bm01",
-    },
-    {
-      system: "Khí nén",
-      code: "BM02",
-      title: "Điểm sương",
-      href: "./gas.html?system=air&form=bm02",
-    },
-    {
-      system: "Khí nén",
-      code: "BM03",
-      title: "Vết dầu",
-      href: "./gas.html?system=air&form=bm03",
-    },
-    {
-      system: "Khí nén",
-      code: "BM04",
-      title: "Vi sinh",
-      href: "./gas.html?system=air&form=bm04",
-    },
-    {
-      system: "Khí nén",
-      code: "BM05",
-      title: "Tổng hợp",
-      href: "./gas.html?system=air&form=bm05",
-    },
-    {
-      system: "Khí nén",
-      code: "BM06",
-      title: "Xu hướng",
-      href: "./gas.html?system=air&form=bm06",
-    },
-    {
-      system: "Khí nitơ",
-      code: "BM01",
-      title: "Tiểu phân",
-      href: "./gas.html?system=nitrogen&form=bm01",
-    },
-    {
-      system: "Khí nitơ",
-      code: "BM02",
-      title: "Điểm sương",
-      href: "./gas.html?system=nitrogen&form=bm02",
-    },
-    {
-      system: "Khí nitơ",
-      code: "BM03",
-      title: "Vết dầu",
-      href: "./gas.html?system=nitrogen&form=bm03",
-    },
-    {
-      system: "Khí nitơ",
-      code: "BM04",
-      title: "Vi sinh",
-      href: "./gas.html?system=nitrogen&form=bm04",
-    },
-    {
-      system: "Khí nitơ",
-      code: "BM05",
-      title: "Độ tinh khiết",
-      href: "./gas.html?system=nitrogen&form=bm05",
-    },
-    {
-      system: "Khí nitơ",
-      code: "BM06",
-      title: "Tổng hợp",
-      href: "./gas.html?system=nitrogen&form=bm06",
-    },
-    {
-      system: "Khí nitơ",
-      code: "BM07",
-      title: "Xu hướng",
-      href: "./gas.html?system=nitrogen&form=bm07",
-    },
-  ];
+    ["steam", "Hơi tinh khiết", "BM01", "Khí không ngưng", "", "./steam.html?form=bm01"],
+    ["steam", "Hơi tinh khiết", "BM02", "Chất lượng nước ngưng", "hóa lý vi sinh", "./steam.html?form=bm02"],
+    ["steam", "Hơi tinh khiết", "BM03", "Độ khô", "", "./steam.html?form=bm03"],
+    ["steam", "Hơi tinh khiết", "BM04", "Quá nhiệt", "", "./steam.html?form=bm04"],
+    ["steam", "Hơi tinh khiết", "BM05", "Tổng hợp", "", "./steam.html?form=bm05"],
+    ["air", "Khí nén", "BM01", "Tiểu phân", "", "./gas.html?system=air&form=bm01"],
+    ["air", "Khí nén", "BM02", "Điểm sương", "", "./gas.html?system=air&form=bm02"],
+    ["air", "Khí nén", "BM03", "Vết dầu", "", "./gas.html?system=air&form=bm03"],
+    ["air", "Khí nén", "BM04", "Vi sinh", "", "./gas.html?system=air&form=bm04"],
+    ["air", "Khí nén", "BM05", "Tổng hợp", "", "./gas.html?system=air&form=bm05"],
+    ["air", "Khí nén", "BM06", "Xu hướng", "", "./gas.html?system=air&form=bm06"],
+    ["nitrogen", "Khí nitơ", "BM01", "Tiểu phân", "", "./gas.html?system=nitrogen&form=bm01"],
+    ["nitrogen", "Khí nitơ", "BM02", "Điểm sương", "", "./gas.html?system=nitrogen&form=bm02"],
+    ["nitrogen", "Khí nitơ", "BM03", "Vết dầu", "", "./gas.html?system=nitrogen&form=bm03"],
+    ["nitrogen", "Khí nitơ", "BM04", "Vi sinh", "", "./gas.html?system=nitrogen&form=bm04"],
+    ["nitrogen", "Khí nitơ", "BM05", "Độ tinh khiết", "", "./gas.html?system=nitrogen&form=bm05"],
+    ["nitrogen", "Khí nitơ", "BM06", "Tổng hợp", "", "./gas.html?system=nitrogen&form=bm06"],
+    ["nitrogen", "Khí nitơ", "BM07", "Xu hướng", "", "./gas.html?system=nitrogen&form=bm07"],
+  ].map(([systemKey, system, code, title, aliases, href]) => ({ systemKey, system, code, title, aliases, href }));
+
   const searchInput = document.querySelector("#form-search");
   const results = document.querySelector("#form-results");
   const resultCount = document.querySelector("#form-count");
   const emptyResults = document.querySelector("#empty-results");
-  const sectionLinks = [...document.querySelectorAll(".primary-nav a")];
+  const filterButtons = [...document.querySelectorAll("[data-system-filter]")];
+  let activeSystem = "all";
 
   function normalize(value) {
-    return value
-      .toLocaleLowerCase("vi")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d");
+    return value.toLocaleLowerCase("vi").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
   }
 
-  function matchesTokens(form, normalizedQuery) {
-    const searchText = normalize(
-      [form.system, form.code, form.title, form.aliases || ""].join(" "),
-    );
-    return normalizedQuery
-      .split(/\s+/)
-      .filter(Boolean)
-      .every((token) => searchText.includes(token));
+  function matchesQuery(form, query) {
+    const text = normalize([form.system, form.code, form.title, form.aliases].join(" "));
+    return query.split(/\s+/).filter(Boolean).every(token => text.includes(token));
   }
 
-  function renderResults(query = "") {
-    const normalizedQuery = normalize(query).trim();
-    const phraseMatches = normalizedQuery.includes(" ")
-      ? forms.filter((form) =>
-          normalize([form.title, form.aliases || ""].join(" ")).includes(
-            normalizedQuery,
-          ),
-        )
-      : [];
-    const visibleForms = phraseMatches.length
-      ? phraseMatches
-      : forms.filter((form) => matchesTokens(form, normalizedQuery));
+  function renderResults() {
+    const query = normalize(searchInput.value).trim();
+    const pool = forms.filter(form => activeSystem === "all" || form.systemKey === activeSystem);
+    const phrases = query.includes(" ") ? pool.filter(form => normalize([form.title, form.aliases].join(" ")).includes(query)) : [];
+    const visibleForms = phrases.length ? phrases : pool.filter(form => matchesQuery(form, query));
     results.replaceChildren();
     visibleForms.forEach((form) => {
       const link = document.createElement("a");
       link.className = "form-result";
       link.href = form.href;
-      link.innerHTML = `<span class="form-code">${form.code}</span><span><small>${form.system}</small><strong>${form.title}</strong></span><span class="result-arrow" aria-hidden="true">→</span>`;
+      link.innerHTML = `<span><small>${form.code} · ${form.system}</small><strong>${form.title}</strong></span><span class="form-code" aria-hidden="true">Mở →</span>`;
       results.append(link);
     });
     resultCount.textContent = `${visibleForms.length} biểu mẫu`;
     emptyResults.hidden = visibleForms.length !== 0;
   }
 
-  function updateCurrentSection() {
-    const currentHash = window.location.hash || "#tong-quan";
-    sectionLinks.forEach((link) => {
-      if (link.getAttribute("href") === currentHash)
-        link.setAttribute("aria-current", "page");
-      else link.removeAttribute("aria-current");
-    });
+  function selectSystem(system) {
+    activeSystem = system;
+    filterButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.systemFilter === activeSystem)));
+    renderResults();
   }
 
-  searchInput.addEventListener("input", () => renderResults(searchInput.value));
-  sectionLinks.forEach((link) =>
-    link.addEventListener("click", () =>
-      window.setTimeout(updateCurrentSection, 0),
-    ),
-  );
-  window.addEventListener("hashchange", updateCurrentSection);
+  searchInput.addEventListener("input", renderResults);
+  filterButtons.forEach((button) => button.addEventListener("click", () => selectSystem(button.dataset.systemFilter)));
   renderResults();
-  updateCurrentSection();
 })();

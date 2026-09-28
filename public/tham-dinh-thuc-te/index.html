@@ -1,189 +1,68 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-visual="lotus-pearl" data-theme="light">
   <head>
+  <script src="./vmp-embed.js"></script>
+  <script src="./appearance.js"></script>
+  <link rel="stylesheet" href="./vmp-tokens.css">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>Thẩm định thực tế (demo) | VMP</title>
-    <link rel="stylesheet" href="./home.css" />
     <link rel="stylesheet" href="./vmp-theme.css" />
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <link rel="stylesheet" href="./home.css" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./rail.css">
+  <link rel="stylesheet" href="./vmp-embed.css">
 </head>
   <body data-qualification-gate="pending">
     <a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>
-    <div class="home-shell">
-      <aside class="home-sidebar" aria-label="Điều hướng chính">
-        <a class="home-brand" href="./index.html" aria-label="V/Q team, Thẩm định thực tế demo, trang tổng quan"><span class="vq-wordmark" role="img" aria-label="V/Q team"><b>V</b><i aria-hidden="true">/</i><b>Q</b><small>team</small></span><span class="brand-product"><strong>Thẩm định thực tế</strong><small>DEMO · VMP</small></span></a>
-        <nav class="primary-nav" aria-label="Khu vực">
-          <a href="#tong-quan" aria-current="page"
-            ><svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"
-              /></svg
-            >Tổng quan</a
-          ><a href="#he-thong"
-            ><svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 7h16M4 12h16M4 17h10" /></svg
-            >Hệ thống</a
-          ><a href="#bieu-mau"
-            ><svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M7 3h8l3 3v15H7zM15 3v4h4M10 12h5M10 16h5" /></svg
-            >Biểu mẫu</a
-          ><a href="#huong-dan"
-            ><svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="8" />
-              <path
-                d="M9.8 9a2.4 2.4 0 1 1 3.7 2c-.9.5-1.5 1-1.5 2.1M12 16.8h.01"
-              /></svg
-            >Hướng dẫn</a
-          >
-        </nav>
-        <a class="vmp-back-link" href="../">← Về VMP</a>
-      </aside>
-      <main id="main-content" tabindex="-1">
-        <header class="home-header">
-          <p class="section-kicker">VMP / THẨM ĐỊNH HỆ THỐNG</p>
-          <a class="header-guide" href="#huong-dan"
-            >Xem hướng dẫn <span aria-hidden="true">↘</span></a
-          >
-        </header>
-        <section id="tong-quan" class="intro" aria-labelledby="page-title">
+    <header class="site-header">
+      <a class="monitor-brand" href="../" aria-label="CPC1HN — VMP Monitor, Hệ giám sát thẩm định">
+      <img class="company-logo" src="../logo-cpc1hn.png" width="290" height="234" alt="CPC1HN">
+      <span class="monitor-masthead" aria-hidden="true"><span class="monitor-name"><span class="monitor-v">V</span><span class="monitor-mp">MP</span><i>Monitor</i></span><span class="monitor-caption">Hệ giám sát thẩm định</span></span>
+    </a>
+      <a class="vmp-back-link" href="../">← VMP</a>
+    </header>
+    <div class="qualification-layout">
+  <aside class="qualification-rail" aria-label="Điều hướng thẩm định"><a class="rail-identity" href="./index.html"><span class="vq-wordmark" role="img" aria-label="V/Q team"><b>V</b><i aria-hidden="true">/</i><b>Q</b><small>team</small></span><span>Thẩm định thực tế <small>(demo)</small></span></a><p class="rail-label">Hệ thống</p><nav class="system-links library-navigation" aria-label="Chọn hệ thống"><a href="./index.html" aria-current="page">Thư viện</a><a href="./steam.html">Hơi tinh khiết</a><a href="./gas.html?system=air">Khí nén</a><a href="./gas.html?system=nitrogen">Nitơ</a><a href="./runs.html">Đợt &amp; xu hướng</a></nav></aside>
+    <main id="main-content" tabindex="-1">
+      <section class="library" aria-labelledby="page-title">
+        <p class="library-kicker">THẨM ĐỊNH THỰC TẾ · DEMO</p>
+        <h1 id="page-title">Thư viện biểu mẫu</h1>
+        <p class="library-intro">Chọn biểu mẫu để nhập số liệu và xem đánh giá trong phạm vi quyền của bạn.</p>
+        <div class="library-tools">
+          <label class="form-search" for="form-search">
+            <span aria-hidden="true">⌕</span>
+            <span class="sr-only">Tìm theo mã, tên biểu mẫu hoặc hệ thống</span>
+            <input id="form-search" type="search" placeholder="Tìm mã, tên hoặc hệ thống" autocomplete="off" />
+          </label>
+          <div class="system-filters" role="group" aria-label="Lọc theo hệ thống">
+            <button type="button" data-system-filter="all" aria-pressed="true">Tất cả</button>
+            <button type="button" data-system-filter="steam" aria-pressed="false">Hơi tinh khiết</button>
+            <button type="button" data-system-filter="air" aria-pressed="false">Khí nén</button>
+            <button type="button" data-system-filter="nitrogen" aria-pressed="false">Khí nitơ</button>
+          </div>
+        </div>
+        <div class="results-heading"><p id="form-count" aria-live="polite">18 biểu mẫu</p></div>
+        <nav id="form-results" class="form-results" aria-label="Kết quả biểu mẫu"></nav>
+        <p id="empty-results" class="empty-results" role="status" aria-live="polite" hidden>Không có biểu mẫu phù hợp. Thử đổi từ khóa hoặc hệ thống.</p>
+        <details class="saved-records">
+          <summary>Hồ sơ đã lưu</summary>
           <div>
-            <p class="eyebrow">MÔ-ĐUN DEMO</p>
-            <h1 id="page-title">Thẩm định thực tế (demo)</h1>
-            <p class="lede">Chọn hệ thống để nhập số liệu, xem hồ sơ và in theo biểu mẫu đã phát hành.</p>
+            <a href="./steam.html?view=records"><span>Hơi tinh khiết</span><span aria-hidden="true">↗</span></a>
+            <a href="./gas.html?system=air&amp;view=records"><span>Khí nén</span><span aria-hidden="true">↗</span></a>
+            <a href="./gas.html?system=nitrogen&amp;view=records"><span>Khí nitơ</span><span aria-hidden="true">↗</span></a>
           </div>
-          <dl class="scope-counts" aria-label="Phạm vi thư viện hiện có">
-            <div>
-              <dt>Hệ thống</dt>
-              <dd>03</dd>
-            </div>
-            <div>
-              <dt>Biểu mẫu</dt>
-              <dd>18</dd>
-            </div>
-          </dl>
-        </section>
-        <section
-          id="he-thong"
-          class="systems-section"
-          aria-labelledby="systems-title"
-        >
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">HỆ THỐNG</p>
-              <h2 id="systems-title">Chọn điểm bắt đầu</h2>
-            </div>
-            <p>Ba phạm vi hiện có trong thư viện.</p>
-          </div>
-          <div class="systems-grid">
-            <article class="system-card">
-              <div class="card-icon"><svg viewBox="0 0 300 140" aria-hidden="true"><path d="M32 115h236M66 112v-12M220 112v-12" stroke="#b7bbc2"/><rect x="65" y="56" width="166" height="44" rx="22" fill="#fff"/><path d="M82 69h122M90 82h94M231 78h29V49h17M65 78H35V96"/><circle cx="191" cy="56" r="13" fill="#fff"/><path d="m191 56 5-6M114 40c-10-8 10-11 0-20M136 40c-10-8 10-11 0-20M158 40c-10-8 10-11 0-20" stroke="#7d1831"/></svg></div>
-              <p class="card-index">01 / 05 BIỂU MẪU</p>
-              <h3>Hơi tinh khiết</h3>
-              <p>Thông số chất lượng hơi và các biểu mẫu tổng hợp.</p>
-              <a href="./steam.html"
-                >Mở hệ thống <span aria-hidden="true">→</span></a
-              >
-            </article>
-            <article class="system-card">
-              <div class="card-icon"><svg viewBox="0 0 300 140" aria-hidden="true"><path d="M32 115h236M89 100v12M179 100v12" stroke="#b7bbc2"/><rect x="68" y="60" width="135" height="40" rx="20" fill="#fff"/><rect x="92" y="37" width="67" height="23" rx="5" fill="#fff"/><path d="M106 37V26h30v11M203 80h41V52h30M51 43h27M38 56h40M47 69h16"/><circle cx="179" cy="41" r="15" fill="#fff"/><path d="m179 41 7-7M103 49h43" stroke="#7d1831"/></svg></div>
-              <p class="card-index">02 / 06 BIỂU MẪU</p>
-              <h3>Khí nén</h3>
-              <p>Nhập kết quả theo từng biểu mẫu và điểm lấy mẫu.</p>
-              <a href="./gas.html?system=air"
-                >Mở hệ thống <span aria-hidden="true">→</span></a
-              >
-            </article>
-            <article class="system-card">
-              <div class="card-icon"><svg viewBox="0 0 300 140" aria-hidden="true"><path d="M32 115h236" stroke="#b7bbc2"/><rect x="75" y="43" width="42" height="70" rx="19" fill="#fff"/><rect x="130" y="43" width="42" height="70" rx="19" fill="#fff"/><rect x="185" y="43" width="42" height="70" rx="19" fill="#fff"/><path d="M88 43V31h16v12M143 43V31h16v12M198 43V31h16v12M96 31V21h110v10"/><path d="M88 69v15h15V69M143 69v15h15V69M198 69v15h15V69" stroke="#7d1831"/></svg></div>
-              <p class="card-index">03 / 07 BIỂU MẪU</p>
-              <h3>Khí nitơ</h3>
-              <p>Thư viện biểu mẫu đo và báo cáo cho khí nitơ.</p>
-              <a href="./gas.html?system=nitrogen"
-                >Mở hệ thống <span aria-hidden="true">→</span></a
-              >
-            </article>
-          </div>
-        </section>
-        <section
-          id="bieu-mau"
-          class="library-section"
-          aria-labelledby="library-title"
-        >
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">THƯ VIỆN</p>
-              <h2 id="library-title">Tìm biểu mẫu</h2>
-            </div>
-            <p id="form-count" aria-live="polite">18 biểu mẫu</p>
-          </div>
-          <label class="form-search" for="form-search"
-            ><svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="10.8" cy="10.8" r="5.8" />
-              <path d="m15 15 4.3 4.3" /></svg
-            ><span class="sr-only">Tìm theo mã, tên biểu mẫu hoặc hệ thống</span
-            ><input
-              id="form-search"
-              type="search"
-              placeholder="Tìm theo mã, tên biểu mẫu hoặc hệ thống"
-              autocomplete="off"
-          /></label>
-          <div id="form-results" class="form-results" aria-live="polite"></div>
-          <p id="empty-results" class="empty-results" hidden>
-            Chưa tìm thấy biểu mẫu phù hợp. Thử tìm theo mã BM hoặc tên hệ
-            thống.
-          </p>
-        </section>
-        <section
-          id="huong-dan"
-          class="guides-section"
-          aria-labelledby="guides-title"
-        >
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">HƯỚNG DẪN</p>
-              <h2 id="guides-title">Làm việc theo từng bước</h2>
-            </div>
-          </div>
-          <div class="guides-grid">
-            <article>
-              <span>01</span>
-              <h3>Chọn hệ thống</h3>
-              <p>Mở hệ thống phù hợp rồi chọn biểu mẫu và điểm lấy mẫu.</p>
-            </article>
-            <article>
-              <span>02</span>
-              <h3>Nhập và đánh giá</h3>
-              <p>
-                Nhập dữ liệu đo. Kết quả chỉ được xác định sau khi hệ thống đánh
-                giá.
-              </p>
-            </article>
-            <article>
-              <span>03</span>
-              <h3>Mở hồ sơ và in</h3>
-              <p>
-                Mở hồ sơ đã lưu sau khi đăng nhập, hoặc in biểu mẫu từ trang hệ
-                thống.
-              </p>
-            </article>
-          </div>
-          <div class="record-links" aria-label="Mở hồ sơ đã lưu theo hệ thống">
-            <p>Hồ sơ đã lưu</p>
-            <a href="./steam.html?view=records"
-              >Hơi tinh khiết <span aria-hidden="true">↗</span></a
-            ><a href="./gas.html?system=air&amp;view=records"
-              >Khí nén <span aria-hidden="true">↗</span></a
-            ><a href="./gas.html?system=nitrogen&amp;view=records"
-              >Khí nitơ <span aria-hidden="true">↗</span></a
-            >
-          </div>
-        </section>
-      </main>
+        </details>
+        <details class="help-details">
+          <summary>Cách dùng thư viện</summary>
+          <p>Mở biểu mẫu theo hệ thống. Nhập số liệu → Tính và đánh giá → Lưu hồ sơ → In biểu mẫu. Kết quả tính không thay thế phê duyệt QA.</p>
+        </details>
+      </section>
+    </main>
     </div>
     <script src="./home.js" defer></script>
     <script src="./runtime-config.js" defer></script>
-  <script src="./cloud.js" defer></script>
-</body>
+    <script src="./cloud.js" defer></script>
+  </body>
 </html>

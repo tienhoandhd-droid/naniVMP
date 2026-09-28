@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  CATALOG_OBJECT_FILTERS_ALL,
+  CATALOG_OBJECT_FILTERS_ALL, catalogVmpDateError,
   activeCatalogObjectFilterChips,
   catalogWorkspaceRegionIds,
   catalogObjectFilterOptions,
@@ -188,4 +188,17 @@ test("Source controls keep lower roles read-only and require edit capability for
   assert.deepEqual(sourceDataControls("admin", false), {
     canChange: false, canImport: false, canExport: true,
   });
+});
+
+test('VMP deadline bounds are sent to server for pagination and export, inactive bounds omitted',()=>{
+ const active=encodeCatalogObjectServerFilters({...CATALOG_OBJECT_FILTERS_ALL,vmpFrom:'2026-03-01',vmpTo:'2026-03-31'});
+ assert.equal(active.filters.vmp_from,'2026-03-01');assert.equal(active.filters.vmp_to,'2026-03-31');
+ const chips=activeCatalogObjectFilterChips({...CATALOG_OBJECT_FILTERS_ALL,vmpFrom:'2026-03-01',vmpTo:'2026-03-31'});
+ assert.deepEqual(chips.slice(-2).map(x=>x.key),['vmpFrom','vmpTo']);
+ assert.equal('vmp_from' in encodeCatalogObjectServerFilters(CATALOG_OBJECT_FILTERS_ALL).filters,false);
+});
+
+test('VMP range validation accepts open bounds and leap dates, rejects invalid or reversed intervals',()=>{
+ for(const f of [{},{vmpFrom:'2024-02-29'},{vmpTo:'2026-03-31'},{vmpFrom:'2026-03-01',vmpTo:'2026-03-01'}])assert.equal(catalogVmpDateError(f),'');
+ for(const f of [{vmpFrom:'2026-02-29'},{vmpTo:'0000-01-01'},{vmpFrom:'2026-04-01',vmpTo:'2026-03-31'},{vmpFrom:'31/03/2026'}])assert.ok(catalogVmpDateError(f));
 });
