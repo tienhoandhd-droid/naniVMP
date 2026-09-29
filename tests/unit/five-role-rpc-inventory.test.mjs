@@ -123,20 +123,21 @@ const CANONICAL_DASHBOARD_REVIEWED_RPC = new Map([
 ]);
 // Additive namespace, reviewed and applied independently of the sealed VMP baseline.
 const QUALIFICATION_REVIEWED_RPC = new Map([
+  ["cpc1_run_requirements", {identity:"cpc1_run_requirements(jsonb)",classification:"guarded_explicit"}],
+  ["cpc1_run_calibration_update", {identity:"cpc1_run_calibration_update(uuid,integer,jsonb,text,uuid)",classification:"guarded_explicit"}],
+  ["cpc1_point_history", {identity:"cpc1_point_history(uuid,text,text)",classification:"guarded_explicit"}],
   ["cpc1_run_list", {identity:"cpc1_run_list()",classification:"guarded_explicit"}],
   ["cpc1_run_create", {identity:"cpc1_run_create(jsonb,uuid)",classification:"guarded_explicit"}],
   ["cpc1_run_transition", {identity:"cpc1_run_transition(uuid,integer,text,text,uuid)",classification:"guarded_explicit"}],
   ["cpc1_run_config", {identity:"cpc1_run_config(uuid,text)",classification:"guarded_explicit"}],
   ["cpc1_run_load", {identity:"cpc1_run_load(uuid,uuid)",classification:"guarded_explicit"}],
   ["cpc1_run_evaluate", {identity:"cpc1_run_evaluate(uuid,jsonb)",classification:"guarded_explicit"}],
-  ["cpc1_run_save", {identity:"cpc1_run_save(uuid,jsonb,uuid,integer,uuid)",classification:"guarded_explicit"}],
+  ["cpc1_run_save", {identity:"cpc1_run_save(uuid,jsonb,uuid,integer,uuid,text)",classification:"guarded_explicit"}],
   ["cpc1_history_list", {identity:"cpc1_history_list()",classification:"guarded_explicit"}],
 
   ["cpc1_context", {identity:"cpc1_context()",classification:"guarded_explicit"}],
   ["cpc1_config", {identity:"cpc1_config()",classification:"guarded_explicit"}],
   ["cpc1_gas_config", {identity:"cpc1_gas_config(text)",classification:"guarded_explicit"}],
-  ["cpc1_evaluate", {identity:"cpc1_evaluate(jsonb)",classification:"guarded_explicit"}],
-  ["cpc1_save", {identity:"cpc1_save(jsonb,uuid,integer,uuid,text)",classification:"guarded_explicit"}],
   ["cpc1_list", {identity:"cpc1_list()",classification:"guarded_explicit"}],
   ["cpc1_load", {identity:"cpc1_load(uuid,integer)",classification:"guarded_explicit"}],
 ]);
@@ -400,7 +401,8 @@ test("every source RPC call has exactly one reviewed migration classification", 
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 99, "reviewed source HEAD must expose 99 literal RPC targets");
+  assert.equal(sourceNames.length, 100, "reviewed source HEAD must expose 100 literal RPC targets");
+  assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260929180000_qualification_run_workspace.sql")).digest("hex"), "41ead7b4a9341bc4d267bf30be4b4f7f62d41400d864635ab16ed93d0e2d2732", "independently reviewed run workspace migration with fresh PostgreSQL17 rehearsal");
   assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928120000_qualification_runs.sql")).digest("hex"), "c1ad3d409cd8777f020a84096a4c21fae703e321af8aadffe1c8c8684f66bc8c", "reviewed/applied qualification run and history migration");
   assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928121000_qualification_run_entry.sql")).digest("hex"), "fcfad0a3b90d9df79b380b138176326322734969db165529d3e123c141f5a770", "reviewed/applied qualification run and history migration");
   assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928122000_qualification_history.sql")).digest("hex"), "853190de40d499a6b56fc136de8f5fd62377eac7f71000a03a45952075aeab24", "reviewed/applied qualification run and history migration");

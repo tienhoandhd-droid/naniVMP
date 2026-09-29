@@ -1,11 +1,14 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {qualificationTarget,QUALIFICATION_LINKS,shellHistoryIndex,writeShellHistory} from './shellRoute.ts';
+import {permittedQualificationTarget,QUALIFICATION_LINKS,shellHistoryIndex,writeShellHistory} from './shellRoute.ts';
 
 type Bridge = {isDirty:()=>boolean;allowNavigation:()=>void;endSession:()=>Promise<void>|undefined};
 type FrameWindow = Window & {CPC1Embedded?:Bridge};
-export function useQualificationWorkspace(allowed:boolean,hasDirty:boolean) {
+export function useQualificationWorkspace(systems:readonly string[],hasDirty:boolean) {
+  const allowed=systems.length>0;
+  const accessKey=systems.join(',');
   const base=()=>new URL('./',window.location.href).href;
-  const read=()=>qualificationTarget(new URLSearchParams(window.location.search).get('qualification')||'',base());
+  const permitted=(input:string)=>permittedQualificationTarget(input,base(),systems);
+  const read=()=>permitted(new URLSearchParams(window.location.search).get('qualification')||'');
   const [target,setTarget]=useState<string|null>(()=>allowed?read():null);
   const current=useRef(target);current.current=target;
   const frame=useRef<HTMLIFrameElement>(null);
@@ -16,6 +19,9 @@ export function useQualificationWorkspace(allowed:boolean,hasDirty:boolean) {
   const acceptedIndex=useRef(shellHistoryIndex());
   const restoring=useRef(false);
   useEffect(()=>{writeShellHistory(window.location.href,true);},[]);
+  useEffect(()=>{
+    setTarget(allowed?read():null);
+  },[accessKey]);
   const canLeave=useCallback(()=>{
     let bridge:Bridge|undefined;
     try {bridge=(frame.current?.contentWindow as FrameWindow|null)?.CPC1Embedded;}
@@ -31,12 +37,12 @@ export function useQualificationWorkspace(allowed:boolean,hasDirty:boolean) {
   };
   const change=useCallback((next:string|null)=>{
     if(next===current.current)return true;
-    if(next&&!allowed)return false;
+    if(next&&!permitted(next))return false;
     if(!canLeave())return false;
     writeUrl(next);setTarget(next);return true;
-  },[allowed,canLeave]);
+  },[accessKey,canLeave]);
   const open=useCallback((input:string)=>{
-    const next=qualificationTarget(input,base());return next?change(next):false;
+    const next=permitted(input);return next?change(next):false;
   },[change]);
   useEffect(()=>{
     if(!allowed){setTarget(null);return;}
@@ -52,7 +58,7 @@ export function useQualificationWorkspace(allowed:boolean,hasDirty:boolean) {
       acceptedIndex.current=shellHistoryIndex();setTarget(next);
     };
     window.addEventListener('popstate',pop,true);return()=>window.removeEventListener('popstate',pop,true);
-  },[allowed,canLeave]);
+  },[accessKey,canLeave]);
   useEffect(()=>{
     readyRef.current=false;setReady(false);setFailed(false);
     if(!target)return;
@@ -71,7 +77,7 @@ export function useQualificationWorkspace(allowed:boolean,hasDirty:boolean) {
     window.addEventListener('message',message);
     return()=>window.removeEventListener('message',message);
   },[target,retry,open,change]);
-  const active=allowed?target:null;
+  const active=target?permitted(target):null;
   const title=QUALIFICATION_LINKS.find(l=>l.target.split('?')[0]===active?.split('?')[0] && (!l.target.includes('system=')||active?.includes(l.target.split('?')[1])))?.label||'Thẩm định thực tế';
   const endSession=async()=>{
     let bridge:Bridge|undefined;

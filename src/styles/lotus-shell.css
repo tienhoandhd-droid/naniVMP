@@ -147,6 +147,14 @@
   .vmp-masthead__phu { display: none; }
 }
 
+/* The unauthenticated brand uses the same VMP mark, adapted only for the
+ * lacquer panel's contrast. It does not change any Auth control or flow. */
+.vq-brand-panel .vmp-masthead { justify-content: center; margin: 10px 0 4px; }
+.vq-brand-panel .vmp-masthead__ten { color: #fff8ee; }
+.vq-brand-panel .vmp-masthead__monitor, .vq-brand-panel .vmp-masthead__phu { color: #ffdca5; }
+.vq-brand-panel .vmp-masthead__net { stroke: #ffdca5; fill: #ffdca5; }
+@media (max-width: 768px) { .vq-brand-panel .vmp-masthead { min-height: 38px; } }
+
 /* ---- Khối thương hiệu V/Q TEAM (sidebar) --------------------------- */
 .vq-brand { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .vq-brand__dong { display: flex; align-items: baseline; gap: 6px; line-height: 1; }
@@ -162,28 +170,79 @@
  * vùng tài khoản; không đổi nhãn, biểu tượng hay thứ tự điều hướng. */
 .vmp-sidebar {
   background:
-    radial-gradient(260px 220px at 100% 0%, color-mix(in srgb, var(--lp-gold) 9%, transparent), transparent 72%),
-    linear-gradient(180deg, var(--lp-nav-surface), var(--lp-surface-2)) !important;
+    radial-gradient(280px 240px at 100% 0%, rgb(255 220 171 / .18), transparent 70%),
+    linear-gradient(180deg, #3b153d, #511e4d 52%, #2f1237) !important;
+  border-right-color: rgb(255 224 192 / .34) !important;
 }
 .vmp-sidebar .vmp-nav {
   position: relative;
   min-height: 44px;
   border: 1px solid transparent !important;
-  color: var(--lp-ink-muted) !important;
+  color: #fff6ed !important;
 }
+.vmp-sidebar .vmp-nav svg { color: inherit; stroke: currentColor; }
 .vmp-sidebar .vmp-nav[aria-current="page"] {
-  background: var(--lp-nav-current) !important;
-  border-color: var(--lp-nav-hairline) !important;
-  box-shadow: inset 3px 0 0 var(--lp-nav-hairline) !important;
-  color: var(--lp-on-nav-current) !important;
+  background: rgb(255 225 189 / .22) !important;
+  border-color: rgb(255 231 194 / .75) !important;
+  box-shadow: inset 4px 0 0 #ffdca5 !important;
+  color: #fff !important;
 }
-.vmp-sidebar .vmp-nav[aria-current="page"] svg { color: var(--lp-on-nav-current) !important; stroke: var(--lp-on-nav-current); }
+.vmp-sidebar .vmp-nav[aria-current="page"] svg { color: #fff !important; stroke: #fff; }
 .vmp-sidebar .vmp-nav:not([aria-current="page"]):hover {
-  background: var(--lp-nav-hover) !important;
-  color: var(--lp-ink) !important;
+  background: rgb(255 240 219 / .14) !important;
+  color: #fff !important;
 }
-.vmp-sidebar .vmp-nav:not([aria-current="page"]):hover svg { color: var(--lp-ink) !important; }
-.vmp-sidebar .vmp-nav:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 3px; }
+.vmp-sidebar .vmp-nav:not([aria-current="page"]):hover svg { color: #fff !important; }
+.vmp-sidebar .vmp-nav:focus-visible { outline: 3px solid #ffdca5; outline-offset: 3px; }
+.vmp-sidebar .vmp-nav-group-heading {
+  margin: 14px 0 6px;
+  padding: 8px 12px !important;
+  border: 1px solid rgb(255 226 191 / .34);
+  border-radius: 9px;
+  background: rgb(20 5 30 / .32);
+  color: #ffe4bd !important;
+  font-size: 12px !important;
+  letter-spacing: .12em !important;
+}
+.vmp-sidebar .vq-brand__vq, .vmp-sidebar .vq-brand__tagline { color: #fff6ed; }
+.vmp-sidebar .vq-brand__donvi { color: #f9d9aa; }
+.vmp-sidebar .vmp-sidebar-preferences { background: rgb(255 240 219 / .14) !important; border-color: rgb(255 226 191 / .34) !important; }
+.vmp-sidebar .vmp-sidebar-preferences span { color: #fff6ed !important; }
+.qualification-nav { margin: 8px 0 12px; }
+.qualification-nav__system { margin-top: 4px; }
+.qualification-nav__system-toggle {
+  width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid transparent;
+  border-radius: 10px; background: transparent; color: var(--lp-ink); font: inherit; font-size: 14px;
+  font-weight: 800; text-align: left; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+}
+.qualification-nav__system-toggle:hover, .qualification-nav__system-toggle[aria-expanded="true"] { background: var(--lp-nav-hover); }
+.qualification-nav__system-toggle:focus-visible { outline: 3px solid var(--lp-focus); outline-offset: 2px; }
+.qualification-nav__system-toggle svg { transition: transform .15s ease; }
+.qualification-nav__system-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.qualification-nav__links { margin: 2px 0 6px 10px; padding-left: 8px; border-left: 1px solid var(--lp-line); }
+.qualification-nav__link { display: flex; align-items: center; min-height: 42px; padding: 8px 12px; border-radius: 10px; text-decoration: none; font-size: 13px; font-weight: 650; }
+.qualification-nav__collapsed { display: flex; justify-content: center; align-items: center; min-height: 44px; border-radius: 10px; }
+.qualification-nav-status { margin: 8px 4px; color: var(--lp-ink); font-size: 12px; line-height: 1.4; }
+.qualification-nav-status button { margin-top: 5px; border: 1px solid var(--lp-line); border-radius: 7px; background: transparent; color: inherit; font: inherit; font-weight: 800; cursor: pointer; }
+.qualification-nav-status button:focus-visible { outline: 3px solid var(--lp-focus); outline-offset: 2px; }
+.vmp-sidebar .qualification-nav__system-toggle { color: #fff6ed; }
+.vmp-sidebar .qualification-nav__system-toggle:hover, .vmp-sidebar .qualification-nav__system-toggle[aria-expanded="true"] { background: rgb(255 240 219 / .14); }
+.vmp-sidebar .qualification-nav__system-toggle:focus-visible { outline-color: #ffdca5; }
+.vmp-sidebar .qualification-nav__links { border-left-color: rgb(255 226 191 / .45); }
+.vmp-sidebar .qualification-nav-status { color: #ffe4bd; }
+.vmp-sidebar .qualification-nav-status button { border-color: rgb(255 226 191 / .6); color: #fff6ed; }
+.vmp-sidebar .qualification-nav-status button:focus-visible { outline-color: #ffdca5; }
+.vmp-mobile-drawer .vmp-nav-group-heading {
+  margin: 12px 0 5px;
+  padding: 7px 10px;
+  border: 1px solid var(--lp-line);
+  border-radius: 8px;
+  background: var(--lp-nav-hover);
+  color: var(--lp-ink);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
 .vmp-sidebar-preferences {
   background: var(--lp-nav-hover) !important;
 }

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const root = new URL('../../public/tham-dinh-thuc-te/', import.meta.url);
 const source = readFileSync(new URL('runs.js', root), 'utf8');
-const context = { window: {}, console, crypto: { randomUUID: () => 'request-id' } };
+const context = { window: {}, console, URLSearchParams, crypto: { randomUUID: () => 'request-id' } };
 vm.runInNewContext(source, context, { filename: 'runs.js' });
 const ui = context.window.CPC1RunsUI;
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -76,4 +76,34 @@ test('shared chart isolates units and metrics and retains duplicate observations
  assert.equal(out.rows.length,3);
  assert.deepEqual(plain(out.series.map(s=>[s.point_id,s.values])),[['A',[10]],['A',[11]],['B',[20]]]);
  const one=ui.trendSeries(history,'air','bm01','B','particles','hạt/m³');assert.deepEqual(plain(one.series.map(s=>s.point_id)),['B']);
+});
+
+test('run calibration validation requires the exact server requirements and keeps scope-derived keys',()=>{
+ assert.equal(typeof ui.validateCalibration,'function');
+ const requirements=[
+  {key:'air:bm01:expiry',name:'Máy đếm',kind:'calibration'},
+  {key:'air:bm03:expiry',name:'Ống phát hiện dầu',kind:'expiry'}
+ ];
+ assert.deepEqual(plain(ui.validateCalibration(requirements,{
+  'air:bm01:expiry':{name:'Máy đếm 01',due_on:'2026-12-31'},
+  'air:bm03:expiry':{name:'',due_on:'2026-11-30'}
+ })),{valid:false,message:'Nhập tên thiết bị và hạn cho tất cả thiết bị trong phạm vi.'});
+ assert.deepEqual(plain(ui.validateCalibration(requirements,{
+  'air:bm01:expiry':{name:'Máy đếm 01',due_on:'2026-12-31'},
+  'air:bm03:expiry':{name:'Ống dầu 02',due_on:'2026-11-30'}
+ })),{valid:true,message:''});
+});
+
+test('dedicated trend route pins one system and closed multi-run series never crosses systems',()=>{
+ assert.equal(typeof ui.trendRoute,'function');
+ assert.equal(typeof ui.closedTrendHistory,'function');
+ assert.deepEqual(plain(ui.trendRoute('?view=trend&system=air')),{dedicated:true,system:'air'});
+ assert.deepEqual(plain(ui.trendRoute('?view=trend&system=oxygen')),{dedicated:false,system:null});
+ const runs=[{id:'r1',status:'completed'},{id:'r2',status:'open'},{id:'r3',status:'closed'}];
+ const history=[
+  {run_id:'r1',system:'air',period:'2026-03-01'},
+  {run_id:'r2',system:'air',period:'2026-04-01'},
+  {run_id:'r3',system:'nitrogen',period:'2026-05-01'}
+ ];
+ assert.deepEqual(plain(ui.closedTrendHistory(history,runs,'air')),[{run_id:'r1',system:'air',period:'2026-03-01'}]);
 });

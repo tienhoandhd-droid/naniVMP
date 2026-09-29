@@ -1,5 +1,6 @@
 import {writeShellHistory} from "./features/qualification/shellRoute.ts";
 import {useQualificationWorkspace} from "./features/qualification/QualificationWorkspace.tsx";
+import {useQualificationAccess} from "./features/qualification/useQualificationAccess.ts";
 /* =====================================================================
  *  App.jsx — VMP Monitor v2.0 · Refactored Main Shell
  *  =====================================================================
@@ -670,7 +671,8 @@ function VerifiedAppShell({ user, logout, access }: {
      dài thì đó là mất cả buổi làm. */
   const [hoiThoat, setHoiThoat] = useState(false);
   const { hasDirty, keys: formDangDo } = useDirtyStateSnapshot();
-  const qualification = useQualificationWorkspace(["admin","qa_manager","qa_staff"].includes(access.businessRole||""),hasDirty);
+  const qualificationAccess = useQualificationAccess();
+  const qualification = useQualificationWorkspace(qualificationAccess.systems,hasDirty);
   const navigateView = (next:string)=>{
     const leavingQualification=Boolean(qualification.active);
     if(!qualification.close())return;
@@ -1023,6 +1025,7 @@ function VerifiedAppShell({ user, logout, access }: {
       <SidebarMemo
         view={view} setView={navigateView} user={user} access={access}
         onOpenQualification={qualification.open} qualificationTarget={qualification.active}
+        qualificationSystems={qualificationAccess.systems} qualificationStatus={qualificationAccess.status} qualificationError={qualificationAccess.error} onRetryQualification={qualificationAccess.retry}
         connected={conn.status === "ok"}
         onLogout={xinThoat}
         onChangePw={moDoiMatKhau}
@@ -1040,8 +1043,9 @@ function VerifiedAppShell({ user, logout, access }: {
             dataUpdatedAt={dataUpdatedAt}
             view={view} setView={navigateView} access={access}
             onOpenQualification={qualification.open} qualificationTarget={qualification.active}
+            qualificationSystems={qualificationAccess.systems} qualificationStatus={qualificationAccess.status} qualificationError={qualificationAccess.error} onRetryQualification={qualificationAccess.retry}
             onLogout={xinThoat} onChangePw={moDoiMatKhau}
-            showMasthead={!qualification.active && view === "overview"} compact={!qualification.active && view === "timeline"}
+            compact={!qualification.active && view === "timeline"}
           />
 
 

@@ -1,3 +1,5 @@
+import VmpMasthead from "../ui/VmpMasthead.tsx";
+
 export default function LuxuryBrandPanel() {
   return (
     <section className="vq-brand-panel" aria-label="V/Q Team"
@@ -23,8 +25,8 @@ export default function LuxuryBrandPanel() {
       </svg>
       <div className="vq-brand-content">
         <div className="vq-brand-hairline" />
-        <div className="vq-brand-wordmark"><span>V/Q</span><strong>TEAM</strong></div>
-        <div className="vq-brand-caption">VALIDATION &amp; QUALIFICATION</div>
+        <VmpMasthead />
+        <div className="vq-brand-caption">V/Q TEAM · VALIDATION &amp; QUALIFICATION</div>
       </div>
       <div className="vq-brand-department">Phòng Quản lý Chất lượng</div>
     </section>

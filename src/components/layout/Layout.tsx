@@ -5,13 +5,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   KeyRound, LogOut, Menu, X, Sun, Moon, Monitor,
-  PanelLeftClose, PanelLeftOpen, ClipboardCheck,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts";
 import { NAV_ITEMS } from "../../constants/vmp.ts";
 import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
 import { prefetchDesktopRoute } from "../../lib/routePrefetch.ts";
-import { useDirtyStateSnapshot } from "../ui/DirtyStateProvider.tsx";
 import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
 import { CrownLogo } from "../ui/Primitives.tsx";
@@ -23,31 +22,21 @@ import type { ScreenId } from "../../lib/access.ts";
    badge trên topbar và bảng phân quyền không lệch chữ nhau. */
 import { VAI_NGHIEP_VU } from "../../lib/supabaseData.ts";
 
-import {QUALIFICATION_LINKS,qualificationHref} from "../../features/qualification/shellRoute.ts";
+import { QualificationNavigation } from "./QualificationNavigation.tsx";
+import VmpMasthead from "../ui/VmpMasthead.tsx";
+import type { QualificationAccessStatus, QualificationSystem } from "../../features/qualification/useQualificationAccess.ts";
 
-type QualificationProps = {onOpenQualification?: (target:string)=>boolean; qualificationTarget?:string|null};
-
-// Separate module navigation; visibility never grants record access.
-function QualificationNavigation({collapsed = false,onOpenQualification,qualificationTarget}: {collapsed?: boolean}&QualificationProps) {
-  const {hasDirty} = useDirtyStateSnapshot();
-  const links = QUALIFICATION_LINKS;
-  return <section data-nav-group="qualification" aria-label="Thẩm định thực tế" style={{marginBottom:8}}>
-    {!collapsed && <h2 style={{fontFamily:TEXT,fontSize:12,color:C.plumSoft,letterSpacing:1.1,fontWeight:800,padding:"10px 12px 6px",margin:0}}>THẨM ĐỊNH THỰC TẾ</h2>}
-    {(collapsed ? [{label:"Thẩm định thực tế",target:"index.html"}] : links).map(link=><a key={link.target}
-      href={qualificationHref(link.target)} className="vmp-nav" data-module="qualification"
-      aria-current={qualificationTarget?.startsWith(link.target)?"page":undefined}
-      onClick={event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||event.button!==0)return;if(onOpenQualification){event.preventDefault();onOpenQualification(link.target);return;}if(hasDirty&&!window.confirm("Có dữ liệu VMP chưa lưu. Rời trang để mở Thẩm định thực tế?"))event.preventDefault();}}
-      title={collapsed?link.label:undefined} aria-label={link.label}
-      style={{display:"flex",alignItems:"center",gap:12,padding:12,minHeight:44,boxSizing:"border-box",borderRadius:R.md,
-        textDecoration:"none",fontFamily:TEXT,fontSize:14,fontWeight:600,color:C.plumSoft,background:qualificationTarget?.startsWith(link.target)?C.pinkSoft:"transparent",
-        justifyContent:collapsed?"center":"flex-start"}}>
-      {collapsed?<ClipboardCheck size={19} strokeWidth={2.2} style={{flexShrink:0}}/>:<span>{link.label}</span>}
-    </a>)}
-  </section>;
-}
+type QualificationProps = {
+  onOpenQualification?: (target:string)=>boolean;
+  qualificationTarget?:string|null;
+  qualificationSystems?: readonly QualificationSystem[];
+  qualificationStatus?: QualificationAccessStatus;
+  qualificationError?: string|null;
+  onRetryQualification?: () => void;
+};
 
 // ======================== SIDEBAR ========================
-export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onOpenQualification, qualificationTarget }: {
+export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onOpenQualification, qualificationTarget, qualificationSystems = [], qualificationStatus = "loading", qualificationError = null, onRetryQualification = () => {} }: {
   view: string;
   setView: (v: string) => void;
   user?: AppUser | null;
@@ -59,7 +48,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
   onOpenQualification?: (target:string)=>boolean;
   qualificationTarget?:string|null;
   connected?: boolean;
-}) {
+}&QualificationProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   /* Nhóm nào không còn mục nào xem được thì không hiện tiêu đề nhóm. Trước
@@ -125,8 +114,9 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
       <nav aria-label="Điều hướng chính" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }} className="vmp-scroll">
         {groups.map((g) => (
           <div key={g.id}>
+            {g.id === "analysis" && <QualificationNavigation collapsed={collapsed} systems={qualificationSystems} status={qualificationStatus} error={qualificationError} onRetry={onRetryQualification} onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} />}
             {!collapsed && (
-              <div style={{ fontSize: 12, color: C.plumSoft, letterSpacing: 1.4, fontWeight: 800, padding: "10px 12px 6px" }}>
+              <div className="vmp-nav-group-heading" style={{ fontSize: 12, color: C.plumSoft, letterSpacing: 1.4, fontWeight: 800, padding: "10px 12px 6px" }}>
                 {g.label}
               </div>
             )}
@@ -160,7 +150,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
             })}
           </div>
         ))}
-        {["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationNavigation collapsed={collapsed} onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} />}
+        {!groups.some((group) => group.id === "analysis") && <QualificationNavigation collapsed={collapsed} systems={qualificationSystems} status={qualificationStatus} error={qualificationError} onRetry={onRetryQualification} onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} />}
       </nav>
 
       {!collapsed && (
@@ -256,7 +246,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
   );
 }
 
-function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionClose, onLogout, onChangePw, onOpenQualification, qualificationTarget }: {
+function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionClose, onLogout, onChangePw, onOpenQualification, qualificationTarget, qualificationSystems = [], qualificationStatus = "loading", qualificationError = null, onRetryQualification = () => {} }: {
   open: boolean;
   view: string;
   setView: (v: string) => void;
@@ -270,7 +260,7 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
   onChangePw: () => void;
   onOpenQualification?: (target:string)=>boolean;
   qualificationTarget?:string|null;
-}) {
+}&QualificationProps) {
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -344,6 +334,14 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
   if (!open) return null;
 
   const allowedItems = NAV_ITEMS.filter((item) => access.canView(item.id));
+  const mobileGroupLabel: Record<string, string> = {
+    work: "THỰC HIỆN", monitor: "GIÁM SÁT", analysis: "PHÂN TÍCH & QUẢN TRỊ",
+  };
+  const mobileGroups = ["work", "monitor", "analysis"].map((id) => ({
+    id, label: mobileGroupLabel[id],
+    items: allowedItems.filter((item) => (item.group === "admin" ? "analysis" : item.group) === id),
+  })).filter((group) => group.items.length > 0);
+  const qualificationNavigation = <QualificationNavigation systems={qualificationSystems} status={qualificationStatus} error={qualificationError} onRetry={onRetryQualification} qualificationTarget={qualificationTarget} onOpenQualification={onOpenQualification ? target=>{const ok=onOpenQualification(target);if(ok)onActionClose();return ok;}:undefined} />;
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="vmp-mobile-drawer-backdrop" onClick={onDismiss}>
@@ -357,7 +355,10 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
         </div>
 
         <nav aria-label="Điều hướng chính" className="vmp-mobile-drawer-nav">
-          {allowedItems.map((item) => {
+          {mobileGroups.map((group) => <div key={group.id}>
+            {group.id === "analysis" && qualificationNavigation}
+            <div className="vmp-nav-group-heading">{group.label}</div>
+            {group.items.map((item) => {
             const Icon = item.icon;
             const active = !qualificationTarget && view === item.id;
             return (
@@ -373,8 +374,8 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
                 {item.label}
               </button>
             );
-          })}
-        {["admin","qa_manager","qa_staff"].includes(access.businessRole || "") && <QualificationNavigation qualificationTarget={qualificationTarget} onOpenQualification={onOpenQualification ? target=>{const ok=onOpenQualification(target);if(ok)onActionClose();return ok;}:undefined} />}
+          })}</div>)}
+          {!mobileGroups.some((group) => group.id === "analysis") && qualificationNavigation}
         </nav>
 
         <div className="vmp-mobile-drawer-account">
@@ -467,11 +468,8 @@ function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
 /* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
 export function Topbar({ title, user, sub,
-  view, setView, access, onLogout, onChangePw, onOpenQualification, qualificationTarget, showMasthead = false, compact = false }: {
+  view, setView, access, onLogout, onChangePw, onOpenQualification, qualificationTarget, qualificationSystems = [], qualificationStatus = "loading", qualificationError = null, onRetryQualification = () => {}, compact = false }: {
   title?: ReactNode;
-  /** #2 (01/09): wordmark chỉ hiện ở trang nhất (Tổng quan) — lặp trên cả
-   *  14 màn là hai tầng thương hiệu đè nhau, tốn ~60px trước dữ liệu. */
-  showMasthead?: boolean;
   /** Timeline reserves the first viewport for the live painting. */
   compact?: boolean;
   user?: AppUser | null;
@@ -485,7 +483,7 @@ export function Topbar({ title, user, sub,
   onChangePw: () => void;
   onOpenQualification?: (target:string)=>boolean;
   qualificationTarget?:string|null;
-}) {
+}&QualificationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const dismissMobileMenu = useCallback(() => {
@@ -501,29 +499,7 @@ export function Topbar({ title, user, sub,
     }}>
       {/* Khối trái co giãn để hàng nút bên phải luôn ở góc phải (thiết kế 29/08). */}
       <div style={{ flex: "1 1 360px", minWidth: 0 }}>
-        {/* Wordmark Art Nouveau: V là chữ cái neo, MP giãn nhịp như một con dấu,
-            Monitor mềm như chữ ký; nụ sen nối wordmark với mô tả hệ thống. */}
-        {showMasthead && (
-        <div className="vmp-masthead" aria-label="VMP Monitor · Hệ giám sát thẩm định">
-          <span className="vmp-masthead__ten" aria-hidden="true">
-            <span className="vmp-masthead__v">V</span>
-            <span className="vmp-masthead__mp">MP</span>
-            <i className="vmp-masthead__monitor">Monitor</i>
-          </span>
-          <svg className="vmp-masthead__net" width="214" height="20" viewBox="0 0 260 20" aria-hidden="true">
-            <path d="M2 12C34 4 61 16 98 10" fill="none" strokeWidth="1.15" strokeLinecap="round" />
-            <path d="M162 10C197 4 224 15 258 9" fill="none" strokeWidth="1.15" strokeLinecap="round" />
-            <g className="vmp-masthead__lotus">
-              <path d="M130 12C123 7 124 2 130 0C136 2 137 7 130 12Z" />
-              <path d="M129 13C120 12 116 8 118 4C124 5 128 8 129 13Z" />
-              <path d="M131 13C140 12 144 8 142 4C136 5 132 8 131 13Z" />
-              <path d="M130 12V18" fill="none" strokeWidth="1" strokeLinecap="round" />
-              <circle cx="130" cy="18" r="1.3" />
-            </g>
-          </svg>
-          <span className="vmp-masthead__phu">Hệ giám sát thẩm định</span>
-        </div>
-        )}
+        <VmpMasthead />
         {/* Đây là <h1> chứ không phải <div> in đậm, và đó là khác biệt thật:
             trước đây KHÔNG màn nào trong app có h1, nên trình đọc màn hình
             không có mốc nào để nhảy tới, còn người dùng bàn phím không biết
@@ -554,7 +530,7 @@ export function Topbar({ title, user, sub,
           <Menu size={19} color={C.pinkText} />
         </button>
       </div>
-      <MobileDrawer onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
+      <MobileDrawer onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} qualificationSystems={qualificationSystems} qualificationStatus={qualificationStatus} qualificationError={qualificationError} onRetryQualification={onRetryQualification} open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
         onDismiss={dismissMobileMenu} onActionClose={closeMobileMenuForAction}
         onLogout={onLogout} onChangePw={onChangePw} />
     </div>

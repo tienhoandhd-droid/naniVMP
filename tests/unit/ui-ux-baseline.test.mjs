@@ -32,13 +32,15 @@ test("app shell exposes keyboard landmarks and names its primary navigation", ()
 
 test("topbar wordmark uses an accessible Art Nouveau masthead structure", () => {
   const layout = source("src/components/layout/Layout.tsx");
+  const mark = source("src/components/ui/VmpMasthead.tsx");
+  assert.match(layout, /<VmpMasthead \/>/);
   const shell = source("src/styles/lotus-shell.css");
 
-  assert.match(layout, /className="vmp-masthead__ten" aria-hidden="true"/);
-  assert.match(layout, /className="vmp-masthead__v"/);
-  assert.match(layout, /className="vmp-masthead__mp"/);
-  assert.match(layout, /className="vmp-masthead__monitor"/);
-  assert.match(layout, /className="vmp-masthead__lotus"/);
+  assert.match(mark, /className="vmp-masthead__ten" aria-hidden="true"/);
+  assert.match(mark, /className="vmp-masthead__v"/);
+  assert.match(mark, /className="vmp-masthead__mp"/);
+  assert.match(mark, /className="vmp-masthead__monitor"/);
+  assert.match(mark, /className="vmp-masthead__lotus"/);
   assert.match(shell, /\.vmp-masthead__ten\s*\{[\s\S]*?display:\s*inline-flex/);
   assert.match(shell, /\.vmp-masthead__v\s*\{[\s\S]*?font-size:\s*clamp\(/);
   assert.match(shell, /\.vmp-masthead__monitor\s*\{[\s\S]*?font-style:\s*italic/);

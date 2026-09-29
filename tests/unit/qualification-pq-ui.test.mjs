@@ -80,13 +80,14 @@ test('a view-only PQ user may request a saved PDF snapshot but cannot save',asyn
   await assert.rejects(api.report('bm01',{system:'air'}),/Lưu Supabase trước khi in/);
 });
 
-test('library and runs UI use the scoped context without requesting denied configurations',()=>{
+test('retired library redirects to runs and runs UI avoids denied configurations',()=>{
   const home=readFileSync(new URL('../../public/tham-dinh-thuc-te/home.js',import.meta.url),'utf8');
   const runs=readFileSync(new URL('../../public/tham-dinh-thuc-te/runs.js',import.meta.url),'utf8');
   const bootstrap=readFileSync(new URL('../../src/features/qualification/bootstrap.js',import.meta.url),'utf8');
   const print=readFileSync(new URL('../../public/tham-dinh-thuc-te/entry-tools.js',import.meta.url),'utf8');
   const recovery=readFileSync(new URL('../../public/tham-dinh-thuc-te/draft-recovery.js',import.meta.url),'utf8');
-  assert.match(home,/permissionsFor\(system\)/);
+  assert.match(home,/location\.replace\(target\.href\)/);
+  assert.doesNotMatch(home,/form-result|permissionsFor\(system\)/);
   assert.match(runs,/availableSystems\(backend\)/);
   assert.doesNotMatch(runs,/Promise\.all\(\[backend\.getConfig\(\),backend\.getGasConfig\('air'\),backend\.getGasConfig\('nitrogen'\)/);
   assert.match(runs,/run\.can_close === true/);

@@ -1,0 +1,71 @@
+{
+  "settings": {
+    "title": "Hơi tinh khiết thử nghiệm",
+    "formula_version": "synthetic-1",
+    "locations": [
+      {"id": "SYN-STEAM-01", "name": "Điểm hơi tổng hợp 01", "endotoxin": true}
+    ],
+    "forms": [
+      {"id": "bm01", "title": "Khí không ngưng tụ", "fields": [{"key": "vg", "type": "number", "unit": "mL", "label": "Vg"}, {"key": "vc", "type": "number", "unit": "mL", "label": "Vc"}]},
+      {"id": "bm02", "title": "Nước ngưng", "fields": []},
+      {"id": "bm03", "title": "Độ khô", "fields": []},
+      {"id": "bm04", "title": "Quá nhiệt", "fields": []},
+      {"id": "bm05", "title": "Tổng hợp", "fields": []}
+    ]
+  },
+  "gas_settings": [
+    {
+      "system": "air",
+      "config": {
+        "title": "Khí nén thử nghiệm",
+        "formula_version": "synthetic-1",
+        "forms": [
+          {
+            "id": "bm01",
+            "kind": "measurement",
+            "title": "Tiểu phân",
+            "fields": [
+              {"key": "p05", "type": "number", "unit": "hạt/m³", "label": "Tiểu phân ≥ 0,5 µm"},
+              {"key": "p5", "type": "number", "unit": "hạt/m³", "label": "Tiểu phân ≥ 5,0 µm"},
+              {"key": "executed_by", "type": "text", "unit": "", "label": "Người thực hiện"},
+              {"key": "execution_date", "type": "date", "unit": "", "label": "Ngày thực hiện"}
+            ],
+            "locations": [{"id": "SYN-AIR-01", "name": "Điểm khí nén tổng hợp 01", "grade": "A", "limits": {"p05": 3520, "p5": 29}}],
+            "equipment_fields": [{"key": "expiry", "type": "date", "unit": "", "label": "Hạn hiệu chuẩn"}]
+          },
+          {"id": "bm05", "kind": "summary", "title": "Tổng hợp chất lượng", "fields": [], "locations": [], "equipment_fields": []}
+        ]
+      }
+    },
+    {
+      "system": "nitrogen",
+      "config": {
+        "title": "Khí nitơ thử nghiệm",
+        "formula_version": "synthetic-1",
+        "forms": [
+          {
+            "id": "bm01",
+            "kind": "measurement",
+            "title": "Tiểu phân",
+            "fields": [{"key": "p05", "type": "number", "unit": "hạt/m³", "label": "Tiểu phân ≥ 0,5 µm"}],
+            "locations": [{"id": "SYN-N2-01", "name": "Điểm nitơ tổng hợp 01", "grade": "A", "limits": {"p05": 3520}}],
+            "equipment_fields": []
+          },
+          {
+            "id": "bm05",
+            "kind": "measurement",
+            "title": "Độ tinh khiết",
+            "fields": [
+              {"key": "purity", "type": "number", "unit": "%", "label": "Độ tinh khiết nitơ"},
+              {"key": "executed_by", "type": "text", "unit": "", "label": "Người thực hiện"},
+              {"key": "execution_date", "type": "date", "unit": "", "label": "Ngày thực hiện"}
+            ],
+            "locations": [{"id": "SYN-N2-01", "name": "Điểm nitơ tổng hợp 01", "grade": "A", "limits": {"purity": 99.9}}],
+            "equipment_fields": []
+          },
+          {"id": "bm06", "kind": "summary", "title": "Tổng hợp chất lượng", "fields": [], "locations": [], "equipment_fields": []}
+        ]
+      }
+    }
+  ]
+}
