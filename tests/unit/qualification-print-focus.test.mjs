@@ -5,7 +5,8 @@ import {readFile} from 'node:fs/promises';
 
 const script=await readFile(new URL('../../public/tham-dinh-thuc-te/entry-tools.js',import.meta.url),'utf8');
 test('print intent waits for current PQ authorization and rejects stale or denied completions',async t=>{
-  const browser=await chromium.launch({headless:true});
+  // CI installs the bundled browser with --no-shell; use its Chromium channel.
+  const browser=await chromium.launch({channel:'chromium',headless:true});
   try {
     for(const scenario of ['allowed','denied','network','changed','signed-out','different-actor'])await t.test(scenario,async()=>{
       const page=await browser.newPage();
