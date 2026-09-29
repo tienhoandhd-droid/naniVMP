@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { DependencyList } from "react";
 import type { Activity, PerformerRow, VmpObject } from "../types/domain.ts";
 import { formatBangkokTime } from "../lib/formatBangkok.ts";
+import { DashboardSessionLoad } from "../lib/dashboardSessionLoad.ts";
 
 /** Trạng thái kết nối nguồn dữ liệu hiển thị trên banner. */
 export interface ConnState {
@@ -488,13 +489,32 @@ export function useVmpData() {
      nhiễu thì lỗi thật sau này chìm trong đó. Chờ có phiên rồi mới gọi. */
   useEffect(() => {
     let con = true;
+    const sessionLoad = new DashboardSessionLoad();
+    let loadDispatch = 0;
+    const loadSession = (session: { user: { id: string }; access_token: string }) => {
+      if (!con) return;
+      const decision = sessionLoad.accept(session);
+      if (decision === "duplicate") return;
+      if (decision === "changed") {
+        permissionModeRef.current = null;
+        permissionUserRef.current = "";
+        clearProtectedData(true);
+      }
+      const dispatch = ++loadDispatch;
+      queueMicrotask(() => {
+        if (!con || dispatch !== loadDispatch) return;
+        const c = loadConn();
+        void connectSheet(c?.readUrl || "", c?.writeUrl || "");
+      });
+    };
     const thu = async () => {
       const c = loadConn();
       if (c?.readUrl && !supabase) { connectSheet(c.readUrl, c?.writeUrl || ""); return; }
       if (!supabase) return;
+      const generation = sessionLoad.generation;
       const { data } = await supabase.auth.getSession();
-      if (!con) return;
-      if (data.session) { connectSheet(c?.readUrl || "", c?.writeUrl || ""); return; }
+      if (!con || generation !== sessionLoad.generation) return;
+      if (data.session) { loadSession(data.session); return; }
       /* Không có phiên → không gọi RPC (đúng), nhưng PHẢI nói ra. Bản trước
          lặng lẽ không làm gì, để banner đứng ở "Đang chờ đồng bộ…" — một câu
          hàm ý "chờ tí nữa là có", trong khi sự thật là sẽ không bao giờ có.
@@ -508,11 +528,14 @@ export function useVmpData() {
     thu();
     /* Đăng nhập xong thì nạp ngay, không bắt người dùng bấm "Làm mới". */
     const { data: sub } = supabase
-      ? supabase.auth.onAuthStateChange((sk) => {
-        if (con && sk === "SIGNED_IN") {
-          const c = loadConn();
-          connectSheet(c?.readUrl || "", c?.writeUrl || "");
+      ? supabase.auth.onAuthStateChange((sk, session) => {
+        if (con && sk === "SIGNED_IN" && session) {
+          sessionLoad.authEvent();
+          loadSession(session);
         } else if (con && sk === "SIGNED_OUT") {
+          loadDispatch += 1;
+          sessionLoad.authEvent();
+          sessionLoad.clear();
           permissionModeRef.current = null;
           permissionUserRef.current = "";
           clearProtectedData(true);
