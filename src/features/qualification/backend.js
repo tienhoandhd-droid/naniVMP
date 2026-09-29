@@ -93,6 +93,18 @@ export function makeBackend(settings, existingClient) {
     }
     return data;
   }
+  async function entryConfig(system) {
+    await requireAccess(system,'view');
+    if(runBinding)return rpc('cpc1_run_config',{p_run_id:runBinding.runId,p_system:system});
+    if(permissionFor(system).can_view_current)return system==='steam'?rpc('cpc1_config'):rpc('cpc1_gas_config',{p_system:system});
+    // Archive-only users can choose a historical run without reading current config.
+    // This frozen configuration is for a disabled selector preview, never an implicit binding.
+    const runs=await rpc('cpc1_run_list');
+    const archived=runs.find(run=>run.items?.some(item=>item.system===system));
+    if(!archived)throw Error('Chưa có đợt thẩm định trong phạm vi được xem.');
+    const config=await rpc('cpc1_run_config',{p_run_id:archived.id,p_system:system});
+    const {_run,_scope,...preview}=config;return preview;
+  }
   const download = async (name,assetPath) => {
     if(!/^v[1-9][0-9]*$/.test(assetPath))throw new Error('Phiên bản bộ mẫu không hợp lệ.');
     const {data,error}=await client.storage.from('cpc1-templates').download(`${assetPath}/${name}`);
@@ -108,10 +120,13 @@ export function makeBackend(settings, existingClient) {
     bindRun(runId,recordId){if(!uuid(runId)||!uuid(recordId))throw Error('Liên kết đợt không hợp lệ.');if(current||runBinding)throw Error('Không đổi đợt trong phiên nhập đang mở.');runBinding={runId,recordId};},
     bindSystem(system){if(!systems.includes(system))throw Error('Hệ thống thẩm định không hợp lệ.');activeSystem=system;},
     get activeSystem(){return activeSystem;},
-    canSaveActive(){const access=activeSystem?permissionFor(activeSystem):null;return Boolean(access&&(runBinding?access.can_edit_archive:access.can_enter));},
-    canEvaluateActive(){const access=activeSystem?permissionFor(activeSystem):null;return Boolean(access&&(runBinding?access.can_edit_archive:access.can_enter));},
+    canSaveActive(){const access=activeSystem?permissionFor(activeSystem):null;return Boolean(runBinding&&access?.can_edit_archive);},
+    canEvaluateActive(){const access=activeSystem?permissionFor(activeSystem):null;return Boolean(runBinding&&access?.can_edit_archive);},
     get runBinding(){return runBinding && {...runBinding};},
     async listRuns(){await requireGlobalView();return rpc('cpc1_run_list');},
+    async runRequirements(scope){await requireGlobalView();return rpc('cpc1_run_requirements',{p_scope:scope});},
+    async updateRunCalibration(runId,version,calibration,reason,requestId){await requireGlobalView();return rpc('cpc1_run_calibration_update',{p_run_id:runId,p_expected_version:version,p_calibration:calibration,p_reason:reason??null,p_request_id:requestId});},
+    async pointHistory(form,point){if(!runBinding)throw Error('Chọn đợt thẩm định trước khi xem lịch sử.');await requireGlobalView();return rpc('cpc1_point_history',{p_record_id:runBinding.recordId,p_form:form,p_point:point});},
     async createRun(definition,requestId){await requireGlobalView();return rpc('cpc1_run_create',{p_definition:definition,p_request_id:requestId});},
     async transitionRun(id,version,status,reason,requestId){await requireGlobalView();return rpc('cpc1_run_transition',{p_run_id:id,p_expected_version:version,p_status:status,p_reason:reason,p_request_id:requestId});},
     async listHistory(){await requireGlobalView();return rpc('cpc1_history_list');},
@@ -137,9 +152,9 @@ export function makeBackend(settings, existingClient) {
     },
     async refreshContext(){return contextSession(true);},
     async refreshAccess(system,action='enter'){await requireAccess(system,action,true);return permissionFor(system);},
-    async getConfig(){await requireAccess('steam',runBinding?'view':'current-view');return runBinding?rpc('cpc1_run_config',{p_run_id:runBinding.runId,p_system:'steam'}):rpc('cpc1_config');},
-    async getGasConfig(system){if(!['air','nitrogen'].includes(system))throw new Error('Hệ thống khí không hợp lệ.');if(activeSystem)activeSystem=system;await requireAccess(system,runBinding?'view':'current-view');return runBinding?rpc('cpc1_run_config',{p_run_id:runBinding.runId,p_system:system}):rpc('cpc1_gas_config',{p_system:system});},
-    async evaluate(data){const system=data?.system || activeSystem;await requireAccess(system,runBinding?'archive-edit':'enter');if(activeSystem&&system!==activeSystem)throw noAccess(system);return runBinding?rpc('cpc1_run_evaluate',{p_run_id:runBinding.runId,p_data:data}):rpc('cpc1_evaluate',{p_data:data});},
+    async getConfig(){return entryConfig('steam');},
+    async getGasConfig(system){if(!['air','nitrogen'].includes(system))throw new Error('Hệ thống khí không hợp lệ.');if(activeSystem)activeSystem=system;return entryConfig(system);},
+    async evaluate(data){const system=data?.system || activeSystem;await requireAccess(system,runBinding?'archive-edit':'enter');if(activeSystem&&system!==activeSystem)throw noAccess(system);if(!runBinding)throw Error('Chọn đợt thẩm định trước khi nhập biểu mẫu.');return rpc('cpc1_run_evaluate',{p_run_id:runBinding.runId,p_data:data});},
     async getSession(){return contextSession();},
     async signIn(){throw new Error('Đăng nhập tại VMP rồi mở lại Thẩm định thực tế (demo).');},
     async signOut(){localLogout=true;try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;}finally{clearAuthorization();localLogout=false;}},
@@ -147,11 +162,12 @@ export function makeBackend(settings, existingClient) {
     async load(id){if(runBinding&&id!==runBinding.recordId)throw Error('Hồ sơ không thuộc đợt đang mở.');await requireGlobalView();const loaded=runBinding?await rpc('cpc1_run_load',{p_record_id:id,p_run_id:runBinding.runId}):await rpc('cpc1_load',{p_record_id:id});const system=loaded?.data?.system||activeSystem;if(activeSystem&&system!==activeSystem){signalDenied();throw noAccess(activeSystem);}await requireAccess(system,'view');current=loaded;return current;},
     async save(data,options={}){
       const system=data?.system||activeSystem,editingExisting=Boolean(runBinding||options.recordId||current?.id);await requireAccess(system,editingExisting?'archive-edit':'enter');if(activeSystem&&system!==activeSystem)throw noAccess(system);
-      const args={p_data:data,p_record_id:options.recordId||null,p_expected_version:options.expectedVersion??0,p_title:options.title||({air:'Đợt đánh giá khí nén',nitrogen:'Đợt đánh giá khí nitơ'}[data.system]||'Đợt đánh giá hơi tinh khiết')};
-      if(runBinding){if(options.recordId&&options.recordId!==runBinding.recordId)throw Error('Hồ sơ không thuộc đợt đang mở.');args.p_run_id=runBinding.runId;args.p_record_id=runBinding.recordId;args.p_expected_version=options.expectedVersion??current?.version??0;delete args.p_title;}
+      if(!runBinding)throw Error('Chọn đợt thẩm định trước khi nhập biểu mẫu.');
+      if(options.recordId&&options.recordId!==runBinding.recordId)throw Error('Hồ sơ không thuộc đợt đang mở.');
+      const args={p_data:data,p_run_id:runBinding.runId,p_record_id:runBinding.recordId,p_expected_version:options.expectedVersion??current?.version??0,p_reason:options.reason??null};
       const key=JSON.stringify(args);
       args.p_request_id=pending.get(key)||options.requestId||crypto.randomUUID();pending.set(key,args.p_request_id);
-      const saved=runBinding?await rpc('cpc1_run_save',args):await rpc('cpc1_save',args);pending.delete(key);current=saved;return saved;
+      const saved=await rpc('cpc1_run_save',args);pending.delete(key);current=saved;return saved;
     },
     async report(form,data){
       const gas=['air','nitrogen'].includes(data?.system);

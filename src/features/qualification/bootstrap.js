@@ -47,7 +47,7 @@ function reflectPermissions() {
   if (!canSave && !document.getElementById('qualification-access-note')) {
     const note = document.createElement('p');note.id='qualification-access-note';note.className='message';note.setAttribute('role','status');
     const codes=access.pq_codes?.length?` · PQ: ${access.pq_codes.join(', ')}`:'';
-    note.textContent=`Quyền chỉ xem${codes} · Có thể in phiên bản hồ sơ đã lưu; nhập, tính và lưu cần quyền nhập.`;
+    note.textContent=runBound?`Quyền chỉ xem${codes} · Có thể in phiên bản hồ sơ đã lưu; nhập, tính và lưu cần quyền nhập.`:'Chọn đợt thẩm định ở phía trên trước khi nhập biểu mẫu.';
     document.querySelector('#entry-form')?.before(note);
   }
   renderCurrentPq(access);
@@ -74,7 +74,7 @@ window.addEventListener('cpc1:permission-denied', clearDeniedContent);
 // Guard the catalogue and direct URLs, not merely the VMP menu.
 window.CPC1Backend.getSession().then(session => {
   if (!session) throw new Error('Đăng nhập VMP bằng tài khoản QA hoặc Admin để mở mục này.');
-  if (currentSystem() && !(runBound?window.CPC1Backend.permissionsFor(currentSystem()).can_view:window.CPC1Backend.permissionsFor(currentSystem()).can_view_current)) throw new Error('Không có quyền PQ hiện thời cho hệ thống này.');
+  if (currentSystem() && !window.CPC1Backend.permissionsFor(currentSystem()).can_view) throw new Error('Không có quyền PQ hiện thời cho hệ thống này.');
   document.body.dataset.qualificationGate = 'ready';
 }).catch(error => {
   if (error?.code === 'CONTEXT_STALE') return;
@@ -90,7 +90,7 @@ async function revalidatePermission() {
   if (window.CPC1_SESSION_ENDED) return;
   try {
     const session=await window.CPC1Backend.refreshContext();
-    if (!session || (currentSystem()&&!(runBound?window.CPC1Backend.permissionsFor(currentSystem()).can_view:window.CPC1Backend.permissionsFor(currentSystem()).can_view_current))) clearDeniedContent();
+    if (!session || (currentSystem()&&!window.CPC1Backend.permissionsFor(currentSystem()).can_view)) clearDeniedContent();
     else window.dispatchEvent(new CustomEvent('cpc1:permissions-refreshed'));
   } catch (error) {
     if (error?.code === '42501') clearDeniedContent();

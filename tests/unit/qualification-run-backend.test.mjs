@@ -29,3 +29,28 @@ test('history snapshot reads exact revision, validates response and does not bin
  mismatch=true;await assert.rejects(api.historySnapshot(record,2),/phiên bản/i);
  await assert.rejects(api.historySnapshot('bad',2));await assert.rejects(api.historySnapshot(record,0));
 });
+test('unbound forms can read configuration but cannot evaluate or save',async()=>{
+ const calls=[];const api=makeBackend(settings,authenticated({rpc:async(name,args)=>{calls.push([name,args]);return {data:{}};}}));api.bindSystem('air');
+ await api.getGasConfig('air');assert.equal(api.canSaveActive(),false);assert.equal(api.canEvaluateActive(),false);
+ await assert.rejects(api.save({system:'air'}),/Chọn đợt/);await assert.rejects(api.evaluate({system:'air'}),/Chọn đợt/);
+ assert.deepEqual(calls.map(x=>x[0]),['cpc1_gas_config']);
+});
+test('correction reason participates in retry identity and point history binds the selected record',async()=>{
+ const calls=[];const api=makeBackend(settings,authenticated({rpc:async(name,args)=>{calls.push([name,structuredClone(args)]);if(name==='cpc1_run_save')return {error:{message:'offline'}};return {data:[]};}}));api.bindSystem('air');api.bindRun(run,record);
+ const options={expectedVersion:4,reason:'Đính chính số đọc'};
+ await assert.rejects(api.save({system:'air'},options));await assert.rejects(api.save({system:'air'},options));await assert.rejects(api.save({system:'air'},{...options,reason:'Đổi lý do'}));
+ assert.equal(calls[0][1].p_reason,options.reason);assert.equal(calls[0][1].p_request_id,calls[1][1].p_request_id);assert.notEqual(calls[1][1].p_request_id,calls[2][1].p_request_id);
+ await api.pointHistory('bm02','A1');assert.deepEqual(calls.at(-1),['cpc1_point_history',{p_record_id:record,p_form:'bm02',p_point:'A1'}]);
+});
+test('device requirements and metadata updates use explicit server contracts',async()=>{
+ const calls=[];const api=makeBackend(settings,authenticated({rpc:async(name,args)=>{calls.push([name,args]);return {data:[]};}}));
+ const scope=[{system:'air',forms:{bm02:['A1']}}],cal={'air:bm02:expiry':{name:'Thiết bị',due_on:'2026-12-31'}};
+ await api.runRequirements(scope);await api.updateRunCalibration(run,2,cal,'Thay thiết bị',record);
+ assert.deepEqual(calls,[['cpc1_run_requirements',{p_scope:scope}],['cpc1_run_calibration_update',{p_run_id:run,p_expected_version:2,p_calibration:cal,p_reason:'Thay thiết bị',p_request_id:record}]]);
+});
+test('archive-only unbound selector reads a permitted frozen config without binding or current config access',async()=>{
+ const calls=[],archived=structuredClone(context);Object.assign(archived.systems.air,{can_view_current:false,can_view_archive:true,can_enter:false,can_edit_archive:false});
+ const api=makeBackend(settings,{auth:{getSession:async()=>({data:{session:{user:{id:'actor'}}}})},rpc:async(name,args)=>{calls.push([name,args]);return {data:name==='cpc1_context'?archived:name==='cpc1_run_list'?[{id:run,items:[{system:'air',record_id:record}]}]:{system:'air',forms:[],_run:{id:run},_scope:{bm02:['A1']}}};}});api.bindSystem('air');
+ assert.deepEqual(await api.getGasConfig('air'),{system:'air',forms:[]});assert.equal(api.runBinding,null);assert.equal(api.canSaveActive(),false);assert.equal(calls.some(([name])=>name==='cpc1_gas_config'),false);
+ assert.deepEqual(calls.at(-1),['cpc1_run_config',{p_run_id:run,p_system:'air'}]);
+});
