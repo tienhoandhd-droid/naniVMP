@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import puppeteer from "puppeteer-core";
+import { hasThreeTravelDirections } from "../helpers/travel-directions.mjs";
 import { CHROME } from "./chrome-path.mjs";
 import { caiGiaLap, nhetPhien } from "./gia-lap-supabase.mjs";
 
@@ -45,7 +46,7 @@ try {
   const distance = second.map((point, index) => Math.hypot(point.x - first[index].x, point.y - first[index].y));
   assert.ok(distance.filter((value) => value > 15).length >= Math.min(4, Math.ceil(distance.length * .5)), "multiple fish make substantial travel, not a shared tiny bob");
   assert.ok(Math.max(...distance) > 30, "at least one fish crosses a clearly visible distance");
-  assert.ok(new Set(second.map((point, index) => `${Math.sign(point.x - first[index].x)},${Math.sign(point.y - first[index].y)}`)).size >= 3,
+  assert.ok(hasThreeTravelDirections(second.map((point, index) => ({x:point.x-first[index].x,y:point.y-first[index].y}))),
     "the pond has distinct travel directions");
 
   const canvas = await page.$(".long-mon-race__canvas");

@@ -282,5 +282,3 @@ do $test$ begin
  assert not has_function_privilege('authenticated','cpc1_private.pq_right(text[],boolean)','EXECUTE'),'Private predicate exposed';
 end$test$;
 rollback;
-
-
