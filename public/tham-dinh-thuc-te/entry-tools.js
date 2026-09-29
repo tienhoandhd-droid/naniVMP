@@ -7,7 +7,7 @@
   const canEnter=()=>canView() && window.CPC1Backend?.canSaveActive?.()===true;
   const canEvaluate=()=>canView() && window.CPC1Backend?.canEvaluateActive?.()===true;
   const key=s=>JSON.stringify([s.userId,s.system,s.form,s.generation,s.recordId,s.version,s.dirty]);
-  function clearPdf(){request++;if(url)URL.revokeObjectURL(url);url=null;for(const id of ['print-review-open','print-review-download']){const a=$(id);if(a){a.hidden=true;a.removeAttribute('href');}}}
+  function clearPdf(){request++;if($('entry-print-status'))$('entry-print-status').textContent='';if(url)URL.revokeObjectURL(url);url=null;for(const id of ['print-review-open','print-review-download']){const a=$(id);if(a){a.hidden=true;a.removeAttribute('href');}}}
   function update() {
     if(!adapter)return;
     const s=adapter.get(), offline=!navigator.onLine;
@@ -33,7 +33,7 @@
     adapter=options;
     if($('print-review')){update();return;}
     const status=document.createElement('div');status.className='entry-assistance';
-    status.innerHTML='<p id="entry-network" role="status"></p><p id="entry-progress"></p>';
+    status.innerHTML='<p id="entry-network" role="status"></p><p id="entry-progress"></p><p id="entry-print-status" role="status"></p>';
     document.querySelector('.action-bar,.actionbar').after(status);
     const dialog=document.createElement('dialog');dialog.id='print-review';dialog.className='print-review';dialog.setAttribute('aria-labelledby','print-review-heading');
     dialog.innerHTML='<div class="print-review-body"><div class="dialog-head"><h2 id="print-review-heading">Kiểm tra trước khi in</h2><button id="print-review-close" type="button" aria-label="Đóng kiểm tra in">Đóng</button></div><h3 id="print-review-title"></h3><p id="print-review-state"></p><ol><li>Kiểm tra số liệu, điểm lấy mẫu và thông tin người thực hiện.</li><li>PDF sử dụng mẫu gốc và dữ liệu của phiên bản đã lưu.</li><li>Khi in, chọn <strong>Kích thước thực / 100%</strong>; kiểm tra khổ giấy trong PDF.</li></ol><p class="muted">Bản PDF là báo cáo nháp theo mẫu; không thay phê duyệt QA.</p><p id="print-review-message" role="status"></p><div class="print-review-actions"><button id="print-review-save" type="button">Lưu hồ sơ trước</button><button id="print-review-generate" class="primary" type="button">Tạo PDF theo mẫu gốc</button><a id="print-review-open" class="button primary" target="_blank" rel="noopener" hidden>Mở PDF để in</a><a id="print-review-download" class="button" hidden>Tải PDF</a></div></div>';
@@ -66,6 +66,22 @@
     update();
   }
   function end(){clearPdf();$('print-review')?.close();}
-  function show(){if(!adapter||!canView())return;clearPdf();$('print-review-message').textContent='';$('print-review').showModal();update();}
+  async function show(){
+    if(!adapter||window.CPC1_SESSION_ENDED)return;
+    clearPdf();const token=request,expected=key(adapter.get());
+    $('entry-print-status').textContent='Đang kiểm tra quyền in…';
+    try{
+      // Entering the iframe can start a focus refresh immediately before this click.
+      // Join that request; never authorize from the context being replaced.
+      const session=await window.CPC1Backend.getSession();
+      if(token!==request||key(adapter.get())!==expected||window.CPC1_SESSION_ENDED)return;
+      if(!session||session.user?.id!==adapter.get().userId||!canView()){
+        $('entry-print-status').textContent='Không có quyền in hồ sơ này trong phiên hiện tại.';return;
+      }
+      $('entry-print-status').textContent='';$('print-review-message').textContent='';$('print-review').showModal();update();
+    }catch{
+      if(token===request&&key(adapter.get())===expected&&!window.CPC1_SESSION_ENDED&&$('entry-print-status'))$('entry-print-status').textContent='Chưa xác minh được quyền in. Dữ liệu vẫn được giữ; hãy thử lại khi có kết nối.';
+    }
+  }
   window.CPC1EntryTools=Object.freeze({attach,show,changed,update,end,isDirty:()=>Boolean(adapter?.get().dirty)});
 })();
