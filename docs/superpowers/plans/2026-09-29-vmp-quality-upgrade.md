@@ -67,3 +67,7 @@ Measured refinement: baseline unauthenticated startup transfers 592,876 decoded 
 - Preserve same-user/same-AAL `USER_UPDATED` and `MFA_CHALLENGE_VERIFIED` form state while authoritative background reassessment runs. RED demonstrated lost password-success and unenrollment-error messages; event mismatches still invalidate.
 - CI now includes e2e:quality and a hash-bound receipt for the new SQL/gateway rehearsal. Keep existing core gates intact.
 - Production preflight is currently blocked by Supabase availability: pooler EAUTHQUERY timeout, management SQL544 and Auth health504; no new migration/Auth-setting/deployment has been applied. Complete local gates and branch CI; hold main rollout until service health, backup and pre/postflight are verified. User reports Supabase is operating normally. Preserve the service; investigate the discrepancy from this environment and do not restart without authorization.
+
+## Bounded dependency fix from final audit
+
+Final npm audit identified two existing development-tool dependencies: browserslist4.28.2 (patched4.28.7+) and baseline-browser-mapping2.10.34 (patched2.11.0+). Primary updates only these transitive packages within existing ranges. RED is the recorded audit with one high and one moderate finding; GREEN requires audit0, typecheck, production build/budget and cold-load/auth smoke. Inspect lockfile diff; no application API/dependency-family migration. Rollback is the isolated lockfile commit. CI reruns on the resulting exact branch SHA.
