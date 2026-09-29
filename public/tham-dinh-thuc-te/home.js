@@ -28,6 +28,7 @@
   const emptyResults = document.querySelector("#empty-results");
   const filterButtons = [...document.querySelectorAll("[data-system-filter]")];
   let activeSystem = "all";
+  let authorized = new Set();
 
   function normalize(value) {
     return value.toLocaleLowerCase("vi").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
@@ -40,7 +41,7 @@
 
   function renderResults() {
     const query = normalize(searchInput.value).trim();
-    const pool = forms.filter(form => activeSystem === "all" || form.systemKey === activeSystem);
+    const pool = forms.filter(form => authorized.has(form.systemKey) && (activeSystem === "all" || form.systemKey === activeSystem));
     const phrases = query.includes(" ") ? pool.filter(form => normalize([form.title, form.aliases].join(" ")).includes(query)) : [];
     const visibleForms = phrases.length ? phrases : pool.filter(form => matchesQuery(form, query));
     results.replaceChildren();
@@ -61,7 +62,20 @@
     renderResults();
   }
 
+  async function loadAccess() {
+    const backend=window.CPC1Backend;
+    if (!backend?.getSession) return renderResults();
+    try {
+      const session=await backend.getSession();
+      if (!session) return;
+      authorized=new Set(['steam','air','nitrogen'].filter(system=>backend.permissionsFor(system).can_view_current));
+      filterButtons.forEach(button=>{const allowed=button.dataset.systemFilter==='all'||authorized.has(button.dataset.systemFilter);button.hidden=!allowed;button.disabled=!allowed;});
+      if (activeSystem!=='all'&&!authorized.has(activeSystem)) activeSystem='all';
+      renderResults();
+    } catch { authorized.clear();renderResults(); }
+  }
   searchInput.addEventListener("input", renderResults);
   filterButtons.forEach((button) => button.addEventListener("click", () => selectSystem(button.dataset.systemFilter)));
-  renderResults();
+  window.addEventListener('DOMContentLoaded',()=>void loadAccess(),{once:true});
+  window.addEventListener('cpc1:permissions-refreshed',()=>void loadAccess());
 })();

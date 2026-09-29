@@ -2,13 +2,17 @@
   'use strict';
   let adapter, url, request=0, frame, printing=false;
   const $=id=>document.getElementById(id);
-  const canEnter=()=>!window.CPC1_SESSION_ENDED && window.CPC1Backend?.permissions?.can_enter===true && Boolean(adapter?.get().userId);
+  const access=()=>window.CPC1Backend?.permissionsFor?.(adapter?.get().system)||{can_view:false,can_enter:false};
+  const canView=()=>!window.CPC1_SESSION_ENDED && access().can_view===true && Boolean(adapter?.get().userId);
+  const canEnter=()=>canView() && window.CPC1Backend?.canSaveActive?.()===true;
+  const canEvaluate=()=>canView() && window.CPC1Backend?.canEvaluateActive?.()===true;
   const key=s=>JSON.stringify([s.userId,s.system,s.form,s.generation,s.recordId,s.version,s.dirty]);
   function clearPdf(){request++;if(url)URL.revokeObjectURL(url);url=null;for(const id of ['print-review-open','print-review-download']){const a=$(id);if(a){a.hidden=true;a.removeAttribute('href');}}}
   function update() {
     if(!adapter)return;
     const s=adapter.get(), offline=!navigator.onLine;
-    for(const id of ['evaluate','record-save','print']){const b=$(id);if(!b)continue;if(offline){if(!b.hasAttribute('data-offline-disabled'))b.dataset.offlineDisabled=String(b.disabled);b.disabled=true;}else if(b.hasAttribute('data-offline-disabled')){if(b.dataset.offlineDisabled==='false'&&canEnter())b.disabled=false;delete b.dataset.offlineDisabled;}}
+    for(const id of ['evaluate','record-save','print']){const b=$(id);if(!b)continue;if(offline){if(!b.hasAttribute('data-offline-disabled')||!b.disabled)b.dataset.offlineDisabled=String(b.disabled);b.disabled=true;}else if(b.hasAttribute('data-offline-disabled')){const allowed=id==='evaluate'?canEvaluate():id==='print'?canView():canEnter();if(b.dataset.offlineDisabled==='false'&&allowed)b.disabled=false;delete b.dataset.offlineDisabled;}}
+    if(!canEvaluate()&&$('evaluate'))$('evaluate').disabled=true;if(!canEnter()&&$('record-save'))$('record-save').disabled=true;if(!canView()&&$('print'))$('print').disabled=true;
     window.CPC1RunEntry?.reflect();
     if($('entry-network'))$('entry-network').textContent=offline?'Mất mạng · Có thể nhập tiếp; tính, lưu và tạo PDF cần kết nối.':'Trực tuyến · Hồ sơ chỉ được lưu lên hệ thống khi bạn bấm Lưu.';
     if($('entry-progress')){
@@ -21,7 +25,7 @@
       $('print-review-state').textContent=s.dirty||!s.recordId?'Lưu hồ sơ trước khi tạo PDF để bản in khớp dữ liệu đang nhập.':`Hồ sơ ${s.recordId} · phiên bản ${s.version}`;
       $('print-review-save').hidden=Boolean(s.recordId&&!s.dirty);
       $('print-review-save').disabled=offline||!canEnter();
-      $('print-review-generate').disabled=offline||s.dirty||!s.recordId||!canEnter()||printing;
+      $('print-review-generate').disabled=offline||s.dirty||!s.recordId||!canView()||printing;
     }
   }
   function changed(){clearPdf();update();}
@@ -41,12 +45,12 @@
       try{await adapter.save();const s=adapter.get();$('print-review-message').textContent=s.recordId&&!s.dirty?'Đã lưu. Bạn có thể tạo PDF.':'Chưa lưu được dữ liệu hiện tại. Kiểm tra thông báo trên biểu mẫu.';}catch(e){$('print-review-message').textContent=e.message;}finally{update();}
     };
     $('print-review-generate').onclick=async()=>{
-      const s=adapter.get();if(printing||s.dirty||!s.recordId||!canEnter()||!navigator.onLine)return;printing=true;
+      const s=adapter.get();if(printing||s.dirty||!s.recordId||!canView()||!navigator.onLine)return;printing=true;
       clearPdf();const token=request, expected=key(s);
       $('print-review-generate').disabled=true;$('print-review-generate').setAttribute('aria-busy','true');$('print-review-message').textContent='Đang tải mẫu và tạo PDF…';
       try{
         const blob=await adapter.report();
-        if(token!==request||key(adapter.get())!==expected||!canEnter()){if($('print-review-message'))$('print-review-message').textContent='Dữ liệu hoặc biểu mẫu đã đổi. Lưu lại trước khi tạo PDF mới.';return;}
+        if(token!==request||key(adapter.get())!==expected||!canView()){if($('print-review-message'))$('print-review-message').textContent='Dữ liệu, biểu mẫu hoặc quyền đã đổi. Mở lại hồ sơ trước khi tạo PDF mới.';return;}
         if(!blob.type.includes('pdf'))throw Error('Không nhận được PDF hợp lệ.');
         url=URL.createObjectURL(blob);
         for(const id of ['print-review-open','print-review-download']){$(id).href=url;$(id).hidden=false;}
@@ -62,6 +66,6 @@
     update();
   }
   function end(){clearPdf();$('print-review')?.close();}
-  function show(){if(!adapter||!canEnter())return;clearPdf();$('print-review-message').textContent='';$('print-review').showModal();update();}
+  function show(){if(!adapter||!canView())return;clearPdf();$('print-review-message').textContent='';$('print-review').showModal();update();}
   window.CPC1EntryTools=Object.freeze({attach,show,changed,update,end,isDirty:()=>Boolean(adapter?.get().dirty)});
 })();

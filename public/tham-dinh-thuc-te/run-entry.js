@@ -12,7 +12,7 @@
  function show(c){config=c;if(!c?._run)return;let note=document.getElementById('run-context');
   if(!note){note=document.createElement('aside');note.id='run-context';note.className='message';note.setAttribute('aria-label','Đợt đang mở');document.getElementById('entry-form').before(note);}
   note.replaceChildren();const link=document.createElement('a');link.href='./runs.html';link.textContent='← Đợt thực hiện';
-  const label=document.createElement('p');label.textContent=c._run.title+' · '+({open:'Đang thực hiện',completed:'Hoàn thành phạm vi',closed:'Đã kết thúc'}[c._run.status]||c._run.status);
+  const label=document.createElement('p'),item=c._run.items.find(x=>x.system===(c.system||'steam'));label.textContent=c._run.title+' · '+({open:'Đang thực hiện',completed:'Hoàn thành phạm vi',closed:'Đã kết thúc'}[c._run.status]||c._run.status)+(item?.pq_codes?.length?((c.system||'steam')==='steam'?' · Biểu mẫu chung — PQ: '+item.pq_codes.join(' hoặc '):' · PQ: '+item.pq_codes.join(', ')):'');
   const detail=document.createElement('p');detail.textContent=c._run.status==='open'?'Chỉ nhập các phép thử và điểm thuộc phạm vi đã chọn.':'Đang xem phiên bản đã chốt. Bản in mới là bản tái tạo; báo cáo nguồn xem tại Xu hướng tháng.';
   note.append(link,label,detail);reflect();
  }

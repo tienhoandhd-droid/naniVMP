@@ -20,14 +20,76 @@ export function makeBackend(settings, existingClient) {
   const client = existingClient || createClient(settings.url,settings.publishableKey,{auth:{persistSession:true,detectSessionInUrl:false,autoRefreshToken:true}});
   let current = null;
   let runBinding = null;
+  let activeSystem = null;
   const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
   let permissions = null;
+  let contextLoaded = false;
+  let contextActor = null;
+  let contextEpoch = 0;
+  let contextPromise = null;
   let localLogout = false;
   const pending = new Map();
+  const systems = ['steam','air','nitrogen'];
+  const noAccess = system => {
+    const error = new Error(`Không có quyền PQ hiện thời cho hệ thống ${system}.`);
+    error.code = '42501';
+    return error;
+  };
+  const validAccess = value => value && typeof value.can_view === 'boolean' && typeof value.can_enter === 'boolean' && Array.isArray(value.pq_codes) && ['can_view_current','can_view_archive','can_edit_archive'].every(key=>value[key]===undefined||typeof value[key]==='boolean');
+  const validContext = value => value && typeof value.can_view === 'boolean' && typeof value.can_enter === 'boolean' && value.record_scope === 'pq' && systems.every(system => validAccess(value.systems?.[system]));
+  const permissionFor = system => {
+    if (!systems.includes(system)) throw new Error('Hệ thống thẩm định không hợp lệ.');
+    if(!validAccess(permissions?.systems?.[system]))return {can_view:false,can_enter:false,can_view_current:false,can_view_archive:false,can_edit_archive:false,pq_codes:[]};
+    const access=permissions.systems[system];return {...access,can_view_current:access.can_view_current??access.can_view,can_view_archive:access.can_view_archive??false,can_edit_archive:access.can_edit_archive??access.can_enter,pq_codes:[...access.pq_codes]};
+  };
+  const clearAuthorization = () => {
+    current = null; permissions = null; contextLoaded = false; contextActor = null; contextEpoch++;contextPromise=null;pending.clear();
+  };
+  const signalDenied = () => {
+    clearAuthorization();
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('cpc1:permission-denied'));
+  };
+  async function contextSession(force=false) {
+    const {data,error}=await client.auth.getSession();
+    if(error) throw error;
+    if(!data.session){clearAuthorization();return null;}
+    const actor=data.session.user?.id;
+    if(!force&&contextLoaded&&contextActor===actor)return data.session;
+    if(!force&&contextPromise&&contextActor===actor)return contextPromise;
+    const epoch=++contextEpoch;contextActor=actor;contextLoaded=false;permissions=null;
+    const request=(async()=>{
+      const context=await rpc('cpc1_context');
+      const verified=await client.auth.getSession();
+      if(verified.error)throw verified.error;
+      if(!verified.data.session||verified.data.session.user?.id!==actor){signalDenied();throw noAccess('thẩm định');}
+      if(epoch!==contextEpoch||contextActor!==actor){
+        // Initial form loaders must follow the newest context rather than stall
+        // when a focus refresh supersedes their shared initialization request.
+        if(contextPromise&&contextPromise!==request)return contextPromise;
+        if(contextLoaded&&contextActor===actor)return verified.data.session;
+        throw Object.assign(new Error('Quyền PQ đang được làm mới.'),{code:'CONTEXT_STALE'});
+      }
+      if(!validContext(context)||!context.can_view){signalDenied();throw noAccess('thẩm định');}
+      permissions=context;contextLoaded=true;
+      if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('cpc1:permissions'));
+      return verified.data.session;
+    })();
+    contextPromise=request;
+    try{return await request;}finally{if(contextPromise===request)contextPromise=null;}
+  }
+  const requireAccess = async (system, action='current-view', force=false) => {
+    await contextSession(force);
+    if (!systems.includes(system)) throw new Error('Hệ thống thẩm định không hợp lệ.');
+    const access=permissionFor(system),allowed={view:access.can_view,'current-view':access.can_view_current,enter:access.can_enter,'archive-edit':access.can_edit_archive}[action];
+    if (!allowed) { signalDenied();throw noAccess(system); }
+  };
+  const requireGlobalView = async force => { await contextSession(force);if (!permissions?.can_view) throw noAccess('đợt thẩm định'); };
   async function rpc(name,args={}) {
     const {data,error}=await client.rpc(name,args);
     if(error) {
-      const err=new Error(error.message || 'Không kết nối được Supabase.');err.code=error.code;throw err;
+      const err=new Error(error.message || 'Không kết nối được Supabase.');err.code=error.code;
+      if (err.code === '42501') signalDenied();
+      throw err;
     }
     return data;
   }
@@ -40,34 +102,51 @@ export function makeBackend(settings, existingClient) {
   return {
     mode:'cloud',
     get permissions(){return permissions;},
+    permissionsFor:permissionFor,
+    getAccess:permissionFor,
     onSessionChange:callback=>client.auth.onAuthStateChange((event,session)=>{if(!(localLogout && event==='SIGNED_OUT'))callback(event,session);}),
     bindRun(runId,recordId){if(!uuid(runId)||!uuid(recordId))throw Error('Liên kết đợt không hợp lệ.');if(current||runBinding)throw Error('Không đổi đợt trong phiên nhập đang mở.');runBinding={runId,recordId};},
+    bindSystem(system){if(!systems.includes(system))throw Error('Hệ thống thẩm định không hợp lệ.');activeSystem=system;},
+    get activeSystem(){return activeSystem;},
+    canSaveActive(){const access=activeSystem?permissionFor(activeSystem):null;return Boolean(access&&(runBinding?access.can_edit_archive:access.can_enter));},
+    canEvaluateActive(){const access=activeSystem?permissionFor(activeSystem):null;return Boolean(access&&(runBinding?access.can_edit_archive:access.can_enter));},
     get runBinding(){return runBinding && {...runBinding};},
-    listRuns:()=>rpc('cpc1_run_list'),
-    createRun:(definition,requestId)=>rpc('cpc1_run_create',{p_definition:definition,p_request_id:requestId}),
-    transitionRun:(id,version,status,reason,requestId)=>rpc('cpc1_run_transition',{p_run_id:id,p_expected_version:version,p_status:status,p_reason:reason,p_request_id:requestId}),
-    listHistory:()=>rpc('cpc1_history_list'),
+    async listRuns(){await requireGlobalView();return rpc('cpc1_run_list');},
+    async createRun(definition,requestId){await requireGlobalView();return rpc('cpc1_run_create',{p_definition:definition,p_request_id:requestId});},
+    async transitionRun(id,version,status,reason,requestId){await requireGlobalView();return rpc('cpc1_run_transition',{p_run_id:id,p_expected_version:version,p_status:status,p_reason:reason,p_request_id:requestId});},
+    async listHistory(){await requireGlobalView();return rpc('cpc1_history_list');},
     async historySnapshot(recordId,version){
       if(!uuid(recordId)||!Number.isSafeInteger(version)||version<1)throw Error('Định danh phiên bản hồ sơ không hợp lệ.');
-      const snapshot=await rpc('cpc1_load',{p_record_id:recordId,p_version:version});
+      await requireGlobalView();const snapshot=await rpc('cpc1_load',{p_record_id:recordId,p_version:version});
       if(snapshot?.id!==recordId || snapshot?.version!==version)throw Error('Phiên bản hồ sơ trả về không khớp. Không dùng tiêu chí này.');
       return snapshot;
     },
+    async checkDraftAccess(recordId,system){
+      await requireAccess(system,runBinding?'archive-edit':'enter',true);
+      if(!uuid(recordId))throw Error('Định danh hồ sơ bản tạm không hợp lệ.');
+      const snapshot=await rpc('cpc1_load',{p_record_id:recordId});
+      if(snapshot?.id!==recordId || (snapshot?.data?.system||'steam')!==system)throw noAccess(system);
+      return true;
+    },
     async downloadHistorySource(path){
+      await requireGlobalView();
       if(!/^[0-9a-f]{64}\.pdf$/.test(path))throw Error('Đường dẫn báo cáo nguồn không hợp lệ.');
       const {data,error}=await client.storage.from('cpc1-history').download(path);if(error)throw Error('Không tải được báo cáo nguồn trong phạm vi quyền.');
       const bytes=await data.arrayBuffer();const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
       if(hash!==path.slice(0,64))throw Error('Báo cáo nguồn không khớp mã kiểm tra đã lưu.');return new Blob([bytes],{type:'application/pdf'});
     },
-    getConfig:()=>runBinding?rpc('cpc1_run_config',{p_run_id:runBinding.runId,p_system:'steam'}):rpc('cpc1_config'),
-    async getGasConfig(system){if(!['air','nitrogen'].includes(system))throw new Error('Hệ thống khí không hợp lệ.');return runBinding?rpc('cpc1_run_config',{p_run_id:runBinding.runId,p_system:system}):rpc('cpc1_gas_config',{p_system:system});},
-    evaluate:data=>runBinding?rpc('cpc1_run_evaluate',{p_run_id:runBinding.runId,p_data:data}):rpc('cpc1_evaluate',{p_data:data}),
-    async getSession(){const {data,error}=await client.auth.getSession();if(error)throw error;if(data.session){permissions=await rpc('cpc1_context');if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('cpc1:permissions'));}return data.session;},
+    async refreshContext(){return contextSession(true);},
+    async refreshAccess(system,action='enter'){await requireAccess(system,action,true);return permissionFor(system);},
+    async getConfig(){await requireAccess('steam',runBinding?'view':'current-view');return runBinding?rpc('cpc1_run_config',{p_run_id:runBinding.runId,p_system:'steam'}):rpc('cpc1_config');},
+    async getGasConfig(system){if(!['air','nitrogen'].includes(system))throw new Error('Hệ thống khí không hợp lệ.');if(activeSystem)activeSystem=system;await requireAccess(system,runBinding?'view':'current-view');return runBinding?rpc('cpc1_run_config',{p_run_id:runBinding.runId,p_system:system}):rpc('cpc1_gas_config',{p_system:system});},
+    async evaluate(data){const system=data?.system || activeSystem;await requireAccess(system,runBinding?'archive-edit':'enter');if(activeSystem&&system!==activeSystem)throw noAccess(system);return runBinding?rpc('cpc1_run_evaluate',{p_run_id:runBinding.runId,p_data:data}):rpc('cpc1_evaluate',{p_data:data});},
+    async getSession(){return contextSession();},
     async signIn(){throw new Error('Đăng nhập tại VMP rồi mở lại Thẩm định thực tế (demo).');},
-    async signOut(){localLogout=true;try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;current=null;pending.clear();}finally{localLogout=false;}},
-    async list(system='steam'){return (await rpc('cpc1_list')).filter(r=>(r.system||'steam')===system);},
-    async load(id){if(runBinding&&id!==runBinding.recordId)throw Error('Hồ sơ không thuộc đợt đang mở.');current=runBinding?await rpc('cpc1_run_load',{p_record_id:id,p_run_id:runBinding.runId}):await rpc('cpc1_load',{p_record_id:id});return current;},
+    async signOut(){localLogout=true;try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;}finally{clearAuthorization();localLogout=false;}},
+    async list(system=activeSystem||'steam'){await requireAccess(system,'view');return (await rpc('cpc1_list')).filter(r=>(r.system||'steam')===system);},
+    async load(id){if(runBinding&&id!==runBinding.recordId)throw Error('Hồ sơ không thuộc đợt đang mở.');await requireGlobalView();const loaded=runBinding?await rpc('cpc1_run_load',{p_record_id:id,p_run_id:runBinding.runId}):await rpc('cpc1_load',{p_record_id:id});const system=loaded?.data?.system||activeSystem;if(activeSystem&&system!==activeSystem){signalDenied();throw noAccess(activeSystem);}await requireAccess(system,'view');current=loaded;return current;},
     async save(data,options={}){
+      const system=data?.system||activeSystem,editingExisting=Boolean(runBinding||options.recordId||current?.id);await requireAccess(system,editingExisting?'archive-edit':'enter');if(activeSystem&&system!==activeSystem)throw noAccess(system);
       const args={p_data:data,p_record_id:options.recordId||null,p_expected_version:options.expectedVersion??0,p_title:options.title||({air:'Đợt đánh giá khí nén',nitrogen:'Đợt đánh giá khí nitơ'}[data.system]||'Đợt đánh giá hơi tinh khiết')};
       if(runBinding){if(options.recordId&&options.recordId!==runBinding.recordId)throw Error('Hồ sơ không thuộc đợt đang mở.');args.p_run_id=runBinding.runId;args.p_record_id=runBinding.recordId;args.p_expected_version=options.expectedVersion??current?.version??0;delete args.p_title;}
       const key=JSON.stringify(args);
@@ -76,6 +155,7 @@ export function makeBackend(settings, existingClient) {
     },
     async report(form,data){
       const gas=['air','nitrogen'].includes(data?.system);
+      const system=data?.system||activeSystem;await requireAccess(system,'view');if(activeSystem&&system!==activeSystem)throw noAccess(system);
       if(!(gas?/^bm0[1-7]$/:/^bm0[1-5]$/).test(form))throw new Error('Biểu mẫu không hợp lệ.');
       if(!current || canonical(data)!==canonical(current.data))throw new Error('Lưu Supabase trước khi in để báo cáo dùng đúng dữ liệu đã lưu.');
       const expected={id:current.id,version:current.version,data:canonical(data)};

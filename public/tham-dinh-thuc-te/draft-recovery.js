@@ -3,7 +3,10 @@
   const store = window.CPC1DraftStore;
   let adapter, active, timer, subscription, queue = Promise.resolve();
   const $ = id => document.getElementById(id);
-  const allowed = () => document.body.dataset.runClosed !== 'true' && !window.CPC1_SESSION_ENDED && window.CPC1Backend?.permissions?.can_enter === true;
+  const allowed = () => {
+    const system=adapter?.get().system;
+    return document.body.dataset.runClosed !== 'true' && !window.CPC1_SESSION_ENDED && window.CPC1Backend?.canSaveActive?.() === true;
+  };
   const storageSystem = s => s.runId ? s.system+':'+s.runId : s.system;
   const time = value => new Date(value).toLocaleString('vi-VN');
   const status = text => { if ($('local-draft-status')) $('local-draft-status').textContent = text; };
@@ -32,6 +35,9 @@
       if(adapter.get().dirty && !confirm('Thay dữ liệu đang trên trang bằng bản tạm đã lưu trên máy?'))return;
       try {
         const snapshot=structuredClone(a.candidate);store.validate(snapshot);
+        const system=snapshot.data?.system || adapter.get().system;
+        if(snapshot.recordId) await window.CPC1Backend.checkDraftAccess(snapshot.recordId,system);
+        else await window.CPC1Backend.refreshAccess(system,window.CPC1Backend.runBinding?'archive-edit':'enter');
         await adapter.restore(snapshot);
         if(a!==active || a.ended)return;
         a.candidate=null;sync();status('Đã khôi phục. Tính lại và lưu Supabase khi có mạng.');
