@@ -86,6 +86,8 @@ try {
   }
 
   await page.setViewport({ width: 390, height: 844, isMobile: true });
+  // Changing isMobile can reload the page; wait for the authenticated workspace.
+  await page.waitForSelector('[data-cw-nav="objects"]', { visible: true, timeout: 15_000 });
   await page.click('[data-cw-nav="objects"]');
   const objectHelp = 'button[aria-label="Hướng dẫn Đối tượng"]';
   await page.click(objectHelp);

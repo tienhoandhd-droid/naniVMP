@@ -284,7 +284,9 @@ async function openToday({
     }, Date.parse(now));
   }
   await page.evaluateOnNewDocument(() => localStorage.clear());
-  await nhetPhien(page, { supabaseUrl: URL_SB, nguoiDung: user });
+  // JWT timestamps must follow the same clock as the browser in date-boundary cases.
+  const nowMs = now ? Date.parse(now) : undefined;
+  await nhetPhien(page, { supabaseUrl: URL_SB, nguoiDung: user, nowMs });
   if (cachedUser) {
     await page.evaluateOnNewDocument((value) => {
       localStorage.setItem("vmp_monitor_user_v1", JSON.stringify(value));
@@ -300,6 +302,7 @@ async function openToday({
     nguoiDung: user,
     mangNghiemNgat: true,
     previewOrigin: GOC,
+    nowMs,
     suaKho(kho) {
       kho.profiles = [{
         id: user.id,

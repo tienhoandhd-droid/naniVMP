@@ -14,7 +14,7 @@ Trạng thái: bản local đã hoàn tất triển khai và kiểm thử; chưa
 | Chống thử sai | Dùng giới hạn phía Supabase và hiển thị lỗi 429 rõ ràng; không gọi bộ đếm phía trình duyệt là biện pháp chống brute force. Không tự khóa tài khoản sau ba lần sai. MFA là lớp bổ sung; CAPTCHA cần cấu hình nhà cung cấp riêng và không được tuyên bố đã bật. |
 | API/phiên | Giữ lỗi native để phân loại, MFA fail-closed, xử lý đổi tài khoản/đăng xuất khi yêu cầu đang chạy, giữ lỗi tắt MFA và thông báo đổi mật khẩu. Recovery có kiểm thử riêng. |
 | Responsive/accessibility | Axe 20 màn đạt; ma trận đăng nhập/báo cáo × sáng/tối × 1440/768/390/320 không có lỗi serious/critical, thiếu alt, lỗi JS hay tràn ngang. Có kiểm tra bàn phím, focus, bố cục720px và root font200%. Đây là bằng chứng tự động, không phải chứng nhận toàn bộ WCAG hoặc kiểm thử thiết bị thật. |
-| Hiệu năng | Tách shell sau đăng nhập thành chunk lazy, giữ thứ tự kiểm tra MFA/quyền. JS giải mã khi mở login giảm 592.876 → khoảng456.800 byte (~23%). Không nạp báo cáo/export trước khi cần. |
+| Hiệu năng | Tách shell sau đăng nhập thành chunk lazy, giữ thứ tự kiểm tra MFA/quyền. JS giải mã khi mở login giảm 592.876 → 457.149 byte (~23%). Không nạp báo cáo/export trước khi cần. |
 
 ## Số đo hiệu năng
 
@@ -64,3 +64,6 @@ Bằng chứng chứa dữ liệu thật/backup lưu riêng trong `.cpc1/quality
 Phát hành đang chờ hạ tầng: Supabase pooler trả `EAUTHQUERY` timeout, truy vấn quản lý544, Auth health504; endpoint health xác nhận DB/Auth/REST `UNHEALTHY`. Chưa xác định nguyên nhân. Không có migration/Auth setting/production write của đợt nâng cấp này. Người dùng xác nhận Supabase vẫn hoạt động; các lỗi trên là kết quả từ môi trường kiểm tra này, chưa xác định nguyên nhân hoặc phạm vi. Giữ nguyên dịch vụ, không khởi động lại. Sau phục hồi phải hoàn tất backup/preflight, áp đúng migration mới và cấu hình mật khẩu, postflight, CI và kiểm tra artifact/web thật trước khi đánh dấu deployed.
 
 Final dependency audit: đã cập nhật Browserslist4.29.2 và baseline-browser-mapping2.11.26 cùng dữ liệu trình duyệt phụ thuộc trong phạm vi semver hiện có. npm audit từ2 cảnh báo (1high/1moderate) xuống0. Đây là dependency của công cụ build; không đổi thư viện nghiệp vụ. Typecheck/build/budget/cold-login/MFA smoke đạt; toàn bộ file dist sau cập nhật có hash giống hệt trước cập nhật. Nguồn: [Browserslist advisory](https://github.com/advisories/GHSA-c83g-rgw3-j3cx), [baseline mapping advisory](https://github.com/advisories/GHSA-w5vr-8v7q-w6rv).
+
+
+CI follow-up: run36539605392 đạt static-quality, source-access-db-contract, a11y và các luồng MFA/báo cáo/quyền, nhưng dừng tại test giao năm. Đã tái hiện: browser giả lập31/12 trong khi JWT fixture dùng đồng hồ host29/09. Fixture nhận cùng đồng hồ cho seed/refresh, giữ nguyên kiểm tra nghiệp vụ; unit RED→GREEN3/3 và Today personal scope đạt. Test hướng dẫn Source cũng chờ workspace sau lần reload do chuyển chế độ mobile. Các test Source/copy/export và toàn bộ e2e:quality chạy lại đạt; review độc lập chấp nhận. Đây chỉ là sửa fixture/wait của test, không thay mã ứng dụng hoặc production. CI nhánh sẽ chạy lại trên commit mới.

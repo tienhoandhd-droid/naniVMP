@@ -37,14 +37,14 @@ export const NGUOI_DUNG = {
 };
 
 /** Phiên giả có hạn xa, để supabase-js không đi làm mới token qua mạng. */
-export function phienGia(nguoiDung = NGUOI_DUNG) {
-  const hetHan = Math.floor(Date.now() / 1000) + 60 * 60 * 8;
+export function phienGia(nguoiDung = NGUOI_DUNG, nowMs = Date.now()) {
+  const hetHan = Math.floor(nowMs / 1000) + 60 * 60 * 8;
   // Native MFA SDK reads signed JWT claims locally. This is deliberately an
   // unsigned fixture; interception prevents it ever reaching a real backend.
   const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const token = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({
     sub: nguoiDung.id, role: "authenticated", aud: "authenticated", exp: hetHan,
-    aal: "aal1", amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+    aal: "aal1", amr: [{ method: "password", timestamp: Math.floor(nowMs / 1000) }],
   })}.${encode("fixture-signature")}`;
   return {
     access_token: token,
@@ -926,6 +926,7 @@ export async function caiGiaLap(trang, {
   nguoiDung = NGUOI_DUNG,
   mangNghiemNgat = false,
   previewOrigin,
+  nowMs,
 } = {}) {
   const kho = dungKhoDuLieu(kichBan);
   /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống nhân viên xưởng để
@@ -944,7 +945,7 @@ export async function caiGiaLap(trang, {
 
     const u = new URL(url);
     if (u.host === hostSupabase) {
-      const phanHoi = traLoi(kho, u, req, { nguoiDung });
+      const phanHoi = traLoi(kho, u, req, { nguoiDung, nowMs });
       /* doTre: { ten_rpc: ms } — giả lập mạng chậm cho TỪNG RPC, để kiểm
          được trạng thái trung gian (vẽ sớm từ bản lưu, banner đang tải).
          Không trễ preflight OPTIONS: trình duyệt chờ preflight xong mới
@@ -971,7 +972,7 @@ export async function caiGiaLap(trang, {
   return { chanNgoai };
 }
 
-export function traLoi(kho, u, req, { nguoiDung = NGUOI_DUNG } = {}) {
+export function traLoi(kho, u, req, { nguoiDung = NGUOI_DUNG, nowMs } = {}) {
   /* Đủ bộ header CORS. Thiếu Allow-Headers là preflight trượt và trình
      duyệt chặn thẳng — lúc đó lỗi hiện ra dưới dạng "net::ERR_FAILED",
      rất dễ tưởng nhầm là mock chưa chạy. */
@@ -1005,7 +1006,7 @@ export function traLoi(kho, u, req, { nguoiDung = NGUOI_DUNG } = {}) {
         }),
       };
     }
-    return { status: 200, headers: dau, body: JSON.stringify(phienGia(nguoiDung)) };
+    return { status: 200, headers: dau, body: JSON.stringify(phienGia(nguoiDung, nowMs)) };
   }
   if (u.pathname.startsWith("/auth/v1/recover")) {
     // Quên mật khẩu: GoTrue trả 200 rỗng dù email tồn tại hay không.
@@ -1084,10 +1085,11 @@ export async function nhetPhien(trang, {
   supabaseUrl,
   cheDo = "light",
   nguoiDung = NGUOI_DUNG,
+  nowMs,
 } = {}) {
   const khoa = `sb-${layRef(supabaseUrl)}-auth-token`;
   await trang.evaluateOnNewDocument((k, phien, che) => {
     localStorage.setItem(k, JSON.stringify(phien));
     localStorage.setItem("vmp-theme", che);
-  }, khoa, phienGia(nguoiDung), cheDo);
+  }, khoa, phienGia(nguoiDung, nowMs), cheDo);
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { caiGiaLap } from "../e2e/gia-lap-supabase.mjs";
+import { caiGiaLap, nhetPhien } from "../e2e/gia-lap-supabase.mjs";
 
 class FakePage {
   async setRequestInterception(enabled) {
@@ -53,4 +53,29 @@ test("mock network legacy vẫn cho loopback khác port khi strict tắt", async
 
   assert.equal(loopback.state.action, "continue");
   assert.deepEqual(chanNgoai, []);
+});
+
+
+test("fixed browser clock also governs seeded and refreshed mock sessions", async () => {
+  const nowMs = Date.parse("2035-12-31T17:00:00Z");
+  const expectedExpiry = Math.floor(nowMs / 1000) + 28_800;
+  const assertSession = (session) => {
+    const claims = JSON.parse(Buffer.from(session.access_token.split(".")[1], "base64url"));
+    assert.equal(session.expires_at, expectedExpiry);
+    assert.equal(claims.exp, expectedExpiry);
+    assert.equal(claims.amr[0].timestamp, Math.floor(nowMs / 1000));
+  };
+  const page = new FakePage();
+  page.evaluateOnNewDocument = async (_fn, _key, session) => assertSession(session);
+  await nhetPhien(page, { supabaseUrl: "https://mock-project.supabase.co", nowMs });
+  await caiGiaLap(page, { supabaseUrl: "https://mock-project.supabase.co", nowMs });
+  let response;
+  page.handleRequest({
+    url: () => "https://mock-project.supabase.co/auth/v1/token?grant_type=refresh_token",
+    method: () => "POST",
+    postData: () => JSON.stringify({ refresh_token: "gia-lap-refresh" }),
+    respond: async (value) => { response = value; },
+  });
+  assert.equal(response.status, 200);
+  assertSession(JSON.parse(response.body));
 });
