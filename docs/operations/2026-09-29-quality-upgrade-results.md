@@ -1,6 +1,6 @@
 # Kết quả nâng cấp chất lượng VMP — 29/09/2026
 
-Trạng thái: bản local đã hoàn tất triển khai và kiểm thử; chưa áp migration/Auth settings hoặc deploy bản này. Mốc nền đã đồng bộ là `683caaa`.
+Mã nâng cấp đã hoàn tất kiểm thử tại `7fd858b`. Migration bảo vệ MFA và chính sách mật khẩu mới tối thiểu 12 ký tự đã áp trên Supabase ngày 29/09/2026, trước khi phát hành giao diện. Mốc nền để so sánh là `683caaa`; trạng thái triển khai giao diện được ghi nhận trong [GitHub Actions](https://github.com/tienhoandhd-droid/naniVMP/actions/workflows/deploy.yml).
 
 ## Đối chiếu yêu cầu với bằng chứng
 
@@ -10,7 +10,7 @@ Trạng thái: bản local đã hoàn tất triển khai và kiểm thử; chưa
 | Tương phản, nhất quán | Giữ hệ màu Lotus đang có vì kiểm tra thực tế đạt; dùng cùng token cho skeleton và trạng thái. Không thay toàn bộ bảng màu theo nhận định chưa có bằng chứng. |
 | Báo cáo | Đã có biểu đồ SVG, bộ lọc, tìm kiếm/sắp xếp trong chi tiết và XLSX/HTML/PDF. Bổ sung cách đọc/xuất, mở chi tiết bằng bàn phím và trả focus về nút mở. Không đổi công thức báo cáo. |
 | MFA | Thêm TOTP do chủ tài khoản tự bật; tài khoản đã bật phải xác minh trước khi mở dữ liệu. Native API, PostgREST pre-request và restrictive RLS cho Storage/các bảng Realtime. Không tự đăng ký thiết bị cho người dùng. |
-| Mật khẩu | Mật khẩu mới/đổi tối thiểu 12 ký tự ở giao diện; cấu hình máy chủ phải được xác nhận khi cutover. Kiểm tra mật khẩu cũ bằng phiên tạm không lưu, giữ nguyên AAL2 của phiên chính. Mật khẩu cũ không bị đổi tự động. Supabase đã dùng bcrypt, không tự viết thuật toán mã hóa. |
+| Mật khẩu | Mật khẩu mới/đổi tối thiểu 12 ký tự ở giao diện; cấu hình máy chủ đã xác nhận tối thiểu 12 ký tự sau cutover. Kiểm tra mật khẩu cũ bằng phiên tạm không lưu, giữ nguyên AAL2 của phiên chính. Mật khẩu cũ không bị đổi tự động. Supabase đã dùng bcrypt, không tự viết thuật toán mã hóa. |
 | Chống thử sai | Dùng giới hạn phía Supabase và hiển thị lỗi 429 rõ ràng; không gọi bộ đếm phía trình duyệt là biện pháp chống brute force. Không tự khóa tài khoản sau ba lần sai. MFA là lớp bổ sung; CAPTCHA cần cấu hình nhà cung cấp riêng và không được tuyên bố đã bật. |
 | API/phiên | Giữ lỗi native để phân loại, MFA fail-closed, xử lý đổi tài khoản/đăng xuất khi yêu cầu đang chạy, giữ lỗi tắt MFA và thông báo đổi mật khẩu. Recovery có kiểm thử riêng. |
 | Responsive/accessibility | Axe 20 màn đạt; ma trận đăng nhập/báo cáo × sáng/tối × 1440/768/390/320 không có lỗi serious/critical, thiếu alt, lỗi JS hay tràn ngang. Có kiểm tra bàn phím, focus, bố cục720px và root font200%. Đây là bằng chứng tự động, không phải chứng nhận toàn bộ WCAG hoặc kiểm thử thiết bị thật. |
@@ -54,16 +54,26 @@ Bằng chứng chứa dữ liệu thật/backup lưu riêng trong `.cpc1/quality
 
 ## Kết quả chốt local
 
-- Unit: 957 tổng, 956 đạt, 1 skip theo cấu hình, 0 lỗi. Typecheck/build/bundle budget và design drift đạt.
+- Unit: 958 tổng, 957 đạt, 1 skip theo cấu hình, 0 lỗi. Typecheck/build/bundle budget và design drift đạt.
 - Luồng chính giả lập149/149; recovery19/19; chỉnh hạn kế hoạch39/39 trên build bật feature flag đúng cấu hình CI.
 - e2e:quality: đăng nhập chống gửi trùng/429, MFA đầy đủ, phiên hết hạn, đổi mật khẩu giữAAL2, báo cáo/bàn phím, reflow và cold-JS budget.
 - Báo cáo xuấtXLSX/HTML và in/retry có hồi quy riêng; axe20/20 và ma trận16 trường hợp đạt.
 - Review độc lập đã đóng các lỗi race lúc đổi tài khoản/đổi mức xác thực; quyết định và yêu cầu đổi mật khẩu đều gắn với cùng token đã kiểm tra.
 - CI giữ các cổng cũ, thêm e2e:quality và receipt niêm phong SQL/PostgREST/Storage. Một test cho phép đổi cổng để không chiếm preview của phiên làm việc khác.
 
-Phát hành đang chờ hạ tầng: Supabase pooler trả `EAUTHQUERY` timeout, truy vấn quản lý544, Auth health504; endpoint health xác nhận DB/Auth/REST `UNHEALTHY`. Chưa xác định nguyên nhân. Không có migration/Auth setting/production write của đợt nâng cấp này. Người dùng xác nhận Supabase vẫn hoạt động; các lỗi trên là kết quả từ môi trường kiểm tra này, chưa xác định nguyên nhân hoặc phạm vi. Giữ nguyên dịch vụ, không khởi động lại. Sau phục hồi phải hoàn tất backup/preflight, áp đúng migration mới và cấu hình mật khẩu, postflight, CI và kiểm tra artifact/web thật trước khi đánh dấu deployed.
+## Sự cố kết nối trước phát hành và khôi phục
+
+Người dùng xác nhận web không kết nối được Supabase. Đối chiếu trực tiếp JavaScript trên web, cấu hình local và Management API cho thấy URL và anon key khớp, chưa hết hạn; không thay hoặc xoay khóa. Lỗi nằm ở khả năng phục vụ của database: truy vấn PostgreSQL timeout, Auth trả HTTP 504, SQL quản trị trả HTTP 544 và health DB/Auth/REST không khỏe, dù metadata dự án vẫn báo ACTIVE_HEALTHY.
+
+Sau khi lưu log và review độc lập, đã khởi động lại đúng dự án một lần theo yêu cầu sửa dịch vụ của người dùng. Lệnh được chấp nhận lúc 08:53:10 UTC; ba dịch vụ khỏe lại lúc 08:56:15 UTC. Truy vấn đọc, trang web/JavaScript/Auth và phiên web thật đều thành công. Headless xác minh 5 hồ sơ, 5 PDF, 3 biểu đồ và 9 file nguồn, không ghi hồ sơ và không có lỗi JavaScript. Chưa có log đủ để kết luận nguyên nhân gốc khiến database mất phản hồi; không coi restart là bằng chứng đã xác định OOM hay lỗi mã ứng dụng.
+
+Để giảm tải trong phát hành, bước đối chiếu xử lý từng bảng và tính hash ở client thay cho gom JSON/sắp xếp nhiều bảng trên server. Bản sao lưu mới được phục hồi riêng; 22 bảng đối chiếu khớp, ma trận MFA và giao dịch phát hành diễn tập đạt. Production đã ghi migration 20260929160000 đúng một lần, kiểm đủ 4 chính sách restrictive và pre-request hook; 22 bảng trước/sau khớp. Auth minimum đổi 6→12, các cấu hình khác giữ nguyên. Không đổi mật khẩu, đăng ký MFA, role, phân công hoặc hồ sơ thay người dùng.
+
 
 Final dependency audit: đã cập nhật Browserslist4.29.2 và baseline-browser-mapping2.11.26 cùng dữ liệu trình duyệt phụ thuộc trong phạm vi semver hiện có. npm audit từ2 cảnh báo (1high/1moderate) xuống0. Đây là dependency của công cụ build; không đổi thư viện nghiệp vụ. Typecheck/build/budget/cold-login/MFA smoke đạt; toàn bộ file dist sau cập nhật có hash giống hệt trước cập nhật. Nguồn: [Browserslist advisory](https://github.com/advisories/GHSA-c83g-rgw3-j3cx), [baseline mapping advisory](https://github.com/advisories/GHSA-w5vr-8v7q-w6rv).
 
 
-CI follow-up: run36539605392 đạt static-quality, source-access-db-contract, a11y và các luồng MFA/báo cáo/quyền, nhưng dừng tại test giao năm. Đã tái hiện: browser giả lập31/12 trong khi JWT fixture dùng đồng hồ host29/09. Fixture nhận cùng đồng hồ cho seed/refresh, giữ nguyên kiểm tra nghiệp vụ; unit RED→GREEN3/3 và Today personal scope đạt. Test hướng dẫn Source cũng chờ workspace sau lần reload do chuyển chế độ mobile. Các test Source/copy/export và toàn bộ e2e:quality chạy lại đạt; review độc lập chấp nhận. Đây chỉ là sửa fixture/wait của test, không thay mã ứng dụng hoặc production. CI nhánh sẽ chạy lại trên commit mới.
+CI follow-up: run36539605392 đạt static-quality, source-access-db-contract, a11y và các luồng MFA/báo cáo/quyền, nhưng dừng tại test giao năm. Đã tái hiện: browser giả lập31/12 trong khi JWT fixture dùng đồng hồ host29/09. Fixture nhận cùng đồng hồ cho seed/refresh, giữ nguyên kiểm tra nghiệp vụ; unit RED→GREEN3/3 và Today personal scope đạt. Test hướng dẫn Source cũng chờ workspace sau lần reload do chuyển chế độ mobile. Các test Source/copy/export và toàn bộ e2e:quality chạy lại đạt; review độc lập chấp nhận. Đây chỉ là sửa fixture/wait của test, không thay mã ứng dụng hoặc production. Kết quả CI cuối được ghi bên dưới.
+
+
+Kết quả CI cuối cho mã ứng dụng `7fd858b`: [run36542554482](https://github.com/tienhoandhd-droid/naniVMP/actions/runs/36542554482) đạt static-quality, source-access-db-contract, a11y 20/20 và toàn bộ E2E. Test quyền tiến độ bổ sung chờ tiêu điểm ban đầu của hộp thoại trước khi gõ và diagnostic khi timeout; không thay quy tắc quyền hoặc bỏ kiểm tra. Các thay đổi tiếp theo trong tài liệu này chỉ ghi nhận vận hành, không đổi mã ứng dụng.
