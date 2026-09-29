@@ -124,6 +124,7 @@ jobs:
         run: |
           bash scripts/with-preview.sh -- bash -c '
             npm run e2e:gialap &&
+            npm run e2e:quality &&
             npm run e2e:catalog &&
             npm run e2e:source-access &&
             npm run e2e:progress-rights &&

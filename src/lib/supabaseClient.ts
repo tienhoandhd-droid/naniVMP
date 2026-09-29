@@ -117,7 +117,10 @@ if (typeof window !== "undefined" && supabase) {
 export async function signIn(email: string, password: string): Promise<AppUser> {
   if (!supabase) throw new Error("Supabase chưa cấu hình. Xem hướng dẫn cài đặt.");
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(error.message === "Invalid login credentials" ? "Email hoặc mật khẩu không đúng." : error.message);
+  // Preserve SDK status/code so the form can distinguish throttling and outages.
+  if (error) throw error;
+  const { requireMfaChallenge } = await import("./mfa.ts");
+  if (await requireMfaChallenge()) throw new Error("MFA_CHALLENGE_REQUIRED");
   // Lấy profile (role, tên...). Đọc không được thì báo thẳng chứ không cho
   // vào với vai viewer mặc định — vào được mà thiếu quyền còn khó hiểu hơn
   // là không vào được kèm lý do.
@@ -245,10 +248,11 @@ export async function changePassword(matKhauCu: string, matKhauMoi: string): Pro
   const { data } = await supabase.auth.getUser();
   const email = data.user?.email;
   if (!email) throw new Error("Không xác định được tài khoản hiện tại.");
-  const thu = await supabase.auth.signInWithPassword({ email, password: matKhauCu });
-  if (thu.error) throw new Error("MAT_KHAU_CU_SAI");
-  const { error } = await supabase.auth.updateUser({ password: matKhauMoi });
-  if (error) throw new Error(error.message);
+  // Checking the old password must not replace the owner's verified AAL2
+  // session with the password-only session returned by reauthentication.
+  const { reauthenticateAndUpdatePassword } = await import("./passwordReauthentication.ts");
+  await reauthenticateAndUpdatePassword({ mainClient: supabase, email,
+    expectedUserId: data.user!.id, currentPassword: matKhauCu, newPassword: matKhauMoi });
 }
 
 /* ---- Đặt lại mật khẩu ở chế độ recovery ----

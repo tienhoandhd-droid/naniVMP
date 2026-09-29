@@ -39,8 +39,15 @@ export const NGUOI_DUNG = {
 /** Phiên giả có hạn xa, để supabase-js không đi làm mới token qua mạng. */
 export function phienGia(nguoiDung = NGUOI_DUNG) {
   const hetHan = Math.floor(Date.now() / 1000) + 60 * 60 * 8;
+  // Native MFA SDK reads signed JWT claims locally. This is deliberately an
+  // unsigned fixture; interception prevents it ever reaching a real backend.
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const token = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({
+    sub: nguoiDung.id, role: "authenticated", aud: "authenticated", exp: hetHan,
+    aal: "aal1", amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+  })}.${encode("fixture-signature")}`;
   return {
-    access_token: "gia-lap-khong-phai-token-that",
+    access_token: token,
     token_type: "bearer",
     expires_in: 28_800,
     expires_at: hetHan,

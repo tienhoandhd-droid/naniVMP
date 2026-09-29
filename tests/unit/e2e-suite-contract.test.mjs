@@ -164,7 +164,7 @@ test("CI static-quality cài Chromium đóng gói trước khi chạy unit contr
   );
 });
 
-test("CI e2e-mock chỉ chạy năm bộ giả lập cốt lõi được duyệt", async () => {
+test("CI e2e-mock giữ các bộ cốt lõi và thêm kiểm thử chất lượng/MFA", async () => {
   const ci = await readRepositoryFile(".github/workflows/deploy.yml");
   const e2eMock = extractWorkflowJob(ci, "e2e-mock", "production-build");
   const e2eInvocations = [...e2eMock.matchAll(/npm run (e2e:[a-z0-9:-]+)/gu)]
@@ -172,8 +172,8 @@ test("CI e2e-mock chỉ chạy năm bộ giả lập cốt lõi được duyệt
 
   assert.deepEqual(
     e2eInvocations,
-    ["e2e:gialap", "e2e:catalog", "e2e:source-access", "e2e:progress-rights", "e2e:admin"],
-    "e2e-mock phải chỉ gọi đúng năm bộ E2E lõi, đúng thứ tự và không lặp",
+    ["e2e:gialap", "e2e:quality", "e2e:catalog", "e2e:source-access", "e2e:progress-rights", "e2e:admin"],
+    "e2e-mock phải giữ các bộ E2E lõi và cổng chất lượng mới, đúng thứ tự và không lặp",
   );
 
   /* 31/08: "drift"/"a11y"/"shell" RỜI danh sách cấm — cả ba đã xanh ổn

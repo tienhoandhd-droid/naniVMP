@@ -176,7 +176,7 @@ test("silent refresh success recovers a retryable connection error", async () =>
 });
 
 test("shell keeps Today period-independent, canonical, static and deep-link safe", async () => {
-  const source = await readFile(new URL("../../src/App.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../../src/AuthenticatedApp.tsx", import.meta.url), "utf8");
 
   assert.match(source, /const TodayCommandCenter = lazy\(nhapCoThuLai\(\(\) => import\("\.\/pages\/TodayCommandCenterPage\.tsx"\)\)\)/);
   assert.doesNotMatch(source, /const TodayView = lazy/);
@@ -187,7 +187,7 @@ test("shell keeps Today period-independent, canonical, static and deep-link safe
 });
 
 test("Today bar does not claim remembered period", async () => {
-  const source = await readFile(new URL("../../src/App.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../../src/AuthenticatedApp.tsx", import.meta.url), "utf8");
 
   assert.match(source, /disabled=\{todayMode\}[\s\S]*aria-label="Từ ngày"/);
   assert.match(source, /disabled=\{todayMode\}[\s\S]*aria-label="Đến ngày"/);
@@ -196,7 +196,7 @@ test("Today bar does not claim remembered period", async () => {
 });
 
 test("shell coalesces focus and visibility through its own visible refresh controller", async () => {
-  const source = await readFile(new URL("../../src/App.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../../src/AuthenticatedApp.tsx", import.meta.url), "utf8");
 
   assert.match(source, /createVisibleRefreshController\(\{[\s\S]*refresh: silentRefresh,[\s\S]*coalesceMs: 1000[\s\S]*\}\)/);
   assert.match(source, /window\.addEventListener\("focus", controller\.request\)/);

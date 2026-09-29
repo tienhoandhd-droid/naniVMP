@@ -20,7 +20,7 @@ export interface ChangePasswordValues {
 
 export type ChangePasswordErrors = Partial<Record<keyof ChangePasswordValues, string>>;
 
-export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MIN_LENGTH = 12;
 
 export function validateChangePassword(
   { cu, moi, nhacLai }: ChangePasswordValues,
@@ -38,7 +38,12 @@ export function validateChangePassword(
 }
 
 export function changePasswordErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error ?? "");
+  const outer = error as { cause?: unknown; code?: string; status?: number } | null;
+  const native = (outer?.cause ?? error) as { message?: string; msg?: string; code?: string; status?: number } | null;
+  if (native?.status === 429 || /rate_limit/.test(native?.code ?? "")) {
+    return "Bạn đã thử quá nhiều lần. Vui lòng chờ rồi thử lại";
+  }
+  const message = native instanceof Error ? native.message : String(native?.message ?? native?.msg ?? error ?? "");
   if (/MAT_KHAU_CU_SAI|invalid login credentials/i.test(message)) {
     return "Mật khẩu hiện tại không đúng";
   }

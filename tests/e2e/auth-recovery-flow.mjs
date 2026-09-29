@@ -141,13 +141,13 @@ console.log("\nRecovery hợp lệ:");
   await page.type("#vmp-recovery-password", "abc1234");
   await page.type("#vmp-recovery-confirm", "abc1234");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => /8 ký tự/.test(document.body.innerText));
+  await page.waitForFunction(() => /12 ký tự/.test(document.body.innerText));
   kiem(requests.filter((request) => request.method === "PUT" && request.path.endsWith("/auth/v1/user")).length === 0,
     "mật khẩu 7 ký tự bị chặn trước API");
 
   await page.$eval("#vmp-recovery-password", (input) => { input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true })); });
   await page.$eval("#vmp-recovery-confirm", (input) => { input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true })); });
-  await page.type("#vmp-recovery-password", "abc12345");
+  await page.type("#vmp-recovery-password", "abc12345-long");
   await page.type("#vmp-recovery-confirm", "abc12346");
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => /không khớp/i.test(document.body.innerText));
@@ -155,7 +155,7 @@ console.log("\nRecovery hợp lệ:");
     "hai mật khẩu lệch bị chặn trước API");
 
   await page.$eval("#vmp-recovery-confirm", (input) => { input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true })); });
-  await page.type("#vmp-recovery-confirm", "abc12345");
+  await page.type("#vmp-recovery-confirm", "abc12345-long");
   await page.keyboard.press("Enter");
   await page.waitForSelector("#vmp-login-password", { timeout: 30_000 });
   const bodyText = await page.$eval("body", (body) => body.innerText);

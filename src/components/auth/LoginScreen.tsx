@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowBigUp, ArrowLeft, Boxes, CheckCircle2, Eye, EyeOff,
-  Lock, MailCheck, RotateCcw, XCircle,
+  Lock, MailCheck, RotateCcw, XCircle, LoaderCircle,
 } from "lucide-react";
 import type { AppUser } from "../../types/domain.ts";
 import { emailError, loginErrorMessage, validateLogin, type LoginErrors } from "../../lib/loginForm.ts";
@@ -56,6 +56,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [loading, setLoading] = useState(false);
+  const requestInFlight = useRef(false);
   const [resendAt, setResendAt] = useState(0);
   const [clock, setClock] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -90,6 +91,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (requestInFlight.current) return;
     const nextErrors = validateLogin({ email, password });
     setErrors(nextErrors);
     setServerError("");
@@ -99,6 +101,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
       return;
     }
 
+    requestInFlight.current = true;
     setLoading(true);
     try {
       const { signIn } = await import("../../lib/supabaseClient.ts");
@@ -106,12 +109,15 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
       onLogin(profile);
     } catch (error) {
       setServerError(loginErrorMessage(error));
+    } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
 
   const sendRecoveryMail = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
+    if (requestInFlight.current || (step === "forgot-sent" && resendAt > Date.now())) return;
     const emailIssue = emailError(email);
     setErrors(emailIssue ? { email: emailIssue } : {});
     setServerError("");
@@ -121,6 +127,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
       return;
     }
 
+    requestInFlight.current = true;
     setLoading(true);
     try {
       const { guiMailQuenMatKhau } = await import("../../lib/supabaseClient.ts");
@@ -132,11 +139,13 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
     } catch (error) {
       setServerError(resetMailErrorMessage(error));
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
 
   const goToForgot = () => {
+    if (requestInFlight.current) return;
     setPassword("");
     setShowPassword(false);
     setCapsLock(false);
@@ -146,6 +155,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
   };
 
   const goToLogin = () => {
+    if (requestInFlight.current) return;
     setPassword("");
     setErrors({});
     setServerError("");
@@ -221,7 +231,9 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
               </div>
 
               {serverError && <ServerError text={serverError} />}
+              <p className="lp-visually-hidden" role="status" aria-label="Trạng thái đăng nhập">{loading ? "Đang xác thực tài khoản, vui lòng chờ." : ""}</p>
               <button className="vq-luxury-btn" type="submit" disabled={loading} aria-busy={loading}>
+                {loading && <LoaderCircle className="spin" size={18} aria-hidden="true" />}
                 {loading ? "Đang đăng nhập…" : "Đăng nhập"}
               </button>
             </form>

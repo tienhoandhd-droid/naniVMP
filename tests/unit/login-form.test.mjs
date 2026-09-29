@@ -20,3 +20,12 @@ test("lỗi Supabase không lộ thông báo kỹ thuật", () => {
   assert.equal(loginErrorMessage(new Error("Invalid login credentials")), "Email hoặc mật khẩu chưa đúng");
   assert.equal(loginErrorMessage(new Error("network request failed")), "Không kết nối được máy chủ. Vui lòng thử lại");
 });
+
+test('login distinguishes server rate limits from invalid credentials without exposing details', () => {
+  for (const error of [{ status: 429 }, { code: 'over_request_rate_limit' }, new Error('Too many requests')]) {
+    assert.match(loginErrorMessage(error), /quá nhiều.*thử lại sau/iu);
+  }
+  assert.match(loginErrorMessage({ status: 503, message: 'upstream maintenance' }), /tạm thời.*thử lại/iu);
+  assert.equal(loginErrorMessage({ code: 'invalid_credentials', message: 'internal private detail' }),
+    'Email hoặc mật khẩu chưa đúng');
+});

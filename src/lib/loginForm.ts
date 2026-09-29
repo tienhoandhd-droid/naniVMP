@@ -24,8 +24,13 @@ export function validateLogin({ email, password }: LoginValues): LoginErrors {
 }
 
 export function loginErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  if (/invalid login credentials/i.test(message)) return "Email hoặc mật khẩu chưa đúng";
+  const detail = error && typeof error === "object" ? error as { message?: unknown; status?: unknown; code?: unknown } : {};
+  const message = typeof detail.message === "string" ? detail.message : String(error ?? "");
+  if (detail.status === 429 || /rate_limit/.test(String(detail.code ?? "")) || /rate limit|too many requests/i.test(message)) {
+    return "Có quá nhiều yêu cầu đăng nhập. Vui lòng thử lại sau ít phút.";
+  }
+  if (typeof detail.status === "number" && detail.status >= 500) return "Máy chủ tạm thời không sẵn sàng. Vui lòng thử lại.";
+  if (detail.code === "invalid_credentials" || /invalid login credentials/i.test(message)) return "Email hoặc mật khẩu chưa đúng";
   if (/network|fetch/i.test(message)) return "Không kết nối được máy chủ. Vui lòng thử lại";
   return "Vui lòng kiểm tra email và mật khẩu";
 }

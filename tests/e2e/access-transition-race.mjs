@@ -6,7 +6,7 @@ import puppeteer from "puppeteer-core";
 import { CHROME } from "./chrome-path.mjs";
 import { choServer } from "./cho-server.mjs";
 
-const PORT = 4178;
+const PORT = Number(process.env.VMP_ACCESS_TEST_PORT || 4178);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 /* Windows: .cmd phải chạy qua shell (Node >=20 chặn spawn EINVAL),
    và detached tạo process group kiểu POSIX không tồn tại trên Win. */

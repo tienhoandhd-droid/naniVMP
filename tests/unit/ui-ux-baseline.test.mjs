@@ -18,7 +18,7 @@ test("CardTitle renders the requested semantic heading level", () => {
 });
 
 test("app shell exposes keyboard landmarks and names its primary navigation", () => {
-  const app = source("src/App.tsx");
+  const app = source("src/AuthenticatedApp.tsx");
   const layout = source("src/components/layout/Layout.tsx");
 
   assert.match(app, /href="#vmp-main-content"/);
@@ -70,7 +70,7 @@ test("chat controls and panel expose accessible names and dialog behavior", () =
 });
 
 test("clickable dashboard targets are native buttons", () => {
-  const app = source("src/App.tsx");
+  const app = source("src/AuthenticatedApp.tsx");
   const alerts = source("src/pages/AlertsPage.tsx");
   const workload = source("src/pages/WorkloadPage.tsx");
 
@@ -83,7 +83,7 @@ test("clickable dashboard targets are native buttons", () => {
 });
 
 test("filters are grouped, named and stay in normal document flow", () => {
-  const app = source("src/App.tsx");
+  const app = source("src/AuthenticatedApp.tsx");
   /* F1 (31/08): AuditLogView tách khỏi App.tsx — bộ lọc nhật ký giờ sống
      ở pages/AuditLogPage.tsx, hợp đồng aria đi theo file. */
   const audit = source("src/pages/AuditLogPage.tsx");

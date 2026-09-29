@@ -139,7 +139,8 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
                   onFocus={() => prefetchDesktopRoute(n.id as ScreenId)}
                   className="vmp-nav" data-view={n.id}
                   aria-current={active ? "page" : undefined}
-                  title={collapsed ? n.label : undefined}
+                  aria-label={n.label}
+                  title={n.id === "reports" ? "Báo cáo: lọc số liệu, xem biểu đồ và xuất Excel/PDF" : n.label}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
                     padding: collapsed ? "12px" : "12px", borderRadius: R.md,
@@ -152,7 +153,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
                     justifyContent: collapsed ? "center" : "flex-start",
                   }}
                 >
-                  <Icon size={19} color={active ? C.pink : C.plumSoft} strokeWidth={2.2} />
+                  <Icon size={19} color={active ? C.pink : C.plumSoft} strokeWidth={2.2} aria-hidden="true" />
                   {!collapsed && n.label}
                 </button>
               );
@@ -216,7 +217,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
             <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
               {/* nowrap + đệm ngang hẹp: sidebar nay là 248px thay vì 266px,
                   và ở bề ngang đó nhãn "Mật khẩu" bị bẻ xuống hai dòng. */}
-              <button onClick={onChangePw} style={{
+              <button onClick={onChangePw} title="Đổi mật khẩu và thiết lập xác thực hai lớp" style={{
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 padding: "9px 4px", borderRadius: R.sm, border: "none", cursor: "pointer",
                 whiteSpace: "nowrap",
@@ -384,7 +385,7 @@ function MobileDrawer({ open, view, setView, user, access, onDismiss, onActionCl
           <div className="vmp-mobile-drawer-preferences">
             <ThemeToggle />
           </div>
-          <button type="button" onClick={() => { onChangePw(); onActionClose(); }} className="vmp-mobile-drawer-account-action">
+          <button type="button" title="Đổi mật khẩu và thiết lập xác thực hai lớp" onClick={() => { onChangePw(); onActionClose(); }} className="vmp-mobile-drawer-account-action">
             <KeyRound size={15} /> Mật khẩu
           </button>
           <button type="button" onClick={() => { onActionClose(); onLogout(); }} className="vmp-mobile-drawer-account-action is-logout">

@@ -643,7 +643,7 @@ export function SkeletonPulse({ w = "100%", h = 16, r = 8 }: {
   return (
     <div style={{
       width: w, height: h, borderRadius: r,
-      background: `linear-gradient(90deg, ${C.pinkSoft} 25%, #fff 50%, ${C.pinkSoft} 75%)`,
+      background: `linear-gradient(90deg, ${C.pinkSoft} 25%, ${C.surface} 50%, ${C.pinkSoft} 75%)`,
       backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite",
     }} />
   );
@@ -652,6 +652,7 @@ export function SkeletonPulse({ w = "100%", h = 16, r = 8 }: {
 export function SkeletonDashboard() {
   return (
     <div data-desktop-skeleton style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0" }}>
+      <p role="status" style={{ margin: 0, color: C.plumSoft, fontSize: "0.875rem" }}>Đang tải nội dung…</p>
       <Card variant="strong" style={{ display: "flex", alignItems: "center", gap: 18, padding: 24 }}>
         <SkeletonPulse w={100} h={100} r={999} />
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>

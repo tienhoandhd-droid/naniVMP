@@ -7,6 +7,7 @@ import { useState } from "react";
 import { KeyRound, CheckCircle2, XCircle } from "lucide-react";
 import { C, TEXT, R, btnPrimary } from "../../constants/theme.ts";
 import ViewportDialog from "../ui/ViewportDialog.tsx";
+import MfaSettings from "./MfaSettings.tsx";
 import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import { isSupabaseConfigured, changePassword, datLaiMatKhauKhoiPhuc } from "../../lib/supabaseClient.ts";
 import {
@@ -23,6 +24,7 @@ export default function ChangePwModal({ onClose, recovery = false }: { onClose: 
   const [loiO, setLoiO] = useState<ChangePasswordErrors>({});
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [loading, setLoading] = useState(false);
+  const [showMfa, setShowMfa] = useState(false);
 
   const submit = async () => {
     const loi = validateChangePassword({ cu, moi, nhacLai }, { recovery });
@@ -106,6 +108,10 @@ export default function ChangePwModal({ onClose, recovery = false }: { onClose: 
             {msg.type === "ok" ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {msg.text}
           </div>
         )}
+        {!recovery && <details onToggle={(event) => setShowMfa(event.currentTarget.open)}>
+          <summary style={{ cursor: "pointer", paddingBlock: 12, fontWeight: 700 }}>Xác thực hai lớp</summary>
+          {showMfa && <MfaSettings />}
+        </details>}
       </div>
     </ViewportDialog>
   );

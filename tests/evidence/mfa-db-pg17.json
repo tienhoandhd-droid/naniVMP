@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "engine": "PostgreSQL 17",
+  "status": "passed",
+  "scope": "disposable restored database only",
+  "files": {
+    "supabase/migrations/20260929160000_opt_in_mfa_guard.sql": "2317dbe328162507799f70f3ab2e4b3ecf0e8c3f00dce4c00997919b960c7737",
+    "tests/sql/mfa-session-guard.sql": "0cc1cabe1f76d0b86d0e8d1db7da6616ce964a0ec392976d675fcd3bde36f532"
+  },
+  "sqlOutputSha256": "84ea05afa312bfc68e647748094de9ede31a4a6c323a74dc247f41e64aef8432",
+  "postgrest": {
+    "postgrest": "v14.16",
+    "clone": "pq_release_finish_20260929",
+    "checks": [
+      {
+        "case": "unenrolled aal1 RPC",
+        "status": 200
+      },
+      {
+        "case": "enrolled aal1 /rpc/cpc1_context",
+        "status": 403,
+        "code": "PT403"
+      },
+      {
+        "case": "enrolled aal1 /rpc/rpc_my_ui_access",
+        "status": 403,
+        "code": "PT403"
+      },
+      {
+        "case": "enrolled aal1 /profiles",
+        "status": 403,
+        "code": "PT403"
+      },
+      {
+        "case": "enrolled aal2 RPC",
+        "status": 200
+      },
+      {
+        "case": "anon existing denial",
+        "status": 401
+      },
+      {
+        "case": "service existing grants retained",
+        "status": 403
+      }
+    ],
+    "productionWrites": 0
+  },
+  "storage": {
+    "image": "public.ecr.aws/supabase/storage-api:v1.68.10",
+    "checks": [
+      {
+        "case": "unenrolled signed URL",
+        "status": 200
+      },
+      {
+        "case": "enrolled aal1 no signed URL",
+        "status": 400
+      },
+      {
+        "case": "enrolled aal2 signed URL",
+        "status": 200
+      }
+    ],
+    "productionWrites": 0,
+    "signedUrlsNotLogged": true
+  }
+}

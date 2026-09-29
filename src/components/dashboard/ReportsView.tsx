@@ -450,11 +450,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               cạnh con số mà nó đổi. */}
           <div>
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Năm báo cáo</div>
-            <Sel val={String(ky.year)} set={(v) => setKy((k) => ({ ...k, year: Number(v) }))} opts={namOptions} />
+            <Sel val={String(ky.year)} set={(v) => setKy((k) => ({ ...k, year: Number(v) }))} opts={namOptions} nhan="Năm báo cáo" />
           </div>
           <div>
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Phạm vi (bộ phận)</div>
-            <Sel val={deptScope} set={setDeptScope} opts={[{ v: "all", l: "Toàn nhà máy" }, ...DEPTS.map((d) => ({ v: d.id, l: d.name }))]} />
+            <Sel val={deptScope} set={setDeptScope} opts={[{ v: "all", l: "Toàn nhà máy" }, ...DEPTS.map((d) => ({ v: d.id, l: d.name }))]} nhan="Phạm vi bộ phận" />
           </div>
           <div>
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, marginBottom: 9 }}>Khu vực</div>
@@ -468,12 +468,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             {/* #6 (01/09): MỘT primary — Excel là bản mọi người thật sự nộp
                 (đủ 5 sheet); PDF/HTML là phụ, cùng một kiểu ghost để không
                 tranh nhau bằng ba màu ba kiểu như trước. */}
-            <button type="button" data-desktop-primary-actionable onClick={() => void exportExcel()} disabled={exporting} style={toolBtn(GRAD, "#fff")}><Download size={16} /> {exporting ? "Đang xuất Excel…" : "Xuất Excel (đủ 5 sheet)"}</button>
-            <button type="button" onClick={printPDF} disabled={printing} style={ghostBtn}><Printer size={16} /> {printing ? "Đang mở hộp in…" : "PDF"}</button>
-            <button type="button" onClick={downloadHtml} style={ghostBtn}><Download size={16} /> HTML</button>
+            <button type="button" data-desktop-primary-actionable onClick={() => void exportExcel()} disabled={exporting}
+              aria-label="Xuất Excel đầy đủ 5 sheet" aria-busy={exporting} title="Tải bảng tính Excel gồm đủ 5 sheet" style={toolBtn(GRAD, "#fff")}><Download size={16} /> {exporting ? "Đang xuất Excel…" : "Xuất Excel (đủ 5 sheet)"}</button>
+            <button type="button" onClick={printPDF} disabled={printing}
+              aria-label="In báo cáo dưới dạng PDF" aria-busy={printing} title="Mở hộp in để lưu báo cáo PDF" style={ghostBtn}><Printer size={16} /> {printing ? "Đang mở hộp in…" : "PDF"}</button>
+            <button type="button" onClick={downloadHtml}
+              aria-label="Tải báo cáo HTML" aria-busy="false" title="Tải bản báo cáo HTML để mở trong trình duyệt" style={ghostBtn}><Download size={16} /> HTML</button>
           </div>
         </div>
-        <div style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
+        <div role="status" aria-label="Phạm vi báo cáo đang xem" style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
           Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b>.
           {" "}Mục 1 tính trên <b style={{ color: C.plum }}>{scopedNamActive.length}</b> hạng mục có mốc đích VMP trong năm {ky.year};
           mục 2 trở xuống tính trên <b style={{ color: C.plum }}>{scopedKyActive.length}</b> hạng mục của <b style={{ color: C.plum }}>{kyLabel}</b>.
@@ -482,6 +485,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           {soChuaCoMoc > 0 && (
             <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục chưa có mốc đích VMP nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
           )}
+          {" "}Chọn một số có gạch chân trong bảng giai đoạn để xem danh sách; các nút Xuất tạo tệp theo đúng phạm vi này.
         </div>
 
         {/* Đây là nơi người dùng hay nhầm "báo cáo sai số" nhất: số ở màn Báo
@@ -585,12 +589,17 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             <thead><tr><th scope="col">Giai đoạn</th><th scope="col" className="reg-num">Số hạng mục</th></tr></thead>
             <tbody>
               {ytdNam.byStage.map((s) => (
-                <tr key={s.id} className={s.count ? "vmp-row" : undefined}
-                  role={s.count ? "button" : undefined}
-                  onClick={s.count ? () => moChiTiet(`${s.label} · năm ${ky.year}`, scopedNamActive.filter((a) => stageOf(a) === s.id)) : undefined}
-                  style={{ cursor: s.count ? "pointer" : "default" }}>
-                  <td>{s.label}{s.count > 0 && <span className="reg-muted"> · bấm để xem</span>}</td>
-                  <td className="reg-num">{s.count}</td>
+                <tr key={s.id} className={s.count ? "vmp-row" : undefined}>
+                  <td>{s.label}</td>
+                  <td className="reg-num">{s.count > 0 ? (
+                    <button type="button" data-report-stage-drilldown=""
+                      aria-label={`Xem ${s.count} hạng mục ở giai đoạn ${s.label}`}
+                      title={`Xem danh sách ${s.count} hạng mục ở giai đoạn ${s.label}`}
+                      onClick={() => moChiTiet(`${s.label} · năm ${ky.year}`, scopedNamActive.filter((a) => stageOf(a) === s.id))}
+                      style={{ font: "inherit", fontWeight: 800, color: C.plum, background: "transparent", border: 0, padding: "4px 0", minHeight: 44, cursor: "pointer", textDecoration: "underline" }}>
+                      {s.count}<span className="reg-muted"> · bấm để xem</span>
+                    </button>
+                  ) : s.count}</td>
                 </tr>
               ))}
             </tbody>
@@ -610,14 +619,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16,
           background: C.pinkMist, borderRadius: 14, padding: "11px 14px" }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginRight: 2 }}>Xem kỳ</span>
-          <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))}
+          <Sel val={ky.kind} set={(v) => setKy((k) => ({ ...k, kind: v as PeriodKind }))} nhan="Cách xem kỳ"
             opts={[{ v: "thang", l: "Theo tháng" }, { v: "quy", l: "Theo quý" }, { v: "nam", l: "Cả năm" }]} />
           {ky.kind === "thang" && (
-            <Sel val={String(ky.month)} set={(v) => setKy((k) => ({ ...k, month: Number(v), quarter: Math.ceil(Number(v) / 3) }))}
+            <Sel val={String(ky.month)} set={(v) => setKy((k) => ({ ...k, month: Number(v), quarter: Math.ceil(Number(v) / 3) }))} nhan="Tháng báo cáo"
               opts={Array.from({ length: 12 }, (_, i) => ({ v: String(i + 1), l: `Tháng ${i + 1}` }))} />
           )}
           {ky.kind === "quy" && (
-            <Sel val={String(ky.quarter)} set={(v) => setKy((k) => ({ ...k, quarter: Number(v), month: (Number(v) - 1) * 3 + 1 }))}
+            <Sel val={String(ky.quarter)} set={(v) => setKy((k) => ({ ...k, quarter: Number(v), month: (Number(v) - 1) * 3 + 1 }))} nhan="Quý báo cáo"
               opts={[1, 2, 3, 4].map((q) => ({ v: String(q), l: `Quý ${q}` }))} />
           )}
           {!laKyHienTai && (

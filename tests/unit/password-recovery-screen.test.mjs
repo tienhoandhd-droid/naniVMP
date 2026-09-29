@@ -23,7 +23,7 @@ test("recovery hợp lệ có hai trường mật khẩu mới và công bố y�
 
   assert.match(html, /Đặt mật khẩu mới/);
   assert.equal((html.match(/autoComplete="new-password"/g) || []).length, 2);
-  assert.match(html, /Tối thiểu 8 ký tự/);
+  assert.match(html, /Tối thiểu 12 ký tự/);
   assert.match(html, /Lưu mật khẩu mới/);
 });
 

@@ -8,7 +8,7 @@ async function readRepositoryFile(relativePath) {
 
 test("quản trị vai chỉ còn ở Vai trò & phạm vi", async () => {
   const page = await readRepositoryFile("src/pages/PhanQuyenPage.tsx");
-  const app = await readRepositoryFile("src/App.tsx");
+  const app = await readRepositoryFile("src/AuthenticatedApp.tsx");
 
   assert.match(page, /AccountAdministrationPanel/);
   assert.match(page, /canManageAccounts=\{duocQuanLyTaiKhoan\}/);
