@@ -24,7 +24,8 @@ export interface OrganicSwimState { agents: OrganicSwimAgent[]; time: number; ra
 // Water-side approach points beside the painted lotuses: upper-right flower
 // bed and lower-left bed, never the painted banks themselves.
 const FLOWERS = [{ x: 70, y: 37 }, { x: 78, y: 39 }, { x: 29, y: 66 }, { x: 32, y: 76 }];
-// Keep the 54×44px hit/sprite wrapper inside the smallest 312×156px pond.
+// Normalized swimming range. Paint projection also contains the 54×44px
+// wrapper when responsive layout leaves a pond smaller than 312×156px.
 const MIN_X = 10; const MAX_X = 90; const MIN_Y = 18; const MAX_Y = 82;
 const WATER = { x: 52, y: 55, radiusX: 42, radiusY: 32 };
 
@@ -202,4 +203,20 @@ export function stepOrganicSwim(state: OrganicSwimState, seconds: number, frozen
     agent.x = Math.max(MIN_X, Math.min(MAX_X, agent.x + agent.vx * dt));
     agent.y = Math.max(MIN_Y, Math.min(MAX_Y, agent.y + agent.vy * dt));
   }
+}
+
+
+/** Reproject the 54×44px wrapper when the responsive shell leaves a smaller
+ * pond. The simulation keeps its normalized course; only the rendered center
+ * is constrained. One pixel absorbs the paint transform's decimal rounding. */
+export function projectOrganicSwimAgent(
+  agent: Pick<OrganicSwimAgent, "x" | "y" | "homeX" | "homeY">,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const insetX = Math.min(28, width / 2);
+  const insetY = Math.min(23, height / 2);
+  const centerX = Math.max(insetX, Math.min(width - insetX, agent.x / 100 * width));
+  const centerY = Math.max(insetY, Math.min(height - insetY, agent.y / 100 * height));
+  return { x: centerX - agent.homeX / 100 * width, y: centerY - agent.homeY / 100 * height };
 }

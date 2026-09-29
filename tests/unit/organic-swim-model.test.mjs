@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createOrganicSwimState, importanceScale, stepOrganicSwim,
+  createOrganicSwimState, importanceScale, stepOrganicSwim, projectOrganicSwimAgent,
 } from "../../src/features/monitoring/organicSwimModel.ts";
 
 const fish = (id, crit = "TB", stage = "carp", placement = { xPct: 40, yPct: 52, rotateDeg: 0, scale: 1 }) => ({
@@ -83,4 +83,32 @@ test("long-running headings stay normalized and continue to follow travel direct
       assert.ok(angularDistance(agent.turn, velocityHeading) <= 70, "art heading continues to follow movement");
     }
   }
+});
+
+
+test("paint projection contains whole wrappers in the smaller mobile pond without mutating motion", () => {
+  for (const [width, height] of [[212, 106], [180, 90]]) {
+    for (const [x, y] of [[10, 18], [90, 82], [50, 50]]) {
+      const agent = { x, y, homeX: 45, homeY: 55 };
+      const before = { ...agent };
+      const projected = projectOrganicSwimAgent(agent, width, height);
+      const centerX = agent.homeX / 100 * width + Number(projected.x.toFixed(2));
+      const centerY = agent.homeY / 100 * height + Number(projected.y.toFixed(2));
+      assert.ok(centerX - 27 >= 0 && centerX + 27 <= width);
+      assert.ok(centerY - 22 >= 0 && centerY + 22 <= height);
+      assert.deepEqual(agent, before);
+    }
+  }
+});
+
+test("paint projection retains ordinary pond positions and reprojects after resize", () => {
+  const agent = { x: 90, y: 82, homeX: 40, homeY: 52 };
+  for (const [width, height] of [[312, 156], [900, 450]]) {
+    const projected = projectOrganicSwimAgent(agent, width, height);
+    assert.ok(Math.abs(projected.x - (agent.x - agent.homeX) / 100 * width) < 1e-9);
+    assert.ok(Math.abs(projected.y - (agent.y - agent.homeY) / 100 * height) < 1e-9);
+  }
+  const narrow = projectOrganicSwimAgent(agent, 212, 106);
+  assert.ok(narrow.x < (agent.x - agent.homeX) / 100 * 212);
+  assert.ok(narrow.y < (agent.y - agent.homeY) / 100 * 106);
 });

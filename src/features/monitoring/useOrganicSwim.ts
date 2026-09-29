@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import {
   createOrganicSwimState,
+  projectOrganicSwimAgent,
   stepOrganicSwim,
   type OrganicSwimInput,
 } from "./organicSwimModel.ts";
@@ -97,8 +98,9 @@ export function useOrganicSwim({ active, canvas, fish }: OrganicSwimOptions) {
       for (const agent of swim.agents) {
         const node = nodes.current.get(agent.id);
         if (!node?.position || !node.heading) continue;
-        const x = ((agent.x - agent.homeX) / 100 * bounds.current.width).toFixed(2);
-        const y = ((agent.y - agent.homeY) / 100 * bounds.current.height).toFixed(2);
+        const projected = projectOrganicSwimAgent(agent, bounds.current.width, bounds.current.height);
+        const x = projected.x.toFixed(2);
+        const y = projected.y.toFixed(2);
         node.position.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
         // Atlas fish are side-on and face right. Mirror a leftward course and
         // use only a modest tilt for vertical travel, never a belly-up sprite.
