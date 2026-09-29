@@ -328,6 +328,9 @@ async function openPersona(persona, { quick = false } = {}) {
     {},
     persona.mode,
   );
+  // ViewportDialog schedules initial focus on an animation frame. Wait for
+  // that handoff before page.type can focus the required reason textarea.
+  await page.waitForFunction(() => document.activeElement?.closest('[role="dialog"]'));
 }
 
 async function controlState() {
@@ -472,8 +475,21 @@ try {
     input?.dispatchEvent(new Event("change", { bubbles: true }));
   }, WORKSHOP_DATE);
   await page.type("textarea", "Xưởng ghi nhận ngày thẩm định thực tế");
-  await page.waitForFunction(() => [...document.querySelectorAll("button")]
-    .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  try {
+    await page.waitForFunction(() => [...document.querySelectorAll("button")]
+      .some((button) => /^Lưu 1 thay đổi$/.test(button.textContent?.trim() || "") && !button.disabled));
+  } catch (cause) {
+    const state = await page.evaluate(() => ({
+      dialog: document.querySelector('[role="dialog"]')?.innerText,
+      dates: [...document.querySelectorAll('input[type="date"]')].map((node) => node.value),
+      reason: document.querySelector("textarea")?.value,
+      active: document.activeElement?.id,
+      save: [...document.querySelectorAll("button")]
+        .filter((node) => /Lưu/.test(node.textContent || ""))
+        .map((node) => ({ text: node.textContent, disabled: node.disabled })),
+    }));
+    throw new Error(`Workshop input diagnostic: ${JSON.stringify(state)}`, { cause });
+  }
   const workshopUpdateStart = updateBodies.length;
   updateShouldFail = true;
   await page.evaluate(() => [...document.querySelectorAll("button")]
