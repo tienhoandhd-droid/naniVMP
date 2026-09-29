@@ -1109,7 +1109,7 @@ export async function setItemPerformer(
   return unwrap(data, error, "Gán người thực hiện thất bại");
 }
 
-/** Gán bằng khóa danh bạ ổn định; tên chỉ còn là dữ liệu hiển thị legacy. */
+/** Gán người thực hiện riêng cho mã thẩm định bằng UUID; không thay quyền QA. */
 export async function setItemPerformerById(
   validationCode: string,
   personId: string | null,

@@ -22,10 +22,10 @@
  * ===================================================================== */
 import type { Activity, VmpObject } from "../types/domain.ts";
 
-const KEY = "vmp_snapshot_v3";
-const LEGACY_KEYS = ["vmp_snapshot_v1", "vmp_snapshot_v2"] as const;
+const KEY = "vmp_snapshot_v4";
+const LEGACY_KEYS = ["vmp_snapshot_v1", "vmp_snapshot_v2", "vmp_snapshot_v3"] as const;
 /** Tăng số này mỗi khi hình dạng Activity/VmpObject đổi. */
-const VERSION = 3;
+const VERSION = 4;
 const TTL_MS = 24 * 60 * 60 * 1000;
 
 export type SnapshotPermissionMode = "preview" | "enforced";

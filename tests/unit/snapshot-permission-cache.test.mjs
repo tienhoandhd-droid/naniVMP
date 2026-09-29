@@ -62,13 +62,13 @@ test("cache phiên bản cũ bị dọn để không giữ dữ liệu trước 
 test("snapshot thiếu hoặc sai revision dương bị dọn và không bao giờ hiển thị", async () => {
   const { loadSnapshot } = await import("../../src/lib/snapshotCache.ts");
   const base = {
-    v: 3, year: 2026, userId: "user-a", mode: "preview", at: Date.now(),
+    v: 4, year: 2026, userId: "user-a", mode: "preview", at: Date.now(),
     objects: [object], activities: [activity],
   };
   for (const authorizationRevision of [undefined, null, 0, -1, 1.5, "7"]) {
-    localStorage.setItem("vmp_snapshot_v3", JSON.stringify({ ...base, authorizationRevision }));
+    localStorage.setItem("vmp_snapshot_v4", JSON.stringify({ ...base, authorizationRevision }));
     assert.equal(loadSnapshot(2026, "user-a", "preview", 7), null);
-    assert.equal(localStorage.getItem("vmp_snapshot_v3"), null);
+    assert.equal(localStorage.getItem("vmp_snapshot_v4"), null);
   }
 });
 
@@ -105,4 +105,14 @@ test("chưa xác minh quyền thì không nạp snapshot hoặc nguồn dự ph�
     bypassWatermark: true,
     revokeBeforeFetch: true,
   });
+});
+
+test("snapshot v3 Source owner is discarded after per-item execution migration", async () => {
+  const { loadSnapshot } = await import("../../src/lib/snapshotCache.ts");
+  localStorage.setItem("vmp_snapshot_v3", JSON.stringify({
+    v: 3, year: 2026, userId: "user-a", mode: "preview", at: Date.now(),
+    authorizationRevision: 7, objects: [object], activities: [activity],
+  }));
+  assert.equal(loadSnapshot(2026, "user-a", "preview", 7), null);
+  assert.equal(localStorage.getItem("vmp_snapshot_v3"), null);
 });

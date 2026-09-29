@@ -94,7 +94,7 @@ test("Today content presents four queues, reason badges, safe CTA, and accordion
   assert.match(html, /Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật/);
   assert.match(html, /Đến hạn trong 7 ngày/);
   assert.match(html, /Chưa lên lịch/);
-  assert.match(html, /QA phụ trách/);
+  assert.match(html, /Người thực hiện/);
   assert.doesNotMatch(html, /Phụ trách · Bộ phận/);
   assert.match(html, /class="hn-muc__nguoi"><b>Chưa phân công QA<\/b><\/span>/);
   const ownerCells = html.match(/<span class="hn-muc__nguoi">[\s\S]*?<\/span>/g) ?? [];

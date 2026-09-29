@@ -42,7 +42,7 @@ const staffAccess = {
 function activity(ownerPersonId, ownerName) {
   return {
     id: CODE,
-    code: CODE,
+    code: "TB-WORKLOAD-E2E",
     obj: "TB-WORKLOAD-E2E",
     name: "Nồi hấp Workload E2E",
     type: "PQ",
@@ -80,6 +80,7 @@ async function openPage(browser, { user, access, calls, state }) {
     mangNghiemNgat: true,
     previewOrigin: APP_URL,
     suaKho(kho) {
+      kho.rpc_errors = { rpc_get_vmp_dashboard_v2: { status: 404, code: "PGRST202", message: "Could not find the function public.rpc_get_vmp_dashboard_v2 in the schema cache" } };
       kho.vmp_performers = [
         {
           id: OLD_PERSON, performer_name: "Nguyễn QA cũ", email: "qa.cu@vi-du.test",
@@ -197,7 +198,7 @@ try {
   assert.deepEqual(staff.chanNgoai, [], "luồng QA staff không được gọi mạng ngoài");
   await staff.page.close();
 
-  console.log("✓ Workload chuyển đúng Source owner cho Quản lý QA và ẩn với QA staff");
+  console.log("✓ Workload chuyển đúng người thực hiện theo mã cho Quản lý QA và ẩn với QA staff");
 } finally {
   await browser.close();
 }

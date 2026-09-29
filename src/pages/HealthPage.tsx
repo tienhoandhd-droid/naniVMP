@@ -151,7 +151,7 @@ function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered,
         <strong>Hai bộ kiểm tra chất lượng dữ liệu</strong>
         <p>Bản đang xem: <b data-health-client-issues>{clientReady ? issueCount : "Chưa tải được"}</b> cảnh báo · Máy chủ: <b data-health-server-issues>{soLoiServer ?? "Chưa tải được"}</b> cảnh báo.</p>
         <p style={{fontSize:13,lineHeight:1.7}}>Hai nguồn dùng quy tắc khác nhau, nên không lấy hiệu hai số để kết luận thiếu lỗi hoặc sai đồng bộ. Một hạng mục có thể có nhiều cảnh báo. Mở từng tab để xem loại cảnh báo và cách xử lý.</p>
-        <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>Nếu nguồn không cung cấp trường email QA, bản đang xem chưa thể kiểm tra trường đó; không tự kết luận nhân sự thiếu email.</p>
+        <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>Nếu nguồn không cung cấp email người thực hiện, bản đang xem chưa thể kiểm tra trường đó; không tự kết luận nhân sự thiếu email.</p>
       </div>
       {kpi?.updated_at && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
@@ -474,7 +474,7 @@ export function MismatchView({ acts }: { acts: Activity[] }) {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: C.plum }}>{a.name}</div>
                   <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-                    {a.id} · {a.vtype} · QA: {a.owner} · Deadline: {a.target || "—"}
+                    {a.id} · {a.vtype} · Người thực hiện: {a.owner} · Deadline: {a.target || "—"}
                   </div>
                 </div>
                 <Tag color={C.marigoldText} bg={C.marigoldSoft}>Lệch pha</Tag>

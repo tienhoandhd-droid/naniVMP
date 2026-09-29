@@ -199,7 +199,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       test: (a: PlanActivity) => !a.target,
     },
     no_owner: {
-      label: "Chưa phân công QA",
+      label: "Chưa có người thực hiện",
       hint: "Không phân công thì không ai theo",
       test: (a: PlanActivity) => !a.owner || a.owner === "—",
     },
@@ -448,7 +448,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
             <div className="pr-loc__tim">
               <Search size={16} color={C.plumSoft} className="pr-loc__kinh" aria-hidden="true" />
               <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setPinnedValidationCode(null); }}
-                placeholder="Tìm theo mã, tên, QA…" aria-label="Tìm theo mã, tên, QA" style={{ ...INP, minHeight: undefined, paddingLeft: 36 }} />
+                placeholder="Tìm theo mã, tên, người thực hiện…" aria-label="Tìm theo mã, tên, người thực hiện" style={{ ...INP, minHeight: undefined, paddingLeft: 36 }} />
             </div>
             <div className="pr-loc__nhanh" role="group" aria-label="Lọc nhanh tiến độ">
               {chipLoi("can_xu_ly", FIXES.can_xu_ly, "Cần xử lý", "Chỉ hiện hạng mục cần xử lý")}
@@ -522,7 +522,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         <div className="vmp-scroll" style={{ overflowX: "auto" }}>
           <table className="pr-table" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
             <thead><tr>
-              {["Hạng mục", "Loại", "QA", "Mốc & hạn", "Trạng thái", "Cập nhật"].map((h, i) => (
+              {["Hạng mục", "Loại", "Người thực hiện", "Mốc & hạn", "Trạng thái", "Cập nhật"].map((h, i) => (
                 <th key={h} scope="col" className={i > 3 ? "pr-th pr-th--giua" : "pr-th"}>{h}</th>
               ))}
             </tr></thead>

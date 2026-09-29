@@ -106,7 +106,7 @@ export function CatalogMilestonesTable({ items, dupYears, readOnly, onQuickDone,
     <table className="catalog-milestones" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
       <caption className="lp-visually-hidden">Mốc tiến độ theo lần thẩm định</caption>
       <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
-        {["Năm", "ID", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "QA", "Chung", "Thao tác"].map((h, i) => <th key={i} scope="col" style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+        {["Năm", "ID", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "Người thực hiện", "Chung", "Thao tác"].map((h, i) => <th key={i} scope="col" style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
       </tr></thead>
       <tbody>
         {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (

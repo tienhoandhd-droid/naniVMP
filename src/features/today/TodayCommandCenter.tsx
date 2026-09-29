@@ -174,7 +174,7 @@ function TodayQueueSection({ section, rows, expandedCode, onToggle, onOpenProgre
   return <section className={`hn-nhom hn-nhom--${section} lp-tone--${meta.tone}`}>
     <h2 className="hn-nhom__ten">{meta.label} <span className="hn-nhom__dem">{rows.length}</span><span className="hn-nhom__phu">xếp theo hạn, mức độ quan trọng và quyền cập nhật</span></h2>
     {/* Hàng tiêu đề cột (đúng bản thiết kế) — chỉ để nhìn, bảng thật vẫn là danh sách có nút. */}
-    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>QA phụ trách</span><span>Trễ</span><span></span></div>
+    <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>Người thực hiện</span><span>Trễ</span><span></span></div>
     <ul className="hn-ds" aria-label={meta.label}>{rows.map((row) => <TodayQueueRow key={row.validationCode} row={row}
       expanded={expandedCode === row.validationCode} onToggle={() => onToggle(row.validationCode)} onOpenProgress={onOpenProgress} />)}</ul>
   </section>;

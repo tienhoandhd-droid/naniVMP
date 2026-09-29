@@ -439,8 +439,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
 
     if (!saveCoordinator.current.begin()) return;
     try {
-    // Người thực hiện lưu riêng: nó nằm ở ĐỐI TƯỢNG chứ không ở hạng mục
-    // (owner_name của hạng mục bị đồng bộ Sheet ghi đè mỗi lần chạy).
+    // Người thực hiện lưu riêng cho đúng mã thẩm định; không đổi quyền QA.
     if (whoChanged) {
       if (performerPersonId && !selectedPerformer) {
         setErr("Người được chọn không còn hoạt động hoặc không tồn tại. Hãy chọn lại từ danh bạ.");
@@ -649,7 +648,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       )}>
       <div style={{ background: C.lavSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16 }}>
         <div style={{ fontWeight: 800, color: C.plum, fontSize: 14 }}>{act.code} · {act.name}</div>
-        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {operationTarget.validationCode} · QA: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
+        <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>{txt(act.vtype)} · ID: {operationTarget.validationCode} · Người thực hiện: {nguoiPhuTrach(act.owner)}{act.score != null ? ` · Trọng yếu: ${act.score}/9` : ""}{act.effort != null ? ` · ${act.effort} ngày công` : ""}</div>
       </div>
       <div style={{
         background: permissionLoading ? C.marigoldSoft : isEnforced ? C.lavSoft : C.mintSoft,
@@ -736,7 +735,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
                 : ownerPersonIdNow && performerPersonId === ownerPersonIdNow
                   ? <b style={{ color: C.raspText }}>Liên kết hiện tại không còn trong danh sách người đang hoạt động — hãy chọn lại.</b>
                   : "Chưa phân công. Liên hệ quản trị viên để cập nhật hồ sơ nhân sự."}
-              {whoChanged && <> · Áp dụng cho <b>mọi hạng mục của đối tượng {act.code}</b> (phân công lưu ở đối tượng nên không bị đồng bộ Sheet xoá).</>}
+              {whoChanged && <> · Áp dụng cho <b>mã {operationTarget.validationCode}</b>. Quyền truy cập được quản lý riêng.</>}
             </span>
           </>
         ) : (

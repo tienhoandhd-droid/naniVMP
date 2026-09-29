@@ -519,7 +519,7 @@
   .hn-muc__moc::before,
   .hn-muc__nguoi::before { margin-right: 5px; color: var(--lp-ink-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
   .hn-muc__moc::before { content: "Mốc"; }
-  .hn-muc__nguoi::before { content: "QA"; }
+  .hn-muc__nguoi::before { content: "Người thực hiện"; }
   .hn-muc__tre { min-height: 30px; }
   .hn-muc__nut { width: 100%; min-height: 44px; justify-self: stretch; }
 }

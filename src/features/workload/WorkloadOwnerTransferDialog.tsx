@@ -14,6 +14,7 @@ import {
   resolvePerformerChoice,
   type PerformerSourceRow,
 } from "../itemPermissions/performerSelection.ts";
+import { progressValidationCode } from "../progress/editableProgressRights.ts";
 import { prepareWorkloadOwnerTransfer } from "./workloadOwnerTransferModel.ts";
 
 interface WorkloadOwnerTransferDialogProps {
@@ -57,7 +58,7 @@ export default function WorkloadOwnerTransferDialog({
   const submit = async () => {
     if (savingRef.current) return;
     const prepared = prepareWorkloadOwnerTransfer({
-      validationCode: activity.code,
+      validationCode: progressValidationCode(activity),
       currentPersonId,
       nextPersonId,
       currentName: String(activity.owner || ""),
@@ -109,7 +110,7 @@ export default function WorkloadOwnerTransferDialog({
     <ViewportDialog
       open
       title="Chuyển phụ trách"
-      description="Thay đổi này được ghi vào Dữ liệu nguồn rồi đồng bộ xuống các hạng mục liên quan."
+      description="Đổi người thực hiện riêng cho mã thẩm định này."
       icon={UserRoundCog}
       maxWidth={520}
       dismissDisabled={saving}
@@ -132,7 +133,7 @@ export default function WorkloadOwnerTransferDialog({
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 16px",
           padding: 14, borderRadius: 14, background: C.surfaceSunk, border: `1px solid ${C.line}` }}>
           <span style={{ color: C.plumSoft, fontSize: 12, fontWeight: 700 }}>Hạng mục</span>
-          <b style={{ color: C.plum, fontSize: 13 }}>{activity.code}</b>
+          <b style={{ color: C.plum, fontSize: 13 }}>{progressValidationCode(activity)}</b>
           <span style={{ color: C.plumSoft, fontSize: 12, fontWeight: 700 }}>Hiện tại</span>
           <b style={{ color: C.plum, fontSize: 13 }}>{activity.owner || "Chưa phân công"}</b>
         </div>
@@ -161,7 +162,7 @@ export default function WorkloadOwnerTransferDialog({
         </div>
 
         <p id="workload-owner-help" style={{ margin: 0, color: C.plumSoft, fontSize: 12, lineHeight: 1.55 }}>
-          Chỉ thay QA phụ trách chính. Người hỗ trợ, deadline và tiến độ giữ nguyên.
+          Người hỗ trợ, hạn công việc và tiến độ giữ nguyên. Quyền truy cập được quản lý riêng.
         </p>
         {choices.length === 0 && (
           <p role="status" style={{ margin: 0, color: C.marigoldText, fontSize: 13, fontWeight: 700 }}>
