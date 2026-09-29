@@ -36,6 +36,7 @@ test("topbar wordmark uses an accessible Art Nouveau masthead structure", () => 
   assert.match(layout, /<VmpMasthead \/>/);
   const shell = source("src/styles/lotus-shell.css");
 
+  assert.match(mark, /className="vmp-masthead" role="img" aria-label="VMP Monitor/);
   assert.match(mark, /className="vmp-masthead__ten" aria-hidden="true"/);
   assert.match(mark, /className="vmp-masthead__v"/);
   assert.match(mark, /className="vmp-masthead__mp"/);

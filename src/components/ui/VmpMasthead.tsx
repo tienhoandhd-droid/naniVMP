@@ -1,5 +1,5 @@
 export default function VmpMasthead() {
-  return <div className="vmp-masthead" aria-label="VMP Monitor · Hệ giám sát thẩm định">
+  return <div className="vmp-masthead" role="img" aria-label="VMP Monitor · Hệ giám sát thẩm định">
     <span className="vmp-masthead__ten" aria-hidden="true">
       <span className="vmp-masthead__v">V</span>
       <span className="vmp-masthead__mp">MP</span>
