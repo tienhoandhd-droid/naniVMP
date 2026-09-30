@@ -25,3 +25,7 @@ Keep CPC1BoxStats type7/1.5IQR, saved snapshot decimal precision, official verdi
 ## Evidence and delivery
 
 Add meaningful RED/GREEN coverage for deterministic non-occluding dots, clear box/point separation, vertically aligned full-width plots, common versus segmented captions, real-sized 17-location/multiple-trial and duplicate scenarios, exact-value tooltip focus/touch/Escape, responsive axes and unchanged verdict/source contracts. Reuse targeted three-system E2E/axe, typecheck/build/drift/budget. Independent reviewer examines implementation and screenshots. Build into a new private directory and replace only task-owned 4173 after verification. Keep a28f376 artifact as rollback. Update both PROJECT-STATE files and open the concrete local result for the user's review.
+
+## Final delivery steering
+
+The user subsequently requests completion and deployment onto their computer. Deliver an exact public-artifact Desktop package and trusted launcher shortcut, running on loopback4173 under the existing local authorization. No GitHub/production publication is implied by deployment onto the computer. Sampling codes use natural numerical order in both plots/statistics, without reordering source observations.

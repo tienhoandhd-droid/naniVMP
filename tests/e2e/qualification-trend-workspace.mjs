@@ -10,12 +10,14 @@ if(evidence)await mkdir(evidence,{recursive:true});
 const configs=JSON.parse(await readFile(root+'/tests/fixtures/qualification-config.json','utf8'));
 const fixture=`
 const configs=${JSON.stringify(configs)};
-const systems=['air','nitrogen','steam'],locations=['P1','P2','P3'].map(id=>({id,name:'Điểm '+id}));
 const variant=new URLSearchParams(location.search).get('fixture');
+const systems=['air','nitrogen','steam'],locations=Array.from({length:variant==='many-points'?17:3},(_,i)=>({id:'P'+(i+1),name:'Điểm lấy mẫu tại khu vực sản xuất '+(i+1)}));
 const settings=system=>system==='steam'?{...configs.settings,locations}:{...configs.gas_settings.find(c=>c.system===system).config,system,forms:[{id:'bm02',title:'Điểm sương',kind:'measurement',locations:locations.map(p=>({...p,limits:{dewpoint:variant==='segmented-equal-bound'&&p.id==='P3'?-20:variant==='different'&&p.id==='P2'?-12:-10}}))},{id:'bm01',title:'Tiểu phân',kind:'measurement',locations:locations.map(p=>({...p,limits:{p05:100}}))}]};
 const rows=(system,early=false)=>{
  const steam=system==='steam',form=steam?'bm03':'bm02',unit=steam?'D':'°C',label=steam?'Độ khô':'Điểm sương';
- const values=steam?[[.93,.94,.95,.96,.97,.98,.99,1.10],[.92,.93,.94,.95,.96,.97,.98,1.09],[.95]]:[[-22,-21,-20,-19,-18,-17,-16,-1],[-35,-34,-33,-32,-31,-30,-29,-18],[-20]];
+ let values=steam?[[.93,.94,.95,.96,.97,.98,.99,1.10],[.92,.93,.94,.95,.96,.97,.98,1.09],[.95]]:[[-22,-21,-20,-19,-18,-17,-16,-1],[-35,-34,-33,-32,-31,-30,-29,-18],[-20]];
+ if(variant==='many-points')values=locations.map((p,i)=>Array.from({length:3},(_,j)=>steam?.95+i*.001+j*.002:-22-(i%4)*3+j*.5));
+ if(variant==='duplicates')values[0]=Array(8).fill(steam?.95:-20);
  const out=values.flatMap((vals,i)=>vals.map((value,j)=>({form,metric:'result',unit,label,point_id:'P'+(i+1),trial:j+1,value:early?value+(steam?.001:-.01):value,source_value:String(value),computed_status:'pass'})));
  if(variant==='equal-bound'&&!steam){out.at(-1).value=-10;out.at(-1).source_value='-10';}
  out.push({...out.at(-1),trial:2,value:steam?.96:-21,uncertain:true},{...out.at(-1),trial:3,value:null,source_value:'Không đọc được'});
@@ -38,7 +40,7 @@ window.CPC1Backend={permissionsFor:system=>({can_view:!(variant==='restricted'&&
 document.body.dataset.qualificationGate='ready';`;
 new Function(fixture);
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||chromium.executablePath()});
-const context=await browser.newContext({viewport:{width:1440,height:1000}});
+const context=await browser.newContext({viewport:{width:1440,height:1000},hasTouch:true});
 const errors=[],writes=[],external=[];
 async function pageFor(system,extra=''){
  const page=await context.newPage();page.setDefaultTimeout(6000);page.on('pageerror',error=>errors.push(error.message));
@@ -75,12 +77,26 @@ try{
   assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P3] .box-median').count(),1);
   assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),2,'horizontal saved PQ limit on both plots');
   const domains=await page.locator('svg[data-chart]').evaluateAll(nodes=>nodes.map(n=>[n.dataset.yMin,n.dataset.yMax]));assert.deepEqual(domains[0],domains[1]);
-  const figures=await page.locator('.pq-figure').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {top:r.top,left:r.left,right:r.right};}));
-  assert.equal(Math.abs(figures[0].top-figures[1].top)<2,true,'desktop pair must share one row for comparison');
-  assert.equal(figures[0].right<=figures[1].left,true,'desktop Individual appears next to Boxplot');
+  const figures=await page.locator('.pq-figure').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right};}));
+  assert.equal(figures[1].top>=figures[0].bottom,true,'full-width chart rows are vertically aligned');
+  assert.equal(Math.abs(figures[0].left-figures[1].left)<1&&Math.abs(figures[0].right-figures[1].right)<1,true,'both plots share the full content width');
+  const guideX=await page.locator('svg[data-chart]').evaluateAll(nodes=>nodes.map(n=>[...n.querySelectorAll('.pq-point-guide')].map(g=>g.getAttribute('x1'))));assert.deepEqual(guideX[0],guideX[1],'category columns align across plots');
+  const separate=await page.locator('[data-chart=boxplot]').evaluate(chart=>[...chart.querySelectorAll('.box-summary[data-n="8"]')].every(box=>{const b=box.querySelector('.box-body').getBoundingClientRect();return [...chart.querySelectorAll('.box-value')].filter(n=>n.dataset.point===box.dataset.point).every(n=>n.getBoundingClientRect().left>b.right+1);}));assert.equal(separate,true,'original observations do not cover quartile boxes or medians');
   assert.equal(await page.locator('[data-chart=individual] .pq-value-label[data-point=P3]').textContent(),system==='steam'?'0,95':'-20','one-observation location exposes its value visibly');
   await page.locator('[data-chart=individual] .individual-value').first().focus();
   assert.match(await page.locator('#chart-inspection').textContent(),/P1.*lần 1/);
+  const tooltip=page.locator('.pq-tooltip:not([hidden])');await tooltip.waitFor();assert.match(await tooltip.textContent(),system==='steam'?/0\.93/:/-22/,'nearby tooltip preserves the raw saved value');
+  assert.match(await tooltip.textContent(),system==='steam'?/PQ đã lưu ≥ 0,94 D/:/PQ đã lưu ≤ -10 °C/,'observation tooltip states the saved criterion with direction and unit');
+  assert.match(await tooltip.textContent(),/Không thuộc ngoại lai IQR/,'ordinary observation has separate IQR status');
+  await page.locator('[data-chart=boxplot] .box-value').first().hover();assert.equal(await tooltip.count(),1,'only one observation tooltip is open across the pair');
+  await page.keyboard.press('Escape');assert.equal(await tooltip.count(),0,'Escape dismisses the nearby tooltip even when mouse and keyboard target different plots');
+  await page.locator('[data-chart=individual] .individual-value[data-point=P3]').scrollIntoViewIfNeeded();
+  const single=await page.locator('[data-chart=individual] .individual-value[data-point=P3]').boundingBox();await page.touchscreen.tap(single.x+single.width/2+18,single.y+single.height/2);await tooltip.waitFor();assert.match(await tooltip.textContent(),/P3.*lần 1/s,'chart touch selects a nearby observation without needing to hit its small dot');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-chart=boxplot] .box-value[data-point=P3]').scrollIntoViewIfNeeded();const boxSingle=await page.locator('[data-chart=boxplot] .box-value[data-point=P3]').boundingBox();await page.touchscreen.tap(boxSingle.x+boxSingle.width/2+18,boxSingle.y+boxSingle.height/2);await tooltip.waitFor();assert.match(await tooltip.textContent(),/P3.*lần 1/s,'touch near co-located singleton Boxplot glyph opens raw observation, not summary');assert.match(await tooltip.textContent(),/PQ đã lưu/);
+  await page.keyboard.press('Escape');
+  const boxSummary=page.locator('[data-chart=boxplot] .box-summary[data-point=P1]');await page.keyboard.press('Tab');await boxSummary.focus();await page.keyboard.press('Escape');
+  const boxFocus=await boxSummary.locator('.box-body').evaluate(n=>({strokeWidth:getComputedStyle(n).strokeWidth,filter:getComputedStyle(n).filter}));assert.equal(boxFocus.strokeWidth,'3px','focused summary has a visible child stroke after tooltip dismissal');assert.notEqual(boxFocus.filter,'none','focused summary has a visible focus halo');
   await page.locator('#trend-data-details summary').click();
   assert.equal(await page.locator('#trend-data tbody tr').count(),19,'all source rows remain including exclusions');
   assert.match(await page.locator('#trend-data tbody').textContent(),/Không đọc được/);
@@ -112,17 +128,23 @@ try{
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,theme+' '+width+' overflow');
    const limitReadable=await page.locator('.pq-figure').evaluateAll(figures=>figures.every(figure=>{const caption=figure.querySelector('.pq-rule-caption:not([hidden])'),tag=caption||figure.querySelector('.pq-limit-tag'),surface=caption?figure:figure.querySelector('.pq-chart-scroll');if(!tag)return false;const a=tag.getBoundingClientRect(),b=surface.getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1;}));
    assert.equal(limitReadable,true,theme+' '+width+' saved common PQ limit is fully readable without scrolling');
-   assert.equal(await page.locator('.pq-chart-scroll').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1)),true,'three short sampling codes fit the chart viewport at '+width);
+   if(width===1440)assert.equal(await page.locator('.pq-chart-scroll').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1)),true,'three sampling groups fit full desktop width');
    const axe=await new AxeBuilder({page}).include('#trend-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
    assert.deepEqual(axe.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,details:n.failureSummary}))})),[],system+' '+theme+' '+width+' axe');
    if(evidence){await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo(0,0);});await page.screenshot({path:evidence+'/'+system+'-'+theme+'-'+width+'.png',fullPage:true});}
   }
   await page.close();
  }
- for(const variant of ['different','unknown','pending','error','empty','restricted','mixed-unit','raw-precision','equal-bound','segmented-equal-bound']){
+ for(const variant of ['many-points','duplicates','different','unknown','pending','error','empty','restricted','mixed-unit','raw-precision','equal-bound','segmented-equal-bound']){
   const page=await pageFor('air','&fixture='+variant);
+  if(['many-points','duplicates'].includes(variant)){
+   await page.waitForFunction(()=>document.querySelector('#limit-source').textContent.includes('fixture-1'));
+   if(variant==='many-points'){assert.equal(await page.locator('#summary-points').textContent(),'17');assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),51);assert.equal(await page.locator('[data-chart=boxplot] .box-summary').count(),17);}
+   else{const spaced=await page.locator('[data-chart=individual]').evaluate(chart=>{const marks=[...chart.querySelectorAll('.individual-value[data-point=P1]')].map(n=>({x:Number(n.getAttribute('cx')),y:Number(n.getAttribute('cy'))}));return marks.length===8&&marks.every((a,i)=>marks.slice(i+1).every(b=>Math.hypot(a.x-b.x,a.y-b.y)>=10));});assert.equal(spaced,true,'eight equal saved values are individually visible');}
+   for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,variant+' '+width+' has no page overflow');if(width===1440&&variant==='many-points')assert.equal(await page.locator('.pq-chart-scroll').evaluateAll(ns=>ns.every(n=>n.scrollWidth<=n.clientWidth+1)),true,'17 short sampling IDs fit full desktop width');if(evidence)await page.locator('.pq-metric-card').screenshot({path:evidence+'/'+variant+'-'+width+'.png'});}
+  }
   if(variant==='segmented-equal-bound'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');await page.setViewportSize({width:320,height:950});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const collision=await page.locator('[data-chart=individual]').evaluate(chart=>{const a=chart.querySelector('.pq-value-label[data-point=P3]').getBoundingClientRect(),b=[...chart.querySelectorAll('.pq-limit-label')].find(n=>n.textContent==='≤ -20').getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});assert.equal(collision,false,'singleton at point-specific PQ boundary must not overlap the segment label');if(evidence)await page.locator('.pq-plots').screenshot({path:evidence+'/segmented-equal-bound-320.png'});}
-  if(variant==='equal-bound'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');const collision=await page.locator('[data-chart=individual]').evaluate(chart=>{const a=chart.querySelector('.pq-value-label[data-point=P3]').getBoundingClientRect(),b=chart.querySelector('.pq-limit-tag').getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});assert.equal(collision,false,'numeric value at saved PQ boundary must not collide with its rule label');}
+  if(variant==='equal-bound'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');const collision=await page.locator('.pq-figure').first().evaluate(figure=>{const a=figure.querySelector('.pq-value-label[data-point=P3]').getBoundingClientRect(),b=figure.querySelector('.pq-rule-caption').getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});assert.equal(collision,false,'numeric value at saved PQ boundary must not collide with its rule label');}
   if(variant==='mixed-unit'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-metric-card').count(),2,'same metric with different units gets separate pair');assert.equal(await page.locator('.pq-metric-card').nth(1).locator('.pq-limit').count(),0,'no limit borrowed for incompatible unit');assert.match(await page.locator('.pq-metric-card').nth(1).textContent(),/K/);}
   if(variant==='raw-precision'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='2');assert.match(await page.locator('[data-chart=individual] .individual-value').first().getAttribute('aria-label'),/-9\.999/,'plot and PQ decision use precise saved snapshot value');}
   if(variant==='different'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),0);assert.equal(await page.locator('.pq-limit[data-scope=point]').count(),6);}
