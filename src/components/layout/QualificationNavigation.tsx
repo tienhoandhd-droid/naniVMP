@@ -78,7 +78,7 @@ export function QualificationNavigation({
     return <a href={qualificationHref(target)} className="vmp-nav qualification-nav__collapsed" data-module="qualification"
       aria-current={isQualificationNavigationCurrent(target, qualificationTarget) ? "page" : undefined}
       aria-label="Thẩm định thực tế" title="Thẩm định thực tế" onClick={(event) => open(event, target)}>
-      <ClipboardCheck size={19} strokeWidth={2.2} aria-hidden="true" />
+      <ClipboardCheck size={19} strokeWidth={1.8} aria-hidden="true" />
     </a>;
   }
   return <section className="qualification-nav" data-nav-group="qualification" aria-label="Thẩm định thực tế">

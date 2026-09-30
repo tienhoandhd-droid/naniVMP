@@ -160,95 +160,76 @@
 .vq-brand__dong { display: flex; align-items: baseline; gap: 6px; line-height: 1; }
 .vq-brand__vq { font-family: var(--ff-display); font-size: 26px; font-weight: 600; color: var(--lp-plum); letter-spacing: 0.01em; }
 .vq-brand__gach { vertical-align: -5px; margin: 0 -1px; stroke: var(--lp-gold); }
-.vq-brand__team { font-family: var(--ff-display); font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lp-gold); }
+.vq-brand__team { font-family: var(--ff-display); font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lp-plum); }
 .vq-brand__tagline { margin-top: 3px; font-family: var(--ff-display); font-style: italic; font-size: 12.5px; font-weight: 500; color: var(--lp-plum); letter-spacing: 0.02em; white-space: nowrap; }
 .vq-brand__donvi { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-ink-muted); white-space: nowrap; }
 .vq-brand__donvi svg { flex: none; stroke: var(--lp-gold); fill: var(--lp-gold); }
 
-/* Sidebar dùng inline styles để giữ layout cũ. Các lớp dưới chỉ đổi lớp
- * hoàn thiện: ivory ấm cho nền, plum cho mục đang chọn và jade rất nhẹ cho
- * vùng tài khoản; không đổi nhãn, biểu tượng hay thứ tự điều hướng. */
+/* A quiet navigation surface; theme tokens keep both modes readable. */
 .vmp-sidebar {
-  background:
-    radial-gradient(280px 240px at 100% 0%, rgb(255 220 171 / .18), transparent 70%),
-    linear-gradient(180deg, #3b153d, #511e4d 52%, #2f1237) !important;
-  border-right-color: rgb(255 224 192 / .34) !important;
+  background: var(--lp-nav-surface) !important;
+  border-right-color: var(--lp-line) !important;
 }
 .vmp-sidebar .vmp-nav {
   position: relative;
   min-height: 44px;
   border: 1px solid transparent !important;
-  color: #fff6ed !important;
+  color: var(--lp-ink-muted) !important;
 }
 .vmp-sidebar .vmp-nav svg { color: inherit; stroke: currentColor; }
 .vmp-sidebar .vmp-nav[aria-current="page"] {
-  background: rgb(255 225 189 / .22) !important;
-  border-color: rgb(255 231 194 / .75) !important;
-  box-shadow: inset 4px 0 0 #ffdca5 !important;
-  color: #fff !important;
+  background: var(--lp-rose-soft) !important;
+  box-shadow: inset 2px 0 0 var(--lp-plum) !important;
+  color: var(--lp-plum) !important;
+  font-weight: 650;
 }
-.vmp-sidebar .vmp-nav[aria-current="page"] svg { color: #fff !important; stroke: #fff; }
 .vmp-sidebar .vmp-nav:not([aria-current="page"]):hover {
-  background: rgb(255 240 219 / .14) !important;
-  color: #fff !important;
+  background: var(--lp-rose-soft) !important;
+  color: var(--lp-plum) !important;
 }
-.vmp-sidebar .vmp-nav:not([aria-current="page"]):hover svg { color: #fff !important; }
-.vmp-sidebar .vmp-nav:focus-visible { outline: 3px solid #ffdca5; outline-offset: 3px; }
+.vmp-sidebar .vmp-nav:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: -2px; }
 .vmp-sidebar .vmp-nav-group-heading {
   margin: 14px 0 6px;
-  padding: 8px 12px !important;
-  border: 1px solid rgb(255 226 191 / .34);
-  border-radius: 9px;
-  background: rgb(20 5 30 / .32);
-  color: #ffe4bd !important;
+  padding: 8px 12px 4px !important;
+  color: var(--lp-ink-muted) !important;
   font-size: 12px !important;
-  letter-spacing: .12em !important;
+  font-weight: 600;
+  letter-spacing: .06em !important;
 }
-.vmp-sidebar .vq-brand__vq, .vmp-sidebar .vq-brand__tagline { color: #fff6ed; }
-.vmp-sidebar .vq-brand__donvi { color: #f9d9aa; }
-.vmp-sidebar .vmp-sidebar-preferences { background: rgb(255 240 219 / .14) !important; border-color: rgb(255 226 191 / .34) !important; }
-.vmp-sidebar .vmp-sidebar-preferences span { color: #fff6ed !important; }
 .qualification-nav { margin: 8px 0 12px; }
 .qualification-nav__system { margin-top: 4px; }
 .qualification-nav__system-toggle {
   width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid transparent;
   border-radius: 10px; background: transparent; color: var(--lp-ink); font: inherit; font-size: 14px;
-  font-weight: 800; text-align: left; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; text-align: left; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
 }
 .qualification-nav__system-toggle:hover, .qualification-nav__system-toggle[aria-expanded="true"] { background: var(--lp-nav-hover); }
 .qualification-nav__system-toggle:focus-visible { outline: 3px solid var(--lp-focus); outline-offset: 2px; }
 .qualification-nav__system-toggle svg { transition: transform .15s ease; }
 .qualification-nav__system-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 .qualification-nav__links { margin: 2px 0 6px 10px; padding-left: 8px; border-left: 1px solid var(--lp-line); }
-.qualification-nav__link { display: flex; align-items: center; min-height: 42px; padding: 8px 12px; border-radius: 10px; text-decoration: none; font-size: 13px; font-weight: 650; }
+.qualification-nav__link { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; border-radius: 10px; text-decoration: none; font-size: 13px; font-weight: 500; color: var(--lp-ink-muted); }
+.qualification-nav__link:hover, .qualification-nav__link[aria-current="page"] { background: var(--lp-rose-soft); color: var(--lp-plum); }
 .qualification-nav__collapsed { display: flex; justify-content: center; align-items: center; min-height: 44px; border-radius: 10px; }
 .qualification-nav-status { margin: 8px 4px; color: var(--lp-ink); font-size: 12px; line-height: 1.4; }
 .qualification-nav-status button { margin-top: 5px; border: 1px solid var(--lp-line); border-radius: 7px; background: transparent; color: inherit; font: inherit; font-weight: 800; cursor: pointer; }
 .qualification-nav-status button:focus-visible { outline: 3px solid var(--lp-focus); outline-offset: 2px; }
-.vmp-sidebar .qualification-nav__system-toggle { color: #fff6ed; }
-.vmp-sidebar .qualification-nav__system-toggle:hover, .vmp-sidebar .qualification-nav__system-toggle[aria-expanded="true"] { background: rgb(255 240 219 / .14); }
-.vmp-sidebar .qualification-nav__system-toggle:focus-visible { outline-color: #ffdca5; }
-.vmp-sidebar .qualification-nav__links { border-left-color: rgb(255 226 191 / .45); }
-.vmp-sidebar .qualification-nav-status { color: #ffe4bd; }
-.vmp-sidebar .qualification-nav-status button { border-color: rgb(255 226 191 / .6); color: #fff6ed; }
-.vmp-sidebar .qualification-nav-status button:focus-visible { outline-color: #ffdca5; }
+.vmp-sidebar .qualification-nav__system-toggle { color: var(--lp-ink-muted); }
+.vmp-sidebar .qualification-nav__system-toggle:hover, .vmp-sidebar .qualification-nav__system-toggle[aria-expanded="true"] { background: var(--lp-rose-soft); color: var(--lp-plum); }
 .vmp-mobile-drawer .vmp-nav-group-heading {
   margin: 12px 0 5px;
   padding: 7px 10px;
-  border: 1px solid var(--lp-line);
-  border-radius: 8px;
-  background: var(--lp-nav-hover);
-  color: var(--lp-ink);
+  color: var(--lp-ink-muted);
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .1em;
+  font-weight: 600;
+  letter-spacing: .06em;
 }
 .vmp-sidebar-preferences {
-  background: var(--lp-nav-hover) !important;
+  background: var(--lp-nav-surface) !important;
 }
 .vmp-sidebar-account__identity {
-  background: linear-gradient(145deg, var(--lp-surface), var(--lp-success-soft)) !important;
-  border-color: color-mix(in srgb, var(--lp-success) 28%, var(--lp-line)) !important;
+  background: var(--lp-surface) !important;
+  border-color: var(--lp-line) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

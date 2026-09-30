@@ -116,7 +116,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
           <div key={g.id}>
             {g.id === "analysis" && <QualificationNavigation collapsed={collapsed} systems={qualificationSystems} status={qualificationStatus} error={qualificationError} onRetry={onRetryQualification} onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} />}
             {!collapsed && (
-              <div className="vmp-nav-group-heading" style={{ fontSize: 12, color: C.plumSoft, letterSpacing: 1.4, fontWeight: 800, padding: "10px 12px 6px" }}>
+              <div className="vmp-nav-group-heading" style={{ fontSize: 12, color: C.plumSoft, letterSpacing: 1.4, fontWeight: 600, padding: "10px 12px 6px" }}>
                 {g.label}
               </div>
             )}
@@ -136,14 +136,14 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
                     padding: collapsed ? "12px" : "12px", borderRadius: R.md,
                     border: "none", cursor: "pointer", textAlign: "left",
                     fontFamily: TEXT, fontSize: 14, width: "100%",
-                    fontWeight: active ? 800 : 600,
+                    fontWeight: active ? 650 : 500,
                     color: active ? C.plum : C.plumSoft,
                     background: active ? C.pinkSoft : "transparent",
                     boxShadow: active ? `inset 3px 0 0 ${C.pink}` : "none",
                     justifyContent: collapsed ? "center" : "flex-start",
                   }}
                 >
-                  <Icon size={19} color={active ? C.pink : C.plumSoft} strokeWidth={2.2} aria-hidden="true" />
+                  <Icon size={19} color={active ? C.pink : C.plumSoft} strokeWidth={1.8} aria-hidden="true" />
                   {!collapsed && n.label}
                 </button>
               );
@@ -165,7 +165,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
             justifyContent: "space-between", gap: 12,
           }}
         >
-          <span style={{ color: C.plumSoft, fontSize: 12, fontWeight: 800, fontFamily: TEXT }}>
+          <span style={{ color: C.plumSoft, fontSize: 12, fontWeight: 500, fontFamily: TEXT }}>
             Giao diện
           </span>
           <ThemeToggle compact />

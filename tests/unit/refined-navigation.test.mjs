@@ -49,25 +49,9 @@ test("navigation has dedicated calm tokens in both themes", async () => {
   }
 });
 
-test("strong plum sidebar keeps readable selected and hover states while artwork stays subdued", async () => {
+// Computed sidebar contrast and focus are exercised by qualification-shell-navigation.mjs.
+test("background artwork stays subdued behind the content", async () => {
   const shell = await read("src/styles/lotus-shell.css");
-  const selected = shell.match(/\.vmp-sidebar \.vmp-nav\[aria-current="page"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-  const hover = shell.match(/\.vmp-sidebar \.vmp-nav:not\(\[aria-current="page"\]\):hover\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-
-  assert.match(selected, /box-shadow:\s*inset 4px/);
-  assert.match(selected, /color:\s*#fff/);
-  const overlay=(rule,background)=>{
-    const [,r,g,b,a]=rule.match(/background:\s*rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)/)||[];
-    assert.ok(a,'navigation overlay must have a measurable opacity');
-    const base=background.slice(1).match(/.{2}/g).map(v=>parseInt(v,16));
-    return '#'+[r,g,b].map((v,i)=>Math.round(Number(v)*Number(a)+base[i]*(1-Number(a))).toString(16).padStart(2,'0')).join('');
-  };
-  for(const base of ['#3b153d','#511e4d','#2f1237']){
-    assert.ok(shell.includes(base),'strong sidebar surface is present');
-    assert.ok(contrast('#fff6ed',base)>=4.5,'normal sidebar text contrast');
-    assert.ok(contrast('#ffffff',overlay(selected,base))>=4.5,'selected text contrast');
-    assert.ok(contrast('#ffffff',overlay(hover,base))>=4.5,'hover text contrast');
-  }
   assert.match(shell, /\.vmp-main-nen::before[\s\S]*?opacity:\s*0\.17;/);
   assert.match(shell, /\.vmp-main-nen::after[\s\S]*?opacity:\s*0\.08;/);
 });
