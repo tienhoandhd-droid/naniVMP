@@ -28,15 +28,16 @@
       <div class="summary-outside"><dt>Ngoài giới hạn</dt><dd id="summary-outside">—</dd></div>
       <div><dt>Chưa đủ cơ sở</dt><dd id="summary-unknown">—</dd></div><div><dt>Ngoại lai IQR</dt><dd id="summary-outliers">—</dd></div>
     </dl>
+    <section class="trend-workspace" aria-label="Biểu đồ đợt lấy mẫu">
+      <div class="pq-key" aria-label="Chú giải biểu đồ"><span><i class="key-dot" aria-hidden="true"></i>Số đo gốc</span><span><i class="key-diamond" aria-hidden="true"></i>Vượt giới hạn PQ</span><span><i class="key-ring" aria-hidden="true"></i>Ngoại lai 1,5 × IQR</span><span><i class="key-limit" aria-hidden="true"></i>Giới hạn PQ đã lưu</span></div>
+      <p id="trend-note" class="trend-selection-note" aria-live="polite"></p>
+      <div id="pq-metric-charts"></div>
     <div id="trend-assessment-box" class="trend-assessment" data-state="pending">
       <p id="assessment-scope" class="assessment-scope"></p><p id="trend-assessment" role="status" aria-live="polite">Đang tải dữ liệu…</p>
       <p id="limit-source" class="help"></p><button id="limits-retry" type="button" hidden>Tải lại tiêu chí</button>
       <p id="limit-summary" class="sr-only" role="status" aria-live="polite"></p><ul id="limit-exceptions" class="limit-exceptions"></ul>
     </div>
-    <section class="trend-workspace" aria-label="Biểu đồ đợt lấy mẫu">
-      <div class="pq-key" aria-label="Chú giải biểu đồ"><span><i class="key-dot" aria-hidden="true"></i>Số đo gốc</span><span><i class="key-diamond" aria-hidden="true"></i>Vượt giới hạn PQ</span><span><i class="key-ring" aria-hidden="true"></i>Ngoại lai 1,5 × IQR</span><span><i class="key-limit" aria-hidden="true"></i>Giới hạn PQ đã lưu</span></div>
-      <p id="trend-note" class="trend-selection-note" aria-live="polite"></p>
-      <div id="pq-metric-charts"></div>
+
       <p id="chart-inspection" class="chart-inspection" role="status" aria-live="polite"></p>
       <details id="point-visibility" class="trend-details"><summary>Chọn điểm hiển thị</summary><fieldset class="legend-fieldset"><legend>Điểm hiển thị trên cả hai biểu đồ</legend><div class="legend-toolbar"><p class="help">Bảng và đánh giá giữ đủ dữ liệu trong phạm vi đã lọc.</p><button id="trend-show-all" type="button">Hiện tất cả điểm</button></div><div id="chart-legend" class="chart-legend"></div></fieldset></details>
       <details id="trend-data-details" class="trend-details"><summary>Xem số liệu và đối chiếu từng lần đo</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Bảng dữ liệu xu hướng có thể cuộn ngang"><table id="trend-data"><caption>Giá trị nguồn và giá trị tính đã lưu</caption><thead><tr><th>Tháng</th><th>Hồ sơ / phiên bản</th><th>Biểu mẫu</th><th>Điểm</th><th>Chỉ tiêu</th><th>Lần thử</th><th>Giá trị nguồn</th><th>Giá trị tính</th><th>Đơn vị</th><th>Giới hạn hành động</th><th>Đối chiếu giới hạn</th><th>Ngoại lai IQR</th><th>Trang nguồn</th><th>Đối chiếu</th><th>Trạng thái</th></tr></thead><tbody></tbody></table></div></details>

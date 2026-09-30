@@ -12,11 +12,12 @@ const fixture=`
 const configs=${JSON.stringify(configs)};
 const systems=['air','nitrogen','steam'],locations=['P1','P2','P3'].map(id=>({id,name:'Điểm '+id}));
 const variant=new URLSearchParams(location.search).get('fixture');
-const settings=system=>system==='steam'?{...configs.settings,locations}:{...configs.gas_settings.find(c=>c.system===system).config,system,forms:[{id:'bm02',title:'Điểm sương',kind:'measurement',locations:locations.map(p=>({...p,limits:{dewpoint:variant==='different'&&p.id==='P2'?-12:-10}}))},{id:'bm01',title:'Tiểu phân',kind:'measurement',locations:locations.map(p=>({...p,limits:{p05:100}}))}]};
+const settings=system=>system==='steam'?{...configs.settings,locations}:{...configs.gas_settings.find(c=>c.system===system).config,system,forms:[{id:'bm02',title:'Điểm sương',kind:'measurement',locations:locations.map(p=>({...p,limits:{dewpoint:variant==='segmented-equal-bound'&&p.id==='P3'?-20:variant==='different'&&p.id==='P2'?-12:-10}}))},{id:'bm01',title:'Tiểu phân',kind:'measurement',locations:locations.map(p=>({...p,limits:{p05:100}}))}]};
 const rows=(system,early=false)=>{
  const steam=system==='steam',form=steam?'bm03':'bm02',unit=steam?'D':'°C',label=steam?'Độ khô':'Điểm sương';
  const values=steam?[[.93,.94,.95,.96,.97,.98,.99,1.10],[.92,.93,.94,.95,.96,.97,.98,1.09],[.95]]:[[-22,-21,-20,-19,-18,-17,-16,-1],[-35,-34,-33,-32,-31,-30,-29,-18],[-20]];
  const out=values.flatMap((vals,i)=>vals.map((value,j)=>({form,metric:'result',unit,label,point_id:'P'+(i+1),trial:j+1,value:early?value+(steam?.001:-.01):value,source_value:String(value),computed_status:'pass'})));
+ if(variant==='equal-bound'&&!steam){out.at(-1).value=-10;out.at(-1).source_value='-10';}
  out.push({...out.at(-1),trial:2,value:steam?.96:-21,uncertain:true},{...out.at(-1),trial:3,value:null,source_value:'Không đọc được'});
  for(const [metric,label,unit,vals] of steam?[['conductivity','Độ dẫn điện','µS/cm',[1,2,6]],['toc','TOC','ppb',[100,200,300]]]:[['p05','Tiểu phân ≥ 0,5 µm','hạt/m³',[10,50,150]]])vals.forEach((value,i)=>out.push({form:steam?'bm02':'bm01',metric,label,unit,point_id:'P'+(i+1),trial:1,value,source_value:String(value),computed_status:'pass'}));
  if(variant==='mixed-unit'&&!steam)out.push({...out[0],unit:'K',value:293,source_value:'293'});
@@ -74,6 +75,10 @@ try{
   assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P3] .box-median').count(),1);
   assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),2,'horizontal saved PQ limit on both plots');
   const domains=await page.locator('svg[data-chart]').evaluateAll(nodes=>nodes.map(n=>[n.dataset.yMin,n.dataset.yMax]));assert.deepEqual(domains[0],domains[1]);
+  const figures=await page.locator('.pq-figure').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {top:r.top,left:r.left,right:r.right};}));
+  assert.equal(Math.abs(figures[0].top-figures[1].top)<2,true,'desktop pair must share one row for comparison');
+  assert.equal(figures[0].right<=figures[1].left,true,'desktop Individual appears next to Boxplot');
+  assert.equal(await page.locator('[data-chart=individual] .pq-value-label[data-point=P3]').textContent(),system==='steam'?'0,95':'-20','one-observation location exposes its value visibly');
   await page.locator('[data-chart=individual] .individual-value').first().focus();
   assert.match(await page.locator('#chart-inspection').textContent(),/P1.*lần 1/);
   await page.locator('#trend-data-details summary').click();
@@ -99,18 +104,25 @@ try{
   assert.equal(await page.locator('#multi-trend-data tbody tr[data-source-state=missing]').count(),2);
   assert.match(await page.locator('#multi-trend-data tbody').textContent(),new RegExp(system+'-record-1.*v1'));
   await page.locator('#history-chart-details summary').first().click();
+  await page.locator('#point-visibility summary').click();
+  await page.locator('#trend-data-details summary').click();
   for(const theme of ['light','dark'])for(const width of [1440,390,320]){
    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.setViewportSize({width,height:950});
-   await page.evaluate(async()=>{await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));});
+   await page.evaluate(async()=>{await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,theme+' '+width+' overflow');
+   const limitReadable=await page.locator('.pq-figure').evaluateAll(figures=>figures.every(figure=>{const caption=figure.querySelector('.pq-rule-caption:not([hidden])'),tag=caption||figure.querySelector('.pq-limit-tag'),surface=caption?figure:figure.querySelector('.pq-chart-scroll');if(!tag)return false;const a=tag.getBoundingClientRect(),b=surface.getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1;}));
+   assert.equal(limitReadable,true,theme+' '+width+' saved common PQ limit is fully readable without scrolling');
+   assert.equal(await page.locator('.pq-chart-scroll').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1)),true,'three short sampling codes fit the chart viewport at '+width);
    const axe=await new AxeBuilder({page}).include('#trend-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
    assert.deepEqual(axe.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,details:n.failureSummary}))})),[],system+' '+theme+' '+width+' axe');
-   if(evidence&&system==='air')await page.screenshot({path:evidence+'/'+theme+'-'+width+'.png',fullPage:true});
+   if(evidence){await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo(0,0);});await page.screenshot({path:evidence+'/'+system+'-'+theme+'-'+width+'.png',fullPage:true});}
   }
   await page.close();
  }
- for(const variant of ['different','unknown','pending','error','empty','restricted','mixed-unit','raw-precision']){
+ for(const variant of ['different','unknown','pending','error','empty','restricted','mixed-unit','raw-precision','equal-bound','segmented-equal-bound']){
   const page=await pageFor('air','&fixture='+variant);
+  if(variant==='segmented-equal-bound'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');await page.setViewportSize({width:320,height:950});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const collision=await page.locator('[data-chart=individual]').evaluate(chart=>{const a=chart.querySelector('.pq-value-label[data-point=P3]').getBoundingClientRect(),b=[...chart.querySelectorAll('.pq-limit-label')].find(n=>n.textContent==='≤ -20').getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});assert.equal(collision,false,'singleton at point-specific PQ boundary must not overlap the segment label');if(evidence)await page.locator('.pq-plots').screenshot({path:evidence+'/segmented-equal-bound-320.png'});}
+  if(variant==='equal-bound'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');const collision=await page.locator('[data-chart=individual]').evaluate(chart=>{const a=chart.querySelector('.pq-value-label[data-point=P3]').getBoundingClientRect(),b=chart.querySelector('.pq-limit-tag').getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});assert.equal(collision,false,'numeric value at saved PQ boundary must not collide with its rule label');}
   if(variant==='mixed-unit'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-metric-card').count(),2,'same metric with different units gets separate pair');assert.equal(await page.locator('.pq-metric-card').nth(1).locator('.pq-limit').count(),0,'no limit borrowed for incompatible unit');assert.match(await page.locator('.pq-metric-card').nth(1).textContent(),/K/);}
   if(variant==='raw-precision'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='2');assert.match(await page.locator('[data-chart=individual] .individual-value').first().getAttribute('aria-label'),/-9\.999/,'plot and PQ decision use precise saved snapshot value');}
   if(variant==='different'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),0);assert.equal(await page.locator('.pq-limit[data-scope=point]').count(),6);}
