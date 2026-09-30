@@ -216,7 +216,7 @@ try{
 
  const trend=await localPage();
  await trend.goto('http://qualification.test/tham-dinh-thuc-te/runs.html?view=trend&system=air');
- await trend.getByRole('tab',{name:'Qua các đợt đã đóng',exact:true}).click();
+ await trend.locator('#history-chart-details > summary').click();
  await trend.locator('#multi-data-details summary').click();
  await trend.locator('#multi-trend-data tbody tr').waitFor();
  assert.equal(await trend.locator('.page-tabs').isHidden(),true,'dedicated trend route hides combined tabs');

@@ -10,22 +10,30 @@ if(evidence)await mkdir(evidence,{recursive:true});
 const configs=JSON.parse(await readFile(root+'/tests/fixtures/qualification-config.json','utf8'));
 const fixture=`
 const configs=${JSON.stringify(configs)};
-const systems=['air','nitrogen','steam'];
-const settings=system=>system==='steam'?{...configs.settings,locations:[{id:'P1',name:'Điểm một'},{id:'P2',name:'Điểm hai'}]}:{...configs.gas_settings.find(c=>c.system===system).config,system,forms:[{id:'bm01',title:'Tiểu phân',kind:'measurement',locations:[{id:'P1',name:'Điểm một',limits:{p05:10}},{id:'P2',name:'Điểm hai',limits:{p05:10}}]}]};
-const spec=system=>system==='steam'?{form:'bm03',metric:'result',label:'Độ khô',unit:'D',values:[.8,.95,.96]}:{form:'bm01',metric:'p05',label:'Tiểu phân ≥ 0,5 µm',unit:'hạt/m³',values:[12,5,3]};
-const rows=(system,early=false)=>{const s=spec(system);return ['P1','P2','P2'].map((point,i)=>({form:s.form,metric:s.metric,label:s.label,unit:s.unit,point_id:point,trial:i===2?2:1,value:early?s.values[i]-.01:s.values[i],uncertain:i===2,source_value:String(s.values[i]),computed_status:i===0?'fail':i===2?'invalid':'pass'}));};
-const runs=systems.flatMap(system=>[1,2,3].map(i=>({id:system+'-run-'+i,title:'Đợt '+i,status:i===3?'open':'closed',items:[],progress:{total:0,complete:0},mode:'single',started_on:'2026-03-01',version:1})));
+const systems=['air','nitrogen','steam'],locations=['P1','P2','P3'].map(id=>({id,name:'Điểm '+id}));
+const variant=new URLSearchParams(location.search).get('fixture');
+const settings=system=>system==='steam'?{...configs.settings,locations}:{...configs.gas_settings.find(c=>c.system===system).config,system,forms:[{id:'bm02',title:'Điểm sương',kind:'measurement',locations:locations.map(p=>({...p,limits:{dewpoint:variant==='different'&&p.id==='P2'?-12:-10}}))},{id:'bm01',title:'Tiểu phân',kind:'measurement',locations:locations.map(p=>({...p,limits:{p05:100}}))}]};
+const rows=(system,early=false)=>{
+ const steam=system==='steam',form=steam?'bm03':'bm02',unit=steam?'D':'°C',label=steam?'Độ khô':'Điểm sương';
+ const values=steam?[[.93,.94,.95,.96,.97,.98,.99,1.10],[.92,.93,.94,.95,.96,.97,.98,1.09],[.95]]:[[-22,-21,-20,-19,-18,-17,-16,-1],[-35,-34,-33,-32,-31,-30,-29,-18],[-20]];
+ const out=values.flatMap((vals,i)=>vals.map((value,j)=>({form,metric:'result',unit,label,point_id:'P'+(i+1),trial:j+1,value:early?value+(steam?.001:-.01):value,source_value:String(value),computed_status:'pass'})));
+ out.push({...out.at(-1),trial:2,value:steam?.96:-21,uncertain:true},{...out.at(-1),trial:3,value:null,source_value:'Không đọc được'});
+ for(const [metric,label,unit,vals] of steam?[['conductivity','Độ dẫn điện','µS/cm',[1,2,6]],['toc','TOC','ppb',[100,200,300]]]:[['p05','Tiểu phân ≥ 0,5 µm','hạt/m³',[10,50,150]]])vals.forEach((value,i)=>out.push({form:steam?'bm02':'bm01',metric,label,unit,point_id:'P'+(i+1),trial:1,value,source_value:String(value),computed_status:'pass'}));
+ if(variant==='mixed-unit'&&!steam)out.push({...out[0],unit:'K',value:293,source_value:'293'});
+ return out;
+};
+const runs=systems.flatMap(system=>[1,2,3].map(i=>({id:system+'-run-'+i,title:'Đợt '+i,status:i===3?'open':'closed',items:[],progress:{},mode:'single',started_on:'2026-03-01',version:1})));
 const history=systems.flatMap(system=>[1,2,3].map(i=>({run_id:system+'-run-'+i,record_id:system+'-record-'+i,version:1,system,period:i===1?'2026-03-01':i===2?'2026-05-01':'2026-02-01',trend:rows(system,i===1),sources:[],issues:[]})));
-if(new URLSearchParams(location.search).get('fixture')==='historical-point')history.find(item=>item.record_id==='air-record-1').trend.push({...rows('air')[0],point_id:'P3',value:8},{...rows('air')[0],point_id:'P3',trial:2,value:null,source_value:'Không đọc được'});
 const snapshots=Object.fromEntries(history.map(item=>{
- const steam=item.system==='steam',s=spec(item.system),a=item.trend[0].value,b=item.trend[1].value;
- const measured=steam?{P1:[{status:'fail',values:{raw_result:String(a)}}],P2:[{status:'pass',values:{raw_result:String(b)}},{status:'invalid'}]}:{P1:{status:'fail',parameters:{p05:'fail'}},P2:{status:'pass',parameters:{p05:'pass'}}};
- const data=steam?{system:'steam'}:{system:item.system,forms:{bm01:{P1:{p05:String(a)},P2:{p05:String(b)}}}};
- const source_context=steam?{criteria:{dryness_min:.9}}:{config:settings(item.system)};
- return [item.record_id,{data,evaluation:{formula_version:'fixture-1',source_context,forms:{[s.form]:{rows:measured}}}}];
+ const steam=item.system==='steam',main=steam?'bm03':'bm02',forms={},raw={};
+ for(const form of [...new Set(item.trend.map(r=>r.form))]){const measured={};raw[form]={};for(const p of locations){const pointRows=item.trend.filter(r=>r.form===form&&r.point_id===p.id);if(form===main)measured[p.id]=pointRows.map(r=>({status:r.uncertain||r.value===null?'invalid':'pass',values:{raw_result:String(r.value)}}));else{measured[p.id]={status:'pass',parameters:Object.fromEntries(pointRows.map(r=>[r.metric,'pass']))};raw[form][p.id]=Object.fromEntries(pointRows.map(r=>[r.metric,String(r.value)]));}}forms[form]={rows:measured};}
+ if(variant==='raw-precision'&&!steam)forms[main].rows.P1[0].values.raw_result='-9.999';
+ const data=steam?{system:'steam',bm02:raw.bm02}:{system:item.system,forms:raw};
+ const source_context=variant==='unknown'?{}:steam?{criteria:{dryness_min:.94,conductivity_max:5,toc_max:500}}:{config:settings(item.system)};
+ return [item.record_id,{data,evaluation:{formula_version:'fixture-1',source_context,forms}}];
 }));
-window.__trendFixture={snapshots,calls:0,fail:new URLSearchParams(location.search).get('fixture')==='error'};
-window.CPC1Backend={permissionsFor:system=>({can_view:!(new URLSearchParams(location.search).get('fixture')==='restricted'&&system==='air'),can_view_current:!(new URLSearchParams(location.search).get('fixture')==='restricted'&&system==='air'),can_enter:false}),getSession:async()=>({user:{id:'fixture-qa'}}),getConfig:async()=>settings('steam'),getGasConfig:async s=>settings(s),listRuns:async()=>structuredClone(runs),listHistory:async()=>new URLSearchParams(location.search).get('fixture')==='empty'?[]:structuredClone(history),runRequirements:async()=>[],historySnapshot:async(id)=>{window.__trendFixture.calls++;if(new URLSearchParams(location.search).get('fixture')==='pending'&&!window.__trendFixture.released)await new Promise(resolve=>window.__trendFixture.release=()=>{window.__trendFixture.released=true;resolve();});if(window.__trendFixture.fail)throw Error('Tiêu chí tạm thời chưa tải được');return structuredClone(snapshots[id]);},downloadHistorySource:async()=>new Blob()};
+window.__trendFixture={snapshots,calls:0,fail:variant==='error'};
+window.CPC1Backend={permissionsFor:system=>({can_view:!(variant==='restricted'&&system==='air'),can_view_current:!(variant==='restricted'&&system==='air'),can_enter:false}),getSession:async()=>({user:{id:'fixture-qa'}}),getConfig:async()=>settings('steam'),getGasConfig:async s=>settings(s),listRuns:async()=>structuredClone(runs),listHistory:async()=>variant==='empty'?[]:structuredClone(history),runRequirements:async()=>[],historySnapshot:async(id)=>{window.__trendFixture.calls++;if(variant==='pending'&&!window.__trendFixture.released)await new Promise(resolve=>window.__trendFixture.release=()=>{window.__trendFixture.released=true;resolve();});if(window.__trendFixture.fail)throw Error('Tiêu chí tạm thời chưa tải được');return structuredClone(snapshots[id]);},downloadHistorySource:async()=>new Blob()};
 document.body.dataset.qualificationGate='ready';`;
 new Function(fixture);
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||chromium.executablePath()});
@@ -40,112 +48,80 @@ async function pageFor(system,extra=''){
 }
 try{
  for(const [system,title] of [['air','Khí nén'],['nitrogen','Khí nitơ'],['steam','Hơi tinh khiết']]){
-  const page=await pageFor(system);
-  if(evidence)await page.screenshot({path:evidence+'/'+system+'-initial.png',fullPage:true});
-  assert.match(await page.locator('h1').textContent(),new RegExp('Xu hướng.*'+title),'dedicated page identifies its system');
-  try{await page.waitForFunction(()=>document.querySelector('#summary-outside')?.textContent==='1');}catch(error){console.log('comparison diagnostic',await page.evaluate(()=>({snapshot:window.__trendFixture.snapshots['air-record-2'],cells:document.querySelector('#trend-data tbody').textContent})));throw error;}
-  assert.equal(await page.locator('#summary-points').textContent(),'2');
-  assert.equal(await page.locator('#summary-samples').textContent(),'3');
-  assert.equal(await page.locator('#summary-unknown').textContent(),'1');
-  assert.match(await page.locator('#assessment-scope').textContent(),/2026-05.*Đợt 2/);
-  assert.equal(await page.locator('#trend-panel svg:visible').count(),1,'one shared chart shown');
-  assert.equal(await page.locator('#trend-chart .action-limit').count(),2,'saved location-specific limits share the value chart');
-  assert.equal(await page.locator('#trend-chart .outside-marker').count(),1,'outside result has a shape as well as color');
-  const selected=await page.locator('#trend-record').inputValue();
-  const modes=page.getByRole('tablist',{name:'Cách xem biểu đồ'});
-  await modes.getByRole('tab',{name:'Theo điểm lấy mẫu',exact:true}).focus();
-  await page.keyboard.press('ArrowRight');
-  assert.equal(await modes.getByRole('tab',{name:'Giới hạn hành động',exact:true}).getAttribute('aria-selected'),'true');
-  assert.equal(await page.locator('#limit-chart').isVisible(),true);
-  await page.keyboard.press('End');
-  assert.equal(await page.locator('#multi-trend-chart').isVisible(),true);
-  assert.equal(await page.locator('#trend-record').inputValue(),selected,'mode change retains selection');
-  assert.match(await page.locator('#multi-trend-status').textContent(),/2 hồ sơ đã đóng/);
-  assert.match(await page.locator('#assessment-scope').textContent(),/đợt đang chọn/i,'comparison scope remains explicit in history mode');
-  assert.equal(await page.locator('#multi-trend-legend').getByText(/P1.*lần 1/).count(),1,'historical lines have a readable legend');
-  const paths=await page.locator('#multi-trend-chart .multi-line[data-point="P1"]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('d')));
-  assert.equal(paths.length,2,'missing April breaks the line into separate segments');
-  assert.equal(paths.some(path=>path.includes('L')),false);
-  await page.locator('#chart-legend input[value="P1"]').uncheck();
-  assert.equal(await page.locator('#multi-trend-chart [data-point="P1"]').count(),0,'hiding a point affects history chart');
-  await page.locator('#multi-data-details summary').click();
-  assert.equal(await page.locator('#multi-trend-data tbody tr').filter({hasText:'P1'}).count(),3,'hidden point remains in source table with missing month');
-  const uncertainRows=page.locator('#multi-trend-data tbody tr[data-source-state=uncertain]');
-  assert.equal(await uncertainRows.count(),2,'both saved uncertain trial-2 observations remain in the history table');
-  assert.match(await uncertainRows.first().textContent(),/P2.*2.*chưa chắc chắn/i);
-  assert.match(await uncertainRows.first().textContent(),new RegExp(system+'-record-1.*v1'),'source table identifies its saved snapshot');
-  await page.locator('#chart-legend input[value="P2"]').uncheck();
-  assert.match(await page.locator('#multi-trend-chart .chart-empty').textContent(),/Đã ẩn tất cả điểm/);
-  assert.equal(await page.locator('#summary-outside').textContent(),'1','chart visibility never hides outside count');
-  assert.equal(await page.locator('#multi-trend-data tbody tr[data-source-state=uncertain]').count(),2,'uncertain source rows remain even when all chart points are hidden');
+  const page=await pageFor(system),outside=system==='steam'?'3':'1';
+  await page.waitForFunction(expected=>document.querySelector('#summary-outside')?.textContent===expected,outside);
+  assert.match(await page.locator('h1').textContent(),new RegExp('Xu hướng.*'+title));
+  assert.match(await page.locator('#assessment-scope').textContent(),/2026-05.*Đợt 2.*v1/);
+  await page.locator('#trend-record').selectOption(system+'-record-1:1');
+  await page.waitForFunction(()=>document.querySelector('#limit-source').textContent.includes('fixture-1'));
+  assert.match(await page.locator('#assessment-scope').textContent(),/2026-03.*Đợt 1.*v1/);
+  assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),17,'record switch stays in the selected run');
+  assert.match(await page.locator('[data-chart=individual] .individual-value').first().getAttribute('aria-label'),system==='steam'?/0\.931/:/-22\.01/);
+  await page.locator('#trend-record').selectOption(system+'-record-2:1');
+  await page.waitForFunction(expected=>document.querySelector('#summary-outside').textContent===expected,outside);
+  assert.equal(await page.locator('.pq-metric-card').count(),1,'one pair per selected form + metric + unit');
+  assert.equal(await page.locator('svg[data-chart]:visible').count(),2,'Individual and Boxplot are visible together');
+  assert.equal(await page.locator('#summary-points').textContent(),'3');
+  assert.equal(await page.locator('#summary-samples').textContent(),'19');
+  assert.equal(await page.locator('#summary-unknown').textContent(),'2');
+  assert.equal(await page.locator('#summary-outliers').textContent(),'2','IQR outliers differ from PQ failures');
+  assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),17,'single run values never pool other records');
+  assert.equal(await page.locator('[data-chart=individual] .pq-outside').count(),Number(outside));
+  assert.equal(await page.locator('[data-chart=individual] .stat-outlier').count(),2);
+  assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P1]').getAttribute('data-n'),'8');
+  assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P3]').getAttribute('data-n'),'1');
+  assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P3] .box-body').count(),0,'n=1 has no manufactured box');
+  assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P3] .box-median').count(),1);
+  assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),2,'horizontal saved PQ limit on both plots');
+  const domains=await page.locator('svg[data-chart]').evaluateAll(nodes=>nodes.map(n=>[n.dataset.yMin,n.dataset.yMax]));assert.deepEqual(domains[0],domains[1]);
+  await page.locator('[data-chart=individual] .individual-value').first().focus();
+  assert.match(await page.locator('#chart-inspection').textContent(),/P1.*lần 1/);
+  await page.locator('#trend-data-details summary').click();
+  assert.equal(await page.locator('#trend-data tbody tr').count(),19,'all source rows remain including exclusions');
+  assert.match(await page.locator('#trend-data tbody').textContent(),/Không đọc được/);
+  assert.match(await page.locator('.pq-stats-table').textContent(),/P1.*8/s);
+  assert.equal(await page.locator('.pq-stats-table th').filter({hasText:/^IQR$/}).count(),1,'statistics table includes explicit IQR');
+  assert.equal(await page.locator('.pq-stats-table tbody tr[data-point=P1] td').nth(5).textContent(),system==='steam'?'0,035':'3,5','IQR magnitude is literal and auditable');
+  await page.locator('#point-visibility summary').click();
+  await page.locator('#chart-legend input[value=P1]').uncheck();
+  assert.equal(await page.locator('svg[data-chart] [data-point=P1]').count(),0,'hiding affects both plots');
+  assert.equal(await page.locator('#summary-outliers').textContent(),'2');
+  assert.equal(await page.locator('#trend-data tbody tr').count(),19);
   await page.locator('#trend-show-all').click();
-  assert.equal(await page.locator('#chart-legend input:checked').count(),2);
-  await page.locator('#trend-point').selectOption('P2');
-  assert.equal(await page.locator('#summary-points').textContent(),'1');
-  assert.equal(await page.locator('#summary-outside').textContent(),'0');
-  assert.equal(await page.locator('#multi-trend-chart [data-point="P1"]').count(),0);
-  await page.locator('#trend-point').selectOption('');
-  await modes.getByRole('tab',{name:'Theo điểm lấy mẫu',exact:true}).click();
-  await page.locator('#trend-chart [tabindex="0"]').first().focus();
-  assert.match(await page.locator('#trend-chart [tabindex="0"]').first().getAttribute('aria-label'),/P1.*lần 1/);
-  for(const theme of ['light','dark']){
-   await modes.getByRole('tab',{name:'Theo điểm lấy mẫu',exact:true}).click();
-   await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
-   for(const width of [1440,390,320]){
-    await page.setViewportSize({width,height:950});
-    await page.evaluate(async()=>{getComputedStyle(document.querySelector('#view-points')).backgroundColor;await Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{})));});
-    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,theme+' '+width+' does not overflow');
-    const axe=await new AxeBuilder({page}).include('#trend-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
-    assert.deepEqual(axe.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,details:n.failureSummary}))})),[],system+' '+theme+' '+width+' axe');
-    if(evidence&&system==='air'){await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo(0,0);});} 
-    if(evidence&&system==='air')await page.screenshot({path:evidence+'/'+theme+'-'+width+'.png',fullPage:true});
-   }
-   await page.setViewportSize({width:1440,height:950});
-   for(const name of ['Giới hạn hành động','Qua các đợt đã đóng']){
-    await modes.getByRole('tab',{name,exact:true}).click();
-    await page.evaluate(async()=>{getComputedStyle(document.querySelector('#view-points')).backgroundColor;await Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{})));});
-    const axe=await new AxeBuilder({page}).include('#trend-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
-    assert.deepEqual(axe.violations.map(v=>v.id),[],system+' '+theme+' '+name+' axe');
-    if(evidence){await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo(0,0);});await page.screenshot({path:evidence+'/'+system+'-'+theme+'-'+(name==='Giới hạn hành động'?'limits':'history')+'.png',fullPage:true});}
-   }
+  await page.locator('#trend-form').selectOption('');
+  assert.equal(await page.locator('.pq-metric-card').count(),system==='steam'?3:2,'all forms retain separate metrics and units');
+  assert.equal(await page.locator('svg[data-chart]').count(),system==='steam'?6:4);
+  await page.locator('#trend-form').selectOption(system==='steam'?'bm03':'bm02');
+  await page.locator('#history-chart-details summary').first().click();
+  assert.match(await page.locator('#multi-trend-status').textContent(),/2 hồ sơ đã đóng/);
+  await page.locator('#multi-data-details summary').click();
+  assert.equal(await page.locator('#multi-trend-data tbody tr[data-source-state=uncertain]').count(),2);
+  assert.equal(await page.locator('#multi-trend-data tbody tr[data-source-state=missing]').count(),2);
+  assert.match(await page.locator('#multi-trend-data tbody').textContent(),new RegExp(system+'-record-1.*v1'));
+  await page.locator('#history-chart-details summary').first().click();
+  for(const theme of ['light','dark'])for(const width of [1440,390,320]){
+   await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.setViewportSize({width,height:950});
+   await page.evaluate(async()=>{await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,theme+' '+width+' overflow');
+   const axe=await new AxeBuilder({page}).include('#trend-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+   assert.deepEqual(axe.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,details:n.failureSummary}))})),[],system+' '+theme+' '+width+' axe');
+   if(evidence&&system==='air')await page.screenshot({path:evidence+'/'+theme+'-'+width+'.png',fullPage:true});
   }
   await page.close();
  }
- const historical=await pageFor('air','&fixture=historical-point');
- await historical.getByRole('tab',{name:'Qua các đợt đã đóng',exact:true}).click();
- assert.equal(await historical.locator('#chart-legend input[value="P3"]').count(),1,'history-only point is selectable');
- assert.equal(await historical.locator('#multi-trend-chart [data-point="P3"]').count()>0,true);
- await historical.locator('#chart-legend input[value="P3"]').uncheck();
- assert.equal(await historical.locator('#multi-trend-chart [data-point="P3"]').count(),0);
- await historical.locator('#multi-data-details summary').click();
- assert.equal(await historical.locator('#multi-trend-data tbody tr[data-source-state=missing]').count(),1,'saved missing value remains in full source table');
- assert.match(await historical.locator('#multi-trend-data tbody tr[data-source-state=missing]').textContent(),/P3.*Không đọc được.*Thiếu giá trị số/);
- await historical.close();
- const empty=await pageFor('air','&fixture=empty');
- assert.equal(await empty.locator('#summary-outside').textContent(),'—');
- assert.equal(await empty.locator('#summary-samples').textContent(),'0');
- assert.match(await empty.locator('#trend-assessment').textContent(),/Chưa có dữ liệu/);
- await empty.close();
- const restricted=await pageFor('air','&fixture=restricted');
- assert.equal(await restricted.locator('#trend-system option').count(),0,'a dedicated route never substitutes a different system if access is unavailable');
- assert.equal(await restricted.locator('#trend-data tbody tr').count(),0);
- assert.equal(await restricted.evaluate(()=>window.__trendFixture.calls),0);
- await restricted.close();
- const pending=await pageFor('air','&fixture=pending');
- assert.equal(await pending.locator('#summary-outside').textContent(),'—','pending cannot present zero outside');
- assert.match(await pending.locator('#trend-assessment').textContent(),/Đang/);
- await pending.evaluate(()=>window.__trendFixture.release());
- await pending.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');
- await pending.close();
- const failed=await pageFor('air','&fixture=error');
- await failed.locator('#limits-retry').waitFor();
- assert.equal(await failed.locator('#summary-outside').textContent(),'—','failed criteria cannot present zero outside');
- assert.match(await failed.locator('#trend-assessment').textContent(),/chưa.*đối chiếu/i);
- assert.doesNotMatch(await failed.locator('#limit-summary').textContent(),/^0 kết quả ngoài/,'failed criteria must not announce a zero-outside verdict');
- await failed.evaluate(()=>window.__trendFixture.fail=false);
- await failed.locator('#limits-retry').click();
- await failed.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');
- await failed.close();
+ for(const variant of ['different','unknown','pending','error','empty','restricted','mixed-unit','raw-precision']){
+  const page=await pageFor('air','&fixture='+variant);
+  if(variant==='mixed-unit'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-metric-card').count(),2,'same metric with different units gets separate pair');assert.equal(await page.locator('.pq-metric-card').nth(1).locator('.pq-limit').count(),0,'no limit borrowed for incompatible unit');assert.match(await page.locator('.pq-metric-card').nth(1).textContent(),/K/);}
+  if(variant==='raw-precision'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='2');assert.match(await page.locator('[data-chart=individual] .individual-value').first().getAttribute('aria-label'),/-9\.999/,'plot and PQ decision use precise saved snapshot value');}
+  if(variant==='different'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),0);assert.equal(await page.locator('.pq-limit[data-scope=point]').count(),6);}
+  if(['unknown','pending','error'].includes(variant)){assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),17,'numeric source remains readable without loaded PQ criteria');assert.equal(await page.locator('.pq-outside').count(),0);}
+  if(variant==='unknown'){await page.waitForFunction(()=>document.querySelector('#summary-unknown').textContent==='19');assert.equal(await page.locator('.pq-limit').count(),0);}
+  if(variant==='pending'){assert.equal(await page.locator('#summary-outside').textContent(),'—');await page.evaluate(()=>window.__trendFixture.release());await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');}
+  if(variant==='error'){await page.locator('#limits-retry').waitFor();assert.equal(await page.locator('#summary-outside').textContent(),'—');await page.evaluate(()=>window.__trendFixture.fail=false);await page.locator('#limits-retry').click();await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');}
+  if(variant==='empty'){assert.equal(await page.locator('.pq-metric-card').count(),0);assert.equal(await page.locator('#summary-outside').textContent(),'—');}
+  if(variant==='restricted'){assert.equal(await page.locator('#trend-system option').count(),0);assert.equal(await page.locator('.pq-metric-card').count(),0);assert.equal(await page.evaluate(()=>window.__trendFixture.calls),0);}
+  await page.close();
+ }
  assert.deepEqual(errors,[],'no JavaScript errors');assert.deepEqual(writes,[],'no network writes');assert.deepEqual(external,[],'no external requests');
- console.log('PASS three systems; shared values/limits; saved scope/counts; keyboard modes; history gaps/legend; point hide/reset/table; pending/error/retry; historical-only point; empty/restricted/pending/error/retry; 30 mode/theme/viewport axe checks; zero errors or network writes');
+ console.log('PASS Individual + Boxplot across three systems; saved-run grouping, PQ/IQR distinction, small samples, raw sources, limits, access, retry, history, 18 theme/viewport axe checks');
 }finally{await context.close();await browser.close();}

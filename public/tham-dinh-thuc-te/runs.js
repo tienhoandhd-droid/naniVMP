@@ -53,7 +53,7 @@
   const route=trendRoute(location.search);
   const $ = id => document.getElementById(id);
   const el = (name, props = {}, children = []) => { const node = ['text','line','path','circle','rect','title','g'].includes(name)?document.createElementNS('http://www.w3.org/2000/svg',name):document.createElement(name); Object.entries(props).forEach(([key, value]) => { if (key === 'text') node.textContent = value; else if (key === 'className') node.setAttribute('class',value); else if (key.startsWith('on')) node.addEventListener(key.slice(2), value); else node.setAttribute(key, value); }); node.append(...children); return node; };
-  const state = { configs: {}, runs: [], history: [], requirements: [], requirementToken: 0, activeSystem: 'steam', trendKey: '', trendView:'points', hiddenPoints: new Set(), snapshots: new Map(), snapshotErrors: new Map(), pendingSnapshots: new Map(), accessRevision:0, loadToken:0 };
+  const state = { configs: {}, runs: [], history: [], requirements: [], requirementToken: 0, activeSystem: 'steam', trendKey: '', hiddenPoints: new Set(), snapshots: new Map(), snapshotErrors: new Map(), pendingSnapshots: new Map(), accessRevision:0, loadToken:0 };
   const message = text => { $('runs-status').textContent = text; };
   const errorText = error => error?.message || 'Không thể tải dữ liệu. Thử lại sau.';
   const payloadKey = payload => JSON.stringify(payload);
@@ -82,23 +82,10 @@
     return window.CPC1PointLabels?.label(point || {id,name:id}) || id;
   }
   function highlightPoint(point) {
-    document.querySelectorAll('#trend-chart [data-point],#limit-chart [data-point],#multi-trend-chart [data-point]').forEach(node=>{
+    document.querySelectorAll('#pq-metric-charts svg [data-point],#multi-trend-chart [data-point]').forEach(node=>{
       node.classList.toggle('chart-muted',!!point&&node.dataset.point!==point);
       node.classList.toggle('chart-emphasis',node.dataset.point===point);
     });
-  }
-  const trendViews=['points','limits','history'];
-  function setTrendView(view) {
-    state.trendView=view;
-    trendViews.forEach(name=>{
-      const active=name===view,button=$('view-'+name);
-      button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;
-      $(name+'-chart-panel').hidden=!active;
-    });
-    $('active-chart-heading').textContent=$('view-'+view).textContent;
-    $('trend-data-details').hidden=view==='history';$('multi-data-details').hidden=view!=='history';
-    const scope=$('assessment-scope');scope.textContent=scope.dataset.recordScope||'Chưa có hồ sơ đã lưu';
-    if(view==='history')scope.textContent+=' · Đánh giá bên dưới chỉ áp dụng cho đợt đang chọn';
   }
   function renderAssessment(item,data,annotated,loading,error) {
     const outside=annotated.filter(row=>['above','below'].includes(row.action.state)).length;
@@ -112,7 +99,7 @@
     const text=!item?'Chưa có dữ liệu phù hợp. Chọn đợt, biểu mẫu và chỉ tiêu khi có hồ sơ đã lưu.':loading?'Đang tải tiêu chí của phiên bản hồ sơ để đối chiếu…':error?'Tiêu chí chưa tải được; chưa thể đối chiếu giới hạn. Thử tải lại tiêu chí.':!annotated.length?'Chưa có kết quả cho phạm vi đã chọn.':outside?`${outside} kết quả ngoài giới hạn hành động${unknown?`; ${unknown} kết quả chưa đủ cơ sở đối chiếu`:''}. Xem từng lần đo và nguồn hồ sơ bên dưới.`:unknown?`${annotated.length-unknown} kết quả trong giới hạn; ${unknown} kết quả chưa đủ cơ sở đối chiếu.`:'Tất cả kết quả trong phạm vi đang chọn đều nằm trong giới hạn hành động đã lưu.';
     $('trend-assessment').textContent=text;
     $('trend-assessment-box').dataset.state=loading||error||!item?'pending':outside?'outside':unknown?'unknown':annotated.length?'within':'pending';
-    setTrendView(state.trendView);
+    $('assessment-scope').textContent=$('assessment-scope').dataset.recordScope;
   }
   function observationProps(point,title) {
     const inspect=()=>{$('chart-inspection').textContent=title;};
@@ -125,41 +112,6 @@
     try {const snapshot=await window.CPC1Backend.historySnapshot(item.record_id,item.version);if(revision===state.accessRevision)state.snapshots.set(key,snapshot);}
     catch(error){if(revision===state.accessRevision)state.snapshotErrors.set(key,errorText(error));}
     finally {if(state.pendingSnapshots.get(key)===revision)state.pendingSnapshots.delete(key);if(revision===state.accessRevision&&$('trend-record').value===key)renderTrend();}
-  }
-  function renderLocationChart(id,rows,points,limits,loading) {
-    const chart=$(id);let svg=chart.querySelector('g');if(!svg){svg=el('g');chart.append(svg);}svg.replaceChildren();
-    const visible=points.filter(p=>!state.hiddenPoints.has(p));
-    const plotted=rows.filter(r=>visible.includes(r.point_id)&&r.action.plotValue!==null);
-    const width=Math.max(760,visible.length*76+104),height=370,left=72,right=width-24,top=30,bottom=258;
-    chart.setAttribute('viewBox',`0 0 ${width} ${height}`);chart.style.minWidth=width+'px';
-    if(!plotted.length){svg.append(el('text',{x:width/2,y:140,className:'chart-empty','text-anchor':'middle',text:!visible.length&&points.length?'Đã ẩn tất cả điểm. Chọn “Hiện tất cả điểm” để xem lại.':loading?'Đang tải phiên bản hồ sơ…':'Không có số đã lưu phù hợp để biểu diễn.'}));return;}
-    const values=plotted.map(r=>r.action.plotValue);
-    plotted.forEach(r=>{if(r.action.limit!==null)values.push(r.action.limit);});if(!limits)values.push(0);
-    const min=Math.min(...values),max=Math.max(...values),pad=(max-min||Math.max(1,Math.abs(max)*.1))*.1;
-    const low=limits?min-pad:min<0?min-pad:0,high=limits?max+pad:max>0?max+pad:min===0?1:0;
-    const slot=(right-left)/visible.length,x=i=>left+slot*(i+.5),y=v=>bottom-(v-low)/(high-low)*(bottom-top);
-    [0,.25,.5,.75,1].forEach(t=>{const yy=bottom-t*(bottom-top);svg.append(el('line',{x1:left,y1:yy,x2:right,y2:yy,className:'chart-grid'}),el('text',{x:left-10,y:yy+4,'text-anchor':'end',className:'chart-label',text:(low+t*(high-low)).toLocaleString('vi-VN',{maximumSignificantDigits:5})}));});
-    visible.forEach((point,i)=>{
-      svg.append(el('text',{x:x(i),y:bottom+20,transform:`rotate(-50 ${x(i)} ${bottom+20})`,'text-anchor':'end',className:'chart-label',text:point}));
-      const samples=plotted.filter(r=>r.point_id===point),step=Math.min(18,slot*.7/Math.max(1,samples.length));
-      {
-        const bounds=[...new Set(samples.map(r=>r.action.limit).filter(v=>v!==null))];
-        bounds.forEach(bound=>svg.append(el('line',{x1:x(i)-slot*.4,x2:x(i)+slot*.4,y1:y(bound),y2:y(bound),className:'action-limit','data-point':point},[el('title',{text:`${point} · giới hạn hành động ${bound}`})])));
-      }
-      samples.forEach((row,j)=>{
-        const xx=x(i)+(j-(samples.length-1)/2)*step,value=row.action.plotValue;
-        const outside=['above','below'].includes(row.action.state);
-        const title=`${point} · lần ${row.trial??1} · ${row.action.rawValue} ${row.unit} · ${row.action.reason}`;
-        if(limits){
-          const attrs={...observationProps(point,title),className:`action-point ${outside?'action-outside':row.action.state==='unknown'?'action-unknown':'action-within'}`};
-          svg.append(outside?el('path',{...attrs,d:`M${xx},${y(value)-6}l6,6 -6,6 -6,-6 Z`},[el('title',{text:title})]):el('circle',{...attrs,cx:xx,cy:y(value),r:5},[el('title',{text:title})]));
-        }else{
-          svg.append(el('rect',{...observationProps(point,title),x:xx-step*.4,y:Math.min(y(0),y(value)),width:Math.max(2,step*.8),height:Math.max(1,Math.abs(y(0)-y(value))),className:`chart-bar trial-${row.trial??1}${outside?' chart-bar-outside':''}`},[el('title',{text:title})]));
-          if(outside)svg.append(el('path',{d:`M${xx},${y(value)-7}l5,5 -5,5 -5,-5 Z`,className:'outside-marker','data-point':point},[el('title',{text:title})]));
-        }
-      });
-    });
-    svg.append(el('text',{x:left,y:16,className:'chart-label',text:rows[0]?.unit||''}));
   }
   function renderMultiTrend(system,form,point,metric,unit){
     const history=closedTrendHistory(state.history,state.runs,system),data=trendSeries(history,system,form,point,metric,unit),chart=$('multi-trend-chart'),group=chart.querySelector('g'),width=Math.max(760,data.months.length*110+120),height=320,left=72,right=width-28,top=28,bottom=240;
@@ -197,63 +149,45 @@
     const system=$('trend-system').value;state.activeSystem=system;
     const entries=state.history.filter(h=>h.system===system).slice().sort((a,b)=>b.period.localeCompare(a.period)||String(a.record_id).localeCompare(String(b.record_id)));
     selectOptions($('trend-record'),entries.map(h=>({value:snapshotKey(h),label:`${h.period.slice(0,7)} · ${state.runs.find(r=>r.id===h.run_id)?.title||'Hồ sơ '+String(h.record_id).slice(-8)} · v${h.version}`})),$('trend-record').value);
-    const item=entries.find(h=>snapshotKey(h)===$('trend-record').value),rows=item?.trend||[];
-    const forms=[...new Set(rows.map(r=>r.form).filter(Boolean))];
-    selectOptions($('trend-form'),forms.map(value=>({value,label:formTitle(measurementForms(system,state.configs[system]).find(f=>f.id===value)||{id:value})})),$('trend-form').value);
-    const form=$('trend-form').value;
-    const metrics=[...new Map(rows.filter(r=>r.form===form).map(r=>[JSON.stringify([r.metric,r.unit||'']),{value:JSON.stringify([r.metric,r.unit||'']),label:`${r.label||r.metric}${r.unit?' ('+r.unit+')':''}`}])).values()];
-    selectOptions($('trend-metric'),metrics,$('trend-metric').value);
-    const [metric,unit]=$('trend-metric').value?JSON.parse($('trend-metric').value):['',''];
-    const key=JSON.stringify([system,item&&snapshotKey(item),form,metric,unit]);
+    const item=entries.find(h=>snapshotKey(h)===$('trend-record').value),rows=item?.trend||[],forms=[...new Set(rows.map(r=>r.form).filter(Boolean))];
+    const formKeep=$('trend-form').options.length>1?$('trend-form').value:forms[0];
+    selectOptions($('trend-form'),[{value:'',label:'Tất cả biểu mẫu'},...forms.map(value=>({value,label:formTitle(measurementForms(system,state.configs[system]).find(f=>f.id===value)||{id:value})}))],formKeep);
+    const form=$('trend-form').value,formRows=rows.filter(r=>!form||r.form===form);
+    const metrics=[...new Map(formRows.map(r=>[JSON.stringify([r.form,r.metric,r.unit||'']),{value:JSON.stringify([r.form,r.metric,r.unit||'']),label:`${!form?r.form.toUpperCase()+' · ':''}${r.label||r.metric}${r.unit?' ('+r.unit+')':''}`}])).values()];
+    selectOptions($('trend-metric'),[{value:'',label:'Tất cả chỉ tiêu'},...metrics],$('trend-metric').value);
+    const selected=$('trend-metric').value?JSON.parse($('trend-metric').value):null;
+    const metricRows=formRows.filter(r=>!selected||(r.form===selected[0]&&r.metric===selected[1]&&(r.unit||'')===selected[2]));
+    const key=JSON.stringify([system,item&&snapshotKey(item),form,selected]);
     if(state.trendKey!==key){state.trendKey=key;state.hiddenPoints.clear();$('trend-point').value='';}
-    const historical=closedTrendHistory(state.history,state.runs,system);
-    const points=[...new Set([...rows,...historical.flatMap(h=>h.trend||[])].filter(r=>r.form===form&&r.metric===metric&&(r.unit||'')===unit).map(r=>r.point_id).filter(Boolean))].sort();
-    selectOptions($('trend-point'),[{value:'',label:`Tất cả điểm (${points.length})`},...points.map(value=>({value,label:pointLabel(system,form,value)}))],$('trend-point').value);
-    const point=$('trend-point').value;
-    const data=trendSeries(item?[item]:[],system,form,point,metric,unit);
+    const points=[...new Set(metricRows.map(r=>r.point_id).filter(Boolean))].sort();
+    selectOptions($('trend-point'),[{value:'',label:`Tất cả điểm (${points.length})`},...points.map(value=>({value,label:pointLabel(system,form||metricRows.find(r=>r.point_id===value)?.form,value)}))],$('trend-point').value);
+    const point=$('trend-point').value,chosen=metricRows.filter(r=>!point||r.point_id===point),data={rows:chosen,points:[...new Set(chosen.map(r=>r.point_id))]};
     const skey=item&&snapshotKey(item),snapshot=state.snapshots.get(skey),error=state.snapshotErrors.get(skey),loading=!!item&&!snapshot&&!error;
-    const annotated=data.rows.map(row=>({...row,action:window.CPC1TrendLimits.annotate(system,row,snapshot)}));
-    const historyPoints=trendSeries(historical,system,form,point,metric,unit).points;
-    const legendPoints=[...new Set([...data.points,...historyPoints])].sort();
+    const annotated=chosen.map((row,sourceIndex)=>({...row,sourceIndex,action:window.CPC1TrendLimits.annotate(system,row,snapshot)})),groups=window.CPC1PQCharts.prepare(annotated);
     renderAssessment(item,data,annotated,loading,error);
-    $('chart-unit').textContent=`${data.label||'Chưa có chỉ tiêu'}${unit?' · '+unit:''}`;
-    $('chart-inspection').textContent='Chạm, di chuột hoặc dùng bàn phím tới giá trị trên biểu đồ để xem chi tiết.';
-    const period=item?.period.slice(0,7)||'';
-    $('chart-title').textContent=`${systems[system]} · ${data.label||'Chưa có chỉ tiêu'} · ${period}`;
-    $('chart-desc').textContent='Trục X là điểm lấy mẫu, trục Y là giá trị đo. Các cột riêng theo lần đo; vạch đứt là giới hạn đề cương tại từng điểm, hình thoi đánh dấu ngoài giới hạn. Không lấy trung bình.';
-    $('chart-caption').textContent=`${data.label||'Chưa có dữ liệu'}${unit?' ('+unit+')':''} · ${period}. Trục X: điểm lấy mẫu · Trục Y: giá trị đo. Giữ riêng từng lần đo.`;
-    $('limit-title').textContent=`Giới hạn hành động · ${data.label||'Chưa có chỉ tiêu'}`;
-    $('limit-desc').textContent='Trục X là điểm lấy mẫu, trục Y là giá trị đo. Vạch đứt là giới hạn đề cương; hình thoi là kết quả ngoài giới hạn. Bảng bên dưới ghi giá trị và giới hạn từng điểm.';
-    $('limit-source').textContent=error?`Không tải được tiêu chí: ${error}`:loading?'Đang tải kết quả và tiêu chí đúng phiên bản…':snapshot?`Tiêu chí từ hồ sơ v${item.version} · ${snapshot.evaluation?.formula_version||snapshot.evaluation?.source_context?.formula_version||'phiên bản đã lưu'}. Giới hạn hành động là giới hạn trong đề cương; đối chiếu này không thay đổi kết luận hồ sơ.`:'Chưa có hồ sơ đã lưu cho hệ thống này.';
-    $('limits-retry').hidden=!error;
-    $('limits-retry').onclick=()=>{state.snapshotErrors.delete(skey);renderTrend();};
+    $('summary-outliers').textContent=String(groups.reduce((n,g)=>n+g.outliers.size,0));
+    $('chart-inspection').textContent='Chạm, di chuột hoặc dùng bàn phím tới số đo để xem điểm, lần đo và giá trị.';
+    $('limit-source').textContent=error?`Không tải được tiêu chí: ${error}`:loading?'Đang tải tiêu chí đúng phiên bản hồ sơ…':snapshot?`Giới hạn PQ từ hồ sơ v${item.version} · ${snapshot.evaluation?.formula_version||'phiên bản đã lưu'}.`:'Chưa có hồ sơ đã lưu.';
+    $('limits-retry').hidden=!error;$('limits-retry').onclick=()=>{state.snapshotErrors.delete(skey);renderTrend();};
     const legend=$('chart-legend');legend.replaceChildren();
+    const historyGroup=groups[0],outlierIndices=new Set(groups.flatMap(g=>[...g.outliers].map(r=>r.sourceIndex)));
+    $('trend-data').querySelector('caption').textContent=`Giá trị nguồn và giá trị tính đã lưu · ${item?.record_id||'—'} · v${item?.version??'—'}`;
     function draw(){
-      const activePoints=state.trendView==='history'?historyPoints:data.points;
-      const shown=activePoints.filter(id=>!state.hiddenPoints.has(id)).length;
-      const unknown=annotated.filter(r=>r.action.state==='unknown'),outside=annotated.filter(r=>['above','below'].includes(r.action.state));
-      $('trend-note').textContent=`Hiển thị ${shown}/${activePoints.length} điểm · Cùng chỉ tiêu và đơn vị · Bảng số liệu giữ đầy đủ điểm đã lọc.`;
-      $('limit-summary').textContent=loading||error||!item?$('trend-assessment').textContent:`${outside.length} kết quả ngoài giới hạn hành động${unknown.length?' · '+unknown.length+' kết quả chưa đủ cơ sở đối chiếu':''}.`;
-      $('limit-exceptions').replaceChildren(...outside.map(r=>el('li',{text:`${r.point_id} · lần ${r.trial??1}: ${r.action.rawValue} ${r.unit} — ${r.action.reason} (${r.action.direction==='max'?'≤':'≥'} ${r.action.limit}).`})));
-      renderLocationChart('trend-chart',annotated,data.points,false,loading);renderLocationChart('limit-chart',annotated,data.points,true,loading);
-      renderMultiTrend(system,form,point,metric,unit);
-      const focus=document.activeElement?.closest('#chart-legend label');if(focus)highlightPoint(focus.querySelector('input').value);
+      const outside=annotated.filter(r=>['above','below'].includes(r.action.state)),unknown=annotated.filter(r=>r.action.state==='unknown');
+      $('trend-note').textContent=`${groups.length} chỉ tiêu · mỗi chỉ tiêu gồm Individual plot và Boxplot · ${data.points.filter(p=>!state.hiddenPoints.has(p)).length}/${data.points.length} điểm hiển thị.`;
+      $('limit-summary').textContent=loading||error||!item?$('trend-assessment').textContent:`${outside.length} kết quả ngoài giới hạn PQ · ${unknown.length} kết quả chưa đủ cơ sở đối chiếu.`;
+      $('limit-exceptions').replaceChildren();
+      window.CPC1PQCharts.render($('pq-metric-charts'),groups,{hiddenPoints:state.hiddenPoints,label:(form,id)=>pointLabel(system,form,id),scope:$('assessment-scope').textContent,verdictPending:loading||!!error||!item,inspect:text=>{$('chart-inspection').textContent=text;}});
+      renderMultiTrend(system,historyGroup?.form||'',point,historyGroup?.metric||'',historyGroup?.unit||'');
       $('trend-data').querySelector('tbody').replaceChildren(...annotated.map(row=>el('tr',{},[
-        period,row.form?.toUpperCase(),row.point_id,row.label||row.metric,row.trial??'—',row.source_value??'—',row.action.rawValue??row.value??'—',row.unit||'—',
-        row.action.limit===null?'Chưa xác định':`${row.action.direction==='max'?'≤':'≥'} ${row.action.limit}`,row.action.reason,
+        item?.period?.slice(0,7)||'—',`${item?.record_id||'—'} · v${item?.version??'—'}`,row.form?.toUpperCase(),row.point_id,row.label||row.metric,row.trial??'—',row.source_value??'—',row.action.rawValue??row.value??'—',row.unit||'—',
+        row.action.limit===null?'Chưa xác định':`${row.action.direction==='max'?'≤':'≥'} ${row.action.limit}`,row.action.reason,outlierIndices.has(row.sourceIndex)?'Ngoại lai IQR · cần xem xét':row.uncertain||!Number.isFinite(row.value)?'Không đưa vào thống kê':'Không ngoại lai IQR',
         row.page?'Trang '+row.page:'—',({match:'Khớp đánh giá',match_at_source_precision:'Khớp độ làm tròn nguồn',mismatch:'Chênh lệch cần xem xét',needs_review:'Cần xem xét'}[row.comparison]||'—'),({pass:'Đạt',fail:'Không đạt',invalid:'Cần kiểm tra',incomplete:'Chưa đủ dữ liệu'}[row.computed_status]||'—')
       ].map(value=>el('td',{text:String(value)})))));
     }
-    legendPoints.forEach(id=>{
-      const input=el('input',{type:'checkbox',value:id});input.checked=!state.hiddenPoints.has(id);
-      input.addEventListener('change',()=>{if(input.checked)state.hiddenPoints.delete(id);else state.hiddenPoints.add(id);draw();});
-      const label=el('label',{},[input,el('span',{text:pointLabel(system,form,id)})]);
-      label.addEventListener('pointerenter',()=>highlightPoint(id));label.addEventListener('pointerleave',()=>highlightPoint(legend.contains(document.activeElement)?document.activeElement.value:null));
-      label.addEventListener('focusin',()=>highlightPoint(id));label.addEventListener('focusout',()=>highlightPoint(null));legend.append(label);
-    });
-    $('trend-show-all').onclick=()=>{state.hiddenPoints.clear();legend.querySelectorAll('input').forEach(input=>input.checked=true);draw();};
-    $('trend-show-all').disabled=!legendPoints.length;draw();renderHistoryDetails(system);
-    if(loading)fetchSnapshot(item);
+    points.forEach(id=>{const input=el('input',{type:'checkbox',value:id});input.checked=!state.hiddenPoints.has(id);input.addEventListener('change',()=>{if(input.checked)state.hiddenPoints.delete(id);else state.hiddenPoints.add(id);draw();});legend.append(el('label',{},[input,el('span',{text:pointLabel(system,form||metricRows.find(r=>r.point_id===id)?.form,id)})]));});
+    $('trend-show-all').onclick=()=>{state.hiddenPoints.clear();legend.querySelectorAll('input').forEach(input=>input.checked=true);draw();};$('trend-show-all').disabled=!points.length;
+    draw();renderHistoryDetails(system);if(loading)fetchSnapshot(item);
   }
   function renderHistoryDetails(system) { const host = $('history-details'); host.replaceChildren(); const entries = state.history.filter(h => h.system === system); if (!entries.length) { host.append(el('p',{className:'empty',text:'Chưa có lịch sử nguồn cho hệ thống này.'})); return; } entries.forEach(item => { const box = el('article',{className:'history-item'}); box.append(el('strong',{text:`${item.period?.slice(0,7)} · hồ sơ ${item.record_id || '—'}`})); if ((item.issues || []).length) { const list = el('ul'); item.issues.forEach(issue => list.append(el('li',{text:typeof issue === 'string' ? issue : JSON.stringify(issue)}))); box.append(el('p',{className:'help',text:'Vấn đề cần xem xét:'}),list); } if ((item.sources || []).length) { const actions = el('div',{className:'source-actions'}); item.sources.forEach(source => actions.append(el('button',{type:'button',text:`Tải PDF: ${source.title || source.source_id}`,onclick:()=>download(source)}))); box.append(actions); } host.append(box); }); }
   async function download(source) { try { const blob = await window.CPC1Backend.downloadHistorySource(source.object_path); const url = URL.createObjectURL(blob), a = el('a',{href:url,download:source.title || 'nguon-lich-su.pdf'}); document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url); } catch(error) { message(errorText(error)); } }
@@ -261,16 +195,8 @@
   function tabs() {
     const buttons=[$('runs-tab'),$('trend-tab')];
     function activate(index){buttons.forEach((b,i)=>{b.setAttribute('aria-selected',String(i===index));b.tabIndex=i===index?0:-1;});$('runs-panel').hidden=index!==0;$('trend-panel').hidden=index!==1;if(index===1)renderTrend();}
-    buttons.forEach((b,i)=>{b.addEventListener('click',()=>activate(i));b.addEventListener('keydown',e=>{const index=e.key==='Home'?0:e.key==='End'?1:['ArrowLeft','ArrowRight'].includes(e.key)?1-i:null;if(index===null)return;e.preventDefault();activate(index);buttons[index].focus();});});if(route.dedicated){document.querySelector('.page-tabs').hidden=true;$('trend-system-control').hidden=true;document.querySelector('h1').textContent=`Xu hướng · ${systems[route.system]}`;document.title=`Xu hướng ${systems[route.system]} | VMP`;document.querySelector('.runs-shell>.intro').textContent='Xem chung các điểm cùng chỉ tiêu và đơn vị. Đối chiếu giới hạn theo phiên bản hồ sơ đã lưu hoặc theo dõi diễn biến qua các đợt đã đóng.';activate(1);}else activate(0);
+    buttons.forEach((b,i)=>{b.addEventListener('click',()=>activate(i));b.addEventListener('keydown',e=>{const index=e.key==='Home'?0:e.key==='End'?1:['ArrowLeft','ArrowRight'].includes(e.key)?1-i:null;if(index===null)return;e.preventDefault();activate(index);buttons[index].focus();});});if(route.dedicated){document.querySelector('.page-tabs').hidden=true;$('trend-system-control').hidden=true;document.querySelector('h1').textContent=`Xu hướng · ${systems[route.system]}`;document.title=`Xu hướng ${systems[route.system]} | VMP`;document.querySelector('.runs-shell>.intro').textContent='Xem từng số đo và độ phân tán giữa các điểm trong một đợt lấy mẫu. Mỗi chỉ tiêu có Individual plot và Boxplot, kèm giới hạn PQ đã lưu.';activate(1);}else activate(0);
   }
-  trendViews.forEach((name,index)=>{
-    const button=$('view-'+name);
-    button.addEventListener('click',()=>{setTrendView(name);renderTrend();});
-    button.addEventListener('keydown',event=>{
-      const next=event.key==='Home'?0:event.key==='End'?trendViews.length-1:event.key==='ArrowRight'?(index+1)%trendViews.length:event.key==='ArrowLeft'?(index+trendViews.length-1)%trendViews.length:null;
-      if(next===null)return;event.preventDefault();setTrendView(trendViews[next]);renderTrend();$('view-'+trendViews[next]).focus();
-    });
-  });
   $('create-run').addEventListener('submit',async event=>{ event.preventDefault(); const error=$('create-error'); error.hidden=true; try { const data=definition(), submit=$('create-submit'); submit.disabled=true; const created=await window.CPC1Backend.createRun(data,requestId(data)); requestIds.delete(payloadKey(data)); state.runs.unshift(created); renderRuns(); event.target.reset();$('run-started').value=new Date().toLocaleDateString('en-CA');toggleMode(); message('Đã tạo đợt thực hiện.'); } catch(err) { error.textContent=errorText(err); error.hidden=false; } finally { $('create-submit').disabled=false; } });
   document.querySelectorAll('input[name="mode"]').forEach(input=>input.addEventListener('change',toggleMode)); $('single-system').addEventListener('change',()=>{renderScopePicker();void loadRequirements();});$('scope-picker').addEventListener('change',()=>void loadRequirements());$('campaign-systems').addEventListener('change',()=>void loadRequirements()); $('reload-runs').addEventListener('click',load); ['trend-system','trend-record','trend-form','trend-point','trend-metric'].forEach(id => $(id).addEventListener('change',()=>{state.hiddenPoints.clear();renderTrend();})); tabs(); $('run-started').value = new Date().toISOString().slice(0,10); load();
   window.addEventListener('cpc1:permissions-refreshed',()=>void load());
