@@ -78,6 +78,7 @@ try{
  assert.equal(await form.locator('#record-save').isDisabled(),true,'bound controls stay locked while the selected record is loading');
  assert.equal(await form.locator('#form-body input:not([readonly]):not([disabled])').count(),0,'blank pre-load fields cannot race the selected record');
  await form.evaluate(()=>window.__fixture.releaseLoad());
+ await form.locator('#run-context summary').click();
  await form.locator('#run-context').getByText('Máy đếm tiểu phân 01').waitFor();
  await form.locator('#entry-mode-warning').waitFor();
  await form.locator('.calibration-warning').getByText(/2026-09-26.*2026-09-27/).waitFor();
@@ -150,9 +151,9 @@ try{
  await form.evaluate(()=>window.__fixture.setCalibrationDue('2026-12-30'));
  await form.reload();
  await form.locator('#message').getByText(/Đã đồng bộ hạn thiết bị/).waitFor();
- const expiry=form.locator('[name="equipment.bm01.expiry"]');
- assert.equal(await expiry.inputValue(),'2026-12-30');
- assert.equal(await expiry.isEditable(),false,'mapped run calibration stays read only in the record');
+ assert.equal(await form.locator('[name="equipment.bm01.expiry"]').count(),0,'mapped run calibration is not repeated in the record');
+ await form.locator('#run-context summary').click();
+ assert.match(await form.locator('#run-context').textContent(),/2026-12-30/);
  await form.locator('#record-save').click();
  await form.locator('#correction-reason-dialog[open]').waitFor();
  assert.match(await form.locator('#correction-preview').textContent(),/equipment\.bm01\.expiry.*2026-09-26.*2026-12-30/s);

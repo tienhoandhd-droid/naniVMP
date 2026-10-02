@@ -51,9 +51,9 @@
   const calibrationWarnings=(config,data,system,form,point)=>{
     const run=config?._run,dates=measurementDates(data,system,form,point);if(!run||!dates.length)return [];
     return (run.calibration_requirements||[]).filter(item=>item.system===system&&item.form===form).flatMap(item=>{
-      const calibration=run.calibration?.[item.key],due=calibration?.due_on;
+      const calibration=run.calibration?.[item.key],path=item.payload_path,due=run.status!=='open'&&Array.isArray(path)&&path.length?at(data,path):calibration?.due_on;
       if(!/^\d{4}-\d{2}-\d{2}$/.test(due||''))return [];
-      return dates.filter(date=>date>due).map(measured_on=>({key:item.key,name:calibration.name||item.name||item.key,due_on:due,measured_on}));
+      return dates.filter(date=>date>due).map(measured_on=>({key:item.key,name:calibration?.name||item.name||item.key,due_on:due,measured_on}));
     });
   };
   const syncCalibration=(data,config)=>{

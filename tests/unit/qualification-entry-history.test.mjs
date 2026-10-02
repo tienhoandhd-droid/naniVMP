@@ -48,7 +48,7 @@ test('accepted baseline changes only for the current generation, session and rec
 });
 
 test('calibration warning compares due date with applicable point dates and never current day or run start',()=>{
- const config={_run:{started_on:'2030-01-01',calibration:{'air:bm01:expiry':{name:'Máy đếm',due_on:'2026-09-28'}},calibration_requirements:[{key:'air:bm01:expiry',system:'air',form:'bm01',label:'Hạn hiệu chuẩn',payload_path:['equipment','bm01','expiry']}]}};
+ const config={_run:{status:'open',started_on:'2030-01-01',calibration:{'air:bm01:expiry':{name:'Máy đếm',due_on:'2026-09-28'}},calibration_requirements:[{key:'air:bm01:expiry',system:'air',form:'bm01',label:'Hạn hiệu chuẩn',payload_path:['equipment','bm01','expiry']}]}};
  const data={forms:{bm01:{A1:{execution_date:'2026-09-27'},A2:{execution_date:'2026-09-29'}}}};
  assert.deepEqual(plain(history.calibrationWarnings(config,data,'air','bm01','A1')),[]);
  assert.deepEqual(plain(history.calibrationWarnings(config,data,'air','bm01','A2')),[{key:'air:bm01:expiry',name:'Máy đếm',due_on:'2026-09-28',measured_on:'2026-09-29'}]);
@@ -69,4 +69,14 @@ test('open runs sync mapped calibration dates into the draft while closed runs r
 test('history rows normalize legacy reason and preserve before/after as text values',()=>{
  const rows=history.historyRows([{version:3,created_at:'2026-09-29T02:03:04Z',actor_name:'QA <script>',reason:null,measurement_dates:['2026-09-27','2026-09-28'],changes:[{path:['forms','bm01','A1','p05'],before:'1',after:'2'}]}]);
  assert.deepEqual(plain(rows),[{version:3,saved_at:'2026-09-29T02:03:04Z',actor:'QA <script>',reason:'Không ghi nhận',measured_on:'2026-09-27, 2026-09-28',path:'forms.bm01.A1.p05',before:'1',after:'2'}]);
+});
+
+test('closed calibration warning uses mapped snapshot dates and preserves metadata-only devices without mutation',()=>{
+ const config={_run:{status:'closed',calibration:{mapped:{name:'Cân',due_on:'2026-12-30'},metadata:{name:'Dụng cụ',due_on:'2026-09-01'}},calibration_requirements:[{key:'mapped',system:'steam',form:'bm01',payload_path:['equipment','balance_due']},{key:'metadata',system:'steam',form:'bm01',payload_path:[]}]}};
+ const data={equipment:{balance_due:'2026-08-01'},bm01:{S1:[{date:'2026-09-27'}]}};
+ const before=JSON.stringify({config,data});
+ assert.deepEqual(plain(history.calibrationWarnings(config,data,'steam','bm01','S1')),[{key:'mapped',name:'Cân',due_on:'2026-08-01',measured_on:'2026-09-27'},{key:'metadata',name:'Dụng cụ',due_on:'2026-09-01',measured_on:'2026-09-27'}]);
+ assert.equal(JSON.stringify({config,data}),before);
+ delete data.equipment.balance_due;
+ assert.deepEqual(plain(history.calibrationWarnings(config,data,'steam','bm01','S1')),[{key:'metadata',name:'Dụng cụ',due_on:'2026-09-01',measured_on:'2026-09-27'}]);
 });
