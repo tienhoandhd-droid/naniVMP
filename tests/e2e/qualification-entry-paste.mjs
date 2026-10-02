@@ -34,7 +34,7 @@ window.CPC1Backend={mode:'cloud',capabilities:{auth:true,persistence:true},permi
  listHistory:async()=>[{run_id:runId,record_id:record,version:2,system,period:'2026-10-02',trend:['P.1','P2'].map(point=>({form:'bm01',metric:'p05',label:'Tiểu phân',unit:'hạt/m³',point_id:point,trial:1,value:Number(String(data().forms?.bm01?.[point]?.p05??'').replace(',','.')),source_value:data().forms?.bm01?.[point]?.p05}))}],
  historySnapshot:async()=>({data:data(),evaluation:{forms:{},source_context:{config:config()}}}),runRequirements:async()=>[],downloadHistorySource:async()=>new Blob()
 };document.body.dataset.qualificationGate='ready';`;
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||chromium.executablePath()});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
 const errors=[],external=[],writes=[];
 async function pageFor(system,form='bm01',extra=''){
