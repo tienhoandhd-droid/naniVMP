@@ -43,8 +43,8 @@ Files: public/tham-dinh-thuc-te/{gas.js,app.js,gas.html,steam.html}; new tests/e
 - [x] Primary inspect every diff and rerun relevant tests. Reviewer separate, gpt-5.6-sol for entry integrity plus chart UX. Give diff file, plan and receipts. Fix important findings with RED/GREEN and scoped re-review.
 - [x] Run units for paste/charts/entry-history/trend, entry+trend+run E2E, npm run typecheck, npm run build into private artifact, npm run drift and bundle budget. Do not overwrite active dist.
 - [x] Verify built artifact E2E, record hashes. Build/commit only owned changes. No push required for local delivery.
-- [ ] Create Desktop versioned package from verified artifact, retain old package. Update existing launcher path after inspecting it; replace only task-owned loopback4173 server if needed. Verify HTTP hashes and headless smoke without GUI. Rollback: prior package+launcher+4173 startup.
-- [ ] Update root and specialist PROJECT-STATE and final local/push/deploy status, brief usage instructions.
+- [x] Create Desktop versioned package from verified artifact, retain old package. Update existing launcher path after inspecting it; replace only task-owned loopback4173 server if needed. Verify HTTP hashes and headless smoke without GUI. Rollback: prior package+launcher+4173 startup.
+- [x] Update root and specialist PROJECT-STATE and final local/push/deploy status, brief usage instructions.
 
 ## Execution evidence — 02/10/2026
 
@@ -55,3 +55,5 @@ Independent review identified cached access check: getSession does not force con
 Evidence folder: /home/admin1/VMP/.cpc1/trend-entry-20261002. Desktop package30/09 retained for rollback. Final artifact check and activation receipts to follow.
 
 Independent final review ACCEPTED; no open findings. Final source and built E2E passed, 50 units passed, typecheck/build/drift/budget passed (5.81MB/6MB). 118-file Desktop package hashes match private artifact; ten edited static assets match source. Local activation follows; web not published.
+
+Local delivery completed: application commit b371d21e090547db4c1e0546e3033a3c8bc5480e, Desktop VMP-XU-HUONG-2026-10-02, loopback4173 PID461637. All118 HTTP files match artifact; ten edited static files match Git commit. Launcher updated/trusted, prior package and shortcut backed up, no GUI or production changes. Root/specialist state updated. deployment-receipt.json records exact scope and rollback.
