@@ -43,7 +43,7 @@
       const unknown=group.rows.filter(r=>r.action.state==='unknown').length,valid=group.rows.filter(r=>r.plotValue!==null).length;
       card.append(node('header',{class:'pq-card-header'},[
         node('div',{},[node('p',{class:'eyebrow',text:group.form.toUpperCase()+' · '+scope}),node('h2',{id:'pq-heading-'+index,text:group.label}),node('p',{class:'pq-card-meta',text:`${group.unit||'Không có đơn vị'} · ${group.points.length} điểm lấy mẫu · ${valid}/${group.rows.length} số đo được vẽ`})]),
-        node('div',{class:'pq-card-verdict'},[node('span',{class:out?'pq-warning':'',text:verdictPending?'Đang chờ tiêu chí PQ':group.rows.every(r=>r.action.state==='unknown')?'Chưa đối chiếu PQ':`${out} vượt PQ${unknown?' · '+unknown+' chưa đối chiếu':''}`}),node('span',{class:'pq-iqr-count',text:`${group.outliers.size} ngoại lai IQR`})])
+        node('div',{class:'pq-card-verdict'},[node('span',{class:out?'pq-warning':'',text:verdictPending?'Chưa tải được giới hạn PQ':group.rows.every(r=>r.action.state==='unknown')?'Chưa đối chiếu PQ':`${out} vượt PQ${unknown?' · '+unknown+' chưa đối chiếu':''}`}),node('span',{class:'pq-iqr-count',text:`${group.outliers.size} số đo khác biệt`})])
       ]));
       const visible=group.points.filter(p=>!hiddenPoints.has(p)),samples=group.rows.filter(r=>visible.includes(r.point_id)&&r.plotValue!==null);
       const numbers=samples.map(r=>r.plotValue);samples.forEach(r=>{if(Number.isFinite(r.action.limit))numbers.push(r.action.limit);});
@@ -55,15 +55,15 @@
       }
       const plots=node('div',{class:'pq-plots'}),figures=[];card.append(plots);
       for(const kind of ['individual','boxplot']){
-        const name=kind==='individual'?'Individual chart':'Boxplot',titleId=`pq-${index}-${kind}-title`,descId=`pq-${index}-${kind}-desc`;
+        const name=kind==='individual'?'Số đo theo điểm':'Phân bố số đo',titleId=`pq-${index}-${kind}-title`,descId=`pq-${index}-${kind}-desc`;
         const ruleCaption=node('span',{class:'pq-rule-caption',hidden:'hidden'});
         const tooltip=node('div',{class:'pq-tooltip',id:`pq-${index}-${kind}-tooltip`,role:'tooltip',hidden:'hidden'});
         const figure=node('figure',{class:'pq-figure'},[
-          node('div',{class:'pq-plot-heading'},[node('div',{},[node('h3',{text:name}),node('p',{class:'pq-chart-type',text:kind==='individual'?'Từng số đo tại các điểm lấy mẫu':'Hộp Q1–Q3 · trung vị · râu 1,5 × IQR'})]),ruleCaption])
+          node('div',{class:'pq-plot-heading'},[node('div',{},[node('h3',{text:name}),node('p',{class:'pq-chart-type',text:kind==='individual'?'Từng số đo tại các điểm lấy mẫu':'So sánh mức phân tán của số đo tại từng điểm'})]),ruleCaption])
         ]);
         const chart=node('svg',{'data-chart':kind,'data-y-min':low,'data-y-max':high,role:'group','aria-labelledby':titleId+' '+descId},[
           node('title',{id:titleId,text:group.label+' · '+name}),
-          node('desc',{id:descId,text:`${scope}. Trục X là điểm lấy mẫu; trục Y là giá trị ${group.unit}. Hình thoi đỏ vượt giới hạn PQ đã lưu. Vòng cam là ngoại lai thống kê 1,5 IQR. Nền đỏ nhạt chỉ vùng số ngoài giới hạn chung đã lưu. Không gộp các đợt. Một số đo chỉ vẽ điểm và trung vị.`})
+          node('desc',{id:descId,text:`${scope}. Trục X là điểm lấy mẫu; trục Y là giá trị ${group.unit}. Hình thoi đỏ vượt giới hạn PQ đã lưu. Vòng cam là số đo khác biệt so với các số đo cùng điểm, không đồng nghĩa với vượt giới hạn. Nền đỏ nhạt chỉ vùng số ngoài giới hạn chung đã lưu. Không gộp các đợt. Một số đo chỉ vẽ điểm và trung vị.`})
         ]);
         const scroll=node('div',{class:'pq-chart-scroll',tabindex:'0',role:'region','aria-label':name+' · '+group.label+' · có thể cuộn ngang'},[chart]);
         const hint=node('figcaption',{class:'pq-scroll-hint',hidden:'hidden',text:'Cuộn ngang để xem đủ các điểm lấy mẫu'});
@@ -101,11 +101,11 @@
       }
       const excluded=group.rows.length-valid,small=group.points.filter(p=>group.stats.get(p).smallSample);
       const footer=node('div',{class:'pq-card-footer'});
-      const smallNote=small.length>3?`${small.length} điểm có ít hơn 4 số đo; xem n dưới từng hộp.`:small.length?`${small.join(', ')}: ít mẫu.`:'';
-      const singletonNote=small.some(p=>group.stats.get(p).n===1)?'n=1 chỉ có số đo và trung vị.':'';
-      footer.append(node('p',{class:'pq-sample-note',text:[smallNote||'Hộp thể hiện Q1–Q3; các chấm bên cạnh là số đo gốc.',singletonNote,excluded?`${excluded} dòng thiếu/chưa chắc chắn giữ trong bảng.`:'','Ngoại lai IQR được đánh dấu riêng với vượt PQ.'].filter(Boolean).join(' ')}));
+      const smallNote=small.length>3?`${small.length} điểm có ít hơn 4 số đo; xem số lượng dưới từng hộp.`:small.length?`${small.join(', ')}: ít mẫu.`:'';
+      const singletonNote=small.some(p=>group.stats.get(p).n===1)?'Điểm chỉ có một số đo không vẽ hộp phân bố.':'';
+      footer.append(node('p',{class:'pq-sample-note',text:[smallNote||'Hộp cho thấy mức phân tán; các chấm bên cạnh là từng số đo.',singletonNote,excluded?`${excluded} dòng thiếu/chưa chắc chắn giữ trong bảng.`:'','Số đo khác biệt không đồng nghĩa với vượt giới hạn PQ.'].filter(Boolean).join(' ')}));
       const tbody=node('tbody',{},group.points.map(point=>{const st=group.stats.get(point);return node('tr',{'data-point':point},[label(group.form,point),st.n,fmt(st.q1),fmt(st.median),fmt(st.q3),fmt(st.iqr),fmt(st.lowerWhisker),fmt(st.upperWhisker),st.outliers.length].map(v=>node('td',{text:String(v)})));}));
-      footer.append(node('details',{class:'trend-details'},[node('summary',{text:'Xem thống kê Boxplot theo điểm'}),node('div',{class:'table-scroll',tabindex:'0',role:'region','aria-label':'Bảng thống kê '+group.label},[node('table',{class:'pq-stats-table'},[node('caption',{text:group.label+' · '+group.unit+' · phân vị tuyến tính (type 7)'}),node('thead',{},[node('tr',{},['Điểm','n','Q1','Trung vị','Q3','IQR','Râu dưới','Râu trên','Ngoại lai IQR'].map(t=>node('th',{scope:'col',text:t})))]),tbody])]) ]));
+      footer.append(node('details',{class:'trend-details'},[node('summary',{text:'Cách đọc phân bố và thống kê theo điểm'}),node('p',{class:'help',text:'Hộp chứa 50% số đo ở giữa (Q1–Q3); vạch giữa là trung vị. IQR = Q3 − Q1. Râu kéo đến số đo xa nhất còn nằm trong khoảng Q1 − 1,5 × IQR đến Q3 + 1,5 × IQR. Số đo ngoài khoảng này được đánh dấu khác biệt. n là số lượng số đo.'}),node('div',{class:'table-scroll',tabindex:'0',role:'region','aria-label':'Bảng thống kê '+group.label},[node('table',{class:'pq-stats-table'},[node('caption',{text:group.label+' · '+group.unit+' · phân vị tuyến tính (type 7)'}),node('thead',{},[node('tr',{},['Điểm','n','Q1','Trung vị','Q3','IQR','Râu dưới','Râu trên','Ngoại lai IQR'].map(t=>node('th',{scope:'col',text:t})))]),tbody])]) ]));
       card.append(footer);host.append(card);
       for(const {chart,scroll,kind,ruleCaption,hint,bind,hide,touchTargets} of figures){
         let lastWidth=0;
@@ -151,7 +151,7 @@
       if(kind==='boxplot')g.append(node('text',{x:x(i),y:bottom+43,'text-anchor':'middle',class:'pq-axis pq-n-label',text:'n='+group.stats.get(point).n}));
     });
     g.append(node('text',{x:(left+right)/2,y:342,'text-anchor':'middle',class:'pq-axis pq-x-title',text:'Điểm lấy mẫu'}));
-    if(!samples.length){g.append(node('text',{x:width/2,y:145,'text-anchor':'middle',class:'chart-empty',text:points.length?'Không có số đo đủ cơ sở để vẽ.':'Đã ẩn tất cả điểm.'}));return {ruleText};}
+    if(!samples.length){g.append(node('text',{x:width/2,y:145,'text-anchor':'middle',class:'chart-empty',text:points.length?'Chưa có số đo hợp lệ để vẽ.':'Đã ẩn tất cả điểm.'}));return {ruleText};}
     const bound=(b,x1,x2,point)=>{
       g.append(node('line',{x1,x2,y1:y(b.limit),y2:y(b.limit),class:'pq-limit','data-scope':point?'point':'shared',...(point?{'data-point':point}:{})}));
       if(point)g.append(node('text',{x:(x1+x2)/2,y:bottom+62,'text-anchor':'middle',class:'pq-limit-label','data-point':point,text:`${b.direction==='max'?'≤':'≥'} ${fmt(b.limit)}`}));
@@ -162,7 +162,8 @@
       const minOffset=offsets.length?Math.min(...offsets):0,spread=offsets.length?Math.max(...offsets)-minOffset:0;
       const boxX=stats.n>1?xx-(9+spread+8)/2:xx,capHalf=Math.min(12,boxHalf*.6);
       if(kind==='boxplot'&&stats.n){
-        const summary=`${label(group.form,point)} · n=${stats.n} · Q1 ${fmt(stats.q1)} · trung vị ${fmt(stats.median)} · Q3 ${fmt(stats.q3)} · IQR ${fmt(stats.iqr)}`;
+        const distribution=`${stats.n} số đo · khoảng giữa ${fmt(stats.q1)} đến ${fmt(stats.q3)} ${group.unit} · độ rộng khoảng giữa ${fmt(stats.iqr)} ${group.unit} · ${stats.outliers.length} số đo khác biệt`;
+        const summary=`${label(group.form,point)} · giá trị giữa ${fmt(stats.median)} ${group.unit} · ${distribution}`;
         const box=node('g',{class:'box-summary','data-point':point,'data-n':stats.n,tabindex:'0',role:'button','aria-label':summary});
         if(stats.n>1){
           box.append(node('line',{x1:boxX,x2:boxX,y1:y(stats.lowerWhisker),y2:y(stats.upperWhisker),class:'box-whisker'}));
@@ -170,14 +171,14 @@
           box.append(node('rect',{x:boxX-boxHalf,y:y(stats.q3),width:boxHalf*2,height:Math.max(1,y(stats.q1)-y(stats.q3)),class:'box-body'}));
         }
         box.append(node('line',{x1:boxX-(stats.n===1?capHalf:boxHalf),x2:boxX+(stats.n===1?capHalf:boxHalf),y1:y(stats.median),y2:y(stats.median),class:'box-median'}));g.append(box);
-        bind(box,label(group.form,point),`Trung vị ${fmt(stats.median)} ${group.unit}`,`n=${stats.n} · Q1 ${fmt(stats.q1)} · Q3 ${fmt(stats.q3)} · IQR ${fmt(stats.iqr)} · ${stats.outliers.length} ngoại lai IQR`,summary);
+        bind(box,label(group.form,point),`Giá trị giữa ${fmt(stats.median)} ${group.unit}`,distribution,summary);
       }
       values.forEach((row,j)=>{
         const cx=kind==='individual'?xx+individual[j]:stats.n>1?boxX+boxHalf+9+offsets[j]-minOffset:xx,yy=ys[j];
         const outside=['above','below'].includes(row.action.state),outlier=group.outliers.has(row);
         const heading=`${label(group.form,point)} · lần ${row.trial??1}`,value=`${row.action.rawValue??row.plotValue} ${group.unit}`;
-        const criterion=Number.isFinite(row.action.limit)&&row.action.direction?`PQ đã lưu ${row.action.direction==='max'?'≤':'≥'} ${fmt(row.action.limit)} ${group.unit}`:'Chưa có giới hạn PQ đủ cơ sở đối chiếu.';
-        const detail=[row.action.reason,criterion,outlier?'Ngoại lai IQR (1,5 × IQR)':'Không thuộc ngoại lai IQR.'].filter(Boolean).join('\n');
+        const criterion=Number.isFinite(row.action.limit)&&row.action.direction?`PQ đã lưu ${row.action.direction==='max'?'≤':'≥'} ${fmt(row.action.limit)} ${group.unit}`:'Chưa có giới hạn PQ phù hợp cho số đo này.';
+        const detail=[row.action.reason,criterion,outlier?'Số đo khác biệt so với các số đo cùng điểm; không đồng nghĩa với vượt giới hạn PQ.':'Không được đánh dấu khác biệt với số liệu hiện có.'].filter(Boolean).join('\n');
         const title=`${heading}: ${value} · ${detail.replace(/\n/g,' · ')}`;
         const attrs={class:(kind==='individual'?'individual-value':'box-value')+(outside?' pq-outside':''),'data-point':point,tabindex:'0',role:'button','aria-label':title};
         const radius=kind==='individual'?5:3.5;

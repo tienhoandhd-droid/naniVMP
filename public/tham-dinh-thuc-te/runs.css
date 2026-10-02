@@ -164,3 +164,6 @@ html[data-theme="dark"] #trend-panel {
   .pq-key { gap: 10px 16px; }
   .trend-assessment { padding: 10px 12px; }
 }
+
+.history-metric-control{display:grid;gap:8px;max-width:560px;margin:18px 0 8px;font-size:14px;font-weight:500}.history-metric-control select{min-width:0;width:100%;min-height:44px}
+ .multi-trend-legend:focus-visible{outline:2px solid var(--accent);outline-offset:3px}

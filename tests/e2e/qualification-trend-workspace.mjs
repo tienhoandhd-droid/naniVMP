@@ -63,10 +63,14 @@ try{
   await page.locator('#trend-record').selectOption(system+'-record-2:1');
   await page.waitForFunction(expected=>document.querySelector('#summary-outside').textContent===expected,outside);
   assert.equal(await page.locator('.pq-metric-card').count(),1,'one pair per selected form + metric + unit');
-  assert.equal(await page.locator('svg[data-chart]:visible').count(),2,'Individual and Boxplot are visible together');
+  assert.equal(await page.locator('svg[data-chart]:visible').count(),2,'Both plots are visible together');
+  assert.deepEqual(await page.locator('.pq-plot-heading h3').allTextContents(),['Số đo theo điểm','Phân bố số đo']);
+  assert.match(await page.locator('.pq-key').textContent(),/Số đo khác biệt/);
   assert.equal(await page.locator('#summary-points').textContent(),'3');
   assert.equal(await page.locator('#summary-samples').textContent(),'19');
   assert.equal(await page.locator('#summary-unknown').textContent(),'2');
+  assert.match(await page.locator('#trend-assessment').textContent(),/giới hạn cho phép/);
+  assert.doesNotMatch(await page.locator('#trend-assessment').textContent(),/cơ sở|hành động|tiêu chí/);
   assert.equal(await page.locator('#summary-outliers').textContent(),'2','IQR outliers differ from PQ failures');
   assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),17,'single run values never pool other records');
   assert.equal(await page.locator('[data-chart=individual] .pq-outside').count(),Number(outside));
@@ -87,7 +91,7 @@ try{
   assert.match(await page.locator('#chart-inspection').textContent(),/P1.*lần 1/);
   const tooltip=page.locator('.pq-tooltip:not([hidden])');await tooltip.waitFor();assert.match(await tooltip.textContent(),system==='steam'?/0\.93/:/-22/,'nearby tooltip preserves the raw saved value');
   assert.match(await tooltip.textContent(),system==='steam'?/PQ đã lưu ≥ 0,94 D/:/PQ đã lưu ≤ -10 °C/,'observation tooltip states the saved criterion with direction and unit');
-  assert.match(await tooltip.textContent(),/Không thuộc ngoại lai IQR/,'ordinary observation has separate IQR status');
+  assert.match(await tooltip.textContent(),/Không được đánh dấu khác biệt với số liệu hiện có/,'ordinary observation has separate IQR status');
   await page.locator('[data-chart=boxplot] .box-value').first().hover();assert.equal(await tooltip.count(),1,'only one observation tooltip is open across the pair');
   await page.keyboard.press('Escape');assert.equal(await tooltip.count(),0,'Escape dismisses the nearby tooltip even when mouse and keyboard target different plots');
   await page.locator('[data-chart=individual] .individual-value[data-point=P3]').scrollIntoViewIfNeeded();
@@ -112,14 +116,27 @@ try{
   await page.locator('#trend-form').selectOption('');
   assert.equal(await page.locator('.pq-metric-card').count(),system==='steam'?3:2,'all forms retain separate metrics and units');
   assert.equal(await page.locator('svg[data-chart]').count(),system==='steam'?6:4);
-  await page.locator('#trend-form').selectOption(system==='steam'?'bm03':'bm02');
   await page.locator('#history-chart-details summary').first().click();
+  const historyMetric=page.locator('#history-metric');
+  assert.equal(await historyMetric.locator('option').count(),system==='steam'?3:2);
+  const alternate=JSON.stringify(system==='steam'?['bm02','toc','ppb']:['bm01','p05','hạt/m³']);
+  await historyMetric.selectOption(alternate);
+  assert.match(await page.locator('#multi-trend-status').textContent(),system==='steam'?/TOC.*ppb/:/Tiểu phân.*hạt\/m³/);
+  assert.equal(await page.locator('#multi-trend-chart .multi-point').count(),6,'history switches to the explicitly selected series');
+  assert.equal(await page.locator('.pq-metric-card').count(),system==='steam'?3:2,'history choice leaves current-run charts unchanged');
+  await page.locator('#trend-record').selectOption(system+'-record-1:1');
+  assert.equal(await historyMetric.inputValue(),alternate,'history metric survives record change');
+  await page.locator('#trend-record').selectOption(system+'-record-2:1');
+  await page.locator('#trend-form').selectOption(system==='steam'?'bm03':'bm02');
+  assert.equal(await historyMetric.inputValue(),alternate,'history metric does not silently follow the first filtered group');
+  await historyMetric.selectOption(JSON.stringify([system==='steam'?'bm03':'bm02','result',system==='steam'?'D':'°C']));
   assert.match(await page.locator('#multi-trend-status').textContent(),/2 hồ sơ đã đóng/);
   await page.locator('#multi-data-details summary').click();
   assert.equal(await page.locator('#multi-trend-data tbody tr[data-source-state=uncertain]').count(),2);
   assert.equal(await page.locator('#multi-trend-data tbody tr[data-source-state=missing]').count(),2);
   assert.match(await page.locator('#multi-trend-data tbody').textContent(),new RegExp(system+'-record-1.*v1'));
-  await page.locator('#history-chart-details summary').first().click();
+  if(evidence)await page.locator('#history-chart-details').screenshot({path:evidence+'/'+system+'-history.png'});
+  await page.locator('#multi-data-details summary').click();
   await page.locator('#point-visibility summary').click();
   await page.locator('#trend-data-details summary').click();
   for(const theme of ['light','dark'])for(const width of [1440,390,320]){
@@ -157,5 +174,5 @@ try{
   await page.close();
  }
  assert.deepEqual(errors,[],'no JavaScript errors');assert.deepEqual(writes,[],'no network writes');assert.deepEqual(external,[],'no external requests');
- console.log('PASS Individual + Boxplot across three systems; saved-run grouping, PQ/IQR distinction, small samples, raw sources, limits, access, retry, history, 18 theme/viewport axe checks');
+ console.log('PASS readable chart pair and explicit historical metric across three systems; saved-run grouping, PQ/IQR distinction, small samples, raw sources, limits, access, retry, history, 18 theme/viewport axe checks');
 }finally{await context.close();await browser.close();}

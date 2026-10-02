@@ -96,7 +96,7 @@
     $('summary-samples').textContent=String(data.rows.length);
     $('summary-outside').textContent=loading||error||!item?'—':String(outside);
     $('summary-unknown').textContent=loading||error||!item?'—':String(unknown);
-    const text=!item?'Chưa có dữ liệu phù hợp. Chọn đợt, biểu mẫu và chỉ tiêu khi có hồ sơ đã lưu.':loading?'Đang tải tiêu chí của phiên bản hồ sơ để đối chiếu…':error?'Tiêu chí chưa tải được; chưa thể đối chiếu giới hạn. Thử tải lại tiêu chí.':!annotated.length?'Chưa có kết quả cho phạm vi đã chọn.':outside?`${outside} kết quả ngoài giới hạn hành động${unknown?`; ${unknown} kết quả chưa đủ cơ sở đối chiếu`:''}. Xem từng lần đo và nguồn hồ sơ bên dưới.`:unknown?`${annotated.length-unknown} kết quả trong giới hạn; ${unknown} kết quả chưa đủ cơ sở đối chiếu.`:'Tất cả kết quả trong phạm vi đang chọn đều nằm trong giới hạn hành động đã lưu.';
+    const text=!item?'Chưa có dữ liệu phù hợp. Chọn đợt, biểu mẫu và chỉ tiêu khi có hồ sơ đã lưu.':loading?'Đang tải giới hạn đã lưu cùng hồ sơ…':error?'Chưa tải được giới hạn đã lưu. Chọn “Tải lại giới hạn” để thử lại.':!annotated.length?'Chưa có kết quả cho phạm vi đã chọn.':outside?`${outside} kết quả ngoài giới hạn cho phép${unknown?`; ${unknown} kết quả chưa so sánh được với giới hạn; xem lý do trong bảng số liệu`:''}. Xem từng lần đo và nguồn hồ sơ bên dưới.`:unknown?`${annotated.length-unknown} kết quả trong giới hạn; ${unknown} kết quả chưa so sánh được với giới hạn; xem lý do trong bảng số liệu.`:'Tất cả kết quả trong phạm vi đang chọn đều nằm trong giới hạn cho phép đã lưu.';
     $('trend-assessment').textContent=text;
     $('trend-assessment-box').dataset.state=loading||error||!item?'pending':outside?'outside':unknown?'unknown':annotated.length?'within':'pending';
     $('assessment-scope').textContent=$('assessment-scope').dataset.recordScope;
@@ -116,21 +116,18 @@
   function renderMultiTrend(system,form,point,metric,unit){
     const history=closedTrendHistory(state.history,state.runs,system),data=trendSeries(history,system,form,point,metric,unit),chart=$('multi-trend-chart'),group=chart.querySelector('g'),width=Math.max(760,data.months.length*110+120),height=320,left=72,right=width-28,top=28,bottom=240;
     chart.setAttribute('viewBox',`0 0 ${width} ${height}`);chart.style.minWidth=width+'px';group.replaceChildren();
-    const visibleSeries=data.series.filter(series=>!state.hiddenPoints.has(series.point_id));
-    const values=visibleSeries.flatMap(series=>series.values).filter(Number.isFinite),low=values.length?Math.min(...values):0,high=values.length?Math.max(...values):1,pad=(high-low||Math.max(1,Math.abs(high)*.1))*.1,y=value=>bottom-(value-(low-pad))/((high+pad)-(low-pad))*(bottom-top),x=index=>data.months.length<2?left+(right-left)/2:left+(right-left)*index/(data.months.length-1);
+    const values=data.series.flatMap(series=>series.values).filter(Number.isFinite),low=values.length?Math.min(...values):0,high=values.length?Math.max(...values):1,pad=(high-low||Math.max(1,Math.abs(high)*.1))*.1,y=value=>bottom-(value-(low-pad))/((high+pad)-(low-pad))*(bottom-top),x=index=>data.months.length<2?left+(right-left)/2:left+(right-left)*index/(data.months.length-1);
     [0,.25,.5,.75,1].forEach(step=>{const yy=bottom-step*(bottom-top),value=(low-pad)+step*((high+pad)-(low-pad));group.append(el('line',{x1:left,x2:right,y1:yy,y2:yy,className:'chart-grid'}),el('text',{x:left-8,y:yy+4,'text-anchor':'end',className:'chart-label',text:value.toLocaleString('vi-VN',{maximumSignificantDigits:5})}));});
     data.months.forEach((month,index)=>group.append(el('text',{x:x(index),y:bottom+24,'text-anchor':'middle',className:'chart-label',text:month.slice(0,7)})));
     data.series.forEach((series,index)=>{
-      if(state.hiddenPoints.has(series.point_id))return;
       let segment=[];
       const flush=()=>{if(!segment.length)return;const path=segment.map((item,position)=>`${position?'L':'M'}${x(item.index)},${y(item.value)}`).join(' ');group.append(el('path',{d:path,className:`multi-line series-${index%6}`,'data-point':series.point_id},[el('title',{text:`${series.point_id} · lần ${series.trial} · chuỗi ${series.occurrence+1}`})]));segment=[];};
       series.values.forEach((value,monthIndex)=>{if(Number.isFinite(value)){segment.push({index:monthIndex,value});const title=`${data.months[monthIndex].slice(0,7)} · ${pointLabel(system,form,series.point_id)} · lần ${series.trial} · chuỗi ${series.occurrence+1}: ${value} ${data.unit}`;group.append(el('circle',{...observationProps(series.point_id,title),cx:x(monthIndex),cy:y(value),r:4,className:`multi-point series-${index%6}`},[el('title',{text:title})]));}else flush();});
       flush();
     });
-    const allHidden=data.series.length>0&&!visibleSeries.length;
-    if(!values.length)group.append(el('text',{x:width/2,y:130,'text-anchor':'middle',className:'chart-empty',text:allHidden?'Đã ẩn tất cả điểm. Chọn “Hiện tất cả điểm” để xem lại.':'Chưa có số liệu từ đợt đã đóng phù hợp.'}));
-    $('multi-trend-status').textContent=data.series.length?`${history.length} hồ sơ đã đóng · ${visibleSeries.length}/${data.series.length} chuỗi hiển thị · ${data.unit||'không có đơn vị'}${data.excluded?' · '+data.excluded+' kết quả thiếu hoặc chưa chắc chắn không được vẽ':''}. Chưa kết luận độ ổn định thống kê của hệ thống.`:'Chưa có số liệu từ đợt đã đóng cho lựa chọn này.';
-    $('multi-trend-legend').replaceChildren(...data.series.flatMap((series,index)=>state.hiddenPoints.has(series.point_id)?[]:[el('li',{},[el('span',{className:`multi-swatch series-${index%6}`,'aria-hidden':'true'}),el('span',{text:`${pointLabel(system,form,series.point_id)} · lần ${series.trial}${series.occurrence?' · chuỗi '+(series.occurrence+1):''}`})])]));
+    if(!values.length)group.append(el('text',{x:width/2,y:130,'text-anchor':'middle',className:'chart-empty',text:'Chưa có số liệu từ đợt đã đóng phù hợp.'}));
+    $('multi-trend-status').textContent=data.series.length?`${$('history-metric').selectedOptions[0]?.textContent||'Chỉ tiêu đã chọn'} · ${history.length} hồ sơ đã đóng · ${data.series.length} chuỗi điểm và lần đo${data.excluded?' · '+data.excluded+' kết quả thiếu hoặc chưa chắc chắn không được vẽ':''}. Chưa kết luận độ ổn định thống kê của hệ thống.`:'Chưa có số liệu từ đợt đã đóng cho lựa chọn này.';
+    $('multi-trend-legend').replaceChildren(...data.series.flatMap((series,index)=>[el('li',{},[el('span',{className:`multi-swatch series-${index%6}`,'aria-hidden':'true'}),el('span',{text:`${pointLabel(system,form,series.point_id)} · lần ${series.trial}${series.occurrence?' · chuỗi '+(series.occurrence+1):''}`})])]));
     // The table is an alternative to the chart: preserve every saved source row,
     // including observations that cannot be plotted. Gap rows are explicitly synthetic.
     const tableRows=data.rows.map(row=>({...row,sourceState:row.uncertain?'uncertain':Number.isFinite(row.value)?'saved':'missing'}));
@@ -167,18 +164,26 @@
     renderAssessment(item,data,annotated,loading,error);
     $('summary-outliers').textContent=String(groups.reduce((n,g)=>n+g.outliers.size,0));
     $('chart-inspection').textContent='Chạm, di chuột hoặc dùng bàn phím tới số đo để xem điểm, lần đo và giá trị.';
-    $('limit-source').textContent=error?`Không tải được tiêu chí: ${error}`:loading?'Đang tải tiêu chí đúng phiên bản hồ sơ…':snapshot?`Giới hạn PQ từ hồ sơ v${item.version} · ${snapshot.evaluation?.formula_version||'phiên bản đã lưu'}.`:'Chưa có hồ sơ đã lưu.';
+    $('limit-source').textContent=error?`Không tải được giới hạn đã lưu: ${error}`:loading?'Đang tải giới hạn đã lưu cùng hồ sơ…':snapshot?`Giới hạn PQ từ hồ sơ v${item.version} · ${snapshot.evaluation?.formula_version||'phiên bản đã lưu'}.`:'Chưa có hồ sơ đã lưu.';
     $('limits-retry').hidden=!error;$('limits-retry').onclick=()=>{state.snapshotErrors.delete(skey);renderTrend();};
     const legend=$('chart-legend');legend.replaceChildren();
-    const historyGroup=groups[0],outlierIndices=new Set(groups.flatMap(g=>[...g.outliers].map(r=>r.sourceIndex)));
+    const historyMetrics=[...new Map(closedTrendHistory(state.history,state.runs,system).flatMap(h=>h.trend||[]).map(row=>[JSON.stringify([row.form,row.metric,row.unit||'']),{value:JSON.stringify([row.form,row.metric,row.unit||'']),label:`${row.form.toUpperCase()} · ${row.label||row.metric}${row.unit?' ('+row.unit+')':''}`}])).values()];
+    selectOptions($('history-metric'),historyMetrics,$('history-metric').value);
+    $('history-metric').disabled=!historyMetrics.length;
+    const drawHistory=()=>{
+      const selectedHistory=$('history-metric').value?JSON.parse($('history-metric').value):null;
+      renderMultiTrend(system,selectedHistory?.[0]||'', '',selectedHistory?.[1]||'',selectedHistory?.[2]||'');
+    };
+    $('history-metric').onchange=drawHistory;
+    const outlierIndices=new Set(groups.flatMap(g=>[...g.outliers].map(r=>r.sourceIndex)));
     $('trend-data').querySelector('caption').textContent=`Giá trị nguồn và giá trị tính đã lưu · ${item?.record_id||'—'} · v${item?.version??'—'}`;
     function draw(){
       const outside=annotated.filter(r=>['above','below'].includes(r.action.state)),unknown=annotated.filter(r=>r.action.state==='unknown');
-      $('trend-note').textContent=`${groups.length} chỉ tiêu · mỗi chỉ tiêu gồm Individual plot và Boxplot · ${data.points.filter(p=>!state.hiddenPoints.has(p)).length}/${data.points.length} điểm hiển thị.`;
-      $('limit-summary').textContent=loading||error||!item?$('trend-assessment').textContent:`${outside.length} kết quả ngoài giới hạn PQ · ${unknown.length} kết quả chưa đủ cơ sở đối chiếu.`;
+      $('trend-note').textContent=`${groups.length} chỉ tiêu · số đo theo điểm và phân bố số đo · ${data.points.filter(p=>!state.hiddenPoints.has(p)).length}/${data.points.length} điểm hiển thị.`;
+      $('limit-summary').textContent=loading||error||!item?$('trend-assessment').textContent:`${outside.length} kết quả ngoài giới hạn PQ · ${unknown.length} kết quả chưa so sánh được với giới hạn; xem lý do trong bảng số liệu.`;
       $('limit-exceptions').replaceChildren();
       window.CPC1PQCharts.render($('pq-metric-charts'),groups,{hiddenPoints:state.hiddenPoints,label:(form,id)=>pointLabel(system,form,id),scope:$('assessment-scope').textContent,verdictPending:loading||!!error||!item,inspect:text=>{$('chart-inspection').textContent=text;}});
-      renderMultiTrend(system,historyGroup?.form||'',point,historyGroup?.metric||'',historyGroup?.unit||'');
+      drawHistory();
       $('trend-data').querySelector('tbody').replaceChildren(...annotated.map(row=>el('tr',{},[
         item?.period?.slice(0,7)||'—',`${item?.record_id||'—'} · v${item?.version??'—'}`,row.form?.toUpperCase(),row.point_id,row.label||row.metric,row.trial??'—',row.source_value??'—',row.action.rawValue??row.value??'—',row.unit||'—',
         row.action.limit===null?'Chưa xác định':`${row.action.direction==='max'?'≤':'≥'} ${row.action.limit}`,row.action.reason,outlierIndices.has(row.sourceIndex)?'Ngoại lai IQR · cần xem xét':row.uncertain||!Number.isFinite(row.value)?'Không đưa vào thống kê':'Không ngoại lai IQR',
