@@ -4,6 +4,10 @@
 -- deliberately self-contained and always rolls its synthetic fixture back.
 begin;
 
+-- Own this FK fixture so a fresh production clone needs no pre-seeding.
+insert into public.departments(id,name,short_name)
+values('QA','QA rollback fixture','QAU') on conflict(id) do nothing;
+
 create temporary table crud_catalog_results(
   scenario_id text primary key, passed boolean not null
 ) on commit drop;

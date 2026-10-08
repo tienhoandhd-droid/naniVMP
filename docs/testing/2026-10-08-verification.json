@@ -103,13 +103,13 @@
     "tests/e2e/workload-owner-transfer.mjs": "916f19ea0319f11eb2a60df3f21fb8f8bf9695e4efa28135985e29d47096c1b5",
     "tests/e2e/catalog-real-db.mjs": "4d45497b99d0082f1eea6fe007e90ce1433984146658cc132ea0fd22b287a541",
     "scripts/run-crud-role-db-tests.py": "3fd49ff727baacc340fc6310a542cfee5508f32bb472bb2cf934c0ffa2b92ff2",
-    "tests/sql/crud-catalog-role-audit.sql": "33c8cce10e3efe0e7cdc7aa4a462fa3f6a38e67283d862faa9e86b00c6da7f31",
+    "tests/sql/crud-catalog-role-audit.sql": "7260a16d7dc570b7d9e4f36f9d7974b1fee55818a2cc3b3d3fc4aac73ae96d99",
     "tests/sql/crud-progress-account-roles.sql": "6d9eaebd626ca0c2bc6daae58464f79f29c17e87280dad2bbde5baf413138814",
     "tests/sql/crud-people-plan-lifecycle.sql": "783bd224919967c954334cd841bbd7c78eb2b5daf8877afb65019df820c5bd3e",
-    "tests/sql/crud-admin-role-mode-matrix.sql": "dd35268d2841a8df1da89bd00686fe0edaf1a22deb4fed0833906606d19a188f",
+    "tests/sql/crud-admin-role-mode-matrix.sql": "bed14dc994bbdea5b4a47020f199d505e89cb0faa7f0d755a813ea9e099e3e35",
     "tests/sql/crud-source-assignment-role-matrix.sql": "8b8fb88c67a2c1cb79d8306b2ac9d7fdc76feddac21fc7ede2c9fc4b3f081451",
-    "supabase/tests/crud_qualification_roles.sql": "160f95579edbb563cadb0dc28f79915b997a59feae153acdfa0408835667bc9d",
-    "supabase/tests/crud_qualification_all_forms.sql": "0eaa23b5911e5b33ea08a974ed314ca4ac89d25fc213c97c34c8064841875d9f",
+    "supabase/tests/crud_qualification_roles.sql": "6a24f2ec5209bdc9533e206983a1d0241f414441d6943e68df87c059488c9e88",
+    "supabase/tests/crud_qualification_all_forms.sql": "2a7b94c6eeb669347924588c81ffef564033c9a607fc9f86871adb5f393cdc2f",
     "supabase/migrations/20261008160000_qa_account_link_department_normalization.sql": "bf2a2e2be76800ea85c5ca5085b12ed98d9278bb9746a2b8880cd899ca34d8ec",
     "supabase/migrations/20261008150000_catalog_persistence_audit_repair.sql": "384178dae9c5f3729ec7ebd9098d9445fecc97c6b54f48a3d634149116cf208b",
     "supabase/migrations/20261008170000_plan_cancellation_audit_reason.sql": "f05e85f8c6106bdb9607e063567c8c2d06a1507ff872625552a17316ee950b31"
@@ -121,5 +121,11 @@
     "existing_supabase_services": "not restarted or stopped"
   },
   "independent_review": "accepted: migration guards/ACL, UI business-key/schedule contracts, all-field readback/no-effect assertions, cancellation audit context; full coverage limits retained",
-  "snapshot_scope": "Pre-release local verification; deployment status is recorded separately in workspace PROJECT-STATE and private release receipt."
+  "snapshot_scope": "Pre-release local verification; deployment status is recorded separately in workspace PROJECT-STATE and private release receipt.",
+  "fresh_release_clone_verification": {
+    "database": "vmp_crud_audit_release_20261008",
+    "all_seven_suites_passed": true,
+    "fixture_fix": "Four suites now create uppercase QA department inside their rollback transaction; no external seed required.",
+    "evidence_private_root": "/home/admin1/VMP/.cpc1/crud-release-20261008/fresh-db-tests"
+  }
 }

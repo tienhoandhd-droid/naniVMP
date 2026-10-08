@@ -1,5 +1,9 @@
 \set ON_ERROR_STOP on
 begin;
+
+-- Own this FK fixture so a fresh production clone needs no pre-seeding.
+insert into public.departments(id,name,short_name)
+values('QA','QA rollback fixture','QAU') on conflict(id) do nothing;
 set local statement_timeout='60s';
 set local lock_timeout='5s';
 

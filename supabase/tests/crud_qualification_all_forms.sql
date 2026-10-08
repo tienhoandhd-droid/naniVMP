@@ -1,5 +1,9 @@
 \set ON_ERROR_STOP on
 begin;
+
+-- Own this FK fixture so a fresh production clone needs no pre-seeding.
+insert into public.departments(id,name,short_name)
+values('QA','QA rollback fixture','QAU') on conflict(id) do nothing;
 set local statement_timeout='120s';set local lock_timeout='5s';
 create function pg_temp.actor(u uuid)returns void language sql as $$select set_config('request.jwt.claim.sub',u::text,true)$$;
 create function pg_temp.must_state(q text,s text,id text)returns void language plpgsql as $$begin execute q;raise exception '% succeeded',id;

@@ -72,3 +72,7 @@ Browser danh mục backend mock: **173 đạt/0 lỗi**. 15/17 bộ mock đầu 
 Các lần trước chủ yếu chứng minh giao diện gửi request đúng hoặc mock trả thành công. Chúng không kiểm đầy đủ hợp đồng UI→RPC→database và không đọc lại tất cả trường/trạng thái. Đợt này đã bắt được cả lỗi ngăn lưu và lỗi nguy hiểm hơn: báo thành công nhưng không lưu thay đổi. Các regression mới được giữ trong repo và có bằng chứng RED/GREEN, cùng reviewer độc lập kiểm cả bản sửa lẫn chất lượng phép kiểm.
 
 Bằng chứng riêng nằm `/home/admin1/VMP/.cpc1/crud-audit-20261008/`; không đưa DB dump, token, dữ liệu cá nhân hoặc cấu hình riêng vào Git.
+
+### Kiểm lại trước phát hành
+
+Bản sao production mới `vmp_crud_audit_release_20261008` phát hiện bốn suite còn dựa vào phòng ban QA viết hoa có sẵn ở clone cũ. Đã bổ sung fixture QA trong transaction rollback của từng suite; cả bảy suite chạy đạt trên bản sao mới. Đây là sửa tính độc lập của phép kiểm, không thay đổi dữ liệu hay logic ứng dụng. Evidence riêng: `crud-release-20261008/fresh-db-tests-red-fixtures` và `fresh-db-tests`.
