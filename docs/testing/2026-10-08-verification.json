@@ -101,7 +101,7 @@
     "src/features/catalogWorkspace/CatalogRecordDialog.tsx": "9036b360807ff6e6276254ee6c34dac4b8f379c35c5d9964b719721c8303c77b",
     "src/features/catalogWorkspace/definitions.ts": "58c349d1a76d8b213511c81bd24c80daa03c680b88e38b76c341e59f8aae5cf6",
     "tests/e2e/workload-owner-transfer.mjs": "916f19ea0319f11eb2a60df3f21fb8f8bf9695e4efa28135985e29d47096c1b5",
-    "tests/e2e/catalog-real-db.mjs": "4d45497b99d0082f1eea6fe007e90ce1433984146658cc132ea0fd22b287a541",
+    "tests/e2e/catalog-real-db.mjs": "da671b5b8933169c05feb8b27cd5162aa66fba7075d6f845df9776225746fd58",
     "scripts/run-crud-role-db-tests.py": "3fd49ff727baacc340fc6310a542cfee5508f32bb472bb2cf934c0ffa2b92ff2",
     "tests/sql/crud-catalog-role-audit.sql": "7260a16d7dc570b7d9e4f36f9d7974b1fee55818a2cc3b3d3fc4aac73ae96d99",
     "tests/sql/crud-progress-account-roles.sql": "6d9eaebd626ca0c2bc6daae58464f79f29c17e87280dad2bbde5baf413138814",
@@ -127,5 +127,21 @@
     "all_seven_suites_passed": true,
     "fixture_fix": "Four suites now create uppercase QA department inside their rollback transaction; no external seed required.",
     "evidence_private_root": "/home/admin1/VMP/.cpc1/crud-release-20261008/fresh-db-tests"
+  },
+  "deployed_app_browser_verification": {
+    "app_commit": "9e4a7a445b2c5004d2897bebe14860d94ec3acbc",
+    "workflow_run": 37752796255,
+    "ci_jobs_passed": 6,
+    "live_assets_verified": 119,
+    "full_browser_receipt": "catalog-real-db-1791450631480-531629.json",
+    "result": "PASS",
+    "harness_change": "Wait for visible editable BFO and initial dialog focus, type once and assert exact value before saving.",
+    "prior_failures_retained": [
+      "catalog-real-db-1791450336652-525726.json",
+      "catalog-real-db-1791450522024-529441.json"
+    ],
+    "prior_failure_scope": "Automation typed before scheduled initial dialog focus; BFO empty, save validation blocked before RPC. No app or migration change required.",
+    "auth_user_mocked": true,
+    "business_rest_real_disposable_db": true
   }
 }

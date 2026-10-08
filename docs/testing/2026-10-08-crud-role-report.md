@@ -76,3 +76,7 @@ Bằng chứng riêng nằm `/home/admin1/VMP/.cpc1/crud-audit-20261008/`; khôn
 ### Kiểm lại trước phát hành
 
 Bản sao production mới `vmp_crud_audit_release_20261008` phát hiện bốn suite còn dựa vào phòng ban QA viết hoa có sẵn ở clone cũ. Đã bổ sung fixture QA trong transaction rollback của từng suite; cả bảy suite chạy đạt trên bản sao mới. Đây là sửa tính độc lập của phép kiểm, không thay đổi dữ liệu hay logic ứng dụng. Evidence riêng: `crud-release-20261008/fresh-db-tests-red-fixtures` và `fresh-db-tests`.
+
+### Kiểm tra trên file tải từ web
+
+Bản ứng dụng `9e4a7a4`: CI37752796255 đạt 6 job, 119 file live khớp artifact. Hai lượt browser ban đầu dừng trước RPC tạo sản phẩm vì script gõ BFO trước khi hộp thoại hoàn tất đặt focus. Giữ nguyên receipt lỗi. Đã sửa riêng phép kiểm: chờ ô hiện/không khóa và focus đã vào hộp thoại, gõ một lần, kiểm giá trị exact ngay sau gõ; không tự điền lại hoặc bỏ qua kiểm lỗi. Lượt đầy đủ `catalog-real-db-1791450631480-531629.json` đạt 10 Source lifecycle, sản phẩm/cảnh báo admin và quản lý QA, bốn quyền bị từ chối. Auth/user vẫn giả lập, REST nghiệp vụ dùng DB thử riêng. Không sửa ứng dụng hoặc áp lại migration cho thay đổi phép kiểm này.

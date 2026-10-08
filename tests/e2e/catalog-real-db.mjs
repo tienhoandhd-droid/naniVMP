@@ -531,7 +531,7 @@ async function runProductLifecycle(browser, role, ordinal) {
     await waitForSourceSettled(page);
     await openDataset(page, "products");
     await page.click("[data-cw-them]");
-    await page.waitForSelector("#cw-products-bfo_code", { timeout: 10_000 });
+    await page.waitForSelector("#cw-products-bfo_code", { visible: true, timeout: 10_000 });
     const keyDisabled = await page.$eval("#cw-products-bfo_code", (input) => input.disabled);
     if (keyDisabled) {
       observation.create = "BLOCKED_UI_BUSINESS_KEY_DISABLED";
@@ -539,7 +539,16 @@ async function runProductLifecycle(browser, role, ordinal) {
       observation.disable = "NOT_RUN_CREATE_BLOCKED";
       return;
     }
+    // The dialog moves initial focus after mounting. Typing before that move
+    // can send the first field's keystrokes to its close button instead.
+    await page.waitForFunction(() => {
+      const input = document.querySelector("#cw-products-bfo_code");
+      return input && !input.disabled && !input.readOnly
+        && input.closest('[role="dialog"]')?.contains(document.activeElement);
+    }, { timeout: 5_000 });
     await page.type("#cw-products-bfo_code", code);
+    assert(await page.$eval("#cw-products-bfo_code", (input, wanted) => input.value === wanted, code),
+      `${role} product BFO keyboard input did not reach the field`);
     await page.type("#cw-products-product_name", `Product ${code}`);
     await page.type("#cw-products-ingredients", "Synthetic ingredient");
     await typeOpenValue(page, "#cw-products-strength", "Hàm lượng", "10 mg");
