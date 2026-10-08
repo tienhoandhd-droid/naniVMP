@@ -12,7 +12,7 @@ const fixture=`
 const configs=${JSON.stringify(configs)};
 const variant=new URLSearchParams(location.search).get('fixture');
 const systems=['air','nitrogen','steam'],locations=Array.from({length:variant==='many-points'?17:3},(_,i)=>({id:'P'+(i+1),name:'Điểm lấy mẫu tại khu vực sản xuất '+(i+1)}));
-const settings=system=>system==='steam'?{...configs.settings,locations}:{...configs.gas_settings.find(c=>c.system===system).config,system,forms:[{id:'bm02',title:'Điểm sương',kind:'measurement',locations:locations.map(p=>({...p,limits:{dewpoint:variant==='segmented-equal-bound'&&p.id==='P3'?-20:variant==='different'&&p.id==='P2'?-12:-10}}))},{id:'bm01',title:'Tiểu phân',kind:'measurement',locations:locations.map(p=>({...p,limits:{p05:100}}))}]};
+const settings=system=>system==='steam'?{...configs.settings,locations}:{...configs.gas_settings.find(c=>c.system===system).config,system,forms:[{id:'bm02',title:'Điểm sương',kind:'measurement',locations:locations.map(p=>({...p,limits:{dewpoint:variant==='segmented-equal-bound'&&p.id==='P3'?-20:variant==='different'&&p.id==='P2'?-12:-10}}))},{id:'bm01',title:'Tiểu phân',kind:'measurement',locations:locations.map(p=>({...p,limits:{p05:100,p5:5}}))}]};
 const rows=(system,early=false)=>{
  const steam=system==='steam',form=steam?'bm03':'bm02',unit=steam?'D':'°C',label=steam?'Độ khô':'Điểm sương';
  let values=steam?[[.93,.94,.95,.96,.97,.98,.99,1.10],[.92,.93,.94,.95,.96,.97,.98,1.09],[.95]]:[[-22,-21,-20,-19,-18,-17,-16,-1],[-35,-34,-33,-32,-31,-30,-29,-18],[-20]];
@@ -21,7 +21,7 @@ const rows=(system,early=false)=>{
  const out=values.flatMap((vals,i)=>vals.map((value,j)=>({form,metric:'result',unit,label,point_id:'P'+(i+1),trial:j+1,value:early?value+(steam?.001:-.01):value,source_value:String(value),computed_status:'pass'})));
  if(variant==='equal-bound'&&!steam){out.at(-1).value=-10;out.at(-1).source_value='-10';}
  out.push({...out.at(-1),trial:2,value:steam?.96:-21,uncertain:true},{...out.at(-1),trial:3,value:null,source_value:'Không đọc được'});
- for(const [metric,label,unit,vals] of steam?[['conductivity','Độ dẫn điện','µS/cm',[1,2,6]],['toc','TOC','ppb',[100,200,300]]]:[['p05','Tiểu phân ≥ 0,5 µm','hạt/m³',[10,50,150]]])vals.forEach((value,i)=>out.push({form:steam?'bm02':'bm01',metric,label,unit,point_id:'P'+(i+1),trial:1,value,source_value:String(value),computed_status:'pass'}));
+ for(const [metric,label,unit,vals] of steam?[['conductivity','Độ dẫn điện','µS/cm',[1,2,6]],['toc','TOC','ppb',[100,200,300]]]:[['p05','Tiểu phân ≥ 0,5 µm','hạt/m³',[10,50,150]],...(system==='air'?[['p5','Tiểu phân ≥ 5 µm','hạt/m³',[8,2,2]]]:[])])vals.forEach((value,i)=>out.push({form:steam?'bm02':'bm01',metric,label,unit,point_id:'P'+(i+1),trial:1,value,source_value:String(value),computed_status:'pass'}));
  if(variant==='mixed-unit'&&!steam)out.push({...out[0],unit:'K',value:293,source_value:'293'});
  return out;
 };
@@ -32,8 +32,8 @@ const snapshots=Object.fromEntries(history.map(item=>{
  for(const form of [...new Set(item.trend.map(r=>r.form))]){const measured={};raw[form]={};for(const p of locations){const pointRows=item.trend.filter(r=>r.form===form&&r.point_id===p.id);if(form===main)measured[p.id]=pointRows.map(r=>({status:r.uncertain||r.value===null?'invalid':'pass',values:{raw_result:String(r.value)}}));else{measured[p.id]={status:'pass',parameters:Object.fromEntries(pointRows.map(r=>[r.metric,'pass']))};raw[form][p.id]=Object.fromEntries(pointRows.map(r=>[r.metric,String(r.value)]));}}forms[form]={rows:measured};}
  if(variant==='raw-precision'&&!steam)forms[main].rows.P1[0].values.raw_result='-9.999';
  const data=steam?{system:'steam',bm02:raw.bm02}:{system:item.system,forms:raw};
- const source_context=variant==='unknown'?{}:steam?{criteria:{dryness_min:.94,conductivity_max:5,toc_max:500}}:{config:settings(item.system)};
- return [item.record_id,{data,evaluation:{formula_version:'fixture-1',source_context,forms}}];
+ const source_context=variant==='unknown'?{}:steam?{config:settings('steam'),criteria:{dryness_min:.94,conductivity_max:5,toc_max:500}}:{config:settings(item.system)};
+ return [item.record_id,{data,evaluation:{formula_version:'fixture-1',source_context,forms,...(variant==='absent-point'?{run_scope:{bm01:['P1','P2','P3','P4'],bm02:['P1','P2','P3','P4']}}:{})}}];
 }));
 window.__trendFixture={snapshots,calls:0,fail:variant==='error'};
 window.CPC1Backend={permissionsFor:system=>({can_view:!(variant==='restricted'&&system==='air'),can_view_current:!(variant==='restricted'&&system==='air'),can_enter:false}),getSession:async()=>({user:{id:'fixture-qa'}}),getConfig:async()=>settings('steam'),getGasConfig:async s=>settings(s),listRuns:async()=>structuredClone(runs),listHistory:async()=>variant==='empty'?[]:structuredClone(history),runRequirements:async()=>[],historySnapshot:async(id)=>{window.__trendFixture.calls++;if(variant==='pending'&&!window.__trendFixture.released)await new Promise(resolve=>window.__trendFixture.release=()=>{window.__trendFixture.released=true;resolve();});if(window.__trendFixture.fail)throw Error('Tiêu chí tạm thời chưa tải được');return structuredClone(snapshots[id]);},downloadHistorySource:async()=>new Blob()};
@@ -42,14 +42,44 @@ new Function(fixture);
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||chromium.executablePath()});
 const context=await browser.newContext({viewport:{width:1440,height:1000},hasTouch:true});
 const errors=[],writes=[],external=[];
-async function pageFor(system,extra=''){
+async function pageFor(system,extra='',selectMain=true){
  const page=await context.newPage();page.setDefaultTimeout(6000);page.on('pageerror',error=>errors.push(error.message));
  await page.route('**/*',async route=>{const req=route.request(),url=new URL(req.url());if(req.method()!=='GET')writes.push(req.url());if(url.origin!=='http://qualification.test'){external.push(url.origin);return route.abort();}if(url.pathname.endsWith('/cloud.js'))return route.fulfill({contentType:'text/javascript',body:fixture});if(url.pathname.endsWith('/runtime-config.js'))return route.fulfill({contentType:'text/javascript',body:'window.CPC1_SETTINGS={};'});try{const ext=url.pathname.split('.').at(-1);return route.fulfill({body:await readFile(publicRoot+url.pathname),contentType:({html:'text/html',js:'text/javascript',css:'text/css',svg:'image/svg+xml',png:'image/png'})[ext]||'application/octet-stream'});}catch{return route.fulfill({status:404});}});
  await page.goto('http://qualification.test/tham-dinh-thuc-te/runs.html?view=trend&system='+system+extra);
  try{await page.locator('#runs-status').getByText('Đã tải dữ liệu đợt và xu hướng.').waitFor();}catch(error){console.log('fixture diagnostic',await page.locator('#runs-status').textContent(),errors);throw error;}
+ if(selectMain&&system!=='nitrogen'&&await page.locator('#trend-form option').count()>1)await page.locator('#trend-form').selectOption(system==='steam'?'bm03':'bm02');
  return page;
 }
 try{
+ // Approved one-run design: both particle channels are independently plotted and summarized.
+ const particle=await pageFor('air','',false);
+ await particle.waitForFunction(()=>document.querySelector('#limit-source').textContent.includes('fixture-1'));
+ assert.equal(await particle.locator('.pq-metric-card').count(),3,'default shows every available metric');
+ await particle.locator('#trend-form').selectOption('bm01');
+ for(const [metric,min,max,failed] of [['p05','10','150','P3'],['p5','2','8','P1']]){
+  const card=particle.locator(`.pq-metric-card[data-metric="${metric}"]`);
+  assert.equal(await card.locator('[data-chart=bar] .bar-value').count(),3);
+  assert.equal(await card.locator('.pq-point-summary').count(),1);
+  assert.equal(await card.locator('[data-summary=min] .pq-summary-value').textContent(),min+' hạt/m³');
+  assert.equal(await card.locator('[data-summary=max] .pq-summary-value').textContent(),max+' hạt/m³');
+  assert.equal(await card.locator('[data-summary=pass] .pq-summary-value').textContent(),'2');
+  assert.equal(await card.locator('[data-summary=fail] .pq-summary-value').textContent(),'1');
+  assert.match(await card.locator('[data-summary=fail] .pq-summary-locations').textContent(),new RegExp(failed));
+  assert.equal(await card.locator('[data-chart=bar]').getAttribute('data-y-min'),'0');
+ }
+ assert.match(await particle.locator('[data-metric=p5] [data-summary=min] .pq-summary-locations').textContent(),/P2.*P3/s,'all tied minima retain locations');
+ for(const metric of ['p05','p5']){
+  await particle.locator('#trend-metric').selectOption(JSON.stringify(['bm01',metric,'hạt/m³']));
+  assert.equal(await particle.locator('.pq-metric-card').count(),1,'metric filter does not fabricate an empty sibling');
+  assert.equal(await particle.locator('.pq-metric-card').getAttribute('data-metric'),metric);
+  assert.equal(await particle.locator('[data-summary=min] .pq-summary-value').textContent(),(metric==='p05'?'10':'2')+' hạt/m³');
+ }
+ await particle.locator('#trend-metric').selectOption('');
+ const before=await particle.locator('.pq-point-summary').allTextContents();
+ await particle.locator('#point-visibility summary').click();await particle.locator('#chart-legend input[value=P3]').uncheck();
+ assert.deepEqual(await particle.locator('.pq-point-summary').allTextContents(),before,'hidden failing point stays in summary');
+ if(evidence)await particle.screenshot({path:evidence+'/both-particles-summary.png',fullPage:true});
+ await particle.close();
  for(const [system,title] of [['air','Khí nén'],['nitrogen','Khí nitơ'],['steam','Hơi tinh khiết']]){
   const page=await pageFor(system),outside=system==='steam'?'3':'1';
   await page.waitForFunction(expected=>document.querySelector('#summary-outside')?.textContent===expected,outside);
@@ -63,8 +93,8 @@ try{
   await page.locator('#trend-record').selectOption(system+'-record-2:1');
   await page.waitForFunction(expected=>document.querySelector('#summary-outside').textContent===expected,outside);
   assert.equal(await page.locator('.pq-metric-card').count(),1,'one pair per selected form + metric + unit');
-  assert.equal(await page.locator('svg[data-chart]:visible').count(),2,'Both plots are visible together');
-  assert.deepEqual(await page.locator('.pq-plot-heading h3').allTextContents(),['Số đo theo điểm','Phân bố số đo']);
+  assert.equal(await page.locator('svg[data-chart]:visible').count(),system==='nitrogen'?2:1,'one primary plot per air/steam metric');
+  assert.deepEqual(await page.locator('.pq-plot-heading h3').allTextContents(),system==='nitrogen'?['Số đo theo điểm','Phân bố số đo']:['Số đo theo điểm']);
   assert.match(await page.locator('.pq-key').textContent(),/Số đo khác biệt/);
   assert.equal(await page.locator('#summary-points').textContent(),'3');
   assert.equal(await page.locator('#summary-samples').textContent(),'19');
@@ -75,6 +105,7 @@ try{
   assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),17,'single run values never pool other records');
   assert.equal(await page.locator('[data-chart=individual] .pq-outside').count(),Number(outside));
   assert.equal(await page.locator('[data-chart=individual] .stat-outlier').count(),2);
+  if(system==='nitrogen'){
   assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P1]').getAttribute('data-n'),'8');
   assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P3]').getAttribute('data-n'),'1');
   assert.equal(await page.locator('[data-chart=boxplot] .box-summary[data-point=P3] .box-body').count(),0,'n=1 has no manufactured box');
@@ -86,27 +117,36 @@ try{
   assert.equal(Math.abs(figures[0].left-figures[1].left)<1&&Math.abs(figures[0].right-figures[1].right)<1,true,'both plots share the full content width');
   const guideX=await page.locator('svg[data-chart]').evaluateAll(nodes=>nodes.map(n=>[...n.querySelectorAll('.pq-point-guide')].map(g=>g.getAttribute('x1'))));assert.deepEqual(guideX[0],guideX[1],'category columns align across plots');
   const separate=await page.locator('[data-chart=boxplot]').evaluate(chart=>[...chart.querySelectorAll('.box-summary[data-n="8"]')].every(box=>{const b=box.querySelector('.box-body').getBoundingClientRect();return [...chart.querySelectorAll('.box-value')].filter(n=>n.dataset.point===box.dataset.point).every(n=>n.getBoundingClientRect().left>b.right+1);}));assert.equal(separate,true,'original observations do not cover quartile boxes or medians');
+  }else{
+    assert.equal(await page.locator('.pq-point-summary').count(),1);
+    assert.equal(await page.locator('[data-summary=unknown] .pq-summary-value').textContent(),'1');
+    assert.equal(await page.locator('[data-summary=fail] .pq-summary-value').textContent(),system==='steam'?'2':'1');
+  }
   assert.equal(await page.locator('[data-chart=individual] .pq-value-label[data-point=P3]').textContent(),system==='steam'?'0,95':'-20','one-observation location exposes its value visibly');
   await page.locator('[data-chart=individual] .individual-value').first().focus();
   assert.match(await page.locator('#chart-inspection').textContent(),/P1.*lần 1/);
   const tooltip=page.locator('.pq-tooltip:not([hidden])');await tooltip.waitFor();assert.match(await tooltip.textContent(),system==='steam'?/0\.93/:/-22/,'nearby tooltip preserves the raw saved value');
   assert.match(await tooltip.textContent(),system==='steam'?/PQ đã lưu ≥ 0,94 D/:/PQ đã lưu ≤ -10 °C/,'observation tooltip states the saved criterion with direction and unit');
   assert.match(await tooltip.textContent(),/Không được đánh dấu khác biệt với số liệu hiện có/,'ordinary observation has separate IQR status');
-  await page.locator('[data-chart=boxplot] .box-value').first().hover();assert.equal(await tooltip.count(),1,'only one observation tooltip is open across the pair');
+  await page.locator(system==='nitrogen'?'[data-chart=boxplot] .box-value':'[data-chart=individual] .individual-value').first().hover();assert.equal(await tooltip.count(),1,'only one observation tooltip is open across the pair');
   await page.keyboard.press('Escape');assert.equal(await tooltip.count(),0,'Escape dismisses the nearby tooltip even when mouse and keyboard target different plots');
   await page.locator('[data-chart=individual] .individual-value[data-point=P3]').scrollIntoViewIfNeeded();
   const single=await page.locator('[data-chart=individual] .individual-value[data-point=P3]').boundingBox();await page.touchscreen.tap(single.x+single.width/2+18,single.y+single.height/2);await tooltip.waitFor();assert.match(await tooltip.textContent(),/P3.*lần 1/s,'chart touch selects a nearby observation without needing to hit its small dot');
   await page.keyboard.press('Escape');
+  if(system==='nitrogen'){
   await page.locator('[data-chart=boxplot] .box-value[data-point=P3]').scrollIntoViewIfNeeded();const boxSingle=await page.locator('[data-chart=boxplot] .box-value[data-point=P3]').boundingBox();await page.touchscreen.tap(boxSingle.x+boxSingle.width/2+18,boxSingle.y+boxSingle.height/2);await tooltip.waitFor();assert.match(await tooltip.textContent(),/P3.*lần 1/s,'touch near co-located singleton Boxplot glyph opens raw observation, not summary');assert.match(await tooltip.textContent(),/PQ đã lưu/);
   await page.keyboard.press('Escape');
   const boxSummary=page.locator('[data-chart=boxplot] .box-summary[data-point=P1]');await page.keyboard.press('Tab');await boxSummary.focus();await page.keyboard.press('Escape');
   const boxFocus=await boxSummary.locator('.box-body').evaluate(n=>({strokeWidth:getComputedStyle(n).strokeWidth,filter:getComputedStyle(n).filter}));assert.equal(boxFocus.strokeWidth,'3px','focused summary has a visible child stroke after tooltip dismissal');assert.notEqual(boxFocus.filter,'none','focused summary has a visible focus halo');
+  }
   await page.locator('#trend-data-details summary').click();
   assert.equal(await page.locator('#trend-data tbody tr').count(),19,'all source rows remain including exclusions');
   assert.match(await page.locator('#trend-data tbody').textContent(),/Không đọc được/);
+  if(system==='nitrogen'){
   assert.match(await page.locator('.pq-stats-table').textContent(),/P1.*8/s);
   assert.equal(await page.locator('.pq-stats-table th').filter({hasText:/^IQR$/}).count(),1,'statistics table includes explicit IQR');
   assert.equal(await page.locator('.pq-stats-table tbody tr[data-point=P1] td').nth(5).textContent(),system==='steam'?'0,035':'3,5','IQR magnitude is literal and auditable');
+  }
   await page.locator('#point-visibility summary').click();
   await page.locator('#chart-legend input[value=P1]').uncheck();
   assert.equal(await page.locator('svg[data-chart] [data-point=P1]').count(),0,'hiding affects both plots');
@@ -114,16 +154,16 @@ try{
   assert.equal(await page.locator('#trend-data tbody tr').count(),19);
   await page.locator('#trend-show-all').click();
   await page.locator('#trend-form').selectOption('');
-  assert.equal(await page.locator('.pq-metric-card').count(),system==='steam'?3:2,'all forms retain separate metrics and units');
-  assert.equal(await page.locator('svg[data-chart]').count(),system==='steam'?6:4);
+  assert.equal(await page.locator('.pq-metric-card').count(),system==='nitrogen'?2:3,'all forms retain separate metrics and units');
+  assert.equal(await page.locator('svg[data-chart]').count(),system==='nitrogen'?4:3);
   await page.locator('#history-chart-details summary').first().click();
   const historyMetric=page.locator('#history-metric');
-  assert.equal(await historyMetric.locator('option').count(),system==='steam'?3:2);
+  assert.equal(await historyMetric.locator('option').count(),system==='nitrogen'?2:3);
   const alternate=JSON.stringify(system==='steam'?['bm02','toc','ppb']:['bm01','p05','hạt/m³']);
   await historyMetric.selectOption(alternate);
   assert.match(await page.locator('#multi-trend-status').textContent(),system==='steam'?/TOC.*ppb/:/Tiểu phân.*hạt\/m³/);
   assert.equal(await page.locator('#multi-trend-chart .multi-point').count(),6,'history switches to the explicitly selected series');
-  assert.equal(await page.locator('.pq-metric-card').count(),system==='steam'?3:2,'history choice leaves current-run charts unchanged');
+  assert.equal(await page.locator('.pq-metric-card').count(),system==='nitrogen'?2:3,'history choice leaves current-run charts unchanged');
   await page.locator('#trend-record').selectOption(system+'-record-1:1');
   assert.equal(await historyMetric.inputValue(),alternate,'history metric survives record change');
   await page.locator('#trend-record').selectOption(system+'-record-2:1');
@@ -152,19 +192,26 @@ try{
   }
   await page.close();
  }
- for(const variant of ['many-points','duplicates','different','unknown','pending','error','empty','restricted','mixed-unit','raw-precision','equal-bound','segmented-equal-bound']){
+ for(const variant of ['many-points','duplicates','different','unknown','pending','error','empty','restricted','mixed-unit','raw-precision','equal-bound','segmented-equal-bound','absent-point']){
   const page=await pageFor('air','&fixture='+variant);
   if(['many-points','duplicates'].includes(variant)){
    await page.waitForFunction(()=>document.querySelector('#limit-source').textContent.includes('fixture-1'));
-   if(variant==='many-points'){assert.equal(await page.locator('#summary-points').textContent(),'17');assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),51);assert.equal(await page.locator('[data-chart=boxplot] .box-summary').count(),17);}
+   if(variant==='many-points'){assert.equal(await page.locator('#summary-points').textContent(),'17');assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),51);assert.equal(await page.locator('.pq-point-summary [data-summary=unknown] .pq-summary-value').textContent(),'1');}
    else{const spaced=await page.locator('[data-chart=individual]').evaluate(chart=>{const marks=[...chart.querySelectorAll('.individual-value[data-point=P1]')].map(n=>({x:Number(n.getAttribute('cx')),y:Number(n.getAttribute('cy'))}));return marks.length===8&&marks.every((a,i)=>marks.slice(i+1).every(b=>Math.hypot(a.x-b.x,a.y-b.y)>=10));});assert.equal(spaced,true,'eight equal saved values are individually visible');}
-   for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,variant+' '+width+' has no page overflow');if(width===1440&&variant==='many-points')assert.equal(await page.locator('.pq-chart-scroll').evaluateAll(ns=>ns.every(n=>n.scrollWidth<=n.clientWidth+1)),true,'17 short sampling IDs fit full desktop width');if(evidence)await page.locator('.pq-metric-card').screenshot({path:evidence+'/'+variant+'-'+width+'.png'});}
+   for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,variant+' '+width+' has no page overflow');if(width===1440&&variant==='many-points')assert.equal(await page.locator('.pq-chart-scroll').evaluateAll(ns=>ns.every(n=>n.scrollWidth>n.clientWidth)),true,'dense labeled points scroll internally instead of shrinking text');if(evidence)await page.locator('.pq-metric-card').screenshot({path:evidence+'/'+variant+'-'+width+'.png'});}
+  }
+  if(variant==='absent-point'){
+   await page.waitForFunction(()=>document.querySelector('#limit-source').textContent.includes('fixture-1'));
+   await page.locator('#trend-form').selectOption('bm01');await page.locator('#trend-point').selectOption('P4');
+   assert.equal(await page.locator('.pq-point-summary').count(),2);
+   assert.deepEqual(await page.locator('[data-summary=unknown] .pq-summary-value').allTextContents(),['1','1']);
+   assert.deepEqual(await page.locator('[data-summary=min] .pq-summary-value').allTextContents(),['—','—']);
   }
   if(variant==='segmented-equal-bound'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');await page.setViewportSize({width:320,height:950});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const collision=await page.locator('[data-chart=individual]').evaluate(chart=>{const a=chart.querySelector('.pq-value-label[data-point=P3]').getBoundingClientRect(),b=[...chart.querySelectorAll('.pq-limit-label')].find(n=>n.textContent==='≤ -20').getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});assert.equal(collision,false,'singleton at point-specific PQ boundary must not overlap the segment label');if(evidence)await page.locator('.pq-plots').screenshot({path:evidence+'/segmented-equal-bound-320.png'});}
   if(variant==='equal-bound'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');const collision=await page.locator('.pq-figure').first().evaluate(figure=>{const a=figure.querySelector('.pq-value-label[data-point=P3]').getBoundingClientRect(),b=figure.querySelector('.pq-rule-caption').getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});assert.equal(collision,false,'numeric value at saved PQ boundary must not collide with its rule label');}
   if(variant==='mixed-unit'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-metric-card').count(),2,'same metric with different units gets separate pair');assert.equal(await page.locator('.pq-metric-card').nth(1).locator('.pq-limit').count(),0,'no limit borrowed for incompatible unit');assert.match(await page.locator('.pq-metric-card').nth(1).textContent(),/K/);}
   if(variant==='raw-precision'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='2');assert.match(await page.locator('[data-chart=individual] .individual-value').first().getAttribute('aria-label'),/-9\.999/,'plot and PQ decision use precise saved snapshot value');}
-  if(variant==='different'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),0);assert.equal(await page.locator('.pq-limit[data-scope=point]').count(),6);}
+  if(variant==='different'){await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');assert.equal(await page.locator('.pq-limit[data-scope=shared]').count(),0);assert.equal(await page.locator('.pq-limit[data-scope=point]').count(),3);}
   if(['unknown','pending','error'].includes(variant)){assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),17,'numeric source remains readable without loaded PQ criteria');assert.equal(await page.locator('.pq-outside').count(),0);}
   if(variant==='unknown'){await page.waitForFunction(()=>document.querySelector('#summary-unknown').textContent==='19');assert.equal(await page.locator('.pq-limit').count(),0);}
   if(variant==='pending'){assert.equal(await page.locator('#summary-outside').textContent(),'—');await page.evaluate(()=>window.__trendFixture.release());await page.waitForFunction(()=>document.querySelector('#summary-outside').textContent==='1');}
@@ -174,5 +221,5 @@ try{
   await page.close();
  }
  assert.deepEqual(errors,[],'no JavaScript errors');assert.deepEqual(writes,[],'no network writes');assert.deepEqual(external,[],'no external requests');
- console.log('PASS readable chart pair and explicit historical metric across three systems; saved-run grouping, PQ/IQR distinction, small samples, raw sources, limits, access, retry, history, 18 theme/viewport axe checks');
+ console.log('PASS single-run column/dot charts and independent particle summaries; nitrogen chart pair and explicit historical metric across three systems; saved-run grouping, PQ/IQR distinction, small samples, raw sources, limits, access, retry, history, 18 theme/viewport axe checks');
 }finally{await context.close();await browser.close();}

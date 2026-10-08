@@ -1223,6 +1223,19 @@ export async function saveCatalogObject(
 ): Promise<KetQuaLuuDanhMuc> {
   if (!supabase) throw new Error("Supabase chưa cấu hình");
 
+  // Form tạo mới cần mã để định danh, nhưng RPC chỉ nhận mã qua tham số
+  // riêng. Không gửi nó trong whitelist thuộc tính, cũng không âm thầm
+  // biến yêu cầu đổi mã thành một lệnh upsert cho đối tượng khác.
+  if (Object.hasOwn(patch, "object_code") && patch.object_code !== objectCode) {
+    return {
+      ok: false,
+      error_code: "OBJECT_CODE_CHANGE_REQUIRES_RENAME",
+      error: "Đổi mã đối tượng cần thực hiện qua chức năng đổi mã riêng.",
+    };
+  }
+  const attributes = { ...patch };
+  delete attributes.object_code;
+
   /* Chưa có trong database.ts vì types sinh từ schema trước migration
      20260812120000. Ép kiểu tại đúng một chỗ, và PHẢI bind — supabase.rpc
      dùng `this` bên trong. */
@@ -1233,7 +1246,7 @@ export async function saveCatalogObject(
   const { data, error } = await goi("rpc_save_catalog_object", {
     p_object_kind: objectKind,
     p_object_code: objectCode,
-    p_patch: patch,
+    p_patch: attributes,
     p_reason: reason,
     p_expected_version: expectedVersion,
   });

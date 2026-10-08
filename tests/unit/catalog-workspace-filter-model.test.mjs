@@ -185,6 +185,12 @@ test("Source controls keep lower roles read-only and require edit capability for
   assert.deepEqual(sourceDataControls("qa_manager", true), {
     canChange: true, canImport: true, canExport: true,
   });
+  assert.deepEqual(sourceDataControls("admin", true), {
+    canChange: true, canImport: true, canExport: true,
+  });
+  assert.deepEqual(sourceDataControls("qa_manager", false), {
+    canChange: false, canImport: false, canExport: true,
+  });
   assert.deepEqual(sourceDataControls("admin", false), {
     canChange: false, canImport: false, canExport: true,
   });

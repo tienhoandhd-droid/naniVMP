@@ -81,6 +81,11 @@
     const point = measurementForms(system,state.configs[system]).find(f => f.id===form)?.locations?.find(p => p.id===id);
     return window.CPC1PointLabels?.label(point || {id,name:id}) || id;
   }
+  function savedPointLabel(snapshot,form,id){
+    const config=snapshot?.evaluation?.source_context?.config;
+    const point=(config?.forms?.find(f=>f.id===form)?.locations||config?.locations||[]).find(p=>p.id===id);
+    return window.CPC1PointLabels?.label(point||{id,name:id})||id;
+  }
   function highlightPoint(point) {
     document.querySelectorAll('#pq-metric-charts svg [data-point],#multi-trend-chart [data-point]').forEach(node=>{
       node.classList.toggle('chart-muted',!!point&&node.dataset.point!==point);
@@ -147,7 +152,8 @@
     const entries=state.history.filter(h=>h.system===system).slice().sort((a,b)=>b.period.localeCompare(a.period)||String(a.record_id).localeCompare(String(b.record_id)));
     selectOptions($('trend-record'),entries.map(h=>({value:snapshotKey(h),label:`${h.period.slice(0,7)} · ${state.runs.find(r=>r.id===h.run_id)?.title||'Hồ sơ '+String(h.record_id).slice(-8)} · v${h.version}`})),$('trend-record').value);
     const item=entries.find(h=>snapshotKey(h)===$('trend-record').value),rows=item?.trend||[],forms=[...new Set(rows.map(r=>r.form).filter(Boolean))];
-    const formKeep=$('trend-form').options.length>1?$('trend-form').value:forms[0];
+    const skey=item&&snapshotKey(item),snapshot=state.snapshots.get(skey),error=state.snapshotErrors.get(skey),loading=!!item&&!snapshot&&!error;
+    const formKeep=$('trend-form').options.length>1?$('trend-form').value:system==='nitrogen'?forms[0]:'';
     selectOptions($('trend-form'),[{value:'',label:'Tất cả biểu mẫu'},...forms.map(value=>({value,label:formTitle(measurementForms(system,state.configs[system]).find(f=>f.id===value)||{id:value})}))],formKeep);
     const form=$('trend-form').value,formRows=rows.filter(r=>!form||r.form===form);
     const metrics=[...new Map(formRows.map(r=>[JSON.stringify([r.form,r.metric,r.unit||'']),{value:JSON.stringify([r.form,r.metric,r.unit||'']),label:`${!form?r.form.toUpperCase()+' · ':''}${r.label||r.metric}${r.unit?' ('+r.unit+')':''}`}])).values()];
@@ -156,11 +162,12 @@
     const metricRows=formRows.filter(r=>!selected||(r.form===selected[0]&&r.metric===selected[1]&&(r.unit||'')===selected[2]));
     const key=JSON.stringify([system,item&&snapshotKey(item),form,selected]);
     if(state.trendKey!==key){state.trendKey=key;state.hiddenPoints.clear();$('trend-point').value='';}
-    const points=[...new Set(metricRows.map(r=>r.point_id).filter(Boolean))].sort();
+    const savedPoints=Object.entries(snapshot?.evaluation?.run_scope||{}).filter(([key])=>!form||key===form).flatMap(([,ids])=>Array.isArray(ids)?ids:[]);
+    const points=[...new Set([...metricRows.map(r=>r.point_id),...savedPoints].filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'vi',{numeric:true}));
     selectOptions($('trend-point'),[{value:'',label:`Tất cả điểm (${points.length})`},...points.map(value=>({value,label:pointLabel(system,form||metricRows.find(r=>r.point_id===value)?.form,value)}))],$('trend-point').value);
     const point=$('trend-point').value,chosen=metricRows.filter(r=>!point||r.point_id===point),data={rows:chosen,points:[...new Set(chosen.map(r=>r.point_id))]};
-    const skey=item&&snapshotKey(item),snapshot=state.snapshots.get(skey),error=state.snapshotErrors.get(skey),loading=!!item&&!snapshot&&!error;
-    const annotated=chosen.map((row,sourceIndex)=>({...row,sourceIndex,action:window.CPC1TrendLimits.annotate(system,row,snapshot)})),groups=window.CPC1PQCharts.prepare(annotated);
+    const annotated=chosen.map((row,sourceIndex)=>({...row,sourceIndex,action:window.CPC1TrendLimits.annotate(system,row,snapshot)})),groups=window.CPC1PQCharts.prepare(annotated,{system,snapshot,point,selectedMetric:selected?.[1],groupRows:metricRows});
+    data.points=[...new Set(groups.flatMap(group=>group.points))];
     renderAssessment(item,data,annotated,loading,error);
     $('summary-outliers').textContent=String(groups.reduce((n,g)=>n+g.outliers.size,0));
     $('chart-inspection').textContent='Chạm, di chuột hoặc dùng bàn phím tới số đo để xem điểm, lần đo và giá trị.';
@@ -179,10 +186,10 @@
     $('trend-data').querySelector('caption').textContent=`Giá trị nguồn và giá trị tính đã lưu · ${item?.record_id||'—'} · v${item?.version??'—'}`;
     function draw(){
       const outside=annotated.filter(r=>['above','below'].includes(r.action.state)),unknown=annotated.filter(r=>r.action.state==='unknown');
-      $('trend-note').textContent=`${groups.length} chỉ tiêu · số đo theo điểm và phân bố số đo · ${data.points.filter(p=>!state.hiddenPoints.has(p)).length}/${data.points.length} điểm hiển thị.`;
+      $('trend-note').textContent=`${groups.length} chỉ tiêu · ${system==='nitrogen'?'số đo theo điểm và phân bố số đo':'giá trị theo điểm trong một đợt'} · ${data.points.filter(p=>!state.hiddenPoints.has(p)).length}/${data.points.length} điểm hiển thị.`;
       $('limit-summary').textContent=loading||error||!item?$('trend-assessment').textContent:`${outside.length} kết quả ngoài giới hạn PQ · ${unknown.length} kết quả chưa so sánh được với giới hạn; xem lý do trong bảng số liệu.`;
       $('limit-exceptions').replaceChildren();
-      window.CPC1PQCharts.render($('pq-metric-charts'),groups,{hiddenPoints:state.hiddenPoints,label:(form,id)=>pointLabel(system,form,id),scope:$('assessment-scope').textContent,verdictPending:loading||!!error||!item,inspect:text=>{$('chart-inspection').textContent=text;}});
+      window.CPC1PQCharts.render($('pq-metric-charts'),groups,{system,snapshot,hiddenPoints:state.hiddenPoints,label:(form,id)=>system==='nitrogen'?pointLabel(system,form,id):savedPointLabel(snapshot,form,id),scope:$('assessment-scope').textContent,verdictPending:loading||!!error||!item,inspect:text=>{$('chart-inspection').textContent=text;}});
       drawHistory();
       $('trend-data').querySelector('tbody').replaceChildren(...annotated.map(row=>el('tr',{},[
         item?.period?.slice(0,7)||'—',`${item?.record_id||'—'} · v${item?.version??'—'}`,row.form?.toUpperCase(),row.point_id,row.label||row.metric,row.trial??'—',row.source_value??'—',row.action.rawValue??row.value??'—',row.unit||'—',

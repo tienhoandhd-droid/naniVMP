@@ -20,7 +20,7 @@
   <section id="trend-panel" role="tabpanel" aria-labelledby="trend-tab" hidden>
     <section class="panel trend-filter-card" aria-labelledby="trend-filter-heading">
       <div class="trend-section-heading"><div><p class="eyebrow">DỮ LIỆU ĐÃ LƯU</p><h2 id="trend-filter-heading">Chọn phạm vi theo dõi</h2></div><span class="trend-readonly">Chỉ xem · Giữ riêng từng lần đo</span></div>
-      <div class="trend-controls"><label id="trend-system-control">Hệ thống<select id="trend-system"><option value="steam">Hơi tinh khiết</option><option value="air">Khí nén</option><option value="nitrogen">Khí nitơ</option></select></label><label>Đợt / tháng đã lưu<select id="trend-record"></select></label><label>Biểu mẫu<select id="trend-form"></select></label><label>Chỉ tiêu<select id="trend-metric"></select></label><label>Điểm lấy mẫu<select id="trend-point"></select></label></div>
+      <div class="trend-controls"><label id="trend-system-control">Hệ thống<select id="trend-system"><option value="steam">Hơi tinh khiết</option><option value="air">Khí nén</option><option value="nitrogen">Khí nitơ</option></select></label><label>Đợt lấy mẫu đã lưu<select id="trend-record"></select></label><label>Biểu mẫu<select id="trend-form"></select></label><label>Chỉ tiêu<select id="trend-metric"></select></label><label>Điểm lấy mẫu<select id="trend-point"></select></label></div>
     </section>
     <dl class="trend-summary" aria-label="Tóm tắt dữ liệu đợt đang chọn">
       <div><dt>Điểm lấy mẫu</dt><dd id="summary-points">—</dd></div>
@@ -40,7 +40,7 @@
     </div>
 
       <p id="chart-inspection" class="chart-inspection" role="status" aria-live="polite"></p>
-      <details id="point-visibility" class="trend-details"><summary>Chọn điểm hiển thị</summary><fieldset class="legend-fieldset"><legend>Điểm hiển thị trên cả hai biểu đồ</legend><div class="legend-toolbar"><p class="help">Bảng và đánh giá giữ đủ dữ liệu trong phạm vi đã lọc.</p><button id="trend-show-all" type="button">Hiện tất cả điểm</button></div><div id="chart-legend" class="chart-legend"></div></fieldset></details>
+      <details id="point-visibility" class="trend-details"><summary>Chọn điểm hiển thị</summary><fieldset class="legend-fieldset"><legend>Điểm hiển thị trên biểu đồ</legend><div class="legend-toolbar"><p class="help">Bảng và đánh giá giữ đủ dữ liệu trong phạm vi đã lọc.</p><button id="trend-show-all" type="button">Hiện tất cả điểm</button></div><div id="chart-legend" class="chart-legend"></div></fieldset></details>
       <details id="trend-data-details" class="trend-details"><summary>Xem số liệu và đối chiếu từng lần đo</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Bảng dữ liệu xu hướng có thể cuộn ngang"><table id="trend-data"><caption>Giá trị nguồn và giá trị tính đã lưu</caption><thead><tr><th>Tháng</th><th>Hồ sơ / phiên bản</th><th>Biểu mẫu</th><th>Điểm</th><th>Chỉ tiêu</th><th>Lần thử</th><th>Giá trị nguồn</th><th>Giá trị tính</th><th>Đơn vị</th><th>Giới hạn cho phép</th><th>Đối chiếu giới hạn</th><th>Ngoại lai IQR</th><th>Trang nguồn</th><th>Đối chiếu</th><th>Trạng thái</th></tr></thead><tbody></tbody></table></div></details>
       <details id="history-chart-details" class="trend-details panel"><summary>Qua các đợt đã đóng</summary>
         <label class="history-metric-control">Chỉ tiêu theo dõi<select id="history-metric" aria-describedby="history-metric-help"></select></label>

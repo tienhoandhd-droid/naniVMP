@@ -167,3 +167,33 @@ html[data-theme="dark"] #trend-panel {
 
 .history-metric-control{display:grid;gap:8px;max-width:560px;margin:18px 0 8px;font-size:14px;font-weight:500}.history-metric-control select{min-width:0;width:100%;min-height:44px}
  .multi-trend-legend:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* Single-run point comparisons and their visible, metric-specific summaries. */
+.pq-point-card .pq-card-header { padding: 20px 24px; }
+.pq-point-card .pq-card-header h2 { font-size: 22px; letter-spacing: -.02em; }
+.pq-point-card .pq-plot-heading { padding-top: 16px; }
+.pq-point-card .bar-value { fill: var(--pq-blue); stroke: var(--pq-paper); stroke-width: 1; cursor: pointer; }
+.pq-point-card .pq-trial-1 { fill: #167a7c; }
+.pq-point-card .pq-trial-2 { fill: #8063a5; }
+.pq-point-card .pq-outside { fill: var(--pq-rule); }
+.pq-trial-label { font-size: 11px; }
+.pq-summary-section { border-top: 1px solid var(--pq-border); padding: 10px 24px 18px; }
+.pq-point-summary { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.6; }
+.pq-point-summary caption { text-align: left; color: var(--pq-ink); font-weight: 600; padding: 10px 0 14px; }
+.pq-point-summary th, .pq-point-summary td { white-space: normal; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--pq-border); vertical-align: top; }
+.pq-point-summary thead th { background: var(--pq-grid); color: var(--pq-ink); font-weight: 600; }
+.pq-point-summary tbody th { width: 23%; font-weight: 500; color: var(--pq-muted); }
+.pq-point-summary .pq-summary-value { width: 23%; font-weight: 600; color: var(--pq-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pq-point-summary .pq-summary-locations { min-width: 180px; overflow-wrap: anywhere; }
+.pq-summary-locations div + div { margin-top: 4px; }
+.pq-point-summary [data-summary=fail] .pq-summary-value { color: var(--pq-rule); }
+.pq-summary-note { margin: 12px 0 0; color: var(--pq-muted); font-size: 12px; line-height: 1.7; }
+html[data-theme="dark"] .pq-point-card .pq-trial-1 { fill: #80c7b8; }
+html[data-theme="dark"] .pq-point-card .pq-trial-2 { fill: #b6a3eb; }
+html[data-theme="dark"] .pq-point-card .pq-outside { fill: var(--pq-rule); }
+@media(max-width:640px) {
+ .pq-point-card .pq-card-header { padding: 18px 14px; }
+ .pq-summary-section { padding: 8px 14px 16px; }
+ .pq-point-summary th, .pq-point-summary td { white-space: normal; padding: 9px 8px; }
+ .pq-point-summary { min-width: 440px; }
+}
