@@ -222,11 +222,17 @@
       const footprint=redesigned?Math.max(48,values.length*lane+18):values.length>1?Math.max(extent(individual)+24,boxHalf*2+9+extent(box)+16):36;
       return {values,ys,individual,box,footprint,lane};
     });
-    const pointSpace=Math.max(52,...points.map((point,i)=>Math.max(String(point).length*7+14,layouts[i].footprint,!shared&&bounds[i]?(`${bounds[i].direction==='max'?'≤':'≥'} ${fmt(bounds[i].limit)}`).length*6.5+16:0)));
-    const width=Math.max(available,points.length*pointSpace+left+20),right=width-20,slot=(right-left)/Math.max(1,points.length),x=i=>left+slot*(i+.5);
+    const required=points.map((point,i)=>Math.max(52,String(point).length*7+14,layouts[i].footprint,!shared&&bounds[i]?(`${bounds[i].direction==='max'?'≤':'≥'} ${fmt(bounds[i].limit)}`).length*6.5+16:0));
+    // Allocate each categorical group its measured label footprint; a point
+    // with one trial need not reserve the space of a neighbour with eight.
+    const spaces=redesigned?required:required.map(()=>Math.max(52,...required));
+    const minimum=spaces.reduce((sum,n)=>sum+n,0),width=Math.max(available,minimum+left+20),right=width-20;
+    const extra=(right-left-minimum)/Math.max(1,points.length),slots=spaces.map(n=>n+extra),starts=[];
+    let cursor=left;slots.forEach(n=>{starts.push(cursor);cursor+=n;});
+    const x=i=>starts[i]+slots[i]/2;
     svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
     if(shared){const yy=y(bounds[0].limit);g.append(node('rect',{x:left,y:bounds[0].direction==='max'?top:yy,width:right-left,height:Math.max(0,bounds[0].direction==='max'?yy-top:bottom-yy),class:'pq-exclusion-band'}));}
-    points.forEach((point,i)=>g.append(node('rect',{x:left+slot*i,y:top,width:slot,height:bottom-top,class:'pq-point-column','data-point':point}),node('line',{x1:x(i),x2:x(i),y1:top,y2:bottom,class:'pq-point-guide','data-point':point})));
+    points.forEach((point,i)=>g.append(node('rect',{x:starts[i],y:top,width:slots[i],height:bottom-top,class:'pq-point-column','data-point':point}),node('line',{x1:x(i),x2:x(i),y1:top,y2:bottom,class:'pq-point-guide','data-point':point})));
     const range=high-low,rawStep=range/5,power=10**Math.floor(Math.log10(rawStep)),ratio=rawStep/power,step=(ratio<=1?1:ratio<=2?2:ratio<=5?5:10)*power,ticks=[];
     if(Number.isFinite(step)&&step>0){for(let i=0,v=Math.ceil(low/step)*step;i<12&&v<=high;i++,v+=step)ticks.push(Math.abs(v)<step*1e-8?0:v);}else ticks.push(low,high);
     ticks.forEach(v=>g.append(node('line',{x1:left,x2:right,y1:y(v),y2:y(v),class:'pq-grid'}),node('text',{x:left-12,y:y(v)+4,'text-anchor':'end',class:'pq-axis',text:fmt(v)})));
@@ -241,7 +247,7 @@
       g.append(node('line',{x1,x2,y1:y(b.limit),y2:y(b.limit),class:'pq-limit','data-scope':point?'point':'shared',...(point?{'data-point':point}:{})}));
       if(point)g.append(node('text',{x:(x1+x2)/2,y:bottom+62,'text-anchor':'middle',class:'pq-limit-label','data-point':point,text:`${b.direction==='max'?'≤':'≥'} ${fmt(b.limit)}`}));
     };
-    if(shared)bound(bounds[0],left,right);else bounds.forEach((b,i)=>{if(b)bound(b,x(i)-slot*.4,x(i)+slot*.4,points[i]);});
+    if(shared)bound(bounds[0],left,right);else bounds.forEach((b,i)=>{if(b)bound(b,x(i)-slots[i]*.4,x(i)+slots[i]*.4,points[i]);});
     points.forEach((point,i)=>{
       const {values,ys,individual,box:offsets,lane}=layouts[i],stats=group.stats.get(point),xx=x(i);
       const minOffset=offsets.length?Math.min(...offsets):0,spread=offsets.length?Math.max(...offsets)-minOffset:0;

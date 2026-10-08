@@ -78,9 +78,12 @@ try{
   }
   if(system!=='steam'){
     const entryUrl=page.url();await page.goto('http://qualification.test/tham-dinh-thuc-te/runs.html?view=trend&system='+system);
-    await page.locator('[data-chart="individual"] .individual-value').first().waitFor();
-    assert.equal(await page.locator('[data-chart="individual"] .individual-value').count(),2,'saved pasted values reach chart');
-    assert.match(await page.locator('[data-chart="individual"]').textContent(),/12,5/);
+    const chart=page.locator(system==='air'?'[data-chart="bar"]':'[data-chart="individual"]');
+    const marks=chart.locator(system==='air'?'.bar-value':'.individual-value');
+    await marks.first().waitFor();
+    assert.equal(await marks.count(),2,'saved pasted values reach the selected chart type');
+    assert.deepEqual((await marks.evaluateAll(nodes=>nodes.map(n=>n.dataset.value))).sort(),['0','12.5'],'chart retains both exact saved numeric values, including zero');
+    assert.match(await chart.first().textContent(),/12,5/);
     await page.goto(entryUrl);await page.locator('#entry-paste-open').waitFor();
   }
   await page.locator('#entry-paste-open').click();text=await table(page,[{point:'P.1',values:{[numericLabel]:'9'}}]);await preview(page,text);assert.equal(await page.locator('#entry-paste-apply').isDisabled(),true);assert.match(await page.locator('#entry-paste-errors').textContent(),/đã có/);

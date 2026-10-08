@@ -63,6 +63,88 @@ function quyenQuanLyQa(kho) {
   kho.rpc_my_ui_access = { ...goc, business_role: "qa_manager" };
 }
 
+async function kiemTaoDoiTuongTheoVaiTro({ vaiTro, suaQuyen, ma }) {
+  const saveBodies = [];
+  let soLanLuu = 0;
+  const ten = `Đối tượng E2E ${vaiTro}`;
+  const pageState = await moTrang(trinhDuyet, { suaKho(kho) {
+    suaQuyen?.(kho);
+    kho.rpc_save_catalog_object = (body) => {
+      saveBodies.push(body);
+      soLanLuu += 1;
+      if (Object.hasOwn(body?.p_patch ?? {}, "object_code")) {
+        return { ok: false, error_code: "INVALID_PATCH_KEYS", error: "p_patch chứa object_code ngoài whitelist" };
+      }
+      if (soLanLuu === 1) {
+        return { ok: false, error_code: "SAVE_RETRY", error: "Máy chủ tạm thời chưa lưu được" };
+      }
+      kho.vmp_source_objects.unshift({
+        id: 89_000 + soLanLuu,
+        code: ma, object_code: ma,
+        name: ten, object_name: ten,
+        object_kind: "Thiết bị", kind: "Thiết bị",
+        department: body.p_patch.department,
+        validate_flag: body.p_patch.validate_flag,
+        version: 1,
+      });
+      return { ok: true, object_code: ma, version: 1, pending_timeline: false };
+    };
+  } });
+  const { trang, loiConsole, chanNgoai } = pageState;
+
+  await trang.waitForSelector("[data-cw-them]", { timeout: 10_000 });
+  await trang.click("[data-cw-them]");
+  await trang.waitForSelector("#cof-object_code", { timeout: 10_000 });
+  await trang.type("#cof-object_code", ma);
+  await trang.type("#cof-object_name", ten);
+  const boPhan = await trang.$eval("#cof-department", (select) => {
+    const option = [...select.options].find((item) => item.value && item.value !== "__khac__");
+    return option?.value ?? "";
+  });
+  await trang.select("#cof-department", boPhan);
+  await trang.select("#cof-validate_flag", "n");
+  await trang.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Lưu")?.click());
+
+  await trang.waitForFunction((message) => [...document.querySelectorAll('[role="alert"]')]
+    .some((node) => node.textContent?.includes(message)), { timeout: 10_000 }, "Máy chủ tạm thời chưa lưu được");
+  const sauLoi = await trang.evaluate(() => ({
+    dialog: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
+      .some((node) => node.textContent?.trim() === "Thêm đối tượng"),
+    ma: document.querySelector("#cof-object_code")?.value ?? "",
+    ten: document.querySelector("#cof-object_name")?.value ?? "",
+  }));
+  kiem(sauLoi.dialog && sauLoi.ma === ma && sauLoi.ten === ten,
+    `${vaiTro}: lưu lỗi giữ hộp thoại và dữ liệu nhập`, JSON.stringify(sauLoi));
+
+  await trang.evaluate(() => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "Lưu")?.click());
+  await trang.waitForFunction((code) => !document.querySelector("#cof-object_code")
+    && [...document.querySelectorAll(".lp-smart-table tbody tr")]
+      .some((row) => row.textContent?.includes(code)), { timeout: 10_000 }, ma);
+  const daHienTrongDanhSach = await trang.evaluate((code) => [...document.querySelectorAll(".lp-smart-table tbody tr")]
+    .some((row) => row.textContent?.includes(code)), ma);
+  kiem(daHienTrongDanhSach, `${vaiTro}: retry thành công và danh sách tải lại có đối tượng mới`);
+
+  const expectedPatch = {
+    object_name: ten,
+    department: boPhan,
+    validate_flag: "n",
+  };
+  kiem(saveBodies.length === 2, `${vaiTro}: lỗi rồi retry tạo đúng hai mutation`, String(saveBodies.length));
+  for (const [index, body] of saveBodies.entries()) {
+    kiem(body.p_object_code === ma && !Object.hasOwn(body.p_patch ?? {}, "object_code"),
+      `${vaiTro}: lần ${index + 1} chỉ gửi mã qua p_object_code`, JSON.stringify(body));
+    kiem(JSON.stringify(body.p_patch) === JSON.stringify(expectedPatch),
+      `${vaiTro}: lần ${index + 1} giữ đúng patch thuộc tính`, JSON.stringify(body.p_patch));
+    kiem(body.p_reason === "Tạo mới từ form" && body.p_expected_version === null,
+      `${vaiTro}: lần ${index + 1} giữ lý do và version tạo mới`, JSON.stringify(body));
+  }
+  kiem(loiConsole.length === 0, `${vaiTro}: console sạch khi tạo đối tượng`, loiConsole.join(" · ").slice(0, 160));
+  kiem(chanNgoai.length === 0, `${vaiTro}: tạo đối tượng không gọi ra ngoài`, chanNgoai[0] || "");
+  await trang.close();
+}
+
 async function moTrang(trinhDuyet, { hash = "source", rong = 1440, cao = 900, suaKho, isMobile = false } = {}) {
   const trang = await trinhDuyet.newPage();
   const loiConsole = [];
@@ -512,6 +594,15 @@ async function chuanBiApV1(trang) {
   const coLichSu = await trang.evaluate(() => !!document.querySelector('[data-cw-nav="history"]'));
   kiem(coLichSu, "quản lý QA vẫn thấy mục Lịch sử");
   await trang.close();
+}
+
+/* ---- 2b+. Admin/Quản lý QA tạo mới qua đúng transport whitelist ------ */
+for (const scenario of [
+  { vaiTro: "admin", ma: "AA-E2E-ADMIN", suaQuyen: null },
+  { vaiTro: "qa_manager", ma: "AA-E2E-QA", suaQuyen: quyenQuanLyQa },
+]) {
+  console.log(`\n${scenario.vaiTro} — tạo đối tượng, lỗi rồi thử lại:`);
+  await kiemTaoDoiTuongTheoVaiTro(scenario);
 }
 
 /* ---- 2c. Bộ lọc Đối tượng: một mảng cho đếm/bảng/thẻ/xuất ------------ */
