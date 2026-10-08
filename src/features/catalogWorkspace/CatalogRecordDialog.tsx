@@ -275,7 +275,7 @@ export default function CatalogRecordDialog({
 
           <div className="cw-nhom">
             {chinh.map((f) => (
-              <CatalogField key={f.key} field={f} value={nhap[f.key]}
+              <CatalogField key={f.key} field={laTaoMoi && f.key === def.businessKeyField ? { ...f, readonly: false } : f} value={nhap[f.key]}
                 onChange={(v) => datGiaTri(f.key, v)}
                 locked={!canEdit} lockReason={!canEdit ? "Bạn không có quyền sửa" : undefined}
                 changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`}
@@ -295,7 +295,7 @@ export default function CatalogRecordDialog({
               </summary>
               <div className="cw-nhom">
                 {nangCao.map((f) => (
-                  <CatalogField key={f.key} field={f} value={nhap[f.key]}
+                  <CatalogField key={f.key} field={laTaoMoi && f.key === def.businessKeyField ? { ...f, readonly: false } : f} value={nhap[f.key]}
                     onChange={(v) => datGiaTri(f.key, v)}
                     locked={!canEdit} lockReason={!canEdit ? "Bạn không có quyền sửa" : undefined}
                     changed={patch[f.key] !== undefined} idPrefix={`cw-${dataset}`}

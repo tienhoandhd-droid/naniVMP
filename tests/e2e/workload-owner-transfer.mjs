@@ -102,6 +102,29 @@ async function openPage(browser, { user, access, calls, state }) {
           year: 2026,
         };
       };
+      // Keep the current dashboard projection tied to the same transfer state.
+      kho.rpc_get_vmp_dashboard_v2 = () => {
+        calls.dashboard += 1;
+        return {
+          objects: [],
+          updated_at: "2026-09-01T05:00:00Z",
+          year: 2026,
+          contract_version: 1,
+          authorization_revision: "7",
+          activities: [{
+            ...activity(state.ownerPersonId, state.ownerName),
+            docDone: false,
+            canonical_deadline: "2026-09-25",
+            days_left: 24,
+            status_as_of: "2026-09-01",
+          }],
+          kpi: {
+            mismatch_count: 0,
+            validation: { done: 0, over: 0, todo: 1, total: 1 },
+            documentation: { done: 0, over: 0, todo: 1, total: 1 },
+          },
+        };
+      };
       kho.rpc_get_vmp_watermark = {
         year: 2026, plan_items: 1, objects: 0,
         updated_at: "2026-09-01T05:00:00Z", authorization_revision: 7,

@@ -91,8 +91,8 @@ const NGUOI_NHAN: CatalogDatasetDefinition = {
     { key: "ai_report_enabled", label: "Nhận báo cáo AI", kind: "boolean" },
     { key: "ai_report_schedule", label: "Lịch báo cáo AI", kind: "select", options: [
       { value: "không", label: "Không gửi" },
-      { value: "hàng tuần", label: "Hàng tuần" },
-      { value: "hàng tháng", label: "Hàng tháng" },
+      { value: "hằng tuần", label: "Hàng tuần" },
+      { value: "hằng tháng", label: "Hàng tháng" },
     ] },
     { key: "note", label: "Ghi chú", kind: "text" },
     { key: "is_enabled", label: "Đang bật", kind: "boolean", reasonRequired: true,

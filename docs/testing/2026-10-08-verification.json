@@ -1,0 +1,125 @@
+{
+  "date": "2026-10-08",
+  "status": "local_verified_with_explicit_coverage_limits",
+  "baseline_commit": "8b8081e65486c75c6bdbd86257c6e7d795226a0a",
+  "committed": false,
+  "pushed": false,
+  "production_database_applied": false,
+  "deployed": false,
+  "confirmed_application_findings_fixed": 10,
+  "database_suites": {
+    "database": "vmp_crud_audit_20261008",
+    "disposable_marker_verified": true,
+    "all_passed": true,
+    "results": [
+      {
+        "suite": "tests/sql/crud-catalog-role-audit.sql",
+        "exit_code": 0,
+        "seconds": 0.405,
+        "log": "crud-catalog-role-audit.log"
+      },
+      {
+        "suite": "tests/sql/crud-progress-account-roles.sql",
+        "exit_code": 0,
+        "seconds": 0.99,
+        "log": "crud-progress-account-roles.log"
+      },
+      {
+        "suite": "tests/sql/crud-people-plan-lifecycle.sql",
+        "exit_code": 0,
+        "seconds": 0.091,
+        "log": "crud-people-plan-lifecycle.log"
+      },
+      {
+        "suite": "tests/sql/crud-admin-role-mode-matrix.sql",
+        "exit_code": 0,
+        "seconds": 0.099,
+        "log": "crud-admin-role-mode-matrix.log"
+      },
+      {
+        "suite": "tests/sql/crud-source-assignment-role-matrix.sql",
+        "exit_code": 0,
+        "seconds": 0.166,
+        "log": "crud-source-assignment-role-matrix.log"
+      },
+      {
+        "suite": "supabase/tests/crud_qualification_roles.sql",
+        "exit_code": 0,
+        "seconds": 1.133,
+        "log": "crud_qualification_roles.log"
+      },
+      {
+        "suite": "supabase/tests/crud_qualification_all_forms.sql",
+        "exit_code": 0,
+        "seconds": 5.97,
+        "log": "crud_qualification_all_forms.log"
+      }
+    ]
+  },
+  "browser": {
+    "receipt": "catalog-real-db-1791446128228-444973.json",
+    "result": "PASS",
+    "auth_user_mocked": true,
+    "business_rest_real": true,
+    "all_entered_product_alert_fields_read_back": true,
+    "disabled_flags_real_query_verified": true,
+    "inactive_ui": "ACCESS_UNVERIFIED; no write controls",
+    "inactive_server": "ACCOUNT_DISABLED"
+  },
+  "unit": {
+    "passed": 1025,
+    "skipped_existing": 1,
+    "failed": 0,
+    "log": "unit-final.log"
+  },
+  "catalog_mock": {
+    "passed": 173,
+    "failed": 0,
+    "log": "catalog-workspace-final.log"
+  },
+  "typecheck": "PASS typecheck-final.log",
+  "drift": "PASS drift.log",
+  "build": "PASS build-alert-fix.log",
+  "schema": {
+    "functions_compared": 385,
+    "changed_functions": 8,
+    "baseline_production_comparison_differences": 0
+  },
+  "rollback_reapply": "PASS all-migrations-rollback-rehearsal.log; 8 definitions and ACLs",
+  "scenario_matrix": {
+    "rows": 260,
+    "statuses": {
+      "PASS_SQL_UI": 6,
+      "PASS_SQL": 130,
+      "PARTIAL": 12,
+      "BLOCKED_SERVER_FEATURE": 24,
+      "PARTIAL_SQL": 88
+    }
+  },
+  "evidence_private_root": "/home/admin1/VMP/.cpc1/crud-audit-20261008",
+  "file_sha256": {
+    "src/features/catalogWorkspace/CatalogRecordDialog.tsx": "9036b360807ff6e6276254ee6c34dac4b8f379c35c5d9964b719721c8303c77b",
+    "src/features/catalogWorkspace/definitions.ts": "58c349d1a76d8b213511c81bd24c80daa03c680b88e38b76c341e59f8aae5cf6",
+    "tests/e2e/workload-owner-transfer.mjs": "916f19ea0319f11eb2a60df3f21fb8f8bf9695e4efa28135985e29d47096c1b5",
+    "tests/e2e/catalog-real-db.mjs": "4d45497b99d0082f1eea6fe007e90ce1433984146658cc132ea0fd22b287a541",
+    "scripts/run-crud-role-db-tests.py": "3fd49ff727baacc340fc6310a542cfee5508f32bb472bb2cf934c0ffa2b92ff2",
+    "tests/sql/crud-catalog-role-audit.sql": "33c8cce10e3efe0e7cdc7aa4a462fa3f6a38e67283d862faa9e86b00c6da7f31",
+    "tests/sql/crud-progress-account-roles.sql": "6d9eaebd626ca0c2bc6daae58464f79f29c17e87280dad2bbde5baf413138814",
+    "tests/sql/crud-people-plan-lifecycle.sql": "783bd224919967c954334cd841bbd7c78eb2b5daf8877afb65019df820c5bd3e",
+    "tests/sql/crud-admin-role-mode-matrix.sql": "dd35268d2841a8df1da89bd00686fe0edaf1a22deb4fed0833906606d19a188f",
+    "tests/sql/crud-source-assignment-role-matrix.sql": "8b8fb88c67a2c1cb79d8306b2ac9d7fdc76feddac21fc7ede2c9fc4b3f081451",
+    "supabase/tests/crud_qualification_roles.sql": "160f95579edbb563cadb0dc28f79915b997a59feae153acdfa0408835667bc9d",
+    "supabase/tests/crud_qualification_all_forms.sql": "0eaa23b5911e5b33ea08a974ed314ca4ac89d25fc213c97c34c8064841875d9f",
+    "supabase/migrations/20261008160000_qa_account_link_department_normalization.sql": "bf2a2e2be76800ea85c5ca5085b12ed98d9278bb9746a2b8880cd899ca34d8ec",
+    "supabase/migrations/20261008150000_catalog_persistence_audit_repair.sql": "384178dae9c5f3729ec7ebd9098d9445fecc97c6b54f48a3d634149116cf208b",
+    "supabase/migrations/20261008170000_plan_cancellation_audit_reason.sql": "f05e85f8c6106bdb9607e063567c8c2d06a1507ff872625552a17316ee950b31"
+  },
+  "services": {
+    "private_postgrest": "stopped",
+    "private_preview": "stopped",
+    "disposable_database": "retained for reproduction; no production data changes",
+    "existing_supabase_services": "not restarted or stopped"
+  },
+  "independent_review": "accepted: migration guards/ACL, UI business-key/schedule contracts, all-field readback/no-effect assertions, cancellation audit context; full coverage limits retained",
+  "snapshot_scope": "Pre-release local verification; deployment status is recorded separately in workspace PROJECT-STATE and private release receipt."
+}
