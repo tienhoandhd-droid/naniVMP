@@ -27,6 +27,7 @@ Chi tiết kỹ thuật nằm trong commit và runbook được dẫn ở từng
 | Việc | Ai | Ghi chú |
 |---|---|---|
 | Bật `item_permissions_mode = enforced` | **[CHỦ DỰ ÁN]** + QA | 511 blocker, chủ yếu 461 hạng mục chưa gán xưởng/bộ phận; sau đó cập nhật allowlist preflight |
+| Bật dashboard v2 (trạng thái/KPI tính ở máy chủ) | Claude | Chỉ sau khi bật enforced: áp `20261016130000`, bỏ dòng hoãn trong `check-migration-drift.mjs` |
 | Bắt buộc MFA cho admin | **[CHỦ DỰ ÁN]** | 4/4 admin chưa bật — bật xong mới bật bắt buộc |
 | Đổi mật khẩu Postgres, giới hạn IP, CAPTCHA Auth, rate limit webhook chat | **[CHỦ DỰ ÁN]** | Checklist 31/08 |
 | PITR Supabase; chuyển bản sao lưu sang kho QA | **[CHỦ DỰ ÁN]** | Bản sao lưu hiện chỉ trên máy này |

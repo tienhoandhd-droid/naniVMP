@@ -82,10 +82,20 @@ async function layProduction() {
 }
 
 /* ---- 3. So sánh ---------------------------------------------------------- */
+// Hàm có trong repo nhưng CỐ Ý chưa có trên production. Mỗi dòng phải có lý do;
+// xoá dòng ngay khi đã áp, nếu không công cụ này sẽ che mất lệch thật.
+const HOAN_CO_CHU_Y = {
+  rpc_get_vmp_dashboard_v2: "16/10 gỡ khỏi production (KPI lệch làm web không tải được; ở chế độ preview v2 mở rộng dữ liệu cho người dùng xưởng). Áp 20261016130000 sau khi bật item_permissions_mode = enforced.",
+};
+
 const { nguon, duLieu: production } = await layProduction();
 
 const theoMigration = new Map();
 for (const [ten, { migration, cacMa }] of banMoiNhat) {
+  if (ten in HOAN_CO_CHU_Y && !(ten in production)) {
+    console.log(`⏸ ${ten} — hoãn có chủ ý: ${HOAN_CO_CHU_Y[ten]}`);
+    continue;
+  }
   const nhom = theoMigration.get(migration) ?? { khop: 0, lech: [] };
   const maProd = new Set(production[ten] ?? []);
   if (!(ten in production)) nhom.lech.push(`${ten} (vắng)`);

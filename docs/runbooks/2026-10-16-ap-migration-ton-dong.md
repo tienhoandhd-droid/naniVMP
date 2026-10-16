@@ -102,3 +102,20 @@ workflow `db-drift.yml`) và `20261016120000_mfa_pre_request_anon_fix` (hook MFA
 nhầm mọi request anon — đã so hook cũ/mới trên production trong giao dịch ROLLBACK
 trước khi áp). Sau áp: `drift:db` 131/131 khớp, cả chế độ psql lẫn anon REST; anon
 vẫn bị từ chối đọc bảng (`vmp_plan_items` → HTTP 401).
+
+## Sự cố 16/10 ~13:30 — web không tải được dữ liệu (đã khắc phục)
+
+- **Nguyên nhân:** `20260901110000` tạo `rpc_get_vmp_dashboard_v2`; có hàm này là web
+  chuyển từ v1 sang v2. KPI `documentation` của v2 bỏ sót 5 hạng mục chưa có
+  `deadline_report` (so sánh với NULL) → total 461 ≠ 456 → bộ kiểm của web từ chối.
+  Runbook `canonical-dashboard-read-model.md` có dòng "không apply nếu KPI không khớp"
+  — bước này đã bị bỏ sót khi áp.
+- **Khắc phục:** `drop function rpc_get_vmp_dashboard_v2` (định nghĩa lưu ở
+  `.backups/ho-so-ap-migration-20261016/`), web quay về v1; đã kiểm dữ liệu v1 thật
+  qua đúng bộ kiểm của web (admin 461, quản lý xưởng 234). Không dữ liệu nào bị sửa.
+- **Phơi nhiễm:** 16 lượt gọi v2 trong thời gian hàm tồn tại; phiên hoạt động
+  trong khoảng đó chỉ có 2 admin (vốn xem toàn bộ) — không lộ dữ liệu ngoài quyền.
+- **KHÔNG áp lại `20260901110000`.** Bản sửa là `20261016130000_dashboard_v2_null_deadline.sql`,
+  tự từ chối chạy khi `item_permissions_mode` chưa là `enforced`.
+- **Bài học:** kiểm thử migration đọc dữ liệu phải đưa kết quả thật qua bộ kiểm
+  của web (decode), không chỉ kiểm "chạy được".
