@@ -38,6 +38,6 @@ Chi tiết kỹ thuật nằm trong commit và runbook được dẫn ở từng
 | Project Supabase staging | **[CHỦ DỰ ÁN]** | Mở khoá E2E đăng nhập thật |
 | Hồ sơ CSV: URS rút gọn, đánh giá rủi ro, lưu bằng chứng CI làm OQ, audit trail các luồng ghi | Claude + QA | Khung có sẵn: `docs/testing/2026-10-08-data-write-inventory.md` |
 | Kiểm phân hệ Thẩm định thực tế trên máy tính bảng xưởng | QA | Sau đợt tách gói PDF |
-| Lỗi chập chờn `catalog-workspace` khi máy tải nặng | Claude | |
+| Lỗi chập chờn khi máy tải nặng: `catalog-workspace` (qa_manager), `qualification-entry-paste` (axe color-contrast) | Claude | Chạy riêng đều đạt 3/3 |
 | Gỡ dần 64 `as never`; tách file > 1.000 dòng; chuyển `index.css` sang hệ thiết kế (133 vi phạm) | Claude | Làm theo từng tính năng |
 | Bước cài Playwright vẫn dùng `--with-deps` | Claude | Đã có timeout; theo dõi |

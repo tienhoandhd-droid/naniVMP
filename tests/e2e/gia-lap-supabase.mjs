@@ -941,6 +941,9 @@ if (process.env.VMP_E2E_NOW && !Number.isFinite(NOW_CO_DINH_MS)) {
 }
 
 async function dongBangDongHo(trang, instant) {
+  /* Unit test truyền trang GIẢ (chỉ có setRequestInterception/on) để kiểm
+     luật chặn mạng — không có trình duyệt nên không có đồng hồ để đóng băng. */
+  if (typeof trang.evaluateOnNewDocument !== "function") return;
   await trang.evaluateOnNewDocument((moc) => {
     const NativeDate = Date;
     class FixedDate extends NativeDate {
