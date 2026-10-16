@@ -1,0 +1,22 @@
+/* Gói 3 (16/10): khung Kiểm tra và duyệt + hộp ký điện tử */
+.ky-duyet{margin:0 0 18px;padding:14px 18px;border:1px solid var(--border);border-left:3px solid var(--warning);border-radius:var(--radius-card,12px);background:var(--surface)}
+.ky-duyet[hidden]{display:none}
+.ky-duyet[data-trang-thai="da_kiem_tra"]{border-left-color:var(--accent)}
+.ky-duyet[data-trang-thai="da_duyet"]{border-left-color:var(--success)}
+.ky-duyet h2{margin:0 0 6px;font-size:16px}
+.ky-duyet p{margin:0;font-size:14px}
+.ky-duyet-lich-su{margin:10px 0 0;padding-left:20px;color:var(--text-secondary);font-size:13px;line-height:1.6}
+.ky-duyet-lich-su:empty{display:none}
+.ky-duyet-nut{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.ky-duyet-nut:empty{display:none}
+.ky-duyet-hop{width:min(480px,calc(100% - 32px));padding:0;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text-primary)}
+.ky-duyet-hop::backdrop{background:rgb(22 24 28 / 46%)}
+.ky-duyet-hop form{display:grid;gap:10px;padding:22px}
+.ky-duyet-hop h2{margin:0;font-size:17px}
+.ky-duyet-hop .ky-y-nghia{margin:0;padding:10px 12px;border-radius:10px;background:var(--surface-subtle);font-weight:500}
+.ky-duyet-hop label{font-size:14px;font-weight:600}
+.ky-duyet-hop input,.ky-duyet-hop textarea{width:100%;min-height:44px;box-sizing:border-box}
+.ky-duyet-hop .help{margin:0;color:var(--text-secondary);font-size:13px}
+.ky-duyet-hop .form-error{margin:0;color:var(--danger);font-size:14px}
+.ky-duyet-hop .form-error:empty{display:none}
+.ky-hop-nut{display:flex;justify-content:flex-end;gap:8px}

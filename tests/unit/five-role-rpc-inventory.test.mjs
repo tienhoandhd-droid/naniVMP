@@ -156,6 +156,8 @@ const QUALIFICATION_REVIEWED_RPC = new Map([
   ["cpc1_audit_trail", {identity:"cpc1_audit_trail(text,date,date,integer)",classification:"guarded_explicit"}],
   ["cpc1_trend_limits", {identity:"cpc1_trend_limits(text)",classification:"guarded_explicit"}],
   ["cpc1_trend_limit_set", {identity:"cpc1_trend_limit_set(text,text,text,text,text,text,numeric,numeric,date,text)",classification:"guarded_explicit"}],
+  ["cpc1_record_signatures", {identity:"cpc1_record_signatures(uuid)",classification:"guarded_explicit"}],
+  ["cpc1_record_sign", {identity:"cpc1_record_sign(uuid,integer,text,text,text)",classification:"guarded_explicit"}],
 ]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
@@ -419,7 +421,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 106, "reviewed source HEAD must expose 106 literal RPC targets");
+  assert.equal(sourceNames.length, 108, "reviewed source HEAD must expose 108 literal RPC targets");
   const nhatKyMigration = readFileSync("supabase/migrations/20261016170000_tham_dinh_nhat_ky.sql", "utf8");
   for (const [ten, chuKy] of [["cpc1_print_log", "uuid, integer, text, text"], ["cpc1_audit_trail", "text, date, date, integer"]]) {
     assert.match(nhatKyMigration, new RegExp(`function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = ''[\\s\\S]*?cpc1_private\\.viewer\\(\\)`, "i"), `${ten} must gate through viewer()`);
@@ -433,6 +435,14 @@ test("every source RPC call has exactly one reviewed migration classification", 
   }
   assert.match(nguongMigration, /vmp_business_role\(u\) is distinct from 'admin' then\s*return jsonb_build_object\('ok', false, 'error_code', 'FORBIDDEN'/, "only Admin may set trend levels");
   assert.match(nguongMigration, /before update or delete on cpc1_private\.trend_limits/, "saved levels are immutable; changes are new versions");
+  const kyDuyetMigration = readFileSync("supabase/migrations/20261016190000_tham_dinh_ky_duyet.sql", "utf8");
+  for (const [ten, chuKy] of [["cpc1_record_signatures", "uuid"], ["cpc1_record_sign", "uuid, integer, text, text, text"]]) {
+    assert.match(kyDuyetMigration, new RegExp(`function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = ''[\\s\\S]*?cpc1_private\\.viewer\\(\\)[\\s\\S]*?require_record_pq\\(p_record_id, false\\)`, "i"), `${ten} must gate through viewer() and record PQ read right`);
+    assert.match(kyDuyetMigration, new RegExp(`revoke all on function public\\.${ten}\\(${chuKy}\\) from public, anon;`, "i"));
+  }
+  assert.match(kyDuyetMigration, /auth\.jwt\(\)->'amr'[\s\S]*?a->>'method' = 'password'[\s\S]*?interval '5 minutes'/, "signing requires a password authentication within 5 minutes");
+  assert.match(kyDuyetMigration, /before insert on public\.cpc1_revisions/, "approved records are locked against every save path");
+  assert.match(kyDuyetMigration, /before update or delete on cpc1_private\.record_signatures/, "signatures are immutable");
   const qaPhuTrachMigration = readFileSync("supabase/migrations/20261016160000_danh_sach_qa_phu_trach.sql", "utf8");
   for (const ten of ["rpc_qa_phu_trach_danh_sach", "rpc_qa_phu_trach_dat"]) {
     assert.match(qaPhuTrachMigration, new RegExp(`create or replace function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = public, pg_temp`, "i"), `${ten} must be security definer with pinned search_path`);

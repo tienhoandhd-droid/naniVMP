@@ -28,7 +28,7 @@ const canonical = value => JSON.stringify(value, function(key,item) {
     ? Object.fromEntries(Object.keys(item).sort().map(k=>[k,item[k]])) : item;
 });
 
-export function makeBackend(settings, existingClient) {
+export function makeBackend(settings, existingClient, makeSigningClient) {
   if (!settings?.url || !settings?.publishableKey) throw new Error('Chưa cấu hình kết nối hệ thống.');
   const parsed = new URL(settings.url);
   if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.supabase.co')) throw new Error('Địa chỉ máy chủ không hợp lệ.');
@@ -40,6 +40,9 @@ export function makeBackend(settings, existingClient) {
   } else if (!/^sb_publishable_[A-Za-z0-9_-]+$/.test(settings.publishableKey)) throw new Error('Chỉ dùng publishable key hoặc anon key cho web.');
   // Match the VMP client: same project/default storage key; never copy tokens.
   const client = existingClient || createClient(settings.url,settings.publishableKey,{auth:{persistSession:true,detectSessionInUrl:false,autoRefreshToken:true}});
+  // Gói 3: phiên RIÊNG chỉ dùng để ký (đăng nhập lại bằng mật khẩu), không lưu, không
+  // dùng chung khoá lưu trữ với phiên chính — cùng cách với src/lib/passwordReauthentication.ts.
+  const signingClient = makeSigningClient || (() => createClient(settings.url,settings.publishableKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:`cpc1-ky-${crypto.randomUUID()}`}}));
   let current = null;
   let runBinding = null;
   let activeSystem = null;
@@ -178,6 +181,38 @@ export function makeBackend(settings, existingClient) {
       await requireGlobalView();
       if(!systems.includes(limit?.system))throw Error('Hệ thống thẩm định không hợp lệ.');
       return rpc('cpc1_trend_limit_set',{p_system:limit.system,p_form:limit.form,p_metric:limit.metric,p_point_id:limit.pointId||'',p_unit:limit.unit,p_direction:limit.direction,p_alert:limit.alert,p_action:limit.action,p_hieu_luc_tu:limit.from,p_ly_do:limit.reason});
+    },
+    async recordSignatures(recordId){
+      await requireGlobalView();
+      if(!uuid(recordId))throw Error('Hồ sơ không hợp lệ.');
+      return rpc('cpc1_record_signatures',{p_record_id:recordId});
+    },
+    // Annex 11 §14 / 21 CFR 11.200: ký = nhập lại mật khẩu. Đăng nhập lại trong phiên riêng
+    // rồi gọi RPC ký bằng CHÍNH phiên đó; máy chủ kiểm JWT vừa xác thực mật khẩu (claim amr).
+    async signRecord({recordId,version,meaning,password,reason,deviation}){
+      await requireGlobalView();
+      if(!uuid(recordId)||!Number.isSafeInteger(version)||version<1)throw Error('Hồ sơ không hợp lệ.');
+      if(!['kiem_tra','duyet','mo_lai'].includes(meaning))throw Error('Ý nghĩa ký không hợp lệ.');
+      if(!password)throw Error('Nhập mật khẩu để ký.');
+      const {data,error}=await client.auth.getSession();if(error)throw error;
+      const email=data.session?.user?.email,actor=data.session?.user?.id;
+      if(!email||!actor)throw Error('Phiên đăng nhập không có email; không ký được.');
+      const signer=signingClient();let signedIn=false;
+      try{
+        const verified=await signer.auth.signInWithPassword({email,password});
+        if(verified.error||!verified.data?.session){
+          const message=verified.error?.message||'';
+          throw Error(/invalid login credentials/i.test(message)?'Mật khẩu không đúng.':`Không xác thực được mật khẩu${message?` (${message})`:''}.`);
+        }
+        signedIn=true;
+        if(verified.data.user?.id!==actor||verified.data.session.user?.id!==actor)throw Error('Tài khoản ký không khớp người đang đăng nhập.');
+        const result=await signer.rpc('cpc1_record_sign',{p_record_id:recordId,p_version:version,p_y_nghia:meaning,p_ly_do:reason||null,p_ma_deviation:deviation||null});
+        if(result.error)throw Error(result.error.message||'Không ký được.');
+        if(!result.data?.ok)throw Error(result.data?.error||'Không ký được.');
+        return result.data;
+      }finally{
+        if(signedIn){const {error:outError}=await signer.auth.signOut({scope:'local'});if(outError)console.warn('Không đóng được phiên ký tạm:',outError.message);}
+      }
     },
     async downloadHistorySource(path){
       await requireGlobalView();
