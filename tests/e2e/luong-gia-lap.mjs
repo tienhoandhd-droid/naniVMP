@@ -721,6 +721,49 @@ for (const [id, ten] of MAN) {
 }
 
 
+/* ---- 3q. Màn hẹp: không đoạn chữ nào bị ép thành cột (16/10) --------- */
+/* Lỗi thật trên bản publish 08/10: luật CSS desktop viết sau đè luật điện
+   thoại, cột câu dẫn Vali ở "Việc hôm nay" co còn 0px — mỗi dòng một chữ.
+   Kiểm "tràn ngang" cấp trang không thấy vì phần tràn bị thẻ cắt mất, nên
+   ở đây đo thẳng bề ngang từng đoạn chữ. */
+{
+  console.log("\nMàn hẹp — chữ không bị ép thành cột:");
+  const KHUNG_HEP = [
+    ["điện thoại", { width: 390, height: 844, isMobile: true, hasTouch: true }],
+    ["máy tính bảng", { width: 820, height: 1180, isMobile: true, hasTouch: true }],
+  ];
+  for (const [tenKhung, vp] of KHUNG_HEP) {
+    for (const [id, ten] of MAN) {
+      const trang = await trinhDuyet.newPage();
+      // Đặt viewport TRƯỚC khi cài phiên: đổi isMobile làm trang nạp lại.
+      await trang.setViewport(vp);
+      await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+      await nhetPhien(trang, { supabaseUrl: URL_SB });
+      await trang.goto(`${GOC}#v=${id}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await new Promise((r) => setTimeout(r, 2000));
+
+      const biEp = await trang.evaluate(() => {
+        const ketQua = [];
+        for (const el of document.querySelectorAll("body *")) {
+          const chu = [...el.childNodes]
+            .filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim();
+          if (chu.length < 20) continue;
+          const s = getComputedStyle(el);
+          if (s.display === "none" || s.visibility === "hidden") continue;
+          // Bỏ qua chữ cố ý ẩn cho trình đọc màn hình (sr-only: 1px, clip).
+          if (s.position === "absolute" && (s.clip !== "auto" || s.clipPath !== "none")) continue;
+          const r = el.getBoundingClientRect();
+          if (r.height === 0) continue;
+          if (r.width < 60) ketQua.push(`${String(el.className).split(" ")[0] || el.tagName} rộng ${Math.round(r.width)}px: "${chu.slice(0, 30)}"`);
+        }
+        return ketQua;
+      });
+      kiem(biEp.length === 0, `${tenKhung} · ${ten}: không có chữ bị ép`, biEp.slice(0, 2).join(" | "));
+      await trang.close();
+    }
+  }
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");

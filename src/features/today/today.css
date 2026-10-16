@@ -487,17 +487,16 @@
   .hn-cot span:nth-child(5) { width: auto; }
   .hn-cot span:nth-child(6) { width: 144px; }
 }
-@media (max-width: 1100px) and (min-width: 769px) {
-  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 176px minmax(0, 1fr) minmax(0, 150px) 116px 144px; }
-  .hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 176px 1fr; }
-  .hn-muc__moc { display: none; }
-  .hn-muc__nguoi { display: block; grid-column: 3; }
-  .hn-muc__tre { grid-column: 4; }
-  .hn-muc__nut { grid-column: 5; }
-  .hn-cot span:nth-child(3) { display: none; }
-  .hn-cot span:nth-child(4) { display: inline; }
+/* 16/10 — máy tính bảng (769–1100px) dùng dạng THẺ như điện thoại. Trước
+   đây khoảng này là bảng 5 cột với 586px cột cố định, nhưng menu trái vẫn
+   hiện nên vùng nội dung chỉ ~430px ở 820px: cột tên hạng mục co còn 0px,
+   tiêu đề cột chồng lên nhau và nút "Cập nhật" bị cắt. */
+@media (max-width: 1100px) {
+  .hn-muc__mo--inline { display: flex; flex-direction: column; gap: 2px; }
+  .hn-muc__ten { white-space: normal; }
+  .hn-muc__thong-tin .hn-ly-do { display: flex; }
 }
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   .hn-nhom { border-radius: 16px; }
   .hn-nhom::after { right: 6px; }
   .hn-nhom__ten { padding: 14px 16px 12px; font-size: 22px; }
@@ -525,4 +524,23 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .hn-muc, .hn-muc__nut { transition: none; }
+}
+
+/* =====================================================================
+ *  16/10 — CHỐT bố cục hero cho màn hẹp. Khối này PHẢI nằm cuối file.
+ *  Các luật desktop ngày 30/08 (padding 24/32, chữ 30px, lưới 3 cột) viết
+ *  không kèm @media và đứng SAU luật màn hẹp ở trên, nên đè mất chúng: trên
+ *  điện thoại và máy tính bảng, cột câu dẫn co còn 0px, mỗi dòng một chữ.
+ *  Nhắc lại luật màn hẹp ở đây để nó thắng theo thứ tự cascade.
+ * ===================================================================== */
+@media (max-width: 1100px) {
+  .hn-hero { grid-template-columns: 118px minmax(0, 1fr); }
+  .hn-hero__so { grid-column: 1 / -1; justify-content: flex-start; margin-top: 10px; }
+  .hn-loi { max-width: none; font-size: 24px; }
+}
+@media (max-width: 768px) {
+  .hn-hero { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px; }
+  .hn-loi { font-size: 20px; }
+  .hn-loi::before, .hn-loi::after { font-size: 26px; vertical-align: -5px; }
+  .hn-hero__uu-tien { flex-wrap: wrap; }
 }
