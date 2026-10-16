@@ -39,7 +39,7 @@ export default function FieldPerformancePanel() {
         right={<button type="button" data-field-performance-refresh onClick={() => void load()} disabled={state==='pending'} className="field-perf-refresh"><RefreshCw size={15}/> Làm mới số đo</button>}>
         Hiệu năng thực tế
       </CardTitle>
-      <p className="field-perf-explanation">Mỗi lần mở trang đóng góp tối đa một giá trị cho mỗi chỉ số. P75 nghĩa là 75% số đo không vượt quá giá trị này. Nhóm theo <b>trang mở đầu</b>; phản hồi thao tác có thể gồm các tab mở tiếp trong cùng phiên trang.</p>
+      <p className="field-perf-explanation">P75: 75% số đo không vượt quá giá trị này.</p>
       <div role="status" aria-live="polite">
         {state==='pending' && 'Đang tải số đo…'}
         {state==='empty' && 'Chưa có số đo trong 7 ngày qua. Hệ thống sẽ ghi nhận khi người dùng mở trang và thao tác; chưa có số đo không có nghĩa là tốc độ bằng 0.'}

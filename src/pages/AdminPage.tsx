@@ -144,7 +144,7 @@ export default function AdminView({ conn, user, access }: {
           </Card>
 
           <Card>
-            <CardTitle icon={Clock} sub="pg_cron chạy ngay trong database — không phụ thuộc máy nào bật">
+            <CardTitle icon={Clock} sub="Chạy trên máy chủ, không cần máy nào bật">
               Việc tự động đang hẹn giờ
             </CardTitle>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -166,8 +166,8 @@ export default function AdminView({ conn, user, access }: {
           <Card>
             <CardTitle icon={Radar}
               sub={loiClientTrangThai === "ok"
-                ? `${loiClientTong} lỗi trong 24 giờ · web tự báo về (lib/baoLoi.ts) — trước đây lỗi chết trong trình duyệt người dùng`
-                : "Web tự báo lỗi runtime về database — tai mắt production"}>
+                ? `${loiClientTong} lỗi trong 24 giờ`
+                : "Lỗi phát sinh trên trình duyệt người dùng"}>
               Lỗi client 24 giờ qua
             </CardTitle>
             {loiClientTrangThai === "dang-tai" && (

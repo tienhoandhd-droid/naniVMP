@@ -163,7 +163,6 @@ export function AccountAdministrationContent({
       <div className="pq-control__heading">
         <div>
           <h2 id="pq-control-title">Bảng kiểm soát vai trò &amp; tài khoản</h2>
-          <p>Ưu tiên tài khoản thiếu cấu hình; mở chi tiết chỉ khi cần xử lý.</p>
         </div>
         <div className="pq-control__filters" role="group" aria-label="Lọc bảng tài khoản">
           <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>Tất cả <b>{rows.length}</b></button>

@@ -457,7 +457,6 @@ export default function CompletionDashboard({ acts, matrix }: {
           <span className="overview-analysis-layer__index" aria-hidden="true">01</span>
           <div>
             <h3 id="overview-analysis-flow-title">Dòng chảy 4 giai đoạn</h3>
-            <p>Đọc từ đề cương đến đích VMP để thấy bước nào đang làm hụt tiến độ.</p>
           </div>
         </div>
 
@@ -537,7 +536,6 @@ export default function CompletionDashboard({ acts, matrix }: {
           <span className="overview-analysis-layer__index" aria-hidden="true">03</span>
           <div>
             <h3 id="overview-analysis-comparison-title">So sánh cơ cấu</h3>
-            <p>Mỗi lần chỉ xem một chiều để nhận ra nhóm đang dẫn đầu hoặc tụt lại.</p>
           </div>
         </div>
 

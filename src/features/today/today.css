@@ -340,6 +340,8 @@
 .hn-mota { display: block; font-size: 13px; line-height: 20px; color: var(--lp-ink-muted); }
 .hn-mota__pham-vi, .hn-mota__moc { display: inline; font-size: 13px; font-weight: 500; color: var(--lp-ink-muted); }
 .hn-mota__pham-vi::before, .hn-mota__moc::before { content: " · "; }
+/* 16/10: bỏ câu mô tả lặp phụ đề — phần tử đầu không còn gì đứng trước để ngăn. */
+.hn-mota > :first-child::before { content: none; }
 /* "Làm trước tiên" — nhãn, nút và gợi ý trên cùng một hàng. */
 .hn-hero__uu-tien { flex-wrap: nowrap; align-items: center; gap: 12px; margin-top: 2px; }
 .hn-hero__goi-y { flex-basis: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

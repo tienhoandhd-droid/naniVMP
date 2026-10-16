@@ -291,7 +291,6 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
         <span className="overview-analysis-layer__index" aria-hidden="true">02</span>
         <div>
           <h3 id="overview-analysis-matrix-title">Ma trận điểm nghẽn</h3>
-          <p>Đổi trục để tìm nơi đang trễ, thiếu dữ liệu hoặc dồn tải theo giai đoạn.</p>
         </div>
       </div>
 

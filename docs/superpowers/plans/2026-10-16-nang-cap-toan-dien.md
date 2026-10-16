@@ -1,103 +1,42 @@
-# Kế hoạch nâng cấp toàn diện VMP Monitor — sau rà soát 16/10/2026
+# Kế hoạch nâng cấp VMP Monitor — sau rà soát 16/10/2026
 
-> Nguồn: rà soát người dùng trên bản publish `e9d1c7f` (deploy 08/10), đọc
-> production chỉ-đọc, thử migration trên bản sao production, chạy lại toàn bộ
-> CI trên máy. Nhánh làm việc: `fix/audit-2026-10-16`.
-> Quy ước: **[CHỦ DỰ ÁN]** = việc cần anh/chị quyết hoặc tự làm (quyền
-> production, chi phí, quyết định thiết kế); còn lại Claude làm được.
+Chi tiết kỹ thuật nằm trong commit và runbook được dẫn ở từng dòng.
+**[CHỦ DỰ ÁN]** = việc cần chủ dự án quyết hoặc tự làm.
 
-## Hiện trạng sau đợt sửa 16/10 (đã xong trên nhánh, CHƯA deploy)
+## Đã xong (16/10)
 
-| # | Việc | Bằng chứng |
+| Việc | Ghi chú |
+|---|---|
+| Deploy đợt sửa lên `main` | CI xanh, đã kiểm trên web thật |
+| Áp 10 migration production | `docs/runbooks/2026-10-16-ap-migration-ton-dong.md`; `drift:db` khớp 131/131 |
+| Kiểm lệch DB mỗi sáng | `.github/workflows/db-drift.yml`, `npm run drift:db` |
+| Sửa hook MFA chặn nhầm anon | migration `20261016120000` |
+| Rà 16 policy `true` còn lại | Đều là bảng cấu hình chỉ đọc — giữ |
+| Rà soát quyền định kỳ | `npm run ra-soat-quyen -- --out <ngoài repo>` |
+| Diễn tập khôi phục sao lưu | `docs/runbooks/2026-10-16-dien-tap-khoi-phuc.md` |
+| E2E không còn hỏng theo lịch | `VMP_E2E_NOW` (CI: 2026-10-08) |
+| Axe chặn cả mức moderate | 0 vi phạm / 20 kịch bản |
+| Đo chữ < 12px và chữ bị ép | luong-gia-lap 3q, 14 màn × 2 cỡ |
+| Sinh lại `database.ts` | typecheck đạt |
+| Xoá script kiểm cũ hỏng | `check-qualification-bundle.mjs` |
+| Gọn chữ giải thích trên 13 màn | Bỏ chữ kỹ thuật, câu tự bào chữa, hướng dẫn đọc biểu đồ, câu lặp |
+| Dọn máy làm việc | `main` khớp GitHub; `main` cũ lưu ở nhánh `luu-tru/main-may-cu-20261016` + bundle; gỡ 15 worktree sạch (giữ nhánh); đóng PR #6 |
+
+## Còn lại
+
+| Việc | Ai | Ghi chú |
 |---|---|---|
-| 1 | Điện thoại/tablet: câu dẫn "Việc hôm nay" co còn 0px; bảng việc vỡ ở 820px | luong-gia-lap 3q (28 màn × 2 cỡ) |
-| 2 | Gói in PDF tách khỏi `cloud.js`: 1,6 MB → 225 KB (gzip 615 → 59 KB) | build + kiểm tải theo yêu cầu |
-| 3 | 3 lỗ hổng thư viện high → 0; CI chặn lỗ hổng runtime high+ | `npm audit` |
-| 4 | Chữ 8–11px ở Tổng quan → 12px | đo 14 màn × 2 cỡ |
-| 5 | Đăng nhập: thương hiệu bị cắt, ô email hai viền, focus lạc khi sai mật khẩu | luong-gia-lap 1b |
-| 6 | Bỏ thuật ngữ "Supabase" khỏi câu người dùng; nhãn cho 4 ô nhập | — |
-| 7 | Migration sửa policy tái thẩm định + đóng 13 policy mở | bản sao production, 4 vai |
-| 8 | Bộ kiểm "bom hẹn giờ" `timeline-deadline-edit` — CI sẽ chặn deploy kế tiếp | gốc hỏng / bản vá 39 đạt |
-| 9 | `npm run drift:db` — phát hiện production lệch repo | chạy thật: 6 migration tồn đọng |
-
----
-
-## Giai đoạn 0 — Đưa đợt sửa lên production (ưu tiên cao nhất)
-
-**0.1 ✅ 16/10 đã push `main`** (chủ dự án uỷ quyền). (Mô tả cũ:) Duyệt và merge nhánh → CI tự deploy GitHub Pages.
-Kiểm sau deploy: mở web trên điện thoại thật, màn Việc hôm nay.
-
-**0.2 ✅ 16/10 đã áp, `drift:db` khớp 130/130 hàm.** (Mô tả cũ:) Áp 8 migration theo `docs/runbooks/2026-10-16-ap-migration-ton-dong.md`.
-Hệ quả mở khoá ngay: tab Tái thẩm định, nhập Excel có xem trước, báo lỗi
-phía người dùng, đóng 6 bảng PII + 13 policy mở, sửa lệch ngày 0h–7h.
-Sau khi áp: `npm run drift:db` phải ra mã thoát 0.
-
-**0.3 Đồng bộ máy làm việc**: `main` cục bộ chậm 877 commit so với GitHub —
-pull trước khi làm gì tiếp trên máy này (tránh sửa trên code cũ như rà soát
-ngày 12/08 từng dính).
-
-## Giai đoạn 1 — Không để production "lệch âm thầm" lần nữa (1–2 ngày)
-
-Bài học lớn nhất đợt này: 6 migration nằm chờ 6 tuần, web gọi tới mà không ai biết.
-
-1.1 ✅ 16/10: workflow `.github/workflows/db-drift.yml` chạy 7h30 mỗi sáng + khi đổi migration, chỉ dùng anon key qua `rpc_schema_fingerprint()`; đỏ → GitHub gửi email. Trên đường làm phát hiện và sửa lỗi hook MFA chặn nhầm mọi request anon (`20261016120000`). (Mô tả cũ:) Chạy `drift:db` **định kỳ**. GitHub hiện cố ý không giữ credential DB
-production, nên đề xuất chạy từ n8n (đã có kết nối Postgres) mỗi sáng, báo
-lỗi qua kênh cảnh báo sẵn có; hoặc cron trên máy chủ nội bộ. **[CHỦ DỰ ÁN]** chọn nơi chạy.
-1.2 Sau khi 0.2 xong: đọc bảng `vmp_client_errors` hàng tuần (thẻ ở Cấu hình hệ thống) — đây là lần đầu có dữ liệu lỗi thật từ người dùng.
-1.3 Quy trình: migration nào merge kèm runbook phải có dòng "ĐÃ ÁP ngày…/người áp" trong runbook; PR template nhắc việc này.
-
-## Giai đoạn 2 — Bảo mật & phân quyền (1–2 tuần, nhiều việc cần chủ dự án)
-
-2.1 **Bật `item_permissions_mode = enforced`** — *số liệu 16/10 sau khi áp migration
-(`rpc_item_permission_preflight`)*: 511 blocker = 461 hạng mục thiếu scope
-hierarchy · 34 phân công chưa xác định · 7 nhân viên thiếu bộ phận/phân loại ·
-2 thiếu xưởng/khu vực/line · 7 RPC "SECURITY DEFINER chưa lọc". Đã kiểm 7 RPC:
-2 cái (dashboard v2, team summary) CÓ lọc qua `vmp_visible_plan_items()` — preflight
-chưa nhận diện (runbook 31/08 mục 5.1 đã dặn cập nhật allowlist); 5 cái chặn theo
-vai quản lý. Không có rò rỉ thật; cập nhật allowlist + niêm phong lại receipt là
-một phần của dự án enforce.
-   Gốc:  — hiện `preview`, nên lọc theo phạm vi hạng mục chưa có hiệu lực ở vài RPC tổng hợp (thử trên bản sao: tổng Tổng quan của nhân viên xưởng = của admin). Chặn bởi 461 hạng mục chưa có canonical scope (thiết kế 24/08). Việc: báo cáo hạng mục thiếu scope → **[CHỦ DỰ ÁN]** QA gán bộ phận/xưởng → thử enforce trên bản sao production → bật.
-2.2 ✅ *Đã rà 16/10*: 16 policy `true` còn lại đều SELECT trên bảng cấu hình/tham chiếu, không PII — giữ nguyên. (Mô tả cũ:) Rà 15 policy `true` còn lại (bảng cấu hình: phòng ban, quy tắc hạn, cấu hình Vali, `vmp_kb_*`, `vmp_objects`, `vmp_danh_gia_anh_huong`…) — xác nhận từng bảng "ai đọc cũng được" là đúng ý.
-2.3 **[CHỦ DỰ ÁN]** Checklist 31/08 còn mở: đổi mật khẩu Postgres production, giới hạn IP; bật CAPTCHA cho Auth; kiểm n8n xác thực JWT; giới hạn tần suất webhook chat (token n8n nằm công khai trong bundle — có chủ ý, nhưng cần rate limit).
-2.4 Bắt buộc MFA cho vai admin (hiện là opt-in, migration 29/09). *Số liệu 16/10 (`npm run ra-soat-quyen`): cả 4 admin chưa bật MFA* — **[CHỦ DỰ ÁN]** yêu cầu từng admin bật MFA trong Đổi mật khẩu → Bảo mật, xong mới bật bắt buộc (bật trước sẽ khoá admin ngoài).
-2.5 ✅ *Đã rà 16/10* (ĐÍNH CHÍNH: ban đầu tưởng là tài khoản thử nghiệm — thực ra là tài khoản một người thật phòng QA, tạo 17/08): không có vai, ĐÃ vô hiệu hoá, không đăng nhập được — rủi ro thấp. **[CHỦ DỰ ÁN]** quyết giữ hay gán vai.
-
-## Giai đoạn 3 — Tuân thủ GMP cho hệ thống máy tính (Annex 11 / Part 11 tinh gọn)
-
-VMP Monitor theo dõi kế hoạch thẩm định gốc — dữ liệu này vào hồ sơ GMP, nên
-nên có bộ hồ sơ thẩm định hệ thống máy tính (CSV) tối thiểu:
-
-3.1 **Đánh giá rủi ro & URS rút gọn**: liệt kê chức năng ghi dữ liệu GMP (đã có `docs/testing/2026-10-08-data-write-inventory.md` — dùng làm khung).
-3.2 **Bằng chứng kiểm thử tự động làm OQ**: CI đã chạy ~1.000 unit + ~25 bộ E2E mỗi lần deploy; sinh báo cáo kết quả có mã commit/ngày, lưu làm hồ sơ (job `upload-artifact` khi thành công, không chỉ khi lỗi).
-3.3 **Audit trail**: xác nhận mọi thay đổi ngày/trạng thái có ai/khi nào/giá trị cũ-mới/lý do (đã có cho deadline kế hoạch) — kiểm đủ cho các luồng ghi còn lại; đợt này đã đóng lỗ `vmp_progress_events` cho INSERT tự do.
-3.4 ✅ *16/10*: đã khôi phục bản dump production 2 lần, số dòng khớp — hồ sơ `docs/runbooks/2026-10-16-dien-tap-khoi-phuc.md`. Còn: **Sao lưu & khôi phục**: **[CHỦ DỰ ÁN]** kiểm PITR Supabase; diễn tập khôi phục lên bản sao (quy trình bản sao production đã chạy được ngày 16/10).
-3.5 ✅ *16/10*: `npm run ra-soat-quyen -- --out <file.csv>` (chỉ đọc; từ chối ghi vào repo vì có email). Bản Q4/2026 đã xuất: 9 tài khoản, 5 dòng cần chú ý. **[CHỦ DỰ ÁN]** QA ký rà soát hằng quý.
-
-## Giai đoạn 4 — Chất lượng bộ kiểm (2–3 ngày)
-
-4.1 ✅ *16/10*: `VMP_E2E_NOW` đóng băng đồng hồ cho mọi trang giả lập; CI đặt 2026-10-08; toàn bộ chuỗi E2E đạt. (Mô tả cũ:) **Quét "bom hẹn giờ"**: `gia-lap-supabase.mjs` dùng ngày cố định (deadline 2026-09…); mọi bộ kiểm phụ thuộc cửa sổ "quanh Hôm nay" sẽ hỏng dần. Chuyển fixture sang ngày tương đối, hoặc đóng băng đồng hồ mặc định trong `caiGiaLap`.
-4.2 Lỗi chập chờn `catalog-workspace` (qa_manager) khi máy tải nặng — tăng ổn định chờ thay vì tăng timeout.
-4.3 ✅ 16/10 đã xoá `scripts/check-qualification-bundle.mjs`: viết cho API cũ (`cpc1_save`), hỏng sẵn, không trong CI; hành vi nó kiểm đã được `tests/unit/qualification-session.test.mjs:34-39` phủ trên API hiện tại.
-4.4 ✅ *16/10*: axe chặn cả moderate (đo 0 vi phạm trên 20 kịch bản).
-4.5 Mở rộng phép đo "chữ bị ép" (3q) và "chữ <12px" thành gate cho mọi màn, gồm chế độ tối.
-4.6 **[CHỦ DỰ ÁN]** Project Supabase staging tách khỏi production — mở khoá bộ E2E đăng nhập thật (`npm run e2e`) và Đợt B Lotus Pearl.
-
-## Giai đoạn 5 — Trải nghiệm & hiệu năng
-
-5.1 **[CHỦ DỰ ÁN]** Long Môn (Timeline): nhãn ngày/tuần 9–10px — khó đọc; trước đây được khoanh ngoài phạm vi. Quyết: nâng lên 12px (cần chỉnh bố cục tranh) hay giữ.
-5.2 ✅ *16/10*: chữ giữa vòng co theo bề ngang vòng (cqi), đo nằm trong vòng ở 390/430/1366.
-5.3 Kiểm thật trên thiết bị xưởng (máy tính bảng): mở phân hệ Thẩm định thực tế sau khi deploy đợt PDF.
-5.4 **[CHỦ DỰ ÁN]** Ảnh `long-mon-vmp-racecourse-v15.webp` (221 KB) không còn được dùng, giữ làm tham chiếu — xoá khỏi `public/` (chuyển sang `docs/`) nếu đồng ý.
-5.5 `exceljs` 940 KB (chỉ tải khi bấm Excel) — giữ; xem lại khi có bản nhẹ hơn.
-
-## Giai đoạn 6 — Nợ kỹ thuật
-
-6.1 ✅ `database.ts` sinh lại từ production 16/10 (typecheck đạt). Còn: gỡ dần 64 `as never` theo từng tính năng.
-6.2 Tách file >1.000 dòng: `index.css` (2.976), `supabaseData.ts`, `Primitives.tsx`, `AuthenticatedApp.tsx`.
-6.3 Thử 16/10: thêm `index.css` vào drift lòi 133 vi phạm (radius, hex) — chuyển hệ là đợt riêng. Thay thế ✅: luong-gia-lap 3q đo chữ <12px ĐÃ TÍNH trên 14 màn × 2 cỡ.
-6.4 Dọn ~18 worktree cũ trong `.worktrees/` sau khi xác nhận đã merge. **[CHỦ DỰ ÁN]** PR #6 (`ci/on-dinh-workflow`, 24/08) còn mở, đã cũ hơn main ~900 commit — đóng hoặc làm lại.
-
-## Thứ tự đề xuất
-
-0 → 1 → 4.1 → 2 → 3 → 5 → 6. Giai đoạn 0 và 1 chặn rủi ro đang có; 4.1 ngăn
-CI tự hỏng theo lịch; 2 và 3 cần thời gian của chủ dự án và QA.
+| Bật `item_permissions_mode = enforced` | **[CHỦ DỰ ÁN]** + QA | 511 blocker, chủ yếu 461 hạng mục chưa gán xưởng/bộ phận; sau đó cập nhật allowlist preflight |
+| Bắt buộc MFA cho admin | **[CHỦ DỰ ÁN]** | 4/4 admin chưa bật — bật xong mới bật bắt buộc |
+| Đổi mật khẩu Postgres, giới hạn IP, CAPTCHA Auth, rate limit webhook chat | **[CHỦ DỰ ÁN]** | Checklist 31/08 |
+| PITR Supabase; chuyển bản sao lưu sang kho QA | **[CHỦ DỰ ÁN]** | Bản sao lưu hiện chỉ trên máy này |
+| QA ký rà soát quyền hằng quý | **[CHỦ DỰ ÁN]** | Bản Q4/2026 đã xuất |
+| Long Môn chữ 9–10px | **[CHỦ DỰ ÁN]** quyết | Nâng 12px cần chỉnh bố cục tranh |
+| Ảnh `long-mon-vmp-racecourse-v15.webp` không còn dùng | **[CHỦ DỰ ÁN]** quyết | 221 KB |
+| 3 worktree còn thay đổi chưa commit | **[CHỦ DỰ ÁN]** quyết | `desktop-ux-data-first`, `qa-rights-account-alignment`, `ui-functional-integrity` |
+| Project Supabase staging | **[CHỦ DỰ ÁN]** | Mở khoá E2E đăng nhập thật |
+| Hồ sơ CSV: URS rút gọn, đánh giá rủi ro, lưu bằng chứng CI làm OQ, audit trail các luồng ghi | Claude + QA | Khung có sẵn: `docs/testing/2026-10-08-data-write-inventory.md` |
+| Kiểm phân hệ Thẩm định thực tế trên máy tính bảng xưởng | QA | Sau đợt tách gói PDF |
+| Lỗi chập chờn `catalog-workspace` khi máy tải nặng | Claude | |
+| Gỡ dần 64 `as never`; tách file > 1.000 dòng; chuyển `index.css` sang hệ thiết kế (133 vi phạm) | Claude | Làm theo từng tính năng |
+| Bước cài Playwright vẫn dùng `--with-deps` | Claude | Đã có timeout; theo dõi |

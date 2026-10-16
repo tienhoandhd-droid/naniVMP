@@ -157,21 +157,21 @@ export const NAV_ITEMS = [
 ];
 
 export const NAV_SUBS = {
-  today: "Việc của tôi hôm nay — đã trễ, tới hạn trong 7 ngày, và hồ sơ cần điền nốt",
+  today: "Việc trễ, tới hạn trong 7 ngày và hồ sơ cần hoàn thiện",
   overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
-  timeline: "Đề cương → Thẩm định → Báo cáo → Đích VMP · một bộ lọc cho cả tổng quan lẫn dòng thời gian",
-  alerts: "Cảnh báo tới hạn / quá hạn / tái thẩm định — xếp theo điểm rủi ro ICH Q9, kèm ma trận QRM",
-  progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn cho mỗi hạng mục — việc làm hàng ngày",
+  timeline: "Đề cương → Thẩm định → Báo cáo → Đích VMP",
+  alerts: "Tới hạn, quá hạn, tái thẩm định · xếp theo rủi ro ICH Q9",
+  progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn",
   inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
   /* Sáu vùng của workspace danh mục — KHÔNG hứa "Người thực hiện" hay
      "Danh bạ nhân sự", không hứa xoá vật lý.
      Chuỗi này có bộ kiểm literal giữ (tests/unit/operational-copy). */
-  source: "Dữ liệu nguồn · Đối tượng theo quyền; Admin/Quản lý QA có thêm phân công QA, phạm vi xưởng và công cụ danh mục",
+  source: "Đối tượng nguồn theo phạm vi được cấp",
   workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
-  reports: "Tổng hợp tình hình VMP theo kỳ, gợi ý nhận xét và xuất PDF / Excel / HTML",
-  rules: "Quy tắc hệ thống đang chạy — đọc thẳng từ máy chủ nên không thể mô tả khác thực tế",
+  reports: "Tổng hợp theo kỳ · xuất PDF, Excel, HTML",
+  rules: "Quy tắc hệ thống đang áp dụng",
   phanquyen: "Chỉ Admin · tài khoản · vai trò · quyền hiệu lực · phân công hạng mục",
-  health: "Chất lượng dữ liệu: lỗi trên bản đang xem + số liệu và kiểm tra chạy thẳng trên máy chủ",
+  health: "Lỗi và kiểm tra chất lượng dữ liệu",
   audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
   admin: "Cấu hình hệ thống, người dùng, phân quyền",
 };

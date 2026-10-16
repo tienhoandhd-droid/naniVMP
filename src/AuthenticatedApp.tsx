@@ -999,7 +999,11 @@ function VerifiedAppShell({ user, logout, access }: {
     };
   }, [silentRefresh]);
 
-  const title = NAV_ITEMS.find((n) => n.id === view)?.label || "Tổng quan";
+  // Màn đã bỏ khỏi menu nhưng URL cũ vẫn mở được — không có tên riêng thì
+  // tiêu đề rơi về "Tổng quan", sai với nội dung đang hiện.
+  const title = NAV_ITEMS.find((n) => n.id === view)?.label
+    || ({ rules: "Quy tắc nghiệp vụ", inventory: "Tiến độ theo đối tượng" } as Record<string, string>)[view]
+    || "Tổng quan";
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: TEXT, color: C.plum, overflow: "hidden" }}>

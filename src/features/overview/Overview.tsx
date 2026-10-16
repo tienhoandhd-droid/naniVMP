@@ -140,9 +140,6 @@ export default function Overview({ acts, setView, access }: {
         <header className="overview-analysis-studio__header">
           <span className="overview-analysis-studio__eyebrow">Phân tích chuyên sâu</span>
           <h2 id="overview-analysis-title">Dòng chảy, điểm nghẽn và cơ cấu</h2>
-          <p>
-            Đọc lần lượt từ giai đoạn đang hụt, nơi tập trung vấn đề đến nhóm đang dẫn hoặc tụt lại.
-          </p>
         </header>
         <CompletionDashboard acts={acts} matrix={<MaTranTienDo acts={acts} />} />
       </section>

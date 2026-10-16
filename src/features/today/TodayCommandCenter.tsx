@@ -223,7 +223,7 @@ export function TodayCommandCenterContent({
       </div>
       <div className="hn-hero__loi">
         <p className="hn-loi">{vali.loi}</p>
-        <p className="hn-mota">Hàng đợi gồm việc quá hạn, đến hạn hôm nay, trong bảy ngày tới và hồ sơ cần hoàn thiện.
+        <p className="hn-mota">
           {scopeLabel && <span className="hn-mota__pham-vi">Phạm vi: {scopeLabel}</span>}
           {updatedLabel && <span className="hn-mota__moc">{updatedLabel}</span>}</p>
         {/* "Làm trước tiên" gộp vào hero thành một nút (anh Hoàn chốt 30/08) —

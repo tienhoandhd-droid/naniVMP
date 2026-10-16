@@ -105,7 +105,7 @@ function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered,
   return (
     <Card variant="strong">
       <CardTitle icon={Radar}
-        sub="KPI đang theo dõi + hạng mục ngoài KPI = phạm vi tổng hợp của máy chủ. Chỉ kết luận khi đã bỏ lọc và hai nguồn có cùng tổng số hạng mục."
+        sub="Chỉ kết luận khi đã bỏ lọc và hai nguồn cùng tổng số hạng mục."
         right={<button type="button" onClick={() => void tai(true)} disabled={busy} data-health-refresh
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px",
                    borderRadius: 10, border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
@@ -122,7 +122,7 @@ function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered,
         </div>
       )}
       <div data-health-conclusion><CauKetLuan chinh={busy ? "Đang tải lại dữ liệu để đối chiếu…" : !clientReady ? "Chưa tải được dữ liệu bản đang xem; chưa thể đối chiếu." : kl.chinh} tone={busy || !clientReady ? "warn" : kl.tone} /></div>
-      <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>“Ngoài KPI” gồm các hạng mục Không áp dụng hoặc Đã hủy còn trong bản dữ liệu được phép xem. Chúng chỉ được cộng để giải thích số máy chủ; không được đưa vào KPI đang theo dõi. Khi đang lọc hoặc tổng phạm vi chưa khớp, cột chênh để trống.</p>
+      <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>“Ngoài KPI” = hạng mục Không áp dụng hoặc Đã hủy.</p>
       <div className="vmp-scroll" role="region" aria-label="Bảng đối chiếu cùng phạm vi" tabIndex={0} style={{overflowX:"auto"}}><table data-health-comparison className="reg-table" style={{ width: "100%",minWidth:600 }}>
         <caption>Chênh sau đối chiếu = máy chủ − KPI đang theo dõi − ngoài KPI. Không thay đổi số liệu gốc.</caption>
         <thead><tr>
@@ -150,8 +150,7 @@ function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered,
       <div data-health-quality-sources style={{marginTop:18,padding:16,borderRadius:16,background:C.surfaceSunk}}>
         <strong>Hai bộ kiểm tra chất lượng dữ liệu</strong>
         <p>Bản đang xem: <b data-health-client-issues>{clientReady ? issueCount : "Chưa tải được"}</b> cảnh báo · Máy chủ: <b data-health-server-issues>{soLoiServer ?? "Chưa tải được"}</b> cảnh báo.</p>
-        <p style={{fontSize:13,lineHeight:1.7}}>Hai nguồn dùng quy tắc khác nhau, nên không lấy hiệu hai số để kết luận thiếu lỗi hoặc sai đồng bộ. Một hạng mục có thể có nhiều cảnh báo. Mở từng tab để xem loại cảnh báo và cách xử lý.</p>
-        <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>Nếu nguồn không cung cấp trường email QA, bản đang xem chưa thể kiểm tra trường đó; không tự kết luận nhân sự thiếu email.</p>
+        <p style={{fontSize:13,lineHeight:1.7}}>Hai nguồn dùng quy tắc khác nhau — không lấy hiệu hai số để kết luận.</p>
       </div>
       {kpi?.updated_at && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>

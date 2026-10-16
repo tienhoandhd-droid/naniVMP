@@ -186,7 +186,7 @@ ${topIssues.length ? `<table><tr><th>Mức</th><th>Loại</th><th>Chi tiết</th
 
 <div class="footer">
 <b>Audit:</b> Snapshot tạo lúc ${now.toISOString()} · Template báo cáo quản lý v3.0 · Hệ thống VMP Monitor CPC1 HN<br/>
-<b>Lưu ý:</b> Số liệu chốt tại thời điểm tạo báo cáo, đọc thẳng từ Supabase — không bịa số. Mọi thay đổi dữ liệu sau thời điểm này không ảnh hưởng đến báo cáo đã phát hành. Mục 7 do AI soạn và luôn mang dấu "bản nháp — cần QA xác nhận"; nó KHÔNG thay cho kết luận của người ký.
+<b>Lưu ý:</b> Số liệu chốt tại thời điểm tạo báo cáo, lấy trực tiếp từ hệ thống VMP. Mọi thay đổi dữ liệu sau thời điểm này không ảnh hưởng đến báo cáo đã phát hành. Mục 7 do AI soạn và luôn mang dấu "bản nháp — cần QA xác nhận"; nó KHÔNG thay cho kết luận của người ký.
 </div>
 </body></html>`;
 }

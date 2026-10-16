@@ -236,10 +236,8 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
                       fontSize: 12, fontFamily: TEXT, lineHeight: 1.6 }}>
           <Info size={16} style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
-            Nội dung trang này <b>không được gõ tay trong giao diện</b> — mọi con số và quy tắc
-            đọc trực tiếp từ database. Nhờ vậy trang luật không thể mô tả khác cái hệ thống thật
-            sự làm. Dùng khi đào tạo người mới, khi thanh tra hỏi "hệ áp luật gì", và khi cần
-            đối chiếu trước lúc sửa luật.
+            Số liệu và quy tắc đọc trực tiếp từ hệ thống, không nhập tay — dùng khi đào tạo,
+            khi thanh tra hỏi, hoặc trước khi sửa luật.
           </div>
         </div>
 
@@ -260,11 +258,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       </Card>
 
       {/* Điểm trọng yếu */}
-      {/* Sub ghi đúng nguồn hiện tại: Supabase là dữ liệu gốc từ 03/08 —
-          tab Sheet cũ chỉ còn là tham chiếu lịch sử, nói "lấy từ Sheet"
-          là mô tả một hệ đã không còn tồn tại. */}
-      <Section icon={Calculator} title="Điểm trọng yếu"
-        sub="Chốt trong database (migration rules_page_score_definitions) — nguồn gốc lịch sử là tab '0.Rule timeline VMP', nay Sheet chỉ còn tham chiếu">
+      <Section icon={Calculator} title="Điểm trọng yếu">
         <div style={{ padding: "12px 14px", borderRadius: 14, background: C.lavSoft,
                       color: C.lavText, fontFamily: TEXT, fontSize: 14, fontWeight: 800,
                       marginBottom: 14 }}>
@@ -373,8 +367,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       />
 
       {/* Sinh timeline */}
-      <Section icon={GanttChartSquare} title="Luật sinh hạng mục timeline"
-        sub="Rà từ workflow VMP01, nay cài trong rpc_generate_timeline">
+      <Section icon={GanttChartSquare} title="Luật sinh hạng mục timeline">
         <Rows rows={[
           ["Điều kiện lọc", tl.loc],
           ["Loại thẩm định", (
@@ -409,7 +402,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       {/* Phân quyền — sáu vai nghiệp vụ đọc từ bảng vmp_screen_permissions
           (RPC mới); RPC cũ trả bốn vai gõ cứng thì vẫn hiển thị được. */}
       <Section icon={Lock} title="Phân quyền"
-        sub="Đọc từ bảng quyền màn hình — kiểm tra nằm phía server trong RPC, giao diện chỉ ẩn nút cho gọn, không phải lớp bảo mật">
+        sub="Quyền được kiểm tra ở máy chủ">
         {rules.phan_quyen_che_do && (
           <div style={{ padding: "10px 13px", borderRadius: 14, marginBottom: 12,
                         background: /enforced/i.test(rules.phan_quyen_che_do) ? C.mintSoft : C.marigoldSoft,

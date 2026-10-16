@@ -50,7 +50,9 @@ try {
   }));
   assert.ok(await page.evaluate(() => [...document.styleSheets].some(sheet => sheet.href?.includes("TodayCommandCenterPage"))), "Today stylesheet is parsed with its route");
   assert.ok(today.rows > 0, "Today must render fixture data");
-  assert.match(today.subtitle, /Hàng đợi gồm việc quá hạn, đến hạn hôm nay, trong bảy ngày tới và hồ sơ cần hoàn thiện\./);
+  // 16/10: câu mô tả lặp phụ đề đã bỏ; dòng này chỉ còn phạm vi + mốc cập nhật.
+  assert.match(today.subtitle, /^Phạm vi:/);
+  assert.ok(!today.subtitle.includes("Hàng đợi gồm"), "Today must not repeat the page subtitle");
   assert.ok(!today.text.includes("Sửa lần cuối"), "Today main must not show the last-edited label");
 
   const todayChunks = await page.evaluate(() => performance.getEntriesByType("resource")

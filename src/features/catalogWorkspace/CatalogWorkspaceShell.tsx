@@ -592,7 +592,6 @@ export default function CatalogWorkspaceShell({
   return (
     <div className="cw-workspace">
       <p className="cw-mota">
-        <span>Sổ dữ liệu nguồn — tìm và kiểm tra đối tượng theo phạm vi được cấp.</span>
         {scopeLabel && <span className="cw-mota__phamvi">Phạm vi: {scopeLabel}</span>}
       </p>
 

@@ -427,7 +427,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
 
       <NhomTabPanel man="phanquyen" id="kiem-soat" tab={tab}>
       <Card variant="strong">
-        <CardTitle icon={ShieldCheck} sub="Năm vai trò, trạng thái tài khoản và lỗi cấu hình trên cùng một mặt kiểm soát.">
+        <CardTitle icon={ShieldCheck}>
           Kiểm soát tài khoản
         </CardTitle>
         <div data-desktop-primary-actionable>

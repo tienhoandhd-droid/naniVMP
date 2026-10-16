@@ -646,8 +646,10 @@ for (const [id, ten] of MAN) {
   kiem(!chu.includes("(viewer)"), "không còn Viewer trong danh sách vai hiệu lực");
   kiem(!chu.includes("department_user"), "không còn vai cũ department_user");
   kiem(/Chế độ quyền màn hình/.test(chu), "hiện chế độ áp quyền (preview/enforced)");
-  kiem(!/Google Sheet'?\s*$/m.test(chu) && /Sheet chỉ còn tham chiếu/.test(chu),
-    "nguồn công thức ghi đúng: database là gốc, Sheet chỉ tham chiếu");
+  // 16/10: phụ đề kể nguồn gốc lịch sử (migration, tab Sheet cũ) đã bỏ khỏi
+  // giao diện — chỉ còn khoá ý định: không được nói công thức lấy từ Sheet.
+  kiem(!/Google Sheet'?\s*$/m.test(chu) && !/(lấy|đọc) từ (Google )?Sheet/i.test(chu),
+    "không mô tả công thức là lấy từ Google Sheet");
   await trang.close();
 }
 

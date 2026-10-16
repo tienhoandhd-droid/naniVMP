@@ -451,11 +451,7 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
       <KhongThamDinhCard authorizationRevision={authorizationRevision} onMoDanhMuc={onMoDanhMuc} />
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        <b style={{ color: C.mintText }}>Web VMP là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).
-        Màn này gộp theo mã đối tượng; bấm <b>Cập nhật</b> ở từng hạng mục là sửa được
-        ngay tại đây — cùng một hộp và cùng luật với màn <b>Cập nhật tiến độ</b>.
-        Thêm / xoá đối tượng thì vào <b>Danh mục &amp; Nhập liệu</b>.
-        Google Sheet nay chỉ là bản tham chiếu chỉ đọc.
+        Thêm / xoá đối tượng ở <b>Danh mục &amp; Nhập liệu</b>.
       </div>
 
       {/* Cùng một hộp với màn Cập nhật tiến độ: ghi thật, có khoá lạc quan,

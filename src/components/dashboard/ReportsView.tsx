@@ -440,7 +440,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       {/* ===== Bộ lọc dữ liệu báo cáo — lấy số liệu theo bất kỳ lát cắt nào ===== */}
       <Card>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo bên dưới — kể cả dữ liệu thô và bản xuất. Chọn tháng/quý ở mục 2.">
+          <CardTitle icon={ListFilter} sub="Áp dụng cho toàn bộ báo cáo và bản xuất">
             Bộ lọc dữ liệu báo cáo quản lý
           </CardTitle>
         </div>
@@ -496,10 +496,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             ai phải đi dò lại dữ liệu. */}
         <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: C.plumSoft,
           background: C.pinkMist, borderRadius: 14, padding: "11px 15px", lineHeight: 1.7 }}>
-          ℹ️ Số ở đây <b style={{ color: C.plum }}>khác với màn Tổng quan</b> — đây là chủ ý, không phải lỗi:
-          màn Báo cáo chỉ đếm hạng mục có <b>mốc đích VMP rơi vào năm {ky.year}</b>, còn màn Tổng quan đếm
-          <b> toàn bộ hạng mục đang hoạt động</b> ở mọi năm (kể cả hạng mục quá hạn từ năm trước). Muốn số khớp
-          Tổng quan, đổi <b>Năm báo cáo</b> ở trên sang bao trọn các năm cần xem, hoặc đối chiếu ở màn Tổng quan.
+          Chỉ tính hạng mục có <b>mốc đích VMP trong năm {ky.year}</b> — màn Tổng quan tính mọi năm nên số có thể khác.
         </div>
 
         {/* Kỳ là LÁT CẮT THEO MỐC ĐÍCH, không phải ảnh chụp quá khứ. Nói thẳng
@@ -549,7 +546,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         </div>
 
         <div style={{ marginTop: 18, marginBottom: 10, fontSize: 12, color: C.plumSoft, fontWeight: 800, letterSpacing: ".04em" }}>
-          DỮ LIỆU BỔ SUNG — ba giai đoạn trước đó, để xem tình hình chứ không phải thước đo mục tiêu
+          DỮ LIỆU BỔ SUNG — ba giai đoạn trước
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
           <StatTile icon={ClipboardCheck} label="Đề cương hoàn thành" value={`${ytdNam.protocol.rate}%`}
@@ -906,7 +903,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       </NhomTabPanel>
 
       <div style={{ ...glass, padding: "10px 16px", fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center" }}>
-        Toàn bộ số liệu trên đọc thẳng từ Supabase tại thời điểm mở trang — không có số nào do AI tạo ra ngoài mục &quot;Nhận xét AI&quot;, và mục đó luôn được đánh dấu cần QA xác nhận.
+        Chỉ mục &quot;Nhận xét AI&quot; do AI soạn và cần QA xác nhận; mọi số liệu khác lấy trực tiếp từ hệ thống.
       </div>
 
       {chiTiet && (

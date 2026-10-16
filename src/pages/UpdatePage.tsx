@@ -419,7 +419,6 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
             {!linked && <Tag color={C.marigoldText} bg={C.marigoldSoft}>○ Chưa kết nối</Tag>}
           </div>
           <p className="hn-loi">{vali.loi}</p>
-          <p className="pr-hero__mota">Cập nhật mốc thực tế. Dữ liệu được lưu thẳng vào hệ thống VMP.</p>
           {uuTien.length > 0 && (
             <div className="pr-hero__uu-tien" aria-label="Cần xử lý trước tiên">
               <span className="pr-hero__nhan">Cần xử lý trước tiên</span>
@@ -672,11 +671,6 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        <b style={{ color: C.mintText }}>Web VMP là nơi lưu dữ liệu gốc</b> (từ 29/07/2026).
-        Sửa ngày, trạng thái và danh mục ngay trên web — Google Sheet nay chỉ là bản tham chiếu
-        chỉ đọc, sửa trên đó sẽ không vào hệ thống.
-      </div>
       {edit && !readOnly && <ProgressEditModal
         key={progressValidationCode(edit)}
         act={edit}
