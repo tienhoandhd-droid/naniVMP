@@ -9,8 +9,9 @@ export function qualificationTarget(input: string, base: string): string | null 
     const url = new URL(input,root);
     if(url.origin!==root.origin || url.username || url.password || url.hash) return null;
     const file = url.pathname.slice(root.pathname.length) || 'index.html';
-    if(!url.pathname.startsWith(root.pathname) || !['index.html','steam.html','gas.html','runs.html'].includes(file))return null;
+    if(!url.pathname.startsWith(root.pathname) || !['index.html','steam.html','gas.html','runs.html','nhat-ky.html'].includes(file))return null;
     if(file==='index.html') return url.search ? null : 'runs.html';
+    if(file==='nhat-ky.html') return url.search ? null : 'nhat-ky.html';
     for(const [key,value] of url.searchParams) {
       if(url.searchParams.getAll(key).length!==1)return null;
       if(key==='system' ? !((file==='gas.html'&&['air','nitrogen'].includes(value)) || (file==='runs.html'&&url.searchParams.get('view')==='trend'&&['steam','air','nitrogen'].includes(value)))

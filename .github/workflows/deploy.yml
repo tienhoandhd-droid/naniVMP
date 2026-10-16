@@ -146,6 +146,7 @@ jobs:
             node tests/e2e/qualification-entry-paste.mjs &&
             node tests/e2e/qualification-trend-workspace.mjs &&
             node tests/e2e/qualification-tablet-entry.mjs &&
+            node tests/e2e/qualification-audit-trail.mjs &&
             node tests/e2e/long-mon-presentation.mjs &&
             node scripts/check-long-mon-release.mjs &&
             node tests/e2e/today-header-performance.mjs &&

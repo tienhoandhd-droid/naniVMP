@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="vi" data-visual="lotus-pearl" data-theme="light">
+<head>
+  <script src="./vmp-embed.js"></script>
+  <script src="./appearance.js"></script><link rel="stylesheet" href="./vmp-tokens.css">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nhật ký thay đổi | Thẩm định thực tế | VMP</title>
+  <link rel="stylesheet" href="./vmp-theme.css"><link rel="stylesheet" href="./rail.css"><link rel="stylesheet" href="./runs.css"><link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./vmp-embed.css">
+</head>
+<body data-qualification-gate="pending">
+<a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>
+<header class="workspace-header"><a class="monitor-brand" href="../" aria-label="CPC1HN — VMP Monitor, Hệ giám sát thẩm định"><img class="company-logo" src="../logo-cpc1hn.png" width="290" height="234" alt="CPC1HN"><span class="monitor-masthead" aria-hidden="true"><span class="monitor-name"><span class="monitor-v">V</span><span class="monitor-mp">MP</span><i>Monitor</i></span><span class="monitor-caption">Hệ giám sát thẩm định</span></span></a><a class="vmp-back-link" href="../">← Về VMP</a></header>
+<div class="qualification-layout"><aside class="qualification-rail" aria-label="Điều hướng thẩm định"><a class="rail-identity" href="./runs.html"><span class="vq-wordmark" role="img" aria-label="V/Q team"><b>V</b><i aria-hidden="true">/</i><b>Q</b><small>team</small></span><span>Thẩm định thực tế</span></a><p class="rail-label">Hệ thống</p><nav class="system-links" aria-label="Chọn hệ thống"><a href="./steam.html">Hơi tinh khiết</a><a href="./gas.html?system=air">Khí nén</a><a href="./gas.html?system=nitrogen">Nitơ</a><a href="./runs.html">Đợt &amp; xu hướng</a><a href="./nhat-ky.html" aria-current="page">Nhật ký thay đổi</a></nav></aside>
+<main id="main-content" class="runs-shell" tabindex="-1">
+  <p class="eyebrow">THẨM ĐỊNH THỰC TẾ</p><h1>Nhật ký thay đổi</h1>
+  <form id="nhat-ky-loc" class="panel nhat-ky-loc" novalidate>
+    <label>Hệ thống<select id="nk-he-thong"><option value="">Tất cả</option><option value="steam">Hơi tinh khiết</option><option value="air">Khí nén</option><option value="nitrogen">Khí nitơ</option></select></label>
+    <label>Từ ngày<input id="nk-tu" type="date"></label>
+    <label>Đến ngày<input id="nk-den" type="date"></label>
+    <button type="submit">Xem</button><button id="nk-xuat" type="button" disabled>Xuất CSV</button>
+  </form>
+  <p id="nk-trang-thai" class="status-line" role="status" aria-live="polite">Đang tải…</p>
+  <div class="chart-scroll"><table id="nk-bang" class="data-table" hidden><thead><tr><th>Thời điểm</th><th>Người</th><th>Hành động</th><th>Hệ thống</th><th>Đợt</th><th>Phiên bản</th><th>Chi tiết</th><th>Lý do</th></tr></thead><tbody></tbody></table></div>
+</main></div>
+<script src="./runtime-config.js" defer></script><script src="./cloud.js" defer></script><script src="./nhat-ky.js" defer></script>
+</body></html>

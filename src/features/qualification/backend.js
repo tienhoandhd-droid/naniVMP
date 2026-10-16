@@ -165,6 +165,10 @@ export function makeBackend(settings, existingClient) {
       if(snapshot?.id!==recordId || (snapshot?.data?.system||'steam')!==system)throw noAccess(system);
       return true;
     },
+    async auditTrail(filters={}){
+      await requireGlobalView();
+      return rpc('cpc1_audit_trail',{p_system:filters.system||null,p_from:filters.from||null,p_to:filters.to||null,p_limit:filters.limit||500});
+    },
     async downloadHistorySource(path){
       await requireGlobalView();
       if(!/^[0-9a-f]{64}\.pdf$/.test(path))throw Error('Đường dẫn báo cáo nguồn không hợp lệ.');
@@ -208,6 +212,11 @@ export function makeBackend(settings, existingClient) {
       const evaluation={...snapshot.evaluation,report_context:{id:snapshot.id,version:snapshot.version,created_at:snapshot.created_at}};
       const pdf=await loadPdfBundle();const renderer=gas?pdf.renderGasPdf:pdf.renderPdf;
       const bytes=await renderer(form,snapshot.data,evaluation,{template,layoutBytes,fonts});
+      // Annex 11 §9 / PIC/S PI 041: bản in phải truy vết được (ai in, bản nào).
+      // Ghi nhận TRƯỚC khi giao file; không ghi được thì không xuất PDF.
+      const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
+      try{await rpc('cpc1_print_log',{p_record_id:snapshot.id,p_version:snapshot.version,p_form:form,p_pdf_sha256:hash});}
+      catch(e){throw new Error(`Không ghi nhận được lần in nên chưa xuất PDF. Thử lại khi có mạng. (${e.message})`);}
       return new Blob([bytes],{type:'application/pdf'});
     }
   };

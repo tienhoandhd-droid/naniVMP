@@ -197,3 +197,4 @@ html[data-theme="dark"] .pq-point-card .pq-outside { fill: var(--pq-rule); }
  .pq-point-summary th, .pq-point-summary td { white-space: normal; padding: 9px 8px; }
  .pq-point-summary { min-width: 440px; }
 }
+.nhat-ky-loc{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin:16px 0}.nhat-ky-loc label{display:grid;gap:4px;font-weight:600}#nk-bang td{max-width:320px;overflow-wrap:anywhere}

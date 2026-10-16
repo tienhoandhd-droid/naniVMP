@@ -151,6 +151,9 @@ const QUALIFICATION_REVIEWED_RPC = new Map([
   ["cpc1_gas_config", {identity:"cpc1_gas_config(text)",classification:"guarded_explicit"}],
   ["cpc1_list", {identity:"cpc1_list()",classification:"guarded_explicit"}],
   ["cpc1_load", {identity:"cpc1_load(uuid,integer)",classification:"guarded_explicit"}],
+  // 20261016170000 — gói 2: ghi nhận in PDF, nhật ký thay đổi (viewer() + record_pq_right).
+  ["cpc1_print_log", {identity:"cpc1_print_log(uuid,integer,text,text)",classification:"guarded_explicit"}],
+  ["cpc1_audit_trail", {identity:"cpc1_audit_trail(text,date,date,integer)",classification:"guarded_explicit"}],
 ]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
@@ -414,7 +417,13 @@ test("every source RPC call has exactly one reviewed migration classification", 
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 102, "reviewed source HEAD must expose 102 literal RPC targets");
+  assert.equal(sourceNames.length, 104, "reviewed source HEAD must expose 104 literal RPC targets");
+  const nhatKyMigration = readFileSync("supabase/migrations/20261016170000_tham_dinh_nhat_ky.sql", "utf8");
+  for (const [ten, chuKy] of [["cpc1_print_log", "uuid, integer, text, text"], ["cpc1_audit_trail", "text, date, date, integer"]]) {
+    assert.match(nhatKyMigration, new RegExp(`function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = ''[\\s\\S]*?cpc1_private\\.viewer\\(\\)`, "i"), `${ten} must gate through viewer()`);
+    assert.match(nhatKyMigration, new RegExp(`revoke all on function public\\.${ten}\\(${chuKy}\\) from public, anon;`, "i"));
+  }
+  assert.match(nhatKyMigration, /record_pq_right\(hs\.record_id, false\)/, "audit trail filters to readable records");
   const qaPhuTrachMigration = readFileSync("supabase/migrations/20261016160000_danh_sach_qa_phu_trach.sql", "utf8");
   for (const ten of ["rpc_qa_phu_trach_danh_sach", "rpc_qa_phu_trach_dat"]) {
     assert.match(qaPhuTrachMigration, new RegExp(`create or replace function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = public, pg_temp`, "i"), `${ten} must be security definer with pinned search_path`);

@@ -14,6 +14,8 @@ test('qualification targets canonicalize the retired library route to runs and a
   assert.equal(new URL(qualificationHref(path,base)).pathname,'/vmp/');
  }
  assert.equal(qualificationTarget('index.html',base),'runs.html');
+ assert.equal(qualificationTarget('nhat-ky.html',base),'nhat-ky.html');
+ assert.equal(qualificationTarget('nhat-ky.html?system=air',base),null,'audit trail page takes no URL parameters');
  assert.equal(qualificationTarget(base+'tham-dinh-thuc-te/steam.html?form=BM03',base),'steam.html?form=BM03');
  assert.equal(qualificationTarget('./',base),'runs.html');
 });
@@ -23,7 +25,7 @@ test('reject external, traversal, unknown files, duplicate or unsupported parame
 
 test('navigation filters systems fail-closed, keeps archive-only access, and has no library destination',()=>{
  const groups=qualificationNavigationForSystems(['steam','nitrogen']);
- assert.deepEqual(groups.map((group)=>group.label),['Đợt thẩm định','Hơi tinh khiết','Khí nitơ']);
+ assert.deepEqual(groups.map((group)=>group.label),['Đợt thẩm định','Nhật ký thay đổi','Hơi tinh khiết','Khí nitơ']);
  assert.equal(groups.some((group)=>group.target==='index.html'),false);
  assert.ok(groups.find((group)=>group.system==='steam')?.links.some((link)=>link.label==='BM03 — Độ khô'));
  assert.ok(groups.find((group)=>group.system==='nitrogen')?.links.some((link)=>link.label==='Sơ đồ xu hướng khí nitơ'));
