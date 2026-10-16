@@ -82,3 +82,17 @@ policy `using (true)`.
 Bản sao dựng từ `pg_dump` production (schema `public` + `cpc1_private`), cả 8 file áp
 thành công theo đúng thứ tự trên; kiểm theo vai admin / qa_staff / workshop_manager /
 workshop_staff. Chi tiết trong báo cáo rà soát.
+
+## Hồ sơ áp
+
+**ĐÃ ÁP 16/10/2026 ~11:25 (giờ VN)** — Claude Code theo uỷ quyền của chủ dự án.
+
+- Sao lưu trước khi áp: `pg_dump` schema `public` + `cpc1_private` (93 MB, 80 bảng,
+  có dấu "dump complete"), lưu ngoài repo tại `/home/admin1/VMP/.backups/` (quyền 600).
+- Bằng chứng trước/sau (danh sách policy, `drift:db`) lưu cùng chỗ, thư mục
+  `ho-so-ap-migration-20261016/`.
+- Kết quả: cả 8 file `exit=0`, mỗi file 0,5–1,6 giây, không lỗi.
+- Sau khi áp: `notify pgrst, 'reload schema'`; `npm run drift:db` →
+  `✓ 130 hàm trong repo khớp production` (mã thoát 0); 0 policy `true` trên 15
+  bảng đã đóng; 16 policy `true` còn lại đều ở bảng cấu hình (giai đoạn 2.2 của
+  kế hoạch nâng cấp).
