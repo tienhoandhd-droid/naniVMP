@@ -22,7 +22,7 @@
   function panel() {
     if ($('local-draft-panel')) return;
     const section = document.createElement('section');section.id='local-draft-panel';section.className='local-draft-panel';section.setAttribute('aria-label','Bản tạm trên máy');
-    section.innerHTML='<div class="draft-switch"><label><input id="local-draft-enable" type="checkbox" aria-describedby="local-draft-help"> Lưu tạm trên máy này</label><span id="local-draft-status" role="status">Chưa bật lưu tạm</span></div><p id="local-draft-help">Chỉ bật trên máy cá nhân. Bản tạm nằm trong trình duyệt, chưa lưu Supabase. Đăng xuất từ trang này sẽ xóa bản tạm của tài khoản. Ứng dụng không mã hóa bản tạm; người dùng chung hồ sơ trình duyệt có thể truy cập. Xóa dữ liệu trình duyệt có thể làm mất bản tạm.</p><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
+    section.innerHTML='<div class="draft-switch"><label><input id="local-draft-enable" type="checkbox" aria-describedby="local-draft-help"> Lưu tạm trên máy này</label><span id="local-draft-status" role="status">Chưa bật lưu tạm</span></div><p id="local-draft-help">Chỉ bật trên máy cá nhân: bản tạm không mã hoá, mất khi đăng xuất hoặc xoá dữ liệu trình duyệt.</p><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
     document.querySelector('.action-bar, .actionbar').after(section);
     $('local-draft-enable').addEventListener('change', async () => {
       if (!active || !allowed()) return;
@@ -40,7 +40,7 @@
         else await window.CPC1Backend.refreshAccess(system,window.CPC1Backend.runBinding?'archive-edit':'enter');
         await adapter.restore(snapshot);
         if(a!==active || a.ended)return;
-        a.candidate=null;sync();status('Đã khôi phục. Tính lại và lưu Supabase khi có mạng.');
+        a.candidate=null;sync();status('Đã khôi phục. Tính lại và lưu khi có mạng.');
         changed();
       } catch(e){status('Không khôi phục được: '+e.message+' Bản tạm vẫn được giữ.');}
     });
@@ -80,14 +80,14 @@
       if(a.ended || a.failed || !allowed())return;
       try {
         const row=await store.write(a.scope,a.system,a.revision,payload,true);a.revision=row.revision;
-        if(a===active&&!a.ended)status(adapter.get().generation!==current.generation?'Đang chờ lưu tạm…':payload?'Đã lưu tạm trên máy · '+time(row.updatedAt)+' · Chưa lưu Supabase':'Đã bật lưu tạm. Chưa có thay đổi mới.');
+        if(a===active&&!a.ended)status(adapter.get().generation!==current.generation?'Đang chờ lưu tạm…':payload?'Đã lưu tạm trên máy · '+time(row.updatedAt)+' · chưa lưu lên hệ thống':'Đã bật lưu tạm. Chưa có thay đổi mới.');
       } catch(e){a.failed=true;if(a===active)status(e.code==='DRAFT_CONFLICT'?e.message:'Không lưu được trên máy. Dữ liệu còn trên trang; hãy tải bản nháp JSON.');}
     });
     return queue;
   }
   async function discard() {
     const a=active;if(!a)return;
-    if(!confirm('Xóa bản tạm của hệ thống này trên máy? Dữ liệu đang trên trang và hồ sơ Supabase vẫn giữ nguyên.')){sync();return;}
+    if(!confirm('Xóa bản tạm của hệ thống này trên máy? Dữ liệu trên trang và hồ sơ đã lưu vẫn giữ nguyên.')){sync();return;}
     clearTimeout(timer);await queue.catch(()=>{});
     if(a!==active || a.ended)return;
     try {
@@ -102,7 +102,7 @@
     if(!a?.enabled || a.ended || a.failed || a.candidate)return queue;
     queue=queue.catch(()=>{}).then(async()=>{
       if(a.ended || !allowed())return;
-      try{const row=await store.write(a.scope,a.system,a.revision,null,true);a.revision=row.revision;if(a===active)status('Đã lưu Supabase. Bản tạm đã được dọn.');}
+      try{const row=await store.write(a.scope,a.system,a.revision,null,true);a.revision=row.revision;if(a===active)status('Đã lưu. Bản tạm đã được dọn.');}
       catch(e){a.failed=true;if(a===active)status('Hồ sơ đã lưu; chưa dọn được bản tạm trên máy.');}
     });return queue;
   }

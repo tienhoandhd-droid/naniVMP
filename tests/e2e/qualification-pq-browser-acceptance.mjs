@@ -83,7 +83,7 @@ try {
  await steam.waitForFunction(()=>document.querySelectorAll('#form-body input:not([readonly])').length>0);
  const steamInput=steam.locator('#form-body input:not([readonly])').first();await steamInput.fill('12');
  await steam.locator('#evaluate').click();await steam.locator('#message').getByText(/Máy chủ đã trả kết quả/).waitFor();
- await steam.locator('#record-save').click();await steam.locator('#message').getByText(/Đã lưu hồ sơ Supabase/).waitFor();
+ await steam.locator('#record-save').click();await steam.locator('#message').getByText(/Đã lưu hồ sơ\./).waitFor();
  assert.equal(await steamInput.inputValue(),'12','shared steam input preserved by save');
  const library=await page();await library.goto(base+'/tham-dinh-thuc-te/index.html');
  await library.locator('body[data-qualification-gate="ready"]').waitFor();
@@ -102,7 +102,7 @@ try {
  const input=form.locator('#form-body input:not([readonly])').first();await input.fill('12');
  await form.locator('#evaluate').click();await form.locator('#message').getByText(/Máy chủ đã trả kết quả/).waitFor();
  await form.locator('#record-save').click();await form.waitForTimeout(100);assert.match(await form.locator('#message').textContent(),/Đã lưu hồ sơ Supabase/);
- await form.locator('.file-actions summary').click();await form.locator('#record-load').click();await form.locator('.saved-record').first().click();await form.locator('#message').getByText(/Đã mở hồ sơ từ Supabase/).waitFor();
+ await form.locator('.file-actions summary').click();await form.locator('#record-load').click();await form.locator('.saved-record').first().click();await form.locator('#message').getByText(/Đã mở hồ sơ\./).waitFor();
  await form.evaluate(()=>{const rpc=window.__cpc1Fixture.client.rpc;window.__cpc1Fixture.client.rpc=async(name,args)=>name==='cpc1_evaluate'?new Promise(resolve=>{window.__cpc1Fixture.releaseEvaluate=()=>resolve({data:{forms:{},overall:'incomplete'}});}):rpc(name,args);});
  await form.locator('#evaluate').click();await form.waitForFunction(()=>typeof window.__cpc1Fixture.releaseEvaluate==='function');
  await context.setOffline(true);await form.evaluate(()=>window.__cpc1Fixture.releaseEvaluate());

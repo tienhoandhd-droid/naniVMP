@@ -85,7 +85,7 @@ try {
     assert.equal(await page.locator('input[name="equipment.bm01.expiry"]').count(),0,'bound calibration date is shown once in run summary');
     await page.locator('#run-context summary').click();
     await page.locator('#run-context').getByText('Máy đếm tiểu phân 01').waitFor();
-    assert.match(await page.locator('#run-context').textContent(),/2026-09-26/);
+    assert.match(await page.locator('#run-context').textContent(),/26\/09\/2026/);
     await page.locator('.calibration-warning').waitFor();
    }
    if(system==='air')await page.locator('#run-context summary').click();
@@ -111,8 +111,8 @@ try {
  }
  const closedPage=await localPage();await closedPage.goto(`http://qualification.test/tham-dinh-thuc-te/gas.html?system=air&form=bm01&run=${closed.id}&record=${closed.items[0].record_id}`);
  await closedPage.locator('#entry-mode-warning').waitFor();await closedPage.locator('#run-context summary').click();
- assert.match(await closedPage.locator('#run-context').textContent(),/2026-08-01/,'closed summary shows saved due date, not current run due');
- const warning=await closedPage.locator('.calibration-warning').textContent();reviewCheck(()=>assert.match(warning,/hết hạn 2026-08-01 trước ngày đo 2026-09-27/,'closed warning uses saved due date'));
+ assert.match(await closedPage.locator('#run-context').textContent(),/01\/08\/2026/,'closed summary shows saved due date, not current run due');
+ const warning=await closedPage.locator('.calibration-warning').textContent();reviewCheck(()=>assert.match(warning,/hết hạn 01\/08\/2026 trước ngày đo 27\/09\/2026/,'closed warning uses saved due date'));
  assert.equal(await closedPage.locator('#record-save').isDisabled(),true);
  await closedPage.evaluate(async id=>{const record=await window.CPC1Backend.load(id);delete record.data.equipment.bm01.expiry;sessionStorage.setItem('qualification-record:'+id,JSON.stringify(record.data));},closed.items[0].record_id);await closedPage.reload();
  await closedPage.locator('#run-context summary').getByText(/Thiếu tên hoặc hạn/).waitFor();assert.equal(await closedPage.locator('.calibration-warning').count(),0,'missing closed mapped date does not fall back to run metadata');await closedPage.close();
@@ -123,7 +123,7 @@ try {
  await missing.evaluate(()=>sessionStorage.removeItem('fixture-calibration-due'));await missing.close();
  const metaClosed=await localPage();await metaClosed.goto(`http://qualification.test/tham-dinh-thuc-te/steam.html?form=bm01&run=${steamClosed.id}&record=${steamClosed.items[0].record_id}`);
  await metaClosed.locator('#entry-mode-warning').waitFor();await metaClosed.locator('#run-context summary').click();
- const closedText=await metaClosed.locator('#run-context').textContent();reviewCheck(()=>assert.match(closedText,/Hạn hiệu chuẩn: 2026-09-01/,'metadata-only closed due remains run metadata'));await metaClosed.close();
+ const closedText=await metaClosed.locator('#run-context').textContent();reviewCheck(()=>assert.match(closedText,/Hạn hiệu chuẩn: 01\/09\/2026/,'metadata-only closed due remains run metadata'));await metaClosed.close();
  const savePage=await localPage();await savePage.setViewportSize({width:1024,height:768});await savePage.goto(`http://qualification.test/tham-dinh-thuc-te/steam.html?form=bm01&run=${steamOpen.id}&record=${steamOpen.items[0].record_id}`);
  await savePage.locator('#entry-continue').click();const steamInput=savePage.locator('#form-body input[name$=".1.vc"]');await steamInput.fill('7');
  await savePage.locator('#form-body input[inputmode="decimal"]').first().evaluate(node=>node.scrollIntoView({block:'center'}));

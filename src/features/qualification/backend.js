@@ -29,9 +29,9 @@ const canonical = value => JSON.stringify(value, function(key,item) {
 });
 
 export function makeBackend(settings, existingClient) {
-  if (!settings?.url || !settings?.publishableKey) throw new Error('Chưa cấu hình dự án Supabase cho CPC1.');
+  if (!settings?.url || !settings?.publishableKey) throw new Error('Chưa cấu hình kết nối hệ thống.');
   const parsed = new URL(settings.url);
-  if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.supabase.co')) throw new Error('Địa chỉ Supabase không hợp lệ.');
+  if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.supabase.co')) throw new Error('Địa chỉ máy chủ không hợp lệ.');
   if (settings.publishableKey.startsWith('sb_secret_')) throw new Error('Không được đưa khóa bí mật vào web.');
   // Legacy anon JWT is allowed; service-role JWT is rejected before bundling/deployment too.
   if (settings.publishableKey.startsWith('eyJ')) {
@@ -109,7 +109,7 @@ export function makeBackend(settings, existingClient) {
   async function rpc(name,args={}) {
     const {data,error}=await client.rpc(name,args);
     if(error) {
-      const err=new Error(error.message || 'Không kết nối được Supabase.');err.code=error.code;
+      const err=new Error(error.message || 'Không kết nối được hệ thống.');err.code=error.code;
       if (err.code === '42501') signalDenied();
       throw err;
     }
@@ -178,7 +178,7 @@ export function makeBackend(settings, existingClient) {
     async getGasConfig(system){if(!['air','nitrogen'].includes(system))throw new Error('Hệ thống khí không hợp lệ.');if(activeSystem)activeSystem=system;return entryConfig(system);},
     async evaluate(data){const system=data?.system || activeSystem;await requireAccess(system,runBinding?'archive-edit':'enter');if(activeSystem&&system!==activeSystem)throw noAccess(system);if(!runBinding)throw Error('Chọn đợt thẩm định trước khi nhập biểu mẫu.');return rpc('cpc1_run_evaluate',{p_run_id:runBinding.runId,p_data:data});},
     async getSession(){return contextSession();},
-    async signIn(){throw new Error('Đăng nhập tại VMP rồi mở lại Thẩm định thực tế (demo).');},
+    async signIn(){throw new Error('Đăng nhập tại VMP rồi mở lại Thẩm định thực tế.');},
     async signOut(){localLogout=true;try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;}finally{clearAuthorization();localLogout=false;}},
     async list(system=activeSystem||'steam'){await requireAccess(system,'view');return (await rpc('cpc1_list')).filter(r=>(r.system||'steam')===system);},
     async load(id){if(runBinding&&id!==runBinding.recordId)throw Error('Hồ sơ không thuộc đợt đang mở.');await requireGlobalView();const loaded=runBinding?await rpc('cpc1_run_load',{p_record_id:id,p_run_id:runBinding.runId}):await rpc('cpc1_load',{p_record_id:id});const system=loaded?.data?.system||activeSystem;if(activeSystem&&system!==activeSystem){signalDenied();throw noAccess(activeSystem);}await requireAccess(system,'view');current=loaded;return current;},
@@ -195,7 +195,7 @@ export function makeBackend(settings, existingClient) {
       const gas=['air','nitrogen'].includes(data?.system);
       const system=data?.system||activeSystem;await requireAccess(system,'view');if(activeSystem&&system!==activeSystem)throw noAccess(system);
       if(!(gas?/^bm0[1-7]$/:/^bm0[1-5]$/).test(form))throw new Error('Biểu mẫu không hợp lệ.');
-      if(!current || canonical(data)!==canonical(current.data))throw new Error('Lưu Supabase trước khi in để báo cáo dùng đúng dữ liệu đã lưu.');
+      if(!current || canonical(data)!==canonical(current.data))throw new Error('Lưu hồ sơ trước khi in để bản in dùng đúng dữ liệu đã lưu.');
       const expected={id:current.id,version:current.version,data:canonical(data)};
       const snapshot=await rpc('cpc1_load',{p_record_id:expected.id,p_version:expected.version});
       if(snapshot?.id!==expected.id || snapshot?.version!==expected.version || canonical(snapshot?.data)!==expected.data)throw new Error('Phiên bản hồ sơ trả về không khớp bản đã lưu. Không tạo PDF.');

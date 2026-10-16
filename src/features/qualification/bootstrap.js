@@ -80,7 +80,7 @@ window.CPC1Backend.getSession().then(session => {
   if (error?.code === 'CONTEXT_STALE') return;
   document.body.dataset.qualificationGate = 'denied';
   const gate = document.createElement('main');gate.className='qualification-gate';
-  const heading = document.createElement('h1');heading.textContent='Thẩm định thực tế (demo)';
+  const heading = document.createElement('h1');heading.textContent='Thẩm định thực tế';
   const detail = document.createElement('p');detail.textContent=error.message || 'Không xác minh được quyền truy cập. Vui lòng thử lại.';
   const link = document.createElement('a');link.href='../';link.textContent='Về VMP';
   gate.append(heading,detail,link);document.body.append(gate);

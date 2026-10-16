@@ -176,6 +176,15 @@ try{
   assert.equal(await page.locator('#multi-trend-data tbody tr[data-source-state=missing]').count(),2);
   assert.match(await page.locator('#multi-trend-data tbody').textContent(),new RegExp(system+'-record-1.*v1'));
   if(evidence)await page.locator('#history-chart-details').screenshot({path:evidence+'/'+system+'-history.png'});
+  // 16/10: trục tung chia bước tròn (1/2/5×10ⁿ), chú giải theo điểm, có đường giới hạn PQ.
+  const tickValues=(await page.locator('#multi-trend-chart text.chart-label:not(.limit-label)').allTextContents())
+    .filter(text=>!/\//.test(text)).map(text=>Number(text.replace(/\./g,'').replace(',','.')));
+  const tickSteps=tickValues.slice(1).map((value,index)=>Math.abs(value-tickValues[index]));
+  assert.ok(tickSteps.length>=2&&tickSteps.every(step=>Math.abs(step-tickSteps[0])<1e-9),'history axis uses one even step');
+  const exponent=Math.floor(Math.log10(tickSteps[0])),mantissa=Math.round(tickSteps[0]/10**exponent*1000)/1000;
+  assert.ok([1,2,5,10].includes(mantissa),`history axis step ${tickSteps[0]} is 1/2/5×10ⁿ`);
+  assert.equal(await page.locator('#multi-trend-legend li').count(),(await page.locator('#multi-trend-chart .multi-point').evaluateAll(nodes=>new Set(nodes.map(node=>node.getAttribute('data-point')||node.closest('[data-point]')?.getAttribute('data-point'))).size))+(await page.locator('#multi-trend-chart .limit-line').count()?1:0),'legend lists sampling points (plus the PQ limit), not every trial');
+  if(system==='steam')assert.ok(await page.locator('#multi-trend-chart .limit-line').count()>=1,'steam history draws the saved PQ limit');
   await page.locator('#multi-data-details summary').click();
   await page.locator('#point-visibility summary').click();
   await page.locator('#trend-data-details summary').click();

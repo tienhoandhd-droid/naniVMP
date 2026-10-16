@@ -53,5 +53,15 @@
     const state=direction==='max'&&cmp>0?'above':direction==='min'&&cmp<0?'below':'within';
     return {...result,state,reason:state==='above'?'Vượt giới hạn trên':state==='below'?'Dưới giới hạn dưới':'Trong giới hạn hành động'};
   }
-  window.CPC1TrendLimits={annotate};
+  // Giới hạn PQ của một chỉ tiêu tại một điểm theo tiêu chí ĐÃ LƯU (chỉ để vẽ
+  // đường giới hạn trên biểu đồ qua các đợt). Cùng nguồn với annotate().
+  function limitFor(system,form,metric,unit,pointId,snapshot) {
+    const ctx=snapshot?.evaluation?.source_context,contract=(system==='steam'?steam:gas)[form]?.[metric];
+    if(!ctx||!contract||contract[2]!==unit)return null;
+    if(system==='steam'?snapshot.data?.system&&snapshot.data.system!=='steam':snapshot.data?.system!==system||ctx.config?.system!==system)return null;
+    const [key,direction]=contract;
+    const limit=system==='steam'?ctx.criteria?.[key]:ctx.config.forms?.find(f=>f.id===form)?.locations?.find(p=>p.id===pointId)?.limits?.[key];
+    return limit!==null&&limit!==undefined&&limit!==''&&Number.isFinite(Number(limit))?{limit:Number(limit),direction}:null;
+  }
+  window.CPC1TrendLimits={annotate,limitFor};
 })();

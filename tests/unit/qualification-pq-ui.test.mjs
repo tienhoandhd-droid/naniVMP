@@ -77,7 +77,7 @@ test('a view-only PQ user may request a saved PDF snapshot but cannot save',asyn
   const client={auth:{getSession:async()=>({data:{session:{user:{id:'qa'}}}})},rpc:async()=>({data:viewOnly})};
   const api=makeBackend(settings,client);await api.getSession();api.bindSystem('air');
   await assert.rejects(api.save({system:'air'}),error=>error.code==='42501');
-  await assert.rejects(api.report('bm01',{system:'air'}),/Lưu Supabase trước khi in/);
+  await assert.rejects(api.report('bm01',{system:'air'}),/Lưu hồ sơ trước khi in/);
 });
 
 test('retired library redirects to runs and runs UI avoids denied configurations',()=>{

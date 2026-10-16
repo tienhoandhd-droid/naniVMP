@@ -81,7 +81,7 @@ try{
  await form.locator('#run-context summary').click();
  await form.locator('#run-context').getByText('Máy đếm tiểu phân 01').waitFor();
  await form.locator('#entry-mode-warning').waitFor();
- await form.locator('.calibration-warning').getByText(/2026-09-26.*2026-09-27/).waitFor();
+ await form.locator('.calibration-warning').getByText(/26\/09\/2026.*27\/09\/2026/).waitFor();
  await form.locator('#entry-continue').click();
  const p05=form.locator('[name="forms.bm01.'+point+'.p05"]'),p5=form.locator('[name="forms.bm01.'+point+'.p5"]');
  assert.equal(await p05.isEditable(),false,'existing value stays locked in continuation');
@@ -103,7 +103,7 @@ try{
  await form.locator('#correction-reason-dialog[open]').waitFor();
  await form.locator('#correction-reason').fill('Bổ sung trong lúc phiên trước đang lưu');
  await form.locator('#correction-reason-dialog button[type="submit"]').click();
- await form.locator('#message').getByText(/Đã lưu hồ sơ Supabase/).waitFor();
+ await form.locator('#message').getByText(/Đã lưu hồ sơ\./).waitFor();
  await form.locator('#entry-view-history').click();
  await form.locator('#entry-history-dialog').getByText('QA Fixture <script>').waitFor();
  await form.locator('#entry-history-dialog').getByText('Không ghi nhận').waitFor();
@@ -120,7 +120,7 @@ try{
  assert.equal(await p05.inputValue(),'','failed correction retains the cleared draft');
  const firstRequest=await form.evaluate(()=>window.__fixture.saveCalls.at(-1).requestId);
  await form.locator('#record-save').click();
- await form.locator('#message').getByText(/Đã lưu hồ sơ Supabase/).waitFor();
+ await form.locator('#message').getByText(/Đã lưu hồ sơ\./).waitFor();
  const retry=await form.evaluate(()=>window.__fixture.saveCalls.slice(-2));
  assert.equal(retry[0].requestId,firstRequest);
  assert.equal(retry[1].requestId,firstRequest,'network retry reuses the idempotency key');
@@ -141,7 +141,7 @@ try{
  assert.equal(await form.locator('#correction-reason').inputValue(),'','a changed correction diff cannot reuse the prior reason');
  await form.locator('#correction-reason').fill('Đính chính số đọc và người thực hiện');
  await form.locator('#correction-reason-dialog button[type="submit"]').click();
- await form.locator('#message').getByText(/Đã lưu hồ sơ Supabase/).waitFor();
+ await form.locator('#message').getByText(/Đã lưu hồ sơ\./).waitFor();
  const changedDiffSave=await form.evaluate(()=>window.__fixture.saveCalls.at(-1));
  assert.notEqual(changedDiffSave.requestId,failedDifferentRequest,'editing after failure creates a new idempotency key');
  assert.equal(changedDiffSave.reason,'Đính chính số đọc và người thực hiện');
@@ -153,7 +153,7 @@ try{
  await form.locator('#message').getByText(/Đã đồng bộ hạn thiết bị/).waitFor();
  assert.equal(await form.locator('[name="equipment.bm01.expiry"]').count(),0,'mapped run calibration is not repeated in the record');
  await form.locator('#run-context summary').click();
- assert.match(await form.locator('#run-context').textContent(),/2026-12-30/);
+ assert.match(await form.locator('#run-context').textContent(),/30\/12\/2026/);
  await form.locator('#record-save').click();
  await form.locator('#correction-reason-dialog[open]').waitFor();
  assert.match(await form.locator('#correction-preview').textContent(),/equipment\.bm01\.expiry.*2026-09-26.*2026-12-30/s);
