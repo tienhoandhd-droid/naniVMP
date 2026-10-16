@@ -665,6 +665,12 @@ select { appearance: none; -webkit-appearance: none; }
   border-color: var(--lp-plum);
   box-shadow: 0 0 0 4px var(--lp-focus);
 }
+/* Vòng tiêu điểm đã vẽ ở khung (focus-within) ngay trên. Luật chung
+   `:is(button, a, input…):focus-visible { outline … !important }` lại vẽ
+   thêm vòng thứ hai bên trong ô → hai lớp viền lồng nhau. Chỉ tắt vòng
+   trong cho ô nằm TRONG khung này; !important vì luật chung cũng dùng nó,
+   selector ở đây cụ thể hơn nên thắng. */
+.vq-input-shell input:focus-visible { outline: none !important; }
 
 .vq-password-toggle {
   display: inline-flex;

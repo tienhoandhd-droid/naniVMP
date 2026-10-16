@@ -149,7 +149,12 @@
 
 /* The unauthenticated brand uses the same VMP mark, adapted only for the
  * lacquer panel's contrast. It does not change any Auth control or flow. */
-.vq-brand-panel .vmp-masthead { justify-content: center; margin: 10px 0 4px; }
+/* 16/10: khung thương hiệu hẹp hơn hàng masthead (chữ + đường trang trí +
+ * phụ đề nowrap), nên căn giữa làm hàng tràn và bị cắt CẢ HAI đầu ở mọi bề
+ * ngang (1440px vẫn mất 25px mỗi bên). Cho phụ đề xuống hàng thứ hai và căn
+ * trái thẳng hàng với "V/Q TEAM…" bên dưới. */
+.vq-brand-panel .vmp-masthead { flex-wrap: wrap; justify-content: flex-start; row-gap: 14px; margin: 10px 0 4px; }
+.vq-brand-panel .vmp-masthead__phu { flex-basis: 100%; }
 .vq-brand-panel .vmp-masthead__ten { color: #fff8ee; }
 .vq-brand-panel .vmp-masthead__monitor, .vq-brand-panel .vmp-masthead__phu { color: #ffdca5; }
 .vq-brand-panel .vmp-masthead__net { stroke: #ffdca5; fill: #ffdca5; }

@@ -90,6 +90,40 @@ const trinhDuyet = await puppeteer.launch({
   await trang.close();
 }
 
+/* ---- 1b. Màn đăng nhập: thương hiệu không bị cắt, focus không lạc (16/10) */
+{
+  console.log("\nĐăng nhập — chi tiết trải nghiệm:");
+  for (const rong of [1000, 1366, 1440]) {
+    const trang = await trinhDuyet.newPage();
+    await trang.setViewport({ width: rong, height: 800 });
+    await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+    await trang.goto(GOC, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await trang.waitForSelector("#vmp-login-email");
+    const biCat = await trang.evaluate(() => {
+      const khung = document.querySelector(".vq-brand-panel")?.getBoundingClientRect();
+      if (!khung) return ["không thấy .vq-brand-panel"];
+      return [...document.querySelectorAll(".vq-brand-panel .vmp-masthead *")]
+        .filter((el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+        .filter((el) => { const r = el.getBoundingClientRect(); return r.left < khung.left - 1 || r.right > khung.right + 1; })
+        .map((el) => el.textContent.trim().slice(0, 20));
+    });
+    kiem(biCat.length === 0, `${rong}px: chữ thương hiệu không tràn khỏi khung`, biCat.join(", "));
+    if (rong === 1366) {
+      await trang.click("#vmp-login-email");
+      const vongTrong = await trang.$eval("#vmp-login-email", (o) => getComputedStyle(o).outlineStyle);
+      kiem(vongTrong === "none", "ô email chỉ có MỘT vòng tiêu điểm (ở khung)", `outline ô trong: ${vongTrong}`);
+      await trang.keyboard.type("gialap@example.com");
+      await trang.click("#vmp-login-password");
+      await trang.keyboard.type("sai-mat-khau");
+      await trang.click('button[type="submit"]');
+      await trang.waitForSelector('[role="alert"]', { timeout: 10_000 });
+      const focus = await trang.evaluate(() => document.activeElement?.id || document.activeElement?.tagName);
+      kiem(focus === "vmp-login-password", "đăng nhập sai: focus về ô mật khẩu, không rơi về body", focus);
+    }
+    await trang.close();
+  }
+}
+
 /* ---- 2. Mở lần lượt mười lăm màn ------------------------------------ */
 console.log("\nĐiều hướng:");
 for (const [id, ten] of MAN) {

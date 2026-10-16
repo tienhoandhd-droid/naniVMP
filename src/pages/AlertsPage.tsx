@@ -829,7 +829,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
               {aiLoading && (
                 <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}>
                   <RefreshCw size={22} className="spin" color={C.pink} />
-                  <div style={{ marginTop: 10 }}>AI đang đọc lại số từ Supabase và phân tích…</div>
+                  <div style={{ marginTop: 10 }}>AI đang đọc lại số liệu mới nhất và phân tích…</div>
                 </div>
               )}
               {!aiLoading && !aiErr && aiText && (

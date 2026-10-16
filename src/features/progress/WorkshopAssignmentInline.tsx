@@ -144,6 +144,7 @@ export default function WorkshopAssignmentInline({ validationCode, canAssign }: 
               {goBo?.assignment_id === a.assignment_id ? (
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                   <input value={lyDoGo} onChange={(e) => setLyDoGo(e.target.value)} autoFocus
+                    aria-label="Lý do gỡ phân công"
                     placeholder="Lý do gỡ (bắt buộc)"
                     style={{ padding: "6px 10px", borderRadius: 10, fontSize: 12,
                              fontFamily: TEXT, border: `1px solid ${C.pinkSoft}`, minWidth: 180 }} />

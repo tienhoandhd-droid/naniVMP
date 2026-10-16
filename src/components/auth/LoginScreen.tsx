@@ -60,6 +60,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
   const [resendAt, setResendAt] = useState(0);
   const [clock, setClock] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const firstStep = useRef(true);
 
   useEffect(() => setStep(initialMode), [initialMode]);
@@ -109,6 +110,11 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
       onLogin(profile);
     } catch (error) {
       setServerError(loginErrorMessage(error));
+      // Nút Đăng nhập bị khoá trong lúc chờ nên trình duyệt đẩy focus về
+      // <body>. Đưa người dùng (nhất là người dùng bàn phím) về ô mật khẩu,
+      // bôi đen sẵn để gõ lại ngay.
+      passwordRef.current?.focus();
+      passwordRef.current?.select();
     } finally {
       requestInFlight.current = false;
       setLoading(false);
@@ -202,7 +208,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
                 </div>
                 <div className="vq-input-shell">
                   <Lock size={18} aria-hidden="true" />
-                  <input id="vmp-login-password" name="password"
+                  <input ref={passwordRef} id="vmp-login-password" name="password"
                     type={showPassword ? "text" : "password"} autoComplete="current-password"
                     value={password}
                     onChange={(event) => { setPassword(event.target.value); clearFieldError("password"); }}

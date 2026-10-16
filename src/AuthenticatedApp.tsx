@@ -587,7 +587,7 @@ function VerifiedAppShell({ user, logout, access }: {
     // "saving" không cần toast riêng: nó đổi thành saved/error rất nhanh,
     // và một toast chớp 200ms chỉ làm màn hình giật.
     if (saveStatus === "saved") toast.thanhCong("Đã lưu thành công");
-    else if (saveStatus === "warning") toast.canhBao("Lưu Supabase OK — Sheet chưa đồng bộ");
+    else if (saveStatus === "warning") toast.canhBao("Đã lưu — Google Sheet chưa đồng bộ");
     else if (saveStatus === "error") toast.loi("Lưu thất bại");
   }, [saveStatus, toast]);
   /* `rules` đứng trong danh sách RIÊNG vì nó không còn mục menu (31/08)

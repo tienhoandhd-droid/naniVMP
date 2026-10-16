@@ -193,10 +193,10 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
                 <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
                   <Search size={15} color={C.plumSoft} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }} />
-                  <input value={q} onChange={(e) => setQ(e.target.value)}
+                  <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm hạng mục không thẩm định"
                     placeholder="Tìm mã, tên, bộ phận, lý do…" style={{ ...INP, paddingLeft: 34 }} />
                 </div>
-                <select value={nhom} onChange={(e) => setNhom(e.target.value)} style={{ ...INP, cursor: "pointer", maxWidth: 190 }}>
+                <select value={nhom} onChange={(e) => setNhom(e.target.value)} aria-label="Lọc theo nhóm" style={{ ...INP, cursor: "pointer", maxWidth: 190 }}>
                   <option value="all">Tất cả nhóm</option>
                   {nhoms.map((k) => <option key={k} value={k}>{k}</option>)}
                 </select>

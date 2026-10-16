@@ -272,6 +272,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
           Hoặc gõ tay email (cách nhau bằng dấu phẩy hoặc xuống dòng)
         </div>
         <textarea value={goTay} onChange={(e) => setGoTay(e.target.value)} rows={2}
+          aria-label="Gõ tay email người nhận"
           placeholder="ten@cpc1hn.com, ten2@cpc1hn.com" style={{ ...o, resize: "vertical", lineHeight: 1.6 }} />
         {goTaySai.length > 0 && (
           <div style={{ marginTop: 7, fontSize: 12, fontWeight: 700, color: C.marigoldText }}>
