@@ -17,6 +17,13 @@ const VALIDATION_CODE = "TB-100-IQ";
 const REASON = "Điều chỉnh theo biên bản QA-26/08";
 const CONFIRMATION = "Tôi xác nhận chỉ đổi bốn deadline kế hoạch; ngày thực tế, trạng thái, người thực hiện và mã hạng mục giữ nguyên.";
 const UPDATED_VMP = "2026-09-16";
+/* 16/10: fixture có deadline_vmp CỐ ĐỊNH 2026-09-15, còn Long Môn chỉ vẽ cá có
+   hạn VMP trong ±30 ngày quanh Hôm nay — từ ~15/10 con cá biến mất và bộ kiểm
+   hỏng theo lịch dù code không đổi (CI 08/10 đạt 39/39). Đóng băng đồng hồ
+   trình duyệt và JWT ở đúng ngày 08/10, cùng cách today-personal-scope.mjs.
+   Chạy tay nhớ đặt VITE_MANUAL_PLANNED_DEADLINES_ENABLED=true như CI, nếu
+   không nút "Chỉnh deadline kế hoạch" không được build vào bundle. */
+const FIXED_NOW_MS = Date.parse("2026-10-08T03:00:00.000Z");
 const PROTECTED_EVIDENCE = {
   actual_protocol_date: "2026-08-01",
   actual_validation_date: "2026-08-03",
@@ -98,9 +105,20 @@ async function openPage(browser, {
     localStorage.removeItem("vmp_monitor_user_v1");
     localStorage.removeItem("vmp_snapshot_v2");
   });
+  await page.evaluateOnNewDocument((instant) => {
+    const NativeDate = Date;
+    class FixedDate extends NativeDate {
+      constructor(...args) {
+        super(...(args.length ? args : [instant]));
+      }
+      static now() { return instant; }
+    }
+    globalThis.Date = FixedDate;
+  }, FIXED_NOW_MS);
   const { chanNgoai } = await caiGiaLap(page, {
     supabaseUrl: SUPABASE_URL,
     kichBan: "day",
+    nowMs: FIXED_NOW_MS,
     doTre: delay ? { rpc_update_planned_deadlines: delay } : undefined,
     suaKho(store) {
       restrictToManualDeadlineFixture(store);
@@ -114,7 +132,7 @@ async function openPage(browser, {
       }
     },
   });
-  await nhetPhien(page, { supabaseUrl: SUPABASE_URL });
+  await nhetPhien(page, { supabaseUrl: SUPABASE_URL, nowMs: FIXED_NOW_MS });
   await page.setViewport({ width, height: 900 });
   /* 31/08: màn Dòng thời gian chỉ còn Ngư đồ Long Môn — không còn nút
      chuyển workspace hay lưới tháng; hạng mục là một con cá có
