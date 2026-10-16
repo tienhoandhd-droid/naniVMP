@@ -1,0 +1,40 @@
+# =====================================================================
+#  db-drift.yml — production có đang chạy đúng migration trong repo không?
+#  ---------------------------------------------------------------------
+#  Rà soát 16/10/2026: 6 migration nằm trong repo 6 tuần mà production
+#  chưa áp; web gọi tới và hỏng mà không ai biết. Workflow này chạy mỗi
+#  sáng 7h30 (giờ VN) và sau mỗi lần sửa migration trên main. Lệch thì
+#  workflow ĐỎ — GitHub gửi email cho chủ repo.
+#
+#  Chỉ dùng anon key (đã công khai trong bundle web) để gọi
+#  rpc_schema_fingerprint() — trả md5 thân hàm, không trả dữ liệu.
+#  GitHub vẫn KHÔNG giữ credential DB production.
+#  Cách xử lý khi đỏ: docs/runbooks/2026-10-16-ap-migration-ton-dong.md
+# =====================================================================
+name: DB drift
+
+on:
+  schedule:
+    - cron: "30 0 * * *" # 00:30 UTC = 07:30 giờ Việt Nam
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**", "scripts/check-migration-drift.mjs"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  so-khop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+      - name: So thân hàm repo với production (anon, chỉ đọc)
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON: ${{ vars.VITE_SUPABASE_ANON }}
+        run: node scripts/check-migration-drift.mjs

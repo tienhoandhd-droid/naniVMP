@@ -96,3 +96,9 @@ workshop_staff. Chi tiết trong báo cáo rà soát.
   `✓ 130 hàm trong repo khớp production` (mã thoát 0); 0 policy `true` trên 15
   bảng đã đóng; 16 policy `true` còn lại đều ở bảng cấu hình (giai đoạn 2.2 của
   kế hoạch nâng cấp).
+
+**Bổ sung 16/10 ~13:00:** áp thêm `20261016110000_schema_fingerprint` (hàm mã băm cho
+workflow `db-drift.yml`) và `20261016120000_mfa_pre_request_anon_fix` (hook MFA chặn
+nhầm mọi request anon — đã so hook cũ/mới trên production trong giao dịch ROLLBACK
+trước khi áp). Sau áp: `drift:db` 131/131 khớp, cả chế độ psql lẫn anon REST; anon
+vẫn bị từ chối đọc bảng (`vmp_plan_items` → HTTP 401).

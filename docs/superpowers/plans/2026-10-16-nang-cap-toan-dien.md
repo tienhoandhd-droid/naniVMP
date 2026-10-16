@@ -40,7 +40,7 @@ ngày 12/08 từng dính).
 
 Bài học lớn nhất đợt này: 6 migration nằm chờ 6 tuần, web gọi tới mà không ai biết.
 
-1.1 Chạy `drift:db` **định kỳ**. GitHub hiện cố ý không giữ credential DB
+1.1 ✅ 16/10: workflow `.github/workflows/db-drift.yml` chạy 7h30 mỗi sáng + khi đổi migration, chỉ dùng anon key qua `rpc_schema_fingerprint()`; đỏ → GitHub gửi email. Trên đường làm phát hiện và sửa lỗi hook MFA chặn nhầm mọi request anon (`20261016120000`). (Mô tả cũ:) Chạy `drift:db` **định kỳ**. GitHub hiện cố ý không giữ credential DB
 production, nên đề xuất chạy từ n8n (đã có kết nối Postgres) mỗi sáng, báo
 lỗi qua kênh cảnh báo sẵn có; hoặc cron trên máy chủ nội bộ. **[CHỦ DỰ ÁN]** chọn nơi chạy.
 1.2 Sau khi 0.2 xong: đọc bảng `vmp_client_errors` hàng tuần (thẻ ở Cấu hình hệ thống) — đây là lần đầu có dữ liệu lỗi thật từ người dùng.
