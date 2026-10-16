@@ -119,3 +119,18 @@ vẫn bị từ chối đọc bảng (`vmp_plan_items` → HTTP 401).
   tự từ chối chạy khi `item_permissions_mode` chưa là `enforced`.
 - **Bài học:** kiểm thử migration đọc dữ liệu phải đưa kết quả thật qua bộ kiểm
   của web (decode), không chỉ kiểm "chạy được".
+
+## Bổ sung 16/10 chiều — danh sách QA phụ trách
+
+- `20261016140000_qa_admin_assignable`: người phòng QA mang vai admin được chọn làm
+  QA phụ trách/hỗ trợ (luật chung `vmp_qa_assignable`). Danh sách: 3 → 6 người.
+  Thử trong ROLLBACK trên production: danh sách qua bộ decode của web; lưu QA phụ
+  trách là admin phòng QA → ok; chọn người xưởng → `PERSON_NOT_ELIGIBLE`.
+  Định nghĩa cũ 4 hàm lưu ở `.backups/ho-so-ap-migration-20261016/truoc-20261016140000/`.
+- `20261016150000_lien_ket_ho_so_theo_email`: tài khoản mới có email khớp đúng một
+  hồ sơ người thực hiện chưa gắn tài khoản thì gắn vào hồ sơ đó (trước đây sinh hồ
+  sơ trùng). Vai vẫn do Admin chọn ở Bảng kiểm soát.
+- Dữ liệu (chạy trực tiếp, không đưa email vào repo public): 2 người QA chưa có tài
+  khoản được thêm vào danh sách được phép tạo tài khoản và đặt `access_class =
+  qa_progress_editor`. Còn lại: tạo tài khoản trong Supabase Authentication → Admin
+  chọn vai QA ở màn Vai trò & phạm vi → họ tự vào danh sách QA phụ trách.
