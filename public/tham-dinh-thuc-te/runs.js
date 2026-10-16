@@ -54,7 +54,7 @@
   const route=trendRoute(location.search);
   const $ = id => document.getElementById(id);
   const el = (name, props = {}, children = []) => { const node = ['text','line','path','circle','rect','title','g'].includes(name)?document.createElementNS('http://www.w3.org/2000/svg',name):document.createElement(name); Object.entries(props).forEach(([key, value]) => { if (key === 'text') node.textContent = value; else if (key === 'className') node.setAttribute('class',value); else if (key.startsWith('on')) node.addEventListener(key.slice(2), value); else node.setAttribute(key, value); }); node.append(...children); return node; };
-  const state = { configs: {}, runs: [], history: [], requirements: [], requirementToken: 0, activeSystem: 'steam', trendKey: '', hiddenPoints: new Set(), snapshots: new Map(), snapshotErrors: new Map(), pendingSnapshots: new Map(), accessRevision:0, loadToken:0 };
+  const state = { configs: {}, runs: [], history: [], requirements: [], requirementToken: 0, activeSystem: 'steam', trendKey: '', hiddenPoints: new Set(), snapshots: new Map(), snapshotErrors: new Map(), pendingSnapshots: new Map(), accessRevision:0, loadToken:0, levels:new Map(), levelErrors:new Map(), levelsLoading:new Set() };
   const message = text => { $('runs-status').textContent = text; };
   const errorText = error => error?.message || 'Không thể tải dữ liệu. Thử lại sau.';
   const payloadKey = payload => JSON.stringify(payload);
@@ -126,12 +126,16 @@
     // là chấm), trục chia bước tròn 1/2/5×10ⁿ, và vẽ giới hạn PQ của hồ sơ đang xem.
     const seriesPoints=[...new Set(data.series.map(series=>series.point_id))],colour=id=>`series-${seriesPoints.indexOf(id)%6}`;
     const limits=[...new Map(seriesPoints.map(id=>window.CPC1TrendLimits?.limitFor?.(system,form,metric,data.unit,id,snapshot)).filter(Boolean).map(item=>[item.direction+item.limit,item])).values()];
-    const values=data.series.flatMap(series=>series.values).filter(Number.isFinite),scale=[...values,...limits.map(item=>item.limit)];
+    // Gói 4: ngưỡng cảnh báo/hành động do Admin đặt (bản mới nhất để vẽ đường; so từng điểm theo bản có hiệu lực tháng đó).
+    const T=window.CPC1TrendLimits,levels=state.levels.get(system)?.rows||[],rank={ok:0,alert:1,action:2};
+    const levelLines=[...new Map(seriesPoints.map(id=>T.levelFor(levels,form,metric,data.unit,id,null)).filter(Boolean).map(l=>[`${l.alert}|${l.action}`,l])).values()];
+    const values=data.series.flatMap(series=>series.values).filter(Number.isFinite),scale=[...values,...limits.map(item=>item.limit),...levelLines.flatMap(l=>[Number(l.alert),Number(l.action)])];
     const lo0=scale.length?Math.min(...scale):0,hi0=scale.length?Math.max(...scale):1,raw=(hi0-lo0||Math.max(1,Math.abs(hi0)*.1))/4,power=10**Math.floor(Math.log10(raw)),ratio=raw/power,step=(ratio<=1?1:ratio<=2?2:ratio<=5?5:10)*power;
     let low=Math.floor(lo0/step)*step,high=Math.ceil(hi0/step)*step;if(high-low<step*2){low-=step;high+=step;}
     const decimals=Math.max(0,-Math.floor(Math.log10(step))),y=value=>bottom-(value-low)/(high-low)*(bottom-top),x=index=>data.months.length<2?left+(right-left)/2:left+(right-left)*index/(data.months.length-1);
     for(let value=low;value<=high+step/2;value+=step){const yy=y(value);group.append(el('line',{x1:left,x2:right,y1:yy,y2:yy,className:'chart-grid'}),el('text',{x:left-8,y:yy+4,'text-anchor':'end',className:'chart-label',text:value.toLocaleString('vi-VN',{minimumFractionDigits:decimals,maximumFractionDigits:decimals})}));}
     limits.forEach(item=>{const yy=y(item.limit);group.append(el('line',{x1:left,x2:right,y1:yy,y2:yy,className:'limit-line','data-limit':String(item.limit)}),el('text',{x:left+8,y:yy-6,'text-anchor':'start',className:'chart-label limit-label',text:`Giới hạn PQ ${item.direction==='max'?'≤':'≥'} ${item.limit.toLocaleString('vi-VN')} ${data.unit}`}));});
+    levelLines.forEach(l=>[['alert','Cảnh báo'],['action','Hành động']].forEach(([k,ten])=>{const yy=y(Number(l[k]));group.append(el('line',{x1:left,x2:right,y1:yy,y2:yy,className:`${k}-line`,'data-level':`${k}:${l[k]}`}),el('text',{x:right-8,y:yy-6,'text-anchor':'end',className:`chart-label ${k}-label`,text:`${ten} ${Number(l[k]).toLocaleString('vi-VN')}`}));}));
     data.months.forEach((month,index)=>group.append(el('text',{x:x(index),y:bottom+24,'text-anchor':'middle',className:'chart-label',text:`${month.slice(5,7)}/${month.slice(0,4)}`})));
     seriesPoints.forEach(id=>{
       const means=data.months.map((_,monthIndex)=>{const list=data.series.filter(series=>series.point_id===id).map(series=>series.values[monthIndex]).filter(Number.isFinite);return list.length?list.reduce((a,b)=>a+b,0)/list.length:null;});
@@ -140,11 +144,15 @@
       means.forEach((value,monthIndex)=>{if(Number.isFinite(value))segment.push({index:monthIndex,value});else flush();});flush();
     });
     data.series.forEach(series=>{
-      series.values.forEach((value,monthIndex)=>{if(Number.isFinite(value)){const title=`${data.months[monthIndex].slice(5,7)}/${data.months[monthIndex].slice(0,4)} · ${pointLabel(system,form,series.point_id)} · lần ${series.trial}${series.occurrence?' · chuỗi '+(series.occurrence+1):''}: ${value} ${data.unit}`;group.append(el('circle',{...observationProps(series.point_id,title),cx:x(monthIndex),cy:y(value),r:4,className:`multi-point ${colour(series.point_id)}`},[el('title',{text:title})]));}});
+      series.values.forEach((value,monthIndex)=>{if(Number.isFinite(value)){const muc=T.classify(value,T.levelFor(levels,form,metric,data.unit,series.point_id,data.months[monthIndex])),title=`${data.months[monthIndex].slice(5,7)}/${data.months[monthIndex].slice(0,4)} · ${pointLabel(system,form,series.point_id)} · lần ${series.trial}${series.occurrence?' · chuỗi '+(series.occurrence+1):''}: ${value} ${data.unit}${{ok:'',alert:' · vượt mức cảnh báo',action:' · vượt mức hành động'}[muc]}`;group.append(el('circle',{...observationProps(series.point_id,title),cx:x(monthIndex),cy:y(value),r:muc==='ok'?4:6,'data-muc':muc,className:`multi-point ${colour(series.point_id)}${{ok:'',alert:' vuot-canh-bao',action:' vuot-hanh-dong'}[muc]}`},[el('title',{text:title})]));}});
     });
     if(!values.length)group.append(el('text',{x:width/2,y:130,'text-anchor':'middle',className:'chart-empty',text:'Chưa có số liệu từ đợt đã đóng phù hợp.'}));
     $('multi-trend-status').textContent=data.series.length?`${$('history-metric').selectedOptions[0]?.textContent||'Chỉ tiêu đã chọn'} · ${history.length} hồ sơ đã đóng · ${seriesPoints.length} điểm lấy mẫu${data.excluded?' · '+data.excluded+' kết quả thiếu hoặc chưa chắc chắn không được vẽ':''}.`:'Chưa có số liệu từ đợt đã đóng cho lựa chọn này.';
-    $('multi-trend-legend').replaceChildren(...seriesPoints.map(id=>el('li',{},[el('span',{className:`multi-swatch ${colour(id)}`,'aria-hidden':'true'}),el('span',{text:pointLabel(system,form,id)})])),...(limits.length?[el('li',{},[el('span',{className:'multi-swatch limit-swatch','aria-hidden':'true'}),el('span',{text:'Giới hạn PQ (theo hồ sơ đang xem)'})])]:[]));
+    $('multi-trend-legend').replaceChildren(...seriesPoints.map(id=>el('li',{},[el('span',{className:`multi-swatch ${colour(id)}`,'aria-hidden':'true'}),el('span',{text:pointLabel(system,form,id)})])),...(limits.length?[el('li',{},[el('span',{className:'multi-swatch limit-swatch','aria-hidden':'true'}),el('span',{text:'Giới hạn PQ (theo hồ sơ đang xem)'})])]:[]),...(levelLines.length?[el('li',{},[el('span',{className:'multi-swatch alert-swatch','aria-hidden':'true'}),el('span',{text:'Mức cảnh báo'})]),el('li',{},[el('span',{className:'multi-swatch action-swatch','aria-hidden':'true'}),el('span',{text:'Mức hành động'})])]:[]));
+    // Annex 1 §9.11: báo vượt hành động và vượt cảnh báo lặp lại (≥2 đợt liên tiếp) tại cùng điểm.
+    const signals=levelLines.length?T.signals(seriesPoints.map(id=>({label:pointLabel(system,form,id),months:data.months.map((month,i)=>{const lv=T.levelFor(levels,form,metric,data.unit,id,month),vals=data.series.filter(series=>series.point_id===id).map(series=>series.values[i]).filter(Number.isFinite);return {month,state:lv&&vals.length?vals.map(v=>T.classify(v,lv)).sort((a,b)=>rank[b]-rank[a])[0]:null};})}))):[];
+    $('multi-trend-signals').replaceChildren(...(levelLines.length&&!signals.length?[{muc:'ok',text:'Không có điểm vượt mức cảnh báo.'}]:signals).map(item=>el('li',{'data-muc':item.muc,text:item.text})));
+    renderLevels(system,form,metric,data);
     // The table is an alternative to the chart: preserve every saved source row,
     // including observations that cannot be plotted. Gap rows are explicitly synthetic.
     const tableRows=data.rows.map(row=>({...row,sourceState:row.uncertain?'uncertain':Number.isFinite(row.value)?'saved':'missing'}));
@@ -158,6 +166,58 @@
       row.source_value??'—',row.value??'—',row.unit||'—',({saved:'Đã lưu',uncertain:'Nguồn chưa chắc chắn · không vẽ',missing:'Thiếu giá trị số · không vẽ',gap:'Tháng chưa có số liệu · không phải dòng hồ sơ'}[row.sourceState])
     ].map(cell=>el('td',{text:String(cell)})))));
 
+  }
+  const soThapPhan=text=>{const value=String(text??'').trim().replace(',','.');return /^[+-]?\d+(\.\d+)?$/.test(value)?Number(value):NaN;};
+  async function loadLevels(system){
+    if(!system||state.levels.has(system)||state.levelErrors.has(system)||state.levelsLoading.has(system))return;
+    const revision=state.accessRevision;state.levelsLoading.add(system);
+    try{
+      if(typeof window.CPC1Backend.trendLimits!=='function')throw Error('Dịch vụ ngưỡng chưa sẵn sàng.');
+      const result=await window.CPC1Backend.trendLimits(system);
+      if(!result?.ok)throw Error(result?.error||'Máy chủ không trả danh sách ngưỡng.');
+      if(revision===state.accessRevision)state.levels.set(system,{rows:result.rows||[],co_the_dat:result.co_the_dat===true});
+    }catch(error){if(revision===state.accessRevision)state.levelErrors.set(system,errorText(error));}
+    finally{state.levelsLoading.delete(system);}
+    if(revision===state.accessRevision&&state.activeSystem===system)renderTrend();
+  }
+  function renderLevels(system,form,metric,data){
+    const T=window.CPC1TrendLimits,info=state.levels.get(system),problem=state.levelErrors.get(system),status=$('nguong-trang-thai'),table=$('nguong-bang'),box=$('nguong-form');
+    if(problem||!info){status.textContent=problem?`Không tải được ngưỡng: ${problem}`:'Đang tải ngưỡng…';table.hidden=true;box.hidden=true;return;}
+    const labelOf=row=>state.history.flatMap(h=>h.trend||[]).find(t=>t.form===row.form&&t.metric===row.metric)?.label||row.metric;
+    status.textContent=info.rows.length?`${info.rows.filter(row=>row.hien_hanh).length} ngưỡng đang áp dụng. Bản cũ được giữ lại để truy vết.`:'Chưa đặt ngưỡng nào cho hệ thống này.';
+    table.hidden=!info.rows.length;
+    table.querySelector('tbody').replaceChildren(...info.rows.map(row=>el('tr',{'data-hien-hanh':String(row.hien_hanh)},[
+      `${row.form.toUpperCase()} · ${labelOf(row)} (${row.unit}) · ${row.direction==='max'?'giới hạn trên':'giới hạn dưới'}`,row.point_id?pointLabel(system,row.form,row.point_id):'Tất cả điểm',
+      row.alert,row.action,ngayVN(row.hieu_luc_tu),`v${row.phien_ban}${row.hien_hanh?' · đang áp dụng':''}`,row.nguoi,row.ly_do
+    ].map(value=>el('td',{text:String(value)})))));
+    box.hidden=!info.co_the_dat||!form||!metric;if(box.hidden)return;
+    const direction=T.directionOf(system,form,metric),submit=box.querySelector('button[type="submit"]');
+    $('nguong-chi-tieu').textContent=direction?`Đặt cho ${form.toUpperCase()} · ${data.label} (${data.unit}) · ${direction==='max'?'vượt khi cao hơn ngưỡng':'vượt khi thấp hơn ngưỡng'}.`:'Chỉ tiêu này chưa đặt ngưỡng được.';
+    submit.disabled=!direction;
+    selectOptions($('nguong-diem'),[{value:'',label:'Tất cả điểm'},...data.points.map(id=>({value:id,label:pointLabel(system,form,id)}))],$('nguong-diem').value);
+    if(!$('nguong-hieu-luc').value)$('nguong-hieu-luc').value=new Date().toLocaleDateString('en-CA');
+    const point=$('nguong-diem').value,goiY=T.suggest(data.series.filter(series=>!point||series.point_id===point).flatMap(series=>series.values),direction,data.unit);
+    $('nguong-goi-y').textContent=goiY.text+(goiY.du?' Chỉ là gợi ý; QA xem xét trước khi áp.':'');
+    $('nguong-dung-goi-y').hidden=!goiY.du;
+    $('nguong-dung-goi-y').onclick=()=>{$('nguong-canh-bao').value=String(goiY.alert);$('nguong-hanh-dong').value=String(goiY.action);};
+    $('nguong-diem').onchange=()=>renderLevels(system,form,metric,data);
+    box.onsubmit=async event=>{
+      event.preventDefault();const loi=$('nguong-loi');loi.textContent='';
+      const alert=soThapPhan($('nguong-canh-bao').value),action=soThapPhan($('nguong-hanh-dong').value),reason=$('nguong-ly-do').value.trim(),from=$('nguong-hieu-luc').value;
+      try{
+        if(!Number.isFinite(alert)||!Number.isFinite(action))throw Error('Nhập ngưỡng cảnh báo và hành động bằng số.');
+        if(direction==='max'?!(alert<action):!(alert>action))throw Error(direction==='max'?'Ngưỡng cảnh báo phải nhỏ hơn ngưỡng hành động.':'Ngưỡng cảnh báo phải lớn hơn ngưỡng hành động.');
+        if(!from)throw Error('Chọn ngày hiệu lực.');
+        if(!reason)throw Error('Ghi lý do đặt ngưỡng.');
+        submit.disabled=true;
+        const result=await window.CPC1Backend.setTrendLimit({system,form,metric,pointId:point,unit:data.unit,direction,alert,action,from,reason});
+        if(!result?.ok)throw Error(result?.error||'Không lưu được ngưỡng.');
+        $('nguong-canh-bao').value='';$('nguong-hanh-dong').value='';$('nguong-ly-do').value='';
+        message(`Đã lưu ngưỡng (phiên bản v${result.phien_ban}).`);
+        state.levels.delete(system);void loadLevels(system);
+      }catch(problem){loi.textContent=errorText(problem);}
+      finally{submit.disabled=false;}
+    };
   }
   function renderTrend() {
     const system=$('trend-system').value;state.activeSystem=system;
@@ -211,11 +271,11 @@
     }
     points.forEach(id=>{const input=el('input',{type:'checkbox',value:id});input.checked=!state.hiddenPoints.has(id);input.addEventListener('change',()=>{if(input.checked)state.hiddenPoints.delete(id);else state.hiddenPoints.add(id);draw();});legend.append(el('label',{},[input,el('span',{text:pointLabel(system,form||metricRows.find(r=>r.point_id===id)?.form,id)})]));});
     $('trend-show-all').onclick=()=>{state.hiddenPoints.clear();legend.querySelectorAll('input').forEach(input=>input.checked=true);draw();};$('trend-show-all').disabled=!points.length;
-    draw();renderHistoryDetails(system);if(loading)fetchSnapshot(item);
+    draw();renderHistoryDetails(system);if(loading)fetchSnapshot(item);void loadLevels(system);
   }
   function renderHistoryDetails(system) { const host = $('history-details'); host.replaceChildren(); const entries = state.history.filter(h => h.system === system); if (!entries.length) { host.append(el('p',{className:'empty',text:'Chưa có lịch sử nguồn cho hệ thống này.'})); return; } entries.forEach(item => { const box = el('article',{className:'history-item'}); box.append(el('strong',{text:`${item.period?.slice(0,7)} · hồ sơ ${item.record_id || '—'}`})); if ((item.issues || []).length) { const list = el('ul'); item.issues.forEach(issue => list.append(el('li',{text:typeof issue === 'string' ? issue : JSON.stringify(issue)}))); box.append(el('p',{className:'help',text:'Vấn đề cần xem xét:'}),list); } if ((item.sources || []).length) { const actions = el('div',{className:'source-actions'}); item.sources.forEach(source => actions.append(el('button',{type:'button',text:`Tải PDF: ${source.title || source.source_id}`,onclick:()=>download(source)}))); box.append(actions); } host.append(box); }); }
   async function download(source) { try { const blob = await window.CPC1Backend.downloadHistorySource(source.object_path); const url = URL.createObjectURL(blob), a = el('a',{href:url,download:source.title || 'nguon-lich-su.pdf'}); document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url); } catch(error) { message(errorText(error)); } }
-  async function load() { const token=++state.loadToken;state.accessRevision++;state.snapshots.clear();state.snapshotErrors.clear();state.pendingSnapshots.clear();state.configs={};state.runs=[];state.history=[];renderRuns();renderTrend();try { const backend = window.CPC1Backend; const session = await backend.getSession(); if (!session)throw new Error('Đăng nhập VMP để xem dữ liệu.'); const visible=availableSystems(backend), archiveVisible=Object.keys(systems).filter(system=>backend.permissionsFor(system).can_view&&(!route.dedicated||system===route.system)), entering=availableSystems(backend,true); const configs={}; for (const system of visible) configs[system]=system==='steam'?await backend.getConfig():await backend.getGasConfig(system); const [runs,history]=await Promise.all([backend.listRuns(),backend.listHistory()]); if(token!==state.loadToken)return; $('create-run').hidden=!entering.length;state.configs=configs; state.runs=runs || []; state.history=history || []; state.activeSystem=route.dedicated&&archiveVisible.includes(route.system)?route.system:archiveVisible[0]||''; renderCampaignSystems(); selectOptions($('single-system'), entering.map(value=>({value,label:systems[value]}))); selectOptions($('trend-system'), archiveVisible.map(value=>({value,label:systems[value]})),state.activeSystem); renderRuns(); renderTrend();toggleMode();message('Đã tải dữ liệu đợt và xu hướng.'); } catch(error) { if(token!==state.loadToken)return;message(errorText(error)); $('run-list').replaceChildren(el('p',{className:'empty',text:'Không tải được danh sách đợt. Dữ liệu đang nhập vẫn được giữ.'})); } }
+  async function load() { const token=++state.loadToken;state.accessRevision++;state.snapshots.clear();state.levels.clear();state.levelErrors.clear();state.snapshotErrors.clear();state.pendingSnapshots.clear();state.configs={};state.runs=[];state.history=[];renderRuns();renderTrend();try { const backend = window.CPC1Backend; const session = await backend.getSession(); if (!session)throw new Error('Đăng nhập VMP để xem dữ liệu.'); const visible=availableSystems(backend), archiveVisible=Object.keys(systems).filter(system=>backend.permissionsFor(system).can_view&&(!route.dedicated||system===route.system)), entering=availableSystems(backend,true); const configs={}; for (const system of visible) configs[system]=system==='steam'?await backend.getConfig():await backend.getGasConfig(system); const [runs,history]=await Promise.all([backend.listRuns(),backend.listHistory()]); if(token!==state.loadToken)return; $('create-run').hidden=!entering.length;state.configs=configs; state.runs=runs || []; state.history=history || []; state.activeSystem=route.dedicated&&archiveVisible.includes(route.system)?route.system:archiveVisible[0]||''; renderCampaignSystems(); selectOptions($('single-system'), entering.map(value=>({value,label:systems[value]}))); selectOptions($('trend-system'), archiveVisible.map(value=>({value,label:systems[value]})),state.activeSystem); renderRuns(); renderTrend();toggleMode();message('Đã tải dữ liệu đợt và xu hướng.'); } catch(error) { if(token!==state.loadToken)return;message(errorText(error)); $('run-list').replaceChildren(el('p',{className:'empty',text:'Không tải được danh sách đợt. Dữ liệu đang nhập vẫn được giữ.'})); } }
   function tabs() {
     const buttons=[$('runs-tab'),$('trend-tab')];
     function activate(index){buttons.forEach((b,i)=>{b.setAttribute('aria-selected',String(i===index));b.tabIndex=i===index?0:-1;});$('runs-panel').hidden=index!==0;$('trend-panel').hidden=index!==1;if(index===1)renderTrend();}

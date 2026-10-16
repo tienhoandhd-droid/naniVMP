@@ -198,3 +198,8 @@ html[data-theme="dark"] .pq-point-card .pq-outside { fill: var(--pq-rule); }
  .pq-point-summary { min-width: 440px; }
 }
 .nhat-ky-loc{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin:16px 0}.nhat-ky-loc label{display:grid;gap:4px;font-weight:600}#nk-bang td{max-width:320px;overflow-wrap:anywhere}
+/* Gói 4 (16/10): ngưỡng cảnh báo (vàng) / hành động (đỏ) do Admin đặt */
+.alert-line{stroke:var(--warning);stroke-width:2;vector-effect:non-scaling-stroke}.alert-label{fill:var(--warning)}.action-line{stroke:var(--danger);stroke-width:2;vector-effect:non-scaling-stroke}.action-label{fill:var(--danger)}.multi-swatch.alert-swatch{border-color:var(--warning)}.multi-swatch.action-swatch{border-color:var(--danger)}
+.multi-point.vuot-canh-bao{stroke:var(--warning)!important;stroke-width:3}.multi-point.vuot-hanh-dong{stroke:var(--danger)!important;stroke-width:3}
+.trend-signals{display:grid;gap:6px;margin:0 0 14px;padding:0;list-style:none;font-size:14px}.trend-signals:empty{display:none}.trend-signals li{padding:8px 12px;border-left:3px solid var(--warning);border-radius:6px;background:var(--surface-subtle)}.trend-signals li[data-muc="action"]{border-left-color:var(--danger)}.trend-signals li[data-muc="ok"]{border-left-color:var(--success)}
+.nguong-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.nguong-form[hidden]{display:none}.nguong-form label{display:grid;gap:6px;font-size:14px;font-weight:500}.nguong-form .help,.nguong-form .form-error,.nguong-form textarea,.nguong-form label:has(textarea){grid-column:1/-1}.nguong-form button{justify-self:start}#nguong-bang tr[data-hien-hanh="false"]{color:var(--text-secondary)}@media(max-width:640px){.nguong-form{grid-template-columns:1fr}}

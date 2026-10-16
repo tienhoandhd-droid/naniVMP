@@ -48,7 +48,24 @@
         <p id="multi-trend-status" class="help" role="status" aria-live="polite"></p>
         <figure class="chart-figure"><div class="chart-scroll" tabindex="0" role="region" aria-label="Biểu đồ nhiều đợt có thể cuộn ngang"><svg id="multi-trend-chart" viewBox="0 0 760 320" role="img" aria-labelledby="multi-trend-title multi-trend-desc"><title id="multi-trend-title">Diễn biến qua các đợt đã đóng</title><desc id="multi-trend-desc">Mỗi đường giữ riêng điểm, lần đo, đơn vị và khoảng trống theo tháng.</desc><g></g></svg></div><figcaption>Trục X: tháng thực hiện · Trục Y: giá trị đo. Giữ riêng điểm và lần đo; không nối tháng thiếu dữ liệu.</figcaption></figure>
         <ul tabindex="0" id="multi-trend-legend" class="multi-trend-legend" aria-label="Chú giải chuỗi qua các đợt"></ul>
+        <ul id="multi-trend-signals" class="trend-signals" aria-label="Cảnh báo xu hướng"></ul>
       <details id="multi-data-details" class="trend-details"><summary>Xem số liệu qua các đợt</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Bảng số liệu nhiều đợt"><table id="multi-trend-data"><caption>Số liệu theo tháng, điểm và lần thử</caption><thead><tr><th>Tháng</th><th>Điểm</th><th>Lần thử</th><th>Hồ sơ / phiên bản</th><th>Giá trị nguồn</th><th>Giá trị đã lưu</th><th>Đơn vị</th><th>Trạng thái nguồn</th></tr></thead><tbody></tbody></table></div></details>
+      <details id="nguong-panel" class="trend-details"><summary>Ngưỡng cảnh báo và hành động</summary>
+        <p id="nguong-trang-thai" class="help" role="status" aria-live="polite"></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Bảng ngưỡng"><table id="nguong-bang" hidden><caption>Các phiên bản ngưỡng của hệ thống đang xem</caption><thead><tr><th>Chỉ tiêu</th><th>Điểm</th><th>Cảnh báo</th><th>Hành động</th><th>Hiệu lực từ</th><th>Phiên bản</th><th>Người đặt</th><th>Lý do</th></tr></thead><tbody></tbody></table></div>
+        <form id="nguong-form" class="nguong-form" hidden novalidate>
+          <p id="nguong-chi-tieu" class="help"></p>
+          <label>Điểm áp dụng<select id="nguong-diem"></select></label>
+          <p id="nguong-goi-y" class="help"></p>
+          <button id="nguong-dung-goi-y" type="button" hidden>Dùng gợi ý</button>
+          <label>Ngưỡng cảnh báo<input id="nguong-canh-bao" type="text" inputmode="decimal" required></label>
+          <label>Ngưỡng hành động<input id="nguong-hanh-dong" type="text" inputmode="decimal" required></label>
+          <label>Hiệu lực từ<input id="nguong-hieu-luc" type="date" required></label>
+          <label>Lý do<textarea id="nguong-ly-do" maxlength="500" required placeholder="Căn cứ: số liệu thống kê, quyết định QA…"></textarea></label>
+          <p id="nguong-loi" class="form-error" role="alert"></p>
+          <button type="submit">Lưu ngưỡng</button>
+        </form>
+      </details>
       </details>
     </section>
     <section class="panel history-panel"><details class="trend-details"><summary>Nguồn hồ sơ và vấn đề cần xem xét</summary><div id="history-details"></div></details></section>

@@ -63,5 +63,52 @@
     const limit=system==='steam'?ctx.criteria?.[key]:ctx.config.forms?.find(f=>f.id===form)?.locations?.find(p=>p.id===pointId)?.limits?.[key];
     return limit!==null&&limit!==undefined&&limit!==''&&Number.isFinite(Number(limit))?{limit:Number(limit),direction}:null;
   }
-  window.CPC1TrendLimits={annotate,limitFor};
+  // ---- Gói 4 (16/10): ngưỡng cảnh báo / hành động do Admin đặt ----------
+  // Annex 1 §9.9: đặt từ dữ liệu thẩm định, xem lại định kỳ; §6.14: vượt cảnh
+  // báo phải ghi nhận, vượt hành động phải điều tra. Máy chỉ so và GỢI Ý.
+  const directionOf=(system,form,metric)=>(system==='steam'?steam:gas)[form]?.[metric]?.[1]||null;
+  // Ngưỡng có hiệu lực cho một tháng (month = 'YYYY-MM…'; bỏ trống = bản mới nhất).
+  // Ưu tiên ngưỡng riêng của điểm, không có thì dùng ngưỡng chung của chỉ tiêu.
+  function levelFor(levels,form,metric,unit,pointId,month) {
+    const pick=point=>(levels||[]).filter(l=>l.form===form&&l.metric===metric&&l.unit===unit&&l.point_id===point&&(!month||String(l.hieu_luc_tu).slice(0,7)<=String(month).slice(0,7)))
+      .sort((a,b)=>b.phien_ban-a.phien_ban)[0]||null;
+    return (pointId&&pick(pointId))||pick('');
+  }
+  function classify(value,level) {
+    if(!level||!Number.isFinite(value))return 'ok';
+    const vuot=(x,nguong)=>level.direction==='max'?x>Number(nguong):x<Number(nguong);
+    return vuot(value,level.action)?'action':vuot(value,level.alert)?'alert':'ok';
+  }
+  // points: [{label, months:[{month, state:'ok'|'alert'|'action'|null}]}] — null = tháng không có số liệu.
+  // Báo: mọi lần vượt hành động; vượt cảnh báo từ 2 đợt có số liệu liên tiếp.
+  function signals(points) {
+    const thang=m=>`${m.slice(5,7)}/${m.slice(0,4)}`,out=[];
+    points.forEach(p=>{
+      const co=p.months.filter(m=>m.state);let chuoi=[];
+      const dong=()=>{if(chuoi.length>=2)out.push({muc:'alert',text:`${p.label}: vượt mức cảnh báo ${chuoi.length} đợt liên tiếp (${thang(chuoi[0])}–${thang(chuoi.at(-1))}) — xem xét xu hướng.`});chuoi=[];};
+      co.forEach(m=>{
+        if(m.state==='action')out.push({muc:'action',text:`${p.label} · ${thang(m.month)}: vượt mức hành động — cần điều tra.`});
+        if(m.state==='ok')dong();else chuoi.push(m.month);
+      });
+      dong();
+    });
+    return out.sort((a,b)=>(a.muc==='action'?0:1)-(b.muc==='action'?0:1));
+  }
+  // Gợi ý từ lịch sử: hoá lý trung bình ± 2SD/3SD; vi sinh (CFU) percentile 95/99.
+  const SO_LIEU_TOI_THIEU=10;
+  function suggest(values,direction,unit) {
+    const v=(values||[]).filter(Number.isFinite).sort((a,b)=>a-b),n=v.length,lamTron=x=>Number(x.toPrecision(3));
+    if(!['max','min'].includes(direction))return {du:false,text:'Chỉ tiêu này chưa có chiều giới hạn; chưa gợi ý được.'};
+    if(n<SO_LIEU_TOI_THIEU)return {du:false,text:`Cần ít nhất ${SO_LIEU_TOI_THIEU} kết quả để gợi ý (hiện có ${n}).`};
+    if(/CFU/i.test(unit||'')&&direction==='max') {
+      const phanVi=p=>v[Math.min(n-1,Math.ceil(p/100*n)-1)],alert=phanVi(95),action=phanVi(99);
+      if(alert===action)return {du:false,text:`Số liệu vi sinh quá ít dao động (${n} kết quả); chưa gợi ý được.`};
+      return {du:true,alert,action,text:`Gợi ý từ ${n} kết quả: cảnh báo = phân vị 95 (${alert}), hành động = phân vị 99 (${action}).`};
+    }
+    const mean=v.reduce((a,b)=>a+b,0)/n,sd=Math.sqrt(v.reduce((a,b)=>a+(b-mean)**2,0)/(n-1));
+    if(!(sd>0))return {du:false,text:`Số liệu không dao động (${n} kết quả); chưa gợi ý được.`};
+    const dau=direction==='max'?1:-1,alert=lamTron(mean+dau*2*sd),action=lamTron(mean+dau*3*sd);
+    return {du:true,alert,action,text:`Gợi ý từ ${n} kết quả: trung bình ${lamTron(mean)}, độ lệch chuẩn ${lamTron(sd)} → cảnh báo ${dau>0?'+':'−'}2SD = ${alert}, hành động ${dau>0?'+':'−'}3SD = ${action}.`};
+  }
+  window.CPC1TrendLimits={annotate,limitFor,directionOf,levelFor,classify,signals,suggest};
 })();

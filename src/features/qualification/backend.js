@@ -169,6 +169,16 @@ export function makeBackend(settings, existingClient) {
       await requireGlobalView();
       return rpc('cpc1_audit_trail',{p_system:filters.system||null,p_from:filters.from||null,p_to:filters.to||null,p_limit:filters.limit||500});
     },
+    async trendLimits(system){
+      await requireGlobalView();
+      if(!systems.includes(system))throw Error('Hệ thống thẩm định không hợp lệ.');
+      return rpc('cpc1_trend_limits',{p_system:system});
+    },
+    async setTrendLimit(limit){
+      await requireGlobalView();
+      if(!systems.includes(limit?.system))throw Error('Hệ thống thẩm định không hợp lệ.');
+      return rpc('cpc1_trend_limit_set',{p_system:limit.system,p_form:limit.form,p_metric:limit.metric,p_point_id:limit.pointId||'',p_unit:limit.unit,p_direction:limit.direction,p_alert:limit.alert,p_action:limit.action,p_hieu_luc_tu:limit.from,p_ly_do:limit.reason});
+    },
     async downloadHistorySource(path){
       await requireGlobalView();
       if(!/^[0-9a-f]{64}\.pdf$/.test(path))throw Error('Đường dẫn báo cáo nguồn không hợp lệ.');
