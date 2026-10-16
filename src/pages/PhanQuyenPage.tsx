@@ -48,6 +48,7 @@ import EffectiveRightsPanel from "../features/itemPermissions/EffectiveRightsPan
 import { AccountAdministrationPanel } from "../features/accountAdministration/AccountAdministrationPanel.tsx";
 import type { ReloadAccountByUserId } from "../features/accountAdministration/AccountAdministrationPanel.tsx";
 import AccountRoleEditor from "../features/accountAdministration/AccountRoleEditor.tsx";
+import QaPhuTrachPanel from "../features/qaPhuTrach/QaPhuTrachPanel.tsx";
 import type { AccountAdministrationRow } from "../features/accountAdministration/accountAdministrationModel.ts";
 import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
 import { SCREEN_IDS } from "../lib/access.ts";
@@ -407,7 +408,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
   /* Bề mặt mặc định là bảng kiểm soát. Liên kết hồ sơ và tra quyền hiệu lực
      nằm riêng; phân công nghiệp vụ lấy Dữ liệu nguồn làm gốc. */
   const [tab, setTab] = useNhomTab("phanquyen", "kiem-soat",
-    ["kiem-soat", "email", "che-do", "quyen-toi"]);
+    ["kiem-soat", "qa-phu-trach", "email", "che-do", "quyen-toi"]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -420,6 +421,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
           hết lệch, và quyền kia mới có việc thật để làm. */}
       <NhomTab man="phanquyen" nhan="Các việc quản trị quyền" tab={tab} onTab={setTab} tabs={[
         { id: "kiem-soat", nhan: "Bảng kiểm soát" },
+        { id: "qa-phu-trach", nhan: "QA phụ trách" },
         { id: "email", nhan: "Email được phép" },
         { id: "che-do", nhan: "Chế độ áp dụng" },
         { id: "quyen-toi", nhan: "Quyền của tôi" },
@@ -521,6 +523,10 @@ function CurrentPermissionWorkspace({ acts, access }: {
 
       <NhomTabPanel man="phanquyen" id="email" tab={tab}>
       {duocChinhChinhSachQuyen && <QuanTriQuyenCards duocSua={duocChinhChinhSachQuyen} />}
+      </NhomTabPanel>
+
+      <NhomTabPanel man="phanquyen" id="qa-phu-trach" tab={tab}>
+      <QaPhuTrachPanel />
       </NhomTabPanel>
 
       <NhomTabPanel man="phanquyen" id="quyen-toi" tab={tab}>

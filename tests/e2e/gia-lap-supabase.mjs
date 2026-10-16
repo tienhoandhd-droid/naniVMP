@@ -723,6 +723,17 @@ export function dungKhoDuLieu(kichBan) {
         .sort((a, b) => a.localeCompare(b, "vi"));
       return { ok: true, rows: values.map((value) => ({ value, count: 1 })), next_cursor: null };
     },
+    // Danh sách QA phụ trách (20261016160000) — 2 người trong danh sách,
+    // 1 người chưa có tài khoản nên chưa thêm được.
+    rpc_qa_phu_trach_danh_sach: {
+      ok: true,
+      rows: [
+        { performer_id: "00000000-0000-4000-8000-00000000a001", performer_name: "QA Giả Lập Một", trong_danh_sach: true, vai: "qa_staff", ly_do_chua_them_duoc: null },
+        { performer_id: "00000000-0000-4000-8000-00000000a002", performer_name: "QA Giả Lập Hai", trong_danh_sach: false, vai: "admin", ly_do_chua_them_duoc: null },
+        { performer_id: "00000000-0000-4000-8000-00000000a003", performer_name: "QA Giả Lập Ba", trong_danh_sach: false, vai: null, ly_do_chua_them_duoc: "Chưa có tài khoản" },
+      ],
+    },
+    rpc_qa_phu_trach_dat: { ok: true, thay_doi: true },
     rpc_source_qa_candidates: {
       ok: true,
       rows: nhanSu.slice(0, 3).map((person, index) => ({

@@ -814,6 +814,30 @@ for (const [id, ten] of MAN) {
   }
 }
 
+/* ---- 3r. Tab QA phụ trách (16/10): bảng, lý do bắt buộc, người chưa đủ điều kiện */
+{
+  console.log("\nVai trò & phạm vi — tab QA phụ trách:");
+  const trang = await trinhDuyet.newPage();
+  const loiConsole = [];
+  trang.on("console", (m) => { if (m.type() === "error" && laLoiThat(m.text())) loiConsole.push(m.text().slice(0, 110)); });
+  await caiGiaLap(trang, { supabaseUrl: URL_SB, kichBan: "day" });
+  await nhetPhien(trang, { supabaseUrl: URL_SB });
+  await trang.setViewport({ width: 1440, height: 900 });
+  await trang.goto(`${GOC}#v=phanquyen&tab=qa-phu-trach`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await trang.waitForSelector("[data-qa-phu-trach]", { timeout: 15_000 });
+  const bang = await trang.evaluate(() => [...document.querySelectorAll("[data-qa-phu-trach] tbody tr")]
+    .map((tr) => [...tr.cells].map((td) => td.textContent?.trim() ?? "")));
+  kiem(bang.length === 3, "bảng hiện đủ người phòng QA", `thấy ${bang.length}`);
+  kiem(bang[0]?.[2] === "Có" && bang[0]?.[3] === "Bỏ", "người trong danh sách có nút Bỏ", JSON.stringify(bang[0]));
+  kiem(bang[2]?.[2] === "Chưa có tài khoản" && bang[2]?.[3] === "", "người chưa có tài khoản: hiện lý do, không có nút", JSON.stringify(bang[2]));
+  await trang.click('[aria-label="Thêm QA Giả Lập Hai"]');
+  await new Promise((r) => setTimeout(r, 400));
+  const chuaGhiLyDo = await trang.evaluate(() => document.body.innerText.includes("Nhập lý do thay đổi trước."));
+  kiem(chuaGhiLyDo, "chưa ghi lý do thì không gửi, nhắc nhập lý do");
+  kiem(loiConsole.length === 0, "console sạch", loiConsole[0] || "");
+  await trang.close();
+}
+
 /* ---- 4. Chuyển sáng/tối đổi thật bảng màu --------------------------- */
 {
   console.log("\nChế độ sáng/tối:");

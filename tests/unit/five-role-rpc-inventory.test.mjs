@@ -115,6 +115,17 @@ const REVALIDATION_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+// 20261016160000: danh sách QA phụ trách — chỉ Admin, kiểm quyền trong hàm.
+const QA_PHU_TRACH_REVIEWED_RPC = new Map([
+  ["rpc_qa_phu_trach_danh_sach", {
+    identity: "rpc_qa_phu_trach_danh_sach()",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_qa_phu_trach_dat", {
+    identity: "rpc_qa_phu_trach_dat(uuid,boolean,text)",
+    classification: "guarded_explicit",
+  }],
+]);
 const CANONICAL_DASHBOARD_REVIEWED_RPC = new Map([
   ["rpc_get_vmp_dashboard_v2", {
     identity: "rpc_get_vmp_dashboard_v2(integer,boolean)",
@@ -380,6 +391,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...FIELD_PERFORMANCE_REVIEWED_RPC.keys(),
     ...REVALIDATION_REVIEWED_RPC.keys(),
     ...CANONICAL_DASHBOARD_REVIEWED_RPC.keys(),
+    ...QA_PHU_TRACH_REVIEWED_RPC.keys(),
     ...QUALIFICATION_REVIEWED_RPC.keys(),
   ]) {
     assert.equal(migrationInventory.has(name), false, `${name} must remain additive to the sealed five-role baseline`);
@@ -396,12 +408,20 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...FIELD_PERFORMANCE_REVIEWED_RPC,
     ...REVALIDATION_REVIEWED_RPC,
     ...CANONICAL_DASHBOARD_REVIEWED_RPC,
+    ...QA_PHU_TRACH_REVIEWED_RPC,
     ...QUALIFICATION_REVIEWED_RPC,
   ]);
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 100, "reviewed source HEAD must expose 100 literal RPC targets");
+  assert.equal(sourceNames.length, 102, "reviewed source HEAD must expose 102 literal RPC targets");
+  const qaPhuTrachMigration = readFileSync("supabase/migrations/20261016160000_danh_sach_qa_phu_trach.sql", "utf8");
+  for (const ten of ["rpc_qa_phu_trach_danh_sach", "rpc_qa_phu_trach_dat"]) {
+    assert.match(qaPhuTrachMigration, new RegExp(`create or replace function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = public, pg_temp`, "i"), `${ten} must be security definer with pinned search_path`);
+    assert.match(qaPhuTrachMigration, new RegExp(`revoke all on function public\\.${ten}\\([^)]*\\) from public, anon;`, "i"));
+    assert.match(qaPhuTrachMigration, new RegExp(`grant execute on function public\\.${ten}\\([^)]*\\) to authenticated;`, "i"));
+  }
+  assert.match(qaPhuTrachMigration, /is distinct from 'admin'/, "QA phụ trách RPCs must refuse non-admin callers");
   assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260929180000_qualification_run_workspace.sql")).digest("hex"), "41ead7b4a9341bc4d267bf30be4b4f7f62d41400d864635ab16ed93d0e2d2732", "independently reviewed run workspace migration with fresh PostgreSQL17 rehearsal");
   assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928120000_qualification_runs.sql")).digest("hex"), "c1ad3d409cd8777f020a84096a4c21fae703e321af8aadffe1c8c8684f66bc8c", "reviewed/applied qualification run and history migration");
   assert.equal(createHash("sha256").update(readFileSync("supabase/migrations/20260928121000_qualification_run_entry.sql")).digest("hex"), "fcfad0a3b90d9df79b380b138176326322734969db165529d3e123c141f5a770", "reviewed/applied qualification run and history migration");
