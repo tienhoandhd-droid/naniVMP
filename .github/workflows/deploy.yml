@@ -59,6 +59,11 @@ jobs:
           cache-dependency-path: ./package-lock.json
 
       - run: npm ci
+      # 16/10: lỗ hổng thư viện trước đây chỉ thấy khi Dependabot báo. Chặn
+      # deploy với lỗ hổng high+ trong gói CHẠY THẬT (--omit=dev); lỗ hổng
+      # chỉ nằm ở công cụ build không chặn để không tắc bản sửa lỗi gấp.
+      - name: Kiểm lỗ hổng thư viện runtime
+        run: npm audit --omit=dev --audit-level=high
       - name: Install bundled Chromium for unit contracts
         run: npx playwright install chromium --with-deps --no-shell
       - run: npm run typecheck
