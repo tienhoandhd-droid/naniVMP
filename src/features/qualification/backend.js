@@ -1,5 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
-import { renderPdf } from './pdf.js';
+
+// Gói in PDF (cloud-pdf.js, ~1,3 MB) chỉ tải khi bấm in — xem pdf-entry.js.
+// Lấy URL theo vị trí cloud.js lúc nó đang chạy (document.currentScript chỉ
+// có giá trị ở lần chạy đầu). ?v= đổi theo nội dung gói để không dính cache cũ.
+const cloudScriptSrc = typeof document !== 'undefined' ? document.currentScript?.src : undefined;
+let pdfBundle = null;
+function loadPdfBundle() {
+  if (window.CPC1Pdf) return Promise.resolve(window.CPC1Pdf);
+  pdfBundle ??= new Promise((resolve, reject) => {
+    const version = typeof __CPC1_PDF_VERSION__ === 'string' ? __CPC1_PDF_VERSION__ : 'dev';
+    const script = document.createElement('script');
+    script.src = new URL(`cloud-pdf.js?v=${version}`, cloudScriptSrc || location.href).href;
+    script.onload = () => window.CPC1Pdf
+      ? resolve(window.CPC1Pdf)
+      : reject(new Error('Gói in PDF tải về không hợp lệ.'));
+    script.onerror = () => {
+      pdfBundle = null; // cho phép bấm in lại sau khi mạng ổn
+      reject(new Error('Không tải được gói in PDF. Kiểm tra mạng rồi bấm in lại.'));
+    };
+    document.head.append(script);
+  });
+  return pdfBundle;
+}
 
 const canonical = value => JSON.stringify(value, function(key,item) {
   return item && typeof item === 'object' && !Array.isArray(item)
@@ -184,7 +206,7 @@ export function makeBackend(settings, existingClient) {
       const [template,layoutBytes,...fontBytes]=await Promise.all([download(`${form}.pdf`,ctx.asset_path),download('print-layout.json',ctx.asset_path),...Object.values(fontFiles).map(name=>download(name,ctx.asset_path))]);
       const fonts=Object.fromEntries(Object.keys(fontFiles).map((key,i)=>[key,fontBytes[i]]));
       const evaluation={...snapshot.evaluation,report_context:{id:snapshot.id,version:snapshot.version,created_at:snapshot.created_at}};
-      const renderer=gas?(await import('./gas-pdf.js')).renderGasPdf:renderPdf;
+      const pdf=await loadPdfBundle();const renderer=gas?pdf.renderGasPdf:pdf.renderPdf;
       const bytes=await renderer(form,snapshot.data,evaluation,{template,layoutBytes,fonts});
       return new Blob([bytes],{type:'application/pdf'});
     }
