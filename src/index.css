@@ -2146,27 +2146,31 @@ body { transition: background var(--mo-slow) var(--ease); }
 }
 .vmp-vongnam-loi-tyle {
   color: var(--c-ink);
-  font-size: clamp(38px, 10cqi, 46px);
+  /* 16/10: sàn 38→30px — ở 360–430px vòng trong chỉ 105–132px. */
+  font-size: clamp(30px, 10cqi, 46px);
   font-weight: 800;
   line-height: .9;
   font-variant-numeric: tabular-nums;
 }
 .vmp-vongnam-loi-nhan {
-  max-width: 128px;
-  margin-top: 8px;
+  /* Theo bề ngang vòng (cqi): vòng nhỏ thì nhãn xuống 2 dòng thay vì tràn
+     khỏi vòng trong (122px chữ vs 105–117px vòng ở điện thoại). */
+  max-width: min(128px, 30cqi);
+  margin-top: min(8px, 1.5cqi);
   color: var(--c-ink-soft);
   font-size: 12px;
   font-weight: 850;
-  line-height: 1.25;
-  /* 16/10: chữ 11→12px; giãn chữ .095→.04em để "HOÀN THÀNH VMP" vẫn một dòng ở 390px */
+  line-height: 1.15;
+  /* 16/10: chữ 11→12px nên giảm giãn chữ .095→.04em cho gọn trong vòng. */
   letter-spacing: .04em;
 }
 .vmp-vongnam-loi-tong {
-  margin-top: 4px;
+  max-width: 34cqi;
+  margin-top: min(4px, 1cqi);
   color: var(--c-ink-soft);
   font-size: 12px;
   font-weight: 650;
-  line-height: 1.25;
+  line-height: 1.15;
 }
 .vmp-vongnam-ben {
   min-width: 0;

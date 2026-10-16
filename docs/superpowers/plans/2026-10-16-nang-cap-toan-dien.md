@@ -77,7 +77,7 @@ nên có bộ hồ sơ thẩm định hệ thống máy tính (CSV) tối thiể
 
 4.1 **Quét "bom hẹn giờ"**: `gia-lap-supabase.mjs` dùng ngày cố định (deadline 2026-09…); mọi bộ kiểm phụ thuộc cửa sổ "quanh Hôm nay" sẽ hỏng dần. Chuyển fixture sang ngày tương đối, hoặc đóng băng đồng hồ mặc định trong `caiGiaLap`.
 4.2 Lỗi chập chờn `catalog-workspace` (qa_manager) khi máy tải nặng — tăng ổn định chờ thay vì tăng timeout.
-4.3 `scripts/check-qualification-bundle.mjs` hỏng sẵn từ trước (không nằm trong CI) — sửa hoặc xoá.
+4.3 ✅ 16/10 đã xoá `scripts/check-qualification-bundle.mjs`: viết cho API cũ (`cpc1_save`), hỏng sẵn, không trong CI; hành vi nó kiểm đã được `tests/unit/qualification-session.test.mjs:34-39` phủ trên API hiện tại.
 4.4 Axe hiện chỉ chặn critical/serious → nâng dần lên moderate.
 4.5 Mở rộng phép đo "chữ bị ép" (3q) và "chữ <12px" thành gate cho mọi màn, gồm chế độ tối.
 4.6 **[CHỦ DỰ ÁN]** Project Supabase staging tách khỏi production — mở khoá bộ E2E đăng nhập thật (`npm run e2e`) và Đợt B Lotus Pearl.
