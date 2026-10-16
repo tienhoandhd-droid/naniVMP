@@ -1797,7 +1797,7 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-vali-brief__eyebrow {
   margin-bottom: 5px;
   color: var(--vmp-vali-accent);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 850;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -1842,7 +1842,7 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-vali-brief__metric dt {
   overflow: hidden;
   color: var(--c-ink-soft);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1866,7 +1866,7 @@ body { transition: background var(--mo-slow) var(--ease); }
   display: block;
   margin-top: 2px;
   color: var(--c-ink-soft);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 1.3;
 }
@@ -1884,7 +1884,7 @@ body { transition: background var(--mo-slow) var(--ease); }
   align-items: flex-start;
   gap: 8px;
   color: var(--c-ink-soft);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -1933,10 +1933,10 @@ body { transition: background var(--mo-slow) var(--ease); }
   .vmp-vali-brief::after { right: 16px; }
   .vmp-vali-brief__chibi { align-self: start; }
   .vmp-vali-brief__chibi img { width: 82px; height: 108px; }
-  .vmp-vali-brief__chibi span { font-size: 10px; }
+  .vmp-vali-brief__chibi span { font-size: 12px; }
   .vmp-vali-brief__chibi span::before,
   .vmp-vali-brief__chibi span::after { width: 6px; }
-  .vmp-vali-brief__eyebrow { font-size: 8px; letter-spacing: .08em; }
+  .vmp-vali-brief__eyebrow { font-size: 12px; letter-spacing: .08em; }
   .vmp-vali-brief__title { font-size: 22px; }
   .vmp-vali-brief__headline { margin: 8px 0 10px; font-size: 12px; line-height: 1.45; }
   .vmp-vali-brief__metrics { grid-template-columns: 1fr; gap: 6px; }
@@ -2113,7 +2113,7 @@ body { transition: background var(--mo-slow) var(--ease); }
 .vmp-vongnam-nhan text { fill: var(--c-ink); }
 .vmp-vongnam-nhan--hientai text { fill: #fff8e6; }
 .vmp-vongnam-nhan-thang {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: .02em;
 }
@@ -2149,15 +2149,16 @@ body { transition: background var(--mo-slow) var(--ease); }
   max-width: 128px;
   margin-top: 8px;
   color: var(--c-ink-soft);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 850;
   line-height: 1.25;
-  letter-spacing: .095em;
+  /* 16/10: chữ 11→12px; giãn chữ .095→.04em để "HOÀN THÀNH VMP" vẫn một dòng ở 390px */
+  letter-spacing: .04em;
 }
 .vmp-vongnam-loi-tong {
   margin-top: 4px;
   color: var(--c-ink-soft);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 1.25;
 }
@@ -2190,7 +2191,7 @@ body { transition: background var(--mo-slow) var(--ease); }
   line-height: 1.45;
 }
 .vmp-vongnam-ketluan .vmp-ketluan span {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 .vmp-vongnam-chu {
