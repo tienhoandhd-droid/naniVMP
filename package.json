@@ -43,6 +43,7 @@
     "e2e:ux": "node tests/e2e/ux-refinement.mjs",
     "postinstall": "node scripts/fix-react-grab-windowshide.mjs",
     "budget": "node scripts/kiem-ngan-sach-bundle.mjs",
+    "drift:db": "node scripts/check-migration-drift.mjs",
     "e2e:quality": "node tests/e2e/login-feedback.mjs && node tests/e2e/mfa-flow.mjs && node tests/e2e/reports-accessibility.mjs && node tests/e2e/quality-zoom.mjs && node tests/e2e/login-cold-budget.mjs"
   },
   "dependencies": {
