@@ -918,6 +918,30 @@ export function dungKhoDuLieu(kichBan) {
  * thời tắt ngoại lệ Google Fonts; mặc định false để các bộ kiểm thẩm mỹ
  * cũ giữ nguyên hành vi loopback/font.
  */
+/* 16/10: kho giả dùng ngày CỐ ĐỊNH (deadline 2026-09…), còn nhiều màn tính
+   theo "Hôm nay" (Long Môn ±30 ngày, quá hạn, tới hạn 7 ngày). Chạy bằng giờ
+   thật thì bộ kiểm hỏng dần theo lịch dù code không đổi — CI 16/10 suýt chặn
+   deploy vì đúng lỗi này. VMP_E2E_NOW (ISO) đóng băng đồng hồ trình duyệt và
+   JWT cho MỌI trang cài giả lập, trừ khi bộ kiểm tự truyền nowMs (vd
+   today-personal-scope kiểm ranh giới ngày riêng). CI đặt biến này. */
+const NOW_CO_DINH_MS = process.env.VMP_E2E_NOW ? Date.parse(process.env.VMP_E2E_NOW) : undefined;
+if (process.env.VMP_E2E_NOW && !Number.isFinite(NOW_CO_DINH_MS)) {
+  throw new Error(`VMP_E2E_NOW không phải ngày hợp lệ: ${process.env.VMP_E2E_NOW}`);
+}
+
+async function dongBangDongHo(trang, instant) {
+  await trang.evaluateOnNewDocument((moc) => {
+    const NativeDate = Date;
+    class FixedDate extends NativeDate {
+      constructor(...args) {
+        super(...(args.length ? args : [moc]));
+      }
+      static now() { return moc; }
+    }
+    globalThis.Date = FixedDate;
+  }, instant);
+}
+
 export async function caiGiaLap(trang, {
   supabaseUrl,
   kichBan = "day",
@@ -928,6 +952,10 @@ export async function caiGiaLap(trang, {
   previewOrigin,
   nowMs,
 } = {}) {
+  if (nowMs === undefined && NOW_CO_DINH_MS !== undefined) {
+    nowMs = NOW_CO_DINH_MS;
+    await dongBangDongHo(trang, nowMs);
+  }
   const kho = dungKhoDuLieu(kichBan);
   /* Cho một bộ kiểm sửa kho trước khi cài — vd hạ quyền xuống nhân viên xưởng để
      kiểm "không thấy nút ghi". Sửa tại chỗ, không trả kho ra ngoài. */
@@ -1088,6 +1116,7 @@ export async function nhetPhien(trang, {
   nowMs,
 } = {}) {
   const khoa = `sb-${layRef(supabaseUrl)}-auth-token`;
+  if (nowMs === undefined) nowMs = NOW_CO_DINH_MS;
   await trang.evaluateOnNewDocument((k, phien, che) => {
     localStorage.setItem(k, JSON.stringify(phien));
     localStorage.setItem("vmp-theme", che);

@@ -171,6 +171,71 @@ export type Database = {
         }
         Relationships: []
       }
+      cpc1_records: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          system: string
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          system?: string
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          system?: string
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      cpc1_revisions: {
+        Row: {
+          actor_id: string
+          created_at: string
+          evaluation: Json
+          payload: Json
+          record_id: string
+          version: number
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          evaluation: Json
+          payload: Json
+          record_id: string
+          version: number
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          evaluation?: Json
+          payload?: Json
+          record_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cpc1_revisions_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "cpc1_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_quality_issues: {
         Row: {
           detected_at: string | null
@@ -1324,6 +1389,45 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_client_errors: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          id: number
+          message: string
+          source: string
+          stack: string | null
+          url: string | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          id?: never
+          message: string
+          source?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          id?: never
+          message?: string
+          source?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       vmp_danh_gia_anh_huong: {
         Row: {
           ah_de_xuat: number | null
@@ -2250,6 +2354,78 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_revalidation_proposals: {
+        Row: {
+          actual_completed_date: string
+          created_at: string
+          created_plan_validation_code: string | null
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          due_date: string
+          frequency_months: number
+          id: string
+          object_code: string
+          plan_item_id: string
+          status: string
+          updated_at: string
+          validation_code: string
+          validation_type: string
+          version: number
+        }
+        Insert: {
+          actual_completed_date: string
+          created_at?: string
+          created_plan_validation_code?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          due_date: string
+          frequency_months: number
+          id?: string
+          object_code: string
+          plan_item_id: string
+          status?: string
+          updated_at?: string
+          validation_code: string
+          validation_type: string
+          version?: number
+        }
+        Update: {
+          actual_completed_date?: string
+          created_at?: string
+          created_plan_validation_code?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          due_date?: string
+          frequency_months?: number
+          id?: string
+          object_code?: string
+          plan_item_id?: string
+          status?: string
+          updated_at?: string
+          validation_code?: string
+          validation_type?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vmp_revalidation_proposals_plan_item_id_fkey"
+            columns: ["plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "vmp_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vmp_revalidation_proposals_plan_item_id_fkey"
+            columns: ["plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "vmp_status_current"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vmp_rls_siet_log: {
         Row: {
           cmd: string
@@ -2924,6 +3100,39 @@ export type Database = {
         }
         Relationships: []
       }
+      vmp_web_vitals: {
+        Row: {
+          created_at: string
+          device: string
+          metrics: Json
+          page_id: string
+          reports: number
+          screen: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device: string
+          metrics?: Json
+          page_id: string
+          reports?: number
+          screen: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device?: string
+          metrics?: Json
+          page_id?: string
+          reports?: number
+          screen?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       workflow_runs: {
         Row: {
           created_at: string | null
@@ -3154,6 +3363,92 @@ export type Database = {
         Args: { item: Database["public"]["Tables"]["vmp_plan_items"]["Row"] }
         Returns: string
       }
+      cpc1_config: { Args: never; Returns: Json }
+      cpc1_context: { Args: never; Returns: Json }
+      cpc1_evaluate: { Args: { p_data: Json }; Returns: Json }
+      cpc1_gas_config: { Args: { p_system: string }; Returns: Json }
+      cpc1_history_list: { Args: never; Returns: Json }
+      cpc1_list: { Args: never; Returns: Json }
+      cpc1_load: {
+        Args: { p_record_id: string; p_version?: number }
+        Returns: Json
+      }
+      cpc1_point_history: {
+        Args: { p_form: string; p_point: string; p_record_id: string }
+        Returns: Json
+      }
+      cpc1_run_calibration_update: {
+        Args: {
+          p_calibration: Json
+          p_expected_version: number
+          p_reason: string
+          p_request_id: string
+          p_run_id: string
+        }
+        Returns: Json
+      }
+      cpc1_run_config: {
+        Args: { p_run_id: string; p_system: string }
+        Returns: Json
+      }
+      cpc1_run_create: {
+        Args: { p_definition: Json; p_request_id: string }
+        Returns: Json
+      }
+      cpc1_run_evaluate: {
+        Args: { p_data: Json; p_run_id: string }
+        Returns: Json
+      }
+      cpc1_run_get: { Args: { p_run_id: string }; Returns: Json }
+      cpc1_run_list: { Args: never; Returns: Json }
+      cpc1_run_load: {
+        Args: { p_record_id: string; p_run_id: string }
+        Returns: Json
+      }
+      cpc1_run_requirements: { Args: { p_scope: Json }; Returns: Json }
+      cpc1_run_save:
+        | {
+            Args: {
+              p_data: Json
+              p_expected_version: number
+              p_record_id: string
+              p_request_id: string
+              p_run_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_data: Json
+              p_expected_version: number
+              p_reason: string
+              p_record_id: string
+              p_request_id: string
+              p_run_id: string
+            }
+            Returns: Json
+          }
+      cpc1_run_transition: {
+        Args: {
+          p_expected_version: number
+          p_reason: string
+          p_request_id: string
+          p_run_id: string
+          p_status: string
+        }
+        Returns: Json
+      }
+      cpc1_save: {
+        Args: {
+          p_data: Json
+          p_expected_version?: number
+          p_record_id?: string
+          p_request_id?: string
+          p_title?: string
+        }
+        Returns: Json
+      }
+      cpc1_template_access: { Args: never; Returns: boolean }
       duoc_phep: {
         Args: { p_hanh_dong: string; p_vai_tro: string }
         Returns: boolean
@@ -3393,6 +3688,14 @@ export type Database = {
         Args: { p_batch_id: string; p_reason: string }
         Returns: Json
       }
+      rpc_confirm_revalidation_proposal: {
+        Args: {
+          p_expected_version: number
+          p_proposal_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       rpc_create_plan_item: {
         Args: {
           p_object_code: string
@@ -3446,6 +3749,18 @@ export type Database = {
         Returns: Json
       }
       rpc_delete_staff_email: { Args: { p_id: string }; Returns: Json }
+      rpc_dismiss_revalidation_proposal: {
+        Args: {
+          p_expected_version: number
+          p_proposal_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      rpc_doc_loi_client: {
+        Args: { p_limit?: number; p_offset?: number; p_tu?: string }
+        Returns: Json
+      }
       rpc_due_alerts: {
         Args: { p_soon_days?: number; p_year?: number }
         Returns: Json
@@ -3455,6 +3770,16 @@ export type Database = {
         Returns: Json
       }
       rpc_export_source_objects: {
+        Args: {
+          p_cursor: Json
+          p_filters: Json
+          p_limit: number
+          p_object_kind: string
+          p_search: string
+        }
+        Returns: Json
+      }
+      rpc_export_source_objects__manager_lock_impl_20260901: {
         Args: {
           p_cursor: Json
           p_filters: Json
@@ -3510,9 +3835,22 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_get_vmp_dashboard_v2: {
+        Args: { p_include_missing?: boolean; p_year?: number }
+        Returns: Json
+      }
       rpc_get_vmp_watermark: { Args: { p_year?: number }; Returns: Json }
       rpc_get_vmp_watermark__five_role_impl_20260824: {
         Args: { p_year?: number }
+        Returns: Json
+      }
+      rpc_ghi_loi_client: {
+        Args: {
+          p_message: string
+          p_source?: string
+          p_stack?: string
+          p_url?: string
+        }
         Returns: Json
       }
       rpc_import_item_permission_staff: {
@@ -3712,9 +4050,22 @@ export type Database = {
         Args: { p_codes_in_sheet: string[] }
         Returns: Json
       }
+      rpc_record_web_vitals: {
+        Args: {
+          p_device: string
+          p_metrics: Json
+          p_page_id: string
+          p_screen: string
+        }
+        Returns: Json
+      }
       rpc_refresh_computed_status: { Args: never; Returns: Json }
       rpc_refresh_computed_status__five_role_impl_20260824: {
         Args: never
+        Returns: Json
+      }
+      rpc_refresh_revalidation_proposals: {
+        Args: { p_as_of?: string }
         Returns: Json
       }
       rpc_refresh_source_item_assignments: { Args: never; Returns: Json }
@@ -4065,6 +4416,7 @@ export type Database = {
         }
         Returns: Json
       }
+      rpc_team_overview_summary: { Args: { p_year?: number }; Returns: Json }
       rpc_tim_tri_thuc: {
         Args: { p_cau_hoi: string; p_k?: number; p_vector?: string }
         Returns: Json
@@ -4186,6 +4538,7 @@ export type Database = {
         Args: { p_id: string; p_patch: Json }
         Returns: Json
       }
+      rpc_web_vitals_summary: { Args: never; Returns: Json }
       screen_access_mode: { Args: never; Returns: string }
       validate_plan_item: {
         Args: { item: Database["public"]["Tables"]["vmp_plan_items"]["Row"] }
@@ -4212,6 +4565,7 @@ export type Database = {
         Args: { p_uid: string }
         Returns: string
       }
+      vmp_can_manage_revalidation: { Args: never; Returns: boolean }
       vmp_can_manage_source_qa_assignment: {
         Args: { p_uid: string }
         Returns: boolean
@@ -4235,6 +4589,13 @@ export type Database = {
       vmp_can_view_source_object: {
         Args: { p_source_id: string; p_uid: string }
         Returns: boolean
+      }
+      vmp_canonical_item_status: {
+        Args: {
+          p_as_of: string
+          p_item: Database["public"]["Tables"]["vmp_plan_items"]["Row"]
+        }
+        Returns: Database["public"]["Enums"]["item_status"]
       }
       vmp_catalog_timeline_fields: { Args: never; Returns: string[] }
       vmp_current_actor_can_manage_source_qa_assignment: {
@@ -4376,6 +4737,7 @@ export type Database = {
         Returns: string[]
       }
       vmp_khong_dau: { Args: { t: string }; Returns: string }
+      vmp_la_vai: { Args: { p_vai: string[] }; Returns: boolean }
       vmp_loai_tham_dinh: {
         Args: {
           p_object_code: string
@@ -4405,6 +4767,8 @@ export type Database = {
           scope_departments: string[]
         }[]
       }
+      vmp_mfa_pre_request: { Args: never; Returns: undefined }
+      vmp_mfa_session_allowed: { Args: never; Returns: boolean }
       vmp_my_item_rights: {
         Args: { p_validation_code: string }
         Returns: {
@@ -4851,3 +5215,4 @@ export const Constants = {
     },
   },
 } as const
+

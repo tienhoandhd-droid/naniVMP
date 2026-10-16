@@ -126,6 +126,11 @@ jobs:
       - name: E2E cốt lõi — luồng giả lập + Source + danh mục + quyền quản trị
         env:
           VITE_MANUAL_PLANNED_DEADLINES_ENABLED: true
+          # 16/10: kho giả dùng ngày cố định; chạy bằng giờ thật thì bộ kiểm
+          # hỏng dần theo lịch (timeline-deadline-edit hỏng từ ~15/10 dù code
+          # không đổi). Đóng băng đồng hồ trình duyệt + JWT ở ngày bộ kiểm
+          # đã đạt — xem tests/e2e/gia-lap-supabase.mjs. Đổi mốc thì đổi CẢ kho giả.
+          VMP_E2E_NOW: "2026-10-08T03:00:00.000Z"
         run: |
           bash scripts/with-preview.sh -- bash -c '
             npm run e2e:gialap &&

@@ -793,6 +793,20 @@ for (const [id, ten] of MAN) {
         return ketQua;
       });
       kiem(biEp.length === 0, `${tenKhung} · ${ten}: không có chữ bị ép`, biEp.slice(0, 2).join(" | "));
+
+      /* Luật thẩm mỹ: chữ >= 12px. Đo cỡ chữ ĐÃ TÍNH thay vì quét CSS — npm
+         run drift không phủ index.css nên từng lọt 8–11px ở Tổng quan. Long
+         Môn (tranh Ngư đồ) chủ dự án khoanh ngoài phạm vi; sr-only bỏ qua. */
+      const chuNho = await trang.evaluate(() => [...document.querySelectorAll("body *")]
+        .filter((el) => !el.closest(".long-mon-race, .lp-visually-hidden"))
+        .filter((el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+        .filter((el) => {
+          const s = getComputedStyle(el);
+          return s.display !== "none" && s.visibility !== "hidden"
+            && el.getBoundingClientRect().width > 1 && parseFloat(s.fontSize) < 12;
+        })
+        .map((el) => `${getComputedStyle(el).fontSize} «${el.textContent.trim().slice(0, 20)}»`));
+      kiem(chuNho.length === 0, `${tenKhung} · ${ten}: không có chữ dưới 12px`, chuNho.slice(0, 3).join(" | "));
       await trang.close();
     }
   }

@@ -24,10 +24,10 @@
 
 ## Giai đoạn 0 — Đưa đợt sửa lên production (ưu tiên cao nhất)
 
-**0.1 [CHỦ DỰ ÁN] Duyệt và merge nhánh** → CI tự deploy GitHub Pages.
+**0.1 ✅ 16/10 đã push `main`** (chủ dự án uỷ quyền). (Mô tả cũ:) Duyệt và merge nhánh → CI tự deploy GitHub Pages.
 Kiểm sau deploy: mở web trên điện thoại thật, màn Việc hôm nay.
 
-**0.2 [CHỦ DỰ ÁN] Áp 8 migration** theo `docs/runbooks/2026-10-16-ap-migration-ton-dong.md`.
+**0.2 ✅ 16/10 đã áp, `drift:db` khớp 130/130 hàm.** (Mô tả cũ:) Áp 8 migration theo `docs/runbooks/2026-10-16-ap-migration-ton-dong.md`.
 Hệ quả mở khoá ngay: tab Tái thẩm định, nhập Excel có xem trước, báo lỗi
 phía người dùng, đóng 6 bảng PII + 13 policy mở, sửa lệch ngày 0h–7h.
 Sau khi áp: `npm run drift:db` phải ra mã thoát 0.
@@ -48,11 +48,19 @@ lỗi qua kênh cảnh báo sẵn có; hoặc cron trên máy chủ nội bộ. 
 
 ## Giai đoạn 2 — Bảo mật & phân quyền (1–2 tuần, nhiều việc cần chủ dự án)
 
-2.1 **Bật `item_permissions_mode = enforced`** — hiện `preview`, nên lọc theo phạm vi hạng mục chưa có hiệu lực ở vài RPC tổng hợp (thử trên bản sao: tổng Tổng quan của nhân viên xưởng = của admin). Chặn bởi 461 hạng mục chưa có canonical scope (thiết kế 24/08). Việc: báo cáo hạng mục thiếu scope → **[CHỦ DỰ ÁN]** QA gán bộ phận/xưởng → thử enforce trên bản sao production → bật.
-2.2 Rà 15 policy `true` còn lại (bảng cấu hình: phòng ban, quy tắc hạn, cấu hình Vali, `vmp_kb_*`, `vmp_objects`, `vmp_danh_gia_anh_huong`…) — xác nhận từng bảng "ai đọc cũng được" là đúng ý.
+2.1 **Bật `item_permissions_mode = enforced`** — *số liệu 16/10 sau khi áp migration
+(`rpc_item_permission_preflight`)*: 511 blocker = 461 hạng mục thiếu scope
+hierarchy · 34 phân công chưa xác định · 7 nhân viên thiếu bộ phận/phân loại ·
+2 thiếu xưởng/khu vực/line · 7 RPC "SECURITY DEFINER chưa lọc". Đã kiểm 7 RPC:
+2 cái (dashboard v2, team summary) CÓ lọc qua `vmp_visible_plan_items()` — preflight
+chưa nhận diện (runbook 31/08 mục 5.1 đã dặn cập nhật allowlist); 5 cái chặn theo
+vai quản lý. Không có rò rỉ thật; cập nhật allowlist + niêm phong lại receipt là
+một phần của dự án enforce.
+   Gốc:  — hiện `preview`, nên lọc theo phạm vi hạng mục chưa có hiệu lực ở vài RPC tổng hợp (thử trên bản sao: tổng Tổng quan của nhân viên xưởng = của admin). Chặn bởi 461 hạng mục chưa có canonical scope (thiết kế 24/08). Việc: báo cáo hạng mục thiếu scope → **[CHỦ DỰ ÁN]** QA gán bộ phận/xưởng → thử enforce trên bản sao production → bật.
+2.2 ✅ *Đã rà 16/10*: 16 policy `true` còn lại đều SELECT trên bảng cấu hình/tham chiếu, không PII — giữ nguyên. (Mô tả cũ:) Rà 15 policy `true` còn lại (bảng cấu hình: phòng ban, quy tắc hạn, cấu hình Vali, `vmp_kb_*`, `vmp_objects`, `vmp_danh_gia_anh_huong`…) — xác nhận từng bảng "ai đọc cũng được" là đúng ý.
 2.3 **[CHỦ DỰ ÁN]** Checklist 31/08 còn mở: đổi mật khẩu Postgres production, giới hạn IP; bật CAPTCHA cho Auth; kiểm n8n xác thực JWT; giới hạn tần suất webhook chat (token n8n nằm công khai trong bundle — có chủ ý, nhưng cần rate limit).
 2.4 Bắt buộc MFA cho vai admin (hiện là opt-in, migration 29/09).
-2.5 Một tài khoản (profiles) không có vai nghiệp vụ — rà và vô hiệu hoá hoặc gán vai.
+2.5 ✅ *Đã rà 16/10*: tài khoản không có vai là tài khoản thử nghiệm tạo 17/08, ĐÃ vô hiệu hoá — rủi ro thấp; **[CHỦ DỰ ÁN]** có thể xoá hẳn.
 
 ## Giai đoạn 3 — Tuân thủ GMP cho hệ thống máy tính (Annex 11 / Part 11 tinh gọn)
 
@@ -84,9 +92,9 @@ nên có bộ hồ sơ thẩm định hệ thống máy tính (CSV) tối thiể
 
 ## Giai đoạn 6 — Nợ kỹ thuật
 
-6.1 `npm run gen:types` — 64 chỗ `as never` vì `database.ts` cũ (cần 0.2 xong trước).
+6.1 ✅ `database.ts` sinh lại từ production 16/10 (typecheck đạt). Còn: gỡ dần 64 `as never` theo từng tính năng.
 6.2 Tách file >1.000 dòng: `index.css` (2.976), `supabaseData.ts`, `Primitives.tsx`, `AuthenticatedApp.tsx`.
-6.3 `index.css` đưa vào phạm vi `npm run drift` (đợt này nó bỏ sót chữ 8–11px).
+6.3 Thử 16/10: thêm `index.css` vào drift lòi 133 vi phạm (radius, hex) — chuyển hệ là đợt riêng. Thay thế ✅: luong-gia-lap 3q đo chữ <12px ĐÃ TÍNH trên 14 màn × 2 cỡ.
 6.4 Dọn ~18 worktree cũ trong `.worktrees/` sau khi xác nhận đã merge.
 
 ## Thứ tự đề xuất
