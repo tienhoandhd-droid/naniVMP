@@ -4,9 +4,9 @@
  *  Chạy TRONG with-preview:  bash scripts/with-preview.sh -- npm run a11y
  *
  *  Dùng CHUNG kho giả lập với bộ visual (cùng dữ liệu, cùng luật chặn
- *  mạng). Ngưỡng PASS theo nghiên cứu: KHÔNG vi phạm critical/serious.
- *  Mức moderate/minor được IN RA để trả nợ dần nhưng chưa chặn — siết
- *  sau khi đã sạch hai mức trên. Axe chỉ bắt được một phần lỗi a11y;
+ *  mạng). Ngưỡng PASS: KHÔNG vi phạm critical/serious/moderate (16/10:
+ *  thử chặn moderate trên cả 20 kịch bản → 0 vi phạm, nên siết luôn).
+ *  Mức minor vẫn chỉ đính kèm kết quả. Axe chỉ bắt được một phần lỗi a11y;
  *  keyboard/manual test vẫn phải làm với người thật.
  * ===================================================================== */
 import { readFileSync, readdirSync } from "node:fs";
@@ -104,7 +104,7 @@ async function expectKhongCoLoiA11yNang(page: Page, testInfo: TestInfo, ten: str
     body: JSON.stringify(kq.violations, null, 2),
     contentType: "application/json",
   });
-  const nang = kq.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+  const nang = kq.violations.filter((v) => v.impact !== "minor");
   expect(nang.map((v) => ({
     id: v.id, impact: v.impact,
     mau: v.nodes.slice(0, 3).map((n) => n.target.join(" ")),
@@ -197,7 +197,7 @@ test("axe · hop-cap-nhat-tien-do", async ({ page }, testInfo) => {
     body: JSON.stringify(kq.violations, null, 2),
     contentType: "application/json",
   });
-  const nang = kq.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+  const nang = kq.violations.filter((v) => v.impact !== "minor");
   expect(nang.map((v) => ({
     id: v.id, impact: v.impact,
     mau: v.nodes.slice(0, 3).map((n) => n.target.join(" ")),
@@ -221,7 +221,7 @@ test("axe · hop-chuyen-phu-trach-workload", async ({ page }, testInfo) => {
     body: JSON.stringify(kq.violations, null, 2),
     contentType: "application/json",
   });
-  const nang = kq.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+  const nang = kq.violations.filter((v) => v.impact !== "minor");
   expect(nang.map((v) => ({
     id: v.id, impact: v.impact,
     mau: v.nodes.slice(0, 3).map((n) => n.target.join(" ")),
@@ -253,7 +253,7 @@ for (const man of MAN) {
       contentType: "application/json",
     });
 
-    const nang = kq.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+    const nang = kq.violations.filter((v) => v.impact !== "minor");
     const nhe = kq.violations.filter((v) => v.impact !== "critical" && v.impact !== "serious");
     if (nhe.length) {
       console.log(`[axe:${man.ten}] nợ moderate/minor (${nhe.length}):`,
