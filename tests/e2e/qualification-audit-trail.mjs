@@ -16,7 +16,7 @@ window.CPC1Backend={getSession:async()=>({user:{id:'qa'}}),permissionsFor:()=>({
   if(k==='loi')throw new Error('mất mạng');if(k==='rong')return {ok:true,rows:[]};return {ok:true,rows:${JSON.stringify(rows)}};}};
 document.body.dataset.qualificationGate='ready';`;
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || chromium.executablePath() });
 const context = await browser.newContext({ acceptDownloads: true, locale: 'vi-VN', timezoneId: 'Asia/Ho_Chi_Minh' });
 const errors = [];
 async function mo(kichBan) {
