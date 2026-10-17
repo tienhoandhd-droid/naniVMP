@@ -284,6 +284,16 @@ async function openPersona(persona, state) {
       return answer(request, candidates());
     }
     if (rpc === "rpc_save_catalog_object") return answer(request, { ok: true, object_code: body.p_object_code, version: 2, timeline_revision: 1, pending_timeline: false });
+    // QA hỗ trợ thêm (20261017100000): danh sách nhiều người, lưu riêng từng lần.
+    if (rpc === "rpc_source_supporters") return answer(request, {
+      ok: true, co_the_sua: persona.role === "qa_manager",
+      rows: state.supporters.map((person) => ({ performer_id: person.id, performer_name: person.name, ly_do: person.reason, them_luc: "2026-10-17T00:00:00Z" })),
+    });
+    if (rpc === "rpc_source_supporter_dat") {
+      state.supporters = state.supporters.filter((person) => person.id !== body.p_performer_id);
+      if (body.p_them) state.supporters.push({ id: body.p_performer_id, name: "QA được chọn E2E", reason: body.p_ly_do });
+      return answer(request, { ok: true, thay_doi: true });
+    }
     if (rpc === "rpc_export_source_objects") {
       const rows = visibleRows(persona, state.revoked);
       const payload = { ok: true, rows, authorized_total: rows.length, next_cursor: null };
@@ -367,7 +377,7 @@ function enabledProgressFields(page) {
 
 try {
   const state = {
-    revision: 7, revoked: false, candidateReads: 0, held: [],
+    revision: 7, revoked: false, candidateReads: 0, held: [], supporters: [],
     areaRightsDelayMs: 0, areaItemRightsDelayMs: 1_500,
     holdOldSource: false, holdOldWarnings: false, holdOldFacets: false, holdOldCard: false,
     holdOldPending: false, pendingHoldRevision: 0, holdOldHistory: false, historyHoldRevision: 0,
@@ -383,6 +393,25 @@ try {
     "candidate error must be announced with a retry, never rendered as an empty select");
   await manager.evaluate(() => [...document.querySelectorAll("button")].find((button) => button.textContent?.includes("Thử lại"))?.click());
   await manager.waitForSelector("#cof-owner_person_id option[value='a1000000-0000-4000-8000-000000000002']");
+
+  // Nhiều QA cùng làm một hạng mục: thêm một người vào "QA hỗ trợ thêm".
+  // Thiếu lý do thì không gửi; có lý do thì gửi đúng UUID và lý do.
+  await manager.waitForFunction(() => document.querySelector("[data-qa-ho-tro-them]")?.textContent?.includes("Chưa có ai."));
+  await manager.evaluate(() => [...document.querySelectorAll("[data-qa-ho-tro-them] button")].find((button) => button.textContent?.trim() === "Thêm người")?.click());
+  await manager.waitForSelector(`#qa-ho-tro-them-chon option[value='${ids.unrelated}']`);
+  await manager.select("#qa-ho-tro-them-chon", ids.unrelated);
+  const themNguoiNay = () => manager.evaluate(() => [...document.querySelectorAll("[data-qa-ho-tro-them] button")].find((button) => button.textContent?.trim() === "Thêm người này")?.click());
+  await themNguoiNay();
+  await manager.waitForFunction(() => document.querySelector("[data-qa-ho-tro-them] [role=alert]")?.textContent?.includes("Nhập lý do"));
+  assert.equal(bodies.filter((entry) => entry.rpc === "rpc_source_supporter_dat").length, 0,
+    "thêm QA hỗ trợ khi chưa có lý do không được gửi lên server");
+  await manager.type("#qa-ho-tro-them-ly-do", "Thêm QA cùng làm E2E");
+  await themNguoiNay();
+  await manager.waitForFunction(() => document.querySelector("[data-qa-ho-tro-them] ul")?.textContent?.includes("QA được chọn E2E"));
+  const themHoTro = bodies.findLast((entry) => entry.rpc === "rpc_source_supporter_dat");
+  assert.deepEqual(themHoTro?.body, { p_object_code: "SRC-E2E-A", p_performer_id: ids.unrelated, p_them: true, p_ly_do: "Thêm QA cùng làm E2E" },
+    "thêm QA hỗ trợ phải gửi mã hạng mục, UUID người và lý do");
+
   await manager.select("#cof-owner_person_id", ids.unrelated);
   const saveCountBeforeReason = bodies.filter((entry) => entry.rpc === "rpc_save_catalog_object").length;
   await manager.click('[role="dialog"] button.cw-nut--chinh');

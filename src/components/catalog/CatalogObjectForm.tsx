@@ -35,6 +35,7 @@ import {
 import type { GiaTriForm, LoiForm, NhomTruong, TruongForm } from "../../lib/catalogForm.ts";
 import ChonHoacGo from "../../features/catalogWorkspace/ChonHoacGo.tsx";
 import QaPersonSelect from "../../features/sourceAccess/QaPersonSelect.tsx";
+import QaHoTroThemPanel from "../../features/sourceAccess/QaHoTroThemPanel.tsx";
 import { useSourceQaCandidates } from "../../features/sourceAccess/useSourceQaCandidates.ts";
 import type { GoiY } from "../../features/catalogWorkspace/suggestions.ts";
 
@@ -322,6 +323,10 @@ export default function CatalogObjectForm({
               </section>
             );
           })}
+
+          {/* Nhiều QA cùng làm một hạng mục: chỉ có khi hạng mục đã tồn tại
+              (server cần mã hạng mục), lưu riêng ngay khi bấm. */}
+          {!dangTaoMoi && row.object_code ? <QaHoTroThemPanel objectCode={String(row.object_code)} /> : null}
 
           {/* Nâng cao thu gọn sẵn: mở form ra mà thấy hai chục ô thì không ai
               biết bắt đầu từ đâu. */}

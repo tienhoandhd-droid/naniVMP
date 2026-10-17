@@ -93,6 +93,9 @@
  * --------------------------------------------------------------------- */
 .cw-nhom-truong { margin-bottom: 20px; }
 .cw-nhom-truong > .cw-cot__ten { font-size: 12px; }
+/* QA hỗ trợ thêm (20261017): mỗi người một dòng, nút Bỏ nằm cuối dòng. */
+.cw-qa-ho-tro-them { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.cw-qa-ho-tro-them li { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
 /* Hai cột ô nhập khi còn chỗ. Ô nhập một cột trên màn rộng tạo dòng dài
    quá 85 ký tự — luật A4. */

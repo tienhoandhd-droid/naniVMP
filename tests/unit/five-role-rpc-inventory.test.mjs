@@ -125,6 +125,16 @@ const QA_PHU_TRACH_REVIEWED_RPC = new Map([
     identity: "rpc_qa_phu_trach_dat(uuid,boolean,text)",
     classification: "guarded_explicit",
   }],
+  // 20261017100000: QA hỗ trợ thêm — xem theo quyền xem hạng mục, sửa theo
+  // quyền phân công QA (kiểm trong tests/unit/qa-ho-tro-them.test.mjs).
+  ["rpc_source_supporters", {
+    identity: "rpc_source_supporters(text)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_source_supporter_dat", {
+    identity: "rpc_source_supporter_dat(text,uuid,boolean,text)",
+    classification: "guarded_explicit",
+  }],
 ]);
 const CANONICAL_DASHBOARD_REVIEWED_RPC = new Map([
   ["rpc_get_vmp_dashboard_v2", {
@@ -421,7 +431,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 108, "reviewed source HEAD must expose 108 literal RPC targets");
+  assert.equal(sourceNames.length, 110, "reviewed source HEAD must expose 110 literal RPC targets");
   const nhatKyMigration = readFileSync("supabase/migrations/20261016170000_tham_dinh_nhat_ky.sql", "utf8");
   for (const [ten, chuKy] of [["cpc1_print_log", "uuid, integer, text, text"], ["cpc1_audit_trail", "text, date, date, integer"]]) {
     assert.match(nhatKyMigration, new RegExp(`function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = ''[\\s\\S]*?cpc1_private\\.viewer\\(\\)`, "i"), `${ten} must gate through viewer()`);

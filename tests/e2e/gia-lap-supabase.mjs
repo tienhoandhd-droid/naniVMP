@@ -734,6 +734,12 @@ export function dungKhoDuLieu(kichBan) {
       ],
     },
     rpc_qa_phu_trach_dat: { ok: true, thay_doi: true },
+    // QA hỗ trợ thêm của một hạng mục (20261017100000).
+    rpc_source_supporters: {
+      ok: true, co_the_sua: true,
+      rows: [{ performer_id: "00000000-0000-4000-8000-00000000a001", performer_name: "QA Giả Lập Một", ly_do: "Giả lập", them_luc: "2026-10-17T00:00:00Z" }],
+    },
+    rpc_source_supporter_dat: { ok: true, thay_doi: true },
     rpc_source_qa_candidates: {
       ok: true,
       rows: nhanSu.slice(0, 3).map((person, index) => ({
