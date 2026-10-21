@@ -17,15 +17,17 @@ const trang = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title
 // Máy chủ giả: kịch bản quyết định người xem được ký gì; signRecord ghi lại tham số.
 const fixture = `
 const kichBan=sessionStorage.getItem('kich-ban');
-window.__ky=[];
+window.__ky=[];window.addEventListener('cpc1:input-issues',e=>{window.__oSai=e.detail;});
 let st={ok:true,version:3,ket_qua:'fail',bat_buoc_deviation:true,trang_thai:'chua_ky',rows:[],
- co_the:{kiem_tra:kichBan==='qa',duyet:kichBan==='admin-duyet',mo_lai:kichBan==='admin-mo'}};
+ co_the:{kiem_tra:kichBan==='qa'||kichBan==='o-sai',duyet:kichBan==='admin-duyet',mo_lai:kichBan==='admin-mo'}};
 if(kichBan==='admin-duyet'||kichBan==='admin-mo')st.rows.push({version:3,y_nghia:'kiem_tra',ho_ten:'QA Hai',vai:'qa_staff',ly_do:null,ma_deviation:'DV-2026-014',luc:'2026-10-16T02:30:00Z'});
 if(kichBan==='admin-duyet')st.trang_thai='da_kiem_tra';
+if(kichBan==='o-sai')st.o_sai=[{path:['bm01','P1','0','vg'],field:'vg',value:'4.000',rule:'thousand_ambiguous',reason:'Số dễ nhầm hàng nghìn — gõ 4000 hoặc 4,0'}];
 if(kichBan==='admin-mo'){st.trang_thai='da_duyet';st.rows.push({version:3,y_nghia:'duyet',ho_ten:'Admin Ba',vai:'admin',ly_do:null,ma_deviation:null,luc:'2026-10-16T03:00:00Z'});}
 window.CPC1Backend={canSaveActive:()=>true,canEvaluateActive:()=>true,listRuns:async()=>[],
  recordSignatures:async id=>{if(kichBan==='loi')throw new Error('mất mạng');return structuredClone(st);},
  signRecord:async args=>{window.__ky.push(args);if(args.password!=='dung')throw new Error('Mật khẩu không đúng.');
+  if(kichBan==='o-sai')throw Object.assign(new Error('Hồ sơ còn ô nhập sai.'),{code:'INVALID_DATA',issues:structuredClone(st.o_sai)});
   if(args.meaning==='kiem_tra'){st.trang_thai='da_kiem_tra';st.co_the.kiem_tra=false;st.rows.push({version:3,y_nghia:'kiem_tra',ho_ten:'QA Hai',vai:'qa_staff',ly_do:null,ma_deviation:args.deviation,luc:'2026-10-16T04:00:00Z'});}
   if(args.meaning==='duyet'){st.trang_thai='da_duyet';st.co_the.duyet=false;st.rows.push({version:3,y_nghia:'duyet',ho_ten:'Admin Ba',vai:'admin',ly_do:null,ma_deviation:null,luc:'2026-10-16T04:30:00Z'});}
   if(args.meaning==='mo_lai'){st.trang_thai='chua_ky';st.co_the.mo_lai=false;st.rows.push({version:3,y_nghia:'mo_lai',ho_ten:'Admin Ba',vai:'admin',ly_do:args.reason,ma_deviation:null,luc:'2026-10-16T05:00:00Z'});}
@@ -108,6 +110,15 @@ await am.click('#ky-duyet-hop button[type=submit]');
 await am.locator('#ky-duyet-trang-thai').getByText('Chưa kiểm tra · phiên bản v3').waitFor();
 assert.match((await am.locator('#ky-duyet-lich-su li').allTextContents()).at(-1), /^Mở lại · Admin Ba · .* · Lý do: Phát hiện nhập sai đơn vị$/);
 assert.equal(await am.locator('#record-save').isDisabled(), false, 'mở lại thì hết khoá');
+
+// Hồ sơ còn ô nhập sai (máy chủ trả issues / o_sai): báo số ô và chuyển danh sách cho trang nhập đánh dấu từng ô.
+const os = await mo('o-sai');
+await os.locator('#ky-duyet-trang-thai').getByText(/Còn 1 ô nhập sai/).waitFor();
+await os.click('#ky-duyet-nut button');
+await os.fill('#ky-deviation', 'DV-1');await os.fill('#ky-mat-khau', 'dung');
+await os.click('#ky-duyet-hop button[type=submit]');
+await os.locator('#ky-loi').getByText(/Hồ sơ còn ô nhập sai\. Còn 1 ô nhập sai/).waitFor();
+assert.deepEqual(await os.evaluate(() => window.__oSai.map(x => x.path)), [['bm01', 'P1', '0', 'vg']]);
 
 // Lỗi tải: báo rõ, không hiện nút ký.
 const loi = await mo('loi');

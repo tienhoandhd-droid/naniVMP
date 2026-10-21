@@ -52,7 +52,7 @@
     host.dataset.trangThai = st?.trang_thai || '';
     $('ky-duyet-trang-thai').textContent = loiTai ? `Không tải được trạng thái ký: ${loiTai}`
       : !st ? 'Đang tải trạng thái ký…'
-      : `${TRANG_THAI[st.trang_thai] || st.trang_thai} · phiên bản v${st.version}`;
+      : `${TRANG_THAI[st.trang_thai] || st.trang_thai} · phiên bản v${st.version}${st.o_sai?.length ? ` · Còn ${st.o_sai.length} ô nhập sai — sửa trước khi ký` : ''}`;
     $('ky-duyet-lich-su').replaceChildren(...(st?.rows || []).map(row => el('li', {
       text: [`${NHAN[row.y_nghia] || row.y_nghia} · ${row.ho_ten}`, luc(row.luc), `v${row.version}`,
         row.ma_deviation ? `Deviation ${row.ma_deviation}` : '', row.ly_do ? `Lý do: ${row.ly_do}` : ''].filter(Boolean).join(' · '),
@@ -112,7 +112,11 @@
         hop.close();
         await tai();
       } catch (error) {
-        loi.textContent = error?.message || 'Không ký được.';
+        // Máy chủ chặn ký khi còn ô nhập sai (INVALID_DATA kèm issues): báo số ô và để trang nhập đánh dấu từng ô.
+        const oSai = Array.isArray(error?.issues) ? error.issues : [];
+        const thongBao = String(error?.message || 'Không ký được.').trim();
+        loi.textContent = oSai.length ? `${/[.!?]$/.test(thongBao) ? thongBao : thongBao + '.'} Còn ${oSai.length} ô nhập sai — xem các ô được đánh dấu.` : thongBao;
+        if (oSai.length) window.dispatchEvent(new CustomEvent('cpc1:input-issues', { detail: oSai }));
       } finally {
         matKhau.value = '';
         nutKy.disabled = false;

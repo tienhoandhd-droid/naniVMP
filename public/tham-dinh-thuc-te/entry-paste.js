@@ -2,6 +2,10 @@
   'use strict';
   const forbidden = value => ['__proto__', 'prototype', 'constructor'].includes(String(value));
   const empty = value => value == null || String(value).trim() === '';
+  // Ô không áp dụng tại điểm được ghi "—" trong bảng mẫu; khi kiểm tra hiểu như ô trống.
+  const notApplicable = value => /^[—–]$/.test(String(value ?? '').trim());
+  const THOUSAND = 'Số dễ nhầm hàng nghìn — gõ 4000 hoặc 4,0';
+  const thousandAmbiguous = value => { const match = /^[+-]?(\d+)[.,](\d{3})$/.exec(value); return Boolean(match) && Number(match[1]) !== 0; };
   const headers = columns => ['Điểm', 'Lần đo', ...columns.map(column => column.label)];
   function parse(text, {columns = [], targets = [], decimal = ','} = {}) {
     const errors = [], rows = [], changes = [];
@@ -31,17 +35,24 @@
       seen.add(key);
       columns.forEach((column, i) => {
         const value = values[i + 2], cell = {label: column.label, value, message: ''}; row.cells.push(cell);
-        if (empty(value)) return;
+        if (empty(value) || notApplicable(value)) return;
         const error = message => { cell.message = message; fail(lineNo, column.label, message); };
         if (value.length > (column.type === 'number' ? 40 : 160)) return error('Nội dung quá dài.');
         if (/["\n\r\t]/.test(value)) return error('Ô chứa dấu nháy hoặc xuống dòng. Hãy nhập ô này trực tiếp trên biểu mẫu.');
+        // Cùng bộ luật với ô nhập tay (entry-checks.js): báo đúng lý do — âm, %, ngày ngoài khoảng, "<1", chữ…
+        const checks = window.CPC1EntryChecks, spec = {type: column.type, unit: column.unit, key: column.key, label: column.label};
+        const ruled = checks && !checks.soft(spec) && column.type !== 'date' ? checks.check(value, spec) : '';
+        if (ruled) return error(ruled);
         if (column.type === 'number') {
           const pattern = decimal === ',' ? /^[+-]?(?:\d+(?:,\d+)?|,\d+)$/ : /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
           if (!pattern.test(value) || !Number.isFinite(Number(value.replace(',', '.')))) return error(`Nhập số dùng dấu ${decimal === ',' ? 'phẩy' : 'chấm'} thập phân; không dùng dấu phân cách hàng nghìn.`);
+          if (thousandAmbiguous(value) && !/^(kg|[µμ]S\/cm)$/i.test(String(column.unit || '').trim())) return error(THOUSAND);
         }
         if (column.type === 'date') {
           const time = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value + 'T00:00:00Z') : null;
           if (!time || !Number.isFinite(time.getTime()) || time.toISOString().slice(0, 10) !== value) return error('Ngày cần đúng dạng năm-tháng-ngày, ví dụ 2026-10-02.');
+          const range = checks?.check(value, spec) || '';
+          if (range) return error(range);
         }
         const before = target.values?.[column.key];
         if (!empty(before)) {
@@ -54,7 +65,7 @@
     });
     return {rows, changes: errors.length ? [] : changes, errors};
   }
-  const template = ({columns, targets}) => [headers(columns).join('\t'), ...targets.map(t => [t.point, t.trial, ...columns.map(() => '')].join('\t'))].join('\n');
+  const template = ({columns, targets}) => [headers(columns).join('\t'), ...targets.map(t => [t.point, t.trial, ...columns.map(c => t.reasons?.[c.key] ? '—' : '')].join('\t'))].join('\n');
   // Both adapters use this all-or-nothing patch, after recomputing their live context.
   function patch(data, context, changes, identity) {
     if (!context.allowed || context.identity !== identity) throw Error('Đợt, hồ sơ hoặc quyền nhập đã thay đổi. Mở lại bảng để kiểm tra.');

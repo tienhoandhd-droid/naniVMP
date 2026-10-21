@@ -20,6 +20,8 @@ export async function buildQualification(root, env) {
   await mkdir(out, {recursive:true});
   // One design source shared with VMP; do not maintain a second colour palette.
   await copyFile(resolve(root,'src/styles/lotus-tokens.css'),resolve(out,'vmp-tokens.css'));
+  // vmp-tokens.css @import "./chart-palette.css": chép kèm để trang thẩm định không bị 404.
+  await copyFile(resolve(root,'src/styles/chart-palette.css'),resolve(out,'chart-palette.css'));
   await writeFile(resolve(out, 'runtime-config.js'), `window.CPC1_SETTINGS=${JSON.stringify({url,publishableKey})};\n`);
   // Gói in PDF build riêng (pdf-lib + fontkit ~1,3 MB): cloud.js chỉ tải nó khi
   // người dùng bấm in. Băm nội dung gói rồi nhúng vào cloud.js làm ?v= để trình

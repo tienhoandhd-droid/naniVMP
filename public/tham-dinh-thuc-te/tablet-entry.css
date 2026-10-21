@@ -52,7 +52,6 @@
  .qualification-workspace .entry-mode-panel { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; }
  .qualification-workspace .entry-mode-panel .calibration-warning { flex-basis:100%; }
  .qualification-workspace .entry-mode-actions { margin:0; }
- .qualification-workspace .point-heading { display:none; }
  .qualification-workspace .card-title p,.qualification-workspace .card-head p { font-size:14px; margin:4px 0; }
 }
 @media(min-width:600px) and (max-width:1199px) and (min-height:600px) {
@@ -64,7 +63,7 @@
  .qualification-workspace .file-actions-menu { top:auto; bottom:100%; }
 }
 @media(min-width:600px) and (max-width:1199px) {
- .qualification-workspace .card-title h3,.qualification-workspace .card-head h2 { margin:0; }
+ .qualification-workspace .card-title h2,.qualification-workspace .card-head h2 { margin:0; }
  .qualification-workspace .card { padding-top:4px; }
  .qualification-workspace .limits { padding-block:4px; }
  .qualification-workspace .run-selector { padding-block:0; }
@@ -74,3 +73,27 @@
 }
 .qualification-workspace[data-entry-keyboard="true"] .actionbar,.qualification-workspace[data-entry-keyboard="true"] .action-bar { position:static; margin-top:16px; }
 .qualification-workspace .actionbar #message,.qualification-workspace .action-bar #message { margin:0 0 8px; padding:8px; font-size:14px; max-height:120px; overflow:auto; }
+/* Thanh tiêu đề điểm dính: mã điểm, thứ tự/tổng, lần đo, giới hạn lấy từ cấu hình. */
+.qualification-workspace .point-bar { position:sticky; top:0; z-index:6; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 12px; margin:0 0 8px; padding:4px 12px; line-height:1.4; border:1px solid var(--border); border-radius:var(--radius-control,10px); background:var(--surface); box-shadow:var(--lp-e-low); font-size:14px; }
+.qualification-workspace .point-bar strong { font-size:16px; font-weight:600; }
+.qualification-workspace #form-body input,.qualification-workspace #form-body textarea,.qualification-workspace #form-body select { scroll-margin-top:72px; }
+/* Phóng to 200%: thanh dính chiếm quá nhiều chỗ, để nó chạy theo trang. */
+.qualification-workspace[data-entry-zoom="true"] .point-bar { position:static; }
+.qualification-workspace .point-bar-step,.qualification-workspace .point-bar-trial { font-variant-numeric:tabular-nums; color:var(--text-secondary); }
+.qualification-workspace .point-bar-limits { color:var(--text-secondary); }
+/* Ô đã lưu bị khoá: gạch chéo nhạt + biểu tượng khoá, khác hẳn ô trống đang nhập. */
+.qualification-workspace #form-body input[readonly],.qualification-workspace #form-body textarea[readonly] { padding-right:36px; cursor:not-allowed; background-color:var(--surface-subtle);
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23857a8c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='11' width='16' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E"),repeating-linear-gradient(135deg,transparent 0 7px,rgba(133,122,140,.2) 7px 9px);
+ background-repeat:no-repeat,repeat; background-position:right 10px center,0 0; }
+.qualification-workspace .entry-mode-panel.attention { outline:3px solid var(--td-focus,var(--accent)); outline-offset:2px; }
+.qualification-workspace .entry-lock-hint { flex-basis:100%; font-weight:600; }
+.qualification-workspace .point > small { font-size:13px; }
+.qualification-workspace .save-retry { margin:0 0 8px; }
+.qualification-workspace .error-count { margin:4px 0; }
+@media(max-width:1199px) {
+ /* Thanh tab biểu mẫu xuống dòng thay vì kéo ngang trên máy tính bảng. */
+ .qualification-workspace .qualification-rail .form-navigation nav,.qualification-workspace .form-tabs,.qualification-workspace .form-nav { flex-wrap:wrap; overflow-x:visible; }
+ .qualification-workspace .qualification-rail .form-navigation .tab,.qualification-workspace .qualification-rail .form-navigation .nav-button { max-width:100%; white-space:normal; text-align:left; }
+}
+/* Dòng lỗi dưới ô có chỗ dành sẵn (một dòng): lỗi hiện khi rời ô không đẩy nút Lưu, lần chạm đầu không trượt. */
+.qualification-workspace #form-body .field-error[id],.qualification-workspace #form-body .field-error[id]:empty { display:block; min-height:calc(13px * 1.4); margin:4px 0 0; font-size:13px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

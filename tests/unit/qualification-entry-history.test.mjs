@@ -90,3 +90,26 @@ test('đợt nhiều hệ thống chỉ đồng bộ hạn hiệu chuẩn của 
  assert.deepEqual(plain(history.syncCalibration(gas,run,'air')),[{path:['equipment','bm01','expiry'],before:'2026-09-26',after:'2026-12-30'}]);
  assert.equal(gas.equipment.balance_due,undefined);
 });
+
+test('sau khi lưu, điểm vừa nhập giữ chế độ Tiếp tục: ô đã có số bị khoá, ô trống vẫn nhập được',()=>{
+ const workspace=history.createWorkspace({});
+ workspace.accept({system:'air',forms:{}},{});
+ const point={system:'air',form:'bm01',point:'A1'};
+ assert.equal(workspace.currentMode(point),'new');
+ const saved={system:'air',forms:{bm01:{A1:{p05:'12',p5:''},B2:{p05:'3'}}}};
+ workspace.accept(saved,{},{resume:{system:'air'}});
+ assert.equal(workspace.currentMode(point),'continue');
+ assert.equal(workspace.canEdit({...point,path:['forms','bm01','A1','p05']}),false,'ô đã lưu vẫn khoá — sửa phải qua Thay đổi + lý do');
+ assert.equal(workspace.canEdit({...point,path:['forms','bm01','A1','p5']}),true);
+ // Mở hồ sơ (không phải lưu) vẫn bắt chọn Tiếp tục/Thay đổi như cũ.
+ workspace.accept(saved,{});
+ assert.equal(workspace.currentMode(point),'warning');
+});
+test('điểm đã có số nhưng chưa chạm tới không tự mở khoá sau khi lưu',()=>{
+ const workspace=history.createWorkspace({});
+ const steam={bm01:{S1:[{vg:'5'}],S2:[{vg:'6'}]},bm02:{},bm03:{},bm04:{}};
+ workspace.accept(steam,{});
+ assert.equal(workspace.currentMode({system:'steam',form:'bm01',point:'S1',data:steam}),'warning');
+ workspace.accept(steam,{},{resume:{system:'steam'}});
+ assert.equal(workspace.currentMode({system:'steam',form:'bm01',point:'S2'}),'warning');
+});

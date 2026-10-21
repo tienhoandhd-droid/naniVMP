@@ -112,7 +112,8 @@ export function makeBackend(settings, existingClient, makeSigningClient) {
   async function rpc(name,args={}) {
     const {data,error}=await client.rpc(name,args);
     if(error) {
-      const err=new Error(error.message || 'Không kết nối được hệ thống.');err.code=error.code;
+      // details/hint mang danh sách ô sai (PT422 INVALID_INPUT) để trang nhập đánh dấu đúng ô.
+      const err=new Error(error.message || 'Không kết nối được hệ thống.');err.code=error.code;err.details=error.details;err.hint=error.hint;
       if (err.code === '42501') signalDenied();
       throw err;
     }
@@ -208,7 +209,8 @@ export function makeBackend(settings, existingClient, makeSigningClient) {
         if(verified.data.user?.id!==actor||verified.data.session.user?.id!==actor)throw Error('Tài khoản ký không khớp người đang đăng nhập.');
         const result=await signer.rpc('cpc1_record_sign',{p_record_id:recordId,p_version:version,p_y_nghia:meaning,p_ly_do:reason||null,p_ma_deviation:deviation||null});
         if(result.error)throw Error(result.error.message||'Không ký được.');
-        if(!result.data?.ok)throw Error(result.data?.error||'Không ký được.');
+        // INVALID_DATA kèm issues: chuyển nguyên danh sách ô sai cho ky-duyet.js đánh dấu tại ô.
+        if(!result.data?.ok)throw Object.assign(Error(result.data?.error||'Không ký được.'),{code:result.data?.error_code,issues:result.data?.issues});
         return result.data;
       }finally{
         if(signedIn){const {error:outError}=await signer.auth.signOut({scope:'local'});if(outError)console.warn('Không đóng được phiên ký tạm:',outError.message);}

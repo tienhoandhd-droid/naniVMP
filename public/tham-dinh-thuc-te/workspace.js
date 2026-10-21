@@ -7,6 +7,51 @@
   resizeRail(); tablet.addEventListener('change', resizeRail);
   const toolbar = document.querySelector('.actionbar,.action-bar');
   const body = document.getElementById('form-body');
+  // Điểm trước/sau bấm nút điểm trong danh sách; khi đó không chuyển con trỏ về tiêu đề như khi chọn tay.
+  let stepping=false;
+  const editable=node=>!node.readOnly&&!node.disabled&&node.type!=='hidden'&&Boolean(node.offsetParent);
+  const entryFields=()=>[...(body?.querySelectorAll('input,select,textarea')||[])].filter(editable);
+  const numberFields=()=>[...(body?.querySelectorAll('input[inputmode="decimal"]')||[])].filter(editable);
+  if (body) {
+    // Bàn phím ảo: Enter = sang ô kế; ô số cuối của điểm = “xong” → Điểm sau. Chỉ nút “Tính và đánh giá” gửi tính.
+    const hints=()=>{const numbers=numberFields();for(const node of body.querySelectorAll('input'))node.enterKeyHint=node===numbers.at(-1)?'done':'next';};
+    new MutationObserver(hints).observe(body,{childList:true,subtree:true});hints();
+    body.addEventListener('keydown',event=>{
+      const input=event.target;
+      if(event.key!=='Enter'||event.isComposing||!input.matches('input')||['checkbox','radio','button','submit','file'].includes(input.type))return;
+      event.preventDefault();
+      const fields=entryFields(),index=fields.indexOf(input),next=document.getElementById('point-next');
+      if(input.enterKeyHint!=='done'&&index>=0&&index<fields.length-1){fields[index+1].focus();return;}
+      if(next&&!next.disabled)next.click();else input.blur();
+    });
+    // Chạm vào ô đã khoá: đưa người nhập tới khung Tiếp tục / Thay đổi kèm câu giải thích ngắn.
+    body.addEventListener('click',event=>{
+      const input=event.target.closest?.('input[readonly],textarea[readonly]'),panel=body.querySelector('.entry-mode-panel');
+      if(!input||!panel||/-copy$/.test(input.name))return;
+      let hint=panel.querySelector('.entry-lock-hint');
+      if(!hint){hint=document.createElement('p');hint.className='entry-lock-hint';hint.setAttribute('role','status');panel.append(hint);}
+      hint.textContent=panel.querySelector('#entry-continue')?'Ô đã có số nên bị khoá. Chọn “Tiếp tục” để nhập ô trống, hoặc “Thay đổi” để sửa (cần nêu lý do).':'Ô đã lưu bị khoá. Muốn sửa, chọn “Thay đổi” và nêu lý do khi lưu.';
+      panel.classList.add('attention');panel.scrollIntoView({block:'center'});
+      setTimeout(()=>panel.classList.remove('attention'),4000);
+    });
+    // Thanh tiêu đề điểm: hiện lần đo của ô đang nhập (hơi có 3 lần đo trên cùng trang).
+    body.addEventListener('focusin',event=>{
+      const legend=event.target.closest('.trial-group')?.querySelector('legend'),trial=body.querySelector('.point-bar-trial');
+      if(legend&&trial)trial.textContent=`${legend.textContent} / ${body.querySelectorAll('.trial-group').length}`;
+    });
+    // Sau khi lưu, con trỏ quay về ô đang nhập (hoặc ô số trống đầu tiên nếu ô đó vừa bị khoá).
+    let lastField='',restoreField='';
+    body.addEventListener('focusin',event=>{if(event.target.name)lastField=event.target.name;});
+    document.addEventListener('click',event=>{if(event.target.closest?.('#record-save,#record-save-retry'))restoreField=lastField;},{capture:true});
+    const saveButton=document.getElementById('record-save');
+    if(saveButton)new MutationObserver(()=>{
+      if(saveButton.disabled||!restoreField)return;
+      const name=restoreField;restoreField='';
+      if(document.getElementById('record-state')?.dataset.saveState!=='saved'||document.querySelector('dialog[open]'))return;
+      const same=body.querySelector(`[name="${CSS.escape(name)}"]`),target=same&&editable(same)?same:numberFields().find(node=>!node.value);
+      target?.focus({preventScroll:true});target?.scrollIntoView({block:'center'});
+    }).observe(saveButton,{attributes:true,attributeFilter:['disabled']});
+  }
   if (toolbar && body) {
     body.after(toolbar);
     const revealInput=()=>{
@@ -17,7 +62,7 @@
       if(bounds.bottom>bottom)window.scrollBy(0,bounds.bottom-bottom+24);
     };
     document.addEventListener('focusin',()=>requestAnimationFrame(revealInput));
-    const resizeVisual=()=>{const visual=window.visualViewport,zoom=parseFloat(getComputedStyle(document.body).zoom)||1;document.body.dataset.entryKeyboard=String(zoom>1||Boolean(visual&&(visual.height<600||innerHeight-visual.height*visual.scale>150)));requestAnimationFrame(revealInput);};
+    const resizeVisual=()=>{const visual=window.visualViewport,zoom=parseFloat(getComputedStyle(document.body).zoom)||1;document.body.dataset.entryKeyboard=String(zoom>1||Boolean(visual&&(visual.height<600||innerHeight-visual.height*visual.scale>150)));document.body.dataset.entryZoom=String(zoom>1);requestAnimationFrame(revealInput);};
     window.visualViewport?.addEventListener('resize',resizeVisual);new ResizeObserver(resizeVisual).observe(document.body);resizeVisual();
     new ResizeObserver(()=>document.documentElement.style.setProperty('--entry-toolbar-height',`${toolbar.getBoundingClientRect().height}px`)).observe(toolbar);
     const message=document.getElementById('message');if(message){toolbar.before(message);for(const id of ['record-save','evaluate'])document.getElementById(id)?.addEventListener('click',()=>toolbar.prepend(message),{capture:true});}
@@ -38,8 +83,11 @@
       button.addEventListener('click',()=>{
         const list=document.querySelector('#point-list,#location-list');
         const buttons=[...list.querySelectorAll('button')], current=buttons.findIndex(node=>node.getAttribute('aria-current')==='true');
-        buttons[current+offset]?.click();
-        document.getElementById('form-title')?.scrollIntoView({block:'start'});
+        stepping=true;buttons[current+offset]?.click();stepping=false;
+        // Sang điểm mới: đặt con trỏ vào ô số đầu tiên còn trống để nhập tiếp ngay.
+        const empty=numberFields().find(node=>!node.value);
+        if(empty){empty.focus({preventScroll:true});empty.scrollIntoView({block:'center'});}
+        else document.getElementById('form-title')?.scrollIntoView({block:'start'});
       });
       pointNav.append(button);
     }
@@ -94,7 +142,7 @@
     buttons[next].click();
   });
   navigation?.addEventListener('click', event => {
-    if (!event.target.closest('nav button')) return;
+    if (!event.target.closest('nav button') || stepping) return;
     setTimeout(() => {
       navigation.open = false;
       const title = document.getElementById('form-title');

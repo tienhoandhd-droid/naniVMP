@@ -55,9 +55,11 @@ try{
   assert.ok(numericLabel,'existing measurement column in template');
   let text=await table(page,[{point:'OUT',values:{[numericLabel]:'5'}}]);await preview(page,text);
   assert.equal(await page.locator('#entry-paste-apply').isDisabled(),true);assert.match(await page.locator('#entry-paste-errors').textContent(),/phạm vi/);
-  text=await table(page,[{point:'P.1',values:{[numericLabel]:'0'}},{point:'P2',trial:system==='steam'?3:1,values:{[numericLabel]:'12,50'}}]);
+  // Số hạt là số đếm nên phải nguyên (chặn khi lưu); giữ ví dụ dấu phẩy thập phân ở cột thể tích của hơi.
+  const pasted=system==='steam'?'12,50':'125';
+  text=await table(page,[{point:'P.1',values:{[numericLabel]:'0'}},{point:'P2',trial:system==='steam'?3:1,values:{[numericLabel]:pasted}}]);
   await preview(page,text);assert.equal(await page.locator('#entry-paste-apply').isEnabled(),true);
-  assert.match(await page.locator('#entry-paste-result').textContent(),/12,50/);
+  assert.match(await page.locator('#entry-paste-result').textContent(),new RegExp(pasted));
   const axe=await new AxeBuilder({page}).include('#entry-paste-dialog').analyze();assert.deepEqual(axe.violations.map(v=>v.id),[]);
   if(evidence)await page.screenshot({path:evidence+'/'+system+'-paste-desktop.png'});
   await page.locator('#entry-paste-apply').click();await page.locator('#entry-paste-dialog').waitFor({state:'hidden'});
@@ -70,10 +72,10 @@ try{
   if(system==='steam'){
     await page.locator('.workspace-navigation>summary').click();await page.locator('#location-list button').filter({hasText:'P2'}).click();
     assert.equal(await page.locator('.trial-group').count(),3,'pasting only trial 3 retains three editable trial rows');
-    assert.equal(await page.locator('[name="bm01.P2.2.vg"]').inputValue(),'12,50');
+    assert.equal(await page.locator('[name="bm01.P2.2.vg"]').inputValue(),pasted);
     await page.locator('.workspace-navigation>summary').click();await page.locator('#location-list button').filter({hasText:'P.1'}).click();
   }else{
-    await page.locator('.workspace-navigation>summary').click();await page.locator('#point-list button').filter({hasText:'P2'}).click();assert.equal(await page.locator('[name="forms.bm01.P2.p05"]').inputValue(),'12,50');
+    await page.locator('.workspace-navigation>summary').click();await page.locator('#point-list button').filter({hasText:'P2'}).click();assert.equal(await page.locator('[name="forms.bm01.P2.p05"]').inputValue(),pasted);
     await page.locator('.workspace-navigation>summary').click();await page.locator('#point-list button').filter({hasText:'P.1'}).click();
   }
   if(system!=='steam'){
@@ -82,8 +84,8 @@ try{
     const marks=chart.locator(system==='air'?'.bar-value':'.individual-value');
     await marks.first().waitFor();
     assert.equal(await marks.count(),2,'saved pasted values reach the selected chart type');
-    assert.deepEqual((await marks.evaluateAll(nodes=>nodes.map(n=>n.dataset.value))).sort(),['0','12.5'],'chart retains both exact saved numeric values, including zero');
-    assert.match(await chart.first().textContent(),/12,5/);
+    assert.deepEqual((await marks.evaluateAll(nodes=>nodes.map(n=>n.dataset.value))).sort(),['0','125'],'chart retains both exact saved numeric values, including zero');
+    assert.match(await chart.first().textContent(),/125/);
     await page.goto(entryUrl);await page.locator('#entry-paste-open').waitFor();
   }
   await page.locator('#entry-paste-open').click();text=await table(page,[{point:'P.1',values:{[numericLabel]:'9'}}]);await preview(page,text);assert.equal(await page.locator('#entry-paste-apply').isDisabled(),true);assert.match(await page.locator('#entry-paste-errors').textContent(),/đã có/);
