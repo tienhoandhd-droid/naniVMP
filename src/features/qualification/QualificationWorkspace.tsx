@@ -87,7 +87,7 @@ export function useQualificationWorkspace(systems:readonly string[],hasDirty:boo
   return {active,title,open,close:()=>change(null),canLeave,endSession,
     content:active?<section aria-label="Nội dung thẩm định thực tế" style={{minWidth:0,height:"100%",display:"flex",flexDirection:"column"}}>
       {!ready&&!failed&&<p role="status">Đang mở {title.toLocaleLowerCase('vi')}…</p>}
-      {failed&&<div role="alert"><p>Chưa mở được biểu mẫu. Bạn có thể thử tải lại.</p><button type="button" onClick={()=>{if(canLeave())setRetry(v=>v+1);}}>Thử lại biểu mẫu</button></div>}
+      {failed&&<div role="alert"><p>Chưa mở được biểu mẫu.</p><button type="button" onClick={()=>{if(canLeave())setRetry(v=>v+1);}}>Thử lại biểu mẫu</button></div>}
       <iframe key={active+":"+retry} ref={frame} id="vmp-qualification-frame" title={title}
         src={new URL('tham-dinh-thuc-te/'+active,base()).href}
         style={{display:'block',width:'100%',flex:1,minHeight:0,border:0,visibility:ready?'visible':'hidden'}} />

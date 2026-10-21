@@ -127,9 +127,9 @@
   padding: 0 5px;
   color: var(--lp-ink-muted);
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .09em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .vmp-global-filter__dates {
@@ -188,7 +188,7 @@
   padding: 0 8px;
   border-color: transparent;
   background: transparent;
-  color: var(--lp-rose);
+  color: var(--lp-brand);
 }
 
 .vmp-global-filter__reset:hover { background: var(--lp-rose-soft); color: var(--lp-plum); }

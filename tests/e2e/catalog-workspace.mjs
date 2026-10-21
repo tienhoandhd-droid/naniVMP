@@ -179,7 +179,7 @@ const MA_HANG_MUC_V2 = "CCTB01/2026.01-PQ";
 const VERSION_HANG_MUC_V2 = 7;
 const LY_DO_AP_V2 = "Xác nhận theo biên bản QA-26/08";
 
-const nhanChonDeadlineV2 = `Chọn cập nhật deadline ${MA_HANG_MUC_V2}`;
+const nhanChonDeadlineV2 = `Chọn đổi hạn chót ${MA_HANG_MUC_V2}`;
 
 async function moXemTruocDeadlineV2(applyResult, moChat = false) {
   const applyBodies = [];
@@ -247,7 +247,7 @@ async function moXemTruocDeadlineV2(applyResult, moChat = false) {
     .find((button) => button.textContent?.trim() === "Lưu")?.click());
 
   await trang.waitForFunction((label) => [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline")
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót")
     && [...document.querySelectorAll('input[type="checkbox"]')]
       .some((input) => input.getAttribute("aria-label") === label),
   { timeout: 10_000 }, nhanChonDeadlineV2);
@@ -264,33 +264,33 @@ async function chuanBiApDeadlineV2(trang) {
     .some((input) => input.getAttribute("aria-label") === label && input.checked),
   { timeout: 10_000 }, nhanChonDeadlineV2);
 
-  const reasonSelector = 'input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]';
+  const reasonSelector = 'input[placeholder="Lý do áp dụng"]';
   await trang.type(reasonSelector, LY_DO_AP_V2);
   await trang.waitForFunction((selector, reason) => document.querySelector(selector)?.value === reason,
     { timeout: 10_000 }, reasonSelector, LY_DO_AP_V2);
 
   await trang.evaluate(() => {
     const label = [...document.querySelectorAll("label")]
-      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn"));
+      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các hạn chót kế hoạch đã chọn"));
     label?.querySelector('input[type="checkbox"]')?.click();
   });
   await trang.waitForFunction((label, selector, reason) => {
     const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
       .find((input) => input.getAttribute("aria-label") === label);
     const confirmation = [...document.querySelectorAll("label")]
-      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn"))
+      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các hạn chót kế hoạch đã chọn"))
       ?.querySelector('input[type="checkbox"]');
     return candidate?.checked === true
       && document.querySelector(selector)?.value === reason
       && confirmation?.checked === true
       && [...document.querySelectorAll("button")]
-        .some((button) => button.textContent?.trim() === "Áp vào timeline" && !button.disabled);
+        .some((button) => button.textContent?.trim() === "Áp dụng" && !button.disabled);
   }, { timeout: 10_000 }, nhanChonDeadlineV2, reasonSelector, LY_DO_AP_V2);
 }
 
 async function bamApDeadlineV2(trang) {
   await trang.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.trim() === "Áp vào timeline")?.click());
+    .find((button) => button.textContent?.trim() === "Áp dụng")?.click());
 }
 
 function expectedApplyBodyV2() {
@@ -479,13 +479,13 @@ async function moXemTruocFallbackV2({ previewV2Error, applyV2Error, previewV2 = 
 }
 
 async function chuanBiApV1(trang) {
-  const reasonSelector = 'input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]';
+  const reasonSelector = 'input[placeholder="Lý do áp dụng"]';
   await trang.waitForSelector(reasonSelector, { timeout: 10_000 });
   await trang.type(reasonSelector, LY_DO_AP_V2);
   await trang.waitForFunction((selector, reason) => document.querySelector(selector)?.value === reason,
     { timeout: 10_000 }, reasonSelector, LY_DO_AP_V2);
   await trang.waitForFunction(() => [...document.querySelectorAll("button")]
-    .some((button) => button.textContent?.trim() === "Áp vào timeline" && !button.disabled), { timeout: 10_000 });
+    .some((button) => button.textContent?.trim() === "Áp dụng" && !button.disabled), { timeout: 10_000 });
 }
 
 /* ---- 1. Đủ quyền: tám mục, nút ghi, bảng ngữ nghĩa ----------------- */
@@ -761,7 +761,7 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   await cho(600);
   const daBam = await trang.evaluate(() => {
     const nut = [...document.querySelectorAll("button")]
-      .find((b) => b.textContent.includes("Mở trong Danh mục"));
+      .find((b) => b.textContent.includes("Mở ở Dữ liệu nguồn"));
     if (!nut) return false;
     nut.click();
     return true;
@@ -1192,11 +1192,11 @@ for (const [rong, cao] of [[1366, 768], [1093, 720]]) {
   await trang.waitForFunction(() => document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')
     ?.textContent?.includes("Đã áp thay đổi vào timeline") === true, { timeout: 10_000 });
   await trang.waitForFunction(() => ![...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót"), { timeout: 10_000 });
   const success = await trang.evaluate(() => ({
     toast: document.querySelector('.vmp-toast[data-vmp-toast="thanhCong"]')?.textContent ?? "",
     dialogConMo: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót"),
   }));
   kiem(JSON.stringify(applyBodies) === JSON.stringify([expectedApplyBodyV2()]),
     "apply V2 gửi đúng change/version/override/xác nhận", JSON.stringify(applyBodies));
@@ -1273,14 +1273,14 @@ for (const scenario of LOI_AP_DUNG_V2) {
     const candidate = [...document.querySelectorAll('input[type="checkbox"]')]
       .find((input) => input.getAttribute("aria-label") === label);
     const confirmation = [...document.querySelectorAll("label")]
-      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn"))
+      .find((node) => node.textContent?.includes("Tôi xác nhận chỉ cập nhật các hạn chót kế hoạch đã chọn"))
       ?.querySelector('input[type="checkbox"]');
     return {
       alert: document.querySelector('[role="alert"]')?.textContent ?? "",
       dialogConMo: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-        .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+        .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót"),
       candidateDuocChon: candidate?.checked === true,
-      lyDoConLai: document.querySelector('input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]')?.value === reason,
+      lyDoConLai: document.querySelector('input[placeholder="Lý do áp dụng"]')?.value === reason,
       daXacNhan: confirmation?.checked === true,
     };
   }, nhanChonDeadlineV2, LY_DO_AP_V2);
@@ -1309,7 +1309,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
     previewV2Error: { status: 404, code: "PGRST202", message: "V2 chưa được triển khai" },
   });
   await trang.waitForFunction(() => [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót"), { timeout: 10_000 });
   /* Tiêu đề hộp thoại xuất hiện ngay khi effect preview BẮT ĐẦU, nên không
      chứng minh fallback V1 đã trả về. Đợi hết trạng thái tải — khi đó RPC
      V1 đã được mock ghi nhận trước lúc React vẽ kết quả. */
@@ -1340,7 +1340,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
     applyV2Error: { status: 404, code: "42883", message: "V2 chưa được triển khai" },
   });
   await trang.waitForFunction(() => [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"), { timeout: 10_000 });
+    .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót"), { timeout: 10_000 });
   rpcSequence.splice(0);
   await chuanBiApV1(trang);
   await bamApDeadlineV2(trang);
@@ -1368,7 +1368,7 @@ for (const scenario of LOI_AP_DUNG_V2) {
   const state = await trang.evaluate(() => ({
     alert: document.querySelector('[role="alert"]')?.textContent ?? "",
     dialogOpen: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót"),
   }));
   kiem(JSON.stringify(v2PreviewBodies) === JSON.stringify([{ p_change_id: CHANGE_ID_V2 }]),
     "PGRST203 gọi đúng V2 preview trước khi báo lỗi", JSON.stringify(v2PreviewBodies));
@@ -1398,10 +1398,10 @@ for (const scenario of LOI_AP_DUNG_V2) {
   const state = await trang.evaluate((label, reason) => ({
     alert: document.querySelector('[role="alert"]')?.textContent ?? "",
     dialogOpen: [...document.querySelectorAll('.lp-dialog__panel[role="dialog"] .lp-dialog__title')]
-      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới timeline"),
+      .some((node) => node.textContent?.trim() === "Ảnh hưởng tới hạn chót"),
     selected: [...document.querySelectorAll('input[type="checkbox"]')]
       .some((input) => input.getAttribute("aria-label") === label && input.checked),
-    reason: document.querySelector('input[placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi."]')?.value === reason,
+    reason: document.querySelector('input[placeholder="Lý do áp dụng"]')?.value === reason,
   }), nhanChonDeadlineV2, LY_DO_AP_V2);
   kiem(JSON.stringify(v2ApplyBodies) === JSON.stringify([expectedApplyBodyV2()]),
     "override đã chọn gọi đúng V2 apply trước khi bị chặn", JSON.stringify(v2ApplyBodies));

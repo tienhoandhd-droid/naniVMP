@@ -20,7 +20,7 @@ const MAN = [
   ["rules", "Quy tắc nghiệp vụ"],
   ["health", "Chất lượng dữ liệu"],
   ["phanquyen", "Vai trò & phạm vi"],
-  ["audit", "Nhật ký thay đổi"],
+  ["audit", "Nhật ký hệ thống"],
   ["admin", "Cấu hình hệ thống"],
 ];
 

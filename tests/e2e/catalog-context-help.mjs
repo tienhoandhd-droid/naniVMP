@@ -48,7 +48,7 @@ async function openAndCloseHelp(page, label, { screenshot } = {}) {
   if (label === "Chờ áp dụng") {
     assert.match(dialog.text, /đã lưu ở Dữ liệu nguồn/i,
       "Pending help must distinguish saved Source data from its later timeline effect");
-    assert.match(dialog.text, /Áp vào timeline/i,
+    assert.match(dialog.text, /chỉ đổi khi bạn Áp dụng/i,
       "Pending help must explain that confirmation applies the timeline change");
   }
   await page.evaluate(async () => { await document.fonts.ready; await Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))); });

@@ -23,7 +23,8 @@ export type RoleCommitOutcome =
   | { kind: "written_unverified"; message: string }
   | { kind: "mismatch"; actualRole: BusinessRole | null };
 
-const WRITTEN_UNVERIFIED_MESSAGE = "Đã ghi thay đổi nhưng chưa đối chiếu lại được";
+const WRITTEN_UNVERIFIED_MESSAGE = "Đã lưu, chưa tải lại được. Bấm Tải lại.";
+const ROLE_SAVE_FAILED_MESSAGE = "Chưa lưu được. Thử lại.";
 
 export async function commitRoleDraft({
   draft,
@@ -45,10 +46,12 @@ export async function commitRoleDraft({
   try {
     mutation = await mutate(draft.targetUserId, draft.nextRole, draft.department, draft.reason);
   } catch (error) {
-    return { kind: "rejected", message: messageFrom(error, "Đổi vai thất bại.") };
+    console.error("Đổi vai thất bại", error);
+    return { kind: "rejected", message: ROLE_SAVE_FAILED_MESSAGE };
   }
   if (!mutation.ok) {
-    return { kind: "rejected", message: mutation.error || "Đổi vai thất bại." };
+    console.error("Đổi vai bị từ chối", mutation.error);
+    return { kind: "rejected", message: ROLE_SAVE_FAILED_MESSAGE };
   }
 
   let reloaded: AccountAdministrationRow | null;
@@ -103,13 +106,9 @@ export function validateRoleEditorDraft({
   ]);
 }
 
-function messageFrom(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 function writtenUnverifiedMessage(error: unknown): string {
-  const detail = messageFrom(error, "");
-  return detail ? `${WRITTEN_UNVERIFIED_MESSAGE}: ${detail}` : WRITTEN_UNVERIFIED_MESSAGE;
+  console.error("Tải lại vai sau khi lưu thất bại", error);
+  return WRITTEN_UNVERIFIED_MESSAGE;
 }
 
 function scopeDescription(role: BusinessRole | ""): string {
@@ -117,16 +116,11 @@ function scopeDescription(role: BusinessRole | ""): string {
   const scopeMode = BUSINESS_ROLE_CATALOG[role].scopeMode;
   if (scopeMode === "role_policy") return "Theo chính sách vai";
   if (scopeMode === "qa_assignment") return "Theo phân công QA";
-  return "Theo bộ phận, xưởng, khu vực và dây chuyền canonical";
+  return "Theo bộ phận, xưởng, khu vực, dây chuyền";
 }
 
 function selectedRoleLabel(role: BusinessRole | ""): string {
   return role ? businessRoleLabel(role) : "Chưa chọn vai nghiệp vụ";
-}
-
-function shortUserId(userId: string | null): string {
-  if (!userId) return "Chưa có user_id";
-  return userId.length <= 12 ? userId : `${userId.slice(0, 8)}…${userId.slice(-4)}`;
 }
 
 export default function AccountRoleEditor({
@@ -208,16 +202,16 @@ export default function AccountRoleEditor({
     } else if (outcome.kind === "rejected" || outcome.kind === "written_unverified") {
       setMessage(outcome.message);
     } else if (outcome.kind === "mismatch") {
-      setMessage(`Vai server trả về là ${businessRoleLabel(outcome.actualRole)}, khác vai đã chọn.`);
+      setMessage(`Vai đã lưu là ${businessRoleLabel(outcome.actualRole)}, khác vai đã chọn.`);
     }
     setSaving(false);
   };
 
   return (
     <section className="ip-panel" aria-labelledby="account-role-editor-title">
-      <h3 id="account-role-editor-title">Đối chiếu thay đổi</h3>
+      <h3 id="account-role-editor-title">Đổi vai</h3>
       <p className="ip-help">
-        <b>{row.name}</b>{row.email ? ` · ${row.email}` : ""} · user_id: {shortUserId(row.userId)}
+        <b>{row.name}</b>{row.email ? ` · ${row.email}` : ""}
       </p>
       <label>Vai mới
         <select ref={roleRef} id="account-role-next" className="pq-o" aria-label="Vai nghiệp vụ mới" value={nextRole}
@@ -244,7 +238,7 @@ export default function AccountRoleEditor({
           onChange={(event) => { setReason(event.target.value); setMessage(""); }} />
       </label>
       <p id={actionDescription} className="ip-help">
-        {actionBlock?.message || "Sẵn sàng lưu và đối chiếu lại với máy chủ."}
+        {actionBlock?.message}
       </p>
       <div className="ip-actions">
         <button type="button" className="pq-nut" disabled={saving} onClick={cancel}>Hủy</button>

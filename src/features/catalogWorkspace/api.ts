@@ -36,14 +36,34 @@ import {
   type CatalogImportPreviewResult,
 } from "./catalogImportPreviewContract.ts";
 
+const CHUA_KET_NOI = "Chưa kết nối được hệ thống. Liên hệ Admin.";
+const MAT_KET_NOI = "Mất kết nối. Tải lại trang.";
+
+/** Ghi chữ thô (tên hàm, mã lỗi, tiếng Anh) ra console; người dùng thấy câu chung. */
+function ghiLoi(cauChung: string, raw: unknown): string {
+  console.error(`[Dữ liệu nguồn] ${cauChung}`, raw);
+  return cauChung;
+}
+
+/** Như ghiLoi, nhưng giữ lý do nghiệp vụ máy chủ trả (câu tiếng Việt không
+ *  lộ chữ kỹ thuật, hoặc từ chối quyền) vì người dùng cần nó để xử lý. */
+function cauLoi(cauChung: string, raw: unknown): string {
+  ghiLoi(cauChung, raw);
+  const msg = raw instanceof Error ? raw.message
+    : raw && typeof raw === "object" && "message" in raw ? String((raw as { message: unknown }).message)
+      : String(raw ?? "");
+  if (/permission denied|42501|forbidden/i.test(msg)) return "Không có quyền thực hiện.";
+  if (/[À-ỹ]/.test(msg) && !/rpc_|PGRST|schema|relation|function|column|violates/i.test(msg)) return msg;
+  return cauChung;
+}
+
 /** Bọc lỗi hạ tầng thành kết quả có mã, để nơi gọi không phải try/catch. */
 function loiHaTang(e: unknown): { ok: false; errorCode: string; error: string } {
-  const msg = e instanceof Error ? e.message : String(e);
-  return { ok: false, errorCode: "NETWORK", error: `Không gọi được máy chủ: ${msg}` };
+  return { ok: false, errorCode: "NETWORK", error: ghiLoi(MAT_KET_NOI, e) };
 }
 
 function chuaCauHinh(): { ok: false; errorCode: string; error: string } {
-  return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+  return { ok: false, errorCode: "NOT_CONFIGURED", error: CHUA_KET_NOI };
 }
 
 export type CatalogSourceObjectPageResult =
@@ -108,7 +128,7 @@ function decodeSourcePage(data: unknown): CatalogSourceObjectPageResult {
       nextCursor: decoded.nextCursor,
     };
   } catch (cause) {
-    return sourcePageFailure("MALFORMED_RESPONSE", `Máy chủ trả dữ liệu Source không hợp lệ: ${cause instanceof Error ? cause.message : String(cause)}`);
+    return sourcePageFailure("MALFORMED_RESPONSE", ghiLoi("Không đọc được Dữ liệu nguồn.", cause));
   }
 }
 
@@ -124,7 +144,7 @@ export interface CatalogSourceObjectPageInput {
 
 /** Rights-filtered keyset page; no browser table read is used. */
 export async function listSourceObjectPage(input: CatalogSourceObjectPageInput): Promise<CatalogSourceObjectPageResult> {
-  if (!supabase) return sourcePageFailure("NOT_CONFIGURED", "Supabase chưa được cấu hình.");
+  if (!supabase) return sourcePageFailure("NOT_CONFIGURED", CHUA_KET_NOI);
   try {
     const { data, error } = await supabase.rpc("rpc_list_source_objects" as never, {
       p_object_kind: input.objectKind,
@@ -135,10 +155,10 @@ export async function listSourceObjectPage(input: CatalogSourceObjectPageInput):
       p_include_inactive: input.includeInactive ?? false,
       p_object_id: input.objectId ?? null,
     } as never);
-    if (error) return sourcePageFailure("NETWORK", error.message);
+    if (error) return sourcePageFailure("NETWORK", cauLoi("Không tải được Dữ liệu nguồn.", error));
     return decodeSourcePage(data);
   } catch (cause) {
-    return sourcePageFailure("NETWORK", `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}`);
+    return sourcePageFailure("NETWORK", ghiLoi(MAT_KET_NOI, cause));
   }
 }
 
@@ -146,20 +166,20 @@ export async function listSourceObjectFacets(input: {
   objectKind: string | null;
   filters: Record<string, string>;
 }): Promise<CatalogSourceFacetsResult | { ok: false; errorCode: "NETWORK" | "NOT_CONFIGURED" | "MALFORMED_RESPONSE"; error: string }> {
-  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: CHUA_KET_NOI };
   try {
     const { data, error } = await supabase.rpc("rpc_source_object_facets" as never, {
       p_object_kind: input.objectKind,
       p_filters: input.filters,
     } as never);
-    if (error) return { ok: false, errorCode: "NETWORK", error: error.message };
+    if (error) return { ok: false, errorCode: "NETWORK", error: cauLoi("Không tải được bộ lọc.", error) };
     try {
       return decodeCatalogSourceFacetsResponse(data);
     } catch (cause) {
-      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: `Máy chủ trả facets không hợp lệ: ${cause instanceof Error ? cause.message : String(cause)}` };
+      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: ghiLoi("Không tải được bộ lọc.", cause) };
     }
   } catch (cause) {
-    return { ok: false, errorCode: "NETWORK", error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}` };
+    return { ok: false, errorCode: "NETWORK", error: ghiLoi(MAT_KET_NOI, cause) };
   }
 }
 
@@ -205,7 +225,7 @@ async function listSourceFieldSuggestionPage(input: {
   search: string;
   cursor: { value: string } | null;
 }): Promise<CatalogSuggestionPage> {
-  if (!supabase) throw new Error("Source suggestion NOT_CONFIGURED: Supabase chưa được cấu hình.");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_source_field_suggestions" as never, {
     p_object_kind: input.objectKind,
     p_field: input.field,
@@ -269,7 +289,7 @@ export async function listDataset({
     } as never);
 
     if (error) {
-      return { ok: false, total: 0, rows: [], errorCode: "RPC_ERROR", error: error.message };
+      return { ok: false, total: 0, rows: [], errorCode: "RPC_ERROR", error: cauLoi("Không tải được danh mục.", error) };
     }
 
     const kq = (data || {}) as Record<string, unknown>;
@@ -348,7 +368,7 @@ export async function saveRecord({
       } as never));
     }
 
-    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: cauLoi("Chưa lưu được.", error) };
 
     const kq = (data || {}) as Record<string, unknown>;
     if (kq.ok !== true) {
@@ -381,7 +401,7 @@ export async function listPendingChanges(objectKind?: string): Promise<{
     const { data, error } = await supabase.rpc("rpc_list_catalog_changes" as never, {
       p_object_kind: objectKind || null, p_status: null, p_limit: 50, p_offset: 0,
     } as never);
-    if (error) return { ok: false, total: 0, changes: [], error: error.message };
+    if (error) return { ok: false, total: 0, changes: [], error: cauLoi("Không tải được thay đổi chờ áp dụng.", error) };
     const kq = (data || {}) as Record<string, unknown>;
     if (kq.ok !== true) return { ok: false, total: 0, changes: [], error: String(kq.error ?? "") };
     return { ok: true, total: Number(kq.total ?? 0), changes: (kq.changes || []) as CatalogChangeRow[] };
@@ -407,7 +427,7 @@ export async function listHistory(filters: {
     const { data, error } = await supabase.rpc("rpc_catalog_history" as never, {
       p_filters: loc, p_limit: pageSize, p_offset: page * pageSize,
     } as never);
-    if (error) return { ok: false, total: 0, history: [], error: error.message };
+    if (error) return { ok: false, total: 0, history: [], error: cauLoi("Không tải được lịch sử.", error) };
     const kq = (data || {}) as Record<string, unknown>;
     if (kq.ok !== true) return { ok: false, total: 0, history: [], error: String(kq.error ?? "") };
     return { ok: true, total: Number(kq.total ?? 0), history: (kq.history || []) as CatalogAuditRow[] };
@@ -426,7 +446,7 @@ export async function listHistory(filters: {
 const CHUA_CO_STAGING = {
   ok: false as const,
   errorCode: "NOT_AVAILABLE",
-  error: "Server chưa có RPC staging của đợt nhập Excel (Đợt B Task 9 chưa áp).",
+  error: "Chưa mở chức năng nhập Excel. Liên hệ Admin.",
 };
 
 /** PostgREST trả PGRST202 khi hàm không tồn tại; mock giả lập trả null. */
@@ -441,7 +461,7 @@ export async function fetchCatalogImportPreview(input: {
   limit?: number;
 }): Promise<CatalogImportPreviewResult> {
   if (!supabase) {
-    return { ok: false, errorCode: "NOT_AVAILABLE", error: "Supabase chưa được cấu hình." };
+    return { ok: false, errorCode: "NOT_AVAILABLE", error: CHUA_KET_NOI };
   }
   try {
     const { data, error } = await supabase.rpc("rpc_catalog_import_preview" as never, {
@@ -450,23 +470,23 @@ export async function fetchCatalogImportPreview(input: {
       p_limit: input.limit ?? 100,
     } as never);
     if (thieuHam(error, data)) {
-      return { ok: false, errorCode: "NOT_AVAILABLE", error: "Server chưa có RPC xem trước lô nhập." };
+      return { ok: false, errorCode: "NOT_AVAILABLE", error: "Chưa xem trước được. Liên hệ Admin." };
     }
-    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: cauLoi("Không xem trước được file.", error) };
     try {
       return decodeCatalogImportPreview(data);
     } catch (cause) {
       return {
         ok: false,
         errorCode: "MALFORMED_RESPONSE",
-        error: `Máy chủ trả bản xem trước không hợp lệ: ${cause instanceof Error ? cause.message : String(cause)}`,
+        error: ghiLoi("Không đọc được bản xem trước. Chọn lại file.", cause),
       };
     }
   } catch (cause) {
     return {
       ok: false,
       errorCode: "RPC_ERROR",
-      error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}`,
+      error: ghiLoi(MAT_KET_NOI, cause),
     };
   }
 }
@@ -488,7 +508,7 @@ export async function stageCatalogImport(input: {
       p_rows: input.rows,
     } as never);
     if (thieuHam(error, data)) return CHUA_CO_STAGING;
-    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: cauLoi("Không xem trước được file.", error) };
     const kq = (data || {}) as Record<string, unknown>;
     if (kq.ok !== true) {
       return { ok: false, errorCode: String(kq.error_code ?? "UNKNOWN"), error: String(kq.error ?? "") };
@@ -515,7 +535,7 @@ export async function setCatalogImportRowReason(
       p_batch_id: batchId, p_row_number: rowNumber, p_reason: reason,
     } as never);
     if (thieuHam(error, data)) return CHUA_CO_STAGING;
-    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: cauLoi("Chưa lưu được lý do.", error) };
     const kq = (data || {}) as Record<string, unknown>;
     return kq.ok === true
       ? { ok: true }
@@ -534,7 +554,7 @@ export async function commitCatalogImport(
       p_batch_id: batchId, p_reason: reason,
     } as never);
     if (thieuHam(error, data)) return CHUA_CO_STAGING;
-    if (error) return { ok: false, errorCode: "RPC_ERROR", error: error.message };
+    if (error) return { ok: false, errorCode: "RPC_ERROR", error: cauLoi("Ghi thất bại.", error) };
     const kq = (data || {}) as Record<string, unknown>;
     if (kq.ok !== true) {
       return { ok: false, errorCode: String(kq.error_code ?? "UNKNOWN"), error: String(kq.error ?? "") };
@@ -560,7 +580,7 @@ export async function historyDetail(id: string): Promise<{
   try {
     const { data, error } = await supabase.rpc("rpc_catalog_history_detail" as never,
       { p_id: id } as never);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: cauLoi("Không tải được chi tiết.", error) };
     const kq = (data || {}) as Record<string, unknown>;
     if (kq.ok !== true) return { ok: false, error: String(kq.error ?? "Không đọc được chi tiết") };
     return { ok: true, history: kq.history as Record<string, unknown> };

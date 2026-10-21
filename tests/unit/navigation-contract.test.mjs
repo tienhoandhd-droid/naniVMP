@@ -47,7 +47,7 @@ test("metadata tiêu đề bao phủ exhaustive mọi ScreenId, kể cả route 
   const metadata = await import(url.href);
   assert.equal(typeof metadata.resolveScreenTitle, "function");
   assert.deepEqual(Object.keys(metadata.SCREEN_TITLES).sort(), [...SCREEN_IDS].sort());
-  assert.equal(metadata.resolveScreenTitle("rules"), "Luật hệ thống đang áp dụng");
+  assert.equal(metadata.resolveScreenTitle("rules"), "Quy tắc nghiệp vụ");
   assert.equal(metadata.resolveScreenTitle("inventory"), "Cập nhật tiến độ");
   assert.equal(metadata.resolveScreenTitle("accounts"), "Vai trò & phạm vi");
 });

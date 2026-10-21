@@ -88,14 +88,14 @@ export function filterCatalogImportRows(
 
 export function catalogImportCommitBlock(input: CatalogImportCommitReadiness): ActionBlock | null {
   return firstActionBlock([
-    { blocked: input.busy, code: "request", message: "Đang ghi lô" },
-    { blocked: !input.previewOk, code: "preview", message: "Chưa có kết quả đối chiếu server" },
-    { blocked: input.status !== "validated", code: "status", message: "Batch chưa sẵn sàng" },
+    { blocked: input.busy, code: "request", message: "Đang ghi đợt nhập" },
+    { blocked: !input.previewOk, code: "preview", message: "Chưa xem trước xong" },
+    { blocked: input.status !== "validated", code: "status", message: "Đợt nhập chưa sẵn sàng" },
     { blocked: input.errors > 0, code: "rows", message: `Còn ${input.errors} dòng lỗi` },
     {
       blocked: !input.reason.trim(),
       code: "required",
-      message: "Nhập lý do của cả lô",
+      message: "Nhập lý do của cả đợt nhập",
       focusId: "cw-import-batch-reason",
     },
   ]);

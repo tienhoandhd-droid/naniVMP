@@ -1,10 +1,20 @@
-export default function VmpMasthead() {
+/* Chữ cách điệu "VMP Monitor" — dùng chung cho dải trang trí (màn Việc hôm
+   nay, đăng nhập), khối thương hiệu ở thanh bên và thanh trên điện thoại.
+   Cỡ chữ do lớp cha quyết định (lotus-shell.css), hình chữ giữ nguyên. */
+export function VmpWordmark() {
+  return <span className="vmp-masthead__ten" aria-hidden="true">
+    <span className="vmp-masthead__v">V</span>
+    <span className="vmp-masthead__mp">MP</span>
+    <i className="vmp-masthead__monitor">Monitor</i>
+  </span>;
+}
+
+/* 21/10: dải trang trí chỉ còn ở màn đầu (Việc hôm nay) và màn đăng nhập.
+   Dòng phụ "Hệ giám sát thẩm định" chỉ hiện khi truyền `phu` (đăng nhập) và
+   viết chữ thường, không còn VIẾT HOA giãn cách. */
+export default function VmpMasthead({ phu = false }: { phu?: boolean } = {}) {
   return <div className="vmp-masthead" role="img" aria-label="VMP Monitor · Hệ giám sát thẩm định">
-    <span className="vmp-masthead__ten" aria-hidden="true">
-      <span className="vmp-masthead__v">V</span>
-      <span className="vmp-masthead__mp">MP</span>
-      <i className="vmp-masthead__monitor">Monitor</i>
-    </span>
+    <VmpWordmark />
     <svg className="vmp-masthead__net" width="214" height="20" viewBox="0 0 260 20" aria-hidden="true">
       <path d="M2 12C34 4 61 16 98 10" fill="none" strokeWidth="1.15" strokeLinecap="round" />
       <path d="M162 10C197 4 224 15 258 9" fill="none" strokeWidth="1.15" strokeLinecap="round" />
@@ -16,6 +26,6 @@ export default function VmpMasthead() {
         <circle cx="130" cy="18" r="1.3" />
       </g>
     </svg>
-    <span className="vmp-masthead__phu">Hệ giám sát thẩm định</span>
+    {phu && <span className="vmp-masthead__phu">Hệ giám sát thẩm định</span>}
   </div>;
 }

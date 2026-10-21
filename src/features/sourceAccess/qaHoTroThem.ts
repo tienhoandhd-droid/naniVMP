@@ -38,11 +38,18 @@ export function docQaHoTroThem(value: unknown): QaHoTroThemDanhSach {
 export async function layQaHoTroThem(objectCode: string): Promise<KetQua<QaHoTroThemDanhSach>> {
   if (!supabase) return { ok: false, error: "Hệ thống chưa cấu hình kết nối." };
   const { data, error } = await supabase.rpc("rpc_source_supporters" as never, { p_object_code: objectCode } as never);
-  if (error) return { ok: false, error: `Không tải được danh sách: ${error.message}` };
+  if (error) {
+    console.error("[QA hỗ trợ thêm] Không tải được danh sách:", error);
+    return { ok: false, error: "Không tải được danh sách." };
+  }
+  // Máy chủ từ chối có lý do nghiệp vụ thì giữ nguyên lý do đó.
+  const tuChoi = data as { ok?: unknown; error?: unknown } | null;
+  if (tuChoi && tuChoi.ok === false) return { ok: false, error: String(tuChoi.error ?? "Không được phép.") };
   try {
     return { ok: true, data: docQaHoTroThem(data) };
   } catch (loi) {
-    return { ok: false, error: loi instanceof Error ? loi.message : String(loi) };
+    console.error("[QA hỗ trợ thêm] Dữ liệu danh sách không hợp lệ:", loi);
+    return { ok: false, error: "Không đọc được danh sách." };
   }
 }
 
@@ -56,7 +63,10 @@ export async function datQaHoTroThem(
     p_them: them,
     p_ly_do: lyDo,
   } as never);
-  if (error) return { ok: false, error: `Không lưu được: ${error.message}` };
+  if (error) {
+    console.error("[QA hỗ trợ thêm] Không lưu được:", error);
+    return { ok: false, error: "Không lưu được." };
+  }
   const kq = (data ?? {}) as Record<string, unknown>;
   if (kq.ok !== true) return { ok: false, error: String(kq.error ?? "Không lưu được") };
   return { ok: true, data: { thayDoi: kq.thay_doi === true } };

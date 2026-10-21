@@ -88,12 +88,12 @@ export function canApplyCatalogImpact(input: {
     return { ok: false, reason: "Lý do là bắt buộc" };
   }
   if (input.selected.length > 0 && input.confirmed !== true) {
-    return { ok: false, reason: "Cần xác nhận đặc biệt để áp deadline đã có tiến độ" };
+    return { ok: false, reason: "Cần xác nhận để đổi hạn chót hạng mục đã có tiến độ" };
   }
   return { ok: true };
 }
 
-const FALLBACK_ERROR = "Áp vào timeline thất bại";
+const FALLBACK_ERROR = "Áp dụng thất bại";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

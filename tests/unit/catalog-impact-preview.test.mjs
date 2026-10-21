@@ -84,8 +84,8 @@ test("progressed deadline preview shows four old-to-new deadlines and real-progr
     assert.match(html, new RegExp(date));
   }
   assert.match(html, /actual_validation_date: 20\/03\/2026/);
-  assert.match(html, /Có thể cập nhật riêng deadline kế hoạch; ngày thực tế và trạng thái giữ nguyên\./);
-  assert.match(html, /type="checkbox"[^>]*aria-label="Chọn cập nhật deadline CCTB01\/2026\.01-PQ"(?![^>]*checked)/);
+  assert.match(html, /Đổi được hạn chót/);
+  assert.match(html, /type="checkbox"[^>]*aria-label="Chọn đổi hạn chót CCTB01\/2026\.01-PQ"(?![^>]*checked)/);
 });
 
 test("blocked progressed candidate names the exact blocker and has no selection checkbox", () => {
@@ -99,10 +99,10 @@ test("blocked progressed candidate names the exact blocker and has no selection 
     }),
   });
 
-  assert.match(html, /Không thể cập nhật deadline/);
+  assert.match(html, /Không đổi được hạn chót/);
   assert.match(html, /Hạng mục đã bị hủy/);
   assert.match(html, /Không thể áp — thiếu: Tháng thẩm định đầu tiên/);
-  assert.doesNotMatch(html, /aria-label="Chọn cập nhật deadline CCTB01\/2026\.01-PQ"/);
+  assert.doesNotMatch(html, /aria-label="Chọn đổi hạn chót CCTB01\/2026\.01-PQ"/);
 });
 
 test("a failed replacement preview clears the prior change before it can be applied", () => {

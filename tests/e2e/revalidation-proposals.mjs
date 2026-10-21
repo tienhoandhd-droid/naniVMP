@@ -102,7 +102,7 @@ try {
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   }));
   assert.equal(table.heading, "Kỳ tái thẩm định");
-  assert.deepEqual(table.headers, ["Mã / đối tượng", "Hoàn thành gốc", "Chu kỳ", "Kỳ tiếp theo", "Trạng thái", "Quyết định"]);
+  assert.deepEqual(table.headers, ["Mã / đối tượng", "Ngày hoàn thành", "Chu kỳ", "Kỳ tiếp theo", "Trạng thái", "Quyết định"]);
   assert.equal(table.status, "Chờ quyết định");
   assert.deepEqual(table.actions, ["Xác nhận", "Bỏ qua"]);
   assert.ok(table.overflow <= 1, `Bảng tái thẩm định không được tràn desktop: ${JSON.stringify(table)}`);

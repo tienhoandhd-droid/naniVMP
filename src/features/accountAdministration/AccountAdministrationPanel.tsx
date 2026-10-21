@@ -29,15 +29,20 @@ export interface AccountAdministrationPanelProps {
 export function resolveReloadedAccount(snapshot: AccountAdministrationSnapshot, userId: string, isCurrent: () => boolean): AccountAdministrationRow | null { if (!isCurrent() || Object.keys(snapshot.errors).length > 0) return null; return snapshot.rows.find((row) => row.userId === userId) ?? null; }
 export function createActivationUiState() { let token = 0; return { begin: () => ++token, cancel: (value: number) => { if (token === value) token++; }, isCurrent: (value: number) => token === value }; }
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
+/** Lỗi gốc chỉ ghi console; người dùng thấy câu nghiệp vụ. */
+const SAVE_FAILED = "Chưa lưu được. Thử lại.";
+const SAVED_UNVERIFIED = "Đã lưu, chưa tải lại được. Bấm Tải lại.";
+function logError(context: string, error: unknown): void { console.error(context, error); }
+const SOURCE_LABEL: Record<AccountSourceName, string> = { accounts: "tài khoản", roles: "vai trò", directory: "hồ sơ nhân sự" };
 export async function loadAccountAdministrationSnapshot(loaders: AccountAdministrationLoaders): Promise<AccountAdministrationSnapshot> {
   const settled = await Promise.allSettled([loaders.loadAccounts(), loaders.loadRoles(), loaders.loadDirectory()]);
   const errors: Partial<Record<AccountSourceName, string>> = {};
   const accounts = settled[0].status === "fulfilled" ? settled[0].value : null;
   const roles = settled[1].status === "fulfilled" ? settled[1].value : [];
   const directory = settled[2].status === "fulfilled" ? settled[2].value : [];
-  if (settled[0].status === "rejected") errors.accounts = errorMessage(settled[0].reason);
-  if (settled[1].status === "rejected") errors.roles = errorMessage(settled[1].reason);
-  if (settled[2].status === "rejected") errors.directory = errorMessage(settled[2].reason);
+  if (settled[0].status === "rejected") { errors.accounts = errorMessage(settled[0].reason); logError("Không tải được tài khoản", settled[0].reason); }
+  if (settled[1].status === "rejected") { errors.roles = errorMessage(settled[1].reason); logError("Không tải được vai trò", settled[1].reason); }
+  if (settled[2].status === "rejected") { errors.directory = errorMessage(settled[2].reason); logError("Không tải được hồ sơ nhân sự", settled[2].reason); }
   return { rows: accounts ? buildAccountAdministrationRows({ accounts: accounts.nguoi, roles, directory }) : [], errors };
 }
 export function applySourceUncertainty(rows: AccountAdministrationRow[], errors: Partial<Record<AccountSourceName, string>>): AccountAdministrationRow[] {
@@ -54,13 +59,13 @@ export function createActivationCoordinator() {
     if (busy) return { kind: "busy" }; if (!args.canManage()) return { kind: "stale" }; if (!args.reason.trim()) return { kind: "rejected", message: "Cần nhập lý do." }; busy = true;
     try {
     let result;
-    try { result = await args.mutate(args.userId, args.nextActive, args.reason.trim()); } catch (error) { return { kind: "rejected", message: errorMessage(error) }; }
-    if (!result.ok) return { kind: "rejected", message: result.error || "Không thể cập nhật tài khoản" };
+    try { result = await args.mutate(args.userId, args.nextActive, args.reason.trim()); } catch (error) { logError("Đổi trạng thái tài khoản thất bại", error); return { kind: "rejected", message: SAVE_FAILED }; }
+    if (!result.ok) { logError("Đổi trạng thái tài khoản bị từ chối", result.error); return { kind: "rejected", message: SAVE_FAILED }; }
     if (!args.canManage()) return { kind: "stale" };
     let row;
-    try { row = await args.reload(args.userId); } catch (error) { return args.canManage() ? { kind: "written_unverified", message: `Đã ghi nhưng chưa đối chiếu lại được: ${errorMessage(error)}` } : { kind: "stale" }; }
+    try { row = await args.reload(args.userId); } catch (error) { logError("Tải lại tài khoản sau khi lưu thất bại", error); return args.canManage() ? { kind: "written_unverified", message: SAVED_UNVERIFIED } : { kind: "stale" }; }
     if (!args.canManage()) return { kind: "stale" };
-    return row?.userId === args.userId && row.accountActive === args.nextActive ? { kind: "verified" } : { kind: "written_unverified", message: "Đã ghi nhưng chưa đối chiếu lại được." };
+    return row?.userId === args.userId && row.accountActive === args.nextActive ? { kind: "verified" } : { kind: "written_unverified", message: SAVED_UNVERIFIED };
     } finally { busy = false; }
   } };
 }
@@ -69,10 +74,10 @@ export async function activateAccount(args: ActivationArgs): Promise<{ kind: "ve
   if (args.operation) args.operation.token = 2;
   if (!args.reason.trim()) return { kind: "rejected", message: "Cần nhập lý do." };
   let result;
-  try { result = await args.mutate(args.userId, args.nextActive, args.reason.trim()); } catch (error) { return args.isCurrent() ? { kind: "rejected", message: errorMessage(error) } : { kind: "stale" }; }
-  if (!result.ok) return args.isCurrent() ? { kind: "rejected", message: result.error || "Không thể cập nhật tài khoản" } : { kind: "stale" };
+  try { result = await args.mutate(args.userId, args.nextActive, args.reason.trim()); } catch (error) { logError("Đổi trạng thái tài khoản thất bại", error); return args.isCurrent() ? { kind: "rejected", message: SAVE_FAILED } : { kind: "stale" }; }
+  if (!result.ok) { logError("Đổi trạng thái tài khoản bị từ chối", result.error); return args.isCurrent() ? { kind: "rejected", message: SAVE_FAILED } : { kind: "stale" }; }
   if (!args.isCurrent()) return { kind: "stale" };
-  try { const row = await args.reload(args.userId); return args.isCurrent() && row?.userId === args.userId && row.accountActive === args.nextActive ? { kind: "verified" } : { kind: "written_unverified", message: "Đã ghi nhưng chưa đối chiếu lại được." }; } catch (error) { return args.isCurrent() ? { kind: "written_unverified", message: `Đã ghi nhưng chưa đối chiếu lại được: ${errorMessage(error)}` } : { kind: "stale" }; }
+  try { const row = await args.reload(args.userId); return args.isCurrent() && row?.userId === args.userId && row.accountActive === args.nextActive ? { kind: "verified" } : { kind: "written_unverified", message: SAVED_UNVERIFIED }; } catch (error) { logError("Tải lại tài khoản sau khi lưu thất bại", error); return args.isCurrent() ? { kind: "written_unverified", message: SAVED_UNVERIFIED } : { kind: "stale" }; }
 }
 export function stableRowKey(row: Pick<AccountAdministrationRow, "key">, index: number): string { return `${row.key}:${index}`; }
 const defaultLoaders: AccountAdministrationLoaders = { loadAccounts: fetchNguoiVaQuyen, loadRoles: fetchVaiNghiepVu, loadDirectory: () => searchPermissionDirectory("") };
@@ -107,7 +112,7 @@ export function ActivationDialog({
   };
   return (
     <div role="dialog" aria-label="Đổi trạng thái tài khoản">
-      <p>{draft.row.userId} → {draft.next ? "hoạt động" : "tắt"}</p>
+      <p>{draft.row.name || draft.row.email || "Tài khoản"} → {draft.next ? "hoạt động" : "tắt"}</p>
       <textarea
         ref={reasonRef}
         aria-label="Lý do đổi trạng thái"
@@ -116,7 +121,7 @@ export function ActivationDialog({
         disabled={submitting}
         onChange={(event) => onReason(event.target.value)}
       />
-      <p id={descriptionId}>Nhập lý do rồi xác nhận; hệ thống sẽ đọc lại đúng tài khoản sau khi ghi.</p>
+      <p id={descriptionId}>Nhập lý do rồi xác nhận.</p>
       <button disabled={submitting} onClick={onCancel}>Hủy</button>
       <button disabled={submitting} aria-describedby={descriptionId} onClick={confirm}>Xác nhận</button>
       {status && <p role="alert">{status}</p>}
@@ -182,22 +187,22 @@ export function AccountAdministrationContent({
       {loading && <p role="status">Đang tải dữ liệu…</p>}
       {snapshot.errors.accounts && (
         <div role="alert">
-          Không tải được tài khoản: {snapshot.errors.accounts}{" "}
+          Không tải được tài khoản.{" "}
           <button onClick={onRetry}>Tải lại</button>
         </div>
       )}
       {Object.entries(snapshot.errors)
         .filter(([key]) => key !== "accounts")
-        .map(([key, value]) => (
+        .map(([key]) => (
           <div role="status" key={key}>
-            Nguồn {key} chưa xác minh: {value}{" "}
+            Chưa tải được {SOURCE_LABEL[key as AccountSourceName] ?? "dữ liệu"}.{" "}
             <button onClick={onRetry}>Tải lại</button>
           </div>
         ))}
       <div className="reg reg--tron pq-control__role-table">
         <div className="reg-scroll">
           <table className="reg-table" data-role-control-table="true">
-            <caption>Tổng hợp tài khoản theo 5 vai trò</caption>
+            <caption>Tài khoản theo vai trò</caption>
             <thead><tr>
               <th scope="col" data-reg-stick>Vai trò</th>
               <th scope="col">Phạm vi mặc định</th>
@@ -235,7 +240,6 @@ export function AccountAdministrationContent({
       <div className="reg reg--tron">
         <div className="reg-scroll">
           <table className="reg-table" data-account-control-table="true">
-            <caption>Tài khoản theo trạng thái sẵn sàng; dòng cần xử lý được xếp trước</caption>
             <thead><tr>
               <th scope="col" data-reg-stick>Tài khoản</th>
               <th scope="col">Vai trò</th>
@@ -261,14 +265,13 @@ export function AccountAdministrationContent({
                     <td>
                       <details className="pq-control__details">
                         <summary>{passed}/{row.readiness.length} đạt{issueItems.length ? ` · ${issueItems.length} vấn đề` : ""}</summary>
-                        <ul aria-label={`Checklist sẵn sàng của ${row.name}`}>
+                        <ul aria-label={`Kiểm tra sẵn sàng của ${row.name}`}>
                           {row.readiness.map((item) => (
                             <li key={item.key} data-state={item.state}>
                               <b>{item.label}</b><span>{item.detail}</span>{item.nextAction && <em>{item.nextAction}</em>}
                             </li>
                           ))}
                         </ul>
-                        <p className="reg-muted">UUID: {row.userId || "thiếu"}</p>
                       </details>
                     </td>
                     <td className="pq-control__row-actions">
@@ -317,12 +320,12 @@ export function AccountAdministrationView({
   activeTool,
 }: AccountAdministrationPanelProps) {
   const [snapshot, setSnapshot] = useState<AccountAdministrationSnapshot>({ rows: [], errors: {} }); const [loading, setLoading] = useState(true); const generation = useRef(0);
-  const load = useCallback(async () => { const current = ++generation.current; setLoading(true); try { const next = await loadAccountAdministrationSnapshot(loaders); if (current === generation.current) setSnapshot(next); } catch (error) { if (current === generation.current) setSnapshot({ rows: [], errors: { accounts: errorMessage(error) } }); } finally { if (current === generation.current) setLoading(false); } }, [loaders]);
+  const load = useCallback(async () => { const current = ++generation.current; setLoading(true); try { const next = await loadAccountAdministrationSnapshot(loaders); if (current === generation.current) setSnapshot(next); } catch (error) { if (current === generation.current) { logError("Không tải được tài khoản", error); setSnapshot({ rows: [], errors: { accounts: errorMessage(error) } }); } } finally { if (current === generation.current) setLoading(false); } }, [loaders]);
   useEffect(() => { void load(); }, [load, revision]);
   const reload = useCallback(async (userId: string) => { const request = ++generation.current; const next = await loadAccountAdministrationSnapshot(loaders); if (generation.current !== request) return null; setSnapshot(next); return resolveReloadedAccount({ ...next, rows: applySourceUncertainty(next.rows, next.errors) }, userId, () => generation.current === request); }, [loaders]);
   const [draft, setDraft] = useState<ActivationDraft | null>(null); const activeGeneration = useRef(0); const uiOperation = useRef(createActivationUiState()); const coordinator = useRef(createActivationCoordinator()); const [status, setStatus] = useState<string | null>(null); const [submitting, setSubmitting] = useState(false);
   useEffect(() => { if (!canManageAccounts) { activeGeneration.current += 1; setDraft(null); setSubmitting(false); } }, [canManageAccounts]);
-  const confirm = async () => { const userId = draft?.row.userId; if (!userId || submitting || !draft) return; setSubmitting(true); const target = draft; const outcome = await coordinator.current.run({ userId, nextActive: target.next, reason: target.reason.trim(), canManage: () => canManageAccounts && activeGeneration.current === target.token && uiOperation.current.isCurrent(target.token), mutate: mutateActive, reload }); if (uiOperation.current.isCurrent(target.token)) { if (outcome.kind === "verified") setDraft(null); else if (outcome.kind !== "stale") setStatus(outcome.message || "Không thể xác minh trạng thái"); setSubmitting(false); } };
+  const confirm = async () => { const userId = draft?.row.userId; if (!userId || submitting || !draft) return; setSubmitting(true); const target = draft; const outcome = await coordinator.current.run({ userId, nextActive: target.next, reason: target.reason.trim(), canManage: () => canManageAccounts && activeGeneration.current === target.token && uiOperation.current.isCurrent(target.token), mutate: mutateActive, reload }); if (uiOperation.current.isCurrent(target.token)) { if (outcome.kind === "verified") setDraft(null); else if (outcome.kind !== "stale") setStatus(outcome.message || SAVED_UNVERIFIED); setSubmitting(false); } };
   const rows = applySourceUncertainty(snapshot.rows, snapshot.errors);
   const startActivation = (row: AccountAdministrationRow) => {
     if (submitting) return;

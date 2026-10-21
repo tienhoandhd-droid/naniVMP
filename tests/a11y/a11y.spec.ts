@@ -212,7 +212,7 @@ test("axe · hop-chuyen-phu-trach-workload", async ({ page }, testInfo) => {
   await page.locator("[data-workload-detail-trigger]").first().click();
   await expect(page.locator("[data-workload-owner-transfer]").first()).toBeVisible({ timeout: 10_000 });
   await page.locator("[data-workload-owner-transfer]").first().click();
-  await expect(page.getByRole("dialog", { name: "Chuyển phụ trách" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("dialog", { name: "Chuyển QA phụ trách" })).toBeVisible({ timeout: 10_000 });
 
   const kq = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

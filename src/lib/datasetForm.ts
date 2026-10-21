@@ -84,7 +84,7 @@ export function validateRecipientForm(form: GiaTriDataset): LoiDataset {
   if ((phamVi === "department" || phamVi === "object"
        || phamVi.includes("bộ phận") || phamVi.includes("đối tượng"))
       && !giaTriPhamVi) {
-    loi.scope = "Chọn phạm vi bộ phận hoặc đối tượng thì phải ghi rõ mã";
+    loi.scope = "Theo bộ phận/khu vực thì phải ghi rõ mã";
   }
 
   return loi;

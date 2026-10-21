@@ -73,12 +73,10 @@ export function buildValiBrief(stats: ValiBriefStats = {}): ValiBrief {
   const moodLabel = mood === "concern" ? "đang lo" : mood === "celebrate" ? "nhẹ nhõm" : "dẫn đường";
 
   const headline = overdue > 0
-    ? `Có ${overdue} hồ sơ quá hạn; đây là điểm nghẽn chính của kế hoạch.`
+    ? `${overdue} hạng mục quá hạn đích VMP.`
     : soon > 0
-      ? `Kế hoạch chưa có hồ sơ trễ; ${soon} hồ sơ sắp tới hạn cần được theo dõi.`
-      : rate >= 70
-        ? `Tiến độ VMP đang ở mức ${rate}%, chưa ghi nhận hồ sơ quá hạn.`
-        : `Tiến độ VMP đang ở mức ${rate}%; cần tiếp tục bám sát các mốc tháng.`;
+      ? `Không có hạng mục quá hạn. ${soon} hạng mục tới hạn 30 ngày.`
+      : `Tiến độ VMP ${rate}%. Không có hạng mục quá hạn.`;
 
   const metrics: ValiBriefMetric[] = [
     {
@@ -92,14 +90,14 @@ export function buildValiBrief(stats: ValiBriefStats = {}): ValiBrief {
       kind: "documents",
       label: "Hồ sơ hoàn thiện",
       value: `${documentRate}%`,
-      detail: `${documentDone}/${documentTotal} hồ sơ hoàn thiện`,
+      detail: `${documentDone}/${documentTotal} hoàn thiện`,
       tone: documentRate >= 70 ? "success" : documentRate < 30 ? "warning" : "info",
     },
     {
       kind: "overdue",
       label: "Quá hạn",
       value: String(overdue),
-      detail: overdue > 0 ? "Cần xử lý ngay" : "Không có hồ sơ trễ",
+      detail: overdue > 0 ? "Cần xử lý ngay" : "Không có hạng mục quá hạn",
       tone: overdue > 0 ? "danger" : "success",
     },
     {
@@ -119,18 +117,18 @@ export function buildValiBrief(stats: ValiBriefStats = {}): ValiBrief {
     },
     {
       kind: "mismatched",
-      text: `${mismatched} hồ sơ lệch pha giữa tiến độ và hồ sơ`,
+      text: `${mismatched} hạng mục lệch pha`,
       tone: mismatched > 0 ? "info" : "success",
     },
   ];
 
   const action = overdue > 0
-    ? "Ưu tiên xử lý hồ sơ quá hạn trước, sau đó chốt các mốc sắp tới hạn."
+    ? "Xử lý hạng mục quá hạn trước."
     : soon > 0
-      ? "Ưu tiên theo dõi các hồ sơ tới hạn trong 30 ngày để không phát sinh trễ."
+      ? "Theo dõi hạng mục tới hạn 30 ngày."
       : mismatched > 0
-        ? "Ưu tiên đồng bộ các hồ sơ lệch pha để số liệu tiến độ và hồ sơ khớp nhau."
-        : "Tiếp tục duy trì tiến độ và kiểm tra các mốc tháng theo kế hoạch.";
+        ? "Rà hạng mục lệch pha."
+        : "Duy trì tiến độ.";
 
   return { mood, moodLabel, rate, headline, metrics, observations, action };
 }

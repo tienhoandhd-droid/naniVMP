@@ -148,11 +148,12 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
         : appendCatalogImportPreviewPage(emptyCatalogImportPreviewState(batchId), result.page));
       if (!append) {
         const count = result.page.batch.counts;
-        if (count.errors > 0) toast.canhBao(`${count.errors} dòng lỗi — kiểm tra bảng đối chiếu server`);
-        else toast.thanhCong(`${result.page.batch.total} dòng đã được server đối chiếu, chưa ghi`);
+        if (count.errors > 0) toast.canhBao(`${count.errors} dòng lỗi`);
+        else toast.thanhCong(`Đã xem trước ${result.page.batch.total} dòng, chưa ghi`);
       }
     } catch (cause) {
-      setPreviewError(cause instanceof Error ? cause.message : "Không ghép được trang xem trước");
+      console.error("[Nhập Excel] Không ghép được trang xem trước:", cause);
+      setPreviewError("Bản xem trước bị lệch. Chọn lại file.");
     }
   };
 
@@ -175,9 +176,9 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
         setStaging({ tt: "san", batch: result.batch });
         if (dataset === "source_objects") void fetchPreviewPage(result.batch.id, 0, false, generation);
       } else if (result.errorCode === "NOT_AVAILABLE") {
-        setStaging({ tt: "chan", loi: result.error || "Chưa bật nhập theo lô trên máy chủ" });
+        setStaging({ tt: "chan", loi: result.error || "Chưa mở chức năng nhập Excel" });
       } else {
-        const message = result.error || "Không staging được lô nhập";
+        const message = result.error || "Không xem trước được file";
         setStaging({ tt: "loi", loi: message }); toast.loi(message);
       }
     });
@@ -222,16 +223,16 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("LOI");
     if (dataset === "source_objects") {
-      sheet.addRow(["Dòng", "Mã đối tượng", "Loại", "Mã lỗi", "Mô tả lỗi", "Trường"]).font = { bold: true };
+      sheet.addRow(["Dòng", "Mã đối tượng", "Loại", "Mô tả lỗi", "Trường"]).font = { bold: true };
       for (const row of (serverPreview?.rows ?? []).filter((item) => item.classification === "error")) {
-        for (const error of row.errors) sheet.addRow([row.rowNumber, row.businessKey, row.objectKind ?? "", error.code, error.message, error.field ?? ""]);
+        for (const error of row.errors) sheet.addRow([row.rowNumber, row.businessKey, row.objectKind ?? "", error.message, error.field ?? ""]);
       }
     } else {
-      sheet.addRow([...cot.map((column) => column.header), "Mã lỗi", "Mô tả lỗi"]).font = { bold: true };
+      sheet.addRow([...cot.map((column) => column.header), "Mô tả lỗi"]).font = { bold: true };
       for (const row of (xemTruoc ?? []).filter((item) => item.loai === "loi")) {
         sheet.addRow([
           ...cot.map((column) => column.key === "object_kind" ? (row.objectKind ?? "") : (row.values[column.key] ?? "")),
-          row.errors.map((error) => error.code).join("; "), row.errors.map((error) => error.message).join(" · "),
+          row.errors.map((error) => error.message).join(" · "),
         ]);
       }
     }
@@ -262,14 +263,14 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
     }
     if (staging.tt !== "san") return;
     setDangGhi(true); setCommitError("");
-    const progress = toast.dangChay("Đang ghi lô vào hệ thống…");
+    const progress = toast.dangChay("Đang ghi đợt nhập vào hệ thống…");
     const result = await commitCatalogImport(staging.batch.id, lyDo.trim());
     setDangGhi(false);
     if (!result.ok) {
       const conflict = result.errorCode === "STALE_VERSION" || result.errorCode === "VERSION_CONFLICT";
       const message = conflict
-        ? "Dữ liệu nguồn đã thay đổi sau khi staging. Hãy chọn lại file để tạo bản xem trước mới; nội dung và lý do hiện tại vẫn được giữ."
-        : `Ghi thất bại: ${result.error || result.errorCode || "không rõ"}`;
+        ? "Dữ liệu vừa có người sửa. Chọn lại file."
+        : `Ghi thất bại: ${result.error || "thử lại sau."}`;
       progress.hong(message); setCommitError(message); return;
     }
     const nextReceipt: ImportReceipt = {
@@ -320,21 +321,21 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
       {loiHienTai && <StateBoundary state="error" title="Chưa tải được dữ liệu hiện tại" description={loiHienTai} />}
       <label className="cw-import__chon">
         <Upload size={16} aria-hidden="true" />
-        <span>Chọn file Excel theo mẫu (.xlsx, tối đa 5 MiB, 2.000 dòng)</span>
+        <span>Chọn file Excel theo mẫu (.xlsx, ≤ 5 MB, ≤ 2.000 dòng)</span>
         <input ref={oFile} type="file" accept=".xlsx" aria-label="Chọn file Excel theo mẫu" onChange={(event) => void chonFile(event.target.files)} />
       </label>
-      {loiCauTruc && <p className="cw-import__loi" role="alert">{loiCauTruc} Không có gì được gửi lên server.</p>}
+      {loiCauTruc && <p className="cw-import__loi" role="alert">{loiCauTruc}</p>}
 
       {receipt && (
         <section className="cw-import-receipt" data-cw-import-receipt aria-labelledby="cw-import-receipt-title">
           <Check size={20} aria-hidden="true" />
           <div><h3 id="cw-import-receipt-title">Đã ghi {NHAN_DATASET[receipt.dataset]}</h3>
             <p>{receipt.created} tạo mới · {receipt.updated} cập nhật · {receipt.unchanged} không đổi</p>
-            <p className="cw-nhe">Batch {receipt.batchId.slice(0, 8)}… · {formatBangkokDateTime(receipt.committedAt)}</p>
+            <p className="cw-nhe">Đợt nhập {receipt.batchId.slice(0, 8)}… · {formatBangkokDateTime(receipt.committedAt)}</p>
           </div>
           <div className="cw-import-receipt__actions">
-            <CopyCodesButton text={receipt.batchId} label="Sao chép ID" className="cw-nut cw-nut--phu">
-              <Copy size={14} aria-hidden="true" /> Sao chép ID
+            <CopyCodesButton text={receipt.batchId} label="Sao chép mã đợt nhập" className="cw-nut cw-nut--phu">
+              <Copy size={14} aria-hidden="true" /> Sao chép mã đợt nhập
             </CopyCodesButton>
             {receipt.pendingChangeIds.length > 0 && <button type="button" className="cw-nut" onClick={onOpenPending}>Mở Chờ áp dụng ({receipt.pendingChangeIds.length})</button>}
           </div>
@@ -342,11 +343,11 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
       )}
 
       {parsed?.ok && dataset === "source_objects" && loadingPreview && !serverPreview && (
-        <StateBoundary state="loading" title="Máy chủ đang đối chiếu từng dòng" skeletonRows={4} />
+        <StateBoundary state="loading" title="Đang đối chiếu…" skeletonRows={4} />
       )}
       {dataset === "source_objects" && previewError && (
         <div className="cw-import__preview-error" role="alert"><span>{previewError}</span>
-          <button type="button" className="cw-nut" onClick={retryPreview}>Thử lại bản xem trước</button>
+          <button type="button" className="cw-nut" onClick={retryPreview}>Xem trước lại</button>
         </div>
       )}
       {dataset === "source_objects" && serverPreview?.batch && (
@@ -379,12 +380,12 @@ export default function CatalogExcelImport({ onCommitted, onOpenPending }: {
 
       {parsed?.ok && (
         <div className="cw-import__ghi">
-          {staging.tt === "chan" && <p className="cw-canh-bao" data-cw-ghi-chan>BỊ CHẶN — {staging.loi}</p>}
+          {staging.tt === "chan" && <p className="cw-canh-bao" data-cw-ghi-chan>Chưa ghi được: {staging.loi}</p>}
           {staging.tt === "loi" && <p className="cw-canh-bao cw-canh-bao--loi" data-cw-ghi-chan>{staging.loi}</p>}
           {soLoi > 0 && <p className="cw-nhe">Còn {soLoi} dòng lỗi — sửa trong Excel rồi chọn lại file.</p>}
-          <label className="cw-truong" htmlFor="cw-import-batch-reason"><span className="cw-nhan">Lý do của cả lô nhập <span className="cw-bat-buoc-chu">Bắt buộc</span></span></label>
+          <label className="cw-truong" htmlFor="cw-import-batch-reason"><span className="cw-nhan">Lý do của cả đợt nhập <span className="cw-bat-buoc-chu">Bắt buộc</span></span></label>
           <textarea id="cw-import-batch-reason" className="cw-o" rows={2} value={lyDo} aria-describedby={commitError ? "cw-import-commit-error" : undefined}
-            placeholder="Vì sao có đợt nhập này — sẽ nằm trong audit" onChange={(event) => { setLyDo(event.target.value); setCommitError(""); }} />
+            placeholder="Lý do nhập (ghi vào nhật ký)" onChange={(event) => { setLyDo(event.target.value); setCommitError(""); }} />
           {commitError && <p id="cw-import-commit-error" className="cw-import__loi" role="alert">{commitError}</p>}
           <div className="cw-chan-nut"><button type="button" className="cw-nut cw-nut--chinh" data-cw-ghi disabled={dangGhi} onClick={() => void ghi()}>{dangGhi ? "Đang ghi…" : "Ghi vào hệ thống"}</button></div>
         </div>

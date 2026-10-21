@@ -477,14 +477,13 @@ try {
       const overviewProgress = await page.$eval(".vmp-overview-progress", (node) => ({
         total: node.getAttribute("data-overview-total"),
         completed: node.querySelector('[data-overview-metric="completed"] [data-overview-value]')?.textContent?.trim(),
-        overdue: node.querySelector('[data-overview-metric="overdue"] [data-overview-value]')?.textContent?.trim(),
       }));
       assert.deepEqual({ total: overviewProgress.total, completed: overviewProgress.completed }, {
         total: "2", completed: "0",
       },
         `${persona.label} Overview completion denominator is recalculated for the selected person`);
-      assert.equal(overviewProgress.overdue, String(todayOverdue),
-        `${persona.label} Overview Quá hạn matches the Today canonical-person KPI despite remembered period`);
+      // 21/10: ô lớn Tổng quan không còn hàng "Đã chuyển quá hạn" (số trùng);
+      // số quá hạn duy nhất trên Tổng quan là ô "Quá hạn đích VMP".
       assert.equal(teamSummaryCalls.length, 0,
         `${persona.label} must not call the ordinary-member aggregate RPC`);
       assert.equal(await page.evaluate(() => document.body.textContent?.includes("Tiến độ cả nhóm") ?? false), false,
@@ -536,7 +535,7 @@ try {
       await page.click(".vmp-vongnam-nut");
       const januaryRingRow = await page.evaluate(() => [...document.querySelectorAll(".vmp-ctrl-bang tbody tr")]
         .find((row) => row.querySelector("th")?.textContent?.trim() === "T1")?.textContent || "");
-      assert.match(januaryRingRow, /Đang chạy/,
+      assert.match(januaryRingRow, /Đang diễn ra/,
         "Overview year ring marks January current at the Bangkok New Year boundary");
 
       await page.click('[data-view="timeline"]');

@@ -322,9 +322,9 @@ async function openPersona(persona, { quick = false } = {}) {
   await page.waitForFunction(
     (expectedMode) => [...document.querySelectorAll('[role="dialog"]')]
       .some((dialog) => dialog.getClientRects().length > 0
-        && dialog.innerText.includes(expectedMode === "preview"
-          ? "Quyền dự kiến chưa áp dụng"
-          : "Quyền theo từng cột đang áp dụng")),
+        && (expectedMode === "preview"
+          ? dialog.innerText.includes("Quyền dự kiến chưa áp dụng")
+          : /🔒 (Bạn được sửa \d+ mục|Chỉ xem)\./.test(dialog.innerText))),
     {},
     persona.mode,
   );

@@ -5,8 +5,8 @@
      một override cho dark. */
   --lmr-khung: #e7e3d9;
   --lmr-chu-dam: #283d34;
-  --lmr-chu: #4f7065;
-  --lmr-chu-mo: #64786f;
+  --lmr-chu: #3D5D53; /* 21/10: 3.97 → ≥ 4.5:1 trên dải gradient khung */
+  --lmr-chu-mo: #4D635A; /* 21/10: 3.42 → 4.69:1 */
   --lmr-nut-nen: #355f52;
   --lmr-nut-chu: #fff9e9;
   --lmr-vien-vung: #698980;
@@ -17,7 +17,7 @@
   --lmr-chu-dam: #e6ece7;
   --lmr-chu: #a9c0b6;
   --lmr-chu-mo: #8aa094;
-  --lmr-nut-nen: #4f8a75;
+  --lmr-nut-nen: #5A957F; /* 21/10: 4.32 → 5.0:1 với --lmr-nut-chu */
   --lmr-nut-chu: #0f1d17;
   --lmr-vien-vung: #4c5f59;
   --lmr-canh-bao: #d99183;
@@ -156,9 +156,9 @@
   margin-bottom: 5px;
   color: var(--lmr-chu);
   font-size: 12px;
-  font-weight: 850;
-  letter-spacing: .16em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .long-mon-race h2 {
@@ -313,11 +313,11 @@
   border-radius: 999px;
   background: rgba(18, 49, 46, .58);
   color: rgba(255, 250, 232, .94);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: .08em;
+  font-size: 12px; /* C3 (21/10): tối thiểu 12px theo luật thẩm mỹ */
+  font-weight: 600;
+  letter-spacing: 0.01em;
   text-shadow: 0 1px 3px rgba(9, 31, 29, .7);
-  text-transform: uppercase;
+  text-transform: none;
   backdrop-filter: blur(8px);
 }
 
@@ -358,7 +358,7 @@
 }
 
 .long-mon-race__month small {
-  font-size: 9px; /* drift-mien: nhãn trên tranh, khung sprite giới hạn */
+  font-size: 12px; /* C3 (21/10): nhãn trên tranh nâng lên tối thiểu 12px */
   font-weight: 800;
   letter-spacing: .08em;
 }
@@ -408,7 +408,7 @@
      tranh (7px, mực 86%). Nâng một nấc đủ đọc từ xa, vẫn nhường sân khấu. */
   background: linear-gradient(180deg, rgba(23, 52, 46, .42), rgba(23, 52, 46, .10));
   color: rgba(252, 248, 232, .96);
-  font-size: 9px; /* drift-mien: nhãn trên tranh, khung sprite giới hạn */
+  font-size: 12px; /* C3 (21/10): nhãn trên tranh nâng lên tối thiểu 12px */
   font-weight: 800;
   letter-spacing: 0;
   text-shadow: 0 1px 3px rgba(15, 41, 36, .74);
@@ -424,7 +424,7 @@
   border-radius: 999px;
   background: rgba(33, 65, 57, .82);
   color: #f8e8b9;
-  font-size: 9px; /* drift-mien: nhãn trên tranh, khung sprite giới hạn */
+  font-size: 12px; /* C3 (21/10): nhãn trên tranh nâng lên tối thiểu 12px */
   font-weight: 850;
   white-space: nowrap;
   transform: translateX(-50%);
@@ -997,8 +997,8 @@
 .long-mon-bang th {
   text-align: left;
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--lp-ink-muted);
   padding: 8px 12px;
   border-bottom: 1px solid var(--lp-line-strong);
@@ -1390,6 +1390,9 @@
   #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact { flex-wrap: nowrap !important; padding: 8px 16px !important; gap: 8px !important; }
   #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact > div:first-child { flex: 1 1 0 !important; }
   #vmp-main-content[data-vmp-view="timeline"] .vmp-topbar--compact .vmp-title { font-size: 20px !important; }
+  /* 21/10: monitoring.css xếp dải hành trình thành cột dọc trên điện thoại
+     (luật A7); riêng màn Long Môn giữ MỘT hàng ba ô gọn để tranh ao đủ cao. */
+  #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__item { grid-template-columns: 1fr auto; padding: 4px; gap: 3px; }
   #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__item > svg { display: none; }
   #vmp-main-content[data-vmp-view="timeline"] .monitoring-journey__copy > strong { font-size: 12px; line-height: 15px; }

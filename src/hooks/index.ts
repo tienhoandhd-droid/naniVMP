@@ -144,7 +144,7 @@ export function useVmpData() {
   const [conn, setConn] = useState<ConnState>(() => {
     const c = loadConn();
     return c
-      ? { readUrl: c.readUrl || "", writeUrl: c.writeUrl || "", status: "idle", msg: "Đã nạp URL — đang chờ đồng bộ…" }
+      ? { readUrl: c.readUrl || "", writeUrl: c.writeUrl || "", status: "idle", msg: "Đang tải dữ liệu…" }
       : { readUrl: "", writeUrl: "", status: "idle", msg: "" };
   });
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -210,13 +210,14 @@ export function useVmpData() {
         permissionModeRef.current = null;
         permissionUserRef.current = "";
         clearProtectedData();
+        console.error("[VMP] Không đọc được ngữ cảnh quyền:", error);
         setConn((c) => ({
           ...c,
           readUrl,
           writeUrl,
           status: "err",
           source: "supabase",
-          msg: `Không xác minh được quyền — đã thu hồi dữ liệu trên màn hình: ${(error as Error).message}`,
+          msg: "Chưa kiểm tra được quyền. Bấm Thử lại.",
         }));
         return;
       }
@@ -318,13 +319,14 @@ export function useVmpData() {
         }
         if (!policy.allowLegacyFallback) {
           clearProtectedData();
+          console.error("[VMP] Không tải được dữ liệu đã lọc quyền:", e);
           setConn((c) => ({
             ...c,
             readUrl,
             writeUrl,
             status: "err",
             source: "supabase",
-            msg: "Không tải được dữ liệu đã lọc quyền — hệ thống đã thu hồi dữ liệu cũ và không dùng nguồn dự phòng chưa lọc.",
+            msg: "Không tải được dữ liệu. Bấm Thử lại.",
           }));
           return;
         }
@@ -340,7 +342,7 @@ export function useVmpData() {
       || permissionModeRef.current !== "preview"
     )) return;
     if (!readUrl) {
-      setConn((c) => ({ ...c, writeUrl, status: "err", msg: "Chưa cấu hình Supabase và chưa có URL đọc n8n." }));
+      setConn((c) => ({ ...c, writeUrl, status: "err", msg: "Chưa kết nối được dữ liệu. Liên hệ IT." }));
       return;
     }
     try {
@@ -362,9 +364,10 @@ export function useVmpData() {
         msg: `Đã tải ${data.objects?.length || 0} đối tượng · ${data.activities?.length || 0} hạng mục từ nguồn dự phòng ✓`,
       });
     } catch (e) {
+      console.error("[VMP] Không tải được dữ liệu từ nguồn dự phòng:", e);
       setConn({
         readUrl, writeUrl, status: "err",
-        msg: "Lỗi tải: " + ((e as Error)?.message || "không rõ") + " — kiểm tra URL / CORS / workflow",
+        msg: "Không tải được dữ liệu. Bấm Thử lại.",
       });
     }
   }, [clearProtectedData, readWatermark]);
@@ -473,12 +476,12 @@ export function useVmpData() {
       permissionModeRef.current = null;
       permissionUserRef.current = "";
       clearProtectedData();
-      const message = cause instanceof Error ? cause.message : "lỗi không xác định";
+      console.error("[VMP] Không làm mới được dữ liệu:", cause);
       setConn((current) => ({
         ...current,
         status: "err",
         source: "supabase",
-        msg: `Không thể làm mới dữ liệu an toàn — dữ liệu cũ đã được thu hồi. ${message}. Thử lại để nạp lại quyền và dữ liệu.`,
+        msg: "Không làm mới được dữ liệu. Bấm Thử lại.",
       }));
     }
   }, [clearProtectedData, readWatermark]);
@@ -630,7 +633,12 @@ export function useVmpData() {
       refreshRef.current?.();          // kéo lại dữ liệu để giao diện khớp DB
       return res;
     } catch (e) {
-      const msg = `${label} thất bại: ${(e as Error).message || "không rõ"}`;
+      /* Thông điệp từ lớp dữ liệu đã là câu nghiệp vụ (kèm lý do máy chủ trả
+         nếu có). Lỗi không mang chữ tiếng Việt là lỗi kỹ thuật thô — chỉ ghi
+         console, người dùng thấy câu chung. */
+      console.error(`[VMP] ${label} chưa lưu được:`, e);
+      const raw = (e as Error)?.message || "";
+      const msg = /[À-ỹ]/.test(raw) ? raw : `${label} chưa lưu được. Thử lại.`;
       setSaveStatus("error");
       setConn((c) => ({ ...c, msg }));
       setTimeout(() => setSaveStatus(""), 5000);

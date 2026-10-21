@@ -148,7 +148,7 @@ try {
       assert.equal(fixture.outside.total, 13, "all appended not_applicable records contribute outside KPI");
       assert.equal(fixture.total.total, 37, "server aggregate uses the full authorised population");
       const conclusion = await page.$eval("[data-health-conclusion]", (node) => node.textContent || "");
-      assert.match(conclusion, /còn khác|chưa thể kết luận bên nào sai/i,
+      assert.match(conclusion, /chỉ số lệch/i,
         "a true residual mismatch remains visible instead of declaring all data reconciled");
       assert.doesNotMatch(await page.$eval("main", (node) => node.textContent || ""), /\+221|máy chủ luôn đúng/i,
         "the old unexplained delta and blanket server-authority claim are absent");
@@ -178,9 +178,9 @@ try {
     const { page, network } = await openHealth(browser, { filtered: true });
     try {
       const conclusion = await page.$eval("[data-health-conclusion]", (node) => node.textContent || "");
-      assert.match(conclusion, /chưa cùng phạm vi|chưa thể kết luận/i,
+      assert.match(conclusion, /chưa cùng phạm vi|chưa so được/i,
         "a filtered Health view suppresses the integrity-match claim");
-      assert.doesNotMatch(conclusion, /Các chỉ số khớp/i,
+      assert.doesNotMatch(conclusion, /Số liệu khớp/i,
         "a filtered population is never presented as reconciled");
       assert.deepEqual(network.chanNgoai, [], "filtered reconciliation also stays inside the strict mock boundary");
     } finally {
@@ -193,9 +193,9 @@ try {
     try {
       const conclusion = await page.$eval("[data-health-conclusion]", (node) => node.textContent || "");
       const main = await page.$eval("main", (node) => node.textContent || "");
-      assert.match(main, /chưa có đủ dữ liệu để kết luận/i,
+      assert.match(main, /Không tải được số liệu hệ thống/i,
         "a failed server KPI read tells the operator that reconciliation is unavailable");
-      assert.doesNotMatch(conclusion, /Các chỉ số khớp/i,
+      assert.doesNotMatch(conclusion, /Số liệu khớp/i,
         "an RPC failure never claims a match");
       assert.deepEqual(network.chanNgoai, [], "failed reconciliation retains the strict network boundary");
     } finally {
@@ -213,11 +213,11 @@ try {
       await page.waitForFunction(() => !document.querySelector("[data-health-refresh]")?.hasAttribute("disabled"), { timeout: 15_000 });
       const conclusion = await page.$eval("[data-health-conclusion]", (node) => node.textContent || "");
       const main = await page.$eval("main", (node) => node.textContent || "");
-      assert.match(conclusion, /Chưa tải được dữ liệu bản đang xem|chưa thể đối chiếu/i,
+      assert.match(conclusion, /Chưa tải được dữ liệu/i,
         "a failed client reload marks the client population unavailable even while the server KPI can still respond");
-      assert.match(main, /chưa có đủ dữ liệu để kết luận|chưa thể đối chiếu/i,
+      assert.match(main, /Không tải được số liệu hệ thống|Chưa tải được dữ liệu/i,
         "the refresh failure is visible to the operator instead of rendering a zero-data result");
-      assert.doesNotMatch(conclusion, /Các chỉ số khớp/i,
+      assert.doesNotMatch(conclusion, /Số liệu khớp/i,
         "a client reload failure never claims that the two sources match");
       assert.equal(await page.$eval("[data-health-client-issues]", node => node.textContent?.trim()), "Chưa tải được",
         "a failed client read does not manufacture a zero-warning count");

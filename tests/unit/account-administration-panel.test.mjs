@@ -99,7 +99,7 @@ test("workspace dùng bảng vai trò và bảng tài khoản làm bề mặt ki
   }));
 
   assert.match(html, /data-role-control-table="true"/);
-  assert.match(html, /Tổng hợp tài khoản theo 5 vai trò/);
+  assert.match(html, /Tài khoản theo vai trò/);
   for (const label of ["Quản trị", "Quản lý QA", "Nhân viên QA", "Quản lý xưởng", "Nhân viên xưởng"]) {
     assert.match(html, new RegExp(label));
   }

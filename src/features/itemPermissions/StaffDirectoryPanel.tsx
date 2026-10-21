@@ -212,7 +212,8 @@ export default function StaffDirectoryPanel({
         const people = visibleSortedDirectoryPeople(await searchPermissionDirectory(query));
         if (sequence === requestSequence.current) setResults(people);
       } catch (error) {
-        if (sequence === requestSequence.current) setMessage((error as Error).message);
+        console.error("Không tìm được danh bạ", error);
+        if (sequence === requestSequence.current) setMessage("Không tải được danh bạ. Thử lại.");
       } finally {
         if (sequence === requestSequence.current) setLoading(false);
       }
@@ -263,11 +264,12 @@ export default function StaffDirectoryPanel({
         knownPeople.current.set(person.person_id, person);
         if (shouldSelect) choose(person);
       } else if (currentSelectedPersonId.current === refreshPersonId) {
-        setMessage(`Đã thay đổi liên kết nhưng chưa tìm thấy lại hồ sơ ${refreshPersonId}. Hãy tải lại danh bạ.`);
+        setMessage("Đã nối. Tải lại danh bạ để xem.");
       }
     }).catch((error) => {
+      console.error("Tải lại danh bạ sau khi nối thất bại", error);
       if (active && currentSelectedPersonId.current === refreshPersonId) {
-        setMessage(`Đã thay đổi liên kết nhưng chưa tải lại được: ${(error as Error).message}`);
+        setMessage("Đã nối, chưa tải lại được.");
       }
     });
     return () => { active = false; };
@@ -535,7 +537,7 @@ export default function StaffDirectoryPanel({
       </div>
 
       {selected && (
-        <div className="ip-badges" aria-label="Trạng thái tài khoản">
+        <div className="ip-badges" aria-label="Trạng thái tài khoản" data-selected-person-id={selected.person_id}>
           <span className={`ip-badge is-${selected.account_status}`}>
             {selected.account_status === "linked" ? "Đã nối tài khoản"
               : selected.account_status === "inactive" ? "Tài khoản đã khóa" : "Chưa có tài khoản"}
@@ -543,13 +545,12 @@ export default function StaffDirectoryPanel({
           {selected.match_status === "ambiguous" && <span className="ip-badge is-warning">Trùng tên — cần nối tay</span>}
           {isQaAccessClass(selected.access_class) && (
             <span className="ip-badge is-warning">{selected.user_id
-              ? "Quyền QA lấy từ người phụ trách/hỗ trợ trong Dữ liệu nguồn"
+              ? "QA: quyền theo phân công"
               : "Chưa nối tài khoản — dữ liệu nguồn chưa thể cấp quyền cho hồ sơ này"}</span>
           )}
           {!isDirectoryPersonComplete(selected) && (
             <span className="ip-badge is-warning">Hồ sơ chưa đủ — cần bổ sung bộ phận, phân loại, phạm vi và khu vực</span>
           )}
-          <span className="ip-badge">Khóa người: {selected.person_id}</span>
         </div>
       )}
 

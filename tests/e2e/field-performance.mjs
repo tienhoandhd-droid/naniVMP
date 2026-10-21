@@ -132,7 +132,7 @@ try {
     await page.waitForSelector('[data-field-performance-state="ready"]', { timeout: 10_000 });
     const text = await page.$eval("[data-field-performance-panel]", (node) => node.textContent || "");
     assert.match(text, /Hiệu năng thực tế/, "admin labels the real-field-performance panel in Vietnamese");
-    assert.match(text, /INP/, "admin renders metric code alongside its Vietnamese label");
+    assert.match(text, /Phản hồi thao tác/, "admin renders the Vietnamese metric label");
     assert.match(text, /180/, "admin renders the aggregate p75 returned by the server");
     assert.equal((calls.rpc_web_vitals_summary || []).length, 1, "admin loads aggregates once initially");
     await page.click("[data-field-performance-refresh]");
@@ -147,7 +147,7 @@ try {
   for (const scenario of [
     ["empty", { summary: { ok: true, days: 7, rows: [] } }, /Chưa có số đo/],
     ["forbidden", { summaryError: { status: 403, code: "42501", message: "Không có quyền xem số đo" } }, /không có quyền/i],
-    ["unavailable", { summaryError: { status: 404, code: "PGRST202", message: "Could not find the function public.rpc_web_vitals_summary" } }, /không khả dụng|chưa sẵn sàng/i],
+    ["unavailable", { summaryError: { status: 404, code: "PGRST202", message: "Could not find the function public.rpc_web_vitals_summary" } }, /không khả dụng|chưa sẵn sàng|chưa bật/i],
   ]) {
     const [state, fixture, expectedText] = scenario;
     const calls = {};

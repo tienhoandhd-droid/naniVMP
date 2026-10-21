@@ -42,7 +42,7 @@ const MAN = [
   ["accounts", "Tài khoản & quyền truy cập"],
   ["phanquyen", "Vai trò & phạm vi"],
   ["health", "Chất lượng dữ liệu"],
-  ["audit", "Nhật ký thay đổi"],
+  ["audit", "Nhật ký hệ thống"],
   ["admin", "Cấu hình hệ thống"],
 ];
 
@@ -238,21 +238,21 @@ for (const [id, ten] of MAN) {
   await trang.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await new Promise((r) => setTimeout(r, 2400));
 
-  /* 31/08 — UI bản cuối: MetricGrid bốn ô đã nhường chỗ cho hero Vali +
-     dải "Cần xử lý trước tiên" + cặp số đếm gọn. Test theo hợp đồng mới. */
+  /* 21/10 (G2): khối Vali "Cần xử lý trước tiên" đã bỏ vì trùng màn Việc
+     hôm nay; còn hai chip lọc nhanh "Cần xử lý · Quá hạn" có số đếm. */
   const kpi = await trang.evaluate(() => {
     const chu = document.querySelector("main")?.innerText || "";
     return {
       coCanXuLy: /Cần xử lý[\s\n]*\d+/.test(chu),
       coQuaHan: /Quá hạn[\s\n]*\d+/.test(chu),
       coDaiUuTien: !!document.querySelector(".pr-hero__uu-tien"),
-      soUuTien: document.querySelectorAll(".pr-hero__uu-tien .pr-uu-tien").length,
+      soChipNhanh: document.querySelectorAll('.pr-loc__nhanh .pr-chip').length,
     };
   });
   kiem(kpi.coCanXuLy, "có số đếm Cần xử lý");
   kiem(kpi.coQuaHan, "có số đếm Quá hạn");
-  kiem(kpi.coDaiUuTien, "có dải Cần xử lý trước tiên");
-  kiem(kpi.soUuTien > 0 && kpi.soUuTien <= 5, "dải ưu tiên có 1–5 mục", `${kpi.soUuTien}`);
+  kiem(!kpi.coDaiUuTien, "không còn khối Vali trùng Việc hôm nay");
+  kiem(kpi.soChipNhanh === 2, "giữ hai chip lọc Cần xử lý · Quá hạn", `${kpi.soChipNhanh}`);
 
   /* Mở hộp sửa dòng đầu rồi mở Lịch sử thay đổi. */
   await trang.evaluate(() => {
@@ -645,7 +645,7 @@ for (const [id, ten] of MAN) {
     "phân quyền liệt kê đủ các vai nghiệp vụ mới", chu.includes("workshop_manager") ? "" : "(thiếu vai xưởng)");
   kiem(!chu.includes("(viewer)"), "không còn Viewer trong danh sách vai hiệu lực");
   kiem(!chu.includes("department_user"), "không còn vai cũ department_user");
-  kiem(/Chế độ quyền màn hình/.test(chu), "hiện chế độ áp quyền (preview/enforced)");
+  kiem(/Quyền màn hình: (Đang áp dụng|Dự kiến)/.test(chu), "hiện chế độ áp quyền (preview/enforced)");
   // 16/10: phụ đề kể nguồn gốc lịch sử (migration, tab Sheet cũ) đã bỏ khỏi
   // giao diện — chỉ còn khoá ý định: không được nói công thức lấy từ Sheet.
   kiem(!/Google Sheet'?\s*$/m.test(chu) && !/(lấy|đọc) từ (Google )?Sheet/i.test(chu),

@@ -9,6 +9,22 @@ import {
   type WorkshopScopeGrantResult,
 } from "./contracts.ts";
 
+const CHUA_KET_NOI = "Chưa kết nối được hệ thống.";
+
+/** Chữ thô (mã lỗi, tên hàm, tiếng Anh) chỉ ra console; người dùng thấy câu chung. */
+function ghiLoi(cauChung: string, raw: unknown): string {
+  console.error(`[Phạm vi Dữ liệu nguồn] ${cauChung}`, raw);
+  return cauChung;
+}
+
+/** Như ghiLoi nhưng giữ lý do nghiệp vụ máy chủ trả (tiếng Việt, từ chối quyền). */
+function cauLoi(cauChung: string, raw: { message: string }): string {
+  ghiLoi(cauChung, raw);
+  if (/permission denied|42501|forbidden/i.test(raw.message)) return "Không có quyền thực hiện.";
+  if (/[À-ỹ]/.test(raw.message) && !/rpc_|PGRST|schema|relation|function|column|violates/i.test(raw.message)) return raw.message;
+  return cauChung;
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface ListSourceQaCandidatesInput {
@@ -62,7 +78,7 @@ function workshopScopeChoicesCursor(cursor: SourceWorkshopScopeChoicesCursor | n
 export async function listSourceQaCandidates(
   input: ListSourceQaCandidatesInput = {},
 ): Promise<SourceQaCandidatesResult> {
-  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: CHUA_KET_NOI };
   const limit = input.limit ?? 25;
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     return { ok: false, errorCode: "INVALID_LIMIT", error: "Giới hạn phải từ 1 đến 50." };
@@ -75,18 +91,18 @@ export async function listSourceQaCandidates(
       p_limit: limit,
       p_include_ids: includeIds,
     } as never);
-    if (error) return { ok: false, errorCode: "NETWORK", error: error.message };
+    if (error) return { ok: false, errorCode: "NETWORK", error: cauLoi("Không tải được dữ liệu.", error) };
     try {
       return decodeSourceQaCandidatesResponse(data);
     } catch (cause) {
       const detail = cause instanceof SourceAccessContractError ? cause.message : String(cause);
-      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: `Máy chủ trả dữ liệu không hợp lệ: ${detail}` };
+      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: ghiLoi("Không đọc được dữ liệu.", detail) };
     }
   } catch (cause) {
     return {
       ok: false,
       errorCode: "NETWORK",
-      error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}`,
+      error: ghiLoi("Mất kết nối. Tải lại.", cause),
     };
   }
 }
@@ -95,7 +111,7 @@ export async function listSourceQaCandidates(
 export async function listSourceWorkshopCoverage(
   input: ListSourceWorkshopCoverageInput = {},
 ): Promise<SourceWorkshopCoverageResult> {
-  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: CHUA_KET_NOI };
   const limit = input.limit ?? 25;
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     return { ok: false, errorCode: "INVALID_LIMIT", error: "Giới hạn phải từ 1 đến 50." };
@@ -106,15 +122,15 @@ export async function listSourceWorkshopCoverage(
       p_cursor: workshopCoverageCursor(input.cursor),
       p_limit: limit,
     } as never);
-    if (error) return { ok: false, errorCode: "NETWORK", error: error.message };
+    if (error) return { ok: false, errorCode: "NETWORK", error: cauLoi("Không tải được dữ liệu.", error) };
     try {
       return decodeSourceWorkshopCoverageResponse(data);
     } catch (cause) {
       const detail = cause instanceof SourceAccessContractError ? cause.message : String(cause);
-      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: `Máy chủ trả dữ liệu không hợp lệ: ${detail}` };
+      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: ghiLoi("Không đọc được dữ liệu.", detail) };
     }
   } catch (cause) {
-    return { ok: false, errorCode: "NETWORK", error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}` };
+    return { ok: false, errorCode: "NETWORK", error: ghiLoi("Mất kết nối. Tải lại.", cause) };
   }
 }
 
@@ -122,7 +138,7 @@ export async function listSourceWorkshopCoverage(
 export async function listSourceWorkshopScopeChoices(
   input: ListSourceWorkshopScopeChoicesInput = {},
 ): Promise<SourceWorkshopScopeChoicesResult> {
-  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: CHUA_KET_NOI };
   const limit = input.limit ?? 50;
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     return { ok: false, errorCode: "INVALID_LIMIT", error: "Giới hạn phải từ 1 đến 50." };
@@ -135,15 +151,15 @@ export async function listSourceWorkshopScopeChoices(
       p_cursor: workshopScopeChoicesCursor(input.cursor),
       p_limit: limit,
     } as never);
-    if (error) return { ok: false, errorCode: "NETWORK", error: error.message };
+    if (error) return { ok: false, errorCode: "NETWORK", error: cauLoi("Không tải được dữ liệu.", error) };
     try {
       return decodeSourceWorkshopScopeChoicesResponse(data);
     } catch (cause) {
       const detail = cause instanceof SourceAccessContractError ? cause.message : String(cause);
-      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: `Máy chủ trả dữ liệu không hợp lệ: ${detail}` };
+      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: ghiLoi("Không đọc được dữ liệu.", detail) };
     }
   } catch (cause) {
-    return { ok: false, errorCode: "NETWORK", error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}` };
+    return { ok: false, errorCode: "NETWORK", error: ghiLoi("Mất kết nối. Tải lại.", cause) };
   }
 }
 
@@ -151,7 +167,7 @@ export async function listSourceWorkshopScopeChoices(
 export async function setSourceWorkshopScopeGrant(
   input: SetSourceWorkshopScopeGrantInput,
 ): Promise<WorkshopScopeGrantResult | { ok: false; errorCode: "NETWORK" | "NOT_CONFIGURED" | "MALFORMED_RESPONSE"; error: string }> {
-  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: "Supabase chưa được cấu hình." };
+  if (!supabase) return { ok: false, errorCode: "NOT_CONFIGURED", error: CHUA_KET_NOI };
   try {
     const { data, error } = await supabase.rpc("rpc_set_source_workshop_scope_grant" as never, {
       p_grant_id: input.grantId,
@@ -163,14 +179,14 @@ export async function setSourceWorkshopScopeGrant(
       p_reason: input.reason,
       p_expected_version: input.expectedVersion,
     } as never);
-    if (error) return { ok: false, errorCode: "NETWORK", error: error.message };
+    if (error) return { ok: false, errorCode: "NETWORK", error: cauLoi("Không tải được dữ liệu.", error) };
     try {
       return decodeWorkshopScopeGrantResponse(data);
     } catch (cause) {
       const detail = cause instanceof SourceAccessContractError ? cause.message : String(cause);
-      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: `Máy chủ trả dữ liệu không hợp lệ: ${detail}` };
+      return { ok: false, errorCode: "MALFORMED_RESPONSE", error: ghiLoi("Không đọc được dữ liệu.", detail) };
     }
   } catch (cause) {
-    return { ok: false, errorCode: "NETWORK", error: `Không gọi được máy chủ: ${cause instanceof Error ? cause.message : String(cause)}` };
+    return { ok: false, errorCode: "NETWORK", error: ghiLoi("Mất kết nối. Tải lại.", cause) };
   }
 }

@@ -1,6 +1,19 @@
-/* Semantic chart palette shared by Overview and Reports. Light and dark
-   values are tuned independently so small labels and thin SVG strokes remain
-   readable in either appearance. */
+/* Semantic chart palette shared by Overview, Reports and the Timeline stage
+   scale (nạp toàn cục qua @import trong lotus-tokens.css).
+
+   Ba lớp, theo thứ tự đè:
+   1. `:root` — bảng màu BẢN XUẤT/IN. Phải khớp từng mã với EXPORT_PALETTE
+      trong src/lib/reportCharts.ts (form xuất đã khoá, có test
+      tests/unit/report-chart-palette.test.mjs giữ hai bên khớp nhau). Không
+      đổi khối này khi chưa đổi form xuất.
+   2. `:root[data-visual="lotus-pearl"]` — bảng màu MÀN HÌNH (21/10, bảng màu
+      tinh giản). Bốn giai đoạn là bốn sắc cùng độ sáng OKLCH L 0.48–0.66,
+      C ≥ 0.11, đã chạy validate_palette.js (dataviz): lệch CVD liền kề ≥ 8.9,
+      lệch thường ≥ 18.8, mọi nét ≥ 3:1 trên nền thẻ. Đề cương lấy họ mận
+      của thương hiệu; trạng thái (quá hạn / thiếu / chờ) đi thẳng về token
+      ngữ nghĩa --lp-*, nên không có bộ màu trạng thái thứ hai.
+      Chữ `-text` luôn là token chữ đạt ≥ 4.5:1 trên cả nền thẻ lẫn nền `-soft`.
+   3. Khối tối — giá trị riêng, kiểm lại trên nền thẻ tối, không đảo tự động. */
 :root {
   --chart-protocol: #7650a5;
   --chart-protocol-text: #56347e;
@@ -24,31 +37,44 @@
   --chart-missing-text: #85530f;
   --chart-missing-soft: #f9ecd3;
   --chart-grid: color-mix(in srgb, var(--c-ink-soft) 19%, transparent);
-  --chart-surface: color-mix(in srgb, var(--c-surface) 88%, var(--chart-complete-soft));
+  --chart-surface: var(--c-surface);
 }
 
-[data-theme="dark"] {
-  --chart-protocol: #bca0eb;
-  --chart-protocol-text: #d8c5fb;
-  --chart-protocol-soft: #382d4d;
-  --chart-validation: #7fc3ed;
-  --chart-validation-text: #b9e3fa;
-  --chart-validation-soft: #1f4053;
-  --chart-report: #edc66f;
-  --chart-report-text: #f7dd9d;
-  --chart-report-soft: #4b3b1c;
-  --chart-complete: #77cbae;
-  --chart-complete-text: #b1ead8;
-  --chart-complete-soft: #1d443b;
-  --chart-overdue: #ef978b;
-  --chart-overdue-text: #ffc3ba;
-  --chart-overdue-soft: #4f2c2a;
-  --chart-pending: #aab8c9;
-  --chart-pending-text: #d4deea;
-  --chart-pending-soft: #303b49;
-  --chart-missing: #edbf67;
-  --chart-missing-text: #f9d994;
-  --chart-missing-soft: #4b3a1a;
-  --chart-grid: color-mix(in srgb, var(--c-ink-soft) 30%, transparent);
-  --chart-surface: color-mix(in srgb, var(--c-surface) 82%, var(--chart-complete-soft));
+/* ---- Màn hình · sáng (nền thẻ #FFFEFE) -------------------------------- */
+:root[data-visual="lotus-pearl"] {
+  --chart-protocol: #8A3D73;            /* 6.96:1 */
+  --chart-protocol-text: var(--lp-brand);
+  --chart-protocol-soft: var(--lp-rose-soft);
+  --chart-validation: #3979B2;          /* 4.58:1 */
+  --chart-validation-text: var(--lp-info);
+  --chart-validation-soft: var(--lp-info-soft);
+  --chart-report: #B87C2B;              /* 3.50:1 · 3.16:1 trên nền trang */
+  --chart-report-text: #784E14;         /* nâu đồng, 6.5:1 trên -soft */
+  --chart-report-soft: #FFF1DE;
+  --chart-complete: #14764A;            /* 5.61:1 */
+  --chart-complete-text: var(--lp-success);
+  --chart-complete-soft: var(--lp-success-soft);
+  --chart-overdue: var(--lp-danger);
+  --chart-overdue-text: var(--lp-danger);
+  --chart-overdue-soft: var(--lp-danger-soft);
+  --chart-pending: #8E7984;             /* trung tính ánh mận, 4.00:1 */
+  --chart-pending-text: var(--lp-text-tertiary);
+  --chart-pending-soft: var(--lp-bg-sunken);
+  --chart-missing: var(--lp-warning);
+  --chart-missing-text: var(--lp-warning);
+  --chart-missing-soft: var(--lp-warning-bg);
+  --chart-grid: var(--lp-grid-line-major);
+  --chart-surface: var(--lp-bg-surface);
+}
+
+/* ---- Màn hình · tối (nền thẻ #1E171B) --------------------------------- */
+:root[data-visual="lotus-pearl"][data-theme="dark"] {
+  --chart-protocol: #BC6A9A;            /* 4.75:1 */
+  --chart-validation: #5399D1;          /* 5.73:1 */
+  --chart-report: #C18634;              /* 5.64:1 */
+  --chart-report-text: #E0B67B;         /* 8.0:1 trên -soft */
+  --chart-report-soft: #33230F;
+  --chart-complete: #227F53;            /* 3.54:1 */
+  --chart-pending: #806F78;             /* 3.74:1 */
+  --chart-pending-soft: var(--lp-bg-raised);
 }

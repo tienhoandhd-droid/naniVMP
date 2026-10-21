@@ -111,7 +111,7 @@ test("Update gộp visible refresh và chỉ consume deep link sau kết quả q
   assert.match(source, /rightsGate\.current\.invalidate\(\);[\s\S]*removeEventListener\("focus", controller\.request\)/);
   assert.match(source, /if \(!pendingProgressLink \|\| rightsState\.status !== "ready"\) return;[\s\S]*resolveProgressDeepLink\(rightsState\.rights, pendingProgressLink\)/);
   assert.match(source, /setFix\("all"\);[\s\S]*setStageF\("all"\);[\s\S]*setFst\("all"\);[\s\S]*setPeriod\("all"\);[\s\S]*setHienNgung\(false\);[\s\S]*setTrang\(0\);[\s\S]*onProgressLinkConsumed\?\.\(\)/);
-  assert.match(source, /Quyền cập nhật \$\{resolution\.validationCode\} đã thay đổi; hạng mục không được mở\./);
+  assert.match(source, /Bạn không còn quyền cập nhật \$\{resolution\.validationCode\}\./);
   assert.match(source, /role="alert"[\s\S]*\{focusAlert\}/);
 });
 
@@ -191,7 +191,7 @@ test("Today bar does not claim remembered period", async () => {
 
   assert.match(source, /disabled=\{todayMode\}[\s\S]*aria-label="Từ ngày"/);
   assert.match(source, /disabled=\{todayMode\}[\s\S]*aria-label="Đến ngày"/);
-  assert.match(source, /Việc hôm nay tự dùng cửa sổ 7 ngày/);
+  assert.match(source, /Việc hôm nay: 7 ngày tới/);
   assert.match(source, /\{!todayMode && \(customFrom \|\| customTo\) && \(/);
 });
 

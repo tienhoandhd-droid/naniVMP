@@ -17,6 +17,17 @@ export interface AccessState {
 
 const KHONG_QUYEN = parseAccessContext(null);
 
+/** B1 (21/10): `rpc_my_ui_access` trả `{ ok:false, error_code }` khi server
+ *  từ chối hẳn (vd tài khoản bị vô hiệu). Trả câu cho người dùng nếu biết mã
+ *  lỗi; `null` để luồng chung xử lý tiếp. */
+export function thongDiepTuChoiQuyen(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as { ok?: unknown; error_code?: unknown };
+  if (p.ok !== false) return null;
+  if (p.error_code === "ACCOUNT_DISABLED") return "Tài khoản không hoạt động. Liên hệ Admin.";
+  return null;
+}
+
 /** Generation gate for access RPCs. It makes an identity change observable
  * before effects run and rejects both late success and late error handlers
  * from the previous identity. */
@@ -117,16 +128,22 @@ export function useAccess(
         if (!gateRef.current.isCurrent(generation)) return;
         if (ketQua.trangThai !== "co") {
           setAccess(KHONG_QUYEN);
-          setLoi(ketQua.trangThai === "chua_co_rpc"
-            ? "Máy chủ chưa trả được quyền màn hình."
-            : ketQua.thongDiep);
+          if (ketQua.trangThai === "loi") console.error("[useAccess] đọc quyền màn hình:", ketQua.thongDiep);
+          setLoi("Chưa tải được quyền. Bấm Thử lại.");
+          return;
+        }
+
+        const tuChoi = thongDiepTuChoiQuyen(ketQua.payload);
+        if (tuChoi) {
+          setAccess(KHONG_QUYEN);
+          setLoi(tuChoi);
           return;
         }
 
         const tuServer = parseAccessContext(ketQua.payload);
         if (!tuServer.businessRole) {
           setAccess(KHONG_QUYEN);
-          setLoi("Máy chủ trả quyền không hợp lệ hoặc tài khoản chưa được phân loại.");
+          setLoi("Tài khoản chưa được gán vai. Báo quản trị.");
           return;
         }
         setAccess(tuServer);
@@ -134,7 +151,8 @@ export function useAccess(
       .catch((error: unknown) => {
         if (!gateRef.current.isCurrent(generation)) return;
         setAccess(KHONG_QUYEN);
-        setLoi(error instanceof Error ? error.message : "Không đọc được quyền màn hình.");
+        console.error("[useAccess] đọc quyền màn hình:", error);
+        setLoi("Chưa tải được quyền. Bấm Thử lại.");
       })
       .finally(() => {
         if (gateRef.current.isCurrent(generation)) setDangTai(false);

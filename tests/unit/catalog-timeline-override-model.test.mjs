@@ -87,7 +87,7 @@ test("apply bị chặn khi không có thao tác, lý do rỗng hoặc chưa xá
     selected: [{ validation_code: "CCTB01/2026.01-PQ", expected_item_version: 7 }],
     reason: "Điều chỉnh theo nguồn mới",
     confirmed: false,
-  }), { ok: false, reason: "Cần xác nhận đặc biệt để áp deadline đã có tiến độ" });
+  }), { ok: false, reason: "Cần xác nhận để đổi hạn chót hạng mục đã có tiến độ" });
   assert.deepEqual(canApplyCatalogImpact({
     normalChangeCount: 0,
     selected: [{ validation_code: "CCTB01/2026.01-PQ", expected_item_version: 7 }],
@@ -124,6 +124,6 @@ test("lỗi dùng details khi server không có error và có fallback khi paylo
     error_code: "INVALID_OVERRIDE_ITEM",
     details: ["CCTB99/2026.01-PQ", "CCTB98/2026.01-PQ"],
   }), "CCTB99/2026.01-PQ · CCTB98/2026.01-PQ");
-  assert.equal(catalogApplyErrorMessage(null), "Áp vào timeline thất bại");
-  assert.equal(catalogApplyErrorMessage({ ok: false, error_code: "NETWORK" }), "Áp vào timeline thất bại");
+  assert.equal(catalogApplyErrorMessage(null), "Áp dụng thất bại");
+  assert.equal(catalogApplyErrorMessage({ ok: false, error_code: "NETWORK" }), "Áp dụng thất bại");
 });

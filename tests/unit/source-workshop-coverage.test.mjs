@@ -145,10 +145,10 @@ test("draft normalizer requires a reason and maps a blank line to area-wide cove
 test("nút lưu phạm vi chỉ đúng lựa chọn đầu tiên còn thiếu thay vì bị khóa im lặng", () => {
   assert.deepEqual(validateWorkshopScopeAction({
     choicesStatus: "ready", department: "", areaCode: "", reason: "",
-  }), { code: "department", message: "Chọn bộ phận Source.", focusId: "workshop-scope-department" });
+  }), { code: "department", message: "Chọn bộ phận.", focusId: "workshop-scope-department" });
   assert.deepEqual(validateWorkshopScopeAction({
     choicesStatus: "ready", department: "Xưởng A", areaCode: "", reason: "",
-  }), { code: "area", message: "Chọn khu vực Source.", focusId: "workshop-scope-area" });
+  }), { code: "area", message: "Chọn khu vực.", focusId: "workshop-scope-area" });
   assert.deepEqual(validateWorkshopScopeAction({
     choicesStatus: "ready", department: "Xưởng A", areaCode: "KV-01", reason: "",
   }), { code: "reason", message: "Nhập lý do thay đổi.", focusId: "workshop-scope-reason" });

@@ -23,13 +23,13 @@ import {
   Boxes, ClipboardCheck, ShieldCheck, FileCheck2, CalendarClock, ListFilter, CheckCircle2, Mail, Layers,
 } from "lucide-react";
 
-import { C, TEXT, GRAD, btnPrimary, glass } from "../../constants/theme.ts";
+import { C, TEXT, GRAD, btnPrimary } from "../../constants/theme.ts";
 import { DEPTS, CRIT } from "../../constants/vmp.ts";
 import { Card, CardTitle, Tag, Sel, StatTile, MultiSelect, TableScroll, CauKetLuan } from "../ui/Primitives.tsx";
 import { CopyCodesButton } from "../ui/CopyCodesButton.tsx";
 import { useToast } from "../ui/ToastProvider.tsx";
 import { download, runDataQualityChecks, nhanXetTuDong, stageOf, wlIsDone } from "../../utils/helpers.ts";
-import NhomTab, { NhomTabPanel, DongSo, useNhomTab } from "../ui/NhomTab.tsx";
+import NhomTab, { NhomTabPanel, useNhomTab } from "../ui/NhomTab.tsx";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
@@ -220,15 +220,15 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     const c = monthly.cur;
     parts.push(
       kyPhase === "chua_toi"
-        ? `Kỳ ${kyLabel} chưa tới — ${c.due} hạng mục sẽ đến hạn, chưa chấm được.`
+        ? `Kỳ ${kyLabel} chưa tới: ${c.due} hạng mục sẽ tới hạn.`
         : c.rate == null
           ? `Kỳ ${kyLabel} chưa có hạng mục nào đến hạn.`
           : kyPhase === "dang_dien_ra"
-            ? `Kỳ ${kyLabel} đang ở ${c.rate}% (${c.done}/${c.due}) — số giữa kỳ, chưa phải kết quả chốt.`
+            ? `Kỳ ${kyLabel}: ${c.rate}% (${c.done}/${c.due}), tạm tính.`
             : `Kỳ ${kyLabel} chốt ở ${c.rate}% (${c.done}/${c.due}) — ${c.meets ? "đạt" : "chưa đạt"} mục tiêu ${TARGET_PCT}%.`,
     );
 
-    if (futureDue) parts.push(`Còn ${futureDue} hạng mục đến hạn ở các tháng chưa tới kỳ — chưa chấm được, chỉ là khối lượng phải bố trí.`);
+    if (futureDue) parts.push(`Còn ${futureDue} hạng mục tới hạn ở các tháng sau.`);
     return parts.join(" ");
   }, [monthly, kyPhase, kyLabel]);
 
@@ -256,7 +256,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       if (f[i].n > f[i - 1].n) nguoc.push(`${f[i].l} (${f[i].n}) nhiều hơn ${f[i - 1].l} (${f[i - 1].n})`);
     }
     return nguoc.length
-      ? `Dữ liệu tự mâu thuẫn: ${nguoc.join("; ")}. Một giai đoạn sau không thể xong nhiều hơn giai đoạn trước — cần rà lại cột trạng thái ở Cập nhật tiến độ.`
+      ? `Trạng thái mâu thuẫn: ${nguoc.join("; ")}. Rà lại ở Cập nhật tiến độ.`
       : "";
   }, [ytdNam]);
 
@@ -273,8 +273,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     try {
       const r = await chayPhanTichAi({ loai, pham_vi: deptScope, ky: kyChoAi });
       if (r.ok && r.ai_text) setAi(r.ai_text);
-      else setErrAi(r.error ? `Lỗi AI: ${r.error}` : "Không nhận được phản hồi AI từ n8n.");
-    } catch (ex) { setErrAi((ex as Error)?.message || "Lỗi kết nối n8n."); }
+      else {
+        console.error("[Báo cáo] AI không trả nhận xét:", r.error ?? r);
+        setErrAi("Chưa tạo được nhận xét. Thử lại sau.");
+      }
+    } catch (ex) {
+      console.error("[Báo cáo] gọi AI lỗi:", ex);
+      setErrAi("Mất kết nối, chưa tạo được nhận xét. Thử lại sau.");
+    }
     finally { setLoadingAi(false); }
   };
 
@@ -312,7 +318,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       printInFlight.current = false;
       setPrinting(false);
       if (ok) dang.xong("Đã mở hộp in báo cáo.");
-      else dang.hong("Không mở được hộp in báo cáo. Hãy thử lại hoặc tải HTML.");
+      else dang.hong("Không mở được hộp in. Tải bản HTML để in.");
     };
     try {
       const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
@@ -469,7 +475,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                 (đủ 5 sheet); PDF/HTML là phụ, cùng một kiểu ghost để không
                 tranh nhau bằng ba màu ba kiểu như trước. */}
             <button type="button" data-desktop-primary-actionable onClick={() => void exportExcel()} disabled={exporting}
-              aria-label="Xuất Excel đầy đủ 5 sheet" aria-busy={exporting} title="Tải bảng tính Excel gồm đủ 5 sheet" style={toolBtn(GRAD, "#fff")}><Download size={16} /> {exporting ? "Đang xuất Excel…" : "Xuất Excel (đủ 5 sheet)"}</button>
+              aria-label="Xuất báo cáo Excel" aria-busy={exporting} title="Tải bảng tính Excel" style={toolBtn(GRAD, "var(--lp-porcelain)")}><Download size={16} /> {exporting ? "Đang xuất Excel…" : "Xuất Excel"}</button>
             <button type="button" onClick={printPDF} disabled={printing}
               aria-label="In báo cáo dưới dạng PDF" aria-busy={printing} title="Mở hộp in để lưu báo cáo PDF" style={ghostBtn}><Printer size={16} /> {printing ? "Đang mở hộp in…" : "PDF"}</button>
             <button type="button" onClick={downloadHtml}
@@ -477,60 +483,25 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           </div>
         </div>
         <div role="status" aria-label="Phạm vi báo cáo đang xem" style={{ marginTop: 14, fontSize: 12, color: C.plumSoft, fontWeight: 700, lineHeight: 1.7 }}>
-          Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b>.
-          {" "}Mục 1 tính trên <b style={{ color: C.plum }}>{scopedNamActive.length}</b> hạng mục có mốc đích VMP trong năm {ky.year};
-          mục 2 trở xuống tính trên <b style={{ color: C.plum }}>{scopedKyActive.length}</b> hạng mục của <b style={{ color: C.plum }}>{kyLabel}</b>.
-          {" "}Chỉ số chính là <b style={{ color: C.plum }}>hoàn thành VMP</b>; mức hoàn thành đề cương và thẩm định
-          thực tế là dữ liệu bổ sung.
+          Đang xem: <b style={{ color: C.plum }}>{scopeLabel}</b> · <b style={{ color: C.plum }}>{kyLabel}</b> · Tính theo Đích VMP, số liệu tới hôm nay.
           {soChuaCoMoc > 0 && (
-            <> {" "}<span style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục chưa có mốc đích VMP nên không thuộc kỳ nào — xem ở mục Chất lượng dữ liệu.</span></>
+            <> {" "}<a href="#v=health" style={{ color: C.marigoldText }}>{soChuaCoMoc} hạng mục chưa có Đích VMP</a></>
           )}
-          {" "}Chọn một số có gạch chân trong bảng giai đoạn để xem danh sách; các nút Xuất tạo tệp theo đúng phạm vi này.
         </div>
-
-        {/* Đây là nơi người dùng hay nhầm "báo cáo sai số" nhất: số ở màn Báo
-            cáo chỉ tính hạng mục có mốc đích VMP RƠI VÀO năm đang chọn, còn
-            màn Tổng quan tính TOÀN BỘ hạng mục đang hoạt động, không lọc theo
-            năm. Hai cách đếm khác mục đích (báo cáo theo kỳ vs. bức tranh hiện
-            tại), không phải một trong hai bị sai — nói thẳng ra đây để không
-            ai phải đi dò lại dữ liệu. */}
-        <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: C.plumSoft,
-          background: C.pinkMist, borderRadius: 14, padding: "11px 15px", lineHeight: 1.7 }}>
-          Chỉ tính hạng mục có <b>mốc đích VMP trong năm {ky.year}</b> — màn Tổng quan tính mọi năm nên số có thể khác.
-        </div>
-
-        {/* Kỳ là LÁT CẮT THEO MỐC ĐÍCH, không phải ảnh chụp quá khứ. Nói thẳng
-            ngay cạnh bộ chọn, vì đây đúng là chỗ người đọc dễ hiểu nhầm nhất —
-            và hiểu nhầm thì mọi con số bên dưới bị đọc sai theo. */}
-        {!laKyHienTai && (
-          <div style={{ marginTop: 12, fontSize: 12, fontWeight: 700, color: C.lavText, background: C.lavSoft,
-            borderRadius: 14, padding: "11px 15px", lineHeight: 1.7 }}>
-            ℹ️ Đang xem kỳ <b>{kyLabel}</b> ({kyPhase === "da_qua" ? "đã qua" : kyPhase === "dang_dien_ra" ? "đang diễn ra" : "chưa tới"}).
-            Đây là <b>lát cắt theo mốc đích VMP</b>: những hạng mục có mốc đích rơi vào kỳ, và tính tới <b>hôm nay</b>
-            đã hoàn thành VMP bao nhiêu — không phải ảnh chụp tại thời điểm đó. Một hạng mục hạn {kyLabel} mà nay mới
-            xong vẫn tính là đã xong, vì dữ liệu chưa ghi ngày hoàn thành thực tế.
-          </div>
-        )}
       </Card>
 
-      <DongSo cacO={[
-        { nhan: "hạng mục năm " + String(ky.year), giaTri: ytd.total, onMo: () => setTab("bao-cao") },
-        { nhan: "hoàn thành VMP", giaTri: `${ytd.vmp.rate}%`, phu: `${ytd.vmp.done}/${ytd.total}`, onMo: () => setTab("bao-cao") },
-        { nhan: "quá hạn VMP", giaTri: ytd.vmp.over, canhBao: ytd.vmp.over > 0, onMo: () => setTab("du-lieu") },
-        { nhan: "nhận xét sẵn dùng", giaTri: autoComments.length, phu: "bấm để lấy", onMo: () => setTab("nhan-xet") },
-      ]} />
       <NhomTab man="reports" nhan="Các phần của báo cáo" tab={tab} onTab={setTab} tabs={[
         { id: "bao-cao", nhan: "Báo cáo quản lý" },
         { id: "du-lieu", nhan: "Dữ liệu thô", dem: rawRows.length },
-        { id: "nhan-xet", nhan: "Nhận xét & AI", dem: autoComments.length },
+        { id: "nhan-xet", nhan: "Nhận xét", dem: autoComments.length },
       ]} />
 
       <NhomTabPanel man="reports" id="bao-cao" tab={tab}>
       {/* ===== 1. Tổng quan số liệu tới hiện tại ===== */}
       <Card variant="strong">
         <CardTitle icon={Boxes}
-          sub={`Toàn bộ hạng mục có mốc đích VMP trong năm ${ky.year} — không đổi khi bạn chọn tháng bên dưới`}>
-          1. Tổng quan năm {ky.year} — đã làm được bao nhiêu
+          sub={`Hạng mục có Đích VMP năm ${ky.year}`}>
+          1. Kết quả năm {ky.year}
         </CardTitle>
         {/* Hai hàng tách bạch: chỉ số CHÍNH của báo cáo đứng riêng, ba mức giai
             đoạn xuống dưới dán nhãn "bổ sung". Xếp năm ô ngang hàng như bản cũ
@@ -538,10 +509,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             chỉ có Hoàn thành VMP mới là. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
           <StatTile icon={Boxes} label={`Tổng hạng mục năm ${ky.year}`} value={ytdNam.total} tone={{ c: C.plum, bg: C.pinkSoft }}
-            sub="Bấm để xem danh sách"
             onClick={() => moChiTiet(`Toàn bộ hạng mục · năm ${ky.year}`, scopedNamActive)} />
-          <StatTile icon={CheckCircle2} label="★ Hoàn thành VMP — chỉ số chính" value={`${ytdNam.vmp.rate}%`}
-            sub={`${ytdNam.vmp.done}/${ytdNam.vmp.total} · quá hạn ${ytdNam.vmp.over} · bấm để xem`} tone={{ c: C.mintText, bg: C.mintSoft }}
+          <StatTile icon={CheckCircle2} label="Hoàn thành VMP" value={`${ytdNam.vmp.rate}%`}
+            sub={`${ytdNam.vmp.done}/${ytdNam.vmp.total} · quá hạn ${ytdNam.vmp.over}`} tone={{ c: C.mintText, bg: C.mintSoft }}
             onClick={() => moChiTiet(`Hoàn thành VMP · năm ${ky.year}`, scopedNamActive, "vmp")} />
         </div>
 
@@ -550,13 +520,13 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
           <StatTile icon={ClipboardCheck} label="Đề cương hoàn thành" value={`${ytdNam.protocol.rate}%`}
-            sub={`${ytdNam.protocol.done}/${ytdNam.protocol.total} · quá hạn ${ytdNam.protocol.over} · bấm để xem`} tone={{ c: C.lavText, bg: C.lavSoft }}
+            sub={`${ytdNam.protocol.done}/${ytdNam.protocol.total} · quá hạn ${ytdNam.protocol.over}`} tone={{ c: C.lavText, bg: C.lavSoft }}
             onClick={() => moChiTiet(`Đề cương · năm ${ky.year}`, scopedNamActive, "de_cuong")} />
           <StatTile icon={ShieldCheck} label="Thẩm định thực tế" value={`${ytdNam.validation.rate}%`}
-            sub={`${ytdNam.validation.done}/${ytdNam.validation.total} · quá hạn ${ytdNam.validation.over} · bấm để xem`} tone={{ c: C.skyText, bg: C.skySoft }}
+            sub={`${ytdNam.validation.done}/${ytdNam.validation.total} · quá hạn ${ytdNam.validation.over}`} tone={{ c: C.skyText, bg: C.skySoft }}
             onClick={() => moChiTiet(`Thẩm định thực tế · năm ${ky.year}`, scopedNamActive, "tham_dinh")} />
           <StatTile icon={FileCheck2} label="Hồ sơ hoàn thiện" value={`${ytdNam.documentation.rate}%`}
-            sub={`${ytdNam.documentation.done}/${ytdNam.documentation.total} · quá hạn ${ytdNam.documentation.over} · bấm để xem`} tone={{ c: C.pinkText, bg: C.pinkSoft }}
+            sub={`${ytdNam.documentation.done}/${ytdNam.documentation.total} · quá hạn ${ytdNam.documentation.over}`} tone={{ c: C.pinkText, bg: C.pinkSoft }}
             onClick={() => moChiTiet(`Hồ sơ · năm ${ky.year}`, scopedNamActive, "ho_so")} />
         </div>
         {/* Phễu 4 giai đoạn phải giảm dần. Nếu không, dữ liệu tự mâu thuẫn
@@ -594,7 +564,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                       title={`Xem danh sách ${s.count} hạng mục ở giai đoạn ${s.label}`}
                       onClick={() => moChiTiet(`${s.label} · năm ${ky.year}`, scopedNamActive.filter((a) => stageOf(a) === s.id))}
                       style={{ font: "inherit", fontWeight: 800, color: C.plum, background: "transparent", border: 0, padding: "4px 0", minHeight: 44, cursor: "pointer", textDecoration: "underline" }}>
-                      {s.count}<span className="reg-muted"> · bấm để xem</span>
+                      {s.count}
                     </button>
                   ) : s.count}</td>
                 </tr>
@@ -609,8 +579,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           "chọn ở trên thì cái nào bên dưới chạy theo". Mục 1 ở trên là cả năm
           và đứng yên; từ đây trở xuống chạy theo kỳ. */}
       <Card variant="strong">
-        <CardTitle icon={CalendarClock} sub="So với kỳ liền trước, cùng phạm vi đang lọc — đổi kỳ thì mục 2, 4, 5 và dữ liệu thô chạy theo">
-          2. Tổng quan {kyLabel}
+        <CardTitle icon={CalendarClock} sub="So với kỳ trước">
+          2. Kết quả {kyLabel}
         </CardTitle>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16,
@@ -633,17 +603,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               ↺ Về kỳ này
             </button>
           )}
-          <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: C.plumSoft }}>
-            Năm chọn ở bộ lọc phía trên
-          </span>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
           <StatTile icon={CalendarClock} label={`Cần hoàn thành ${kyLabel}`} value={monthly.cur.due}
-            sub="Bấm để xem danh sách" tone={{ c: C.plum, bg: C.pinkSoft }}
+            tone={{ c: C.plum, bg: C.pinkSoft }}
             onClick={() => moChiTiet(`Hạng mục đến hạn · ${kyLabel}`, scopedKyActive)} />
           <StatTile icon={FileCheck2} label="Đã hoàn thành VMP" value={monthly.cur.done}
-            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : `${monthly.cur.rate}% trong kỳ · bấm để xem`}
+            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : `${monthly.cur.rate}% trong kỳ`}
             tone={{ c: C.mintText, bg: C.mintSoft }}
             onClick={() => moChiTiet(`Hoàn thành VMP · ${kyLabel}`, scopedKyActive, "vmp")} />
           <StatTile icon={ShieldCheck} label="Tỷ lệ kỳ trước" value={monthly.prev?.rate == null ? "—" : `${monthly.prev.rate}%`}
@@ -653,14 +620,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
               Ghi thẳng "Chưa đạt" là chốt sổ một kỳ chưa xong. */}
           <StatTile icon={AlertCircle} label={`So mục tiêu ${TARGET_PCT}%`}
             value={monthly.cur.rate == null ? "—" : kyPhase === "dang_dien_ra" ? (monthly.cur.meets ? "Tạm đạt" : "Tạm dưới") : (monthly.cur.meets ? "Đạt" : "Chưa đạt")}
-            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : kyPhase === "dang_dien_ra" ? "Số giữa kỳ — kỳ chưa kết thúc" : kyPhase === "chua_toi" ? "Kỳ chưa tới — chưa chấm được" : "Kết quả đã chốt"}
+            sub={monthly.cur.rate == null ? "Chưa có hạng mục đến hạn" : kyPhase === "dang_dien_ra" ? "Tạm tính" : kyPhase === "chua_toi" ? "Chưa tới kỳ" : "Kết quả đã chốt"}
             tone={monthly.cur.meets === false ? { c: C.marigoldText, bg: C.marigoldSoft } : { c: C.mintText, bg: C.mintSoft }} />
         </div>
       </Card>
 
       {/* ===== 3. Mục tiêu 50%/tháng ===== */}
       <Card variant="strong">
-        <CardTitle icon={FileBarChart} sub="Mục tiêu: 50% hạng mục có mốc đích VMP rơi vào tháng đó phải hoàn thành VMP trong tháng">
+        <CardTitle icon={FileBarChart} sub="Tính theo Đích VMP">
           3. Đánh giá so với mục tiêu {TARGET_PCT}%/tháng
         </CardTitle>
         {/* Kết luận đặt trước biểu đồ để người đọc biết ngay điều cần chú ý. */}
@@ -671,8 +638,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 4. Bất cập trong VMP ===== */}
       <Card variant="strong">
-        <CardTitle icon={AlertCircle} sub="Chậm đề cương, chậm thẩm định thực tế hay chậm báo cáo — theo từng bộ phận">
-          4. Bất cập trong VMP — bộ phận nào chậm
+        <CardTitle icon={AlertCircle}>
+          4. Bộ phận chậm tiến độ
         </CardTitle>
         <CauKetLuan chinh={bottleneckVerdict} tone={bottleneck.length ? "over" : "ok"} />
         {bottleneckChartHtml
@@ -681,7 +648,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <div style={{ height: 14 }} />
         <TableScroll maxHeight={320}>
           <table className="reg-table" style={{ minWidth: 720 }}>
-            <caption>Số hạng mục chậm theo từng giai đoạn, chia theo bộ phận, trong phạm vi đang lọc.</caption>
             <thead><tr>
               <th scope="col" data-reg-stick>Bộ phận</th><th scope="col" className="reg-num">Tổng</th>
               <th scope="col" className="reg-num">Chậm đề cương</th><th scope="col" className="reg-num">Chậm thẩm định</th>
@@ -703,7 +669,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                       đếm, và khi chưa hạng mục nào xong thì ghi "—" chứ
                       không ghi 0%: chưa có gì để đo khác với đo ra số 0. */}
                   <td className="reg-num reg-total">
-                    {r.total === 0 ? "—" : r.onTimeRate === 0 ? "0% (chưa mục nào xong)" : `${r.onTimeRate}%`}
+                    {r.total === 0 ? "—" : r.onTimeRate === 0 ? "0%" : `${r.onTimeRate}%`}
                   </td>
                 </tr>
               ))}
@@ -715,13 +681,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== 5. Công việc dự kiến tháng tới ===== */}
       <Card>
-        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục có mốc đích VMP rơi vào ${nextMonth.monthLabel}, chưa hoàn thành VMP`}>
+        <CardTitle icon={CalendarClock} sub={`${nextMonth.total} hạng mục chưa xong`}>
           5. Công việc dự kiến {nextMonth.monthLabel}
         </CardTitle>
         {workloadChartHtml && <div dangerouslySetInnerHTML={{ __html: workloadChartHtml }} />}
         <TableScroll maxHeight={340}>
           <table className="reg-table" style={{ minWidth: 720, marginTop: 12 }}>
-            <caption>Hạng mục có mốc đích VMP rơi vào {nextMonth.monthLabel}, chưa hoàn thành VMP.</caption>
             <thead><tr>
               <th scope="col">Mã</th><th scope="col">Tên</th><th scope="col">Loại thẩm định</th><th scope="col">Bộ phận</th>
               <th scope="col">Người thực hiện</th><th scope="col">Hạn đích VMP</th><th scope="col">Trọng yếu</th>
@@ -760,8 +725,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <AlertCircle size={16} aria-hidden="true" color={quality.length ? C.marigoldText : C.mintText} />
           <span style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 700, color: C.plum, flex: 1, minWidth: 220 }}>
             {quality.length === 0
-              ? "Dữ liệu nền của kỳ này sạch — không phát hiện vấn đề nào trong phạm vi đang lọc."
-              : `Dữ liệu nền có ${qualityBySeverity.error || 0} lỗi · ${qualityBySeverity.warning || 0} cảnh báo · ${qualityBySeverity.info || 0} thông tin — đã kèm vào bản xuất.`}
+              ? "Dữ liệu không có lỗi."
+              : `Chất lượng dữ liệu: ${qualityBySeverity.error || 0} lỗi · ${qualityBySeverity.warning || 0} cảnh báo`}
           </span>
           <a href="#v=health" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>
             Tra từng lỗi → Chất lượng dữ liệu
@@ -771,15 +736,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
       {/* ===== Dữ liệu thô ===== */}
       <Card>
-        <CardTitle icon={Boxes} sub={`${rawRows.length} dòng — đúng phạm vi đang lọc phía trên, xuất đầy đủ ở nút Excel`}>
+        <CardTitle icon={Boxes} sub={`${rawRows.length} hạng mục`}>
           Dữ liệu thô
         </CardTitle>
         <TableScroll maxHeight={420}>
           <table className="reg-table" style={{ minWidth: 1100 }}>
-            <caption>Dữ liệu thô theo phạm vi đang lọc — mỗi dòng một hạng mục với trạng thái bốn giai đoạn.</caption>
             <thead><tr>
               <th scope="col" data-reg-stick>Mã</th><th scope="col">Tên</th><th scope="col">Bộ phận</th><th scope="col">Người thực hiện</th>
-              <th scope="col">TT đề cương</th><th scope="col">TT thẩm định</th><th scope="col">TT báo cáo</th><th scope="col">TT VMP</th>
+              <th scope="col">Đề cương</th><th scope="col">Thẩm định</th><th scope="col">Báo cáo</th><th scope="col">VMP</th>
               <th scope="col">Hạn VMP</th><th scope="col">Ngày VMP thực tế</th>
             </tr></thead>
             <tbody>
@@ -809,14 +773,14 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <SparkIcon size={18} color={C.pink} />
             <span style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>Nhận xét</span>
-            <Tag color={C.mintText} bg={C.mintSoft}>Tính từ số liệu</Tag>
+            <Tag color={C.mintText} bg={C.mintSoft}>Từ số liệu</Tag>
           </div>
           {/* Nút KHÔNG bị ẩn khi thiếu cấu hình. Bản cũ giấu nút đi nên trên
               bản deploy thiếu biến môi trường, người dùng tưởng chức năng
               không tồn tại thay vì biết là chưa cấu hình. */}
           <div className="vmp-report-ai-actions" role="group" aria-label="Thao tác gợi ý nhận xét">
             <button onClick={() => generateAi("bao_cao")} disabled={loadingAi || !aiConfigured()}
-              title={aiConfigured() ? "Nhận xét trên số đã tổng hợp — nhanh, rẻ" : AI_SETUP_HINT}
+              title={aiConfigured() ? "Nhận xét nhanh từ số tổng hợp" : AI_SETUP_HINT}
               style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 9, padding: "11px 20px",
                 borderRadius: 14, fontSize: 14, opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
                 cursor: loadingAi || !aiConfigured() ? "not-allowed" : "pointer" }}>
@@ -829,7 +793,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                 tooltip là dùng theo tuần/tháng chứ không phải mỗi lần mở trang. */}
             <button onClick={() => generateAi("phan_tich_sau")} disabled={loadingAi || !aiConfigured()}
               title={aiConfigured()
-                ? "AI đọc từng dòng dữ liệu thô để tìm quy luật lặp (cùng khu vực, cùng loại thẩm định, chuỗi hạn dồn). Nặng hơn nhiều — nên chạy theo tuần hoặc tháng."
+                ? "Tìm quy luật lặp trong toàn bộ hạng mục"
                 : AI_SETUP_HINT}
               style={{ ...toolBtn(C.skySoft, C.skyText), opacity: loadingAi || !aiConfigured() ? 0.55 : 1,
                 cursor: loadingAi || !aiConfigured() ? "not-allowed" : "pointer" }}>
@@ -856,7 +820,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             bằng luật cố định, viền liền. Phân biệt với bề mặt AI bên dưới
             (viền đứt) — hai loại nội dung không được trông giống nhau. */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-          <Tag color={C.mintText} bg={C.mintSoft}>Suy từ số liệu thật</Tag>
           {/* Vận hành (spec 01/09): nhận xét sinh ra để ĐEM ĐI — vào email
               giao ban, biên bản họp. Một nút chép cả cụm, hết gõ lại. */}
           <CopyCodesButton text={autoComments.map((c) => `- ${c}`).join("\n")}
@@ -864,9 +827,6 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             style={{ padding: "6px 12px", borderRadius: 10, cursor: "pointer",
                      border: `1px solid ${C.pinkSoft}`, background: C.surface, color: C.plum,
                      fontFamily: TEXT, fontSize: 12, fontWeight: 700 }} />
-          <span style={{ fontSize: 12, color: C.plumSoft, fontFamily: TEXT, fontWeight: 600 }}>
-            luật cố định, không có AI — cùng con số với các bảng trên
-          </span>
         </div>
         <div style={{ fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.85, fontWeight: 500,
           background: C.pinkMist, borderLeft: `4px solid ${C.pink}`, borderRadius: "0 14px 14px 0", padding: "16px 20px" }}>
@@ -889,22 +849,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
                 AI đề xuất · {AI_NHAN[loaiAi]}
               </span>
               <Tag color={C.raspText} bg={C.raspSoft}>Cần QA xác nhận</Tag>
-              {loaiAi === "phan_tich_sau" && (
-                <Tag color={C.skyText} bg={C.skySoft}>Đọc từng dòng dữ liệu thô · mọi nhận định phải dẫn mã</Tag>
-              )}
             </div>
             <div style={{ whiteSpace: "pre-wrap", fontFamily: TEXT, fontSize: 14, color: C.plum, lineHeight: 1.8, fontWeight: 500, background: C.lavSoft, borderLeft: `4px solid ${C.lav}`, borderRadius: "0 14px 14px 0", padding: "18px 22px" }}>{ai}</div>
-            <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontFamily: TEXT, fontWeight: 600 }}>
-              Nội dung do AI tạo — đối chiếu với số liệu xác thực ở trên trước khi đưa vào hồ sơ.
-            </div>
           </div>
         )}
       </Card>
       </NhomTabPanel>
-
-      <div style={{ ...glass, padding: "10px 16px", fontSize: 12, color: C.plumSoft, fontWeight: 700, textAlign: "center" }}>
-        Chỉ mục &quot;Nhận xét AI&quot; do AI soạn và cần QA xác nhận; mọi số liệu khác lấy trực tiếp từ hệ thống.
-      </div>
 
       {chiTiet && (
         <ChiTietKyModal title={chiTiet.title} sub={chiTiet.sub} rows={chiTiet.rows}

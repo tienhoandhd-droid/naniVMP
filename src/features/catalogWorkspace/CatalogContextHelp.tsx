@@ -25,14 +25,8 @@ export default function CatalogContextHelp({ region, canChange }: { region: stri
             <h3 id="cch-steps-heading">Cách dùng</h3>
             <ol>{guide.steps.map((step) => <li key={step}>{step}</li>)}</ol>
           </section>
-          {guide.fields && (
-            <section aria-labelledby="cch-fields-heading">
-              <h3 id="cch-fields-heading">Trường cần chú ý</h3>
-              <ul className="cch-fields">{guide.fields.map((field) => <li key={field}>{field}</li>)}</ul>
-            </section>
-          )}
           {guide.caution && <p className="cch-caution"><b>Lưu ý:</b> {guide.caution}</p>}
-          <p className="cch-access" role="note">{canChange ? guide.editorNote : guide.readerNote}</p>
+          {!canChange && <p className="cch-access" role="note">Chỉ xem.</p>}
         </div>
       </ViewportDialog>
     </>

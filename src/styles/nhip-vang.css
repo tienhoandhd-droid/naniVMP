@@ -1,0 +1,64 @@
+/* =====================================================================
+ *  nhip-vang.css — thang chữ và khoảng cách theo tỉ lệ vàng (21/10/2026)
+ *  ---------------------------------------------------------------------
+ *  Nạp NGAY SAU lotus-tokens.css (src/main.tsx), cùng selector gốc nên
+ *  các token cùng tên ở đây thắng theo thứ tự cascade.
+ *
+ *  Cỡ chữ (φ ≈ 1.618, gốc 16px):
+ *    16 · 20 · 26 · 33 · 42
+ *    26 ≈ 16φ, 42 ≈ 16φ²; 20 và 33 là bậc trung gian √φ.
+ *  Ánh xạ: H1 trang = 42, tiêu đề khối = 26, tiêu đề phụ = 20, thân = 16.
+ *  Chữ phụ và chữ trong bảng giữ 13–14px như cũ để không phá mật độ bảng.
+ *
+ *  Khoảng cách (dãy Fibonacci): 8 · 13 · 21 · 34 · 55
+ *  Dùng cho khoảng giữa các khối/section và đệm trong thẻ.
+ *
+ *  Chữ tiếng Việt có dấu chồng hai tầng (ví dụ "Ẩ", "ệ") — serif cỡ lớn
+ *  cần line-height ≥ 1.25 để dấu không chạm dòng trên; thân chữ ≥ 1.55.
+ *  File này KHÔNG chứa giá trị màu.
+ * ===================================================================== */
+
+:root[data-visual="lotus-pearl"] {
+  /* --- Thang cỡ chữ ------------------------------------------------ */
+  --lp-fs-1: 16px;
+  --lp-fs-2: 20px;
+  --lp-fs-3: 26px;
+  --lp-fs-4: 33px;
+  --lp-fs-5: 42px;
+
+  /* Tên theo vai trò — trang chỉ dùng các tên này. */
+  --lp-fs-than: var(--lp-fs-1);
+  --lp-fs-tieu-de-phu: var(--lp-fs-2);
+  --lp-fs-tieu-de-khoi: var(--lp-fs-3);
+  /* Ghi đè token cũ của lotus-tokens.css: H1 44 → 42, tiêu đề nhóm việc
+     giữ 26 (đã đúng bậc), câu Vali 30 → 26. */
+  --lp-fs-h1: var(--lp-fs-5);
+  --lp-lh-h1: 54px;            /* 42 × 1.28 — dấu tầng hai không chạm dòng trên */
+  --lp-fs-muc: var(--lp-fs-3);
+  --lp-fs-loi: var(--lp-fs-3);
+
+  /* Nhãn nhỏ (eyebrow, tiêu đề cột): chữ thường, đậm vừa, không giãn. */
+  --lp-fs-nhan: 13px;
+  --lp-fw-nhan: 600;
+  --lp-tracking-nhan: 0.01em;
+
+  /* Chiều cao dòng tối thiểu */
+  --lp-lh-tieu-de: 1.28;
+  --lp-lh-than: 1.6;
+
+  /* --- Dãy khoảng cách -------------------------------------------- */
+  --lp-sp-1: 8px;
+  --lp-sp-2: 13px;
+  --lp-sp-3: 21px;
+  --lp-sp-4: 34px;
+  --lp-sp-5: 55px;
+
+  /* --- Lưới hai cột tỉ lệ vàng ------------------------------------- */
+  --lp-cot-vang: minmax(0, 1.618fr) minmax(0, 1fr);
+}
+
+/* Mã hạng mục / đối tượng (TB-108-PV, CMTB508/2026.01-OQ…) không bao giờ
+   bị ngắt giữa chừng ở dấu gạch nối. */
+.lp-ma {
+  white-space: nowrap;
+}

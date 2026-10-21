@@ -17,6 +17,7 @@ function boundary(result = { data: { ok: true, id: "source-id", version: 1 }, er
   const context = vm.createContext({
     supabase: { async rpc(name, args) { calls.push(JSON.parse(JSON.stringify({ name, args }))); return result; } },
     asShape: (value) => value,
+    console: { error() {} },
   });
   vm.runInContext(js, context);
   return { save: context.saveCatalogObject, calls };
@@ -54,5 +55,8 @@ test("server denial remains a denial and transport failure remains visible", asy
   const denied = boundary({ data: { ok: false, error_code: "FORBIDDEN" }, error: null });
   assert.equal((await denied.save("Thiết bị", "TB-NEW", { object_name: "Máy" }, null, null)).error_code, "FORBIDDEN");
   const network = boundary({ data: null, error: { message: "offline" } });
-  await assert.rejects(network.save("Thiết bị", "TB-NEW", { object_name: "Máy" }, null, null), /offline/);
+  // Lỗi đường truyền vẫn ném ra (không bị biến thành từ chối); người dùng thấy
+  // câu nghiệp vụ, chữ thô của máy chủ nằm ở `cause` và console.
+  await assert.rejects(network.save("Thiết bị", "TB-NEW", { object_name: "Máy" }, null, null),
+    (error) => /Chưa lưu được đối tượng/.test(error.message) && error.cause?.message === "offline");
 });

@@ -209,9 +209,9 @@
   border-block-end: 1px solid var(--reg-rule-strong);
   color: var(--lp-text-secondary);
   font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
   white-space: nowrap;
 }
 

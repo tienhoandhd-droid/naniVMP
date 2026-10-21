@@ -172,7 +172,6 @@ function ChiTietDoiTuong({ row, canEdit, onEdit }: {
     ["Dây chuyền", doc(d.line)],
     ["Tình trạng", doc(d.status)],
     ["Ghi chú", doc(d.note)],
-    ["Phiên bản", `v${row.version}`],
   ];
   return (
     <div className="cw-chi-tiet">
@@ -184,10 +183,7 @@ function ChiTietDoiTuong({ row, canEdit, onEdit }: {
           </div>
         ))}
       </dl>
-      <div className="cw-chi-tiet__chan">
-        <span className="cw-nhe">
-          Mỗi lần sửa đều có lý do và nằm ở mục Lịch sử.
-        </span>
+      <div className="cw-chi-tiet__chan" style={{ justifyContent: "flex-end" }}>
         {canEdit && <NutSua row={row} onEdit={onEdit} label="Cập nhật" />}
       </div>
     </div>

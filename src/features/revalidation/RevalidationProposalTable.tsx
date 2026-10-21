@@ -62,7 +62,7 @@ export default function RevalidationProposalTable({ canManage = false }: { canMa
       ),
       priority: "primary",
     },
-    { id: "completed", header: "Hoàn thành gốc", cell: (row) => formatBangkokDate(row.actualCompletedDate) },
+    { id: "completed", header: "Ngày hoàn thành", cell: (row) => formatBangkokDate(row.actualCompletedDate) },
     { id: "cycle", header: "Chu kỳ", cell: (row) => <span className="rv-number">{row.frequencyMonths} tháng</span>, align: "end" },
     { id: "due", header: "Kỳ tiếp theo", cell: (row) => <b>{formatBangkokDate(row.dueDate)}</b> },
     {
@@ -107,7 +107,7 @@ export default function RevalidationProposalTable({ canManage = false }: { canMa
       <header className="rv-toolbar">
         <div>
           <h3 id="rv-heading">Kỳ tái thẩm định</h3>
-          <p>Ngày hoàn thành thực tế + chu kỳ trong Dữ liệu nguồn.</p>
+          <p>Tính từ ngày hoàn thành + chu kỳ</p>
         </div>
         <div className="rv-toolbar__actions">
           <label className="rv-filter" htmlFor="rv-status-filter">
@@ -177,9 +177,10 @@ function DecisionDialog({ decision, onClose, onSaved }: {
       });
       if (!result.ok) {
         if (result.errorCode === "VERSION_CONFLICT") {
-          setError(`Dòng đã thay đổi trên máy chủ (v${result.currentVersion ?? "?"}). Đóng hộp thoại để tải lại.`);
+          setError("Người khác vừa sửa dòng này. Đóng để tải lại.");
         } else {
-          setError(result.error ?? `Không ghi được quyết định (${result.errorCode}).`);
+          console.error("[tái thẩm định] quyết định bị từ chối:", result.errorCode, result.error);
+          setError(result.error ?? "Không ghi được quyết định.");
         }
         return;
       }

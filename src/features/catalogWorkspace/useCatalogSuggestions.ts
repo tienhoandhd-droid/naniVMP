@@ -53,7 +53,8 @@ export function useCatalogSuggestions(enabled: boolean): {
         ] as const));
         values.forEach(([field, suggestions]) => { kq[field] = suggestions; });
       } catch (cause) {
-        if (con) setError(`Không tải được gợi ý Source: ${cause instanceof Error ? cause.message : String(cause)}`);
+        console.error("[Dữ liệu nguồn] Không tải được gợi ý:", cause);
+        if (con) setError("Không tải được gợi ý.");
       }
       try {
         const sp = await listDataset({ dataset: "products", query: "", page: 0, pageSize: SO_DONG_GOI_Y });

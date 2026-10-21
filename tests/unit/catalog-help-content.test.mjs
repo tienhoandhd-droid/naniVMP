@@ -10,43 +10,39 @@ test("contextual guide covers every authorized catalog workspace region", () => 
     const guide = getCatalogHelp(region);
     assert.ok(guide.title);
     assert.ok(guide.summary);
-    assert.ok(guide.steps.length >= 2, `${region} needs actionable steps`);
+    assert.ok(guide.steps.length >= 1, `${region} needs an actionable step`);
+    // Trợ giúp gọn: tối đa 3 câu thân (bước + lưu ý), không liệt kê lại tên cột.
+    assert.ok(guide.steps.length + (guide.caution ? 1 : 0) <= 3, `${region} help must stay short`);
   }
 });
 
 test("source and pending guidance preserves the audited timeline workflow", () => {
-  const objects = getCatalogHelp("objects").fields.join(" ");
-  assert.match(objects, /Có thẩm định/);
-  assert.match(objects, /Tần suất \(tháng\)/);
-  assert.match(objects, /Người phụ trách/);
+  const objects = getCatalogHelp("objects").steps.join(" ");
   assert.match(objects, /lý do/i);
+  assert.match(objects, /Chờ áp dụng/);
   const pending = getCatalogHelp("pending").steps.join(" ");
-  assert.match(pending, /đã lưu ở Dữ liệu nguồn/i);
   assert.match(pending, /xem ảnh hưởng/i);
   assert.match(pending, /lý do/i);
-  assert.match(pending, /không đổi mốc thời gian/i);
   assert.match(pending, /tiến độ/i);
-  assert.match(pending, /xác nhận đặc biệt/i);
+  assert.match(pending, /xác nhận riêng/i);
   assert.match(getCatalogHelp("pending").caution, /toàn bộ/i);
+  assert.match(getCatalogHelp("pending").caution, /ngày thực tế giữ nguyên/i);
 });
 
-test("dataset and workbook guidance describes validation contracts instead of label-only chips", () => {
-  assert.match(getCatalogHelp("products").fields.join(" "), /Bắt buộc.*Mã BFO.*Tên sản phẩm/i);
-  assert.match(getCatalogHelp("alerts").fields.join(" "), /tên@miền\.tld/i);
-  assert.match(getCatalogHelp("alerts").fields.join(" "), /Ngưỡng.*số/i);
+test("import help points to the template instead of re-listing its columns", () => {
   const imported = getCatalogHelp("import").steps.join(" ");
   assert.match(imported, /DU_LIEU/);
-  assert.match(imported, /Loại đối tượng/);
-  assert.match(imported, /Mã BFO/);
-  assert.match(imported, /không đổi tên.*không di chuyển/i);
-  assert.match(imported, /Ô trống.*không có giá trị/i);
-  assert.doesNotMatch(getCatalogHelp("history").steps.join(" "), /tìm kiếm/i);
+  assert.doesNotMatch(imported, /Loại đối tượng, Mã đối tượng/);
+  assert.match(getCatalogHelp("import").caution, /chưa ghi/i);
+  assert.match(getCatalogHelp("history").caution, /không sửa, không xoá/i);
 });
 
-test("read-only help remains explanatory and never promises edit access", () => {
-  const guide = getCatalogHelp("import");
-  assert.match(guide.readerNote, /chỉ đọc/i);
-  assert.doesNotMatch(guide.readerNote, /bạn có thể lưu/i);
+test("help content never carries permission notes", () => {
+  for (const region of expectedRegions) {
+    const guide = getCatalogHelp(region);
+    assert.equal("readerNote" in guide, false);
+    assert.equal("editorNote" in guide, false);
+  }
 });
 
 test("help permissions match each region instead of generic catalog edit", async () => {

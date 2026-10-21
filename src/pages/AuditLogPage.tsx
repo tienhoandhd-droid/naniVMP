@@ -11,6 +11,34 @@ import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.ts";
 import type { Database } from "../types/database.ts";
 import { formatBangkokDateTime } from "../lib/formatBangkok.ts";
 
+/** Nhãn hiển thị cho tên bảng — dùng chung cho bộ lọc và cột "Loại dữ liệu". */
+const NHAN_BANG: Record<string, string> = {
+  vmp_plan_items: "Hạng mục kế hoạch",
+  vmp_source_objects: "Đối tượng",
+  vmp_item_assignments: "Phân công hạng mục",
+  vmp_source_workshop_scope_grants: "Phạm vi xưởng",
+  profiles: "Hồ sơ tài khoản",
+};
+const nhanBang = (bang: string | null | undefined) => (bang ? NHAN_BANG[bang] ?? "Khác" : "—");
+
+/** Nhãn trường hay gặp; trường lạ giữ nguyên tên để nhật ký vẫn truy được. */
+const NHAN_TRUONG: Record<string, string> = {
+  deadline_protocol: "Hạn đề cương",
+  deadline_validation: "Hạn thẩm định",
+  deadline_report: "Hạn báo cáo",
+  deadline_vmp: "Đích VMP",
+  actual_protocol_date: "Ngày xong đề cương",
+  actual_validation_date: "Ngày xong thẩm định",
+  actual_report_date: "Ngày xong báo cáo",
+  actual_vmp_date: "Ngày xong VMP",
+  status_protocol: "Trạng thái đề cương",
+  status_validation: "Trạng thái thẩm định",
+  status_report: "Trạng thái báo cáo",
+  status_vmp: "Trạng thái VMP",
+  scheduled_at: "Lịch thẩm định",
+  state: "Trạng thái theo dõi",
+};
+
 export default function AuditLogView() {
   /** Một dòng nhật ký thao tác từ bảng audit_logs. */
   type AuditRow = Database["public"]["Tables"]["audit_logs"]["Row"];
@@ -71,7 +99,7 @@ export default function AuditLogView() {
       console.error("Audit log error:", e);
       setLogs([]);
       setTotal(0);
-      setLoadErr((e as { message?: string })?.message || "Không rõ nguyên nhân");
+      setLoadErr("Đăng nhập lại rồi thử lại.");
     } finally { setLoading(false); }
   }, [filters]);
 
@@ -82,10 +110,10 @@ export default function AuditLogView() {
     UPDATE: { label: "Sửa", color: C.skyText, bg: C.skySoft },
     DELETE: { label: "Xoá", color: C.raspText, bg: C.raspSoft },
     STATUS_CHANGE: { label: "Đổi trạng thái", color: C.marigoldText, bg: C.marigoldSoft },
-    DEADLINE_CHANGE: { label: "Đổi deadline", color: C.raspText, bg: C.raspSoft },
+    DEADLINE_CHANGE: { label: "Đổi hạn chót", color: C.raspText, bg: C.raspSoft },
     LOGIN: { label: "Đăng nhập", color: C.lavText, bg: C.lavSoft },
     EXPORT: { label: "Xuất dữ liệu", color: C.skyText, bg: C.skySoft },
-    AI_GENERATE: { label: "Tạo AI report", color: C.pinkText, bg: C.pinkSoft },
+    AI_GENERATE: { label: "Tạo báo cáo AI", color: C.pinkText, bg: C.pinkSoft },
   };
 
   const fmtTime = (ts: string | number | null | undefined): string => {
@@ -96,13 +124,10 @@ export default function AuditLogView() {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         <Card>
-          <CardTitle icon={ShieldCheck} sub="Cần Supabase để xem audit trail">Audit Log</CardTitle>
+          <CardTitle icon={ShieldCheck}>Nhật ký hệ thống</CardTitle>
           <div style={{ padding: "40px 20px", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>🔐</div>
-            <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>Cần cấu hình Supabase</div>
-            <div style={{ fontSize: 14, color: C.plumSoft, fontWeight: 600, marginTop: 8 }}>
-              Đặt VITE_SUPABASE_URL và VITE_SUPABASE_ANON để xem nhật ký thao tác.
-            </div>
+            <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum }}>Chưa kết nối hệ thống</div>
           </div>
         </Card>
       </div>
@@ -112,8 +137,8 @@ export default function AuditLogView() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
-        <CardTitle icon={ShieldCheck} sub={loadErr ? "Không tải được nhật ký" : `${uocLuong ? "≈" : ""}${total} bản ghi · ALCOA+ audit trail · Không thể sửa/xoá`}>
-          Nhật ký thao tác hệ thống
+        <CardTitle icon={ShieldCheck} sub={loadErr ? "Không tải được nhật ký" : `${uocLuong ? "≈" : ""}${total} bản ghi · không sửa/xoá được`}>
+          Nhật ký hệ thống
         </CardTitle>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
           <select aria-label="Lọc nhật ký theo hành động" value={filters.action} onChange={(e) => setFilters(f => ({ ...f, action: e.target.value }))}
@@ -124,18 +149,14 @@ export default function AuditLogView() {
           <input aria-label="Lọc nhật ký theo email" placeholder="Tìm theo email..." value={filters.user}
             onChange={(e) => setFilters(f => ({ ...f, user: e.target.value }))}
             style={{ ...INP, maxWidth: 220 }} />
-          <input aria-label="Lọc nhật ký theo mã hạng mục" placeholder="Tìm theo ID hạng mục..." value={filters.record}
+          <input aria-label="Lọc nhật ký theo mã hạng mục" placeholder="Tìm theo mã hạng mục…" value={filters.record}
             onChange={(e) => setFilters(f => ({ ...f, record: e.target.value }))}
             style={{ ...INP, maxWidth: 200 }} />
-          <select aria-label="Lọc nhật ký theo bảng" value={filters.bang}
+          <select aria-label="Lọc nhật ký theo loại dữ liệu" value={filters.bang}
             onChange={(e) => setFilters(f => ({ ...f, bang: e.target.value }))}
             style={{ ...INP, maxWidth: 210, cursor: "pointer" }}>
-            <option value="">Mọi bảng</option>
-            <option value="vmp_plan_items">Hạng mục kế hoạch</option>
-            <option value="vmp_source_objects">Đối tượng nguồn</option>
-            <option value="vmp_item_assignments">Phân công hạng mục</option>
-            <option value="vmp_source_workshop_scope_grants">Phạm vi xưởng</option>
-            <option value="profiles">Hồ sơ tài khoản</option>
+            <option value="">Tất cả loại dữ liệu</option>
+            {Object.entries(NHAN_BANG).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           {/* Lọc NHANH theo thời gian — hai câu vận hành hay hỏi nhất:
               "hôm nay ai đổi gì?" và "tuần này có gì lạ?". */}
@@ -165,13 +186,10 @@ export default function AuditLogView() {
           <div style={{ margin: "10px 0", padding: "16px 18px", borderRadius: 14,
                         background: C.raspSoft, border: `1px solid ${C.rasp}` }}>
             <div style={{ fontFamily: TEXT, fontWeight: 800, fontSize: 14, color: C.raspText }}>
-              Không tải được nhật ký thao tác
+              Không tải được nhật ký
             </div>
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 5, lineHeight: 1.6 }}>
               {loadErr}
-              <br />
-              Thường gặp: phiên đăng nhập hết hạn (đăng nhập lại), hoặc tài khoản không phải admin/QA —
-              nhật ký chỉ mở cho hai vai trò này.
             </div>
             <button onClick={() => loadLogs(0)}
               style={{ ...btnPrimary, marginTop: 12, padding: "9px 18px", borderRadius: 14, fontSize: 14 }}>
@@ -182,7 +200,7 @@ export default function AuditLogView() {
 
         {!loading && !loadErr && logs.length === 0 && (
           <div style={{ textAlign: "center", padding: 40, color: C.plumSoft, fontWeight: 600 }}>
-            Chưa có bản ghi audit log nào khớp bộ lọc.
+            Không có bản ghi khớp bộ lọc.
           </div>
         )}
 
@@ -191,23 +209,22 @@ export default function AuditLogView() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 800 }}>
               <thead>
                 <tr style={{ background: C.pinkMist }}>
-                  {["Thời gian", "Người thực hiện", "Hành động", "Bảng", "ID bản ghi", "Nguồn", "Chi tiết"].map((h, i) => (
-                    <th key={i} style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, fontWeight: 800, color: C.plumSoft, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                  {["Thời gian", "Người thực hiện", "Hành động", "Loại dữ liệu", "Mã", "Chi tiết"].map((h, i) => (
+                    <th key={i} style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft, textTransform: "none", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log, i) => {
                   const al = (actionLabels as Record<string, { label: string; color: string; bg: string }>)[log.action]
-                    || { label: log.action, color: C.plumSoft, bg: C.pinkSoft };
+                    || { label: "Khác", color: C.plumSoft, bg: C.pinkSoft };
                   return (
                     <tr key={log.id} style={{ borderTop: `1px solid ${C.line}`, background: i % 2 ? C.surfaceSunk : "transparent" }}>
                       <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft, whiteSpace: "nowrap" }}>{fmtTime(log.created_at)}</td>
                       <td style={{ padding: "11px 14px", fontSize: 14, fontWeight: 700, color: C.plum }}>{log.user_email || "—"}</td>
                       <td style={{ padding: "11px 14px" }}><Tag color={al.color} bg={al.bg}>{al.label}</Tag></td>
-                      <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft }}>{log.table_name || "—"}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft }}>{nhanBang(log.table_name)}</td>
                       <td style={{ padding: "11px 14px", fontSize: 12, fontFamily: "monospace", color: C.lavText }}>{log.record_id || "—"}</td>
-                      <td style={{ padding: "11px 14px", fontSize: 12, fontWeight: 600, color: C.plumSoft }}>{log.source || "—"}</td>
                       <td style={{ padding: "11px 14px" }}>
                         {(log.new_data || log.old_data) && (
                           <button type="button" onClick={() => setXemDiff(log)}
@@ -250,9 +267,9 @@ export default function AuditLogView() {
         const rows = dungBangDiff(xemDiff.old_data, xemDiff.new_data, xemDiff.changed_fields);
         return (
           <Modal onClose={() => setXemDiff(null)} icon={ShieldCheck}
-            title={`Thay đổi · ${xemDiff.record_id || xemDiff.table_name || ""}`}>
+            title={`Thay đổi · ${xemDiff.record_id || nhanBang(xemDiff.table_name)}`}>
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 12, lineHeight: 1.7 }}>
-              {fmtTime(xemDiff.created_at)} · {xemDiff.user_email || "không rõ người"} · {xemDiff.table_name || "—"}
+              {fmtTime(xemDiff.created_at)} · {xemDiff.user_email || "không rõ người"} · {nhanBang(xemDiff.table_name)}
               {xemDiff.change_reason && (
                 <div style={{ marginTop: 4 }}>
                   Lý do: <b style={{ color: C.plum }}>{xemDiff.change_reason}</b>
@@ -261,18 +278,17 @@ export default function AuditLogView() {
             </div>
             {rows.length === 0 ? (
               <div style={{ padding: 18, textAlign: "center", color: C.plumSoft, fontWeight: 600 }}>
-                Bản ghi không kèm chi tiết trường thay đổi (vd đăng nhập, xuất dữ liệu).
+                Không có chi tiết.
               </div>
             ) : (
               <table className="reg-table" style={{ width: "100%" }}>
-                <caption>Từng trường thay đổi: giá trị cũ gạch ngang, giá trị mới in đậm.</caption>
                 <thead><tr>
                   <th scope="col">Trường</th><th scope="col">Trước</th><th scope="col">Sau</th>
                 </tr></thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.field}>
-                      <th scope="row" style={{ fontFamily: NUM, fontSize: 12 }}>{r.field}</th>
+                      <th scope="row" style={{ fontFamily: NUM, fontSize: 12 }}>{NHAN_TRUONG[r.field] ?? r.field}</th>
                       <td style={{ color: C.plumSoft }}>
                         {r.cu === null ? <span className="vmp-trong">trống</span>
                           : <s style={{ textDecorationColor: C.rasp }}>{r.cu}</s>}

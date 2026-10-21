@@ -456,7 +456,7 @@ try {
     throw new Error(`Form phạm vi xưởng chưa sẵn sàng: ${JSON.stringify(formState)}`, { cause });
   }
   await manager.evaluate(() => document.querySelector('form[aria-label="Thiết lập phạm vi xưởng"] button[type="submit"]')?.click());
-  await manager.waitForFunction(() => document.body.innerText.includes("Đã lưu phạm vi xưởng"));
+  await manager.waitForFunction(() => document.body.innerText.includes("Đã lưu."));
   const grant = bodies.findLast((entry) => entry.rpc === "rpc_set_source_workshop_scope_grant");
   assert.deepEqual({ person: grant?.body.p_performer_id, line: grant?.body.p_line, reason: grant?.body.p_reason }, {
     person: ids.areaWorkshop, line: null, reason: "Phạm vi xưởng E2E có lý do",
@@ -505,7 +505,7 @@ try {
     assert.equal(await page.$("[data-cw-them]"), null, `${key} must not receive a Source mutation control`);
     assert.equal(await page.$("[data-cw-export-count]"), null, `${key} must not receive Source export`);
     assert.match(await page.$eval("[data-cw-source-guide]", (node) => node.textContent ?? ""),
-      /chế độ chỉ đọc.*Chỉ Admin và Quản lý QA/i, `${key} receives the concise read-only guide`);
+      /Chỉ xem/, `${key} receives the read-only tag`);
     for (const code of expectedCodes) await waitSource(page, code);
     for (const code of sourceRows.map((row) => row.object_code).filter((code) => !expectedCodes.includes(code))) {
       assert.equal(await page.evaluate((value) => document.body.innerText.includes(value), code), false, `${key} must not receive ${code}`);

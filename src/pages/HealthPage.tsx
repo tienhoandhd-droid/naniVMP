@@ -30,10 +30,10 @@ export default function HealthView({ acts, access, onRefresh, refreshing = false
   const [tab, setTab] = useNhomTab("health", "doi-chieu", ["doi-chieu", "client", "server"]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <NhomTab man="health" nhan="Chọn nguồn kiểm tra" tab={tab} onTab={setTab} tabs={[
-        { id: "doi-chieu", nhan: "Đối chiếu client ↔ máy chủ" },
-        { id: "client", nhan: "Lỗi trên bản đang xem" },
-        { id: "server", nhan: "Kiểm tra trên máy chủ" },
+      <NhomTab man="health" nhan="Chế độ xem" tab={tab} onTab={setTab} tabs={[
+        { id: "doi-chieu", nhan: "Đối chiếu số liệu" },
+        { id: "client", nhan: "Lỗi dữ liệu" },
+        { id: "server", nhan: "Kiểm tra toàn bộ" },
       ]} />
       <NhomTabPanel man="health" id="doi-chieu" tab={tab}>
         <DoiChieuView acts={acts} onRefresh={onRefresh} refreshing={refreshing} clientReady={clientReady} scopeFiltered={scopeFiltered} year={year} />
@@ -76,7 +76,8 @@ function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered,
       setKpi(k); setSoLoiServer(q.length);
     } catch (e) {
       if (run !== generation.current) return;
-      setLoi((e as Error).message || "Không đọc được số máy chủ");
+      console.error("Đối chiếu số liệu: không tải được số liệu hệ thống", e);
+      setLoi("Không tải được số liệu hệ thống. Bấm Làm mới.");
       setKpi(null); setSoLoiServer(null);
     }
     if (run === generation.current) setDangTai(false);
@@ -111,25 +112,23 @@ function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered,
                    borderRadius: 10, border: `1.5px solid ${C.pinkSoft}`, background: C.surface,
                    color: C.plum, fontFamily: TEXT, fontSize: 12, fontWeight: 700,
                    cursor: busy ? "wait" : "pointer" }}>
-          <RefreshCw size={13} className={busy ? "spin" : ""} /> {busy ? "Đang tải hai nguồn…" : "Làm mới hai nguồn"}
+          <RefreshCw size={13} className={busy ? "spin" : ""} /> {busy ? "Đang tải…" : "Làm mới"}
         </button>}>
-        Đối chiếu client ↔ máy chủ
+        Đối chiếu số liệu
       </CardTitle>
       {loi && (
         <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12,
                       background: C.raspSoft, color: C.raspText, fontSize: 13, fontWeight: 700 }}>
-          {loi} — chưa có đủ dữ liệu để kết luận khớp hay lệch.
+          {loi}
         </div>
       )}
-      <div data-health-conclusion><CauKetLuan chinh={busy ? "Đang tải lại dữ liệu để đối chiếu…" : !clientReady ? "Chưa tải được dữ liệu bản đang xem; chưa thể đối chiếu." : kl.chinh} tone={busy || !clientReady ? "warn" : kl.tone} /></div>
-      <p style={{fontSize:13,lineHeight:1.7,color:C.plumSoft}}>“Ngoài KPI” = hạng mục Không áp dụng hoặc Đã hủy.</p>
+      <div data-health-conclusion><CauKetLuan chinh={busy ? "Đang tải lại dữ liệu để đối chiếu…" : !clientReady ? "Chưa tải được dữ liệu." : kl.chinh} tone={busy || !clientReady ? "warn" : kl.tone} /></div>
       <div className="vmp-scroll" role="region" aria-label="Bảng đối chiếu cùng phạm vi" tabIndex={0} style={{overflowX:"auto"}}><table data-health-comparison className="reg-table" style={{ width: "100%",minWidth:600 }}>
-        <caption>Chênh sau đối chiếu = máy chủ − KPI đang theo dõi − ngoài KPI. Không thay đổi số liệu gốc.</caption>
         <thead><tr>
           <th scope="col">Con số</th>
-          <th scope="col" className="reg-num">KPI đang theo dõi</th>
-          <th scope="col" className="reg-num">Ngoài KPI</th>
-          <th scope="col" className="reg-num">Máy chủ</th>
+          <th scope="col" className="reg-num">Đang theo dõi</th>
+          <th scope="col" className="reg-num">Không áp dụng, đã hủy</th>
+          <th scope="col" className="reg-num">Tổng hệ thống</th>
           <th scope="col" className="reg-num">Chênh</th>
         </tr></thead>
         <tbody>
@@ -148,13 +147,12 @@ function DoiChieuView({ acts, onRefresh, refreshing, clientReady, scopeFiltered,
         </tbody>
       </table></div>
       <div data-health-quality-sources style={{marginTop:18,padding:16,borderRadius:16,background:C.surfaceSunk}}>
-        <strong>Hai bộ kiểm tra chất lượng dữ liệu</strong>
-        <p>Bản đang xem: <b data-health-client-issues>{clientReady ? issueCount : "Chưa tải được"}</b> cảnh báo · Máy chủ: <b data-health-server-issues>{soLoiServer ?? "Chưa tải được"}</b> cảnh báo.</p>
-        <p style={{fontSize:13,lineHeight:1.7}}>Hai nguồn dùng quy tắc khác nhau — không lấy hiệu hai số để kết luận.</p>
+        <strong>Cảnh báo chất lượng dữ liệu</strong>
+        <p>Lỗi dữ liệu: <b data-health-client-issues>{clientReady ? issueCount : "Chưa tải được"}</b> · Kiểm tra toàn bộ: <b data-health-server-issues>{soLoiServer ?? "Chưa tải được"}</b>.</p>
       </div>
       {kpi?.updated_at && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-          Mốc dữ liệu máy chủ: {formatBangkokDateTime(kpi.updated_at)}. Khác phạm vi không phải lý do để tự đổi trạng thái hồ sơ.
+          Cập nhật {formatBangkokDateTime(kpi.updated_at)}
         </div>
       )}
     </Card>
@@ -197,8 +195,15 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
       .eq("is_resolved", false)
       .order("detected_at", { ascending: false })
       .limit(100)
-      .then(({ data, error }) => { if (error) setServerErr(error.message); else setServerIssues((data || []) as QualityIssue[]); },
-            () => setServerErr("Không đọc được bảng lỗi của hệ thống"));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Không tải được danh sách lỗi đồng bộ", error);
+          setServerErr("Không tải được danh sách lỗi. Tải lại trang.");
+        } else setServerIssues((data || []) as QualityIssue[]);
+      }, (e) => {
+        console.error("Không tải được danh sách lỗi đồng bộ", e);
+        setServerErr("Không tải được danh sách lỗi. Tải lại trang.");
+      });
   }, []);
 
   const [filter, setFilter] = useState("all");
@@ -251,13 +256,13 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
         ].map((c) => (
           <KpiCard key={c.id} emoji={c.emoji} bg={c.bg} color={c.color} value={c.v} label={c.l}
             onClick={() => setFilter(filter === c.id ? "all" : c.id)} pressed={filter === c.id}
-            sub={filter === c.id ? "● Đang lọc" : "Bấm để lọc"} subColor={c.color} />
+            sub={filter === c.id ? "● Đang lọc" : undefined} subColor={c.color} />
         ))}
       </div>
 
       <Card variant="strong">
         <CardTitle icon={Radar}
-          sub={`${nhom.length} loại vấn đề · ${tongHienThi} hạng mục · gom theo loại để sửa một thể`}>
+          sub={`${nhom.length} loại · ${tongHienThi} hạng mục`}>
           Kiểm tra chất lượng dữ liệu
         </CardTitle>
 
@@ -316,9 +321,6 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                           <CopyCodesButton text={g.ds.map((x) => x.id).join("\n")}
                             label={`Sao chép ${g.ds.length} mã`} successLabel="Đã chép ✓"
                             style={{ ...nutNho, fontSize: 12 }} />
-                          <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-                            dán vào ô tìm ở Cập nhật tiến độ để xử lý từng mã
-                          </span>
                         </div>
                         {giongNhau ? (
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -383,12 +385,12 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
 
       <Card variant="soft">
         <CardTitle icon={Radar}
-          sub="Do trigger database và đồng bộ n8n ghi lại (chưa xử lý) — nguồn chính thức, web không tự tính lại">
-          Lỗi / xung đột ghi nhận từ hệ thống (Supabase)
+          sub="Chưa xử lý">
+          Lỗi đồng bộ chưa xử lý
         </CardTitle>
         {serverErr ? (
           <div style={{ padding: 16, color: C.raspText, fontWeight: 700, fontSize: 14 }}>
-            Không đọc được: {serverErr}
+            {serverErr}
           </div>
         ) : nhomServer.length === 0 ? (
           <div style={{ textAlign: "center", padding: 26, color: C.mintText, fontWeight: 700 }}>
@@ -406,7 +408,7 @@ function DataQualityView({ acts }: { acts: Activity[] }) {
                     style={{ width: "100%", textAlign: "left", border: "none", background: "transparent", cursor: "pointer", padding: "11px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                     <ChevronRight size={16} color={C.plumSoft} style={{ transform: dangMo ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
                     <span style={{ fontSize: 16 }}>{nang ? "🚫" : "⚠️"}</span>
-                    <span style={{ flex: 1, fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{loai}</span>
+                    <span style={{ flex: 1, fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum }}>{LOAI_LOI[loai]?.ten ?? "Khác"}</span>
                     <Tag color={nang ? C.raspText : C.marigoldText} bg={nang ? C.raspSoft : C.marigoldSoft}>{ds.length}</Tag>
                   </button>
                   {dangMo && (

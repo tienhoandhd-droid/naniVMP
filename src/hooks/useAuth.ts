@@ -80,7 +80,7 @@ export function useAuth() {
 
   const login = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured()) {
-      throw new Error("Hệ thống chưa cấu hình Supabase Auth. Liên hệ IT để thiết lập.");
+      throw new Error("Chưa đăng nhập được. Liên hệ IT.");
     }
     const profile = await signIn(email, password);
     setUser(profile);

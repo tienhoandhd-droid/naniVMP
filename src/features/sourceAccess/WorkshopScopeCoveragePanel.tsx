@@ -25,10 +25,10 @@ export function validateWorkshopScopeAction({
   reason: string;
 }): ActionBlock | null {
   return firstActionBlock([
-    { blocked: choicesStatus === "loading" || choicesStatus === "idle", code: "choices", message: "Đang tải lựa chọn từ dữ liệu Source." },
-    { blocked: choicesStatus === "error", code: "choices", message: "Chưa tải được lựa chọn từ dữ liệu Source; hãy thử lại." },
-    { blocked: !department, code: "department", message: "Chọn bộ phận Source.", focusId: "workshop-scope-department" },
-    { blocked: !areaCode, code: "area", message: "Chọn khu vực Source.", focusId: "workshop-scope-area" },
+    { blocked: choicesStatus === "loading" || choicesStatus === "idle", code: "choices", message: "Đang tải lựa chọn." },
+    { blocked: choicesStatus === "error", code: "choices", message: "Chưa tải được lựa chọn. Bấm Thử lại." },
+    { blocked: !department, code: "department", message: "Chọn bộ phận.", focusId: "workshop-scope-department" },
+    { blocked: !areaCode, code: "area", message: "Chọn khu vực.", focusId: "workshop-scope-area" },
     { blocked: !reason.trim(), code: "reason", message: "Nhập lý do thay đổi.", focusId: "workshop-scope-reason" },
   ]);
 }
@@ -212,7 +212,7 @@ export default function WorkshopScopeCoveragePanel({
         rows: applyOptimisticWorkshopScopeGrant(previous.rows, { personId: currentPersonId, grant }),
       }));
       clearEditor();
-      setMessage(isActive ? "Đã lưu phạm vi xưởng; đang đồng bộ dữ liệu máy chủ." : "Đã thu hồi phạm vi; đang đồng bộ dữ liệu máy chủ.");
+      setMessage(isActive ? "Đã lưu." : "Đã thu hồi.");
       onChanged?.();
       refresh();
     } finally {
@@ -230,7 +230,7 @@ export default function WorkshopScopeCoveragePanel({
        một chiều, hộp phải nói rõ mất gì và của ai. */
     const dongY = await xacNhan({
       title: "Thu hồi phạm vi xưởng?",
-      description: `${selectedPerson.fullName || "Người này"} sẽ mất quyền xem Source của `
+      description: `${selectedPerson.fullName || "Người này"} sẽ mất quyền xem Dữ liệu nguồn của `
         + `${grant.department} / ${grant.areaCode}${grant.line ? ` / ${grant.line}` : " (toàn khu vực)"}. `
         + "Thao tác được ghi vết kèm lý do; muốn cấp lại phải tạo phạm vi mới.",
       confirmLabel: "Thu hồi",
@@ -248,14 +248,14 @@ export default function WorkshopScopeCoveragePanel({
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div>
           <h2 id="workshop-scope-heading" style={{ margin: 0, color: C.plum }}>Phạm vi xưởng</h2>
-          <p style={{ margin: "6px 0 0", color: C.plumSoft }}>Chỉ quản lý quyền xem Source; không thay đổi tài khoản, vai trò hay hồ sơ nhân sự.</p>
+          <p style={{ margin: "6px 0 0", color: C.plumSoft }}>Giao bộ phận, khu vực cho nhân sự xưởng.</p>
         </div>
         <button type="button" className="cw-nut cw-nut--phu" onClick={refresh}><RefreshCw size={14} /> Làm mới</button>
       </div>
 
       {areaLessSourceCount > 0 && (
         <p role="alert" style={{ marginTop: 14, color: C.raspText }}>
-          Có {areaLessSourceCount} đối tượng Source chưa có khu vực; các đối tượng này không hiển thị cho người xưởng cho đến khi dữ liệu Source được bổ sung.
+          {areaLessSourceCount} đối tượng chưa có khu vực — xưởng chưa thấy.
         </p>
       )}
       {message && <p role="alert" style={{ color: C.raspText }}>{message}</p>}
@@ -293,11 +293,11 @@ export default function WorkshopScopeCoveragePanel({
 
             <form onSubmit={(event) => { event.preventDefault(); void save(true); }} aria-label="Thiết lập phạm vi xưởng">
               <h3>{editingGrant ? "Sửa phạm vi" : "Thêm phạm vi"}</h3>
-              <label htmlFor="workshop-scope-department">Bộ phận Source</label>
+              <label htmlFor="workshop-scope-department">Bộ phận</label>
               <select id="workshop-scope-department" aria-describedby={actionDescription} value={department} onChange={(event) => { setDepartment(event.target.value); setAreaCode(""); setLine(""); setMessage(""); }} style={INP} disabled={choices.status === "loading" || saving}>
                 <option value="">— chọn bộ phận —</option>{departments.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
-              <label htmlFor="workshop-scope-area">Khu vực Source</label>
+              <label htmlFor="workshop-scope-area">Khu vực</label>
               <select id="workshop-scope-area" aria-describedby={actionDescription} value={areaCode} onChange={(event) => { setAreaCode(event.target.value); setLine(""); setMessage(""); }} style={INP} disabled={!department || choices.status === "loading" || saving}>
                 <option value="">— chọn khu vực —</option>{areas.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
@@ -306,12 +306,12 @@ export default function WorkshopScopeCoveragePanel({
                 <option value="">— để trống: toàn khu vực —</option>{lines.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               <p>Để trống dây chuyền nghĩa là quyền xem toàn khu vực đã chọn.</p>
-              {choices.status === "loading" && <p role="status">Đang tải lựa chọn từ Source…</p>}
-              {choices.status === "error" && <p role="alert">Không tải được lựa chọn Source: {choices.error?.error} <button type="button" className="cw-nut cw-nut--phu" onClick={() => setChoicesRetry((value) => value + 1)}>Thử lại</button></p>}
-              {choices.status === "ready" && choices.nextCursor && <button type="button" className="cw-nut cw-nut--phu" onClick={() => void loadChoices(true, choices.nextCursor)}>Tải thêm lựa chọn Source</button>}
+              {choices.status === "loading" && <p role="status">Đang tải lựa chọn…</p>}
+              {choices.status === "error" && <p role="alert">Không tải được lựa chọn: {choices.error?.error} <button type="button" className="cw-nut cw-nut--phu" onClick={() => setChoicesRetry((value) => value + 1)}>Thử lại</button></p>}
+              {choices.status === "ready" && choices.nextCursor && <button type="button" className="cw-nut cw-nut--phu" onClick={() => void loadChoices(true, choices.nextCursor)}>Tải thêm lựa chọn</button>}
               <label htmlFor="workshop-scope-reason">Lý do thay đổi</label>
               <textarea id="workshop-scope-reason" aria-describedby={actionDescription} value={reason} onChange={(event) => { setReason(event.target.value); setMessage(""); }} required style={{ ...INP, minHeight: 76, paddingTop: 10 }} disabled={saving} />
-              <p id={actionDescription}>{actionBlock?.message || "Sẵn sàng lưu phạm vi và đối chiếu lại với Source."}</p>
+              <p id={actionDescription}>{actionBlock?.message}</p>
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                 <button type="submit" style={btnPrimary} disabled={saving} aria-describedby={actionDescription}>{saving ? "Đang lưu…" : editingGrant ? "Lưu thay đổi" : "Thêm phạm vi"}</button>
                 {editingGrant && <button type="button" className="cw-nut cw-nut--phu" onClick={clearEditor}>Hủy</button>}

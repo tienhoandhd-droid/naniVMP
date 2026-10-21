@@ -25,7 +25,7 @@ export default function MonitoringJourneyNav({
   metrics,
   canView,
   onNavigate,
-  scopeLabel = "Theo phạm vi chung",
+  scopeLabel = "",
 }: MonitoringJourneyNavProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const visibleItems = ITEMS.filter(({ id }) => canView(id));
@@ -60,7 +60,7 @@ export default function MonitoringJourneyNav({
 
   return (
     <nav className="monitoring-journey" aria-label="Ba màn giám sát">
-      <p className="monitoring-journey__scope">{scopeLabel}</p>
+      {scopeLabel && <p className="monitoring-journey__scope">{scopeLabel}</p>}
       <span className="lp-visually-hidden" aria-live="polite">{liveSummary}</span>
       <div ref={railRef} className="monitoring-journey__rail">
         {visibleItems.map(({ id, metric, Icon }) => {
@@ -78,13 +78,12 @@ export default function MonitoringJourneyNav({
               <Icon aria-hidden="true" size={20} />
               <span className="monitoring-journey__copy">
                 <strong>{copy.title}</strong>
-                <span>{copy.description}</span>
-                {active && <span className="monitoring-journey__current">Đang xem</span>}
               </span>
-              <span className="monitoring-journey__metric">
+              {/* Ô đang đứng không lặp số: màn đó đã có ô số cùng nghĩa bên dưới. */}
+              {!active && <span className="monitoring-journey__metric">
                 <strong>{metrics[metric]}</strong>
                 <span>{copy.metricLabel}</span>
-              </span>
+              </span>}
             </button>
           );
         })}

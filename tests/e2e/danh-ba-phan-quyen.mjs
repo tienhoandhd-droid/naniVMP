@@ -416,10 +416,10 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.body.innerText.includes("Bảng kiểm soát vai trò & tài khoản"), { timeout: 15000 });
   await page.click("#phanquyen-tab-email");
-  await page.waitForFunction(() => document.body.innerText.includes("1 · Ai được phép có tài khoản"));
+  await page.waitForFunction(() => document.body.innerText.includes("Ai được phép có tài khoản"));
   assert.match(page.url(), /#v=phanquyen&tab=email$/,
     "tab email phải có URL có thể gửi cho đồng nghiệp");
-  assert.equal(await documentContains("1 · Ai được phép có tài khoản"), true,
+  assert.equal(await documentContains("Ai được phép có tài khoản"), true,
     "admin phải quản lý được danh sách email ngay trên web");
   /* Ma trận 4 vai thì XOÁ HẲN cùng hệ quyền cũ — không phải ẩn, mà không
      còn tồn tại. Thứ thay nó là ma trận 6 vai "Màn hình bạn được xem". */
@@ -495,7 +495,7 @@ try {
     p_reason: "Nối lại tài khoản legacy",
     p_expected_version: 1,
   });
-  assert.equal(await documentContains(`Khóa người: ${legacyPerson.person_id}`), true,
+  assert.equal(await page.evaluate((id) => !!document.querySelector(`[data-selected-person-id="${id}"]`), legacyPerson.person_id), true,
     "tải lại sau nối giữ đúng person_id dù tên có thể trùng");
 
   uiAccessHienTai = uiAccessQuanLyQa;

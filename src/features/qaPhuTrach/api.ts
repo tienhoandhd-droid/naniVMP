@@ -37,11 +37,15 @@ export function docDanhSachQaPhuTrach(value: unknown): QaPhuTrachRow[] {
 export async function layDanhSachQaPhuTrach(): Promise<KetQua<QaPhuTrachRow[]>> {
   if (!supabase) return { ok: false, error: "Hệ thống chưa cấu hình kết nối." };
   const { data, error } = await supabase.rpc("rpc_qa_phu_trach_danh_sach" as never);
-  if (error) return { ok: false, error: `Không tải được danh sách: ${error.message}` };
+  if (error) {
+    console.error("Không tải được danh sách QA phụ trách", error);
+    return { ok: false, error: "Không tải được danh sách. Thử lại." };
+  }
   try {
     return { ok: true, data: docDanhSachQaPhuTrach(data) };
   } catch (loi) {
-    return { ok: false, error: loi instanceof Error ? loi.message : String(loi) };
+    console.error("Danh sách QA phụ trách trả về không hợp lệ", loi);
+    return { ok: false, error: "Không tải được danh sách. Thử lại." };
   }
 }
 
@@ -52,7 +56,10 @@ export async function datQaPhuTrach(performerId: string, trongDanhSach: boolean,
     p_trong_danh_sach: trongDanhSach,
     p_ly_do: lyDo,
   } as never);
-  if (error) return { ok: false, error: `Không lưu được: ${error.message}` };
+  if (error) {
+    console.error("Không lưu được QA phụ trách", error);
+    return { ok: false, error: "Chưa lưu được. Thử lại." };
+  }
   const kq = (data ?? {}) as Record<string, unknown>;
   if (kq.ok !== true) return { ok: false, error: String(kq.error ?? "Không lưu được") };
   return { ok: true, data: null };

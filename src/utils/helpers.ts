@@ -292,7 +292,7 @@ export function runDataQualityChecks(acts: Activity[]) {
 
     // 2. Trùng ID
     if (seenIds.has(a.id)) {
-      issues.push({ type: "duplicate_id", severity: "error", id: a.id, msg: `ID "${a.id}" bị trùng` });
+      issues.push({ type: "duplicate_id", severity: "error", id: a.id, msg: `Mã "${a.id}" bị trùng` });
     }
     seenIds.add(a.id);
 
@@ -301,7 +301,7 @@ export function runDataQualityChecks(acts: Activity[]) {
       const dl = parseD(a.target);
       const start = parseD(r.ngay_de_cuong);
       if (dl && start && dl < start) {
-        issues.push({ type: "deadline_before_start", severity: "warning", id: a.id, msg: `Deadline VMP (${a.target}) trước ngày đề cương (${r.ngay_de_cuong})` });
+        issues.push({ type: "deadline_before_start", severity: "warning", id: a.id, msg: `Đích VMP (${a.target}) trước ngày đề cương (${r.ngay_de_cuong})` });
       }
     }
 
@@ -319,7 +319,7 @@ export function runDataQualityChecks(acts: Activity[]) {
     // An omitted field was not supplied by this read model; it is not proof
     // that the performer has no email. Explicit null/blank remains a warning.
     if (a.owner && a.owner !== "—" && Object.hasOwn(r, "email_qa") && !r.email_qa) {
-      issues.push({ type: "owner_no_email", severity: "info", id: a.id, msg: `QA "${a.owner}" chưa có email — không nhận được cảnh báo. Liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự.` });
+      issues.push({ type: "owner_no_email", severity: "info", id: a.id, msg: `QA "${a.owner}" chưa có email — không nhận được cảnh báo.` });
     }
 
     // 7. Thiếu loại thẩm định
@@ -375,7 +375,7 @@ export function nhanXetTuDong(acts: Activity[], phamVi = ""): string[] {
   if (cao.length && thap.length) {
     const tlCao = tl(cao), tlThap = tl(thap);
     y.push(tlCao + 5 < tlThap
-      ? `Đang làm ngược thứ tự rủi ro: nhóm trọng yếu cao mới xong ${tlCao}% trong khi nhóm thấp đã ${tlThap}%. ICH Q9 và Annex 15 đòi ưu tiên nhóm rủi ro cao — chênh lệch này là thứ thanh tra hỏi đầu tiên.`
+      ? `Đang làm ngược thứ tự rủi ro: nhóm trọng yếu cao mới xong ${tlCao}% trong khi nhóm thấp đã ${tlThap}%. ICH Q9 yêu cầu ưu tiên nhóm rủi ro cao.`
       : `Thứ tự ưu tiên hợp lý: nhóm trọng yếu cao đạt ${tlCao}%, không tụt sau nhóm thấp (${tlThap}%).`);
   }
 

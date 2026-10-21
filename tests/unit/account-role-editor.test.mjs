@@ -106,7 +106,7 @@ test("mutation bị từ chối giữ lỗi mà không reload", async () => {
     isCurrent: () => true,
   });
 
-  assert.deepEqual(outcome, { kind: "rejected", message: "Không có quyền" });
+  assert.deepEqual(outcome, { kind: "rejected", message: "Chưa lưu được. Thử lại." });
   assert.equal(reloaded, false);
 });
 
@@ -122,7 +122,7 @@ test("reload lỗi sau khi ghi cảnh báo đã ghi và không retry mutation", 
   assert.equal(mutations, 1);
   assert.deepEqual(outcome, {
     kind: "written_unverified",
-    message: "Đã ghi thay đổi nhưng chưa đối chiếu lại được: Mất kết nối",
+    message: "Đã lưu, chưa tải lại được. Bấm Tải lại.",
   });
 });
 
@@ -164,7 +164,7 @@ test("editor SSR nêu đối chiếu, lý do bắt buộc, hủy và lưu", () =
     onVerified: () => {},
   }));
 
-  assert.match(html, /Đối chiếu thay đổi/);
+  assert.match(html, /Đổi vai/);
   assert.match(html, /Lý do/);
   assert.match(html, /Hủy/);
   assert.match(html, /Lưu thay đổi/);

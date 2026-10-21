@@ -117,7 +117,8 @@ export default function AccountLinkPanel({
           setMessage("");
         }
       } catch (error) {
-        if (sequence === requestSequence.current) setMessage((error as Error).message);
+        console.error("Không tìm được tài khoản để nối", error);
+        if (sequence === requestSequence.current) setMessage("Không tìm được tài khoản. Thử lại.");
       } finally {
         if (sequence === requestSequence.current) setLoading(false);
       }
@@ -166,7 +167,8 @@ export default function AccountLinkPanel({
         setMessage(userId ? "Đã nối tài khoản. Đang tải lại hồ sơ…" : "Đã gỡ nối tài khoản. Đang tải lại hồ sơ…");
       }
     } catch (error) {
-      if (currentPersonId.current === targetPerson.person_id) setMessage((error as Error).message);
+      console.error("Nối/gỡ nối tài khoản thất bại", error);
+      if (currentPersonId.current === targetPerson.person_id) setMessage("Chưa lưu được. Thử lại.");
     } finally {
       if (currentPersonId.current === targetPerson.person_id) setSaving(false);
     }
@@ -176,9 +178,9 @@ export default function AccountLinkPanel({
     <section className="ip-panel" aria-labelledby="ip-account-link-title">
       <h3 id="ip-account-link-title">Nối tài khoản</h3>
       <p className="ip-help">
-        Trạng thái: <b>{accountStatusLabel[person.account_status]}</b>. Liên kết dùng mã hồ sơ cố định, không dùng tên hoặc email làm khóa.
+        Trạng thái: <b>{accountStatusLabel[person.account_status]}</b>.
       </p>
-      <div className="ip-selected"><b>{person.full_name}</b><span>{person.person_id}</span></div>
+      <div className="ip-selected"><b>{person.full_name}</b></div>
       {person.user_id ? (
         <>
           <label>Lý do gỡ nối
@@ -224,7 +226,7 @@ export default function AccountLinkPanel({
         </>
       )}
       <p id={descriptionId} className="ip-help">
-        {currentBlock?.message || "Sẵn sàng ghi và tải lại hồ sơ theo mã cố định."}
+        {currentBlock?.message}
       </p>
       {message && <div className="ip-message" role="status">{message}</div>}
     </section>

@@ -19,7 +19,7 @@ test("Vali summary prioritizes overdue work and exposes the complete dashboard c
 
   assert.equal(brief.mood, "concern");
   assert.equal(brief.moodLabel, "đang lo");
-  assert.match(brief.headline, /14 hồ sơ quá hạn/);
+  assert.match(brief.headline, /14 hạng mục quá hạn/);
   assert.deepEqual(brief.metrics.map((metric) => metric.kind), [
     "progress", "documents", "overdue", "soon",
   ]);
@@ -28,7 +28,7 @@ test("Vali summary prioritizes overdue work and exposes the complete dashboard c
   assert.match(brief.metrics[1].detail, /9\/24/);
   assert.deepEqual(brief.observations.map((item) => item.kind), ["todo", "mismatched"]);
   assert.match(brief.observations[0].text, /9 hạng mục/);
-  assert.match(brief.observations[1].text, /2 hồ sơ/);
+  assert.match(brief.observations[1].text, /2 hạng mục/);
   assert.match(brief.action, /quá hạn/i);
 });
 
@@ -51,7 +51,7 @@ test("Vali summary keeps checked zero values visible for a clean plan", () => {
   assert.match(brief.headline, /82%/);
   assert.equal(brief.metrics.length, 4);
   assert.equal(brief.observations.length, 2);
-  assert.match(brief.observations[1].text, /^0 hồ sơ lệch pha/);
+  assert.match(brief.observations[1].text, /^0 hạng mục lệch pha/);
   assert.match(brief.action, /duy trì/i);
 });
 
@@ -75,6 +75,6 @@ test("Vali summary normalizes invalid counts without inventing totals", () => {
   assert.match(brief.metrics[0].detail, /4\/4/);
   assert.match(brief.metrics[1].detail, /0\/0/);
   assert.match(brief.observations[0].text, /^0 hạng mục/);
-  assert.match(brief.observations[1].text, /^7 hồ sơ/);
+  assert.match(brief.observations[1].text, /^7 hạng mục/);
   assert.match(brief.action, /tới hạn/i);
 });

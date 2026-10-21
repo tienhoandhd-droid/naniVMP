@@ -105,8 +105,8 @@ export function CatalogMilestonesTable({ items, dupYears, readOnly, onQuickDone,
   return (
     <table className="catalog-milestones" style={{ width: "100%", borderCollapse: "collapse", fontFamily: TEXT, minWidth: 820 }}>
       <caption className="lp-visually-hidden">Mốc tiến độ theo lần thẩm định</caption>
-      <thead><tr style={{ background: "rgba(252,227,239,.35)" }}>
-        {["Năm", "ID", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "QA", "Chung", "Thao tác"].map((h, i) => <th key={i} scope="col" style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
+      <thead><tr style={{ background: "var(--lp-bg-sunken)" }}>
+        {["Năm", "Mã hạng mục", "Đề cương", "Thẩm định", "Báo cáo", "Đích VMP", "QA phụ trách", "Trạng thái", "Thao tác"].map((h, i) => <th key={i} scope="col" style={{ textAlign: i >= 7 ? "center" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 800, color: C.plumSoft, whiteSpace: "nowrap" }}>{h}</th>)}
       </tr></thead>
       <tbody>
         {items.map((a, i) => { const dup = dupYears.has(yearOf(a)); return (
@@ -122,7 +122,7 @@ export function CatalogMilestonesTable({ items, dupYears, readOnly, onQuickDone,
             <td style={{ padding: "9px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
               {!readOnly && a.st !== "done" && (
                 <button onClick={() => onQuickDone(a)}
-                  title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu"
+                  title="Xong bước hôm nay"
                   style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.mint}`,
                     background: C.mintSoft, color: C.mintText, fontFamily: TEXT, fontSize: 12,
                     fontWeight: 800, cursor: "pointer", marginRight: 6 }}>
@@ -270,8 +270,7 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
         <header className="catalog-progress__header">
           <span className="catalog-progress__mark" aria-hidden="true"><Boxes size={20} /></span>
           <div>
-            <h2>Danh mục đối tượng &amp; Tiến độ</h2>
-            <p>Nhóm theo mã · theo dõi từng loại và lần thẩm định</p>
+            <h2>Tiến độ theo đối tượng</h2>
           </div>
         </header>
         <div className="catalog-progress__primary">
@@ -305,8 +304,7 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
             <select value={year} onChange={(e) => setYear(e.target.value)} aria-label="Lọc theo năm thẩm định" style={{ ...INP, minHeight: undefined }}><option value="all">Tất cả năm</option>{years.map((y) => <option key={y} value={y}>Năm {y}</option>)}</select>
           </label>
           <label><span>Phạm vi thẩm định</span>
-            <select value={tdinh} onChange={(e) => setTdinh(e.target.value as "y" | "n" | "all")} aria-label="Lọc theo có thẩm định hay không" style={{ ...INP, minHeight: undefined }}
-              title="Đối tượng không thẩm định không sinh timeline và mặc định được ẩn.">
+            <select value={tdinh} onChange={(e) => setTdinh(e.target.value as "y" | "n" | "all")} aria-label="Lọc theo có thẩm định hay không" style={{ ...INP, minHeight: undefined }}>
               <option value="y">Chỉ đối tượng có thẩm định</option>
               <option value="n">Chỉ đối tượng không thẩm định</option>
               <option value="all">Cả hai</option>
@@ -365,7 +363,7 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                       )}
                       {thongTin.lech && (
                         <span style={{ background: C.raspSoft, color: C.raspText, borderRadius: 999, padding: "2px 8px", fontWeight: 800 }}
-                          title="Các hạng mục của đối tượng này không cùng điểm trọng yếu / phân loại báo cáo — mở từng hạng mục để xem đúng của nó.">
+                          title="Mỗi lần thẩm định có điểm khác nhau">
                           ⚠ các lần không giống nhau
                         </span>
                       )}
@@ -379,13 +377,12 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                     người nhập ngó lại, không được ru ngủ bằng chữ "không thẩm định". */}
                 {g.items.length === 0 ? (
                   !coThamDinh(o) ? (
-                    <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
-                      title="Danh mục nguồn đánh dấu đối tượng này không thẩm định nên không sinh hạng mục nào.">
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, background: C.pinkMist, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>
                       Không thẩm định
                     </span>
                   ) : (
                     <span style={{ fontSize: 12, fontWeight: 800, color: C.marigoldText, background: C.marigoldSoft, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}
-                      title="Đối tượng CÓ trong kế hoạch thẩm định nhưng không còn hạng mục nào đang hiệu lực — thường do các lần đã bị đánh dấu &quot;Không áp dụng&quot;. Mở Danh mục &amp; Nhập liệu để kiểm tra.">
+                      title="Mọi lần đều Không áp dụng — kiểm tra ở Dữ liệu nguồn">
                       Có thẩm định · chưa có lần nào hiệu lực
                     </span>
                   )
@@ -406,10 +403,9 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                 {isOpen && <>
                   {onMoDanhMuc && (
                     <div className="catalog-object__source-link">
-                      <span>Sửa tên · khu vực · bộ phận · tần suất · điểm trọng yếu của đối tượng này:</span>
                       <button type="button"
                         onClick={() => onMoDanhMuc(String(o.code), CLS_SANG_NHOM[String(o.cls ?? "")])}>
-                        <ExternalLink size={13} aria-hidden="true" /> Mở trong Danh mục &amp; Nhập liệu
+                        <ExternalLink size={13} aria-hidden="true" /> Mở ở Dữ liệu nguồn
                       </button>
                     </div>
                   )}
@@ -420,7 +416,7 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
                         <Tag color={C.lavText} bg={C.lavSoft}>{txt(vtype)}</Tag>
                         <span style={{ fontSize: 12, fontWeight: 800, color: C.plum }}>{items.length} lần thẩm định</span>
                         {dupYears.size > 0 && (
-                          <span style={{ fontSize: 12, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 9px", borderRadius: 999 }} title="Cùng một loại thẩm định không nên lặp trong cùng một năm">
+                          <span style={{ fontSize: 12, fontWeight: 800, color: C.raspText, background: C.raspSoft, padding: "3px 9px", borderRadius: 999 }}>
                             ⚠ Trùng loại trong năm {[...dupYears].join(", ")}
                           </span>
                         )}
@@ -450,9 +446,6 @@ export default function CatalogView({ objects = [], acts = [], authorizationRevi
           chỗ tra: mở ra là thấy đủ 55 đối tượng ngoài kế hoạch kèm lý do. */}
       <KhongThamDinhCard authorizationRevision={authorizationRevision} onMoDanhMuc={onMoDanhMuc} />
 
-      <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, padding: "0 4px", lineHeight: 1.6 }}>
-        Thêm / xoá đối tượng ở <b>Danh mục &amp; Nhập liệu</b>.
-      </div>
 
       {/* Cùng một hộp với màn Cập nhật tiến độ: ghi thật, có khoá lạc quan,
           bắt buộc lý do theo ALCOA+, gán được người thực hiện. */}

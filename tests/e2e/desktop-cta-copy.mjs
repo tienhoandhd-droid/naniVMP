@@ -45,13 +45,17 @@ try {
   assert.ok(today.top >= 0 && today.bottom <= VIEWPORT_HEIGHT, JSON.stringify(today));
 
   await page.goto(`${GOC}#v=progress`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForSelector("button.pr-uu-tien--dau", { timeout: 15_000 });
-  const progress = await page.$eval("button.pr-uu-tien--dau", (button) => ({
-    label: button.textContent?.trim(),
-    top: button.getBoundingClientRect().top,
-    bottom: button.getBoundingClientRect().bottom,
-  }));
-  assert.match(progress.label, /^Cập nhật /u);
+  /* 21/10 (G2): khối Vali đã bỏ — nút hành động đầu tiên là "Cập nhật" ở
+     hàng đầu bảng, vẫn phải thấy ngay không cần cuộn. */
+  await page.waitForSelector("tr[data-progress-item] button", { timeout: 15_000 });
+  const progress = await page.evaluate(() => {
+    const button = [...document.querySelectorAll("tr[data-progress-item] button")]
+      .find((node) => /^Cập nhật/u.test(node.textContent?.trim() || ""));
+    if (!button) return { label: "", top: -1, bottom: -1 };
+    const rect = button.getBoundingClientRect();
+    return { label: button.textContent?.trim() || "", top: rect.top, bottom: rect.bottom };
+  });
+  assert.match(progress.label, /^Cập nhật/u);
   assert.ok(progress.top >= 0 && progress.bottom <= VIEWPORT_HEIGHT, JSON.stringify(progress));
 
   await page.goto(`${GOC}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });

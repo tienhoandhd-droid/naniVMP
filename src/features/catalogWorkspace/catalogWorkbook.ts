@@ -263,7 +263,7 @@ export async function parseCatalogWorkbook(
     return tuChoi("FILE_KIND", "Chỉ nhận file .xlsx theo mẫu chính thức.");
   }
   if (file.size > MAX_FILE_BYTES) {
-    return tuChoi("FILE_TOO_LARGE", "File Excel không được lớn hơn 5 MiB.");
+    return tuChoi("FILE_TOO_LARGE", "File Excel không được lớn hơn 5 MB.");
   }
 
   const ExcelJS = (await import("exceljs")).default;
@@ -271,11 +271,11 @@ export async function parseCatalogWorkbook(
   try {
     await wb.xlsx.load(await file.arrayBuffer());
   } catch {
-    return tuChoi("WORKBOOK_UNREADABLE", "File không đọc được thành workbook Excel hợp lệ.");
+    return tuChoi("WORKBOOK_UNREADABLE", "File Excel bị hỏng hoặc không đúng định dạng.");
   }
 
   if (wb.worksheets.length > MAX_SHEETS) {
-    return tuChoi("TOO_MANY_SHEETS", `Workbook chỉ được có tối đa ${MAX_SHEETS} sheet.`);
+    return tuChoi("TOO_MANY_SHEETS", "File có quá nhiều sheet.");
   }
 
   /* Đếm tổng ô phải duyệt TRƯỚC khi đọc nội dung — trần cứng chống file
@@ -284,7 +284,7 @@ export async function parseCatalogWorkbook(
   for (const sheet of wb.worksheets) {
     sheet.eachRow({ includeEmpty: true }, (row) => { tongO += row.cellCount; });
     if (tongO > MAX_VISITED_CELLS) {
-      return tuChoi("TOO_MANY_CELLS", `Workbook vượt trần ${MAX_VISITED_CELLS.toLocaleString("vi-VN")} ô.`);
+      return tuChoi("TOO_MANY_CELLS", "File quá lớn.");
     }
   }
 
@@ -292,7 +292,7 @@ export async function parseCatalogWorkbook(
   const meta = wb.getWorksheet("_VMP_META");
   if (!meta) {
     return tuChoi("META_MISSING",
-      "Không thấy dấu mẫu chính thức (_VMP_META) — hãy tải mẫu từ chính màn này, đừng tự tạo file.");
+      "File không phải mẫu của VMP. Tải mẫu ở màn này.");
   }
   const docMeta = (o: string) => String(giaTriTho(meta.getCell(o).value).raw ?? "").trim();
   const dataset = docMeta("B1") as CatalogTemplateDataset;
@@ -385,7 +385,7 @@ export async function parseCatalogWorkbook(
 
     const businessKey = String(values[khoa] ?? "").trim();
     if (!businessKey) {
-      errors.push({ code: "THIEU_KHOA", message: "Thiếu mã khoá của dòng — không có mã thì không đối chiếu được." });
+      errors.push({ code: "THIEU_KHOA", message: "Thiếu mã." });
     } else if (daThay.has(businessKey)) {
       errors.push({ code: "TRUNG_KHOA", message: `Mã "${businessKey}" đã xuất hiện ở dòng trước trong chính file này.` });
     } else {

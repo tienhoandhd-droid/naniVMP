@@ -100,16 +100,16 @@ test("dialog renders exactly four editable deadlines and eight protected evidenc
   ]) {
     assert.match(html, new RegExp(`data-planned-deadline-protected="${key}"`));
   }
-  assert.match(html, /Tôi xác nhận chỉ đổi bốn deadline kế hoạch/);
+  assert.match(html, /Tôi xác nhận chỉ đổi bốn hạn kế hoạch/);
   assert.match(html, /data-planned-deadline-submit="true"/);
   assert.doesNotMatch(html, /data-planned-deadline-submit="true"[^>]*disabled=""/);
   assert.match(html, /aria-describedby="planned-deadline-action-description"/);
 });
 
 test("lỗi deadline trỏ đúng ô cần sửa", () => {
-  assert.equal(plannedDeadlineErrorFocusId("Phải nhập lý do điều chỉnh deadline kế hoạch"), "planned-deadline-reason");
-  assert.equal(plannedDeadlineErrorFocusId("Phải xác nhận chỉ đổi bốn deadline kế hoạch"), "planned-deadline-confirmation");
-  assert.equal(plannedDeadlineErrorFocusId("Không có deadline nào thay đổi"), "planned-deadline-deadline_protocol");
+  assert.equal(plannedDeadlineErrorFocusId("Nhập lý do."), "planned-deadline-reason");
+  assert.equal(plannedDeadlineErrorFocusId("Tích ô xác nhận."), "planned-deadline-confirmation");
+  assert.equal(plannedDeadlineErrorFocusId("Chưa đổi hạn nào."), "planned-deadline-deadline_protocol");
 });
 
 test("footer, X/Escape guard, and conflict reload share the synchronous busy close policy", async () => {

@@ -130,6 +130,13 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
   const [transferActivity, setTransferActivity] = useState<PlanActivity | null>(null);
   const TAB_IDS = ["suc-tai", "ma-tran", "nhom-viec", "theo-nguoi", "trong-yeu"] as const;
   const [tab, setTab] = useNhomTab("workload", "suc-tai", TAB_IDS);
+  /* B4 (21/10): ô số liệu trỏ tới tab ĐANG mở thì bấm trước đây không có gì
+     xảy ra. Nay mở tab (nếu khác) rồi cuộn tới panel của tab đó. */
+  const moTabSo = (id: (typeof TAB_IDS)[number]) => {
+    setTab(id);
+    requestAnimationFrame(() => document.getElementById(`workload-panel-${id}`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" }));
+  };
 
   const pend = useMemo(() => acts.filter((a) => a.st !== "done" && wlMonthOf(a) >= 0), [acts]);
 
@@ -255,7 +262,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
   const openDetail = (title: string, tasks: PlanActivity[]) => {
     if (tasks.length) setDetail({ title, tasks });
   };
-  const Btn = ({ on, onClick, children, primary = false }: { on: boolean; onClick: () => void; children: ReactNode; primary?: boolean }) => <button data-desktop-primary-actionable={primary || undefined} onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "#fff" : C.plumSoft }}>{children}</button>;
+  const Btn = ({ on, onClick, children, primary = false }: { on: boolean; onClick: () => void; children: ReactNode; primary?: boolean }) => <button data-desktop-primary-actionable={primary || undefined} onClick={onClick} style={{ padding: "8px 15px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: TEXT, fontSize: 12, fontWeight: 800, background: on ? GRAD : C.pinkSoft, color: on ? "var(--lp-porcelain)" : C.plumSoft }}>{children}</button>;
   /* ---------------- Câu kết luận của từng biểu đồ ----------------
    * Ba biểu đồ dưới đây trước giờ chỉ bày số. Người xem phải tự quét 20
    * thẻ người, 12 cột tháng rồi tự rút ra "ai quá tải, tháng nào" — đúng
@@ -268,14 +275,11 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
     // lịch, một bên là phải phân người.
     const thuc = people.filter((p) => p.name !== "Chưa phân công");
     const voChu = people.find((p) => p.name === "Chưa phân công");
-    const voChuCau = voChu
-      ? ` Ngoài ra còn ${voChu.congTotal} ngày công (${voChu.count} hạng mục) chưa có ai đứng tên — chưa nằm trong sức tải của bất kỳ ai.`
-      : "";
     if (!thuc.length) {
       return voChu
         ? {
           chinh: `Toàn bộ ${voChu.count} hạng mục còn lại chưa phân cho ai (${voChu.congTotal} ngày công).`,
-          phu: "Chưa phân người thì không tính được sức tải — đây là việc phải làm trước.",
+          phu: "Cần phân công trước.",
           tone: "over" as const,
         }
         : null;
@@ -288,15 +292,14 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
       return {
         chinh: `Không ai quá tải: người bận nhất là ${nang.p.name}, cao điểm ${nang.pk.eff} ngày công `
           + `ở ${WL_MONTHS[nang.pk.mi] || "—"} (ngưỡng ${CAP_MONTH}).`,
-        phu: `Trung bình mỗi người còn ${Math.round(tbCong)} ngày công trong năm.${voChuCau}`,
+        phu: `Trung bình mỗi người còn ${Math.round(tbCong)} ngày công trong năm.`,
         tone: (voChu ? "warn" : "ok") as "warn" | "ok",
       };
     }
     return {
       chinh: `${quaTai.length} người vượt ngưỡng ${CAP_MONTH} ngày công ở tháng cao điểm — `
         + `nặng nhất là ${nang.p.name}: ${nang.pk.eff} ngày công dồn vào ${WL_MONTHS[nang.pk.mi] || "—"}.`,
-      phu: `Gấp ${(nang.pk.eff / CAP_MONTH).toFixed(1)} lần ngưỡng. Giãn bớt hạng mục của tháng đó sang tháng trống là cách rẻ nhất, `
-        + `trước khi tính tới chuyện thêm người.${voChuCau}`,
+      phu: `Gấp ${(nang.pk.eff / CAP_MONTH).toFixed(1)} lần ngưỡng.`,
       tone: (nang.pk.eff > CAP_MONTH * 1.5 ? "over" : "warn") as "over" | "warn",
     };
   }, [people]);
@@ -315,9 +318,9 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
     return {
       chinh: `Ô nóng nhất: ${o.ten} · ${o.cot} — ${o.v} ${donVi}${quaCap ? `, vượt ngưỡng ${cap}` : ""}.`,
       phu: voChu
-        ? "Đây là việc chưa có người đứng tên, không phải một người đang quá tải — phải phân người trước khi nói tới giãn lịch."
+        ? "Hạng mục chưa phân công."
         : quaCap
-          ? "Bấm vào ô để xem đúng những hạng mục đang dồn ở đó."
+          ? ""
           : `Mọi ô đều nằm dưới ngưỡng ${cap} ${donVi}/${scope === "month" ? "tháng" : scope === "quarter" ? "quý" : "năm"}.`,
       tone: (quaCap ? "warn" : "ok") as "warn" | "ok",
     };
@@ -330,8 +333,8 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
     return {
       chinh: `${critCount.Cao || 0} trong ${tong} hạng mục còn lại thuộc mức trọng yếu Cao (${tyCao}%).`,
       phu: tyCao >= 40
-        ? "Phần việc còn tồn nghiêng hẳn về nhóm rủi ro cao — đây là nhóm Annex 15 đòi làm trước."
-        : "Phần lớn việc còn tồn thuộc nhóm rủi ro thấp và trung bình.",
+        ? "Nghiêng về trọng yếu cao — ưu tiên trước."
+        : "Phần lớn thuộc trọng yếu thấp và trung bình.",
       tone: (tyCao >= 40 ? "warn" : "ok") as "warn" | "ok",
     };
   }, [critCount]);
@@ -343,8 +346,8 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
     ? "concern"
     : people.length > 0 ? "celebrate" : "guide";
   const bubble = overloaded.length > 0
-    ? `Có ${overloaded.length} bạn đang quá tải ở tháng cao điểm (trên ngưỡng ${CAP_MONTH} ngày công/tháng). Bấm vào từng người xem chi tiết.`
-    : `Cả đội đang cân đối. Cứ giữ nhịp này là về đích VMP đúng hẹn.`;
+    ? `${overloaded.length} người quá tải tháng cao điểm (ngưỡng ${CAP_MONTH} ngày công/tháng).`
+    : "Không ai quá tải.";
   /* Chú giải đọc thẳng từ BAC_TAI — một nguồn cho cả ô lẫn chú giải, nên
      không thể lệch nhau như bản trước (chú giải tự khai màu riêng, và hai
      ô đầu còn trong suốt vì cùng lỗi nối chuỗi). */
@@ -387,11 +390,11 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
       {/* BÀN QUẢN TRỊ (01/09): số mở màn bấm được + tab thay cuộn. */}
       <DongSo cacO={[
         { nhan: "người quá tải", giaTri: overloaded.length, canhBao: overloaded.length > 0,
-          phu: `ngưỡng ${CAP_MONTH} nc/tháng`, onMo: () => setTab("suc-tai") },
-        { nhan: "hạng mục vô chủ", giaTri: voChu?.count ?? 0, canhBao: (voChu?.count ?? 0) > 0,
-          phu: voChu ? `${voChu.congTotal} ngày công` : "đã phân đủ", onMo: () => setTab("suc-tai") },
-        { nhan: "ngày công còn lại", giaTri: totalCong, phu: `${totalHoso} hồ sơ`, onMo: () => setTab("ma-tran") },
-        { nhan: "người đang gánh việc", giaTri: nguoiThat.length, onMo: () => setTab("theo-nguoi") },
+          phu: `ngưỡng ${CAP_MONTH} ngày công/tháng`, onMo: () => moTabSo("suc-tai") },
+        { nhan: "chưa phân công", giaTri: voChu?.count ?? 0, canhBao: (voChu?.count ?? 0) > 0,
+          phu: voChu ? `${voChu.congTotal} ngày công` : "đã phân đủ", onMo: () => moTabSo("suc-tai") },
+        { nhan: "ngày công còn lại", giaTri: totalCong, phu: `${totalHoso} hồ sơ`, onMo: () => moTabSo("ma-tran") },
+        { nhan: "người đang gánh việc", giaTri: nguoiThat.length, onMo: () => moTabSo("theo-nguoi") },
       ]} />
       <NhomTab man="workload" nhan="Các góc nhìn phân công" tab={tab} onTab={setTab} tabs={[
         { id: "suc-tai", nhan: "Sức tải", dem: overloaded.length, canhBao: true },
@@ -405,8 +408,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
       {/* Việc vô chủ — thẻ RIÊNG, không trộn vào danh sách người. */}
       {voChu && voChu.count > 0 && (
         <Card variant="strong" style={{ borderColor: C.marigold }}>
-          <CardTitle icon={UserX}
-            sub="Chưa có ai đứng tên nên không nằm trong sức tải của bất kỳ ai — phải phân người trước khi nói tới giãn lịch">
+          <CardTitle icon={UserX}>
             {voChu.count} hạng mục chưa phân công
           </CardTitle>
           <button type="button" className="vmp-lift"
@@ -437,7 +439,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
 
       {/* Capacity cards */}
       <Card variant="strong" id="reg-suc-tai">
-        <CardTitle icon={Activity} sub={`Thanh = tháng bận nhất so với ngưỡng ${CAP_MONTH} ngày công/tháng · bấm vào thẻ để xem chi tiết`}>Sức tải từng người</CardTitle>
+        <CardTitle icon={Activity} sub={`Ngưỡng ${CAP_MONTH} ngày công/tháng`}>Sức tải từng người</CardTitle>
         {klSucTai && <CauKetLuan chinh={klSucTai.chinh} phu={klSucTai.phu} tone={klSucTai.tone} />}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(262px,1fr))", gap: 14 }}>
           {nguoiThat.map((p) => {
@@ -450,7 +452,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
                 onClick={() => openDetail(`Việc còn lại của ${p.name}`, p.months.flatMap((m) => m.tasks))}
                 style={{ textAlign: "left", cursor: "pointer", background: C.surface, border: `1.5px solid ${C.pinkSoft}`, borderRadius: 14, padding: 15, fontFamily: TEXT }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontFamily: NUM, fontSize: 16, flexShrink: 0 }}>{p.name[0]}</div>
+                  <div style={{ width: 40, height: 40, borderRadius: 999, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--lp-porcelain)", fontWeight: 800, fontFamily: NUM, fontSize: 16, flexShrink: 0 }}>{p.name[0]}</div>
                   <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 14, color: C.plum }}>{p.name}</div><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>{p.count} hạng mục</div></div>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 800, color: band.t, background: band.bg, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}><band.I size={12} aria-hidden="true" /> {band.l}</span>
                 </div>
@@ -483,7 +485,6 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
           <h2 className="reg-section__title" id="reg-ma-tran-tieu-de">
             Ma trận · Người × {scope === "month" ? "Tháng" : scope === "quarter" ? "Quý" : "Năm"}
           </h2>
-          <p className="reg-section__note">Bấm một ô để xem hạng mục trong ô đó</p>
         </div>
         {klMaTran && <CauKetLuan chinh={klMaTran.chinh} phu={klMaTran.phu} tone={klMaTran.tone} />}
         <ul className="reg-legend">
@@ -498,8 +499,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
           <table className="reg-table">
             <caption>
               Sức tải còn lại theo {metric === "cong" ? "ngày công" : "hồ sơ"}, ngưỡng {cap} mỗi{" "}
-              {scope === "month" ? "tháng" : scope === "quarter" ? "quý" : "năm"}. Mỗi ô ghi số và
-              một khấc chỉ mức tải, nên đọc được cả khi không phân biệt được màu.
+              {scope === "month" ? "tháng" : scope === "quarter" ? "quý" : "năm"}.
             </caption>
             <thead>
               <tr>
@@ -553,7 +553,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
       {/* Phân công theo nhóm việc */}
       <Card variant="strong" id="reg-nhom-viec">
         <CardTitle icon={Users}
-          sub="Theo bảng phân công QA 2026 — bấm vào nhóm để xem toàn bộ hạng mục">
+          sub="Theo bảng phân công QA 2026">
           Phân công theo nhóm việc
         </CardTitle>
         <div style={{ display: "grid", gap: 12,
@@ -600,7 +600,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
             hạng mục toàn hạn cuối năm không so được với nhau bằng một con số
             phần trăm. Xếp hạng công khai kiểu đó gây mâu thuẫn nội bộ mà
             không đo đúng thứ nó tưởng đang đo. */}
-        <CardTitle icon={Users} sub="Sắp theo tỷ lệ hoàn thành · bấm để xem việc còn lại. Tỷ lệ phụ thuộc nhiều vào phân bổ việc và mốc hạn, không phải thước đo năng lực.">
+        <CardTitle icon={Users} sub="Sắp theo tỷ lệ hoàn thành">
           Tiến độ theo người
         </CardTitle>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -644,7 +644,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
           thật. Ở đây chỉ giữ phân bố trọng yếu (góc nhìn KHỐI LƯỢNG), kèm
           lối sang màn ưu tiên thật. */}
       <Card variant="soft" id="reg-trong-yeu">
-        <CardTitle icon={ShieldAlert} sub="Theo mức trọng yếu"
+        <CardTitle icon={ShieldAlert}
           right={<a href="#v=alerts" style={{ fontSize: 12, fontWeight: 800, color: C.pinkText, textDecoration: "none", whiteSpace: "nowrap" }}>Thứ tự ưu tiên đầy đủ → Cảnh báo &amp; ưu tiên</a>}>
           Phân bố trọng yếu
         </CardTitle>
@@ -652,7 +652,7 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <Donut size={132} segments={[{ value: critCount.Cao, color: C.rasp }, { value: critCount.TB, color: C.marigold }, { value: critCount["Thấp"], color: C.mint }]} />
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-            {[["Cao", C.rasp, C.raspText], ["TB", C.marigold, C.marigoldText], ["Thấp", C.mint, C.mintText]].map(([k, c, t]) => <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: c }} />TY {k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: t }}>{critCount[k] || 0}</span></div>)}
+            {[["Cao", C.rasp, C.raspText], ["TB", C.marigold, C.marigoldText], ["Thấp", C.mint, C.mintText]].map(([k, c, t]) => <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: c }} />Trọng yếu {k === "TB" ? "trung bình" : k.toLowerCase()}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: t }}>{critCount[k] || 0}</span></div>)}
           </div>
         </div>
       </Card>

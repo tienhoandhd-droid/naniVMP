@@ -129,7 +129,7 @@ test("workload owner transfer dialog labels identity, person and reason controls
   }));
 
   assertSharedDialog(html);
-  assert.match(html, /Chuyển phụ trách/);
+  assert.match(html, /Chuyển QA phụ trách/);
   assert.match(html, /PQ-001/);
   assert.match(html, /<label[^>]*for="workload-owner-next"/);
   assert.match(html, /<label[^>]*for="workload-owner-reason"/);

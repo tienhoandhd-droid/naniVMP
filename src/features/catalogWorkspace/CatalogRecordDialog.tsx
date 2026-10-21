@@ -250,7 +250,7 @@ export default function CatalogRecordDialog({
     >
       {!canEdit && (
         <p className="cw-canh-bao" role="status">
-          Bạn đang ở chế độ chỉ xem. Chỉ Admin và Quản lý QA sửa được danh mục.
+          Chỉ xem
         </p>
       )}
 
@@ -339,21 +339,14 @@ export default function CatalogRecordDialog({
             onChange={(e) => { setLyDo(e.target.value); setReasonError(null); }}
             aria-required="true"
             aria-invalid={reasonError !== null}
-            aria-describedby={reasonError ? `cw-${dataset}-ly-do-goi-y cw-${dataset}-ly-do-loi` : `cw-${dataset}-ly-do-goi-y`} />
-          <p id={`cw-${dataset}-ly-do-goi-y`} className="cw-goi-y">
-            Thay đổi này ảnh hưởng tới timeline hoặc phạm vi báo cáo, nên hồ sơ
-            cần ghi lại vì sao.
-          </p>
+            aria-describedby={reasonError ? `cw-${dataset}-ly-do-loi` : undefined} />
           {reasonError && <p id={`cw-${dataset}-ly-do-loi`} className="cw-loi" role="alert">{reasonError}</p>}
         </div>
       )}
 
       {loi && (
         <p className="cw-loi" role="alert">
-          {loi.error}
-          {loi.errorCode === "VERSION_CONFLICT" && loi.currentVersion != null && (
-            <> Bản trên máy chủ đang ở phiên bản {loi.currentVersion}.</>
-          )}
+          {loi.errorCode === "VERSION_CONFLICT" ? "Người khác vừa sửa. Tải lại." : loi.error}
         </p>
       )}
     </ViewportDialog>

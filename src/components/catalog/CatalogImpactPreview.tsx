@@ -114,21 +114,21 @@ function DeadlineCandidate({ candidate, selected, applying, onToggle }: {
 }) {
   const selectable = candidateCanBeSelected(candidate);
   const pairs: Array<[string, string | null, string | null]> = [
-    ["Protocol", candidate.deadline_protocol_cu, candidate.deadline_protocol_moi],
+    ["Đề cương", candidate.deadline_protocol_cu, candidate.deadline_protocol_moi],
     ["Thẩm định", candidate.deadline_validation_cu, candidate.deadline_validation_moi],
     ["Báo cáo", candidate.deadline_report_cu, candidate.deadline_report_moi],
-    ["VMP", candidate.deadline_vmp_cu, candidate.deadline_vmp_moi],
+    ["Đích VMP", candidate.deadline_vmp_cu, candidate.deadline_vmp_moi],
   ];
   return <article style={{ padding: "10px 0", borderTop: `1px solid ${C.pinkSoft}` }}>
     <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-      {selectable && <input type="checkbox" aria-label={`Chọn cập nhật deadline ${candidate.validation_code}`} checked={isSelected(selected, candidate)} disabled={applying} onChange={() => onToggle(candidate)} />}
+      {selectable && <input type="checkbox" aria-label={`Chọn đổi hạn chót ${candidate.validation_code}`} checked={isSelected(selected, candidate)} disabled={applying} onChange={() => onToggle(candidate)} />}
       <div>
         <b>{candidate.validation_code}</b>
-        {selectable ? <p style={{ margin: "3px 0", fontSize: 12, color: C.mintText }}>Có thể cập nhật riêng deadline kế hoạch; ngày thực tế và trạng thái giữ nguyên.</p> : <div style={{ fontSize: 12, color: C.raspText, marginTop: 3 }}>
-          <b>Không thể cập nhật deadline</b>
+        {selectable ? <p style={{ margin: "3px 0", fontSize: 12, color: C.mintText }}>Đổi được hạn chót</p> : <div style={{ fontSize: 12, color: C.raspText, marginTop: 3 }}>
+          <b>Không đổi được hạn chót</b>
           {candidate.blocker_reason && <div>{candidate.blocker_reason}</div>}
           {candidate.missing.length > 0 && <div>Không thể áp — thiếu: {candidate.missing.join(", ")}</div>}
-          {!candidate.blocker_reason && candidate.missing.length === 0 && !candidateHasDeadlineChange(candidate) && <div>Không có deadline kế hoạch thay đổi.</div>}
+          {!candidate.blocker_reason && candidate.missing.length === 0 && !candidateHasDeadlineChange(candidate) && <div>Hạn chót không đổi.</div>}
         </div>}
         <ProgressEvidence candidate={candidate} />
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto 1fr", gap: "3px 7px", fontSize: 12 }}>
@@ -170,28 +170,28 @@ export function CatalogImpactPreviewContent({ preview, loading, error, reason, r
 
   return <ViewportDialog
     open
-    title="Ảnh hưởng tới timeline"
-    description="Danh mục đã lưu rồi. Timeline chỉ đổi sau khi bạn xác nhận ở đây."
+    title="Ảnh hưởng tới hạn chót"
+    description="Đã lưu. Hạn chót đổi khi bạn áp dụng."
     maxWidth={880}
     onRequestClose={close}
     dismissDisabled={applying}
     footer={<>
       <button type="button" onClick={close} disabled={applying} style={{ padding: "10px 16px", borderRadius: 12, cursor: applying ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 700, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, color: C.plum }}>Để sau</button>
-      <button type="button" onClick={onApply} disabled={applying || loading || !canApply.ok} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 12, cursor: applying || loading || !canApply.ok ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 800, border: "none", background: applying || loading || !canApply.ok ? C.pinkSoft : C.pink, color: applying || loading || !canApply.ok ? C.plumSoft : "#fff" }}><Check size={16} /> {applying ? "Đang áp…" : "Áp vào timeline"}</button>
+      <button type="button" onClick={onApply} disabled={applying || loading || !canApply.ok} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 12, cursor: applying || loading || !canApply.ok ? "not-allowed" : "pointer", fontFamily: TEXT, fontWeight: 800, border: "none", background: applying || loading || !canApply.ok ? C.pinkSoft : C.pink, color: applying || loading || !canApply.ok ? C.plumSoft : "var(--lp-on-plum)" }}><Check size={16} /> {applying ? "Đang áp…" : "Áp dụng"}</button>
     </>}
   >
       {loading && <p style={{ color: C.plumSoft }}>Đang tính ảnh hưởng…</p>}
       {error && <div role="alert" style={{ display: "flex", gap: 8, padding: 10, borderRadius: 10, background: C.raspSoft, color: C.raspText, marginBottom: 12 }}><AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} /><span style={{ fontSize: 13 }}>{error}</span></div>}
       {preview && !loading && <>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>{card("Tạo mới", tao.length, C.mintSoft)}{card("Đổi deadline", sua.length, C.marigoldSoft)}{card("Dừng", dung.length, C.lavSoft)}{card("Giữ nguyên", giu.length, C.pinkSoft)}</div>
-        {khongCoGi && <div style={{ display: "flex", gap: 8, padding: 10, borderRadius: 10, background: C.mintSoft, color: C.mintText, marginBottom: 14 }}><Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /><span style={{ fontSize: 13 }}><b>Không có gì phải áp</b> — timeline đã khớp đúng dữ liệu danh mục hiện tại rồi.</span></div>}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>{card("Tạo mới", tao.length, C.mintSoft)}{card("Đổi hạn chót", sua.length, C.marigoldSoft)}{card("Dừng", dung.length, C.lavSoft)}{card("Giữ nguyên", giu.length, C.pinkSoft)}</div>
+        {khongCoGi && <div style={{ display: "flex", gap: 8, padding: 10, borderRadius: 10, background: C.mintSoft, color: C.mintText, marginBottom: 14 }}><Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /><span style={{ fontSize: 13 }}><b>Không có gì cần áp dụng.</b></span></div>}
         {canhBao.length > 0 && <div style={{ padding: 10, borderRadius: 10, background: C.marigoldSoft, color: C.marigoldText, marginBottom: 14, fontSize: 13 }}><b>Thiếu dữ liệu, mốc thời gian sẽ để trống:</b> {canhBao.join(" · ")}</div>}
-        {sua.length > 0 && <section style={{ marginBottom: 14 }}><div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Deadline sẽ đổi</div>{sua.slice(0, 12).map((item) => <div key={item.validation_code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" }}><span style={{ minWidth: 210, fontWeight: 600 }}>{item.validation_code}</span><span style={{ color: C.plumSoft }}>{formatDate(item.deadline_vmp_cu)}</span><ArrowRight size={13} /><span style={{ fontWeight: 700 }}>{formatDate(item.deadline_vmp_moi)}</span></div>)}</section>}
+        {sua.length > 0 && <section style={{ marginBottom: 14 }}><div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Hạn chót sẽ đổi</div>{sua.slice(0, 12).map((item) => <div key={item.validation_code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" }}><span style={{ minWidth: 210, fontWeight: 600 }}>{item.validation_code}</span><span style={{ color: C.plumSoft }}>{formatDate(item.deadline_vmp_cu)}</span><ArrowRight size={13} /><span style={{ fontWeight: 700 }}>{formatDate(item.deadline_vmp_moi)}</span></div>)}</section>}
         {tao.length > 0 && <section style={{ marginBottom: 14 }}><div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Hạng mục sẽ được tạo</div>{tao.slice(0, 12).map((item) => <div key={item.validation_code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" }}><Plus size={13} color={C.mintText} /><span style={{ minWidth: 210, fontWeight: 600 }}>{item.validation_code}</span><span style={{ color: C.plumSoft }}>{formatDate(item.deadline_vmp)}</span></div>)}</section>}
-        {giu.length > 0 && <section style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: C.bg2 }}><div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}><Lock size={14} /> Giữ nguyên vì đã có tiến độ</div><p style={{ margin: "0 0 6px", fontSize: 12, color: C.plumSoft }}>Các hạng mục này chỉ đổi deadline kế hoạch khi được xác nhận đặc biệt bên dưới; ngày thực tế và trạng thái không bị thay đổi.</p>{giu.slice(0, 10).map((item) => <div key={item.validation_code} style={{ fontSize: 13, padding: "2px 0" }}><b>{item.validation_code}</b><span style={{ color: C.plumSoft }}> — {item.ly_do}</span></div>)}</section>}
-        {deadlineOverrides.length > 0 && <section style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: C.bg2 }}><div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Deadline của hạng mục đã có tiến độ</div>{deadlineOverrides.map((candidate) => <DeadlineCandidate key={`${candidate.validation_code}:${candidate.item_version}`} candidate={candidate} selected={selected} applying={applying} onToggle={onToggleOverride} />)}</section>}
-        {showApplyForm && <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}><span style={{ fontSize: 12, fontWeight: 700 }}>Lý do áp <span style={{ color: C.raspText }}>*</span></span><input value={reason} disabled={applying} onChange={(event) => onReason(event.target.value)} placeholder="Câu này đi vào nhật ký, người sau đọc để hiểu vì sao timeline đổi." style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 14, border: `1.5px solid ${reasonError ? C.rasp : C.pinkSoft}` }} />{reasonError && <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{reasonError}</span>}</label>}
-        {selected.length > 0 && <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, fontSize: 13 }}><input type="checkbox" checked={confirmed} disabled={applying} onChange={(event) => onConfirmed(event.target.checked)} /><span>Tôi xác nhận chỉ cập nhật các deadline kế hoạch đã chọn; ngày thực tế và trạng thái giữ nguyên.</span></label>}
+        {giu.length > 0 && <section style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: C.bg2 }}><div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}><Lock size={14} /> Giữ nguyên vì đã có tiến độ</div>{giu.slice(0, 10).map((item) => <div key={item.validation_code} style={{ fontSize: 13, padding: "2px 0" }}><b>{item.validation_code}</b><span style={{ color: C.plumSoft }}> — {item.ly_do}</span></div>)}</section>}
+        {deadlineOverrides.length > 0 && <section style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: C.bg2 }}><div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Hạn chót của hạng mục đã có tiến độ</div>{deadlineOverrides.map((candidate) => <DeadlineCandidate key={`${candidate.validation_code}:${candidate.item_version}`} candidate={candidate} selected={selected} applying={applying} onToggle={onToggleOverride} />)}</section>}
+        {showApplyForm && <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}><span style={{ fontSize: 12, fontWeight: 700 }}>Lý do áp <span style={{ color: C.raspText }}>*</span></span><input value={reason} disabled={applying} onChange={(event) => onReason(event.target.value)} placeholder="Lý do áp dụng" style={{ padding: "8px 10px", borderRadius: 10, fontFamily: TEXT, fontSize: 14, border: `1.5px solid ${reasonError ? C.rasp : C.pinkSoft}` }} />{reasonError && <span style={{ fontSize: 12, color: C.raspText, fontWeight: 600 }}>{reasonError}</span>}</label>}
+        {selected.length > 0 && <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, fontSize: 13 }}><input type="checkbox" checked={confirmed} disabled={applying} onChange={(event) => onConfirmed(event.target.checked)} /><span>Tôi xác nhận chỉ cập nhật các hạn chót kế hoạch đã chọn; ngày thực tế và trạng thái giữ nguyên.</span></label>}
       </>}
   </ViewportDialog>;
 }

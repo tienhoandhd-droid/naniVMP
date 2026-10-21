@@ -102,8 +102,7 @@ function DanhSachVanDe({ ten, ds }: { ten: string; ds: PermissionIssue[] }) {
       <ul>
         {ds.slice(0, 20).map((v, i) => (
           <li key={`${v.code}-${v.record_id}-${i}`}>
-            <b>{v.code}</b> · {v.message}
-            {v.record_id ? <span> ({v.record_id})</span> : null}
+            {v.message}
           </li>
         ))}
       </ul>
@@ -149,7 +148,7 @@ const cotAnhHuong: SmartTableColumn<DongAnhHuong>[] = [
         : <span className={`ip-badge ${
           h.soXem > 0 ? "is-linked" : h.nguoi.user_id ? "is-inactive" : "is-warning"
         }`} title={h.soXem === 0 && !h.nguoi.user_id
-          ? "Chưa có tài khoản nên vốn đã không xem được — bật hay không cũng vậy"
+          ? "Chưa có tài khoản"
           : undefined}>{h.soXem}</span>
     ),
   },
@@ -204,7 +203,8 @@ export default function ItemPermissionModeCard() {
           } catch (e) {
             // Một người lỗi không được làm hỏng cả bảng — ghi rõ "không đo
             // được" kèm lý do ngắn, những người còn lại vẫn đo bình thường.
-            return { nguoi, soXem: 0, soSua: 0, loi: (e as Error).message || "RPC lỗi không rõ lý do" };
+            console.error("Không đo được quyền hiệu lực", nguoi.person_id, e);
+            return { nguoi, soXem: 0, soSua: 0, loi: "Không đo được" };
           }
         },
         () => { xong += 1; setTienDoDo({ xong, tong: dangHoatDong.length }); },
@@ -227,7 +227,8 @@ export default function ItemPermissionModeCard() {
       });
       setKetQuaAnhHuong(hang);
     } catch (e) {
-      setLoiXemTruoc((e as Error).message || "Không lấy được danh bạ để đo ảnh hưởng");
+      console.error("Không lấy được danh bạ để đo ảnh hưởng", e);
+      setLoiXemTruoc("Không lấy được danh bạ. Thử lại.");
     } finally {
       setDangDoAnhHuong(false);
       setTienDoDo(null);
@@ -238,8 +239,9 @@ export default function ItemPermissionModeCard() {
     setDangTai(true);
     try {
       setTienKiem(await fetchPermissionPreflight());
-    } catch {
+    } catch (e) {
       // Tiền kiểm chỉ Admin chạy được; người khác thì thẻ tự ẩn (xem dưới).
+      console.error("Không chạy được kiểm tra phân quyền", e);
       setTienKiem(null);
     } finally {
       setDangTai(false);
@@ -252,7 +254,7 @@ export default function ItemPermissionModeCard() {
     return (
       <Card variant="strong">
         <p className="ip-help" role="status">
-          <Loader size={14} aria-hidden="true" /> Đang chạy tiền kiểm phân quyền…
+          <Loader size={14} aria-hidden="true" /> Đang kiểm tra…
         </p>
       </Card>
     );
@@ -285,7 +287,8 @@ export default function ItemPermissionModeCard() {
       setChuGo("");
       await tai();
     } catch (e) {
-      dang.hong((e as Error).message || "Không đổi được chế độ");
+      console.error("Đổi chế độ quyền thất bại", e);
+      dang.hong("Không đổi được chế độ. Thử lại.");
     } finally {
       setDangDoi(false);
     }
@@ -305,15 +308,12 @@ export default function ItemPermissionModeCard() {
           <b>{dangApDung ? "ĐANG ÁP DỤNG QUYỀN THEO HẠNG MỤC" : "DỰ THẢO — CHƯA ÁP DỤNG QUYỀN THẬT"}</b>
           <span>
             {soLoi} lỗi bắt buộc · {soCanhBao} cảnh báo
-            {dangApDung
-              ? " — dữ liệu đang bị chặn theo phân công."
-              : " — luật đã tính nhưng chưa chặn ai."}
           </span>
         </div>
       </div>
 
       <button type="button" className="pq-nut" onClick={() => void tai()} disabled={dangDoi}>
-        Chạy lại tiền kiểm
+        Kiểm tra lại
       </button>
 
       <DanhSachVanDe ten="Lỗi bắt buộc phải sửa trước khi bật" ds={tienKiem.blocking_errors} />
@@ -322,10 +322,6 @@ export default function ItemPermissionModeCard() {
       {!dangApDung && (
         <div className="ip-form is-compact">
           <h3>Xem trước ảnh hưởng</h3>
-          <p className="ip-help">
-            Đo bằng đúng luật quyền sẽ áp dụng — bấm mới đo, không tự chạy khi mở màn
-            này. Xong việc sẽ biết ai còn xem/sửa được gì và ai mất sạch quyền xem.
-          </p>
           <button type="button" className="pq-nut" disabled={dangDoAnhHuong}
             onClick={() => void xemTruocAnhHuong()}>
             {dangDoAnhHuong
@@ -372,15 +368,13 @@ export default function ItemPermissionModeCard() {
                     )}
                     {soChuaNoiTaiKhoan > 0 && (
                       <p className="ip-help" role="status">
-                        {soChuaNoiTaiKhoan} người chưa nối tài khoản đăng nhập — họ vốn chưa
-                        vào được web, nên bật hay không cũng không đổi gì với họ. Muốn họ dùng
-                        được thì nối tài khoản ở thẻ “Tài khoản &amp; quyền” bên dưới.
+                        {soChuaNoiTaiKhoan} người chưa nối tài khoản. Nối ở tab Bảng kiểm soát → Liên kết tài khoản.
                       </p>
                     )}
                     {soKhongDoDuoc > 0 && (
                       <p className="pq-canhbao la-vang" role="status">
                         <AlertTriangle size={15} aria-hidden="true" />
-                        {soKhongDoDuoc} người không đo được — di chuột vào ô "Không đo được" để xem lý do.
+                        {soKhongDoDuoc} người không đo được.
                       </p>
                     )}
                   </>
@@ -416,15 +410,14 @@ export default function ItemPermissionModeCard() {
         <div className="ip-form is-compact">
           {soLoi > 0 && (
             <p className="ip-help" role="status">
-              Còn {soLoi} lỗi bắt buộc. Sửa hết rồi mới bật được — bật khi dữ liệu
-              phân công còn thủng nghĩa là có người mất quyền xem chính việc của họ.
+              Còn {soLoi} lỗi bắt buộc. Sửa hết mới bật được.
             </p>
           )}
           <label>
             <span>Lý do bật áp dụng<span className="cw-bat-buoc-chu">Bắt buộc</span></span>
             <input className="pq-o" value={lyDo} onChange={(e) => setLyDo(e.target.value)}
               disabled={soLoi > 0}
-              placeholder="Ít nhất 10 ký tự. Câu này vào nhật ký kiểm toán." />
+              placeholder="Ít nhất 10 ký tự. Câu này vào nhật ký." />
           </label>
           <label>
             <span>Gõ {CHU_XAC_NHAN} để xác nhận</span>

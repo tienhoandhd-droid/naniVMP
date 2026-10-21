@@ -101,9 +101,12 @@ try {
         blue * alpha + background[2] * (1 - alpha),
       ], [255, 255, 255]);
     };
-    const activeMetric = document.querySelector(".monitoring-journey__item.is-active .monitoring-journey__metric > strong");
-    const masthead = document.querySelector(".vmp-masthead__phu");
-    const journeyLabel = document.querySelector(".monitoring-journey__item.is-active .monitoring-journey__copy > span");
+    // 21/10: ô đang đứng không còn số; kiểm tương phản trên tên màn của ô đó.
+    const activeMetric = document.querySelector(".monitoring-journey__item.is-active .monitoring-journey__copy > strong");
+    // 21/10: dải masthead rời các màn ngoài Việc hôm nay — dòng chữ nhỏ của
+    // khối nhận diện ở thanh bên thay vào chỗ kiểm cỡ chữ tối thiểu.
+    const masthead = document.querySelector(".vmp-brand-khoi .vq-brand__donvi");
+    const journeyLabel = document.querySelector(".monitoring-journey__item:not(.is-active) .monitoring-journey__metric > span");
     if (!activeMetric || !masthead || !journeyLabel) throw new Error("Thiếu phần tử kiểm tra trên Tổng quan");
     return {
       activeMetric: {
@@ -116,20 +119,13 @@ try {
   });
   await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
   const darkActiveMetric = await page.$eval(
-    ".monitoring-journey__item.is-active .monitoring-journey__metric > strong",
+    ".monitoring-journey__item.is-active .monitoring-journey__copy > strong",
     (element) => ({
       color: getComputedStyle(element).color,
       backgroundColor: getComputedStyle(element.closest(".monitoring-journey__item")).backgroundColor,
     }),
   );
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
-
-  await page.goto(`${APP_URL}#v=alerts`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForSelector(".alerts-command__actions button", { timeout: 15_000 });
-  const alertCta = await page.$eval(".alerts-command__actions button", (element) => ({
-    color: getComputedStyle(element).color,
-    backgroundColor: getComputedStyle(element).backgroundColor,
-  }));
 
   await page.goto(`${APP_URL}#v=accounts`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector('.reg-flag[data-on="true"]', { timeout: 15_000 });
@@ -180,10 +176,6 @@ try {
 
   assert.ok(contrast(overview.activeMetric.color, overview.activeMetric.backgroundColor) >= 4.5);
   assert.ok(contrast(rgb(darkActiveMetric.color), rgb(darkActiveMetric.backgroundColor)) >= 4.5);
-  assert.ok(contrast(
-    rgb(alertCta.color),
-    rgb(alertCta.backgroundColor),
-  ) >= 4.5);
   assert.ok(contrast(permissionFlag.color, permissionFlag.backgroundColor) >= 4.5);
   assert.ok(Number.parseFloat(overview.masthead.fontSize) >= 12);
   assert.ok(Number.parseFloat(overview.journeyLabel.fontSize) >= 12);
@@ -194,27 +186,19 @@ try {
   await page.goto(`${APP_URL}#v=overview`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector(".monitoring-journey__item.is-active", { timeout: 15_000 });
   const mobileTypography = await page.evaluate(() => {
-    const masthead = document.querySelector(".vmp-masthead__phu");
-    const active = document.querySelector(".monitoring-journey__item.is-active");
-    const journeyDescription = active?.querySelector(".monitoring-journey__copy > span");
-    const journeyMetricLabel = active?.querySelector(".monitoring-journey__metric > span");
-    const journeyCurrent = active?.querySelector(".monitoring-journey__current");
-    if (!masthead || !journeyDescription || !journeyMetricLabel || !journeyCurrent) {
+    const masthead = document.querySelector(".vmp-mobile-bar__ten .vmp-masthead__mp");
+    // 21/10: bỏ câu mô tả và nhãn "Đang xem"; số chỉ còn ở ô không đứng.
+    const journeyMetricLabel = document.querySelector(".monitoring-journey__item:not(.is-active) .monitoring-journey__metric > span");
+    if (!masthead || !journeyMetricLabel) {
       throw new Error("Thiếu typography kiểm tra ở viewport mobile");
     }
     return {
       masthead: getComputedStyle(masthead).fontSize,
-      journeyDescription: getComputedStyle(journeyDescription).fontSize,
       journeyMetricLabel: getComputedStyle(journeyMetricLabel).fontSize,
-      journeyCurrent: getComputedStyle(journeyCurrent).fontSize,
     };
   });
-  assert.deepEqual(mobileTypography, {
-    masthead: "11px",
-    journeyDescription: "11px",
-    journeyMetricLabel: "11px",
-    journeyCurrent: "10px",
-  });
+  assert.ok(Number.parseFloat(mobileTypography.masthead) >= 12, `chữ cách điệu thanh trên ${mobileTypography.masthead}`);
+  assert.equal(mobileTypography.journeyMetricLabel, "11px");
 
   console.log("✓ foundation desktop UX audit đạt tương phản, focus và khả năng đọc");
   }

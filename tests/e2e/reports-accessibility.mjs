@@ -21,7 +21,7 @@ try {
   await nhetPhien(page, { supabaseUrl });
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${APP_URL}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForFunction(() => document.body.textContent?.includes("1. Tổng quan năm"), { timeout: 15_000 });
+  await page.waitForFunction(() => document.body.textContent?.includes("1. Kết quả năm"), { timeout: 15_000 });
 
   for (const name of ["Năm báo cáo", "Phạm vi bộ phận", "Cách xem kỳ", "Tháng báo cáo"]) {
     const found = await page.evaluate((label) => [...document.querySelectorAll("select")]
@@ -33,7 +33,7 @@ try {
   assert.ok(filterStatus, "filter scope feedback must be a named live status");
   assert.match(await filterStatus.evaluate((node) => node.textContent || ""), /Đang xem:/);
 
-  for (const name of ["Xuất Excel đầy đủ 5 sheet", "In báo cáo dưới dạng PDF", "Tải báo cáo HTML"]) {
+  for (const name of ["Xuất báo cáo Excel", "In báo cáo dưới dạng PDF", "Tải báo cáo HTML"]) {
     const found = await page.evaluate((label) => [...document.querySelectorAll(".vmp-report-export-actions button")]
       .some((button) => (button.getAttribute("aria-label") || button.textContent || "").includes(label)), name);
     assert.ok(found, `export action must have the accessible name ${name}`);

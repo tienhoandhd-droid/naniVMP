@@ -7,7 +7,7 @@ export const DEADLINE_KEYS = [
   "deadline_vmp",
 ] as const;
 
-export const PLANNED_DEADLINE_SUCCESS_TOAST = "Đã cập nhật deadline kế hoạch";
+export const PLANNED_DEADLINE_SUCCESS_TOAST = "Đã cập nhật hạn kế hoạch";
 
 export type PlannedDeadlineKey = typeof DEADLINE_KEYS[number];
 export type PlannedDeadlineSnapshot = Record<PlannedDeadlineKey, string | null>;
@@ -152,31 +152,31 @@ export function validatePlannedDeadlineDraft({
   version,
 }: PlannedDeadlineDraftValidationInput): string | null {
   if (typeof validationCode !== "string" || !validationCode.trim()) {
-    return "Thiếu mã hạng mục đã tải";
+    return "Không xác định được hạng mục. Mở lại hộp.";
   }
   if (!Number.isFinite(version) || !Number.isInteger(version) || Number(version) < 0) {
-    return "Thiếu phiên bản hạng mục đã tải";
+    return "Không xác định được phiên bản hạng mục. Mở lại hộp.";
   }
   if (!isExactPlannedDeadlineSnapshot(before) || !isExactPlannedDeadlineSnapshot(next)) {
-    return "Bản ghi phải có đúng bốn deadline kế hoạch";
+    return "Thiếu một trong bốn hạn kế hoạch. Mở lại hộp.";
   }
-  if (!reason.trim()) return "Phải nhập lý do điều chỉnh deadline kế hoạch";
-  if (!confirmed) return "Phải xác nhận chỉ đổi bốn deadline kế hoạch";
+  if (!reason.trim()) return "Nhập lý do.";
+  if (!confirmed) return "Tích ô xác nhận.";
   if (DEADLINE_KEYS.some((key) => next[key] !== null && !isIsoCalendarDate(next[key]!))) {
-    return "Deadline phải là ngày ISO YYYY-MM-DD hoặc null";
+    return "Ngày không hợp lệ.";
   }
   if (DEADLINE_KEYS.some((key) => before[key] !== null && next[key] === null)) {
-    return "Không được xoá deadline kế hoạch đã có";
+    return "Không được xoá hạn kế hoạch đã có.";
   }
 
   const populatedDates = DEADLINE_KEYS.map((key) => next[key]).filter(
     (value): value is string => value !== null,
   );
   if (populatedDates.some((value, index) => index > 0 && populatedDates[index - 1] > value)) {
-    return "Bốn deadline kế hoạch phải theo đúng thứ tự";
+    return "Bốn hạn phải theo đúng thứ tự.";
   }
   if (DEADLINE_KEYS.every((key) => before[key] === next[key])) {
-    return "Không có deadline nào thay đổi";
+    return "Chưa đổi hạn nào.";
   }
   return null;
 }
@@ -214,7 +214,7 @@ export function preparePlannedDeadlineUpdate(
 export function resultMessage(result: PlannedDeadlineResult): string {
   if (result.ok) return "";
   if (result.error_code === "VERSION_CONFLICT") {
-    return `${result.error} (phiên bản đã tải ${result.expected_version}; hiện tại ${result.current_version})`;
+    return "Người khác vừa sửa hạng mục này. Tải lại rồi sửa tiếp.";
   }
   return result.error;
 }

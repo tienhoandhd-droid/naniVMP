@@ -140,7 +140,7 @@ export function planBusinessRoleChange(row: AccountAdministrationRow, nextRole: 
       department,
       scopeMode,
       canSave: false,
-      blocker: "Tài khoản chưa có user_id để lưu thay đổi.",
+      blocker: "Tài khoản chưa nối hồ sơ.",
     };
   }
   if (scopeMode === "hierarchy" && !department) {
@@ -254,22 +254,22 @@ function buildReadiness(args: {
       : item("account", "Tài khoản", "ready", "Tài khoản đang hoạt động.");
 
   const linkItem = !account.user_id || !account.pid
-    ? item("person_link", "Nối hồ sơ", "missing", "Tài khoản chưa nối hồ sơ bằng ID.", "Nối tài khoản với hồ sơ.")
+    ? item("person_link", "Nối hồ sơ", "missing", "Chưa nối hồ sơ.", "Nối tài khoản với hồ sơ.")
     : personSourceAmbiguous
-      ? item("person_link", "Nối hồ sơ", "unknown", "Có nhiều hồ sơ cùng person_id nên chưa thể xác minh nối hồ sơ.")
+      ? item("person_link", "Nối hồ sơ", "unknown", "Trùng hồ sơ, cần kiểm tra.")
     : !person
-      ? item("person_link", "Nối hồ sơ", "missing", "Không tìm thấy hồ sơ theo person_id.", "Kiểm tra person_id và nối lại tài khoản.")
+      ? item("person_link", "Nối hồ sơ", "missing", "Không tìm thấy hồ sơ.", "Nối lại tài khoản.")
       : !correctlyLinked
-        ? item("person_link", "Nối hồ sơ", "missing", "Hồ sơ tìm được đang thuộc user_id khác.", "Nối lại đúng tài khoản với hồ sơ.")
-        : item("person_link", "Nối hồ sơ", "ready", "Tài khoản và hồ sơ khớp bằng ID.");
+        ? item("person_link", "Nối hồ sơ", "missing", "Hồ sơ đang nối tài khoản khác.", "Nối lại đúng tài khoản với hồ sơ.")
+        : item("person_link", "Nối hồ sơ", "ready", "Đã nối đúng hồ sơ.");
 
   const roleItem = roleSourceAmbiguous
-    ? item("business_role", "Vai nghiệp vụ", "unknown", "Có nhiều nguồn vai cùng user_id nên chưa thể xác minh.")
+    ? item("business_role", "Vai nghiệp vụ", "unknown", "Vai bị trùng, cần kiểm tra.")
     : !roleSource
-    ? item("business_role", "Vai nghiệp vụ", "unknown", "Chưa có nguồn vai theo user_id để xác minh.")
+    ? item("business_role", "Vai nghiệp vụ", "unknown", "Chưa có vai.")
     : !businessRole
-      ? item("business_role", "Vai nghiệp vụ", "missing", "Server chưa giải được một trong năm vai nghiệp vụ.", "Chọn lại vai để sửa dữ liệu lệch.")
-      : item("business_role", "Vai nghiệp vụ", "ready", "Server đã giải được vai nghiệp vụ.");
+      ? item("business_role", "Vai nghiệp vụ", "missing", "Vai chưa hợp lệ.", "Chọn lại vai để sửa dữ liệu lệch.")
+      : item("business_role", "Vai nghiệp vụ", "ready", "Vai hợp lệ.");
 
   return [
     accountItem,

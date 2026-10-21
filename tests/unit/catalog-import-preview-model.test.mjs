@@ -74,7 +74,7 @@ test("readiness ưu tiên request, preview, trạng thái, dòng lỗi rồi lý
   assert.equal(catalogImportCommitBlock({ ...base, errors: 2 })?.code, "rows");
   assert.deepEqual(catalogImportCommitBlock({ ...base, reason: "  " }), {
     code: "required",
-    message: "Nhập lý do của cả lô",
+    message: "Nhập lý do của cả đợt nhập",
     focusId: "cw-import-batch-reason",
   });
 });

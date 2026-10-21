@@ -11,7 +11,6 @@ import { C, TEXT, NUM, DISPLAY, GRAD, R, glass } from "../../constants/theme.ts"
 import { NAV_ITEMS } from "../../constants/vmp.ts";
 import { NAV_GROUP_ORDER } from "../../lib/navigationContract.ts";
 import { prefetchDesktopRoute } from "../../lib/routePrefetch.ts";
-import CrownMark from "../ui/CrownMark.tsx";
 import type { ReactNode } from "react";
 import { CrownLogo } from "../ui/Primitives.tsx";
 import type { AppUser } from "../../types/domain.ts";
@@ -23,7 +22,7 @@ import type { ScreenId } from "../../lib/access.ts";
 import { VAI_NGHIEP_VU } from "../../lib/supabaseData.ts";
 
 import { QualificationNavigation } from "./QualificationNavigation.tsx";
-import VmpMasthead from "../ui/VmpMasthead.tsx";
+import VmpMasthead, { VmpWordmark } from "../ui/VmpMasthead.tsx";
 import type { QualificationAccessStatus, QualificationSystem } from "../../features/qualification/useQualificationAccess.ts";
 
 type QualificationProps = {
@@ -97,14 +96,14 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
       {/* Sao lấp lánh đã bỏ (thiết kế 29/08): trang trí chỉ ở mép trang,
           không rải sau vùng đọc. */}
 
-      {/* Logo */}
-      <div style={{ padding: "0 6px 16px" }}>
+      {/* Khối nhận diện (21/10): logo CPC1 HN + chữ cách điệu "VMP Monitor"
+          + dòng "V/Q Team · CPC1 HN" — thay cho dải masthead lặp đầu mọi màn.
+          Thu gọn vẫn giữ logo CPC1 HN để thanh bên không mất nhận diện; khối
+          được đẩy xuống dưới nút thu gọn để hai thứ không chồng nhau. */}
+      <div className={collapsed ? "vmp-sidebar-brand vmp-sidebar-brand--gon" : "vmp-sidebar-brand"}>
         {collapsed
-          /* Vương miện hình học thay ký tự emoji: emoji đổi hình theo hệ
-             điều hành, không ăn màu thương hiệu, và ở 16px trên Windows thì
-             nó ra một khối vàng bẹt. */
-          ? <div style={{ width: 40, height: 40, borderRadius: R.sm, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", color: "var(--lp-on-plum)" }}>
-              <CrownMark size={22} />
+          ? <div className="vmp-brand-khoi vmp-brand-khoi--gon" title="VMP Monitor · V/Q Team · CPC1 HN">
+              <span className="vmp-brand-khoi__logo"><img src="./logo-cpc1hn.png" alt="VMP Monitor · CPC1 HN" /></span>
             </div>
           : <CrownLogo />
         }
@@ -130,7 +129,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
                   className="vmp-nav" data-view={n.id}
                   aria-current={active ? "page" : undefined}
                   aria-label={n.label}
-                  title={n.id === "reports" ? "Báo cáo: lọc số liệu, xem biểu đồ và xuất Excel/PDF" : n.label}
+                  title={n.label}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
                     padding: collapsed ? "12px" : "12px", borderRadius: R.md,
@@ -153,25 +152,6 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
         {!groups.some((group) => group.id === "analysis") && <QualificationNavigation collapsed={collapsed} systems={qualificationSystems} status={qualificationStatus} error={qualificationError} onRetry={onRetryQualification} onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} />}
       </nav>
 
-      {!collapsed && (
-        <div
-          className="vmp-sidebar-preferences"
-          role="group"
-          aria-label="Tùy chọn giao diện"
-          style={{
-            marginTop: 14, padding: "6px 7px 6px 12px",
-            borderRadius: 14, border: `1px solid ${C.line}`,
-            background: C.pinkMist, display: "flex", alignItems: "center",
-            justifyContent: "space-between", gap: 12,
-          }}
-        >
-          <span style={{ color: C.plumSoft, fontSize: 12, fontWeight: 500, fontFamily: TEXT }}>
-            Giao diện
-          </span>
-          <ThemeToggle compact />
-        </div>
-      )}
-
       {/* User card */}
       <div className="vmp-sidebar-account__identity" style={{
         marginTop: collapsed ? 14 : 10, padding: collapsed ? "10px" : "13px",
@@ -181,7 +161,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
           <div style={{
             width: 36, height: 36, borderRadius: 999, background: GRAD, margin: "0 auto",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "var(--lp-on-plum)", fontWeight: 800, fontFamily: NUM, fontSize: 14,
+            color: "var(--lp-porcelain)", fontWeight: 800, fontFamily: NUM, fontSize: 14,
           }}>
             {user?.name?.[0] || "U"}
           </div>
@@ -191,7 +171,7 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
               <div style={{
                 width: 40, height: 40, borderRadius: 999, flexShrink: 0,
                 background: GRAD, display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lp-on-plum)", fontWeight: 800, fontFamily: NUM, fontSize: 16,
+                color: "var(--lp-porcelain)", fontWeight: 800, fontFamily: NUM, fontSize: 16,
               }}>
                 {user?.name?.[0] || "U"}
               </div>
@@ -203,6 +183,11 @@ export function Sidebar({ view, setView, user, access, onLogout, onChangePw, onO
                   {(access?.businessRole && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}
                 </div>
               </div>
+              {/* G3 (21/10): khung "Giao diện" riêng đã gộp vào thẻ người dùng —
+                  nút sáng/tối nằm góc phải thẻ, cuối thanh bên chỉ còn MỘT khối. */}
+              <span className="vmp-sidebar-preferences" role="group" aria-label="Tùy chọn giao diện">
+                <ThemeToggle compact />
+              </span>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
               {/* nowrap + đệm ngang hẹp: sidebar nay là 248px thay vì 266px,
@@ -468,8 +453,11 @@ function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
 /* ThanhTraToggle đã GỠ 01/09/2026 cùng chế độ trình bày thanh tra. */
 
 export function Topbar({ title, user, sub,
-  view, setView, access, onLogout, onChangePw, onOpenQualification, qualificationTarget, qualificationSystems = [], qualificationStatus = "loading", qualificationError = null, onRetryQualification = () => {}, compact = false }: {
+  view, setView, access, onLogout, onChangePw, onOpenQualification, qualificationTarget, qualificationSystems = [], qualificationStatus = "loading", qualificationError = null, onRetryQualification = () => {}, compact = false, masthead = false }: {
   title?: ReactNode;
+  /** Dải trang trí "VMP Monitor ─✿─" chỉ ở màn đầu (Việc hôm nay). Các màn
+   *  khác chỉ còn tiêu đề trang; nhận diện nằm ở thanh bên. */
+  masthead?: boolean;
   /** Timeline reserves the first viewport for the live painting. */
   compact?: boolean;
   user?: AppUser | null;
@@ -493,13 +481,24 @@ export function Topbar({ title, user, sub,
   const closeMobileMenuForAction = useCallback(() => setMobileMenuOpen(false), []);
 
   return (
-    <div className={`vmp-topbar${compact ? " vmp-topbar--compact" : ""}`} style={{
+    <>
+    {/* Thanh trên điện thoại (21/10): ☰ + chữ cách điệu thu nhỏ, dính đỉnh
+        vùng cuộn. Thay cho nút ☰ trước đây nằm lửng dưới tiêu đề. Desktop
+        ẩn hẳn (index.css), vì thanh bên đã mang nhận diện. */}
+    <div className="vmp-mobile-bar">
+      <button ref={mobileMenuButtonRef} type="button" className="vmp-mobile-menu-button"
+        aria-label="Mở menu" aria-expanded={mobileMenuOpen} aria-controls="vmp-mobile-drawer"
+        onClick={() => setMobileMenuOpen(true)}>
+        <Menu size={19} color={C.pinkText} />
+      </button>
+      <span className="vmp-mobile-bar__ten" role="img" aria-label="VMP Monitor"><VmpWordmark /></span>
+    </div>
+    <div className={`vmp-topbar${compact ? " vmp-topbar--compact" : ""}${masthead ? " vmp-topbar--masthead" : ""}`} style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "22px 34px", gap: 20, flexWrap: "wrap",
+      padding: "var(--lp-sp-4) var(--lp-sp-4) var(--lp-sp-3)", gap: 20, flexWrap: "wrap",
     }}>
-      {/* Khối trái co giãn để hàng nút bên phải luôn ở góc phải (thiết kế 29/08). */}
       <div style={{ flex: "1 1 360px", minWidth: 0 }}>
-        <VmpMasthead />
+        {masthead && <VmpMasthead />}
         {/* Đây là <h1> chứ không phải <div> in đậm, và đó là khác biệt thật:
             trước đây KHÔNG màn nào trong app có h1, nên trình đọc màn hình
             không có mốc nào để nhảy tới, còn người dùng bàn phím không biết
@@ -514,25 +513,20 @@ export function Topbar({ title, user, sub,
           letterSpacing: "var(--lp-tracking-display)",
           color: C.plum,
         }}>{title}</h1>
-        <div className="vmp-topbar__sub" style={{ fontSize: 14, color: C.plum, marginTop: 5, fontWeight: 700 }}>
-          {!compact && (sub || "CPC1 HN")}
+        {/* Phụ đề: chữ thường đậm vừa (21/10) — đậm 700 cạnh H1 serif làm
+            hai dòng tranh nhau. Màn không có phụ đề thì không in gì (nhận
+            diện "CPC1 HN" đã nằm ở thanh bên). */}
+        {!compact && sub && <div className="vmp-topbar__sub" style={{ fontSize: 14, lineHeight: 1.55, color: C.plum, marginTop: 4, fontWeight: 500 }}>
+          {sub}
           {/* Giờ đồng bộ đã rời khỏi phụ đề (anh Hoàn chốt 30/08): nó đổi từng
               phút làm dòng này nhấp nháy và gãy dòng. Nay chỉ nằm ở chân
               trang (App.tsx). */}
-
-        </div>
+        </div>}
       </div>
-
-      <div className="vmp-topbar-actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button ref={mobileMenuButtonRef} type="button" className="vmp-mobile-menu-button"
-          aria-label="Mở menu" aria-expanded={mobileMenuOpen} aria-controls="vmp-mobile-drawer"
-          onClick={() => setMobileMenuOpen(true)}>
-          <Menu size={19} color={C.pinkText} />
-        </button>
-      </div>
+    </div>
       <MobileDrawer onOpenQualification={onOpenQualification} qualificationTarget={qualificationTarget} qualificationSystems={qualificationSystems} qualificationStatus={qualificationStatus} qualificationError={qualificationError} onRetryQualification={onRetryQualification} open={mobileMenuOpen} view={view} setView={setView} user={user} access={access}
         onDismiss={dismissMobileMenu} onActionClose={closeMobileMenuForAction}
         onLogout={onLogout} onChangePw={onChangePw} />
-    </div>
+    </>
   );
 }

@@ -17,6 +17,25 @@ import {
   resultMessage,
   validatePlannedDeadlineDraft,
 } from "./plannedDeadlineEditModel.ts";
+import type { PlannedDeadlineKey, ProtectedKey } from "./plannedDeadlineEditModel.ts";
+
+const DEADLINE_LABELS: Record<PlannedDeadlineKey, string> = {
+  deadline_protocol: "Hạn đề cương",
+  deadline_validation: "Hạn thẩm định",
+  deadline_report: "Hạn báo cáo",
+  deadline_vmp: "Đích VMP",
+};
+
+const PROTECTED_LABELS: Record<ProtectedKey, string> = {
+  actual_protocol_date: "Ngày xong đề cương",
+  actual_validation_date: "Ngày xong thẩm định",
+  actual_report_date: "Ngày xong báo cáo",
+  actual_vmp_date: "Ngày xong VMP",
+  status_protocol: "Trạng thái đề cương",
+  status_validation: "Trạng thái thẩm định",
+  status_report: "Trạng thái báo cáo",
+  status_vmp: "Trạng thái VMP",
+};
 
 interface PlannedDeadlineDialogProps {
   a: Activity;
@@ -94,8 +113,9 @@ export default function PlannedDeadlineDialog({
         setError(resultMessage(outcome.result));
         setConflict(outcome.result.error_code === "VERSION_CONFLICT");
       } else if (outcome.kind === "transport_error") {
+        console.error("Lưu hạn kế hoạch thất bại:", outcome.message);
         setConflict(false);
-        setError(outcome.message);
+        setError("Chưa lưu được. Thử lại.");
       }
     } finally {
       setBusy(false);
@@ -113,7 +133,7 @@ export default function PlannedDeadlineDialog({
   return (
     <ViewportDialog
       open
-      title="Chỉnh kế hoạch thủ công"
+      title="Chỉnh hạn kế hoạch"
       onRequestClose={requestClose}
       footer={(
         <>
@@ -132,13 +152,12 @@ export default function PlannedDeadlineDialog({
     >
       <div data-planned-deadline-dialog>
         <p data-planned-deadline-identity>{validationCode}</p>
-        <p data-planned-deadline-version>Phiên bản: {a.version ?? "—"}</p>
 
         <div className="planned-deadline-grid">
           {DEADLINE_KEYS.map((key) => (
             <label key={key}>
-              {key}
-              <span>Đã tải: {before[key] || "—"}</span>
+              {DEADLINE_LABELS[key]}
+              <span>Hiện tại: {before[key] || "—"}</span>
               <input
                 id={`planned-deadline-${key}`}
                 data-planned-deadline-input={key}
@@ -158,11 +177,11 @@ export default function PlannedDeadlineDialog({
           ))}
         </div>
 
-        <h3>Ngày thực tế và trạng thái được bảo vệ</h3>
+        <h3>Không đổi</h3>
         <div className="planned-deadline-protected">
           {PROTECTED_KEYS.map((key) => (
             <p key={key} data-planned-deadline-protected={key}>
-              {key}: <b>{protectedValues[key] || "—"}</b>
+              {PROTECTED_LABELS[key]}: <b>{protectedValues[key] || "—"}</b>
             </p>
           ))}
         </div>
@@ -172,7 +191,7 @@ export default function PlannedDeadlineDialog({
           <input
             id="planned-deadline-reason"
             data-dialog-focus
-            aria-label="Lý do chỉnh deadline kế hoạch"
+            aria-label="Lý do chỉnh hạn kế hoạch"
             aria-describedby="planned-deadline-action-description"
             value={reason}
             disabled={busy}
@@ -190,12 +209,11 @@ export default function PlannedDeadlineDialog({
             aria-describedby="planned-deadline-action-description"
             onChange={(event) => { setConfirmed(event.target.checked); setError(""); }}
           />
-          Tôi xác nhận chỉ đổi bốn deadline kế hoạch; ngày thực tế, trạng thái,
-          người thực hiện và mã hạng mục giữ nguyên.
+          Tôi xác nhận chỉ đổi bốn hạn kế hoạch.
         </label>
 
         <p id="planned-deadline-action-description">
-          {localError || "Sẵn sàng lưu; hệ thống sẽ kiểm tra lại phiên bản trước khi ghi."}
+          {localError}
         </p>
 
         {error && <p data-planned-deadline-error role="alert">{error}</p>}

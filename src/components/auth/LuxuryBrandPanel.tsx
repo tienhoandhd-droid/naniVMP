@@ -25,7 +25,7 @@ export default function LuxuryBrandPanel() {
       </svg>
       <div className="vq-brand-content">
         <div className="vq-brand-hairline" />
-        <VmpMasthead />
+        <VmpMasthead phu />
         <div className="vq-brand-caption">V/Q TEAM · VALIDATION &amp; QUALIFICATION</div>
       </div>
       <div className="vq-brand-department">Phòng Quản lý Chất lượng</div>

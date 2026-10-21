@@ -49,6 +49,11 @@
 }
 :root[data-theme="dark"] .vmp-main-nen::before { opacity: 0.18; }
 :root[data-theme="dark"] .vmp-main-nen::after { opacity: 0.06; mix-blend-mode: screen; }
+/* G5 (21/10): tranh cô gái + sen chỉ hiện đủ ở màn Việc hôm nay. Màn có
+   bảng/biểu đồ hạ gần như ẩn (data-vmp-art="nhe", AuthenticatedApp.tsx) để
+   số liệu dễ đọc; màn đăng nhập có tranh riêng ở panel thương hiệu. */
+.vmp-main-nen[data-vmp-art="nhe"]::before,
+:root[data-theme="dark"] .vmp-main-nen[data-vmp-art="nhe"]::before { opacity: 0.015; }
 @media (max-width: 768px) {
   .vmp-main-nen::before { width: 420px; height: 300px; background-size: 640px auto; background-position: -150px 0; opacity: 0.20; }
 }
@@ -105,7 +110,7 @@
   font-weight: 500;
   font-style: italic;
   letter-spacing: 0.01em;
-  color: var(--lp-rose);
+  color: var(--lp-brand);
   transform: translateY(1px) rotate(-1deg);
   transform-origin: left center;
 }
@@ -122,13 +127,13 @@
 .vmp-masthead__lotus { transform-origin: 130px 10px; }
 .vmp-masthead__phu {
   flex: none;
-  font-family: var(--ff-text);
-  font-size: 12px;
+  font-family: var(--ff-display);
+  font-style: italic;
+  font-size: var(--lp-fs-1);
   line-height: 1.35;
-  font-weight: 800;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--lp-rose);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--lp-brand);
   white-space: nowrap;
 }
 @media (min-width: 769px) {
@@ -136,7 +141,6 @@
 }
 @media (max-width: 1100px) {
   .vmp-masthead__net { max-width: 132px; }
-  .vmp-masthead__phu { letter-spacing: 0.22em; }
 }
 @media (max-width: 768px) {
   .vmp-masthead { min-height: 42px; gap: 8px; }
@@ -155,9 +159,9 @@
  * trái thẳng hàng với "V/Q TEAM…" bên dưới. */
 .vq-brand-panel .vmp-masthead { flex-wrap: wrap; justify-content: flex-start; row-gap: 14px; margin: 10px 0 4px; }
 .vq-brand-panel .vmp-masthead__phu { flex-basis: 100%; }
-.vq-brand-panel .vmp-masthead__ten { color: #fff8ee; }
-.vq-brand-panel .vmp-masthead__monitor, .vq-brand-panel .vmp-masthead__phu { color: #ffdca5; }
-.vq-brand-panel .vmp-masthead__net { stroke: #ffdca5; fill: #ffdca5; }
+.vq-brand-panel .vmp-masthead__ten { color: var(--lp-porcelain); }
+.vq-brand-panel .vmp-masthead__monitor, .vq-brand-panel .vmp-masthead__phu { color: color-mix(in srgb, var(--lp-porcelain) 82%, var(--lp-brand-solid)); }
+.vq-brand-panel .vmp-masthead__net { stroke: var(--lp-gold); fill: var(--lp-gold); }
 @media (max-width: 768px) { .vq-brand-panel .vmp-masthead { min-height: 38px; } }
 
 /* ---- Khối thương hiệu V/Q TEAM (sidebar) --------------------------- */
@@ -165,10 +169,51 @@
 .vq-brand__dong { display: flex; align-items: baseline; gap: 6px; line-height: 1; }
 .vq-brand__vq { font-family: var(--ff-display); font-size: 26px; font-weight: 600; color: var(--lp-plum); letter-spacing: 0.01em; }
 .vq-brand__gach { vertical-align: -5px; margin: 0 -1px; stroke: var(--lp-gold); }
-.vq-brand__team { font-family: var(--ff-display); font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lp-plum); }
+.vq-brand__team { font-family: var(--ff-display); font-size: 12px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: var(--lp-plum); }
 .vq-brand__tagline { margin-top: 3px; font-family: var(--ff-display); font-style: italic; font-size: 12.5px; font-weight: 500; color: var(--lp-plum); letter-spacing: 0.02em; white-space: nowrap; }
-.vq-brand__donvi { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-ink-muted); white-space: nowrap; }
+.vq-brand__donvi { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.01em; color: var(--lp-ink-muted); white-space: nowrap; }
 .vq-brand__donvi svg { flex: none; stroke: var(--lp-gold); fill: var(--lp-gold); }
+
+/* ---- Khối nhận diện ở thanh bên (21/10) ---------------------------
+ * Logo CPC1 HN + chữ cách điệu "VMP Monitor" + dòng "V/Q Team · CPC1 HN".
+ * Đệm phải 34px chừa chỗ cho nút thu gọn (absolute, góc trên phải). */
+.vmp-sidebar-brand { padding: 0 30px var(--lp-sp-3) 0; }
+.vmp-sidebar-brand--gon { display: flex; justify-content: center; padding: 40px 0 var(--lp-sp-2); }
+.vmp-brand-khoi { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vmp-brand-khoi__logo {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  height: 38px; padding: 4px 6px; border-radius: 10px;
+  background: var(--lp-surface); border: 1px solid var(--lp-line); box-shadow: var(--lp-e-low);
+}
+.vmp-brand-khoi__logo img { display: block; width: auto; height: 26px; }
+.vmp-brand-khoi__chu { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.vmp-brand-khoi__ten { display: block; line-height: 1; }
+.vmp-brand-khoi__ten .vmp-masthead__v { font-size: 28px; }
+.vmp-brand-khoi__ten .vmp-masthead__mp { font-size: 16px; }
+.vmp-brand-khoi__ten .vmp-masthead__monitor { font-size: 18px; margin-left: 0.24em; }
+.vmp-brand-khoi__ten .vmp-masthead__ten::after { left: 2px; bottom: -5px; width: 46px; }
+.vmp-brand-khoi .vq-brand__donvi { margin-top: 0; }
+.vmp-mobile-drawer-head .vmp-brand-khoi { min-width: 0; }
+
+/* ---- Thanh trên điện thoại (21/10) --------------------------------
+ * ☰ + chữ cách điệu thu nhỏ, dính đỉnh vùng cuộn <main>. Desktop ẩn. */
+.vmp-mobile-bar { display: none; }
+@media (max-width: 768px) {
+  .vmp-mobile-bar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: var(--lp-sp-2);
+    min-height: 56px; padding: 0 16px;
+    background: var(--lp-glass); border-bottom: 1px solid var(--lp-line);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .vmp-mobile-bar__ten { display: block; line-height: 1; }
+  .vmp-mobile-bar__ten .vmp-masthead__v { font-size: 28px; }
+  .vmp-mobile-bar__ten .vmp-masthead__mp { font-size: 16px; }
+  .vmp-mobile-bar__ten .vmp-masthead__monitor { font-size: 18px; }
+  .vmp-mobile-bar__ten .vmp-masthead__ten::after { display: none; }
+  /* Thanh trên đã mang chữ cách điệu — không lặp dải masthead bên dưới. */
+  .vmp-topbar .vmp-masthead { display: none; }
+}
 
 /* A quiet navigation surface; theme tokens keep both modes readable. */
 .vmp-sidebar {
@@ -229,9 +274,8 @@
   font-weight: 600;
   letter-spacing: .06em;
 }
-.vmp-sidebar-preferences {
-  background: var(--lp-nav-surface) !important;
-}
+/* G3 (21/10): nút sáng/tối nằm trong thẻ người dùng, không còn khung riêng. */
+.vmp-sidebar-preferences { display: inline-flex; flex: none; align-self: flex-start; }
 .vmp-sidebar-account__identity {
   background: var(--lp-surface) !important;
   border-color: var(--lp-line) !important;

@@ -69,7 +69,7 @@ function gopUngVien(
     if (cu) { cu.dinhKy = cu.dinhKy || dinhKy; return; }
     m.set(k, { email: e, ten: ten.trim() || e, nguon, dinhKy });
   };
-  recips.forEach((r) => them(r.email, r.recipient_name || "", "Người nhận mail", !!r.ai_report_enabled));
+  recips.forEach((r) => them(r.email, r.recipient_name || "", "Người nhận email", !!r.ai_report_enabled));
   staff.forEach((s) => them(s.email, s.staff_name, s.department ? `Danh bạ · ${s.department}` : "Danh bạ"));
   performers.filter((p) => p.is_active).forEach((p) => them(p.email, p.performer_name, "Người thực hiện"));
   return [...m.values()].sort((a, b) => {
@@ -113,9 +113,12 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
         if (!song) return;
         const ds = gopUngVien(r, s, p);
         setUngVien(ds);
-        if (!ds.length) setLoiTai("Danh bạ trống — hãy gõ tay email, hoặc khai người nhận ở Danh mục & Nhập liệu → Người nhận mail.");
+        if (!ds.length) setLoiTai("Danh bạ trống — gõ email, hoặc thêm ở Dữ liệu nguồn → Người nhận email.");
       })
-      .catch((e: Error) => { if (song) setLoiTai("Không đọc được danh bạ: " + e.message); })
+      .catch((e: Error) => {
+        console.error("[Mail AI] Không đọc được danh bạ:", e);
+        if (song) setLoiTai("Chưa tải được danh bạ.");
+      })
       .finally(() => { if (song) setDangTai(false); });
     return () => { song = false; };
   }, []);
@@ -152,10 +155,15 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
         dung_danh_sach: dungDanhSach,
       });
       setKetQua(r);
+      if (r.mail?.that_bai?.length) console.error("[Mail AI] Địa chỉ gửi hỏng:", r.mail.that_bai);
       if (r.ok && onDone) onDone(r);
-      if (!r.ok) setLoiGui(r.error || "n8n không dựng được bản phân tích.");
+      if (!r.ok) {
+        console.error("[Mail AI] Không dựng được bản phân tích:", r.error ?? r);
+        setLoiGui("Chưa tạo được bản phân tích. Thử lại sau.");
+      }
     } catch (e) {
-      setLoiGui((e as Error)?.message || "Không gọi được n8n.");
+      console.error("[Mail AI] Không gọi được dịch vụ gửi:", e);
+      setLoiGui("Chưa gửi được. Thử lại sau.");
     } finally {
       sendCoordinator.current.finish();
       setDangGui(false);
@@ -196,9 +204,8 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700, marginBottom: 14, lineHeight: 1.65 }}>
         Phạm vi gửi: <b style={{ color: C.plum }}>{phamViLabel}</b>
         {ky ? <> · kỳ <b style={{ color: C.plum }}>{ky.nhan}</b></> : null}.
-        Mail gồm <b>phần phân tích AI</b> và <b>toàn bộ dữ liệu thô</b> của phạm vi này (đính kèm tệp CSV).
-        Số liệu do n8n đọc lại thẳng từ Supabase lúc gửi — không lấy từ trang đang mở, nên không phụ
-        thuộc bản này đã cũ tới đâu.
+        Mail gồm <b>phần phân tích AI</b> và <b>toàn bộ dữ liệu thô</b> của phạm vi này, kèm tệp CSV.
+        Số liệu lấy mới lúc gửi.
       </div>
 
       {/* 1. Danh sách định kỳ — cách dùng thật */}
@@ -212,8 +219,7 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
         <span style={{ fontSize: 14, fontWeight: 700, color: C.plum, lineHeight: 1.6 }}>
           Gửi cho danh sách định kỳ ({soDinhKy} người đang bật &quot;Mail phân tích AI&quot;)
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
-            Đúng danh sách mà lịch tự động dùng. n8n lọc lại theo phạm vi từng người, nên bỏ tick
-            nếu chỉ muốn thử gửi cho riêng mình.
+            Danh sách nhận báo cáo định kỳ.
           </div>
         </span>
       </label>
@@ -300,12 +306,9 @@ export default function AiMailModal({ loai, phamVi, phamViLabel, ky, onClose, on
           </div>
           {thatBai.length > 0 && (
             <div style={{ marginTop: 7, fontSize: 12, fontWeight: 700, color: C.raspText }}>
-              Gửi hỏng {thatBai.length}: {thatBai.map((t) => `${t.email} (${t.loi})`).join("; ")}
+              Chưa gửi được tới: {thatBai.map((t) => t.email).join(", ")}
             </div>
           )}
-          <div style={{ marginTop: 6, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-            Bản phân tích cũng đã hiện ở trang bên dưới — không phải chạy AI lần nữa.
-          </div>
         </div>
       )}
 

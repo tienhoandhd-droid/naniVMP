@@ -52,7 +52,7 @@ import AccountRoleEditor from "../features/accountAdministration/AccountRoleEdit
 import QaPhuTrachPanel from "../features/qaPhuTrach/QaPhuTrachPanel.tsx";
 import type { AccountAdministrationRow } from "../features/accountAdministration/accountAdministrationModel.ts";
 import type { DirectoryPerson } from "../features/itemPermissions/types.ts";
-import { SCREEN_IDS } from "../lib/access.ts";
+import { SCREEN_IDS, BUSINESS_ROLE_LABELS } from "../lib/access.ts";
 import type { AccessContext } from "../lib/access.ts";
 
 type KetQuaLuu = { xong: number; tong: number; loi: string[] } | null;
@@ -104,7 +104,8 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
       setVaiTaiKhoan(await fetchVaiNghiepVu());
       setTrangThaiTaiKhoan("ready");
     } catch (e) {
-      setLoiTaiKhoan((e as Error).message || "Không đọc được vai nghiệp vụ");
+      console.error("Không đọc được vai nghiệp vụ", e);
+      setLoiTaiKhoan("Bấm Thử lại. Nếu vẫn lỗi, đăng nhập lại.");
       setTrangThaiTaiKhoan("error");
     }
   };
@@ -124,11 +125,13 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
     try {
       const r = await setEmailChoPhep(email, choPhep, ghiChu);
       setKetQua((c) => ({
-        ...c, E: { xong: r.ok ? 1 : 0, tong: 1, loi: r.ok ? [] : [`${email}: ${r.error}`] },
+        ...c, E: { xong: r.ok ? 1 : 0, tong: 1, loi: r.ok ? [] : [`${email}: chưa lưu được. Thử lại.`] },
       }));
+      if (!r.ok) console.error("Lưu email được phép thất bại", email, r.error);
       if (r.ok) { setEmailMoi({ email: "", ghiChu: "" }); await taiDsEmail(); }
     } catch (e) {
-      setKetQua((c) => ({ ...c, E: { xong: 0, tong: 1, loi: [`${email}: ${(e as Error).message}`] } }));
+      console.error("Lưu email được phép thất bại", email, e);
+      setKetQua((c) => ({ ...c, E: { xong: 0, tong: 1, loi: [`${email}: chưa lưu được. Thử lại.`] } }));
     }
     setDangLuu("");
   };
@@ -138,8 +141,8 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
       {/* ============ 1 · AI ĐƯỢC PHÉP CÓ TÀI KHOẢN ============ */}
       <Card variant="strong">
         <CardTitle icon={Mail}
-          sub="Cửa vào duy nhất: không có email ở đây thì Supabase từ chối tạo tài khoản, kể cả tạo tay trong Dashboard.">
-          1 · Ai được phép có tài khoản
+          sub="Chỉ email trong danh sách mới tạo được tài khoản.">
+          Ai được phép có tài khoản
         </CardTitle>
 
         {trangThaiTaiKhoan === "loading" && (
@@ -156,7 +159,6 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
 
         <CauKetLuan tone="ok"
           chinh={`${dsEmail.filter((e) => e.is_active).length} email được phép tạo tài khoản.`}
-          phu="Danh sách được thực thi tại database."
         />
 
         {quyenSuaA && (
@@ -208,9 +210,9 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
                         : trangThaiTaiKhoan === "error"
                           ? <span style={{ color: C.marigoldText, fontWeight: 700, fontSize: 12.5 }}>chưa xác minh được</span>
                           : taiKhoan.exists
-                        ? <Tag color={C.mintText} bg={C.mintSoft}>rồi</Tag>
+                        ? <Tag color={C.mintText} bg={C.mintSoft}>Có</Tag>
                         : <span style={{ color: C.marigoldText, fontWeight: 700, fontSize: 12.5 }}>
-                            chưa — người này còn phải được tạo tài khoản ở Supabase
+                            Chưa có
                           </span>}
                     </td>
                     {quyenSuaA && (
@@ -234,7 +236,7 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
               })}
               {!dsEmail.length && (
                 <tr><td colSpan={quyenSuaA ? 5 : 4}>
-                  Chưa đọc được danh sách — cần đăng nhập bằng tài khoản admin.
+                  Không tải được danh sách.
                 </td></tr>
               )}
             </tbody>
@@ -256,8 +258,8 @@ function QuanTriQuyenCards({ duocSua = false }: { duocSua?: boolean }) {
           <summary>Quy trình thêm người mới</summary>
           <ol>
             <li>Cho phép email ở bảng này.</li>
-            <li>Tạo tài khoản đúng email trong Supabase Authentication.</li>
-            <li>Chọn vai ở Bảng kiểm soát, rồi nối hồ sơ trong tab Liên kết &amp; quyền.</li>
+            <li>Tạo tài khoản đúng email trên trang quản trị đăng nhập.</li>
+            <li>Ở tab Bảng kiểm soát: chọn vai, rồi bấm Liên kết tài khoản để nối hồ sơ.</li>
           </ol>
         </details>
       </Card>
@@ -280,18 +282,30 @@ const TEN_MAN: Record<string, string> = {
   overview: "Tổng quan",
   timeline: "Dòng thời gian VMP",
   alerts: "Cảnh báo & ưu tiên",
-  risk: "Rủi ro (đường dẫn cũ)",
+  risk: "Rủi ro",
   progress: "Cập nhật tiến độ",
-  inventory: "Tiến độ theo đối tượng",
+  inventory: "Cập nhật tiến độ · Theo đối tượng",
   source: "Dữ liệu nguồn",
   workload: "Phân công & khối lượng",
   reports: "Báo cáo",
   rules: "Quy tắc nghiệp vụ",
   health: "Chất lượng dữ liệu",
-  audit: "Nhật ký thay đổi",
-  accounts: "Tài khoản & quyền truy cập",
-  admin: "Quản trị",
+  audit: "Nhật ký hệ thống",
+  accounts: "Vai trò & phạm vi · Tài khoản",
+  admin: "Cấu hình hệ thống",
   phanquyen: "Vai trò & phạm vi",
+};
+
+/** Nhãn hành động; mã lạ hiện "Khác" để không lộ mã thô. */
+const TEN_HANH_DONG: Record<string, string> = {
+  edit: "Sửa",
+  export: "Xuất dữ liệu",
+  manage_accounts: "Quản lý tài khoản",
+  manage_authorization_policy: "Chỉnh chính sách quyền",
+  assign_workshop_staff: "Phân nhân viên xưởng",
+  edit_catalog: "Sửa dữ liệu nguồn",
+  generate_timeline: "Sinh lịch",
+  manage_workshop_scope: "Chỉnh phạm vi xưởng",
 };
 
 const TEN_PHAM_VI: Record<string, string> = {
@@ -305,17 +319,13 @@ const TEN_PHAM_VI: Record<string, string> = {
 function MaTranQuyenManHinh({ access }: { access: AccessContext }) {
   return (
     <Card variant="strong">
-      <CardTitle icon={ShieldCheck}
-        sub={access.mode === "enforced"
-          ? "Quyền đang có hiệu lực. Đây là kết quả server trả về cho chính tài khoản bạn đang dùng."
-          : "Đang ở chế độ đối chiếu: bảng này cho thấy quyền dự kiến, nhưng hệ vẫn chạy theo luật cũ."}>
+      <CardTitle icon={ShieldCheck}>
         Màn hình bạn được xem
       </CardTitle>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         <Tag>{access.mode === "enforced" ? "Đang áp dụng" : "Dự kiến, chưa áp dụng"}</Tag>
-        <Tag>Vai nghiệp vụ: {access.businessRole ?? "chưa giải được"}</Tag>
-        {access.unresolvedReason && <Tag>Lý do: {access.unresolvedReason}</Tag>}
+        <Tag>Vai: {access.businessRole ? BUSINESS_ROLE_LABELS[access.businessRole] : "chưa xác định"}</Tag>
       </div>
 
       {/* Bề mặt sổ: kẻ dòng, hàng tiêu đề dính, có <caption> và scope.
@@ -326,9 +336,7 @@ function MaTranQuyenManHinh({ access }: { access: AccessContext }) {
         <div className="reg-scroll">
           <table className="reg-table">
             <caption>
-              Quyền có hiệu lực cho chính tài khoản đang đăng nhập, do máy chủ trả về
-              ({SCREEN_IDS.length} màn). Muốn xem quyền của vai khác thì phải đăng nhập
-              bằng tài khoản vai đó.
+              Quyền của bạn trên {SCREEN_IDS.length} màn.
             </caption>
             <thead>
               <tr>
@@ -353,7 +361,7 @@ function MaTranQuyenManHinh({ access }: { access: AccessContext }) {
                     </td>
                     <td>{TEN_PHAM_VI[access.scope(id)] ?? access.scope(id)}</td>
                     <td className="reg-muted">
-                      {hanhDong.length ? hanhDong.join(", ") : (xem ? "chỉ xem" : "—")}
+                      {hanhDong.length ? hanhDong.map((a) => TEN_HANH_DONG[a] ?? "Khác").join(", ") : (xem ? "chỉ xem" : "—")}
                     </td>
                   </tr>
                 );
@@ -425,7 +433,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
         { id: "kiem-soat", nhan: "Bảng kiểm soát" },
         { id: "qa-phu-trach", nhan: "QA phụ trách" },
         { id: "email", nhan: "Email được phép" },
-        { id: "che-do", nhan: "Chế độ áp dụng" },
+        { id: "che-do", nhan: "Áp dụng quyền" },
         { id: "quyen-toi", nhan: "Quyền của tôi" },
       ]} />
 
@@ -551,7 +559,7 @@ export default function PhanQuyenView(props: PhanQuyenViewProps) {
     return (
       <Card variant="strong">
         <CardTitle icon={ShieldCheck}>Không có quyền truy cập</CardTitle>
-        <p>Bạn không có quyền truy cập màn Phân quyền &amp; trách nhiệm.</p>
+        <p>Bạn không có quyền truy cập màn Vai trò &amp; phạm vi.</p>
       </Card>
     );
   }

@@ -532,7 +532,7 @@ test("trường đua kể hành trình 60 ngày, cá có tên truy cập và leg
   assert.match(html, /30 ngày đã qua/);
   assert.match(html, /data-long-mon-period="future"/);
   assert.match(html, /30 ngày sắp tới/);
-  assert.match(html, /Bấm cá để xem hạn và hồ sơ/);
+  assert.doesNotMatch(html, /Bấm cá để xem hạn và hồ sơ/);
   assert.doesNotMatch(html, /Dòng nước/);
   assert.match(html, /08\/2026/);
   assert.match(html, /09\/2026/);

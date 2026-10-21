@@ -56,7 +56,7 @@ export default function CatalogField({
   const idGoiY = `${id}-goi-y`;
   const khoa = Boolean(locked || field.readonly);
   const lyDoKhoa = lockReason
-    || (field.readonly ? "Khoá nghiệp vụ — không sửa được sau khi tạo" : undefined);
+    || (field.readonly ? "Không sửa được sau khi tạo" : undefined);
 
   const moTa = [error ? idLoi : null, field.hint || lyDoKhoa ? idGoiY : null]
     .filter(Boolean).join(" ") || undefined;

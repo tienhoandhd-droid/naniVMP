@@ -54,7 +54,7 @@ export function useTeamOverviewSummary({
     setStored({ key, status: "loading", data: null, error: null });
     void (async () => {
       try {
-        if (!supabase) throw new Error("Chưa cấu hình kết nối Supabase.");
+        if (!supabase) throw new Error("Chưa kết nối được hệ thống.");
         const { data, error } = await supabase.rpc(
           "rpc_team_overview_summary" as never,
           { p_year: year } as never,
@@ -66,11 +66,13 @@ export function useTeamOverviewSummary({
         setStored({ key, status: "ready", data: decoded.data, error: null });
       } catch (error) {
         if (!gate.current.isCurrent(generation)) return;
+        /* Lỗi gốc chỉ ghi console; người dùng thấy câu nghiệp vụ. */
+        console.error("[Tổng quan] Không tải được tiến độ cả nhóm:", error);
         setStored({
           key,
           status: "error",
           data: null,
-          error: error instanceof Error ? error.message : "Không tải được tiến độ cả nhóm.",
+          error: "Không tải được tiến độ cả nhóm. Thử lại.",
         });
       }
     })();

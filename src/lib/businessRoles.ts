@@ -16,8 +16,8 @@ export const BUSINESS_ROLE_CATALOG = {
   admin: { id: "admin", label: "Quản trị", description: "Toàn quyền theo chính sách hệ thống", scopeMode: "role_policy" },
   qa_manager: { id: "qa_manager", label: "Quản lý QA", description: "Theo chính sách của vai Quản lý QA", scopeMode: "role_policy" },
   qa_staff: { id: "qa_staff", label: "Nhân viên QA", description: "Theo phân công QA", scopeMode: "qa_assignment" },
-  workshop_manager: { id: "workshop_manager", label: "Quản lý xưởng", description: "Theo phạm vi phân cấp canonical", scopeMode: "hierarchy" },
-  workshop_staff: { id: "workshop_staff", label: "Nhân viên xưởng", description: "Theo phạm vi canonical và phân công", scopeMode: "hierarchy" },
+  workshop_manager: { id: "workshop_manager", label: "Quản lý xưởng", description: "Theo xưởng phụ trách", scopeMode: "hierarchy" },
+  workshop_staff: { id: "workshop_staff", label: "Nhân viên xưởng", description: "Theo xưởng và phân công", scopeMode: "hierarchy" },
 } as const satisfies Readonly<Record<BusinessRole, BusinessRoleDefinition>>;
 
 export const BUSINESS_ROLE_LABELS: Readonly<Record<BusinessRole, string>> = Object.fromEntries(

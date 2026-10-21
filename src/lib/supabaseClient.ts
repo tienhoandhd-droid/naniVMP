@@ -115,7 +115,7 @@ if (typeof window !== "undefined" && supabase) {
 
 /* ---- Đăng nhập ---- */
 export async function signIn(email: string, password: string): Promise<AppUser> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình. Xem hướng dẫn cài đặt.");
+  if (!supabase) throw new Error("Chưa kết nối được hệ thống. Liên hệ IT.");
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   // Preserve SDK status/code so the form can distinguish throttling and outages.
   if (error) throw error;
@@ -244,7 +244,7 @@ async function getProfile(uid: string): Promise<Omit<AppUser, "uid" | "token"> |
  * tài khoản. Nên re-auth bằng signInWithPassword trước; sai thì ném
  * "MAT_KHAU_CU_SAI" để passwordForm dịch ra thông điệp tiếng Việt. */
 export async function changePassword(matKhauCu: string, matKhauMoi: string): Promise<void> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình.");
+  if (!supabase) throw new Error("Chưa kết nối được hệ thống. Liên hệ IT.");
   const { data } = await supabase.auth.getUser();
   const email = data.user?.email;
   if (!email) throw new Error("Không xác định được tài khoản hiện tại.");
@@ -259,7 +259,7 @@ export async function changePassword(matKhauCu: string, matKhauMoi: string): Pro
  * Người dùng vào bằng link email "quên mật khẩu" — chính link đó là bằng
  * chứng, không còn mật khẩu cũ để hỏi. */
 export async function datLaiMatKhauKhoiPhuc(matKhauMoi: string): Promise<void> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình.");
+  if (!supabase) throw new Error("Chưa kết nối được hệ thống. Liên hệ IT.");
   const { error } = await supabase.auth.updateUser({ password: matKhauMoi });
   if (error) throw new Error(error.message);
 }
@@ -277,7 +277,7 @@ export async function kiemTraPhienKhoiPhuc(): Promise<void> {
  * supabase-js với detectSessionInUrl sẽ nhặt token trong hash khi người
  * dùng quay lại và phát sự kiện PASSWORD_RECOVERY. */
 export async function guiMailQuenMatKhau(email: string): Promise<void> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình.");
+  if (!supabase) throw new Error("Chưa kết nối được hệ thống. Liên hệ IT.");
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin + window.location.pathname,
   });

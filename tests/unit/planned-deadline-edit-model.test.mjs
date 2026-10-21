@@ -40,7 +40,7 @@ test("gate chỉ admin/qa_manager khi env đúng", () => {
 });
 
 test("draft cần version, lý do, xác nhận và thay đổi hợp lệ", () => {
-  assert.match(validate(before), /Không có/);
+  assert.match(validate(before), /Chưa đổi hạn/);
   assert.match(
     validate({ ...before, deadline_protocol: null }),
     /Không được/,
@@ -64,18 +64,18 @@ test("submit validation rejects a blank identity and a snapshot with extra keys"
 
   assert.match(
     validate(draft, { validationCode: "  " }),
-    /mã hạng mục/,
+    /Không xác định được hạng mục/,
   );
   assert.match(
     validate(draft),
-    /bốn deadline/,
+    /bốn hạn/,
   );
 });
 
 test("validation precedence is identity, version, exact shape, then user fields", () => {
-  assert.match(validate(before, { validationCode: "", version: -1 }), /mã hạng mục/);
+  assert.match(validate(before, { validationCode: "", version: -1 }), /Không xác định được hạng mục/);
   assert.match(validate(before, { version: -1 }), /phiên bản/);
-  assert.match(validate({ ...before, extra: "x" }, { reason: "" }), /bốn deadline/);
+  assert.match(validate({ ...before, extra: "x" }, { reason: "" }), /bốn hạn/);
   assert.match(validate({ ...before, deadline_vmp: "2026-01-05" }, { reason: "" }), /lý do/);
   assert.match(validate({ ...before, deadline_vmp: "2026-01-05" }, { confirmed: false }), /xác nhận/);
 });
@@ -89,7 +89,7 @@ test("exact snapshot needs four own string-or-null keys and calendar dates are r
   assert.equal(isIsoCalendarDate("2028-02-29"), true);
   assert.equal(isIsoCalendarDate("2026-02-29"), false);
   assert.equal(isIsoCalendarDate("2026-02-30"), false);
-  assert.match(validate({ ...before, deadline_vmp: "2026-02-30" }), /ngày ISO/);
+  assert.match(validate({ ...before, deadline_vmp: "2026-02-30" }), /Ngày không hợp lệ/);
 });
 
 test("null gaps are legal, but erasure and nondecreasing ordering are not", () => {
@@ -173,12 +173,12 @@ test("snapshot reads direct, raw, then legacy for all planned and protected fiel
   });
 });
 
-test("conflict text preserves both exact server versions", () => {
+test("conflict text is a business sentence without raw versions", () => {
   assert.equal(resultMessage({
     ok: false,
     error_code: "VERSION_CONFLICT",
     error: "Dữ liệu đã đổi",
     expected_version: 7,
     current_version: 9,
-  }), "Dữ liệu đã đổi (phiên bản đã tải 7; hiện tại 9)");
+  }), "Người khác vừa sửa hạng mục này. Tải lại rồi sửa tiếp.");
 });

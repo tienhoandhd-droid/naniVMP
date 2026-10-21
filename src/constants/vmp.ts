@@ -69,13 +69,13 @@ export const STAGE_COLOR = {
 // Dùng chung cho DataQualityView (Sức khoẻ dữ liệu) và ReportsView (Báo cáo
 // & AI) — một nơi định nghĩa nhãn lỗi, đổi một nơi khớp cả hai màn.
 export const LOAI_LOI: Record<string, { ten: string; sua: string }> = {
-  missing_code:          { ten: "Thiếu mã đối tượng", sua: "Sửa ở Dữ liệu nguồn → Danh mục nguồn" },
-  duplicate_id:          { ten: "Trùng ID hạng mục", sua: "Hai dòng cùng mã thẩm định — xoá hoặc đổi mã một dòng" },
-  deadline_before_start: { ten: "Deadline VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
+  missing_code:          { ten: "Thiếu mã đối tượng", sua: "Sửa ở Dữ liệu nguồn" },
+  duplicate_id:          { ten: "Trùng mã hạng mục", sua: "Hai dòng cùng mã thẩm định — xoá hoặc đổi mã một dòng" },
+  deadline_before_start: { ten: "Đích VMP trước ngày đề cương", sua: "Kiểm lại mốc đích hoặc ngày đề cương ở Cập nhật tiến độ" },
   done_no_date:          { ten: "Đánh dấu hoàn thành nhưng thiếu ngày", sua: "Vi phạm ALCOA+ — nhập ngày thực tế ở Cập nhật tiến độ" },
   date_no_done:          { ten: "Có ngày hoàn thành nhưng trạng thái chưa xong", sua: "Đặt trạng thái về Hoàn thành, hoặc xoá ngày nếu nhập nhầm" },
-  owner_no_email:        { ten: "Người thực hiện chưa có email", sua: "Liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự" },
-  no_validation_type:    { ten: "Chưa xác định loại thẩm định", sua: "Đặt IQ/OQ/PQ/CV ở Danh mục nguồn rồi sinh lại timeline" },
+  owner_no_email:        { ten: "QA phụ trách chưa có email", sua: "Liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự" },
+  no_validation_type:    { ten: "Chưa xác định loại thẩm định", sua: "Đặt IQ/OQ/PQ/CV ở Dữ liệu nguồn rồi lập lại lịch" },
   high_crit_no_plan:     { ten: "Trọng yếu cao nhưng vẫn ở Kế hoạch", sua: "ICH Q9 đòi làm nhóm rủi ro cao trước — xếp lịch sớm" },
 };
 
@@ -152,28 +152,26 @@ export const NAV_ITEMS = [
      khác fail-closed kể cả khi client còn cache capability cũ. */
   { id: "phanquyen", label: "Vai trò & phạm vi", icon: ShieldCheck, group: "admin" },
   { id: "health", label: "Chất lượng dữ liệu", icon: Radar, group: "admin" },
-  { id: "audit", label: "Nhật ký thay đổi", icon: ShieldCheck, group: "admin" },
+  { id: "audit", label: "Nhật ký hệ thống", icon: ShieldCheck, group: "admin" },
   { id: "admin", label: "Cấu hình hệ thống", icon: BarChart3, group: "admin" },
 ];
 
 export const NAV_SUBS = {
-  today: "Việc trễ, tới hạn trong 7 ngày và hồ sơ cần hoàn thiện",
-  overview: "Theo dõi Kế hoạch Thẩm định Gốc (VMP) — CPC1 HN",
+  today: "Việc trễ, tới hạn 7 ngày tới",
+  overview: "Kế hoạch Thẩm định Gốc — CPC1 HN",
   timeline: "Đề cương → Thẩm định → Báo cáo → Đích VMP",
-  alerts: "Tới hạn, quá hạn, tái thẩm định · xếp theo rủi ro ICH Q9",
-  progress: "Cập nhật ngày thực tế và trạng thái từng giai đoạn",
-  inventory: "Gộp theo mã đối tượng: một đối tượng có nhiều loại thẩm định / nhiều lần trong năm",
+  alerts: "Tới hạn, quá hạn, tái thẩm định theo rủi ro",
+  progress: "Ngày thực tế và trạng thái từng giai đoạn",
   /* Sáu vùng của workspace danh mục — KHÔNG hứa "Người thực hiện" hay
      "Danh bạ nhân sự", không hứa xoá vật lý.
      Chuỗi này có bộ kiểm literal giữ (tests/unit/operational-copy). */
   source: "Đối tượng nguồn theo phạm vi được cấp",
-  workload: "Phân công QA theo nhóm việc và ma trận tải Người × Tháng",
+  workload: "Phân công QA và tải việc theo tháng",
   reports: "Tổng hợp theo kỳ · xuất PDF, Excel, HTML",
-  rules: "Quy tắc hệ thống đang áp dụng",
-  phanquyen: "Chỉ Admin · tài khoản · vai trò · quyền hiệu lực · phân công hạng mục",
-  health: "Lỗi và kiểm tra chất lượng dữ liệu",
-  audit: "Nhật ký thao tác hệ thống — ALCOA+ audit trail",
-  admin: "Cấu hình hệ thống, người dùng, phân quyền",
+  phanquyen: "Tài khoản, vai trò và phân công",
+  health: "Dòng dữ liệu cần sửa",
+  audit: "Ai sửa gì, lúc nào — theo ALCOA+",
+  admin: "Kết nối, việc tự động và cấu hình",
 };
 
 // ======================== STAGE PIPELINE ========================
@@ -183,7 +181,7 @@ export const STAGES = [
   { id: "cho_td", label: "Xong đề cương · chờ thực tế", color: C.lavText, bg: C.lavSoft },
   { id: "dang_td", label: "Đang thẩm định thực tế", color: C.marigoldText, bg: C.marigoldSoft },
   { id: "cho_bc", label: "Xong thực tế · chờ báo cáo", color: C.lavText, bg: C.lavSoft },
-  { id: "bc", label: "Đang/đã làm báo cáo", color: C.pinkText, bg: C.pinkSoft },
+  { id: "bc", label: "Đang làm báo cáo", color: C.pinkText, bg: C.pinkSoft },
   { id: "done", label: "Hoàn thành VMP", color: C.mintText, bg: C.mintSoft },
 ];
 
@@ -225,7 +223,7 @@ export const VMP_TODAY = vmpToday();
 
 // ======================== GANTT TIMELINE ========================
 export const MONTHS = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
-export const PHASE_COLOR = { done: C.mint, current: C.marigold, over: C.rasp, future: "#D9C3D5" };
+export const PHASE_COLOR = { done: C.mint, current: C.marigold, over: C.rasp, future: "var(--chart-pending)" };
 
 // ======================== WORKLOAD MATRIX ========================
 export const WL_MONTHS = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];

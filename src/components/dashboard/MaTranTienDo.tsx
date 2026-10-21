@@ -20,7 +20,7 @@
  *     thích. Không có nó thì mọi tỷ lệ phần trăm khác đều đáng ngờ.
  * ===================================================================== */
 import { useMemo, useState } from "react";
-import { LayoutGrid, ShieldAlert, Flame, CheckCircle2, AlertTriangle, Clock, HelpCircle } from "lucide-react";
+import { LayoutGrid, Flame, CheckCircle2, AlertTriangle, Clock, HelpCircle } from "lucide-react";
 import { C, TEXT, NUM } from "../../constants/theme.ts";
 import { DEPTS, vmpToday } from "../../constants/vmp.ts";
 import { parseD, fmtVN, wlIsDone, nguoiPhuTrach, qrmRpn } from "../../utils/helpers.ts";
@@ -40,7 +40,7 @@ type TrangThai = "xong" | "tre" | "chua" | "thieu";
    màu". */
 const MAU: Record<TrangThai, { nhan: string; Icon: typeof CheckCircle2 }> = {
   xong:  { nhan: "Đã xong", Icon: CheckCircle2 },
-  tre:   { nhan: "Trễ hạn", Icon: AlertTriangle },
+  tre:   { nhan: "Quá hạn", Icon: AlertTriangle },
   chua:  { nhan: "Chưa tới hạn", Icon: Clock },
   thieu: { nhan: "Thiếu dữ liệu", Icon: HelpCircle },
 };
@@ -141,7 +141,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
   const [cot, setCot] = useState<CotId>("giai_doan");
   const [soHang, setSoHang] = useState(12);
 
-  const { luoi, chatLuong, diemNong, tong } = useMemo(() => {
+  const { luoi, diemNong, tong } = useMemo(() => {
     const A = acts.filter((a) => (a.state || "active") === "active");
 
     // Gom hạng mục theo trục hàng đang chọn
@@ -200,20 +200,6 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
       .sort((x, y) => (y.tre * 3 + y.thieu) - (x.tre * 3 + x.thieu) || y.tong - x.tong)
       .filter((h) => h.tong > 0);
 
-    // Điểm chất lượng dữ liệu: bao nhiêu phần trăm ô chấm được
-    let oTong = 0, oThieu = 0;
-    A.forEach((a) => GIAI_DOAN.forEach((gd) => {
-      oTong++;
-      if (chamGiaiDoan(a, gd) === "thieu") oThieu++;
-    }));
-    const diem = oTong ? Math.round(((oTong - oThieu) / oTong) * 100) : 0;
-    const chatLuong = {
-      diem, oTong, oThieu,
-      muc: diem >= 95 ? "Tốt" : diem >= 80 ? "Cần chú ý" : "Kém",
-      mau: diem >= 95 ? C.mintText : diem >= 80 ? C.marigoldText : C.raspText,
-      nen: diem >= 95 ? C.mintSoft : diem >= 80 ? C.marigoldSoft : C.raspSoft,
-    };
-
     // Điểm nóng: đối tượng cần chú ý nhất (giống "Top 10 vị trí" của BMS)
     const theoDoiTuong = new Map<string, { ten: string; ds: Activity[] }>();
     A.forEach((a) => {
@@ -232,7 +218,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
       .sort((x, y) => y.diem - x.diem)
       .slice(0, 10);
 
-    return { luoi, chatLuong, diemNong, tong: A.length };
+    return { luoi, diemNong, tong: A.length };
   }, [acts, truc, cot]);
 
   const O = ({ dem, ten }: { dem: Record<TrangThai, Activity[]>; ten: string }) => {
@@ -295,23 +281,8 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
       </div>
 
       <Card variant="strong" cls="analysis-matrix__card">
-        <div className="analysis-matrix__masthead">
-          <CardTitle level={3} icon={LayoutGrid}
-            sub="Màu theo trạng thái nặng nhất trong ô · bấm ô để xem danh sách hạng mục"
-            right={(
-              <div className="analysis-quality-badge" data-analysis-quality-badge
-                aria-label={`Chất lượng dữ liệu ${chatLuong.diem}%, mức ${chatLuong.muc}; thiếu ${chatLuong.oThieu} trên ${chatLuong.oTong} ô`}>
-                <ShieldAlert size={18} aria-hidden="true" />
-                <span>
-                  <small>Chất lượng dữ liệu</small>
-                  <strong>{chatLuong.diem}% · {chatLuong.muc}</strong>
-                </span>
-                <em>{chatLuong.oThieu.toLocaleString("vi-VN")}/{chatLuong.oTong.toLocaleString("vi-VN")} ô thiếu</em>
-              </div>
-            )}>
-            Bản đồ trạng thái
-          </CardTitle>
-        </div>
+        {/* 21/10: bỏ tiêu đề thẻ "Bản đồ trạng thái" (trùng tiêu đề lớp) và huy hiệu
+            chất lượng dữ liệu (đã có ô "Vấn đề dữ liệu" và màn Chất lượng dữ liệu). */}
 
         {/* Đổi trục là đổi câu hỏi — cùng một bộ dữ liệu, bốn cách nhìn */}
         <div className="analysis-matrix__toolbar">
@@ -338,13 +309,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
               );
             })}
           </div>
-          <span className="analysis-matrix__hint">
-            {cot === "thang"
-              ? "Cột tháng xếp theo MỐC ĐÍCH của hạng mục — ô trống là tháng đó không có việc"
-              : truc === "bo_phan"
-                ? "Một hạng mục thuộc nhiều bộ phận sẽ đếm ở cả hai hàng"
-                : "Hàng có nhiều hạng mục trễ / thiếu dữ liệu xếp lên trước"}
-          </span>
+          {cot === "thang" && <span className="analysis-matrix__hint">Theo Đích VMP</span>}
         </div>
 
         <div className="analysis-matrix-legend" aria-label="Chú giải trạng thái">
@@ -407,7 +372,7 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
 
       <div className="analysis-matrix__hotspots">
         <Card variant="soft" cls="analysis-matrix__hotspot-card">
-          <CardTitle level={3} icon={Flame} sub="Nhiều hạng mục trễ, nhiều ô thiếu dữ liệu, điểm rủi ro cao">
+          <CardTitle level={3} icon={Flame}>
             Đối tượng cần chú ý nhất
           </CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -417,13 +382,13 @@ export default function MaTranTienDo({ acts }: { acts: Activity[] }) {
                          background: C.surface, border: `1px solid ${C.pinkSoft}`, cursor: "pointer", textAlign: "left" }}>
                 <span style={{ fontFamily: NUM, fontSize: 12, fontWeight: 800, color: C.plum, background: C.pinkMist, borderRadius: 8, padding: "3px 8px" }}>{d.ma}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: C.plum, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.ten}</span>
-                {d.tre > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{d.tre} trễ</Tag>}
+                {d.tre > 0 && <Tag color={C.raspText} bg={C.raspSoft}>{d.tre} quá hạn</Tag>}
                 {d.thieu > 0 && <Tag color={C.marigoldText} bg={C.marigoldSoft}>{d.thieu} thiếu</Tag>}
               </button>
             ))}
             {!diemNong.length && (
               <div style={{ textAlign: "center", padding: 22, color: C.mintText, fontWeight: 700 }}>
-                Không có đối tượng nào trễ hạn hay thiếu dữ liệu.
+                Không có đối tượng quá hạn hay thiếu dữ liệu.
               </div>
             )}
           </div>

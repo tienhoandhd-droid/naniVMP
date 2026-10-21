@@ -70,9 +70,10 @@ console.log("Bố cục desktop:");
       khoangCan: filterRect && personRect ? Math.round(personRect.left - filterRect.right) : -1,
     };
   });
-  kiem(geometry.themeTrongTuyChon, "theme nằm trong hàng tùy chọn riêng");
-  kiem(geometry.themeTrongTaiKhoan === 0, "thẻ tài khoản không chứa nút theme", String(geometry.themeTrongTaiKhoan));
-  kiem(geometry.khoangCachTaiKhoan >= 8, "theme cách an toàn khỏi thẻ tài khoản", `${geometry.khoangCachTaiKhoan}px`);
+  /* G3 (21/10): khung "Giao diện" gộp vào thẻ người dùng — nút theme nằm
+     trong thẻ tài khoản, đúng một nút. */
+  kiem(geometry.themeTrongTuyChon, "theme nằm trong nhóm tùy chọn giao diện");
+  kiem(geometry.themeTrongTaiKhoan === 1, "thẻ tài khoản chứa đúng một nút theme", String(geometry.themeTrongTaiKhoan));
   kiem(geometry.themeTrenTopbar === 0, "topbar không còn nút theme", String(geometry.themeTrenTopbar));
   kiem(geometry.personBenPhai, "capsule nhân sự nằm bên phải Bộ lọc", `${geometry.khoangCan}px`);
 

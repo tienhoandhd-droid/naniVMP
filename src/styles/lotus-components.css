@@ -49,9 +49,9 @@
   margin: 0 0 8px;
   font-family: var(--ff-text);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--lp-ink-muted);
 }
 
@@ -318,7 +318,8 @@
   height: 54px;
 }
 
-.lp-smart-table__tr:hover { background: color-mix(in srgb, var(--lp-success-soft) 54%, var(--lp-surface)); }
+/* 21/10: hover là tương tác, không phải "xong" — nền hover trung tính, không mượn xanh lục. */
+.lp-smart-table__tr:hover { background: var(--lp-nav-hover); }
 .lp-smart-table__tr.is-open { background: var(--lp-rose-soft); }
 
 .lp-smart-table__toggle {
@@ -480,7 +481,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgb(26 16 26 / 0.52);
+  background: color-mix(in srgb, var(--lp-shadow-ink) 52%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: lp-dialog-mo var(--lp-mo-modal) var(--lp-ease);
@@ -644,10 +645,10 @@
 .vali-hero__loi { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .vali-hero__eyebrow {
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--lp-rose);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--lp-brand);
 }
 .vali-hero__mota { margin: 0; font-size: 13px; color: var(--lp-ink-muted); }
 .vali-hero__mota b { color: var(--lp-ink); }
@@ -656,9 +657,9 @@
   display: block;
   margin-bottom: 7px;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--lp-ink-muted);
 }
 .vali-hero__nhom > div { display: flex; gap: 7px; }

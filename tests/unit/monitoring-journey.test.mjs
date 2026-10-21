@@ -33,7 +33,7 @@ test("monitoring signatures keep three business meanings distinct", () => {
 test("monitoring labels do not collapse to Quá hạn", () => {
   assert.deepEqual(
     Object.values(MONITORING_SCREEN_COPY).map((item) => item.metricLabel),
-    ["Trễ đích VMP", "Có pha bị trễ", "Rủi ro cao cần xem"],
+    ["Quá hạn đích VMP", "Giai đoạn quá hạn", "Rủi ro cao"],
   );
 });
 
@@ -47,9 +47,10 @@ test("journey nav renders allowed screens and marks current screen", () => {
   }));
   assert.match(html, /aria-label="Ba màn giám sát"/);
   assert.match(html, /aria-current="page"/);
-  assert.match(html, /Đang xem/);
-  assert.equal((html.match(/Đang xem/g) || []).length, 1);
+  assert.doesNotMatch(html, /Đang xem/);
   assert.match(html, /Theo phạm vi chung/);
-  assert.match(html, /Có pha bị trễ/);
-  assert.doesNotMatch(html, /Rủi ro cao cần xem/);
+  // Ô đang đứng (timeline) không lặp số; ô khác vẫn hiện số làm gợi ý điều hướng.
+  assert.doesNotMatch(html, /<span>Giai đoạn quá hạn<\/span>/);
+  assert.match(html, /<span>Quá hạn đích VMP<\/span>/);
+  assert.doesNotMatch(html, /Rủi ro cao/);
 });

@@ -24,7 +24,7 @@ try {
  await page.goto(origin+'#v=reports',{waitUntil:'domcontentloaded'});
  await firstDashboard;
  await broadcast(false);await page.waitForNetworkIdle({idleTime:500});
- await page.waitForFunction(()=>document.body.textContent.includes('1. Tổng quan năm'));
+ await page.waitForFunction(()=>document.body.textContent.includes('1. Kết quả năm'));
  const initial=dashboards;assert.equal(initial,1,'startup peer confirmation shares the initial load');
  const initialContexts=contexts;
  await broadcast(false);await broadcast(false);await broadcast(false);
@@ -37,12 +37,12 @@ try {
  await broadcast('actor');await page.waitForNetworkIdle({idleTime:500});
  assert.ok(dashboards>beforeActor,'different actor must read fresh protected data');
  await page.evaluate(key=>{localStorage.removeItem(key);const c=new BroadcastChannel(key);c.postMessage({event:'SIGNED_OUT',session:null});c.close();},key);
- await page.waitForFunction(()=>document.body.textContent.includes('Đăng nhập VMP Monitor'));
+ await page.waitForFunction(()=>document.body.textContent.includes('Đăng nhập VMP'));
  assert.equal(await page.$('.vmp-sidebar'),null,'sign-out removes the protected shell');
  const beforeReturn=dashboards;
  // nhetPhien restores fixture credentials on reload, creating a fresh session load gate.
  await page.reload({waitUntil:'networkidle0'});
- await page.waitForFunction(()=>document.body.textContent.includes('1. Tổng quan năm'));
+ await page.waitForFunction(()=>document.body.textContent.includes('1. Kết quả năm'));
  assert.ok(dashboards>beforeReturn,'returning after sign-out loads again');
  console.log('PASS dashboard startup/peer deduplication, changed token/actor and sign-out/reentry');
 }finally{await browser.close();}

@@ -14,6 +14,7 @@ import { C, R, TEXT, DISPLAY } from "./constants/theme.ts";
    được khai báo cũ. Đảo thứ tự là bảng màu cũ thắng và cả app vẫn pastel. */
 import "./index.css";
 import "./styles/lotus-tokens.css";
+import "./styles/nhip-vang.css"; /* thang chữ/khoảng cách tỉ lệ vàng — phải sau lotus-tokens */
 import "./styles/lotus-components.css";
 import "./styles/lotus-responsive.css";
 import "./styles/lotus-art.css";
@@ -69,9 +70,8 @@ class ErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
           <div style={{ maxWidth: 560, width: "100%", background: "var(--lp-sheen)", borderRadius: R.xl, padding: "30px 28px", boxShadow: "var(--e-modal)", border: "1px solid var(--lp-gold-hairline)" }}>
             <div style={{ fontSize: 40, marginBottom: 6 }} aria-hidden="true">🛠️</div>
             <h1 style={{ fontFamily: DISPLAY, fontSize: 28, fontWeight: 600, color: C.plum, margin: 0, letterSpacing: "-0.01em" }}>Ứng dụng gặp lỗi khi hiển thị</h1>
-            <div style={{ fontSize: 14, color: C.plumSoft, fontWeight: 500, marginTop: 8, lineHeight: 1.6 }}>Hãy thử <b>tải lại trang</b> (giữ Ctrl/Cmd + Shift + R để xoá cache). Nếu vẫn lỗi, gửi đoạn chữ bên dưới cho người hỗ trợ:</div>
-            <pre style={{ marginTop: 14, background: "var(--lp-danger-soft)", border: "1px solid var(--c-rasp)", borderRadius: R.md, padding: "12px 14px", fontSize: 12, color: "var(--c-rasp-text)", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 220, overflow: "auto" }}>{String(this.state.err && this.state.err.stack ? this.state.err.stack : this.state.err)}</pre>
-            <button onClick={() => location.reload()} style={{ marginTop: 16, padding: "11px 20px", borderRadius: R.sm, border: "none", cursor: "pointer", background: "var(--grad)", color: "#fff", fontWeight: 700, fontSize: 14, fontFamily: TEXT }}>↻ Tải lại trang</button>
+            <div style={{ fontSize: 14, color: C.plumSoft, fontWeight: 500, marginTop: 8, lineHeight: 1.6 }}>Bấm Tải lại trang. Lỗi đã được ghi lại để quản trị xử lý.</div>
+            <button onClick={() => location.reload()} style={{ marginTop: 16, padding: "11px 20px", borderRadius: R.sm, border: "none", cursor: "pointer", background: "var(--grad)", color: "var(--lp-porcelain)", fontWeight: 700, fontSize: 14, fontFamily: TEXT }}>↻ Tải lại trang</button>
           </div>
         </div>
       );

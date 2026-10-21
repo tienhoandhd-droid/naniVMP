@@ -237,9 +237,8 @@ function LongMonRace({
     <section ref={raceRef} className="long-mon-race" style={availableHeight ? { "--long-mon-available-height": `${availableHeight}px` } as CSSProperties : undefined} data-view={view} data-paused={paused || hidden} aria-label={view === "date" ? "Dòng thời gian VMP 60 ngày quanh Hôm nay" : "Long Môn VMP · Ngư đồ nghệ thuật"}>
       <header className="long-mon-race__head">
         <div className="long-mon-race__title-block">
-          <span className="long-mon-race__eyebrow">60 ngày quanh Hôm nay</span>
+          <span className="long-mon-race__eyebrow">60 ngày quanh hôm nay</span>
           <h2>Long Môn VMP</h2>
-          <p>Mỗi cá một hành trình · Bấm cá để xem hạn và hồ sơ</p>
         </div>
         <div className="long-mon-race__head-side">
           {scopeControl && (
@@ -273,7 +272,7 @@ function LongMonRace({
                 </span>
               )}
               <span className="long-mon-race__scope-status" aria-live="polite">
-                {model.fish.length} cá · {scopeControl.scopeLabel}
+                {model.fish.length} hạng mục · {scopeControl.scopeLabel}
               </span>
             </div>
           )}
@@ -289,9 +288,6 @@ function LongMonRace({
             <Waves size={18} aria-hidden="true" /> Bơi tự nhiên
           </button>
         </div>
-        <p className="long-mon-race__view-hint" aria-live="polite">
-          {view === "date" ? "Vị trí cá theo hạn VMP · từ trái sang phải · cỡ cá theo trọng yếu" : "Ngư đồ nghệ thuật · vị trí tự do · cỡ cá theo trọng yếu"}
-        </p>
         <button type="button" className="long-mon-race__pause" data-long-mon-pause aria-pressed={paused}
           aria-label={paused ? "Tiếp tục bơi" : "Tạm dừng chuyển động"} onClick={() => setPaused(value => !value)}>
           {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
@@ -300,7 +296,7 @@ function LongMonRace({
         <label className="long-mon-race__search">
           <Search size={15} aria-hidden="true" />
           <span className="lp-visually-hidden">Tìm hồ sơ trong ngư đồ</span>
-          <input data-long-mon-search value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã, tên hồ sơ" />
+          <input data-long-mon-search value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã, tên hạng mục" />
         </label>
         {matches.length > 0 && <div className="long-mon-race__search-results" role="list" aria-label="Hồ sơ khớp tìm kiếm">
           {matches.map(({ activity }) => {
@@ -311,7 +307,7 @@ function LongMonRace({
             </button></div>;
           })}
         </div>}
-        {query.trim() && matches.length === 0 && <p className="long-mon-race__search-empty" role="status">Không có hồ sơ khớp.</p>}
+        {query.trim() && matches.length === 0 && <p className="long-mon-race__search-empty" role="status">Không có hạng mục khớp.</p>}
       </div>
 
       <div ref={viewportRef} className="long-mon-race__viewport" tabIndex={0} aria-label={view === "date" ? "60 ngày VMP quanh Hôm nay; dùng Tab để chọn cá và Enter để mở hồ sơ" : "Hồ cá nghệ thuật; dùng Tab để chọn cá và Enter để mở hồ sơ"}>
@@ -447,8 +443,8 @@ function LongMonRace({
           ) : (
             <div className="long-mon-race__empty">
               <CalendarClock size={22} aria-hidden="true" />
-              <strong>{scopeControl?.emptyMessage ? "Không thể mở ngư đồ cá nhân" : "Không có hạn VMP trong 30 ngày đã qua và 30 ngày sắp tới"}</strong>
-              <span>{scopeControl?.emptyMessage ?? "Các bộ lọc hiện tại không để lại hạng mục nào trên trường đua."}</span>
+              <strong>{scopeControl?.emptyMessage ? "Chưa xem được phạm vi cá nhân" : "Không có hạn VMP trong 30 ngày đã qua và 30 ngày sắp tới"}</strong>
+              <span>{scopeControl?.emptyMessage ?? "Không có hạng mục trong phạm vi đang lọc."}</span>
             </div>
           )}
         </div>
@@ -461,15 +457,15 @@ function LongMonRace({
               <span className="long-mon-race__legend-sprite" style={spriteStyle(stage)} aria-hidden="true" />
               <span>
                 <strong>{stage.shortLabel}</strong>
-                <small>{stage.species}</small>
               </span>
               <b>{model.stageCounts[stage.id]}</b>
             </li>
           ))}
         </ul>
         <div className="long-mon-race__notes">
-          <span>{model.fish.length} hạng mục trong 60 ngày</span>
-          <span title="Dựa trên mức độ trọng yếu đã có trong hồ sơ nguồn">Kích thước cá biểu thị mức độ trọng yếu</span>
+          {/* Số hạng mục đã ghi ở đầu khi có chọn phạm vi; chỉ nhắc lại ở đây khi không có. */}
+          {!scopeControl && <span>{model.fish.length} hạng mục</span>}
+          <span>Cá lớn = trọng yếu cao</span>
           {model.missingDeadlineCount > 0 && (
             <span className="long-mon-race__missing">
               {model.missingDeadlineCount} hạng mục chưa có hạn VMP

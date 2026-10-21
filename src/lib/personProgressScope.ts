@@ -39,9 +39,9 @@ export function buildPersonProgressChoices(
   const add = (personIdValue: unknown, nameValue: unknown) => {
     const personId = text(personIdValue);
     if (!personId) return;
-    const fullName = text(nameValue) ?? `Nhân sự ID …${personId.slice(-8)}`;
+    const fullName = text(nameValue) ?? "(Chưa có tên)";
     const current = byId.get(personId);
-    if (!current || current.fullName.startsWith("Nhân sự ID …")) {
+    if (!current || current.fullName === "(Chưa có tên)") {
       byId.set(personId, { personId, fullName });
     }
   };

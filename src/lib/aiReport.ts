@@ -24,7 +24,7 @@ import { vePhien } from "./supabaseClient.ts";
 export type AiKind = "bao_cao" | "canh_bao" | "phan_tich_sau";
 
 export const AI_NHAN: Record<AiKind, string> = {
-  bao_cao: "Nhận xét AI cho báo cáo",
+  bao_cao: "Nhận xét",
   canh_bao: "Phân tích cảnh báo",
   phan_tich_sau: "Phân tích sâu dữ liệu",
 };
@@ -84,10 +84,8 @@ export function aiConfigured(): boolean {
   return !!AI_URL;
 }
 
-export const AI_SETUP_HINT =
-  "Chưa cấu hình đường gọi AI. Đặt biến VITE_N8N_AI_REPORT_URL " +
-  "(ví dụ https://n8n.cpc1hn.com/webhook/vmp-ai-report) trong file .env khi chạy máy, " +
-  "hoặc trong GitHub → Settings → Secrets and variables → Actions → Variables khi deploy.";
+/* Thiếu VITE_N8N_AI_REPORT_URL (đặt trong .env hoặc biến Actions khi deploy). */
+export const AI_SETUP_HINT = "Chức năng AI chưa bật — liên hệ quản trị.";
 
 /** Kiểm email đủ chặt để không gửi nhầm, đủ lỏng để không chặn tên miền lạ. */
 export function emailHopLe(v: string): boolean {
@@ -130,17 +128,24 @@ export async function chayPhanTichAi(req: AiRequest, signal?: AbortSignal): Prom
     }),
   });
 
-  if (!res.ok) throw new Error(`n8n trả mã ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    console.error(`[AI] Dịch vụ AI trả mã ${res.status} ${res.statusText}`);
+    throw new Error("Dịch vụ AI đang lỗi. Thử lại sau.");
+  }
 
   // n8n có thể trả chuỗi rỗng khi workflow chạy nhưng không tới node phản hồi.
   const raw = await res.text();
-  if (!raw.trim()) throw new Error("n8n không trả nội dung — kiểm tra workflow Vani VMP 5 còn bật không.");
+  if (!raw.trim()) {
+    console.error("[AI] Dịch vụ AI không trả nội dung — kiểm tra workflow Vani VMP 5 còn bật không.");
+    throw new Error("AI chưa trả lời. Thử lại sau.");
+  }
 
   let json: AiResult;
   try {
     json = JSON.parse(raw) as AiResult;
   } catch {
-    throw new Error("n8n trả về dữ liệu không đọc được: " + raw.slice(0, 160));
+    console.error("[AI] Dữ liệu AI trả về không đọc được:", raw.slice(0, 160));
+    throw new Error("Không đọc được kết quả AI. Thử lại sau.");
   }
   return json;
 }

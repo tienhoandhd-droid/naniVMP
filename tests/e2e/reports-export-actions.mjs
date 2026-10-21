@@ -53,7 +53,7 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".vmp-report-export-actions", { timeout: 15_000 });
   await page.click('.vmp-report-export-actions button:nth-child(2)');
-  await page.waitForFunction(() => document.body.innerText.includes("Không mở được hộp in báo cáo"), { timeout: 5_000 });
+  await page.waitForFunction(() => document.body.innerText.includes("Không mở được hộp in."), { timeout: 5_000 });
   assert.equal(await page.$("iframe"), null, "print setup failure must remove its temporary iframe");
 
   await page.evaluate(() => {

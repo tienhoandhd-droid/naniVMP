@@ -267,6 +267,8 @@ function doTrongTrang() {
   const mauNen = new Set();
   const coCu = new Set();
   const hoPhong = new Set();
+  /* Phần tử B1 đã báo — B7 không báo trùng cùng một chỗ. */
+  const daBaoB1 = new Set();
 
   for (const el of tatCa) {
     const chu = chuTrucTiep(el);
@@ -306,6 +308,7 @@ function doTrongTrang() {
     const ty = tuongPhan(truoc_tron, nen_that);
     const nguong = (co >= 24 || (co >= 18.66 && dam)) ? 3 : 4.5;
     if (ty < nguong) {
+      daBaoB1.add(el);
       bao(true, "B1",
         `${moTa(el)} ${ty.toFixed(2)}:1 < ${nguong}:1 · chữ ${hex(truoc_tron)} trên nền ${hex(nen_that)}`
         + ` · ${co}px — "${chu.slice(0, 28)}"`);
@@ -356,6 +359,195 @@ function doTrongTrang() {
     if (!laToi && sang < 0.12) {
       bao(true, "B6", `${moTa(el)} nền ${hex(nen)} tối giữa chế độ sáng`
         + ` (${Math.round(r.width)}×${Math.round(r.height)}px)`);
+    }
+  }
+
+  /* ---- B7 · tương phản chữ trên NỀN THỰC TẾ ----
+   * B1 đo chữ trên nền đặc và BỎ QUA hai trường hợp: nền gradient (nenThat
+   * trả null) và chữ nằm trong khối có `opacity` < 1. Cả hai đều phổ biến ở
+   * Lotus Pearl — thẻ hero tô gradient, nhãn phụ đặt `opacity: .82` — và cả
+   * hai đều làm tương phản THẬT thấp hơn con số đọc từ `color`.
+   * Cách đo: dựng chồng lớp nền từ phần tử lên tới nền đục đầu tiên; lớp
+   * gradient góp MỌI chặng màu của nó (mỗi chặng trộn lên lớp dưới), rồi lấy
+   * tương phản TỆ NHẤT — chữ phải đọc được ở mọi điểm của gradient. Độ mờ
+   * là tích opacity từ phần tử tới (không kể) lớp nền đục. Ảnh nền `url()`
+   * thì bỏ qua: không suy ra được màu điểm ảnh, báo bừa còn tệ hơn im. */
+  const tachChang = (anh) => (anh.match(/(?:rgba?\([^)]+\)|color\([^)]+\))/g) || [])
+    .map(soRGB).filter(Boolean);
+
+  function cacNenCoThe(el) {
+    const lop = [];
+    let doMo = 1;
+    let node = el;
+    let day = { r: 255, g: 255, b: 255, a: 1 };
+    while (node && node !== document.documentElement.parentElement) {
+      const cs = getComputedStyle(node);
+      const anh = cs.backgroundImage && cs.backgroundImage !== "none" ? cs.backgroundImage : "";
+      if (/url\(/.test(anh)) return null;
+      const mau = soRGB(cs.backgroundColor);
+      const chang = anh ? tachChang(anh) : [];
+      if (chang.length) lop.push({ chang });
+      if (mau && mau.a > 0) {
+        if (mau.a >= 0.999) { day = mau; break; }
+        lop.push({ chang: [mau] });
+      }
+      doMo *= Number(cs.opacity);
+      node = node.parentElement;
+    }
+    let ungVien = [day];
+    for (let i = lop.length - 1; i >= 0; i -= 1) {
+      const moi = [];
+      for (const duoi of ungVien) for (const c of lop[i].chang) moi.push(c.a > 0 ? tron(c, duoi) : duoi);
+      ungVien = moi.slice(0, 64);
+    }
+    return { ungVien, doMo, coGradient: lop.some((l) => l.chang.length > 1) };
+  }
+
+  /* Nền là ẢNH nếu ngay dưới tâm chữ có <img>/<canvas>/<video> hoặc một
+     khối (kể cả ::before/::after) tô `url()`. Ảnh thường là phần tử ANH EM
+     định vị tuyệt đối chứ không phải tổ tiên, nên leo cây tổ tiên không
+     thấy — phải hỏi trình duyệt cái gì thật sự nằm dưới điểm đó. */
+  const coAnhBenDuoi = (el) => {
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2; const y = r.top + r.height / 2;
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+    /* Duyệt từ trên xuống; gặp nền đặc trước khi gặp ảnh thì ảnh (vd. lớp
+       artwork chìm của trang) đã bị che, không còn là nền của chữ. */
+    for (const d of document.elementsFromPoint(x, y)) {
+      if (d === el) continue;
+      if (["IMG", "CANVAS", "VIDEO", "image"].includes(d.tagName)) return true;
+      if (["", "::before", "::after"].some((p) => /url\(/.test(getComputedStyle(d, p || null).backgroundImage))) return true;
+      const m = soRGB(getComputedStyle(d).backgroundColor);
+      if (m && m.a >= 0.999) return false;
+    }
+    return false;
+  };
+
+  for (const el of tatCa) {
+    if (daBaoB1.has(el) || el.closest("svg")) continue;
+    const chu = chuTrucTiep(el);
+    /* Chỉ đo chữ MANG NỘI DUNG: một dấu "·" hay "—" phân cách không có chữ
+       cái/chữ số nào là trang trí. Control đang vô hiệu được WCAG 1.4.3 miễn
+       tương phản — chúng cố ý mờ để nói "chưa bấm được". */
+    if (!chu || !/[\p{L}\p{N}]/u.test(chu)) continue;
+    if (el.closest(':disabled, [aria-disabled="true"]')) continue;
+    const cs = getComputedStyle(el);
+    const mauChuGoc = soRGB(cs.color);
+    if (!mauChuGoc || mauChuGoc.a === 0) continue; // chữ cắt nền (background-clip:text)
+    const nen = cacNenCoThe(el);
+    if (!nen || (!nen.coGradient && nen.doMo >= 0.999)) continue; // B1 đã đo đúng ca này
+    if (coAnhBenDuoi(el)) continue; // nền thật là điểm ảnh — không đo được
+    const co = parseFloat(cs.fontSize);
+    const nguong = (co >= 24 || (co >= 18.66 && Number(cs.fontWeight) >= 700)) ? 3 : 4.5;
+    let teNhat = null;
+    for (const n of nen.ungVien) {
+      const chuThat = tron({ ...mauChuGoc, a: mauChuGoc.a * nen.doMo }, n);
+      const ty = tuongPhan(chuThat, n);
+      if (!teNhat || ty < teNhat.ty) teNhat = { ty, chuThat, n };
+    }
+    if (teNhat && teNhat.ty < nguong) {
+      bao(true, "B7",
+        `${moTa(el)} ${teNhat.ty.toFixed(2)}:1 < ${nguong}:1 trên nền thực tế`
+        + ` · chữ ${hex(teNhat.chuThat)} trên ${hex(teNhat.n)}`
+        + `${nen.doMo < 0.999 ? ` · opacity ${nen.doMo.toFixed(2)}` : ""}`
+        + `${nen.coGradient ? " · nền gradient" : ""} · ${co}px — "${chu.slice(0, 28)}"`);
+    }
+  }
+
+  /* ---- B8 · số màu NHẤN trên một màn ≤ 6 ----
+   * Bảng màu tinh giản (21/10): một họ trung tính + MỘT màu tương tác + ba
+   * màu trạng thái + info/biểu đồ. Màu "nhấn" = sắc có độ bão hoà OKLCH
+   * C > 0.06; dưới mức đó mắt đọc là trung tính. Đếm theo HỌ MÀU chứ không
+   * theo mã: brand và brand-hover, chữ đậm và nền -soft cùng sắc là MỘT
+   * nhấn — đếm theo mã thì một nút hover đã thành hai màu, luật vô nghĩa.
+   * Hai màu cùng họ khi lệch sắc độ (hue) < 20° so với màu mở họ; màu mở
+   * họ chọn theo tần suất, không nối chuỗi (tránh mận → hồng → đỏ thành một).
+   * Bỏ qua phần tử trang trí (aria-hidden) và tranh SVG: đó là minh hoạ,
+   * không phải màu giao diện. */
+  const oklch = ({ r, g, b }) => {
+    const f = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    const [R, G, B] = [f(r), f(g), f(b)];
+    const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+    const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+    const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+    const a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+    const bb = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+    return { C: Math.hypot(a, bb), H: ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360 };
+  };
+  const tanSuat = new Map();
+  for (const el of tatCa) {
+    if (el.closest('[aria-hidden="true"], svg')) continue;
+    const cs = getComputedStyle(el);
+    const mauDung = [];
+    if (chuTrucTiep(el)) mauDung.push(soRGB(cs.color));
+    mauDung.push(soRGB(cs.backgroundColor));
+    for (const m of mauDung) {
+      if (!m || m.a < 0.5) continue;
+      const k = `${Math.round(m.r)},${Math.round(m.g)},${Math.round(m.b)}`;
+      tanSuat.set(k, (tanSuat.get(k) || 0) + 1);
+    }
+  }
+  const ho = [];
+  for (const [k, so] of [...tanSuat.entries()].sort((x, y) => y[1] - x[1])) {
+    const [r, g, b] = k.split(",").map(Number);
+    const { C, H } = oklch({ r, g, b });
+    if (C <= 0.06) continue;
+    const lech = (h) => Math.min(Math.abs(h - H), 360 - Math.abs(h - H));
+    const cung = ho.find((h) => lech(h.H) < 20);
+    if (cung) { cung.so += so; continue; }
+    ho.push({ H, mau: hex({ r, g, b }), so });
+  }
+  if (ho.length > 6) {
+    bao(true, "B8", `${ho.length} họ màu nhấn (C > 0.06), trên 6: `
+      + ho.map((h) => `${h.mau}·${Math.round(h.H)}°×${h.so}`).join(" "));
+  }
+
+  /* ---- B9 · thẻ phải tách khỏi nền trang ----
+   * Thẻ = khối có nền đục riêng, bo góc ≥ 8px, diện tích ≥ 20.000px², đặt
+   * TRỰC TIẾP trên nền trang. Nó phải chênh nền trang ≥ 1.05:1 hoặc có viền
+   * nhìn thấy được — không thì mắt không biết thẻ bắt đầu ở đâu (bóng đổ
+   * không tính: bóng mảnh gần như biến mất trên màn sáng và màn rẻ).
+   * Không xét khối CÙNG màu tuyệt đối với nền trang mà không có bóng: đó là
+   * khung bọc tô nền cho cuộn/sticky, không tự nhận là thẻ — bắt nó là báo
+   * sai bản chất luật. Khối cùng màu MÀ có bóng thì vẫn bắt: nó muốn nổi
+   * lên như thẻ nhưng nền không tách. */
+  /* Nền trang = MÀU canvas đặc. Trang Lotus phủ lên canvas một lớp vân
+     giấy (png) và vài quầng radial-gradient rất nhạt; nenThat() gặp lớp ảnh
+     là trả null, khiến luật im lặng ở mọi màn (đã gặp khi viết luật). Ở đây
+     chỉ cần MÀU nền đặc dưới cùng, nên bỏ qua background-image khi leo cây. */
+  const nenDac = (el) => {
+    const chong = [];
+    for (let n = el; n; n = n.parentElement) {
+      const m = soRGB(getComputedStyle(n).backgroundColor);
+      if (m && m.a > 0) { chong.push(m); if (m.a >= 0.999) break; }
+    }
+    let kq = { r: 255, g: 255, b: 255, a: 1 };
+    if (chong.length && chong[chong.length - 1].a >= 0.999) kq = chong.pop();
+    for (let i = chong.length - 1; i >= 0; i -= 1) kq = tron(chong[i], kq);
+    return kq;
+  };
+  const nenTrang = nenDac(document.querySelector("#vmp-main-content") || document.body);
+  {
+    for (const el of tatCa) {
+      if (el.closest('[aria-hidden="true"], svg')) continue;
+      const cs = getComputedStyle(el);
+      if (parseFloat(cs.borderTopLeftRadius) < 8) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width * r.height < 20_000) continue;
+      const nen = soRGB(cs.backgroundColor);
+      if (!nen || nen.a < 0.999 || (cs.backgroundImage && cs.backgroundImage !== "none")) continue;
+      const sau = el.parentElement ? nenDac(el.parentElement) : null;
+      if (!sau || tuongPhan(sau, nenTrang) > 1.01) continue; // không nằm trực tiếp trên nền trang
+      const ty = tuongPhan(nen, nenTrang);
+      if (ty >= 1.05) continue;
+      const coVien = ["Top", "Right", "Bottom", "Left"].some((c) => {
+        const mv = soRGB(cs[`border${c}Color`]);
+        return parseFloat(cs[`border${c}Width`]) >= 1 && cs[`border${c}Style`] !== "none" && mv && mv.a > 0.05;
+      });
+      if (coVien) continue;
+      if (ty < 1.005 && cs.boxShadow === "none") continue;
+      bao(true, "B9", `${moTa(el)} nền ${hex(nen)} chỉ chênh nền trang ${hex(nenTrang)} ${ty.toFixed(3)}:1`
+        + ` (< 1.05) và không có viền · ${Math.round(r.width)}×${Math.round(r.height)}px`);
     }
   }
 
@@ -417,7 +609,7 @@ const MAN = [
   { id: "accounts", ten: "Tài khoản & quyền" },
   { id: "phanquyen", ten: "Phân quyền" },
   { id: "health", ten: "Chất lượng dữ liệu" },
-  { id: "audit", ten: "Nhật ký thay đổi" },
+  { id: "audit", ten: "Nhật ký hệ thống" },
   { id: "admin", ten: "Quản trị" },
 ];
 

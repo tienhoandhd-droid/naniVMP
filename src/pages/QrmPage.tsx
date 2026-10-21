@@ -39,8 +39,7 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
 
   return (
     <Card variant="strong">
-      <CardTitle icon={ShieldAlert}
-        sub="Điểm trọng yếu = mức độ phức tạp × ảnh hưởng chất lượng sản phẩm (1…9)">
+      <CardTitle icon={ShieldAlert}>
         Tiến độ theo mức trọng yếu
       </CardTitle>
 
@@ -53,7 +52,7 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
           ? `Đang làm ngược thứ tự rủi ro: nhóm trọng yếu cao mới xong ${cao.rate}% trong khi nhóm thấp đã ${thap.rate}%.`
           : `Thứ tự ưu tiên hợp lý: nhóm trọng yếu cao đang ở ${cao.rate}%, không tụt sau nhóm thấp (${thap.rate}%).`}
         phu={[
-          nguoc ? "ICH Q9 và Annex 15 đòi làm nhóm rủi ro cao trước — chênh này là thứ thanh tra hỏi đầu tiên." : "",
+          nguoc ? "Cần ưu tiên nhóm trọng yếu cao (ICH Q9)." : "",
           chuaCham > 0 ? `Còn ${chuaCham} hạng mục chưa có điểm trọng yếu, chưa tính vào biểu đồ này.` : "",
         ].filter(Boolean).join(" ")}
       />
@@ -85,7 +84,9 @@ function RiskProgress({ acts }: { acts: Activity[] }) {
   );
 }
 
-/** Ô ma trận: danh sách hạng mục theo (mức tới hạn × trạng thái). */
+/** Ô ma trận: danh sách hạng mục theo (mức trọng yếu × trạng thái). */
+
+const CRIT_LABEL: Record<string, string> = { Cao: "cao", TB: "trung bình", "Thấp": "thấp" };
 type RiskGrid = Record<string, Record<string, Activity[]>>;
 
 export default function QrmView({ acts }: { acts: Activity[] }) {
@@ -120,23 +121,23 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
     const caoChua = cao.filter((a) => a.st !== "done").length;
     const ty = Math.round((cao.length / tong) * 100);
     return {
-      chinh: `${cao.length}/${tong} hạng mục thuộc mức ảnh hưởng Cao (${ty}%), trong đó ${caoChua} chưa hoàn thành.`,
+      chinh: `${cao.length}/${tong} hạng mục trọng yếu cao (${ty}%), trong đó ${caoChua} chưa hoàn thành.`,
       phu: caoChua > 0
-        ? "Đây là nhóm phải xong trước theo ICH Q9 — xem thứ tự thực tế ở biểu đồ tiến độ phía trên."
-        : "Toàn bộ nhóm ảnh hưởng Cao đã hoàn thành.",
+        ? "Đây là nhóm phải xong trước theo ICH Q9."
+        : "Toàn bộ nhóm trọng yếu cao đã hoàn thành.",
       tone: (caoChua > cao.length * 0.5 ? "warn" : "ok") as "warn" | "ok",
     };
   }, [acts]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card>
-        <CardTitle icon={ShieldAlert} sub="ICH Q9 / EU GMP Annex 15 — ưu tiên đối tượng ảnh hưởng GxP cao">Ma trận rủi ro thẩm định (QRM)</CardTitle>
+        <CardTitle icon={ShieldAlert} sub="Ưu tiên ảnh hưởng chất lượng cao">Ma trận rủi ro thẩm định (QRM)</CardTitle>
         <div style={{ overflowX: "auto", marginTop: 8 }} className="vmp-scroll">
           <table style={{ borderCollapse: "separate", borderSpacing: 8, margin: "0 auto" }}>
             <thead><tr><th></th>{cols.map((c) => <th key={c} style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: C.plumSoft, padding: "0 8px" }}>{c}</th>)}</tr></thead>
             <tbody>{rowsC.map((rc) => (
               <tr key={rc}>
-                <td style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: CRITMAP[rc].text, paddingRight: 8, whiteSpace: "nowrap" }}>Ảnh hưởng {rc}</td>
+                <td style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 800, color: CRITMAP[rc].text, paddingRight: 8, whiteSpace: "nowrap" }}>Trọng yếu {CRIT_LABEL[rc]}</td>
                 {cols.map((c) => { const items = grid[rc][c]; const col = cellRisk(rc, c); return (
                   <td key={c}><div style={{ width: 100, height: 74, borderRadius: 14, background: col + "26", border: `2px solid ${col}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <span style={{ fontFamily: NUM, fontSize: 28, fontWeight: 800, color: cellText(col) }}>{items.length}</span>
@@ -148,23 +149,23 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
           </table>
         </div>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
-          {[[C.mint, "Rủi ro thấp"], [C.marigold, "Rủi ro TB"], [C.rasp, "Rủi ro cao — ưu tiên"]].map(([c, l]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: C.plum }}><span style={{ width: 14, height: 14, borderRadius: 8, background: c }} />{l}</span>)}
+          {[[C.mint, "Rủi ro thấp"], [C.marigold, "Rủi ro trung bình"], [C.rasp, "Rủi ro cao — ưu tiên"]].map(([c, l]) => <span key={l} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: C.plum }}><span style={{ width: 14, height: 14, borderRadius: 8, background: c }} />{l}</span>)}
         </div>
       </Card>
       <RiskProgress acts={acts} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 24 }}>
         <Card variant="soft">
-          <CardTitle icon={Trophy}>Phân bố mức tới hạn</CardTitle>
+          <CardTitle icon={Trophy}>Phân bố trọng yếu</CardTitle>
           {klPhanBo && <CauKetLuan chinh={klPhanBo.chinh} phu={klPhanBo.phu} tone={klPhanBo.tone} />}
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <Donut size={140} segments={critCount.map((x) => ({ value: x.n, color: CRITMAP[x.k].color }))} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-              {critCount.map((x) => <div key={x.k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: CRITMAP[x.k].color }} />Ảnh hưởng {x.k}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: CRITMAP[x.k].text }}>{x.n}</span></div>)}
+              {critCount.map((x) => <div key={x.k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: C.plum }}><span style={{ width: 11, height: 11, borderRadius: 999, background: CRITMAP[x.k].color }} />Trọng yếu {CRIT_LABEL[x.k]}</span><span style={{ fontFamily: NUM, fontWeight: 800, fontSize: 16, color: CRITMAP[x.k].text }}>{x.n}</span></div>)}
             </div>
           </div>
         </Card>
         <Card variant="strong">
-          <CardTitle icon={AlertCircle} sub="GxP cao nhưng chưa hoàn thành">Rủi ro ưu tiên xử lý</CardTitle>
+          <CardTitle icon={AlertCircle} sub="Trọng yếu cao, chưa xong">Rủi ro ưu tiên xử lý</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {top.map((x) => { const cls = (CLS as Record<string, typeof CLS.tb>)[String(x.a.cls ?? "tb")] ?? CLS.tb; return (
               <div key={x.a.id} className="vmp-row" style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${C.raspSoft}` }}>
@@ -173,7 +174,7 @@ export default function QrmView({ acts }: { acts: Activity[] }) {
                 <Pill s={x.a.st} small />
               </div>
             ); })}
-            {top.length === 0 && <div style={{ textAlign: "center", padding: 20, color: C.mintText, fontWeight: 700 }}>Không còn rủi ro cao 🎉</div>}
+            {top.length === 0 && <div style={{ textAlign: "center", padding: 20, color: C.mintText, fontWeight: 700 }}>Không còn rủi ro cao.</div>}
           </div>
         </Card>
       </div>

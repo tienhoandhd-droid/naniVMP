@@ -119,7 +119,7 @@ export function VongNamTable({ months }: { months: readonly OThangNam[] }) {
     <table>
       <caption className="lp-visually-hidden">Tiến độ thẩm định theo tháng</caption>
       <thead>
-        <tr><th scope="col">Tháng</th><th scope="col">Đến hạn</th><th scope="col">Đã xong</th><th scope="col">Tỉ lệ</th><th scope="col">Trạng thái</th></tr>
+        <tr><th scope="col">Tháng</th><th scope="col">Đến hạn</th><th scope="col">Đã xong</th><th scope="col">Tỷ lệ</th><th scope="col">Trạng thái</th></tr>
       </thead>
       {/* Không tô đỏ dòng nào: bảy trên mười hai tháng đã qua đều còn
           việc, tô hết thì đỏ không còn là tín hiệu. Cột trạng thái đã
@@ -131,7 +131,7 @@ export function VongNamTable({ months }: { months: readonly OThangNam[] }) {
             <td className="tnum">{x.tong}</td>
             <td className="tnum">{x.xong}</td>
             <td className="tnum">{x.tong ? `${Math.round((x.xong / x.tong) * 100)}%` : "—"}</td>
-            <td>{x.daQua ? "Đã qua" : x.dangChay ? "Đang chạy" : "Chưa tới hạn"}</td>
+            <td>{x.daQua ? "Đã qua" : x.dangChay ? "Đang diễn ra" : "Chưa tới hạn"}</td>
           </tr>
         ))}
       </tbody>
@@ -139,7 +139,7 @@ export function VongNamTable({ months }: { months: readonly OThangNam[] }) {
   );
 }
 
-export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: {
+export default function VongNam({ acts, rate, year, bangkokToday, ben }: {
   acts: Activity[];
   /** Tỉ lệ hoàn thành VMP in giữa vòng — dùng chung phép đếm với KPI trang. */
   rate: number;
@@ -180,8 +180,8 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
     }
     if (!trongNam || !daQua.length) {
       return {
-        chinh: `Cả năm ${nam} có ${tongNam} hạng mục, đã hoàn thành ${xongNam} (${Math.round((xongNam / tongNam) * 100)}%).`,
-        phu: `Tháng ${dinh.thang + 1} nặng nhất với ${dinh.tong} hạng mục.`,
+        chinh: `Tháng ${dinh.thang + 1} nặng nhất với ${dinh.tong} hạng mục.`,
+        phu: "",
         tone: "ok" as const,
       };
     }
@@ -196,7 +196,7 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
     const lan = nhipQua > 0 ? nhipCan / nhipQua : Infinity;
 
     return {
-      chinh: `${soThangQua} tháng đã qua gánh ${tongDaQua} hạng mục và mới xong ${xongDaQua}`
+      chinh: `${soThangQua} tháng qua: xong ${xongDaQua}/${tongDaQua}`
         + ` (${Math.round((xongDaQua / Math.max(1, tongDaQua)) * 100)}%).`
         + ` Còn ${conPhaiXong} hạng mục phải xong trong ${soThangConLai} tháng cuối.`,
       phu: Number.isFinite(lan) && lan > 1.2
@@ -228,7 +228,7 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
                   <title>
                     {`${MONTHS[x.thang]}: ${x.tong} hạng mục đến hạn, ${x.xong} đã xong`
                       + ` (${Math.round(x.tiLeXong * 100)}%)`
-                      + (x.daQua ? " · tháng đã qua" : x.dangChay ? " · tháng đang chạy" : " · chưa tới hạn")}
+                      + (x.daQua ? " · tháng đã qua" : x.dangChay ? " · tháng đang diễn ra" : " · chưa tới hạn")}
                   </title>
                   <path data-vongnam-track="" className="vmp-vongnam-ranh"
                     d={quat(R0, RMAX, a0, a1)} aria-hidden="true" />
@@ -289,9 +289,6 @@ export default function VongNam({ acts, rate, total, year, bangkokToday, ben }: 
             </div>
             <div className="vmp-vongnam-loi-nhan">
               HOÀN THÀNH VMP
-            </div>
-            <div className="vmp-vongnam-loi-tong">
-              trên {total} hạng mục
             </div>
           </div>
         </div>

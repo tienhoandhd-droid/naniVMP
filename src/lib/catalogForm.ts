@@ -74,7 +74,7 @@ export const DIEM_1_3 = ["1", "2", "3"] as const;
 export const TRUONG_FORM: readonly TruongForm[] = [
   // ---- 1. Thông tin chính ----
   { key: "object_code", label: "Mã đối tượng", nhom: "chinh", batBuoc: true, khoaSauKhiTao: true,
-    goiY: "Khoá nghiệp vụ, không đổi được sau khi tạo. Timeline tham chiếu bằng mã này." },
+    goiY: "Không sửa được sau khi tạo." },
   { key: "object_name", label: "Tên đối tượng", nhom: "chinh", batBuoc: true },
   { key: "department", label: "Bộ phận quản lý", nhom: "chinh", batBuoc: true,
     chonCoKhac: true,
@@ -83,7 +83,7 @@ export const TRUONG_FORM: readonly TruongForm[] = [
   { key: "line", label: "Line", nhom: "chinh", goiYTu: "line" },
   { key: "status", label: "Tình trạng", nhom: "chinh", chon: TINH_TRANG },
   { key: "validate_flag", label: "Có thẩm định", nhom: "chinh", chon: CO_KHONG,
-    goiY: "Chỉ 'y' mới sinh hạng mục timeline. 'n' là loại khỏi kế hoạch." },
+    goiY: "Tắt = ngoài kế hoạch thẩm định." },
 
   // ---- 2. Kế hoạch thẩm định — chỉ hiện khi validate_flag = 'y' ----
   { key: "frequency_months", label: "Tần suất (tháng)", nhom: "ke_hoach", so: true, chon: TAN_SUAT,
@@ -92,7 +92,7 @@ export const TRUONG_FORM: readonly TruongForm[] = [
     batBuoc: true,
     goiY: "Thiếu tháng này thì không tính được mốc thời gian nào của đối tượng." },
   { key: "year_ref", label: "Năm nhập / ban hành", nhom: "ke_hoach", so: true,
-    goiY: "Bằng năm thẩm định và chưa từng có IQ ⇒ sinh đủ DQ, FAT/SAT, IQ, OQ, PQ một lần." },
+    goiY: "Năm nhập thiết bị mới." },
   { key: "report_class", label: "Phân loại báo cáo", nhom: "ke_hoach", chon: PHAN_LOAI_BAO_CAO,
     goiY: "Khoảng cách báo cáo: không phụ thuộc 2 · hóa lý 2 · nhiễm khuẩn 7 · vô khuẩn 16 ngày." },
   { key: "workdays", label: "Số ngày công", nhom: "ke_hoach", so: true,
@@ -100,7 +100,7 @@ export const TRUONG_FORM: readonly TruongForm[] = [
 
   // ---- 3. Phân công ----
   { key: "owner_person_id", label: "QA phụ trách", nhom: "phan_cong", chonNguoi: "owner",
-    goiY: "Chọn từ danh bạ. Tên gõ tay không dùng làm khoá được — người trùng tên sẽ gán nhầm." },
+    goiY: "Chọn từ danh bạ." },
   { key: "support_person_id", label: "Người hỗ trợ", nhom: "phan_cong", chonNguoi: "support" },
   { key: "work_group", label: "Nhóm công việc", nhom: "phan_cong", goiYTu: "work_group" },
 
@@ -204,6 +204,14 @@ export function validateCatalogForm(
   return loi;
 }
 
+/** Bỏ phân công: xoá cả tên hiển thị đi kèm. Giữ lại tên thì luật "có tên
+ *  mà không có ID" ở trên hiểu nhầm là dữ liệu cũ chưa nối và chặn Lưu. */
+export function boPhanCongNguoi(form: GiaTriForm, key: string): GiaTriForm {
+  const ten = key === "owner_person_id" ? "owner_name"
+    : key === "support_person_id" ? "support_name" : null;
+  return ten ? { ...form, [key]: "", [ten]: "" } : { ...form, [key]: "" };
+}
+
 /**
  * Dựng patch để gửi lên `rpc_save_catalog_object`.
  *
@@ -261,5 +269,5 @@ export function goiYLyDoThayDoi(patch: Record<string, unknown>): string {
   if (TRUONG_PHAN_CONG_QA.some((key) => key in patch)) {
     return "Thay đổi này cấp hoặc thu quyền QA ngay và được ghi vào nhật ký phân công.";
   }
-  return "Thay đổi này chạm tới deadline nên timeline sẽ cần cập nhật lại.";
+  return "Đổi hạn chót — cần lý do.";
 }

@@ -95,7 +95,8 @@ export default function WorkloadOwnerTransferDialog({
         toast.canhBao("Đã chuyển người nhưng chưa tải lại được bảng. Hãy bấm Làm mới.");
       });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Chuyển người phụ trách thất bại.");
+      console.error("[WorkloadOwnerTransferDialog] Chuyển QA phụ trách lỗi", caught);
+      setError("Chưa chuyển được QA phụ trách. Thử lại.");
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -109,8 +110,8 @@ export default function WorkloadOwnerTransferDialog({
   return (
     <ViewportDialog
       open
-      title="Chuyển phụ trách"
-      description="Thay đổi này được ghi vào Dữ liệu nguồn rồi đồng bộ xuống các hạng mục liên quan."
+      title="Chuyển QA phụ trách"
+      description="Áp dụng cho mọi hạng mục của đối tượng."
       icon={UserRoundCog}
       maxWidth={520}
       dismissDisabled={saving}
@@ -162,7 +163,7 @@ export default function WorkloadOwnerTransferDialog({
         </div>
 
         <p id="workload-owner-help" style={{ margin: 0, color: C.plumSoft, fontSize: 12, lineHeight: 1.55 }}>
-          Chỉ thay QA phụ trách chính. Người hỗ trợ, deadline và tiến độ giữ nguyên.
+          Chỉ đổi QA phụ trách. Hạn và tiến độ giữ nguyên.
         </p>
         {choices.length === 0 && (
           <p role="status" style={{ margin: 0, color: C.marigoldText, fontSize: 13, fontWeight: 700 }}>

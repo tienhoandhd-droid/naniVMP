@@ -129,7 +129,7 @@ try {
   "thành công/finally muộn của A không được ghi role hoặc đổi loading của B");
 
   await page.evaluate(() => window.__accessRace.deferred[2].reject(new Error("B bị từ chối")));
-  await page.waitForFunction(() => document.querySelector("#state")?.textContent === "locked:false:B bị từ chối");
+  await page.waitForFunction(() => document.querySelector("#state")?.textContent === "locked:false:Chưa tải được quyền. Bấm Thử lại.");
   await page.evaluate(() => window.__accessRace.current.taiLai());
   await page.waitForFunction(() => window.__accessRace.deferred.length === 4);
   await page.evaluate(() => window.__accessRace.deferred[3].resolve({ trangThai: "co", payload: {
@@ -179,7 +179,7 @@ try {
   });
   await page.waitForFunction(() => window.__accessRace.deferred.length === 9);
   await page.evaluate(() => window.__accessRace.deferred[8].reject(new Error("RPC quyền lỗi")));
-  await page.waitForFunction(() => document.querySelector("#state")?.textContent === "locked:false:RPC quyền lỗi");
+  await page.waitForFunction(() => document.querySelector("#state")?.textContent === "locked:false:Chưa tải được quyền. Bấm Thử lại.");
   assert.deepEqual(await page.evaluate(() => ({
     snapshot: localStorage.getItem("vmp_snapshot_v3"), cache: localStorage.getItem("vmp_cache"),
   })), { snapshot: null, cache: null }, "lỗi RPC quyền cũng phải dọn cả snapshot và cache legacy");

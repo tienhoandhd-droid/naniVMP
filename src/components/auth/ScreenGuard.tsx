@@ -27,7 +27,7 @@ const LY_DO: Record<string, string> = {
   duplicate_person_link: "Tài khoản đang nối với nhiều hồ sơ nhân sự đang hoạt động.",
   missing_access_class: "Hồ sơ nhân sự chưa được phân loại vai trò nghiệp vụ.",
   department_mismatch: "Bộ phận trên tài khoản và trên hồ sơ nhân sự không khớp.",
-  legacy_role_disabled: "Vai Chỉ xem cũ đã ngừng sử dụng; cần quản trị phân loại lại tài khoản vào một trong năm vai hiện hành.",
+  legacy_role_disabled: "Tài khoản chưa được gán vai.",
 };
 
 function KhongVaoDuoc({ access }: { access: AccessContext }) {
@@ -46,7 +46,6 @@ function KhongVaoDuoc({ access }: { access: AccessContext }) {
       </p>
       <p style={{ margin: 0, color: C.plumSoft }}>
         Liên hệ quản trị hệ thống để được phân loại vai trò và phạm vi làm việc.
-        {access.unresolvedReason ? ` (mã: ${access.unresolvedReason})` : ""}
       </p>
     </div>
   );

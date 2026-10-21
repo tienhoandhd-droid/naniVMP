@@ -98,7 +98,7 @@ try {
   await page.waitForFunction(() => document.querySelector("[data-cw-tools]")?.hasAttribute("open") === true);
   const toolActions = await page.$$eval("[data-cw-tools] button", (nodes) =>
     nodes.map((node) => node.textContent?.trim()).filter(Boolean));
-  assert.deepEqual(toolActions, ["Tải lại", "Xuất Excel", "Sinh timeline"],
+  assert.deepEqual(toolActions, ["Tải lại", "Xuất Excel", "Tạo hạng mục năm…"],
     "Admin chỉ thấy ba công cụ dữ liệu đã duyệt");
 
   const updatedCode = await page.$eval(".cw-bang--objects tbody tr", (row) => {

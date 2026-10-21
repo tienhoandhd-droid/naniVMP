@@ -9,6 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import { C, TEXT, NUM, NUM_HERO, DISPLAY, MO, R, cardDefault, cardStrong, cardSoft } from "../../constants/theme.ts";
 import { STATUS } from "../../constants/vmp.ts";
 import { XCircle } from "lucide-react";
+import { VmpWordmark } from "./VmpMasthead.tsx";
 import { buildValiBrief } from "../../features/overview/valiBrief.ts";
 import { formatBangkokDateTime, formatBangkokTime } from "../../lib/formatBangkok.ts";
 
@@ -88,42 +89,10 @@ export function PrincessCommentary({ stats }: { stats?: CommentaryStats }) {
         <span>Vali · {brief.moodLabel}</span>
       </div>
 
+      {/* 21/10: chỉ giữ một câu. Bốn chỉ số và hai nhận xét cũ lặp đúng các
+          ô số ngay bên cạnh trên màn Tổng quan nên đã bỏ. */}
       <div className="vmp-vali-brief__content">
-        <div className="vmp-vali-brief__eyebrow">Công chúa Vali · Báo cáo tổng hợp</div>
-        <h2 className="vmp-vali-brief__title">
-          {"Tình hình thẩm định"}
-        </h2>
         <p className="vmp-vali-brief__headline">{brief.headline}</p>
-
-        <dl className="vmp-vali-brief__metrics" aria-label="Chỉ số tổng hợp">
-          {brief.metrics.map((metric) => (
-            <div key={metric.kind} data-vmp-vali-metric={metric.kind}
-              className={`vmp-vali-brief__metric vmp-vali-brief__metric--${metric.tone}`}>
-              {/* Chi tiết nằm TRONG <dd>: nhóm dl chỉ được chứa dt/dd
-                  (axe: definition-list, mức serious). Giá trị và dòng chú
-                  vẫn là hai phần tử riêng để CSS giữ nguyên bố cục. */}
-              <dt>{metric.label}</dt>
-              <dd>
-                <b className="vmp-vali-brief__metric-value">{metric.value}</b>
-                <span className="vmp-vali-brief__metric-detail">{metric.detail}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        <ul className="vmp-vali-brief__observations" aria-label="Nhận xét bổ sung">
-          {brief.observations.map((item) => (
-            <li key={item.kind} data-vmp-vali-observation={item.kind}
-              className={`vmp-vali-brief__observation vmp-vali-brief__observation--${item.tone}`}>
-              {item.text}
-            </li>
-          ))}
-        </ul>
-
-        <p className="vmp-vali-brief__action" data-vmp-vali-action="">
-          <strong>Ưu tiên</strong>
-          <span>{brief.action}</span>
-        </p>
       </div>
     </section>
   );
@@ -209,8 +178,7 @@ export function TableScroll({ children, maxHeight = "68vh", hint = true }: {
       </div>
       {hint && canPan && (
         <div className="vmp-table-hint">
-          ↔ Bảng rộng hơn màn hình — kéo thả bằng chuột, hoặc giữ <b>Shift</b> và lăn chuột để xem các cột bên phải.
-          Cột đầu và hàng tiêu đề luôn được ghim.
+          ↔ Kéo ngang để xem thêm cột
         </div>
       )}
     </>
@@ -379,7 +347,7 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: 
     <Portal>
     <div onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} style={{
       position: "fixed", inset: 0, zIndex: 999,
-      background: "rgba(78,42,78,.48)", backdropFilter: "blur(4px)",
+      background: "color-mix(in srgb, var(--lp-shadow-ink) 48%, transparent)", backdropFilter: "blur(4px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: 20,
     }}>
@@ -388,7 +356,7 @@ export function Modal({ onClose, title, icon: Icon = XCircle, children, wide }: 
         background: C.pinkMist, borderRadius: 14, padding: 28,
         width: "100%", maxWidth: wide ? 620 : 440,
         maxHeight: "90vh", overflowY: "auto",
-        boxShadow: "0 24px 54px rgba(78,42,78,.32)",
+        boxShadow: "var(--lp-e-modal)",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -722,7 +690,8 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
      Hét "Đang tải dữ liệu…" đè lên số liệu đang hiện là tự mâu thuẫn, và
      chính là thứ người dùng than "nút đang tải hiện rất lâu". */
   const noiDung = conn.status === "loading" ? (conn.msg || "Đang tải dữ liệu…")
-    : isErr ? `Lỗi kết nối: ${conn.msg}`
+    /* Lỗi thô (conn.msg) không hiện cho người dùng; nơi tải dữ liệu tự ghi log. */
+    : isErr ? "Mất kết nối. Bấm Làm mới."
       : "Dữ liệu chưa tải. Bấm Làm mới để tải.";
 
   return (
@@ -738,11 +707,11 @@ export function SyncBanner({ conn, lastSync, dataUpdatedAt }: {
       <span>{noiDung}</span>
       {dataUpdatedAt ? (
         <span style={{ marginLeft: "auto", fontWeight: 600, opacity: 0.8 }}>
-          Cập nhật dữ liệu: {formatBangkokDateTime(dataUpdatedAt)}
+          Cập nhật lúc {formatBangkokDateTime(dataUpdatedAt)}
         </span>
       ) : lastSync && (
         <span style={{ marginLeft: "auto", fontWeight: 600, opacity: 0.8 }}>
-          Đồng bộ cuối: {formatBangkokTime(lastSync)}
+          Cập nhật lúc {formatBangkokTime(lastSync)}
         </span>
       )}
       {/* Không còn nút thu gọn: dải này giờ chỉ hiện khi đường tải thật sự
@@ -892,9 +861,9 @@ export function Pill({ s, small }: { s: string; small?: boolean }) {
 export function StateBadge({ state, small }: { state?: string; small?: boolean }) {
   if (!state || state === "active") return null;
   const m = state === "not_applicable"
-    ? { label: "Không áp dụng", text: "#6B4DB3", bg: "#EDE5FA" }
+    ? { label: "Không áp dụng", text: "var(--lp-text-secondary)", bg: "var(--lp-bg-sunken)" }
     : state === "cancelled"
-    ? { label: "Đã hủy", text: "#9A6A00", bg: "#FFF1C4" }
+    ? { label: "Đã hủy", text: "var(--lp-text-secondary)", bg: "var(--lp-disabled-surface)" }
     : null;
   if (!m) return null;
   return (
@@ -921,7 +890,7 @@ export function ChartTip({ active, payload, label }: {
     <div style={{
       background: C.surface, padding: "10px 14px", borderRadius: 14,
       border: `1.5px solid ${C.pinkSoft}`,
-      boxShadow: "0 8px 24px rgba(238,123,169,.18)",
+      boxShadow: "0 8px 24px color-mix(in srgb, var(--lp-shadow-ink) 12%, transparent)",
       fontFamily: TEXT, fontSize: 14,
     }}>
       {label && <div style={{ fontWeight: 700, color: C.plum, marginBottom: 5 }}>{label}</div>}
@@ -947,7 +916,7 @@ export function phaseTag(txt: string) {
   const c = done ? { l: "✓ Hoàn thành", col: C.mintText, bg: C.mintSoft }
     : prog ? { l: "● Đang làm", col: C.marigoldText, bg: C.marigoldSoft }
     : isOverdue ? { l: "⚠ Quá hạn", col: C.raspText, bg: C.raspSoft }
-    : isEmptyish ? { l: "Chưa có", col: C.plumSoft, bg: "rgba(122,74,110,.08)" }
+    : isEmptyish ? { l: "Chưa có", col: C.plumSoft, bg: "var(--lp-bg-sunken)" }
     : { l: "○ " + (s.length > 16 ? s.slice(0, 16) + "…" : s), col: C.skyText, bg: C.skySoft };
   return <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 800, color: c.col, background: c.bg, whiteSpace: "nowrap" }}>{c.l}</span>;
 }
@@ -1304,7 +1273,7 @@ export function MultiSelect({ label, allLabel, options, selected, onChange }: {
             ...(box.lenNguoc ? { bottom: window.innerHeight - box.top } : { top: box.top }),
             maxHeight: CAO_TOI_DA, overflowY: "auto",
             background: C.surface, border: `1px solid ${C.pinkSoft}`, borderRadius: 14,
-            boxShadow: "0 12px 34px rgba(120,60,110,.18)", padding: 6,
+            boxShadow: "0 12px 34px color-mix(in srgb, var(--lp-shadow-ink) 18%, transparent)", padding: 6,
           }}>
             <div style={{ display: "flex", gap: 6, padding: "2px 4px 8px", borderBottom: `1px solid ${C.pinkMist}`, marginBottom: 4 }}>
               <button type="button" onClick={() => onChange(options.map((o) => o.v))} style={multiSelectMiniBtn}>Chọn hết</button>
@@ -1329,42 +1298,19 @@ export function MultiSelect({ label, allLabel, options, selected, onChange }: {
 }
 
 export function CrownLogo() {
+  /* 21/10: MỘT khối nhận diện thay cho hai (V/Q TEAM ở thanh bên + dải
+     "VMP Monitor" lặp đầu mọi màn): logo CPC1 HN + chữ cách điệu "VMP
+     Monitor" là tên sản phẩm, dòng nhỏ "V/Q Team · CPC1 HN" là đơn vị.
+     Kiểu dáng ở lotus-shell.css (.vmp-brand-khoi). */
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-      <div
-        style={{
-          height: 40,
-          padding: "4px 8px",
-          borderRadius: 14,
-          background: C.surface,
-          border: `1px solid ${C.pinkSoft}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 2px 6px rgba(30,58,138,.08)",
-        }}
-      >
-        <img
-          src="./logo-cpc1hn.png"
-          alt="CPC1 HN"
-          style={{ height: 30, width: "auto", display: "block" }}
-        />
-      </div>
-      {/* Khối chữ V/Q TEAM viết theo lối "bức tranh nhỏ ở rìa" (thiết kế
-          29/08): V/Q serif + gạch chéo vàng, TEAM vàng giãn cách, dòng
-          nghiêng Validation & Qualification, nét sóng vàng + đơn vị. Logo
-          CPC1 HN giữ nguyên. Kiểu dáng nằm ở lotus-shell.css (.vq-brand). */}
-      <div className="vq-brand">
-        <div className="vq-brand__dong">
-          <span className="vq-brand__vq">V<svg className="vq-brand__gach" width="11" height="24" viewBox="0 0 11 24" aria-hidden="true"><line x1="9.5" y1="1.5" x2="1.5" y2="22.5" strokeWidth="1.6" strokeLinecap="round" /></svg>Q</span>
-          <span className="vq-brand__team">Team</span>
-        </div>
-        <div className="vq-brand__tagline">Validation &amp; Qualification</div>
-        <div className="vq-brand__donvi">
-          <svg width="40" height="12" viewBox="0 0 54 14" aria-hidden="true"><path d="M1 9C10 3 18 12 27 7C36 2 44 11 53 6" fill="none" strokeWidth="1.1" strokeLinecap="round" /><circle cx="27" cy="7" r="1.6" /></svg>
-          <span>CPC1 HN · QLCL</span>
-        </div>
-      </div>
+    <div className="vmp-brand-khoi">
+      <span className="vmp-brand-khoi__logo">
+        <img src="./logo-cpc1hn.png" alt="CPC1 HN" />
+      </span>
+      <span className="vmp-brand-khoi__chu">
+        <span className="vmp-brand-khoi__ten" role="img" aria-label="VMP Monitor"><VmpWordmark /></span>
+        <span className="vq-brand__donvi">V/Q Team · CPC1 HN</span>
+      </span>
     </div>
   );
 }

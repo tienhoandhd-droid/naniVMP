@@ -58,6 +58,6 @@ test("lỗi thiếu email QA hướng dẫn liên hệ quản trị viên, khôn
     type: "owner_no_email",
     severity: "info",
     id: "TB-101-IQ",
-    msg: 'QA "Nguyễn Thị QA" chưa có email — không nhận được cảnh báo. Liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự.',
+    msg: 'QA "Nguyễn Thị QA" chưa có email — không nhận được cảnh báo.',
   }]);
 });

@@ -98,7 +98,7 @@ test("chỉ dựng các field tiến độ được phép theo từng bước", 
 test("biên RPC quyền tiến độ từ chối payload bị từ chối hoặc sai hợp đồng", async () => {
   await assert.rejects(
     fetchMyEditableProgressRightsViaRpc(async () => ({ data: { ok: false, rights: [] }, error: null })),
-    /Không thể xác nhận quyền cập nhật tiến độ/,
+    /Chưa kiểm tra được quyền sửa tiến độ/,
   );
   await assert.rejects(
     fetchMyEditableProgressRightsViaRpc(async () => ({
@@ -111,7 +111,7 @@ test("biên RPC quyền tiến độ từ chối payload bị từ chối hoặc
       },
       error: null,
     })),
-    /Không thể xác nhận quyền cập nhật tiến độ/,
+    /Chưa kiểm tra được quyền sửa tiến độ/,
   );
 });
 

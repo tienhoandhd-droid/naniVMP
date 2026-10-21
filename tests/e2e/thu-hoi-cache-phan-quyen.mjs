@@ -241,7 +241,7 @@ try {
   await openProgressModal();
   await page.waitForFunction(() => [...document.querySelectorAll(".vmp-scroll")]
     .some((dialog) => dialog.getClientRects().length > 0
-      && dialog.innerText.includes("Quyền theo từng cột đang áp dụng")));
+      && /🔒 (Bạn được sửa \d+ mục|Chỉ xem)\./.test(dialog.innerText)));
   assert.equal(await enabledQaControls(), 8, "QA phối hợp ban đầu sửa đúng tám control");
 
   holdNextRights = true;

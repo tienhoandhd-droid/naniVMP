@@ -59,7 +59,7 @@ function LongMonBangDanhSach({ activities, now, soonDays, onOpen }: {
               <tr>
                 <th scope="col">Mã</th>
                 <th scope="col">Tên hạng mục</th>
-                <th scope="col">Phụ trách</th>
+                <th scope="col">QA phụ trách</th>
                 <th scope="col">Hạn VMP</th>
                 <th scope="col">Còn lại</th>
                 <th scope="col">Tình trạng</th>
@@ -81,7 +81,7 @@ function LongMonBangDanhSach({ activities, now, soonDays, onOpen }: {
                     <td className="tnum">{r.deadline ?? <Trong nhan="chưa có hạn" />}</td>
                     <td className="tnum">
                       {r.daysRemaining === null ? <Trong />
-                        : r.daysRemaining < 0 ? `trễ ${-r.daysRemaining} ngày`
+                        : r.daysRemaining < 0 ? `quá hạn ${-r.daysRemaining} ngày`
                         : r.daysRemaining === 0 ? "hôm nay"
                         : `${r.daysRemaining} ngày`}
                     </td>

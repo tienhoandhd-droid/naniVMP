@@ -114,9 +114,9 @@ export function RangeStat({ label, value, tone = "plum", sub }: {
       borderRadius: 14,
       padding: "13px 14px",
       background: bg,
-      border: "1px solid rgba(255,255,255,.7)",
+      border: "1px solid var(--lp-line)",
     }}>
-      <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: .35, textTransform: "uppercase", color }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0, textTransform: "none", color }}>{label}</div>
       <div className="tnum" style={{ fontFamily: NUM, fontSize: 28, lineHeight: 1.02, fontWeight: 900, color, marginTop: 3 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, fontWeight: 700, color: C.plumSoft, marginTop: 3 }}>{sub}</div>}
     </div>
@@ -462,31 +462,31 @@ function ActivityDetailModal({ a, onClose, canEditPlannedDeadlines, onEditPlanne
   const has = (v: unknown): boolean => String(v == null ? "" : v).trim() !== "";
   const canonicalVmpDeadline = vmpDeadlineDate(a);
   const info = [
-    ["Phân loại", cls.label], ["Bộ phận", dp ? dp.name : dShow(r.bo_phan)], ["Line", dShow(r.line)],
+    ["Phân loại", cls.label], ["Bộ phận", dp ? dp.name : dShow(r.bo_phan)], ["Dây chuyền", dShow(r.line)],
     ["Khu vực", dShow(r.khu_vuc)], ["Tình trạng", dShow(r.tinh_trang)], ["Tần suất", has(r.tan_suat) ? dShow(r.tan_suat) + " tháng" : "—"],
-    ["PL báo cáo", dShow(a.dep)], ["Ngày công", a.effort != null ? String(a.effort) : "—"], ["Điểm trọng yếu", a.score != null ? a.score + " / 9" : "—"],
+    ["Phân loại báo cáo", dShow(a.dep)], ["Ngày công", a.effort != null ? String(a.effort) : "—"], ["Điểm trọng yếu", a.score != null ? a.score + " / 9" : "—"],
   ];
   const phases = [
     { ic: "📝", label: "Đề cương", note: "Hạn T‑60", dl: has(r.dl_de_cuong) ? dShow(r.dl_de_cuong) : fmtVN(m.protocol), act: r.ngay_de_cuong, st: r.tt_de_cuong },
-    { ic: "🔬", label: "Thẩm định thực tế", note: "Hạn T‑5‑BC", dl: has(r.dl_tham_dinh) ? dShow(r.dl_tham_dinh) : fmtVN(m.validation), act: r.ngay_tham_dinh, st: r.tt_tham_dinh, sched: r.lich_td },
+    { ic: "🔬", label: "Thẩm định thực tế", note: "Hạn T−(5+BC)", dl: has(r.dl_tham_dinh) ? dShow(r.dl_tham_dinh) : fmtVN(m.validation), act: r.ngay_tham_dinh, st: r.tt_tham_dinh, sched: r.lich_td },
     { ic: "📄", label: "Báo cáo", note: "Hạn T‑5", dl: has(r.dl_bao_cao) ? dShow(r.dl_bao_cao) : fmtVN(m.report), act: r.ngay_bao_cao, st: r.tt_bao_cao },
-    { ic: "🏁", label: "Hoàn tất VMP", note: "Đích VMP (T)", dl: canonicalVmpDeadline ? fmtVN(parseD(canonicalVmpDeadline)) : fmtVN(m.target), act: r.ngay_vmp, st: r.tt_vmp },
+    { ic: "🏁", label: "Đích VMP", note: "Mốc T", dl: canonicalVmpDeadline ? fmtVN(parseD(canonicalVmpDeadline)) : fmtVN(m.target), act: r.ngay_vmp, st: r.tt_vmp },
   ];
   return (
     <Modal onClose={onClose} title="Chi tiết hạng mục" icon={FileText} wide>
       <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 6 }}>
         <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 800, color: cls.text, background: cls.soft, padding: "4px 10px", borderRadius: 8 }}>{a.code}</span>
         <Tag color={cls.text} bg={cls.soft}>{a.vtype}</Tag>
-        <Tag color={ct.text} bg={ct.soft}>Rủi ro {a.crit}</Tag>
+        <Tag color={ct.text} bg={ct.soft}>Trọng yếu {a.crit === "TB" ? "trung bình" : a.crit}</Tag>
         <Pill s={a.st} small />
       </div>
       <div style={{ fontFamily: TEXT, fontSize: 16, fontWeight: 800, color: C.plum, marginBottom: 16 }}>{a.name}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 9, marginBottom: 14 }}>
-        {info.map(([k, v]) => <div key={k} style={{ background: C.surface, borderRadius: 14, padding: "8px 11px" }}><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800, textTransform: "uppercase", letterSpacing: .3 }}>{k}</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 700, marginTop: 2 }}>{v}</div></div>)}
+        {info.map(([k, v]) => <div key={k} style={{ background: C.surface, borderRadius: 14, padding: "8px 11px" }}><div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, textTransform: "none", letterSpacing: 0 }}>{k}</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 700, marginTop: 2 }}>{v}</div></div>)}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
-        <div style={{ flex: 1, minWidth: 190, background: C.pinkSoft, borderRadius: 14, padding: "10px 13px" }}><div style={{ fontSize: 12, color: C.pinkText, fontWeight: 800, textTransform: "uppercase" }}>QA phụ trách</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.qa)}</div>{has(r.email_qa) && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_qa ?? "")}</div>}</div>
-        <div style={{ flex: 1, minWidth: 190, background: C.lavSoft, borderRadius: 14, padding: "10px 13px" }}><div style={{ fontSize: 12, color: C.lavText, fontWeight: 800, textTransform: "uppercase" }}>NS bộ phận khác</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 800, marginTop: 2 }}>{dShow(r.ns_khac)}</div>{has(r.email_khac) && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_khac ?? "")}</div>}</div>
+        <div style={{ flex: 1, minWidth: 190, background: C.pinkSoft, borderRadius: 14, padding: "10px 13px" }}><div style={{ fontSize: 12, color: C.pinkText, fontWeight: 600, textTransform: "none" }}>QA phụ trách</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 600, marginTop: 2 }}>{dShow(r.qa)}</div>{has(r.email_qa) && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_qa ?? "")}</div>}</div>
+        <div style={{ flex: 1, minWidth: 190, background: C.lavSoft, borderRadius: 14, padding: "10px 13px" }}><div style={{ fontSize: 12, color: C.lavText, fontWeight: 600, textTransform: "none" }}>Nhân sự bộ phận khác</div><div style={{ fontSize: 14, color: C.plum, fontWeight: 600, marginTop: 2 }}>{dShow(r.ns_khac)}</div>{has(r.email_khac) && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>{String(r.email_khac ?? "")}</div>}</div>
       </div>
       <div style={{ fontFamily: TEXT, fontSize: 14, fontWeight: 800, color: C.plum, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><CalendarClock size={17} color={C.pink} /> Vòng đời thẩm định</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -498,13 +498,13 @@ function ActivityDetailModal({ a, onClose, canEditPlannedDeadlines, onEditPlanne
             </div>
             <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap", fontSize: 12 }}>
               <span style={{ color: C.plumSoft, fontWeight: 600 }}>Hạn: <b style={{ color: C.plum }}>{dShow(p.dl)}</b></span>
-              <span style={{ color: C.plumSoft, fontWeight: 600 }}>Thực tế: <b style={{ color: has(p.act) ? C.mintText : "#C9B6C7" }}>{dShow(p.act)}</b></span>
+              <span style={{ color: C.plumSoft, fontWeight: 600 }}>Thực tế: <b style={{ color: has(p.act) ? C.mintText : "var(--lp-text-tertiary)" }}>{dShow(p.act)}</b></span>
               {p.sched != null && has(p.sched) && <span style={{ color: C.plumSoft, fontWeight: 600 }}>Lịch xếp: <b style={{ color: C.plum }}>{dShow(p.sched)}</b></span>}
             </div>
           </div>
         ))}
       </div>
-      {canEditPlannedDeadlines && <button type="button" data-timeline-edit-planned-deadlines onClick={() => onEditPlannedDeadlines(a)}>Chỉnh deadline kế hoạch</button>}
+      {canEditPlannedDeadlines && <button type="button" data-timeline-edit-planned-deadlines onClick={() => onEditPlannedDeadlines(a)}>Chỉnh hạn kế hoạch</button>}
     </Modal>
   );
 }
@@ -543,9 +543,9 @@ class LongMonRaceGuard extends Component<RaceGuardProps, { loi: Error | null }> 
     const sorted = [...this.props.activities].sort((a, b) =>
       String(vmpDeadlineDate(a) ?? "9999").localeCompare(String(vmpDeadlineDate(b) ?? "9999")));
     return (
-      <section className="long-mon-race long-mon-race--fallback" aria-label="Danh sách hạn VMP (chế độ dự phòng)">
+      <section className="long-mon-race long-mon-race--fallback" aria-label="Danh sách hạn VMP">
         <p style={{ margin: "0 0 12px", fontWeight: 700 }}>
-          Bức tranh Long Môn gặp lỗi hiển thị — đây là danh sách hạn VMP thay thế.
+          Không vẽ được Ngư đồ. Danh sách hạn:
           <button type="button" style={{ marginLeft: 12 }}
             onClick={() => this.setState({ loi: null })}>Thử vẽ lại</button>
         </p>

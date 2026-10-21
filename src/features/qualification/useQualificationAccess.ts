@@ -91,8 +91,8 @@ export function useQualificationAccess(): QualificationAccess {
     const request = controller.current.begin();
     if (mounted.current) setState(controller.current.state);
     if (!supabase) {
-      if (controller.current.commitError(request, "Chưa cấu hình kết nối thẩm định.") && mounted.current) {
-        setState({ status: "unavailable", systems: [], error: "Chưa cấu hình kết nối thẩm định." });
+      if (controller.current.commitError(request, "Chưa mở được Thẩm định thực tế. Báo quản trị.") && mounted.current) {
+        setState({ status: "unavailable", systems: [], error: "Chưa mở được Thẩm định thực tế. Báo quản trị." });
       }
       return;
     }
@@ -112,8 +112,9 @@ export function useQualificationAccess(): QualificationAccess {
         identity.current = { actor, token };
         setState(controller.current.state);
       }
-    } catch {
-      const error = "Không xác minh được quyền Thẩm định thực tế. Thử lại để tải menu.";
+    } catch (cause) {
+      console.error("[VMP] Không đọc được quyền Thẩm định thực tế:", cause);
+      const error = "Chưa tải được mục Thẩm định thực tế.";
       if (controller.current.commitError(request, error) && mounted.current) setState(controller.current.state);
     }
   }, []);

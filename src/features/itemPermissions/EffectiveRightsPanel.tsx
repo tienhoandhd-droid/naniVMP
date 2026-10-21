@@ -54,7 +54,7 @@ export function EffectiveRightBasisSummary({ right }: {
     <div>Phạm vi: Bộ phận {right.scope_match ? "khớp" : "không khớp"}
       {right.factory_match !== undefined && ` · Xưởng ${right.factory_match ? "khớp" : "không khớp"}`}
       {` · Khu vực ${right.area_match ? "khớp" : "không khớp"}`}
-      {right.line_match !== undefined && ` · Line ${right.line_match ? "khớp" : "không khớp"}`}
+      {right.line_match !== undefined && ` · Dây chuyền ${right.line_match ? "khớp" : "không khớp"}`}
     </div>
   );
 }
@@ -92,7 +92,10 @@ export default function EffectiveRightsPanel({ person, revision = 0 }: {
         setRows(result.rights);
         setMode(result.mode);
       },
-      onError: (error) => setMessage((error as Error).message),
+      onError: (error) => {
+        console.error("Không tải được quyền hiệu lực", error);
+        setMessage("Không tải được quyền. Thử lại.");
+      },
     });
   };
 
@@ -105,7 +108,7 @@ export default function EffectiveRightsPanel({ person, revision = 0 }: {
 
   return (
     <section className="ip-panel" aria-labelledby="ip-rights-title">
-      <h3 id="ip-rights-title">Quyền hiệu lực theo từng đầu mục</h3>
+      <h3 id="ip-rights-title">Quyền theo hạng mục</h3>
       <div className="ip-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={view === "person"} onClick={() => setView("person")}>Theo nhân viên</button>
         <button type="button" role="tab" aria-selected={view === "item"} onClick={() => setView("item")}>Theo hạng mục</button>
@@ -116,7 +119,7 @@ export default function EffectiveRightsPanel({ person, revision = 0 }: {
           <button type="button" className="pq-nut" onClick={load}>Xem quyền</button>
         </div>
       )}
-      <p className="ip-help">Chế độ: <b>{mode === "preview" ? "Dự kiến, chưa áp dụng" : "Đang áp dụng"}</b>. Mỗi dòng nói rõ được xem vì sao và sửa chính xác cột nào.</p>
+      <p className="ip-help">Chế độ: <b>{mode === "preview" ? "Dự kiến, chưa áp dụng" : "Đang áp dụng"}</b>.</p>
       <div className="ip-rights-list">
         {rows.map((right) => (
           <article key={`${right.person_id}-${right.validation_code}`}>
@@ -126,7 +129,7 @@ export default function EffectiveRightsPanel({ person, revision = 0 }: {
             </div>
             <div><Pencil size={14} /> {right.editable_fields.length
               ? right.editable_fields.map((field) => fieldLabels[field] || field).join(" · ")
-              : "Chỉ xem, không sửa cột timeline nào"}</div>
+              : "Chỉ xem"}</div>
             <EffectiveRightBasisSummary right={right} />
           </article>
         ))}

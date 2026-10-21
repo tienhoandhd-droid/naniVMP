@@ -32,8 +32,8 @@
   font-size: 13px;
   line-height: 1.4;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--lp-ink-muted);
 }
 
@@ -609,6 +609,9 @@
 
 .cw-bang--objects { min-width: 0; }
 .cw-bang--objects .lp-smart-table__table { width: 100%; table-layout: fixed; }
+/* T5 (21/10): hai cột nút có bề ngang CỐ ĐỊNH đủ chứa "Cập nhật"/"Chi tiết"
+   ở màn ≥1200px — trước đây 11% bề ngang nên nút sát/cắt mép thẻ. Máy tính
+   bảng giữ tỉ lệ % cũ để cột tên đối tượng không bị ép. */
 .cw-bang--objects .lp-smart-table__th:nth-child(1) { width: 32%; }
 .cw-bang--objects .lp-smart-table__th:nth-child(2) { width: 12%; }
 .cw-bang--objects .lp-smart-table__th:nth-child(3) { width: 16%; }
@@ -616,6 +619,15 @@
 .cw-bang--objects .lp-smart-table__th:nth-child(5) { width: 8%; }
 .cw-bang--objects .lp-smart-table__th:nth-child(6),
 .cw-bang--objects .lp-smart-table__th:nth-child(7) { width: 11%; }
+@media (min-width: 1200px) {
+  .cw-bang--objects .lp-smart-table__th:nth-child(1) { width: auto; }
+  .cw-bang--objects .lp-smart-table__th:nth-child(2) { width: 13%; }
+  .cw-bang--objects .lp-smart-table__th:nth-child(3) { width: 17%; }
+  .cw-bang--objects .lp-smart-table__th:nth-child(4) { width: 11%; }
+  .cw-bang--objects .lp-smart-table__th:nth-child(5) { width: 9%; }
+  .cw-bang--objects .lp-smart-table__th:nth-child(6) { width: 104px; }
+  .cw-bang--objects .lp-smart-table__th:nth-child(7) { width: 112px; }
+}
 .cw-bang--objects .lp-smart-table__th {
   padding: 8px;
   white-space: normal;
@@ -625,7 +637,8 @@
   overflow-wrap: anywhere;
 }
 .cw-bang--objects .lp-smart-table__td:nth-child(6),
-.cw-bang--objects .lp-smart-table__td:nth-child(7) { padding-inline: 8px; }
+.cw-bang--objects .lp-smart-table__td:nth-child(7) { padding-inline: 8px; overflow-wrap: normal; }
+.cw-bang--objects .lp-smart-table__td:nth-child(7) { padding-right: var(--lp-sp-2); }
 .cw-doi-tuong {
   display: flex;
   flex-direction: column;

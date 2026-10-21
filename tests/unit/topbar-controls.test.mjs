@@ -44,7 +44,7 @@ test("thanh đầu nhường nút đổi giao diện cho khu vực tài khoản"
   assert.doesNotMatch(html, /aria-label="Giao diện Theo hệ thống/);
 });
 
-test("nút đổi giao diện nằm trong hàng tùy chọn riêng trước thẻ tài khoản", () => {
+test("nút đổi giao diện nằm trong thẻ tài khoản (G3 21/10: gộp khung Giao diện)", () => {
   const html = renderToStaticMarkup(React.createElement(Sidebar, {
     view: "overview",
     setView: () => {},
@@ -57,10 +57,10 @@ test("nút đổi giao diện nằm trong hàng tùy chọn riêng trước th�
   const accountStart = html.indexOf('class="vmp-sidebar-account__identity"');
   const themeStart = html.indexOf('aria-label="Giao diện Theo hệ thống');
 
-  assert.ok(preferencesStart >= 0, "thiếu hàng tùy chọn giao diện riêng");
-  assert.ok(preferencesStart < themeStart, "nút theme phải thuộc hàng tùy chọn");
-  assert.ok(themeStart < accountStart, "hàng tùy chọn theme phải đứng trước thẻ tài khoản");
-  assert.doesNotMatch(html.slice(accountStart), /aria-label="Giao diện Theo hệ thống/);
+  assert.ok(preferencesStart >= 0, "thiếu nhóm tùy chọn giao diện");
+  assert.ok(accountStart >= 0 && accountStart < preferencesStart, "nhóm giao diện phải nằm trong thẻ tài khoản");
+  assert.ok(preferencesStart < themeStart, "nút theme phải thuộc nhóm tùy chọn");
+  assert.equal(html.split('aria-label="Giao diện ').length - 1, 1, "chỉ một nút đổi giao diện ở thanh bên");
 });
 
 test("Today omits last-edited timestamp while keeping its subtitle", () => {

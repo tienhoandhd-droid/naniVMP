@@ -27,11 +27,11 @@ function isNonNegativeInteger(value: unknown): value is number {
 /** Decode the aggregate at the network boundary; every malformed or expanded
  * payload is rejected so detail fields cannot accidentally become UI state. */
 export function decodeTeamOverviewSummary(input: unknown): TeamOverviewSummaryResult {
-  if (!isRecord(input)) return { ok: false, error: "Phản hồi tiến độ nhóm không hợp lệ." };
+  if (!isRecord(input)) return { ok: false, error: "Không đọc được tiến độ nhóm." };
   const keys = Object.keys(input).sort();
   if (keys.length !== SUMMARY_KEYS.length
       || keys.some((key, index) => key !== SUMMARY_KEYS[index])) {
-    return { ok: false, error: "Phản hồi tiến độ nhóm không đúng hợp đồng." };
+    return { ok: false, error: "Không đọc được tiến độ nhóm." };
   }
   if (input.ok !== true
       || !Number.isInteger(input.year)
@@ -40,11 +40,11 @@ export function decodeTeamOverviewSummary(input: unknown): TeamOverviewSummaryRe
       || input.completed > input.total
       || !isNonNegativeInteger(input.rate)
       || (input.updated_at !== null && typeof input.updated_at !== "string")) {
-    return { ok: false, error: "Phản hồi tiến độ nhóm không hợp lệ." };
+    return { ok: false, error: "Không đọc được tiến độ nhóm." };
   }
   const expectedRate = input.total === 0 ? 0 : Math.round(input.completed * 100 / input.total);
   if (input.rate !== expectedRate) {
-    return { ok: false, error: "Tỷ lệ tiến độ nhóm không khớp tổng số." };
+    return { ok: false, error: "Không đọc được tiến độ nhóm: tỷ lệ không khớp tổng số." };
   }
   return { ok: true, data: input as unknown as TeamOverviewSummary };
 }

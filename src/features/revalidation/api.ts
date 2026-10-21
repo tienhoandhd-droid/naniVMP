@@ -30,7 +30,10 @@ export async function decideRevalidationViaRpc(
       p_expected_version: decision.expectedVersion,
     },
   );
-  if (error) throw new Error(`Không ghi được quyết định tái thẩm định: ${error.message}`);
+  if (error) {
+    console.error("[tái thẩm định] ghi quyết định lỗi:", error);
+    throw new Error("Không ghi được quyết định. Thử lại.");
+  }
   return decodeRevalidationDecisionResult(data);
 }
 
@@ -44,7 +47,7 @@ export async function listRevalidationProposals(
   status: RevalidationProposalStatus | "all" = "all",
 ): Promise<RevalidationProposal[]> {
   const client = supabase;
-  if (!client) throw new Error("Supabase chưa cấu hình");
+  if (!client) throw new Error("Chưa kết nối được dữ liệu.");
   let query = client.from("vmp_revalidation_proposals" as never)
     .select(SELECT_COLUMNS)
     .order("due_date", { ascending: true })
@@ -52,7 +55,10 @@ export async function listRevalidationProposals(
     .limit(200);
   if (status !== "all") query = query.eq("status", status as never);
   const { data, error } = await query;
-  if (error) throw new Error(`Không tải được kỳ tái thẩm định: ${error.message}`);
+  if (error) {
+    console.error("[tái thẩm định] tải danh sách lỗi:", error);
+    throw new Error("Không tải được kỳ tái thẩm định. Thử lại.");
+  }
   return decodeRevalidationProposals(data);
 }
 
@@ -60,13 +66,22 @@ export async function refreshRevalidationProposals(): Promise<{
   created: number; unchanged: number; obsolete: number;
 }> {
   const client = supabase;
-  if (!client) throw new Error("Supabase chưa cấu hình");
+  if (!client) throw new Error("Chưa kết nối được dữ liệu.");
   const { data, error } = await client.rpc("rpc_refresh_revalidation_proposals" as never, {} as never);
-  if (error) throw new Error(`Không làm mới được kỳ tái thẩm định: ${error.message}`);
-  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Máy chủ trả kết quả refresh không hợp lệ");
+  if (error) {
+    console.error("[tái thẩm định] làm mới lỗi:", error);
+    throw new Error("Không làm mới được kỳ tái thẩm định. Thử lại.");
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    console.error("[tái thẩm định] kết quả làm mới không hợp lệ:", data);
+    throw new Error("Đối chiếu nguồn không thành công.");
+  }
   const raw = data as Record<string, unknown>;
   for (const key of ["created", "unchanged", "obsolete"] as const) {
-    if (!Number.isSafeInteger(raw[key]) || (raw[key] as number) < 0) throw new Error(`Kết quả refresh thiếu ${key}`);
+    if (!Number.isSafeInteger(raw[key]) || (raw[key] as number) < 0) {
+      console.error(`[tái thẩm định] kết quả làm mới thiếu ${key}:`, data);
+      throw new Error("Đối chiếu nguồn không thành công.");
+    }
   }
   return {
     created: raw.created as number,
@@ -80,7 +95,7 @@ export async function decideRevalidation(
   input: RevalidationDecisionInput,
 ): Promise<RevalidationDecisionResult> {
   const client = supabase;
-  if (!client) throw new Error("Supabase chưa cấu hình");
+  if (!client) throw new Error("Chưa kết nối được dữ liệu.");
   if (action === "confirm") {
     return decideRevalidationViaRpc(async (_rpcName, args) => {
       const { data, error } = await client.rpc("rpc_confirm_revalidation_proposal" as never, args as never);

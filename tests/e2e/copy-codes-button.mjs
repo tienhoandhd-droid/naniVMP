@@ -31,9 +31,9 @@ async function openReports(page, clipboard) {
   await nhetPhien(page, { supabaseUrl });
   await page.goto(`${APP_URL}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForFunction(() => [...document.querySelectorAll("button")]
-    .some((button) => button.textContent?.trim().startsWith("Nhận xét & AI")), { timeout: 15_000 });
+    .some((button) => button.textContent?.trim().startsWith("Nhận xét")), { timeout: 15_000 });
   await page.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.trim().startsWith("Nhận xét & AI"))?.click());
+    .find((button) => button.textContent?.trim().startsWith("Nhận xét"))?.click());
   await page.waitForSelector('button[type="button"]', { timeout: 5_000 });
   await page.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => button.textContent?.trim() === "Sao chép nhận xét"), { timeout: 5_000 });
@@ -93,9 +93,9 @@ try {
   const health = await browser.newPage();
   await openRoute(health, "health", "denied");
   await health.waitForFunction(() => [...document.querySelectorAll("button")]
-    .some((button) => button.textContent?.trim() === "Lỗi trên bản đang xem"), { timeout: 15_000 });
+    .some((button) => button.textContent?.trim() === "Lỗi dữ liệu"), { timeout: 15_000 });
   await health.evaluate(() => [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.trim() === "Lỗi trên bản đang xem")?.click());
+    .find((button) => button.textContent?.trim() === "Lỗi dữ liệu")?.click());
   await health.waitForFunction(() => [...document.querySelectorAll("button")]
     .some((button) => button.textContent?.trim() === "Mở hết"), { timeout: 5_000 });
   await health.evaluate(() => [...document.querySelectorAll("button")]

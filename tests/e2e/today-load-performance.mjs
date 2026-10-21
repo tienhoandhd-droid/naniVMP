@@ -261,7 +261,7 @@ try {
       .find((button) => button.textContent?.trim() === "Cập nhật tiến độ")?.click();
   }, ACTION_EDIT_CODE);
   await page.waitForFunction((code) => document.body.innerText.includes(
-    `Quyền cập nhật ${code} đã thay đổi; hạng mục không được mở.`
+    `Bạn không còn quyền cập nhật ${code}.`
   ), { timeout: 5_000 }, ACTION_EDIT_CODE);
   const wronglyFocused = await page.evaluate((code) =>
     [...document.querySelectorAll("[data-progress-item]")]

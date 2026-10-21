@@ -11,7 +11,7 @@
  * ===================================================================== */
 import { useState, useEffect, useRef } from "react";
 import {
-  Scale, RefreshCw, Calculator, GanttChartSquare, ShieldCheck, Lock, Info,
+  Scale, RefreshCw, Calculator, GanttChartSquare, ShieldCheck, Lock,
 } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
 import { Card, CardTitle, Tag } from "../components/ui/Primitives.tsx";
@@ -21,6 +21,7 @@ import ShellConfirmDialog from "../components/layout/ShellConfirmDialog.tsx";
 import { fetchActiveRules, recalcCriticality } from "../lib/supabaseData.ts";
 import type { ActiveRules } from "../lib/supabaseData.ts";
 import type { AccessContext } from "../lib/access.ts";
+import { BUSINESS_ROLE_LABELS, isBusinessRole } from "../lib/businessRoles.ts";
 
 /** Màu theo điểm trọng yếu 1..9 — cao thì đỏ, thấp thì xanh. */
 function toneForScore(score: number) {
@@ -157,7 +158,10 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
   const load = async () => {
     setLoading(true); setErr("");
     try { setRules(await fetchActiveRules()); }
-    catch (e) { setErr((e as Error).message || "Lỗi đọc luật"); }
+    catch (e) {
+      console.error("Không tải được quy tắc nghiệp vụ", e);
+      setErr((e as Error).message || "Lỗi đọc luật");
+    }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -184,7 +188,8 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       setRecalcSuccess(r.msg || "Đã chấm lại điểm trọng yếu.");
       await load();
     } catch (e) {
-      setRecalcError((e as Error).message || "Máy chủ không phản hồi. Kiểm tra kết nối rồi thử lại.");
+      console.error("Chấm lại điểm trọng yếu thất bại", e);
+      setRecalcError("Không kết nối được. Thử lại.");
     } finally {
       recalcInFlight.current = false;
       setBusy(false);
@@ -204,7 +209,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
     const loiPhienHoacQuyen = /permission denied|401|JWT|not authorized/i.test(err);
     const huongDan = loiPhienHoacQuyen
       ? "Phiên đăng nhập đã hết hạn hoặc tài khoản chưa đủ quyền. Đăng nhập lại rồi mở lại trang này."
-      : "Máy chủ không trả về dữ liệu luật. Thử lại sau ít phút; nếu vẫn vậy, gửi chi tiết kỹ thuật bên dưới cho người hỗ trợ.";
+      : "Không tải được. Bấm Thử lại.";
     return (
       <Card>
         <StateBoundary
@@ -212,7 +217,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
           title="Không đọc được luật đang áp dụng"
           description={<>
             <span>{huongDan}</span>
-            {err && <><br /><span>Chi tiết kỹ thuật: {err}</span></>}
+            {err && canRun && <><br /><span>Chi tiết kỹ thuật: {err}</span></>}
           </>}
           onRetry={() => { void load(); }}
         />
@@ -228,24 +233,15 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       {/* Lời dẫn */}
       <Card variant="strong">
         <CardTitle icon={Scale}
-          sub={`Đọc thẳng từ database · cập nhật ${formatBangkokDateTime(rules.cap_nhat)}`}>
-          Luật hệ thống đang áp dụng
+          sub={`Cập nhật ${formatBangkokDateTime(rules.cap_nhat)}`}>
+          Quy tắc nghiệp vụ
         </CardTitle>
-        <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "11px 13px",
-                      borderRadius: 14, background: C.skySoft, color: C.skyText,
-                      fontSize: 12, fontFamily: TEXT, lineHeight: 1.6 }}>
-          <Info size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
-            Số liệu và quy tắc đọc trực tiếp từ hệ thống, không nhập tay — dùng khi đào tạo,
-            khi thanh tra hỏi, hoặc trước khi sửa luật.
-          </div>
-        </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-          {[["Đối tượng nguồn", rules.so_lieu_hien_tai.doi_tuong_nguon],
+          {[["Đối tượng", rules.so_lieu_hien_tai.doi_tuong_nguon],
             ["Có thẩm định", rules.so_lieu_hien_tai.co_tham_dinh],
-            ["Hạng mục timeline", rules.so_lieu_hien_tai.hang_muc],
-            ["Bản ghi audit", rules.so_lieu_hien_tai.ban_ghi_audit]].map(([l, v]) => (
+            ["Hạng mục", rules.so_lieu_hien_tai.hang_muc],
+            ["Dòng nhật ký", rules.so_lieu_hien_tai.ban_ghi_audit]].map(([l, v]) => (
             <div key={String(l)} style={{ padding: "9px 15px", borderRadius: 14,
                                           background: C.pinkMist, minWidth: 130 }}>
               <div style={{ fontFamily: NUM, fontSize: 20, fontWeight: 800, color: C.plum }}>
@@ -297,7 +293,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
           })}
         </div>
 
-        {dtl.phan_bo_truc && (
+        {canRun && dtl.phan_bo_truc && (
           <div style={{ marginTop: 16, padding: "11px 13px", borderRadius: 14,
                         background: C.skySoft, color: C.skyText,
                         fontSize: 12, fontFamily: TEXT, lineHeight: 1.65 }}>
@@ -322,7 +318,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
                       {/* Không emoji nghiệp vụ (hiến pháp Atelier §5) —
                           màu chữ đã mang tín hiệu, chữ nói rõ mức độ. */}
                       {tapTrung >= 90
-                        ? `${tapTrung}% dồn vào một mức — trục này gần như không phân biệt`
+                        ? `${tapTrung}% cùng một mức`
                         : `Phân tán tốt (mức đông nhất ${tapTrung}%)`}
                     </div>
                   </div>
@@ -339,7 +335,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
             <button type="button" onClick={requestRecalc} disabled={busy}
               style={{ ...btnPrimary, background: C.surface, color: C.plum,
                        border: `1.5px solid ${C.pinkSoft}`, opacity: busy ? 0.6 : 1 }}>
-              <RefreshCw size={15} /> {busy ? "Đang chấm…" : "Chấm lại (không đụng dòng đã duyệt)"}
+              <RefreshCw size={15} /> {busy ? "Đang chấm…" : "Chấm lại"}
             </button>
           )}
         </div>
@@ -349,17 +345,15 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
         <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 14,
                       background: C.marigoldSoft, color: C.marigoldText,
                       fontSize: 12, fontFamily: TEXT, lineHeight: 1.6 }}>
-          <b>Điểm do máy chấm là ĐỀ XUẤT, không phải quyết định.</b> Chấm rủi ro là phán quyết
-          chuyên môn GMP. Máy phân loại theo từ khoá trong tên đối tượng — minh bạch và tái lập
-          được — rồi đánh dấu "chờ QA duyệt". Khi QA sửa tay ở màn <b>Danh mục nguồn</b>, dòng đó
-          chuyển sang "đã duyệt" và lần chấm tự động sau <b>không ghi đè</b>.
+          <b>Điểm do máy chấm là ĐỀ XUẤT, không phải quyết định.</b> QA sửa ở <b>Dữ liệu nguồn</b>
+          → "đã duyệt", lần chấm sau không ghi đè.
         </div>
       </Section>
 
       <ShellConfirmDialog
         open={recalcConfirmation === "open"}
         title="Chấm lại điểm trọng yếu"
-        description="Chấm lại điểm trọng yếu cho các đối tượng CHƯA được QA chốt tay. Dòng QA đã sửa (nguồn “đã duyệt”) sẽ không bị ghi đè."
+        description="Chỉ chấm lại đối tượng chưa được QA duyệt."
         confirmLabel="Chấm lại"
         cancelLabel="Huỷ"
         onConfirm={() => { void confirmRecalc(); }}
@@ -367,7 +361,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
       />
 
       {/* Sinh timeline */}
-      <Section icon={GanttChartSquare} title="Luật sinh hạng mục timeline">
+      <Section icon={GanttChartSquare} title="Cách tạo hạng mục">
         <Rows rows={[
           ["Điều kiện lọc", tl.loc],
           ["Loại thẩm định", (
@@ -381,7 +375,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
           )],
           ["Điều kiện \"lần đầu\"", tl.lan_dau],
           ["Số lần trong năm", tl.so_lan_trong_nam],
-          ["Quy ước mã", <code style={{ fontSize: 12 }}>{tl.ma_id}</code>],
+          ["Quy ước mã", tl.ma_id],
           ["Mốc thời gian", (
             <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
               {tl.moc_thoi_gian.map((m, i) => <li key={i}>{m}</li>)}
@@ -401,18 +395,17 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
 
       {/* Phân quyền — sáu vai nghiệp vụ đọc từ bảng vmp_screen_permissions
           (RPC mới); RPC cũ trả bốn vai gõ cứng thì vẫn hiển thị được. */}
-      <Section icon={Lock} title="Phân quyền"
-        sub="Quyền được kiểm tra ở máy chủ">
+      <Section icon={Lock} title="Phân quyền">
         {rules.phan_quyen_che_do && (
           <div style={{ padding: "10px 13px", borderRadius: 14, marginBottom: 12,
                         background: /enforced/i.test(rules.phan_quyen_che_do) ? C.mintSoft : C.marigoldSoft,
                         color: /enforced/i.test(rules.phan_quyen_che_do) ? C.mintText : C.marigoldText,
                         fontSize: 12, fontFamily: TEXT, fontWeight: 700, lineHeight: 1.6 }}>
-            Chế độ quyền màn hình: {rules.phan_quyen_che_do}
+            Quyền màn hình: {/enforced/i.test(rules.phan_quyen_che_do) ? "Đang áp dụng" : "Dự kiến"}
           </div>
         )}
         <Rows rows={rules.phan_quyen.map((x) => [
-          <code key={x.vai_tro} style={{ fontSize: 12 }}>{x.vai_tro}</code>, x.quyen,
+          <b key={x.vai_tro}>{isBusinessRole(x.vai_tro) ? BUSINESS_ROLE_LABELS[x.vai_tro] : x.vai_tro}</b>, x.quyen,
         ])} />
         {rules.phan_quyen_ghi_chu && (
           <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 14,
@@ -425,7 +418,7 @@ export default function ActiveRulesView({ access }: { access?: AccessContext | n
 
       {/* Toàn vẹn dữ liệu */}
       <Section icon={ShieldCheck} title="Luật toàn vẹn dữ liệu"
-        sub="Các ràng buộc luôn được áp, không tắt được từ giao diện">
+        sub="Luôn áp dụng">
         <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 2, fontSize: 14,
                      color: C.plumSoft, fontFamily: TEXT }}>
           {rules.toan_ven_du_lieu.map((x, i) => <li key={i}>{x}</li>)}

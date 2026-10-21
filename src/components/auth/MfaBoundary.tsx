@@ -203,7 +203,6 @@ export default function MfaBoundary({ children }: { children: ReactNode }) {
     <BoundaryCard>
       <LockKeyhole size={28} color={C.raspText} aria-hidden="true" />
       <h1 style={{ fontSize: 20, margin: "12px 0 6px" }}>Chưa xác minh được phiên đăng nhập</h1>
-      <p role="alert" style={{ color: C.raspText }}>Không mở dữ liệu khi trạng thái bảo mật chưa rõ.</p>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button type="button" onClick={invalidate} style={btnPrimary}><RefreshCw size={16} /> Thử lại</button>
         <button type="button" onClick={() => { void signOut(); }} style={btnPrimary}><LogOut size={16} /> Đăng xuất</button>

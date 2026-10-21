@@ -20,13 +20,11 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, memo, Suspense
 
 // ===== External libs =====
 import {
-    AlertCircle,
   ShieldCheck,
   Filter,
   RefreshCw,
   XCircle,
 
-  Cloud,
   Users,
 } from "lucide-react";
 // Lưu ý: recharts đã bị gỡ vì KHÔNG dùng (chỉ import thừa, nặng bundle).
@@ -54,6 +52,7 @@ import { useAccess, useAccessCacheTransition } from "./hooks/useAccess.ts";
 import { ScreenGuard } from "./components/auth/ScreenGuard.tsx";
 import { resolveAuthorizedView, resolveViewIntent } from "./lib/navigationContract.ts";
 import { createVisibleRefreshController } from "./lib/visibleRefresh.ts";
+import { SCREEN_TITLES } from "./lib/screenMetadata.ts";
 import {
   buildPersonProgressChoices,
   canSelectPersonProgressScope,
@@ -183,11 +182,11 @@ function TeamOverviewComparison({ summary, acts }: {
  * Lọc TOÀN CỤC theo Khu vực + Thời gian (tháng/quý/nửa năm/năm).
  * Đặt dưới Topbar, hiển thị trên mọi trang. */
 const PERIOD_OPTS = [
-  { v: "all", l: "Toàn bộ thời gian" },
+  { v: "all", l: "Tất cả" },
   { v: "thang", l: "Tháng này" },
   { v: "quy", l: "Quý này" },
-  { v: "sixm", l: "Nửa năm tới" },
-  { v: "nam", l: "Trong năm nay" },
+  { v: "sixm", l: "6 tháng tới" },
+  { v: "nam", l: "Năm nay" },
   { v: "custom", l: "Tùy chọn…" },
 ];
 
@@ -231,7 +230,7 @@ export function GlobalFilterBarLegacy({
       position: "relative", zIndex: 40,
       marginBottom: 18, padding: "11px 16px", borderRadius: 14,
       background: C.glass, backdropFilter: "blur(6px)",
-      border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px rgba(120,60,110,.06)",
+      border: `1px solid ${C.pinkSoft}`, boxShadow: "0 4px 14px color-mix(in srgb, var(--lp-shadow-ink) 6%, transparent)",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 7, color: C.plumSoft }}>
         <Filter size={15} />
@@ -291,7 +290,7 @@ const DEPT_CHIP = {
   rd:  { soft: C.raspSoft, text: C.raspText, dot: C.rasp },
   qa:  { soft: C.lavSoft,  text: C.lavText,  dot: C.lav },
 };
-const neutralChip = { background: "rgba(78,42,78,.06)", color: C.plum };
+const neutralChip = { background: "var(--lp-bg-sunken)", color: C.plum };
 
 function FilterChip({ style, label, onRemove }: {
   style?: React.CSSProperties; label: ReactNode; onRemove: () => void;
@@ -299,7 +298,7 @@ function FilterChip({ style, label, onRemove }: {
   return (
     <span className="vmp-global-filter__chip" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 6px 5px 11px", borderRadius: 999, fontFamily: TEXT, fontSize: 12, fontWeight: 800, ...style }}>
       {label}
-      <button type="button" onClick={onRemove} aria-label={`Bỏ ${label}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, border: "none", cursor: "pointer", background: "rgba(0,0,0,.08)", color: "inherit", fontSize: 14, lineHeight: 1, fontWeight: 900 }}>×</button>
+      <button type="button" onClick={onRemove} aria-label={`Bỏ ${label}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, border: "none", cursor: "pointer", background: "color-mix(in srgb, currentColor 10%, transparent)", color: "inherit", fontSize: 14, lineHeight: 1, fontWeight: 900 }}>×</button>
     </span>
   );
 }
@@ -509,7 +508,7 @@ function GlobalFilterBar({
                     <input type="date" value={customTo} onChange={(event) => onTo(event.target.value)}
                       disabled={todayMode} aria-label="Đến ngày" style={dateInp} />
                   </div>
-                  {todayMode && <p className="vmp-global-filter__hint">Việc hôm nay tự dùng cửa sổ 7 ngày.</p>}
+                  {todayMode && <p className="vmp-global-filter__hint">Việc hôm nay: 7 ngày tới.</p>}
                 </fieldset>
                 <fieldset className="vmp-global-filter__group">
                   <legend>Bộ phận</legend>
@@ -894,12 +893,16 @@ function VerifiedAppShell({ user, logout, access }: {
      mà thấy hai con số khác nhau sẽ tưởng hệ thống sai. */
   const nhanPhamVi = useMemo(() => {
     const phan: string[] = [];
-    if (deptSel.length > 0) {
+    // Chọn nhiều thì chỉ ghi số lượng — dòng phạm vi giữ ngắn một hàng.
+    if (deptSel.length > 2) {
+      phan.push(`${deptSel.length} bộ phận`);
+    } else if (deptSel.length > 0) {
       phan.push(deptSel.map((id) => DEPTS.find((d) => d.id === id)?.short || id).join(", "));
     } else {
       phan.push("Toàn hệ thống");
     }
-    if (areaSel.length > 0) phan.push(`khu vực ${areaSel.join(", ")}`);
+    if (areaSel.length > 2) phan.push(`${areaSel.length} khu vực`);
+    else if (areaSel.length > 0) phan.push(`khu vực ${areaSel.join(", ")}`);
     const kyHan = PERIODS.find(([id]) => id === periodFilter)?.[1];
     if (kyHan && periodFilter !== "all") phan.push(String(kyHan).toLowerCase());
     return phan.join(" · ");
@@ -1002,7 +1005,7 @@ function VerifiedAppShell({ user, logout, access }: {
   // Màn đã bỏ khỏi menu nhưng URL cũ vẫn mở được — không có tên riêng thì
   // tiêu đề rơi về "Tổng quan", sai với nội dung đang hiện.
   const title = NAV_ITEMS.find((n) => n.id === view)?.label
-    || ({ rules: "Quy tắc nghiệp vụ", inventory: "Tiến độ theo đối tượng" } as Record<string, string>)[view]
+    || (SCREEN_TITLES as Record<string, string>)[view]
     || "Tổng quan";
 
   return (
@@ -1038,18 +1041,19 @@ function VerifiedAppShell({ user, logout, access }: {
       {/* Nền theo thiết kế 29/08 (lotus-shell.css .vmp-main-nen): ánh hồng–
           lavender toả từ góc như cũ, thêm tranh hồ sen mờ ở góc phải (không
           đè chữ) và vân sơn mài; bỏ sao lấp lánh. */}
-      <main ref={mainRef} id="vmp-main-content" data-vmp-view={view} tabIndex={-1} className="vmp-scroll vmp-main-nen" style={{
+      <main ref={mainRef} id="vmp-main-content" data-vmp-view={view} data-vmp-art={!qualification.active && view === "today" ? "day-du" : "nhe"} tabIndex={-1} className="vmp-scroll vmp-main-nen" style={{
         flex: 1, minWidth:0, overflowY: qualification.active ? "hidden" : "auto", position: "relative",
       }}>
         <div style={{ position: "relative", zIndex: 1, ...(qualification.active ? {height:"100%",display:"flex",flexDirection:"column" as const} : {}) }}>
           <TopbarMemo
-            title={qualification.active ? qualification.title : title} user={user} sub={qualification.active ? "Thẩm định thực tế" : (NAV_SUBS as Record<string, string>)[view]}
+            title={qualification.active ? qualification.title : title} user={user} sub={qualification.active ? (qualification.title === "Thẩm định thực tế" ? undefined : "Thẩm định thực tế") : (NAV_SUBS as Record<string, string>)[view]}
             dataUpdatedAt={dataUpdatedAt}
             view={view} setView={navigateView} access={access}
             onOpenQualification={qualification.open} qualificationTarget={qualification.active}
             qualificationSystems={qualificationAccess.systems} qualificationStatus={qualificationAccess.status} qualificationError={qualificationAccess.error} onRetryQualification={qualificationAccess.retry}
             onLogout={xinThoat} onChangePw={moDoiMatKhau}
             compact={!qualification.active && view === "timeline"}
+            masthead={!qualification.active && view === "today"}
           />
 
 
@@ -1057,35 +1061,9 @@ function VerifiedAppShell({ user, logout, access }: {
               Desktop rộng thở bằng padding, không kéo card dài ra. */}
           <div style={{ padding: qualification.active ? "0 var(--lp-shell-pad, 34px) 12px" : "0 var(--lp-shell-pad, 34px) 38px", ...(qualification.active ? {flex:1,minHeight:0} : {}) }}>
             {qualification.active ? qualification.content : <>
-            {/* Loading state */}
-            {objects.length === 0 && conn.status === "loading" && <SkeletonDashboard />}
-
-            {/* Empty / Error state */}
-            {objects.length === 0 && conn.status !== "loading" && (
-              <div style={{
-                marginBottom: 22, padding: "16px 18px", borderRadius: 14,
-                border: `1.5px solid ${conn.status === "err" ? C.raspSoft : C.pinkSoft}`,
-                background: conn.status === "err" ? C.raspSoft : C.surface,
-                display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
-              }}>
-                <div style={{ width: 44, height: 44, borderRadius: 14, flexShrink: 0, background: conn.status === "err" ? C.surface : C.pinkMist, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {conn.status === "err" ? <AlertCircle size={22} color={C.raspText} /> : <Cloud size={22} color={C.pink} />}
-                </div>
-                <div style={{ flex: 1, minWidth: 220 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, color: conn.status === "err" ? C.raspText : C.plum }}>
-                    {conn.status === "err" ? "Chưa tải được dữ liệu" : conn.readUrl ? "Đang chờ đồng bộ…" : "Chưa cấu hình kết nối"}
-                  </div>
-                  <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 3 }}>
-                    {conn.msg || "Nhúng URL webhook trong .env hoặc bấm Làm mới."}
-                  </div>
-                </div>
-                {conn.readUrl && (
-                  <button onClick={reloadData} style={{ ...btnPrimary, padding: "10px 18px", borderRadius: 14, display: "flex", alignItems: "center", gap: 8 }}>
-                    <RefreshCw size={15} /> Thử lại
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Trạng thái tải/lỗi/rỗng do từng màn tự báo (StateBoundary cấp
+                router bên dưới cho các màn ăn theo acts; Hôm nay, Cập nhật tiến độ
+                và các màn tự quản dữ liệu có khối riêng) — không báo trùng ở đây. */}
 
             {/* Sync warning banner */}
             {acts.length > 0 && <SyncBanner conn={conn} lastSync={lastSync} dataUpdatedAt={dataUpdatedAt} />}
@@ -1138,9 +1116,9 @@ function VerifiedAppShell({ user, logout, access }: {
                     : boundaryDuLieu === "filtered-empty" ? "Bộ lọc đang che hết dữ liệu"
                     : "Chưa có dữ liệu VMP"}
                   description={boundaryDuLieu === "error"
-                    ? `${conn.msg || "Mạng hoặc máy chủ đang trục trặc."} Dữ liệu đã nhập không mất — thử tải lại.`
+                    ? "Dữ liệu đã nhập vẫn còn. Bấm Thử lại."
                     : boundaryDuLieu === "filtered-empty"
-                      ? "Có dữ liệu, nhưng tổ hợp khu vực / bộ phận / thời gian đang chọn không khớp hạng mục nào."
+                      ? "Không có hạng mục khớp bộ lọc."
                       : undefined}
                   onRetry={reloadData}
                   onClearFilters={xoaBoLocToanCuc}
@@ -1153,7 +1131,7 @@ function VerifiedAppShell({ user, logout, access }: {
                   metrics={monitoringMetrics}
                   canView={(screen) => access.canView(screen)}
                   onNavigate={setView}
-                  scopeLabel="Theo phạm vi chung"
+                  scopeLabel={nhanPhamVi}
                 />
               )}
               {view === "today" && (
@@ -1275,8 +1253,8 @@ export default function AuthorizedAppShell({ user, logout }: { user: AppUser; lo
         </h1>
         <p style={{ margin: 0, color: C.plumSoft }}>
           {dangXacMinhQuyen
-            ? "Hệ thống đang kiểm tra quyền của phiên này trước khi mở dữ liệu."
-            : `${loiQuyen} Dữ liệu và các màn làm việc đang được giữ kín.`}
+            ? "Đang kiểm tra quyền…"
+            : loiQuyen}
         </p>
         {!dangXacMinhQuyen && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 20 }}>

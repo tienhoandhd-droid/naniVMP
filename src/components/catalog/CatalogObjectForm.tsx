@@ -30,7 +30,7 @@ import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { useRegisterDirtyState } from "../ui/DirtyStateProvider.tsx";
 import {
   TRUONG_FORM, BO_PHAN_CHUAN,
-  buildCatalogPatch, canLyDo, coThamDinh, firstCatalogFormErrorTarget, goiYLyDoThayDoi, validateCatalogForm,
+  boPhanCongNguoi, buildCatalogPatch, canLyDo, coThamDinh, firstCatalogFormErrorTarget, goiYLyDoThayDoi, validateCatalogForm,
 } from "../../lib/catalogForm.ts";
 import type { GiaTriForm, LoiForm, NhomTruong, TruongForm } from "../../lib/catalogForm.ts";
 import ChonHoacGo from "../../features/catalogWorkspace/ChonHoacGo.tsx";
@@ -140,6 +140,17 @@ export default function CatalogObjectForm({
     setOCanNhay(null);
   };
 
+  const boPhanCong = (key: string) => {
+    setForm((truoc) => boPhanCongNguoi(truoc, key));
+    setLoi((truoc) => {
+      if (!truoc[key]) return truoc;
+      const con = { ...truoc };
+      delete con[key];
+      return con;
+    });
+    setOCanNhay(null);
+  };
+
   const { xacNhan, hopXacNhan } = useXacNhan();
 
   const dong = async () => {
@@ -161,7 +172,7 @@ export default function CatalogObjectForm({
     if (phaiCoLyDo && !lyDo.trim()) {
       loiMoi.__lyDo = doiPhanCongQa
         ? "Thay đổi phân công QA phải nhập lý do"
-        : "Sửa thông tin ảnh hưởng tới timeline thì phải nhập lý do";
+        : "Nhập lý do thay đổi";
     }
     setLoi(loiMoi);
     if (Object.keys(loiMoi).length) {
@@ -239,7 +250,7 @@ export default function CatalogObjectForm({
             ariaLabel={t.label}
             ariaDescribedBy={moTa}
             ariaInvalid={Boolean(loiO)}
-            onChange={(nguoi) => dat(t.key, nguoi ?? "")}
+            onChange={(nguoi) => nguoi ? dat(t.key, nguoi) : boPhanCong(t.key)}
             state={qaCandidates.state}
             query={qaCandidates.query}
             onRetry={qaCandidates.retry}
@@ -367,7 +378,7 @@ export default function CatalogObjectForm({
             className={`cw-o${loi.__lyDo ? " is-loi" : ""}`}
             aria-invalid={loi.__lyDo ? true : undefined}
             aria-describedby={loi.__lyDo ? "cof-ly-do-loi" : "cof-ly-do-goi-y"}
-            placeholder="Vì sao đổi? Câu này đi vào nhật ký, người sau đọc để hiểu." />
+            placeholder="Lý do thay đổi" />
           {loi.__lyDo && <p id="cof-ly-do-loi" className="cw-loi" role="alert">{loi.__lyDo}</p>}
           <p id="cof-ly-do-goi-y" className="cw-goi-y">
             {goiYLyDoThayDoi(patch)}

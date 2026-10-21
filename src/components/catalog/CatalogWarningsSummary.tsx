@@ -22,7 +22,7 @@ export default function CatalogWarningsSummary({ warnings }: { warnings: Catalog
         <AlertTriangle size={16} aria-hidden="true" />
         <span>Có {warnings.length} nhóm vấn đề dữ liệu</span>
         {blockingCount > 0 && <b>{blockingCount} nhóm cần xử lý ngay</b>}
-        {blockingCount === 0 && <span>Không có nhóm nào chặn timeline</span>}
+        {blockingCount === 0 && <span>Không có lỗi chặn</span>}
       </div>
 
       <div className="vmp-catalog-warnings__groups">

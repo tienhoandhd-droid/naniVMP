@@ -19,7 +19,7 @@ export default function Overview({ acts, setView, access }: {
   const now = new Date();
   const currentBangkokDate = bangkokCalendarDate(now);
   const currentBangkokYear = Number(currentBangkokDate.slice(0, 4));
-  const { e, d, overdue, soon, gap, gapPts, mismatched } = useMemo(() => {
+  const { e, d, overdue, soon, gap, mismatched } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
     const overdue = acts.filter((a) => classifyVmpDeadline(a, now, 30).kind === "overdue");
     const soon = acts.filter((a) => {
@@ -29,7 +29,7 @@ export default function Overview({ acts, setView, access }: {
 
     return {
       e, d, overdue, soon,
-      gap: e.done - d.done, gapPts: e.rate - d.rate,
+      gap: e.done - d.done,
       mismatched: acts.filter((a) => a.mismatch),
     };
   }, [acts, now]);
@@ -66,7 +66,6 @@ export default function Overview({ acts, setView, access }: {
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               {[
                 { id: "completed", l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
-                { id: "overdue", l: "Đã chuyển quá hạn", v: e.over, c: C.rasp, t: C.raspText },
                 { id: "incomplete", l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
               ].map((x) => (
                 <div key={x.id} data-overview-metric={x.id} className="vmp-overview-progress__row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -90,7 +89,7 @@ export default function Overview({ acts, setView, access }: {
               Hồ sơ hoàn thiện: <b style={{ color: C.plum }}>{d.rate}%</b> ({d.done}/{d.total})
               {gap > 0 && (
                 <span style={{ color: C.marigoldText }}>
-                  {" · lệch "}{gap} hạng mục ({gapPts} điểm%)
+                  {" · lệch "}{gap} hạng mục
                 </span>
               )}
             </div>
@@ -107,16 +106,18 @@ export default function Overview({ acts, setView, access }: {
           thái) 208" và "Có mốc đã quá hạn 268" cạnh nhau, người mới nhìn
           tưởng web tính sai. Nay lấy con số RỘNG hơn (theo mốc) làm chỉ số
           chính vì đó mới là thứ phải xử, và nói thẳng chênh lệch là gì. */}
-      <StatTile cls="b-k1" icon={AlertCircle} label="Trễ đích VMP" value={overdue.length}
+      {/* 21/10: bỏ hàng "Đã chuyển quá hạn" (e.over) ở ô lớn — trên màn chỉ còn
+          MỘT số quá hạn, và nhãn ghi rõ cửa sổ: quá hạn ĐÍCH VMP. */}
+      <StatTile cls="b-k1" icon={AlertCircle} label="Quá hạn đích VMP" value={overdue.length}
         metricId="vmp-overdue"
         tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di(destinations.overdue)}
         sub={overdue.length
-          ? `${e.over} đã đổi trạng thái · ${Math.max(0, overdue.length - e.over)} mốc đã trôi mà trạng thái chưa đổi`
-          : "Không còn hạng mục nào trễ"} />
+          ? `trong đó ${Math.max(0, overdue.length - e.over)} chưa cập nhật trạng thái`
+          : "Không có hạng mục quá hạn"} />
 
       <StatTile cls="b-k2" icon={Clock} label="Tới hạn đích VMP 30 ngày" value={soon.length}
         tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di(destinations.soon)}
-        sub={soon.length ? "Theo dõi để không rơi sang quá hạn" : "Tháng tới đang trống"} />
+        sub={soon.length ? undefined : "Không có hạng mục tới hạn"} />
 
       {/* Ô thứ tư là CHẤT LƯỢNG DỮ LIỆU, không phải một chỉ số tiến độ nữa.
           Lý do: mọi con số còn lại trên trang đều chỉ đáng tin bằng đúng chất
@@ -126,8 +127,8 @@ export default function Overview({ acts, setView, access }: {
         tone={soLoiDl > 0 ? { c: C.marigoldText, bg: C.marigoldSoft } : { c: C.mintText, bg: C.mintSoft }}
         onClick={di(destinations.dataQuality)}
         sub={soLoiDl
-          ? `${soLoiDl} vấn đề được phát hiện · trong đó ${mismatched.length} lệch pha`
-          : "Không phát hiện vấn đề nào"} />
+          ? `trong đó ${mismatched.length} lệch pha`
+          : "Không có vấn đề"} />
 
       <div className="b-vali">
         <PrincessCommentary stats={{

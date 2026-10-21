@@ -150,9 +150,10 @@ try {
   assert.match(valiBrief.src, /vali-chibi-concern[^/]*\.webp(?:$|\?)/);
   assert.equal(valiBrief.ariaLabel, "Công chúa Vali đang lo");
   assert.equal(valiBrief.tag, "IMG");
-  assert.equal(valiBrief.metrics, 4);
-  assert.equal(valiBrief.observations, 2);
-  assert.match(valiBrief.action, /quá hạn/i);
+  // 21/10: Vali chỉ giữ một câu; chỉ số/nhận xét lặp ô bên cạnh đã bỏ.
+  assert.equal(valiBrief.metrics, 0);
+  assert.equal(valiBrief.observations, 0);
+  assert.equal(valiBrief.action, "");
   assert.equal(valiBrief.oldPortrait, false);
 
   const duplicatedUrgentCards = await page.$$eval(".card", (cards) => cards
@@ -194,8 +195,9 @@ try {
     selectedRows: root.querySelectorAll('[role="group"][aria-label="Xem theo"] button[aria-pressed="true"]').length,
     selectedColumns: root.querySelectorAll('[role="group"][aria-label="Cột"] button[aria-pressed="true"]').length,
   }));
+  // 21/10: bỏ huy hiệu chất lượng dữ liệu trong ma trận (trùng ô "Vấn đề dữ liệu").
   assert.deepEqual(matrix, {
-    qualityBadges: 1,
+    qualityBadges: 0,
     standaloneQualityCards: 0,
     rowGroups: 1,
     columnGroups: 1,
@@ -223,7 +225,7 @@ try {
   assert.deepEqual(matrixVisual.legendStatuses.sort(), ["chua", "thieu", "tre", "xong"]);
   assert.equal(new Set(matrixVisual.legendAccents).size, 4);
   assert.ok(matrixVisual.cellStatus);
-  assert.match(matrixVisual.cellName || "", /Đã xong|Trễ hạn|Thiếu dữ liệu|Chưa tới hạn/);
+  assert.match(matrixVisual.cellName || "", /Đã xong|Quá hạn|Thiếu dữ liệu|Chưa tới hạn/);
   assert.equal(matrixVisual.mixHeight, 12);
   assert.ok((matrixVisual.segments ?? 0) >= 1);
   assert.equal(matrixVisual.headPosition, "sticky");

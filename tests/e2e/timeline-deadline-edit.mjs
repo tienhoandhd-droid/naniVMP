@@ -15,14 +15,14 @@ import { caiGiaLap, nhetPhien } from "./gia-lap-supabase.mjs";
 const ROOT_URL = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
 const VALIDATION_CODE = "TB-100-IQ";
 const REASON = "Điều chỉnh theo biên bản QA-26/08";
-const CONFIRMATION = "Tôi xác nhận chỉ đổi bốn deadline kế hoạch; ngày thực tế, trạng thái, người thực hiện và mã hạng mục giữ nguyên.";
+const CONFIRMATION = "Tôi xác nhận chỉ đổi bốn hạn kế hoạch.";
 const UPDATED_VMP = "2026-09-16";
 /* 16/10: fixture có deadline_vmp CỐ ĐỊNH 2026-09-15, còn Long Môn chỉ vẽ cá có
    hạn VMP trong ±30 ngày quanh Hôm nay — từ ~15/10 con cá biến mất và bộ kiểm
    hỏng theo lịch dù code không đổi (CI 08/10 đạt 39/39). Đóng băng đồng hồ
    trình duyệt và JWT ở đúng ngày 08/10, cùng cách today-personal-scope.mjs.
    Chạy tay nhớ đặt VITE_MANUAL_PLANNED_DEADLINES_ENABLED=true như CI, nếu
-   không nút "Chỉnh deadline kế hoạch" không được build vào bundle. */
+   không nút "Chỉnh hạn kế hoạch" không được build vào bundle. */
 const FIXED_NOW_MS = Date.parse("2026-10-08T03:00:00.000Z");
 const PROTECTED_EVIDENCE = {
   actual_protocol_date: "2026-08-01",
@@ -172,7 +172,7 @@ async function setInputValue(page, selector, value) {
 
 async function fillValidDraft(page, vmp = UPDATED_VMP) {
   await setInputValue(page, '[data-planned-deadline-input="deadline_vmp"]', vmp);
-  await setInputValue(page, 'input[aria-label="Lý do chỉnh deadline kế hoạch"]', REASON);
+  await setInputValue(page, 'input[aria-label="Lý do chỉnh hạn kế hoạch"]', REASON);
   await page.click("[data-planned-deadline-confirmation]");
   await page.waitForFunction(() => {
     const checkbox = document.querySelector("[data-planned-deadline-confirmation]");
@@ -214,7 +214,7 @@ for (const { role, width, label } of [
 
   await fillValidDraft(page);
   await page.click("[data-planned-deadline-submit]");
-  await page.waitForFunction(() => document.body.innerText.includes("Đã cập nhật deadline kế hoạch"),
+  await page.waitForFunction(() => document.body.innerText.includes("Đã cập nhật hạn kế hoạch"),
     { timeout: 10_000 });
   await page.waitForFunction(() => !document.querySelector("[data-planned-deadline-dialog]"),
     { timeout: 10_000 });
@@ -270,15 +270,15 @@ for (const { role, width, label } of [
   check(await page.$eval("[data-planned-deadline-submit]", (button) => !button.disabled),
     "submit remains actionable so it can explain the first missing field");
   await page.click("[data-planned-deadline-submit]");
-  check(await page.$eval('input[aria-label="Lý do chỉnh deadline kế hoạch"]',
+  check(await page.$eval('input[aria-label="Lý do chỉnh hạn kế hoạch"]',
     (input) => document.activeElement === input), "initial submit focuses the missing reason");
 
   await setInputValue(page, '[data-planned-deadline-input="deadline_vmp"]', UPDATED_VMP);
   await page.click("[data-planned-deadline-submit]");
-  check(await page.$eval('input[aria-label="Lý do chỉnh deadline kế hoạch"]',
+  check(await page.$eval('input[aria-label="Lý do chỉnh hạn kế hoạch"]',
     (input) => document.activeElement === input), "reason validation points to its input");
 
-  await setInputValue(page, 'input[aria-label="Lý do chỉnh deadline kế hoạch"]', REASON);
+  await setInputValue(page, 'input[aria-label="Lý do chỉnh hạn kế hoạch"]', REASON);
   await page.click("[data-planned-deadline-submit]");
   check(await page.$eval("[data-planned-deadline-confirmation]",
     (input) => document.activeElement === input), "confirmation validation points to its checkbox");
@@ -308,11 +308,11 @@ for (const { role, width, label } of [
   await fillValidDraft(page);
   await page.click("[data-planned-deadline-submit]");
   await page.waitForFunction(() => document.querySelector("[data-planned-deadline-error]")?.textContent
-    ?.includes("phiên bản đã tải 7; hiện tại 9"), { timeout: 10_000 });
+    ?.includes("Người khác vừa sửa hạng mục này"), { timeout: 10_000 });
 
   check(await page.$eval('[data-planned-deadline-input="deadline_vmp"]', (input) => input.value) === UPDATED_VMP,
     "conflict retains edited deadline draft");
-  check(await page.$eval('input[aria-label="Lý do chỉnh deadline kế hoạch"]', (input) => input.value) === REASON,
+  check(await page.$eval('input[aria-label="Lý do chỉnh hạn kế hoạch"]', (input) => input.value) === REASON,
     "conflict retains reason draft");
   check(await page.$eval("[data-planned-deadline-confirmation]", (input) => input.checked),
     "conflict retains confirmation draft");
@@ -345,7 +345,7 @@ for (const scenario of [
   {
     label: "transport failure",
     rpcError: { status: 503, message: "Mạng Supabase bị ngắt" },
-    expected: "Mạng Supabase bị ngắt",
+    expected: "Chưa lưu được. Thử lại.",
   },
 ]) {
   const { page, rpcBodies } = await openPage(browser, scenario);
@@ -388,7 +388,7 @@ for (const scenario of [
   });
   await page.waitForFunction(() => document.querySelector("[data-planned-deadline-dialog]") !== null,
     { timeout: 10_000 });
-  await page.waitForFunction(() => document.body.innerText.includes("Đã cập nhật deadline kế hoạch"),
+  await page.waitForFunction(() => document.body.innerText.includes("Đã cập nhật hạn kế hoạch"),
     { timeout: 10_000 });
   await page.waitForFunction(() => !document.querySelector("[data-planned-deadline-dialog]"),
     { timeout: 10_000 });

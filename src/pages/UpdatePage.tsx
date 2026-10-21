@@ -40,11 +40,17 @@ type ProgressRightsState = {
 
 const EMPTY_PROGRESS_RIGHTS = new Map<string, EditableProgressRight>();
 
+const ITEM_STATE_LABEL: Record<string, string> = {
+  active: "Đang theo dõi",
+  not_applicable: "Không áp dụng",
+  cancelled: "Đã hủy",
+};
+
 function progressRightsLoadingState(): ProgressRightsState {
   return { status: "loading", rights: EMPTY_PROGRESS_RIGHTS, error: "" };
 }
 
-export default function UpdateView({ acts, readableActs = acts, conn, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, pendingProgressLink, onProgressLinkConsumed, canAssignWorkshop, onMoPhanQuyen }: {
+export default function UpdateView({ acts, readableActs = acts, canChonNguoiThucHien, canDoiTrangThai, onUpdate, onReload, readOnly = true, pendingProgressLink, onProgressLinkConsumed, canAssignWorkshop, onMoPhanQuyen }: {
   acts: PlanActivity[];
   /** Nguồn hiện còn đọc được từ shell, dùng để tìm lại đúng mã Today nằm ngoài kỳ nhớ. */
   readableActs?: readonly PlanActivity[];
@@ -109,6 +115,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       setRightsState({ status: "ready", rights, error: "" });
     } catch (cause) {
       if (!rightsGate.current.isCurrent(request)) return;
+      console.error("[UpdatePage] Không tải được quyền cập nhật tiến độ", cause);
       const message = cause instanceof Error ? cause.message : "Không thể xác nhận quyền cập nhật tiến độ";
       setRightsState({ status: "error", rights: EMPTY_PROGRESS_RIGHTS, error: message });
     }
@@ -180,12 +187,12 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
   const FIXES = useMemo(() => ({
     can_xu_ly: {
       label: "Cần xử lý (mọi vấn đề hồ sơ)",
-      hint: "Thiếu người phụ trách theo person_id, thiếu deadline, xong thiếu ngày, lệch pha",
+      hint: "Thiếu QA phụ trách, thiếu hạn, thiếu ngày xong, lệch pha",
       test: (a: PlanActivity) => maCanXuLy.has(progressValidationCode(a)),
     },
     qua_han: {
       label: "Quá hạn",
-      hint: "Mốc chưa xong gần nhất đã đứng trước hôm nay",
+      hint: "",
       test: (a: PlanActivity) => maQuaHan.has(progressValidationCode(a)),
     },
     done_no_date: {
@@ -194,13 +201,13 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       test: (a: PlanActivity) => a.st === "done" && !a._raw?.ngay_vmp,
     },
     no_deadline: {
-      label: "Thiếu deadline VMP",
-      hint: "Không có mốc đích thì mọi mốc khác không tính được",
+      label: "Thiếu Đích VMP",
+      hint: "",
       test: (a: PlanActivity) => !a.target,
     },
     no_owner: {
       label: "Chưa phân công QA",
-      hint: "Không phân công thì không ai theo",
+      hint: "",
       test: (a: PlanActivity) => !a.owner || a.owner === "—",
     },
     mismatch: {
@@ -293,7 +300,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       setPinnedValidationCode(null);
       setEdit(null);
       setQuick(false);
-      setFocusAlert(`Quyền cập nhật ${resolution.validationCode} đã thay đổi; hạng mục không được mở.`);
+      setFocusAlert(`Bạn không còn quyền cập nhật ${resolution.validationCode}.`);
       onProgressLinkConsumed?.();
       return;
     }
@@ -322,7 +329,6 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
   const soLocNangCao = countProgressAdvancedFilters({
     fix, status: fst, stage: stageF, period, showStopped: hienNgung,
   });
-  const linked = conn?.status === "ok";
   const toast = useScopedToast();
   const handleProgressReload = useCallback(async () => {
     try {
@@ -334,7 +340,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
   const doiTrangThai = async (id: string, newState: string, reason?: string) => {
     // S3-G: gọi RPC rpc_set_item_state (010) — lý do nhập ngay trong hộp.
     // Báo kết quả bằng toast của app (A4) thay vì alert() chặn màn hình.
-    if (!supabase) { toast.loi("Supabase chưa cấu hình."); return; }
+    if (!supabase) { toast.loi("Chưa kết nối được hệ thống. Báo Admin."); return; }
     if (!reason || !reason.trim()) return;
     try {
       const { data, error } = await supabase.rpc("rpc_set_item_state", {
@@ -345,10 +351,11 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
       if (error) throw error;
       const r = data as unknown as { ok?: boolean; error?: string } | null;
       if (r && r.ok === false) throw new Error(r.error);
-      toast.thanhCong(`Đã đổi trạng thái ${id} → ${newState}`);
+      toast.thanhCong(`Đã chuyển ${id} sang ${ITEM_STATE_LABEL[newState] ?? newState}`);
       setEdit(null); setQuick(false);
       void handleProgressReload(); // nạp lại dashboard và tập quyền trước khi hiện danh sách mới
-    } catch {
+    } catch (cause) {
+      console.error("[UpdatePage] rpc_set_item_state lỗi", cause);
       toast.loi(`Không đổi được trạng thái ${id}. Dữ liệu chưa được lưu.`, {
         nhan: "Thử lại",
         thucHien: () => { void doiTrangThai(id, newState, reason); },
@@ -367,26 +374,6 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     return () => window.clearTimeout(t);
   }, [pinnedValidationCode, rightsState.status, lat]);
 
-  const uuTien = model.priorityRows.slice(0, 5);
-  /* Không lặp mã khi hạng mục chưa có tên riêng. */
-  const tenHangMuc = (r: { validationCode: string; title: string }) => r.title && r.title !== r.validationCode ? ` — ${r.title}` : "";
-  const moHangMuc = (validationCode: string) => {
-    const a = inWindow.find((x) => progressValidationCode(x) === validationCode);
-    if (a && !readOnly) { setEdit(a); setQuick(false); }
-  };
-  /* Lời Vali — dựng từ model, không bịa số. */
-  const vali = (() => {
-    const dau = uuTien[0];
-    if (rightsState.status !== "ready") return { mood: "guide" as const, nhan: "đang kiểm tra", loi: "Mình đang xác nhận hạng mục bạn được phân công…" };
-    if (model.kpis.needsAction > 0 && dau) return { mood: "concern" as const, nhan: "đang lo",
-      loi: `Còn ${model.kpis.needsAction} hồ sơ thiếu hoặc lệch. Mình gợi ý làm ${dau.validationCode} trước${tenHangMuc(dau)}.` };
-    if (model.kpis.overdue > 0 && dau) return { mood: "concern" as const, nhan: "đang lo",
-      loi: `Hồ sơ đã đủ, nhưng ${model.kpis.overdue} hạng mục quá hạn. Bắt đầu từ ${dau.validationCode}${tenHangMuc(dau)}.` };
-    if (inWindow.length === 0) return { mood: "guide" as const, nhan: "dẫn đường", loi: "Chưa có hạng mục nào trong kỳ đang xem." };
-    return { mood: (model.kpis.completenessPercent >= 90 ? "celebrate" : "guide") as "celebrate" | "guide",
-      nhan: model.kpis.completenessPercent >= 90 ? "nhẹ nhõm" : "dẫn đường",
-      loi: `Hồ sơ đang sạch: ${inWindow.length} hạng mục trong kỳ, ${model.kpis.completenessPercent}% đủ dữ liệu.` };
-  })();
   const chipLoi = (k: string, v: { label: string; hint: string }, label = v.label, ariaLabel?: string) => {
     const n = fixCount[k] || 0;
     const on = fix === k;
@@ -394,7 +381,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     const nhanh = k === "can_xu_ly" ? " pr-chip--quick pr-chip--quick-action"
       : k === "qua_han" ? " pr-chip--quick pr-chip--quick-overdue" : "";
     return (
-      <button key={k} type="button" onClick={() => setFix(on ? "all" : k)} title={v.hint} disabled={n === 0}
+      <button key={k} type="button" onClick={() => setFix(on ? "all" : k)} title={v.hint || undefined} disabled={n === 0}
         className={`pr-chip${on ? " is-on" : ""}${nang ? " pr-chip--nang" : ""}${nhanh}`} aria-pressed={on} aria-label={ariaLabel}>
         {label} <span className="pr-chip__so">{n}</span>
       </button>
@@ -407,39 +394,9 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
     <div data-progress-rights-state={rightsState.status} className="pr-trang">
       {focusAlert && <div role="alert" className="pr-canh-bao">{focusAlert}</div>}
 
-      {/* ---- Hero Vali: câu dẫn + "Làm trước tiên" (thay dải thẻ hồng) ---- */}
-      <section className="pr-hero" aria-label="Vali tóm tắt tiến độ">
-        <div className="pr-hero__vali">
-          <div className={`hn-vali hn-vali--${vali.mood}`} role="img" aria-label={`Công chúa Vali ${vali.nhan}`} />
-          <span className="hn-vali__nhan">Vali · {vali.nhan}</span>
-        </div>
-        <div className="pr-hero__loi">
-          <div className="pr-hero__eyebrow">
-            <span>Tiến độ thẩm định</span>
-            {!linked && <Tag color={C.marigoldText} bg={C.marigoldSoft}>○ Chưa kết nối</Tag>}
-          </div>
-          <p className="hn-loi">{vali.loi}</p>
-          {uuTien.length > 0 && (
-            <div className="pr-hero__uu-tien" aria-label="Cần xử lý trước tiên">
-              <span className="pr-hero__nhan">Cần xử lý trước tiên</span>
-              {uuTien.map((r, i) => {
-                const goiY = [r.issues.length > 0 ? "hồ sơ thiếu/lệch" : null, r.overdueDays > 0 ? `trễ ${r.overdueDays} ngày` : null].filter(Boolean).join(" · ");
-                return (
-                  !readOnly
-                    ? <button key={r.validationCode} type="button" onClick={() => moHangMuc(r.validationCode)}
-                      className={`pr-uu-tien${i === 0 ? " pr-uu-tien--dau" : ""}${r.overdueDays > 0 ? " pr-uu-tien--tre" : ""}`}
-                      title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>
-                      {i === 0 && "Cập nhật "}<span className="pr-ma">{r.validationCode}</span>
-                    </button>
-                    : <span key={r.validationCode} className="pr-ma" title={`${r.title}${goiY ? ` · ${goiY}` : ""}`}>{r.validationCode}</span>
-                );
-              })}
-              {uuTien[0] && <span className="pr-hero__goi-y">{uuTien[0].title !== uuTien[0].validationCode ? uuTien[0].title : uuTien[0].validationCode}{uuTien[0].overdueDays > 0 ? ` · trễ ${uuTien[0].overdueDays} ngày` : ""}{uuTien[0].issues.length > 0 ? " · hồ sơ thiếu/lệch" : ""}</span>}
-            </div>
-          )}
-        </div>
-      </section>
-
+      {/* G2 (21/10): bỏ khối Vali "Cần xử lý trước tiên" — trùng với màn Việc
+          hôm nay. Việc cần làm trước lọc bằng chip "Cần xử lý · Quá hạn" ngay
+          dưới đây. */}
       {/* ---- Thanh lọc chính + phần nâng cao đóng/mở --------------------- */}
       <section className="pr-loc" aria-label="Lọc danh sách tiến độ">
         <Card cls="pr-loc__mat" style={{ padding: 12 }}>
@@ -485,7 +442,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
                 </select>
               </label>
               {soNgung > 0 && (
-                <label className={`pr-ngung${hienNgung ? " is-on" : ""}`} title="Hạng mục Không áp dụng / Đã huỷ — ẩn mặc định để không chen vào danh sách làm việc">
+                <label className={`pr-ngung${hienNgung ? " is-on" : ""}`} title="Không áp dụng / Đã huỷ">
                   <input type="checkbox" checked={hienNgung} onChange={(e) => setHienNgung(e.target.checked)} />
                   Hiện mục đã ngừng ({soNgung})
                 </label>
@@ -497,8 +454,8 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
                 {(["done_no_date", "no_deadline", "no_owner", "mismatch"] as const).map((key) => chipLoi(key, FIXES[key]))}
               </div>
             </fieldset>
-            {isDetailedProgressFix(fix) && (
-              <div className="pr-loc__goi-y">{FIXES[fix as keyof typeof FIXES].hint}. Bấm <b>Cập nhật</b> ở từng dòng để điền.</div>
+            {isDetailedProgressFix(fix) && FIXES[fix as keyof typeof FIXES].hint && (
+              <div className="pr-loc__goi-y">{FIXES[fix as keyof typeof FIXES].hint}.</div>
             )}
           </div>
         </Card>
@@ -510,7 +467,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
         rightsState.status === "error"
           ? <Card>
               <div role="alert" className="pr-quyen pr-quyen--loi">
-                Không thể tải quyền cập nhật tiến độ. Không hiển thị hạng mục để bảo vệ dữ liệu. {rightsState.error}
+                Chưa tải được quyền cập nhật. Bấm Thử lại.
               </div>
               <button type="button" onClick={() => { void reloadRights(); }} style={{ ...btnPrimary, marginTop: 14, padding: "8px 16px", borderRadius: 10, fontSize: 12 }}>Thử lại</button>
             </Card>
@@ -549,7 +506,7 @@ export default function UpdateView({ acts, readableActs = acts, conn, canChonNgu
                     <div className="pr-hanh-dong">
                       {!readOnly && !isFrozen && stageByItem.get(validationCode) !== "done" && (
                         <button type="button" onClick={() => { setEdit(a); setQuick(true); }} className="pr-nhanh"
-                          title="Đánh dấu xong bước hiện tại hôm nay — hộp điền sẵn, chỉ cần chọn lý do rồi Lưu">
+                          title="Xong bước hôm nay">
                           ✓ Xong bước
                         </button>
                       )}

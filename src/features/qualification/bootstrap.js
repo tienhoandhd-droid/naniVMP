@@ -28,7 +28,9 @@ try {
     }
     actor = next;
   });
-} catch {
+} catch (error) {
+  // B3 (21/10): ghi lỗi gốc để chẩn đoán; hành vi giữ nguyên (backend "không khả dụng").
+  console.error('[CPC1] Không khởi tạo được backend thẩm định:', error);
   window.CPC1Backend = {getConfig:unavailable,getGasConfig:unavailable,evaluate:unavailable,save:unavailable,list:unavailable,load:unavailable,report:unavailable,signIn:unavailable,signOut:async()=>{},getSession:async()=>null,permissionsFor:()=>({can_view:false,can_enter:false,pq_codes:[]}),openLogin:login};
 }
 

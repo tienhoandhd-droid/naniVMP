@@ -12,10 +12,11 @@ export interface MonitoringSignatureMetrics {
   highRisk: number;
 }
 
+/* 21/10: bỏ câu mô tả từng màn; tên màn khớp menu, nhãn số dùng thuật ngữ chuẩn. */
 export const MONITORING_SCREEN_COPY = {
-  overview: { title: "Tổng quan VMP", metricLabel: "Trễ đích VMP", description: "Có chuyện gì?" },
-  timeline: { title: "Dòng thời gian", metricLabel: "Có pha bị trễ", description: "Kẹt ở đâu, khi nào?" },
-  alerts: { title: "Cảnh báo & ưu tiên", metricLabel: "Rủi ro cao cần xem", description: "Cần xử lý gì trước?" },
+  overview: { title: "Tổng quan VMP", metricLabel: "Quá hạn đích VMP" },
+  timeline: { title: "Dòng thời gian VMP", metricLabel: "Giai đoạn quá hạn" },
+  alerts: { title: "Cảnh báo & ưu tiên", metricLabel: "Rủi ro cao" },
 } as const;
 
 export function buildMonitoringSignatureMetrics(

@@ -16,7 +16,7 @@ import {
   Sparkles as SparkIcon, Mail, RefreshCw,
 } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary } from "../constants/theme.ts";
-import { CLS, CRIT, DEPTS, DEP_DAYS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
+import { CLS, DEPTS, DEP_DAYS, SOON_DAYS, vmpToday } from "../constants/vmp.ts";
 import {
   parseD, fmtVN, daysBetween, addMonths, txt, nguoiPhuTrach, milestones,
   qrmRpn, qrmLevel, byRisk,
@@ -53,11 +53,11 @@ const SORTS = [
   ["name", "Theo tên hạng mục"],
 ];
 
-const AI_UNAVAILABLE = "Phân tích AI chưa được bật. Dữ liệu cảnh báo vẫn đầy đủ.";
+const AI_UNAVAILABLE = "AI chưa sẵn sàng.";
 
 const LEVEL_STYLE: Record<string, { text: string; soft: string; label: string }> = {
   cao:  { text: C.raspText,     soft: C.raspSoft,     label: "Rủi ro cao" },
-  tb:   { text: C.marigoldText, soft: C.marigoldSoft, label: "Rủi ro TB" },
+  tb:   { text: C.marigoldText, soft: C.marigoldSoft, label: "Rủi ro trung bình" },
   thap: { text: C.mintText,     soft: C.mintSoft,     label: "Rủi ro thấp" },
 };
 
@@ -111,7 +111,7 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
     <div className="vmp-row vmp-lift"
       style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", borderRadius: 14, background: C.surface, border: `1px solid ${edge}` }}>
       <button type="button" onClick={() => onOpen(r)}
-        title="Bấm để xem timeline các mốc hạn"
+        title="Xem bốn mốc hạn"
         style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, padding: 0,
           border: "none", background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer", fontFamily: TEXT }}>
       {/* Ô ngày — trễ thì đỏ, còn hạn thì cam/xanh theo nhóm */}
@@ -120,7 +120,7 @@ r: AlertRow; email?: string | null; onOpen: (r: AlertRow) => void;
         <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>ngày {late ? "trễ" : "nữa"}</span>
       </div>
       {/* Điểm rủi ro — lý do dòng này nằm ở vị trí này trong danh sách */}
-      <div title={`RPN = trọng yếu × khả năng xảy ra (ICH Q9). Tối đa 27.`}
+      <div title="Điểm rủi ro (tối đa 27)"
         style={{ width: 54, flexShrink: 0, textAlign: "center", padding: "6px 0", borderRadius: 14, background: lv.soft }}>
         <div style={{ fontFamily: NUM, fontWeight: 800, fontSize: 14, color: lv.text, lineHeight: 1 }}>{rpn}</div>
         <div style={{ fontSize: 12, fontWeight: 800, color: lv.text }}>RPN</div>
@@ -246,7 +246,7 @@ export function AlertDetailModal({ r, email, onClose }: {
         {/* Hạng mục đã xong thì mốc kế tiếp là LẦN SAU — dự báo theo tần suất */}
         {r.kind === "requal" && r.date && (
           <div style={{ fontSize: 12, color: C.plum, fontWeight: 700, marginTop: 4 }}>
-            Tái thẩm định dự kiến: <b>{fmtVN(r.date)}</b> ({r.dleft < 0 ? `quá ${Math.abs(r.dleft)} ngày` : `còn ${r.dleft} ngày`}) — chu kỳ {r.a.freq} tháng tính từ mốc đích lần này.
+            Tái thẩm định dự kiến: <b>{fmtVN(r.date)}</b> ({r.dleft < 0 ? `quá ${Math.abs(r.dleft)} ngày` : `còn ${r.dleft} ngày`})
           </div>
         )}
       </div>
@@ -292,9 +292,7 @@ export function AlertDetailModal({ r, email, onClose }: {
       </div>
 
       <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.6, borderTop: `1px solid ${C.pinkSoft}`, paddingTop: 10 }}>
-        <b style={{ color: C.plum }}>Hạn theo luật</b> suy từ mốc đích VMP: đề cương T−60 · thẩm định T−(5+{dep}) ·
-        báo cáo T−5, trong đó {dep} ngày là theo phân loại báo cáo “{txt(a.dep)}”. Lệch giữa hạn kế hoạch và hạn
-        theo luật nghĩa là kế hoạch đang đặt khác quy tắc — kiểm lại trước khi lấy làm mốc.
+        <b style={{ color: C.plum }}>Hạn theo luật:</b> Đề cương T−60 · Thẩm định T−(5+{dep}) · Báo cáo T−5.
       </div>
     </ViewportDialog>
   );
@@ -438,7 +436,6 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     ...byKind.soon,
     ...byKind.requal,
   ], 5), [byKind]);
-  const [topAlert, ...nextAlerts] = command.queue;
 
   /* Đếm hạng mục mà điểm trọng yếu chưa có dấu QA duyệt. Không có trường đó
      trong bản đang tải thì để 0 và câu chữ tự chuyển sang cách nói không
@@ -486,7 +483,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   // ----- Xuất danh sách đang xem ra CSV để dán vào biên bản họp -----
   const exportCsv = () => {
     const head = ["Nhóm", "Mã", "Tên hạng mục", "Loại", "Bộ phận", "Người thực hiện", "Email",
-                  "Mốc", "Hạn", "Ngày còn (âm = trễ)", "RPN", "Mức rủi ro"];
+                  "Mốc", "Hạn", "Số ngày còn", "RPN", "Mức rủi ro"];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const lines = [head.map(esc).join(",")];
     for (const r of shown) {
@@ -514,8 +511,14 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     try {
       const r = await chayPhanTichAi({ loai: "canh_bao", pham_vi: dept });
       if (r.ok && r.ai_text) setAiText(r.ai_text);
-      else setAiErr(r.error ? `Lỗi AI: ${r.error}` : "Không nhận được phản hồi AI từ n8n.");
-    } catch (e) { setAiErr((e as Error)?.message || "Lỗi kết nối n8n."); }
+      else if (r.error) {
+        console.error("Phân tích AI cảnh báo lỗi:", r.error);
+        setAiErr("AI lỗi. Thử lại sau.");
+      } else setAiErr("AI chưa trả lời. Thử lại sau.");
+    } catch (e) {
+      console.error("Không gọi được AI phân tích cảnh báo:", e);
+      setAiErr("Không kết nối được AI. Thử lại sau.");
+    }
     finally { setAiLoading(false); }
   };
 
@@ -526,9 +529,6 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
     { id: "requal", Icon: RefreshCw, label: "Tái thẩm định", sub: "Chu kỳ kế tiếp cần chuẩn bị" },
   ] as const;
 
-  const topEmail = topAlert ? find(topAlert.a.owner)?.email : null;
-  const topRpn = topAlert ? qrmRpn(topAlert.a) : 0;
-  const topLevel = LEVEL_STYLE[qrmLevel(topRpn)];
   const departmentLabel = (department: string) => department === "unassigned"
     ? "Chưa phân bộ phận"
     : (DEPTS.find((item) => item.id === department)?.name || department);
@@ -542,101 +542,29 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   return (
     <div className="alerts-page-shell">
       {/* Hai mặt của cùng một việc: danh sách để làm, ma trận để nhìn tổng thể */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button data-desktop-primary-actionable type="button" onClick={() => setTab("list")} style={tabBtn(tab === "list")}>
+      <div role="group" aria-label="Cách xem cảnh báo" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button data-desktop-primary-actionable type="button" aria-pressed={tab === "list"} onClick={() => setTab("list")} style={tabBtn(tab === "list")}>
           <AlertCircle size={15} /> Danh sách cảnh báo
         </button>
-        <button type="button" onClick={() => setTab("matrix")} style={tabBtn(tab === "matrix")}>
+        <button type="button" aria-pressed={tab === "matrix"} onClick={() => setTab("matrix")} style={tabBtn(tab === "matrix")}>
           <ShieldAlert size={15} /> Ma trận rủi ro (QRM)
         </button>
       </div>
 
       {tab === "matrix" ? <QrmView acts={acts} /> : (
         <>
-          <section className="alerts-command" aria-labelledby="alerts-command-title">
-            <article className="alerts-command__hero">
-              <div className="alerts-command__hero-head">
-                <span className="alerts-command__eyebrow">Bàn điều phối · ưu tiên số 1</span>
-                {topAlert && <Tag color={topLevel.text} bg={topLevel.soft}>RPN {topRpn}</Tag>}
-              </div>
-              <h2 id="alerts-command-title">Việc cần hành động trước</h2>
-              {topAlert ? (
-                <>
-                  <div className="alerts-command__identity">
-                    <strong>{topAlert.a.id}</strong>
-                    {/* #7 (01/09): tên = mã (dữ liệu chưa đặt tên riêng) thì đừng
-                        in đôi "TB-108-PV TB-108-PV" — nhìn như lỗi render. */}
-                    {topAlert.a.name && topAlert.a.name !== String(topAlert.a.id)
-                      && <span>{topAlert.a.name}</span>}
-                  </div>
-                  <div className="alerts-command__facts">
-                    <span><b>{topAlert.dleft < 0 ? `Trễ ${Math.abs(topAlert.dleft)} ngày` : `Còn ${topAlert.dleft} ngày`}</b> · {topAlert.stage}</span>
-                    <span>{nguoiPhuTrach(topAlert.a.owner)}{topAlert.a.dept ? ` · ${departmentLabel(String(topAlert.a.dept))}` : ""}</span>
-                    {topAlert.date && <span>Hạn {fmtVN(topAlert.date)}</span>}
-                  </div>
-                  <div className="alerts-command__actions">
-                    <button type="button" onClick={() => moKho(topAlert)}>Mở chi tiết</button>
-                    {topEmail ? (
-                      <a href={`mailto:${topEmail}?subject=${encodeURIComponent(`[VMP] Nhắc việc: ${topAlert.a.id} — ${topAlert.a.name}`)}`}>
-                        <Mail size={15} aria-hidden="true" /> Nhắc qua email
-                      </a>
-                    ) : (
-                      <span className="alerts-command__missing-email">Chưa có email người phụ trách</span>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="alerts-command__empty">
-                  <strong>Không có việc cần ưu tiên trong phạm vi này</strong>
-                  <span>Thử mở rộng bộ lọc thời gian hoặc bộ phận để xem thêm.</span>
-                </div>
-              )}
-            </article>
-
-            <aside className="alerts-command__queue" aria-label="Bốn việc ưu tiên tiếp theo">
-              <div className="alerts-command__queue-head">
-                <strong>Tiếp theo</strong>
-                <span>{nextAlerts.length} việc</span>
-              </div>
-              {nextAlerts.length ? nextAlerts.map((row, index) => {
-                const rowEmail = find(row.a.owner)?.email;
-                return (
-                  <div key={`${row.kind}-${row.a.id}`} className="alerts-command__queue-item">
-                    <button type="button" onClick={() => moKho(row)}>
-                      <span className="alerts-command__rank">{index + 2}</span>
-                      <span className="alerts-command__queue-copy">
-                        <strong>{row.a.name && row.a.name !== String(row.a.id)
-                          ? `${row.a.id} · ${row.a.name}` : row.a.id}</strong>
-                        <small>{row.stage} · {row.dleft < 0 ? `trễ ${Math.abs(row.dleft)} ngày` : `còn ${row.dleft} ngày`} · RPN {qrmRpn(row.a)}</small>
-                      </span>
-                      <ChevronRight size={17} aria-hidden="true" />
-                    </button>
-                    {rowEmail && (
-                      <a aria-label={`Nhắc ${row.a.id} qua email`}
-                        href={`mailto:${rowEmail}?subject=${encodeURIComponent(`[VMP] Nhắc việc: ${row.a.id} — ${row.a.name}`)}`}>
-                        <Mail size={14} aria-hidden="true" />
-                      </a>
-                    )}
-                  </div>
-                );
-              }) : <span className="alerts-command__queue-empty">Không còn việc nào trong hàng đợi.</span>}
-            </aside>
-          </section>
-
           <section className="alerts-management" aria-labelledby="alerts-management-title">
             <div className="alerts-management__head">
               <div>
-                <span className="alerts-command__eyebrow">Góc nhìn quản lý</span>
-                <h2 id="alerts-management-title">Điểm nghẽn trong phạm vi đang lọc</h2>
+                <h2 id="alerts-management-title">Điểm nghẽn</h2>
               </div>
-              <span>{command.totalUnique} hạng mục duy nhất</span>
+              <span>{command.totalUnique} hạng mục</span>
             </div>
             <div className="alerts-management__body">
               <div className="alerts-management__metrics">
                 <article>
                   <strong>{command.overdueRate}%</strong>
                   <span>đang quá hạn</span>
-                  <small>Cần tháo nút thắt trước</small>
                 </article>
                 <article>
                   <strong>{command.highRiskRate}%</strong>
@@ -646,13 +574,12 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                 <article>
                   <strong>{command.unassignedCount}</strong>
                   <span>chưa có người</span>
-                  <small>Cần xác nhận đầu mối</small>
+                  <small>Cần phân công</small>
                 </article>
               </div>
               <div className="alerts-management__hotspots">
                 <div className="alerts-management__hotspots-head">
                   <strong>Bộ phận nhiều cảnh báo</strong>
-                  <span>Tối đa 5 điểm nóng</span>
                 </div>
                 {command.hotspots.length ? command.hotspots.slice(0, 5).map((item) => (
                   <div key={item.department} className="alerts-hotspot">
@@ -662,7 +589,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                     <small>{item.overdueCount} trễ · {item.highRiskCount} rủi ro cao</small>
                   </div>
                 )) : (
-                  <div className="alerts-management__empty">Chưa có cảnh báo để phân tích điểm nghẽn.</div>
+                  <div className="alerts-management__empty">Không có cảnh báo.</div>
                 )}
               </div>
             </div>
@@ -696,7 +623,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
           <CauKetLuan
             tone="warn"
             chinh={`Thứ tự ưu tiên dưới đây dựa trên điểm rủi ro do máy chấm${soChuaDuyet ? ` — ${soChuaDuyet} hạng mục chưa được QA duyệt điểm` : ", chưa qua QA duyệt"}.`}
-            phu="Điểm máy chấm là đề xuất, không thay đánh giá của QA. Xem cách chấm và duyệt lại ở màn Luật đang áp dụng."
+            phu="Điểm máy chấm là đề xuất, không thay đánh giá của QA. Xem cách chấm ở màn Quy tắc nghiệp vụ."
           />
 
           {/* Bộ lọc chính giữ các quyết định phạm vi; tìm, xếp và xuất là công cụ phụ. */}
@@ -751,7 +678,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
 
           {bucket === "requal" ? (
             <Card variant="soft">
-              <CardTitle icon={CalendarClock} sub="Dự báo từ ngày hoàn thành + tần suất — xếp theo điểm rủi ro">
+              <CardTitle icon={CalendarClock} sub="Xếp theo điểm rủi ro">
                 Lịch tái thẩm định ({shown.length})
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -760,7 +687,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                   : shownCut.map((r) => <AlertRowItem key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
                 {shown.length > 0 && (
                   <PhanTrang tong={gom ? cum.length : shown.length} trang={trang} setTrang={setTrang}
-                    coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "cụm" : "hạng mục"} />
+                    coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "đối tượng" : "hạng mục"} />
                 )}
                 {!shown.length && <div style={{ textAlign: "center", padding: 20, color: C.plumSoft, fontWeight: 600 }}>{hasFilter ? "Không có lịch tái thẩm định khớp bộ lọc." : "Chưa có lịch tái thẩm định."}</div>}
               </div>
@@ -769,9 +696,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
             <Card variant="strong">
               <CardTitle
                 icon={bucket === "risk" ? ShieldAlert : AlertCircle}
-                sub={bucket === "risk"
-                  ? "Trọng yếu cao mà chưa xong — xử lý trước cả khi tới hạn"
-                  : "Quy tắc: Đề cương T‑60 · Báo cáo T‑5 · xếp theo điểm rủi ro ICH Q9"}>
+                sub={bucket === "risk" ? "Trọng yếu cao, chưa xong" : undefined}>
                 {KIND_LABEL[bucket]} ({shown.length})
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -780,11 +705,11 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
                   : shownCut.map((r) => <AlertRowItem key={`${r.kind}-${r.a.id}`} r={r} email={find(r.a.owner)?.email} onOpen={moKho} />)}
                 {shown.length > 0 && (
                   <PhanTrang tong={gom ? cum.length : shown.length} trang={trang} setTrang={setTrang}
-                    coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "cụm" : "hạng mục"} />
+                    coTrang={coTrang} setCoTrang={setCoTrang} donVi={gom ? "đối tượng" : "hạng mục"} />
                 )}
                 {!shown.length && (
                   <div style={{ textAlign: "center", padding: 30, color: C.mintText, fontWeight: 700 }}>
-                    {hasFilter ? `Không có hạng mục ${KIND_LABEL[bucket].toLowerCase()} khớp bộ lọc.` : `🎉 Không có hạng mục ${KIND_LABEL[bucket].toLowerCase()}!`}
+                    {hasFilter ? `Không có hạng mục ${KIND_LABEL[bucket].toLowerCase()} khớp bộ lọc.` : `Không có hạng mục ${KIND_LABEL[bucket].toLowerCase()}.`}
                   </div>
                 )}
               </div>
@@ -829,7 +754,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
               {aiLoading && (
                 <div style={{ padding: 24, textAlign: "center", color: C.plumSoft, fontWeight: 700 }}>
                   <RefreshCw size={22} className="spin" color={C.pink} />
-                  <div style={{ marginTop: 10 }}>AI đang đọc lại số liệu mới nhất và phân tích…</div>
+                  <div style={{ marginTop: 10 }}>AI đang phân tích…</div>
                 </div>
               )}
               {!aiLoading && !aiErr && aiText && (
@@ -839,20 +764,12 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
               )}
               {!aiLoading && !aiErr && !aiText && aiConfigured() && (
                 <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.7 }}>
-                  AI đọc lại số thẳng từ Supabase lúc bấm — không lấy từ bảng đang hiện, nên kết quả không
-                  phụ thuộc bộ lọc rủi ro/người/từ khoá ở trên, chỉ theo bộ phận. AI chỉ nhận định, không
-                  thay đánh giá của QA và không phải căn cứ phê duyệt GMP.
+                  AI phân tích theo bộ phận đã chọn, không theo các bộ lọc khác.
                 </div>
               )}
             </div>
           </details>
 
-          {/* Nhắc luật chấm điểm ngay dưới danh sách — để không ai phải đoán vì sao dòng này lên trên */}
-          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.6, padding: "0 4px" }}>
-            <b style={{ color: C.plum }}>Thứ tự ưu tiên</b> theo RPN = điểm trọng yếu (1–9) × khả năng xảy ra
-            (quá hạn 3 · đang làm 2 · kế hoạch 1 · đã xong 0). Cùng điểm thì hạng mục trễ nhiều/gần hạn đứng trước.
-            Mức: <b style={{ color: CRIT.Cao.text }}>cao ≥ 15</b> · <b style={{ color: CRIT.TB.text }}>trung bình 7–14</b> · <b style={{ color: CRIT["Thấp"].text }}>thấp ≤ 6</b>.
-          </div>
         </>
       )}
 

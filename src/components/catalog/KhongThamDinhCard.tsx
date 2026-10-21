@@ -85,7 +85,10 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
       filters: { validation: "outside", first_month: "all", owner: "all", frequency: "all" },
     })
       .then((ds) => { if (seq === requestSeq.current) setRows(ds); })
-      .catch((e) => { if (seq === requestSeq.current) setLoi((e as Error).message || "không rõ"); });
+      .catch((e) => {
+        console.error("[Ngoài kế hoạch] Không tải được danh sách:", e);
+        if (seq === requestSeq.current) setLoi("Không tải được danh sách.");
+      });
     return () => { requestSeq.current += 1; };
   }, [authorizationRevision, hasAuthorizationRevision, mo, rows]);
 
@@ -160,7 +163,7 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
             Danh mục đối tượng không thẩm định
           </div>
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 2 }}>
-            Cột &quot;Thẩm định&quot; ở Danh mục nguồn để <b>n</b> · không sinh hạng mục nào nên không có trên danh sách tiến độ ở trên
+            Đối tượng ngoài kế hoạch thẩm định
           </div>
         </div>
         {rows && dem.soat > 0 && (
@@ -176,9 +179,9 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
       {mo && (
         <div style={{ marginTop: 14 }}>
           {!hasAuthorizationRevision && (
-            <Tag color={C.marigoldText} bg={C.marigoldSoft}>Đang xác minh lại quyền xem Dữ liệu nguồn…</Tag>
+            <Tag color={C.marigoldText} bg={C.marigoldSoft}>Đang tải…</Tag>
           )}
-          {loi && <Tag color={C.raspText} bg={C.raspSoft}>Lỗi đọc danh mục: {loi}</Tag>}
+          {loi && <Tag color={C.raspText} bg={C.raspSoft}>{loi}</Tag>}
           {hasAuthorizationRevision && !rows && !loi && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Đang tải…</div>}
 
           {rows && (
@@ -193,7 +196,7 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
                 <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
                   <Search size={15} color={C.plumSoft} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }} />
-                  <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm hạng mục không thẩm định"
+                  <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm đối tượng"
                     placeholder="Tìm mã, tên, bộ phận, lý do…" style={{ ...INP, paddingLeft: 34 }} />
                 </div>
                 <select value={nhom} onChange={(e) => setNhom(e.target.value)} aria-label="Lọc theo nhóm" style={{ ...INP, cursor: "pointer", maxWidth: 190 }}>
@@ -244,7 +247,7 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
                             {txt(r.validate_reason)}
                             {soat && (
                               <div style={{ marginTop: 5, fontSize: 12, fontWeight: 800, color: C.raspText }}>
-                                ⚠ Lý do nói là cần thẩm định nhưng cột Thẩm định đang để &quot;n&quot; — QA cần chốt lại.
+                                ⚠ Lý do ghi cần thẩm định nhưng đang tắt Thẩm định — QA chốt lại.
                               </div>
                             )}
                           </td>
@@ -270,11 +273,6 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
                 </table>
               </TableScroll>
 
-              <div style={{ marginTop: 11, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.65 }}>
-                Danh mục này chỉ ĐỌC. Muốn đưa một đối tượng vào kế hoạch thẩm định thì sang
-                <b style={{ color: C.plum }}> Danh mục &amp; Nhập liệu</b>, đổi cột <b style={{ color: C.plum }}>Thẩm định</b> sang
-                &quot;y&quot;, điền <b style={{ color: C.plum }}>tháng thẩm định đầu tiên</b> rồi bấm <b style={{ color: C.plum }}>Sinh timeline</b>.
-              </div>
             </>
           )}
         </div>

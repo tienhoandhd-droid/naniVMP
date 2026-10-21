@@ -47,7 +47,7 @@ const METRICS = [
   {
     id: "validation",
     label: "Thẩm định thực tế",
-    short: "Thực tế",
+    short: "Thẩm định",
     field: "tt_tham_dinh",
     icon: ShieldCheck,
     ...CHART_STAGE.validation,
@@ -114,11 +114,11 @@ function valueGroup(value: unknown, emptyLabel: string): Group[] {
 }
 
 const DIMENSION_OPTIONS = [
-  { id: "department", label: "Bộ phận quản lý", head: "Đơn vị" },
+  { id: "department", label: "Bộ phận quản lý", head: "Bộ phận quản lý" },
   { id: "person", label: "Người phụ trách", head: "Người phụ trách", multiNote: true },
   { id: "executionDepartment", label: "Bộ phận thực hiện", head: "Bộ phận thực hiện" },
   { id: "area", label: "Mã khu vực", head: "Mã khu vực" },
-  { id: "line", label: "Line", head: "Line" },
+  { id: "line", label: "Dây chuyền", head: "Dây chuyền" },
 ];
 
 function dimensionGroups(activity: Activity, dimension: string): Group[] {
@@ -139,7 +139,7 @@ function dimensionGroups(activity: Activity, dimension: string): Group[] {
     return groups.length ? groups : [{ key: "unknown", label: "Chưa có dữ liệu", short: "—" }];
   }
   if (dimension === "area") return valueGroup(activity.area || raw.khu_vuc, "Chưa có khu vực");
-  if (dimension === "line") return valueGroup(activity.line || raw.line, "Chưa có line");
+  if (dimension === "line") return valueGroup(activity.line || raw.line, "Chưa có dây chuyền");
 
   const people = activityPeople(activity);
   if (!people.length) return [{ key: "unassigned", label: "Chưa phân công" }];
@@ -206,14 +206,11 @@ export function DimensionTable({ activities, dimension }: {
   const rows = useMemo(() => groupRows(activities, dimension), [activities, dimension]);
   const activeDimension = DIMENSION_OPTIONS.find((item) => item.id === dimension) || DIMENSION_OPTIONS[0];
   const isExecutionDepartment = dimension === "executionDepartment";
-  const title = isExecutionDepartment ? "Tiến độ theo bộ phận thực hiện" : "Tiến độ theo đơn vị phụ trách";
-  const subtitle = isExecutionDepartment
-    ? "Theo dõi tiến độ từng bộ phận qua 4 chỉ tiêu: đề cương, thực tế, hồ sơ, VMP"
-    : `So sánh bốn mốc hoàn thành trên cùng một mẫu số · ${activeDimension.label.toLowerCase()}`;
+  const title = isExecutionDepartment ? "Tiến độ theo bộ phận thực hiện" : `Tiến độ theo ${activeDimension.label.toLowerCase()}`;
 
   return (
     <Card variant="strong">
-      <CardTitle level={3} icon={Users} sub={subtitle}>{title}</CardTitle>
+      <CardTitle level={3} icon={Users}>{title}</CardTitle>
 
       {rows.length ? (
         <div className="completion-table-scroll" style={{ overflowX: "auto" }}>
@@ -249,7 +246,7 @@ export function DimensionTable({ activities, dimension }: {
                       ) : (
                         <div style={{
                           width: 38, height: 38, borderRadius: 999, flexShrink: 0,
-                          background: "linear-gradient(135deg,#C2497A,#6E54C0)", color: "#fff",
+                          background: "var(--grad)", color: "var(--lp-porcelain)",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           fontFamily: NUM, fontSize: 16, fontWeight: 800,
                         }}>
@@ -310,17 +307,17 @@ export function DimensionTable({ activities, dimension }: {
 
       {activeDimension.multiNote && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
-          Một hạng mục có nhiều người phụ trách được tính vào kết quả của từng người liên quan; vì vậy tổng số theo người có thể lớn hơn tổng hạng mục duy nhất.
+          Hạng mục nhiều người được tính cho từng người.
         </div>
       )}
       {isExecutionDepartment && rows.some((row) => row.key !== "unknown") && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
-          Dòng có nhiều bộ phận thực hiện, ví dụ “RD, QA, QC, XSX”, được tách và tính vào từng bộ phận riêng.
+          Hạng mục nhiều bộ phận được tính cho từng bộ phận.
         </div>
       )}
       {dimension === "executionDepartment" && rows.length === 1 && rows[0].key === "unknown" && (
         <div style={{ marginTop: 10, fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.5 }}>
-          Cần chạy migration read model và sync snapshot mới để lấy cột Sheet “Bộ phận thực hiện thẩm định” vào dashboard.
+          Chưa có dữ liệu Bộ phận thực hiện.
         </div>
       )}
     </Card>
@@ -329,8 +326,8 @@ export function DimensionTable({ activities, dimension }: {
 
 const TH: CSSProperties = {
   padding: "0 14px 6px", textAlign: "left", color: C.plumSoft,
-  fontFamily: TEXT, fontSize: 12, fontWeight: 800, textTransform: "uppercase",
-  letterSpacing: ".04em", whiteSpace: "nowrap",
+  fontFamily: TEXT, fontSize: 12, fontWeight: 600, textTransform: "none",
+  letterSpacing: 0, whiteSpace: "nowrap",
 };
 
 const TD: CSSProperties = {
@@ -356,9 +353,9 @@ export function buildFlowConclusion(stages: readonly CompletionStage[]): {
     chinh: drop >= 8
       ? `Tắc nhất ở khâu ${stages[bottleneck].short} → ${stages[bottleneck + 1].short}: ${stages[bottleneck].rate}% xuống ${stages[bottleneck + 1].rate}%, mất ${drop} điểm.`
       : ratesDiffer
-        ? "Không ghi nhận mức giảm giữa các giai đoạn; tỷ lệ từng giai đoạn được tính độc lập."
+        ? "Không có khâu tắc."
         : "Bốn giai đoạn có cùng tỷ lệ — không có khâu nào tắc riêng.",
-    phu: `Đích cuối: ${final.done}/${final.total} hạng mục đã hoàn thành VMP (${final.rate}%).`,
+    phu: `Đích VMP: ${final.done}/${final.total} hạng mục đã hoàn thành VMP (${final.rate}%).`,
     tone: (drop >= 25 ? "over" : drop >= 8 ? "warn" : "ok") as "ok" | "warn" | "over",
   };
 }
@@ -432,7 +429,6 @@ export default function CompletionDashboard({ acts, matrix }: {
     const dau = xep[0], cuoi = xep[xep.length - 1];
     return {
       chinh: `${cuoi.type} tụt xa nhất: ${cuoi.rate}% trên ${cuoi.total} hạng mục, kém ${dau.type} (${dau.rate}%) ${dau.rate - cuoi.rate} điểm.`,
-      phu: "Chỉ so các loại có từ 3 hạng mục trở lên — dưới mức đó một hạng mục đã làm lệch tỉ lệ.",
       tone: (dau.rate - cuoi.rate >= 30 ? "warn" : "ok") as "warn" | "ok",
     };
   }, [typeRows]);
@@ -551,10 +547,10 @@ export default function CompletionDashboard({ acts, matrix }: {
         <div data-analysis-comparison data-analysis-comparison-panel={comparisonMode}>
           {comparisonMode === "validationType" ? (
             <Card variant="strong">
-              <CardTitle level={3} icon={ClipboardCheck} sub="Hoàn thành được xác định theo trạng thái VMP của từng hạng mục">
+              <CardTitle level={3} icon={ClipboardCheck}>
                 Tỷ lệ hoàn thành từng loại thẩm định
               </CardTitle>
-              {klLoai && <CauKetLuan chinh={klLoai.chinh} phu={klLoai.phu} tone={klLoai.tone} />}
+              {klLoai && <CauKetLuan chinh={klLoai.chinh} tone={klLoai.tone} />}
               {typeRows.length ? (
                 <div className="completion-type-grid">
                   {typeRows.map((row) => (

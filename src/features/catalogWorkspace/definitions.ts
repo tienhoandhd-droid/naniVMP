@@ -44,7 +44,7 @@ const SAN_PHAM: CatalogDatasetDefinition = {
   businessKeyField: "bfo_code",
   fields: [
     { key: "bfo_code", label: "Mã BFO", kind: "text", readonly: true, required: true,
-      hint: "Khoá nghiệp vụ — không sửa được sau khi tạo" },
+      hint: "Không sửa được sau khi tạo" },
     { key: "product_name", label: "Tên sản phẩm", kind: "text", required: true },
     { key: "ingredients", label: "Hoạt chất", kind: "text" },
     { key: "strength", label: "Hàm lượng", kind: "combobox" },

@@ -70,7 +70,8 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
       setLoadedSoonDays(soonDays);
     } catch (e) {
       if (generation !== loadGeneration.current) return;
-      setErr((e as Error).message || "Lỗi tải dữ liệu từ server");
+      console.error("Kiểm tra toàn bộ: không tải được dữ liệu", e);
+      setErr("Không tải được dữ liệu. Bấm Thử lại.");
     } finally {
       if (generation === loadGeneration.current) setLoading(false);
     }
@@ -97,8 +98,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
        trap, và kết quả báo qua toast thay vì hộp trình duyệt khoá luồng. */
     const dongY = await xacNhan({
       title: "Tính lại trạng thái toàn bộ?",
-      description: "Tính lại computed_status cho toàn bộ hạng mục theo ngày hôm nay. "
-        + "Thao tác này ghi vào DB và được ghi vết trong audit log.",
+      description: "Tính lại trạng thái mọi hạng mục theo hôm nay. Có ghi nhật ký.",
       confirmLabel: "Tính lại",
     });
     if (!dongY) return;
@@ -108,7 +108,8 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
       toast.thanhCong(r.msg || "Đã tính lại trạng thái");
       await load();
     } catch (e) {
-      toast.loi("Lỗi: " + ((e as Error).message || "không rõ"));
+      console.error("Tính lại trạng thái thất bại", e);
+      toast.loi("Không tính lại được. Thử lại.");
     }
     setBusy(false);
   };
@@ -116,13 +117,13 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
   /* Lần tải đầu chưa có snapshot thì cả route có đúng một readiness state.
      Không dựng các card số 0 bên dưới: số 0 ở đây chưa phải dữ liệu sạch. */
   if (!kpi && loading) {
-    return <StateBoundary state="loading" title="Đang tải số liệu theo server…" skeletonRows={6} />;
+    return <StateBoundary state="loading" title="Đang tải số liệu…" skeletonRows={6} />;
   }
   if (!kpi && err) {
     return (
       <StateBoundary
         state="error"
-        title="Không đọc được số liệu theo server"
+        title="Không đọc được số liệu"
         description={err}
         onRetry={() => { void load(); }}
       />
@@ -134,16 +135,15 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
       {err && (
         <StateBoundary
           state="error"
-          title="Không làm mới được số liệu theo server"
+          title="Không làm mới được số liệu"
           description={err}
           onRetry={() => { void load(); }}
         />
       )}
       {/* ---------- KPI theo server ---------- */}
       <Card variant="strong">
-        <CardTitle icon={Gauge}
-          sub="Tính bằng rpc_dashboard_kpi — đây là số mà báo cáo và workflow dùng, dùng để đối chiếu với số trên dashboard">
-          Số liệu theo server {kpi?.updated_at ? `· cập nhật ${formatBangkokDateTime(kpi.updated_at)}` : ""}
+        <CardTitle icon={Gauge}>
+          Số liệu hệ thống {kpi?.updated_at ? `· cập nhật ${formatBangkokDateTime(kpi.updated_at)}` : ""}
         </CardTitle>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
@@ -176,7 +176,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
               label="Hồ sơ hoàn thành"
               sub={`${kpi.documentation.over} quá hạn`} subColor={C.raspText} />
             <KpiCard emoji={<AlertTriangle size={22} aria-hidden="true" />} bg={C.marigoldSoft} color={C.marigoldText}
-              value={kpi.mismatch_count} label="Bản ghi lệch trạng thái"
+              value={kpi.mismatch_count} label="Hạng mục lệch pha"
               sub="cần rà lại" subColor={C.plumSoft} />
           </div>
         )}
@@ -185,8 +185,8 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
       {/* ---------- Cảnh báo sẽ gửi ---------- */}
       <Card>
         <CardTitle icon={Bell}
-          sub="rpc_due_alerts — ĐÚNG danh sách mà workflow 'Vani VMP 1' dùng để soạn email. Xem trước ở đây trước khi bật workflow.">
-          Cảnh báo server sẽ gửi ({alerts.length})
+          sub="Danh sách sẽ gửi email">
+          Email cảnh báo sẽ gửi ({alerts.length})
         </CardTitle>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
@@ -210,7 +210,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
         {loadedSoonDays != null && loadedSoonDays !== soonDays && (
           <p role="status" style={{ margin: "-2px 0 12px", fontSize: 12, fontWeight: 700,
             color: err ? C.marigoldText : C.plumSoft }}>
-            Đang hiển thị bản chụp theo ngưỡng {loadedSoonDays} ngày.
+            Đang hiện mốc {loadedSoonDays} ngày.
             {err ? ` Ngưỡng ${soonDays} ngày chưa tải được.` : ` Đang tải ngưỡng ${soonDays} ngày…`}
           </p>
         )}
@@ -220,7 +220,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
               mã thẩm định là tiêu đề dòng và dính khi cuộn ngang. */}
           <table className="reg-table">
             <caption>
-              Hạng mục quá hạn hoặc đến hạn trong {snapshotSoonDays} ngày tới, máy chủ rà trực tiếp trên DB.
+              Hạng mục quá hạn hoặc đến hạn trong {snapshotSoonDays} ngày tới.
             </caption>
             <thead>
               <tr>
@@ -267,8 +267,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
 
       {/* ---------- Chất lượng dữ liệu ---------- */}
       <Card>
-        <CardTitle icon={Radar}
-          sub="rpc_check_data_quality — server rà trực tiếp trên DB, không phụ thuộc dữ liệu đã tải về trình duyệt">
+        <CardTitle icon={Radar}>
           Chất lượng dữ liệu ({issues.length})
         </CardTitle>
 
@@ -301,7 +300,7 @@ export default function ServerChecksView({ access }: { access?: AccessContext | 
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{i.msg}</div>
                   <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>
-                    {i.id} · {i.type}
+                    {i.id}
                   </div>
                 </div>
               </div>

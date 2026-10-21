@@ -18,12 +18,12 @@ test("commit is actionable, focuses the batch reason and preserves recovery stat
   assert.match(source, /focusId/);
   assert.match(source, /disabled=\{dangGhi\}/);
   assert.match(source, /STALE_VERSION|VERSION_CONFLICT/);
-  assert.match(source, /Thử lại bản xem trước/);
+  assert.match(source, /Xem trước lại/);
 });
 
 test("successful commit keeps a traceable receipt with copy and pending action", () => {
   assert.match(source, /data-cw-import-receipt/);
-  assert.match(source, /<CopyCodesButton text=\{receipt\.batchId\} label="Sao chép ID"/);
+  assert.match(source, /<CopyCodesButton text=\{receipt\.batchId\} label="Sao chép mã đợt nhập"/);
   assert.match(source, /formatBangkokDateTime/);
   assert.match(source, /onOpenPending/);
 });

@@ -43,7 +43,7 @@ const EMPTY_RIGHTS: ReadonlyMap<string, EditableProgressRight> = new Map();
 const SECTION_META: Record<TodaySection, { label: string; tone: "danger" | "warning" | "info" }> = {
   overdue: { label: "Quá hạn", tone: "danger" },
   today: { label: "Đến hạn hôm nay", tone: "warning" },
-  upcoming: { label: "Trong 7 ngày tới", tone: "warning" },
+  upcoming: { label: "Tới hạn 7 ngày", tone: "warning" },
   incomplete: { label: "Hồ sơ cần hoàn thiện", tone: "info" },
 };
 
@@ -91,28 +91,28 @@ export function getTodayValiState(model: TodayActionModel): TodayValiState {
   }
   if (model.kpis.overdue >= 3 && dau) {
     return { mood: "urgent", nhan: "rất lo",
-      loi: `Có ${model.kpis.overdue} việc quá hạn — mình đang rất lo. Xử lý ngay ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
+      loi: `${model.kpis.overdue} việc quá hạn. Làm ngay ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
   }
   if (model.kpis.overdue > 0 && dau) {
     return { mood: "concern", nhan: "đang lo",
-      loi: `Mình đếm được ${model.kpis.overdue} việc quá hạn. Nên bắt đầu từ ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
+      loi: `${model.kpis.overdue} việc quá hạn. Bắt đầu từ ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
   }
   if (model.kpis.today > 0 && dau) {
     return { mood: "focus", nhan: "tập trung",
-      loi: `Hôm nay có ${model.kpis.today} việc đến hạn. Mình tập trung trước vào ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
+      loi: `${model.kpis.today} việc đến hạn hôm nay. Làm trước ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
   }
   if (dau) {
     return { mood: "guide", nhan: "dẫn đường",
       loi: `Không có việc quá hạn. Gần nhất là ${dau.validationCode} — ${dau.title}, ${deadlineFact(dau)}.` };
   }
-  return { mood: "guide", nhan: "dẫn đường", loi: "Mình đã xếp việc theo hạn, mức độ quan trọng và quyền cập nhật." };
+  return { mood: "guide", nhan: "dẫn đường", loi: "Không có việc quá hạn." };
 }
 
-function TodayRightsNotice({ status, error, onRetry }: Pick<RightsState, "status" | "error"> & { onRetry: () => void }) {
-  if (status === "ready") return null;
-  if (status === "loading") return <p className="hn-quyen hn-quyen--loading" role="status">Đang kiểm tra quyền cập nhật.</p>;
+/* Chỉ báo khi lỗi; lỗi gốc đã ghi console ở nơi tải quyền, không hiện cho người dùng. */
+function TodayRightsNotice({ status, onRetry }: Pick<RightsState, "status"> & { onRetry: () => void }) {
+  if (status !== "error") return null;
   return <div className="hn-quyen hn-quyen--error" role="alert">
-    <p><b>Chưa xác minh được quyền cập nhật.</b> {error || "Không thể xác nhận quyền cập nhật tiến độ."}</p>
+    <p><b>Chưa tải được quyền cập nhật.</b> Tạm chỉ xem.</p>
     <button type="button" className="hn-quyen__thu-lai" onClick={onRetry}>Thử lại quyền</button>
   </div>;
 }
@@ -121,12 +121,11 @@ function TodayRowDetails({ row, id, hidden }: { row: TodayActionRow; id: string;
   return <div id={id} className="hn-muc__chi-tiet hn-muc__chi-tiet--inline" role="region"
     aria-label={`Chi tiết ${row.validationCode}`} hidden={hidden}>
     <dl className="hn-chi-tiet__facts">
-      <div><dt>Người phụ trách</dt><dd>{row.ownerName}</dd></div>
-      <div><dt>Phòng ban</dt><dd>{row.department || "Chưa xác định"}</dd></div>
-      <div><dt>Mức độ quan trọng</dt><dd>{row.criticality || "Chưa xếp hạng"}</dd></div>
+      <div><dt>QA phụ trách</dt><dd>{row.ownerName}</dd></div>
+      <div><dt>Bộ phận</dt><dd>{row.department || "Chưa xác định"}</dd></div>
+      <div><dt>Trọng yếu</dt><dd>{row.criticality || "Chưa xếp hạng"}</dd></div>
       <div><dt>Đang chờ</dt><dd>{row.blockingStage}</dd></div>
-      <div><dt>Hạn xử lý</dt><dd>{deadlineFact(row)}</dd></div>
-      <div><dt>Quyền cập nhật</dt><dd>{row.permissionReason}</dd></div>
+      <div><dt>Hạn</dt><dd>{deadlineFact(row)}</dd></div>
     </dl>
     <div className="hn-ly-do" aria-label={`Lý do ưu tiên ${row.validationCode}`}>
       {row.reasons.map((reason) => <span key={reason.kind} className="hn-ly-do__badge">{reason.label}</span>)}
@@ -172,7 +171,7 @@ function TodayQueueSection({ section, rows, expandedCode, onToggle, onOpenProgre
   if (rows.length === 0) return null;
   const meta = SECTION_META[section];
   return <section className={`hn-nhom hn-nhom--${section} lp-tone--${meta.tone}`}>
-    <h2 className="hn-nhom__ten">{meta.label} <span className="hn-nhom__dem">{rows.length}</span><span className="hn-nhom__phu">xếp theo hạn, mức độ quan trọng và quyền cập nhật</span></h2>
+    <h2 className="hn-nhom__ten">{meta.label} <span className="hn-nhom__dem">{rows.length}</span></h2>
     {/* Hàng tiêu đề cột (đúng bản thiết kế) — chỉ để nhìn, bảng thật vẫn là danh sách có nút. */}
     <div className="hn-cot" aria-hidden="true"><span>Mã</span><span>Hạng mục</span><span>Mốc</span><span>QA phụ trách</span><span>Trễ</span><span></span></div>
     <ul className="hn-ds" aria-label={meta.label}>{rows.map((row) => <TodayQueueRow key={row.validationCode} row={row}
@@ -210,11 +209,18 @@ export function TodayCommandCenterContent({
      bấm lại để bỏ. Không lọc thì vẫn thấy đủ bốn nhóm như trước. */
   const [locNhom, setLocNhom] = useState<TodaySection | null>(null);
   const chonNhom = useCallback((section: TodaySection) => setLocNhom((current) => current === section ? null : section), []);
-  const oSo = (id: TodaySection, label: string, value: number, tone: "danger" | "warning" | "info", hint: string) => ({
+  /* T4 (21/10): màu số theo nghĩa — quá hạn = danger, tới hạn (hôm nay, 7
+     ngày) = warning, còn lại (hồ sơ cần hoàn thiện) = chữ chính. */
+  const oSo = (id: TodaySection, label: string, value: number, tone: "danger" | "warning" | "neutral", hint: string) => ({
     id, label, value, tone, hint, selected: locNhom === id, onActivate: () => chonNhom(id),
   });
   const nhomHien = (Object.keys(SECTION_META) as TodaySection[]).filter((section) => locNhom === null || section === locNhom);
   const dau = model.nextAction;
+  /* Mã hạng mục trong câu Vali không được ngắt giữa "TB-108-" / "PV". */
+  const loiVali = dau && vali.loi.includes(dau.validationCode)
+    ? vali.loi.split(dau.validationCode).flatMap((doan, i) => i === 0 ? [doan]
+      : [<span key={i} className="lp-ma">{dau.validationCode}</span>, doan])
+    : vali.loi;
   return <div className="hn-lotus">
     <section className="hn-hero" aria-label="Vali tóm tắt hôm nay">
       <div className="hn-hero__vali">
@@ -222,7 +228,7 @@ export function TodayCommandCenterContent({
         <span className="hn-vali__nhan">Vali · {vali.nhan}</span>
       </div>
       <div className="hn-hero__loi">
-        <p className="hn-loi">{vali.loi}</p>
+        <p className="hn-loi">{loiVali}</p>
         <p className="hn-mota">
           {scopeLabel && <span className="hn-mota__pham-vi">Phạm vi: {scopeLabel}</span>}
           {updatedLabel && <span className="hn-mota__moc">{updatedLabel}</span>}</p>
@@ -232,10 +238,10 @@ export function TodayCommandCenterContent({
         {dau && <div className="hn-hero__uu-tien">
           <span className="hn-hero__eyebrow">Làm trước tiên</span>
           {dau.canEditProgress
-            ? <button type="button" className="hn-hero__cta" title={`Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. ${deadlineFact(dau)}`}
+            ? <button type="button" className="hn-hero__cta" title={deadlineFact(dau)}
                 onClick={() => onOpenProgress(progressLink(dau))}>
                 Cập nhật {dau.validationCode}</button>
-            : <span className="hn-hero__cta hn-hero__cta--chu" title={`Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật. ${deadlineFact(dau)}`}>{dau.validationCode} · {dau.title}</span>}
+            : <span className="hn-hero__cta hn-hero__cta--chu" title={deadlineFact(dau)}>{dau.validationCode} · {dau.title}</span>}
         </div>}
       </div>
       {/* Bốn ô số nằm NGAY TRONG hero (đúng bản thiết kế): ô "Quá hạn" là số
@@ -244,20 +250,19 @@ export function TodayCommandCenterContent({
         <MetricGrid label="Việc hôm nay" items={[
           oSo("overdue", "Quá hạn", model.kpis.overdue, "danger", "cần xử lý trước tiên"),
           oSo("today", "Hạn hôm nay", model.kpis.today, "warning", "cần theo dõi trong ngày"),
-          oSo("upcoming", "Trong 7 ngày", model.kpis.upcoming, "warning", "chuẩn bị trước hạn"),
-          oSo("incomplete", "Hồ sơ cần hoàn thiện", model.kpis.dataQuality, "info", "bổ sung thông tin còn thiếu"),
+          oSo("upcoming", "Tới hạn 7 ngày", model.kpis.upcoming, "warning", "chuẩn bị trước hạn"),
+          oSo("incomplete", "Hồ sơ cần hoàn thiện", model.kpis.dataQuality, "neutral", "bổ sung thông tin còn thiếu"),
         ]} />
       </div>
     </section>
-    <TodayRightsNotice status={rightsState.status} error={rightsState.error} onRetry={onRetryRights} />
+    <TodayRightsNotice status={rightsState.status} onRetry={onRetryRights} />
     {model.rows.length === 0 ? (hasScopeFilters
       ? <StateBoundary state="filtered-empty" title="Không có việc trong phạm vi đã lọc"
           description={scopeLabel ? `Phạm vi hiện tại: ${scopeLabel}.` : "Phạm vi hiện tại không có việc phù hợp."} onClearFilters={onClearScope} />
-      : <StateBoundary state="empty" title="Không còn việc gấp nào" description="Không có hạng mục quá hạn, đến hạn hôm nay, trong bảy ngày tới hoặc cần hoàn thiện." />
+      : <StateBoundary state="empty" title="Không còn việc gấp nào" />
     ) : <div className="lp-supporting-layout hn-bo-cuc"><div className="hn-chinh">
       {locNhom !== null && model.sections[locNhom].length === 0 && <StateBoundary state="filtered-empty"
-        title={`Nhóm "${SECTION_META[locNhom].label}" đang trống`} description="Bấm lại ô số liệu hoặc xoá bộ lọc để xem đủ bốn nhóm."
-        onClearFilters={() => setLocNhom(null)} />}
+        title={`Nhóm "${SECTION_META[locNhom].label}" đang trống`} onClearFilters={() => setLocNhom(null)} />}
       {nhomHien.map((section) => <TodayQueueSection key={section} section={section}
         rows={model.sections[section]} expandedCode={expandedCode} onToggle={toggle} onOpenProgress={onOpenProgress} />)}
     </div><TodaySupportingPane row={selectedRow} onOpenProgress={onOpenProgress}
@@ -279,6 +284,7 @@ export default function TodayCommandCenter({
       setRightsState({ status: "ready", rights, error: "" });
     } catch (cause) {
       if (!rightsGate.current.isCurrent(request)) return;
+      console.error("[Hôm nay] Không tải được quyền cập nhật tiến độ:", cause);
       setRightsState({ status: "error", rights: EMPTY_RIGHTS,
         error: cause instanceof Error ? cause.message : "Không thể xác nhận quyền cập nhật tiến độ" });
     }
@@ -296,7 +302,7 @@ export default function TodayCommandCenter({
     [acts, modelNow, rightsState.rights, rightsState.status]);
   if (state === "loading") return <StateBoundary state="loading" title="Đang tải việc hôm nay" skeletonRows={4} />;
   if (state === "error") return <StateBoundary state="error" title="Chưa tải được dữ liệu"
-    description="Không đọc được danh sách hạng mục. Thử lại, hoặc kiểm tra kết nối." onRetry={onRetry} />;
+    description="Không tải được danh sách." onRetry={onRetry} />;
   return <TodayCommandCenterContent model={model} rightsState={rightsState} scopeLabel={scopeLabel} updatedLabel={updatedLabel}
     hasScopeFilters={hasScopeFilters} onClearScope={onClearScope} onOpenProgress={onOpenProgress} onRetryRights={() => { void reloadRights(); }} />;
 }

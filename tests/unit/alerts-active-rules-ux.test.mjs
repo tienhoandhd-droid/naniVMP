@@ -60,11 +60,11 @@ test("asynchronous AI errors are announced", async () => {
   assert.equal(typeof alerts.AlertAiError, "function");
 
   const html = renderToStaticMarkup(React.createElement(alerts.AlertAiError, {
-    message: "Lỗi kết nối n8n.",
+    message: "Không kết nối được AI. Thử lại sau.",
   }));
 
   assert.match(html, /role="alert"/);
-  assert.match(html, /Lỗi kết nối n8n\./);
+  assert.match(html, /Không kết nối được AI\. Thử lại sau\./);
 });
 
 test("bulk recalculation confirmation opens only on request and closes after cancel or confirm", async () => {

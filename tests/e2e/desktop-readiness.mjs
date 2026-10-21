@@ -58,7 +58,7 @@ try {
       // Account roles are a partial-source error: verified accounts remain visible.
       const errorRegion = view === "phanquyen" ? 'main [role="status"]' : 'main [role="alert"]';
       if (view === "phanquyen") {
-        await page.waitForFunction(() => [...document.querySelectorAll('main [role="status"]')].some(el => el.textContent.includes("Nguồn roles chưa xác minh")));
+        await page.waitForFunction(() => [...document.querySelectorAll('main [role="status"]')].some(el => el.textContent.includes("Chưa tải được vai trò")));
       } else await page.waitForSelector(errorRegion, { timeout: 15_000 });
       const retry = await page.$eval(`${errorRegion} button`, (button) => button.textContent?.trim() ?? "");
       assert.match(retry, /Thử lại|Tải lại/);
@@ -68,12 +68,12 @@ try {
           "lỗi tải ban đầu không được giả làm kết quả cảnh báo sạch");
         assert.doesNotMatch(text, /Không phát hiện vấn đề nào/,
           "lỗi tải ban đầu không được giả làm kết quả chất lượng sạch");
-        assert.doesNotMatch(text, /Cảnh báo server sẽ gửi|Chất lượng dữ liệu \(0\)/,
+        assert.doesNotMatch(text, /Email cảnh báo sẽ gửi|Chất lượng dữ liệu \(0\)/,
           "lỗi tải ban đầu phải dừng ở readiness boundary chung thay vì dựng card rỗng");
       }
       if (view === "rules") {
         const errorText = await page.$eval("main [role=\"alert\"]", (alert) => alert.textContent ?? "");
-        assert.match(errorText, /Máy chủ không trả về dữ liệu luật/);
+        assert.match(errorText, /Không tải được\. Bấm Thử lại/);
       }
     } finally {
       await page.close();
@@ -173,7 +173,7 @@ try {
         text: main.textContent ?? "",
         caption: main.querySelector(".reg-table caption")?.textContent?.trim() ?? "",
       }));
-      assert.match(failed.text, /Đang hiển thị bản chụp theo ngưỡng 7 ngày/,
+      assert.match(failed.text, /Đang hiện mốc 7 ngày/,
         "refresh ngưỡng lỗi phải nói rõ rows vẫn thuộc snapshot 7 ngày");
       assert.match(failed.caption, /trong 7 ngày tới/,
         "caption phải mô tả snapshot đã commit, không mô tả intent 30 ngày bị lỗi");

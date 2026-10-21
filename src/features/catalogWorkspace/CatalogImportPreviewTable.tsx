@@ -56,14 +56,14 @@ function DiffDetail({ row }: { row: CatalogImportPreviewRow }) {
       <ul className="cw-import-preview__errors">
         {row.errors.map((error, index) => (
           <li key={`${error.code}-${index}`}>
-            <b>{error.code}</b>: {error.message}{error.field ? ` · ${FIELD_LABELS.get(error.field) ?? error.field}` : ""}
+            {error.message}{error.field ? ` · ${FIELD_LABELS.get(error.field) ?? "Trường khác"}` : ""}
           </li>
         ))}
       </ul>
     );
   }
   if (row.classification === "unchanged") {
-    return <p className="cw-nhe">Server xác nhận dòng này không làm thay đổi dữ liệu.</p>;
+    return <p className="cw-nhe">Không đổi.</p>;
   }
   const changes = catalogImportRowDiff(row);
   if (changes.length === 0) return <p className="cw-nhe">Không có trường thay đổi để hiển thị.</p>;
@@ -117,10 +117,10 @@ export default function CatalogImportPreviewTable({
     <section className="cw-import-preview" aria-labelledby="cw-import-preview-title">
       <div className="cw-import-preview__head">
         <div>
-          <h3 id="cw-import-preview-title">Đối chiếu do máy chủ xác nhận</h3>
+          <h3 id="cw-import-preview-title">Xem trước</h3>
           <p className="cw-nhe" aria-live="polite">Đã tải {state.loaded}/{batch.total} dòng</p>
         </div>
-        <div className="cw-import-preview__summary" aria-label="Tổng phân loại từ máy chủ">
+        <div className="cw-import-preview__summary" aria-label="Tổng kết">
           <span className="cw-import-preview__metric is-create" data-cw-preview-count="create"><span>Tạo mới</span><b>{batch.counts.created}</b></span>
           <span className="cw-import-preview__metric is-update" data-cw-preview-count="update"><span>Cập nhật</span><b>{batch.counts.updated}</b></span>
           <span className="cw-import-preview__metric" data-cw-preview-count="unchanged"><span>Không đổi</span><b>{batch.counts.unchanged}</b></span>
@@ -142,7 +142,7 @@ export default function CatalogImportPreviewTable({
 
       <div className="cw-import-preview__scroll">
         <table data-cw-import-preview-table>
-          <caption>Chi tiết các dòng đã được máy chủ đối chiếu</caption>
+          <caption>Chi tiết từng dòng</caption>
           <thead><tr><th>Dòng</th><th>Mã</th><th>Trạng thái</th><th>Thay đổi / lỗi</th><th>Lý do ngoại lệ</th></tr></thead>
           <tbody>
             {rows.map((row) => {

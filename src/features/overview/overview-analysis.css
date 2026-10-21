@@ -20,11 +20,11 @@
 .overview-analysis-studio__eyebrow {
   display: block;
   margin-bottom: 8px;
-  color: var(--lp-rose);
+  color: var(--lp-brand);
   font-size: 12px;
-  font-weight: 900;
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .overview-analysis-studio__header h2 {
@@ -80,7 +80,7 @@
   border: 1px solid var(--lp-gold-hairline);
   border-radius: 50%;
   background: var(--lp-bg-raised);
-  color: var(--lp-rose);
+  color: var(--lp-brand);
   font-family: var(--ff-num);
   font-size: 12px;
   font-weight: 900;
@@ -151,7 +151,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 13px;
-  color: var(--lp-rose);
+  color: var(--lp-brand);
 }
 
 .analysis-scope-note {
@@ -179,7 +179,7 @@
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-r-card);
   background: color-mix(in srgb, var(--lp-bg-raised) 88%, transparent);
-  box-shadow: 0 10px 25px rgb(47 36 48 / .05);
+  box-shadow: 0 10px 25px color-mix(in srgb, var(--lp-shadow-ink) 5%, transparent);
 }
 
 .analysis-flow__stage-head {
@@ -230,7 +230,7 @@
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-r-pill);
   background: var(--lp-bg-surface);
-  color: var(--lp-rose);
+  color: var(--lp-brand);
   font-family: var(--ff-num);
   font-size: 12px;
   font-weight: 900;
@@ -308,9 +308,9 @@
   margin-right: 2px;
   color: var(--lp-ink-muted);
   font-size: 12px;
-  font-weight: 900;
-  letter-spacing: .04em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .analysis-matrix__choice button { padding: 0 12px; }
@@ -352,7 +352,8 @@
   border: 1px solid color-mix(in srgb, var(--matrix-accent) 34%, var(--lp-line));
   border-radius: var(--lp-r-pill);
   background: color-mix(in srgb, var(--matrix-soft) 76%, var(--lp-bg-raised));
-  color: var(--matrix-accent);
+  /* Chữ chú giải mặc mực chữ; chấm màu bên cạnh mới mang danh tính. */
+  color: var(--lp-text-secondary);
   font-size: 12px;
   font-weight: 850;
   line-height: 1.2;
@@ -431,11 +432,11 @@
   background: var(--lp-bg-raised);
   color: var(--lp-ink-muted);
   font-size: 12px;
-  font-weight: 900;
-  letter-spacing: .045em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   line-height: 1.3;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -463,7 +464,7 @@
   border-left: 3px solid var(--lp-gold-hairline);
   border-radius: 10px 0 0 12px;
   background: var(--matrix-row-surface);
-  box-shadow: 8px 0 18px rgb(47 36 48 / .055);
+  box-shadow: 8px 0 18px color-mix(in srgb, var(--lp-shadow-ink) 5.5%, transparent);
   text-align: left;
 }
 
@@ -509,7 +510,7 @@
     linear-gradient(138deg,
       color-mix(in srgb, var(--matrix-soft) 88%, var(--lp-bg-raised)),
       color-mix(in srgb, var(--matrix-soft) 48%, var(--lp-bg-raised)));
-  box-shadow: 0 7px 16px rgb(47 36 48 / .045);
+  box-shadow: 0 7px 16px color-mix(in srgb, var(--lp-shadow-ink) 4.5%, transparent);
   color: var(--matrix-accent);
   cursor: pointer;
   flex-direction: column;
@@ -722,6 +723,9 @@
   .analysis-matrix__choice > span { width: 100%; }
   .analysis-matrix__choice button,
   .analysis-comparison-switch button { min-height: 44px; }
+  /* A7 (21/10): điện thoại không bắt kéo ngang — các nút so sánh xuống dòng. */
+  .analysis-comparison-switch { flex-wrap: wrap; overflow-x: visible; }
+  .analysis-comparison-switch button { flex: 1 1 calc(50% - 7px); white-space: normal; }
   .analysis-matrix__choice button { flex: 1 1 calc(50% - 6px); padding: 0 9px; }
   .analysis-matrix__hint { min-width: 0; }
   .analysis-matrix-table__corner,

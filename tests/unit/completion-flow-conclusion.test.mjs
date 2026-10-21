@@ -11,6 +11,6 @@ test("flow conclusion does not call independently measured stages even when no s
     { id: "vmp", label: "Hoàn thành VMP", short: "VMP", done: 1, total: 4, rate: 25, deltaFromPrevious: 25 },
   ]);
 
-  assert.match(conclusion.chinh, /Không ghi nhận mức giảm giữa các giai đoạn/);
+  assert.match(conclusion.chinh, /Không có khâu tắc/);
   assert.doesNotMatch(conclusion.chinh, /đi đều nhau/);
 });

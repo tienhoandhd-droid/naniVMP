@@ -15,6 +15,7 @@ import {
   MA_BO_PHAN_KHAC,
   truongThieuDauTien,
   firstCatalogFormErrorTarget,
+  boPhanCongNguoi,
 } from "../../src/lib/catalogForm.ts";
 
 const hopLe = {
@@ -116,7 +117,7 @@ test("phân công QA cần lý do truy vết nhưng không phải thay đổi ti
 
 test("gợi ý lý do của phân công QA không nói sai rằng timeline sẽ thay đổi", () => {
   assert.doesNotMatch(goiYLyDoThayDoi({ owner_person_id: "x" }), /timeline/i);
-  assert.match(goiYLyDoThayDoi({ frequency_months: 6 }), /timeline/i);
+  assert.match(goiYLyDoThayDoi({ frequency_months: 6 }), /hạn chót/i);
 });
 
 test("mã đối tượng khoá sau khi tạo", () => {
@@ -197,4 +198,13 @@ test("tình trạng dùng đúng bộ chữ của dữ liệu thật", () => {
   for (const v of ["Hoạt động", "Ngưng hoạt động", "Chưa hoạt động"]) {
     assert.equal(validateCatalogForm({ ...hopLe, status: v }).status, undefined, v);
   }
+});
+
+test("bỏ phân công xoá cả tên cũ nên không bị chặn lưu", () => {
+  // HT-16/17/18: người hỗ trợ cũ không còn hợp lệ; bỏ phân công phải lưu được.
+  const banGoc = { ...hopLe, support_name: "Người cũ", support_person_id: "p-cu" };
+  const sau = boPhanCongNguoi(banGoc, "support_person_id");
+  assert.equal(sau.support_person_id, "");
+  assert.equal(sau.support_name, "");
+  assert.equal(validateCatalogForm(sau, banGoc).support_person_id, undefined);
 });

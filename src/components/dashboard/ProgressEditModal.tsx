@@ -18,6 +18,7 @@ import { TT_OPTS } from "../../constants/vmp.ts";
 import { txt, nguoiPhuTrach, stageOf } from "../../utils/helpers.ts";
 import { toISO } from "../../lib/n8nAdapter.ts";
 import { formatBangkokDateTime } from "../../lib/formatBangkok.ts";
+import { businessRoleLabel, isBusinessRole } from "../../lib/businessRoles.ts";
 import {
   fetchTimelineFieldPermission,
   fetchItemProgressHistory,
@@ -112,7 +113,7 @@ const CHUOI = [
   { n: 1, ten: "Đề cương",          d: "ngay_de_cuong",  t: "tt_de_cuong",  dl: "dl_de_cuong",  goc: "tt_de_cuong_goc" },
   { n: 2, ten: "Thẩm định thực tế", d: "ngay_tham_dinh", t: "tt_tham_dinh", dl: "dl_tham_dinh", goc: "tt_tham_dinh_goc" },
   { n: 3, ten: "Báo cáo",           d: "ngay_bao_cao",   t: "tt_bao_cao",   dl: "dl_bao_cao",   goc: "tt_bao_cao_goc" },
-  { n: 4, ten: "Tổng kết VMP",      d: "ngay_vmp",       t: "tt_vmp",       dl: "dl_vmp",       goc: "tt_vmp_goc" },
+  { n: 4, ten: "Đích VMP",          d: "ngay_vmp",       t: "tt_vmp",       dl: "dl_vmp",       goc: "tt_vmp_goc" },
 ] as const;
 
 const ngayVN = (s: string) => (s ? s.split("-").reverse().join("/") : "—");
@@ -205,7 +206,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   const [err, setErr] = useState("");
   const [fieldPermission, setFieldPermission] = useState<TimelineFieldPermission | null>(() =>
     permissionMode
-      ? { mode: permissionMode, canView: true, editableFields: editableFields || [], reason: editableFields?.length ? "Theo quyền hiệu lực" : "Chỉ xem" }
+      ? { mode: permissionMode, canView: true, editableFields: editableFields || [], reason: editableFields?.length ? "Được sửa" : "Chỉ xem" }
       : null
   );
   const [permissionError, setPermissionError] = useState("");
@@ -215,7 +216,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
         mode: permissionMode,
         canView: true,
         editableFields: editableFields || [],
-        reason: editableFields?.length ? "Theo quyền hiệu lực" : "Chỉ xem",
+        reason: editableFields?.length ? "Được sửa" : "Chỉ xem",
       });
       setPermissionError("");
       return;
@@ -238,7 +239,8 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
         setFieldPermission(permission);
       }).catch((error: unknown) => {
         if (!active || currentRequest !== requestVersion) return;
-        setPermissionError((error as Error).message || "Không tải được quyền hạng mục");
+        console.error("[ProgressEditModal] Không tải được quyền hạng mục", error);
+        setPermissionError("Chưa tải được quyền");
         setF({ ...init });
         setReason("");
         setErr("");
@@ -345,7 +347,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       const canValidateStatusOrder = canEditForm(tr.t) && canEditForm(sau.t);
       if (canValidateDateOrder && dTr && dSau && dSau < dTr) {
         out.push({
-          msg: `Ngày ${sau.ten.toLowerCase()} (${ngayVN(dSau)}) sớm hơn ngày ${tr.ten.toLowerCase()} (${ngayVN(dTr)}).`,
+          msg: `Ngày ${sau.ten.charAt(0).toLowerCase() + sau.ten.slice(1)} (${ngayVN(dSau)}) sớm hơn ngày ${tr.ten.charAt(0).toLowerCase() + tr.ten.slice(1)} (${ngayVN(dTr)}).`,
           keys: [tr.d, sau.d],
         });
       }
@@ -378,7 +380,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
       const canValidateStage = canEditForm(b.d) && canEditForm(b.t);
       if (canValidateStage && f[b.t] === "Hoàn thành" && !f[b.d]) {
         out.push({
-          msg: `${b.ten} ghi HOÀN THÀNH nhưng chưa có ngày thực tế — ALCOA+ đòi ghi rõ xong lúc nào.`,
+          msg: `${b.ten}: Hoàn thành nhưng thiếu ngày thực tế (ALCOA+).`,
           keys: [b.t, b.d],
         });
       }
@@ -412,8 +414,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   const thieuGi = (!formChanged && !whoChanged)
     ? "chưa sửa ô nào"
     : ngayTuongLai.length
-      ? `ngày hoàn thành thực tế không thể ở tương lai — ${ngayTuongLai.join(", ")}. `
-        + `Hôm nay là ${ngayVN(todayISO())}.`
+      ? `ngày hoàn thành thực tế không thể ở tương lai — ${ngayTuongLai.join(", ")}.`
     : chan.length
       ? "còn mâu thuẫn giữa các bước — " + chan.map((v) => v.msg).join(" ")
       : (needsReason && !reason.trim())
@@ -428,7 +429,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
     }
     if (chan.length) {
       setErr("Không lưu được vì mâu thuẫn giữa các bước: " + chan.map((v) => v.msg).join(" ")
-        + " Bốn bước phải theo đúng thứ tự đề cương → thẩm định → báo cáo → tổng kết VMP.");
+        + " Bốn bước phải theo đúng thứ tự đề cương → thẩm định → báo cáo → Đích VMP.");
       return;
     }
     if (needsReason && !reason.trim()) {
@@ -455,7 +456,8 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
         );
         if (!r.ok) { setErr(r.error || "Gán người thực hiện thất bại"); setSavingWho(false); return; }
       } catch (e) {
-        setErr((e as Error).message || "Gán người thực hiện thất bại");
+        console.error("[ProgressEditModal] Gán người thực hiện lỗi", e);
+        setErr("Chưa lưu được người thực hiện. Thử lại.");
         setSavingWho(false);
         return;
       }
@@ -499,7 +501,8 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
           return;
         }
       } catch (error) {
-        setErr((error as Error).message || "Cập nhật tiến độ thất bại");
+        console.error("[ProgressEditModal] Cập nhật tiến độ lỗi", error);
+        setErr("Chưa lưu được tiến độ. Thử lại.");
         return;
       } finally {
         setSavingProgress(false);
@@ -547,7 +550,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
             )}
             {!isDone && canMarkDone && (
               <button onClick={markDone(dCol, tCol)} disabled={khoaBoiTruoc}
-                title={khoaBoiTruoc ? `Phải xong "${truoc!.ten}" trước đã — bốn bước đi theo thứ tự.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
+                title={khoaBoiTruoc ? `Cần xong "${truoc!.ten}" trước.` : "Điền ngày hôm nay + trạng thái Hoàn thành trong 1 bấm"}
                 style={{ padding: "5px 11px", borderRadius: 999, border: `1px solid ${khoaBoiTruoc ? C.pinkSoft : C.mint}`, background: khoaBoiTruoc ? C.pinkMist : C.mintSoft, color: khoaBoiTruoc ? C.plumSoft : C.mintText, fontFamily: TEXT, fontSize: 12, fontWeight: 800, cursor: khoaBoiTruoc ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
                 ✓ Xong hôm nay
               </button>
@@ -573,20 +576,17 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
           <div style={{ ...FIELD, marginTop: 12 }}>
             <label style={LBL} htmlFor="pem-lich-td">Lịch thẩm định (bộ phận xếp)</label>
             <input id="pem-lich-td" type="datetime-local" value={f.lich_td} onChange={set("lich_td")} style={{ ...INP }} />
-            <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-              Ngày bộ phận hẹn vào làm. Khác với ngày hoàn thành thực tế ở trên.
-            </span>
           </div>
         )}
         {/* Chữ gốc trong Sheet — nhiều ô ghi kiểu "Chờ thẩm định thực tế",
             "Chờ xử lý"; ô chọn 4 nhãn ở trên nuốt mất sắc thái đó. */}
         {ttGoc && (
           <div style={{ marginTop: 8, fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-            Dữ liệu gốc ghi: <b style={{ color: C.plum }}>{ttGoc}</b>
+            Ghi chú cũ: <b style={{ color: C.plum }}>{ttGoc}</b>
           </div>
         )}
         {canEditForm(dCol) && f[tCol] === "Hoàn thành" && !f[dCol] && (
-          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: "#b00020" }}>
+          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: "var(--lp-danger)" }}>
             Đã ghi Hoàn thành nhưng thiếu ngày thực tế — sẽ bị báo lỗi ALCOA+.{" "}
             <button onClick={() => setF((p) => ({ ...p, [dCol]: todayISO() }))}
               style={{ border: "none", background: "none", color: C.mintText, fontFamily: TEXT, fontWeight: 800, fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
@@ -617,9 +617,9 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
                 : "Quyền xem hạng mục đã bị thu hồi"}
           </div>
           {contentState === "checking"
-            ? "Nội dung hạng mục sẽ chỉ hiện sau khi kiểm tra quyền hoàn tất."
+            ? null
             : isError
-              ? `${permissionError || "Không tải được quyền hạng mục"}. Nội dung được ẩn để bảo vệ dữ liệu.`
+              ? "Chưa tải được quyền xem. Thử lại."
               : `${fieldPermission?.reason || "Bạn không còn được phân quyền xem hạng mục này"}. Nội dung đã được ẩn.`}
         </div>
       </ViewportDialog>
@@ -661,16 +661,15 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
         {permissionLoading
           ? "Đang kiểm tra quyền từng cột…"
           : isEnforced
-            ? <>🔒 <b>Quyền theo từng cột đang áp dụng.</b>{timelineViewOnly
-              ? ` Chỉ xem — ${fieldPermission?.reason || "không được sửa cột timeline nào"}.`
-              : ` Bạn được sửa ${fieldPermission?.editableFields.length || 0} cột timeline.`}</>
+            ? <>🔒 {timelineViewOnly
+              ? "Chỉ xem."
+              : `Bạn được sửa ${fieldPermission?.editableFields.length || 0} mục.`}</>
             : null}
-        {permissionError && <> Không tải được quyền: {permissionError} — tạm khóa để an toàn.</>}
+        {permissionError && <> Chưa tải được quyền. Tạm chỉ xem.</>}
       </div>
       {quickDone && canQuickDone && (
         <div style={{ background: C.mintSoft, border: `1px solid ${C.mint}`, borderRadius: 14, padding: "10px 14px", marginBottom: 16, fontSize: 12, fontWeight: 700, color: C.mintText, lineHeight: 1.55 }}>
-          ⚡ Đã điền sẵn <b>hôm nay + Hoàn thành</b> cho bước hiện tại — kiểm tra lại ngày,
-          chọn lý do rồi bấm Lưu. Chưa ghi gì cho tới khi bạn Lưu.
+          ⚡ Đã điền sẵn <b>hôm nay + Hoàn thành</b>. Chọn lý do rồi Lưu.
         </div>
       )}
       {/* Chuỗi bước: nhìn một dòng là biết đang tắc ở đâu và bước nào chờ bước
@@ -697,7 +696,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
           sửa được chính nó), nhưng phải nói ra chứ không im lặng. */}
       {nhac.length > 0 && (
         <div style={{ background: C.marigoldSoft, border: `1px solid ${C.marigold}`, borderRadius: 14, padding: "10px 14px", marginBottom: 14, fontSize: 12, fontWeight: 700, color: C.marigoldText, lineHeight: 1.6 }}>
-          ⚠ Hạng mục này đang có mâu thuẫn giữa các bước (có từ trước, không phải do bạn):
+          ⚠ Mâu thuẫn sẵn có giữa các bước:
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             {nhac.map((v, i) => <li key={i}>{v.msg}</li>)}
           </ul>
@@ -732,11 +731,11 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
             />
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.45 }}>
               {selectedPerformer
-                ? <>Email: <b style={{ color: C.plum }}>{selectedPerformer.email || "chưa có — liên hệ quản trị viên để bổ sung email cho hồ sơ nhân sự"}</b>{selectedPerformer.department ? ` · ${selectedPerformer.department}` : " · chưa có bộ phận"}</>
+                ? <>Email: <b style={{ color: C.plum }}>{selectedPerformer.email || "chưa có"}</b>{selectedPerformer.department ? ` · ${selectedPerformer.department}` : " · chưa có bộ phận"}</>
                 : ownerPersonIdNow && performerPersonId === ownerPersonIdNow
                   ? <b style={{ color: C.raspText }}>Liên kết hiện tại không còn trong danh sách người đang hoạt động — hãy chọn lại.</b>
-                  : "Chưa phân công. Liên hệ quản trị viên để cập nhật hồ sơ nhân sự."}
-              {whoChanged && <> · Áp dụng cho <b>mọi hạng mục của đối tượng {act.code}</b> (phân công lưu ở đối tượng nên không bị đồng bộ Sheet xoá).</>}
+                  : "Chưa phân công."}
+              {whoChanged && <> · Áp dụng cho <b>mọi hạng mục của đối tượng {act.code}</b>.</>}
             </span>
           </>
         ) : (
@@ -765,14 +764,14 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
         {/* C4 (31/08): label thật + aria — trình đọc màn hình đọc được nhãn
             khi vào ô, NGHE được lỗi khi nó xuất hiện (role=alert), và ô lý do
             tự khai "đang không hợp lệ" khi lỗi thuộc về nó. */}
-        <label style={LBL} htmlFor="pem-ly-do">Lý do {needsReason ? <b style={{ color: "#b00020" }}>(bắt buộc)</b> : "(tuỳ chọn)"}</label>
+        <label style={LBL} htmlFor="pem-ly-do">Lý do {needsReason ? <b style={{ color: "var(--lp-danger)" }}>(bắt buộc)</b> : "(tuỳ chọn)"}</label>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {REASON_CHIPS.map((r) => (
             <button key={r} onClick={() => { setReason(r); if (err) setErr(""); }}
               style={{ padding: "5px 11px", borderRadius: 999, border: "none", cursor: "pointer",
                        fontFamily: TEXT, fontSize: 12, fontWeight: 700,
                        background: reason === r ? C.plum : C.pinkSoft,
-                       color: reason === r ? "#fff" : C.plumSoft }}>
+                       color: reason === r ? "var(--lp-on-ink)" : C.plumSoft }}>
               {r}
             </button>
           ))}
@@ -782,7 +781,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
           aria-invalid={!!err && /LÝ DO/i.test(err)}
           aria-describedby={err ? "pem-loi" : undefined}
           style={{ ...INP, resize: "vertical", minHeight: 54 }} />
-        {err && <span id="pem-loi" role="alert" style={{ color: "#b00020", fontSize: 12, fontWeight: 700 }}>{err}</span>}
+        {err && <span id="pem-loi" role="alert" style={{ color: "var(--lp-danger)", fontSize: 12, fontWeight: 700 }}>{err}</span>}
       </div>
       {/* CÒN THIẾU GÌ — nói NGAY CẠNH NÚT, trước khi bấm.
           Đo được (2026-08-01): đường ghi từ web hoạt động tốt, nhưng người
@@ -804,14 +803,13 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
           Lý do nhập NGAY TẠI ĐÂY thay vì window.prompt: prompt hệ thống không
           có gợi ý, bấm nhầm Cancel là mất, và không đồng bộ giao diện. */}
       {canDoiTrangThai && onChangeState && (
-        <div style={{ marginTop: 18, padding: 14, borderRadius: 14, background: "#FFF5FA", border: `1px dashed ${C.pinkSoft}` }}>
+        <div style={{ marginTop: 18, padding: 14, borderRadius: 14, background: "var(--lp-rose-soft)", border: `1px dashed ${C.pinkSoft}` }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, marginBottom: 8 }}>
-            ⚙️ Trạng thái nghiệp vụ (chỉ admin / QA manager)
+            ⚙️ Trạng thái hạng mục
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>Hiện tại:</span>
             <StateBadge state={String(currentState)} small />
-            {currentState === "active" && <span style={{ fontSize: 12, color: C.plumSoft }}>(đang theo dõi bình thường)</span>}
             <div style={{ flex: 1 }} />
             {currentState === "active" ? (
               <>
@@ -819,13 +817,13 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
                 <button onClick={() => { setPendingState(pendingState === "cancelled" ? null : "cancelled"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 8, border: `1px solid ${C.marigold}`, background: pendingState === "cancelled" ? C.marigoldSoft : C.surface, color: C.marigoldText, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>⊘ Hủy hạng mục</button>
               </>
             ) : (
-              <button onClick={() => { setPendingState(pendingState === "active" ? null : "active"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 8, border: `1px solid ${C.mint}`, background: pendingState === "active" ? C.mintSoft : C.surface, color: C.mintText, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>↻ Khôi phục Active</button>
+              <button onClick={() => { setPendingState(pendingState === "active" ? null : "active"); setStateReason(""); }} style={{ padding: "6px 11px", borderRadius: 8, border: `1px solid ${C.mint}`, background: pendingState === "active" ? C.mintSoft : C.surface, color: C.mintText, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>↻ Khôi phục theo dõi</button>
             )}
           </div>
           {pendingState && (
             <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={LBL} htmlFor="pem-ly-do-trang-thai">
-                Lý do {pendingState === "active" ? "KHÔI PHỤC về Active" : pendingState === "not_applicable" ? 'đánh dấu "Không áp dụng"' : "HỦY hạng mục"} <b style={{ color: "#b00020" }}>(bắt buộc)</b>
+                Lý do {pendingState === "active" ? "khôi phục" : pendingState === "not_applicable" ? 'đánh dấu "Không áp dụng"' : "HỦY hạng mục"} <b style={{ color: "var(--lp-danger)" }}>(bắt buộc)</b>
               </label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <input id="pem-ly-do-trang-thai" value={stateReason} onChange={(e) => setStateReason(e.target.value)} autoFocus
@@ -861,6 +859,27 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   );
 }
 
+/** Nhãn tiếng Việt cho lịch sử: cùng bộ hành động với màn Nhật ký, cột lấy
+ *  từ CHUỖI bốn bước (tên control trên form và tên cột DB tương ứng). */
+const HISTORY_ACTION_LABEL: Record<string, string> = {
+  INSERT: "Tạo mới",
+  UPDATE: "Cập nhật tiến độ",
+  DELETE: "Xoá",
+  STATUS_CHANGE: "Đổi trạng thái",
+  DEADLINE_CHANGE: "Đổi hạn",
+};
+const HISTORY_FIELD_LABEL: Record<string, string> = Object.fromEntries(
+  CHUOI.flatMap((b) => {
+    const ten = b.ten.charAt(0).toLowerCase() + b.ten.slice(1);
+    return [
+      [b.d, `Ngày ${ten}`],
+      [b.t, `Trạng thái ${ten}`],
+      [FORM_TO_DB_COLUMN[b.d], `Ngày ${ten}`],
+      [FORM_TO_DB_COLUMN[b.t], `Trạng thái ${ten}`],
+    ];
+  }).concat([["lich_td", "Lịch thẩm định"], ["scheduled_at", "Lịch thẩm định"]]),
+);
+
 /* ====================================================================
  *  Lịch sử thay đổi của một hạng mục — bấm mới tải, tải rồi giữ nguyên.
  * ==================================================================== */
@@ -878,7 +897,11 @@ function LichSuHangMuc({ operationTarget }: { operationTarget: ProgressModalOper
     setTt("dang");
     const kq = await operationTarget.run(fetchItemProgressHistory);
     if (kq.ok) { setRows(kq.history); setTong(kq.total); setTt("xong"); }
-    else { setLoi(kq.error || "Không đọc được lịch sử"); setTt("loi"); }
+    else {
+      console.error("[ProgressEditModal] Không tải được lịch sử", kq.error);
+      setLoi("Không tải được lịch sử. Thử lại sau.");
+      setTt("loi");
+    }
   };
 
   return (
@@ -911,11 +934,11 @@ function LichSuHangMuc({ operationTarget }: { operationTarget: ProgressModalOper
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", color: C.plum, fontWeight: 700 }}>
                 <span>{formatBangkokDateTime(h.created_at)}</span>
                 <span>· {h.actor}</span>
-                <span style={{ color: C.plumSoft, fontWeight: 600 }}>({h.effective_business_role})</span>
+                <span style={{ color: C.plumSoft, fontWeight: 600 }}>({isBusinessRole(h.effective_business_role) ? businessRoleLabel(h.effective_business_role) : h.effective_business_role})</span>
               </div>
               <div style={{ color: C.plumSoft }}>
-                {h.action}
-                {h.changed_fields?.length ? ` · cột: ${h.changed_fields.join(", ")}` : ""}
+                {HISTORY_ACTION_LABEL[h.action] ?? h.action}
+                {h.changed_fields?.length ? ` · ${h.changed_fields.map((k) => HISTORY_FIELD_LABEL[k] ?? k).join(", ")}` : ""}
               </div>
               {h.reason && <div style={{ color: C.plum }}>Lý do: {h.reason}</div>}
             </li>

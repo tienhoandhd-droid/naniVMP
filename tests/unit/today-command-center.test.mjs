@@ -83,7 +83,7 @@ test("Today content presents four queues, reason badges, safe CTA, and accordion
   const html = render(contentProps());
   assert.match(html, /Quá hạn/);
   assert.match(html, /Đến hạn hôm nay/);
-  assert.match(html, /Trong 7 ngày tới/);
+  assert.match(html, /Tới hạn 7 ngày/);
   assert.match(html, /Hồ sơ cần hoàn thiện/);
   assert.match(html, /Chưa phân công QA/);
   assert.match(html, /Đang chờ Đề cương/);
@@ -91,7 +91,7 @@ test("Today content presents four queues, reason badges, safe CTA, and accordion
   assert.match(html, /Cập nhật tiến độ/);
   assert.match(html, /Xem chi tiết/);
   assert.match(html, /Làm trước tiên/);
-  assert.match(html, /Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật/);
+  assert.doesNotMatch(html, /Ưu tiên theo hạn, mức độ quan trọng và quyền cập nhật/);
   assert.match(html, /Đến hạn trong 7 ngày/);
   assert.match(html, /Chưa lên lịch/);
   assert.match(html, /QA phụ trách/);
@@ -100,7 +100,8 @@ test("Today content presents four queues, reason badges, safe CTA, and accordion
   const ownerCells = html.match(/<span class="hn-muc__nguoi">[\s\S]*?<\/span>/g) ?? [];
   assert.ok(ownerCells.length > 0);
   ownerCells.forEach((cell) => assert.doesNotMatch(cell, /<i>/));
-  assert.match(html, /<dt>Phòng ban<\/dt><dd>QA<\/dd>/);
+  assert.match(html, /<dt>Bộ phận<\/dt><dd>QA<\/dd>/);
+  assert.doesNotMatch(html, /<dt>Quyền cập nhật<\/dt>/);
   assert.equal(count(html, /aria-controls=/g), 8);
   assert.equal(count(html, /role="region"/g), 4);
   assert.equal(count(html, /aria-expanded="false"/g), 8);
@@ -148,7 +149,7 @@ test("selected desktop pane offers Bỏ chọn without changing editable or read
 
 test("Today content keeps rows readable while rights load or fail closed", () => {
   const loadingHtml = render(contentProps(loadingRights));
-  assert.match(loadingHtml, /Đang kiểm tra quyền/);
+  assert.doesNotMatch(loadingHtml, /Đang kiểm tra quyền/);
   assert.match(loadingHtml, /V-OVERDUE/);
 
   const readOnlyRows = rows.map((row) => ({ ...row, canEditProgress: false, editableFields: [] }));
@@ -162,8 +163,8 @@ test("Today content keeps rows readable while rights load or fail closed", () =>
     nextAction: readOnlyRows[0],
   };
   const errorHtml = render(contentProps(errorRights, { model: failClosedModel }));
-  assert.match(errorHtml, /Chưa xác minh được quyền cập nhật/);
-  assert.match(errorHtml, /Máy chủ chưa phản hồi/);
+  assert.match(errorHtml, /Chưa tải được quyền cập nhật/);
+  assert.doesNotMatch(errorHtml, /Máy chủ chưa phản hồi/);
   assert.match(errorHtml, /V-OVERDUE/);
   assert.equal(count(errorHtml, /<button[^>]*>Thử lại quyền<\/button>/g), 1);
   assert.doesNotMatch(errorHtml, /Cập nhật tiến độ/);

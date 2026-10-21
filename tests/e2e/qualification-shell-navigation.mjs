@@ -37,7 +37,7 @@ async function sidebarPalette(page) {
       surface: sidebar.backgroundColor,
       activeSurface: active.backgroundColor,
       activeText: active.color,
-      texts: ['.vmp-nav:not([aria-current="page"])', '.vmp-nav-group-heading', '.qualification-nav__system-toggle', '.vq-brand__donvi', '.vq-brand__team']
+      texts: ['.vmp-nav:not([aria-current="page"])', '.vmp-nav-group-heading', '.qualification-nav__system-toggle', '.vq-brand__donvi', '.vmp-masthead__mp']
         .map((selector) => style(`.vmp-sidebar ${selector}`).color),
     };
   });
@@ -101,7 +101,10 @@ try {
     return {
       headings: [...document.querySelectorAll(".vmp-sidebar .vmp-nav-group-heading")].map((node) => node.textContent?.trim()),
       hasLibrary: document.body.textContent?.includes("Thư viện biểu mẫu") ?? false,
+      /* 21/10: dải masthead chỉ còn ở Việc hôm nay; các màn khác nhận diện
+         bằng MỘT khối ở thanh bên (logo + VMP Monitor + V/Q Team). */
       mastheads: document.querySelectorAll(".vmp-masthead").length,
+      brandBlocks: document.querySelectorAll(".vmp-sidebar .vmp-brand-khoi").length,
       iconStroke: getComputedStyle(document.querySelector('.vmp-sidebar [data-view="today"] svg')).stroke,
       navColor: getComputedStyle(document.querySelector('.vmp-sidebar [data-view="today"]')).color,
       sideOverflow: (sidebar?.scrollWidth ?? 0) - (sidebar?.clientWidth ?? 0),
@@ -109,7 +112,8 @@ try {
   });
   assert.deepEqual(desktopContract.headings, ["THỰC HIỆN", "GIÁM SÁT", "THẨM ĐỊNH THỰC TẾ", "PHÂN TÍCH & QUẢN TRỊ"]);
   assert.equal(desktopContract.hasLibrary, false);
-  assert.equal(desktopContract.mastheads, 1);
+  assert.equal(desktopContract.mastheads, 0);
+  assert.equal(desktopContract.brandBlocks, 1);
   assert.equal(desktopContract.iconStroke,desktopContract.navColor,"inactive icons keep sidebar text contrast");
   assert.ok(desktopContract.sideOverflow <= 1, `sidebar overflow ${desktopContract.sideOverflow}`);
   await desktop.click(".qualification-nav__system-toggle");
@@ -117,6 +121,7 @@ try {
   await screenshot(desktop, 'desktop-expanded');
   await desktop.click('button[aria-label="Thu gọn menu"]');
   assert.equal(await desktop.$eval('.vmp-sidebar', (node) => Math.round(node.getBoundingClientRect().width)), 72);
+  assert.equal(await desktop.$$eval('.vmp-sidebar .vmp-brand-khoi img', (nodes) => nodes.length), 1, 'collapsed sidebar keeps its identity');
   await screenshot(desktop, 'desktop-collapsed');
   await desktop.click('button[aria-label="Mở rộng menu"]');
   const focusTarget = await desktop.$('.vmp-sidebar [data-view="today"]');
@@ -129,7 +134,9 @@ try {
   });
   assert.ok(focus.width >= 2 && contrast(focus.color, lightPalette.surface) >= 3, 'keyboard focus must be visible against the sidebar');
   await desktop.goto(`${origin}#v=reports`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await desktop.waitForFunction(() => document.querySelectorAll(".vmp-masthead").length === 1, { timeout: 12_000 });
+  await desktop.waitForFunction(() => document.querySelectorAll(".vmp-sidebar .vmp-brand-khoi").length === 1 && document.querySelectorAll(".vmp-masthead").length === 0, { timeout: 12_000 });
+  await desktop.goto(`${origin}#v=today`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await desktop.waitForFunction(() => document.querySelectorAll(".vmp-topbar .vmp-masthead").length === 1, { timeout: 12_000 });
   await desktop.close();
 
   const dark = await open({ width: 1440, height: 900 }, 'dark');
@@ -160,7 +167,7 @@ try {
     surface: getComputedStyle(document.querySelector('#vmp-mobile-drawer')).backgroundColor,
   }));
   assert.ok(contrast(mobileLink.color, mobileLink.surface) >= 4.5, 'mobile form links must remain readable');
-  const mobileTeamColor = await mobile.$eval('#vmp-mobile-drawer .vq-brand__team', (node) => getComputedStyle(node).color);
+  const mobileTeamColor = await mobile.$eval('#vmp-mobile-drawer .vq-brand__donvi', (node) => getComputedStyle(node).color);
   assert.ok(contrast(mobileTeamColor, mobileLink.surface) >= 4.5, 'mobile branding text must remain readable');
   await screenshot(mobile, 'mobile-drawer');
   await mobile.close();
@@ -175,20 +182,28 @@ try {
       dark: document.documentElement.dataset.theme,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       mastheads: document.querySelectorAll(".vmp-masthead").length,
+      mobileBar: getComputedStyle(document.querySelector(".vmp-mobile-bar")).display,
     }));
     assert.equal(compactContract.dark, "dark");
-    assert.equal(compactContract.mastheads, 1);
+    assert.equal(compactContract.mastheads, 0);
+    assert.equal(compactContract.mobileBar, "flex", "mobile keeps its identity in the top bar");
     assert.ok(compactContract.overflow <= 1, `${viewport.width}px overflow ${compactContract.overflow}`);
     await compact.close();
   }
 
-  const login = await browser.newPage();
+  /* 21/10: trang đăng nhập mở trong ngữ cảnh RIÊNG — ngữ cảnh mặc định còn
+     phiên giả lập của các trang trên, nên trước đây "trang đăng nhập" thực
+     ra là app đã đăng nhập (và chỉ đạt vì masthead lặp ở mọi màn). */
+  const loginContext = await browser.createBrowserContext();
+  const login = await loginContext.newPage();
   await caiGiaLap(login, { supabaseUrl, kichBan: "day", mangNghiemNgat: true, previewOrigin: origin });
   await login.setViewport({ width: 1440, height: 900 });
   await login.goto(origin, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await login.waitForFunction(() => document.querySelectorAll(".vmp-masthead").length === 1, { timeout: 12_000 });
   assert.equal(await login.$$eval(".vmp-masthead", (nodes) => nodes.length), 1);
+  assert.equal(await login.$$eval(".vq-brand-panel .vmp-masthead", (nodes) => nodes.length), 1, "masthead belongs to the login brand panel");
   await login.close();
+  await loginContext.close();
   console.log('PASS navigation: light/dark contrast, collapse, keyboard focus, qualification groups, mobile and access boundaries');
 } finally {
   await browser.close();

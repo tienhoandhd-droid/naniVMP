@@ -32,7 +32,7 @@ export const LEGACY_ACCESS_CLASSES = ["equipment_scheduler", "view_only"] as con
 /** Nhãn đọc được cho cả giá trị legacy — để bản ghi cũ không hiện mã thô. */
 export const NHAN_PHAN_LOAI_CU: Record<string, string> = {
   equipment_scheduler: "Điều phối thiết bị (giá trị cũ)",
-  view_only: "Chỉ xem (giá trị cũ — KHÔNG giải ra vai nào)",
+  view_only: "Chỉ xem (cũ)",
 };
 
 export type AccessClass =

@@ -131,7 +131,9 @@ function suaKhoRolePanel(kho) {
     people: accounts.map((row) => ({
       person_id: row.pid, user_id: row.user_id, employee_code: row.pid.toUpperCase(),
       full_name: row.ten, department: "qa", email: row.email, account_status: "linked",
-      access_class: row.user_id === USER_B ? "qa_progress_editor" : "admin",
+      /* "admin" không phải access_class hợp lệ (decodeDirectoryPerson từ chối
+         cả danh bạ). Tài khoản quản trị chưa phân loại nghiệp vụ → null. */
+      access_class: row.user_id === USER_B ? "qa_progress_editor" : null,
       scope_departments: [], scope_factory_ids: [], scope_area_ids: [], scope_line_ids: [],
       version: 1, access_areas: [], email_sent_confirmed: true, is_active: true,
       match_status: "unique",
@@ -236,6 +238,11 @@ function suaKhoQuanLyXuongTheoLuatServer(kho) {
       : { ...q, actions: ["view"] };
   }
   kho.rpc_my_ui_access = { ...goc, business_role: "workshop_manager", screens };
+  /* Vai xưởng tải tiến độ cả nhóm ở Việc hôm nay; RPC thiếu trong kho trả
+     null = sai hợp đồng. Dựng đúng hình dạng thật của rpc_team_overview_summary. */
+  kho.rpc_team_overview_summary = (body) => ({
+    ok: true, year: body?.p_year ?? 2026, total: 0, completed: 0, rate: 0, updated_at: null,
+  });
 }
 
 const EMAIL_AUTH_KHAC_HO_SO = "tai-khoan-auth@vi-du.test";
@@ -623,18 +630,18 @@ for (const [ten, suaKho] of [
 
 /* ---- 6. "Tính lại trạng thái" chỉ hiện với vai nghiệp vụ admin ------- */
 {
-  console.log("\nChất lượng dữ liệu → Kiểm tra trên máy chủ — nút Tính lại trạng thái:");
+  console.log("\nChất lượng dữ liệu → Kiểm tra toàn bộ — nút Tính lại trạng thái:");
 
   // 6a. Admin: thấy nút.
   const a = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "health" });
   await a.trang.evaluate(() => {
     [...document.querySelectorAll("button")]
-      .find((b) => b.textContent.includes("Kiểm tra trên máy chủ"))?.click();
+      .find((b) => b.textContent.includes("Kiểm tra toàn bộ"))?.click();
   });
   await cho(900);
   const coNutAdmin = await a.trang.evaluate(() =>
     [...document.querySelectorAll("button")].some((b) => b.textContent.includes("Tính lại trạng thái")));
-  kiem(coNutAdmin, "admin thấy nút Tính lại trạng thái ở tab Kiểm tra trên máy chủ");
+  kiem(coNutAdmin, "admin thấy nút Tính lại trạng thái ở tab Kiểm tra toàn bộ");
   await a.trang.close();
 
   // 6b. Quản lý QA bị chặn cả màn, nên không thể dựng nút ghi.
@@ -784,9 +791,9 @@ for (const [ten, suaKho] of [
       return emails.includes(cells[0]) ? [[cells[0], cells[3] || ""]] : [];
     }),
   ), [EMAIL_AUTH_KHAC_HO_SO, EMAIL_CHUA_CO_TAI_KHOAN]);
-  kiem(trangThai[EMAIL_AUTH_KHAC_HO_SO] === "rồi",
+  kiem(trangThai[EMAIL_AUTH_KHAC_HO_SO] === "Có",
     "email Auth đã có account khác email performer vẫn báo rồi", trangThai[EMAIL_AUTH_KHAC_HO_SO]);
-  kiem(trangThai[EMAIL_CHUA_CO_TAI_KHOAN].startsWith("chưa"),
+  kiem(trangThai[EMAIL_CHUA_CO_TAI_KHOAN] === "Chưa có",
     "email allowlist chưa có account báo chưa", trangThai[EMAIL_CHUA_CO_TAI_KHOAN]);
   await trang.close();
 }
@@ -871,7 +878,8 @@ for (const [ten, suaKho] of [
     });
   };
 
-  const a = await moTrang(trinhDuyet, { suaKho: suaKhoAdmin, hash: "phanquyen" });
+  /* Cần một dòng tài khoản có hồ sơ danh bạ thì nút "Xem quyền" mới có. */
+  const a = await moTrang(trinhDuyet, { suaKho: suaKhoRolePanel, hash: "phanquyen" });
   await cho(1500);
   const chonDuoc = await chonMotNguoi(a.trang);
   await cho(1200);
@@ -888,7 +896,7 @@ for (const [ten, suaKho] of [
   const admin = {
     coNoiTaiKhoan: chuTabTaiKhoan.includes("Nối tài khoản"),
     coMaTranManHinh: chuTabQuyenToi.includes("Màn hình bạn được xem"),
-    coQuyenHieuLuc: chuQuyenHieuLuc.includes("Quyền") && chuQuyenHieuLuc.includes("hiệu lực"),
+    coQuyenHieuLuc: chuQuyenHieuLuc.includes("Quyền theo hạng mục"),
   };
   kiem(admin.coNoiTaiKhoan, "admin vẫn nối/gỡ được tài khoản sau khi gộp màn");
   kiem(admin.coMaTranManHinh, "ma trận Màn hình bạn được xem theo sang màn mới");

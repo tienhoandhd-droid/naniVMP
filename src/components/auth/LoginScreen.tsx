@@ -98,7 +98,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
     setServerError("");
     if (Object.keys(nextErrors).length > 0) return;
     if (!useSupa) {
-      setServerError("Hệ thống chưa cấu hình Supabase Auth. Liên hệ IT để thiết lập VITE_SUPABASE_URL và VITE_SUPABASE_ANON.");
+      setServerError("Chưa đăng nhập được. Liên hệ IT.");
       return;
     }
 
@@ -129,7 +129,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
     setServerError("");
     if (emailIssue) return;
     if (!useSupa) {
-      setServerError("Hệ thống chưa cấu hình Supabase Auth. Liên hệ IT.");
+      setServerError("Chưa gửi được liên kết. Liên hệ IT.");
       return;
     }
 
@@ -168,7 +168,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
     setStep("login");
   };
 
-  const title = step === "login" ? "Đăng nhập VMP Monitor"
+  const title = step === "login" ? "Đăng nhập VMP"
     : step === "forgot" ? "Khôi phục mật khẩu" : "Kiểm tra email của bạn";
   const description = step === "login" ? getTimeOfDayGreeting()
     : step === "forgot"
@@ -271,7 +271,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
               <button className="vq-auth-resend" type="button" onClick={() => sendRecoveryMail()}
                 disabled={loading || secondsLeft > 0} aria-busy={loading}>
                 <RotateCcw size={15} aria-hidden="true" />
-                {loading ? "Đang gửi lại…" : secondsLeft > 0 ? `Gửi lại sau ${secondsLeft}s` : "Gửi lại liên kết"}
+                {loading ? "Đang gửi lại…" : secondsLeft > 0 ? `Gửi lại sau ${secondsLeft} giây` : "Gửi lại liên kết"}
               </button>
             </div>
           )}
@@ -283,7 +283,7 @@ export default function LoginScreen({ onLogin, initialMode = "login", notice = "
             </aside>
           ) : !useSupa ? (
             <aside className="vq-login-notice" role="status">
-              <strong>Chế độ tạm (chưa có Supabase)</strong>
+              <strong>Chưa sẵn sàng đăng nhập</strong>
               <span>Liên hệ IT để thiết lập xác thực trước khi đăng nhập.</span>
             </aside>
           ) : null}

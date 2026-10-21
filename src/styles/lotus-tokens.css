@@ -15,6 +15,12 @@
  *    · Raspberry chỉ dành cho lỗi và quá hạn.
  * ===================================================================== */
 
+/* Thang màu biểu đồ & giai đoạn (Đề cương / Thẩm định / Báo cáo / VMP) dùng
+   chung cho Tổng quan, Báo cáo VÀ Dòng thời gian — nạp toàn cục ở đây để
+   index.css cũng dùng được --chart-*, không phải giữ một bộ màu giai đoạn
+   thứ hai. @import phải đứng trước mọi quy tắc. */
+@import "./chart-palette.css";
+
 :root[data-visual="lotus-pearl"] {
   color-scheme: light;
 
@@ -29,15 +35,20 @@
    * < overlay (popover, modal). Light lấy chiều sâu bằng canvas đậm
    * hơn một bậc; dark lấy chiều sâu bằng elevation sáng dần về trước.
    * ================================================================== */
-  --lp-bg-canvas:  #F5F2EB;
-  --lp-bg-sunken:  #EAEDE6;
-  --lp-bg-surface: #FAFAF5;
-  --lp-bg-raised:  #FDFDF8;
-  --lp-bg-overlay: #FCFCF8;
+  /* 21/10 — bảng màu tinh giản: MỘT họ trung tính ánh mận (OKLCH hue 345,
+     độ bão hoà rất thấp), bỏ hẳn nền ánh vàng be / xanh rêu trộn lẫn làm
+     tổng thể bị đục. Thẻ trắng sứ tách khỏi nền trang 1.11:1 + viền mảnh. */
+  --lp-bg-canvas:  #F6F1F3;
+  --lp-bg-sunken:  #F1EBEE;
+  --lp-bg-surface: #FFFEFE;
+  --lp-bg-raised:  #FFFFFF;
+  --lp-bg-overlay: #FFFFFF;
 
-  --lp-text-primary:   #34272B;
-  --lp-text-secondary: #5F4D52; /* ~7.2:1 trên surface */
-  --lp-text-tertiary:  #77666B; /* chỉ metadata thật sự phụ (timestamp) */
+  /* Ba tầng chữ cách nhau đúng φ (1.618) về độ tương phản trên surface:
+     13.6 → 8.5 → 5.5:1. Tầng mờ nhất vẫn ≥ 4.5:1 trên cả nền lõm (4.70). */
+  --lp-text-primary:   #3A2832;
+  --lp-text-secondary: #5A4752;
+  --lp-text-tertiary:  #75646D;
 
   /* Brand SOLID (mảng sơn mài đặc, hero/anchor) tách hẳn khỏi brand
      ACCENT (link, selected). Ở dark, solid VẪN tối — không còn token
@@ -50,11 +61,13 @@
   /* Navigation is its own interaction layer: it must never borrow the
      * success/warning/danger palette. The selected location is a quiet,
      * deep plum field; jade only acknowledges a possible next action. */
-  --lp-nav-surface:    #FAFAF5;
-  --lp-nav-hover:      #EDF5EF;
-  /* Decorative atmosphere, separate from status and interaction colors. */
-  --lp-ambient-jade:   #EDF2EA;
-  --lp-ambient-petal:  #F3E8E6;
+  --lp-nav-surface:    #FFFEFE;
+  --lp-nav-hover:      #F3EAEF;
+  /* Decorative atmosphere, separate from status and interaction colors.
+     21/10: "jade" giữ tên cho tương thích nhưng về họ trung tính — ánh
+     xanh rêu trên nền hồng là nguồn chính của cảm giác "đục". */
+  --lp-ambient-jade:   #F1EBEE;
+  --lp-ambient-petal:  #F9E5E8;
   --lp-nav-current:    #4A2941;
   --lp-on-nav-current: #FFFDFC;
   --lp-nav-hairline:   #C7A15B;
@@ -78,18 +91,20 @@
   --lp-plum-600:  var(--lp-plum-2);
   --lp-rose:      #B35872;
   --lp-rose-600:  var(--lp-rose);
-  --lp-rose-soft: #F1ECEA;
+  --lp-rose-soft: #F8EAF1;
 
   /* --- Ngữ nghĩa ---------------------------------------------------- */
-  --lp-success:      #386958;
-  --lp-success-soft: #E1EFE8;
-  --lp-danger:       #A93F5A;
-  --lp-danger-soft:  #F7E2E7;
-  --lp-warning:      #8B5D24;
-  --lp-warning-bg:   #FBF0DF;
-  --lp-warning-line: #E3C48F;
-  --lp-info:         #416B8C;
-  --lp-info-soft:    #E4EEF5;
+  /* Mỗi cặp chữ/nền ≥ 5:1 (đo 21/10): đỏ = quá hạn, hổ phách = tới hạn,
+     xanh lục = xong. Info chỉ dùng cho biểu đồ/ghi chú trung tính. */
+  --lp-success:      #367255;
+  --lp-success-soft: #E3F6EA;
+  --lp-danger:       #A84552;
+  --lp-danger-soft:  #FFEAEB;
+  --lp-warning:      #925910;
+  --lp-warning-bg:   #FCEDDF;
+  --lp-warning-line: #E7C08F;
+  --lp-info:         #3E6B8A;
+  --lp-info-soft:    #E2F3FF;
 
   /* Vàng — trang trí thuần tuý (~2.4:1, cấm làm chữ nhỏ hay trạng thái).
      Xem chú thích đầu file. */
@@ -120,19 +135,19 @@
   --lp-on-ink:     var(--lp-canvas);
 
   /* --- Đường nét, tiêu điểm, trạng thái vô hiệu --------------------- */
-  --lp-line:             rgb(52 39 43 / 0.15); /* v4: viền rõ hơn một nấc */
-  --lp-line-strong:      rgb(52 39 43 / 0.27);
+  --lp-line:             rgb(58 40 50 / 0.13);
+  --lp-line-strong:      rgb(58 40 50 / 0.24);
   /* v5 (nghiên cứu 6): focus phải ĐẶC — plum 46% composite trên nền
    * sáng chỉ ~2.4:1, dưới ngưỡng 3:1 của non-text contrast. plum-2 đặc
    * đạt ~7.6:1, và không hex mới. */
   --lp-focus:            var(--lp-plum-2);
-  --lp-disabled-ink:     #A79BA6;
-  --lp-disabled-surface: #F1EAEC;
+  --lp-disabled-ink:     #A89DA3;
+  --lp-disabled-surface: #EEEAEC;
   /* Bổ sung nghiên cứu (3): ranh giới control 3:1 và lưới biểu đồ hai
    * bậc — không hex mới, chỉ vai trò mới trên mực hiện có. */
   --lp-control-boundary: var(--lp-ink-muted);
-  --lp-grid-line:        rgb(47 36 48 / 0.09);
-  --lp-grid-line-major:  rgb(47 36 48 / 0.18);
+  --lp-grid-line:        rgb(58 40 50 / 0.08);
+  --lp-grid-line-major:  rgb(58 40 50 / 0.16);
 
 
   /* --- Nhịp chuyển động (nghiên cứu (3)) ---------------------------- */
@@ -156,7 +171,7 @@
    * Chênh sáng giữa hai đầu dưới 4% nên chữ đặt lên vẫn giữ tương phản.
    * Chỉ dùng ở shell, panel hero, thẻ đăng nhập, empty state — tuyệt đối
    * không đặt sau bảng dữ liệu (spec §5.4). */
-  --lp-sheen: linear-gradient(135deg, #FAFAF5 0%, #F8EFE8 48%, #F1ECEA 100%);
+  --lp-sheen: linear-gradient(135deg, #FCF9FB 0%, #FCF0F0 48%, #F8EDF2 100%);
 
   /* --- §6.7b · Chỉ vàng mảnh --------------------------------------- */
   --lp-gold-hairline: rgb(199 161 91 / 0.38);
@@ -189,10 +204,15 @@
   /* Bóng lấy sắc từ ink (#2F2430) và plum-900 (#3E213E) — bóng xám thuần
      trên nền hồng trông như bụi. Bảng = flat, hero = low, popover = mid,
      modal = modal: KHÔNG cho mọi card cùng bay. */
-  --lp-e-low:   0 1px 2px rgb(52 39 43 / .04), 0 8px 24px rgb(107 59 85 / .07);
-  --lp-e-mid:   0 2px 5px rgb(52 39 43 / .07), 0 18px 42px rgb(107 59 85 / .12);
+  /* 21/10: thẻ tách nền bằng viền mảnh, bóng chỉ còn gợi nhẹ. */
+  --lp-e-low:   0 1px 2px rgb(58 40 50 / .04), 0 4px 14px rgb(107 59 85 / .05);
+  --lp-e-mid:   0 2px 5px rgb(58 40 50 / .06), 0 14px 34px rgb(107 59 85 / .10);
   --lp-e-high:  0 2px 6px rgb(52 39 43 / .09), 0 22px 54px rgb(107 59 85 / .16);
   --lp-e-modal: 0 8px 24px rgb(52 39 43 / .16), 0 40px 90px rgb(52 39 43 / .24);
+  /* 21/10: mực đổ bóng cho bóng viết tay ngoài file token (dùng qua
+     color-mix(in srgb, var(--lp-shadow-ink) N%, transparent)). Sáng = mực
+     chữ chính; tối = đen, vì bóng màu sáng trên nền tối thành quầng. */
+  --lp-shadow-ink: #3A2832;
 
   /* ==================================================================
    * CẦU TƯƠNG THÍCH — token cũ trỏ sang token mới.
@@ -218,26 +238,26 @@
   --c-pink-deep: var(--lp-plum);
   --c-pink-text: var(--lp-plum);
   --c-pink-soft: var(--lp-rose-soft);
-  --c-pink-mist: #FDF6F8;
+  --c-pink-mist: var(--lp-rose-soft);
 
   --c-lav:      var(--lp-rose);
   --c-lav-text: var(--lp-plum);
   --c-lav-soft: var(--lp-rose-soft);
 
   --c-mint:      var(--lp-success);
-  --c-mint-text: #2F5A4B;
+  --c-mint-text: var(--lp-success);
   --c-mint-soft: var(--lp-success-soft);
 
   --c-sky:      var(--lp-info);
-  --c-sky-text: #2F536E;
+  --c-sky-text: var(--lp-info);
   --c-sky-soft: var(--lp-info-soft);
 
   --c-rasp:      var(--lp-danger);
-  --c-rasp-text: #8E3049;
+  --c-rasp-text: var(--lp-danger);
   --c-rasp-soft: var(--lp-danger-soft);
 
   --c-marigold:      var(--lp-warning);
-  --c-marigold-text: #7A5122;
+  --c-marigold-text: var(--lp-warning);
   --c-marigold-soft: var(--lp-warning-bg);
 
   --c-gold:   var(--lp-gold);
@@ -268,15 +288,16 @@
   /* v4: elevation — càng gần người xem càng sáng. Chiều sâu đến từ
      BẬC BỀ MẶT, không đến từ bóng đen (bóng gần như vô hình trên nền
      tối; xem chú thích --lp-e-* bên dưới). */
-  --lp-bg-canvas:  #151116;
-  --lp-bg-sunken:  #1B161C;
-  --lp-bg-surface: #211A22;
-  --lp-bg-raised:  #2B222C;
-  --lp-bg-overlay: #342936;
+  --lp-bg-canvas:  #130E10;
+  --lp-bg-sunken:  #191316;
+  --lp-bg-surface: #1E171B;
+  --lp-bg-raised:  #261F23;
+  --lp-bg-overlay: #2E262A;
 
-  --lp-text-primary:   #F5EEF1;
-  --lp-text-secondary: #BFB1BA;
-  --lp-text-tertiary:  #9F919B;
+  /* Cùng nhịp φ như chế độ sáng: 13.6 → 8.5 → 5.2:1 trên surface. */
+  --lp-text-primary:   #E9E0E4;
+  --lp-text-secondary: #BEB0B7;
+  --lp-text-tertiary:  #96888F;
 
   /* Brand solid GIỮ tối — mảng nhận diện không đảo nghĩa theo theme.
      Accent tương tác mới là thứ đảo sang phấn sáng để đọc được. */
@@ -287,9 +308,9 @@
 
   /* Keep navigation orientation stable across themes. Its plum selection
      * remains distinct from the semantic status colours below. */
-  --lp-nav-surface:    #211A22;
-  --lp-nav-hover:      #26382F;
-  --lp-ambient-jade:   #26312D;
+  --lp-nav-surface:    #1E171B;
+  --lp-nav-hover:      #2A2126;
+  --lp-ambient-jade:   #241C21;
   --lp-ambient-petal:  #32242C;
   --lp-nav-current:    #41263F;
   --lp-on-nav-current: #FFF7FA;
@@ -301,30 +322,30 @@
   --lp-plum-900:  #E2BDCD;
   --lp-plum-2:    var(--lp-brand-hover);
   --lp-rose:      #E09BB7;
-  --lp-rose-soft: #38293A;
+  --lp-rose-soft: #31212A;
 
   /* Nền tối nuốt bớt chi tiết mờ nên artwork cần đậm hơn một chút. */
   --lp-art-opacity: 0.075;
 
-  --lp-success:      #84B6A0;
-  --lp-success-soft: #24352E;
-  --lp-danger:       #F08BA2;
-  --lp-danger-soft:  #3A222A;
-  --lp-warning:      #F2C47A;
-  --lp-warning-bg:   #352718;
-  --lp-warning-line: #745026;
-  --lp-info:         #8FB3CE;
-  --lp-info-soft:    #22303A;
+  --lp-success:      #79AD91;
+  --lp-success-soft: #14291E;
+  --lp-danger:       #DB8A90;
+  --lp-danger-soft:  #331D1E;
+  --lp-warning:      #C79957;
+  --lp-warning-bg:   #2E2210;
+  --lp-warning-line: #6B4F26;
+  --lp-info:         #7EA6C2;
+  --lp-info-soft:    #132633;
 
   --lp-gold: #D8B76C;
 
-  --lp-line:             rgb(245 238 241 / 0.16); /* v4: theo text-primary mới */
-  --lp-line-strong:      rgb(245 238 241 / 0.28);
+  --lp-line:             rgb(233 224 228 / 0.14);
+  --lp-line-strong:      rgb(233 224 228 / 0.26);
   --lp-focus:            var(--lp-rose); /* v5: đặc, ~7.2:1 */
   --lp-disabled-ink:     #9E919B;
-  --lp-disabled-surface: #2A232B;
+  --lp-disabled-surface: #261F23;
 
-  --lp-sheen:         linear-gradient(135deg, #2B222C 0%, #211A22 52%, #271E28 100%);
+  --lp-sheen:         linear-gradient(135deg, #261F23 0%, #1E171B 52%, #231B20 100%);
   --lp-gold-hairline: rgb(216 183 108 / 0.30);
 
   /* Nền sáng thì chữ phải tối. Ba màu này ở chế độ tối đều là sắc phấn
@@ -338,12 +359,13 @@
   --lp-on-warning: #2E2110;
   --lp-on-ink:     var(--lp-canvas);
 
-  --lp-glass:      rgb(33 26 34 / 0.76); /* = bg-surface v4 */
+  --lp-glass:      rgb(30 23 27 / 0.76); /* = bg-surface */
   --lp-glass-line: rgb(245 238 241 / 0.10);
   --lp-e-low:   0 1px 2px rgb(0 0 0 / .34), 0 6px 18px rgb(0 0 0 / .30);
   --lp-e-mid:   0 1px 3px rgb(0 0 0 / .40), 0 14px 34px rgb(0 0 0 / .38);
   --lp-e-high:  0 2px 6px rgb(0 0 0 / .46), 0 22px 54px rgb(0 0 0 / .46);
   --lp-e-modal: 0 4px 12px rgb(0 0 0 / .54), 0 40px 90px rgb(0 0 0 / .58);
+  --lp-shadow-ink: #000000;
 
   /* --- Bắc lại cầu cho chế độ tối --------------------------------- *
    * Bắt buộc phải lặp: khối trên gán `--c-surface: var(--lp-surface)`

@@ -73,7 +73,7 @@ export function buildBangDanhSach(
 export const NHAN_TINH_TRANG: Record<BangTinhTrang, string> = {
   overdue: "Quá hạn",
   today: "Đến hạn hôm nay",
-  soon: "Sắp đến hạn",
+  soon: "Tới hạn",
   future: "Còn thời gian",
   missing: "Chưa có hạn",
   done: "Đã xong",

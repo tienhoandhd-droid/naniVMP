@@ -15,7 +15,7 @@
  *  mà nghe rất trôi chảy — kiểu sai nguy hiểm nhất trong hệ GMP.
  * ===================================================================== */
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, X, Send, Sparkles, AlertTriangle, Database, BookOpen, Lightbulb } from "lucide-react";
+import { MessageCircle, X, Send, Sparkles, AlertTriangle, BookOpen, Lightbulb } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
 import { supabase, vePhien } from "../../lib/supabaseClient.ts";
 import type { AppUser } from "../../types/domain.ts";
@@ -47,32 +47,29 @@ const GOI_Y_THEO_TRANG: Record<string, string[]> = {
               "Bộ phận nào đang đuối nhất?"],
   timeline:  ["Khu vực nào đang chậm nhất?",
               "Nhóm công việc nào còn nhiều việc chưa bắt đầu?",
-              "Quy tắc tính deadline đề cương là gì?"],
+              "Hạn chót đề cương tính thế nào?"],
   alerts:    ["Ba hạng mục quá hạn nặng nhất là gì?",
               "Cái nào quá hạn mà điểm trọng yếu từ 7 trở lên?",
               "Tuần này còn gì gấp không?"],
   progress:  ["Hôm nay nên làm gì trước?",
               "Hạng mục nào sắp đến hạn trong 30 ngày?",
               "Sửa tiến độ ở đâu thì đúng quy trình?"],
-  inventory: ["Thiết bị này thuộc nhóm công việc nào?",
-              "Đối tượng nào còn nhiều hạng mục dở nhất?",
-              "IQ với OQ khác nhau ở chỗ nào?"],
   source:    ["Mã thiết bị đặt theo quy tắc gì?",
-              "Dòng nào thì được sinh timeline?",
-              "Nhập thiếu deadline thì hệ xử lý ra sao?"],
+              "Dòng nào được lập lịch thẩm định?",
+              "Thiếu hạn chót thì sao?"],
   workload:  ["Ai đang phụ trách nhiều hạng mục nhất?",
               "Việc có đang dồn lệch vào vài người không?",
               "Bộ phận nào cần chia lại việc?"],
   reports:   ["Tóm tắt tình hình cho cuộc họp tuần",
               "So với đầu năm thì đã đi được bao xa?",
               "Chuẩn bị thanh tra thì cần soi những gì?"],
-  rules:     ["Quy tắc tính deadline đề cương là gì?",
+  rules:     ["Hạn chót đề cương tính thế nào?",
               "Điểm trọng yếu chấm thế nào?",
               "Annex 15 yêu cầu gì về đề cương?"],
   health:    ["Vì sao những hạng mục này bị coi là thiếu dữ liệu?",
-              "Thiếu deadline thì có tính là quá hạn không?",
+              "Thiếu hạn chót có tính quá hạn không?",
               "Nên bổ sung gì trước cho nhanh?"],
-  audit:     ["Audit trail đang ghi lại những gì?",
+  audit:     ["Nhật ký thay đổi ghi những gì?",
               "Thanh tra hay bắt lỗi ở chỗ nào?",
               "Sửa dữ liệu có phải ghi lý do không?"],
   admin:     ["Hệ thống đang chạy có ổn không?",
@@ -123,7 +120,7 @@ const MAU_CHO_DU_PHONG: MauCho[] = [
   { loai: "meo", nguon: null,
     noi_dung: "Hỏi bổn cung một tên riêng thôi cũng được — \"tank\", \"nồi hấp\", \"KNTB1\" — bổn cung tự dò ra cả nhóm rồi hỏi lại cho hẹp." },
   { loai: "meo", nguon: null,
-    noi_dung: "Số bổn cung đưa ra đều đếm bằng SQL trên toàn bộ bảng, không phải ước lượng. Nghi ngờ thì cứ đối chiếu với trang Timeline." },
+    noi_dung: "Đối chiếu số với màn Dòng thời gian VMP." },
 ];
 
 const NHIP_CHO: Array<{ tu: number; loai: string }> = [
@@ -247,8 +244,7 @@ export default function ChatBox({ user, trang, access }: {
 
     if (!url) {
       setMsgs((m) => [...m, { ai: true, loi: true,
-        text: "Chưa cấu hình VITE_N8N_CHAT_URL nên chưa gọi được trợ lý. "
-            + "Đặt biến này trong .env rồi build lại." }]);
+        text: "Trợ lý chưa sẵn sàng. Báo quản trị." }]);
       setDangHoi(false);
       return;
     }
@@ -285,7 +281,7 @@ export default function ChatBox({ user, trang, access }: {
       });
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) {
-        throw new Error(data?.loi || `Máy chủ trả về ${r.status}`);
+        throw new Error(data?.loi || `HTTP ${r.status}`);
       }
       // Trả lời rỗng là LỖI, không phải câu trả lời. Hiện "(không có nội
       // dung)" chỉ làm người dùng tưởng hệ thống bí — nói thật là mô hình
@@ -294,10 +290,8 @@ export default function ChatBox({ user, trang, access }: {
       const noiDung = String(data.tra_loi ?? "").trim();
       if (!noiDung) {
         setMsgs((m) => [...m, { ai: true, loi: true,
-          text: "Mô hình vừa không trả về nội dung nào. "
-              + "Ngươi thử hỏi ngắn gọn hơn — ví dụ "
-              + "\"bao nhiêu hạng mục quá hạn\" — những câu như vậy bổn cung tra "
-              + "thẳng từ database, không cần nhờ tới AI." }]);
+          text: "Bổn cung chưa trả lời được. Ngươi hỏi ngắn hơn, "
+              + "vd \"bao nhiêu hạng mục quá hạn\"." }]);
         setDangHoi(false);
         return;
       }
@@ -312,8 +306,11 @@ export default function ChatBox({ user, trang, access }: {
           : undefined,
         goiY: Array.isArray(data.goi_y) ? data.goi_y.slice(0, 3) : undefined }]);
     } catch (e) {
+      /* Lý do trợ lý tự trả (tiếng Việt) thì giữ; lỗi mạng/HTTP thô chỉ ra console. */
+      console.error("[Vali] Không hỏi được:", e);
+      const lyDo = (e as Error)?.message || "";
       setMsgs((m) => [...m, { ai: true, loi: true,
-        text: "Không hỏi được: " + ((e as Error).message || "lỗi không rõ") }]);
+        text: /[À-ỹ]/.test(lyDo) ? lyDo : "Chưa hỏi được, ngươi thử lại sau." }]);
     }
     setDangHoi(false);
   };
@@ -326,7 +323,7 @@ export default function ChatBox({ user, trang, access }: {
         style={{
           position: "fixed", right: 22, bottom: 22, zIndex: 90,
           width: 56, height: 56, borderRadius: R.pill, border: "none",
-          cursor: "pointer", background: "var(--grad)", color: "#fff",
+          cursor: "pointer", background: "var(--grad)", color: "var(--lp-porcelain)",
           boxShadow: "var(--e-accent)", display: "flex",
           alignItems: "center", justifyContent: "center",
           transition: `transform ${MO.base} ${MO.spring}`,
@@ -357,14 +354,14 @@ export default function ChatBox({ user, trang, access }: {
         <div style={{ width: 32, height: 32, borderRadius: R.pill,
                       background: "var(--grad)", display: "flex",
                       alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Sparkles size={16} color="#fff" />
+          <Sparkles size={16} color="currentColor" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div id="vmp-chat-title" style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>
             Công chúa Vali
           </div>
           <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-            Số liệu đọc thẳng từ database · bổn cung không đoán
+            Trợ lý tra cứu VMP
           </div>
         </div>
         <button type="button" onClick={dongChat} aria-label="Đóng trò chuyện" title="Đóng"
@@ -405,7 +402,7 @@ export default function ChatBox({ user, trang, access }: {
               padding: "10px 13px", borderRadius: R.md, fontSize: 14, lineHeight: 1.68,
               whiteSpace: "pre-wrap", wordBreak: "break-word",
               background: m.loi ? C.raspSoft : m.ai ? C.surface : "var(--grad)",
-              color: m.loi ? C.raspText : m.ai ? C.plum : "#fff",
+              color: m.loi ? C.raspText : m.ai ? C.plum : "var(--lp-porcelain)",
               border: m.ai && !m.loi ? `1px solid ${C.line}` : "none",
               boxShadow: m.ai ? E.low : "none",
             }}>
@@ -445,14 +442,6 @@ export default function ChatBox({ user, trang, access }: {
                     {g}
                   </button>
                 ))}
-              </div>
-            )}
-            {/* Icon Lucide cho NGỮ NGHĨA (đây là thông báo cache), emoji
-                chỉ dành cho chữ ký persona 🌸 — quyết định Atelier vòng 2. */}
-            {m.nguon === "dem" && (
-              <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 4, paddingLeft: 3,
-                            fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
-                <Database size={12} /> Bổn cung đã tra câu này, dữ liệu chưa đổi nên dùng lại
               </div>
             )}
           </div>
@@ -532,7 +521,7 @@ export default function ChatBox({ user, trang, access }: {
             style={{ width: 40, height: 40, flexShrink: 0, borderRadius: R.md,
                      border: "none", cursor: q.trim() && !dangHoi ? "pointer" : "default",
                      background: q.trim() && !dangHoi ? "var(--grad)" : C.pinkSoft,
-                     color: q.trim() && !dangHoi ? "#fff" : C.plumSoft,
+                     color: q.trim() && !dangHoi ? "var(--lp-porcelain)" : C.plumSoft,
                      display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Send size={16} />
           </button>

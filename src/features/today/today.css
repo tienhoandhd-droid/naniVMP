@@ -82,7 +82,7 @@
   background-repeat: no-repeat;
   background-position: center bottom;
   background-size: contain;
-  filter: drop-shadow(0 10px 18px rgb(62 33 62 / .18));
+  filter: drop-shadow(0 10px 18px color-mix(in srgb, var(--lp-shadow-ink) 18%, transparent));
 }
 .hn-vali--guide { background-image: url("../../assets/brand/vali/vali-chibi-guide.webp"); }
 .hn-vali--concern { background-image: url("../../assets/brand/vali/vali-chibi-concern.webp"); }
@@ -118,7 +118,7 @@
 .hn-nhom__ten { font-size: 24px; }
 /* "Làm trước tiên" trong hero: một nút, cùng đích với thẻ ưu tiên cũ. */
 .hn-hero__uu-tien { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
-.hn-hero__eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--lp-rose); }
+.hn-hero__eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: var(--lp-brand); }
 .hn-hero__cta { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--lp-plum); color: var(--lp-on-plum); font-family: var(--ff-text); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--lp-e-low); }
 .hn-hero__cta:hover { background: var(--lp-brand-hover); }
 .hn-hero__cta:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 2px; }
@@ -187,7 +187,7 @@
 /* Hàng tiêu đề cột + phụ đề nhóm (đúng bản thiết kế) */
 .hn-nhom__ten { align-items: baseline; flex-wrap: wrap; }
 .hn-nhom__phu { font-family: var(--ff-text); font-size: 13px; font-weight: 500; color: var(--lp-ink-muted); }
-.hn-cot { display: grid; grid-template-columns: 124px minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 16px; padding: 0 20px; height: 34px; align-items: center; background: var(--lp-surface-2); border-top: 1px solid var(--lp-line); border-bottom: 1px solid var(--lp-line-strong); font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 12px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--lp-ink-muted); }
+.hn-cot { display: grid; grid-template-columns: 124px minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 16px; padding: 0 20px; height: 34px; align-items: center; background: var(--lp-surface-2); border-top: 1px solid var(--lp-line); border-bottom: 1px solid var(--lp-line-strong); font-family: ui-monospace, "Cascadia Mono", Consolas, "Be Vietnam Pro", monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.01em; text-transform: none; color: var(--lp-ink-muted); }
 .hn-cot span:last-child { width: 118px; }
 .hn-ds .hn-muc:first-child { border-top: 0; }
 @media (max-width: 768px) { .hn-cot { display: none; } }
@@ -518,7 +518,7 @@
   .hn-muc__nguoi,
   .hn-muc__tre { display: inline-flex; align-items: center; grid-column: auto; }
   .hn-muc__moc::before,
-  .hn-muc__nguoi::before { margin-right: 5px; color: var(--lp-ink-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .hn-muc__nguoi::before { margin-right: 5px; color: var(--lp-ink-muted); font-size: 12px; font-weight: 600; letter-spacing: 0; }
   .hn-muc__moc::before { content: "Mốc"; }
   .hn-muc__nguoi::before { content: "QA"; }
   .hn-muc__tre { min-height: 30px; }
@@ -526,6 +526,37 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .hn-muc, .hn-muc__nut { transition: none; }
+}
+
+/* =====================================================================
+ *  21/10 — nhịp vàng (nhip-vang.css). Đặt TRƯỚC khối "CHỐT" màn hẹp bên
+ *  dưới để luật điện thoại/máy tính bảng vẫn thắng.
+ *  · Hero hai phần theo tỉ lệ 1.618 : 1 — câu Vali | cụm số liệu.
+ *  · Khoảng cách theo dãy 8 · 13 · 21 · 34.
+ *  · Nhãn "Làm trước tiên" và tiêu đề cột: chữ thường, đậm vừa, không giãn
+ *    (chữ hoa có dấu tiếng Việt giãn cách rất khó đọc).
+ * ===================================================================== */
+/* (Vali + câu dẫn) : cụm số = 1.618 : 1. Cột số R = (C − gap) / 2.618, với C
+   là bề ngang nội dung hero — phần còn lại (kể cả 118px của Vali) đúng
+   bằng 1.618·R. */
+.hn-hero { grid-template-columns: 118px minmax(0, 1fr) calc((100% - var(--lp-sp-4)) / 2.618); column-gap: var(--lp-sp-4); padding: var(--lp-sp-3) var(--lp-sp-4); }
+.hn-hero__so { justify-content: center; }
+.hn-hero__so .lp-metric-grid { gap: 2px var(--lp-sp-2); }
+.hn-hero__so .lp-metric:not(:first-child) { grid-template-columns: 32px 1fr; padding: 4px 8px; }
+.hn-hero__so .lp-metric:not(:first-child) .lp-metric__label { white-space: nowrap; }
+.hn-loi { line-height: var(--lp-lh-tieu-de); max-width: 46ch; }
+.hn-hero__loi { gap: var(--lp-sp-2); }
+.hn-hero__eyebrow,
+.hn-cot { font-family: var(--ff-text); font-size: var(--lp-fs-nhan); font-weight: var(--lp-fw-nhan); letter-spacing: var(--lp-tracking-nhan); text-transform: none; }
+.hn-nhom { margin-bottom: var(--lp-sp-3); }
+.hn-nhom__ten { line-height: var(--lp-lh-tieu-de); }
+.hn-bo-cuc { margin-top: var(--lp-sp-3); }
+/* T5: cột Hạng mục rộng hơn (bớt cột Mã/nút), tên dài xuống tối đa 2 dòng. */
+@media (min-width: 1101px) {
+  .hn-muc__tom-tat, .hn-cot { grid-template-columns: 156px minmax(200px, 1.6fr) 100px minmax(0, 170px) 112px 136px; }
+  .hn-muc__mo--inline, .hn-muc__mo--desktop { grid-template-columns: 156px 1fr; }
+  .hn-cot span:nth-child(6) { width: 136px; }
+  .hn-muc__ten { white-space: normal; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 }
 
 /* =====================================================================

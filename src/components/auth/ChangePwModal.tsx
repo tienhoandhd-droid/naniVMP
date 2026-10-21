@@ -32,7 +32,7 @@ export default function ChangePwModal({ onClose, recovery = false }: { onClose: 
     setMsg({ type: "", text: "" });
     if (Object.keys(loi).length > 0) return;
     if (!isSupabaseConfigured()) {
-      return setMsg({ type: "err", text: "Cần Supabase để đổi mật khẩu." });
+      return setMsg({ type: "err", text: "Chưa đổi được mật khẩu. Liên hệ IT." });
     }
     setLoading(true);
     try {
@@ -67,7 +67,7 @@ export default function ChangePwModal({ onClose, recovery = false }: { onClose: 
       open
       title={recovery ? "Đặt mật khẩu mới" : "Đổi mật khẩu"}
       description={recovery
-        ? `Bạn vào bằng link email nên không cần mật khẩu cũ. Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự.`
+        ? `Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự.`
         : `Cần mật khẩu hiện tại để xác minh. Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự.`}
       icon={KeyRound}
       maxWidth={460}

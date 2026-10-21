@@ -610,7 +610,7 @@ export function normalizeWorkshopScopeDraft(value: { department: string; areaCod
   const department = value.department.trim();
   const areaCode = value.areaCode.trim();
   const reason = value.reason.trim();
-  if (!department || !areaCode) throw new SourceAccessContractError("Cần chọn bộ phận và khu vực Source.");
+  if (!department || !areaCode) throw new SourceAccessContractError("Chọn bộ phận và khu vực.");
   if (!reason) throw new SourceAccessContractError("Cần nhập lý do thay đổi phạm vi xưởng.");
   return { department, areaCode, line: value.line.trim() || null, reason };
 }

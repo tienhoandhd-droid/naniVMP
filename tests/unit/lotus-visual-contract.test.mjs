@@ -64,20 +64,21 @@ test("thang bo góc cũ được ánh xạ sang thang Lotus", () => {
 
 /* ---- Token màu ----------------------------------------------------- */
 
-test("token nền và chữ chế độ sáng đúng bảng ivory–sage dịu mắt", () => {
+test("token nền và chữ chế độ sáng đúng bảng trung tính ánh mận (21/10)", () => {
   /* v4 (nghiên cứu 7): tách PIGMENT khỏi VAI TRÒ. Nền có năm tầng
      canvas/sunken/surface/raised/overlay; chữ có ba bậc; token cũ trỏ
      var() về lớp v4 để ~990 style nội tuyến đổi theo mà không sửa dòng
-     nào. Bản v5 làm nền sứ ấm hơn (#F5F2EB), giữ lớp chìm xanh xám nhẹ và
-     mọi cặp chữ/nền vẫn ≥ 4.5:1. */
-  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F5F2EB");
-  assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#EAEDE6");
-  assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FAFAF5");
-  assert.equal(bien(KHOI_SANG, "lp-bg-raised"), "#FDFDF8");
-  assert.equal(bien(KHOI_SANG, "lp-bg-overlay"), "#FCFCF8");
-  assert.equal(bien(KHOI_SANG, "lp-text-primary"), "#34272B");
-  assert.equal(bien(KHOI_SANG, "lp-text-secondary"), "#5F4D52");
-  assert.equal(bien(KHOI_SANG, "lp-text-tertiary"), "#77666B");
+     nào. 21/10 (bảng màu tinh giản, chủ dự án duyệt): một họ trung tính
+     ánh mận hue 345, thẻ trắng sứ; ba tầng chữ cách nhau φ về tương phản
+     và mọi cặp chữ/nền vẫn ≥ 4.5:1 (kiểm số ở test tương phản bên dưới). */
+  assert.equal(bien(KHOI_SANG, "lp-bg-canvas"), "#F6F1F3");
+  assert.equal(bien(KHOI_SANG, "lp-bg-sunken"), "#F1EBEE");
+  assert.equal(bien(KHOI_SANG, "lp-bg-surface"), "#FFFEFE");
+  assert.equal(bien(KHOI_SANG, "lp-bg-raised"), "#FFFFFF");
+  assert.equal(bien(KHOI_SANG, "lp-bg-overlay"), "#FFFFFF");
+  assert.equal(bien(KHOI_SANG, "lp-text-primary"), "#3A2832");
+  assert.equal(bien(KHOI_SANG, "lp-text-secondary"), "#5A4752");
+  assert.equal(bien(KHOI_SANG, "lp-text-tertiary"), "#75646D");
   // Cầu: token cũ phải TRỎ vào v4, không được giữ hex riêng lệch pha.
   assert.equal(bien(KHOI_SANG, "lp-canvas"), "var(--lp-bg-canvas)");
   assert.equal(bien(KHOI_SANG, "lp-surface"), "var(--lp-bg-surface)");
@@ -94,9 +95,9 @@ test("token nền và chữ chế độ sáng đúng bảng ivory–sage dịu m
 });
 
 test("ba màu ngữ nghĩa và vàng trang trí, chế độ sáng", () => {
-  assert.equal(bien(KHOI_SANG, "lp-success"), "#386958");
-  assert.equal(bien(KHOI_SANG, "lp-danger"), "#A93F5A");
-  assert.equal(bien(KHOI_SANG, "lp-warning"), "#8B5D24");
+  assert.equal(bien(KHOI_SANG, "lp-success"), "#367255");
+  assert.equal(bien(KHOI_SANG, "lp-danger"), "#A84552");
+  assert.equal(bien(KHOI_SANG, "lp-warning"), "#925910");
   assert.equal(bien(KHOI_SANG, "lp-gold"), "#C7A15B");
   assert.ok(bien(KHOI_SANG, "lp-focus"), "phải có vòng focus riêng");
 });
@@ -105,29 +106,62 @@ test("chế độ tối: elevation năm tầng + warning, line, focus — v4", (
   /* Dark theo nguyên tắc elevation: bề mặt phía trước SÁNG HƠN base
      (canvas < sunken < surface < raised < overlay), không cứu chiều sâu
      bằng bóng đen. Nghiên cứu 7 §Bộ token đề xuất. */
-  assert.equal(bien(KHOI_TOI, "lp-bg-canvas"), "#151116");
-  assert.equal(bien(KHOI_TOI, "lp-bg-sunken"), "#1B161C");
-  assert.equal(bien(KHOI_TOI, "lp-bg-surface"), "#211A22");
-  assert.equal(bien(KHOI_TOI, "lp-bg-raised"), "#2B222C");
-  assert.equal(bien(KHOI_TOI, "lp-bg-overlay"), "#342936");
-  assert.equal(bien(KHOI_TOI, "lp-text-primary"), "#F5EEF1");
-  assert.equal(bien(KHOI_TOI, "lp-text-secondary"), "#BFB1BA");
-  assert.equal(bien(KHOI_TOI, "lp-text-tertiary"), "#9F919B");
+  assert.equal(bien(KHOI_TOI, "lp-bg-canvas"), "#130E10");
+  assert.equal(bien(KHOI_TOI, "lp-bg-sunken"), "#191316");
+  assert.equal(bien(KHOI_TOI, "lp-bg-surface"), "#1E171B");
+  assert.equal(bien(KHOI_TOI, "lp-bg-raised"), "#261F23");
+  assert.equal(bien(KHOI_TOI, "lp-bg-overlay"), "#2E262A");
+  assert.equal(bien(KHOI_TOI, "lp-text-primary"), "#E9E0E4");
+  assert.equal(bien(KHOI_TOI, "lp-text-secondary"), "#BEB0B7");
+  assert.equal(bien(KHOI_TOI, "lp-text-tertiary"), "#96888F");
   // Brand solid ở dark vẫn là SƠN MÀI TỐI, không đảo thành phấn sáng.
   assert.equal(bien(KHOI_TOI, "lp-brand-solid"), "#41263F");
   assert.equal(bien(KHOI_TOI, "lp-on-brand-solid"), "#FFF7FA");
   assert.equal(bien(KHOI_TOI, "lp-brand"), "#D8A8BC");
   assert.equal(bien(KHOI_TOI, "lp-rose"), "#E09BB7");
-  assert.equal(bien(KHOI_TOI, "lp-success"), "#84B6A0");
-  assert.equal(bien(KHOI_TOI, "lp-danger"), "#F08BA2");
-  assert.equal(bien(KHOI_TOI, "lp-warning"), "#F2C47A");
-  assert.equal(bien(KHOI_TOI, "lp-warning-bg"), "#352718");
-  assert.equal(bien(KHOI_TOI, "lp-warning-line"), "#745026");
-  assert.equal(bien(KHOI_TOI, "lp-line"), "rgb(245 238 241 / 0.16)"); // v4: theo text-primary mới
-  assert.equal(bien(KHOI_TOI, "lp-line-strong"), "rgb(245 238 241 / 0.28)");
+  assert.equal(bien(KHOI_TOI, "lp-success"), "#79AD91");
+  assert.equal(bien(KHOI_TOI, "lp-danger"), "#DB8A90");
+  assert.equal(bien(KHOI_TOI, "lp-warning"), "#C79957");
+  assert.equal(bien(KHOI_TOI, "lp-warning-bg"), "#2E2210");
+  assert.equal(bien(KHOI_TOI, "lp-warning-line"), "#6B4F26");
+  assert.equal(bien(KHOI_TOI, "lp-line"), "rgb(233 224 228 / 0.14)"); // theo text-primary
+  assert.equal(bien(KHOI_TOI, "lp-line-strong"), "rgb(233 224 228 / 0.26)");
   assert.equal(bien(KHOI_TOI, "lp-focus"), "var(--lp-rose)"); // v5: focus ĐẶC ≥3:1 (nghiên cứu 6)
   assert.equal(bien(KHOI_TOI, "lp-disabled-ink"), "#9E919B");
-  assert.equal(bien(KHOI_TOI, "lp-disabled-surface"), "#2A232B");
+  assert.equal(bien(KHOI_TOI, "lp-disabled-surface"), "#261F23");
+});
+
+/* Ý kiểm của bảng 21/10, đo bằng SỐ chứ không chỉ so mã: mọi tầng chữ đọc
+   được trên mọi nền đọc (≥ 4.5:1, kể cả nền lõm), ba tầng tách bậc rõ, và
+   vàng quá nhạt để làm chữ — nên nó chỉ được trang trí. */
+const doSang = (h) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const tuongPhan = (a, b) => {
+  const [x, y] = [doSang(a), doSang(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+test("mọi tầng chữ ≥ 4.5:1 trên mọi nền đọc, ba tầng tách bậc, vàng không đủ làm chữ", () => {
+  for (const [ten, khoi] of [["sáng", KHOI_SANG], ["tối", KHOI_TOI]]) {
+    const tang = ["primary", "secondary", "tertiary"].map((t) => bien(khoi, `lp-text-${t}`));
+    for (const nen of ["canvas", "sunken", "surface", "raised"]) {
+      for (const chu of tang) {
+        const ty = tuongPhan(chu, bien(khoi, `lp-bg-${nen}`));
+        assert.ok(ty >= 4.5, `chế độ ${ten}: chữ ${chu} trên ${nen} chỉ ${ty.toFixed(2)}:1`);
+      }
+    }
+    const tp = tang.map((c) => tuongPhan(c, bien(khoi, "lp-bg-surface")));
+    assert.ok(tp[0] / tp[1] >= 1.4 && tp[1] / tp[2] >= 1.4, `chế độ ${ten}: ba tầng chữ không tách bậc`);
+    for (const ngNghia of ["success", "danger", "warning", "brand"]) {
+      const ty = tuongPhan(bien(khoi, `lp-${ngNghia}`), bien(khoi, "lp-bg-surface"));
+      assert.ok(ty >= 4.5, `chế độ ${ten}: --lp-${ngNghia} chỉ ${ty.toFixed(2)}:1 trên thẻ`);
+    }
+  }
+  assert.ok(tuongPhan(bien(KHOI_SANG, "lp-gold"), bien(KHOI_SANG, "lp-bg-surface")) < 3,
+    "vàng sáng đủ đậm để thành chữ — vậy là đã trượt khỏi vai trò trang trí");
 });
 
 test("vàng không bao giờ mang nghĩa cảnh báo — spec §5.3", () => {

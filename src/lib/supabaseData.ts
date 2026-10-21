@@ -40,6 +40,25 @@ import {
   type EditableProgressRight,
 } from "../features/progress/editableProgressRights.ts";
 
+/* Chữ lỗi người dùng thấy: câu nghiệp vụ + cách xử lý. Chữ thô của máy chủ
+   (thường tiếng Anh, lộ tên hàm/bảng) chỉ ra console và nằm ở `cause`.
+   Lý do nghiệp vụ do máy chủ trả (RAISE tiếng Việt, từ chối quyền, hết
+   phiên) thì giữ, vì đó là điều người dùng cần biết để xử lý. */
+const CHUA_KET_NOI = "Chưa kết nối được hệ thống. Liên hệ IT.";
+
+function lyDoNghiepVu(raw: string): string {
+  if (/permission denied|42501|forbidden/i.test(raw)) return "Không có quyền thực hiện.";
+  if (/JWT|\b401\b/i.test(raw)) return "Phiên đăng nhập đã hết hạn, đăng nhập lại.";
+  if (/[À-ỹ]/.test(raw) && !/rpc_|PGRST|schema|relation|function|column|violates/i.test(raw)) return raw;
+  return "";
+}
+
+function loiNghiepVu(cau: string, error: { message: string }): Error {
+  console.error(`[VMP] ${cau}`, error);
+  const lyDo = lyDoNghiepVu(error.message);
+  return new Error(lyDo ? `${cau} ${lyDo}` : cau, { cause: error });
+}
+
 export interface PlannedDeadlineRpcResponse {
   data: unknown;
   error: { message: string } | null;
@@ -85,7 +104,7 @@ export async function updatePlannedDeadlines(
   input: UpdatePlannedDeadlinesInput,
 ): Promise<PlannedDeadlineResult> {
   const client = supabase;
-  if (!client) throw new PlannedDeadlineTransportError("Supabase chưa cấu hình");
+  if (!client) throw new PlannedDeadlineTransportError(CHUA_KET_NOI);
 
   return updatePlannedDeadlinesViaRpc(async (_rpcName, args) => {
     const { data, error } = await client.rpc("rpc_update_planned_deadlines" as never, args as never);
@@ -169,7 +188,7 @@ export async function fetchVmpDataFromSupabase(
   includeMissing = false,
 ): Promise<VmpDataset> {
   const client = supabase;
-  if (!client) throw new Error("Supabase chưa cấu hình");
+  if (!client) throw new Error(CHUA_KET_NOI);
   return fetchCanonicalDashboardViaRpc(async (rpcName, args) => {
     const { data, error } = rpcName === "rpc_get_vmp_dashboard_v2"
       ? await client.rpc("rpc_get_vmp_dashboard_v2" as never, args as never)
@@ -184,7 +203,7 @@ export async function fetchVmpDataFromSupabase(
 // Trả { year, plan_items, objects, updated_at }. Frontend so chuỗi watermark
 // trước khi refetch toàn bộ dashboard → poll 20s gần như miễn phí khi không đổi.
 export async function fetchVmpWatermark(year?: number): Promise<AuthorizationWatermark> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_get_vmp_watermark", {
     p_year: year || new Date().getFullYear(),
   });
@@ -213,23 +232,23 @@ export const SOURCE_KINDS: ObjectKind[] = [
 ];
 
 export async function fetchAlertRecipients(): Promise<AlertRecipientRow[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.from("vmp_alert_recipients").select("*").order("email");
-  if (error) throw new Error("Lỗi đọc danh sách nhận cảnh báo: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được danh sách nhận cảnh báo.", error);
   return data || [];
 }
 
 export async function fetchStaffEmails(): Promise<StaffEmailRow[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.from("vmp_staff_emails").select("*").order("staff_name");
-  if (error) throw new Error("Lỗi đọc danh bạ: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được danh bạ.", error);
   return data || [];
 }
 
 export async function fetchPerformers(): Promise<PerformerRow[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.from("vmp_performers").select("*").order("performer_name");
-  if (error) throw new Error("Lỗi đọc danh sách người thực hiện: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được danh sách người thực hiện.", error);
   return data || [];
 }
 
@@ -262,19 +281,19 @@ export async function fetchMyEditableProgressRightsViaRpc(
   rpc: EditableProgressRightsRpc,
 ): Promise<EditableProgressRight[]> {
   const { data, error } = await rpc("rpc_my_editable_progress_rights");
-  if (error) throw new Error("Không tải được quyền cập nhật tiến độ: " + error.message);
+  if (error) throw loiNghiepVu("Chưa kiểm tra được quyền sửa tiến độ.", error);
   try {
     return parseEditableProgressRights(data);
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : "phản hồi máy chủ không hợp lệ";
-    throw new Error("Không thể xác nhận quyền cập nhật tiến độ: " + message);
+    console.error("[VMP] Phản hồi quyền sửa tiến độ không hợp lệ:", cause);
+    throw new Error("Chưa kiểm tra được quyền sửa tiến độ.", { cause });
   }
 }
 
 /** Tập quyền của chính phiên hiện tại. Không dùng `item_permissions_mode`:
  *  màn Cập nhật tiến độ có writer enforced riêng, còn mode toàn cục vẫn preview. */
 export async function fetchMyEditableProgressRights(): Promise<EditableProgressRight[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const rpc = supabase.rpc.bind(supabase) as unknown as EditableProgressRightsRpc;
   return fetchMyEditableProgressRightsViaRpc(rpc);
 }
@@ -284,12 +303,12 @@ export async function fetchMyEditableProgressRights(): Promise<EditableProgressR
 export async function fetchTimelineFieldPermission(
   validationCode: string,
 ): Promise<TimelineFieldPermission> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
 
   const rightsResult = await supabase.rpc("vmp_my_item_rights" as never, {
     p_validation_code: validationCode,
   } as never);
-  if (rightsResult.error) throw new Error("Không đọc được quyền hạng mục: " + rightsResult.error.message);
+  if (rightsResult.error) throw loiNghiepVu("Chưa tải được quyền theo hạng mục.", rightsResult.error);
 
   const rows = Array.isArray(rightsResult.data) ? rightsResult.data : [rightsResult.data];
   const row = (rows[0] || {}) as Record<string, unknown>;
@@ -302,7 +321,7 @@ export async function fetchTimelineFieldPermission(
     editableFields,
     reason: typeof row.view_reason === "string" && row.view_reason.trim()
       ? row.view_reason
-      : editableFields.length ? "Theo quyền hiệu lực" : "Chỉ xem",
+      : editableFields.length ? "Được sửa" : "Chỉ xem",
   };
 }
 
@@ -316,10 +335,14 @@ function unwrap<T extends RpcResult = RpcResult>(
   error: { message: string } | null,
   fallbackMsg: string,
 ): T {
-  if (error) throw new Error(fallbackMsg + ": " + error.message);
+  if (error) throw loiNghiepVu(fallbackMsg, error);
   const r = data as RpcResult | null;
   if (r && r.ok === false) {
-    const e = new Error(r.error || fallbackMsg) as Error & {
+    /* Lý do nghiệp vụ máy chủ trả (hồ sơ khoá, không có quyền…) thì giữ;
+       chữ kỹ thuật thì chỉ ghi console, người dùng thấy câu chung. */
+    const lyDo = r.error ? lyDoNghiepVu(r.error) : "";
+    if (r.error && !lyDo) console.error(`[VMP] ${fallbackMsg}`, r);
+    const e = new Error(lyDo || fallbackMsg) as Error & {
       code?: string; currentVersion?: number;
     };
     if (r.code) e.code = r.code;                    // vd 'version_conflict'
@@ -339,7 +362,7 @@ export async function updateProgressSupabase(
   sheetPatch?: unknown,
   expectedVersion?: number | null,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   void sheetPatch;  // Sheet là chỉ đọc — tham số giữ lại cho tương thích chữ ký cũ
   // PHẢI gửi ĐỦ 5 khoá, và dùng `null` chứ KHÔNG dùng `undefined`.
   //
@@ -362,7 +385,7 @@ export async function updateProgressSupabase(
     p_sheet_patch: null,
     p_expected_version: expectedVersion ?? null,
   } as never);
-  return unwrap(data, error, "Cập nhật thất bại");
+  return unwrap(data, error, "Chưa lưu được tiến độ.");
 }
 
 /* ------------------------------------------------------------------
@@ -457,7 +480,7 @@ export async function createPlanItem(
     occurrence?: number; patch?: Record<string, unknown>;
   },
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_create_plan_item", {
     p_object_code: objectCode,
     p_validation_type: validationType,
@@ -465,17 +488,17 @@ export async function createPlanItem(
     p_occurrence: occurrence,
     p_patch: patch as never,
   });
-  return unwrap(data, error, "Tạo hạng mục thất bại");
+  return unwrap(data, error, "Chưa tạo được hạng mục.");
 }
 
 /** Xoá mềm hạng mục timeline (giữ lại để audit). Bắt buộc có lý do. */
 export async function deletePlanItem(validationCode: string, reason: string): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_delete_plan_item", {
     p_validation_code: validationCode,
     p_reason: reason,
   });
-  return unwrap(data, error, "Xoá hạng mục thất bại");
+  return unwrap(data, error, "Chưa xoá được hạng mục.");
 }
 
 /* upsertSourceObject / deleteSourceObject đã GỠ (Đợt B Task 6): mọi lối
@@ -503,14 +526,14 @@ export interface ItemProgressHistoryEntry {
 export async function fetchItemProgressHistory(
   validationCode: string, limit = 50, offset = 0,
 ): Promise<{ ok: boolean; total: number; history: ItemProgressHistoryEntry[]; error?: string }> {
-  if (!supabase) return { ok: false, total: 0, history: [], error: "Supabase chưa cấu hình" };
+  if (!supabase) return { ok: false, total: 0, history: [], error: CHUA_KET_NOI };
   const goi = supabase.rpc.bind(supabase) as unknown as (
     fn: string, args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string } | null }>;
   const { data, error } = await goi("rpc_item_progress_history", {
     p_validation_code: validationCode, p_limit: limit, p_offset: offset,
   });
-  if (error) return { ok: false, total: 0, history: [], error: error.message };
+  if (error) return { ok: false, total: 0, history: [], error: loiNghiepVu("Chưa tải được lịch sử.", error).message };
   const kq = (data || {}) as Record<string, unknown>;
   if (kq.ok !== true) {
     return { ok: false, total: 0, history: [], error: String(kq.error ?? "Không đọc được lịch sử") };
@@ -537,9 +560,9 @@ export interface SourceWarnings {
 }
 
 export async function fetchSourceWarnings(year?: number): Promise<SourceWarnings> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_source_warnings", { p_year: year ?? undefined });
-  if (error) throw new Error("Lỗi rà dữ liệu nguồn: " + error.message);
+  if (error) throw loiNghiepVu("Chưa kiểm được dữ liệu nguồn.", error);
 
   /* Điền đủ năm nhóm cảnh báo trước khi trả về.
    *
@@ -564,12 +587,12 @@ export async function fetchSourceWarnings(year?: number): Promise<SourceWarnings
 export async function generateTimeline(
   year?: number | null, commit = false,
 ): Promise<GenerateTimelineResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_generate_timeline", {
     p_year: year ?? undefined,
     p_commit: commit,
   });
-  return unwrap<GenerateTimelineResult>(data, error, "Sinh timeline thất bại");
+  return unwrap<GenerateTimelineResult>(data, error, "Chưa lập được lịch thẩm định.");
 }
 
 /* ============================================================
@@ -587,9 +610,9 @@ export interface ServerKpi {
 }
 
 export async function fetchDashboardKpi(year?: number): Promise<ServerKpi> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_dashboard_kpi", { p_year: year ?? undefined });
-  if (error) throw new Error("Lỗi đọc KPI: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được số liệu tổng hợp.", error);
   return asShape<ServerKpi>(data);
 }
 
@@ -602,9 +625,9 @@ export interface ServerQualityIssue {
 }
 
 export async function checkDataQuality(year?: number): Promise<ServerQualityIssue[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_check_data_quality", { p_year: year ?? undefined });
-  if (error) throw new Error("Lỗi kiểm tra chất lượng dữ liệu: " + error.message);
+  if (error) throw loiNghiepVu("Chưa kiểm được chất lượng dữ liệu.", error);
   return asShape<ServerQualityIssue[]>(data) || [];
 }
 
@@ -623,19 +646,19 @@ export interface DueAlert {
 }
 
 export async function fetchDueAlerts(year?: number, soonDays = 7): Promise<DueAlert[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_due_alerts", {
     p_year: year ?? undefined, p_soon_days: soonDays,
   });
-  if (error) throw new Error("Lỗi đọc cảnh báo: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được cảnh báo.", error);
   return asShape<DueAlert[]>(data) || [];
 }
 
 /** Tính lại computed_status cho toàn bộ hạng mục (theo ngày hôm nay). */
 export async function refreshComputedStatus(): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_refresh_computed_status");
-  return unwrap(data, error, "Tính lại trạng thái thất bại");
+  return unwrap(data, error, "Chưa tính lại được trạng thái.");
 }
 
 /** Nhật ký thao tác, lọc phía server thay vì kéo hết về client. */
@@ -643,7 +666,7 @@ export async function fetchAuditLogs(opts: {
   limit?: number; offset?: number; table?: string | null;
   action?: string | null; userEmail?: string | null; recordId?: string | null;
 } = {}): Promise<unknown> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_get_audit_logs", {
     p_limit: opts.limit ?? 100,
     p_offset: opts.offset ?? 0,
@@ -652,7 +675,7 @@ export async function fetchAuditLogs(opts: {
     p_user_email: opts.userEmail ?? undefined,
     p_record_id: opts.recordId ?? undefined,
   });
-  if (error) throw new Error("Lỗi đọc nhật ký: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được nhật ký.", error);
   return data;
 }
 
@@ -671,9 +694,9 @@ export interface SystemStatus {
 }
 
 export async function fetchSystemStatus(): Promise<SystemStatus> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_trang_thai_he_thong");
-  if (error) throw new Error("Lỗi đọc trạng thái hệ thống: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được trạng thái hệ thống.", error);
   return asShape<SystemStatus>(data);
 }
 
@@ -718,9 +741,9 @@ export interface ActiveRules {
 }
 
 export async function fetchActiveRules(): Promise<ActiveRules> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_active_rules");
-  if (error) throw new Error("Lỗi đọc luật: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được quy tắc nghiệp vụ.", error);
 
   /* Điền đủ cây mặc định trước khi trả về — cùng lý do với
    * fetchSourceWarnings: màn Luật đọc thẳng `rules.so_lieu_hien_tai.doi_tuong_nguon`,
@@ -753,9 +776,9 @@ export async function fetchActiveRules(): Promise<ActiveRules> {
 
 /** Chấm lại điểm trọng yếu. Mặc định chỉ đụng dòng chưa được QA chốt tay. */
 export async function recalcCriticality(onlyAuto = true): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_recalc_criticality", { p_only_auto: onlyAuto });
-  return unwrap(data, error, "Chấm lại điểm trọng yếu thất bại");
+  return unwrap(data, error, "Chưa chấm lại được điểm trọng yếu.");
 }
 
 /* ---- Tab thô (mọi tab của workbook) ---- */
@@ -771,42 +794,42 @@ export interface SourceRow {
 export async function listSourceTabs(): Promise<
   Array<{ source_tab: string; rows: number; columns: number }>
 > {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_list_source_tabs");
-  if (error) throw new Error("Lỗi đọc danh sách tab: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được danh mục.", error);
   return asShape(data);
 }
 
 export async function fetchSourceRows(tab: string): Promise<SourceRow[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase
     .from("vmp_source_rows")
     .select("id,source_tab,row_number,payload")
     .eq("source_tab", tab)
     .order("row_number");
-  if (error) throw new Error("Lỗi đọc dữ liệu tab: " + error.message);
+  if (error) throw loiNghiepVu("Chưa tải được danh mục.", error);
   return asShape(data || []);
 }
 
 export async function upsertSourceRow(
   tab: string, rowNumber: number | null, payload: Record<string, unknown>,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_upsert_source_row", {
     p_source_tab: tab,
     // NULL = thêm mới, RPC tự lấy số dòng kế tiếp.
     p_row_number: (rowNumber ?? null) as unknown as number,
     p_payload: payload as never,
   });
-  return unwrap(data, error, "Lưu dòng thất bại");
+  return unwrap(data, error, "Chưa lưu được.");
 }
 
 export async function deleteSourceRow(tab: string, rowNumber: number): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_delete_source_row", {
     p_source_tab: tab, p_row_number: rowNumber,
   });
-  return unwrap(data, error, "Xoá dòng thất bại");
+  return unwrap(data, error, "Chưa xoá được.");
 }
 
 /* ---- Người nhận cảnh báo & Danh bạ nhân sự ----
@@ -823,7 +846,7 @@ export async function setUserRole(
   userId: string, role: string, department: string | null, reason?: string,
   phamVi?: string | null,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   // Kiểu RPC sinh tự động từ schema (src/types/database.ts) chưa có hàm này
   // vì file đó sinh trước migration 20260801050000. Chạy `npm run gen:types`
   // là hết cần ép kiểu — ép ở đây để không phải sinh lại cả file ngay lúc này.
@@ -837,7 +860,7 @@ export async function setUserRole(
     // Rỗng = "theo mức chung của vai", đúng nghĩa NULL ở cột profiles.pham_vi.
     p_pham_vi: phamVi || null,
   });
-  return unwrap(data, error, "Đổi phân quyền thất bại");
+  return unwrap(data, error, "Chưa đổi được phân quyền.");
 }
 
 /** Bật/tắt tài khoản (profiles.is_active) — admin làm thẳng trên web.
@@ -851,7 +874,7 @@ export async function setUserRole(
 export async function setUserActive(
   userId: string, active: boolean, reason: string,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string, args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_user_active", {
@@ -859,7 +882,7 @@ export async function setUserActive(
     p_active: active,
     p_reason: reason,
   });
-  return unwrap(data, error, active ? "Bật tài khoản thất bại" : "Tắt tài khoản thất bại");
+  return unwrap(data, error, active ? "Chưa bật được tài khoản." : "Chưa tắt được tài khoản.");
 }
 
 /** Năm vai NGHIỆP VỤ hiệu lực — đúng những gì `vmp_business_role()` giải ra. Đây là
@@ -883,11 +906,11 @@ export interface VaiNghiepVuRow {
  *  trả vai ĐĂNG NHẬP, mà một `department_user` ứng với ba vai nghiệp vụ
  *  khác nhau tuỳ access_class — client không suy ngược được. */
 export async function fetchVaiNghiepVu(): Promise<VaiNghiepVuRow[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_business_roles");
-  if (error) throw new Error(error.message);
+  if (error) throw loiNghiepVu("Chưa tải được vai nghiệp vụ.", error);
   const o = (data || {}) as { ok?: boolean; error?: string; nguoi?: VaiNghiepVuRow[] };
   if (o.ok === false) throw new Error(o.error || "Không đọc được vai nghiệp vụ");
   return o.nguoi || [];
@@ -903,7 +926,7 @@ export async function fetchVaiNghiepVu(): Promise<VaiNghiepVuRow[]> {
 export async function setBusinessRole(
   userId: string, businessRole: string, department: string | null, reason: string,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string, args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_business_role", {
@@ -912,7 +935,7 @@ export async function setBusinessRole(
     p_department: department,
     p_reason: reason,
   });
-  return unwrap(data, error, "Đổi vai thất bại");
+  return unwrap(data, error, "Chưa đổi được vai.");
 }
 
 /* ---- Một người, một dòng (migration 20260801110000) ----
@@ -952,11 +975,11 @@ export interface NguoiVaQuyen {
 }
 
 export async function fetchNguoiVaQuyen(): Promise<NguoiVaQuyen> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_nguoi_va_quyen");
-  if (error) throw new Error(error.message);
+  if (error) throw loiNghiepVu("Chưa tải được danh sách người.", error);
   const o = (data || {}) as { ok?: boolean; error?: string; tong_hang_muc?: number; nguoi?: NguoiQuyenRow[] };
   if (o.ok === false) throw new Error(o.error || "Không đọc được danh sách người");
   return { tongHangMuc: o.tong_hang_muc || 0, nguoi: o.nguoi || [] };
@@ -984,13 +1007,13 @@ export interface LuatXemRow {
 }
 
 export async function fetchLuatXem(): Promise<LuatXemRow[]> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_luat_xem");
-  if (error) throw new Error(error.message);
+  if (error) throw loiNghiepVu("Chưa tải được quyền xem.", error);
   const o = (data || {}) as { ok?: boolean; error?: string; noi_dung?: LuatXemRow[] };
-  if (o.ok === false) throw new Error(o.error || "Không đọc được luật xem");
+  if (o.ok === false) throw new Error(o.error || "Chưa tải được quyền xem");
   return o.noi_dung || [];
 }
 
@@ -1000,14 +1023,14 @@ export async function fetchLuatXem(): Promise<LuatXemRow[]> {
 export async function lienKetTaiKhoan(
   performerId: string, userId: string | null,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string, args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_lien_ket_tai_khoan", {
     p_performer_id: performerId,
     p_user_id: userId,
   });
-  return unwrap(data, error, "Nối tài khoản thất bại");
+  return unwrap(data, error, "Chưa nối được tài khoản.");
 }
 
 /* ---- Danh sách email được phép có tài khoản ---- */
@@ -1023,7 +1046,7 @@ export async function fetchEmailChoPhep(): Promise<EmailChoPhepRow[]> {
   const { data, error } = await supabase
     .from("vmp_email_cho_phep" as never)
     .select("email,ghi_chu,is_active");
-  if (error) throw new Error(error.message);
+  if (error) throw loiNghiepVu("Chưa tải được danh sách email.", error);
   return ((data || []) as unknown as EmailChoPhepRow[])
     .sort((a, b) => a.email.localeCompare(b.email));
 }
@@ -1031,13 +1054,13 @@ export async function fetchEmailChoPhep(): Promise<EmailChoPhepRow[]> {
 export async function setEmailChoPhep(
   email: string, choPhep: boolean, ghiChu?: string,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string, args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_email_cho_phep", {
     p_email: email, p_cho_phep: choPhep, p_ghi_chu: ghiChu ?? null,
   });
-  return unwrap(data, error, "Lưu danh sách email thất bại");
+  return unwrap(data, error, "Chưa lưu được danh sách email.");
 }
 
 /* ---- Ma trận phân công: nhân viên × loại thẩm định × line ---- */
@@ -1059,7 +1082,7 @@ export async function fetchAssignments(): Promise<AssignmentRow[]> {
     .from("vmp_assignment_matrix" as never)
     .select("staff_name,department,validation_type,line,vai_tro")
     .eq("is_active", true);
-  if (error) throw new Error(error.message);
+  if (error) throw loiNghiepVu("Chưa tải được phân công.", error);
   return (data || []) as unknown as AssignmentRow[];
 }
 
@@ -1068,7 +1091,7 @@ export async function setAssignment(
   staffName: string, department: string, validationType: string,
   line: string, vaiTro: "" | "thuc_hien" | "ho_tro",
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await (supabase.rpc as unknown as (
     fn: string, args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string } | null }>)("rpc_set_assignment", {
@@ -1078,20 +1101,20 @@ export async function setAssignment(
     p_line: line,
     p_vai_tro: vaiTro,
   });
-  return unwrap(data, error, "Lưu phân công thất bại");
+  return unwrap(data, error, "Chưa lưu được phân công.");
 }
 
 /* ---- Người thực hiện ---- */
 export async function upsertPerformer(
   id: string | null, patch: Record<string, unknown>,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_upsert_performer", {
     // NULL nghĩa là 'tạo mới'; type sinh tự động khai uuid không nullable.
     p_id: (id ?? null) as unknown as string,
     p_patch: patch as never,
   });
-  return unwrap(data, error, "Lưu người thực hiện thất bại");
+  return unwrap(data, error, "Chưa lưu được người thực hiện.");
 }
 
 /** Gán người thực hiện cho một hạng mục.
@@ -1101,12 +1124,12 @@ export async function upsertPerformer(
 export async function setItemPerformer(
   validationCode: string, performerName: string,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_set_item_performer", {
     p_validation_code: validationCode,
     p_performer_name: performerName,
   });
-  return unwrap(data, error, "Gán người thực hiện thất bại");
+  return unwrap(data, error, "Chưa gán được người thực hiện.");
 }
 
 /** Gán bằng khóa danh bạ ổn định; tên chỉ còn là dữ liệu hiển thị legacy. */
@@ -1115,18 +1138,18 @@ export async function setItemPerformerById(
   personId: string | null,
   reason: string,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc(
     "rpc_set_item_performer_by_id" as never,
     buildSetItemPerformerByIdArgs(validationCode, personId, reason) as never,
   );
-  return unwrap(data, error, "Gán người thực hiện thất bại");
+  return unwrap(data, error, "Chưa gán được người thực hiện.");
 }
 
 export async function deletePerformer(id: string): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_delete_performer", { p_id: id });
-  return unwrap(data, error, "Xoá người thực hiện thất bại");
+  return unwrap(data, error, "Chưa xoá được người thực hiện.");
 }
 
 /* ---- Sản phẩm GMP ----
@@ -1139,7 +1162,7 @@ export async function upsertObjectSupabase(obj: {
   area?: string | null; criticality?: string; frequency_months?: number | null;
   notes?: string | null;
 }): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   // rpc_upsert_object yêu cầu department/area/frequency_months không rỗng
   // (xem chữ ký trong types/database.ts) — điền mặc định giống DB.
   const { data, error } = await supabase.rpc("rpc_upsert_object", {
@@ -1152,23 +1175,23 @@ export async function upsertObjectSupabase(obj: {
     p_frequency_months: obj.frequency_months ?? 12,
     p_notes: obj.notes ?? undefined,
   });
-  return unwrap(data, error, "Lưu đối tượng thất bại");
+  return unwrap(data, error, "Chưa lưu được đối tượng.");
 }
 
 export async function resolveMissingItem(
   validationCode: string, decision: string, reason: string,
 ): Promise<RpcResult> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_resolve_missing", {
     p_validation_code: validationCode, p_decision: decision, p_reason: reason,
   });
-  return unwrap(data, error, "Xử lý mã mất thất bại");
+  return unwrap(data, error, "Chưa xử lý được mã đã mất.");
 }
 
 // ---- Các API chỉ có nghĩa trong kiến trúc cũ (ghi ngược Google Sheet) ----
 // Sheet nay là dữ liệu gốc CHỈ ĐỌC; outbox đã bị vô hiệu hoá ngay trong RPC.
 function sheetIsReadOnly() {
-  return new Error("Google Sheet là dữ liệu gốc chỉ đọc. Nhập liệu thực hiện trên dashboard.");
+  return new Error("Google Sheet chỉ đọc. Nhập liệu trên VMP.");
 }
 
 export async function resolveOutbox(outboxId: number, ok: boolean, error?: string): Promise<never> {
@@ -1221,7 +1244,7 @@ export async function saveCatalogObject(
   reason: string | null,
   expectedVersion: number | null,
 ): Promise<KetQuaLuuDanhMuc> {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
 
   // Form tạo mới cần mã để định danh, nhưng RPC chỉ nhận mã qua tham số
   // riêng. Không gửi nó trong whitelist thuộc tính, cũng không âm thầm
@@ -1250,7 +1273,10 @@ export async function saveCatalogObject(
     p_reason: reason,
     p_expected_version: expectedVersion,
   });
-  if (error) throw new Error("Lưu danh mục thất bại: " + error.message);
+  if (error) {
+    console.error("[VMP] Chưa lưu được đối tượng.", error);
+    throw new Error("Chưa lưu được đối tượng. Thử lại.", { cause: error });
+  }
   return asShape<KetQuaLuuDanhMuc>(data);
 }
 
@@ -1302,7 +1328,7 @@ export type KetQuaApDungV2 = KetQuaApDung & {
 /** Ép kiểu tại một chỗ: types sinh từ schema trước migration 20260812130000.
  *  PHẢI bind — supabase.rpc dùng `this` bên trong. */
 function goiRpc() {
-  if (!supabase) throw new Error("Supabase chưa cấu hình");
+  if (!supabase) throw new Error(CHUA_KET_NOI);
   return supabase.rpc.bind(supabase) as unknown as (
     fn: string, args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
@@ -1310,7 +1336,7 @@ function goiRpc() {
 
 export async function previewCatalogChange(changeId: string): Promise<AnhHuongTimeline> {
   const { data, error } = await goiRpc()("rpc_preview_catalog_change", { p_change_id: changeId });
-  if (error) throw new Error("Không xem trước được ảnh hưởng: " + error.message);
+  if (error) throw loiNghiepVu("Chưa xem trước được thay đổi lịch.", error);
   return asShape<AnhHuongTimeline>(data);
 }
 
@@ -1322,14 +1348,14 @@ export async function applyCatalogChange(
     p_reason: reason,
     p_expected_timeline_revision: expectedTimelineRevision,
   });
-  if (error) throw new Error("Áp vào timeline thất bại: " + error.message);
+  if (error) throw loiNghiepVu("Chưa áp được vào lịch thẩm định.", error);
   return asShape<KetQuaApDung>(data);
 }
 
 export async function previewCatalogChangeV2(changeId: string): Promise<AnhHuongTimelineV2> {
   const { data, error } = await goiRpc()("rpc_preview_catalog_change_v2", { p_change_id: changeId });
   if (error && maLoiThieuHam(error)) return asShape<AnhHuongTimelineV2>(await previewCatalogChange(changeId));
-  if (error) throw new Error("Không xem trước được ảnh hưởng: " + error.message);
+  if (error) throw loiNghiepVu("Chưa xem trước được thay đổi lịch.", error);
   return asShape<AnhHuongTimelineV2>(data);
 }
 
@@ -1348,7 +1374,7 @@ export async function applyCatalogChangeV2(
       input.changeId, input.reason, input.expectedTimelineRevision,
     ));
   }
-  if (error) throw new Error("Áp vào timeline thất bại: " + error.message);
+  if (error) throw loiNghiepVu("Chưa áp được vào lịch thẩm định.", error);
   return asShape<KetQuaApDungV2>(data);
 }
 
@@ -1376,7 +1402,7 @@ function maLoiThieuHam(error: { code?: string } | null): boolean {
 }
 
 export async function fetchUiAccess(): Promise<UiAccessKetQua> {
-  if (!supabase) return { trangThai: "loi", thongDiep: "Supabase chưa cấu hình" };
+  if (!supabase) return { trangThai: "loi", thongDiep: CHUA_KET_NOI };
 
   /* `rpc_my_ui_access` chưa có trong src/types/database.ts vì file đó sinh từ
      schema live, mà migration tạo hàm này chưa chạy. Ép kiểu tại đúng một
@@ -1395,7 +1421,7 @@ export async function fetchUiAccess(): Promise<UiAccessKetQua> {
 
   if (error) {
     if (maLoiThieuHam(error)) return { trangThai: "chua_co_rpc" };
-    return { trangThai: "loi", thongDiep: error.message };
+    return { trangThai: "loi", thongDiep: loiNghiepVu("Chưa tải được quyền.", error).message };
   }
   if (data == null) return { trangThai: "chua_co_rpc" };
   return { trangThai: "co", payload: data };

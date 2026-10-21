@@ -84,7 +84,7 @@ async function assertMobileLayout(page, view) {
   await page.waitForSelector(".monitoring-journey", { timeout: 15_000 });
   const readiness = {
     overview: { label: "Tổng quan VMP", root: ".b-hero" },
-    timeline: { label: "Dòng thời gian", root: ".timeline-page-shell .long-mon-view-switch" },
+    timeline: { label: "Dòng thời gian VMP", root: ".timeline-page-shell .long-mon-view-switch" },
     alerts: { label: "Cảnh báo & ưu tiên", root: ".alerts-page-shell .alerts-priority-rail" },
   }[view];
   assert.ok(readiness, `mobile view không được hỗ trợ: ${view}`);
@@ -220,13 +220,13 @@ try {
   });
 
   assert.ok(overview.heroTop < overview.firstTop, JSON.stringify(overview));
-  assert.match(overview.firstText, /Trễ đích VMP/);
+  assert.match(overview.firstText, /Quá hạn đích VMP/);
   assert.match(overview.secondText, /Tới hạn đích VMP 30 ngày/);
   assert.equal(overview.duplicateCompletionCards, 0);
   const qualityCount = overview.qualityText.match(/Vấn đề dữ liệu(\d+)/)?.[1];
   assert.ok(qualityCount, `Không đọc được số Vấn đề dữ liệu: ${overview.qualityText}`);
   assert.ok(Number(qualityCount) > 0, `Fixture phải có vấn đề dữ liệu: ${overview.qualityText}`);
-  assert.match(overview.qualityText, /\d+ vấn đề được phát hiện · trong đó \d+ lệch pha/);
+  assert.match(overview.qualityText, /trong đó \d+ lệch pha/);
   await page.screenshot({ path: screenshotPaths.overview, fullPage: true });
 
   console.log("✓ tổng quan ưu tiên tiến độ năm và ba thẻ hỗ trợ không trùng lặp");
@@ -308,11 +308,11 @@ try {
     };
   });
   assert.equal(alerts.primaryCount, 4);
-  assert.equal(alerts.commandHeroCount, 1);
-  assert.ok(alerts.commandQueueCount >= 1 && alerts.commandQueueCount <= 4);
+  assert.equal(alerts.commandHeroCount, 0, "Khối việc làm trước tiên chỉ còn ở Việc hôm nay");
+  assert.equal(alerts.commandQueueCount, 0);
   assert.equal(alerts.managementCount, 1);
   assert.equal(alerts.managementBeforePriority, true,
-    "Góc nhìn quản lý phải đứng ngay sau bàn điều phối và trước bốn tín hiệu cảnh báo");
+    "Khối điểm nghẽn phải đứng trước bốn tín hiệu cảnh báo");
   assert.deepEqual(alerts.managementMetricAlignment, [
     { alignItems: "center", textAlign: "center" },
     { alignItems: "center", textAlign: "center" },
@@ -326,10 +326,10 @@ try {
   assert.deepEqual(alerts.groupLabels, ["Gom theo đối tượng", "Theo từng hạng mục"]);
   assert.deepEqual(alerts.groupPressed, ["true", "false"]);
   assert.doesNotMatch(alerts.bodyText, /VITE_N8N_AI_REPORT_URL|GitHub → Settings/);
-  const aiUnavailable = alerts.bodyText.includes("Phân tích AI chưa được bật. Dữ liệu cảnh báo vẫn đầy đủ.");
+  const aiUnavailable = alerts.bodyText.includes("AI chưa sẵn sàng.");
   assert.deepEqual(alerts.aiButtonsDisabled, aiUnavailable ? [true, true] : [false, false]);
   if (!aiUnavailable) {
-    assert.match(alerts.bodyText, /AI chỉ nhận định, không thay đánh giá của QA/);
+    assert.match(alerts.bodyText, /AI phân tích theo bộ phận đã chọn/);
   }
 
   await clickButtonByText(page, "Theo từng hạng mục");
@@ -337,7 +337,7 @@ try {
     buttons.map((button) => button.getAttribute("aria-pressed")));
   assert.deepEqual(groupPressed, ["false", "true"]);
 
-  console.log("✓ cảnh báo có bàn điều phối, bốn tín hiệu, góc nhìn quản lý và công cụ phụ đóng mặc định");
+  console.log("✓ cảnh báo có điểm nghẽn, bốn tín hiệu và công cụ phụ đóng mặc định");
 
   await page.setViewport({ width: 390, height: 844 });
   const mobileJourneyVisibility = [];

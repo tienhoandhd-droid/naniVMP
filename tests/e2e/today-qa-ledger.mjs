@@ -60,7 +60,7 @@ try {
   await page.waitForFunction((id) => !document.getElementById(id)?.hasAttribute("hidden"), {}, desktop.detailId);
   const detail = await page.$eval(`#${desktop.detailId}`, (panel) => {
     const departmentLabel = [...panel.querySelectorAll("dt")]
-      .find((term) => term.textContent?.trim() === "Phòng ban");
+      .find((term) => term.textContent?.trim() === "Bộ phận");
     return {
       department: departmentLabel?.nextElementSibling?.textContent?.trim(),
       region: panel.getAttribute("role"),

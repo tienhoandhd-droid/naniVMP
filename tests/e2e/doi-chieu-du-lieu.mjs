@@ -159,7 +159,7 @@ const truoc = await p.evaluate(() => {
     chip: (t.match(/(\d+)\s*\/(\d+) hạng mục/) || []).slice(1).join("/"),
     quaHan: (t.match(/Quá hạn\s*(\d+)/) || [])[1],
     tyLe: (t.match(/Hoàn thành VMP\s*(\d+)%/) || [])[1],
-    ketLuan: (t.match(/(\d+) tháng đã qua gánh (\d+) hạng mục/) || []).slice(1).join("/"),
+    ketLuan: (t.match(/(\d+) tháng qua: xong \d+\/(\d+)/) || []).slice(1).join("/"),
     vanDe: (t.match(/Vấn đề dữ liệu\s*(\d+)/) || [])[1],
   };
 });
@@ -176,7 +176,7 @@ const sau = await p.evaluate(() => {
     chip: (t.match(/(\d+)\s*\/(\d+) hạng mục/) || []).slice(1).join("/"),
     quaHan: (t.match(/Quá hạn\s*(\d+)/) || [])[1],
     tyLe: (t.match(/Hoàn thành VMP\s*(\d+)%/) || [])[1],
-    ketLuan: (t.match(/(\d+) tháng đã qua gánh (\d+) hạng mục/) || []).slice(1).join("/"),
+    ketLuan: (t.match(/(\d+) tháng qua: xong \d+\/(\d+)/) || []).slice(1).join("/"),
     vanDe: (t.match(/Vấn đề dữ liệu\s*(\d+)/) || [])[1],
   };
 });

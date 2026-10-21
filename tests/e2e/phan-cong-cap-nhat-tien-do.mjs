@@ -296,7 +296,7 @@ try {
   assert.ok(itemBodies.length > itemReadsBeforeOpen, "mở modal phải phát sinh per-item rights read mới");
   await assigned.page.waitForFunction(() => [...document.querySelectorAll('[role="dialog"]')]
     .some((dialog) => dialog.getClientRects().length > 0
-      && dialog.innerText.includes("Quyền theo từng cột đang áp dụng")));
+      && /🔒 (Bạn được sửa \d+ mục|Chỉ xem)\./.test(dialog.innerText)));
   assert.deepEqual(itemBodies.at(-1), {
     persona: "assigned_qa", body: { p_validation_code: ITEM_ID },
   }, "modal phải reload quyền từng item bằng session QA được gán");

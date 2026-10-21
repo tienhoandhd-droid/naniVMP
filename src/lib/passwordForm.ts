@@ -63,7 +63,7 @@ export function resetMailErrorMessage(error: unknown): string {
     return "Vì lý do bảo mật, vui lòng thử lại sau ít phút";
   }
   if (/network|fetch/i.test(message)) return "Không kết nối được máy chủ. Vui lòng thử lại";
-  return "Chưa gửi được mail. Vui lòng thử lại";
+  return "Chưa gửi được email. Vui lòng thử lại";
 }
 
 export function recoverySessionErrorMessage(error: unknown): string {

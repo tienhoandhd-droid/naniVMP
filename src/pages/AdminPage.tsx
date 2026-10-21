@@ -42,16 +42,21 @@ export default function AdminView({ conn, user, access }: {
     setLoading(true); setErr("");
     try {
       const r = await fetchSystemStatus();
-      if (r?.ok === false) setErr(r.error || "Không đọc được trạng thái hệ thống");
-      else setTt(r);
-    } catch (e) { setErr((e as Error).message || "Không đọc được trạng thái hệ thống"); }
+      if (r?.ok === false) {
+        console.error("Không đọc được trạng thái hệ thống", r.error);
+        setErr("Bấm Thử lại. Nếu vẫn lỗi, tải lại trang.");
+      } else setTt(r);
+    } catch (e) {
+      console.error("Không đọc được trạng thái hệ thống", e);
+      setErr("Bấm Thử lại. Nếu vẫn lỗi, tải lại trang.");
+    }
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const oSo = (nhan: string, giaTri: React.ReactNode, phu?: string) => (
     <div style={{ padding: "13px 15px", borderRadius: 14, background: C.surface, border: `1px solid ${C.pinkSoft}` }}>
-      <div style={{ fontSize: 12, fontWeight: 800, color: C.plumSoft, textTransform: "uppercase", letterSpacing: ".03em" }}>{nhan}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.plumSoft, textTransform: "none", letterSpacing: 0 }}>{nhan}</div>
       <div style={{ fontFamily: NUM, fontSize: 20, fontWeight: 800, color: C.plum, marginTop: 3 }}>{giaTri}</div>
       {phu && <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>{phu}</div>}
     </div>
@@ -88,36 +93,39 @@ export default function AdminView({ conn, user, access }: {
         setLoiClient(kq?.errors ?? []);
         setLoiClientTong(kq?.total ?? 0);
         setLoiClientTrangThai("ok");
-      } catch { setLoiClientTrangThai("loi"); }
+      } catch (e) {
+        console.error("Không tải được nhật ký lỗi trình duyệt", e);
+        setLoiClientTrangThai("loi");
+      }
     })();
   }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <Card>
-        <CardTitle icon={BarChart3} sub="Người dùng · cấu hình · việc tự động · khối lượng dữ liệu"
+        <CardTitle icon={BarChart3} sub="Kết nối · đăng nhập · việc tự động"
           right={<button onClick={load} disabled={loading}
             style={{ ...btnPrimary, padding: "8px 15px", borderRadius: 14, fontSize: 12, opacity: loading ? 0.6 : 1 }}>
             {loading ? "Đang tải…" : "Tải lại"}</button>}>
-          Quản trị hệ thống
+          Trạng thái hệ thống
         </CardTitle>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14 }}>
           <div style={{ padding: "13px 15px", borderRadius: 14, background: conn.status === "ok" ? C.mintSoft : C.marigoldSoft }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: conn.status === "ok" ? C.mintText : C.marigoldText, textTransform: "uppercase" }}>Kết nối dữ liệu</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: conn.status === "ok" ? C.mintText : C.marigoldText, textTransform: "none" }}>Kết nối dữ liệu</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 3 }}>
-              {conn.status === "ok" ? "Đang chạy · Supabase" : conn.status === "loading" ? "Đang tải…" : conn.status === "err" ? "Lỗi kết nối" : "Chưa kết nối"}
+              {conn.status === "ok" ? "Đang kết nối" : conn.status === "loading" ? "Đang tải…" : conn.status === "err" ? "Lỗi kết nối" : "Chưa kết nối"}
             </div>
           </div>
           <div style={{ padding: "13px 15px", borderRadius: 14, background: isSupabaseConfigured() ? C.mintSoft : C.raspSoft }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: isSupabaseConfigured() ? C.mintText : C.raspText, textTransform: "uppercase" }}>Xác thực</div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 3 }}>{isSupabaseConfigured() ? "Supabase Auth" : "Chế độ tạm (env)"}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: isSupabaseConfigured() ? C.mintText : C.raspText, textTransform: "none" }}>Xác thực</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.plum, marginTop: 3 }}>{isSupabaseConfigured() ? "Đăng nhập bằng tài khoản" : "Chưa cấu hình"}</div>
           </div>
-          {oSo("Đang đăng nhập", user?.name || "—", `${user?.role || ""} · ${(access && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—"}`)}
+          {oSo("Đang đăng nhập", user?.name || "—", (access && VAI_NGHIEP_VU.find((v) => v.id === access.businessRole)?.nhan) || "—")}
         </div>
       </Card>
 
-      <FieldPerformancePanel />
+      {access?.businessRole === "admin" && <FieldPerformancePanel />}
 
       {err && (
         <Card>
@@ -132,14 +140,14 @@ export default function AdminView({ conn, user, access }: {
       {tt && (
         <>
           <Card variant="strong">
-            <CardTitle icon={Radar} sub="Đọc thẳng từ database lúc mở trang">Khối lượng dữ liệu</CardTitle>
+            <CardTitle icon={Radar}>Khối lượng dữ liệu</CardTitle>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(165px,1fr))", gap: 12 }}>
-              {oSo("Hạng mục đang theo dõi", String(d.hang_muc_dang_theo_doi ?? "—"), "tính vào KPI")}
-              {oSo("Không áp dụng", String(d.hang_muc_khong_ap_dung ?? "—"), "ngoài KPI, vẫn tra được")}
+              {oSo("Hạng mục đang theo dõi", String(d.hang_muc_dang_theo_doi ?? "—"), "Tính tiến độ")}
+              {oSo("Không áp dụng", String(d.hang_muc_khong_ap_dung ?? "—"), "Không tính tiến độ")}
               {oSo("Đối tượng", String(d.doi_tuong ?? "—"))}
               {oSo("Người thực hiện", String(d.nguoi_thuc_hien ?? "—"))}
-              {oSo("Dòng nhật ký", String(d.dong_nhat_ky ?? "—"), "ALCOA+ audit trail")}
-              {oSo("Dung lượng", String(d.dung_luong ?? "—"), "cả database")}
+              {oSo("Dòng nhật ký", String(d.dong_nhat_ky ?? "—"))}
+              {oSo("Dung lượng", String(d.dung_luong ?? "—"), "Toàn hệ thống")}
             </div>
           </Card>
 
@@ -154,7 +162,7 @@ export default function AdminView({ conn, user, access }: {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>{j.ten}</div>
                     <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginTop: 1 }}>
-                      {docLichCron(j.lich)} · <span style={{ fontFamily: NUM }}>{j.lich}</span>
+                      {docLichCron(j.lich)}
                     </div>
                   </div>
                 </div>
@@ -168,7 +176,7 @@ export default function AdminView({ conn, user, access }: {
               sub={loiClientTrangThai === "ok"
                 ? `${loiClientTong} lỗi trong 24 giờ`
                 : "Lỗi phát sinh trên trình duyệt người dùng"}>
-              Lỗi client 24 giờ qua
+              Lỗi trên trình duyệt 24 giờ qua
             </CardTitle>
             {loiClientTrangThai === "dang-tai" && (
               <div style={{ padding: 14, color: C.plumSoft, fontWeight: 600 }}>Đang tải…</div>
@@ -176,20 +184,18 @@ export default function AdminView({ conn, user, access }: {
             {loiClientTrangThai === "chua-ap" && (
               <div style={{ padding: "13px 15px", borderRadius: 14, background: C.marigoldSoft,
                             fontSize: 13, color: C.marigoldText, fontWeight: 700, lineHeight: 1.7 }}>
-                Kênh báo lỗi chưa bật: áp migration <span style={{ fontFamily: NUM }}>20260831170000_client_error_log.sql</span> theo
-                runbook <span style={{ fontFamily: NUM }}>docs/runbooks/2026-08-31-client-error-log.md</span>.
-                Frontend đã gắn sẵn — áp xong là cột này tự có số.
+                Chưa bật ghi lỗi trình duyệt.
               </div>
             )}
             {loiClientTrangThai === "loi" && (
               <div style={{ padding: 14, color: C.raspText, fontWeight: 700 }}>
-                Không đọc được nhật ký lỗi client (cần vai Admin/Quản lý QA).
+                Không tải được nhật ký lỗi. Bấm Tải lại.
               </div>
             )}
             {loiClientTrangThai === "ok" && (
               (loiClient ?? []).length === 0 ? (
                 <div style={{ padding: 14, color: C.mintText, fontWeight: 700 }}>
-                  24 giờ qua web không báo lỗi nào — production sạch.
+                  Không có lỗi trong 24 giờ.
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -209,8 +215,8 @@ export default function AdminView({ conn, user, access }: {
 
           {!!(tt.workflow_loi_7_ngay || []).length && (
             <Card variant="strong">
-              <CardTitle icon={FileWarning} sub="Ghi từ bảng workflow_runs — n8n báo về khi một workflow chạy hỏng">
-                Workflow lỗi 7 ngày qua ({tt.workflow_loi_7_ngay!.length})
+              <CardTitle icon={FileWarning}>
+                Việc tự động lỗi 7 ngày qua ({tt.workflow_loi_7_ngay!.length})
               </CardTitle>
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 {tt.workflow_loi_7_ngay!.map((wf: NonNullable<SystemStatus["workflow_loi_7_ngay"]>[number], i: number) => (
@@ -226,11 +232,11 @@ export default function AdminView({ conn, user, access }: {
           )}
 
           <Card variant="soft">
-            <CardTitle icon={Scale} sub={`${tt.cau_hinh?.length || 0} khoá · khoá đánh dấu nhạy cảm không hiện ở đây`}
+            <CardTitle icon={Scale} sub={`${tt.cau_hinh?.length || 0} mục`}
               right={<button onClick={() => setMoCauHinh((v) => !v)}
                 style={{ fontFamily: TEXT, fontSize: 12, fontWeight: 700, color: C.plum, border: `1.5px solid ${C.pinkSoft}`, background: C.surface, borderRadius: 999, padding: "7px 13px", cursor: "pointer" }}>
                 {moCauHinh ? "Gập lại" : "Xem"}</button>}>
-              Cấu hình hệ thống
+              Thông số cấu hình
             </CardTitle>
             {moCauHinh && (
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
