@@ -92,7 +92,10 @@ do $$declare j jsonb;pid uuid;v int;linked uuid;upper_linked uuid;wrong_linked u
  assert(j->>'error_code'='INVALID_QA_PRINCIPAL'and pg_temp.person(wrong_linked)is not distinct from before_wrong and pg_temp.link_digest()=before_digest)is true,'LIFE_WRONG_DEPARTMENT_RELINK_DENIED_NO_EFFECT';
  perform set_config('request.jwt.claims','{"sub":"a8500000-0000-4000-8000-000000000004","role":"authenticated"}',true);
  before_digest:=pg_temp.link_digest();j:=public.rpc_link_item_permission_account(wrong_linked,'a8500000-0000-4000-8000-000000000004','Nonadmin must fail',v);
- assert(j->>'error_code'='FORBIDDEN'and pg_temp.person(wrong_linked)is not distinct from before_wrong and pg_temp.link_digest()=before_digest)is true,'LIFE_NONADMIN_RELINK_DENIED_NO_EFFECT';
+ -- Tài khoản này đã bị gỡ hồ sơ nhân sự nên không còn vai nghiệp vụ: từ
+-- migration 20261021120000 cổng phiên trả ROLE_UNRESOLVED trước khi tới
+-- kiểm quyền admin (FORBIDDEN). Cả hai đều là từ chối; vẫn bắt buộc không ghi gì.
+assert(j->>'ok'='false'and j->>'error_code' in ('FORBIDDEN','ROLE_UNRESOLVED')and pg_temp.person(wrong_linked)is not distinct from before_wrong and pg_temp.link_digest()=before_digest)is true,'LIFE_NONADMIN_RELINK_DENIED_NO_EFFECT';
  perform pg_temp.actor();
 
  -- Plan lifecycle is create then soft cancellation; duplicate and missing reason fail.
