@@ -157,7 +157,7 @@ export default function CatalogObjectForm({
   };
 
   const luu = async () => {
-    const loiMoi = validateCatalogForm(form);
+    const loiMoi = validateCatalogForm(form, row);
     if (phaiCoLyDo && !lyDo.trim()) {
       loiMoi.__lyDo = doiPhanCongQa
         ? "Thay đổi phân công QA phải nhập lý do"
@@ -253,6 +253,11 @@ export default function CatalogObjectForm({
             onChange={(e) => dat(t.key, e.target.value)}>
             <option value="">—</option>
             {t.chon.map((v) => <option key={v} value={v}>{v}</option>)}
+            {/* Giá trị cũ ngoài danh sách vẫn phải hiện đúng, nếu không ô
+                trông như trống ("—") dù dữ liệu đang có. */}
+            {form[t.key] && !t.chon.includes(form[t.key]) && (
+              <option value={form[t.key]}>{form[t.key]}</option>
+            )}
           </select>
         ) : (
           <input id={id} className={lop} value={form[t.key] ?? ""} disabled={khoa}

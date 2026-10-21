@@ -4,6 +4,7 @@ import ViewportDialog from "../../components/ui/ViewportDialog.tsx";
 import { useToast } from "../../components/ui/ToastProvider.tsx";
 import { updatePlannedDeadlines } from "../../lib/supabaseData.ts";
 import type { Activity } from "../../types/domain.ts";
+import { progressValidationCode } from "../progress/editableProgressRights.ts";
 import {
   DEADLINE_KEYS,
   PLANNED_DEADLINE_SUCCESS_TOAST,
@@ -29,6 +30,9 @@ export default function PlannedDeadlineDialog({
   onReload,
 }: PlannedDeadlineDialogProps) {
   const toast = useToast();
+  // `a.code` có thể là mã đối tượng (dữ liệu bảng điều khiển v1) — server
+  // cần mã hạng mục, nên lấy qua cùng hàm với hộp cập nhật tiến độ.
+  const validationCode = progressValidationCode(a);
   const before = plannedSnapshot(a);
   const protectedValues = protectedSnapshot(a);
   const [draft, setDraft] = useState(before);
@@ -57,7 +61,7 @@ export default function PlannedDeadlineDialog({
   })).current;
 
   const localError = validatePlannedDeadlineDraft({
-    validationCode: a.code,
+    validationCode,
     before,
     next: draft,
     reason,
@@ -69,7 +73,7 @@ export default function PlannedDeadlineDialog({
     if (controller.isBusy()) return;
 
     const prepared = preparePlannedDeadlineUpdate({
-      validationCode: a.code,
+      validationCode,
       before,
       next: draft,
       reason,
@@ -127,7 +131,7 @@ export default function PlannedDeadlineDialog({
       )}
     >
       <div data-planned-deadline-dialog>
-        <p data-planned-deadline-identity>{a.code}</p>
+        <p data-planned-deadline-identity>{validationCode}</p>
         <p data-planned-deadline-version>Phiên bản: {a.version ?? "—"}</p>
 
         <div className="planned-deadline-grid">

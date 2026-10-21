@@ -57,9 +57,10 @@
       return dates.filter(date=>date>due).map(measured_on=>({key:item.key,name:calibration?.name||item.name||item.key,due_on:due,measured_on}));
     });
   };
-  const syncCalibration=(data,config)=>{
+  // Một đợt có thể gồm nhiều hệ thống; chỉ chép hạn của hệ thống đang nhập, nếu không máy chủ từ chối trường lạ.
+  const syncCalibration=(data,config,system)=>{
     const run=config?._run;if(run?.status!=='open'||!data||typeof data!=='object')return [];
-    return (run.calibration_requirements||[]).flatMap(item=>{
+    return (run.calibration_requirements||[]).filter(item=>!system||!item.system||item.system===system).flatMap(item=>{
       const path=item.payload_path,value=run.calibration?.[item.key]?.due_on;
       if(!Array.isArray(path)||!path.length||!/^\d{4}-\d{2}-\d{2}$/.test(value||'')||path.some(key=>['__proto__','prototype','constructor'].includes(String(key))))return [];
       const before=at(data,path);if(String(before??'')===value)return [];

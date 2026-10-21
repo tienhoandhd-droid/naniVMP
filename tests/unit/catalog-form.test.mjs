@@ -173,3 +173,28 @@ test("lỗi lý do phân công QA có đích focus riêng khi các trường kh�
     ...hopLe, object_name: "",
   }), "object_name");
 });
+
+test("giá trị cũ ngoài danh sách mà không sửa thì vẫn lưu được", () => {
+  // Dữ liệu thật: show_flag "Y" (241 đối tượng), tần suất 3, vài dòng "Đang dùng".
+  // Chỉ đổi QA phụ trách thì không được bắt sửa luôn các ô cũ này.
+  const banGoc = { ...hopLe, status: "Đang dùng", show_flag: "Y", frequency_months: "3" };
+  assert.deepEqual(validateCatalogForm({ ...banGoc }, banGoc), {});
+});
+
+test("giá trị ngoài danh sách do người dùng vừa nhập thì vẫn bị chặn", () => {
+  const banGoc = { ...hopLe, status: "Đang dùng" };
+  assert.equal(
+    validateCatalogForm({ ...banGoc, status: "Linh tinh" }, banGoc).status,
+    "Tình trạng phải chọn trong danh sách",
+  );
+  assert.equal(
+    validateCatalogForm({ ...hopLe, status: "Đang dùng" }).status,
+    "Tình trạng phải chọn trong danh sách",
+  );
+});
+
+test("tình trạng dùng đúng bộ chữ của dữ liệu thật", () => {
+  for (const v of ["Hoạt động", "Ngưng hoạt động", "Chưa hoạt động"]) {
+    assert.equal(validateCatalogForm({ ...hopLe, status: v }).status, undefined, v);
+  }
+});

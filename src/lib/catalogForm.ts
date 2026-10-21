@@ -61,7 +61,7 @@ export const BO_PHAN_CHUAN = [
  *  thật, và giá trị gửi đi là tên thật đó. */
 export const MA_BO_PHAN_KHAC = "__khac__";
 
-export const TINH_TRANG = ["Đang dùng", "Ngừng dùng", "Dự phòng"] as const;
+export const TINH_TRANG = ["Hoạt động", "Ngưng hoạt động", "Chưa hoạt động"] as const;
 export const CO_KHONG = ["y", "n"] as const;
 export const PHAN_LOAI_BAO_CAO = [
   "Không phụ thuộc", "Hóa lý", "Nhiễm khuẩn", "Vô khuẩn",
@@ -153,8 +153,15 @@ export function firstCatalogFormErrorTarget(loi: LoiForm, form: GiaTriForm): str
  *
  * Chỉ kiểm trường ĐANG HIỆN: bắt người dùng điền tháng thẩm định cho một
  * đối tượng họ vừa khai là không thẩm định thì vô nghĩa.
+ *
+ * Giá trị ngoài danh sách chọn mà vẫn y như bản gốc (dữ liệu cũ như
+ * "Đang dùng", "Y", tần suất 3) thì không chặn: người dùng không sửa ô đó,
+ * và `buildCatalogPatch` cũng không gửi nó đi.
  */
-export function validateCatalogForm(form: GiaTriForm): LoiForm {
+export function validateCatalogForm(
+  form: GiaTriForm,
+  banGoc: Record<string, unknown> = {},
+): LoiForm {
   const loi: LoiForm = {};
 
   for (const t of truongDangHien(form)) {
@@ -172,7 +179,9 @@ export function validateCatalogForm(form: GiaTriForm): LoiForm {
       loi[t.key] = `${t.label} phải là số`;
       continue;
     }
-    if (t.chon && !t.chon.includes(raw)) {
+    const goc = banGoc[t.key] === null || banGoc[t.key] === undefined
+      ? "" : String(banGoc[t.key]).trim();
+    if (t.chon && !t.chon.includes(raw) && raw !== goc) {
       loi[t.key] = `${t.label} phải chọn trong danh sách`;
     }
   }

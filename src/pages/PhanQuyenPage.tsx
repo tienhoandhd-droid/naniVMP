@@ -30,6 +30,7 @@ import { useEffect, useMemo, useState } from "react";
 import "../styles/catalog-workspace.css"; // B5: dung .cw-* (ItemPermissionModeCard...)
 import { ShieldCheck, AlertTriangle, Check, Plus, Mail, Trash2 } from "lucide-react";
 import { C } from "../constants/theme.ts";
+import { useToast } from "../components/ui/ToastProvider.tsx";
 import { supabase } from "../lib/supabaseClient.ts";
 import {
   fetchEmailChoPhep, setEmailChoPhep, fetchNguoiVaQuyen, fetchVaiNghiepVu,
@@ -380,6 +381,7 @@ function CurrentPermissionWorkspace({ acts, access }: {
   const [accountTool, setAccountTool] = useState<
     { kind: "link" } | { kind: "rights"; person: DirectoryPerson } | null
   >(null);
+  const toast = useToast();
   const [roleEditor, setRoleEditor] = useState<{
     row: AccountAdministrationRow;
     reload: ReloadAccountByUserId;
@@ -508,7 +510,11 @@ function CurrentPermissionWorkspace({ acts, access }: {
             canEdit={duocQuanLyTaiKhoan}
             mutateRole={setBusinessRole}
             reloadByUserId={roleEditor.reload}
-            onVerified={() => setRoleEditor(null)}
+            onVerified={(row) => {
+              // Khung sửa đóng ngay nên thông báo trong khung không kịp hiện.
+              toast.thanhCong(`Đã đổi vai ${row.name}.`);
+              setRoleEditor(null);
+            }}
             onCancel={() => setRoleEditor(null)}
           />
         )}

@@ -80,3 +80,13 @@ test('closed calibration warning uses mapped snapshot dates and preserves metada
  delete data.equipment.balance_due;
  assert.deepEqual(plain(history.calibrationWarnings(config,data,'steam','bm01','S1')),[{key:'metadata',name:'Dụng cụ',due_on:'2026-09-01',measured_on:'2026-09-27'}]);
 });
+
+test('đợt nhiều hệ thống chỉ đồng bộ hạn hiệu chuẩn của hệ thống đang nhập',()=>{
+ const run={_run:{status:'open',calibration:{'air:bm01:expiry':{due_on:'2026-12-30'},'steam:bm01:balance_due':{due_on:'2026-11-11'}},calibration_requirements:[
+  {key:'air:bm01:expiry',system:'air',form:'bm01',payload_path:['equipment','bm01','expiry']},
+  {key:'steam:bm01:balance_due',system:'steam',form:'bm01',payload_path:['equipment','balance_due']},
+ ]}};
+ const gas={equipment:{bm01:{expiry:'2026-09-26'}}};
+ assert.deepEqual(plain(history.syncCalibration(gas,run,'air')),[{path:['equipment','bm01','expiry'],before:'2026-09-26',after:'2026-12-30'}]);
+ assert.equal(gas.equipment.balance_due,undefined);
+});

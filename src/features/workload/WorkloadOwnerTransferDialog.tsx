@@ -8,6 +8,7 @@ import { usePerformers } from "../../hooks/index.ts";
 import { useXacNhan } from "../../hooks/useXacNhan.tsx";
 import { setItemPerformerById } from "../../lib/supabaseData.ts";
 import type { Activity } from "../../types/domain.ts";
+import { progressValidationCode } from "../progress/editableProgressRights.ts";
 import {
   buildActivePerformerChoices,
   formatPerformerOptionLabel,
@@ -57,7 +58,7 @@ export default function WorkloadOwnerTransferDialog({
   const submit = async () => {
     if (savingRef.current) return;
     const prepared = prepareWorkloadOwnerTransfer({
-      validationCode: activity.code,
+      validationCode: progressValidationCode(activity),
       currentPersonId,
       nextPersonId,
       currentName: String(activity.owner || ""),
