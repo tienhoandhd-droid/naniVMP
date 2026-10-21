@@ -82,7 +82,7 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
     <td>${esc(it.depts.join("+"))}</td><td>${esc(it.owner)}</td><td>${esc(it.target)}</td><td>${esc(it.crit)}</td>
   </tr>`).join("");
   const nextMonthTruncated = d.nextMonth.items.length > 60
-    ? `<p style="font-size:12px;color:#6E4869">… và ${d.nextMonth.items.length - 60} hạng mục khác — xem đầy đủ ở bản xuất Excel.</p>` : "";
+    ? `<p style="font-size:12px;color:#5A4752">… và ${d.nextMonth.items.length - 60} hạng mục khác — xem đầy đủ ở bản xuất Excel.</p>` : "";
 
   const issueRows = topIssues.map((q) => {
     const meta = LOAI_LOI[q.type];
@@ -94,23 +94,23 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
 <html lang="vi"><head><meta charset="UTF-8">
 <title>Báo cáo quản lý VMP — CPC1 HN</title>
 <style>
-  body{font-family:'Segoe UI',system-ui,sans-serif;max-width:960px;margin:auto;padding:40px 30px;color:#2d2d2d;line-height:1.7}
-  h1{color:#A83364;border-bottom:3px solid #E4749F;padding-bottom:12px}
-  h2{color:#5F44AD;margin-top:34px;border-left:4px solid #8168CE;padding-left:12px}
+  body{font-family:'Segoe UI',system-ui,sans-serif;max-width:960px;margin:auto;padding:40px 30px;color:#3A2832;line-height:1.7}
+  h1{color:#6B3B55;border-bottom:3px solid #C7A15B;padding-bottom:12px}
+  h2{color:#6B3B55;margin-top:34px;border-left:4px solid #B35872;padding-left:12px}
   table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
-  th,td{border:1px solid #ddd;padding:8px 12px;text-align:center}
-  th{background:#FBE4EF;color:#A83364;font-weight:700}
+  th,td{border:1px solid #DFD6DB;padding:8px 12px;text-align:center}
+  th{background:#F8EAF1;color:#6B3B55;font-weight:700}
   .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
-  .badge.good{background:#DAF2E9;color:#146851} .badge.mid{background:#FAEDD3;color:#8D550A} .badge.bad{background:#FBE1E8;color:#B62E52}
-  .over{background:#FBE1E8;color:#B62E52;font-weight:700}
-  .footer{margin-top:40px;padding:16px;background:#FDF0F7;border-radius:12px;font-size:13px;color:#6E4869}
+  .badge.good{background:#E3F6EA;color:#367255} .badge.mid{background:#FCEDDF;color:#925910} .badge.bad{background:#FFEAEB;color:#A84552}
+  .over{background:#FFEAEB;color:#A84552;font-weight:700}
+  .footer{margin-top:40px;padding:16px;background:#F6F1F3;border-radius:12px;font-size:13px;color:#5A4752}
   .chart{margin:14px 0}
   .kpi{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0}
-  .kpi div{flex:1;min-width:140px;background:#FDF0F7;border-radius:12px;padding:14px 16px;text-align:center}
-  .kpi .v{font-size:26px;font-weight:800;color:#A83364}
-  .kpi .l{font-size:11.5;color:#6E4869;font-weight:700}
-  .ai-box{background:#FDEEF6;border-left:4px solid #E4749F;padding:18px 22px;border-radius:0 12px 12px 0;margin:16px 0;white-space:pre-wrap}
-  .stamp{background:#FBE1E8;color:#B62E52;padding:6px 14px;border-radius:8px;font-weight:800;font-size:13px;display:inline-block;margin-bottom:12px}
+  .kpi div{flex:1;min-width:140px;background:#F6F1F3;border-radius:12px;padding:14px 16px;text-align:center}
+  .kpi .v{font-size:26px;font-weight:800;color:#6B3B55}
+  .kpi .l{font-size:11.5;color:#5A4752;font-weight:700}
+  .ai-box{background:#F8EAF1;border-left:4px solid #B35872;padding:18px 22px;border-radius:0 12px 12px 0;margin:16px 0;white-space:pre-wrap}
+  .stamp{background:#FFEAEB;color:#A84552;padding:6px 14px;border-radius:8px;font-weight:800;font-size:13px;display:inline-block;margin-bottom:12px}
   @page{size:A4;margin:14mm 12mm}
   @media print{
     body{max-width:none;margin:0;padding:0}
@@ -154,7 +154,7 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
 <h2>3. Đánh giá so với mục tiêu ${d.monthly.cur.target}%/tháng</h2>
 <div class="chart">${monthlyChart}</div>
 <table><tr><th>Tháng</th><th>Kỳ</th><th>Cần hoàn thành</th><th>Đã hoàn thành</th><th>Tỷ lệ</th><th>So mục tiêu</th></tr>${monthTableRows}</table>
-<p style="font-size:12px;color:#6E4869">Tháng chưa tới kỳ không được chấm đạt/chưa đạt — 0% hoàn thành ở kỳ chưa xảy ra là đương nhiên, không phải trượt mục tiêu. Tháng đang diễn ra là số giữa kỳ.</p>
+<p style="font-size:12px;color:#5A4752">Tháng chưa tới kỳ không được chấm đạt/chưa đạt — 0% hoàn thành ở kỳ chưa xảy ra là đương nhiên, không phải trượt mục tiêu. Tháng đang diễn ra là số giữa kỳ.</p>
 
 <h2>4. Bất cập trong VMP — bộ phận nào chậm, chậm giai đoạn nào</h2>
 ${bottleneckChart ? `<div class="chart">${bottleneckChart}</div>` : "<p>Không có bộ phận nào đang chậm ở giai đoạn nào.</p>"}
@@ -171,7 +171,7 @@ ${d.nextMonth.items.length ? `<table><tr><th>Mã</th><th>Tên</th><th>Bộ phậ
   <div><div class="v">${bySeverity.warning || 0}</div><div class="l">${SEV.warning.emoji} Cảnh báo</div></div>
   <div><div class="v">${bySeverity.info || 0}</div><div class="l">${SEV.info.emoji} Thông tin</div></div>
 </div>
-${topIssues.length ? `<table><tr><th>Mức</th><th>Loại</th><th>Chi tiết</th></tr>${issueRows}</table>${d.quality.length > 15 ? `<p style="font-size:12px;color:#6E4869">… và ${d.quality.length - 15} vấn đề khác — xem đầy đủ ở màn Chất lượng dữ liệu.</p>` : ""}` : "<p>Không phát hiện vấn đề chất lượng dữ liệu trong phạm vi này.</p>"}
+${topIssues.length ? `<table><tr><th>Mức</th><th>Loại</th><th>Chi tiết</th></tr>${issueRows}</table>${d.quality.length > 15 ? `<p style="font-size:12px;color:#5A4752">… và ${d.quality.length - 15} vấn đề khác — xem đầy đủ ở màn Chất lượng dữ liệu.</p>` : ""}` : "<p>Không phát hiện vấn đề chất lượng dữ liệu trong phạm vi này.</p>"}
 
 <h2>7. Nhận xét &amp; Đánh giá (AI)</h2>
 <div class="stamp">${disclaimer}</div>

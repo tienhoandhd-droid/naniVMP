@@ -6,7 +6,7 @@
  *      là biến CSS var(--c-*) nên tự đổi theo sáng/tối.
  *    - Bản in PDF/HTML (buildReportHTML trong helpers.ts) — tài liệu xuất
  *      ra ĐỘC LẬP, không có :root nạp var(--c-*), nên phải dùng palette
- *      hex tĩnh (EXPORT_PALETTE, lấy đúng giá trị light-mode ở index.css).
+ *      hex tĩnh (EXPORT_PALETTE = màn hình sáng sau khi giải token, xem chart-palette.css).
  *
  *  Không dùng thư viện chart ngoài (recharts đã bị gỡ khỏi app vì không
  *  dùng) — SVG tay, nét mảnh, có <title> làm tooltip, legend cố định thứ
@@ -39,13 +39,13 @@ export const SCREEN_PALETTE: ChartPalette = {
 /** Dùng cho bản xuất PDF/HTML tĩnh — hex thật của bảng màu biểu đồ sáng (chart-palette.css),
  *  vì tài liệu xuất ra không có biến CSS của app. */
 export const EXPORT_PALETTE: ChartPalette = {
-  ink: "#2d2d2d", inkSoft: "#6E4869", line: "#e7d9e3", surface: "#ffffff",
-  mint: "#23856b", mintText: "#14614e", mintSoft: "#e1f3ec",
-  sky: "#2b6f9d", skyText: "#174f78", skySoft: "#e5f1f8",
-  lav: "#7650a5", lavText: "#56347e", lavSoft: "#f0eafa",
-  pink: "#9a6b18", pinkText: "#704b08", pinkSoft: "#fbf1d8",
-  rasp: "#bf5a4f", raspText: "#91392f", raspSoft: "#f9e4e0",
-  marigold: "#b67820", marigoldText: "#85530f", marigoldSoft: "#f9ecd3",
+  ink: "#3a2832", inkSoft: "#5a4752", line: "#e5e3e4", surface: "#ffffff",
+  mint: "#14764a", mintText: "#367255", mintSoft: "#e3f6ea",
+  sky: "#3979b2", skyText: "#3e6b8a", skySoft: "#e2f3ff",
+  lav: "#8a3d73", lavText: "#6b3b55", lavSoft: "#f8eaf1",
+  pink: "#b87c2b", pinkText: "#784e14", pinkSoft: "#fff1de",
+  rasp: "#a84552", raspText: "#a84552", raspSoft: "#ffeaeb",
+  marigold: "#925910", marigoldText: "#925910", marigoldSoft: "#fceddf",
 };
 
 /** Màu theo BỘ PHẬN — cùng thứ tự cố định với DEPT_COLOR trong constants/vmp.ts
