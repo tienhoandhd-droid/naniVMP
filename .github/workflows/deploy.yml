@@ -20,10 +20,10 @@ on:
         required: true
         type: string
 
+# Mặc định chỉ đọc. Quyền ghi Pages + OIDC cấp riêng cho job deploy (21/10):
+# đặt ở đây thì cả job chạy code pull request cũng nhận token có quyền ghi.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   # Chỉ các push main cùng chia sẻ hàng đợi phát hành. PR và dispatch chỉ
@@ -219,6 +219,10 @@ jobs:
 
   production-build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # configure-pages chỉ đọc cấu hình site (GET /repos/{owner}/{repo}/pages).
+    permissions:
+      contents: read
+      pages: read
     needs:
       - static-quality
       - source-access-db-contract
@@ -263,6 +267,11 @@ jobs:
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: production-build
+    # Giữ đúng bộ quyền job này có trước 21/10 (contents read + Pages/OIDC).
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:

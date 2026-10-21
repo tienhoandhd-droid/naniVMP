@@ -87,14 +87,18 @@ export function useAuth() {
     return profile;
   }, []);
 
-  const logout = useCallback(async () => {
-    if (isSupabaseConfigured()) await signOut();
+  /* Trả về câu cảnh báo khi máy chủ chưa thu hồi được phiên (mất mạng),
+     null khi thoát trọn vẹn. Phiên trên máy này luôn bị xoá. */
+  const logout = useCallback(async (): Promise<string | null> => {
+    const ketQua = isSupabaseConfigured() ? await signOut() : { thuHoiMayChu: true as const };
     clearPasswordRecoverySignal();
     setRecoverySignal(null);
     setUser(null);
     saveUser(null);
     clearVmpCache();
     clearSnapshot();   // máy dùng chung: không để dữ liệu người trước nằm lại
+    return ketQua.thuHoiMayChu ? null
+      : "Đã thoát trên máy này, nhưng mất kết nối nên phiên chưa được huỷ trên máy chủ. Khi có mạng, hãy đăng nhập rồi thoát lại.";
   }, []);
 
   const clearRecovery = useCallback(() => {

@@ -1,10 +1,10 @@
 // The public auth/recovery entry keeps the working dashboard off the cold path.
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import LoginScreen, { type LoginScreenMode } from "./components/auth/LoginScreen.tsx";
 import PasswordRecoveryScreen from "./components/auth/PasswordRecoveryScreen.tsx";
 import MfaBoundary from "./components/auth/MfaBoundary.tsx";
 import { DirtyStateProvider } from "./components/ui/DirtyStateProvider.tsx";
-import ToastProvider from "./components/ui/ToastProvider.tsx";
+import ToastProvider, { useToast } from "./components/ui/ToastProvider.tsx";
 import { useAuth } from "./hooks/useAuth.ts";
 import { saveUser } from "./lib/config.ts";
 import { nhapCoThuLai } from "./lib/tailMan.ts";
@@ -19,6 +19,19 @@ type AuthFlowProps = {
 
 function AppShell({ authMode, setAuthMode, authNotice, setAuthNotice }: AuthFlowProps) {
   const { user, setUser, logout, loading, recoverySignal, clearRecovery } = useAuth();
+  const toast = useToast();
+  /* Mất mạng lúc thoát: phiên trên máy đã xoá nhưng máy chủ chưa huỷ —
+     báo ngay ở màn đăng nhập. Không xoá được cả phiên trên máy thì người
+     dùng vẫn ở trong app, kèm thông báo lỗi. */
+  const thoat = useCallback(async () => {
+    try {
+      const canhBao = await logout();
+      if (canhBao) setAuthNotice(canhBao);
+    } catch (e) {
+      console.error("[VMP] Đăng xuất thất bại:", e);
+      toast.loi(e instanceof Error ? e.message : "Chưa đăng xuất được. Thử lại.");
+    }
+  }, [logout, setAuthNotice, toast]);
 
   if (recoverySignal) return (
     <PasswordRecoveryScreen
@@ -46,7 +59,7 @@ function AppShell({ authMode, setAuthMode, authNotice, setAuthNotice }: AuthFlow
   );
 
   return <Suspense fallback={<main className="vq-login-page"><p role="status">Đang mở không gian làm việc…</p></main>}>
-    <AuthorizedAppShell user={user} logout={logout} />
+    <AuthorizedAppShell user={user} logout={thoat} />
   </Suspense>;
 }
 

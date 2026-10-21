@@ -8,6 +8,9 @@ on:
         required: true
         type: string
 
+# Cần ghi thật, không thu hẹp được: bước cuối commit + push baseline lên
+# nhánh được dispatch (contents: write) rồi gọi API dispatch deploy.yml
+# (actions: write). Chỉ chạy bằng workflow_dispatch, từ chối nhánh main.
 permissions:
   actions: write
   contents: write

@@ -57,6 +57,18 @@ class BackupSafety(unittest.TestCase):
             link.symlink_to(p)
             with self.assertRaises(ValueError):
                 backup.private_file(link)
+    def test_backup_includes_qualification_private_schema(self):
+        # cpc1_private giữ dữ liệu thẩm định, chữ ký và nhật ký in — thiếu là
+        # bản sao lưu không khôi phục được phân hệ Thẩm định thực tế.
+        self.assertIn('cpc1_private', backup.BACKUP_SCHEMAS)
+        for schema in ('public', 'auth', 'storage'):
+            self.assertIn(schema, backup.BACKUP_SCHEMAS)
+        args = backup.dump_args()
+        self.assertEqual(args[:2], ['pg_dump', '-Fc'])
+        for schema in backup.BACKUP_SCHEMAS:
+            i = args.index(schema)
+            self.assertEqual(args[i - 1], '-n')
+        self.assertIn('--lock-wait-timeout=30000', args)
 
 if __name__ == '__main__':
     unittest.main()

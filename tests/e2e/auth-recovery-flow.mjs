@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 import { CHROME } from "./chrome-path.mjs";
-import { caiGiaLap, NGUOI_DUNG } from "./gia-lap-supabase.mjs";
+import { caiGiaLap, layRef, NGUOI_DUNG, phienGia } from "./gia-lap-supabase.mjs";
 
 const GOC = process.env.VMP_E2E_URL || "http://127.0.0.1:4173/";
 const envText = readFileSync(fileURLToPath(new URL("../../.env.local", import.meta.url)), "utf8");
@@ -202,6 +202,49 @@ console.log("\nMobile:");
     `${Math.round(mobile.inputHeight)}px/${Math.round(mobile.submitHeight)}px`);
   kiem(mobile.submitBottom <= mobile.viewportHeight + 120, "CTA chính xuất hiện sớm trong luồng mobile",
     `${Math.round(mobile.submitBottom)}px`);
+  await page.close();
+}
+
+console.log("\nĐăng xuất khi mất mạng (máy dùng chung):");
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 900 });
+  const logoutPosts = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/auth/v1/logout")) logoutPosts.push(request.url());
+  });
+  await caiGiaLap(page, { supabaseUrl, kichBan: "day", logoutMatMang: true });
+  const khoa = `sb-${layRef(supabaseUrl)}-auth-token`;
+  const nowMs = process.env.VMP_E2E_NOW ? Date.parse(process.env.VMP_E2E_NOW) : Date.now();
+  // Nhét phiên MỘT lần cho cả tab — lần tải lại phải thấy đúng những gì app để lại.
+  await page.evaluateOnNewDocument((k, phien) => {
+    if (sessionStorage.getItem("e2e-da-nhet-phien")) return;
+    sessionStorage.setItem("e2e-da-nhet-phien", "1");
+    localStorage.clear();
+    localStorage.setItem(k, JSON.stringify(phien));
+  }, khoa, phienGia(NGUOI_DUNG, nowMs));
+
+  await page.goto(`${GOC}?auth-flow=logout-offline`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.waitForFunction(() => [...document.querySelectorAll("button")]
+    .some((item) => /^\s*Thoát\s*$/.test(item.textContent || "")), { timeout: 30_000 });
+  await clickByText(page, /^\s*Thoát\s*$/);
+  await page.waitForSelector("#vmp-login-password", { timeout: 30_000 });
+  kiem(logoutPosts.length >= 1, "vẫn thử huỷ phiên trên máy chủ", String(logoutPosts.length));
+  kiem(/chưa được huỷ trên máy chủ/.test(await page.$eval("body", (body) => body.innerText)),
+    "báo rõ phiên chưa huỷ được trên máy chủ");
+  kiem(await page.evaluate((k) => localStorage.getItem(k) === null, khoa), "vé đăng nhập đã bị xoá khỏi máy");
+
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+  // Chờ MỘT trong hai kết cục để bản lỗi báo ✗ rõ ràng thay vì quá hạn.
+  await page.waitForFunction(() => document.querySelector("#vmp-login-password")
+    || [...document.querySelectorAll("button")].some((item) => /^\s*Thoát\s*$/.test(item.textContent || "")),
+  { timeout: 30_000 });
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  const sauTaiLai = await page.evaluate(() => ({
+    form: Boolean(document.querySelector("#vmp-login-password")),
+    thoat: [...document.querySelectorAll("button")].some((item) => /^\s*Thoát\s*$/.test(item.textContent || "")),
+  }));
+  kiem(sauTaiLai.form && !sauTaiLai.thoat, "tải lại trang không còn đăng nhập", JSON.stringify(sauTaiLai));
   await page.close();
 }
 

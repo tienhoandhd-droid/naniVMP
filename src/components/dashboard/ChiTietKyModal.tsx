@@ -19,6 +19,7 @@ import ViewportDialog from "../ui/ViewportDialog.tsx";
 import { parseD, fmtVN, wlIsDone, nguoiPhuTrach, txt, download } from "../../utils/helpers.ts";
 import { vmpToday } from "../../constants/vmp.ts";
 import type { Activity } from "../../types/domain.ts";
+import { chanCongThucCsv } from "../../lib/csvAnToan.ts";
 
 /** Giai đoạn đang soi. `null` = xem cả hạng mục, không nhấn giai đoạn nào. */
 export type GiaiDoan = "de_cuong" | "tham_dinh" | "ho_so" | "vmp" | null;
@@ -96,7 +97,7 @@ export default function ChiTietKyModal({ title, sub, rows, giaiDoan, onClose }: 
       "Hạn đề cương", "Hạn thẩm định", "Hạn báo cáo", "Hạn đích VMP",
       "TT đề cương", "TT thẩm định", "TT báo cáo", "TT VMP"];
     const o = (v: unknown) => {
-      const s = String(v ?? "");
+      const s = chanCongThucCsv(v);
       return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const dong = hienThi.map((a) => {

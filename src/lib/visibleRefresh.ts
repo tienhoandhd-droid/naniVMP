@@ -38,3 +38,24 @@ export function createVisibleRefreshController({
 
   return { request };
 }
+
+export interface VisiblePollingOptions extends VisibleRefreshOptions {
+  intervalMs: number;
+  schedule?: (fn: () => void, ms: number) => unknown;
+  cancel?: (id: unknown) => void;
+}
+
+/** Hỏi lại định kỳ nhưng bỏ qua mọi nhịp lúc tab đang ẩn. Làm mới ngay khi
+ *  tab hiện lại là việc của listener visibilitychange nơi dùng (xem
+ *  AuthenticatedApp) — ở đây chỉ lo không gọi máy chủ khi không ai nhìn.
+ *  Trả về hàm dừng vòng kiểm. */
+export function startVisiblePolling({
+  intervalMs,
+  schedule = (fn, ms) => setInterval(fn, ms),
+  cancel = (id) => clearInterval(id as ReturnType<typeof setInterval>),
+  ...refreshOptions
+}: VisiblePollingOptions): () => void {
+  const controller = createVisibleRefreshController(refreshOptions);
+  const id = schedule(controller.request, intervalMs);
+  return () => cancel(id);
+}

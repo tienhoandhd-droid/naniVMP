@@ -16,6 +16,14 @@ import tempfile
 from urllib.parse import urlparse, unquote
 
 IMAGE = 'public.ecr.aws/supabase/postgres:17.6.1.158'
+# cpc1_private: dữ liệu thẩm định thực tế, chữ ký, nhật ký in (bị sót trước 21/10/2026).
+BACKUP_SCHEMAS = ('public', 'auth', 'storage', 'cpc1_private')
+
+def dump_args():
+    args = ['pg_dump', '-Fc']
+    for schema in BACKUP_SCHEMAS:
+        args += ['-n', schema]
+    return args + ['--lock-wait-timeout=30000']
 
 def private_file(path):
     info = Path(path).lstat()
@@ -97,7 +105,7 @@ def main():
             snapshot.mkdir(mode=0o700)
             encrypted = snapshot / 'backup.dump.gpg'
             with plain.open('xb') as output:
-                run(pg_command('pg_dump', '-Fc', '-n', 'public', '-n', 'auth', '-n', 'storage', '--lock-wait-timeout=30000'), env=env, stdout=output)
+                run(pg_command(*dump_args()), env=env, stdout=output)
             # Listing validates custom-format archive before encryption.
             with plain.open('rb') as source_dump:
                 run(['docker', 'run', '--rm', '-i', IMAGE, 'pg_restore', '--list'], stdin=source_dump, stdout=subprocess.DEVNULL)
@@ -109,7 +117,7 @@ def main():
                 run(['gpg', '--batch', '--pinentry-mode', 'loopback', '--passphrase-file', str(key), '--decrypt', str(encrypted)], stdout=output)
             if digest(plain) != digest(recovered):
                 raise RuntimeError('Encryption round trip mismatch')
-            receipt = {'created_at': stamp, 'server_version_num': int(version), 'schemas': ['public', 'auth', 'storage'],
+            receipt = {'created_at': stamp, 'server_version_num': int(version), 'schemas': list(BACKUP_SCHEMAS),
                        'encrypted_bytes': encrypted.stat().st_size, 'sha256': digest(encrypted),
                        'encryption_verified': True, 'scope': 'Logical schemas and rows; storage object bytes and platform configuration excluded'}
             pending_manifest = snapshot / 'backup.json'

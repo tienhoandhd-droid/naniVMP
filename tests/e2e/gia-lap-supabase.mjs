@@ -971,6 +971,8 @@ export async function caiGiaLap(trang, {
   mangNghiemNgat = false,
   previewOrigin,
   nowMs,
+  // true: POST /auth/v1/logout bị đứt mạng (giả lập bấm Thoát lúc mất mạng).
+  logoutMatMang = false,
 } = {}) {
   if (nowMs === undefined && NOW_CO_DINH_MS !== undefined) {
     nowMs = NOW_CO_DINH_MS;
@@ -993,6 +995,10 @@ export async function caiGiaLap(trang, {
 
     const u = new URL(url);
     if (u.host === hostSupabase) {
+      if (logoutMatMang && u.pathname.startsWith("/auth/v1/logout") && req.method() !== "OPTIONS") {
+        req.abort("internetdisconnected");
+        return;
+      }
       const phanHoi = traLoi(kho, u, req, { nguoiDung, nowMs });
       /* doTre: { ten_rpc: ms } — giả lập mạng chậm cho TỪNG RPC, để kiểm
          được trạng thái trung gian (vẽ sớm từ bản lưu, banner đang tải).

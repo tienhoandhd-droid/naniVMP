@@ -163,7 +163,7 @@ ${d.bottleneck.length ? `<table><tr><th>Bộ phận</th><th>Tổng</th><th>Chậ
 <h2>5. Công việc dự kiến ${esc(d.nextMonth.monthLabel)}</h2>
 <p><b>${d.nextMonth.total}</b> hạng mục đến hạn, chưa hoàn thành.</p>
 ${workloadChart ? `<div class="chart">${workloadChart}</div>` : ""}
-${d.nextMonth.items.length ? `<table><tr><th>Mã</th><th>Tên</th><th>Bộ phận</th><th>Người thực hiện</th><th>Hạn</th><th>Trọng yếu</th></tr>${nextMonthRows}</table>${nextMonthTruncated}` : "<p>Không có hạng mục nào đến hạn ${esc(d.nextMonth.monthLabel)} trong phạm vi này.</p>"}
+${d.nextMonth.items.length ? `<table><tr><th>Mã</th><th>Tên</th><th>Bộ phận</th><th>Người thực hiện</th><th>Hạn</th><th>Trọng yếu</th></tr>${nextMonthRows}</table>${nextMonthTruncated}` : `<p>Không có hạng mục nào đến hạn ${esc(d.nextMonth.monthLabel)} trong phạm vi này.</p>`}
 
 <h2>6. Chất lượng dữ liệu</h2>
 <div class="kpi">

@@ -13,6 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../types/database.ts";
 import type { AppUser, UserRole } from "../types/domain.ts";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "./supabaseConfig.ts";
+import { authStorageKey, dangXuatChac, type KetQuaDangXuat } from "./dangXuat.ts";
 
 export { isSupabaseConfigured } from "./supabaseConfig.ts";
 
@@ -26,7 +27,10 @@ export const supabase = isSupabaseConfigured()
        * supabase-js nhặt #access_token…type=recovery trong hash, dựng
        * phiên và phát PASSWORD_RECOVERY (App mở hộp đặt mật khẩu mới).
        * Không đụng router nội bộ — router chỉ đọc hash dạng #v=… */
-      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
+      /* storageKey tường minh (trùng mặc định) để đăng xuất lúc mất mạng
+       * vẫn biết chắc khoá cần xoá — xem lib/dangXuat.ts. */
+      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true,
+        storageKey: authStorageKey(supabaseUrl) },
     })
   : null;
 
@@ -134,9 +138,11 @@ export async function signIn(email: string, password: string): Promise<AppUser> 
 }
 
 /* ---- Đăng xuất ---- */
-export async function signOut() {
-  if (!supabase) return;
-  await supabase.auth.signOut();
+/** Luôn xoá phiên trên máy này. `thuHoiMayChu: false` nghĩa là máy chủ
+ *  chưa thu hồi được vé (mất mạng…) — bên gọi phải báo cho người dùng. */
+export async function signOut(): Promise<KetQuaDangXuat> {
+  if (!supabase) return { thuHoiMayChu: true };
+  return dangXuatChac(supabase.auth, window.localStorage, authStorageKey(supabaseUrl));
 }
 
 /* ---- Kiểm tra phiên hiện tại ----

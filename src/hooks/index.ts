@@ -63,6 +63,7 @@ import {
   matchedAuthorizationRevision,
   type AuthorizationWatermark,
 } from "../lib/dashboardAuthorizationContracts.ts";
+import { startVisiblePolling } from "../lib/visibleRefresh.ts";
 
 async function readItemPermissionContext(): Promise<{
   userId: string;
@@ -605,11 +606,17 @@ export function useVmpData() {
     // Backup polling mỗi 20s — đảm bảo web cập nhật nhanh kể cả khi Realtime lỡ.
     // silentRefresh giờ so WATERMARK trước (query vài byte) nên poll gần như miễn
     // phí; chỉ kéo cả payload khi count/updated_at thật sự đổi.
-    const poll = setInterval(() => refreshRef.current?.(), 20000);
+    // Tab ẩn thì bỏ nhịp (21/10); tab hiện lại thì AuthenticatedApp làm mới ngay.
+    const dungPoll = startVisiblePolling({
+      isVisible: () => document.visibilityState !== "hidden",
+      refresh: () => refreshRef.current?.(),
+      intervalMs: 20_000,
+      coalesceMs: 0,
+    });
 
     return () => {
       clearTimeout(timer);
-      clearInterval(poll);
+      dungPoll();
       supabase?.removeChannel(kenhDuLieu);
       supabase?.removeChannel(kenhCauHinh);
     };

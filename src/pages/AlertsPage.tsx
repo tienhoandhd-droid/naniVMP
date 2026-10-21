@@ -32,6 +32,7 @@ import {
   buildAlertsCommandModel,
   type AlertRow,
 } from "../features/monitoring/alertsCommandModel.ts";
+import { chanCongThucCsv } from "../lib/csvAnToan.ts";
 
 const WINDOWS = [
   ["all", "Mọi thời điểm"],
@@ -484,7 +485,7 @@ export default function AlertsView({ acts }: { acts: Activity[] }) {
   const exportCsv = () => {
     const head = ["Nhóm", "Mã", "Tên hạng mục", "Loại", "Bộ phận", "Người thực hiện", "Email",
                   "Mốc", "Hạn", "Số ngày còn", "RPN", "Mức rủi ro"];
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const esc = (v: unknown) => `"${chanCongThucCsv(v).replace(/"/g, '""')}"`;
     const lines = [head.map(esc).join(",")];
     for (const r of shown) {
       const rpn = qrmRpn(r.a);

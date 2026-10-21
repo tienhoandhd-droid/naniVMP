@@ -23,6 +23,7 @@ import { txt, download } from "../../utils/helpers.ts";
 import { listAllSourceObjects } from "../../features/catalogWorkspace/api.ts";
 import { useDebounce } from "../../hooks/index.ts";
 import type { SourceObjectRow } from "../../types/domain.ts";
+import { chanCongThucCsv } from "../../lib/csvAnToan.ts";
 
 /** Đang ngưng hoạt động thì không thẩm định là hợp lý — tách riêng để hai
  *  nhóm này không bị đọc lẫn với nhau. */
@@ -127,7 +128,7 @@ export default function KhongThamDinhCard({ authorizationRevision, onMoDanhMuc }
     const cot = ["Mã", "Tên", "Nhóm", "Bộ phận", "Khu vực", "Tình trạng",
       "Lý do thẩm định", "Cần rà soát"];
     const o = (v: unknown) => {
-      const s = String(v ?? "");
+      const s = chanCongThucCsv(v);
       return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const dong = hien.map((r) => [r.object_code, r.object_name, r.object_kind,
