@@ -1,158 +1,79 @@
 /* =====================================================================
- *  ChatBox.tsx — Trò chuyện cùng công chúa Vali (nổi ở góc phải dưới)
+ *  ChatBox.tsx — Trợ lý VMP (nổi ở góc phải dưới)
  *  ---------------------------------------------------------------------
- *  Gọi webhook n8n "Vani VMP 4". Bên đó là AI Agent chạy Gemini với hai
- *  công cụ Postgres:
- *
- *    · Tra so lieu timeline   → rpc_ai_context, tính bằng SQL trên TOÀN
- *                               BỘ 461 hạng mục
- *    · Tra tai lieu luat GMP  → rpc_kb_search_text, tìm trong 176 mảnh
- *                               tài liệu luật
- *
- *  Vì sao KHÔNG nhét số liệu vào kho vector: tìm theo ngữ nghĩa chỉ lấy
- *  về vài đoạn giống nhất, nên hỏi "bao nhiêu hạng mục quá hạn" thì mô
- *  hình chỉ nhìn thấy mấy đoạn đó và đếm ra con số của riêng chúng. Sai,
- *  mà nghe rất trôi chảy — kiểu sai nguy hiểm nhất trong hệ GMP.
+ *  Hai bước, AI không bao giờ viết con số:
+ *    1. n8n "Vani VMP 9": AI (Gemini, dự phòng Groq) đổi câu hỏi thành
+ *       {công cụ, tham số}. AI chỉ thấy câu hỏi, không thấy dữ liệu.
+ *    2. rpc_tro_ly_tra_loi: SQL dựng câu trả lời + bảng, chạy bằng quyền
+ *       của chính người hỏi — số khớp các màn (cách tính ô Tổng quan).
+ *  Nút gợi ý gọi thẳng bước 2. AI lỗi thì đoán nhanh bằng từ khoá
+ *  (doanNhanh); không đoán được thì nói thật và mời bấm gợi ý.
+ *  Thiết kế: docs/superpowers/specs/2026-10-22-tro-ly-vmp-moi-design.md
  * ===================================================================== */
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, X, Send, Sparkles, AlertTriangle, BookOpen, Lightbulb } from "lucide-react";
+import { MessageCircle, X, Send, Sparkles, AlertTriangle, ThumbsUp, ThumbsDown, Info } from "lucide-react";
 import { C, TEXT, R, E, MO, glass } from "../../constants/theme.ts";
-import { supabase, vePhien } from "../../lib/supabaseClient.ts";
 import type { AppUser } from "../../types/domain.ts";
 import type { AccessContext } from "../../lib/access.ts";
+import {
+  gioPhut,
+  laCongCuDuLieu,
+  TroLyTuChoiError,
+  type Bang,
+  type CongCu,
+  type GoiY,
+  type ThamSo,
+} from "../../features/assistant/contracts.ts";
+import { danhGia, ghiNhatKy, hieuCauHoi, traLoi, type NhatKy } from "../../features/assistant/api.ts";
+import { doanNhanh } from "../../features/assistant/doanNhanh.ts";
+import { HUONG_DAN_WEB, timHuongDan, type ChuDeHuongDan } from "../../features/assistant/huongDan.ts";
 
-interface TrichDan { nguon: string; muc?: string }
 interface Msg {
-  ai: boolean; text: string; loi?: boolean; nguon?: string;
-  goiY?: string[]; canhBao?: string; trichDan?: TrichDan[]; lop?: number;
+  id: number;
+  ai: boolean;
+  text: string;
+  loi?: boolean;
+  hieuLa?: string;
+  bang?: Bang | null;
+  hoiLai?: GoiY[];
+  goiY?: GoiY[];
+  nguon?: string;
+  ghiChu?: string;
+  huongDan?: ChuDeHuongDan[];
+  nhatKyId?: number | null;
+  danhGia?: 1 | -1;
 }
 
-/** Câu hỏi mồi chung — dùng khi không biết người dùng đang ở màn nào. */
-const GOI_Y = [
-  "Ta là ai?",
-  "Còn bao nhiêu hạng mục quá hạn?",
-  "Liệt kê hạng mục sắp đến hạn 30 ngày",
-  "Vì sao LAF cân được 9 điểm trọng yếu?",
+/** Gợi ý mở đầu: bấm là tra thẳng SQL, không cần AI. */
+const GOI_Y_DAU: GoiY[] = [
+  { nhan: "Tổng quan năm nay", congCu: "tong_quan", thamSo: {} },
+  { nhan: "Hạng mục quá hạn", congCu: "qua_han", thamSo: {} },
+  { nhan: "Đến hạn trong 30 ngày", congCu: "sap_den_han", thamSo: { so_ngay: 30 } },
+  { nhan: "Việc của tôi tuần này", congCu: "viec_cua_toi", thamSo: { so_ngay: 7 } },
+  { nhan: "Phiếu thay đổi cần thẩm định", congCu: "thay_doi", thamSo: {} },
 ];
 
-/* Câu hỏi mồi THEO MÀN ĐANG XEM.
- *
- * Bốn câu chung ở trên đúng cho người mới, nhưng người đang đứng ở màn
- * Cảnh báo thì đầu họ đang nghĩ về chuyện trễ hạn, không nghĩ về "ta là
- * ai". Gợi ý bám theo màn khiến ô chat trở thành thứ nối tiếp việc đang
- * làm, thay vì một cái hộp phải nghĩ từ đầu mới dùng được. */
-const GOI_Y_THEO_TRANG: Record<string, string[]> = {
-  overview:  ["Tháng này có gì đáng lo nhất?",
-              "Tỷ lệ hoàn thành đang là bao nhiêu?",
-              "Bộ phận nào đang đuối nhất?"],
-  timeline:  ["Khu vực nào đang chậm nhất?",
-              "Nhóm công việc nào còn nhiều việc chưa bắt đầu?",
-              "Hạn chót đề cương tính thế nào?"],
-  alerts:    ["Ba hạng mục quá hạn nặng nhất là gì?",
-              "Cái nào quá hạn mà điểm trọng yếu từ 7 trở lên?",
-              "Tuần này còn gì gấp không?"],
-  progress:  ["Hôm nay nên làm gì trước?",
-              "Hạng mục nào sắp đến hạn trong 30 ngày?",
-              "Sửa tiến độ ở đâu thì đúng quy trình?"],
-  source:    ["Mã thiết bị đặt theo quy tắc gì?",
-              "Dòng nào được lập lịch thẩm định?",
-              "Thiếu hạn chót thì sao?"],
-  workload:  ["Ai đang phụ trách nhiều hạng mục nhất?",
-              "Việc có đang dồn lệch vào vài người không?",
-              "Bộ phận nào cần chia lại việc?"],
-  reports:   ["Tóm tắt tình hình cho cuộc họp tuần",
-              "So với đầu năm thì đã đi được bao xa?",
-              "Chuẩn bị thanh tra thì cần soi những gì?"],
-  rules:     ["Hạn chót đề cương tính thế nào?",
-              "Điểm trọng yếu chấm thế nào?",
-              "Annex 15 yêu cầu gì về đề cương?"],
-  health:    ["Vì sao những hạng mục này bị coi là thiếu dữ liệu?",
-              "Thiếu hạn chót có tính quá hạn không?",
-              "Nên bổ sung gì trước cho nhanh?"],
-  audit:     ["Nhật ký thay đổi ghi những gì?",
-              "Thanh tra hay bắt lỗi ở chỗ nào?",
-              "Sửa dữ liệu có phải ghi lý do không?"],
-  admin:     ["Hệ thống đang chạy có ổn không?",
-              "Dữ liệu cập nhật lần cuối lúc nào?",
-              "Có việc nền nào đang treo không?"],
-};
+const GIOI_THIEU = "Tôi tra kế hoạch thẩm định VMP cho bạn: quá hạn, sắp đến hạn, tiến độ theo bộ phận, "
+  + "một thiết bị cụ thể, việc của một người, phiếu thay đổi cần thẩm định, cách dùng web, "
+  + "và kiến thức GMP chung. Số liệu lấy thẳng từ dữ liệu bạn được xem, cách tính giống ô Tổng quan.";
 
-/* Lời chờ đổi dần theo thời gian đợi.
- *
- * Ba dấu chấm nhấp nháy chỉ nói "đang bận", không nói "còn lâu không".
- * Câu dài phải gọi mô hình rồi tra hai nguồn dữ liệu, có khi mất 8–10
- * giây — im lặng chừng đó là người dùng tưởng hỏng và bấm lại. Lời chờ
- * đổi dần vừa cho biết hệ vẫn chạy, vừa nói ra nó đang làm gì. */
-const LOI_CHO: Array<{ tu: number; text: string }> = [
-  { tu: 0,     text: "Công chúa đang lật sổ tra cho ngươi…" },
-  { tu: 2500,  text: "Công chúa đang đăm chiêu, suy nghĩ để đưa ra câu trả lời…" },
-  { tu: 6000,  text: "Câu này hơi hóc, công chúa phải giở thêm tài liệu luật…" },
-  { tu: 11000, text: "Công chúa vẫn đang cặm cụi, ngươi nán thêm chút nữa…" },
-  { tu: 18000, text: "Hôm nay cung đông khách, công chúa đang chờ tới lượt…" },
-];
+const SO_DONG_GON = 8;
 
-/* Mẩu tri thức hiện trong lúc chờ.
- *
- * Người dùng BUỘC phải nhìn màn hình suốt 10–30 giây đó — bỏ trống là
- * phí. Kho `vmp_chat_loi_cho` có 54 mẩu chia ba loại: thơ về nghề thẩm
- * định, nguyên tắc GMP gọn trong vài dòng, và mẹo dùng hệ VMP.
- *
- * Chống lặp bằng ba lớp: nội dung unique ở DB, `daHien` loại mẩu đã
- * hiện trong phiên, và mỗi mốc thời gian rút một LOẠI khác nhau — nên
- * chờ 20 giây thì đọc được thơ rồi tới nguyên tắc, không đọc lại. */
-interface MauCho { loai: string; noi_dung: string; nguon?: string | null }
-
-/* Mốc nào thì rút loại gì. Mở đầu bằng mẹo cho nhẹ, chờ lâu mới tới
- * nguyên tắc — thứ đáng đọc nhất thì để lúc người ta đã yên vị. */
-/* Mẩu dự phòng nhúng sẵn. Kho thật nằm ở DB nhưng bảng đó chỉ mở cho
- * vai `authenticated` — chưa đăng nhập, mạng chậm, hoặc RLS đổi là kho
- * rỗng và khung chờ trống trơn. Vài mẩu nhúng sẵn để không bao giờ
- * trống, còn kho DB là phần mở rộng. */
-const MAU_CHO_DU_PHONG: MauCho[] = [
-  { loai: "tho", nguon: "Annex 15",
-    noi_dung: "Đề cương ký trước một ngày,\nMẻ chạy hôm ấy mới thay được lời.\nKý sau thì hỏng cả rồi,\nGiấy còn số đẹp, người soi vẫn tường." },
-  { loai: "tho", nguon: "ALCOA+ — Contemporaneous",
-    noi_dung: "Sổ ghi đúng lúc đang làm,\nĐừng chờ tối mịt mới cầm bút biên.\nGhi sau ký ức đã phiền,\nSố kia thành thể ước nguyền, chẳng thân." },
-  { loai: "nguyen_tac", nguon: "Nguyên tắc nền",
-    noi_dung: "Thẩm định là chứng minh bằng văn bản rằng kết quả đạt MỘT CÁCH NHẤT QUÁN. Một mẻ đạt chỉ nói lần đó đạt — nó không chứng minh được gì cả." },
-  { loai: "nguyen_tac", nguon: "Annex 11",
-    noi_dung: "Audit trail phải KHÔNG SỬA ĐƯỢC và phải ĐƯỢC RÀ SOÁT định kỳ. Thanh tra hỏi \"ai rà, rà lúc nào\" chứ không hỏi \"có audit trail không\"." },
-  { loai: "meo", nguon: null,
-    noi_dung: "Hỏi bổn cung một tên riêng thôi cũng được — \"tank\", \"nồi hấp\", \"KNTB1\" — bổn cung tự dò ra cả nhóm rồi hỏi lại cho hẹp." },
-  { loai: "meo", nguon: null,
-    noi_dung: "Đối chiếu số với màn Dòng thời gian VMP." },
-];
-
-const NHIP_CHO: Array<{ tu: number; loai: string }> = [
-  { tu: 4000,  loai: "meo" },
-  { tu: 9000,  loai: "tho" },
-  { tu: 15000, loai: "nguyen_tac" },
-  { tu: 24000, loai: "tho" },
-  { tu: 32000, loai: "nguyen_tac" },
-];
-
-export default function ChatBox({ user, trang, access }: {
+export default function ChatBox({ user: _user, trang: _trang, access: _access }: {
   user?: AppUser | null; trang?: string;
-  /** access.businessRole — Vali cần biết vai nghiệp vụ hiệu lực (hệ mới), không còn đọc user.perm cũ. */
   access?: Pick<AccessContext, "businessRole"> | null;
 }) {
   const [mo, setMo] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
-  const [dangHoi, setDangHoi] = useState(false);
-  const [choMs, setChoMs] = useState(0);
-  const [khoCho, setKhoCho] = useState<MauCho[]>(MAU_CHO_DU_PHONG);
-  const [mauCho, setMauCho] = useState<MauCho | null>(null);
-  // Mẩu đã hiện trong phiên — để không đọc lại cái vừa đọc
-  const daHienRef = useRef<Set<string>>(new Set());
-  const mocDaRutRef = useRef<number>(-1);
+  const [dangHoi, setDangHoi] = useState<null | "hieu" | "tra">(null);
+  const [moRong, setMoRong] = useState<Set<number>>(new Set());
+  const truocRef = useRef<{ congCu: string; thamSo: ThamSo } | null>(null);
+  const idRef = useRef(0);
   const cuoiRef = useRef<HTMLDivElement | null>(null);
   const oNhapRef = useRef<HTMLTextAreaElement | null>(null);
   const fabRef = useRef<HTMLButtonElement | null>(null);
   const wasOpenRef = useRef(false);
-
-  const url = import.meta.env.VITE_N8N_CHAT_URL as string | undefined;
-  const token = import.meta.env.VITE_N8N_CHAT_TOKEN as string | undefined;
 
   useEffect(() => {
     cuoiRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -163,15 +84,12 @@ export default function ChatBox({ user, trang, access }: {
       wasOpenRef.current = true;
       oNhapRef.current?.focus();
     } else if (wasOpenRef.current) {
-      /* Chờ React commit nút FAB trở lại DOM rồi mới trả focus. */
       wasOpenRef.current = false;
       fabRef.current?.focus();
     }
   }, [mo]);
 
-  const dongChat = useCallback(() => {
-    setMo(false);
-  }, []);
+  const dongChat = useCallback(() => setMo(false), []);
 
   useEffect(() => {
     if (!mo) return;
@@ -185,141 +103,122 @@ export default function ChatBox({ user, trang, access }: {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [mo, dongChat]);
 
-  /* Tải kho mẩu chờ MỘT LẦN lúc mở ô chat, không phải lúc đang chờ —
-   * lúc đang chờ mà mới gọi mạng thì mẩu hiện ra sau khi câu trả lời
-   * đã về, thành vô dụng. */
-  useEffect(() => {
-    // Chỉ tải khi vẫn đang dùng bộ dự phòng — tải xong thì thôi
-    if (!mo || khoCho !== MAU_CHO_DU_PHONG || !supabase) return;
-    let huy = false;
-    // Bảng vmp_chat_loi_cho mới thêm, chưa có trong types sinh tự động của
-    // Supabase nên phải ép kiểu. Chỉ đọc, chỉ ba cột, hỏng thì im lặng bỏ
-    // qua — mẩu chờ là thứ có thì hay, không có cũng không sao.
-    (supabase.from("vmp_chat_loi_cho" as never) as unknown as {
-      select: (c: string) => { eq: (k: string, v: boolean) => PromiseLike<{ data: MauCho[] | null }> };
-    })
-      .select("loai,noi_dung,nguon").eq("bat", true)
-      .then(({ data }) => { if (!huy && data && data.length > 0) setKhoCho(data); });
-    return () => { huy = true; };
-  }, [mo, khoCho]);
+  const themMsg = (m: Omit<Msg, "id">): number => {
+    idRef.current += 1;
+    const id = idRef.current;
+    setMsgs((cu) => [...cu, { ...m, id }]);
+    return id;
+  };
 
-  // Đếm thời gian đã chờ, để đổi lời chờ cho đúng nhịp
-  useEffect(() => {
-    if (!dangHoi) {
-      setChoMs(0); setMauCho(null); mocDaRutRef.current = -1;
+  const ganNhatKy = (msgId: number, n: NhatKy) => {
+    ghiNhatKy(n)
+      .then((nkId) => {
+        if (nkId !== null) setMsgs((cu) => cu.map((m) => (m.id === msgId ? { ...m, nhatKyId: nkId } : m)));
+      })
+      .catch((loi: unknown) => console.error("[trợ lý] ghi nhật ký lỗi:", loi));
+  };
+
+  /** Chạy một công cụ đã biết (từ AI, từ đoán nhanh hoặc từ nút gợi ý). */
+  const chay = async (cauHoi: string, congCu: CongCu, thamSo: ThamSo, extra: {
+    duong: NhatKy["duong"]; moHinh: string | null; kienThuc?: string | null; ghiChu?: string; t0: number;
+  }) => {
+    const nk = { cauHoi, congCu, thamSo, duong: extra.duong, moHinh: extra.moHinh };
+    if (laCongCuDuLieu(congCu)) {
+      setDangHoi("tra");
+      try {
+        const kq = await traLoi(congCu, thamSo);
+        truocRef.current = { congCu: kq.congCu, thamSo: kq.thamSo };
+        const id = themMsg({
+          ai: true, text: kq.traLoi, hieuLa: kq.hieuLa, bang: kq.bang, hoiLai: kq.hoiLai,
+          goiY: kq.goiY, ghiChu: extra.ghiChu,
+          nguon: kq.nguon ? `${kq.nguon}${kq.luc ? ` · lúc ${gioPhut(kq.luc)}` : ""}` : undefined,
+        });
+        ganNhatKy(id, { ...nk, ok: true, soDong: kq.bang?.tongDong ?? null, thoiGianMs: performance.now() - extra.t0 });
+      } catch (loi) {
+        const text = loi instanceof Error && /[À-ỹ]/.test(loi.message) ? loi.message : "Chưa tra được, thử lại sau.";
+        if (!(loi instanceof TroLyTuChoiError)) console.error("[trợ lý] tra dữ liệu lỗi:", loi);
+        const id = themMsg({ ai: true, loi: true, text, goiY: GOI_Y_DAU.slice(0, 3) });
+        ganNhatKy(id, { ...nk, ok: false, soDong: null, thoiGianMs: performance.now() - extra.t0 });
+      }
       return;
     }
-    const t0 = Date.now();
-    const id = setInterval(() => setChoMs(Date.now() - t0), 500);
-    return () => clearInterval(id);
-  }, [dangHoi]);
 
-  /* Tới mốc nào thì rút một mẩu của LOẠI ứng với mốc đó. Ưu tiên mẩu
-   * chưa hiện trong phiên; hết mẩu mới thì mới cho lặp lại. */
-  useEffect(() => {
-    if (!dangHoi || khoCho.length === 0) return;
-    const moc = NHIP_CHO.reduce((acc, x, i) => (choMs >= x.tu ? i : acc), -1);
-    if (moc < 0 || moc === mocDaRutRef.current) return;
-    mocDaRutRef.current = moc;
+    let id: number;
+    let traLoiDuoc = true;
+    if (congCu === "huong_dan") {
+      const chuDe = timHuongDan(thamSo.chu_de);
+      id = themMsg(chuDe
+        ? { ai: true, text: chuDe.tieuDe, huongDan: [chuDe], hieuLa: `Hướng dẫn: ${chuDe.tieuDe}` }
+        : { ai: true, text: "Bạn muốn hướng dẫn phần nào?", hoiLai: HUONG_DAN_WEB.map((c) => ({
+            nhan: c.tieuDe, congCu: "huong_dan" as const, thamSo: { chu_de: c.id } })) });
+    } else if (congCu === "kien_thuc" && extra.kienThuc) {
+      id = themMsg({ ai: true, text: extra.kienThuc, hieuLa: "Kiến thức GMP chung",
+        ghiChu: "Kiến thức chung do AI viết, không phải SOP nội bộ. Đối chiếu văn bản gốc trước khi dùng cho hồ sơ." });
+    } else if (congCu === "chao_hoi") {
+      id = themMsg({ ai: true, text: GIOI_THIEU, goiY: GOI_Y_DAU });
+    } else {
+      traLoiDuoc = false;
+      id = themMsg({ ai: true, text: "Câu này trợ lý chưa trả lời được (ví dụ SOP nội bộ, số đo thẩm định thực tế). "
+        + "Câu hỏi đã được ghi lại để bổ sung. Bạn thử một trong các câu sau:", goiY: GOI_Y_DAU });
+    }
+    ganNhatKy(id, { ...nk, ok: traLoiDuoc, soDong: null, thoiGianMs: performance.now() - extra.t0 });
+  };
 
-    const loai = NHIP_CHO[moc].loai;
-    const cungLoai = khoCho.filter((m) => m.loai === loai);
-    const chuaDoc = cungLoai.filter((m) => !daHienRef.current.has(m.noi_dung));
-    const nguon = chuaDoc.length > 0 ? chuaDoc : cungLoai;
-    if (nguon.length === 0) return;
-    const chon = nguon[Math.floor(Math.random() * nguon.length)];
-    daHienRef.current.add(chon.noi_dung);
-    setMauCho(chon);
-  }, [choMs, dangHoi, khoCho]);
-
-  const loiCho = [...LOI_CHO].reverse().find((x) => choMs >= x.tu)?.text
-    ?? LOI_CHO[0].text;
-
-  const hoi = async (text: string) => {
+  const hoi = async (text: string, goiY?: GoiY) => {
     const cauHoi = text.trim();
     if (!cauHoi || dangHoi) return;
-    setMsgs((m) => [...m, { ai: false, text: cauHoi }]);
+    const t0 = performance.now();
+    themMsg({ ai: false, text: cauHoi });
     setQ("");
-    setDangHoi(true);
-
-    if (!url) {
-      setMsgs((m) => [...m, { ai: true, loi: true,
-        text: "Trợ lý chưa sẵn sàng. Báo quản trị." }]);
-      setDangHoi(false);
-      return;
-    }
-
     try {
-      /* Vé phiên đăng nhập — thứ n8n xác thực được với Supabase. Token tĩnh
-         bên dưới chỉ còn là lớp chặn quét bừa. */
-      const ve = await vePhien();
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(ve ? { Authorization: `Bearer ${ve}` } : {}),
-          // Token RIÊNG cho ô chat. Nó nằm trong gói JS công khai nên ai cũng
-          // đọc được — việc của nó chỉ là chặn quét bừa, không phải giữ bí mật.
-          // Vì vậy tuyệt đối không dùng lại x-vmp-secret (token đó còn mở
-          // /vmp-write, /vmp-alert-now, /vmp-drain-now).
-          ...(token ? { "x-vmp-chat": token } : {}),
-        },
-        body: JSON.stringify({
-          cau_hoi: cauHoi,
-          // Khoá phiên theo người dùng để trợ lý nhớ được mạch hội thoại
-          phien: user?.email || "khach",
-          email: user?.email || "",
-          // Vali cần biết đang nói chuyện với ai thì mới trả lời được
-          // "tôi là ai", "tôi có quyền gì" — hai câu người mới hỏi đầu tiên.
-          nguoi: {
-            ten: user?.name || "",
-            email: user?.email || "",
-            quyen: access?.businessRole ?? "",
-            bo_phan: user?.department || "",
-          },
-        }),
-      });
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data?.ok) {
-        throw new Error(data?.loi || `HTTP ${r.status}`);
-      }
-      // Trả lời rỗng là LỖI, không phải câu trả lời. Hiện "(không có nội
-      // dung)" chỉ làm người dùng tưởng hệ thống bí — nói thật là mô hình
-      // không trả về gì, và mời hỏi lại theo cách ngắn hơn (câu ngắn rơi
-      // vào đường SQL, không phụ thuộc mô hình).
-      const noiDung = String(data.tra_loi ?? "").trim();
-      if (!noiDung) {
-        setMsgs((m) => [...m, { ai: true, loi: true,
-          text: "Bổn cung chưa trả lời được. Ngươi hỏi ngắn hơn, "
-              + "vd \"bao nhiêu hạng mục quá hạn\"." }]);
-        setDangHoi(false);
+      if (goiY) {
+        await chay(cauHoi, goiY.congCu, goiY.thamSo, { duong: "goi_y", moHinh: null, t0 });
         return;
       }
-      setMsgs((m) => [...m, { ai: true, nguon: data.nguon, text: noiDung,
-        canhBao: data.canh_bao || undefined,
-        lop: typeof data.lop === "number" ? data.lop : undefined,
-        // Tài liệu mà lớp tìm kiếm lai lấy về cho câu này. Hiện ra thành
-        // chip riêng thay vì bắt Vali chú nguồn giữa câu — chú giữa câu
-        // đọc rất thô, mà trong hồ sơ GMP thì vẫn phải truy được nguồn.
-        trichDan: Array.isArray(data.trich_dan)
-          ? (data.trich_dan as TrichDan[]).filter((t) => t?.nguon).slice(0, 4)
-          : undefined,
-        goiY: Array.isArray(data.goi_y) ? data.goi_y.slice(0, 3) : undefined }]);
-    } catch (e) {
-      /* Lý do trợ lý tự trả (tiếng Việt) thì giữ; lỗi mạng/HTTP thô chỉ ra console. */
-      console.error("[Vali] Không hỏi được:", e);
-      const lyDo = (e as Error)?.message || "";
-      setMsgs((m) => [...m, { ai: true, loi: true,
-        text: /[À-ỹ]/.test(lyDo) ? lyDo : "Chưa hỏi được, ngươi thử lại sau." }]);
+      setDangHoi("hieu");
+      let hieu: Awaited<ReturnType<typeof hieuCauHoi>> | null = null;
+      let lyDoAi = "";
+      try {
+        hieu = await hieuCauHoi(cauHoi, truocRef.current);
+      } catch (loi) {
+        lyDoAi = loi instanceof TroLyTuChoiError ? loi.message : "Trợ lý AI chưa phản hồi.";
+        console.error("[trợ lý] bước hiểu câu hỏi lỗi:", loi);
+      }
+      if (hieu) {
+        await chay(cauHoi, hieu.congCu, hieu.thamSo, { duong: "ai", moHinh: hieu.moHinh, kienThuc: hieu.kienThuc, t0 });
+        return;
+      }
+      const doan = doanNhanh(cauHoi);
+      if (doan) {
+        await chay(cauHoi, doan.congCu, doan.thamSo, {
+          duong: "doan_nhanh", moHinh: null, t0,
+          ghiChu: `${lyDoAi} Tôi đoán theo từ khoá — xem dòng "Tôi hiểu là" để chắc đúng ý bạn.`,
+        });
+        return;
+      }
+      const id = themMsg({ ai: true, loi: true, text: `${lyDoAi} Bạn bấm một gợi ý bên dưới, hoặc hỏi lại sau ít phút.`,
+        goiY: GOI_Y_DAU });
+      ganNhatKy(id, { cauHoi, congCu: null, thamSo: null, duong: "loi", moHinh: null, ok: false, soDong: null,
+        thoiGianMs: performance.now() - t0 });
+    } finally {
+      setDangHoi(null);
     }
-    setDangHoi(false);
+  };
+
+  const guiDanhGia = (m: Msg, diem: 1 | -1) => {
+    if (m.nhatKyId == null || m.danhGia) return;
+    setMsgs((cu) => cu.map((x) => (x.id === m.id ? { ...x, danhGia: diem } : x)));
+    danhGia(m.nhatKyId, diem).catch((loi: unknown) => {
+      console.error("[trợ lý] đánh giá lỗi:", loi);
+      setMsgs((cu) => cu.map((x) => (x.id === m.id ? { ...x, danhGia: undefined } : x)));
+    });
   };
 
   /* -------------------------------------------------------------- */
   if (!mo) {
     return (
       <button ref={fabRef} type="button" className="vmp-chat-fab" onClick={() => setMo(true)}
-        aria-label="Trò chuyện cùng công chúa Vali" title="Trò chuyện cùng công chúa Vali"
+        aria-label="Mở trợ lý VMP" title="Trợ lý VMP"
         style={{
           position: "fixed", right: 22, bottom: 22, zIndex: 90,
           width: 56, height: 56, borderRadius: R.pill, border: "none",
@@ -335,202 +234,202 @@ export default function ChatBox({ user, trang, access }: {
     );
   }
 
+  const nutGoiY = (g: GoiY, nho = false) => (
+    <button key={`${g.congCu}:${JSON.stringify(g.thamSo)}:${g.nhan}`} type="button"
+      onClick={() => hoi(g.nhan, g)} disabled={dangHoi !== null} className="vmp-lift"
+      style={{ textAlign: "left", padding: nho ? "8px 10px" : "10px 12px", minHeight: 44,
+               borderRadius: R.md, border: `1px solid ${C.line}`, background: C.surface,
+               cursor: dangHoi ? "default" : "pointer", fontFamily: TEXT, fontSize: 12,
+               color: C.plum, fontWeight: 600, lineHeight: 1.45 }}>
+      {g.nhan}
+    </button>
+  );
+
   return (
     <div role="dialog" aria-modal="false" aria-labelledby="vmp-chat-title" style={{
       position: "fixed", right: 22, bottom: 22, zIndex: 90,
-      width: "min(400px, calc(100vw - 32px))",
-      height: "min(600px, calc(100vh - 100px))",
+      width: "min(440px, calc(100vw - 32px))",
+      height: "min(640px, calc(100vh - 100px))",
       display: "flex", flexDirection: "column",
       borderRadius: R.xl, overflow: "hidden",
       background: C.surfaceOverlay, border: `1px solid ${C.line}`,
       boxShadow: E.modal, fontFamily: TEXT,
     }} className="vmp-chat-panel vmp-view-enter">
 
-      {/* Đầu hộp */}
-      <div style={{ ...glass, borderRadius: 8, border: "none",
-                    borderBottom: `1px solid ${C.line}`,
-                    padding: "13px 15px", display: "flex",
-                    alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <div style={{ width: 32, height: 32, borderRadius: R.pill,
-                      background: "var(--grad)", display: "flex",
+      <div style={{ ...glass, borderRadius: 8, border: "none", borderBottom: `1px solid ${C.line}`,
+                    padding: "13px 15px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div style={{ width: 32, height: 32, borderRadius: R.pill, background: "var(--grad)", display: "flex",
                       alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Sparkles size={16} color="currentColor" />
+          <Sparkles size={16} color="currentColor" aria-hidden="true" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div id="vmp-chat-title" style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>
-            Công chúa Vali
-          </div>
-          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
-            Trợ lý tra cứu VMP
-          </div>
+          <div id="vmp-chat-title" style={{ fontSize: 14, fontWeight: 800, color: C.plum }}>Trợ lý VMP</div>
+          <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>Số liệu lấy thẳng từ dữ liệu bạn được xem</div>
         </div>
-        <button type="button" onClick={dongChat} aria-label="Đóng trò chuyện" title="Đóng"
-          style={{ border: "none", background: "transparent", cursor: "pointer",
-                   padding: 6, borderRadius: R.sm, display: "flex" }}>
-          <X size={17} color={C.plumSoft} />
+        <button type="button" onClick={dongChat} aria-label="Đóng trợ lý" title="Đóng"
+          style={{ border: "none", background: "transparent", cursor: "pointer", padding: 10,
+                   borderRadius: R.sm, display: "flex" }}>
+          <X size={17} color={C.plumSoft} aria-hidden="true" />
         </button>
       </div>
 
-      {/* Khung hội thoại */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "14px 15px",
-                    display: "flex", flexDirection: "column", gap: 11,
-                    background: C.surfaceSunk }}>
+      <div aria-live="polite" style={{ flex: 1, overflowY: "auto", padding: "14px 15px", display: "flex",
+                    flexDirection: "column", gap: 11, background: C.surfaceSunk }}>
         {msgs.length === 0 && (
           <>
-            <div style={{ fontSize: 12, color: C.plumSoft, lineHeight: 1.65 }}>
-              Bổn cung là Vali 🌸 Ngươi cứ hỏi thẳng chuyện trong kế hoạch
-              thẩm định — tiến độ, người phụ trách, điểm trọng yếu, hay quy
-              tắc tính hạn, bổn cung tra cho.
-            </div>
+            <div style={{ fontSize: 13, color: C.plumSoft, lineHeight: 1.65 }}>{GIOI_THIEU}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 3 }}>
-              {(GOI_Y_THEO_TRANG[trang || ""] ?? GOI_Y).map((g) => (
-                <button key={g} onClick={() => hoi(g)} className="vmp-lift"
-                  style={{ textAlign: "left", padding: "10px 12px", borderRadius: R.md,
-                           border: `1px solid ${C.line}`, background: C.surface,
-                           cursor: "pointer", fontFamily: TEXT, fontSize: 12,
-                           color: C.plum, fontWeight: 600, lineHeight: 1.5 }}>
-                  {g}
-                </button>
-              ))}
+              {GOI_Y_DAU.map((g) => nutGoiY(g))}
             </div>
           </>
         )}
 
-        {msgs.map((m, i) => (
-          <div key={i} style={{ alignSelf: m.ai ? "flex-start" : "flex-end", maxWidth: "88%" }}>
-            <div style={{
-              padding: "10px 13px", borderRadius: R.md, fontSize: 14, lineHeight: 1.68,
-              whiteSpace: "pre-wrap", wordBreak: "break-word",
-              background: m.loi ? C.raspSoft : m.ai ? C.surface : "var(--grad)",
-              color: m.loi ? C.raspText : m.ai ? C.plum : "var(--lp-porcelain)",
-              border: m.ai && !m.loi ? `1px solid ${C.line}` : "none",
-              boxShadow: m.ai ? E.low : "none",
-            }}>
-              {m.loi && <AlertTriangle size={14} style={{ verticalAlign: -2, marginRight: 6 }} />}
-              {m.text}
-            </div>
-            {m.canhBao && (
-              <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: R.sm,
-                            background: C.marigoldSoft, color: C.marigoldText,
-                            fontSize: 12, lineHeight: 1.55, fontWeight: 600 }}>
-                <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
-                {m.canhBao} Ngươi đối chiếu lại trên bảng cho chắc.
-              </div>
-            )}
-            {/* Chip "Tài liệu bổn cung giở" đã BỎ.
-             *
-             * Lý do: nguồn hiện ra là top mảnh của tìm kiếm lai, không phải
-             * mảnh Vali thực sự dựa vào để viết câu trả lời. Nên nó hay
-             * hiện những mục chẳng liên quan gì tới câu hỏi — "1. Luồng
-             * chạy", "3. Tách WF-04" — làm người đọc hoang mang thay vì
-             * yên tâm. Một trích dẫn không đúng thì tệ hơn không trích dẫn.
-             *
-             * Máy chủ vẫn trả về trich_dan và Msg vẫn giữ trường đó, nên
-             * bật lại chỉ là chuyện thêm khối JSX — nhưng chỉ nên bật khi
-             * nào truy được ĐÚNG mảnh mà mô hình đã dùng. */}
-            {m.goiY && m.goiY.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 700 }}>
-                  Ngươi muốn hỏi tiếp gì nữa 🌸
+        {msgs.map((m) => {
+          const bang = m.bang;
+          const daMo = moRong.has(m.id);
+          const dongHien = bang ? (daMo ? bang.dong : bang.dong.slice(0, SO_DONG_GON)) : [];
+          return (
+            <div key={m.id} className="vmp-tl-msg" style={{ alignSelf: m.ai ? "stretch" : "flex-end",
+                                         maxWidth: m.ai ? "100%" : "88%" }}>
+              {m.hieuLa && (
+                <div className="vmp-tl-hieu" style={{ fontSize: 12, color: C.plumSoft, marginBottom: 4, fontWeight: 600 }}>
+                  Tôi hiểu là: <span style={{ color: C.plum }}>{m.hieuLa}</span>
                 </div>
-                {m.goiY.map((g) => (
-                  <button key={g} onClick={() => hoi(g)} className="vmp-lift"
-                    style={{ textAlign: "left", padding: "7px 10px", borderRadius: R.sm,
-                             border: `1px solid ${C.line}`, background: C.surface,
-                             cursor: "pointer", fontFamily: TEXT, fontSize: 12,
-                             color: C.plum, fontWeight: 600, lineHeight: 1.45 }}>
-                    {g}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+              <div style={{
+                padding: "10px 13px", borderRadius: R.md, fontSize: 14, lineHeight: 1.65,
+                whiteSpace: "pre-wrap", wordBreak: "break-word",
+                background: m.loi ? C.raspSoft : m.ai ? C.surface : "var(--grad)",
+                color: m.loi ? C.raspText : m.ai ? C.plum : "var(--lp-porcelain)",
+                border: m.ai && !m.loi ? `1px solid ${C.line}` : "none",
+                boxShadow: m.ai ? E.low : "none",
+              }}>
+                {m.loi && <AlertTriangle size={14} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 6 }} />}
+                {m.text}
 
-        {dangHoi && (
-          <div style={{ alignSelf: "flex-start", maxWidth: "88%",
-                        display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10,
-                          padding: "11px 14px", borderRadius: R.md,
-                          background: C.surface, border: `1px solid ${C.line}` }}>
-              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                {[0, 1, 2].map((i) => (
-                  <span key={i} style={{
-                    width: 6, height: 6, borderRadius: R.pill, background: C.pink,
-                    animation: `vmpNhipCho 1100ms ${MO.ease} ${i * 180}ms infinite`,
-                  }} />
+                {m.huongDan?.map((c) => (
+                  <div key={c.id} style={{ marginTop: 8 }}>
+                    <ol style={{ margin: "0 0 6px", paddingLeft: 20, fontSize: 13, lineHeight: 1.6 }}>
+                      {c.buoc.map((b) => <li key={b}>{b}</li>)}
+                    </ol>
+                    <div style={{ fontSize: 12, color: C.plumSoft }}><b>Ai làm được:</b> {c.vai}</div>
+                  </div>
                 ))}
-              </div>
-              <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600,
-                             lineHeight: 1.5, fontStyle: "italic" }}>
-                {loiCho}
-              </span>
-            </div>
 
-            {/* Chờ thì đọc lấy một mẩu — thơ về nghề, nguyên tắc GMP, hay
-                mẹo dùng hệ. Đằng nào cũng phải nhìn màn hình chừng đó giây. */}
-            {mauCho && (
-              <div style={{ padding: "10px 13px", borderRadius: R.md,
-                            background: C.surfaceSunk, border: `1px dashed ${C.line}`,
-                            animation: `vmpHienNhe 400ms ${MO.ease}` }}>
-                <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 800,
-                              letterSpacing: 0.4, marginBottom: 5, opacity: 0.75,
-                              display: "flex", alignItems: "center", gap: 5 }}>
-                  {/* Nhãn phân loại là NGỮ NGHĨA → icon Lucide. Riêng thơ giữ
-                      🌸 vì đó là chữ ký persona, không phải trạng thái. */}
-                  {mauCho.loai === "tho" ? <>🌸 CÔNG CHÚA NGÂM THƠ</>
-                    : mauCho.loai === "nguyen_tac"
-                      ? <><BookOpen size={12} /> NHÂN TIỆN, MỘT NGUYÊN TẮC GMP</>
-                      : <><Lightbulb size={12} /> MÁCH NHỎ</>}
-                </div>
-                <div style={{ fontSize: 12, color: C.plum, lineHeight: 1.7,
-                              whiteSpace: "pre-wrap",
-                              fontStyle: mauCho.loai === "tho" ? "italic" : "normal" }}>
-                  {mauCho.noi_dung}
-                </div>
-                {mauCho.nguon && (
-                  <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 6,
-                                fontWeight: 700, opacity: 0.8 }}>
-                    — {mauCho.nguon}
+                {bang && bang.dong.length > 0 && (
+                  <div className="vmp-tl-bang" style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {dongHien.map((d, i) => (
+                      <div key={`${d[bang.cot[0].key]}-${i}`} style={{ padding: "7px 9px", borderRadius: R.sm,
+                        background: C.surfaceSunk, border: `1px solid ${C.line}`, fontSize: 12, lineHeight: 1.5 }}>
+                        <div style={{ fontWeight: 700, color: C.plum }}>{d[bang.cot[0].key]}</div>
+                        {bang.cot.length > 1 && <div style={{ color: C.plum }}>{d[bang.cot[1].key]}</div>}
+                        {bang.cot.length > 2 && (
+                          <div style={{ color: C.plumSoft, marginTop: 2 }}>
+                            {bang.cot.slice(2).map((c) => `${c.nhan}: ${d[c.key]}`).join(" · ")}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {bang.dong.length > SO_DONG_GON && (
+                      <button type="button" onClick={() => setMoRong((cu) => {
+                        const moi = new Set(cu);
+                        if (moi.has(m.id)) moi.delete(m.id); else moi.add(m.id);
+                        return moi;
+                      })} style={{ alignSelf: "flex-start", border: "none", background: "transparent",
+                        color: C.pink, fontWeight: 700, fontSize: 12, cursor: "pointer", padding: "8px 2px", minHeight: 44 }}>
+                        {daMo ? "Thu gọn" : `Xem cả ${bang.dong.length} dòng`}
+                      </button>
+                    )}
+                    {bang.tongDong > bang.dong.length && (
+                      <div style={{ fontSize: 12, color: C.plumSoft }}>
+                        Còn {bang.tongDong - bang.dong.length} dòng nữa — xem đủ ở màn Cảnh báo hoặc Cập nhật tiến độ.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
+
+              {m.ghiChu && (
+                <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: R.sm, background: C.marigoldSoft,
+                              color: C.marigoldText, fontSize: 12, lineHeight: 1.55, fontWeight: 600 }}>
+                  <Info size={13} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 5 }} />{m.ghiChu}
+                </div>
+              )}
+
+              {m.ai && !m.loi && (m.nguon || m.nhatKyId != null) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, flexWrap: "wrap" }}>
+                  {m.nguon && <span style={{ fontSize: 12, color: C.plumSoft, flex: 1, minWidth: 0 }}>Nguồn: {m.nguon}</span>}
+                  {m.nhatKyId != null && (m.danhGia ? (
+                    <span style={{ fontSize: 12, color: C.plumSoft }}>Đã ghi nhận đánh giá</span>
+                  ) : (
+                    <>
+                      <button type="button" aria-label="Câu trả lời đúng ý" title="Đúng ý" onClick={() => guiDanhGia(m, 1)}
+                        style={{ border: "none", background: "transparent", cursor: "pointer", padding: 8, display: "flex" }}>
+                        <ThumbsUp size={14} color={C.plumSoft} aria-hidden="true" />
+                      </button>
+                      <button type="button" aria-label="Câu trả lời chưa đúng" title="Chưa đúng" onClick={() => guiDanhGia(m, -1)}
+                        style={{ border: "none", background: "transparent", cursor: "pointer", padding: 8, display: "flex" }}>
+                        <ThumbsDown size={14} color={C.plumSoft} aria-hidden="true" />
+                      </button>
+                    </>
+                  ))}
+                </div>
+              )}
+
+              {m.hoiLai && m.hoiLai.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                  {m.hoiLai.map((g) => nutGoiY(g, true))}
+                </div>
+              )}
+              {m.goiY && m.goiY.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  {m.goiY.map((g) => nutGoiY(g, true))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {dangHoi && (
+          <div role="status" style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 10,
+                        padding: "11px 14px", borderRadius: R.md, background: C.surface, border: `1px solid ${C.line}` }}>
+            <div style={{ display: "flex", gap: 4, flexShrink: 0 }} aria-hidden="true">
+              {[0, 1, 2].map((i) => (
+                <span key={i} style={{ width: 6, height: 6, borderRadius: R.pill, background: C.pink,
+                  animation: `vmpNhipCho 1100ms ${MO.ease} ${i * 180}ms infinite` }} />
+              ))}
+            </div>
+            <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600 }}>
+              {dangHoi === "hieu" ? "Đang đọc câu hỏi…" : "Đang tra dữ liệu…"}
+            </span>
           </div>
         )}
         <div ref={cuoiRef} />
       </div>
 
-      {/* Ô nhập */}
-      <div style={{ padding: "11px 12px", borderTop: `1px solid ${C.line}`,
-                    background: C.surface, flexShrink: 0 }}>
+      <div style={{ padding: "11px 12px", borderTop: `1px solid ${C.line}`, background: C.surface, flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <textarea ref={oNhapRef} value={q} rows={1} aria-label="Nội dung câu hỏi"
+          <textarea ref={oNhapRef} value={q} rows={1} aria-label="Nội dung câu hỏi" maxLength={500}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
-              // Enter gửi, Shift+Enter xuống dòng — quy ước quen thuộc
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); hoi(q); }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void hoi(q); }
             }}
-            placeholder="Ngươi muốn hỏi bổn cung điều gì…"
-            style={{ flex: 1, resize: "none", maxHeight: 110, padding: "10px 12px",
-                     borderRadius: R.md, border: `1px solid ${C.line}`,
-                     background: C.surfaceSunk, color: C.plum, fontFamily: TEXT,
+            placeholder="Hỏi về hạng mục, thiết bị, hạn, phiếu thay đổi…"
+            style={{ flex: 1, resize: "none", maxHeight: 110, padding: "10px 12px", borderRadius: R.md,
+                     border: `1px solid ${C.line}`, background: C.surfaceSunk, color: C.plum, fontFamily: TEXT,
                      fontSize: 14, lineHeight: 1.5, outline: "none" }} />
-          <button type="button" onClick={() => hoi(q)} disabled={!q.trim() || dangHoi}
+          <button type="button" onClick={() => void hoi(q)} disabled={!q.trim() || dangHoi !== null}
             aria-label="Gửi câu hỏi" title="Gửi"
-            style={{ width: 40, height: 40, flexShrink: 0, borderRadius: R.md,
-                     border: "none", cursor: q.trim() && !dangHoi ? "pointer" : "default",
+            style={{ width: 44, height: 44, flexShrink: 0, borderRadius: R.md, border: "none",
+                     cursor: q.trim() && !dangHoi ? "pointer" : "default",
                      background: q.trim() && !dangHoi ? "var(--grad)" : C.pinkSoft,
                      color: q.trim() && !dangHoi ? "var(--lp-porcelain)" : C.plumSoft,
                      display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Send size={16} />
+            <Send size={16} aria-hidden="true" />
           </button>
         </div>
-        {/* Một câu là đủ. Bản cũ nói cả chuyện ghi nhật ký ALCOA+ lẫn
-            chuyện đối chiếu lại trên bảng — dài, và người dùng đọc lướt
-            qua hết. Giữ đúng điều họ cần nhớ. */}
         <div style={{ fontSize: 12, color: C.plumSoft, marginTop: 7, lineHeight: 1.5 }}>
-          Bổn cung vẫn có thể nhầm. <span style={{ color: C.plumSoft, fontWeight: 700 }}>Shift + Enter để xuống dòng.</span>
+          Xem dòng "Tôi hiểu là" để chắc trợ lý hiểu đúng. Shift + Enter để xuống dòng.
         </div>
       </div>
     </div>

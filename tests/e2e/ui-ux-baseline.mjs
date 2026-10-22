@@ -90,7 +90,7 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector(".vmp-chat-panel"));
   const focusReturned = await page.evaluate(() =>
-    document.activeElement?.getAttribute("aria-label") === "Trò chuyện cùng công chúa Vali");
+    document.activeElement?.getAttribute("aria-label") === "Mở trợ lý VMP");
   if (!focusReturned) throw new Error("đóng ChatBox chưa trả focus về nút mở");
 
   if (process.env.VMP_E2E_SCREENSHOT) {

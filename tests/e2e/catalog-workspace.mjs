@@ -227,7 +227,7 @@ async function moXemTruocDeadlineV2(applyResult, moChat = false) {
 
   await trang.waitForSelector("[data-cw-sua]", { timeout: 10_000 });
   if (moChat) {
-    await trang.click('[aria-label="Trò chuyện cùng công chúa Vali"]');
+    await trang.click('[aria-label="Mở trợ lý VMP"]');
     await trang.waitForSelector(".vmp-chat-panel", { timeout: 10_000 });
     await trang.evaluate(() => {
       const edit = document.querySelector("[data-cw-sua]");

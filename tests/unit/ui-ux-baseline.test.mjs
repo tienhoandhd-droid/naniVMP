@@ -62,11 +62,11 @@ test("shared modal has dialog semantics, Escape handling and focus restoration",
 test("chat controls and panel expose accessible names and dialog behavior", () => {
   const chat = source("src/components/ai/ChatBox.tsx");
 
-  assert.match(chat, /aria-label="Trò chuyện cùng công chúa Vali"/);
+  assert.match(chat, /aria-label="Mở trợ lý VMP"/);
   assert.match(chat, /role="dialog"/);
   assert.match(chat, /aria-modal="false"/);
   assert.match(chat, /aria-labelledby="vmp-chat-title"/);
-  assert.match(chat, /aria-label="Đóng trò chuyện"/);
+  assert.match(chat, /aria-label="Đóng trợ lý"/);
   assert.match(chat, /aria-label="Nội dung câu hỏi"/);
   assert.match(chat, /aria-label="Gửi câu hỏi"/);
   assert.match(chat, /event\.key === "Escape"/);

@@ -1986,7 +1986,7 @@ body { transition: background var(--mo-slow) var(--ease); }
   border-radius: 8px;
 }
 
-/* Nhịp chấm khi công chúa Vali đang suy nghĩ — thở đều, không nhấp nháy
+/* Nhịp chấm khi trợ lý VMP đang tra — thở đều, không nhấp nháy
    chói mắt. Ba chấm lệch pha nhau tạo cảm giác đang tiến triển. */
 @keyframes vmpNhipCho {
   0%, 100% { opacity: .25; transform: translateY(0); }
