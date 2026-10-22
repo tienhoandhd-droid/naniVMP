@@ -49,11 +49,12 @@
 }
 :root[data-theme="dark"] .vmp-main-nen::before { opacity: 0.18; }
 :root[data-theme="dark"] .vmp-main-nen::after { opacity: 0.06; mix-blend-mode: screen; }
-/* G5 (21/10): tranh cô gái + sen chỉ hiện đủ ở màn Việc hôm nay. Màn có
-   bảng/biểu đồ hạ gần như ẩn (data-vmp-art="nhe", AuthenticatedApp.tsx) để
-   số liệu dễ đọc; màn đăng nhập có tranh riêng ở panel thương hiệu. */
-.vmp-main-nen[data-vmp-art="nhe"]::before,
-:root[data-theme="dark"] .vmp-main-nen[data-vmp-art="nhe"]::before { opacity: 0.015; }
+/* Tranh sen hiện ở MỌI màn (chủ dự án 22/10, thay G5 ngày 21/10 vốn ẩn ở
+   màn khác). Màn có bảng/biểu đồ (data-vmp-art="nhe", AuthenticatedApp.tsx)
+   nhạt hơn Việc hôm nay một chút; tranh vẫn mờ dần về vùng đọc và nằm sau
+   thẻ nền đặc nên không đè chữ/số liệu. */
+.vmp-main-nen[data-vmp-art="nhe"]::before { opacity: 0.12; }
+:root[data-theme="dark"] .vmp-main-nen[data-vmp-art="nhe"]::before { opacity: 0.13; }
 @media (max-width: 768px) {
   .vmp-main-nen::before { width: 420px; height: 300px; background-size: 640px auto; background-position: -150px 0; opacity: 0.20; }
 }
