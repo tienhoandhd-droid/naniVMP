@@ -115,6 +115,22 @@ const REVALIDATION_REVIEWED_RPC = new Map([
     classification: "guarded_explicit",
   }],
 ]);
+// 20261022100000: thẩm định do thay đổi — QA sửa, xưởng xem theo phạm vi
+// (kiểm trong tests/sql/tham-dinh-do-thay-doi.sql).
+const CHANGE_VALIDATION_REVIEWED_RPC = new Map([
+  ["rpc_change_list", { identity: "rpc_change_list()", classification: "guarded_explicit" }],
+  ["rpc_change_search_objects", { identity: "rpc_change_search_objects(text)", classification: "guarded_explicit" }],
+  ["rpc_change_save", {
+    identity: "rpc_change_save(uuid,integer,text[],text[],date,text,text)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_change_create_plan_item", {
+    identity: "rpc_change_create_plan_item(uuid,integer,text,text,integer)",
+    classification: "guarded_explicit",
+  }],
+  ["rpc_change_request_sync", { identity: "rpc_change_request_sync()", classification: "guarded_explicit" }],
+  ["rpc_change_plan_badges", { identity: "rpc_change_plan_badges()", classification: "guarded_explicit" }],
+]);
 // 20261016160000: danh sách QA phụ trách — chỉ Admin, kiểm quyền trong hàm.
 const QA_PHU_TRACH_REVIEWED_RPC = new Map([
   ["rpc_qa_phu_trach_danh_sach", {
@@ -407,6 +423,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...CLIENT_ERROR_REVIEWED_RPC.keys(),
     ...FIELD_PERFORMANCE_REVIEWED_RPC.keys(),
     ...REVALIDATION_REVIEWED_RPC.keys(),
+    ...CHANGE_VALIDATION_REVIEWED_RPC.keys(),
     ...CANONICAL_DASHBOARD_REVIEWED_RPC.keys(),
     ...QA_PHU_TRACH_REVIEWED_RPC.keys(),
     ...QUALIFICATION_REVIEWED_RPC.keys(),
@@ -424,6 +441,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
     ...CLIENT_ERROR_REVIEWED_RPC,
     ...FIELD_PERFORMANCE_REVIEWED_RPC,
     ...REVALIDATION_REVIEWED_RPC,
+    ...CHANGE_VALIDATION_REVIEWED_RPC,
     ...CANONICAL_DASHBOARD_REVIEWED_RPC,
     ...QA_PHU_TRACH_REVIEWED_RPC,
     ...QUALIFICATION_REVIEWED_RPC,
@@ -431,7 +449,7 @@ test("every source RPC call has exactly one reviewed migration classification", 
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 110, "reviewed source HEAD must expose 110 literal RPC targets");
+  assert.equal(sourceNames.length, 116, "reviewed source HEAD must expose 116 literal RPC targets");
   const nhatKyMigration = readFileSync("supabase/migrations/20261016170000_tham_dinh_nhat_ky.sql", "utf8");
   for (const [ten, chuKy] of [["cpc1_print_log", "uuid, integer, text, text"], ["cpc1_audit_trail", "text, date, date, integer"]]) {
     assert.match(nhatKyMigration, new RegExp(`function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = ''[\\s\\S]*?cpc1_private\\.viewer\\(\\)`, "i"), `${ten} must gate through viewer()`);

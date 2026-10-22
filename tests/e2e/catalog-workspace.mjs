@@ -4,8 +4,8 @@
  *  Chạy trên Supabase giả lập (gia-lap-supabase.mjs) — không request nào
  *  ra ngoài. Bộ này kiểm HỢP ĐỒNG workspace theo quyền:
  *
- *   1. Admin/Quản lý QA có tám mục: objects · coverage · products · alerts ·
- *      revalidation · import · pending · history. Không còn "Người thực hiện".
+ *   1. Admin/Quản lý QA có chín mục: objects · coverage · products · alerts ·
+ *      revalidation · changes · import · pending · history. Không còn "Người thực hiện".
  *   2. Quyền quyết định nút: đủ quyền thấy Thêm/Nhập Excel/Chờ áp dụng;
  *      nhân viên xưởng không thấy bất kỳ lối ghi nào và không mở Lịch sử.
  *   3. Bảng ngữ nghĩa thật: <caption>, header dính; mở dòng thấy chi tiết.
@@ -488,9 +488,9 @@ async function chuanBiApV1(trang) {
     .some((button) => button.textContent?.trim() === "Áp dụng" && !button.disabled), { timeout: 10_000 });
 }
 
-/* ---- 1. Đủ quyền: tám mục, nút ghi, bảng ngữ nghĩa ----------------- */
+/* ---- 1. Đủ quyền: chín mục, nút ghi, bảng ngữ nghĩa ----------------- */
 {
-  console.log("Đủ quyền — cấu trúc tám mục:");
+  console.log("Đủ quyền — cấu trúc chín mục:");
   const { trang, loiConsole, chanNgoai } = await moTrang(trinhDuyet);
 
   const kq = await trang.evaluate(() => {
@@ -516,8 +516,8 @@ async function chuanBiApV1(trang) {
     };
   });
 
-  kiem(kq.thuTu === "objects,coverage,products,alerts,revalidation,import,pending,history",
-    "tám mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
+  kiem(kq.thuTu === "objects,coverage,products,alerts,revalidation,changes,import,pending,history",
+    "chín mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
   kiem(kq.coThem, "đủ quyền thấy nút Thêm");
   kiem(kq.coNhapExcel, "đủ quyền thấy mục Nhập Excel");
   kiem(!kq.coNguoiThucHien, "không còn chữ 'Người thực hiện' trên màn");
@@ -566,6 +566,10 @@ async function chuanBiApV1(trang) {
 {
   console.log("\nNhân viên xưởng — không lối ghi:");
   const { trang } = await moTrang(trinhDuyet, { suaKho: quyenNhanVienXuong });
+  // Tab Thay đổi hiện sau khi revision quyền về; chờ để đọc nav đã ổn định.
+  await trang.waitForSelector('[data-cw-nav="changes"]', { timeout: 15_000 }).catch((loi) => {
+    console.error("[catalog-workspace] chưa thấy tab Thay đổi:", loi.message);
+  });
 
   const kq = await trang.evaluate(() => {
     const nav = document.querySelector('[aria-label="Bộ dữ liệu danh mục"]');
@@ -579,7 +583,8 @@ async function chuanBiApV1(trang) {
     };
   });
 
-  kiem(kq.muc === "objects",
+  // Tab Thay đổi mở cho mọi vai; RPC lọc phiếu theo phạm vi xưởng.
+  kiem(kq.muc === "objects,changes",
     "nhân viên xưởng chỉ thấy đối tượng Source theo quyền", kq.muc || "(không thấy nav)");
   kiem(!kq.coThem, "nhân viên xưởng không thấy nút Thêm");
   kiem(!kq.coSua, "nhân viên xưởng không thấy nút Sửa");

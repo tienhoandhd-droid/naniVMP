@@ -151,28 +151,34 @@ test("keyset cursor stack moves forward/back and reset never reuses a stale filt
   assert.deepEqual(initialCatalogSourceCursorStack(), first, "query/kind/filter change gets a fresh stack");
 });
 
-test("lower Source roles get objects only while managers receive only capability-backed regions", () => {
-  for (const businessRole of ["qa_staff", "workshop_manager", "workshop_staff", null]) {
+test("lower Source roles get objects + changes only while managers receive only capability-backed regions", () => {
+  for (const businessRole of ["qa_staff", "workshop_manager", "workshop_staff"]) {
     assert.deepEqual(catalogWorkspaceRegionIds({
       businessRole,
       canEdit: true,
       canGenerateTimeline: true,
       canManageWorkshopScope: true,
-    }), ["objects"]);
+    }), ["objects", "changes"]);
   }
+  assert.deepEqual(catalogWorkspaceRegionIds({
+    businessRole: null,
+    canEdit: true,
+    canGenerateTimeline: true,
+    canManageWorkshopScope: true,
+  }), ["objects"], "chưa có vai thì không mở tab Thay đổi");
 
   assert.deepEqual(catalogWorkspaceRegionIds({
     businessRole: "qa_manager",
     canEdit: true,
     canGenerateTimeline: true,
     canManageWorkshopScope: true,
-  }), ["objects", "coverage", "products", "alerts", "revalidation", "import", "pending", "history"]);
+  }), ["objects", "coverage", "products", "alerts", "revalidation", "changes", "import", "pending", "history"]);
   assert.deepEqual(catalogWorkspaceRegionIds({
     businessRole: "admin",
     canEdit: false,
     canGenerateTimeline: false,
     canManageWorkshopScope: false,
-  }), ["objects", "products", "alerts", "revalidation", "history"]);
+  }), ["objects", "products", "alerts", "revalidation", "changes", "history"]);
 });
 
 test("Source controls keep lower roles read-only and require edit capability for mutations", () => {

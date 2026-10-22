@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CATALOG_HELP_CONTENT, getCatalogHelp } from "../../src/features/catalogWorkspace/catalogHelpContent.ts";
 
-const expectedRegions = ["objects", "coverage", "products", "alerts", "revalidation", "import", "pending", "history"];
+const expectedRegions = ["objects", "coverage", "products", "alerts", "revalidation", "changes", "import", "pending", "history"];
 
 test("contextual guide covers every authorized catalog workspace region", () => {
   assert.deepEqual(Object.keys(CATALOG_HELP_CONTENT), expectedRegions);
@@ -52,6 +52,8 @@ test("help permissions match each region instead of generic catalog edit", async
   assert.equal(canChangeCatalogHelpRegion("objects", rights), false);
   assert.equal(canChangeCatalogHelpRegion("pending", rights), false);
   assert.equal(canChangeCatalogHelpRegion("revalidation", rights), true);
+  assert.equal(canChangeCatalogHelpRegion("changes", rights), false, "Thay đổi theo vai QA, không theo quyền danh mục");
+  assert.equal(canChangeCatalogHelpRegion("changes", { ...rights, manager: false, qaEditor: true }), true);
   assert.equal(canChangeCatalogHelpRegion("history", { ...rights, canEdit: true }), false);
   assert.equal(canChangeCatalogHelpRegion("pending", { ...rights, canEdit: true }), true);
   assert.equal(canChangeCatalogHelpRegion("pending", { ...rights, canEdit: true, canGenerateTimeline: false }), false);

@@ -159,6 +159,7 @@ jobs:
             node tests/e2e/today-personal-scope.mjs &&
             node tests/e2e/catalog-context-help.mjs &&
             node tests/e2e/copy-codes-button.mjs &&
+            node tests/e2e/change-validation.mjs &&
             node tests/e2e/reports-export-actions.mjs
           '
       # E4 (31/08): CI đỏ mà chỉ có log text thì chẩn đoán mù — giữ lại

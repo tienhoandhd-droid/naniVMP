@@ -21,6 +21,7 @@ const regions = [
   ["products", "Sản phẩm GMP"],
   ["alerts", "Người nhận cảnh báo"],
   ["revalidation", "Tái thẩm định"],
+  ["changes", "Thay đổi"],
   ["import", "Nhập Excel"],
   ["pending", "Chờ áp dụng"],
   ["history", "Lịch sử"],
@@ -71,7 +72,7 @@ try {
   await page.waitForSelector(".cw-bang--objects tbody tr", { timeout: 15_000 });
 
   assert.deepEqual(await page.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))),
-    regions.map(([id]) => id), "an authorized manager must receive help for all eight Source regions");
+    regions.map(([id]) => id), "an authorized manager must receive help for all nine Source regions");
 
   for (const [id, label] of regions) {
     await page.click(`[data-cw-nav="${id}"]`);
@@ -116,7 +117,9 @@ try {
     };
   });
   await reader.waitForSelector(".cw-bang--objects tbody tr", { timeout: 15_000 });
-  assert.deepEqual(await reader.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))), ["objects"],
+  // "changes" không phải dữ liệu quản trị: RPC lọc phiếu theo phạm vi, chỉ QA sửa.
+  await reader.waitForSelector('[data-cw-nav="changes"]', { timeout: 15_000 });
+  assert.deepEqual(await reader.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))), ["objects", "changes"],
     "object-only reader must not gain management regions");
   assert.equal(await reader.$("[data-cw-them], [data-cw-sua], [data-cw-export-count]"), null,
     "opening reader help must not grant any catalog mutation or export control");
@@ -124,7 +127,7 @@ try {
   await reader.close();
 
   assert.deepEqual(errors, [], "contextual help must not cause browser runtime errors");
-  console.log("PASS Source contextual help: eight manager regions, reader access, Escape focus return, and mobile containment");
+  console.log("PASS Source contextual help: nine manager regions, reader access, Escape focus return, and mobile containment");
 } finally {
   await browser.close();
 }

@@ -501,7 +501,10 @@ try {
   for (const [key, expectedCodes] of [["owner", ["SRC-E2E-A"]], ["support", ["SRC-E2E-A"]], ["areaWorkshop", ["SRC-E2E-A", "SRC-E2E-B"]], ["lineWorkshop", ["SRC-E2E-A"]], ["unrelated", []], ["unassignedWorkshop", []]]) {
     const page = await openPersona(PERSONAS[key], state);
     await page.waitForSelector(".cw-workspace", { timeout: 15_000 });
-    assert.deepEqual(await visibleNav(page), ["objects"], `${key} may see Source objects only, never management datasets`);
+    // "changes" không phải dữ liệu quản trị: RPC lọc phiếu theo phạm vi, chỉ QA sửa.
+    // Tab hiện sau khi revision quyền về — chờ cho ổn định rồi mới đọc.
+    await page.waitForSelector('[data-cw-nav="changes"]', { timeout: 15_000 });
+    assert.deepEqual(await visibleNav(page), ["objects", "changes"], `${key} may see Source objects only, never management datasets`);
     assert.equal(await page.$("[data-cw-them]"), null, `${key} must not receive a Source mutation control`);
     assert.equal(await page.$("[data-cw-export-count]"), null, `${key} must not receive Source export`);
     assert.match(await page.$eval("[data-cw-source-guide]", (node) => node.textContent ?? ""),
@@ -561,7 +564,8 @@ try {
   state.revoked = true; state.revision += 1;
   await revokedOwner.evaluate(() => window.dispatchEvent(new Event("focus")));
   await revokedOwner.waitForFunction(() => !document.body.innerText.includes("SRC-E2E-A"), { timeout: 15_000 });
-  assert.equal(await visibleNav(revokedOwner).then((items) => items.join(",")), "objects", "revocation closes protected Source UI to its safe object-only shell");
+  // Tab Thay đổi theo vai QA (không theo phân công Source) nên vẫn còn sau thu hồi.
+  assert.equal(await visibleNav(revokedOwner).then((items) => items.join(",")), "objects,changes", "revocation closes protected Source UI to its safe object-only shell");
   for (const old of state.held) answer(old.request, old.payload);
   await wait(300);
   assert.equal(await revokedOwner.evaluate(() => document.body.innerText.includes("SRC-E2E-A")), false,

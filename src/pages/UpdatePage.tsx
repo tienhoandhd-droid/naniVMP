@@ -26,6 +26,7 @@ import {
   type EditableProgressRight,
 } from "../features/progress/editableProgressRights.ts";
 import { resolveProgressDeepLink } from "../features/progress/progressDeepLink.ts";
+import { loadChangeBadges } from "../features/changeValidation/api.ts";
 import type { ProgressDeepLink } from "../features/today/todayModel.ts";
 // Đặt tên khác vì lucide-react cũng xuất một icon tên Activity dùng ở dưới.
 import type { Activity as PlanActivity } from "../types/domain.ts";
@@ -119,6 +120,14 @@ export default function UpdateView({ acts, readableActs = acts, canChonNguoiThuc
       const message = cause instanceof Error ? cause.message : "Không thể xác nhận quyền cập nhật tiến độ";
       setRightsState({ status: "error", rights: EMPTY_PROGRESS_RIGHTS, error: message });
     }
+  }, []);
+  /* Nhãn "Do CC-…": đợt thẩm định được gắn với phiếu thay đổi. Chỉ là phụ —
+     lỗi thì không có nhãn, màn Tiến độ vẫn chạy bình thường. */
+  const [changeBadges, setChangeBadges] = useState<Map<string, string[]>>(() => new Map());
+  useEffect(() => {
+    let active = true;
+    void loadChangeBadges().then((next) => { if (active) setChangeBadges(next); });
+    return () => { active = false; };
   }, []);
   useEffect(() => {
     const controller = createVisibleRefreshController({
@@ -490,6 +499,9 @@ export default function UpdateView({ acts, readableActs = acts, canChonNguoiThuc
                   <td className="pr-td pr-td--hang-muc">
                     <span className="pr-ma">{a.code}</span>
                     <span className={tenRieng ? "pr-ten" : "pr-td__trong"}>{tenRieng || "Chưa đặt tên riêng"}</span>
+                    {changeBadges.has(validationCode) && (
+                      <span className="pr-do-thay-doi">Do {changeBadges.get(validationCode)?.join(", ")}</span>
+                    )}
                     {isFrozen && <span className="pr-hang-muc__state"><StateBadge state={String(itemState)} small /></span>}
                   </td>
                   <td className="pr-td pr-td--phu">{a.vtype}</td>
@@ -590,6 +602,9 @@ export default function UpdateView({ acts, readableActs = acts, canChonNguoiThuc
                 <Tag color={C.lavText} bg={C.lavSoft}>{a.vtype}</Tag>
                 {sg && <Tag color={sg.color} bg={sg.bg}>{sg.label}</Tag>}
                 {isFrozen && <StateBadge state={String(itemState)} small />}
+                {changeBadges.has(validationCode) && (
+                  <span className="pr-do-thay-doi">Do {changeBadges.get(validationCode)?.join(", ")}</span>
+                )}
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", fontSize: 13, color: C.plumSoft, fontWeight: 600 }}>

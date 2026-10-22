@@ -1,6 +1,6 @@
 export type CatalogHelpRegion =
   | "objects" | "coverage" | "products" | "alerts"
-  | "revalidation" | "import" | "pending" | "history";
+  | "revalidation" | "changes" | "import" | "pending" | "history";
 
 export interface CatalogHelpGuide {
   title: string;
@@ -54,6 +54,14 @@ export const CATALOG_HELP_CONTENT: Record<CatalogHelpRegion, CatalogHelpGuide> =
     ],
     caution: "Rà ngày hoàn thành gốc và chu kỳ trước khi xác nhận.",
   },
+  changes: {
+    title: "Thay đổi", summary: "Phiếu thay đổi cần thẩm định, lấy từ sheet Tổng hợp thay đổi mỗi sáng.",
+    steps: [
+      "Sửa → gõ mã thiết bị → chọn đợt thẩm định hoặc Tạo đợt.",
+      "Làm mới: lấy ngay dữ liệu mới từ sheet (1–2 phút).",
+    ],
+    caution: "Nội dung phiếu sửa trên sheet; web chỉ gắn thiết bị, đợt, hạn và trạng thái.",
+  },
   import: {
     title: "Nhập Excel", summary: "Nhập theo mẫu của VMP, xem trước rồi mới ghi.",
     steps: [
@@ -86,8 +94,10 @@ export function getCatalogHelp(region: string): CatalogHelpGuide {
 /** Mirror the actual region action guards; help never grants these capabilities. */
 export function canChangeCatalogHelpRegion(region: string, rights: {
   manager: boolean; canEdit: boolean; canManageWorkshopScope: boolean; canGenerateTimeline: boolean;
+  qaEditor?: boolean;
 }): boolean {
   if (region === "history") return false;
+  if (region === "changes") return rights.qaEditor === true;
   if (region === "coverage") return rights.canManageWorkshopScope;
   if (region === "revalidation") return rights.manager;
   if (region === "pending") return rights.manager && rights.canEdit && rights.canGenerateTimeline;

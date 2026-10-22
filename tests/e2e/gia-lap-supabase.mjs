@@ -608,6 +608,15 @@ export function dungKhoDuLieu(kichBan) {
 
     /* --- RPC --- */
     rpc_my_ui_access: quyenDayDu(),
+    /* Tab Thay đổi (thẩm định do thay đổi): mặc định chưa có phiếu nào. */
+    rpc_change_list: {
+      ok: true, can_edit: true, can_create_plan: true, records: [],
+      sync: {
+        last_ok_at: null, last_status: null, last_trigger: null, last_requested_at: null,
+        last_finished_at: null, last_error: null, last_summary: null,
+      },
+    },
+    rpc_change_plan_badges: { ok: true, badges: [] },
     rpc_my_editable_progress_rights: {
       ok: true,
       rights: hangMuc.map((item) => ({

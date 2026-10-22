@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "../../styles/catalog-workspace.css"; // B5: CSS theo route
 import {
-  Bell, Boxes, CalendarClock, CalendarPlus, Check, Download, FileSpreadsheet, FlaskConical,
+  Bell, Boxes, CalendarClock, CalendarPlus, Check, Download, FileDiff, FileSpreadsheet, FlaskConical,
   History, Hourglass, Plus, RefreshCw, Search,
 } from "lucide-react";
 
@@ -35,6 +35,7 @@ import CatalogImpactPreview from "../../components/catalog/CatalogImpactPreview.
 import CatalogWarningsSummary, { type CatalogWarning } from "../../components/catalog/CatalogWarningsSummary.tsx";
 import WorkshopScopeCoveragePanel from "../sourceAccess/WorkshopScopeCoveragePanel.tsx";
 import RevalidationProposalTable from "../revalidation/RevalidationProposalTable.tsx";
+import ChangeValidationPanel from "../changeValidation/ChangeValidationPanel.tsx";
 import {
   SOURCE_KINDS, fetchSourceWarnings, generateTimeline,
   saveCatalogObject,
@@ -84,7 +85,7 @@ const NHAN_TRANG_THAI_CHO: Record<string, string> = {
 const DO_TRE_TIM_KIEM_MS = 250;
 
 /** Sáu mục của workspace — thứ tự này là hợp đồng, có bộ kiểm giữ. */
-type VungId = "objects" | "coverage" | "products" | "alerts" | "revalidation" | "import" | "pending" | "history";
+type VungId = "objects" | "coverage" | "products" | "alerts" | "revalidation" | "changes" | "import" | "pending" | "history";
 
 const CAC_VUNG: Array<{
   id: VungId; nhan: string; icon: typeof Boxes;
@@ -95,6 +96,7 @@ const CAC_VUNG: Array<{
   { id: "products", nhan: "Sản phẩm GMP", icon: FlaskConical },
   { id: "alerts", nhan: "Người nhận cảnh báo", icon: Bell },
   { id: "revalidation", nhan: "Tái thẩm định", icon: CalendarClock },
+  { id: "changes", nhan: "Thay đổi", icon: FileDiff },
   { id: "import", nhan: "Nhập Excel", icon: FileSpreadsheet, canSua: true },
   { id: "pending", nhan: "Chờ áp dụng", icon: Hourglass, canSua: true, canSinhTimeline: true },
   { id: "history", nhan: "Lịch sử", icon: History, canAudit: true },
@@ -632,7 +634,7 @@ export default function CatalogWorkspaceShell({
         <div className="cw-noi-dung">
           <div className="cw-context-heading">
             <span>{CAC_VUNG.find((item) => item.id === vung)?.nhan}</span>
-            <CatalogContextHelp key={`${vung}:${sourceAccessKey}`} region={vung} canChange={canChangeCatalogHelpRegion(vung, { manager: canManageSourceDatasets, canEdit, canManageWorkshopScope, canGenerateTimeline: canSinhTimeline })} />
+            <CatalogContextHelp key={`${vung}:${sourceAccessKey}`} region={vung} canChange={canChangeCatalogHelpRegion(vung, { manager: canManageSourceDatasets, canEdit, canManageWorkshopScope, canGenerateTimeline: canSinhTimeline, qaEditor: access.businessRole === "admin" || access.businessRole === "qa_manager" || access.businessRole === "qa_staff" })} />
           </div>
           {catalogSuggestions.error && canManageSourceDatasets && (
             <p role="alert" className="cw-loi">
@@ -874,6 +876,9 @@ export default function CatalogWorkspaceShell({
           {vung === "revalidation" && canManageSourceDatasets && (
             <RevalidationProposalTable canManage />
           )}
+
+          {/* ----- Thẩm định do thay đổi (phiếu CC lấy từ sheet nhóm QMS) ----- */}
+          {vung === "changes" && <ChangeValidationPanel />}
 
           {/* ----- Nhập Excel theo mẫu chính thức ----- */}
           {vung === "import" && sourceControls.canImport && (
